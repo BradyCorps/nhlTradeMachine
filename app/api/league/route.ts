@@ -1,37 +1,352 @@
-import { NextResponse } from 'next/server';
-import { TEAMS_DB, FINANCIALS_DB } from '@/app/lib/db';
+import { NextResponse } from "next/server";
+import { TEAMS_DB } from "@/app/lib/db";
+import fs from "fs";
+import path from "path";
 
 const CAP_CEILING = 104.0;
-const CAP_FLOOR = 75.0;
+const CAP_FLOOR   = 70.6;
+
+// ── Team metadata that needs human curation ──────────────────
+// Everything else (standing, capSpace, phase) comes from live APIs
+const TEAM_NEEDS: Record<string, { pos: string; minWar: number; label: string }[]> = {
+  EDM: [{ pos: "D", minWar: 2.0, label: "Top 4 RD" }],
+  CHI: [{ pos: "W", minWar: 2.5, label: "Elite Winger for Bedard" }],
+  VGK: [{ pos: "D", minWar: 2.0, label: "Top 4 D" }],
+  WPG: [{ pos: "W", minWar: 2.0, label: "Top 6 Winger" }, { pos: "D", minWar: 2.0, label: "Top 4 D" }],
+  SJS: [{ pos: "C", minWar: 2.0, label: "Top 6 C" }],
+};
+
+// CapWages team slug mapping
+const CW_SLUGS: Record<string, string> = {
+  ANA: "anaheim_ducks",     BOS: "boston_bruins",      BUF: "buffalo_sabres",
+  CGY: "calgary_flames",    CAR: "carolina_hurricanes", CHI: "chicago_blackhawks",
+  COL: "colorado_avalanche",CBJ: "columbus_blue_jackets",DAL: "dallas_stars",
+  DET: "detroit_red_wings", EDM: "edmonton_oilers",     FLA: "florida_panthers",
+  LAK: "los_angeles_kings", MIN: "minnesota_wild",      MTL: "montreal_canadiens",
+  NSH: "nashville_predators",NJD: "new_jersey_devils",  NYI: "new_york_islanders",
+  NYR: "new_york_rangers",  OTT: "ottawa_senators",     PHI: "philadelphia_flyers",
+  PIT: "pittsburgh_penguins",SEA: "seattle_kraken",     SJS: "san_jose_sharks",
+  STL: "st_louis_blues",    TBL: "tampa_bay_lightning", TOR: "toronto_maple_leafs",
+  UTA: "utah_mammoth",      VAN: "vancouver_canucks",   VGK: "vegas_golden_knights",
+  WSH: "washington_capitals",WPG: "winnipeg_jets",
+};
+
+const TEAMS_CACHE_PATH = path.join(process.cwd(), "app", "data", "teams.json");
+const TEAMS_CACHE_TTL  = 6 * 60 * 60 * 1000; // 6 hours
+
+// Derive team phase from standing (1=best, 32=worst) and points percentage
+// Tanking = deliberately non-competitive (< 38% point pct AND bottom 6)
+// Rebuilding = losing but not deliberately tanking (young core, future focus)
+// Retooling = middle of the pack, transitioning
+// Bubble = fringe playoff, competitive but not elite
+// Contender = genuine Cup contender
+const derivePhase = (standing: number, pointPct: number): string => {
+  if (standing <= 8  && pointPct >= 0.58) return "Contender";
+  if (standing <= 14 && pointPct >= 0.52) return "Bubble";
+  if (standing <= 8  && pointPct >= 0.52) return "Bubble";
+  if (standing <= 22)                      return "Retooling";
+  if (standing <= 32 && pointPct < 0.38)  return "Tanking";
+  return "Rebuilding";
+};
+
+// ── Phase overrides for teams whose standing misleads about their true window ──
+// Some teams have a bad year but retain the core of a contender.
+// These are manually curated based on roster quality, not just standings.
+const PHASE_OVERRIDES: Record<string, string> = {
+  WPG: "Retooling",    // Presidents Trophy 2023-24, Hellebuyck/Connor/Morrissey core intact
+  FLA: "Retooling",    // Back-to-back finals, core still together, off year
+  EDM: "Bubble",       // McDavid/Draisaitl never truly rebuild
+  TOR: "Retooling",    // Core still competitive, structural issues not a rebuild
+};
+
+async function loadTeams(): Promise<any[]> {
+  // ── Check cache ──────────────────────────────────────────────
+  try {
+    if (fs.existsSync(TEAMS_CACHE_PATH)) {
+      const stat = fs.statSync(TEAMS_CACHE_PATH);
+      if (Date.now() - stat.mtimeMs < TEAMS_CACHE_TTL) {
+        const cached = JSON.parse(fs.readFileSync(TEAMS_CACHE_PATH, "utf-8"));
+        if (cached.length >= 32) return cached;
+      }
+    }
+  } catch (_) {}
+
+  // ── Fetch standings from NHL stats API ───────────────────────
+  let standingsMap = new Map<string, { standing: number; pointPct: number; teamFullName: string }>();
+  try {
+    const res = await fetchWithTimeout(
+      "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId=20252026%20and%20gameTypeId=2",
+      8000
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const teams: any[] = data.data ?? [];
+
+      // NHL stats API teamId → tricode mapping for reliable lookup
+      // Utah Hockey Club (now Utah Mammoth) uses teamId 59
+      // Arizona Coyotes relocated to Utah for 2024-25 season
+      const NHL_ID_TO_TRICODE: Record<number, string> = {
+        1: "NJD", 2: "NYI", 3: "NYR", 4: "PHI", 5: "PIT",
+        6: "BOS", 7: "BUF", 8: "MTL", 9: "OTT", 10: "TOR",
+        12: "CAR", 13: "FLA", 14: "TBL", 15: "WSH", 16: "CHI",
+        17: "DET", 18: "NSH", 19: "STL", 20: "CGY", 21: "COL",
+        22: "EDM", 23: "VAN", 24: "ANA", 25: "DAL", 26: "LAK",
+        28: "SJS", 29: "CBJ", 30: "MIN", 52: "WPG", 54: "VGK",
+        55: "SEA", 68: "UTA",
+      };
+
+      // Sort by points then regulation+OT wins (NHL tiebreaker)
+      teams.sort((a, b) =>
+        b.points !== a.points
+          ? b.points - a.points
+          : (b.regulationAndOtWins ?? 0) - (a.regulationAndOtWins ?? 0)
+      );
+
+      // Assign sequential ranks using teamId lookup
+      teams.forEach((t, i) => {
+        const tricode = NHL_ID_TO_TRICODE[t.teamId];
+        if (tricode) {
+          standingsMap.set(tricode, {
+            standing:     i + 1,
+            pointPct:     t.pointPct ?? 0.5,
+            teamFullName: t.teamFullName,
+          });
+        }
+      });
+    }
+  } catch (_) {}
+
+  // ── Fetch cap space from CapWages (batch 8 at a time) ────────
+  const capMap = new Map<string, number>();
+  const teamIds = Object.keys(CW_SLUGS);
+
+  for (let i = 0; i < teamIds.length; i += 8) {
+    const batch = teamIds.slice(i, i + 8);
+    await Promise.allSettled(batch.map(async (id) => {
+      try {
+        const slug = CW_SLUGS[id];
+        const res  = await fetchWithTimeout(
+          `https://capwages.com/teams/${slug}`,
+          8000,
+          { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
+        );
+        if (!res.ok) return;
+        const html  = await res.text();
+        const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+        if (!match) return;
+        const nextData = JSON.parse(match[1]);
+        const summary  = nextData?.props?.pageProps?.teamSummary;
+        if (summary?.capSpace !== undefined) {
+          capMap.set(id, Math.round((summary.capSpace / 1_000_000) * 10) / 10);
+        }
+      } catch (_) {}
+    }));
+    if (i + 8 < teamIds.length) await new Promise(r => setTimeout(r, 300));
+  }
+
+  // ── Build team objects ────────────────────────────────────────
+  const teams = TEAMS_DB.map((t) => {
+    const st      = standingsMap.get(t.id);
+    const standing = st?.standing  ?? t.standing;
+    const pointPct = st?.pointPct  ?? 0.5;
+    const capSpace = capMap.get(t.id) ?? t.capSpace;
+    const phase = PHASE_OVERRIDES[t.id]
+      ?? (standingsMap.size >= 28 ? derivePhase(standing, pointPct) : t.phase);
+
+    return {
+      id:       t.id,
+      name:     st?.teamFullName ?? t.name,
+      capSpace: Math.round(capSpace * 10) / 10,
+      standing,
+      phase,
+      needs:    TEAM_NEEDS[t.id] ?? [],
+    };
+  });
+
+  // ── Cache result ──────────────────────────────────────────────
+  try {
+    const dir = path.dirname(TEAMS_CACHE_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(TEAMS_CACHE_PATH, JSON.stringify(teams, null, 2));
+  } catch (_) {}
+
+  return teams;
+}
+
+// ── CapWages contract scraper ─────────────────────────────────
+// CapWages embeds all player data in a __NEXT_DATA__ JSON blob.
+// Array indices (verified against known contracts):
+//   [0]  name "Last, First"
+//   [2]  teamId
+//   [3]  position
+//   [8]  age
+//   [15] yearsRemaining
+//   [18] capHit (raw number, divide by 10 to get $M — e.g. 85 = $8.5M)
+//   [24] expiryStatus ("UFA" | "RFA" | ...)
+//   [29] ageAtExpiry
+
+const CONTRACTS_PATH = path.join(process.cwd(), "app", "data", "contracts.json");
+const BUNDLED_PATH   = path.join(process.cwd(), "app", "data", "contracts.bundled.json");
+const CACHE_TTL      = 23 * 60 * 60 * 1000; // 23 hours
+
+// Convert "Last, First" → "First Last"
+const normaliseName = (raw: string): string => {
+  const parts = raw.split(",").map((s) => s.trim());
+  return parts.length === 2 ? `${parts[1]} ${parts[0]}` : raw;
+};
+
+async function scrapeCapWages(): Promise<Record<string, any>> {
+  try {
+    const res = await fetch("https://capwages.com/players/active", {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      signal: AbortSignal.timeout(15000),
+      cache: "no-store",
+    });
+
+    if (!res.ok) return {};
+
+    const html  = await res.text();
+    const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (!match) return {};
+
+    const nextData  = JSON.parse(match[1]);
+    const players   = nextData?.props?.pageProps?.playersArray;
+    if (!Array.isArray(players) || players.length < 100) return {};
+
+    const contracts: Record<string, any> = {};
+
+    for (const p of players) {
+      if (!Array.isArray(p) || p.length < 25) continue;
+
+      const rawName        = p[0] as string;
+      const yearsRemaining = p[15] as number;
+      const capRaw         = p[18] as number;
+      const expiryStatus   = p[24] as string;
+      const teamSlug       = (p[2] as string ?? "").toLowerCase().replace(/\s+/g, "_");
+      const position       = (p[3] as string ?? "").toUpperCase();
+
+      if (!rawName || !capRaw || capRaw <= 0) continue;
+
+      const name   = normaliseName(rawName);
+      const capHit = Math.round((capRaw / 10) * 1000) / 1000;
+
+      const contractData = {
+        capHit,
+        yearsRemaining: Math.max(0, yearsRemaining),
+        expiryStatus,
+        position,
+        teamSlug,
+      };
+
+      // Store by plain name (may be overwritten if duplicate)
+      contracts[name] = contractData;
+
+      // Also store by name+position and name+team for disambiguation
+      if (position) contracts[`${name}__${position}`] = contractData;
+      if (teamSlug) contracts[`${name}__${teamSlug}`] = contractData;
+    }
+
+    return contracts;
+  } catch (_) {
+    return {};
+  }
+}
+
+// Load contracts: live cache → CapWages scrape → bundled fallback
+async function loadContracts(): Promise<Record<string, any>> {
+  // 1. Check if live cache is fresh
+  try {
+    if (fs.existsSync(CONTRACTS_PATH)) {
+      const stat = fs.statSync(CONTRACTS_PATH);
+      if (Date.now() - stat.mtimeMs < CACHE_TTL) {
+        const data = JSON.parse(fs.readFileSync(CONTRACTS_PATH, "utf-8"));
+        if (Object.keys(data).length > 200) return data;
+      }
+    }
+  } catch (_) {}
+
+  // 2. Scrape CapWages (works server-side — returns 200)
+  const fresh = await scrapeCapWages();
+  if (Object.keys(fresh).length > 200) {
+    // Merge with bundled data so NMC/NTC flags are preserved
+    const bundled = loadBundled();
+
+    // Fresh CapWages data takes priority for cap/years,
+    // bundled data fills in NMC/NTC/canRetain flags
+    const merged: Record<string, any> = {};
+    for (const [name, cw] of Object.entries(fresh)) {
+      const b = bundled[name];
+      merged[name] = {
+        capHit:         cw.capHit,
+        yearsRemaining: cw.yearsRemaining,
+        hasNMC:         b?.hasNMC  ?? false,
+        hasNTC:         b?.hasNTC  ?? false,
+        canRetain:      b?.hasNMC  ? false : true,
+        expiryStatus:   cw.expiryStatus,
+      };
+    }
+
+    // Write to cache
+    try {
+      const dir = path.dirname(CONTRACTS_PATH);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(CONTRACTS_PATH, JSON.stringify(merged, null, 2));
+    } catch (_) {}
+
+    return merged;
+  }
+
+  // 3. Fall back to bundled JSON
+  return loadBundled();
+}
+
+function loadBundled(): Record<string, any> {
+  try {
+    if (fs.existsSync(BUNDLED_PATH)) {
+      return JSON.parse(fs.readFileSync(BUNDLED_PATH, "utf-8"));
+    }
+  } catch (_) {}
+  return {};
+}
 
 const slugify = (n: string) =>
-  n
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9 ]/g, '')
-    .trim()
-    .replace(/\s+/g, '-');
+  n.toLowerCase().normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9 ]/g, "")
+    .trim().replace(/\s+/g, "-");
 
 const buildFallbackMap = (map: Map<string, any>) => {
   const fb = new Map<string, any>();
   map.forEach((val, slug) => {
-    const last = slug.split('-').slice(-1)[0];
+    const last = slug.split("-").slice(-1)[0];
     fb.set(last, fb.has(last) ? null : val);
   });
   return fb;
 };
 
-const fetchWithTimeout = (url: string, ms = 7000): Promise<Response> => {
+const NHL_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Origin": "https://www.nhl.com",
+  "Referer": "https://www.nhl.com/",
+};
+
+const fetchWithTimeout = (url: string, ms = 8000, extraHeaders: Record<string,string> = {}): Promise<Response> => {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
-  return fetch(url, { signal: ctrl.signal, cache: 'no-store' }).finally(() =>
-    clearTimeout(t)
-  );
+  return fetch(url, {
+    signal: ctrl.signal,
+    cache: "no-store",
+    headers: { ...extraHeaders },
+  }).finally(() => clearTimeout(t));
 };
 
 const normalisePos = (code: string) =>
-  code === 'L' || code === 'R' ? 'W' : code;
+  code === "L" || code === "R" ? "W" : code;
 
 const calcAge = (birthDate: string): number => {
   const b = new Date(birthDate);
@@ -43,475 +358,719 @@ const calcAge = (birthDate: string): number => {
 };
 
 // ============================================================
-// STATIC ROSTER — guaranteed fallback when NHL API is blocked.
-// Format: [teamId, name, position, birthDate, nhlId]
-// Covers top 6-8 skaters per team — enough for a trade machine.
+// STATIC ROSTER — ~15 players per team, no duplicates
+// Format: [teamId, name, position, birthDate]
 // ============================================================
-const STATIC_ROSTER: [string, string, string, string, string][] = [
+const STATIC_ROSTER: [string, string, string, string][] = [
   // ANA
-  ['ANA', 'Mason McTavish', 'C', '2003-01-30', '8482702'],
-  ['ANA', 'Leo Carlsson', 'C', '2004-04-09', '8484997'],
-  ['ANA', 'Trevor Zegras', 'C', '2001-03-20', '8481533'],
-  ['ANA', 'Troy Terry', 'W', '1997-09-10', '8479371'],
-  ['ANA', 'Frank Vatrano', 'W', '1994-03-14', '8478366'],
-  ['ANA', 'Cam Fowler', 'D', '1991-12-05', '8475764'],
-  ['ANA', 'Radko Gudas', 'D', '1990-06-05', '8475462'],
-  ['ANA', 'Jackson LaCombe', 'D', '2001-06-12', '8482655'],
+  ["ANA","Mason McTavish","C","2003-01-30"],
+  ["ANA","Leo Carlsson","C","2004-04-09"],
+  ["ANA","Trevor Zegras","C","2001-03-20"],
+  ["ANA","Troy Terry","W","1997-09-10"],
+  ["ANA","Frank Vatrano","W","1994-03-14"],
+  ["ANA","Alex Killorn","W","1989-09-14"],
+  ["ANA","Brock McGinn","W","1994-02-02"],
+  ["ANA","Cam Fowler","D","1991-12-05"],
+  ["ANA","Jackson LaCombe","D","2001-06-12"],
+  ["ANA","Radko Gudas","D","1990-06-05"],
+  ["ANA","Urho Vaakanainen","D","1999-03-20"],
+  ["ANA","Pavel Mintyukov","D","2003-10-05"],
+  ["ANA","Brian Dumoulin","D","1991-09-06"],
   // BOS
-  ['BOS', 'David Pastrnak', 'W', '1996-05-25', '8778476'],
-  ['BOS', 'Brad Marchand', 'W', '1988-05-11', '8473419'],
-  ['BOS', 'Charlie Coyle', 'C', '1992-03-02', '8476469'],
-  ['BOS', 'Pavel Zacha', 'C', '1997-04-06', '8479325'],
-  ['BOS', 'Charlie McAvoy', 'D', '1997-12-21', '8479325'],
-  ['BOS', 'Matt Grzelcyk', 'D', '1994-01-05', '8478009'],
-  ['BOS', 'Hampus Lindholm', 'D', '1993-01-20', '8477506'],
+  ["BOS","David Pastrnak","W","1996-05-25"],
+  ["BOS","Brad Marchand","W","1988-05-11"],
+  ["BOS","Morgan Geekie","C","1998-07-20"],
+  ["BOS","Pavel Zacha","C","1997-04-06"],
+  ["BOS","Elias Lindholm","C","1994-12-02"],
+  ["BOS","Casey Mittelstadt","C","1998-11-22"],
+  ["BOS","Fraser Minten","C","2004-03-05"],
+  ["BOS","Charlie McAvoy","D","1997-12-21"],
+  ["BOS","Hampus Lindholm","D","1993-01-20"],
+  ["BOS","Mason Lohrei","D","2001-09-06"],
+  ["BOS","Nikita Zadorov","D","1995-04-16"],
+  ["BOS","Andrew Peeke","D","1997-03-17"],
   // BUF
-  ['BUF', 'Tage Thompson', 'C', '1997-10-30', '8480801'],
-  ['BUF', 'JJ Peterka', 'W', '2002-01-14', '8482716'],
-  ['BUF', 'Jason Zucker', 'W', '1992-01-16', '8475743'],
-  ['BUF', 'Dylan Cozens', 'C', '2001-02-09', '8482114'],
-  ['BUF', 'Rasmus Dahlin', 'D', '2000-04-13', '8480769'],
-  ['BUF', 'Owen Power', 'D', '2002-11-22', '8483516'],
-  ['BUF', 'Henri Jokiharju', 'D', '1999-06-17', '8481033'],
+  ["BUF","Tage Thompson","C","1997-10-30"],
+  ["BUF","Dylan Cozens","C","2001-02-09"],
+  ["BUF","JJ Peterka","W","2002-01-14"],
+  ["BUF","Jack Quinn","W","2001-09-19"],
+  ["BUF","Alex Tuch","W","1996-02-17"],
+  ["BUF","Zach Benson","W","2004-05-12"],
+  ["BUF","Jason Zucker","W","1992-01-16"],
+  ["BUF","Rasmus Dahlin","D","2000-04-13"],
+  ["BUF","Owen Power","D","2002-11-22"],
+  ["BUF","Bowen Byram","D","2001-06-13"],
+  ["BUF","Mattias Samuelsson","D","1999-03-17"],
+  ["BUF","Henri Jokiharju","D","1999-06-17"],
   // CGY
-  ['CGY', 'Nazem Kadri', 'C', '1990-10-06', '8475172'],
-  ['CGY', 'Jonathan Huberdeau', 'W', '1993-06-04', '8476456'],
-  ['CGY', 'Yegor Sharangovich', 'W', '1998-06-06', '8481617'],
-  ['CGY', 'Daniil Miromanov', 'D', '1999-06-17', '8482752'],
-  ['CGY', 'Rasmus Andersson', 'D', '1996-10-27', '8479369'],
-  ['CGY', 'MacKenzie Weegar', 'D', '1994-01-07', '8478007'],
+  ["CGY","Nazem Kadri","C","1990-10-06"],
+  ["CGY","Yegor Sharangovich","C","1998-06-06"],
+  ["CGY","Jonathan Huberdeau","W","1993-06-04"],
+  ["CGY","Blake Coleman","W","1991-11-28"],
+  ["CGY","Matt Coronato","W","2002-10-11"],
+  ["CGY","Joel Farabee","W","1999-08-25"],
+  ["CGY","MacKenzie Weegar","D","1994-01-07"],
+  ["CGY","Rasmus Andersson","D","1996-10-27"],
+  ["CGY","Kevin Bahl","D","2000-05-27"],
+  ["CGY","Zayne Parekh","D","2005-04-02"],
   // CAR
-  ['CAR', 'Sebastian Aho', 'C', '1997-07-26', '8478443'],
-  ['CAR', 'Andrei Svechnikov', 'W', '2000-03-26', '8480830'],
-  ['CAR', 'Martin Necas', 'C', '1999-01-15', '8480762'],
-  ['CAR', 'Seth Jarvis', 'W', '2002-02-01', '8483413'],
-  ['CAR', 'Brent Burns', 'D', '1985-03-09', '8470319'],
-  ['CAR', 'Jaccob Slavin', 'D', '1994-05-01', '8477507'],
-  ['CAR', 'Brady Skjei', 'D', '1994-03-26', '8476894'],
+  ["CAR","Sebastian Aho","C","1997-07-26"],
+  ["CAR","Seth Jarvis","C","2002-02-01"],
+  ["CAR","Jordan Staal","C","1988-09-10"],
+  ["CAR","Andrei Svechnikov","W","2000-03-26"],
+  ["CAR","Nikolaj Ehlers","W","1996-02-14"],
+  ["CAR","Taylor Hall","W","1991-11-14"],
+  ["CAR","Jaccob Slavin","D","1994-05-01"],
+  ["CAR","Shayne Gostisbehere","D","1993-04-20"],
+  ["CAR","Brady Skjei","D","1994-03-26"],
+  ["CAR","KAndre Miller","D","1999-01-21"],
+  ["CAR","Sean Walker","D","1994-11-05"],
   // CHI
-  ['CHI', 'Connor Bedard', 'C', '2005-07-17', '8484144'],
-  ['CHI', 'Nick Foligno', 'W', '1987-10-31', '8471769'],
-  ['CHI', 'Tyler Bertuzzi', 'W', '1995-02-24', '8478476'],
-  ['CHI', 'Seth Jones', 'D', '1994-10-03', '8476882'],
-  ['CHI', 'Alex Vlasic', 'D', '2002-07-10', '8482175'],
-  ['CHI', 'Kevin Korchinski', 'D', '2003-09-09', '8483604'],
-  ['CHI', 'Frank Nazar', 'C', '2003-06-10', '8484148'],
+  ["CHI","Connor Bedard","C","2005-07-17"],
+  ["CHI","Frank Nazar","C","2003-06-10"],
+  ["CHI","Ryan Greene","C","2003-04-16"],
+  ["CHI","Tyler Bertuzzi","W","1995-02-24"],
+  ["CHI","Ilya Mikheyev","W","1994-10-10"],
+  ["CHI","Nick Lardis","W","2004-08-05"],
+  ["CHI","Seth Jones","D","1994-10-03"],
+  ["CHI","Alex Vlasic","D","2002-07-10"],
+  ["CHI","Kevin Korchinski","D","2003-09-09"],
+  ["CHI","Artyom Levshunov","D","2005-02-08"],
+  ["CHI","Wyatt Kaiser","D","2002-03-01"],
   // COL
-  ['COL', 'Nathan MacKinnon', 'C', '1995-09-01', '8477492'],
-  ['COL', 'Mikko Rantanen', 'W', '1996-10-29', '8478444'],
-  ['COL', 'Valeri Nichushkin', 'W', '1995-03-04', '8477503'],
-  ['COL', 'Cale Makar', 'D', '1998-10-30', '8480069'],
-  ['COL', 'Devon Toews', 'D', '1994-02-27', '8479038'],
-  ['COL', 'Samuel Girard', 'D', '1998-05-12', '8480768'],
-  ['COL', 'Casey Mittelstadt', 'C', '1998-11-22', '8481532'],
+  ["COL","Nathan MacKinnon","C","1995-09-01"],
+  ["COL","Martin Necas","C","1999-01-15"],
+  ["COL","Nazem Kadri","C","1990-10-06"],
+  ["COL","Mikko Rantanen","W","1996-10-29"],
+  ["COL","Valeri Nichushkin","W","1995-03-04"],
+  ["COL","Artturi Lehkonen","W","1995-07-04"],
+  ["COL","Gabriel Landeskog","W","1992-11-23"],
+  ["COL","Cale Makar","D","1998-10-30"],
+  ["COL","Devon Toews","D","1994-02-27"],
+  ["COL","Josh Manson","D","1991-10-07"],
+  ["COL","Brent Burns","D","1985-03-09"],
   // CBJ
-  ['CBJ', 'Kirill Marchenko', 'W', '2000-08-08', '8482699'],
-  ['CBJ', 'Dmitri Voronkov', 'W', '1999-07-28', '8482718'],
-  ['CBJ', 'Sean Monahan', 'C', '1994-10-12', '8476988'],
-  ['CBJ', 'Ivan Provorov', 'D', '1997-01-13', '8479324'],
-  ['CBJ', 'Zach Werenski', 'D', '1996-07-19', '8479672'],
-  ['CBJ', 'David Jiricek', 'D', '2003-04-09', '8483484'],
-  ['CBJ', 'Adam Fantilli', 'C', '2004-01-13', '8484799'],
+  ["CBJ","Adam Fantilli","C","2004-01-13"],
+  ["CBJ","Sean Monahan","C","1994-10-12"],
+  ["CBJ","Kirill Marchenko","W","2000-08-08"],
+  ["CBJ","Dmitri Voronkov","W","1999-07-28"],
+  ["CBJ","Ivan Provorov","D","1997-01-13"],
+  ["CBJ","Zach Werenski","D","1996-07-19"],
+  ["CBJ","David Jiricek","D","2003-04-09"],
+  ["CBJ","Jake Bean","D","1998-06-09"],
   // DAL
-  ['DAL', 'Jason Robertson', 'W', '1999-07-22', '8481533'],
-  ['DAL', 'Roope Hintz', 'C', '1997-03-03', '8479346'],
-  ['DAL', 'Wyatt Johnston', 'C', '2003-05-14', '8483493'],
-  ['DAL', 'Tyler Seguin', 'C', '1992-01-31', '8475794'],
-  ['DAL', 'Miro Heiskanen', 'D', '1999-07-18', '8481600'],
-  ['DAL', 'Thomas Harley', 'D', '2002-08-19', '8482669'],
-  ['DAL', 'Matt Duchene', 'C', '1991-01-16', '8476460'],
+  ["DAL","Jason Robertson","W","1999-07-22"],
+  ["DAL","Roope Hintz","C","1997-03-03"],
+  ["DAL","Wyatt Johnston","C","2003-05-14"],
+  ["DAL","Tyler Seguin","C","1992-01-31"],
+  ["DAL","Matt Duchene","C","1991-01-16"],
+  ["DAL","Logan Stankoven","C","2002-11-16"],
+  ["DAL","Miro Heiskanen","D","1999-07-18"],
+  ["DAL","Thomas Harley","D","2002-08-19"],
+  ["DAL","Esa Lindell","D","1994-05-23"],
+  ["DAL","Brendan Smith","D","1988-02-08"],
   // DET
-  ['DET', 'Dylan Larkin', 'C', '1996-07-30', '8478009'],
-  ['DET', 'Lucas Raymond', 'W', '2002-03-28', '8482071'],
-  ['DET', 'Patrick Kane', 'W', '1988-11-19', '8474141'],
-  ['DET', 'Moritz Seider', 'D', '2001-04-06', '8482638'],
-  ['DET', 'Ben Chiarot', 'D', '1991-05-09', '8476397'],
-  ['DET', 'Simon Edvinsson', 'D', '2003-02-13', '8483469'],
-  ['DET', 'Alex DeBrincat', 'W', '1997-12-18', '8480768'],
+  ["DET","Dylan Larkin","C","1996-07-30"],
+  ["DET","Alex DeBrincat","W","1997-12-18"],
+  ["DET","Lucas Raymond","W","2002-03-28"],
+  ["DET","Patrick Kane","W","1988-11-19"],
+  ["DET","Andrew Copp","C","1994-07-08"],
+  ["DET","Robby Fabbri","C","1996-01-22"],
+  ["DET","Moritz Seider","D","2001-04-06"],
+  ["DET","Simon Edvinsson","D","2003-02-13"],
+  ["DET","Ben Chiarot","D","1991-05-09"],
+  ["DET","Jeff Petry","D","1987-12-09"],
   // EDM
-  ['EDM', 'Connor McDavid', 'C', '1997-01-13', '8478402'],
-  ['EDM', 'Leon Draisaitl', 'C', '1995-10-27', '8477934'],
-  ['EDM', 'Zach Hyman', 'W', '1992-06-09', '8475786'],
-  ['EDM', 'Ryan Nugent-Hopkins', 'C', '1992-04-12', '8476454'],
-  ['EDM', 'Evan Bouchard', 'D', '1999-10-20', '8480762'],
-  ['EDM', 'Darnell Nurse', 'D', '1995-02-04', '8477498'],
-  ['EDM', 'Brett Kulak', 'D', '1994-01-06', '8477346'],
+  ["EDM","Connor McDavid","C","1997-01-13"],
+  ["EDM","Leon Draisaitl","C","1995-10-27"],
+  ["EDM","Ryan Nugent-Hopkins","C","1992-04-12"],
+  ["EDM","Zach Hyman","W","1992-06-09"],
+  ["EDM","Vasily Podkolzin","W","2001-06-24"],
+  ["EDM","Kasperi Kapanen","W","1996-07-23"],
+  ["EDM","Matt Savoie","C","2003-07-17"],
+  ["EDM","Jack Roslovic","C","1996-01-29"],
+  ["EDM","Evan Bouchard","D","1999-10-20"],
+  ["EDM","Darnell Nurse","D","1995-02-04"],
+  ["EDM","Mattias Ekholm","D","1990-05-03"],
+  ["EDM","Brett Kulak","D","1994-01-06"],
+  ["EDM","Connor Murphy","D","1992-03-26"],
   // FLA
-  ['FLA', 'Aleksander Barkov', 'C', '1995-09-02', '8478444'],
-  ['FLA', 'Sam Reinhart', 'W', '1995-11-06', '8477956'],
-  ['FLA', 'Matthew Tkachuk', 'W', '1997-12-11', '8479314'],
-  ['FLA', 'Carter Verhaeghe', 'W', '1995-08-14', '8478244'],
-  ['FLA', 'Aaron Ekblad', 'D', '1996-02-07', '8478021'],
-  ['FLA', 'Gustav Forsling', 'D', '1996-06-12', '8478028'],
-  ['FLA', 'Niko Mikkola', 'D', '1996-04-26', '8480315'],
+  ["FLA","Aleksander Barkov","C","1995-09-02"],
+  ["FLA","Sam Reinhart","W","1995-11-06"],
+  ["FLA","Matthew Tkachuk","W","1997-12-11"],
+  ["FLA","Carter Verhaeghe","W","1995-08-14"],
+  ["FLA","Evan Rodrigues","C","1993-07-28"],
+  ["FLA","Eetu Luostarinen","C","1998-09-02"],
+  ["FLA","Aaron Ekblad","D","1996-02-07"],
+  ["FLA","Gustav Forsling","D","1996-06-12"],
+  ["FLA","Niko Mikkola","D","1996-04-26"],
+  ["FLA","Brandon Montour","D","1994-04-11"],
   // LAK
-  ['LAK', 'Anze Kopitar', 'C', '1987-08-24', '8470626'],
-  ['LAK', 'Kevin Fiala', 'W', '1996-07-22', '8478475'],
-  ['LAK', 'Adrian Kempe', 'W', '1996-09-20', '8478550'],
-  ['LAK', 'Quinton Byfield', 'C', '2002-08-13', '8482182'],
-  ['LAK', 'Drew Doughty', 'D', '1989-12-08', '8474563'],
-  ['LAK', 'Mikey Anderson', 'D', '1999-05-07', '8481537'],
-  ['LAK', 'Brandt Clarke', 'D', '2002-11-27', '8483491'],
+  ["LAK","Anze Kopitar","C","1987-08-24"],
+  ["LAK","Quinton Byfield","C","2002-08-13"],
+  ["LAK","Kevin Fiala","W","1996-07-22"],
+  ["LAK","Adrian Kempe","W","1996-09-20"],
+  ["LAK","Artemi Panarin","W","1991-10-30"],
+  ["LAK","Alex Laferriere","W","2001-12-08"],
+  ["LAK","Trevor Moore","W","1995-01-31"],
+  ["LAK","Drew Doughty","D","1989-12-08"],
+  ["LAK","Mikey Anderson","D","1999-05-07"],
+  ["LAK","Brandt Clarke","D","2002-11-27"],
+  ["LAK","Joel Edmundson","D","1993-09-28"],
   // MIN
-  ['MIN', 'Kirill Kaprizov', 'W', '1997-04-26', '8481596'],
-  ['MIN', 'Joel Eriksson Ek', 'C', '1997-07-29', '8478837'],
-  ['MIN', 'Matt Boldy', 'W', '2001-04-05', '8482102'],
-  ['MIN', 'Marco Rossi', 'C', '2002-06-23', '8482116'],
-  ['MIN', 'Jonas Brodin', 'D', '1993-07-12', '8476981'],
-  ['MIN', 'Jake Middleton', 'D', '1996-02-04', '8478880'],
-  ['MIN', 'Jared Spurgeon', 'D', '1989-11-29', '8473419'],
+  ["MIN","Kirill Kaprizov","W","1997-04-26"],
+  ["MIN","Matt Boldy","W","2001-04-05"],
+  ["MIN","Joel Eriksson Ek","C","1997-07-29"],
+  ["MIN","Marco Rossi","C","2002-06-23"],
+  ["MIN","Ryan Hartman","W","1994-09-20"],
+  ["MIN","Marcus Johansson","W","1990-10-06"],
+  ["MIN","Mats Zuccarello","W","1987-09-01"],
+  ["MIN","Quinn Hughes","D","2000-10-14"],
+  ["MIN","Jonas Brodin","D","1993-07-12"],
+  ["MIN","Brock Faber","D","2002-05-28"],
+  ["MIN","Jake Middleton","D","1996-02-04"],
+  ["MIN","Jared Spurgeon","D","1989-11-29"],
   // MTL
-  ['MTL', 'Nick Suzuki', 'C', '1999-08-10', '8481540'],
-  ['MTL', 'Cole Caufield', 'W', '2001-01-02', '8482468'],
-  ['MTL', 'Juraj Slafkovsky', 'W', '2004-03-30', '8484793'],
-  ['MTL', 'Kirby Dach', 'C', '2001-01-21', '8482116'],
-  ['MTL', 'Mike Matheson', 'D', '1994-02-27', '8477220'],
-  ['MTL', 'Kaiden Guhle', 'D', '2002-01-18', '8483438'],
-  ['MTL', 'Lane Hutson', 'D', '2003-02-12', '8484930'],
+  ["MTL","Nick Suzuki","C","1999-08-10"],
+  ["MTL","Cole Caufield","W","2001-01-02"],
+  ["MTL","Juraj Slafkovsky","W","2004-03-30"],
+  ["MTL","Ivan Demidov","W","2005-10-14"],
+  ["MTL","Kirby Dach","C","2001-01-21"],
+  ["MTL","Phillip Danault","C","1993-04-24"],
+  ["MTL","Alex Newhook","C","2001-01-28"],
+  ["MTL","Jake Evans","C","1996-06-02"],
+  ["MTL","Lane Hutson","D","2003-02-12"],
+  ["MTL","Mike Matheson","D","1994-02-27"],
+  ["MTL","Kaiden Guhle","D","2002-01-18"],
+  ["MTL","Noah Dobson","D","2000-01-07"],
+  ["MTL","Alexandre Carrier","D","1997-10-08"],
   // NSH
-  ['NSH', 'Filip Forsberg', 'W', '1994-08-13', '8477932'],
-  ['NSH', "Ryan O'Reilly", 'C', '1991-02-07', '8475158'],
-  ['NSH', 'Gustav Nyquist', 'W', '1990-09-01', '8476410'],
-  ['NSH', 'Roman Josi', 'D', '1990-06-01', '8474600'],
-  ['NSH', 'Alexandre Carrier', 'D', '1997-10-08', '8478527'],
-  ['NSH', 'Jeremy Lauzon', 'D', '1997-04-28', '8479324'],
+  ["NSH","Filip Forsberg","W","1994-08-13"],
+  ["NSH","Ryan O'Reilly","C","1991-02-07"],
+  ["NSH","Steven Stamkos","C","1990-02-07"],
+  ["NSH","Jonathan Marchessault","C","1990-12-27"],
+  ["NSH","Luke Evangelista","W","2001-12-25"],
+  ["NSH","Roman Josi","D","1990-06-01"],
+  ["NSH","Brady Skjei","D","1994-03-26"],
+  ["NSH","Alexandre Carrier","D","1997-10-08"],
+  ["NSH","Nick Perbix","D","1997-12-14"],
   // NJD
-  ['NJD', 'Jack Hughes', 'C', '2001-05-14', '8481559'],
-  ['NJD', 'Nico Hischier', 'C', '1999-01-04', '8480315'],
-  ['NJD', 'Jesper Bratt', 'W', '1998-07-30', '8480817'],
-  ['NJD', 'Timo Meier', 'W', '1996-10-08', '8478476'],
-  ['NJD', 'Dougie Hamilton', 'D', '1993-06-17', '8477474'],
-  ['NJD', 'Jonas Siegenthaler', 'D', '1997-05-06', '8479394'],
-  ['NJD', 'Luke Hughes', 'D', '2003-09-09', '8483484'],
+  ["NJD","Jack Hughes","C","2001-05-14"],
+  ["NJD","Nico Hischier","C","1999-01-04"],
+  ["NJD","Timo Meier","W","1996-10-08"],
+  ["NJD","Jesper Bratt","W","1998-07-30"],
+  ["NJD","Dawson Mercer","C","2002-10-27"],
+  ["NJD","Stefan Noesen","W","1993-02-26"],
+  ["NJD","Dougie Hamilton","D","1993-06-17"],
+  ["NJD","Jonas Siegenthaler","D","1997-05-06"],
+  ["NJD","Luke Hughes","D","2003-09-09"],
+  ["NJD","Brendan Smith","D","1988-02-08"],
   // NYI
-  ['NYI', 'Mathew Barzal', 'C', '1997-05-26', '8478470'],
-  ['NYI', 'Bo Horvat', 'C', '1995-04-05', '8477500'],
-  ['NYI', 'Anders Lee', 'W', '1990-07-03', '8474716'],
-  ['NYI', 'Brock Nelson', 'C', '1991-10-15', '8476434'],
-  ['NYI', 'Noah Dobson', 'D', '2000-01-07', '8481603'],
-  ['NYI', 'Ryan Pulock', 'D', '1994-10-18', '8478248'],
-  ['NYI', 'Adam Pelech', 'D', '1994-08-16', '8477474'],
+  ["NYI","Mathew Barzal","C","1997-05-26"],
+  ["NYI","Bo Horvat","C","1995-04-05"],
+  ["NYI","Jean-Gabriel Pageau","C","1992-11-11"],
+  ["NYI","Brock Nelson","C","1991-10-15"],
+  ["NYI","Simon Holmstrom","W","2001-10-15"],
+  ["NYI","Anders Lee","W","1990-07-03"],
+  ["NYI","Noah Dobson","D","2000-01-07"],
+  ["NYI","Ryan Pulock","D","1994-10-18"],
+  ["NYI","Adam Pelech","D","1994-08-16"],
+  ["NYI","Alexander Romanov","D","2000-02-06"],
+  ["NYI","Matthew Schaefer","D","2007-02-13"],
   // NYR
-  ['NYR', 'Artemi Panarin', 'W', '1991-10-30', '8478550'],
-  ['NYR', 'Mika Zibanejad', 'C', '1993-04-18', '8476459'],
-  ['NYR', 'Chris Kreider', 'W', '1991-04-30', '8476775'],
-  ['NYR', 'Vincent Trocheck', 'C', '1993-07-11', '8476893'],
-  ['NYR', 'Adam Fox', 'D', '1998-02-17', '8481554'],
-  ['NYR', 'Ryan Lindgren', 'D', '1998-02-11', '8481534'],
-  ['NYR', 'Alexis Lafreniere', 'W', '2001-10-11', '8482055'],
+  ["NYR","Mika Zibanejad","C","1993-04-18"],
+  ["NYR","Vincent Trocheck","C","1993-07-11"],
+  ["NYR","Artemi Panarin","W","1991-10-30"],
+  ["NYR","Alexis Lafreniere","W","2001-10-11"],
+  ["NYR","Chris Kreider","W","1991-04-30"],
+  ["NYR","Will Cuylle","W","2002-02-05"],
+  ["NYR","Gabe Perreault","W","2004-08-02"],
+  ["NYR","JT Miller","C","1993-03-14"],
+  ["NYR","Adam Fox","D","1998-02-17"],
+  ["NYR","Braden Schneider","D","2001-09-20"],
+  ["NYR","Vladislav Gavrikov","D","1995-11-15"],
+  ["NYR","K'Andre Miller","D","1999-01-21"],
   // OTT
-  ['OTT', 'Tim Stutzle', 'C', '2002-01-15', '8482116'],
-  ['OTT', 'Brady Tkachuk', 'W', '1999-09-16', '8481543'],
-  ['OTT', 'Drake Batherson', 'W', '1998-04-27', '8480762'],
-  ['OTT', 'Claude Giroux', 'W', '1988-01-12', '8474150'],
-  ['OTT', 'Jake Sanderson', 'D', '2002-07-08', '8483438'],
-  ['OTT', 'Thomas Chabot', 'D', '1997-01-30', '8479420'],
-  ['OTT', 'Artem Zub', 'D', '1995-10-03', '8480369'],
+  ["OTT","Tim Stutzle","C","2002-01-15"],
+  ["OTT","Brady Tkachuk","W","1999-09-16"],
+  ["OTT","Drake Batherson","W","1998-04-27"],
+  ["OTT","Dylan Cozens","C","2001-02-09"],
+  ["OTT","Claude Giroux","W","1988-01-12"],
+  ["OTT","Shane Pinto","C","2000-11-07"],
+  ["OTT","Ridly Greig","C","2002-08-08"],
+  ["OTT","Jake Sanderson","D","2002-07-08"],
+  ["OTT","Thomas Chabot","D","1997-01-30"],
+  ["OTT","Artem Zub","D","1995-10-03"],
+  ["OTT","Jordan Spence","D","2000-09-28"],
   // PHI
-  ['PHI', 'Sean Couturier', 'C', '1992-12-07', '8476892'],
-  ['PHI', 'Travis Konecny', 'W', '1997-03-11', '8479325'],
-  ['PHI', 'Owen Tippett', 'W', '1999-02-16', '8481028'],
-  ['PHI', 'Matvei Michkov', 'W', '2004-11-06', '8485694'],
-  ['PHI', 'Travis Sanheim', 'D', '1996-03-29', '8478876'],
-  ['PHI', 'Sean Walker', 'D', '1994-11-05', '8479041'],
-  ['PHI', 'Cam York', 'D', '2001-01-05', '8481601'],
+  ["PHI","Sean Couturier","C","1992-12-07"],
+  ["PHI","Travis Konecny","W","1997-03-11"],
+  ["PHI","Matvei Michkov","W","2004-11-06"],
+  ["PHI","Owen Tippett","W","1999-02-16"],
+  ["PHI","Joel Farabee","W","1999-08-25"],
+  ["PHI","Morgan Frost","C","1999-05-14"],
+  ["PHI","Travis Sanheim","D","1996-03-29"],
+  ["PHI","Cam York","D","2001-01-05"],
+  ["PHI","Ivan Provorov","D","1997-01-13"],
+  ["PHI","Sean Walker","D","1994-11-05"],
   // PIT
-  ['PIT', 'Sidney Crosby', 'C', '1987-08-07', '8471675'],
-  ['PIT', 'Evgeni Malkin', 'C', '1986-07-31', '8471218'],
-  ['PIT', 'Rickard Rakell', 'W', '1993-05-05', '8476461'],
-  ['PIT', 'Bryan Rust', 'W', '1991-05-11', '8476792'],
-  ['PIT', 'Kris Letang', 'D', '1987-04-24', '8471724'],
-  ['PIT', 'Marcus Pettersson', 'D', '1996-05-08', '8478554'],
-  ['PIT', 'Erik Karlsson', 'D', '1990-05-31', '8474578'],
+  ["PIT","Sidney Crosby","C","1987-08-07"],
+  ["PIT","Evgeni Malkin","C","1986-07-31"],
+  ["PIT","Rickard Rakell","W","1993-05-05"],
+  ["PIT","Bryan Rust","W","1991-05-11"],
+  ["PIT","Reilly Smith","W","1991-04-01"],
+  ["PIT","Kris Letang","D","1987-04-24"],
+  ["PIT","Erik Karlsson","D","1990-05-31"],
+  ["PIT","Marcus Pettersson","D","1996-05-08"],
+  ["PIT","Matt Grzelcyk","D","1994-01-05"],
   // SEA
-  ['SEA', 'Matty Beniers', 'C', '2002-11-05', '8483411'],
-  ['SEA', 'Jordan Eberle', 'W', '1990-05-15', '8474455'],
-  ['SEA', 'Jared McCann', 'C', '1996-05-31', '8478391'],
-  ['SEA', 'Yanni Gourde', 'C', '1991-12-15', '8478571'],
-  ['SEA', 'Vince Dunn', 'D', '1996-10-29', '8479369'],
-  ['SEA', 'Adam Larsson', 'D', '1992-11-12', '8477494'],
-  ['SEA', 'Will Borgen', 'D', '1996-12-19', '8479671'],
+  ["SEA","Matty Beniers","C","2002-11-05"],
+  ["SEA","Jared McCann","C","1996-05-31"],
+  ["SEA","Jordan Eberle","W","1990-05-15"],
+  ["SEA","Chandler Stephenson","C","1993-08-09"],
+  ["SEA","Eeli Tolvanen","W","1998-04-02"],
+  ["SEA","Kaapo Kakko","W","2001-02-15"],
+  ["SEA","Shane Wright","C","2003-01-05"],
+  ["SEA","Vince Dunn","D","1996-10-29"],
+  ["SEA","Adam Larsson","D","1992-11-12"],
+  ["SEA","Brandon Montour","D","1994-04-11"],
+  ["SEA","Ryker Evans","D","2001-11-06"],
   // SJS
-  ['SJS', 'Macklin Celebrini', 'C', '2006-01-05', '8487533'],
-  ['SJS', 'Fabian Zetterlund', 'W', '1999-08-26', '8481600'],
-  ['SJS', 'William Eklund', 'W', '2003-10-12', '8483492'],
-  ['SJS', 'Mikael Granlund', 'C', '1992-02-26', '8476469'],
-  ['SJS', 'Jake Walman', 'D', '1996-02-10', '8478775'],
-  ['SJS', 'Marc-Edouard Vlasic', 'D', '1987-03-30', '8471242'],
-  ['SJS', 'Cody Ceci', 'D', '1993-12-21', '8477498'],
+  ["SJS","Macklin Celebrini","C","2006-01-05"],
+  ["SJS","Will Smith","C","2004-02-21"],
+  ["SJS","William Eklund","W","2003-10-12"],
+  ["SJS","Tyler Toffoli","W","1992-04-24"],
+  ["SJS","Fabian Zetterlund","W","1999-08-26"],
+  ["SJS","Alexander Wennberg","C","1994-09-22"],
+  ["SJS","Collin Graf","W","2002-07-07"],
+  ["SJS","Mario Ferraro","D","1998-09-17"],
+  ["SJS","Dmitry Orlov","D","1991-07-23"],
+  ["SJS","Jake Walman","D","1996-02-10"],
+  ["SJS","Sam Dickinson","D","2005-11-15"],
   // STL
-  ['STL', 'Robert Thomas', 'C', '1999-07-02', '8481543'],
-  ['STL', 'Pavel Buchnevich', 'W', '1995-04-17', '8479410'],
-  ['STL', 'Jordan Kyrou', 'W', '1998-05-05', '8481034'],
-  ['STL', 'Brayden Schenn', 'C', '1991-08-22', '8476460'],
-  ['STL', 'Torey Krug', 'D', '1991-04-12', '8476345'],
-  ['STL', 'Colton Parayko', 'D', '1993-05-12', '8477987'],
-  ['STL', 'Justin Faulk', 'D', '1992-03-20', '8476368'],
+  ["STL","Robert Thomas","C","1999-07-02"],
+  ["STL","Jordan Kyrou","W","1998-05-05"],
+  ["STL","Pavel Buchnevich","W","1995-04-17"],
+  ["STL","Dylan Holloway","W","2002-01-23"],
+  ["STL","Jake Neighbours","W","2002-03-30"],
+  ["STL","Jimmy Snuggerud","W","2004-06-25"],
+  ["STL","Colton Parayko","D","1993-05-12"],
+  ["STL","Philip Broberg","D","2001-07-11"],
+  ["STL","Cam Fowler","D","1991-12-05"],
+  ["STL","Logan Mailloux","D","2002-09-22"],
   // TBL
-  ['TBL', 'Nikita Kucherov', 'W', '1993-06-17', '8476453'],
-  ['TBL', 'Brayden Point', 'C', '1996-03-13', '8479314'],
-  ['TBL', 'Brandon Hagel', 'W', '1998-08-27', '8480796'],
-  ['TBL', 'Steven Stamkos', 'C', '1990-02-07', '8474600'],
-  ['TBL', 'Victor Hedman', 'D', '1990-12-18', '8475167'],
-  ['TBL', 'Mikhail Sergachev', 'D', '1998-06-25', '8479420'],
-  ['TBL', 'Erik Cernak', 'D', '1997-05-28', '8479325'],
+  ["TBL","Nikita Kucherov","W","1993-06-17"],
+  ["TBL","Brayden Point","C","1996-03-13"],
+  ["TBL","Brandon Hagel","W","1998-08-27"],
+  ["TBL","Jake Guentzel","C","1994-10-06"],
+  ["TBL","Anthony Cirelli","C","1997-07-15"],
+  ["TBL","Steven Stamkos","C","1990-02-07"],
+  ["TBL","Yanni Gourde","C","1991-12-15"],
+  ["TBL","Victor Hedman","D","1990-12-18"],
+  ["TBL","Mikhail Sergachev","D","1998-06-25"],
+  ["TBL","Erik Cernak","D","1997-05-28"],
+  ["TBL","Darren Raddysh","D","1995-08-10"],
   // TOR
-  ['TOR', 'Auston Matthews', 'C', '1997-09-17', '8479318'],
-  ['TOR', 'Mitch Marner', 'W', '1997-05-05', '8478483'],
-  ['TOR', 'William Nylander', 'W', '1996-05-01', '8477939'],
-  ['TOR', 'John Tavares', 'C', '1990-09-20', '8475091'],
-  ['TOR', 'Morgan Rielly', 'D', '1994-03-09', '8477492'],
-  ['TOR', 'Jake McCabe', 'D', '1993-10-12', '8477459'],
-  ['TOR', 'Timothy Liljegren', 'D', '1999-04-30', '8480801'],
+  ["TOR","Auston Matthews","C","1997-09-17"],
+  ["TOR","Mitch Marner","W","1997-05-05"],
+  ["TOR","William Nylander","W","1996-05-01"],
+  ["TOR","John Tavares","C","1990-09-20"],
+  ["TOR","Matthew Knies","W","2003-03-25"],
+  ["TOR","Max Domi","C","1995-03-02"],
+  ["TOR","Nicholas Robertson","W","2001-09-11"],
+  ["TOR","Morgan Rielly","D","1994-03-09"],
+  ["TOR","Jake McCabe","D","1993-10-12"],
+  ["TOR","Chris Tanev","D","1989-12-20"],
+  ["TOR","Timothy Liljegren","D","1999-04-30"],
   // UTA
-  ['UTA', 'Clayton Keller', 'C', '1998-07-29', '8479543'],
-  ['UTA', 'Nick Schmaltz', 'C', '1996-02-15', '8478476'],
-  ['UTA', 'Lawson Crouse', 'W', '1997-06-23', '8479543'],
-  ['UTA', 'Mikhail Sergachev', 'D', '1998-06-25', '8479420'],
-  ['UTA', 'Juuso Valimaki', 'D', '1998-10-06', '8481034'],
-  ['UTA', 'Vladislav Kolyachonok', 'D', '2001-04-18', '8482655'],
-  ['UTA', 'Logan Cooley', 'C', '2003-05-04', '8483549'],
+  ["UTA","Clayton Keller","C","1998-07-29"],
+  ["UTA","Nick Schmaltz","C","1996-02-15"],
+  ["UTA","Logan Cooley","C","2003-05-04"],
+  ["UTA","Lawson Crouse","W","1997-06-23"],
+  ["UTA","Dylan Guenther","W","2003-06-24"],
+  ["UTA","Mikhail Sergachev","D","1998-06-25"],
+  ["UTA","Juuso Valimaki","D","1998-10-06"],
+  ["UTA","Sean Durzi","D","1998-10-03"],
+  ["UTA","Ian Cole","D","1989-02-21"],
   // VAN
-  ['VAN', 'Elias Pettersson', 'C', '1998-11-12', '8480012'],
-  ['VAN', 'J.T. Miller', 'C', '1993-03-14', '8476468'],
-  ['VAN', 'Brock Boeser', 'W', '1997-02-25', '8479435'],
-  ['VAN', 'Conor Garland', 'W', '1996-03-11', '8480369'],
-  ['VAN', 'Quinn Hughes', 'D', '2000-10-14', '8481533'],
-  ['VAN', 'Filip Hronek', 'D', '1997-11-02', '8479434'],
-  ['VAN', 'Carson Soucy', 'D', '1994-07-27', '8479038'],
+  ["VAN","Elias Pettersson","C","1998-11-12"],
+  ["VAN","JT Miller","C","1993-03-14"],
+  ["VAN","Brock Boeser","W","1997-02-25"],
+  ["VAN","Jake DeBrusk","W","1999-10-17"],
+  ["VAN","Conor Garland","W","1996-03-11"],
+  ["VAN","Nils Hoglander","W","2000-10-20"],
+  ["VAN","Quinn Hughes","D","2000-10-14"],
+  ["VAN","Filip Hronek","D","1997-11-02"],
+  ["VAN","Marcus Pettersson","D","1996-05-08"],
+  ["VAN","Nikita Zadorov","D","1995-04-16"],
+  ["VAN","Tom Willander","D","2004-06-05"],
   // VGK
-  ['VGK', 'Jack Eichel', 'C', '1996-10-28', '8478403'],
-  ['VGK', 'Mitch Marner', 'W', '1997-05-05', '8478483'],
-  ['VGK', 'Mark Stone', 'W', '1992-05-13', '8477494'],
-  ['VGK', 'William Karlsson', 'C', '1993-01-08', '8477973'],
-  ['VGK', 'Shea Theodore', 'D', '1995-08-03', '8478476'],
-  ['VGK', 'Alex Pietrangelo', 'D', '1990-01-18', '8475763'],
-  ['VGK', 'Zach Whitecloud', 'D', '1996-11-26', '8479325'],
+  ["VGK","Jack Eichel","C","1996-10-28"],
+  ["VGK","Mitch Marner","W","1997-05-05"],
+  ["VGK","Mark Stone","W","1992-05-13"],
+  ["VGK","Ivan Barbashev","W","1995-12-08"],
+  ["VGK","William Karlsson","C","1993-01-08"],
+  ["VGK","Pavel Dorofeyev","W","2000-11-21"],
+  ["VGK","Tomas Hertl","C","1993-11-12"],
+  ["VGK","Shea Theodore","D","1995-08-03"],
+  ["VGK","Rasmus Andersson","D","1996-10-27"],
+  ["VGK","Noah Hanifin","D","1997-01-25"],
+  ["VGK","Brayden McNabb","D","1991-01-21"],
   // WSH
-  ['WSH', 'Alexander Ovechkin', 'W', '1985-09-17', '8471214'],
-  ['WSH', 'Nicklas Backstrom', 'C', '1987-11-23', '8473563'],
-  ['WSH', 'Dylan Strome', 'C', '1997-03-07', '8479420'],
-  ['WSH', 'Tom Wilson', 'W', '1994-03-26', '8477493'],
-  ['WSH', 'John Carlson', 'D', '1990-01-10', '8474578'],
-  ['WSH', 'Trevor van Riemsdyk', 'D', '1991-07-24', '8477220'],
-  ['WSH', 'Matt Roy', 'D', '1995-04-05', '8479038'],
+  ["WSH","Alexander Ovechkin","W","1985-09-17"],
+  ["WSH","Dylan Strome","C","1997-03-07"],
+  ["WSH","Tom Wilson","W","1994-03-26"],
+  ["WSH","Lars Eller","C","1989-05-08"],
+  ["WSH","Aliaksei Protas","C","2001-01-06"],
+  ["WSH","Pierre-Luc Dubois","C","1998-06-24"],
+  ["WSH","John Carlson","D","1990-01-10"],
+  ["WSH","Matt Roy","D","1995-04-05"],
+  ["WSH","Trevor van Riemsdyk","D","1991-07-24"],
+  ["WSH","Jakob Chychrun","D","1998-03-31"],
   // WPG
-  ['WPG', 'Mark Scheifele', 'C', '1993-03-15', '8476460'],
-  ['WPG', 'Kyle Connor', 'W', '1996-12-09', '8478398'],
-  ['WPG', 'Nikolaj Ehlers', 'W', '1996-02-14', '8478476'],
-  ['WPG', 'Gabriel Vilardi', 'C', '2000-08-16', '8480762'],
-  ['WPG', 'Josh Morrissey', 'D', '1995-03-28', '8477504'],
-  ['WPG', 'Dylan DeMelo', 'D', '1993-05-01', '8478009'],
-  ['WPG', 'Brenden Dillon', 'D', '1990-11-13', '8476345'],
-  ['WPG', 'Adam Lowry', 'C', '1992-03-29', '8476374'],
+  ["WPG","Mark Scheifele","C","1993-03-15"],
+  ["WPG","Kyle Connor","W","1996-12-09"],
+  ["WPG","Gabriel Vilardi","C","2000-08-16"],
+  ["WPG","Nino Niederreiter","W","1992-09-08"],
+  ["WPG","Adam Lowry","C","1992-03-29"],
+  ["WPG","Cole Perfetti","C","2002-01-01"],
+  ["WPG","Josh Morrissey","D","1995-03-28"],
+  ["WPG","Dylan DeMelo","D","1993-05-01"],
+  ["WPG","Brenden Dillon","D","1990-11-13"],
+  ["WPG","Neal Pionk","D","1995-07-29"],
+  ["WPG","Logan Stanley","D","2001-05-26"],
+  // GOALIES — one starter per team minimum
+  ["WPG","Connor Hellebuyck","G","1993-05-19"],
+  ["EDM","Stuart Skinner","G","1998-11-01"],
+  ["EDM","Calvin Pickard","G","1992-04-15"],
+  ["FLA","Sergei Bobrovsky","G","1988-09-20"],
+  ["TBL","Andrei Vasilevskiy","G","1994-07-25"],
+  ["CAR","Pyotr Kochetkov","G","1999-06-25"],
+  ["COL","Alexandar Georgiev","G","1996-02-10"],
+  ["DAL","Jake Oettinger","G","1998-12-18"],
+  ["NYR","Igor Shesterkin","G","1995-12-30"],
+  ["VGK","Adin Hill","G","1996-05-11"],
+  ["TOR","Joseph Woll","G","1998-07-12"],
+  ["TOR","Anthony Stolarz","G","1994-01-20"],
+  ["BOS","Jeremy Swayman","G","1998-11-16"],
+  ["MIN","Filip Gustavsson","G","1998-06-07"],
+  ["NSH","Juuse Saros","G","1995-04-19"],
+  ["OTT","Linus Ullmark","G","1993-07-31"],
+  ["NJD","Jacob Markstrom","G","1990-01-31"],
+  ["SEA","Philipp Grubauer","G","1991-11-25"],
+  ["BUF","Ukko-Pekka Luukkonen","G","1999-03-09"],
+  ["MTL","Sam Montembeault","G","1996-10-30"],
+  ["VAN","Kevin Lankinen","G","1995-04-28"],
+  ["LAK","Darcy Kuemper","G","1990-05-05"],
+  ["PIT","Tristan Jarry","G","1995-04-29"],
+  ["STL","Jordan Binnington","G","1993-07-11"],
+  ["ANA","Lukas Dostal","G","2000-06-22"],
+  ["CHI","Petr Mrazek","G","1992-02-14"],
+  ["DET","Cam Talbot","G","1987-07-05"],
+  ["PHI","Samuel Ersson","G","2000-02-26"],
+  ["NYI","Semyon Varlamov","G","1988-04-27"],
+  ["SJS","Mackenzie Blackwood","G","1996-12-09"],
+  ["CBJ","Elvis Merzlikins","G","1994-04-13"],
+  ["UTA","Connor Ingram","G","1997-04-09"],
+  ["CGY","Dustin Wolf","G","2001-04-16"],
+  ["WSH","Logan Thompson","G","1997-02-25"],
+  ["BOS","Linus Ullmark","G","1993-07-31"],
+  ["CAR","Frederik Andersen","G","1989-10-02"],
+  ["NYI","Ilya Sorokin","G","1995-08-04"],
 ];
 
 export async function GET() {
-  // ── 1. MoneyPuck live analytics ────────────────────────────
+  // Load contracts and teams in parallel
+  const [CONTRACTS, LIVE_TEAMS] = await Promise.all([
+    loadContracts(),
+    loadTeams(),
+  ]);
+  // ── 1. MoneyPuck analytics — skaters + goalies ─────────────
   const analyticsMap = new Map<string, any>();
+  const goalieMap    = new Map<string, any>();
   let fbMap = new Map<string, any>();
 
   try {
-    const mpRes = await fetchWithTimeout(
-      'https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/skaters.csv',
-      8000
-    );
-    if (mpRes.ok) {
-      const csv = await mpRes.text();
-      const rows = csv.split('\n').filter(Boolean);
-      const hdr = rows[0].split(',');
-      const h = (k: string) => hdr.indexOf(k);
+    const [mpRes, gpRes] = await Promise.allSettled([
+      fetchWithTimeout(
+        "https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/skaters.csv",
+        8000,
+        { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
+      ),
+      fetchWithTimeout(
+        "https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/goalies.csv",
+        8000,
+        { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
+      ),
+    ]);
+
+    // Parse skaters
+    if (mpRes.status === "fulfilled" && mpRes.value.ok) {
+      const csv  = await mpRes.value.text();
+      const rows = csv.split("\n").filter(Boolean);
+      const hdr  = rows[0].split(",");
+      const h    = (k: string) => hdr.indexOf(k);
       const [nI, sI, pI, xgI, gI, iceI, onAI, offAI, rkI] = [
-        h('name'),
-        h('situation'),
-        h('I_F_points'),
-        h('I_F_xGoals'),
-        h('games_played'),
-        h('icetime'),
-        h('OnIce_A_xGoals'),
-        h('OffIce_A_xGoals'),
-        h('iceTimeRank'),
+        h("name"), h("situation"), h("I_F_points"), h("I_F_xGoals"),
+        h("games_played"), h("icetime"),
+        h("OnIce_A_xGoals"), h("OffIce_A_xGoals"), h("iceTimeRank"),
       ];
       rows.slice(1).forEach((row) => {
-        const c = row.split(',');
-        if (c.length <= nI || c[sI]?.trim() !== 'all') return;
-        const name = c[nI].replace(/"/g, '').trim();
-        const g = Math.max(1, parseFloat(c[gI]) || 1);
-        const iceSec = parseFloat(c[iceI]) || 1;
+        const c = row.split(",");
+        if (c.length <= nI || c[sI]?.trim() !== "all") return;
+        const name     = c[nI].replace(/"/g, "").trim();
+        const g        = Math.max(1, parseFloat(c[gI]) || 1);
+        const iceSec   = parseFloat(c[iceI]) || 1;
         const iceHours = iceSec / 3600;
-        const benchH = Math.max(0.01, (g * 60 - iceSec / 60) / 60);
-        const onA = (parseFloat(c[onAI]) || 0) / Math.max(0.01, iceHours);
+        const benchH   = Math.max(0.01, (g * 60 - iceSec / 60) / 60);
+        const onA  = (parseFloat(c[onAI])  || 0) / Math.max(0.01, iceHours);
         const offA = (parseFloat(c[offAI]) || 0) / Math.max(0.01, benchH);
         analyticsMap.set(slugify(name), {
-          ptsPace: (parseFloat(c[pI]) / g) * 82,
-          xGPace: (parseFloat(c[xgI]) / g) * 82,
+          ptsPace: (parseFloat(c[pI])  / g) * 82,
+          xGPace:  (parseFloat(c[xgI]) / g) * 82,
           defRate: offA - onA,
-          avgTOI: iceSec / g / 60,
+          avgTOI:  iceSec / g / 60,
           qocRank: parseFloat(c[rkI]) || 500,
-          games: g,
+          games:   g,
           hasLiveStats: true,
         });
       });
       fbMap = buildFallbackMap(analyticsMap);
     }
-  } catch (_) {
-    /* MoneyPuck blocked */
+
+    // Parse goalies
+    if (gpRes.status === "fulfilled" && gpRes.value.ok) {
+      const csv  = await gpRes.value.text();
+      const rows = csv.split("\n").filter(Boolean);
+      const hdr  = rows[0].split(",");
+      const h    = (k: string) => hdr.indexOf(k);
+      // MoneyPuck goalie columns — GSAx = xGoals - goals, SV% = 1 - goals/ongoal
+      const [nI, sI, gI, xgI, goalsI, ongoalI] = [
+        h("name"), h("situation"), h("games_played"),
+        h("xGoals"), h("goals"), h("ongoal"),
+      ];
+      if (nI >= 0 && xgI >= 0) {
+        // First pass: collect all rows per player for "all" situation
+        const goalieRows = new Map<string, any>();
+        rows.slice(1).forEach((row) => {
+          const c        = row.split(",");
+          if (c.length <= nI) return;
+          const sit = (c[sI] ?? "").trim().toLowerCase();
+          if (sit !== "all") return;
+          const name    = c[nI].replace(/"/g, "").trim();
+          const g       = Math.max(1, parseFloat(c[gI]) || 1);
+          const xGoals  = parseFloat(c[xgI])    || 0;
+          const goals   = parseFloat(c[goalsI]) || 0;
+          const ongoal  = parseFloat(c[ongoalI])|| 0;
+          const gsax    = xGoals - goals;
+          const savePct = ongoal > 0 ? (ongoal - goals) / ongoal : 0.900;
+          goalieRows.set(name, {
+            gsax,
+            savePct:      Math.round(savePct * 10000) / 10000,
+            shotsPerGame: ongoal / g,
+            gamesStarted: g,
+            hasLiveStats: true,
+          });
+        });
+
+        goalieRows.forEach((stats, name) => {
+          goalieMap.set(slugify(name), stats);
+          const parts = name.split(" ");
+          if (parts.length >= 2) {
+            goalieMap.set(slugify(parts[parts.length - 1]), stats);
+          }
+        });
+      }
+    }
+  } catch (_) { /* external APIs blocked */ }
+
+  // ── 2. Build roster from static list (guaranteed) ──────────
+  // Then try to enrich with NHL API headshots
+  const rosterMap = new Map<string, any[]>();
+
+  // First populate from static roster — this always works
+  for (const [teamId, name, position, birthDate] of STATIC_ROSTER) {
+    const list = rosterMap.get(teamId) ?? [];
+    list.push({
+      id:       `${teamId}-${slugify(name)}`,
+      name,
+      position: normalisePos(position),
+      age:      calcAge(birthDate),
+      headshot: null,
+    });
+    rosterMap.set(teamId, list);
   }
 
-  // ── 2. Try NHL API for live rosters; fall back to STATIC_ROSTER ──
-  let rosterMap = new Map<string, any[]>(); // teamId → player objects
-  let usedLiveRoster = false;
-
+  // Then try NHL API to get headshots and update IDs (optional enrichment)
   try {
     const results = await Promise.allSettled(
-      TEAMS_DB.map((t) =>
+      LIVE_TEAMS.map((t) =>
         fetchWithTimeout(
-          `https://api-web.nhle.com/v1/roster/${t.id}/current`,
-          6000
+          `https://api-web.nhle.com/v1/roster/${t.id}/20252026`,
+          5000,
+          NHL_HEADERS
         )
           .then((r) => (r.ok ? r.json() : null))
           .catch(() => null)
       )
     );
 
-    let liveCount = 0;
     results.forEach((result, idx) => {
-      const teamId = TEAMS_DB[idx].id;
-      const data = result.status === 'fulfilled' ? result.value : null;
+      const teamId = LIVE_TEAMS[idx].id;
+      const data   = result.status === "fulfilled" ? result.value : null;
       if (!data) return;
-      const skaters = [...(data.forwards || []), ...(data.defensemen || [])];
-      if (skaters.length === 0) return;
-      liveCount++;
-      rosterMap.set(
-        teamId,
-        skaters.map((p: any) => ({
-          id: p.id.toString(),
-          name: `${p.firstName.default} ${p.lastName.default}`,
-          position: normalisePos(p.positionCode),
-          age: calcAge(p.birthDate),
-          headshot: p.headshot ?? null,
-        }))
-      );
+
+      const skaters = [
+        ...(data.forwards   || []),
+        ...(data.defensemen || []),
+        ...(data.goalies    || []),
+      ];
+
+      if (skaters.length < 5) return; // skip bad responses
+
+      // Replace static roster with live roster for this team
+      const liveList = skaters.map((p: any) => ({
+        id:       p.id.toString(),
+        name:     `${p.firstName.default} ${p.lastName.default}`,
+        position: normalisePos(p.positionCode),
+        age:      calcAge(p.birthDate),
+        headshot: p.headshot ?? null,
+      }));
+
+      rosterMap.set(teamId, liveList);
     });
-
-    usedLiveRoster = liveCount >= 20; // at least 20 teams responded
-  } catch (_) {
-    /* NHL API blocked */
-  }
-
-  // If live roster failed, build from static list
-  if (!usedLiveRoster) {
-    rosterMap = new Map();
-    for (const [teamId, name, position, birthDate, _id] of STATIC_ROSTER) {
-      const list = rosterMap.get(teamId) ?? [];
-      list.push({
-        id: `${teamId}-${slugify(name)}`,
-        name,
-        position: normalisePos(position),
-        age: calcAge(birthDate),
-        headshot: null,
-      });
-      rosterMap.set(teamId, list);
-    }
-  }
+  } catch (_) { /* NHL API blocked — static roster already set */ }
 
   // ── 3. Build player objects ─────────────────────────────────
   const players: any[] = [];
 
   rosterMap.forEach((skaters, teamId) => {
-    const team = TEAMS_DB.find((t) => t.id === teamId);
+    const team = LIVE_TEAMS.find((t) => t.id === teamId);
     if (!team) return;
 
-    skaters.forEach((p) => {
+    skaters.forEach((p: any) => {
       const slug = slugify(p.name);
-      let stats = analyticsMap.get(slug);
+      let stats  = analyticsMap.get(slug);
       if (!stats) {
-        const last = slug.split('-').slice(-1)[0];
-        const fb = fbMap.get(last);
+        const last = slug.split("-").slice(-1)[0];
+        const fb   = fbMap.get(last);
         if (fb !== null && fb !== undefined) stats = fb;
       }
 
-      const fin = FINANCIALS_DB[p.name] ?? null;
-      const defaultTOI = p.position === 'D' ? 18.5 : 13.5;
-      const defaultPts = p.position === 'D' ? 22 : p.position === 'C' ? 32 : 28;
+      // Contract lookup — try compound keys first to handle same-name players
+      // e.g. two Elias Petterssons on VAN: one C ($11.6M), one D ($0.84M ELC)
+      const posKey  = `${p.name}__${p.position}`;
+      const teamKey = `${p.name}__${teamId.toLowerCase()}`;
+      const fin     = CONTRACTS[posKey] ?? CONTRACTS[teamKey] ?? CONTRACTS[p.name] ?? null;
+
+      // If no contract found and player is young (≤23), assume ELC rates
+      // rather than inheriting a same-name veteran's contract
+      const isLikelyELC = !fin && p.age <= 23;
+      const elcCapHit   = p.age <= 22 ? 0.8775 : 0.925; // standard ELC AAV
+      const isGoalie   = p.position === "G";
+      const defaultTOI = isGoalie ? 0 : p.position === "D" ? 18.5 : 13.5;
+      const defaultPts = isGoalie ? 0 : p.position === "D" ? 22 : p.position === "C" ? 32 : 28;
+
+      // Merge goalie-specific stats — try full name slug, then last name only
+      const goalieSlug  = slugify(p.name);
+      const goalieSlugLast = slugify(p.name.split(" ").pop() ?? "");
+      const goalieStats = isGoalie
+        ? (goalieMap.get(goalieSlug) ?? goalieMap.get(goalieSlugLast) ?? null)
+        : null;
+
+      // Contract sanity check — if player is ≤23 with a suspiciously high
+      // contract (likely inherited via same-name collision e.g. two Petterssons),
+      // cap at ELC rates. Young players on real big deals are rare exceptions.
+      const rawCapHit = isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925);
+      const nameCollision = p.age <= 23 && rawCapHit > 3.0 && !fin?.position?.startsWith(p.position);
+      const finalCapHit   = nameCollision ? elcCapHit : rawCapHit;
+      const finalYears    = nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1));
+      const finalNMC      = nameCollision ? false : (fin?.hasNMC ?? false);
+      const finalNTC      = nameCollision ? false : (fin?.hasNTC ?? false);
+      const finalRetain   = nameCollision ? true  : (fin?.canRetain ?? true);
 
       players.push({
-        id: p.id,
+        id:             p.id,
         teamId,
-        name: p.name,
-        position: p.position,
-        age: p.age,
-        headshot: p.headshot ?? null,
-        games: stats?.games ?? 40,
-        ptsPace: stats?.ptsPace ?? defaultPts,
-        xGPace: stats?.xGPace ?? 8,
-        defRate: stats?.defRate ?? 0.08,
-        avgTOI: stats?.avgTOI ?? defaultTOI,
-        qocRank: stats?.qocRank ?? 450,
-        hasLiveStats: stats?.hasLiveStats ?? false,
-        capHit: fin?.capHit ?? 0.925,
-        yearsRemaining: fin?.yearsRemaining ?? 1,
-        hasNMC: fin?.hasNMC ?? false,
-        hasNTC: fin?.hasNTC ?? false,
-        canRetain: fin?.canRetain ?? true,
-        retainedPct: 0,
-        multiplier: fin?.intangibleMultiplier ?? 1.0,
+        name:           p.name,
+        position:       p.position,
+        age:            p.age,
+        headshot:       p.headshot ?? null,
+        games:          stats?.games    ?? goalieStats?.gamesStarted ?? 40,
+        ptsPace:        stats?.ptsPace  ?? defaultPts,
+        xGPace:         stats?.xGPace   ?? 0,
+        defRate:        stats?.defRate  ?? 0.08,
+        avgTOI:         stats?.avgTOI   ?? defaultTOI,
+        qocRank:        stats?.qocRank  ?? 450,
+        hasLiveStats:   stats?.hasLiveStats ?? goalieStats?.hasLiveStats ?? false,
+        // Goalie-specific
+        gsax:           goalieStats?.gsax         ?? 0,
+        savePct:        goalieStats?.savePct       ?? 0.900,
+        gamesStarted:   goalieStats?.gamesStarted  ?? 0,
+        shotsPerGame:   goalieStats?.shotsPerGame  ?? 0,
+        // Contract
+        capHit:         finalCapHit,
+        yearsRemaining: finalYears,
+        hasNMC:         finalNMC,
+        hasNTC:         finalNTC,
+        canRetain:      finalRetain,
+        retainedPct:    0,
+        multiplier:     fin?.intangibleMultiplier ?? 1.0,
       });
     });
   });
 
   // ── 4. Draft picks ──────────────────────────────────────────
   const picks: any[] = [];
-  TEAMS_DB.forEach((team) => {
+  LIVE_TEAMS.forEach((team) => {
     [
-      { round: 1, year: 2026 },
-      { round: 1, year: 2027 },
-      { round: 2, year: 2026 },
+      { round: 1, year: 2026 }, { round: 1, year: 2027 },
+      { round: 2, year: 2026 }, { round: 2, year: 2027 },
+      { round: 3, year: 2026 }, { round: 3, year: 2027 },
+      { round: 4, year: 2026 },
+      { round: 5, year: 2026 },
     ].forEach(({ round, year }) => {
+      const roundLabel = round === 1 ? "1st" : round === 2 ? "2nd" : round === 3 ? "3rd" : `${round}th`;
       picks.push({
-        id: `pick-${team.id}-${year}-${round}`,
-        teamId: team.id,
-        name: `${year} ${round === 1 ? '1st' : '2nd'} Round Pick (${team.id})`,
-        position: 'Pick',
-        age: 19,
+        id:           `pick-${team.id}-${year}-${round}`,
+        teamId:       team.id,
+        name:         `${year} ${roundLabel} Round Pick (${team.id})`,
+        position:     "Pick",
+        age:          19,
         round,
         year,
         teamStanding: team.standing,
-        isProtected: false,
-        games: 0,
-        ptsPace: 0,
-        xGPace: 0,
-        defRate: 0,
-        avgTOI: 0,
-        qocRank: 999,
-        capHit: 0,
-        yearsRemaining: 0,
-        hasNMC: false,
-        hasNTC: false,
-        canRetain: false,
-        retainedPct: 0,
-        multiplier: 1.0,
-        hasLiveStats: false,
+        isProtected:  false,
+        games: 0, ptsPace: 0, xGPace: 0, defRate: 0,
+        avgTOI: 0, qocRank: 999,
+        capHit: 0, yearsRemaining: 0,
+        hasNMC: false, hasNTC: false,
+        canRetain: false, retainedPct: 0,
+        multiplier: 1.0, hasLiveStats: false,
       });
     });
   });
 
-  const teams = TEAMS_DB.map((t) => ({
-    id: t.id,
-    name: t.name,
+  const teams = LIVE_TEAMS.map((t: any) => ({
+    id:       t.id,
+    name:     t.name,
     capSpace: t.capSpace,
     standing: t.standing,
-    phase: t.phase,
-    needs: (t as any).needs ?? [],
+    phase:    t.phase,
+    needs:    t.needs ?? [],
   }));
 
   return NextResponse.json({
     teams,
     players: [...players, ...picks],
     capCeiling: CAP_CEILING,
-    capFloor: CAP_FLOOR,
+    capFloor:   CAP_FLOOR,
     generatedAt: new Date().toISOString(),
-    source: usedLiveRoster ? 'NHL API (live)' : 'Static roster (fallback)',
-    liveStats: analyticsMap.size > 0,
+    source: "Static + NHL API enrichment",
+    liveStats:  analyticsMap.size > 0,
+    debug: {
+      playerCount:    players.length,
+      analyticsCount: analyticsMap.size,
+    },
   });
 }

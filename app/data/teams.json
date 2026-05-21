@@ -1,0 +1,293 @@
+[
+  {
+    "id": "ANA",
+    "name": "Anaheim Ducks",
+    "capSpace": 7.1,
+    "standing": 17,
+    "phase": "Retooling",
+    "needs": []
+  },
+  {
+    "id": "BOS",
+    "name": "Boston Bruins",
+    "capSpace": 0.3,
+    "standing": 8,
+    "phase": "Contender",
+    "needs": []
+  },
+  {
+    "id": "BUF",
+    "name": "Buffalo Sabres",
+    "capSpace": -3.5,
+    "standing": 4,
+    "phase": "Contender",
+    "needs": []
+  },
+  {
+    "id": "CGY",
+    "name": "Calgary Flames",
+    "capSpace": 10.4,
+    "standing": 30,
+    "phase": "Rebuilding",
+    "needs": []
+  },
+  {
+    "id": "CAR",
+    "name": "Carolina Hurricanes",
+    "capSpace": 7.9,
+    "standing": 2,
+    "phase": "Contender",
+    "needs": []
+  },
+  {
+    "id": "CHI",
+    "name": "Chicago Blackhawks",
+    "capSpace": 14.7,
+    "standing": 31,
+    "phase": "Rebuilding",
+    "needs": [
+      {
+        "pos": "W",
+        "minWar": 2.5,
+        "label": "Elite Winger for Bedard"
+      }
+    ]
+  },
+  {
+    "id": "COL",
+    "name": "Colorado Avalanche",
+    "capSpace": -3.6,
+    "standing": 1,
+    "phase": "Contender",
+    "needs": []
+  },
+  {
+    "id": "CBJ",
+    "name": "Columbus Blue Jackets",
+    "capSpace": 3.6,
+    "standing": 18,
+    "phase": "Retooling",
+    "needs": []
+  },
+  {
+    "id": "DAL",
+    "name": "Dallas Stars",
+    "capSpace": -4.3,
+    "standing": 3,
+    "phase": "Contender",
+    "needs": []
+  },
+  {
+    "id": "DET",
+    "name": "Detroit Red Wings",
+    "capSpace": 8.9,
+    "standing": 16,
+    "phase": "Retooling",
+    "needs": []
+  },
+  {
+    "id": "EDM",
+    "name": "Edmonton Oilers",
+    "capSpace": -2.4,
+    "standing": 14,
+    "phase": "Bubble",
+    "needs": [
+      {
+        "pos": "D",
+        "minWar": 2,
+        "label": "Top 4 RD"
+      }
+    ]
+  },
+  {
+    "id": "FLA",
+    "name": "Florida Panthers",
+    "capSpace": 4,
+    "standing": 25,
+    "phase": "Retooling",
+    "needs": []
+  },
+  {
+    "id": "LAK",
+    "name": "Los Angeles Kings",
+    "capSpace": 3.1,
+    "standing": 20,
+    "phase": "Retooling",
+    "needs": []
+  },
+  {
+    "id": "MIN",
+    "name": "Minnesota Wild",
+    "capSpace": -10.9,
+    "standing": 7,
+    "phase": "Contender",
+    "needs": []
+  },
+  {
+    "id": "MTL",
+    "name": "Montréal Canadiens",
+    "capSpace": -5.4,
+    "standing": 6,
+    "phase": "Contender",
+    "needs": []
+  },
+  {
+    "id": "NSH",
+    "name": "Nashville Predators",
+    "capSpace": 14.3,
+    "standing": 24,
+    "phase": "Rebuilding",
+    "needs": []
+  },
+  {
+    "id": "NJD",
+    "name": "New Jersey Devils",
+    "capSpace": 3.9,
+    "standing": 21,
+    "phase": "Retooling",
+    "needs": []
+  },
+  {
+    "id": "NYI",
+    "name": "New York Islanders",
+    "capSpace": 1.8,
+    "standing": 19,
+    "phase": "Retooling",
+    "needs": []
+  },
+  {
+    "id": "NYR",
+    "name": "New York Rangers",
+    "capSpace": 6.5,
+    "standing": 29,
+    "phase": "Rebuilding",
+    "needs": []
+  },
+  {
+    "id": "OTT",
+    "name": "Ottawa Senators",
+    "capSpace": -5.6,
+    "standing": 9,
+    "phase": "Bubble",
+    "needs": []
+  },
+  {
+    "id": "PHI",
+    "name": "Philadelphia Flyers",
+    "capSpace": 0.8,
+    "standing": 11,
+    "phase": "Bubble",
+    "needs": []
+  },
+  {
+    "id": "PIT",
+    "name": "Pittsburgh Penguins",
+    "capSpace": 11.9,
+    "standing": 10,
+    "phase": "Bubble",
+    "needs": []
+  },
+  {
+    "id": "SEA",
+    "name": "Seattle Kraken",
+    "capSpace": 5.8,
+    "standing": 27,
+    "phase": "Rebuilding",
+    "needs": []
+  },
+  {
+    "id": "SJS",
+    "name": "San Jose Sharks",
+    "capSpace": 19.8,
+    "standing": 22,
+    "phase": "Retooling",
+    "needs": [
+      {
+        "pos": "C",
+        "minWar": 2,
+        "label": "Top 6 C"
+      }
+    ]
+  },
+  {
+    "id": "STL",
+    "name": "St. Louis Blues",
+    "capSpace": 13.3,
+    "standing": 23,
+    "phase": "Rebuilding",
+    "needs": []
+  },
+  {
+    "id": "TBL",
+    "name": "Tampa Bay Lightning",
+    "capSpace": -3.3,
+    "standing": 5,
+    "phase": "Contender",
+    "needs": []
+  },
+  {
+    "id": "TOR",
+    "name": "Toronto Maple Leafs",
+    "capSpace": 13.4,
+    "standing": 28,
+    "phase": "Retooling",
+    "needs": []
+  },
+  {
+    "id": "UTA",
+    "name": "Utah Mammoth",
+    "capSpace": -4.5,
+    "standing": 15,
+    "phase": "Retooling",
+    "needs": []
+  },
+  {
+    "id": "VAN",
+    "name": "Vancouver Canucks",
+    "capSpace": 14.6,
+    "standing": 32,
+    "phase": "Tanking",
+    "needs": []
+  },
+  {
+    "id": "VGK",
+    "name": "Vegas Golden Knights",
+    "capSpace": -6.8,
+    "standing": 13,
+    "phase": "Bubble",
+    "needs": [
+      {
+        "pos": "D",
+        "minWar": 2,
+        "label": "Top 4 D"
+      }
+    ]
+  },
+  {
+    "id": "WSH",
+    "name": "Washington Capitals",
+    "capSpace": 14.6,
+    "standing": 12,
+    "phase": "Bubble",
+    "needs": []
+  },
+  {
+    "id": "WPG",
+    "name": "Winnipeg Jets",
+    "capSpace": 5,
+    "standing": 26,
+    "phase": "Retooling",
+    "needs": [
+      {
+        "pos": "W",
+        "minWar": 2,
+        "label": "Top 6 Winger"
+      },
+      {
+        "pos": "D",
+        "minWar": 2,
+        "label": "Top 4 D"
+      }
+    ]
+  }
+]
