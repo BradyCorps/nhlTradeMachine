@@ -27,6 +27,12 @@ interface Asset {
   multiplier: number;
   headshot?: string;
   hasLiveStats?: boolean;
+  qocRank?: number;
+  xgRelTM?: number | null;
+  xgaRelTM?: number | null;
+  dzPct?: number | null;
+  goalsPace?: number;
+  assistsPace?: number;
   round?: number;
   year?: number;
   teamStanding?: number;
@@ -57,6 +63,8 @@ interface XNAVResult {
   age: number;
   cap: number;
   upside: number;
+  noivImpact?: number;  // How much NOIV adjusted the final total
+  fArchetype?: string;  // Forward archetype for display
 }
 
 // ============================================================
@@ -113,6 +121,21 @@ const PLAYER_PEDIGREE: Record<string, {
   "Quinn Hughes":       { peakPtsPace: 102, awards: ["Norris"],                                           allStarYears: 3 },
   "Rasmus Dahlin":      { peakPtsPace: 102, awards: [],                                                   allStarYears: 2 },
   "Elias Pettersson":   { peakPtsPace: 102, awards: ["Calder"],                                           allStarYears: 2 },
+  "Josh Morrissey":     { peakPtsPace: 76,  awards: [],                                                   allStarYears: 1 },
+  "Kyle Connor":        { peakPtsPace: 92,  awards: [],                                                   allStarYears: 1 },
+  "Mark Scheifele":     { peakPtsPace: 88,  awards: [],                                                   allStarYears: 1 },
+  "Mikko Rantanen":     { peakPtsPace: 110, awards: ["Conn Smythe"],                                      allStarYears: 3 },
+  "Matthew Tkachuk":    { peakPtsPace: 109, awards: [],                                                   allStarYears: 2 },
+  "Brady Tkachuk":      { peakPtsPace: 80,  awards: [],                                                   allStarYears: 1 },
+  "Auston Matthews":    { peakPtsPace: 124, awards: ["Hart","Calder","Rocket Richard","Rocket Richard","Rocket Richard"], allStarYears: 5 },
+  "Mitch Marner":       { peakPtsPace: 101, awards: [],                                                   allStarYears: 3 },
+  "William Nylander":   { peakPtsPace: 97,  awards: [],                                                   allStarYears: 1 },
+  "Nico Hischier":      { peakPtsPace: 80,  awards: ["Calder"],                                           allStarYears: 1 },
+  "Jack Hughes":        { peakPtsPace: 98,  awards: [],                                                   allStarYears: 2 },
+  "Aleksander Barkov":  { peakPtsPace: 96,  awards: ["Selke","Selke"],                                    allStarYears: 3 },
+  "Jonathan Huberdeau": { peakPtsPace: 115, awards: [],                                                   allStarYears: 2 },
+  "Jakob Chychrun":     { peakPtsPace: 75,  awards: [],                                                   allStarYears: 0 },
+  "Jaccob Slavin":      { peakPtsPace: 42,  awards: [],                                                   allStarYears: 0 },
 };
 
 // ── Award hardware multipliers ────────────────────────────────
@@ -164,7 +187,21 @@ const PROSPECT_TIERS: Record<string, {
   "Rutger McGroarty":   { tier: 3, navFloor: 42,  ceiling: 18, note: "2022 14th overall" },
 };
 
-// ── Injury Risk Database ──────────────────────────────────────
+// ── Shutdown D Pedigree — known elite defensive specialists ───
+// These players have proven track records as top-pairing shutdown D-men.
+// Their value doesn't show up in points or xG metrics reliably.
+const SHUTDOWN_D_PEDIGREE: Record<string, { navFloor: number; note: string }> = {
+  "Jaccob Slavin":     { navFloor: 55,  note: "Perennial Selke candidate, elite shutdown D" },
+  "Ryan Suter":        { navFloor: 30,  note: "Veteran shutdown D, declining but proven" },
+  "Rasmus Ristolainen":{ navFloor: 25,  note: "Defensive specialist, PHI" },
+  "Luke Schenn":       { navFloor: 20,  note: "Veteran shutdown D" },
+  "Joel Edmundson":    { navFloor: 22,  note: "Shutdown D, physical" },
+  "Brendan Dillon":    { navFloor: 18,  note: "Veteran shutdown D" },
+  "Colin Miller":      { navFloor: 18,  note: "Defensive D" },
+  "Damon Severson":    { navFloor: 30,  note: "Two-way D, shutdown capable" },
+  "Jake Walman":       { navFloor: 25,  note: "Defensive D, DET" },
+  "Travis Hamonic":    { navFloor: 18,  note: "Veteran shutdown D" },
+};
 // Players with known fragility or chronic issues get a risk flag.
 // This isn't a disqualifier — just context for the acquiring GM.
 const INJURY_RISK: Record<string, {
@@ -313,18 +350,27 @@ const getXNAV = (asset: Asset): XNAVResult => {
 
   // ----- GOALIES (G-NAV model with historical context) -----
   if (asset.position === "G") {
-    // GSAx is total season GSAx (e.g. Shesterkin +21, Hellebuyck +5, Jarry -4)
-    // We normalise to a per-season (60-game) pace for comparability
     const gamesG      = Math.max(1, asset.gamesStarted ?? asset.games ?? 1);
     const confidenceG = Math.min(1.0, Math.pow(gamesG / 45, 1.2));
 
-    const gsaxRaw   = safe(asset.gsax ?? 0);
-    const gsaxPer60 = (gsaxRaw / gamesG) * 60; // annualised GSAx
+    // Role detection — anything under 40 games is not a true starter
+    // 30 games = backup/tandem regardless of per-game stats
+    const isStarter = gamesG >= 40;
+    const isBackup  = gamesG < 33;
+    const isTandem  = !isStarter && !isBackup;
 
-    // GSAX_SD in per-60 units — league spread is roughly ±8 GSAx/60 for starters
+    const gsaxRaw     = safe(asset.gsax ?? 0);
+    // Hard cap on per-game rate — hot streaks in limited starts don't extrapolate
+    const gsaxPerGame       = gsaxRaw / gamesG;
+    const gsaxPerGameCapped = isBackup
+      ? Math.min(gsaxPerGame, 0.18)   // backup: very conservative cap
+      : isTandem
+      ? Math.min(gsaxPerGame, 0.28)   // tandem: moderate cap
+      : Math.min(gsaxPerGame, 0.42);  // starter: generous cap
+    const gsaxPer60   = gsaxPerGameCapped * 60;
+
     const GSAX_SD = 8.0;
 
-    // Bayesian shrinkage toward personal career mean for proven goalies
     const pedigree   = PLAYER_PEDIGREE[asset.name];
     const careerMean = pedigree?.careerGsax
       ? Math.min(15, (pedigree.careerGsax / Math.max(1, pedigree.allStarYears ?? 1) / 60) * 15)
@@ -332,62 +378,145 @@ const getXNAV = (asset: Asset): XNAVResult => {
 
     const expGSAx = gsaxPer60 * confidenceG + careerMean * (1 - confidenceG);
 
-    // Linear scaling for negatives, nonlinear only for elite positives
-    // This prevents average/bad goalies from getting absurdly negative values
-    // while still rewarding elite goalies exponentially
     const goalieImpact = expGSAx >= 0
-      ? Math.pow(expGSAx / GSAX_SD, 1.5) * 80   // nonlinear upside for elites
-      : (expGSAx / GSAX_SD) * 40;                // linear downside — no explosion
+      ? Math.pow(expGSAx / GSAX_SD, 1.5) * 80
+      : (expGSAx / GSAX_SD) * 40;
 
-    const workloadBonus = Math.min(20, (gamesG / 60) * 15);
+    // Backups get reduced workload bonus — they're not carrying 60 games
+    const workloadBonus = isStarter
+      ? Math.min(20, (gamesG / 60) * 15)
+      : isTandem
+      ? Math.min(10, (gamesG / 60) * 10)
+      : Math.min(5,  (gamesG / 60) * 5);
 
-    // Age curve: goalies peak 28-33, cliff after 36
     const peakAgeG    = 30;
     const agePenaltyG = asset.age > peakAgeG
       ? Math.pow(asset.age - peakAgeG, 1.8) * 1.2
       : 0;
     const ageFactorG  = Math.max(0.3, 1.05 - agePenaltyG / 100);
 
-    const termMult = Math.min(2.5, 1.0 + (asset.yearsRemaining || 1) * 0.15);
-    const capCostG = asset.capHit * 1.6 * termMult;
+    const termMult       = Math.min(2.5, 1.0 + (asset.yearsRemaining || 1) * 0.15);
+    const effectiveCap   = asset.capHit * (1 - (asset.retainedPct || 0));
+    const capCostG       = effectiveCap * 1.6 * termMult;
+    const retainedBonusG = (asset.retainedPct || 0) * asset.capHit * 10;
 
-    const rawTotal = safe((goalieImpact + workloadBonus) * ageFactorG - capCostG);
+    const rawTotal = safe((goalieImpact + workloadBonus) * ageFactorG - capCostG + retainedBonusG);
 
-    // Historical floor — Hellebuyck can't be worth less than Jarry
-    const totalG = getGoalieHistoricalFloor(asset.name, rawTotal);
+    // Hard NAV caps by role — hot streaks in limited games can't push past these
+    // Even elite starters are capped to keep goalie values in a sane range
+    const roleCap     = isBackup ? 35 : isTandem ? 60 : 250;
+    const cappedTotal = Math.min(rawTotal, roleCap);
+    const totalG      = getGoalieHistoricalFloor(asset.name, cappedTotal);
 
     return {
       total:  totalG,
       off:    0,
       def:    safe(goalieImpact * ageFactorG),
       age:    -agePenaltyG,
-      cap:    -capCostG,
+      cap:    -(capCostG - retainedBonusG),
       upside: 0,
+      noivImpact: 0,
+      fArchetype: "",
     };
   }
-  // 1. Bayesian Regularization (confidence from sample size)
-  const SIGMA = { PTS_M: 34.0, PTS_SD: 24.2, DEF_M: 0.28, DEF_SD: 0.65 };
+  // 1. Bayesian Regularization
+  // Position-adjusted baselines — reflect true NHL averages for qualifying skaters.
+  // A C at 38pts is above average; a D at 38pts is elite.
+  const PTS_BASE: Record<string, { mean: number; sd: number }> = {
+    C: { mean: 30.0, sd: 22.0 },  // includes 4th-line centres
+    W: { mean: 27.0, sd: 20.0 },  // includes 4th-line wingers
+    L: { mean: 27.0, sd: 20.0 },
+    R: { mean: 27.0, sd: 20.0 },
+    D: { mean: 22.0, sd: 17.0 },  // includes stay-at-home types
+  };
+  const posBaseline = PTS_BASE[asset.position] ?? { mean: 34.0, sd: 22.0 };
+  const SIGMA = { PTS_M: posBaseline.mean, PTS_SD: posBaseline.sd, DEF_M: 0.05, DEF_SD: 0.30 };
   const confidence = Math.min(1.0, Math.pow(Math.max(0, asset.games) / 45, 1.8));
-
-  // Shrink toward league mean when sample is small
   const expPts = safe(asset.ptsPace) * confidence + SIGMA.PTS_M * (1 - confidence);
-  const expDef = safe(asset.defRate) * confidence + SIGMA.DEF_M * (1 - confidence);
 
-  // 2. Z-scores (capped to prevent McDavid-style NaN explosion)
+  // defRate reliability filter:
+  // The metric is only meaningful when:
+  //   a) Player has high TOI (actually affects team possession)
+  //   b) Player faces real competition (qocRank < 350)
+  //   c) Sample is large enough (confidence > 0.6)
+  // For sheltered players (Nyquist, 4th liners) the metric captures
+  // opponent quality not individual defense — we discard it.
+  const qocRank    = safe(asset.qocRank ?? 450);
+  const avgTOI     = safe(asset.avgTOI);
+  const rawDefRate = safe(asset.defRate);
+  const defReliability =
+    Math.min(1.0, avgTOI / 20) *        // low TOI = unreliable
+    Math.min(1.0, (400 - qocRank) / 200) * // sheltered = unreliable
+    confidence;                           // small sample = unreliable
+  // Apply: clamp extreme values AND scale by reliability
+  // This means Nyquist (toi=12.7, qoc=429) gets near-zero weight
+  // while Morrissey (toi=24.7, qoc=106) gets full weight
+  const clampedDef = asset.position === "D"
+    ? Math.max(-0.25, Math.min(0.5, rawDefRate))
+    : Math.max(-0.3,  Math.min(0.4, rawDefRate));
+  const adjustedDef = clampedDef * defReliability;
+  const expDef = adjustedDef * confidence + SIGMA.DEF_M * (1 - confidence);
+
+  // 2. Z-scores
   const zPts = clamp((expPts - SIGMA.PTS_M) / SIGMA.PTS_SD, -3.5, 5.5);
-  const zDef = clamp((expDef - SIGMA.DEF_M) / SIGMA.DEF_SD, -3.0, 3.0);
+  const zDef = clamp((expDef - SIGMA.DEF_M) / SIGMA.DEF_SD, -2.0, 2.5);
 
-  // 3. Positional value weights
+  // 3. Positional value weights + D-man archetype classification
   const toiWeight = Math.pow(clamp(safe(asset.avgTOI) / 18, 0.4, 2.0), 1.3);
   const isPillarD = asset.position === "D" && safe(asset.avgTOI) > 22;
-  const posAdj = isPillarD ? 1.9 : asset.position === "C" ? 1.45 : asset.position === "D" ? 1.3 : 1.0;
+  // posAdj: C is the most valuable position per unit of production
+  // D-men get a bonus for elite minutes but should never exceed elite C value
+  // Pillar D (22+ min) gets 1.6 — less than elite C at 1.45... wait:
+  // The old 1.9 for pillar D was causing Bouchard > McDavid.
+  // Real market: elite C = ~$12-14M, elite D = ~$9-11M. Ratio ~0.8x.
+  const posAdj = isPillarD ? 1.35           // top-pair D: high but under C
+    : asset.position === "C"  ? 1.45        // centre: highest value position
+    : asset.position === "D"  ? 1.15        // depth D
+    : 1.0;                                  // winger
 
-  // 4. Nonlinear impact (superstars are exponentially more valuable)
-  const offImpact = Math.sign(zPts) * Math.pow(Math.abs(zPts), 1.9) * 62;
+  // D-man archetype — determines how we weight offense vs defense in TMV
+  // OFFENSIVE D:  pts > 45                          → Bouchard, Makar, Fox
+  // TWO_WAY D:    pts 28-45, toi > 21               → Morrissey, Josi, Ekman-Larsson
+  // SHUTDOWN D:   pts < 28, toi > 19, qoc < 200     → Slavin, Giordano, Holl
+  // DEPTH D:      toi < 19 or qoc > 300             → 5th/6th defender
+  type DArchetype = "OFFENSIVE" | "TWO_WAY" | "SHUTDOWN" | "DEPTH";
+  let dArchetype: DArchetype = "DEPTH";
+  if (asset.position === "D") {
+    const pts   = safe(asset.ptsPace);
+    const toi   = safe(asset.avgTOI);
+    const qoc   = safe(asset.qocRank ?? 450);
+    if      (pts >= 45)                           dArchetype = "OFFENSIVE";
+    else if (pts >= 28 && toi >= 21)              dArchetype = "TWO_WAY";
+    else if (pts <  28 && toi >= 19 && qoc < 220) dArchetype = "SHUTDOWN";
+    else                                           dArchetype = "DEPTH";
+  }
+
+  // 3b. QoC adjustment — shutdown D-men facing elite competition deserve credit.
+  // Slavin (qoc=97) vs DeMelo (qoc=235) playing similar TOI is NOT the same job.
+  const isHighTOI_D = asset.position === "D" && safe(asset.avgTOI) > 20;
+  const qocBonus    = isHighTOI_D
+    ? Math.max(0, (350 - qocRank) / 350) * 22 * (safe(asset.avgTOI) / 21)
+    : 0;
+
+  // Coach trust floor — elite minutes = real player, regardless of raw metrics
+  const coachTrustFloor = asset.position === "D"
+    ? Math.max(0, (safe(asset.avgTOI) - 18) * 3.5)
+    : 0;
+
+  // Shutdown D bonus — elite defensive specialists get explicit credit.
+  // Slavin (qoc=97, toi=21.3) is enormously valuable even without points.
+  // The bonus scales with competition difficulty and ice time.
+  const shutdownBonus = dArchetype === "SHUTDOWN"
+    ? Math.max(0, (220 - qocRank) / 220) * 55 * Math.min(1.0, safe(asset.avgTOI) / 21)
+    : 0;
+
+  // 4. Nonlinear impact
+  // Exponent 1.6 (reduced from 1.9) — still rewards elite scorers nonlinearly
+  // but prevents Bouchard/McDavid type explosion
+  const offImpact = Math.sign(zPts) * Math.pow(Math.abs(zPts), 1.6) * 55;
   const defImpact = Math.sign(zDef) * Math.pow(Math.abs(zDef), 1.25) * 33 * toiWeight;
 
   // 5. Age / depreciation curve
-  //    Superstars peak later and decline more gradually
   const isSuperstar = expPts > 80;
   const peakAge = isSuperstar ? 30 : 28;
   const agePenaltyRaw = asset.age > peakAge
@@ -395,25 +524,96 @@ const getXNAV = (asset: Asset): XNAVResult => {
     : 0;
   const ageFactor = Math.max(0.25, 1.1 - agePenaltyRaw / 100);
 
-  // 6. True Market Value
-  const trueMarketValue = safe((offImpact * 0.65 + defImpact * 0.35) * posAdj * ageFactor);
+  // 6. True Market Value — archetype-based offense/defense weighting
+  // For SHUTDOWN D, defImpact from xG is unreliable (team-polluted + hard matchups)
+  // so we zero it out and rely on shutdownBonus + qocBonus instead.
+  const defWeight = dArchetype === "OFFENSIVE" ? 0.18
+                  : dArchetype === "TWO_WAY"   ? 0.25
+                  : dArchetype === "SHUTDOWN"  ? 0.0   // bonuses carry the value
+                  : asset.position === "D"     ? 0.20
+                  : 0.30;
+  const offWeight = dArchetype === "SHUTDOWN" ? 1.0 : 1 - defWeight;
+  const rawMarketValue = safe((offImpact * offWeight + defImpact * defWeight) * posAdj * ageFactor);
+  const trueMarketValue = Math.max(rawMarketValue + qocBonus + shutdownBonus, coachTrustFloor * ageFactor);
 
   // 7. Contract surplus (FIX: single penalty, not double)
   //    A player is worth their performance value minus what they're paid.
   //    We represent cap cost as a direct surplus subtractor.
   const perfPerMillion = Math.max(0, trueMarketValue / Math.max(1, asset.capHit));
-  const capEfficiencyRatio = perfPerMillion; // higher = better deal
-  // FIX: Only subtract cap once, scaled by years remaining (long bad deals are worse)
-  const termMultiplier = Math.min(2.5, 1.0 + (asset.yearsRemaining || 1) * 0.15);
-  const capCostNet = asset.capHit * 1.5 * termMultiplier;
-  const overpayPenalty = asset.capHit > trueMarketValue / 10
-    ? Math.max(0, asset.capHit - trueMarketValue / 10) * 3.0
+  const capEfficiencyRatio = perfPerMillion;
+  const termMultiplier  = Math.min(2.5, 1.0 + (asset.yearsRemaining || 1) * 0.15);
+  // Apply retention — acquiring team pays reduced cap, boosting value
+  const effectiveCapHit = asset.capHit * (1 - (asset.retainedPct || 0));
+  const capCostNet      = effectiveCapHit * 1.5 * termMultiplier;
+
+  // Overpay penalty — softened for young ascending players.
+  // A 24-year-old on a bridge deal isn't "overpaid" relative to today's
+  // production — the market prices in growth. Full penalty only at 27+.
+  const overpayRaw = effectiveCapHit > trueMarketValue / 10
+    ? Math.max(0, effectiveCapHit - trueMarketValue / 10) * 3.0
+    : 0;
+  const youngDiscount = asset.age < 27
+    ? Math.max(0.15, (asset.age - 18) / 9)  // 18yo=15%, 22yo=44%, 26yo=89%
+    : 1.0;
+  const overpayPenalty = overpayRaw * youngDiscount;
+
+  // 8. Age curve component (YNG/AGE bar)
+  // ─────────────────────────────────────────────────────────────
+  // Bayesian age premium/discount — independent of contract type.
+  // Front offices price players relative to their PROJECTED peak,
+  // not just current production. A 24-year-old on a bridge deal
+  // IS more valuable than his stats alone suggest.
+  //
+  // Curve (inspired by hockey WAR research and market data):
+  //   18-21: High YNG — pre-peak, maximum upside window
+  //          weighted by on-ice performance (can't just be a bad
+  //          player with youth premium)
+  //   22-24: Moderate YNG — ascending but partially proven
+  //   25-26: Small positive — still pre-peak, less uncertainty
+  //   27-29: ZERO — peak years, pure production value
+  //   30-33: Light negative — aging discount begins
+  //   34+:   Hard negative — decline accelerating, esp on big $
+  //
+  // The premium scales with PRODUCTION QUALITY — a 21-year-old
+  // with 60pts/82 gets full premium; one with 15pts/82 gets very
+  // little. Proven on-ice performance validates the upside bet.
+  // ─────────────────────────────────────────────────────────────
+  const age = asset.age;
+  const productionQuality = Math.min(2.0, safe(asset.ptsPace) / 45); // 1.0 at 45pts/82 pace
+
+  const prospectTier  = PROSPECT_TIERS[asset.name];
+  const pedigreeBonus = prospectTier
+    ? (prospectTier.tier === 1 ? 30 : prospectTier.tier === 2 ? 15 : 7)
     : 0;
 
-  // 8. Option value (young players on cheap deals)
-  const optionValue = asset.age < 25
-    ? Math.pow(25 - asset.age, 1.6) * (1 - confidence) * 16.0
-    : 0;
+  let ageCurveRaw: number;
+  if (age <= 21) {
+    // Pre-peak: high upside, weighted by proven production
+    // A 19-year-old who scores 50pts/82 is extremely rare and valuable
+    const youthMultiplier = Math.pow(22 - age, 1.3); // 19yo > 20yo > 21yo
+    ageCurveRaw = youthMultiplier * productionQuality * 18 + pedigreeBonus;
+  } else if (age <= 24) {
+    // Ascending: still pre-peak, more proven
+    const youthMultiplier = Math.pow(25 - age, 1.2);
+    ageCurveRaw = youthMultiplier * productionQuality * 12 + pedigreeBonus * 0.5;
+  } else if (age <= 26) {
+    // Late ascent: small premium, approaching peak
+    ageCurveRaw = (27 - age) * productionQuality * 6;
+  } else if (age <= 29) {
+    // Peak: zero age component — pure production value
+    ageCurveRaw = 0;
+  } else if (age <= 33) {
+    // Early decline: light negative scaling
+    const declineYears = age - 29;
+    ageCurveRaw = -Math.pow(declineYears, 1.4) * 4;
+  } else {
+    // Hard decline: accelerating, especially brutal on big contracts
+    const hardDecline = age - 33;
+    const contractPenalty = Math.max(0, asset.capHit - 4) * 2; // extra penalty for albatross deals
+    ageCurveRaw = -(Math.pow(hardDecline, 1.8) * 6 + contractPenalty);
+  }
+
+  const optionValue = safe(ageCurveRaw);
 
   // 9. Intangibles
   const intangibleBoost = trueMarketValue * ((asset.multiplier || 1.0) - 1.0) * 0.5;
@@ -430,23 +630,107 @@ const getXNAV = (asset: Asset): XNAVResult => {
     + retainedBonus
   );
 
+  // ── 11. NOIV Multiplier — baked into total, not just display ────
+  // Archetype-routed: forwards and D-men weight the components differently.
+  let preFloorTotal = netSurplus;
+  let noivImpact    = 0;
+  let fArchetype    = "";
+
+  const hasNOIV = asset.xgRelTM != null && asset.xgaRelTM != null
+    && asset.dzPct != null && asset.position !== "Pick"
+    && asset.position !== "G" && (asset.games ?? 0) >= 20;
+
+  if (hasNOIV) {
+    // xgRelTM is already in percentage points (e.g. 1.2 = 1.2% better than teammates)
+    // DO NOT divide by 100 — that was suffocating the xG signal
+    const xgR  = asset.xgRelTM!;
+    const xgaR = asset.xgaRelTM!;
+    const dz   = asset.dzPct!;
+    let sOnIce = 0;
+
+    const isForward = ["C","W","L","R"].includes(asset.position);
+    if (isForward) {
+      const goals   = safe(asset.goalsPace ?? 0);
+      const assists = safe(asset.assistsPace ?? 0);
+      const pts     = safe(asset.ptsPace);
+      const toi     = safe(asset.avgTOI);
+
+      if      (goals > assists * 1.1 && pts >= 25)                    fArchetype = "SNIPER";
+      else if (assists > goals * 1.8  && pts >= 30)                   fArchetype = "PLAYMAKER";
+      else if (safe(asset.defRate) > 0.10 && toi >= 16 && pts >= 25)  fArchetype = "TWO_WAY";
+      else if (toi < 14 && pts < 25)                                  fArchetype = "GRINDER";
+      else                                                             fArchetype = "SCORER";
+
+      // Multipliers rebalanced: xgR is now ~1-3 range, dz is ~0-1 range
+      // dz multipliers reduced to 1-2 to avoid suffocating the xG signal
+      if      (fArchetype === "SNIPER")     sOnIce = xgR * 2.5  - xgaR * 0.5;
+      else if (fArchetype === "PLAYMAKER")  sOnIce = xgR * 2.2  - xgaR * 0.8  + (dz - 0.50) * 2.0;
+      else if (fArchetype === "TWO_WAY")    sOnIce = xgR * 1.0  - xgaR * 2.5  + (dz - 0.50) * 3.0;
+      else if (fArchetype === "GRINDER")    sOnIce = xgR * 0.8  - xgaR * 2.0  + (dz - 0.50) * 2.5;
+      else                                  sOnIce = xgR * 1.8  - xgaR * 1.2  + (dz - 0.50) * 2.0;
+    } else if (asset.position === "D") {
+      if      (dArchetype === "SHUTDOWN")  sOnIce = xgR * 0.5  - xgaR * 3.0  + (dz - 0.50) * 4.0;
+      else if (dArchetype === "OFFENSIVE") sOnIce = xgR * 1.8  - xgaR * 1.0;
+      else                                 sOnIce = xgR * 1.2  - xgaR * 1.8  + (dz - 0.50) * 2.0;
+    }
+
+    const noivMult = Math.exp(clamp(sOnIce / 10, -0.4, 0.4)); // max ~1.5x boost or 0.67x drag
+    preFloorTotal  = netSurplus > 0 ? netSurplus * noivMult : netSurplus / Math.max(0.67, noivMult);
+    noivImpact     = preFloorTotal - netSurplus;
+  }
+
   // Apply historical floor — proven superstars can't be valued below their track record.
-  const historicalTotal = getHistoricalFloor(asset.name, netSurplus);
+  const historicalTotal = getHistoricalFloor(asset.name, preFloorTotal);
+
+  // Apply shutdown D pedigree floor — elite defensive specialists get a minimum
+  const shutdownPedigree = SHUTDOWN_D_PEDIGREE[asset.name];
+  const shutdownPedigreeFloor = shutdownPedigree ? shutdownPedigree.navFloor : -Infinity;
 
   // Apply prospect floor — only for players explicitly in PROSPECT_TIERS
-  // Do NOT use Math.max with 0 as default — that would clamp all negative NAVs to 0
   const prospect = PROSPECT_TIERS[asset.name];
   const finalTotal = prospect
-    ? Math.max(historicalTotal, prospect.navFloor * Math.max(0.5, 1 - (asset.age - 18) * 0.04))
-    : historicalTotal;
+    ? Math.max(historicalTotal, shutdownPedigreeFloor, prospect.navFloor * Math.max(0.5, 1 - (asset.age - 18) * 0.04))
+    : shutdownPedigreeFloor > -Infinity
+      ? Math.max(historicalTotal, shutdownPedigreeFloor)
+      : historicalTotal;
+
+  // ELC floor — players on entry-level or minimum contracts (≤$950K) can never
+  // be negative assets.
+  const isELC = asset.capHit <= 0.95 && asset.age <= 25;
+  const elcFloor = isELC ? 0 : -Infinity;
+
+  // Auto-prospect floor — any player under 25 with under 12 NHL games
+  // who earned a roster spot is a prospect by definition.
+  // They have no negative value — worst case they get reassigned.
+  // Floor scales with age: younger = more upside.
+  const isUnprovenProspect = asset.age < 25
+    && (asset.games ?? 0) < 12
+    && asset.position !== "Pick"
+    && asset.position !== "G";
+  const autoprospectFloor = isUnprovenProspect
+    ? Math.max(5, (25 - asset.age) * 2.5)  // age 24=2.5, age 22=7.5, age 20=12.5
+    : -Infinity;
+
+  // For display purposes, the DEF bar should show meaningful value.
+  // SHUTDOWN D: show shutdownBonus + qocBonus (their actual contribution)
+  // OFFENSIVE D: cap at ±30 — their defRate is polluted by hard matchups
+  //              and they're not primarily valued for defense anyway
+  // Everyone else: show raw defImpact * posAdj
+  const defDisplay = dArchetype === "SHUTDOWN"
+    ? safe(shutdownBonus + qocBonus)
+    : dArchetype === "OFFENSIVE" && asset.position === "D"
+    ? clamp(safe(defImpact * posAdj), -30, 30)
+    : safe(defImpact * posAdj);
 
   return {
-    total: finalTotal,
-    off: safe(offImpact * posAdj),
-    def: safe(defImpact * posAdj),
-    age: optionValue > 0 ? optionValue : -agePenaltyRaw,
-    cap: -(capCostNet + overpayPenalty),
-    upside: prospect ? prospect.ceiling : optionValue,
+    total:       Math.max(finalTotal, elcFloor, autoprospectFloor),
+    off:         safe(offImpact * posAdj),
+    def:         defDisplay,
+    age:         safe(ageCurveRaw),
+    cap:         -(capCostNet + overpayPenalty),
+    upside:      prospectTier ? prospectTier.ceiling : Math.max(0, ageCurveRaw),
+    noivImpact:  safe(noivImpact),
+    fArchetype,
   };
 };
 
@@ -525,9 +809,9 @@ const classifyTeam = (team: Team, roster: Asset[]): TeamMode => {
 
 const positionalDepth = (assets: Asset[], position: string): number =>
   assets.filter((a) => {
-    if (position === "C") return a.position === "C" && a.ptsPace > 45;
-    if (position === "D") return a.position === "D" && a.avgTOI > 20;
-    return (a.position === "W" || a.position === "L" || a.position === "R") && a.ptsPace > 40;
+    if (position === "C") return a.position === "C" && (a.ptsPace > 25 || a.avgTOI > 13);
+    if (position === "D") return a.position === "D" && a.avgTOI > 18;
+    return (a.position === "W" || a.position === "L" || a.position === "R") && (a.ptsPace > 20 || a.avgTOI > 11);
   }).length;
 
 // How many quality players does a team have at a position AFTER removing outgoing assets
@@ -774,10 +1058,13 @@ const runGmLogic = (
 
   const qualityCount = (roster: Asset[], pos: string): number => {
     const p = normalisePos(pos);
-    if (p === "C") return roster.filter(a => normalisePos(a.position) === "C" && a.ptsPace > 45).length;
-    if (p === "W") return roster.filter(a => normalisePos(a.position) === "W" && a.ptsPace > 35).length;
-    if (p === "D") return roster.filter(a => normalisePos(a.position) === "D" && a.avgTOI > 20).length;
-    if (p === "G") return roster.filter(a => normalisePos(a.position) === "G" && (a.gamesStarted ?? a.games) > 20).length;
+    // "Quality" = actually deployed at the position with meaningful ice time
+    // Thresholds are intentionally low — we want to catch REAL gaps, not penalize
+    // teams for trading average players when average players are coming back
+    if (p === "C") return roster.filter(a => normalisePos(a.position) === "C" && (a.ptsPace > 25 || a.avgTOI > 13)).length;
+    if (p === "W") return roster.filter(a => normalisePos(a.position) === "W" && (a.ptsPace > 20 || a.avgTOI > 11)).length;
+    if (p === "D") return roster.filter(a => normalisePos(a.position) === "D" && a.avgTOI > 18).length;
+    if (p === "G") return roster.filter(a => normalisePos(a.position) === "G" && (a.gamesStarted ?? a.games) > 10).length;
     return 0;
   };
 
@@ -801,12 +1088,22 @@ const runGmLogic = (
         .filter(a => normalisePos(a.position) === pos)
         .map(a => a.name).join(" and ");
 
-      const incomingFills = inPlayers.some(a =>
+      const incomingAtPos = inPlayers.filter(a =>
         normalisePos(a.position) === pos && qualityCount([a], pos) > 0
       );
+      const incomingFills = incomingAtPos.length > 0;
 
-      // Star premium exception: contenders/bubble teams can drop to
-      // survivable floor if they're acquiring a genuine star
+      // Skip flag for direct same-position swaps of comparable quality
+      // e.g. trading a D-man and getting a D-man back of similar value
+      const leavingNav   = homeGivingUp
+        .filter(a => normalisePos(a.position) === pos)
+        .reduce((s, a) => s + getXNAV(a).total, 0);
+      const incomingNav  = incomingAtPos.reduce((s, a) => s + getXNAV(a).total, 0);
+      // Direct swap: incoming fills same position at ≥50% value OR both are near-zero
+      const bothNearZero = Math.abs(leavingNav) < 15 && Math.abs(incomingNav) < 15;
+      const isDirectSwap = incomingFills && (incomingNav >= leavingNav * 0.5 || bothNearZero);
+      if (isDirectSwap) continue;
+
       const starException = (modeHome === "CONTENDER" || modeHome === "BUBBLE")
         && after >= survivable
         && isStarUpgrade(inPlayers);
@@ -818,10 +1115,10 @@ const runGmLogic = (
           ? `${teamHome.name} trades depth for star power — calculated risk`
           : `${teamHome.name} can't drop below ${min} quality ${label}`,
         explanation: starException
-          ? `${teamHome.name} drops to ${after} quality ${label} after this trade — below their usual threshold of ${min}, but still survivable at ${after}. This is a calculated contender move: trading proven depth to acquire elite star power. Hockey is team-dependent and depth matters, but a genuine top-end talent does shift a team's ceiling. Tampa did this repeatedly (Coleman, Goodrow, Hagel), and the Oilers traded Puljujarvi for Hyman for exactly this reason. The risk is real — injury, a slump, or a short Cup run leaves you thin. But ${modeHome} teams in a window sometimes make this bet.`
-          : `${teamHome.name} currently has ${before} quality ${label} on their roster. Trading away ${playersLeaving} leaves them with only ${after} — below the minimum viable threshold of ${min} for a competitive NHL team. ${
+          ? `${teamHome.name} drops to ${after} quality ${label} after this trade — below their usual threshold of ${min}, but still survivable at ${after}. This is a calculated contender move: trading proven depth to acquire elite star power.`
+          : `${teamHome.name} currently has ${before} quality ${label} on their roster. Trading away ${playersLeaving} leaves them with only ${after} — below the minimum viable threshold of ${min}. ${
               incomingFills
-                ? `The incoming package does include a ${label.slice(0,-1)}, but GMs are cautious about trading proven depth for unproven replacements at a critical position.`
+                ? `A ${label.slice(0,-1)} is coming back at a lower quality level — the downgrade needs to be justified by what else is in the package.`
                 : `No ${label.slice(0,-1)} is coming back in this deal, creating a roster hole that would need to be addressed separately.`
             } Real GMs run roster construction checks before accepting any deal — this one fails.`,
         vetoesSide: 0,
@@ -844,9 +1141,22 @@ const runGmLogic = (
         .filter(a => normalisePos(a.position) === pos)
         .map(a => a.name).join(" and ");
 
-      const incomingFills = outPlayers.some(a =>
+      const incomingAtPos = outPlayers.filter(a =>
         normalisePos(a.position) === pos && qualityCount([a], pos) > 0
       );
+      const incomingFills = incomingAtPos.length > 0;
+
+      // If they're trading a D and getting a D back of similar quality,
+      // this is a position swap — don't flag as a roster hole
+      const leavingNav    = partnerGivingUp
+        .filter(a => normalisePos(a.position) === pos)
+        .reduce((s, a) => s + getXNAV(a).total, 0);
+      const incomingNav   = incomingAtPos.reduce((s, a) => s + getXNAV(a).total, 0);
+      const bothNearZero  = Math.abs(leavingNav) < 15 && Math.abs(incomingNav) < 15;
+      const isDirectSwap  = incomingFills && (incomingNav >= leavingNav * 0.5 || bothNearZero);
+
+      // Skip flag entirely for direct position swaps of comparable quality
+      if (isDirectSwap) continue;
 
       const starException = (modePartner === "CONTENDER" || modePartner === "BUBBLE")
         && after >= survivable
@@ -859,11 +1169,11 @@ const runGmLogic = (
           ? `${teamPartner.name} trades depth for star power — calculated risk`
           : `${teamPartner.name} can't drop below ${min} quality ${label}`,
         explanation: starException
-          ? `${teamPartner.name} drops to ${after} quality ${label} — below their usual threshold of ${min}, but still survivable. This is the classic contender calculation: sacrifice depth to add a game-changing talent. It works when the star is elite enough to compensate and the team has depth elsewhere to paper over the gap. The risk is concentration — if the star gets injured or underperforms, there's less margin for error than before.`
+          ? `${teamPartner.name} drops to ${after} quality ${label} — below their usual threshold of ${min}, but still survivable. This is the classic contender calculation: sacrifice depth to add a game-changing talent.`
           : `${teamPartner.name} currently has ${before} quality ${label}. Trading away ${playersLeaving} leaves them with only ${after} — below the minimum viable threshold of ${min}. ${
               incomingFills
-                ? `A ${label.slice(0,-1)} is coming back, but ${teamPartner.name}'s GM would need to evaluate whether the incoming player actually upgrades or just maintains the position.`
-                : `Nothing coming back fills this hole. No GM — contender or rebuilder — willingly creates a critical positional gap without a direct replacement already identified.`
+                ? `A ${label.slice(0,-1)} is coming back, but at a lower quality level — ${teamPartner.name}'s GM would need to confirm this is an acceptable downgrade before proceeding.`
+                : `Nothing coming back fills this hole. No GM willingly creates a critical positional gap without a direct replacement already identified.`
             }`,
         vetoesSide: 1,
       });
@@ -871,20 +1181,25 @@ const runGmLogic = (
   }
 
   // ── SOFT: Defensive Dependency ─────────────────────────────
-  // Check HOME team losing a top-pairing D
   const tradingAwayD = outPlayers.filter((a) => a.position === "D");
   if (tradingAwayD.length > 0) {
-    const depScore       = defensiveDependencyScore(allHomeRoster);
+    const depScore          = defensiveDependencyScore(allHomeRoster);
     const eliteDBeingTraded = tradingAwayD.filter((a) => a.avgTOI > 22 || getXNAV(a).total > 100);
+    const dComingBack       = inPlayers.filter(a => a.position === "D" && (a.avgTOI > 20 || getXNAV(a).total > 60));
 
-    if (depScore >= 0.6 && eliteDBeingTraded.length > 0) {
-      const dName          = eliteDBeingTraded[0].name;
+    // If a comparable D is coming back, this is a D-for-D swap — skip the flag
+    const leavingDNav   = eliteDBeingTraded.reduce((s, a) => s + getXNAV(a).total, 0);
+    const incomingDNav  = dComingBack.reduce((s, a) => s + getXNAV(a).total, 0);
+    const isDForD       = dComingBack.length > 0 && incomingDNav >= leavingDNav * 0.6;
+
+    if (depScore >= 0.6 && eliteDBeingTraded.length > 0 && !isDForD) {
+      const dName           = eliteDBeingTraded[0].name;
       const remainingEliteD = qualityCountAfter(allHomeRoster, eliteDBeingTraded, "D");
       flags.push({
         severity: "SOFT",
         category: "ASSET_SHAPE_MISMATCH",
         headline: `${teamHome.name}'s D corps can't absorb losing ${dName}`,
-        explanation: `${teamHome.name}'s defensive structure is already one of their organisational vulnerabilities. ${dName} (${eliteDBeingTraded[0].avgTOI.toFixed(1)} min/game) anchors their top pairing — trading him leaves only ${remainingEliteD} quality defencemen. Teams in this situation do not trade top-pairing defencemen for forwards regardless of the NAV return. A winger does not solve the underlying defensive problem.`,
+        explanation: `${teamHome.name}'s defensive structure is a known vulnerability. ${dName} (${eliteDBeingTraded[0].avgTOI.toFixed(1)} min/game) anchors their top pairing — trading him leaves ${remainingEliteD} quality defencemen. Nothing defensively meaningful is coming back. A forward, however talented, does not solve the underlying blue-line problem.`,
         affectedAsset: dName,
         vetoesSide: 0,
       });
@@ -894,21 +1209,58 @@ const runGmLogic = (
   // Check PARTNER team losing a top-pairing D
   const partnerTradingAwayD = partnerGivingUp.filter((a) => a.position === "D");
   if (partnerTradingAwayD.length > 0) {
-    const depScore       = defensiveDependencyScore(allPartnerRoster);
+    const depScore          = defensiveDependencyScore(allPartnerRoster);
     const eliteDBeingTraded = partnerTradingAwayD.filter((a) => a.avgTOI > 22 || getXNAV(a).total > 100);
+    const dComingBack       = outPlayers.filter(a => a.position === "D" && (a.avgTOI > 20 || getXNAV(a).total > 60));
 
-    if (depScore >= 0.6 && eliteDBeingTraded.length > 0) {
-      const dName          = eliteDBeingTraded[0].name;
+    // If a comparable D is coming back, this is a D-for-D swap — skip the flag
+    const leavingDNav   = eliteDBeingTraded.reduce((s, a) => s + getXNAV(a).total, 0);
+    const incomingDNav  = dComingBack.reduce((s, a) => s + getXNAV(a).total, 0);
+    const isDForD       = dComingBack.length > 0 && incomingDNav >= leavingDNav * 0.6;
+
+    if (depScore >= 0.6 && eliteDBeingTraded.length > 0 && !isDForD) {
+      const dName           = eliteDBeingTraded[0].name;
       const remainingEliteD = qualityCountAfter(allPartnerRoster, eliteDBeingTraded, "D");
       flags.push({
         severity: "SOFT",
         category: "ASSET_SHAPE_MISMATCH",
         headline: `${teamPartner.name}'s D corps can't absorb losing ${dName}`,
-        explanation: `${teamPartner.name}'s defensive structure is already one of their organisational vulnerabilities. ${dName} (${eliteDBeingTraded[0].avgTOI.toFixed(1)} min/game) anchors their top pairing — trading him leaves only ${remainingEliteD} quality defencemen. Teams in this situation do not trade top-pairing defencemen for forwards regardless of the NAV return.`,
+        explanation: `${teamPartner.name}'s defensive structure is a known vulnerability. ${dName} (${eliteDBeingTraded[0].avgTOI.toFixed(1)} min/game) anchors their top pairing — trading him leaves ${remainingEliteD} quality defencemen. Nothing defensively meaningful is coming back. This creates a structural vulnerability that a forward can't paper over.`,
         affectedAsset: dName,
         vetoesSide: 1,
       });
     }
+  }
+
+  // ── SOFT: Contender selling prime asset without future return ──
+  // A Bubble or Contender team trading away a high-NAV player straight-up
+  // for another player (no picks, no prospects) is shortening their window.
+  // This is only acceptable if the incoming player is BETTER, not just
+  // comparable. Washington trading Chychrun for Morrissey is a lateral move
+  // at best — they need additional assets to justify it.
+  const partnerIsContending = modePartner === "CONTENDER" || modePartner === "BUBBLE";
+  const partnerHighNavOut   = partnerGivingUp.filter(a => getXNAV(a).total > 100);
+  const homeHasPicksOrProsp = outPlayers.some(a =>
+    a.position === "Pick" || (PROSPECT_TIERS[a.name] != null)
+  );
+  // Check from PARTNER'S perspective — are they getting back comparable value?
+  // navOut = what home sends = what partner receives
+  // partnerGivingNav = what partner sends away
+  const partnerGivingNav   = partnerHighNavOut.reduce((s, a) => s + getXNAV(a).total, 0);
+  const partnerReceiving   = navOut; // Morrissey's NAV in this case
+  // Partner accepts if they're getting back ≥90% of what they give — otherwise they need a sweetener
+  const partnerGetsEnough  = partnerReceiving >= partnerGivingNav * 0.90;
+
+  if (partnerIsContending && partnerHighNavOut.length > 0 && !homeHasPicksOrProsp && !partnerGetsEnough) {
+    const topAsset = partnerHighNavOut.sort((a,b) => getXNAV(b).total - getXNAV(a).total)[0];
+    flags.push({
+      severity: "HARD",
+      category: "TIMELINE_MISMATCH",
+      headline: `${teamPartner.name} requires future assets to move ${topAsset.name}`,
+      explanation: `${teamPartner.name} is a ${modePartner.toLowerCase()} team — they do not trade prime assets in straight player swaps. ${topAsset.name} is worth ${getXNAV(topAsset).total.toFixed(0)} NAV and is in the heart of their window. Accepting a comparable player with no picks or prospects attached gains them nothing strategically. Real GMs in ${teamPartner.name}'s position demand a sweetener for any deal of this magnitude — at minimum a mid-round pick to justify the inconvenience of a roster reshuffling. Add draft capital or a prospect to this package and the conversation changes entirely.`,
+      affectedAsset: topAsset.name,
+      vetoesSide: 1,
+    });
   }
 
   // ── SOFT: Trading from an identified roster need ────────────
@@ -1263,15 +1615,14 @@ const SEVERITY_STYLES: Record<FlagSeverity, { dot: string; bg: string; border: s
 };
 
 const STATUS_CONFIG: Record<TradeStatus, { border: string; headerText: string; icon: string; bg: string }> = {
-  IDLE:     { border: "border-zinc-800",      headerText: "text-zinc-500",    icon: "—", bg: "bg-zinc-900/40" },
-  PENDING:  { border: "border-zinc-700",      headerText: "text-zinc-300",    icon: "…", bg: "bg-zinc-900/40" },
-  FAIR:     { border: "border-sky-600/50",    headerText: "text-sky-300",     icon: "⚖", bg: "bg-sky-950/15" },
-  WIN:      { border: "border-emerald-600/50",headerText: "text-emerald-400", icon: "↑", bg: "bg-emerald-950/15" },
-  LOSS:     { border: "border-amber-600/50",  headerText: "text-amber-400",   icon: "↓", bg: "bg-amber-950/15" },
-  BLOCKED:  { border: "border-red-600/50",    headerText: "text-red-400",     icon: "✕", bg: "bg-red-950/20" },
-  DECLINED: { border: "border-orange-600/50", headerText: "text-orange-400",  icon: "✗", bg: "bg-orange-950/20" },
+  IDLE:     { border: "border-ink-faint", headerText: "text-ink-ghost", icon: "—", bg: "bg-paper-inset" },
+  PENDING:  { border: "border-ink-faint", headerText: "text-ink-mid",   icon: "…", bg: "bg-paper-inset" },
+  FAIR:     { border: "border-blue-ink",  headerText: "text-blue-ink",  icon: "⚖", bg: "bg-paper-card" },
+  WIN:      { border: "border-green-ink", headerText: "text-green-ink", icon: "↑", bg: "bg-paper-card" },
+  LOSS:     { border: "border-amber-ink", headerText: "text-amber-ink", icon: "↓", bg: "bg-paper-card" },
+  BLOCKED:  { border: "border-red-ink",   headerText: "text-red-ink",   icon: "✕", bg: "bg-paper-dark" },
+  DECLINED: { border: "border-red-ink",   headerText: "text-red-ink",   icon: "✗", bg: "bg-paper-dark" },
 };
-
 // ============================================================
 // MAIN COMPONENT
 // ============================================================
@@ -1286,7 +1637,7 @@ export default function TradeMachine() {
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [evaluated, setEvaluated] = useState(false);
   const [expandedFlag,   setExpandedFlag]   = useState<number | null>(null);
-  const [tradeRequest,   setTradeRequest]   = useState<Asset | null>(null);
+  const [tradeRequest,   setTradeRequest]   = useState<Asset[] | null>(null);
 
   // ── Persistent trade simulation state ────────────────────────
   const [executedTrades, setExecutedTrades] = useState<{
@@ -1300,6 +1651,7 @@ export default function TradeMachine() {
   const [simResult, setSimResult]   = useState<string | null>(null);
   const [simLoading, setSimLoading] = useState(false);
   const [showSimPanel, setShowSimPanel] = useState(false);
+  const [showMemo, setShowMemo] = useState(false);
 
   useEffect(() => {
     fetch("/api/league")
@@ -1405,31 +1757,45 @@ export default function TradeMachine() {
       .slice(0, 12)
       .map(p => `${p.name} (${p.position}, ${p.ptsPace.toFixed(0)}pts/82, age ${p.age})`) : [];
 
-    const prompt = `You are an NHL analyst simulating one full season — regular season AND playoffs — after a trade.
+    const isRebuilding = ["Rebuilding","Tanking","Retooling"].includes(teams[0]!.phase ?? "");
+
+    const prompt = `You are an NHL beat reporter writing a season-in-review column one year after a trade.
+
+CRITICAL: Only reference players from the rosters listed below. Do not invent players.
 
 TRADES EXECUTED:
 ${tradesSummary}
 
 ${teams[0]!.name} POST-TRADE ROSTER (top 12):
 ${homeRoster.join("\n")}
-Team phase: ${teams[0]!.phase} · Standing before trades: #${teams[0]!.standing}/32
+Phase: ${teams[0]!.phase} · Pre-trade standing: #${teams[0]!.standing}/32
 
 ${partnerTeam ? `${partnerTeam.name} POST-TRADE ROSTER (top 12):
 ${partnerRoster.join("\n")}
-Team phase: ${partnerTeam.phase} · Standing before trades: #${partnerTeam.standing}/32` : ""}
+Phase: ${partnerTeam.phase} · Pre-trade standing: #${partnerTeam.standing}/32` : ""}
 
-Simulate one full NHL season after these trades. Write 4-5 paragraphs:
+Write exactly 5 sections. Each section is 2-3 sentences maximum — be punchy, not verbose.
 
-1. REGULAR SEASON: How the key acquired players performed. Give specific simulated stat lines (e.g. "scored 34 goals, 71 points in 79 games"). How did each team finish in the standings?
+**THE TRADE, ONE YEAR LATER**
+Key traded players' stat lines. Did it work as advertised?
 
-2. PLAYOFFS: Did either team make the playoffs? If yes — how far did they go? Describe 1-2 key moments or series. If a team won the Stanley Cup, describe the clinching moment and which traded player was most impactful. If they were eliminated, what was the fatal flaw?
+**${teams[0]!.name.toUpperCase()}'S SEASON**
+${isRebuilding
+  ? `Rebuild focus: where did they finish? What draft pick did they land? One sentence on what that means for their timeline.`
+  : `Standings finish and playoff result. One key moment.`}
 
-3. SURPRISE: One player who dramatically outperformed or underperformed expectations. Be specific.
+**AROUND THE LEAGUE**
+3 punchy bullets of notable things that happened this NHL season — a surprise Cup run, a star injury, a prospect breakout on another team, a trade that backfired. Make it feel like a real season.
 
-4. VERDICT: One sentence — did the trade achieve its stated goal for each team?
+**THE DRAFT LOTTERY**
+${isRebuilding
+  ? `${teams[0]!.name} is rebuilding — this matters. What pick did they get in the lottery? Who are the top 3 prospects in the class? What are the scouts saying about the player they're projected to select?`
+  : `One sentence: who won the lottery, what team needed it most.`}
 
-Be specific with numbers and playoff rounds. Write like a beat reporter doing a season-end trade retrospective. If the trades helped a team win the Cup, make it feel earned and emotional — this is what fans care about. Always finish with the VERDICT section — never cut off mid-sentence.`;
+**VERDICT**
+One sentence per team — right call or wrong call?
 
+Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}. Use specific numbers. Never cut off mid-sentence.`;
 
     try {
       const res = await fetch("/api/claude", {
@@ -1437,7 +1803,7 @@ Be specific with numbers and playoff rounds. Write like a beat reporter doing a 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-haiku-4-5",
-          max_tokens: 1200,
+          max_tokens: 900,
           messages: [{ role: "user", content: prompt }],
         }),
       });
@@ -1495,13 +1861,12 @@ ANALYTICS:
 GM LOGIC FLAGS:
 ${flagSummary || "None — trade passes all logic checks"}
 
-Write a 3-4 paragraph front office memo analyzing this trade. Cover:
+Write a concise 3-paragraph front office memo. Each paragraph maximum 4 sentences. Cover:
 1. What each team's motivation is and whether it aligns with their organizational direction
-2. Whether the analytics support the trade or raise concerns
-3. The key risks for each side
-4. Your overall assessment — would you recommend this trade?
+2. Whether the analytics support the trade — address BOTH teams' perspectives and what additional assets would make it fair
+3. Your recommendation — be direct, one clear verdict
 
-Write in the voice of a confident, analytical NHL executive. Reference the specific players and numbers. Be direct — no hedging, no fluff.`;
+IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}. Use current knowledge — do not reference future events as pending if they have already occurred. Complete every sentence. Never cut off mid-paragraph.`;
 
     try {
       const res = await fetch("/api/claude", {
@@ -1509,7 +1874,7 @@ Write in the voice of a confident, analytical NHL executive. Reference the speci
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-sonnet-4-5",
-          max_tokens: 600,
+          max_tokens: 700,
           messages: [{ role: "user", content: prompt }],
         }),
       });
@@ -1546,23 +1911,21 @@ Write in the voice of a confident, analytical NHL executive. Reference the speci
   const sc = verdict ? STATUS_CONFIG[verdict.status] : STATUS_CONFIG.IDLE;
 
   return (
-    <main className="min-h-screen bg-[#080809] text-zinc-300 font-sans antialiased select-none overflow-x-hidden">
+    <main className="min-h-screen antialiased select-none overflow-x-hidden bg-paper text-ink font-serif">
       <ContractSyncer />
 
       {/* Trade Proposal Engine Modal */}
-      {tradeRequest && (
+      {tradeRequest && tradeRequest.length > 0 && (
         <TradeProposalEngine
-          targetPlayer={tradeRequest}
+          outgoingBlock={tradeRequest}
           homeTeam={teams[0]}
           allTeams={db.teams}
           allPlayers={db.players}
           navMap={Object.fromEntries(db.players.map(p => [p.id, getXNAV(p).total]))}
           onClose={() => setTradeRequest(null)}
           onLoadTrade={(partner, outgoing, incoming) => {
-            // Set partner team
             const partnerTeam = db.teams.find(t => t.id === partner.id) ?? null;
             setTeams([teams[0], partnerTeam]);
-            // Set blocks: home gives outgoing, partner gives incoming
             setBlocks([outgoing, incoming]);
             setTradeRequest(null);
             setEvaluated(false);
@@ -1570,46 +1933,151 @@ Write in the voice of a confident, analytical NHL executive. Reference the speci
           }}
         />
       )}
-      <div className="fixed inset-0 opacity-[0.025] pointer-events-none"
-        style={{ backgroundImage: "linear-gradient(rgba(255,255,255,.2) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.2) 1px,transparent 1px)", backgroundSize: "44px 44px" }} />
+      {/* ── Front Office Memo Modal ───────────────────────────── */}
+      {showMemo && verdict?.claudeAnalysis && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
+          style={{ background: 'rgba(28,20,10,0.75)', backdropFilter: 'blur(3px)' }}
+          onClick={() => setShowMemo(false)}>
+          <div className="relative max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            style={{ background: '#f0e6cc', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', borderRadius: '2px' }}
+            onClick={e => e.stopPropagation()}>
 
-      <div className="relative max-w-[1700px] mx-auto px-6 py-8 flex flex-col gap-5">
+            {/* Memo letterhead */}
+            <div className="px-8 pt-8 pb-4" style={{ borderBottom: '2px solid #1c140a' }}>
+              <div className="text-center mb-4">
+                <div className="text-[9px] uppercase tracking-[0.5em] mb-1" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                  Quant Front Office — Internal Memorandum
+                </div>
+                <div className="font-black text-2xl" style={{ fontFamily: "'Libre Baskerville', serif", color: '#1c140a' }}>
+                  Trade Evaluation Report
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-[10px]" style={{ fontFamily: "'Courier Prime', monospace" }}>
+                {[
+                  ["TO",      "GM & Hockey Operations Leadership"],
+                  ["FROM",    "Senior Front Office Analyst — Claude"],
+                  ["DATE",    new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })],
+                  ["RE",      `${teams[0]?.name ?? 'Home'} ↔ ${teams[1]?.name ?? 'Partner'} Trade`],
+                  ["VERDICT", verdict.status],
+                  ["NAV",     `${verdict.metrics.homeNetGain > 0 ? '+' : ''}${verdict.metrics.homeNetGain.toFixed(0)} for ${teams[0]?.name ?? 'Home'}`],
+                ].map(([label, val]) => (
+                  <div key={label} className="flex gap-3">
+                    <span className="font-black w-16 shrink-0" style={{ color: '#6b5030' }}>{label}:</span>
+                    <span style={{ color: (label === "VERDICT" && (verdict.status === "WIN" || verdict.status === "FAIR")) ? '#1a5c2e'
+                      : (label === "VERDICT" && (verdict.status === "BLOCKED" || verdict.status === "DECLINED")) ? '#b83020'
+                      : '#1c140a' }}>{val}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-        <header className="flex justify-between items-end pb-5 border-b border-zinc-800/50">
-          <div>
+            {/* Memo body */}
+            <div className="px-8 py-6 relative">
+              {/* Faint ruled lines like a memo pad */}
+              <div className="absolute inset-0 pointer-events-none" style={{
+                backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, rgba(184,160,112,0.2) 28px)',
+                backgroundSize: '100% 28px',
+                top: '24px'
+              }} />
+              <p className="relative text-[12px] leading-[1.85]" style={{
+                color: '#1c140a',
+                fontFamily: "'Libre Baskerville', serif",
+                whiteSpace: 'pre-wrap',
+              }}>
+                {verdict.claudeAnalysis}
+              </p>
+            </div>
+
+            {/* Verdict stamp + disclaimer */}
+            <div className="px-8 pb-6 flex items-end justify-between" style={{ borderTop: '1px solid #b8a070', paddingTop: '16px' }}>
+              <div className="text-[9px]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace", lineHeight: 1.6 }}>
+                CONFIDENTIAL — Internal Use Only<br />
+                Valuations are analytical estimates only.
+              </div>
+              <div style={{ transform: 'rotate(-4deg)', transformOrigin: 'center' }}>
+                <div className="px-4 py-1.5 text-center font-black text-base uppercase tracking-widest" style={{
+                  border: `3px solid ${['WIN','FAIR'].includes(verdict.status) ? '#1a5c2e' : '#b83020'}`,
+                  color: ['WIN','FAIR'].includes(verdict.status) ? '#1a5c2e' : '#b83020',
+                  fontFamily: "'Courier Prime', monospace",
+                  opacity: 0.85,
+                }}>
+                  {verdict.status}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer actions */}
+            <div className="px-8 py-3 flex justify-between items-center" style={{ borderTop: '1px solid #b8a070' }}>
+              <button onClick={() => { setShowMemo(false); generateClaudeAnalysis(); }}
+                className="text-[9px] font-black uppercase tracking-wider transition-opacity hover:opacity-60"
+                style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                ↺ Regenerate
+              </button>
+              <button onClick={() => setShowMemo(false)}
+                className="text-[9px] font-black uppercase tracking-wider px-4 py-1.5"
+                style={{ background: '#1c140a', color: '#f0e6cc', fontFamily: "'Courier Prime', monospace", borderRadius: '2px' }}>
+                Close ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="fixed inset-0 pointer-events-none bg-newsprint" />
+
+      <div className="relative w-full max-w-[1700px] mx-auto px-4 lg:px-6 py-6 lg:py-8 flex flex-col gap-5 overflow-x-hidden">
+
+        <header className="flex flex-col lg:flex-row lg:justify-between lg:items-end pb-5 border-b" style={{ borderColor: '#b8a070' }}>
+          <div className="w-full">
             <div className="flex items-center gap-2 mb-1">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-60" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-50" style={{ background: '#b83020' }} />
+                <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: '#b83020' }} />
               </span>
-              <span className="text-[9px] font-black uppercase tracking-[0.5em] text-zinc-600">Live NHL Data Feed</span>
+              <span className="text-[9px] font-bold uppercase tracking-[0.4em]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>Live Data Feed Active</span>
             </div>
-            <h1 className="text-[2.1rem] font-black uppercase tracking-tighter text-white leading-none">
-              Quant Front Office
-              <span className="ml-2 text-sm font-mono font-normal text-cyan-500 lowercase tracking-normal">v7.1</span>
-            </h1>
-            <p className="text-[10px] text-zinc-700 mt-1 font-bold uppercase tracking-widest">
-              X-NAV · xG Suppression · Bayesian · GM Logic Engine · Team Archetype Analysis
-            </p>
+
+            {/* Masthead */}
+            <div style={{ borderTop: '4px double #1c140a', borderBottom: '4px double #1c140a', padding: '8px 0 6px', marginBottom: '4px' }}>
+              <div className="text-center">
+                <div className="text-[8px] uppercase tracking-[0.4em] mb-1" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                  Est. 2025 &nbsp;—&nbsp; Vol. VII &nbsp;—&nbsp; Trade Edition
+                </div>
+                <h1 className="font-black leading-none" style={{ color: '#1c140a', fontFamily: "'Libre Baskerville', Georgia, serif",
+                  fontSize: 'clamp(1.8rem, 5vw, 3rem)',
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1,
+                }}>
+                  The Hockey Ledger
+                </h1>
+                <div className="text-[8px] uppercase tracking-[0.3em] mt-1.5 hidden sm:block" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                  X-NAV Analytics &nbsp;·&nbsp; xG Suppression &nbsp;·&nbsp; GM Logic Engine &nbsp;·&nbsp; Live Statistics
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="text-right">
-            <div className="text-[9px] uppercase tracking-[0.35em] text-zinc-700 font-black mb-1">Home Net Gain</div>
-            <div className={`text-4xl font-black font-mono tabular-nums transition-colors duration-500 ${Math.abs(homeNetGain) < 5 ? "text-sky-400" : homeNetGain > 0 ? "text-emerald-400" : "text-rose-500"}`}>
+          <div className="text-right mt-2 lg:mt-0 lg:ml-6 shrink-0">
+            <div className="text-[9px] uppercase tracking-[0.35em] font-black mb-1" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>Home Net Gain</div>
+            <div className={`text-3xl lg:text-4xl font-black font-mono tabular-nums transition-colors duration-500 ${Math.abs(homeNetGain) < 5 ? "text-sky-400" : homeNetGain > 0 ? "text-emerald-400" : "text-rose-500"}`}>
               {fmt(homeNetGain, 1)}
-              <span className="text-sm text-zinc-600 ml-1.5 font-sans font-bold">NAV</span>
+              <span className="text-sm ml-1.5 font-bold" style={{ color: '#9a7d58' }}>NAV</span>
             </div>
           </div>
         </header>
 
         <TugBar homeNetGain={homeNetGain} navA={navA} navB={navB} />
 
-        <div className="grid grid-cols-[1fr_280px_1fr] gap-5 items-start">
+        {/* ── Main Trade Grid ── */}
+        <div className="flex flex-col lg:grid lg:grid-cols-[1fr_260px_1fr] xl:grid-cols-[1fr_280px_1fr] gap-4 lg:gap-5 items-start">
 
+          {/* Home panel */}
           <TradePanel idx={0} team={teams[0]} nav={navA} capSpace={capA} db={db} blocks={blocks}
             setTeams={setTeams} setBlocks={setBlocks} label="Your Franchise" accent="HOME"
-            onRequestTrade={(a) => setTradeRequest(a)} />
+            onRequestTrade={(a) => setTradeRequest([a])}
+            onRequestBlockTrade={(block) => setTradeRequest(block)} />
 
-          <div className="flex flex-col gap-3 pt-8">
+          {/* Middle controls — on mobile sits between panels */}
+          <div className="flex flex-col gap-3 lg:pt-8 order-last lg:order-none">
             {teams[0] && teams[1] && (
               <div className="grid grid-cols-2 gap-2">
                 <ModeBadge team={teams[0]} roster={allHomeRoster} label="Home Mode" />
@@ -1618,21 +2086,23 @@ Write in the voice of a confident, analytical NHL executive. Reference the speci
             )}
 
             <button onClick={runEval} disabled={!blocks[0].length && !blocks[1].length}
-              className="w-full py-4 rounded-xl font-black uppercase tracking-widest text-[11px] bg-white text-black hover:bg-cyan-400 transition-all duration-200 disabled:opacity-25 disabled:cursor-not-allowed active:scale-[0.97] shadow-xl shadow-black/50">
-              Run GM Audit ↗
+              className="w-full py-4 font-black uppercase tracking-widest text-[11px] transition-all duration-200 disabled:opacity-25 disabled:cursor-not-allowed active:scale-[0.97] btn-stamp"
+              onMouseEnter={e => (e.currentTarget.style.background = '#d43820')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#b83020')}>
+              ✦ Run GM Audit ✦
             </button>
 
             {verdict && (verdict.status === "FAIR" || verdict.status === "WIN") && (
               <button onClick={executeTrade}
-                className="w-full py-3 rounded-xl font-black uppercase tracking-widest text-[11px] bg-emerald-950 border border-emerald-700 text-emerald-400 hover:bg-emerald-900 transition-all duration-200 active:scale-[0.97]">
-                ✓ Execute Trade
+                className="w-full py-3 font-black uppercase tracking-widest text-[11px] transition-all duration-200 active:scale-[0.97] btn-green-ink">
+                ✓ Execute Trade — File It
               </button>
             )}
 
             {executedTrades.length > 0 && (
               <button onClick={resetTrades}
-                className="w-full py-2 rounded-xl font-black uppercase tracking-widest text-[10px] text-zinc-600 hover:text-zinc-400 border border-zinc-800 hover:border-zinc-700 transition-all">
-                ↺ Reset All Trades
+                className="w-full py-2 font-black uppercase tracking-widest text-[10px] transition-all btn-ghost">
+                ↺ Void All Trades
               </button>
             )}
 
@@ -1646,13 +2116,13 @@ Write in the voice of a confident, analytical NHL executive. Reference the speci
             )}
 
             {verdict && verdict.status !== "IDLE" && (
-              <VerdictPanel verdict={verdict} sc={sc} expandedFlag={expandedFlag} setExpandedFlag={setExpandedFlag} onRequestClaudeAnalysis={generateClaudeAnalysis} />
+              <VerdictPanel verdict={verdict} sc={sc} expandedFlag={expandedFlag} setExpandedFlag={setExpandedFlag} onRequestClaudeAnalysis={generateClaudeAnalysis} onOpenMemo={() => setShowMemo(true)} />
             )}
           </div>
 
           <TradePanel idx={1} team={teams[1]} nav={navB} capSpace={capB} db={db} blocks={blocks}
             setTeams={setTeams} setBlocks={setBlocks} label="Trade Partner" accent="PARTNER"
-            onRequestTrade={(a) => setTradeRequest(a)} />
+            onRequestTrade={(a) => setTradeRequest([a])} />
         </div>
 
         {/* ── Executed Trades Log + Sim Panel ── */}
@@ -1727,6 +2197,96 @@ Write in the voice of a confident, analytical NHL executive. Reference the speci
         )}
 
         {(blocks[0].length > 0 || blocks[1].length > 0) && <BreakdownTable blocks={blocks} />}
+        {/* ── Footer — Glossary & Methodology ── */}
+        <footer className="mt-12 pt-8" style={{ borderTop: '2px solid #1c140a' }}>
+          <div className="text-center mb-6">
+            <div className="text-[9px] uppercase tracking-[0.5em] mb-1" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+              Methodology & Glossary
+            </div>
+            <h2 className="text-xl font-black" style={{ fontFamily: "'Libre Baskerville', serif", color: '#1c140a' }}>
+              How The Hockey Ledger Works
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
+            {/* Valuation */}
+            <div>
+              <div className="font-black text-sm mb-3 pb-1" style={{ color: '#1c140a', borderBottom: '1px solid #b8a070', fontFamily: "'Libre Baskerville', serif" }}>
+                Player Valuation
+              </div>
+              <div className="space-y-3 text-[11px]" style={{ color: '#4a3820', lineHeight: 1.7 }}>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>NAV (Net Asset Value)</span>
+                  <p className="mt-0.5">A player's overall trade value on a scale from roughly -100 to +1000. Combines offensive production, defensive contribution, contract cost, and age. Think of it as "how much is this player actually worth versus what they cost?" A positive NAV means the player is providing more value than their salary — a negative NAV means they're a contract liability.</p>
+                </div>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>NOIV (Net On-Ice Value)</span>
+                  <p className="mt-0.5">A contextual adjustment to NAV based on how much a player elevates their teammates. Uses three metrics: how much the team controls expected goals when the player is on ice vs off, how well they suppress the opposition relative to their linemates, and how often they start shifts in the defensive zone. A player with NOIV higher than NAV is a hidden gem — their raw stats undersell their actual impact.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Metrics */}
+            <div>
+              <div className="font-black text-sm mb-3 pb-1" style={{ color: '#1c140a', borderBottom: '1px solid #b8a070', fontFamily: "'Libre Baskerville', serif" }}>
+                The Numbers Explained
+              </div>
+              <div className="space-y-3 text-[11px]" style={{ color: '#4a3820', lineHeight: 1.7 }}>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>OFF</span>
+                  <p className="mt-0.5">Offensive impact — derived from points per 82 games and expected goals generated. Uses Bayesian regularization to account for sample size, so a player with 20 games gets pulled toward the league average until we have enough data to trust their numbers.</p>
+                </div>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>DEF</span>
+                  <p className="mt-0.5">Defensive value — for shutdown defencemen, this shows their competition-adjusted bonus (how hard their matchups are). For everyone else, it reflects on-ice vs off-ice expected goals against. Filtered by reliability — sheltered players on easy minutes get a near-zero DEF rating because the metric isn't meaningful for them.</p>
+                </div>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>YNG / AGE</span>
+                  <p className="mt-0.5">Youth option value or age penalty. Young players on cheap contracts get a premium because teams control their rights at below-market rates. Veterans past their peak get penalized as their production is expected to decline. Shows as YNG when positive (upside), AGE when negative (decline risk).</p>
+                </div>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>CAP</span>
+                  <p className="mt-0.5">Contract cost penalty. A player paid more than their on-ice production justifies creates negative cap value — the team is spending money they could use elsewhere. Long bad contracts are penalized more than short ones because they're harder to escape.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Archetypes & GM Logic */}
+            <div>
+              <div className="font-black text-sm mb-3 pb-1" style={{ color: '#1c140a', borderBottom: '1px solid #b8a070', fontFamily: "'Libre Baskerville', serif" }}>
+                Archetypes & GM Logic
+              </div>
+              <div className="space-y-3 text-[11px]" style={{ color: '#4a3820', lineHeight: 1.7 }}>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>D-Man Archetypes</span>
+                  <p className="mt-0.5"><strong>Offensive D</strong> — 45+ pts/82, valued primarily for scoring and powerplay (Makar, Bouchard). <strong>Two-Way D</strong> — 28-45 pts/82 with heavy minutes, balanced value (Morrissey, Josi). <strong>Shutdown D</strong> — under 28 pts/82 but faces elite competition (QoC rank below 220), valued for defensive role not scoring (Slavin). <strong>Depth D</strong> — sheltered deployment, standard evaluation.</p>
+                </div>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>EWA (Estimated Wins Added)</span>
+                  <p className="mt-0.5">Translates NAV into actual standings wins. Roughly 7 NAV points equals one win above replacement, adjusted for where the team sits — wins are harder to add for teams already near the top of the standings.</p>
+                </div>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>CWI (Contention Window Index)</span>
+                  <p className="mt-0.5">Estimates how a trade affects a team's championship window. Positive numbers mean the window opens sooner or extends longer. Young players on cheap deals and high draft picks push CWI up. Aging veterans on long contracts push it down.</p>
+                </div>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>GM Flags</span>
+                  <p className="mt-0.5">The audit engine checks 15+ real-world factors a GM would consider: cap compliance, positional depth thresholds, NMC/NTC clause probability, timeline mismatch between team phases, defensive dependency, same-division conflicts, and value imbalance. HARD flags block the trade; SOFT flags warn but allow it.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center pt-4" style={{ borderTop: '1px solid #b8a070' }}>
+            <p className="text-[9px] uppercase tracking-[0.4em]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+              Data: NHL API · MoneyPuck · CapWages &nbsp;·&nbsp; Models: X-NAV 7.2 · G-NAV · NOIV &nbsp;·&nbsp; AI: Claude Sonnet & Haiku
+            </p>
+            <p className="text-[8px] mt-1" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
+              All valuations are analytical estimates, not financial advice. Player values fluctuate with injury, performance, and market conditions.
+            </p>
+          </div>
+        </footer>
+
       </div>
     </main>
   );
@@ -1736,7 +2296,7 @@ Write in the voice of a confident, analytical NHL executive. Reference the speci
 // TRADE PANEL
 // ============================================================
 function TradePanel({
-  idx, team, nav, capSpace, db, blocks, setTeams, setBlocks, label, accent, onRequestTrade
+  idx, team, nav, capSpace, db, blocks, setTeams, setBlocks, label, accent, onRequestTrade, onRequestBlockTrade
 }: {
   idx: 0 | 1;
   team: Team | null;
@@ -1749,71 +2309,70 @@ function TradePanel({
   label: string;
   accent: string;
   onRequestTrade?: (a: Asset) => void;
+  onRequestBlockTrade?: (block: Asset[]) => void;
 }) {
   const isLeft = idx === 0;
 
   return (
-    <div className={`relative bg-zinc-900/50 border rounded-2xl p-6 flex flex-col min-h-[740px] backdrop-blur-sm ${
-      isLeft ? "border-cyan-900/40" : "border-zinc-800/60"
-    }`}>
+    <div className="relative border rounded-2xl p-4 lg:p-6 flex flex-col min-h-[400px] lg:min-h-[740px]" style={{
+      background: '#ede4cc',
+      borderColor: isLeft ? '#9a7d58' : '#b8a070',
+    }}>
       {/* Badge */}
-      <div className={`absolute -top-3 ${isLeft ? "left-6" : "left-6"} px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.3em] border ${
-        isLeft
-          ? "bg-cyan-950 border-cyan-800 text-cyan-400"
-          : "bg-zinc-800 border-zinc-700 text-zinc-400"
-      }`}>
+      <div className={`absolute -top-3 left-6 px-3 py-1 text-[9px] font-black uppercase tracking-[0.3em] border`} style={{
+        background: '#e8dab8',
+        borderColor: '#b8a070',
+        color: '#6b5030',
+        borderRadius: '2px'
+      }}>
         {accent}
       </div>
 
-      {/* Team selector */}
-      <div className="flex justify-between items-start mb-6 border-b border-zinc-800/40 pb-4">
-        <div>
-          <div className="text-[8px] text-zinc-600 font-black uppercase tracking-widest mb-1">{label}</div>
+      {/* Section dateline */}
+      <div className="mb-4 pb-3">
+        <div className="text-[8px] font-black uppercase tracking-[0.5em] mb-1">
+          {label}
+        </div>
+        <div className="flex justify-between items-end">
           <select
-            className="bg-transparent text-2xl font-black text-white outline-none cursor-pointer hover:text-cyan-400 transition-colors max-w-[200px] truncate"
+            className="bg-transparent outline-none cursor-pointer font-black leading-tight"
+            style={{ fontSize: '1.35rem', color: '#1c140a', fontFamily: "'Libre Baskerville', Georgia, serif", maxWidth: '100%' }}
             value={team?.id ?? ""}
             onChange={(e) => {
               const found = db.teams.find((t) => t.id === e.target.value) ?? null;
-              setTeams((prev) => {
-                const n = [...prev] as [Team | null, Team | null];
-                n[idx] = found;
-                return n;
-              });
-              setBlocks((prev) => {
-                const n = [...prev] as [Asset[], Asset[]];
-                n[idx] = [];
-                return n;
-              });
+              setTeams((prev) => { const n = [...prev] as [Team | null, Team | null]; n[idx] = found; return n; });
+              setBlocks((prev) => { const n = [...prev] as [Asset[], Asset[]]; n[idx] = []; return n; });
             }}
           >
             {db.teams.map((t) => (
-              <option key={t.id} value={t.id} className="bg-zinc-900 text-sm">
+              <option key={t.id} value={t.id} style={{ background: '#e8dab8', color: '#1c140a' }}>
                 {t.name}
               </option>
             ))}
           </select>
-        </div>
 
-        <div className="text-right shrink-0">
-          <div className="text-2xl font-black font-mono italic text-white leading-none">{nav.toFixed(1)}</div>
-          <div className="text-[9px] font-black uppercase tracking-wide text-zinc-600 mb-1">NAV</div>
-          <div className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${
-            capSpace < 0
-              ? "bg-rose-950/50 text-rose-400 animate-pulse"
-              : "bg-emerald-950/30 text-emerald-400"
-          }`}>
-            {capSpace >= 0
-              ? `+${capSpace.toFixed(1)}M cap`
-              : `${capSpace.toFixed(1)}M over cap`}
+          <div className="text-right shrink-0 ml-3">
+            <div className="font-black leading-none" style={{ fontSize: '1.4rem', color: '#1c140a', fontFamily: "'Courier Prime', monospace", fontStyle: 'italic' }}>
+              {nav.toFixed(1)}
+            </div>
+            <div className="text-[8px] font-black uppercase tracking-widest">NAV</div>
+            <div className="text-[9px] font-black px-1.5 py-0.5 mt-0.5" style={{
+              fontFamily: "'Courier Prime', monospace",
+              color: capSpace < 0 ? '#b83020' : '#1a5c2e',
+              background: capSpace < 0 ? 'rgba(184,48,32,0.08)' : 'rgba(26,92,46,0.08)',
+              border: `1px solid ${capSpace < 0 ? 'rgba(184,48,32,0.25)' : 'rgba(26,92,46,0.25)'}`,
+            }}>
+              {capSpace >= 0 ? `+${capSpace.toFixed(1)}M` : `${capSpace.toFixed(1)}M`}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Asset list */}
-      <div className="flex-grow overflow-y-auto space-y-2.5 mb-4 pr-1 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+      <div className="flex-grow overflow-y-auto space-y-2 mb-4 pr-1">
         {blocks[idx].length === 0 && (
-          <div className="flex items-center justify-center h-32 border border-dashed border-zinc-800 rounded-xl">
-            <span className="text-zinc-700 text-xs font-black uppercase tracking-wider">No assets selected</span>
+          <div className="flex items-center justify-center h-32 border-2 border-dashed" >
+            <span className="text-[10px] font-black uppercase tracking-[0.3em]">No assets on the block</span>
           </div>
         )}
         {blocks[idx].map((a) => (
@@ -1827,6 +2386,16 @@ function TradePanel({
           />
         ))}
       </div>
+
+      {/* Find Trade Partners button — only on outgoing (home) side with assets */}
+      {idx === 0 && blocks[0].length > 0 && onRequestBlockTrade && (
+        <button
+          onClick={() => onRequestBlockTrade(blocks[0])}
+          className="w-full py-2.5 font-black text-[10px] uppercase tracking-widest transition-all mb-2 flex items-center justify-center gap-2 btn-ink"
+        >
+          ⚡ Find Trade Partners for This Package
+        </button>
+      )}
 
       {/* Asset selector */}
       <AssetDropdown idx={idx} team={team} db={db} blocks={blocks} setBlocks={setBlocks} />
@@ -1868,23 +2437,29 @@ function AssetCard({
   const navColor = xnav.total > 80 ? "text-emerald-400" : xnav.total > 20 ? "text-sky-400" : xnav.total > -20 ? "text-zinc-400" : "text-rose-400";
 
   return (
-    <div className="bg-zinc-950/60 border border-zinc-800/50 rounded-xl p-3.5 group hover:border-zinc-700/70 transition-all">
+    <div className="p-3 transition-all">
       <div className="flex justify-between items-start mb-2.5">
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
           {asset.headshot && (
-            <img src={asset.headshot} alt={asset.name} className="w-8 h-8 rounded-full object-cover border border-zinc-700/50 shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+            <img src={asset.headshot} alt={asset.name}
+              className="w-8 h-8 object-cover shrink-0"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
           )}
           <div className="min-w-0">
-            <div className="font-black text-white text-[13px] leading-tight truncate flex items-center gap-1.5">
+            <div className="font-black leading-tight truncate flex items-center gap-1.5"
+              style={{ fontSize: '13px', color: '#1c140a' }}>
               {asset.name}
-              {asset.hasNMC && <span className="text-[8px] bg-rose-900/40 text-rose-400 px-1 rounded border border-rose-900/60 font-black shrink-0">NMC</span>}
-              {asset.hasNTC && !asset.hasNMC && <span className="text-[8px] bg-amber-900/40 text-amber-400 px-1 rounded border border-amber-900/60 font-black shrink-0">NTC</span>}
-              {!asset.hasLiveStats && !isPick && <span className="text-[8px] bg-zinc-800 text-zinc-600 px-1 rounded font-black shrink-0">EST</span>}
+              {asset.hasNMC && <span className="text-[7px] px-1 font-black shrink-0" style={{ color: '#b83020', border: '1px solid #b83020',  }}>NMC</span>}
+              {asset.hasNTC && !asset.hasNMC && <span className="text-[7px] px-1 font-black shrink-0" style={{ color: '#8a5c00', border: '1px solid #8a5c00',  }}>NTC</span>}
+              {!asset.hasLiveStats && !isPick && <span className="text-[7px] px-1 font-black shrink-0" style={{ color: '#9a7d58', border: '1px solid #b8a070',  }}>EST</span>}
             </div>
-            <div className="text-[9px] text-zinc-600 font-black uppercase tracking-wider mt-0.5">
+            <div className="text-[9px] font-bold uppercase tracking-wider mt-0.5" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
               {isPick
                 ? `${asset.year} · ${asset.round === 1 ? "1st" : asset.round === 2 ? "2nd" : "3rd"} Round`
-                : `${asset.position} · Age ${asset.age} · $${asset.capHit.toFixed(2)}M × ${asset.yearsRemaining}yr`}
+                : (() => {
+                    const expiryYear = new Date().getFullYear() + (asset.yearsRemaining ?? 1);
+                    return `${asset.position} · Age ${asset.age} · $${asset.capHit.toFixed(2)}M × ${asset.yearsRemaining}yr · Exp. ${expiryYear}`;
+                  })()}
             </div>
             {/* Awards badges */}
             {PLAYER_PEDIGREE[asset.name]?.awards && PLAYER_PEDIGREE[asset.name].awards!.length > 0 && (
@@ -1892,7 +2467,7 @@ function AssetCard({
                 {Array.from(new Set(PLAYER_PEDIGREE[asset.name].awards)).map((award) => {
                   const count = PLAYER_PEDIGREE[asset.name].awards!.filter(a => a === award).length;
                   return (
-                    <span key={award} className="text-[7px] bg-yellow-900/30 text-yellow-400 border border-yellow-800/40 px-1 py-0.5 rounded font-black">
+                    <span key={award} className="text-[7px] px-1 py-0.5 font-black" style={{ color: '#8a5c00', border: '1px solid rgba(138,92,0,0.4)',  }}>
                       {count > 1 ? `${count}× ` : ""}{award}
                     </span>
                   );
@@ -1902,25 +2477,106 @@ function AssetCard({
             {/* Prospect tier badge */}
             {PROSPECT_TIERS[asset.name] && (
               <div className="flex items-center gap-1 mt-1">
-                <span className={`text-[7px] px-1.5 py-0.5 rounded font-black border ${
-                  PROSPECT_TIERS[asset.name].tier === 1 ? "bg-purple-900/40 text-purple-300 border-purple-800/50" :
-                  PROSPECT_TIERS[asset.name].tier === 2 ? "bg-cyan-900/40 text-cyan-300 border-cyan-800/50" :
-                  "bg-zinc-800/60 text-zinc-400 border-zinc-700/50"
-                }`}>
-                  {PROSPECT_TIERS[asset.name].tier === 1 ? "★ FRANCHISE PROSPECT" :
-                   PROSPECT_TIERS[asset.name].tier === 2 ? "◆ TOP PROSPECT" : "◇ PROSPECT"}
+                <span className="text-[7px] px-1 py-0.5 font-black" style={{
+                  color: PROSPECT_TIERS[asset.name].tier === 1 ? '#1a2e5c' : PROSPECT_TIERS[asset.name].tier === 2 ? '#1a5c2e' : '#6b5030',
+                  border: `1px solid ${PROSPECT_TIERS[asset.name].tier === 1 ? 'rgba(26,46,92,0.4)' : PROSPECT_TIERS[asset.name].tier === 2 ? 'rgba(26,92,46,0.4)' : 'rgba(107,80,48,0.4)'}`,
+                  
+                }}>
+                  {PROSPECT_TIERS[asset.name].tier === 1 ? "★ FRANCHISE" : PROSPECT_TIERS[asset.name].tier === 2 ? "◆ TOP PROSPECT" : "◇ PROSPECT"}
                 </span>
               </div>
             )}
             {/* Injury risk badge */}
             {INJURY_RISK[asset.name] && (
               <div className="flex items-center gap-1 mt-1">
-                <span className={`text-[7px] px-1.5 py-0.5 rounded font-black border ${
-                  INJURY_RISK[asset.name].level === "HIGH"
-                    ? "bg-red-900/30 text-red-400 border-red-800/40"
-                    : "bg-amber-900/30 text-amber-400 border-amber-800/40"
-                }`} title={INJURY_RISK[asset.name].note}>
-                  ⚕ {INJURY_RISK[asset.name].level === "HIGH" ? "HIGH" : "MOD"} INJURY RISK
+                <span className="text-[7px] px-1 py-0.5 font-black" style={{
+                  color: '#b83020',
+                  border: '1px solid rgba(184,48,32,0.4)',
+                  fontFamily: "'Courier Prime', monospace"
+                }} title={INJURY_RISK[asset.name].note}>
+                  ⚕ {INJURY_RISK[asset.name].level} RISK
+                </span>
+              </div>
+            )}
+            {/* D-man archetype badge */}
+            {asset.position === "D" && !isPick && (() => {
+              const pts = asset.ptsPace ?? 0;
+              const toi = asset.avgTOI ?? 0;
+              const qoc = asset.qocRank ?? 450;
+              let arch = "DEPTH D";
+              let color = '#6b5030';
+              let title = "5th/6th defender — limited deployment";
+              if (pts >= 45) {
+                arch = "OFFENSIVE D"; color = '#1a2e5c';
+                title = "Offensive defenceman — primary value from scoring and powerplay";
+              } else if (pts >= 28 && toi >= 21) {
+                arch = "TWO-WAY D"; color = '#1a5c2e';
+                title = "Two-way defenceman — contributes offensively and defensively";
+              } else if (pts < 28 && toi >= 19 && qoc < 220) {
+                arch = "SHUTDOWN D"; color = '#8a5c00';
+                title = `Shutdown defenceman — faces elite competition (QoC rank: ${qoc}), valued for defensive role not scoring`;
+              }
+              return (
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-[7px] px-1 py-0.5 font-black" style={{
+                    color, border: `1px solid ${color}40`,
+                    fontFamily: "'Courier Prime', monospace"
+                  }} title={title}>
+                    {arch}
+                  </span>
+                </div>
+              );
+            })()}
+            {/* Forward archetype badge */}
+            {["C","W","L","R"].includes(asset.position) && !isPick && xnav.fArchetype && (() => {
+              const archMap: Record<string, { color: string; title: string }> = {
+                SNIPER:     { color: '#1a2e5c', title: "Sniper — primary value from goal generation" },
+                PLAYMAKER:  { color: '#1a5c2e', title: "Playmaker — primary value from assist generation and play-driving" },
+                TWO_WAY:    { color: '#8a5c00', title: "Two-Way Forward — balanced offense with strong defensive suppression" },
+                GRINDER:    { color: '#b83020', title: "Grinder — defensive deployment, physical play, limited offensive upside" },
+                SCORER:     { color: '#1a2e5c', title: "Scoring Forward — balanced offensive production" },
+              };
+              const cfg = archMap[xnav.fArchetype];
+              if (!cfg) return null;
+              return (
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-[7px] px-1 py-0.5 font-black" style={{
+                    color: cfg.color,
+                    border: `1px solid ${cfg.color}40`,
+                    fontFamily: "'Courier Prime', monospace",
+                  }} title={cfg.title}>
+                    {xnav.fArchetype.replace("_", " ")}
+                  </span>
+                </div>
+              );
+            })()}
+
+            {/* Surplus contract stamp */}
+            {!isPick && (() => {
+              const effectiveCap = asset.capHit * (1 - (asset.retainedPct || 0));
+              const isSurplus = xnav.total > effectiveCap * 18 && xnav.total > 50;
+              if (!isSurplus) return null;
+              return (
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-[7px] px-1 py-0.5 font-black" style={{
+                    color: '#1a5c2e',
+                    border: '1px solid rgba(26,92,46,0.5)',
+                    fontFamily: "'Courier Prime', monospace",
+                  }} title="Surplus contract — this player's on-ice value significantly exceeds their cap hit.">
+                    ★ SURPLUS CONTRACT
+                  </span>
+                </div>
+              );
+            })()}
+            {/* Shutdown D pedigree badge */}
+            {SHUTDOWN_D_PEDIGREE[asset.name] && (
+              <div className="flex items-center gap-1 mt-1">
+                <span className="text-[7px] px-1 py-0.5 font-black" style={{
+                  color: '#8a5c00',
+                  border: '1px solid rgba(138,92,0,0.5)',
+                  fontFamily: "'Courier Prime', monospace"
+                }} title={SHUTDOWN_D_PEDIGREE[asset.name].note}>
+                  ★ ELITE SHUTDOWN
                 </span>
               </div>
             )}
@@ -1929,21 +2585,33 @@ function AssetCard({
 
         <div className="flex items-center gap-2 shrink-0 ml-2">
           <div className={`text-xl font-black font-mono italic ${navColor}`}>
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="font-black" style={{
+            fontSize: '1.1rem',
+            fontStyle: 'italic',
+            color: xnav.total > 80 ? '#1a5c2e' : xnav.total > 20 ? '#1a2e5c' : xnav.total > -20 ? '#6b5030' : '#b83020',
+            fontFamily: "'Courier Prime', monospace",
+          }}>
             {fmt(xnav.total, 0)}
+          </span>
+          {xnav.noivImpact !== undefined && Math.abs(xnav.noivImpact) >= 2 && (
+            <span className="text-[8px] font-black" style={{
+              color: xnav.noivImpact > 0 ? '#1a5c2e' : '#b83020',
+              fontFamily: "'Courier Prime', monospace",
+              letterSpacing: '0.05em',
+            }} title={`NOIV Impact: ${xnav.noivImpact > 0 ? '+' : ''}${xnav.noivImpact.toFixed(0)}. ${xnav.noivImpact > 0 ? 'Elevates teammates beyond raw stats.' : 'On-ice context reduces value vs raw stats.'}`}>
+              {xnav.noivImpact > 0 ? '↑' : '↓'} {Math.abs(xnav.noivImpact).toFixed(0)} NOIV
+            </span>
+          )}
+        </div>
           </div>
           {!isPick && (
-            <button
-              onClick={() => onRequestTrade?.(asset)}
-              title="Generate trade proposals"
-              className="text-zinc-700 hover:text-cyan-400 transition-colors text-xs font-bold leading-none"
-            >
+            <button onClick={() => onRequestTrade?.(asset)} title="Generate trade proposals"
+              className="font-bold leading-none transition-colors text-ink-faint text-[11px]">
               ⚡
             </button>
           )}
-          <button
-            onClick={removeAsset}
-            className="text-zinc-700 hover:text-rose-400 transition-colors text-sm font-bold leading-none"
-          >
+          <button onClick={removeAsset} className="font-bold leading-none transition-colors text-ink-faint text-[13px]">
             ✕
           </button>
         </div>
@@ -1952,51 +2620,127 @@ function AssetCard({
       {/* GOALIE stat panel */}
       {asset.position === "G" && !isPick && (
         <div className="grid grid-cols-3 gap-1.5 mb-2.5">
-          <div className="bg-zinc-900 rounded-lg p-2 text-center">
-            <div className="text-[7px] text-zinc-600 font-black uppercase tracking-tight mb-0.5">GSAx</div>
-            <div className={`text-[11px] font-black font-mono ${(asset.gsax ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-              {(asset.gsax ?? 0) > 0 ? "+" : ""}{(asset.gsax ?? 0).toFixed(1)}
+          {[
+            { label: 'GSAx', val: (asset.gsax??0).toFixed(1), good: (asset.gsax??0) >= 0 },
+            { label: 'SV%',  val: ((asset.savePct??0.9)*100).toFixed(1), good: (asset.savePct??0) >= 0.910 },
+            { label: 'GP',   val: String(asset.gamesStarted ?? 0), good: true },
+          ].map(s => (
+            <div key={s.label} className="p-2 text-center">
+              <div className="text-[7px] font-black uppercase tracking-tight mb-0.5">{s.label}</div>
+              <div className="text-[11px] font-black" style={{ color: s.good ? '#1a5c2e' : '#b83020' }}>{s.val}</div>
             </div>
-          </div>
-          <div className="bg-zinc-900 rounded-lg p-2 text-center">
-            <div className="text-[7px] text-zinc-600 font-black uppercase tracking-tight mb-0.5">SV%</div>
-            <div className={`text-[11px] font-black font-mono ${(asset.savePct ?? 0) >= 0.910 ? "text-emerald-400" : (asset.savePct ?? 0) >= 0.900 ? "text-amber-400" : "text-rose-400"}`}>
-              {((asset.savePct ?? 0.900) * 100).toFixed(1)}
-            </div>
-          </div>
-          <div className="bg-zinc-900 rounded-lg p-2 text-center">
-            <div className="text-[7px] text-zinc-600 font-black uppercase tracking-tight mb-0.5">GP</div>
-            <div className="text-[11px] font-black font-mono text-zinc-400">
-              {asset.gamesStarted ?? asset.games ?? 0}
-            </div>
-          </div>
-          {/* Career context row */}
-          {PLAYER_PEDIGREE[asset.name]?.careerGsax && (
-            <div className="col-span-3 bg-zinc-900/50 rounded-lg px-2 py-1 flex justify-between items-center">
-              <span className="text-[7px] text-zinc-600 font-black uppercase tracking-tight">Career GSAx</span>
-              <span className="text-[9px] font-black font-mono text-sky-400">
+          ))}
+          {/* Role badge */}
+          <div className="col-span-3 px-2 py-1 flex justify-between items-center">
+            {(() => {
+              const gp = asset.gamesStarted ?? asset.games ?? 0;
+              const isBackup  = gp < 33;
+              const isStarter = gp >= 40;
+              return (
+                <span className="text-[7px] px-1 py-0.5 font-black" style={{
+                  color: isStarter ? '#1a2e5c' : isBackup ? '#9a6b00' : '#6b5030',
+                  border: `1px solid ${isStarter ? 'rgba(26,46,92,0.4)' : isBackup ? 'rgba(154,107,0,0.4)' : 'rgba(107,80,48,0.4)'}`,
+                  fontFamily: "'Courier Prime', monospace",
+                }} title={isBackup ? "Backup goalie — NAV capped at 55. Per-game rates on <25 starts are unreliable predictors of full-season value." : isStarter ? "Starter — played 35+ games, full valuation applied" : "Tandem — shared starter role"}>
+                  {isBackup ? "BACKUP" : isStarter ? "STARTER" : "TANDEM"}
+                </span>
+              );
+            })()}
+            {PLAYER_PEDIGREE[asset.name]?.careerGsax && (
+              <span className="text-[9px] font-black" style={{ color: '#1a2e5c', fontFamily: "'Courier Prime', monospace" }}>
                 +{PLAYER_PEDIGREE[asset.name].careerGsax} career · Peak {PLAYER_PEDIGREE[asset.name].peakGsax}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SKATER NAV breakdown bars */}
+      {!isPick && asset.position !== "G" && (
+        <div className="mb-2.5">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>NAV Breakdown</span>
+            <span
+              className="text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center cursor-help shrink-0"
+              style={{ color: '#9a7d58', border: '1px solid #c8b890' }}
+              title="OFF: Offensive production value (pts/82 pace, xG). DEF: Defensive suppression (xG against, TOI quality). YNG: Option value from proven youth on cheap deal. CAP: Contract cost penalty — overpaid contracts drag total NAV."
+            >i</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
+            <MicroBar label="OFF" val={xnav.off} max={300} color="cyan"
+              tooltip="Offensive impact — scoring production (pts/82, xG rate)" />
+            <MicroBar label="DEF" val={xnav.def} max={150} color="emerald"
+              tooltip="Defensive value — xG suppression weighted by ice time quality" />
+            <MicroBar label={xnav.age > 0 ? "YNG" : "AGE"} val={xnav.age} max={80}
+              color={xnav.age > 0 ? "violet" : "amber"}
+              tooltip={xnav.age > 0
+                ? "Youth premium — proven production on a cheap contract creates surplus value"
+                : "Age penalty — decline curve discount for veterans past peak age"} />
+            <MicroBar label="CAP" val={xnav.cap} max={100} color="rose" invert
+              tooltip="Contract cost — overpaid contracts drag total NAV. Negative = cap hit exceeds on-ice value" />
+          </div>
+          {/* Peak pts for established skaters with pedigree */}
+          {PLAYER_PEDIGREE[asset.name]?.peakPtsPace && (
+            <div className="mt-1.5 px-1 py-1 flex justify-between items-center" style={{ borderTop: '1px solid #c8b890' }}>
+              <span className="text-[7px] font-black uppercase tracking-tight" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>Career Peak</span>
+              <span className="text-[9px] font-black" style={{ color: '#1a2e5c', fontFamily: "'Courier Prime', monospace" }}>
+                {PLAYER_PEDIGREE[asset.name].peakPtsPace} pts/82
               </span>
             </div>
           )}
         </div>
       )}
 
-      {/* SKATER NAV breakdown bars */}
-      {!isPick && asset.position !== "G" && (
-        <div className="grid grid-cols-4 gap-1 mb-2.5">
-          <MicroBar label="OFF" val={xnav.off} max={300} color="cyan" />
-          <MicroBar label="DEF" val={xnav.def} max={150} color="emerald" />
-          <MicroBar label={xnav.age > 0 ? "YNG" : "AGE"} val={xnav.age} max={80} color={xnav.age > 0 ? "violet" : "amber"} />
-          <MicroBar label="CAP" val={xnav.cap} max={100} color="rose" invert />
+      {/* Goalie G-NAV + CAP bars */}
+      {!isPick && asset.position === "G" && (
+        <div className="mb-2.5">
+          <div className="flex items-center justify-between mb-1.5">
+            <span>G-NAV Breakdown</span>
+            <span
+              className="text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center cursor-help shrink-0 badge-rule"
+              title="G-NAV: Goals Saved Above Expected (GSAx) — how many goals this goalie prevented vs an average starter. CAP: Contract cost penalty."
+            >i</span>
+          </div>
+          <div className="grid grid-cols-2 gap-1">
+            <MicroBar label="G-NAV" val={xnav.def} max={150} color="emerald"
+              tooltip="Goalie NAV — based on GSAx (goals saved above expected) from MoneyPuck" />
+            <MicroBar label="CAP" val={xnav.cap} max={100} color="rose" invert
+              tooltip="Contract cost — overpaid contracts drag total NAV" />
+          </div>
         </div>
       )}
 
-      {/* Goalie single DEF + CAP bars */}
-      {!isPick && asset.position === "G" && (
-        <div className="grid grid-cols-2 gap-1 mb-2.5">
-          <MicroBar label="G-NAV" val={xnav.def} max={150} color="emerald" />
-          <MicroBar label="CAP" val={xnav.cap} max={100} color="rose" invert />
+      {/* ── Player stat line (skaters only) ───────────────────── */}
+      {!isPick && asset.position !== "G" && asset.hasLiveStats && (
+        <div className="mt-2 pt-2" style={{ borderTop: '1px solid #c8b890' }}>
+          {/* Box score row */}
+          <div className="grid grid-cols-4 gap-1 mb-1.5">
+            {[
+              { label: 'GP',    val: asset.games.toString() },
+              { label: 'G',     val: (asset.goalsPace  ? (asset.goalsPace  * asset.games / 82).toFixed(0) : '—') },
+              { label: 'A',     val: (asset.assistsPace ? (asset.assistsPace * asset.games / 82).toFixed(0) : '—') },
+              { label: 'PTS',   val: (asset.ptsPace ? (asset.ptsPace * asset.games / 82).toFixed(0) : '—') },
+            ].map(s => (
+              <div key={s.label} className="text-center p-1" style={{ background: '#dfd0a8', border: '1px solid #b8a070' }}>
+                <div className="text-[7px] font-black uppercase tracking-tight" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>{s.label}</div>
+                <div className="text-[11px] font-black" style={{ color: '#1c140a', fontFamily: "'Courier Prime', monospace" }}>{s.val}</div>
+              </div>
+            ))}
+          </div>
+          {/* Advanced row */}
+          <div className="grid grid-cols-4 gap-1">
+            {[
+              { label: 'TOI',   val: asset.avgTOI?.toFixed(1) ?? '—',   tooltip: 'Average time on ice per game (minutes)' },
+              { label: 'xG/82', val: asset.xGPace?.toFixed(1)  ?? '—',  tooltip: 'Expected goals generated per 82 games' },
+              { label: 'xG%+', val: asset.xgRelTM != null ? `${asset.xgRelTM > 0 ? '+' : ''}${asset.xgRelTM.toFixed(1)}` : '—', tooltip: 'xG% relative to teammates — positive means team controls more shots when this player is on ice vs off' },
+              { label: 'QoC',   val: asset.qocRank?.toString() ?? '—',  tooltip: 'Quality of competition rank — lower = harder opponents faced' },
+            ].map(s => (
+              <div key={s.label} className="text-center p-1" title={s.tooltip} style={{ background: '#e8dab8', border: '1px solid #b8a070' }}>
+                <div className="text-[7px] font-black uppercase tracking-tight" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>{s.label}</div>
+                <div className="text-[10px] font-black" style={{ color: '#1a2e5c', fontFamily: "'Courier Prime', monospace" }}>{s.val}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -2016,7 +2760,8 @@ function AssetCard({
             step="5"
             value={(asset.retainedPct * 100).toFixed(0)}
             onChange={(e) => updateAsset({ retainedPct: parseFloat(e.target.value) / 100 })}
-            className="w-full h-1 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-cyan-500"
+            className="w-full h-1 rounded-full appearance-none cursor-pointer"
+          
           />
           <div className="flex justify-between text-[8px] text-zinc-700 font-black mt-0.5">
             <span>0%</span><span>25%</span><span>50% MAX</span>
@@ -2073,7 +2818,8 @@ function AssetDropdown({
 
   return (
     <select
-      className="w-full bg-zinc-900 border border-zinc-800 hover:border-zinc-700 p-3.5 rounded-xl font-black uppercase tracking-widest text-[9px] outline-none text-zinc-500 appearance-none cursor-pointer transition-colors"
+      className="w-full border p-3.5 rounded-xl font-black uppercase tracking-widest text-[9px] outline-none appearance-none cursor-pointer transition-colors"
+      style={{ background: '#e8dab8', borderColor: '#b8a070', color: '#6b5030' }}
       onChange={(e) => {
         const asset = db.players.find((p) => p.id === e.target.value);
         if (asset) {
@@ -2118,7 +2864,7 @@ function TugBar({ homeNetGain, navA, navB }: { homeNetGain: number; navA: number
   const leftPct = clamp((navA / total) * 100, 5, 95);
 
   return (
-    <div className="w-full h-9 bg-zinc-900 border border-zinc-800/50 rounded-2xl relative overflow-hidden flex items-center shadow-inner">
+    <div className="w-full h-9 border rounded-2xl relative overflow-hidden flex items-center shadow-inner">
       <div className="absolute inset-0 flex">
         <div className="h-full bg-rose-500/8 transition-all duration-700 ease-out" style={{ width: `${leftPct}%` }} />
         <div className="h-full bg-emerald-500/8 transition-all duration-700 ease-out flex-1" />
@@ -2159,12 +2905,13 @@ function ModeBadge({ team, roster, label }: { team: Team; roster: Asset[]; label
 // ============================================================
 // VERDICT PANEL — expandable GM flags
 // ============================================================
-function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestClaudeAnalysis }: {
+function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestClaudeAnalysis, onOpenMemo }: {
   verdict: TradeVerdict;
   sc: typeof STATUS_CONFIG[TradeStatus];
   expandedFlag: number | null;
   setExpandedFlag: (i: number | null) => void;
   onRequestClaudeAnalysis: () => void;
+  onOpenMemo: () => void;
 }) {
   const flags = verdict.flags;
   const hardCount = flags.filter((f) => f.severity === "HARD").length;
@@ -2246,42 +2993,33 @@ function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestCla
         })}
       </div>
 
-      {/* ── Claude GM Analysis ────────────────────────────────── */}
+      {/* ── Claude GM Analysis — triggers modal ───────────────── */}
       <div className="px-4 py-3">
-        <div className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-2">
-          AI Front Office Memo
-        </div>
-
         {!verdict.claudeAnalysis && !verdict.claudeLoading && (
           <button
             onClick={onRequestClaudeAnalysis}
-            className="w-full py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-zinc-900 border border-zinc-700 text-zinc-400 hover:border-cyan-700 hover:text-cyan-400 transition-all flex items-center justify-center gap-2"
+            className="w-full py-2.5 font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+            style={{ background: 'transparent', border: '1px solid #b8a070', color: '#6b5030', fontFamily: "'Courier Prime', monospace", borderRadius: '2px' }}
           >
-            <span className="text-cyan-600">✦</span> Generate Claude Analysis
+            <span style={{ color: '#b83020' }}>✦</span> Generate Front Office Memo
           </button>
         )}
 
         {verdict.claudeLoading && (
           <div className="flex items-center gap-2.5 py-3 px-1">
-            <div className="w-3 h-3 rounded-full border-2 border-cyan-600 border-t-transparent animate-spin shrink-0" />
-            <span className="text-[10px] text-zinc-500 font-bold">Claude is reviewing the trade...</span>
+            <div className="w-3 h-3 rounded-full border-t-transparent animate-spin shrink-0" style={{ borderColor: '#b83020', borderTopColor: 'transparent', borderWidth: '2px' }} />
+            <span className="text-[10px] font-bold" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>Claude is reviewing the trade...</span>
           </div>
         )}
 
-        {verdict.claudeAnalysis && (
-          <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3.5">
-            <div className="flex items-center gap-1.5 mb-2.5">
-              <span className="text-cyan-600 text-[10px]">✦</span>
-              <span className="text-[8px] font-black uppercase tracking-widest text-cyan-700">Claude · Front Office Analysis</span>
-            </div>
-            <p className="text-[11px] text-zinc-300 leading-relaxed whitespace-pre-wrap">{verdict.claudeAnalysis}</p>
-            <button
-              onClick={onRequestClaudeAnalysis}
-              className="mt-2.5 text-[9px] font-black uppercase tracking-wider text-zinc-700 hover:text-zinc-500 transition-colors"
-            >
-              ↺ Regenerate
-            </button>
-          </div>
+        {verdict.claudeAnalysis && !verdict.claudeLoading && (
+          <button
+            onClick={onOpenMemo}
+            className="w-full py-2.5 font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+            style={{ background: '#1a5c2e', border: '1px solid #0f3d1e', color: '#fff', fontFamily: "'Courier Prime', monospace", borderRadius: '2px' }}
+          >
+            ✦ Read Front Office Memo
+          </button>
         )}
       </div>
     </div>
@@ -2355,29 +3093,35 @@ function BreakdownTable({ blocks }: { blocks: [Asset[], Asset[]] }) {
 // ============================================================
 // MICRO COMPONENTS
 // ============================================================
-function MicroBar({ label, val, max, color, invert = false }: {
-  label: string; val: number; max: number; color: string; invert?: boolean;
+function MicroBar({ label, val, max, color, invert = false, tooltip }: {
+  label: string; val: number; max: number; color: string; invert?: boolean; tooltip?: string;
 }) {
   const norm = clamp(Math.abs(val) / max, 0, 1);
   const colorMap: Record<string, string> = {
-    cyan: "bg-cyan-500/60",
-    emerald: "bg-emerald-500/60",
-    violet: "bg-violet-500/60",
-    amber: "bg-amber-500/60",
-    rose: "bg-rose-500/60",
+    cyan:    "#1a3a6b",
+    emerald: "#1a6b3a",
+    violet:  "#5b4a9b",
+    amber:   "#9a6b00",
+    rose:    "#c0392b",
   };
-  const isNeg = invert ? val < 0 : val < 0;
+  // Bar color: negative values always red, positive use their assigned color
+  // CAP (invert) is always rose colored — it's always a cost
+  const barColor = val < 0 ? "#c0392b" : colorMap[color];
+  const numColor = invert
+    ? (val < -40 ? '#c0392b' : val < -20 ? '#9a6b00' : '#1a5c2e')
+    : (val < 0 ? '#c0392b' : '#1a5c2e');
 
   return (
-    <div className="bg-zinc-900 rounded p-1.5 text-center">
-      <div className="text-[7px] text-zinc-700 font-black uppercase tracking-tighter mb-1">{label}</div>
-      <div className="h-1 bg-zinc-800 rounded-full mb-1 overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${isNeg ? "bg-rose-500/50" : colorMap[color]}`}
-          style={{ width: `${norm * 100}%` }}
-        />
+    <div className="rounded p-2 text-center" title={tooltip}>
+      <div className="text-[9px] font-black uppercase tracking-wider mb-1.5">{label}</div>
+      <div className="h-1.5 rounded-full mb-1.5 overflow-hidden" style={{ background: '#c8b078' }}>
+        <div className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${norm * 100}%`, background: barColor, opacity: 0.85 }} />
       </div>
-      <div className={`text-[8px] font-black ${isNeg ? "text-rose-400" : "text-zinc-400"}`}>
+      <div className="text-[11px] font-black tabular-nums" style={{
+        color: numColor,
+        fontFamily: "'Courier Prime', monospace"
+      }}>
         {val > 0 ? "+" : ""}{val.toFixed(0)}
       </div>
     </div>
@@ -2401,16 +3145,16 @@ function DeltaRow({ label, val, unit, invert = false, tooltip }: {
 
 function MiniStat({ label, val }: { label: string; val: string }) {
   return (
-    <div className="bg-zinc-900/60 border border-zinc-800/40 rounded-lg p-2 text-center">
-      <div className="text-[8px] text-zinc-600 font-black uppercase tracking-widest mb-0.5">{label}</div>
-      <div className="text-[13px] font-black font-mono text-white">{val}</div>
+    <div className="p-2 text-center">
+      <div className="text-[8px] font-black uppercase tracking-widest mb-0.5">{label}</div>
+      <div className="text-[13px] font-black" style={{ color: '#1c140a',  }}>{val}</div>
     </div>
   );
 }
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen bg-[#0a0a0c] flex flex-col items-center justify-center gap-4">
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
       <div className="relative">
         <div className="w-12 h-12 border-2 border-zinc-800 rounded-full" />
         <div className="w-12 h-12 border-2 border-t-cyan-500 rounded-full animate-spin absolute inset-0" />
@@ -2427,7 +3171,7 @@ function LoadingScreen() {
 
 function ErrorScreen({ msg }: { msg: string }) {
   return (
-    <div className="min-h-screen bg-[#0a0a0c] flex flex-col items-center justify-center gap-3">
+    <div className="min-h-screen flex flex-col items-center justify-center gap-3">
       <div className="text-rose-500 font-black text-lg">Data Pipeline Error</div>
       <div className="text-zinc-600 text-sm font-mono">{msg}</div>
       <div className="text-zinc-700 text-xs">Check that /api/league is deployed and reachable.</div>

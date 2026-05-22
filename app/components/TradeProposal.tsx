@@ -23,7 +23,6 @@ interface Asset {
   year?: number;
   teamStanding?: number;
   gsax?: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 
@@ -49,27 +48,55 @@ interface TradeProposal {
 
 const getNav = (a: Asset, navMap: Record<string, number>): number => navMap[a.id] ?? 0;
 
-const teamFitsPlayer = (team: Team, player: Asset, teamRoster: Asset[]): number => {
+// Score how well a team fits the ENTIRE outgoing block
+const blockFitsTeam = (team: Team, block: Asset[], teamRoster: Asset[], navMap: Record<string, number>): number => {
   let score = 0;
-  const pos = player.position === "L" || player.position === "R" ? "W" : player.position;
   const phase = team.phase ?? "Retooling";
-  if (player.age <= 28 && (phase === "Rebuilding" || phase === "Retooling")) score += 25;
-  if (player.age >= 27 && player.age <= 33 && (phase === "Contender" || phase === "Bubble")) score += 25;
-  if (player.age > 33 && (phase === "Rebuilding" || phase === "Tanking")) score -= 20;
-  const posCount = teamRoster.filter(p => {
-    const pp = p.position === "L" || p.position === "R" ? "W" : p.position;
-    return pp === pos;
-  }).length;
-  if (posCount < 3) score += 30;
-  else if (posCount < 5) score += 10;
-  if (team.needs?.some(n => n.pos === pos)) score += 20;
-  if (team.capSpace >= player.capHit) score += 10;
-  else if (team.capSpace < 0) score -= 20;
-  if (player.hasNMC) score -= 10;
+
+  // Total NAV of the block
+  const blockNav = block.reduce((s, a) => s + getNav(a, navMap), 0);
+
+  // Cap space check — can they absorb the incoming cap?
+  const blockCap = block.filter(a => a.position !== "Pick").reduce((s, a) => s + a.capHit, 0);
+  if (team.capSpace >= blockCap) score += 15;
+  else if (team.capSpace >= blockCap * 0.5) score += 5;
+  else score -= 20;
+
+  // Evaluate each player in the block individually
+  for (const player of block) {
+    if (player.position === "Pick") {
+      // Rebuilding/retooling teams love picks
+      if (phase === "Rebuilding" || phase === "Tanking") score += 15;
+      else if (phase === "Retooling") score += 8;
+      continue;
+    }
+
+    const pos = player.position === "L" || player.position === "R" ? "W" : player.position;
+
+    // Phase fit per player
+    if (player.age <= 28 && (phase === "Rebuilding" || phase === "Retooling")) score += 15;
+    if (player.age >= 27 && player.age <= 33 && (phase === "Contender" || phase === "Bubble")) score += 15;
+    if (player.age > 33 && (phase === "Rebuilding" || phase === "Tanking")) score -= 15;
+
+    // Positional need
+    const posCount = teamRoster.filter(p => {
+      const pp = p.position === "L" || p.position === "R" ? "W" : p.position;
+      return pp === pos;
+    }).length;
+    if (posCount < 3) score += 20;
+    else if (posCount < 5) score += 8;
+
+    // Explicit need match
+    if (team.needs?.some(n => n.pos === pos)) score += 15;
+
+    // NMC risk
+    if (player.hasNMC) score -= 8;
+  }
+
   return Math.max(0, Math.min(100, score));
 };
 
-const buildPackage = (
+const buildReturnPackage = (
   targetNAV: number,
   roster:    Asset[],
   picks:     Asset[],
@@ -89,8 +116,10 @@ const buildPackage = (
   const fwds = tradeable.filter(p => ["W","C","L","R"].includes(p.position));
   const dmen = tradeable.filter(p => p.position === "D");
 
+  // 1. Single player
   for (const p of tradeable) if (fits(n(p))) return [p];
 
+  // 2. Forward + picks
   for (const f of fwds.slice(0,8)) {
     const fv = n(f);
     for (const pk of sortedPicks) if (fits(fv+n(pk))) return [f,pk];
@@ -104,6 +133,7 @@ const buildPackage = (
             return [f,sortedPicks[i],sortedPicks[j],sortedPicks[k]];
   }
 
+  // 3. D + picks
   for (const d of dmen.slice(0,5)) {
     const dv = n(d);
     for (const pk of sortedPicks) if (fits(dv+n(pk))) return [d,pk];
@@ -112,6 +142,7 @@ const buildPackage = (
         if (fits(dv+n(sortedPicks[i])+n(sortedPicks[j]))) return [d,sortedPicks[i],sortedPicks[j]];
   }
 
+  // 4. Forward + D + pick
   for (const f of fwds.slice(0,5))
     for (const d of dmen.slice(0,5)) {
       const base = n(f)+n(d);
@@ -119,6 +150,7 @@ const buildPackage = (
       for (const pk of sortedPicks) if (fits(base+n(pk))) return [f,d,pk];
     }
 
+  // 5. Picks only
   let pnav=0; const pkg:Asset[]=[];
   for (const pk of sortedPicks) {
     pkg.push(pk); pnav+=n(pk);
@@ -126,6 +158,7 @@ const buildPackage = (
     if (pkg.length>=5) break;
   }
 
+  // 6. Two forwards
   for (let i=0;i<fwds.length;i++)
     for (let j=i+1;j<fwds.length;j++)
       if (fits(n(fwds[i])+n(fwds[j]))) return [fwds[i],fwds[j]];
@@ -134,23 +167,33 @@ const buildPackage = (
 };
 
 const generateNarrative = async (
-  targetPlayer: Asset, homeTeam: Team, partnerTeam: Team,
-  gives: Asset[], navGives: number, navReceives: number,
+  outgoingBlock: Asset[],
+  homeTeam:      Team,
+  partnerTeam:   Team,
+  gives:         Asset[],
+  navGives:      number,
+  navReceives:   number,
 ): Promise<string> => {
-  const givesDesc = gives.map(a =>
+  const blockDesc  = outgoingBlock.map(a =>
+    a.position === "Pick"
+      ? `${a.year} ${a.round===1?"1st":a.round===2?"2nd":"3rd"} round pick`
+      : `${a.name} ($${a.capHit}M, age ${a.age}, ${a.position})`
+  ).join(" + ");
+  const givesDesc  = gives.map(a =>
     a.position === "Pick"
       ? `${a.year} ${a.round===1?"1st":a.round===2?"2nd":a.round===3?"3rd":`${a.round}th`} round pick`
       : `${a.name} ($${a.capHit}M, age ${a.age})`
   ).join(" + ");
+
   try {
     const res = await fetch("/api/claude", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-haiku-4-5",
-        max_tokens: 150,
+        model: "claude-sonnet-4-5",
+        max_tokens: 120,
         messages: [{ role: "user", content:
-          `NHL GM analyst. 2-3 sentences max 80 words.\n\nTrade: ${homeTeam.name} trades ${targetPlayer.name} ($${targetPlayer.capHit}M, age ${targetPlayer.age}) to ${partnerTeam.name} for ${givesDesc}.\nNAV: home gets ${navGives.toFixed(0)}, gives ${navReceives.toFixed(0)}.\n${homeTeam.name}: ${homeTeam.phase} #${homeTeam.standing}. ${partnerTeam.name}: ${partnerTeam.phase} #${partnerTeam.standing} $${partnerTeam.capSpace}M cap.\n\nWhy does this work for both teams? Be specific, no fluff.`
+          `NHL GM analyst. Max 2 sentences, max 80 words. Be precise about which team gets what.\n\nTrade: ${homeTeam.name} sends [${blockDesc}] to ${partnerTeam.name}. ${partnerTeam.name} sends [${givesDesc}] to ${homeTeam.name}.\nNAV: ${homeTeam.name} receives ${navGives.toFixed(0)} NAV, gives ${navReceives.toFixed(0)} NAV.\n${homeTeam.name}: ${homeTeam.phase} #${homeTeam.standing}. ${partnerTeam.name}: ${partnerTeam.phase} #${partnerTeam.standing}.\n\nWhy does this work for both teams?`
         }],
       }),
     });
@@ -160,46 +203,55 @@ const generateNarrative = async (
 };
 
 interface Props {
-  targetPlayer: Asset;
-  homeTeam:     Team | null;
-  allTeams:     Team[];
-  allPlayers:   Asset[];
-  navMap:       Record<string, number>;
-  onClose:      () => void;
-  onLoadTrade:  (partner: Team, outgoing: Asset[], incoming: Asset[]) => void;
+  outgoingBlock: Asset[];
+  homeTeam:      Team | null;
+  allTeams:      Team[];
+  allPlayers:    Asset[];
+  navMap:        Record<string, number>;
+  onClose:       () => void;
+  onLoadTrade:   (partner: Team, outgoing: Asset[], incoming: Asset[]) => void;
 }
 
-export default function TradeProposalEngine({ targetPlayer, homeTeam, allTeams, allPlayers, navMap, onClose, onLoadTrade }: Props) {
+export default function TradeProposalEngine({ outgoingBlock, homeTeam, allTeams, allPlayers, navMap, onClose, onLoadTrade }: Props) {
   const [proposals,  setProposals]  = useState<TradeProposal[]>([]);
   const [generating, setGenerating] = useState(false);
   const [done,       setDone]       = useState(false);
 
-  const targetNAV = navMap[targetPlayer.id] ?? 0;
-  const rdLabel   = (r?: number) => r===1?"1st":r===2?"2nd":r===3?"3rd":`${r}th`;
+  const blockNav   = outgoingBlock.reduce((s, a) => s + (navMap[a.id] ?? 0), 0);
+  const rdLabel    = (r?: number) => r===1?"1st":r===2?"2nd":r===3?"3rd":`${r}th`;
+
+  // Describe the outgoing block concisely
+  const blockSummary = outgoingBlock.length === 1
+    ? outgoingBlock[0].name
+    : `${outgoingBlock.length}-piece package`;
 
   const generate = async () => {
     if (!homeTeam) return;
     setGenerating(true); setDone(false); setProposals([]);
+
     const candidates: { team: Team; fitScore: number; pkg: Asset[] }[] = [];
+
     for (const team of allTeams) {
       if (team.id === homeTeam.id) continue;
       const roster = allPlayers.filter(p => p.teamId === team.id && p.position !== "Pick");
       const picks  = allPlayers.filter(p => p.teamId === team.id && p.position === "Pick");
-      const fit    = teamFitsPlayer(team, targetPlayer, roster);
+      const fit    = blockFitsTeam(team, outgoingBlock, roster, navMap);
       if (fit < 15) continue;
-      const pkg = buildPackage(targetNAV, roster, picks, navMap);
+      const pkg = buildReturnPackage(blockNav, roster, picks, navMap);
       if (pkg) candidates.push({ team, fitScore: fit, pkg });
     }
+
     candidates.sort((a,b) => b.fitScore - a.fitScore);
     const top = candidates.slice(0,5);
+
     if (!top.length) { setGenerating(false); setDone(true); return; }
 
     const initial: TradeProposal[] = top.map(c => ({
       partner:     c.team,
       gives:       c.pkg,
-      receives:    [targetPlayer],
+      receives:    outgoingBlock,
       navGives:    c.pkg.reduce((s,a) => s+(navMap[a.id]??0), 0),
-      navReceives: targetNAV,
+      navReceives: blockNav,
       fitScore:    c.fitScore,
       narrative:   "",
       loading:     true,
@@ -208,8 +260,8 @@ export default function TradeProposalEngine({ targetPlayer, homeTeam, allTeams, 
     setGenerating(false);
 
     const narratives = await Promise.all(top.map(c =>
-      generateNarrative(targetPlayer, homeTeam, c.team, c.pkg,
-        c.pkg.reduce((s,a)=>s+(navMap[a.id]??0),0), targetNAV)
+      generateNarrative(outgoingBlock, homeTeam, c.team, c.pkg,
+        c.pkg.reduce((s,a)=>s+(navMap[a.id]??0),0), blockNav)
     ));
     setProposals(prev => prev.map((p,i) => ({ ...p, narrative: narratives[i], loading: false })));
     setDone(true);
@@ -222,9 +274,12 @@ export default function TradeProposalEngine({ targetPlayer, homeTeam, allTeams, 
         <div className="flex justify-between items-start p-6 border-b border-zinc-800">
           <div>
             <div className="text-[9px] font-black uppercase tracking-[0.4em] text-cyan-600 mb-1">Trade Request Generator</div>
-            <div className="text-xl font-black text-white">Find a trade for {targetPlayer.name}</div>
+            <div className="text-xl font-black text-white">Find a trade for {blockSummary}</div>
             <div className="text-[10px] text-zinc-600 mt-1 font-mono">
-              {targetPlayer.position} · Age {targetPlayer.age} · ${targetPlayer.capHit}M · NAV {targetNAV.toFixed(0)}
+              {outgoingBlock.length > 1
+                ? outgoingBlock.map(a => `${a.name} (${a.position})`).join(" · ")
+                : `${outgoingBlock[0]?.position} · Age ${outgoingBlock[0]?.age} · $${outgoingBlock[0]?.capHit}M`}
+              {" "}· NAV {blockNav.toFixed(0)}
             </div>
           </div>
           <button onClick={onClose} className="text-zinc-600 hover:text-white transition-colors text-xl font-bold mt-1">✕</button>
@@ -239,7 +294,7 @@ export default function TradeProposalEngine({ targetPlayer, homeTeam, allTeams, 
                 : <>⚡ Generate Trade Proposals</>}
             </button>
             <p className="text-center text-[10px] text-zinc-700 mt-3 font-bold uppercase tracking-wider">
-              Uses identical NAV values as trade screen · Claude GM analysis
+              Evaluates the full package · Searches all 31 teams · Claude GM analysis
             </p>
           </div>
         )}
@@ -247,7 +302,7 @@ export default function TradeProposalEngine({ targetPlayer, homeTeam, allTeams, 
         {done && !proposals.length && (
           <div className="p-6 text-center">
             <div className="text-zinc-500 text-sm font-bold">No realistic trade partners found.</div>
-            <div className="text-zinc-700 text-[10px] mt-1">Player may have NMC, be too expensive, or no team has matching assets.</div>
+            <div className="text-zinc-700 text-[10px] mt-1">Try adjusting the package — a player may have NMC, or the NAV is hard to match.</div>
           </div>
         )}
 
@@ -289,11 +344,13 @@ export default function TradeProposalEngine({ targetPlayer, homeTeam, allTeams, 
                     </div>
                     <div className="text-zinc-700 text-lg font-bold text-center">⇄</div>
                     <div className="bg-zinc-800/50 rounded-lg p-2.5">
-                      <div className="text-[8px] font-black uppercase tracking-wider text-zinc-600 mb-1.5">{p.partner.name.split(" ").pop()} receives</div>
-                      <div className="text-[11px] font-bold text-white">
-                        {targetPlayer.name}
-                        <span className="text-zinc-600 ml-1 font-mono text-[9px]">${targetPlayer.capHit}M</span>
-                      </div>
+                      <div className="text-[8px] font-black uppercase tracking-wider text-zinc-600 mb-1.5">{homeTeam?.name.split(" ").pop()} sends</div>
+                      {outgoingBlock.map((a,j) => (
+                        <div key={j} className="text-[11px] font-bold text-white leading-tight">
+                          {a.position==="Pick" ? `${a.year} ${rdLabel(a.round)} Rd` : a.name}
+                          {a.position!=="Pick" && <span className="text-zinc-600 ml-1 font-mono text-[9px]">${a.capHit}M</span>}
+                        </div>
+                      ))}
                       <div className="text-[10px] font-black font-mono mt-1.5 text-zinc-400">{p.navReceives.toFixed(0)} NAV</div>
                     </div>
                   </div>
@@ -307,7 +364,7 @@ export default function TradeProposalEngine({ targetPlayer, homeTeam, allTeams, 
                       {balanced?"⚖ Balanced":diff>0?`↑ +${diff.toFixed(0)} NAV for home`:`↓ ${diff.toFixed(0)} NAV for home`}
                     </div>
                     <button
-                      onClick={() => onLoadTrade(p.partner, [targetPlayer], p.gives)}
+                      onClick={() => onLoadTrade(p.partner, outgoingBlock, p.gives)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest bg-white text-black hover:bg-cyan-400 transition-all active:scale-95"
                     >
                       Load into Trade Machine ↗

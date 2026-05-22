@@ -12,7 +12,7 @@ interface Asset {
   position: string;
   age: number;
   ptsPace: number;
-  xGPace: number;
+  xGPace?: number;
   defRate: number;
   avgTOI: number;
   capHit: number;
@@ -129,7 +129,7 @@ const PlayerCard = ({ asset, nav, side }: { asset: Asset; nav: NavBreakdown; sid
           {[
             { label: "Pts/82", val: asset.ptsPace?.toFixed(0) ?? "—" },
             { label: "TOI",    val: asset.avgTOI?.toFixed(1)  ?? "—" },
-            { label: "xG/82",  val: asset.xGPace?.toFixed(1)  ?? "—" },
+            { label: "xG/82",  val: (asset.xGPace ?? 0).toFixed(1)  },
           ].map(s => (
             <div key={s.label} className="text-center">
               <div className="text-[11px] font-black text-zinc-300">{s.val}</div>
@@ -159,8 +159,8 @@ export default function PlayerComparison({ outgoing, incoming, navMap }: Props) 
   const inPts   = sum(incoming, "ptsPace");
   const outTOI  = sum(outgoing, "avgTOI");
   const inTOI   = sum(incoming, "avgTOI");
-  const outxG   = sum(outgoing, "xGPace");
-  const inxG    = sum(incoming, "xGPace");
+  const outxG   = sum(outgoing, "xGPace") || 0;
+  const inxG    = sum(incoming, "xGPace") || 0;
   const outAge  = outgoing.filter(a => a.position !== "Pick").reduce((s, a, _, arr) => s + a.age / arr.length, 0);
   const inAge   = incoming.filter(a => a.position !== "Pick").reduce((s, a, _, arr) => s + a.age / arr.length, 0);
   const outCap  = outgoing.reduce((s, a) => s + (a.capHit || 0), 0);

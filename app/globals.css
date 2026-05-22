@@ -2,26 +2,406 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── THE HOCKEY LEDGER — Broadsheet Edition ─────────────────
+   All ink on aged paper. No dark surfaces anywhere.
+   ─────────────────────────────────────────────────────────── */
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  --paper:        #f2ecd7;
+  --paper-card:   #e4d8b8;
+  --paper-inset:  #d6c8a5;
+  --paper-dark:   #b8a98c;
+
+  --ink:          #261e12;
+  --ink-mid:      #403525;
+  --ink-light:    #5e4f3a;
+  --ink-faint:    #7a6a50;
+  --ink-ghost:    #5c503d; /* Shifted from #a39378 to a deeper, browner tone */
+
+  --rule:           #a89569;   /* The column separator */
+  --rule-light:     #d6c8a5;
+  
+  --red:            #a63524;   /* Oxidized red ink */
+  --red-hover:      #8a2a1c;
+  --red-dim:        rgba(166, 53, 36, 0.06);
+
+  --green:          #245e39;   /* Muted forest/editorial green */
+  --green-dim:      rgba(36, 94, 57, 0.06);
+
+  --amber:          #946914;   /* Burnt amber, not traffic light yellow */
+  --amber-dim:      rgba(148, 105, 20, 0.06);
+
+  --blue:           #2b3f66;   /* Slate navy note ink */
+  --blue-dim:       rgba(43, 63, 102, 0.06);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+* { box-sizing: border-box; padding: 0; margin: 0; }
+
+html, body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* ── Aged paper grain ────────────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--paper); }
+::-webkit-scrollbar-thumb { background: var(--rule); }
+
+/* ── Selection ───────────────────────────────────────────────── */
+::selection { background: rgba(184,48,32,0.15); color: var(--red); }
+
+/* ── ALL zinc backgrounds → paper tones ─────────────────────── */
+/* This is the key fix — nothing should be dark gray */
+.bg-zinc-950,
+.bg-zinc-900  { background-color: var(--paper-card) !important; }
+.bg-zinc-800  { background-color: var(--paper-inset) !important; }
+.bg-zinc-700  { background-color: var(--paper-dark) !important; }
+
+/* Also catch opacity variants */
+[class*="bg-zinc-900\/"] { background-color: var(--paper-card) !important; }
+[class*="bg-zinc-800\/"] { background-color: var(--paper-inset) !important; }
+
+/* Text */
+.text-white    { color: var(--ink) !important; }
+.text-zinc-300 { color: var(--ink) !important; }
+.text-zinc-400 { color: var(--ink-mid) !important; }
+.text-zinc-500 { color: var(--ink-light) !important; }
+.text-zinc-600 { color: var(--ink-faint) !important; }
+.text-zinc-700 { color: var(--ink-ghost) !important; }
+
+/* Borders */
+.border-zinc-800,
+.border-zinc-700 { border-color: var(--rule) !important; }
+.border-zinc-600 { border-color: var(--rule) !important; }
+[class*="border-zinc-800\/"] { border-color: var(--rule-light) !important; }
+
+/* ── Cyan → blue ink ─────────────────────────────────────────── */
+.text-cyan-400, .text-cyan-500, .text-cyan-600, .text-cyan-700
+  { color: var(--blue) !important; }
+.bg-cyan-950, .bg-cyan-900 { background-color: var(--blue-dim) !important; }
+.border-cyan-800, .border-cyan-700 { border-color: rgba(26,46,92,0.3) !important; }
+.border-cyan-600 { border-color: var(--blue) !important; }
+.hover\:bg-cyan-900:hover { background-color: var(--blue-dim) !important; }
+.hover\:border-cyan-600:hover { border-color: var(--blue) !important; }
+.hover\:bg-cyan-400:hover { background-color: var(--red-hover) !important; color: #fff !important; }
+
+/* ── Emerald → green ink ─────────────────────────────────────── */
+.text-emerald-400, .text-emerald-300 { color: var(--green) !important; }
+.bg-emerald-950 { background-color: var(--green-dim) !important; }
+.border-emerald-800, .border-emerald-900 { border-color: rgba(26,92,46,0.25) !important; }
+
+/* ── Rose → red ink ──────────────────────────────────────────── */
+.text-rose-400, .text-rose-500 { color: var(--red) !important; }
+.bg-rose-950 { background-color: var(--red-dim) !important; }
+.border-rose-800, .border-rose-900 { border-color: rgba(184,48,32,0.25) !important; }
+
+/* ── Amber ───────────────────────────────────────────────────── */
+.text-amber-400, .text-amber-300 { color: var(--amber) !important; }
+.bg-amber-950 { background-color: var(--amber-dim) !important; }
+.border-amber-800 { border-color: rgba(138,92,0,0.25) !important; }
+
+/* ── Sky → blue ──────────────────────────────────────────────── */
+.text-sky-400, .text-sky-500 { color: var(--blue) !important; }
+.text-sky-300 { color: var(--ink) !important; }
+.bg-sky-950 { background-color: var(--blue-dim) !important; }
+.border-sky-900 { border-color: rgba(26,46,92,0.2) !important; }
+
+/* ── Orange → amber ──────────────────────────────────────────── */
+.text-orange-300 { color: var(--amber) !important; }
+.bg-orange-950 { background-color: var(--amber-dim) !important; }
+.border-orange-800 { border-color: rgba(138,92,0,0.25) !important; }
+
+/* ── Purple → blue ───────────────────────────────────────────── */
+.text-purple-400, .text-purple-500, .text-purple-600 { color: var(--blue) !important; }
+.bg-purple-950 { background-color: var(--blue-dim) !important; }
+.border-purple-800, .border-purple-500 { border-color: rgba(26,46,92,0.25) !important; }
+.hover\:bg-purple-900:hover { background-color: var(--blue-dim) !important; }
+
+/* ── White CTA → red stamp ───────────────────────────────────── */
+.bg-white { background-color: var(--red) !important; }
+.text-black { color: #fff !important; }
+
+/* ── Corners — sharp editorial ───────────────────────────────── */
+.rounded-2xl { border-radius: 3px !important; }
+.rounded-xl  { border-radius: 2px !important; }
+.rounded-lg  { border-radius: 2px !important; }
+.rounded     { border-radius: 1px !important; }
+
+/* ── Monospace ───────────────────────────────────────────────── */
+.font-mono, [class*="font-mono"] {
+  font-family: 'Courier Prime', 'Courier New', monospace !important;
+}
+
+/* ── Dashed border for empty slots ──────────────────────────── */
+.border-dashed { border-style: dashed !important; border-color: var(--rule) !important; }
+
+/* ── Background grid ─────────────────────────────────────────── */
+.bg-editorial-grid {
+  background-image:
+    linear-gradient(rgba(184,160,112,0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(184,160,112,0.12) 1px, transparent 1px);
+  background-size: 52px 52px;
+}
+
+/* ── Utility classes to replace all inline styles in page.tsx ── */
+
+/* Backgrounds */
+.bg-paper        { background-color: var(--paper) !important; }
+.bg-paper-card   { background-color: var(--paper-card) !important; }
+.bg-paper-inset  { background-color: var(--paper-inset) !important; }
+.bg-paper-dark   { background-color: var(--paper-dark) !important; }
+
+/* Text colors */
+.text-ink        { color: var(--ink) !important; }
+.text-ink-mid    { color: var(--ink-mid) !important; }
+.text-ink-light  { color: var(--ink-light) !important; }
+.text-ink-faint  { color: var(--ink-faint) !important; }
+.text-ink-ghost  { color: var(--ink-ghost) !important; }
+.text-red-ink    { color: var(--red) !important; }
+.text-green-ink  { color: var(--green) !important; }
+.text-amber-ink  { color: var(--amber) !important; }
+.text-blue-ink   { color: var(--blue) !important; }
+
+/* Borders */
+.border-rule       { border-color: var(--rule) !important; }
+.border-rule-light { border-color: var(--rule-light) !important; }
+.border-ink        { border-color: var(--ink) !important; }
+.border-red-ink    { border-color: var(--red) !important; }
+.border-green-ink  { border-color: var(--green) !important; }
+.border-blue-ink   { border-color: var(--blue) !important; }
+
+/* Fonts */
+.font-serif  { font-family: 'Libre Baskerville', Georgia, serif !important; }
+.font-press  { font-family: 'Courier Prime', 'Courier New', monospace !important; }
+
+/* Masthead border */
+.masthead-rule {
+  border-top: 4px double var(--ink);
+  border-bottom: 4px double var(--ink);
+}
+
+/* Section header rule */
+.section-rule {
+  border-bottom: 2px solid var(--ink);
+}
+
+/* Column rule left border (newspaper clipping style) */
+.clip-border {
+  border-left: 3px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Inset cell (goalie stats, MiniStat, MicroBar) */
+.cell-inset {
+  background-color: var(--paper-inset);
+  border: 1px solid var(--rule);
+}
+.cell-card {
+  background-color: var(--paper-card);
+  border: 1px solid var(--rule);
+}
+
+/* Badge styles */
+.badge-rule  { border: 1px solid var(--rule); color: var(--ink-faint); font-family: 'Courier Prime', monospace; font-size: 7px; padding: 0 4px; }
+.badge-red   { border: 1px solid var(--red);   color: var(--red);   font-family: 'Courier Prime', monospace; font-size: 7px; padding: 0 4px; }
+.badge-amber { border: 1px solid var(--amber); color: var(--amber); font-family: 'Courier Prime', monospace; font-size: 7px; padding: 0 4px; }
+.badge-blue  { border: 1px solid var(--blue);  color: var(--blue);  font-family: 'Courier Prime', monospace; font-size: 7px; padding: 0 4px; }
+.badge-green { border: 1px solid var(--green); color: var(--green); font-family: 'Courier Prime', monospace; font-size: 7px; padding: 0 4px; }
+
+/* Button styles */
+.btn-stamp {
+  background: var(--red);
+  color: #fff;
+  border: 2px solid #8b2820;
+  border-radius: 2px;
+  font-family: 'Courier Prime', monospace;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 900;
+}
+.btn-stamp:hover { background: var(--red-hover); }
+
+.btn-ink {
+  background: transparent;
+  border: 2px solid var(--blue);
+  color: var(--blue);
+  border-radius: 2px;
+  font-family: 'Courier Prime', monospace;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 900;
+}
+.btn-ink:hover { background: var(--blue-dim); }
+
+.btn-green-ink {
+  background: var(--green);
+  color: #fff;
+  border: 2px solid #0f3d1e;
+  border-radius: 2px;
+  font-family: 'Courier Prime', monospace;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 900;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-faint);
+  border-radius: 2px;
+  font-family: 'Courier Prime', monospace;
+  text-transform: uppercase;
+  font-weight: 900;
+}
+.btn-ghost:hover { border-color: var(--ink-faint); color: var(--ink-light); }
+
+/* Data label — Courier, muted */
+.data-label {
+  font-family: 'Courier Prime', monospace;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+}
+
+/* Data value — Courier, ink */
+.data-value {
+  font-family: 'Courier Prime', monospace;
+  font-weight: 900;
+  color: var(--ink);
+}
+
+/* NAV number on card */
+.nav-positive { color: var(--green); font-family: 'Courier Prime', monospace; font-style: italic; font-weight: 900; }
+.nav-neutral  { color: var(--blue);  font-family: 'Courier Prime', monospace; font-style: italic; font-weight: 900; }
+.nav-warning  { color: var(--ink-light); font-family: 'Courier Prime', monospace; font-style: italic; font-weight: 900; }
+.nav-negative { color: var(--red);   font-family: 'Courier Prime', monospace; font-style: italic; font-weight: 900; }
+
+/* Slider track */
+input[type="range"] {
+  accent-color: var(--red);
+  background: var(--paper-dark);
+}
+
+/* Select option background */
+select option {
+  background: var(--paper-card);
+  color: var(--ink);
+}
+
+/* Trade panel */
+.trade-panel {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+/* Asset card clipping */
+.asset-clip {
+  background: var(--paper);
+  border-left: 3px solid var(--rule);
+  border-bottom: 1px solid var(--rule-light);
+  padding: 12px;
+}
+
+/* Headshot */
+.headshot {
+  border-radius: 1px;
+  border: 1px solid var(--rule);
+  filter: sepia(20%);
+}
+
+/* Inline live indicator dot */
+.live-dot {
+  background: var(--red);
+  border-radius: 50%;
+  width: 8px;
+  height: 8px;
+}
+
+/* TugBar */
+.tugbar {
+  background: var(--paper-inset);
+  border: 1px solid var(--rule);
+}
+
+@keyframes stamp {
+  0%   { transform: scale(1.6) rotate(-4deg); opacity: 0; }
+  65%  { transform: scale(0.93) rotate(-2deg); opacity: 1; }
+  100% { transform: scale(1) rotate(-2deg); opacity: 1; }
+}
+.verdict-stamp {
+  display: inline-block;
+  animation: stamp 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  transform-origin: center;
+  border: 2px solid currentColor;
+  padding: 1px 6px;
+  font-family: 'Courier Prime', monospace;
+  letter-spacing: 0.12em;
+}
+
+/* Add to bottom of your CSS file */
+.bg-paper-card { background-color: var(--paper-card) !important; }
+.bg-paper-inset { background-color: var(--paper-inset) !important; }
+.bg-paper-dark { background-color: var(--paper-dark) !important; }
+
+.text-blue-ink { color: var(--blue) !important; }
+.text-green-ink { color: var(--green) !important; }
+.text-amber-ink { color: var(--amber) !important; }
+.text-red-ink { color: var(--red) !important; }
+
+.border-blue-ink { border-color: var(--blue) !important; }
+.border-green-ink { border-color: var(--green) !important; }
+.border-amber-ink { border-color: var(--amber) !important; }
+.border-red-ink { border-color: var(--red) !important; }
+
+/* 1. Subtle Text Shadow: Adds a slight "ink bleed" into the paper */
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  text-shadow: 0 0 0.1px rgba(0,0,0,0.1);
+}
+
+/* 2. Soften the harshness: Slightly rounded corners that look like paper cuts */
+.rounded-2xl { border-radius: 4px !important; }
+.rounded-xl  { border-radius: 3px !important; }
+.rounded-lg  { border-radius: 2px !important; }
+
+/* 3. Drop shadows: Replace harsh shadows with subtle border-based depth */
+.shadow-lg { 
+  box-shadow: 2px 2px 0px rgba(0,0,0,0.05); 
+}
+
+/* 4. Select dropdown: Style like a vintage typewriter form */
+select, input {
+  font-family: 'Courier Prime', monospace;
+  background-color: var(--paper-inset) !important;
+  border: 1px solid var(--rule) !important;
+  border-radius: 0px !important;
+  box-shadow: inset 1px 1px 2px rgba(0,0,0,0.1);
+}
+/* High-contrast ink for dark backgrounds */
+.text-ink-on-dark {
+  color: var(--ink-mid) !important;
+  font-weight: 700; /* Bolding helps visibility on darker paper */
+}
+
+.text-faint-on-dark {
+  color: var(--ink-light) !important;
+  font-weight: 600;
+}
+html, body {
+  /* ... existing styles ... */
+  font-feature-settings: "kern" 1, "onum" 1; /* Improves readability of numbers in fonts */
+  -webkit-font-smoothing: subpixel-antialiased; /* Can make text look slightly "inkier" on some displays */
 }

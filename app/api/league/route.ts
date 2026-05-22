@@ -59,6 +59,11 @@ const PHASE_OVERRIDES: Record<string, string> = {
   TOR: "Retooling",    // Core still competitive, structural issues not a rebuild
 };
 
+// ── Contract overrides — manual corrections for known data errors ──
+const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: number }> = {
+  "Alexander Ovechkin": { yearsRemaining: 1 },  // 2025-26 is final season, all-time goals record broken
+};
+
 async function loadTeams(): Promise<any[]> {
   // ── Check cache ──────────────────────────────────────────────
   try {
@@ -810,10 +815,13 @@ export async function GET() {
       const rows = csv.split("\n").filter(Boolean);
       const hdr  = rows[0].split(",");
       const h    = (k: string) => hdr.indexOf(k);
-      const [nI, sI, pI, xgI, gI, iceI, onAI, offAI, rkI] = [
+      const [nI, sI, pI, xgI, gI, iceI, onAI, offAI, rkI, onFI, offFI, dzI, ozI, goalsI] = [
         h("name"), h("situation"), h("I_F_points"), h("I_F_xGoals"),
         h("games_played"), h("icetime"),
         h("OnIce_A_xGoals"), h("OffIce_A_xGoals"), h("iceTimeRank"),
+        h("OnIce_F_xGoals"), h("OffIce_F_xGoals"),
+        h("I_F_dZoneShifts"), h("I_F_oZoneShifts"),
+        h("I_F_goals"),
       ];
       rows.slice(1).forEach((row) => {
         const c = row.split(",");
@@ -825,6 +833,27 @@ export async function GET() {
         const benchH   = Math.max(0.01, (g * 60 - iceSec / 60) / 60);
         const onA  = (parseFloat(c[onAI])  || 0) / Math.max(0.01, iceHours);
         const offA = (parseFloat(c[offAI]) || 0) / Math.max(0.01, benchH);
+
+        // NOIV components — Relative to Teammates metrics
+        const onF      = parseFloat(c[onFI])  || 0;
+        const offFVal  = parseFloat(c[offFI]) || 0;
+        const onAVal   = parseFloat(c[onAI])  || 0;
+        const offAVal  = parseFloat(c[offAI]) || 0;
+        // xG% on ice vs off ice (relative to teammates)
+        const onXgPct  = onF + onAVal > 0 ? onF / (onF + onAVal) : 0.5;
+        const offXgPct = offFVal + offAVal > 0 ? offFVal / (offFVal + offAVal) : 0.5;
+        const xgRelTM  = (onXgPct - offXgPct) * 100; // percentage points
+
+        // xGA/60 relative to teammates
+        const onXgA60  = onA;
+        const offXgA60 = offA;
+        const xgaRelTM = onXgA60 - offXgA60; // negative = better defense
+
+        // Defensive zone start %
+        const dz = parseFloat(c[dzI]) || 0;
+        const oz = parseFloat(c[ozI]) || 0;
+        const dzPct = dz + oz > 0 ? dz / (dz + oz) : 0.5;
+
         analyticsMap.set(slugify(name), {
           ptsPace: (parseFloat(c[pI])  / g) * 82,
           xGPace:  (parseFloat(c[xgI]) / g) * 82,
@@ -833,6 +862,11 @@ export async function GET() {
           qocRank: parseFloat(c[rkI]) || 500,
           games:   g,
           hasLiveStats: true,
+          xgRelTM,
+          xgaRelTM,
+          dzPct,
+          goalsPace:   goalsI   >= 0 ? (parseFloat(c[goalsI])   / g) * 82 : undefined,
+          assistsPace: goalsI   >= 0 ? ((parseFloat(c[pI]) - parseFloat(c[goalsI])) / g) * 82 : undefined,
         });
       });
       fbMap = buildFallbackMap(analyticsMap);
@@ -1009,13 +1043,19 @@ export async function GET() {
         gamesStarted:   goalieStats?.gamesStarted  ?? 0,
         shotsPerGame:   goalieStats?.shotsPerGame  ?? 0,
         // Contract
-        capHit:         finalCapHit,
-        yearsRemaining: finalYears,
+        capHit:         CONTRACT_OVERRIDES[p.name]?.capHit         ?? finalCapHit,
+        yearsRemaining: CONTRACT_OVERRIDES[p.name]?.yearsRemaining ?? finalYears,
         hasNMC:         finalNMC,
         hasNTC:         finalNTC,
         canRetain:      finalRetain,
         retainedPct:    0,
         multiplier:     fin?.intangibleMultiplier ?? 1.0,
+        // NOIV components
+        xgRelTM:        stats?.xgRelTM   ?? null,
+        xgaRelTM:       stats?.xgaRelTM  ?? null,
+        dzPct:          stats?.dzPct     ?? null,
+        goalsPace:      stats?.goalsPace,
+        assistsPace:    stats?.assistsPace,
       });
     });
   });
