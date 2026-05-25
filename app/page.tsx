@@ -160,6 +160,25 @@ export default function TradeMachine() {
     return () => ctrl.abort();
   }, [db.players]);
 
+  // Re-fetch NAV for any block assets with retention applied —
+  // retained assets have different effective cap hits so need fresh server calc.
+  // Debounced to avoid hammering the API on every slider tick.
+  useEffect(() => {
+    const retainedAssets = [...blocks[0], ...blocks[1]]
+      .filter(a => a.position !== "Pick" && (a.retainedPct || 0) > 0);
+    if (retainedAssets.length === 0) return;
+
+    const timer = setTimeout(() => {
+      const ctrl = new AbortController();
+      fetchNavMap(retainedAssets, ctrl.signal)
+        .then(fresh => setNavMap(prev => ({ ...prev, ...fresh })))
+        .catch(() => {});
+      return () => ctrl.abort();
+    }, 300); // 300ms debounce — don't fire on every slider tick
+
+    return () => clearTimeout(timer);
+  }, [blocks]);
+
   useEffect(() => {
     fetch("/api/league")
       .then((r) => r.json())
@@ -474,12 +493,8 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
     }
   }, [blocks, teams, db.teams, allHomeRoster, allPartnerRoster]);
 
-  const navA = blocks[0].reduce((s, a) => s + (
-    (a.retainedPct && a.retainedPct > 0) ? getXNAV(a).total : (navMap[a.id]?.total ?? getXNAV(a).total)
-  ), 0);
-  const navB = blocks[1].reduce((s, a) => s + (
-    (a.retainedPct && a.retainedPct > 0) ? getXNAV(a).total : (navMap[a.id]?.total ?? getXNAV(a).total)
-  ), 0);
+  const navA = blocks[0].reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);
+  const navB = blocks[1].reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);
   const homeNetGain = navB - navA;
 
   // Always pull live cap space from db — teams state can be stale after trade execution
@@ -513,15 +528,9 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
           allTeams={db.teams}
           allPlayers={db.players}
           navMap={(() => {
-            // Start with the pre-computed navMap (total values only)
             const base = Object.fromEntries(Object.entries(navMap).map(([id, r]) => [id, r.total]));
-            // Override with fresh calculations for any retained assets in the request
-            // — retained assets have different effective cap hits that change their NAV
-            tradeRequest.forEach(a => {
-              if (a.retainedPct && a.retainedPct > 0) {
-                base[a.id] = getXNAV(a).total;
-              }
-            });
+            // Retained assets are already updated in navMap via the blocks useEffect
+            // No client-side getXNAV calls needed
             return base;
           })()}
           onClose={() => setTradeRequest(null)}
@@ -682,9 +691,18 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
           {/* Middle controls — on mobile sits between panels */}
           <div className="flex flex-col gap-3 lg:pt-8 order-last lg:order-none">
             {teams[0] && teams[1] && (
-              <div className="grid grid-cols-2 gap-2">
-                <ModeBadge team={teams[0]} roster={allHomeRoster} label="Home Mode" />
-                <ModeBadge team={teams[1]} roster={allPartnerRoster} label="Partner Mode" />
+              <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <ModeBadge team={teams[0]} roster={allHomeRoster} label="Home Mode" />
+                  <ModeBadge team={teams[1]} roster={allPartnerRoster} label="Partner Mode" />
+                </div>
+                <TeamDNA
+                  homeTeam={teams[0]}
+                  partnerTeam={teams[1]}
+                  homeRoster={allHomeRoster}
+                  partnerRoster={allPartnerRoster}
+                  navMap={navMap}
+                />
               </div>
             )}
 
@@ -891,11 +909,36 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
                 </div>
               </div>
             </div>
+
+            {/* STRAND */}
+            <div>
+              <div className="font-black text-sm mb-3 pb-1" style={{ color: '#1c140a', borderBottom: '1px solid #b8a070', fontFamily: "'Libre Baskerville', serif" }}>
+                STRAND™ Visualization
+              </div>
+              <div className="space-y-3 text-[11px]" style={{ color: '#4a3820', lineHeight: 1.7 }}>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>What is STRAND™?</span>
+                  <p className="mt-0.5">STRAND — Stylistic Trait & Rating Analysis for NHL Development — is a proprietary double-helix visualization that encodes a player's complete on-ice identity into two intertwined strands. Toggle it on any skater card using the STRAND™ tab.</p>
+                </div>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>Offensive Strand (Navy)</span>
+                  <p className="mt-0.5">Encodes five offensive traits: <strong>SCR</strong> (scoring pace), <strong>xG</strong> (expected goals generated), <strong>OFF</strong> (offensive NAV component), <strong>NOIV</strong> (xG% relative to teammates on ice), and <strong>TOI+</strong> (deployment). Node size scales with trait strength — a dominant node means that quality defines the player.</p>
+                </div>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>Defensive Strand (Red)</span>
+                  <p className="mt-0.5">Encodes five defensive traits: <strong>SUPP</strong> (xGA suppression vs teammates), <strong>QoC</strong> (quality of competition faced), <strong>DEF</strong> (defensive NAV component), <strong>DZ%</strong> (offensive zone deployment), and <strong>AGE</strong> (trajectory of value over time).</p>
+                </div>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>Reading the Helix</span>
+                  <p className="mt-0.5">The two strands twist together — a tight, symmetric helix signals an elite two-way player. A helix where one strand dominates the other reveals a one-dimensional player. The connecting rungs (the "ladder") show where the strands cross, indicating moments of balanced impact. The archetype badge in the top-right classifies the player: Offensive Force, Defensive Anchor, or Elite Two-Way.</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="text-center pt-4" style={{ borderTop: '1px solid #b8a070' }}>
             <p className="text-[9px] uppercase tracking-[0.4em]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
-              Data: NHL API · MoneyPuck · CapWages &nbsp;·&nbsp; Models: X-NAV 7.2 · G-NAV · NOIV &nbsp;·&nbsp; AI: Claude Sonnet & Haiku
+              Data: NHL API · MoneyPuck · CapWages &nbsp;·&nbsp; Models: X-NAV 7.3 · G-NAV · NOIV · STRAND™ &nbsp;·&nbsp; AI: Claude Sonnet & Haiku
             </p>
             <p className="text-[8px] mt-1" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
               All valuations are analytical estimates, not financial advice. Player values fluctuate with injury, performance, and market conditions.
@@ -994,6 +1037,7 @@ function TradePanel({
             setBlocks={setBlocks}
             onRequestTrade={onRequestTrade}
             navResult={navMap[a.id]}
+            navMap={navMap}
           />
         ))}
       </div>
@@ -1018,7 +1062,7 @@ function TradePanel({
 // ASSET CARD — with retention slider and contract details
 // ============================================================
 function AssetCard({
-  asset, idx, blocks, setBlocks, onRequestTrade, navResult
+  asset, idx, blocks, setBlocks, onRequestTrade, navResult, navMap
 }: {
   asset: Asset;
   idx: 0 | 1;
@@ -1026,16 +1070,20 @@ function AssetCard({
   setBlocks: React.Dispatch<React.SetStateAction<[Asset[], Asset[]]>>;
   onRequestTrade?: (a: Asset) => void;
   navResult?: XNAVResult;
+  navMap?: Record<string, XNAVResult>;
 }) {
-  // Use pre-computed navResult if available, fall back to fresh calculation
-  // for newly added assets that haven't been indexed yet
-  // Use pre-computed navResult if available, BUT if salary retention has been
-  // applied, we must recalculate fresh — navMap uses the original player data
-  // and doesn't reflect the current retention slider state.
-  const xnav   = (asset.retainedPct && asset.retainedPct > 0)
-    ? getXNAV(asset)           // retention is live — recalculate
-    : (navResult ?? getXNAV(asset));  // no retention — use cached value
+  const [view, setView] = React.useState<"STATS" | "STRAND">("STATS");
+  const [compareId, setCompareId] = React.useState<string>("");
+  const xnav   = navResult ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
   const isPick = asset.position === "Pick";
+
+  const otherBlock = blocks[1 - idx].filter(a =>
+    a.position !== "Pick" && a.position !== "G" && a.id !== asset.id
+  );
+  const compareAsset = otherBlock.find(a => a.id === compareId) ?? null;
+  const compareXnav  = compareAsset
+    ? (navMap?.[compareAsset.id] ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 })
+    : null;
 
   const updateAsset = (partial: Partial<Asset>) => {
     setBlocks((prev) => {
@@ -1260,7 +1308,73 @@ function AssetCard({
         </div>
       </div>
 
-      {/* GOALIE stat panel */}
+      {/* STRAND / STATS tab toggle — only for skaters with live data */}
+      {!isPick && asset.position !== "G" && asset.hasLiveStats && (
+        <div className="flex gap-0 mb-2" style={{ borderBottom: '1px solid #c8b890' }}>
+          {(["STATS", "STRAND"] as const).map(v => (
+            <button key={v} onClick={() => setView(v)}
+              className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest px-3 py-1.5 transition-all"
+              style={{
+                color: view === v ? '#1c140a' : '#9a7d58',
+                borderBottom: view === v ? '2px solid #1c140a' : '2px solid transparent',
+                fontFamily: "'Courier Prime', monospace",
+                marginBottom: '-1px',
+                background: 'transparent',
+              }}>
+              {v === "STRAND" ? (
+                <>
+                  {/* Mini double helix SVG icon */}
+                  <svg width="14" height="10" viewBox="0 0 14 10" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+                    <path d="M0,2 C2,2 2,8 4,8 C6,8 6,2 8,2 C10,2 10,8 12,8 C14,8 14,2 14,2"
+                      fill="none" stroke={view === "STRAND" ? "#1a2e5c" : "#9a7d58"} strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M0,8 C2,8 2,2 4,2 C6,2 6,8 8,8 C10,8 10,2 12,2 C14,2 14,8 14,8"
+                      fill="none" stroke={view === "STRAND" ? "#b83020" : "#c8b890"} strokeWidth="1.5" strokeLinecap="round"/>
+                    {[2, 5, 8, 11].map(x => (
+                      <line key={x} x1={x} y1={2} x2={x} y2={8}
+                        stroke={view === "STRAND" ? "#9a7d58" : "#c8b890"} strokeWidth="0.8" opacity="0.6"/>
+                    ))}
+                  </svg>
+                  STRAND™
+                </>
+              ) : "STATS"}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* STRAND™ — Stylistic Trait & Rating Analysis for NHL Development */}
+      {view === "STRAND" && !isPick && asset.position !== "G" && (
+        <>
+          {otherBlock.length > 0 && (
+            <div className="flex items-center gap-2 mb-1.5 px-0.5">
+              <span className="text-[7px] font-black uppercase tracking-wider shrink-0"
+                style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                Compare vs
+              </span>
+              <select
+                value={compareId}
+                onChange={e => setCompareId(e.target.value)}
+                className="text-[8px] font-black flex-1 py-0.5 px-1 appearance-none"
+                style={{ background: '#dfd0a8', border: '1px solid #c8b890', color: '#1c140a', fontFamily: "'Courier Prime', monospace", borderRadius: '1px' }}
+              >
+                <option value="">— none —</option>
+                {otherBlock.map(a => (
+                  <option key={a.id} value={a.id}>{a.name} ({a.position})</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <StrandView
+            asset={asset}
+            xnav={xnav}
+            compareAsset={compareAsset}
+            compareXnav={compareXnav}
+          />
+        </>
+      )}
+
+      {/* Standard STATS view */}
+      {(view === "STATS" || isPick || asset.position === "G") && (<>
       {asset.position === "G" && !isPick && (
         <div className="grid grid-cols-3 gap-1.5 mb-2.5">
           {[
@@ -1428,6 +1542,181 @@ function AssetCard({
           </button>
         </div>
       )}
+      {/* Close STATS view wrapper */}
+      </>)}
+    </div>
+  );
+}
+
+// ============================================================
+// STRAND™ — Stylistic Trait & Rating Analysis for NHL Development
+// A double-helix visualization of a player's offensive/defensive DNA.
+// Strand A (top): Offensive traits — scoring, playmaking, xG generation
+// Strand B (bottom): Defensive traits — suppression, compete, zone starts
+// The two strands intertwine — balanced players have a tight helix,
+// one-dimensional players show one strand dominating.
+// ============================================================
+function StrandView({ asset, xnav, compareAsset, compareXnav }: {
+  asset: Asset;
+  xnav: XNAVResult;
+  compareAsset?: Asset | null;
+  compareXnav?: XNAVResult | null;
+}) {
+  const W = 320, H = 160;
+  const cy = H / 2;
+  const amplitude = 38;
+  const freq = (2 * Math.PI) / W;
+
+  const norm = (val: number, mn: number, mx: number) =>
+    Math.max(0, Math.min(1, (val - mn) / (mx - mn)));
+
+  const buildTraits = (a: Asset, nav: XNAVResult) => {
+    const isD = a.position === "D";
+    return {
+      off: [
+        { label: "SCR",  val: norm(safe(a.ptsPace), 0, isD ? 80 : 100),    title: "Scoring pace per 82" },
+        { label: "xG",   val: norm(safe(a.xGPace ?? 0), 0, isD ? 25 : 50), title: "Expected Goals generated" },
+        { label: "OFF",  val: norm(nav.off, -80, 300),                      title: "Offensive NAV component" },
+        { label: "NOIV", val: norm(safe(a.xgRelTM ?? 0), -12, 12),         title: "xG% relative to teammates" },
+        { label: "TOI+", val: norm(safe(a.avgTOI), 10, 27),                title: "Ice time deployment" },
+      ],
+      def: [
+        { label: "SUPP", val: norm(-(a.xgaRelTM ?? 0), -1.5, 1.5),        title: "xGA suppression vs teammates" },
+        { label: "QoC",  val: norm(400 - safe(a.qocRank ?? 400), 50, 380), title: "Quality of competition" },
+        { label: "DEF",  val: norm(nav.def, -60, 150),                     title: "Defensive NAV component" },
+        { label: "DZ%",  val: 1 - norm(safe(a.dzPct ?? 0.5), 0.3, 0.7),   title: "Offensive zone deployment" },
+        { label: "AGE",  val: norm(nav.age, -80, 60),                      title: "Age curve trajectory" },
+      ],
+    };
+  };
+
+  const primary   = buildTraits(asset, xnav);
+  const secondary = compareAsset && compareXnav ? buildTraits(compareAsset, compareXnav) : null;
+
+  const offAvg = primary.off.reduce((s, t) => s + t.val, 0) / primary.off.length;
+  const defAvg = primary.def.reduce((s, t) => s + t.val, 0) / primary.def.length;
+  const balance = Math.abs(offAvg - defAvg);
+
+  const strandType =
+    (offAvg > 0.72 && defAvg > 0.60 && balance < 0.20) ? "ELITE TWO-WAY"
+    : offAvg > defAvg + 0.15
+      ? offAvg > 0.65 ? "OFFENSIVE FORCE" : "OFFENSIVE LEAN"
+    : defAvg > offAvg + 0.15
+      ? defAvg > 0.65 ? "DEFENSIVE ANCHOR" : "DEFENSIVE LEAN"
+    : offAvg > 0.52 && defAvg > 0.52 ? "COMPLETE PLAYER"
+    : "BALANCED";
+
+  const offColor = "#1a2e5c";
+  const defColor = "#b83020";
+  const cmpOff   = "#4a7c9b";
+  const cmpDef   = "#c86040";
+
+  const buildPath = (traits: {label:string;val:number;title:string}[], isOff: boolean) => {
+    const pts = [];
+    for (let i = 0; i <= 80; i++) {
+      const t    = i / 80;
+      const x    = t * W;
+      const ti   = Math.min(4, Math.floor(t * 5));
+      const amp  = amplitude * (0.35 + traits[ti].val * 0.65);
+      const y    = cy + (isOff ? -1 : 1) * amp * Math.sin(freq * x * 2.5);
+      pts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`);
+    }
+    return pts.join(" ");
+  };
+
+  return (
+    <div className="mt-1 mb-2">
+      <div className="relative" style={{ background: "#dfd0a8", border: "1px solid #c8b890", borderRadius: "2px" }}>
+        <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+          {[0.25, 0.5, 0.75].map(t => (
+            <line key={t} x1={t*W} y1={8} x2={t*W} y2={H-8} stroke="#c8b890" strokeWidth="0.5" strokeDasharray="3,3"/>
+          ))}
+          <line x1={0} y1={cy} x2={W} y2={cy} stroke="#c8b890" strokeWidth="0.5"/>
+
+          {secondary && (<>
+            <path d={buildPath(secondary.off, true)}  fill="none" stroke={cmpOff} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.6" strokeLinecap="round"/>
+            <path d={buildPath(secondary.def, false)} fill="none" stroke={cmpDef} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.6" strokeLinecap="round"/>
+          </>)}
+
+          {Array.from({ length: 18 }, (_, i) => {
+            const t = (i + 0.5) / 18;
+            const x = t * W;
+            const ti = Math.min(4, Math.floor(t * 5));
+            const oA = amplitude * (0.35 + primary.off[ti].val * 0.65);
+            const dA = amplitude * (0.35 + primary.def[ti].val * 0.65);
+            const oy = cy - oA * Math.sin(freq * x * 2.5);
+            const dy = cy + dA * Math.sin(freq * x * 2.5);
+            return <line key={i} x1={x} y1={oy} x2={x} y2={dy} stroke="#9a7d58" strokeWidth="0.8" opacity={0.12 + Math.abs(Math.sin(freq * x * 2.5)) * 0.25}/>;
+          })}
+
+          <path d={buildPath(primary.def, false)} fill="none" stroke={defColor} strokeWidth="2" strokeLinecap="round" opacity="0.9"/>
+          <path d={buildPath(primary.off, true)}  fill="none" stroke={offColor} strokeWidth="2" strokeLinecap="round" opacity="0.9"/>
+
+          {primary.off.map((t, i) => {
+            const x = ((i + 0.5) / 5) * W;
+            const amp = amplitude * (0.35 + t.val * 0.65);
+            const y = cy - amp * Math.sin(freq * x * 2.5);
+            return <g key={t.label}>
+              <circle cx={x} cy={y} r={t.val * 5 + 2} fill={offColor} opacity="0.2"/>
+              <circle cx={x} cy={y} r={2.5} fill={offColor}/>
+              <text x={x} y={y-9} textAnchor="middle" fontSize="7" fill={offColor} fontFamily="Courier Prime, monospace" fontWeight="bold">{t.label}</text>
+            </g>;
+          })}
+          {primary.def.map((t, i) => {
+            const x = ((i + 0.5) / 5) * W;
+            const amp = amplitude * (0.35 + t.val * 0.65);
+            const y = cy + amp * Math.sin(freq * x * 2.5);
+            return <g key={t.label}>
+              <circle cx={x} cy={y} r={t.val * 5 + 2} fill={defColor} opacity="0.2"/>
+              <circle cx={x} cy={y} r={2.5} fill={defColor}/>
+              <text x={x} y={y+16} textAnchor="middle" fontSize="7" fill={defColor} fontFamily="Courier Prime, monospace" fontWeight="bold">{t.label}</text>
+            </g>;
+          })}
+
+          <text x={6} y={cy-30} fontSize="7" fill={offColor} fontFamily="Courier Prime, monospace" fontWeight="bold">OFFENSE</text>
+          <text x={6} y={cy+40} fontSize="7" fill={defColor} fontFamily="Courier Prime, monospace" fontWeight="bold">DEFENSE</text>
+
+          {secondary && (
+            <g>
+              <line x1={W-95} y1={12} x2={W-81} y2={12} stroke={cmpOff} strokeWidth="1.5" strokeDasharray="4,2"/>
+              <text x={W-78} y={15} fontSize="6.5" fill={cmpOff} fontFamily="Courier Prime, monospace">
+                {compareAsset?.name.split(" ").pop()}
+              </text>
+            </g>
+          )}
+        </svg>
+
+        <div className="absolute top-1.5 right-2 text-[7px] font-black px-1.5 py-0.5" style={{
+          fontFamily: "'Courier Prime', monospace",
+          color: strandType === "ELITE TWO-WAY" ? "#1a5c2e" : strandType === "COMPLETE PLAYER" ? "#245e39" : strandType.includes("OFFENSIVE") ? "#1a2e5c" : strandType.includes("DEFENSIVE") ? "#b83020" : "#6b5030",
+          border: `1px solid ${strandType === "ELITE TWO-WAY" ? "rgba(26,92,46,0.5)" : strandType === "COMPLETE PLAYER" ? "rgba(36,94,57,0.4)" : strandType.includes("OFFENSIVE") ? "rgba(26,46,92,0.4)" : strandType.includes("DEFENSIVE") ? "rgba(184,48,32,0.4)" : "rgba(107,80,48,0.4)"}`,
+          background: "#dfd0a8",
+        }}>{strandType}</div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-3 mt-1.5 px-0.5">
+        {([
+          { label: "◆ OFFENSE", traits: primary.off, color: offColor },
+          { label: "◆ DEFENSE", traits: primary.def, color: defColor },
+        ] as const).map(({ label, traits, color }) => (
+          <div key={label}>
+            <div className="text-[7px] font-black mb-1" style={{ color, fontFamily: "'Courier Prime', monospace" }}>{label}</div>
+            {traits.map(t => (
+              <div key={t.label} className="flex items-center gap-1.5 mb-0.5" title={t.title}>
+                <span className="text-[7px] font-black w-8 shrink-0" style={{ color: "#6b5030", fontFamily: "'Courier Prime', monospace" }}>{t.label}</span>
+                <div className="flex-1 h-1 rounded-full" style={{ background: "#c8b890" }}>
+                  <div className="h-full rounded-full" style={{ width: `${t.val * 100}%`, background: color, opacity: 0.8 }}/>
+                </div>
+                <span className="text-[7px] font-black w-5 text-right" style={{ color, fontFamily: "'Courier Prime', monospace" }}>{Math.round(t.val * 100)}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <div className="text-[7px] mt-1 text-center" style={{ color: "#b8a070", fontFamily: "'Courier Prime', monospace" }}>
+        STRAND™ — Stylistic Trait & Rating Analysis for NHL Development
+      </div>
     </div>
   );
 }
@@ -1542,6 +1831,284 @@ const classifyTeam = (team: Team, _roster: Asset[]): TeamMode => {
   if (team.standing > 18)  return "REBUILDING";
   return "RETOOLING";
 };
+
+// ============================================================
+// TEAM DNA — Aggregate STRAND™ for an entire roster
+// Shows collective offensive/defensive profile and gaps vs
+// championship template. Drives Need Score for GM logic.
+// ============================================================
+
+// Championship template — normalized 0-1 values calibrated to tighter ranges
+// Based on Cup winner roster profiles (top-9F + top-4D TOI-weighted averages)
+const CHAMPIONSHIP_TEMPLATE = {
+  off: { SCR: 0.55, xG: 0.52, OFF: 0.58, NOIV: 0.55, TOI: 0.68 },
+  def: { SUPP: 0.55, QoC: 0.60, DEF: 0.52, DZ: 0.50, AGE: 0.52 },
+};
+
+function computeRosterStrand(roster: Asset[], navMap: Record<string, XNAVResult>) {
+  // Weight by ice time and use only meaningful contributors
+  // Top-9 forwards by TOI + top-4 D by TOI — excludes depth drag
+  const fwds = roster
+    .filter(p => ["C","W","L","R"].includes(p.position) && p.hasLiveStats && (p.games ?? 0) >= 20)
+    .sort((a, b) => (b.avgTOI ?? 0) - (a.avgTOI ?? 0))
+    .slice(0, 9);
+  const dmen = roster
+    .filter(p => p.position === "D" && p.hasLiveStats && (p.games ?? 0) >= 20)
+    .sort((a, b) => (b.avgTOI ?? 0) - (a.avgTOI ?? 0))
+    .slice(0, 4);
+  const qualified = [...fwds, ...dmen];
+  if (qualified.length === 0) return null;
+
+  const norm = (val: number, min: number, max: number) =>
+    Math.max(0, Math.min(1, (val - min) / (max - min)));
+
+  let offTotals = { SCR: 0, xG: 0, OFF: 0, NOIV: 0, TOI: 0 };
+  let defTotals = { SUPP: 0, QoC: 0, DEF: 0, DZ: 0, AGE: 0 };
+  const n = qualified.length;
+
+  for (const p of qualified) {
+    const xnav = navMap[p.id] ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
+    const isD  = p.position === "D";
+    // Use same tighter ranges as StrandView for consistency
+    offTotals.SCR  += norm(safe(p.ptsPace), 0, isD ? 80 : 100);
+    offTotals.xG   += norm(safe(p.xGPace ?? 0), 0, isD ? 25 : 50);
+    offTotals.OFF  += norm(xnav.off, -80, 300);
+    offTotals.NOIV += norm(safe(p.xgRelTM ?? 0), -12, 12);
+    offTotals.TOI  += norm(safe(p.avgTOI), 10, 27);
+    defTotals.SUPP += norm(-(p.xgaRelTM ?? 0), -1.5, 1.5);
+    defTotals.QoC  += norm(400 - safe(p.qocRank ?? 400), 50, 380);
+    defTotals.DEF  += norm(xnav.def, -60, 150);
+    defTotals.DZ   += 1 - norm(safe(p.dzPct ?? 0.5), 0.3, 0.7);
+    defTotals.AGE  += norm(xnav.age, -80, 60);
+  }
+
+  return {
+    off: {
+      SCR:  offTotals.SCR  / n,
+      xG:   offTotals.xG   / n,
+      OFF:  offTotals.OFF  / n,
+      NOIV: offTotals.NOIV / n,
+      TOI:  offTotals.TOI  / n,
+    },
+    def: {
+      SUPP: defTotals.SUPP / n,
+      QoC:  defTotals.QoC  / n,
+      DEF:  defTotals.DEF  / n,
+      DZ:   defTotals.DZ   / n,
+      AGE:  defTotals.AGE  / n,
+    },
+  };
+}
+
+function TeamDNA({
+  homeTeam, partnerTeam, homeRoster, partnerRoster, navMap
+}: {
+  homeTeam: Team | null;
+  partnerTeam: Team | null;
+  homeRoster: Asset[];
+  partnerRoster: Asset[];
+  navMap: Record<string, XNAVResult>;
+}) {
+  const [expanded, setExpanded] = React.useState(false);
+  const homeStrand    = computeRosterStrand(homeRoster, navMap);
+  const partnerStrand = computeRosterStrand(partnerRoster, navMap);
+  if (!homeStrand || !partnerStrand) return null;
+
+  // Gap vs championship template — negative = below template, positive = above
+  const homeGaps = {
+    off: Object.entries(CHAMPIONSHIP_TEMPLATE.off).map(([k, target]) => ({
+      label: k, gap: (homeStrand.off as any)[k] - target
+    })),
+    def: Object.entries(CHAMPIONSHIP_TEMPLATE.def).map(([k, target]) => ({
+      label: k, gap: (homeStrand.def as any)[k] - target
+    })),
+  };
+
+  // Top needs: biggest negative gaps
+  const allGaps = [...homeGaps.off, ...homeGaps.def]
+    .sort((a, b) => a.gap - b.gap)
+    .slice(0, 3);
+
+  const offAvgHome = Object.values(homeStrand.off).reduce((s, v) => s + v, 0) / 5;
+  const defAvgHome = Object.values(homeStrand.def).reduce((s, v) => s + v, 0) / 5;
+  const offAvgPart = Object.values(partnerStrand.off).reduce((s, v) => s + v, 0) / 5;
+  const defAvgPart = Object.values(partnerStrand.def).reduce((s, v) => s + v, 0) / 5;
+
+  const W = 260, H = 80;
+  const offColor = "#1a2e5c";
+  const defColor = "#b83020";
+  const tmplColor = "#9a7d58";
+  const freq = (2 * Math.PI) / W;
+  const amplitude = 22;
+
+  const buildPath = (offA: number, defA: number, phase: number) => {
+    const pts = [];
+    for (let i = 0; i <= 60; i++) {
+      const t = i / 60;
+      const x = t * W;
+      pts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${(H/2 - (amplitude * (0.3 + offA * 0.7)) * Math.sin(freq * x * 2 + phase)).toFixed(1)}`);
+    }
+    return pts.join(" ");
+  };
+  const buildDefPath = (defA: number, phase: number) => {
+    const pts = [];
+    for (let i = 0; i <= 60; i++) {
+      const t = i / 60;
+      const x = t * W;
+      pts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${(H/2 + (amplitude * (0.3 + defA * 0.7)) * Math.sin(freq * x * 2 + phase)).toFixed(1)}`);
+    }
+    return pts.join(" ");
+  };
+
+  // Championship template averages
+  const tmplOff = Object.values(CHAMPIONSHIP_TEMPLATE.off).reduce((s,v) => s+v, 0) / 5;
+  const tmplDef = Object.values(CHAMPIONSHIP_TEMPLATE.def).reduce((s,v) => s+v, 0) / 5;
+
+  return (
+    <div style={{ border: '1px solid #c8b890', borderRadius: '2px', background: '#e8dab8' }}>
+      {/* Header */}
+      <button
+        className="w-full flex items-center justify-between px-3 py-2"
+        onClick={() => setExpanded(e => !e)}
+      >
+        <div className="flex items-center gap-2">
+          <svg width="16" height="12" viewBox="0 0 16 12">
+            <path d="M0,3 C2,3 2,9 4,9 C6,9 6,3 8,3 C10,3 10,9 12,9 C14,9 14,3 16,3"
+              fill="none" stroke={offColor} strokeWidth="1.5" strokeLinecap="round"/>
+            <path d="M0,9 C2,9 2,3 4,3 C6,3 6,9 8,9 C10,9 10,3 12,3 C14,3 14,9 16,9"
+              fill="none" stroke={defColor} strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          <span className="text-[8px] font-black uppercase tracking-widest"
+            style={{ color: '#1c140a', fontFamily: "'Courier Prime', monospace" }}>
+            TEAM DNA
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Quick need indicators */}
+          {allGaps.slice(0, 2).map(g => (
+            <span key={g.label} className="text-[7px] font-black px-1 py-0.5"
+              style={{
+                color: g.gap < -0.15 ? '#b83020' : '#9a7d58',
+                border: `1px solid ${g.gap < -0.15 ? 'rgba(184,48,32,0.35)' : 'rgba(168,149,105,0.35)'}`,
+                fontFamily: "'Courier Prime', monospace",
+              }}>
+              {g.label} {g.gap < -0.15 ? '↓' : '~'}
+            </span>
+          ))}
+          <span className="text-[9px]" style={{ color: '#9a7d58' }}>{expanded ? '▲' : '▼'}</span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-3 pb-3" style={{ borderTop: '1px solid #c8b890' }}>
+
+          {/* Dual helix comparison — home vs partner */}
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            {[
+              { team: homeTeam, strand: homeStrand, offA: offAvgHome, defA: defAvgHome, label: homeTeam?.name.split(" ").pop() ?? "" },
+              { team: partnerTeam, strand: partnerStrand, offA: offAvgPart, defA: defAvgPart, label: partnerTeam?.name.split(" ").pop() ?? "" },
+            ].map(({ team, offA, defA, label }) => (
+              <div key={team?.id} style={{ background: '#dfd0a8', border: '1px solid #c8b890', borderRadius: '2px' }}>
+                <div className="text-[7px] font-black uppercase tracking-wider px-2 pt-1.5 pb-0.5"
+                  style={{ color: '#6b5030', fontFamily: "'Courier Prime', monospace" }}>
+                  {label}
+                </div>
+                <svg width="100%" viewBox={`0 0 ${W} ${H}`}>
+                  {/* Championship template (faint gold) */}
+                  <path d={buildPath(tmplOff, tmplDef, 0)} fill="none"
+                    stroke={tmplColor} strokeWidth="1" strokeDasharray="3,2" opacity="0.4"/>
+                  <path d={buildDefPath(tmplDef, 0)} fill="none"
+                    stroke={tmplColor} strokeWidth="1" strokeDasharray="3,2" opacity="0.4"/>
+                  {/* Defensive strand */}
+                  <path d={buildDefPath(defA, 0)} fill="none"
+                    stroke={defColor} strokeWidth="1.8" strokeLinecap="round" opacity="0.85"/>
+                  {/* Offensive strand */}
+                  <path d={buildPath(offA, defA, 0)} fill="none"
+                    stroke={offColor} strokeWidth="1.8" strokeLinecap="round" opacity="0.85"/>
+                  {/* Rungs */}
+                  {[40, 80, 120, 160, 200, 240].map(x => {
+                    const oy = H/2 - (amplitude*(0.3+offA*0.7))*Math.sin(freq*x*2);
+                    const dy = H/2 + (amplitude*(0.3+defA*0.7))*Math.sin(freq*x*2);
+                    return <line key={x} x1={x} y1={oy} x2={x} y2={dy}
+                      stroke={tmplColor} strokeWidth="0.6" opacity="0.3"/>;
+                  })}
+                </svg>
+                {/* Off/Def bars */}
+                <div className="px-2 pb-2 grid grid-cols-2 gap-1">
+                  <div>
+                    <div className="text-[6px] font-black mb-0.5" style={{ color: offColor, fontFamily: "'Courier Prime', monospace" }}>OFF {(offA * 100).toFixed(0)}</div>
+                    <div className="h-1 rounded-full" style={{ background: '#c8b890' }}>
+                      <div className="h-full rounded-full" style={{ width: `${offA * 100}%`, background: offColor }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[6px] font-black mb-0.5" style={{ color: defColor, fontFamily: "'Courier Prime', monospace" }}>DEF {(defA * 100).toFixed(0)}</div>
+                    <div className="h-1 rounded-full" style={{ background: '#c8b890' }}>
+                      <div className="h-full rounded-full" style={{ width: `${defA * 100}%`, background: defColor }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Need score — gaps vs championship template */}
+          <div className="mt-2 pt-2" style={{ borderTop: '1px solid #c8b890' }}>
+            <div className="text-[7px] font-black uppercase tracking-wider mb-1.5"
+              style={{ color: '#6b5030', fontFamily: "'Courier Prime', monospace" }}>
+              {homeTeam?.name.split(" ").pop()} — Gaps vs Championship Template
+            </div>
+            <div className="space-y-1">
+              {[...homeGaps.off, ...homeGaps.def]
+                .sort((a, b) => a.gap - b.gap)
+                .map(g => {
+                  const pct = Math.min(48, Math.abs(g.gap) * 180);
+                  return (
+                    <div key={g.label} className="flex items-center gap-1.5">
+                      <span className="text-[7px] font-black w-8 shrink-0"
+                        style={{ color: '#6b5030', fontFamily: "'Courier Prime', monospace" }}>
+                        {g.label}
+                      </span>
+                      {/* Diverging bar — left half = deficit (red), right half = surplus (green) */}
+                      <div className="flex flex-1 h-2 rounded-full overflow-hidden"
+                        style={{ background: '#c8b890' }}>
+                        {/* Left half */}
+                        <div className="flex justify-end" style={{ width: '50%' }}>
+                          {g.gap < 0 && (
+                            <div className="h-full rounded-l-full"
+                              style={{ width: `${pct * 2}%`, background: '#b83020', opacity: 0.85 }}/>
+                          )}
+                        </div>
+                        {/* Center divider */}
+                        <div style={{ width: '1px', background: '#9a7d58', opacity: 0.5 }}/>
+                        {/* Right half */}
+                        <div className="flex justify-start" style={{ width: '50%' }}>
+                          {g.gap >= 0 && (
+                            <div className="h-full rounded-r-full"
+                              style={{ width: `${pct * 2}%`, background: '#1a5c2e', opacity: 0.85 }}/>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-[7px] font-black w-6 text-right shrink-0"
+                        style={{ color: g.gap < -0.10 ? '#b83020' : g.gap > 0.05 ? '#1a5c2e' : '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                        {g.gap > 0 ? '+' : ''}{(g.gap * 100).toFixed(0)}
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+            <div className="text-[6px] mt-1.5 flex items-center gap-2"
+              style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
+              <span style={{ color: '#b83020' }}>■</span> Below template
+              <span style={{ color: '#1a5c2e' }}>■</span> Exceeds template
+              <span style={{ color: '#9a7d58' }}>— </span> Championship standard
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ============================================================
 // TEAM MODE BADGE
@@ -1713,7 +2280,7 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
           </thead>
           <tbody>
             {allAssets.map((a) => {
-              const xnav = navMap[a.id] ?? getXNAV(a);
+              const xnav = navMap[a.id] ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
               const isOut = a.side === "OUT";
               return (
                 <tr key={a.id} className={`border-b border-zinc-900 hover:bg-zinc-800/20 transition-colors ${isOut ? "bg-rose-950/5" : "bg-emerald-950/5"}`}>
