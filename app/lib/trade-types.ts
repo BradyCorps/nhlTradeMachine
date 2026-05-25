@@ -40,6 +40,9 @@ export interface Asset {
   careerGsax?: number;
   awards?: string[];
   peakNAV?: number;
+  // Point Shares (computed dynamically from NHL Stats API)
+  ops?: number | null;  // Offensive Point Shares — current season
+  dps?: number | null;  // Defensive Point Shares — current season
 }
 
 export interface Team {

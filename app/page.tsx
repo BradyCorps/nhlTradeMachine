@@ -950,6 +950,10 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
                   <p className="mt-0.5">Encodes five defensive traits: <strong>SUPP</strong> (xGA suppression vs teammates), <strong>QoC</strong> (quality of competition faced), <strong>DEF</strong> (defensive NAV component), <strong>DZ%</strong> (offensive zone deployment), and <strong>AGE</strong> (trajectory of value over time).</p>
                 </div>
                 <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>OPS · DPS · PS</span>
+                  <p className="mt-0.5">Offensive Point Shares (OPS) and Defensive Point Shares (DPS) are computed dynamically each session from the NHL Stats API using the marginal goals framework. OPS measures a player's offensive contribution to their team's points; DPS measures their defensive contribution. PS (total) is the sum. These inform the OFF and DEF nodes in the STRAND™ visualization when available, replacing heuristic estimates with mathematically grounded values. A player like Jaccob Slavin (OPS ~1.5, DPS ~5.4) shows a strongly dominant defensive strand; Josh Morrissey (OPS ~3.0, DPS ~4.2) shows true two-way balance.</p>
+                </div>
+                <div>
                   <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>Reading the Helix</span>
                   <p className="mt-0.5">The two strands twist together — a tight, symmetric helix signals an elite two-way player. A helix where one strand dominates the other reveals a one-dimensional player. The connecting rungs (the "ladder") show where the strands cross, indicating moments of balanced impact. The archetype badge in the top-right classifies the player: Offensive Force, Defensive Anchor, or Elite Two-Way.</p>
                 </div>
@@ -1436,6 +1440,29 @@ function AssetCard({
       {/* SKATER NAV breakdown bars */}
       {!isPick && asset.position !== "G" && (
         <div className="mb-2.5">
+          {/* Point Shares — shown when available */}
+          {(asset.ops != null || asset.dps != null) && (
+            <div className="flex gap-1.5 mb-1.5">
+              {asset.ops != null && (
+                <div className="flex items-center gap-1 px-1.5 py-0.5" style={{ background: 'rgba(26,46,92,0.08)', border: '1px solid rgba(26,46,92,0.2)', borderRadius: '2px' }}>
+                  <span className="text-[6.5px] font-black uppercase tracking-wider" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>OPS</span>
+                  <span className="text-[8px] font-black" style={{ color: '#1a2e5c', fontFamily: "'Courier Prime', monospace" }}>{asset.ops.toFixed(1)}</span>
+                </div>
+              )}
+              {asset.dps != null && (
+                <div className="flex items-center gap-1 px-1.5 py-0.5" style={{ background: 'rgba(184,48,32,0.08)', border: '1px solid rgba(184,48,32,0.2)', borderRadius: '2px' }}>
+                  <span className="text-[6.5px] font-black uppercase tracking-wider" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>DPS</span>
+                  <span className="text-[8px] font-black" style={{ color: '#b83020', fontFamily: "'Courier Prime', monospace" }}>{asset.dps.toFixed(1)}</span>
+                </div>
+              )}
+              {asset.ops != null && asset.dps != null && (asset.ops + asset.dps) > 0 && (
+                <div className="flex items-center gap-1 px-1.5 py-0.5" style={{ background: 'rgba(107,80,48,0.08)', border: '1px solid rgba(107,80,48,0.2)', borderRadius: '2px' }}>
+                  <span className="text-[6.5px] font-black uppercase tracking-wider" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>PS</span>
+                  <span className="text-[8px] font-black" style={{ color: '#6b5030', fontFamily: "'Courier Prime', monospace" }}>{(asset.ops + asset.dps).toFixed(1)}</span>
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>NAV Breakdown</span>
             <span
@@ -1593,18 +1620,25 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
 
   const buildTraits = (a: Asset, nav: XNAVResult) => {
     const isD = a.position === "D";
+    // Use PS ratio when available — most accurate signal for off/def balance
+    const ops = a.ops ?? null;
+    const dps = a.dps ?? null;
+    const psTotal = ops !== null && dps !== null ? ops + dps : null;
+    const opsNorm = psTotal !== null && psTotal > 0 ? Math.max(0, Math.min(1, ops! / Math.max(psTotal, 1))) : null;
+    const dpsNorm = psTotal !== null && psTotal > 0 ? Math.max(0, Math.min(1, dps! / Math.max(psTotal, 1))) : null;
+
     return {
       off: [
         { label: "SCR",  val: norm(safe(a.ptsPace), 0, isD ? 80 : 100),    title: "Scoring pace per 82" },
         { label: "xG",   val: norm(safe(a.xGPace ?? 0), 0, isD ? 25 : 50), title: "Expected Goals generated" },
-        { label: "OFF",  val: norm(nav.off, -80, 300),                      title: "Offensive NAV component" },
+        { label: "OFF",  val: opsNorm ?? norm(nav.off, -80, 300),           title: ops !== null ? `OPS ${ops?.toFixed(1)} — Offensive Point Shares` : "Offensive NAV component" },
         { label: "NOIV", val: norm(safe(a.xgRelTM ?? 0), -12, 12),         title: "xG% relative to teammates" },
         { label: "TOI+", val: norm(safe(a.avgTOI), 10, 27),                title: "Ice time deployment" },
       ],
       def: [
         { label: "SUPP", val: norm(-(a.xgaRelTM ?? 0), -1.5, 1.5),        title: "xGA suppression vs teammates" },
         { label: "QoC",  val: norm(400 - safe(a.qocRank ?? 400), 50, 380), title: "Quality of competition" },
-        { label: "DEF",  val: norm(nav.def, -60, 150),                     title: "Defensive NAV component" },
+        { label: "DEF",  val: dpsNorm ?? norm(nav.def, -60, 150),          title: dps !== null ? `DPS ${dps?.toFixed(1)} — Defensive Point Shares` : "Defensive NAV component" },
         { label: "DZ%",  val: 1 - norm(safe(a.dzPct ?? 0.5), 0.3, 0.7),   title: "Offensive zone deployment" },
         { label: "AGE",  val: norm(nav.age, -80, 60),                      title: "Age curve trajectory" },
       ],

@@ -791,11 +791,217 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["NYI","Ilya Sorokin","G","1995-08-04"],
 ];
 
+// ── Point Shares computation ─────────────────────────────────
+// Computes OPS (Offensive) and DPS (Defensive) Point Shares
+// using the marginal goals framework (Justin Kubatko / Hockey Reference)
+// Data sources: NHL Stats API skater summary + team summary
+// Formula (1998-99 to present, TOI available):
+//   goalsCreated = G + 0.5*A (simplified — full formula uses team GF context)
+//   marginalGF   = goalsCreated - (7/12) * TOI * (posGC / posTOI)
+//   OPS          = marginalGF / (leagueGoals / leaguePoints)
+//   DPS          = (TOIproportion * posAdj * teamMGA + plusMinusAdj)
+//                   / (leagueGoals / leaguePoints)
+
+interface NHLSkaterRow {
+  playerId:        number;
+  skaterFullName:  string;
+  teamAbbrevs:     string;
+  positionCode:    string;
+  gamesPlayed:     number;
+  goals:           number;
+  assists:         number;
+  plusMinus:       number;
+  timeOnIcePerGame: number; // seconds per game
+}
+
+interface NHLTeamRow {
+  teamId:       number;
+  teamFullName: string;
+  gamesPlayed:  number;
+  goalsFor:     number;
+  goalsAgainst: number;
+  points:       number;
+}
+
+declare global {
+  var __psCache: { data: Map<string, { ops: number; dps: number }>; ts: number } | null;
+}
+if (!global.__psCache) global.__psCache = null;
+const PS_CACHE_TTL = 12 * 60 * 60 * 1000; // 12 hours
+
+async function fetchPointShares(): Promise<Map<string, { ops: number; dps: number }>> {
+  // Check cache
+  if (global.__psCache && Date.now() - global.__psCache.ts < PS_CACHE_TTL) {
+    return global.__psCache.data;
+  }
+
+  const psMap = new Map<string, { ops: number; dps: number }>();
+
+  try {
+    // Fetch skater summary and team summary in parallel
+    const [skatersRes, teamsRes] = await Promise.allSettled([
+      fetchWithTimeout(
+        "https://api.nhle.com/stats/rest/en/skater/summary?cayenneExp=seasonId%3D20252026%20and%20gameTypeId%3D2&limit=-1",
+        10000
+      ),
+      fetchWithTimeout(
+        "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId%3D20252026%20and%20gameTypeId%3D2&limit=32",
+        8000
+      ),
+    ]);
+
+    console.log("[PS] skatersRes:", skatersRes.status, skatersRes.status === "fulfilled" ? skatersRes.value.ok : (skatersRes as any).reason?.message);
+    console.log("[PS] teamsRes:", teamsRes.status, teamsRes.status === "fulfilled" ? teamsRes.value.ok : (teamsRes as any).reason?.message);
+
+    if (skatersRes.status !== "fulfilled" || !skatersRes.value.ok) return psMap;
+    if (teamsRes.status  !== "fulfilled" || !teamsRes.value.ok)   return psMap;
+
+    const skaterData: { data: NHLSkaterRow[] } = await skatersRes.value.json();
+    const teamData:   { data: NHLTeamRow[]   } = await teamsRes.value.json();
+
+    const skaters = skaterData.data ?? [];
+    const teams   = teamData.data   ?? [];
+
+    if (skaters.length < 100 || teams.length < 28) return psMap;
+
+    // ── League-level constants ────────────────────────────────
+    const leagueGoals  = teams.reduce((s, t) => s + t.goalsFor, 0);
+    const leaguePoints = teams.reduce((s, t) => s + t.points, 0);
+    const leagueGames  = teams.reduce((s, t) => s + t.gamesPlayed, 0) / 2; // each game counted twice
+    const leagueGPG    = leagueGoals / leagueGames;  // goals per game
+    const marginalGoalsPerPoint = leagueGoals / leaguePoints; // goals needed per point
+
+    // ── Team lookup ───────────────────────────────────────────
+    // Map team abbreviation → team stats
+    const TEAM_ABBREV_MAP: Record<string, string> = {
+      "ANA":"Anaheim Ducks","ARI":"Utah Hockey Club","UTA":"Utah Hockey Club",
+      "BOS":"Boston Bruins","BUF":"Buffalo Sabres","CGY":"Calgary Flames",
+      "CAR":"Carolina Hurricanes","CHI":"Chicago Blackhawks","COL":"Colorado Avalanche",
+      "CBJ":"Columbus Blue Jackets","DAL":"Dallas Stars","DET":"Detroit Red Wings",
+      "EDM":"Edmonton Oilers","FLA":"Florida Panthers","LAK":"Los Angeles Kings",
+      "MIN":"Minnesota Wild","MTL":"Montreal Canadiens","NSH":"Nashville Predators",
+      "NJD":"New Jersey Devils","NYI":"New York Islanders","NYR":"New York Rangers",
+      "OTT":"Ottawa Senators","PHI":"Philadelphia Flyers","PIT":"Pittsburgh Penguins",
+      "SJS":"San Jose Sharks","SEA":"Seattle Kraken","STL":"St. Louis Blues",
+      "TBL":"Tampa Bay Lightning","TOR":"Toronto Maple Leafs","VAN":"Vancouver Canucks",
+      "VGK":"Vegas Golden Knights","WSH":"Washington Capitals","WPG":"Winnipeg Jets",
+    };
+    const teamByName = new Map<string, NHLTeamRow>();
+    for (const t of teams) teamByName.set(t.teamFullName, t);
+    const teamByAbbrev = new Map<string, NHLTeamRow>();
+    for (const [abbrev, fullName] of Object.entries(TEAM_ABBREV_MAP)) {
+      const t = teamByName.get(fullName);
+      if (t) teamByAbbrev.set(abbrev, t);
+    }
+
+    // ── Build team-level aggregates for DPS formula ───────────
+    // Need: team total TOI by position, team plus/minus by position
+    const teamAggregates = new Map<string, {
+      fwdTOI: number; defTOI: number; totalSktTOI: number;
+      fwdPM: number;  defPM: number;
+      fwdGP: number;  defGP: number;
+    }>();
+
+    for (const s of skaters) {
+      const abbrev = s.teamAbbrevs.split(",")[0].trim();
+      const totalTOI = s.timeOnIcePerGame * s.gamesPlayed; // total seconds
+      const isD = s.positionCode === "D";
+      const agg = teamAggregates.get(abbrev) ?? {
+        fwdTOI: 0, defTOI: 0, totalSktTOI: 0,
+        fwdPM: 0,  defPM: 0,
+        fwdGP: 0,  defGP: 0,
+      };
+      if (isD) {
+        agg.defTOI += totalTOI;
+        agg.defPM  += s.plusMinus;
+        agg.defGP  += s.gamesPlayed;
+      } else {
+        agg.fwdTOI += totalTOI;
+        agg.fwdPM  += s.plusMinus;
+        agg.fwdGP  += s.gamesPlayed;
+      }
+      agg.totalSktTOI += totalTOI;
+      teamAggregates.set(abbrev, agg);
+    }
+
+    // ── League position averages for OPS formula ─────────────
+    let fwdGCtotal = 0, fwdTOItotal = 0;
+    let defGCtotal = 0, defTOItotal = 0;
+
+    for (const s of skaters) {
+      const gc     = s.goals + 0.5 * s.assists;
+      const totTOI = s.timeOnIcePerGame * s.gamesPlayed;
+      if (s.positionCode === "D") {
+        defGCtotal  += gc;
+        defTOItotal += totTOI;
+      } else {
+        fwdGCtotal  += gc;
+        fwdTOItotal += totTOI;
+      }
+    }
+
+    const fwdGCperTOI = fwdTOItotal > 0 ? fwdGCtotal / fwdTOItotal : 0;
+    const defGCperTOI = defTOItotal > 0 ? defGCtotal / defTOItotal : 0;
+
+    // ── Compute PS per player ─────────────────────────────────
+    for (const s of skaters) {
+      const abbrev  = s.teamAbbrevs.split(",")[0].trim();
+      const team    = teamByAbbrev.get(abbrev);
+      const agg     = teamAggregates.get(abbrev);
+      if (!team || !agg) continue;
+
+      const isD      = s.positionCode === "D";
+      const posAdj   = isD ? 10/7 : 5/7;
+      const totTOI   = s.timeOnIcePerGame * s.gamesPlayed; // total seconds
+      const gc       = s.goals + 0.5 * s.assists;
+
+      // ── OPS ──────────────────────────────────────────────────
+      const gcPerTOI   = isD ? defGCperTOI : fwdGCperTOI;
+      const marginalGF = gc - (7/12) * totTOI * gcPerTOI;
+      const ops        = Math.max(-3, marginalGF / marginalGoalsPerPoint);
+
+      // ── DPS ──────────────────────────────────────────────────
+      // Team marginal goals against
+      const teamMGA = (1 + 7/12) * team.gamesPlayed * leagueGPG - team.goalsAgainst;
+
+      // TOI proportion of team skaters
+      const teamSktTOI  = agg.totalSktTOI;
+      const toiProportion = teamSktTOI > 0 ? totTOI / teamSktTOI : 0;
+
+      // Plus/minus adjustment
+      const posTOI   = isD ? agg.defTOI : agg.fwdTOI;
+      const posPM    = isD ? agg.defPM  : agg.fwdPM;
+      const pmAdj    = (1/7) * posAdj * (s.plusMinus - totTOI * (posTOI > 0 ? posPM / posTOI : 0));
+
+      // Shots against proportion (5/7 default — shots against not per-player available)
+      const shotsAdjProportion = 5/7;
+
+      const marginalGA = toiProportion * shotsAdjProportion * posAdj * teamMGA + pmAdj;
+      const dps        = Math.max(-3, marginalGA / marginalGoalsPerPoint);
+
+      const name = s.skaterFullName.trim();
+      psMap.set(name, { ops: Math.round(ops * 10) / 10, dps: Math.round(dps * 10) / 10 });
+
+      // Also store by player ID for more reliable lookup
+      psMap.set(`id:${s.playerId}`, { ops: Math.round(ops * 10) / 10, dps: Math.round(dps * 10) / 10 });
+    }
+
+    console.log(`[PS] Computed Point Shares for ${psMap.size / 2} players`);
+    global.__psCache = { data: psMap, ts: Date.now() };
+    return psMap;
+
+  } catch (e: any) {
+    console.warn("[PS] fetchPointShares failed:", e.message);
+    return psMap;
+  }
+}
+
 export async function GET() {
-  // Load contracts and teams in parallel
-  const [CONTRACTS, LIVE_TEAMS] = await Promise.all([
+  // Load contracts, teams, and point shares in parallel
+  const [CONTRACTS, LIVE_TEAMS, PS_MAP] = await Promise.all([
     loadContracts(),
     loadTeams(),
+    fetchPointShares(),
   ]);
   // ── 1. MoneyPuck analytics — skaters + goalies ─────────────
   const analyticsMap = new Map<string, any>();
@@ -1055,6 +1261,9 @@ export async function GET() {
         canRetain:      finalRetain,
         retainedPct:    0,
         multiplier:     fin?.intangibleMultiplier ?? 1.0,
+        // Point Shares — lookup by name, fallback to null (computed dynamically)
+        ops:  PS_MAP.get(p.name)?.ops ?? PS_MAP.get(`id:${p.id}`)?.ops ?? null,
+        dps:  PS_MAP.get(p.name)?.dps ?? PS_MAP.get(`id:${p.id}`)?.dps ?? null,
         // NOIV components
         xgRelTM:        stats?.xgRelTM   ?? null,
         xgaRelTM:       stats?.xgaRelTM  ?? null,
