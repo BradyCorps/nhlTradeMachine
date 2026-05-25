@@ -323,14 +323,25 @@ export default function TradeMachine() {
 
     const prompt = `You are a senior NHL beat reporter writing the end-of-season trade retrospective column for a major hockey publication. This is the definitive year-in-review piece for the 2025-26 NHL season — written as if these trades happened at the 2026 trade deadline and we are now reflecting on how the season finished.
 
+2025-26 SEASON FACTS — USE THESE EXACTLY, DO NOT CONTRADICT THEM:
+- Calder Trophy (Rookie of the Year): Matthew Schaefer, New York Islanders — won unanimously (198 first-place votes). Runner-up: Ivan Demidov, Montreal. Do NOT give this award to Michkov, Bedard, or anyone else.
+- Florida Panthers did NOT win the Stanley Cup this year (they won 2023-24 and 2024-25). Pick a different champion.
+- Atlantic Division standings leader: Buffalo Sabres (109 pts). Tampa Bay Lightning also strong (106 pts). Toronto Maple Leafs missed playoffs (78 pts).
+- Metropolitan Division: Carolina Hurricanes strong (113 pts). 
+- Casey DeSmith won the Dallas Stars starting job (per team data).
+- These are real facts for this season — treat them as established record.
+
 CRITICAL RULES — VIOLATIONS WILL RUIN THE COLUMN:
-1. Only reference players from the rosters listed below. Do not invent players or prospects.
+1. Only reference players from the rosters listed below. Do NOT invent players, prospects, or supporting cast.
 2. A player RECEIVED by a team plays FOR that team. A player GIVEN AWAY plays for the OTHER team.
-3. PICKS: If a team GAVE AWAY a pick, they DO NOT have that pick anymore. They cannot draft with it. The team that RECEIVED the pick makes the draft selection. Read the trade summary carefully — "GAVE AWAY" means it is gone.
-4. PLAYER HISTORY: Players have ONLY played for the teams shown. Do NOT invent trades, signings, or history not in the trade summary. Connor McDavid has never been traded. No player has a fictional trade history.
-5. This is the 2025-26 season. Florida Panthers won 2023-24 and 2024-25 Cups — they did NOT win again. Pick a different champion.
-6. Statistical leaders: goals ~52-65, points ~105-140, GAA ~2.10-2.40, save% ~.918-.932.
-7. If a team gave away their 1st round pick, write about MISSING the draft lottery — not participating in it.
+3. PICKS: If a team GAVE AWAY a pick, they DO NOT have it. The RECEIVING team drafts with it. "GAVE AWAY" means it is gone.
+4. PLAYER HISTORY: Players have ONLY played for teams shown in the trade summary. NEVER invent prior teams, trades, or signings. Connor McDavid has only ever played for Edmonton. Zero exceptions.
+5. STATISTICS: Only invent stats within these realistic 2025-26 ranges — goals: 25-60, points: 50-135, GAA: 2.05-2.85, save%: .905-.935.
+6. INVENTED FACTS: Do not invent injuries, coaching changes, contract disputes, suspensions, retirements, or off-ice events unless strongly implied by roster/phase data.
+7. If a team gave away their 1st round pick, write about MISSING the draft lottery — they do NOT participate.
+8. TEAM PHASES: Honor the phase shown. A REBUILDING team did not make the playoffs. A CONTENDER competed for the Cup.
+9. THE YEAR IN NUMBERS section: Use Matthew Schaefer as Calder winner. Do not use Michkov. Pick a realistic Stanley Cup champion that is NOT Florida Panthers.
+10. Keep each section focused — do not repeat information across sections.
 
 TRADES EXECUTED (READ CAREFULLY — direction matters):
 ${tradesSummary}
@@ -357,15 +368,15 @@ ${isRebuilding
 4-5 sentences covering 3 distinct storylines from across the NHL this season. Include: one team that surprised everyone (good or bad), one major injury that shaped the playoff race, one off-ice or trade story that dominated headlines. Make it feel like a real, specific season happened — not generic filler.
 
 **THE YEAR IN NUMBERS**
-Present the statistical leaders in a clean format. Generate realistic but fictional numbers:
+Present the statistical leaders in a clean format. Use the SEASON FACTS above for awards — do not invent award winners.
 - **Goals:** [Player, Team] — XX goals
 - **Points:** [Player, Team] — XXX points  
 - **GAA:** [Goalie, Team] — X.XX
 - **Save %:** [Goalie, Team] — .XXX
 - **Presidents' Trophy:** [Team] — XX wins
-- **Stanley Cup Champion:** [Team] — brief one-line note on how they won it
+- **Stanley Cup Champion:** [Team] — brief one-line note (NOT the Florida Panthers)
 - **Conn Smythe:** [Player, Team]
-- **Rookie of the Year:** [Player, Team] — brief note
+- **Calder Trophy (Rookie of the Year):** Matthew Schaefer, New York Islanders — unanimous winner
 
 **THE DRAFT LOTTERY**
 ${(() => {
@@ -433,7 +444,7 @@ Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'lon
       .map(f => `• [${f.severity}] ${f.headline}`)
       .join("\n");
 
-    const prompt = `You are a senior NHL front office analyst writing an internal trade evaluation memo.
+    const prompt = `You are a senior NHL front office analyst writing an internal trade evaluation memo. Base your analysis ONLY on the data provided — do not invent injuries, contract disputes, locker room issues, or league context not shown here.
 
 TRADE DETAILS:
 ${teams[0].name} (${teams[0].phase}, #${teams[0].standing}/32, $${teams[0].capSpace}M cap space) sends:
@@ -454,12 +465,12 @@ ANALYTICS:
 GM LOGIC FLAGS:
 ${flagSummary || "None — trade passes all logic checks"}
 
-Write a concise 3-paragraph front office memo. Each paragraph maximum 4 sentences. Cover:
-1. What each team's motivation is and whether it aligns with their organizational direction
-2. Whether the analytics support the trade — address BOTH teams' perspectives and what additional assets would make it fair
-3. Your recommendation — be direct, one clear verdict
+Write a concise 3-paragraph front office memo. Each paragraph maximum 4 sentences.
+1. What each team's organizational motivation is based on their phase and standing — stick to what the data shows
+2. Whether the analytics support the trade for BOTH teams — use the NAV/EWA/CWI numbers directly
+3. One clear recommendation — accept, reject, or counter with specific conditions
 
-IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}. Use current knowledge — do not reference future events as pending if they have already occurred. Complete every sentence. Never cut off mid-paragraph.`;
+RULES: No invented context. No speculation about players not in this trade. Complete every sentence. Use the numbers provided.`;
 
     if (memoAbortRef.current) memoAbortRef.current.abort();
     memoAbortRef.current = new AbortController();
@@ -550,7 +561,7 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
             return base;
           })()}
           onClose={() => setTradeRequest(null)}
-          onLoadTrade={(partner, outgoing, incoming) => {
+          onLoadTrade={(partner: Team, outgoing: Asset[], incoming: Asset[]) => {
             const partnerTeam = db.teams.find(t => t.id === partner.id) ?? null;
             setTeams([teams[0], partnerTeam]);
             setBlocks([outgoing, incoming]);
@@ -562,7 +573,7 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
       )}
       {/* ── Front Office Memo Modal ───────────────────────────── */}
       {showMemo && verdict?.claudeAnalysis && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6"
           style={{ background: 'rgba(28,20,10,0.75)', backdropFilter: 'blur(3px)' }}
           onClick={() => setShowMemo(false)}>
           <div className="relative max-w-2xl w-full max-h-[90vh] overflow-y-auto"
@@ -570,7 +581,7 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
             onClick={e => e.stopPropagation()}>
 
             {/* Memo letterhead */}
-            <div className="px-8 pt-8 pb-4" style={{ borderBottom: '2px solid #1c140a' }}>
+            <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-4" style={{ borderBottom: '2px solid #1c140a' }}>
               <div className="text-center mb-4">
                 <div className="text-[9px] uppercase tracking-[0.5em] mb-1" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                   Quant Front Office — Internal Memorandum
@@ -579,7 +590,7 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
                   Trade Evaluation Report
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-[10px]" style={{ fontFamily: "'Courier Prime', monospace" }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5 text-[10px]" style={{ fontFamily: "'Courier Prime', monospace" }}>
                 {[
                   ["TO",      "GM & Hockey Operations Leadership"],
                   ["FROM",    "Senior Front Office Analyst — Claude"],
@@ -599,7 +610,7 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
             </div>
 
             {/* Memo body */}
-            <div className="px-8 py-6 relative">
+            <div className="px-4 sm:px-8 py-5 sm:py-6 relative">
               {/* Faint ruled lines like a memo pad */}
               <div className="absolute inset-0 pointer-events-none" style={{
                 backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, rgba(184,160,112,0.2) 28px)',
@@ -616,7 +627,7 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
             </div>
 
             {/* Verdict stamp + disclaimer */}
-            <div className="px-8 pb-6 flex items-end justify-between" style={{ borderTop: '1px solid #b8a070', paddingTop: '16px' }}>
+            <div className="px-4 sm:px-8 pb-5 sm:pb-6 flex items-end justify-between flex-wrap gap-3" style={{ borderTop: '1px solid #b8a070', paddingTop: '16px' }}>
               <div className="text-[9px]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace", lineHeight: 1.6 }}>
                 CONFIDENTIAL — Internal Use Only<br />
                 Valuations are analytical estimates only.
@@ -634,7 +645,7 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
             </div>
 
             {/* Footer actions */}
-            <div className="px-8 py-3 flex justify-between items-center" style={{ borderTop: '1px solid #b8a070' }}>
+            <div className="px-4 sm:px-8 py-3 flex justify-between items-center flex-wrap gap-2" style={{ borderTop: '1px solid #b8a070' }}>
               <button onClick={() => { setShowMemo(false); generateClaudeAnalysis(); }}
                 className="text-[9px] font-black uppercase tracking-wider transition-opacity hover:opacity-60"
                 style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
@@ -694,9 +705,23 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
 
         <TugBar homeNetGain={homeNetGain} navA={navA} navB={navB} />
 
+        {/* ── Team Strands — full width above trade grid ── */}
+        {teams[0] && teams[1] && (
+          <div className="mb-4">
+            <TeamDNA
+              homeTeam={teams[0]}
+              partnerTeam={teams[1]}
+              homeRoster={allHomeRoster}
+              partnerRoster={allPartnerRoster}
+              homeBlocks={blocks[0]}
+              partnerBlocks={blocks[1]}
+              navMap={navMap}
+            />
+          </div>
+        )}
+
         {/* ── Main Trade Grid ── */}
         <div className="flex flex-col lg:grid lg:grid-cols-[1fr_260px_1fr] xl:grid-cols-[1fr_280px_1fr] gap-4 lg:gap-5 items-start">
-
           {/* Home panel */}
           <TradePanel idx={0} team={teams[0]} nav={navA} capSpace={capA} db={db} blocks={blocks}
             setTeams={setTeams} setBlocks={setBlocks} label="Your Franchise" accent="HOME"
@@ -712,13 +737,6 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
                   <ModeBadge team={teams[0]} roster={allHomeRoster} label="Home Mode" />
                   <ModeBadge team={teams[1]} roster={allPartnerRoster} label="Partner Mode" />
                 </div>
-                <TeamDNA
-                  homeTeam={teams[0]}
-                  partnerTeam={teams[1]}
-                  homeRoster={allHomeRoster}
-                  partnerRoster={allPartnerRoster}
-                  navMap={navMap}
-                />
               </div>
             )}
 
@@ -766,7 +784,7 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
         {/* ── Executed Trades Log + Sim Panel ── */}
         {(executedTrades.length > 0 || showSimPanel) && (
           <div className="mt-6 bg-zinc-900/30 border border-zinc-800/40 rounded-2xl overflow-hidden">
-            <div className="px-6 py-3 border-b border-zinc-800/40 flex items-center justify-between">
+            <div className="px-3 sm:px-6 py-3 border-b border-zinc-800/40 flex items-center justify-between">
               <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600">
                 Simulated Universe — {executedTrades.length} Trade{executedTrades.length !== 1 ? "s" : ""} Executed
               </span>
@@ -1401,7 +1419,7 @@ function AssetCard({
       {/* Standard STATS view */}
       {(view === "STATS" || isPick || asset.position === "G") && (<>
       {asset.position === "G" && !isPick && (
-        <div className="grid grid-cols-3 gap-1.5 mb-2.5">
+        <div className="grid grid-cols-3 gap-1.5 mb-2.5 sm:grid-cols-3">
           {[
             { label: 'GSAx', val: (asset.gsax??0).toFixed(1), good: (asset.gsax??0) >= 0 },
             { label: 'SV%',  val: ((asset.savePct??0.9)*100).toFixed(1), good: (asset.savePct??0) >= 0.910 },
@@ -1471,7 +1489,7 @@ function AssetCard({
               title="OFF: Offensive production value (pts/82 pace, xG). DEF: Defensive suppression (xG against, TOI quality). YNG: Option value from proven youth on cheap deal. CAP: Contract cost penalty — overpaid contracts drag total NAV."
             >i</span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
+          <div className="stat-grid-4">
             <MicroBar label="OFF" val={xnav.off} max={300} color="cyan"
               tooltip="Offensive impact — scoring production (pts/82, xG rate)" />
             <MicroBar label="DEF" val={xnav.def} max={150} color="emerald"
@@ -1519,7 +1537,7 @@ function AssetCard({
       {!isPick && asset.position !== "G" && asset.hasLiveStats && (
         <div className="mt-2 pt-2" style={{ borderTop: '1px solid #c8b890' }}>
           {/* Box score row */}
-          <div className="grid grid-cols-4 gap-1 mb-1.5">
+          <div className="stat-grid-4 mb-1.5">
             {[
               { label: 'GP',    val: asset.games.toString() },
               { label: 'G',     val: ((asset.goalsPace   ?? 0) * asset.games / 82).toFixed(0) },
@@ -1533,11 +1551,11 @@ function AssetCard({
             ))}
           </div>
           {/* Advanced row */}
-          <div className="grid grid-cols-4 gap-1">
+          <div className="stat-grid-4">
             {[
               { label: 'TOI',   val: asset.avgTOI?.toFixed(1) ?? '—',   tooltip: 'Average time on ice per game (minutes)' },
               { label: 'xG/82', val: asset.xGPace?.toFixed(1)  ?? '—',  tooltip: 'Expected goals generated per 82 games' },
-              { label: 'xG%+', val: asset.xgRelTM != null ? `${asset.xgRelTM > 0 ? '+' : ''}${(asset.xgRelTM as number).toFixed(1)}` : '—', tooltip: 'xG% relative to teammates — positive means team controls more shots when this player is on ice vs off' },
+              { label: 'xG%+', val: asset.xgRelTM != null ? `${(asset.xgRelTM as number) > 0 ? '+' : ''}${(asset.xgRelTM as number).toFixed(1)}` : '—', tooltip: 'xG% relative to teammates — positive means team controls more shots when this player is on ice vs off' },
               { label: 'QoC',   val: asset.qocRank?.toString() ?? '—',  tooltip: 'Quality of competition rank — lower = harder opponents faced' },
             ].map(s => (
               <div key={s.label} className="text-center p-1" title={s.tooltip} style={{ background: '#e8dab8', border: '1px solid #b8a070' }}>
@@ -1610,7 +1628,7 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
   compareAsset?: Asset | null;
   compareXnav?: XNAVResult | null;
 }) {
-  const W = 320, H = 160;
+  const W = 320, H = 175;
   const cy = H / 2;
   const amplitude = 38;
   const freq = (2 * Math.PI) / W;
@@ -1620,7 +1638,6 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
 
   const buildTraits = (a: Asset, nav: XNAVResult) => {
     const isD = a.position === "D";
-    // Use PS ratio when available — most accurate signal for off/def balance
     const ops = a.ops ?? null;
     const dps = a.dps ?? null;
     const psTotal = ops !== null && dps !== null ? ops + dps : null;
@@ -1629,18 +1646,32 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
 
     return {
       off: [
-        { label: "SCR",  val: norm(safe(a.ptsPace), 0, isD ? 80 : 100),    title: "Scoring pace per 82" },
-        { label: "xG",   val: norm(safe(a.xGPace ?? 0), 0, isD ? 25 : 50), title: "Expected Goals generated" },
-        { label: "OFF",  val: opsNorm ?? norm(nav.off, -80, 300),           title: ops !== null ? `OPS ${ops?.toFixed(1)} — Offensive Point Shares` : "Offensive NAV component" },
-        { label: "NOIV", val: norm(safe(a.xgRelTM ?? 0), -12, 12),         title: "xG% relative to teammates" },
-        { label: "TOI+", val: norm(safe(a.avgTOI), 10, 27),                title: "Ice time deployment" },
+        { label: "SCR",  val: norm(safe(a.ptsPace), 0, isD ? 80 : 100),
+          title: "Scoring pace per 82" },
+        { label: "xG",   val: norm(safe(a.xGPace ?? 0), 0, isD ? 25 : 50),
+          title: "Expected Goals generated" },
+        { label: ops !== null ? "OPS" : "OFF",
+          val: opsNorm ?? norm(nav.off, -80, 300),
+          title: ops !== null ? `OPS ${ops.toFixed(1)} — Offensive Point Shares` : "Offensive NAV component",
+          ps: ops !== null ? ops.toFixed(1) : null },
+        { label: "NOIV", val: norm(safe(a.xgRelTM ?? 0), -12, 12),
+          title: "xG% relative to teammates" },
+        { label: "TOI+", val: norm(safe(a.avgTOI), 10, 27),
+          title: "Ice time deployment" },
       ],
       def: [
-        { label: "SUPP", val: norm(-(a.xgaRelTM ?? 0), -1.5, 1.5),        title: "xGA suppression vs teammates" },
-        { label: "QoC",  val: norm(400 - safe(a.qocRank ?? 400), 50, 380), title: "Quality of competition" },
-        { label: "DEF",  val: dpsNorm ?? norm(nav.def, -60, 150),          title: dps !== null ? `DPS ${dps?.toFixed(1)} — Defensive Point Shares` : "Defensive NAV component" },
-        { label: "DZ%",  val: 1 - norm(safe(a.dzPct ?? 0.5), 0.3, 0.7),   title: "Offensive zone deployment" },
-        { label: "AGE",  val: norm(nav.age, -80, 60),                      title: "Age curve trajectory" },
+        { label: "SUPP", val: norm(-(a.xgaRelTM ?? 0), -1.5, 1.5),
+          title: "xGA suppression vs teammates" },
+        { label: "QoC",  val: norm(400 - safe(a.qocRank ?? 400), 50, 380),
+          title: "Quality of competition" },
+        { label: dps !== null ? "DPS" : "DEF",
+          val: dpsNorm ?? norm(nav.def, -60, 150),
+          title: dps !== null ? `DPS ${dps.toFixed(1)} — Defensive Point Shares` : "Defensive NAV component",
+          ps: dps !== null ? dps.toFixed(1) : null },
+        { label: "DZ%",  val: 1 - norm(safe(a.dzPct ?? 0.5), 0.3, 0.7),
+          title: "Offensive zone deployment" },
+        { label: "AGE",  val: norm(nav.age, -80, 60),
+          title: "Age curve trajectory" },
       ],
     };
   };
@@ -1652,8 +1683,24 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
   const defAvg = primary.def.reduce((s, t) => s + t.val, 0) / primary.def.length;
   const balance = Math.abs(offAvg - defAvg);
 
+  // PS ratio is the most accurate archetype signal when available —
+  // it directly measures fraction of value that is offensive vs defensive.
+  // Morrissey OPS 3.5 / DPS 5.0 = psRatio 0.41 → correctly identified as defensive
+  const psRatio = (asset.ops != null && asset.dps != null && (asset.ops + asset.dps) > 1)
+    ? asset.ops / (asset.ops + asset.dps)
+    : null;
+
   const strandType =
-    (offAvg > 0.72 && defAvg > 0.60 && balance < 0.20) ? "ELITE TWO-WAY"
+    // PS ratio overrides heuristics when live data is available
+    psRatio !== null && psRatio > 0.70 && offAvg > 0.60              ? "OFFENSIVE FORCE"
+    : psRatio !== null && psRatio > 0.60 && offAvg > 0.50            ? "OFFENSIVE LEAN"
+    : psRatio !== null && psRatio < 0.30 && defAvg > 0.55            ? "DEFENSIVE ANCHOR"
+    : psRatio !== null && psRatio < 0.40 && defAvg > 0.45            ? "DEFENSIVE LEAN"
+    : psRatio !== null && psRatio >= 0.40 && psRatio <= 0.60
+        && offAvg > 0.58 && defAvg > 0.52                            ? "ELITE TWO-WAY"
+    : psRatio !== null && psRatio >= 0.38 && psRatio <= 0.62         ? "COMPLETE PLAYER"
+    // Fallback heuristics when no PS data
+    : (offAvg > 0.72 && defAvg > 0.60 && balance < 0.20)            ? "ELITE TWO-WAY"
     : offAvg > defAvg + 0.15
       ? offAvg > 0.65 ? "OFFENSIVE FORCE" : "OFFENSIVE LEAN"
     : defAvg > offAvg + 0.15
@@ -1682,6 +1729,7 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
   return (
     <div className="mt-1 mb-2">
       <div className="relative" style={{ background: "#dfd0a8", border: "1px solid #c8b890", borderRadius: "2px" }}>
+        <div className="strand-svg-wrap">
         <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
           {[0.25, 0.5, 0.75].map(t => (
             <line key={t} x1={t*W} y1={8} x2={t*W} y2={H-8} stroke="#c8b890" strokeWidth="0.5" strokeDasharray="3,3"/>
@@ -1711,20 +1759,32 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
             const x = ((i + 0.5) / 5) * W;
             const amp = amplitude * (0.35 + t.val * 0.65);
             const y = cy - amp * Math.sin(freq * x * 2.5);
+            const hasPs = (t as any).ps != null;
+            const displayVal = hasPs ? (t as any).ps : Math.round(t.val * 100);
+            // Push label UP — clamp so it never goes below center
+            const labelY = Math.min(y - 11, cy - 8);
+            const valY   = Math.min(y - 3,  cy - 1);
             return <g key={t.label}>
               <circle cx={x} cy={y} r={t.val * 5 + 2} fill={offColor} opacity="0.2"/>
-              <circle cx={x} cy={y} r={2.5} fill={offColor}/>
-              <text x={x} y={y-9} textAnchor="middle" fontSize="7" fill={offColor} fontFamily="Courier Prime, monospace" fontWeight="bold">{t.label}</text>
+              <circle cx={x} cy={y} r={hasPs ? 3.5 : 2.5} fill={offColor}/>
+              <text x={x} y={labelY} textAnchor="middle" fontSize="7" fill={offColor} fontFamily="Courier Prime, monospace" fontWeight="bold">{t.label}</text>
+              <text x={x} y={valY}   textAnchor="middle" fontSize="6" fill={offColor} fontFamily="Courier Prime, monospace" opacity="0.85">{displayVal}</text>
             </g>;
           })}
           {primary.def.map((t, i) => {
             const x = ((i + 0.5) / 5) * W;
             const amp = amplitude * (0.35 + t.val * 0.65);
             const y = cy + amp * Math.sin(freq * x * 2.5);
+            const hasPs = (t as any).ps != null;
+            const displayVal = hasPs ? (t as any).ps : Math.round(t.val * 100);
+            // Push label DOWN — clamp so it never goes above center
+            const labelY = Math.max(y + 17, cy + 9);
+            const valY   = Math.max(y + 25, cy + 17);
             return <g key={t.label}>
               <circle cx={x} cy={y} r={t.val * 5 + 2} fill={defColor} opacity="0.2"/>
-              <circle cx={x} cy={y} r={2.5} fill={defColor}/>
-              <text x={x} y={y+16} textAnchor="middle" fontSize="7" fill={defColor} fontFamily="Courier Prime, monospace" fontWeight="bold">{t.label}</text>
+              <circle cx={x} cy={y} r={hasPs ? 3.5 : 2.5} fill={defColor}/>
+              <text x={x} y={labelY} textAnchor="middle" fontSize="7" fill={defColor} fontFamily="Courier Prime, monospace" fontWeight="bold">{t.label}</text>
+              <text x={x} y={valY}   textAnchor="middle" fontSize="6" fill={defColor} fontFamily="Courier Prime, monospace" opacity="0.85">{displayVal}</text>
             </g>;
           })}
 
@@ -1740,6 +1800,7 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
             </g>
           )}
         </svg>
+        </div>
 
         <div className="absolute top-1.5 right-2 text-[7px] font-black px-1.5 py-0.5" style={{
           fontFamily: "'Courier Prime', monospace",
@@ -1749,13 +1810,20 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
         }}>{strandType}</div>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-3 mt-1.5 px-0.5">
-        {([
-          { label: "◆ OFFENSE", traits: primary.off, color: offColor },
-          { label: "◆ DEFENSE", traits: primary.def, color: defColor },
-        ] as const).map(({ label, traits, color }) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 mt-1.5 px-0.5">
+        {[
+          { label: "◆ OFFENSE", traits: primary.off, color: offColor, ps: asset.ops ?? null, psLabel: "OPS" },
+          { label: "◆ DEFENSE", traits: primary.def, color: defColor, ps: asset.dps ?? null, psLabel: "DPS" },
+        ].map(({ label, traits, color, ps, psLabel }) => (
           <div key={label}>
-            <div className="text-[7px] font-black mb-1" style={{ color, fontFamily: "'Courier Prime', monospace" }}>{label}</div>
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-[7px] font-black" style={{ color, fontFamily: "'Courier Prime', monospace" }}>{label}</div>
+              {ps !== null && ps !== undefined && (
+                <div className="text-[7px] font-black" style={{ color, fontFamily: "'Courier Prime', monospace" }}>
+                  {psLabel} {(ps as number).toFixed(1)}
+                </div>
+              )}
+            </div>
             {traits.map(t => (
               <div key={t.label} className="flex items-center gap-1.5 mb-0.5" title={t.title}>
                 <span className="text-[7px] font-black w-8 shrink-0" style={{ color: "#6b5030", fontFamily: "'Courier Prime', monospace" }}>{t.label}</span>
@@ -1856,12 +1924,14 @@ function TugBar({ homeNetGain, navA, navB }: { homeNetGain: number; navA: number
         <div className="h-full bg-emerald-500/8 transition-all duration-700 ease-out flex-1" />
       </div>
       <div className="absolute left-1/2 -translate-x-1/2 h-full w-px bg-zinc-700/50" />
-      <div className="z-10 w-full flex justify-between px-5 font-black text-[9px] uppercase tracking-[0.3em] text-zinc-700">
-        <span className={homeNetGain < -5 ? "text-rose-500" : ""}>Outgoing Value</span>
+      <div className="z-10 w-full flex justify-between px-3 sm:px-5 font-black text-[9px] uppercase tracking-[0.3em] text-zinc-700">
+        <span className={`hidden sm:inline ${homeNetGain < -5 ? "text-rose-500" : ""}`}>Outgoing Value</span>
+        <span className={`sm:hidden ${homeNetGain < -5 ? "text-rose-500" : ""}`}>OUT</span>
         <span className="bg-zinc-950 text-zinc-300 px-3 py-1 rounded-lg border border-zinc-800 font-mono text-[10px] tracking-tight">
           {navA.toFixed(0)} ←→ {navB.toFixed(0)} NAV
         </span>
-        <span className={homeNetGain > 5 ? "text-emerald-400" : ""}>Incoming Value</span>
+        <span className={`hidden sm:inline ${homeNetGain > 5 ? "text-emerald-400" : ""}`}>Incoming Value</span>
+        <span className={`sm:hidden ${homeNetGain > 5 ? "text-emerald-400" : ""}`}>IN</span>
       </div>
     </div>
   );
@@ -1956,17 +2026,41 @@ function computeRosterStrand(roster: Asset[], navMap: Record<string, XNAVResult>
 }
 
 function TeamDNA({
-  homeTeam, partnerTeam, homeRoster, partnerRoster, navMap
+  homeTeam, partnerTeam, homeRoster, partnerRoster, homeBlocks, partnerBlocks, navMap
 }: {
   homeTeam: Team | null;
   partnerTeam: Team | null;
   homeRoster: Asset[];
   partnerRoster: Asset[];
+  homeBlocks: Asset[];
+  partnerBlocks: Asset[];
   navMap: Record<string, XNAVResult>;
 }) {
   const [expanded, setExpanded] = React.useState(false);
-  const homeStrand    = computeRosterStrand(homeRoster, navMap);
-  const partnerStrand = computeRosterStrand(partnerRoster, navMap);
+
+  // Post-trade roster: remove outgoing, add incoming
+  // This makes the panel react live to trade changes
+  const effectiveHomeRoster = React.useMemo(() => {
+    const outIds = new Set(homeBlocks.map(a => a.id));
+    const inIds  = new Set(partnerBlocks.map(a => a.id));
+    return [
+      ...homeRoster.filter(p => !outIds.has(p.id)),
+      ...partnerBlocks.filter(a => a.position !== "Pick"),
+    ];
+  }, [homeRoster, homeBlocks, partnerBlocks]);
+
+  const effectivePartnerRoster = React.useMemo(() => {
+    const outIds = new Set(partnerBlocks.map(a => a.id));
+    return [
+      ...partnerRoster.filter(p => !outIds.has(p.id)),
+      ...homeBlocks.filter(a => a.position !== "Pick"),
+    ];
+  }, [partnerRoster, homeBlocks, partnerBlocks]);
+
+  const hasActiveTrade = homeBlocks.length > 0 || partnerBlocks.length > 0;
+
+  const homeStrand    = computeRosterStrand(effectiveHomeRoster, navMap);
+  const partnerStrand = computeRosterStrand(effectivePartnerRoster, navMap);
   if (!homeStrand || !partnerStrand) return null;
 
   // Gap vs championship template — negative = below template, positive = above
@@ -2020,151 +2114,136 @@ function TeamDNA({
   const tmplDef = Object.values(CHAMPIONSHIP_TEMPLATE.def).reduce((s,v) => s+v, 0) / 5;
 
   return (
-    <div style={{ border: '1px solid #c8b890', borderRadius: '2px', background: '#e8dab8' }}>
-      {/* Header */}
-      <button
-        className="w-full flex items-center justify-between px-3 py-2"
-        onClick={() => setExpanded(e => !e)}
-      >
-        <div className="flex items-center gap-2">
-          <svg width="16" height="12" viewBox="0 0 16 12">
+    <div className="strands-panel">
+      <button className="strands-header" onClick={() => setExpanded(e => !e)}>
+        <div className="strands-header-left">
+          <svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true">
             <path d="M0,3 C2,3 2,9 4,9 C6,9 6,3 8,3 C10,3 10,9 12,9 C14,9 14,3 16,3"
-              fill="none" stroke={offColor} strokeWidth="1.5" strokeLinecap="round"/>
+              fill="none" stroke="var(--blue)" strokeWidth="1.5" strokeLinecap="round"/>
             <path d="M0,9 C2,9 2,3 4,3 C6,3 6,9 8,9 C10,9 10,3 12,3 C14,3 14,9 16,9"
-              fill="none" stroke={defColor} strokeWidth="1.5" strokeLinecap="round"/>
+              fill="none" stroke="var(--red)" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
-          <span className="text-[8px] font-black uppercase tracking-widest"
-            style={{ color: '#1c140a', fontFamily: "'Courier Prime', monospace" }}>
-            TEAM DNA
-          </span>
+          <span className="strands-title">Team Strands</span>
+          {hasActiveTrade && (
+            <span className="strands-post-trade-badge">Post-Trade</span>
+          )}
         </div>
-        <div className="flex items-center gap-3">
-          {/* Quick need indicators */}
-          {allGaps.slice(0, 2).map(g => (
-            <span key={g.label} className="text-[7px] font-black px-1 py-0.5"
-              style={{
-                color: g.gap < -0.15 ? '#b83020' : '#9a7d58',
-                border: `1px solid ${g.gap < -0.15 ? 'rgba(184,48,32,0.35)' : 'rgba(168,149,105,0.35)'}`,
-                fontFamily: "'Courier Prime', monospace",
-              }}>
+        <div className="strands-header-right">
+          {allGaps.slice(0, 3).map(g => (
+            <span key={g.label} className={`strands-need-pill${g.gap < -0.15 ? ' urgent' : ''}`}>
               {g.label} {g.gap < -0.15 ? '↓' : '~'}
             </span>
           ))}
-          <span className="text-[9px]" style={{ color: '#9a7d58' }}>{expanded ? '▲' : '▼'}</span>
+          <span className="data-label">{expanded ? '▲' : '▼'}</span>
         </div>
       </button>
 
       {expanded && (
-        <div className="px-3 pb-3" style={{ borderTop: '1px solid #c8b890' }}>
+        <div className="strands-body">
+          <p className="strands-context">
+            Each helix shows a team's aggregate offensive (navy) and defensive (red) profile across their top-9 forwards and top-4 D by ice time. The dashed gold line is the championship template — the average profile of recent Stanley Cup winners. Gaps below the template are roster needs.{hasActiveTrade ? " Updated to reflect the current trade." : ""}
+          </p>
 
-          {/* Dual helix comparison — home vs partner */}
-          <div className="grid grid-cols-2 gap-2 mt-2">
+          <div className="strands-helix-grid">
             {[
-              { team: homeTeam, strand: homeStrand, offA: offAvgHome, defA: defAvgHome, label: homeTeam?.name.split(" ").pop() ?? "" },
-              { team: partnerTeam, strand: partnerStrand, offA: offAvgPart, defA: defAvgPart, label: partnerTeam?.name.split(" ").pop() ?? "" },
-            ].map(({ team, offA, defA, label }) => (
-              <div key={team?.id} style={{ background: '#dfd0a8', border: '1px solid #c8b890', borderRadius: '2px' }}>
-                <div className="text-[7px] font-black uppercase tracking-wider px-2 pt-1.5 pb-0.5"
-                  style={{ color: '#6b5030', fontFamily: "'Courier Prime', monospace" }}>
-                  {label}
-                </div>
-                <svg width="100%" viewBox={`0 0 ${W} ${H}`}>
-                  {/* Championship template (faint gold) */}
-                  <path d={buildPath(tmplOff, tmplDef, 0)} fill="none"
-                    stroke={tmplColor} strokeWidth="1" strokeDasharray="3,2" opacity="0.4"/>
-                  <path d={buildDefPath(tmplDef, 0)} fill="none"
-                    stroke={tmplColor} strokeWidth="1" strokeDasharray="3,2" opacity="0.4"/>
-                  {/* Defensive strand */}
-                  <path d={buildDefPath(defA, 0)} fill="none"
-                    stroke={defColor} strokeWidth="1.8" strokeLinecap="round" opacity="0.85"/>
-                  {/* Offensive strand */}
-                  <path d={buildPath(offA, defA, 0)} fill="none"
-                    stroke={offColor} strokeWidth="1.8" strokeLinecap="round" opacity="0.85"/>
-                  {/* Rungs */}
-                  {[40, 80, 120, 160, 200, 240].map(x => {
-                    const oy = H/2 - (amplitude*(0.3+offA*0.7))*Math.sin(freq*x*2);
-                    const dy = H/2 + (amplitude*(0.3+defA*0.7))*Math.sin(freq*x*2);
-                    return <line key={x} x1={x} y1={oy} x2={x} y2={dy}
-                      stroke={tmplColor} strokeWidth="0.6" opacity="0.3"/>;
-                  })}
-                </svg>
-                {/* Off/Def bars */}
-                <div className="px-2 pb-2 grid grid-cols-2 gap-1">
-                  <div>
-                    <div className="text-[6px] font-black mb-0.5" style={{ color: offColor, fontFamily: "'Courier Prime', monospace" }}>OFF {(offA * 100).toFixed(0)}</div>
-                    <div className="h-1 rounded-full" style={{ background: '#c8b890' }}>
-                      <div className="h-full rounded-full" style={{ width: `${offA * 100}%`, background: offColor }} />
+              { team: homeTeam,    offA: offAvgHome, defA: defAvgHome },
+              { team: partnerTeam, offA: offAvgPart, defA: defAvgPart },
+            ].map(({ team, offA, defA }) => {
+              const W2 = 560; const H2 = 140;
+              const freq2 = (2 * Math.PI) / W2;
+              const amp2  = 42;
+              const buildP = (a: number, flip: boolean) => {
+                const pts = [];
+                for (let i = 0; i <= 120; i++) {
+                  const x = (i / 120) * W2;
+                  const y = H2/2 + (flip ? 1 : -1) * (amp2 * (0.25 + a * 0.75)) * Math.sin(freq2 * x * 2);
+                  pts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`);
+                }
+                return pts.join(" ");
+              };
+              const tmplOffA = Object.values(CHAMPIONSHIP_TEMPLATE.off).reduce((s: number, v) => s + (v as number), 0) / 5;
+              const tmplDefA = Object.values(CHAMPIONSHIP_TEMPLATE.def).reduce((s: number, v) => s + (v as number), 0) / 5;
+              const rungs = [70, 140, 210, 280, 350, 420, 490];
+              return (
+                <div key={team?.id} className="strands-helix-card">
+                  <div className="strands-helix-card-header">
+                    <span className="strands-helix-team-name">{team?.name}</span>
+                    <div className="strands-helix-scores">
+                      <span className="strands-helix-off">OFF {(offA * 100).toFixed(0)}</span>
+                      <span className="strands-helix-def">DEF {(defA * 100).toFixed(0)}</span>
                     </div>
                   </div>
-                  <div>
-                    <div className="text-[6px] font-black mb-0.5" style={{ color: defColor, fontFamily: "'Courier Prime', monospace" }}>DEF {(defA * 100).toFixed(0)}</div>
-                    <div className="h-1 rounded-full" style={{ background: '#c8b890' }}>
-                      <div className="h-full rounded-full" style={{ width: `${defA * 100}%`, background: defColor }} />
-                    </div>
-                  </div>
+                  <svg className="strands-helix-svg" viewBox={`0 0 ${W2} ${H2}`}>
+                    <path d={buildP(tmplOffA, false)} fill="none"
+                      stroke="var(--rule)" strokeWidth="2" strokeDasharray="8,5" opacity="0.8"/>
+                    <path d={buildP(tmplDefA, true)} fill="none"
+                      stroke="var(--rule)" strokeWidth="2" strokeDasharray="8,5" opacity="0.8"/>
+                    {rungs.map(x => {
+                      const oy = H2/2 - (amp2*(0.25+offA*0.75))*Math.sin(freq2*x*2);
+                      const dy = H2/2 + (amp2*(0.25+defA*0.75))*Math.sin(freq2*x*2);
+                      return <line key={x} x1={x} y1={oy} x2={x} y2={dy}
+                        stroke="var(--rule)" strokeWidth="1" opacity="0.2"/>;
+                    })}
+                    <path d={buildP(defA, true)} fill="none"
+                      stroke="var(--red)" strokeWidth="3" strokeLinecap="round" opacity="0.9"/>
+                    <path d={buildP(offA, false)} fill="none"
+                      stroke="var(--blue)" strokeWidth="3" strokeLinecap="round" opacity="0.9"/>
+                    <line x1="14" y1="12" x2="34" y2="12" stroke="var(--blue)" strokeWidth="2.5"/>
+                    <text x="38" y="16" fontSize="9" fill="var(--blue)" fontFamily="Courier Prime, monospace" fontWeight="bold">OFFENSE</text>
+                    <line x1="14" y1="27" x2="34" y2="27" stroke="var(--red)" strokeWidth="2.5"/>
+                    <text x="38" y="31" fontSize="9" fill="var(--red)" fontFamily="Courier Prime, monospace" fontWeight="bold">DEFENSE</text>
+                    <line x1="14" y1="42" x2="34" y2="42" stroke="var(--rule)" strokeWidth="2" strokeDasharray="5,3"/>
+                    <text x="38" y="46" fontSize="9" fill="var(--rule)" fontFamily="Courier Prime, monospace">CHAMP. TEMPLATE</text>
+                  </svg>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          {/* Need score — gaps vs championship template */}
-          <div className="mt-2 pt-2" style={{ borderTop: '1px solid #c8b890' }}>
-            <div className="text-[7px] font-black uppercase tracking-wider mb-1.5"
-              style={{ color: '#6b5030', fontFamily: "'Courier Prime', monospace" }}>
-              {homeTeam?.name.split(" ").pop()} — Gaps vs Championship Template
-            </div>
-            <div className="space-y-1">
-              {[...homeGaps.off, ...homeGaps.def]
-                .sort((a, b) => a.gap - b.gap)
-                .map(g => {
-                  const pct = Math.min(48, Math.abs(g.gap) * 180);
-                  return (
-                    <div key={g.label} className="flex items-center gap-1.5">
-                      <span className="text-[7px] font-black w-8 shrink-0"
-                        style={{ color: '#6b5030', fontFamily: "'Courier Prime', monospace" }}>
-                        {g.label}
-                      </span>
-                      {/* Diverging bar — left half = deficit (red), right half = surplus (green) */}
-                      <div className="flex flex-1 h-2 rounded-full overflow-hidden"
-                        style={{ background: '#c8b890' }}>
-                        {/* Left half */}
-                        <div className="flex justify-end" style={{ width: '50%' }}>
-                          {g.gap < 0 && (
-                            <div className="h-full rounded-l-full"
-                              style={{ width: `${pct * 2}%`, background: '#b83020', opacity: 0.85 }}/>
-                          )}
-                        </div>
-                        {/* Center divider */}
-                        <div style={{ width: '1px', background: '#9a7d58', opacity: 0.5 }}/>
-                        {/* Right half */}
-                        <div className="flex justify-start" style={{ width: '50%' }}>
-                          {g.gap >= 0 && (
-                            <div className="h-full rounded-r-full"
-                              style={{ width: `${pct * 2}%`, background: '#1a5c2e', opacity: 0.85 }}/>
-                          )}
-                        </div>
+          <div className="strands-gaps-header">
+            {homeTeam?.name} — Gaps vs Championship Template{hasActiveTrade ? " (post-trade)" : ""}
+          </div>
+
+          <div className="strands-gaps-grid">
+            {[...homeGaps.off, ...homeGaps.def]
+              .sort((a, b) => a.gap - b.gap)
+              .map(g => {
+                const pct = Math.min(48, Math.abs(g.gap) * 180);
+                const valClass = g.gap < -0.10 ? 'deficit' : g.gap > 0.05 ? 'surplus' : 'neutral';
+                return (
+                  <div key={g.label} className="strands-gap-row">
+                    <span className="strands-gap-label">{g.label}</span>
+                    <div className="strands-gap-track">
+                      <div className="strands-gap-left">
+                        {g.gap < 0 && (
+                          <div className="strands-gap-fill-deficit" style={{ width: `${pct * 2}%` }}/>
+                        )}
                       </div>
-                      <span className="text-[7px] font-black w-6 text-right shrink-0"
-                        style={{ color: g.gap < -0.10 ? '#b83020' : g.gap > 0.05 ? '#1a5c2e' : '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
-                        {g.gap > 0 ? '+' : ''}{(g.gap * 100).toFixed(0)}
-                      </span>
+                      <div className="strands-gap-divider"/>
+                      <div className="strands-gap-right">
+                        {g.gap >= 0 && (
+                          <div className="strands-gap-fill-surplus" style={{ width: `${pct * 2}%` }}/>
+                        )}
+                      </div>
                     </div>
-                  );
-                })}
-            </div>
-            <div className="text-[6px] mt-1.5 flex items-center gap-2"
-              style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
-              <span style={{ color: '#b83020' }}>■</span> Below template
-              <span style={{ color: '#1a5c2e' }}>■</span> Exceeds template
-              <span style={{ color: '#9a7d58' }}>— </span> Championship standard
-            </div>
+                    <span className={`strands-gap-value ${valClass}`}>
+                      {g.gap > 0 ? '+' : ''}{(g.gap * 100).toFixed(0)}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+
+          <div className="strands-legend">
+            <span><span style={{ color: 'var(--red)' }}>■</span> Below template</span>
+            <span><span style={{ color: 'var(--green)' }}>■</span> Exceeds template</span>
+            <span><span style={{ color: 'var(--rule)' }}>— —</span> Championship standard</span>
           </div>
         </div>
       )}
     </div>
   );
 }
-
 // ============================================================
 // TEAM MODE BADGE
 // ============================================================
@@ -2321,7 +2400,7 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
 
   return (
     <div className="bg-zinc-900/30 border border-zinc-800/40 rounded-2xl overflow-hidden">
-      <div className="px-6 py-3 border-b border-zinc-800/40 flex items-center gap-2">
+      <div className="px-3 sm:px-6 py-3 border-b border-zinc-800/40 flex items-center gap-2">
         <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600">Full NAV Breakdown</span>
       </div>
       <div className="overflow-x-auto">

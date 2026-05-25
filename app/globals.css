@@ -27,7 +27,7 @@
   --green:        #245e39;
   --green-dim:    rgba(36, 94, 57, 0.06);
 
-  --amber:        #48330a;
+  --amber:        #946914;
   --amber-dim:    rgba(148, 105, 20, 0.06);
 
   --blue:         #2b3f66;
@@ -272,7 +272,237 @@ select.ledger-select {
   padding: 4px 16px 4px 0 !important; border-radius: 0 !important; box-shadow: none !important;
 }
 
-/* ── Animations ──────────────────────────────────────────────── */
+/* ── Team Strands panel ──────────────────────────────────────── */
+.strands-panel {
+  background: var(--paper-card);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  width: 100%;
+}
+
+.strands-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  width: 100%;
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+.strands-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.strands-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.strands-title {
+  font-family: 'Courier Prime', monospace;
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: var(--ink);
+}
+
+.strands-post-trade-badge {
+  font-family: 'Courier Prime', monospace;
+  font-size: 6.5px;
+  font-weight: 900;
+  color: var(--green);
+  border: 1px solid rgba(36,94,57,0.4);
+  padding: 1px 5px;
+}
+
+.strands-need-pill {
+  font-family: 'Courier Prime', monospace;
+  font-size: 7px;
+  font-weight: 900;
+  padding: 1px 5px;
+  border: 1px solid rgba(168,149,105,0.35);
+  color: var(--ink-faint);
+}
+.strands-need-pill.urgent {
+  color: var(--red);
+  border-color: rgba(184,48,32,0.35);
+}
+
+.strands-body {
+  border-top: 1px solid var(--rule);
+  padding: 12px 16px 20px;
+}
+
+.strands-context {
+  font-family: 'Libre Baskerville', serif;
+  font-size: 9px;
+  font-style: italic;
+  color: var(--ink-light);
+  line-height: 1.6;
+  margin-bottom: 14px;
+  max-width: 72ch;
+}
+
+/* Helix cards — stacked on mobile, side-by-side on md+ */
+.strands-helix-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+@media (min-width: 640px) {
+  .strands-helix-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+}
+
+.strands-helix-card {
+  background: var(--paper-inset);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.strands-helix-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 10px 14px 4px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.strands-helix-team-name {
+  font-family: 'Libre Baskerville', serif;
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--ink);
+}
+
+.strands-helix-scores {
+  display: flex;
+  gap: 12px;
+}
+
+.strands-helix-off {
+  font-family: 'Courier Prime', monospace;
+  font-size: 8px;
+  font-weight: 900;
+  color: var(--blue);
+}
+
+.strands-helix-def {
+  font-family: 'Courier Prime', monospace;
+  font-size: 8px;
+  font-weight: 900;
+  color: var(--red);
+}
+
+.strands-helix-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Gap bars */
+.strands-gaps-header {
+  font-family: 'Courier Prime', monospace;
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--ink-light);
+  margin-bottom: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+
+.strands-gaps-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+@media (min-width: 640px) {
+  .strands-gaps-grid {
+    grid-template-columns: 1fr 1fr;
+    column-gap: 32px;
+    row-gap: 7px;
+  }
+}
+
+.strands-gap-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.strands-gap-label {
+  font-family: 'Courier Prime', monospace;
+  font-size: 8px;
+  font-weight: 900;
+  color: var(--ink-light);
+  width: 36px;
+  flex-shrink: 0;
+}
+
+.strands-gap-track {
+  flex: 1;
+  height: 10px;
+  background: var(--paper-dark);
+  border-radius: 99px;
+  overflow: hidden;
+  display: flex;
+}
+
+.strands-gap-left  { width: 50%; display: flex; justify-content: flex-end; }
+.strands-gap-right { width: 50%; display: flex; justify-content: flex-start; }
+.strands-gap-divider { width: 1px; background: var(--ink-faint); opacity: 0.5; flex-shrink: 0; }
+
+.strands-gap-fill-deficit {
+  height: 100%;
+  background: var(--red);
+  opacity: 0.8;
+  border-radius: 99px 0 0 99px;
+}
+
+.strands-gap-fill-surplus {
+  height: 100%;
+  background: var(--green);
+  opacity: 0.8;
+  border-radius: 0 99px 99px 0;
+}
+
+.strands-gap-value {
+  font-family: 'Courier Prime', monospace;
+  font-size: 8px;
+  font-weight: 900;
+  width: 26px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.strands-gap-value.deficit { color: var(--red); }
+.strands-gap-value.surplus { color: var(--green); }
+.strands-gap-value.neutral { color: var(--ink-faint); }
+
+.strands-legend {
+  font-family: 'Courier Prime', monospace;
+  font-size: 7px;
+  color: var(--rule);
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.strands-legend span { display: flex; align-items: center; gap: 4px; }
 @keyframes stamp {
   0%   { transform: scale(1.6) rotate(-4deg); opacity: 0; }
   65%  { transform: scale(0.93) rotate(-2deg); opacity: 1; }
@@ -293,3 +523,54 @@ select.ledger-select {
 .animate-modal-pop {
   animation: modal-pop 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ── Mobile structural fixes ─────────────────────────────────── */
+
+/* Stat cell grids — 2-up on mobile, 4-up on sm+ */
+.stat-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+@media (min-width: 480px) {
+  .stat-grid-4 { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* STRAND SVG — never overflow */
+.strand-svg-wrap { width: 100%; overflow: hidden; }
+.strand-svg-wrap svg { width: 100%; height: auto; display: block; }
+
+/* Trade proposal sends — stack on mobile */
+.proposal-sends {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  align-items: start;
+  margin-bottom: 12px;
+}
+@media (min-width: 480px) {
+  .proposal-sends { grid-template-columns: 1fr auto 1fr; }
+}
+
+.proposal-swap-arrow {
+  display: none;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--rule);
+  align-items: center;
+  justify-content: center;
+}
+@media (min-width: 480px) {
+  .proposal-swap-arrow { display: flex; }
+}
+
+/* Masthead headline scaling */
+.masthead-headline {
+  font-size: clamp(1.6rem, 6vw, 3rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/* Modal — tighter padding on mobile */
+.modal-outer { padding: 12px; }
+@media (min-width: 640px) { .modal-outer { padding: 24px; } }

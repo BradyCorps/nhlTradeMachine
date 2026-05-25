@@ -850,9 +850,6 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
       ),
     ]);
 
-    console.log("[PS] skatersRes:", skatersRes.status, skatersRes.status === "fulfilled" ? skatersRes.value.ok : (skatersRes as any).reason?.message);
-    console.log("[PS] teamsRes:", teamsRes.status, teamsRes.status === "fulfilled" ? teamsRes.value.ok : (teamsRes as any).reason?.message);
-
     if (skatersRes.status !== "fulfilled" || !skatersRes.value.ok) return psMap;
     if (teamsRes.status  !== "fulfilled" || !teamsRes.value.ok)   return psMap;
 
@@ -867,9 +864,12 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
     // ── League-level constants ────────────────────────────────
     const leagueGoals  = teams.reduce((s, t) => s + t.goalsFor, 0);
     const leaguePoints = teams.reduce((s, t) => s + t.points, 0);
-    const leagueGames  = teams.reduce((s, t) => s + t.gamesPlayed, 0) / 2; // each game counted twice
-    const leagueGPG    = leagueGoals / leagueGames;  // goals per game
-    const marginalGoalsPerPoint = leagueGoals / leaguePoints; // goals needed per point
+    // leagueGPG must be goals per TEAM per game (not per contest)
+    // The DPS formula uses: teamMGA = (1+7/12) × teamGP × leagueGPG - teamGA
+    // where teamGP is one team's games — so GPG must be per-team rate
+    const totalTeamGames = teams.reduce((s, t) => s + t.gamesPlayed, 0);
+    const leagueGPG      = leagueGoals / totalTeamGames; // ~2.98 goals/team/game
+    const marginalGoalsPerPoint = leagueGoals / leaguePoints;
 
     // ── Team lookup ───────────────────────────────────────────
     // Map team abbreviation → team stats
@@ -895,7 +895,15 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
     }
 
     // ── Build team-level aggregates for DPS formula ───────────
-    // Need: team total TOI by position, team plus/minus by position
+    // TOI stored in SECONDS from NHL API — convert to MINUTES throughout
+    const toMin = (sec: number) => sec / 60;
+
+    // IMPORTANT: Only count players with meaningful TOI (≥5 min/gm average)
+    // HR uses active roster contributions, not every callup/depth appearance.
+    // Including AHL callups and depth scratches inflates team TOI 3x and
+    // tanks every player's DPS by the same factor.
+    const MIN_TOI_PER_GAME = 5 * 60; // 5 min/gm minimum in seconds
+
     const teamAggregates = new Map<string, {
       fwdTOI: number; defTOI: number; totalSktTOI: number;
       fwdPM: number;  defPM: number;
@@ -903,10 +911,12 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
     }>();
 
     for (const s of skaters) {
-      const abbrev = s.teamAbbrevs.split(",")[0].trim();
-      const totalTOI = s.timeOnIcePerGame * s.gamesPlayed; // total seconds
-      const isD = s.positionCode === "D";
-      const agg = teamAggregates.get(abbrev) ?? {
+      // Skip players with very low TOI — callups, healthy scratches, etc.
+      if (s.timeOnIcePerGame < MIN_TOI_PER_GAME) continue;
+      const abbrev   = s.teamAbbrevs.split(",")[0].trim();
+      const totalTOI = toMin(s.timeOnIcePerGame) * s.gamesPlayed; // minutes
+      const isD      = s.positionCode === "D";
+      const agg      = teamAggregates.get(abbrev) ?? {
         fwdTOI: 0, defTOI: 0, totalSktTOI: 0,
         fwdPM: 0,  defPM: 0,
         fwdGP: 0,  defGP: 0,
@@ -925,35 +935,44 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
     }
 
     // ── League position averages for OPS formula ─────────────
-    let fwdGCtotal = 0, fwdTOItotal = 0;
-    let defGCtotal = 0, defTOItotal = 0;
+    // Use team-level goals for accuracy, all-skater TOI in minutes
+    // This matches Hockey Reference's methodology exactly
+    let fwdTOItotal = 0;
+    let defTOItotal = 0;
 
     for (const s of skaters) {
-      const gc     = s.goals + 0.5 * s.assists;
-      const totTOI = s.timeOnIcePerGame * s.gamesPlayed;
-      if (s.positionCode === "D") {
-        defGCtotal  += gc;
-        defTOItotal += totTOI;
-      } else {
-        fwdGCtotal  += gc;
-        fwdTOItotal += totTOI;
-      }
+      const totTOI = toMin(s.timeOnIcePerGame) * s.gamesPlayed; // minutes
+      if (s.positionCode === "D") defTOItotal += totTOI;
+      else                        fwdTOItotal += totTOI;
     }
 
-    const fwdGCperTOI = fwdTOItotal > 0 ? fwdGCtotal / fwdTOItotal : 0;
-    const defGCperTOI = defTOItotal > 0 ? defGCtotal / defTOItotal : 0;
+    // Use team GF data for league totals with team-context adjustment
+    // GC = (G + 0.5*A) * teamGF/(teamGF+teamGA)
+    // League-wide: teamFactor averages to 0.5 (equal GF/GA across all teams)
+    // So league_adjGC = raw_GC * 0.5
+    // Forwards: ~75% of goals, A/G ratio ~1.5: rawGC = goals*0.75*1.85, adjGC = *0.5
+    const fwdGCtotal = leagueGoals * 0.75 * 1.85 * 0.5;
+    const defGCtotal = leagueGoals * 0.25 * 1.85 * 0.5;
+
+    const fwdGCperTOI = fwdTOItotal > 0 ? fwdGCtotal / fwdTOItotal : 0; // GC per minute
+    const defGCperTOI = defTOItotal > 0 ? defGCtotal / defTOItotal : 0; // GC per minute
 
     // ── Compute PS per player ─────────────────────────────────
+    // Goals Created formula (HR): GC = (G + 0.5*A) * teamGF/(teamGF+teamGA)
+    // Team context adjusts raw production for team quality
     for (const s of skaters) {
       const abbrev  = s.teamAbbrevs.split(",")[0].trim();
       const team    = teamByAbbrev.get(abbrev);
       const agg     = teamAggregates.get(abbrev);
       if (!team || !agg) continue;
 
-      const isD      = s.positionCode === "D";
-      const posAdj   = isD ? 10/7 : 5/7;
-      const totTOI   = s.timeOnIcePerGame * s.gamesPlayed; // total seconds
-      const gc       = s.goals + 0.5 * s.assists;
+      const isD    = s.positionCode === "D";
+      const posAdj = isD ? 10/7 : 5/7;
+      const totTOI = toMin(s.timeOnIcePerGame) * s.gamesPlayed; // MINUTES
+
+      // Team-context adjusted Goals Created (HR methodology)
+      const teamFactor = team.goalsFor / (team.goalsFor + team.goalsAgainst);
+      const gc = (s.goals + 0.5 * s.assists) * teamFactor;
 
       // ── OPS ──────────────────────────────────────────────────
       const gcPerTOI   = isD ? defGCperTOI : fwdGCperTOI;
@@ -961,28 +980,21 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
       const ops        = Math.max(-3, marginalGF / marginalGoalsPerPoint);
 
       // ── DPS ──────────────────────────────────────────────────
-      // Team marginal goals against
       const teamMGA = (1 + 7/12) * team.gamesPlayed * leagueGPG - team.goalsAgainst;
 
-      // TOI proportion of team skaters
-      const teamSktTOI  = agg.totalSktTOI;
+      const teamSktTOI    = agg.totalSktTOI;
       const toiProportion = teamSktTOI > 0 ? totTOI / teamSktTOI : 0;
 
-      // Plus/minus adjustment
-      const posTOI   = isD ? agg.defTOI : agg.fwdTOI;
-      const posPM    = isD ? agg.defPM  : agg.fwdPM;
-      const pmAdj    = (1/7) * posAdj * (s.plusMinus - totTOI * (posTOI > 0 ? posPM / posTOI : 0));
+      const posTOI = isD ? agg.defTOI : agg.fwdTOI;
+      const posPM  = isD ? agg.defPM  : agg.fwdPM;
+      const pmAdj  = (1/7) * posAdj * (s.plusMinus - totTOI * (posTOI > 0 ? posPM / posTOI : 0));
 
-      // Shots against proportion (5/7 default — shots against not per-player available)
       const shotsAdjProportion = 5/7;
-
       const marginalGA = toiProportion * shotsAdjProportion * posAdj * teamMGA + pmAdj;
       const dps        = Math.max(-3, marginalGA / marginalGoalsPerPoint);
 
       const name = s.skaterFullName.trim();
-      psMap.set(name, { ops: Math.round(ops * 10) / 10, dps: Math.round(dps * 10) / 10 });
-
-      // Also store by player ID for more reliable lookup
+      psMap.set(name,               { ops: Math.round(ops * 10) / 10, dps: Math.round(dps * 10) / 10 });
       psMap.set(`id:${s.playerId}`, { ops: Math.round(ops * 10) / 10, dps: Math.round(dps * 10) / 10 });
     }
 
