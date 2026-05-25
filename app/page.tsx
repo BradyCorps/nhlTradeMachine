@@ -802,8 +802,13 @@ IMPORTANT: Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', 
                       return <div key={i} className="text-[11px] leading-relaxed pl-3" style={{ color: '#3d2e18', borderLeft: '2px solid #b8a070' }}>{text}</div>;
                     }
                     if (line.trim() === '' || line.startsWith('#')) return null;
-                    const rendered = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                    return <p key={i} className="text-[11px] leading-[1.8]" style={{ color: '#3d2e18', fontFamily: "'Libre Baskerville', serif" }} dangerouslySetInnerHTML={{ __html: rendered }} />;
+                    // Split on **bold** markers and render with <strong> — no dangerouslySetInnerHTML
+                    const boldParts = line.split(/\*\*(.*?)\*\*/g);
+                    return (
+                      <p key={i} className="text-[11px] leading-[1.8]" style={{ color: '#3d2e18', fontFamily: "'Libre Baskerville', serif" }}>
+                        {boldParts.map((part, j) => j % 2 === 0 ? part : <strong key={j}>{part}</strong>)}
+                      </p>
+                    );
                   })}
                 </div>
               </div>

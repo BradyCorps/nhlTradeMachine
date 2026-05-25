@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 
-const CACHE_PATH = path.join(process.cwd(), "app", "data", "contracts.json");
+// ── Use /tmp for writes — the repo filesystem is read-only on Vercel ──
+// /tmp is the only writable path in serverless environments.
+// Max /tmp size on Vercel is 512 MB — well within our needs.
+const CACHE_PATH = path.join("/tmp", "contracts.json");
 
 export async function GET() {
   try {
@@ -23,11 +26,15 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const dir  = path.dirname(CACHE_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+    // Basic schema validation — must be a non-empty object
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ success: false, error: "Invalid data shape" }, { status: 400 });
+    }
+
     fs.writeFileSync(CACHE_PATH, JSON.stringify(body, null, 2));
     return NextResponse.json({ success: true, playerCount: Object.keys(body).length });
   } catch (e: any) {
-    return NextResponse.json({ success: false, error: e.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Write failed" }, { status: 500 });
   }
 }
