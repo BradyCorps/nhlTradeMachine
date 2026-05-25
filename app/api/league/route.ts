@@ -1,10 +1,21 @@
 import { NextResponse } from "next/server";
 import { TEAMS_DB } from "@/app/lib/db";
-import fs from "fs";
-import path from "path";
 
 const CAP_CEILING = 104.0;
 const CAP_FLOOR   = 70.6;
+
+// ── In-memory cache — works in both local dev and serverless ──
+// Global variables persist across warm lambda invocations on Vercel.
+// On cold start or after TTL, data is re-fetched from source APIs.
+declare global {
+  var __teamsCache: { data: any[]; ts: number } | null;
+  var __contractsCache: { data: Record<string, any>; ts: number } | null;
+}
+if (!global.__teamsCache)     global.__teamsCache     = null;
+if (!global.__contractsCache) global.__contractsCache = null;
+
+const TEAMS_CACHE_TTL     = 6  * 60 * 60 * 1000; // 6 hours
+const CONTRACTS_CACHE_TTL = 23 * 60 * 60 * 1000; // 23 hours
 
 // ── Team metadata that needs human curation ──────────────────
 // Everything else (standing, capSpace, phase) comes from live APIs
@@ -31,8 +42,8 @@ const CW_SLUGS: Record<string, string> = {
   WSH: "washington_capitals",WPG: "winnipeg_jets",
 };
 
-const TEAMS_CACHE_PATH = path.join(process.cwd(), "app", "data", "teams.json");
-const TEAMS_CACHE_TTL  = 6 * 60 * 60 * 1000; // 6 hours
+const TEAMS_CACHE_PATH = ""; // unused — kept for reference only
+const CACHE_TTL = TEAMS_CACHE_TTL;
 
 // Derive team phase from standing (1=best, 32=worst) and points percentage
 // Tanking = deliberately non-competitive (< 38% point pct AND bottom 6)
@@ -65,16 +76,10 @@ const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: num
 };
 
 async function loadTeams(): Promise<any[]> {
-  // ── Check cache ──────────────────────────────────────────────
-  try {
-    if (fs.existsSync(TEAMS_CACHE_PATH)) {
-      const stat = fs.statSync(TEAMS_CACHE_PATH);
-      if (Date.now() - stat.mtimeMs < TEAMS_CACHE_TTL) {
-        const cached = JSON.parse(fs.readFileSync(TEAMS_CACHE_PATH, "utf-8"));
-        if (cached.length >= 32) return cached;
-      }
-    }
-  } catch (_) {}
+  // ── Check in-memory cache (works on Vercel — no filesystem needed) ──
+  if (global.__teamsCache && Date.now() - global.__teamsCache.ts < TEAMS_CACHE_TTL) {
+    if (global.__teamsCache.data.length >= 32) return global.__teamsCache.data;
+  }
 
   // ── Fetch standings from NHL stats API ───────────────────────
   let standingsMap = new Map<string, { standing: number; pointPct: number; teamFullName: string }>();
@@ -170,9 +175,8 @@ async function loadTeams(): Promise<any[]> {
 
   // ── Cache result ──────────────────────────────────────────────
   try {
-    const dir = path.dirname(TEAMS_CACHE_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(TEAMS_CACHE_PATH, JSON.stringify(teams, null, 2));
+  // ── Store in-memory cache ─────────────────────────────────────
+  global.__teamsCache = { data: teams, ts: Date.now() };
   } catch (_) {}
 
   return teams;
@@ -190,9 +194,8 @@ async function loadTeams(): Promise<any[]> {
 //   [24] expiryStatus ("UFA" | "RFA" | ...)
 //   [29] ageAtExpiry
 
-const CONTRACTS_PATH = path.join(process.cwd(), "app", "data", "contracts.json");
-const BUNDLED_PATH   = path.join(process.cwd(), "app", "data", "contracts.bundled.json");
-const CACHE_TTL      = 23 * 60 * 60 * 1000; // 23 hours
+const CONTRACTS_PATH = ""; // unused — kept for reference only
+const BUNDLED_PATH   = ""; // unused — bundled data loaded via import
 
 // Convert "Last, First" → "First Last"
 const normaliseName = (raw: string): string => {
@@ -238,6 +241,16 @@ async function scrapeCapWages(): Promise<Record<string, any>> {
       const name   = normaliseName(rawName);
       const capHit = Math.round((capRaw / 10) * 1000) / 1000;
 
+      // ── Sanity check — CapWages array index shift detection ──
+      // If the array indices shift due to a schema change, cap hits become
+      // wildly wrong. Discard any contract outside realistic NHL bounds.
+      const CAP_MIN = 0.70;   // minimum NHL contract (close to league minimum)
+      const CAP_MAX = 18.0;   // no player earns above this in modern NHL
+      if (capHit < CAP_MIN || capHit > CAP_MAX) {
+        console.warn(`[CapWages] Sanity check failed for ${name}: capHit=${capHit} — skipping`);
+        continue;
+      }
+
       const contractData = {
         capHit,
         yearsRemaining: Math.max(0, yearsRemaining),
@@ -246,12 +259,9 @@ async function scrapeCapWages(): Promise<Record<string, any>> {
         teamSlug,
       };
 
-      // Store by plain name (may be overwritten if duplicate)
       contracts[name] = contractData;
-
-      // Also store by name+position and name+team for disambiguation
       if (position) contracts[`${name}__${position}`] = contractData;
-      if (teamSlug) contracts[`${name}__${teamSlug}`] = contractData;
+      if (teamSlug) contracts[`${name}__${teamSlug}`]  = contractData;
     }
 
     return contracts;
@@ -260,27 +270,16 @@ async function scrapeCapWages(): Promise<Record<string, any>> {
   }
 }
 
-// Load contracts: live cache → CapWages scrape → bundled fallback
 async function loadContracts(): Promise<Record<string, any>> {
-  // 1. Check if live cache is fresh
-  try {
-    if (fs.existsSync(CONTRACTS_PATH)) {
-      const stat = fs.statSync(CONTRACTS_PATH);
-      if (Date.now() - stat.mtimeMs < CACHE_TTL) {
-        const data = JSON.parse(fs.readFileSync(CONTRACTS_PATH, "utf-8"));
-        if (Object.keys(data).length > 200) return data;
-      }
-    }
-  } catch (_) {}
+  // 1. Check in-memory cache
+  if (global.__contractsCache && Date.now() - global.__contractsCache.ts < CONTRACTS_CACHE_TTL) {
+    if (Object.keys(global.__contractsCache.data).length > 200) return global.__contractsCache.data;
+}
 
-  // 2. Scrape CapWages (works server-side — returns 200)
+  // 2. Scrape fresh from CapWages
   const fresh = await scrapeCapWages();
   if (Object.keys(fresh).length > 200) {
-    // Merge with bundled data so NMC/NTC flags are preserved
     const bundled = loadBundled();
-
-    // Fresh CapWages data takes priority for cap/years,
-    // bundled data fills in NMC/NTC/canRetain flags
     const merged: Record<string, any> = {};
     for (const [name, cw] of Object.entries(fresh)) {
       const b = bundled[name];
@@ -293,14 +292,8 @@ async function loadContracts(): Promise<Record<string, any>> {
         expiryStatus:   cw.expiryStatus,
       };
     }
-
-    // Write to cache
-    try {
-      const dir = path.dirname(CONTRACTS_PATH);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(CONTRACTS_PATH, JSON.stringify(merged, null, 2));
-    } catch (_) {}
-
+    // Store in-memory — no filesystem needed
+    global.__contractsCache = { data: merged, ts: Date.now() };
     return merged;
   }
 
@@ -310,12 +303,27 @@ async function loadContracts(): Promise<Record<string, any>> {
 
 function loadBundled(): Record<string, any> {
   try {
-    if (fs.existsSync(BUNDLED_PATH)) {
-      return JSON.parse(fs.readFileSync(BUNDLED_PATH, "utf-8"));
-    }
+    // Dynamic require works in Next.js API routes — reads from app/data at build time
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require("@/app/data/contracts.bundled.json");
   } catch (_) {}
   return {};
 }
+
+// Proper CSV row parser — handles quoted fields containing commas.
+// Prevents silent data corruption when player names contain commas.
+const parseCSVRow = (row: string): string[] => {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (const ch of row) {
+    if (ch === '"') { inQuotes = !inQuotes; continue; }
+    if (ch === "," && !inQuotes) { result.push(current.trim()); current = ""; continue; }
+    current += ch;
+  }
+  result.push(current.trim());
+  return result;
+};
 
 const slugify = (n: string) =>
   n.toLowerCase().normalize("NFD")
@@ -809,11 +817,11 @@ export async function GET() {
       ),
     ]);
 
-    // Parse skaters
+    // Parse skaters — use proper CSV parser to handle quoted fields (e.g. "Last, First")
     if (mpRes.status === "fulfilled" && mpRes.value.ok) {
       const csv  = await mpRes.value.text();
       const rows = csv.split("\n").filter(Boolean);
-      const hdr  = rows[0].split(",");
+      const hdr  = parseCSVRow(rows[0]);
       const h    = (k: string) => hdr.indexOf(k);
       const [nI, sI, pI, xgI, gI, iceI, onAI, offAI, rkI, onFI, offFI, dzI, ozI, goalsI] = [
         h("name"), h("situation"), h("I_F_points"), h("I_F_xGoals"),
@@ -824,9 +832,9 @@ export async function GET() {
         h("I_F_goals"),
       ];
       rows.slice(1).forEach((row) => {
-        const c = row.split(",");
+        const c = parseCSVRow(row);
         if (c.length <= nI || c[sI]?.trim() !== "all") return;
-        const name     = c[nI].replace(/"/g, "").trim();
+        const name     = c[nI].trim();
         const g        = Math.max(1, parseFloat(c[gI]) || 1);
         const iceSec   = parseFloat(c[iceI]) || 1;
         const iceHours = iceSec / 3600;
@@ -872,26 +880,24 @@ export async function GET() {
       fbMap = buildFallbackMap(analyticsMap);
     }
 
-    // Parse goalies
+    // Parse goalies — same quote-aware CSV parser
     if (gpRes.status === "fulfilled" && gpRes.value.ok) {
       const csv  = await gpRes.value.text();
       const rows = csv.split("\n").filter(Boolean);
-      const hdr  = rows[0].split(",");
+      const hdr  = parseCSVRow(rows[0]);
       const h    = (k: string) => hdr.indexOf(k);
-      // MoneyPuck goalie columns — GSAx = xGoals - goals, SV% = 1 - goals/ongoal
       const [nI, sI, gI, xgI, goalsI, ongoalI] = [
         h("name"), h("situation"), h("games_played"),
         h("xGoals"), h("goals"), h("ongoal"),
       ];
       if (nI >= 0 && xgI >= 0) {
-        // First pass: collect all rows per player for "all" situation
         const goalieRows = new Map<string, any>();
         rows.slice(1).forEach((row) => {
-          const c        = row.split(",");
+          const c        = parseCSVRow(row);
           if (c.length <= nI) return;
           const sit = (c[sI] ?? "").trim().toLowerCase();
           if (sit !== "all") return;
-          const name    = c[nI].replace(/"/g, "").trim();
+          const name    = c[nI].trim();
           const g       = Math.max(1, parseFloat(c[gI]) || 1);
           const xGoals  = parseFloat(c[xgI])    || 0;
           const goals   = parseFloat(c[goalsI]) || 0;

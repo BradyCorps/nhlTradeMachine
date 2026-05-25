@@ -85,11 +85,16 @@ const TeamProjection = ({ team, currentRoster, outgoing, incoming, label }: {
   const outIds = new Set(outgoing.map(a => a.id));
   const inIds  = new Set(incoming.map(a => a.id));
 
-  // Build post-trade roster
+  // Build post-trade roster — deduplicated by id to handle any stale state
+  const seenIds = new Set<string>();
   const postRoster = [
     ...currentRoster.filter(a => !outIds.has(a.id)),
     ...incoming.filter(a => a.position !== "Pick"),
-  ];
+  ].filter(a => {
+    if (seenIds.has(a.id)) return false;
+    seenIds.add(a.id);
+    return true;
+  });
 
   const currentCapUsed = currentRoster.reduce((s, a) => s + (a.capHit || 0), 0);
   const outCap  = outgoing.reduce((s, a) => s + (a.capHit || 0), 0);
@@ -153,7 +158,7 @@ const TeamProjection = ({ team, currentRoster, outgoing, incoming, label }: {
                   .sort((a, b) => (b.avgTOI || 0) - (a.avgTOI || 0))
                   .map(p => (
                     <RosterSlot
-                      key={p.id}
+                      key={`post-${pos}-${p.id}`}
                       player={p}
                       isNew={inIds.has(p.id)}
                       isLeaving={false}
@@ -163,7 +168,7 @@ const TeamProjection = ({ team, currentRoster, outgoing, incoming, label }: {
                 {outgoing
                   .filter(a => (a.position === "L" || a.position === "R" ? "W" : a.position) === pos)
                   .map(p => (
-                    <RosterSlot key={p.id} player={p} isLeaving={true} />
+                    <RosterSlot key={`out-${pos}-${p.id}`} player={p} isLeaving={true} />
                   ))}
               </div>
             </div>

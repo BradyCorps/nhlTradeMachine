@@ -2,7 +2,7 @@
   {
     "id": "ANA",
     "name": "Anaheim Ducks",
-    "capSpace": 7.1,
+    "capSpace": 12.6,
     "standing": 17,
     "phase": "Retooling",
     "needs": []
@@ -10,7 +10,7 @@
   {
     "id": "BOS",
     "name": "Boston Bruins",
-    "capSpace": 0.3,
+    "capSpace": 2.9,
     "standing": 8,
     "phase": "Contender",
     "needs": []
@@ -18,7 +18,7 @@
   {
     "id": "BUF",
     "name": "Buffalo Sabres",
-    "capSpace": -3.5,
+    "capSpace": 4.4,
     "standing": 4,
     "phase": "Contender",
     "needs": []
@@ -26,7 +26,7 @@
   {
     "id": "CGY",
     "name": "Calgary Flames",
-    "capSpace": 10.4,
+    "capSpace": 14,
     "standing": 30,
     "phase": "Rebuilding",
     "needs": []
@@ -42,7 +42,7 @@
   {
     "id": "CHI",
     "name": "Chicago Blackhawks",
-    "capSpace": 14.7,
+    "capSpace": 16.6,
     "standing": 31,
     "phase": "Rebuilding",
     "needs": [
@@ -64,7 +64,7 @@
   {
     "id": "CBJ",
     "name": "Columbus Blue Jackets",
-    "capSpace": 3.6,
+    "capSpace": 5.6,
     "standing": 18,
     "phase": "Retooling",
     "needs": []
@@ -72,7 +72,7 @@
   {
     "id": "DAL",
     "name": "Dallas Stars",
-    "capSpace": -4.3,
+    "capSpace": -4.2,
     "standing": 3,
     "phase": "Contender",
     "needs": []
@@ -88,7 +88,7 @@
   {
     "id": "EDM",
     "name": "Edmonton Oilers",
-    "capSpace": -2.4,
+    "capSpace": -0.1,
     "standing": 14,
     "phase": "Bubble",
     "needs": [
@@ -102,7 +102,7 @@
   {
     "id": "FLA",
     "name": "Florida Panthers",
-    "capSpace": 4,
+    "capSpace": -3.7,
     "standing": 25,
     "phase": "Retooling",
     "needs": []
@@ -110,7 +110,7 @@
   {
     "id": "LAK",
     "name": "Los Angeles Kings",
-    "capSpace": 3.1,
+    "capSpace": 4.7,
     "standing": 20,
     "phase": "Retooling",
     "needs": []
@@ -118,7 +118,7 @@
   {
     "id": "MIN",
     "name": "Minnesota Wild",
-    "capSpace": -10.9,
+    "capSpace": -2.5,
     "standing": 7,
     "phase": "Contender",
     "needs": []
@@ -142,7 +142,7 @@
   {
     "id": "NJD",
     "name": "New Jersey Devils",
-    "capSpace": 3.9,
+    "capSpace": 0.3,
     "standing": 21,
     "phase": "Retooling",
     "needs": []
@@ -150,7 +150,7 @@
   {
     "id": "NYI",
     "name": "New York Islanders",
-    "capSpace": 1.8,
+    "capSpace": -7,
     "standing": 19,
     "phase": "Retooling",
     "needs": []
@@ -158,7 +158,7 @@
   {
     "id": "NYR",
     "name": "New York Rangers",
-    "capSpace": 6.5,
+    "capSpace": 8.1,
     "standing": 29,
     "phase": "Rebuilding",
     "needs": []
@@ -166,7 +166,7 @@
   {
     "id": "OTT",
     "name": "Ottawa Senators",
-    "capSpace": -5.6,
+    "capSpace": 3,
     "standing": 9,
     "phase": "Bubble",
     "needs": []
@@ -174,7 +174,7 @@
   {
     "id": "PHI",
     "name": "Philadelphia Flyers",
-    "capSpace": 0.8,
+    "capSpace": 10.3,
     "standing": 11,
     "phase": "Bubble",
     "needs": []
@@ -182,7 +182,7 @@
   {
     "id": "PIT",
     "name": "Pittsburgh Penguins",
-    "capSpace": 11.9,
+    "capSpace": 15.3,
     "standing": 10,
     "phase": "Bubble",
     "needs": []
@@ -190,7 +190,7 @@
   {
     "id": "SEA",
     "name": "Seattle Kraken",
-    "capSpace": 5.8,
+    "capSpace": 7.6,
     "standing": 27,
     "phase": "Rebuilding",
     "needs": []
@@ -198,7 +198,7 @@
   {
     "id": "SJS",
     "name": "San Jose Sharks",
-    "capSpace": 19.8,
+    "capSpace": 22.3,
     "standing": 22,
     "phase": "Retooling",
     "needs": [
@@ -212,7 +212,7 @@
   {
     "id": "STL",
     "name": "St. Louis Blues",
-    "capSpace": 13.3,
+    "capSpace": 9.5,
     "standing": 23,
     "phase": "Rebuilding",
     "needs": []
@@ -220,7 +220,7 @@
   {
     "id": "TBL",
     "name": "Tampa Bay Lightning",
-    "capSpace": -3.3,
+    "capSpace": 0.9,
     "standing": 5,
     "phase": "Contender",
     "needs": []
@@ -228,7 +228,7 @@
   {
     "id": "TOR",
     "name": "Toronto Maple Leafs",
-    "capSpace": 13.4,
+    "capSpace": 9.6,
     "standing": 28,
     "phase": "Retooling",
     "needs": []
@@ -236,7 +236,7 @@
   {
     "id": "UTA",
     "name": "Utah Mammoth",
-    "capSpace": -4.5,
+    "capSpace": 4.6,
     "standing": 15,
     "phase": "Retooling",
     "needs": []
@@ -244,7 +244,7 @@
   {
     "id": "VAN",
     "name": "Vancouver Canucks",
-    "capSpace": 14.6,
+    "capSpace": 10.4,
     "standing": 32,
     "phase": "Tanking",
     "needs": []
