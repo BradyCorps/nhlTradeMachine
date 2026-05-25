@@ -42,6 +42,8 @@ const CW_SLUGS: Record<string, string> = {
   WSH: "washington_capitals",WPG: "winnipeg_jets",
 };
 
+// ── In-memory cache globals ───────────────────────────────────
+
 // Derive team phase from standing (1=best, 32=worst) and points percentage
 // Tanking = deliberately non-competitive (< 38% point pct AND bottom 6)
 // Rebuilding = losing but not deliberately tanking (young core, future focus)
@@ -50,7 +52,8 @@ const CW_SLUGS: Record<string, string> = {
 // Contender = genuine Cup contender
 const derivePhase = (standing: number, pointPct: number): string => {
   if (standing <= 8  && pointPct >= 0.58) return "Contender";
-  if (standing <= 8  && pointPct >= 0.52) return "Bubble";  // top-8 team, under-performing expectations
+  // More specific conditions must come before broader ones
+  if (standing <= 8  && pointPct >= 0.52) return "Contender";
   if (standing <= 14 && pointPct >= 0.52) return "Bubble";
   if (standing <= 22)                      return "Retooling";
   if (standing <= 32 && pointPct < 0.38)  return "Tanking";
@@ -191,6 +194,8 @@ async function loadTeams(): Promise<any[]> {
 //   [24] expiryStatus ("UFA" | "RFA" | ...)
 //   [29] ageAtExpiry
 
+// loadBundled uses dynamic require — no path constant needed
+
 // Convert "Last, First" → "First Last"
 const normaliseName = (raw: string): string => {
   const parts = raw.split(",").map((s) => s.trim());
@@ -268,7 +273,7 @@ async function loadContracts(): Promise<Record<string, any>> {
   // 1. Check in-memory cache
   if (global.__contractsCache && Date.now() - global.__contractsCache.ts < CONTRACTS_CACHE_TTL) {
     if (Object.keys(global.__contractsCache.data).length > 200) return global.__contractsCache.data;
-}
+  }
 
   // 2. Scrape fresh from CapWages
   const fresh = await scrapeCapWages();
@@ -282,10 +287,7 @@ async function loadContracts(): Promise<Record<string, any>> {
         yearsRemaining: cw.yearsRemaining,
         hasNMC:         b?.hasNMC  ?? false,
         hasNTC:         b?.hasNTC  ?? false,
-        // NMC holders cannot have salary retained (they veto the trade structure).
-        // NTC holders CAN have salary retained — the NTC governs trade consent, not
-        // the cap retention mechanism, which is a separate CBA provision.
-        canRetain:      b?.hasNMC ? false : true,
+        canRetain:      b?.hasNMC  ? false : true,
         expiryStatus:   cw.expiryStatus,
       };
     }
@@ -301,7 +303,7 @@ async function loadContracts(): Promise<Record<string, any>> {
 function loadBundled(): Record<string, any> {
   try {
     // Dynamic require works in Next.js API routes — reads from app/data at build time
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require("@/app/data/contracts.bundled.json");
   } catch (_) {}
   return {};
@@ -432,6 +434,8 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["CAR","Taylor Hall","W","1991-11-14"],
   ["CAR","Jaccob Slavin","D","1994-05-01"],
   ["CAR","Shayne Gostisbehere","D","1993-04-20"],
+  ["CAR","Brady Skjei","D","1994-03-26"],
+  ["CAR","KAndre Miller","D","1999-01-21"],
   ["CAR","Sean Walker","D","1994-11-05"],
   // CHI
   ["CHI","Connor Bedard","C","2005-07-17"],
@@ -448,6 +452,7 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   // COL
   ["COL","Nathan MacKinnon","C","1995-09-01"],
   ["COL","Martin Necas","C","1999-01-15"],
+  ["COL","Nazem Kadri","C","1990-10-06"],
   ["COL","Mikko Rantanen","W","1996-10-29"],
   ["COL","Valeri Nichushkin","W","1995-03-04"],
   ["COL","Artturi Lehkonen","W","1995-07-04"],
@@ -461,7 +466,7 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["CBJ","Sean Monahan","C","1994-10-12"],
   ["CBJ","Kirill Marchenko","W","2000-08-08"],
   ["CBJ","Dmitri Voronkov","W","1999-07-28"],
-  ["CBJ","Ivan Provorov","D","1997-01-13"],  // acquired from PHI
+  ["CBJ","Ivan Provorov","D","1997-01-13"],
   ["CBJ","Zach Werenski","D","1996-07-19"],
   ["CBJ","David Jiricek","D","2003-04-09"],
   ["CBJ","Jake Bean","D","1998-06-09"],
@@ -511,11 +516,13 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["FLA","Aaron Ekblad","D","1996-02-07"],
   ["FLA","Gustav Forsling","D","1996-06-12"],
   ["FLA","Niko Mikkola","D","1996-04-26"],
+  ["FLA","Brandon Montour","D","1994-04-11"],
   // LAK
   ["LAK","Anze Kopitar","C","1987-08-24"],
   ["LAK","Quinton Byfield","C","2002-08-13"],
   ["LAK","Kevin Fiala","W","1996-07-22"],
   ["LAK","Adrian Kempe","W","1996-09-20"],
+  ["LAK","Artemi Panarin","W","1991-10-30"],
   ["LAK","Alex Laferriere","W","2001-12-08"],
   ["LAK","Trevor Moore","W","1995-01-31"],
   ["LAK","Drew Doughty","D","1989-12-08"],
@@ -530,6 +537,7 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["MIN","Ryan Hartman","W","1994-09-20"],
   ["MIN","Marcus Johansson","W","1990-10-06"],
   ["MIN","Mats Zuccarello","W","1987-09-01"],
+  ["MIN","Quinn Hughes","D","2000-10-14"],
   ["MIN","Jonas Brodin","D","1993-07-12"],
   ["MIN","Brock Faber","D","2002-05-28"],
   ["MIN","Jake Middleton","D","1996-02-04"],
@@ -548,7 +556,6 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["MTL","Kaiden Guhle","D","2002-01-18"],
   ["MTL","Noah Dobson","D","2000-01-07"],
   ["MTL","Alexandre Carrier","D","1997-10-08"],
-  // ↑ Carrier and Dobson both traded to MTL from their original teams
   // NSH
   ["NSH","Filip Forsberg","W","1994-08-13"],
   ["NSH","Ryan O'Reilly","C","1991-02-07"],
@@ -557,6 +564,7 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["NSH","Luke Evangelista","W","2001-12-25"],
   ["NSH","Roman Josi","D","1990-06-01"],
   ["NSH","Brady Skjei","D","1994-03-26"],
+  ["NSH","Alexandre Carrier","D","1997-10-08"],
   ["NSH","Nick Perbix","D","1997-12-14"],
   // NJD
   ["NJD","Jack Hughes","C","2001-05-14"],
@@ -568,6 +576,7 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["NJD","Dougie Hamilton","D","1993-06-17"],
   ["NJD","Jonas Siegenthaler","D","1997-05-06"],
   ["NJD","Luke Hughes","D","2003-09-09"],
+  ["NJD","Brendan Smith","D","1988-02-08"],
   // NYI
   ["NYI","Mathew Barzal","C","1997-05-26"],
   ["NYI","Bo Horvat","C","1995-04-05"],
@@ -575,6 +584,7 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["NYI","Brock Nelson","C","1991-10-15"],
   ["NYI","Simon Holmstrom","W","2001-10-15"],
   ["NYI","Anders Lee","W","1990-07-03"],
+  ["NYI","Noah Dobson","D","2000-01-07"],
   ["NYI","Ryan Pulock","D","1994-10-18"],
   ["NYI","Adam Pelech","D","1994-08-16"],
   ["NYI","Alexander Romanov","D","2000-02-06"],
@@ -587,6 +597,7 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["NYR","Chris Kreider","W","1991-04-30"],
   ["NYR","Will Cuylle","W","2002-02-05"],
   ["NYR","Gabe Perreault","W","2004-08-02"],
+  ["NYR","JT Miller","C","1993-03-14"],
   ["NYR","Adam Fox","D","1998-02-17"],
   ["NYR","Braden Schneider","D","2001-09-20"],
   ["NYR","Vladislav Gavrikov","D","1995-11-15"],
@@ -595,6 +606,7 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["OTT","Tim Stutzle","C","2002-01-15"],
   ["OTT","Brady Tkachuk","W","1999-09-16"],
   ["OTT","Drake Batherson","W","1998-04-27"],
+  ["OTT","Dylan Cozens","C","2001-02-09"],
   ["OTT","Claude Giroux","W","1988-01-12"],
   ["OTT","Shane Pinto","C","2000-11-07"],
   ["OTT","Ridly Greig","C","2002-08-08"],
@@ -607,9 +619,12 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["PHI","Travis Konecny","W","1997-03-11"],
   ["PHI","Matvei Michkov","W","2004-11-06"],
   ["PHI","Owen Tippett","W","1999-02-16"],
+  ["PHI","Joel Farabee","W","1999-08-25"],
   ["PHI","Morgan Frost","C","1999-05-14"],
   ["PHI","Travis Sanheim","D","1996-03-29"],
   ["PHI","Cam York","D","2001-01-05"],
+  ["PHI","Ivan Provorov","D","1997-01-13"],
+  ["PHI","Sean Walker","D","1994-11-05"],
   // PIT
   ["PIT","Sidney Crosby","C","1987-08-07"],
   ["PIT","Evgeni Malkin","C","1986-07-31"],
@@ -618,6 +633,7 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["PIT","Reilly Smith","W","1991-04-01"],
   ["PIT","Kris Letang","D","1987-04-24"],
   ["PIT","Erik Karlsson","D","1990-05-31"],
+  ["PIT","Marcus Pettersson","D","1996-05-08"],
   ["PIT","Matt Grzelcyk","D","1994-01-05"],
   // SEA
   ["SEA","Matty Beniers","C","2002-11-05"],
@@ -629,7 +645,7 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["SEA","Shane Wright","C","2003-01-05"],
   ["SEA","Vince Dunn","D","1996-10-29"],
   ["SEA","Adam Larsson","D","1992-11-12"],
-  ["SEA","Brandon Montour","D","1994-04-11"],  // acquired from FLA
+  ["SEA","Brandon Montour","D","1994-04-11"],
   ["SEA","Ryker Evans","D","2001-11-06"],
   // SJS
   ["SJS","Macklin Celebrini","C","2006-01-05"],
@@ -660,8 +676,10 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["TBL","Brandon Hagel","W","1998-08-27"],
   ["TBL","Jake Guentzel","C","1994-10-06"],
   ["TBL","Anthony Cirelli","C","1997-07-15"],
+  ["TBL","Steven Stamkos","C","1990-02-07"],
   ["TBL","Yanni Gourde","C","1991-12-15"],
   ["TBL","Victor Hedman","D","1990-12-18"],
+  ["TBL","Mikhail Sergachev","D","1998-06-25"],
   ["TBL","Erik Cernak","D","1997-05-28"],
   ["TBL","Darren Raddysh","D","1995-08-10"],
   // TOR
@@ -698,7 +716,6 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["VAN","Marcus Pettersson","D","1996-05-08"],
   ["VAN","Nikita Zadorov","D","1995-04-16"],
   ["VAN","Tom Willander","D","2004-06-05"],
-  // ↑ JT Miller and Quinn Hughes remain on VAN; NYR/MIN entries removed
   // VGK
   ["VGK","Jack Eichel","C","1996-10-28"],
   ["VGK","Mitch Marner","W","1997-05-05"],
@@ -708,6 +725,7 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["VGK","Pavel Dorofeyev","W","2000-11-21"],
   ["VGK","Tomas Hertl","C","1993-11-12"],
   ["VGK","Shea Theodore","D","1995-08-03"],
+  ["VGK","Rasmus Andersson","D","1996-10-27"],
   ["VGK","Noah Hanifin","D","1997-01-25"],
   ["VGK","Brayden McNabb","D","1991-01-21"],
   // WSH
@@ -768,6 +786,7 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["UTA","Connor Ingram","G","1997-04-09"],
   ["CGY","Dustin Wolf","G","2001-04-16"],
   ["WSH","Logan Thompson","G","1997-02-25"],
+  ["BOS","Linus Ullmark","G","1993-07-31"],
   ["CAR","Frederik Andersen","G","1989-10-02"],
   ["NYI","Ilya Sorokin","G","1995-08-04"],
 ];

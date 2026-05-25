@@ -18,39 +18,30 @@ declare global {
 }
 if (!global.__rateLimitMap) global.__rateLimitMap = new Map();
 
-const RATE_LIMIT  = 10;          // max requests per rolling window
-const RATE_WINDOW = 60 * 1000;  // 1-minute window
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const map  = global.__rateLimitMap!;
-  const rec  = map.get(ip);
-  if (!rec || now > rec.resetAt) {
-    map.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
-    return false;
+function checkRateLimit(ip: string): boolean {
+  const now    = Date.now();
+  const window = 60_000; // 1 minute
+  const limit  = 10;
+  const entry  = global.__rateLimitMap!.get(ip);
+  if (!entry || now > entry.resetAt) {
+    global.__rateLimitMap!.set(ip, { count: 1, resetAt: now + window });
+    return true;
   }
-  if (rec.count >= RATE_LIMIT) return true;
-  rec.count++;
-  return false;
+  if (entry.count >= limit) return false;
+  entry.count++;
+  return true;
 }
 
 export async function POST(req: Request) {
-  // ── Rate limit by source IP ───────────────────────────────
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    req.headers.get("x-real-ip") ??
-    "unknown";
-
-  if (isRateLimited(ip)) {
-    return NextResponse.json(
-      { error: "Rate limit exceeded — try again in a minute" },
-      { status: 429 }
-    );
-  }
-
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
+  }
+
+  // Rate limit by IP — 10 requests per minute
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json({ error: "Rate limit exceeded — try again in a minute" }, { status: 429 });
   }
 
   let body: any;

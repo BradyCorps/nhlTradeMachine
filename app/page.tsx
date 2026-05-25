@@ -160,12 +160,28 @@ export default function TradeMachine() {
     return () => ctrl.abort();
   }, [db.players]);
 
-  // Re-fetch NAV for any block assets with retention applied —
-  // retained assets have different effective cap hits so need fresh server calc.
-  // Debounced to avoid hammering the API on every slider tick.
+  // Re-fetch NAV for any block assets with retention applied.
+  // When retention returns to 0, immediately restore the original cached value
+  // so the display doesn't stay stuck showing the retained NAV.
+  // Debounced for non-zero retention to avoid API hammering on every slider tick.
   useEffect(() => {
     const retainedAssets = [...blocks[0], ...blocks[1]]
       .filter(a => a.position !== "Pick" && (a.retainedPct || 0) > 0);
+    const zeroedAssets = [...blocks[0], ...blocks[1]]
+      .filter(a => a.position !== "Pick" && (a.retainedPct || 0) === 0);
+
+    // Immediately restore zero-retention assets from cache — no debounce needed
+    if (zeroedAssets.length > 0) {
+      setNavMap(prev => {
+        const updated = { ...prev };
+        for (const a of zeroedAssets) {
+          const original = getCachedNav({ ...a, retainedPct: 0 });
+          if (original) updated[a.id] = original;
+        }
+        return updated;
+      });
+    }
+
     if (retainedAssets.length === 0) return;
 
     const timer = setTimeout(() => {
@@ -174,7 +190,7 @@ export default function TradeMachine() {
         .then(fresh => setNavMap(prev => ({ ...prev, ...fresh })))
         .catch(() => {});
       return () => ctrl.abort();
-    }, 300); // 300ms debounce — don't fire on every slider tick
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [blocks]);

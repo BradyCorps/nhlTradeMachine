@@ -90,6 +90,11 @@ export async function fetchTradeVerdict(
   if (!res.ok) throw new Error(`evaluate API ${res.status}`);
   const data: EvaluateResponse = await res.json();
 
+  if (!res.ok) {
+  if (res.status === 404) throw new Error("evaluate API not found — engine file missing");
+  throw new Error(`evaluate API ${res.status}`);
+}
+
   // Update cache with all returned nav values
   for (const a of uniqueAssets) {
     const result = data.navMap[a.id];
@@ -108,3 +113,4 @@ export function clearNavCache(): void {
 export function getCachedNav(asset: Asset): XNAVResult | null {
   return _navCache.get(assetCacheKey(asset)) ?? null;
 }
+
