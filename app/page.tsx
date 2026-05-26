@@ -327,24 +327,31 @@ export default function TradeMachine() {
 - Calder Trophy (Rookie of the Year): Matthew Schaefer, New York Islanders — won unanimously (198 first-place votes). Runner-up: Ivan Demidov, Montreal. Do NOT give this award to Michkov, Bedard, or anyone else.
 - Florida Panthers did NOT win the Stanley Cup this year (they won 2023-24 and 2024-25). Pick a different champion.
 - Atlantic Division standings leader: Buffalo Sabres (109 pts). Tampa Bay Lightning also strong (106 pts). Toronto Maple Leafs missed playoffs (78 pts).
-- Metropolitan Division: Carolina Hurricanes strong (113 pts). 
+- Metropolitan Division: Carolina Hurricanes strong (113 pts).
 - Casey DeSmith won the Dallas Stars starting job (per team data).
+- Auston Matthews plays for the Toronto Maple Leafs — NOT Arizona, NOT Utah.
+- The Arizona Coyotes no longer exist — they relocated and became the Utah Hockey Club.
 - These are real facts for this season — treat them as established record.
 
 CRITICAL RULES — VIOLATIONS WILL RUIN THE COLUMN:
 1. Only reference players from the rosters listed below. Do NOT invent players, prospects, or supporting cast.
 2. A player RECEIVED by a team plays FOR that team. A player GIVEN AWAY plays for the OTHER team.
-3. PICKS: If a team GAVE AWAY a pick, they DO NOT have it. The RECEIVING team drafts with it. "GAVE AWAY" means it is gone.
-4. PLAYER HISTORY: Players have ONLY played for teams shown in the trade summary. NEVER invent prior teams, trades, or signings. Connor McDavid has only ever played for Edmonton. Zero exceptions.
+3. PICKS — READ THE TRADE SUMMARY LITERALLY: The trade summary is the ONLY source of truth for picks. Do NOT invent pick movements. If Team A received a pick, Team A has it. If Team A gave away a pick, Team A does NOT have it. Never say a team "surrendered" a pick they actually received.
+4. PLAYER HISTORY: Players have ONLY played for teams shown in the trade summary. NEVER invent prior teams, trades, or signings.
 5. STATISTICS: Only invent stats within these realistic 2025-26 ranges — goals: 25-60, points: 50-135, GAA: 2.05-2.85, save%: .905-.935.
-6. INVENTED FACTS: Do not invent injuries, coaching changes, contract disputes, suspensions, retirements, or off-ice events unless strongly implied by roster/phase data.
-7. If a team gave away their 1st round pick, write about MISSING the draft lottery — they do NOT participate.
-8. TEAM PHASES: Honor the phase shown. A REBUILDING team did not make the playoffs. A CONTENDER competed for the Cup.
-9. THE YEAR IN NUMBERS section: Use Matthew Schaefer as Calder winner. Do not use Michkov. Pick a realistic Stanley Cup champion that is NOT Florida Panthers.
-10. Keep each section focused — do not repeat information across sections.
+6. INVENTED FACTS: Do not invent injuries, coaching changes, contract disputes, suspensions, retirements, or off-ice events.
+7. TEAM PHASES: Honor the phase shown. A REBUILDING team did not make the playoffs. A CONTENDER competed for the Cup.
+8. THE YEAR IN NUMBERS: Use Matthew Schaefer as Calder winner. Stanley Cup champion must NOT be Florida Panthers.
+9. Keep each section focused — do not repeat information across sections.
+10. INTERNAL CONSISTENCY — THIS IS CRITICAL: Before writing each team's season summary, reason through the actual roster quality. If a team received an elite goalie, a 100-point center, and strong supporting cast, they CANNOT finish 25th. If a team gave away its core and received only picks, they finish near the bottom. The season record must be LOGICALLY CONSISTENT with the roster quality shown below.
 
-TRADES EXECUTED (READ CAREFULLY — direction matters):
+TRADE ASSET CONTEXT (use this to calibrate season outcomes):
 ${tradesSummary}
+
+HOME TEAM RECEIVED (playing FOR ${teams[0]!.name}): ${blocks[1].filter((a: Asset) => a.position !== "Pick").map((a: Asset) => `${a.name} (${a.ptsPace.toFixed(0)} pts/82, $${a.capHit}M)`).join(", ") || "no players"}
+HOME TEAM PICKS RECEIVED: ${blocks[1].filter((a: Asset) => a.position === "Pick").map((a: Asset) => `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : `${a.round}th`}`).join(", ") || "none"}
+HOME TEAM GAVE AWAY (no longer on ${teams[0]!.name}): ${blocks[0].filter((a: Asset) => a.position !== "Pick").map((a: Asset) => `${a.name} (${a.ptsPace.toFixed(0)} pts/82)`).join(", ") || "no players"}
+HOME TEAM PICKS GIVEN AWAY (GONE — do not say ${teams[0]!.name} has these): ${blocks[0].filter((a: Asset) => a.position === "Pick").map((a: Asset) => `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : `${a.round}th`}`).join(", ") || "none"}
 
 ${teams[0]!.name} CURRENT ROSTER after all trades (top 12 by production):
 ${homeRoster.join("\n")}
@@ -361,8 +368,8 @@ Write 6 sections. Be a real storyteller — this should have narrative tension, 
 
 **${teams[0]!.name.toUpperCase()}'S SEASON**
 ${isRebuilding
-  ? `4-5 sentences. Paint the full picture of the rebuild — where did they finish, what was the low point, was there a surprise bright spot from a young player? What draft pick did they land and what does it mean?`
-  : `4-5 sentences. How did they finish and how far did they go in the playoffs? Describe one defining game or moment that captured the entire season. Was there a player who emerged or collapsed unexpectedly?`}
+  ? `4-5 sentences. Paint the full picture of the rebuild — where did they finish, what was the low point, was there a surprise bright spot from a young player? What draft pick did they land and what does it mean? REMEMBER: derive the finish position from the actual roster quality shown above.`
+  : `4-5 sentences. How did they finish and how far did they go in the playoffs? Describe one defining game or moment that captured the entire season. Was there a player who emerged or collapsed unexpectedly? REMEMBER: derive the finish position from the actual roster quality shown above.`}
 
 **AROUND THE LEAGUE**
 4-5 sentences covering 3 distinct storylines from across the NHL this season. Include: one team that surprised everyone (good or bad), one major injury that shaped the playoff race, one off-ice or trade story that dominated headlines. Make it feel like a real, specific season happened — not generic filler.
@@ -370,7 +377,7 @@ ${isRebuilding
 **THE YEAR IN NUMBERS**
 Present the statistical leaders in a clean format. Use the SEASON FACTS above for awards — do not invent award winners.
 - **Goals:** [Player, Team] — XX goals
-- **Points:** [Player, Team] — XXX points  
+- **Points:** [Player, Team] — XXX points
 - **GAA:** [Goalie, Team] — X.XX
 - **Save %:** [Goalie, Team] — .XXX
 - **Presidents' Trophy:** [Team] — XX wins
@@ -380,8 +387,8 @@ Present the statistical leaders in a clean format. Use the SEASON FACTS above fo
 
 **THE DRAFT LOTTERY**
 ${(() => {
-  const tradedAwayPick = executedTrades.some(t =>
-    t.outgoing.some(a => a.position === "Pick" && (a.round ?? 1) === 1)
+  const tradedAwayPick = executedTrades.some((t: any) =>
+    t.outgoing.some((a: any) => a.position === "Pick" && (a.round ?? 1) === 1)
   );
   if (tradedAwayPick) {
     return `IMPORTANT: ${teams[0]!.name} traded away their 1st round pick. They DO NOT participate in the lottery. Write 2 sentences about them watching from the sidelines while another team won their pick, and what that means for their timeline.`;
@@ -406,7 +413,7 @@ Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'lon
         signal: simAbortRef.current.signal,
         body: JSON.stringify({
           model: "claude-sonnet-4-5",
-          max_tokens: 1400,
+          max_tokens: 1600,
           messages: [{ role: "user", content: prompt }],
         }),
       });
@@ -691,6 +698,17 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                 <div className="text-[8px] uppercase tracking-[0.3em] mt-1.5 hidden sm:block" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                   X-NAV Analytics &nbsp;·&nbsp; xG Suppression &nbsp;·&nbsp; GM Logic Engine &nbsp;·&nbsp; Live Statistics
                 </div>
+                <div className="mt-2 flex items-center justify-center gap-4">
+                  <span className="text-[8px] font-black uppercase tracking-[0.2em]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                    ◆ TRADE MACHINE
+                  </span>
+                  <span style={{ color: '#c8b890' }}>|</span>
+                  <a href="/players" className="text-[8px] font-black uppercase tracking-[0.2em]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace", textDecoration: 'none', transition: 'color 0.15s' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#1c140a')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#9a7d58')}>
+                    ◇ PLAYER ANALYTICS
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -890,36 +908,52 @@ RULES: No invented context. No speculation about players not in this trade. Comp
               <div className="space-y-3 text-[11px]" style={{ color: '#4a3820', lineHeight: 1.7 }}>
                 <div>
                   <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>NAV (Net Asset Value)</span>
-                  <p className="mt-0.5">A player's overall trade value on a scale from roughly -100 to +1000. Combines offensive production, defensive contribution, contract cost, and age. Think of it as "how much is this player actually worth versus what they cost?" A positive NAV means the player is providing more value than their salary — a negative NAV means they're a contract liability.</p>
+                  <p className="mt-0.5">A player's overall trade value on a scale from roughly -100 to +1000. Combines offensive production, defensive contribution, contract cost, and age. Think of it as "how much is this player worth versus what they cost?" Positive NAV = providing more value than salary. Negative NAV = contract liability.</p>
                 </div>
                 <div>
                   <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>NOIV (Net On-Ice Value)</span>
-                  <p className="mt-0.5">A contextual adjustment to NAV based on how much a player elevates their teammates. Uses three metrics: how much the team controls expected goals when the player is on ice vs off, how well they suppress the opposition relative to their linemates, and how often they start shifts in the defensive zone. A player with NOIV higher than NAV is a hidden gem — their raw stats undersell their actual impact.</p>
+                  <p className="mt-0.5">A contextual multiplier based on how much a player elevates their teammates. Measures xG% relative to teammates on ice vs off, xGA suppression, and defensive zone deployment. A player with NOIV significantly above their raw stats is a hidden gem whose impact outstrips the box score.</p>
+                </div>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>OPS · DPS · PS</span>
+                  <p className="mt-0.5">Offensive and Defensive Point Shares — computed dynamically from the NHL Stats API using the Kubatko marginal goals framework. OPS measures offensive contribution to team points; DPS measures defensive contribution. These replace heuristic OFF/DEF estimates when live data is available.</p>
                 </div>
               </div>
             </div>
 
-            {/* Metrics */}
+            {/* STRAND metrics */}
             <div>
               <div className="font-black text-sm mb-3 pb-1" style={{ color: '#1c140a', borderBottom: '1px solid #b8a070', fontFamily: "'Libre Baskerville', serif" }}>
-                The Numbers Explained
+                STRAND™ Node Glossary
               </div>
-              <div className="space-y-3 text-[11px]" style={{ color: '#4a3820', lineHeight: 1.7 }}>
+              <div className="space-y-2 text-[11px]" style={{ color: '#4a3820', lineHeight: 1.7 }}>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>OFF</span>
-                  <p className="mt-0.5">Offensive impact — derived from points per 82 games and expected goals generated. Uses Bayesian regularization to account for sample size, so a player with 20 games gets pulled toward the league average until we have enough data to trust their numbers.</p>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>SCR — Scoring Pace</span>
+                  <p className="mt-0.5">Points per 82 games, normalized by position. D-men scored against a 0-80 scale; forwards against 0-100. A 73 SCR for a defenceman means he scores at the top of the D-man range — not that he scores like a forward.</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>DEF</span>
-                  <p className="mt-0.5">Defensive value — for shutdown defencemen, this shows their competition-adjusted bonus (how hard their matchups are). For everyone else, it reflects on-ice vs off-ice expected goals against. Filtered by reliability — sheltered players on easy minutes get a near-zero DEF rating because the metric isn't meaningful for them.</p>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>xG — Expected Goals</span>
+                  <p className="mt-0.5">Shot quality and volume generated per 82 games. Accounts for where shots come from, not just how many. A player who generates high-danger chances scores higher than one who fires from the perimeter.</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>YNG / AGE</span>
-                  <p className="mt-0.5">Youth option value or age penalty. Young players on cheap contracts get a premium because teams control their rights at below-market rates. Veterans past their peak get penalized as their production is expected to decline. Shows as YNG when positive (upside), AGE when negative (decline risk).</p>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>TOI+ — Ice Time</span>
+                  <p className="mt-0.5">Average time on ice per game. Normalized 10-27 minutes. Reflects coach trust and role deployment — players earning 24+ minutes are being used in every situation. Normalized so 27+ min = 100.</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>CAP</span>
-                  <p className="mt-0.5">Contract cost penalty. A player paid more than their on-ice production justifies creates negative cap value — the team is spending money they could use elsewhere. Long bad contracts are penalized more than short ones because they're harder to escape.</p>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>SUPP — xGA Suppression</span>
+                  <p className="mt-0.5">On-ice expected goals against vs off-ice, relative to teammates. Positive = team leaks fewer chances with this player on ice. Range -1.5 to +1.5. The defensive counterpart to xG — how well does this player prevent quality shots against?</p>
+                </div>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>QoC — Quality of Competition</span>
+                  <p className="mt-0.5">Rank of opponents faced by ice time. Lower rank = harder matchups. Rank 1 faces the toughest competition in the league every night. A player with QoC rank 50 and good SUPP is genuinely shutting down the opposition's best players.</p>
+                </div>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>DZ% — Defensive Zone Starts</span>
+                  <p className="mt-0.5">Percentage of shifts starting in the defensive zone. High DZ% means the coach deploys this player specifically to protect their own net — a mark of trust in their defensive reliability. Inverted in STRAND so higher score = more defensive deployment.</p>
+                </div>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>AGE — Age Curve</span>
+                  <p className="mt-0.5">The trajectory of a player's value over the life of their contract. Young players show positive age curves (improving). Veterans past their peak show negative curves (declining). Used in the defensive strand to show whether a player's contribution will grow or shrink.</p>
                 </div>
               </div>
             </div>
@@ -932,24 +966,24 @@ RULES: No invented context. No speculation about players not in this trade. Comp
               <div className="space-y-3 text-[11px]" style={{ color: '#4a3820', lineHeight: 1.7 }}>
                 <div>
                   <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>D-Man Archetypes</span>
-                  <p className="mt-0.5"><strong>Offensive D</strong> — 45+ pts/82, valued primarily for scoring and powerplay (Makar, Bouchard). <strong>Two-Way D</strong> — 28-45 pts/82 with heavy minutes, balanced value (Morrissey, Josi). <strong>Shutdown D</strong> — under 28 pts/82 but faces elite competition (QoC rank below 220), valued for defensive role not scoring (Slavin). <strong>Depth D</strong> — sheltered deployment, standard evaluation.</p>
+                  <p className="mt-0.5"><strong>Offensive D</strong> — 45+ pts/82, valued for scoring and powerplay (Makar, Bouchard). <strong>Two-Way D</strong> — 28-45 pts/82 with heavy minutes and balanced PS ratio (Morrissey, Josi). <strong>Shutdown D</strong> — under 28 pts/82 but faces elite competition, DPS dominates OPS (Slavin). <strong>Depth D</strong> — sheltered deployment, standard evaluation.</p>
                 </div>
                 <div>
                   <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>EWA (Estimated Wins Added)</span>
-                  <p className="mt-0.5">Translates NAV into actual standings wins. Roughly 7 NAV points equals one win above replacement, adjusted for where the team sits — wins are harder to add for teams already near the top of the standings.</p>
+                  <p className="mt-0.5">Translates NAV into actual standings wins. Roughly 7 NAV points equals one win above replacement, adjusted for where the team sits in the standings.</p>
                 </div>
                 <div>
                   <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>CWI (Contention Window Index)</span>
-                  <p className="mt-0.5">Estimates how a trade affects a team's championship window. Positive numbers mean the window opens sooner or extends longer. Young players on cheap deals and high draft picks push CWI up. Aging veterans on long contracts push it down.</p>
+                  <p className="mt-0.5">Estimates how a trade affects a team's championship window in years. Young players on cheap deals push CWI up. Aging veterans on long contracts push it down.</p>
                 </div>
                 <div>
                   <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>GM Flags</span>
-                  <p className="mt-0.5">The audit engine checks 15+ real-world factors a GM would consider: cap compliance, positional depth thresholds, NMC/NTC clause probability, timeline mismatch between team phases, defensive dependency, same-division conflicts, and value imbalance. HARD flags block the trade; SOFT flags warn but allow it.</p>
+                  <p className="mt-0.5">The audit engine checks 15+ real-world factors: cap compliance, positional depth, NMC/NTC clause probability, timeline mismatch, defensive dependency, same-division conflicts. HARD flags block; SOFT flags warn. DECLINED means the model believes one side's GM wouldn't sign off — not that the trade is bad hockey.</p>
                 </div>
               </div>
             </div>
 
-            {/* STRAND */}
+            {/* STRAND visualization */}
             <div>
               <div className="font-black text-sm mb-3 pb-1" style={{ color: '#1c140a', borderBottom: '1px solid #b8a070', fontFamily: "'Libre Baskerville', serif" }}>
                 STRAND™ Visualization
@@ -957,31 +991,33 @@ RULES: No invented context. No speculation about players not in this trade. Comp
               <div className="space-y-3 text-[11px]" style={{ color: '#4a3820', lineHeight: 1.7 }}>
                 <div>
                   <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>What is STRAND™?</span>
-                  <p className="mt-0.5">STRAND — Stylistic Trait & Rating Analysis for NHL Development — is a proprietary double-helix visualization that encodes a player's complete on-ice identity into two intertwined strands. Toggle it on any skater card using the STRAND™ tab.</p>
-                </div>
-                <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>Offensive Strand (Navy)</span>
-                  <p className="mt-0.5">Encodes five offensive traits: <strong>SCR</strong> (scoring pace), <strong>xG</strong> (expected goals generated), <strong>OFF</strong> (offensive NAV component), <strong>NOIV</strong> (xG% relative to teammates on ice), and <strong>TOI+</strong> (deployment). Node size scales with trait strength — a dominant node means that quality defines the player.</p>
-                </div>
-                <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>Defensive Strand (Red)</span>
-                  <p className="mt-0.5">Encodes five defensive traits: <strong>SUPP</strong> (xGA suppression vs teammates), <strong>QoC</strong> (quality of competition faced), <strong>DEF</strong> (defensive NAV component), <strong>DZ%</strong> (offensive zone deployment), and <strong>AGE</strong> (trajectory of value over time).</p>
-                </div>
-                <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>OPS · DPS · PS</span>
-                  <p className="mt-0.5">Offensive Point Shares (OPS) and Defensive Point Shares (DPS) are computed dynamically each session from the NHL Stats API using the marginal goals framework. OPS measures a player's offensive contribution to their team's points; DPS measures their defensive contribution. PS (total) is the sum. These inform the OFF and DEF nodes in the STRAND™ visualization when available, replacing heuristic estimates with mathematically grounded values. A player like Jaccob Slavin (OPS ~1.5, DPS ~5.4) shows a strongly dominant defensive strand; Josh Morrissey (OPS ~3.0, DPS ~4.2) shows true two-way balance.</p>
+                  <p className="mt-0.5">STRAND — Stylistic Trait & Rating Analysis for NHL Development — is a proprietary double-helix visualization encoding a player's complete on-ice identity into two intertwined strands. Navy = offensive profile. Red = defensive profile.</p>
                 </div>
                 <div>
                   <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>Reading the Helix</span>
-                  <p className="mt-0.5">The two strands twist together — a tight, symmetric helix signals an elite two-way player. A helix where one strand dominates the other reveals a one-dimensional player. The connecting rungs (the "ladder") show where the strands cross, indicating moments of balanced impact. The archetype badge in the top-right classifies the player: Offensive Force, Defensive Anchor, or Elite Two-Way.</p>
+                  <p className="mt-0.5">A tight symmetric helix signals an elite two-way player. A helix where one strand dominates reveals a specialist — not a weakness, a definition. Slavin's helix is almost entirely red. That's not a criticism; it's the most accurate visual description of what makes him valuable. Node size scales with trait strength. Values shown directly on each node.</p>
+                </div>
+                <div>
+                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>Archetype Classification</span>
+                  <p className="mt-0.5">When Point Shares data is available, the OPS/DPS ratio directly determines archetype: players with psRatio {'>'} 0.62 are Offensive, {'<'} 0.38 are Defensive, 0.38-0.62 with strong both strands are Two-Way or Elite Two-Way. Heuristic scoring fills in when PS data isn't available.</p>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Value vs Worth note */}
+          <div className="mb-6 p-4" style={{ border: '1px solid #b8a070', background: '#e4d8b8' }}>
+            <div className="text-[9px] uppercase tracking-[0.4em] mb-2" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+              A Note on Value vs Worth
+            </div>
+            <p className="text-[11px]" style={{ color: '#4a3820', lineHeight: 1.8, fontFamily: "'Libre Baskerville', serif", fontStyle: 'italic' }}>
+              Every player in this database plays in the NHL. That alone puts them in the top 0.1% of hockey players on earth. A negative NAV does not mean a negative player — it means the contract represents negative trade value relative to production and term. Hockey is rooted in reality: every player who dresses for an NHL game is fundamentally one of the best athletes in the world at what they do. These numbers measure tradeable asset value, not human worth. Use them as a starting point for conversation, not a final verdict.
+            </p>
+          </div>
+
           <div className="text-center pt-4" style={{ borderTop: '1px solid #b8a070' }}>
             <p className="text-[9px] uppercase tracking-[0.4em]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
-              Data: NHL API · MoneyPuck · CapWages &nbsp;·&nbsp; Models: X-NAV 7.3 · G-NAV · NOIV · STRAND™ &nbsp;·&nbsp; AI: Claude Sonnet & Haiku
+              Data: NHL API · MoneyPuck · CapWages &nbsp;·&nbsp; Models: X-NAV 7.3 · G-NAV · NOIV · STRAND™ &nbsp;·&nbsp; AI: Claude Sonnet
             </p>
             <p className="text-[8px] mt-1" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
               All valuations are analytical estimates, not financial advice. Player values fluctuate with injury, performance, and market conditions.
@@ -1788,8 +1824,8 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
             </g>;
           })}
 
-          <text x={6} y={cy-2} fontSize="7" fill={offColor} fontFamily="Courier Prime, monospace" fontWeight="bold">OFFENSE</text>
-          <text x={6} y={cy+6} fontSize="7" fill={defColor} fontFamily="Courier Prime, monospace" fontWeight="bold">DEFENSE</text>
+          <text x={6} y={cy-30} fontSize="7" fill={offColor} fontFamily="Courier Prime, monospace" fontWeight="bold">OFFENSE</text>
+          <text x={6} y={cy+40} fontSize="7" fill={defColor} fontFamily="Courier Prime, monospace" fontWeight="bold">DEFENSE</text>
 
           {secondary && (
             <g>
@@ -2192,8 +2228,8 @@ function TeamDNA({
                     <text x="38" y="16" fontSize="9" fill="var(--blue)" fontFamily="Courier Prime, monospace" fontWeight="bold">OFFENSE</text>
                     <line x1="14" y1="27" x2="34" y2="27" stroke="var(--red)" strokeWidth="2.5"/>
                     <text x="38" y="31" fontSize="9" fill="var(--red)" fontFamily="Courier Prime, monospace" fontWeight="bold">DEFENSE</text>
-                    <line x1="14" y1="118" x2="34" y2="118" stroke="var(--rule)" strokeWidth="2" strokeDasharray="5,3"/>
-                    <text x="38" y="120" fontSize="9" fill="var(--rule)" fontFamily="Courier Prime, monospace">CHAMP. TEMPLATE</text>
+                    <line x1="14" y1="42" x2="34" y2="42" stroke="var(--rule)" strokeWidth="2" strokeDasharray="5,3"/>
+                    <text x="38" y="46" fontSize="9" fill="var(--rule)" fontFamily="Courier Prime, monospace">CHAMP. TEMPLATE</text>
                   </svg>
                 </div>
               );

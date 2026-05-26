@@ -524,7 +524,34 @@ select.ledger-select {
   animation: modal-pop 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* ── Mobile structural fixes ─────────────────────────────────── */
+/* ── Players analytics page ──────────────────────────────────── */
+.player-row:hover { background: var(--paper-card) !important; }
+
+.players-hide-mobile { display: block; }
+@media (max-width: 540px) { .players-hide-mobile { display: none; } }
+
+.filter-btn {
+  font-family: 'Courier Prime', monospace;
+  font-size: 8px; font-weight: 900;
+  text-transform: uppercase; letter-spacing: 0.15em;
+  padding: 5px 10px; cursor: pointer;
+  border: 1px solid var(--rule);
+  background: transparent; color: var(--ink-faint);
+  transition: all 0.15s;
+}
+.filter-btn.active  { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.filter-btn:hover:not(.active) { border-color: var(--ink); color: var(--ink); }
+
+.col-header {
+  font-family: 'Courier Prime', monospace;
+  font-size: 7px; font-weight: 900;
+  text-transform: uppercase; letter-spacing: 0.15em;
+  color: var(--rule); cursor: pointer;
+  padding: 6px 0; border: none; background: none;
+  transition: color 0.1s;
+}
+.col-header.active { color: var(--ink); }
+.col-header:hover  { color: var(--ink); }
 
 /* Stat cell grids — 2-up on mobile, 4-up on sm+ */
 .stat-grid-4 {

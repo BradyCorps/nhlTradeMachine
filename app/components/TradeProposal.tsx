@@ -90,7 +90,7 @@ const dumpFitScore = (
     if (p.age > 33) score -= 15;
   }
 
-  return Math.max(0, Math.min(100, score));
+ return Math.round(Math.max(0, Math.min(100, score)));
 };
 
 // Score standard trade fit
@@ -129,7 +129,7 @@ const blockFitsTeam = (
     if (player.hasNMC) score -= 8;
   }
 
-  return Math.max(0, Math.min(100, score));
+  return Math.round(Math.max(0, Math.min(100, score)));
 };
 
 // Build picks sweetener HOME adds to make dump palatable
@@ -585,7 +585,7 @@ export default function TradeProposalEngine({
         // Cap at 4 packages per team to avoid one team dominating the pool
         for (const pkg of pkgs.slice(0, 4)) {
           // Slightly vary fitScore per package so weighted random picks different ones
-          const pkgFit = fit * (0.85 + Math.random() * 0.15);
+          const pkgFit = Math.round(fit * (0.85 + Math.random() * 0.15));
           candidates.push({
             team, fitScore: pkgFit,
             homeSends: outgoingBlock,
