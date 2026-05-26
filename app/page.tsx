@@ -649,6 +649,11 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                   {verdict.status}
                 </div>
               </div>
+                {(verdict.status === "DECLINED" || verdict.status === "BLOCKED") && (
+                  <p className="text-[8px] italic w-full mt-1 text-center" style={{ color: '#9a7d58', fontFamily: "'Libre Baskerville', serif" }}>
+                    One or more conditions would cause a real GM to reject this trade
+                  </p>
+                )}
             </div>
 
             {/* Footer actions */}
@@ -695,7 +700,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                 }}>
                   The Hockey Ledger
                 </h1>
-                <div className="text-[8px] uppercase tracking-[0.3em] mt-1.5 hidden sm:block" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                <div className="text-[11px] uppercase tracking-[0.3em] mt-1.5 hidden sm:block" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                   X-NAV Analytics &nbsp;·&nbsp; xG Suppression &nbsp;·&nbsp; GM Logic Engine &nbsp;·&nbsp; Live Statistics
                 </div>
                 <div className="mt-2 flex items-center justify-center gap-4">
@@ -2330,7 +2335,7 @@ function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestCla
         <div className="text-[10px] text-zinc-500 font-bold">{verdict.message}</div>
         <div className="flex gap-1.5 mt-2 flex-wrap">
           {hardCount > 0 && <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-red-900/50 text-red-300 border border-red-800/50">{hardCount} HARD BLOCK{hardCount > 1 ? "S" : ""}</span>}
-          {softCount > 0 && <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-orange-900/50 text-orange-300 border border-orange-800/50">{softCount} GM VETO{softCount > 1 ? "S" : ""}</span>}
+          {softCount > 0 && <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-orange-900/50 text-orange-300 border border-orange-800/50">{softCount} GM CONCERN{softCount > 1 ? "S" : ""}</span>}
           {warnCount > 0 && <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-300 border border-amber-800/40">{warnCount} WARNING{warnCount > 1 ? "S" : ""}</span>}
         </div>
       </div>

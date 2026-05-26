@@ -261,7 +261,7 @@ input[type="range"] { accent-color: var(--red); }
 .ledger-select-wrapper::after {
   content: "▼"; position: absolute; right: 0; top: 50%;
   transform: translateY(-50%) scaleY(0.6);
-  pointer-events: none; font-size: 8px; color: var(--ink-faint);
+  pointer-events: none; font-size: 11px; color: var(--ink-faint);
 }
 select.ledger-select {
   appearance: none; background-image: none !important;
