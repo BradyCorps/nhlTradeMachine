@@ -281,49 +281,104 @@ const getXNAV = (asset: Asset): XNAVResult => {
     const round    = asset.round    || 1;
     const year     = asset.year     || 2026;
     const standing = asset.teamStanding || 16;
-    const yearDecay = Math.pow(0.92, year - 2026);
 
-    // ── Standing → expected draft slot with lottery math ─────────
-    // Non-playoff teams (17-32) enter the lottery for slots 1-16.
-    // Even the worst team only has ~18.5% chance at #1 — their
-    // expected slot after lottery math is closer to 3rd, not 1st.
+    // Year decay — future picks worth less (uncertainty compounds)
+    const yearDecay = Math.pow(0.88, year - 2026);
+
+    // ── Standing → expected draft slot with lottery math ────────
+    // Non-playoff teams (17-32) enter the lottery for top-16 slots.
     // Playoff teams (1-16) pick 17-32, no lottery.
     let expectedSlot: number;
     if (standing >= 17) {
-      const rank = 33 - standing; // rank 1=worst, rank 16=best miss
-      if      (rank === 1)  expectedSlot = 3.2;  // ~18.5% at #1, expected ~3rd
-      else if (rank === 2)  expectedSlot = 4.1;
-      else if (rank === 3)  expectedSlot = 4.8;
-      else if (rank === 4)  expectedSlot = 5.2;
-      else if (rank === 5)  expectedSlot = 6.0;
-      else                  expectedSlot = rank;  // 6-16: no meaningful lottery
+      // Lottery odds table — expected slot accounts for probability
+      // of jumping up, not just raw finishing position
+      const rank = 33 - standing; // rank 1 = worst team, rank 16 = best lottery team
+      const slotMap: Record<number, number> = {
+        1: 2.8,   // ~18.5% at #1, expected ~3rd after lottery math
+        2: 3.8,
+        3: 4.5,
+        4: 5.2,
+        5: 6.1,
+        6: 7.0,
+        7: 8.0,
+        8: 9.2,
+        9: 10.4,
+        10: 11.5,
+        11: 12.5,
+        12: 13.4,
+        13: 14.2,
+        14: 14.8,
+        15: 15.4,
+        16: 15.9,
+      };
+      expectedSlot = slotMap[rank] ?? rank;
     } else {
-      expectedSlot = 33 - standing; // playoff: standing 1→slot 32, standing 16→slot 17
+      // Playoff teams: standing 1 → pick 32, standing 16 → pick 17
+      expectedSlot = 33 - standing;
     }
 
     const pickSlot = Math.round(clamp(expectedSlot, 1, 32));
 
+    // ── Pick value curve — calibrated to real trade market ────────
+    // Based on observed NHL trade market values, not just prospect grades:
+    // - Top-3 picks (tanking teams): near-untradable, franchise-altering
+    // - Picks 4-10: significant roster pieces
+    // - Picks 11-20: solid contributors
+    // - Picks 21-32: depth/role player ceiling
+    //
+    // Key calibration points from real trades:
+    // - Bedard/Schaefer/McKenna tier (#1): ~380-420 NAV
+    // - Top-5 pick: ~240-280 NAV (Werenski, Celebrini tier)
+    // - Top-10 pick: ~160-200 NAV (solid top-6/top-4 ceiling)
+    // - Top-15: ~100-140 NAV (NHLer with upside)
+    // - Pick 20-25: ~55-80 NAV (depth piece / roster filler)
+    // - Pick 26-32: ~30-45 NAV (late 1st, similar to 2nd)
+    //
+    // This makes a Vancouver/Chicago tanking-team 1st genuinely
+    // untradable unless the return is a legitimate star.
+    // A Carolina/Boston contender 1st is worth a mid-range player.
+
     let baseValue: number;
+
     if (round === 1) {
-      // Calibrated: worst team ~70, WPG ~48, EDM ~19, BOS ~9, best team ~5
-      baseValue = 85.0 * Math.pow(0.91, pickSlot - 1) * yearDecay;
+      if      (pickSlot <= 1)  baseValue = 400;  // Franchise cornerstone (#1 overall)
+      else if (pickSlot <= 2)  baseValue = 340;  // Clear #2 overall
+      else if (pickSlot <= 3)  baseValue = 290;  // Top-3 still franchise-altering
+      else if (pickSlot <= 5)  baseValue = 240;  // High lottery
+      else if (pickSlot <= 8)  baseValue = 190;  // Mid-lottery
+      else if (pickSlot <= 10) baseValue = 160;  // Bottom lottery / early non-lottery
+      else if (pickSlot <= 12) baseValue = 130;
+      else if (pickSlot <= 15) baseValue = 105;
+      else if (pickSlot <= 18) baseValue = 82;
+      else if (pickSlot <= 21) baseValue = 65;
+      else if (pickSlot <= 24) baseValue = 52;
+      else if (pickSlot <= 27) baseValue = 42;
+      else                     baseValue = 32;   // Late 1st (contender pick, pick 28-32)
     } else if (round === 2) {
-      // Independent 2nd round curve — not a continuation of 1st round.
-      // Top 2nd ≈ 10 NAV, mid 2nd ≈ 3-5, late 2nd ≈ 1-2
-      baseValue = 12.0 * Math.pow(0.91, pickSlot - 1) * yearDecay;
+      // 2nd round: top of class ~30 NAV, mid ~15, late ~8
+      // Follows own independent curve — NOT continuation of 1st round
+      if      (pickSlot <= 5)  baseValue = 28;
+      else if (pickSlot <= 10) baseValue = 20;
+      else if (pickSlot <= 16) baseValue = 14;
+      else if (pickSlot <= 24) baseValue = 10;
+      else                     baseValue = 7;
+    } else if (round === 3) {
+      baseValue = pickSlot <= 10 ? 5 : 3;
     } else {
-      // 3rd round: modest kicker value
-      baseValue = 3.0 * Math.pow(0.88, pickSlot - 1) * yearDecay;
+      baseValue = 2; // 4th+ rounds: almost no tradeable value
     }
 
-    const pickTotal = Math.max(round === 1 ? 2 : 1, baseValue);
+    const pickTotal = Math.max(round === 1 ? 5 : 1, baseValue * yearDecay);
+
+    // Upside fraction is higher for earlier picks — more variance in outcomes
+    const upsideFraction = pickSlot <= 5 ? 0.55 : pickSlot <= 15 ? 0.45 : 0.30;
 
     return {
-      total:  pickTotal,
+      total:  Math.round(pickTotal),
       off:    0, def: 0,
-      age:    pickTotal * 0.4,
+      age:    Math.round(pickTotal * upsideFraction),
       cap:    0,
-      upside: pickTotal * 0.4,
+      upside: Math.round(pickTotal * upsideFraction),
     };
   }
 
@@ -332,21 +387,33 @@ const getXNAV = (asset: Asset): XNAVResult => {
     const gamesG      = Math.max(1, asset.gamesStarted ?? asset.games ?? 1);
     const confidenceG = Math.min(1.0, Math.pow(gamesG / 45, 1.2));
 
-    // Role detection — anything under 40 games is not a true starter
-    // 30 games = backup/tandem regardless of per-game stats
     const isStarter = gamesG >= 40;
     const isBackup  = gamesG < 33;
     const isTandem  = !isStarter && !isBackup;
 
-    const gsaxRaw     = safe(asset.gsax ?? 0);
-    // Hard cap on per-game rate — hot streaks in limited starts don't extrapolate
-    const gsaxPerGame       = gsaxRaw / gamesG;
+    const gsaxRaw         = safe(asset.gsax ?? 0);
+    const gsaxPerGame     = gsaxRaw / gamesG;
     const gsaxPerGameCapped = isBackup
-      ? Math.min(gsaxPerGame, 0.18)   // backup: very conservative cap
+      ? Math.min(gsaxPerGame, 0.18)
       : isTandem
-      ? Math.min(gsaxPerGame, 0.28)   // tandem: moderate cap
-      : Math.min(gsaxPerGame, 0.42);  // starter: generous cap
-    const gsaxPer60   = gsaxPerGameCapped * 60;
+      ? Math.min(gsaxPerGame, 0.28)
+      : Math.min(gsaxPerGame, 0.42);
+
+    // ── Team defense context adjustment ───────────────────────────
+    // Goalies on bad teams face more shots and higher-danger chances.
+    // Their GSAx is structurally suppressed by team context.
+    // Askarov/Wallstedt playing behind a 30th-place defense is not
+    // the same as a -12 GSAx goalie on a competent team.
+    // We partially neutralize team shot-volume drag using standing.
+    const teamStanding = asset.teamStanding ?? 16;
+    const defCorrection =
+      teamStanding >= 29 ? 0.13 :  // bottom-4 team defense (SJS, CHI tier)
+      teamStanding >= 25 ? 0.08 :  // bad team defense
+      teamStanding >= 20 ? 0.04 :  // below average
+      teamStanding >= 17 ? 0.02 :  // just missed playoffs
+      0;                            // playoff-level defense — no correction
+
+    const gsaxPer60 = (gsaxPerGameCapped + defCorrection) * 60;
 
     const GSAX_SD = 8.0;
 
@@ -361,7 +428,6 @@ const getXNAV = (asset: Asset): XNAVResult => {
       ? Math.pow(expGSAx / GSAX_SD, 1.5) * 80
       : (expGSAx / GSAX_SD) * 40;
 
-    // Backups get reduced workload bonus — they're not carrying 60 games
     const workloadBonus = isStarter
       ? Math.min(20, (gamesG / 60) * 15)
       : isTandem
@@ -381,10 +447,17 @@ const getXNAV = (asset: Asset): XNAVResult => {
 
     const rawTotal = safe((goalieImpact + workloadBonus) * ageFactorG - capCostG + retainedBonusG);
 
-    // Hard NAV caps by role — hot streaks in limited games can't push past these
-    // Even elite starters are capped to keep goalie values in a sane range
+    // ── Young starter floor ────────────────────────────────────────
+    // A starting goalie aged ≤26 on a cost-controlled deal (≤$3.5M)
+    // has genuine trade value regardless of team context GSAx.
+    // The market consistently pays for controlled young starters.
+    // Floor scales with youth: age 23 = +33, age 24 = +25, age 25 = +17, age 26 = +9
+    const youngStarterFloor = isStarter && asset.age <= 26 && effectiveCap <= 3.5
+      ? Math.max(0, (27 - asset.age) * 11 - effectiveCap * 3)
+      : 0;
+
     const roleCap     = isBackup ? 35 : isTandem ? 60 : 250;
-    const cappedTotal = Math.min(rawTotal, roleCap);
+    const cappedTotal = Math.min(Math.max(rawTotal, youngStarterFloor), roleCap);
     const totalG      = getGoalieHistoricalFloor(asset.name, cappedTotal);
 
     return {
@@ -393,7 +466,7 @@ const getXNAV = (asset: Asset): XNAVResult => {
       def:    safe(goalieImpact * ageFactorG),
       age:    -agePenaltyG,
       cap:    -(capCostG - retainedBonusG),
-      upside: 0,
+      upside: youngStarterFloor > 0 ? youngStarterFloor * 0.4 : 0,
       noivImpact: 0,
       fArchetype: "",
     };

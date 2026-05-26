@@ -321,69 +321,122 @@ export default function TradeMachine() {
 
     const isRebuilding = ["Rebuilding","Tanking","Retooling"].includes(teams[0]!.phase ?? "");
 
-    const prompt = `You are a senior NHL beat reporter writing the end-of-season trade retrospective column for a major hockey publication. This is the definitive year-in-review piece for the 2025-26 NHL season — written as if these trades happened at the 2026 trade deadline and we are now reflecting on how the season finished.
+    const prompt = (() => {
+      // ── Detect franchise players traded away ──────────────────
+      const allTradedNames = executedTrades.flatMap(t => [
+        ...t.outgoing.map(a => a.name),
+        ...t.incoming.map(a => a.name),
+      ]);
+      const franchiseMoved = (name: string) => allTradedNames.includes(name);
 
-2025-26 SEASON FACTS — USE THESE EXACTLY, DO NOT CONTRADICT THEM:
-- Calder Trophy (Rookie of the Year): Matthew Schaefer, New York Islanders — won unanimously (198 first-place votes). Runner-up: Ivan Demidov, Montreal. Do NOT give this award to Michkov, Bedard, or anyone else.
-- Florida Panthers did NOT win the Stanley Cup this year (they won 2023-24 and 2024-25). Pick a different champion.
-- Atlantic Division standings leader: Buffalo Sabres (109 pts). Tampa Bay Lightning also strong (106 pts). Toronto Maple Leafs missed playoffs (78 pts).
-- Metropolitan Division: Carolina Hurricanes strong (113 pts).
-- Casey DeSmith won the Dallas Stars starting job (per team data).
-- Auston Matthews plays for the Toronto Maple Leafs — NOT Arizona, NOT Utah.
-- The Arizona Coyotes no longer exist — they relocated and became the Utah Hockey Club.
-- These are real facts for this season — treat them as established record.
+      // Wild card teams — strong on paper, volatile in reality
+      const WILD_CARDS = ["WPG","TOR","CGY","EDM","NYR"];
+      const homeIsWildCard    = WILD_CARDS.includes(teams[0]!.id);
+      const partnerIsWildCard = teams[1] && WILD_CARDS.includes(teams[1].id);
 
-CRITICAL RULES — VIOLATIONS WILL RUIN THE COLUMN:
-1. Only reference players from the rosters listed below. Do NOT invent players, prospects, or supporting cast.
-2. A player RECEIVED by a team plays FOR that team. A player GIVEN AWAY plays for the OTHER team.
-3. PICKS — READ THE TRADE SUMMARY LITERALLY: The trade summary is the ONLY source of truth for picks. Do NOT invent pick movements. If Team A received a pick, Team A has it. If Team A gave away a pick, Team A does NOT have it. Never say a team "surrendered" a pick they actually received.
-4. PLAYER HISTORY: Players have ONLY played for teams shown in the trade summary. NEVER invent prior teams, trades, or signings.
-5. STATISTICS: Only invent stats within these realistic 2025-26 ranges — goals: 25-60, points: 50-135, GAA: 2.05-2.85, save%: .905-.935.
-6. INVENTED FACTS: Do not invent injuries, coaching changes, contract disputes, suspensions, retirements, or off-ice events.
-7. TEAM PHASES: Honor the phase shown. A REBUILDING team did not make the playoffs. A CONTENDER competed for the Cup.
-8. THE YEAR IN NUMBERS: Use Matthew Schaefer as Calder winner. Stanley Cup champion must NOT be Florida Panthers.
-9. Keep each section focused — do not repeat information across sections.
-10. INTERNAL CONSISTENCY — THIS IS CRITICAL: Before writing each team's season summary, reason through the actual roster quality. If a team received an elite goalie, a 100-point center, and strong supporting cast, they CANNOT finish 25th. If a team gave away its core and received only picks, they finish near the bottom. The season record must be LOGICALLY CONSISTENT with the roster quality shown below.
+      // Team narrative from phase + standing
+      const teamNarrative = (t: Team): string => {
+        const p = t.phase; const s = t.standing;
+        if (p === "Tanking" || p === "Rebuilding") return "deep in a rebuild — draft positioning is the only currency that matters";
+        if (s <= 3)  return "legitimate Presidents' Trophy contender — Cup or bust";
+        if (s <= 8)  return "locked into the playoff race with real Cup upside";
+        if (s <= 14) return "bubble team fighting to survive the final weeks";
+        if (s <= 20) return "underperforming their talent — fans restless, GM on notice";
+        return "fading season — playing for draft lottery position";
+      };
 
-TRADE ASSET CONTEXT (use this to calibrate season outcomes):
+      return `You are a senior NHL beat reporter writing the definitive end-of-season trade retrospective column. This is a SIMULATION — not a history book. The trades below are the divergence point from reality. Everything after the deadline is your story to tell.
+
+THE TRADE IS THE DIVERGENCE POINT. Honor it above all real-world events.
+If a player was traded, they play for their NEW team. Their old team's season reflects their absence.
+If Matthews was traded, Toronto collapses. If Hellebuyck was traded, Winnipeg's identity is gone.
+
+LOCKED FACTS — happened before the deadline, cannot change:
+- Calder Trophy: Matthew Schaefer, New York Islanders — unanimous (198 first-place votes). Runner-up: Ivan Demidov, Montreal. LOCKED. Do not give to anyone else.
+- Florida Panthers did NOT win the Cup this year (won 2023 and 2024 and 2025). Choose anyone else.
+- Auston Matthews plays for Toronto — unless he appears in the TRADE SUMMARY below as traded.
+- Connor Hellebuyck plays for Winnipeg — unless he appears in the TRADE SUMMARY below as traded.
+- Utah Hockey Club is now called the Utah Mammoth (UTA). Arizona Coyotes do not exist.
+- Casey DeSmith won the Dallas Stars starting job.
+
+NHL CONFERENCE & DIVISION STRUCTURE:
+Eastern: Atlantic (BOS,BUF,DET,FLA,MTL,OTT,TBL,TOR) · Metro (CAR,CBJ,NJD,NYI,NYR,PHI,PIT,WSH)
+Western: Central (UTA,CHI,COL,DAL,MIN,NSH,STL,WPG) · Pacific (ANA,CGY,EDM,LAK,SEA,SJS,VAN,VGK)
+
+STANDINGS LOGIC — ABSOLUTE, NEVER VIOLATE:
+- Presidents' Trophy = best record league-wide. No team can have more points.
+- Buffalo leads Atlantic at 109pts. Carolina leads Metro at 113pts. Carolina wins Presidents' Trophy. Both true.
+- A goalie on a team finishing 22nd-32nd CANNOT post GAA under 2.30 or SV% over .922. Bad teams give up goals.
+- Playoff seeds: top 3 per division auto-qualify. Next 2 best records per conference are wildcards.
+- If a team's best player was traded away, adjust their finish position accordingly.
+
+PRE-DEADLINE TEAM CONTEXT:
+- Buffalo Sabres: Atlantic leaders at 109pts — genuine playoff team, proving the rebuild worked
+- Carolina Hurricanes: Metro dominants at 113pts — deep Cup contender
+- Tampa Bay Lightning: 106pts, Atlantic threat with Kucherov still elite
+- ${franchiseMoved("Auston Matthews") ? "Toronto Maple Leafs: MATTHEWS WAS TRADED — their season collapsed without their franchise player. Model a bottom-10 finish." : `Toronto Maple Leafs: Classic wild card — missed playoffs at 78pts but volatile enough to surge OR collapse further`}
+- ${franchiseMoved("Connor Hellebuyck") ? "Winnipeg Jets: HELLEBUYCK WAS TRADED — their defensive identity is gone. Model accordingly." : `Winnipeg Jets: Wild card — strong on paper but historically volatile. Could flame out early OR go deep`}
+- Calgary Flames: Talented but inconsistent — genuine wild card, 50/50 on playoff spot
+- Edmonton Oilers: McDavid ceiling is the Cup, floor is first-round exit — always
+- ${homeIsWildCard ? `${teams[0]!.name}: Wild card team — give them one unexpected development, good or bad` : ""}
+- ${partnerIsWildCard ? `${teams[1]!.name}: Wild card team — give them one unexpected development, good or bad` : ""}
+
+TRADE SUMMARY — THE DIVERGENCE POINT:
 ${tradesSummary}
 
-HOME TEAM RECEIVED (playing FOR ${teams[0]!.name}): ${blocks[1].filter((a: Asset) => a.position !== "Pick").map((a: Asset) => `${a.name} (${a.ptsPace.toFixed(0)} pts/82, $${a.capHit}M)`).join(", ") || "no players"}
-HOME TEAM PICKS RECEIVED: ${blocks[1].filter((a: Asset) => a.position === "Pick").map((a: Asset) => `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : `${a.round}th`}`).join(", ") || "none"}
-HOME TEAM GAVE AWAY (no longer on ${teams[0]!.name}): ${blocks[0].filter((a: Asset) => a.position !== "Pick").map((a: Asset) => `${a.name} (${a.ptsPace.toFixed(0)} pts/82)`).join(", ") || "no players"}
-HOME TEAM PICKS GIVEN AWAY (GONE — do not say ${teams[0]!.name} has these): ${blocks[0].filter((a: Asset) => a.position === "Pick").map((a: Asset) => `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : `${a.round}th`}`).join(", ") || "none"}
+HOME TEAM (${teams[0]!.name}) POST-TRADE:
+Received: ${blocks[1].filter((a: Asset) => a.position !== "Pick").map((a: Asset) => `${a.name} (${a.ptsPace.toFixed(0)}pts/82, $${a.capHit}M)`).join(", ") || "no players"}
+Picks received: ${blocks[1].filter((a: Asset) => a.position === "Pick").map((a: Asset) => `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : `${a.round}th`}`).join(", ") || "none"}
+Gave away: ${blocks[0].filter((a: Asset) => a.position !== "Pick").map((a: Asset) => `${a.name} (${a.ptsPace.toFixed(0)}pts/82)`).join(", ") || "no players"}
+Picks given away (GONE): ${blocks[0].filter((a: Asset) => a.position === "Pick").map((a: Asset) => `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : `${a.round}th`}`).join(", ") || "none"}
 
-${teams[0]!.name} CURRENT ROSTER after all trades (top 12 by production):
+${teams[0]!.name} ROSTER (top 12 post-trade):
 ${homeRoster.join("\n")}
-Phase: ${teams[0]!.phase} · Pre-trade standing: #${teams[0]!.standing}/32
+Phase: ${teams[0]!.phase} · Standing entering deadline: #${teams[0]!.standing}/32
+Narrative: ${teamNarrative(teams[0]!)}
 
-${partnerTeam ? `${partnerTeam.name} CURRENT ROSTER after all trades (top 12 by production):
+${teams[1] ? `${teams[1].name} ROSTER (top 12 post-trade):
 ${partnerRoster.join("\n")}
-Phase: ${partnerTeam.phase} · Pre-trade standing: #${partnerTeam.standing}/32` : ""}
+Phase: ${teams[1].phase} · Standing entering deadline: #${teams[1].standing}/32
+Narrative: ${teamNarrative(teams[1])}` : ""}
 
-Write 6 sections. Be a real storyteller — this should have narrative tension, not just facts.
+VARIANCE PERMISSION:
+This is a "what if" machine. You have creative license to:
+- Give any wild card team one completely unexpected development (hot streak, cold snap, goalie steal, surprising hero)
+- Apply ±15% variance to any player's statistical pace — great players can have off years, depth players can surprise
+- Let the traded players' impact ripple realistically through both teams' seasons
+- Invent one league-wide story (trade, controversy, record chase, unexpected rivalry) for the AROUND THE LEAGUE section
+- Choose ANY Stanley Cup champion except Florida Panthers
+
+WHAT YOU CANNOT DO:
+- Reference players not in the rosters below or in the trade summary
+- Say a team kept a player they traded or vice versa
+- Put Auston Matthews on Utah/Arizona unless he was traded there
+- Give a goalie elite stats on a bottom-10 team
+- Award the Calder to anyone except Matthew Schaefer
+
+Write 6 sections with genuine narrative tension. This should read like the best hockey column you've ever written.
 
 **THE TRADE, ONE YEAR LATER**
-3-4 sentences. How did each key traded player perform FOR THEIR NEW TEAM? Give specific stat lines. Was the trade what both sides hoped for, or did reality diverge from the plan?
+3-4 sentences. How did the key traded players perform for their NEW teams? Specific stat lines. Was it what both sides hoped for?
 
 **${teams[0]!.name.toUpperCase()}'S SEASON**
 ${isRebuilding
-  ? `4-5 sentences. Paint the full picture of the rebuild — where did they finish, what was the low point, was there a surprise bright spot from a young player? What draft pick did they land and what does it mean? REMEMBER: derive the finish position from the actual roster quality shown above.`
-  : `4-5 sentences. How did they finish and how far did they go in the playoffs? Describe one defining game or moment that captured the entire season. Was there a player who emerged or collapsed unexpectedly? REMEMBER: derive the finish position from the actual roster quality shown above.`}
+  ? `4-5 sentences. Full rebuild picture — finish position (derived from actual roster quality above), low point, surprise bright spot, draft pick significance. REMEMBER: roster quality drives finish position.`
+  : `4-5 sentences. Finish position and playoff run (derived from actual roster quality above). One defining moment. One player who emerged or collapsed. REMEMBER: roster quality drives finish position.`}
 
 **AROUND THE LEAGUE**
-4-5 sentences covering 3 distinct storylines from across the NHL this season. Include: one team that surprised everyone (good or bad), one major injury that shaped the playoff race, one off-ice or trade story that dominated headlines. Make it feel like a real, specific season happened — not generic filler.
+4-5 sentences covering 3 distinct storylines. One team that shocked everyone, one injury that shaped the race, one off-ice story. Make it feel like a specific, real season happened.
 
 **THE YEAR IN NUMBERS**
-Present the statistical leaders in a clean format. Use the SEASON FACTS above for awards — do not invent award winners.
 - **Goals:** [Player, Team] — XX goals
 - **Points:** [Player, Team] — XXX points
-- **GAA:** [Goalie, Team] — X.XX
-- **Save %:** [Goalie, Team] — .XXX
-- **Presidents' Trophy:** [Team] — XX wins
-- **Stanley Cup Champion:** [Team] — brief one-line note (NOT the Florida Panthers)
+- **GAA:** [Goalie, Team — must be top-10 team] — X.XX
+- **Save %:** [Goalie, Team — must be top-10 team] — .XXX
+- **Presidents' Trophy:** [Team] — XXX pts
+- **Stanley Cup Champion:** [Team] — one line (NOT Florida Panthers)
 - **Conn Smythe:** [Player, Team]
-- **Calder Trophy (Rookie of the Year):** Matthew Schaefer, New York Islanders — unanimous winner
+- **Calder Trophy:** Matthew Schaefer, New York Islanders — unanimous
 
 **THE DRAFT LOTTERY**
 ${(() => {
@@ -391,17 +444,18 @@ ${(() => {
     t.outgoing.some((a: any) => a.position === "Pick" && (a.round ?? 1) === 1)
   );
   if (tradedAwayPick) {
-    return `IMPORTANT: ${teams[0]!.name} traded away their 1st round pick. They DO NOT participate in the lottery. Write 2 sentences about them watching from the sidelines while another team won their pick, and what that means for their timeline.`;
+    return `${teams[0]!.name} traded away their 1st round pick. They DO NOT participate. 2 sentences about watching another team use their pick.`;
   }
   return isRebuilding
-    ? `3-4 sentences. ${teams[0]!.name} still has their pick and is rebuilding — make this count. What pick did they land? Describe the top prospect in one vivid sentence. What are scouts projecting?`
-    : `2 sentences. Who won the lottery, which franchise needed it most, one line on the top prospect.`;
+    ? `3-4 sentences. ${teams[0]!.name} is rebuilding — what pick did they land? Describe the top prospect vividly. What are scouts saying?`
+    : `2 sentences. Who won the lottery, why they needed it, one line on the top prospect.`;
 })()}
 
 **VERDICT**
-Two sentences per team — one on what went right or wrong, one definitive verdict on whether the GM made the right call. Be direct and honest, not diplomatic.
+Two sentences per team — what went right or wrong, and whether the GM made the right call. Be direct. No diplomacy.
 
-Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}. Use specific numbers throughout. Never cut off mid-sentence. Write like someone who watched every game.`;
+Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}. Use specific numbers. Never cut off mid-sentence. Write like someone who watched every single game.`;
+    })()
 
     if (simAbortRef.current) simAbortRef.current.abort();
     simAbortRef.current = new AbortController();
@@ -649,11 +703,6 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                   {verdict.status}
                 </div>
               </div>
-                {(verdict.status === "DECLINED" || verdict.status === "BLOCKED") && (
-                  <p className="text-[8px] italic w-full mt-1 text-center" style={{ color: '#9a7d58', fontFamily: "'Libre Baskerville', serif" }}>
-                    One or more conditions would cause a real GM to reject this trade
-                  </p>
-                )}
             </div>
 
             {/* Footer actions */}
@@ -700,7 +749,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                 }}>
                   The Hockey Ledger
                 </h1>
-                <div className="text-[11px] uppercase tracking-[0.3em] mt-1.5 hidden sm:block" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                <div className="text-[8px] uppercase tracking-[0.3em] mt-1.5 hidden sm:block" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                   X-NAV Analytics &nbsp;·&nbsp; xG Suppression &nbsp;·&nbsp; GM Logic Engine &nbsp;·&nbsp; Live Statistics
                 </div>
                 <div className="mt-2 flex items-center justify-center gap-4">
@@ -1022,7 +1071,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
           <div className="text-center pt-4" style={{ borderTop: '1px solid #b8a070' }}>
             <p className="text-[9px] uppercase tracking-[0.4em]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
-              Data: NHL API · MoneyPuck · CapWages &nbsp;·&nbsp; Models: X-NAV 1.0 · G-NAV · NOIV · STRAND™ &nbsp;·&nbsp; AI: Claude Sonnet
+              Data: NHL API · MoneyPuck · CapWages &nbsp;·&nbsp; Models: X-NAV 7.3 · G-NAV · NOIV · STRAND™ &nbsp;·&nbsp; AI: Claude Sonnet
             </p>
             <p className="text-[8px] mt-1" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
               All valuations are analytical estimates, not financial advice. Player values fluctuate with injury, performance, and market conditions.
@@ -2335,7 +2384,7 @@ function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestCla
         <div className="text-[10px] text-zinc-500 font-bold">{verdict.message}</div>
         <div className="flex gap-1.5 mt-2 flex-wrap">
           {hardCount > 0 && <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-red-900/50 text-red-300 border border-red-800/50">{hardCount} HARD BLOCK{hardCount > 1 ? "S" : ""}</span>}
-          {softCount > 0 && <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-orange-900/50 text-orange-300 border border-orange-800/50">{softCount} GM CONCERN{softCount > 1 ? "S" : ""}</span>}
+          {softCount > 0 && <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-orange-900/50 text-orange-300 border border-orange-800/50">{softCount} GM VETO{softCount > 1 ? "S" : ""}</span>}
           {warnCount > 0 && <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-300 border border-amber-800/40">{warnCount} WARNING{warnCount > 1 ? "S" : ""}</span>}
         </div>
       </div>
@@ -2567,7 +2616,7 @@ function LoadingScreen() {
         Syncing NHL Data Core
       </div>
       <div className="text-[9px] text-zinc-800 font-black uppercase tracking-widest">
-        MoneyPuck · NHL API · X-NAV 1.0
+        MoneyPuck · NHL API · X-NAV 7.0
       </div>
     </div>
   );
