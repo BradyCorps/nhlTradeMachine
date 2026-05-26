@@ -106,13 +106,16 @@ export default function TradeMachine() {
   const [error, setError] = useState<string | null>(null);
   const [db, setDb] = useState<{ teams: Team[]; players: Asset[] }>({ teams: [], players: [] });
   const [originalDb, setOriginalDb] = useState<{ teams: Team[]; players: Asset[] } | null>(null);
-  // ^^^ always initialized with empty arrays so .filter() never throws before fetch completes
   const [teams, setTeams] = useState<[Team | null, Team | null]>([null, null]);
   const [blocks, setBlocks] = useState<[Asset[], Asset[]]>([[], []]);
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [evaluated, setEvaluated] = useState(false);
   const [expandedFlag,   setExpandedFlag]   = useState<number | null>(null);
   const [tradeRequest,   setTradeRequest]   = useState<Asset[] | null>(null);
+
+  // ── Team lock state ───────────────────────────────────────────
+  const [homeTeamLocked, setHomeTeamLocked] = useState(false);
+  const [showTeamSelect, setShowTeamSelect] = useState(false);
 
   // ── Persistent trade simulation state ────────────────────────
   const [executedTrades, setExecutedTrades] = useState<{
@@ -206,9 +209,10 @@ export default function TradeMachine() {
         }
         setDb(data);
         setOriginalDb(data);
-        const edm = data.teams.find((t: Team) => t.id === "EDM") ?? data.teams[0] ?? null;
+        // Don't auto-select teams — show the franchise selection modal
         const wpg = data.teams.find((t: Team) => t.id === "WPG") ?? data.teams[1] ?? null;
-        setTeams([edm, wpg]);
+        setTeams([null, wpg]);
+        setShowTeamSelect(true);
         setBooting(false);
       })
       .catch((e) => {
@@ -291,6 +295,8 @@ export default function TradeMachine() {
       setShowSimPanel(false);
       setBlocks([[], []]);
       setVerdict(null);
+      setHomeTeamLocked(false);
+      setShowTeamSelect(true);
     }
   }, [originalDb]);
 
@@ -644,6 +650,137 @@ RULES: No invented context. No speculation about players not in this trade. Comp
           }}
         />
       )}
+      {/* ── Team Selection Modal ─────────────────────────────────── */}
+      {showTeamSelect && db.teams.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(28,20,10,0.88)', backdropFilter: 'blur(4px)' }}>
+          <div className="relative w-full max-w-lg"
+            style={{ background: '#f0e6cc', borderRadius: '2px', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}>
+
+            {/* Header rule */}
+            <div style={{ borderTop: '4px double #1c140a', borderBottom: '1px solid #b8a070', padding: '20px 28px 14px' }}>
+              <div className="text-center">
+                <div className="text-[8px] uppercase tracking-[0.5em] mb-2" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                  The Hockey Ledger · GM Challenge
+                </div>
+                <h2 className="font-black" style={{ fontFamily: "'Libre Baskerville', serif", fontSize: '1.6rem', color: '#1c140a', lineHeight: 1.1 }}>
+                  Think you can do better<br/>than your GM?
+                </h2>
+                <p className="mt-3 text-[11px] leading-relaxed" style={{ color: '#6b5030', fontFamily: "'Libre Baskerville', serif", fontStyle: 'italic' }}>
+                  Pick your franchise. Make your moves. Sim a year and find out if you had what it takes — or if your GM was right all along.
+                </p>
+              </div>
+            </div>
+
+            {/* Team grid */}
+            <div style={{ padding: '16px 28px 20px' }}>
+              <div className="text-[8px] font-black uppercase tracking-[0.3em] mb-3" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                Select Your Franchise
+              </div>
+              <div className="grid grid-cols-4 gap-1.5 mb-4" style={{ maxHeight: '260px', overflowY: 'auto' }}>
+                {db.teams
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map(t => {
+                    const isSelected = teams[0]?.id === t.id;
+                    const phase = t.phase ?? "";
+                    const phaseColor =
+                      phase === "Contender"  ? '#1a5c2e' :
+                      phase === "Bubble"     ? '#1a2e5c' :
+                      phase === "Retooling"  ? '#8a5c00' :
+                      phase === "Rebuilding" ? '#b83020' :
+                      '#6b5030';
+                    const cityName = t.name.split(' ').slice(0, -1).join(' ');
+                    const teamName = t.name.split(' ').slice(-1)[0];
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          setTeams(prev => {
+                            const partner = prev[1]?.id === t.id
+                              ? db.teams.find(x => x.id !== t.id) ?? null
+                              : prev[1];
+                            return [t, partner];
+                          });
+                          setBlocks([[], []]);
+                        }}
+                        className="p-2 text-left transition-all"
+                        style={{
+                          background: isSelected ? '#1c140a' : '#e4d8b8',
+                          border: `1px solid ${isSelected ? '#1c140a' : '#c8b890'}`,
+                          borderRadius: '2px',
+                        }}
+                      >
+                        <div className="text-[10px] font-black" style={{
+                          color: isSelected ? '#f0e6cc' : '#1c140a',
+                          fontFamily: "'Courier Prime', monospace",
+                          lineHeight: 1.1,
+                        }}>
+                          {t.id}
+                        </div>
+                        <div className="text-[7px] font-black leading-tight mt-0.5" style={{
+                          color: isSelected ? '#c8b890' : '#4a3820',
+                          fontFamily: "'Libre Baskerville', serif",
+                        }}>
+                          {teamName}
+                        </div>
+                        <div className="text-[6px] mt-0.5 font-black uppercase tracking-wide" style={{
+                          color: isSelected ? '#9a7d58' : phaseColor,
+                          fontFamily: "'Courier Prime', monospace",
+                        }}>
+                          {phase}
+                        </div>
+                      </button>
+                    );
+                  })}
+              </div>
+
+              {/* Selected team summary */}
+              {teams[0] && (
+                <div className="mb-4 p-3" style={{ background: '#e4d8b8', border: '1px solid #b8a070' }}>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="font-black text-[14px]" style={{ color: '#1c140a', fontFamily: "'Libre Baskerville', serif" }}>
+                        {teams[0].name}
+                      </div>
+                      <div className="text-[8px] mt-0.5" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                        #{teams[0].standing}/32 · {teams[0].phase} · ${teams[0].capSpace.toFixed(1)}M cap space
+                      </div>
+                    </div>
+                    <div className="text-[9px] font-black px-2 py-1" style={{
+                      color: '#b83020', border: '1px solid rgba(184,48,32,0.4)',
+                      fontFamily: "'Courier Prime', monospace",
+                    }}>
+                      YOUR FRANCHISE
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <button
+                disabled={!teams[0]}
+                onClick={() => {
+                  setHomeTeamLocked(true); // lock immediately on confirm
+                  setShowTeamSelect(false);
+                }}
+                className="w-full py-3.5 font-black uppercase tracking-widest text-[11px] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                style={{
+                  background: teams[0] ? '#1c140a' : '#c8b890',
+                  color: '#f0e6cc',
+                  fontFamily: "'Courier Prime', monospace",
+                  borderRadius: '2px',
+                }}
+              >
+                {teams[0] ? `✦ Take Control of the ${teams[0].name} ✦` : 'Select a team to begin'}
+              </button>
+
+              <p className="text-center mt-2 text-[8px]" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
+                Your franchise locks in when you confirm. Reset via Void All Trades.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Front Office Memo Modal ───────────────────────────── */}
       {showMemo && verdict?.claudeAnalysis && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6"
@@ -810,6 +947,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
           <TradePanel idx={0} team={teams[0]} nav={navA} capSpace={capA} db={db} blocks={blocks}
             setTeams={setTeams} setBlocks={setBlocks} label="Your Franchise" accent="HOME"
             navMap={navMap}
+            locked={homeTeamLocked}
             onRequestTrade={(a) => setTradeRequest([a])}
             onRequestBlockTrade={(block) => setTradeRequest(block)} />
 
@@ -832,9 +970,27 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             </button>
 
             {verdict && (verdict.status === "FAIR" || verdict.status === "WIN") && (
-              <button onClick={executeTrade}
+              <button onClick={() => { executeTrade(); setHomeTeamLocked(true); }}
                 className="w-full py-3 font-black uppercase tracking-widest text-[11px] transition-all duration-200 active:scale-[0.97] btn-green-ink">
                 ✓ Execute Trade — File It
+              </button>
+            )}
+
+            {/* My Team, My Call — for any trade where home team is losing NAV
+                (LOSS, DECLINED, or BLOCKED) but NOT when player hard-refuses NMC */}
+            {verdict && (verdict.status === "DECLINED" || verdict.status === "BLOCKED" || verdict.status === "LOSS")
+              && verdict.metrics.homeNetGain < 0
+              && !verdict.flags.some(f => f.category === "CLAUSE" && f.severity === "HARD") && (
+              <button onClick={() => { executeTrade(); setHomeTeamLocked(true); }}
+                className="w-full py-2.5 font-black uppercase tracking-widest text-[10px] transition-all duration-200 active:scale-[0.97]"
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #b83020',
+                  color: '#b83020',
+                  fontFamily: "'Courier Prime', monospace",
+                }}
+                title="You're giving up value — but it's your team, your call. This trade will be locked in.">
+                ⚠ My Team, My Call
               </button>
             )}
 
@@ -1100,7 +1256,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 // TRADE PANEL
 // ============================================================
 function TradePanel({
-  idx, team, nav, capSpace, db, blocks, setTeams, setBlocks, label, accent, navMap, onRequestTrade, onRequestBlockTrade
+  idx, team, nav, capSpace, db, blocks, setTeams, setBlocks, label, accent, navMap, locked, onRequestTrade, onRequestBlockTrade
 }: {
   idx: 0 | 1;
   team: Team | null;
@@ -1113,6 +1269,7 @@ function TradePanel({
   label: string;
   accent: string;
   navMap: Record<string, XNAVResult>;
+  locked?: boolean;
   onRequestTrade?: (a: Asset) => void;
   onRequestBlockTrade?: (block: Asset[]) => void;
 }) {
@@ -1139,6 +1296,17 @@ function TradePanel({
           {label}
         </div>
         <div className="flex justify-between items-end gap-3">
+          {locked && idx === 0 ? (
+            <div className="flex items-center gap-2 flex-1">
+              <span className="font-black text-[15px]" style={{ color: '#1c140a', fontFamily: "'Libre Baskerville', serif" }}>
+                {team?.name}
+              </span>
+              <span className="text-[7px] font-black px-1.5 py-0.5" style={{
+                color: '#b83020', border: '1px solid rgba(184,48,32,0.4)',
+                fontFamily: "'Courier Prime', monospace",
+              }}>LOCKED</span>
+            </div>
+          ) : (
           <LedgerDropdown
             teams={db.teams}
             selectedId={team?.id ?? ""}
@@ -1148,6 +1316,7 @@ function TradePanel({
               setBlocks((prev) => { const n = [...prev] as [Asset[], Asset[]]; n[idx] = []; return n; });
             }}
           />
+          )}
 
           <div className="text-right shrink-0 ml-3">
             <div className="font-black leading-none" style={{ fontSize: '1.4rem', color: '#1c140a', fontFamily: "'Courier Prime', monospace", fontStyle: 'italic' }}>

@@ -1042,36 +1042,38 @@ const runGmLogic = (
 
   const nmcOut = outPlayers.find((a) => a.hasNMC);
   if (nmcOut) {
-    const prob    = waiverProbability(nmcOut, teamPartner);
-    const pctStr  = `${Math.round(prob * 100)}%`;
-    const likelyWaives = prob >= 0.60;
+    const prob         = waiverProbability(nmcOut, teamPartner);
+    const pctStr       = `${Math.round(prob * 100)}%`;
+    // Above 50%: player likely waives — downgrade to WARN, trade can proceed
+    // Below 50%: player likely refuses — HARD block, cannot be overridden
+    const likelyWaives = prob >= 0.50;
     flags.push({
       severity: likelyWaives ? "WARN" : "HARD",
       category: "CLAUSE",
       headline: likelyWaives
-        ? `NMC — ${nmcOut.name} (~${pctStr} waiver probability)`
-        : `NMC — ${nmcOut.name} unlikely to waive (${pctStr})`,
+        ? `NMC — ${nmcOut.name} likely to waive (~${pctStr})`
+        : `NMC — ${nmcOut.name} will not waive (${pctStr})`,
       explanation: likelyWaives
-        ? `${nmcOut.name} holds a Full No-Movement Clause but ${teamHome.name} needs his written consent to proceed. At age ${nmcOut.age} heading to a ${teamPartner?.phase ?? "unknown"} team, the analytics suggest a ~${pctStr} probability he waives. ${nmcOut.age >= 32 ? "Veterans in the late stages of their career often waive for a legitimate Cup contender." : "The destination is attractive but not guaranteed to get his approval."} This isn't a hard block — it's a negotiation that needs to happen before the deal is finalised.`
-        : `${nmcOut.name} holds a Full No-Movement Clause and the destination makes this a difficult ask. At age ${nmcOut.age} heading to a ${teamPartner?.phase ?? "unknown"} team, the waiver probability is only ~${pctStr}. Under the CBA, ${teamHome.name} cannot trade him without his written consent — and based on the destination, there is a real risk he exercises his veto. This deal cannot proceed without a direct conversation with the player.`,
+        ? `${nmcOut.name} holds a Full No-Movement Clause but the destination makes this workable. At age ${nmcOut.age} heading to a ${teamPartner?.phase ?? "unknown"} team, the model puts waiver probability at ~${pctStr}. ${nmcOut.age >= 32 ? "Veterans in the late stages of their career often waive for a legitimate Cup contender." : "The destination is attractive enough that he will likely consent."} Needs a direct conversation with the player but this deal can move forward.`
+        : `${nmcOut.name} holds a Full No-Movement Clause and this destination gives him every reason to exercise it. At age ${nmcOut.age} heading to a ${teamPartner?.phase ?? "unknown"} team, the waiver probability is only ~${pctStr}. Under the CBA, ${teamHome.name} cannot trade him without his written consent — and he won't give it. This trade is dead until the destination changes.`,
       affectedAsset: nmcOut.name, vetoesSide: 0,
     });
   }
 
   const nmcIn = inPlayers.find((a) => a.hasNMC);
   if (nmcIn) {
-    const prob    = waiverProbability(nmcIn, teamHome);
-    const pctStr  = `${Math.round(prob * 100)}%`;
-    const likelyWaives = prob >= 0.60;
+    const prob         = waiverProbability(nmcIn, teamHome);
+    const pctStr       = `${Math.round(prob * 100)}%`;
+    const likelyWaives = prob >= 0.50;
     flags.push({
       severity: likelyWaives ? "WARN" : "HARD",
       category: "CLAUSE",
       headline: likelyWaives
-        ? `NMC — ${nmcIn.name} (~${pctStr} waiver probability)`
-        : `NMC — ${nmcIn.name} unlikely to waive (${pctStr})`,
+        ? `NMC — ${nmcIn.name} likely to waive (~${pctStr})`
+        : `NMC — ${nmcIn.name} will not waive (${pctStr})`,
       explanation: likelyWaives
         ? `${nmcIn.name} holds a Full No-Movement Clause requiring his consent to be traded. Going to ${teamHome.name} (${teamHome.phase ?? "unknown"}), the model puts waiver probability at ~${pctStr}. ${nmcIn.age >= 32 ? "At this stage of his career, a move to a winning situation likely appeals." : "The destination is competitive enough that he may agree."} Still requires direct player approval before the deal is official.`
-        : `${nmcIn.name} holds a Full No-Movement Clause. Moving to ${teamHome.name} (${teamHome.phase ?? "unknown"}), the waiver probability is only ~${pctStr}. ${teamPartner.name} cannot trade him without his consent — and this destination doesn't obviously appeal to him. The deal is effectively blocked until player buy-in is confirmed.`,
+        : `${nmcIn.name} holds a Full No-Movement Clause and moving to ${teamHome.name} (${teamHome.phase ?? "unknown"}) doesn't appeal to him. Waiver probability is only ~${pctStr}. ${teamPartner.name} cannot trade him without his consent — and this destination doesn't obviously get it. This trade cannot proceed as structured.`,
       affectedAsset: nmcIn.name, vetoesSide: 1,
     });
   }
@@ -1794,7 +1796,7 @@ const evaluateTrade = (
   const vetoCategories = new Set([
     "POSITIONAL_REDUNDANCY",  // team can't absorb positional loss
     "TIMELINE_MISMATCH",      // rebuilder getting old vet / contender getting prospect
-    "NMC_BLOCK",              // player has no-movement clause
+    "CLAUSE",                 // player NMC — hard block when waiver prob < 50%
     "ASSET_SHAPE_MISMATCH",   // team needs picks not vets, or D corps gutted
     "ELITE_BLOCKADE",         // trading away the only franchise player
     "REBUILD_LOGIC",          // rebuild-specific logic violations
