@@ -229,20 +229,32 @@ export default function TradeMachine() {
     const inIds  = new Set(blocks[1].map(a => a.id));
 
     setDb(prev => {
-      // First update player teamIds
+      // Update player teamIds
       const updatedPlayers = prev.players.map(p => {
         if (outIds.has(p.id)) return { ...p, teamId: teams[1]!.id };
         if (inIds.has(p.id))  return { ...p, teamId: teams[0]!.id };
         return p;
       });
 
-      // Recalculate cap space for ALL teams based on actual roster
-      // Cap space = ceiling - sum of all active (non-pick) player cap hits
+      // Recalculate cap space using DELTA only — not a full rebuild from ceiling.
+      // The API cap space already accounts for LTIR, retained salaries, bonuses etc.
+      // Rebuilding from CAP_CEILING - rosterCap ignores all of that complexity.
+      // Delta approach: add outgoing cap hits back, subtract incoming cap hits.
+      const outCapHome = blocks[0]
+        .filter(a => a.position !== "Pick")
+        .reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0);
+      const inCapHome = blocks[1]
+        .filter(a => a.position !== "Pick")
+        .reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0);
+
       const updatedTeams = prev.teams.map(team => {
-        const rosterCap = updatedPlayers
-          .filter(p => p.teamId === team.id && p.position !== "Pick")
-          .reduce((sum, p) => sum + (p.capHit ?? 0), 0);
-        return { ...team, capSpace: Math.round((CAP_CEILING - rosterCap) * 10) / 10 };
+        if (team.id === teams[0]!.id) {
+          return { ...team, capSpace: Math.round((team.capSpace + outCapHome - inCapHome) * 10) / 10 };
+        }
+        if (team.id === teams[1]!.id) {
+          return { ...team, capSpace: Math.round((team.capSpace + inCapHome - outCapHome) * 10) / 10 };
+        }
+        return team;
       });
 
       return { players: updatedPlayers, teams: updatedTeams };

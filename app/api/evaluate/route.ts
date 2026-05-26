@@ -285,93 +285,61 @@ const getXNAV = (asset: Asset): XNAVResult => {
     // Year decay — future picks worth less (uncertainty compounds)
     const yearDecay = Math.pow(0.88, year - 2026);
 
-    // ── Standing → expected draft slot with lottery math ────────
-    // Non-playoff teams (17-32) enter the lottery for top-16 slots.
-    // Playoff teams (1-16) pick 17-32, no lottery.
-    let expectedSlot: number;
-    if (standing >= 17) {
-      // Lottery odds table — expected slot accounts for probability
-      // of jumping up, not just raw finishing position
-      const rank = 33 - standing; // rank 1 = worst team, rank 16 = best lottery team
-      const slotMap: Record<number, number> = {
-        1: 2.8,   // ~18.5% at #1, expected ~3rd after lottery math
-        2: 3.8,
-        3: 4.5,
-        4: 5.2,
-        5: 6.1,
-        6: 7.0,
-        7: 8.0,
-        8: 9.2,
-        9: 10.4,
-        10: 11.5,
-        11: 12.5,
-        12: 13.4,
-        13: 14.2,
-        14: 14.8,
-        15: 15.4,
-        16: 15.9,
-      };
-      expectedSlot = slotMap[rank] ?? rank;
-    } else {
-      // Playoff teams: standing 1 → pick 32, standing 16 → pick 17
-      expectedSlot = 33 - standing;
-    }
-
-    const pickSlot = Math.round(clamp(expectedSlot, 1, 32));
-
-    // ── Pick value curve — calibrated to real trade market ────────
-    // Based on observed NHL trade market values, not just prospect grades:
-    // - Top-3 picks (tanking teams): near-untradable, franchise-altering
-    // - Picks 4-10: significant roster pieces
-    // - Picks 11-20: solid contributors
-    // - Picks 21-32: depth/role player ceiling
+    // ── Standing → pick value ─────────────────────────────────────
+    // Key insight: teams trade picks based on UPSIDE potential, not
+    // lottery-adjusted expected value. A last-place team's first is
+    // priced as "probably top-3, possibly #1" — not "expected pick 2.8".
+    // We use raw standing tiers to reflect real trade market behavior.
     //
-    // Key calibration points from real trades:
-    // - Bedard/Schaefer/McKenna tier (#1): ~380-420 NAV
-    // - Top-5 pick: ~240-280 NAV (Werenski, Celebrini tier)
-    // - Top-10 pick: ~160-200 NAV (solid top-6/top-4 ceiling)
-    // - Top-15: ~100-140 NAV (NHLer with upside)
-    // - Pick 20-25: ~55-80 NAV (depth piece / roster filler)
-    // - Pick 26-32: ~30-45 NAV (late 1st, similar to 2nd)
-    //
-    // This makes a Vancouver/Chicago tanking-team 1st genuinely
-    // untradable unless the return is a legitimate star.
-    // A Carolina/Boston contender 1st is worth a mid-range player.
+    // Non-playoff teams (17-32) — lottery eligible:
+    //   Worst 4 teams: near-untradable, franchise-altering upside
+    //   Teams 5-8 from bottom: still top-10 likely
+    //   Teams 9-16 from bottom: mid-lottery range
+    // Playoff teams (1-16): known position, no lottery upside
 
     let baseValue: number;
 
     if (round === 1) {
-      if      (pickSlot <= 1)  baseValue = 400;  // Franchise cornerstone (#1 overall)
-      else if (pickSlot <= 2)  baseValue = 340;  // Clear #2 overall
-      else if (pickSlot <= 3)  baseValue = 290;  // Top-3 still franchise-altering
-      else if (pickSlot <= 5)  baseValue = 240;  // High lottery
-      else if (pickSlot <= 8)  baseValue = 190;  // Mid-lottery
-      else if (pickSlot <= 10) baseValue = 160;  // Bottom lottery / early non-lottery
-      else if (pickSlot <= 12) baseValue = 130;
-      else if (pickSlot <= 15) baseValue = 105;
-      else if (pickSlot <= 18) baseValue = 82;
-      else if (pickSlot <= 21) baseValue = 65;
-      else if (pickSlot <= 24) baseValue = 52;
-      else if (pickSlot <= 27) baseValue = 42;
-      else                     baseValue = 32;   // Late 1st (contender pick, pick 28-32)
+      if (standing >= 30) {
+        // Bottom 3 teams — top-3 pick almost certain, #1 realistic
+        baseValue = standing === 32 ? 400 : standing === 31 ? 370 : 340;
+      } else if (standing >= 27) {
+        // Bottom 4-6 — top-5 likely
+        baseValue = standing === 29 ? 290 : standing === 28 ? 260 : 235;
+      } else if (standing >= 23) {
+        // Bottom 7-10 — top-10 range
+        baseValue = 190 - (30 - standing) * 8;
+      } else if (standing >= 17) {
+        // Bottom half of lottery — picks 11-16 range
+        baseValue = 130 - (23 - standing) * 7;
+      } else {
+        // Playoff teams — known position, no lottery upside
+        // Standing 1 (best) → ~pick 32, standing 16 → ~pick 17
+        const slot = 33 - standing;
+        if      (slot <= 17) baseValue = 82;
+        else if (slot <= 20) baseValue = 65;
+        else if (slot <= 24) baseValue = 52;
+        else if (slot <= 27) baseValue = 42;
+        else                 baseValue = 32;
+      }
     } else if (round === 2) {
       // 2nd round: top of class ~30 NAV, mid ~15, late ~8
-      // Follows own independent curve — NOT continuation of 1st round
-      if      (pickSlot <= 5)  baseValue = 28;
-      else if (pickSlot <= 10) baseValue = 20;
-      else if (pickSlot <= 16) baseValue = 14;
-      else if (pickSlot <= 24) baseValue = 10;
-      else                     baseValue = 7;
+      const slot = standing >= 17 ? Math.round((33 - standing) * 0.9) : 33 - standing;
+      if      (slot <= 5)  baseValue = 28;
+      else if (slot <= 10) baseValue = 20;
+      else if (slot <= 16) baseValue = 14;
+      else if (slot <= 24) baseValue = 10;
+      else                 baseValue = 7;
     } else if (round === 3) {
-      baseValue = pickSlot <= 10 ? 5 : 3;
+      baseValue = standing >= 25 ? 5 : 3;
     } else {
-      baseValue = 2; // 4th+ rounds: almost no tradeable value
+      baseValue = 2;
     }
 
     const pickTotal = Math.max(round === 1 ? 5 : 1, baseValue * yearDecay);
 
-    // Upside fraction is higher for earlier picks — more variance in outcomes
-    const upsideFraction = pickSlot <= 5 ? 0.55 : pickSlot <= 15 ? 0.45 : 0.30;
+    // Upside fraction higher for top picks — more variance in outcomes
+    const upsideFraction = standing >= 27 ? 0.55 : standing >= 20 ? 0.45 : 0.30;
 
     return {
       total:  Math.round(pickTotal),
