@@ -1788,8 +1788,8 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
             </g>;
           })}
 
-          <text x={6} y={cy-30} fontSize="7" fill={offColor} fontFamily="Courier Prime, monospace" fontWeight="bold">OFFENSE</text>
-          <text x={6} y={cy+40} fontSize="7" fill={defColor} fontFamily="Courier Prime, monospace" fontWeight="bold">DEFENSE</text>
+          <text x={6} y={cy-2} fontSize="7" fill={offColor} fontFamily="Courier Prime, monospace" fontWeight="bold">OFFENSE</text>
+          <text x={6} y={cy+6} fontSize="7" fill={defColor} fontFamily="Courier Prime, monospace" fontWeight="bold">DEFENSE</text>
 
           {secondary && (
             <g>
@@ -2192,8 +2192,8 @@ function TeamDNA({
                     <text x="38" y="16" fontSize="9" fill="var(--blue)" fontFamily="Courier Prime, monospace" fontWeight="bold">OFFENSE</text>
                     <line x1="14" y1="27" x2="34" y2="27" stroke="var(--red)" strokeWidth="2.5"/>
                     <text x="38" y="31" fontSize="9" fill="var(--red)" fontFamily="Courier Prime, monospace" fontWeight="bold">DEFENSE</text>
-                    <line x1="14" y1="42" x2="34" y2="42" stroke="var(--rule)" strokeWidth="2" strokeDasharray="5,3"/>
-                    <text x="38" y="46" fontSize="9" fill="var(--rule)" fontFamily="Courier Prime, monospace">CHAMP. TEMPLATE</text>
+                    <line x1="14" y1="118" x2="34" y2="118" stroke="var(--rule)" strokeWidth="2" strokeDasharray="5,3"/>
+                    <text x="38" y="120" fontSize="9" fill="var(--rule)" fontFamily="Courier Prime, monospace">CHAMP. TEMPLATE</text>
                   </svg>
                 </div>
               );
