@@ -1017,7 +1017,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
           <div className="text-center pt-4" style={{ borderTop: '1px solid #b8a070' }}>
             <p className="text-[9px] uppercase tracking-[0.4em]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
-              Data: NHL API · MoneyPuck · CapWages &nbsp;·&nbsp; Models: X-NAV 7.3 · G-NAV · NOIV · STRAND™ &nbsp;·&nbsp; AI: Claude Sonnet
+              Data: NHL API · MoneyPuck · CapWages &nbsp;·&nbsp; Models: X-NAV 1.0 · G-NAV · NOIV · STRAND™ &nbsp;·&nbsp; AI: Claude Sonnet
             </p>
             <p className="text-[8px] mt-1" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
               All valuations are analytical estimates, not financial advice. Player values fluctuate with injury, performance, and market conditions.
@@ -2562,7 +2562,7 @@ function LoadingScreen() {
         Syncing NHL Data Core
       </div>
       <div className="text-[9px] text-zinc-800 font-black uppercase tracking-widest">
-        MoneyPuck · NHL API · X-NAV 7.0
+        MoneyPuck · NHL API · X-NAV 1.0
       </div>
     </div>
   );
