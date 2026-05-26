@@ -72,7 +72,9 @@ const PHASE_OVERRIDES: Record<string, string> = {
 
 // ── Contract overrides — manual corrections for known data errors ──
 const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: number }> = {
-  "Alexander Ovechkin": { yearsRemaining: 1 },  // 2025-26 is final season, all-time goals record broken
+  "Alexander Ovechkin": { yearsRemaining: 1 },
+  // Bundled JSON corrections — cap hit or years that have changed since bundle was generated
+  "Dylan DeMelo":       { capHit: 4.9, yearsRemaining: 2 },  // PuckPedia: $4.9M x 4yr, Year 2 of 4
 };
 
 async function loadTeams(): Promise<any[]> {
@@ -189,10 +191,19 @@ async function loadTeams(): Promise<any[]> {
 //   [2]  teamId
 //   [3]  position
 //   [8]  age
-//   [15] yearsRemaining
+    // CapWages array key indices (verified 2025-26):
+    //   [0]  player name (LastName, FirstName)
+    //   [2]  team abbreviation
+    //   [3]  position code
+    //   [8]  current age
+    //   [15] total contract length in years
+    //   [18] AAV cap hit (in $100k units — divide by 10 for millions)
+    //   [24] expiry status (UFA/RFA)
+    //   [28] age at signing (primary) — but swapped with [29] for some players
+    //   [29] age at signing (secondary) — take max(p[28], p[29]) for reliability
 //   [18] capHit (raw number, divide by 10 to get $M — e.g. 85 = $8.5M)
 //   [24] expiryStatus ("UFA" | "RFA" | ...)
-//   [29] ageAtExpiry
+//   [29] age at signing
 
 // loadBundled uses dynamic require — no path constant needed
 
@@ -226,29 +237,36 @@ async function scrapeCapWages(): Promise<Record<string, any>> {
     const contracts: Record<string, any> = {};
 
     for (const p of players) {
-      if (!Array.isArray(p) || p.length < 25) continue;
+      if (!Array.isArray(p) || p.length < 30) continue;
 
-      const rawName        = p[0] as string;
-      const yearsRemaining = p[15] as number;
-      const capRaw         = p[18] as number;
-      const expiryStatus   = p[24] as string;
-      const teamSlug       = (p[2] as string ?? "").toLowerCase().replace(/\s+/g, "_");
-      const position       = (p[3] as string ?? "").toUpperCase();
+      const rawName      = p[0]  as string;
+      const capRaw       = p[18] as number;
+      const expiryStatus = p[24] as string;
+      const teamSlug     = (p[2] as string ?? "").toLowerCase().replace(/\s+/g, "_");
+      const position     = (p[3] as string ?? "").toUpperCase();
+      const ageNow      = p[8]  as number;
+      const totalLength = p[15] as number;
 
       if (!rawName || !capRaw || capRaw <= 0) continue;
 
       const name   = normaliseName(rawName);
       const capHit = Math.round((capRaw / 10) * 1000) / 1000;
 
-      // ── Sanity check — CapWages array index shift detection ──
-      // If the array indices shift due to a schema change, cap hits become
-      // wildly wrong. Discard any contract outside realistic NHL bounds.
-      const CAP_MIN = 0.70;   // minimum NHL contract (close to league minimum)
-      const CAP_MAX = 18.0;   // no player earns above this in modern NHL
-      if (capHit < CAP_MIN || capHit > CAP_MAX) {
-        console.warn(`[CapWages] Sanity check failed for ${name}: capHit=${capHit} — skipping`);
-        continue;
-      }
+      // ── Sanity check ──────────────────────────────────────────
+      const CAP_MIN = 0.70;
+      const CAP_MAX = 18.0;
+      if (capHit < CAP_MIN || capHit > CAP_MAX) continue;
+
+      // ── Correct years remaining formula ──────────────────────
+      // p[28] and p[29] both encode "age at signing" but CapWages
+      // inconsistently swaps them between players — DeMelo has them
+      // reversed vs McDavid/Parayko/Morrissey. max() reliably
+      // identifies the correct signing age in all observed cases.
+      // Verified against PuckPedia for Parayko, Hellebuyck, McDavid,
+      // Morrissey, DeMelo — all correct.
+      const ageSigned      = Math.max((p[28] as number) || 0, (p[29] as number) || 0);
+      const yearsServed    = (ageNow && ageSigned) ? Math.max(0, ageNow - ageSigned) : 0;
+      const yearsRemaining = totalLength > 0 ? Math.max(1, totalLength - yearsServed) : 1;
 
       const contractData = {
         capHit,
@@ -270,42 +288,67 @@ async function scrapeCapWages(): Promise<Record<string, any>> {
 }
 
 async function loadContracts(): Promise<Record<string, any>> {
-  // 1. Check in-memory cache
   if (global.__contractsCache && Date.now() - global.__contractsCache.ts < CONTRACTS_CACHE_TTL) {
     if (Object.keys(global.__contractsCache.data).length > 200) return global.__contractsCache.data;
   }
 
-  // 2. Scrape fresh from CapWages
-  const fresh = await scrapeCapWages();
+  const bundled = loadBundled();
+  const fresh   = await scrapeCapWages();
+  const merged: Record<string, any> = {};
+
   if (Object.keys(fresh).length > 200) {
-    const bundled = loadBundled();
-    const merged: Record<string, any> = {};
+    // Live CapWages data available — use fresh cap hits, bundled for years/NMC/NTC
     for (const [name, cw] of Object.entries(fresh)) {
-      const b = bundled[name];
-      merged[name] = {
+      // Strip any __position or __teamSlug suffix to get the base name
+      const baseName = name.includes("__") ? name.split("__")[0] : name;
+      const b = bundled[baseName];
+      const entry = {
         capHit:         cw.capHit,
-        yearsRemaining: cw.yearsRemaining,
+        yearsRemaining: b?.yearsRemaining ?? cw.yearsRemaining,
         hasNMC:         b?.hasNMC  ?? false,
         hasNTC:         b?.hasNTC  ?? false,
         canRetain:      b?.hasNMC  ? false : true,
         expiryStatus:   cw.expiryStatus,
       };
+      merged[name] = entry;
     }
-    // Store in-memory — no filesystem needed
-    global.__contractsCache = { data: merged, ts: Date.now() };
-    return merged;
+  } else {
+    // CapWages unavailable — use bundled entirely but ensure all fields present
+    for (const [name, b] of Object.entries(bundled)) {
+      merged[name] = {
+        capHit:         b.capHit,
+        yearsRemaining: b.yearsRemaining ?? 1,
+        hasNMC:         b.hasNMC  ?? false,
+        hasNTC:         b.hasNTC  ?? false,
+        canRetain:      b.hasNMC  ? false : true,
+        expiryStatus:   b.expiryStatus ?? "UFA",
+      };
+    }
   }
 
-  // 3. Fall back to bundled JSON
-  return loadBundled();
+  // Apply manual overrides last — corrects known stale bundled data
+  for (const [name, override] of Object.entries(CONTRACT_OVERRIDES)) {
+    if (merged[name]) {
+      if (override.capHit        !== undefined) merged[name].capHit        = override.capHit;
+      if (override.yearsRemaining !== undefined) merged[name].yearsRemaining = override.yearsRemaining;
+    }
+  }
+
+  if (Object.keys(merged).length > 200) {
+    global.__contractsCache = { data: merged, ts: Date.now() };
+  }
+  return merged;
 }
 
 function loadBundled(): Record<string, any> {
   try {
-    // Dynamic require works in Next.js API routes — reads from app/data at build time
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require("@/app/data/contracts.bundled.json");
-  } catch (_) {}
+    const fs   = require("fs");
+    const path = require("path");
+    const file = path.join(process.cwd(), "app/data/contracts.bundled.json");
+    return JSON.parse(fs.readFileSync(file, "utf-8"));
+  } catch (e: any) {
+    console.error("[Bundled] FAILED:", e.message);
+  }
   return {};
 }
 
@@ -1332,7 +1375,7 @@ export async function GET() {
     capCeiling: CAP_CEILING,
     capFloor:   CAP_FLOOR,
     generatedAt: new Date().toISOString(),
-    source: "Static + NHL API enrichment",
+    source: "NHL API + CapWages + Bundled Contracts",
     liveStats:  analyticsMap.size > 0,
     debug: {
       playerCount:    players.length,
