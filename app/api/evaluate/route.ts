@@ -868,7 +868,7 @@ type FlagCategory =
   | "ELITE_BLOCKADE" | "TIMELINE_MISMATCH" | "REBUILD_LOGIC"
   | "CONTENDER_LOGIC" | "ASSET_SHAPE_MISMATCH" | "POSITIONAL_REDUNDANCY"
   | "ROSTER_HOLE" | "LEVERAGE_ASYMMETRY" | "RENTAL_TAX" | "AGE_CLIFF"
-  | "DEAD_WEIGHT" | "FIRE_SALE" | "LOCKER_ROOM" | "RETAIN_ABUSE" | "GOOD";
+  | "DEAD_WEIGHT" | "FIRE_SALE" | "LOCKER_ROOM" | "RETAIN_ABUSE" | "GOOD" | "VALUE_VETO";
 
 interface GmFlag {
   severity: FlagSeverity;
@@ -978,6 +978,53 @@ const runGmLogic = (
   const outPicks   = outgoing.filter((a) => a.position === "Pick");
   const inPicks    = incoming.filter((a) => a.position === "Pick");
 
+  // ── HARD: The "Something for Nothing" Block ──
+  // Prevents taking positive-value players while sending an empty package
+  if (incoming.length > 0 && outgoing.length === 0 && navIn > 0) {
+    flags.push({
+      severity: "HARD",
+      category: "VALUE_VETO",
+      headline: "Incomplete Trade Proposal",
+      explanation: `${teamPartner.name} is not a charity. You cannot acquire positive-value assets for nothing. You must send back a player, draft capital, or absorb a negative-value contract to make this a legal structure.`,
+      vetoesSide: 1,
+    });
+  } else if (outgoing.length > 0 && incoming.length === 0 && navOut > 0) {
+    flags.push({
+      severity: "HARD",
+      category: "VALUE_VETO",
+      headline: "Incomplete Trade Proposal",
+      explanation: `${teamHome.name} cannot give away positive-value assets for nothing. Real NHL trades require a return — even if it is just a late draft pick.`,
+      vetoesSide: 0,
+    });
+  }
+
+  // ── SOFT: Gross Underpayment (The Fleecing Veto) ──
+  // Prevents users from acquiring a +25 NAV player for a +10 NAV package
+  // Only applies when both sides are exchanging positive value
+  if (navIn > 0 && navOut > 0) {
+    // Threshold: Paying less than 45% of the value AND the raw NAV gap is greater than 10
+    const isHomeRobbing = navOut < navIn * 0.45 && (navIn - navOut) > 10;
+    const isPartnerRobbing = navIn < navOut * 0.45 && (navOut - navIn) > 10;
+
+    if (isHomeRobbing) {
+      flags.push({
+        severity: "SOFT",
+        category: "VALUE_VETO",
+        headline: `${teamPartner.name} rejects massive underpayment`,
+        explanation: `You are asking ${teamPartner.name} to give up ${navIn.toFixed(0)} NAV while only offering ${navOut.toFixed(0)} NAV in return. While GMs occasionally lose trades on paper, a value gap this extreme gets rejected immediately. The offer needs significantly more value to be taken seriously.`,
+        vetoesSide: 1,
+      });
+    } else if (isPartnerRobbing) {
+       flags.push({
+        severity: "SOFT",
+        category: "VALUE_VETO",
+        headline: `${teamHome.name} rejects massive underpayment`,
+        explanation: `${teamHome.name} is being asked to give up ${navOut.toFixed(0)} NAV while only receiving ${navIn.toFixed(0)} NAV. This is a gross underpayment and gets rejected by the front office.`,
+        vetoesSide: 0,
+      });
+    }
+  }
+
   // ── HARD: Cap ceiling — home ──
   const capDeltaHome = incoming.reduce((s,a) => s + a.capHit*(1-(a.retainedPct||0)),0)
                      - outgoing.reduce((s,a) => s + a.capHit*(1-(a.retainedPct||0)),0);
@@ -989,6 +1036,8 @@ const runGmLogic = (
     vetoesSide: 0,
   });
 
+  
+
   // ── HARD: Cap ceiling — partner ──
   const capDeltaPartner = outgoing.reduce((s,a) => s + a.capHit*(1-(a.retainedPct||0)),0)
                         - incoming.reduce((s,a) => s + a.capHit*(1-(a.retainedPct||0)),0);
@@ -999,6 +1048,8 @@ const runGmLogic = (
     explanation: `This trade puts ${teamPartner.name} $${Math.abs(projCapPartner).toFixed(2)}M over the ceiling. The deal cannot be legally submitted until ${teamPartner.name} clears space — via waivers, a compliance buyout, or restructuring another deal.`,
     vetoesSide: 1,
   });
+
+  
 
   // ── HARD: Cap floor ──
   const newCapUsedHome = 104 - projCapHome;
@@ -1800,6 +1851,7 @@ const evaluateTrade = (
     "ASSET_SHAPE_MISMATCH",   // team needs picks not vets, or D corps gutted
     "ELITE_BLOCKADE",         // trading away the only franchise player
     "REBUILD_LOGIC",          // rebuild-specific logic violations
+    "VALUE_VETO",
   ]);
   const vetoFlags = softFlags.filter(f => f.category && vetoCategories.has(f.category));
   const warnFlags = softFlags.filter(f => !f.category || !vetoCategories.has(f.category));
