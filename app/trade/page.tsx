@@ -18,8 +18,21 @@ import {
 // The real valuation data lives server-side in /api/evaluate.
 // These are purely for rendering badges in the UI.
 const PLAYER_PEDIGREE: Record<string, { peakPtsPace?: number; peakGsax?: number; careerGsax?: number; awards?: string[]; allStarYears?: number }> = {
+  // ── Elite Goalies ──
   "Connor Hellebuyck":  { peakGsax: 28.4, careerGsax: 108, awards: ["Hart","Vezina","Vezina","Vezina"], allStarYears: 5 },
   "Igor Shesterkin":    { peakGsax: 25.1, careerGsax: 72,  awards: ["Vezina","Vezina"], allStarYears: 4 },
+  "Andrei Vasilevskiy": { peakGsax: 22.1, careerGsax: 95,  awards: ["Vezina","Conn Smythe"], allStarYears: 4 },
+  "Frederik Andersen":  { peakGsax: 18.2, careerGsax: 48,  awards: [], allStarYears: 1 },
+  "Jake Oettinger":     { peakGsax: 16.4, careerGsax: 38,  awards: [], allStarYears: 1 },
+  "Juuse Saros":        { peakGsax: 19.8, careerGsax: 52,  awards: [], allStarYears: 2 },
+  "Ilya Sorokin":       { peakGsax: 21.3, careerGsax: 55,  awards: [], allStarYears: 2 },
+  "Linus Ullmark":      { peakGsax: 22.5, careerGsax: 44,  awards: ["Vezina"], allStarYears: 2 },
+  "Jeremy Swayman":     { peakGsax: 17.2, careerGsax: 32,  awards: [], allStarYears: 1 },
+  "Thatcher Demko":     { peakGsax: 18.9, careerGsax: 41,  awards: [], allStarYears: 1 },
+  "Stuart Skinner":     { peakGsax: 12.1, careerGsax: 22,  awards: [], allStarYears: 0 },
+  "Samuel Montembeault":{ peakGsax: 14.2, careerGsax: 28,  awards: [], allStarYears: 0 },
+
+  // ── Elite Forwards ──
   "Connor McDavid":     { peakPtsPace: 153, awards: ["Hart","Hart","Hart","Ted Lindsay","Ted Lindsay","Ted Lindsay","Calder"], allStarYears: 8 },
   "Leon Draisaitl":     { peakPtsPace: 128, awards: ["Hart","Ted Lindsay","Art Ross"], allStarYears: 5 },
   "Nathan MacKinnon":   { peakPtsPace: 140, awards: ["Hart","Hart","Ted Lindsay","Ted Lindsay"], allStarYears: 7 },
@@ -27,40 +40,138 @@ const PLAYER_PEDIGREE: Record<string, { peakPtsPace?: number; peakGsax?: number;
   "Auston Matthews":    { peakPtsPace: 124, awards: ["Hart","Calder","Rocket Richard","Rocket Richard","Rocket Richard"], allStarYears: 5 },
   "Sidney Crosby":      { peakPtsPace: 120, awards: ["Hart","Hart","Hart","Conn Smythe","Conn Smythe"], allStarYears: 9 },
   "Alexander Ovechkin": { peakPtsPace: 115, awards: ["Hart","Hart","Hart","Art Ross","Rocket Richard","Rocket Richard","Rocket Richard"], allStarYears: 13 },
+  "David Pastrnak":     { peakPtsPace: 118, awards: ["Rocket Richard"], allStarYears: 4 },
+  "Mikko Rantanen":     { peakPtsPace: 122, awards: ["Ted Lindsay"], allStarYears: 3 },
+  "Aleksander Barkov":  { peakPtsPace: 98,  awards: ["Selke","Selke"], allStarYears: 3 },
+  "Mitch Marner":       { peakPtsPace: 101, awards: [], allStarYears: 3 },
+  "Jonathan Huberdeau": { peakPtsPace: 115, awards: [], allStarYears: 2 },
+  "Elias Pettersson":   { peakPtsPace: 102, awards: [], allStarYears: 2 },
+  "Brady Tkachuk":      { peakPtsPace: 88,  awards: [], allStarYears: 1 },
+  "Matthew Tkachuk":    { peakPtsPace: 109, awards: ["Conn Smythe"], allStarYears: 3 },
+  "Mark Scheifele":     { peakPtsPace: 92,  awards: [], allStarYears: 2 },
+  "Kyle Connor":        { peakPtsPace: 90,  awards: [], allStarYears: 1 },
+  "Jake Guentzel":      { peakPtsPace: 84,  awards: [], allStarYears: 1 },
+  "Jason Robertson":    { peakPtsPace: 102, awards: [], allStarYears: 2 },
+  "Brock Boeser":       { peakPtsPace: 82,  awards: [], allStarYears: 1 },
+  "Jesper Bratt":       { peakPtsPace: 92,  awards: [], allStarYears: 1 },
+  "Tage Thompson":      { peakPtsPace: 103, awards: [], allStarYears: 2 },
+  "J.T. Miller":        { peakPtsPace: 99,  awards: [], allStarYears: 1 },
+  "Sebastian Aho":      { peakPtsPace: 94,  awards: [], allStarYears: 2 },
+  "Andrei Svechnikov":  { peakPtsPace: 80,  awards: [], allStarYears: 1 },
+  "Travis Konecny":     { peakPtsPace: 88,  awards: [], allStarYears: 1 },
+  "Kirill Marchenko":   { peakPtsPace: 76,  awards: [], allStarYears: 0 },
+  "Jake Zibanejad":     { peakPtsPace: 92,  awards: [], allStarYears: 2 },
+  "Mika Zibanejad":     { peakPtsPace: 92,  awards: [], allStarYears: 2 },
+  "Vincent Trocheck":   { peakPtsPace: 78,  awards: [], allStarYears: 1 },
+  "Nico Hischier":      { peakPtsPace: 82,  awards: [], allStarYears: 1 },
+  "Jack Hughes":        { peakPtsPace: 99,  awards: [], allStarYears: 2 },
+  "Trevor Zegras":      { peakPtsPace: 74,  awards: [], allStarYears: 1 },
+  "Tim Stützle":        { peakPtsPace: 88,  awards: [], allStarYears: 1 },
+  "Dylan Cozens":       { peakPtsPace: 80,  awards: [], allStarYears: 1 },
+  "Roope Hintz":        { peakPtsPace: 88,  awards: [], allStarYears: 1 },
+  "Ryan Nugent-Hopkins":{ peakPtsPace: 84,  awards: [], allStarYears: 1 },
+  "Evgeni Malkin":      { peakPtsPace: 112, awards: ["Hart","Art Ross","Conn Smythe"], allStarYears: 6 },
+  "Jack Eichel":        { peakPtsPace: 95,  awards: [], allStarYears: 2 },
+  "Artemi Panarin":     { peakPtsPace: 108, awards: ["Calder"], allStarYears: 4 },
+  "Steven Stamkos":     { peakPtsPace: 98,  awards: ["Rocket Richard"], allStarYears: 4 },
+
+  // ── Elite Defencemen ──
   "Cale Makar":         { peakPtsPace: 93,  awards: ["Calder","Norris","Norris","Conn Smythe"], allStarYears: 4 },
   "Roman Josi":         { peakPtsPace: 96,  awards: ["Norris"], allStarYears: 3 },
   "Adam Fox":           { peakPtsPace: 102, awards: ["Norris","Norris"], allStarYears: 3 },
   "Quinn Hughes":       { peakPtsPace: 102, awards: ["Norris"], allStarYears: 3 },
-  "Mitch Marner":       { peakPtsPace: 101, awards: [], allStarYears: 3 },
   "Josh Morrissey":     { peakPtsPace: 76,  awards: [], allStarYears: 1 },
-  "Jonathan Huberdeau": { peakPtsPace: 115, awards: [], allStarYears: 2 },
   "Jaccob Slavin":      { peakPtsPace: 42,  awards: [], allStarYears: 0 },
+  "Rasmus Dahlin":      { peakPtsPace: 88,  awards: [], allStarYears: 2 },
+  "Evan Bouchard":      { peakPtsPace: 82,  awards: [], allStarYears: 1 },
+  "Devon Toews":        { peakPtsPace: 62,  awards: [], allStarYears: 1 },
+  "Dougie Hamilton":    { peakPtsPace: 72,  awards: [], allStarYears: 2 },
+  "Victor Hedman":      { peakPtsPace: 74,  awards: ["Norris","Conn Smythe"], allStarYears: 5 },
+  "Drew Doughty":       { peakPtsPace: 68,  awards: ["Norris","Conn Smythe"], allStarYears: 5 },
+  "Erik Karlsson":      { peakPtsPace: 100, awards: ["Norris","Norris","Norris"], allStarYears: 6 },
+  "Brent Burns":        { peakPtsPace: 76,  awards: ["Norris"], allStarYears: 4 },
+  "Thomas Chabot":      { peakPtsPace: 72,  awards: [], allStarYears: 1 },
+  "Miro Heiskanen":     { peakPtsPace: 68,  awards: [], allStarYears: 2 },
+  "Jakob Chychrun":     { peakPtsPace: 62,  awards: [], allStarYears: 1 },
+  "Zach Werenski":      { peakPtsPace: 72,  awards: [], allStarYears: 1 },
+  "Moritz Seider":      { peakPtsPace: 58,  awards: ["Calder"], allStarYears: 1 },
+  "Owen Power":         { peakPtsPace: 62,  awards: [], allStarYears: 1 },
+  "Noah Dobson":        { peakPtsPace: 72,  awards: [], allStarYears: 1 },
+  "Mikhail Sergachev":  { peakPtsPace: 66,  awards: [], allStarYears: 1 },
+  "Samuel Girard":      { peakPtsPace: 48,  awards: [], allStarYears: 0 },
+  "Darnell Nurse":      { peakPtsPace: 52,  awards: [], allStarYears: 0 },
 };
 
 const PROSPECT_TIERS: Record<string, { tier: 1|2|3|4; navFloor: number; ceiling: number; note: string }> = {
+  // Tier 1 — Franchise cornerstones, already proven or near-certain
   "Connor Bedard":      { tier: 1, navFloor: 180, ceiling: 50, note: "2023 #1 overall" },
   "Macklin Celebrini":  { tier: 1, navFloor: 160, ceiling: 50, note: "2024 #1 overall" },
   "Gavin McKenna":      { tier: 1, navFloor: 200, ceiling: 60, note: "2026 #1 overall" },
   "Matthew Schaefer":   { tier: 1, navFloor: 140, ceiling: 45, note: "2025 #1 overall" },
+  "Ivan Demidov":       { tier: 1, navFloor: 130, ceiling: 45, note: "2025 #5 overall, elite skill" },
+  "Cayden Lindstrom":   { tier: 1, navFloor: 120, ceiling: 40, note: "2024 #4 overall" },
+  "Leo Carlsson":       { tier: 1, navFloor: 115, ceiling: 40, note: "2023 #2 overall" },
+  // Tier 2 — High-end prospects, likely top-6/top-4
   "Matvei Michkov":     { tier: 2, navFloor: 95,  ceiling: 40, note: "Elite skill, PHI" },
   "Beckett Sennecke":   { tier: 2, navFloor: 90,  ceiling: 35, note: "2024 #3 overall" },
   "Will Smith":         { tier: 2, navFloor: 85,  ceiling: 30, note: "2023 #4 overall" },
+  "Brayden Yager":      { tier: 2, navFloor: 80,  ceiling: 30, note: "2023 #14 overall" },
+  "David Reinbacher":   { tier: 2, navFloor: 75,  ceiling: 30, note: "2023 #5 overall, D" },
+  "Zach Benson":        { tier: 2, navFloor: 75,  ceiling: 28, note: "2023 #13 overall" },
+  "Luca Fantilli":      { tier: 2, navFloor: 72,  ceiling: 28, note: "2023 #6 overall" },
+  "Dalibor Dvoracek":   { tier: 2, navFloor: 70,  ceiling: 28, note: "2024 top prospect" },
+  "Tanner Molendyk":    { tier: 2, navFloor: 68,  ceiling: 25, note: "D prospect, OTT" },
+  // Tier 3 — Solid prospects, likely NHLers
+  "Cole Eiserman":      { tier: 3, navFloor: 55,  ceiling: 22, note: "Goal scorer, BOS" },
+  "Danny Nelson":       { tier: 3, navFloor: 50,  ceiling: 20, note: "2024 top-10" },
+  "Konsta Helenius":    { tier: 3, navFloor: 48,  ceiling: 20, note: "2024 top-10, CHI" },
 };
 
 const SHUTDOWN_D_PEDIGREE: Record<string, { navFloor: number; note: string }> = {
-  "Jaccob Slavin":     { navFloor: 55, note: "Perennial Selke candidate" },
-  "Joel Edmundson":    { navFloor: 22, note: "Shutdown D, physical" },
-  "Damon Severson":    { navFloor: 30, note: "Two-way D" },
+  "Jaccob Slavin":      { navFloor: 55, note: "Perennial Selke candidate, best defensive D in the game" },
+  "Joel Edmundson":     { navFloor: 22, note: "Shutdown D, physical presence" },
+  "Damon Severson":     { navFloor: 30, note: "Reliable two-way D" },
+  "Brent Burns":        { navFloor: 28, note: "Shutdown role in later career" },
+  "Luke Schenn":        { navFloor: 18, note: "Physical shutdown D, veteran presence" },
+  "Matt Grzelcyk":      { navFloor: 22, note: "Defensive D, penalty kill specialist" },
+  "Chris Tanev":        { navFloor: 24, note: "Elite shot-blocking, consistent shutdown role" },
+  "Nate Schmidt":       { navFloor: 20, note: "Defensive depth, PK specialist" },
+  "Gustav Forsling":    { navFloor: 32, note: "Two-way D, strong defensive metrics" },
+  "Noah Hanifin":       { navFloor: 35, note: "Reliable two-way D, proven top-4" },
+  "Jake Walman":        { navFloor: 28, note: "Defensive D, strong possession metrics" },
+  "Shayne Gostisbehere":{ navFloor: 25, note: "Two-way D, powerplay QB" },
 };
 
 const INJURY_RISK: Record<string, { level: "HIGH"|"MODERATE"; note: string }> = {
+  // High risk — repeated significant injuries or chronic conditions
   "Erik Karlsson":       { level: "HIGH",     note: "Two Achilles surgeries, wrist issues" },
+  "Evander Kane":        { level: "HIGH",     note: "Wrist surgery, repeated absences" },
+  "Tristan Jarry":       { level: "HIGH",     note: "Foot injury, significant missed time" },
+  "Ryan Johansen":       { level: "HIGH",     note: "Hernia and leg surgery history" },
+  "Ondrej Palat":        { level: "HIGH",     note: "Repeated lower-body issues" },
+  "Zach Hyman":          { level: "HIGH",     note: "Multiple knee surgeries" },
+  "Jonathan Drouin":     { level: "HIGH",     note: "Mental health leave, wrist surgery" },
+  "Max Domi":            { level: "HIGH",     note: "Type 1 diabetes, injury history" },
+  // Moderate risk — documented history but generally available
   "Nathan MacKinnon":    { level: "MODERATE", note: "History of upper-body injuries" },
   "Elias Pettersson":    { level: "MODERATE", note: "Wrist/shoulder concerns" },
-  "Evander Kane":        { level: "HIGH",     note: "Wrist surgery, repeated absences" },
   "Jack Eichel":         { level: "MODERATE", note: "Disk fusion surgery history" },
-  "Tristan Jarry":       { level: "HIGH",     note: "Foot injury, has missed significant time" },
   "Thomas Chabot":       { level: "MODERATE", note: "History of concussions" },
+  "Nazem Kadri":         { level: "MODERATE", note: "Suspension history, thumb injury" },
+  "Brock Boeser":        { level: "MODERATE", note: "Hip surgery, recurring absences" },
+  "Jakob Chychrun":      { level: "MODERATE", note: "Multiple lower-body surgeries" },
+  "Samuel Girard":       { level: "MODERATE", note: "Spinal fracture history" },
+  "Dougie Hamilton":     { level: "MODERATE", note: "Leg fracture, ankle issues" },
+  "Victor Hedman":       { level: "MODERATE", note: "Recurring lower-body issues" },
+  "Rickard Rakell":      { level: "MODERATE", note: "Concussion history" },
+  "Anthony Mantha":      { level: "MODERATE", note: "Shoulder surgery, extended absences" },
+  "Andrei Svechnikov":   { level: "MODERATE", note: "ACL tear history" },
+  "Timo Meier":          { level: "MODERATE", note: "Lower-body injury history" },
+  "Bryan Rust":          { level: "MODERATE", note: "Recurring lower-body issues" },
+  "Tom Wilson":          { level: "MODERATE", note: "Knee ligament surgery history" },
+  "Ondrej Kase":         { level: "HIGH",     note: "Severe concussion history, limited games" },
+  "Nick Foligno":        { level: "MODERATE", note: "Recurring lower-body issues" },
+  "Ryan Reaves":         { level: "MODERATE", note: "Concussion history" },
 };
 
 const safe  = (n: number) => (isNaN(n) || !isFinite(n) ? 0 : n);
@@ -658,7 +769,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             {/* Header rule */}
             <div style={{ borderTop: '4px double #1c140a', borderBottom: '1px solid #b8a070', padding: '20px 28px 14px' }}>
               <div className="text-center">
-                <div className="text-[8px] uppercase tracking-[0.5em] mb-2" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                <div className="text-[11px] uppercase tracking-[0.5em] mb-2" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                   The Hockey Ledger · GM Challenge
                 </div>
                 <h2 className="font-black" style={{ fontFamily: "'Libre Baskerville', serif", fontSize: '1.6rem', color: '#1c140a', lineHeight: 1.1 }}>
@@ -672,7 +783,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
             {/* Team grid */}
             <div style={{ padding: '16px 28px 20px' }}>
-              <div className="text-[8px] font-black uppercase tracking-[0.3em] mb-3" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+              <div className="text-[11px] font-black uppercase tracking-[0.3em] mb-3" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                 Select Your Franchise
               </div>
               <div className="grid grid-cols-4 gap-1.5 mb-4" style={{ maxHeight: '260px', overflowY: 'auto' }}>
@@ -740,7 +851,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                       <div className="font-black text-[14px]" style={{ color: '#1c140a', fontFamily: "'Libre Baskerville', serif" }}>
                         {teams[0].name}
                       </div>
-                      <div className="text-[8px] mt-0.5" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                      <div className="text-[11px] mt-0.5" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                         #{teams[0].standing}/32 · {teams[0].phase} · ${teams[0].capSpace.toFixed(1)}M cap space
                       </div>
                     </div>
@@ -771,7 +882,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                 {teams[0] ? `✦ Take Control of the ${teams[0].name} ✦` : 'Select a team to begin'}
               </button>
 
-              <p className="text-center mt-2 text-[8px]" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
+              <p className="text-center mt-2 text-[11px]" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
                 Your franchise locks in when you confirm. Reset via Void All Trades.
               </p>
             </div>
@@ -887,7 +998,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             <div style={{ borderTop: '4px double #1c140a', borderBottom: '4px double #1c140a', padding: '8px 0 6px', marginBottom: '4px' }}>
               <div className="text-center">
                 <div className="text-[8px] uppercase tracking-[0.4em] mb-1" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
-                  Est. 2025 &nbsp;—&nbsp; Vol. VII &nbsp;—&nbsp; Trade Edition
+                  Est. 2025 &nbsp;—&nbsp; Vol. I &nbsp;—&nbsp; Trade Edition
                 </div>
                 <a href="/" style={{ textDecoration: 'none' }}>
                   <h1 className="font-black leading-none transition-opacity hover:opacity-70" style={{ color: '#1c140a', fontFamily: "'Libre Baskerville', Georgia, serif",
@@ -899,18 +1010,18 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                     The Hockey Ledger
                   </h1>
                 </a>
-                <div className="text-[8px] uppercase tracking-[0.3em] mt-1.5 hidden sm:block" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                <div className="text-[11px] uppercase tracking-[0.3em] mt-1.5 hidden sm:block" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                   X-NAV Analytics &nbsp;·&nbsp; xG Suppression &nbsp;·&nbsp; GM Logic Engine &nbsp;·&nbsp; Live Statistics
                 </div>
                 <div className="mt-2 flex items-center justify-center gap-4">
-                  <a href="/players" className="text-[8px] font-black uppercase tracking-[0.2em]"
+                  <a href="/players" className="text-[12px] font-black uppercase tracking-[0.2em]"
                     style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace", textDecoration: 'none', transition: 'color 0.15s' }}
                     onMouseEnter={e => (e.currentTarget.style.color = '#1c140a')}
                     onMouseLeave={e => (e.currentTarget.style.color = '#9a7d58')}>
                     ◇ PLAYER ANALYTICS
                   </a>
                   <span style={{ color: '#c8b890' }}>|</span>
-                  <span className="text-[8px] font-black uppercase tracking-[0.2em]" style={{ color: '#1c140a', fontFamily: "'Courier Prime', monospace" }}>
+                  <span className="text-[12px] font-black uppercase tracking-[0.2em]" style={{ color: '#1c140a', fontFamily: "'Courier Prime', monospace" }}>
                     ◆ TRADE MACHINE
                   </span>
                 </div>
@@ -971,11 +1082,15 @@ RULES: No invented context. No speculation about players not in this trade. Comp
               </button>
             )}
 
-            {/* My Team, My Call — for any trade where home team is losing NAV
-                (LOSS, DECLINED, or BLOCKED) but NOT when player hard-refuses NMC */}
+            {/* My Team, My Call — override for DECLINED/BLOCKED/LOSS
+                Cannot override: hard NMC refusal, cap violations, floor violations
+                These are CBA rules — not GM preference */}
             {verdict && (verdict.status === "DECLINED" || verdict.status === "BLOCKED" || verdict.status === "LOSS")
-              && verdict.metrics.homeNetGain < 0
-              && !verdict.flags.some(f => f.category === "CLAUSE" && f.severity === "HARD") && (
+              && !verdict.flags.some(f => f.severity === "HARD" && (
+                f.category === "CLAUSE" ||
+                f.category === "CAP_VIOLATION" ||
+                f.category === "FLOOR_VIOLATION"
+              )) && (
               <button onClick={() => { executeTrade(); setHomeTeamLocked(true); }}
                 className="w-full py-2.5 font-black uppercase tracking-widest text-[10px] transition-all duration-200 active:scale-[0.97]"
                 style={{
@@ -1056,7 +1171,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             {simData && (
               <div style={{ borderTop: '1px solid #b8a070', padding: '16px 20px 12px' }}>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                  <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                     ⚡ Projected Season Results
                   </span>
                   <span className="text-[7px]" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>

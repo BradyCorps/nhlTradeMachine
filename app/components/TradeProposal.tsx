@@ -410,24 +410,63 @@ const preScreenProposal = (
   // Cap check — partner must be able to absorb incoming cap
   const homeCap    = homeSends.reduce((s,a) => s + a.capHit*(1-(a.retainedPct||0)), 0);
   const partnerCap = partnerSends.reduce((s,a) => s + a.capHit*(1-(a.retainedPct||0)), 0);
-  const homeCapDelta    = partnerCap - homeCap;   // cap home gains
-  const partnerCapDelta = homeCap - partnerCap;   // cap partner absorbs
+  const homeCapDelta    = partnerCap - homeCap;
+  const partnerCapDelta = homeCap - partnerCap;
 
-  if (partnerTeam.capSpace + homeCapDelta < 0) return false;  // partner can't fit
-  if (homeTeam.capSpace + partnerCapDelta < 0) return false;  // home can't fit
+  if (partnerTeam.capSpace + homeCapDelta < 0) return false;
+  if (homeTeam.capSpace + partnerCapDelta < 0) return false;
 
   // NMC check — never propose trading an NMC player
   if (homeSends.some(a => a.hasNMC)) return false;
 
-  // Don't propose a team trading away their own stated need position
-  // e.g. SJS giving away their only C when they need a C
+  // ── Partner GM veto checks ────────────────────────────────────
+  // These mirror the server-side logic for vetoesSide === 1 flags.
+  // Filtering here avoids surfacing proposals the partner would decline.
+
+  // Same-division block — real GMs avoid strengthening direct rivals
+  const DIVISIONS: Record<string, string[]> = {
+    Atlantic:     ["BOS","BUF","DET","FLA","MTL","OTT","TBL","TOR"],
+    Metropolitan: ["CAR","CBJ","NJD","NYI","NYR","PHI","PIT","WSH"],
+    Central:      ["UTA","CHI","COL","DAL","MIN","NSH","STL","WPG"],
+    Pacific:      ["ANA","CGY","EDM","LAK","SEA","SJS","VAN","VGK"],
+  };
+  const inSameDivision = Object.values(DIVISIONS).some(div =>
+    div.includes(homeTeam.id) && div.includes(partnerTeam.id)
+  );
+  // Contending teams won't help a division rival — block those proposals
+  if (inSameDivision &&
+    (partnerTeam.phase === "Contender" || partnerTeam.phase === "Bubble") &&
+    (homeTeam.phase === "Contender" || homeTeam.phase === "Bubble")) {
+    return false;
+  }
+
+  // Timeline mismatch — rebuilding partner won't take aging veterans on long deals
+  const partnerPhase = partnerTeam.phase ?? "";
+  if (partnerPhase === "Rebuilding" || partnerPhase === "Tanking") {
+    const sendingOldVet = homeSends.some(a =>
+      a.position !== "Pick" && a.age >= 32 && a.yearsRemaining >= 3
+    );
+    if (sendingOldVet) return false;
+  }
+
+  // Contender partner won't take bad long contracts for cap relief
+  if (partnerPhase === "Contender" || partnerPhase === "Bubble") {
+    const sendingNegativeContract = homeSends.some(a =>
+      a.position !== "Pick" && (navMap[a.id] ?? 0) < -30
+    );
+    if (sendingNegativeContract) return false;
+  }
+
+  // Partner NMC — don't propose trading their NMC player out
+  if (partnerSends.some(a => a.hasNMC)) return false;
+
+  // Don't propose partner trading away their own stated need
   const partnerPlayers = partnerSends.filter(a => a.position !== "Pick");
   if (partnerTeam.needs && partnerPlayers.length > 0) {
     const givingAwayNeed = partnerPlayers.every(a => {
       const pos = ["L","R"].includes(a.position) ? "W" : a.position;
       return partnerTeam.needs!.some(n => n.pos === pos || n.pos === "Any");
     });
-    // Only veto if they're giving away ALL their stated-need players with nothing coming back at that position
     const gettingBackPos = homeSends
       .filter(a => a.position !== "Pick")
       .map(a => ["L","R"].includes(a.position) ? "W" : a.position);
@@ -441,15 +480,14 @@ const preScreenProposal = (
     )) return false;
   }
 
-  // NAV sanity — don't propose massive imbalances (>100 NAV gap)
-  const homeNavOut  = homeSends.reduce((s,a) => s+(navMap[a.id]??0), 0);
+  // NAV sanity — don't propose massive imbalances (>120 NAV gap)
+  const homeNavOut    = homeSends.reduce((s,a) => s+(navMap[a.id]??0), 0);
   const partnerNavOut = partnerSends.reduce((s,a) => s+(navMap[a.id]??0), 0);
   if (Math.abs(homeNavOut - partnerNavOut) > 120) return false;
 
-  // Don't propose rebuilding teams trading away young high-value players
-  // for aging veterans — goes against rebuild logic
+  // Rebuild logic — don't propose rebuilding home team giving young stars for old vets
   const homePhase = homeTeam.phase ?? "";
-  if ((homePhase === "Rebuilding" || homePhase === "Tanking")) {
+  if (homePhase === "Rebuilding" || homePhase === "Tanking") {
     const givingAwayYoungStar = homeSends.some(a =>
       a.position !== "Pick" && a.age <= 25 && (navMap[a.id]??0) > 80
     );

@@ -162,26 +162,26 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
           {!isG && (player.ops != null || player.dps != null) && (
             <div style={{ display: "flex", gap: "6px" }}>
               {player.ops != null && (
-                <div style={{ padding: "3px 8px", background: "var(--blue-dim)", border: "1px solid rgba(43,63,102,0.3)", fontFamily: "'Courier Prime', monospace", fontSize: "8px", fontWeight: 900 }}>
+                <div style={{ padding: "3px 8px", background: "var(--blue-dim)", border: "1px solid rgba(43,63,102,0.3)", fontFamily: "'Courier Prime', monospace", fontSize: "10px", fontWeight: 900 }}>
                   <span style={{ color: "var(--rule)", marginRight: "4px" }}>OPS</span>
                   <span style={{ color: "var(--blue)" }}>{player.ops.toFixed(1)}</span>
                 </div>
               )}
               {player.dps != null && (
-                <div style={{ padding: "3px 8px", background: "var(--red-dim)", border: "1px solid rgba(166,53,36,0.3)", fontFamily: "'Courier Prime', monospace", fontSize: "8px", fontWeight: 900 }}>
+                <div style={{ padding: "3px 8px", background: "var(--red-dim)", border: "1px solid rgba(166,53,36,0.3)", fontFamily: "'Courier Prime', monospace", fontSize: "10px", fontWeight: 900 }}>
                   <span style={{ color: "var(--rule)", marginRight: "4px" }}>DPS</span>
                   <span style={{ color: "var(--red)" }}>{player.dps.toFixed(1)}</span>
                 </div>
               )}
               {player.ops != null && player.dps != null && (
-                <div style={{ padding: "3px 8px", background: "var(--paper-card)", border: "1px solid var(--rule-light)", fontFamily: "'Courier Prime', monospace", fontSize: "8px", fontWeight: 900 }}>
+                <div style={{ padding: "3px 8px", background: "var(--paper-card)", border: "1px solid var(--rule-light)", fontFamily: "'Courier Prime', monospace", fontSize: "10px", fontWeight: 900 }}>
                   <span style={{ color: "var(--rule)", marginRight: "4px" }}>PS</span>
                   <span style={{ color: "var(--ink)" }}>{(player.ops + player.dps).toFixed(1)}</span>
                 </div>
               )}
             </div>
           )}
-          <div style={{ marginTop: "10px", fontFamily: "'Courier Prime', monospace", fontSize: "8px", color: "var(--ink-faint)" }}>
+          <div style={{ marginTop: "10px", fontFamily: "'Courier Prime', monospace", fontSize: "10px", color: "var(--ink-faint)" }}>
             <span style={{ color: "var(--rule)", marginRight: "6px" }}>CONTRACT</span>
             ${player.capHit}M × {player.yearsRemaining}yr
             {player.hasNMC && <span style={{ marginLeft: "8px", color: "var(--red)", border: "1px solid var(--red)", padding: "0 3px" }}>NMC</span>}
@@ -354,7 +354,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
             <ArchetypeBadge player={player} />
             {player.hasNMC && <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: "6px", color: "var(--red)", border: "1px solid var(--red)", padding: "0 3px" }}>NMC</span>}
           </div>
-          <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: "8px", color: "var(--rule)", marginTop: "1px" }}>
+          <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: "10px", color: "var(--rule)", marginTop: "1px" }}>
             {team?.name ?? player.teamId} · {player.position} · Age {player.age}
           </div>
         </div>
@@ -519,8 +519,8 @@ export default function PlayersPage() {
       <div style={{ borderBottom: '1px solid #b8a070', padding: "16px 20px 12px" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <div style={{ borderTop: '4px double #1c140a', borderBottom: '4px double #1c140a', padding: '8px 0 6px', marginBottom: '12px', textAlign: 'center' }}>
-            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: "8px", color: "#9a7d58", letterSpacing: "0.4em", textTransform: "uppercase", marginBottom: "4px" }}>
-              Est. 2025 &nbsp;—&nbsp; Vol. VII &nbsp;—&nbsp; Trade Edition
+            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: "11px", color: "#9a7d58", letterSpacing: "0.4em", textTransform: "uppercase", marginBottom: "4px" }}>
+              Est. 2026 &nbsp;—&nbsp; Vol. I &nbsp;—&nbsp; Trade Edition
             </div>
             <a href="/trade" style={{ textDecoration: "none" }}>
               <h1 style={{ fontFamily: "'Libre Baskerville', Georgia, serif", fontSize: "clamp(1.8rem, 5vw, 3rem)", fontWeight: 900, color: "#1c140a", margin: 0, lineHeight: 1, letterSpacing: "-0.02em", cursor: "pointer", opacity: 1, transition: "opacity 0.15s" }}
@@ -529,24 +529,24 @@ export default function PlayersPage() {
                 The Hockey Ledger
               </h1>
             </a>
-            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: "8px", color: "#9a7d58", letterSpacing: "0.3em", textTransform: "uppercase", marginTop: "6px" }}>
+            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: "11px", color: "#9a7d58", letterSpacing: "0.3em", textTransform: "uppercase", marginTop: "6px" }}>
               X-NAV Analytics &nbsp;·&nbsp; xG Suppression &nbsp;·&nbsp; GM Logic Engine &nbsp;·&nbsp; Live Statistics
             </div>
             <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "center", gap: "16px" }}>
-              <a href="/trade" style={{ fontFamily: "'Courier Prime', monospace", fontSize: "8px", fontWeight: 900, color: "#9a7d58", textDecoration: "none", letterSpacing: "0.2em", textTransform: "uppercase", transition: "color 0.15s" }}
+              <a href="/trade" style={{ fontFamily: "'Courier Prime', monospace", fontSize: "11px", fontWeight: 900, color: "#9a7d58", textDecoration: "none", letterSpacing: "0.2em", textTransform: "uppercase", transition: "color 0.15s" }}
                 onMouseEnter={e => (e.currentTarget.style.color = "#1c140a")}
                 onMouseLeave={e => (e.currentTarget.style.color = "#9a7d58")}>
                 ◇ TRADE MACHINE
               </a>
               <span style={{ color: "#c8b890" }}>|</span>
-              <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: "8px", fontWeight: 900, color: "#1c140a", letterSpacing: "0.2em", textTransform: "uppercase" }}>
+              <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: "11px", fontWeight: 900, color: "#1c140a", letterSpacing: "0.2em", textTransform: "uppercase" }}>
                 ◆ PLAYER ANALYTICS
               </span>
             </div>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", flexWrap: "wrap" }}>
-            <span style={{ color: "#b8a070", fontFamily: "'Courier Prime', monospace", fontSize: "8px" }}>
+            <span style={{ color: "#b8a070", fontFamily: "'Courier Prime', monospace", fontSize: "11px" }}>
               {players.length > 0 ? `${skaters.length + goalies.length} players · Live data` : "Loading..."}
             </span>
           </div>
