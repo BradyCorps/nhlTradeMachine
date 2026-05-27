@@ -353,33 +353,41 @@ const getXNAV = (asset: Asset): XNAVResult => {
   // ----- GOALIES (G-NAV model with historical context) -----
   if (asset.position === "G") {
     const gamesG      = Math.max(1, asset.gamesStarted ?? asset.games ?? 1);
-    const confidenceG = Math.min(1.0, Math.pow(gamesG / 45, 1.2));
+    // Confidence: calibrated to a full 60-game starter season as the reference point
+    // More aggressive regression for small samples — 45 games is only 0.87 confidence
+    const confidenceG = Math.min(1.0, Math.pow(gamesG / 60, 1.4));
 
-    const isStarter = gamesG >= 40;
-    const isBackup  = gamesG < 33;
+    // Role detection — raised thresholds to properly classify workload
+    // 50+ games = clear starter, 38-49 = tandem/shared, <38 = backup
+    const isStarter = gamesG >= 50;
+    const isBackup  = gamesG < 38;
     const isTandem  = !isStarter && !isBackup;
 
-    const gsaxRaw         = safe(asset.gsax ?? 0);
-    const gsaxPerGame     = gsaxRaw / gamesG;
-    const gsaxPerGameCapped = isBackup
-      ? Math.min(gsaxPerGame, 0.18)
-      : isTandem
-      ? Math.min(gsaxPerGame, 0.28)
-      : Math.min(gsaxPerGame, 0.42);
+    const gsaxRaw     = safe(asset.gsax ?? 0);
+    const gsaxPerGame = gsaxRaw / gamesG;
 
-    // ── Team defense context adjustment ───────────────────────────
-    // Goalies on bad teams face more shots and higher-danger chances.
-    // Their GSAx is structurally suppressed by team context.
-    // Askarov/Wallstedt playing behind a 30th-place defense is not
-    // the same as a -12 GSAx goalie on a competent team.
-    // We partially neutralize team shot-volume drag using standing.
-    const teamStanding = asset.teamStanding ?? 16;
-    const defCorrection =
-      teamStanding >= 29 ? 0.13 :  // bottom-4 team defense (SJS, CHI tier)
-      teamStanding >= 25 ? 0.08 :  // bad team defense
-      teamStanding >= 20 ? 0.04 :  // below average
-      teamStanding >= 17 ? 0.02 :  // just missed playoffs
-      0;                            // playoff-level defense — no correction
+    // ── Soft per-game sanity cap ───────────────────────────────────────
+    // Hellebuyck's all-time best season was ~0.46 GSAx/game (28.4 GSAx / 62GP)
+    // Cap at 0.50/game for starters, slightly lower for tandem/backup
+    // This prevents 23.1 GSAx in 45 games (0.51/game) from extrapolating to
+    // superhuman levels — that pace simply isn't sustainable over a full season
+    const perGameCap = isStarter ? 0.48 : isTandem ? 0.35 : 0.22;
+    const gsaxPerGameCapped = gsaxPerGame > 0
+      ? Math.min(gsaxPerGame, perGameCap)
+      : gsaxPerGame; // no floor cap — bad seasons should still hurt
+
+    // ── Team defense context: xGA/60 instead of standings ─────────────────
+    // teamXga60 measures how many expected goals the team allows per 60 min.
+    // League average ~2.55. Teams above 2.75 have hostile goalie environments.
+    // This is more accurate than standings which reflect scoring/PP success too.
+    const LEAGUE_AVG_XGA60 = 2.55;
+    const teamXga60 = (asset as any).teamXga60 ?? LEAGUE_AVG_XGA60;
+    const xgaDelta  = teamXga60 - LEAGUE_AVG_XGA60; // positive = worse than avg
+    // Scale correction: each 0.1 above league avg = +0.04 GSAx/game forgiven
+    // CGY at 2.85 xGA/60 (+0.30 above avg) → +0.12/game correction
+    // SJS at 3.10 xGA/60 (+0.55 above avg) → +0.22/game correction (capped 0.25)
+    // This properly reflects that -1.8 GSAx on CGY ≈ above-average performance
+    const defCorrection = Math.max(-0.15, Math.min(0.25, xgaDelta * 0.40));
 
     const gsaxPer60 = (gsaxPerGameCapped + defCorrection) * 60;
 
@@ -410,18 +418,36 @@ const getXNAV = (asset: Asset): XNAVResult => {
 
     const termMult       = Math.min(2.5, 1.0 + (asset.yearsRemaining || 1) * 0.15);
     const effectiveCap   = asset.capHit * (1 - (asset.retainedPct || 0));
-    const capCostG       = effectiveCap * 1.6 * termMult;
+
+    // ── Extension-aware cap cost ───────────────────────────────────────
+    // If a player has a signed extension, NAV must reflect what the acquiring
+    // team is actually committing to — not the cheap current-year deal.
+    // Cap space calculation uses current capHit (what Calgary pays this year).
+    // NAV evaluation uses the extension AAV (what the acquiring team inherits).
+    const extCapHit  = (asset as any).extensionCapHit;
+    const extYears   = (asset as any).extensionYears;
+    const navCapHit  = extCapHit
+      ? extCapHit * (1 - (asset.retainedPct || 0))   // extension AAV for NAV math
+      : effectiveCap;                                  // no extension — use current
+    const navYears   = extCapHit ? (extYears ?? asset.yearsRemaining) : asset.yearsRemaining;
+    const navTermMult = Math.min(2.5, 1.0 + navYears * 0.15);
+    const capCostG       = navCapHit * 1.6 * navTermMult;
     const retainedBonusG = (asset.retainedPct || 0) * asset.capHit * 10;
 
     const rawTotal = safe((goalieImpact + workloadBonus) * ageFactorG - capCostG + retainedBonusG);
 
-    // ── Young starter floor ────────────────────────────────────────
-    // A starting goalie aged ≤26 on a cost-controlled deal (≤$3.5M)
-    // has genuine trade value regardless of team context GSAx.
-    // The market consistently pays for controlled young starters.
-    // Floor scales with youth: age 23 = +33, age 24 = +25, age 25 = +17, age 26 = +9
-    const youngStarterFloor = isStarter && asset.age <= 26 && effectiveCap <= 3.5
-      ? Math.max(0, (27 - asset.age) * 11 - effectiveCap * 3)
+    // ── Young goalie floor ────────────────────────────────────────
+    // Young cost-controlled goalies have real trade value even with bad stats.
+    // Applies to starters AND tandem goalies on bad teams (like Askarov on SJS)
+    // Disabled when player has signed an extension (extension cap cost captures reality)
+    const isYoungControlled = asset.age <= 26 && effectiveCap <= 3.5 && !extCapHit;
+    const youngStarterFloor = isYoungControlled && (isStarter || isTandem)
+      ? Math.max(0,
+          (27 - asset.age) * 10
+          - effectiveCap * 3
+          + Math.min(15, (gamesG / 82) * 20)
+          + (isTandem ? -8 : 0) // tandem discount vs starter
+        )
       : 0;
 
     const roleCap     = isBackup ? 35 : isTandem ? 60 : 250;

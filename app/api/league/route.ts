@@ -1074,6 +1074,7 @@ export async function GET() {
   // ── 1. MoneyPuck analytics — skaters + goalies ─────────────
   const analyticsMap = new Map<string, any>();
   const goalieMap    = new Map<string, any>();
+  const teamXgaMap = new Map<string, { xGoals: number; games: number }>();
   let fbMap = new Map<string, any>();
 
   try {
@@ -1154,14 +1155,17 @@ export async function GET() {
     }
 
     // Parse goalies — same quote-aware CSV parser
+    // Also derive teamXga60 from xGoals allowed per team
+    const teamXgaMap = new Map<string, { xGoals: number; games: number }>();
+
     if (gpRes.status === "fulfilled" && gpRes.value.ok) {
       const csv  = await gpRes.value.text();
       const rows = csv.split("\n").filter(Boolean);
       const hdr  = parseCSVRow(rows[0]);
       const h    = (k: string) => hdr.indexOf(k);
-      const [nI, sI, gI, xgI, goalsI, ongoalI] = [
+      const [nI, sI, gI, xgI, goalsI, ongoalI, teamI] = [
         h("name"), h("situation"), h("games_played"),
-        h("xGoals"), h("goals"), h("ongoal"),
+        h("xGoals"), h("goals"), h("ongoal"), h("team"),
       ];
       if (nI >= 0 && xgI >= 0) {
         const goalieRows = new Map<string, any>();
@@ -1177,11 +1181,24 @@ export async function GET() {
           const ongoal  = parseFloat(c[ongoalI])|| 0;
           const gsax    = xGoals - goals;
           const savePct = ongoal > 0 ? (ongoal - goals) / ongoal : 0.900;
+
+          // Accumulate team-level xGA — sum across all goalies on that team
+          const teamAbbr = (c[teamI] ?? "").trim().toUpperCase();
+          if (teamAbbr) {
+            const prev = teamXgaMap.get(teamAbbr) ?? { xGoals: 0, games: 0 };
+            // Use max games (starter's GP) as denominator — avoids double-counting
+            teamXgaMap.set(teamAbbr, {
+              xGoals: prev.xGoals + xGoals,
+              games:  Math.max(prev.games, g),
+            });
+          }
+
           goalieRows.set(name, {
             gsax,
             savePct:      Math.round(savePct * 10000) / 10000,
             shotsPerGame: ongoal / g,
             gamesStarted: g,
+            xGoalsAllowed: xGoals,  // raw xGoals allowed — used for teamXga60
             hasLiveStats: true,
           });
         });
@@ -1303,13 +1320,22 @@ export async function GET() {
       const finalNMC      = override?.hasNMC ?? (nameCollision ? false : (fin?.hasNMC ?? false));
       const finalNTC      = override?.hasNTC ?? (nameCollision ? false : (fin?.hasNTC ?? false));
       const finalRetain   = override?.canRetain ?? (nameCollision ? true  : (fin?.canRetain ?? true));
-      const hasExtension  = override?.hasExtension ?? false;
+      const hasExtension     = override?.hasExtension ?? false;
+      const extensionCapHit  = override?.extensionCapHit ?? undefined;
+      const extensionYears   = override?.extensionYears ?? undefined;
       const intangibleMult = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
 
       // ── UPSTREAM GOALIE METRICS ─────────────────────────────
-      // Adding safe fallbacks for the new G-NAV math until historical models are fully wired
-      const teamXga60 = 2.55; // League average placeholder
-      const baselineGsax = goalieStats?.gsax ?? 0; // Current year fallback
+      // teamXga60: derived from MoneyPuck xGoals allowed / team games played
+      // League average is ~2.55 xGA/60. Higher = worse defense = goalie in hostile env.
+      const LEAGUE_AVG_XGA60 = 2.55;
+      const teamXgaRaw = teamXgaMap.get(teamId);
+      const teamXga60 = teamXgaRaw && teamXgaRaw.games > 10
+        ? Math.round((teamXgaRaw.xGoals / teamXgaRaw.games / (30 / 60)) * 100) / 100
+        : LEAGUE_AVG_XGA60;
+
+      // baselineGsax: current year GSAx — future enhancement will add weighted 3yr avg
+      const baselineGsax = goalieStats?.gsax ?? 0;
 
       players.push({
         id:             p.id,
@@ -1335,7 +1361,9 @@ export async function GET() {
         // Contract
         capHit:         CONTRACT_OVERRIDES[p.name]?.capHit         ?? finalCapHit,
         yearsRemaining: CONTRACT_OVERRIDES[p.name]?.yearsRemaining ?? finalYears,
-        hasExtension:   hasExtension,  // NEW
+        hasExtension:   hasExtension,
+        extensionCapHit: extensionCapHit,
+        extensionYears:  extensionYears,
         hasNMC:         finalNMC,
         hasNTC:         finalNTC,
         canRetain:      finalRetain,

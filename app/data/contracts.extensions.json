@@ -1,293 +1,409 @@
 {
   "William Eklund": {
-    "capHit": 5.6,
-    "yearsRemaining": 3,
+    "capHit": 0.925,
+    "yearsRemaining": 1,
     "hasExtension": true,
+    "extensionCapHit": 5.6,
+    "extensionYears": 3,
     "intangibleMultiplier": 1.04
   },
   "Dustin Wolf": {
-    "capHit": 1.7,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 0.875,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 7.5,
+    "extensionYears": 7
   },
   "Kirill Kaprizov": {
-    "capHit": 17.0,
-    "yearsRemaining": 8,
-    "hasExtension": true
+    "capHit": 9.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 17.0,
+    "extensionYears": 8
   },
   "Evgeni Malkin": {
-    "capHit": 5.5,
+    "capHit": 6.1,
     "yearsRemaining": 1,
-    "hasExtension": true
+    "hasExtension": true,
+    "extensionCapHit": 5.5,
+    "extensionYears": 1
   },
   "Timothy Liljegren": {
-    "capHit": 3.25,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 2.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.25,
+    "extensionYears": 2
   },
   "Charlie Coyle": {
-    "capHit": 6.0,
-    "yearsRemaining": 6,
-    "hasExtension": true
+    "capHit": 5.25,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 6.0,
+    "extensionYears": 6
   },
   "Mark Jankowski": {
-    "capHit": 1.85,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 1.35,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.85,
+    "extensionYears": 2
   },
   "Connor Dewar": {
-    "capHit": 2.25,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 1.2,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 2.25,
+    "extensionYears": 2
   },
   "Cole Koepke": {
-    "capHit": 1.45,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 0.775,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.45,
+    "extensionYears": 2
   },
   "David Jiricek": {
-    "capHit": 1.5,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.5,
+    "extensionYears": 2
   },
   "Fyodor Svechkov": {
-    "capHit": 1.25,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.25,
+    "extensionYears": 2
   },
   "Michael Carcone": {
-    "capHit": 1.75,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.75,
+    "extensionYears": 2
   },
   "Nick Schmaltz": {
-    "capHit": 8.0,
-    "yearsRemaining": 8,
-    "hasExtension": true
+    "capHit": 5.85,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 8.0,
+    "extensionYears": 8
   },
   "Jean-Gabriel Pageau": {
-    "capHit": 4.85,
-    "yearsRemaining": 3,
-    "hasExtension": true
+    "capHit": 5.25,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 4.85,
+    "extensionYears": 3
   },
   "Jordan Eberle": {
     "capHit": 5.5,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 5.5,
+    "extensionYears": 2
   },
   "Alex Nedeljkovic": {
-    "capHit": 3.0,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 2.6,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.0,
+    "extensionYears": 2
   },
   "Ryan Poehling": {
-    "capHit": 3.75,
-    "yearsRemaining": 4,
-    "hasExtension": true
+    "capHit": 1.6,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.75,
+    "extensionYears": 4
   },
   "Kiefer Sherwood": {
-    "capHit": 5.75,
-    "yearsRemaining": 5,
-    "hasExtension": true
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 5.75,
+    "extensionYears": 5
   },
   "Ethen Frank": {
-    "capHit": 2.0,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 2.0,
+    "extensionYears": 2
   },
   "Ryan Winterton": {
-    "capHit": 1.125,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 0.775,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.125,
+    "extensionYears": 2
   },
   "Ben Meyers": {
-    "capHit": 1.0,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 0.775,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.0,
+    "extensionYears": 2
   },
   "Brandon Bussi": {
-    "capHit": 1.9,
-    "yearsRemaining": 3,
-    "hasExtension": true
+    "capHit": 0.775,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.9,
+    "extensionYears": 3
   },
   "Artemi Panarin": {
-    "capHit": 11.0,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 11.6,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 11.0,
+    "extensionYears": 2
   },
   "Ben Chiarot": {
-    "capHit": 3.85,
-    "yearsRemaining": 3,
-    "hasExtension": true
+    "capHit": 3.75,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.85,
+    "extensionYears": 3
   },
   "Sam Malinski": {
-    "capHit": 4.75,
-    "yearsRemaining": 4,
-    "hasExtension": true
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 4.75,
+    "extensionYears": 4
   },
   "Blake Lizotte": {
-    "capHit": 2.25,
-    "yearsRemaining": 3,
-    "hasExtension": true
+    "capHit": 1.15,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 2.25,
+    "extensionYears": 3
   },
   "Christian Dvorak": {
-    "capHit": 5.15,
-    "yearsRemaining": 5,
-    "hasExtension": true
+    "capHit": 4.45,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 5.15,
+    "extensionYears": 5
   },
   "Alexei Toropchenko": {
-    "capHit": 2.5,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 1.15,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 2.5,
+    "extensionYears": 2
   },
   "Alexander Wennberg": {
-    "capHit": 6.0,
-    "yearsRemaining": 3,
-    "hasExtension": true
+    "capHit": 4.5,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 6.0,
+    "extensionYears": 3
   },
   "Devin Cooley": {
-    "capHit": 1.35,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 0.775,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.35,
+    "extensionYears": 2
   },
   "Ryan McDonagh": {
-    "capHit": 4.1,
-    "yearsRemaining": 3,
-    "hasExtension": true
+    "capHit": 3.4,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 4.1,
+    "extensionYears": 3
   },
   "Mike Matheson": {
-    "capHit": 6.0,
-    "yearsRemaining": 5,
-    "hasExtension": true
+    "capHit": 4.875,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 6.0,
+    "extensionYears": 5
   },
   "Adam Lowry": {
-    "capHit": 5.0,
-    "yearsRemaining": 5,
-    "hasExtension": true
+    "capHit": 3.4,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 5.0,
+    "extensionYears": 5
   },
   "Adrian Kempe": {
-    "capHit": 10.625,
-    "yearsRemaining": 8,
-    "hasExtension": true
+    "capHit": 5.5,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 10.6,
+    "extensionYears": 8
   },
   "David Kampf": {
-    "capHit": 1.1,
+    "capHit": 2.0,
     "yearsRemaining": 1,
-    "hasExtension": true
+    "hasExtension": true,
+    "extensionCapHit": 1.1,
+    "extensionYears": 1
   },
   "Scott Wedgewood": {
-    "capHit": 2.5,
+    "capHit": 2.0,
     "yearsRemaining": 1,
-    "hasExtension": true
+    "hasExtension": true,
+    "extensionCapHit": 2.5,
+    "extensionYears": 1
   },
   "Jacob Markstrom": {
     "capHit": 6.0,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 6.0,
+    "extensionYears": 2
   },
   "Martin Necas": {
-    "capHit": 11.5,
-    "yearsRemaining": 8,
-    "hasExtension": true
+    "capHit": 6.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 11.5,
+    "extensionYears": 8
   },
   "Logan Cooley": {
-    "capHit": 10.0,
-    "yearsRemaining": 8,
-    "hasExtension": true
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 10.0,
+    "extensionYears": 8
   },
   "Lane Hutson": {
-    "capHit": 8.85,
-    "yearsRemaining": 8,
-    "hasExtension": true
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 8.8,
+    "extensionYears": 8
   },
   "Jack Roslovic": {
-    "capHit": 1.5,
+    "capHit": 2.5,
     "yearsRemaining": 1,
-    "hasExtension": true
+    "hasExtension": true,
+    "extensionCapHit": 1.5,
+    "extensionYears": 1
   },
   "Jack Eichel": {
-    "capHit": 13.5,
-    "yearsRemaining": 8,
-    "hasExtension": true
+    "capHit": 10.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 13.5,
+    "extensionYears": 8
   },
   "Mattias Ekholm": {
-    "capHit": 4.0,
-    "yearsRemaining": 3,
-    "hasExtension": true
+    "capHit": 3.5,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 4.0,
+    "extensionYears": 3
   },
   "Kyle Connor": {
-    "capHit": 12.0,
-    "yearsRemaining": 8,
-    "hasExtension": true
+    "capHit": 7.142,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 12.0,
+    "extensionYears": 8
   },
   "Jake Walman": {
-    "capHit": 7.0,
-    "yearsRemaining": 7,
-    "hasExtension": true
+    "capHit": 3.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 7.0,
+    "extensionYears": 7
   },
   "Connor McDavid": {
     "capHit": 12.5,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 12.5,
+    "extensionYears": 2
   },
   "Jeremy Davies": {
-    "capHit": 1.15,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 0.775,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.15,
+    "extensionYears": 2
   },
   "Matt Grzelcyk": {
-    "capHit": 1.0,
+    "capHit": 3.5,
     "yearsRemaining": 1,
-    "hasExtension": true
+    "hasExtension": true,
+    "extensionCapHit": 1.0,
+    "extensionYears": 1
   },
   "Filip Gustavsson": {
-    "capHit": 6.8,
-    "yearsRemaining": 5,
-    "hasExtension": true
+    "capHit": 4.4,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 6.8,
+    "extensionYears": 5
   },
   "Luke Evangelista": {
-    "capHit": 3.0,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.0,
+    "extensionYears": 2
   },
   "Niko Mikkola": {
-    "capHit": 5.0,
-    "yearsRemaining": 8,
-    "hasExtension": true
+    "capHit": 2.25,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 5.0,
+    "extensionYears": 8
   },
   "Luke Hughes": {
     "capHit": 9.0,
-    "yearsRemaining": 7,
-    "hasExtension": true
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 9.0,
+    "extensionYears": 7
   },
   "Anthony Stolarz": {
-    "capHit": 3.75,
-    "yearsRemaining": 4,
-    "hasExtension": true
+    "capHit": 4.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.75,
+    "extensionYears": 4
   },
   "Cam Fowler": {
-    "capHit": 6.1,
-    "yearsRemaining": 3,
-    "hasExtension": true
+    "capHit": 6.5,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 6.1,
+    "extensionYears": 3
   },
   "Mason McTavish": {
-    "capHit": 7.0,
-    "yearsRemaining": 6,
-    "hasExtension": true
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 7.0,
+    "extensionYears": 6
   },
   "Wyatt Kaiser": {
-    "capHit": 1.7,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.7,
+    "extensionYears": 2
   },
   "Mikael Backlund": {
-    "capHit": 3.25,
-    "yearsRemaining": 2,
-    "hasExtension": true
+    "capHit": 6.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.25,
+    "extensionYears": 2
   },
   "Connor Zary": {
-    "capHit": 3.775,
-    "yearsRemaining": 3,
-    "hasExtension": true
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.775,
+    "extensionYears": 3
   }
 }

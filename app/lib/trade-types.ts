@@ -47,6 +47,8 @@ export interface Asset {
   teamXga60?: number;      
   baselineGsax?: number;   
   hasExtension?: boolean;
+  extensionCapHit?: number;   // future AAV once extension kicks in
+  extensionYears?: number;    // length of the extension
 }
 
 export interface Team {

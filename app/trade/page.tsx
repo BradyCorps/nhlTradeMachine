@@ -1627,16 +1627,28 @@ function AssetCard({
               )}
             </div>
             
-            {/* ── NEW: Future AAV Text formatting ── */}
             <div className="text-[9px] font-bold uppercase tracking-wider mt-0.5" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
               {isPick
                 ? `${asset.year} · ${asset.round === 1 ? "1st" : asset.round === 2 ? "2nd" : "3rd"} Round`
                 : (() => {
                     const expiryYear = new Date().getFullYear() + (asset.yearsRemaining ?? 1);
+                    const extCap   = (asset as any).extensionCapHit;
+                    const extYears = (asset as any).extensionYears;
+                    if (asset.hasExtension && extCap) {
+                      // Show both: current cheap deal + incoming expensive extension
+                      return (
+                        <span>
+                          {asset.position} · Age {asset.age} ·{' '}
+                          <span style={{ color: '#6b5030' }}>${asset.capHit.toFixed(2)}M × {asset.yearsRemaining}yr</span>
+                          <span style={{ color: '#9a7d58' }}> → </span>
+                          <span style={{ color: '#d97706' }}>EXT ${extCap.toFixed(2)}M × {extYears}yr</span>
+                        </span>
+                      );
+                    }
                     if (asset.hasExtension) {
                       return (
                         <span style={{ color: '#d97706' }}>
-                          {asset.position} · Age {asset.age} · FUTURE AAV: ${asset.capHit.toFixed(2)}M × {asset.yearsRemaining}yr
+                          {asset.position} · Age {asset.age} · ${asset.capHit.toFixed(2)}M × {asset.yearsRemaining}yr · EXTENDED
                         </span>
                       );
                     }
