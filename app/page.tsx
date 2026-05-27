@@ -128,6 +128,7 @@ export default function TradeMachine() {
   }[]>([]);
   const [simResult, setSimResult]   = useState<string | null>(null);
   const [simLoading, setSimLoading] = useState(false);
+  const [simData, setSimData]       = useState<any | null>(null);
   const [showSimPanel, setShowSimPanel] = useState(false);
   const [showMemo, setShowMemo] = useState(false);
 
@@ -292,6 +293,7 @@ export default function TradeMachine() {
       setDb(originalDb);
       setExecutedTrades([]);
       setSimResult(null);
+      setSimData(null);
       setShowSimPanel(false);
       setBlocks([[], []]);
       setVerdict(null);
@@ -305,8 +307,34 @@ export default function TradeMachine() {
     if (!teams[0] || executedTrades.length === 0) return;
     setSimLoading(true);
     setSimResult(null);
+    setSimData(null);
 
-    // Build context from all executed trades
+    // ── Step 1: Run projection engine ─────────────────────────
+    let sim: any = null;
+    try {
+      const simRes = await fetch("/api/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          homeTeamId:    teams[0]!.id,
+          partnerTeamId: teams[1]?.id ?? "",
+          teams:   db.teams,
+          players: db.players,
+          trades:  executedTrades.map(t => ({
+            homeTeamId:    db.teams.find(x => x.name === t.homeTeamName)?.id ?? "",
+            partnerTeamId: db.teams.find(x => x.name === t.partnerTeamName)?.id ?? "",
+            outgoing: t.outgoing,
+            incoming: t.incoming,
+          })),
+        }),
+      });
+      if (simRes.ok) {
+        sim = await simRes.json();
+        setSimData(sim);
+      }
+    } catch (_) {}
+
+    // ── Step 2: Build trade summary ────────────────────────────
     const tradesSummary = executedTrades.map(t => {
       const outNames = t.outgoing.map(a => a.position === "Pick"
         ? `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : "3rd"} round pick`
@@ -314,16 +342,13 @@ export default function TradeMachine() {
       const inNames = t.incoming.map(a => a.position === "Pick"
         ? `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : "3rd"} round pick`
         : `${a.name} (${a.position}, $${a.capHit}M)`).join(", ");
-      // Explicit directional format to prevent Haiku from confusing who got what
       return [
         `TRADE: ${t.homeTeamName} ↔ ${t.partnerTeamName}`,
         `  ${t.homeTeamName} GAVE AWAY: ${outNames}`,
         `  ${t.homeTeamName} RECEIVED: ${inNames}`,
-        `  (${t.partnerTeamName} now owns any picks that ${t.homeTeamName} gave away)`,
       ].join("\n");
     }).join("\n\n");
 
-    // Build post-trade rosters for both teams
     const homeRoster = db.players
       .filter(p => p.teamId === teams[0]!.id && p.position !== "Pick")
       .sort((a, b) => b.ptsPace - a.ptsPace)
@@ -331,28 +356,49 @@ export default function TradeMachine() {
       .map(p => `${p.name} (${p.position}, ${p.ptsPace.toFixed(0)}pts/82, age ${p.age})`);
 
     const partnerTeam = teams[1];
-    const partnerRoster = partnerTeam ? db.players
-      .filter(p => p.teamId === partnerTeam.id && p.position !== "Pick")
-      .sort((a, b) => b.ptsPace - a.ptsPace)
-      .slice(0, 12)
-      .map(p => `${p.name} (${p.position}, ${p.ptsPace.toFixed(0)}pts/82, age ${p.age})`) : [];
-
     const isRebuilding = ["Rebuilding","Tanking","Retooling"].includes(teams[0]!.phase ?? "");
 
+    // ── Step 3: Build structured prompt ───────────────────────
+    // If sim engine succeeded, Claude gets exact numbers and writes narrative only.
+    // If sim engine failed, Claude falls back to its own projection (old behavior).
+    const simContext = sim ? `
+PROJECTED SEASON RESULTS — USE THESE EXACT NUMBERS, DO NOT INVENT ALTERNATIVES:
+
+${teams[0]!.name}: ${sim.homeTeam?.projectedPoints ?? "?"} pts · Finished #${sim.homeTeam?.leagueRank ?? "?"}/32 · ${sim.homeTeam?.madePlayoffs ? "MADE PLAYOFFS" : "MISSED PLAYOFFS"}
+  Top scorer: ${sim.homeTeam?.topScorer?.name ?? "—"} — ${sim.homeTeam?.topScorer?.projectedPts ?? "—"} pts
+  Starting goalie: ${sim.homeTeam?.goalie?.name ?? "—"} — ${sim.homeTeam?.goalie?.projectedGAA ?? "—"} GAA / ${sim.homeTeam?.goalie?.projectedSVP ?? "—"} SV%
+
+${partnerTeam?.name ?? ""}: ${sim.partnerTeam?.projectedPoints ?? "?"} pts · Finished #${sim.partnerTeam?.leagueRank ?? "?"}/32 · ${sim.partnerTeam?.madePlayoffs ? "MADE PLAYOFFS" : "MISSED PLAYOFFS"}
+  Top scorer: ${sim.partnerTeam?.topScorer?.name ?? "—"} — ${sim.partnerTeam?.topScorer?.projectedPts ?? "—"} pts
+  Starting goalie: ${sim.partnerTeam?.goalie?.name ?? "—"} — ${sim.partnerTeam?.goalie?.projectedGAA ?? "—"} GAA / ${sim.partnerTeam?.goalie?.projectedSVP ?? "—"} SV%
+
+LEAGUE RESULTS (LOCKED — do not contradict):
+  Presidents' Trophy: ${sim.leaders?.presidentsTrophy?.teamName ?? "—"} — ${sim.leaders?.presidentsTrophy?.projectedPoints ?? "—"} pts
+  Stanley Cup Champion: ${sim.leaders?.cupWinner?.teamName ?? "—"} (NOT Florida Panthers)
+  Points Leader: ${sim.leaders?.topScorer?.name ?? "—"}, ${sim.leaders?.topScorer?.team ?? "—"} — ${sim.leaders?.topScorer?.pts ?? "—"} pts
+  GAA Leader: ${sim.leaders?.topGoalie?.name ?? "—"}, ${sim.leaders?.topGoalie?.team ?? "—"} — ${sim.leaders?.topGoalie?.gaa ?? "—"} GAA
+  SV% Leader: ${sim.leaders?.topGoalie?.name ?? "—"}, ${sim.leaders?.topGoalie?.team ?? "—"} — ${sim.leaders?.topGoalie?.svp ?? "—"} SV%
+  Calder Trophy: Matthew Schaefer, New York Islanders — unanimous (198 first-place votes)
+  Draft Lottery: ${sim.leaders?.draftLottery?.teamName ?? "—"} finished last (${sim.leaders?.draftLottery?.projectedPoints ?? "—"} pts)
+  Simulation seed: #${sim.seed ?? "—"}
+
+PLAYOFF TEAMS: ${sim.playoffTeams?.join(", ") ?? "—"}
+
+YOUR ROLE: Write the narrative column using ONLY these numbers.
+Do not invent standings, stat lines, or results.
+Claude is the storyteller — the simulation engine is the source of truth.` : `
+NOTE: Projection engine unavailable. Use your best judgment for outcomes but follow all constraints below.`;
+
     const prompt = (() => {
-      // ── Detect franchise players traded away ──────────────────
       const allTradedNames = executedTrades.flatMap(t => [
         ...t.outgoing.map(a => a.name),
         ...t.incoming.map(a => a.name),
       ]);
       const franchiseMoved = (name: string) => allTradedNames.includes(name);
-
-      // Wild card teams — strong on paper, volatile in reality
       const WILD_CARDS = ["WPG","TOR","CGY","EDM","NYR"];
       const homeIsWildCard    = WILD_CARDS.includes(teams[0]!.id);
       const partnerIsWildCard = teams[1] && WILD_CARDS.includes(teams[1].id);
 
-      // Team narrative from phase + standing
       const teamNarrative = (t: Team): string => {
         const p = t.phase; const s = t.standing;
         if (p === "Tanking" || p === "Rebuilding") return "deep in a rebuild — draft positioning is the only currency that matters";
@@ -363,97 +409,52 @@ export default function TradeMachine() {
         return "fading season — playing for draft lottery position";
       };
 
-      return `You are a senior NHL beat reporter writing the definitive end-of-season trade retrospective column. This is a SIMULATION — not a history book. The trades below are the divergence point from reality. Everything after the deadline is your story to tell.
+      return `You are a senior NHL beat reporter writing the definitive end-of-season trade retrospective column.
+${simContext}
 
 THE TRADE IS THE DIVERGENCE POINT. Honor it above all real-world events.
-If a player was traded, they play for their NEW team. Their old team's season reflects their absence.
-If Matthews was traded, Toronto collapses. If Hellebuyck was traded, Winnipeg's identity is gone.
+${franchiseMoved("Auston Matthews") ? "Matthews was TRADED — Toronto's season is reflected in the numbers above." : ""}
+${franchiseMoved("Connor Hellebuyck") ? "Hellebuyck was TRADED — Winnipeg's identity changed." : ""}
 
-LOCKED FACTS — happened before the deadline, cannot change:
-- Calder Trophy: Matthew Schaefer, New York Islanders — unanimous (198 first-place votes). Runner-up: Ivan Demidov, Montreal. LOCKED. Do not give to anyone else.
-- Florida Panthers did NOT win the Cup this year (won 2023 and 2024 and 2025). Choose anyone else.
-- Auston Matthews plays for Toronto — unless he appears in the TRADE SUMMARY below as traded.
-- Connor Hellebuyck plays for Winnipeg — unless he appears in the TRADE SUMMARY below as traded.
-- Utah Hockey Club is now called the Utah Mammoth (UTA). Arizona Coyotes do not exist.
-- Casey DeSmith won the Dallas Stars starting job.
+LOCKED FACTS (pre-deadline, cannot change):
+- Calder: Matthew Schaefer, New York Islanders — unanimous. Do NOT give to anyone else.
+- Florida Panthers did NOT win the Cup (won 2023, 2024, 2025).
+- Utah Hockey Club is now the Utah Mammoth (UTA). Arizona Coyotes do not exist.
 
-NHL CONFERENCE & DIVISION STRUCTURE:
+NHL STRUCTURE:
 Eastern: Atlantic (BOS,BUF,DET,FLA,MTL,OTT,TBL,TOR) · Metro (CAR,CBJ,NJD,NYI,NYR,PHI,PIT,WSH)
 Western: Central (UTA,CHI,COL,DAL,MIN,NSH,STL,WPG) · Pacific (ANA,CGY,EDM,LAK,SEA,SJS,VAN,VGK)
 
-STANDINGS LOGIC — ABSOLUTE, NEVER VIOLATE:
-- Presidents' Trophy = best record league-wide. No team can have more points.
-- Buffalo leads Atlantic at 109pts. Carolina leads Metro at 113pts. Carolina wins Presidents' Trophy. Both true.
-- A goalie on a team finishing 22nd-32nd CANNOT post GAA under 2.30 or SV% over .922. Bad teams give up goals.
-- Playoff seeds: top 3 per division auto-qualify. Next 2 best records per conference are wildcards.
-- If a team's best player was traded away, adjust their finish position accordingly.
-
-PRE-DEADLINE TEAM CONTEXT:
-- Buffalo Sabres: Atlantic leaders at 109pts — genuine playoff team, proving the rebuild worked
-- Carolina Hurricanes: Metro dominants at 113pts — deep Cup contender
-- Tampa Bay Lightning: 106pts, Atlantic threat with Kucherov still elite
-- ${franchiseMoved("Auston Matthews") ? "Toronto Maple Leafs: MATTHEWS WAS TRADED — their season collapsed without their franchise player. Model a bottom-10 finish." : `Toronto Maple Leafs: Classic wild card — missed playoffs at 78pts but volatile enough to surge OR collapse further`}
-- ${franchiseMoved("Connor Hellebuyck") ? "Winnipeg Jets: HELLEBUYCK WAS TRADED — their defensive identity is gone. Model accordingly." : `Winnipeg Jets: Wild card — strong on paper but historically volatile. Could flame out early OR go deep`}
-- Calgary Flames: Talented but inconsistent — genuine wild card, 50/50 on playoff spot
-- Edmonton Oilers: McDavid ceiling is the Cup, floor is first-round exit — always
-- ${homeIsWildCard ? `${teams[0]!.name}: Wild card team — give them one unexpected development, good or bad` : ""}
-- ${partnerIsWildCard ? `${teams[1]!.name}: Wild card team — give them one unexpected development, good or bad` : ""}
-
-TRADE SUMMARY — THE DIVERGENCE POINT:
+TRADE SUMMARY:
 ${tradesSummary}
 
-HOME TEAM (${teams[0]!.name}) POST-TRADE:
-Received: ${blocks[1].filter((a: Asset) => a.position !== "Pick").map((a: Asset) => `${a.name} (${a.ptsPace.toFixed(0)}pts/82, $${a.capHit}M)`).join(", ") || "no players"}
-Picks received: ${blocks[1].filter((a: Asset) => a.position === "Pick").map((a: Asset) => `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : `${a.round}th`}`).join(", ") || "none"}
-Gave away: ${blocks[0].filter((a: Asset) => a.position !== "Pick").map((a: Asset) => `${a.name} (${a.ptsPace.toFixed(0)}pts/82)`).join(", ") || "no players"}
-Picks given away (GONE): ${blocks[0].filter((a: Asset) => a.position === "Pick").map((a: Asset) => `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : `${a.round}th`}`).join(", ") || "none"}
-
-${teams[0]!.name} ROSTER (top 12 post-trade):
+${teams[0]!.name} ROSTER (top 12):
 ${homeRoster.join("\n")}
-Phase: ${teams[0]!.phase} · Standing entering deadline: #${teams[0]!.standing}/32
-Narrative: ${teamNarrative(teams[0]!)}
+Phase: ${teams[0]!.phase} · Pre-trade standing: #${teams[0]!.standing}/32
+Narrative entering second half: ${teamNarrative(teams[0]!)}
 
-${teams[1] ? `${teams[1].name} ROSTER (top 12 post-trade):
-${partnerRoster.join("\n")}
-Phase: ${teams[1].phase} · Standing entering deadline: #${teams[1].standing}/32
-Narrative: ${teamNarrative(teams[1])}` : ""}
-
-VARIANCE PERMISSION:
-This is a "what if" machine. You have creative license to:
-- Give any wild card team one completely unexpected development (hot streak, cold snap, goalie steal, surprising hero)
-- Apply ±15% variance to any player's statistical pace — great players can have off years, depth players can surprise
-- Let the traded players' impact ripple realistically through both teams' seasons
-- Invent one league-wide story (trade, controversy, record chase, unexpected rivalry) for the AROUND THE LEAGUE section
-- Choose ANY Stanley Cup champion except Florida Panthers
-
-WHAT YOU CANNOT DO:
-- Reference players not in the rosters below or in the trade summary
-- Say a team kept a player they traded or vice versa
-- Put Auston Matthews on Utah/Arizona unless he was traded there
-- Give a goalie elite stats on a bottom-10 team
-- Award the Calder to anyone except Matthew Schaefer
-
-Write 6 sections with genuine narrative tension. This should read like the best hockey column you've ever written.
+Write 6 sections. The numbers are given — your job is to bring them to life.
 
 **THE TRADE, ONE YEAR LATER**
-3-4 sentences. How did the key traded players perform for their NEW teams? Specific stat lines. Was it what both sides hoped for?
+3-4 sentences. Use the projected stats above. How did the key players perform for their NEW teams?
 
 **${teams[0]!.name.toUpperCase()}'S SEASON**
 ${isRebuilding
-  ? `4-5 sentences. Full rebuild picture — finish position (derived from actual roster quality above), low point, surprise bright spot, draft pick significance. REMEMBER: roster quality drives finish position.`
-  : `4-5 sentences. Finish position and playoff run (derived from actual roster quality above). One defining moment. One player who emerged or collapsed. REMEMBER: roster quality drives finish position.`}
+  ? `4-5 sentences. Use the exact finish position from the projection above. Paint the narrative around those numbers — low point, bright spot, draft pick significance.`
+  : `4-5 sentences. Use the exact finish and playoff result from above. One defining moment. One unexpected development.`}
 
 **AROUND THE LEAGUE**
-4-5 sentences covering 3 distinct storylines. One team that shocked everyone, one injury that shaped the race, one off-ice story. Make it feel like a specific, real season happened.
+4-5 sentences. 3 storylines — one surprise (refer to the standings above for context), one injury, one off-ice story.
 
 **THE YEAR IN NUMBERS**
-- **Goals:** [Player, Team] — XX goals
-- **Points:** [Player, Team] — XXX points
-- **GAA:** [Goalie, Team — must be top-10 team] — X.XX
-- **Save %:** [Goalie, Team — must be top-10 team] — .XXX
-- **Presidents' Trophy:** [Team] — XXX pts
-- **Stanley Cup Champion:** [Team] — one line (NOT Florida Panthers)
-- **Conn Smythe:** [Player, Team]
+Use ONLY the numbers from PROJECTED SEASON RESULTS above. Do not invent alternatives.
+- **Goals:** [Player who led in pts, approximated goals]
+- **Points:** ${sim?.leaders?.topScorer?.name ?? "[Points leader]"}, ${sim?.leaders?.topScorer?.team ?? ""} — ${sim?.leaders?.topScorer?.pts ?? "??"} pts
+- **GAA:** ${sim?.leaders?.topGoalie?.name ?? "[GAA leader]"}, ${sim?.leaders?.topGoalie?.team ?? ""} — ${sim?.leaders?.topGoalie?.gaa ?? "??"}
+- **Save %:** ${sim?.leaders?.topGoalie?.name ?? "[SV% leader]"}, ${sim?.leaders?.topGoalie?.team ?? ""} — ${sim?.leaders?.topGoalie?.svp ?? "??"}
+- **Presidents' Trophy:** ${sim?.leaders?.presidentsTrophy?.teamName ?? "[Team]"} — ${sim?.leaders?.presidentsTrophy?.projectedPoints ?? "??"}  pts
+- **Stanley Cup Champion:** ${sim?.leaders?.cupWinner?.teamName ?? "[Team]"} — one line
+- **Conn Smythe:** [Best player from Cup winner's roster]
 - **Calder Trophy:** Matthew Schaefer, New York Islanders — unanimous
 
 **THE DRAFT LOTTERY**
@@ -461,19 +462,17 @@ ${(() => {
   const tradedAwayPick = executedTrades.some((t: any) =>
     t.outgoing.some((a: any) => a.position === "Pick" && (a.round ?? 1) === 1)
   );
-  if (tradedAwayPick) {
-    return `${teams[0]!.name} traded away their 1st round pick. They DO NOT participate. 2 sentences about watching another team use their pick.`;
-  }
-  return isRebuilding
-    ? `3-4 sentences. ${teams[0]!.name} is rebuilding — what pick did they land? Describe the top prospect vividly. What are scouts saying?`
-    : `2 sentences. Who won the lottery, why they needed it, one line on the top prospect.`;
+  if (tradedAwayPick) return `${teams[0]!.name} traded away their 1st round pick. 2 sentences about watching another team use it.`;
+  if (sim?.homeTeam && !sim.homeTeam.madePlayoffs)
+    return `${teams[0]!.name} finished #${sim.homeTeam.leagueRank}/32 with ${sim.homeTeam.projectedPoints} pts. 3 sentences on what their lottery position means and who they might draft.`;
+  return `2 sentences. ${sim?.leaders?.draftLottery?.teamName ?? "The worst team"} won the lottery. Who is the top prospect?`;
 })()}
 
 **VERDICT**
-Two sentences per team — what went right or wrong, and whether the GM made the right call. Be direct. No diplomacy.
+Two sentences per team — what went right or wrong, definitive judgment on the GM's call.
 
-Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}. Use specific numbers. Never cut off mid-sentence. Write like someone who watched every single game.`;
-    })()
+Simulation #${sim?.seed ?? "—"} · ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}. Write like someone who watched every game.`;
+    })();
 
     if (simAbortRef.current) simAbortRef.current.abort();
     simAbortRef.current = new AbortController();
@@ -485,7 +484,7 @@ Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'lon
         signal: simAbortRef.current.signal,
         body: JSON.stringify({
           model: "claude-sonnet-4-5",
-          max_tokens: 1600,
+          max_tokens: 1800,
           messages: [{ role: "user", content: prompt }],
         }),
       });
@@ -497,7 +496,6 @@ Today is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'lon
     }
     setSimLoading(false);
   }, [teams, db, executedTrades]);
-
   useEffect(() => {
     if (evaluated) runEval();
   }, [blocks, teams]);
@@ -875,9 +873,9 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
       <div className="relative w-full max-w-[1700px] mx-auto px-4 lg:px-6 py-6 lg:py-8 flex flex-col gap-5 overflow-x-hidden">
 
-        <header className="flex flex-col lg:flex-row lg:justify-between lg:items-end pb-5 border-b" style={{ borderColor: '#b8a070' }}>
+        <header className="flex flex-col pb-5 border-b" style={{ borderColor: '#b8a070' }}>
           <div className="w-full">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center justify-center gap-2 mb-1">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-50" style={{ background: '#b83020' }} />
                 <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: '#b83020' }} />
@@ -885,41 +883,38 @@ RULES: No invented context. No speculation about players not in this trade. Comp
               <span className="text-[9px] font-bold uppercase tracking-[0.4em]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>Live Data Feed Active</span>
             </div>
 
-            {/* Masthead */}
+            {/* Masthead — fully centered */}
             <div style={{ borderTop: '4px double #1c140a', borderBottom: '4px double #1c140a', padding: '8px 0 6px', marginBottom: '4px' }}>
               <div className="text-center">
                 <div className="text-[8px] uppercase tracking-[0.4em] mb-1" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                   Est. 2025 &nbsp;—&nbsp; Vol. VII &nbsp;—&nbsp; Trade Edition
                 </div>
-                <h1 className="font-black leading-none" style={{ color: '#1c140a', fontFamily: "'Libre Baskerville', Georgia, serif",
-                  fontSize: 'clamp(1.8rem, 5vw, 3rem)',
-                  letterSpacing: '-0.02em',
-                  lineHeight: 1,
-                }}>
-                  The Hockey Ledger
-                </h1>
+                <a href="/" style={{ textDecoration: 'none' }}>
+                  <h1 className="font-black leading-none transition-opacity hover:opacity-70" style={{ color: '#1c140a', fontFamily: "'Libre Baskerville', Georgia, serif",
+                    fontSize: 'clamp(1.8rem, 5vw, 3rem)',
+                    letterSpacing: '-0.02em',
+                    lineHeight: 1,
+                    cursor: 'pointer',
+                  }}>
+                    The Hockey Ledger
+                  </h1>
+                </a>
                 <div className="text-[8px] uppercase tracking-[0.3em] mt-1.5 hidden sm:block" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                   X-NAV Analytics &nbsp;·&nbsp; xG Suppression &nbsp;·&nbsp; GM Logic Engine &nbsp;·&nbsp; Live Statistics
                 </div>
                 <div className="mt-2 flex items-center justify-center gap-4">
-                  <span className="text-[8px] font-black uppercase tracking-[0.2em]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
-                    ◆ TRADE MACHINE
-                  </span>
-                  <span style={{ color: '#c8b890' }}>|</span>
-                  <a href="/players" className="text-[8px] font-black uppercase tracking-[0.2em]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace", textDecoration: 'none', transition: 'color 0.15s' }}
+                  <a href="/players" className="text-[8px] font-black uppercase tracking-[0.2em]"
+                    style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace", textDecoration: 'none', transition: 'color 0.15s' }}
                     onMouseEnter={e => (e.currentTarget.style.color = '#1c140a')}
                     onMouseLeave={e => (e.currentTarget.style.color = '#9a7d58')}>
                     ◇ PLAYER ANALYTICS
                   </a>
+                  <span style={{ color: '#c8b890' }}>|</span>
+                  <span className="text-[8px] font-black uppercase tracking-[0.2em]" style={{ color: '#1c140a', fontFamily: "'Courier Prime', monospace" }}>
+                    ◆ TRADE MACHINE
+                  </span>
                 </div>
               </div>
-            </div>
-          </div>
-          <div className="text-right mt-2 lg:mt-0 lg:ml-6 shrink-0">
-            <div className="text-[9px] uppercase tracking-[0.35em] font-black mb-1" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>Home Net Gain</div>
-            <div className={`text-3xl lg:text-4xl font-black font-mono tabular-nums transition-colors duration-500 ${Math.abs(homeNetGain) < 5 ? "text-sky-400" : homeNetGain > 0 ? "text-emerald-400" : "text-rose-500"}`}>
-              {fmt(homeNetGain, 1)}
-              <span className="text-sm ml-1.5 font-bold" style={{ color: '#9a7d58' }}>NAV</span>
             </div>
           </div>
         </header>
@@ -1057,6 +1052,68 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             </div>
 
             {/* Sim result */}
+            {/* ── Projected Season Breakdown ── */}
+            {simData && (
+              <div style={{ borderTop: '1px solid #b8a070', padding: '16px 20px 12px' }}>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                    ⚡ Projected Season Results
+                  </span>
+                  <span className="text-[7px]" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
+                    Simulation #{simData.seed}
+                  </span>
+                </div>
+
+                {/* Two team cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  {[simData.homeTeam, simData.partnerTeam].filter(Boolean).map((t: any) => (
+                    <div key={t.teamId} style={{ background: '#e4d8b8', border: '1px solid #b8a070', padding: '10px 12px' }}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-black text-[12px]" style={{ color: '#1c140a', fontFamily: "'Libre Baskerville', serif" }}>{t.teamName}</span>
+                        <span className={`text-[8px] font-black px-1.5 py-0.5`} style={{
+                          color: t.madePlayoffs ? '#1a5c2e' : '#b83020',
+                          border: `1px solid ${t.madePlayoffs ? 'rgba(26,92,46,0.4)' : 'rgba(184,48,32,0.4)'}`,
+                          fontFamily: "'Courier Prime', monospace",
+                        }}>
+                          {t.madePlayoffs ? '✓ PLAYOFFS' : '✗ MISSED'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[
+                          { label: 'PTS', val: t.projectedPoints },
+                          { label: 'RANK', val: `#${t.leagueRank}` },
+                          { label: 'TOP SCORER', val: t.topScorer ? `${t.topScorer.name.split(' ').pop()} ${t.topScorer.projectedPts}pts` : '—' },
+                          { label: 'GOALIE', val: t.goalie?.name.split(' ').pop() ?? '—' },
+                          { label: 'GAA', val: t.goalie?.projectedGAA ?? '—' },
+                          { label: 'SV%', val: t.goalie?.projectedSVP?.toFixed(3) ?? '—' },
+                        ].map((s: any) => (
+                          <div key={s.label} style={{ background: '#dfd0a8', border: '1px solid #c8b890', padding: '4px 6px', textAlign: 'center' }}>
+                            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '6px', color: '#9a7d58', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.label}</div>
+                            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '9px', fontWeight: 900, color: '#1c140a', marginTop: '1px' }}>{s.val}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* League results strip */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                  {[
+                    { label: "Presidents' Trophy", val: `${simData.leaders?.presidentsTrophy?.teamName} (${simData.leaders?.presidentsTrophy?.projectedPoints}pts)` },
+                    { label: "Stanley Cup", val: simData.leaders?.cupWinner?.teamName },
+                    { label: "Points Leader", val: `${simData.leaders?.topScorer?.name?.split(' ').pop()} ${simData.leaders?.topScorer?.pts}pts` },
+                    { label: "Draft Lottery", val: `${simData.leaders?.draftLottery?.teamName} (${simData.leaders?.draftLottery?.projectedPoints}pts)` },
+                  ].map((s: any) => (
+                    <div key={s.label} style={{ background: '#e4d8b8', border: '1px solid #b8a070', padding: '6px 8px' }}>
+                      <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '6.5px', color: '#9a7d58', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>{s.label}</div>
+                      <div style={{ fontFamily: "'Libre Baskerville', serif", fontSize: '10px', fontWeight: 700, color: '#1c140a' }}>{s.val}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {simResult && (
               <div className="px-5 py-5" style={{ borderTop: '1px solid #b8a070' }}>
                 <div className="flex items-center gap-2 mb-4" style={{ borderBottom: '1px solid #c8b890', paddingBottom: '8px' }}>
@@ -2189,20 +2246,32 @@ function TugBar({ homeNetGain, navA, navB }: { homeNetGain: number; navA: number
   const leftPct = clamp((navA / total) * 100, 5, 95);
 
   return (
-    <div className="w-full h-9 border rounded-2xl relative overflow-hidden flex items-center shadow-inner">
-      <div className="absolute inset-0 flex">
-        <div className="h-full bg-rose-500/8 transition-all duration-700 ease-out" style={{ width: `${leftPct}%` }} />
-        <div className="h-full bg-emerald-500/8 transition-all duration-700 ease-out flex-1" />
-      </div>
-      <div className="absolute left-1/2 -translate-x-1/2 h-full w-px bg-zinc-700/50" />
-      <div className="z-10 w-full flex justify-between px-3 sm:px-5 font-black text-[9px] uppercase tracking-[0.3em] text-zinc-700">
-        <span className={`hidden sm:inline ${homeNetGain < -5 ? "text-rose-500" : ""}`}>Outgoing Value</span>
-        <span className={`sm:hidden ${homeNetGain < -5 ? "text-rose-500" : ""}`}>OUT</span>
-        <span className="bg-zinc-950 text-zinc-300 px-3 py-1 rounded-lg border border-zinc-800 font-mono text-[10px] tracking-tight">
-          {navA.toFixed(0)} ←→ {navB.toFixed(0)} NAV
+    <div className="flex flex-col gap-1">
+      {/* Home Net Gain — centered above the bar */}
+      <div className="flex items-center justify-center gap-2">
+        <span className="text-[9px] uppercase tracking-[0.35em] font-black" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+          Home Net Gain
         </span>
-        <span className={`hidden sm:inline ${homeNetGain > 5 ? "text-emerald-400" : ""}`}>Incoming Value</span>
-        <span className={`sm:hidden ${homeNetGain > 5 ? "text-emerald-400" : ""}`}>IN</span>
+        <span className={`text-xl font-black font-mono tabular-nums transition-colors duration-500 ${Math.abs(homeNetGain) < 5 ? "text-sky-400" : homeNetGain > 0 ? "text-emerald-400" : "text-rose-500"}`}>
+          {fmt(homeNetGain, 1)}
+        </span>
+        <span className="text-[10px] font-bold" style={{ color: '#9a7d58' }}>NAV</span>
+      </div>
+      <div className="w-full h-9 border rounded-2xl relative overflow-hidden flex items-center shadow-inner">
+        <div className="absolute inset-0 flex">
+          <div className="h-full bg-rose-500/8 transition-all duration-700 ease-out" style={{ width: `${leftPct}%` }} />
+          <div className="h-full bg-emerald-500/8 transition-all duration-700 ease-out flex-1" />
+        </div>
+        <div className="absolute left-1/2 -translate-x-1/2 h-full w-px bg-zinc-700/50" />
+        <div className="z-10 w-full flex justify-between px-3 sm:px-5 font-black text-[9px] uppercase tracking-[0.3em] text-zinc-700">
+          <span className={`hidden sm:inline ${homeNetGain < -5 ? "text-rose-500" : ""}`}>Outgoing Value</span>
+          <span className={`sm:hidden ${homeNetGain < -5 ? "text-rose-500" : ""}`}>OUT</span>
+          <span className="bg-zinc-950 text-zinc-300 px-3 py-1 rounded-lg border border-zinc-800 font-mono text-[10px] tracking-tight">
+            {navA.toFixed(0)} ←→ {navB.toFixed(0)} NAV
+          </span>
+          <span className={`hidden sm:inline ${homeNetGain > 5 ? "text-emerald-400" : ""}`}>Incoming Value</span>
+          <span className={`sm:hidden ${homeNetGain > 5 ? "text-emerald-400" : ""}`}>IN</span>
+        </div>
       </div>
     </div>
   );
@@ -2412,8 +2481,30 @@ function TeamDNA({
       {expanded && (
         <div className="strands-body">
           <p className="strands-context">
-            Each helix shows a team's aggregate offensive (navy) and defensive (red) profile across their top-9 forwards and top-4 D by ice time. The dashed gold line is the championship template — the average profile of recent Stanley Cup winners. Gaps below the template are roster needs.{hasActiveTrade ? " Updated to reflect the current trade." : ""}
+            Each helix shows a team's aggregate offensive (navy) and defensive (red) profile across their top-9 forwards and top-4 D by ice time. The dashed gold line is the championship template. The dotted green line is the playoff threshold — the minimum profile needed to realistically compete for a postseason spot. Gaps below either line are roster needs.{hasActiveTrade ? " Updated to reflect the current trade." : ""}
           </p>
+
+          {/* Playoff standing context */}
+          {homeTeam && (
+            <div className="flex items-center gap-3 mb-3 flex-wrap">
+              <div className="text-[8px] font-black px-2 py-1" style={{
+                fontFamily: "'Courier Prime', monospace",
+                color: homeTeam.standing <= 8 ? '#1a5c2e' : homeTeam.standing <= 16 ? '#8a5c00' : '#b83020',
+                border: `1px solid ${homeTeam.standing <= 8 ? 'rgba(26,92,46,0.4)' : homeTeam.standing <= 16 ? 'rgba(138,92,0,0.4)' : 'rgba(184,48,32,0.4)'}`,
+              }}>
+                {homeTeam.name} · #{homeTeam.standing}/32 · {homeTeam.standing <= 8 ? '✓ IN PLAYOFFS' : homeTeam.standing <= 12 ? '~ BUBBLE' : homeTeam.standing <= 16 ? '~ WILDCARD RANGE' : '✗ OUT'}
+              </div>
+              {partnerTeam && (
+                <div className="text-[8px] font-black px-2 py-1" style={{
+                  fontFamily: "'Courier Prime', monospace",
+                  color: partnerTeam.standing <= 8 ? '#1a5c2e' : partnerTeam.standing <= 16 ? '#8a5c00' : '#b83020',
+                  border: `1px solid ${partnerTeam.standing <= 8 ? 'rgba(26,92,46,0.4)' : partnerTeam.standing <= 16 ? 'rgba(138,92,0,0.4)' : 'rgba(184,48,32,0.4)'}`,
+                }}>
+                  {partnerTeam.name} · #{partnerTeam.standing}/32 · {partnerTeam.standing <= 8 ? '✓ IN PLAYOFFS' : partnerTeam.standing <= 12 ? '~ BUBBLE' : partnerTeam.standing <= 16 ? '~ WILDCARD RANGE' : '✗ OUT'}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="strands-helix-grid">
             {[
@@ -2434,6 +2525,9 @@ function TeamDNA({
               };
               const tmplOffA = Object.values(CHAMPIONSHIP_TEMPLATE.off).reduce((s: number, v) => s + (v as number), 0) / 5;
               const tmplDefA = Object.values(CHAMPIONSHIP_TEMPLATE.def).reduce((s: number, v) => s + (v as number), 0) / 5;
+              // Playoff threshold — roughly 80% of championship template
+              const playoffOffA = tmplOffA * 0.80;
+              const playoffDefA = tmplDefA * 0.80;
               const rungs = [70, 140, 210, 280, 350, 420, 490];
               return (
                 <div key={team?.id} className="strands-helix-card">
@@ -2445,10 +2539,16 @@ function TeamDNA({
                     </div>
                   </div>
                   <svg className="strands-helix-svg" viewBox={`0 0 ${W2} ${H2}`}>
+                    {/* Championship template — gold dashed */}
                     <path d={buildP(tmplOffA, false)} fill="none"
                       stroke="var(--rule)" strokeWidth="2" strokeDasharray="8,5" opacity="0.8"/>
                     <path d={buildP(tmplDefA, true)} fill="none"
                       stroke="var(--rule)" strokeWidth="2" strokeDasharray="8,5" opacity="0.8"/>
+                    {/* Playoff threshold — green dotted */}
+                    <path d={buildP(playoffOffA, false)} fill="none"
+                      stroke="#1a5c2e" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5"/>
+                    <path d={buildP(playoffDefA, true)} fill="none"
+                      stroke="#1a5c2e" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5"/>
                     {rungs.map(x => {
                       const oy = H2/2 - (amp2*(0.25+offA*0.75))*Math.sin(freq2*x*2);
                       const dy = H2/2 + (amp2*(0.25+defA*0.75))*Math.sin(freq2*x*2);
@@ -2465,6 +2565,8 @@ function TeamDNA({
                     <text x="38" y="31" fontSize="9" fill="var(--red)" fontFamily="Courier Prime, monospace" fontWeight="bold">DEFENSE</text>
                     <line x1="14" y1="42" x2="34" y2="42" stroke="var(--rule)" strokeWidth="2" strokeDasharray="5,3"/>
                     <text x="38" y="46" fontSize="9" fill="var(--rule)" fontFamily="Courier Prime, monospace">CHAMP. TEMPLATE</text>
+                    <line x1="14" y1="57" x2="34" y2="57" stroke="#1a5c2e" strokeWidth="1.5" strokeDasharray="4,3"/>
+                    <text x="38" y="61" fontSize="9" fill="#1a5c2e" fontFamily="Courier Prime, monospace">PLAYOFF THRESHOLD</text>
                   </svg>
                 </div>
               );
@@ -2472,7 +2574,7 @@ function TeamDNA({
           </div>
 
           <div className="strands-gaps-header">
-            {homeTeam?.name} — Gaps vs Championship Template{hasActiveTrade ? " (post-trade)" : ""}
+            {homeTeam?.name} — Roster Gaps vs Playoff & Championship Thresholds{hasActiveTrade ? " (post-trade)" : ""}
           </div>
 
           <div className="strands-gaps-grid">
@@ -2506,8 +2608,9 @@ function TeamDNA({
           </div>
 
           <div className="strands-legend">
-            <span><span style={{ color: 'var(--red)' }}>■</span> Below template</span>
+            <span><span style={{ color: 'var(--red)' }}>■</span> Below playoff threshold</span>
             <span><span style={{ color: 'var(--green)' }}>■</span> Exceeds template</span>
+            <span><span style={{ color: '#1a5c2e' }}>· ·</span> Playoff threshold</span>
             <span><span style={{ color: 'var(--rule)' }}>— —</span> Championship standard</span>
           </div>
         </div>

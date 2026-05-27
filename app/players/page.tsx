@@ -525,24 +525,36 @@ export default function PlayersPage() {
     <main style={{ minHeight: "100vh", background: "var(--paper)", color: "var(--ink)", fontFamily: "'Libre Baskerville', serif" }}>
 
       {/* Header — newspaper masthead style */}
-      <div style={{ borderBottom: '4px double #1c140a', padding: "16px 20px 12px" }}>
+      <div style={{ borderBottom: '1px solid #b8a070', padding: "16px 20px 12px" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ borderTop: '4px double #1c140a', borderBottom: '1px solid #b8a070', padding: '8px 0 6px', marginBottom: '12px', textAlign: 'center' }}>
+          <div style={{ borderTop: '4px double #1c140a', borderBottom: '4px double #1c140a', padding: '8px 0 6px', marginBottom: '12px', textAlign: 'center' }}>
             <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: "8px", color: "#9a7d58", letterSpacing: "0.4em", textTransform: "uppercase", marginBottom: "4px" }}>
-              The Hockey Ledger &nbsp;—&nbsp; Player Intelligence Bureau
+              Est. 2025 &nbsp;—&nbsp; Vol. VII &nbsp;—&nbsp; Trade Edition
             </div>
-            <h1 style={{ fontFamily: "'Libre Baskerville', Georgia, serif", fontSize: "clamp(1.4rem, 4vw, 2.2rem)", fontWeight: 900, color: "#1c140a", margin: 0, lineHeight: 1, letterSpacing: "-0.02em" }}>
-              Player Analytics
-            </h1>
-            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: "8px", color: "#9a7d58", letterSpacing: "0.3em", textTransform: "uppercase", marginTop: "4px" }}>
-              X-NAV · STRAND™ Profiles · Point Shares · Live 2025-26 Data
+            <a href="/" style={{ textDecoration: "none" }}>
+              <h1 style={{ fontFamily: "'Libre Baskerville', Georgia, serif", fontSize: "clamp(1.8rem, 5vw, 3rem)", fontWeight: 900, color: "#1c140a", margin: 0, lineHeight: 1, letterSpacing: "-0.02em", cursor: "pointer", opacity: 1, transition: "opacity 0.15s" }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = "0.7")}
+                onMouseLeave={e => (e.currentTarget.style.opacity = "1")}>
+                The Hockey Ledger
+              </h1>
+            </a>
+            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: "8px", color: "#9a7d58", letterSpacing: "0.3em", textTransform: "uppercase", marginTop: "6px" }}>
+              X-NAV Analytics &nbsp;·&nbsp; xG Suppression &nbsp;·&nbsp; GM Logic Engine &nbsp;·&nbsp; Live Statistics
+            </div>
+            <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "center", gap: "16px" }}>
+              <a href="/" style={{ fontFamily: "'Courier Prime', monospace", fontSize: "8px", fontWeight: 900, color: "#9a7d58", textDecoration: "none", letterSpacing: "0.2em", textTransform: "uppercase", transition: "color 0.15s" }}
+                onMouseEnter={e => (e.currentTarget.style.color = "#1c140a")}
+                onMouseLeave={e => (e.currentTarget.style.color = "#9a7d58")}>
+                ◇ TRADE MACHINE
+              </a>
+              <span style={{ color: "#c8b890" }}>|</span>
+              <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: "8px", fontWeight: 900, color: "#1c140a", letterSpacing: "0.2em", textTransform: "uppercase" }}>
+                ◆ PLAYER ANALYTICS
+              </span>
             </div>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", flexWrap: "wrap" }}>
-            <a href="/" style={{ fontFamily: "'Courier Prime', monospace", fontSize: "8px", color: "#9a7d58", textDecoration: "none", letterSpacing: "0.2em", textTransform: "uppercase", border: "1px solid #b8a070", padding: "3px 8px" }}>
-              ← Trade Machine
-            </a>
             <span style={{ color: "#b8a070", fontFamily: "'Courier Prime', monospace", fontSize: "8px" }}>
               {players.length > 0 ? `${skaters.length + goalies.length} players · Live data` : "Loading..."}
             </span>
