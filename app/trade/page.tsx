@@ -6,6 +6,7 @@ import TradeProposalEngine from "@/app/components/TradeProposal";
 import PlayerComparison from "@/app/components/PlayerComparison";
 import CapProjection from "@/app/components/CapProjection";
 import LedgerDropdown from "@/app/components/LedgerDropdown";
+
 import type {
   Asset, Team, XNAVResult, GmFlag, FlagSeverity, FlagCategory,
   TradeVerdict, TradeStatus, TradeMetrics,
@@ -1555,6 +1556,9 @@ function TradePanel({
 // ============================================================
 // ASSET CARD — with retention slider and contract details
 // ============================================================
+// ============================================================
+// ASSET CARD — with retention slider and contract details
+// ============================================================
 function AssetCard({
   asset, idx, blocks, setBlocks, onRequestTrade, navResult, navMap
 }: {
@@ -1610,18 +1614,36 @@ function AssetCard({
             <div className="font-black leading-tight truncate flex items-center gap-1.5"
               style={{ fontSize: '13px', color: '#1c140a' }}>
               {asset.name}
-              {asset.hasNMC && <span className="text-[7px] px-1 font-black shrink-0" style={{ color: '#b83020', border: '1px solid #b83020',  }}>NMC</span>}
-              {asset.hasNTC && !asset.hasNMC && <span className="text-[7px] px-1 font-black shrink-0" style={{ color: '#8a5c00', border: '1px solid #8a5c00',  }}>NTC</span>}
-              {!asset.hasLiveStats && !isPick && <span className="text-[7px] px-1 font-black shrink-0" style={{ color: '#9a7d58', border: '1px solid #b8a070',  }}>EST</span>}
+              {asset.hasNMC && <span className="text-[7px] px-1 font-black shrink-0" style={{ color: '#b83020', border: '1px solid #b83020' }}>NMC</span>}
+              {asset.hasNTC && !asset.hasNMC && <span className="text-[7px] px-1 font-black shrink-0" style={{ color: '#8a5c00', border: '1px solid #8a5c00' }}>NTC</span>}
+              {!asset.hasLiveStats && !isPick && <span className="text-[7px] px-1 font-black shrink-0" style={{ color: '#9a7d58', border: '1px solid #b8a070' }}>EST</span>}
+              {/* ── NEW: Extension Badge ── */}
+              {asset.hasExtension && (
+                <span className="text-[7px] px-1 font-black shrink-0 shadow-sm rounded-sm" 
+                  style={{ background: '#d97706', color: '#fff', border: '1px solid #b45309' }} 
+                  title="Future contract extension applied to valuation">
+                  EXTENSION
+                </span>
+              )}
             </div>
+            
+            {/* ── NEW: Future AAV Text formatting ── */}
             <div className="text-[9px] font-bold uppercase tracking-wider mt-0.5" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
               {isPick
                 ? `${asset.year} · ${asset.round === 1 ? "1st" : asset.round === 2 ? "2nd" : "3rd"} Round`
                 : (() => {
                     const expiryYear = new Date().getFullYear() + (asset.yearsRemaining ?? 1);
+                    if (asset.hasExtension) {
+                      return (
+                        <span style={{ color: '#d97706' }}>
+                          {asset.position} · Age {asset.age} · FUTURE AAV: ${asset.capHit.toFixed(2)}M × {asset.yearsRemaining}yr
+                        </span>
+                      );
+                    }
                     return `${asset.position} · Age ${asset.age} · $${asset.capHit.toFixed(2)}M × ${asset.yearsRemaining}yr · Exp. ${expiryYear}`;
                   })()}
             </div>
+            
             {/* Awards badges */}
             {PLAYER_PEDIGREE[asset.name]?.awards && PLAYER_PEDIGREE[asset.name].awards!.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1">
@@ -1991,7 +2013,7 @@ function AssetCard({
           <div className="stat-grid-4 mb-1.5">
             {[
               { label: 'GP',    val: asset.games.toString() },
-              { label: 'G',     val: ((asset.goalsPace   ?? 0) * asset.games / 82).toFixed(0) },
+              { label: 'G',     val: ((asset.goalsPace    ?? 0) * asset.games / 82).toFixed(0) },
               { label: 'A',     val: ((asset.assistsPace ?? 0) * asset.games / 82).toFixed(0) },
               { label: 'PTS',   val: (asset.ptsPace ? (asset.ptsPace * asset.games / 82).toFixed(0) : '—') },
             ].map(s => (
@@ -2899,6 +2921,9 @@ function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestCla
 // ============================================================
 // BREAKDOWN TABLE
 // ============================================================
+// ============================================================
+// BREAKDOWN TABLE
+// ============================================================
 function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap: Record<string, XNAVResult> }) {
   const allAssets = [
     ...blocks[0].map((a) => ({ ...a, side: "OUT" as const })),
@@ -2939,7 +2964,10 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
                     {a.position === "Pick" ? "—" : fmt(a.defRate, 2)}
                   </td>
                   <td className="px-3 py-2 text-zinc-400">{a.position === "Pick" ? "—" : a.avgTOI.toFixed(1)}</td>
-                  <td className="px-3 py-2 text-amber-400">{a.position === "Pick" ? "—" : `$${a.capHit.toFixed(2)}M`}</td>
+                  {/* ── NEW: Extension styling on the Cap Hit column ── */}
+                  <td className={`px-3 py-2 ${a.hasExtension ? "text-amber-500 font-bold" : "text-amber-400"}`} title={a.hasExtension ? "Valuation based on future extension AAV" : undefined}>
+                    {a.position === "Pick" ? "—" : `$${a.capHit.toFixed(2)}M${a.hasExtension ? '*' : ''}`}
+                  </td>
                   <td className="px-3 py-2 text-zinc-500">{a.position === "Pick" ? "—" : `${a.yearsRemaining}yr`}</td>
                   <td className={`px-3 py-2 font-black text-[12px] ${xnav.total > 0 ? "text-emerald-400" : "text-rose-400"}`}>
                     {fmt(xnav.total, 1)}

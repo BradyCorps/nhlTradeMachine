@@ -43,6 +43,10 @@ export interface Asset {
   // Point Shares (computed dynamically from NHL Stats API)
   ops?: number | null;  // Offensive Point Shares — current season
   dps?: number | null;  // Defensive Point Shares — current season
+
+  teamXga60?: number;      
+  baselineGsax?: number;   
+  hasExtension?: boolean;
 }
 
 export interface Team {

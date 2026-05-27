@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { TEAMS_DB } from "@/app/lib/db";
+export const dynamic = "force-dynamic";
 
 const CAP_CEILING = 104.0;
 const CAP_FLOOR   = 70.6;
@@ -350,6 +351,17 @@ function loadBundled(): Record<string, any> {
     console.error("[Bundled] FAILED:", e.message);
   }
   return {};
+}
+
+function loadExtensions(): Record<string, any> {
+  try {
+    const fs   = require("fs");
+    const path = require("path");
+    const file = path.join(process.cwd(), "app/data/contracts.extensions.json");
+    return JSON.parse(fs.readFileSync(file, "utf-8"));
+  } catch (e: any) {
+    return {};
+  }
 }
 
 // Proper CSV row parser — handles quoted fields containing commas.
@@ -1058,6 +1070,7 @@ export async function GET() {
     loadTeams(),
     fetchPointShares(),
   ]);
+  const EXTENSIONS = loadExtensions();
   // ── 1. MoneyPuck analytics — skaters + goalies ─────────────
   const analyticsMap = new Map<string, any>();
   const goalieMap    = new Map<string, any>();
@@ -1278,16 +1291,25 @@ export async function GET() {
         ? (goalieMap.get(goalieSlug) ?? goalieMap.get(goalieSlugLast) ?? null)
         : null;
 
-      // Contract sanity check — if player is ≤23 with a suspiciously high
-      // contract (likely inherited via same-name collision e.g. two Petterssons),
-      // cap at ELC rates. Young players on real big deals are rare exceptions.
+// Contract sanity check
       const rawCapHit = isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925);
       const nameCollision = p.age <= 23 && rawCapHit > 3.0 && !fin?.position?.startsWith(p.position);
-      const finalCapHit   = nameCollision ? elcCapHit : rawCapHit;
-      const finalYears    = nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1));
-      const finalNMC      = nameCollision ? false : (fin?.hasNMC ?? false);
-      const finalNTC      = nameCollision ? false : (fin?.hasNTC ?? false);
-      const finalRetain   = nameCollision ? true  : (fin?.canRetain ?? true);
+
+      // ── THE OVERRIDE LAYER (Highest Priority) ───────────────
+    const override = EXTENSIONS[p.name];
+      
+      const finalCapHit   = override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
+      const finalYears    = override?.yearsRemaining ?? (nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1)));
+      const finalNMC      = override?.hasNMC ?? (nameCollision ? false : (fin?.hasNMC ?? false));
+      const finalNTC      = override?.hasNTC ?? (nameCollision ? false : (fin?.hasNTC ?? false));
+      const finalRetain   = override?.canRetain ?? (nameCollision ? true  : (fin?.canRetain ?? true));
+      const hasExtension  = override?.hasExtension ?? false;
+      const intangibleMult = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
+
+      // ── UPSTREAM GOALIE METRICS ─────────────────────────────
+      // Adding safe fallbacks for the new G-NAV math until historical models are fully wired
+      const teamXga60 = 2.55; // League average placeholder
+      const baselineGsax = goalieStats?.gsax ?? 0; // Current year fallback
 
       players.push({
         id:             p.id,
@@ -1308,15 +1330,18 @@ export async function GET() {
         savePct:        goalieStats?.savePct       ?? 0.900,
         gamesStarted:   goalieStats?.gamesStarted  ?? 0,
         shotsPerGame:   goalieStats?.shotsPerGame  ?? 0,
+        teamXga60:      teamXga60,     // NEW
+        baselineGsax:   baselineGsax,  // NEW
         // Contract
         capHit:         CONTRACT_OVERRIDES[p.name]?.capHit         ?? finalCapHit,
         yearsRemaining: CONTRACT_OVERRIDES[p.name]?.yearsRemaining ?? finalYears,
+        hasExtension:   hasExtension,  // NEW
         hasNMC:         finalNMC,
         hasNTC:         finalNTC,
         canRetain:      finalRetain,
         retainedPct:    0,
-        multiplier:     fin?.intangibleMultiplier ?? 1.0,
-        // Point Shares — lookup by name, fallback to null (computed dynamically)
+        multiplier:     intangibleMult,
+        // Point Shares
         ops:  PS_MAP.get(p.name)?.ops ?? PS_MAP.get(`id:${p.id}`)?.ops ?? null,
         dps:  PS_MAP.get(p.name)?.dps ?? PS_MAP.get(`id:${p.id}`)?.dps ?? null,
         // NOIV components
