@@ -142,9 +142,10 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
   return (
     <div style={{
       background: "#d6c8a5", borderTop: "1px solid #b8a070",
-      padding: "12px 16px",
+      padding: "12px 10px",
     }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "12px" }}
+        className="expanded-player-grid">
         {/* Left — stats */}
         <div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginBottom: "10px" }}>
@@ -326,18 +327,8 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
     <>
       <div
         onClick={() => setExpanded(e => !e)}
-        style={{
-          display: "grid",
-          gridTemplateColumns: "32px 36px 1fr 80px 72px 64px",
-          alignItems: "center",
-          gap: "8px",
-          padding: "8px 12px",
-          borderBottom: "1px solid var(--rule-light)",
-          cursor: "pointer",
-          background: expanded ? "var(--paper-card)" : "transparent",
-          transition: "background 0.15s",
-        }}
-        className="player-row"
+        className="player-row-grid player-row"
+        style={{ background: expanded ? "var(--paper-card)" : "transparent", transition: "background 0.15s" }}
       >
         {/* Rank */}
         <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: "9px", color: "var(--rule)", textAlign: "right" }}>
@@ -531,7 +522,7 @@ export default function PlayersPage() {
             <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: "8px", color: "#9a7d58", letterSpacing: "0.4em", textTransform: "uppercase", marginBottom: "4px" }}>
               Est. 2025 &nbsp;—&nbsp; Vol. VII &nbsp;—&nbsp; Trade Edition
             </div>
-            <a href="/" style={{ textDecoration: "none" }}>
+            <a href="/trade" style={{ textDecoration: "none" }}>
               <h1 style={{ fontFamily: "'Libre Baskerville', Georgia, serif", fontSize: "clamp(1.8rem, 5vw, 3rem)", fontWeight: 900, color: "#1c140a", margin: 0, lineHeight: 1, letterSpacing: "-0.02em", cursor: "pointer", opacity: 1, transition: "opacity 0.15s" }}
                 onMouseEnter={e => (e.currentTarget.style.opacity = "0.7")}
                 onMouseLeave={e => (e.currentTarget.style.opacity = "1")}>
@@ -542,7 +533,7 @@ export default function PlayersPage() {
               X-NAV Analytics &nbsp;·&nbsp; xG Suppression &nbsp;·&nbsp; GM Logic Engine &nbsp;·&nbsp; Live Statistics
             </div>
             <div style={{ marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "center", gap: "16px" }}>
-              <a href="/" style={{ fontFamily: "'Courier Prime', monospace", fontSize: "8px", fontWeight: 900, color: "#9a7d58", textDecoration: "none", letterSpacing: "0.2em", textTransform: "uppercase", transition: "color 0.15s" }}
+              <a href="/trade" style={{ fontFamily: "'Courier Prime', monospace", fontSize: "8px", fontWeight: 900, color: "#9a7d58", textDecoration: "none", letterSpacing: "0.2em", textTransform: "uppercase", transition: "color 0.15s" }}
                 onMouseEnter={e => (e.currentTarget.style.color = "#1c140a")}
                 onMouseLeave={e => (e.currentTarget.style.color = "#9a7d58")}>
                 ◇ TRADE MACHINE
@@ -561,7 +552,7 @@ export default function PlayersPage() {
           </div>
 
           {/* Search + filters */}
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+          <div className="filter-row">
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -570,14 +561,14 @@ export default function PlayersPage() {
                 fontFamily: "'Courier Prime', monospace", fontSize: "10px",
                 padding: "7px 12px", border: "1px solid #b8a070",
                 background: "#e4d8b8", color: "#1c140a",
-                outline: "none", width: "clamp(160px, 30vw, 220px)",
+                outline: "none", minWidth: "140px", flex: "1 1 140px", maxWidth: "220px",
               }}
             />
-            <div style={{ display: "flex", gap: "4px" }}>
+            <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
               {(["ALL","F","D","G"] as const).map(p => (
                 <button key={p} className={`filter-btn${posFilter === p ? " active" : ""}`}
                   onClick={() => setPosFilter(p)}>
-                  {p === "ALL" ? "All" : p === "F" ? "Forwards" : p === "D" ? "Defence" : "Goalies"}
+                  {p === "ALL" ? "All" : p === "F" ? "Fwds" : p === "D" ? "D" : "G"}
                 </button>
               ))}
             </div>
@@ -586,13 +577,14 @@ export default function PlayersPage() {
               onChange={e => setTeamFilter(e.target.value)}
               style={{
                 fontFamily: "'Courier Prime', monospace", fontSize: "8px",
-                padding: "6px 10px", border: "1px solid #b8a070",
+                padding: "6px 8px", border: "1px solid #b8a070",
                 background: "#e4d8b8", color: "#1c140a", cursor: "pointer",
+                flexShrink: 0,
               }}
             >
               <option value="ALL">All Teams</option>
               {teams.sort((a,b) => a.name.localeCompare(b.name)).map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+                <option key={t.id} value={t.id}>{t.id}</option>
               ))}
             </select>
           </div>
@@ -609,11 +601,7 @@ export default function PlayersPage() {
           <>
             {/* Column headers */}
             {(posFilter === "ALL" || posFilter === "F" || posFilter === "D") && skaters.length > 0 && (
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "32px 36px 1fr 80px 72px 64px",
-                gap: "8px",
-                padding: "6px 12px",
+              <div className="player-row-grid" style={{
                 borderBottom: "2px solid #1c140a",
                 background: "#f2ecd7",
                 position: "sticky", top: 0, zIndex: 10,
@@ -626,7 +614,7 @@ export default function PlayersPage() {
                   <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: "7px", color: "var(--rule)", textTransform: "uppercase", letterSpacing: "0.1em" }}>STRAND™</span>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "4px", flexWrap: "wrap" }}>
+                  <div className="sort-btn-row">
                     {(["ppg","pts","ops","dps","toi","age","cap"] as const).map(k => (
                       <button key={k} className={`col-header${sortKey === k ? " active" : ""}`}
                         onClick={() => setSortKey(k)}>

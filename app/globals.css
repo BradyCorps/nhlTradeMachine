@@ -530,30 +530,92 @@ select.ledger-select {
 .players-hide-mobile { display: block; }
 @media (max-width: 540px) { .players-hide-mobile { display: none; } }
 
+/* Filter buttons — larger tap targets on mobile */
 .filter-btn {
   font-family: 'Courier Prime', monospace;
   font-size: 8px; font-weight: 900;
-  text-transform: uppercase; letter-spacing: 0.15em;
-  padding: 5px 10px; cursor: pointer;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  padding: 6px 10px; cursor: pointer;
   border: 1px solid var(--rule);
   background: transparent; color: var(--ink-faint);
   transition: all 0.15s;
+  white-space: nowrap;
 }
 .filter-btn.active  { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .filter-btn:hover:not(.active) { border-color: var(--ink); color: var(--ink); }
 
+/* Sort buttons — horizontal scroll on mobile, no wrap */
+.sort-btn-row {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  justify-content: flex-end;
+}
+.sort-btn-row::-webkit-scrollbar { display: none; }
+
 .col-header {
   font-family: 'Courier Prime', monospace;
   font-size: 7px; font-weight: 900;
-  text-transform: uppercase; letter-spacing: 0.15em;
+  text-transform: uppercase; letter-spacing: 0.1em;
   color: var(--rule); cursor: pointer;
-  padding: 6px 0; border: none; background: none;
+  padding: 6px 6px; border: none; background: none;
   transition: color 0.1s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .col-header.active { color: var(--ink); }
 .col-header:hover  { color: var(--ink); }
 
-/* Stat cell grids — 2-up on mobile, 4-up on sm+ */
+/* Player row grid — responsive columns */
+.player-row-grid {
+  display: grid;
+  grid-template-columns: 24px 32px 1fr 60px 56px;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--rule-light);
+  cursor: pointer;
+}
+@media (min-width: 540px) {
+  .player-row-grid {
+    grid-template-columns: 32px 36px 1fr 80px 72px 64px;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+}
+
+/* Filter row — scroll on mobile */
+.filter-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+@media (max-width: 540px) {
+  .filter-row {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  .filter-row::-webkit-scrollbar { display: none; }
+}
+
+/* Expanded player panel — stack on mobile, side by side on sm+ */
+.expanded-player-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 540px) {
+  .expanded-player-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+}
 .stat-grid-4 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
