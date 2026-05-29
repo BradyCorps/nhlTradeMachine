@@ -917,11 +917,31 @@ const getXNAV = (asset: Asset): XNAVResult => {
     ? (asset.retainedPct || 0) * asset.capHit * 6
     : 0;
 
-  const baseTotal = Math.max(finalTotal, elcFloor, autoprospectFloor, depthFloor);
+const baseTotal = Math.max(finalTotal, elcFloor, autoprospectFloor, depthFloor);
+
+  // ── OFF Display Metric (Point Share Scale 0-300) ──────────────
+  // We calculate this separately from offImpact so trade NAV isn't affected.
+  const ptsScale = asset.position === "D" ? 0.75 : 1.0;
+  const ptsVal   = safe(asset.ptsPace ?? 0) * ptsScale;
+  const noivB    = asset.xgRelTM ? clamp(asset.xgRelTM * 3.5, -20, 25) : 0; 
+  
+  // FIX: Read directly from asset.ops to avoid redeclaring the variable!
+  const offPS = asset.ops != null ? asset.ops * 17 : null;
+  
+  const offDisplayRaw = offPS !== null
+    ? (offPS * confidence) + (ptsVal * 1.6 * (1 - confidence)) + (noivB * 0.25)
+    : (ptsVal * 1.6) + (safe(asset.xGPace ?? 0) * 0.5) + noivB;
+
+  let offDisplay = safe(offDisplayRaw);
+  
+  // The Lemieux Asymptote 
+  if (offDisplay > 250) {
+    offDisplay = 250 + ((offDisplay - 250) * 0.40); 
+  }
 
   return {
     total:       baseTotal + retentionPremium,
-    off:         safe(offImpact * posAdj),
+    off:         Math.round(offDisplay),
     def:         defDisplay,
     age:         safe(ageCurveRaw),
     cap:         -(capCostNet + overpayPenalty),
