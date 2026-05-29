@@ -543,6 +543,7 @@ ${tradesSummary}
 ${teams[0]!.name} ROSTER (top 12):
 ${homeRoster.join("\n")}
 Phase: ${teams[0]!.phase} · Pre-trade standing: #${teams[0]!.standing}/32
+Contention ratings (X-NAV derived): Present ${computeContention(db.players.filter(p => p.teamId === teams[0]!.id), navMap).present.toFixed(1)}/10 · Future ${computeContention(db.players.filter(p => p.teamId === teams[0]!.id), navMap).future.toFixed(1)}/10
 Narrative entering second half: ${teamNarrative(teams[0]!)}
 
 Write 6 sections. The numbers are given — your job is to bring them to life.
@@ -2532,6 +2533,121 @@ function computeRosterStrand(roster: Asset[], navMap: Record<string, XNAVResult>
   };
 }
 
+// ── Contention Cycle Computation ─────────────────────────────
+// Derives Present and Future ratings (0-10) from X-NAV data.
+// Present: what the roster is worth RIGHT NOW
+// Future:  what the roster will be worth in ~3 years (age decay + prospects)
+//
+// Calibration:
+//   10 = perfect elite roster (~2800 NAV across top 10 players)
+//   7+ = legitimate Cup contender
+//   5-7 = playoff team, window open
+//   3-5 = bubble / retooling
+//   0-3 = rebuilding / tanking
+
+const PRESENT_RATING_MAX = 2800; // NAV benchmark for a "perfect 10" roster
+
+function computeContention(
+  roster: Asset[],
+  navMap: Record<string, XNAVResult>,
+): {
+  present: number;
+  future:  number;
+  quadrant: "WIN_NOW" | "WINDOW_OPEN" | "WINDOW_OPENING" | "REBUILDING";
+  presentLabel: string;
+  futureLabel:  string;
+} {
+  if (roster.length === 0) return {
+    present: 0, future: 0,
+    quadrant: "REBUILDING",
+    presentLabel: "No Data",
+    futureLabel: "No Data",
+  };
+
+  const qualified = roster.filter(p =>
+    p.position !== "Pick" && (p.games ?? 0) >= 10
+  );
+
+  // ── Present Rating ──────────────────────────────────────────
+  // Top 6 forwards + top 3 D + top 1 goalie by NAV
+  const forwards = qualified
+    .filter(p => ["C","W","L","R","F"].includes(p.position))
+    .sort((a, b) => (navMap[b.id]?.total ?? 0) - (navMap[a.id]?.total ?? 0))
+    .slice(0, 6);
+
+  const dmen = qualified
+    .filter(p => p.position === "D")
+    .sort((a, b) => (navMap[b.id]?.total ?? 0) - (navMap[a.id]?.total ?? 0))
+    .slice(0, 3);
+
+  const goalies = qualified
+    .filter(p => p.position === "G")
+    .sort((a, b) => (navMap[b.id]?.total ?? 0) - (navMap[a.id]?.total ?? 0))
+    .slice(0, 1);
+
+  const presentNAV = [...forwards, ...dmen, ...goalies]
+    .reduce((s, p) => s + Math.max(0, navMap[p.id]?.total ?? 0), 0);
+
+  const present = Math.min(10, Math.max(0,
+    Math.round((presentNAV / PRESENT_RATING_MAX) * 10 * 10) / 10
+  ));
+
+  // ── Future Rating ───────────────────────────────────────────
+  // Apply 3-year age decay to each player's NAV
+  // Young players (≤23) get an upside bonus
+  // Prospects in PROSPECT_TIERS add future value
+  const peakAge = (pos: string) => pos === "D" ? 27 : pos === "G" ? 29 : 26;
+
+  const futureNAV = [...forwards, ...dmen, ...goalies].reduce((s, p) => {
+    const nav    = Math.max(0, navMap[p.id]?.total ?? 0);
+    const age3   = p.age + 3;
+    const peak   = peakAge(p.position);
+    let decayFactor: number;
+
+    if (age3 <= peak) {
+      // Still approaching peak — slight upside
+      decayFactor = 1.0 + Math.max(0, (peak - age3) * 0.02);
+    } else {
+      // Past peak — decline curve
+      const yearsOver = age3 - peak;
+      decayFactor = Math.max(0.3, 1.0 - (Math.pow(yearsOver, 1.4) * 0.05));
+    }
+    return s + nav * decayFactor;
+  }, 0);
+
+  // Prospect bonus — young players on roster with high upside
+  const prospectBonus = qualified
+    .filter(p => p.age <= 23 && (navMap[p.id]?.upside ?? 0) > 20)
+    .reduce((s, p) => s + Math.min(150, (navMap[p.id]?.upside ?? 0) * 0.5), 0);
+
+  const future = Math.min(10, Math.max(0,
+    Math.round(((futureNAV + prospectBonus) / PRESENT_RATING_MAX) * 10 * 10) / 10
+  ));
+
+  // ── Quadrant classification ──────────────────────────────────
+  const quadrant =
+    present >= 6.5 && future >= 5.0 ? "WIN_NOW"        :
+    present >= 5.0 && future >= 5.0 ? "WINDOW_OPEN"    :
+    present >= 5.0 && future <  5.0 ? "WIN_NOW"        : // high present, low future = win now
+    present <  5.0 && future >= 5.5 ? "WINDOW_OPENING" :
+    "REBUILDING";
+
+  const presentLabel =
+    present >= 8.0 ? "Elite" :
+    present >= 6.5 ? "Contender" :
+    present >= 5.0 ? "Playoff Calibre" :
+    present >= 3.5 ? "Fringe Playoff" :
+    present >= 2.0 ? "Rebuilding" : "Tanking";
+
+  const futureLabel =
+    future >= 8.0 ? "Bright" :
+    future >= 6.0 ? "Strong" :
+    future >= 4.5 ? "Solid" :
+    future >= 3.0 ? "Limited" : "Bleak";
+
+  return { present, future, quadrant, presentLabel, futureLabel };
+}
+
 function TeamDNA({
   homeTeam, partnerTeam, homeRoster, partnerRoster, homeBlocks, partnerBlocks, navMap
 }: {
@@ -2543,7 +2659,7 @@ function TeamDNA({
   partnerBlocks: Asset[];
   navMap: Record<string, XNAVResult>;
 }) {
-  const [expanded, setExpanded] = React.useState(false);
+  const [expanded, setExpanded] = React.useState(true);
 
   // Post-trade roster: remove outgoing, add incoming
   // This makes the panel react live to trade changes
@@ -2569,6 +2685,10 @@ function TeamDNA({
   const homeStrand    = computeRosterStrand(effectiveHomeRoster, navMap);
   const partnerStrand = computeRosterStrand(effectivePartnerRoster, navMap);
   if (!homeStrand || !partnerStrand) return null;
+
+  // Contention ratings — derived from X-NAV
+  const homeContention    = computeContention(effectiveHomeRoster, navMap);
+  const partnerContention = computeContention(effectivePartnerRoster, navMap);
 
   // Gap vs championship template — negative = below template, positive = above
   const homeGaps = {
@@ -2651,7 +2771,85 @@ function TeamDNA({
             Each helix shows a team's aggregate offensive (navy) and defensive (red) profile across their top-9 forwards and top-4 D by ice time. The dashed gold line is the championship template. The dotted green line is the playoff threshold — the minimum profile needed to realistically compete for a postseason spot. Gaps below either line are roster needs.{hasActiveTrade ? " Updated to reflect the current trade." : ""}
           </p>
 
-          {/* Playoff standing context */}
+          {/* ── Contention Cycle ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+            {[
+              { team: homeTeam,    contention: homeContention,    label: "Your Franchise" },
+              { team: partnerTeam, contention: partnerContention, label: "Trade Partner"  },
+            ].filter(x => x.team).map(({ team, contention, label }) => {
+              const quadrantConfig: Record<string, { bg: string; text: string; label: string; desc: string }> = {
+                WIN_NOW:        { bg: '#b83020', text: '#fff',    label: 'Win Now',        desc: 'Window is open — compete now'              },
+                WINDOW_OPEN:    { bg: '#1a5c2e', text: '#fff',    label: 'Window Open',    desc: 'Strong present and future'                  },
+                WINDOW_OPENING: { bg: '#1a2e5c', text: '#fff',    label: 'Window Opening', desc: 'Building toward contention'                 },
+                REBUILDING:     { bg: '#6b5030', text: '#f0e6cc', label: 'Rebuilding',     desc: 'Developing for the future'                  },
+              };
+              const qc = quadrantConfig[contention.quadrant];
+              const dotX = (contention.present / 10) * 74 + 4;
+              const dotY = 78 - (contention.future / 10) * 74;
+              return (
+                <div key={team!.id} style={{ background: '#e4d8b8', border: '1px solid #b8a070', borderTop: `3px solid ${qc.bg}`, padding: '12px 14px' }}>
+                  {/* Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', gap: '8px' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: '#9a7d58', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '2px' }}>{label}</div>
+                      <div style={{ fontFamily: "'Libre Baskerville', serif", fontSize: '13px', fontWeight: 900, color: '#1c140a', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{team!.name}</div>
+                    </div>
+                    <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                      <div style={{ background: qc.bg, color: qc.text, fontFamily: "'Courier Prime', monospace", fontSize: '11px', fontWeight: 900, padding: '4px 8px', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '2px', whiteSpace: 'nowrap' }}>{qc.label}</div>
+                      <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: '#9a7d58', whiteSpace: 'nowrap' }}>{qc.desc}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'stretch' }}>
+                    {/* Mini quadrant chart */}
+                    <div style={{ flexShrink: 0 }}>
+                      <svg width="130" height="130" viewBox="0 0 82 82">
+                        <rect x="1"  y="1"  width="39" height="39" fill="rgba(26,46,92,0.07)"  rx="1"/>
+                        <rect x="42" y="1"  width="39" height="39" fill="rgba(26,92,46,0.07)"  rx="1"/>
+                        <rect x="1"  y="42" width="39" height="39" fill="rgba(107,80,48,0.07)" rx="1"/>
+                        <rect x="42" y="42" width="39" height="39" fill="rgba(184,48,32,0.07)" rx="1"/>
+                        <line x1="41" y1="1" x2="41" y2="81" stroke="#c8b890" strokeWidth="1"/>
+                        <line x1="1" y1="41" x2="81" y2="41" stroke="#c8b890" strokeWidth="1"/>
+                        <text x="20.5" y="10" textAnchor="middle" fontSize="7" fill="#1a2e5c" fontFamily="Courier Prime, monospace" fontWeight="bold" opacity="0.8">OPENING</text>
+                        <text x="61.5" y="10" textAnchor="middle" fontSize="7" fill="#1a5c2e" fontFamily="Courier Prime, monospace" fontWeight="bold" opacity="0.8">WIN OPEN</text>
+                        <text x="20.5" y="79" textAnchor="middle" fontSize="7" fill="#6b5030" fontFamily="Courier Prime, monospace" fontWeight="bold" opacity="0.8">REBUILD</text>
+                        <text x="61.5" y="79" textAnchor="middle" fontSize="7" fill="#b83020" fontFamily="Courier Prime, monospace" fontWeight="bold" opacity="0.8">WIN NOW</text>
+                        <circle cx={dotX} cy={dotY} r="6"   fill={qc.bg} opacity="0.2"/>
+                        <circle cx={dotX} cy={dotY} r="3.5" fill={qc.bg}/>
+                        <circle cx={dotX} cy={dotY} r="1.5" fill="white" opacity="0.7"/>
+                      </svg>
+                      <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: '#9a7d58', textAlign: 'center', marginTop: '3px', letterSpacing: '0.05em', fontWeight: 900 }}>PRESENT → / ↑ FUTURE</div>
+                    </div>
+                    {/* Ratings */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '8px' }}>
+                      {([
+                        { label: 'PRESENT RATING', val: contention.present, sublabel: contention.presentLabel, hint: 'Roster quality right now',      color: contention.present >= 6.5 ? '#1a5c2e' : contention.present >= 5.0 ? '#8a5c00' : '#b83020' },
+                        { label: 'FUTURE RATING',  val: contention.future,  sublabel: contention.futureLabel,  hint: 'Projected value in ~3 years', color: contention.future  >= 6.0 ? '#1a5c2e' : contention.future  >= 4.5 ? '#8a5c00' : '#b83020' },
+                      ] as const).map(r => (
+                        <div key={r.label}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px', gap: '4px' }}>
+                            <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: '#9a7d58', textTransform: 'uppercase', letterSpacing: '0.1em', whiteSpace: 'nowrap' }}>{r.label}</span>
+                            <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: r.color, fontWeight: 900, whiteSpace: 'nowrap' }}>{r.sublabel}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ flex: 1, height: '6px', background: '#c8b890', borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ width: `${r.val * 10}%`, height: '100%', background: r.color, borderRadius: '3px', transition: 'width 0.5s ease' }}/>
+                            </div>
+                            <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: '14px', fontWeight: 900, color: r.color, minWidth: '30px', textAlign: 'right', lineHeight: 1 }}>{r.val.toFixed(1)}</span>
+                          </div>
+                          <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: '#b8a070', marginTop: '2px' }}>{r.hint}</div>
+                        </div>
+                      ))}
+                      {hasActiveTrade && (
+                        <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: '#1a5c2e', borderTop: '1px solid #c8b890', paddingTop: '5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          ↻ Ratings updated for this trade
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
           {homeTeam && (
             <div className="flex items-center gap-3 mb-3 flex-wrap">
               <div className="text-[8px] font-black px-2 py-1" style={{
@@ -2744,41 +2942,87 @@ function TeamDNA({
             {homeTeam?.name} — Roster Gaps vs Playoff & Championship Thresholds{hasActiveTrade ? " (post-trade)" : ""}
           </div>
 
-          <div className="strands-gaps-grid">
-            {[...homeGaps.off, ...homeGaps.def]
-              .sort((a, b) => a.gap - b.gap)
-              .map(g => {
-                const pct = Math.min(48, Math.abs(g.gap) * 180);
-                const valClass = g.gap < -0.10 ? 'deficit' : g.gap > 0.05 ? 'surplus' : 'neutral';
-                return (
-                  <div key={g.label} className="strands-gap-row">
-                    <span className="strands-gap-label">{g.label}</span>
-                    <div className="strands-gap-track">
-                      <div className="strands-gap-left">
-                        {g.gap < 0 && (
-                          <div className="strands-gap-fill-deficit" style={{ width: `${pct * 2}%` }}/>
-                        )}
-                      </div>
-                      <div className="strands-gap-divider"/>
-                      <div className="strands-gap-right">
-                        {g.gap >= 0 && (
-                          <div className="strands-gap-fill-surplus" style={{ width: `${pct * 2}%` }}/>
-                        )}
-                      </div>
+          {/* Metric explanations */}
+          {(() => {
+            const GAP_EXPLAIN: Record<string, { full: string; need: string }> = {
+              SCR:  { full: "Scoring Pace",           need: "More offensive production from forwards/D" },
+              xG:   { full: "Expected Goals",         need: "Higher quality shot generation"            },
+              OFF:  { full: "Offensive NAV",          need: "Better offensive contributors overall"      },
+              OPS:  { full: "Offensive Point Shares", need: "More offensive output across the lineup"    },
+              NOIV: { full: "On-Ice Impact",          need: "Players who elevate their linemates"        },
+              TOI:  { full: "Ice Time Quality",       need: "Heavier usage from top players"             },
+              SUPP: { full: "Shot Suppression",       need: "Better defensive structure under pressure"  },
+              QoC:  { full: "Competition Quality",    need: "Players who can handle top-line matchups"   },
+              DEF:  { full: "Defensive NAV",          need: "Better defensive contributors overall"      },
+              DPS:  { full: "Defensive Point Shares", need: "More defensive value across the roster"     },
+              DZ:   { full: "Defensive Zone Starts",  need: "More reliable defensive zone players"       },
+              AGE:  { full: "Age Curve",              need: "Younger contributors with upside"           },
+            };
+            const allGapsSorted = [...homeGaps.off, ...homeGaps.def].sort((a, b) => a.gap - b.gap);
+            const biggestNeeds = allGapsSorted.filter(g => g.gap < -0.10).slice(0, 3);
+            return (
+              <>
+                {/* What this team needs */}
+                {biggestNeeds.length > 0 && (
+                  <div style={{ background: '#dfd0a8', border: '1px solid #c8b890', padding: '8px 12px', marginBottom: '10px' }}>
+                    <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: '#9a7d58', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '6px' }}>
+                      🔍 What This Team Needs{hasActiveTrade ? ' (post-trade)' : ''}
                     </div>
-                    <span className={`strands-gap-value ${valClass}`}>
-                      {g.gap > 0 ? '+' : ''}{(g.gap * 100).toFixed(0)}
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {biggestNeeds.map(g => (
+                        <div key={g.label} style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                          <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: '8px', fontWeight: 900, color: '#b83020', minWidth: '28px' }}>{g.label}</span>
+                          <span style={{ fontFamily: "'Libre Baskerville', serif", fontSize: '10px', color: '#3d2e18' }}>
+                            {GAP_EXPLAIN[g.label]?.need ?? `Improve ${GAP_EXPLAIN[g.label]?.full ?? g.label}`}
+                          </span>
+                          <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: '8px', color: '#b83020', marginLeft: 'auto', fontWeight: 900 }}>
+                            {(g.gap * 100).toFixed(0)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                );
-              })}
-          </div>
+                )}
+
+                {/* Gap bars */}
+                <div className="strands-gaps-grid">
+                  {allGapsSorted.map(g => {
+                    const pct = Math.min(48, Math.abs(g.gap) * 180);
+                    const valClass = g.gap < -0.10 ? 'deficit' : g.gap > 0.05 ? 'surplus' : 'neutral';
+                    const explain = GAP_EXPLAIN[g.label];
+                    return (
+                      <div key={g.label} className="strands-gap-row" title={explain ? `${explain.full}: ${explain.need}` : g.label}>
+                        <span className="strands-gap-label" style={{ cursor: 'help' }} title={explain?.full}>{g.label}</span>
+                        <div className="strands-gap-track">
+                          <div className="strands-gap-left">
+                            {g.gap < 0 && (
+                              <div className="strands-gap-fill-deficit" style={{ width: `${pct * 2}%` }}/>
+                            )}
+                          </div>
+                          <div className="strands-gap-divider"/>
+                          <div className="strands-gap-right">
+                            {g.gap >= 0 && (
+                              <div className="strands-gap-fill-surplus" style={{ width: `${pct * 2}%` }}/>
+                            )}
+                          </div>
+                        </div>
+                        <span className={`strands-gap-value ${valClass}`}>
+                          {g.gap > 0 ? '+' : ''}{(g.gap * 100).toFixed(0)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
 
           <div className="strands-legend">
             <span><span style={{ color: 'var(--red)' }}>■</span> Below playoff threshold</span>
             <span><span style={{ color: 'var(--green)' }}>■</span> Exceeds template</span>
             <span><span style={{ color: '#1a5c2e' }}>· ·</span> Playoff threshold</span>
             <span><span style={{ color: 'var(--rule)' }}>— —</span> Championship standard</span>
+            <span style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace", fontSize: '7px' }}>Hover metric labels for explanations</span>
           </div>
         </div>
       )}

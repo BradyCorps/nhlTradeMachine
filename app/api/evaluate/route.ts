@@ -520,7 +520,12 @@ const getXNAV = (asset: Asset): XNAVResult => {
     ? Math.max(-0.25, Math.min(0.5, rawDefRate))
     : Math.max(-0.3,  Math.min(0.4, rawDefRate));
   const adjustedDef = clampedDef * defReliability;
-  const expDef = adjustedDef * confidence + SIGMA.DEF_M * (1 - confidence);
+  // When NOIV data is present, defRate is zeroed out above.
+  // Bayesian fallback: regress toward league mean (not 0) so suppression
+  // doesn't accidentally penalise elite D-men like Morrissey and Makar.
+  const expDef = hasReliableNOIV
+    ? SIGMA.DEF_M  // neutral — NOIV handles the defensive signal
+    : adjustedDef * confidence + SIGMA.DEF_M * (1 - confidence);
 
   // 2. Z-scores
   const zPts = clamp((expPts - SIGMA.PTS_M) / SIGMA.PTS_SD, -3.5, 5.5);
@@ -838,16 +843,50 @@ const getXNAV = (asset: Asset): XNAVResult => {
     ? Math.max(5, (25 - asset.age) * 2.5)  // age 24=2.5, age 22=7.5, age 20=12.5
     : -Infinity;
 
-  // For display purposes, the DEF bar should show meaningful value.
-  // SHUTDOWN D: show shutdownBonus + qocBonus (their actual contribution)
-  // OFFENSIVE D: cap at ±30 — their defRate is polluted by hard matchups
-  //              and they're not primarily valued for defense anyway
-  // Everyone else: show raw defImpact * posAdj
+  // ── DEF display — position-aware ─────────────────────────────
+  // D-men and forwards need different defensive display logic.
+  //
+  // D-MEN: xgaRelTM is reliable — they get matched regardless of role.
+  //   Morrissey suppresses xGA relative to teammates → positive DEF.
+  //
+  // FORWARDS: xgaRelTM is MISLEADING for shutdown players.
+  //   Cirelli draws McDavid/Draisaitl every night. When he's on ice,
+  //   Tampa faces elite lines → more xGA. When he's off, they face 4th lines.
+  //   Raw xgaRelTM punishes him for doing his job → Cirelli shows -33 DEF.
+  //   Fix: use QoC + DZ + defRate composite instead of raw xgaRelTM.
+  //   A Selke candidate (qocRank ~110, DZ% ~55%) should show positive DEF.
+  //
+  // SHUTDOWN D: uses shutdownBonus + qocBonus (already position-corrected).
+
+  const defTOIReliability = safe(asset.avgTOI) >= 20 ? 1.0
+    : safe(asset.avgTOI) >= 17 ? 0.65
+    : safe(asset.avgTOI) >= 15 ? 0.35
+    : 0.15;
+
+  const isForwardPos = ["C","W","L","R","F"].includes(asset.position);
+
+  // Forward defensive display: QoC credit + DZ bonus + defRate (reliability-weighted)
+  // Cirelli (qoc=110, DZ=55%, defRate~0.3): +9.5 + 3.0 + 2.9 = +15
+  // Nelson (qoc=150, DZ=48%, defRate~0.15): +7.5 + 0.9 + 1.5 = +10
+  // Offensive F (qoc=300, DZ=42%, defRate~0): +0 + 0 + 0 = ~0
+  const fwdQocCredit  = isForwardPos
+    ? Math.max(0, (300 - qocRank) / 300) * 15
+    : 0;
+  const fwdDzBonus    = isForwardPos
+    ? Math.max(0, (safe(asset.dzPct ?? 0.5) - 0.45) * 30)
+    : 0;
+  const forwardDefDisplay = clamp(
+    fwdQocCredit + fwdDzBonus + safe(adjustedDef * 15 * defTOIReliability),
+    -20, 35
+  );
+
   const defDisplay = dArchetype === "SHUTDOWN"
     ? safe(shutdownBonus + qocBonus)
-    : dArchetype === "OFFENSIVE" && asset.position === "D"
-    ? clamp(safe(defImpact * posAdj), -30, 30)
-    : safe(defImpact * posAdj);
+    : isForwardPos
+    ? forwardDefDisplay                                                       // QoC-adjusted for forwards
+    : hasReliableNOIV && asset.xgaRelTM != null
+    ? clamp(safe(-asset.xgaRelTM * toiWeight * 40 * defTOIReliability), -40, 50) // xgaRelTM for D
+    : clamp(safe(defImpact * posAdj * defTOIReliability), -30, 30);              // fallback for D
 
   // Retention premium for depth players — if sender retains salary,
   // the acquirer gets a better deal than the floor alone shows.

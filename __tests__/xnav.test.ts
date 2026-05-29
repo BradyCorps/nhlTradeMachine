@@ -254,6 +254,92 @@ describe("X-NAV — Elite Defencemen", () => {
     inRange(result.total, 500, 800, "Makar NAV");
   });
 
+  it("Morrissey: two-way D with NOIV data — DEF bar positive, not an artifact", () => {
+    const result = calcSkaterNAV({
+      id: "morrissey", name: "Josh Morrissey", position: "D",
+      age: 29, capHit: 6.25, yearsRemaining: 6,
+      ptsPace: 58, xGPace: 12, defRate: 0.0, // suppressed — NOIV present
+      avgTOI: 24.7, qocRank: 106,
+      xgRelTM: 3.5, xgaRelTM: -0.38, dzPct: 0.42,
+      games: 77, ops: 3.5, dps: 5.0,
+    });
+    expect(result.def).toBeGreaterThan(0);   // not negative from suppression artifact
+    expect(result.def).toBeGreaterThan(10);  // meaningful positive — not just noise
+  });
+
+  it("Karlsson-type: offensive liability on D — DEF bar negative", () => {
+    const result = calcSkaterNAV({
+      id: "karlsson-type", name: "Offensive Liability D", position: "D",
+      age: 34, capHit: 7.0, yearsRemaining: 1,
+      ptsPace: 65, xGPace: 18, defRate: -0.2,
+      avgTOI: 21, qocRank: 280,
+      xgRelTM: 5, xgaRelTM: 0.30, // bleeds goals against
+      games: 70, ops: 6.5, dps: 1.2,
+    });
+    expect(result.def).toBeLessThan(0); // defensive liability should show negative
+  });
+
+  it("Low-minute depth player: DEF capped by TOI reliability — cannot exceed primary D-man", () => {
+    const depth = calcSkaterNAV({
+      id: "nyquist-type", name: "Depth Winger", position: "W",
+      age: 35, capHit: 1.5, yearsRemaining: 1,
+      ptsPace: 22, xGPace: 4, defRate: 0.8,
+      avgTOI: 12.0, qocRank: 420, dzPct: 0.40,
+      games: 58,
+    });
+    const pillarD = calcSkaterNAV({
+      id: "parayko-type", name: "Pillar D", position: "D",
+      age: 29, capHit: 5.5, yearsRemaining: 4,
+      ptsPace: 30, xGPace: 6, defRate: 0.4,
+      avgTOI: 22.0, qocRank: 130, dzPct: 0.60,
+      xgRelTM: 0.5, xgaRelTM: -0.25,
+      games: 72,
+    });
+    expect(depth.def).toBeLessThan(pillarD.def);
+    expect(Math.abs(depth.def)).toBeLessThan(5);
+  });
+
+  it("Selke candidate (Cirelli-type): shutdown C gets positive DEF despite hard matchups", () => {
+    // Cirelli draws McDavid/Draisaitl nightly — raw xgaRelTM is positive
+    // (Tampa allows more xGA when he's on ice because he faces elites)
+    // QoC-adjusted formula should credit him for this, not penalize
+    const result = calcSkaterNAV({
+      id: "cirelli", name: "Anthony Cirelli", position: "C",
+      age: 27, capHit: 6.5, yearsRemaining: 5,
+      ptsPace: 42, xGPace: 8, defRate: 0.3,
+      avgTOI: 17.2, qocRank: 105, dzPct: 0.55,
+      xgRelTM: -1.0, xgaRelTM: 1.2, // positive xgaRelTM from tough matchups
+      games: 75,
+    });
+    expect(result.def).toBeGreaterThan(0);   // Selke candidate must show positive DEF
+    expect(result.def).toBeGreaterThan(8);   // meaningful credit for QoC + DZ deployment
+  });
+
+  it("Selke candidate (Nelson-type): two-way C with tough matchups shows positive DEF", () => {
+    const result = calcSkaterNAV({
+      id: "nelson", name: "Brock Nelson", position: "C",
+      age: 33, capHit: 6.0, yearsRemaining: 1,
+      ptsPace: 55, xGPace: 14, defRate: 0.2,
+      avgTOI: 18.5, qocRank: 140, dzPct: 0.50,
+      xgRelTM: 1.5, xgaRelTM: 0.3,
+      games: 76,
+    });
+    expect(result.def).toBeGreaterThan(0);
+  });
+
+  it("Offensive forward: low DEF — not a defensive player", () => {
+    const result = calcSkaterNAV({
+      id: "off-fwd", name: "Offensive Winger", position: "W",
+      age: 26, capHit: 7.0, yearsRemaining: 4,
+      ptsPace: 85, xGPace: 24, defRate: 0.0,
+      avgTOI: 18.0, qocRank: 310, dzPct: 0.43, // sheltered, offensive zone starts
+      xgRelTM: 5.0, xgaRelTM: -0.1,
+      games: 78,
+    });
+    // Offensive forward with easy matchups should not get DEF credit
+    expect(result.def).toBeLessThan(8);
+  });
+
   it("Shutdown D: low pts but high defensive value → 40-90 NAV", () => {
     const result = calcSkaterNAV({
       id: "slavin", name: "Jaccob Slavin", position: "D",

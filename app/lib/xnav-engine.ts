@@ -228,6 +228,37 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     : def * 20 + qocVal + toiD + dzVal - xgaRel * 4;
   const defTotal = safe(defRaw);
 
+  // ── DEF display ───────────────────────────────────────────────
+  // When NOIV data is present (xgaRelTM), derive the DEF bar from it directly.
+  // Negative xgaRelTM = suppresses goals against = positive DEF value.
+  // Morrissey (-0.38, 24.7 TOI) → ~+23 DEF; Karlsson (+0.30) → ~-15 DEF
+  const xgaRelDisp  = asset.xgaRelTM;
+  const toiWeightD  = Math.pow(clamp(toi / 18, 0.4, 2.0), 1.3);
+
+  // ── DEF display ───────────────────────────────────────────────
+  // Two paths:
+  // 1. xgaRelTM present (MoneyPuck NOIV data) — use it directly.
+  //    This is the most reliable signal. Scaled by TOI weight.
+  // 2. No xgaRelTM (depth/low-minute players) — use defTotal BUT
+  //    apply a reliability dampener based on TOI. Players under 15 min
+  //    don't have enough on-ice exposure for defRate to be meaningful.
+  //    Nyquist at 12 min/game should not show same DEF as Parayko at 22.
+  const defReliabilityWeight = toi >= 20 ? 1.0
+    : toi >= 17 ? 0.65
+    : toi >= 15 ? 0.35
+    : 0.15;
+
+  const isForwardPos = ["C","W","L","R","F"].includes(asset.position ?? "");
+  const fwdQocCredit = isForwardPos ? Math.max(0, (300 - qoc) / 300) * 15 : 0;
+  const fwdDzBonus   = isForwardPos ? Math.max(0, (safe(asset.dzPct ?? 0.5) - 0.45) * 30) : 0;
+  const forwardDef   = clamp(fwdQocCredit + fwdDzBonus + safe(def * 15 * defReliabilityWeight), -20, 35);
+
+  const defDisplay = isForwardPos
+    ? forwardDef
+    : (xgaRelDisp !== null && xgaRelDisp !== undefined) && (asset.games ?? 0) >= 20
+    ? clamp(safe(-xgaRelDisp * toiWeightD * 40 * defReliabilityWeight), -40, 50)
+    : defTotal * defReliabilityWeight;
+
   // ── Age curve ─────────────────────────────────────────────────
   const peakAge  = isD ? 27 : 26;
   const ageVal   = age <= peakAge
@@ -270,7 +301,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   return {
     total:  Math.round(total),
     off:    Math.round(offTotal),
-    def:    Math.round(defTotal),
+    def:    Math.round(defDisplay),
     age:    Math.round(ageTotal),
     cap:    Math.round(capTotal),
     upside: Math.round(Math.max(0, ageTotal)),
