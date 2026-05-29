@@ -6,6 +6,10 @@ import TradeProposalEngine from "@/app/components/TradeProposal";
 import PlayerComparison from "@/app/components/PlayerComparison";
 import CapProjection from "@/app/components/CapProjection";
 import LedgerDropdown from "@/app/components/LedgerDropdown";
+import { 
+  HISTORICAL_MAX_OFF, 
+  HISTORICAL_MAX_DEF 
+} from "../lib/historical-benchmarks";
 
 import type {
   Asset, Team, XNAVResult, GmFlag, FlagSeverity, FlagCategory,
@@ -1976,21 +1980,28 @@ function AssetCard({
             >i</span>
           </div>
           <div className="stat-grid-4">
-            <MicroBar label="OFF" val={xnav.off} max={300} color="cyan"
-              tooltip="Offensive impact — scoring production (pts/82, xG rate)" />
+            <MicroBar 
+    label="OFF" 
+    val={xnav.off} 
+    max={HISTORICAL_MAX_OFF} // Updated to Lemieux's 300 scale
+    color="cyan"
+    tooltip="Offensive impact — scoring production (pts/82, xG rate)" 
+/>
             <MicroBar
-              label={asset.dps != null ? "DPS" : "DEF"}
-              val={asset.dps != null
-                // DPS available: scale Point Shares to NAV-comparable range
-                // Benchmark: Selke finalist DPS≈5 → ~80 DEF; elite D DPS≈8 → ~130 DEF
-                ? Math.round(asset.dps * 16)
-                : xnav.def
-              }
-              max={150} color="emerald"
-              tooltip={asset.dps != null
-                ? `Defensive Point Shares: ${asset.dps.toFixed(1)} — hockey-reference defensive contribution metric`
-                : "Defensive value — xG suppression weighted by ice time quality"
-              } />
+    label={asset.dps != null ? "DPS" : "DEF"}
+    val={asset.dps != null
+    // Changed multiplier from 16 to 15 to perfectly match the xnav-engine math!
+    ? Math.round(asset.dps * 15)
+    : xnav.def
+    }
+    // Now that the scales are mathematically synced, the max is 148 either way
+    max={HISTORICAL_MAX_DEF}
+    color="emerald"
+    tooltip={asset.dps != null
+    ? `Defensive Point Shares: ${asset.dps.toFixed(1)} — hockey-reference defensive contribution metric`
+    : "Defensive value — xG suppression weighted by ice time quality"
+    } 
+/>
             <MicroBar label={xnav.age > 0 ? "YNG" : "AGE"} val={xnav.age} max={80}
               color={xnav.age > 0 ? "violet" : "amber"}
               tooltip={xnav.age > 0

@@ -202,23 +202,24 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const effectiveCap = asset.capHit * (1 - (asset.retainedPct || 0));
   const confidence   = clamp(games / 65, 0.3, 1.0);
 
-  // ── Offensive value ───────────────────────────────────────────
-  // Normalize by position — D-men scored against lower scale
+// ── Offensive value ───────────────────────────────────────────
   const ptsScale = isD ? 0.75 : 1.0;
   const ptsVal   = pts * ptsScale;
 
-  // Point Shares based offensive value when available
-  const offPS    = ops !== null ? ops * 12 : null;
-  const offRaw   = offPS !== null
-    ? offPS * confidence + (ptsVal * 1.8) * (1 - confidence)
-    : ptsVal * 1.8 + xg * 0.8;
+  const noivBonus = clamp(xgRel * 3.5, -20, 25); 
 
-  // NOIV — teammate impact
-  const noivBonus = xgRel * 3.5;
-  const offTotal  = safe(offRaw + noivBonus);
+  const offPS  = ops !== null ? ops * 17 : null;
+  
+  // If we have pure historical Point Shares, let that be the primary driver.
+  // We fade out the NOIV bonus when OPS is present to prevent modern inflation.
+  const offRaw = offPS !== null
+    ? (offPS * confidence) + (ptsVal * 1.6 * (1 - confidence)) + (noivBonus * 0.25)
+    : (ptsVal * 1.6) + (xg * 0.5) + noivBonus;
+
+  const offTotal = safe(offRaw);
 
   // ── Defensive value ───────────────────────────────────────────
-  const defPS  = dps !== null ? dps * 12 : null;
+  const defPS  = dps !== null ? dps * 15 : null;
   const toiD   = clamp((toi - 15) * 2.5, 0, 30); // TOI above 15 min signals heavy usage
   const qocVal = clamp((400 - qoc) / 400 * 20, 0, 20);
   const dzVal  = clamp((dzPct - 0.3) * 40, 0, 12);
