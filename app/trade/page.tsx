@@ -1978,8 +1978,19 @@ function AssetCard({
           <div className="stat-grid-4">
             <MicroBar label="OFF" val={xnav.off} max={300} color="cyan"
               tooltip="Offensive impact — scoring production (pts/82, xG rate)" />
-            <MicroBar label="DEF" val={xnav.def} max={150} color="emerald"
-              tooltip="Defensive value — xG suppression weighted by ice time quality" />
+            <MicroBar
+              label={asset.dps != null ? "DPS" : "DEF"}
+              val={asset.dps != null
+                // DPS available: scale Point Shares to NAV-comparable range
+                // Benchmark: Selke finalist DPS≈5 → ~80 DEF; elite D DPS≈8 → ~130 DEF
+                ? Math.round(asset.dps * 16)
+                : xnav.def
+              }
+              max={150} color="emerald"
+              tooltip={asset.dps != null
+                ? `Defensive Point Shares: ${asset.dps.toFixed(1)} — hockey-reference defensive contribution metric`
+                : "Defensive value — xG suppression weighted by ice time quality"
+              } />
             <MicroBar label={xnav.age > 0 ? "YNG" : "AGE"} val={xnav.age} max={80}
               color={xnav.age > 0 ? "violet" : "amber"}
               tooltip={xnav.age > 0
@@ -3251,6 +3262,9 @@ function MicroBar({ label, val, max, color, invert = false, tooltip }: {
   label: string; val: number; max: number; color: string; invert?: boolean; tooltip?: string;
 }) {
   const norm = clamp(Math.abs(val) / max, 0, 1);
+  // Clamp displayed number to ±max so the scale is consistent and interpretable
+  // Bar width already capped — now the number matches what the bar shows
+  const displayVal = clamp(val, -max, max);
   const colorMap: Record<string, string> = {
     cyan:    "#1a3a6b",
     emerald: "#1a6b3a",
@@ -3258,8 +3272,6 @@ function MicroBar({ label, val, max, color, invert = false, tooltip }: {
     amber:   "#9a6b00",
     rose:    "#c0392b",
   };
-  // Bar color: negative values always red, positive use their assigned color
-  // CAP (invert) is always rose colored — it's always a cost
   const barColor = val < 0 ? "#c0392b" : colorMap[color];
   const numColor = invert
     ? (val < -40 ? '#c0392b' : val < -20 ? '#9a6b00' : '#1a5c2e')
@@ -3276,7 +3288,7 @@ function MicroBar({ label, val, max, color, invert = false, tooltip }: {
         color: numColor,
         fontFamily: "'Courier Prime', monospace"
       }}>
-        {val > 0 ? "+" : ""}{val.toFixed(0)}
+        {displayVal > 0 ? "+" : ""}{displayVal.toFixed(0)}
       </div>
     </div>
   );

@@ -870,32 +870,35 @@ const getXNAV = (asset: Asset): XNAVResult => {
     : null;
   const hasDZData = dzPctVal !== null;
 
-  // DZ bonus: only when we have real zone data
+  // ── Forward DEF display — single signal, no double-dipping ─────────
+  // KEY INSIGHT: defRate = offA - onA  AND  xgaRelTM = onA - offA
+  // These are the SAME measurement with OPPOSITE signs.
+  // Using both = partial cancellation → Cirelli shows -4 DEF (the bug).
+  // FIX: use defRate ONLY. Remove fwdNoDataFallback (it used xgaRelTM).
+  //
+  // Positive defRate = team allows LESS xGA when player is on ice = good defender.
+  // Scale by TOI reliability: 20+ min=1.0, 17-19=0.65, 15-16=0.35, <15=0.15
+  // DZ% bonus only fires when real zone data exists (not the null default).
+
   const fwdDzBonus = isForwardPos && hasDZData
     ? Math.max(0, (dzPctVal! - 0.45) * 60)
     : 0;
 
-  // defRate component — use display-only defRate (bypasses NOIV suppression for forwards)
-  // For display: use TOI-only reliability (not qocRank which isn't true QoC)
-  // Higher multiplier since defRate is the primary forward defensive signal
+  // Single defensive signal: defRate with TOI reliability weight
   const fwdDefRate = isForwardPos
     ? safe(clampedDefDisplay * 45 * defTOIReliability)
     : 0;
 
-  // Matchup credit: positive xgaRelTM + high DZ% = hard deployment, not bad defense
-  const fwdMatchupCredit = isForwardPos && hasDZData && dzPctVal! > 0.50 && asset.xgaRelTM != null
-    ? Math.min(8, Math.max(0, (asset.xgaRelTM as number) * (dzPctVal! - 0.45) * 80))
-    : 0;
-
-  // No DZ% data fallback — use xgaRelTM modestly when zone data unavailable
-  // Positive xgaRelTM for a forward typically means hard matchups → partial credit
-  // Capped conservatively at ±8 since we can't verify with zone context
-  const fwdNoDataFallback = isForwardPos && !hasDZData && asset.xgaRelTM != null
-    ? clamp(safe((asset.xgaRelTM as number) * defTOIReliability * 5), -8, 8)
+  // Matchup credit: only when BOTH real DZ% data AND positive xgaRelTM
+  // High DZ% + positive xgaRelTM = genuinely hard deployment, not bad defense
+  const xgaRTM = asset.xgaRelTM as number | null | undefined;
+  const fwdMatchupCredit = isForwardPos && hasDZData && dzPctVal! > 0.50
+    && xgaRTM !== null && xgaRTM !== undefined && xgaRTM > 0
+    ? Math.min(6, xgaRTM * (dzPctVal! - 0.45) * 60)
     : 0;
 
   const forwardDefDisplay = clamp(
-    fwdDzBonus + fwdDefRate + fwdMatchupCredit + fwdNoDataFallback,
+    fwdDzBonus + fwdDefRate + fwdMatchupCredit,
     -20, 35
   );
 

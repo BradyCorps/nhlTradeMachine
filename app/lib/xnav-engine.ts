@@ -261,18 +261,15 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
 
   const xgaRD = asset.xgaRelTM;
   const fwdMatchupCredit = isForwardPos && hasDZData && dzPctVal! > 0.50
-    && xgaRD !== null && xgaRD !== undefined
-    ? Math.min(8, Math.max(0, xgaRD * (dzPctVal! - 0.45) * 80))
+    && xgaRD !== null && xgaRD !== undefined && xgaRD > 0
+    ? Math.min(6, xgaRD * (dzPctVal! - 0.45) * 60)
     : 0;
 
-  // No DZ% data fallback — modest xgaRelTM signal
-  const fwdNoDataFallback = isForwardPos && !hasDZData
-    && xgaRD !== null && xgaRD !== undefined
-    ? clamp(safe(xgaRD * defReliabilityWeight * 5), -8, 8)
-    : 0;
+  // fwdNoDataFallback REMOVED — it used xgaRelTM which = -defRate (double-dipping).
+  // Single signal: defRate only. Clean, no cancellation.
 
   const forwardDef = clamp(
-    fwdDzBonus + fwdDefRate + fwdMatchupCredit + fwdNoDataFallback,
+    fwdDzBonus + fwdDefRate + fwdMatchupCredit,
     -20, 35
   );
 
