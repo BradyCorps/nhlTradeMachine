@@ -212,11 +212,22 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   
   // If we have pure historical Point Shares, let that be the primary driver.
   // We fade out the NOIV bonus when OPS is present to prevent modern inflation.
-  const offRaw = offPS !== null
+const offRaw = offPS !== null
     ? (offPS * confidence) + (ptsVal * 1.6 * (1 - confidence)) + (noivBonus * 0.25)
     : (ptsVal * 1.6) + (xg * 0.5) + noivBonus;
 
-  const offTotal = safe(offRaw);
+  let offTotal = safe(offRaw);
+
+  // ── THE LEMIEUX ASYMPTOTE ─────────────────────────────────────
+  // Modern stats (xG, NOIV) inflate current stars past historical benchmarks.
+  // As a player surpasses 250 OFF, the gravity of historical greatness kicks in.
+  // It becomes exponentially harder to gain points, ensuring nobody touches 
+  // Lemieux's 300 ceiling unless they literally score 200 real-world points.
+  if (offTotal > 250) {
+    const excess = offTotal - 250;
+    // Compress all excess value to 40% strength
+    offTotal = 250 + (excess * 0.40); 
+  }
 
   // ── Defensive value ───────────────────────────────────────────
   const defPS  = dps !== null ? dps * 15 : null;

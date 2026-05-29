@@ -3273,9 +3273,10 @@ function MicroBar({ label, val, max, color, invert = false, tooltip }: {
   label: string; val: number; max: number; color: string; invert?: boolean; tooltip?: string;
 }) {
   const norm = clamp(Math.abs(val) / max, 0, 1);
-  // Clamp displayed number to ±max so the scale is consistent and interpretable
-  // Bar width already capped — now the number matches what the bar shows
-  const displayVal = clamp(val, -max, max);
+  
+  // FIX: Let the text display the true value, don't clamp it!
+  const displayVal = val; 
+  
   const colorMap: Record<string, string> = {
     cyan:    "#1a3a6b",
     emerald: "#1a6b3a",
