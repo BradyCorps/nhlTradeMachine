@@ -299,45 +299,78 @@ describe("X-NAV — Elite Defencemen", () => {
     expect(Math.abs(depth.def)).toBeLessThan(5);
   });
 
-  it("Selke candidate (Cirelli-type): shutdown C gets positive DEF despite hard matchups", () => {
-    // Cirelli draws McDavid/Draisaitl nightly — raw xgaRelTM is positive
-    // (Tampa allows more xGA when he's on ice because he faces elites)
-    // QoC-adjusted formula should credit him for this, not penalize
+  it("Selke candidate (Cirelli-type): shutdown C shows positive DEF from defRate", () => {
     const result = calcSkaterNAV({
       id: "cirelli", name: "Anthony Cirelli", position: "C",
       age: 27, capHit: 6.5, yearsRemaining: 5,
-      ptsPace: 42, xGPace: 8, defRate: 0.3,
-      avgTOI: 17.2, qocRank: 105, dzPct: 0.55,
-      xgRelTM: -1.0, xgaRelTM: 1.2, // positive xgaRelTM from tough matchups
+      ptsPace: 42, xGPace: 8, defRate: 0.35,
+      avgTOI: 17.2, qocRank: 105, dzPct: null, // no zone data — uses defRate path
+      xgRelTM: -1.0, xgaRelTM: 1.2,            // positive xgaRelTM from hard matchups
       games: 75,
     });
-    expect(result.def).toBeGreaterThan(0);   // Selke candidate must show positive DEF
-    expect(result.def).toBeGreaterThan(8);   // meaningful credit for QoC + DZ deployment
+    expect(result.def).toBeGreaterThan(0);   // must be positive for a Selke candidate
+    expect(result.def).toBeGreaterThan(8);   // meaningful, not just +1-2
   });
 
-  it("Selke candidate (Nelson-type): two-way C with tough matchups shows positive DEF", () => {
+  it("Selke candidate with DZ% data: bonus kicks in", () => {
+    const result = calcSkaterNAV({
+      id: "cirelli-dz", name: "Cirelli DZ", position: "C",
+      age: 27, capHit: 6.5, yearsRemaining: 5,
+      ptsPace: 42, xGPace: 8, defRate: 0.35,
+      avgTOI: 17.2, qocRank: 105, dzPct: 0.56, // real DZ data available
+      xgRelTM: -1.0, xgaRelTM: 1.2,
+      games: 75,
+    });
+    expect(result.def).toBeGreaterThan(0);
+    // DZ% bonus should push it higher than no-data version
+    const noDZResult = calcSkaterNAV({
+      id: "cirelli-nodz", name: "Cirelli NoDZ", position: "C",
+      age: 27, capHit: 6.5, yearsRemaining: 5,
+      ptsPace: 42, xGPace: 8, defRate: 0.35,
+      avgTOI: 17.2, qocRank: 105, dzPct: null,
+      xgRelTM: -1.0, xgaRelTM: 1.2, games: 75,
+    });
+    expect(result.def).toBeGreaterThanOrEqual(noDZResult.def);
+  });
+
+  it("Selke candidate (Nelson-type): two-way C shows positive DEF", () => {
     const result = calcSkaterNAV({
       id: "nelson", name: "Brock Nelson", position: "C",
       age: 33, capHit: 6.0, yearsRemaining: 1,
-      ptsPace: 55, xGPace: 14, defRate: 0.2,
-      avgTOI: 18.5, qocRank: 140, dzPct: 0.50,
-      xgRelTM: 1.5, xgaRelTM: 0.3,
-      games: 76,
+      ptsPace: 55, xGPace: 14, defRate: 0.20,
+      avgTOI: 18.5, qocRank: 140, dzPct: null,
+      xgRelTM: 1.5, xgaRelTM: 0.3, games: 76,
     });
     expect(result.def).toBeGreaterThan(0);
   });
 
-  it("Offensive forward: low DEF — not a defensive player", () => {
+  it("Offensive forward: near-zero DEF — not a defensive player", () => {
     const result = calcSkaterNAV({
       id: "off-fwd", name: "Offensive Winger", position: "W",
       age: 26, capHit: 7.0, yearsRemaining: 4,
-      ptsPace: 85, xGPace: 24, defRate: 0.0,
-      avgTOI: 18.0, qocRank: 310, dzPct: 0.43, // sheltered, offensive zone starts
-      xgRelTM: 5.0, xgaRelTM: -0.1,
-      games: 78,
+      ptsPace: 85, xGPace: 24, defRate: 0.02,
+      avgTOI: 18.0, qocRank: 310, dzPct: 0.43,
+      xgRelTM: 5.0, xgaRelTM: -0.1, games: 78,
     });
-    // Offensive forward with easy matchups should not get DEF credit
-    expect(result.def).toBeLessThan(8);
+    expect(Math.abs(result.def)).toBeLessThan(8);
+  });
+
+  it("Selke C shows more DEF than offensive winger with similar stats", () => {
+    const selke = calcSkaterNAV({
+      id: "selke", name: "Selke C", position: "C",
+      age: 28, capHit: 5.5, yearsRemaining: 3,
+      ptsPace: 50, xGPace: 12, defRate: 0.32,
+      avgTOI: 18.0, qocRank: 120, dzPct: null,
+      xgRelTM: -0.5, xgaRelTM: 0.8, games: 76,
+    });
+    const offC = calcSkaterNAV({
+      id: "offc", name: "Offensive C", position: "C",
+      age: 28, capHit: 5.5, yearsRemaining: 3,
+      ptsPace: 50, xGPace: 12, defRate: 0.03,
+      avgTOI: 18.0, qocRank: 300, dzPct: null,
+      xgRelTM: 3.0, xgaRelTM: -0.3, games: 76,
+    });
+    expect(selke.def).toBeGreaterThan(offC.def);
   });
 
   it("Shutdown D: low pts but high defensive value → 40-90 NAV", () => {

@@ -228,30 +228,53 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     : def * 20 + qocVal + toiD + dzVal - xgaRel * 4;
   const defTotal = safe(defRaw);
 
-  // ── DEF display ───────────────────────────────────────────────
-  // When NOIV data is present (xgaRelTM), derive the DEF bar from it directly.
-  // Negative xgaRelTM = suppresses goals against = positive DEF value.
-  // Morrissey (-0.38, 24.7 TOI) → ~+23 DEF; Karlsson (+0.30) → ~-15 DEF
-  const xgaRelDisp  = asset.xgaRelTM;
-  const toiWeightD  = Math.pow(clamp(toi / 18, 0.4, 2.0), 1.3);
+  const xgaRelDisp = asset.xgaRelTM;
+  const toiWeightD = Math.pow(clamp(toi / 18, 0.4, 2.0), 1.3);
 
-  // ── DEF display ───────────────────────────────────────────────
-  // Two paths:
-  // 1. xgaRelTM present (MoneyPuck NOIV data) — use it directly.
-  //    This is the most reliable signal. Scaled by TOI weight.
-  // 2. No xgaRelTM (depth/low-minute players) — use defTotal BUT
-  //    apply a reliability dampener based on TOI. Players under 15 min
-  //    don't have enough on-ice exposure for defRate to be meaningful.
-  //    Nyquist at 12 min/game should not show same DEF as Parayko at 22.
   const defReliabilityWeight = toi >= 20 ? 1.0
     : toi >= 17 ? 0.65
     : toi >= 15 ? 0.35
     : 0.15;
 
   const isForwardPos = ["C","W","L","R","F"].includes(asset.position ?? "");
-  const fwdQocCredit = isForwardPos ? Math.max(0, (300 - qoc) / 300) * 15 : 0;
-  const fwdDzBonus   = isForwardPos ? Math.max(0, (safe(asset.dzPct ?? 0.5) - 0.45) * 30) : 0;
-  const forwardDef   = clamp(fwdQocCredit + fwdDzBonus + safe(def * 15 * defReliabilityWeight), -20, 35);
+
+  // dzPct: null = no zone data. Don't default to 0.5 (gives everyone +3 spuriously).
+  const dzRaw    = asset.dzPct;
+  const hasDZData = dzRaw !== null && dzRaw !== undefined;
+  const dzPctVal  = hasDZData ? safe(dzRaw!) : null;
+
+  // ── Forward DEF display ───────────────────────────────────────
+  // Mirrors evaluate/route.ts logic exactly so tests match production.
+  //
+  // defRate for display: bypasses NOIV suppression (display-only — doesn't affect NAV).
+  // adjustedDef = 0 when hasNOIV=true, so we use rawDef for forwards directly.
+  const rawDefForDisplay  = safe(asset.defRate ?? 0);
+  const clampedDefDisplay = Math.max(-0.3, Math.min(0.4, rawDefForDisplay));
+
+  const fwdDzBonus = isForwardPos && hasDZData
+    ? Math.max(0, (dzPctVal! - 0.45) * 60)
+    : 0;
+
+  const fwdDefRate = isForwardPos
+    ? safe(clampedDefDisplay * 45 * defReliabilityWeight)
+    : 0;
+
+  const xgaRD = asset.xgaRelTM;
+  const fwdMatchupCredit = isForwardPos && hasDZData && dzPctVal! > 0.50
+    && xgaRD !== null && xgaRD !== undefined
+    ? Math.min(8, Math.max(0, xgaRD * (dzPctVal! - 0.45) * 80))
+    : 0;
+
+  // No DZ% data fallback — modest xgaRelTM signal
+  const fwdNoDataFallback = isForwardPos && !hasDZData
+    && xgaRD !== null && xgaRD !== undefined
+    ? clamp(safe(xgaRD * defReliabilityWeight * 5), -8, 8)
+    : 0;
+
+  const forwardDef = clamp(
+    fwdDzBonus + fwdDefRate + fwdMatchupCredit + fwdNoDataFallback,
+    -20, 35
+  );
 
   const defDisplay = isForwardPos
     ? forwardDef

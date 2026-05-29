@@ -510,21 +510,25 @@ const getXNAV = (asset: Asset): XNAVResult => {
   const hasReliableNOIV = asset.xgaRelTM != null && (asset.games ?? 0) >= 20;
   const rawDefRate = hasReliableNOIV ? 0 : safe(asset.defRate);
   const defReliability =
-    Math.min(1.0, avgTOI / 20) *        // low TOI = unreliable
-    Math.min(1.0, (400 - qocRank) / 200) * // sheltered = unreliable
-    confidence;                           // small sample = unreliable
-  // Apply: clamp extreme values AND scale by reliability
-  // This means Nyquist (toi=12.7, qoc=429) gets near-zero weight
-  // while Morrissey (toi=24.7, qoc=106) gets full weight
+    Math.min(1.0, avgTOI / 20) *
+    Math.min(1.0, (400 - qocRank) / 200) *
+    confidence;
   const clampedDef = asset.position === "D"
     ? Math.max(-0.25, Math.min(0.5, rawDefRate))
     : Math.max(-0.3,  Math.min(0.4, rawDefRate));
   const adjustedDef = clampedDef * defReliability;
-  // When NOIV data is present, defRate is zeroed out above.
-  // Bayesian fallback: regress toward league mean (not 0) so suppression
-  // doesn't accidentally penalise elite D-men like Morrissey and Makar.
+
+  // ── Display-only defRate for forwards ──────────────────────────
+  // hasReliableNOIV suppresses defRate to prevent double-counting in NAV math.
+  // But for the DEF display bar only, we can use defRate directly for forwards
+  // since xgaRelTM is an unreliable defensive signal for shutdown players.
+  // This doesn't affect NAV totals — purely visual.
+  const rawDefRateDisplay = safe(asset.defRate);
+  const clampedDefDisplay = Math.max(-0.3, Math.min(0.4, rawDefRateDisplay));
+  const adjustedDefDisplay = clampedDefDisplay * defReliability;
+
   const expDef = hasReliableNOIV
-    ? SIGMA.DEF_M  // neutral — NOIV handles the defensive signal
+    ? SIGMA.DEF_M
     : adjustedDef * confidence + SIGMA.DEF_M * (1 - confidence);
 
   // 2. Z-scores
@@ -844,19 +848,13 @@ const getXNAV = (asset: Asset): XNAVResult => {
     : -Infinity;
 
   // ── DEF display — position-aware ─────────────────────────────
-  // D-men and forwards need different defensive display logic.
-  //
-  // D-MEN: xgaRelTM is reliable — they get matched regardless of role.
-  //   Morrissey suppresses xGA relative to teammates → positive DEF.
-  //
-  // FORWARDS: xgaRelTM is MISLEADING for shutdown players.
-  //   Cirelli draws McDavid/Draisaitl every night. When he's on ice,
-  //   Tampa faces elite lines → more xGA. When he's off, they face 4th lines.
-  //   Raw xgaRelTM punishes him for doing his job → Cirelli shows -33 DEF.
-  //   Fix: use QoC + DZ + defRate composite instead of raw xgaRelTM.
-  //   A Selke candidate (qocRank ~110, DZ% ~55%) should show positive DEF.
-  //
-  // SHUTDOWN D: uses shutdownBonus + qocBonus (already position-corrected).
+  // D-men: xgaRelTM is reliable — use directly, scaled by TOI.
+  // Forwards: xgaRelTM is misleading for shutdown players (Cirelli faces elites,
+  //   so Tampa allows more xGA when he's on ice → raw xgaRelTM is positive).
+  //   Use DZ% + defRate as primary signals. If xgaRelTM > 0 AND DZ% > 0.50,
+  //   give partial matchup credit — shutdown C with hard deployment earned it.
+  // NOTE: qocRank from MoneyPuck is iceTimeRank (volume), not matchup quality.
+  //   We cannot use it for QoC credit. DZ% and xgaRelTM are the reliable signals.
 
   const defTOIReliability = safe(asset.avgTOI) >= 20 ? 1.0
     : safe(asset.avgTOI) >= 17 ? 0.65
@@ -864,29 +862,50 @@ const getXNAV = (asset: Asset): XNAVResult => {
     : 0.15;
 
   const isForwardPos = ["C","W","L","R","F"].includes(asset.position);
+  // dzPct: null means no zone data from MoneyPuck (column missing or player not tracked)
+  // Don't treat null as 0.50 — that gives every forward +3 DEF spuriously.
+  // Only apply DZ bonus when we have real data.
+  const dzPctVal = (asset.dzPct !== null && asset.dzPct !== undefined)
+    ? safe(asset.dzPct)
+    : null;
+  const hasDZData = dzPctVal !== null;
 
-  // Forward defensive display: QoC credit + DZ bonus + defRate (reliability-weighted)
-  // Cirelli (qoc=110, DZ=55%, defRate~0.3): +9.5 + 3.0 + 2.9 = +15
-  // Nelson (qoc=150, DZ=48%, defRate~0.15): +7.5 + 0.9 + 1.5 = +10
-  // Offensive F (qoc=300, DZ=42%, defRate~0): +0 + 0 + 0 = ~0
-  const fwdQocCredit  = isForwardPos
-    ? Math.max(0, (300 - qocRank) / 300) * 15
+  // DZ bonus: only when we have real zone data
+  const fwdDzBonus = isForwardPos && hasDZData
+    ? Math.max(0, (dzPctVal! - 0.45) * 60)
     : 0;
-  const fwdDzBonus    = isForwardPos
-    ? Math.max(0, (safe(asset.dzPct ?? 0.5) - 0.45) * 30)
+
+  // defRate component — use display-only defRate (bypasses NOIV suppression for forwards)
+  // For display: use TOI-only reliability (not qocRank which isn't true QoC)
+  // Higher multiplier since defRate is the primary forward defensive signal
+  const fwdDefRate = isForwardPos
+    ? safe(clampedDefDisplay * 45 * defTOIReliability)
     : 0;
+
+  // Matchup credit: positive xgaRelTM + high DZ% = hard deployment, not bad defense
+  const fwdMatchupCredit = isForwardPos && hasDZData && dzPctVal! > 0.50 && asset.xgaRelTM != null
+    ? Math.min(8, Math.max(0, (asset.xgaRelTM as number) * (dzPctVal! - 0.45) * 80))
+    : 0;
+
+  // No DZ% data fallback — use xgaRelTM modestly when zone data unavailable
+  // Positive xgaRelTM for a forward typically means hard matchups → partial credit
+  // Capped conservatively at ±8 since we can't verify with zone context
+  const fwdNoDataFallback = isForwardPos && !hasDZData && asset.xgaRelTM != null
+    ? clamp(safe((asset.xgaRelTM as number) * defTOIReliability * 5), -8, 8)
+    : 0;
+
   const forwardDefDisplay = clamp(
-    fwdQocCredit + fwdDzBonus + safe(adjustedDef * 15 * defTOIReliability),
+    fwdDzBonus + fwdDefRate + fwdMatchupCredit + fwdNoDataFallback,
     -20, 35
   );
 
   const defDisplay = dArchetype === "SHUTDOWN"
     ? safe(shutdownBonus + qocBonus)
     : isForwardPos
-    ? forwardDefDisplay                                                       // QoC-adjusted for forwards
+    ? forwardDefDisplay
     : hasReliableNOIV && asset.xgaRelTM != null
-    ? clamp(safe(-asset.xgaRelTM * toiWeight * 40 * defTOIReliability), -40, 50) // xgaRelTM for D
-    : clamp(safe(defImpact * posAdj * defTOIReliability), -30, 30);              // fallback for D
+    ? clamp(safe(-asset.xgaRelTM * toiWeight * 40 * defTOIReliability), -40, 50)
+    : clamp(safe(defImpact * posAdj * defTOIReliability), -30, 30);
 
   // Retention premium for depth players — if sender retains salary,
   // the acquirer gets a better deal than the floor alone shows.

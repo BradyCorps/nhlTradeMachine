@@ -1105,6 +1105,23 @@ export async function GET() {
         h("I_F_dZoneShifts"), h("I_F_oZoneShifts"),
         h("I_F_goals"),
       ];
+      const zoneMap = new Map<string, number>(); // slugified name → 5on5 DZ%
+
+      // First pass: collect 5on5 zone shift data
+      rows.slice(1).forEach((row) => {
+        const c = parseCSVRow(row);
+        if (c.length <= nI) return;
+        if (c[sI]?.trim() !== "5on5") return;
+        if (dzI < 0 || ozI < 0) return;
+        const name = c[nI].trim();
+        const dz5  = parseFloat(c[dzI]) || 0;
+        const oz5  = parseFloat(c[ozI]) || 0;
+        if (dz5 + oz5 > 0) {
+          zoneMap.set(slugify(name), dz5 / (dz5 + oz5));
+        }
+      });
+
+      // Second pass: process "all" situation rows, using zoneMap for DZ%
       rows.slice(1).forEach((row) => {
         const c = parseCSVRow(row);
         if (c.length <= nI || c[sI]?.trim() !== "all") return;
@@ -1131,10 +1148,11 @@ export async function GET() {
         const offXgA60 = offA;
         const xgaRelTM = onXgA60 - offXgA60; // negative = better defense
 
-        // Defensive zone start %
-        const dz = parseFloat(c[dzI]) || 0;
-        const oz = parseFloat(c[ozI]) || 0;
-        const dzPct = dz + oz > 0 ? dz / (dz + oz) : 0.5;
+        // Defensive zone start % — prefer all-situation, fall back to 5on5 from zoneMap
+        const dz = dzI >= 0 ? (parseFloat(c[dzI]) || 0) : -1;
+        const oz = ozI >= 0 ? (parseFloat(c[ozI]) || 0) : -1;
+        const dzPctAll = dz >= 0 && oz >= 0 && dz + oz > 0 ? dz / (dz + oz) : null;
+        const dzPct = dzPctAll ?? zoneMap.get(slugify(name)) ?? null;
 
         analyticsMap.set(slugify(name), {
           ptsPace: (parseFloat(c[pI])  / g) * 82,
