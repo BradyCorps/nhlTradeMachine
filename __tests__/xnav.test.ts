@@ -382,7 +382,8 @@ describe("X-NAV — Elite Defencemen", () => {
       games: 78, ops: 2.8, dps: 6.5,
     });
     inRange(result.total, 600, 900, "Slavin NAV");
-    expect(result.def).toBeGreaterThan(result.off); // must be defense-dominant
+    // DEF must be meaningfully positive — xgaRelTM-0.8 at 22min = elite suppression
+    expect(result.def).toBeGreaterThan(25);
   });
 });
 

@@ -231,12 +231,15 @@ const offRaw = offPS !== null
 
   // ── Defensive value ───────────────────────────────────────────
   const defPS  = dps !== null ? dps * 15 : null;
-  const toiD   = clamp((toi - 15) * 2.5, 0, 30); // TOI above 15 min signals heavy usage
+  const toiD   = clamp((toi - 15) * 2.5, 0, 30);
   const qocVal = clamp((400 - qoc) / 400 * 20, 0, 20);
   const dzVal  = clamp((dzPct - 0.3) * 40, 0, 12);
 
+  // defPS * 8 (not * 10) — compensates for outer multiplier rising from 12→15
+  // Net: dps * 15 * 8 = dps * 120 (same total as old dps * 12 * 10 = dps * 120)
+  // This keeps total NAV stable while the display multiplier in the UI uses * 15
   const defRaw   = defPS !== null
-    ? defPS * 10 * confidence + (def * 20 + qocVal + toiD) * (1 - confidence)
+    ? defPS * 8 * confidence + (def * 20 + qocVal + toiD) * (1 - confidence)
     : def * 20 + qocVal + toiD + dzVal - xgaRel * 4;
   const defTotal = safe(defRaw);
 

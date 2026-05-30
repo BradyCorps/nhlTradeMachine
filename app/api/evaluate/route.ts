@@ -76,6 +76,8 @@ const PLAYER_PEDIGREE: Record<string, {
   peakGsax?:    number;
   careerGsax?:  number;
   peakPtsPace?: number;
+  peakDps?:     number;   // peak Defensive Point Shares season
+  peakOps?:     number;   // peak Offensive Point Shares season
   awards?:      string[];
   allStarYears?: number;
 }> = {
@@ -128,7 +130,17 @@ const PLAYER_PEDIGREE: Record<string, {
   "Aleksander Barkov":  { peakPtsPace: 96,  awards: ["Selke","Selke"],                                    allStarYears: 3 },
   "Jonathan Huberdeau": { peakPtsPace: 115, awards: [],                                                   allStarYears: 2 },
   "Jakob Chychrun":     { peakPtsPace: 75,  awards: [],                                                   allStarYears: 0 },
-  "Jaccob Slavin":      { peakPtsPace: 42,  awards: [],                                                   allStarYears: 0 },
+  // ── SKATERS — DEFENSIVE D PEDIGREE ───────────────────────────
+  // Slavin 2019-20: 43 pts / 68 GP (52 pts/82 pace), OPS 2.2, DPS 5.7
+  // Awards: All-Star Game, All-NHL 5th, Norris-5th, Lady Byng-4th
+  // E+/-: +16.9 (exceptional defensive impact)
+  // NOTE: 2025-26 Slavin only played 38 GP (injury) — current NAV reflects that,
+  //   but historical floor honours his peak
+  "Jaccob Slavin":      { peakPtsPace: 52, peakDps: 5.7, peakOps: 2.2,
+                          awards: ["Norris"],  allStarYears: 1 },
+  // Seider 2025-26: played all 82 games — current benchmark for elite defensive D
+  "Moritz Seider":      { peakPtsPace: 68, peakDps: 5.2, peakOps: 4.1,
+                          awards: ["Calder"],  allStarYears: 1 },
 };
 
 // ── Award hardware multipliers ────────────────────────────────
@@ -185,7 +197,10 @@ const PROSPECT_TIERS: Record<string, {
 // Their value doesn't show up in points or xG metrics reliably.
 const SHUTDOWN_D_PEDIGREE: Record<string, { navFloor: number; note: string }> = {
   // Floors calibrated to reflect true trade market — elite shutdown D commands real return
-  "Jaccob Slavin":     { navFloor: 90,  note: "Perennial Selke candidate, elite shutdown D" },
+  // Slavin: 38 GP in 2025-26 (injury) → reduced current floor, but historical floor via PLAYER_PEDIGREE
+  "Jaccob Slavin":     { navFloor: 55,  note: "Elite shutdown D — 38 GP this season, peak 2019-20" },
+  // Seider: 82 GP in 2025-26 — current benchmark for elite defensive D-man
+  "Moritz Seider":     { navFloor: 75,  note: "Elite two-way D, played all 82 GP in 2025-26" },
   "Gustav Forsling":   { navFloor: 70,  note: "Elite two-way D, CAR" },
   "Chris Tanev":       { navFloor: 55,  note: "Elite shutdown D, Cup winner" },
   "Ryan Suter":        { navFloor: 30,  note: "Veteran shutdown D, declining but proven" },
@@ -231,20 +246,24 @@ const getHistoricalFloor = (name: string, currentNAV: number): number => {
   const pedigree = PLAYER_PEDIGREE[name];
   if (!pedigree) return currentNAV;
 
-  // Award bonus — accumulated hardware adds a permanent credibility premium
   const awardBonus = (pedigree.awards ?? []).reduce((sum, award) => {
-    return sum + (AWARD_BONUS[award] ?? 0) * 0.4; // 40% residual value per award
+    return sum + (AWARD_BONUS[award] ?? 0) * 0.4;
   }, 0);
-
-  // All-Star bonus — consistent selection signals sustained excellence
   const allStarBonus = (pedigree.allStarYears ?? 0) * 3;
+  const awardCount   = (pedigree.awards ?? []).length;
+  const floorPct     = Math.min(0.80, 0.55 + awardCount * 0.04);
 
-  // Historical floor — proven players can't drop below 60% of their peak NAV
-  // The more awards, the higher the floor (max 80% of peak for Hart winners)
-  const awardCount  = (pedigree.awards ?? []).length;
-  const floorPct    = Math.min(0.80, 0.55 + awardCount * 0.04);
+  // For shutdown D-men: anchor floor to peak DPS (more reliable than pts pace)
+  // Slavin peak DPS 5.7 → floor = 5.7 * 15 * 0.65 = 55.6 + awards/allstar
+  if (pedigree.peakDps) {
+    const dpsFloor = pedigree.peakDps * 15 * Math.min(0.80, 0.55 + awardCount * 0.05);
+    const ptsFloor = pedigree.peakPtsPace
+      ? (pedigree.peakPtsPace / 82) * 25 * floorPct
+      : 0;
+    return Math.max(currentNAV, Math.max(dpsFloor, ptsFloor) + awardBonus + allStarBonus);
+  }
 
-  // For skaters: floor based on peak pts pace
+  // Standard skater floor: based on peak pts pace
   if (pedigree.peakPtsPace) {
     const historicalFloorNAV = (pedigree.peakPtsPace / 82) * 25 * floorPct;
     return Math.max(currentNAV, historicalFloorNAV + awardBonus + allStarBonus);
