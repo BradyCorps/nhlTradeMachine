@@ -1097,13 +1097,14 @@ export async function GET() {
       const rows = csv.split("\n").filter(Boolean);
       const hdr  = parseCSVRow(rows[0]);
       const h    = (k: string) => hdr.indexOf(k);
-      const [nI, sI, pI, xgI, gI, iceI, onAI, offAI, rkI, onFI, offFI, dzI, ozI, goalsI] = [
+      const [nI, sI, pI, xgI, gI, iceI, onAI, offAI, rkI, onFI, offFI, dzI, ozI, goalsI, posI] = [
         h("name"), h("situation"), h("I_F_points"), h("I_F_xGoals"),
         h("games_played"), h("icetime"),
         h("OnIce_A_xGoals"), h("OffIce_A_xGoals"), h("iceTimeRank"),
         h("OnIce_F_xGoals"), h("OffIce_F_xGoals"),
         h("I_F_dZoneShifts"), h("I_F_oZoneShifts"),
         h("I_F_goals"),
+        h("position"),  // used to disambiguate same-name players (e.g. two Elias Petterssons on VAN)
       ];
       const zoneMap = new Map<string, number>(); // slugified name → 5on5 DZ%
 
@@ -1117,6 +1118,8 @@ export async function GET() {
         const dz5  = parseFloat(c[dzI]) || 0;
         const oz5  = parseFloat(c[ozI]) || 0;
         if (dz5 + oz5 > 0) {
+          const pos5 = posI >= 0 ? (c[posI]?.trim().toUpperCase() ?? "") : "";
+          if (pos5) zoneMap.set(`${slugify(name)}__${pos5}`, dz5 / (dz5 + oz5));
           zoneMap.set(slugify(name), dz5 / (dz5 + oz5));
         }
       });
@@ -1149,12 +1152,17 @@ export async function GET() {
         const xgaRelTM = onXgA60 - offXgA60; // negative = better defense
 
         // Defensive zone start % — prefer all-situation, fall back to 5on5 from zoneMap
+        const pos = posI >= 0 ? (c[posI]?.trim().toUpperCase() ?? "") : "";
         const dz = dzI >= 0 ? (parseFloat(c[dzI]) || 0) : -1;
         const oz = ozI >= 0 ? (parseFloat(c[ozI]) || 0) : -1;
         const dzPctAll = dz >= 0 && oz >= 0 && dz + oz > 0 ? dz / (dz + oz) : null;
-        const dzPct = dzPctAll ?? zoneMap.get(slugify(name)) ?? null;
+        const posForZone = pos ? `${slugify(name)}__${pos}` : slugify(name);
+        const dzPct = dzPctAll ?? zoneMap.get(posForZone) ?? zoneMap.get(slugify(name)) ?? null;
 
-        analyticsMap.set(slugify(name), {
+        // Use name__position key when available to handle same-name players
+        // e.g. "elias-pettersson__C" vs "elias-pettersson__D" (two VAN players)
+        const mapKey = pos ? `${slugify(name)}__${pos}` : slugify(name);
+        const entry = {
           ptsPace: (parseFloat(c[pI])  / g) * 82,
           xGPace:  (parseFloat(c[xgI]) / g) * 82,
           defRate: offA - onA,
@@ -1165,9 +1173,12 @@ export async function GET() {
           xgRelTM,
           xgaRelTM,
           dzPct,
-          goalsPace:   goalsI   >= 0 ? (parseFloat(c[goalsI])   / g) * 82 : undefined,
-          assistsPace: goalsI   >= 0 ? ((parseFloat(c[pI]) - parseFloat(c[goalsI])) / g) * 82 : undefined,
-        });
+          goalsPace:   goalsI >= 0 ? (parseFloat(c[goalsI])   / g) * 82 : undefined,
+          assistsPace: goalsI >= 0 ? ((parseFloat(c[pI]) - parseFloat(c[goalsI])) / g) * 82 : undefined,
+        };
+        analyticsMap.set(mapKey, entry);
+        // Also store by name-only for players without a name collision
+        if (pos) analyticsMap.set(slugify(name), entry);
       });
       fbMap = buildFallbackMap(analyticsMap);
     }
@@ -1298,7 +1309,9 @@ export async function GET() {
 
     skaters.forEach((p: any) => {
       const slug = slugify(p.name);
-      let stats  = analyticsMap.get(slug);
+      // Try position-specific key first to handle same-name players (e.g. two Petterssons)
+      const posSlug = `${slug}__${(p.position ?? "").toUpperCase()}`;
+      let stats = analyticsMap.get(posSlug) ?? analyticsMap.get(slug);
       if (!stats) {
         const last = slug.split("-").slice(-1)[0];
         const fb   = fbMap.get(last);

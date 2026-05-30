@@ -1,59 +1,13 @@
 import { NextResponse } from "next/server";
 import type {
-  EvaluateRequest, EvaluateResponse
+  Asset, EvaluateRequest, EvaluateResponse, FArchetype
 } from "@/app/lib/trade-types";
 
 // ── Core interfaces — self-contained so engine has no client deps ──
-interface Asset {
-  id: string;
-  teamId: string;
-  name: string;
-  position: string;
-  age: number;
-  games: number;
-  ptsPace: number;
-  xGPace?: number;
-  defRate: number;
-  avgTOI: number;
-  capHit: number;
-  yearsRemaining: number;
-  hasNMC: boolean;
-  hasNTC: boolean;
-  canRetain: boolean;
-  retainedPct: number;
-  multiplier: number;
-  headshot?: string;
-  hasLiveStats?: boolean;
-  qocRank?: number;
-  xgRelTM?: number | null;
-  xgaRelTM?: number | null;
-  dzPct?: number | null;
-  goalsPace?: number;
-  assistsPace?: number;
-  round?: number;
-  year?: number;
-  teamStanding?: number;
-  isProtected?: boolean;
-  gsax?: number;
-  savePct?: number;
-  gamesStarted?: number;
-  shotsPerGame?: number;
-  careerGsax?: number;
-  awards?: string[];
-  peakNAV?: number;
-  ops?: number | null;
-  dps?: number | null;
-}
+// Asset, Team, XNAVResult imported from trade-types.ts — no local duplicates.
+// All fields including teamXga60, extensionCapHit, extensionYears are defined there.
 
-interface Team {
-  id: string;
-  name: string;
-  capSpace: number;
-  standing: number;
-  phase?: string;
-  needs?: { pos: string; minWar: number; label: string }[];
-  prospectPool?: string;
-}
+type Team = import("@/app/lib/trade-types").Team;
 
 interface XNAVResult {
   total: number;
@@ -63,7 +17,7 @@ interface XNAVResult {
   cap: number;
   upside: number;
   noivImpact?: number;
-  fArchetype?: string;
+  fArchetype?: FArchetype;
 }
 
 // ============================================================
@@ -220,14 +174,10 @@ const INJURY_RISK: Record<string, {
   "Nathan MacKinnon":    { level: "MODERATE", note: "History of upper-body injuries" },
   "Elias Pettersson":    { level: "MODERATE", note: "Wrist/shoulder concerns" },
   "Blake Wheeler":       { level: "HIGH",     note: "Chronic knee issues, age 38" },
-  "Jakub Voracek":       { level: "HIGH",     note: "Retired due to concussion" },
   "Evander Kane":        { level: "HIGH",     note: "Wrist surgery, repeated absences" },
   "Cam Fowler":          { level: "MODERATE", note: "Knee surgery history" },
-  "Ryan Ellis":          { level: "HIGH",     note: "Chronic hip/pelvis — barely played since 2022" },
-  "Marc-Andre Fleury":   { level: "MODERATE", note: "Age-related durability" },
   "Jonathan Toews":      { level: "HIGH",     note: "Chronic Immune condition" },
   "Jack Eichel":         { level: "MODERATE", note: "Disk fusion surgery history" },
-  "Carey Price":         { level: "HIGH",     note: "Knee, substance — effectively retired" },
   "Nazem Kadri":         { level: "MODERATE", note: "Thumb surgery, suspension history" },
   "Erik Karlsson":       { level: "HIGH",     note: "Two Achilles surgeries, wrist issues" },
   "Thomas Chabot":       { level: "MODERATE", note: "History of concussions" },
@@ -401,7 +351,7 @@ const getXNAV = (asset: Asset): XNAVResult => {
     // League average ~2.55. Teams above 2.75 have hostile goalie environments.
     // This is more accurate than standings which reflect scoring/PP success too.
     const LEAGUE_AVG_XGA60 = 2.55;
-    const teamXga60 = (asset as any).teamXga60 ?? LEAGUE_AVG_XGA60;
+    const teamXga60 = asset.teamXga60 ?? LEAGUE_AVG_XGA60;
     const xgaDelta  = teamXga60 - LEAGUE_AVG_XGA60; // positive = worse than avg
     // Scale correction: each 0.1 above league avg = +0.04 GSAx/game forgiven
     // CGY at 2.85 xGA/60 (+0.30 above avg) → +0.12/game correction
@@ -444,8 +394,8 @@ const getXNAV = (asset: Asset): XNAVResult => {
     // team is actually committing to — not the cheap current-year deal.
     // Cap space calculation uses current capHit (what Calgary pays this year).
     // NAV evaluation uses the extension AAV (what the acquiring team inherits).
-    const extCapHit  = (asset as any).extensionCapHit;
-    const extYears   = (asset as any).extensionYears;
+    const extCapHit  = asset.extensionCapHit;
+    const extYears   = asset.extensionYears;
     const navCapHit  = extCapHit
       ? extCapHit * (1 - (asset.retainedPct || 0))   // extension AAV for NAV math
       : effectiveCap;                                  // no extension — use current
@@ -645,9 +595,8 @@ const getXNAV = (asset: Asset): XNAVResult => {
   const rawMarketValue = safe((offImpact * offWeight + defImpact * defWeight) * posAdj * ageFactor);
   const trueMarketValue = Math.max(rawMarketValue + qocBonus + shutdownBonus, coachTrustFloor * ageFactor);
 
-  // 7. Contract surplus (FIX: single penalty, not double)
-  //    A player is worth their performance value minus what they're paid.
-  //    We represent cap cost as a direct surplus subtractor.
+  // 7. Contract surplus — single penalty.
+  //    Player value minus cap cost = trade surplus/deficit.
   // Apply retention — acquiring team pays reduced cap, boosting value
   const effectiveCapHit = asset.capHit * (1 - (asset.retainedPct || 0));
 
@@ -769,7 +718,7 @@ const getXNAV = (asset: Asset): XNAVResult => {
   // Archetype-routed: forwards and D-men weight the components differently.
   let preFloorTotal = netSurplus;
   let noivImpact    = 0;
-  let fArchetype    = "";
+  let fArchetype: FArchetype = "";
 
   const hasNOIV = asset.xgRelTM != null && asset.xgaRelTM != null
     && asset.dzPct != null && asset.position !== "Pick"
@@ -894,7 +843,8 @@ const getXNAV = (asset: Asset): XNAVResult => {
   // KEY INSIGHT: defRate = offA - onA  AND  xgaRelTM = onA - offA
   // These are the SAME measurement with OPPOSITE signs.
   // Using both = partial cancellation → Cirelli shows -4 DEF (the bug).
-  // FIX: use defRate ONLY. Remove fwdNoDataFallback (it used xgaRelTM).
+  // Single signal: defRate only — xgaRelTM and defRate measure the same thing
+  // with opposite signs; using both causes partial cancellation.
   //
   // Positive defRate = team allows LESS xGA when player is on ice = good defender.
   // Scale by TOI reliability: 20+ min=1.0, 17-19=0.65, 15-16=0.35, <15=0.15
@@ -945,7 +895,6 @@ const baseTotal = Math.max(finalTotal, elcFloor, autoprospectFloor, depthFloor);
   const ptsVal   = safe(asset.ptsPace ?? 0) * ptsScale;
   const noivB    = asset.xgRelTM ? clamp(asset.xgRelTM * 3.5, -20, 25) : 0; 
   
-  // FIX: Read directly from asset.ops to avoid redeclaring the variable!
   const offPS = asset.ops != null ? asset.ops * 17 : null;
   
   const offDisplayRaw = offPS !== null
