@@ -1988,7 +1988,7 @@ function AssetCard({
     tooltip="Offensive impact — scoring production (pts/82, xG rate)" 
 />
             <MicroBar
-    label={asset.dps != null ? "DPS" : "DEF"}
+    label="DEF"
     val={asset.dps != null
     // Changed multiplier from 16 to 15 to perfectly match the xnav-engine math!
     ? Math.round(asset.dps * 15)

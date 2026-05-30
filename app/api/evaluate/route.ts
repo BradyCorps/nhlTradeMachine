@@ -184,16 +184,17 @@ const PROSPECT_TIERS: Record<string, {
 // These players have proven track records as top-pairing shutdown D-men.
 // Their value doesn't show up in points or xG metrics reliably.
 const SHUTDOWN_D_PEDIGREE: Record<string, { navFloor: number; note: string }> = {
-  "Jaccob Slavin":     { navFloor: 55,  note: "Perennial Selke candidate, elite shutdown D" },
+  // Floors calibrated to reflect true trade market — elite shutdown D commands real return
+  "Jaccob Slavin":     { navFloor: 90,  note: "Perennial Selke candidate, elite shutdown D" },
+  "Gustav Forsling":   { navFloor: 70,  note: "Elite two-way D, CAR" },
+  "Chris Tanev":       { navFloor: 55,  note: "Elite shutdown D, Cup winner" },
   "Ryan Suter":        { navFloor: 30,  note: "Veteran shutdown D, declining but proven" },
-  "Rasmus Ristolainen":{ navFloor: 25,  note: "Defensive specialist, PHI" },
+  "Rasmus Ristolainen":{ navFloor: 25,  note: "Defensive specialist" },
   "Luke Schenn":       { navFloor: 20,  note: "Veteran shutdown D" },
   "Joel Edmundson":    { navFloor: 22,  note: "Shutdown D, physical" },
   "Brendan Dillon":    { navFloor: 18,  note: "Veteran shutdown D" },
-  "Colin Miller":      { navFloor: 18,  note: "Defensive D" },
   "Damon Severson":    { navFloor: 30,  note: "Two-way D, shutdown capable" },
-  "Jake Walman":       { navFloor: 25,  note: "Defensive D, DET" },
-  "Travis Hamonic":    { navFloor: 18,  note: "Veteran shutdown D" },
+  "Jake Walman":       { navFloor: 28,  note: "Defensive D" },
 };
 // Players with known fragility or chronic issues get a risk flag.
 // This isn't a disqualifier — just context for the acquiring GM.
