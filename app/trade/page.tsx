@@ -11,6 +11,8 @@ import {
   HISTORICAL_MAX_DEF 
 } from "../lib/historical-benchmarks";
 
+import Header from "@/app/components/Header";
+import Footer from "@/app/components/Footer";
 import type {
   Asset, Team, XNAVResult, GmFlag, FlagSeverity, FlagCategory,
   TradeVerdict, TradeStatus, TradeMetrics,
@@ -990,51 +992,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
       <div className="relative w-full max-w-[1700px] mx-auto px-4 lg:px-6 py-6 lg:py-8 flex flex-col gap-5 overflow-x-hidden">
 
-        <header className="flex flex-col pb-5 border-b" style={{ borderColor: '#b8a070' }}>
-          <div className="w-full">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-50" style={{ background: '#b83020' }} />
-                <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: '#b83020' }} />
-              </span>
-              <span className="text-[9px] font-bold uppercase tracking-[0.4em]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>Live Data Feed Active</span>
-            </div>
-
-            {/* Masthead — fully centered */}
-            <div style={{ borderTop: '4px double #1c140a', borderBottom: '4px double #1c140a', padding: '8px 0 6px', marginBottom: '4px' }}>
-              <div className="text-center">
-                <div className="text-[8px] uppercase tracking-[0.4em] mb-1" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
-                  Est. 2025 &nbsp;—&nbsp; Vol. I &nbsp;—&nbsp; Trade Edition
-                </div>
-                <a href="/" style={{ textDecoration: 'none' }}>
-                  <h1 className="font-black leading-none transition-opacity hover:opacity-70" style={{ color: '#1c140a', fontFamily: "'Libre Baskerville', Georgia, serif",
-                    fontSize: 'clamp(1.8rem, 5vw, 3rem)',
-                    letterSpacing: '-0.02em',
-                    lineHeight: 1,
-                    cursor: 'pointer',
-                  }}>
-                    The Hockey Ledger
-                  </h1>
-                </a>
-                <div className="text-[11px] uppercase tracking-[0.3em] mt-1.5 hidden sm:block" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
-                  X-NAV Analytics &nbsp;·&nbsp; xG Suppression &nbsp;·&nbsp; GM Logic Engine &nbsp;·&nbsp; Live Statistics
-                </div>
-                <div className="mt-2 flex items-center justify-center gap-4">
-                  <a href="/players" className="text-[12px] font-black uppercase tracking-[0.2em]"
-                    style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace", textDecoration: 'none', transition: 'color 0.15s' }}
-                    onMouseEnter={e => (e.currentTarget.style.color = '#1c140a')}
-                    onMouseLeave={e => (e.currentTarget.style.color = '#9a7d58')}>
-                    ◇ PLAYER ANALYTICS
-                  </a>
-                  <span style={{ color: '#c8b890' }}>|</span>
-                  <span className="text-[12px] font-black uppercase tracking-[0.2em]" style={{ color: '#1c140a', fontFamily: "'Courier Prime', monospace" }}>
-                    ◆ TRADE MACHINE
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
+        <Header activeTab="trade" />
 
         <TugBar homeNetGain={homeNetGain} navA={navA} navB={navB} />
 
@@ -1415,14 +1373,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             </p>
           </div>
 
-          <div className="text-center pt-4" style={{ borderTop: '1px solid #b8a070' }}>
-            <p className="text-[9px] uppercase tracking-[0.4em]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
-              Data: NHL API · MoneyPuck · CapWages &nbsp;·&nbsp; Models: X-NAV 1.1 · G-NAV · NOIV · STRAND™ &nbsp;·&nbsp; AI: Claude Sonnet
-            </p>
-            <p className="text-[8px] mt-1" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
-              All valuations are analytical estimates, not financial advice. Player values fluctuate with injury, performance, and market conditions.
-            </p>
-          </div>
+          <Footer />
         </footer>
 
       </div>
