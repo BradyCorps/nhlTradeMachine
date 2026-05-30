@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import ContractSyncer from "@/app/components/ContractSyncer";
 import TradeProposalEngine from "@/app/components/TradeProposal";
 import PlayerComparison from "@/app/components/PlayerComparison";
 import CapProjection from "@/app/components/CapProjection";
@@ -741,7 +740,6 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
   return (
     <main className="min-h-screen antialiased select-none overflow-x-hidden bg-paper text-ink font-serif">
-      <ContractSyncer />
 
       {/* Trade Proposal Engine Modal */}
       {tradeRequest && tradeRequest.length > 0 && (
@@ -1395,7 +1393,7 @@ function TradePanel({
   const isLeft = idx === 0;
 
   return (
-    <div className="relative border rounded-2xl p-4 lg:p-6 flex flex-col min-h-[400px] lg:min-h-[740px]" style={{
+    <div className="relative border rounded-2xl p-4 lg:p-6 flex flex-col min-h-[400px] lg:min-h-[1rem]" style={{
       background: 'var(--ledger-card-light)',
       borderColor: isLeft ? 'var(--ledger-ink-faint)' : 'var(--ledger-rule)',
     }}>
