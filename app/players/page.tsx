@@ -770,18 +770,18 @@ RULES: No invented context. No speculation about players not in this trade. Comp
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(28,20,10,0.88)', backdropFilter: 'blur(4px)' }}>
           <div className="relative w-full max-w-lg"
-            style={{ background: '#f0e6cc', borderRadius: '2px', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}>
+            style={{ background: 'var(--ledger-card-light)', borderRadius: '2px', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}>
 
             {/* Header rule */}
             <div style={{ borderTop: '4px double #1c140a', borderBottom: '1px solid #b8a070', padding: '20px 28px 14px' }}>
               <div className="text-center">
-                <div className="text-[11px] uppercase tracking-[0.5em] mb-2" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                <div className="text-[11px] uppercase tracking-[0.5em] mb-2 text-ledger-ink-faint font-mono">
                   The Hockey Ledger · GM Challenge
                 </div>
-                <h2 className="font-black" style={{ fontFamily: "'Libre Baskerville', serif", fontSize: '1.6rem', color: '#1c140a', lineHeight: 1.1 }}>
+                <h2 className="font-black" style={{ fontSize: '1.6rem', color: 'var(--ledger-ink)', lineHeight: 1.1 }}>
                   Think you can do better<br/>than your GM?
                 </h2>
-                <p className="mt-3 text-[11px] leading-relaxed" style={{ color: '#6b5030', fontFamily: "'Libre Baskerville', serif", fontStyle: 'italic' }}>
+                <p className="mt-3 text-[11px] leading-relaxed" style={{ color: 'var(--ledger-brown)', fontStyle: 'italic' }}>
                   Pick your franchise. Make your moves. Sim a year and find out if you had what it takes — or if your GM was right all along.
                 </p>
               </div>
@@ -789,7 +789,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
             {/* Team grid */}
             <div style={{ padding: '16px 28px 20px' }}>
-              <div className="text-[11px] font-black uppercase tracking-[0.3em] mb-3" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+              <div className="text-[11px] font-black uppercase tracking-[0.3em] mb-3 text-ledger-ink-faint font-mono">
                 Select Your Franchise
               </div>
               <div className="grid grid-cols-4 gap-1.5 mb-4" style={{ maxHeight: '260px', overflowY: 'auto' }}>
@@ -799,11 +799,11 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                     const isSelected = teams[0]?.id === t.id;
                     const phase = t.phase ?? "";
                     const phaseColor =
-                      phase === "Contender"  ? '#1a5c2e' :
-                      phase === "Bubble"     ? '#1a2e5c' :
-                      phase === "Retooling"  ? '#8a5c00' :
-                      phase === "Rebuilding" ? '#b83020' :
-                      '#6b5030';
+                      phase === "Contender"  ? 'var(--ledger-green)' :
+                      phase === "Bubble"     ? 'var(--ledger-navy)' :
+                      phase === "Retooling"  ? 'var(--ledger-amber)' :
+                      phase === "Rebuilding" ? 'var(--ledger-red)' :
+                      'var(--ledger-brown)';
                     const cityName = t.name.split(' ').slice(0, -1).join(' ');
                     const teamName = t.name.split(' ').slice(-1)[0];
                     return (
@@ -820,27 +820,24 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                         }}
                         className="p-2 text-left transition-all"
                         style={{
-                          background: isSelected ? '#1c140a' : '#e4d8b8',
-                          border: `1px solid ${isSelected ? '#1c140a' : '#c8b890'}`,
+                          background: isSelected ? 'var(--ledger-ink)' : 'var(--ledger-card)',
+                          border: `1px solid ${isSelected ? 'var(--ledger-ink)' : 'var(--ledger-rule-mid)'}`,
                           borderRadius: '2px',
                         }}
                       >
-                        <div className="text-[10px] font-black" style={{
-                          color: isSelected ? '#f0e6cc' : '#1c140a',
-                          fontFamily: "'Courier Prime', monospace",
+                        <div className="text-2xs font-black" style={{
+                          color: isSelected ? 'var(--ledger-card-light)' : 'var(--ledger-ink)',
                           lineHeight: 1.1,
                         }}>
                           {t.id}
                         </div>
-                        <div className="text-[7px] font-black leading-tight mt-0.5" style={{
-                          color: isSelected ? '#c8b890' : '#4a3820',
-                          fontFamily: "'Libre Baskerville', serif",
+                        <div className="text-2xs font-black leading-tight mt-0.5" style={{
+                          color: isSelected ? 'var(--ledger-rule-mid)' : 'var(--ledger-ink-body)',
                         }}>
                           {teamName}
                         </div>
-                        <div className="text-[6px] mt-0.5 font-black uppercase tracking-wide" style={{
-                          color: isSelected ? '#9a7d58' : phaseColor,
-                          fontFamily: "'Courier Prime', monospace",
+                        <div className="text-2xs mt-0.5 font-black uppercase tracking-wide" style={{
+                          color: isSelected ? 'var(--ledger-ink-faint)' : phaseColor,
                         }}>
                           {phase}
                         </div>
@@ -851,19 +848,18 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
               {/* Selected team summary */}
               {teams[0] && (
-                <div className="mb-4 p-3" style={{ background: '#e4d8b8', border: '1px solid #b8a070' }}>
+                <div className="mb-4 p-3" style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070' }}>
                   <div className="flex justify-between items-center">
                     <div>
-                      <div className="font-black text-[14px]" style={{ color: '#1c140a', fontFamily: "'Libre Baskerville', serif" }}>
+                      <div className="font-black text-[14px] text-ledger-ink font-serif">
                         {teams[0].name}
                       </div>
-                      <div className="text-[11px] mt-0.5" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                      <div className="text-[11px] mt-0.5 text-ledger-ink-faint font-mono">
                         #{teams[0].standing}/32 · {teams[0].phase} · ${teams[0].capSpace.toFixed(1)}M cap space
                       </div>
                     </div>
-                    <div className="text-[9px] font-black px-2 py-1" style={{
-                      color: '#b83020', border: '1px solid rgba(184,48,32,0.4)',
-                      fontFamily: "'Courier Prime', monospace",
+                    <div className="text-2xs font-black px-2 py-1" style={{
+                      color: 'var(--ledger-red)', border: '1px solid rgba(184,48,32,0.4)',
                     }}>
                       YOUR FRANCHISE
                     </div>
@@ -879,16 +875,15 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                 }}
                 className="w-full py-3.5 font-black uppercase tracking-widest text-[11px] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                 style={{
-                  background: teams[0] ? '#1c140a' : '#c8b890',
-                  color: '#f0e6cc',
-                  fontFamily: "'Courier Prime', monospace",
+                  background: teams[0] ? 'var(--ledger-ink)' : 'var(--ledger-rule-mid)',
+                  color: 'var(--ledger-card-light)',
                   borderRadius: '2px',
                 }}
               >
                 {teams[0] ? `✦ Take Control of the ${teams[0].name} ✦` : 'Select a team to begin'}
               </button>
 
-              <p className="text-center mt-2 text-[11px]" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
+              <p className="text-center mt-2 text-[11px] text-ledger-rule font-mono">
                 Your franchise locks in when you confirm. Reset via Void All Trades.
               </p>
             </div>
@@ -902,20 +897,20 @@ RULES: No invented context. No speculation about players not in this trade. Comp
           style={{ background: 'rgba(28,20,10,0.75)', backdropFilter: 'blur(3px)' }}
           onClick={() => setShowMemo(false)}>
           <div className="relative max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-            style={{ background: '#f0e6cc', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', borderRadius: '2px' }}
+            style={{ background: 'var(--ledger-card-light)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', borderRadius: '2px' }}
             onClick={e => e.stopPropagation()}>
 
             {/* Memo letterhead */}
             <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-4" style={{ borderBottom: '2px solid #1c140a' }}>
               <div className="text-center mb-4">
-                <div className="text-[9px] uppercase tracking-[0.5em] mb-1" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                <div className="text-2xs uppercase tracking-[0.5em] mb-1 text-ledger-ink-faint font-mono">
                   Quant Front Office — Internal Memorandum
                 </div>
-                <div className="font-black text-2xl" style={{ fontFamily: "'Libre Baskerville', serif", color: '#1c140a' }}>
+                <div className="font-black text-2xl" style={{ color: 'var(--ledger-ink)' }}>
                   Trade Evaluation Report
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5 text-[10px]" style={{ fontFamily: "'Courier Prime', monospace" }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5 text-2xs font-mono">
                 {[
                   ["TO",      "GM & Hockey Operations Leadership"],
                   ["FROM",    "Senior Front Office Analyst — Claude"],
@@ -925,10 +920,10 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                   ["NAV",     `${verdict.metrics.homeNetGain > 0 ? '+' : ''}${verdict.metrics.homeNetGain.toFixed(0)} for ${teams[0]?.name ?? 'Home'}`],
                 ].map(([label, val]) => (
                   <div key={label} className="flex gap-3">
-                    <span className="font-black w-16 shrink-0" style={{ color: '#6b5030' }}>{label}:</span>
-                    <span style={{ color: (label === "VERDICT" && (verdict.status === "WIN" || verdict.status === "FAIR")) ? '#1a5c2e'
-                      : (label === "VERDICT" && (verdict.status === "BLOCKED" || verdict.status === "DECLINED")) ? '#b83020'
-                      : '#1c140a' }}>{val}</span>
+                    <span className="font-black w-16 shrink-0 text-ledger-brown">{label}:</span>
+                    <span style={{ color: (label === "VERDICT" && (verdict.status === "WIN" || verdict.status === "FAIR")) ? 'var(--ledger-green)'
+                      : (label === "VERDICT" && (verdict.status === "BLOCKED" || verdict.status === "DECLINED")) ? 'var(--ledger-red)'
+                      : 'var(--ledger-ink)' }}>{val}</span>
                   </div>
                 ))}
               </div>
@@ -943,8 +938,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                 top: '24px'
               }} />
               <p className="relative text-[12px] leading-[1.85]" style={{
-                color: '#1c140a',
-                fontFamily: "'Libre Baskerville', serif",
+                color: 'var(--ledger-ink)',
                 whiteSpace: 'pre-wrap',
               }}>
                 {verdict.claudeAnalysis}
@@ -953,15 +947,14 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
             {/* Verdict stamp + disclaimer */}
             <div className="px-4 sm:px-8 pb-5 sm:pb-6 flex items-end justify-between flex-wrap gap-3" style={{ borderTop: '1px solid #b8a070', paddingTop: '16px' }}>
-              <div className="text-[9px]" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace", lineHeight: 1.6 }}>
+              <div className="text-2xs" style={{ color: 'var(--ledger-ink-faint)', lineHeight: 1.6 }}>
                 CONFIDENTIAL — Internal Use Only<br />
                 Valuations are analytical estimates only.
               </div>
               <div style={{ transform: 'rotate(-4deg)', transformOrigin: 'center' }}>
                 <div className="px-4 py-1.5 text-center font-black text-base uppercase tracking-widest" style={{
-                  border: `3px solid ${['WIN','FAIR'].includes(verdict.status) ? '#1a5c2e' : '#b83020'}`,
-                  color: ['WIN','FAIR'].includes(verdict.status) ? '#1a5c2e' : '#b83020',
-                  fontFamily: "'Courier Prime', monospace",
+                  border: `3px solid ${['WIN','FAIR'].includes(verdict.status) ? 'var(--ledger-green)' : 'var(--ledger-red)'}`,
+                  color: ['WIN','FAIR'].includes(verdict.status) ? 'var(--ledger-green)' : 'var(--ledger-red)',
                   opacity: 0.85,
                 }}>
                   {verdict.status}
@@ -972,13 +965,12 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             {/* Footer actions */}
             <div className="px-4 sm:px-8 py-3 flex justify-between items-center flex-wrap gap-2" style={{ borderTop: '1px solid #b8a070' }}>
               <button onClick={() => { setShowMemo(false); generateClaudeAnalysis(); }}
-                className="text-[9px] font-black uppercase tracking-wider transition-opacity hover:opacity-60"
-                style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                className="text-2xs font-black uppercase tracking-wider transition-opacity hover:opacity-60 text-ledger-ink-faint font-mono">
                 ↺ Regenerate
               </button>
               <button onClick={() => setShowMemo(false)}
-                className="text-[9px] font-black uppercase tracking-wider px-4 py-1.5"
-                style={{ background: '#1c140a', color: '#f0e6cc', fontFamily: "'Courier Prime', monospace", borderRadius: '2px' }}>
+                className="text-2xs font-black uppercase tracking-wider px-4 py-1.5"
+                style={{ background: 'var(--ledger-ink)', color: 'var(--ledger-card-light)', borderRadius: '2px' }}>
                 Close ✕
               </button>
             </div>
@@ -1032,8 +1024,8 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
             <button onClick={runEval} disabled={!blocks[0].length && !blocks[1].length}
               className="w-full py-4 font-black uppercase tracking-widest text-[11px] transition-all duration-200 disabled:opacity-25 disabled:cursor-not-allowed active:scale-[0.97] btn-stamp"
-              onMouseEnter={e => (e.currentTarget.style.background = '#d43820')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#b83020')}>
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--ledger-red-dark)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'var(--ledger-red)')}>
               ✦ Run GM Audit ✦
             </button>
 
@@ -1054,12 +1046,11 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                 f.category === "FLOOR_VIOLATION"
               )) && (
               <button onClick={() => { executeTrade(); setHomeTeamLocked(true); }}
-                className="w-full py-2.5 font-black uppercase tracking-widest text-[10px] transition-all duration-200 active:scale-[0.97]"
+                className="w-full py-2.5 font-black uppercase tracking-widest text-2xs transition-all duration-200 active:scale-[0.97]"
                 style={{
                   background: 'transparent',
                   border: '1px solid #b83020',
-                  color: '#b83020',
-                  fontFamily: "'Courier Prime', monospace",
+                  color: 'var(--ledger-red)',
                 }}
                 title="You're giving up value — but it's your team, your call. This trade will be locked in.">
                 ⚠ My Team, My Call
@@ -1068,7 +1059,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
             {executedTrades.length > 0 && (
               <button onClick={resetTrades}
-                className="w-full py-2 font-black uppercase tracking-widest text-[10px] transition-all btn-ghost">
+                className="w-full py-2 font-black uppercase tracking-widest text-2xs transition-all btn-ghost">
                 ↺ Void All Trades
               </button>
             )}
@@ -1097,12 +1088,12 @@ RULES: No invented context. No speculation about players not in this trade. Comp
         {(executedTrades.length > 0 || showSimPanel) && (
           <div className="mt-6 bg-zinc-900/30 border border-zinc-800/40 rounded-2xl overflow-hidden">
             <div className="px-3 sm:px-6 py-3 border-b border-zinc-800/40 flex items-center justify-between">
-              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600">
+              <span className="text-2xs font-black uppercase tracking-[0.4em] text-zinc-600">
                 Simulated Universe — {executedTrades.length} Trade{executedTrades.length !== 1 ? "s" : ""} Executed
               </span>
               <div className="flex items-center gap-2">
                 <button onClick={simYear} disabled={simLoading || executedTrades.length === 0}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest bg-purple-950 border border-purple-800 text-purple-400 hover:bg-purple-900 disabled:opacity-40 transition-all">
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-2xs font-black uppercase tracking-widest bg-purple-950 border border-purple-800 text-purple-400 hover:bg-purple-900 disabled:opacity-40 transition-all">
                   {simLoading
                     ? <><div className="w-2.5 h-2.5 rounded-full border-2 border-purple-500 border-t-transparent animate-spin"/>Simulating...</>
                     : <>⚡ Sim a Year</>}
@@ -1113,7 +1104,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             {/* Trade log */}
             <div className="px-5 py-3 space-y-2">
               {executedTrades.map((t) => (
-                <div key={t.id} className="flex items-start gap-3 text-[10px]">
+                <div key={t.id} className="flex items-start gap-3 text-2xs">
                   <span className="text-emerald-500 font-black shrink-0">✓</span>
                   <div>
                     <span className="font-black text-zinc-300">{t.homeTeamName}</span>
@@ -1133,10 +1124,10 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             {simData && (
               <div style={{ borderTop: '1px solid #b8a070', padding: '16px 20px 12px' }}>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                  <span className="text-[11px] font-black uppercase tracking-widest text-ledger-ink-faint font-mono">
                     ⚡ Projected Season Results
                   </span>
-                  <span className="text-[7px]" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
+                  <span className="text-2xs text-ledger-rule font-mono">
                     Simulation #{simData.seed}
                   </span>
                 </div>
@@ -1144,13 +1135,12 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                 {/* Two team cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                   {[simData.homeTeam, simData.partnerTeam].filter(Boolean).map((t: any) => (
-                    <div key={t.teamId} style={{ background: '#e4d8b8', border: '1px solid #b8a070', padding: '10px 12px' }}>
+                    <div key={t.teamId} style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070', padding: '10px 12px' }}>
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-black text-[12px]" style={{ color: '#1c140a', fontFamily: "'Libre Baskerville', serif" }}>{t.teamName}</span>
-                        <span className={`text-[8px] font-black px-1.5 py-0.5`} style={{
-                          color: t.madePlayoffs ? '#1a5c2e' : '#b83020',
+                        <span className="font-black text-[12px] text-ledger-ink font-serif">{t.teamName}</span>
+                        <span className={`text-2xs font-black px-1.5 py-0.5`} style={{
+                          color: t.madePlayoffs ? 'var(--ledger-green)' : 'var(--ledger-red)',
                           border: `1px solid ${t.madePlayoffs ? 'rgba(26,92,46,0.4)' : 'rgba(184,48,32,0.4)'}`,
-                          fontFamily: "'Courier Prime', monospace",
                         }}>
                           {t.madePlayoffs ? '✓ PLAYOFFS' : '✗ MISSED'}
                         </span>
@@ -1164,9 +1154,9 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                           { label: 'GAA', val: t.goalie?.projectedGAA ?? '—' },
                           { label: 'SV%', val: t.goalie?.projectedSVP?.toFixed(3) ?? '—' },
                         ].map((s: any) => (
-                          <div key={s.label} style={{ background: '#dfd0a8', border: '1px solid #c8b890', padding: '4px 6px', textAlign: 'center' }}>
-                            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '6px', color: '#9a7d58', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.label}</div>
-                            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '9px', fontWeight: 900, color: '#1c140a', marginTop: '1px' }}>{s.val}</div>
+                          <div key={s.label} style={{ background: 'var(--ledger-cream)', border: '1px solid #c8b890', padding: '4px 6px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '6px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.label}</div>
+                            <div style={{ fontSize: '9px', fontWeight: 900, color: 'var(--ledger-ink)', marginTop: '1px' }}>{s.val}</div>
                           </div>
                         ))}
                       </div>
@@ -1182,9 +1172,9 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                     { label: "Points Leader", val: `${simData.leaders?.topScorer?.name?.split(' ').pop()} ${simData.leaders?.topScorer?.pts}pts` },
                     { label: "Draft Lottery", val: `${simData.leaders?.draftLottery?.teamName} (${simData.leaders?.draftLottery?.projectedPoints}pts)` },
                   ].map((s: any) => (
-                    <div key={s.label} style={{ background: '#e4d8b8', border: '1px solid #b8a070', padding: '6px 8px' }}>
-                      <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '6.5px', color: '#9a7d58', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>{s.label}</div>
-                      <div style={{ fontFamily: "'Libre Baskerville', serif", fontSize: '10px', fontWeight: 700, color: '#1c140a' }}>{s.val}</div>
+                    <div key={s.label} style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070', padding: '6px 8px' }}>
+                      <div style={{ fontSize: '6.5px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>{s.label}</div>
+                      <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--ledger-ink)' }}>{s.val}</div>
                     </div>
                   ))}
                 </div>
@@ -1194,8 +1184,8 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             {simResult && (
               <div className="px-5 py-5" style={{ borderTop: '1px solid #b8a070' }}>
                 <div className="flex items-center gap-2 mb-4" style={{ borderBottom: '1px solid #c8b890', paddingBottom: '8px' }}>
-                  <span style={{ color: '#b83020' }}>⚡</span>
-                  <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                  <span className="text-ledger-red">⚡</span>
+                  <span className="text-2xs font-black uppercase tracking-widest text-ledger-ink-faint font-mono">
                     Claude · One Year Later
                   </span>
                 </div>
@@ -1203,17 +1193,17 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                   {simResult.split('\n').map((line, i) => {
                     if (line.startsWith('## ') || line.startsWith('**THE ') || line.startsWith('**EDMONTON') || line.startsWith('**AROUND') || line.startsWith('**THE YEAR') || line.startsWith('**DRAFT') || line.startsWith('**VERDICT')) {
                       const text = line.replace(/^\#{1,3}\s+/, '').replace(/\*\*/g, '');
-                      return <div key={i} className="font-black text-[11px] uppercase tracking-widest mt-4 mb-1" style={{ color: '#1c140a', fontFamily: "'Courier Prime', monospace", borderBottom: '1px solid #c8b890', paddingBottom: '4px' }}>{text}</div>;
+                      return <div key={i} className="font-black text-[11px] uppercase tracking-widest mt-4 mb-1" style={{ color: 'var(--ledger-ink)', borderBottom: '1px solid #c8b890', paddingBottom: '4px' }}>{text}</div>;
                     }
                     if (line.startsWith('- **') || line.startsWith('- ')) {
                       const text = line.replace(/^-\s+/, '').replace(/\*\*(.*?)\*\*/g, '$1');
-                      return <div key={i} className="text-[11px] leading-relaxed pl-3" style={{ color: '#3d2e18', borderLeft: '2px solid #b8a070' }}>{text}</div>;
+                      return <div key={i} className="text-[11px] leading-relaxed pl-3" style={{ color: 'var(--ledger-ink-mid)', borderLeft: '2px solid #b8a070' }}>{text}</div>;
                     }
                     if (line.trim() === '' || line.startsWith('#')) return null;
                     // Split on **bold** markers and render with <strong> — no dangerouslySetInnerHTML
                     const boldParts = line.split(/\*\*(.*?)\*\*/g);
                     return (
-                      <p key={i} className="text-[11px] leading-[1.8]" style={{ color: '#3d2e18', fontFamily: "'Libre Baskerville', serif" }}>
+                      <p key={i} className="text-[11px] leading-[1.8]" style={{ color: 'var(--ledger-ink-mid)' }}>
                         {boldParts.map((part, j) => j % 2 === 0 ? part : <strong key={j}>{part}</strong>)}
                       </p>
                     );
@@ -1247,10 +1237,10 @@ RULES: No invented context. No speculation about players not in this trade. Comp
         {/* ── Footer — Glossary & Methodology ── */}
         <footer className="mt-12 pt-8" style={{ borderTop: '2px solid #1c140a' }}>
           <div className="text-center mb-6">
-            <div className="text-[9px] uppercase tracking-[0.5em] mb-1" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+            <div className="text-2xs uppercase tracking-[0.5em] mb-1 text-ledger-ink-faint font-mono">
               Methodology & Glossary
             </div>
-            <h2 className="text-xl font-black" style={{ fontFamily: "'Libre Baskerville', serif", color: '#1c140a' }}>
+            <h2 className="text-xl font-black" style={{ color: 'var(--ledger-ink)' }}>
               How The Hockey Ledger Works
             </h2>
           </div>
@@ -1258,20 +1248,20 @@ RULES: No invented context. No speculation about players not in this trade. Comp
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
             {/* Valuation */}
             <div>
-              <div className="font-black text-sm mb-3 pb-1" style={{ color: '#1c140a', borderBottom: '1px solid #b8a070', fontFamily: "'Libre Baskerville', serif" }}>
+              <div className="font-black text-sm mb-3 pb-1" style={{ color: 'var(--ledger-ink)', borderBottom: '1px solid #b8a070' }}>
                 Player Valuation
               </div>
-              <div className="space-y-3 text-[11px]" style={{ color: '#4a3820', lineHeight: 1.7 }}>
+              <div className="space-y-3 text-[11px] text-ledger-ink-body leading-relaxed">
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>NAV (Net Asset Value)</span>
+                  <span className="font-black font-mono">NAV (Net Asset Value)</span>
                   <p className="mt-0.5">A player's overall trade value on a scale from roughly -100 to +1000. Combines offensive production, defensive contribution, contract cost, and age. Think of it as "how much is this player worth versus what they cost?" Positive NAV = providing more value than salary. Negative NAV = contract liability.</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>NOIV (Net On-Ice Value)</span>
+                  <span className="font-black font-mono">NOIV (Net On-Ice Value)</span>
                   <p className="mt-0.5">A contextual multiplier based on how much a player elevates their teammates. Measures xG% relative to teammates on ice vs off, xGA suppression, and defensive zone deployment. A player with NOIV significantly above their raw stats is a hidden gem whose impact outstrips the box score.</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>OPS · DPS · PS</span>
+                  <span className="font-black font-mono">OPS · DPS · PS</span>
                   <p className="mt-0.5">Offensive and Defensive Point Shares — computed dynamically from the NHL Stats API using the Kubatko marginal goals framework. OPS measures offensive contribution to team points; DPS measures defensive contribution. These replace heuristic OFF/DEF estimates when live data is available.</p>
                 </div>
               </div>
@@ -1279,36 +1269,36 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
             {/* STRAND metrics */}
             <div>
-              <div className="font-black text-sm mb-3 pb-1" style={{ color: '#1c140a', borderBottom: '1px solid #b8a070', fontFamily: "'Libre Baskerville', serif" }}>
+              <div className="font-black text-sm mb-3 pb-1" style={{ color: 'var(--ledger-ink)', borderBottom: '1px solid #b8a070' }}>
                 STRAND™ Node Glossary
               </div>
-              <div className="space-y-2 text-[11px]" style={{ color: '#4a3820', lineHeight: 1.7 }}>
+              <div className="space-y-2 text-[11px] text-ledger-ink-body leading-relaxed">
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>SCR — Scoring Pace</span>
+                  <span className="font-black font-mono">SCR — Scoring Pace</span>
                   <p className="mt-0.5">Points per 82 games, normalized by position. D-men scored against a 0-80 scale; forwards against 0-100. A 73 SCR for a defenceman means he scores at the top of the D-man range — not that he scores like a forward.</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>xG — Expected Goals</span>
+                  <span className="font-black font-mono">xG — Expected Goals</span>
                   <p className="mt-0.5">Shot quality and volume generated per 82 games. Accounts for where shots come from, not just how many. A player who generates high-danger chances scores higher than one who fires from the perimeter.</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>TOI+ — Ice Time</span>
+                  <span className="font-black font-mono">TOI+ — Ice Time</span>
                   <p className="mt-0.5">Average time on ice per game. Normalized 10-27 minutes. Reflects coach trust and role deployment — players earning 24+ minutes are being used in every situation. Normalized so 27+ min = 100.</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>SUPP — xGA Suppression</span>
+                  <span className="font-black font-mono">SUPP — xGA Suppression</span>
                   <p className="mt-0.5">On-ice expected goals against vs off-ice, relative to teammates. Positive = team leaks fewer chances with this player on ice. Range -1.5 to +1.5. The defensive counterpart to xG — how well does this player prevent quality shots against?</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>QoC — Quality of Competition</span>
+                  <span className="font-black font-mono">QoC — Quality of Competition</span>
                   <p className="mt-0.5">Rank of opponents faced by ice time. Lower rank = harder matchups. Rank 1 faces the toughest competition in the league every night. A player with QoC rank 50 and good SUPP is genuinely shutting down the opposition's best players.</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>DZ% — Defensive Zone Starts</span>
+                  <span className="font-black font-mono">DZ% — Defensive Zone Starts</span>
                   <p className="mt-0.5">Percentage of shifts starting in the defensive zone. High DZ% means the coach deploys this player specifically to protect their own net — a mark of trust in their defensive reliability. Inverted in STRAND so higher score = more defensive deployment.</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>AGE — Age Curve</span>
+                  <span className="font-black font-mono">AGE — Age Curve</span>
                   <p className="mt-0.5">The trajectory of a player's value over the life of their contract. Young players show positive age curves (improving). Veterans past their peak show negative curves (declining). Used in the defensive strand to show whether a player's contribution will grow or shrink.</p>
                 </div>
               </div>
@@ -1316,24 +1306,24 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
             {/* Archetypes & GM Logic */}
             <div>
-              <div className="font-black text-sm mb-3 pb-1" style={{ color: '#1c140a', borderBottom: '1px solid #b8a070', fontFamily: "'Libre Baskerville', serif" }}>
+              <div className="font-black text-sm mb-3 pb-1" style={{ color: 'var(--ledger-ink)', borderBottom: '1px solid #b8a070' }}>
                 Archetypes & GM Logic
               </div>
-              <div className="space-y-3 text-[11px]" style={{ color: '#4a3820', lineHeight: 1.7 }}>
+              <div className="space-y-3 text-[11px] text-ledger-ink-body leading-relaxed">
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>D-Man Archetypes</span>
+                  <span className="font-black font-mono">D-Man Archetypes</span>
                   <p className="mt-0.5"><strong>Offensive D</strong> — 45+ pts/82, valued for scoring and powerplay (Makar, Bouchard). <strong>Two-Way D</strong> — 28-45 pts/82 with heavy minutes and balanced PS ratio (Morrissey, Josi). <strong>Shutdown D</strong> — under 28 pts/82 but faces elite competition, DPS dominates OPS (Slavin). <strong>Depth D</strong> — sheltered deployment, standard evaluation.</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>EWA (Estimated Wins Added)</span>
+                  <span className="font-black font-mono">EWA (Estimated Wins Added)</span>
                   <p className="mt-0.5">Translates NAV into actual standings wins. Roughly 7 NAV points equals one win above replacement, adjusted for where the team sits in the standings.</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>CWI (Contention Window Index)</span>
+                  <span className="font-black font-mono">CWI (Contention Window Index)</span>
                   <p className="mt-0.5">Estimates how a trade affects a team's championship window in years. Young players on cheap deals push CWI up. Aging veterans on long contracts push it down.</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>GM Flags</span>
+                  <span className="font-black font-mono">GM Flags</span>
                   <p className="mt-0.5">The audit engine checks 15+ real-world factors: cap compliance, positional depth, NMC/NTC clause probability, timeline mismatch, defensive dependency, same-division conflicts. HARD flags block; SOFT flags warn. DECLINED means the model believes one side's GM wouldn't sign off — not that the trade is bad hockey.</p>
                 </div>
               </div>
@@ -1341,20 +1331,20 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
             {/* STRAND visualization */}
             <div>
-              <div className="font-black text-sm mb-3 pb-1" style={{ color: '#1c140a', borderBottom: '1px solid #b8a070', fontFamily: "'Libre Baskerville', serif" }}>
+              <div className="font-black text-sm mb-3 pb-1" style={{ color: 'var(--ledger-ink)', borderBottom: '1px solid #b8a070' }}>
                 STRAND™ Visualization
               </div>
-              <div className="space-y-3 text-[11px]" style={{ color: '#4a3820', lineHeight: 1.7 }}>
+              <div className="space-y-3 text-[11px] text-ledger-ink-body leading-relaxed">
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>What is STRAND™?</span>
+                  <span className="font-black font-mono">What is STRAND™?</span>
                   <p className="mt-0.5">STRAND — Stylistic Trait & Rating Analysis for NHL Development — is a proprietary double-helix visualization encoding a player's complete on-ice identity into two intertwined strands. Navy = offensive profile. Red = defensive profile.</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>Reading the Helix</span>
+                  <span className="font-black font-mono">Reading the Helix</span>
                   <p className="mt-0.5">A tight symmetric helix signals an elite two-way player. A helix where one strand dominates reveals a specialist — not a weakness, a definition. Slavin's helix is almost entirely red. That's not a criticism; it's the most accurate visual description of what makes him valuable. Node size scales with trait strength. Values shown directly on each node.</p>
                 </div>
                 <div>
-                  <span className="font-black" style={{ fontFamily: "'Courier Prime', monospace" }}>Archetype Classification</span>
+                  <span className="font-black font-mono">Archetype Classification</span>
                   <p className="mt-0.5">When Point Shares data is available, the OPS/DPS ratio directly determines archetype: players with psRatio {'>'} 0.62 are Offensive, {'<'} 0.38 are Defensive, 0.38-0.62 with strong both strands are Two-Way or Elite Two-Way. Heuristic scoring fills in when PS data isn't available.</p>
                 </div>
               </div>
@@ -1362,11 +1352,11 @@ RULES: No invented context. No speculation about players not in this trade. Comp
           </div>
 
           {/* Value vs Worth note */}
-          <div className="mb-6 p-4" style={{ border: '1px solid #b8a070', background: '#e4d8b8' }}>
-            <div className="text-[9px] uppercase tracking-[0.4em] mb-2" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+          <div className="mb-6 p-4" style={{ border: '1px solid #b8a070', background: 'var(--ledger-card)' }}>
+            <div className="text-2xs uppercase tracking-[0.4em] mb-2 text-ledger-ink-faint font-mono">
               A Note on Value vs Worth
             </div>
-            <p className="text-[11px]" style={{ color: '#4a3820', lineHeight: 1.8, fontFamily: "'Libre Baskerville', serif", fontStyle: 'italic' }}>
+            <p className="text-[11px]" style={{ color: 'var(--ledger-ink-body)', lineHeight: 1.8, fontStyle: 'italic' }}>
               Every player in this database plays in the NHL. That alone puts them in the top 0.1% of hockey players on earth. A negative NAV does not mean a negative player — it means the contract represents negative trade value relative to production and term. Hockey is rooted in reality: every player who dresses for an NHL game is fundamentally one of the best athletes in the world at what they do. These numbers measure tradeable asset value, not human worth. Use them as a starting point for conversation, not a final verdict.
             </p>
           </div>
@@ -1404,14 +1394,14 @@ function TradePanel({
 
   return (
     <div className="relative border rounded-2xl p-4 lg:p-6 flex flex-col min-h-[400px] lg:min-h-[740px]" style={{
-      background: '#ede4cc',
-      borderColor: isLeft ? '#9a7d58' : '#b8a070',
+      background: 'var(--ledger-card-light)',
+      borderColor: isLeft ? 'var(--ledger-ink-faint)' : 'var(--ledger-rule)',
     }}>
       {/* Badge */}
-      <div className={`absolute -top-3 left-6 px-3 py-1 text-[9px] font-black uppercase tracking-[0.3em] border`} style={{
-        background: '#e8dab8',
-        borderColor: '#b8a070',
-        color: '#6b5030',
+      <div className={`absolute -top-3 left-6 px-3 py-1 text-2xs font-black uppercase tracking-[0.3em] border`} style={{
+        background: 'var(--ledger-warm)',
+        borderColor: 'var(--ledger-rule)',
+        color: 'var(--ledger-brown)',
         borderRadius: '2px'
       }}>
         {accent}
@@ -1419,18 +1409,17 @@ function TradePanel({
 
       {/* Section dateline */}
       <div className="mb-4 pb-3">
-        <div className="text-[8px] font-black uppercase tracking-[0.5em] mb-1">
+        <div className="text-2xs font-black uppercase tracking-[0.5em] mb-1">
           {label}
         </div>
         <div className="flex justify-between items-end gap-3">
           {locked && idx === 0 ? (
             <div className="flex items-center gap-2 flex-1">
-              <span className="font-black text-[15px]" style={{ color: '#1c140a', fontFamily: "'Libre Baskerville', serif" }}>
+              <span className="font-black text-[15px] text-ledger-ink font-serif">
                 {team?.name}
               </span>
-              <span className="text-[7px] font-black px-1.5 py-0.5" style={{
-                color: '#b83020', border: '1px solid rgba(184,48,32,0.4)',
-                fontFamily: "'Courier Prime', monospace",
+              <span className="text-2xs font-black px-1.5 py-0.5" style={{
+                color: 'var(--ledger-red)', border: '1px solid rgba(184,48,32,0.4)',
               }}>LOCKED</span>
             </div>
           ) : (
@@ -1446,13 +1435,12 @@ function TradePanel({
           )}
 
           <div className="text-right shrink-0 ml-3">
-            <div className="font-black leading-none" style={{ fontSize: '1.4rem', color: '#1c140a', fontFamily: "'Courier Prime', monospace", fontStyle: 'italic' }}>
+            <div className="font-black leading-none" style={{ fontSize: '1.4rem', color: 'var(--ledger-ink)', fontStyle: 'italic' }}>
               {nav.toFixed(1)}
             </div>
-            <div className="text-[8px] font-black uppercase tracking-widest">NAV</div>
-            <div className="text-[9px] font-black px-1.5 py-0.5 mt-0.5" style={{
-              fontFamily: "'Courier Prime', monospace",
-              color: capSpace < 0 ? '#b83020' : '#1a5c2e',
+            <div className="text-2xs font-black uppercase tracking-widest">NAV</div>
+            <div className="text-2xs font-black px-1.5 py-0.5 mt-0.5" style={{
+              color: capSpace < 0 ? 'var(--ledger-red)' : 'var(--ledger-green)',
               background: capSpace < 0 ? 'rgba(184,48,32,0.08)' : 'rgba(26,92,46,0.08)',
               border: `1px solid ${capSpace < 0 ? 'rgba(184,48,32,0.25)' : 'rgba(26,92,46,0.25)'}`,
             }}>
@@ -1466,7 +1454,7 @@ function TradePanel({
       <div className="flex-grow overflow-y-auto space-y-2 mb-4 pr-1">
         {!team && idx === 1 && (
           <div className="flex flex-col items-center justify-center h-40 gap-3">
-            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: "9px", color: "#9a7d58", textAlign: "center", letterSpacing: "0.2em", textTransform: "uppercase" }}>
+            <div style={{ fontSize: "9px", color: "#9a7d58", textAlign: "center", letterSpacing: "0.2em", textTransform: "uppercase" }}>
               Select a trade partner<br/>above to begin
             </div>
             <div style={{ color: "#c8b890", fontSize: "24px" }}>⇄</div>
@@ -1474,7 +1462,7 @@ function TradePanel({
         )}
         {blocks[idx].length === 0 && team && (
           <div className="flex items-center justify-center h-32 border-2 border-dashed" >
-            <span className="text-[10px] font-black uppercase tracking-[0.3em]">No assets on the block</span>
+            <span className="text-2xs font-black uppercase tracking-[0.3em]">No assets on the block</span>
           </div>
         )}
         {blocks[idx].map((a) => (
@@ -1495,7 +1483,7 @@ function TradePanel({
       {idx === 0 && blocks[0].length > 0 && onRequestBlockTrade && (
         <button
           onClick={() => onRequestBlockTrade(blocks[0])}
-          className="w-full py-2.5 font-black text-[10px] uppercase tracking-widest transition-all mb-2 flex items-center justify-center gap-2 btn-ink"
+          className="w-full py-2.5 font-black text-2xs uppercase tracking-widest transition-all mb-2 flex items-center justify-center gap-2 btn-ink"
         >
           ⚡ Find Trade Partners for This Package
         </button>
@@ -1553,7 +1541,7 @@ function AssetCard({
     });
   };
 
-  const navColor = xnav.total > 80 ? '#1a5c2e' : xnav.total > 20 ? '#1a2e5c' : xnav.total > -20 ? '#6b5030' : '#b83020';
+  const navColor = xnav.total > 80 ? 'var(--ledger-green)' : xnav.total > 20 ? 'var(--ledger-navy)' : xnav.total > -20 ? 'var(--ledger-brown)' : 'var(--ledger-red)';
 
   return (
     <div className="p-3 transition-all">
@@ -1566,22 +1554,22 @@ function AssetCard({
           )}
           <div className="min-w-0">
             <div className="font-black leading-tight truncate flex items-center gap-1.5"
-              style={{ fontSize: '13px', color: '#1c140a' }}>
+              style={{ fontSize: '13px', color: 'var(--ledger-ink)' }}>
               {asset.name}
-              {asset.hasNMC && <span className="text-[7px] px-1 font-black shrink-0" style={{ color: '#b83020', border: '1px solid #b83020' }}>NMC</span>}
-              {asset.hasNTC && !asset.hasNMC && <span className="text-[7px] px-1 font-black shrink-0" style={{ color: '#8a5c00', border: '1px solid #8a5c00' }}>NTC</span>}
-              {!asset.hasLiveStats && !isPick && <span className="text-[7px] px-1 font-black shrink-0" style={{ color: '#9a7d58', border: '1px solid #b8a070' }}>EST</span>}
+              {asset.hasNMC && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-red)', border: '1px solid #b83020' }}>NMC</span>}
+              {asset.hasNTC && !asset.hasNMC && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-amber)', border: '1px solid #8a5c00' }}>NTC</span>}
+              {!asset.hasLiveStats && !isPick && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-ink-faint)', border: '1px solid #b8a070' }}>EST</span>}
               {/* ── NEW: Extension Badge ── */}
               {asset.hasExtension && (
-                <span className="text-[7px] px-1 font-black shrink-0 shadow-sm rounded-sm" 
-                  style={{ background: '#d97706', color: '#fff', border: '1px solid #b45309' }} 
+                <span className="text-2xs px-1 font-black shrink-0 shadow-sm rounded-sm" 
+                  style={{ background: 'var(--ledger-orange)', color: 'white', border: '1px solid #b45309' }} 
                   title="Future contract extension applied to valuation">
                   EXTENSION
                 </span>
               )}
             </div>
             
-            <div className="text-[9px] font-bold uppercase tracking-wider mt-0.5" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+            <div className="text-2xs font-bold uppercase tracking-wider mt-0.5 text-ledger-ink-faint font-mono">
               {isPick
                 ? `${asset.year} · ${asset.round === 1 ? "1st" : asset.round === 2 ? "2nd" : "3rd"} Round`
                 : (() => {
@@ -1593,15 +1581,15 @@ function AssetCard({
                       return (
                         <span>
                           {asset.position} · Age {asset.age} ·{' '}
-                          <span style={{ color: '#6b5030' }}>${asset.capHit.toFixed(2)}M × {asset.yearsRemaining}yr</span>
-                          <span style={{ color: '#9a7d58' }}> → </span>
-                          <span style={{ color: '#d97706' }}>EXT ${extCap.toFixed(2)}M × {extYears}yr</span>
+                          <span className="text-ledger-brown">${asset.capHit.toFixed(2)}M × {asset.yearsRemaining}yr</span>
+                          <span className="text-ledger-ink-faint"> → </span>
+                          <span className="text-ledger-orange">EXT ${extCap.toFixed(2)}M × {extYears}yr</span>
                         </span>
                       );
                     }
                     if (asset.hasExtension) {
                       return (
-                        <span style={{ color: '#d97706' }}>
+                        <span className="text-ledger-orange">
                           {asset.position} · Age {asset.age} · ${asset.capHit.toFixed(2)}M × {asset.yearsRemaining}yr · EXTENDED
                         </span>
                       );
@@ -1616,7 +1604,7 @@ function AssetCard({
                 {Array.from(new Set(PLAYER_PEDIGREE[asset.name].awards)).map((award) => {
                   const count = PLAYER_PEDIGREE[asset.name].awards!.filter(a => a === award).length;
                   return (
-                    <span key={award} className="text-[7px] px-1 py-0.5 font-black" style={{ color: '#8a5c00', border: '1px solid rgba(138,92,0,0.4)',  }}>
+                    <span key={award} className="text-2xs px-1 py-0.5 font-black" style={{ color: 'var(--ledger-amber)', border: '1px solid rgba(138,92,0,0.4)',  }}>
                       {count > 1 ? `${count}× ` : ""}{award}
                     </span>
                   );
@@ -1626,8 +1614,8 @@ function AssetCard({
             {/* Prospect tier badge */}
             {PROSPECT_TIERS[asset.name] && (
               <div className="flex items-center gap-1 mt-1">
-                <span className="text-[7px] px-1 py-0.5 font-black" style={{
-                  color: PROSPECT_TIERS[asset.name].tier === 1 ? '#1a2e5c' : PROSPECT_TIERS[asset.name].tier === 2 ? '#1a5c2e' : '#6b5030',
+                <span className="text-2xs px-1 py-0.5 font-black" style={{
+                  color: PROSPECT_TIERS[asset.name].tier === 1 ? 'var(--ledger-navy)' : PROSPECT_TIERS[asset.name].tier === 2 ? 'var(--ledger-green)' : 'var(--ledger-brown)',
                   border: `1px solid ${PROSPECT_TIERS[asset.name].tier === 1 ? 'rgba(26,46,92,0.4)' : PROSPECT_TIERS[asset.name].tier === 2 ? 'rgba(26,92,46,0.4)' : 'rgba(107,80,48,0.4)'}`,
                   
                 }}>
@@ -1638,10 +1626,9 @@ function AssetCard({
             {/* Injury risk badge */}
             {INJURY_RISK[asset.name] && (
               <div className="flex items-center gap-1 mt-1">
-                <span className="text-[7px] px-1 py-0.5 font-black" style={{
-                  color: '#b83020',
-                  border: '1px solid rgba(184,48,32,0.4)',
-                  fontFamily: "'Courier Prime', monospace"
+                <span className="text-2xs px-1 py-0.5 font-black" style={{
+                  color: 'var(--ledger-red)',
+                  border: '1px solid rgba(184,48,32,0.4)'
                 }} title={INJURY_RISK[asset.name].note}>
                   ⚕ {INJURY_RISK[asset.name].level} RISK
                 </span>
@@ -1653,23 +1640,22 @@ function AssetCard({
               const toi = asset.avgTOI ?? 0;
               const qoc = asset.qocRank ?? 450;
               let arch = "DEPTH D";
-              let color = '#6b5030';
+              let color = 'var(--ledger-brown)';
               let title = "5th/6th defender — limited deployment";
               if (pts >= 45) {
-                arch = "OFFENSIVE D"; color = '#1a2e5c';
+                arch = "OFFENSIVE D"; color = 'var(--ledger-navy)';
                 title = "Offensive defenceman — primary value from scoring and powerplay";
               } else if (pts >= 28 && toi >= 21) {
-                arch = "TWO-WAY D"; color = '#1a5c2e';
+                arch = "TWO-WAY D"; color = 'var(--ledger-green)';
                 title = "Two-way defenceman — contributes offensively and defensively";
               } else if (pts < 28 && toi >= 19 && qoc < 220) {
-                arch = "SHUTDOWN D"; color = '#8a5c00';
+                arch = "SHUTDOWN D"; color = 'var(--ledger-amber)';
                 title = `Shutdown defenceman — faces elite competition (QoC rank: ${qoc}), valued for defensive role not scoring`;
               }
               return (
                 <div className="flex items-center gap-1 mt-1">
-                  <span className="text-[7px] px-1 py-0.5 font-black" style={{
-                    color, border: `1px solid ${color}40`,
-                    fontFamily: "'Courier Prime', monospace"
+                  <span className="text-2xs px-1 py-0.5 font-black" style={{
+                    color, border: `1px solid ${color}40`
                   }} title={title}>
                     {arch}
                   </span>
@@ -1679,20 +1665,19 @@ function AssetCard({
             {/* Forward archetype badge */}
             {["C","W","L","R"].includes(asset.position) && !isPick && xnav.fArchetype && (() => {
               const archMap: Record<string, { color: string; title: string }> = {
-                SNIPER:     { color: '#1a2e5c', title: "Sniper — primary value from goal generation" },
-                PLAYMAKER:  { color: '#1a5c2e', title: "Playmaker — primary value from assist generation and play-driving" },
-                TWO_WAY:    { color: '#8a5c00', title: "Two-Way Forward — balanced offense with strong defensive suppression" },
-                GRINDER:    { color: '#b83020', title: "Grinder — defensive deployment, physical play, limited offensive upside" },
-                SCORER:     { color: '#1a2e5c', title: "Scoring Forward — balanced offensive production" },
+                SNIPER:     { color: 'var(--ledger-navy)', title: "Sniper — primary value from goal generation" },
+                PLAYMAKER:  { color: 'var(--ledger-green)', title: "Playmaker — primary value from assist generation and play-driving" },
+                TWO_WAY:    { color: 'var(--ledger-amber)', title: "Two-Way Forward — balanced offense with strong defensive suppression" },
+                GRINDER:    { color: 'var(--ledger-red)', title: "Grinder — defensive deployment, physical play, limited offensive upside" },
+                SCORER:     { color: 'var(--ledger-navy)', title: "Scoring Forward — balanced offensive production" },
               };
               const cfg = archMap[xnav.fArchetype];
               if (!cfg) return null;
               return (
                 <div className="flex items-center gap-1 mt-1">
-                  <span className="text-[7px] px-1 py-0.5 font-black" style={{
+                  <span className="text-2xs px-1 py-0.5 font-black" style={{
                     color: cfg.color,
                     border: `1px solid ${cfg.color}40`,
-                    fontFamily: "'Courier Prime', monospace",
                   }} title={cfg.title}>
                     {xnav.fArchetype.replace("_", " ")}
                   </span>
@@ -1703,10 +1688,9 @@ function AssetCard({
             {/* Change of scenery badge — negative NAV players that might thrive elsewhere */}
             {!isPick && xnav.total < -5 && xnav.total > -40 && asset.age <= 32 && (
               <div className="flex items-center gap-1 mt-1">
-                <span className="text-[7px] px-1 py-0.5 font-black" style={{
-                  color: '#946914',
+                <span className="text-2xs px-1 py-0.5 font-black" style={{
+                  color: 'var(--ledger-gold)',
                   border: '1px solid rgba(148,105,20,0.45)',
-                  fontFamily: "'Courier Prime', monospace",
                 }} title={`Negative NAV on current team — may suit a different system or situation. Teams with cap space and the right roster need sometimes absorb these contracts for picks.`}>
                   ⟳ CHANGE OF SCENERY
                 </span>
@@ -1716,10 +1700,9 @@ function AssetCard({
             {/* Salary dump badge — deeply negative, hard to move */}
             {!isPick && xnav.total <= -40 && (
               <div className="flex items-center gap-1 mt-1">
-                <span className="text-[7px] px-1 py-0.5 font-black" style={{
-                  color: '#b83020',
+                <span className="text-2xs px-1 py-0.5 font-black" style={{
+                  color: 'var(--ledger-red)',
                   border: '1px solid rgba(184,48,32,0.45)',
-                  fontFamily: "'Courier Prime', monospace",
                 }} title="Deeply negative contract — moving this requires significant salary retention or picks sweetener.">
                   ⚠ SALARY DUMP
                 </span>
@@ -1733,10 +1716,9 @@ function AssetCard({
               if (!isSurplus) return null;
               return (
                 <div className="flex items-center gap-1 mt-1">
-                  <span className="text-[7px] px-1 py-0.5 font-black" style={{
-                    color: '#1a5c2e',
+                  <span className="text-2xs px-1 py-0.5 font-black" style={{
+                    color: 'var(--ledger-green)',
                     border: '1px solid rgba(26,92,46,0.5)',
-                    fontFamily: "'Courier Prime', monospace",
                   }} title="Surplus contract — this player's on-ice value significantly exceeds their cap hit.">
                     ★ SURPLUS CONTRACT
                   </span>
@@ -1746,10 +1728,9 @@ function AssetCard({
             {/* Shutdown D pedigree badge */}
             {SHUTDOWN_D_PEDIGREE[asset.name] && (
               <div className="flex items-center gap-1 mt-1">
-                <span className="text-[7px] px-1 py-0.5 font-black" style={{
-                  color: '#8a5c00',
-                  border: '1px solid rgba(138,92,0,0.5)',
-                  fontFamily: "'Courier Prime', monospace"
+                <span className="text-2xs px-1 py-0.5 font-black" style={{
+                  color: 'var(--ledger-amber)',
+                  border: '1px solid rgba(138,92,0,0.5)'
                 }} title={SHUTDOWN_D_PEDIGREE[asset.name].note}>
                   ★ ELITE SHUTDOWN
                 </span>
@@ -1763,15 +1744,13 @@ function AssetCard({
           <span className="font-black" style={{
             fontSize: '1.1rem',
             fontStyle: 'italic',
-            color: xnav.total > 80 ? '#1a5c2e' : xnav.total > 20 ? '#1a2e5c' : xnav.total > -20 ? '#6b5030' : '#b83020',
-            fontFamily: "'Courier Prime', monospace",
+            color: xnav.total > 80 ? 'var(--ledger-green)' : xnav.total > 20 ? 'var(--ledger-navy)' : xnav.total > -20 ? 'var(--ledger-brown)' : 'var(--ledger-red)',
           }}>
             {fmt(xnav.total, 0)}
           </span>
           {xnav.noivImpact !== undefined && Math.abs(xnav.noivImpact) >= 2 && (
-            <span className="text-[8px] font-black" style={{
-              color: xnav.noivImpact > 0 ? '#1a5c2e' : '#b83020',
-              fontFamily: "'Courier Prime', monospace",
+            <span className="text-2xs font-black" style={{
+              color: xnav.noivImpact > 0 ? 'var(--ledger-green)' : 'var(--ledger-red)',
               letterSpacing: '0.05em',
             }} title={`NOIV Impact: ${xnav.noivImpact > 0 ? '+' : ''}${xnav.noivImpact.toFixed(0)}. ${xnav.noivImpact > 0 ? 'Elevates teammates beyond raw stats.' : 'On-ice context reduces value vs raw stats.'}`}>
               {xnav.noivImpact > 0 ? '↑' : '↓'} {Math.abs(xnav.noivImpact).toFixed(0)} NOIV
@@ -1795,11 +1774,10 @@ function AssetCard({
         <div className="flex gap-0 mb-2" style={{ borderBottom: '1px solid #c8b890' }}>
           {(["STATS", "STRAND"] as const).map(v => (
             <button key={v} onClick={() => setView(v)}
-              className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest px-3 py-1.5 transition-all"
+              className="flex items-center gap-1 text-2xs font-black uppercase tracking-widest px-3 py-1.5 transition-all"
               style={{
-                color: view === v ? '#1c140a' : '#9a7d58',
+                color: view === v ? 'var(--ledger-ink)' : 'var(--ledger-ink-faint)',
                 borderBottom: view === v ? '2px solid #1c140a' : '2px solid transparent',
-                fontFamily: "'Courier Prime', monospace",
                 marginBottom: '-1px',
                 background: 'transparent',
               }}>
@@ -1829,15 +1807,14 @@ function AssetCard({
         <>
           {otherBlock.length > 0 && (
             <div className="flex items-center gap-2 mb-1.5 px-0.5">
-              <span className="text-[7px] font-black uppercase tracking-wider shrink-0"
-                style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+              <span className="text-2xs font-black uppercase tracking-wider shrink-0 text-ledger-ink-faint font-mono">
                 Compare vs
               </span>
               <select
                 value={compareId}
                 onChange={e => setCompareId(e.target.value)}
-                className="text-[8px] font-black flex-1 py-0.5 px-1 appearance-none"
-                style={{ background: '#dfd0a8', border: '1px solid #c8b890', color: '#1c140a', fontFamily: "'Courier Prime', monospace", borderRadius: '1px' }}
+                className="text-2xs font-black flex-1 py-0.5 px-1 appearance-none"
+                style={{ background: 'var(--ledger-cream)', border: '1px solid #c8b890', color: 'var(--ledger-ink)', borderRadius: '1px' }}
               >
                 <option value="">— none —</option>
                 {otherBlock.map(a => (
@@ -1865,8 +1842,8 @@ function AssetCard({
             { label: 'GP',   val: String(asset.gamesStarted ?? 0), good: true },
           ].map(s => (
             <div key={s.label} className="p-2 text-center">
-              <div className="text-[7px] font-black uppercase tracking-tight mb-0.5">{s.label}</div>
-              <div className="text-[11px] font-black" style={{ color: s.good ? '#1a5c2e' : '#b83020' }}>{s.val}</div>
+              <div className="text-2xs font-black uppercase tracking-tight mb-0.5">{s.label}</div>
+              <div className="text-[11px] font-black" style={{ color: s.good ? 'var(--ledger-green)' : 'var(--ledger-red)' }}>{s.val}</div>
             </div>
           ))}
           {/* Role badge */}
@@ -1876,17 +1853,16 @@ function AssetCard({
               const isBackup  = gp < 33;
               const isStarter = gp >= 40;
               return (
-                <span className="text-[7px] px-1 py-0.5 font-black" style={{
-                  color: isStarter ? '#1a2e5c' : isBackup ? '#9a6b00' : '#6b5030',
+                <span className="text-2xs px-1 py-0.5 font-black" style={{
+                  color: isStarter ? 'var(--ledger-navy)' : isBackup ? 'var(--ledger-amber-dark)' : 'var(--ledger-brown)',
                   border: `1px solid ${isStarter ? 'rgba(26,46,92,0.4)' : isBackup ? 'rgba(154,107,0,0.4)' : 'rgba(107,80,48,0.4)'}`,
-                  fontFamily: "'Courier Prime', monospace",
                 }} title={isBackup ? "Backup goalie — NAV capped at 55. Per-game rates on <25 starts are unreliable predictors of full-season value." : isStarter ? "Starter — played 35+ games, full valuation applied" : "Tandem — shared starter role"}>
                   {isBackup ? "BACKUP" : isStarter ? "STARTER" : "TANDEM"}
                 </span>
               );
             })()}
             {PLAYER_PEDIGREE[asset.name]?.careerGsax && (
-              <span className="text-[9px] font-black" style={{ color: '#1a2e5c', fontFamily: "'Courier Prime', monospace" }}>
+              <span className="text-2xs font-black text-ledger-navy font-mono">
                 +{PLAYER_PEDIGREE[asset.name].careerGsax} career · Peak {PLAYER_PEDIGREE[asset.name].peakGsax}
               </span>
             )}
@@ -1902,29 +1878,29 @@ function AssetCard({
             <div className="flex gap-1.5 mb-1.5">
               {asset.ops != null && (
                 <div className="flex items-center gap-1 px-1.5 py-0.5" style={{ background: 'rgba(26,46,92,0.08)', border: '1px solid rgba(26,46,92,0.2)', borderRadius: '2px' }}>
-                  <span className="text-[6.5px] font-black uppercase tracking-wider" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>OPS</span>
-                  <span className="text-[8px] font-black" style={{ color: '#1a2e5c', fontFamily: "'Courier Prime', monospace" }}>{asset.ops.toFixed(1)}</span>
+                  <span className="text-[6.5px] font-black uppercase tracking-wider text-ledger-ink-faint font-mono">OPS</span>
+                  <span className="text-2xs font-black text-ledger-navy font-mono">{asset.ops.toFixed(1)}</span>
                 </div>
               )}
               {asset.dps != null && (
                 <div className="flex items-center gap-1 px-1.5 py-0.5" style={{ background: 'rgba(184,48,32,0.08)', border: '1px solid rgba(184,48,32,0.2)', borderRadius: '2px' }}>
-                  <span className="text-[6.5px] font-black uppercase tracking-wider" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>DPS</span>
-                  <span className="text-[8px] font-black" style={{ color: '#b83020', fontFamily: "'Courier Prime', monospace" }}>{asset.dps.toFixed(1)}</span>
+                  <span className="text-[6.5px] font-black uppercase tracking-wider text-ledger-ink-faint font-mono">DPS</span>
+                  <span className="text-2xs font-black" style={{ color: 'var(--ledger-red)' }}>{asset.dps.toFixed(1)}</span>
                 </div>
               )}
               {asset.ops != null && asset.dps != null && (asset.ops + asset.dps) > 0 && (
                 <div className="flex items-center gap-1 px-1.5 py-0.5" style={{ background: 'rgba(107,80,48,0.08)', border: '1px solid rgba(107,80,48,0.2)', borderRadius: '2px' }}>
-                  <span className="text-[6.5px] font-black uppercase tracking-wider" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>PS</span>
-                  <span className="text-[8px] font-black" style={{ color: '#6b5030', fontFamily: "'Courier Prime', monospace" }}>{(asset.ops + asset.dps).toFixed(1)}</span>
+                  <span className="text-[6.5px] font-black uppercase tracking-wider text-ledger-ink-faint font-mono">PS</span>
+                  <span className="text-2xs font-black" style={{ color: 'var(--ledger-brown)' }}>{(asset.ops + asset.dps).toFixed(1)}</span>
                 </div>
               )}
             </div>
           )}
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>NAV Breakdown</span>
+            <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">NAV Breakdown</span>
             <span
-              className="text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center cursor-help shrink-0"
-              style={{ color: '#9a7d58', border: '1px solid #c8b890' }}
+              className="text-2xs font-black rounded-full w-4 h-4 flex items-center justify-center cursor-help shrink-0"
+              style={{ color: 'var(--ledger-ink-faint)', border: '1px solid #c8b890' }}
               title="OFF: Offensive production value (pts/82 pace, xG). DEF: Defensive suppression (xG against, TOI quality). YNG: Option value from proven youth on cheap deal. CAP: Contract cost penalty — overpaid contracts drag total NAV."
             >i</span>
           </div>
@@ -1962,8 +1938,8 @@ function AssetCard({
           {/* Peak pts for established skaters with pedigree */}
           {PLAYER_PEDIGREE[asset.name]?.peakPtsPace && (
             <div className="mt-1.5 px-1 py-1 flex justify-between items-center" style={{ borderTop: '1px solid #c8b890' }}>
-              <span className="text-[7px] font-black uppercase tracking-tight" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>Career Peak</span>
-              <span className="text-[9px] font-black" style={{ color: '#1a2e5c', fontFamily: "'Courier Prime', monospace" }}>
+              <span className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">Career Peak</span>
+              <span className="text-2xs font-black text-ledger-navy font-mono">
                 {PLAYER_PEDIGREE[asset.name].peakPtsPace} pts/82
               </span>
             </div>
@@ -1977,7 +1953,7 @@ function AssetCard({
           <div className="flex items-center justify-between mb-1.5">
             <span>G-NAV Breakdown</span>
             <span
-              className="text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center cursor-help shrink-0 badge-rule"
+              className="text-2xs font-black rounded-full w-4 h-4 flex items-center justify-center cursor-help shrink-0 badge-rule"
               title="G-NAV: Goals Saved Above Expected (GSAx) — how many goals this goalie prevented vs an average starter. CAP: Contract cost penalty."
             >i</span>
           </div>
@@ -2001,9 +1977,9 @@ function AssetCard({
               { label: 'A',     val: ((asset.assistsPace ?? 0) * asset.games / 82).toFixed(0) },
               { label: 'PTS',   val: (asset.ptsPace ? (asset.ptsPace * asset.games / 82).toFixed(0) : '—') },
             ].map(s => (
-              <div key={s.label} className="text-center p-1" style={{ background: '#dfd0a8', border: '1px solid #b8a070' }}>
-                <div className="text-[7px] font-black uppercase tracking-tight" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>{s.label}</div>
-                <div className="text-[11px] font-black" style={{ color: '#1c140a', fontFamily: "'Courier Prime', monospace" }}>{s.val}</div>
+              <div key={s.label} className="text-center p-1" style={{ background: 'var(--ledger-cream)', border: '1px solid #b8a070' }}>
+                <div className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">{s.label}</div>
+                <div className="text-[11px] font-black text-ledger-ink font-mono">{s.val}</div>
               </div>
             ))}
           </div>
@@ -2015,9 +1991,9 @@ function AssetCard({
               { label: 'xG%+', val: asset.xgRelTM != null ? `${(asset.xgRelTM as number) > 0 ? '+' : ''}${(asset.xgRelTM as number).toFixed(1)}` : '—', tooltip: 'xG% relative to teammates — positive means team controls more shots when this player is on ice vs off' },
               { label: 'QoC',   val: asset.qocRank?.toString() ?? '—',  tooltip: 'Quality of competition rank — lower = harder opponents faced' },
             ].map(s => (
-              <div key={s.label} className="text-center p-1" title={s.tooltip} style={{ background: '#e8dab8', border: '1px solid #b8a070' }}>
-                <div className="text-[7px] font-black uppercase tracking-tight" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>{s.label}</div>
-                <div className="text-[10px] font-black" style={{ color: '#1a2e5c', fontFamily: "'Courier Prime', monospace" }}>{s.val}</div>
+              <div key={s.label} className="text-center p-1" title={s.tooltip} style={{ background: 'var(--ledger-warm)', border: '1px solid #b8a070' }}>
+                <div className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">{s.label}</div>
+                <div className="text-2xs font-black text-ledger-navy font-mono">{s.val}</div>
               </div>
             ))}
           </div>
@@ -2028,8 +2004,8 @@ function AssetCard({
       {asset.canRetain && !isPick && (
         <div className="mt-2 border-t border-zinc-800/50 pt-2">
           <div className="flex justify-between items-center mb-1">
-            <span className="text-[9px] text-zinc-600 font-black uppercase tracking-wider">Salary Retention</span>
-            <span className="text-[9px] font-mono text-zinc-400 font-black">
+            <span className="text-2xs text-zinc-600 font-black uppercase tracking-wider">Salary Retention</span>
+            <span className="text-2xs font-mono text-zinc-400 font-black">
               {(asset.retainedPct * 100).toFixed(0)}% (${(asset.capHit * asset.retainedPct).toFixed(2)}M)
             </span>
           </div>
@@ -2043,7 +2019,7 @@ function AssetCard({
             className="w-full h-1 rounded-full appearance-none cursor-pointer"
           
           />
-          <div className="flex justify-between text-[8px] text-zinc-700 font-black mt-0.5">
+          <div className="flex justify-between text-2xs text-zinc-700 font-black mt-0.5">
             <span>0%</span><span>25%</span><span>50% MAX</span>
           </div>
         </div>
@@ -2052,10 +2028,10 @@ function AssetCard({
       {/* Pick protection toggle */}
       {isPick && (
         <div className="flex items-center justify-between mt-1.5">
-          <span className="text-[9px] text-zinc-600 font-black uppercase tracking-wider">Protected</span>
+          <span className="text-2xs text-zinc-600 font-black uppercase tracking-wider">Protected</span>
           <button
             onClick={() => updateAsset({ isProtected: !asset.isProtected })}
-            className={`text-[9px] font-black px-2 py-0.5 rounded border transition-colors ${
+            className={`text-2xs font-black px-2 py-0.5 rounded border transition-colors ${
               asset.isProtected
                 ? "bg-amber-900/30 border-amber-800/50 text-amber-400"
                 : "bg-zinc-800 border-zinc-700 text-zinc-500"
@@ -2284,27 +2260,27 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
         ].map(({ label, traits, color, ps, psLabel }) => (
           <div key={label} style={{ background: "#e4d8b8", border: "1px solid #c8b890", padding: "6px 8px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
-              <span style={{ fontSize: "7px", fontWeight: 900, color, fontFamily: "'Courier Prime', monospace" }}>{label}</span>
+              <span style={{ fontSize: "7px", fontWeight: 900, color }}>{label}</span>
               {ps !== null && ps !== undefined && (
-                <span style={{ fontSize: "7px", fontWeight: 900, color, fontFamily: "'Courier Prime', monospace" }}>
+                <span style={{ fontSize: "7px", fontWeight: 900, color }}>
                   {psLabel} {(ps as number).toFixed(1)}
                 </span>
               )}
             </div>
             {traits.map(t => (
               <div key={t.label} style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "3px" }} title={t.title}>
-                <span style={{ fontSize: "6.5px", fontWeight: 900, width: "26px", flexShrink: 0, color: "#6b5030", fontFamily: "'Courier Prime', monospace" }}>{t.label}</span>
+                <span style={{ fontSize: "6.5px", fontWeight: 900, width: "26px", flexShrink: 0, color: "#6b5030" }}>{t.label}</span>
                 <div style={{ flex: 1, height: "4px", background: "#c8b890", borderRadius: "2px", overflow: "hidden" }}>
                   <div style={{ width: `${t.val * 100}%`, height: "100%", background: color, opacity: 0.85 }}/>
                 </div>
-                <span style={{ fontSize: "6.5px", fontWeight: 900, width: "18px", textAlign: "right", flexShrink: 0, color, fontFamily: "'Courier Prime', monospace" }}>{Math.round(t.val * 100)}</span>
+                <span style={{ fontSize: "6.5px", fontWeight: 900, width: "18px", textAlign: "right", flexShrink: 0, color }}>{Math.round(t.val * 100)}</span>
               </div>
             ))}
           </div>
         ))}
       </div>
 
-      <div className="text-[7px] mt-1 text-center" style={{ color: "#b8a070", fontFamily: "'Courier Prime', monospace" }}>
+      <div className="text-2xs mt-1 text-center" style={{ color: "#b8a070" }}>
         STRAND™ — Stylistic Trait & Rating Analysis for NHL Development
       </div>
     </div>
@@ -2339,8 +2315,8 @@ function AssetDropdown({
 
   return (
     <select
-      className="w-full border p-3.5 rounded-xl font-black uppercase tracking-widest text-[9px] outline-none appearance-none cursor-pointer transition-colors"
-      style={{ background: '#e8dab8', borderColor: '#b8a070', color: '#6b5030' }}
+      className="w-full border p-3.5 rounded-xl font-black uppercase tracking-widest text-2xs outline-none appearance-none cursor-pointer transition-colors"
+      style={{ background: 'var(--ledger-warm)', borderColor: 'var(--ledger-rule)', color: 'var(--ledger-brown)' }}
       onChange={(e) => {
         const asset = db.players.find((p) => p.id === e.target.value);
         if (asset) {
@@ -2388,13 +2364,13 @@ function TugBar({ homeNetGain, navA, navB }: { homeNetGain: number; navA: number
     <div className="flex flex-col gap-1">
       {/* Home Net Gain — centered above the bar */}
       <div className="flex items-center justify-center gap-2">
-        <span className="text-[9px] uppercase tracking-[0.35em] font-black" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+        <span className="text-2xs uppercase tracking-[0.35em] font-black text-ledger-ink-faint font-mono">
           Home Net Gain
         </span>
         <span className={`text-xl font-black font-mono tabular-nums transition-colors duration-500 ${Math.abs(homeNetGain) < 5 ? "text-sky-400" : homeNetGain > 0 ? "text-emerald-400" : "text-rose-500"}`}>
           {fmt(homeNetGain, 1)}
         </span>
-        <span className="text-[10px] font-bold" style={{ color: '#9a7d58' }}>NAV</span>
+        <span className="text-2xs font-bold text-ledger-ink-faint">NAV</span>
       </div>
       <div className="w-full h-9 border rounded-2xl relative overflow-hidden flex items-center shadow-inner">
         <div className="absolute inset-0 flex">
@@ -2402,10 +2378,10 @@ function TugBar({ homeNetGain, navA, navB }: { homeNetGain: number; navA: number
           <div className="h-full bg-emerald-500/8 transition-all duration-700 ease-out flex-1" />
         </div>
         <div className="absolute left-1/2 -translate-x-1/2 h-full w-px bg-zinc-700/50" />
-        <div className="z-10 w-full flex justify-between px-3 sm:px-5 font-black text-[9px] uppercase tracking-[0.3em] text-zinc-700">
+        <div className="z-10 w-full flex justify-between px-3 sm:px-5 font-black text-2xs uppercase tracking-[0.3em] text-zinc-700">
           <span className={`hidden sm:inline ${homeNetGain < -5 ? "text-rose-500" : ""}`}>Outgoing Value</span>
           <span className={`sm:hidden ${homeNetGain < -5 ? "text-rose-500" : ""}`}>OUT</span>
-          <span className="bg-zinc-950 text-zinc-300 px-3 py-1 rounded-lg border border-zinc-800 font-mono text-[10px] tracking-tight">
+          <span className="bg-zinc-950 text-zinc-300 px-3 py-1 rounded-lg border border-zinc-800 font-mono text-2xs tracking-tight">
             {navA.toFixed(0)} ←→ {navB.toFixed(0)} NAV
           </span>
           <span className={`hidden sm:inline ${homeNetGain > 5 ? "text-emerald-400" : ""}`}>Incoming Value</span>
@@ -2749,25 +2725,25 @@ function TeamDNA({
               { team: partnerTeam, contention: partnerContention, label: "Trade Partner"  },
             ].filter(x => x.team).map(({ team, contention, label }) => {
               const quadrantConfig: Record<string, { bg: string; text: string; label: string; desc: string }> = {
-                WIN_NOW:        { bg: '#b83020', text: '#fff',    label: 'Win Now',        desc: 'Window is open — compete now'              },
-                WINDOW_OPEN:    { bg: '#1a5c2e', text: '#fff',    label: 'Window Open',    desc: 'Strong present and future'                  },
-                WINDOW_OPENING: { bg: '#1a2e5c', text: '#fff',    label: 'Window Opening', desc: 'Building toward contention'                 },
-                REBUILDING:     { bg: '#6b5030', text: '#f0e6cc', label: 'Rebuilding',     desc: 'Developing for the future'                  },
+                WIN_NOW:        { bg: 'var(--ledger-red)', text: 'white',    label: 'Win Now',        desc: 'Window is open — compete now'              },
+                WINDOW_OPEN:    { bg: 'var(--ledger-green)', text: 'white',    label: 'Window Open',    desc: 'Strong present and future'                  },
+                WINDOW_OPENING: { bg: 'var(--ledger-navy)', text: 'white',    label: 'Window Opening', desc: 'Building toward contention'                 },
+                REBUILDING:     { bg: 'var(--ledger-brown)', text: 'var(--ledger-card-light)', label: 'Rebuilding',     desc: 'Developing for the future'                  },
               };
               const qc = quadrantConfig[contention.quadrant];
               const dotX = (contention.present / 10) * 74 + 4;
               const dotY = 78 - (contention.future / 10) * 74;
               return (
-                <div key={team!.id} style={{ background: '#e4d8b8', border: '1px solid #b8a070', borderTop: `3px solid ${qc.bg}`, padding: '12px 14px' }}>
+                <div key={team!.id} style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070', borderTop: `3px solid ${qc.bg}`, padding: '12px 14px' }}>
                   {/* Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', gap: '8px' }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: '#9a7d58', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '2px' }}>{label}</div>
-                      <div style={{ fontFamily: "'Libre Baskerville', serif", fontSize: '13px', fontWeight: 900, color: '#1c140a', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{team!.name}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '2px' }}>{label}</div>
+                      <div style={{ fontSize: '13px', fontWeight: 900, color: 'var(--ledger-ink)', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{team!.name}</div>
                     </div>
                     <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                      <div style={{ background: qc.bg, color: qc.text, fontFamily: "'Courier Prime', monospace", fontSize: '11px', fontWeight: 900, padding: '4px 8px', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '2px', whiteSpace: 'nowrap' }}>{qc.label}</div>
-                      <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: '#9a7d58', whiteSpace: 'nowrap' }}>{qc.desc}</div>
+                      <div style={{ background: qc.bg, color: qc.text, fontSize: '11px', fontWeight: 900, padding: '4px 8px', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '2px', whiteSpace: 'nowrap' }}>{qc.label}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--ledger-ink-faint)', whiteSpace: 'nowrap' }}>{qc.desc}</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'stretch' }}>
@@ -2788,30 +2764,30 @@ function TeamDNA({
                         <circle cx={dotX} cy={dotY} r="3.5" fill={qc.bg}/>
                         <circle cx={dotX} cy={dotY} r="1.5" fill="white" opacity="0.7"/>
                       </svg>
-                      <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: '#9a7d58', textAlign: 'center', marginTop: '3px', letterSpacing: '0.05em', fontWeight: 900 }}>PRESENT → / ↑ FUTURE</div>
+                      <div style={{ fontSize: '11px', color: 'var(--ledger-ink-faint)', textAlign: 'center', marginTop: '3px', letterSpacing: '0.05em', fontWeight: 900 }}>PRESENT → / ↑ FUTURE</div>
                     </div>
                     {/* Ratings */}
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '8px' }}>
                       {([
-                        { label: 'PRESENT RATING', val: contention.present, sublabel: contention.presentLabel, hint: 'Roster quality right now',      color: contention.present >= 6.5 ? '#1a5c2e' : contention.present >= 5.0 ? '#8a5c00' : '#b83020' },
-                        { label: 'FUTURE RATING',  val: contention.future,  sublabel: contention.futureLabel,  hint: 'Projected value in ~3 years', color: contention.future  >= 6.0 ? '#1a5c2e' : contention.future  >= 4.5 ? '#8a5c00' : '#b83020' },
+                        { label: 'PRESENT RATING', val: contention.present, sublabel: contention.presentLabel, hint: 'Roster quality right now',      color: contention.present >= 6.5 ? 'var(--ledger-green)' : contention.present >= 5.0 ? 'var(--ledger-amber)' : 'var(--ledger-red)' },
+                        { label: 'FUTURE RATING',  val: contention.future,  sublabel: contention.futureLabel,  hint: 'Projected value in ~3 years', color: contention.future  >= 6.0 ? 'var(--ledger-green)' : contention.future  >= 4.5 ? 'var(--ledger-amber)' : 'var(--ledger-red)' },
                       ] as const).map(r => (
                         <div key={r.label}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px', gap: '4px' }}>
-                            <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: '#9a7d58', textTransform: 'uppercase', letterSpacing: '0.1em', whiteSpace: 'nowrap' }}>{r.label}</span>
-                            <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: r.color, fontWeight: 900, whiteSpace: 'nowrap' }}>{r.sublabel}</span>
+                            <span style={{ fontSize: '11px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.1em', whiteSpace: 'nowrap' }}>{r.label}</span>
+                            <span style={{ fontSize: '11px', color: r.color, fontWeight: 900, whiteSpace: 'nowrap' }}>{r.sublabel}</span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <div style={{ flex: 1, height: '6px', background: '#c8b890', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{ flex: 1, height: '6px', background: 'var(--ledger-rule-mid)', borderRadius: '3px', overflow: 'hidden' }}>
                               <div style={{ width: `${r.val * 10}%`, height: '100%', background: r.color, borderRadius: '3px', transition: 'width 0.5s ease' }}/>
                             </div>
-                            <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: '14px', fontWeight: 900, color: r.color, minWidth: '30px', textAlign: 'right', lineHeight: 1 }}>{r.val.toFixed(1)}</span>
+                            <span style={{ fontSize: '14px', fontWeight: 900, color: r.color, minWidth: '30px', textAlign: 'right', lineHeight: 1 }}>{r.val.toFixed(1)}</span>
                           </div>
-                          <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: '#b8a070', marginTop: '2px' }}>{r.hint}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--ledger-rule)', marginTop: '2px' }}>{r.hint}</div>
                         </div>
                       ))}
                       {hasActiveTrade && (
-                        <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: '#1a5c2e', borderTop: '1px solid #c8b890', paddingTop: '5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--ledger-green)', borderTop: '1px solid #c8b890', paddingTop: '5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           ↻ Ratings updated for this trade
                         </div>
                       )}
@@ -2823,17 +2799,15 @@ function TeamDNA({
           </div>
           {homeTeam && (
             <div className="flex items-center gap-3 mb-3 flex-wrap">
-              <div className="text-[8px] font-black px-2 py-1" style={{
-                fontFamily: "'Courier Prime', monospace",
-                color: homeTeam.standing <= 8 ? '#1a5c2e' : homeTeam.standing <= 16 ? '#8a5c00' : '#b83020',
+              <div className="text-2xs font-black px-2 py-1" style={{
+                color: homeTeam.standing <= 8 ? 'var(--ledger-green)' : homeTeam.standing <= 16 ? 'var(--ledger-amber)' : 'var(--ledger-red)',
                 border: `1px solid ${homeTeam.standing <= 8 ? 'rgba(26,92,46,0.4)' : homeTeam.standing <= 16 ? 'rgba(138,92,0,0.4)' : 'rgba(184,48,32,0.4)'}`,
               }}>
                 {homeTeam.name} · #{homeTeam.standing}/32 · {homeTeam.standing <= 8 ? '✓ IN PLAYOFFS' : homeTeam.standing <= 12 ? '~ BUBBLE' : homeTeam.standing <= 16 ? '~ WILDCARD RANGE' : '✗ OUT'}
               </div>
               {partnerTeam && (
-                <div className="text-[8px] font-black px-2 py-1" style={{
-                  fontFamily: "'Courier Prime', monospace",
-                  color: partnerTeam.standing <= 8 ? '#1a5c2e' : partnerTeam.standing <= 16 ? '#8a5c00' : '#b83020',
+                <div className="text-2xs font-black px-2 py-1" style={{
+                  color: partnerTeam.standing <= 8 ? 'var(--ledger-green)' : partnerTeam.standing <= 16 ? 'var(--ledger-amber)' : 'var(--ledger-red)',
                   border: `1px solid ${partnerTeam.standing <= 8 ? 'rgba(26,92,46,0.4)' : partnerTeam.standing <= 16 ? 'rgba(138,92,0,0.4)' : 'rgba(184,48,32,0.4)'}`,
                 }}>
                   {partnerTeam.name} · #{partnerTeam.standing}/32 · {partnerTeam.standing <= 8 ? '✓ IN PLAYOFFS' : partnerTeam.standing <= 12 ? '~ BUBBLE' : partnerTeam.standing <= 16 ? '~ WILDCARD RANGE' : '✗ OUT'}
@@ -2935,18 +2909,18 @@ function TeamDNA({
               <>
                 {/* What this team needs */}
                 {biggestNeeds.length > 0 && (
-                  <div style={{ background: '#dfd0a8', border: '1px solid #c8b890', padding: '8px 12px', marginBottom: '10px' }}>
-                    <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: '11px', color: '#9a7d58', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '6px' }}>
+                  <div style={{ background: 'var(--ledger-cream)', border: '1px solid #c8b890', padding: '8px 12px', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '6px' }}>
                       🔍 What This Team Needs{hasActiveTrade ? ' (post-trade)' : ''}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {biggestNeeds.map(g => (
                         <div key={g.label} style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                          <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: '8px', fontWeight: 900, color: '#b83020', minWidth: '28px' }}>{g.label}</span>
-                          <span style={{ fontFamily: "'Libre Baskerville', serif", fontSize: '10px', color: '#3d2e18' }}>
+                          <span style={{ fontSize: '8px', fontWeight: 900, color: 'var(--ledger-red)', minWidth: '28px' }}>{g.label}</span>
+                          <span style={{ fontSize: '10px', color: 'var(--ledger-ink-mid)' }}>
                             {GAP_EXPLAIN[g.label]?.need ?? `Improve ${GAP_EXPLAIN[g.label]?.full ?? g.label}`}
                           </span>
-                          <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: '8px', color: '#b83020', marginLeft: 'auto', fontWeight: 900 }}>
+                          <span style={{ fontSize: '8px', color: 'var(--ledger-red)', marginLeft: 'auto', fontWeight: 900 }}>
                             {(g.gap * 100).toFixed(0)}
                           </span>
                         </div>
@@ -2991,9 +2965,9 @@ function TeamDNA({
           <div className="strands-legend">
             <span><span style={{ color: 'var(--red)' }}>■</span> Below playoff threshold</span>
             <span><span style={{ color: 'var(--green)' }}>■</span> Exceeds template</span>
-            <span><span style={{ color: '#1a5c2e' }}>· ·</span> Playoff threshold</span>
+            <span><span className="text-ledger-green">· ·</span> Playoff threshold</span>
             <span><span style={{ color: 'var(--rule)' }}>— —</span> Championship standard</span>
-            <span style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace", fontSize: '7px' }}>Hover metric labels for explanations</span>
+            <span style={{ color: 'var(--ledger-ink-faint)', fontSize: '7px' }}>Hover metric labels for explanations</span>
           </div>
         </div>
       )}
@@ -3015,8 +2989,8 @@ function ModeBadge({ team, roster, label }: { team: Team; roster: Asset[]; label
   const c = config[mode];
   return (
     <div className={`border rounded-lg px-2 py-1.5 text-center ${c.bg}`}>
-      <div className="text-[7px] font-black uppercase tracking-widest text-zinc-700 mb-0.5">{label}</div>
-      <div className={`text-[10px] font-black uppercase tracking-tight ${c.color}`}>{mode}</div>
+      <div className="text-2xs font-black uppercase tracking-widest text-zinc-700 mb-0.5">{label}</div>
+      <div className={`text-2xs font-black uppercase tracking-tight ${c.color}`}>{mode}</div>
     </div>
   );
 }
@@ -3047,11 +3021,11 @@ function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestCla
           </div>
           <div className={`text-lg font-black font-mono ${sc.headerText}`}>{sc.icon}</div>
         </div>
-        <div className="text-[10px] text-zinc-500 font-bold">{verdict.message}</div>
+        <div className="text-2xs text-zinc-500 font-bold">{verdict.message}</div>
         <div className="flex gap-1.5 mt-2 flex-wrap">
-          {hardCount > 0 && <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-red-900/50 text-red-300 border border-red-800/50">{hardCount} HARD BLOCK{hardCount > 1 ? "S" : ""}</span>}
-          {softCount > 0 && <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-orange-900/50 text-orange-300 border border-orange-800/50">{softCount} GM VETO{softCount > 1 ? "S" : ""}</span>}
-          {warnCount > 0 && <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-300 border border-amber-800/40">{warnCount} WARNING{warnCount > 1 ? "S" : ""}</span>}
+          {hardCount > 0 && <span className="text-2xs font-black px-2 py-0.5 rounded-full bg-red-900/50 text-red-300 border border-red-800/50">{hardCount} HARD BLOCK{hardCount > 1 ? "S" : ""}</span>}
+          {softCount > 0 && <span className="text-2xs font-black px-2 py-0.5 rounded-full bg-orange-900/50 text-orange-300 border border-orange-800/50">{softCount} GM VETO{softCount > 1 ? "S" : ""}</span>}
+          {warnCount > 0 && <span className="text-2xs font-black px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-300 border border-amber-800/40">{warnCount} WARNING{warnCount > 1 ? "S" : ""}</span>}
         </div>
       </div>
 
@@ -3074,10 +3048,10 @@ function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestCla
 
       {/* GM Flags — expandable */}
       <div className="px-4 py-3 space-y-1.5 border-b border-zinc-800/30">
-        <div className="text-[8px] font-black text-zinc-700 uppercase tracking-widest mb-2">
+        <div className="text-2xs font-black text-zinc-700 uppercase tracking-widest mb-2">
           GM Intelligence Flags — click to expand
         </div>
-        {flags.length === 0 && <div className="text-[10px] text-zinc-700 italic">No flags raised.</div>}
+        {flags.length === 0 && <div className="text-2xs text-zinc-700 italic">No flags raised.</div>}
         {flags.map((flag, i) => {
           const fs = SEVERITY_STYLES[flag.severity];
           const isOpen = expandedFlag === i;
@@ -3087,21 +3061,21 @@ function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestCla
               onClick={() => setExpandedFlag(isOpen ? null : i)}>
               <div className="flex items-center gap-2 px-3 py-2">
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${fs.dot}`} />
-                <span className={`text-[9px] font-black uppercase tracking-tight flex-1 leading-tight ${fs.text}`}>
+                <span className={`text-2xs font-black uppercase tracking-tight flex-1 leading-tight ${fs.text}`}>
                   {flag.headline}
                 </span>
                 {flag.affectedAsset && (
-                  <span className={`text-[7px] font-black px-1.5 py-0.5 rounded border shrink-0 ${fs.label}`}>
+                  <span className={`text-2xs font-black px-1.5 py-0.5 rounded border shrink-0 ${fs.label}`}>
                     {flag.affectedAsset.split(" ").pop()}
                   </span>
                 )}
-                <span className={`text-[9px] font-black shrink-0 ml-1 ${fs.text}`}>{isOpen ? "▲" : "▼"}</span>
+                <span className={`text-2xs font-black shrink-0 ml-1 ${fs.text}`}>{isOpen ? "▲" : "▼"}</span>
               </div>
               {isOpen && (
                 <div className={`px-3 pb-3 pt-0.5 border-t ${fs.border}`}>
-                  <p className={`text-[10px] leading-relaxed font-medium ${fs.text}`}>{flag.explanation}</p>
+                  <p className={`text-2xs leading-relaxed font-medium ${fs.text}`}>{flag.explanation}</p>
                   {flag.vetoesSide !== undefined && (
-                    <div className={`mt-2 text-[8px] font-black uppercase tracking-wide border-t pt-1.5 ${fs.border} ${fs.text} opacity-70`}>
+                    <div className={`mt-2 text-2xs font-black uppercase tracking-wide border-t pt-1.5 ${fs.border} ${fs.text} opacity-70`}>
                       Vetoes: {flag.vetoesSide === 0 ? "Home team GM declines" : "Partner GM declines"}
                     </div>
                   )}
@@ -3117,25 +3091,25 @@ function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestCla
         {!verdict.claudeAnalysis && !verdict.claudeLoading && (
           <button
             onClick={onRequestClaudeAnalysis}
-            className="w-full py-2.5 font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-            style={{ background: 'transparent', border: '1px solid #b8a070', color: '#6b5030', fontFamily: "'Courier Prime', monospace", borderRadius: '2px' }}
+            className="w-full py-2.5 font-black text-2xs uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+            style={{ background: 'transparent', border: '1px solid #b8a070', color: 'var(--ledger-brown)', borderRadius: '2px' }}
           >
-            <span style={{ color: '#b83020' }}>✦</span> Generate Front Office Memo
+            <span className="text-ledger-red">✦</span> Generate Front Office Memo
           </button>
         )}
 
         {verdict.claudeLoading && (
           <div className="flex items-center gap-2.5 py-3 px-1">
-            <div className="w-3 h-3 rounded-full border-t-transparent animate-spin shrink-0" style={{ borderColor: '#b83020', borderTopColor: 'transparent', borderWidth: '2px' }} />
-            <span className="text-[10px] font-bold" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>Claude is reviewing the trade...</span>
+            <div className="w-3 h-3 rounded-full border-t-transparent animate-spin shrink-0" style={{ borderColor: 'var(--ledger-red)', borderTopColor: 'transparent', borderWidth: '2px' }} />
+            <span className="text-2xs font-bold text-ledger-ink-faint font-mono">Claude is reviewing the trade...</span>
           </div>
         )}
 
         {verdict.claudeAnalysis && !verdict.claudeLoading && (
           <button
             onClick={onOpenMemo}
-            className="w-full py-2.5 font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-            style={{ background: '#1a5c2e', border: '1px solid #0f3d1e', color: '#fff', fontFamily: "'Courier Prime', monospace", borderRadius: '2px' }}
+            className="w-full py-2.5 font-black text-2xs uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+            style={{ background: 'var(--ledger-green)', border: '1px solid #0f3d1e', color: 'white', borderRadius: '2px' }}
           >
             ✦ Read Front Office Memo
           </button>
@@ -3160,14 +3134,14 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
   return (
     <div className="bg-zinc-900/30 border border-zinc-800/40 rounded-2xl overflow-hidden">
       <div className="px-3 sm:px-6 py-3 border-b border-zinc-800/40 flex items-center gap-2">
-        <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600">Full NAV Breakdown</span>
+        <span className="text-2xs font-black uppercase tracking-[0.4em] text-zinc-600">Full NAV Breakdown</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-[11px] font-mono">
           <thead>
             <tr className="border-b border-zinc-800/30">
               {["Side", "Player", "Pos", "Age", "Pts/82", "xG/82", "DefRate", "Avg TOI", "Cap", "Term", "X-NAV", "Off", "Def", "Age/YNG", "Cap Cost"].map((h) => (
-                <th key={h} className="px-3 py-2.5 text-left text-[9px] font-black uppercase tracking-wider text-zinc-600">{h}</th>
+                <th key={h} className="px-3 py-2.5 text-left text-2xs font-black uppercase tracking-wider text-zinc-600">{h}</th>
               ))}
             </tr>
           </thead>
@@ -3178,7 +3152,7 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
               return (
                 <tr key={a.id} className={`border-b border-zinc-900 hover:bg-zinc-800/20 transition-colors ${isOut ? "bg-rose-950/5" : "bg-emerald-950/5"}`}>
                   <td className="px-3 py-2">
-                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${isOut ? "bg-rose-900/30 text-rose-400" : "bg-emerald-900/30 text-emerald-400"}`}>
+                    <span className={`text-2xs font-black px-1.5 py-0.5 rounded ${isOut ? "bg-rose-900/30 text-rose-400" : "bg-emerald-900/30 text-emerald-400"}`}>
                       {a.side}
                     </span>
                   </td>
@@ -3234,19 +3208,18 @@ function MicroBar({ label, val, max, color, invert = false, tooltip }: {
   };
   const barColor = val < 0 ? "#c0392b" : colorMap[color];
   const numColor = invert
-    ? (val < -40 ? '#c0392b' : val < -20 ? '#9a6b00' : '#1a5c2e')
-    : (val < 0 ? '#c0392b' : '#1a5c2e');
+    ? (val < -40 ? 'var(--ledger-red-deep)' : val < -20 ? 'var(--ledger-amber-dark)' : 'var(--ledger-green)')
+    : (val < 0 ? 'var(--ledger-red-deep)' : 'var(--ledger-green)');
 
   return (
     <div className="rounded p-2 text-center" title={tooltip}>
-      <div className="text-[9px] font-black uppercase tracking-wider mb-1.5">{label}</div>
-      <div className="h-1.5 rounded-full mb-1.5 overflow-hidden" style={{ background: '#c8b078' }}>
+      <div className="text-2xs font-black uppercase tracking-wider mb-1.5">{label}</div>
+      <div className="h-1.5 rounded-full mb-1.5 overflow-hidden" style={{ background: 'var(--ledger-rule-light)' }}>
         <div className="h-full rounded-full transition-all duration-500"
           style={{ width: `${norm * 100}%`, background: barColor, opacity: 0.85 }} />
       </div>
       <div className="text-[11px] font-black tabular-nums" style={{
-        color: numColor,
-        fontFamily: "'Courier Prime', monospace"
+        color: numColor
       }}>
         {displayVal > 0 ? "+" : ""}{displayVal.toFixed(0)}
       </div>
@@ -3261,8 +3234,8 @@ function DeltaRow({ label, val, unit, invert = false, tooltip }: {
   const isNeutral = Math.abs(val) < 0.5;
   return (
     <div className="flex justify-between items-center" title={tooltip}>
-      <span className="text-zinc-700 text-[9px] uppercase tracking-tight font-black">{label}</span>
-      <span className={`font-black text-[10px] ${isNeutral ? "text-zinc-600" : isGood ? "text-emerald-400" : "text-rose-400"}`}>
+      <span className="text-zinc-700 text-2xs uppercase tracking-tight font-black">{label}</span>
+      <span className={`font-black text-2xs ${isNeutral ? "text-zinc-600" : isGood ? "text-emerald-400" : "text-rose-400"}`}>
         {val > 0 ? "+" : ""}{val.toFixed(1)}{unit}
       </span>
     </div>
@@ -3272,8 +3245,8 @@ function DeltaRow({ label, val, unit, invert = false, tooltip }: {
 function MiniStat({ label, val }: { label: string; val: string }) {
   return (
     <div className="p-2 text-center">
-      <div className="text-[8px] font-black uppercase tracking-widest mb-0.5">{label}</div>
-      <div className="text-[13px] font-black" style={{ color: '#1c140a',  }}>{val}</div>
+      <div className="text-2xs font-black uppercase tracking-widest mb-0.5">{label}</div>
+      <div className="text-[13px] font-black" style={{ color: 'var(--ledger-ink)',  }}>{val}</div>
     </div>
   );
 }
@@ -3285,10 +3258,10 @@ function LoadingScreen() {
         <div className="w-12 h-12 border-2 border-zinc-800 rounded-full" />
         <div className="w-12 h-12 border-2 border-t-cyan-500 rounded-full animate-spin absolute inset-0" />
       </div>
-      <div className="text-[10px] font-black uppercase tracking-[0.5em] text-zinc-600 animate-pulse">
+      <div className="text-2xs font-black uppercase tracking-[0.5em] text-zinc-600 animate-pulse">
         Syncing NHL Data Core
       </div>
-      <div className="text-[9px] text-zinc-800 font-black uppercase tracking-widest">
+      <div className="text-2xs text-zinc-800 font-black uppercase tracking-widest">
         MoneyPuck · NHL API · X-NAV 1.1
       </div>
     </div>
