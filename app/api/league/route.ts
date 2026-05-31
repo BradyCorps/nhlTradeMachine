@@ -20,7 +20,7 @@ if (!global.__mpSkaterCache)  global.__mpSkaterCache  = null;
 if (!global.__mpGoalieCache)  global.__mpGoalieCache  = null;
 
 const TEAMS_CACHE_TTL     = 6  * 60 * 60 * 1000; // 6 hours
-const CONTRACTS_CACHE_TTL = 23 * 60 * 60 * 1000; // 23 hours
+const CONTRACTS_CACHE_TTL = 0; // TEMP: force fresh scrape every request for debugging — restore to 23h after
 const MONEYPUCK_CACHE_TTL = 4  * 60 * 60 * 1000; // 4 hours — MP updates ~twice daily
 
 // ── Team metadata that needs human curation ──────────────────
