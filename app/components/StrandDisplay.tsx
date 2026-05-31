@@ -33,14 +33,20 @@ interface Props {
   amplitude?: number;
 }
 
-function buildAvgPath(W: number, H: number, amplitude: number, isOff: boolean) {
-  const cy   = H / 2;
-  const freq = (2 * Math.PI) / W;
-  const avgAmp = amplitude * (0.35 + 0.5 * 0.65); // val=0.5 → league avg amplitude
+// sineM = n/2: each trait occupies exactly one half-cycle.
+// Nodes sit at sine peaks/troughs — clean helix for any trait count.
+// 5 traits → 2.5 cycles (trade machine)  |  4 traits → 2.0 cycles (players page)
+const sineM = (n: number) => n / 2;
+
+function buildAvgPath(W: number, H: number, amplitude: number, isOff: boolean, n: number) {
+  const cy     = H / 2;
+  const freq   = (2 * Math.PI) / W;
+  const sm     = sineM(n);
+  const avgAmp = amplitude * (0.35 + 0.5 * 0.65);
   const pts: string[] = [];
   for (let i = 0; i <= 80; i++) {
     const x = (i / 80) * W;
-    const y = cy + (isOff ? -1 : 1) * avgAmp * Math.sin(freq * x * 2.5);
+    const y = cy + (isOff ? -1 : 1) * avgAmp * Math.sin(freq * x * sm);
     pts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`);
   }
   return pts.join(" ");
@@ -48,15 +54,23 @@ function buildAvgPath(W: number, H: number, amplitude: number, isOff: boolean) {
 
 function buildStrandPath(traits: StrandTrait[], W: number, H: number, amplitude: number, isOff: boolean) {
   const cy   = H / 2;
-  const freq = (2 * Math.PI) / W;
   const n    = traits.length;
+  const freq = (2 * Math.PI) / W;
+  const sm   = sineM(n);
   const pts: string[] = [];
   for (let i = 0; i <= 80; i++) {
-    const t  = i / 80;
-    const x  = t * W;
-    const ti = Math.min(n - 1, Math.floor(t * n));
-    const amp = amplitude * (0.35 + traits[ti].val * 0.65);
-    const y   = cy + (isOff ? -1 : 1) * amp * Math.sin(freq * x * 2.5);
+    const t    = i / 80;
+    const x    = t * W;
+    // Smooth cubic interpolation — eliminates kinks at trait boundaries.
+    // Step function caused amplitude to snap mid-oscillation at grid lines.
+    const normX = t * n - 0.5;
+    const lo    = Math.max(0, Math.floor(normX));
+    const hi    = Math.min(n - 1, lo + 1);
+    const frac  = Math.max(0, Math.min(1, normX - lo));
+    const ease  = frac * frac * (3 - 2 * frac);
+    const val   = traits[lo].val * (1 - ease) + traits[hi].val * ease;
+    const amp   = amplitude * (0.35 + val * 0.65);
+    const y     = cy + (isOff ? -1 : 1) * amp * Math.sin(freq * x * sm);
     pts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`);
   }
   return pts.join(" ");
@@ -104,9 +118,9 @@ export default function StrandDisplay({
           )}
 
           {/* League average reference helix — dashed, behind player strands */}
-          <path d={buildAvgPath(W, H, amplitude, true)}  fill="none"
+          <path d={buildAvgPath(W, H, amplitude, true, offTraits.length)}  fill="none"
             stroke="var(--ledger-ink-faint)" strokeWidth="1" strokeDasharray="4,4" opacity="0.35"/>
-          <path d={buildAvgPath(W, H, amplitude, false)} fill="none"
+          <path d={buildAvgPath(W, H, amplitude, false, defTraits.length)} fill="none"
             stroke="var(--ledger-ink-faint)" strokeWidth="1" strokeDasharray="4,4" opacity="0.35"/>
           <text x={W-4} y={cy - amplitude * 0.65 + 3} textAnchor="end"
             fontSize="5.5" fill="var(--ledger-ink-faint)" fontFamily="Courier Prime, monospace"
@@ -122,16 +136,25 @@ export default function StrandDisplay({
 
           {/* Rungs connecting the two strands */}
           {Array.from({ length: 18 }, (_, i) => {
-            const t  = (i + 0.5) / 18;
-            const x  = t * W;
-            const ti = Math.min(offTraits.length - 1, Math.floor(t * offTraits.length));
-            const oA = amplitude * (0.35 + offTraits[ti].val * 0.65);
-            const dA = amplitude * (0.35 + defTraits[ti < defTraits.length ? ti : defTraits.length-1].val * 0.65);
-            const oy = cy - oA * Math.sin(freq * x * 2.5);
-            const dy = cy + dA * Math.sin(freq * x * 2.5);
+            const t     = (i + 0.5) / 18;
+            const x     = t * W;
+            const sm    = sineM(offTraits.length);
+            // Use smooth interpolation for rung endpoints (same as strand paths)
+            const normX = t * offTraits.length - 0.5;
+            const lo    = Math.max(0, Math.floor(normX));
+            const hi    = Math.min(offTraits.length - 1, lo + 1);
+            const frac  = Math.max(0, Math.min(1, normX - lo));
+            const ease  = frac * frac * (3 - 2 * frac);
+            const oVal  = offTraits[lo].val * (1 - ease) + offTraits[hi].val * ease;
+            const dVal  = defTraits[lo < defTraits.length ? lo : defTraits.length-1].val * (1 - ease)
+                        + defTraits[hi < defTraits.length ? hi : defTraits.length-1].val * ease;
+            const oA    = amplitude * (0.35 + oVal * 0.65);
+            const dA    = amplitude * (0.35 + dVal * 0.65);
+            const oy    = cy - oA * Math.sin(freq * x * sm);
+            const dy    = cy + dA * Math.sin(freq * x * sm);
             return <line key={i} x1={x} y1={oy} x2={x} y2={dy}
               stroke="var(--ledger-ink-faint)" strokeWidth="0.8"
-              opacity={0.12 + Math.abs(Math.sin(freq * x * 2.5)) * 0.25}/>;
+              opacity={0.12 + Math.abs(Math.sin(freq * x * sm)) * 0.25}/>;
           })}
 
           {/* Player strands */}
@@ -140,44 +163,56 @@ export default function StrandDisplay({
           <path d={buildStrandPath(offTraits, W, H, amplitude, true)}  fill="none"
             stroke={offColor} strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
 
-          {/* Offensive nodes */}
+          {/* Offensive nodes — label follows node: above centre → label above, below → label below */}
           {offTraits.map((t, i) => {
-            const x      = ((i + 0.5) / offTraits.length) * W;
+            const x       = ((i + 0.5) / offTraits.length) * W;
             const nodeAmp = amplitude * (0.35 + t.val * 0.65);
-            const y      = cy - nodeAmp * Math.sin(freq * x * 2.5);
-            const hasPs  = t.ps != null;
-            const labelY = Math.min(y - 12, cy - 16);
+            const y       = cy - nodeAmp * Math.sin(freq * x * sineM(offTraits.length));
+            const hasPs   = t.ps != null;
+            const r       = hasPs ? 4 : 3;
+            const isAbove = y <= cy;                               // node above centre line
+            const labelY  = isAbove
+              ? Math.max(8,     y - 14)                            // above: push label up
+              : Math.min(H - 18, y + 14);                          // below: push label down
+            const valY    = labelY + 9;
+            const lineY1  = isAbove ? y - r : y + r;
+            const lineY2  = isAbove ? labelY + 2 : labelY - 3;
             return <g key={t.label}>
               <circle cx={x} cy={y} r={t.val * 4 + 2.5} fill={offColor} opacity="0.15"/>
-              <circle cx={x} cy={y} r={hasPs ? 4 : 3} fill={offColor}/>
-              <line x1={x} y1={y - (hasPs ? 4 : 3)} x2={x} y2={labelY + 2}
+              <circle cx={x} cy={y} r={r} fill={offColor}/>
+              <line x1={x} y1={lineY1} x2={x} y2={lineY2}
                 stroke={offColor} strokeWidth="0.8" opacity="0.4"/>
-              <text x={x} y={labelY}     textAnchor="middle" fontSize="7.5" fontWeight="bold"
+              <text x={x} y={labelY}  textAnchor="middle" fontSize="7.5" fontWeight="bold"
                 fill={offColor} fontFamily="Courier Prime, monospace">{t.label}</text>
-              <text x={x} y={labelY + 9} textAnchor="middle" fontSize="6.5"
+              <text x={x} y={valY}    textAnchor="middle" fontSize="6.5"
                 fill={offColor} fontFamily="Courier Prime, monospace" opacity="0.9">{displayNum(t)}</text>
             </g>;
           })}
 
-          {/* Defensive nodes */}
+          {/* Defensive nodes — same logic */}
           {defTraits.map((t, i) => {
-            const x      = ((i + 0.5) / defTraits.length) * W;
+            const x       = ((i + 0.5) / defTraits.length) * W;
             const nodeAmp = amplitude * (0.35 + t.val * 0.65);
-            const y      = cy + nodeAmp * Math.sin(freq * x * 2.5);
-            const hasPs  = t.ps != null;
-            const labelY = Math.max(y + 14, cy + 18);
+            const y       = cy + nodeAmp * Math.sin(freq * x * sineM(defTraits.length));
+            const hasPs   = t.ps != null;
+            const r       = hasPs ? 4 : 3;
+            const color   = t.unavailable ? "var(--ledger-rule-mid)" : defColor;
+            const isAbove = y <= cy;
+            const labelY  = isAbove
+              ? Math.max(8,     y - 14)
+              : Math.min(H - 18, y + 14);
+            const valY    = labelY + 9;
+            const lineY1  = isAbove ? y - r : y + r;
+            const lineY2  = isAbove ? labelY + 2 : labelY - 3;
             return <g key={t.label}>
-              <circle cx={x} cy={y} r={t.val * 4 + 2.5} fill={defColor} opacity="0.15"/>
-              <circle cx={x} cy={y} r={hasPs ? 4 : 3}
-                fill={t.unavailable ? "var(--ledger-rule-mid)" : defColor}/>
-              <line x1={x} y1={y + (hasPs ? 4 : 3)} x2={x} y2={labelY - 4}
-                stroke={t.unavailable ? "var(--ledger-rule-mid)" : defColor} strokeWidth="0.8" opacity="0.4"/>
-              <text x={x} y={labelY}     textAnchor="middle" fontSize="7.5" fontWeight="bold"
-                fill={t.unavailable ? "var(--ledger-rule-mid)" : defColor}
-                fontFamily="Courier Prime, monospace">{t.label}</text>
-              <text x={x} y={labelY + 9} textAnchor="middle" fontSize="6.5"
-                fill={t.unavailable ? "var(--ledger-rule-mid)" : defColor}
-                fontFamily="Courier Prime, monospace" opacity="0.9">{displayNum(t)}</text>
+              <circle cx={x} cy={y} r={t.val * 4 + 2.5} fill={color} opacity="0.15"/>
+              <circle cx={x} cy={y} r={r} fill={color}/>
+              <line x1={x} y1={lineY1} x2={x} y2={lineY2}
+                stroke={color} strokeWidth="0.8" opacity="0.4"/>
+              <text x={x} y={labelY} textAnchor="middle" fontSize="7.5" fontWeight="bold"
+                fill={color} fontFamily="Courier Prime, monospace">{t.label}</text>
+              <text x={x} y={valY}   textAnchor="middle" fontSize="6.5"
+                fill={color} fontFamily="Courier Prime, monospace" opacity="0.9">{displayNum(t)}</text>
             </g>;
           })}
 
