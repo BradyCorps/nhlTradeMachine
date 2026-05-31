@@ -87,6 +87,8 @@ const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: num
   "Quinton Byfield":    { capHit: 6.25, yearsRemaining: 3, position: "C" }, // $6.25M x 5yr, Year 3 of 5
   "Connor Bedard":      { capHit: 0.8775, yearsRemaining: 1 },  // ELC, correct
   "Matvei Michkov":     { capHit: 0.8775, yearsRemaining: 1 },  // ELC, correct
+  // Years formula broken: p[29] is expiry age not signing age → max() picks wrong value
+  "Brady Tkachuk":      { yearsRemaining: 3 },  // 7yr deal signed 2022-23, expires 2028-29; p[29]=28 is expiry age not signing age
 };
 
 async function loadTeams(): Promise<any[]> {
