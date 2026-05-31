@@ -3,6 +3,11 @@
 // Imported by /api/evaluate/route.ts for production and by tests for validation.
 // Any change to these functions will be caught by the test suite before deploy.
 
+// ── Shared constants (import these in evaluate/route.ts and trade/page.tsx) ──
+// DPS_NAV_MULTIPLIER: dps * 15 (MicroBar display) * 8 (NAV weight) = dps * 120 net.
+// Changing one without the other silently drifts the display from the math.
+export const DPS_NAV_MULTIPLIER = 120; // net NAV per Point Share of DPS
+
 export interface AssetInput {
   // Identity
   id:             string;

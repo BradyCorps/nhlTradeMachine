@@ -1118,7 +1118,9 @@ export async function GET() {
       const [nI, sI, pI, xgI, gI, iceI, onAI, offAI, rkI, onFI, offFI, dzI, ozI, goalsI, posI] = [
         h("name"), h("situation"), h("I_F_points"), h("I_F_xGoals"),
         h("games_played"), h("icetime"),
-        h("OnIce_A_xGoals"), h("OffIce_A_xGoals"), h("iceTimeRank"),
+        h("OnIce_A_xGoals"), h("OffIce_A_xGoals"),
+        h("iceTimeRank"),  // NOTE: This is ice time VOLUME rank (1=most TOI), NOT quality of competition.
+                           // Stored as asset.qocRank but is a usage proxy only — not true QoC.
         h("OnIce_F_xGoals"), h("OffIce_F_xGoals"),
         h("I_F_dZoneShifts"), h("I_F_oZoneShifts"),
         h("I_F_goals"),
@@ -1185,7 +1187,7 @@ export async function GET() {
           xGPace:  (parseFloat(c[xgI]) / g) * 82,
           defRate: offA - onA,
           avgTOI:  iceSec / g / 60,
-          qocRank: parseFloat(c[rkI]) || 500,
+          qocRank: parseFloat(c[rkI]) || 500, // = iceTimeRank (volume), not competition quality
           games:   g,
           hasLiveStats: true,
           xgRelTM,
