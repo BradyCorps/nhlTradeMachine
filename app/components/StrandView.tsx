@@ -52,8 +52,9 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
           val: dpsNorm ?? norm(nav.def, -60, 150),
           title: dps !== null ? `DPS ${dps.toFixed(1)} — Defensive Point Shares` : "Defensive NAV component",
           ps: dps !== null ? dps.toFixed(1) : null },
-        { label: "DZ%",  val: a.dzPct != null ? 1 - norm(safe(a.dzPct), 0.3, 0.7) : 0.5,
-          title: a.dzPct != null ? `DZ starts ${((a.dzPct)*100).toFixed(0)}% — 5on5 zone deployment` : "DZ% unavailable",
+        { label: "OZ",   val: a.dzPct != null ? 1 - norm(safe(a.dzPct), 0.3, 0.7) : 0.5,
+          title: a.dzPct != null ? `OZ deployment — ${((1-a.dzPct)*100).toFixed(0)}% OZ starts (DZ: ${(a.dzPct*100).toFixed(0)}%)` : "Zone deployment unavailable",
+          display: a.dzPct != null ? Math.round((1 - a.dzPct) * 100) : undefined,
           unavailable: a.dzPct == null },
         { label: "AGE",  val: norm(nav.age, -80, 60),
           title: "Age curve trajectory" },
@@ -159,8 +160,7 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
             const amp = amplitude * (0.35 + t.val * 0.65);
             const y = cy - amp * Math.sin(freq * x * 2.5);
             const hasPs = (t as any).ps != null;
-            const displayVal = hasPs ? (t as any).ps : Math.round(t.val * 100);
-            // Label always above the node, value below label — both above center line
+            const displayVal = hasPs ? (t as any).ps : (t as any).display !== undefined ? (t as any).display : Math.round(t.val * 100);
             const labelY = Math.min(y - 12, cy - 16);
             const valY   = labelY + 9;
             return <g key={t.label}>
@@ -178,7 +178,7 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
             const amp = amplitude * (0.35 + t.val * 0.65);
             const y = cy + amp * Math.sin(freq * x * 2.5);
             const hasPs = (t as any).ps != null;
-            const displayVal = hasPs ? (t as any).ps : Math.round(t.val * 100);
+            const displayVal = hasPs ? (t as any).ps : (t as any).display !== undefined ? (t as any).display : Math.round(t.val * 100);
             // Label always below the node, value above label — both below center line
             const labelY = Math.max(y + 14, cy + 18);
             const valY   = labelY + 9;
@@ -219,31 +219,69 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
                 </span>
               )}
             </div>
-            {traits.map(t => (
+            {traits.map(t => {
+              const aboveAvg = !((t as any).unavailable) && t.val > 0.5;
+              const displayNum = (t as any).unavailable ? "—"
+                : (t as any).display !== undefined ? (t as any).display
+                : Math.round(t.val * 100);
+              return (
               <div key={t.label} style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "3px" }}
-                title={t.title}>
+                title={`${t.title}${!(t as any).unavailable ? ` · Score: ${Math.round(t.val * 100)}/100 · League avg ≈ 50` : ''}`}>
                 <span style={{ fontSize: "11px", fontWeight: 900, width: "26px", flexShrink: 0,
                   color: (t as any).unavailable ? "var(--ledger-rule-mid)" : "var(--ledger-brown)" }}>
                   {t.label}
                 </span>
-                <div style={{ flex: 1, height: "4px", background: "var(--ledger-rule-mid)", borderRadius: "2px", overflow: "hidden" }}>
-                  <div style={{ width: `${t.val * 100}%`, height: "100%",
+                {/* Bar with league average tick at 50% */}
+                <div style={{ flex: 1, height: "4px", background: "var(--ledger-rule-mid)", borderRadius: "2px",
+                  position: "relative", overflow: "visible" }}>
+                  {/* Fill bar */}
+                  <div style={{ width: `${t.val * 100}%`, height: "100%", borderRadius: "2px",
                     background: (t as any).unavailable ? "var(--ledger-rule-mid)" : color,
-                    opacity: (t as any).unavailable ? 0.3 : 0.85 }}/>
+                    opacity: (t as any).unavailable ? 0.3 : 0.85, overflow: "hidden" }}/>
+                  {/* League average tick — thin line at 50% */}
+                  <div style={{
+                    position: "absolute", left: "50%", top: "-2px",
+                    width: "1.5px", height: "8px",
+                    background: "var(--ledger-ink)",
+                    opacity: 0.35,
+                    transform: "translateX(-50%)",
+                  }}/>
                 </div>
                 <span style={{ fontSize: "11px", fontWeight: 900, width: "18px", textAlign: "right", flexShrink: 0,
-                  color: (t as any).unavailable ? "var(--ledger-rule-mid)" : color }}>
-                  {(t as any).unavailable ? "—" : Math.round(t.val * 100)}
+                  color: (t as any).unavailable ? "var(--ledger-rule-mid)"
+                    : aboveAvg ? color : "var(--ledger-ink-faint)" }}>
+                  {displayNum}
                 </span>
               </div>
-            ))}
+              );
+            })}
           </div>
         ))}
       </div>
 
+      {/* Legend */}
       <div className="text-2xs mt-2" style={{ color: "var(--ledger-ink-faint)", lineHeight: 1.6 }}>
-        <div style={{ fontWeight: 900, color: "var(--ledger-brown)", marginBottom: "3px", letterSpacing: "0.1em" }}>
+        <div style={{ fontWeight: 900, color: "var(--ledger-brown)", marginBottom: "2px", letterSpacing: "0.1em" }}>
           STRAND — trait guide
+        </div>
+        {/* Baseline explanation */}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px",
+          padding: "3px 5px", background: "var(--ledger-card)", border: "1px solid var(--ledger-rule-mid)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
+            {/* Mini bar with tick to illustrate */}
+            <div style={{ width: "32px", height: "4px", background: "var(--ledger-rule-mid)", borderRadius: "2px",
+              position: "relative", overflow: "visible" }}>
+              <div style={{ width: "65%", height: "100%", borderRadius: "2px",
+                background: "var(--ledger-navy)", opacity: 0.7 }}/>
+              <div style={{ position: "absolute", left: "50%", top: "-2px", width: "1.5px", height: "8px",
+                background: "var(--ledger-ink)", opacity: 0.35, transform: "translateX(-50%)" }}/>
+            </div>
+            <span style={{ fontWeight: 900, color: "var(--ledger-ink-body)" }}>│</span>
+          </div>
+          <span style={{ color: "var(--ledger-ink-faint)" }}>
+            Bars are normalised 0–100 vs NHL range. The tick mark (│) is <strong style={{ color: "var(--ledger-ink-body)" }}>league average ≈ 50</strong>.
+            Numbers above avg are shown in trait colour. OZ shows raw OZ% (not score).
+          </span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
           {[
@@ -255,7 +293,7 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
             ["SUPP", "xGA suppression vs teammates"],
             ["QoC",  "Competition quality proxy"],
             ["DPS",  "Defensive Point Shares"],
-            ["DZ%",  "5on5 zone deployment (↑ = OZ)"],
+            ["OZ",   "Raw OZ% · bar shows deployment vs league"],
             ["AGE",  "Contract age curve trajectory"],
           ].map(([abbr, desc]) => (
             <div key={abbr} style={{ display: "flex", gap: "4px" }}>

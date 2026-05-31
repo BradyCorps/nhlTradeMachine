@@ -947,10 +947,13 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
       "VGK":"Vegas Golden Knights","WSH":"Washington Capitals","WPG":"Winnipeg Jets",
     };
     const teamByName = new Map<string, NHLTeamRow>();
-    for (const t of teams) teamByName.set(t.teamFullName, t);
+    // Normalise accents on stored keys so "Montréal Canadiens" → "montreal canadiens"
+    // The NHL API returns "Montréal Canadiens" (accented é) but TEAM_ABBREV_MAP has "Montreal Canadiens"
+    const normalise = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    for (const t of teams) teamByName.set(normalise(t.teamFullName), t);
     const teamByAbbrev = new Map<string, NHLTeamRow>();
     for (const [abbrev, fullName] of Object.entries(TEAM_ABBREV_MAP)) {
-      const t = teamByName.get(fullName);
+      const t = teamByName.get(normalise(fullName));
       if (t) teamByAbbrev.set(abbrev, t);
     }
 
@@ -1054,8 +1057,10 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
       const dps        = Math.max(-3, marginalGA / marginalGoalsPerPoint);
 
       const name = s.skaterFullName.trim();
-      psMap.set(name,               { ops: Math.round(ops * 10) / 10, dps: Math.round(dps * 10) / 10 });
-      psMap.set(`id:${s.playerId}`, { ops: Math.round(ops * 10) / 10, dps: Math.round(dps * 10) / 10 });
+      const ps   = { ops: Math.round(ops * 10) / 10, dps: Math.round(dps * 10) / 10 };
+      psMap.set(name,               ps);
+      psMap.set(`id:${s.playerId}`, ps);
+      psMap.set(slugify(name),      ps); // normalised fallback — handles nickname/encoding mismatches
     }
 
     console.log(`[PS] Computed Point Shares for ${psMap.size / 2} players`);
@@ -1122,7 +1127,7 @@ export async function GET() {
         h("iceTimeRank"),  // NOTE: This is ice time VOLUME rank (1=most TOI), NOT quality of competition.
                            // Stored as asset.qocRank but is a usage proxy only — not true QoC.
         h("OnIce_F_xGoals"), h("OffIce_F_xGoals"),
-        h("I_F_dZoneShifts"), h("I_F_oZoneShifts"),
+        h("I_F_dZoneShiftStarts"), h("I_F_oZoneShiftStarts"),
         h("I_F_goals"),
         h("position"),  // used to disambiguate same-name players (e.g. two Elias Petterssons on VAN)
       ];
@@ -1420,9 +1425,10 @@ export async function GET() {
         canRetain:      finalRetain,
         retainedPct:    0,
         multiplier:     intangibleMult,
-        // Point Shares
-        ops:  PS_MAP.get(p.name)?.ops ?? PS_MAP.get(`id:${p.id}`)?.ops ?? null,
-        dps:  PS_MAP.get(p.name)?.dps ?? PS_MAP.get(`id:${p.id}`)?.dps ?? null,
+        // Point Shares — three lookup methods to handle API name variations
+        // (roster API may use "Nick" while stats API uses "Nicholas", or Unicode differences)
+        ops:  PS_MAP.get(p.name)?.ops ?? PS_MAP.get(`id:${p.id}`)?.ops ?? PS_MAP.get(slugify(p.name))?.ops ?? null,
+        dps:  PS_MAP.get(p.name)?.dps ?? PS_MAP.get(`id:${p.id}`)?.dps ?? PS_MAP.get(slugify(p.name))?.dps ?? null,
         // NOIV components
         xgRelTM:        stats?.xgRelTM   ?? null,
         xgaRelTM:       stats?.xgaRelTM  ?? null,

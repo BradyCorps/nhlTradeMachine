@@ -158,7 +158,7 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
     { label: "xG/82",  val: player.xGPace.toFixed(1) },
     { label: "TOI",    val: player.avgTOI.toFixed(1) },
     { label: "xG%+",   val: player.xgRelTM != null ? `${(player.xgRelTM as number) > 0 ? "+" : ""}${(player.xgRelTM as number).toFixed(1)}` : "—" },
-    { label: "DZ%",    val: player.dzPct != null ? `${((player.dzPct as number) * 100).toFixed(0)}%` : "—" },
+    { label: "OZ%",    val: player.dzPct != null ? `${(((1 - (player.dzPct as number)) * 100)).toFixed(0)}%` : "—" },
   ];
 
   return (
@@ -251,7 +251,7 @@ function FullStrand({ player }: { player: Player }) {
   const defTraits = [
     { label: dps !== null ? "DPS" : "DEF",  val: dpsNorm ?? 0.5, ps: dps?.toFixed(1) },
     { label: "QoC",  val: norm(400 - (player.qocRank ?? 400), 50, 380) },
-    { label: "DZ%",  val: 1 - norm(player.dzPct ?? 0.5, 0.3, 0.7) },
+    { label: "OZ%",  val: 1 - norm(player.dzPct ?? 0.5, 0.3, 0.7) },
     { label: "SUPP", val: norm(-(player.xgaRelTM ?? 0), -1.5, 1.5) },
   ];
 
