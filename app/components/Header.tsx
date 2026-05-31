@@ -29,7 +29,7 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
         <div className="border-y-[3px] border-double border-ledger-ink py-2 mb-1">
           <div className="text-center">
             <p className="text-2xs uppercase tracking-[0.4em] mb-1 font-mono text-ledger-ink-faint">
-              Est. 2025 &nbsp;—&nbsp; Vol. I &nbsp;—&nbsp; Trade Edition
+              Est. 2026 &nbsp;—&nbsp; Vol. I &nbsp;—&nbsp; Trade Edition
             </p>
             <a href="/" className="no-underline">
               <h1

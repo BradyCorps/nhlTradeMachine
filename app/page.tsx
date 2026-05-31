@@ -2,6 +2,7 @@
 // app/page.tsx — The Hockey Ledger welcome page
 import React from "react";
 import Link from "next/link";
+import Footer from "./components/Footer";
 
 export default function WelcomePage() {
   return (
@@ -13,7 +14,7 @@ export default function WelcomePage() {
         <div className="max-w-4xl mx-auto px-5 py-6 text-center">
           <p className="text-2xs uppercase tracking-[0.4em] mb-2 font-mono"
             style={{ color: "var(--ledger-ink-faint)" }}>
-            Est. 2025 &nbsp;—&nbsp; Vol. I &nbsp;—&nbsp; Analytics Edition
+            Est. 2026 &nbsp;—&nbsp; Vol. I &nbsp;—&nbsp; The Front Page
           </p>
           <h1 className="font-black leading-none"
             style={{ fontSize: "clamp(2.4rem, 8vw, 4.5rem)", letterSpacing: "-0.02em", color: "var(--ink)" }}>
@@ -63,7 +64,7 @@ export default function WelcomePage() {
                 ["Sim Engine",      "Project the season after any trade combination"],
               ].map(([label, desc]) => (
                 <div key={label} className="flex gap-2 text-2xs font-mono"
-                  style={{ color: "var(--ledger-ink-faint)" }}>
+                  style={{ color: "var(--ledger-ink-body)" }}>
                   <span className="font-black shrink-0" style={{ color: "var(--ledger-ink-body)" }}>{label}</span>
                   <span>— {desc}</span>
                 </div>
@@ -100,7 +101,7 @@ export default function WelcomePage() {
                 ["Goalie Tiers", "Starter / Tandem / Backup by GSAX"],
               ].map(([label, desc]) => (
                 <div key={label} className="flex gap-2 text-2xs font-mono"
-                  style={{ color: "var(--ledger-ink-faint)" }}>
+                  style={{ color: "var(--ledger-ink-body)" }}>
                   <span className="font-black shrink-0" style={{ color: "var(--ledger-ink-body)" }}>{label}</span>
                   <span>— {desc}</span>
                 </div>
@@ -147,15 +148,7 @@ export default function WelcomePage() {
       </div>
 
       {/* ── Footer ───────────────────────────────────────────── */}
-      <div className="max-w-4xl mx-auto px-5 py-6 text-center">
-        <p className="text-2xs font-mono uppercase tracking-[0.4em]"
-          style={{ color: "var(--ledger-rule)" }}>
-          Data: NHL API · MoneyPuck · CapWages &nbsp;·&nbsp; Models: X-NAV 1.1 · STRAND™ · G-NAV · NOIV
-        </p>
-        <p className="text-2xs font-mono mt-1" style={{ color: "var(--ledger-dark)" }}>
-          All valuations are analytical estimates, not financial advice.
-        </p>
-      </div>
+      <Footer />
     </main>
   );
 }
