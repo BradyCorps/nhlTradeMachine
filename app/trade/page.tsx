@@ -1778,7 +1778,7 @@ function TeamDNA({
             <span className="strands-post-trade-badge">Post-Trade</span>
           )}
         </div>
-        <div className="strands-header-right">
+        <div className="strands-header-right" style={{ flexWrap: 'wrap', gap: '4px' }}>
           {allGaps.slice(0, 3).map(g => (
             <span key={g.label} className={`strands-need-pill${g.gap < -0.15 ? ' urgent' : ''}`}>
               {g.label} {g.gap < -0.15 ? '↓' : '~'}
@@ -1790,12 +1790,12 @@ function TeamDNA({
 
       {expanded && (
         <div className="strands-body">
-          <p className="strands-context">
+          <p className="strands-context" style={{ wordBreak: "break-word", overflowWrap: "break-word" }}>
             Each helix shows a team's aggregate offensive (navy) and defensive (red) profile across their top-9 forwards and top-4 D by ice time. The dashed gold line is the championship template. The dotted green line is the playoff threshold — the minimum profile needed to realistically compete for a postseason spot. Gaps below either line are roster needs.{hasActiveTrade ? " Updated to reflect the current trade." : ""}
           </p>
 
           {/* ── Contention Cycle ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: '12px', marginBottom: '16px' }}>
             {[
               { team: homeTeam,    contention: homeContention,    label: "Your Franchise" },
               { team: partnerTeam, contention: partnerContention, label: "Trade Partner"  },
@@ -1818,14 +1818,14 @@ function TeamDNA({
                       <div style={{ fontSize: '13px', fontWeight: 900, color: 'var(--ledger-ink)', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{team!.name}</div>
                     </div>
                     <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                      <div style={{ background: qc.bg, color: qc.text, fontSize: '11px', fontWeight: 900, padding: '4px 8px', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '2px', whiteSpace: 'nowrap' }}>{qc.label}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--ledger-ink-faint)', whiteSpace: 'nowrap' }}>{qc.desc}</div>
+                      <div style={{ background: qc.bg, color: qc.text, fontSize: '11px', fontWeight: 900, padding: '4px 8px', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '2px', }}>{qc.label}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--ledger-ink-faint)', }}>{qc.desc}</div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'stretch' }}>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                     {/* Mini quadrant chart */}
                     <div style={{ flexShrink: 0 }}>
-                      <svg width="130" height="130" viewBox="0 0 82 82">
+                      <svg width="100%" style={{ maxWidth: 110, display: "block" }} viewBox="0 0 82 82">
                         <rect x="1"  y="1"  width="39" height="39" fill="rgba(26,46,92,0.07)"  rx="1"/>
                         <rect x="42" y="1"  width="39" height="39" fill="rgba(26,92,46,0.07)"  rx="1"/>
                         <rect x="1"  y="42" width="39" height="39" fill="rgba(107,80,48,0.07)" rx="1"/>

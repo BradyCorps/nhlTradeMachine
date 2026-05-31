@@ -376,7 +376,28 @@ select.ledger-select {
   max-width: 72ch;
 }
 
-/* Helix cards — stacked on mobile, side-by-side on md+ */
+/* ── Mobile overrides for strands panel ─────────────────────── */
+@media (max-width: 539px) {
+  .strands-header {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .strands-header-right {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .strands-helix-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  /* Contention grid — single column on phones */
+  .strands-body > div[style*="auto-fit"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
 .strands-helix-grid {
   display: grid;
   grid-template-columns: 1fr;

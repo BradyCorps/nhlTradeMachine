@@ -1,7 +1,161 @@
-// app/page.tsx — redirects to /players (canonical Player Analytics page)
-// players/page.tsx is the authoritative implementation.
-import { redirect } from 'next/navigation';
+"use client";
+// app/page.tsx — The Hockey Ledger welcome page
+import React from "react";
+import Link from "next/link";
 
-export default function Home() {
-  redirect('/players');
+export default function WelcomePage() {
+  return (
+    <main className="min-h-screen font-serif antialiased"
+      style={{ background: "var(--paper)", color: "var(--ink)" }}>
+
+      {/* ── Masthead ─────────────────────────────────────────── */}
+      <div className="border-b-2 border-double" style={{ borderColor: "var(--ink)" }}>
+        <div className="max-w-4xl mx-auto px-5 py-6 text-center">
+          <p className="text-2xs uppercase tracking-[0.4em] mb-2 font-mono"
+            style={{ color: "var(--ledger-ink-faint)" }}>
+            Est. 2025 &nbsp;—&nbsp; Vol. I &nbsp;—&nbsp; Analytics Edition
+          </p>
+          <h1 className="font-black leading-none"
+            style={{ fontSize: "clamp(2.4rem, 8vw, 4.5rem)", letterSpacing: "-0.02em", color: "var(--ink)" }}>
+            The Hockey Ledger
+          </h1>
+          <p className="mt-3 text-[11px] uppercase tracking-[0.3em] font-mono"
+            style={{ color: "var(--ledger-ink-faint)" }}>
+            X-NAV Analytics &nbsp;·&nbsp; STRAND™ DNA &nbsp;·&nbsp; GM Logic Engine &nbsp;·&nbsp; Live Data
+          </p>
+        </div>
+      </div>
+
+      {/* ── Lede ─────────────────────────────────────────────── */}
+      <div className="max-w-2xl mx-auto px-5 py-8 text-center">
+        <p className="text-[14px] leading-[1.85]" style={{ color: "var(--ledger-ink-body)" }}>
+          The Hockey Ledger evaluates NHL trades the way a front office does —
+          surplus value, cap context, contention window, and player fit.
+          Every number is derived from live NHL data, MoneyPuck analytics,
+          and the X-NAV engine built for this.
+        </p>
+      </div>
+
+      {/* ── Route cards ──────────────────────────────────────── */}
+      <div className="max-w-3xl mx-auto px-5 pb-10 grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+        <Link href="/trade" className="no-underline group">
+          <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 group-hover:opacity-90"
+            style={{ background: "var(--ledger-card)", border: "2px solid var(--ledger-rule)" }}>
+            <div>
+              <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
+                style={{ color: "var(--ledger-red)" }}>Feature One</div>
+              <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
+                Trade Machine
+              </h2>
+              <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
+                Build any trade, add retention, evaluate it against the X-NAV engine.
+                Run the GM Audit to see what a front office would flag — cap violations,
+                clause issues, surplus value, and window fit.
+              </p>
+            </div>
+            <div className="space-y-2 mt-auto">
+              {[
+                ["X-NAV",           "Surplus value over cap cost, per player"],
+                ["STRAND™ DNA",     "10-trait helix — offensive & defensive profile"],
+                ["GM Audit",        "Hard flags: NMC, cap floor, negative retention"],
+                ["Who Wants This?", "Ranks all 32 teams as partners for your package"],
+                ["Sim Engine",      "Project the season after any trade combination"],
+              ].map(([label, desc]) => (
+                <div key={label} className="flex gap-2 text-2xs font-mono"
+                  style={{ color: "var(--ledger-ink-faint)" }}>
+                  <span className="font-black shrink-0" style={{ color: "var(--ledger-ink-body)" }}>{label}</span>
+                  <span>— {desc}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 py-3 text-center font-black text-2xs uppercase tracking-[0.3em] font-mono"
+              style={{ background: "var(--ledger-red)", color: "white" }}>
+              Open Trade Machine →
+            </div>
+          </div>
+        </Link>
+
+        <Link href="/players" className="no-underline group">
+          <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 group-hover:opacity-90"
+            style={{ background: "var(--ledger-card)", border: "2px solid var(--ledger-rule)" }}>
+            <div>
+              <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
+                style={{ color: "var(--ledger-navy)" }}>Feature Two</div>
+              <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
+                Player Analytics
+              </h2>
+              <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
+                Search the full NHL roster. Every player's scoring pace, xGoals,
+                ice time, point shares, and NAV components in one view —
+                sortable, filterable by team and position.
+              </p>
+            </div>
+            <div className="space-y-2 mt-auto">
+              {[
+                ["Live Roster",  "NHL API data — updates every game"],
+                ["MiniHelix",    "Compact STRAND™ for every player in the list"],
+                ["OPS / DPS",    "Offensive and Defensive Point Shares"],
+                ["Cap & Contract","Years remaining, NMC/NTC flags, cap hit"],
+                ["Goalie Tiers", "Starter / Tandem / Backup by GSAX"],
+              ].map(([label, desc]) => (
+                <div key={label} className="flex gap-2 text-2xs font-mono"
+                  style={{ color: "var(--ledger-ink-faint)" }}>
+                  <span className="font-black shrink-0" style={{ color: "var(--ledger-ink-body)" }}>{label}</span>
+                  <span>— {desc}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 py-3 text-center font-black text-2xs uppercase tracking-[0.3em] font-mono"
+              style={{ background: "var(--ledger-navy)", color: "white" }}>
+              Open Player Analytics →
+            </div>
+          </div>
+        </Link>
+      </div>
+
+      {/* ── Explainer strip ──────────────────────────────────── */}
+      <div className="border-y py-8" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-inset)" }}>
+        <div className="max-w-3xl mx-auto px-5">
+          <p className="text-2xs uppercase tracking-[0.4em] font-mono text-center mb-5"
+            style={{ color: "var(--ledger-ink-faint)" }}>How the engine works</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 text-center">
+            {[
+              {
+                label: "What is NAV?",
+                body:  "Net Asset Value — how much a player is worth in a trade relative to their cap hit. A $6M player producing at $10M value = +NAV. A $10M player producing at $6M = −NAV.",
+              },
+              {
+                label: "What is STRAND™?",
+                body:  "A 10-trait DNA helix showing offensive and defensive profile across scoring, xGoals, ice time, NOIV suppression, and zone deployment. Compare two teams to see where a trade moves each.",
+              },
+              {
+                label: "What is the GM Audit?",
+                body:  "The logic engine that flags what a real front office would reject — hard clause blocks, cap floor violations, negative retention, surplus mismatches, and contention window alignment.",
+              },
+            ].map(({ label, body }) => (
+              <div key={label}>
+                <div className="font-black text-[11px] uppercase tracking-[0.2em] mb-2 font-mono"
+                  style={{ color: "var(--ledger-ink-body)" }}>{label}</div>
+                <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
+                  {body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Footer ───────────────────────────────────────────── */}
+      <div className="max-w-4xl mx-auto px-5 py-6 text-center">
+        <p className="text-2xs font-mono uppercase tracking-[0.4em]"
+          style={{ color: "var(--ledger-rule)" }}>
+          Data: NHL API · MoneyPuck · CapWages &nbsp;·&nbsp; Models: X-NAV 1.1 · STRAND™ · G-NAV · NOIV
+        </p>
+        <p className="text-2xs font-mono mt-1" style={{ color: "var(--ledger-dark)" }}>
+          All valuations are analytical estimates, not financial advice.
+        </p>
+      </div>
+    </main>
+  );
 }
