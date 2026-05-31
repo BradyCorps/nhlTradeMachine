@@ -20,7 +20,7 @@ if (!global.__mpSkaterCache)  global.__mpSkaterCache  = null;
 if (!global.__mpGoalieCache)  global.__mpGoalieCache  = null;
 
 const TEAMS_CACHE_TTL     = 6  * 60 * 60 * 1000; // 6 hours
-const CONTRACTS_CACHE_TTL = 0; // TEMP: force fresh scrape every request for debugging — restore to 23h after
+const CONTRACTS_CACHE_TTL = 23 * 60 * 60 * 1000; // 23 hours
 const MONEYPUCK_CACHE_TTL = 4  * 60 * 60 * 1000; // 4 hours — MP updates ~twice daily
 
 // ── Team metadata that needs human curation ──────────────────
@@ -271,13 +271,6 @@ async function scrapeCapWages(): Promise<Record<string, any>> {
       const name   = normaliseName(rawName);
       const capHit = Math.round((capRaw / 10) * 1000) / 1000;
 
-      // Temporary diagnostic — log full numeric array for known mismatches
-      // to identify which index holds the real total cap hit
-      if (name === "Quinton Byfield" || name === "Brady Tkachuk" || name === "Matthew Tkachuk") {
-        const nums = p.map((v: any, i: number) => typeof v === "number" && v > 5 && v < 200 ? `[${i}]=${v}` : null).filter(Boolean);
-        console.log(`[CapWages] ${name} numeric fields in range 5-200 (cap hit in $100k units would be ~62.5): ${nums.join(", ")}`);
-      }
-
       // ── Sanity check ──────────────────────────────────────────
       const CAP_MIN = 0.70;
       const CAP_MAX = 18.0;
@@ -349,6 +342,7 @@ async function loadContracts(): Promise<Record<string, any>> {
         hasNTC:         b?.hasNTC  ?? false,
         canRetain:      b?.hasNMC  ? false : true,
         expiryStatus:   cw.expiryStatus,
+        position:       cw.position, // needed by nameCollision check in player builder
       };
       merged[name] = entry;
     }
@@ -1409,7 +1403,7 @@ export async function GET() {
       const rawCapHit     = isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925);
       const nameCollision = p.age <= 23 && rawCapHit > 3.0 && !fin?.position?.startsWith(p.position);
 
-      const finalCapHit   = override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
+      const finalCapHit   = contractOverride?.capHit ?? override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
       const finalYears    = override?.yearsRemaining ?? (nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1)));
       const finalNMC      = override?.hasNMC ?? (nameCollision ? false : (fin?.hasNMC ?? false));
       const finalNTC      = override?.hasNTC ?? (nameCollision ? false : (fin?.hasNTC ?? false));
