@@ -549,11 +549,33 @@ const getXNAV = (asset: Asset): XNAVResult => {
       const pts     = safe(asset.ptsPace);
       const toi     = safe(asset.avgTOI);
 
-      if      (goals > assists * 1.1 && pts >= 25)                    fArchetype = "SNIPER";
-      else if (assists > goals * 1.8  && pts >= 30)                   fArchetype = "PLAYMAKER";
-      else if (safe(asset.defRate) > 0.10 && toi >= 16 && pts >= 25)  fArchetype = "TWO_WAY";
-      else if (toi < 14 && pts < 25)                                  fArchetype = "GRINDER";
-      else                                                             fArchetype = "SCORER";
+      // Archetype classification — ordered from most to least specific.
+      // Uses assists-to-points ratio as the primary creative-style signal.
+      const assistRatio = pts > 0 ? assists / pts : 0.5;
+      const goalRatio   = pts > 0 ? goals   / pts : 0.5;
+
+      if      (pts >= 95 && (assistRatio >= 0.55 || safe(xgR) > 4))
+        // Franchise-level production with elite creative or NOIV dominance
+        // McDavid (~68% assists), Draisaitl (~55%), elite impact players
+        fArchetype = "FRANCHISE";
+      else if (goalRatio > 0.53 && pts >= 25)
+        // Goal-first scorers: goals exceed assists by meaningful margin
+        // DeBrincat, Ovechkin type — people see goals before playmaking
+        fArchetype = "SNIPER";
+      else if (assistRatio > 0.60 && pts >= 35)
+        // Assist-dominant: creates far more than they score personally
+        // Barkov, Aho at their best, elite passers
+        fArchetype = "PLAYMAKER";
+      else if (safe(asset.defRate) > 0.10 && toi >= 16 && pts >= 25)
+        // Positive defensive metrics + adequate offense = true two-way value
+        fArchetype = "TWO_WAY";
+      else if (toi < 14 && pts < 25)
+        // Depth players: limited ice time, replacement-level production
+        fArchetype = "GRINDER";
+      else
+        // Balanced contributor — adequate offense without a defining style
+        // Kyle Connor (goal/assist ratio ~50/50) lives here correctly
+        fArchetype = "SCORER";
 
       // xgaR is negative when opponents score more with player on ice (bad)
       // Weight it more heavily — defensive liability should show up clearly

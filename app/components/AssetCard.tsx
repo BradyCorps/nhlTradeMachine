@@ -173,7 +173,8 @@ function AssetCard({
             {/* Forward archetype badge */}
             {["C","W","L","R"].includes(asset.position) && !isPick && xnav.fArchetype && (() => {
               const archMap: Record<string, { color: string; title: string }> = {
-                SNIPER:     { color: 'var(--ledger-navy)', title: "Sniper — primary value from goal generation" },
+                FRANCHISE:  { color: 'var(--ledger-ink)', title: "Franchise — elite production with dominant creative or NOIV impact" },
+                SNIPER:     { color: 'var(--ledger-navy)', title: "Sniper — goal-first scorer, goal ratio > 53% of points" },
                 PLAYMAKER:  { color: 'var(--ledger-green)', title: "Playmaker — primary value from assist generation and play-driving" },
                 TWO_WAY:    { color: 'var(--ledger-amber)', title: "Two-Way Forward — balanced offense with strong defensive suppression" },
                 GRINDER:    { color: 'var(--ledger-red)', title: "Grinder — defensive deployment, physical play, limited offensive upside" },
@@ -302,7 +303,7 @@ function AssetCard({
                         stroke={view === "STRAND" ? "var(--ledger-ink-faint)" : "var(--ledger-rule-mid)"} strokeWidth="0.8" opacity="0.6"/>
                     ))}
                   </svg>
-                  STRAND™
+                  STRAND
                 </>
               ) : "STATS"}
             </button>
@@ -310,7 +311,7 @@ function AssetCard({
         </div>
       )}
 
-      {/* STRAND™ — Stylistic Trait & Rating Analysis for NHL Development */}
+      {/* STRAND — Stylistic Trait & Rating Analysis for NHL Development */}
       {view === "STRAND" && !isPick && asset.position !== "G" && (
         <>
           {otherBlock.length > 0 && (

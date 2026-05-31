@@ -73,7 +73,7 @@ export interface XNAVResult {
 }
 
 // Forward archetypes — used for STRAND helix and DEF display routing
-export type FArchetype = "SNIPER" | "SCORER" | "PLAYMAKER" | "TWO_WAY" | "GRINDER" | "";
+export type FArchetype = "FRANCHISE" | "SNIPER" | "SCORER" | "PLAYMAKER" | "TWO_WAY" | "GRINDER" | "";
 
 export type FlagSeverity = "HARD" | "SOFT" | "WARN" | "INFO";
 

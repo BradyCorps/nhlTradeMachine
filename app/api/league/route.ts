@@ -1171,13 +1171,11 @@ export async function GET() {
         const offXgA60 = offA;
         const xgaRelTM = onXgA60 - offXgA60; // negative = better defense
 
-        // Defensive zone start % — prefer all-situation, fall back to 5on5 from zoneMap
+        // Defensive zone start % — 5on5 only (MoneyPuck "all" rows have 0 for zone shifts)
+        // 5on5 zone deployment is the analytics standard for deployment measurement.
         const pos = posI >= 0 ? (c[posI]?.trim().toUpperCase() ?? "") : "";
-        const dz = dzI >= 0 ? (parseFloat(c[dzI]) || 0) : -1;
-        const oz = ozI >= 0 ? (parseFloat(c[ozI]) || 0) : -1;
-        const dzPctAll = dz >= 0 && oz >= 0 && dz + oz > 0 ? dz / (dz + oz) : null;
         const posForZone = pos ? `${slugify(name)}__${pos}` : slugify(name);
-        const dzPct = dzPctAll ?? zoneMap.get(posForZone) ?? zoneMap.get(slugify(name)) ?? null;
+        const dzPct = zoneMap.get(posForZone) ?? zoneMap.get(slugify(name)) ?? null;
 
         // Use name__position key when available to handle same-name players
         // e.g. "elias-pettersson__C" vs "elias-pettersson__D" (two VAN players)

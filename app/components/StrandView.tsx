@@ -1,5 +1,5 @@
 "use client";
-// ── StrandView — STRAND™ helix analytics visualization ────────
+// ── StrandView — STRAND helix analytics visualization ────────
 import React from "react";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 import { PLAYER_PEDIGREE, INJURY_RISK } from "@/app/lib/player-data";
@@ -52,8 +52,9 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
           val: dpsNorm ?? norm(nav.def, -60, 150),
           title: dps !== null ? `DPS ${dps.toFixed(1)} — Defensive Point Shares` : "Defensive NAV component",
           ps: dps !== null ? dps.toFixed(1) : null },
-        { label: "DZ%",  val: 1 - norm(safe(a.dzPct ?? 0.5), 0.3, 0.7),
-          title: "Offensive zone deployment" },
+        { label: "DZ%",  val: a.dzPct != null ? 1 - norm(safe(a.dzPct), 0.3, 0.7) : 0.5,
+          title: a.dzPct != null ? `DZ starts ${((a.dzPct)*100).toFixed(0)}% — 5on5 zone deployment` : "DZ% unavailable",
+          unavailable: a.dzPct == null },
         { label: "AGE",  val: norm(nav.age, -80, 60),
           title: "Age curve trajectory" },
       ],
@@ -219,20 +220,50 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
               )}
             </div>
             {traits.map(t => (
-              <div key={t.label} style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "3px" }} title={t.title}>
-                <span style={{ fontSize: "11px", fontWeight: 900, width: "26px", flexShrink: 0, color: "var(--ledger-brown)" }}>{t.label}</span>
+              <div key={t.label} style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "3px" }}
+                title={t.title}>
+                <span style={{ fontSize: "11px", fontWeight: 900, width: "26px", flexShrink: 0,
+                  color: (t as any).unavailable ? "var(--ledger-rule-mid)" : "var(--ledger-brown)" }}>
+                  {t.label}
+                </span>
                 <div style={{ flex: 1, height: "4px", background: "var(--ledger-rule-mid)", borderRadius: "2px", overflow: "hidden" }}>
-                  <div style={{ width: `${t.val * 100}%`, height: "100%", background: color, opacity: 0.85 }}/>
+                  <div style={{ width: `${t.val * 100}%`, height: "100%",
+                    background: (t as any).unavailable ? "var(--ledger-rule-mid)" : color,
+                    opacity: (t as any).unavailable ? 0.3 : 0.85 }}/>
                 </div>
-                <span style={{ fontSize: "11px", fontWeight: 900, width: "18px", textAlign: "right", flexShrink: 0, color }}>{Math.round(t.val * 100)}</span>
+                <span style={{ fontSize: "11px", fontWeight: 900, width: "18px", textAlign: "right", flexShrink: 0,
+                  color: (t as any).unavailable ? "var(--ledger-rule-mid)" : color }}>
+                  {(t as any).unavailable ? "—" : Math.round(t.val * 100)}
+                </span>
               </div>
             ))}
           </div>
         ))}
       </div>
 
-      <div className="text-2xs mt-1 text-center" style={{ color: "var(--ledger-rule)" }}>
-        STRAND™ — Stylistic Trait & Rating Analysis for NHL Development
+      <div className="text-2xs mt-2" style={{ color: "var(--ledger-ink-faint)", lineHeight: 1.6 }}>
+        <div style={{ fontWeight: 900, color: "var(--ledger-brown)", marginBottom: "3px", letterSpacing: "0.1em" }}>
+          STRAND — trait guide
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
+          {[
+            ["SCR",  "Pts/82 — scoring pace"],
+            ["xG",   "Expected goals generated"],
+            ["OPS",  "Offensive Point Shares"],
+            ["NOIV", "xG% vs teammates on ice"],
+            ["TOI+", "Ice time & deployment"],
+            ["SUPP", "xGA suppression vs teammates"],
+            ["QoC",  "Competition quality proxy"],
+            ["DPS",  "Defensive Point Shares"],
+            ["DZ%",  "5on5 zone deployment (↑ = OZ)"],
+            ["AGE",  "Contract age curve trajectory"],
+          ].map(([abbr, desc]) => (
+            <div key={abbr} style={{ display: "flex", gap: "4px" }}>
+              <span style={{ fontWeight: 900, width: "28px", flexShrink: 0, color: "var(--ledger-ink-body)" }}>{abbr}</span>
+              <span style={{ color: "var(--ledger-rule)" }}>{desc}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

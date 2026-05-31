@@ -24,6 +24,9 @@ interface Player {
   xgRelTM?: number | null;
   xgaRelTM?: number | null;
   dzPct?: number | null;
+  defRate?: number | null;
+  goalsPace?: number | null;
+  assistsPace?: number | null;
   capHit: number;
   yearsRemaining: number;
   hasNMC?: boolean;
@@ -101,14 +104,29 @@ function ArchetypeBadge({ player }: { player: Player }) {
       else                           { label = "DEPTH D";  color = "var(--ink-faint)"; }
     }
   } else {
-    if (psRatio !== null) {
+    // Forward archetype — uses goals/assists ratio as primary style signal
+    const goals   = player.goalsPace ?? null;
+    const assists = player.assistsPace ?? null;
+    const pts     = player.ptsPace;
+    const assistRatio = goals != null && assists != null && pts > 0 ? assists / pts : null;
+    const goalRatio   = goals != null && assists != null && pts > 0 ? goals   / pts : null;
+
+    if      (pts >= 95 && assistRatio != null && assistRatio >= 0.55)
+      { label = "FRANCHISE"; color = "var(--ledger-ink)"; }
+    else if (pts >= 95 && player.xgRelTM != null && (player.xgRelTM as number) > 4)
+      { label = "FRANCHISE"; color = "var(--ledger-ink)"; }
+    else if (goalRatio != null && goalRatio > 0.53 && pts >= 25)
+      { label = "SNIPER";    color = "var(--blue)"; }
+    else if (assistRatio != null && assistRatio > 0.60 && pts >= 35)
+      { label = "PLAYMAKER"; color = "var(--ledger-green)"; }
+    else if (psRatio !== null) {
       if (psRatio > 0.65)      { label = "SCORER";   color = "var(--blue)"; }
       else if (psRatio < 0.35) { label = "CHECKER";  color = "var(--red)"; }
       else                     { label = "TWO-WAY";  color = "var(--green)"; }
     } else {
-      if (player.ptsPace >= 70)      { label = "SCORER";  color = "var(--blue)"; }
-      else if (player.avgTOI >= 16)  { label = "TWO-WAY"; color = "var(--green)"; }
-      else                           { label = "DEPTH";   color = "var(--ink-faint)"; }
+      if (pts >= 70)               { label = "SCORER";  color = "var(--blue)"; }
+      else if (player.avgTOI >= 16){ label = "TWO-WAY"; color = "var(--green)"; }
+      else                         { label = "DEPTH";   color = "var(--ink-faint)"; }
     }
   }
 
@@ -132,10 +150,13 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
     { label: "SV%",   val: player.savePct?.toFixed(3) ?? "—" },
     { label: "Tier",  val: goalieTeir(player.gamesStarted ?? 0) },
   ] : [
+    // Standard stats first — what fans recognise immediately
     { label: "PTS/82", val: player.ptsPace.toFixed(1) },
+    { label: "G/82",   val: player.goalsPace != null ? (player.goalsPace as number).toFixed(1) : "—" },
+    { label: "A/82",   val: player.assistsPace != null ? (player.assistsPace as number).toFixed(1) : "—" },
+    // Analytics layer
     { label: "xG/82",  val: player.xGPace.toFixed(1) },
     { label: "TOI",    val: player.avgTOI.toFixed(1) },
-    { label: "QoC",    val: player.qocRank.toFixed(0) },
     { label: "xG%+",   val: player.xgRelTM != null ? `${(player.xgRelTM as number) > 0 ? "+" : ""}${(player.xgRelTM as number).toFixed(1)}` : "—" },
     { label: "DZ%",    val: player.dzPct != null ? `${((player.dzPct as number) * 100).toFixed(0)}%` : "—" },
   ];
@@ -193,7 +214,7 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
         {!isG && (
           <div>
             <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "6px" }}>
-              STRAND™ Profile
+              STRAND Profile
             </div>
             <div style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px", position: "relative" }}>
               {/* Full STRAND inline */}
