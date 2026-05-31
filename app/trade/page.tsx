@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import TradeProposalEngine from "@/app/components/TradeProposal";
-import PlayerComparison from "@/app/components/PlayerComparison";
-import CapProjection from "@/app/components/CapProjection";
-import LedgerDropdown from "@/app/components/LedgerDropdown";
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from "react";
+
+// Lazy-load heavy components — defers their JS from the initial bundle.
+// Each one is only parsed/executed when first rendered.
+const TradeProposalEngine = lazy(() => import("@/app/components/TradeProposal"));
+const PlayerComparison    = lazy(() => import("@/app/components/PlayerComparison"));
+const CapProjection       = lazy(() => import("@/app/components/CapProjection"));
+const LedgerDropdown      = lazy(() => import("@/app/components/LedgerDropdown"));
 import { 
   HISTORICAL_MAX_OFF, 
   HISTORICAL_MAX_DEF 
@@ -743,6 +746,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
       {/* Trade Proposal Engine Modal */}
       {tradeRequest && tradeRequest.length > 0 && (
+        <Suspense fallback={<LoadingScreen />}>
         <TradeProposalEngine
           outgoingBlock={tradeRequest}
           homeTeam={teams[0]}
@@ -764,6 +768,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             setVerdict(null);
           }}
         />
+        </Suspense>
       )}
       {/* ── Team Selection Modal ─────────────────────────────────── */}
       {showTeamSelect && db.teams.length > 0 && (
@@ -1216,21 +1221,23 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
         {/* ── Player Comparison + Cap Projection ── */}
         {(blocks[0].length > 0 || blocks[1].length > 0) && (
-          <>
-            <PlayerComparison
-              outgoing={blocks[0]}
-              incoming={blocks[1]}
-              navMap={navMap}
-            />
-            <CapProjection
-              homeTeam={teams[0]}
-              partnerTeam={teams[1]}
-              homeRoster={allHomeRoster}
-              partnerRoster={allPartnerRoster}
-              outgoing={blocks[0]}
-              incoming={blocks[1]}
-            />
-          </>
+          <Suspense fallback={<div className="h-32 animate-pulse bg-ledger-card rounded" />}>
+            <>
+              <PlayerComparison
+                outgoing={blocks[0]}
+                incoming={blocks[1]}
+                navMap={navMap}
+              />
+              <CapProjection
+                homeTeam={teams[0]}
+                partnerTeam={teams[1]}
+                homeRoster={allHomeRoster}
+                partnerRoster={allPartnerRoster}
+                outgoing={blocks[0]}
+                incoming={blocks[1]}
+              />
+            </>
+          </Suspense>
         )}
 
         {(blocks[0].length > 0 || blocks[1].length > 0) && <BreakdownTable blocks={blocks} navMap={navMap} />}
@@ -1423,6 +1430,7 @@ function TradePanel({
               }}>LOCKED</span>
             </div>
           ) : (
+          <Suspense fallback={<div className="h-8 w-48 animate-pulse bg-ledger-card rounded" />}>
           <LedgerDropdown
             teams={db.teams}
             selectedId={team?.id ?? ""}
@@ -1432,6 +1440,7 @@ function TradePanel({
               setBlocks((prev) => { const n = [...prev] as [Asset[], Asset[]]; n[idx] = []; return n; });
             }}
           />
+          </Suspense>
           )}
 
           <div className="text-right shrink-0 ml-3">

@@ -9,14 +9,19 @@ const CAP_FLOOR   = 70.6;
 // Global variables persist across warm lambda invocations on Vercel.
 // On cold start or after TTL, data is re-fetched from source APIs.
 declare global {
-  var __teamsCache: { data: any[]; ts: number } | null;
+  var __teamsCache:     { data: any[];                ts: number } | null;
   var __contractsCache: { data: Record<string, any>; ts: number } | null;
+  var __mpSkaterCache:  { csv: string;                ts: number } | null;
+  var __mpGoalieCache:  { csv: string;                ts: number } | null;
 }
 if (!global.__teamsCache)     global.__teamsCache     = null;
 if (!global.__contractsCache) global.__contractsCache = null;
+if (!global.__mpSkaterCache)  global.__mpSkaterCache  = null;
+if (!global.__mpGoalieCache)  global.__mpGoalieCache  = null;
 
 const TEAMS_CACHE_TTL     = 6  * 60 * 60 * 1000; // 6 hours
 const CONTRACTS_CACHE_TTL = 23 * 60 * 60 * 1000; // 23 hours
+const MONEYPUCK_CACHE_TTL = 4  * 60 * 60 * 1000; // 4 hours — MP updates ~twice daily
 
 // ── Team metadata that needs human curation ──────────────────
 // Everything else (standing, capSpace, phase) comes from live APIs
@@ -1072,28 +1077,41 @@ export async function GET() {
   ]);
   const EXTENSIONS = loadExtensions();
   // ── 1. MoneyPuck analytics — skaters + goalies ─────────────
+  // Cached for 4 hours — MP updates roughly twice daily.
+  // Without this cache, every page load downloads two large CSVs (~2MB total).
   const analyticsMap = new Map<string, any>();
   const goalieMap    = new Map<string, any>();
   const teamXgaMap = new Map<string, { xGoals: number; games: number }>();
   let fbMap = new Map<string, any>();
 
+  const mpNow = Date.now();
+  const skaterCsvFresh = global.__mpSkaterCache && mpNow - global.__mpSkaterCache.ts < MONEYPUCK_CACHE_TTL;
+  const goalieCsvFresh = global.__mpGoalieCache && mpNow - global.__mpGoalieCache.ts < MONEYPUCK_CACHE_TTL;
+
   try {
+    // Fetch only stale CSVs — use cache for fresh ones
     const [mpRes, gpRes] = await Promise.allSettled([
-      fetchWithTimeout(
-        "https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/skaters.csv",
-        8000,
-        { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
-      ),
-      fetchWithTimeout(
-        "https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/goalies.csv",
-        8000,
-        { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
-      ),
+      skaterCsvFresh
+        ? Promise.resolve({ ok: true, text: async () => global.__mpSkaterCache!.csv })
+        : fetchWithTimeout(
+            "https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/skaters.csv",
+            8000,
+            { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
+          ),
+      goalieCsvFresh
+        ? Promise.resolve({ ok: true, text: async () => global.__mpGoalieCache!.csv })
+        : fetchWithTimeout(
+            "https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/goalies.csv",
+            8000,
+            { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
+          ),
     ]);
 
     // Parse skaters — use proper CSV parser to handle quoted fields (e.g. "Last, First")
     if (mpRes.status === "fulfilled" && mpRes.value.ok) {
       const csv  = await mpRes.value.text();
+      // Store in cache if this was a fresh fetch
+      if (!skaterCsvFresh) global.__mpSkaterCache = { csv, ts: mpNow };
       const rows = csv.split("\n").filter(Boolean);
       const hdr  = parseCSVRow(rows[0]);
       const h    = (k: string) => hdr.indexOf(k);
@@ -1189,6 +1207,8 @@ export async function GET() {
 
     if (gpRes.status === "fulfilled" && gpRes.value.ok) {
       const csv  = await gpRes.value.text();
+      // Store in cache if this was a fresh fetch
+      if (!goalieCsvFresh) global.__mpGoalieCache = { csv, ts: mpNow };
       const rows = csv.split("\n").filter(Boolean);
       const hdr  = parseCSVRow(rows[0]);
       const h    = (k: string) => hdr.indexOf(k);
