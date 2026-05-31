@@ -59,7 +59,7 @@ const nullMetrics = () => ({
 });
 
 const SEVERITY_STYLES: Record<FlagSeverity, { dot: string; bg: string; border: string; text: string; label: string }> = {
-  HARD:  { dot: "bg-red-500",    bg: "bg-red-950/20",    border: "border-red-700/40",    text: "text-red-300",    label: "bg-red-900/50 text-red-300 border-red-800/60" },
+  HARD:  { dot: "bg-red-500",    bg: "bg-red-950/20",    border: "border-red-700/40",    text: "text-ledger-ink-deep",    label: "bg-red-900/50 text-ledger-red-deep border-red-800/60" },
   SOFT:  { dot: "bg-orange-500", bg: "bg-orange-950/20", border: "border-orange-700/40", text: "text-orange-300", label: "bg-orange-900/50 text-orange-300 border-orange-800/60" },
   WARN:  { dot: "bg-amber-400",  bg: "bg-amber-950/15",  border: "border-amber-700/30",  text: "text-amber-300",  label: "bg-amber-900/40 text-amber-300 border-amber-800/50" },
   INFO:  { dot: "bg-sky-400",    bg: "bg-sky-950/15",    border: "border-sky-800/30",    text: "text-sky-300",    label: "bg-sky-900/40 text-sky-300 border-sky-800/50" },
@@ -71,8 +71,8 @@ const STATUS_CONFIG: Record<TradeStatus, { border: string; headerText: string; i
   FAIR:     { border: "border-sky-600/50",    headerText: "text-sky-300",     icon: "⚖", bg: "bg-sky-950/15" },
   WIN:      { border: "border-emerald-600/50",headerText: "text-emerald-400", icon: "↑", bg: "bg-emerald-950/15" },
   LOSS:     { border: "border-amber-600/50",  headerText: "text-amber-400",   icon: "↓", bg: "bg-amber-950/15" },
-  BLOCKED:  { border: "border-red-600/50",    headerText: "text-red-400",     icon: "✕", bg: "bg-red-950/20" },
-  DECLINED: { border: "border-orange-600/50", headerText: "text-orange-400",  icon: "✗", bg: "bg-orange-950/20" },
+  BLOCKED:  { border: "border-red-600/50",    headerText: "text-rose-400",     icon: "✕", bg: "bg-red-950/20" },
+  DECLINED: { border: "border-orange-600/50", headerText: "text-ledger-red-deep",  icon: "✗", bg: "bg-orange-950/20" },
 };
 
 // ============================================================
@@ -2099,9 +2099,9 @@ function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestCla
         </div>
         <div className="text-2xs text-zinc-500 font-bold">{verdict.message}</div>
         <div className="flex gap-1.5 mt-2 flex-wrap">
-          {hardCount > 0 && <span className="text-2xs font-black px-2 py-0.5 rounded-full bg-red-900/50 text-red-300 border border-red-800/50">{hardCount} HARD BLOCK{hardCount > 1 ? "S" : ""}</span>}
-          {softCount > 0 && <span className="text-2xs font-black px-2 py-0.5 rounded-full bg-orange-900/50 text-orange-300 border border-orange-800/50">{softCount} GM VETO{softCount > 1 ? "S" : ""}</span>}
-          {warnCount > 0 && <span className="text-2xs font-black px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-300 border border-amber-800/40">{warnCount} WARNING{warnCount > 1 ? "S" : ""}</span>}
+          {hardCount > 0 && <span className="text-2xs font-black px-2 py-0.5 rounded-full bg-red-900 text-darkmode border border-red-800">{hardCount} HARD BLOCK{hardCount > 1 ? "S" : ""}</span>}
+          {softCount > 0 && <span className="text-2xs font-black px-2 py-0.5 rounded-full bg-orange-900 text-darkmode border border-orange-800">{softCount} GM VETO{softCount > 1 ? "S" : ""}</span>}
+          {warnCount > 0 && <span className="text-2xs font-black px-2 py-0.5 rounded-full bg-amber-900 text-darkmode border border-amber-800">{warnCount} WARNING{warnCount > 1 ? "S" : ""}</span>}
         </div>
       </div>
 

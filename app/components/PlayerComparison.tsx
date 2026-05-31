@@ -133,7 +133,7 @@ const PlayerCard = ({ asset, nav, side }: { asset: Asset; nav: NavBreakdown; sid
           ].map(s => (
             <div key={s.label} className="text-center">
               <div className="text-[11px] font-black text-zinc-300">{s.val}</div>
-              <div className="text-[8px] font-black uppercase tracking-wide text-zinc-700">{s.label}</div>
+              <div className="text-[11px] font-black uppercase tracking-wide text-zinc-700">{s.label}</div>
             </div>
           ))}
         </div>
@@ -183,13 +183,13 @@ export default function PlayerComparison({ outgoing, incoming, navMap }: Props) 
         {/* Individual player cards */}
         <div className="grid grid-cols-2 gap-3 mb-5">
           <div className="space-y-2">
-            <div className="text-[8px] font-black uppercase tracking-widest text-rose-600 mb-2">You Give Away</div>
+            <div className="text-[11px] font-black uppercase tracking-widest text-rose-600 mb-2">You Give Away</div>
             {outgoing.map(a => (
               <PlayerCard key={a.id} asset={a} nav={navMap[a.id] ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 }} side="out" />
             ))}
           </div>
           <div className="space-y-2">
-            <div className="text-[8px] font-black uppercase tracking-widest text-cyan-600 mb-2">You Receive</div>
+            <div className="text-[11px] font-black uppercase tracking-widest text-cyan-600 mb-2">You Receive</div>
             {incoming.map(a => (
               <PlayerCard key={a.id} asset={a} nav={navMap[a.id] ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 }} side="in" />
             ))}
@@ -199,10 +199,10 @@ export default function PlayerComparison({ outgoing, incoming, navMap }: Props) 
         {/* Head-to-head comparison bars */}
         {(hasSkaters(outgoing) || hasSkaters(incoming)) && (
           <div className="border-t border-zinc-800/40 pt-4">
-            <div className="text-[8px] font-black uppercase tracking-widest text-zinc-700 mb-3">Head-to-Head</div>
+            <div className="text-[11px] font-black uppercase tracking-widest text-zinc-700 mb-3">Head-to-Head</div>
             <div className="grid grid-cols-[auto_1fr] gap-x-3 items-center mb-1">
-              <div className="text-[8px] font-black text-rose-500 text-right w-20">OUTGOING</div>
-              <div className="text-[8px] font-black text-cyan-500">INCOMING</div>
+              <div className="text-[11px] font-black text-rose-500 text-right w-20">OUTGOING</div>
+              <div className="text-[11px] font-black text-cyan-500">INCOMING</div>
             </div>
             <StatBar label="Total NAV"   homeVal={outNav}  partnerVal={inNav}  unit="" />
             <StatBar label="Pts/82"      homeVal={outPts}  partnerVal={inPts}  unit="" />

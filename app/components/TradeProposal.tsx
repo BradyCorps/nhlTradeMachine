@@ -772,7 +772,7 @@ export default function TradeProposalEngine({
                   <div className="proposal-sends">
                     {/* HOME SENDS */}
                     <div className="p-2.5" style={{ background: '#dfd0a8', border: '1px solid #b8a070' }}>
-                      <div className="text-[8px] font-black uppercase tracking-wider mb-1.5"
+                      <div className="text-[11px] font-black uppercase tracking-wider mb-1.5"
                         style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                         {homeTeam?.name.split(" ").pop()} sends
                         {p.isDump && p.dumpSweetener.length > 0 &&
@@ -789,10 +789,10 @@ export default function TradeProposalEngine({
                               <span className="ml-1 font-mono text-[9px]" style={{ color: '#9a7d58' }}>
                                 {a.position!=="Pick" && `$${a.capHit}M`}
                               </span>
-                              {isSweetener && <span className="ml-1 text-[8px]" style={{ color: '#245e39' }}>↑ sweetener</span>}
+                              {isSweetener && <span className="ml-1 text-[11px]" style={{ color: '#245e39' }}>↑ sweetener</span>}
                             </div>
                             {a.position !== "Pick" && (
-                              <div className="text-[8px] font-mono mt-0.5" style={{ color: '#9a7d58' }}>
+                              <div className="text-[11px] font-mono mt-0.5" style={{ color: '#9a7d58' }}>
                                 {a.position} · Age {a.age}
                                 {a.position === "G"
                                   ? ` · ${a.savePct?.toFixed(3) ?? "—"} SV%`
@@ -812,7 +812,7 @@ export default function TradeProposalEngine({
 
                     {/* PARTNER SENDS */}
                     <div className="p-2.5" style={{ background: '#dfd0a8', border: '1px solid #b8a070' }}>
-                      <div className="text-[8px] font-black uppercase tracking-wider mb-1.5"
+                      <div className="text-[11px] font-black uppercase tracking-wider mb-1.5"
                         style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                         {p.partner.name.split(" ").pop()} sends
                       </div>
@@ -829,7 +829,7 @@ export default function TradeProposalEngine({
                             </span>
                           </div>
                           {a.position !== "Pick" && (
-                            <div className="text-[8px] font-mono mt-0.5" style={{ color: '#9a7d58' }}>
+                            <div className="text-[11px] font-mono mt-0.5" style={{ color: '#9a7d58' }}>
                               {a.position} · Age {a.age}
                               {a.position === "G"
                                 ? ` · ${a.savePct?.toFixed(3) ?? "—"} SV%`

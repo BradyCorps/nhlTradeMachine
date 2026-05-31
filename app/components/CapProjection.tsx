@@ -65,7 +65,7 @@ const RosterSlot = ({ player, isNew, isLeaving }: {
       <div className={`text-[10px] font-black truncate ${isLeaving ? "line-through text-zinc-600" : isNew ? "text-emerald-300" : "text-zinc-300"}`}>
         {player.name}
       </div>
-      <div className="text-[8px] text-zinc-700 font-bold">
+      <div className="text-[11px] text-zinc-700 font-bold">
         ${player.capHit.toFixed(1)}M · {player.yearsRemaining}yr
       </div>
     </div>
@@ -126,7 +126,7 @@ const TeamProjection = ({ team, currentRoster, outgoing, incoming, label }: {
       {/* Cap bar */}
       <div className="mb-4">
         <div className="flex justify-between items-center mb-1">
-          <span className="text-[8px] font-black uppercase tracking-wider text-zinc-700">Cap After Trade</span>
+          <span className="text-[11px] font-black uppercase tracking-wider text-zinc-700">Cap After Trade</span>
           <span className={`text-[10px] font-black font-mono ${postCapSpace >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
             {postCapSpace >= 0 ? `+$${postCapSpace.toFixed(1)}M` : `-$${Math.abs(postCapSpace).toFixed(1)}M over`}
           </span>
@@ -137,7 +137,7 @@ const TeamProjection = ({ team, currentRoster, outgoing, incoming, label }: {
             style={{ width: `${Math.min(100, (postCapUsed / CAP_CEILING) * 100)}%` }}
           />
         </div>
-        <div className="flex justify-between text-[8px] text-zinc-700 font-mono mt-0.5">
+        <div className="flex justify-between text-[11px] text-zinc-700 font-mono mt-0.5">
           <span>${postCapUsed.toFixed(1)}M used</span>
           <span>${CAP_CEILING}M ceiling</span>
         </div>
@@ -150,7 +150,7 @@ const TeamProjection = ({ team, currentRoster, outgoing, incoming, label }: {
           if (!players.length) return null;
           return (
             <div key={pos}>
-              <div className="text-[8px] font-black uppercase tracking-widest text-zinc-700 mb-1.5">
+              <div className="text-[11px] font-black uppercase tracking-widest text-zinc-700 mb-1.5">
                 {posLabel[pos]} ({players.length})
               </div>
               <div className="space-y-1">
@@ -187,7 +187,7 @@ export default function CapProjection({ homeTeam, partnerTeam, homeRoster, partn
     <div className="mt-4 bg-zinc-900/30 border border-zinc-800/40 rounded-2xl overflow-hidden">
       <div className="px-6 py-3 border-b border-zinc-800/40 flex items-center justify-between">
         <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600">Post-Trade Roster Projection</span>
-        <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-wider text-zinc-700">
+        <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-zinc-700">
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-rose-900/60 border border-rose-800/60 inline-block" />Departing</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-900/60 border border-emerald-800/60 inline-block" />Arriving</span>
         </div>

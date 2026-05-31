@@ -40,7 +40,7 @@ export default function LedgerDropdown({ teams, selectedId, onSelect }: {
         }}>
           {selected?.name || "Select Team"}
         </span>
-        <span className="text-[8px] font-black shrink-0" style={{ color: 'var(--rule)' }}>▼</span>
+        <span className="text-[11px] font-black shrink-0" style={{ color: 'var(--rule)' }}>▼</span>
       </button>
 
       {/* Tear-off modal overlay */}

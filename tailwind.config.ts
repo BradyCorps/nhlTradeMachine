@@ -49,7 +49,7 @@ const config: Config = {
         fraktur: ['var(--font-fraktur)',     'serif'],
       },
       fontSize: {
-        '2xs': ['0.6875rem', { lineHeight: '1rem' }], // 11px minimum
+        '2xs': ['1rem', { lineHeight: '1rem' }], // 11px minimum
       },
     },
   },
