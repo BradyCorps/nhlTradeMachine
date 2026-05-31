@@ -1,4 +1,5 @@
 "use client";
+import StrandDisplay from "@/app/components/StrandDisplay";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
@@ -228,90 +229,61 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
 }
 
 // ── Inline full strand ────────────────────────────────────────
+// Computes Player traits and delegates rendering to the shared
+// StrandDisplay component — same renderer used by the trade machine.
+// Player page uses 8 traits (4+4); trade machine uses 10 (5+5).
+// The extra 2 in the trade machine come from evaluate/route.ts
+// (nav.off/def detailed components + nav.age) which needs evaluation.
 function FullStrand({ player }: { player: Player }) {
-  const W = 280; const H = 135; const cy = H / 2;
-  const amp = 34; const freq = (2 * Math.PI) / W;
-  const offColor = "var(--blue)"; const defColor = "var(--red)";
+  const isD  = player.position === "D";
+  const norm = (v: number, lo: number, hi: number) => Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
+  const safe = (n: number) => isNaN(n) || !isFinite(n) ? 0 : n;
 
   const ops = player.ops ?? null;
   const dps = player.dps ?? null;
-  const psTotal = ops !== null && dps !== null ? ops + dps : null;
-  const opsNorm = psTotal !== null && psTotal > 0 ? Math.max(0, Math.min(1, ops! / psTotal)) : null;
-  const dpsNorm = psTotal !== null && psTotal > 0 ? Math.max(0, Math.min(1, dps! / psTotal)) : null;
-
-  const isD = player.position === "D";
-  const norm = (v: number, lo: number, hi: number) => Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
+  const psTotal  = ops !== null && dps !== null ? ops + dps : null;
+  const opsNorm  = psTotal !== null && psTotal > 0 ? Math.max(0, Math.min(1, ops! / psTotal)) : null;
+  const dpsNorm  = psTotal !== null && psTotal > 0 ? Math.max(0, Math.min(1, dps! / psTotal)) : null;
+  const dzAvail  = player.dzPct != null;
+  const ozRaw    = dzAvail ? Math.round((1 - (player.dzPct as number)) * 100) : undefined;
+  const ozScore  = dzAvail ? 1 - norm(player.dzPct as number, 0.3, 0.7) : 0.5;
 
   const offTraits = [
-    { label: ops !== null ? "OPS" : "SCR",  val: opsNorm ?? norm(player.ptsPace, 0, isD ? 80 : 100), ps: ops?.toFixed(1) },
-    { label: "xG",   val: norm(player.xGPace ?? 0, 0, isD ? 25 : 50) },
-    { label: "NOIV", val: norm(player.xgRelTM ?? 0, -12, 12) },
-    { label: "TOI+", val: norm(player.avgTOI, 10, 27) },
+    { label: ops !== null ? "OPS" : "SCR",
+      val: opsNorm ?? norm(safe(player.ptsPace), 0, isD ? 80 : 100),
+      ps: ops?.toFixed(1),
+      title: ops !== null ? `OPS ${ops.toFixed(1)} — Offensive Point Shares` : `Pts/82: ${player.ptsPace.toFixed(1)}` },
+    { label: "xG",   val: norm(safe(player.xGPace ?? 0), 0, isD ? 25 : 50),
+      title: `xG/82: ${(player.xGPace ?? 0).toFixed(1)}` },
+    { label: "NOIV", val: norm(safe(player.xgRelTM ?? 0), -12, 12),
+      title: `xG% vs teammates: ${player.xgRelTM != null ? (player.xgRelTM as number).toFixed(1) : "—"}` },
+    { label: "TOI+", val: norm(safe(player.avgTOI), 10, 27),
+      title: `Ice time: ${player.avgTOI.toFixed(1)} min/gm` },
   ];
   const defTraits = [
-    { label: dps !== null ? "DPS" : "DEF",  val: dpsNorm ?? 0.5, ps: dps?.toFixed(1) },
-    { label: "QoC",  val: norm(400 - (player.qocRank ?? 400), 50, 380) },
-    { label: "OZ%",  val: 1 - norm(player.dzPct ?? 0.5, 0.3, 0.7) },
-    { label: "SUPP", val: norm(-(player.xgaRelTM ?? 0), -1.5, 1.5) },
+    { label: dps !== null ? "DPS" : "DEF",
+      val: dpsNorm ?? norm(safe(player.defRate ?? 0), -0.3, 0.3),
+      ps: dps?.toFixed(1),
+      unavailable: dps === null && player.defRate == null,
+      title: dps !== null ? `DPS ${dps.toFixed(1)} — Defensive Point Shares` : "Defensive NAV component" },
+    { label: "SUPP", val: norm(-(safe(player.xgaRelTM ?? 0)), -1.5, 1.5),
+      title: `xGA vs teammates: ${player.xgaRelTM != null ? (player.xgaRelTM as number).toFixed(2) : "—"}` },
+    { label: "QoC",  val: norm(400 - safe(player.qocRank ?? 400), 50, 380),
+      title: `Usage rank: ${(player.qocRank ?? 0).toFixed(0)}` },
+    { label: "OZ",   val: ozScore, display: ozRaw, unavailable: !dzAvail,
+      title: dzAvail ? `OZ%: ${ozRaw}% offensive zone starts` : "Zone deployment unavailable" },
   ];
 
-  // Build a sine wave that passes EXACTLY through each trait node.
-  // At each node's x position the amplitude = that trait's val.
-  // Between nodes we interpolate amplitude smoothly (cubic ease).
-  const buildPath = (traits: typeof offTraits, flip: boolean) => {
-    const n = traits.length;
-    const pts = [];
-    for (let i = 0; i <= 80; i++) {
-      const x = (i / 80) * W;
-      // Which segment are we in? Each trait occupies 1/n of the width, centered.
-      const normX = x / W * n - 0.5; // 0 = first node, n-1 = last node
-      const lo    = Math.max(0, Math.floor(normX));
-      const hi    = Math.min(n - 1, lo + 1);
-      const t2    = Math.max(0, Math.min(1, normX - lo));
-      // Smooth step interpolation
-      const smooth = t2 * t2 * (3 - 2 * t2);
-      const interpVal = traits[lo].val * (1 - smooth) + traits[hi].val * smooth;
-      const y = cy + (flip ? 1 : -1) * (amp * (0.3 + interpVal * 0.7)) * Math.sin(freq * x * 2);
-      pts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`);
-    }
-    return pts.join(" ");
-  };
-
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
-      <path d={buildPath(defTraits, true)}  fill="none" stroke={defColor} strokeWidth="2" strokeLinecap="round" opacity="0.85"/>
-      <path d={buildPath(offTraits, false)} fill="none" stroke={offColor} strokeWidth="2" strokeLinecap="round" opacity="0.85"/>
-      {offTraits.map((t, i) => {
-        const x    = ((i + 0.5) / offTraits.length) * W;
-        // Node is at the sine peak for this trait — sin=1 at peak
-        // At node x, normX = i (exactly), so interpVal = t.val exactly
-        const y    = cy - (amp * (0.3 + t.val * 0.7)) * Math.sin(freq * x * 2);
-        const labelY = Math.min(y - 14, cy - 13);
-        return (
-          <g key={t.label}>
-            <circle cx={x} cy={y} r={t.ps ? 3.5 : 2.5} fill={offColor}/>
-            <text x={x} y={labelY}     textAnchor="middle" fontSize="7" fill={offColor} fontFamily="Courier Prime, monospace" fontWeight="bold">{t.label}</text>
-            <text x={x} y={labelY + 8} textAnchor="middle" fontSize="6" fill={offColor} fontFamily="Courier Prime, monospace" opacity="0.85">
-              {t.ps ?? Math.round(t.val * 100)}
-            </text>
-          </g>
-        );
-      })}
-      {defTraits.map((t, i) => {
-        const x    = ((i + 0.5) / defTraits.length) * W;
-        const y    = cy + (amp * (0.3 + t.val * 0.7)) * Math.sin(freq * x * 2);
-        const labelY = Math.max(y + 17, cy + 9);
-        return (
-          <g key={t.label}>
-            <circle cx={x} cy={y} r={t.ps ? 3.5 : 2.5} fill={defColor}/>
-            <text x={x} y={labelY}     textAnchor="middle" fontSize="7" fill={defColor} fontFamily="Courier Prime, monospace" fontWeight="bold">{t.label}</text>
-            <text x={x} y={labelY + 8} textAnchor="middle" fontSize="6" fill={defColor} fontFamily="Courier Prime, monospace" opacity="0.85">
-              {t.ps ?? Math.round(t.val * 100)}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+    <StrandDisplay
+      offTraits={offTraits}
+      defTraits={defTraits}
+      ops={ops}
+      dps={dps}
+      W={280}
+      H={135}
+      amplitude={34}
+    />
   );
 }
 

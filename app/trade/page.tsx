@@ -2,7 +2,6 @@
 
 import AssetCard from "@/app/components/AssetCard";
 import TradePanel from "@/app/components/TradePanel";
-import StrandView from "@/app/components/StrandView";
 import AssetDropdown from "@/app/components/AssetDropdown";
 import TugBar from "@/app/components/TugBar";
 import { MicroBar, DeltaRow } from "@/app/components/MicroBar";
