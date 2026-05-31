@@ -247,6 +247,7 @@ async function scrapeCapWages(): Promise<Record<string, any>> {
     if (!Array.isArray(players) || players.length < 100) return {};
 
     const contracts: Record<string, any> = {};
+    let scraped = 0;
     let skipped = 0;
     const skipReasons: Record<string, string> = {};
 
@@ -269,6 +270,13 @@ async function scrapeCapWages(): Promise<Record<string, any>> {
 
       const name   = normaliseName(rawName);
       const capHit = Math.round((capRaw / 10) * 1000) / 1000;
+
+      // Temporary diagnostic — log full numeric array for known mismatches
+      // to identify which index holds the real total cap hit
+      if (name === "Quinton Byfield" || name === "Brady Tkachuk" || name === "Matthew Tkachuk") {
+        const nums = p.map((v: any, i: number) => typeof v === "number" && v > 5 && v < 200 ? `[${i}]=${v}` : null).filter(Boolean);
+        console.log(`[CapWages] ${name} numeric fields in range 5-200 (cap hit in $100k units would be ~62.5): ${nums.join(", ")}`);
+      }
 
       // ── Sanity check ──────────────────────────────────────────
       const CAP_MIN = 0.70;
@@ -301,9 +309,10 @@ async function scrapeCapWages(): Promise<Record<string, any>> {
       contracts[name] = contractData;
       if (position) contracts[`${name}__${position}`] = contractData;
       if (teamSlug) contracts[`${name}__${teamSlug}`]  = contractData;
+      scraped++;
     }
 
-    console.log(`[CapWages] Scraped ${Object.keys(contracts).length / 3} players, skipped ${skipped}.`);
+    console.log(`[CapWages] Scraped ${scraped} players, skipped ${skipped}.`);
     // Log any known-good players that got skipped — helps diagnose index drift
     const watchList = ["Quinton Byfield","Connor McDavid","Nathan MacKinnon","Auston Matthews"];
     for (const name of watchList) {
