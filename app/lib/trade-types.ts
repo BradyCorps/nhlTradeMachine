@@ -91,6 +91,7 @@ export interface GmFlag {
   explanation: string;
   affectedAsset?: string;
   vetoesSide?: 0 | 1;
+  perspective?: "home" | "partner"; // whose problem this is; omit = home team
 }
 
 export type TradeStatus = "IDLE" | "PENDING" | "FAIR" | "WIN" | "LOSS" | "BLOCKED" | "DECLINED";

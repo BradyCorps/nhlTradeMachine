@@ -787,6 +787,7 @@ interface GmFlag {
   explanation: string;
   affectedAsset?: string;
   vetoesSide?: 0 | 1;
+  perspective?: "home" | "partner"; // whose problem this is — partner flags shown separately in UI
 }
 
 // ── NHL Division map ─────────────────────────────────────────
@@ -1327,6 +1328,7 @@ const runGmLogic = (
         severity: "SOFT",
         category: "ASSET_SHAPE_MISMATCH",
         headline: `${teamPartner.name}'s D corps can't absorb losing ${dName}`,
+        perspective: "partner" as const,
         explanation: `${teamPartner.name}'s defensive structure is a known vulnerability. ${dName} (${eliteDBeingTraded[0].avgTOI.toFixed(1)} min/game) anchors their top pairing — trading him leaves ${remainingEliteD} quality defencemen. Nothing defensively meaningful is coming back. This creates a structural vulnerability that a forward can't paper over.`,
         affectedAsset: dName,
         vetoesSide: 1,
@@ -1358,7 +1360,7 @@ const runGmLogic = (
     flags.push({
       severity: "HARD",
       category: "TIMELINE_MISMATCH",
-      headline: `${teamPartner.name} requires future assets to move ${topAsset.name}`,
+      headline: `${teamPartner.name} requires future assets to move ${topAsset.name}`, perspective: "partner" as const,
       explanation: `${teamPartner.name} is a ${modePartner.toLowerCase()} team — they do not trade prime assets in straight player swaps. ${topAsset.name} is worth ${getXNAV(topAsset).total.toFixed(0)} NAV and is in the heart of their window. Accepting a comparable player with no picks or prospects attached gains them nothing strategically. Real GMs in ${teamPartner.name}'s position demand a sweetener for any deal of this magnitude — at minimum a mid-round pick to justify the inconvenience of a roster reshuffling. Add draft capital or a prospect to this package and the conversation changes entirely.`,
       affectedAsset: topAsset.name,
       vetoesSide: 1,
@@ -1395,6 +1397,7 @@ const runGmLogic = (
       explanation: `${teamPartner.name} has internally identified "${need.label}" as a priority acquisition. ${player.name} plays exactly that position and meets the quality threshold (${player.avgTOI.toFixed(1)} min, ${playerNav.toFixed(0)} NAV) — trading him away is the direct opposite of the team's stated roster-building direction. You don't sell the asset you're desperately trying to buy.`,
       affectedAsset: player.name,
       vetoesSide: 1,
+      perspective: "partner",
     });
     break;
   }
@@ -1403,7 +1406,8 @@ const runGmLogic = (
   if (modePartner === "CONTENDER" && inPicks.length > 0 && outPlayers.length === 0) flags.push({
     severity: "SOFT", category: "ASSET_SHAPE_MISMATCH",
     headline: `${teamPartner.name} needs players, not picks`,
-    explanation: `${teamPartner.name} is in win-now mode. Contending teams don't trade their assets for draft picks that won't produce NHL players for 3–5 years — that's the opposite of what a team in a Stanley Cup window needs. ${teamPartner.name}'s GM would decline this and call teams that can send impact players.`,
+    perspective: "partner" as const,
+        explanation: `${teamPartner.name} is in win-now mode. Contending teams don't trade their assets for draft picks that won't produce NHL players for 3–5 years — that's the opposite of what a team in a Stanley Cup window needs. ${teamPartner.name}'s GM would decline this and call teams that can send impact players.`,
     vetoesSide: 1,
   });
 
@@ -1424,7 +1428,7 @@ const runGmLogic = (
       flags.push({
         severity: "HARD",
         category: "TIMELINE_MISMATCH",
-        headline: `${teamPartner.name} shouldn't trade young core for ${vetName}`,
+        headline: `${teamPartner.name} shouldn't trade young core for ${vetName}`, perspective: "partner" as const,
         explanation: `${teamPartner.name} is rebuilding around youth. Giving up ${youngNames} — players in the heart of their development window — to receive ${vetName} (age ${vetAge}, ${vetYears}yr deal) is the wrong direction entirely. ${vetName} will peak and decline on a contract that outlasts the rebuild timeline, while the assets leaving are exactly what a rebuild is built around. No draft capital is coming back to soften the blow. This trade sets ${teamPartner.name}'s rebuild back by years.`,
         affectedAsset: youngGoingOut[0].name,
         vetoesSide: 1,
@@ -1436,6 +1440,7 @@ const runGmLogic = (
       flags.push({
         severity: "SOFT", category: "ASSET_SHAPE_MISMATCH",
         headline: `${teamPartner.name} needs picks, not aging vets`,
+        perspective: "partner" as const,
         explanation: `${teamPartner.name} is rebuilding. They trade current assets to stockpile picks and prospects — not to receive aging veterans with limited upside. Accepting players over 28 with no draft capital advances their rebuild by exactly zero. Their GM would counter by demanding at least one first-round pick or a young cost-controlled prospect.`,
         vetoesSide: 1,
       });

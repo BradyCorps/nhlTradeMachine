@@ -64,14 +64,14 @@ const SEVERITY_STYLES: Record<FlagSeverity, { dot: string; bg: string; border: s
   INFO:  { dot: "bg-sky-400",    bg: "bg-sky-950/15",    border: "border-sky-800/30",    text: "text-sky-300",    label: "bg-sky-900/40 text-sky-300 border-sky-800/50" },
 };
 
-const STATUS_CONFIG: Record<TradeStatus, { border: string; headerText: string; icon: string; bg: string }> = {
-  IDLE:     { border: "border-zinc-800",      headerText: "text-zinc-500",    icon: "—", bg: "bg-zinc-900/40" },
-  PENDING:  { border: "border-zinc-700",      headerText: "text-zinc-300",    icon: "…", bg: "bg-zinc-900/40" },
-  FAIR:     { border: "border-sky-600/50",    headerText: "text-sky-300",     icon: "⚖", bg: "bg-sky-950/15" },
-  WIN:      { border: "border-emerald-600/50",headerText: "text-emerald-400", icon: "↑", bg: "bg-emerald-950/15" },
-  LOSS:     { border: "border-amber-600/50",  headerText: "text-amber-400",   icon: "↓", bg: "bg-amber-950/15" },
-  BLOCKED:  { border: "border-red-600/50",    headerText: "text-rose-400",     icon: "✕", bg: "bg-red-950/20" },
-  DECLINED: { border: "border-orange-600/50", headerText: "text-ledger-red-deep",  icon: "✗", bg: "bg-orange-950/20" },
+const STATUS_CONFIG: Record<TradeStatus, { border: string; headerText: string; icon: string; bg: string; cssColor: string }> = {
+  IDLE:     { border: "border-zinc-800",       headerText: "text-zinc-500",    icon: "—", bg: "bg-zinc-900/40",    cssColor: "var(--ledger-rule)"       },
+  PENDING:  { border: "border-zinc-700",       headerText: "text-zinc-300",    icon: "…", bg: "bg-zinc-900/40",    cssColor: "var(--ledger-ink-faint)"  },
+  FAIR:     { border: "border-sky-600/50",     headerText: "text-sky-300",     icon: "⚖", bg: "bg-sky-950/15",    cssColor: "var(--ledger-navy)"       },
+  WIN:      { border: "border-emerald-600/50", headerText: "text-emerald-400", icon: "↑", bg: "bg-emerald-950/15", cssColor: "var(--ledger-green)"      },
+  LOSS:     { border: "border-amber-600/50",   headerText: "text-amber-400",   icon: "↓", bg: "bg-amber-950/15",  cssColor: "var(--ledger-amber)"      },
+  BLOCKED:  { border: "border-red-600/50",     headerText: "text-rose-400",    icon: "✕", bg: "bg-red-950/20",    cssColor: "var(--ledger-red)"        },
+  DECLINED: { border: "border-orange-600/50",  headerText: "text-ledger-red-deep", icon: "✗", bg: "bg-orange-950/20", cssColor: "var(--ledger-orange)" },
 };
 
 // ============================================================
@@ -1385,7 +1385,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
           maxHeight: verdictOpen ? '70vh' : '52px',
           boxShadow: '0 -4px 32px rgba(28,20,10,0.35)',
           background: 'var(--ledger-card-light)',
-          borderTop: `3px solid ${sc.border ?? 'var(--ledger-ink)'}`,
+          borderTop: `3px solid ${sc.cssColor}`,
         }}>
 
         {/* ── Handle / collapsed strip ─────────────────────────── */}
@@ -1395,7 +1395,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
           style={{ height: 52, background: 'transparent' }}>
           <div className="flex items-center gap-3">
             <span className="px-2.5 py-0.5 font-black text-2xs uppercase tracking-widest rounded-sm"
-              style={{ background: sc.border.replace('/50',''), color: 'white', letterSpacing: '0.15em' }}>
+              style={{ background: sc.cssColor, color: 'white', letterSpacing: '0.15em' }}>
               {v.status}
             </span>
             <span className="font-black text-[13px]" style={{ color: 'var(--ledger-ink)' }}>
@@ -2121,19 +2121,22 @@ function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestCla
         </div>
       </div>
 
-      {/* GM Flags — expandable */}
+      {/* GM Flags — split by perspective */}
       <div className="px-4 py-3 space-y-1.5 border-b border-zinc-800/30">
         <div className="text-2xs font-black text-zinc-700 uppercase tracking-widest mb-2">
           GM Intelligence Flags — click to expand
         </div>
         {flags.length === 0 && <div className="text-2xs text-zinc-700 italic">No flags raised.</div>}
-        {flags.map((flag, i) => {
+
+        {/* Home-team flags — your concerns */}
+        {flags.filter(f => f.perspective !== "partner").map((flag, i) => {
+          const globalIdx = flags.indexOf(flag);
           const fs = SEVERITY_STYLES[flag.severity];
-          const isOpen = expandedFlag === i;
+          const isOpen = expandedFlag === globalIdx;
           return (
-            <div key={i}
+            <div key={globalIdx}
               className={`rounded-lg border overflow-hidden cursor-pointer transition-all duration-200 ${fs.bg} ${fs.border} hover:opacity-90`}
-              onClick={() => setExpandedFlag(isOpen ? null : i)}>
+              onClick={() => setExpandedFlag(isOpen ? null : globalIdx)}>
               <div className="flex items-center gap-2 px-3 py-2">
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${fs.dot}`} />
                 <span className={`text-2xs font-black uppercase tracking-tight flex-1 leading-tight ${fs.text}`}>
@@ -2159,6 +2162,52 @@ function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestCla
             </div>
           );
         })}
+
+        {/* Partner-side flags — the other team's concerns */}
+        {flags.some(f => f.perspective === "partner") && (
+          <div className="mt-3">
+            <div className="text-2xs font-black text-zinc-600 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+              <span style={{ opacity: 0.5 }}>◈</span> Concerns for the other side
+            </div>
+            {flags.filter(f => f.perspective === "partner").map((flag, i) => {
+              const globalIdx = flags.indexOf(flag);
+              const isOpen = expandedFlag === globalIdx;
+              return (
+                <div key={globalIdx}
+                  className="rounded-lg border overflow-hidden cursor-pointer transition-all duration-200 hover:opacity-90 mb-1.5"
+                  style={{ background: 'rgba(28,20,10,0.04)', borderColor: 'var(--ledger-rule-mid)', opacity: 0.85 }}
+                  onClick={() => setExpandedFlag(isOpen ? null : globalIdx)}>
+                  <div className="flex items-center gap-2 px-3 py-2">
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--ledger-ink-faint)' }} />
+                    <span className="text-2xs font-black uppercase tracking-tight flex-1 leading-tight"
+                      style={{ color: 'var(--ledger-ink-faint)' }}>
+                      {flag.headline}
+                    </span>
+                    {flag.affectedAsset && (
+                      <span className="text-2xs font-black px-1.5 py-0.5 rounded border shrink-0"
+                        style={{ color: 'var(--ledger-ink-faint)', borderColor: 'var(--ledger-rule-mid)' }}>
+                        {flag.affectedAsset.split(" ").pop()}
+                      </span>
+                    )}
+                    <span className="text-2xs font-black shrink-0 ml-1"
+                      style={{ color: 'var(--ledger-ink-faint)' }}>{isOpen ? "▲" : "▼"}</span>
+                  </div>
+                  {isOpen && (
+                    <div className="px-3 pb-3 pt-0.5 border-t" style={{ borderColor: 'var(--ledger-rule-mid)' }}>
+                      <p className="text-2xs leading-relaxed font-medium" style={{ color: 'var(--ledger-ink-faint)' }}>
+                        {flag.explanation}
+                      </p>
+                      <div className="mt-1.5 text-2xs font-black uppercase tracking-wide"
+                        style={{ color: 'var(--ledger-rule)', opacity: 0.8 }}>
+                        This flag applies to the other side — good intel for your negotiation.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ── Claude GM Analysis — triggers modal ───────────────── */}

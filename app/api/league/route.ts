@@ -77,10 +77,16 @@ const PHASE_OVERRIDES: Record<string, string> = {
 };
 
 // ── Contract overrides — manual corrections for known data errors ──
-const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: number }> = {
+const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: number; position?: string }> = {
   "Alexander Ovechkin": { yearsRemaining: 1 },
   // Bundled JSON corrections — cap hit or years that have changed since bundle was generated
-  "Dylan DeMelo":       { capHit: 4.9, yearsRemaining: 2 },  // PuckPedia: $4.9M x 4yr, Year 2 of 4
+  "Dylan DeMelo":       { capHit: 4.9,  yearsRemaining: 2 },   // PuckPedia: $4.9M x 4yr, Year 2 of 4
+  // Young players (age ≤ 23) with real multi-year deals who get misidentified as ELC
+  // when CapWages scrape returns null or wrong p[18] for their entry.
+  // Position override needed when NHL API returns "L"/"R" instead of true position.
+  "Quinton Byfield":    { capHit: 6.25, yearsRemaining: 3, position: "C" }, // $6.25M x 5yr, Year 3 of 5
+  "Connor Bedard":      { capHit: 0.8775, yearsRemaining: 1 },  // ELC, correct
+  "Matvei Michkov":     { capHit: 0.8775, yearsRemaining: 1 },  // ELC, correct
 };
 
 async function loadTeams(): Promise<any[]> {
@@ -241,9 +247,11 @@ async function scrapeCapWages(): Promise<Record<string, any>> {
     if (!Array.isArray(players) || players.length < 100) return {};
 
     const contracts: Record<string, any> = {};
+    let skipped = 0;
+    const skipReasons: Record<string, string> = {};
 
     for (const p of players) {
-      if (!Array.isArray(p) || p.length < 30) continue;
+      if (!Array.isArray(p) || p.length < 30) { skipped++; continue; }
 
       const rawName      = p[0]  as string;
       const capRaw       = p[18] as number;
@@ -253,7 +261,11 @@ async function scrapeCapWages(): Promise<Record<string, any>> {
       const ageNow      = p[8]  as number;
       const totalLength = p[15] as number;
 
-      if (!rawName || !capRaw || capRaw <= 0) continue;
+      if (!rawName || !capRaw || capRaw <= 0) {
+        if (rawName) skipReasons[normaliseName(rawName)] = `capRaw=${capRaw} (p[18] null/zero)`;
+        skipped++;
+        continue;
+      }
 
       const name   = normaliseName(rawName);
       const capHit = Math.round((capRaw / 10) * 1000) / 1000;
@@ -261,7 +273,11 @@ async function scrapeCapWages(): Promise<Record<string, any>> {
       // ── Sanity check ──────────────────────────────────────────
       const CAP_MIN = 0.70;
       const CAP_MAX = 18.0;
-      if (capHit < CAP_MIN || capHit > CAP_MAX) continue;
+      if (capHit < CAP_MIN || capHit > CAP_MAX) {
+        skipReasons[name] = `capHit=${capHit} out of range [${CAP_MIN},${CAP_MAX}]`;
+        skipped++;
+        continue;
+      }
 
       // ── Correct years remaining formula ──────────────────────
       // p[28] and p[29] both encode "age at signing" but CapWages
@@ -287,6 +303,15 @@ async function scrapeCapWages(): Promise<Record<string, any>> {
       if (teamSlug) contracts[`${name}__${teamSlug}`]  = contractData;
     }
 
+    console.log(`[CapWages] Scraped ${Object.keys(contracts).length / 3} players, skipped ${skipped}.`);
+    // Log any known-good players that got skipped — helps diagnose index drift
+    const watchList = ["Quinton Byfield","Connor McDavid","Nathan MacKinnon","Auston Matthews"];
+    for (const name of watchList) {
+      if (!contracts[name]) {
+        const reason = skipReasons[name] ?? "not found in playersArray";
+        console.warn(`[CapWages] ⚠ ${name} missing from contracts — ${reason}`);
+      }
+    }
     return contracts;
   } catch (_) {
     return {};
@@ -1353,24 +1378,28 @@ export async function GET() {
       // rather than inheriting a same-name veteran's contract
       const isLikelyELC = !fin && p.age <= 23;
       const elcCapHit   = p.age <= 22 ? 0.8775 : 0.925; // standard ELC AAV
-      const isGoalie   = p.position === "G";
-      const defaultTOI = isGoalie ? 0 : p.position === "D" ? 18.5 : 13.5;
-      const defaultPts = isGoalie ? 0 : p.position === "D" ? 22 : p.position === "C" ? 32 : 28;
+
+      // ── THE OVERRIDE LAYER (Highest Priority) ───────────────
+      const override         = EXTENSIONS[p.name];
+      const contractOverride = CONTRACT_OVERRIDES[p.name];
+      // Position override must be resolved before isGoalie/defaultTOI/defaultPts
+      const finalPosition    = contractOverride?.position ?? p.position;
+
+      const isGoalie   = finalPosition === "G";
+      const defaultTOI = isGoalie ? 0 : finalPosition === "D" ? 18.5 : 13.5;
+      const defaultPts = isGoalie ? 0 : finalPosition === "D" ? 22 : finalPosition === "C" ? 32 : 28;
 
       // Merge goalie-specific stats — try full name slug, then last name only
-      const goalieSlug  = slugify(p.name);
-      const goalieSlugLast = slugify(p.name.split(" ").pop() ?? "");
-      const goalieStats = isGoalie
+      const goalieSlug      = slugify(p.name);
+      const goalieSlugLast  = slugify(p.name.split(" ").pop() ?? "");
+      const goalieStats     = isGoalie
         ? (goalieMap.get(goalieSlug) ?? goalieMap.get(goalieSlugLast) ?? null)
         : null;
 
-// Contract sanity check
-      const rawCapHit = isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925);
+      // Contract sanity check
+      const rawCapHit     = isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925);
       const nameCollision = p.age <= 23 && rawCapHit > 3.0 && !fin?.position?.startsWith(p.position);
 
-      // ── THE OVERRIDE LAYER (Highest Priority) ───────────────
-    const override = EXTENSIONS[p.name];
-      
       const finalCapHit   = override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
       const finalYears    = override?.yearsRemaining ?? (nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1)));
       const finalNMC      = override?.hasNMC ?? (nameCollision ? false : (fin?.hasNMC ?? false));
@@ -1397,7 +1426,7 @@ export async function GET() {
         id:             p.id,
         teamId,
         name:           p.name,
-        position:       p.position,
+        position:       finalPosition,
         age:            p.age,
         headshot:       p.headshot ?? null,
         games:          stats?.games    ?? goalieStats?.gamesStarted ?? 40,
