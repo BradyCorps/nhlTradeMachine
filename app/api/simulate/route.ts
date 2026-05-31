@@ -176,6 +176,10 @@ function projectTopScorer(
 }
 
 // ── Project starting goalie ───────────────────────────────────
+// VARIANCE FIX: Previous version had Math.max(0.895,...) hard floor which
+// caused every goalie to land at exactly .895 regardless of actual quality.
+// Now: anchor to career quality via gsax, wider realistic variance,
+// age regression, and position-appropriate ranges.
 function projectGoalie(
   roster: SimPlayer[],
   teamWinPct: number,
@@ -189,18 +193,44 @@ function projectGoalie(
 
   const g = goalies[0];
 
-  // Base save% from current stats, adjusted for team defense
-  const baseSVP = g.savePct ?? 0.910;
-  // Team defense context: better teams = better save% (goalie faces fewer dangerous shots)
+  // ── Quality anchor: gsax tells us how good this goalie actually is ──
+  // League average GSAX ≈ 0 → .910 SVP, elite (+20) → .925, poor (-10) → .900
+  const gsax = g.gsax ?? 0;
+  const gsaxSVP = 0.910 + (gsax / 20) * 0.015; // +1.5% SVP per 20 GSAX above average
+
+  // ── Base: blend current save% with gsax-derived quality ──────────────
+  // Heavy weight on gsax (70%) — current stats are small-sample; gsax is career signal
+  const currentSVP = g.savePct ?? 0.910;
+  const baseSVP    = gsaxSVP * 0.70 + currentSVP * 0.30;
+
+  // ── Team defense context (stronger team = fewer dangerous shots) ──────
   const teamContext = (teamWinPct - 0.5) * 0.008;
-  const svpVariance = (rand() - 0.5) * 0.012;
-  const projectedSVP = Math.max(0.895, Math.min(0.940, baseSVP + teamContext + svpVariance));
 
-  // GAA from save% and shots faced (approximate ~30 shots/game)
-  const shotsPerGame = 30;
-  const projectedGAA = Math.round(shotsPerGame * (1 - projectedSVP) * 100) / 100;
+  // ── Age regression: goalies peak 27-32, decline after ────────────────
+  const age = g.age ?? 28;
+  const ageRegression = age > 33 ? -(age - 33) * 0.002 : // -0.002 per year after 33
+                        age < 24 ? -(24 - age)  * 0.001 : // slight regression for very young
+                        0;
 
-  const gamesStarted = Math.round(45 + rand() * 20);
+  // ── Realistic season-long variance (±0.010 = realistic swing) ────────
+  // Elite goalies have tighter variance; backups have wider
+  const gsaxQuality = Math.abs(gsax);
+  const varianceWidth = gsaxQuality > 15 ? 0.008 :  // elite: tight
+                        gsaxQuality > 5  ? 0.012 :  // solid: moderate
+                                           0.018;   // fringe: wide
+  const svpVariance = (rand() - 0.5) * varianceWidth * 2;
+
+  // ── Final projected SVP — no hard floor, natural bounds only ─────────
+  const projectedSVP = Math.max(0.880, Math.min(0.945,
+    baseSVP + teamContext + ageRegression + svpVariance
+  ));
+
+  // ── GAA from SVP and context-adjusted shots/game ──────────────────────
+  // Better teams face fewer shots (25-32 range)
+  const shotsPerGame  = 28 + (1 - teamWinPct) * 8; // worse team → more shots faced
+  const projectedGAA  = shotsPerGame * (1 - projectedSVP);
+
+  const gamesStarted  = Math.round(48 + rand() * 20);
 
   return {
     name: g.name,

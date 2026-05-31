@@ -86,6 +86,15 @@ export default function TradeMachine() {
   const [teams, setTeams] = useState<[Team | null, Team | null]>([null, null]);
   const [blocks, setBlocks] = useState<[Asset[], Asset[]]>([[], []]);
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
+  const [matchResults, setMatchResults] = useState<null | {
+    matches: Array<{
+      teamId: string; teamName: string; phase: string; score: number;
+      navDelta: number; capFit: "FITS"|"TIGHT"|"OVER";
+      fitReasons: string[]; warnReasons: string[]; returnProfile: string;
+    }>;
+    packageNAV: number; packageCap: number; avgAge: number;
+  }>(null);
+  const [matchLoading, setMatchLoading] = useState(false);
   const [evaluated, setEvaluated] = useState(false);
   const [expandedFlag,   setExpandedFlag]   = useState<number | null>(null);
   const [tradeRequest,   setTradeRequest]   = useState<Asset[] | null>(null);
@@ -556,6 +565,36 @@ RULES: No invented context. No speculation about players not in this trade. Comp
     }
   }, [verdict, teams, blocks]);
 
+  // ── Trade Partner Finder ─────────────────────────────────────
+  // "Who wants this package?" — scores all 32 teams on fit
+  const findMatches = useCallback(async (packageBlocks: Asset[]) => {
+    if (!packageBlocks.length || !teams[0]) return;
+    setMatchLoading(true);
+    setMatchResults(null);
+    try {
+      const res = await fetch("/api/match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assets:     packageBlocks,
+          homeTeamId: teams[0]?.id ?? "",
+          allTeams:   db.teams,
+          allPlayers: db.players,
+          navMap:     Object.fromEntries(
+            Object.entries(navMap).map(([id, r]) => [id, {
+              total: r.total, off: r.off, def: r.def, age: r.age, cap: r.cap
+            }])
+          ),
+        }),
+      });
+      if (res.ok) setMatchResults(await res.json());
+    } catch (e) {
+      console.error("[findMatches]", e);
+    } finally {
+      setMatchLoading(false);
+    }
+  }, [teams, db, navMap]);
+
   const runEval = useCallback(async () => {
     const liveT0 = db.teams.find(t => t.id === teams[0]?.id) ?? teams[0];
     const liveT1 = db.teams.find(t => t.id === teams[1]?.id) ?? teams[1];
@@ -890,6 +929,101 @@ RULES: No invented context. No speculation about players not in this trade. Comp
               onMouseLeave={e => (e.currentTarget.style.background = 'var(--ledger-red)')}>
               ✦ Run GM Audit ✦
             </button>
+
+            {/* ── Who Wants This? — Trade Partner Finder ── */}
+            {(blocks[0].length > 0 || blocks[1].length > 0) && (
+              <button
+                onClick={() => findMatches(blocks[0].length > 0 ? blocks[0] : blocks[1])}
+                disabled={matchLoading}
+                className="w-full py-3 font-black uppercase tracking-widest text-[11px] transition-all duration-200 disabled:opacity-50 active:scale-[0.97]"
+                style={{ background: 'var(--ledger-navy)', color: 'white', border: '2px solid var(--ledger-navy)' }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
+                {matchLoading ? "Finding matches…" : "◈ Who Wants This Package?"}
+              </button>
+            )}
+
+            {/* ── Match Results ── */}
+            {matchResults && matchResults.matches.length > 0 && (
+              <div className="mt-3 border-t-2 pt-3" style={{ borderColor: 'var(--ledger-navy)' }}>
+                {/* Sticky header — stays visible while scrolling */}
+                <div className="text-2xs font-black uppercase tracking-[0.4em] mb-1 font-mono text-center"
+                  style={{ color: 'var(--ledger-navy)' }}>
+                  Best-Fit Trade Partners
+                </div>
+                <div className="text-2xs font-mono mb-3 text-center" style={{ color: 'var(--ledger-ink-faint)' }}>
+                  Package: {matchResults.packageNAV > 0 ? "+" : ""}{matchResults.packageNAV.toFixed(0)} NAV
+                  · ${matchResults.packageCap.toFixed(1)}M cap
+                  {matchResults.avgAge > 0 ? ` · avg ${matchResults.avgAge.toFixed(0)} yrs old` : ""}
+                </div>
+                {/* Scrollable card list — max 3 cards visible, scroll for rest */}
+                <div className="space-y-2 overflow-y-auto pr-1"
+                  style={{ maxHeight: '420px', scrollbarWidth: 'thin', scrollbarColor: 'var(--ledger-rule) transparent' }}>
+                  {matchResults.matches.map((m, i) => (
+                    <div key={m.teamId} className="rounded p-2.5"
+                      style={{
+                        background: i === 0 ? 'rgba(26,46,92,0.08)' : 'var(--ledger-card)',
+                        border: i === 0 ? '1px solid var(--ledger-navy)' : '1px solid var(--ledger-rule)',
+                      }}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-2xs font-black" style={{ color: 'var(--ledger-ink-faint)', fontFamily: 'monospace' }}>
+                            #{i + 1}
+                          </span>
+                          <span className="font-black text-[11px]" style={{ color: 'var(--ledger-ink)' }}>
+                            {m.teamName}
+                          </span>
+                          <span className="text-2xs font-mono px-1.5 py-0.5 rounded"
+                            style={{ background: 'var(--ledger-rule-light)', color: 'var(--ledger-ink-body)' }}>
+                            {m.phase}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-2xs font-mono"
+                            style={{ color: m.capFit === "FITS" ? 'var(--ledger-green)' : m.capFit === "TIGHT" ? 'var(--ledger-amber)' : 'var(--ledger-red)' }}>
+                            {m.capFit}
+                          </span>
+                          {/* Score bar */}
+                          <div className="flex items-center gap-1">
+                            <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--ledger-rule-light)' }}>
+                              <div className="h-full rounded-full"
+                                style={{ width: `${m.score}%`, background: m.score >= 65 ? 'var(--ledger-navy)' : m.score >= 45 ? 'var(--ledger-amber)' : 'var(--ledger-red)' }} />
+                            </div>
+                            <span className="text-2xs font-black font-mono" style={{ color: 'var(--ledger-ink)', minWidth: 24 }}>
+                              {m.score}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      {m.fitReasons.length > 0 && (
+                        <div className="text-2xs font-mono space-y-0.5 mb-1">
+                          {m.fitReasons.map((r, j) => (
+                            <div key={j} style={{ color: 'var(--ledger-green)' }}>✓ {r}</div>
+                          ))}
+                        </div>
+                      )}
+                      {m.warnReasons.length > 0 && (
+                        <div className="text-2xs font-mono space-y-0.5 mb-1">
+                          {m.warnReasons.map((r, j) => (
+                            <div key={j} style={{ color: 'var(--ledger-amber)' }}>⚠ {r}</div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="text-2xs font-mono mt-1 pt-1" style={{ color: 'var(--ledger-ink-faint)', borderTop: '1px solid var(--ledger-rule-light)' }}>
+                        Return profile: {m.returnProfile}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Fade hint — signals more cards below */}
+                {matchResults.matches.length > 3 && (
+                  <div className="text-2xs font-mono text-center mt-1.5"
+                    style={{ color: 'var(--ledger-ink-faint)' }}>
+                    ↕ scroll · {matchResults.matches.length} teams ranked
+                  </div>
+                )}
+              </div>
+            )}
 
             {verdict && (verdict.status === "FAIR" || verdict.status === "WIN") && (
               <button onClick={() => { executeTrade(); setHomeTeamLocked(true); }}
