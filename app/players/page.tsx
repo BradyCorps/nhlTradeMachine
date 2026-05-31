@@ -294,6 +294,24 @@ function FullStrand({ player }: { player: Player }) {
   );
 }
 
+// ── Stat pill — labelled stat for mobile card ─────────────────
+function StatPill({ value, label, accent }: { value: string; label: string; accent?: boolean }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0 }}>
+      <span style={{
+        fontSize: "12px", fontWeight: 900,
+        color: accent ? "var(--ink)" : "var(--ink-light)",
+        lineHeight: 1,
+      }}>{value}</span>
+      <span style={{
+        fontSize: "9px", color: "var(--rule)",
+        textTransform: "uppercase", letterSpacing: "0.08em",
+        marginTop: "2px", whiteSpace: "nowrap",
+      }}>{label}</span>
+    </div>
+  );
+}
+
 // ── Player row ────────────────────────────────────────────────
 function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
   player: Player; team?: Team; rank: number;
@@ -303,30 +321,52 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
   const [expanded, setExpanded] = useState(false);
   const isG = player.position === "G";
 
-  const primaryStat = isG
-    ? `${(player.gsax ?? 0).toFixed(1)} GSAx`
-    : sortKey === "ppg"   ? `${actualPPG(player).toFixed(3)} PPG`
-    : sortKey === "pts"   ? `${player.ptsPace.toFixed(1)} P/82`
-    : sortKey === "ops"   ? `${player.ops != null ? player.ops.toFixed(1) : "—"} OPS`
-    : sortKey === "dps"   ? `${player.dps != null ? player.dps.toFixed(1) : "—"} DPS`
-    : sortKey === "toi"   ? `${player.avgTOI.toFixed(1)} TOI`
-    : sortKey === "age"   ? `${player.age} Age`
-    : sortKey === "cap"   ? `$${player.capHit}M Cap`
-    : `${actualPPG(player).toFixed(3)} PPG`;
+  // Derive labelled stat pairs based on sort key
+  const primaryVal = isG
+    ? (player.gsax ?? 0).toFixed(1)
+    : sortKey === "ppg"   ? actualPPG(player).toFixed(3)
+    : sortKey === "pts"   ? player.ptsPace.toFixed(1)
+    : sortKey === "ops"   ? (player.ops != null ? player.ops.toFixed(1) : "—")
+    : sortKey === "dps"   ? (player.dps != null ? player.dps.toFixed(1) : "—")
+    : sortKey === "toi"   ? player.avgTOI.toFixed(1)
+    : sortKey === "age"   ? `${player.age}`
+    : sortKey === "cap"   ? `$${player.capHit}M`
+    : actualPPG(player).toFixed(3);
 
-  const secondaryStat = isG
-    ? `${player.savePct?.toFixed(3) ?? "—"} SV%`
-    : sortKey === "dps"   ? `${player.ptsPace.toFixed(1)} P/82`
-    : sortKey === "ops"   ? `${player.ptsPace.toFixed(1)} P/82`
-    : sortKey === "toi"   ? `${actualPPG(player).toFixed(3)} PPG`
-    : sortKey === "age"   ? `${player.capHit}M Cap`
-    : sortKey === "cap"   ? `${player.yearsRemaining}yr Left`
-    : `${player.avgTOI.toFixed(1)} TOI`;
+  const primaryLabel = isG ? "GSAx"
+    : sortKey === "ppg" ? "PPG"
+    : sortKey === "pts" ? "P/82"
+    : sortKey === "ops" ? "OPS"
+    : sortKey === "dps" ? "DPS"
+    : sortKey === "toi" ? "TOI"
+    : sortKey === "age" ? "Age"
+    : sortKey === "cap" ? "Cap"
+    : "PPG";
+
+  const secondaryVal = isG
+    ? (player.savePct?.toFixed(3) ?? "—")
+    : sortKey === "dps" || sortKey === "ops" ? player.ptsPace.toFixed(1)
+    : sortKey === "toi"   ? actualPPG(player).toFixed(3)
+    : sortKey === "age"   ? `$${player.capHit}M`
+    : sortKey === "cap"   ? `${player.yearsRemaining}yr`
+    : player.avgTOI.toFixed(1);
+
+  const secondaryLabel = isG ? "SV%"
+    : sortKey === "dps" || sortKey === "ops" ? "P/82"
+    : sortKey === "toi"   ? "PPG"
+    : sortKey === "age"   ? "Cap"
+    : sortKey === "cap"   ? "Left"
+    : "TOI";
+
+  // Abbreviated team name for mobile (use teamId which is already short)
+  const teamAbbr = player.teamId;
 
   return (
     <>
+      {/* ── Desktop row (≥540px) — original 6-column grid ── */}
       <div
         onClick={() => setExpanded(e => !e)}
+        className="player-row player-row-desktop"
         style={{
           display: "grid",
           gridTemplateColumns: "32px 36px 1fr 80px 72px 64px",
@@ -338,14 +378,9 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
           background: expanded ? "var(--paper-card)" : "transparent",
           transition: "background 0.15s",
         }}
-        className="player-row"
       >
-        {/* Rank */}
-        <div style={{ fontSize: "11px", color: "var(--rule)", textAlign: "right" }}>
-          {rank}
-        </div>
+        <div style={{ fontSize: "11px", color: "var(--rule)", textAlign: "right" }}>{rank}</div>
 
-        {/* Headshot */}
         <div style={{ width: 32, height: 32, borderRadius: "50%", overflow: "hidden", background: "var(--paper-dark)", flexShrink: 0 }}>
           {player.headshot
             ? <img src={player.headshot} alt={player.name} width={32} height={32} style={{ objectFit: "cover" }}/>
@@ -355,7 +390,6 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
           }
         </div>
 
-        {/* Name + team + badges */}
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "nowrap", overflow: "hidden", minWidth: 0 }}>
             <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%", display: "block" }}>
@@ -369,7 +403,6 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
           </div>
         </div>
 
-        {/* Mini helix — hidden on mobile */}
         <div className="players-hide-mobile">
           {!isG
             ? <MiniHelix ops={player.ops} dps={player.dps} ptsPace={player.ptsPace} avgTOI={player.avgTOI}/>
@@ -379,29 +412,86 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
           }
         </div>
 
-        {/* Primary stat */}
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: "11px", fontWeight: 900, color: "var(--ink)" }}>
-            {primaryStat.split(" ")[0]}
-          </div>
-          <div style={{ fontSize: "11px", color: "var(--rule)", textTransform: "uppercase" }}>
-            {primaryStat.split(" ").slice(1).join(" ")}
-          </div>
+          <div style={{ fontSize: "11px", fontWeight: 900, color: "var(--ink)" }}>{primaryVal}</div>
+          <div style={{ fontSize: "11px", color: "var(--rule)", textTransform: "uppercase" }}>{primaryLabel}</div>
         </div>
 
-        {/* Secondary stat + expand */}
         <div style={{ textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
           <div>
-            <div style={{ fontSize: "11px", color: "var(--ink-light)" }}>
-              {secondaryStat.split(" ")[0]}
+            <div style={{ fontSize: "11px", color: "var(--ink-light)" }}>{secondaryVal}</div>
+            <div style={{ fontSize: "11px", color: "var(--rule)", textTransform: "uppercase" }}>{secondaryLabel}</div>
+          </div>
+          <span style={{ fontSize: "11px", color: "var(--rule)" }}>{expanded ? "▲" : "▼"}</span>
+        </div>
+      </div>
+
+      {/* ── Mobile card (≤539px) — 2-line layout with labelled stats ── */}
+      <div
+        onClick={() => setExpanded(e => !e)}
+        className="player-row player-row-mobile"
+        style={{
+          padding: "10px 12px",
+          borderBottom: "1px solid var(--rule-light)",
+          cursor: "pointer",
+          background: expanded ? "var(--paper-card)" : "transparent",
+          transition: "background 0.15s",
+        }}
+      >
+        {/* Line 1: headshot + name block + expand arrow */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+          {/* Headshot */}
+          <div style={{ width: 36, height: 36, borderRadius: "50%", overflow: "hidden", background: "var(--paper-dark)", flexShrink: 0 }}>
+            {player.headshot
+              ? <img src={player.headshot} alt={player.name} width={36} height={36} style={{ objectFit: "cover" }}/>
+              : <div style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "var(--rule)" }}>
+                  {player.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                </div>
+            }
+          </div>
+
+          {/* Name + meta */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "nowrap", overflow: "hidden" }}>
+              <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {player.name}
+              </span>
+              <ArchetypeBadge player={player} />
+              {player.hasNMC && <span style={{ fontSize: "10px", color: "var(--red)", border: "1px solid var(--red)", padding: "0 3px", flexShrink: 0 }}>NMC</span>}
             </div>
-            <div style={{ fontSize: "11px", color: "var(--rule)", textTransform: "uppercase" }}>
-              {secondaryStat.split(" ").slice(1).join(" ")}
+            <div style={{ fontSize: "11px", color: "var(--rule)", marginTop: "2px" }}>
+              {teamAbbr} · {player.position} · Age {player.age}
             </div>
           </div>
-          <span style={{ fontSize: "11px", color: "var(--rule)" }}>
+
+          {/* Expand toggle */}
+          <span style={{ fontSize: "12px", color: "var(--rule)", flexShrink: 0 }}>
             {expanded ? "▲" : "▼"}
           </span>
+        </div>
+
+        {/* Line 2: rank pill + stats row */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0", paddingLeft: "46px" }}>
+          {/* Rank */}
+          <span style={{
+            fontSize: "10px", color: "var(--rule)",
+            marginRight: "10px", minWidth: "18px", textAlign: "right",
+          }}>#{rank}</span>
+
+          {/* Divider line */}
+          <div style={{ width: "1px", height: "28px", background: "var(--rule-light)", marginRight: "10px", flexShrink: 0 }} />
+
+          {/* Stats */}
+          <div style={{ display: "flex", gap: "14px", alignItems: "center", flex: 1 }}>
+            <StatPill value={primaryVal} label={primaryLabel} accent />
+            <StatPill value={secondaryVal} label={secondaryLabel} />
+            {/* Always show TOI for context unless TOI IS the primary/secondary */}
+            {!isG && sortKey !== "toi" && secondaryLabel !== "TOI" && (
+              <StatPill value={player.avgTOI.toFixed(1)} label="TOI" />
+            )}
+            {/* Contract shorthand */}
+            <StatPill value={`$${player.capHit}M`} label={`${player.yearsRemaining}yr`} />
+          </div>
         </div>
       </div>
 
@@ -438,6 +528,16 @@ export default function PlayersPage() {
   const [posFilter, setPosFilter] = useState<"ALL" | "F" | "D" | "G">("ALL");
   const [teamFilter, setTeamFilter] = useState<string>("ALL");
   const [sortKey, setSortKey] = useState<"ppg" | "pts" | "toi" | "ops" | "dps" | "age" | "cap">("ppg");
+  const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
+
+  const handleSortKey = (k: typeof sortKey) => {
+    if (k === sortKey) {
+      setSortDir(d => d === "desc" ? "asc" : "desc");
+    } else {
+      setSortKey(k);
+      setSortDir("desc");
+    }
+  };
 
   // PPG = actual points per game played (not pace-projected)
   const ppg = (p: Player): number => {
@@ -500,15 +600,16 @@ export default function PlayersPage() {
     const go = filtered.filter(p => p.position === "G");
 
     const sortFn = (a: Player, b: Player): number => {
+      const dir = sortDir === "desc" ? 1 : -1;
       switch (sortKey) {
-        case "ppg": return actualPPG(b) - actualPPG(a);
-        case "pts": return b.ptsPace - a.ptsPace;
-        case "toi": return b.avgTOI - a.avgTOI;
-        case "ops": return (b.ops ?? -99) - (a.ops ?? -99);
-        case "dps": return (b.dps ?? -99) - (a.dps ?? -99);
-        case "age": return a.age - b.age;
-        case "cap": return b.capHit - a.capHit;
-        default:    return actualPPG(b) - actualPPG(a);
+        case "ppg": return dir * (actualPPG(b) - actualPPG(a));
+        case "pts": return dir * (b.ptsPace - a.ptsPace);
+        case "toi": return dir * (b.avgTOI - a.avgTOI);
+        case "ops": return dir * ((b.ops ?? -99) - (a.ops ?? -99));
+        case "dps": return dir * ((b.dps ?? -99) - (a.dps ?? -99));
+        case "age": return dir * (a.age - b.age);
+        case "cap": return dir * (b.capHit - a.capHit);
+        default:    return dir * (actualPPG(b) - actualPPG(a));
       }
     };
 
@@ -516,7 +617,7 @@ export default function PlayersPage() {
       skaters: sk.sort(sortFn),
       goalies: go.sort((a, b) => (b.gsax ?? 0) - (a.gsax ?? 0)),
     };
-  }, [filtered, sortKey]);
+  }, [filtered, sortKey, sortDir]);
 
   const starters = goalies.filter(g => goalieTeir(g.gamesStarted ?? 0) === "STARTER");
   const tandems  = goalies.filter(g => goalieTeir(g.gamesStarted ?? 0) === "TANDEM");
@@ -526,30 +627,37 @@ export default function PlayersPage() {
     <main style={{ minHeight: "100vh", background: "var(--paper)", color: "var(--ink)" }}>
 
       <Header activeTab="players" />
-      <div style={{ padding: "0 20px 12px" }}/>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", flexWrap: "wrap" }}>
-            <span style={{ color: "var(--ledger-rule)", fontSize: "11px" }}>
+      {/* ── Filter bar ── */}
+      <div className="players-filter-bar">
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "12px 16px 10px" }}>
+
+          {/* Row 1: count + search */}
+          <div className="players-filter-row1">
+            <span style={{ fontSize: "11px", color: "var(--rule)", whiteSpace: "nowrap", letterSpacing: "0.05em" }}>
               {players.length > 0 ? `${skaters.length + goalies.length} players · Live data` : "Loading..."}
             </span>
-          </div>
-
-          {/* Search + filters */}
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search player or team..."
               style={{
                 fontSize: "11px",
-                padding: "7px 12px", border: "1px solid #b8a070",
-                background: "#e4d8b8", color: "var(--ledger-ink)",
-                outline: "none", width: "clamp(160px, 30vw, 220px)",
+                padding: "7px 12px",
+                border: "1px solid #b8a070",
+                background: "#e4d8b8",
+                color: "var(--ledger-ink)",
+                outline: "none",
+                flex: 1,
+                minWidth: "140px",
+                maxWidth: "260px",
               }}
             />
-            <div style={{ display: "flex", gap: "4px" }}>
+          </div>
+
+          {/* Row 2: pos filters + team dropdown */}
+          <div className="players-filter-row2">
+            <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
               {(["ALL","F","D","G"] as const).map(p => (
                 <button key={p} className={`filter-btn${posFilter === p ? " active" : ""}`}
                   onClick={() => setPosFilter(p)}>
@@ -562,8 +670,12 @@ export default function PlayersPage() {
               onChange={e => setTeamFilter(e.target.value)}
               style={{
                 fontSize: "11px",
-                padding: "6px 10px", border: "1px solid #b8a070",
-                background: "#e4d8b8", color: "var(--ledger-ink)", cursor: "pointer",
+                padding: "6px 10px",
+                border: "1px solid #b8a070",
+                background: "#e4d8b8",
+                color: "var(--ledger-ink)",
+                cursor: "pointer",
+                flexShrink: 0,
               }}
             >
               <option value="ALL">All Teams</option>
@@ -572,6 +684,7 @@ export default function PlayersPage() {
               ))}
             </select>
           </div>
+
         </div>
       </div>
 
@@ -583,9 +696,29 @@ export default function PlayersPage() {
           </div>
         ) : (
           <>
-            {/* Column headers */}
+            {/* Mobile sort strip — only visible on mobile when skaters shown */}
             {(posFilter === "ALL" || posFilter === "F" || posFilter === "D") && skaters.length > 0 && (
-              <div style={{
+              <div className="players-mobile-sort-strip">
+                <span style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", letterSpacing: "0.1em", whiteSpace: "nowrap", marginRight: "6px" }}>Sort:</span>
+                <div style={{ display: "flex", gap: "4px", overflowX: "auto", WebkitOverflowScrolling: "touch" as any }}>
+                  {(["ppg","pts","ops","dps","toi","age","cap"] as const).map(k => (
+                    <button key={k} className={`col-header${sortKey === k ? " active" : ""}`}
+                      onClick={() => handleSortKey(k)}
+                      style={{ flexShrink: 0 }}>
+                      {k === "ppg" ? "PPG" : k === "pts" ? "P/82" : k.toUpperCase()}
+                      {sortKey === k && (
+                        <span style={{ marginLeft: "2px", fontSize: "8px" }}>
+                          {sortDir === "desc" ? "▼" : "▲"}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Column headers — desktop only */}
+            {(posFilter === "ALL" || posFilter === "F" || posFilter === "D") && skaters.length > 0 && (
+              <div className="players-column-header" style={{
                 display: "grid",
                 gridTemplateColumns: "32px 36px 1fr 80px 72px 64px",
                 gap: "8px",
@@ -598,19 +731,7 @@ export default function PlayersPage() {
                 <div/>
                 <div/>
                 <div/>
-                <div className="players-hide-mobile" style={{ textAlign: "center" }}>
-                  <span style={{ fontSize: "11px", color: "var(--rule)", textTransform: "uppercase", letterSpacing: "0.1em" }}>STRAND™</span>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "4px", flexWrap: "wrap" }}>
-                    {(["ppg","pts","ops","dps","toi","age","cap"] as const).map(k => (
-                      <button key={k} className={`col-header${sortKey === k ? " active" : ""}`}
-                        onClick={() => setSortKey(k)}>
-                        {k === "ppg" ? "PPG" : k === "pts" ? "P/82" : k.toUpperCase()}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                
                 <div/>
               </div>
             )}

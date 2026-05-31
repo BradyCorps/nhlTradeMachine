@@ -576,8 +576,86 @@ select.ledger-select {
 /* ── Players analytics page ──────────────────────────────────── */
 .player-row:hover { background: var(--paper-card) !important; }
 
+/* Desktop row: show on ≥540px, hide on mobile */
+.player-row-desktop { display: grid; }
+.player-row-mobile  { display: none; }
+
+@media (max-width: 539px) {
+  .player-row-desktop { display: none !important; }
+  .player-row-mobile  { display: block !important; }
+}
+
 .players-hide-mobile { display: block; }
 @media (max-width: 540px) { .players-hide-mobile { display: none; } }
+
+/* ── Filter bar ── */
+.players-filter-bar {
+  background: var(--paper);
+  border-bottom: 2px solid var(--ledger-ink);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+/* Row 1: count label + search — side by side on desktop, stacked on mobile */
+.players-filter-row1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+@media (max-width: 539px) {
+  .players-filter-row1 {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .players-filter-row1 input {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* Row 2: pos buttons + team dropdown — flex row, scroll on overflow */
+.players-filter-row2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+@media (max-width: 539px) {
+  .players-filter-row2 {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 6px;
+    padding-bottom: 2px;
+  }
+  .players-filter-row2::-webkit-scrollbar { display: none; }
+}
+
+/* ── Mobile sort strip — only visible on mobile, sticky below filter bar ── */
+.players-column-header { display: grid; }
+@media (max-width: 539px) { .players-column-header { display: none !important; } }
+@media (max-width: 539px) {
+  .players-mobile-sort-strip {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    background: #f2ecd7;
+    border-bottom: 1px solid #b8a070;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    overflow: hidden;
+  }
+  .players-mobile-sort-strip > div {
+    scrollbar-width: none;
+  }
+  .players-mobile-sort-strip > div::-webkit-scrollbar { display: none; }
+}
 
 /* Filter buttons — larger tap targets on mobile */
 .filter-btn {
