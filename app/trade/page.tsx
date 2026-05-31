@@ -95,6 +95,7 @@ export default function TradeMachine() {
     packageNAV: number; packageCap: number; avgAge: number;
   }>(null);
   const [matchLoading, setMatchLoading] = useState(false);
+  const [verdictOpen, setVerdictOpen] = useState(false);   // bottom sheet expanded
   const [evaluated, setEvaluated] = useState(false);
   const [expandedFlag,   setExpandedFlag]   = useState<number | null>(null);
   const [tradeRequest,   setTradeRequest]   = useState<Asset[] | null>(null);
@@ -608,7 +609,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
         allHomeRoster, allPartnerRoster,
         evalAbortRef.current.signal
       );
-      if (v) { setVerdict(v); setEvaluated(true); }
+      if (v) { setVerdict(v); setEvaluated(true); setVerdictOpen(true); }
     } catch (e: any) {
       if (e.name !== "AbortError") console.error("[runEval]", e.message);
     }
@@ -638,6 +639,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
   const sc = verdict ? STATUS_CONFIG[verdict.status] : STATUS_CONFIG.IDLE;
 
   return (
+    <>
     <main className="min-h-screen antialiased select-none overflow-x-hidden bg-paper text-ink font-serif">
 
       {/* Trade Proposal Engine Modal */}
@@ -1070,7 +1072,11 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             )}
 
             {verdict && verdict.status !== "IDLE" && (
-              <VerdictPanel verdict={verdict} sc={sc} expandedFlag={expandedFlag} setExpandedFlag={setExpandedFlag} onRequestClaudeAnalysis={generateClaudeAnalysis} onOpenMemo={() => setShowMemo(true)} />
+              // Verdict now shown in sticky bottom sheet — see below
+              <div className="text-2xs font-mono text-center py-2 rounded"
+                style={{ background: 'var(--ledger-card)', color: 'var(--ledger-ink-faint)' }}>
+                {verdict.status} — see verdict bar ↓
+              </div>
             )}
           </div>
 
@@ -1364,6 +1370,73 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
       </div>
     </main>
+
+    {/* ── Verdict Bottom Sheet ─────────────────────────────────────
+        Always anchored to the bottom of the viewport — no scrolling needed.
+        Collapsed: shows status pill + net NAV + tap to expand.
+        Expanded: full VerdictPanel slides up into view.
+        Auto-opens when GM Audit completes. */}
+    {verdict && verdict.status !== "IDLE" && (() => {
+      const v = verdict; // narrow to non-null for TypeScript
+      return (
+      <div
+        className="fixed bottom-0 left-0 right-0 z-40 transition-all duration-300 ease-out"
+        style={{
+          transform: verdictOpen ? 'translateY(0)' : 'translateY(calc(100% - 52px))',
+          maxHeight: verdictOpen ? '70vh' : '52px',
+          boxShadow: '0 -4px 32px rgba(28,20,10,0.35)',
+          background: 'var(--ledger-card-light)',
+          borderTop: `3px solid ${sc.border ?? 'var(--ledger-ink)'}`,
+        }}>
+
+        {/* ── Handle / collapsed strip ─────────────────────────── */}
+        <button
+          onClick={() => setVerdictOpen(o => !o)}
+          className="w-full flex items-center justify-between px-4 sm:px-6"
+          style={{ height: 52, background: 'transparent' }}>
+          <div className="flex items-center gap-3">
+            <span className="px-2.5 py-0.5 font-black text-2xs uppercase tracking-widest rounded-sm"
+              style={{ background: sc.border.replace('/50',''), color: 'white', letterSpacing: '0.15em' }}>
+              {v.status}
+            </span>
+            <span className="font-black text-[13px]" style={{ color: 'var(--ledger-ink)' }}>
+              {v.metrics.homeNetGain > 0 ? '+' : ''}{v.metrics.homeNetGain.toFixed(0)} NAV
+              <span className="font-normal text-2xs ml-2 font-mono" style={{ color: 'var(--ledger-ink-faint)' }}>
+                for {teams[0]?.name ?? 'Home'}
+              </span>
+            </span>
+            {v.flags.filter(f => f.severity === 'HARD').length > 0 && (
+              <span className="text-2xs font-mono px-1.5 py-0.5 rounded"
+                style={{ background: 'rgba(166,53,36,0.12)', color: 'var(--ledger-red)' }}>
+                {v.flags.filter(f => f.severity === 'HARD').length} hard flag{v.flags.filter(f => f.severity === 'HARD').length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          <span className="text-2xs font-mono" style={{ color: 'var(--ledger-ink-faint)' }}>
+            {verdictOpen ? 'collapse ↓' : 'expand ↑'}
+          </span>
+        </button>
+
+        {/* ── Expanded content — scrollable ────────────────────── */}
+        {verdictOpen && (
+          <div className="overflow-y-auto px-4 sm:px-6 pb-6 pt-1"
+            style={{ maxHeight: 'calc(70vh - 52px)', scrollbarWidth: 'thin', scrollbarColor: 'var(--ledger-rule) transparent' }}>
+            <VerdictPanel
+              verdict={v}
+              sc={sc}
+              expandedFlag={expandedFlag}
+              setExpandedFlag={setExpandedFlag}
+              onRequestClaudeAnalysis={generateClaudeAnalysis}
+              onOpenMemo={() => setShowMemo(true)} />
+          </div>
+        )}
+      </div>
+      );
+    })()}
+
+    {/* Bottom padding so page content isn't hidden behind verdict bar */}
+    {verdict && verdict.status !== "IDLE" && <div style={{ height: 52 }} />}
+  </>
   );
 }
 
