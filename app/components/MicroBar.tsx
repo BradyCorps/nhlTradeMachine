@@ -12,13 +12,13 @@ function MicroBar({ label, val, max, color, invert = false, tooltip }: {
   const displayVal = val; 
   
   const colorMap: Record<string, string> = {
-    cyan:    "#1a3a6b",
-    emerald: "#1a6b3a",
-    violet:  "#5b4a9b",
-    amber:   "#9a6b00",
-    rose:    "#c0392b",
+    cyan:    "var(--ledger-navy)",
+    emerald: "var(--ledger-green)",
+    violet:  "var(--ledger-violet)",
+    amber:   "var(--ledger-amber-dark)",
+    rose:    "var(--ledger-red-deep)",
   };
-  const barColor = val < 0 ? "#c0392b" : colorMap[color];
+  const barColor = val < 0 ? "var(--ledger-red-deep)" : colorMap[color];
   const numColor = invert
     ? (val < -40 ? 'var(--ledger-red-deep)' : val < -20 ? 'var(--ledger-amber-dark)' : 'var(--ledger-green)')
     : (val < 0 ? 'var(--ledger-red-deep)' : 'var(--ledger-green)');

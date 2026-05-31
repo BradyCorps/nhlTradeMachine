@@ -294,12 +294,12 @@ function AssetCard({
                   {/* Mini double helix SVG icon */}
                   <svg width="14" height="10" viewBox="0 0 14 10" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
                     <path d="M0,2 C2,2 2,8 4,8 C6,8 6,2 8,2 C10,2 10,8 12,8 C14,8 14,2 14,2"
-                      fill="none" stroke={view === "STRAND" ? "#1a2e5c" : "#9a7d58"} strokeWidth="1.5" strokeLinecap="round"/>
+                      fill="none" stroke={view === "STRAND" ? "var(--ledger-navy)" : "var(--ledger-ink-faint)"} strokeWidth="1.5" strokeLinecap="round"/>
                     <path d="M0,8 C2,8 2,2 4,2 C6,2 6,8 8,8 C10,8 10,2 12,2 C14,2 14,8 14,8"
-                      fill="none" stroke={view === "STRAND" ? "#b83020" : "#c8b890"} strokeWidth="1.5" strokeLinecap="round"/>
+                      fill="none" stroke={view === "STRAND" ? "var(--ledger-red)" : "var(--ledger-rule-mid)"} strokeWidth="1.5" strokeLinecap="round"/>
                     {[2, 5, 8, 11].map(x => (
                       <line key={x} x1={x} y1={2} x2={x} y2={8}
-                        stroke={view === "STRAND" ? "#9a7d58" : "#c8b890"} strokeWidth="0.8" opacity="0.6"/>
+                        stroke={view === "STRAND" ? "var(--ledger-ink-faint)" : "var(--ledger-rule-mid)"} strokeWidth="0.8" opacity="0.6"/>
                     ))}
                   </svg>
                   STRAND™

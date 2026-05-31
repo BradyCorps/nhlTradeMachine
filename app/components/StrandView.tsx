@@ -92,10 +92,10 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
     : offAvg > 0.52 && defAvg > 0.52 ? "COMPLETE PLAYER"
     : "BALANCED";
 
-  const offColor = "#1a2e5c";
-  const defColor = "#b83020";
-  const cmpOff   = "#4a7c9b";
-  const cmpDef   = "#c86040";
+  const offColor = "var(--ledger-navy)";
+  const defColor = "var(--ledger-red)";
+  const cmpOff   = "var(--ledger-navy)";
+  const cmpDef   = "var(--ledger-red)";
 
   const buildPath = (traits: {label:string;val:number;title:string}[], isOff: boolean) => {
     const pts = [];
@@ -112,22 +112,22 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
 
   return (
     <div className="mt-1 mb-2">
-      <div className="relative" style={{ background: "#dfd0a8", border: "1px solid #c8b890", borderRadius: "2px" }}>
+      <div className="relative" style={{ background: "var(--ledger-cream)", border: "1px solid #c8b890", borderRadius: "2px" }}>
         <div className="strand-svg-wrap">
         <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
           {/* Grid lines */}
           {[0.25, 0.5, 0.75].map(t => (
-            <line key={t} x1={t*W} y1={12} x2={t*W} y2={H-12} stroke="#c8b890" strokeWidth="0.5" strokeDasharray="3,3"/>
+            <line key={t} x1={t*W} y1={12} x2={t*W} y2={H-12} stroke="var(--ledger-rule-mid)" strokeWidth="0.5" strokeDasharray="3,3"/>
           ))}
-          <line x1={0} y1={cy} x2={W} y2={cy} stroke="#c8b890" strokeWidth="0.5"/>
+          <line x1={0} y1={cy} x2={W} y2={cy} stroke="var(--ledger-rule-mid)" strokeWidth="0.5"/>
 
           {/* Strand type badge — top left */}
-          <rect x={4} y={4} width={strandType.length * 5.2 + 8} height={13} fill="#dfd0a8" rx="1"/>
+          <rect x={4} y={4} width={strandType.length * 5.2 + 8} height={13} fill="var(--ledger-cream)" rx="1"/>
           <text x={8} y={13.5} fontSize="7.5" fill={
-            strandType === "ELITE TWO-WAY" ? "#1a5c2e" :
-            strandType === "COMPLETE PLAYER" ? "#245e39" :
-            strandType.includes("OFFENSIVE") ? "#1a2e5c" :
-            strandType.includes("DEFENSIVE") ? "#b83020" : "#6b5030"
+            strandType === "ELITE TWO-WAY" ? "var(--ledger-green)" :
+            strandType === "COMPLETE PLAYER" ? "var(--ledger-green)" :
+            strandType.includes("OFFENSIVE") ? "var(--ledger-navy)" :
+            strandType.includes("DEFENSIVE") ? "var(--ledger-red)" : "var(--ledger-brown)"
           } fontFamily="Courier Prime, monospace" fontWeight="bold">{strandType}</text>
 
           {/* Compare strands */}
@@ -145,7 +145,7 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
             const dA = amplitude * (0.35 + primary.def[ti].val * 0.65);
             const oy = cy - oA * Math.sin(freq * x * 2.5);
             const dy = cy + dA * Math.sin(freq * x * 2.5);
-            return <line key={i} x1={x} y1={oy} x2={x} y2={dy} stroke="#9a7d58" strokeWidth="0.8" opacity={0.12 + Math.abs(Math.sin(freq * x * 2.5)) * 0.25}/>;
+            return <line key={i} x1={x} y1={oy} x2={x} y2={dy} stroke="var(--ledger-ink-faint)" strokeWidth="0.8" opacity={0.12 + Math.abs(Math.sin(freq * x * 2.5)) * 0.25}/>;
           })}
 
           {/* Strands */}
@@ -209,29 +209,29 @@ function StrandView({ asset, xnav, compareAsset, compareXnav }: {
           { label: "◆ OFFENSE", traits: primary.off, color: offColor, ps: asset.ops ?? null, psLabel: "OPS" },
           { label: "◆ DEFENSE", traits: primary.def, color: defColor, ps: asset.dps ?? null, psLabel: "DPS" },
         ].map(({ label, traits, color, ps, psLabel }) => (
-          <div key={label} style={{ background: "#e4d8b8", border: "1px solid #c8b890", padding: "6px 8px" }}>
+          <div key={label} style={{ background: "var(--ledger-card)", border: "1px solid #c8b890", padding: "6px 8px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
-              <span style={{ fontSize: "7px", fontWeight: 900, color }}>{label}</span>
+              <span style={{ fontSize: "11px", fontWeight: 900, color }}>{label}</span>
               {ps !== null && ps !== undefined && (
-                <span style={{ fontSize: "7px", fontWeight: 900, color }}>
+                <span style={{ fontSize: "11px", fontWeight: 900, color }}>
                   {psLabel} {(ps as number).toFixed(1)}
                 </span>
               )}
             </div>
             {traits.map(t => (
               <div key={t.label} style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "3px" }} title={t.title}>
-                <span style={{ fontSize: "6.5px", fontWeight: 900, width: "26px", flexShrink: 0, color: "#6b5030" }}>{t.label}</span>
-                <div style={{ flex: 1, height: "4px", background: "#c8b890", borderRadius: "2px", overflow: "hidden" }}>
+                <span style={{ fontSize: "11px", fontWeight: 900, width: "26px", flexShrink: 0, color: "var(--ledger-brown)" }}>{t.label}</span>
+                <div style={{ flex: 1, height: "4px", background: "var(--ledger-rule-mid)", borderRadius: "2px", overflow: "hidden" }}>
                   <div style={{ width: `${t.val * 100}%`, height: "100%", background: color, opacity: 0.85 }}/>
                 </div>
-                <span style={{ fontSize: "6.5px", fontWeight: 900, width: "18px", textAlign: "right", flexShrink: 0, color }}>{Math.round(t.val * 100)}</span>
+                <span style={{ fontSize: "11px", fontWeight: 900, width: "18px", textAlign: "right", flexShrink: 0, color }}>{Math.round(t.val * 100)}</span>
               </div>
             ))}
           </div>
         ))}
       </div>
 
-      <div className="text-2xs mt-1 text-center" style={{ color: "#b8a070" }}>
+      <div className="text-2xs mt-1 text-center" style={{ color: "var(--ledger-rule)" }}>
         STRAND™ — Stylistic Trait & Rating Analysis for NHL Development
       </div>
     </div>

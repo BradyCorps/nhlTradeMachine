@@ -90,10 +90,10 @@ function TradePanel({
       <div className="flex-grow overflow-y-auto space-y-2 mb-4 pr-1">
         {!team && idx === 1 && (
           <div className="flex flex-col items-center justify-center h-40 gap-3">
-            <div style={{ fontSize: "9px", color: "#9a7d58", textAlign: "center", letterSpacing: "0.2em", textTransform: "uppercase" }}>
+            <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textAlign: "center", letterSpacing: "0.2em", textTransform: "uppercase" }}>
               Select a trade partner<br/>above to begin
             </div>
-            <div style={{ color: "#c8b890", fontSize: "24px" }}>⇄</div>
+            <div style={{ color: "var(--ledger-rule-mid)", fontSize: "24px" }}>⇄</div>
           </div>
         )}
         {blocks[idx].length === 0 && team && (
