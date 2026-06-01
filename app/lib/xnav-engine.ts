@@ -3,7 +3,7 @@
 // Imported by /api/evaluate/route.ts for production and by tests for validation.
 // Any change to these functions will be caught by the test suite before deploy.
 
-// ── Shared constants (import these in evaluate/route.ts and trade/page.tsx) ──
+import { LEAGUE, FRANCHISE, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 // DPS_NAV_MULTIPLIER: dps * 15 (MicroBar display) * 8 (NAV weight) = dps * 120 net.
 // Changing one without the other silently drifts the display from the math.
 export const DPS_NAV_MULTIPLIER = 120; // net NAV per Point Share of DPS
@@ -12,7 +12,7 @@ export interface AssetInput {
   // Identity
   id:             string;
   name:           string;
-  position:       string;
+  position:       "C" | "W" | "D" | "G" | "Pick";
   age:            number;
 
   // Contract
@@ -125,19 +125,19 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
     : gsaxPerGame;
 
   // Team defense context — xGA/60 vs league average (2.55)
-  const LEAGUE_AVG_XGA60 = 2.55;
-  const teamXga60 = asset.teamXga60 ?? LEAGUE_AVG_XGA60;
-  const defCorrection = clamp((teamXga60 - LEAGUE_AVG_XGA60) * 0.40, -0.15, 0.25);
+  // LEAGUE.avgXga60 — imported from season-config as LEAGUE.avgXga60
+  const teamXga60 = asset.teamXga60 ?? LEAGUE.avgXga60;
+  const defCorrection = clamp((teamXga60 - LEAGUE.avgXga60) * 0.40, -0.15, 0.25);
   const gsaxPer60 = (gsaxPerGameCapped + defCorrection) * 60;
 
-  const GSAX_SD = 8.0;
+  // LEAGUE.gsaxSd — imported from season-config as LEAGUE.gsaxSd
   // Bayesian regression — blend current season with career mean
   const careerMean = asset.baselineGsax ?? 0;
   const expGSAx = gsaxPer60 * confidenceG + careerMean * (1 - confidenceG);
 
   const goalieImpact = expGSAx >= 0
-    ? Math.pow(expGSAx / GSAX_SD, 1.5) * 80
-    : (expGSAx / GSAX_SD) * 40;
+    ? Math.pow(expGSAx / LEAGUE.gsaxSd, 1.5) * 80
+    : (expGSAx / LEAGUE.gsaxSd) * 40;
 
   const workloadBonus = isStarter
     ? Math.min(20, (gamesG / 60) * 15)
@@ -378,8 +378,7 @@ export function calcNAV(asset: AssetInput): XNAVResult {
 //   Young NHL (24-27): semi-independent, beginning to compete for prime slots
 //   Prime (28-31): full roster slot competition, standard compression
 //   Veterans (32+): steepest — maximum displacement cost, limited upside
-const ageDecayRate   = (age: number) => age <= 23 ? 0.80 : age <= 27 ? 0.65 : age <= 31 ? 0.60 : 0.55;
-const ageSlotPenalty = (age: number) => age <= 23 ? 15   : age <= 27 ? 35   : age <= 31 ? 50   : 60;
+// ageDecayRate / ageSlotPenalty — imported from season-config
 
 export function compressPackage(
   assets: Array<{ nav: number; isPick?: boolean; age?: number }>,
@@ -403,5 +402,5 @@ export function compressPackage(
 }
 
 // Tier classification for franchise veto logic
-export const FRANCHISE_NAV_THRESHOLD = 600;  // Elite stars — can be moved but requires major return
-export const MEGALODON_NAV_THRESHOLD  = 900;  // Generational talents — functionally untradeable
+// FRANCHISE.threshold — imported from season-config as FRANCHISE.threshold
+// FRANCHISE.megalodon — imported from season-config as FRANCHISE.megalodon

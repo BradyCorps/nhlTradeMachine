@@ -6,6 +6,7 @@ import {
 import type {
   Asset, EvaluateRequest, EvaluateResponse, FArchetype
 } from "@/app/lib/trade-types";
+import { SEASON, LEAGUE, FRANCHISE, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 
 // ── Core interfaces — self-contained so engine has no client deps ──
 // Asset, Team, XNAVResult imported from trade-types.ts — no local duplicates.
@@ -61,11 +62,11 @@ const getXNAV = (asset: Asset): XNAVResult => {
   // ----- DRAFT PICKS -----
   if (asset.position === "Pick") {
     const round    = asset.round    || 1;
-    const year     = asset.year     || 2026;
+    const year     = asset.year     || SEASON.draftYear;
     const standing = asset.teamStanding || 16;
 
     // Year decay — future picks worth less (uncertainty compounds)
-    const yearDecay = Math.pow(0.88, year - 2026);
+    const yearDecay = Math.pow(0.88, year - SEASON.draftYear);
 
     // ── Standing → pick value ─────────────────────────────────────
     // Key insight: teams trade picks based on UPSIDE potential, not
@@ -162,7 +163,7 @@ const getXNAV = (asset: Asset): XNAVResult => {
     // teamXga60 measures how many expected goals the team allows per 60 min.
     // League average ~2.55. Teams above 2.75 have hostile goalie environments.
     // This is more accurate than standings which reflect scoring/PP success too.
-    const LEAGUE_AVG_XGA60 = 2.55;
+    const LEAGUE_AVG_XGA60 = LEAGUE.avgXga60;
     const teamXga60 = asset.teamXga60 ?? LEAGUE_AVG_XGA60;
     const xgaDelta  = teamXga60 - LEAGUE_AVG_XGA60; // positive = worse than avg
     // Scale correction: each 0.1 above league avg = +0.04 GSAx/game forgiven
@@ -173,7 +174,7 @@ const getXNAV = (asset: Asset): XNAVResult => {
 
     const gsaxPer60 = (gsaxPerGameCapped + defCorrection) * 60;
 
-    const GSAX_SD = 8.0;
+    const GSAX_SD = LEAGUE.gsaxSd;
 
     const pedigree   = PLAYER_PEDIGREE[asset.name];
     const careerMean = pedigree?.careerGsax
@@ -417,7 +418,7 @@ const getXNAV = (asset: Asset): XNAVResult => {
   // to a $125M ceiling than it is today at $104M.
   // Elite contracts (>8% of cap) carry a severity penalty per year.
   // Future years are discounted at 10%/yr (future GM's problem).
-  const CURRENT_CAP     = 104.0;
+  const CURRENT_CAP     = SEASON.capCeiling;
   const CAP_GROWTH_RATE = 1.04;
   const years = Math.max(1, asset.yearsRemaining || 1);
   let rawCapCostSum = 0;
@@ -772,6 +773,7 @@ const baseTotal = Math.max(finalTotal, elcFloor, autoprospectFloor, depthFloor);
 //   INFO    — context / positive signal
 // ============================================================
 
+
 type FlagSeverity = "HARD" | "SOFT" | "WARN" | "INFO";
 type FlagCategory =
   | "CAP_VIOLATION" | "FLOOR_VIOLATION" | "CLAUSE"
@@ -820,7 +822,7 @@ const classifyTeam = (team: Team, roster: Asset[]): TeamMode => {
   if (team.phase === "Contender")  return "CONTENDER";
 
   // Fallback: derive from standing + cap if phase is missing
-  const capCeiling = 104;
+  const capCeiling = SEASON.capCeiling;
   const capUsed = capCeiling - team.capSpace;
   if (team.standing <= 6  && capUsed > 85) return "CONTENDER";
   if (team.standing <= 14 && capUsed > 72) return "BUBBLE";
@@ -866,16 +868,12 @@ const defensiveDependencyScore = (roster: Asset[]): number => {
   return eliteD.length <= 1 ? 0.9 : eliteD.length === 2 ? 0.6 : 0.3;
 };
 
-// ── Package compression ───────────────────────────────────────────────────────
-// True Package Value = Σ(NAVᵢ × δᵢⁱ⁻¹) − Σμᵢ  (both δ and μ are age-tiered)
-// Prospects (≤23): δ=0.80, μ=15  — independent developmental bets, not prime-slot pieces
-// Young NHL (24-27): δ=0.65, μ=35 — beginning to compete for lineup spots
-// Prime (28-31): δ=0.60, μ=50    — full roster slot competition
-// Veterans (32+): δ=0.55, μ=60   — steepest compression; limited upside, max displacement
-const FRANCHISE_THRESHOLD = 600;
-const MEGALODON_THRESHOLD = 900;
-const ageDecayRate_ev   = (age: number) => age <= 23 ? 0.80 : age <= 27 ? 0.65 : age <= 31 ? 0.60 : 0.55;
-const ageSlotPenalty_ev = (age: number) => age <= 23 ? 15   : age <= 27 ? 35   : age <= 31 ? 50   : 60;
+
+
+// ── Package compression — all constants from season-config ─────────────────
+const FRANCHISE_THRESHOLD = FRANCHISE.threshold;
+const MEGALODON_THRESHOLD  = FRANCHISE.megalodon;
+// ageDecayRate / ageSlotPenalty — imported from season-config
 
 const compressPackage = (assets: Asset[]): number => {
   if (assets.length === 0) return 0;
@@ -887,8 +885,8 @@ const compressPackage = (assets: Asset[]): number => {
   let decaySum = 0, penaltySum = 0;
   sorted.forEach((a, i) => {
     const age = a.age ?? 27;
-    decaySum += getXNAV(a).total * Math.pow(ageDecayRate_ev(age), i);
-    if (i > 0) penaltySum += ageSlotPenalty_ev(age);
+    decaySum += getXNAV(a).total * Math.pow(ageDecayRate(age), i);
+    if (i > 0) penaltySum += ageSlotPenalty(age);
   });
   return pickValue + Math.max(0, decaySum - penaltySum);
 };
@@ -1063,7 +1061,7 @@ const runGmLogic = (
 
   
   // ── HARD: Cap floor ──
-  const newCapUsedHome = 104 - projCapHome;
+  const newCapUsedHome = SEASON.capCeiling - projCapHome;
   if (newCapUsedHome < 65 && capDeltaHome < -3) flags.push({
     severity: "HARD", category: "FLOOR_VIOLATION",
     headline: "Cap Floor Violation",

@@ -5,6 +5,7 @@ import TradePanel from "@/app/components/TradePanel";
 import AssetDropdown from "@/app/components/AssetDropdown";
 import TugBar from "@/app/components/TugBar";
 import { MicroBar, DeltaRow } from "@/app/components/MicroBar";
+import { ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 import {
   PLAYER_PEDIGREE, PROSPECT_TIERS, SHUTDOWN_D_PEDIGREE, INJURY_RISK,
 } from "@/app/lib/player-data";
@@ -617,21 +618,21 @@ RULES: No invented context. No speculation about players not in this trade. Comp
   // Client-side package compression — mirrors evaluate/route.ts compressPackage
   // Shows users the roster-slot-aware value as they build, so the audit result
   // isn't a surprise. Only visible when compression materially changes things.
+  // Package compression — age tier constants from season-config (single source of truth).
+  // Formula mirrors compressPackage in xnav-engine; rates change by editing season-config only.
   const compressBlock = (block: Asset[]): number => {
     if (block.length === 0) return 0;
     const picks   = block.filter(a => a.position === "Pick");
     const players = block.filter(a => a.position !== "Pick");
-    const pickValue = picks.reduce((sum, a) => sum + (navMap[a.id]?.total ?? 0), 0);
+    const pickValue = picks.reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);
     if (players.length === 0) return pickValue;
     const sorted = [...players]
       .map(a => ({ nav: navMap[a.id]?.total ?? 0, age: a.age ?? 27 }))
       .sort((a, b) => b.nav - a.nav);
-    const ageDecay   = (age: number) => age <= 23 ? 0.80 : age <= 27 ? 0.65 : age <= 31 ? 0.60 : 0.55;
-    const agePenalty = (age: number) => age <= 23 ? 15   : age <= 27 ? 35   : age <= 31 ? 50   : 60;
     let decaySum = 0, penaltySum = 0;
     sorted.forEach((a, i) => {
-      decaySum += a.nav * Math.pow(ageDecay(a.age), i);
-      if (i > 0) penaltySum += agePenalty(a.age);
+      decaySum += a.nav * Math.pow(ageDecayRate(a.age), i);
+      if (i > 0) penaltySum += ageSlotPenalty(a.age);
     });
     return pickValue + Math.max(0, decaySum - penaltySum);
   };

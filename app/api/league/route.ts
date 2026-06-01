@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 export const dynamic = "force-dynamic";
 
@@ -833,14 +834,11 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["WPG","Mark Scheifele","C","1993-03-15"],
   ["WPG","Kyle Connor","W","1996-12-09"],
   ["WPG","Gabriel Vilardi","C","2000-08-16"],
-  ["WPG","Nino Niederreiter","W","1992-09-08"],
   ["WPG","Adam Lowry","C","1992-03-29"],
   ["WPG","Cole Perfetti","C","2002-01-01"],
   ["WPG","Josh Morrissey","D","1995-03-28"],
   ["WPG","Dylan DeMelo","D","1993-05-01"],
-  ["WPG","Brenden Dillon","D","1990-11-13"],
   ["WPG","Neal Pionk","D","1995-07-29"],
-  ["WPG","Logan Stanley","D","2001-05-26"],
   // GOALIES — one starter per team minimum
   ["WPG","Connor Hellebuyck","G","1993-05-19"],
   ["EDM","Stuart Skinner","G","1998-11-01"],
@@ -1316,16 +1314,25 @@ export async function GET() {
   }
 
   // Then try NHL API to get headshots and update IDs (optional enrichment)
+  // Try /current first (always reflects active roster), fall back to season-specific
   try {
     const results = await Promise.allSettled(
       LIVE_TEAMS.map((t) =>
         fetchWithTimeout(
-          `https://api-web.nhle.com/v1/roster/${t.id}/20252026`,
+          `https://api-web.nhle.com/v1/roster/${t.id}/current`,
           5000,
           NHL_HEADERS
         )
           .then((r) => (r.ok ? r.json() : null))
-          .catch(() => null)
+          .catch(() =>
+            fetchWithTimeout(
+              `https://api-web.nhle.com/v1/roster/${t.id}/${SEASON.nhleSeasonId}`,
+              5000,
+              NHL_HEADERS
+            )
+              .then((r) => (r.ok ? r.json() : null))
+              .catch(() => null)
+          )
       )
     );
 
