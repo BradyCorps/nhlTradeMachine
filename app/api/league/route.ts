@@ -1375,15 +1375,18 @@ export async function GET() {
 
       // Debug: trace analytics lookup for Slafkovsky
       if (slug.includes("slafkovsky")) {
+        // Find MTL-adjacent keys to verify season alignment
+        const mtlPlayerKeys = [...analyticsMap.keys()]
+          .filter(k => ["caufield","suzuki","anderson","newhook","barron"].some(n => k.includes(n)))
+          .slice(0, 8);
         console.log(`[DEBUG analytics Slafkovsky]`, JSON.stringify({
           slug, posSlug,
           posSlugHit: analyticsMap.has(posSlug),
           slugHit:    analyticsMap.has(slug),
-          fbHit:      fbMap.has(slug.split("-").slice(-1)[0]),
           statsFound: !!stats,
           analyticsMapSize: analyticsMap.size,
-          // Sample first 5 keys containing "slafkovsky"
           relatedKeys: [...analyticsMap.keys()].filter(k => k.includes("slafkovsky")),
+          sampleMTLKeys: mtlPlayerKeys,
         }));
       }
 
