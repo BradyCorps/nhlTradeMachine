@@ -309,7 +309,7 @@ async function scrapeCapWages(): Promise<Record<string, any>> {
 
     console.log(`[CapWages] Scraped ${scraped} players, skipped ${skipped}.`);
     // Log any known-good players that got skipped — helps diagnose index drift
-    const watchList = ["Quinton Byfield","Connor McDavid","Nathan MacKinnon","Auston Matthews","Juraj Slafkovsky","Juraj Slafkovský"];
+    const watchList = ["Quinton Byfield","Connor McDavid","Nathan MacKinnon","Auston Matthews"];
     for (const name of watchList) {
       if (!contracts[name]) {
         const reason = skipReasons[name] ?? "not found in playersArray";
@@ -1373,6 +1373,20 @@ export async function GET() {
         if (fb !== null && fb !== undefined) stats = fb;
       }
 
+      // Debug: trace analytics lookup for Slafkovsky
+      if (slug.includes("slafkovsky")) {
+        console.log(`[DEBUG analytics Slafkovsky]`, JSON.stringify({
+          slug, posSlug,
+          posSlugHit: analyticsMap.has(posSlug),
+          slugHit:    analyticsMap.has(slug),
+          fbHit:      fbMap.has(slug.split("-").slice(-1)[0]),
+          statsFound: !!stats,
+          analyticsMapSize: analyticsMap.size,
+          // Sample first 5 keys containing "slafkovsky"
+          relatedKeys: [...analyticsMap.keys()].filter(k => k.includes("slafkovsky")),
+        }));
+      }
+
       // Contract lookup — try compound keys first to handle same-name players
       // e.g. two Elias Petterssons on VAN: one C ($11.6M), one D ($0.84M ELC)
       // normalName strips accents so "Slafkovský" matches "Slafkovsky" in CapWages data
@@ -1391,23 +1405,17 @@ export async function GET() {
       const isLikelyELC = !fin && p.age <= 23;
       const elcCapHit   = p.age <= 22 ? 0.8775 : 0.925;
 
-      // ── DEBUG: Slafkovsky contract trace ─────────────────────
-      if (normalName.includes("Slafkovsky")) {
-        console.log(`[DEBUG Slafkovsky]`, JSON.stringify({
-          rawName:      p.name,
-          normalName,
-          age:          p.age,
-          position:     p.position,
-          finFound:     !!fin,
-          finCapHit:    fin?.capHit,
-          finYears:     fin?.yearsRemaining,
-          finPosition:  fin?.position,
-          isLikelyELC,
-          rawCapHit:    isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925),
-          nameCollision: p.age <= 23 && (isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925)) > 3.0 && !fin?.position?.startsWith(p.position),
-          contractOverride: CONTRACT_OVERRIDES[p.name] ?? CONTRACT_OVERRIDES[normalName] ?? null,
-        }));
-      }
+      // Normalise a contract position string (may be "LW", "RW", "LW, RW", "RW, LW")
+      // to match our system's "W" / "C" / "D" / "G" — used in nameCollision check.
+      const normContractPos = (pos: string | undefined): string => {
+        if (!pos) return "";
+        const u = pos.toUpperCase();
+        if (u.includes("G")) return "G";
+        if (u.includes("D")) return "D";
+        if (u.includes("C")) return "C";
+        if (u.includes("W") || u.includes("L") || u.includes("R")) return "W";
+        return u.charAt(0);
+      };
 
       // ── THE OVERRIDE LAYER (Highest Priority) ───────────────
       const override         = EXTENSIONS[p.name]    ?? EXTENSIONS[normalName];
@@ -1428,7 +1436,12 @@ export async function GET() {
 
       // Contract sanity check
       const rawCapHit     = isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925);
-      const nameCollision = p.age <= 23 && rawCapHit > 3.0 && !fin?.position?.startsWith(p.position);
+      // nameCollision: young player with a high cap hit whose contract position
+      // doesn't match their NHL position — likely inherited a veteran's contract.
+      // Use normContractPos so "RW, LW" → "W" matches "W" (fixes Slafkovsky and all wingers).
+      const nameCollision = p.age <= 23
+        && rawCapHit > 3.0
+        && normContractPos(fin?.position) !== p.position;
 
       const finalCapHit   = contractOverride?.capHit ?? override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
       const finalYears    = override?.yearsRemaining ?? (nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1)));
