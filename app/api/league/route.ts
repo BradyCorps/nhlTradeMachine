@@ -60,8 +60,8 @@ const derivePhase = (standing: number, pointPct: number): string => {
   if (standing <= 8  && pointPct >= 0.58) return "Contender";
   // More specific conditions must come before broader ones
   if (standing <= 8  && pointPct >= 0.52) return "Contender";
-  if (standing <= 14 && pointPct >= 0.52) return "Bubble";
-  if (standing <= 22)                      return "Retooling";
+  if (standing <= 16 && pointPct >= 0.52) return "Bubble";
+  if (standing <= 24)                      return "Retooling";
   if (standing <= 32 && pointPct < 0.38)  return "Tanking";
   return "Rebuilding";
 };
@@ -74,7 +74,8 @@ const PHASE_OVERRIDES: Record<string, string> = {
   FLA: "Retooling",    // Back-to-back finals, core still together, off year
   EDM: "Bubble",       // McDavid/Draisaitl never truly rebuild
   TOR: "Retooling",    // Core still competitive, structural issues not a rebuild
-};
+  ANA: "Bubble", // Made the playoffs with a young core, looking for the next step
+  };
 
 // ── Contract overrides — manual corrections for known data errors ──
 const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: number; position?: string }> = {

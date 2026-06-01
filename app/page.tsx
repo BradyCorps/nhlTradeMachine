@@ -41,7 +41,7 @@ export default function WelcomePage() {
       <div className="max-w-3xl mx-auto px-5 pb-10 grid grid-cols-1 sm:grid-cols-2 gap-5">
 
         <Link href="/trade" className="no-underline group">
-          <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 group-hover:opacity-90"
+          <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 group-hover:opacity-80"
             style={{ background: "var(--ledger-card)", border: "2px solid var(--ledger-rule)" }}>
             <div>
               <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
@@ -78,7 +78,7 @@ export default function WelcomePage() {
         </Link>
 
         <Link href="/players" className="no-underline group">
-          <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 group-hover:opacity-90"
+          <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 group-hover:opacity-80"
             style={{ background: "var(--ledger-card)", border: "2px solid var(--ledger-rule)" }}>
             <div>
               <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
@@ -113,7 +113,35 @@ export default function WelcomePage() {
             </div>
           </div>
         </Link>
-      </div>
+        
+        <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 opacity-50"
+            style={{ background: "var(--paper-card)", border: "2px solid var(--paper)" }}>
+            <div>
+              <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
+                style={{ color: "var(--ledger-violet)" }}>Feature Three</div><div>Coming Soon</div>
+              <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
+                Fantasy Hockey Expansion
+              </h2>
+              <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
+                Built for fantasy managers who want to draft smarter, execute flawless trades, and dominate the waiver wire using front-office data.
+              </p>
+            </div>
+          </div>
+          <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 opacity-50"
+            style={{ background: "var(--paper-card)", border: "2px solid var(--paper)" }}>
+            <div>
+              <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
+                style={{ color: "var(--ledger-violet)" }}>Feature Four</div><div>Coming Soon</div>
+              <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
+                Micro-Context Prop Engine
+              </h2>
+              <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
+                Built for sharp bettors who want a mathematically grounded, daily mispricing matrix to consistently beat the closing lines on player props.
+              </p>
+            </div>
+          </div>
+        </div>
+        
 
       {/* ── Explainer strip ──────────────────────────────────── */}
       <div className="border-y py-8" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-inset)" }}>
