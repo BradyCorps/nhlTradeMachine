@@ -1232,10 +1232,6 @@ export async function GET() {
         analyticsMap.set(mapKey, entry);
         // Also store by name-only for players without a name collision
         if (pos) analyticsMap.set(slugify(name), entry);
-        // Debug: log raw MoneyPuck name for Slafkovsky to catch any encoding variant
-        if (name.toLowerCase().includes("slaf") || slugify(name).includes("slaf")) {
-          console.log(`[DEBUG MP raw] name="${name}" slug="${slugify(name)}" pos="${pos}" pts=${entry.ptsPace?.toFixed(1)}`);
-        }
       });
       fbMap = buildFallbackMap(analyticsMap);
     }
@@ -1376,18 +1372,13 @@ export async function GET() {
         const fb   = fbMap.get(last);
         if (fb !== null && fb !== undefined) stats = fb;
       }
-
-      // Debug: trace analytics lookup for Slafkovsky
-      if (slug.includes("slafkovsky")) {
-        // Search for any key that starts with "slaf" or "juraj" — catches encoding variants
-        const slafKeys  = [...analyticsMap.keys()].filter(k => k.startsWith("slaf") || k.includes("slaf"));
-        const jurajKeys = [...analyticsMap.keys()].filter(k => k.startsWith("juraj"));
-        // Also dump raw MoneyPuck CSV name for this player if we can find it by partial match
-        console.log(`[DEBUG analytics Slafkovsky]`, JSON.stringify({
-          slug, posSlugHit: analyticsMap.has(posSlug), slugHit: analyticsMap.has(slug),
-          statsFound: !!stats, analyticsMapSize: analyticsMap.size,
-          slafKeys, jurajKeys,
-        }));
+      // Fallback: MoneyPuck sometimes drops accented characters entirely
+      // e.g. "Slafkovský" → "Slafkovsk" in CSV (ý stripped, not converted to y).
+      // Try slug minus its last character to recover these truncated entries.
+      if (!stats && slug.length > 4) {
+        const truncSlug = slug.slice(0, -1);
+        stats = analyticsMap.get(`${truncSlug}__${(p.position ?? "").toUpperCase()}`)
+             ?? analyticsMap.get(truncSlug);
       }
 
       // Contract lookup — try compound keys first to handle same-name players
