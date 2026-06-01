@@ -60,8 +60,8 @@ const derivePhase = (standing: number, pointPct: number): string => {
   if (standing <= 8  && pointPct >= 0.58) return "Contender";
   // More specific conditions must come before broader ones
   if (standing <= 8  && pointPct >= 0.52) return "Contender";
-  if (standing <= 16 && pointPct >= 0.52) return "Bubble";
-  if (standing <= 24)                      return "Retooling";
+  if (standing <= 14 && pointPct >= 0.52) return "Bubble";
+  if (standing <= 22)                      return "Retooling";
   if (standing <= 32 && pointPct < 0.38)  return "Tanking";
   return "Rebuilding";
 };
@@ -74,8 +74,7 @@ const PHASE_OVERRIDES: Record<string, string> = {
   FLA: "Retooling",    // Back-to-back finals, core still together, off year
   EDM: "Bubble",       // McDavid/Draisaitl never truly rebuild
   TOR: "Retooling",    // Core still competitive, structural issues not a rebuild
-  ANA: "Bubble", // Made the playoffs with a young core, looking for the next step
-  };
+};
 
 // ── Contract overrides — manual corrections for known data errors ──
 const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: number; position?: string }> = {
@@ -310,7 +309,7 @@ async function scrapeCapWages(): Promise<Record<string, any>> {
 
     console.log(`[CapWages] Scraped ${scraped} players, skipped ${skipped}.`);
     // Log any known-good players that got skipped — helps diagnose index drift
-    const watchList = ["Quinton Byfield","Connor McDavid","Nathan MacKinnon","Auston Matthews"];
+    const watchList = ["Quinton Byfield","Connor McDavid","Nathan MacKinnon","Auston Matthews","Juraj Slafkovsky","Juraj Slafkovský"];
     for (const name of watchList) {
       if (!contracts[name]) {
         const reason = skipReasons[name] ?? "not found in playersArray";
@@ -1376,18 +1375,43 @@ export async function GET() {
 
       // Contract lookup — try compound keys first to handle same-name players
       // e.g. two Elias Petterssons on VAN: one C ($11.6M), one D ($0.84M ELC)
+      // normalName strips accents so "Slafkovský" matches "Slafkovsky" in CapWages data
+      const normalName = p.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       const posKey  = `${p.name}__${p.position}`;
       const teamKey = `${p.name}__${teamId.toLowerCase()}`;
-      const fin     = CONTRACTS[posKey] ?? CONTRACTS[teamKey] ?? CONTRACTS[p.name] ?? null;
+      const normPosKey  = `${normalName}__${p.position}`;
+      const normTeamKey = `${normalName}__${teamId.toLowerCase()}`;
+      const fin = CONTRACTS[posKey]     ?? CONTRACTS[teamKey]
+               ?? CONTRACTS[normPosKey] ?? CONTRACTS[normTeamKey]
+               ?? CONTRACTS[p.name]     ?? CONTRACTS[normalName]
+               ?? null;
 
       // If no contract found and player is young (≤23), assume ELC rates
       // rather than inheriting a same-name veteran's contract
       const isLikelyELC = !fin && p.age <= 23;
-      const elcCapHit   = p.age <= 22 ? 0.8775 : 0.925; // standard ELC AAV
+      const elcCapHit   = p.age <= 22 ? 0.8775 : 0.925;
+
+      // ── DEBUG: Slafkovsky contract trace ─────────────────────
+      if (normalName.includes("Slafkovsky")) {
+        console.log(`[DEBUG Slafkovsky]`, JSON.stringify({
+          rawName:      p.name,
+          normalName,
+          age:          p.age,
+          position:     p.position,
+          finFound:     !!fin,
+          finCapHit:    fin?.capHit,
+          finYears:     fin?.yearsRemaining,
+          finPosition:  fin?.position,
+          isLikelyELC,
+          rawCapHit:    isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925),
+          nameCollision: p.age <= 23 && (isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925)) > 3.0 && !fin?.position?.startsWith(p.position),
+          contractOverride: CONTRACT_OVERRIDES[p.name] ?? CONTRACT_OVERRIDES[normalName] ?? null,
+        }));
+      }
 
       // ── THE OVERRIDE LAYER (Highest Priority) ───────────────
-      const override         = EXTENSIONS[p.name];
-      const contractOverride = CONTRACT_OVERRIDES[p.name];
+      const override         = EXTENSIONS[p.name]    ?? EXTENSIONS[normalName];
+      const contractOverride = CONTRACT_OVERRIDES[p.name] ?? CONTRACT_OVERRIDES[normalName];
       // Position override must be resolved before isGoalie/defaultTOI/defaultPts
       const finalPosition    = contractOverride?.position ?? p.position;
 

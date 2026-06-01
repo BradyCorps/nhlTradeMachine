@@ -624,11 +624,16 @@ RULES: No invented context. No speculation about players not in this trade. Comp
     const pickValue = picks.reduce((sum, a) => sum + (navMap[a.id]?.total ?? 0), 0);
     if (players.length === 0) return pickValue;
     const sorted = [...players]
-      .map(a => ({ nav: navMap[a.id]?.total ?? 0 }))
+      .map(a => ({ nav: navMap[a.id]?.total ?? 0, age: a.age ?? 27 }))
       .sort((a, b) => b.nav - a.nav);
-    const decay      = sorted.reduce((sum, a, i) => sum + a.nav * Math.pow(0.60, i), 0);
-    const extraSlots = Math.max(0, players.length - 1);
-    return pickValue + Math.max(0, decay - extraSlots * 50);
+    const ageDecay   = (age: number) => age <= 23 ? 0.80 : age <= 27 ? 0.65 : age <= 31 ? 0.60 : 0.55;
+    const agePenalty = (age: number) => age <= 23 ? 15   : age <= 27 ? 35   : age <= 31 ? 50   : 60;
+    let decaySum = 0, penaltySum = 0;
+    sorted.forEach((a, i) => {
+      decaySum += a.nav * Math.pow(ageDecay(a.age), i);
+      if (i > 0) penaltySum += agePenalty(a.age);
+    });
+    return pickValue + Math.max(0, decaySum - penaltySum);
   };
 
   const navA = blocks[0].reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);

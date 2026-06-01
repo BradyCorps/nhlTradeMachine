@@ -372,22 +372,34 @@ export function calcNAV(asset: AssetInput): XNAVResult {
 //
 // Picks skip the slot penalty (they don't consume a current-year active roster slot)
 // but still decay (marginal value of each additional pick diminishes).
+// Age-tiered compression helpers — prospects compress much less than veterans.
+// Each tier reflects different roster-slot economics:
+//   Prospects (≤23): independent developmental bets, not yet occupying prime slots
+//   Young NHL (24-27): semi-independent, beginning to compete for prime slots
+//   Prime (28-31): full roster slot competition, standard compression
+//   Veterans (32+): steepest — maximum displacement cost, limited upside
+const ageDecayRate   = (age: number) => age <= 23 ? 0.80 : age <= 27 ? 0.65 : age <= 31 ? 0.60 : 0.55;
+const ageSlotPenalty = (age: number) => age <= 23 ? 15   : age <= 27 ? 35   : age <= 31 ? 50   : 60;
+
 export function compressPackage(
-  assets: Array<{ nav: number; isPick?: boolean }>,
-  decay       = 0.60,
-  slotPenalty = 50,
+  assets: Array<{ nav: number; isPick?: boolean; age?: number }>,
 ): number {
   if (assets.length === 0) return 0;
-  // Picks are future options — no roster slot constraints, no lineup displacement.
-  // Each pick is valued independently (linear sum). Only players compress.
+  // Picks: no compression — future options, independent value, no slot costs
+  // Players: compressed with age-tiered decay rate and slot penalty per asset
   const picks   = assets.filter(a => a.isPick);
   const players = assets.filter(a => !a.isPick);
   const pickValue = picks.reduce((sum, a) => sum + a.nav, 0);
   if (players.length === 0) return pickValue;
   const sorted = [...players].sort((a, b) => b.nav - a.nav);
-  const decaySum = sorted.reduce((sum, a, i) => sum + a.nav * Math.pow(decay, i), 0);
-  const extraSlots = Math.max(0, players.length - 1);
-  return pickValue + Math.max(0, decaySum - extraSlots * slotPenalty);
+  let decaySum = 0;
+  let penaltySum = 0;
+  sorted.forEach((a, i) => {
+    const age = a.age ?? 27; // default to prime age when unknown
+    decaySum += a.nav * Math.pow(ageDecayRate(age), i);
+    if (i > 0) penaltySum += ageSlotPenalty(age);
+  });
+  return pickValue + Math.max(0, decaySum - penaltySum);
 }
 
 // Tier classification for franchise veto logic

@@ -867,25 +867,30 @@ const defensiveDependencyScore = (roster: Asset[]): number => {
 };
 
 // ── Package compression ───────────────────────────────────────────────────────
-// True Package Value = Σ(NAVᵢ × δⁱ⁻¹) − (n−1) × μ
-// δ=0.60 decay, μ=50 slot penalty per extra non-pick asset
-const DECAY        = 0.60;
-const SLOT_PENALTY = 50;
-const FRANCHISE_THRESHOLD = 600; // Elite stars — requires elite return
-const MEGALODON_THRESHOLD = 900; // Generational talents — functionally untradeable
+// True Package Value = Σ(NAVᵢ × δᵢⁱ⁻¹) − Σμᵢ  (both δ and μ are age-tiered)
+// Prospects (≤23): δ=0.80, μ=15  — independent developmental bets, not prime-slot pieces
+// Young NHL (24-27): δ=0.65, μ=35 — beginning to compete for lineup spots
+// Prime (28-31): δ=0.60, μ=50    — full roster slot competition
+// Veterans (32+): δ=0.55, μ=60   — steepest compression; limited upside, max displacement
+const FRANCHISE_THRESHOLD = 600;
+const MEGALODON_THRESHOLD = 900;
+const ageDecayRate_ev   = (age: number) => age <= 23 ? 0.80 : age <= 27 ? 0.65 : age <= 31 ? 0.60 : 0.55;
+const ageSlotPenalty_ev = (age: number) => age <= 23 ? 15   : age <= 27 ? 35   : age <= 31 ? 50   : 60;
 
 const compressPackage = (assets: Asset[]): number => {
   if (assets.length === 0) return 0;
-  // Picks are future options with no roster slot constraints — each valued independently.
-  // Compression only applies to players (depth pieces compete for finite active roster slots).
   const picks   = assets.filter(a => a.position === "Pick");
   const players = assets.filter(a => a.position !== "Pick");
-  const pickValue = picks.reduce((sum, a) => sum + getXNAV(a).total, 0); // linear — no decay
+  const pickValue = picks.reduce((sum, a) => sum + getXNAV(a).total, 0);
   if (players.length === 0) return pickValue;
-  const sorted   = [...players].sort((a, b) => getXNAV(b).total - getXNAV(a).total);
-  const decaySum = sorted.reduce((sum, a, i) => sum + getXNAV(a).total * Math.pow(DECAY, i), 0);
-  const extraSlots = Math.max(0, players.length - 1);
-  return pickValue + Math.max(0, decaySum - extraSlots * SLOT_PENALTY);
+  const sorted = [...players].sort((a, b) => getXNAV(b).total - getXNAV(a).total);
+  let decaySum = 0, penaltySum = 0;
+  sorted.forEach((a, i) => {
+    const age = a.age ?? 27;
+    decaySum += getXNAV(a).total * Math.pow(ageDecayRate_ev(age), i);
+    if (i > 0) penaltySum += ageSlotPenalty_ev(age);
+  });
+  return pickValue + Math.max(0, decaySum - penaltySum);
 };
 
 const runGmLogic = (
