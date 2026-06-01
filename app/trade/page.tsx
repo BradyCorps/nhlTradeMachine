@@ -614,9 +614,28 @@ RULES: No invented context. No speculation about players not in this trade. Comp
     }
   }, [blocks, teams, db.teams, allHomeRoster, allPartnerRoster]);
 
+  // Client-side package compression — mirrors evaluate/route.ts compressPackage
+  // Shows users the roster-slot-aware value as they build, so the audit result
+  // isn't a surprise. Only visible when compression materially changes things.
+  const compressBlock = (block: Asset[]): number => {
+    if (block.length === 0) return 0;
+    const picks   = block.filter(a => a.position === "Pick");
+    const players = block.filter(a => a.position !== "Pick");
+    const pickValue = picks.reduce((sum, a) => sum + (navMap[a.id]?.total ?? 0), 0);
+    if (players.length === 0) return pickValue;
+    const sorted = [...players]
+      .map(a => ({ nav: navMap[a.id]?.total ?? 0 }))
+      .sort((a, b) => b.nav - a.nav);
+    const decay      = sorted.reduce((sum, a, i) => sum + a.nav * Math.pow(0.60, i), 0);
+    const extraSlots = Math.max(0, players.length - 1);
+    return pickValue + Math.max(0, decay - extraSlots * 50);
+  };
+
   const navA = blocks[0].reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);
   const navB = blocks[1].reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);
-  const homeNetGain = navB - navA;
+  const cNavA = compressBlock(blocks[0]);
+  const cNavB = compressBlock(blocks[1]);
+  const homeNetGain = cNavB - cNavA;
 
   // Always pull live cap space from db — teams state can be stale after trade execution
   const liveHome    = db.teams.find(t => t.id === teams[0]?.id) ?? teams[0];
@@ -886,7 +905,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
         <Header activeTab="trade" />
 
-        <TugBar homeNetGain={homeNetGain} navA={navA} navB={navB} />
+        <TugBar homeNetGain={homeNetGain} navA={navA} navB={navB} cNavA={cNavA} cNavB={cNavB} />
 
         {/* ── Team Strands — full width above trade grid ── */}
         {teams[0] && teams[1] && (
@@ -924,12 +943,41 @@ RULES: No invented context. No speculation about players not in this trade. Comp
               </div>
             )}
 
-            <button onClick={runEval} disabled={!blocks[0].length && !blocks[1].length}
-              className="w-full py-4 font-black uppercase tracking-widest text-[11px] transition-all duration-200 disabled:opacity-25 disabled:cursor-not-allowed active:scale-[0.97] btn-stamp"
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--ledger-red-dark)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'var(--ledger-red)')}>
-              ✦ Run GM Audit ✦
-            </button>
+            {/* ── GM Audit button — only active when both sides have assets ── */}
+            {(() => {
+              const missingHome    = blocks[0].length === 0;
+              const missingPartner = blocks[1].length === 0;
+              const missingTeams   = !teams[0] || !teams[1];
+              const ready = !missingHome && !missingPartner && !missingTeams;
+
+              const hint = missingTeams
+                ? "Select both teams to enable the audit"
+                : missingHome && missingPartner
+                ? "Add assets to both sides to begin"
+                : missingHome
+                ? `Add assets to ${teams[0]?.name ?? "your side"} to continue`
+                : missingPartner
+                ? `Add assets to ${teams[1]?.name ?? "the other side"} to continue`
+                : null;
+
+              return (
+                <>
+                  <button
+                    onClick={runEval}
+                    disabled={!ready}
+                    className="w-full py-4 font-black uppercase tracking-widest text-[11px] transition-all duration-200 disabled:opacity-25 disabled:cursor-not-allowed active:scale-[0.97] btn-stamp"
+                    onMouseEnter={e => ready && (e.currentTarget.style.background = 'var(--ledger-red-dark)')}
+                    onMouseLeave={e => ready && (e.currentTarget.style.background = 'var(--ledger-red)')}>
+                    ✦ Run GM Audit ✦
+                  </button>
+                  {hint && (
+                    <p className="text-center font-mono mt-1.5" style={{ fontSize: "10px", color: "var(--ledger-ink-faint)" }}>
+                      {hint}
+                    </p>
+                  )}
+                </>
+              );
+            })()}
 
             {/* ── Who Wants This? — Trade Partner Finder ── */}
             {(blocks[0].length > 0 || blocks[1].length > 0) && (
@@ -1394,17 +1442,42 @@ RULES: No invented context. No speculation about players not in this trade. Comp
           className="w-full flex items-center justify-between px-4 sm:px-6"
           style={{ height: 52, background: 'transparent' }}>
           <div className="flex items-center gap-3">
+            {/* Status pill */}
             <span className="px-2.5 py-0.5 font-black text-2xs uppercase tracking-widest rounded-sm"
               style={{ background: sc.cssColor, color: 'white', letterSpacing: '0.15em' }}>
               {v.status}
             </span>
-            <span className="font-black text-[13px]" style={{ color: 'var(--ledger-ink)' }}>
-              {v.metrics.homeNetGain > 0 ? '+' : ''}{v.metrics.homeNetGain.toFixed(0)} NAV
-              <span className="font-normal text-2xs ml-2 font-mono" style={{ color: 'var(--ledger-ink-faint)' }}>
-                for {teams[0]?.name ?? 'Home'}
+
+            {/* Context-aware summary — NAV for WIN/LOSS/FAIR, flags for BLOCKED/DECLINED */}
+            {(v.status === 'WIN' || v.status === 'FAIR' || v.status === 'LOSS') && (
+              <span className="font-black text-[13px]" style={{
+                color: v.status === 'WIN' ? 'var(--ledger-green)' : v.status === 'LOSS' ? 'var(--ledger-red)' : 'var(--ledger-ink)'
+              }}>
+                {v.metrics.homeNetGain > 0 ? '+' : ''}{v.metrics.homeNetGain.toFixed(0)} NAV
+                <span className="font-normal text-2xs ml-2 font-mono" style={{ color: 'var(--ledger-ink-faint)' }}>
+                  for {teams[0]?.name ?? 'Home'}
+                </span>
               </span>
-            </span>
-            {v.flags.filter(f => f.severity === 'HARD').length > 0 && (
+            )}
+
+            {(v.status === 'BLOCKED' || v.status === 'DECLINED') && (() => {
+              const hardFlags = v.flags.filter(f => f.severity === 'HARD');
+              const topFlag   = hardFlags[0];
+              return (
+                <span className="font-black text-[13px]" style={{ color: 'var(--ledger-red)' }}>
+                  {topFlag ? topFlag.headline : 'Trade blocked'}
+                  {hardFlags.length > 1 && (
+                    <span className="font-normal text-2xs ml-2 font-mono" style={{ color: 'var(--ledger-ink-faint)' }}>
+                      +{hardFlags.length - 1} more
+                    </span>
+                  )}
+                </span>
+              );
+            })()}
+
+            {/* Soft flag count — shown for all statuses when present */}
+            {v.flags.filter(f => f.severity === 'HARD').length > 0
+              && v.status !== 'BLOCKED' && v.status !== 'DECLINED' && (
               <span className="text-2xs font-mono px-1.5 py-0.5 rounded"
                 style={{ background: 'rgba(166,53,36,0.12)', color: 'var(--ledger-red)' }}>
                 {v.flags.filter(f => f.severity === 'HARD').length} hard flag{v.flags.filter(f => f.severity === 'HARD').length !== 1 ? 's' : ''}

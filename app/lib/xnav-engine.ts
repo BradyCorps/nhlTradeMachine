@@ -356,3 +356,40 @@ export function calcNAV(asset: AssetInput): XNAVResult {
   if (asset.position === "G")    return calcGoalieNAV(asset);
   return calcSkaterNAV(asset);
 }
+
+// ── Package compression ───────────────────────────────────────────────────────
+// True Package Value = Σ(NAVᵢ × δⁱ⁻¹) − (n−1) × μ
+//
+// δ (decay):       Each subsequent asset is worth less — roster slots are finite.
+//                  2nd asset = 60%, 3rd = 36%, 4th = 21.6%, ...
+// μ (slotPenalty): Structural cost of burning a roster slot on depth vs elite talent.
+//                  50 NAV per extra slot — reflects displacement of existing baseline utility.
+//
+// Why: A single 1,000-NAV superstar is not replaceable by four 250-NAV assets.
+// A team receiving four depth pieces must use four roster slots, four cap chunks,
+// and four lineup spots — degrading the remaining roster's production density.
+// This models the scarcity economics of elite concentration vs depth distribution.
+//
+// Picks skip the slot penalty (they don't consume a current-year active roster slot)
+// but still decay (marginal value of each additional pick diminishes).
+export function compressPackage(
+  assets: Array<{ nav: number; isPick?: boolean }>,
+  decay       = 0.60,
+  slotPenalty = 50,
+): number {
+  if (assets.length === 0) return 0;
+  // Picks are future options — no roster slot constraints, no lineup displacement.
+  // Each pick is valued independently (linear sum). Only players compress.
+  const picks   = assets.filter(a => a.isPick);
+  const players = assets.filter(a => !a.isPick);
+  const pickValue = picks.reduce((sum, a) => sum + a.nav, 0);
+  if (players.length === 0) return pickValue;
+  const sorted = [...players].sort((a, b) => b.nav - a.nav);
+  const decaySum = sorted.reduce((sum, a, i) => sum + a.nav * Math.pow(decay, i), 0);
+  const extraSlots = Math.max(0, players.length - 1);
+  return pickValue + Math.max(0, decaySum - extraSlots * slotPenalty);
+}
+
+// Tier classification for franchise veto logic
+export const FRANCHISE_NAV_THRESHOLD = 600;  // Elite stars — can be moved but requires major return
+export const MEGALODON_NAV_THRESHOLD  = 900;  // Generational talents — functionally untradeable

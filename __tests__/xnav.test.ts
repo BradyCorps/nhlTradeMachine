@@ -480,3 +480,47 @@ describe("Sanity Guards — Values that should never happen", () => {
     expect(Math.abs(r.total - sum)).toBeLessThan(Math.abs(sum) * 0.3 + 30);
   });
 });
+// ── Package compression tests ─────────────────────────────────────────────
+import { compressPackage } from "../app/lib/xnav-engine";
+
+describe("compressPackage", () => {
+
+  it("single asset — no compression or penalty", () => {
+    expect(compressPackage([{ nav: 1082, isPick: false }])).toBeCloseTo(1082, 0);
+  });
+
+  it("four depth pieces vs one superstar — should not equal 1082", () => {
+    const fourDepth = [
+      { nav: 270, isPick: false },
+      { nav: 270, isPick: false },
+      { nav: 270, isPick: false },
+      { nav: 270, isPick: false },
+    ];
+    const compressed = compressPackage(fourDepth);
+    // Linear would be 1080 ≈ McDavid's 1082 — compression should make it much less
+    expect(compressed).toBeLessThan(600);  // well short of 1082
+    // Decay: 270 + 162 + 97.2 + 58.3 = 587.5 − (3 × 50) = 437.5
+    expect(compressed).toBeCloseTo(437.5, 0);
+  });
+
+  it("picks are fully linear — no decay, no slot penalty", () => {
+    const twoPicks = [
+      { nav: 100, isPick: true },
+      { nav: 80,  isPick: true },
+    ];
+    // No decay, no penalty: 100 + 80 = 180 (linear sum)
+    expect(compressPackage(twoPicks)).toBeCloseTo(180, 0);
+  });
+
+  it("mixed player + pick package — player compresses, pick is linear", () => {
+    const mixed = [
+      { nav: 300, isPick: false },
+      { nav: 80,  isPick: true  },
+      { nav: 100, isPick: false },
+    ];
+    // Players: 300 + 100×0.6 = 360, slot penalty: 1×50 = 50 → player value = 310
+    // Picks: 80 (linear)
+    // Total: 310 + 80 = 390
+    expect(compressPackage(mixed)).toBeCloseTo(390, 0);
+  });
+});

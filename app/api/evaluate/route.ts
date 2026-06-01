@@ -778,7 +778,8 @@ type FlagCategory =
   | "ELITE_BLOCKADE" | "TIMELINE_MISMATCH" | "REBUILD_LOGIC"
   | "CONTENDER_LOGIC" | "ASSET_SHAPE_MISMATCH" | "POSITIONAL_REDUNDANCY"
   | "ROSTER_HOLE" | "LEVERAGE_ASYMMETRY" | "RENTAL_TAX" | "AGE_CLIFF"
-  | "DEAD_WEIGHT" | "FIRE_SALE" | "LOCKER_ROOM" | "RETAIN_ABUSE" | "GOOD" | "VALUE_VETO";
+  | "DEAD_WEIGHT" | "FIRE_SALE" | "LOCKER_ROOM" | "RETAIN_ABUSE" | "GOOD" | "VALUE_VETO"
+  | "FRANCHISE_ANCHOR";
 
 interface GmFlag {
   severity: FlagSeverity;
@@ -865,6 +866,28 @@ const defensiveDependencyScore = (roster: Asset[]): number => {
   return eliteD.length <= 1 ? 0.9 : eliteD.length === 2 ? 0.6 : 0.3;
 };
 
+// ── Package compression ───────────────────────────────────────────────────────
+// True Package Value = Σ(NAVᵢ × δⁱ⁻¹) − (n−1) × μ
+// δ=0.60 decay, μ=50 slot penalty per extra non-pick asset
+const DECAY        = 0.60;
+const SLOT_PENALTY = 50;
+const FRANCHISE_THRESHOLD = 600; // Elite stars — requires elite return
+const MEGALODON_THRESHOLD = 900; // Generational talents — functionally untradeable
+
+const compressPackage = (assets: Asset[]): number => {
+  if (assets.length === 0) return 0;
+  // Picks are future options with no roster slot constraints — each valued independently.
+  // Compression only applies to players (depth pieces compete for finite active roster slots).
+  const picks   = assets.filter(a => a.position === "Pick");
+  const players = assets.filter(a => a.position !== "Pick");
+  const pickValue = picks.reduce((sum, a) => sum + getXNAV(a).total, 0); // linear — no decay
+  if (players.length === 0) return pickValue;
+  const sorted   = [...players].sort((a, b) => getXNAV(b).total - getXNAV(a).total);
+  const decaySum = sorted.reduce((sum, a, i) => sum + getXNAV(a).total * Math.pow(DECAY, i), 0);
+  const extraSlots = Math.max(0, players.length - 1);
+  return pickValue + Math.max(0, decaySum - extraSlots * SLOT_PENALTY);
+};
+
 const runGmLogic = (
   outgoing: Asset[],
   incoming: Asset[],
@@ -878,11 +901,86 @@ const runGmLogic = (
 
   const modeHome = classifyTeam(teamHome, allHomeRoster);
   const modePartner = classifyTeam(teamPartner, allPartnerRoster);
-  const navOut = outgoing.reduce((s, a) => s + getXNAV(a).total, 0);
-  const navIn = incoming.reduce((s, a) => s + getXNAV(a).total, 0);
-  const homeNetGain = navIn - navOut;
-  const maxNav = Math.max(Math.abs(navOut), Math.abs(navIn), 1);
+
+  // Linear NAV — used for display in flag explanations
+  const navOut     = outgoing.reduce((s, a) => s + getXNAV(a).total, 0);
+  const navIn      = incoming.reduce((s, a) => s + getXNAV(a).total, 0);
+  // Compressed NAV — used for trade balance decisions (models roster slot scarcity)
+  const cNavOut    = compressPackage(outgoing);
+  const cNavIn     = compressPackage(incoming);
+  const homeNetGain = cNavIn - cNavOut;
+  const maxNav = Math.max(Math.abs(cNavOut), Math.abs(cNavIn), 1);
   const imbalancePct = (Math.abs(homeNetGain) / maxNav) * 100;
+
+  // Package compression diagnostics — direction-aware messaging
+  const compressionLossIn  = navIn  - cNavIn;
+  const compressionLossOut = navOut - cNavOut;
+
+  // Incoming compressed: WPG is RECEIVING the depth package — they're getting less than linear
+  if (compressionLossIn > 120 && incoming.filter(a => a.position !== "Pick").length >= 3) {
+    flags.push({
+      severity: "SOFT",
+      category: "VALUE_VETO",
+      headline: `Incoming package discounted — receiving depth, not concentration`,
+      explanation: `The ${incoming.filter(a=>a.position!=="Pick").length}-player incoming package has a linear value of ${Math.round(navIn)} NAV, but its compressed value is ${Math.round(cNavIn)} NAV after the roster slot penalty (−${Math.round(compressionLossIn)}). You are receiving depth distribution across multiple lineup slots rather than one elite concentrated asset. The TugBar reflects the compressed value.`,
+      perspective: "home",
+    });
+  }
+
+  // Outgoing compressed: WPG is SENDING the depth package — WPG is overpaying in asset count
+  if (compressionLossOut > 120 && outgoing.filter(a => a.position !== "Pick").length >= 3) {
+    flags.push({
+      severity: "SOFT",
+      category: "VALUE_VETO",
+      headline: `You are overpaying — your depth package compresses to ${Math.round(cNavOut)} NAV`,
+      explanation: `Your ${outgoing.filter(a=>a.position!=="Pick").length}-player outgoing package has a linear value of ${Math.round(navOut)} NAV, but its compressed value is ${Math.round(cNavOut)} NAV after the roster slot penalty (−${Math.round(compressionLossOut)}). You are spending ${outgoing.filter(a=>a.position!=="Pick").length} roster slots when the return is ${Math.round(navIn)} NAV — a net deficit of ${Math.round(cNavOut - navIn)}. Consolidate your package around fewer, higher-value assets.`,
+      perspective: "home",
+    });
+  }
+
+  // ── PHASE 2: Franchise Anchor Veto ───────────────────────────────────────
+  // Franchise-tier players (NAV ≥ 600) are functionally untradeable unless
+  // specific real-world catalysts are present.
+  const outFranchise = outgoing.filter(a => getXNAV(a).total >= FRANCHISE_THRESHOLD);
+  for (const asset of outFranchise) {
+    const nav       = getXNAV(asset).total;
+    const isMegalodon = nav >= MEGALODON_THRESHOLD;
+
+    // Catalyst 1 — Contract leverage: final year / UFA
+    const contractLeverage = asset.yearsRemaining <= 1;
+
+    // Catalyst 2 — Franchise-level return: incoming has an elite player
+    const franchiseReturn = incoming.some(a =>
+      getXNAV(a).total >= FRANCHISE_THRESHOLD && a.position !== "Pick");
+
+    // Catalyst 3 — Landscape-shifting capital: 2+ 1st-round picks + ELC prospect
+    const firstRoundPicks = incoming.filter(a =>
+      a.position === "Pick" && (a.round ?? 99) === 1).length;
+    const elcProspects = incoming.filter(a =>
+      a.position !== "Pick" && (a.age ?? 99) <= 23 && a.capHit <= 0.95).length;
+    const massiveCapital = firstRoundPicks >= 2 && elcProspects >= 1;
+
+    if (isMegalodon && !contractLeverage && !franchiseReturn && !massiveCapital) {
+      flags.push({
+        severity: "HARD",
+        category: "FRANCHISE_ANCHOR",
+        headline: `${asset.name.split(" ").pop()} is a generational franchise anchor`,
+        explanation: `At ${Math.round(nav)} NAV, ${asset.name} is not a tradeable asset under normal circumstances. Generational talents compress the production of an entire top line into one roster slot — trading them requires either imminent UFA status, a franchise-level player in return, or a Lindros-tier package (multiple 1st-round picks + elite ELC prospect). The Gretzky trade is a cautionary tale, not a blueprint.`,
+        affectedAsset: asset.name,
+        vetoesSide: 0,
+      });
+    } else if (!isMegalodon && !contractLeverage && !franchiseReturn && !massiveCapital) {
+      flags.push({
+        severity: "SOFT",
+        category: "FRANCHISE_ANCHOR",
+        headline: `${asset.name.split(" ").pop()} commands franchise-level return`,
+        explanation: `${asset.name} (${Math.round(nav)} NAV) is an elite franchise cornerstone. Moving him requires either a franchise-calibre player in return, significant contract leverage (final year), or a package of at least two 1st-round picks and a high-ceiling ELC prospect. The current package doesn't meet that bar.`,
+        affectedAsset: asset.name,
+        vetoesSide: 0,
+      });
+    }
+  }
+  // imbalancePct already declared above using compressed values
 
   const outPlayers = outgoing.filter((a) => a.position !== "Pick");
   const inPlayers  = incoming.filter((a) => a.position !== "Pick");
@@ -890,8 +988,7 @@ const runGmLogic = (
   const inPicks    = incoming.filter((a) => a.position === "Pick");
 
   // ── HARD: The "Something for Nothing" Block ──
-  // Prevents taking positive-value players while sending an empty package
-  if (incoming.length > 0 && outgoing.length === 0 && navIn > 0) {
+  if (incoming.length > 0 && outgoing.length === 0 && cNavIn > 0) {
     flags.push({
       severity: "HARD",
       category: "VALUE_VETO",
@@ -912,10 +1009,10 @@ const runGmLogic = (
   // ── SOFT: Gross Underpayment (The Fleecing Veto) ──
   // Prevents users from acquiring a +25 NAV player for a +10 NAV package
   // Only applies when both sides are exchanging positive value
-  if (navIn > 0 && navOut > 0) {
-    // Threshold: Paying less than 45% of the value AND the raw NAV gap is greater than 10
-    const isHomeRobbing = navOut < navIn * 0.45 && (navIn - navOut) > 10;
-    const isPartnerRobbing = navIn < navOut * 0.45 && (navOut - navIn) > 10;
+  // ── SOFT: Gross Underpayment — uses compressed NAV (roster slot aware) ──
+  if (cNavIn > 0 && cNavOut > 0) {
+    const isHomeRobbing    = cNavOut < cNavIn  * 0.45 && (cNavIn  - cNavOut) > 10;
+    const isPartnerRobbing = cNavIn  < cNavOut * 0.45 && (cNavOut - cNavIn)  > 10;
 
     if (isHomeRobbing) {
       flags.push({
@@ -1664,27 +1761,18 @@ const evaluateTrade = (
   const navOut = outgoing.reduce((s, a) => s + getXNAV(a).total, 0);
   const navIn  = incoming.reduce((s, a) => s + getXNAV(a).total, 0);
 
-  // ── Consolidation Premium ────────────────────────────────────
-  // In a hard-cap league, elite players are exponentially harder to acquire
-  // than depth. Sending 4×25 NAV players for 1×100 NAV player undervalues
-  // the star — the team receiving the best asset must pay a premium.
-  // This tax is baked into the math before the logic engine evaluates flags.
-  const maxNavOut = Math.max(...outgoing.map(a => getXNAV(a).total), 0);
-  const maxNavIn  = Math.max(...incoming.map(a => getXNAV(a).total), 0);
-  let consolidationTax = 0;
-  if (maxNavIn > maxNavOut && maxNavIn > 120) {
-    // Home receiving the star — they pay a 20% gap premium
-    consolidationTax = (maxNavIn - maxNavOut) * 0.20;
-  } else if (maxNavOut > maxNavIn && maxNavOut > 120) {
-    // Home sending the star — they receive the consolidation premium
-    consolidationTax = -(maxNavOut - maxNavIn) * 0.20;
-  }
+  // ── Package compression (roster slot scarcity model) ─────────
+  // Replaces the old consolidation tax. True Package Value formula:
+  // Σ(NAVᵢ × δⁱ⁻¹) − (n−1) × μ  where δ=0.60, μ=50 NAV/slot
+  // Single-asset packages are unaffected; depth bundles are penalised.
+  const cNavOut = compressPackage(outgoing);
+  const cNavIn  = compressPackage(incoming);
 
-  const homeNetGain = navIn - navOut - consolidationTax;
+  const homeNetGain = cNavIn - cNavOut;
   const ptsGain = incoming.reduce((s,a) => s+a.ptsPace,0) - outgoing.reduce((s,a) => s+a.ptsPace,0);
   const defGain = incoming.reduce((s,a) => s+a.defRate*(a.avgTOI/18),0) - outgoing.reduce((s,a) => s+a.defRate*(a.avgTOI/18),0);
   const capDelta = incoming.reduce((s,a) => s+a.capHit*(1-(a.retainedPct||0)),0) - outgoing.reduce((s,a) => s+a.capHit*(1-(a.retainedPct||0)),0);
-  const maxNav = Math.max(Math.abs(navOut), Math.abs(navIn), 1);
+  const maxNav = Math.max(Math.abs(cNavOut), Math.abs(cNavIn), 1);
   const variance = (Math.abs(homeNetGain) / maxNav) * 100;
 
   // ── Estimated Wins Added (EWA) ────────────────────────────────
