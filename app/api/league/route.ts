@@ -57,24 +57,43 @@ const CW_SLUGS: Record<string, string> = {
 // Retooling = middle of the pack, transitioning
 // Bubble = fringe playoff, competitive but not elite
 // Contender = genuine Cup contender
-const derivePhase = (standing: number, pointPct: number): string => {
-  if (standing <= 8  && pointPct >= 0.58) return "Contender";
-  // More specific conditions must come before broader ones
-  if (standing <= 8  && pointPct >= 0.52) return "Contender";
-  if (standing <= 14 && pointPct >= 0.52) return "Bubble";
-  if (standing <= 22)                      return "Retooling";
-  if (standing <= 32 && pointPct < 0.38)  return "Tanking";
+const derivePhase = (confRank: number, divRank: number, pointPct: number): string => {
+  // 🏆 Conference leaders, Division Winners, and top-tier home-ice seeds (e.g., Anaheim at #3)
+  if ((confRank <= 4 || divRank === 1) && pointPct >= 0.52) return "Contender";
+  
+  // ⚔️ Secured division spots or high-end wild card threats (Seeds 5 & 6)
+  if (confRank <= 6 && pointPct >= 0.50) return "Contender";
+
+  // 🫧 True Wild Card bracket / Playoff Bubble lines (Seeds 7 & 8, or close hunters)
+  if (confRank <= 8 && pointPct >= 0.50) return "Bubble";
+  if (confRank <= 10 && pointPct >= 0.48) return "Bubble"; 
+
+  // 🛠️ Outside the playoff window
+  if (confRank <= 14) return "Retooling";
+  if (pointPct < 0.38) return "Tanking";
+  
   return "Rebuilding";
 };
 
 // ── Phase overrides for teams whose standing misleads about their true window ──
 // Some teams have a bad year but retain the core of a contender.
 // These are manually curated based on roster quality, not just standings.
+// ── Phase overrides for teams whose standing misleads about their true window ──
 const PHASE_OVERRIDES: Record<string, string> = {
-  WPG: "Retooling",    // Presidents Trophy 2023-24, Hellebuyck/Connor/Morrissey core intact
-  FLA: "Retooling",    // Back-to-back finals, core still together, off year
-  EDM: "Bubble",       // McDavid/Draisaitl never truly rebuild
-  TOR: "Retooling",    // Core still competitive, structural issues not a rebuild
+  // ── Unlucky Elite (The Bounce-Backs) ──
+  WPG: "Retooling",    // Elite core intact, anomalous off-year
+  FLA: "Retooling",    // Elite core intact, anomalous off-year
+  TOR: "Retooling",    // 78 pts naturally flags as Rebuilding, but they won't sell the core
+  CHI: "Retooling",    // Bedard is entering Year 3; they are shifting from Tanking to buying
+
+  // ── The "Blow It Up" Tier (The Mushy Middle) ──
+  SEA: "Rebuilding",   // 79 pts naturally flags as Retooling, but the roster needs a hard reset
+  NYR: "Rebuilding",   // Aging core's window has definitively closed
+  STL: "Rebuilding",   // 86 pts naturally flags as Bubble, but requires a structural teardown
+  LAK: "Rebuilding",   // 90 pts naturally flags as Bubble, but they are aging out of contention
+  DET: "Rebuilding",   // 92 pts naturally flags as Bubble, but current core has peaked
+  
+ 
 };
 
 // ── Contract overrides — manual corrections for known data errors ──
@@ -99,7 +118,14 @@ async function loadTeams(): Promise<any[]> {
   }
 
   // ── Fetch standings from NHL stats API ───────────────────────
-  let standingsMap = new Map<string, { standing: number; pointPct: number; teamFullName: string }>();
+  let standingsMap = new Map<string, { 
+  standing: number; 
+  pointPct: number; 
+  teamFullName: string;
+  conferenceRank: number;
+  divisionRank: number; // Add this
+  points: number;
+}>();
   try {
     const res = await fetchWithTimeout(
       "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId=20252026%20and%20gameTypeId=2",
@@ -109,9 +135,6 @@ async function loadTeams(): Promise<any[]> {
       const data = await res.json();
       const teams: any[] = data.data ?? [];
 
-      // NHL stats API teamId → tricode mapping for reliable lookup
-      // Utah Hockey Club (now Utah Mammoth) uses teamId 59
-      // Arizona Coyotes relocated to Utah for 2024-25 season
       const NHL_ID_TO_TRICODE: Record<number, string> = {
         1: "NJD", 2: "NYI", 3: "NYR", 4: "PHI", 5: "PIT",
         6: "BOS", 7: "BUF", 8: "MTL", 9: "OTT", 10: "TOR",
@@ -122,21 +145,60 @@ async function loadTeams(): Promise<any[]> {
         55: "SEA", 68: "UTA",
       };
 
-      // Sort by points then regulation+OT wins (NHL tiebreaker)
+      // 1. Sort globally by NHL tiebreakers (Points -> RW -> ROW)
+      // Note: NHL changed tiebreakers, Regulation Wins (RW) comes before ROW now!
       teams.sort((a, b) =>
         b.points !== a.points
           ? b.points - a.points
-          : (b.regulationAndOtWins ?? 0) - (a.regulationAndOtWins ?? 0)
+          : (b.regulationWins ?? 0) - (a.regulationWins ?? 0)
       );
 
-      // Assign sequential ranks using teamId lookup
+      // 2. Assign overall standing and map standard points
       teams.forEach((t, i) => {
-        const tricode = NHL_ID_TO_TRICODE[t.teamId];
-        if (tricode) {
-          standingsMap.set(tricode, {
-            standing:     i + 1,
-            pointPct:     t.pointPct ?? 0.5,
-            teamFullName: t.teamFullName,
+        t.overallRank = i + 1;
+        t.tricode = NHL_ID_TO_TRICODE[t.teamId];
+      });
+
+     // 3. Define accurate division blueprints
+      const DIVISIONS: Record<string, string> = {
+        BOS: "Atlantic", BUF: "Atlantic", DET: "Atlantic", FLA: "Atlantic", MTL: "Atlantic", OTT: "Atlantic", TBL: "Atlantic", TOR: "Atlantic",
+        CAR: "Metro", CBJ: "Metro", NJD: "Metro", NYI: "Metro", NYR: "Metro", PHI: "Metro", PIT: "Metro", WSH: "Metro",
+        CHI: "Central", COL: "Central", DAL: "Central", MIN: "Central", NSH: "Central", STL: "Central", UTA: "Central", WPG: "Central",
+        ANA: "Pacific", CGY: "Pacific", EDM: "Pacific", LAK: "Pacific", SJS: "Pacific", SEA: "Pacific", VAN: "Pacific", VGK: "Pacific"
+      };
+
+      const WESTERN_TEAMS = new Set(["CHI","COL","DAL","MIN","NSH","STL","UTA","WPG","ANA","CGY","EDM","LAK","SJS","SEA","VAN","VGK"]);
+      
+      // 4. Distribute into Conference buckets for ranking
+      let westTeams = teams.filter(t => WESTERN_TEAMS.has(t.tricode));
+      let eastTeams = teams.filter(t => !WESTERN_TEAMS.has(t.tricode) && t.tricode);
+
+      westTeams.forEach((t, i) => t.confRank = i + 1);
+      eastTeams.forEach((t, i) => t.confRank = i + 1);
+
+      // 5. Calculate Division Ranks cleanly via sequential index counters
+      const divCounters: Record<string, number> = { Atlantic: 0, Metro: 0, Central: 0, Pacific: 0 };
+      
+      teams.forEach((t) => {
+        const divName = DIVISIONS[t.tricode];
+        if (divCounters[divName] !== undefined) {
+          divCounters[divName]++;
+          t.divRank = divCounters[divName];
+        } else {
+          t.divRank = 8; // Fallback bound
+        }
+      });
+
+      // 6. Construct the completely updated standings data map
+      teams.forEach((t) => {
+        if (t.tricode) {
+          standingsMap.set(t.tricode, {
+            standing:       t.overallRank,
+            conferenceRank: t.confRank,
+            divisionRank:   t.divRank,
+            points:         t.points,
+            pointPct:       t.pointPct ?? 0.5,
+            teamFullName:   t.teamFullName,
           });
         }
       });
@@ -172,20 +234,24 @@ async function loadTeams(): Promise<any[]> {
   }
 
   // ── Build team objects ────────────────────────────────────────
+// ── Build team objects ────────────────────────────────────────
   const teams = TEAMS_DB.map((t) => {
-    const st      = standingsMap.get(t.id);
-    const standing = st?.standing  ?? t.standing;
-    const pointPct = st?.pointPct  ?? 0.5;
-    const capSpace = capMap.get(t.id) ?? t.capSpace;
+    const st       = standingsMap.get(t.id);
+    const standing = st?.standing       ?? t.standing;
+    const confRank = st?.conferenceRank ?? 8;   // Safe baseline fallback if API misses
+    const divRank  = st?.divisionRank   ?? 4;   // Safe baseline fallback if API misses
+    const pointPct = st?.pointPct       ?? 0.5;
+    const capSpace = capMap.get(t.id)   ?? t.capSpace;
+    
     const phase = PHASE_OVERRIDES[t.id]
-      ?? (standingsMap.size >= 28 ? derivePhase(standing, pointPct) : t.phase);
+      ?? (standingsMap.size >= 28 ? derivePhase(confRank, divRank, pointPct) : t.phase);
 
     return {
       id:       t.id,
       name:     st?.teamFullName ?? t.name,
       capSpace: Math.round(capSpace * 10) / 10,
-      standing,
-      phase,
+      standing, // Preserves overall league rank for UI sorting
+      phase,    // Now accurately driven by playoff positioning
       needs:    TEAM_NEEDS[t.id] ?? [],
     };
   });
