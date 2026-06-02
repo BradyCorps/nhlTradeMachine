@@ -309,7 +309,7 @@ export default function StrandDisplay({
             ["NOIV", "xG% vs teammates on ice"],
             ["TOI+", "Ice time & deployment"],
             ["SUPP", "xGA suppression vs teammates"],
-            ["QoC",  "Competition quality proxy"],
+            ["Usage",  "Ice time deployment proxy — correlates with opponent quality"],
             ["DPS",  "Defensive Point Shares"],
             ["OZ",   "Raw OZ% · bar shows vs league"],
             ["AGE",  "Contract age curve trajectory"],

@@ -45,7 +45,7 @@ export function buildAssetTraits(a: Asset, nav: XNAVResult): {
     def: [
       { label: "SUPP", val: norm(-(a.xgaRelTM ?? 0), -1.5, 1.5),
         title: `xGA suppression vs teammates: ${(a.xgaRelTM ?? 0).toFixed(2)}` },
-      { label: "QoC",  val: norm(400 - safe(a.qocRank ?? 400), 50, 380),
+      { label: "Usage",  val: norm(400 - safe(a.qocRank ?? 400), 50, 380),
         title: "Ice time rank (usage proxy)" },
       { label: dps !== null ? "DPS" : "DEF",
         val: dpsNorm ?? norm(nav.def, -60, 150),

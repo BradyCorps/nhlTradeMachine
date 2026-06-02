@@ -102,6 +102,18 @@ function AssetCard({
                         </span>
                       );
                     }
+                    // Show effective cap hit when retention is active — the receiving
+                    // team only pays the retained-down portion, not the full cap hit.
+                    if ((asset.retainedPct || 0) > 0) {
+                      const effectiveCap = asset.capHit * (1 - asset.retainedPct!);
+                      return (
+                        <span>
+                          {asset.position} · Age {asset.age} ·{' '}
+                          <span className="text-emerald-500">${effectiveCap.toFixed(2)}M × {asset.yearsRemaining}yr</span>
+                          <span className="text-ledger-ink-faint text-2xs ml-1">(${asset.capHit.toFixed(2)}M − {Math.round(asset.retainedPct! * 100)}% retained)</span>
+                        </span>
+                      );
+                    }
                     return `${asset.position} · Age ${asset.age} · $${asset.capHit.toFixed(2)}M × ${asset.yearsRemaining}yr · Exp. ${expiryYear}`;
                   })()}
             </div>

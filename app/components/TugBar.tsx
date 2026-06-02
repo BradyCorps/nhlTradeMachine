@@ -49,8 +49,8 @@ function TugBar({ homeNetGain, navA, navB, cNavA, cNavB }: TugBarProps) {
       {/* Main bar */}
       <div className="w-full h-9 border rounded-2xl relative overflow-hidden flex items-center shadow-inner">
         <div className="absolute inset-0 flex">
-          <div className="h-full bg-rose-500/8 transition-all duration-700 ease-out" style={{ width: `${leftPct}%` }} />
-          <div className="h-full bg-emerald-500/8 transition-all duration-700 ease-out flex-1" />
+          <div className="h-full bg-rose-500/20 transition-all duration-700 ease-out" style={{ width: `${leftPct}%` }} />
+          <div className="h-full bg-emerald-500/15 transition-all duration-700 ease-out flex-1" />
         </div>
         <div className="absolute left-1/2 -translate-x-1/2 h-full w-px bg-zinc-700/50" />
         <div className="z-10 w-full flex justify-between px-3 sm:px-5 font-black text-2xs uppercase tracking-[0.3em] text-zinc-700">

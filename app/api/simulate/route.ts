@@ -30,6 +30,26 @@ interface SimTeam {
   points?: number;
 }
 
+interface PlayoffSeries {
+  home:     { teamId: string; teamName: string; pts: number };
+  away:     { teamId: string; teamName: string; pts: number };
+  winner:   { teamId: string; teamName: string };
+  homeWins: number;
+  awayWins: number;
+}
+interface ConferenceBracket {
+  r1:       PlayoffSeries[];
+  r2:       PlayoffSeries[];
+  cf:       PlayoffSeries;
+  champion: { teamId: string; teamName: string };
+}
+interface PlayoffBracket {
+  eastern: ConferenceBracket;
+  western: ConferenceBracket;
+  final:   PlayoffSeries;
+  champion: { teamId: string; teamName: string };
+}
+
 interface TradeRecord {
   homeTeamId: string;
   partnerTeamId: string;
@@ -156,7 +176,7 @@ function projectTeamPoints(
 function projectTopScorer(
   roster: SimPlayer[],
   rand: () => number,
-): { name: string; projectedPts: number; position: string } | null {
+): { name: string; projectedPts: number; projectedGoals: number; position: string } | null {
   const skaters = roster
     .filter(p => p.position !== "Pick" && p.position !== "G"
       && p.ptsPace > 0
@@ -172,7 +192,10 @@ function projectTopScorer(
   const variance = 0.88 + rand() * 0.24; // ±12% variance
   const projectedPts = Math.round(rawPts * variance);
 
-  return { name: top.name, projectedPts, position: top.position };
+  // Estimate goals: forwards ~40% of points, D ~25%
+  const goalPct = top.position === "D" ? 0.25 : 0.40;
+  const projectedGoals = Math.round(projectedPts * goalPct * (0.90 + rand() * 0.20));
+  return { name: top.name, projectedPts, projectedGoals, position: top.position };
 }
 
 // ── Project starting goalie ───────────────────────────────────
@@ -270,7 +293,7 @@ interface SimTeamResult {
   teamName: string;
   phase: string;
   projectedPoints: number;
-  topScorer: { name: string; projectedPts: number; position: string } | null;
+  topScorer: { name: string; projectedPts: number; projectedGoals: number; position: string } | null;
   goalie: { name: string; projectedGAA: number; projectedSVP: number; gamesStarted: number } | null;
   madePlayoffs: boolean;
   divisionRank: number;
@@ -331,6 +354,81 @@ function assignPlayoffSeeds(results: SimTeamResult[]): SimTeamResult[] {
 }
 
 // ── Find league statistical leaders ──────────────────────────
+
+// ── Simulate playoff bracket ──────────────────────────────────
+// Runs full best-of-7 bracket from conference quarters to Cup Final.
+// Higher seed wins with probability based on regular season point gap.
+function simulateSeries(high: SimTeamResult, low: SimTeamResult, rand: () => number): PlayoffSeries {
+  const gap = high.projectedPoints - low.projectedPoints;
+  // Win probability: 50% base + 0.25% per point gap, capped 35-72%
+  const winProb = Math.min(0.72, Math.max(0.35, 0.50 + gap * 0.0025));
+  let highWins = 0, lowWins = 0;
+  while (highWins < 4 && lowWins < 4) {
+    if (rand() < winProb) highWins++; else lowWins++;
+  }
+  const winner = highWins === 4 ? high : low;
+  return {
+    home:     { teamId: high.teamId, teamName: high.teamName, pts: high.projectedPoints },
+    away:     { teamId: low.teamId,  teamName: low.teamName,  pts: low.projectedPoints  },
+    winner:   { teamId: winner.teamId, teamName: winner.teamName },
+    homeWins: highWins,
+    awayWins: lowWins,
+  };
+}
+
+function simulateConference(seeds: SimTeamResult[], rand: () => number): ConferenceBracket {
+  if (seeds.length < 8) {
+    // Pad with worst available if fewer than 8 made playoffs
+    while (seeds.length < 8) seeds.push(seeds[seeds.length - 1]);
+  }
+  // Round 1: 1v8, 2v7, 3v6, 4v5
+  const r1 = [
+    simulateSeries(seeds[0], seeds[7], rand),
+    simulateSeries(seeds[1], seeds[6], rand),
+    simulateSeries(seeds[2], seeds[5], rand),
+    simulateSeries(seeds[3], seeds[4], rand),
+  ];
+  // Round 2: winner(1v8) vs winner(2v7), winner(3v6) vs winner(4v5)
+  const getWinner = (s: PlayoffSeries, all: SimTeamResult[]) =>
+    all.find(t => t.teamId === s.winner.teamId)!;
+  const r2 = [
+    simulateSeries(getWinner(r1[0], seeds), getWinner(r1[1], seeds), rand),
+    simulateSeries(getWinner(r1[2], seeds), getWinner(r1[3], seeds), rand),
+  ];
+  const cf = simulateSeries(getWinner(r2[0], seeds), getWinner(r2[1], seeds), rand);
+  return { r1, r2, cf, champion: cf.winner };
+}
+
+function simulatePlayoffs(standings: SimTeamResult[], rand: () => number): PlayoffBracket {
+  const playoffTeams = standings.filter(t => t.madePlayoffs);
+  // Conference seeds sorted by projected points
+  const eastern = playoffTeams
+    .filter(t => EASTERN.has(t.teamId))
+    .sort((a, b) => b.projectedPoints - a.projectedPoints);
+  const western = playoffTeams
+    .filter(t => !EASTERN.has(t.teamId))
+    .sort((a, b) => b.projectedPoints - a.projectedPoints);
+
+  const eastBracket = simulateConference(eastern, rand);
+  const westBracket = simulateConference(western, rand);
+
+  // Cup Final: Eastern champion vs Western champion
+  const eastChamp = playoffTeams.find(t => t.teamId === eastBracket.champion.teamId)!;
+  const westChamp = playoffTeams.find(t => t.teamId === westBracket.champion.teamId)!;
+  const final = simulateSeries(
+    eastChamp.projectedPoints >= westChamp.projectedPoints ? eastChamp : westChamp,
+    eastChamp.projectedPoints >= westChamp.projectedPoints ? westChamp : eastChamp,
+    rand
+  );
+
+  return {
+    eastern: eastBracket,
+    western: westBracket,
+    final,
+    champion: final.winner,
+  };
+}
+
 function findLeagueLeaders(
   standings: SimTeamResult[],
   rand: () => number,
@@ -363,16 +461,22 @@ function findLeagueLeaders(
     }
   }
 
-  // Top goalie — best GAA among starters on playoff teams (goalie quality reflects team quality)
+  // Vezina — best goalie adjusted for team quality.
+  // A goalie on a dominant defensive team benefits from fewer dangerous shots
+  // (inflated SVP). We discount SVP proportionally to team win quality so that
+  // Sorokin/Swayman/Vasilevskiy beat Wedgewood-on-a-juggernaut scenarios.
   let topGoalieResult: { name: string; team: string; gaa: number; svp: number } | null = null;
-  for (const team of standings.filter(t => t.madePlayoffs)) {
-    if (team.goalie) {
-      if (!topGoalieResult || team.goalie.projectedSVP > topGoalieResult.svp) {
-        topGoalieResult = {
-          name: team.goalie.name, team: team.teamName,
-          gaa: team.goalie.projectedGAA, svp: team.goalie.projectedSVP,
-        };
-      }
+  for (const team of standings) {
+    if (!team.goalie) continue;
+    const teamWinPct = team.projectedPoints / 164;
+    // Discount SVP for goalies on elite defensive teams (they face softer shots)
+    const teamBoost = Math.max(0, teamWinPct - 0.56) * 0.018;
+    const adjustedSVP = team.goalie.projectedSVP - teamBoost;
+    if (!topGoalieResult || adjustedSVP > topGoalieResult.svp) {
+      topGoalieResult = {
+        name: team.goalie.name, team: team.teamName,
+        gaa: team.goalie.projectedGAA, svp: team.goalie.projectedSVP,
+      };
     }
   }
 
@@ -459,8 +563,29 @@ export async function POST(req: NextRequest) {
         .sort((a, b) => b.projectedPoints - a.projectedPoints);
     }
 
-    // Calder — always Matthew Schaefer (locked fact)
-    const calderWinner = { name: "Matthew Schaefer", team: "New York Islanders", note: "Unanimous (198 first-place votes)" };
+    // Calder — dynamic: best projected scorer among players age ≤ 22 (ELC-tier rookie).
+    // Schaefer is no longer hardcoded — if he's on the roster and projects well, he wins it;
+    // if trades change the roster composition, the award goes to whoever actually earns it.
+    const rookieCandidates = [...playersByTeam.entries()].flatMap(([teamId, roster]) =>
+      roster
+        .filter(p => p.age <= 22 && p.position !== "G" && p.ptsPace > 0)
+        .map(p => ({ ...p, teamId }))
+    );
+    const calderWinner = (() => {
+      if (rookieCandidates.length === 0) return { name: "Matthew Schaefer", team: "New York Islanders", note: "—" };
+      // Sort by adjusted ptsPace with variance so it's not always the same player
+      const sorted = rookieCandidates
+        .map(p => ({ p, score: p.ptsPace * (0.85 + rand() * 0.30) }))
+        .sort((a, b) => b.score - a.score);
+      const winner = sorted[0].p;
+      const teamName = teams.find(t => t.id === winner.teamId)?.name ?? winner.teamId;
+      return { name: winner.name, team: teamName, note: `${Math.round(winner.ptsPace * 0.9)}-${Math.round(winner.ptsPace * 0.9 * 0.55)} in projected first full season` };
+    })();
+
+    const playoffBracket = simulatePlayoffs(standings, rand);
+
+    // Override cupWinner from leaders with bracket result (more accurate)
+    const cupWinner = standings.find(t => t.teamId === playoffBracket.champion.teamId) ?? leaders.cupWinner;
 
     return NextResponse.json({
       seed,
@@ -470,8 +595,10 @@ export async function POST(req: NextRequest) {
       divisions:   divisionContext,
       leaders: {
         ...leaders,
+        cupWinner,
         calder: calderWinner,
       },
+      playoffBracket,
       playoffTeams: standings.filter(t => t.madePlayoffs).map(t => t.teamId),
       generatedAt: new Date().toISOString(),
     });

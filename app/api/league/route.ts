@@ -1279,9 +1279,19 @@ export async function GET() {
         // Use name__position key when available to handle same-name players
         // e.g. "elias-pettersson__C" vs "elias-pettersson__D" (two VAN players)
         const mapKey = pos ? `${slugify(name)}__${pos}` : slugify(name);
+        // Bayesian small-sample correction — prevents wild extrapolation for players
+        // with limited games (e.g. Oliver Bonk 1GP 2pts → 164pts raw, ~31pts corrected).
+        // Blend raw pace toward position mean based on games played.
+        // Weight reaches 1.0 at 25 games; below that, regress toward position mean.
+        const rawPtsPace   = (parseFloat(c[pI]) / g) * 82;
+        const posDefault   = pos.startsWith('D') ? 26 : pos === 'C' ? 52 : 44;
+        const sampleWeight = Math.min(1.0, g / 25);
+        const ptsPace      = rawPtsPace * sampleWeight + posDefault * (1 - sampleWeight);
+        const rawXgPace    = (parseFloat(c[xgI]) / g) * 82;
+        const xGPace       = rawXgPace * sampleWeight + (pos.startsWith('D') ? 6 : 10) * (1 - sampleWeight);
         const entry = {
-          ptsPace: (parseFloat(c[pI])  / g) * 82,
-          xGPace:  (parseFloat(c[xgI]) / g) * 82,
+          ptsPace,
+          xGPace,
           defRate: offA - onA,
           avgTOI:  iceSec / g / 60,
           qocRank: parseFloat(c[rkI]) || 500, // = iceTimeRank (volume), not competition quality

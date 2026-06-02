@@ -268,8 +268,8 @@ function FullStrand({ player }: { player: Player }) {
       title: dps !== null ? `DPS ${dps.toFixed(1)} — Defensive Point Shares` : "Defensive NAV component" },
     { label: "SUPP", val: norm(-(safe(player.xgaRelTM ?? 0)), -1.5, 1.5),
       title: `xGA vs teammates: ${player.xgaRelTM != null ? (player.xgaRelTM as number).toFixed(2) : "—"}` },
-    { label: "QoC",  val: norm(400 - safe(player.qocRank ?? 400), 50, 380),
-      title: `Usage rank: ${(player.qocRank ?? 0).toFixed(0)}` },
+    { label: "Usage",  val: norm(400 - safe(player.qocRank ?? 400), 50, 380),
+      title: `Ice time rank: ${(player.qocRank ?? 0).toFixed(0)} (lower = more ice time)` },
     { label: "OZ",   val: ozScore, display: ozRaw, unavailable: !dzAvail,
       title: dzAvail ? `OZ%: ${ozRaw}% offensive zone starts` : "Zone deployment unavailable" },
   ];

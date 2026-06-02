@@ -117,7 +117,13 @@ const PlayerCard = ({ asset, nav, side }: { asset: Asset; nav: NavBreakdown; sid
           <div className="text-[9px] text-zinc-600 font-bold">
             {isPick
               ? `${asset.year} ${asset.round === 1 ? "1st" : asset.round === 2 ? "2nd" : `${asset.round}th`} Round Pick`
-              : `${asset.position} · Age ${asset.age} · $${asset.capHit.toFixed(1)}M × ${asset.yearsRemaining}yr`}
+              : (() => {
+                  const effective = asset.capHit * (1 - (asset.retainedPct || 0));
+                  const hasRetention = (asset.retainedPct || 0) > 0;
+                  return hasRetention
+                    ? `${asset.position} · Age ${asset.age} · $${effective.toFixed(1)}M × ${asset.yearsRemaining}yr (${Math.round(asset.retainedPct! * 100)}% retained)`
+                    : `${asset.position} · Age ${asset.age} · $${asset.capHit.toFixed(1)}M × ${asset.yearsRemaining}yr`;
+                })()}
           </div>
         </div>
         <div className={`text-lg font-black font-mono italic ${nav.total > 80 ? "text-emerald-400" : nav.total > 20 ? "text-sky-400" : nav.total > -20 ? "text-zinc-400" : "text-rose-400"}`}>
@@ -163,8 +169,9 @@ export default function PlayerComparison({ outgoing, incoming, navMap }: Props) 
   const inxG    = sum(incoming, "xGPace") || 0;
   const outAge  = outgoing.filter(a => a.position !== "Pick").reduce((s, a, _, arr) => s + a.age / arr.length, 0);
   const inAge   = incoming.filter(a => a.position !== "Pick").reduce((s, a, _, arr) => s + a.age / arr.length, 0);
-  const outCap  = outgoing.reduce((s, a) => s + (a.capHit || 0), 0);
-  const inCap   = incoming.reduce((s, a) => s + (a.capHit || 0), 0);
+  // Use effective cap hit (post-retention) so totals match what each team actually pays
+  const outCap  = outgoing.reduce((s, a) => s + (a.capHit || 0) * (1 - (a.retainedPct || 0)), 0);
+  const inCap   = incoming.reduce((s, a) => s + (a.capHit || 0) * (1 - (a.retainedPct || 0)), 0);
 
   const hasSkaters = (assets: Asset[]) => assets.some(a => a.position !== "Pick" && a.position !== "G");
 
