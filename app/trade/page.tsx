@@ -2026,7 +2026,12 @@ function TeamDNA({
                                 fontFamily: "'Courier Prime', monospace" }}>
                     🔍 What This Team Needs{hasActiveTrade ? ' (post-trade)' : ''}
                   </div>
-                  <WhatWeNeed gaps={gapsWithExplain} db={db} excludeIds={excludeIds} />
+                  <WhatWeNeed
+                    gaps={gapsWithExplain}
+                    db={db}
+                    excludeIds={excludeIds}
+                    homeCapSpace={homeTeam ? (db.teams.find(t => t.id === homeTeam.id)?.capSpace ?? 8) : 8}
+                  />
                 </div>
 
                 {/* Gap bars */}
