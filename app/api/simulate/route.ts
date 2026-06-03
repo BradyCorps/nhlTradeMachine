@@ -207,7 +207,7 @@ function projectGoalie(
   roster: SimPlayer[],
   teamWinPct: number,
   rand: () => number,
-): { name: string; projectedGAA: number; projectedSVP: number; gamesStarted: number } | null {
+): { name: string; projectedGAA: number; projectedSVP: number; gamesStarted: number; gsax: number } | null {
   const goalies = roster
     .filter(p => p.position === "G")
     .sort((a, b) => (b.gamesStarted ?? 0) - (a.gamesStarted ?? 0));
@@ -258,9 +258,21 @@ function projectGoalie(
   return {
     name: g.name,
     projectedGAA: Math.round(projectedGAA * 100) / 100,
-    projectedSVP: Math.round(projectedSVP * 10000) / 10000,
+    projectedSVP: Math.round(projectedSVP * 1000) / 1000,
     gamesStarted,
+    gsax: g.gsax ?? 0,
   };
+}
+
+// ── Project top defenseman (Norris candidate) ───────────────────
+function projectTopDefenseman(roster: SimPlayer[], rand: () => number): { name: string; projectedPts: number } | null {
+  const dmen = roster.filter(p => p.position === "D" && p.ptsPace > 0 && (p as any).games >= 10)
+    .sort((a, b) => b.ptsPace - a.ptsPace);
+  if (dmen.length === 0) return null;
+  const top = dmen[0];
+  const decay = ageDecay(top.age, top.position);
+  const proj  = Math.round((top.ptsPace / 82) * (72 + rand() * 10) * decay * (0.85 + rand() * 0.30));
+  return { name: top.name, projectedPts: proj };
 }
 
 // ── Simulate full league standings ────────────────────────────
@@ -280,9 +292,10 @@ function simulateLeague(
     const winPct     = projectedPoints / 164;
     const goalie     = projectGoalie(roster, winPct, rand);
 
+    const topDefenseman = projectTopDefenseman(roster, rand);
     return {
       teamId: team.id, teamName: team.name, phase: team.phase,
-      projectedPoints, topScorer, goalie,
+      projectedPoints, topScorer, goalie, topDefenseman,
       madePlayoffs: false, divisionRank: 0, leagueRank: 0,
     };
   });
@@ -294,7 +307,8 @@ interface SimTeamResult {
   phase: string;
   projectedPoints: number;
   topScorer: { name: string; projectedPts: number; projectedGoals: number; position: string } | null;
-  goalie: { name: string; projectedGAA: number; projectedSVP: number; gamesStarted: number } | null;
+  goalie: { name: string; projectedGAA: number; projectedSVP: number; gamesStarted: number; gsax: number } | null;
+  topDefenseman: { name: string; projectedPts: number } | null;
   madePlayoffs: boolean;
   divisionRank: number;
   leagueRank: number;
@@ -434,7 +448,13 @@ function findLeagueLeaders(
   rand: () => number,
 ): {
   topScorer: { name: string; team: string; pts: number } | null;
-  topGoalie: { name: string; team: string; gaa: number; svp: number } | null;
+  topGoalie:     { name: string; team: string; gaa: number; svp: number } | null;
+  vezina:        { name: string; team: string; gaa: number; svp: number } | null;
+  hart:          { name: string; team: string; pts: number } | null;
+  norris:        { name: string; team: string; pts: number } | null;
+  goalsLeader:   { name: string; team: string; goals: number } | null;
+  assistsLeader: { name: string; team: string; assists: number } | null;
+  connSmythe:    { name: string; team: string } | null;
   presidentsTrophy: SimTeamResult;
   cupWinner: SimTeamResult;
   draftLottery: SimTeamResult;
@@ -461,31 +481,86 @@ function findLeagueLeaders(
     }
   }
 
-  // Vezina — best goalie adjusted for team quality.
-  // A goalie on a dominant defensive team benefits from fewer dangerous shots
-  // (inflated SVP). We discount SVP proportionally to team win quality so that
-  // Sorokin/Swayman/Vasilevskiy beat Wedgewood-on-a-juggernaut scenarios.
+  // ── GAA Leader — lowest GAA among starters (raw honest stat) ───────────────
   let topGoalieResult: { name: string; team: string; gaa: number; svp: number } | null = null;
   for (const team of standings) {
-    if (!team.goalie) continue;
-    const teamWinPct = team.projectedPoints / 164;
-    // Discount SVP for goalies on elite defensive teams (they face softer shots)
-    const teamBoost = Math.max(0, teamWinPct - 0.56) * 0.018;
-    const adjustedSVP = team.goalie.projectedSVP - teamBoost;
-    if (!topGoalieResult || adjustedSVP > topGoalieResult.svp) {
-      topGoalieResult = {
-        name: team.goalie.name, team: team.teamName,
-        gaa: team.goalie.projectedGAA, svp: team.goalie.projectedSVP,
-      };
+    if (team.goalie && team.goalie.gamesStarted >= 25 &&
+        (!topGoalieResult || team.goalie.projectedGAA < topGoalieResult.gaa)) {
+      topGoalieResult = { name: team.goalie.name, team: team.teamName,
+                          gaa: team.goalie.projectedGAA, svp: team.goalie.projectedSVP };
     }
   }
 
-  // Draft lottery winner — worst team
-  const nonPlayoff = standings.filter(t => !t.madePlayoffs)
+  // ── Vezina Trophy — GSAX-based (team-quality-adjusted) ───────────────────
+  // GSAX = goals saved above expected given shot quality faced.
+  // Prevents dominant-team goalies (Wedgewood on Colorado) winning via shot
+  // suppression alone — Sorokin/Swayman facing harder shots score higher.
+  let vezinaResult: { name: string; team: string; gaa: number; svp: number } | null = null;
+  let bestVezinaScore = -Infinity;
+  for (const team of standings) {
+    if (!team.goalie || team.goalie.gamesStarted < 25) continue;
+    const gsax  = team.goalie.gsax ?? 0;
+    const score = gsax * 2.5 + (team.goalie.projectedSVP - 0.905) * 200 + rand() * 5;
+    if (score > bestVezinaScore) {
+      bestVezinaScore = score;
+      vezinaResult = { name: team.goalie.name, team: team.teamName,
+                       gaa: team.goalie.projectedGAA, svp: team.goalie.projectedSVP };
+    }
+  }
+
+  // ── Hart Trophy — MVP: points weighted by team playoff standing ───────────
+  let hartResult: { name: string; team: string; pts: number } | null = null;
+  let bestHart = -Infinity;
+  for (const team of standings) {
+    if (!team.topScorer) continue;
+    const bonus = team.madePlayoffs ? 1.10 + (1 / (team.leagueRank + 1)) * 0.20 : 0.80;
+    const score = team.topScorer.projectedPts * bonus * (0.88 + rand() * 0.24);
+    if (score > bestHart) {
+      bestHart = score;
+      hartResult = { name: team.topScorer.name, team: team.teamName, pts: team.topScorer.projectedPts };
+    }
+  }
+
+  // ── Norris Trophy — best defenseman by projected pts ─────────────────────
+  let norrisResult: { name: string; team: string; pts: number } | null = null;
+  let bestNorris = -Infinity;
+  for (const team of standings) {
+    if (!team.topDefenseman) continue;
+    const score = team.topDefenseman.projectedPts * (0.82 + rand() * 0.36);
+    if (score > bestNorris) {
+      bestNorris = score;
+      norrisResult = { name: team.topDefenseman.name, team: team.teamName, pts: team.topDefenseman.projectedPts };
+    }
+  }
+
+  // ── Goals / Assists leaders ───────────────────────────────────────────────
+  let goalsLeader:   { name: string; team: string; goals: number } | null = null;
+  let assistsLeader: { name: string; team: string; assists: number } | null = null;
+  for (const team of standings) {
+    if (!team.topScorer) continue;
+    const goals   = team.topScorer.projectedGoals ?? Math.round(team.topScorer.projectedPts * 0.40);
+    const assists = team.topScorer.projectedPts - goals;
+    if (!goalsLeader   || goals   > goalsLeader.goals)    goalsLeader   = { name: team.topScorer.name, team: team.teamName, goals };
+    if (!assistsLeader || assists > assistsLeader.assists) assistsLeader = { name: team.topScorer.name, team: team.teamName, assists };
+  }
+
+  // ── Conn Smythe — Cup winner's top scorer ─────────────────────────────────
+  const cupTeam          = standings.find(t => t.teamId === cupWinner?.teamId);
+  const connSmytheResult = cupTeam?.topScorer
+    ? { name: cupTeam.topScorer.name, team: cupTeam.teamName }
+    : null;
+
+  // ── Draft lottery winner — worst team ────────────────────────────────────
+  const nonPlayoff  = standings.filter(t => !t.madePlayoffs)
     .sort((a, b) => a.projectedPoints - b.projectedPoints);
   const draftLottery = nonPlayoff[0];
 
-  return { topScorer: topScorerResult, topGoalie: topGoalieResult, presidentsTrophy, cupWinner, draftLottery };
+  return {
+    topScorer: topScorerResult, topGoalie: topGoalieResult,
+    vezina: vezinaResult, hart: hartResult, norris: norrisResult,
+    goalsLeader, assistsLeader, connSmythe: connSmytheResult,
+    presidentsTrophy, cupWinner, draftLottery,
+  };
 }
 
 // ── Main handler ──────────────────────────────────────────────
@@ -575,7 +650,7 @@ export async function POST(req: NextRequest) {
       if (rookieCandidates.length === 0) return { name: "Matthew Schaefer", team: "New York Islanders", note: "—" };
       // Sort by adjusted ptsPace with variance so it's not always the same player
       const sorted = rookieCandidates
-        .map(p => ({ p, score: p.ptsPace * (0.85 + rand() * 0.30) }))
+        .map(p => ({ p, score: p.ptsPace * (0.50 + rand() * 1.00) }))
         .sort((a, b) => b.score - a.score);
       const winner = sorted[0].p;
       const teamName = teams.find(t => t.id === winner.teamId)?.name ?? winner.teamId;

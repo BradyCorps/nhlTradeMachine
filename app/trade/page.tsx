@@ -6,6 +6,7 @@ import AssetDropdown from "@/app/components/AssetDropdown";
 import TugBar from "@/app/components/TugBar";
 import { MicroBar, DeltaRow } from "@/app/components/MicroBar";
 import { ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
+import PlayoffBracket from "@/app/components/PlayoffBracket";
 import {
   PLAYER_PEDIGREE, PROSPECT_TIERS, SHUTDOWN_D_PEDIGREE, INJURY_RISK,
 } from "@/app/lib/player-data";
@@ -446,12 +447,17 @@ ${isRebuilding
 
 **THE YEAR IN NUMBERS**
 Use ONLY the numbers provided. Do not approximate, estimate, or calculate anything not given here.
-- **Points leader:** ${sim?.leaders?.topScorer?.name ?? "[Points leader]"}, ${sim?.leaders?.topScorer?.team ?? ""} — ${sim?.leaders?.topScorer?.pts ?? "??"} pts, ${sim?.leaders?.topScorer?.goals ?? "?"} G
-- **GAA leader:** ${sim?.leaders?.topGoalie?.name ?? "[GAA leader]"}, ${sim?.leaders?.topGoalie?.team ?? ""} — ${sim?.leaders?.topGoalie?.gaa ?? "??"} GAA / ${sim?.leaders?.topGoalie?.svp ?? "??"} SV%
-- **Presidents' Trophy:** ${sim?.leaders?.presidentsTrophy?.teamName ?? "[Team]"} — ${sim?.leaders?.presidentsTrophy?.projectedPoints ?? "??"}  pts
-- **Stanley Cup Champion:** ${sim?.playoffBracket?.champion?.teamName ?? sim?.leaders?.cupWinner?.teamName ?? "[Team]"} def ${sim?.playoffBracket?.final ? `${sim.playoffBracket.final.home.teamName === sim.playoffBracket.champion.teamName ? sim.playoffBracket.final.away.teamName : sim.playoffBracket.final.home.teamName} ${sim.playoffBracket.final.homeWins}-${sim.playoffBracket.final.awayWins}` : "—"}
-- **Conn Smythe:** Best player from the Cup winner's playoff run — pick from their roster
-- **Calder Trophy:** ${sim?.leaders?.calder?.name ?? "Matthew Schaefer"}, ${sim?.leaders?.calder?.team ?? "New York Islanders"}
+- **Points leader:** ${sim?.leaders?.topScorer?.name ?? "—"}, ${sim?.leaders?.topScorer?.team ?? ""} — ${sim?.leaders?.topScorer?.pts ?? "??"} pts
+- **Goals leader:** ${sim?.leaders?.goalsLeader?.name ?? "—"}, ${sim?.leaders?.goalsLeader?.team ?? ""} — ${sim?.leaders?.goalsLeader?.goals ?? "?"} G
+- **Assists leader:** ${sim?.leaders?.assistsLeader?.name ?? "—"}, ${sim?.leaders?.assistsLeader?.team ?? ""} — ${sim?.leaders?.assistsLeader?.assists ?? "?"} A
+- **GAA leader:** ${sim?.leaders?.topGoalie?.name ?? "—"}, ${sim?.leaders?.topGoalie?.team ?? ""} — ${sim?.leaders?.topGoalie?.gaa ?? "??"} GAA / .${String(Math.round((sim?.leaders?.topGoalie?.svp ?? 0) * 1000)).padStart(3,"0")} SV%
+- **Presidents' Trophy:** ${sim?.leaders?.presidentsTrophy?.teamName ?? "—"} — ${sim?.leaders?.presidentsTrophy?.projectedPoints ?? "??"} pts
+- **Stanley Cup Champion:** ${sim?.playoffBracket?.champion?.teamName ?? sim?.leaders?.cupWinner?.teamName ?? "—"} def ${sim?.playoffBracket?.final ? `${sim.playoffBracket.final.home.teamName === sim.playoffBracket.champion.teamName ? sim.playoffBracket.final.away.teamName : sim.playoffBracket.final.home.teamName} ${sim.playoffBracket.final.homeWins}-${sim.playoffBracket.final.awayWins}` : "—"}
+- **Hart Trophy (MVP):** ${sim?.leaders?.hart?.name ?? "—"}, ${sim?.leaders?.hart?.team ?? ""} — ${sim?.leaders?.hart?.pts ?? "?"} pts
+- **Norris Trophy (best D):** ${sim?.leaders?.norris?.name ?? "—"}, ${sim?.leaders?.norris?.team ?? ""} — ${sim?.leaders?.norris?.pts ?? "?"} pts
+- **Vezina Trophy (best G):** ${sim?.leaders?.vezina?.name ?? "—"}, ${sim?.leaders?.vezina?.team ?? ""} — ${sim?.leaders?.vezina?.gaa ?? "??"} GAA
+- **Conn Smythe:** ${sim?.leaders?.connSmythe?.name ?? "—"}, ${sim?.leaders?.connSmythe?.team ?? ""}
+- **Calder Trophy:** ${sim?.leaders?.calder?.name ?? "—"}, ${sim?.leaders?.calder?.team ?? ""}
 
 **THE DRAFT LOTTERY**
 ${(() => {
@@ -1243,56 +1249,9 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                 </div>
 
                 {/* ── Playoff Bracket ── */}
-                {simData.playoffBracket && (() => {
-                  const bracket = simData.playoffBracket;
-                  const SeriesLine = ({ s }: { s: any }) => {
-                    const homeWon = s.winner.teamId === s.home.teamId;
-                    return (
-                      <div className="flex items-center gap-1 text-2xs font-mono">
-                        <span style={{ fontWeight: homeWon ? 900 : 400, color: homeWon ? 'var(--ledger-ink)' : 'var(--ledger-ink-faint)' }}>{s.home.teamName.split(' ').pop()}</span>
-                        <span style={{ color: 'var(--ledger-ink-faint)' }}>{s.homeWins}‑{s.awayWins}</span>
-                        <span style={{ fontWeight: !homeWon ? 900 : 400, color: !homeWon ? 'var(--ledger-ink)' : 'var(--ledger-ink-faint)' }}>{s.away.teamName.split(' ').pop()}</span>
-                      </div>
-                    );
-                  };
-                  return (
-                    <div className="mt-3" style={{ borderTop: '1px solid #c8b890', paddingTop: '10px' }}>
-                      <div className="text-2xs font-black uppercase tracking-widest text-ledger-ink-faint mb-2">🏆 Playoff Bracket</div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {[
-                          { conf: 'Eastern Conference', b: bracket.eastern },
-                          { conf: 'Western Conference', b: bracket.western },
-                        ].map(({ conf, b }) => (
-                          <div key={conf} style={{ background: 'var(--ledger-cream)', border: '1px solid #c8b890', padding: '8px 10px' }}>
-                            <div className="text-2xs font-black uppercase tracking-widest text-ledger-ink-faint mb-2">{conf}</div>
-                            <div className="space-y-0.5">
-                              {b.r1.map((s: any, i: number) => <SeriesLine key={i} s={s} />)}
-                            </div>
-                            <div className="mt-1.5 space-y-0.5 pl-2" style={{ borderLeft: '2px solid #c8b890' }}>
-                              {b.r2.map((s: any, i: number) => <SeriesLine key={i} s={s} />)}
-                            </div>
-                            <div className="mt-1.5 pl-4" style={{ borderLeft: '2px solid var(--ledger-red)' }}>
-                              <div className="text-2xs font-black uppercase tracking-widest" style={{ color: 'var(--ledger-red)', fontSize: '6px' }}>Conf Final</div>
-                              <SeriesLine s={b.cf} />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      {/* Cup Final */}
-                      <div className="mt-2" style={{ background: 'var(--ledger-card)', border: '2px solid var(--ledger-red)', padding: '8px 10px', textAlign: 'center' }}>
-                        <div className="text-2xs font-black uppercase tracking-widest mb-1" style={{ color: 'var(--ledger-red)' }}>🏆 Stanley Cup Final</div>
-                        <div className="flex items-center justify-center gap-3 font-mono text-[11px]">
-                          <span style={{ fontWeight: bracket.final.winner.teamId === bracket.final.home.teamId ? 900 : 400 }}>{bracket.final.home.teamName}</span>
-                          <span style={{ color: 'var(--ledger-ink-faint)' }}>{bracket.final.homeWins}‑{bracket.final.awayWins}</span>
-                          <span style={{ fontWeight: bracket.final.winner.teamId === bracket.final.away.teamId ? 900 : 400 }}>{bracket.final.away.teamName}</span>
-                        </div>
-                        <div className="text-[11px] font-black mt-1" style={{ color: 'var(--ledger-green)' }}>
-                          {bracket.champion.teamName} win the Stanley Cup
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
+                {simData.playoffBracket && (
+                  <PlayoffBracket bracket={simData.playoffBracket} />
+                )}
               </div>
             )}
 
