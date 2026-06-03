@@ -116,6 +116,77 @@ The institutional layer designed for advanced analytics needs, sports agencies, 
 * **The Strategy:** Extract the pure mathematical execution layer out of the layout components entirely, wrapping the system logic inside a high-throughput headless API platform. This enables the core value calculator engine to run as an independent software-as-a-service application, capable of powering external platforms, fantasy tracking tool ecosystems, and major sports media networks.
 
 
+## 🧠 Phase 4: X-NAV 2.0 (The Economics & Betting Engine)
+
+This phase transitions the beating heart of the platform from a linear points calculator into a stochastic scarcity and probability engine, preparing it for commercial licensing in the fantasy and sports betting markets.
+
+1. **Divergent Term Multipliers:** Split contract cost calculations to respect the immense leverage gap between cost-controlled RFAs and flight-risk UFAs.
+2. **Positional Scarcity Premiums:** Apply structural value modifiers to premium positions (Centers and Top-Pairing Defensemen) to correct the undervaluation vs. Wingers.
+3. **The Logistic Lemieux Asymptote:** Replace the piecewise linear offensive cap with a true exponential decay function, creating a hard mathematical ceiling for historical production.
+4. **Exponential Retention Tax:** Rewrite the salary retention logic to scale exponentially rather than linearly, reflecting the real-world cash friction of billionaire owners paying dead money.
+5. **Era-Agnostic Dependency Injection:** Extract all `1.6` and `4.5` integer weights into an injectable `EnvironmentWeights` matrix, allowing the engine to instantly recalibrate for different scoring eras or betting markets on the fly.
+
+---
+
+### The Blueprint: Expanding X-NAV to the Next Level
+
+To make this the holy grail for betting and fantasy, the engine needs to expand from ~400 lines to a comprehensive algorithmic suite. Here is every single missing component required to reach that tier.
+
+#### 1. The "Passenger vs. Driver" Matrix (Linemate Dependency)
+
+Raw Point Shares and xG metrics lie because they don't decouple players from their linemates. A winger playing with Leon Draisaitl will have artificially inflated metrics. The engine must ingest WOWY (With or Without You) data to determine if a player is driving the play or just along for the ride.
+
+* **The Math:** You need to calculate an isolation coefficient.
+
+$$NAV_{isolated} = NAV_{raw} \times \left(1 - \frac{xG_{with} - xG_{without}}{xG_{with}}\right)$$
+
+
+* **The Value:** This identifies "buy-low" candidates for front offices—players trapped on the 3rd line with bad teammates who mathematically project to explode if given top-line minutes.
+
+#### 2. Stochastic Volatility Index (SVI)
+
+Fantasy platforms and sports bettors do not care about an 82-game pace; they care about *game-to-game variance*. A player who scores exactly 1 point every game is great for an NHL team. A player who scores 0 points for four games and 5 points in the fifth is incredible for daily fantasy tournaments (GPPs) but a nightmare for steady prop betting.
+
+* **The Feature:** The engine must measure the standard deviation of a player's game logs to generate an SVI score.
+
+$$SVI = \sqrt{\frac{1}{N} \sum_{i=1}^{N} (P_i - \mu)^2} \times \lambda_{role}$$
+
+
+* **The Value:** You can output a "Boom/Bust Rating" for every player. "Player X has a median projection of 65 points, but a 90th percentile ceiling of 95 points due to extreme deployment volatility."
+
+#### 3. Market-Implied Valuation (MIV) Layer
+
+Right now, you are waiting for MoneyPuck data to update. If you want to cater to the betting industry, your engine needs to scrape live futures props from sportsbooks (e.g., DraftKings Over/Under point totals) and reverse-engineer them into the engine.
+
+* **The Feature:** If Vegas sets a player's over/under at 85.5 points, but your engine projects 72 points based on historical decay, the engine highlights a **Market Discrepancy Alert**.
+* **The Value:** This turns your trade machine into a direct betting arbitrage tool.
+
+#### 4. Actuarial Attrition & Health Modeling
+
+NHL GMs and fantasy managers get fired for ignoring injury risk. The current engine relies on a manual flag (`INJURY_RISK[asset.name]`).
+
+* **The Feature:** The engine needs a probabilistic injury curve based on age, position, and physical playstyle (hits/blocked shots per 60). An Expected Value (EV) calculation must discount the player's total NAV by their probability of playing a full season.
+
+$$EV = \sum (NAV \times P(health_t))$$
+
+
+* **The Value:** This prevents the engine from treating a 33-year-old injury-prone defenseman with the same reliability as a 24-year-old ironman.
+
+#### 5. Post-Season Translation (The "Grit" Multiplier)
+
+The game changes in April. Whistles go away, the ice shrinks, and perimeter players disappear. A true simulation engine needs a separate set of weights for playoff evaluations.
+
+* **The Feature:** Create a secondary `calcPlayoffNAV()` function that heavily weights contested puck battles, hits, blocked shots, and high-danger unassisted expected goals, while suppressing powerplay-dependent point production.
+* **The Value:** You can offer a "Playoff Translation Score" to tell GMs if a player they are acquiring at the trade deadline is actually built for a 7-game series.
+
+#### 6. Advanced Cap Mechanics (Buyouts & Dead Cash)
+
+To make this indispensable for front offices, the engine must understand buyout economics. If you trade for a terrible $7M contract, the engine shouldn't just say "This costs $7M."
+
+* **The Feature:** It should automatically calculate the NHL buyout formula ($2/3$ or $1/3$ ratio based on age, spread over twice the remaining term) and output: "This player is a -45 NAV, but they can be bought out next summer for a cap penalty of only $1.5M over 4 years."
+
+---
+
 
 Testing Adjustments - to be made after critical improvements: 
 
@@ -159,3 +230,12 @@ Dustin Wolf has a comically low NAV of +14, this should be fixed if we add a cus
 OPS player Suggested in What This team needs has an OPS of -2, doesnt make sense.
 
 AI still fabricating numbers, Simulation #10306 runs with WPG top scorer being Scheifele at 87 points but the AI summary reads Scheifele with 103 points.
+
+
+-xnav engine roadmap to V 2.0
+If the ultimate goal is to license this to front offices, fantasy syndicates, or sports betting platforms, a 400-line calculator won't cut it. To bridge the gap between a standard simulator and an enterprise-grade quantitative model, the X-NAV engine must stop looking at *what has happened* (lagging indicators) and start modeling *probability distributions of what will happen next* (stochastic forecasting).
+
+Here is how we integrate the engine rewrite into the remediation pipeline, followed by the blueprint to "go full AI" and turn this into an industry-leading economics engine.
+
+---
+
