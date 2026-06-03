@@ -7,6 +7,7 @@ import TugBar from "@/app/components/TugBar";
 import { MicroBar, DeltaRow } from "@/app/components/MicroBar";
 import { ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
+import TeamStrand, { CHAMP_TEMPLATE, TeamStrandData } from "@/app/components/TeamStrand";
 import {
   PLAYER_PEDIGREE, PROSPECT_TIERS, SHUTDOWN_D_PEDIGREE, INJURY_RISK,
 } from "@/app/lib/player-data";
@@ -1005,7 +1006,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             onRequestBlockTrade={(block) => setTradeRequest(block)} />
 
           {/* Middle controls — on mobile sits between panels */}
-          <div className="flex flex-col gap-3 lg:pt-8 order-last lg:order-none">
+          <div className="flex flex-col gap-3 lg:pt-8 order-first lg:order-none">
             {teams[0] && teams[1] && (
               <div className="flex flex-col gap-2">
                 <div className="grid grid-cols-2 gap-2">
@@ -1686,14 +1687,10 @@ const classifyTeam = (team: Team, _roster: Asset[]): TeamMode => {
 
 // Championship template — normalized 0-1 values calibrated to tighter ranges
 // Based on Cup winner roster profiles (top-9F + top-4D TOI-weighted averages)
-const CHAMPIONSHIP_TEMPLATE = {
-  off: { SCR: 0.55, xG: 0.52, OFF: 0.58, NOIV: 0.55, TOI: 0.68 },
-  def: { SUPP: 0.55, QoC: 0.60, DEF: 0.52, DZ: 0.50, AGE: 0.52 },
-};
-
-function computeRosterStrand(roster: Asset[], navMap: Record<string, XNAVResult>) {
-  // Weight by ice time and use only meaningful contributors
-  // Top-9 forwards by TOI + top-4 D by TOI — excludes depth drag
+// computeRosterStrand — aggregates top-13 contributors' analytics into
+// team-level trait scores (4 off + 4 def) using the same normalised 0–1 scale
+// as the player STRAND. Trait order matches TeamStrand component.
+function computeRosterStrand(roster: Asset[], navMap: Record<string, XNAVResult>): TeamStrandData | null {
   const fwds = roster
     .filter(p => ["C","W","L","R"].includes(p.position) && p.hasLiveStats && (p.games ?? 0) >= 20)
     .sort((a, b) => (b.avgTOI ?? 0) - (a.avgTOI ?? 0))
@@ -1705,48 +1702,38 @@ function computeRosterStrand(roster: Asset[], navMap: Record<string, XNAVResult>
   const qualified = [...fwds, ...dmen];
   if (qualified.length === 0) return null;
 
-  const norm = (val: number, min: number, max: number) =>
-    Math.max(0, Math.min(1, (val - min) / (max - min)));
+  const norm = (val: number, mn: number, mx: number) =>
+    Math.max(0, Math.min(1, (val - mn) / (mx - mn)));
+  const safe = (v: number | null | undefined) => v ?? 0;
 
-  let offTotals = { SCR: 0, xG: 0, OFF: 0, NOIV: 0, TOI: 0 };
-  let defTotals = { SUPP: 0, QoC: 0, DEF: 0, DZ: 0, AGE: 0 };
+  let off = { OPS: 0, xG: 0, NOIV: 0, TOI: 0 };
+  let def = { DPS: 0, SUPP: 0, Usage: 0, OZ: 0 };
   const n = qualified.length;
 
   for (const p of qualified) {
     const xnav = navMap[p.id] ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
     const isD  = p.position === "D";
-    // Use same tighter ranges as StrandView for consistency
-    offTotals.SCR  += norm(safe(p.ptsPace), 0, isD ? 80 : 100);
-    offTotals.xG   += norm(safe(p.xGPace ?? 0), 0, isD ? 25 : 50);
-    offTotals.OFF  += norm(xnav.off, -80, 300);
-    offTotals.NOIV += norm(safe(p.xgRelTM ?? 0), -12, 12);
-    offTotals.TOI  += norm(safe(p.avgTOI), 10, 27);
-    defTotals.SUPP += norm(-(p.xgaRelTM ?? 0), -1.5, 1.5);
-    defTotals.QoC  += norm(400 - safe(p.qocRank /* iceTimeRank — ice time volume rank, NOT competition quality */ ?? 400), 50, 380);
-    defTotals.DEF  += norm(xnav.def, -60, 150);
-    defTotals.DZ   += 1 - norm(safe(p.dzPct ?? 0.5), 0.3, 0.7);
-    defTotals.AGE  += norm(xnav.age, -80, 60);
+    const ops  = (p as any).ops as number | null | undefined;
+    const dps  = (p as any).dps as number | null | undefined;
+    const opsMax = 15, dpsMax = 10;
+    // OPS: use point shares if available, fall back to scoring pace
+    off.OPS  += ops != null ? norm(ops, 0, opsMax) : norm(safe(p.ptsPace), 0, isD ? 80 : 100);
+    off.xG   += norm(safe(p.xGPace ?? 0), 0, isD ? 25 : 50);
+    off.NOIV += norm(safe(p.xgRelTM ?? 0), -12, 12);
+    off.TOI  += norm(safe(p.avgTOI), 10, 27);
+    def.DPS  += dps != null ? norm(dps, 0, dpsMax) : norm(xnav.def, -60, 150);
+    def.SUPP += norm(-(p.xgaRelTM ?? 0), -1.5, 1.5);
+    def.Usage+= norm(400 - safe(p.qocRank ?? 400), 50, 380);
+    def.OZ   += p.dzPct != null ? 1 - norm(safe(p.dzPct), 0.3, 0.7) : 0.5;
   }
 
   return {
-    off: {
-      SCR:  offTotals.SCR  / n,
-      xG:   offTotals.xG   / n,
-      OFF:  offTotals.OFF  / n,
-      NOIV: offTotals.NOIV / n,
-      TOI:  offTotals.TOI  / n,
-    },
-    def: {
-      SUPP: defTotals.SUPP / n,
-      QoC:  defTotals.QoC  / n,
-      DEF:  defTotals.DEF  / n,
-      DZ:   defTotals.DZ   / n,
-      AGE:  defTotals.AGE  / n,
-    },
+    off: { OPS: off.OPS/n, xG: off.xG/n, NOIV: off.NOIV/n, TOI: off.TOI/n },
+    def: { DPS: def.DPS/n, SUPP: def.SUPP/n, Usage: def.Usage/n, OZ: def.OZ/n },
   };
 }
 
-// ── Contention Cycle Computation ─────────────────────────────
+// ── Contention Cycle// ── Contention Cycle Computation ─────────────────────────────
 // Derives Present and Future ratings (0-10) from X-NAV data.
 // Present: what the roster is worth RIGHT NOW
 // Future:  what the roster will be worth in ~3 years (age decay + prospects)
@@ -1905,10 +1892,10 @@ function TeamDNA({
 
   // Gap vs championship template — negative = below template, positive = above
   const homeGaps = {
-    off: Object.entries(CHAMPIONSHIP_TEMPLATE.off).map(([k, target]) => ({
+    off: Object.entries(CHAMP_TEMPLATE.off).map(([k, target]) => ({
       label: k, gap: (homeStrand.off as any)[k] - target
     })),
-    def: Object.entries(CHAMPIONSHIP_TEMPLATE.def).map(([k, target]) => ({
+    def: Object.entries(CHAMP_TEMPLATE.def).map(([k, target]) => ({
       label: k, gap: (homeStrand.def as any)[k] - target
     })),
   };
@@ -1918,41 +1905,7 @@ function TeamDNA({
     .sort((a, b) => a.gap - b.gap)
     .slice(0, 3);
 
-  const offAvgHome = Object.values(homeStrand.off).reduce((s, v) => s + v, 0) / 5;
-  const defAvgHome = Object.values(homeStrand.def).reduce((s, v) => s + v, 0) / 5;
-  const offAvgPart = Object.values(partnerStrand.off).reduce((s, v) => s + v, 0) / 5;
-  const defAvgPart = Object.values(partnerStrand.def).reduce((s, v) => s + v, 0) / 5;
-
-  const W = 260, H = 80;
-  const offColor = "#1a2e5c";
-  const defColor = "#b83020";
-  const tmplColor = "#9a7d58";
-  const freq = (2 * Math.PI) / W;
-  const amplitude = 22;
-
-  const buildPath = (offA: number, defA: number, phase: number) => {
-    const pts = [];
-    for (let i = 0; i <= 60; i++) {
-      const t = i / 60;
-      const x = t * W;
-      pts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${(H/2 - (amplitude * (0.3 + offA * 0.7)) * Math.sin(freq * x * 2 + phase)).toFixed(1)}`);
-    }
-    return pts.join(" ");
-  };
-  const buildDefPath = (defA: number, phase: number) => {
-    const pts = [];
-    for (let i = 0; i <= 60; i++) {
-      const t = i / 60;
-      const x = t * W;
-      pts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${(H/2 + (amplitude * (0.3 + defA * 0.7)) * Math.sin(freq * x * 2 + phase)).toFixed(1)}`);
-    }
-    return pts.join(" ");
-  };
-
-  // Championship template averages
-  const tmplOff = Object.values(CHAMPIONSHIP_TEMPLATE.off).reduce((s,v) => s+v, 0) / 5;
-  const tmplDef = Object.values(CHAMPIONSHIP_TEMPLATE.def).reduce((s,v) => s+v, 0) / 5;
-
+  // Team Strand displays — use TeamStrand component for clean 4+4 helix
   return (
     <div className="strands-panel">
       <button className="strands-header" onClick={() => setExpanded(e => !e)}>
@@ -1964,9 +1917,7 @@ function TeamDNA({
               fill="none" stroke="var(--red)" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
           <span className="strands-title">Team Strands</span>
-          {hasActiveTrade && (
-            <span className="strands-post-trade-badge">Post-Trade</span>
-          )}
+          {hasActiveTrade && <span className="strands-post-trade-badge">Post-Trade</span>}
         </div>
         <div className="strands-header-right" style={{ flexWrap: 'wrap', gap: '4px' }}>
           {allGaps.slice(0, 3).map(g => (
@@ -1981,193 +1932,35 @@ function TeamDNA({
       {expanded && (
         <div className="strands-body">
           <p className="strands-context" style={{ wordBreak: "break-word", overflowWrap: "break-word" }}>
-            Each helix shows a team's aggregate offensive (navy) and defensive (red) profile across their top-9 forwards and top-4 D by ice time. The dashed gold line is the championship template. The dotted green line is the playoff threshold — the minimum profile needed to realistically compete for a postseason spot. Gaps below either line are roster needs.{hasActiveTrade ? " Updated to reflect the current trade." : ""}
+            Each helix shows a team's aggregate offensive (navy) and defensive (red) profile across their top-9 forwards and top-4 D by ice time. The dashed gold line is the championship template. The dotted green line is the playoff threshold. Gaps below either line are roster needs.{hasActiveTrade ? " Updated to reflect the current trade." : ""}
           </p>
 
-          {/* ── Contention Cycle ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: '12px', marginBottom: '16px' }}>
-            {[
-              { team: homeTeam,    contention: homeContention,    label: "Your Franchise" },
-              { team: partnerTeam, contention: partnerContention, label: "Trade Partner"  },
-            ].filter(x => x.team).map(({ team, contention, label }) => {
-              const quadrantConfig: Record<string, { bg: string; text: string; label: string; desc: string }> = {
-                WIN_NOW:        { bg: 'var(--ledger-red)', text: 'white',    label: 'Win Now',        desc: 'Window is open — compete now'              },
-                WINDOW_OPEN:    { bg: 'var(--ledger-green)', text: 'white',    label: 'Window Open',    desc: 'Strong present and future'                  },
-                WINDOW_OPENING: { bg: 'var(--ledger-navy)', text: 'white',    label: 'Window Opening', desc: 'Building toward contention'                 },
-                REBUILDING:     { bg: 'var(--ledger-brown)', text: 'var(--ledger-card-light)', label: 'Rebuilding',     desc: 'Developing for the future'                  },
-              };
-              const qc = quadrantConfig[contention.quadrant];
-              const dotX = (contention.present / 10) * 74 + 4;
-              const dotY = 78 - (contention.future / 10) * 74;
-              return (
-                <div key={team!.id} style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070', borderTop: `3px solid ${qc.bg}`, padding: '12px 14px' }}>
-                  {/* Header */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', gap: '8px' }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: '11px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '2px' }}>{label}</div>
-                      <div style={{ fontSize: '13px', fontWeight: 900, color: 'var(--ledger-ink)', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{team!.name}</div>
-                    </div>
-                    <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                      <div style={{ background: qc.bg, color: qc.text, fontSize: '11px', fontWeight: 900, padding: '4px 8px', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '2px', }}>{qc.label}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--ledger-ink-faint)', }}>{qc.desc}</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                    {/* Mini quadrant chart */}
-                    <div style={{ flexShrink: 0 }}>
-                      <svg width="100%" style={{ maxWidth: 110, display: "block" }} viewBox="0 0 82 82">
-                        <rect x="1"  y="1"  width="39" height="39" fill="rgba(26,46,92,0.07)"  rx="1"/>
-                        <rect x="42" y="1"  width="39" height="39" fill="rgba(26,92,46,0.07)"  rx="1"/>
-                        <rect x="1"  y="42" width="39" height="39" fill="rgba(107,80,48,0.07)" rx="1"/>
-                        <rect x="42" y="42" width="39" height="39" fill="rgba(184,48,32,0.07)" rx="1"/>
-                        <line x1="41" y1="1" x2="41" y2="81" stroke="#c8b890" strokeWidth="1"/>
-                        <line x1="1" y1="41" x2="81" y2="41" stroke="#c8b890" strokeWidth="1"/>
-                        <text x="20.5" y="10" textAnchor="middle" fontSize="7" fill="#1a2e5c" fontFamily="Courier Prime, monospace" fontWeight="bold" opacity="0.8">OPENING</text>
-                        <text x="61.5" y="10" textAnchor="middle" fontSize="7" fill="#1a5c2e" fontFamily="Courier Prime, monospace" fontWeight="bold" opacity="0.8">WIN OPEN</text>
-                        <text x="20.5" y="79" textAnchor="middle" fontSize="7" fill="#6b5030" fontFamily="Courier Prime, monospace" fontWeight="bold" opacity="0.8">REBUILD</text>
-                        <text x="61.5" y="79" textAnchor="middle" fontSize="7" fill="#b83020" fontFamily="Courier Prime, monospace" fontWeight="bold" opacity="0.8">WIN NOW</text>
-                        <circle cx={dotX} cy={dotY} r="6"   fill={qc.bg} opacity="0.2"/>
-                        <circle cx={dotX} cy={dotY} r="3.5" fill={qc.bg}/>
-                        <circle cx={dotX} cy={dotY} r="1.5" fill="white" opacity="0.7"/>
-                      </svg>
-                      <div style={{ fontSize: '11px', color: 'var(--ledger-ink-faint)', textAlign: 'center', marginTop: '3px', letterSpacing: '0.05em', fontWeight: 900 }}>PRESENT → / ↑ FUTURE</div>
-                    </div>
-                    {/* Ratings */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '8px' }}>
-                      {([
-                        { label: 'PRESENT RATING', val: contention.present, sublabel: contention.presentLabel, hint: 'Roster quality right now',      color: contention.present >= 6.5 ? 'var(--ledger-green)' : contention.present >= 5.0 ? 'var(--ledger-amber)' : 'var(--ledger-red)' },
-                        { label: 'FUTURE RATING',  val: contention.future,  sublabel: contention.futureLabel,  hint: 'Projected value in ~3 years', color: contention.future  >= 6.0 ? 'var(--ledger-green)' : contention.future  >= 4.5 ? 'var(--ledger-amber)' : 'var(--ledger-red)' },
-                      ] as const).map(r => (
-                        <div key={r.label}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px', gap: '4px' }}>
-                            <span style={{ fontSize: '11px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.1em', whiteSpace: 'nowrap' }}>{r.label}</span>
-                            <span style={{ fontSize: '11px', color: r.color, fontWeight: 900, whiteSpace: 'nowrap' }}>{r.sublabel}</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <div style={{ flex: 1, height: '6px', background: 'var(--ledger-rule-mid)', borderRadius: '3px', overflow: 'hidden' }}>
-                              <div style={{ width: `${r.val * 10}%`, height: '100%', background: r.color, borderRadius: '3px', transition: 'width 0.5s ease' }}/>
-                            </div>
-                            <span style={{ fontSize: '14px', fontWeight: 900, color: r.color, minWidth: '30px', textAlign: 'right', lineHeight: 1 }}>{r.val.toFixed(1)}</span>
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'var(--ledger-rule)', marginTop: '2px' }}>{r.hint}</div>
-                        </div>
-                      ))}
-                      {hasActiveTrade && (
-                        <div style={{ fontSize: '11px', color: 'var(--ledger-green)', borderTop: '1px solid #c8b890', paddingTop: '5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          ↻ Ratings updated for this trade
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {homeTeam && (
-            <div className="flex items-center gap-3 mb-3 flex-wrap">
-              <div className="text-2xs font-black px-2 py-1" style={{
-                color: homeTeam.standing <= 8 ? 'var(--ledger-green)' : homeTeam.standing <= 16 ? 'var(--ledger-amber)' : 'var(--ledger-red)',
-                border: `1px solid ${homeTeam.standing <= 8 ? 'rgba(26,92,46,0.4)' : homeTeam.standing <= 16 ? 'rgba(138,92,0,0.4)' : 'rgba(184,48,32,0.4)'}`,
-              }}>
-                {homeTeam.name} · #{homeTeam.standing}/32 · {homeTeam.standing <= 8 ? '✓ IN PLAYOFFS' : homeTeam.standing <= 12 ? '~ BUBBLE' : homeTeam.standing <= 16 ? '~ WILDCARD RANGE' : '✗ OUT'}
+          <div className="flex flex-col sm:flex-row gap-4 mb-4" style={{ overflowX: 'auto' }}>
+            {([
+              { strand: homeStrand,    team: homeTeam,    label: hasActiveTrade ? "Post-trade" : undefined },
+              { strand: partnerStrand, team: partnerTeam, label: undefined },
+            ]).map(({ strand, team, label }: { strand: TeamStrandData | null; team: any; label: string | undefined }) => strand && team ? (
+              <div key={team.id} style={{ flex: 1, minWidth: 260, background: 'var(--ledger-cream)',
+                                         border: '1px solid #c8b890', padding: '10px 12px' }}>
+                <TeamStrand strand={strand} teamName={team.name} label={label} />
               </div>
-              {partnerTeam && (
-                <div className="text-2xs font-black px-2 py-1" style={{
-                  color: partnerTeam.standing <= 8 ? 'var(--ledger-green)' : partnerTeam.standing <= 16 ? 'var(--ledger-amber)' : 'var(--ledger-red)',
-                  border: `1px solid ${partnerTeam.standing <= 8 ? 'rgba(26,92,46,0.4)' : partnerTeam.standing <= 16 ? 'rgba(138,92,0,0.4)' : 'rgba(184,48,32,0.4)'}`,
-                }}>
-                  {partnerTeam.name} · #{partnerTeam.standing}/32 · {partnerTeam.standing <= 8 ? '✓ IN PLAYOFFS' : partnerTeam.standing <= 12 ? '~ BUBBLE' : partnerTeam.standing <= 16 ? '~ WILDCARD RANGE' : '✗ OUT'}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="strands-helix-grid">
-            {[
-              { team: homeTeam,    offA: offAvgHome, defA: defAvgHome },
-              { team: partnerTeam, offA: offAvgPart, defA: defAvgPart },
-            ].map(({ team, offA, defA }) => {
-              const W2 = 560; const H2 = 140;
-              const freq2 = (2 * Math.PI) / W2;
-              const amp2  = 42;
-              const buildP = (a: number, flip: boolean) => {
-                const pts = [];
-                for (let i = 0; i <= 120; i++) {
-                  const x = (i / 120) * W2;
-                  const y = H2/2 + (flip ? 1 : -1) * (amp2 * (0.25 + a * 0.75)) * Math.sin(freq2 * x * 2);
-                  pts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`);
-                }
-                return pts.join(" ");
-              };
-              const tmplOffA = Object.values(CHAMPIONSHIP_TEMPLATE.off).reduce((s: number, v) => s + (v as number), 0) / 5;
-              const tmplDefA = Object.values(CHAMPIONSHIP_TEMPLATE.def).reduce((s: number, v) => s + (v as number), 0) / 5;
-              // Playoff threshold — roughly 80% of championship template
-              const playoffOffA = tmplOffA * 0.80;
-              const playoffDefA = tmplDefA * 0.80;
-              const rungs = [70, 140, 210, 280, 350, 420, 490];
-              return (
-                <div key={team?.id} className="strands-helix-card">
-                  <div className="strands-helix-card-header">
-                    <span className="strands-helix-team-name">{team?.name}</span>
-                    <div className="strands-helix-scores">
-                      <span className="strands-helix-off">OFF {(offA * 100).toFixed(0)}</span>
-                      <span className="strands-helix-def">DEF {(defA * 100).toFixed(0)}</span>
-                    </div>
-                  </div>
-                  <svg className="strands-helix-svg" viewBox={`0 0 ${W2} ${H2}`}>
-                    {/* Championship template — gold dashed */}
-                    <path d={buildP(tmplOffA, false)} fill="none"
-                      stroke="var(--rule)" strokeWidth="2" strokeDasharray="8,5" opacity="0.8"/>
-                    <path d={buildP(tmplDefA, true)} fill="none"
-                      stroke="var(--rule)" strokeWidth="2" strokeDasharray="8,5" opacity="0.8"/>
-                    {/* Playoff threshold — green dotted */}
-                    <path d={buildP(playoffOffA, false)} fill="none"
-                      stroke="#1a5c2e" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5"/>
-                    <path d={buildP(playoffDefA, true)} fill="none"
-                      stroke="#1a5c2e" strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5"/>
-                    {rungs.map(x => {
-                      const oy = H2/2 - (amp2*(0.25+offA*0.75))*Math.sin(freq2*x*2);
-                      const dy = H2/2 + (amp2*(0.25+defA*0.75))*Math.sin(freq2*x*2);
-                      return <line key={x} x1={x} y1={oy} x2={x} y2={dy}
-                        stroke="var(--rule)" strokeWidth="1" opacity="0.2"/>;
-                    })}
-                    <path d={buildP(defA, true)} fill="none"
-                      stroke="var(--red)" strokeWidth="3" strokeLinecap="round" opacity="0.9"/>
-                    <path d={buildP(offA, false)} fill="none"
-                      stroke="var(--blue)" strokeWidth="3" strokeLinecap="round" opacity="0.9"/>
-                    <line x1="14" y1="12" x2="34" y2="12" stroke="var(--blue)" strokeWidth="2.5"/>
-                    <text x="38" y="16" fontSize="9" fill="var(--blue)" fontFamily="Courier Prime, monospace" fontWeight="bold">OFFENSE</text>
-                    <line x1="14" y1="27" x2="34" y2="27" stroke="var(--red)" strokeWidth="2.5"/>
-                    <text x="38" y="31" fontSize="9" fill="var(--red)" fontFamily="Courier Prime, monospace" fontWeight="bold">DEFENSE</text>
-                    <line x1="14" y1="42" x2="34" y2="42" stroke="var(--rule)" strokeWidth="2" strokeDasharray="5,3"/>
-                    <text x="38" y="46" fontSize="9" fill="var(--rule)" fontFamily="Courier Prime, monospace">CHAMP. TEMPLATE</text>
-                    <line x1="14" y1="57" x2="34" y2="57" stroke="#1a5c2e" strokeWidth="1.5" strokeDasharray="4,3"/>
-                    <text x="38" y="61" fontSize="9" fill="#1a5c2e" fontFamily="Courier Prime, monospace">PLAYOFF THRESHOLD</text>
-                  </svg>
-                </div>
-              );
-            })}
+            ) : null)}
           </div>
-
-          <div className="strands-gaps-header">
+                    <div className="strands-gaps-header">
             {homeTeam?.name} — Roster Gaps vs Playoff & Championship Thresholds{hasActiveTrade ? " (post-trade)" : ""}
           </div>
 
           {/* Metric explanations */}
           {(() => {
             const GAP_EXPLAIN: Record<string, { full: string; need: string }> = {
-              SCR:  { full: "Scoring Pace",           need: "More offensive production from forwards/D" },
-              xG:   { full: "Expected Goals",         need: "Higher quality shot generation"            },
-              OFF:  { full: "Offensive NAV",          need: "Better offensive contributors overall"      },
-              OPS:  { full: "Offensive Point Shares", need: "More offensive output across the lineup"    },
-              NOIV: { full: "On-Ice Impact",          need: "Players who elevate their linemates"        },
-              TOI:  { full: "Ice Time Quality",       need: "Heavier usage from top players"             },
-              SUPP: { full: "Shot Suppression",       need: "Better defensive structure under pressure"  },
-              QoC:  { full: "Competition Quality",    need: "Players who can handle top-line matchups"   },
-              DEF:  { full: "Defensive NAV",          need: "Better defensive contributors overall"      },
-              DPS:  { full: "Defensive Point Shares", need: "More defensive value across the roster"     },
-              DZ:   { full: "Defensive Zone Starts",  need: "More reliable defensive zone players"       },
-              AGE:  { full: "Age Curve",              need: "Younger contributors with upside"           },
+              OPS:   { full: "Offensive Point Shares", need: "More offensive output across the lineup"    },
+              xG:    { full: "Expected Goals",         need: "Higher quality shot generation"            },
+              NOIV:  { full: "On-Ice Impact",          need: "Players who elevate their linemates"       },
+              TOI:   { full: "Ice Time Quality",       need: "Heavier usage from top players"            },
+              DPS:   { full: "Defensive Point Shares", need: "More defensive value across the roster"    },
+              SUPP:  { full: "Shot Suppression",       need: "Better defensive structure under pressure" },
+              Usage: { full: "Ice Time Deployment",    need: "Players who can handle tougher matchups"   },
+              OZ:    { full: "Zone Deployment",        need: "More offensive-zone focused personnel"     },
             };
             const allGapsSorted = [...homeGaps.off, ...homeGaps.def].sort((a, b) => a.gap - b.gap);
             const biggestNeeds = allGapsSorted.filter(g => g.gap < -0.10).slice(0, 3);
