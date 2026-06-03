@@ -35,8 +35,11 @@ const abbr = (name: string) => {
   return `${parts[0][0]}. ${parts.slice(1).join(" ")}`.slice(0, 14);
 };
 
-const sortByIce = (ps: Player[]) =>
+const sortByIce     = (ps: Player[]) =>
   [...ps].sort((a, b) => (b.avgTOI ?? b.ptsPace ?? 0) - (a.avgTOI ?? a.ptsPace ?? 0));
+
+const sortByGames   = (ps: Player[]) =>
+  [...ps].sort((a, b) => (b.games ?? 0) - (a.games ?? 0));
 
 function buildLineup(roster: Player[], outgoing: Player[], incoming: Player[]) {
   const outIds = new Set(outgoing.map(p => p.id));
@@ -56,7 +59,7 @@ function buildLineup(roster: Player[], outgoing: Player[], incoming: Player[]) {
   const centers  = sortByIce(effective.filter(isC)).slice(0, 4);
   const wingers  = sortByIce(effective.filter(isW)).slice(0, 8);
   const dmen     = sortByIce(effective.filter(isD)).slice(0, 6);
-  const goalies  = sortByIce(effective.filter(isG)).slice(0, 2);
+  const goalies  = sortByGames(effective.filter(isG)).slice(0, 2);
 
   const statusOf = (p: Player): SlotStatus =>
     inIds.has(p.id) ? "in" : outIds.has(p.id) ? "out" : "normal";
@@ -69,7 +72,7 @@ function buildLineup(roster: Player[], outgoing: Player[], incoming: Player[]) {
   const origCenters = sortByIce(roster.filter(isC)).slice(0, 4);
   const origWingers = sortByIce(roster.filter(isW)).slice(0, 8);
   const origDmen    = sortByIce(roster.filter(isD)).slice(0, 6);
-  const origGoalies = sortByIce(roster.filter(isG)).slice(0, 2);
+  const origGoalies = sortByGames(roster.filter(isG)).slice(0, 2);
 
   // Build lines showing both outgoing and incoming in order
   const buildSlots = (orig: Player[], eff: Player[], count: number): Slot[] => {

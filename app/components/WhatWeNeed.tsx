@@ -10,7 +10,7 @@ interface Player {
   id: string;
   name: string;
   position: string;
-  currentTeam?: string;
+  teamId?: string;
   ptsPace?:   number;
   xGPace?:    number;
   xgRelTM?:   number | null;
@@ -142,7 +142,7 @@ export default function WhatWeNeed({ gaps, db, excludeIds }: Props) {
                       {p.name}
                     </span>
                     <span style={{ fontSize: 8, color: "var(--ledger-ink-faint)" }}>
-                      {p.position} · {p.currentTeam ?? "UFA"}
+                      {p.position} · {p.teamId ?? "UFA"}
                     </span>
                   </div>
                 ))}

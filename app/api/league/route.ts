@@ -1294,11 +1294,20 @@ export async function GET() {
           xGPace,
           defRate: offA - onA,
           avgTOI:  iceSec / g / 60,
-          qocRank: parseFloat(c[rkI]) || 500, // = iceTimeRank (volume), not competition quality
+          // ── Bayesian shrinkage for relative stats ──────────────────────────
+          // xgRelTM / xgaRelTM are even noisier than ptsPace — a single shift
+          // can produce extreme values. Shrink towards 0 (league mean) using a
+          // longer stabilisation window (30 GP vs 25 for counting stats).
+          // qocRank is an ice-time rank — 1 GP can produce rank=1 if the player
+          // happened to log heavy minutes that night. Shrink towards 400 (median).
+          xgRelTM:  xgRelTM  * Math.min(1.0, g / 30),
+          xgaRelTM: xgaRelTM * Math.min(1.0, g / 30),
+          qocRank:  Math.round(
+            (parseFloat(c[rkI]) || 500) * Math.min(1.0, g / 20) +
+            400 * (1 - Math.min(1.0, g / 20))
+          ),
           games:   g,
           hasLiveStats: true,
-          xgRelTM,
-          xgaRelTM,
           dzPct,
           goalsPace:   goalsI >= 0 ? (parseFloat(c[goalsI])   / g) * 82 : undefined,
           assistsPace: goalsI >= 0 ? ((parseFloat(c[pI]) - parseFloat(c[goalsI])) / g) * 82 : undefined,
