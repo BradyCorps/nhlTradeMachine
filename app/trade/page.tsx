@@ -1715,7 +1715,7 @@ function computeRosterStrand(roster: Asset[], navMap: Record<string, XNAVResult>
     const isD  = p.position === "D";
     const ops  = (p as any).ops as number | null | undefined;
     const dps  = (p as any).dps as number | null | undefined;
-    const opsMax = 15, dpsMax = 10;
+    const opsMax = 7, dpsMax = 4.5;   // team averages, not individual player ceilings
     // OPS: use point shares if available, fall back to scoring pace
     off.OPS  += ops != null ? norm(ops, 0, opsMax) : norm(safe(p.ptsPace), 0, isD ? 80 : 100);
     off.xG   += norm(safe(p.xGPace ?? 0), 0, isD ? 25 : 50);
