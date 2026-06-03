@@ -153,6 +153,30 @@ export async function POST(req: NextRequest) {
         score += 10; fit.push("Elite piece completes contender's window");
       }
 
+      // ── 6. YOUNG CORE UNTRADEABLE CHECK ─────────────────────
+      // If the partner's only matching-value players are their young core
+      // (age ≤ 24, ptsPace > 55), this proposal will fail the GM audit.
+      // Penalise heavily so it drops below the threshold and doesn't surface.
+      if (packageNAV > 0) {
+        const partnerTopPlayers = roster
+          .filter(p => p.position !== "Pick" && p.position !== "G")
+          .sort((a, b) => (navMap[b.id]?.total ?? 0) - (navMap[a.id]?.total ?? 0))
+          .slice(0, 5);
+        const youngCoreOnly = partnerTopPlayers.length > 0 &&
+          partnerTopPlayers.every(p => (p.age ?? 30) <= 24 && (p.ptsPace ?? 0) > 55);
+        if (youngCoreOnly) {
+          score -= 40;
+          warn.push("Would require trading untouchable young core");
+        }
+        // Also penalise if the #1 return asset is their franchise cornerstone (young + elite)
+        const topReturn = partnerTopPlayers[0];
+        if (topReturn && (topReturn.age ?? 30) <= 24 && (topReturn.ptsPace ?? 0) > 70
+            && (navMap[topReturn.id]?.total ?? 0) > 80) {
+          score -= 20;
+          warn.push(`${topReturn.name} is untouchable young core`);
+        }
+      }
+
       const returnProfile =
         packageNAV > 150 ? "Top prospect + first-round pick" :
         packageNAV > 80  ? "Roster player + first-round pick" :

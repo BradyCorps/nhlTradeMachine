@@ -13,11 +13,14 @@ interface TugBarProps {
 }
 
 function TugBar({ homeNetGain, navA, navB, cNavA, cNavB }: TugBarProps) {
-  // Use absolute values for bar proportions so negative-NAV trades render correctly.
-  // When both sides are negative (salary dumps), |navA| and |navB| still show
-  // the relative size of each side's obligation.
-  const absA  = Math.abs(cNavA ?? navA);
-  const absB  = Math.abs(cNavB ?? navB);
+  // Use the compressed value when it is positive (normal trade).
+  // When a package is entirely negative-NAV (salary dumps), compressPackage
+  // clamps to 0 — but 0 ?? navA still returns 0 (??  only catches null/undefined).
+  // Fall back to raw nav when compressed is ≤ 0 but raw nav is meaningful.
+  const dispA = cNavA !== undefined ? (cNavA > 0 ? cNavA : navA) : navA;
+  const dispB = cNavB !== undefined ? (cNavB > 0 ? cNavB : navB) : navB;
+  const absA  = Math.abs(dispA);
+  const absB  = Math.abs(dispB);
   const total = Math.max(absA + absB, 1);
   const leftPct = clamp((absA / total) * 100, 5, 95);
 

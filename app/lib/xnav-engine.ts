@@ -305,9 +305,12 @@ const offRaw = offPS !== null
   const baseAge  = age <= peakAge
     ? Math.max(0, (peakAge - age) * 4.5)           // youth upside
     : -Math.pow(age - peakAge, 1.6) * 1.8;          // decline penalty
-  // Rental discount: 1-yr contracts are pure "this season" bets — not locked into
-  // a long decline. Reduce age PENALTY (not bonus) by 75% for rentals.
-  const rentalFactor = (asset.yearsRemaining || 2) <= 1 ? 0.25 : 1.0;
+  // Rental / short-term discount on age PENALTY (not bonus):
+  //   1yr left → 75% reduction (pure rental — you're betting on this season only)
+  //   2yr left → 40% reduction (short commitment — limited exposure to decline)
+  //   3+yr     → no reduction (you own the decline curve)
+  const yrs = asset.yearsRemaining || 3;
+  const rentalFactor = yrs <= 1 ? 0.25 : yrs <= 2 ? 0.60 : 1.0;
   const ageVal   = baseAge < 0 ? baseAge * rentalFactor : baseAge;
   const ageTotal = safe(ageVal);
 
