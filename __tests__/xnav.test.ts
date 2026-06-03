@@ -195,7 +195,7 @@ describe("Pick NAV — First Round Curve", () => {
 // SKATER TESTS
 // ─────────────────────────────────────────────────────────────────────────────
 describe("X-NAV — Franchise Centers", () => {
-  it("McDavid-tier: elite production, reasonable cap → 400-600 NAV", () => {
+  it("McDavid-tier: elite production, reasonable cap → 100-210 NAV", () => {
     const result = calcSkaterNAV({
       id: "mcdavid", name: "Connor McDavid", position: "C",
       age: 28, capHit: 12.5, yearsRemaining: 2,
@@ -203,10 +203,10 @@ describe("X-NAV — Franchise Centers", () => {
       avgTOI: 22, qocRank: 80, xgRelTM: 12, xgaRelTM: -0.3,
       games: 78, ops: 12.5, dps: 2.1,
     });
-    inRange(result.total, 200, 400, "McDavid NAV");
+    inRange(result.total, 100, 210, "McDavid NAV");
   });
 
-  it("Barkov: two-way C, fair contract → 150-250 NAV", () => {
+  it("Barkov: two-way C, fair contract → 50-130 NAV", () => {
     const result = calcSkaterNAV({
       id: "barkov", name: "Aleksander Barkov", position: "C",
       age: 30, capHit: 10.0, yearsRemaining: 8,
@@ -214,7 +214,7 @@ describe("X-NAV — Franchise Centers", () => {
       avgTOI: 21, qocRank: 120, xgRelTM: 4, xgaRelTM: -0.5,
       games: 75, ops: 7.2, dps: 5.8,
     });
-    inRange(result.total, 450, 700, "Barkov NAV");
+    inRange(result.total, 50, 130, "Barkov NAV");
   });
 });
 
@@ -243,7 +243,7 @@ describe("X-NAV — Overpaid Veterans", () => {
 });
 
 describe("X-NAV — Elite Defencemen", () => {
-  it("Makar-tier: elite offensive D, strong contract → 250-400 NAV", () => {
+  it("Makar-tier: elite offensive D, strong contract → 120-230 NAV", () => {
     const result = calcSkaterNAV({
       id: "makar", name: "Cale Makar", position: "D",
       age: 26, capHit: 9.0, yearsRemaining: 3,
@@ -251,7 +251,7 @@ describe("X-NAV — Elite Defencemen", () => {
       avgTOI: 25, qocRank: 100, xgRelTM: 8, xgaRelTM: -0.4,
       games: 78, ops: 9.5, dps: 5.2,
     });
-    inRange(result.total, 500, 800, "Makar NAV");
+    inRange(result.total, 120, 230, "Makar NAV");
   });
 
   it("Morrissey: two-way D with NOIV data — DEF bar positive, not an artifact", () => {
@@ -373,7 +373,7 @@ describe("X-NAV — Elite Defencemen", () => {
     expect(selke.def).toBeGreaterThan(offC.def);
   });
 
-  it("Shutdown D: low pts but high defensive value → 40-90 NAV", () => {
+  it("Shutdown D: low pts but high defensive value → 50-130 NAV", () => {
     const result = calcSkaterNAV({
       id: "slavin", name: "Jaccob Slavin", position: "D",
       age: 32, capHit: 5.3, yearsRemaining: 2,
@@ -381,14 +381,14 @@ describe("X-NAV — Elite Defencemen", () => {
       avgTOI: 22, qocRank: 90, xgRelTM: 1, xgaRelTM: -0.8,
       games: 78, ops: 2.8, dps: 6.5,
     });
-    inRange(result.total, 600, 900, "Slavin NAV");
+    inRange(result.total, 50, 130, "Slavin NAV");
     // DEF must be meaningfully positive — xgaRelTM-0.8 at 22min = elite suppression
     expect(result.def).toBeGreaterThan(25);
   });
 });
 
 describe("X-NAV — Young Surplus Contracts", () => {
-  it("Young star on ELC: massive surplus value → 300+ NAV", () => {
+  it("Young star on ELC: massive surplus value → 140+ NAV", () => {
     const result = calcSkaterNAV({
       id: "young-star", name: "Young Star", position: "C",
       age: 21, capHit: 0.925, yearsRemaining: 1,
@@ -396,7 +396,7 @@ describe("X-NAV — Young Surplus Contracts", () => {
       avgTOI: 18, qocRank: 200, xgRelTM: 5, xgaRelTM: 0,
       games: 68, ops: 7.2, dps: 2.1,
     });
-    expect(result.total).toBeGreaterThan(300);
+    expect(result.total).toBeGreaterThan(140);
   });
 
   it("Age curve: younger player worth more than identical older player", () => {
@@ -498,9 +498,9 @@ describe("compressPackage — age-tiered", () => {
 
   it("blue-chip prospects (age 21) — mild compression", () => {
     const prospects = Array(3).fill(null).map(() => ({ nav: 270, isPick: false, age: 21 }));
-    // δ=0.80: 270 + 270×0.80 + 270×0.64 = 270+216+172.8=658.8; penalty 2×15=30 → 628.8
+    // δ=0.80: 270 + 270×0.80 + 270×0.64 = 658.8; penalty 2×10=20 → 638.8
     expect(compressPackage(prospects)).toBeGreaterThan(580);
-    expect(compressPackage(prospects)).toBeCloseTo(628.8, 0);
+    expect(compressPackage(prospects)).toBeCloseTo(638.8, 0);
   });
 
   it("prospects compress significantly less than equivalent veterans", () => {
@@ -522,7 +522,7 @@ describe("compressPackage — age-tiered", () => {
       { nav: 80,  isPick: true             }, // pick: linear → 80
       { nav: 100, isPick: false, age: 22 }, // prospect at i=1: 100×0.80=80, penalty 15
     ];
-    // player sum: 300 + 80 - 15 = 365; pick: 80; total: 445
-    expect(compressPackage(mixed)).toBeCloseTo(445, 0);
+    // player sum: 300 + 80 - 10 = 370; pick: 80; total: 450
+    expect(compressPackage(mixed)).toBeCloseTo(450, 0);
   });
 });

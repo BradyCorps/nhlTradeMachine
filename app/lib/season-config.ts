@@ -23,22 +23,25 @@ export const LEAGUE = {
 
 export const COMPRESSION = {
   // Age-tiered decay rates — prospects compress less than veterans.
-  // Each asset at position i in a sorted package contributes: NAVᵢ × δᵢⁱ
+  // Each subsequent asset in a sorted package contributes: NAVᵢ × δⁱ
   decayProspect:  0.80,          // ≤23 yrs — independent developmental bets
   decayYoung:     0.65,          // 24-27 yrs — semi-independent
   decayPrime:     0.60,          // 28-31 yrs — full roster slot competition
   decayVeteran:   0.55,          // 32+  yrs — max displacement cost
 
-  // Roster slot penalty per extra non-pick player beyond the anchor
-  penaltyProspect: 15,
-  penaltyYoung:    35,
-  penaltyPrime:    50,
-  penaltyVeteran:  60,
+  // Roster slot penalty per extra non-pick player beyond the anchor.
+  // Recalibrated with corrected NAV scale (cap * 6, dps * 15):
+  //   Prime NAV range is now 40-180 (was 200-800), so old μ=50 penalised
+  //   depth players too harshly — packages of 3+ solid players went negative.
+  penaltyProspect: 10,           // was 15
+  penaltyYoung:    15,           // was 35
+  penaltyPrime:    20,           // was 50
+  penaltyVeteran:  35,           // was 60
 } as const;
 
 export const FRANCHISE = {
-  threshold:  600,               // Elite stars — requires elite return to move
-  megalodon:  900,               // Generational talents — functionally untradeable
+  threshold:  80,                // Elite stars — recalibrated from 600 (dps*15 + cap*6 scale)
+  megalodon:  125,               // Generational talents — recalibrated from 900
 } as const;
 
 // Helpers derived from the above — avoids recalculating at call sites

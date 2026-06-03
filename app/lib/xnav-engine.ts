@@ -235,16 +235,17 @@ const offRaw = offPS !== null
   }
 
   // ── Defensive value ───────────────────────────────────────────
-  const defPS  = dps !== null ? dps * 15 : null;
+  // FIX: dps * 15 directly (was defPS * 8 = dps * 15 * 8 = dps * 120).
+  // The old * 15 display scaler was compounded with a * 8 NAV weight,
+  // inflating defTotal 8x — Makar showed DEF=720, Ekholm DEF=360.
+  // dps * 15 gives ~70-100 for elite D, ~30-50 for solid D — correct range.
+  const defPS  = dps !== null ? dps * 15 : null;  // kept for any display usage
   const toiD   = clamp((toi - 15) * 2.5, 0, 30);
   const qocVal = clamp((400 - qoc) / 400 * 20, 0, 20);
   const dzVal  = clamp((dzPct - 0.3) * 40, 0, 12);
 
-  // defPS * 8 (not * 10) — compensates for outer multiplier rising from 12→15
-  // Net: dps * 15 * 8 = dps * 120 (same total as old dps * 12 * 10 = dps * 120)
-  // This keeps total NAV stable while the display multiplier in the UI uses * 15
-  const defRaw   = defPS !== null
-    ? defPS * 8 * confidence + (def * 20 + qocVal + toiD) * (1 - confidence)
+  const defRaw   = dps !== null
+    ? dps * 15 * confidence + (def * 20 + qocVal + toiD) * (1 - confidence)
     : def * 20 + qocVal + toiD + dzVal - xgaRel * 4;
   const defTotal = safe(defRaw);
 
@@ -308,7 +309,10 @@ const offRaw = offPS !== null
 
   // ── Contract cost ─────────────────────────────────────────────
   const termMult  = Math.min(2.5, 1.0 + asset.yearsRemaining * 0.12);
-  const capCost   = effectiveCap * 10 * termMult;
+  // FIX: * 6 (was * 10) — cap * 10 was calibrated when DEF was 8x inflated.
+  // With corrected DEF, * 10 made elite players on big contracts go negative.
+  // * 6 restores balance: elite players on fair contracts show positive NAV.
+  const capCost   = effectiveCap * 6 * termMult;
   const retained  = (asset.retainedPct || 0) * asset.capHit * 12;
   const capTotal  = safe(-(capCost - retained));
 
