@@ -1,79 +1,161 @@
-PHASE 1: CRITICAL PRIORITY (Structural Threats)
+# `CRITICALPRIORITY.md`
 
-These are fundamental architectural flaws that will cause the app to crash, leak money, or fail under real-world user load.
+This document tracks the master architectural remediation roadmap for `nhlTradeMachine`. It prioritizes stability fixes, performance updates, and enterprise scaling milestones to transition the codebase from a functional prototype to an enterprise-grade platform.
 
-1. The "Type Coercion" Time Bomb (Runtime Instability)
+---
 
-    The Issue: Throughout your scraping and API routes, you are using TypeScript's as keyword (e.g., p[18] as number). This is not type safety; it is type illusion. You are forcing the compiler to trust you, but if the scraped data changes, p[18] becomes undefined, your math engine tries to multiply undefined * 1.6, returns NaN, and the entire UI crashes with a React white-screen-of-death.
+## 🚨 Phase 1: Critical Priority (Structural Threats & Core Stability)
 
-    The Fix: Implement Zod (or Yup) schema validation at the exact boundary where external data enters your app. If an API route or scraper fetches data, it must pass through a PlayerSchema.parse() step. If it fails, the app catches it gracefully and logs an error, rather than crashing the client's browser.
+These items address fundamental design flaws that risk client-side runtime crashes, memory leaks, security bypasses, or unpredictable operational expenses under production scaling.
 
-2. O(n²) React Render Cascades (Client Performance)
+### 1. Unified Valuation Engine Convergence
 
-    The Issue: In a complex trade application, users are dragging/dropping players, adjusting salary retention sliders, and adding draft picks. If you manage this state with standard Next.js/React useState at the top level of TradePanel.tsx, every single slider adjustment forces the entire DOM tree (every player card, every team strand, every micro-bar) to re-render.
+* **The Issue:** The application maintains separate calculation engines in `app/lib/xnav-engine.ts` (client rendering) and `app/api/evaluate/route.ts` (server trade evaluation). These files have drifted apart on fallback branches and positional scalars, causing split-brain validation errors where the UI context conflicts with the server's verdict.
 
-    The Fix: You must migrate the trade state to an atomic state manager like Zustand or Jotai. This allows a salary retention slider to update only the specific salary UI component and the total cap math, without forcing 40 other player cards to re-render.
 
-3. Unbounded LLM Financial Exposure (api/claude/route.ts)
+* **The Fix:** Remove duplicate valuation math from `app/api/evaluate/route.ts`. Refactor the server route to import and run calculations directly from the single source of truth in `app/lib/xnav-engine.ts`.
 
-    The Issue: Your Claude API proxy lacks Prompt Injection safeguards and token bounding. A malicious user can intercept the network request, replace the trade payload with a 100,000-token text file, and trigger your server to process it. Because your rate limiter is broken (as noted in the previous audit), an attacker can drain hundreds of dollars from your Anthropic account in minutes.
 
-    The Fix: * Implement Upstash Redis for strict, IP-based or User-ID-based rate limiting (e.g., 5 AI evaluations per user per hour).
 
-        Set strict max_tokens limits on the Anthropic SDK call.
+### 2. Type-Safe Boundary Enforcement via Zod Data Ingestion
 
-        Strip all non-alphanumeric characters from user inputs before passing them to the prompt template.
+* **The Issue:** The web scraping pipeline and external stats intake endpoints rely heavily on loose type casting (`as number`, `as string`) and static nested array index lookups (e.g., `p[18]` or `p[24]` from raw HTML scripts). If a third-party site changes its data schema, indices evaluate to `undefined`, creating `NaN` metrics that can crash the React client UI.
 
-PHASE 2: MEDIUM PRIORITY (Maintainability & Cleanliness)
 
-These elements make the code professional, scalable, and attractive to potential acquiring companies or open-source contributors.
+* **The Fix:** Implement strict Zod schemas at data boundaries. Parse incoming crawled arrays through a validator layer using `.safeParse()` to isolate individual data structural changes cleanly without breaking the entire platform runtime.
 
-1. Break Up the Monolithic JSON Bundle (contracts.bundled.json)
+### 3. Stateless Cache Synchronization & Shared Rate Limiting
 
-    The Issue: Loading a massive JSON file directly into the client bundle massively inflates your Time-To-Interactive (TTI). On mobile networks, this means users will stare at a loading screen while megabytes of inactive player data are downloaded.
+* **The Issue:** Endpoint caching and the AI proxy rate-limiting mechanisms utilize localized, in-memory global state tracking maps. Because serverless environments spin up, down, and duplicate micro-containers dynamically, global memory structures are un-synchronized across concurrent sessions. This allows users to easily bypass rate limits, exposing backend API keys to high exploitation costs.
 
-    The Fix: Move the data to a lightweight edge database (like Turso/SQLite, Supabase, or PlanetScale). Use Next.js Server Components to fetch only the specific teams involved in the trade, reducing the data payload by 95%.
 
-2. Extract "Magic Numbers" to a Configuration Matrix
+* **The Fix:** Remove local container tracking maps. Deploy an out-of-process distributed storage layer (such as Upstash Redis) to synchronize live team states, scraper caches, and API throttling rules uniformly across serverless infrastructure containers.
 
-    The Issue: Your xnav-engine.ts is littered with hardcoded weights (e.g., 4.5 for youth upside, 1.6 for points). If you want to update the model for a new season, you have to hunt through the code.
 
-    The Fix: Create a valuation-weights.yaml or .json file. The engine should ingest these weights dynamically. This allows you to A/B test different mathematical models (e.g., "2024 Scoring Era Math" vs "Dead Puck Era Math") without touching a single line of TypeScript.
 
-3. Implement Regression & Integration Testing
+### 4. Atomic Trade State Management (Zustand Migration)
 
-    The Issue: You have exactly one test file (xnav.test.ts). You are testing isolated math, but not the integrations.
+* **The Issue:** Managing multi-asset trade arrays, custom retention rules, and draft pick logic using top-level layout component hooks forces deep tree re-render cascades. Every slider adjustment or drag-and-drop event forces every single visible element, layout chart, and player card to refresh, causing interface lag.
+* **The Fix:** Decouple layout state completely by migrating the transactional context to an isolated, atomic store like Zustand. Ensure that structural value changes selectively trigger re-renders only on the specific data values affected.
 
-    The Fix: You need Playwright or Cypress for end-to-end tests. A test must physically simulate: "Select Team A, add Player X, Select Team B, add Player Y, verify Cap Compliance turns red if over $88M."
+### 5. LLM Prompt Layer Sanitization & Token Hard Caps
 
-PHASE 3: THE ENTERPRISE VISION (How to Make it Lucrative)
+* **The Issue:** The external language model proxy route parses client context strings into the model prompt pipeline without escaping characters or applying structural token validation. This leaves the endpoint vulnerable to raw payload manipulation or oversized contextual returns that inflate API operational costs.
 
-If you want to sell this to an NHL team, a sports agency, or a major betting/media company, they don't just want a NAV calculator. They need a Compliance & Projection Engine.
 
-1. The Strict CBA Compliance Layer (The "Holy Grail")
+* **The Fix:** Configure strict token constraint bounds on proxy execution calls. Run character-stripping regex arrays across input parameters to strip formatting controls before assembling conversational payloads.
 
-    A true enterprise tool doesn't just check if the salary cap is under $88M. It must encode the actual NHL Collective Bargaining Agreement rules. Your engine needs to flag:
+---
 
-        NMC/NTC Violations: "Player X has a Full No-Move Clause and must waive it for this trade."
+## 🧰 Phase 2: Medium Priority (Maintainability, Testing & Cleanliness)
 
-        Retention Limits: "A team can only retain a maximum of 3 salaries concurrently." (Does your app track existing retained salaries?)
+These items optimize the project's performance footprint and establish regression testing safeguards to prevent structural logic drift during subsequent iterations.
 
-        Contract Limits: "This trade puts Team B at 51 standard player contracts (Limit is 50). Trade invalid."
+### 1. Relational Database Extraction of Local JSON Files
 
-2. Multi-Year Cap Forecasting (The GM Dashboard)
+* **The Issue:** Large static datasets—like bundled player contracts and performance benchmarks—are packed directly inside monolithic JSON files inside the client bundle architecture. This unnecessarily inflates initial page load payloads and slows down mobile performance metrics.
 
-    Right now, trade machines focus on this year. Real GMs trade based on Year 3.
 
-    Feature: A toggle that projects the trade's impact 1, 2, and 3 years into the future, automatically dropping expiring contracts and projecting Restricted Free Agent (RFA) qualifying offers.
+* **The Fix:** Move roster and contract data arrays out of raw project files. Relocate them inside a high-efficiency edge-database instance (such as Turso or Supabase) and leverage Next.js Server Components to fetch records matching only the specific teams involved in an active configuration.
 
-3. Monte Carlo "Probability of Win" Simulations
 
-    Instead of returning a static "Team A wins by 45 NAV", run 1,000 background simulations applying standard deviation to player development.
 
-    Feature: The UI outputs: "Team A has a 68% chance of winning this trade in Year 1, but Team B has an 82% chance of winning by Year 3 due to prospect aging curves."
+### 2. Isolation of Calculation Weights to Configuration Schemas
 
-4. The Headless API (SaaS Monetization)
+* **The Issue:** The pure math execution module contains hardcoded system scalars, aging regression penalties, and positional multipliers distributed inline across the file layout. This requires a software engineer to manually modify and ship code changes just to update calculation formulas for new season dynamics.
 
-    The most lucrative part of your app isn't the Next.js UI; it's the xnav-engine.
 
-    Feature: Package the pure-math valuation engine into a REST API. You can license this API to fantasy sports platforms, bloggers, or sports betting sites so they can display "X-NAV Values" on their own websites.
+* **The Fix:** Extract all formulas and hardcoded integers into an isolated matrix config document (e.g., `valuation-weights.json`). Build the math execution modules to load configuration parameters dynamically, enabling seamless updates and straightforward model validation adjustments.
+
+
+
+### 3. Comprehensive End-to-End Regression Test Suite
+
+* **The Issue:** Test scripts are limited to basic unit assessments on isolated execution loops. Complex system changes risk introducing silent calculation bugs across transaction constraints or trade validation state rules without triggering warnings.
+
+
+* **The Fix:** Author complete workflow simulation layers using tools like Playwright or Vitest. Program tests to explicitly validate complex transaction procedures, verifying that financial indicators adjust accurately and rule violations register correctly.
+
+---
+
+## 🚀 Phase 3: The Enterprise Vision (Commercial Feature Scaling)
+
+The institutional layer designed for advanced analytics needs, sports agencies, frontend sports networks, and organizational platform integration.
+
+### 1. Hybrid Front-Office Pipeline & Overrides Dashboard
+
+* **The Strategy:** Transition the data backend to a managed asset hub. Deploy an automated scraper pipeline that pulls nightly analytics to a central database, but introduce a secondary operational override table that takes system priority. This allows platform administrators to log into a secure utility dashboard to manually patch injuries, adjust trade multipliers, or update metrics instantly without deploying new code.
+
+
+
+### 2. Strict Collective Bargaining Agreement (CBA) Compliance Layer
+
+* **The Strategy:** Expand verification logic past fundamental cap limits to encompass full NHL CBA compliance tracking. Build rule-enforcement constraints to evaluate transactions against:
+* **The 50-Contract Constraint:** Flag trades that push an acquiring organization over the active 50 standard player contract limit.
+* **Retention Tracking Limits:** Enforce strict caps on concurrent team salary retentions (maximum of 3 active player retentions per team).
+* **Clause Compliance:** Track dynamic interactions for No-Trade and No-Movement clauses, evaluating destination attractiveness to gauge if a player is likely to waive their waiver control requirements.
+
+
+
+
+
+### 3. Multi-Year Financial & Roster Forecast Dashboard
+
+* **The Strategy:** Build visual matrix grids that project roster choices over three-year horizons. Implement layout views to process dynamic salary cap growth projections, calculate pending unrestricted free agency exits, map future extension impacts, and estimate accurate baseline qualifying values for incoming restricted free agents.
+
+
+
+### 4. Stochastic Player Evaluation Models (Monte Carlo Engine)
+
+* **The Strategy:** Replace fixed score evaluations with probability distributions. Run multiple background simulation cycles that factor in historical variance and localized age regression metrics to estimate performance variability. Output results as a dynamic analytics indicator tracking structural value win probability over 1, 2, and 3-year windows based on aging curves and development volatility.
+
+
+
+### 5. Headless REST API Framework for External Syndication
+
+* **The Strategy:** Extract the pure mathematical execution layer out of the layout components entirely, wrapping the system logic inside a high-throughput headless API platform. This enables the core value calculator engine to run as an independent software-as-a-service application, capable of powering external platforms, fantasy tracking tool ecosystems, and major sports media networks.
+
+
+
+Testing Adjustments - to be made after critical improvements: 
+
+Barkov has a -10 NAV but was injured all year, needs to have an adjustment that coordinates with his true value
+
+Goaltenders are hard coded to have a base of 0 NAV, I think we need to adjust this or have goalie logic be separate from skater logic to calculate truely a goaltenders value based on incoming stats.
+
+all modal popups should freeze scroll
+
+For realistic targets, players that have played for the team previously should be weighted less, as rarely do players come back.
+
+Investigate why Colton Parakyo has a negative NAV 
+
+TugBar doesnt go under 0 for a negative on negative trade.
+
+Head-To-Head needs to be revamped and updated and for it to be its own component.
+
+EST. WINs ADDED needs to calculate the impact of the player, not just if NAV higher === more wins. 
+
+When trading away older player from Rebuilding team, getting "[Team B]needs picks to trade away [Player B], when adding pick to [Team A] outgoing asset, the flag isnt cleared, but when adding a pick to [Team B] outgoing assets, the flag is cleared. Should be when adding pick or prospect of reasonable value, Flag for [Team B] is cleared. 
+
+Investigate why Dylan DeMelo DEF is so high (+71) on depth D with a -40 NAV
+
+Player with Negative NAV causes find trade proposals not working even if overall value is positive
+
+Investigate why Simon Edvinsson Value NAV is so low (+32) with OFF (+13) and DEF (+74)
+Simon Edvinsson has 1 year left on contract not 3
+
+Find Trade Partners often finds trades that dont go throuhg as [Team B] can't afford to lose [Player A], then why have the trade proposal pop up?
+
+I can make a trade with a +130 NAV Net Gain. Seems extremly lopsided.
+Flag for Significantly overpaying is wrong
+    Reads: The NAV analysis shows Detroit Red Wings giving up 369 NAV points worth of assets and receiving only 223 — a 35% gap. Winnipeg Jets's GM has no incentive to accept this deal when they could simply wait for a better offer. Lopsided trades only happen under specific pressure: a player demanding a trade, a GM under ownership pressure to cut salary, or a team desperate to fill a critical hole before a deadline. Without that context, Winnipeg Jets holds all the leverage here.
+
+    But: Im playing as Winnipeg, so this should read that the Red Wings GM has no incentive to accept this deal, this flag should be a hard veto unless certain parameters are met (ie outside factors)
+
+If a player has 1 year left on contract, and we convert this into a 3-year window sim. AGE shouldnt be listed as a negative NAV, as rentals have value to them. We do already have a flag for this so we can add in an uncertainty principle that advises if a player resigns.
+
+Dustin Wolf has a comically low NAV of +14, this should be fixed if we add a custom calculation for Goalie NAV value as we can base it on quality of team in front. 
+
+OPS player Suggested in What This team needs has an OPS of -2, doesnt make sense.
+
+AI still fabricating numbers, Simulation #10306 runs with WPG top scorer being Scheifele at 87 points but the AI summary reads Scheifele with 103 points.
