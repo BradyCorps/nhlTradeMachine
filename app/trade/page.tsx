@@ -8,6 +8,8 @@ import { MicroBar, DeltaRow } from "@/app/components/MicroBar";
 import { ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
 import TeamStrand, { CHAMP_TEMPLATE, TeamStrandData } from "@/app/components/TeamStrand";
+import LineupCard from "@/app/components/LineupCard";
+import WhatWeNeed from "@/app/components/WhatWeNeed";
 import {
   PLAYER_PEDIGREE, PROSPECT_TIERS, SHUTDOWN_D_PEDIGREE, INJURY_RISK,
 } from "@/app/lib/player-data";
@@ -991,6 +993,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
               homeBlocks={blocks[0]}
               partnerBlocks={blocks[1]}
               navMap={navMap}
+              db={db}
             />
           </div>
         )}
@@ -1224,12 +1227,37 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             )}
 
             {(blocks[0].length > 0 || blocks[1].length > 0) && (
-              <div className="grid grid-cols-2 gap-1.5">
-                <MiniStat label="Out" val={blocks[0].length.toString()} />
-                <MiniStat label="In" val={blocks[1].length.toString()} />
-                <MiniStat label="Variance" val={verdict ? `${verdict.metrics.variance.toFixed(0)}%` : "—"} />
-                <MiniStat label="Cap Δ" val={verdict ? `${verdict.metrics.capDelta > 0 ? "+" : ""}${verdict.metrics.capDelta.toFixed(1)}M` : "—"} />
-              </div>
+              <>
+                {/* Home Net Gain — prominent, right below TugBar context */}
+                {verdict && verdict.status !== "IDLE" && (
+                  <div style={{
+                    textAlign: "center", padding: "6px 10px",
+                    background: "var(--ledger-card)", border: "1px solid #c8b890",
+                    fontFamily: "'Courier Prime', monospace",
+                  }}>
+                    <div style={{ fontSize: 7, fontWeight: 900, textTransform: "uppercase",
+                                  letterSpacing: "0.15em", color: "var(--ledger-ink-faint)",
+                                  marginBottom: 2 }}>
+                      {teams[0]?.name?.split(" ").pop() ?? "Home"} Net Gain
+                    </div>
+                    <div style={{
+                      fontSize: 20, fontWeight: 900, lineHeight: 1,
+                      color: verdict.metrics.homeNetGain > 2   ? "var(--ledger-green)"
+                           : verdict.metrics.homeNetGain < -2  ? "var(--ledger-red)"
+                           : "var(--ledger-ink)",
+                    }}>
+                      {verdict.metrics.homeNetGain > 0 ? "+" : ""}
+                      {verdict.metrics.homeNetGain.toFixed(0)}
+                      <span style={{ fontSize: 9, fontWeight: 400, marginLeft: 3,
+                                     color: "var(--ledger-ink-faint)" }}>NAV</span>
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-1.5">
+                  <MiniStat label="Variance" val={verdict ? `${verdict.metrics.variance.toFixed(0)}%` : "—"} />
+                  <MiniStat label="Cap Δ" val={verdict ? `${verdict.metrics.capDelta > 0 ? "+" : ""}${verdict.metrics.capDelta.toFixed(1)}M` : "—"} />
+                </div>
+              </>
             )}
 
             {verdict && verdict.status !== "IDLE" && (
@@ -1849,7 +1877,7 @@ function computeContention(
 }
 
 function TeamDNA({
-  homeTeam, partnerTeam, homeRoster, partnerRoster, homeBlocks, partnerBlocks, navMap
+  homeTeam, partnerTeam, homeRoster, partnerRoster, homeBlocks, partnerBlocks, navMap, db
 }: {
   homeTeam: Team | null;
   partnerTeam: Team | null;
@@ -1858,6 +1886,7 @@ function TeamDNA({
   homeBlocks: Asset[];
   partnerBlocks: Asset[];
   navMap: Record<string, XNAVResult>;
+  db: { players: Asset[]; teams: Team[] };
 }) {
   const [expanded, setExpanded] = React.useState(true);
 
@@ -1950,7 +1979,23 @@ function TeamDNA({
             {homeTeam?.name} — Roster Gaps vs Playoff & Championship Thresholds{hasActiveTrade ? " (post-trade)" : ""}
           </div>
 
-          {/* Metric explanations */}
+          {/* ── Lineup Depth Charts ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: 12, marginBottom: 16 }}>
+            {[
+              { team: homeTeam,    roster: homeRoster,    out: homeBlocks,    inc: partnerBlocks.filter(a => a.position !== 'Pick'), label: 'Your Franchise' },
+              { team: partnerTeam, roster: partnerRoster, out: partnerBlocks, inc: homeBlocks.filter(a => a.position !== 'Pick'),    label: 'Trade Partner' },
+            ].filter(x => x.team).map(({ team, roster, out, inc, label }) => (
+              <div key={team!.id} style={{ background: 'var(--ledger-cream)', border: '1px solid #c8b890', padding: '10px 12px' }}>
+                <div style={{ fontSize: 9, fontWeight: 900, color: 'var(--ledger-ink)', fontFamily: "'Courier Prime', monospace", marginBottom: 6, letterSpacing: '0.05em' }}>
+                  {team!.name}
+                  <span style={{ color: 'var(--ledger-ink-faint)', fontWeight: 400 }}> — {label}</span>
+                </div>
+                <LineupCard roster={roster} outgoing={out} incoming={inc} />
+              </div>
+            ))}
+          </div>
+
+          {/* Metric explanations + WhatWeNeed */}
           {(() => {
             const GAP_EXPLAIN: Record<string, { full: string; need: string }> = {
               OPS:   { full: "Offensive Point Shares", need: "More offensive output across the lineup"    },
@@ -1963,30 +2008,26 @@ function TeamDNA({
               OZ:    { full: "Zone Deployment",        need: "More offensive-zone focused personnel"     },
             };
             const allGapsSorted = [...homeGaps.off, ...homeGaps.def].sort((a, b) => a.gap - b.gap);
-            const biggestNeeds = allGapsSorted.filter(g => g.gap < -0.10).slice(0, 3);
+            const gapsWithExplain = allGapsSorted.map(g => ({
+              ...g,
+              full: GAP_EXPLAIN[g.label]?.full ?? g.label,
+              need: GAP_EXPLAIN[g.label]?.need ?? `Improve ${g.label}`,
+            }));
+            const excludeIds = new Set([
+              ...homeRoster.map(p => p.id),
+              ...partnerRoster.map(p => p.id),
+            ]);
             return (
               <>
-                {/* What this team needs */}
-                {biggestNeeds.length > 0 && (
-                  <div style={{ background: 'var(--ledger-cream)', border: '1px solid #c8b890', padding: '8px 12px', marginBottom: '10px' }}>
-                    <div style={{ fontSize: '11px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '6px' }}>
-                      🔍 What This Team Needs{hasActiveTrade ? ' (post-trade)' : ''}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {biggestNeeds.map(g => (
-                        <div key={g.label} style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                          <span style={{ fontSize: '8px', fontWeight: 900, color: 'var(--ledger-red)', minWidth: '28px' }}>{g.label}</span>
-                          <span style={{ fontSize: '10px', color: 'var(--ledger-ink-mid)' }}>
-                            {GAP_EXPLAIN[g.label]?.need ?? `Improve ${GAP_EXPLAIN[g.label]?.full ?? g.label}`}
-                          </span>
-                          <span style={{ fontSize: '8px', color: 'var(--ledger-red)', marginLeft: 'auto', fontWeight: 900 }}>
-                            {(g.gap * 100).toFixed(0)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                {/* What This Team Needs — gaps with real player suggestions */}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 9, fontWeight: 900, color: 'var(--ledger-ink-faint)',
+                                textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6,
+                                fontFamily: "'Courier Prime', monospace" }}>
+                    🔍 What This Team Needs{hasActiveTrade ? ' (post-trade)' : ''}
                   </div>
-                )}
+                  <WhatWeNeed gaps={gapsWithExplain} db={db} excludeIds={excludeIds} />
+                </div>
 
                 {/* Gap bars */}
                 <div className="strands-gaps-grid">
