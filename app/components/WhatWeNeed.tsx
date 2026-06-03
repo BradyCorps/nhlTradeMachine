@@ -118,11 +118,11 @@ function attainability(
 
 // ── Trait → metric function ───────────────────────────────────────────────────
 const TRAIT_METRIC: Record<string, (p: Player) => number> = {
-  OPS:   p => p.ops    ?? p.ptsPace  ?? 0,
+  OPS:   p => Math.max(0, p.ops ?? p.ptsPace  ?? 0),  // ops=-2 should not suggest player
   xG:    p => p.xGPace ?? 0,
   NOIV:  p => p.xgRelTM ?? 0,
   TOI:   p => p.avgTOI  ?? 0,
-  DPS:   p => p.dps     ?? 0,
+  DPS:   p => Math.max(0, p.dps ?? 0),
   SUPP:  p => -(p.xgaRelTM ?? 0),
   Usage: p => -(p.qocRank ?? 999),
   OZ:    p => -(p.dzPct ?? 0.5),

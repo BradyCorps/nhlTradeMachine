@@ -1533,10 +1533,10 @@ const runGmLogic = (
         affectedAsset: youngGoingOut[0].name,
         vetoesSide: 1,
       });
-    } else if (outPlayers.length > 0 && inPicks.length === 0
+    } else if (outPlayers.length > 0 && outPicks.length === 0
+        && !outgoing.some((a) => a.age <= 23 && a.position !== "Pick")
         && outPlayers.every((a) => a.age > 28)) {
-      // Rebuilder only getting old players, no picks — wrong direction
-      // Note: outPlayers = what HOME sends = what PARTNER (rebuilder) receives
+      // Rebuilder only getting old players with no picks or prospects — wrong direction
       flags.push({
         severity: "SOFT", category: "ASSET_SHAPE_MISMATCH",
         headline: `${teamPartner.name} needs picks, not aging vets`,
@@ -1722,7 +1722,7 @@ const runGmLogic = (
       severity: "SOFT",
       category: "LEVERAGE_ASYMMETRY",
       headline: `${losingTeam.name} is significantly overpaying`,
-      explanation: `The NAV analysis shows ${losingTeam.name} giving up ${losingNav.toFixed(0)} NAV points worth of assets and receiving only ${gainingNav.toFixed(0)} — a ${navGapPct.toFixed(0)}% gap. ${gainingTeam.name}'s GM has no incentive to accept this deal when they could simply wait for a better offer. Lopsided trades only happen under specific pressure: a player demanding a trade, a GM under ownership pressure to cut salary, or a team desperate to fill a critical hole before a deadline. Without that context, ${gainingTeam.name} holds all the leverage here.`,
+      explanation: `The NAV analysis shows ${losingTeam.name} giving up ${losingNav.toFixed(0)} NAV points worth of assets and receiving only ${gainingNav.toFixed(0)} — a ${navGapPct.toFixed(0)}% gap. ${losingTeam.name}'s GM has no incentive to accept this deal when they could simply wait for a better offer. Lopsided trades only happen under specific pressure: a player demanding a trade, a GM under ownership pressure to cut salary, or a team desperate to fill a critical hole before a deadline. Without that context, ${gainingTeam.name} holds all the leverage here.`,
       vetoesSide: homeNetGain < 0 ? 1 : 0,
     });
   }

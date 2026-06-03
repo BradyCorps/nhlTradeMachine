@@ -152,6 +152,22 @@ export default function TradeMachine() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db]);
   const [verdictOpen, setVerdictOpen] = useState(false);   // bottom sheet expanded
+
+  // Freeze body scroll when verdict panel is open (prevents background scroll on mobile)
+  React.useEffect(() => {
+    if (verdictOpen) {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.paddingRight = '0px';
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.paddingRight = '0px';
+      document.body.style.overflow = 'unset';
+    };
+  }, [verdictOpen]);
   const [evaluated, setEvaluated] = useState(false);
   const [expandedFlag,   setExpandedFlag]   = useState<number | null>(null);
   const [tradeRequest,   setTradeRequest]   = useState<Asset[] | null>(null);
@@ -425,9 +441,17 @@ LEAGUE RESULTS (LOCKED — do not contradict):
   Points Leader: ${sim.leaders?.topScorer?.name ?? "—"}, ${sim.leaders?.topScorer?.team ?? "—"} — ${sim.leaders?.topScorer?.pts ?? "—"} pts
   GAA Leader: ${sim.leaders?.topGoalie?.name ?? "—"}, ${sim.leaders?.topGoalie?.team ?? "—"} — ${sim.leaders?.topGoalie?.gaa ?? "—"} GAA
   SV% Leader: ${sim.leaders?.topGoalie?.name ?? "—"}, ${sim.leaders?.topGoalie?.team ?? "—"} — ${sim.leaders?.topGoalie?.svp ?? "—"} SV%
-  Calder Trophy: Matthew Schaefer, New York Islanders — unanimous (198 first-place votes)
+  Calder Trophy: ${sim.leaders?.calder?.name ?? "—"}, ${sim.leaders?.calder?.team ?? "—"} — ${sim.leaders?.calder?.note ?? ""}
+  Vezina Trophy: ${sim.leaders?.vezina?.name ?? "—"}, ${sim.leaders?.vezina?.team ?? "—"} — ${sim.leaders?.vezina?.gaa ?? "—"} GAA
+  Hart Trophy (MVP): ${sim.leaders?.hart?.name ?? "—"}, ${sim.leaders?.hart?.team ?? "—"} — ${sim.leaders?.hart?.pts ?? "—"} pts
+  Norris Trophy: ${sim.leaders?.norris?.name ?? "—"}, ${sim.leaders?.norris?.team ?? "—"} — ${sim.leaders?.norris?.pts ?? "—"} pts
   Draft Lottery: ${sim.leaders?.draftLottery?.teamName ?? "—"} finished last (${sim.leaders?.draftLottery?.projectedPoints ?? "—"} pts)
   Simulation seed: #${sim.seed ?? "—"}
+
+CRITICAL ACCURACY RULES:
+- Every stat (pts, GAA, SV%) must match the exact number above — no rounding, no approximating
+- Do not add stats for players not listed above
+- Do not add context (injuries, feuds, locker room issues) not in the data above
 
 PLAYOFF TEAMS: ${sim.playoffTeams?.join(", ") ?? "—"}
 

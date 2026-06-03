@@ -173,8 +173,9 @@ export async function POST(req: NextRequest) {
         returnProfile,
       };
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8);
+    .filter(m => m !== null && m.score >= 12)   // minimum threshold — below 12 the trade would almost certainly fail
+    .sort((a, b) => b!.score - a!.score)
+    .slice(0, 8) as TeamMatch[];
 
   return NextResponse.json({ matches, packageNAV, packageCap, avgAge });
 }

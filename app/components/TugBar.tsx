@@ -13,8 +13,13 @@ interface TugBarProps {
 }
 
 function TugBar({ homeNetGain, navA, navB, cNavA, cNavB }: TugBarProps) {
-  const total = Math.max((cNavA ?? navA) + (cNavB ?? navB), 1);
-  const leftPct = clamp(((cNavA ?? navA) / total) * 100, 5, 95);
+  // Use absolute values for bar proportions so negative-NAV trades render correctly.
+  // When both sides are negative (salary dumps), |navA| and |navB| still show
+  // the relative size of each side's obligation.
+  const absA  = Math.abs(cNavA ?? navA);
+  const absB  = Math.abs(cNavB ?? navB);
+  const total = Math.max(absA + absB, 1);
+  const leftPct = clamp((absA / total) * 100, 5, 95);
 
   // Show compression note when the slot penalty meaningfully reduces a package
   const deltaA = navA - (cNavA ?? navA);
