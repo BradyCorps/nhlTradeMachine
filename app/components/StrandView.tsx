@@ -29,36 +29,32 @@ export function buildAssetTraits(a: Asset, nav: XNAVResult): {
 
   return {
     off: [
-      { label: "SCR",  val: norm(safe(a.ptsPace), 0, isD ? 80 : 100),
-        title: `Scoring pace: ${a.ptsPace.toFixed(1)} pts/82` },
+      { label: ops !== null ? "OPS" : "SCR",
+        val: opsNorm ?? norm(safe(a.ptsPace), 0, isD ? 80 : 100),
+        title: ops !== null ? `OPS ${ops.toFixed(1)} — Offensive Point Shares` : `Pts/82: ${a.ptsPace.toFixed(1)}`,
+        ps: ops !== null ? ops.toFixed(1) : null },
       { label: "xG",   val: norm(safe(a.xGPace ?? 0), 0, isD ? 25 : 50),
         title: `xGoals: ${(a.xGPace ?? 0).toFixed(1)}/82` },
-      { label: ops !== null ? "OPS" : "OFF",
-        val: opsNorm ?? norm(nav.off, -80, 300),
-        title: ops !== null ? `OPS ${ops.toFixed(1)} — Offensive Point Shares` : "Offensive NAV component",
-        ps: ops !== null ? ops.toFixed(1) : null },
       { label: "NOIV", val: norm(safe(a.xgRelTM ?? 0), -12, 12),
         title: `xG% vs teammates: ${(a.xgRelTM ?? 0).toFixed(1)}` },
       { label: "TOI+", val: norm(safe(a.avgTOI), 10, 27),
         title: `Ice time: ${safe(a.avgTOI).toFixed(1)} min/gm` },
     ],
     def: [
-      { label: "SUPP", val: norm(-(a.xgaRelTM ?? 0), -1.5, 1.5),
-        title: `xGA suppression vs teammates: ${(a.xgaRelTM ?? 0).toFixed(2)}` },
-      { label: "Usage",  val: norm(400 - safe(a.qocRank ?? 400), 50, 380),
-        title: "Ice time rank (usage proxy)" },
       { label: dps !== null ? "DPS" : "DEF",
         val: dpsNorm ?? norm(nav.def, -60, 150),
         title: dps !== null ? `DPS ${dps.toFixed(1)} — Defensive Point Shares` : "Defensive NAV component",
         ps: dps !== null ? dps.toFixed(1) : null },
+      { label: "SUPP", val: norm(-(a.xgaRelTM ?? 0), -1.5, 1.5),
+        title: `xGA suppression vs teammates: ${(a.xgaRelTM ?? 0).toFixed(2)}` },
+      { label: "Usage",  val: norm(400 - safe(a.qocRank ?? 400), 50, 380),
+        title: "Ice time rank (usage proxy)" },
       { label: "OZ",   val: a.dzPct != null ? 1 - norm(safe(a.dzPct), 0.3, 0.7) : 0.5,
         title: a.dzPct != null
           ? `OZ: ${((1-a.dzPct)*100).toFixed(0)}% offensive zone starts`
           : "Zone deployment unavailable",
         display: a.dzPct != null ? Math.round((1 - a.dzPct) * 100) : undefined,
         unavailable: a.dzPct == null },
-      { label: "AGE",  val: norm(nav.age, -80, 60),
-        title: "Age curve trajectory" },
     ],
   };
 }

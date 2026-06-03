@@ -303,16 +303,14 @@ export default function StrandDisplay({
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
           {[
-            ["SCR",  "Pts/82 — scoring pace"],
-            ["xG",   "Expected goals generated"],
-            ["OPS",  "Offensive Point Shares"],
-            ["NOIV", "xG% vs teammates on ice"],
+            ["OPS",  "Offensive Point Shares (or Pts/82 when unavailable)"],
+            ["xG",   "Expected goals generated per 82"],
+            ["NOIV", "xG% vs teammates on ice — team impact"],
             ["TOI+", "Ice time & deployment"],
-            ["SUPP", "xGA suppression vs teammates"],
-            ["Usage",  "Ice time deployment proxy — correlates with opponent quality"],
             ["DPS",  "Defensive Point Shares"],
-            ["OZ",   "Raw OZ% · bar shows vs league"],
-            ["AGE",  "Contract age curve trajectory"],
+            ["SUPP", "xGA suppression vs teammates"],
+            ["Usage","Ice time deployment — correlates with opponent quality"],
+            ["OZ",   "Offensive zone start % vs league average"],
           ].map(([abbr, desc]) => (
             <div key={abbr} style={{ display: "flex", gap: "4px" }}>
               <span style={{ fontWeight: 900, width: "28px", flexShrink: 0, color: "var(--ledger-ink-body)" }}>{abbr}</span>

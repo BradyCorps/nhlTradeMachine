@@ -86,7 +86,24 @@ export default function LedgerDropdown({ teams, selectedId, onSelect }: {
                     if (t.id !== selectedId) (e.currentTarget as HTMLElement).style.background = 'transparent';
                   }}
                 >
-                  {t.name}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                    <span>{t.name}</span>
+                    {t.phase && (
+                      <span style={{
+                        fontSize: 7, fontWeight: 900, textTransform: 'uppercase',
+                        letterSpacing: '0.08em', flexShrink: 0,
+                        fontFamily: "'Courier Prime', monospace",
+                        color:
+                          t.phase === 'Contender'  ? 'var(--green)'  :
+                          t.phase === 'Bubble'     ? 'var(--navy)'   :
+                          t.phase === 'Retooling'  ? 'var(--amber)'  :
+                          t.phase === 'Rebuilding' ? 'var(--red)'    :
+                          'var(--brown)',
+                      }}>
+                        {t.phase}
+                      </span>
+                    )}
+                  </div>
                 </button>
               ))}
             </div>

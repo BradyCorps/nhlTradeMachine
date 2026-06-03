@@ -95,7 +95,59 @@ export default function TradeMachine() {
     }>;
     packageNAV: number; packageCap: number; avgAge: number;
   }>(null);
-  const [matchLoading, setMatchLoading] = useState(false);
+  const [matchLoading,    setMatchLoading]    = useState(false);
+  const [approvedOnly,    setApprovedOnly]    = useState(true);
+
+  // ── Shared trade links — URL serialisation ────────────────────────────────
+  // Format: ?home=WPG&partner=SJS&out=id1,id2:50&in=id3
+  // where id2:50 means 50% retention. Updates without a full navigation.
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  // Sync state → URL on every trade change
+  useEffect(() => {
+    if (!teams[0] && !teams[1] && !blocks[0].length && !blocks[1].length) return;
+    const p = new URLSearchParams();
+    if (teams[0]) p.set('home', teams[0].id);
+    if (teams[1]) p.set('partner', teams[1].id);
+    if (blocks[0].length) p.set('out', blocks[0].map(a =>
+      (a.retainedPct ?? 0) > 0 ? `${a.id}:${Math.round(a.retainedPct! * 100)}` : a.id
+    ).join(','));
+    if (blocks[1].length) p.set('in', blocks[1].map(a => a.id).join(','));
+    const newUrl = `${window.location.pathname}?${p.toString()}`;
+    window.history.replaceState({}, '', newUrl);
+  }, [teams, blocks]);
+
+  // Parse URL → state on cold load (after db is ready)
+  useEffect(() => {
+    if (!db || db.players.length === 0) return;
+    const p = new URLSearchParams(window.location.search);
+    const homeId    = p.get('home');
+    const partnerId = p.get('partner');
+    const outStr    = p.get('out');
+    const inStr     = p.get('in');
+    if (!homeId && !partnerId && !outStr && !inStr) return;
+
+    const parseBlock = (str: string | null): Asset[] => {
+      if (!str) return [];
+      return str.split(',').flatMap(token => {
+        const [id, retStr] = token.split(':');
+        const asset = db.players.find(pl => pl.id === id);
+        if (!asset) return [];
+        return [{ ...asset, retainedPct: retStr ? parseInt(retStr) / 100 : 0 }];
+      });
+    };
+
+    const homeTeam    = homeId    ? db.teams.find(t => t.id === homeId)    ?? null : null;
+    const partnerTeam = partnerId ? db.teams.find(t => t.id === partnerId) ?? null : null;
+    const outgoing    = parseBlock(outStr);
+    const incoming    = parseBlock(inStr);
+
+    if (homeTeam || partnerTeam || outgoing.length || incoming.length) {
+      setTeams([homeTeam, partnerTeam]);
+      setBlocks([outgoing, incoming]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [db]);
   const [verdictOpen, setVerdictOpen] = useState(false);   // bottom sheet expanded
   const [evaluated, setEvaluated] = useState(false);
   const [expandedFlag,   setExpandedFlag]   = useState<number | null>(null);
@@ -995,6 +1047,26 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                       {hint}
                     </p>
                   )}
+                  {/* Share trade link — only when there's something worth sharing */}
+                  {(teams[0] || teams[1] || blocks[0].length > 0) && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(window.location.href).then(() => {
+                          setLinkCopied(true);
+                          setTimeout(() => setLinkCopied(false), 2000);
+                        });
+                      }}
+                      className="w-full py-2 font-mono text-2xs uppercase tracking-widest transition-all duration-200"
+                      style={{
+                        background: 'transparent',
+                        border: '1px solid var(--ledger-rule)',
+                        color: linkCopied ? 'var(--ledger-green)' : 'var(--ledger-ink-faint)',
+                        cursor: 'pointer',
+                        marginTop: 4,
+                      }}>
+                      {linkCopied ? '✓ Link copied!' : '⛓ Copy trade link'}
+                    </button>
+                  )}
                 </>
               );
             })()}
@@ -1013,22 +1085,43 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             )}
 
             {/* ── Match Results ── */}
-            {matchResults && matchResults.matches.length > 0 && (
+            {matchResults && matchResults.matches.length > 0 && (() => {
+              const displayed = approvedOnly
+                ? matchResults.matches.filter(m => m.capFit !== "OVER")
+                : matchResults.matches;
+              return (
               <div className="mt-3 border-t-2 pt-3" style={{ borderColor: 'var(--ledger-navy)' }}>
-                {/* Sticky header — stays visible while scrolling */}
-                <div className="text-2xs font-black uppercase tracking-[0.4em] mb-1 font-mono text-center"
-                  style={{ color: 'var(--ledger-navy)' }}>
-                  Best-Fit Trade Partners
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-2xs font-black uppercase tracking-[0.4em] font-mono"
+                    style={{ color: 'var(--ledger-navy)' }}>
+                    Best-Fit Trade Partners
+                  </div>
+                  <button
+                    onClick={() => setApprovedOnly(v => !v)}
+                    className="text-2xs font-mono px-2 py-0.5 rounded transition-colors"
+                    style={{
+                      background: approvedOnly ? 'var(--ledger-green)' : 'var(--ledger-rule-light)',
+                      color: approvedOnly ? 'white' : 'var(--ledger-ink-faint)',
+                      fontWeight: 900, border: 'none', cursor: 'pointer',
+                    }}>
+                    {approvedOnly ? '✓ Approved' : 'All Teams'}
+                  </button>
                 </div>
                 <div className="text-2xs font-mono mb-3 text-center" style={{ color: 'var(--ledger-ink-faint)' }}>
                   Package: {matchResults.packageNAV > 0 ? "+" : ""}{matchResults.packageNAV.toFixed(0)} NAV
                   · ${matchResults.packageCap.toFixed(1)}M cap
                   {matchResults.avgAge > 0 ? ` · avg ${matchResults.avgAge.toFixed(0)} yrs old` : ""}
+                  {approvedOnly && ` · ${displayed.length} of ${matchResults.matches.length} teams`}
                 </div>
-                {/* Scrollable card list — max 3 cards visible, scroll for rest */}
+                {displayed.length === 0 && (
+                  <div className="text-center text-2xs font-mono py-3" style={{ color: 'var(--ledger-ink-faint)' }}>
+                    No teams can absorb this package under the cap.
+                    <button onClick={() => setApprovedOnly(false)} className="ml-2 underline">Show all</button>
+                  </div>
+                )}
                 <div className="space-y-2 overflow-y-auto pr-1"
                   style={{ maxHeight: '420px', scrollbarWidth: 'thin', scrollbarColor: 'var(--ledger-rule) transparent' }}>
-                  {matchResults.matches.map((m, i) => (
+                  {displayed.map((m, i) => (
                     <div key={m.teamId} className="rounded p-2.5"
                       style={{
                         background: i === 0 ? 'rgba(26,46,92,0.08)' : 'var(--ledger-card)',
@@ -1084,15 +1177,15 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                     </div>
                   ))}
                 </div>
-                {/* Fade hint — signals more cards below */}
-                {matchResults.matches.length > 3 && (
+                {displayed.length > 3 && (
                   <div className="text-2xs font-mono text-center mt-1.5"
                     style={{ color: 'var(--ledger-ink-faint)' }}>
-                    ↕ scroll · {matchResults.matches.length} teams ranked
+                    ↕ scroll · {displayed.length} teams ranked
                   </div>
                 )}
               </div>
-            )}
+              );
+            })()}
 
             {verdict && (verdict.status === "FAIR" || verdict.status === "WIN") && (
               <button onClick={() => { executeTrade(); setHomeTeamLocked(true); }}
