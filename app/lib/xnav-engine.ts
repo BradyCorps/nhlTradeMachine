@@ -327,7 +327,70 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const isTopPairD       = isD && toi > 22;
   const positionalPremium = asset.position === "C" ? 1.15 : isTopPairD ? 1.20 : 1.0;
   const mult             = asset.multiplier ?? 1.0;
-  const total            = safe((trueMarketValue + capTotal) * mult * positionalPremium);
+  const rawTotal         = safe((trueMarketValue + capTotal) * mult * positionalPremium);
+
+  // ── Development Risk Discount ─────────────────────────────────
+  // Young players on ELCs have significant bust probability that the cap surplus
+  // model ignores. A 21-year-old D-man might become Makar — or might plateau as a
+  // solid #2. This discount prices that uncertainty into their trade value.
+  //
+  // Graduated by age (players 26+ are considered fully established):
+  //   ≤21: ×0.68  — ELC, limited NHL track record, high variance
+  //   22:  ×0.76  — first full contract year, still developing
+  //   23:  ×0.82  — showing signs but not proven elite
+  //   24:  ×0.88  — near prime, most upside captured
+  //   25:  ×0.93  — essentially proven, minor residual risk
+  //   26+: ×1.00  — fully established, no discount
+  //
+  // Note: only applies to skaters; goalies and picks have their own models.
+  const developmentDiscount =
+    age <= 21 ? 0.68 :
+    age <= 22 ? 0.76 :
+    age <= 23 ? 0.82 :
+    age <= 24 ? 0.88 :
+    age <= 25 ? 0.93 :
+    1.0;
+
+  const discountedTotal = rawTotal * developmentDiscount;
+
+  // ── Franchise Cornerstone Floor ───────────────────────────────
+  // A proven franchise player can never be worth less than their floor in a trade,
+  // regardless of contract situation. Any GM would take Draisaitl at $14M — the
+  // surplus model shouldn't be able to drag him below this floor.
+  //
+  // Qualification:
+  //   Forwards: age ≥ 27 AND ptsPace ≥ 90 (proven multi-year elite scorer)
+  //   D-men:    age ≥ 27 AND ptsPace ≥ 65 AND avgTOI > 22 (proven top-pair anchor)
+  //
+  // The floor reflects the "blockbuster required" principle: acquiring a franchise
+  // cornerstone demands a premium roster player + elite prospect + 1st-round pick.
+  // No package of depth players and ELC wildcards should be able to match them.
+  // ── Franchise Cornerstone Floor ───────────────────────────────
+  // A proven franchise player can never be worth less than their floor in a trade,
+  // regardless of contract situation. Any GM would take Draisaitl at $14M — the
+  // surplus model shouldn't be able to drag him below this floor due to data gaps
+  // or partial-season stats.
+  //
+  // Qualification criteria:
+  //   Forwards: age ≥ 27 AND (ptsPace ≥ 80  OR  ops ≥ 5.0 when data is available)
+  //             — 80+ pts at age 27+ is unambiguously franchise-tier production
+  //   D-men:    age ≥ 27 AND ptsPace ≥ 65 AND avgTOI > 22
+  //             — top-pair anchor who has proven it over multiple seasons
+  //
+  // The floor (300 / 250) embodies the "blockbuster required" principle:
+  // acquiring a franchise cornerstone demands a premium roster player +
+  // elite prospect + 1st-round pick. No ELC-heavy package should match them alone.
+  //
+  // Floor uses -Infinity for non-qualifying players so negative NAV contracts
+  // (e.g. Huberdeau) are NOT accidentally floored at zero.
+  const qualifiesEliteForward  = !isD && age >= 27
+    && (pts >= 80 || (ops !== null && ops >= 5.0));
+  const qualifiesEliteDefender =  isD && age >= 27 && pts >= 65 && toi > 22;
+  const franchiseFloor = qualifiesEliteForward ? 300
+    : qualifiesEliteDefender                   ? 250
+    : -Infinity;
+
+  const total = Math.max(discountedTotal, franchiseFloor);
 
   return {
     total:  Math.round(total),

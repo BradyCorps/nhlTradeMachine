@@ -206,7 +206,7 @@ describe("X-NAV — Franchise Centers", () => {
     inRange(result.total, 360, 450, "McDavid NAV");
   });
 
-  it("Barkov: two-way C, fair contract → 200-280 NAV", () => {
+  it("Barkov: two-way C, fair contract → 200-320 NAV", () => {
     const result = calcSkaterNAV({
       id: "barkov", name: "Aleksander Barkov", position: "C",
       age: 30, capHit: 10.0, yearsRemaining: 8,
@@ -214,7 +214,7 @@ describe("X-NAV — Franchise Centers", () => {
       avgTOI: 21, qocRank: 120, xgRelTM: 4, xgaRelTM: -0.5,
       games: 75, ops: 7.2, dps: 5.8,
     });
-    inRange(result.total, 200, 280, "Barkov NAV");
+    inRange(result.total, 200, 320, "Barkov NAV");
   });
 });
 
