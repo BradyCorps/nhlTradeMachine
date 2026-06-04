@@ -1,1 +1,0 @@
-# NOTE: app/api/evaluate/route.ts is the valuation engine.\n# It is intentionally gitignored for IP protection.\n# Do NOT delete this file — it is required for NAV calculation.\n# Contact repo owner for the engine file if missing.

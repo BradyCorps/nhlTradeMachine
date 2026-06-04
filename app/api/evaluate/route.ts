@@ -67,7 +67,7 @@ const compressPackage = (assets: Asset[]): number => {
 
 
 // ============================================================
-// GM LOGIC ENGINE — v7.1
+// X-NAV — v2.0
 // ============================================================
 type FlagSeverity = "HARD" | "SOFT" | "WARN" | "INFO";
 type FlagCategory =

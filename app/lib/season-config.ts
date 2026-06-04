@@ -40,8 +40,8 @@ export const COMPRESSION = {
 } as const;
 
 export const FRANCHISE = {
-  threshold:  80,                // Elite stars — recalibrated from 600 (dps*15 + cap*6 scale)
-  megalodon:  125,               // Generational talents — recalibrated from 900
+  threshold:  220,               // Elite franchise stars — recalibrated for 2.0 scale (McDavid ~286, Barkov ~245)
+  megalodon:  380,               // Generational talent on elite deal — Makar-tier (~442), functionally untradeable
 } as const;
 
 // Helpers derived from the above — avoids recalculating at call sites

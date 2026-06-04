@@ -195,7 +195,7 @@ describe("Pick NAV — First Round Curve", () => {
 // SKATER TESTS
 // ─────────────────────────────────────────────────────────────────────────────
 describe("X-NAV — Franchise Centers", () => {
-  it("McDavid-tier: elite production, reasonable cap → 100-210 NAV", () => {
+  it("McDavid-tier: elite production, reasonable cap → 360-450 NAV", () => {
     const result = calcSkaterNAV({
       id: "mcdavid", name: "Connor McDavid", position: "C",
       age: 28, capHit: 12.5, yearsRemaining: 2,
@@ -203,10 +203,10 @@ describe("X-NAV — Franchise Centers", () => {
       avgTOI: 22, qocRank: 80, xgRelTM: 12, xgaRelTM: -0.3,
       games: 78, ops: 12.5, dps: 2.1,
     });
-    inRange(result.total, 100, 210, "McDavid NAV");
+    inRange(result.total, 360, 450, "McDavid NAV");
   });
 
-  it("Barkov: two-way C, fair contract → 50-130 NAV", () => {
+  it("Barkov: two-way C, fair contract → 200-280 NAV", () => {
     const result = calcSkaterNAV({
       id: "barkov", name: "Aleksander Barkov", position: "C",
       age: 30, capHit: 10.0, yearsRemaining: 8,
@@ -214,7 +214,7 @@ describe("X-NAV — Franchise Centers", () => {
       avgTOI: 21, qocRank: 120, xgRelTM: 4, xgaRelTM: -0.5,
       games: 75, ops: 7.2, dps: 5.8,
     });
-    inRange(result.total, 50, 130, "Barkov NAV");
+    inRange(result.total, 200, 280, "Barkov NAV");
   });
 });
 
@@ -243,7 +243,7 @@ describe("X-NAV — Overpaid Veterans", () => {
 });
 
 describe("X-NAV — Elite Defencemen", () => {
-  it("Makar-tier: elite offensive D, strong contract → 120-230 NAV", () => {
+  it("Makar-tier: elite offensive D, strong contract → 500-650 NAV", () => {
     const result = calcSkaterNAV({
       id: "makar", name: "Cale Makar", position: "D",
       age: 26, capHit: 9.0, yearsRemaining: 3,
@@ -251,7 +251,7 @@ describe("X-NAV — Elite Defencemen", () => {
       avgTOI: 25, qocRank: 100, xgRelTM: 8, xgaRelTM: -0.4,
       games: 78, ops: 9.5, dps: 5.2,
     });
-    inRange(result.total, 120, 230, "Makar NAV");
+    inRange(result.total, 500, 650, "Makar NAV");
   });
 
   it("Morrissey: two-way D with NOIV data — DEF bar positive, not an artifact", () => {
@@ -373,7 +373,7 @@ describe("X-NAV — Elite Defencemen", () => {
     expect(selke.def).toBeGreaterThan(offC.def);
   });
 
-  it("Shutdown D: low pts but high defensive value → 50-130 NAV", () => {
+  it("Shutdown D: low pts but high defensive value → 130-200 NAV", () => {
     const result = calcSkaterNAV({
       id: "slavin", name: "Jaccob Slavin", position: "D",
       age: 32, capHit: 5.3, yearsRemaining: 2,
@@ -381,7 +381,7 @@ describe("X-NAV — Elite Defencemen", () => {
       avgTOI: 22, qocRank: 90, xgRelTM: 1, xgaRelTM: -0.8,
       games: 78, ops: 2.8, dps: 6.5,
     });
-    inRange(result.total, 50, 130, "Slavin NAV");
+    inRange(result.total, 130, 200, "Slavin NAV");
     // DEF must be meaningfully positive — xgaRelTM-0.8 at 22min = elite suppression
     expect(result.def).toBeGreaterThan(25);
   });
