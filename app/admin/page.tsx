@@ -4,11 +4,17 @@ import { teams as teamsTable } from "@/app/db/schema";
 import { AdminTeamRow } from "./AdminTeamRow";
 import Link from "next/link";
 
-
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
-  const allTeams = await db.select().from(teamsTable).orderBy(teamsTable.name);
+  let allTeams: any[] = [];
+  let dbError = null;
+
+  try {
+    allTeams = await db.select().from(teamsTable).orderBy(teamsTable.name);
+  } catch (e: any) {
+    dbError = e.message || String(e);
+  }
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 p-8 font-sans">
@@ -24,21 +30,29 @@ export default async function AdminDashboard() {
           </Link>
         </header>
 
-        <section className="mb-12">
-          <div className="mb-4">
-            <h2 className="text-lg font-bold uppercase tracking-wider text-zinc-100 mb-1">Team Phase Overrides</h2>
-            <p className="text-zinc-500 text-xs leading-relaxed max-w-2xl">
-              By default, a team's phase (Contender, Bubble, Rebuilding) is calculated automatically based on their live standings.
-              Use this dashboard to manually lock a team into a specific phase (e.g. if a team is technically in a playoff spot but is a known seller).
-            </p>
+        {dbError ? (
+          <div className="bg-red-950 border border-red-800 text-red-200 p-6 rounded-lg font-mono text-sm">
+            <h3 className="font-bold mb-2">Database Connection Error:</h3>
+            <p>{dbError}</p>
+            <p className="mt-4 text-xs text-red-400">Make sure DATABASE_URL and DATABASE_AUTH_TOKEN are correctly set in Vercel.</p>
           </div>
+        ) : (
+          <section className="mb-12">
+            <div className="mb-4">
+              <h2 className="text-lg font-bold uppercase tracking-wider text-zinc-100 mb-1">Team Phase Overrides</h2>
+              <p className="text-zinc-500 text-xs leading-relaxed max-w-2xl">
+                By default, a team's phase (Contender, Bubble, Rebuilding) is calculated automatically based on their live standings.
+                Use this dashboard to manually lock a team into a specific phase (e.g. if a team is technically in a playoff spot but is a known seller).
+              </p>
+            </div>
 
-          <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
-            {allTeams.map((t) => (
-              <AdminTeamRow key={t.id} team={t} />
-            ))}
-          </div>
-        </section>
+            <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+              {allTeams.map((t) => (
+                <AdminTeamRow key={t.id} team={t} />
+              ))}
+            </div>
+          </section>
+        )}
 
       </div>
     </div>
