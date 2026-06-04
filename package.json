@@ -12,12 +12,15 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
+    "@libsql/client": "^0.17.3",
     "@types/node": "20.14.10",
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
     "@upstash/redis": "^1.38.0",
     "autoprefixer": "10.4.19",
     "cheerio": "^1.0.0-rc.12",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
     "eslint": "8.57.0",
     "eslint-config-next": "14.2.15",
     "next": "14.2.15",
@@ -32,6 +35,8 @@
   },
   "devDependencies": {
     "@vitest/ui": "^4.1.7",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.22.4",
     "vitest": "^4.1.7"
   }
 }

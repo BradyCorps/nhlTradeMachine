@@ -3,6 +3,9 @@ import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
+import { db } from "@/app/db/client";
+import { teams as teamsTable } from "@/app/db/schema";
+
 export const dynamic = "force-dynamic";
 
 const CAP_CEILING = 104.0;
@@ -69,22 +72,7 @@ const derivePhase = (confRank: number, divRank: number, pointPct: number): strin
 // Some teams have a bad year but retain the core of a contender.
 // These are manually curated based on roster quality, not just standings.
 // ── Phase overrides for teams whose standing misleads about their true window ──
-const PHASE_OVERRIDES: Record<string, string> = {
-  // ── Unlucky Elite (The Bounce-Backs) ──
-  WPG: "Retooling",    // Elite core intact, anomalous off-year
-  FLA: "Retooling",    // Elite core intact, anomalous off-year
-  TOR: "Retooling",    // 78 pts naturally flags as Rebuilding, but they won't sell the core
-  CHI: "Retooling",    // Bedard is entering Year 3; they are shifting from Tanking to buying
 
-  // ── The "Blow It Up" Tier (The Mushy Middle) ──
-  SEA: "Rebuilding",   // 79 pts naturally flags as Retooling, but the roster needs a hard reset
-  NYR: "Rebuilding",   // Aging core's window has definitively closed
-  STL: "Rebuilding",   // 86 pts naturally flags as Bubble, but requires a structural teardown
-  LAK: "Rebuilding",   // 90 pts naturally flags as Bubble, but they are aging out of contention
-  DET: "Rebuilding",   // 92 pts naturally flags as Bubble, but current core has peaked
-  
- 
-};
 
 // ── Contract overrides — manual corrections for known data errors ──
 const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: number; position?: string }> = {
@@ -224,24 +212,34 @@ async function loadTeams(): Promise<any[]> {
     if (i + 8 < teamIds.length) await new Promise(r => setTimeout(r, 300));
   }
 
+  // ── Query Database for manual overrides ────────
+  let dbTeams: any[] = [];
+  try {
+    dbTeams = await db.select().from(teamsTable);
+  } catch (e) {
+    console.warn("DB not reachable, falling back to static/live data.");
+  }
+  const dbTeamMap = new Map(dbTeams.map(t => [t.id, t]));
+
   // ── Build team objects ────────────────────────────────────────
   const teams = TEAMS_DB.map((t) => {
+    const dbTeam   = dbTeamMap.get(t.id);
     const st       = standingsMap.get(t.id);
-    const standing = st?.standing       ?? t.standing;
+    const standing = dbTeam?.standingOverride ?? st?.standing ?? t.standing;
     const confRank = st?.conferenceRank ?? 8;   // Safe baseline fallback if API misses
     const divRank  = st?.divisionRank   ?? 4;   // Safe baseline fallback if API misses
     const pointPct = st?.pointPct       ?? 0.5;
     const capSpace = capMap.get(t.id)   ?? t.capSpace;
     
-    const phase = PHASE_OVERRIDES[t.id]
+    const phase = dbTeam?.phaseOverride
       ?? (standingsMap.size >= 28 ? derivePhase(confRank, divRank, pointPct) : t.phase);
 
     return {
       id:       t.id,
-      name:     st?.teamFullName ?? t.name,
+      name:     st?.teamFullName ?? dbTeam?.name ?? t.name,
       capSpace: Math.round(capSpace * 10) / 10,
       standing, // Preserves overall league rank for UI sorting
-      phase,    // Now accurately driven by playoff positioning
+      phase,    // Now accurately driven by playoff positioning or DB manual override
       needs:    TEAM_NEEDS[t.id] ?? [],
     };
   });
