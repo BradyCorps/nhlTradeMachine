@@ -1,3 +1,6 @@
+import { config } from "dotenv";
+config({ path: ".env" });
+
 import { db } from "./client";
 import { teams, players } from "./schema";
 import { TEAMS_DB } from "../lib/db";
