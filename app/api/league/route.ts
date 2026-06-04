@@ -467,6 +467,17 @@ function loadExtensions(): Record<string, any> {
   }
 }
 
+function loadBaselines(): Record<string, any> {
+  try {
+    const fs   = require("fs");
+    const path = require("path");
+    const file = path.join(process.cwd(), "app/data/moneypuck_baselines.json");
+    return JSON.parse(fs.readFileSync(file, "utf-8"));
+  } catch (e: any) {
+    return {};
+  }
+}
+
 // Proper CSV row parser — handles quoted fields containing commas.
 // Prevents silent data corruption when player names contain commas.
 const parseCSVRow = (row: string): string[] => {
@@ -1176,6 +1187,7 @@ export async function GET() {
     fetchPointShares(),
   ]);
   const EXTENSIONS = loadExtensions();
+  const BASELINES = loadBaselines();
   // ── 1. MoneyPuck analytics — skaters + goalies ─────────────
   // Cached for 4 hours — MP updates roughly twice daily.
   // Without this cache, every page load downloads two large CSVs (~2MB total).
@@ -1550,7 +1562,10 @@ export async function GET() {
         : LEAGUE_AVG_XGA60;
 
       // baselineGsax: current year GSAx — future enhancement will add weighted 3yr avg
-      const baselineGsax = goalieStats?.gsax ?? 0;
+      const currentYearGsax = goalieStats?.gsax ?? 0;
+
+      const baselineKey = p.name.toLowerCase().replace(/[^a-z]/g, '');
+      const baselines = BASELINES[baselineKey] || {};
 
       players.push({
         id:             p.id,
@@ -1572,7 +1587,10 @@ export async function GET() {
         gamesStarted:   goalieStats?.gamesStarted  ?? 0,
         shotsPerGame:   goalieStats?.shotsPerGame  ?? 0,
         teamXga60:      teamXga60,     // NEW
-        baselineGsax:   baselineGsax,  // NEW
+        baselineGsax:   baselines.baselineGsax ?? currentYearGsax,  // NEW
+        baselinePtsPace: baselines.baselinePtsPace,
+        baselineGameScore: baselines.baselineGameScore,
+        baselineDpsProxy: baselines.baselineDpsProxy,
         // Contract
         capHit:         CONTRACT_OVERRIDES[p.name]?.capHit         ?? finalCapHit,
         yearsRemaining: CONTRACT_OVERRIDES[p.name]?.yearsRemaining ?? finalYears,

@@ -479,7 +479,7 @@ function AssetCard({
             >i</span>
           </div>
           <div className="grid grid-cols-2 gap-1">
-            <MicroBar label="G-NAV" val={xnav.def} max={150} color="emerald"
+            <MicroBar label="G-NAV" val={xnav.def} max={300} color="emerald"
               tooltip="Goalie NAV — based on GSAx (goals saved above expected) from MoneyPuck" />
             <MicroBar label="CAP" val={xnav.cap} max={100} color="rose" invert
               tooltip="Contract cost — overpaid contracts drag total NAV" />

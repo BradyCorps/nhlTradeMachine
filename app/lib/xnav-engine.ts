@@ -47,6 +47,9 @@ export interface AssetInput {
   multiplier?:    number;
   hasLiveStats?:  boolean;
   baselineGsax?:  number;
+  baselinePtsPace?: number;
+  baselineGameScore?: number;
+  baselineDpsProxy?: number;
 }
 
 export interface XNAVResult {
@@ -120,9 +123,17 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const careerMean    = asset.baselineGsax ?? 0;
   const expGSAx       = gsaxPer60 * confidenceG + careerMean * (1 - confidenceG);
 
-  const goalieImpact = expGSAx >= 0
+  let goalieImpact = expGSAx >= 0
     ? Math.pow(expGSAx / LEAGUE.gsaxSd, 1.5) * 80
     : (expGSAx / LEAGUE.gsaxSd) * 40;
+
+  // ── Roberto Luongo Goalie Asymptote ─────────────────────────────
+  // Absolute max on-ice impact is 300.
+  if (goalieImpact > 150) {
+    const L = 150;
+    const excess = goalieImpact - 150;
+    goalieImpact = 150 + L * (1 - Math.exp(-excess / L));
+  }
 
   const workloadBonus = isStarter ? Math.min(20, (gamesG / 60) * 15)
     : isTandem ? Math.min(10, (gamesG / 60) * 10)
@@ -136,17 +147,48 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const extCapHit    = asset.extensionCapHit;
   const navCapHit    = extCapHit ? extCapHit * (1 - (asset.retainedPct || 0)) : effectiveCap;
   const navYears     = extCapHit ? (asset.extensionYears ?? asset.yearsRemaining) : asset.yearsRemaining;
+  const contractYears = Math.max(1, navYears || 1);
 
   // RFA Cliff: cost-controlled goalie years carry a premium
   const isRFA       = asset.age + navYears <= 27;
-  const navTermMult = isRFA
-    ? Math.min(2.5, 1.4 + navYears * 0.15)
-    : Math.min(2.5, 1.0 + navYears * 0.12);
 
-  const capCostG       = navCapHit * 1.6 * navTermMult;
+  // ── Logistic S-Curve FMV Cap Percentage (Goalies) ──────────────
+  // The max cap for a goalie is historically around 12% of the cap.
+  const trueMarketValueG = (goalieImpact + workloadBonus) * ageFactor;
+  
+  const LEAGUE_MIN_PCT_G = 0.009; // 0.9%
+  const MAX_CAP_PCT_G    = 0.12;  // 12.0%
+  const MIDPOINT_G       = 100;   // The ON_ICE_NAV where a goalie deserves ~6% (elite starter)
+  const K_FACTOR_G       = 0.025; // Steepness of the S-curve
+  
+  const fmvCapPctG = LEAGUE_MIN_PCT_G + (MAX_CAP_PCT_G - LEAGUE_MIN_PCT_G) / (1 + Math.exp(-K_FACTOR_G * (trueMarketValueG - MIDPOINT_G)));
+
+  const BASE_CAP_CEILING = 104.0;
+  const CAP_GROWTH_RATE  = 1.04;
+
+  let capSumG = 0;
+  for (let i = 0; i < contractYears; i++) {
+    const projectedCapCeiling = BASE_CAP_CEILING * Math.pow(CAP_GROWTH_RATE, i);
+    const fmvDollars = projectedCapCeiling * fmvCapPctG;
+    const annualSurplus = fmvDollars - navCapHit;
+    const timeDiscount = Math.pow(0.92, i);
+    
+    const ageAtYear = asset.age + i;
+    const gammaRFA = ageAtYear <= 27 ? 1.25 : 1.0;
+    
+    capSumG += annualSurplus * 12 * gammaRFA * timeDiscount;
+  }
+  
+  const baselineCapComponentNormalizedG = capSumG / contractYears;
+  const singleSlotMultiplierG = Math.max(1.0, trueMarketValueG / 100);
+  const multiplierToApplyG = baselineCapComponentNormalizedG < 0 ? 1.0 : singleSlotMultiplierG;
+  const baselineCapComponentG = baselineCapComponentNormalizedG * multiplierToApplyG;
+
   const retentionSev   = Math.pow((asset.retainedPct || 0) * 100, 1.25);
   const retainedBonus  = retentionSev * asset.capHit * 0.06;
-  const rawTotal       = safe((goalieImpact + workloadBonus) * ageFactor - capCostG + retainedBonus);
+  const capTotalG      = safe(baselineCapComponentG + retainedBonus);
+  
+  const rawTotal       = safe(trueMarketValueG + capTotalG);
 
   const isYoungControlled = asset.age <= 26 && effectiveCap <= 3.5 && !extCapHit;
   const youngFloor = isYoungControlled && (isStarter || isTandem)
@@ -162,7 +204,7 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
     off:    0,
     def:    safe(goalieImpact * ageFactor),
     age:    -agePenalty,
-    cap:    -(capCostG - retainedBonus),
+    cap:    Math.round(capTotalG),
     upside: youngFloor > 0 ? youngFloor * 0.4 : 0,
     noivImpact: 0,
     fArchetype: "",
@@ -193,22 +235,42 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const effectiveCap = asset.capHit * (1 - (asset.retainedPct || 0));
   const confidence   = clamp(games / 65, 0.3, 1.0);
 
-  // ── Offensive value ───────────────────────────────────────────
+  // ── Baseline Blending ─────────────────────────────────────────
+  // MoneyPuck 3-year weighted baselines anchor valuations, especially
+  // early in the season or during anomalous/injury-shortened years.
+  const baselinePtsPace = asset.baselinePtsPace;
+  const blendedPts = baselinePtsPace !== undefined && baselinePtsPace > 0
+    ? (pts * 0.4 + baselinePtsPace * 0.6)
+    : pts;
+
   const ptsScale  = isD ? 0.75 : 1.0;
-  const ptsVal    = pts * ptsScale;
+  const ptsVal    = blendedPts * ptsScale;
+
+  const baselineDpsProxy = asset.baselineDpsProxy;
+  const blendedDps = baselineDpsProxy !== undefined && baselineDpsProxy > 0
+    ? (dps !== null ? dps * 0.4 + baselineDpsProxy * 0.6 : baselineDpsProxy)
+    : dps;
   const noivBonus = clamp(xgRel * 3.5, -20, 25);
   const offPS     = ops !== null ? ops * 17 : null;
 
   // Power-law curve: elite players separate more than linear pts * 1.6
+  // Use the power curve as the primary engine to properly value generational talent.
+  // We use offPS (Point Shares) to slightly modulate it, but we never let a linear 
+  // Point Shares stat overwrite the exponential power curve!
+  const baseOffCurve = Math.pow(ptsVal / 45, 1.6) * 55;
   const offRaw = offPS !== null
-    ? (offPS * confidence) + Math.pow(ptsVal / 45, 1.6) * 55 * (1 - confidence) + (noivBonus * 0.25)
-    : Math.pow(ptsVal / 45, 1.6) * 55 + (xg * 0.5) + noivBonus;
+    ? baseOffCurve + (offPS - (ptsVal / 45) * 55) * 0.4 + (noivBonus * 0.25)
+    : baseOffCurve + (xg * 0.5) + noivBonus;
 
   let offTotal = safe(offRaw);
-  // Soft ceiling at 450 — historic Gretzky-level seasons still separate
-  if (offTotal > 450) {
-    const excess = offTotal - 450;
-    offTotal = 450 + (150 * (1 - Math.exp(-excess / 150)));
+  // ── Lemieux Offensive Asymptote ─────────────────────────────
+  // V(P) = L * (1 - e^(-kP)) applied to the high-end to prevent 
+  // generational separation from exploding off the UI charts.
+  // Absolute Max = 450.
+  if (offTotal > 250) {
+    const L = 200; // Remaining headroom to absolute max of 450
+    const excess = offTotal - 250;
+    offTotal = 250 + L * (1 - Math.exp(-excess / L));
   }
 
   // ── Defensive value ───────────────────────────────────────────
@@ -217,10 +279,18 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const dzVal  = clamp((dzPct - 0.3) * 40, 0, 12);
 
   // dps * 15 (not * 120 — the old * 15 * 8 compounding bug is removed)
-  const defRaw = dps !== null
-    ? dps * 15 * confidence + (def * 20 + qocVal + toiD) * (1 - confidence)
+  const defRaw = blendedDps !== null
+    ? blendedDps * 15 * confidence + (def * 20 + qocVal + toiD) * (1 - confidence)
     : def * 20 + qocVal + toiD + dzVal - xgaRel * 4;
-  const defTotal = safe(defRaw);
+  
+  let defTotal = safe(defRaw);
+  // ── Larry Robinson Defensive Asymptote ──────────────────────────
+  // Max 150 UI ceiling.
+  if (defTotal > 80) {
+    const L = 70; // Remaining headroom to 150
+    const excess = defTotal - 80;
+    defTotal = 80 + L * (1 - Math.exp(-excess / L));
+  }
 
   // DEF display (position-aware, not used in total)
   const xgaRelDisp = asset.xgaRelTM;
@@ -263,11 +333,17 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const trueMarketValue = offTotal + defTotal + ageTotal;
   const isRFA = asset.age + asset.yearsRemaining <= 27;
 
-  // ── DailyFaceoff Relative Efficiency Cap Model ────────────────
-  // Compares player's performance percentile against cap percentile
-  // relative to a moving salary cap ceiling ($104M baseline).
-  const BASE_CAP_CEILING = 104.0;
-  const CAP_GROWTH_RATE  = 1.04;
+  // ── Logistic S-Curve FMV Cap Percentage ───────────────────────
+  // The absolute maximum a player can legally earn under the NHL CBA is 20% of the cap.
+  // We use a logistic function to map ON_ICE_NAV to an FMV Cap Percentage between
+  // League Minimum (0.9%) and the Maximum (20%).
+  
+  const LEAGUE_MIN_PCT = 0.009; // 0.9%
+  const MAX_CAP_PCT    = 0.20;  // 20.0%
+  const MIDPOINT       = 180;   // The ON_ICE_NAV where a player deserves ~10.4% (e.g. low 1st liner)
+  const K_FACTOR       = 0.022; // Steepness of the S-curve
+  
+  const fmvCapPct = LEAGUE_MIN_PCT + (MAX_CAP_PCT - LEAGUE_MIN_PCT) / (1 + Math.exp(-K_FACTOR * (trueMarketValue - MIDPOINT)));
 
   // Use extension cap hit and years if available to align with Goalie NAV and fix extension distortions
   const extCapHit        = asset.extensionCapHit;
@@ -275,36 +351,34 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const navYears         = extCapHit ? (asset.extensionYears ?? asset.yearsRemaining) : asset.yearsRemaining;
   const contractYears    = Math.max(1, navYears || 1);
 
-  // 1. Calculate FMV in dollars using a stabilized scaling curve:
-  // FMV caps out naturally around the CBA theoretical maximum (~$20M-$22M)
-  // so that positive surplus doesn't mathematically explode to +400 NAV.
-  const baseFmv = trueMarketValue / 20;
-  const elitePremium = trueMarketValue > 130 ? Math.pow((trueMarketValue - 130) / 80, 1.4) : 0;
-  const fmvDollars = Math.min(22.0, baseFmv + elitePremium);
+  const BASE_CAP_CEILING = 104.0; // Current cap space
+  const CAP_GROWTH_RATE  = 1.04;  // 4% annual growth
 
-  // 2. Loop through contract term to calculate the multi-year compound inflation sum:
+  // Loop through contract term to calculate the multi-year compound surplus sum:
   let capSum = 0;
   for (let i = 0; i < contractYears; i++) {
     const projectedCapCeiling = BASE_CAP_CEILING * Math.pow(CAP_GROWTH_RATE, i);
-    // Cap footprint shrinks relative to a growing ceiling
-    const adjustedCapFootprint = navCapHit * (BASE_CAP_CEILING / projectedCapCeiling);
-    const annualSurplus = fmvDollars - adjustedCapFootprint;
+    
+    // Convert FMV% into raw dollars based on the projected cap ceiling for that year
+    const fmvDollars = projectedCapCeiling * fmvCapPct;
+    const annualSurplus = fmvDollars - navCapHit;
     
     // 8% annual financial discount: future cap space/penalties matter less today
     const timeDiscount = Math.pow(0.92, i);
     
-    // gamma_RFA applies organizational premium for control-controlled years
+    // gamma_RFA applies organizational premium for cost-controlled years
     const ageAtYear = asset.age + i;
     const gammaRFA = ageAtYear <= 27 ? 1.25 : 1.0;
     
+    // Multiply by 12 to convert raw dollars to NAV points ($1M surplus = 12 NAV)
     capSum += annualSurplus * 12 * gammaRFA * timeDiscount;
   }
 
   // Normalize by contract years to maintain NAV scaling compatibility
   const baselineCapComponentNormalized = capSum / contractYears;
 
-  // 3. Single-slot concentration multiplier protection:
-  // Negative contracts on elite talents can never be amplified
+  // Single-slot concentration multiplier protection:
+  // Positive surplus from elite talents carries compounding value
   const singleSlotMultiplier = Math.max(1.0, trueMarketValue / 180);
   const multiplierToApply = baselineCapComponentNormalized < 0 ? 1.0 : singleSlotMultiplier;
   const baselineCapComponent = baselineCapComponentNormalized * multiplierToApply;
@@ -406,9 +480,9 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
 
   let franchiseFloor = -Infinity;
   if (qualifiesEliteForward) {
-    franchiseFloor = age <= 24 ? 400 : age <= 26 ? 350 : 300;
+    franchiseFloor = age <= 24 ? 260 : age <= 26 ? 220 : 180;
   } else if (qualifiesEliteDefender) {
-    franchiseFloor = age <= 24 ? 350 : age <= 26 ? 300 : 250;
+    franchiseFloor = age <= 24 ? 240 : age <= 26 ? 200 : 160;
   }
 
   const total = Math.max(discountedTotal, franchiseFloor);

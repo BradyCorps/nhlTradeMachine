@@ -5,12 +5,12 @@
 export interface OPSRecord { rank: number; player: string; season: string; ops: number; }
 export interface DPSRecord { rank: number; player: string; season: string; dps: number; }
 
-// Mario Lemieux 1988-89: OPS 17.68 × 12 = 212
-export const HISTORICAL_MAX_OFF = 300;
-// Larry Robinson 1976-77: DPS 9.86 × 10 = 99 (xnav.def engine units)
-export const HISTORICAL_MAX_DEF = 148;
+// Mario Lemieux 1988-89: OPS 17.68 mapped to Lemieux Asymptote = 450
+export const HISTORICAL_MAX_OFF = 450;
+// Larry Robinson 1976-77: DPS 9.86 mapped to Robinson Asymptote = 150
+export const HISTORICAL_MAX_DEF = 150;
 // Same DPS season at ×16 display multiplier used in trade UI (158)
-export const HISTORICAL_MAX_DEF_DPS_DISPLAY = 148;
+export const HISTORICAL_MAX_DEF_DPS_DISPLAY = 150;
 
 export const TOP_OPS_SEASONS: OPSRecord[] = [
   { rank: 1, player: "Mario Lemieux", season: "1988-89", ops: 17.68 },

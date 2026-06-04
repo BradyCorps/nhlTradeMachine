@@ -49,6 +49,11 @@ export interface Asset {
   hasExtension?: boolean;
   extensionCapHit?: number;   // future AAV once extension kicks in
   extensionYears?: number;    // length of the extension
+  
+  // MoneyPuck 3-Year Baselines
+  baselinePtsPace?: number;
+  baselineGameScore?: number;
+  baselineDpsProxy?: number;
 }
 
 export interface Team {

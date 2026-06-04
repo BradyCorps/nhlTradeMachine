@@ -50,6 +50,9 @@ const getAssetNAV = (asset: Asset): XNAVResult => {
     multiplier: asset.multiplier,
     hasLiveStats: asset.hasLiveStats,
     baselineGsax: asset.baselineGsax,
+    baselinePtsPace: asset.baselinePtsPace,
+    baselineGameScore: asset.baselineGameScore,
+    baselineDpsProxy: asset.baselineDpsProxy,
   };
   return calcNAV(input);
 };
