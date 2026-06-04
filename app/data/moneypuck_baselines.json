@@ -1,0 +1,6666 @@
+{
+  "marcandrefleury": {
+    "name": "Marc-Andre Fleury",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -8.079999999999998,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryansuter": {
+    "name": "Ryan Suter",
+    "baselinePtsPace": 15,
+    "baselineGameScore": 8.75,
+    "baselineDpsProxy": 2,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brentburns": {
+    "name": "Brent Burns",
+    "baselinePtsPace": 29,
+    "baselineGameScore": 56.85,
+    "baselineDpsProxy": 2.6500000000000004,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "coreyperry": {
+    "name": "Corey Perry",
+    "baselinePtsPace": 30.370370370370377,
+    "baselineGameScore": 39.54222222222223,
+    "baselineDpsProxy": 2.9634146341463414,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexovechkin": {
+    "name": "Alex Ovechkin",
+    "baselinePtsPace": 92.09230769230768,
+    "baselineGameScore": 87.92923076923077,
+    "baselineDpsProxy": 2.3384146341463414,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "evgenimalkin": {
+    "name": "Evgeni Malkin",
+    "baselinePtsPace": 60.29411764705882,
+    "baselineGameScore": 54.04764705882353,
+    "baselineDpsProxy": 2.1975609756097563,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "sidneycrosby": {
+    "name": "Sidney Crosby",
+    "baselinePtsPace": 93.27499999999999,
+    "baselineGameScore": 92.62925,
+    "baselineDpsProxy": 2.731707317073171,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jackjohnson": {
+    "name": "Jack Johnson",
+    "baselinePtsPace": 12,
+    "baselineGameScore": 1.64,
+    "baselineDpsProxy": 0.8750000000000001,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "anzekopitar": {
+    "name": "Anze Kopitar",
+    "baselinePtsPace": 67.82716049382717,
+    "baselineGameScore": 66.42,
+    "baselineDpsProxy": 2.716463414634146,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "marcedouardvlasic": {
+    "name": "Marc-Edouard Vlasic",
+    "baselinePtsPace": 9.11111111111111,
+    "baselineGameScore": -3.6444444444444444,
+    "baselineDpsProxy": 0.6420731707317074,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "krisletang": {
+    "name": "Kris Letang",
+    "baselinePtsPace": 33.24324324324324,
+    "baselineGameScore": 34.73918918918919,
+    "baselineDpsProxy": 2.0756097560975615,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jonathanquick": {
+    "name": "Jonathan Quick",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -5.3799999999999955,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryanreaves": {
+    "name": "Ryan Reaves",
+    "baselinePtsPace": 4.685714285714286,
+    "baselineGameScore": -1.897714285714286,
+    "baselineDpsProxy": 0.9603658536585366,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "bradmarchand": {
+    "name": "Brad Marchand",
+    "baselinePtsPace": 58.901408450704224,
+    "baselineGameScore": 59.732957746478874,
+    "baselineDpsProxy": 2.4243902439024394,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nickfoligno": {
+    "name": "Nick Foligno",
+    "baselinePtsPace": 36.794871794871796,
+    "baselineGameScore": 24.84179487179487,
+    "baselineDpsProxy": 1.9499999999999995,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "erikjohnson": {
+    "name": "Erik Johnson",
+    "baselinePtsPace": 11.38888888888889,
+    "baselineGameScore": 16.126666666666665,
+    "baselineDpsProxy": 1.053658536585366,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "trevorlewis": {
+    "name": "Trevor Lewis",
+    "baselinePtsPace": 16.4,
+    "baselineGameScore": 10.304666666666668,
+    "baselineDpsProxy": 1.6829268292682928,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jamesreimer": {
+    "name": "James Reimer",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 8.010000000000005,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jeffpetry": {
+    "name": "Jeff Petry",
+    "baselinePtsPace": 14.90909090909091,
+    "baselineGameScore": 0.7081818181818181,
+    "baselineDpsProxy": 1.1536585365853658,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "claudegiroux": {
+    "name": "Claude Giroux",
+    "baselinePtsPace": 50.617283950617285,
+    "baselineGameScore": 54.35283950617284,
+    "baselineDpsProxy": 2.370731707317073,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jordanstaal": {
+    "name": "Jordan Staal",
+    "baselinePtsPace": 39.36,
+    "baselineGameScore": 61.94826666666667,
+    "baselineDpsProxy": 2.3323170731707314,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "semyonvarlamov": {
+    "name": "Semyon Varlamov",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -0.6600000000000001,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexkillorn": {
+    "name": "Alex Killorn",
+    "baselinePtsPace": 37,
+    "baselineGameScore": 38.3,
+    "baselineDpsProxy": 2.25,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jamiebenn": {
+    "name": "Jamie Benn",
+    "baselinePtsPace": 50.224999999999994,
+    "baselineGameScore": 40.979499999999994,
+    "baselineDpsProxy": 2.6341463414634148,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "iancole": {
+    "name": "Ian Cole",
+    "baselinePtsPace": 17,
+    "baselineGameScore": 28.2,
+    "baselineDpsProxy": 2.25,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "patrickmaroon": {
+    "name": "Patrick Maroon",
+    "baselinePtsPace": 22.91176470588235,
+    "baselineGameScore": 10.575588235294116,
+    "baselineDpsProxy": 1.8243902439024393,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jamesvanriemsdyk": {
+    "name": "James van Riemsdyk",
+    "baselinePtsPace": 41.57746478873239,
+    "baselineGameScore": 35.167605633802815,
+    "baselineDpsProxy": 2.2079268292682923,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brendansmith": {
+    "name": "Brendan Smith",
+    "baselinePtsPace": 15.375,
+    "baselineGameScore": 14.016874999999999,
+    "baselineDpsProxy": 0.8975609756097562,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "davidperron": {
+    "name": "David Perron",
+    "baselinePtsPace": 30.51162790697674,
+    "baselineGameScore": 32.037209302325586,
+    "baselineDpsProxy": 1.4682926829268295,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "patrickkane": {
+    "name": "Patrick Kane",
+    "baselinePtsPace": 67.19444444444444,
+    "baselineGameScore": 57.16083333333333,
+    "baselineDpsProxy": 2.458536585365854,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "robertbortuzzo": {
+    "name": "Robert Bortuzzo",
+    "baselinePtsPace": 9.647058823529411,
+    "baselineGameScore": 14.229411764705882,
+    "baselineDpsProxy": 0.5804878048780489,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "evgeniidadonov": {
+    "name": "Evgenii Dadonov",
+    "baselinePtsPace": 41,
+    "baselineGameScore": 36.25424999999999,
+    "baselineDpsProxy": 2.6341463414634148,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mikaelbacklund": {
+    "name": "Mikael Backlund",
+    "baselinePtsPace": 34.526315789473685,
+    "baselineGameScore": 46.79394736842105,
+    "baselineDpsProxy": 2.2243902439024392,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryanmcdonagh": {
+    "name": "Ryan McDonagh",
+    "baselinePtsPace": 30.999999999999996,
+    "baselineGameScore": 32.8,
+    "baselineDpsProxy": 2.45,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "maxpacioretty": {
+    "name": "Max Pacioretty",
+    "baselinePtsPace": 28.81081081081081,
+    "baselineGameScore": 29.94108108108108,
+    "baselineDpsProxy": 1.1731707317073172,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alecmartinez": {
+    "name": "Alec Martinez",
+    "baselinePtsPace": 22.363636363636363,
+    "baselineGameScore": -0.27954545454545454,
+    "baselineDpsProxy": 1.0463414634146344,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "larseller": {
+    "name": "Lars Eller",
+    "baselinePtsPace": 22.549999999999997,
+    "baselineGameScore": 28.064499999999995,
+    "baselineDpsProxy": 2.341463414634146,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "drewdoughty": {
+    "name": "Drew Doughty",
+    "baselinePtsPace": 46.46666666666667,
+    "baselineGameScore": 44.006666666666675,
+    "baselineDpsProxy": 1.0060975609756098,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "stevenstamkos": {
+    "name": "Steven Stamkos",
+    "baselinePtsPace": 53,
+    "baselineGameScore": 44.33,
+    "baselineDpsProxy": 2.9,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexpietrangelo": {
+    "name": "Alex Pietrangelo",
+    "baselinePtsPace": 38.11267605633803,
+    "baselineGameScore": 47.61774647887324,
+    "baselineDpsProxy": 2.078048780487805,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "zachbogosian": {
+    "name": "Zach Bogosian",
+    "baselinePtsPace": 16.19753086419753,
+    "baselineGameScore": 7.825432098765432,
+    "baselineDpsProxy": 1.975609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "lukeschenn": {
+    "name": "Luke Schenn",
+    "baselinePtsPace": 7.552631578947368,
+    "baselineGameScore": 11.350526315789473,
+    "baselineDpsProxy": 2.2243902439024392,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tylermyers": {
+    "name": "Tyler Myers",
+    "baselinePtsPace": 27.718309859154928,
+    "baselineGameScore": 22.036056338028168,
+    "baselineDpsProxy": 1.9914634146341468,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "erikkarlsson": {
+    "name": "Erik Karlsson",
+    "baselinePtsPace": 53,
+    "baselineGameScore": 56.82,
+    "baselineDpsProxy": 2.55,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jordaneberle": {
+    "name": "Jordan Eberle",
+    "baselinePtsPace": 50.76190476190476,
+    "baselineGameScore": 37.5052380952381,
+    "baselineDpsProxy": 1.357317073170732,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "johncarlson": {
+    "name": "John Carlson",
+    "baselinePtsPace": 52.936708860759495,
+    "baselineGameScore": 65.15367088607596,
+    "baselineDpsProxy": 2.601219512195122,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jacobmarkstrom": {
+    "name": "Jacob Markstrom",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 3.4300000000000064,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakeallen": {
+    "name": "Jake Allen",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 18.42,
+    "totalSeasonsWeighted": 0.3
+  },
+  "romanjosi": {
+    "name": "Roman Josi",
+    "baselinePtsPace": 58.79245283018868,
+    "baselineGameScore": 75.81132075471699,
+    "baselineDpsProxy": 1.7451219512195124,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "travishamonic": {
+    "name": "Travis Hamonic",
+    "baselinePtsPace": 9.728813559322035,
+    "baselineGameScore": 7.713559322033898,
+    "baselineDpsProxy": 1.4749999999999999,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "adamhenrique": {
+    "name": "Adam Henrique",
+    "baselinePtsPace": 27.33333333333334,
+    "baselineGameScore": 23.729382716049386,
+    "baselineDpsProxy": 2.271951219512195,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tjbrodie": {
+    "name": "TJ Brodie",
+    "baselinePtsPace": 15.185185185185189,
+    "baselineGameScore": 0.7137037037037037,
+    "baselineDpsProxy": 1.4158536585365853,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "gustavnyquist": {
+    "name": "Gustav Nyquist",
+    "baselinePtsPace": 29.0632911392405,
+    "baselineGameScore": 31.03544303797468,
+    "baselineDpsProxy": 2.553048780487805,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mattmartin": {
+    "name": "Matt Martin",
+    "baselinePtsPace": 5.125,
+    "baselineGameScore": -5.2787500000000005,
+    "baselineDpsProxy": 0.7219512195121952,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "camatkinson": {
+    "name": "Cam Atkinson",
+    "baselinePtsPace": 18.923076923076923,
+    "baselineGameScore": 13.687692307692307,
+    "baselineDpsProxy": 0.9749999999999998,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jaredspurgeon": {
+    "name": "Jared Spurgeon",
+    "baselinePtsPace": 39.75757575757576,
+    "baselineGameScore": 46.62818181818182,
+    "baselineDpsProxy": 2.2939024390243903,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "marcusjohansson": {
+    "name": "Marcus Johansson",
+    "baselinePtsPace": 38.72222222222222,
+    "baselineGameScore": 33.62,
+    "baselineDpsProxy": 2.326829268292683,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kylepalmieri": {
+    "name": "Kyle Palmieri",
+    "baselinePtsPace": 48,
+    "baselineGameScore": 41.55,
+    "baselineDpsProxy": 2.45,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryanoreilly": {
+    "name": "Ryan O'Reilly",
+    "baselinePtsPace": 55.01265822784809,
+    "baselineGameScore": 60.524303797468356,
+    "baselineDpsProxy": 2.7939024390243903,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "johntavares": {
+    "name": "John Tavares",
+    "baselinePtsPace": 80.90666666666667,
+    "baselineGameScore": 69.00026666666666,
+    "baselineDpsProxy": 2.6067073170731705,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "victorhedman": {
+    "name": "Victor Hedman",
+    "baselinePtsPace": 68.50632911392405,
+    "baselineGameScore": 74.50582278481012,
+    "baselineDpsProxy": 2.6975609756097563,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mattduchene": {
+    "name": "Matt Duchene",
+    "baselinePtsPace": 82,
+    "baselineGameScore": 69.8,
+    "baselineDpsProxy": 2.8499999999999996,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "braydenschenn": {
+    "name": "Brayden Schenn",
+    "baselinePtsPace": 50,
+    "baselineGameScore": 42.62,
+    "baselineDpsProxy": 2.6,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "oliverekmanlarsson": {
+    "name": "Oliver Ekman-Larsson",
+    "baselinePtsPace": 30.883116883116877,
+    "baselineGameScore": 28.540259740259742,
+    "baselineDpsProxy": 2.5353658536585364,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nazemkadri": {
+    "name": "Nazem Kadri",
+    "baselinePtsPace": 67,
+    "baselineGameScore": 76.53,
+    "baselineDpsProxy": 2.75,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "calvindehaan": {
+    "name": "Calvin de Haan",
+    "baselinePtsPace": 13.957446808510639,
+    "baselineGameScore": 22.209787234042555,
+    "baselineDpsProxy": 1.4329268292682926,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dmitrykulikov": {
+    "name": "Dmitry Kulikov",
+    "baselinePtsPace": 15.22857142857143,
+    "baselineGameScore": 27.997142857142858,
+    "baselineDpsProxy": 2.0060975609756095,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nickleddy": {
+    "name": "Nick Leddy",
+    "baselinePtsPace": 13.225806451612902,
+    "baselineGameScore": 16.743870967741934,
+    "baselineDpsProxy": 0.7939024390243903,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "chriskreider": {
+    "name": "Chris Kreider",
+    "baselinePtsPace": 36.17647058823529,
+    "baselineGameScore": 33.05323529411765,
+    "baselineDpsProxy": 2.2390243902439027,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "braydenmcnabb": {
+    "name": "Brayden McNabb",
+    "baselinePtsPace": 20,
+    "baselineGameScore": 35.27,
+    "baselineDpsProxy": 2.4,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "reillysmith": {
+    "name": "Reilly Smith",
+    "baselinePtsPace": 41.51898734177215,
+    "baselineGameScore": 39.411898734177214,
+    "baselineDpsProxy": 2.4567073170731706,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tomastatar": {
+    "name": "Tomas Tatar",
+    "baselinePtsPace": 18.83783783783784,
+    "baselineGameScore": 19.957027027027028,
+    "baselineDpsProxy": 2.5268292682926834,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tysonbarrie": {
+    "name": "Tyson Barrie",
+    "baselinePtsPace": 18.923076923076923,
+    "baselineGameScore": 19.68,
+    "baselineDpsProxy": 0.37256097560975604,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dmitryorlov": {
+    "name": "Dmitry Orlov",
+    "baselinePtsPace": 30.210526315789473,
+    "baselineGameScore": 57.324473684210524,
+    "baselineDpsProxy": 2.3170731707317076,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "briandumoulin": {
+    "name": "Brian Dumoulin",
+    "baselinePtsPace": 22.549999999999997,
+    "baselineGameScore": 14.267999999999999,
+    "baselineDpsProxy": 1.8536585365853657,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mattiasekholm": {
+    "name": "Mattias Ekholm",
+    "baselinePtsPace": 41.63076923076923,
+    "baselineGameScore": 74.02707692307692,
+    "baselineDpsProxy": 2.1006097560975614,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "marcusfoligno": {
+    "name": "Marcus Foligno",
+    "baselinePtsPace": 30.883116883116877,
+    "baselineGameScore": 35.64337662337662,
+    "baselineDpsProxy": 2.394512195121951,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "craigsmith": {
+    "name": "Craig Smith",
+    "baselinePtsPace": 25.016949152542374,
+    "baselineGameScore": 16.44169491525424,
+    "baselineDpsProxy": 1.6189024390243902,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "caseycizikas": {
+    "name": "Casey Cizikas",
+    "baselinePtsPace": 17,
+    "baselineGameScore": 20.81,
+    "baselineDpsProxy": 2.15,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "davidsavard": {
+    "name": "David Savard",
+    "baselinePtsPace": 16.4,
+    "baselineGameScore": 4.865333333333333,
+    "baselineDpsProxy": 1.554878048780488,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nicolasdeslauriers": {
+    "name": "Nicolas Deslauriers",
+    "baselinePtsPace": 7.935483870967741,
+    "baselineGameScore": 7.6974193548387095,
+    "baselineDpsProxy": 0.9640243902439024,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "benchiarot": {
+    "name": "Ben Chiarot",
+    "baselinePtsPace": 13.160493827160494,
+    "baselineGameScore": 3.3711111111111114,
+    "baselineDpsProxy": 1.975609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "erikhaula": {
+    "name": "Erik Haula",
+    "baselinePtsPace": 24.956521739130434,
+    "baselineGameScore": 26.58463768115942,
+    "baselineDpsProxy": 2.0615853658536585,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "darcykuemper": {
+    "name": "Darcy Kuemper",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 22.510000000000005,
+    "totalSeasonsWeighted": 0.3
+  },
+  "anderslee": {
+    "name": "Anders Lee",
+    "baselinePtsPace": 54,
+    "baselineGameScore": 63.919999999999995,
+    "baselineDpsProxy": 2.8000000000000003,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nickjensen": {
+    "name": "Nick Jensen",
+    "baselinePtsPace": 24.253521126760564,
+    "baselineGameScore": 32.31492957746479,
+    "baselineDpsProxy": 1.9048780487804882,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nicdowd": {
+    "name": "Nic Dowd",
+    "baselinePtsPace": 27,
+    "baselineGameScore": 26.07,
+    "baselineDpsProxy": 2.2,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "justindowling": {
+    "name": "Justin Dowling",
+    "baselinePtsPace": 11.038461538461538,
+    "baselineGameScore": 6.6861538461538474,
+    "baselineDpsProxy": 1.4902439024390242,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brendendillon": {
+    "name": "Brenden Dillon",
+    "baselinePtsPace": 16,
+    "baselineGameScore": 17.55,
+    "baselineDpsProxy": 2.15,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "radkogudas": {
+    "name": "Radko Gudas",
+    "baselinePtsPace": 16.19753086419753,
+    "baselineGameScore": 13.686913580246916,
+    "baselineDpsProxy": 1.975609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "camtalbot": {
+    "name": "Cam Talbot",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 12.800000000000011,
+    "totalSeasonsWeighted": 0.3
+  },
+  "sergeibobrovsky": {
+    "name": "Sergei Bobrovsky",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 7.24000000000001,
+    "totalSeasonsWeighted": 0.3
+  },
+  "christanev": {
+    "name": "Chris Tanev",
+    "baselinePtsPace": 19.68,
+    "baselineGameScore": 23.692533333333333,
+    "baselineDpsProxy": 2.103658536585366,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "matszuccarello": {
+    "name": "Mats Zuccarello",
+    "baselinePtsPace": 64.17391304347825,
+    "baselineGameScore": 57.45942028985507,
+    "baselineDpsProxy": 2.5664634146341463,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "callejarnkrok": {
+    "name": "Calle Jarnkrok",
+    "baselinePtsPace": 30.210526315789473,
+    "baselineGameScore": -3.7978947368421054,
+    "baselineDpsProxy": 0.41707317073170735,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "calvinpickard": {
+    "name": "Calvin Pickard",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -9.090000000000003,
+    "totalSeasonsWeighted": 0.3
+  },
+  "justinholl": {
+    "name": "Justin Holl",
+    "baselinePtsPace": 8.986301369863014,
+    "baselineGameScore": 13.389589041095888,
+    "baselineDpsProxy": 2.0030487804878048,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jasonzucker": {
+    "name": "Jason Zucker",
+    "baselinePtsPace": 59.53424657534246,
+    "baselineGameScore": 52.300273972602746,
+    "baselineDpsProxy": 2.5817073170731706,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tylertoffoli": {
+    "name": "Tyler Toffoli",
+    "baselinePtsPace": 56.769230769230774,
+    "baselineGameScore": 59.81794871794872,
+    "baselineDpsProxy": 2.710975609756097,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "charliecoyle": {
+    "name": "Charlie Coyle",
+    "baselinePtsPace": 34.57831325301205,
+    "baselineGameScore": 31.62433734939759,
+    "baselineDpsProxy": 2.3786585365853656,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jonmerrill": {
+    "name": "Jon Merrill",
+    "baselinePtsPace": 7.0285714285714285,
+    "baselineGameScore": 1.897714285714286,
+    "baselineDpsProxy": 1.6646341463414636,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "justinfaulk": {
+    "name": "Justin Faulk",
+    "baselinePtsPace": 33.64102564102564,
+    "baselineGameScore": 23.916666666666668,
+    "baselineDpsProxy": 2.4256097560975607,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brocknelson": {
+    "name": "Brock Nelson",
+    "baselinePtsPace": 57.399999999999984,
+    "baselineGameScore": 59.183499999999995,
+    "baselineDpsProxy": 2.4390243902439024,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nickbjugstad": {
+    "name": "Nick Bjugstad",
+    "baselinePtsPace": 23.606060606060606,
+    "baselineGameScore": 31.048181818181817,
+    "baselineDpsProxy": 2.1731707317073172,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "derekforbort": {
+    "name": "Derek Forbort",
+    "baselinePtsPace": 16.703703703703706,
+    "baselineGameScore": 12.573333333333332,
+    "baselineDpsProxy": 1.251219512195122,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kevinhayes": {
+    "name": "Kevin Hayes",
+    "baselinePtsPace": 29.46875,
+    "baselineGameScore": 34.106875,
+    "baselineDpsProxy": 2.1463414634146343,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "camfowler": {
+    "name": "Cam Fowler",
+    "baselinePtsPace": 48.23529411764706,
+    "baselineGameScore": 48.29558823529411,
+    "baselineDpsProxy": 2.0317073170731708,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "vladimirtarasenko": {
+    "name": "Vladimir Tarasenko",
+    "baselinePtsPace": 33.824999999999996,
+    "baselineGameScore": 26.506499999999996,
+    "baselineDpsProxy": 2.3902439024390243,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "austinwatson": {
+    "name": "Austin Watson",
+    "baselinePtsPace": 18.923076923076923,
+    "baselineGameScore": 21.004615384615384,
+    "baselineDpsProxy": 0.2932926829268293,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jadenschwartz": {
+    "name": "Jaden Schwartz",
+    "baselinePtsPace": 49.604938271604944,
+    "baselineGameScore": 50.00987654320988,
+    "baselineDpsProxy": 2.716463414634146,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "chriswagner": {
+    "name": "Chris Wagner",
+    "baselinePtsPace": 2.9285714285714284,
+    "baselineGameScore": 5.4471428571428575,
+    "baselineDpsProxy": 0.7341463414634146,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jeffskinner": {
+    "name": "Jeff Skinner",
+    "baselinePtsPace": 33.02777777777778,
+    "baselineGameScore": 42.89055555555555,
+    "baselineDpsProxy": 2.5024390243902435,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "zachhyman": {
+    "name": "Zach Hyman",
+    "baselinePtsPace": 49.42465753424658,
+    "baselineGameScore": 78.33808219178081,
+    "baselineDpsProxy": 2.982317073170732,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "erikgudbranson": {
+    "name": "Erik Gudbranson",
+    "baselinePtsPace": 20.5,
+    "baselineGameScore": 14.606250000000001,
+    "baselineDpsProxy": 0.3902439024390244,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "taylorhall": {
+    "name": "Taylor Hall",
+    "baselinePtsPace": 44.72727272727273,
+    "baselineGameScore": 44.759220779220776,
+    "baselineDpsProxy": 2.347560975609756,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tylerseguin": {
+    "name": "Tyler Seguin",
+    "baselinePtsPace": 86.1,
+    "baselineGameScore": 90.19999999999999,
+    "baselineDpsProxy": 0.7439024390243902,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dylanmcilrath": {
+    "name": "Dylan McIlrath",
+    "baselinePtsPace": 9.647058823529411,
+    "baselineGameScore": -5.788235294117647,
+    "baselineDpsProxy": 0.497560975609756,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mikaelgranlund": {
+    "name": "Mikael Granlund",
+    "baselinePtsPace": 65.20481927710843,
+    "baselineGameScore": 46.64120481927711,
+    "baselineDpsProxy": 2.3280487804878054,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ninoniederreiter": {
+    "name": "Nino Niederreiter",
+    "baselinePtsPace": 37,
+    "baselineGameScore": 41.29,
+    "baselineDpsProxy": 2.9,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "scottwedgewood": {
+    "name": "Scott Wedgewood",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 3.1700000000000017,
+    "totalSeasonsWeighted": 0.3
+  },
+  "bryanrust": {
+    "name": "Bryan Rust",
+    "baselinePtsPace": 75.07042253521126,
+    "baselineGameScore": 69.38816901408451,
+    "baselineDpsProxy": 2.1646341463414633,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "philippgrubauer": {
+    "name": "Philipp Grubauer",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -16.299999999999997,
+    "totalSeasonsWeighted": 0.3
+  },
+  "samcarrick": {
+    "name": "Sam Carrick",
+    "baselinePtsPace": 20.5,
+    "baselineGameScore": 13.45825,
+    "baselineDpsProxy": 2.1951219512195124,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brendangallagher": {
+    "name": "Brendan Gallagher",
+    "baselinePtsPace": 38,
+    "baselineGameScore": 36.19,
+    "baselineDpsProxy": 2.75,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "petrmrazek": {
+    "name": "Petr Mrazek",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -13.97,
+    "totalSeasonsWeighted": 0.3
+  },
+  "frederikandersen": {
+    "name": "Frederik Andersen",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 8.950000000000003,
+    "totalSeasonsWeighted": 0.3
+  },
+  "johnklingberg": {
+    "name": "John Klingberg",
+    "baselinePtsPace": 29.81818181818182,
+    "baselineGameScore": 25.494545454545452,
+    "baselineDpsProxy": 0.3286585365853659,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "markstone": {
+    "name": "Mark Stone",
+    "baselinePtsPace": 83.24242424242425,
+    "baselineGameScore": 80.22333333333333,
+    "baselineDpsProxy": 2.4951219512195126,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "colinblackwell": {
+    "name": "Colin Blackwell",
+    "baselinePtsPace": 22.126984126984127,
+    "baselineGameScore": 26.578412698412702,
+    "baselineDpsProxy": 1.5365853658536586,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ondrejpalat": {
+    "name": "Ondrej Palat",
+    "baselinePtsPace": 29.81818181818182,
+    "baselineGameScore": 29.74363636363636,
+    "baselineDpsProxy": 2.2536585365853656,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joshmanson": {
+    "name": "Josh Manson",
+    "baselinePtsPace": 25.625,
+    "baselineGameScore": 32.91958333333333,
+    "baselineDpsProxy": 1.2585365853658534,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dylandemelo": {
+    "name": "Dylan DeMelo",
+    "baselinePtsPace": 19,
+    "baselineGameScore": 25.82,
+    "baselineDpsProxy": 2.45,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "antonforsberg": {
+    "name": "Anton Forsberg",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 2.230000000000004,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nickseeler": {
+    "name": "Nick Seeler",
+    "baselinePtsPace": 21.298701298701296,
+    "baselineGameScore": 16.027272727272727,
+    "baselineDpsProxy": 2.300609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "seankuraly": {
+    "name": "Sean Kuraly",
+    "baselinePtsPace": 17,
+    "baselineGameScore": 17.6,
+    "baselineDpsProxy": 2.2,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "vincenttrocheck": {
+    "name": "Vincent Trocheck",
+    "baselinePtsPace": 59,
+    "baselineGameScore": 68.76,
+    "baselineDpsProxy": 2.45,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "adamlowry": {
+    "name": "Adam Lowry",
+    "baselinePtsPace": 38.19178082191781,
+    "baselineGameScore": 43.920547945205485,
+    "baselineDpsProxy": 2.092073170731707,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nickcousins": {
+    "name": "Nick Cousins",
+    "baselinePtsPace": 24.599999999999998,
+    "baselineGameScore": 29.109999999999996,
+    "baselineDpsProxy": 1.5548780487804876,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "blakecoleman": {
+    "name": "Blake Coleman",
+    "baselinePtsPace": 39,
+    "baselineGameScore": 52.82,
+    "baselineDpsProxy": 2.5,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jordanbinnington": {
+    "name": "Jordan Binnington",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 5.25,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jeangabrielpageau": {
+    "name": "Jean-Gabriel Pageau",
+    "baselinePtsPace": 43.59493670886076,
+    "baselineGameScore": 51.27594936708861,
+    "baselineDpsProxy": 2.3121951219512193,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mikereilly": {
+    "name": "Mike Reilly",
+    "baselinePtsPace": 9.11111111111111,
+    "baselineGameScore": 36.35333333333333,
+    "baselineDpsProxy": 0.6585365853658537,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "scottmayfield": {
+    "name": "Scott Mayfield",
+    "baselinePtsPace": 11.181818181818182,
+    "baselineGameScore": 14.80969696969697,
+    "baselineDpsProxy": 1.730487804878049,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "boonejenner": {
+    "name": "Boone Jenner",
+    "baselinePtsPace": 59.92307692307692,
+    "baselineGameScore": 71.59230769230768,
+    "baselineDpsProxy": 0.8085365853658536,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "johngibson": {
+    "name": "John Gibson",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 15.340000000000005,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brandonsaad": {
+    "name": "Brandon Saad",
+    "baselinePtsPace": 34.166666666666664,
+    "baselineGameScore": 38.05027777777777,
+    "baselineDpsProxy": 2.4146341463414633,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joeledmundson": {
+    "name": "Joel Edmundson",
+    "baselinePtsPace": 22.465753424657535,
+    "baselineGameScore": 32.99095890410959,
+    "baselineDpsProxy": 2.18109756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mattnieto": {
+    "name": "Matt Nieto",
+    "baselinePtsPace": 7.6875,
+    "baselineGameScore": 3.9975,
+    "baselineDpsProxy": 0.6048780487804879,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "williamkarlsson": {
+    "name": "William Karlsson",
+    "baselinePtsPace": 44.86792452830189,
+    "baselineGameScore": 64.7645283018868,
+    "baselineDpsProxy": 1.8097560975609759,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nikitakucherov": {
+    "name": "Nikita Kucherov",
+    "baselinePtsPace": 127.20512820512822,
+    "baselineGameScore": 122.60051282051285,
+    "baselineDpsProxy": 2.948780487804878,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryannugenthopkins": {
+    "name": "Ryan Nugent-Hopkins",
+    "baselinePtsPace": 51.51282051282052,
+    "baselineGameScore": 59.534102564102575,
+    "baselineDpsProxy": 2.710975609756097,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jonathanhuberdeau": {
+    "name": "Jonathan Huberdeau",
+    "baselinePtsPace": 62.76543209876543,
+    "baselineGameScore": 64.32444444444445,
+    "baselineDpsProxy": 2.6176829268292687,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "adamlarsson": {
+    "name": "Adam Larsson",
+    "baselinePtsPace": 28.000000000000004,
+    "baselineGameScore": 29.65,
+    "baselineDpsProxy": 2.05,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryanstrome": {
+    "name": "Ryan Strome",
+    "baselinePtsPace": 41,
+    "baselineGameScore": 33.24,
+    "baselineDpsProxy": 2.6500000000000004,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mikazibanejad": {
+    "name": "Mika Zibanejad",
+    "baselinePtsPace": 61.99999999999999,
+    "baselineGameScore": 55.040000000000006,
+    "baselineDpsProxy": 2.6,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "markscheifele": {
+    "name": "Mark Scheifele",
+    "baselinePtsPace": 87,
+    "baselineGameScore": 73.58,
+    "baselineDpsProxy": 2.8499999999999996,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "seancouturier": {
+    "name": "Sean Couturier",
+    "baselinePtsPace": 46.70886075949367,
+    "baselineGameScore": 45.899240506329114,
+    "baselineDpsProxy": 2.649390243902439,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dougiehamilton": {
+    "name": "Dougie Hamilton",
+    "baselinePtsPace": 51.25,
+    "baselineGameScore": 63.678124999999994,
+    "baselineDpsProxy": 2.4585365853658536,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jonasbrodin": {
+    "name": "Jonas Brodin",
+    "baselinePtsPace": 32.8,
+    "baselineGameScore": 32.1768,
+    "baselineDpsProxy": 1.402439024390244,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jamieoleksiak": {
+    "name": "Jamie Oleksiak",
+    "baselinePtsPace": 17,
+    "baselineGameScore": 12.25,
+    "baselineDpsProxy": 2,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jtmiller": {
+    "name": "J.T. Miller",
+    "baselinePtsPace": 79.72222222222221,
+    "baselineGameScore": 72.50166666666667,
+    "baselineDpsProxy": 2.239024390243902,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joelarmia": {
+    "name": "Joel Armia",
+    "baselinePtsPace": 29.358024691358025,
+    "baselineGameScore": 21.380740740740745,
+    "baselineDpsProxy": 1.975609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "connormurphy": {
+    "name": "Connor Murphy",
+    "baselinePtsPace": 22.91176470588235,
+    "baselineGameScore": 14.952941176470587,
+    "baselineDpsProxy": 1.6170731707317074,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "stefannoesen": {
+    "name": "Stefan Noesen",
+    "baselinePtsPace": 43.1025641025641,
+    "baselineGameScore": 49.242051282051285,
+    "baselineDpsProxy": 2.948780487804878,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "phillipdanault": {
+    "name": "Phillip Danault",
+    "baselinePtsPace": 44.074999999999996,
+    "baselineGameScore": 61.52049999999999,
+    "baselineDpsProxy": 2.6341463414634148,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "vladislavnamestnikov": {
+    "name": "Vladislav Namestnikov",
+    "baselinePtsPace": 39.94871794871795,
+    "baselineGameScore": 41.357435897435906,
+    "baselineDpsProxy": 2.6634146341463416,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "rickardrakell": {
+    "name": "Rickard Rakell",
+    "baselinePtsPace": 70.8641975308642,
+    "baselineGameScore": 74.76172839506172,
+    "baselineDpsProxy": 2.7658536585365856,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "colinmiller": {
+    "name": "Colin Miller",
+    "baselinePtsPace": 20.5,
+    "baselineGameScore": 26.991666666666667,
+    "baselineDpsProxy": 2.0121951219512195,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jonathanmarchessault": {
+    "name": "Jonathan Marchessault",
+    "baselinePtsPace": 58.871794871794876,
+    "baselineGameScore": 49.85179487179487,
+    "baselineDpsProxy": 2.710975609756097,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "barclaygoodrow": {
+    "name": "Barclay Goodrow",
+    "baselinePtsPace": 8.519480519480519,
+    "baselineGameScore": -5.25012987012987,
+    "baselineDpsProxy": 1.4554878048780486,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "lukeglendening": {
+    "name": "Luke Glendening",
+    "baselinePtsPace": 7.454545454545455,
+    "baselineGameScore": 5.058441558441558,
+    "baselineDpsProxy": 1.643292682926829,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "yannigourde": {
+    "name": "Yanni Gourde",
+    "baselinePtsPace": 44.59649122807018,
+    "baselineGameScore": 45.73298245614035,
+    "baselineDpsProxy": 1.6682926829268294,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "morganrielly": {
+    "name": "Morgan Rielly",
+    "baselinePtsPace": 41,
+    "baselineGameScore": 35.75,
+    "baselineDpsProxy": 2.6500000000000004,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "hampuslindholm": {
+    "name": "Hampus Lindholm",
+    "baselinePtsPace": 33.76470588235294,
+    "baselineGameScore": 49.58588235294117,
+    "baselineDpsProxy": 0.4664634146341463,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mathewdumba": {
+    "name": "Mathew Dumba",
+    "baselinePtsPace": 13.015873015873016,
+    "baselineGameScore": 17.480317460317462,
+    "baselineDpsProxy": 1.8823170731707317,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "phillipdigiuseppe": {
+    "name": "Phillip Di Giuseppe",
+    "baselinePtsPace": 24.599999999999998,
+    "baselineGameScore": 27.059999999999995,
+    "baselineDpsProxy": 0.5487804878048781,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brendangaunce": {
+    "name": "Brendan Gaunce",
+    "baselinePtsPace": 6.833333333333333,
+    "baselineGameScore": -15.375,
+    "baselineDpsProxy": 0.2634146341463414,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "bradyskjei": {
+    "name": "Brady Skjei",
+    "baselinePtsPace": 33,
+    "baselineGameScore": 31.95,
+    "baselineDpsProxy": 2.4,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tannerpearson": {
+    "name": "Tanner Pearson",
+    "baselinePtsPace": 28.384615384615387,
+    "baselineGameScore": 26.5974358974359,
+    "baselineDpsProxy": 2.235365853658536,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "scottlaughton": {
+    "name": "Scott Laughton",
+    "baselinePtsPace": 31.775,
+    "baselineGameScore": 19.5775,
+    "baselineDpsProxy": 2.1463414634146343,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "markjankowski": {
+    "name": "Mark Jankowski",
+    "baselinePtsPace": 23.233333333333334,
+    "baselineGameScore": 35.875,
+    "baselineDpsProxy": 1.8658536585365852,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ollimtt": {
+    "name": "Olli Mtt",
+    "baselinePtsPace": 19.16883116883117,
+    "baselineGameScore": 30.435844155844155,
+    "baselineDpsProxy": 2.300609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mikematheson": {
+    "name": "Mike Matheson",
+    "baselinePtsPace": 31.775,
+    "baselineGameScore": 29.079250000000002,
+    "baselineDpsProxy": 2.048780487804878,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "zemgusgirgensons": {
+    "name": "Zemgus Girgensons",
+    "baselinePtsPace": 6,
+    "baselineGameScore": 12.86,
+    "baselineDpsProxy": 1.9500000000000004,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "codyceci": {
+    "name": "Cody Ceci",
+    "baselinePtsPace": 23.152941176470588,
+    "baselineGameScore": 6.9941176470588236,
+    "baselineDpsProxy": 1.8140243902439024,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tomwilson": {
+    "name": "Tom Wilson",
+    "baselinePtsPace": 65.80246913580247,
+    "baselineGameScore": 65.83283950617285,
+    "baselineDpsProxy": 2.914024390243902,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tomashertl": {
+    "name": "Tomas Hertl",
+    "baselinePtsPace": 68.52054794520548,
+    "baselineGameScore": 73.81123287671232,
+    "baselineDpsProxy": 2.9378048780487807,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "teuvoteravainen": {
+    "name": "Teuvo Teravainen",
+    "baselinePtsPace": 58,
+    "baselineGameScore": 39.79,
+    "baselineDpsProxy": 2.5,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "andreivasilevskiy": {
+    "name": "Andrei Vasilevskiy",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 29.16,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jacobtrouba": {
+    "name": "Jacob Trouba",
+    "baselinePtsPace": 14.90909090909091,
+    "baselineGameScore": 8.55142857142857,
+    "baselineDpsProxy": 1.8780487804878048,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "filipforsberg": {
+    "name": "Filip Forsberg",
+    "baselinePtsPace": 76,
+    "baselineGameScore": 76.08,
+    "baselineDpsProxy": 2.9,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "radekfaksa": {
+    "name": "Radek Faksa",
+    "baselinePtsPace": 17.571428571428573,
+    "baselineGameScore": 17.641714285714286,
+    "baselineDpsProxy": 1.707317073170732,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mattgrzelcyk": {
+    "name": "Matt Grzelcyk",
+    "baselinePtsPace": 40,
+    "baselineGameScore": 36.3,
+    "baselineDpsProxy": 2.7,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "coltonparayko": {
+    "name": "Colton Parayko",
+    "baselinePtsPace": 46.125,
+    "baselineGameScore": 48.341562499999995,
+    "baselineDpsProxy": 1.678048780487805,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "oskarsundqvist": {
+    "name": "Oskar Sundqvist",
+    "baselinePtsPace": 24.47761194029851,
+    "baselineGameScore": 19.19044776119403,
+    "baselineDpsProxy": 2.001829268292683,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "esalindell": {
+    "name": "Esa Lindell",
+    "baselinePtsPace": 26.65,
+    "baselineGameScore": 26.731999999999996,
+    "baselineDpsProxy": 2.1951219512195124,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "chandlerstephenson": {
+    "name": "Chandler Stephenson",
+    "baselinePtsPace": 53.61538461538462,
+    "baselineGameScore": 32.863076923076925,
+    "baselineDpsProxy": 2.0926829268292684,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "shaynegostisbehere": {
+    "name": "Shayne Gostisbehere",
+    "baselinePtsPace": 52.714285714285715,
+    "baselineGameScore": 74.03428571428572,
+    "baselineDpsProxy": 2.774390243902439,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "devinshore": {
+    "name": "Devin Shore",
+    "baselinePtsPace": 7.454545454545455,
+    "baselineGameScore": -1.8338181818181818,
+    "baselineDpsProxy": 1.3079268292682928,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joonaskorpisalo": {
+    "name": "Joonas Korpisalo",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -1.6500000000000057,
+    "totalSeasonsWeighted": 0.3
+  },
+  "adampelech": {
+    "name": "Adam Pelech",
+    "baselinePtsPace": 28.7,
+    "baselineGameScore": 49.309333333333335,
+    "baselineDpsProxy": 1.719512195121951,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jimmyvesey": {
+    "name": "Jimmy Vesey",
+    "baselinePtsPace": 15.25581395348837,
+    "baselineGameScore": 16.228372093023257,
+    "baselineDpsProxy": 1.153658536585366,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jordanmartinook": {
+    "name": "Jordan Martinook",
+    "baselinePtsPace": 37.36708860759494,
+    "baselineGameScore": 58.780506329113926,
+    "baselineDpsProxy": 2.504878048780488,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "damonseverson": {
+    "name": "Damon Severson",
+    "baselinePtsPace": 29.28571428571429,
+    "baselineGameScore": 29.543428571428567,
+    "baselineDpsProxy": 2.048780487804878,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "coltonsissons": {
+    "name": "Colton Sissons",
+    "baselinePtsPace": 23.916666666666664,
+    "baselineGameScore": 21.240277777777774,
+    "baselineDpsProxy": 1.8439024390243905,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "teddyblueger": {
+    "name": "Teddy Blueger",
+    "baselinePtsPace": 26,
+    "baselineGameScore": 20.6,
+    "baselineDpsProxy": 2.1,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakemccabe": {
+    "name": "Jake McCabe",
+    "baselinePtsPace": 28.575757575757574,
+    "baselineGameScore": 33.60757575757576,
+    "baselineDpsProxy": 1.8109756097560978,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "anthonystolarz": {
+    "name": "Anthony Stolarz",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 25.78,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brockmcginn": {
+    "name": "Brock McGinn",
+    "baselinePtsPace": 25.23076923076923,
+    "baselineGameScore": 16.999230769230767,
+    "baselineDpsProxy": 0.6182926829268294,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "connorhellebuyck": {
+    "name": "Connor Hellebuyck",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 39.59,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jaccobslavin": {
+    "name": "Jaccob Slavin",
+    "baselinePtsPace": 27.674999999999997,
+    "baselineGameScore": 56.4775,
+    "baselineDpsProxy": 2.4390243902439024,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brettkulak": {
+    "name": "Brett Kulak",
+    "baselinePtsPace": 25,
+    "baselineGameScore": 38.88,
+    "baselineDpsProxy": 2.55,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "erikgustafsson": {
+    "name": "Erik Gustafsson",
+    "baselinePtsPace": 24.6,
+    "baselineGameScore": 26.267333333333333,
+    "baselineDpsProxy": 2.085365853658536,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joshanderson": {
+    "name": "Josh Anderson",
+    "baselinePtsPace": 27.33333333333334,
+    "baselineGameScore": 17.88814814814815,
+    "baselineDpsProxy": 2.123780487804878,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "vinniehinostroza": {
+    "name": "Vinnie Hinostroza",
+    "baselinePtsPace": 21.578947368421055,
+    "baselineGameScore": 23.99578947368421,
+    "baselineDpsProxy": 1.4597560975609756,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "linusullmark": {
+    "name": "Linus Ullmark",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 13.840000000000003,
+    "totalSeasonsWeighted": 0.3
+  },
+  "connorbrown": {
+    "name": "Connor Brown",
+    "baselinePtsPace": 30,
+    "baselineGameScore": 29.26,
+    "baselineDpsProxy": 2.4,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "benhutton": {
+    "name": "Ben Hutton",
+    "baselinePtsPace": 14.90909090909091,
+    "baselineGameScore": 11.33090909090909,
+    "baselineDpsProxy": 0.32195121951219513,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexanderkerfoot": {
+    "name": "Alexander Kerfoot",
+    "baselinePtsPace": 28.345679012345677,
+    "baselineGameScore": 39.349876543209874,
+    "baselineDpsProxy": 2.1731707317073172,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "liamobrien": {
+    "name": "Liam O'Brien",
+    "baselinePtsPace": 5.857142857142857,
+    "baselineGameScore": 11.01142857142857,
+    "baselineDpsProxy": 0.8365853658536586,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kurtismacdermid": {
+    "name": "Kurtis MacDermid",
+    "baselinePtsPace": 0,
+    "baselineGameScore": -11.337391304347825,
+    "baselineDpsProxy": 0.5189024390243904,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nateschmidt": {
+    "name": "Nate Schmidt",
+    "baselinePtsPace": 19.474999999999998,
+    "baselineGameScore": 36.84875,
+    "baselineDpsProxy": 2.926829268292683,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kyleburroughs": {
+    "name": "Kyle Burroughs",
+    "baselinePtsPace": 7.454545454545455,
+    "baselineGameScore": 7.454545454545455,
+    "baselineDpsProxy": 1.0664634146341465,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mackenzieweegar": {
+    "name": "MacKenzie Weegar",
+    "baselinePtsPace": 47.58024691358025,
+    "baselineGameScore": 70.39851851851853,
+    "baselineDpsProxy": 2.5682926829268293,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tylermotte": {
+    "name": "Tyler Motte",
+    "baselinePtsPace": 13.418181818181818,
+    "baselineGameScore": 13.120000000000001,
+    "baselineDpsProxy": 1.274390243902439,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "connorclifton": {
+    "name": "Connor Clifton",
+    "baselinePtsPace": 17.972602739726028,
+    "baselineGameScore": 10.143287671232876,
+    "baselineDpsProxy": 1.6469512195121951,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "carsonsoucy": {
+    "name": "Carson Soucy",
+    "baselinePtsPace": 14.213333333333331,
+    "baselineGameScore": 8.8232,
+    "baselineDpsProxy": 1.6920731707317072,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jonnybrodzinski": {
+    "name": "Jonny Brodzinski",
+    "baselinePtsPace": 30.549019607843135,
+    "baselineGameScore": 25.725490196078432,
+    "baselineDpsProxy": 1.430487804878049,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joshuabrown": {
+    "name": "Joshua Brown",
+    "baselinePtsPace": 8.2,
+    "baselineGameScore": 0.6559999999999999,
+    "baselineDpsProxy": 0.23170731707317072,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "hudsonfasching": {
+    "name": "Hudson Fasching",
+    "baselinePtsPace": 7.627906976744185,
+    "baselineGameScore": 20.538139534883722,
+    "baselineDpsProxy": 1.4420731707317074,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "johnhayden": {
+    "name": "John Hayden",
+    "baselinePtsPace": 8.2,
+    "baselineGameScore": 16.769,
+    "baselineDpsProxy": 0.6829268292682927,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "pavelbuchnevich": {
+    "name": "Pavel Buchnevich",
+    "baselinePtsPace": 61.5,
+    "baselineGameScore": 53.62368421052632,
+    "baselineDpsProxy": 2.45609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakeguentzel": {
+    "name": "Jake Guentzel",
+    "baselinePtsPace": 82,
+    "baselineGameScore": 83.46575,
+    "baselineDpsProxy": 2.8780487804878048,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "marcushogberg": {
+    "name": "Marcus Hogberg",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -5.770000000000003,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mattiasjanmark": {
+    "name": "Mattias Janmark",
+    "baselinePtsPace": 18.45,
+    "baselineGameScore": 12.422999999999998,
+    "baselineDpsProxy": 1.951219512195122,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "anthonyduclair": {
+    "name": "Anthony Duclair",
+    "baselinePtsPace": 20.5,
+    "baselineGameScore": 21.506363636363634,
+    "baselineDpsProxy": 1.3414634146341464,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "carterverhaeghe": {
+    "name": "Carter Verhaeghe",
+    "baselinePtsPace": 53.654320987654316,
+    "baselineGameScore": 71.50197530864197,
+    "baselineDpsProxy": 3.1115853658536583,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "oliverbjorkstrand": {
+    "name": "Oliver Bjorkstrand",
+    "baselinePtsPace": 47.74683544303797,
+    "baselineGameScore": 51.90911392405063,
+    "baselineDpsProxy": 2.601219512195122,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "juusesaros": {
+    "name": "Juuse Saros",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -7.419999999999987,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mileswood": {
+    "name": "Miles Wood",
+    "baselinePtsPace": 17.72972972972973,
+    "baselineGameScore": 21.829729729729728,
+    "baselineDpsProxy": 0.9926829268292685,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nickpaul": {
+    "name": "Nick Paul",
+    "baselinePtsPace": 44.23684210526316,
+    "baselineGameScore": 44.91657894736842,
+    "baselineDpsProxy": 2.409756097560976,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "andrewcopp": {
+    "name": "Andrew Copp",
+    "baselinePtsPace": 33.67857142857142,
+    "baselineGameScore": 28.24607142857143,
+    "baselineDpsProxy": 1.6048780487804877,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryangraves": {
+    "name": "Ryan Graves",
+    "baselinePtsPace": 5.377049180327869,
+    "baselineGameScore": 9.705573770491803,
+    "baselineDpsProxy": 1.525,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "andreburakovsky": {
+    "name": "Andre Burakovsky",
+    "baselinePtsPace": 38.40506329113924,
+    "baselineGameScore": 32.156455696202535,
+    "baselineDpsProxy": 2.4567073170731706,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "michaelmccarron": {
+    "name": "Michael McCarron",
+    "baselinePtsPace": 15.513513513513514,
+    "baselineGameScore": 12.366486486486487,
+    "baselineDpsProxy": 1.8499999999999999,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "sheatheodore": {
+    "name": "Shea Theodore",
+    "baselinePtsPace": 69.76119402985074,
+    "baselineGameScore": 70.18955223880597,
+    "baselineDpsProxy": 2.573780487804878,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jasondickinson": {
+    "name": "Jason Dickinson",
+    "baselinePtsPace": 22.23728813559322,
+    "baselineGameScore": 12.3,
+    "baselineDpsProxy": 1.1512195121951219,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryanhartman": {
+    "name": "Ryan Hartman",
+    "baselinePtsPace": 30.89855072463768,
+    "baselineGameScore": 35.224347826086955,
+    "baselineDpsProxy": 2.271951219512195,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jtcompher": {
+    "name": "J.T. Compher",
+    "baselinePtsPace": 34.526315789473685,
+    "baselineGameScore": 21.53578947368421,
+    "baselineDpsProxy": 1.9926829268292683,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tristanjarry": {
+    "name": "Tristan Jarry",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -4.670000000000002,
+    "totalSeasonsWeighted": 0.3
+  },
+  "artturilehkonen": {
+    "name": "Artturi Lehkonen",
+    "baselinePtsPace": 53.478260869565226,
+    "baselineGameScore": 74.07333333333332,
+    "baselineDpsProxy": 2.35609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "williamcarrier": {
+    "name": "William Carrier",
+    "baselinePtsPace": 20.976744186046513,
+    "baselineGameScore": 40.33255813953488,
+    "baselineDpsProxy": 1.5731707317073171,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tylerbertuzzi": {
+    "name": "Tyler Bertuzzi",
+    "baselinePtsPace": 46,
+    "baselineGameScore": 28.39,
+    "baselineDpsProxy": 2.5,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ericcomrie": {
+    "name": "Eric Comrie",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 2.469999999999999,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brettpesce": {
+    "name": "Brett Pesce",
+    "baselinePtsPace": 19.36111111111111,
+    "baselineGameScore": 34.18944444444444,
+    "baselineDpsProxy": 2.0195121951219517,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nathanmackinnon": {
+    "name": "Nathan MacKinnon",
+    "baselinePtsPace": 120.40506329113924,
+    "baselineGameScore": 140.0020253164557,
+    "baselineDpsProxy": 3.0347560975609755,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "aleksanderbarkov": {
+    "name": "Aleksander Barkov",
+    "baselinePtsPace": 86.8955223880597,
+    "baselineGameScore": 102.51223880597016,
+    "baselineDpsProxy": 2.492073170731707,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jonathandrouin": {
+    "name": "Jonathan Drouin",
+    "baselinePtsPace": 70.55813953488372,
+    "baselineGameScore": 77.15627906976745,
+    "baselineDpsProxy": 1.494512195121951,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "sethjones": {
+    "name": "Seth Jones",
+    "baselinePtsPace": 46.85714285714286,
+    "baselineGameScore": 43.121587301587304,
+    "baselineDpsProxy": 1.84390243902439,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "eliaslindholm": {
+    "name": "Elias Lindholm",
+    "baselinePtsPace": 47,
+    "baselineGameScore": 48.59,
+    "baselineDpsProxy": 2.6,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "seanmonahan": {
+    "name": "Sean Monahan",
+    "baselinePtsPace": 86.55555555555556,
+    "baselineGameScore": 92.34111111111112,
+    "baselineDpsProxy": 1.8109756097560978,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "darnellnurse": {
+    "name": "Darnell Nurse",
+    "baselinePtsPace": 35.60526315789474,
+    "baselineGameScore": 51.30394736842105,
+    "baselineDpsProxy": 2.3634146341463413,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "rasmusristolainen": {
+    "name": "Rasmus Ristolainen",
+    "baselinePtsPace": 24.73015873015873,
+    "baselineGameScore": 28.5047619047619,
+    "baselineDpsProxy": 1.8823170731707317,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "bohorvat": {
+    "name": "Bo Horvat",
+    "baselinePtsPace": 57.70370370370372,
+    "baselineGameScore": 67.80691358024693,
+    "baselineDpsProxy": 2.5682926829268293,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "valerinichushkin": {
+    "name": "Valeri Nichushkin",
+    "baselinePtsPace": 64.83720930232559,
+    "baselineGameScore": 77.23255813953489,
+    "baselineDpsProxy": 1.3634146341463416,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "maxdomi": {
+    "name": "Max Domi",
+    "baselinePtsPace": 36.567567567567565,
+    "baselineGameScore": 26.15135135135135,
+    "baselineDpsProxy": 2.3463414634146345,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joshmorrissey": {
+    "name": "Josh Morrissey",
+    "baselinePtsPace": 63.55,
+    "baselineGameScore": 67.18874999999998,
+    "baselineDpsProxy": 2.8292682926829267,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexanderwennberg": {
+    "name": "Alexander Wennberg",
+    "baselinePtsPace": 37.272727272727266,
+    "baselineGameScore": 29.413506493506492,
+    "baselineDpsProxy": 2.2536585365853656,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryanpulock": {
+    "name": "Ryan Pulock",
+    "baselinePtsPace": 25.486486486486488,
+    "baselineGameScore": 21.973783783783784,
+    "baselineDpsProxy": 1.8499999999999999,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nikitazadorov": {
+    "name": "Nikita Zadorov",
+    "baselinePtsPace": 22.271604938271608,
+    "baselineGameScore": 18.556296296296296,
+    "baselineDpsProxy": 2.271951219512195,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "curtislazar": {
+    "name": "Curtis Lazar",
+    "baselinePtsPace": 8.541666666666666,
+    "baselineGameScore": -0.46125,
+    "baselineDpsProxy": 1.1121951219512194,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "anthonymantha": {
+    "name": "Anthony Mantha",
+    "baselinePtsPace": 44.15384615384615,
+    "baselineGameScore": 41.88307692307692,
+    "baselineDpsProxy": 0.499390243902439,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "rossjohnston": {
+    "name": "Ross Johnston",
+    "baselinePtsPace": 7.627906976744185,
+    "baselineGameScore": -5.434883720930233,
+    "baselineDpsProxy": 1.0225609756097562,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nathanwalker": {
+    "name": "Nathan Walker",
+    "baselinePtsPace": 17.972602739726028,
+    "baselineGameScore": 16.3213698630137,
+    "baselineDpsProxy": 1.780487804878049,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joelhanley": {
+    "name": "Joel Hanley",
+    "baselinePtsPace": 13.924528301886792,
+    "baselineGameScore": 29.318867924528305,
+    "baselineDpsProxy": 1.5835365853658538,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "trevorvanriemsdyk": {
+    "name": "Trevor van Riemsdyk",
+    "baselinePtsPace": 21,
+    "baselineGameScore": 25.05,
+    "baselineDpsProxy": 2.45,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jordanoesterle": {
+    "name": "Jordan Oesterle",
+    "baselinePtsPace": 22.16216216216216,
+    "baselineGameScore": 29.586486486486486,
+    "baselineDpsProxy": 1.0378048780487807,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "patrickbrown": {
+    "name": "Patrick Brown",
+    "baselinePtsPace": 5.466666666666667,
+    "baselineGameScore": -4.701333333333333,
+    "baselineDpsProxy": 0.23780487804878048,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "garnethathaway": {
+    "name": "Garnet Hathaway",
+    "baselinePtsPace": 25.70149253731343,
+    "baselineGameScore": 22.519402985074624,
+    "baselineDpsProxy": 1.920121951219512,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "frederickgaudreau": {
+    "name": "Frederick Gaudreau",
+    "baselinePtsPace": 37,
+    "baselineGameScore": 26.21,
+    "baselineDpsProxy": 2.15,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tomasnosek": {
+    "name": "Tomas Nosek",
+    "baselinePtsPace": 12.508474576271187,
+    "baselineGameScore": 24.030169491525424,
+    "baselineDpsProxy": 1.870731707317073,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "aaronekblad": {
+    "name": "Aaron Ekblad",
+    "baselinePtsPace": 48.32142857142857,
+    "baselineGameScore": 63.76964285714285,
+    "baselineDpsProxy": 1.9121951219512199,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "samreinhart": {
+    "name": "Sam Reinhart",
+    "baselinePtsPace": 84.07594936708861,
+    "baselineGameScore": 99.15772151898734,
+    "baselineDpsProxy": 2.8902439024390243,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "leondraisaitl": {
+    "name": "Leon Draisaitl",
+    "baselinePtsPace": 122.42253521126761,
+    "baselineGameScore": 137.9794366197183,
+    "baselineDpsProxy": 2.857317073170732,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "sambennett": {
+    "name": "Sam Bennett",
+    "baselinePtsPace": 55.026315789473685,
+    "baselineGameScore": 66.39842105263158,
+    "baselineDpsProxy": 2.8268292682926828,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "haydnfleury": {
+    "name": "Haydn Fleury",
+    "baselinePtsPace": 14.717948717948719,
+    "baselineGameScore": 11.774358974358973,
+    "baselineDpsProxy": 0.9749999999999998,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "williamnylander": {
+    "name": "William Nylander",
+    "baselinePtsPace": 84,
+    "baselineGameScore": 77.47,
+    "baselineDpsProxy": 2.8499999999999996,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nikolajehlers": {
+    "name": "Nikolaj Ehlers",
+    "baselinePtsPace": 74.8695652173913,
+    "baselineGameScore": 80.16985507246376,
+    "baselineDpsProxy": 2.524390243902439,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kevinfiala": {
+    "name": "Kevin Fiala",
+    "baselinePtsPace": 60.740740740740755,
+    "baselineGameScore": 77.82913580246914,
+    "baselineDpsProxy": 3.1115853658536583,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakubvrana": {
+    "name": "Jakub Vrana",
+    "baselinePtsPace": 29.435897435897438,
+    "baselineGameScore": 20.752307692307692,
+    "baselineDpsProxy": 1.0463414634146342,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dylanlarkin": {
+    "name": "Dylan Larkin",
+    "baselinePtsPace": 70,
+    "baselineGameScore": 74.38,
+    "baselineDpsProxy": 2.8499999999999996,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "travissanheim": {
+    "name": "Travis Sanheim",
+    "baselinePtsPace": 30,
+    "baselineGameScore": 31.97,
+    "baselineDpsProxy": 2.5,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alextuch": {
+    "name": "Alex Tuch",
+    "baselinePtsPace": 67,
+    "baselineGameScore": 67.04,
+    "baselineDpsProxy": 2.55,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tonydeangelo": {
+    "name": "Tony DeAngelo",
+    "baselinePtsPace": 44.51428571428572,
+    "baselineGameScore": 50.95714285714286,
+    "baselineDpsProxy": 1.0457317073170733,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nickschmaltz": {
+    "name": "Nick Schmaltz",
+    "baselinePtsPace": 63,
+    "baselineGameScore": 67.99,
+    "baselineDpsProxy": 3.05,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "robbyfabbri": {
+    "name": "Robby Fabbri",
+    "baselinePtsPace": 29.81818181818182,
+    "baselineGameScore": 11.722272727272726,
+    "baselineDpsProxy": 1.0731707317073171,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kasperikapanen": {
+    "name": "Kasperi Kapanen",
+    "baselinePtsPace": 17.134328358208954,
+    "baselineGameScore": 16.448955223880596,
+    "baselineDpsProxy": 1.920121951219512,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jaredmccann": {
+    "name": "Jared McCann",
+    "baselinePtsPace": 61.00000000000001,
+    "baselineGameScore": 57.69,
+    "baselineDpsProxy": 2.55,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "davidpastrnak": {
+    "name": "David Pastrnak",
+    "baselinePtsPace": 106,
+    "baselineGameScore": 106.05,
+    "baselineDpsProxy": 2.9,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "adriankempe": {
+    "name": "Adrian Kempe",
+    "baselinePtsPace": 73.90123456790124,
+    "baselineGameScore": 79.52987654320988,
+    "baselineDpsProxy": 2.7658536585365856,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ivanbarbashev": {
+    "name": "Ivan Barbashev",
+    "baselinePtsPace": 59.74285714285715,
+    "baselineGameScore": 58.07942857142858,
+    "baselineDpsProxy": 2.304878048780488,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "thatcherdemko": {
+    "name": "Thatcher Demko",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 1.4399999999999977,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexnedeljkovic": {
+    "name": "Alex Nedeljkovic",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -0.9800000000000041,
+    "totalSeasonsWeighted": 0.3
+  },
+  "marcuspettersson": {
+    "name": "Marcus Pettersson",
+    "baselinePtsPace": 30.487179487179485,
+    "baselineGameScore": 33.01025641025641,
+    "baselineDpsProxy": 2.235365853658536,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "vitekvanecek": {
+    "name": "Vitek Vanecek",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -8.530000000000001,
+    "totalSeasonsWeighted": 0.3
+  },
+  "andreasenglund": {
+    "name": "Andreas Englund",
+    "baselinePtsPace": 7.0285714285714285,
+    "baselineGameScore": 2.7645714285714287,
+    "baselineDpsProxy": 0.9817073170731709,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nicolasaubekubel": {
+    "name": "Nicolas Aube-Kubel",
+    "baselinePtsPace": 7.454545454545455,
+    "baselineGameScore": 5.851818181818182,
+    "baselineDpsProxy": 0.6573170731707318,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brandonmontour": {
+    "name": "Brandon Montour",
+    "baselinePtsPace": 41.50617283950618,
+    "baselineGameScore": 40.51407407407408,
+    "baselineDpsProxy": 2.4695121951219514,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryandonato": {
+    "name": "Ryan Donato",
+    "baselinePtsPace": 63.55,
+    "baselineGameScore": 48.41074999999999,
+    "baselineDpsProxy": 2.341463414634146,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "christiandvorak": {
+    "name": "Christian Dvorak",
+    "baselinePtsPace": 33,
+    "baselineGameScore": 25.92,
+    "baselineDpsProxy": 2.15,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jonasjohansson": {
+    "name": "Jonas Johansson",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -1.0499999999999972,
+    "totalSeasonsWeighted": 0.3
+  },
+  "justinkirkland": {
+    "name": "Justin Kirkland",
+    "baselinePtsPace": 31.238095238095234,
+    "baselineGameScore": 18.118095238095236,
+    "baselineDpsProxy": 0.49939024390243913,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "warrenfoegele": {
+    "name": "Warren Foegele",
+    "baselinePtsPace": 46,
+    "baselineGameScore": 62.77,
+    "baselineDpsProxy": 2.8499999999999996,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "elvismerzlikins": {
+    "name": "Elvis Merzlikins",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -8.169999999999987,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ilyasorokin": {
+    "name": "Ilya Sorokin",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 17.539999999999992,
+    "totalSeasonsWeighted": 0.3
+  },
+  "braydenpoint": {
+    "name": "Brayden Point",
+    "baselinePtsPace": 87.32467532467531,
+    "baselineGameScore": 80.6581818181818,
+    "baselineDpsProxy": 2.7701219512195117,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakewalman": {
+    "name": "Jake Walman",
+    "baselinePtsPace": 50.46153846153846,
+    "baselineGameScore": 57.65230769230769,
+    "baselineDpsProxy": 1.9817073170731712,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "michaelamadio": {
+    "name": "Michael Amadio",
+    "baselinePtsPace": 30.75,
+    "baselineGameScore": 30.806944444444447,
+    "baselineDpsProxy": 2.282926829268293,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "villehusso": {
+    "name": "Ville Husso",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -4.920000000000002,
+    "totalSeasonsWeighted": 0.3
+  },
+  "devontoews": {
+    "name": "Devon Toews",
+    "baselinePtsPace": 47.473684210526315,
+    "baselineGameScore": 69.37631578947368,
+    "baselineDpsProxy": 2.3634146341463413,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "viktorarvidsson": {
+    "name": "Viktor Arvidsson",
+    "baselinePtsPace": 33.04477611940298,
+    "baselineGameScore": 51.121492537313436,
+    "baselineDpsProxy": 2.369512195121951,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "samlafferty": {
+    "name": "Sam Lafferty",
+    "baselinePtsPace": 9.566666666666666,
+    "baselineGameScore": 4.742333333333334,
+    "baselineDpsProxy": 1.3902439024390243,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dantonheinen": {
+    "name": "Danton Heinen",
+    "baselinePtsPace": 30.10126582278481,
+    "baselineGameScore": 27.74506329113924,
+    "baselineDpsProxy": 2.1195121951219513,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "michaelbunting": {
+    "name": "Michael Bunting",
+    "baselinePtsPace": 41,
+    "baselineGameScore": 47.150000000000006,
+    "baselineDpsProxy": 2.548780487804878,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "igorshesterkin": {
+    "name": "Igor Shesterkin",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 21.560000000000002,
+    "totalSeasonsWeighted": 0.3
+  },
+  "gustavforsling": {
+    "name": "Gustav Forsling",
+    "baselinePtsPace": 31.775,
+    "baselineGameScore": 63.775499999999994,
+    "baselineDpsProxy": 2.292682926829268,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dakotajoshua": {
+    "name": "Dakota Joshua",
+    "baselinePtsPace": 20.140350877192983,
+    "baselineGameScore": 11.206666666666667,
+    "baselineDpsProxy": 1.5640243902439024,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kevinlabanc": {
+    "name": "Kevin Labanc",
+    "baselinePtsPace": 28.941176470588236,
+    "baselineGameScore": 28.31411764705882,
+    "baselineDpsProxy": 1.1817073170731704,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "victorolofsson": {
+    "name": "Victor Olofsson",
+    "baselinePtsPace": 42.46428571428571,
+    "baselineGameScore": 54.07607142857142,
+    "baselineDpsProxy": 2.151219512195122,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "pierreengvall": {
+    "name": "Pierre Engvall",
+    "baselinePtsPace": 19.838709677419352,
+    "baselineGameScore": 22.92032258064516,
+    "baselineDpsProxy": 1.8902439024390243,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakeevans": {
+    "name": "Jake Evans",
+    "baselinePtsPace": 36,
+    "baselineGameScore": 31.79,
+    "baselineDpsProxy": 1.9500000000000004,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakemiddleton": {
+    "name": "Jake Middleton",
+    "baselinePtsPace": 25.70149253731343,
+    "baselineGameScore": 21.80955223880597,
+    "baselineDpsProxy": 1.7567073170731706,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "matthewhighmore": {
+    "name": "Matthew Highmore",
+    "baselinePtsPace": 12,
+    "baselineGameScore": 7.160000000000001,
+    "baselineDpsProxy": 0.95,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "bokondjiimama": {
+    "name": "Bokondji Imama",
+    "baselinePtsPace": 5.125,
+    "baselineGameScore": 3.3312500000000003,
+    "baselineDpsProxy": 0.3219512195121952,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "darrenraddysh": {
+    "name": "Darren Raddysh",
+    "baselinePtsPace": 41.56164383561644,
+    "baselineGameScore": 44.369863013698634,
+    "baselineDpsProxy": 2.5371951219512194,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "andrewmangiapane": {
+    "name": "Andrew Mangiapane",
+    "baselinePtsPace": 28.345679012345677,
+    "baselineGameScore": 34.2679012345679,
+    "baselineDpsProxy": 2.815243902439024,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "frankvatrano": {
+    "name": "Frank Vatrano",
+    "baselinePtsPace": 45.55555555555556,
+    "baselineGameScore": 46.193333333333335,
+    "baselineDpsProxy": 2.6176829268292687,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "noahhanifin": {
+    "name": "Noah Hanifin",
+    "baselinePtsPace": 39.974999999999994,
+    "baselineGameScore": 51.99824999999999,
+    "baselineDpsProxy": 2.6829268292682924,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "rasmusandersson": {
+    "name": "Rasmus Andersson",
+    "baselinePtsPace": 31.382716049382715,
+    "baselineGameScore": 37.628888888888895,
+    "baselineDpsProxy": 2.1731707317073172,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kyleconnor": {
+    "name": "Kyle Connor",
+    "baselinePtsPace": 97,
+    "baselineGameScore": 86.77,
+    "baselineDpsProxy": 2.8000000000000003,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jonassiegenthaler": {
+    "name": "Jonas Siegenthaler",
+    "baselinePtsPace": 13.418181818181818,
+    "baselineGameScore": 23.55636363636364,
+    "baselineDpsProxy": 1.7774390243902443,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "pavelzacha": {
+    "name": "Pavel Zacha",
+    "baselinePtsPace": 47,
+    "baselineGameScore": 40.87,
+    "baselineDpsProxy": 2.5,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "connormcdavid": {
+    "name": "Connor McDavid",
+    "baselinePtsPace": 122.38805970149254,
+    "baselineGameScore": 134.73701492537313,
+    "baselineDpsProxy": 2.696341463414634,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jackeichel": {
+    "name": "Jack Eichel",
+    "baselinePtsPace": 100.10389610389609,
+    "baselineGameScore": 95.27974025974025,
+    "baselineDpsProxy": 2.723170731707317,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mackenzieblackwood": {
+    "name": "Mackenzie Blackwood",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 13.319999999999993,
+    "totalSeasonsWeighted": 0.3
+  },
+  "vincedunn": {
+    "name": "Vince Dunn",
+    "baselinePtsPace": 51.58064516129032,
+    "baselineGameScore": 56.580000000000005,
+    "baselineDpsProxy": 1.9280487804878048,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "travisdermott": {
+    "name": "Travis Dermott",
+    "baselinePtsPace": 0,
+    "baselineGameScore": -1.2947368421052632,
+    "baselineDpsProxy": 0.46341463414634154,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "anthonyrichard": {
+    "name": "Anthony Richard",
+    "baselinePtsPace": 32.8,
+    "baselineGameScore": 32.58133333333333,
+    "baselineDpsProxy": 0.5030487804878049,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jordangreenway": {
+    "name": "Jordan Greenway",
+    "baselinePtsPace": 19.294117647058822,
+    "baselineGameScore": 25.56470588235294,
+    "baselineDpsProxy": 0.7878048780487804,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "timomeier": {
+    "name": "Timo Meier",
+    "baselinePtsPace": 54.325,
+    "baselineGameScore": 70.38674999999999,
+    "baselineDpsProxy": 2.975609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "erikcernak": {
+    "name": "Erik Cernak",
+    "baselinePtsPace": 22.657894736842106,
+    "baselineGameScore": 21.417105263157897,
+    "baselineDpsProxy": 2.1317073170731713,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mikkorantanen": {
+    "name": "Mikko Rantanen",
+    "baselinePtsPace": 88,
+    "baselineGameScore": 89.3,
+    "baselineDpsProxy": 3,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ajgreer": {
+    "name": "A.J. Greer",
+    "baselinePtsPace": 17.209876543209877,
+    "baselineGameScore": 23.790123456790123,
+    "baselineDpsProxy": 2.6670731707317072,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jansenharkins": {
+    "name": "Jansen Harkins",
+    "baselinePtsPace": 7.935483870967741,
+    "baselineGameScore": 1.4151612903225808,
+    "baselineDpsProxy": 1.3609756097560974,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "sebastianaho": {
+    "name": "Sebastian Aho",
+    "baselinePtsPace": 76.81012658227849,
+    "baselineGameScore": 94.36227848101265,
+    "baselineDpsProxy": 2.8902439024390243,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "oliverkylington": {
+    "name": "Oliver Kylington",
+    "baselinePtsPace": 21.578947368421055,
+    "baselineGameScore": 24.815789473684212,
+    "baselineDpsProxy": 0.6140243902439025,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "christianfischer": {
+    "name": "Christian Fischer",
+    "baselinePtsPace": 12.478260869565217,
+    "baselineGameScore": 2.8343478260869563,
+    "baselineDpsProxy": 0.9817073170731709,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "keegankolesar": {
+    "name": "Keegan Kolesar",
+    "baselinePtsPace": 30,
+    "baselineGameScore": 30.99,
+    "baselineDpsProxy": 2.5,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "danvladar": {
+    "name": "Dan Vladar",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 0.9099999999999966,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tommynovak": {
+    "name": "Tommy Novak",
+    "baselinePtsPace": 33.40740740740741,
+    "baselineGameScore": 45.22148148148148,
+    "baselineDpsProxy": 1.8439024390243905,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "traviskonecny": {
+    "name": "Travis Konecny",
+    "baselinePtsPace": 76,
+    "baselineGameScore": 61.48,
+    "baselineDpsProxy": 2.7,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dylanstrome": {
+    "name": "Dylan Strome",
+    "baselinePtsPace": 82,
+    "baselineGameScore": 67.55,
+    "baselineDpsProxy": 2.8000000000000003,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brandoncarlo": {
+    "name": "Brandon Carlo",
+    "baselinePtsPace": 11.855421686746988,
+    "baselineGameScore": 5.512771084337349,
+    "baselineDpsProxy": 2.024390243902439,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brockboeser": {
+    "name": "Brock Boeser",
+    "baselinePtsPace": 54.666666666666664,
+    "baselineGameScore": 46.105866666666664,
+    "baselineDpsProxy": 2.6067073170731705,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mathewbarzal": {
+    "name": "Mathew Barzal",
+    "baselinePtsPace": 54.66666666666668,
+    "baselineGameScore": 86.42800000000001,
+    "baselineDpsProxy": 1.1524390243902438,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "roopehintz": {
+    "name": "Roope Hintz",
+    "baselinePtsPace": 72.28947368421053,
+    "baselineGameScore": 65.55684210526316,
+    "baselineDpsProxy": 2.548780487804878,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "parkerwotherspoon": {
+    "name": "Parker Wotherspoon",
+    "baselinePtsPace": 10.436363636363637,
+    "baselineGameScore": 10.734545454545454,
+    "baselineDpsProxy": 1.4085365853658538,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "noahjuulsen": {
+    "name": "Noah Juulsen",
+    "baselinePtsPace": 0,
+    "baselineGameScore": -4.920000000000001,
+    "baselineDpsProxy": 0.6829268292682927,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jackroslovic": {
+    "name": "Jack Roslovic",
+    "baselinePtsPace": 39.48148148148148,
+    "baselineGameScore": 53.765679012345686,
+    "baselineDpsProxy": 2.815243902439024,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "zachwerenski": {
+    "name": "Zach Werenski",
+    "baselinePtsPace": 83.01234567901236,
+    "baselineGameScore": 97.2358024691358,
+    "baselineDpsProxy": 2.6670731707317072,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nicolasroy": {
+    "name": "Nicolas Roy",
+    "baselinePtsPace": 35.80281690140845,
+    "baselineGameScore": 35.07521126760564,
+    "baselineDpsProxy": 2.2945121951219516,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "anthonybeauvillier": {
+    "name": "Anthony Beauvillier",
+    "baselinePtsPace": 25.308641975308642,
+    "baselineGameScore": 36.54567901234568,
+    "baselineDpsProxy": 2.51890243902439,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "danielsprong": {
+    "name": "Daniel Sprong",
+    "baselinePtsPace": 19.133333333333333,
+    "baselineGameScore": 27.825333333333333,
+    "baselineDpsProxy": 0.9329268292682926,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jeremylauzon": {
+    "name": "Jeremy Lauzon",
+    "baselinePtsPace": 2.9285714285714284,
+    "baselineGameScore": 4.92,
+    "baselineDpsProxy": 0.7682926829268293,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "thomaschabot": {
+    "name": "Thomas Chabot",
+    "baselinePtsPace": 46.12499999999999,
+    "baselineGameScore": 60.71075,
+    "baselineDpsProxy": 2.4390243902439024,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "sammontembeault": {
+    "name": "Sam Montembeault",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 24.590000000000003,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mathieujoseph": {
+    "name": "Mathieu Joseph",
+    "baselinePtsPace": 19.133333333333333,
+    "baselineGameScore": 20.349666666666668,
+    "baselineDpsProxy": 1.75609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "lawsoncrouse": {
+    "name": "Lawson Crouse",
+    "baselinePtsPace": 18.22222222222222,
+    "baselineGameScore": 30.643703703703707,
+    "baselineDpsProxy": 2.716463414634146,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mitchellstephens": {
+    "name": "Mitchell Stephens",
+    "baselinePtsPace": 8.785714285714285,
+    "baselineGameScore": -1.552142857142857,
+    "baselineDpsProxy": 0.5804878048780489,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mitchmarner": {
+    "name": "Mitch Marner",
+    "baselinePtsPace": 103.25925925925927,
+    "baselineGameScore": 88.72197530864199,
+    "baselineDpsProxy": 2.6176829268292687,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ilyasamsonov": {
+    "name": "Ilya Samsonov",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 0.6099999999999994,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joelerikssonek": {
+    "name": "Joel Eriksson Ek",
+    "baselinePtsPace": 51.69565217391304,
+    "baselineGameScore": 68.43434782608695,
+    "baselineDpsProxy": 1.5146341463414636,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakedebrusk": {
+    "name": "Jake DeBrusk",
+    "baselinePtsPace": 48,
+    "baselineGameScore": 43.45,
+    "baselineDpsProxy": 2.8000000000000003,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "adinhill": {
+    "name": "Adin Hill",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 14.530000000000001,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ivanprovorov": {
+    "name": "Ivan Provorov",
+    "baselinePtsPace": 33,
+    "baselineGameScore": 30.549999999999997,
+    "baselineDpsProxy": 2.2,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dennisgilbert": {
+    "name": "Dennis Gilbert",
+    "baselinePtsPace": 16.96551724137931,
+    "baselineGameScore": 9.246206896551724,
+    "baselineDpsProxy": 0.7073170731707317,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "johnmarino": {
+    "name": "John Marino",
+    "baselinePtsPace": 32.800000000000004,
+    "baselineGameScore": 44.39714285714286,
+    "baselineDpsProxy": 0.9817073170731709,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "yakovtrenin": {
+    "name": "Yakov Trenin",
+    "baselinePtsPace": 16.18421052631579,
+    "baselineGameScore": 11.987105263157895,
+    "baselineDpsProxy": 2.039024390243903,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "anthonycirelli": {
+    "name": "Anthony Cirelli",
+    "baselinePtsPace": 60.474999999999994,
+    "baselineGameScore": 73.12349999999999,
+    "baselineDpsProxy": 2.731707317073171,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "evanrodrigues": {
+    "name": "Evan Rodrigues",
+    "baselinePtsPace": 32,
+    "baselineGameScore": 50.65,
+    "baselineDpsProxy": 2.8499999999999996,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "artemipanarin": {
+    "name": "Artemi Panarin",
+    "baselinePtsPace": 91.225,
+    "baselineGameScore": 91.24549999999999,
+    "baselineDpsProxy": 2.7804878048780486,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "noelacciari": {
+    "name": "Noel Acciari",
+    "baselinePtsPace": 12.455696202531644,
+    "baselineGameScore": 8.314177215189874,
+    "baselineDpsProxy": 1.6859756097560974,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "derekryan": {
+    "name": "Derek Ryan",
+    "baselinePtsPace": 13.666666666666666,
+    "baselineGameScore": 14.167777777777777,
+    "baselineDpsProxy": 0.8560975609756099,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kevinstenlund": {
+    "name": "Kevin Stenlund",
+    "baselinePtsPace": 28.000000000000004,
+    "baselineGameScore": 30.3,
+    "baselineDpsProxy": 1.9,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "willborgen": {
+    "name": "Will Borgen",
+    "baselinePtsPace": 14.642857142857142,
+    "baselineGameScore": 9.547142857142855,
+    "baselineDpsProxy": 2.151219512195122,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexandrecarrier": {
+    "name": "Alexandre Carrier",
+    "baselinePtsPace": 25.949367088607595,
+    "baselineGameScore": 18.424050632911392,
+    "baselineDpsProxy": 1.9268292682926829,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryanshea": {
+    "name": "Ryan Shea",
+    "baselinePtsPace": 10.512820512820513,
+    "baselineGameScore": 10.554871794871794,
+    "baselineDpsProxy": 0.9512195121951219,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "conorgarland": {
+    "name": "Conor Garland",
+    "baselinePtsPace": 50.617283950617285,
+    "baselineGameScore": 51.498024691358026,
+    "baselineDpsProxy": 2.815243902439024,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nikomikkola": {
+    "name": "Niko Mikkola",
+    "baselinePtsPace": 23.736842105263158,
+    "baselineGameScore": 40.46052631578947,
+    "baselineDpsProxy": 2.3634146341463413,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kirillkaprizov": {
+    "name": "Kirill Kaprizov",
+    "baselinePtsPace": 112.00000000000001,
+    "baselineGameScore": 115.3,
+    "baselineDpsProxy": 1.55,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "karelvejmelka": {
+    "name": "Karel Vejmelka",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 14.180000000000009,
+    "totalSeasonsWeighted": 0.3
+  },
+  "troyterry": {
+    "name": "Troy Terry",
+    "baselinePtsPace": 58.57142857142857,
+    "baselineGameScore": 55.45116883116883,
+    "baselineDpsProxy": 2.5823170731707314,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "adamgaudette": {
+    "name": "Adam Gaudette",
+    "baselinePtsPace": 26.320987654320987,
+    "baselineGameScore": 29.98567901234568,
+    "baselineDpsProxy": 2.8646341463414635,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "vladislavgavrikov": {
+    "name": "Vladislav Gavrikov",
+    "baselinePtsPace": 30,
+    "baselineGameScore": 50.05,
+    "baselineDpsProxy": 2.5,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "masonappleton": {
+    "name": "Mason Appleton",
+    "baselinePtsPace": 25.408450704225352,
+    "baselineGameScore": 29.08112676056338,
+    "baselineDpsProxy": 2.2079268292682923,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "stevenlorentz": {
+    "name": "Steven Lorentz",
+    "baselinePtsPace": 19.474999999999998,
+    "baselineGameScore": 17.8965,
+    "baselineDpsProxy": 2.048780487804878,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ivanfedotov": {
+    "name": "Ivan Fedotov",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -13.639999999999999,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mattroy": {
+    "name": "Matt Roy",
+    "baselinePtsPace": 28.521739130434778,
+    "baselineGameScore": 30.12608695652174,
+    "baselineDpsProxy": 2.0195121951219512,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joeydaccord": {
+    "name": "Joey Daccord",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 19.05000000000001,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jalenchatfield": {
+    "name": "Jalen Chatfield",
+    "baselinePtsPace": 18.68354430379747,
+    "baselineGameScore": 48.006329113924046,
+    "baselineDpsProxy": 2.4085365853658534,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "connoringram": {
+    "name": "Connor Ingram",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -11.64,
+    "totalSeasonsWeighted": 0.3
+  },
+  "masonmarchment": {
+    "name": "Mason Marchment",
+    "baselinePtsPace": 62.16129032258063,
+    "baselineGameScore": 58.51096774193548,
+    "baselineDpsProxy": 2.1170731707317074,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "rodrigoabols": {
+    "name": "Rodrigo Abols",
+    "baselinePtsPace": 18.636363636363637,
+    "baselineGameScore": 14.014545454545456,
+    "baselineDpsProxy": 0.7109756097560977,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "philippemyers": {
+    "name": "Philippe Myers",
+    "baselinePtsPace": 11.38888888888889,
+    "baselineGameScore": 15.03333333333333,
+    "baselineDpsProxy": 0.9219512195121953,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryanlomberg": {
+    "name": "Ryan Lomberg",
+    "baselinePtsPace": 13.325,
+    "baselineGameScore": 8.70225,
+    "baselineDpsProxy": 2.1463414634146343,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "caseydesmith": {
+    "name": "Casey DeSmith",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 15.860000000000001,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kevinrooney": {
+    "name": "Kevin Rooney",
+    "baselinePtsPace": 11.714285714285715,
+    "baselineGameScore": 10.273428571428571,
+    "baselineDpsProxy": 1.4512195121951221,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "charlielindgren": {
+    "name": "Charlie Lindgren",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -0.9699999999999989,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brandontanev": {
+    "name": "Brandon Tanev",
+    "baselinePtsPace": 22.835443037974684,
+    "baselineGameScore": 18.99493670886076,
+    "baselineDpsProxy": 2.023170731707317,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexlyon": {
+    "name": "Alex Lyon",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 2.3700000000000045,
+    "totalSeasonsWeighted": 0.3
+  },
+  "matthewtkachuk": {
+    "name": "Matthew Tkachuk",
+    "baselinePtsPace": 89.88461538461539,
+    "baselineGameScore": 102.295,
+    "baselineDpsProxy": 2.0926829268292684,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joeyanderson": {
+    "name": "Joey Anderson",
+    "baselinePtsPace": 4.555555555555555,
+    "baselineGameScore": 1.321111111111111,
+    "baselineDpsProxy": 0.39512195121951216,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "lukekunin": {
+    "name": "Luke Kunin",
+    "baselinePtsPace": 19.68,
+    "baselineGameScore": 2.8535999999999997,
+    "baselineDpsProxy": 1.7835365853658536,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "austonmatthews": {
+    "name": "Auston Matthews",
+    "baselinePtsPace": 95.46268656716418,
+    "baselineGameScore": 105.62089552238805,
+    "baselineDpsProxy": 2.246951219512195,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "adamfox": {
+    "name": "Adam Fox",
+    "baselinePtsPace": 67.5945945945946,
+    "baselineGameScore": 80.6481081081081,
+    "baselineDpsProxy": 2.436585365853659,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryanlindgren": {
+    "name": "Ryan Lindgren",
+    "baselinePtsPace": 25.055555555555554,
+    "baselineGameScore": 26.342499999999998,
+    "baselineDpsProxy": 1.8439024390243905,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "charliemcavoy": {
+    "name": "Charlie McAvoy",
+    "baselinePtsPace": 37.72,
+    "baselineGameScore": 42.804,
+    "baselineDpsProxy": 1.6158536585365855,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "carlgrundstrom": {
+    "name": "Carl Grundstrom",
+    "baselinePtsPace": 13.178571428571427,
+    "baselineGameScore": 12.358571428571427,
+    "baselineDpsProxy": 1.6390243902439026,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexdebrincat": {
+    "name": "Alex DeBrincat",
+    "baselinePtsPace": 70,
+    "baselineGameScore": 73.19,
+    "baselineDpsProxy": 2.9,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "patriklaine": {
+    "name": "Patrik Laine",
+    "baselinePtsPace": 52.03846153846154,
+    "baselineGameScore": 36.379615384615384,
+    "baselineDpsProxy": 1.5853658536585367,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "claytonkeller": {
+    "name": "Clayton Keller",
+    "baselinePtsPace": 91.11111111111111,
+    "baselineGameScore": 90.70617283950617,
+    "baselineDpsProxy": 3.0128048780487804,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jessepuljujarvi": {
+    "name": "Jesse Puljujarvi",
+    "baselinePtsPace": 26.451612903225804,
+    "baselineGameScore": 31.847741935483867,
+    "baselineDpsProxy": 1.0396341463414633,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakobchychrun": {
+    "name": "Jakob Chychrun",
+    "baselinePtsPace": 52.08108108108108,
+    "baselineGameScore": 61.24513513513513,
+    "baselineDpsProxy": 2.571951219512195,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "samsteel": {
+    "name": "Sam Steel",
+    "baselinePtsPace": 25.949367088607595,
+    "baselineGameScore": 27.713924050632915,
+    "baselineDpsProxy": 2.167682926829268,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "bretthowden": {
+    "name": "Brett Howden",
+    "baselinePtsPace": 41,
+    "baselineGameScore": 40.74375,
+    "baselineDpsProxy": 2.3902439024390243,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kiefferbellows": {
+    "name": "Kieffer Bellows",
+    "baselinePtsPace": 17.263157894736842,
+    "baselineGameScore": 14.501052631578947,
+    "baselineDpsProxy": 0.6256097560975611,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "beckmalenstyn": {
+    "name": "Beck Malenstyn",
+    "baselinePtsPace": 10.789473684210527,
+    "baselineGameScore": 10.757105263157897,
+    "baselineDpsProxy": 1.7609756097560978,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "josephwoll": {
+    "name": "Joseph Woll",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 16.849999999999994,
+    "totalSeasonsWeighted": 0.3
+  },
+  "trentfrederic": {
+    "name": "Trent Frederic",
+    "baselinePtsPace": 21.206896551724135,
+    "baselineGameScore": 16.86655172413793,
+    "baselineDpsProxy": 1.626829268292683,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "maxjones": {
+    "name": "Max Jones",
+    "baselinePtsPace": 6.3076923076923075,
+    "baselineGameScore": -5.456153846153846,
+    "baselineDpsProxy": 0.5548780487804879,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "andrewpeeke": {
+    "name": "Andrew Peeke",
+    "baselinePtsPace": 18.342105263157894,
+    "baselineGameScore": 12.138157894736842,
+    "baselineDpsProxy": 1.9926829268292683,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tysonjost": {
+    "name": "Tyson Jost",
+    "baselinePtsPace": 18.923076923076923,
+    "baselineGameScore": 36.4374358974359,
+    "baselineDpsProxy": 1.3079268292682926,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dantefabbro": {
+    "name": "Dante Fabbro",
+    "baselinePtsPace": 31.352941176470583,
+    "baselineGameScore": 40.19205882352941,
+    "baselineDpsProxy": 2.0317073170731708,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joshuamahura": {
+    "name": "Joshua Mahura",
+    "baselinePtsPace": 11.53125,
+    "baselineGameScore": 9.9296875,
+    "baselineDpsProxy": 1.678048780487805,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "loganstanley": {
+    "name": "Logan Stanley",
+    "baselinePtsPace": 18.22222222222222,
+    "baselineGameScore": 12.000634920634921,
+    "baselineDpsProxy": 1.575,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "givanismith": {
+    "name": "Givani Smith",
+    "baselinePtsPace": 0,
+    "baselineGameScore": -18.166153846153843,
+    "baselineDpsProxy": 0.16646341463414635,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jordankyrou": {
+    "name": "Jordan Kyrou",
+    "baselinePtsPace": 70,
+    "baselineGameScore": 76.18,
+    "baselineDpsProxy": 2.9499999999999997,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "keatonmiddleton": {
+    "name": "Keaton Middleton",
+    "baselinePtsPace": 4,
+    "baselineGameScore": 15.099999999999998,
+    "baselineDpsProxy": 1.225,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "taylorraddysh": {
+    "name": "Taylor Raddysh",
+    "baselinePtsPace": 27.674999999999997,
+    "baselineGameScore": 28.1055,
+    "baselineDpsProxy": 2.731707317073171,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "noahgregor": {
+    "name": "Noah Gregor",
+    "baselinePtsPace": 11.038461538461538,
+    "baselineGameScore": 1.5138461538461538,
+    "baselineDpsProxy": 1.1097560975609757,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dennischolowski": {
+    "name": "Dennis Cholowski",
+    "baselinePtsPace": 21.025641025641026,
+    "baselineGameScore": 10.828205128205129,
+    "baselineDpsProxy": 1.1652439024390244,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "samuelgirard": {
+    "name": "Samuel Girard",
+    "baselinePtsPace": 26.958904109589042,
+    "baselineGameScore": 40.74164383561644,
+    "baselineDpsProxy": 2.18109756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "pierrelucdubois": {
+    "name": "Pierre-Luc Dubois",
+    "baselinePtsPace": 66,
+    "baselineGameScore": 67.28,
+    "baselineDpsProxy": 2.9499999999999997,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakebean": {
+    "name": "Jake Bean",
+    "baselinePtsPace": 8.96875,
+    "baselineGameScore": 23.0240625,
+    "baselineDpsProxy": 1.873170731707317,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "filipgustavsson": {
+    "name": "Filip Gustavsson",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 15.319999999999991,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jesperbratt": {
+    "name": "Jesper Bratt",
+    "baselinePtsPace": 89.08641975308643,
+    "baselineGameScore": 83.53876543209877,
+    "baselineDpsProxy": 3.0128048780487804,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mikhailsergachev": {
+    "name": "Mikhail Sergachev",
+    "baselinePtsPace": 56.441558441558435,
+    "baselineGameScore": 65.65324675324675,
+    "baselineDpsProxy": 2.488414634146342,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nathanbastian": {
+    "name": "Nathan Bastian",
+    "baselinePtsPace": 13.898305084745761,
+    "baselineGameScore": 12.73084745762712,
+    "baselineDpsProxy": 1.690853658536585,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tagethompson": {
+    "name": "Tage Thompson",
+    "baselinePtsPace": 77.6842105263158,
+    "baselineGameScore": 79.01131578947368,
+    "baselineDpsProxy": 2.641463414634146,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jacobmoverare": {
+    "name": "Jacob Moverare",
+    "baselinePtsPace": 13.387755102040817,
+    "baselineGameScore": 21.420408163265307,
+    "baselineDpsProxy": 1.6731707317073172,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "filiphronek": {
+    "name": "Filip Hronek",
+    "baselinePtsPace": 44.36065573770492,
+    "baselineGameScore": 49.10590163934426,
+    "baselineDpsProxy": 1.822560975609756,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "troystecher": {
+    "name": "Troy Stecher",
+    "baselinePtsPace": 8.696969696969697,
+    "baselineGameScore": 8.908181818181818,
+    "baselineDpsProxy": 1.8914634146341462,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "davidrittich": {
+    "name": "David Rittich",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -11.379999999999995,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brandonduhaime": {
+    "name": "Brandon Duhaime",
+    "baselinePtsPace": 21,
+    "baselineGameScore": 21.45,
+    "baselineDpsProxy": 2,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "lucascarlsson": {
+    "name": "Lucas Carlsson",
+    "baselinePtsPace": 25.23076923076923,
+    "baselineGameScore": 3.5953846153846154,
+    "baselineDpsProxy": 0.28536585365853656,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "rosscolton": {
+    "name": "Ross Colton",
+    "baselinePtsPace": 38.983606557377044,
+    "baselineGameScore": 50.31573770491803,
+    "baselineDpsProxy": 2.194512195121951,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joonakoppanen": {
+    "name": "Joona Koppanen",
+    "baselinePtsPace": 7.454545454545455,
+    "baselineGameScore": 3.3545454545454545,
+    "baselineDpsProxy": 0.21463414634146344,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brandonhagel": {
+    "name": "Brandon Hagel",
+    "baselinePtsPace": 90,
+    "baselineGameScore": 93.68,
+    "baselineDpsProxy": 3,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "michaelpezzetta": {
+    "name": "Michael Pezzetta",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 2.8207999999999998,
+    "baselineDpsProxy": 0.9298780487804877,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "vincentdesharnais": {
+    "name": "Vincent Desharnais",
+    "baselinePtsPace": 4.8235294117647065,
+    "baselineGameScore": 2.331372549019608,
+    "baselineDpsProxy": 1.4615853658536584,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "michaeleyssimont": {
+    "name": "Michael Eyssimont",
+    "baselinePtsPace": 17.038961038961038,
+    "baselineGameScore": 27.30493506493506,
+    "baselineDpsProxy": 2.5353658536585364,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "michaelcarcone": {
+    "name": "Michael Carcone",
+    "baselinePtsPace": 29.39622641509434,
+    "baselineGameScore": 34.30075471698114,
+    "baselineDpsProxy": 1.7451219512195124,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "justinbrazeau": {
+    "name": "Justin Brazeau",
+    "baselinePtsPace": 23.736842105263158,
+    "baselineGameScore": 22.56078947368421,
+    "baselineDpsProxy": 2.2707317073170734,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tannerjeannot": {
+    "name": "Tanner Jeannot",
+    "baselinePtsPace": 15.91044776119403,
+    "baselineGameScore": 17.109850746268656,
+    "baselineDpsProxy": 2.2060975609756097,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mathieuolivier": {
+    "name": "Mathieu Olivier",
+    "baselinePtsPace": 32,
+    "baselineGameScore": 19.45,
+    "baselineDpsProxy": 2.3000000000000003,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "trevormoore": {
+    "name": "Trevor Moore",
+    "baselinePtsPace": 46.19718309859155,
+    "baselineGameScore": 59.5712676056338,
+    "baselineDpsProxy": 2.3378048780487806,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "zackmacewen": {
+    "name": "Zack MacEwen",
+    "baselinePtsPace": 11.714285714285714,
+    "baselineGameScore": 20.03142857142857,
+    "baselineDpsProxy": 0.6914634146341464,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "justindanforth": {
+    "name": "Justin Danforth",
+    "baselinePtsPace": 28.229508196721312,
+    "baselineGameScore": 25.446885245901637,
+    "baselineDpsProxy": 1.6365853658536587,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "zacharyastonreese": {
+    "name": "Zachary Aston-Reese",
+    "baselinePtsPace": 17.645569620253163,
+    "baselineGameScore": 13.369113924050636,
+    "baselineDpsProxy": 2.264024390243902,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "vinnilettieri": {
+    "name": "Vinni Lettieri",
+    "baselinePtsPace": 15.769230769230766,
+    "baselineGameScore": 17.976923076923075,
+    "baselineDpsProxy": 0.8085365853658536,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "stuartskinner": {
+    "name": "Stuart Skinner",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -1.5200000000000102,
+    "totalSeasonsWeighted": 0.3
+  },
+  "juusovlimki": {
+    "name": "Juuso Vlimki",
+    "baselinePtsPace": 9.534883720930234,
+    "baselineGameScore": 18.688372093023258,
+    "baselineDpsProxy": 1.20609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kaileryamamoto": {
+    "name": "Kailer Yamamoto",
+    "baselinePtsPace": 20.5,
+    "baselineGameScore": 43.32333333333333,
+    "baselineDpsProxy": 0.5195121951219511,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakeoettinger": {
+    "name": "Jake Oettinger",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 10.650000000000006,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nicolashague": {
+    "name": "Nicolas Hague",
+    "baselinePtsPace": 14.470588235294118,
+    "baselineGameScore": 13.38529411764706,
+    "baselineDpsProxy": 1.8658536585365852,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jonahgadjovich": {
+    "name": "Jonah Gadjovich",
+    "baselinePtsPace": 7.809523809523808,
+    "baselineGameScore": 17.23952380952381,
+    "baselineDpsProxy": 1.4341463414634148,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "conortimmins": {
+    "name": "Conor Timmins",
+    "baselinePtsPace": 18.088235294117645,
+    "baselineGameScore": 27.47,
+    "baselineDpsProxy": 1.990243902439024,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "marioferraro": {
+    "name": "Mario Ferraro",
+    "baselinePtsPace": 17.871794871794872,
+    "baselineGameScore": 10.544358974358975,
+    "baselineDpsProxy": 1.8548780487804881,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "calefleury": {
+    "name": "Cale Fleury",
+    "baselinePtsPace": 5.857142857142857,
+    "baselineGameScore": 23.135714285714286,
+    "baselineDpsProxy": 0.5036585365853659,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "morgangeekie": {
+    "name": "Morgan Geekie",
+    "baselinePtsPace": 60.7012987012987,
+    "baselineGameScore": 61.06337662337662,
+    "baselineDpsProxy": 2.5823170731707314,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "michaelrasmussen": {
+    "name": "Michael Rasmussen",
+    "baselinePtsPace": 22.363636363636363,
+    "baselineGameScore": 19.711948051948053,
+    "baselineDpsProxy": 2.2536585365853656,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "codyglass": {
+    "name": "Cody Glass",
+    "baselinePtsPace": 27.75384615384615,
+    "baselineGameScore": 38.93107692307692,
+    "baselineDpsProxy": 1.9420731707317074,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mikeyanderson": {
+    "name": "Mikey Anderson",
+    "baselinePtsPace": 25.558441558441558,
+    "baselineGameScore": 35.19610389610389,
+    "baselineDpsProxy": 2.2536585365853656,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "caseymittelstadt": {
+    "name": "Casey Mittelstadt",
+    "baselinePtsPace": 40.49382716049383,
+    "baselineGameScore": 29.358024691358025,
+    "baselineDpsProxy": 2.51890243902439,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "urhovaakanainen": {
+    "name": "Urho Vaakanainen",
+    "baselinePtsPace": 25.725490196078432,
+    "baselineGameScore": 17.445098039215686,
+    "baselineDpsProxy": 1.3060975609756098,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nicohischier": {
+    "name": "Nico Hischier",
+    "baselinePtsPace": 75.44,
+    "baselineGameScore": 89.216,
+    "baselineDpsProxy": 2.7439024390243905,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jesperboqvist": {
+    "name": "Jesper Boqvist",
+    "baselinePtsPace": 24.17948717948718,
+    "baselineGameScore": 26.513333333333332,
+    "baselineDpsProxy": 2.1878048780487807,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jonasrondbjerg": {
+    "name": "Jonas Rondbjerg",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 2.144615384615385,
+    "baselineDpsProxy": 0.36463414634146346,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "eelitolvanen": {
+    "name": "Eeli Tolvanen",
+    "baselinePtsPace": 35.4320987654321,
+    "baselineGameScore": 32.76962962962963,
+    "baselineDpsProxy": 2.271951219512195,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "klimkostin": {
+    "name": "Klim Kostin",
+    "baselinePtsPace": 16.400000000000002,
+    "baselineGameScore": 1.1714285714285715,
+    "baselineDpsProxy": 0.8749999999999999,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "eliaspettersson": {
+    "name": "Elias Pettersson",
+    "baselinePtsPace": 8.785714285714285,
+    "baselineGameScore": 14.877142857142855,
+    "baselineDpsProxy": 0.8365853658536586,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "gabrielvilardi": {
+    "name": "Gabriel Vilardi",
+    "baselinePtsPace": 70.45070422535211,
+    "baselineGameScore": 62.34309859154929,
+    "baselineDpsProxy": 2.5109756097560973,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "owentippett": {
+    "name": "Owen Tippett",
+    "baselinePtsPace": 45.79220779220779,
+    "baselineGameScore": 49.68987012987012,
+    "baselineDpsProxy": 2.629268292682927,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nicksuzuki": {
+    "name": "Nick Suzuki",
+    "baselinePtsPace": 89,
+    "baselineGameScore": 86.07,
+    "baselineDpsProxy": 2.6500000000000004,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "robertthomas": {
+    "name": "Robert Thomas",
+    "baselinePtsPace": 94.88571428571429,
+    "baselineGameScore": 85.76028571428571,
+    "baselineDpsProxy": 2.26219512195122,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jasonrobertson": {
+    "name": "Jason Robertson",
+    "baselinePtsPace": 80,
+    "baselineGameScore": 75.87,
+    "baselineDpsProxy": 3,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "morganfrost": {
+    "name": "Morgan Frost",
+    "baselinePtsPace": 37.45679012345679,
+    "baselineGameScore": 38.418518518518525,
+    "baselineDpsProxy": 2.815243902439024,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "henrijokiharju": {
+    "name": "Henri Jokiharju",
+    "baselinePtsPace": 13.66666666666667,
+    "baselineGameScore": 23.342666666666666,
+    "baselineDpsProxy": 1.6829268292682928,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "miroheiskanen": {
+    "name": "Miro Heiskanen",
+    "baselinePtsPace": 41,
+    "baselineGameScore": 58.46599999999999,
+    "baselineDpsProxy": 1.8292682926829267,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "martinnecas": {
+    "name": "Martin Necas",
+    "baselinePtsPace": 86.15189873417721,
+    "baselineGameScore": 96.65620253164558,
+    "baselineDpsProxy": 2.8902439024390243,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "timothyliljegren": {
+    "name": "Timothy Liljegren",
+    "baselinePtsPace": 20.5,
+    "baselineGameScore": 15.375,
+    "baselineDpsProxy": 1.907317073170732,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ukkopekkaluukkonen": {
+    "name": "Ukko-Pekka Luukkonen",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -8.580000000000013,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dylansamberg": {
+    "name": "Dylan Samberg",
+    "baselinePtsPace": 27.33333333333334,
+    "baselineGameScore": 47.05433333333333,
+    "baselineDpsProxy": 1.8658536585365852,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "caydenprimeau": {
+    "name": "Cayden Primeau",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -9.469999999999999,
+    "totalSeasonsWeighted": 0.3
+  },
+  "pojoseph": {
+    "name": "P.O Joseph",
+    "baselinePtsPace": 5.23404255319149,
+    "baselineGameScore": 6.542553191489362,
+    "baselineDpsProxy": 1.2323170731707316,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joshnorris": {
+    "name": "Josh Norris",
+    "baselinePtsPace": 51.25,
+    "baselineGameScore": 44.35321428571428,
+    "baselineDpsProxy": 1.5707317073170735,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryanpoehling": {
+    "name": "Ryan Poehling",
+    "baselinePtsPace": 37.38235294117647,
+    "baselineGameScore": 30.06264705882353,
+    "baselineDpsProxy": 1.8658536585365852,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "calemakar": {
+    "name": "Cale Makar",
+    "baselinePtsPace": 94.3,
+    "baselineGameScore": 113.77499999999998,
+    "baselineDpsProxy": 2.731707317073171,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ianmitchell": {
+    "name": "Ian Mitchell",
+    "baselinePtsPace": 5.466666666666667,
+    "baselineGameScore": -6.833333333333335,
+    "baselineDpsProxy": 0.35670731707317077,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "erikbrannstrom": {
+    "name": "Erik Brannstrom",
+    "baselinePtsPace": 23.428571428571427,
+    "baselineGameScore": 25.85928571428571,
+    "baselineDpsProxy": 0.8024390243902438,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexandretexier": {
+    "name": "Alexandre Texier",
+    "baselinePtsPace": 29.096774193548388,
+    "baselineGameScore": 23.356774193548386,
+    "baselineDpsProxy": 0.8506097560975611,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "filipchytil": {
+    "name": "Filip Chytil",
+    "baselinePtsPace": 38.07142857142857,
+    "baselineGameScore": 44.675357142857145,
+    "baselineDpsProxy": 1.9121951219512199,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nickdesimone": {
+    "name": "Nick DeSimone",
+    "baselinePtsPace": 24.599999999999998,
+    "baselineGameScore": 33.824999999999996,
+    "baselineDpsProxy": 0.6829268292682927,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexiafallo": {
+    "name": "Alex Iafallo",
+    "baselinePtsPace": 30.999999999999996,
+    "baselineGameScore": 38.22,
+    "baselineDpsProxy": 2.6500000000000004,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "davidkampf": {
+    "name": "David Kampf",
+    "baselinePtsPace": 18.06779661016949,
+    "baselineGameScore": 12.383389830508476,
+    "baselineDpsProxy": 1.4390243902439024,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nealpionk": {
+    "name": "Neal Pionk",
+    "baselinePtsPace": 46.347826086956516,
+    "baselineGameScore": 51.25594202898551,
+    "baselineDpsProxy": 2.0615853658536585,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "janrutta": {
+    "name": "Jan Rutta",
+    "baselinePtsPace": 13.66666666666667,
+    "baselineGameScore": 4.585925925925927,
+    "baselineDpsProxy": 1.152439024390244,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "eetuluostarinen": {
+    "name": "Eetu Luostarinen",
+    "baselinePtsPace": 24.599999999999998,
+    "baselineGameScore": 33.87624999999999,
+    "baselineDpsProxy": 2.1951219512195124,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "fabianzetterlund": {
+    "name": "Fabian Zetterlund",
+    "baselinePtsPace": 40.023809523809526,
+    "baselineGameScore": 37.99333333333333,
+    "baselineDpsProxy": 2.5609756097560976,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "johnathankovacevic": {
+    "name": "Johnathan Kovacevic",
+    "baselinePtsPace": 17.209876543209877,
+    "baselineGameScore": 23.33456790123457,
+    "baselineDpsProxy": 2.3213414634146337,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "daniiltarasov": {
+    "name": "Daniil Tarasov",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -4.359999999999999,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jacobbryson": {
+    "name": "Jacob Bryson",
+    "baselinePtsPace": 11.958333333333332,
+    "baselineGameScore": 3.7583333333333333,
+    "baselineDpsProxy": 1.170731707317073,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "emilbemstrom": {
+    "name": "Emil Bemstrom",
+    "baselinePtsPace": 5.857142857142857,
+    "baselineGameScore": 19.27,
+    "baselineDpsProxy": 0.45243902439024397,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "drakebatherson": {
+    "name": "Drake Batherson",
+    "baselinePtsPace": 68,
+    "baselineGameScore": 62.25000000000001,
+    "baselineDpsProxy": 2.9,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "noahcates": {
+    "name": "Noah Cates",
+    "baselinePtsPace": 38.8974358974359,
+    "baselineGameScore": 36.80538461538462,
+    "baselineDpsProxy": 2.330487804878049,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ollelycksell": {
+    "name": "Olle Lycksell",
+    "baselinePtsPace": 21.578947368421055,
+    "baselineGameScore": 20.06842105263158,
+    "baselineDpsProxy": 0.6835365853658536,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nickperbix": {
+    "name": "Nick Perbix",
+    "baselinePtsPace": 21.054054054054053,
+    "baselineGameScore": 27.093243243243244,
+    "baselineDpsProxy": 2.301219512195122,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "benjones": {
+    "name": "Ben Jones",
+    "baselinePtsPace": 0,
+    "baselineGameScore": -7.443076923076921,
+    "baselineDpsProxy": 0.6499999999999999,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jeremyswayman": {
+    "name": "Jeremy Swayman",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -9.099999999999994,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexeytoropchenko": {
+    "name": "Alexey Toropchenko",
+    "baselinePtsPace": 18.45,
+    "baselineGameScore": 15.415999999999999,
+    "baselineDpsProxy": 1.8536585365853657,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "morganbarron": {
+    "name": "Morgan Barron",
+    "baselinePtsPace": 16.62162162162162,
+    "baselineGameScore": 24.4227027027027,
+    "baselineDpsProxy": 2.25609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "granthutton": {
+    "name": "Grant Hutton",
+    "baselinePtsPace": 12.615384615384615,
+    "baselineGameScore": 2.2076923076923074,
+    "baselineDpsProxy": 0.30121951219512194,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "loganthompson": {
+    "name": "Logan Thompson",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 25.960000000000008,
+    "totalSeasonsWeighted": 0.3
+  },
+  "seanwalker": {
+    "name": "Sean Walker",
+    "baselinePtsPace": 16,
+    "baselineGameScore": 47.5,
+    "baselineDpsProxy": 2.7,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "markkastelic": {
+    "name": "Mark Kastelic",
+    "baselinePtsPace": 18.81967213114754,
+    "baselineGameScore": 11.560655737704916,
+    "baselineDpsProxy": 1.7109756097560977,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexandargeorgiev": {
+    "name": "Alexandar Georgiev",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -17.94999999999999,
+    "totalSeasonsWeighted": 0.3
+  },
+  "seandurzi": {
+    "name": "Sean Durzi",
+    "baselinePtsPace": 30.066666666666666,
+    "baselineGameScore": 44.471333333333334,
+    "baselineDpsProxy": 1.024390243902439,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "parkerkelly": {
+    "name": "Parker Kelly",
+    "baselinePtsPace": 19.474999999999998,
+    "baselineGameScore": 27.316249999999993,
+    "baselineDpsProxy": 2.1463414634146343,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "piussuter": {
+    "name": "Pius Suter",
+    "baselinePtsPace": 46.567901234567906,
+    "baselineGameScore": 42.51851851851852,
+    "baselineDpsProxy": 2.4201219512195125,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "zachwhitecloud": {
+    "name": "Zach Whitecloud",
+    "baselinePtsPace": 14.405405405405405,
+    "baselineGameScore": 25.874324324324327,
+    "baselineDpsProxy": 2.210975609756098,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kiefersherwood": {
+    "name": "Kiefer Sherwood",
+    "baselinePtsPace": 42.05128205128205,
+    "baselineGameScore": 43.15512820512821,
+    "baselineDpsProxy": 2.045121951219512,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ericrobinson": {
+    "name": "Eric Robinson",
+    "baselinePtsPace": 32,
+    "baselineGameScore": 50.51,
+    "baselineDpsProxy": 2.6,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "oliverwahlstrom": {
+    "name": "Oliver Wahlstrom",
+    "baselinePtsPace": 11.44186046511628,
+    "baselineGameScore": 4.93906976744186,
+    "baselineDpsProxy": 1.2323170731707316,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "martinfehrvry": {
+    "name": "Martin Fehrvry",
+    "baselinePtsPace": 25.308641975308642,
+    "baselineGameScore": 31.635802469135804,
+    "baselineDpsProxy": 2.074390243902439,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joelfarabee": {
+    "name": "Joel Farabee",
+    "baselinePtsPace": 25.308641975308642,
+    "baselineGameScore": 28.588641975308647,
+    "baselineDpsProxy": 2.6670731707317072,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "philippkurashev": {
+    "name": "Philipp Kurashev",
+    "baselinePtsPace": 22.50980392156863,
+    "baselineGameScore": 5.916862745098039,
+    "baselineDpsProxy": 1.119512195121951,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "quinnhughes": {
+    "name": "Quinn Hughes",
+    "baselinePtsPace": 91.6470588235294,
+    "baselineGameScore": 102.46382352941175,
+    "baselineDpsProxy": 2.5292682926829264,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "bradytkachuk": {
+    "name": "Brady Tkachuk",
+    "baselinePtsPace": 62.638888888888886,
+    "baselineGameScore": 77.54694444444445,
+    "baselineDpsProxy": 2.7219512195121953,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryanmcleod": {
+    "name": "Ryan McLeod",
+    "baselinePtsPace": 55.01265822784809,
+    "baselineGameScore": 45.9926582278481,
+    "baselineDpsProxy": 2.023170731707317,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "evanbouchard": {
+    "name": "Evan Bouchard",
+    "baselinePtsPace": 67,
+    "baselineGameScore": 94.83,
+    "baselineDpsProxy": 3.2,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "isaclundestrom": {
+    "name": "Isac Lundestrom",
+    "baselinePtsPace": 15.569620253164558,
+    "baselineGameScore": 3.3526582278481016,
+    "baselineDpsProxy": 1.4451219512195121,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mattiassamuelsson": {
+    "name": "Mattias Samuelsson",
+    "baselinePtsPace": 18.516129032258064,
+    "baselineGameScore": 14.085483870967742,
+    "baselineDpsProxy": 1.4743902439024392,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joeveleno": {
+    "name": "Joe Veleno",
+    "baselinePtsPace": 18.83783783783784,
+    "baselineGameScore": 9.031081081081082,
+    "baselineDpsProxy": 1.8951219512195125,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kandremiller": {
+    "name": "K'Andre Miller",
+    "baselinePtsPace": 29.918918918918923,
+    "baselineGameScore": 32.19054054054054,
+    "baselineDpsProxy": 2.1658536585365855,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "patrickgiles": {
+    "name": "Patrick Giles",
+    "baselinePtsPace": 4.823529411764706,
+    "baselineGameScore": -4.485882352941177,
+    "baselineDpsProxy": 0.40426829268292686,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "michaelcallahan": {
+    "name": "Michael Callahan",
+    "baselinePtsPace": 4.823529411764706,
+    "baselineGameScore": -8.827058823529411,
+    "baselineDpsProxy": 0.38353658536585367,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jesperikotkaniemi": {
+    "name": "Jesperi Kotkaniemi",
+    "baselinePtsPace": 34.69230769230769,
+    "baselineGameScore": 50.59820512820513,
+    "baselineDpsProxy": 2.8060975609756094,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "andreisvechnikov": {
+    "name": "Andrei Svechnikov",
+    "baselinePtsPace": 54.666666666666664,
+    "baselineGameScore": 68.36749999999999,
+    "baselineDpsProxy": 2.590243902439024,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tyemberson": {
+    "name": "Ty Emberson",
+    "baselinePtsPace": 14.026315789473685,
+    "baselineGameScore": 17.69473684210526,
+    "baselineDpsProxy": 1.9463414634146345,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jackdrury": {
+    "name": "Jack Drury",
+    "baselinePtsPace": 20.5,
+    "baselineGameScore": 36.193888888888885,
+    "baselineDpsProxy": 2.151219512195122,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "rasmusdahlin": {
+    "name": "Rasmus Dahlin",
+    "baselinePtsPace": 76.38356164383562,
+    "baselineGameScore": 92.05342465753425,
+    "baselineDpsProxy": 2.4926829268292687,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "oskarbck": {
+    "name": "Oskar Bck",
+    "baselinePtsPace": 17.972602739726028,
+    "baselineGameScore": 20.129315068493153,
+    "baselineDpsProxy": 1.825,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "lukasdostal": {
+    "name": "Lukas Dostal",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 14.349999999999994,
+    "totalSeasonsWeighted": 0.3
+  },
+  "rasmuskupari": {
+    "name": "Rasmus Kupari",
+    "baselinePtsPace": 11.11864406779661,
+    "baselineGameScore": 15.468813559322037,
+    "baselineDpsProxy": 1.403048780487805,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tydellandrea": {
+    "name": "Ty Dellandrea",
+    "baselinePtsPace": 9.647058823529411,
+    "baselineGameScore": -7.367941176470588,
+    "baselineDpsProxy": 1.3682926829268294,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "barretthayton": {
+    "name": "Barrett Hayton",
+    "baselinePtsPace": 46,
+    "baselineGameScore": 63.42,
+    "baselineDpsProxy": 2.9499999999999997,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "akilthomas": {
+    "name": "Akil Thomas",
+    "baselinePtsPace": 9.84,
+    "baselineGameScore": 9.02,
+    "baselineDpsProxy": 0.7621951219512195,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jackmcbain": {
+    "name": "Jack McBain",
+    "baselinePtsPace": 27,
+    "baselineGameScore": 29.68,
+    "baselineDpsProxy": 2.3499999999999996,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kevinbahl": {
+    "name": "Kevin Bahl",
+    "baselinePtsPace": 22.465753424657535,
+    "baselineGameScore": 23.252054794520546,
+    "baselineDpsProxy": 1.9140243902439025,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "noahdobson": {
+    "name": "Noah Dobson",
+    "baselinePtsPace": 45.04225352112676,
+    "baselineGameScore": 62.42394366197182,
+    "baselineDpsProxy": 2.4243902439024394,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "adamboqvist": {
+    "name": "Adam Boqvist",
+    "baselinePtsPace": 32.800000000000004,
+    "baselineGameScore": 28.465714285714288,
+    "baselineDpsProxy": 1.2164634146341462,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "rasmussandin": {
+    "name": "Rasmus Sandin",
+    "baselinePtsPace": 30,
+    "baselineGameScore": 32.4,
+    "baselineDpsProxy": 2.75,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nilslundkvist": {
+    "name": "Nils Lundkvist",
+    "baselinePtsPace": 10.512820512820513,
+    "baselineGameScore": 24.074358974358972,
+    "baselineDpsProxy": 1.2365853658536585,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jacobbernarddocker": {
+    "name": "Jacob Bernard-Docker",
+    "baselinePtsPace": 16.4,
+    "baselineGameScore": 19.987499999999997,
+    "baselineDpsProxy": 1.2195121951219512,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakublauko": {
+    "name": "Jakub Lauko",
+    "baselinePtsPace": 16.107142857142858,
+    "baselineGameScore": -0.3367857142857143,
+    "baselineDpsProxy": 1.1951219512195124,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jordanharris": {
+    "name": "Jordan Harris",
+    "baselinePtsPace": 12.424242424242424,
+    "baselineGameScore": 0.7951515151515152,
+    "baselineDpsProxy": 0.7847560975609758,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "michaelkesselring": {
+    "name": "Michael Kesselring",
+    "baselinePtsPace": 29,
+    "baselineGameScore": 44.5,
+    "baselineDpsProxy": 2.6,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kirillmarchenko": {
+    "name": "Kirill Marchenko",
+    "baselinePtsPace": 76.81012658227849,
+    "baselineGameScore": 84.30430379746835,
+    "baselineDpsProxy": 2.7457317073170726,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kevinlankinen": {
+    "name": "Kevin Lankinen",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 0.09000000000000341,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ilyalyubushkin": {
+    "name": "Ilya Lyubushkin",
+    "baselinePtsPace": 14.349999999999996,
+    "baselineGameScore": 10.6395,
+    "baselineDpsProxy": 2.048780487804878,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "connordewar": {
+    "name": "Connor Dewar",
+    "baselinePtsPace": 17.083333333333332,
+    "baselineGameScore": 14.76,
+    "baselineDpsProxy": 1.024390243902439,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joelhofer": {
+    "name": "Joel Hofer",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -4.340000000000003,
+    "totalSeasonsWeighted": 0.3
+  },
+  "declanchisholm": {
+    "name": "Declan Chisholm",
+    "baselinePtsPace": 14.90909090909091,
+    "baselineGameScore": 20.773333333333333,
+    "baselineDpsProxy": 2.1731707317073172,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "pontusholmberg": {
+    "name": "Pontus Holmberg",
+    "baselinePtsPace": 22.91176470588235,
+    "baselineGameScore": 22.67058823529412,
+    "baselineDpsProxy": 1.990243902439024,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tylertucker": {
+    "name": "Tyler Tucker",
+    "baselinePtsPace": 15.105263157894736,
+    "baselineGameScore": 18.83842105263158,
+    "baselineDpsProxy": 1.0890243902439023,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jonatanberggren": {
+    "name": "Jonatan Berggren",
+    "baselinePtsPace": 26.24,
+    "baselineGameScore": 18.455466666666666,
+    "baselineDpsProxy": 2.1951219512195124,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexanderromanov": {
+    "name": "Alexander Romanov",
+    "baselinePtsPace": 25.625,
+    "baselineGameScore": 33.696875,
+    "baselineDpsProxy": 1.7170731707317075,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "davidgustafsson": {
+    "name": "David Gustafsson",
+    "baselinePtsPace": 13.666666666666666,
+    "baselineGameScore": 22.09444444444444,
+    "baselineDpsProxy": 1.2512195121951217,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "justusannunen": {
+    "name": "Justus Annunen",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -9.099999999999994,
+    "totalSeasonsWeighted": 0.3
+  },
+  "linuskarlsson": {
+    "name": "Linus Karlsson",
+    "baselinePtsPace": 21.391304347826086,
+    "baselineGameScore": 26.27565217391304,
+    "baselineDpsProxy": 0.8134146341463415,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "martinpospisil": {
+    "name": "Martin Pospisil",
+    "baselinePtsPace": 25.308641975308642,
+    "baselineGameScore": 36.7279012345679,
+    "baselineDpsProxy": 2.4201219512195125,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jackstivany": {
+    "name": "Jack St. Ivany",
+    "baselinePtsPace": 4.315789473684211,
+    "baselineGameScore": -0.21578947368421056,
+    "baselineDpsProxy": 0.3707317073170732,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "paulcotter": {
+    "name": "Paul Cotter",
+    "baselinePtsPace": 22.835443037974684,
+    "baselineGameScore": 21.994683544303797,
+    "baselineDpsProxy": 2.4567073170731706,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "samuelersson": {
+    "name": "Samuel Ersson",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -19.879999999999995,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nikolaikovalenko": {
+    "name": "Nikolai Kovalenko",
+    "baselinePtsPace": 28.771929824561404,
+    "baselineGameScore": 22.053684210526317,
+    "baselineDpsProxy": 1.7030487804878047,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "colekoepke": {
+    "name": "Cole Koepke",
+    "baselinePtsPace": 19.095890410958905,
+    "baselineGameScore": 14.670136986301372,
+    "baselineDpsProxy": 2.0030487804878048,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "spencerstastney": {
+    "name": "Spencer Stastney",
+    "baselinePtsPace": 10.695652173913043,
+    "baselineGameScore": 11.123478260869565,
+    "baselineDpsProxy": 0.6731707317073171,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "scottperunovich": {
+    "name": "Scott Perunovich",
+    "baselinePtsPace": 21.085714285714285,
+    "baselineGameScore": 22.022857142857145,
+    "baselineDpsProxy": 1.152439024390244,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "yegorsharangovich": {
+    "name": "Yegor Sharangovich",
+    "baselinePtsPace": 35.945205479452056,
+    "baselineGameScore": 43.02191780821918,
+    "baselineDpsProxy": 2.359146341463415,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "simonbenoit": {
+    "name": "Simon Benoit",
+    "baselinePtsPace": 10.512820512820513,
+    "baselineGameScore": -0.4730769230769231,
+    "baselineDpsProxy": 1.7121951219512193,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "colereinhardt": {
+    "name": "Cole Reinhardt",
+    "baselinePtsPace": 9.647058823529411,
+    "baselineGameScore": -1.3023529411764707,
+    "baselineDpsProxy": 0.38353658536585367,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakechristiansen": {
+    "name": "Jake Christiansen",
+    "baselinePtsPace": 9.647058823529411,
+    "baselineGameScore": 5.4264705882352935,
+    "baselineDpsProxy": 1.6999999999999997,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "braydenpachal": {
+    "name": "Brayden Pachal",
+    "baselinePtsPace": 12.947368421052632,
+    "baselineGameScore": 18.212631578947367,
+    "baselineDpsProxy": 1.9926829268292683,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "egorzamula": {
+    "name": "Egor Zamula",
+    "baselinePtsPace": 19.523809523809526,
+    "baselineGameScore": 19.888253968253967,
+    "baselineDpsProxy": 2.0359756097560977,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "loganoconnor": {
+    "name": "Logan O'Connor",
+    "baselinePtsPace": 21.525,
+    "baselineGameScore": 30.30925,
+    "baselineDpsProxy": 2.292682926829268,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kylemaclean": {
+    "name": "Kyle MacLean",
+    "baselinePtsPace": 11.135802469135804,
+    "baselineGameScore": 4.778271604938271,
+    "baselineDpsProxy": 1.975609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nicosturm": {
+    "name": "Nico Sturm",
+    "baselinePtsPace": 18.516129032258064,
+    "baselineGameScore": 18.397096774193546,
+    "baselineDpsProxy": 1.4743902439024392,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "blakelizotte": {
+    "name": "Blake Lizotte",
+    "baselinePtsPace": 27.796610169491522,
+    "baselineGameScore": 19.207457627118647,
+    "baselineDpsProxy": 1.403048780487805,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "noahphilp": {
+    "name": "Noah Philp",
+    "baselinePtsPace": 10.933333333333334,
+    "baselineGameScore": 21.374666666666666,
+    "baselineDpsProxy": 0.4847560975609757,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brettleason": {
+    "name": "Brett Leason",
+    "baselinePtsPace": 22.483870967741936,
+    "baselineGameScore": 8.70258064516129,
+    "baselineDpsProxy": 1.4743902439024392,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "spencerknight": {
+    "name": "Spencer Knight",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 6.900000000000006,
+    "totalSeasonsWeighted": 0.3
+  },
+  "peytonkrebs": {
+    "name": "Peyton Krebs",
+    "baselinePtsPace": 28.345679012345677,
+    "baselineGameScore": 26.948641975308643,
+    "baselineDpsProxy": 2.123780487804878,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kirbydach": {
+    "name": "Kirby Dach",
+    "baselinePtsPace": 31.649122807017545,
+    "baselineGameScore": 16.889122807017543,
+    "baselineDpsProxy": 1.6682926829268294,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "bowenbyram": {
+    "name": "Bowen Byram",
+    "baselinePtsPace": 38,
+    "baselineGameScore": 35.85,
+    "baselineDpsProxy": 2.3000000000000003,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kaedankorczak": {
+    "name": "Kaedan Korczak",
+    "baselinePtsPace": 20.5,
+    "baselineGameScore": 25.317499999999995,
+    "baselineDpsProxy": 1.3902439024390243,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dylancozens": {
+    "name": "Dylan Cozens",
+    "baselinePtsPace": 47,
+    "baselineGameScore": 45.19,
+    "baselineDpsProxy": 2.6,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexturcotte": {
+    "name": "Alex Turcotte",
+    "baselinePtsPace": 30.14705882352941,
+    "baselineGameScore": 36.17647058823529,
+    "baselineDpsProxy": 2.4463414634146337,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "trevorzegras": {
+    "name": "Trevor Zegras",
+    "baselinePtsPace": 46.03508771929825,
+    "baselineGameScore": 31.57719298245614,
+    "baselineDpsProxy": 1.7725609756097558,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nilshoglander": {
+    "name": "Nils Hoglander",
+    "baselinePtsPace": 28.47222222222222,
+    "baselineGameScore": 29.91861111111111,
+    "baselineDpsProxy": 2.4146341463414633,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "colecaufield": {
+    "name": "Cole Caufield",
+    "baselinePtsPace": 70,
+    "baselineGameScore": 74.77,
+    "baselineDpsProxy": 2.6500000000000004,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "moritzseider": {
+    "name": "Moritz Seider",
+    "baselinePtsPace": 46,
+    "baselineGameScore": 51,
+    "baselineDpsProxy": 2.55,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "camyork": {
+    "name": "Cam York",
+    "baselinePtsPace": 21.12121212121212,
+    "baselineGameScore": 19.605454545454545,
+    "baselineDpsProxy": 1.8512195121951223,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "bobbybrink": {
+    "name": "Bobby Brink",
+    "baselinePtsPace": 42.55696202531645,
+    "baselineGameScore": 33.464303797468354,
+    "baselineDpsProxy": 2.7939024390243903,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kaapokakko": {
+    "name": "Kaapo Kakko",
+    "baselinePtsPace": 45.67088607594937,
+    "baselineGameScore": 40.44987341772152,
+    "baselineDpsProxy": 2.553048780487805,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "johnbeecher": {
+    "name": "John Beecher",
+    "baselinePtsPace": 11.564102564102564,
+    "baselineGameScore": 4.4889743589743585,
+    "baselineDpsProxy": 1.8548780487804881,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mattboldy": {
+    "name": "Matt Boldy",
+    "baselinePtsPace": 73,
+    "baselineGameScore": 75.51,
+    "baselineDpsProxy": 3.05,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jackhughes": {
+    "name": "Jack Hughes",
+    "baselinePtsPace": 92.58064516129032,
+    "baselineGameScore": 104.64258064516129,
+    "baselineDpsProxy": 2.457317073170732,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "arthurkaliyev": {
+    "name": "Arthur Kaliyev",
+    "baselinePtsPace": 23.428571428571427,
+    "baselineGameScore": 26.240000000000002,
+    "baselineDpsProxy": 0.40975609756097564,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "drewhelleson": {
+    "name": "Drew Helleson",
+    "baselinePtsPace": 19.035714285714285,
+    "baselineGameScore": 7.4971428571428556,
+    "baselineDpsProxy": 1.2975609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "henrythrun": {
+    "name": "Henry Thrun",
+    "baselinePtsPace": 16.4,
+    "baselineGameScore": -6.628333333333333,
+    "baselineDpsProxy": 1.2439024390243902,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexvlasic": {
+    "name": "Alex Vlasic",
+    "baselinePtsPace": 30,
+    "baselineGameScore": 9.53,
+    "baselineDpsProxy": 2.05,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "villeheinola": {
+    "name": "Ville Heinola",
+    "baselinePtsPace": 4.555555555555555,
+    "baselineGameScore": 11.616666666666665,
+    "baselineDpsProxy": 0.5817073170731708,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "philiptomasino": {
+    "name": "Philip Tomasino",
+    "baselinePtsPace": 32.26229508196721,
+    "baselineGameScore": 37.612459016393444,
+    "baselineDpsProxy": 2.1201219512195117,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "connormcmichael": {
+    "name": "Connor McMichael",
+    "baselinePtsPace": 56.99999999999999,
+    "baselineGameScore": 54.78000000000001,
+    "baselineDpsProxy": 2.8499999999999996,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "thomasharley": {
+    "name": "Thomas Harley",
+    "baselinePtsPace": 52.56410256410257,
+    "baselineGameScore": 64.5697435897436,
+    "baselineDpsProxy": 2.6634146341463416,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nicholasrobertson": {
+    "name": "Nicholas Robertson",
+    "baselinePtsPace": 26.144927536231883,
+    "baselineGameScore": 30.29246376811594,
+    "baselineDpsProxy": 2.1878048780487807,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakobpelletier": {
+    "name": "Jakob Pelletier",
+    "baselinePtsPace": 31.79591836734694,
+    "baselineGameScore": 33.28530612244898,
+    "baselineDpsProxy": 1.4939024390243902,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jaydenstruble": {
+    "name": "Jayden Struble",
+    "baselinePtsPace": 19.035714285714285,
+    "baselineGameScore": 23.61892857142857,
+    "baselineDpsProxy": 1.707317073170732,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "shanepinto": {
+    "name": "Shane Pinto",
+    "baselinePtsPace": 43.34285714285714,
+    "baselineGameScore": 44.91257142857143,
+    "baselineDpsProxy": 2.0914634146341466,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "philipbroberg": {
+    "name": "Philip Broberg",
+    "baselinePtsPace": 34.970588235294116,
+    "baselineGameScore": 36.62264705882353,
+    "baselineDpsProxy": 1.990243902439024,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tobiasbjornfot": {
+    "name": "Tobias Bjornfot",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 16.4,
+    "baselineDpsProxy": 0.426829268292683,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "simonholmstrom": {
+    "name": "Simon Holmstrom",
+    "baselinePtsPace": 49.199999999999996,
+    "baselineGameScore": 46.3792,
+    "baselineDpsProxy": 2.057926829268293,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "paveldorofeyev": {
+    "name": "Pavel Dorofeyev",
+    "baselinePtsPace": 52,
+    "baselineGameScore": 65.48,
+    "baselineDpsProxy": 3.2,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jacksonlacombe": {
+    "name": "Jackson LaCombe",
+    "baselinePtsPace": 47.01333333333333,
+    "baselineGameScore": 47.60373333333333,
+    "baselineDpsProxy": 2.1951219512195124,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jordanspence": {
+    "name": "Jordan Spence",
+    "baselinePtsPace": 29.0632911392405,
+    "baselineGameScore": 47.79873417721519,
+    "baselineDpsProxy": 2.7939024390243903,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "albertjohansson": {
+    "name": "Albert Johansson",
+    "baselinePtsPace": 12.098360655737704,
+    "baselineGameScore": 12.098360655737704,
+    "baselineDpsProxy": 1.6737804878048779,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "vladislavkolyachonok": {
+    "name": "Vladislav Kolyachonok",
+    "baselinePtsPace": 16.400000000000002,
+    "baselineGameScore": 13.12,
+    "baselineDpsProxy": 1.1097560975609757,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "pyotrkochetkov": {
+    "name": "Pyotr Kochetkov",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 5.989999999999995,
+    "totalSeasonsWeighted": 0.3
+  },
+  "vasilypodkolzin": {
+    "name": "Vasily Podkolzin",
+    "baselinePtsPace": 24,
+    "baselineGameScore": 39.66,
+    "baselineDpsProxy": 2.8000000000000003,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexnewhook": {
+    "name": "Alex Newhook",
+    "baselinePtsPace": 26,
+    "baselineGameScore": 15.85,
+    "baselineDpsProxy": 2.55,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ilyamikheyev": {
+    "name": "Ilya Mikheyev",
+    "baselinePtsPace": 34.849999999999994,
+    "baselineGameScore": 29.417499999999997,
+    "baselineDpsProxy": 2.097560975609756,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joelkiviranta": {
+    "name": "Joel Kiviranta",
+    "baselinePtsPace": 23.873417721518987,
+    "baselineGameScore": 29.04253164556962,
+    "baselineDpsProxy": 2.3121951219512193,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "coleschwindt": {
+    "name": "Cole Schwindt",
+    "baselinePtsPace": 15.619047619047617,
+    "baselineGameScore": 11.265238095238095,
+    "baselineDpsProxy": 1.3317073170731708,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "aliakseiprotas": {
+    "name": "Aliaksei Protas",
+    "baselinePtsPace": 71.21052631578948,
+    "baselineGameScore": 74.59842105263158,
+    "baselineDpsProxy": 2.3170731707317076,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "arturssilovs": {
+    "name": "Arturs Silovs",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -10.170000000000002,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dustinwolf": {
+    "name": "Dustin Wolf",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 11.930000000000007,
+    "totalSeasonsWeighted": 0.3
+  },
+  "valtteripuustinen": {
+    "name": "Valtteri Puustinen",
+    "baselinePtsPace": 18.923076923076923,
+    "baselineGameScore": 5.361538461538461,
+    "baselineDpsProxy": 0.4359756097560976,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "juusoparssinen": {
+    "name": "Juuso Parssinen",
+    "baselinePtsPace": 27.333333333333332,
+    "baselineGameScore": 15.255416666666664,
+    "baselineDpsProxy": 1.1414634146341465,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "zacjones": {
+    "name": "Zac Jones",
+    "baselinePtsPace": 19.608695652173914,
+    "baselineGameScore": 17.879565217391303,
+    "baselineDpsProxy": 1.4585365853658538,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "matiasmaccelli": {
+    "name": "Matias Maccelli",
+    "baselinePtsPace": 26.836363636363636,
+    "baselineGameScore": 37.943636363636365,
+    "baselineDpsProxy": 1.7439024390243905,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dmitrivoronkov": {
+    "name": "Dmitri Voronkov",
+    "baselinePtsPace": 52.79452054794521,
+    "baselineGameScore": 56.838356164383576,
+    "baselineDpsProxy": 2.448170731707317,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "elmersoderblom": {
+    "name": "Elmer Soderblom",
+    "baselinePtsPace": 34.69230769230769,
+    "baselineGameScore": 32.57923076923077,
+    "baselineDpsProxy": 0.8243902439024391,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "adamedstrom": {
+    "name": "Adam Edstrom",
+    "baselinePtsPace": 14.470588235294118,
+    "baselineGameScore": 10.708235294117648,
+    "baselineDpsProxy": 1.4615853658536584,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "andrelee": {
+    "name": "Andre Lee",
+    "baselinePtsPace": 12.947368421052632,
+    "baselineGameScore": 15.536842105263158,
+    "baselineDpsProxy": 0.6835365853658536,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "marcdelgaizo": {
+    "name": "Marc Del Gaizo",
+    "baselinePtsPace": 16.043478260869563,
+    "baselineGameScore": 18.53913043478261,
+    "baselineDpsProxy": 1.4304878048780487,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nikitanesterenko": {
+    "name": "Nikita Nesterenko",
+    "baselinePtsPace": 24.599999999999998,
+    "baselineGameScore": 16.481999999999996,
+    "baselineDpsProxy": 0.5609756097560976,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tyekartye": {
+    "name": "Tye Kartye",
+    "baselinePtsPace": 16.92063492063492,
+    "baselineGameScore": 13.354285714285714,
+    "baselineDpsProxy": 1.84390243902439,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "louiscrevier": {
+    "name": "Louis Crevier",
+    "baselinePtsPace": 10.25,
+    "baselineGameScore": -4.7406250000000005,
+    "baselineDpsProxy": 0.7219512195121952,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "drewoconnor": {
+    "name": "Drew O'Connor",
+    "baselinePtsPace": 24.404761904761905,
+    "baselineGameScore": 29.03190476190476,
+    "baselineDpsProxy": 2.3048780487804876,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "colesmith": {
+    "name": "Cole Smith",
+    "baselinePtsPace": 13.859154929577464,
+    "baselineGameScore": 11.884225352112676,
+    "baselineDpsProxy": 1.6884146341463413,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mitchellchaffee": {
+    "name": "Mitchell Chaffee",
+    "baselinePtsPace": 22.363636363636363,
+    "baselineGameScore": 14.80969696969697,
+    "baselineDpsProxy": 1.8914634146341462,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "bradenschneider": {
+    "name": "Braden Schneider",
+    "baselinePtsPace": 21.525,
+    "baselineGameScore": 16.727999999999998,
+    "baselineDpsProxy": 2.097560975609756,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "connorzary": {
+    "name": "Connor Zary",
+    "baselinePtsPace": 41,
+    "baselineGameScore": 48.01555555555556,
+    "baselineDpsProxy": 1.8439024390243905,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dylanholloway": {
+    "name": "Dylan Holloway",
+    "baselinePtsPace": 67.09090909090908,
+    "baselineGameScore": 70.96727272727273,
+    "baselineDpsProxy": 2.723170731707317,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "lucasraymond": {
+    "name": "Lucas Raymond",
+    "baselinePtsPace": 80,
+    "baselineGameScore": 75.34,
+    "baselineDpsProxy": 2.9,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "marcorossi": {
+    "name": "Marco Rossi",
+    "baselinePtsPace": 60,
+    "baselineGameScore": 56.260000000000005,
+    "baselineDpsProxy": 3,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kaidenguhle": {
+    "name": "Kaiden Guhle",
+    "baselinePtsPace": 26.836363636363636,
+    "baselineGameScore": 22.691636363636366,
+    "baselineDpsProxy": 1.5091463414634148,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakeneighbours": {
+    "name": "Jake Neighbours",
+    "baselinePtsPace": 46,
+    "baselineGameScore": 38.87,
+    "baselineDpsProxy": 2.6500000000000004,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ridlygreig": {
+    "name": "Ridly Greig",
+    "baselinePtsPace": 35.743589743589745,
+    "baselineGameScore": 28.636923076923075,
+    "baselineDpsProxy": 2.2829268292682925,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "sethjarvis": {
+    "name": "Seth Jarvis",
+    "baselinePtsPace": 75.26027397260275,
+    "baselineGameScore": 95.55808219178081,
+    "baselineDpsProxy": 2.6262195121951217,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tylerkleven": {
+    "name": "Tyler Kleven",
+    "baselinePtsPace": 10.379746835443038,
+    "baselineGameScore": 9.549367088607594,
+    "baselineDpsProxy": 2.1195121951219513,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jackquinn": {
+    "name": "Jack Quinn",
+    "baselinePtsPace": 43.21621621621622,
+    "baselineGameScore": 36.2018918918919,
+    "baselineDpsProxy": 2.391463414634147,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "danilgushchin": {
+    "name": "Danil Gushchin",
+    "baselinePtsPace": 6.833333333333333,
+    "baselineGameScore": 5.876666666666666,
+    "baselineDpsProxy": 0.31463414634146336,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakesanderson": {
+    "name": "Jake Sanderson",
+    "baselinePtsPace": 58.425000000000004,
+    "baselineGameScore": 60.13674999999999,
+    "baselineDpsProxy": 2.4878048780487805,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexislafrenire": {
+    "name": "Alexis Lafrenire",
+    "baselinePtsPace": 45,
+    "baselineGameScore": 49.59,
+    "baselineDpsProxy": 2.5,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dawsonmercer": {
+    "name": "Dawson Mercer",
+    "baselinePtsPace": 36,
+    "baselineGameScore": 38.88,
+    "baselineDpsProxy": 2.55,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "justinbarron": {
+    "name": "Justin Barron",
+    "baselinePtsPace": 17.193548387096772,
+    "baselineGameScore": 25.433225806451613,
+    "baselineDpsProxy": 1.8902439024390243,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "antonlundell": {
+    "name": "Anton Lundell",
+    "baselinePtsPace": 46.70886075949367,
+    "baselineGameScore": 58.75974683544303,
+    "baselineDpsProxy": 2.504878048780488,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "timsttzle": {
+    "name": "Tim Sttzle",
+    "baselinePtsPace": 79,
+    "baselineGameScore": 80.87,
+    "baselineDpsProxy": 3,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "lukasreichel": {
+    "name": "Lukas Reichel",
+    "baselinePtsPace": 25.771428571428572,
+    "baselineGameScore": 7.4151428571428575,
+    "baselineDpsProxy": 1.920731707317073,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "samcolangelo": {
+    "name": "Sam Colangelo",
+    "baselinePtsPace": 30.75,
+    "baselineGameScore": 14.888124999999999,
+    "baselineDpsProxy": 0.9560975609756099,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brockfaber": {
+    "name": "Brock Faber",
+    "baselinePtsPace": 30.487179487179485,
+    "baselineGameScore": 23.653846153846153,
+    "baselineDpsProxy": 2.2829268292682925,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "quintonbyfield": {
+    "name": "Quinton Byfield",
+    "baselinePtsPace": 54.66666666666668,
+    "baselineGameScore": 64.66864197530865,
+    "baselineDpsProxy": 2.7658536585365856,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexanderholtz": {
+    "name": "Alexander Holtz",
+    "baselinePtsPace": 18.566037735849058,
+    "baselineGameScore": 17.11169811320755,
+    "baselineDpsProxy": 1.5835365853658538,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "emilandrae": {
+    "name": "Emil Andrae",
+    "baselinePtsPace": 13.666666666666666,
+    "baselineGameScore": 23.33095238095238,
+    "baselineDpsProxy": 1.4085365853658538,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brettberard": {
+    "name": "Brett Berard",
+    "baselinePtsPace": 23.42857142857143,
+    "baselineGameScore": 21.46057142857143,
+    "baselineDpsProxy": 0.9603658536585366,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "yaroslavaskarov": {
+    "name": "Yaroslav Askarov",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 1.689999999999998,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jamiedrysdale": {
+    "name": "Jamie Drysdale",
+    "baselinePtsPace": 23.42857142857143,
+    "baselineGameScore": 13.155142857142858,
+    "baselineDpsProxy": 2.26219512195122,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jackthompson": {
+    "name": "Jack Thompson",
+    "baselinePtsPace": 26.451612903225804,
+    "baselineGameScore": 19.653548387096773,
+    "baselineDpsProxy": 0.8884146341463414,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mavrikbourque": {
+    "name": "Mavrik Bourque",
+    "baselinePtsPace": 28.08219178082192,
+    "baselineGameScore": 32.50794520547945,
+    "baselineDpsProxy": 2.3146341463414637,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "lukeevangelista": {
+    "name": "Luke Evangelista",
+    "baselinePtsPace": 38.588235294117645,
+    "baselineGameScore": 47.23441176470588,
+    "baselineDpsProxy": 2.4048780487804877,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "hendrixlapierre": {
+    "name": "Hendrix Lapierre",
+    "baselinePtsPace": 24.296296296296298,
+    "baselineGameScore": 20.46962962962963,
+    "baselineDpsProxy": 0.7573170731707318,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "coleperfetti": {
+    "name": "Cole Perfetti",
+    "baselinePtsPace": 50,
+    "baselineGameScore": 53.87,
+    "baselineDpsProxy": 3,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alexlaferriere": {
+    "name": "Alex Laferriere",
+    "baselinePtsPace": 44.72727272727273,
+    "baselineGameScore": 65.09948051948052,
+    "baselineDpsProxy": 2.723170731707317,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "willcuylle": {
+    "name": "Will Cuylle",
+    "baselinePtsPace": 45,
+    "baselineGameScore": 43.94,
+    "baselineDpsProxy": 2.3499999999999996,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tysonfoerster": {
+    "name": "Tyson Foerster",
+    "baselinePtsPace": 43.53086419753087,
+    "baselineGameScore": 39.10691358024692,
+    "baselineDpsProxy": 2.6176829268292687,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "shakirmukhamadullin": {
+    "name": "Shakir Mukhamadullin",
+    "baselinePtsPace": 24.6,
+    "baselineGameScore": 21.32,
+    "baselineDpsProxy": 0.7682926829268293,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "landonslaggert": {
+    "name": "Landon Slaggert",
+    "baselinePtsPace": 14.90909090909091,
+    "baselineGameScore": -1.2672727272727273,
+    "baselineDpsProxy": 0.7445121951219513,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jjpeterka": {
+    "name": "JJ Peterka",
+    "baselinePtsPace": 72.4155844155844,
+    "baselineGameScore": 62.60753246753246,
+    "baselineDpsProxy": 2.629268292682927,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "wyattkaiser": {
+    "name": "Wyatt Kaiser",
+    "baselinePtsPace": 11.508771929824562,
+    "baselineGameScore": 15.105263157894736,
+    "baselineDpsProxy": 1.4597560975609756,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "maratkhusnutdinov": {
+    "name": "Marat Khusnutdinov",
+    "baselinePtsPace": 13.12,
+    "baselineGameScore": -0.18586666666666668,
+    "baselineDpsProxy": 1.646341463414634,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "gagegoncalves": {
+    "name": "Gage Goncalves",
+    "baselinePtsPace": 27.33333333333334,
+    "baselineGameScore": 26.896,
+    "baselineDpsProxy": 1.9390243902439028,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "artemzub": {
+    "name": "Artem Zub",
+    "baselinePtsPace": 19.035714285714285,
+    "baselineGameScore": 26.69392857142857,
+    "baselineDpsProxy": 1.6390243902439026,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "bobbymcmann": {
+    "name": "Bobby McMann",
+    "baselinePtsPace": 37.67567567567568,
+    "baselineGameScore": 39.936216216216216,
+    "baselineDpsProxy": 2.3463414634146345,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jeffmalott": {
+    "name": "Jeff Malott",
+    "baselinePtsPace": 6.833333333333333,
+    "baselineGameScore": 18.92833333333333,
+    "baselineDpsProxy": 0.3951219512195122,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joelblomqvist": {
+    "name": "Joel Blomqvist",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -4.670000000000002,
+    "totalSeasonsWeighted": 0.3
+  },
+  "leevimerilinen": {
+    "name": "Leevi Merilinen",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 6.75,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mikaelpyyhtia": {
+    "name": "Mikael Pyyhtia",
+    "baselinePtsPace": 12.212765957446809,
+    "baselineGameScore": 2.8961702127659574,
+    "baselineDpsProxy": 0.8884146341463414,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mattrempe": {
+    "name": "Matt Rempe",
+    "baselinePtsPace": 15.619047619047617,
+    "baselineGameScore": 7.048095238095238,
+    "baselineDpsProxy": 1.0499999999999998,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "yegorchinakhov": {
+    "name": "Yegor Chinakhov",
+    "baselinePtsPace": 41,
+    "baselineGameScore": 51.11333333333333,
+    "baselineDpsProxy": 0.9695121951219514,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "emilheineman": {
+    "name": "Emil Heineman",
+    "baselinePtsPace": 23.806451612903224,
+    "baselineGameScore": 20.632258064516126,
+    "baselineDpsProxy": 2.003658536585366,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "adamwilsby": {
+    "name": "Adam Wilsby",
+    "baselinePtsPace": 17.82608695652174,
+    "baselineGameScore": 27.202608695652174,
+    "baselineDpsProxy": 0.7573170731707318,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jakubdobes": {
+    "name": "Jakub Dobes",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 9.030000000000001,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nilsaman": {
+    "name": "Nils Aman",
+    "baselinePtsPace": 25.894736842105264,
+    "baselineGameScore": 13.896842105263161,
+    "baselineDpsProxy": 0.49817073170731707,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "masonlohrei": {
+    "name": "Mason Lohrei",
+    "baselinePtsPace": 35.14285714285714,
+    "baselineGameScore": 24.919480519480516,
+    "baselineDpsProxy": 2.300609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "matthewkessel": {
+    "name": "Matthew Kessel",
+    "baselinePtsPace": 8.482758620689655,
+    "baselineGameScore": 11.395172413793103,
+    "baselineDpsProxy": 0.8134146341463415,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "daniilmiromanov": {
+    "name": "Daniil Miromanov",
+    "baselinePtsPace": 16.772727272727273,
+    "baselineGameScore": 28.047727272727272,
+    "baselineDpsProxy": 1.2341463414634148,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "walkerduehr": {
+    "name": "Walker Duehr",
+    "baselinePtsPace": 10.25,
+    "baselineGameScore": -1.025,
+    "baselineDpsProxy": 0.6146341463414634,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jjmoser": {
+    "name": "J.J. Moser",
+    "baselinePtsPace": 21.25925925925926,
+    "baselineGameScore": 25.511111111111113,
+    "baselineDpsProxy": 1.6134146341463416,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joshdoan": {
+    "name": "Josh Doan",
+    "baselinePtsPace": 30.549019607843135,
+    "baselineGameScore": 48.074509803921565,
+    "baselineDpsProxy": 1.9902439024390244,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kentjohnson": {
+    "name": "Kent Johnson",
+    "baselinePtsPace": 68.73529411764706,
+    "baselineGameScore": 62.88676470588235,
+    "baselineDpsProxy": 2.2390243902439027,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mattybeniers": {
+    "name": "Matty Beniers",
+    "baselinePtsPace": 43,
+    "baselineGameScore": 44.84,
+    "baselineDpsProxy": 2.6,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "scottmorrow": {
+    "name": "Scott Morrow",
+    "baselinePtsPace": 35.14285714285714,
+    "baselineGameScore": 65.19,
+    "baselineDpsProxy": 0.43536585365853664,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "williameklund": {
+    "name": "William Eklund",
+    "baselinePtsPace": 61.76623376623375,
+    "baselineGameScore": 58.61402597402598,
+    "baselineDpsProxy": 2.394512195121951,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "owenpower": {
+    "name": "Owen Power",
+    "baselinePtsPace": 41.51898734177215,
+    "baselineGameScore": 46.11721518987342,
+    "baselineDpsProxy": 2.3121951219512193,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mattcoronato": {
+    "name": "Matt Coronato",
+    "baselinePtsPace": 50.051948051948045,
+    "baselineGameScore": 59.977142857142844,
+    "baselineDpsProxy": 2.6762195121951216,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "lukehughes": {
+    "name": "Luke Hughes",
+    "baselinePtsPace": 50.816901408450704,
+    "baselineGameScore": 53.55408450704225,
+    "baselineDpsProxy": 2.3810975609756095,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "aaturaty": {
+    "name": "Aatu Raty",
+    "baselinePtsPace": 27.333333333333332,
+    "baselineGameScore": 28.178181818181823,
+    "baselineDpsProxy": 0.9457317073170731,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dylanguenther": {
+    "name": "Dylan Guenther",
+    "baselinePtsPace": 70.28571428571429,
+    "baselineGameScore": 76.09599999999999,
+    "baselineDpsProxy": 2.6036585365853657,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nolanallan": {
+    "name": "Nolan Allan",
+    "baselinePtsPace": 15.25581395348837,
+    "baselineGameScore": -7.38,
+    "baselineDpsProxy": 0.9439024390243902,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "loganstankoven": {
+    "name": "Logan Stankoven",
+    "baselinePtsPace": 39.94871794871795,
+    "baselineGameScore": 55.25538461538463,
+    "baselineDpsProxy": 2.8060975609756094,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "coltondach": {
+    "name": "Colton Dach",
+    "baselinePtsPace": 22.959999999999997,
+    "baselineGameScore": 6.986399999999999,
+    "baselineDpsProxy": 0.6707317073170732,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "colesillinger": {
+    "name": "Cole Sillinger",
+    "baselinePtsPace": 41,
+    "baselineGameScore": 27.68121212121212,
+    "baselineDpsProxy": 1.730487804878049,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mackiesamoskevich": {
+    "name": "Mackie Samoskevich",
+    "baselinePtsPace": 35.30555555555556,
+    "baselineGameScore": 46.546388888888885,
+    "baselineDpsProxy": 2.809756097560976,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "matthewknies": {
+    "name": "Matthew Knies",
+    "baselinePtsPace": 60.97435897435897,
+    "baselineGameScore": 58.545897435897444,
+    "baselineDpsProxy": 2.6158536585365852,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "samuelhelenius": {
+    "name": "Samuel Helenius",
+    "baselinePtsPace": 11.479999999999999,
+    "baselineGameScore": 8.8232,
+    "baselineDpsProxy": 1.4634146341463414,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brandtclarke": {
+    "name": "Brandt Clarke",
+    "baselinePtsPace": 34.69230769230769,
+    "baselineGameScore": 49.11589743589744,
+    "baselineDpsProxy": 2.7585365853658534,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "zackbolduc": {
+    "name": "Zack Bolduc",
+    "baselinePtsPace": 41,
+    "baselineGameScore": 44.76972222222222,
+    "baselineDpsProxy": 2.5024390243902435,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "wyattjohnston": {
+    "name": "Wyatt Johnston",
+    "baselinePtsPace": 71,
+    "baselineGameScore": 62.76,
+    "baselineDpsProxy": 2.75,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "zacharylheureux": {
+    "name": "Zachary L'Heureux",
+    "baselinePtsPace": 19.838709677419352,
+    "baselineGameScore": 19.785806451612903,
+    "baselineDpsProxy": 1.9280487804878048,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "masonmctavish": {
+    "name": "Mason McTavish",
+    "baselinePtsPace": 56.10526315789474,
+    "baselineGameScore": 44.64684210526316,
+    "baselineDpsProxy": 2.45609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "brennanothmann": {
+    "name": "Brennan Othmann",
+    "baselinePtsPace": 7.454545454545455,
+    "baselineGameScore": 20.20181818181818,
+    "baselineDpsProxy": 0.6707317073170732,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "joshuaroy": {
+    "name": "Joshua Roy",
+    "baselinePtsPace": 13.666666666666666,
+    "baselineGameScore": -5.739999999999999,
+    "baselineDpsProxy": 0.29999999999999993,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ryanwinterton": {
+    "name": "Ryan Winterton",
+    "baselinePtsPace": 6.833333333333333,
+    "baselineGameScore": -0.205,
+    "baselineDpsProxy": 0.2853658536585366,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "simonedvinsson": {
+    "name": "Simon Edvinsson",
+    "baselinePtsPace": 32.58974358974359,
+    "baselineGameScore": 31.643589743589747,
+    "baselineDpsProxy": 2.235365853658536,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "fabianlysell": {
+    "name": "Fabian Lysell",
+    "baselinePtsPace": 20.5,
+    "baselineGameScore": 9.02,
+    "baselineDpsProxy": 0.35853658536585364,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "fedorsvechkov": {
+    "name": "Fedor Svechkov",
+    "baselinePtsPace": 26.807692307692307,
+    "baselineGameScore": 22.56576923076923,
+    "baselineDpsProxy": 1.6170731707317072,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "oliverkapanen": {
+    "name": "Oliver Kapanen",
+    "baselinePtsPace": 9.11111111111111,
+    "baselineGameScore": -2.1866666666666665,
+    "baselineDpsProxy": 0.39512195121951216,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "alekseikolosov": {
+    "name": "Aleksei Kolosov",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": -8.990000000000002,
+    "totalSeasonsWeighted": 0.3
+  },
+  "olenzellweger": {
+    "name": "Olen Zellweger",
+    "baselinePtsPace": 26.451612903225804,
+    "baselineGameScore": 32.99838709677419,
+    "baselineDpsProxy": 1.9280487804878048,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ethandelmastro": {
+    "name": "Ethan Del Mastro",
+    "baselinePtsPace": 20.5,
+    "baselineGameScore": 14.11083333333333,
+    "baselineDpsProxy": 0.6878048780487803,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jacksonblake": {
+    "name": "Jackson Blake",
+    "baselinePtsPace": 34.849999999999994,
+    "baselineGameScore": 60.044499999999985,
+    "baselineDpsProxy": 3.2195121951219514,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "arvidsoderblom": {
+    "name": "Arvid Soderblom",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 0.9599999999999936,
+    "totalSeasonsWeighted": 0.3
+  },
+  "rykerevans": {
+    "name": "Ryker Evans",
+    "baselinePtsPace": 28.08219178082192,
+    "baselineGameScore": 16.714520547945206,
+    "baselineDpsProxy": 2.0030487804878048,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "zackostapchuk": {
+    "name": "Zack Ostapchuk",
+    "baselinePtsPace": 5.857142857142857,
+    "baselineGameScore": -0.6296428571428571,
+    "baselineDpsProxy": 1.4,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "tysonkozak": {
+    "name": "Tyson Kozak",
+    "baselinePtsPace": 19.523809523809522,
+    "baselineGameScore": 11.558095238095238,
+    "baselineDpsProxy": 0.5762195121951219,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "emillilleberg": {
+    "name": "Emil Lilleberg",
+    "baselinePtsPace": 20.5,
+    "baselineGameScore": 14.457894736842105,
+    "baselineDpsProxy": 2.1317073170731713,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "arberxhekaj": {
+    "name": "Arber Xhekaj",
+    "baselinePtsPace": 7.0285714285714285,
+    "baselineGameScore": 0.25771428571428573,
+    "baselineDpsProxy": 1.7499999999999998,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jetgreaves": {
+    "name": "Jet Greaves",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0,
+    "baselineDpsProxy": 0,
+    "baselineGsax": 14.46,
+    "totalSeasonsWeighted": 0.3
+  },
+  "arshdeepbains": {
+    "name": "Arshdeep Bains",
+    "baselinePtsPace": 6.3076923076923075,
+    "baselineGameScore": 2.649230769230769,
+    "baselineDpsProxy": 0.36463414634146346,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "marcmclaughlin": {
+    "name": "Marc McLaughlin",
+    "baselinePtsPace": 17.57142857142857,
+    "baselineGameScore": 16.28285714285714,
+    "baselineDpsProxy": 0.4695121951219513,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "owenbeck": {
+    "name": "Owen Beck",
+    "baselinePtsPace": 6.833333333333333,
+    "baselineGameScore": 10.455,
+    "baselineDpsProxy": 0.40243902439024387,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "lianbichsel": {
+    "name": "Lian Bichsel",
+    "baselinePtsPace": 19.42105263157895,
+    "baselineGameScore": 18.277368421052632,
+    "baselineDpsProxy": 1.0426829268292683,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "seamuscasey": {
+    "name": "Seamus Casey",
+    "baselinePtsPace": 46.857142857142854,
+    "baselineGameScore": 30.749999999999993,
+    "baselineDpsProxy": 0.37560975609756103,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "logancooley": {
+    "name": "Logan Cooley",
+    "baselinePtsPace": 71.06666666666666,
+    "baselineGameScore": 64.50666666666666,
+    "baselineDpsProxy": 2.4237804878048785,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "lucadelbelbelluz": {
+    "name": "Luca Del Bel Belluz",
+    "baselinePtsPace": 43.733333333333334,
+    "baselineGameScore": 20.992,
+    "baselineDpsProxy": 0.47560975609756095,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "cuttergauthier": {
+    "name": "Cutter Gauthier",
+    "baselinePtsPace": 43,
+    "baselineGameScore": 40.16,
+    "baselineDpsProxy": 2.45,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "conorgeekie": {
+    "name": "Conor Geekie",
+    "baselinePtsPace": 22.076923076923077,
+    "baselineGameScore": 24.347692307692306,
+    "baselineDpsProxy": 1.6170731707317072,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "isaiahgeorge": {
+    "name": "Isaiah George",
+    "baselinePtsPace": 12.424242424242424,
+    "baselineGameScore": 4.348484848484849,
+    "baselineDpsProxy": 0.9859756097560978,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "lanehutson": {
+    "name": "Lane Hutson",
+    "baselinePtsPace": 66,
+    "baselineGameScore": 58.75,
+    "baselineDpsProxy": 2.7,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "davidjiricek": {
+    "name": "David Jiricek",
+    "baselinePtsPace": 20.5,
+    "baselineGameScore": 11.479999999999999,
+    "baselineDpsProxy": 0.35853658536585364,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "marcokasper": {
+    "name": "Marco Kasper",
+    "baselinePtsPace": 39.4025974025974,
+    "baselineGameScore": 41.947792207792205,
+    "baselineDpsProxy": 2.4414634146341463,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "kevinkorchinski": {
+    "name": "Kevin Korchinski",
+    "baselinePtsPace": 10.25,
+    "baselineGameScore": -2.30625,
+    "baselineDpsProxy": 0.4487804878048781,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jirikulich": {
+    "name": "Jiri Kulich",
+    "baselinePtsPace": 31.741935483870964,
+    "baselineGameScore": 41.33064516129032,
+    "baselineDpsProxy": 2.003658536585366,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "mavericlamoureux": {
+    "name": "Maveric Lamoureux",
+    "baselinePtsPace": 16.4,
+    "baselineGameScore": 30.449333333333335,
+    "baselineDpsProxy": 0.45731707317073167,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jonathanlekkerimki": {
+    "name": "Jonathan Lekkerimki",
+    "baselinePtsPace": 20.5,
+    "baselineGameScore": 24.05333333333333,
+    "baselineDpsProxy": 0.8487804878048781,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "camlund": {
+    "name": "Cam Lund",
+    "baselinePtsPace": 22.363636363636363,
+    "baselineGameScore": 6.038181818181818,
+    "baselineDpsProxy": 0.27499999999999997,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "dentonmateychuk": {
+    "name": "Denton Mateychuk",
+    "baselinePtsPace": 23.68888888888889,
+    "baselineGameScore": 16.308888888888887,
+    "baselineDpsProxy": 1.207317073170732,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "fraserminten": {
+    "name": "Fraser Minten",
+    "baselinePtsPace": 19.523809523809522,
+    "baselineGameScore": 7.653333333333333,
+    "baselineDpsProxy": 0.5121951219512195,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "pavelmintyukov": {
+    "name": "Pavel Mintyukov",
+    "baselinePtsPace": 22.91176470588235,
+    "baselineGameScore": 7.633235294117648,
+    "baselineDpsProxy": 1.7829268292682925,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ivanmiroshnichenko": {
+    "name": "Ivan Miroshnichenko",
+    "baselinePtsPace": 18.22222222222222,
+    "baselineGameScore": 20.044444444444444,
+    "baselineDpsProxy": 0.647560975609756,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "franknazar": {
+    "name": "Frank Nazar",
+    "baselinePtsPace": 40.22641509433963,
+    "baselineGameScore": 28.34415094339623,
+    "baselineDpsProxy": 1.4865853658536587,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "simonnemec": {
+    "name": "Simon Nemec",
+    "baselinePtsPace": 12.148148148148149,
+    "baselineGameScore": -0.45555555555555555,
+    "baselineDpsProxy": 0.6914634146341464,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "janinyman": {
+    "name": "Jani Nyman",
+    "baselinePtsPace": 41,
+    "baselineGameScore": 28.085,
+    "baselineDpsProxy": 0.34390243902439016,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "liamohgren": {
+    "name": "Liam Ohgren",
+    "baselinePtsPace": 17.083333333333332,
+    "baselineGameScore": 8.2,
+    "baselineDpsProxy": 0.5999999999999999,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "owenpickering": {
+    "name": "Owen Pickering",
+    "baselinePtsPace": 9.84,
+    "baselineGameScore": 9.577599999999999,
+    "baselineDpsProxy": 0.5945121951219513,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "matthewpoitras": {
+    "name": "Matthew Poitras",
+    "baselinePtsPace": 27.333333333333332,
+    "baselineGameScore": 29.097575757575758,
+    "baselineDpsProxy": 1.0463414634146342,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jurajslafkovsk": {
+    "name": "Juraj Slafkovsk",
+    "baselinePtsPace": 52.936708860759495,
+    "baselineGameScore": 49.656708860759494,
+    "baselineDpsProxy": 2.553048780487805,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "shanewright": {
+    "name": "Shane Wright",
+    "baselinePtsPace": 45.67088607594937,
+    "baselineGameScore": 36.33949367088607,
+    "baselineDpsProxy": 2.601219512195122,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "marcgatcomb": {
+    "name": "Marc Gatcomb",
+    "baselinePtsPace": 18.923076923076923,
+    "baselineGameScore": 18.62871794871795,
+    "baselineDpsProxy": 0.998780487804878,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nickblankenburg": {
+    "name": "Nick Blankenburg",
+    "baselinePtsPace": 21.866666666666667,
+    "baselineGameScore": 26.445000000000004,
+    "baselineDpsProxy": 1.75609756097561,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ethenfrank": {
+    "name": "Ethen Frank",
+    "baselinePtsPace": 23.916666666666664,
+    "baselineGameScore": 30.613333333333333,
+    "baselineDpsProxy": 0.8780487804878048,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "adamklapka": {
+    "name": "Adam Klapka",
+    "baselinePtsPace": 26.451612903225804,
+    "baselineGameScore": 26.054838709677416,
+    "baselineDpsProxy": 1.0396341463414633,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "victormancini": {
+    "name": "Victor Mancini",
+    "baselinePtsPace": 21.161290322580644,
+    "baselineGameScore": -3.2270967741935483,
+    "baselineDpsProxy": 0.7749999999999999,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "andreikuzmenko": {
+    "name": "Andrei Kuzmenko",
+    "baselinePtsPace": 45.96969696969697,
+    "baselineGameScore": 44.764545454545456,
+    "baselineDpsProxy": 2.535365853658537,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "ivanivan": {
+    "name": "Ivan Ivan",
+    "baselinePtsPace": 16.4,
+    "baselineGameScore": 17.5275,
+    "baselineDpsProxy": 1.2926829268292683,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "maxsasson": {
+    "name": "Max Sasson",
+    "baselinePtsPace": 19.79310344827586,
+    "baselineGameScore": 16.71103448275862,
+    "baselineDpsProxy": 0.9018292682926828,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "connorbedard": {
+    "name": "Connor Bedard",
+    "baselinePtsPace": 67,
+    "baselineGameScore": 37.73,
+    "baselineDpsProxy": 2.3499999999999996,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "zachbenson": {
+    "name": "Zach Benson",
+    "baselinePtsPace": 30.613333333333333,
+    "baselineGameScore": 43.973866666666666,
+    "baselineDpsProxy": 2.4237804878048785,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "leocarlsson": {
+    "name": "Leo Carlsson",
+    "baselinePtsPace": 47.473684210526315,
+    "baselineGameScore": 37.96815789473684,
+    "baselineDpsProxy": 2.3634146341463413,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "adamfantilli": {
+    "name": "Adam Fantilli",
+    "baselinePtsPace": 54,
+    "baselineGameScore": 49.09,
+    "baselineDpsProxy": 2.45,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "willsmith": {
+    "name": "Will Smith",
+    "baselinePtsPace": 49.86486486486486,
+    "baselineGameScore": 38.174324324324324,
+    "baselineDpsProxy": 2.210975609756098,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "sammalinski": {
+    "name": "Sam Malinski",
+    "baselinePtsPace": 16.18421052631579,
+    "baselineGameScore": 33.317894736842106,
+    "baselineDpsProxy": 2.3634146341463413,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "uvisbalinskis": {
+    "name": "Uvis Balinskis",
+    "baselinePtsPace": 19.42105263157895,
+    "baselineGameScore": 32.67052631578947,
+    "baselineDpsProxy": 2.548780487804878,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nikolasmatinpalo": {
+    "name": "Nikolas Matinpalo",
+    "baselinePtsPace": 8,
+    "baselineGameScore": 7.84,
+    "baselineDpsProxy": 1.125,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "matveimichkov": {
+    "name": "Matvei Michkov",
+    "baselinePtsPace": 64.57499999999999,
+    "baselineGameScore": 56.344249999999995,
+    "baselineDpsProxy": 2.731707317073171,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "artyomlevshunov": {
+    "name": "Artyom Levshunov",
+    "baselinePtsPace": 27.333333333333332,
+    "baselineGameScore": 6.058888888888889,
+    "baselineDpsProxy": 0.4280487804878049,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "macklincelebrini": {
+    "name": "Macklin Celebrini",
+    "baselinePtsPace": 73.8,
+    "baselineGameScore": 69.03228571428572,
+    "baselineDpsProxy": 2.26219512195122,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "collingraf": {
+    "name": "Collin Graf",
+    "baselinePtsPace": 27.333333333333332,
+    "baselineGameScore": 16.424848484848486,
+    "baselineDpsProxy": 0.8048780487804879,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "juhajaaska": {
+    "name": "Juha Jaaska",
+    "baselinePtsPace": 18.22222222222222,
+    "baselineGameScore": 29.747777777777777,
+    "baselineDpsProxy": 0.702439024390244,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "maximtsyplakov": {
+    "name": "Maxim Tsyplakov",
+    "baselinePtsPace": 37.272727272727266,
+    "baselineGameScore": 38.838181818181816,
+    "baselineDpsProxy": 2.6762195121951216,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "jereinnala": {
+    "name": "Jere Innala",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 0.19294117647058823,
+    "baselineDpsProxy": 0.5286585365853658,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  },
+  "nikitaprishchepov": {
+    "name": "Nikita Prishchepov",
+    "baselinePtsPace": 0,
+    "baselineGameScore": 6.56,
+    "baselineDpsProxy": 0.31097560975609756,
+    "baselineGsax": 0,
+    "totalSeasonsWeighted": 0.3
+  }
+}

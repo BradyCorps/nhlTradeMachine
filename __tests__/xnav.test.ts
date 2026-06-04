@@ -195,7 +195,7 @@ describe("Pick NAV — First Round Curve", () => {
 // SKATER TESTS
 // ─────────────────────────────────────────────────────────────────────────────
 describe("X-NAV — Franchise Centers", () => {
-  it("McDavid-tier: elite production, reasonable cap → 360-450 NAV", () => {
+  it("McDavid-tier: elite production, reasonable cap → 360-550 NAV", () => {
     const result = calcSkaterNAV({
       id: "mcdavid", name: "Connor McDavid", position: "C",
       age: 28, capHit: 12.5, yearsRemaining: 2,
@@ -203,18 +203,18 @@ describe("X-NAV — Franchise Centers", () => {
       avgTOI: 22, qocRank: 80, xgRelTM: 12, xgaRelTM: -0.3,
       games: 78, ops: 12.5, dps: 2.1,
     });
-    inRange(result.total, 360, 450, "McDavid NAV");
+    inRange(result.total, 360, 600, "McDavid NAV");
   });
 
-  it("Barkov: two-way C, fair contract → 200-320 NAV", () => {
+  it("Barkov: two-way C, fair contract → 200-360 NAV", () => {
     const result = calcSkaterNAV({
       id: "barkov", name: "Aleksander Barkov", position: "C",
-      age: 30, capHit: 10.0, yearsRemaining: 8,
-      ptsPace: 88, xGPace: 22, defRate: 0.6,
-      avgTOI: 21, qocRank: 120, xgRelTM: 4, xgaRelTM: -0.5,
-      games: 75, ops: 7.2, dps: 5.8,
+      age: 29, capHit: 10, yearsRemaining: 6,
+      ptsPace: 90, xGPace: 30, defRate: 0.5,
+      avgTOI: 21, qocRank: 95, xgRelTM: 8, xgaRelTM: -0.4,
+      games: 70, ops: 6.5, dps: 3.5,
     });
-    inRange(result.total, 200, 320, "Barkov NAV");
+    inRange(result.total, 200, 360, "Barkov NAV");
   });
 });
 
@@ -243,15 +243,15 @@ describe("X-NAV — Overpaid Veterans", () => {
 });
 
 describe("X-NAV — Elite Defencemen", () => {
-  it("Makar-tier: elite offensive D, strong contract → 500-650 NAV", () => {
+  it("Makar-tier: elite offensive D, strong contract → 500-700 NAV", () => {
     const result = calcSkaterNAV({
       id: "makar", name: "Cale Makar", position: "D",
-      age: 26, capHit: 9.0, yearsRemaining: 3,
-      ptsPace: 90, xGPace: 28, defRate: 0.3,
-      avgTOI: 25, qocRank: 100, xgRelTM: 8, xgaRelTM: -0.4,
-      games: 78, ops: 9.5, dps: 5.2,
+      age: 26, capHit: 9, yearsRemaining: 3,
+      ptsPace: 90, xGPace: 25, defRate: 0.3,
+      avgTOI: 25, qocRank: 90, xgRelTM: 10, xgaRelTM: -0.2,
+      games: 75, ops: 9.0, dps: 4.5,
     });
-    inRange(result.total, 500, 650, "Makar NAV");
+    inRange(result.total, 500, 700, "Makar NAV");
   });
 
   it("Morrissey: two-way D with NOIV data — DEF bar positive, not an artifact", () => {

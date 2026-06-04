@@ -180,11 +180,15 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const xgRel  = safe(asset.xgRelTM ?? 0);
   const xgaRel = safe(asset.xgaRelTM ?? 0);
   const dzPct  = safe(asset.dzPct   ?? 0.5);
-  const ops    = asset.ops != null ? safe(asset.ops) : null;
-  const dps    = asset.dps != null ? safe(asset.dps) : null;
   const age    = asset.age;
   const isD    = asset.position === "D";
   const games  = asset.games ?? 60;
+
+  // Pace cumulative point shares to 82 games to prevent injury collapse
+  // We use a floor of 20 games to avoid absurd small-sample size multipliers
+  const paceMultiplier = clamp(82 / Math.max(games, 20), 1.0, 4.1);
+  const ops    = asset.ops != null ? safe(asset.ops) * paceMultiplier : null;
+  const dps    = asset.dps != null ? safe(asset.dps) * paceMultiplier : null;
 
   const effectiveCap = asset.capHit * (1 - (asset.retainedPct || 0));
   const confidence   = clamp(games / 65, 0.3, 1.0);
@@ -259,43 +263,51 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const trueMarketValue = offTotal + defTotal + ageTotal;
   const isRFA = asset.age + asset.yearsRemaining <= 27;
 
-  // ── Time-Discounted Cap Surplus Model ─────────────────────────
-  // Treats the contract as a multi-year liability that deflates as the cap grows.
-  // Non-linear superstar curve: elite production commands an exponential cap share,
-  // so Draisaitl at $14M on 7yr isn't crushed the same as a depth player.
+  // ── DailyFaceoff Relative Efficiency Cap Model ────────────────
+  // Compares player's performance percentile against cap percentile
+  // relative to a moving salary cap ceiling ($104M baseline).
   const BASE_CAP_CEILING = 104.0;
   const CAP_GROWTH_RATE  = 1.04;
-  const contractYears    = Math.max(1, asset.yearsRemaining || 1);
 
-  // Star premium: franchise talent commands exponential market value above $1M/20NAV
-  const baseExpectedCap = trueMarketValue / 20;
-  const starPremium     = trueMarketValue > 150
-    ? Math.pow((trueMarketValue - 150) / 45, 1.6)
-    : 0;
-  const marketValueDollars = Math.max(0.9, baseExpectedCap + starPremium);
+  // Use extension cap hit and years if available to align with Goalie NAV and fix extension distortions
+  const extCapHit        = asset.extensionCapHit;
+  const navCapHit        = extCapHit ? extCapHit * (1 - (asset.retainedPct || 0)) : effectiveCap;
+  const navYears         = extCapHit ? (asset.extensionYears ?? asset.yearsRemaining) : asset.yearsRemaining;
+  const contractYears    = Math.max(1, navYears || 1);
 
-  let netSurplusValuePoints = 0;
+  // 1. Calculate FMV in dollars using a stabilized scaling curve:
+  // FMV caps out naturally around the CBA theoretical maximum (~$20M-$22M)
+  // so that positive surplus doesn't mathematically explode to +400 NAV.
+  const baseFmv = trueMarketValue / 20;
+  const elitePremium = trueMarketValue > 130 ? Math.pow((trueMarketValue - 130) / 80, 1.4) : 0;
+  const fmvDollars = Math.min(22.0, baseFmv + elitePremium);
+
+  // 2. Loop through contract term to calculate the multi-year compound inflation sum:
+  let capSum = 0;
   for (let i = 0; i < contractYears; i++) {
     const projectedCapCeiling = BASE_CAP_CEILING * Math.pow(CAP_GROWTH_RATE, i);
     // Cap footprint shrinks relative to a growing ceiling
-    const adjustedCapFootprint = effectiveCap * (BASE_CAP_CEILING / projectedCapCeiling);
-    const annualSurplusDollars = marketValueDollars - adjustedCapFootprint;
-    const annualSurplusPoints  = annualSurplusDollars * 20;
-    const timeDiscount         = Math.pow(0.92, i); // 8% annual financial discounting
-    if (annualSurplusPoints >= 0) {
-      // Bargain: surplus years are premium assets; RFA years get structural bonus
-      const ageAtYear        = asset.age + i;
-      const structuralPremium = ageAtYear <= 27 ? 1.25 : 1.10;
-      netSurplusValuePoints  += annualSurplusPoints * structuralPremium * timeDiscount;
-    } else {
-      // Overpaid: deficit years are unmitigated drag anchors
-      netSurplusValuePoints += annualSurplusPoints * 1.35 * timeDiscount;
-    }
+    const adjustedCapFootprint = navCapHit * (BASE_CAP_CEILING / projectedCapCeiling);
+    const annualSurplus = fmvDollars - adjustedCapFootprint;
+    
+    // 8% annual financial discount: future cap space/penalties matter less today
+    const timeDiscount = Math.pow(0.92, i);
+    
+    // gamma_RFA applies organizational premium for control-controlled years
+    const ageAtYear = asset.age + i;
+    const gammaRFA = ageAtYear <= 27 ? 1.25 : 1.0;
+    
+    capSum += annualSurplus * 12 * gammaRFA * timeDiscount;
   }
 
-  // Normalise by duration; elite production in one slot earns efficiency bonus
-  const rosterSlotEfficiencyBonus = Math.max(1.0, trueMarketValue / 180);
-  const baselineCapComponent      = (netSurplusValuePoints / contractYears) * rosterSlotEfficiencyBonus;
+  // Normalize by contract years to maintain NAV scaling compatibility
+  const baselineCapComponentNormalized = capSum / contractYears;
+
+  // 3. Single-slot concentration multiplier protection:
+  // Negative contracts on elite talents can never be amplified
+  const singleSlotMultiplier = Math.max(1.0, trueMarketValue / 180);
+  const multiplierToApply = baselineCapComponentNormalized < 0 ? 1.0 : singleSlotMultiplier;
+  const baselineCapComponent = baselineCapComponentNormalized * multiplierToApply;
 
   // Retention tax (exponential — absorbing dead cap still commands a premium)
   const retentionSev  = Math.pow((asset.retainedPct || 0) * 100, 1.25);
@@ -343,13 +355,22 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   //   26+: ×1.00  — fully established, no discount
   //
   // Note: only applies to skaters; goalies and picks have their own models.
-  const developmentDiscount =
+  let developmentDiscount =
     age <= 21 ? 0.68 :
     age <= 22 ? 0.76 :
     age <= 23 ? 0.82 :
     age <= 24 ? 0.88 :
     age <= 25 ? 0.93 :
     1.0;
+
+  // Generational Exemption:
+  // If a young player is already producing at a top-tier pace, they are proven.
+  // We linearly reduce their discount back toward 1.0 based on production.
+  if (age <= 25 && (pts >= 65 || (ops !== null && ops >= 4.5))) {
+     const metric = Math.max(pts, ops !== null ? ops * 15 : 0);
+     const exemptionFactor = clamp((metric - 65) / 20, 0, 1);
+     developmentDiscount = developmentDiscount + (1.0 - developmentDiscount) * exemptionFactor;
+  }
 
   const discountedTotal = rawTotal * developmentDiscount;
 
@@ -367,28 +388,28 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   // No package of depth players and ELC wildcards should be able to match them.
   // ── Franchise Cornerstone Floor ───────────────────────────────
   // A proven franchise player can never be worth less than their floor in a trade,
-  // regardless of contract situation. Any GM would take Draisaitl at $14M — the
-  // surplus model shouldn't be able to drag him below this floor due to data gaps
-  // or partial-season stats.
+  // regardless of contract situation. The surplus model shouldn't be able to 
+  // drag them below this floor due to data gaps or partial-season stats.
   //
   // Qualification criteria:
-  //   Forwards: age ≥ 27 AND (ptsPace ≥ 80  OR  ops ≥ 5.0 when data is available)
-  //             — 80+ pts at age 27+ is unambiguously franchise-tier production
-  //   D-men:    age ≥ 27 AND ptsPace ≥ 65 AND avgTOI > 22
-  //             — top-pair anchor who has proven it over multiple seasons
+  //   Forwards: ptsPace ≥ 80 OR ops ≥ 5.0
+  //   D-men:    ptsPace ≥ 65 AND avgTOI > 22 OR ops ≥ 4.0
   //
-  // The floor (300 / 250) embodies the "blockbuster required" principle:
-  // acquiring a franchise cornerstone demands a premium roster player +
-  // elite prospect + 1st-round pick. No ELC-heavy package should match them alone.
+  // The floor embodies the "blockbuster required" principle. Elite young players
+  // (under 26) have significantly higher floors due to prime years and team control.
+  // No ELC-heavy package should match them alone.
   //
   // Floor uses -Infinity for non-qualifying players so negative NAV contracts
-  // (e.g. Huberdeau) are NOT accidentally floored at zero.
-  const qualifiesEliteForward  = !isD && age >= 27
-    && (pts >= 80 || (ops !== null && ops >= 5.0));
-  const qualifiesEliteDefender =  isD && age >= 27 && pts >= 65 && toi > 22;
-  const franchiseFloor = qualifiesEliteForward ? 300
-    : qualifiesEliteDefender                   ? 250
-    : -Infinity;
+  // are NOT accidentally floored at zero.
+  const qualifiesEliteForward  = !isD && (pts >= 80 || (ops !== null && ops >= 5.0));
+  const qualifiesEliteDefender =  isD && (pts >= 65 || (ops !== null && ops >= 4.0)) && toi > 22;
+
+  let franchiseFloor = -Infinity;
+  if (qualifiesEliteForward) {
+    franchiseFloor = age <= 24 ? 400 : age <= 26 ? 350 : 300;
+  } else if (qualifiesEliteDefender) {
+    franchiseFloor = age <= 24 ? 350 : age <= 26 ? 300 : 250;
+  }
 
   const total = Math.max(discountedTotal, franchiseFloor);
 
