@@ -4,6 +4,9 @@ import { teams as teamsTable } from "@/app/db/schema";
 import { AdminTeamRow } from "./AdminTeamRow";
 import Link from "next/link";
 
+
+export const dynamic = "force-dynamic";
+
 export default async function AdminDashboard() {
   const allTeams = await db.select().from(teamsTable).orderBy(teamsTable.name);
 
