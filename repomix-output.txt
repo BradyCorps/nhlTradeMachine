@@ -52,7 +52,6 @@ app/
     claude/
       route.ts
     evaluate/
-      README.md
       route.ts
     league/
       route.ts
@@ -125,11 +124,6 @@ vitest.config.ts
 ================================================================
 Files
 ================================================================
-
-================
-File: app/api/evaluate/README.md
-================
-# NOTE: app/api/evaluate/route.ts is the valuation engine.\n# It is intentionally gitignored for IP protection.\n# Do NOT delete this file — it is required for NAV calculation.\n# Contact repo owner for the engine file if missing.
 
 ================
 File: app/components/AssetDropdown.tsx
@@ -39988,68 +39982,6 @@ export function getCachedNav(asset: Asset): XNAVResult | null {
 }
 
 ================
-File: app/lib/season-config.ts
-================
-// ── season-config.ts ──────────────────────────────────────────
-// Single source of truth for every season-specific constant.
-// Update this file each September when the new season begins.
-// All other modules import from here — no magic numbers in logic files.
-
-export const SEASON = {
-  label:          "2025-26",
-  apiSeasonId:    "20252026",
-  capCeiling:     88.0,          // NHL salary cap ceiling ($M)
-  capFloor:       65.0,          // NHL salary cap floor ($M)
-  draftYear:      2026,          // Current draft class year
-  mpSeason:       "2025",        // MoneyPuck URL path segment
-  nhleSeasonId:   "20252026",    // NHL API season identifier
-} as const;
-
-export const LEAGUE = {
-  avgXga60:       2.55,          // League-average xGA/60 (MoneyPuck)
-  avgXgf60:       2.55,          // League-average xGF/60
-  gsaxSd:         8.0,           // GSAX standard deviation (goalie normalisation)
-  peakAge:        27,            // Skater production peak (age curve inflection)
-  goaliePeakAge:  30,            // Goalie peak age
-} as const;
-
-export const COMPRESSION = {
-  // Age-tiered decay rates — prospects compress less than veterans.
-  // Each subsequent asset in a sorted package contributes: NAVᵢ × δⁱ
-  decayProspect:  0.80,          // ≤23 yrs — independent developmental bets
-  decayYoung:     0.65,          // 24-27 yrs — semi-independent
-  decayPrime:     0.60,          // 28-31 yrs — full roster slot competition
-  decayVeteran:   0.55,          // 32+  yrs — max displacement cost
-
-  // Roster slot penalty per extra non-pick player beyond the anchor.
-  // Recalibrated with corrected NAV scale (cap * 6, dps * 15):
-  //   Prime NAV range is now 40-180 (was 200-800), so old μ=50 penalised
-  //   depth players too harshly — packages of 3+ solid players went negative.
-  penaltyProspect: 10,           // was 15
-  penaltyYoung:    15,           // was 35
-  penaltyPrime:    20,           // was 50
-  penaltyVeteran:  35,           // was 60
-} as const;
-
-export const FRANCHISE = {
-  threshold:  80,                // Elite stars — recalibrated from 600 (dps*15 + cap*6 scale)
-  megalodon:  125,               // Generational talents — recalibrated from 900
-} as const;
-
-// Helpers derived from the above — avoids recalculating at call sites
-export const ageDecayRate   = (age: number): number =>
-  age <= 23 ? COMPRESSION.decayProspect
-  : age <= 27 ? COMPRESSION.decayYoung
-  : age <= 31 ? COMPRESSION.decayPrime
-  : COMPRESSION.decayVeteran;
-
-export const ageSlotPenalty = (age: number): number =>
-  age <= 23 ? COMPRESSION.penaltyProspect
-  : age <= 27 ? COMPRESSION.penaltyYoung
-  : age <= 31 ? COMPRESSION.penaltyPrime
-  : COMPRESSION.penaltyVeteran;
-
-================
 File: .eslintrc.json
 ================
 {
@@ -40165,6 +40097,1292 @@ Engine are proprietary. The codebase is private.
 ---
 
 *The Hockey Ledger · X-NAV 7.3 · STRAND™ · Est. 2025*
+
+================
+File: tsconfig.json
+================
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "ES2017"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
+
+================
+File: app/api/match/route.ts
+================
+import { NextRequest, NextResponse } from "next/server";
+import type { Asset, Team } from "@/app/lib/trade-types";
+
+// ── Trade Partner Finder — "Who wants this package?" ─────────
+// A player's NAV is team-contextual. A $7M 35yr albatross for Tampa
+// could be mentor/bridge value for Buffalo. Score all 32 teams on fit.
+//
+// Scoring dimensions:
+//   1. NAV FIT:            does this asset improve their roster?
+//   2. CAP FIT:            can they absorb the cap hit?
+//   3. POSITIONAL NEED:    does this fill a hole?
+//   4. CONTENTION WINDOW:  does the player's age/term match the team's timeline?
+//   5. CONTEXT BONUS:      veteran on rebuild (mentor), picks for tankers, etc.
+
+interface MatchRequest {
+  assets:     Asset[];
+  homeTeamId: string;
+  allTeams:   Team[];
+  allPlayers: Asset[];
+  navMap:     Record<string, { total: number; off: number; def: number; age: number; cap: number }>;
+}
+
+export interface TeamMatch {
+  teamId:        string;
+  teamName:      string;
+  phase:         string;
+  score:         number;
+  navDelta:      number;
+  capFit:        "FITS" | "TIGHT" | "OVER";
+  fitReasons:    string[];
+  warnReasons:   string[];
+  returnProfile: string;
+}
+
+export async function POST(req: NextRequest) {
+  const { assets, homeTeamId, allTeams, allPlayers, navMap } = await req.json() as MatchRequest;
+
+  if (!assets?.length || !allTeams?.length) {
+    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  const packageNAV    = assets.reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);
+  const packageCap    = assets.reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0);
+  const packageYears  = assets.filter(a => a.position !== "Pick").length > 0
+    ? assets.filter(a => a.position !== "Pick").reduce((s, a, _, arr) => s + (a.yearsRemaining || 0) / arr.length, 0)
+    : 0;
+  const avgAge        = assets.filter(a => a.position !== "Pick").length > 0
+    ? assets.filter(a => a.position !== "Pick").reduce((s, a, _, arr) => s + (a.age || 0) / arr.length, 0)
+    : 0;
+
+  const hasGoalie  = assets.some(a => a.position === "G");
+  const hasD       = assets.some(a => a.position === "D");
+  const hasC       = assets.some(a => a.position === "C");
+  const hasPick    = assets.some(a => a.position === "Pick");
+  const isNegNAV   = packageNAV < 0;
+  const isDump     = packageNAV < -30;
+
+  const matches: TeamMatch[] = allTeams
+    .filter(t => t.id !== homeTeamId)
+    .map(team => {
+      const roster   = allPlayers.filter(p => p.teamId === team.id);
+      const phase    = team.phase ?? "Unknown";
+      const capSpace = team.capSpace ?? 0;
+      const standing = team.standing ?? 16;
+
+      let score = 50;
+      const fit:  string[] = [];
+      const warn: string[] = [];
+
+      // ── 1. NAV FIT ──────────────────────────────────────────
+      if (packageNAV > 0) {
+        score += Math.min(30, packageNAV / 5);
+        if (packageNAV > 50)  fit.push(`Strong asset (+${packageNAV.toFixed(0)} NAV)`);
+        if (packageNAV > 150) fit.push("Franchise-altering NAV");
+      } else {
+        const penalty = phase === "Tanking"    ? -5
+                      : phase === "Rebuilding" ? -8
+                      : phase === "Retooling"  ? -12
+                      : phase === "Bubble"     ? -18
+                      : /* Contender */          -25;
+        score += penalty;
+        if (isDump && phase === "Contender")
+          warn.push("Dead cap risk for a contending team");
+        if (isDump && (phase === "Rebuilding" || phase === "Retooling"))
+          fit.push("Bridge veteran — locker room value in rebuild");
+      }
+
+      // ── 2. CAP FIT ──────────────────────────────────────────
+      let capFit: TeamMatch["capFit"] = "FITS";
+      if (packageCap > capSpace) {
+        capFit = "OVER"; score -= 25;
+        warn.push(`Over cap by $${(packageCap - capSpace).toFixed(1)}M`);
+      } else if (packageCap > capSpace * 0.75) {
+        capFit = "TIGHT"; score -= 8;
+        warn.push("Leaves limited cap flexibility");
+      } else {
+        score += 5;
+        if (capSpace > 12) fit.push(`$${capSpace.toFixed(1)}M space — comfortable`);
+      }
+
+      // ── 3. POSITIONAL NEED ──────────────────────────────────
+      const topGoalieNAV = roster.filter(p => p.position === "G")
+        .reduce((mx, g) => Math.max(mx, navMap[g.id]?.total ?? 0), 0);
+      const topDNAV = roster.filter(p => p.position === "D")
+        .reduce((mx, d) => Math.max(mx, navMap[d.id]?.total ?? 0), 0);
+
+      if (hasGoalie) {
+        if (topGoalieNAV < 60)  { score += 15; fit.push("Starter-level goalie need"); }
+        if (topGoalieNAV >= 100){ score -= 10; warn.push("Already have an elite starter"); }
+      }
+      if (hasD && topDNAV < 80 && (phase === "Contender" || phase === "Bubble")) {
+        score += 12; fit.push("Top-4 D upgrade for a competing team");
+      }
+      if (hasC && roster.filter(p => p.position === "C").length < 3) {
+        score += 10; fit.push("Center depth need");
+      }
+      if (hasPick) {
+        if (phase === "Rebuilding" || phase === "Tanking") { score += 14; fit.push("Picks are gold in a rebuild"); }
+        if (phase === "Contender")                          { score -= 5;  warn.push("Contenders rarely trade for future picks"); }
+      }
+
+      // ── 4. CONTENTION WINDOW ALIGNMENT ──────────────────────
+      const isVet      = avgAge > 32;
+      const isYoung    = avgAge < 25;
+      const isLongTerm = packageYears > 4;
+
+      if (isVet && (phase === "Contender" || phase === "Bubble")) {
+        score += 8; fit.push("Veteran fits compete-now window");
+      }
+      if (isVet && (phase === "Tanking" || phase === "Rebuilding")) {
+        score -= 10; warn.push("Veteran age mismatches rebuild timeline");
+        fit.push("Possible mentor/bridge role");
+      }
+      if (isYoung && (phase === "Rebuilding" || phase === "Retooling")) {
+        score += 12; fit.push("Young asset aligns with rebuild timeline");
+      }
+      if (isLongTerm && phase === "Contender") {
+        score += 6; fit.push("Term covers contention window");
+      }
+      if (isLongTerm && (phase === "Tanking" || phase === "Rebuilding")) {
+        score -= 8; warn.push("Long term may outlast rebuild window");
+      }
+
+      // ── 5. CONTEXT BONUS — the "hidden gem" angle ───────────
+      // Negative NAV to a team with space = cap game play (LTIR, buyout leverage)
+      if (isDump && capSpace > packageCap * 1.5) {
+        score += 6; fit.push("Enough space to absorb and manage out");
+      }
+      if (standing >= 25 && packageNAV > 0) {
+        score += 8; fit.push("Immediate roster upgrade for a bottom team");
+      }
+      if (standing <= 8 && packageNAV > 80) {
+        score += 10; fit.push("Elite piece completes contender's window");
+      }
+
+      // ── 6. YOUNG CORE UNTRADEABLE CHECK ─────────────────────
+      // If the partner's only matching-value players are their young core
+      // (age ≤ 24, ptsPace > 55), this proposal will fail the GM audit.
+      // Penalise heavily so it drops below the threshold and doesn't surface.
+      if (packageNAV > 0) {
+        const partnerTopPlayers = roster
+          .filter(p => p.position !== "Pick" && p.position !== "G")
+          .sort((a, b) => (navMap[b.id]?.total ?? 0) - (navMap[a.id]?.total ?? 0))
+          .slice(0, 5);
+        const youngCoreOnly = partnerTopPlayers.length > 0 &&
+          partnerTopPlayers.every(p => (p.age ?? 30) <= 24 && (p.ptsPace ?? 0) > 55);
+        if (youngCoreOnly) {
+          score -= 40;
+          warn.push("Would require trading untouchable young core");
+        }
+        // Also penalise if the #1 return asset is their franchise cornerstone (young + elite)
+        const topReturn = partnerTopPlayers[0];
+        if (topReturn && (topReturn.age ?? 30) <= 24 && (topReturn.ptsPace ?? 0) > 70
+            && (navMap[topReturn.id]?.total ?? 0) > 80) {
+          score -= 20;
+          warn.push(`${topReturn.name} is untouchable young core`);
+        }
+      }
+
+      const returnProfile =
+        packageNAV > 150 ? "Top prospect + first-round pick" :
+        packageNAV > 80  ? "Roster player + first-round pick" :
+        packageNAV > 30  ? "Roster player + mid-round pick" :
+        packageNAV > 0   ? "Depth piece or late pick" :
+        isDump           ? "Cap relief + conditional pick" :
+                           "Salary retained — minimal return";
+
+      return {
+        teamId:    team.id,
+        teamName:  team.name,
+        phase,
+        score:     Math.max(0, Math.min(100, Math.round(score))),
+        navDelta:  packageNAV,
+        capFit,
+        fitReasons:  fit.slice(0, 3),
+        warnReasons: warn.slice(0, 2),
+        returnProfile,
+      };
+    })
+    .filter(m => m !== null && m.score >= 12)   // minimum threshold — below 12 the trade would almost certainly fail
+    .sort((a, b) => b!.score - a!.score)
+    .slice(0, 8) as TeamMatch[];
+
+  return NextResponse.json({ matches, packageNAV, packageCap, avgAge });
+}
+
+================
+File: app/components/CapProjection.tsx
+================
+"use client";
+
+// ============================================================
+// CAP PROJECTION PANEL
+// Shows both rosters before and after the trade, with cap
+// space, position depth, and lineup health visualised.
+// ============================================================
+
+interface Asset {
+  id: string;
+  name: string;
+  position: string;
+  age: number;
+  ptsPace: number;
+  avgTOI: number;
+  capHit: number;
+  yearsRemaining: number;
+  games: number;
+  teamId: string;
+  headshot?: string;
+  [key: string]: any;
+}
+
+interface Team {
+  id: string;
+  name: string;
+  capSpace: number;
+  standing: number;
+  phase?: string;
+}
+
+interface Props {
+  homeTeam:   Team | null;
+  partnerTeam: Team | null;
+  homeRoster:    Asset[];
+  partnerRoster: Asset[];
+  outgoing: Asset[];  // home gives away
+  incoming: Asset[];  // home receives
+}
+
+const CAP_CEILING = 95.5; // 2025-26
+
+const posOrder = ["C", "W", "L", "R", "D", "G"];
+const posLabel: Record<string, string> = {
+  C: "Centres", W: "Wingers", L: "Wingers", R: "Wingers",
+  D: "Defence", G: "Goalies",
+};
+
+const RosterSlot = ({ player, isNew, isLeaving }: {
+  player: Asset;
+  isNew?: boolean;
+  isLeaving?: boolean;
+}) => (
+  <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-all ${
+    isNew     ? "bg-emerald-950/40 border border-emerald-900/50" :
+    isLeaving ? "bg-rose-950/40 border border-rose-900/40 opacity-50" :
+    "bg-zinc-900/40 border border-zinc-800/30"
+  }`}>
+    {player.headshot && (
+      <img src={player.headshot} alt={player.name}
+        className="w-5 h-5 rounded-full object-cover border border-zinc-700/50 shrink-0"
+        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+    )}
+    <div className="flex-1 min-w-0">
+      <div className={`text-[10px] font-black truncate ${isLeaving ? "line-through text-zinc-600" : isNew ? "text-emerald-300" : "text-zinc-300"}`}>
+        {player.name}
+      </div>
+      <div className="text-[11px] text-zinc-700 font-bold">
+        ${player.capHit.toFixed(1)}M · {player.yearsRemaining}yr
+      </div>
+    </div>
+    <div className={`text-[9px] font-black font-mono ${isNew ? "text-emerald-400" : isLeaving ? "text-rose-500" : "text-zinc-600"}`}>
+      {player.ptsPace > 0 ? `${player.ptsPace.toFixed(0)}pts` : ""}
+    </div>
+  </div>
+);
+
+const TeamProjection = ({ team, currentRoster, outgoing, incoming, label }: {
+  team: Team;
+  currentRoster: Asset[];
+  outgoing: Asset[];
+  incoming: Asset[];
+  label: string;
+}) => {
+  const outIds = new Set(outgoing.map(a => a.id));
+  const inIds  = new Set(incoming.map(a => a.id));
+
+  // Build post-trade roster — deduplicated by id to handle any stale state
+  const seenIds = new Set<string>();
+  const postRoster = [
+    ...currentRoster.filter(a => !outIds.has(a.id)),
+    ...incoming.filter(a => a.position !== "Pick"),
+  ].filter(a => {
+    if (seenIds.has(a.id)) return false;
+    seenIds.add(a.id);
+    return true;
+  });
+
+  const currentCapUsed = currentRoster.reduce((s, a) => s + (a.capHit || 0), 0);
+  const outCap  = outgoing.reduce((s, a) => s + (a.capHit || 0), 0);
+  const inCap   = incoming.filter(a => a.position !== "Pick").reduce((s, a) => s + (a.capHit || 0), 0);
+  const postCapUsed = currentCapUsed - outCap + inCap;
+  const postCapSpace = CAP_CEILING - postCapUsed;
+
+  // Group by normalised position
+  const groupByPos = (roster: Asset[]) => {
+    const groups: Record<string, Asset[]> = {};
+    roster.filter(a => a.position !== "Pick").forEach(a => {
+      const pos = a.position === "L" || a.position === "R" ? "W" : a.position;
+      if (!groups[pos]) groups[pos] = [];
+      groups[pos].push(a);
+    });
+    return groups;
+  };
+
+  const postGroups = groupByPos(postRoster);
+
+  return (
+    <div className="flex-1 min-w-0">
+      {/* Team header */}
+      <div className="mb-3">
+        <div className="font-black text-white text-sm">{team.name}</div>
+        <div className="text-[9px] text-zinc-600 font-black uppercase tracking-wider">{label}</div>
+      </div>
+
+      {/* Cap bar */}
+      <div className="mb-4">
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-[11px] font-black uppercase tracking-wider text-zinc-700">Cap After Trade</span>
+          <span className={`text-[10px] font-black font-mono ${postCapSpace >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+            {postCapSpace >= 0 ? `+$${postCapSpace.toFixed(1)}M` : `-$${Math.abs(postCapSpace).toFixed(1)}M over`}
+          </span>
+        </div>
+        <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${postCapSpace < 0 ? "bg-rose-500" : postCapSpace < 5 ? "bg-amber-500" : "bg-emerald-500"}`}
+            style={{ width: `${Math.min(100, (postCapUsed / CAP_CEILING) * 100)}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-[11px] text-zinc-700 font-mono mt-0.5">
+          <span>${postCapUsed.toFixed(1)}M used</span>
+          <span>${CAP_CEILING}M ceiling</span>
+        </div>
+      </div>
+
+      {/* Roster by position */}
+      <div className="space-y-3">
+        {["C", "W", "D", "G"].map(pos => {
+          const players = postGroups[pos] ?? [];
+          if (!players.length) return null;
+          return (
+            <div key={pos}>
+              <div className="text-[11px] font-black uppercase tracking-widest text-zinc-700 mb-1.5">
+                {posLabel[pos]} ({players.length})
+              </div>
+              <div className="space-y-1">
+                {players
+                  .sort((a, b) => (b.avgTOI || 0) - (a.avgTOI || 0))
+                  .map(p => (
+                    <RosterSlot
+                      key={`post-${pos}-${p.id}`}
+                      player={p}
+                      isNew={inIds.has(p.id)}
+                      isLeaving={false}
+                    />
+                  ))}
+                {/* Show departing players as struck through */}
+                {outgoing
+                  .filter(a => (a.position === "L" || a.position === "R" ? "W" : a.position) === pos)
+                  .map(p => (
+                    <RosterSlot key={`out-${pos}-${p.id}`} player={p} isLeaving={true} />
+                  ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default function CapProjection({ homeTeam, partnerTeam, homeRoster, partnerRoster, outgoing, incoming }: Props) {
+  if (!homeTeam || !partnerTeam) return null;
+  if (!outgoing.length && !incoming.length) return null;
+
+  return (
+    <div className="mt-4 bg-zinc-900/30 border border-zinc-800/40 rounded-2xl overflow-hidden">
+      <div className="px-6 py-3 border-b border-zinc-800/40 flex items-center justify-between">
+        <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600">Post-Trade Roster Projection</span>
+        <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-zinc-700">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-rose-900/60 border border-rose-800/60 inline-block" />Departing</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-900/60 border border-emerald-800/60 inline-block" />Arriving</span>
+        </div>
+      </div>
+
+      <div className="p-5 flex gap-6">
+        <TeamProjection
+          team={homeTeam}
+          currentRoster={homeRoster}
+          outgoing={outgoing}
+          incoming={incoming.filter(a => a.position !== "Pick")}
+          label="Your franchise after trade"
+        />
+        <div className="w-px bg-zinc-800/50 self-stretch" />
+        <TeamProjection
+          team={partnerTeam}
+          currentRoster={partnerRoster}
+          outgoing={incoming.filter(a => a.position !== "Pick")}
+          incoming={outgoing}
+          label="Partner franchise after trade"
+        />
+      </div>
+    </div>
+  );
+}
+
+================
+File: app/data/contracts.extensions.json
+================
+{
+  "William Eklund": {
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 5.6,
+    "extensionYears": 3,
+    "intangibleMultiplier": 1.04
+  },
+  "Dustin Wolf": {
+    "capHit": 0.875,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 7.5,
+    "extensionYears": 7
+  },
+  "Kirill Kaprizov": {
+    "capHit": 9.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 17.0,
+    "extensionYears": 8
+  },
+  "Evgeni Malkin": {
+    "capHit": 6.1,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 5.5,
+    "extensionYears": 1
+  },
+  "Timothy Liljegren": {
+    "capHit": 2.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.25,
+    "extensionYears": 2
+  },
+  "Charlie Coyle": {
+    "capHit": 5.25,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 6.0,
+    "extensionYears": 6
+  },
+  "Mark Jankowski": {
+    "capHit": 1.35,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.85,
+    "extensionYears": 2
+  },
+  "Connor Dewar": {
+    "capHit": 1.2,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 2.25,
+    "extensionYears": 2
+  },
+  "Cole Koepke": {
+    "capHit": 0.775,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.45,
+    "extensionYears": 2
+  },
+  "David Jiricek": {
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.5,
+    "extensionYears": 2
+  },
+  "Fyodor Svechkov": {
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.25,
+    "extensionYears": 2
+  },
+  "Michael Carcone": {
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.75,
+    "extensionYears": 2
+  },
+  "Nick Schmaltz": {
+    "capHit": 5.85,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 8.0,
+    "extensionYears": 8
+  },
+  "Jean-Gabriel Pageau": {
+    "capHit": 5.25,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 4.85,
+    "extensionYears": 3
+  },
+  "Jordan Eberle": {
+    "capHit": 5.5,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 5.5,
+    "extensionYears": 2
+  },
+  "Alex Nedeljkovic": {
+    "capHit": 2.6,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.0,
+    "extensionYears": 2
+  },
+  "Ryan Poehling": {
+    "capHit": 1.6,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.75,
+    "extensionYears": 4
+  },
+  "Kiefer Sherwood": {
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 5.75,
+    "extensionYears": 5
+  },
+  "Ethen Frank": {
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 2.0,
+    "extensionYears": 2
+  },
+  "Ryan Winterton": {
+    "capHit": 0.775,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.125,
+    "extensionYears": 2
+  },
+  "Ben Meyers": {
+    "capHit": 0.775,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.0,
+    "extensionYears": 2
+  },
+  "Brandon Bussi": {
+    "capHit": 0.775,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.9,
+    "extensionYears": 3
+  },
+  "Artemi Panarin": {
+    "capHit": 11.6,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 11.0,
+    "extensionYears": 2
+  },
+  "Ben Chiarot": {
+    "capHit": 3.75,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.85,
+    "extensionYears": 3
+  },
+  "Sam Malinski": {
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 4.75,
+    "extensionYears": 4
+  },
+  "Blake Lizotte": {
+    "capHit": 1.15,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 2.25,
+    "extensionYears": 3
+  },
+  "Christian Dvorak": {
+    "capHit": 4.45,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 5.15,
+    "extensionYears": 5
+  },
+  "Alexei Toropchenko": {
+    "capHit": 1.15,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 2.5,
+    "extensionYears": 2
+  },
+  "Alexander Wennberg": {
+    "capHit": 4.5,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 6.0,
+    "extensionYears": 3
+  },
+  "Devin Cooley": {
+    "capHit": 0.775,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.35,
+    "extensionYears": 2
+  },
+  "Ryan McDonagh": {
+    "capHit": 3.4,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 4.1,
+    "extensionYears": 3
+  },
+  "Mike Matheson": {
+    "capHit": 4.875,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 6.0,
+    "extensionYears": 5
+  },
+  "Adam Lowry": {
+    "capHit": 3.4,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 5.0,
+    "extensionYears": 5
+  },
+  "Adrian Kempe": {
+    "capHit": 5.5,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 10.6,
+    "extensionYears": 8
+  },
+  "David Kampf": {
+    "capHit": 2.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.1,
+    "extensionYears": 1
+  },
+  "Scott Wedgewood": {
+    "capHit": 2.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 2.5,
+    "extensionYears": 1
+  },
+  "Jacob Markstrom": {
+    "capHit": 6.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 6.0,
+    "extensionYears": 2
+  },
+  "Martin Necas": {
+    "capHit": 6.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 11.5,
+    "extensionYears": 8
+  },
+  "Logan Cooley": {
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 10.0,
+    "extensionYears": 8
+  },
+  "Lane Hutson": {
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 8.8,
+    "extensionYears": 8
+  },
+  "Jack Roslovic": {
+    "capHit": 2.5,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.5,
+    "extensionYears": 1
+  },
+  "Jack Eichel": {
+    "capHit": 10.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 13.5,
+    "extensionYears": 8
+  },
+  "Mattias Ekholm": {
+    "capHit": 3.5,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 4.0,
+    "extensionYears": 3
+  },
+  "Kyle Connor": {
+    "capHit": 7.142,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 12.0,
+    "extensionYears": 8
+  },
+  "Jake Walman": {
+    "capHit": 3.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 7.0,
+    "extensionYears": 7
+  },
+  "Connor McDavid": {
+    "capHit": 12.5,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 12.5,
+    "extensionYears": 2
+  },
+  "Jeremy Davies": {
+    "capHit": 0.775,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.15,
+    "extensionYears": 2
+  },
+  "Matt Grzelcyk": {
+    "capHit": 3.5,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.0,
+    "extensionYears": 1
+  },
+  "Filip Gustavsson": {
+    "capHit": 4.4,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 6.8,
+    "extensionYears": 5
+  },
+  "Luke Evangelista": {
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.0,
+    "extensionYears": 2
+  },
+  "Niko Mikkola": {
+    "capHit": 2.25,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 5.0,
+    "extensionYears": 8
+  },
+  "Luke Hughes": {
+    "capHit": 9.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 9.0,
+    "extensionYears": 7
+  },
+  "Anthony Stolarz": {
+    "capHit": 4.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.75,
+    "extensionYears": 4
+  },
+  "Cam Fowler": {
+    "capHit": 6.5,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 6.1,
+    "extensionYears": 3
+  },
+  "Mason McTavish": {
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 7.0,
+    "extensionYears": 6
+  },
+  "Wyatt Kaiser": {
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 1.7,
+    "extensionYears": 2
+  },
+  "Mikael Backlund": {
+    "capHit": 6.0,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.25,
+    "extensionYears": 2
+  },
+  "Connor Zary": {
+    "capHit": 0.925,
+    "yearsRemaining": 1,
+    "hasExtension": true,
+    "extensionCapHit": 3.775,
+    "extensionYears": 3
+  }
+
+}
+
+================
+File: app/lib/season-config.ts
+================
+// ── season-config.ts ──────────────────────────────────────────
+// Single source of truth for every season-specific constant.
+// Update this file each September when the new season begins.
+// All other modules import from here — no magic numbers in logic files.
+
+export const SEASON = {
+  label:          "2025-26",
+  apiSeasonId:    "20252026",
+  capCeiling:     88.0,          // NHL salary cap ceiling ($M)
+  capFloor:       65.0,          // NHL salary cap floor ($M)
+  draftYear:      2026,          // Current draft class year
+  mpSeason:       "2025",        // MoneyPuck URL path segment
+  nhleSeasonId:   "20252026",    // NHL API season identifier
+} as const;
+
+export const LEAGUE = {
+  avgXga60:       2.55,          // League-average xGA/60 (MoneyPuck)
+  avgXgf60:       2.55,          // League-average xGF/60
+  gsaxSd:         8.0,           // GSAX standard deviation (goalie normalisation)
+  peakAge:        27,            // Skater production peak (age curve inflection)
+  goaliePeakAge:  30,            // Goalie peak age
+} as const;
+
+export const COMPRESSION = {
+  // Age-tiered decay rates — prospects compress less than veterans.
+  // Each subsequent asset in a sorted package contributes: NAVᵢ × δⁱ
+  decayProspect:  0.80,          // ≤23 yrs — independent developmental bets
+  decayYoung:     0.65,          // 24-27 yrs — semi-independent
+  decayPrime:     0.60,          // 28-31 yrs — full roster slot competition
+  decayVeteran:   0.55,          // 32+  yrs — max displacement cost
+
+  // Roster slot penalty per extra non-pick player beyond the anchor.
+  // Recalibrated with corrected NAV scale (cap * 6, dps * 15):
+  //   Prime NAV range is now 40-180 (was 200-800), so old μ=50 penalised
+  //   depth players too harshly — packages of 3+ solid players went negative.
+  penaltyProspect: 10,           // was 15
+  penaltyYoung:    15,           // was 35
+  penaltyPrime:    20,           // was 50
+  penaltyVeteran:  35,           // was 60
+} as const;
+
+export const FRANCHISE = {
+  threshold:  220,               // Elite franchise stars — recalibrated for 2.0 scale (McDavid ~286, Barkov ~245)
+  megalodon:  380,               // Generational talent on elite deal — Makar-tier (~442), functionally untradeable
+} as const;
+
+// Helpers derived from the above — avoids recalculating at call sites
+export const ageDecayRate   = (age: number): number =>
+  age <= 23 ? COMPRESSION.decayProspect
+  : age <= 27 ? COMPRESSION.decayYoung
+  : age <= 31 ? COMPRESSION.decayPrime
+  : COMPRESSION.decayVeteran;
+
+export const ageSlotPenalty = (age: number): number =>
+  age <= 23 ? COMPRESSION.penaltyProspect
+  : age <= 27 ? COMPRESSION.penaltyYoung
+  : age <= 31 ? COMPRESSION.penaltyPrime
+  : COMPRESSION.penaltyVeteran;
+
+================
+File: app/layout.tsx
+================
+import type { Metadata, Viewport } from 'next';
+import { Libre_Baskerville, Courier_Prime } from 'next/font/google';
+import './globals.css';
+
+// ── next/font: self-hosted, no layout shift, no external request ──
+const baskerville = Libre_Baskerville({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  style: ['normal', 'italic'],
+  variable: '--font-baskerville',
+  display: 'swap',
+});
+
+const courier = Courier_Prime({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  style: ['normal', 'italic'],
+  variable: '--font-courier',
+  display: 'swap',
+});
+
+// UnifrakturMaguntia not in next/font — loaded via globals.css @import
+// so we don't lose the masthead fraktur style
+
+export const metadata: Metadata = {
+  title: 'The Hockey Ledger — NHL Trade Machine',
+  description: 'X-NAV Analytics · xG Suppression · GM Logic Engine. Evaluate NHL trades with advanced analytics.',
+  keywords: ['NHL', 'trade machine', 'hockey analytics', 'X-NAV', 'xG', 'cap hit'],
+  openGraph: {
+    title: 'The Hockey Ledger — NHL Trade Machine',
+    description: 'Evaluate NHL trades like a front office. X-NAV · STRAND™ · GM Logic Engine.',
+    type: 'website',
+    siteName: 'The Hockey Ledger',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'The Hockey Ledger — NHL Trade Machine',
+    description: 'Evaluate NHL trades like a front office. X-NAV · STRAND™ · GM Logic Engine.',
+  },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  minimumScale: 1,
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html lang="en" className={`${baskerville.variable} ${courier.variable}`}>
+      <head>
+        {/* UnifrakturMaguntia — not available in next/font, load via CSS */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&display=swap" rel="stylesheet" />
+      </head>
+      <body className="antialiased font-serif">
+        {children}
+      </body>
+    </html>
+  );
+}
+
+================
+File: .gitignore
+================
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+================
+File: CRITICALPRIORITY.md
+================
+# `CRITICALPRIORITY.md`
+
+This document tracks the master architectural remediation roadmap for `nhlTradeMachine`. It prioritizes stability fixes, performance updates, and enterprise scaling milestones to transition the codebase from a functional prototype to an enterprise-grade platform.
+
+---
+
+## 🚨 Phase 1: Critical Priority (Structural Threats & Core Stability)
+
+These items address fundamental design flaws that risk client-side runtime crashes, memory leaks, security bypasses, or unpredictable operational expenses under production scaling.
+
+### 1. Unified Valuation Engine Convergence
+
+* **The Issue:** The application maintains separate calculation engines in `app/lib/xnav-engine.ts` (client rendering) and `app/api/evaluate/route.ts` (server trade evaluation). These files have drifted apart on fallback branches and positional scalars, causing split-brain validation errors where the UI context conflicts with the server's verdict.
+
+
+* **The Fix:** Remove duplicate valuation math from `app/api/evaluate/route.ts`. Refactor the server route to import and run calculations directly from the single source of truth in `app/lib/xnav-engine.ts`.
+
+
+
+### 2. Type-Safe Boundary Enforcement via Zod Data Ingestion
+
+* **The Issue:** The web scraping pipeline and external stats intake endpoints rely heavily on loose type casting (`as number`, `as string`) and static nested array index lookups (e.g., `p[18]` or `p[24]` from raw HTML scripts). If a third-party site changes its data schema, indices evaluate to `undefined`, creating `NaN` metrics that can crash the React client UI.
+
+
+* **The Fix:** Implement strict Zod schemas at data boundaries. Parse incoming crawled arrays through a validator layer using `.safeParse()` to isolate individual data structural changes cleanly without breaking the entire platform runtime.
+
+### 3. Stateless Cache Synchronization & Shared Rate Limiting
+
+* **The Issue:** Endpoint caching and the AI proxy rate-limiting mechanisms utilize localized, in-memory global state tracking maps. Because serverless environments spin up, down, and duplicate micro-containers dynamically, global memory structures are un-synchronized across concurrent sessions. This allows users to easily bypass rate limits, exposing backend API keys to high exploitation costs.
+
+
+* **The Fix:** Remove local container tracking maps. Deploy an out-of-process distributed storage layer (such as Upstash Redis) to synchronize live team states, scraper caches, and API throttling rules uniformly across serverless infrastructure containers.
+
+
+
+### 4. Atomic Trade State Management (Zustand Migration)
+
+* **The Issue:** Managing multi-asset trade arrays, custom retention rules, and draft pick logic using top-level layout component hooks forces deep tree re-render cascades. Every slider adjustment or drag-and-drop event forces every single visible element, layout chart, and player card to refresh, causing interface lag.
+* **The Fix:** Decouple layout state completely by migrating the transactional context to an isolated, atomic store like Zustand. Ensure that structural value changes selectively trigger re-renders only on the specific data values affected.
+
+### 5. LLM Prompt Layer Sanitization & Token Hard Caps
+
+* **The Issue:** The external language model proxy route parses client context strings into the model prompt pipeline without escaping characters or applying structural token validation. This leaves the endpoint vulnerable to raw payload manipulation or oversized contextual returns that inflate API operational costs.
+
+
+* **The Fix:** Configure strict token constraint bounds on proxy execution calls. Run character-stripping regex arrays across input parameters to strip formatting controls before assembling conversational payloads.
+
+---
+
+## 🧰 Phase 2: Medium Priority (Maintainability, Testing & Cleanliness)
+
+These items optimize the project's performance footprint and establish regression testing safeguards to prevent structural logic drift during subsequent iterations.
+
+### 1. Relational Database Extraction of Local JSON Files
+
+* **The Issue:** Large static datasets—like bundled player contracts and performance benchmarks—are packed directly inside monolithic JSON files inside the client bundle architecture. This unnecessarily inflates initial page load payloads and slows down mobile performance metrics.
+
+
+* **The Fix:** Move roster and contract data arrays out of raw project files. Relocate them inside a high-efficiency edge-database instance (such as Turso or Supabase) and leverage Next.js Server Components to fetch records matching only the specific teams involved in an active configuration.
+
+
+
+### 2. Isolation of Calculation Weights to Configuration Schemas
+
+* **The Issue:** The pure math execution module contains hardcoded system scalars, aging regression penalties, and positional multipliers distributed inline across the file layout. This requires a software engineer to manually modify and ship code changes just to update calculation formulas for new season dynamics.
+
+
+* **The Fix:** Extract all formulas and hardcoded integers into an isolated matrix config document (e.g., `valuation-weights.json`). Build the math execution modules to load configuration parameters dynamically, enabling seamless updates and straightforward model validation adjustments.
+
+
+
+### 3. Comprehensive End-to-End Regression Test Suite
+
+* **The Issue:** Test scripts are limited to basic unit assessments on isolated execution loops. Complex system changes risk introducing silent calculation bugs across transaction constraints or trade validation state rules without triggering warnings.
+
+
+* **The Fix:** Author complete workflow simulation layers using tools like Playwright or Vitest. Program tests to explicitly validate complex transaction procedures, verifying that financial indicators adjust accurately and rule violations register correctly.
+
+---
+
+## 🚀 Phase 3: The Enterprise Vision (Commercial Feature Scaling)
+
+The institutional layer designed for advanced analytics needs, sports agencies, frontend sports networks, and organizational platform integration.
+
+### 1. Hybrid Front-Office Pipeline & Overrides Dashboard
+
+* **The Strategy:** Transition the data backend to a managed asset hub. Deploy an automated scraper pipeline that pulls nightly analytics to a central database, but introduce a secondary operational override table that takes system priority. This allows platform administrators to log into a secure utility dashboard to manually patch injuries, adjust trade multipliers, or update metrics instantly without deploying new code.
+
+
+
+### 2. Strict Collective Bargaining Agreement (CBA) Compliance Layer
+
+* **The Strategy:** Expand verification logic past fundamental cap limits to encompass full NHL CBA compliance tracking. Build rule-enforcement constraints to evaluate transactions against:
+* **The 50-Contract Constraint:** Flag trades that push an acquiring organization over the active 50 standard player contract limit.
+* **Retention Tracking Limits:** Enforce strict caps on concurrent team salary retentions (maximum of 3 active player retentions per team).
+* **Clause Compliance:** Track dynamic interactions for No-Trade and No-Movement clauses, evaluating destination attractiveness to gauge if a player is likely to waive their waiver control requirements.
+
+
+
+
+
+### 3. Multi-Year Financial & Roster Forecast Dashboard
+
+* **The Strategy:** Build visual matrix grids that project roster choices over three-year horizons. Implement layout views to process dynamic salary cap growth projections, calculate pending unrestricted free agency exits, map future extension impacts, and estimate accurate baseline qualifying values for incoming restricted free agents.
+
+
+
+### 4. Stochastic Player Evaluation Models (Monte Carlo Engine)
+
+* **The Strategy:** Replace fixed score evaluations with probability distributions. Run multiple background simulation cycles that factor in historical variance and localized age regression metrics to estimate performance variability. Output results as a dynamic analytics indicator tracking structural value win probability over 1, 2, and 3-year windows based on aging curves and development volatility.
+
+
+
+### 5. Headless REST API Framework for External Syndication
+
+* **The Strategy:** Extract the pure mathematical execution layer out of the layout components entirely, wrapping the system logic inside a high-throughput headless API platform. This enables the core value calculator engine to run as an independent software-as-a-service application, capable of powering external platforms, fantasy tracking tool ecosystems, and major sports media networks.
+
+
+## 🧠 Phase 4: X-NAV 2.0 (The Economics & Betting Engine)
+
+This phase transitions the beating heart of the platform from a linear points calculator into a stochastic scarcity and probability engine, preparing it for commercial licensing in the fantasy and sports betting markets.
+
+1. **Divergent Term Multipliers:** Split contract cost calculations to respect the immense leverage gap between cost-controlled RFAs and flight-risk UFAs.
+2. **Positional Scarcity Premiums:** Apply structural value modifiers to premium positions (Centers and Top-Pairing Defensemen) to correct the undervaluation vs. Wingers.
+3. **The Logistic Lemieux Asymptote:** Replace the piecewise linear offensive cap with a true exponential decay function, creating a hard mathematical ceiling for historical production.
+4. **Exponential Retention Tax:** Rewrite the salary retention logic to scale exponentially rather than linearly, reflecting the real-world cash friction of billionaire owners paying dead money.
+5. **Era-Agnostic Dependency Injection:** Extract all `1.6` and `4.5` integer weights into an injectable `EnvironmentWeights` matrix, allowing the engine to instantly recalibrate for different scoring eras or betting markets on the fly.
+
+---
+
+### The Blueprint: Expanding X-NAV to the Next Level
+
+To make this the holy grail for betting and fantasy, the engine needs to expand from ~400 lines to a comprehensive algorithmic suite. Here is every single missing component required to reach that tier.
+
+#### 1. The "Passenger vs. Driver" Matrix (Linemate Dependency)
+
+Raw Point Shares and xG metrics lie because they don't decouple players from their linemates. A winger playing with Leon Draisaitl will have artificially inflated metrics. The engine must ingest WOWY (With or Without You) data to determine if a player is driving the play or just along for the ride.
+
+* **The Math:** You need to calculate an isolation coefficient.
+
+$$NAV_{isolated} = NAV_{raw} \times \left(1 - \frac{xG_{with} - xG_{without}}{xG_{with}}\right)$$
+
+
+* **The Value:** This identifies "buy-low" candidates for front offices—players trapped on the 3rd line with bad teammates who mathematically project to explode if given top-line minutes.
+
+#### 2. Stochastic Volatility Index (SVI)
+
+Fantasy platforms and sports bettors do not care about an 82-game pace; they care about *game-to-game variance*. A player who scores exactly 1 point every game is great for an NHL team. A player who scores 0 points for four games and 5 points in the fifth is incredible for daily fantasy tournaments (GPPs) but a nightmare for steady prop betting.
+
+* **The Feature:** The engine must measure the standard deviation of a player's game logs to generate an SVI score.
+
+$$SVI = \sqrt{\frac{1}{N} \sum_{i=1}^{N} (P_i - \mu)^2} \times \lambda_{role}$$
+
+
+* **The Value:** You can output a "Boom/Bust Rating" for every player. "Player X has a median projection of 65 points, but a 90th percentile ceiling of 95 points due to extreme deployment volatility."
+
+#### 3. Market-Implied Valuation (MIV) Layer
+
+Right now, you are waiting for MoneyPuck data to update. If you want to cater to the betting industry, your engine needs to scrape live futures props from sportsbooks (e.g., DraftKings Over/Under point totals) and reverse-engineer them into the engine.
+
+* **The Feature:** If Vegas sets a player's over/under at 85.5 points, but your engine projects 72 points based on historical decay, the engine highlights a **Market Discrepancy Alert**.
+* **The Value:** This turns your trade machine into a direct betting arbitrage tool.
+
+#### 4. Actuarial Attrition & Health Modeling
+
+NHL GMs and fantasy managers get fired for ignoring injury risk. The current engine relies on a manual flag (`INJURY_RISK[asset.name]`).
+
+* **The Feature:** The engine needs a probabilistic injury curve based on age, position, and physical playstyle (hits/blocked shots per 60). An Expected Value (EV) calculation must discount the player's total NAV by their probability of playing a full season.
+
+$$EV = \sum (NAV \times P(health_t))$$
+
+
+* **The Value:** This prevents the engine from treating a 33-year-old injury-prone defenseman with the same reliability as a 24-year-old ironman.
+
+#### 5. Post-Season Translation (The "Grit" Multiplier)
+
+The game changes in April. Whistles go away, the ice shrinks, and perimeter players disappear. A true simulation engine needs a separate set of weights for playoff evaluations.
+
+* **The Feature:** Create a secondary `calcPlayoffNAV()` function that heavily weights contested puck battles, hits, blocked shots, and high-danger unassisted expected goals, while suppressing powerplay-dependent point production.
+* **The Value:** You can offer a "Playoff Translation Score" to tell GMs if a player they are acquiring at the trade deadline is actually built for a 7-game series.
+
+#### 6. Advanced Cap Mechanics (Buyouts & Dead Cash)
+
+To make this indispensable for front offices, the engine must understand buyout economics. If you trade for a terrible $7M contract, the engine shouldn't just say "This costs $7M."
+
+* **The Feature:** It should automatically calculate the NHL buyout formula ($2/3$ or $1/3$ ratio based on age, spread over twice the remaining term) and output: "This player is a -45 NAV, but they can be bought out next summer for a cap penalty of only $1.5M over 4 years."
+
+---
+
+
+Testing Adjustments - to be made after critical improvements: 
+
+Barkov has a -10 NAV but was injured all year, needs to have an adjustment that coordinates with his true value
+
+Goaltenders are hard coded to have a base of 0 NAV, I think we need to adjust this or have goalie logic be separate from skater logic to calculate truely a goaltenders value based on incoming stats.
+
+all modal popups should freeze scroll
+
+For realistic targets, players that have played for the team previously should be weighted less, as rarely do players come back.
+
+Investigate why Colton Parakyo has a negative NAV 
+
+TugBar doesnt go under 0 for a negative on negative trade.
+
+Head-To-Head needs to be revamped and updated and for it to be its own component.
+
+EST. WINs ADDED needs to calculate the impact of the player, not just if NAV higher === more wins. 
+
+When trading away older player from Rebuilding team, getting "[Team B]needs picks to trade away [Player B], when adding pick to [Team A] outgoing asset, the flag isnt cleared, but when adding a pick to [Team B] outgoing assets, the flag is cleared. Should be when adding pick or prospect of reasonable value, Flag for [Team B] is cleared. 
+
+Investigate why Dylan DeMelo DEF is so high (+71) on depth D with a -40 NAV
+
+Player with Negative NAV causes find trade proposals not working even if overall value is positive
+
+Investigate why Simon Edvinsson Value NAV is so low (+32) with OFF (+13) and DEF (+74)
+Simon Edvinsson has 1 year left on contract not 3
+
+Find Trade Partners often finds trades that dont go throuhg as [Team B] can't afford to lose [Player A], then why have the trade proposal pop up?
+
+I can make a trade with a +130 NAV Net Gain. Seems extremly lopsided.
+Flag for Significantly overpaying is wrong
+    Reads: The NAV analysis shows Detroit Red Wings giving up 369 NAV points worth of assets and receiving only 223 — a 35% gap. Winnipeg Jets's GM has no incentive to accept this deal when they could simply wait for a better offer. Lopsided trades only happen under specific pressure: a player demanding a trade, a GM under ownership pressure to cut salary, or a team desperate to fill a critical hole before a deadline. Without that context, Winnipeg Jets holds all the leverage here.
+
+    But: Im playing as Winnipeg, so this should read that the Red Wings GM has no incentive to accept this deal, this flag should be a hard veto unless certain parameters are met (ie outside factors)
+
+If a player has 1 year left on contract, and we convert this into a 3-year window sim. AGE shouldnt be listed as a negative NAV, as rentals have value to them. We do already have a flag for this so we can add in an uncertainty principle that advises if a player resigns.
+
+Dustin Wolf has a comically low NAV of +14, this should be fixed if we add a custom calculation for Goalie NAV value as we can base it on quality of team in front. 
+
+OPS player Suggested in What This team needs has an OPS of -2, doesnt make sense.
+
+AI still fabricating numbers, Simulation #10306 runs with WPG top scorer being Scheifele at 87 points but the AI summary reads Scheifele with 103 points.
+
+
+-xnav engine roadmap to V 2.0
+If the ultimate goal is to license this to front offices, fantasy syndicates, or sports betting platforms, a 400-line calculator won't cut it. To bridge the gap between a standard simulator and an enterprise-grade quantitative model, the X-NAV engine must stop looking at *what has happened* (lagging indicators) and start modeling *probability distributions of what will happen next* (stochastic forecasting).
+
+Here is how we integrate the engine rewrite into the remediation pipeline, followed by the blueprint to "go full AI" and turn this into an industry-leading economics engine.
+
+---
 
 ================
 File: repomix-output.xml
@@ -93038,1230 +94256,6 @@ export async function GET() {
 </files>
 
 ================
-File: tsconfig.json
-================
-{
-  "compilerOptions": {
-    "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "ES2017"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "paths": {
-      "@/*": ["./*"]
-    }
-  },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
-}
-
-================
-File: app/api/match/route.ts
-================
-import { NextRequest, NextResponse } from "next/server";
-import type { Asset, Team } from "@/app/lib/trade-types";
-
-// ── Trade Partner Finder — "Who wants this package?" ─────────
-// A player's NAV is team-contextual. A $7M 35yr albatross for Tampa
-// could be mentor/bridge value for Buffalo. Score all 32 teams on fit.
-//
-// Scoring dimensions:
-//   1. NAV FIT:            does this asset improve their roster?
-//   2. CAP FIT:            can they absorb the cap hit?
-//   3. POSITIONAL NEED:    does this fill a hole?
-//   4. CONTENTION WINDOW:  does the player's age/term match the team's timeline?
-//   5. CONTEXT BONUS:      veteran on rebuild (mentor), picks for tankers, etc.
-
-interface MatchRequest {
-  assets:     Asset[];
-  homeTeamId: string;
-  allTeams:   Team[];
-  allPlayers: Asset[];
-  navMap:     Record<string, { total: number; off: number; def: number; age: number; cap: number }>;
-}
-
-export interface TeamMatch {
-  teamId:        string;
-  teamName:      string;
-  phase:         string;
-  score:         number;
-  navDelta:      number;
-  capFit:        "FITS" | "TIGHT" | "OVER";
-  fitReasons:    string[];
-  warnReasons:   string[];
-  returnProfile: string;
-}
-
-export async function POST(req: NextRequest) {
-  const { assets, homeTeamId, allTeams, allPlayers, navMap } = await req.json() as MatchRequest;
-
-  if (!assets?.length || !allTeams?.length) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-  }
-
-  const packageNAV    = assets.reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);
-  const packageCap    = assets.reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0);
-  const packageYears  = assets.filter(a => a.position !== "Pick").length > 0
-    ? assets.filter(a => a.position !== "Pick").reduce((s, a, _, arr) => s + (a.yearsRemaining || 0) / arr.length, 0)
-    : 0;
-  const avgAge        = assets.filter(a => a.position !== "Pick").length > 0
-    ? assets.filter(a => a.position !== "Pick").reduce((s, a, _, arr) => s + (a.age || 0) / arr.length, 0)
-    : 0;
-
-  const hasGoalie  = assets.some(a => a.position === "G");
-  const hasD       = assets.some(a => a.position === "D");
-  const hasC       = assets.some(a => a.position === "C");
-  const hasPick    = assets.some(a => a.position === "Pick");
-  const isNegNAV   = packageNAV < 0;
-  const isDump     = packageNAV < -30;
-
-  const matches: TeamMatch[] = allTeams
-    .filter(t => t.id !== homeTeamId)
-    .map(team => {
-      const roster   = allPlayers.filter(p => p.teamId === team.id);
-      const phase    = team.phase ?? "Unknown";
-      const capSpace = team.capSpace ?? 0;
-      const standing = team.standing ?? 16;
-
-      let score = 50;
-      const fit:  string[] = [];
-      const warn: string[] = [];
-
-      // ── 1. NAV FIT ──────────────────────────────────────────
-      if (packageNAV > 0) {
-        score += Math.min(30, packageNAV / 5);
-        if (packageNAV > 50)  fit.push(`Strong asset (+${packageNAV.toFixed(0)} NAV)`);
-        if (packageNAV > 150) fit.push("Franchise-altering NAV");
-      } else {
-        const penalty = phase === "Tanking"    ? -5
-                      : phase === "Rebuilding" ? -8
-                      : phase === "Retooling"  ? -12
-                      : phase === "Bubble"     ? -18
-                      : /* Contender */          -25;
-        score += penalty;
-        if (isDump && phase === "Contender")
-          warn.push("Dead cap risk for a contending team");
-        if (isDump && (phase === "Rebuilding" || phase === "Retooling"))
-          fit.push("Bridge veteran — locker room value in rebuild");
-      }
-
-      // ── 2. CAP FIT ──────────────────────────────────────────
-      let capFit: TeamMatch["capFit"] = "FITS";
-      if (packageCap > capSpace) {
-        capFit = "OVER"; score -= 25;
-        warn.push(`Over cap by $${(packageCap - capSpace).toFixed(1)}M`);
-      } else if (packageCap > capSpace * 0.75) {
-        capFit = "TIGHT"; score -= 8;
-        warn.push("Leaves limited cap flexibility");
-      } else {
-        score += 5;
-        if (capSpace > 12) fit.push(`$${capSpace.toFixed(1)}M space — comfortable`);
-      }
-
-      // ── 3. POSITIONAL NEED ──────────────────────────────────
-      const topGoalieNAV = roster.filter(p => p.position === "G")
-        .reduce((mx, g) => Math.max(mx, navMap[g.id]?.total ?? 0), 0);
-      const topDNAV = roster.filter(p => p.position === "D")
-        .reduce((mx, d) => Math.max(mx, navMap[d.id]?.total ?? 0), 0);
-
-      if (hasGoalie) {
-        if (topGoalieNAV < 60)  { score += 15; fit.push("Starter-level goalie need"); }
-        if (topGoalieNAV >= 100){ score -= 10; warn.push("Already have an elite starter"); }
-      }
-      if (hasD && topDNAV < 80 && (phase === "Contender" || phase === "Bubble")) {
-        score += 12; fit.push("Top-4 D upgrade for a competing team");
-      }
-      if (hasC && roster.filter(p => p.position === "C").length < 3) {
-        score += 10; fit.push("Center depth need");
-      }
-      if (hasPick) {
-        if (phase === "Rebuilding" || phase === "Tanking") { score += 14; fit.push("Picks are gold in a rebuild"); }
-        if (phase === "Contender")                          { score -= 5;  warn.push("Contenders rarely trade for future picks"); }
-      }
-
-      // ── 4. CONTENTION WINDOW ALIGNMENT ──────────────────────
-      const isVet      = avgAge > 32;
-      const isYoung    = avgAge < 25;
-      const isLongTerm = packageYears > 4;
-
-      if (isVet && (phase === "Contender" || phase === "Bubble")) {
-        score += 8; fit.push("Veteran fits compete-now window");
-      }
-      if (isVet && (phase === "Tanking" || phase === "Rebuilding")) {
-        score -= 10; warn.push("Veteran age mismatches rebuild timeline");
-        fit.push("Possible mentor/bridge role");
-      }
-      if (isYoung && (phase === "Rebuilding" || phase === "Retooling")) {
-        score += 12; fit.push("Young asset aligns with rebuild timeline");
-      }
-      if (isLongTerm && phase === "Contender") {
-        score += 6; fit.push("Term covers contention window");
-      }
-      if (isLongTerm && (phase === "Tanking" || phase === "Rebuilding")) {
-        score -= 8; warn.push("Long term may outlast rebuild window");
-      }
-
-      // ── 5. CONTEXT BONUS — the "hidden gem" angle ───────────
-      // Negative NAV to a team with space = cap game play (LTIR, buyout leverage)
-      if (isDump && capSpace > packageCap * 1.5) {
-        score += 6; fit.push("Enough space to absorb and manage out");
-      }
-      if (standing >= 25 && packageNAV > 0) {
-        score += 8; fit.push("Immediate roster upgrade for a bottom team");
-      }
-      if (standing <= 8 && packageNAV > 80) {
-        score += 10; fit.push("Elite piece completes contender's window");
-      }
-
-      // ── 6. YOUNG CORE UNTRADEABLE CHECK ─────────────────────
-      // If the partner's only matching-value players are their young core
-      // (age ≤ 24, ptsPace > 55), this proposal will fail the GM audit.
-      // Penalise heavily so it drops below the threshold and doesn't surface.
-      if (packageNAV > 0) {
-        const partnerTopPlayers = roster
-          .filter(p => p.position !== "Pick" && p.position !== "G")
-          .sort((a, b) => (navMap[b.id]?.total ?? 0) - (navMap[a.id]?.total ?? 0))
-          .slice(0, 5);
-        const youngCoreOnly = partnerTopPlayers.length > 0 &&
-          partnerTopPlayers.every(p => (p.age ?? 30) <= 24 && (p.ptsPace ?? 0) > 55);
-        if (youngCoreOnly) {
-          score -= 40;
-          warn.push("Would require trading untouchable young core");
-        }
-        // Also penalise if the #1 return asset is their franchise cornerstone (young + elite)
-        const topReturn = partnerTopPlayers[0];
-        if (topReturn && (topReturn.age ?? 30) <= 24 && (topReturn.ptsPace ?? 0) > 70
-            && (navMap[topReturn.id]?.total ?? 0) > 80) {
-          score -= 20;
-          warn.push(`${topReturn.name} is untouchable young core`);
-        }
-      }
-
-      const returnProfile =
-        packageNAV > 150 ? "Top prospect + first-round pick" :
-        packageNAV > 80  ? "Roster player + first-round pick" :
-        packageNAV > 30  ? "Roster player + mid-round pick" :
-        packageNAV > 0   ? "Depth piece or late pick" :
-        isDump           ? "Cap relief + conditional pick" :
-                           "Salary retained — minimal return";
-
-      return {
-        teamId:    team.id,
-        teamName:  team.name,
-        phase,
-        score:     Math.max(0, Math.min(100, Math.round(score))),
-        navDelta:  packageNAV,
-        capFit,
-        fitReasons:  fit.slice(0, 3),
-        warnReasons: warn.slice(0, 2),
-        returnProfile,
-      };
-    })
-    .filter(m => m !== null && m.score >= 12)   // minimum threshold — below 12 the trade would almost certainly fail
-    .sort((a, b) => b!.score - a!.score)
-    .slice(0, 8) as TeamMatch[];
-
-  return NextResponse.json({ matches, packageNAV, packageCap, avgAge });
-}
-
-================
-File: app/components/CapProjection.tsx
-================
-"use client";
-
-// ============================================================
-// CAP PROJECTION PANEL
-// Shows both rosters before and after the trade, with cap
-// space, position depth, and lineup health visualised.
-// ============================================================
-
-interface Asset {
-  id: string;
-  name: string;
-  position: string;
-  age: number;
-  ptsPace: number;
-  avgTOI: number;
-  capHit: number;
-  yearsRemaining: number;
-  games: number;
-  teamId: string;
-  headshot?: string;
-  [key: string]: any;
-}
-
-interface Team {
-  id: string;
-  name: string;
-  capSpace: number;
-  standing: number;
-  phase?: string;
-}
-
-interface Props {
-  homeTeam:   Team | null;
-  partnerTeam: Team | null;
-  homeRoster:    Asset[];
-  partnerRoster: Asset[];
-  outgoing: Asset[];  // home gives away
-  incoming: Asset[];  // home receives
-}
-
-const CAP_CEILING = 95.5; // 2025-26
-
-const posOrder = ["C", "W", "L", "R", "D", "G"];
-const posLabel: Record<string, string> = {
-  C: "Centres", W: "Wingers", L: "Wingers", R: "Wingers",
-  D: "Defence", G: "Goalies",
-};
-
-const RosterSlot = ({ player, isNew, isLeaving }: {
-  player: Asset;
-  isNew?: boolean;
-  isLeaving?: boolean;
-}) => (
-  <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-all ${
-    isNew     ? "bg-emerald-950/40 border border-emerald-900/50" :
-    isLeaving ? "bg-rose-950/40 border border-rose-900/40 opacity-50" :
-    "bg-zinc-900/40 border border-zinc-800/30"
-  }`}>
-    {player.headshot && (
-      <img src={player.headshot} alt={player.name}
-        className="w-5 h-5 rounded-full object-cover border border-zinc-700/50 shrink-0"
-        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-    )}
-    <div className="flex-1 min-w-0">
-      <div className={`text-[10px] font-black truncate ${isLeaving ? "line-through text-zinc-600" : isNew ? "text-emerald-300" : "text-zinc-300"}`}>
-        {player.name}
-      </div>
-      <div className="text-[11px] text-zinc-700 font-bold">
-        ${player.capHit.toFixed(1)}M · {player.yearsRemaining}yr
-      </div>
-    </div>
-    <div className={`text-[9px] font-black font-mono ${isNew ? "text-emerald-400" : isLeaving ? "text-rose-500" : "text-zinc-600"}`}>
-      {player.ptsPace > 0 ? `${player.ptsPace.toFixed(0)}pts` : ""}
-    </div>
-  </div>
-);
-
-const TeamProjection = ({ team, currentRoster, outgoing, incoming, label }: {
-  team: Team;
-  currentRoster: Asset[];
-  outgoing: Asset[];
-  incoming: Asset[];
-  label: string;
-}) => {
-  const outIds = new Set(outgoing.map(a => a.id));
-  const inIds  = new Set(incoming.map(a => a.id));
-
-  // Build post-trade roster — deduplicated by id to handle any stale state
-  const seenIds = new Set<string>();
-  const postRoster = [
-    ...currentRoster.filter(a => !outIds.has(a.id)),
-    ...incoming.filter(a => a.position !== "Pick"),
-  ].filter(a => {
-    if (seenIds.has(a.id)) return false;
-    seenIds.add(a.id);
-    return true;
-  });
-
-  const currentCapUsed = currentRoster.reduce((s, a) => s + (a.capHit || 0), 0);
-  const outCap  = outgoing.reduce((s, a) => s + (a.capHit || 0), 0);
-  const inCap   = incoming.filter(a => a.position !== "Pick").reduce((s, a) => s + (a.capHit || 0), 0);
-  const postCapUsed = currentCapUsed - outCap + inCap;
-  const postCapSpace = CAP_CEILING - postCapUsed;
-
-  // Group by normalised position
-  const groupByPos = (roster: Asset[]) => {
-    const groups: Record<string, Asset[]> = {};
-    roster.filter(a => a.position !== "Pick").forEach(a => {
-      const pos = a.position === "L" || a.position === "R" ? "W" : a.position;
-      if (!groups[pos]) groups[pos] = [];
-      groups[pos].push(a);
-    });
-    return groups;
-  };
-
-  const postGroups = groupByPos(postRoster);
-
-  return (
-    <div className="flex-1 min-w-0">
-      {/* Team header */}
-      <div className="mb-3">
-        <div className="font-black text-white text-sm">{team.name}</div>
-        <div className="text-[9px] text-zinc-600 font-black uppercase tracking-wider">{label}</div>
-      </div>
-
-      {/* Cap bar */}
-      <div className="mb-4">
-        <div className="flex justify-between items-center mb-1">
-          <span className="text-[11px] font-black uppercase tracking-wider text-zinc-700">Cap After Trade</span>
-          <span className={`text-[10px] font-black font-mono ${postCapSpace >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-            {postCapSpace >= 0 ? `+$${postCapSpace.toFixed(1)}M` : `-$${Math.abs(postCapSpace).toFixed(1)}M over`}
-          </span>
-        </div>
-        <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${postCapSpace < 0 ? "bg-rose-500" : postCapSpace < 5 ? "bg-amber-500" : "bg-emerald-500"}`}
-            style={{ width: `${Math.min(100, (postCapUsed / CAP_CEILING) * 100)}%` }}
-          />
-        </div>
-        <div className="flex justify-between text-[11px] text-zinc-700 font-mono mt-0.5">
-          <span>${postCapUsed.toFixed(1)}M used</span>
-          <span>${CAP_CEILING}M ceiling</span>
-        </div>
-      </div>
-
-      {/* Roster by position */}
-      <div className="space-y-3">
-        {["C", "W", "D", "G"].map(pos => {
-          const players = postGroups[pos] ?? [];
-          if (!players.length) return null;
-          return (
-            <div key={pos}>
-              <div className="text-[11px] font-black uppercase tracking-widest text-zinc-700 mb-1.5">
-                {posLabel[pos]} ({players.length})
-              </div>
-              <div className="space-y-1">
-                {players
-                  .sort((a, b) => (b.avgTOI || 0) - (a.avgTOI || 0))
-                  .map(p => (
-                    <RosterSlot
-                      key={`post-${pos}-${p.id}`}
-                      player={p}
-                      isNew={inIds.has(p.id)}
-                      isLeaving={false}
-                    />
-                  ))}
-                {/* Show departing players as struck through */}
-                {outgoing
-                  .filter(a => (a.position === "L" || a.position === "R" ? "W" : a.position) === pos)
-                  .map(p => (
-                    <RosterSlot key={`out-${pos}-${p.id}`} player={p} isLeaving={true} />
-                  ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-export default function CapProjection({ homeTeam, partnerTeam, homeRoster, partnerRoster, outgoing, incoming }: Props) {
-  if (!homeTeam || !partnerTeam) return null;
-  if (!outgoing.length && !incoming.length) return null;
-
-  return (
-    <div className="mt-4 bg-zinc-900/30 border border-zinc-800/40 rounded-2xl overflow-hidden">
-      <div className="px-6 py-3 border-b border-zinc-800/40 flex items-center justify-between">
-        <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600">Post-Trade Roster Projection</span>
-        <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-zinc-700">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-rose-900/60 border border-rose-800/60 inline-block" />Departing</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-900/60 border border-emerald-800/60 inline-block" />Arriving</span>
-        </div>
-      </div>
-
-      <div className="p-5 flex gap-6">
-        <TeamProjection
-          team={homeTeam}
-          currentRoster={homeRoster}
-          outgoing={outgoing}
-          incoming={incoming.filter(a => a.position !== "Pick")}
-          label="Your franchise after trade"
-        />
-        <div className="w-px bg-zinc-800/50 self-stretch" />
-        <TeamProjection
-          team={partnerTeam}
-          currentRoster={partnerRoster}
-          outgoing={incoming.filter(a => a.position !== "Pick")}
-          incoming={outgoing}
-          label="Partner franchise after trade"
-        />
-      </div>
-    </div>
-  );
-}
-
-================
-File: app/data/contracts.extensions.json
-================
-{
-  "William Eklund": {
-    "capHit": 0.925,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 5.6,
-    "extensionYears": 3,
-    "intangibleMultiplier": 1.04
-  },
-  "Dustin Wolf": {
-    "capHit": 0.875,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 7.5,
-    "extensionYears": 7
-  },
-  "Kirill Kaprizov": {
-    "capHit": 9.0,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 17.0,
-    "extensionYears": 8
-  },
-  "Evgeni Malkin": {
-    "capHit": 6.1,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 5.5,
-    "extensionYears": 1
-  },
-  "Timothy Liljegren": {
-    "capHit": 2.0,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 3.25,
-    "extensionYears": 2
-  },
-  "Charlie Coyle": {
-    "capHit": 5.25,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 6.0,
-    "extensionYears": 6
-  },
-  "Mark Jankowski": {
-    "capHit": 1.35,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 1.85,
-    "extensionYears": 2
-  },
-  "Connor Dewar": {
-    "capHit": 1.2,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 2.25,
-    "extensionYears": 2
-  },
-  "Cole Koepke": {
-    "capHit": 0.775,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 1.45,
-    "extensionYears": 2
-  },
-  "David Jiricek": {
-    "capHit": 0.925,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 1.5,
-    "extensionYears": 2
-  },
-  "Fyodor Svechkov": {
-    "capHit": 0.925,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 1.25,
-    "extensionYears": 2
-  },
-  "Michael Carcone": {
-    "capHit": 0.925,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 1.75,
-    "extensionYears": 2
-  },
-  "Nick Schmaltz": {
-    "capHit": 5.85,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 8.0,
-    "extensionYears": 8
-  },
-  "Jean-Gabriel Pageau": {
-    "capHit": 5.25,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 4.85,
-    "extensionYears": 3
-  },
-  "Jordan Eberle": {
-    "capHit": 5.5,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 5.5,
-    "extensionYears": 2
-  },
-  "Alex Nedeljkovic": {
-    "capHit": 2.6,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 3.0,
-    "extensionYears": 2
-  },
-  "Ryan Poehling": {
-    "capHit": 1.6,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 3.75,
-    "extensionYears": 4
-  },
-  "Kiefer Sherwood": {
-    "capHit": 0.925,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 5.75,
-    "extensionYears": 5
-  },
-  "Ethen Frank": {
-    "capHit": 0.925,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 2.0,
-    "extensionYears": 2
-  },
-  "Ryan Winterton": {
-    "capHit": 0.775,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 1.125,
-    "extensionYears": 2
-  },
-  "Ben Meyers": {
-    "capHit": 0.775,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 1.0,
-    "extensionYears": 2
-  },
-  "Brandon Bussi": {
-    "capHit": 0.775,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 1.9,
-    "extensionYears": 3
-  },
-  "Artemi Panarin": {
-    "capHit": 11.6,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 11.0,
-    "extensionYears": 2
-  },
-  "Ben Chiarot": {
-    "capHit": 3.75,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 3.85,
-    "extensionYears": 3
-  },
-  "Sam Malinski": {
-    "capHit": 0.925,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 4.75,
-    "extensionYears": 4
-  },
-  "Blake Lizotte": {
-    "capHit": 1.15,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 2.25,
-    "extensionYears": 3
-  },
-  "Christian Dvorak": {
-    "capHit": 4.45,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 5.15,
-    "extensionYears": 5
-  },
-  "Alexei Toropchenko": {
-    "capHit": 1.15,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 2.5,
-    "extensionYears": 2
-  },
-  "Alexander Wennberg": {
-    "capHit": 4.5,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 6.0,
-    "extensionYears": 3
-  },
-  "Devin Cooley": {
-    "capHit": 0.775,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 1.35,
-    "extensionYears": 2
-  },
-  "Ryan McDonagh": {
-    "capHit": 3.4,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 4.1,
-    "extensionYears": 3
-  },
-  "Mike Matheson": {
-    "capHit": 4.875,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 6.0,
-    "extensionYears": 5
-  },
-  "Adam Lowry": {
-    "capHit": 3.4,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 5.0,
-    "extensionYears": 5
-  },
-  "Adrian Kempe": {
-    "capHit": 5.5,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 10.6,
-    "extensionYears": 8
-  },
-  "David Kampf": {
-    "capHit": 2.0,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 1.1,
-    "extensionYears": 1
-  },
-  "Scott Wedgewood": {
-    "capHit": 2.0,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 2.5,
-    "extensionYears": 1
-  },
-  "Jacob Markstrom": {
-    "capHit": 6.0,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 6.0,
-    "extensionYears": 2
-  },
-  "Martin Necas": {
-    "capHit": 6.0,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 11.5,
-    "extensionYears": 8
-  },
-  "Logan Cooley": {
-    "capHit": 0.925,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 10.0,
-    "extensionYears": 8
-  },
-  "Lane Hutson": {
-    "capHit": 0.925,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 8.8,
-    "extensionYears": 8
-  },
-  "Jack Roslovic": {
-    "capHit": 2.5,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 1.5,
-    "extensionYears": 1
-  },
-  "Jack Eichel": {
-    "capHit": 10.0,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 13.5,
-    "extensionYears": 8
-  },
-  "Mattias Ekholm": {
-    "capHit": 3.5,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 4.0,
-    "extensionYears": 3
-  },
-  "Kyle Connor": {
-    "capHit": 7.142,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 12.0,
-    "extensionYears": 8
-  },
-  "Jake Walman": {
-    "capHit": 3.0,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 7.0,
-    "extensionYears": 7
-  },
-  "Connor McDavid": {
-    "capHit": 12.5,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 12.5,
-    "extensionYears": 2
-  },
-  "Jeremy Davies": {
-    "capHit": 0.775,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 1.15,
-    "extensionYears": 2
-  },
-  "Matt Grzelcyk": {
-    "capHit": 3.5,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 1.0,
-    "extensionYears": 1
-  },
-  "Filip Gustavsson": {
-    "capHit": 4.4,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 6.8,
-    "extensionYears": 5
-  },
-  "Luke Evangelista": {
-    "capHit": 0.925,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 3.0,
-    "extensionYears": 2
-  },
-  "Niko Mikkola": {
-    "capHit": 2.25,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 5.0,
-    "extensionYears": 8
-  },
-  "Luke Hughes": {
-    "capHit": 9.0,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 9.0,
-    "extensionYears": 7
-  },
-  "Anthony Stolarz": {
-    "capHit": 4.0,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 3.75,
-    "extensionYears": 4
-  },
-  "Cam Fowler": {
-    "capHit": 6.5,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 6.1,
-    "extensionYears": 3
-  },
-  "Mason McTavish": {
-    "capHit": 0.925,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 7.0,
-    "extensionYears": 6
-  },
-  "Wyatt Kaiser": {
-    "capHit": 0.925,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 1.7,
-    "extensionYears": 2
-  },
-  "Mikael Backlund": {
-    "capHit": 6.0,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 3.25,
-    "extensionYears": 2
-  },
-  "Connor Zary": {
-    "capHit": 0.925,
-    "yearsRemaining": 1,
-    "hasExtension": true,
-    "extensionCapHit": 3.775,
-    "extensionYears": 3
-  }
-
-}
-
-================
-File: app/layout.tsx
-================
-import type { Metadata, Viewport } from 'next';
-import { Libre_Baskerville, Courier_Prime } from 'next/font/google';
-import './globals.css';
-
-// ── next/font: self-hosted, no layout shift, no external request ──
-const baskerville = Libre_Baskerville({
-  subsets: ['latin'],
-  weight: ['400', '700'],
-  style: ['normal', 'italic'],
-  variable: '--font-baskerville',
-  display: 'swap',
-});
-
-const courier = Courier_Prime({
-  subsets: ['latin'],
-  weight: ['400', '700'],
-  style: ['normal', 'italic'],
-  variable: '--font-courier',
-  display: 'swap',
-});
-
-// UnifrakturMaguntia not in next/font — loaded via globals.css @import
-// so we don't lose the masthead fraktur style
-
-export const metadata: Metadata = {
-  title: 'The Hockey Ledger — NHL Trade Machine',
-  description: 'X-NAV Analytics · xG Suppression · GM Logic Engine. Evaluate NHL trades with advanced analytics.',
-  keywords: ['NHL', 'trade machine', 'hockey analytics', 'X-NAV', 'xG', 'cap hit'],
-  openGraph: {
-    title: 'The Hockey Ledger — NHL Trade Machine',
-    description: 'Evaluate NHL trades like a front office. X-NAV · STRAND™ · GM Logic Engine.',
-    type: 'website',
-    siteName: 'The Hockey Ledger',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'The Hockey Ledger — NHL Trade Machine',
-    description: 'Evaluate NHL trades like a front office. X-NAV · STRAND™ · GM Logic Engine.',
-  },
-};
-
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  minimumScale: 1,
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
-  return (
-    <html lang="en" className={`${baskerville.variable} ${courier.variable}`}>
-      <head>
-        {/* UnifrakturMaguntia — not available in next/font, load via CSS */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&display=swap" rel="stylesheet" />
-      </head>
-      <body className="antialiased font-serif">
-        {children}
-      </body>
-    </html>
-  );
-}
-
-================
-File: .gitignore
-================
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# local env files
-.env*.local
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-================
-File: CRITICALPRIORITY.md
-================
-# `CRITICALPRIORITY.md`
-
-This document tracks the master architectural remediation roadmap for `nhlTradeMachine`. It prioritizes stability fixes, performance updates, and enterprise scaling milestones to transition the codebase from a functional prototype to an enterprise-grade platform.
-
----
-
-## 🚨 Phase 1: Critical Priority (Structural Threats & Core Stability)
-
-These items address fundamental design flaws that risk client-side runtime crashes, memory leaks, security bypasses, or unpredictable operational expenses under production scaling.
-
-### 1. Unified Valuation Engine Convergence
-
-* **The Issue:** The application maintains separate calculation engines in `app/lib/xnav-engine.ts` (client rendering) and `app/api/evaluate/route.ts` (server trade evaluation). These files have drifted apart on fallback branches and positional scalars, causing split-brain validation errors where the UI context conflicts with the server's verdict.
-
-
-* **The Fix:** Remove duplicate valuation math from `app/api/evaluate/route.ts`. Refactor the server route to import and run calculations directly from the single source of truth in `app/lib/xnav-engine.ts`.
-
-
-
-### 2. Type-Safe Boundary Enforcement via Zod Data Ingestion
-
-* **The Issue:** The web scraping pipeline and external stats intake endpoints rely heavily on loose type casting (`as number`, `as string`) and static nested array index lookups (e.g., `p[18]` or `p[24]` from raw HTML scripts). If a third-party site changes its data schema, indices evaluate to `undefined`, creating `NaN` metrics that can crash the React client UI.
-
-
-* **The Fix:** Implement strict Zod schemas at data boundaries. Parse incoming crawled arrays through a validator layer using `.safeParse()` to isolate individual data structural changes cleanly without breaking the entire platform runtime.
-
-### 3. Stateless Cache Synchronization & Shared Rate Limiting
-
-* **The Issue:** Endpoint caching and the AI proxy rate-limiting mechanisms utilize localized, in-memory global state tracking maps. Because serverless environments spin up, down, and duplicate micro-containers dynamically, global memory structures are un-synchronized across concurrent sessions. This allows users to easily bypass rate limits, exposing backend API keys to high exploitation costs.
-
-
-* **The Fix:** Remove local container tracking maps. Deploy an out-of-process distributed storage layer (such as Upstash Redis) to synchronize live team states, scraper caches, and API throttling rules uniformly across serverless infrastructure containers.
-
-
-
-### 4. Atomic Trade State Management (Zustand Migration)
-
-* **The Issue:** Managing multi-asset trade arrays, custom retention rules, and draft pick logic using top-level layout component hooks forces deep tree re-render cascades. Every slider adjustment or drag-and-drop event forces every single visible element, layout chart, and player card to refresh, causing interface lag.
-* **The Fix:** Decouple layout state completely by migrating the transactional context to an isolated, atomic store like Zustand. Ensure that structural value changes selectively trigger re-renders only on the specific data values affected.
-
-### 5. LLM Prompt Layer Sanitization & Token Hard Caps
-
-* **The Issue:** The external language model proxy route parses client context strings into the model prompt pipeline without escaping characters or applying structural token validation. This leaves the endpoint vulnerable to raw payload manipulation or oversized contextual returns that inflate API operational costs.
-
-
-* **The Fix:** Configure strict token constraint bounds on proxy execution calls. Run character-stripping regex arrays across input parameters to strip formatting controls before assembling conversational payloads.
-
----
-
-## 🧰 Phase 2: Medium Priority (Maintainability, Testing & Cleanliness)
-
-These items optimize the project's performance footprint and establish regression testing safeguards to prevent structural logic drift during subsequent iterations.
-
-### 1. Relational Database Extraction of Local JSON Files
-
-* **The Issue:** Large static datasets—like bundled player contracts and performance benchmarks—are packed directly inside monolithic JSON files inside the client bundle architecture. This unnecessarily inflates initial page load payloads and slows down mobile performance metrics.
-
-
-* **The Fix:** Move roster and contract data arrays out of raw project files. Relocate them inside a high-efficiency edge-database instance (such as Turso or Supabase) and leverage Next.js Server Components to fetch records matching only the specific teams involved in an active configuration.
-
-
-
-### 2. Isolation of Calculation Weights to Configuration Schemas
-
-* **The Issue:** The pure math execution module contains hardcoded system scalars, aging regression penalties, and positional multipliers distributed inline across the file layout. This requires a software engineer to manually modify and ship code changes just to update calculation formulas for new season dynamics.
-
-
-* **The Fix:** Extract all formulas and hardcoded integers into an isolated matrix config document (e.g., `valuation-weights.json`). Build the math execution modules to load configuration parameters dynamically, enabling seamless updates and straightforward model validation adjustments.
-
-
-
-### 3. Comprehensive End-to-End Regression Test Suite
-
-* **The Issue:** Test scripts are limited to basic unit assessments on isolated execution loops. Complex system changes risk introducing silent calculation bugs across transaction constraints or trade validation state rules without triggering warnings.
-
-
-* **The Fix:** Author complete workflow simulation layers using tools like Playwright or Vitest. Program tests to explicitly validate complex transaction procedures, verifying that financial indicators adjust accurately and rule violations register correctly.
-
----
-
-## 🚀 Phase 3: The Enterprise Vision (Commercial Feature Scaling)
-
-The institutional layer designed for advanced analytics needs, sports agencies, frontend sports networks, and organizational platform integration.
-
-### 1. Hybrid Front-Office Pipeline & Overrides Dashboard
-
-* **The Strategy:** Transition the data backend to a managed asset hub. Deploy an automated scraper pipeline that pulls nightly analytics to a central database, but introduce a secondary operational override table that takes system priority. This allows platform administrators to log into a secure utility dashboard to manually patch injuries, adjust trade multipliers, or update metrics instantly without deploying new code.
-
-
-
-### 2. Strict Collective Bargaining Agreement (CBA) Compliance Layer
-
-* **The Strategy:** Expand verification logic past fundamental cap limits to encompass full NHL CBA compliance tracking. Build rule-enforcement constraints to evaluate transactions against:
-* **The 50-Contract Constraint:** Flag trades that push an acquiring organization over the active 50 standard player contract limit.
-* **Retention Tracking Limits:** Enforce strict caps on concurrent team salary retentions (maximum of 3 active player retentions per team).
-* **Clause Compliance:** Track dynamic interactions for No-Trade and No-Movement clauses, evaluating destination attractiveness to gauge if a player is likely to waive their waiver control requirements.
-
-
-
-
-
-### 3. Multi-Year Financial & Roster Forecast Dashboard
-
-* **The Strategy:** Build visual matrix grids that project roster choices over three-year horizons. Implement layout views to process dynamic salary cap growth projections, calculate pending unrestricted free agency exits, map future extension impacts, and estimate accurate baseline qualifying values for incoming restricted free agents.
-
-
-
-### 4. Stochastic Player Evaluation Models (Monte Carlo Engine)
-
-* **The Strategy:** Replace fixed score evaluations with probability distributions. Run multiple background simulation cycles that factor in historical variance and localized age regression metrics to estimate performance variability. Output results as a dynamic analytics indicator tracking structural value win probability over 1, 2, and 3-year windows based on aging curves and development volatility.
-
-
-
-### 5. Headless REST API Framework for External Syndication
-
-* **The Strategy:** Extract the pure mathematical execution layer out of the layout components entirely, wrapping the system logic inside a high-throughput headless API platform. This enables the core value calculator engine to run as an independent software-as-a-service application, capable of powering external platforms, fantasy tracking tool ecosystems, and major sports media networks.
-
-
-## 🧠 Phase 4: X-NAV 2.0 (The Economics & Betting Engine)
-
-This phase transitions the beating heart of the platform from a linear points calculator into a stochastic scarcity and probability engine, preparing it for commercial licensing in the fantasy and sports betting markets.
-
-1. **Divergent Term Multipliers:** Split contract cost calculations to respect the immense leverage gap between cost-controlled RFAs and flight-risk UFAs.
-2. **Positional Scarcity Premiums:** Apply structural value modifiers to premium positions (Centers and Top-Pairing Defensemen) to correct the undervaluation vs. Wingers.
-3. **The Logistic Lemieux Asymptote:** Replace the piecewise linear offensive cap with a true exponential decay function, creating a hard mathematical ceiling for historical production.
-4. **Exponential Retention Tax:** Rewrite the salary retention logic to scale exponentially rather than linearly, reflecting the real-world cash friction of billionaire owners paying dead money.
-5. **Era-Agnostic Dependency Injection:** Extract all `1.6` and `4.5` integer weights into an injectable `EnvironmentWeights` matrix, allowing the engine to instantly recalibrate for different scoring eras or betting markets on the fly.
-
----
-
-### The Blueprint: Expanding X-NAV to the Next Level
-
-To make this the holy grail for betting and fantasy, the engine needs to expand from ~400 lines to a comprehensive algorithmic suite. Here is every single missing component required to reach that tier.
-
-#### 1. The "Passenger vs. Driver" Matrix (Linemate Dependency)
-
-Raw Point Shares and xG metrics lie because they don't decouple players from their linemates. A winger playing with Leon Draisaitl will have artificially inflated metrics. The engine must ingest WOWY (With or Without You) data to determine if a player is driving the play or just along for the ride.
-
-* **The Math:** You need to calculate an isolation coefficient.
-
-$$NAV_{isolated} = NAV_{raw} \times \left(1 - \frac{xG_{with} - xG_{without}}{xG_{with}}\right)$$
-
-
-* **The Value:** This identifies "buy-low" candidates for front offices—players trapped on the 3rd line with bad teammates who mathematically project to explode if given top-line minutes.
-
-#### 2. Stochastic Volatility Index (SVI)
-
-Fantasy platforms and sports bettors do not care about an 82-game pace; they care about *game-to-game variance*. A player who scores exactly 1 point every game is great for an NHL team. A player who scores 0 points for four games and 5 points in the fifth is incredible for daily fantasy tournaments (GPPs) but a nightmare for steady prop betting.
-
-* **The Feature:** The engine must measure the standard deviation of a player's game logs to generate an SVI score.
-
-$$SVI = \sqrt{\frac{1}{N} \sum_{i=1}^{N} (P_i - \mu)^2} \times \lambda_{role}$$
-
-
-* **The Value:** You can output a "Boom/Bust Rating" for every player. "Player X has a median projection of 65 points, but a 90th percentile ceiling of 95 points due to extreme deployment volatility."
-
-#### 3. Market-Implied Valuation (MIV) Layer
-
-Right now, you are waiting for MoneyPuck data to update. If you want to cater to the betting industry, your engine needs to scrape live futures props from sportsbooks (e.g., DraftKings Over/Under point totals) and reverse-engineer them into the engine.
-
-* **The Feature:** If Vegas sets a player's over/under at 85.5 points, but your engine projects 72 points based on historical decay, the engine highlights a **Market Discrepancy Alert**.
-* **The Value:** This turns your trade machine into a direct betting arbitrage tool.
-
-#### 4. Actuarial Attrition & Health Modeling
-
-NHL GMs and fantasy managers get fired for ignoring injury risk. The current engine relies on a manual flag (`INJURY_RISK[asset.name]`).
-
-* **The Feature:** The engine needs a probabilistic injury curve based on age, position, and physical playstyle (hits/blocked shots per 60). An Expected Value (EV) calculation must discount the player's total NAV by their probability of playing a full season.
-
-$$EV = \sum (NAV \times P(health_t))$$
-
-
-* **The Value:** This prevents the engine from treating a 33-year-old injury-prone defenseman with the same reliability as a 24-year-old ironman.
-
-#### 5. Post-Season Translation (The "Grit" Multiplier)
-
-The game changes in April. Whistles go away, the ice shrinks, and perimeter players disappear. A true simulation engine needs a separate set of weights for playoff evaluations.
-
-* **The Feature:** Create a secondary `calcPlayoffNAV()` function that heavily weights contested puck battles, hits, blocked shots, and high-danger unassisted expected goals, while suppressing powerplay-dependent point production.
-* **The Value:** You can offer a "Playoff Translation Score" to tell GMs if a player they are acquiring at the trade deadline is actually built for a 7-game series.
-
-#### 6. Advanced Cap Mechanics (Buyouts & Dead Cash)
-
-To make this indispensable for front offices, the engine must understand buyout economics. If you trade for a terrible $7M contract, the engine shouldn't just say "This costs $7M."
-
-* **The Feature:** It should automatically calculate the NHL buyout formula ($2/3$ or $1/3$ ratio based on age, spread over twice the remaining term) and output: "This player is a -45 NAV, but they can be bought out next summer for a cap penalty of only $1.5M over 4 years."
-
----
-
-
-Testing Adjustments - to be made after critical improvements: 
-
-Barkov has a -10 NAV but was injured all year, needs to have an adjustment that coordinates with his true value
-
-Goaltenders are hard coded to have a base of 0 NAV, I think we need to adjust this or have goalie logic be separate from skater logic to calculate truely a goaltenders value based on incoming stats.
-
-all modal popups should freeze scroll
-
-For realistic targets, players that have played for the team previously should be weighted less, as rarely do players come back.
-
-Investigate why Colton Parakyo has a negative NAV 
-
-TugBar doesnt go under 0 for a negative on negative trade.
-
-Head-To-Head needs to be revamped and updated and for it to be its own component.
-
-EST. WINs ADDED needs to calculate the impact of the player, not just if NAV higher === more wins. 
-
-When trading away older player from Rebuilding team, getting "[Team B]needs picks to trade away [Player B], when adding pick to [Team A] outgoing asset, the flag isnt cleared, but when adding a pick to [Team B] outgoing assets, the flag is cleared. Should be when adding pick or prospect of reasonable value, Flag for [Team B] is cleared. 
-
-Investigate why Dylan DeMelo DEF is so high (+71) on depth D with a -40 NAV
-
-Player with Negative NAV causes find trade proposals not working even if overall value is positive
-
-Investigate why Simon Edvinsson Value NAV is so low (+32) with OFF (+13) and DEF (+74)
-Simon Edvinsson has 1 year left on contract not 3
-
-Find Trade Partners often finds trades that dont go throuhg as [Team B] can't afford to lose [Player A], then why have the trade proposal pop up?
-
-I can make a trade with a +130 NAV Net Gain. Seems extremly lopsided.
-Flag for Significantly overpaying is wrong
-    Reads: The NAV analysis shows Detroit Red Wings giving up 369 NAV points worth of assets and receiving only 223 — a 35% gap. Winnipeg Jets's GM has no incentive to accept this deal when they could simply wait for a better offer. Lopsided trades only happen under specific pressure: a player demanding a trade, a GM under ownership pressure to cut salary, or a team desperate to fill a critical hole before a deadline. Without that context, Winnipeg Jets holds all the leverage here.
-
-    But: Im playing as Winnipeg, so this should read that the Red Wings GM has no incentive to accept this deal, this flag should be a hard veto unless certain parameters are met (ie outside factors)
-
-If a player has 1 year left on contract, and we convert this into a 3-year window sim. AGE shouldnt be listed as a negative NAV, as rentals have value to them. We do already have a flag for this so we can add in an uncertainty principle that advises if a player resigns.
-
-Dustin Wolf has a comically low NAV of +14, this should be fixed if we add a custom calculation for Goalie NAV value as we can base it on quality of team in front. 
-
-OPS player Suggested in What This team needs has an OPS of -2, doesnt make sense.
-
-AI still fabricating numbers, Simulation #10306 runs with WPG top scorer being Scheifele at 87 points but the AI summary reads Scheifele with 103 points.
-
-
--xnav engine roadmap to V 2.0
-If the ultimate goal is to license this to front offices, fantasy syndicates, or sports betting platforms, a 400-line calculator won't cut it. To bridge the gap between a standard simulator and an enterprise-grade quantitative model, the X-NAV engine must stop looking at *what has happened* (lagging indicators) and start modeling *probability distributions of what will happen next* (stochastic forecasting).
-
-Here is how we integrate the engine rewrite into the remediation pipeline, followed by the blueprint to "go full AI" and turn this into an industry-leading economics engine.
-
----
-
-================
 File: app/api/simulate/route.ts
 ================
 import { NextRequest, NextResponse } from "next/server";
@@ -96894,538 +96888,6 @@ File: package.json
 }
 
 ================
-File: __tests__/xnav.test.ts
-================
-// ── X-NAV Engine Test Suite ──────────────────────────────────────────────────
-// Run with: npx vitest run
-// Watch mode: npx vitest
-//
-// These tests establish NAV baselines for known archetypes.
-// If a change to the engine breaks these ranges, the test fails
-// BEFORE the code reaches production — no more catching Wedgewood
-// at +250 NAV via screenshot.
-//
-// Ranges are intentionally wide (~±20%) to allow for tuning
-// without constant test updates. They're floor/ceiling guards,
-// not precision assertions.
-
-import { describe, it, expect } from "vitest";
-import { calcNAV, calcGoalieNAV, calcPickNAV, calcSkaterNAV } from "../app/lib/xnav-engine";
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-const inRange = (val: number, min: number, max: number, label: string) => {
-  if (val < min || val > max) {
-    throw new Error(`${label}: ${val} not in [${min}, ${max}]`);
-  }
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GOALIE TESTS
-// ─────────────────────────────────────────────────────────────────────────────
-describe("G-NAV — Elite Starters", () => {
-  it("Hellebuyck: elite starter on good team → 150-220 NAV", () => {
-    const result = calcGoalieNAV({
-      id: "hellebuyck", name: "Connor Hellebuyck", position: "G",
-      age: 33, capHit: 8.5, yearsRemaining: 5,
-      gsax: 18.5, gamesStarted: 60, teamXga60: 2.35,
-    });
-    inRange(result.total, 150, 220, "Hellebuyck NAV");
-  });
-
-  it("Saros: solid starter on average team → 90-130 NAV", () => {
-    const result = calcGoalieNAV({
-      id: "saros", name: "Juuse Saros", position: "G",
-      age: 29, capHit: 5.0, yearsRemaining: 4,
-      gsax: 8.2, gamesStarted: 55, teamXga60: 2.60,
-    });
-    inRange(result.total, 90, 130, "Saros NAV");
-  });
-
-  it("Oettinger: decent starter on defensive team → 15-45 NAV", () => {
-    const result = calcGoalieNAV({
-      id: "oettinger", name: "Jake Oettinger", position: "G",
-      age: 26, capHit: 5.75, yearsRemaining: 4,
-      gsax: 5.1, gamesStarted: 50, teamXga60: 2.45,
-    });
-    inRange(result.total, 15, 45, "Oettinger NAV");
-  });
-});
-
-describe("G-NAV — Young Controlled Goalies", () => {
-  it("Wolf (with extension): cheap now but big commitment → 20-45 NAV", () => {
-    const result = calcGoalieNAV({
-      id: "wolf", name: "Dustin Wolf", position: "G",
-      age: 25, capHit: 0.875, yearsRemaining: 1,
-      gsax: -1.8, gamesStarted: 57, teamXga60: 2.85,
-      extensionCapHit: 7.5, extensionYears: 7,
-    });
-    inRange(result.total, 20, 45, "Wolf (extension) NAV");
-  });
-
-  it("Wolf (no extension): cheap controlled starter → 40-70 NAV", () => {
-    const result = calcGoalieNAV({
-      id: "wolf-noext", name: "Dustin Wolf", position: "G",
-      age: 25, capHit: 0.875, yearsRemaining: 2,
-      gsax: -1.8, gamesStarted: 57, teamXga60: 2.85,
-    });
-    inRange(result.total, 40, 70, "Wolf (no ext) NAV");
-    expect(result.total).toBeGreaterThan(20); // must exceed raw negative GSAx
-  });
-
-  it("Askarov: young tandem on terrible team → 25-55 NAV via floor", () => {
-    const result = calcGoalieNAV({
-      id: "askarov", name: "Yaroslav Askarov", position: "G",
-      age: 23, capHit: 2.0, yearsRemaining: 2,
-      gsax: -9.5, gamesStarted: 47, teamXga60: 3.10,
-    });
-    inRange(result.total, 25, 55, "Askarov NAV");
-    expect(result.total).toBeGreaterThan(0); // bad team context should prevent negative
-  });
-});
-
-describe("G-NAV — Backup/Tandem Edge Cases", () => {
-  it("Wedgewood: tandem goalie — hard cap at 60 NAV max", () => {
-    const result = calcGoalieNAV({
-      id: "wedge", name: "Scott Wedgewood", position: "G",
-      age: 33, capHit: 2.0, yearsRemaining: 1,
-      gsax: 23.1, gamesStarted: 45, teamXga60: 2.35,
-      extensionCapHit: 2.5, extensionYears: 1,
-    });
-    // 45 games = TANDEM, hard capped at 60
-    expect(result.total).toBeLessThanOrEqual(60);
-    inRange(result.total, 30, 60, "Wedgewood NAV");
-  });
-
-  it("Elite backup with small sample: regressed by confidence", () => {
-    const result = calcGoalieNAV({
-      id: "hot-backup", name: "Hot Streak Backup", position: "G",
-      age: 27, capHit: 1.5, yearsRemaining: 1,
-      gsax: 8.0, gamesStarted: 20, teamXga60: 2.55,
-    });
-    // 20 games backup — confidence should heavily regress this
-    expect(result.total).toBeLessThan(35);
-    inRange(result.total, 0, 35, "Elite backup (20gp) NAV");
-  });
-
-  it("Backup on a good team: per-game cap prevents inflation", () => {
-    const result = calcGoalieNAV({
-      id: "col-backup", name: "Col Backup", position: "G",
-      age: 30, capHit: 2.0, yearsRemaining: 1,
-      gsax: 15.0, gamesStarted: 30, teamXga60: 2.30,
-    });
-    expect(result.total).toBeLessThanOrEqual(35); // backup cap
-  });
-});
-
-describe("G-NAV — Declining Veterans", () => {
-  it("Aging starter on bad team: negative NAV is possible", () => {
-    const result = calcGoalieNAV({
-      id: "aging-g", name: "Aging Vet Goalie", position: "G",
-      age: 38, capHit: 4.5, yearsRemaining: 2,
-      gsax: -8.0, gamesStarted: 52, teamXga60: 2.55,
-    });
-    expect(result.total).toBeLessThan(20);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PICK TESTS
-// ─────────────────────────────────────────────────────────────────────────────
-describe("Pick NAV — First Round Curve", () => {
-  it("Last place team 1st (standing 32): near-untradable → 380-420 NAV", () => {
-    const result = calcPickNAV({
-      id: "sjs-1st", name: "SJS 1st", position: "Pick",
-      age: 0, capHit: 0, yearsRemaining: 0,
-      round: 1, year: 2026, teamStanding: 32,
-    });
-    inRange(result.total, 380, 420, "32nd pick NAV");
-  });
-
-  it("Bottom-3 team 1st (standing 30): franchise-altering → 320-360 NAV", () => {
-    const result = calcPickNAV({
-      id: "van-1st", name: "VAN 1st", position: "Pick",
-      age: 0, capHit: 0, yearsRemaining: 0,
-      round: 1, year: 2026, teamStanding: 30,
-    });
-    inRange(result.total, 320, 360, "30th pick NAV");
-  });
-
-  it("Mid-lottery team 1st (standing 24): solid prospect → 50-90 NAV", () => {
-    const result = calcPickNAV({
-      id: "mid-1st", name: "Mid 1st", position: "Pick",
-      age: 0, capHit: 0, yearsRemaining: 0,
-      round: 1, year: 2026, teamStanding: 24,
-    });
-    inRange(result.total, 100, 180, "24th pick NAV");
-  });
-
-  it("Contender 1st (standing 3): late pick, depth piece → 28-45 NAV", () => {
-    const result = calcPickNAV({
-      id: "car-1st", name: "CAR 1st", position: "Pick",
-      age: 0, capHit: 0, yearsRemaining: 0,
-      round: 1, year: 2026, teamStanding: 3,
-    });
-    inRange(result.total, 28, 45, "Contender 1st NAV");
-  });
-
-  it("Future 1st decays by year", () => {
-    const now = calcPickNAV({
-      id: "p2026", name: "2026 1st", position: "Pick",
-      age: 0, capHit: 0, yearsRemaining: 0,
-      round: 1, year: 2026, teamStanding: 25,
-    });
-    const future = calcPickNAV({
-      id: "p2028", name: "2028 1st", position: "Pick",
-      age: 0, capHit: 0, yearsRemaining: 0,
-      round: 1, year: 2028, teamStanding: 25,
-    });
-    expect(future.total).toBeLessThan(now.total);
-  });
-
-  it("2nd round pick: always less than any 1st from same team", () => {
-    const first  = calcPickNAV({ id:"f",name:"1st",position:"Pick",age:0,capHit:0,yearsRemaining:0,round:1,year:2026,teamStanding:25 });
-    const second = calcPickNAV({ id:"s",name:"2nd",position:"Pick",age:0,capHit:0,yearsRemaining:0,round:2,year:2026,teamStanding:25 });
-    expect(second.total).toBeLessThan(first.total);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SKATER TESTS
-// ─────────────────────────────────────────────────────────────────────────────
-describe("X-NAV — Franchise Centers", () => {
-  it("McDavid-tier: elite production, reasonable cap → 100-210 NAV", () => {
-    const result = calcSkaterNAV({
-      id: "mcdavid", name: "Connor McDavid", position: "C",
-      age: 28, capHit: 12.5, yearsRemaining: 2,
-      ptsPace: 140, xGPace: 45, defRate: 0.2,
-      avgTOI: 22, qocRank: 80, xgRelTM: 12, xgaRelTM: -0.3,
-      games: 78, ops: 12.5, dps: 2.1,
-    });
-    inRange(result.total, 100, 210, "McDavid NAV");
-  });
-
-  it("Barkov: two-way C, fair contract → 50-130 NAV", () => {
-    const result = calcSkaterNAV({
-      id: "barkov", name: "Aleksander Barkov", position: "C",
-      age: 30, capHit: 10.0, yearsRemaining: 8,
-      ptsPace: 88, xGPace: 22, defRate: 0.6,
-      avgTOI: 21, qocRank: 120, xgRelTM: 4, xgaRelTM: -0.5,
-      games: 75, ops: 7.2, dps: 5.8,
-    });
-    inRange(result.total, 50, 130, "Barkov NAV");
-  });
-});
-
-describe("X-NAV — Overpaid Veterans", () => {
-  it("Overpaid aging vet: negative NAV expected", () => {
-    const result = calcSkaterNAV({
-      id: "overpaid-vet", name: "Overpaid Vet", position: "W",
-      age: 37, capHit: 7.0, yearsRemaining: 3,
-      ptsPace: 38, xGPace: 8, defRate: -0.1,
-      avgTOI: 14, qocRank: 350, xgRelTM: -2, xgaRelTM: 0.2,
-      games: 55, ops: 2.1, dps: 1.2,
-    });
-    expect(result.total).toBeLessThan(0);
-  });
-
-  it("Salary dump contract: deeply negative → below -50 NAV", () => {
-    const result = calcSkaterNAV({
-      id: "salary-dump", name: "Salary Dump", position: "W",
-      age: 36, capHit: 8.5, yearsRemaining: 4,
-      ptsPace: 28, xGPace: 5, defRate: -0.2,
-      avgTOI: 12, qocRank: 400, xgRelTM: -4, xgaRelTM: 0.4,
-      games: 48, ops: 1.2, dps: 0.8,
-    });
-    expect(result.total).toBeLessThan(-50);
-  });
-});
-
-describe("X-NAV — Elite Defencemen", () => {
-  it("Makar-tier: elite offensive D, strong contract → 120-230 NAV", () => {
-    const result = calcSkaterNAV({
-      id: "makar", name: "Cale Makar", position: "D",
-      age: 26, capHit: 9.0, yearsRemaining: 3,
-      ptsPace: 90, xGPace: 28, defRate: 0.3,
-      avgTOI: 25, qocRank: 100, xgRelTM: 8, xgaRelTM: -0.4,
-      games: 78, ops: 9.5, dps: 5.2,
-    });
-    inRange(result.total, 120, 230, "Makar NAV");
-  });
-
-  it("Morrissey: two-way D with NOIV data — DEF bar positive, not an artifact", () => {
-    const result = calcSkaterNAV({
-      id: "morrissey", name: "Josh Morrissey", position: "D",
-      age: 29, capHit: 6.25, yearsRemaining: 6,
-      ptsPace: 58, xGPace: 12, defRate: 0.0, // suppressed — NOIV present
-      avgTOI: 24.7, qocRank: 106,
-      xgRelTM: 3.5, xgaRelTM: -0.38, dzPct: 0.42,
-      games: 77, ops: 3.5, dps: 5.0,
-    });
-    expect(result.def).toBeGreaterThan(0);   // not negative from suppression artifact
-    expect(result.def).toBeGreaterThan(10);  // meaningful positive — not just noise
-  });
-
-  it("Karlsson-type: offensive liability on D — DEF bar negative", () => {
-    const result = calcSkaterNAV({
-      id: "karlsson-type", name: "Offensive Liability D", position: "D",
-      age: 34, capHit: 7.0, yearsRemaining: 1,
-      ptsPace: 65, xGPace: 18, defRate: -0.2,
-      avgTOI: 21, qocRank: 280,
-      xgRelTM: 5, xgaRelTM: 0.30, // bleeds goals against
-      games: 70, ops: 6.5, dps: 1.2,
-    });
-    expect(result.def).toBeLessThan(0); // defensive liability should show negative
-  });
-
-  it("Low-minute depth player: DEF capped by TOI reliability — cannot exceed primary D-man", () => {
-    const depth = calcSkaterNAV({
-      id: "nyquist-type", name: "Depth Winger", position: "W",
-      age: 35, capHit: 1.5, yearsRemaining: 1,
-      ptsPace: 22, xGPace: 4, defRate: 0.8,
-      avgTOI: 12.0, qocRank: 420, dzPct: 0.40,
-      games: 58,
-    });
-    const pillarD = calcSkaterNAV({
-      id: "parayko-type", name: "Pillar D", position: "D",
-      age: 29, capHit: 5.5, yearsRemaining: 4,
-      ptsPace: 30, xGPace: 6, defRate: 0.4,
-      avgTOI: 22.0, qocRank: 130, dzPct: 0.60,
-      xgRelTM: 0.5, xgaRelTM: -0.25,
-      games: 72,
-    });
-    expect(depth.def).toBeLessThan(pillarD.def);
-    expect(Math.abs(depth.def)).toBeLessThan(5);
-  });
-
-  it("Selke candidate (Cirelli-type): shutdown C shows positive DEF from defRate", () => {
-    const result = calcSkaterNAV({
-      id: "cirelli", name: "Anthony Cirelli", position: "C",
-      age: 27, capHit: 6.5, yearsRemaining: 5,
-      ptsPace: 42, xGPace: 8, defRate: 0.35,
-      avgTOI: 17.2, qocRank: 105, dzPct: null, // no zone data — uses defRate path
-      xgRelTM: -1.0, xgaRelTM: 1.2,            // positive xgaRelTM from hard matchups
-      games: 75,
-    });
-    expect(result.def).toBeGreaterThan(0);   // must be positive for a Selke candidate
-    expect(result.def).toBeGreaterThan(8);   // meaningful, not just +1-2
-  });
-
-  it("Selke candidate with DZ% data: bonus kicks in", () => {
-    const result = calcSkaterNAV({
-      id: "cirelli-dz", name: "Cirelli DZ", position: "C",
-      age: 27, capHit: 6.5, yearsRemaining: 5,
-      ptsPace: 42, xGPace: 8, defRate: 0.35,
-      avgTOI: 17.2, qocRank: 105, dzPct: 0.56, // real DZ data available
-      xgRelTM: -1.0, xgaRelTM: 1.2,
-      games: 75,
-    });
-    expect(result.def).toBeGreaterThan(0);
-    // DZ% bonus should push it higher than no-data version
-    const noDZResult = calcSkaterNAV({
-      id: "cirelli-nodz", name: "Cirelli NoDZ", position: "C",
-      age: 27, capHit: 6.5, yearsRemaining: 5,
-      ptsPace: 42, xGPace: 8, defRate: 0.35,
-      avgTOI: 17.2, qocRank: 105, dzPct: null,
-      xgRelTM: -1.0, xgaRelTM: 1.2, games: 75,
-    });
-    expect(result.def).toBeGreaterThanOrEqual(noDZResult.def);
-  });
-
-  it("Selke candidate (Nelson-type): two-way C shows positive DEF", () => {
-    const result = calcSkaterNAV({
-      id: "nelson", name: "Brock Nelson", position: "C",
-      age: 33, capHit: 6.0, yearsRemaining: 1,
-      ptsPace: 55, xGPace: 14, defRate: 0.20,
-      avgTOI: 18.5, qocRank: 140, dzPct: null,
-      xgRelTM: 1.5, xgaRelTM: 0.3, games: 76,
-    });
-    expect(result.def).toBeGreaterThan(0);
-  });
-
-  it("Offensive forward: near-zero DEF — not a defensive player", () => {
-    const result = calcSkaterNAV({
-      id: "off-fwd", name: "Offensive Winger", position: "W",
-      age: 26, capHit: 7.0, yearsRemaining: 4,
-      ptsPace: 85, xGPace: 24, defRate: 0.02,
-      avgTOI: 18.0, qocRank: 310, dzPct: 0.43,
-      xgRelTM: 5.0, xgaRelTM: -0.1, games: 78,
-    });
-    expect(Math.abs(result.def)).toBeLessThan(8);
-  });
-
-  it("Selke C shows more DEF than offensive winger with similar stats", () => {
-    const selke = calcSkaterNAV({
-      id: "selke", name: "Selke C", position: "C",
-      age: 28, capHit: 5.5, yearsRemaining: 3,
-      ptsPace: 50, xGPace: 12, defRate: 0.32,
-      avgTOI: 18.0, qocRank: 120, dzPct: null,
-      xgRelTM: -0.5, xgaRelTM: 0.8, games: 76,
-    });
-    const offC = calcSkaterNAV({
-      id: "offc", name: "Offensive C", position: "C",
-      age: 28, capHit: 5.5, yearsRemaining: 3,
-      ptsPace: 50, xGPace: 12, defRate: 0.03,
-      avgTOI: 18.0, qocRank: 300, dzPct: null,
-      xgRelTM: 3.0, xgaRelTM: -0.3, games: 76,
-    });
-    expect(selke.def).toBeGreaterThan(offC.def);
-  });
-
-  it("Shutdown D: low pts but high defensive value → 50-130 NAV", () => {
-    const result = calcSkaterNAV({
-      id: "slavin", name: "Jaccob Slavin", position: "D",
-      age: 32, capHit: 5.3, yearsRemaining: 2,
-      ptsPace: 38, xGPace: 8, defRate: 0.8,
-      avgTOI: 22, qocRank: 90, xgRelTM: 1, xgaRelTM: -0.8,
-      games: 78, ops: 2.8, dps: 6.5,
-    });
-    inRange(result.total, 50, 130, "Slavin NAV");
-    // DEF must be meaningfully positive — xgaRelTM-0.8 at 22min = elite suppression
-    expect(result.def).toBeGreaterThan(25);
-  });
-});
-
-describe("X-NAV — Young Surplus Contracts", () => {
-  it("Young star on ELC: massive surplus value → 140+ NAV", () => {
-    const result = calcSkaterNAV({
-      id: "young-star", name: "Young Star", position: "C",
-      age: 21, capHit: 0.925, yearsRemaining: 1,
-      ptsPace: 85, xGPace: 22, defRate: 0.1,
-      avgTOI: 18, qocRank: 200, xgRelTM: 5, xgaRelTM: 0,
-      games: 68, ops: 7.2, dps: 2.1,
-    });
-    expect(result.total).toBeGreaterThan(140);
-  });
-
-  it("Age curve: younger player worth more than identical older player", () => {
-    const base = {
-      id: "base", name: "Player", position: "C" as const,
-      capHit: 5.0, yearsRemaining: 4,
-      ptsPace: 75, xGPace: 18, defRate: 0.2,
-      avgTOI: 18, qocRank: 200, xgRelTM: 3, xgaRelTM: 0,
-      games: 72,
-    };
-    const young = calcSkaterNAV({ ...base, id: "young", age: 23 });
-    const old   = calcSkaterNAV({ ...base, id: "old",   age: 34 });
-    expect(young.total).toBeGreaterThan(old.total);
-  });
-});
-
-describe("X-NAV — Salary Retention", () => {
-  it("50% retention increases NAV by reducing cap cost", () => {
-    const base = {
-      id: "retain", name: "Retained Player", position: "W" as const,
-      age: 34, capHit: 7.0, yearsRemaining: 2,
-      ptsPace: 55, xGPace: 14, defRate: 0.0,
-      avgTOI: 16, qocRank: 280, xgRelTM: 1, xgaRelTM: 0,
-      games: 70,
-    };
-    const noRetain = calcSkaterNAV({ ...base, retainedPct: 0 });
-    const retained = calcSkaterNAV({ ...base, retainedPct: 0.5 });
-    expect(retained.total).toBeGreaterThan(noRetain.total);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SANITY / REGRESSION GUARDS
-// ─────────────────────────────────────────────────────────────────────────────
-describe("Sanity Guards — Values that should never happen", () => {
-  it("No tandem goalie should exceed 60 NAV", () => {
-    const result = calcGoalieNAV({
-      id: "tandem-max", name: "Tandem G", position: "G",
-      age: 25, capHit: 1.0, yearsRemaining: 2,
-      gsax: 50.0, gamesStarted: 45, teamXga60: 2.55, // absurd GSAx, should still be capped
-    });
-    expect(result.total).toBeLessThanOrEqual(60);
-  });
-
-  it("No backup should exceed 35 NAV", () => {
-    const result = calcGoalieNAV({
-      id: "backup-max", name: "Backup G", position: "G",
-      age: 24, capHit: 0.9, yearsRemaining: 1,
-      gsax: 30.0, gamesStarted: 25, teamXga60: 2.55,
-    });
-    expect(result.total).toBeLessThanOrEqual(35);
-  });
-
-  it("Last place 1st round pick should always beat contender 1st", () => {
-    const worst = calcPickNAV({ id:"w",name:"w",position:"Pick",age:0,capHit:0,yearsRemaining:0,round:1,year:2026,teamStanding:32 });
-    const best  = calcPickNAV({ id:"b",name:"b",position:"Pick",age:0,capHit:0,yearsRemaining:0,round:1,year:2026,teamStanding:1  });
-    expect(worst.total).toBeGreaterThan(best.total);
-  });
-
-  it("Extension reduces NAV vs cheap current deal", () => {
-    const cheap = calcGoalieNAV({
-      id:"cheap",name:"G",position:"G",age:25,capHit:0.875,yearsRemaining:2,
-      gsax:3.0,gamesStarted:55,teamXga60:2.55,
-    });
-    const extended = calcGoalieNAV({
-      id:"ext",name:"G",position:"G",age:25,capHit:0.875,yearsRemaining:1,
-      gsax:3.0,gamesStarted:55,teamXga60:2.55,
-      extensionCapHit:7.5,extensionYears:7,
-    });
-    expect(extended.total).toBeLessThan(cheap.total);
-  });
-
-  it("NAV components sum correctly — total ≈ off + def + age + cap", () => {
-    const r = calcSkaterNAV({
-      id:"sum",name:"P",position:"C",age:27,capHit:6.0,yearsRemaining:3,
-      ptsPace:80,xGPace:20,defRate:0.2,avgTOI:19,qocRank:200,
-      xgRelTM:3,xgaRelTM:0,games:72,
-    });
-    const sum = r.off + r.def + r.age + r.cap;
-    // Total should be within 20% of component sum (multiplier / rounding can differ)
-    expect(Math.abs(r.total - sum)).toBeLessThan(Math.abs(sum) * 0.3 + 30);
-  });
-});
-// ── Package compression tests ─────────────────────────────────────────────
-import { compressPackage } from "../app/lib/xnav-engine";
-
-describe("compressPackage — age-tiered", () => {
-
-  it("single asset — no compression", () => {
-    expect(compressPackage([{ nav: 1082, isPick: false, age: 28 }])).toBeCloseTo(1082, 0);
-  });
-
-  it("veteran depth (age 33) — heavy compression", () => {
-    const fourVets = Array(4).fill(null).map(() => ({ nav: 270, isPick: false, age: 33 }));
-    // δ=0.55: 270 + 270×0.55 + 270×0.30 + 270×0.17 ≈ 545; penalty 3×60=180 → ~365
-    expect(compressPackage(fourVets)).toBeLessThan(450);
-    expect(compressPackage(fourVets)).toBeGreaterThan(200);
-  });
-
-  it("blue-chip prospects (age 21) — mild compression", () => {
-    const prospects = Array(3).fill(null).map(() => ({ nav: 270, isPick: false, age: 21 }));
-    // δ=0.80: 270 + 270×0.80 + 270×0.64 = 658.8; penalty 2×10=20 → 638.8
-    expect(compressPackage(prospects)).toBeGreaterThan(580);
-    expect(compressPackage(prospects)).toBeCloseTo(638.8, 0);
-  });
-
-  it("prospects compress significantly less than equivalent veterans", () => {
-    const prospects = Array(3).fill(null).map(() => ({ nav: 270, isPick: false, age: 21 }));
-    const veterans  = Array(3).fill(null).map(() => ({ nav: 270, isPick: false, age: 33 }));
-    expect(compressPackage(prospects)).toBeGreaterThan(compressPackage(veterans) + 100);
-  });
-
-  it("picks are fully linear — no age-tiered compression", () => {
-    expect(compressPackage([
-      { nav: 100, isPick: true },
-      { nav: 80,  isPick: true },
-    ])).toBeCloseTo(180, 0);
-  });
-
-  it("mixed: prime player + prospect + pick — each age tier applied correctly", () => {
-    const mixed = [
-      { nav: 300, isPick: false, age: 30 }, // prime: δ=0.60 at i=0 → 300
-      { nav: 80,  isPick: true             }, // pick: linear → 80
-      { nav: 100, isPick: false, age: 22 }, // prospect at i=1: 100×0.80=80, penalty 15
-    ];
-    // player sum: 300 + 80 - 10 = 370; pick: 80; total: 450
-    expect(compressPackage(mixed)).toBeCloseTo(450, 0);
-  });
-});
-
-================
 File: app/components/StrandView.tsx
 ================
 "use client";
@@ -98471,6 +97933,538 @@ export default function TradeProposalEngine({
 }
 
 ================
+File: __tests__/xnav.test.ts
+================
+// ── X-NAV Engine Test Suite ──────────────────────────────────────────────────
+// Run with: npx vitest run
+// Watch mode: npx vitest
+//
+// These tests establish NAV baselines for known archetypes.
+// If a change to the engine breaks these ranges, the test fails
+// BEFORE the code reaches production — no more catching Wedgewood
+// at +250 NAV via screenshot.
+//
+// Ranges are intentionally wide (~±20%) to allow for tuning
+// without constant test updates. They're floor/ceiling guards,
+// not precision assertions.
+
+import { describe, it, expect } from "vitest";
+import { calcNAV, calcGoalieNAV, calcPickNAV, calcSkaterNAV } from "../app/lib/xnav-engine";
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const inRange = (val: number, min: number, max: number, label: string) => {
+  if (val < min || val > max) {
+    throw new Error(`${label}: ${val} not in [${min}, ${max}]`);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GOALIE TESTS
+// ─────────────────────────────────────────────────────────────────────────────
+describe("G-NAV — Elite Starters", () => {
+  it("Hellebuyck: elite starter on good team → 150-220 NAV", () => {
+    const result = calcGoalieNAV({
+      id: "hellebuyck", name: "Connor Hellebuyck", position: "G",
+      age: 33, capHit: 8.5, yearsRemaining: 5,
+      gsax: 18.5, gamesStarted: 60, teamXga60: 2.35,
+    });
+    inRange(result.total, 150, 220, "Hellebuyck NAV");
+  });
+
+  it("Saros: solid starter on average team → 90-130 NAV", () => {
+    const result = calcGoalieNAV({
+      id: "saros", name: "Juuse Saros", position: "G",
+      age: 29, capHit: 5.0, yearsRemaining: 4,
+      gsax: 8.2, gamesStarted: 55, teamXga60: 2.60,
+    });
+    inRange(result.total, 90, 130, "Saros NAV");
+  });
+
+  it("Oettinger: decent starter on defensive team → 15-45 NAV", () => {
+    const result = calcGoalieNAV({
+      id: "oettinger", name: "Jake Oettinger", position: "G",
+      age: 26, capHit: 5.75, yearsRemaining: 4,
+      gsax: 5.1, gamesStarted: 50, teamXga60: 2.45,
+    });
+    inRange(result.total, 15, 45, "Oettinger NAV");
+  });
+});
+
+describe("G-NAV — Young Controlled Goalies", () => {
+  it("Wolf (with extension): cheap now but big commitment → 20-45 NAV", () => {
+    const result = calcGoalieNAV({
+      id: "wolf", name: "Dustin Wolf", position: "G",
+      age: 25, capHit: 0.875, yearsRemaining: 1,
+      gsax: -1.8, gamesStarted: 57, teamXga60: 2.85,
+      extensionCapHit: 7.5, extensionYears: 7,
+    });
+    inRange(result.total, 20, 45, "Wolf (extension) NAV");
+  });
+
+  it("Wolf (no extension): cheap controlled starter → 40-70 NAV", () => {
+    const result = calcGoalieNAV({
+      id: "wolf-noext", name: "Dustin Wolf", position: "G",
+      age: 25, capHit: 0.875, yearsRemaining: 2,
+      gsax: -1.8, gamesStarted: 57, teamXga60: 2.85,
+    });
+    inRange(result.total, 40, 70, "Wolf (no ext) NAV");
+    expect(result.total).toBeGreaterThan(20); // must exceed raw negative GSAx
+  });
+
+  it("Askarov: young tandem on terrible team → 25-55 NAV via floor", () => {
+    const result = calcGoalieNAV({
+      id: "askarov", name: "Yaroslav Askarov", position: "G",
+      age: 23, capHit: 2.0, yearsRemaining: 2,
+      gsax: -9.5, gamesStarted: 47, teamXga60: 3.10,
+    });
+    inRange(result.total, 25, 55, "Askarov NAV");
+    expect(result.total).toBeGreaterThan(0); // bad team context should prevent negative
+  });
+});
+
+describe("G-NAV — Backup/Tandem Edge Cases", () => {
+  it("Wedgewood: tandem goalie — hard cap at 60 NAV max", () => {
+    const result = calcGoalieNAV({
+      id: "wedge", name: "Scott Wedgewood", position: "G",
+      age: 33, capHit: 2.0, yearsRemaining: 1,
+      gsax: 23.1, gamesStarted: 45, teamXga60: 2.35,
+      extensionCapHit: 2.5, extensionYears: 1,
+    });
+    // 45 games = TANDEM, hard capped at 60
+    expect(result.total).toBeLessThanOrEqual(60);
+    inRange(result.total, 30, 60, "Wedgewood NAV");
+  });
+
+  it("Elite backup with small sample: regressed by confidence", () => {
+    const result = calcGoalieNAV({
+      id: "hot-backup", name: "Hot Streak Backup", position: "G",
+      age: 27, capHit: 1.5, yearsRemaining: 1,
+      gsax: 8.0, gamesStarted: 20, teamXga60: 2.55,
+    });
+    // 20 games backup — confidence should heavily regress this
+    expect(result.total).toBeLessThan(35);
+    inRange(result.total, 0, 35, "Elite backup (20gp) NAV");
+  });
+
+  it("Backup on a good team: per-game cap prevents inflation", () => {
+    const result = calcGoalieNAV({
+      id: "col-backup", name: "Col Backup", position: "G",
+      age: 30, capHit: 2.0, yearsRemaining: 1,
+      gsax: 15.0, gamesStarted: 30, teamXga60: 2.30,
+    });
+    expect(result.total).toBeLessThanOrEqual(35); // backup cap
+  });
+});
+
+describe("G-NAV — Declining Veterans", () => {
+  it("Aging starter on bad team: negative NAV is possible", () => {
+    const result = calcGoalieNAV({
+      id: "aging-g", name: "Aging Vet Goalie", position: "G",
+      age: 38, capHit: 4.5, yearsRemaining: 2,
+      gsax: -8.0, gamesStarted: 52, teamXga60: 2.55,
+    });
+    expect(result.total).toBeLessThan(20);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PICK TESTS
+// ─────────────────────────────────────────────────────────────────────────────
+describe("Pick NAV — First Round Curve", () => {
+  it("Last place team 1st (standing 32): near-untradable → 380-420 NAV", () => {
+    const result = calcPickNAV({
+      id: "sjs-1st", name: "SJS 1st", position: "Pick",
+      age: 0, capHit: 0, yearsRemaining: 0,
+      round: 1, year: 2026, teamStanding: 32,
+    });
+    inRange(result.total, 380, 420, "32nd pick NAV");
+  });
+
+  it("Bottom-3 team 1st (standing 30): franchise-altering → 320-360 NAV", () => {
+    const result = calcPickNAV({
+      id: "van-1st", name: "VAN 1st", position: "Pick",
+      age: 0, capHit: 0, yearsRemaining: 0,
+      round: 1, year: 2026, teamStanding: 30,
+    });
+    inRange(result.total, 320, 360, "30th pick NAV");
+  });
+
+  it("Mid-lottery team 1st (standing 24): solid prospect → 50-90 NAV", () => {
+    const result = calcPickNAV({
+      id: "mid-1st", name: "Mid 1st", position: "Pick",
+      age: 0, capHit: 0, yearsRemaining: 0,
+      round: 1, year: 2026, teamStanding: 24,
+    });
+    inRange(result.total, 100, 180, "24th pick NAV");
+  });
+
+  it("Contender 1st (standing 3): late pick, depth piece → 28-45 NAV", () => {
+    const result = calcPickNAV({
+      id: "car-1st", name: "CAR 1st", position: "Pick",
+      age: 0, capHit: 0, yearsRemaining: 0,
+      round: 1, year: 2026, teamStanding: 3,
+    });
+    inRange(result.total, 28, 45, "Contender 1st NAV");
+  });
+
+  it("Future 1st decays by year", () => {
+    const now = calcPickNAV({
+      id: "p2026", name: "2026 1st", position: "Pick",
+      age: 0, capHit: 0, yearsRemaining: 0,
+      round: 1, year: 2026, teamStanding: 25,
+    });
+    const future = calcPickNAV({
+      id: "p2028", name: "2028 1st", position: "Pick",
+      age: 0, capHit: 0, yearsRemaining: 0,
+      round: 1, year: 2028, teamStanding: 25,
+    });
+    expect(future.total).toBeLessThan(now.total);
+  });
+
+  it("2nd round pick: always less than any 1st from same team", () => {
+    const first  = calcPickNAV({ id:"f",name:"1st",position:"Pick",age:0,capHit:0,yearsRemaining:0,round:1,year:2026,teamStanding:25 });
+    const second = calcPickNAV({ id:"s",name:"2nd",position:"Pick",age:0,capHit:0,yearsRemaining:0,round:2,year:2026,teamStanding:25 });
+    expect(second.total).toBeLessThan(first.total);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SKATER TESTS
+// ─────────────────────────────────────────────────────────────────────────────
+describe("X-NAV — Franchise Centers", () => {
+  it("McDavid-tier: elite production, reasonable cap → 360-450 NAV", () => {
+    const result = calcSkaterNAV({
+      id: "mcdavid", name: "Connor McDavid", position: "C",
+      age: 28, capHit: 12.5, yearsRemaining: 2,
+      ptsPace: 140, xGPace: 45, defRate: 0.2,
+      avgTOI: 22, qocRank: 80, xgRelTM: 12, xgaRelTM: -0.3,
+      games: 78, ops: 12.5, dps: 2.1,
+    });
+    inRange(result.total, 360, 450, "McDavid NAV");
+  });
+
+  it("Barkov: two-way C, fair contract → 200-280 NAV", () => {
+    const result = calcSkaterNAV({
+      id: "barkov", name: "Aleksander Barkov", position: "C",
+      age: 30, capHit: 10.0, yearsRemaining: 8,
+      ptsPace: 88, xGPace: 22, defRate: 0.6,
+      avgTOI: 21, qocRank: 120, xgRelTM: 4, xgaRelTM: -0.5,
+      games: 75, ops: 7.2, dps: 5.8,
+    });
+    inRange(result.total, 200, 280, "Barkov NAV");
+  });
+});
+
+describe("X-NAV — Overpaid Veterans", () => {
+  it("Overpaid aging vet: negative NAV expected", () => {
+    const result = calcSkaterNAV({
+      id: "overpaid-vet", name: "Overpaid Vet", position: "W",
+      age: 37, capHit: 7.0, yearsRemaining: 3,
+      ptsPace: 38, xGPace: 8, defRate: -0.1,
+      avgTOI: 14, qocRank: 350, xgRelTM: -2, xgaRelTM: 0.2,
+      games: 55, ops: 2.1, dps: 1.2,
+    });
+    expect(result.total).toBeLessThan(0);
+  });
+
+  it("Salary dump contract: deeply negative → below -50 NAV", () => {
+    const result = calcSkaterNAV({
+      id: "salary-dump", name: "Salary Dump", position: "W",
+      age: 36, capHit: 8.5, yearsRemaining: 4,
+      ptsPace: 28, xGPace: 5, defRate: -0.2,
+      avgTOI: 12, qocRank: 400, xgRelTM: -4, xgaRelTM: 0.4,
+      games: 48, ops: 1.2, dps: 0.8,
+    });
+    expect(result.total).toBeLessThan(-50);
+  });
+});
+
+describe("X-NAV — Elite Defencemen", () => {
+  it("Makar-tier: elite offensive D, strong contract → 500-650 NAV", () => {
+    const result = calcSkaterNAV({
+      id: "makar", name: "Cale Makar", position: "D",
+      age: 26, capHit: 9.0, yearsRemaining: 3,
+      ptsPace: 90, xGPace: 28, defRate: 0.3,
+      avgTOI: 25, qocRank: 100, xgRelTM: 8, xgaRelTM: -0.4,
+      games: 78, ops: 9.5, dps: 5.2,
+    });
+    inRange(result.total, 500, 650, "Makar NAV");
+  });
+
+  it("Morrissey: two-way D with NOIV data — DEF bar positive, not an artifact", () => {
+    const result = calcSkaterNAV({
+      id: "morrissey", name: "Josh Morrissey", position: "D",
+      age: 29, capHit: 6.25, yearsRemaining: 6,
+      ptsPace: 58, xGPace: 12, defRate: 0.0, // suppressed — NOIV present
+      avgTOI: 24.7, qocRank: 106,
+      xgRelTM: 3.5, xgaRelTM: -0.38, dzPct: 0.42,
+      games: 77, ops: 3.5, dps: 5.0,
+    });
+    expect(result.def).toBeGreaterThan(0);   // not negative from suppression artifact
+    expect(result.def).toBeGreaterThan(10);  // meaningful positive — not just noise
+  });
+
+  it("Karlsson-type: offensive liability on D — DEF bar negative", () => {
+    const result = calcSkaterNAV({
+      id: "karlsson-type", name: "Offensive Liability D", position: "D",
+      age: 34, capHit: 7.0, yearsRemaining: 1,
+      ptsPace: 65, xGPace: 18, defRate: -0.2,
+      avgTOI: 21, qocRank: 280,
+      xgRelTM: 5, xgaRelTM: 0.30, // bleeds goals against
+      games: 70, ops: 6.5, dps: 1.2,
+    });
+    expect(result.def).toBeLessThan(0); // defensive liability should show negative
+  });
+
+  it("Low-minute depth player: DEF capped by TOI reliability — cannot exceed primary D-man", () => {
+    const depth = calcSkaterNAV({
+      id: "nyquist-type", name: "Depth Winger", position: "W",
+      age: 35, capHit: 1.5, yearsRemaining: 1,
+      ptsPace: 22, xGPace: 4, defRate: 0.8,
+      avgTOI: 12.0, qocRank: 420, dzPct: 0.40,
+      games: 58,
+    });
+    const pillarD = calcSkaterNAV({
+      id: "parayko-type", name: "Pillar D", position: "D",
+      age: 29, capHit: 5.5, yearsRemaining: 4,
+      ptsPace: 30, xGPace: 6, defRate: 0.4,
+      avgTOI: 22.0, qocRank: 130, dzPct: 0.60,
+      xgRelTM: 0.5, xgaRelTM: -0.25,
+      games: 72,
+    });
+    expect(depth.def).toBeLessThan(pillarD.def);
+    expect(Math.abs(depth.def)).toBeLessThan(5);
+  });
+
+  it("Selke candidate (Cirelli-type): shutdown C shows positive DEF from defRate", () => {
+    const result = calcSkaterNAV({
+      id: "cirelli", name: "Anthony Cirelli", position: "C",
+      age: 27, capHit: 6.5, yearsRemaining: 5,
+      ptsPace: 42, xGPace: 8, defRate: 0.35,
+      avgTOI: 17.2, qocRank: 105, dzPct: null, // no zone data — uses defRate path
+      xgRelTM: -1.0, xgaRelTM: 1.2,            // positive xgaRelTM from hard matchups
+      games: 75,
+    });
+    expect(result.def).toBeGreaterThan(0);   // must be positive for a Selke candidate
+    expect(result.def).toBeGreaterThan(8);   // meaningful, not just +1-2
+  });
+
+  it("Selke candidate with DZ% data: bonus kicks in", () => {
+    const result = calcSkaterNAV({
+      id: "cirelli-dz", name: "Cirelli DZ", position: "C",
+      age: 27, capHit: 6.5, yearsRemaining: 5,
+      ptsPace: 42, xGPace: 8, defRate: 0.35,
+      avgTOI: 17.2, qocRank: 105, dzPct: 0.56, // real DZ data available
+      xgRelTM: -1.0, xgaRelTM: 1.2,
+      games: 75,
+    });
+    expect(result.def).toBeGreaterThan(0);
+    // DZ% bonus should push it higher than no-data version
+    const noDZResult = calcSkaterNAV({
+      id: "cirelli-nodz", name: "Cirelli NoDZ", position: "C",
+      age: 27, capHit: 6.5, yearsRemaining: 5,
+      ptsPace: 42, xGPace: 8, defRate: 0.35,
+      avgTOI: 17.2, qocRank: 105, dzPct: null,
+      xgRelTM: -1.0, xgaRelTM: 1.2, games: 75,
+    });
+    expect(result.def).toBeGreaterThanOrEqual(noDZResult.def);
+  });
+
+  it("Selke candidate (Nelson-type): two-way C shows positive DEF", () => {
+    const result = calcSkaterNAV({
+      id: "nelson", name: "Brock Nelson", position: "C",
+      age: 33, capHit: 6.0, yearsRemaining: 1,
+      ptsPace: 55, xGPace: 14, defRate: 0.20,
+      avgTOI: 18.5, qocRank: 140, dzPct: null,
+      xgRelTM: 1.5, xgaRelTM: 0.3, games: 76,
+    });
+    expect(result.def).toBeGreaterThan(0);
+  });
+
+  it("Offensive forward: near-zero DEF — not a defensive player", () => {
+    const result = calcSkaterNAV({
+      id: "off-fwd", name: "Offensive Winger", position: "W",
+      age: 26, capHit: 7.0, yearsRemaining: 4,
+      ptsPace: 85, xGPace: 24, defRate: 0.02,
+      avgTOI: 18.0, qocRank: 310, dzPct: 0.43,
+      xgRelTM: 5.0, xgaRelTM: -0.1, games: 78,
+    });
+    expect(Math.abs(result.def)).toBeLessThan(8);
+  });
+
+  it("Selke C shows more DEF than offensive winger with similar stats", () => {
+    const selke = calcSkaterNAV({
+      id: "selke", name: "Selke C", position: "C",
+      age: 28, capHit: 5.5, yearsRemaining: 3,
+      ptsPace: 50, xGPace: 12, defRate: 0.32,
+      avgTOI: 18.0, qocRank: 120, dzPct: null,
+      xgRelTM: -0.5, xgaRelTM: 0.8, games: 76,
+    });
+    const offC = calcSkaterNAV({
+      id: "offc", name: "Offensive C", position: "C",
+      age: 28, capHit: 5.5, yearsRemaining: 3,
+      ptsPace: 50, xGPace: 12, defRate: 0.03,
+      avgTOI: 18.0, qocRank: 300, dzPct: null,
+      xgRelTM: 3.0, xgaRelTM: -0.3, games: 76,
+    });
+    expect(selke.def).toBeGreaterThan(offC.def);
+  });
+
+  it("Shutdown D: low pts but high defensive value → 130-200 NAV", () => {
+    const result = calcSkaterNAV({
+      id: "slavin", name: "Jaccob Slavin", position: "D",
+      age: 32, capHit: 5.3, yearsRemaining: 2,
+      ptsPace: 38, xGPace: 8, defRate: 0.8,
+      avgTOI: 22, qocRank: 90, xgRelTM: 1, xgaRelTM: -0.8,
+      games: 78, ops: 2.8, dps: 6.5,
+    });
+    inRange(result.total, 130, 200, "Slavin NAV");
+    // DEF must be meaningfully positive — xgaRelTM-0.8 at 22min = elite suppression
+    expect(result.def).toBeGreaterThan(25);
+  });
+});
+
+describe("X-NAV — Young Surplus Contracts", () => {
+  it("Young star on ELC: massive surplus value → 140+ NAV", () => {
+    const result = calcSkaterNAV({
+      id: "young-star", name: "Young Star", position: "C",
+      age: 21, capHit: 0.925, yearsRemaining: 1,
+      ptsPace: 85, xGPace: 22, defRate: 0.1,
+      avgTOI: 18, qocRank: 200, xgRelTM: 5, xgaRelTM: 0,
+      games: 68, ops: 7.2, dps: 2.1,
+    });
+    expect(result.total).toBeGreaterThan(140);
+  });
+
+  it("Age curve: younger player worth more than identical older player", () => {
+    const base = {
+      id: "base", name: "Player", position: "C" as const,
+      capHit: 5.0, yearsRemaining: 4,
+      ptsPace: 75, xGPace: 18, defRate: 0.2,
+      avgTOI: 18, qocRank: 200, xgRelTM: 3, xgaRelTM: 0,
+      games: 72,
+    };
+    const young = calcSkaterNAV({ ...base, id: "young", age: 23 });
+    const old   = calcSkaterNAV({ ...base, id: "old",   age: 34 });
+    expect(young.total).toBeGreaterThan(old.total);
+  });
+});
+
+describe("X-NAV — Salary Retention", () => {
+  it("50% retention increases NAV by reducing cap cost", () => {
+    const base = {
+      id: "retain", name: "Retained Player", position: "W" as const,
+      age: 34, capHit: 7.0, yearsRemaining: 2,
+      ptsPace: 55, xGPace: 14, defRate: 0.0,
+      avgTOI: 16, qocRank: 280, xgRelTM: 1, xgaRelTM: 0,
+      games: 70,
+    };
+    const noRetain = calcSkaterNAV({ ...base, retainedPct: 0 });
+    const retained = calcSkaterNAV({ ...base, retainedPct: 0.5 });
+    expect(retained.total).toBeGreaterThan(noRetain.total);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SANITY / REGRESSION GUARDS
+// ─────────────────────────────────────────────────────────────────────────────
+describe("Sanity Guards — Values that should never happen", () => {
+  it("No tandem goalie should exceed 60 NAV", () => {
+    const result = calcGoalieNAV({
+      id: "tandem-max", name: "Tandem G", position: "G",
+      age: 25, capHit: 1.0, yearsRemaining: 2,
+      gsax: 50.0, gamesStarted: 45, teamXga60: 2.55, // absurd GSAx, should still be capped
+    });
+    expect(result.total).toBeLessThanOrEqual(60);
+  });
+
+  it("No backup should exceed 35 NAV", () => {
+    const result = calcGoalieNAV({
+      id: "backup-max", name: "Backup G", position: "G",
+      age: 24, capHit: 0.9, yearsRemaining: 1,
+      gsax: 30.0, gamesStarted: 25, teamXga60: 2.55,
+    });
+    expect(result.total).toBeLessThanOrEqual(35);
+  });
+
+  it("Last place 1st round pick should always beat contender 1st", () => {
+    const worst = calcPickNAV({ id:"w",name:"w",position:"Pick",age:0,capHit:0,yearsRemaining:0,round:1,year:2026,teamStanding:32 });
+    const best  = calcPickNAV({ id:"b",name:"b",position:"Pick",age:0,capHit:0,yearsRemaining:0,round:1,year:2026,teamStanding:1  });
+    expect(worst.total).toBeGreaterThan(best.total);
+  });
+
+  it("Extension reduces NAV vs cheap current deal", () => {
+    const cheap = calcGoalieNAV({
+      id:"cheap",name:"G",position:"G",age:25,capHit:0.875,yearsRemaining:2,
+      gsax:3.0,gamesStarted:55,teamXga60:2.55,
+    });
+    const extended = calcGoalieNAV({
+      id:"ext",name:"G",position:"G",age:25,capHit:0.875,yearsRemaining:1,
+      gsax:3.0,gamesStarted:55,teamXga60:2.55,
+      extensionCapHit:7.5,extensionYears:7,
+    });
+    expect(extended.total).toBeLessThan(cheap.total);
+  });
+
+  it("NAV components sum correctly — total ≈ off + def + age + cap", () => {
+    const r = calcSkaterNAV({
+      id:"sum",name:"P",position:"C",age:27,capHit:6.0,yearsRemaining:3,
+      ptsPace:80,xGPace:20,defRate:0.2,avgTOI:19,qocRank:200,
+      xgRelTM:3,xgaRelTM:0,games:72,
+    });
+    const sum = r.off + r.def + r.age + r.cap;
+    // Total should be within 20% of component sum (multiplier / rounding can differ)
+    expect(Math.abs(r.total - sum)).toBeLessThan(Math.abs(sum) * 0.3 + 30);
+  });
+});
+// ── Package compression tests ─────────────────────────────────────────────
+import { compressPackage } from "../app/lib/xnav-engine";
+
+describe("compressPackage — age-tiered", () => {
+
+  it("single asset — no compression", () => {
+    expect(compressPackage([{ nav: 1082, isPick: false, age: 28 }])).toBeCloseTo(1082, 0);
+  });
+
+  it("veteran depth (age 33) — heavy compression", () => {
+    const fourVets = Array(4).fill(null).map(() => ({ nav: 270, isPick: false, age: 33 }));
+    // δ=0.55: 270 + 270×0.55 + 270×0.30 + 270×0.17 ≈ 545; penalty 3×60=180 → ~365
+    expect(compressPackage(fourVets)).toBeLessThan(450);
+    expect(compressPackage(fourVets)).toBeGreaterThan(200);
+  });
+
+  it("blue-chip prospects (age 21) — mild compression", () => {
+    const prospects = Array(3).fill(null).map(() => ({ nav: 270, isPick: false, age: 21 }));
+    // δ=0.80: 270 + 270×0.80 + 270×0.64 = 658.8; penalty 2×10=20 → 638.8
+    expect(compressPackage(prospects)).toBeGreaterThan(580);
+    expect(compressPackage(prospects)).toBeCloseTo(638.8, 0);
+  });
+
+  it("prospects compress significantly less than equivalent veterans", () => {
+    const prospects = Array(3).fill(null).map(() => ({ nav: 270, isPick: false, age: 21 }));
+    const veterans  = Array(3).fill(null).map(() => ({ nav: 270, isPick: false, age: 33 }));
+    expect(compressPackage(prospects)).toBeGreaterThan(compressPackage(veterans) + 100);
+  });
+
+  it("picks are fully linear — no age-tiered compression", () => {
+    expect(compressPackage([
+      { nav: 100, isPick: true },
+      { nav: 80,  isPick: true },
+    ])).toBeCloseTo(180, 0);
+  });
+
+  it("mixed: prime player + prospect + pick — each age tier applied correctly", () => {
+    const mixed = [
+      { nav: 300, isPick: false, age: 30 }, // prime: δ=0.60 at i=0 → 300
+      { nav: 80,  isPick: true             }, // pick: linear → 80
+      { nav: 100, isPick: false, age: 22 }, // prospect at i=1: 100×0.80=80, penalty 15
+    ];
+    // player sum: 300 + 80 - 10 = 370; pick: 80; total: 450
+    expect(compressPackage(mixed)).toBeCloseTo(450, 0);
+  });
+});
+
+================
 File: app/lib/trade-types.ts
 ================
 // ============================================================
@@ -99409,31 +99403,33 @@ select.ledger-select {
 ================
 File: app/lib/xnav-engine.ts
 ================
-// ── X-NAV Pure Valuation Engine ─────────────────────────────────────────────
-// This module contains only pure math — no Next.js, no HTTP, no side effects.
-// Imported by /api/evaluate/route.ts for production and by tests for validation.
-// Any change to these functions will be caught by the test suite before deploy.
+// ── X-NAV Pure Valuation Engine 2.0 ─────────────────────────────────────────
+// Single source of truth for all asset valuation math.
+// No Next.js, no HTTP, no side effects — pure functions only.
+//
+// Key 2.0 features:
+//   • Time-Discounted Cap Surplus Model (cap grows 4%/yr; far-future years cost less)
+//   • Non-Linear Superstar Cap Curve (elite production commands exponential cap share)
+//   • RFA Cliff for goalies (cost-controlled years premium)
+//   • Positional Scarcity Premium (C +15%, top-pair D +20%)
+//   • Exponential Retention Tax
+//   • Rental discount on age penalty (1yr = 75% reduction, 2yr = 40%)
 
 import { LEAGUE, FRANCHISE, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
-// DPS_NAV_MULTIPLIER: dps * 15 (MicroBar display) * 8 (NAV weight) = dps * 120 net.
-// Changing one without the other silently drifts the display from the math.
-export const DPS_NAV_MULTIPLIER = 120; // net NAV per Point Share of DPS
 
+export const DPS_NAV_MULTIPLIER = 15; // dps * 15 = defPS for NAV (not 120 — the *8 bug is removed)
+
+// ── Interfaces ────────────────────────────────────────────────────────────────
 export interface AssetInput {
-  // Identity
   id:             string;
   name:           string;
   position:       "C" | "W" | "D" | "G" | "Pick";
   age:            number;
-
-  // Contract
   capHit:         number;
   yearsRemaining: number;
   retainedPct?:   number;
   extensionCapHit?: number;
   extensionYears?:  number;
-
-  // Skater stats
   ptsPace?:       number;
   xGPace?:        number;
   defRate?:       number;
@@ -99445,20 +99441,14 @@ export interface AssetInput {
   ops?:           number | null;
   dps?:           number | null;
   games?:         number;
-
-  // Goalie stats
   gsax?:          number;
   savePct?:       number;
   gamesStarted?:  number;
-  teamXga60?:     number;    // team xGA/60 — goalie context adjustment
-
-  // Pick fields
+  teamXga60?:     number;
   round?:         number;
   year?:          number;
   teamStanding?:  number;
   isProtected?:   boolean;
-
-  // Misc
   multiplier?:    number;
   hasLiveStats?:  boolean;
   baselineGsax?:  number;
@@ -99473,22 +99463,22 @@ export interface XNAVResult {
   upside:      number;
   noivImpact?: number;
   fArchetype?: string;
+  isRFA?:      boolean;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 export const safe  = (n: number): number => (isNaN(n) || !isFinite(n) ? 0 : n);
 export const clamp = (n: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, n));
 
-// ── Pick NAV ─────────────────────────────────────────────────────────────────
+// ── Pick NAV ──────────────────────────────────────────────────────────────────
 export function calcPickNAV(asset: AssetInput): XNAVResult {
-  const round    = asset.round ?? 1;
-  const year     = asset.year  ?? 2026;
+  const round    = asset.round    ?? 1;
+  const year     = asset.year     ?? 2026;
   const standing = asset.teamStanding ?? 16;
   const yearDecay = Math.pow(0.88, year - 2026);
 
   let baseValue: number;
-
   if (round === 1) {
     if      (standing >= 30) baseValue = standing === 32 ? 400 : standing === 31 ? 370 : 340;
     else if (standing >= 27) baseValue = standing === 29 ? 290 : standing === 28 ? 260 : 235;
@@ -99509,7 +99499,6 @@ export function calcPickNAV(asset: AssetInput): XNAVResult {
 
   const pickTotal = Math.max(round === 1 ? 5 : 1, baseValue * yearDecay);
   const upsideFraction = standing >= 27 ? 0.55 : standing >= 20 ? 0.45 : 0.30;
-
   return {
     total:  Math.round(pickTotal),
     off: 0, def: 0, age: 0, cap: 0,
@@ -99517,71 +99506,57 @@ export function calcPickNAV(asset: AssetInput): XNAVResult {
   };
 }
 
-// ── Goalie NAV (G-NAV) ────────────────────────────────────────────────────────
+// ── Goalie NAV ────────────────────────────────────────────────────────────────
 export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const gamesG      = Math.max(1, asset.gamesStarted ?? asset.games ?? 1);
   const confidenceG = Math.min(1.0, Math.pow(gamesG / 60, 1.4));
+  const isStarter   = gamesG >= 50;
+  const isBackup    = gamesG < 38;
+  const isTandem    = !isStarter && !isBackup;
 
-  const isStarter = gamesG >= 50;
-  const isBackup  = gamesG < 38;
-  const isTandem  = !isStarter && !isBackup;
+  const gsaxRaw          = safe(asset.gsax ?? 0);
+  const gsaxPerGame      = gsaxRaw / gamesG;
+  const perGameCap       = isStarter ? 0.48 : isTandem ? 0.35 : 0.22;
+  const gsaxPerGameCapped = gsaxPerGame > 0 ? Math.min(gsaxPerGame, perGameCap) : gsaxPerGame;
 
-  const gsaxRaw     = safe(asset.gsax ?? 0);
-  const gsaxPerGame = gsaxRaw / gamesG;
-
-  // Soft per-game ceiling — Hellebuyck's best season was 0.46/game
-  const perGameCap = isStarter ? 0.48 : isTandem ? 0.35 : 0.22;
-  const gsaxPerGameCapped = gsaxPerGame > 0
-    ? Math.min(gsaxPerGame, perGameCap)
-    : gsaxPerGame;
-
-  // Team defense context — xGA/60 vs league average (2.55)
-  // LEAGUE.avgXga60 — imported from season-config as LEAGUE.avgXga60
-  const teamXga60 = asset.teamXga60 ?? LEAGUE.avgXga60;
+  const teamXga60     = asset.teamXga60 ?? LEAGUE.avgXga60;
   const defCorrection = clamp((teamXga60 - LEAGUE.avgXga60) * 0.40, -0.15, 0.25);
-  const gsaxPer60 = (gsaxPerGameCapped + defCorrection) * 60;
-
-  // LEAGUE.gsaxSd — imported from season-config as LEAGUE.gsaxSd
-  // Bayesian regression — blend current season with career mean
-  const careerMean = asset.baselineGsax ?? 0;
-  const expGSAx = gsaxPer60 * confidenceG + careerMean * (1 - confidenceG);
+  const gsaxPer60     = (gsaxPerGameCapped + defCorrection) * 60;
+  const careerMean    = asset.baselineGsax ?? 0;
+  const expGSAx       = gsaxPer60 * confidenceG + careerMean * (1 - confidenceG);
 
   const goalieImpact = expGSAx >= 0
     ? Math.pow(expGSAx / LEAGUE.gsaxSd, 1.5) * 80
     : (expGSAx / LEAGUE.gsaxSd) * 40;
 
-  const workloadBonus = isStarter
-    ? Math.min(20, (gamesG / 60) * 15)
-    : isTandem
-    ? Math.min(10, (gamesG / 60) * 10)
-    : Math.min(5,  (gamesG / 60) * 5);
+  const workloadBonus = isStarter ? Math.min(20, (gamesG / 60) * 15)
+    : isTandem ? Math.min(10, (gamesG / 60) * 10)
+    : Math.min(5, (gamesG / 60) * 5);
 
   const peakAge    = 30;
-  const agePenalty = asset.age > peakAge
-    ? Math.pow(asset.age - peakAge, 1.8) * 1.2
-    : 0;
+  const agePenalty = asset.age > peakAge ? Math.pow(asset.age - peakAge, 1.8) * 1.2 : 0;
   const ageFactor  = Math.max(0.3, 1.05 - agePenalty / 100);
 
-  const effectiveCap   = asset.capHit * (1 - (asset.retainedPct || 0));
-  const extCapHit      = asset.extensionCapHit;
-  const extYears       = asset.extensionYears;
-  const navCapHit      = extCapHit ? extCapHit * (1 - (asset.retainedPct || 0)) : effectiveCap;
-  const navYears       = extCapHit ? (extYears ?? asset.yearsRemaining) : asset.yearsRemaining;
-  const navTermMult    = Math.min(2.5, 1.0 + navYears * 0.15);
+  const effectiveCap = asset.capHit * (1 - (asset.retainedPct || 0));
+  const extCapHit    = asset.extensionCapHit;
+  const navCapHit    = extCapHit ? extCapHit * (1 - (asset.retainedPct || 0)) : effectiveCap;
+  const navYears     = extCapHit ? (asset.extensionYears ?? asset.yearsRemaining) : asset.yearsRemaining;
+
+  // RFA Cliff: cost-controlled goalie years carry a premium
+  const isRFA       = asset.age + navYears <= 27;
+  const navTermMult = isRFA
+    ? Math.min(2.5, 1.4 + navYears * 0.15)
+    : Math.min(2.5, 1.0 + navYears * 0.12);
+
   const capCostG       = navCapHit * 1.6 * navTermMult;
-  const retainedBonus  = (asset.retainedPct || 0) * asset.capHit * 10;
+  const retentionSev   = Math.pow((asset.retainedPct || 0) * 100, 1.25);
+  const retainedBonus  = retentionSev * asset.capHit * 0.06;
+  const rawTotal       = safe((goalieImpact + workloadBonus) * ageFactor - capCostG + retainedBonus);
 
-  const rawTotal = safe((goalieImpact + workloadBonus) * ageFactor - capCostG + retainedBonus);
-
-  // Young goalie floor — applies to starters AND tandem goalies without extensions
   const isYoungControlled = asset.age <= 26 && effectiveCap <= 3.5 && !extCapHit;
   const youngFloor = isYoungControlled && (isStarter || isTandem)
-    ? Math.max(0,
-        (27 - asset.age) * 10
-        - effectiveCap * 3
-        + Math.min(15, (gamesG / 82) * 20)
-        + (isTandem ? -8 : 0)
-      )
+    ? Math.max(0, (27 - asset.age) * 10 - effectiveCap * 3
+        + Math.min(15, (gamesG / 82) * 20) + (isTandem ? -8 : 0))
     : 0;
 
   const roleCap     = isBackup ? 35 : isTandem ? 60 : 250;
@@ -99596,148 +99571,144 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
     upside: youngFloor > 0 ? youngFloor * 0.4 : 0,
     noivImpact: 0,
     fArchetype: "",
+    isRFA,
   };
 }
 
-// ── Skater NAV (X-NAV) ────────────────────────────────────────────────────────
+// ── Skater NAV ────────────────────────────────────────────────────────────────
 export function calcSkaterNAV(asset: AssetInput): XNAVResult {
-  const pts      = safe(asset.ptsPace ?? 0);
-  const xg       = safe(asset.xGPace  ?? 0);
-  const def      = safe(asset.defRate ?? 0);
-  const toi      = safe(asset.avgTOI  ?? 18);
-  const qoc      = safe(asset.qocRank ?? 300);
-  const xgRel    = safe(asset.xgRelTM ?? 0);
-  const xgaRel   = safe(asset.xgaRelTM ?? 0);
-  const dzPct    = safe(asset.dzPct   ?? 0.5);
-  const ops      = asset.ops != null ? safe(asset.ops) : null;
-  const dps      = asset.dps != null ? safe(asset.dps) : null;
-  const age      = asset.age;
-  const isD      = asset.position === "D";
-  const games    = asset.games ?? 60;
+  const pts    = safe(asset.ptsPace ?? 0);
+  const xg     = safe(asset.xGPace  ?? 0);
+  const def    = safe(asset.defRate ?? 0);
+  const toi    = safe(asset.avgTOI  ?? 18);
+  const qoc    = safe(asset.qocRank ?? 300);
+  const xgRel  = safe(asset.xgRelTM ?? 0);
+  const xgaRel = safe(asset.xgaRelTM ?? 0);
+  const dzPct  = safe(asset.dzPct   ?? 0.5);
+  const ops    = asset.ops != null ? safe(asset.ops) : null;
+  const dps    = asset.dps != null ? safe(asset.dps) : null;
+  const age    = asset.age;
+  const isD    = asset.position === "D";
+  const games  = asset.games ?? 60;
 
   const effectiveCap = asset.capHit * (1 - (asset.retainedPct || 0));
   const confidence   = clamp(games / 65, 0.3, 1.0);
 
-// ── Offensive value ───────────────────────────────────────────
-  const ptsScale = isD ? 0.75 : 1.0;
-  const ptsVal   = pts * ptsScale;
+  // ── Offensive value ───────────────────────────────────────────
+  const ptsScale  = isD ? 0.75 : 1.0;
+  const ptsVal    = pts * ptsScale;
+  const noivBonus = clamp(xgRel * 3.5, -20, 25);
+  const offPS     = ops !== null ? ops * 17 : null;
 
-  const noivBonus = clamp(xgRel * 3.5, -20, 25); 
-
-  const offPS  = ops !== null ? ops * 17 : null;
-  
-  // If we have pure historical Point Shares, let that be the primary driver.
-  // We fade out the NOIV bonus when OPS is present to prevent modern inflation.
-const offRaw = offPS !== null
-    ? (offPS * confidence) + (ptsVal * 1.6 * (1 - confidence)) + (noivBonus * 0.25)
-    : (ptsVal * 1.6) + (xg * 0.5) + noivBonus;
+  // Power-law curve: elite players separate more than linear pts * 1.6
+  const offRaw = offPS !== null
+    ? (offPS * confidence) + Math.pow(ptsVal / 45, 1.6) * 55 * (1 - confidence) + (noivBonus * 0.25)
+    : Math.pow(ptsVal / 45, 1.6) * 55 + (xg * 0.5) + noivBonus;
 
   let offTotal = safe(offRaw);
-
-  // ── THE LEMIEUX ASYMPTOTE ─────────────────────────────────────
-  // Modern stats (xG, NOIV) inflate current stars past historical benchmarks.
-  // As a player surpasses 250 OFF, the gravity of historical greatness kicks in.
-  // It becomes exponentially harder to gain points, ensuring nobody touches 
-  // Lemieux's 300 ceiling unless they literally score 200 real-world points.
-  if (offTotal > 250) {
-    const excess = offTotal - 250;
-    // Compress all excess value to 40% strength
-    offTotal = 250 + (excess * 0.40); 
+  // Soft ceiling at 450 — historic Gretzky-level seasons still separate
+  if (offTotal > 450) {
+    const excess = offTotal - 450;
+    offTotal = 450 + (150 * (1 - Math.exp(-excess / 150)));
   }
 
   // ── Defensive value ───────────────────────────────────────────
-  // FIX: dps * 15 directly (was defPS * 8 = dps * 15 * 8 = dps * 120).
-  // The old * 15 display scaler was compounded with a * 8 NAV weight,
-  // inflating defTotal 8x — Makar showed DEF=720, Ekholm DEF=360.
-  // dps * 15 gives ~70-100 for elite D, ~30-50 for solid D — correct range.
-  const defPS  = dps !== null ? dps * 15 : null;  // kept for any display usage
   const toiD   = clamp((toi - 15) * 2.5, 0, 30);
   const qocVal = clamp((400 - qoc) / 400 * 20, 0, 20);
   const dzVal  = clamp((dzPct - 0.3) * 40, 0, 12);
 
-  const defRaw   = dps !== null
+  // dps * 15 (not * 120 — the old * 15 * 8 compounding bug is removed)
+  const defRaw = dps !== null
     ? dps * 15 * confidence + (def * 20 + qocVal + toiD) * (1 - confidence)
     : def * 20 + qocVal + toiD + dzVal - xgaRel * 4;
   const defTotal = safe(defRaw);
 
+  // DEF display (position-aware, not used in total)
   const xgaRelDisp = asset.xgaRelTM;
   const toiWeightD = Math.pow(clamp(toi / 18, 0.4, 2.0), 1.3);
-
-  const defReliabilityWeight = toi >= 20 ? 1.0
-    : toi >= 17 ? 0.65
-    : toi >= 15 ? 0.35
-    : 0.15;
-
-  const isForwardPos = ["C","W","L","R","F"].includes(asset.position ?? "");
-
-  // dzPct: null = no zone data. Don't default to 0.5 (gives everyone +3 spuriously).
+  const defReliabilityWeight = toi >= 20 ? 1.0 : toi >= 17 ? 0.65 : toi >= 15 ? 0.35 : 0.15;
+  const isForwardPos = ["C", "W", "L", "R", "F"].includes(asset.position ?? "");
   const dzRaw    = asset.dzPct;
   const hasDZData = dzRaw !== null && dzRaw !== undefined;
   const dzPctVal  = hasDZData ? safe(dzRaw!) : null;
 
-  // ── Forward DEF display ───────────────────────────────────────
-  // Mirrors evaluate/route.ts logic exactly so tests match production.
-  //
-  // defRate for display: bypasses NOIV suppression (display-only — doesn't affect NAV).
-  // adjustedDef = 0 when hasNOIV=true, so we use rawDef for forwards directly.
   const rawDefForDisplay  = safe(asset.defRate ?? 0);
   const clampedDefDisplay = Math.max(-0.3, Math.min(0.4, rawDefForDisplay));
-
   const fwdDzBonus = isForwardPos && hasDZData
-    ? Math.max(0, (dzPctVal! - 0.45) * 60)
-    : 0;
-
+    ? Math.max(0, (dzPctVal! - 0.45) * 60) : 0;
   const fwdDefRate = isForwardPos
-    ? safe(clampedDefDisplay * 45 * defReliabilityWeight)
-    : 0;
-
+    ? safe(clampedDefDisplay * 45 * defReliabilityWeight) : 0;
   const xgaRD = asset.xgaRelTM;
   const fwdMatchupCredit = isForwardPos && hasDZData && dzPctVal! > 0.50
     && xgaRD !== null && xgaRD !== undefined && xgaRD > 0
-    ? Math.min(6, xgaRD * (dzPctVal! - 0.45) * 60)
-    : 0;
+    ? Math.min(6, xgaRD * (dzPctVal! - 0.45) * 60) : 0;
 
-  // fwdNoDataFallback REMOVED — it used xgaRelTM which = -defRate (double-dipping).
-  // Single signal: defRate only. Clean, no cancellation.
-
-  const forwardDef = clamp(
-    fwdDzBonus + fwdDefRate + fwdMatchupCredit,
-    -20, 35
-  );
-
-  const defDisplay = isForwardPos
-    ? forwardDef
+  const forwardDef = clamp(fwdDzBonus + fwdDefRate + fwdMatchupCredit, -20, 35);
+  const defDisplay = isForwardPos ? forwardDef
     : (xgaRelDisp !== null && xgaRelDisp !== undefined) && (asset.games ?? 0) >= 20
     ? clamp(safe(-xgaRelDisp * toiWeightD * 40 * defReliabilityWeight), -40, 50)
     : defTotal * defReliabilityWeight;
 
   // ── Age curve ─────────────────────────────────────────────────
-  const peakAge  = isD ? 27 : 26;
-  const baseAge  = age <= peakAge
-    ? Math.max(0, (peakAge - age) * 4.5)           // youth upside
-    : -Math.pow(age - peakAge, 1.6) * 1.8;          // decline penalty
-  // Rental / short-term discount on age PENALTY (not bonus):
-  //   1yr left → 75% reduction (pure rental — you're betting on this season only)
-  //   2yr left → 40% reduction (short commitment — limited exposure to decline)
-  //   3+yr     → no reduction (you own the decline curve)
-  const yrs = asset.yearsRemaining || 3;
+  const peakAge = isD ? 27 : 26;
+  const baseAge = age <= peakAge
+    ? Math.max(0, (peakAge - age) * 4.5)
+    : -Math.pow(age - peakAge, 1.6) * 1.8;
+  // Rental discount: 1yr contract = 75% age penalty reduction; 2yr = 40%
+  const yrs          = asset.yearsRemaining || 3;
   const rentalFactor = yrs <= 1 ? 0.25 : yrs <= 2 ? 0.60 : 1.0;
-  const ageVal   = baseAge < 0 ? baseAge * rentalFactor : baseAge;
-  const ageTotal = safe(ageVal);
+  const ageVal       = baseAge < 0 ? baseAge * rentalFactor : baseAge;
+  const ageTotal     = safe(ageVal);
 
-  // ── Contract cost ─────────────────────────────────────────────
-  const termMult  = Math.min(2.5, 1.0 + asset.yearsRemaining * 0.12);
-  // FIX: * 6 (was * 10) — cap * 10 was calibrated when DEF was 8x inflated.
-  // With corrected DEF, * 10 made elite players on big contracts go negative.
-  // * 6 restores balance: elite players on fair contracts show positive NAV.
-  const capCost   = effectiveCap * 6 * termMult;
-  const retained  = (asset.retainedPct || 0) * asset.capHit * 12;
-  const capTotal  = safe(-(capCost - retained));
+  // ── On-Ice Core ───────────────────────────────────────────────
+  const trueMarketValue = offTotal + defTotal + ageTotal;
+  const isRFA = asset.age + asset.yearsRemaining <= 27;
 
-  // ── NOIV impact for display ───────────────────────────────────
-  const noivImpact = Math.round(noivBonus);
+  // ── Time-Discounted Cap Surplus Model ─────────────────────────
+  // Treats the contract as a multi-year liability that deflates as the cap grows.
+  // Non-linear superstar curve: elite production commands an exponential cap share,
+  // so Draisaitl at $14M on 7yr isn't crushed the same as a depth player.
+  const BASE_CAP_CEILING = 104.0;
+  const CAP_GROWTH_RATE  = 1.04;
+  const contractYears    = Math.max(1, asset.yearsRemaining || 1);
+
+  // Star premium: franchise talent commands exponential market value above $1M/20NAV
+  const baseExpectedCap = trueMarketValue / 20;
+  const starPremium     = trueMarketValue > 150
+    ? Math.pow((trueMarketValue - 150) / 45, 1.6)
+    : 0;
+  const marketValueDollars = Math.max(0.9, baseExpectedCap + starPremium);
+
+  let netSurplusValuePoints = 0;
+  for (let i = 0; i < contractYears; i++) {
+    const projectedCapCeiling = BASE_CAP_CEILING * Math.pow(CAP_GROWTH_RATE, i);
+    // Cap footprint shrinks relative to a growing ceiling
+    const adjustedCapFootprint = effectiveCap * (BASE_CAP_CEILING / projectedCapCeiling);
+    const annualSurplusDollars = marketValueDollars - adjustedCapFootprint;
+    const annualSurplusPoints  = annualSurplusDollars * 20;
+    const timeDiscount         = Math.pow(0.92, i); // 8% annual financial discounting
+    if (annualSurplusPoints >= 0) {
+      // Bargain: surplus years are premium assets; RFA years get structural bonus
+      const ageAtYear        = asset.age + i;
+      const structuralPremium = ageAtYear <= 27 ? 1.25 : 1.10;
+      netSurplusValuePoints  += annualSurplusPoints * structuralPremium * timeDiscount;
+    } else {
+      // Overpaid: deficit years are unmitigated drag anchors
+      netSurplusValuePoints += annualSurplusPoints * 1.35 * timeDiscount;
+    }
+  }
+
+  // Normalise by duration; elite production in one slot earns efficiency bonus
+  const rosterSlotEfficiencyBonus = Math.max(1.0, trueMarketValue / 180);
+  const baselineCapComponent      = (netSurplusValuePoints / contractYears) * rosterSlotEfficiencyBonus;
+
+  // Retention tax (exponential — absorbing dead cap still commands a premium)
+  const retentionSev  = Math.pow((asset.retainedPct || 0) * 100, 1.25);
+  const retainedBonus = retentionSev * asset.capHit * 0.08;
+  const capTotal      = safe(baselineCapComponent + retainedBonus);
 
   // ── Forward archetype ─────────────────────────────────────────
+  const noivImpact = Math.round(noivBonus);
   let fArchetype = "";
   if (!isD) {
     const psRatio = ops !== null && dps !== null && (ops + dps) > 1
@@ -99747,18 +99718,21 @@ const offRaw = offPS !== null
         : psRatio > 0.58 ? "SCORER"
         : psRatio < 0.35 ? "GRINDER"
         : defTotal > 35 && offTotal > 60 ? "TWO_WAY"
-        : offTotal > 70 ? "PLAYMAKER" : "SCORER";
+        : offTotal > 70 ? "PLAYMAKER"
+        : "SCORER";
     } else {
       fArchetype = pts > 80 ? "SNIPER"
         : def > 0.5 && toi > 20 ? "TWO_WAY"
-        : pts > 50 ? "PLAYMAKER" : "SCORER";
+        : pts > 50 ? "PLAYMAKER"
+        : "SCORER";
     }
   }
 
-  // ── Multiplier (extension, intangible) ────────────────────────
-  const mult = asset.multiplier ?? 1.0;
-
-  const total = safe((offTotal + defTotal + ageTotal + capTotal) * mult);
+  // ── Positional Scarcity Premium ───────────────────────────────
+  const isTopPairD       = isD && toi > 22;
+  const positionalPremium = asset.position === "C" ? 1.15 : isTopPairD ? 1.20 : 1.0;
+  const mult             = asset.multiplier ?? 1.0;
+  const total            = safe((trueMarketValue + capTotal) * mult * positionalPremium);
 
   return {
     total:  Math.round(total),
@@ -99769,10 +99743,11 @@ const offRaw = offPS !== null
     upside: Math.round(Math.max(0, ageTotal)),
     noivImpact,
     fArchetype,
+    isRFA,
   };
 }
 
-// ── Main dispatch ─────────────────────────────────────────────────────────────
+// ── Entry point ───────────────────────────────────────────────────────────────
 export function calcNAV(asset: AssetInput): XNAVResult {
   if (asset.position === "Pick") return calcPickNAV(asset);
   if (asset.position === "G")    return calcGoalieNAV(asset);
@@ -99780,52 +99755,23 @@ export function calcNAV(asset: AssetInput): XNAVResult {
 }
 
 // ── Package compression ───────────────────────────────────────────────────────
-// True Package Value = Σ(NAVᵢ × δⁱ⁻¹) − (n−1) × μ
-//
-// δ (decay):       Each subsequent asset is worth less — roster slots are finite.
-//                  2nd asset = 60%, 3rd = 36%, 4th = 21.6%, ...
-// μ (slotPenalty): Structural cost of burning a roster slot on depth vs elite talent.
-//                  50 NAV per extra slot — reflects displacement of existing baseline utility.
-//
-// Why: A single 1,000-NAV superstar is not replaceable by four 250-NAV assets.
-// A team receiving four depth pieces must use four roster slots, four cap chunks,
-// and four lineup spots — degrading the remaining roster's production density.
-// This models the scarcity economics of elite concentration vs depth distribution.
-//
-// Picks skip the slot penalty (they don't consume a current-year active roster slot)
-// but still decay (marginal value of each additional pick diminishes).
-// Age-tiered compression helpers — prospects compress much less than veterans.
-// Each tier reflects different roster-slot economics:
-//   Prospects (≤23): independent developmental bets, not yet occupying prime slots
-//   Young NHL (24-27): semi-independent, beginning to compete for prime slots
-//   Prime (28-31): full roster slot competition, standard compression
-//   Veterans (32+): steepest — maximum displacement cost, limited upside
-// ageDecayRate / ageSlotPenalty — imported from season-config
-
 export function compressPackage(
   assets: Array<{ nav: number; isPick?: boolean; age?: number }>,
 ): number {
   if (assets.length === 0) return 0;
-  // Picks: no compression — future options, independent value, no slot costs
-  // Players: compressed with age-tiered decay rate and slot penalty per asset
   const picks   = assets.filter(a => a.isPick);
   const players = assets.filter(a => !a.isPick);
   const pickValue = picks.reduce((sum, a) => sum + a.nav, 0);
   if (players.length === 0) return pickValue;
   const sorted = [...players].sort((a, b) => b.nav - a.nav);
-  let decaySum = 0;
-  let penaltySum = 0;
+  let decaySum = 0, penaltySum = 0;
   sorted.forEach((a, i) => {
-    const age = a.age ?? 27; // default to prime age when unknown
-    decaySum += a.nav * Math.pow(ageDecayRate(age), i);
+    const age = a.age ?? 27;
+    decaySum  += a.nav * Math.pow(ageDecayRate(age), i);
     if (i > 0) penaltySum += ageSlotPenalty(age);
   });
   return pickValue + Math.max(0, decaySum - penaltySum);
 }
-
-// Tier classification for franchise veto logic
-// FRANCHISE.threshold — imported from season-config as FRANCHISE.threshold
-// FRANCHISE.megalodon — imported from season-config as FRANCHISE.megalodon
 
 ================
 File: app/players/page.tsx
@@ -100680,7 +100626,7 @@ const compressPackage = (assets: Asset[]): number => {
 
 
 // ============================================================
-// GM LOGIC ENGINE — v7.1
+// X-NAV — v2.0
 // ============================================================
 type FlagSeverity = "HARD" | "SOFT" | "WARN" | "INFO";
 type FlagCategory =
