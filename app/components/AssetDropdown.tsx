@@ -1,18 +1,20 @@
 "use client";
 // ── AssetDropdown — search + select player from a team roster ─
 import React from "react";
-import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
+import type { Asset, Team } from "@/app/lib/trade-types";
+import { useTradeStore } from "@/app/store/tradeStore";
 
 function AssetDropdown({
-  idx, team, db, blocks, setBlocks, navMap
+  idx, team, db
 }: {
   idx: 0 | 1;
   team: Team | null;
   db: { teams: Team[]; players: Asset[] };
-  blocks: [Asset[], Asset[]];
-  setBlocks: React.Dispatch<React.SetStateAction<[Asset[], Asset[]]>>;
-  navMap: Record<string, XNAVResult>;
 }) {
+  const blocks = useTradeStore(s => s.blocks);
+  const navMap = useTradeStore(s => s.navMap);
+  const addAsset = useTradeStore(s => s.addAsset);
+
   const label = idx === 0 ? "+ ADD OUTGOING ASSET" : "+ REQUEST INCOMING ASSET";
 
   const eligible = db.players
@@ -33,11 +35,7 @@ function AssetDropdown({
       onChange={(e) => {
         const asset = db.players.find((p) => p.id === e.target.value);
         if (asset) {
-          setBlocks((prev) => {
-            const n = [...prev] as [Asset[], Asset[]];
-            n[idx] = [...n[idx], { ...asset, retainedPct: 0 }];
-            return n;
-          });
+          addAsset({ ...asset, retainedPct: 0 }, idx);
         }
         e.target.value = "";
       }}

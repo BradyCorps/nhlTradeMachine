@@ -2,24 +2,29 @@
 // ── AssetCard — individual player/pick card in trade panels ───
 import React from "react";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
-import { PLAYER_PEDIGREE, INJURY_RISK, PROSPECT_TIERS, SHUTDOWN_D_PEDIGREE } from "@/app/lib/player-data";
+import { PLAYER_PEDIGREE } from "@/app/lib/player-data";
 import { HISTORICAL_MAX_OFF, HISTORICAL_MAX_DEF } from "@/app/lib/historical-benchmarks";
 import { MicroBar } from "@/app/components/MicroBar";
 import StrandView from "@/app/components/StrandView";
+import { useTradeStore } from "@/app/store/tradeStore";
+import { AssetBadges } from "@/app/components/AssetBadges";
 
 const fmt = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
 
-function AssetCard({
-  asset, idx, blocks, setBlocks, onRequestTrade, navResult, navMap
+export default function AssetCard({
+  asset, idx, onRequestTrade, navResult
 }: {
   asset: Asset;
   idx: 0 | 1;
-  blocks: [Asset[], Asset[]];
-  setBlocks: React.Dispatch<React.SetStateAction<[Asset[], Asset[]]>>;
   onRequestTrade?: (a: Asset) => void;
   navResult?: XNAVResult;
-  navMap?: Record<string, XNAVResult>;
 }) {
+  const blocks = useTradeStore(s => s.blocks);
+  const navMap = useTradeStore(s => s.navMap);
+  const updateBlock = useTradeStore(s => s.updateBlock);
+  const removeAssetFromStore = useTradeStore(s => s.removeAsset);
+  const setRetainedPctStore = useTradeStore(s => s.setRetainedPct);
+
   const [view, setView] = React.useState<"STATS" | "STRAND">("STATS");
   const [compareId, setCompareId] = React.useState<string>("");
   const xnav   = navResult ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
@@ -34,19 +39,11 @@ function AssetCard({
     : null;
 
   const updateAsset = (partial: Partial<Asset>) => {
-    setBlocks((prev) => {
-      const n = [...prev] as [Asset[], Asset[]];
-      n[idx] = n[idx].map((a) => a.id === asset.id ? { ...a, ...partial } : a);
-      return n;
-    });
+    updateBlock(idx, blocks[idx].map((a) => a.id === asset.id ? { ...a, ...partial } : a));
   };
 
   const removeAsset = () => {
-    setBlocks((prev) => {
-      const n = [...prev] as [Asset[], Asset[]];
-      n[idx] = n[idx].filter((a) => a.id !== asset.id);
-      return n;
-    });
+    removeAssetFromStore(asset.id, idx);
   };
 
   const navColor = xnav.total > 80 ? 'var(--ledger-green)' : xnav.total > 20 ? 'var(--ledger-navy)' : xnav.total > -20 ? 'var(--ledger-brown)' : 'var(--ledger-red)';
@@ -118,145 +115,8 @@ function AssetCard({
                   })()}
             </div>
             
-            {/* Awards badges */}
-            {PLAYER_PEDIGREE[asset.name]?.awards && PLAYER_PEDIGREE[asset.name].awards!.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1">
-                {Array.from(new Set(PLAYER_PEDIGREE[asset.name].awards)).map((award) => {
-                  const count = PLAYER_PEDIGREE[asset.name].awards!.filter(a => a === award).length;
-                  return (
-                    <span key={award} className="text-2xs px-1 py-0.5 font-black" style={{ color: 'var(--ledger-amber)', border: '1px solid rgba(138,92,0,0.4)',  }}>
-                      {count > 1 ? `${count}× ` : ""}{award}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-            {/* Prospect tier badge */}
-            {PROSPECT_TIERS[asset.name] && (
-              <div className="flex items-center gap-1 mt-1">
-                <span className="text-2xs px-1 py-0.5 font-black" style={{
-                  color: PROSPECT_TIERS[asset.name].tier === 1 ? 'var(--ledger-navy)' : PROSPECT_TIERS[asset.name].tier === 2 ? 'var(--ledger-green)' : 'var(--ledger-brown)',
-                  border: `1px solid ${PROSPECT_TIERS[asset.name].tier === 1 ? 'rgba(26,46,92,0.4)' : PROSPECT_TIERS[asset.name].tier === 2 ? 'rgba(26,92,46,0.4)' : 'rgba(107,80,48,0.4)'}`,
-                  
-                }}>
-                  {PROSPECT_TIERS[asset.name].tier === 1 ? "★ FRANCHISE" : PROSPECT_TIERS[asset.name].tier === 2 ? "◆ TOP PROSPECT" : "◇ PROSPECT"}
-                </span>
-              </div>
-            )}
-            {/* Injury risk badge */}
-            {INJURY_RISK[asset.name] && (
-              <div className="flex items-center gap-1 mt-1">
-                <span className="text-2xs px-1 py-0.5 font-black" style={{
-                  color: 'var(--ledger-red)',
-                  border: '1px solid rgba(184,48,32,0.4)'
-                }} title={INJURY_RISK[asset.name].note}>
-                  ⚕ {INJURY_RISK[asset.name].level} RISK
-                </span>
-              </div>
-            )}
-            {/* D-man archetype badge */}
-            {asset.position === "D" && !isPick && (() => {
-              const pts = asset.ptsPace ?? 0;
-              const toi = asset.avgTOI ?? 0;
-              const qoc = asset.qocRank ?? 450;
-              let arch = "DEPTH D";
-              let color = 'var(--ledger-brown)';
-              let title = "5th/6th defender — limited deployment";
-              if (pts >= 45) {
-                arch = "OFFENSIVE D"; color = 'var(--ledger-navy)';
-                title = "Offensive defenceman — primary value from scoring and powerplay";
-              } else if (pts >= 28 && toi >= 21) {
-                arch = "TWO-WAY D"; color = 'var(--ledger-green)';
-                title = "Two-way defenceman — contributes offensively and defensively";
-              } else if (pts < 28 && toi >= 19 && qoc < 220) {
-                arch = "SHUTDOWN D"; color = 'var(--ledger-amber)';
-                title = `Shutdown defenceman — faces elite competition (QoC rank: ${qoc}), valued for defensive role not scoring`;
-              }
-              return (
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-2xs px-1 py-0.5 font-black" style={{
-                    color, border: `1px solid ${color}40`
-                  }} title={title}>
-                    {arch}
-                  </span>
-                </div>
-              );
-            })()}
-            {/* Forward archetype badge */}
-            {["C","W","L","R"].includes(asset.position) && !isPick && xnav.fArchetype && (() => {
-              const archMap: Record<string, { color: string; title: string }> = {
-                FRANCHISE:  { color: 'var(--ledger-ink)', title: "Franchise — elite production with dominant creative or NOIV impact" },
-                SNIPER:     { color: 'var(--ledger-navy)', title: "Sniper — goal-first scorer, goal ratio > 53% of points" },
-                PLAYMAKER:  { color: 'var(--ledger-green)', title: "Playmaker — primary value from assist generation and play-driving" },
-                TWO_WAY:    { color: 'var(--ledger-amber)', title: "Two-Way Forward — balanced offense with strong defensive suppression" },
-                GRINDER:    { color: 'var(--ledger-red)', title: "Grinder — defensive deployment, physical play, limited offensive upside" },
-                SCORER:     { color: 'var(--ledger-navy)', title: "Scoring Forward — balanced offensive production" },
-              };
-              const cfg = archMap[xnav.fArchetype];
-              if (!cfg) return null;
-              return (
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-2xs px-1 py-0.5 font-black" style={{
-                    color: cfg.color,
-                    border: `1px solid ${cfg.color}40`,
-                  }} title={cfg.title}>
-                    {xnav.fArchetype.replace("_", " ")}
-                  </span>
-                </div>
-              );
-            })()}
-
-            {/* Change of scenery badge — negative NAV players that might thrive elsewhere */}
-            {!isPick && xnav.total < -5 && xnav.total > -40 && asset.age <= 32 && (
-              <div className="flex items-center gap-1 mt-1">
-                <span className="text-2xs px-1 py-0.5 font-black" style={{
-                  color: 'var(--ledger-gold)',
-                  border: '1px solid rgba(148,105,20,0.45)',
-                }} title={`Negative NAV on current team — may suit a different system or situation. Teams with cap space and the right roster need sometimes absorb these contracts for picks.`}>
-                  ⟳ CHANGE OF SCENERY
-                </span>
-              </div>
-            )}
-
-            {/* Salary dump badge — deeply negative, hard to move */}
-            {!isPick && xnav.total <= -40 && (
-              <div className="flex items-center gap-1 mt-1">
-                <span className="text-2xs px-1 py-0.5 font-black" style={{
-                  color: 'var(--ledger-red)',
-                  border: '1px solid rgba(184,48,32,0.45)',
-                }} title="Deeply negative contract — moving this requires significant salary retention or picks sweetener.">
-                  ⚠ SALARY DUMP
-                </span>
-              </div>
-            )}
-
-            {/* Surplus contract stamp */}
-            {!isPick && (() => {
-              const effectiveCap = asset.capHit * (1 - (asset.retainedPct || 0));
-              const isSurplus = xnav.total > effectiveCap * 18 && xnav.total > 50;
-              if (!isSurplus) return null;
-              return (
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-2xs px-1 py-0.5 font-black" style={{
-                    color: 'var(--ledger-green)',
-                    border: '1px solid rgba(26,92,46,0.5)',
-                  }} title="Surplus contract — this player's on-ice value significantly exceeds their cap hit.">
-                    ★ SURPLUS CONTRACT
-                  </span>
-                </div>
-              );
-            })()}
-            {/* Shutdown D pedigree badge */}
-            {SHUTDOWN_D_PEDIGREE[asset.name] && (
-              <div className="flex items-center gap-1 mt-1">
-                <span className="text-2xs px-1 py-0.5 font-black" style={{
-                  color: 'var(--ledger-amber)',
-                  border: '1px solid rgba(138,92,0,0.5)'
-                }} title={SHUTDOWN_D_PEDIGREE[asset.name].note}>
-                  ★ ELITE SHUTDOWN
-                </span>
-              </div>
-            )}
+            {/* Asset Badges */}
+            <AssetBadges asset={asset} xnav={xnav} />
           </div>
         </div>
 
@@ -569,4 +429,33 @@ function AssetCard({
 }
 
 
-export default AssetCard;
+
+
+// ============================================================
+// MICRO COMPONENTS
+// ============================================================
+
+function StatItem({ val, pct, label, good, invert, note }: { val: string; pct: number; label: string; good?: boolean; invert?: boolean; note?: string }) {
+  // same color logic...
+  const color = good === undefined
+    ? 'var(--ledger-navy)'
+    : good ? (invert ? 'var(--ledger-amber)' : 'var(--ledger-green)') : (invert ? 'var(--ledger-green)' : 'var(--ledger-red)');
+  
+  return (
+    <div className="flex justify-between items-center group relative cursor-help">
+      <span className="text-[10px] font-black uppercase tracking-widest text-ledger-ink-faint">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] font-bold" style={{ color }}>{val}</span>
+        <div className="w-12 h-1 rounded-full overflow-hidden shrink-0" style={{ background: 'var(--ledger-rule-light)' }}>
+          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+        </div>
+      </div>
+      {note && (
+        <div className="absolute right-0 bottom-full mb-1 w-48 p-2 bg-ledger-cream border border-ledger-rule shadow-sm 
+                        text-[9px] text-ledger-ink-faint font-medium rounded opacity-0 group-hover:opacity-100 pointer-events-none z-10 transition-opacity">
+          {note}
+        </div>
+      )}
+    </div>
+  );
+}

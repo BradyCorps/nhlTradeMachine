@@ -3,6 +3,72 @@ import { PROSPECT_TIERS, INJURY_RISK } from "@/app/lib/player-data";
 import type { Asset, EvaluateRequest, EvaluateResponse, FArchetype } from "@/app/lib/trade-types";
 import { SEASON, LEAGUE, FRANCHISE } from "@/app/lib/season-config";
 import { calcNAV, compressPackage as coreCompress, AssetInput, XNAVResult } from "@/app/lib/xnav-engine";
+import { z } from "zod";
+
+// ============================================================
+// ZOD SCHEMAS
+// ============================================================
+const AssetSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  position: z.enum(["C", "W", "D", "G", "Pick", "L", "R"]),
+  age: z.number().nullish().default(27),
+  capHit: z.number().nullish().default(0),
+  yearsRemaining: z.number().nullish().default(1),
+  retainedPct: z.number().nullish(),
+  extensionCapHit: z.number().nullish(),
+  extensionYears: z.number().nullish(),
+  ptsPace: z.number().nullish(),
+  xGPace: z.number().nullish(),
+  defRate: z.number().nullish(),
+  avgTOI: z.number().nullish(),
+  qocRank: z.number().nullish(),
+  xgRelTM: z.number().nullish(),
+  xgaRelTM: z.number().nullish(),
+  dzPct: z.number().nullish(),
+  ops: z.number().nullish(),
+  dps: z.number().nullish(),
+  games: z.number().nullish(),
+  gsax: z.number().nullish(),
+  savePct: z.number().nullish(),
+  gamesStarted: z.number().nullish(),
+  teamXga60: z.number().nullish(),
+  round: z.number().nullish(),
+  year: z.number().nullish(),
+  teamStanding: z.number().nullish(),
+  isProtected: z.boolean().nullish(),
+  multiplier: z.number().nullish(),
+  hasLiveStats: z.boolean().nullish(),
+  baselineGsax: z.number().nullish(),
+  baselinePtsPace: z.number().nullish(),
+  baselineGameScore: z.number().nullish(),
+  baselineDpsProxy: z.number().nullish(),
+  teamId: z.string().nullish(),
+  hasNMC: z.boolean().nullish(),
+  hasNTC: z.boolean().nullish(),
+  canRetain: z.boolean().nullish(),
+}).passthrough();
+
+const TeamSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  capSpace: z.number(),
+  standing: z.number(),
+  phase: z.string().optional(),
+  needs: z.array(z.any()).optional(),
+}).passthrough();
+
+const EvaluateRequestSchema = z.object({
+  assets: z.array(AssetSchema).optional(),
+  runTrade: z.boolean().optional(),
+  tradeOutgoing: z.array(AssetSchema).optional(),
+  tradeIncoming: z.array(AssetSchema).optional(),
+  homeTeam: TeamSchema.optional(),
+  partnerTeam: TeamSchema.optional(),
+  allHomeRoster: z.array(AssetSchema).optional(),
+  allPartnerRoster: z.array(AssetSchema).optional(),
+});
+
 
 type Team = import("@/app/lib/trade-types").Team;
 
@@ -895,7 +961,15 @@ interface TradeVerdict {
 // ============================================================
 export async function POST(req: Request) {
   try {
-    const body: EvaluateRequest = await req.json();
+    const rawBody = await req.json();
+    
+    // Validate incoming payload with Zod
+    const parsed = EvaluateRequestSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      console.error("[evaluate] Validation Error:", parsed.error.format());
+      return NextResponse.json({ error: "Invalid payload structure", details: parsed.error.format() }, { status: 400 });
+    }
+    const body = parsed.data as unknown as EvaluateRequest;
 
     const navMap: Record<string, XNAVResult> = {};
     if (Array.isArray(body.assets)) {

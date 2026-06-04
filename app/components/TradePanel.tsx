@@ -6,25 +6,28 @@ import AssetCard from "@/app/components/AssetCard";
 import AssetDropdown from "@/app/components/AssetDropdown";
 import LedgerDropdown from "@/app/components/LedgerDropdown";
 
+import { useTradeStore } from "@/app/store/tradeStore";
+
 function TradePanel({
-  idx, team, nav, capSpace, db, blocks, setTeams, setBlocks, label, accent, navMap, locked, onRequestTrade, onRequestBlockTrade
+  idx, team, nav, capSpace, db, label, accent, locked, onRequestTrade, onRequestBlockTrade
 }: {
   idx: 0 | 1;
   team: Team | null;
   nav: number;
   capSpace: number;
   db: { teams: Team[]; players: Asset[] };
-  blocks: [Asset[], Asset[]];
-  setTeams: React.Dispatch<React.SetStateAction<[Team | null, Team | null]>>;
-  setBlocks: React.Dispatch<React.SetStateAction<[Asset[], Asset[]]>>;
   label: string;
   accent: string;
-  navMap: Record<string, XNAVResult>;
   locked?: boolean;
   onRequestTrade?: (a: Asset) => void;
   onRequestBlockTrade?: (block: Asset[]) => void;
 }) {
   const isLeft = idx === 0;
+  const teams = useTradeStore(s => s.teams);
+  const setTeams = useTradeStore(s => s.setTeams);
+  const blocks = useTradeStore(s => s.blocks);
+  const setBlocks = useTradeStore(s => s.setBlocks);
+  const navMap = useTradeStore(s => s.navMap);
 
   return (
     <div className="relative border rounded-2xl p-4 lg:p-6 flex flex-col min-h-[400px] lg:min-h-[1rem]" style={{
@@ -106,11 +109,8 @@ function TradePanel({
             key={a.id}
             asset={a}
             idx={idx}
-            blocks={blocks}
-            setBlocks={setBlocks}
             onRequestTrade={onRequestTrade}
             navResult={navMap[a.id]}
-            navMap={navMap}
           />
         ))}
       </div>
@@ -126,7 +126,7 @@ function TradePanel({
       )}
 
       {/* Asset selector */}
-      <AssetDropdown idx={idx} team={team} db={db} blocks={blocks} setBlocks={setBlocks} navMap={navMap} />
+      <AssetDropdown idx={idx} team={team} db={db} />
     </div>
   );
 }

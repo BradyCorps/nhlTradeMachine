@@ -1,28 +1,18 @@
 import { NextResponse } from "next/server";
 import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
+import { scrapeCapWages } from "@/app/services/scraper";
+import { redis } from "@/app/lib/redis";
 export const dynamic = "force-dynamic";
 
 const CAP_CEILING = 104.0;
 const CAP_FLOOR   = 70.6;
 
-// ── In-memory cache — works in both local dev and serverless ──
-// Global variables persist across warm lambda invocations on Vercel.
-// On cold start or after TTL, data is re-fetched from source APIs.
-declare global {
-  var __teamsCache:     { data: any[];                ts: number } | null;
-  var __contractsCache: { data: Record<string, any>; ts: number } | null;
-  var __mpSkaterCache:  { csv: string;                ts: number } | null;
-  var __mpGoalieCache:  { csv: string;                ts: number } | null;
-}
-if (!global.__teamsCache)     global.__teamsCache     = null;
-if (!global.__contractsCache) global.__contractsCache = null;
-if (!global.__mpSkaterCache)  global.__mpSkaterCache  = null;
-if (!global.__mpGoalieCache)  global.__mpGoalieCache  = null;
+const TEAMS_CACHE_TTL     = 6  * 60 * 60; // 6 hours (in seconds for Redis)
+const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
+const MONEYPUCK_CACHE_TTL = 4  * 60 * 60; // 4 hours
+const PS_CACHE_TTL        = 12 * 60 * 60; // 12 hours
 
-const TEAMS_CACHE_TTL     = 6  * 60 * 60 * 1000; // 6 hours
-const CONTRACTS_CACHE_TTL = 23 * 60 * 60 * 1000; // 23 hours
-const MONEYPUCK_CACHE_TTL = 4  * 60 * 60 * 1000; // 4 hours — MP updates ~twice daily
 
 // ── Team metadata that needs human curation ──────────────────
 // Everything else (standing, capSpace, phase) comes from live APIs
@@ -113,9 +103,9 @@ const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: num
 };
 
 async function loadTeams(): Promise<any[]> {
-  // ── Check in-memory cache (works on Vercel — no filesystem needed) ──
-  if (global.__teamsCache && Date.now() - global.__teamsCache.ts < TEAMS_CACHE_TTL) {
-    if (global.__teamsCache.data.length >= 32) return global.__teamsCache.data;
+  if (redis) {
+    const cached = await redis.get<any[]>("cache:teams");
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
   }
 
   // ── Fetch standings from NHL stats API ───────────────────────
@@ -235,7 +225,6 @@ async function loadTeams(): Promise<any[]> {
   }
 
   // ── Build team objects ────────────────────────────────────────
-// ── Build team objects ────────────────────────────────────────
   const teams = TEAMS_DB.map((t) => {
     const st       = standingsMap.get(t.id);
     const standing = st?.standing       ?? t.standing;
@@ -258,142 +247,20 @@ async function loadTeams(): Promise<any[]> {
   });
 
   // ── Cache result ──────────────────────────────────────────────
-  try {
-  // ── Store in-memory cache ─────────────────────────────────────
-  global.__teamsCache = { data: teams, ts: Date.now() };
-  } catch (_) {}
+  if (redis && teams.length > 0) {
+    await redis.setex("cache:teams", TEAMS_CACHE_TTL, teams);
+  }
+
 
   return teams;
 }
 
-// ── CapWages contract scraper ─────────────────────────────────
-// CapWages embeds all player data in a __NEXT_DATA__ JSON blob.
-// Array indices (verified against known contracts):
-//   [0]  name "Last, First"
-//   [2]  teamId
-//   [3]  position
-//   [8]  age
-    // CapWages array key indices (verified 2025-26):
-    //   [0]  player name (LastName, FirstName)
-    //   [2]  team abbreviation
-    //   [3]  position code
-    //   [8]  current age
-    //   [15] total contract length in years
-    //   [18] AAV cap hit (in $100k units — divide by 10 for millions)
-    //   [24] expiry status (UFA/RFA)
-    //   [28] age at signing (primary) — but swapped with [29] for some players
-    //   [29] age at signing (secondary) — take max(p[28], p[29]) for reliability
-//   [18] capHit (raw number, divide by 10 to get $M — e.g. 85 = $8.5M)
-//   [24] expiryStatus ("UFA" | "RFA" | ...)
-//   [29] age at signing
-
-// loadBundled uses dynamic require — no path constant needed
-
-// Convert "Last, First" → "First Last"
-const normaliseName = (raw: string): string => {
-  const parts = raw.split(",").map((s) => s.trim());
-  return parts.length === 2 ? `${parts[1]} ${parts[0]}` : raw;
-};
-
-async function scrapeCapWages(): Promise<Record<string, any>> {
-  try {
-    const res = await fetch("https://capwages.com/players/active", {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-      signal: AbortSignal.timeout(15000),
-      cache: "no-store",
-    });
-
-    if (!res.ok) return {};
-
-    const html  = await res.text();
-    const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-    if (!match) return {};
-
-    const nextData  = JSON.parse(match[1]);
-    const players   = nextData?.props?.pageProps?.playersArray;
-    if (!Array.isArray(players) || players.length < 100) return {};
-
-    const contracts: Record<string, any> = {};
-    let scraped = 0;
-    let skipped = 0;
-    const skipReasons: Record<string, string> = {};
-
-    for (const p of players) {
-      if (!Array.isArray(p) || p.length < 30) { skipped++; continue; }
-
-      const rawName      = p[0]  as string;
-      const capRaw       = p[18] as number;
-      const expiryStatus = p[24] as string;
-      const teamSlug     = (p[2] as string ?? "").toLowerCase().replace(/\s+/g, "_");
-      const position     = (p[3] as string ?? "").toUpperCase();
-      const ageNow      = p[8]  as number;
-      const totalLength = p[15] as number;
-
-      if (!rawName || !capRaw || capRaw <= 0) {
-        if (rawName) skipReasons[normaliseName(rawName)] = `capRaw=${capRaw} (p[18] null/zero)`;
-        skipped++;
-        continue;
-      }
-
-      const name   = normaliseName(rawName);
-      const capHit = Math.round((capRaw / 10) * 1000) / 1000;
-
-      // ── Sanity check ──────────────────────────────────────────
-      const CAP_MIN = 0.70;
-      const CAP_MAX = 18.0;
-      if (capHit < CAP_MIN || capHit > CAP_MAX) {
-        skipReasons[name] = `capHit=${capHit} out of range [${CAP_MIN},${CAP_MAX}]`;
-        skipped++;
-        continue;
-      }
-
-      // ── Correct years remaining formula ──────────────────────
-      // p[28] and p[29] both encode "age at signing" but CapWages
-      // inconsistently swaps them between players — DeMelo has them
-      // reversed vs McDavid/Parayko/Morrissey. max() reliably
-      // identifies the correct signing age in all observed cases.
-      // Verified against PuckPedia for Parayko, Hellebuyck, McDavid,
-      // Morrissey, DeMelo — all correct.
-      const ageSigned      = Math.max((p[28] as number) || 0, (p[29] as number) || 0);
-      const yearsServed    = (ageNow && ageSigned) ? Math.max(0, ageNow - ageSigned) : 0;
-      const yearsRemaining = totalLength > 0 ? Math.max(1, totalLength - yearsServed) : 1;
-
-      const contractData = {
-        capHit,
-        yearsRemaining: Math.max(0, yearsRemaining),
-        expiryStatus,
-        position,
-        teamSlug,
-      };
-
-      contracts[name] = contractData;
-      if (position) contracts[`${name}__${position}`] = contractData;
-      if (teamSlug) contracts[`${name}__${teamSlug}`]  = contractData;
-      scraped++;
-    }
-
-    console.log(`[CapWages] Scraped ${scraped} players, skipped ${skipped}.`);
-    // Log any known-good players that got skipped — helps diagnose index drift
-    const watchList = ["Quinton Byfield","Connor McDavid","Nathan MacKinnon","Auston Matthews"];
-    for (const name of watchList) {
-      if (!contracts[name]) {
-        const reason = skipReasons[name] ?? "not found in playersArray";
-        console.warn(`[CapWages] ⚠ ${name} missing from contracts — ${reason}`);
-      }
-    }
-    return contracts;
-  } catch (_) {
-    return {};
-  }
-}
-
 async function loadContracts(): Promise<Record<string, any>> {
-  if (global.__contractsCache && Date.now() - global.__contractsCache.ts < CONTRACTS_CACHE_TTL) {
-    if (Object.keys(global.__contractsCache.data).length > 200) return global.__contractsCache.data;
+  if (redis) {
+    const cached = await redis.get<Record<string, any>>("cache:contracts");
+    if (cached && Object.keys(cached).length > 200) return cached;
   }
+
 
   const bundled = loadBundled();
   const fresh   = await scrapeCapWages();
@@ -438,9 +305,10 @@ async function loadContracts(): Promise<Record<string, any>> {
     }
   }
 
-  if (Object.keys(merged).length > 200) {
-    global.__contractsCache = { data: merged, ts: Date.now() };
+  if (redis && Object.keys(merged).length > 200) {
+    await redis.setex("cache:contracts", CONTRACTS_CACHE_TTL, merged);
   }
+
   return merged;
 }
 
@@ -989,16 +857,12 @@ interface NHLTeamRow {
   points:       number;
 }
 
-declare global {
-  var __psCache: { data: Map<string, { ops: number; dps: number }>; ts: number } | null;
-}
-if (!global.__psCache) global.__psCache = null;
-const PS_CACHE_TTL = 12 * 60 * 60 * 1000; // 12 hours
-
 async function fetchPointShares(): Promise<Map<string, { ops: number; dps: number }>> {
-  // Check cache
-  if (global.__psCache && Date.now() - global.__psCache.ts < PS_CACHE_TTL) {
-    return global.__psCache.data;
+  if (redis) {
+    const cached = await redis.get<Record<string, { ops: number; dps: number }>>("cache:pointshares");
+    if (cached) {
+      return new Map(Object.entries(cached));
+    }
   }
 
   const psMap = new Map<string, { ops: number; dps: number }>();
@@ -1170,7 +1034,9 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
     }
 
     console.log(`[PS] Computed Point Shares for ${psMap.size / 2} players`);
-    global.__psCache = { data: psMap, ts: Date.now() };
+    if (redis) {
+      await redis.setex("cache:pointshares", PS_CACHE_TTL, Object.fromEntries(psMap));
+    }
     return psMap;
 
   } catch (e: any) {
@@ -1196,22 +1062,29 @@ export async function GET() {
   const teamXgaMap = new Map<string, { xGoals: number; games: number }>();
   let fbMap = new Map<string, any>();
 
-  const mpNow = Date.now();
-  const skaterCsvFresh = global.__mpSkaterCache && mpNow - global.__mpSkaterCache.ts < MONEYPUCK_CACHE_TTL;
-  const goalieCsvFresh = global.__mpGoalieCache && mpNow - global.__mpGoalieCache.ts < MONEYPUCK_CACHE_TTL;
+  let skaterCsv: string | null = null;
+  let goalieCsv: string | null = null;
+  
+  if (redis) {
+    skaterCsv = await redis.get<string>("cache:mp_skaters");
+    goalieCsv = await redis.get<string>("cache:mp_goalies");
+  }
+
+  const skaterCsvFresh = !!skaterCsv;
+  const goalieCsvFresh = !!goalieCsv;
 
   try {
     // Fetch only stale CSVs — use cache for fresh ones
     const [mpRes, gpRes] = await Promise.allSettled([
       skaterCsvFresh
-        ? Promise.resolve({ ok: true, text: async () => global.__mpSkaterCache!.csv })
+        ? Promise.resolve({ ok: true, text: async () => skaterCsv! })
         : fetchWithTimeout(
             "https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/skaters.csv",
             8000,
             { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
           ),
       goalieCsvFresh
-        ? Promise.resolve({ ok: true, text: async () => global.__mpGoalieCache!.csv })
+        ? Promise.resolve({ ok: true, text: async () => goalieCsv! })
         : fetchWithTimeout(
             "https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/goalies.csv",
             8000,
@@ -1223,7 +1096,7 @@ export async function GET() {
     if (mpRes.status === "fulfilled" && mpRes.value.ok) {
       const csv  = await mpRes.value.text();
       // Store in cache if this was a fresh fetch
-      if (!skaterCsvFresh) global.__mpSkaterCache = { csv, ts: mpNow };
+      if (!skaterCsvFresh && redis) await redis.setex("cache:mp_skaters", MONEYPUCK_CACHE_TTL, csv);
       const rows = csv.split("\n").filter(Boolean);
       const hdr  = parseCSVRow(rows[0]);
       const h    = (k: string) => hdr.indexOf(k);
@@ -1339,7 +1212,7 @@ export async function GET() {
     if (gpRes.status === "fulfilled" && gpRes.value.ok) {
       const csv  = await gpRes.value.text();
       // Store in cache if this was a fresh fetch
-      if (!goalieCsvFresh) global.__mpGoalieCache = { csv, ts: mpNow };
+      if (!goalieCsvFresh && redis) await redis.setex("cache:mp_goalies", MONEYPUCK_CACHE_TTL, csv);
       const rows = csv.split("\n").filter(Boolean);
       const hdr  = parseCSVRow(rows[0]);
       const h    = (k: string) => hdr.indexOf(k);
