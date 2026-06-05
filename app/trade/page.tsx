@@ -14,6 +14,7 @@ import {
   PLAYER_PEDIGREE, PROSPECT_TIERS, SHUTDOWN_D_PEDIGREE, INJURY_RISK,
 } from "@/app/lib/player-data";
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from "react";
+import { createPortal } from "react-dom";
 
 // Lazy-load heavy components — defers their JS from the initial bundle.
 // Each one is only parsed/executed when first rendered.
@@ -140,29 +141,32 @@ export default function TradeMachine() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db]);
   const [verdictOpen, setVerdictOpen] = useState(false);   // bottom sheet expanded
+  const [showTeamSelect, setShowTeamSelect] = useState(false); // Team select modal open
 
-  // Freeze body scroll when verdict panel is open (prevents background scroll on mobile)
+  // Freeze body scroll when verdict panel or team select modal is open
   React.useEffect(() => {
-    if (verdictOpen) {
+    if (verdictOpen || showTeamSelect) {
       const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       document.body.style.paddingRight = `${scrollbarWidth}px`;
       document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
     } else {
       document.body.style.paddingRight = '0px';
       document.body.style.overflow = 'unset';
+      document.documentElement.style.overflow = 'unset';
     }
     return () => {
       document.body.style.paddingRight = '0px';
       document.body.style.overflow = 'unset';
+      document.documentElement.style.overflow = 'unset';
     };
-  }, [verdictOpen]);
+  }, [verdictOpen, showTeamSelect]);
   const [evaluated, setEvaluated] = useState(false);
   const [expandedFlag,   setExpandedFlag]   = useState<number | null>(null);
   const [tradeRequest,   setTradeRequest]   = useState<Asset[] | null>(null);
 
   // ── Team lock state ───────────────────────────────────────────
   const [homeTeamLocked, setHomeTeamLocked] = useState(false);
-  const [showTeamSelect, setShowTeamSelect] = useState(false);
 
   // ── Persistent trade simulation state ────────────────────────
   const [executedTrades, setExecutedTrades] = useState<{
@@ -567,7 +571,12 @@ Simulation #${sim?.seed ?? "—"} · ${new Date().toLocaleDateString('en-US', { 
     setSimLoading(false);
   }, [teams, db, executedTrades]);
   useEffect(() => {
-    if (evaluated) runEval();
+    // Issue 10: Don't auto-evaluate. Clear old verdict so user must click "Make the call" again.
+    if (evaluated) {
+      setEvaluated(false);
+      setVerdict(null);
+      setVerdictOpen(false);
+    }
   }, [blocks, teams]);
 
   // ── Claude GM Analysis ────────────────────────────────────────
@@ -775,8 +784,9 @@ RULES: No invented context. No speculation about players not in this trade. Comp
         </Suspense>
       )}
       {/* ── Team Selection Modal ─────────────────────────────────── */}
-      {showTeamSelect && db.teams.length > 0 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      {showTeamSelect && db.teams.length > 0 && typeof document !== 'undefined' && createPortal(
+        (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4"
           style={{ background: 'rgba(28,20,10,0.88)', backdropFilter: 'blur(4px)' }}>
           <div className="relative w-full max-w-lg"
             style={{ background: 'var(--ledger-card-light)', borderRadius: '2px', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}>
@@ -796,10 +806,14 @@ RULES: No invented context. No speculation about players not in this trade. Comp
               </div>
             </div>
 
-            {/* Team grid */}
             <div style={{ padding: '16px 28px 20px' }}>
-              <div className="text-[11px] font-black uppercase tracking-[0.3em] mb-3 text-ledger-ink-faint font-mono">
-                Select Your Franchise
+              <div className="flex justify-between items-center mb-3">
+                <div className="text-[11px] font-black uppercase tracking-[0.3em] text-ledger-ink-faint font-mono">
+                  Select Your Franchise
+                </div>
+                <button onClick={() => setShowTeamSelect(false)} className="text-[10px] uppercase font-bold text-ledger-ink-faint hover:text-ledger-ink transition-colors">
+                  Close ✕
+                </button>
               </div>
               <div className="grid grid-cols-4 gap-1.5 mb-4" style={{ maxHeight: '260px', overflowY: 'auto' }}>
                 {db.teams
@@ -834,21 +848,14 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                           borderRadius: '2px',
                         }}
                       >
-                        <div className="text-2xs font-black" style={{
-                          color: isSelected ? 'var(--ledger-card-light)' : 'var(--ledger-ink)',
-                          lineHeight: 1.1,
-                        }}>
-                          {t.id}
-                        </div>
-                        <div className="text-2xs font-black leading-tight mt-0.5" style={{
-                          color: isSelected ? 'var(--ledger-rule-mid)' : 'var(--ledger-ink-body)',
-                        }}>
-                          {teamName}
-                        </div>
-                        <div className="text-2xs mt-0.5 font-black uppercase tracking-wide" style={{
-                          color: isSelected ? 'var(--ledger-ink-faint)' : phaseColor,
-                        }}>
-                          {phase}
+                        <div className="flex flex-col items-center justify-center gap-1.5 py-1">
+                          <img src={`https://assets.nhle.com/logos/nhl/svg/${t.id}_light.svg`} alt={t.id} className="w-8 h-8 opacity-90 mix-blend-multiply" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                          <div className="text-[9px] font-black uppercase tracking-widest text-center leading-tight" style={{
+                            color: isSelected ? 'var(--ledger-ink-faint)' : phaseColor,
+                            lineHeight: 1.1
+                          }}>
+                            {phase}
+                          </div>
                         </div>
                       </button>
                     );
@@ -898,6 +905,8 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             </div>
           </div>
         </div>
+        ),
+        document.body
       )}
 
       {/* ── Front Office Memo Modal ───────────────────────────── */}
@@ -993,8 +1002,6 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
         <Header activeTab="trade" />
 
-        <TugBar homeNetGain={homeNetGain} navA={navA} navB={navB} cNavA={cNavA} cNavB={cNavB} />
-
         {/* ── Team Strands — full width above trade grid ── */}
         {teams[0] && teams[1] && (
           <div className="mb-4">
@@ -1011,8 +1018,10 @@ RULES: No invented context. No speculation about players not in this trade. Comp
           </div>
         )}
 
+        <TugBar homeNetGain={homeNetGain} navA={navA} navB={navB} cNavA={cNavA} cNavB={cNavB} />
+
         {/* ── Main Trade Grid ── */}
-        <div className="flex flex-col lg:grid lg:grid-cols-[1fr_260px_1fr] xl:grid-cols-[1fr_280px_1fr] gap-4 lg:gap-5 items-start">
+        <div className="flex flex-col lg:grid lg:grid-cols-[1fr_260px_1fr] xl:grid-cols-[1fr_280px_1fr] gap-4 lg:gap-5 items-stretch mt-2">
           {/* Home panel */}
           <TradePanel idx={0} team={teams[0]} nav={navA} capSpace={capA} db={db}
             label="Your Franchise" accent="HOME"
@@ -1021,12 +1030,12 @@ RULES: No invented context. No speculation about players not in this trade. Comp
             onRequestBlockTrade={(block) => setTradeRequest(block)} />
 
           {/* Middle controls — on mobile sits between panels */}
-          <div className="flex flex-col gap-3 lg:pt-8 order-first lg:order-none">
+          <div className="flex flex-col gap-3 lg:pt-8">
             {teams[0] && teams[1] && (
               <div className="flex flex-col gap-2">
                 <div className="grid grid-cols-2 gap-2">
-                  <ModeBadge team={teams[0]} roster={allHomeRoster} label="Home Mode" />
-                  <ModeBadge team={teams[1]} roster={allPartnerRoster} label="Partner Mode" />
+                  <ModeBadge team={teams[0]} roster={allHomeRoster} label="Home Timeline" />
+                  <ModeBadge team={teams[1]} roster={allPartnerRoster} label="Partner Timeline" />
                 </div>
               </div>
             )}
@@ -1050,39 +1059,45 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
               return (
                 <>
-                  <button
-                    onClick={runEval}
-                    disabled={!ready}
-                    className="w-full py-4 font-black uppercase tracking-widest text-[11px] transition-all duration-200 disabled:opacity-25 disabled:cursor-not-allowed active:scale-[0.97] btn-stamp"
-                    onMouseEnter={e => ready && (e.currentTarget.style.background = 'var(--ledger-red-dark)')}
-                    onMouseLeave={e => ready && (e.currentTarget.style.background = 'var(--ledger-red)')}>
-                    ✦ Run GM Audit ✦
-                  </button>
-                  {hint && (
-                    <p className="text-center font-mono mt-1.5" style={{ fontSize: "10px", color: "var(--ledger-ink-faint)" }}>
-                      {hint}
-                    </p>
-                  )}
-                  {/* Share trade link — only when there's something worth sharing */}
-                  {(teams[0] || teams[1] || blocks[0].length > 0) && (
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(window.location.href).then(() => {
-                          setLinkCopied(true);
-                          setTimeout(() => setLinkCopied(false), 2000);
-                        });
-                      }}
-                      className="w-full py-2 font-mono text-2xs uppercase tracking-widest transition-all duration-200"
-                      style={{
-                        background: 'transparent',
-                        border: '1px solid var(--ledger-rule)',
-                        color: linkCopied ? 'var(--ledger-green)' : 'var(--ledger-ink-faint)',
-                        cursor: 'pointer',
-                        marginTop: 4,
-                      }}>
-                      {linkCopied ? '✓ Link copied!' : '⛓ Copy trade link'}
-                    </button>
-                  )}
+                  <div className={`py-3 lg:py-0 ${verdict && verdict.status !== "IDLE" ? "hidden lg:block" : ""}`}>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { runEval(); setVerdictOpen(true); }}
+                        disabled={!ready}
+                        className="flex-grow py-3.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 disabled:opacity-40 md:disabled:opacity-25 md:disabled:cursor-not-allowed disabled:pointer-events-none active:scale-[0.98]"
+                        style={{ background: 'var(--ledger-ink)', color: 'var(--ledger-card-light)', borderRadius: '2px' }}
+                        onMouseEnter={e => ready && (e.currentTarget.style.opacity = '0.8')}
+                        onMouseLeave={e => ready && (e.currentTarget.style.opacity = '1')}>
+                        Make the Call
+                      </button>
+                      
+                      {(teams[0] || teams[1] || blocks[0].length > 0) && (
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(window.location.href).then(() => {
+                              setLinkCopied(true);
+                              setTimeout(() => setLinkCopied(false), 2000);
+                            });
+                          }}
+                          className="shrink-0 flex items-center justify-center w-12 transition-all duration-200"
+                          style={{
+                            background: 'transparent',
+                            border: `1px solid ${linkCopied ? 'var(--ledger-green)' : 'var(--ledger-rule)'}`,
+                            color: linkCopied ? 'var(--ledger-green)' : 'var(--ledger-ink-faint)',
+                            borderRadius: '2px',
+                          }}
+                          title="Copy Trade Link"
+                        >
+                          {linkCopied ? '✓' : '🔗'}
+                        </button>
+                      )}
+                    </div>
+                    {hint && (
+                      <p className="text-center font-mono mt-2" style={{ fontSize: "10px", color: "var(--ledger-ink-faint)" }}>
+                        {hint}
+                      </p>
+                    )}
+                  </div>
                 </>
               );
             })()}
@@ -1203,33 +1218,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
               );
             })()}
 
-            {verdict && (verdict.status === "FAIR" || verdict.status === "WIN") && (
-              <button onClick={() => { executeTrade(); setHomeTeamLocked(true); }}
-                className="w-full py-3 font-black uppercase tracking-widest text-[11px] transition-all duration-200 active:scale-[0.97] btn-green-ink">
-                ✓ Execute Trade — File It
-              </button>
-            )}
-
-            {/* My Team, My Call — override for DECLINED/BLOCKED/LOSS
-                Cannot override: hard NMC refusal, cap violations, floor violations
-                These are CBA rules — not GM preference */}
-            {verdict && (verdict.status === "DECLINED" || verdict.status === "BLOCKED" || verdict.status === "LOSS")
-              && !verdict.flags.some(f => f.severity === "HARD" && (
-                f.category === "CLAUSE" ||
-                f.category === "CAP_VIOLATION" ||
-                f.category === "FLOOR_VIOLATION"
-              )) && (
-              <button onClick={() => { executeTrade(); setHomeTeamLocked(true); }}
-                className="w-full py-2.5 font-black uppercase tracking-widest text-2xs transition-all duration-200 active:scale-[0.97]"
-                style={{
-                  background: 'transparent',
-                  border: '1px solid #b83020',
-                  color: 'var(--ledger-red)',
-                }}
-                title="You're giving up value — but it's your team, your call. This trade will be locked in.">
-                ⚠ My Team, My Call
-              </button>
-            )}
+            {/* My Team, My Call and Execute Trade moved to Verdict Bottom Sheet */}
 
             {executedTrades.length > 0 && (
               <button onClick={resetTrades}
@@ -1582,7 +1571,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
         Expanded: full VerdictPanel slides up into view.
         Auto-opens when GM Audit completes. */}
     {verdict && verdict.status !== "IDLE" && (() => {
-      const v = verdict; // narrow to non-null for TypeScript
+      const v = verdict!; // narrow to non-null for TypeScript
       return (
       <div
         className="fixed bottom-0 left-0 right-0 z-40 transition-all duration-300 ease-out"
@@ -1658,6 +1647,62 @@ RULES: No invented context. No speculation about players not in this trade. Comp
               setExpandedFlag={setExpandedFlag}
               onRequestClaudeAnalysis={generateClaudeAnalysis}
               onOpenMemo={() => setShowMemo(true)} />
+
+            {/* ── Execute Trade Actions ── */}
+            <div className="mt-4 flex flex-col gap-2">
+              {(v.status === "FAIR" || v.status === "WIN") && (
+                <button onClick={() => { executeTrade(); setHomeTeamLocked(true); setVerdictOpen(false); }}
+                  className="w-full py-4 font-black uppercase tracking-widest text-[13px] transition-all duration-200 active:scale-[0.97] btn-green-ink rounded shadow-lg">
+                  ✓ Execute Trade — File It
+                </button>
+              )}
+
+              {/* My Team, My Call — override for DECLINED/BLOCKED/LOSS
+                  Cannot override: hard NMC refusal, cap violations, floor violations
+                  Cannot override: Hard flags raised by the opposing GM (they refuse the trade) */}
+              {(v.status === "DECLINED" || v.status === "BLOCKED" || v.status === "LOSS") && (() => {
+                const hasHardNhlRule = v.flags.some(f => f.severity === "HARD" && (
+                  f.category === "CLAUSE" ||
+                  f.category === "CAP_VIOLATION" ||
+                  f.category === "FLOOR_VIOLATION"
+                ));
+                const isVetoCat = (cat: string) => ["POSITIONAL_REDUNDANCY", "TIMELINE_MISMATCH", "CLAUSE", "ASSET_SHAPE_MISMATCH", "ELITE_BLOCKADE", "REBUILD_LOGIC", "VALUE_VETO"].includes(cat);
+                const partnerVetoed = v.flags.some(f => 
+                  (f.vetoesSide === 1 || f.perspective === "partner") && 
+                  (f.severity === "HARD" || isVetoCat(f.category))
+                );
+                
+                const canOverride = !hasHardNhlRule && !partnerVetoed;
+
+                if (canOverride) {
+                  return (
+                    <button onClick={() => { executeTrade(); setHomeTeamLocked(true); setVerdictOpen(false); }}
+                      className="w-full py-3.5 font-black uppercase tracking-widest text-xs transition-all duration-200 active:scale-[0.97] rounded shadow-lg"
+                      style={{
+                        background: 'transparent',
+                        border: '2px solid #b83020',
+                        color: 'var(--ledger-red)',
+                      }}
+                      title="You're giving up value — but it's your team, your call. This trade will be locked in.">
+                      ⚠ My Team, My Call — Override & Execute
+                    </button>
+                  );
+                } else if (partnerVetoed) {
+                  return (
+                    <div className="w-full py-3 text-center font-mono text-[11px] rounded bg-red-950/20 text-red-500 border border-red-900/50">
+                      Opposing GM has vetoed this trade.
+                    </div>
+                  );
+                } else if (hasHardNhlRule) {
+                  return (
+                    <div className="w-full py-3 text-center font-mono text-[11px] rounded bg-red-950/20 text-red-500 border border-red-900/50">
+                      Blocked by CBA regulations.
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+            </div>
           </div>
         )}
       </div>

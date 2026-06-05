@@ -135,8 +135,7 @@ function PlayerCell({ slot, pos }: { slot: Slot; pos: string }) {
       padding: "2px 5px", fontFamily: MONO, fontSize: 9, color,
       fontWeight: slot.status === "in" ? 900 : slot.status === "normal" ? 700 : 400,
       textDecoration: slot.status === "out" ? "line-through" : "none",
-      minWidth: 90, maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
+      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
     }}>
       <span style={{ fontSize: 7, opacity: 0.55, marginRight: 3, fontWeight: 900 }}>{pos}</span>
       {name}

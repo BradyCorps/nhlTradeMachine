@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 export default function LedgerDropdown({ teams, selectedId, onSelect }: {
   teams: any[];
@@ -36,23 +37,27 @@ export default function LedgerDropdown({ teams, selectedId, onSelect }: {
         className="w-full text-left pb-1 flex justify-between items-baseline group hover:opacity-70 transition-opacity"
         style={{ borderBottom: '2px solid var(--rule)' }}
       >
-        <span className="font-black leading-tight truncate pr-2" style={{
+        <span className="font-black leading-tight truncate pr-2 flex items-center gap-2" style={{
           fontFamily: "'Libre Baskerville', serif",
           color: 'var(--ink)',
-          fontSize: 'clamp(1.2rem, 3vw, 1.6rem)',
+          fontSize: 'clamp(1.4rem, 3.5vw, 1.8rem)',
         }}>
+          {selected?.id && (
+            <img src={`https://assets.nhle.com/logos/nhl/svg/${selected.id}_light.svg`} alt={selected.id} className="w-8 h-8 opacity-90 mix-blend-multiply" onError={(e) => (e.currentTarget.style.display = 'none')} />
+          )}
           {selected?.name || "Select Team"}
         </span>
-        <span className="text-[11px] font-black shrink-0" style={{ color: 'var(--rule)' }}>▼</span>
+        <span className="text-xs font-black shrink-0" style={{ color: 'var(--rule)' }}>▼</span>
       </button>
 
       {/* Tear-off modal overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-          style={{ background: 'rgba(38,30,18,0.4)', backdropFilter: 'blur(2px)' }}
-          onClick={() => setIsOpen(false)}
-        >
+      {isOpen && typeof document !== 'undefined' && createPortal(
+        (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+            style={{ background: 'rgba(38,30,18,0.4)', backdropFilter: 'blur(2px)' }}
+            onClick={() => setIsOpen(false)}
+          >
           <div
             className="w-full max-w-sm max-h-[80vh] overflow-y-auto animate-modal-pop"
             style={{
@@ -90,7 +95,10 @@ export default function LedgerDropdown({ teams, selectedId, onSelect }: {
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
-                    <span>{t.name}</span>
+                    <div className="flex items-center gap-2">
+                      <img src={`https://assets.nhle.com/logos/nhl/svg/${t.id}_light.svg`} alt={t.id} className="w-5 h-5 opacity-80 mix-blend-multiply" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                      <span>{t.name}</span>
+                    </div>
                     {t.phase && (
                       <span style={{
                         fontSize: 7, fontWeight: 900, textTransform: 'uppercase',
@@ -112,6 +120,8 @@ export default function LedgerDropdown({ teams, selectedId, onSelect }: {
             </div>
           </div>
         </div>
+        ),
+        document.body
       )}
     </div>
   );

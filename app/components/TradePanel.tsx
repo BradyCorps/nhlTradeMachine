@@ -30,7 +30,7 @@ function TradePanel({
   const navMap = useTradeStore(s => s.navMap);
 
   return (
-    <div className="relative border rounded-2xl p-4 lg:p-6 flex flex-col min-h-[400px] lg:min-h-[1rem]" style={{
+    <div className="relative border rounded-2xl p-4 lg:p-6 flex flex-col min-h-[420px] h-full" style={{
       background: 'var(--ledger-card-light)',
       borderColor: isLeft ? 'var(--ledger-ink-faint)' : 'var(--ledger-rule)',
     }}>
@@ -62,7 +62,7 @@ function TradePanel({
           ) : (
           <Suspense fallback={<div className="h-8 w-48 animate-pulse bg-ledger-card rounded" />}>
           <LedgerDropdown
-            teams={db.teams}
+            teams={db.teams.filter(t => t.id !== (idx === 0 ? teams[1]?.id : teams[0]?.id))}
             selectedId={team?.id ?? ""}
             onSelect={(id: string) => {
               const found = db.teams.find((t) => t.id === id) ?? null;
@@ -90,9 +90,9 @@ function TradePanel({
       </div>
 
       {/* Asset list */}
-      <div className="flex-grow overflow-y-auto space-y-2 mb-4 pr-1">
+      <div className="flex-1 overflow-y-auto flex flex-col gap-2 mb-4 pr-1 min-h-[200px]">
         {!team && idx === 1 && (
-          <div className="flex flex-col items-center justify-center h-40 gap-3">
+          <div className="w-full h-full flex flex-col items-center justify-center gap-3">
             <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textAlign: "center", letterSpacing: "0.2em", textTransform: "uppercase" }}>
               Select a trade partner<br/>above to begin
             </div>
@@ -100,7 +100,7 @@ function TradePanel({
           </div>
         )}
         {blocks[idx].length === 0 && team && (
-          <div className="flex items-center justify-center h-32 border-2 border-dashed" >
+          <div className="w-full h-full flex items-center justify-center border-2 border-dashed px-4 text-center" style={{ borderColor: 'var(--ledger-rule-mid)', color: 'var(--ledger-ink-faint)' }}>
             <span className="text-2xs font-black uppercase tracking-[0.3em]">No assets on the block</span>
           </div>
         )}
@@ -115,15 +115,17 @@ function TradePanel({
         ))}
       </div>
 
-      {/* Find Trade Partners button — only on outgoing (home) side with assets */}
-      {idx === 0 && blocks[0].length > 0 && onRequestBlockTrade && (
-        <button
-          onClick={() => onRequestBlockTrade(blocks[0])}
-          className="w-full py-2.5 font-black text-2xs uppercase tracking-widest transition-all mb-2 flex items-center justify-center gap-2 btn-ink"
-        >
-          ⚡ Find Trade Partners for This Package
-        </button>
-      )}
+      {/* Find Trade Partners button wrapper — reserves space so UI doesn't jump */}
+      <div className="min-h-[44px] mb-2 flex flex-col justify-end">
+        {idx === 0 && blocks[0].length > 0 && onRequestBlockTrade && (
+          <button
+            onClick={() => onRequestBlockTrade(blocks[0])}
+            className="w-full py-2.5 font-black text-2xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 btn-ink"
+          >
+            ⚡ Find Trade Partners for This Package
+          </button>
+        )}
+      </div>
 
       {/* Asset selector */}
       <AssetDropdown idx={idx} team={team} db={db} />

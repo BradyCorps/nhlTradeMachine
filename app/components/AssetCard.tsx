@@ -58,9 +58,9 @@ export default function AssetCard({
               onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
           )}
           <div className="min-w-0">
-            <div className="font-black leading-tight truncate flex items-center gap-1.5"
+            <div className="font-black leading-tight flex flex-wrap items-center gap-1.5"
               style={{ fontSize: '13px', color: 'var(--ledger-ink)' }}>
-              {asset.name}
+              <span className="truncate max-w-full">{asset.name}</span>
               {asset.hasNMC && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-red)', border: '1px solid #b83020' }}>NMC</span>}
               {asset.hasNTC && !asset.hasNMC && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-amber)', border: '1px solid #8a5c00' }}>NTC</span>}
               {!asset.hasLiveStats && !isPick && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-ink-faint)', border: '1px solid #b8a070' }}>EST</span>}

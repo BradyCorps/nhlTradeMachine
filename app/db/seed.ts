@@ -1,13 +1,14 @@
 import { config } from "dotenv";
 config({ path: ".env" });
 
-import { db } from "./client";
+// Dynamically import db inside main() so dotenv runs BEFORE the client is created
 import { teams, players } from "./schema";
 import { TEAMS_DB } from "../lib/db";
 import fs from "fs";
 import path from "path";
 
 async function main() {
+  const { db } = await import("./client");
   console.log("🌱 Starting database seed...");
 
   // 1. Seed Teams

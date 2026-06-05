@@ -30,7 +30,7 @@ function AssetDropdown({
 
   return (
     <select
-      className="w-full border p-3.5 rounded-xl font-black uppercase tracking-widest text-2xs outline-none appearance-none cursor-pointer transition-colors"
+      className="w-full text-center border p-3.5 rounded-xl font-black uppercase tracking-widest text-2xs outline-none appearance-none cursor-pointer transition-colors"
       style={{ background: 'var(--ledger-warm)', borderColor: 'var(--ledger-rule)', color: 'var(--ledger-brown)' }}
       onChange={(e) => {
         const asset = db.players.find((p) => p.id === e.target.value);
