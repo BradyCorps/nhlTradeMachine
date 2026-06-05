@@ -381,7 +381,7 @@ describe("X-NAV — Elite Defencemen", () => {
       avgTOI: 22, qocRank: 90, xgRelTM: 1, xgaRelTM: -0.8,
       games: 78, ops: 2.8, dps: 6.5,
     });
-    inRange(result.total, 100, 160, "Slavin NAV");
+    inRange(result.total, 130, 220, "Slavin NAV");
     // DEF must be meaningfully positive — xgaRelTM-0.8 at 22min = elite suppression
     expect(result.def).toBeGreaterThan(25);
   });

@@ -340,7 +340,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   
   const LEAGUE_MIN_PCT = 0.009; // 0.9%
   const MAX_CAP_PCT    = 0.20;  // 20.0%
-  const MIDPOINT       = 180;   // The ON_ICE_NAV where a player deserves ~10.4% (e.g. low 1st liner)
+  const MIDPOINT       = isD ? 120 : 180;   // The ON_ICE_NAV where a player deserves ~10.4% (e.g. low 1st liner)
   const K_FACTOR       = 0.022; // Steepness of the S-curve
   
   const fmvCapPct = LEAGUE_MIN_PCT + (MAX_CAP_PCT - LEAGUE_MIN_PCT) / (1 + Math.exp(-K_FACTOR * (trueMarketValue - MIDPOINT)));
@@ -368,7 +368,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     
     // gamma_RFA applies organizational premium for cost-controlled years
     const ageAtYear = asset.age + i;
-    const gammaRFA = ageAtYear <= 27 ? 1.25 : 1.0;
+    const gammaRFA = (ageAtYear <= 27 && annualSurplus > 0) ? 1.25 : 1.0;
     
     // Multiply by 12 to convert raw dollars to NAV points ($1M surplus = 12 NAV)
     capSum += annualSurplus * 12 * gammaRFA * timeDiscount;
