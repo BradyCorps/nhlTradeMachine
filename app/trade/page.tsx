@@ -257,11 +257,20 @@ export default function TradeMachine() {
   }, [blocks]);
 
   useEffect(() => {
-    fetch("/api/league")
-      .then((r) => r.json())
-      .then((data) => {
+    Promise.all([
+      fetch("/api/league/teams").then((r) => r.json()),
+      fetch("/api/league/players").then((r) => r.json()),
+    ])
+      .then(([td, pd]) => {
+        const data = {
+          teams:      td.teams,
+          players:    [...(pd.players ?? []), ...(td.picks ?? [])],
+          capCeiling: td.capCeiling,
+          capFloor:   td.capFloor,
+          liveStats:  pd.liveStats,
+        };
         if (!data.teams || !data.players) {
-          setError(`API returned invalid data: ${JSON.stringify(data)}`);
+          setError(`API returned invalid data`);
           setBooting(false);
           return;
         }
@@ -1490,7 +1499,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                 </div>
                 <div>
                   <span className="font-black font-mono">QoC — Opponent Ice-Time Rank</span>
-<p className="mt-0.5">Rank of opponents faced by ice time — a measure of deployment difficulty, not raw opponent quality. Lower rank = harder matchups. Rank 1 faces the toughest competition in the league every night. A player with QoC rank 50 and good SUPP is genuinely shutting down the opposition's best players.</p>
+                  <p className="mt-0.5">Rank of opponents faced by ice time — a measure of deployment difficulty, not raw opponent quality. Lower rank = harder matchups. Rank 1 faces the toughest competition in the league every night. A player with QoC rank 50 and good SUPP is genuinely shutting down the opposition's best players.</p>
                 </div>
                 <div>
                   <span className="font-black font-mono">DZ% — Defensive Zone Starts</span>
@@ -2032,7 +2041,8 @@ function TeamDNA({
               </div>
             ) : null)}
           </div>
-                    {/* ── Contention Quadrant ── */}
+
+          {/* ── Contention Quadrant ── */}
           {homeTeam && partnerTeam && (
             <div style={{ marginBottom: 16 }}>
               <ContentionQuadrant
@@ -2043,8 +2053,8 @@ function TeamDNA({
               />
             </div>
           )}
-                    <div className="strands-gaps-header">
 
+          <div className="strands-gaps-header">
             {homeTeam?.name} — Roster Gaps vs Playoff & Championship Thresholds{hasActiveTrade ? " (post-trade)" : ""}
           </div>
 
@@ -2277,7 +2287,7 @@ function ErrorScreen({ msg }: { msg: string }) {
     <div className="min-h-screen flex flex-col items-center justify-center gap-3">
       <div className="text-rose-500 font-black text-lg">Data Pipeline Error</div>
       <div className="text-zinc-600 text-sm font-mono">{msg}</div>
-      <div className="text-zinc-700 text-xs">Check that /api/league is deployed and reachable.</div>
+      <div className="text-zinc-700 text-xs">Check that /api/league/teams and /api/league/players are deployed and reachable.</div>
     </div>
   );
 }
