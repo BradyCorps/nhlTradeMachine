@@ -6,6 +6,7 @@ import { PLAYER_PEDIGREE } from "@/app/lib/player-data";
 import { HISTORICAL_MAX_OFF, HISTORICAL_MAX_DEF } from "@/app/lib/historical-benchmarks";
 import { MicroBar } from "@/app/components/MicroBar";
 import StrandView from "@/app/components/StrandView";
+import PlayerTimeline from "@/app/components/PlayerTimeline";
 import { useTradeStore } from "@/app/store/tradeStore";
 import { AssetBadges } from "@/app/components/AssetBadges";
 
@@ -25,7 +26,7 @@ export default function AssetCard({
   const removeAssetFromStore = useTradeStore(s => s.removeAsset);
   const setRetainedPctStore = useTradeStore(s => s.setRetainedPct);
 
-  const [view, setView] = React.useState<"STATS" | "STRAND">("STATS");
+  const [view, setView] = React.useState<"STATS" | "STRAND" | "TIMELINE">("STATS");
   const [compareId, setCompareId] = React.useState<string>("");
   const xnav   = navResult ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
   const isPick = asset.position === "Pick";
@@ -151,9 +152,13 @@ export default function AssetCard({
       </div>
 
       {/* STRAND / STATS tab toggle — only for skaters with live data */}
-      {!isPick && asset.position !== "G" && asset.hasLiveStats && (
+      {!isPick && (
         <div className="flex gap-0 mb-2" style={{ borderBottom: '1px solid #c8b890' }}>
-          {(["STATS", "STRAND"] as const).map(v => (
+                    {([
+            "STATS",
+            ...(asset.position !== "G" && asset.hasLiveStats ? ["STRAND"] : []),
+            "TIMELINE",
+          ] as const).map((v: any) => (
             <button key={v} onClick={() => setView(v)}
               className="flex items-center gap-1 text-2xs font-black uppercase tracking-widest px-3 py-1.5 transition-all"
               style={{
@@ -164,7 +169,7 @@ export default function AssetCard({
               }}>
               {v === "STRAND" ? (
                 <>
-                  {/* Mini double helix SVG icon */}
+               
                   <svg width="14" height="10" viewBox="0 0 14 10" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
                     <path d="M0,2 C2,2 2,8 4,8 C6,8 6,2 8,2 C10,2 10,8 12,8 C14,8 14,2 14,2"
                       fill="none" stroke={view === "STRAND" ? "var(--ledger-navy)" : "var(--ledger-ink-faint)"} strokeWidth="1.5" strokeLinecap="round"/>
@@ -177,7 +182,7 @@ export default function AssetCard({
                   </svg>
                   STRAND
                 </>
-              ) : "STATS"}
+              ) : v}
             </button>
           ))}
         </div>
@@ -212,7 +217,11 @@ export default function AssetCard({
           />
         </>
       )}
-
+      {view === "TIMELINE" && !isPick && (
+        <div className="py-1">
+                    <PlayerTimeline asset={asset as any} /> 
+        </div>
+      )}
       {/* Standard STATS view */}
       {(view === "STATS" || isPick || asset.position === "G") && (<>
       {asset.position === "G" && !isPick && (

@@ -1,5 +1,6 @@
 "use client";
 import StrandDisplay from "@/app/components/StrandDisplay";
+import PlayerTimeline from "@/app/components/PlayerTimeline";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
@@ -211,18 +212,49 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
           </div>
         </div>
 
-        {/* Right — helix */}
-        {!isG && (
-          <div>
-            <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "6px" }}>
-              STRAND Profile
-            </div>
-            <div style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px", position: "relative" }}>
-              {/* Full STRAND inline */}
-              <FullStrand player={player} />
-            </div>
-          </div>
-        )}
+        {/* Right — helix + timeline */}
+        <div>
+          {!isG && (
+            <>
+              <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "6px" }}>
+                STRAND Profile
+              </div>
+              <div style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px", marginBottom: "12px" }}>
+                <FullStrand player={player} />
+              </div>
+            </>
+          )}
+          {player.yearsRemaining > 0 && (
+            <div style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px" }}>
+              <PlayerTimeline asset={{
+                id:             player.id,
+                name:           player.name,
+                position:       player.position as any,
+                age:            player.age,
+                capHit:         player.capHit,
+                yearsRemaining: player.yearsRemaining,
+                ptsPace:        player.ptsPace,
+                xGPace:         player.xGPace,
+                defRate:        player.defRate ?? 0.08,
+                avgTOI:         player.avgTOI,
+                qocRank:        player.qocRank,
+                ops:            player.ops ?? undefined,
+                dps:            player.dps ?? undefined,
+                xgRelTM:        player.xgRelTM ?? undefined,
+                xgaRelTM:       player.xgaRelTM ?? undefined,
+                dzPct:          player.dzPct ?? undefined,
+                gsax:           player.gsax,
+                savePct:        player.savePct,
+                gamesStarted:   player.gamesStarted,
+                games:          player.games ?? 40,
+                hasLiveStats:   player.hasLiveStats,
+                retainedPct:    0,
+                multiplier:     1.0,
+              }} />
+               </div>
+                    )}
+        </div>
+    
       </div>
     </div>
   );

@@ -71,11 +71,15 @@ export async function scrapeCapWages(): Promise<Record<string, any>> {
       const name   = normaliseName(rawName);
       const capHit = Math.round((capRaw / 10) * 1000) / 1000;
 
-      // ── Sanity check ──────────────────────────────────────────
-      const CAP_MIN = 0.70;
-      const CAP_MAX = 18.0;
+      // ── Sanity check — reject implausible cap hits ────────────
+      // Floor: lowest realistic NHL salary ($0.8M = league minimum band)
+      // Ceiling: highest ever signed (~$16M, Draisaitl 2025)
+      // Anything outside this range signals a parse error; skip and fall back to bundled.
+      const CAP_MIN = 0.8;
+      const CAP_MAX = 16.0;
       if (capHit < CAP_MIN || capHit > CAP_MAX) {
-        skipReasons[name] = `capHit=${capHit} out of range [${CAP_MIN},${CAP_MAX}]`;
+        skipReasons[name] = `capHit=${capHit} out of range [${CAP_MIN},${CAP_MAX}] — falling back to bundled`;
+        console.warn(`[CapWages Scraper] ⚠ ${name}: capHit=${capHit} rejected, will use bundled value`);
         skipped++;
         continue;
       }

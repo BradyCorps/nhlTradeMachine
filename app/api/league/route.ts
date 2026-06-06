@@ -75,19 +75,11 @@ const derivePhase = (confRank: number, divRank: number, pointPct: number): strin
 
 
 // ── Contract overrides — manual corrections for known data errors ──
+// Manual overrides for contracts where the CapWages scraper's age-based year calculation
+// is unreliable (e.g. back-loaded extensions where ageSigned ≠ effective start year).
 const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: number; position?: string }> = {
-  "Alexander Ovechkin": { yearsRemaining: 1 },
-  // Bundled JSON corrections — cap hit or years that have changed since bundle was generated
-  "Dylan DeMelo":       { capHit: 4.9,  yearsRemaining: 2 },   // PuckPedia: $4.9M x 4yr, Year 2 of 4
-  // Young players (age ≤ 23) with real multi-year deals who get misidentified as ELC
-  // when CapWages scrape returns null or wrong p[18] for their entry.
-  // Position override needed when NHL API returns "L"/"R" instead of true position.
-  "Quinton Byfield":    { capHit: 6.25, yearsRemaining: 3, position: "C" }, // $6.25M x 5yr, Year 3 of 5
-  "Connor Bedard":      { capHit: 0.8775, yearsRemaining: 1 },  // ELC, correct
-  "Matvei Michkov":     { capHit: 0.8775, yearsRemaining: 1 },  // ELC, correct
-  "Simon Edvinsson":    { capHit: 0.8775, yearsRemaining: 1 },  // ELC Year 3, expires this summer
-  // Years formula broken: p[29] is expiry age not signing age → max() picks wrong value
-  "Brady Tkachuk":      { yearsRemaining: 3 },  // 7yr deal signed 2022-23, expires 2028-29; p[29]=28 is expiry age not signing age
+  "Quinton Byfield":  { position: "C" },          // NHL API sometimes tags as "LW"
+  "Mark Scheifele":   { yearsRemaining: 5 },       // 8yr/2023→2031; scraper age math gives 1
 };
 
 async function loadTeams(): Promise<any[]> {
@@ -265,14 +257,15 @@ async function loadContracts(): Promise<Record<string, any>> {
   const merged: Record<string, any> = {};
 
   if (Object.keys(fresh).length > 200) {
-    // Live CapWages data available — use fresh cap hits, bundled for years/NMC/NTC
+    // Live CapWages data available — use fresh cap hits and years; bundled for NMC/NTC only.
+    // Bundled years go stale as seasons pass; CapWages years are computed from live data.
     for (const [name, cw] of Object.entries(fresh)) {
       // Strip any __position or __teamSlug suffix to get the base name
       const baseName = name.includes("__") ? name.split("__")[0] : name;
       const b = bundled[baseName];
       const entry = {
         capHit:         cw.capHit,
-        yearsRemaining: b?.yearsRemaining ?? cw.yearsRemaining,
+        yearsRemaining: (cw.yearsRemaining > 0 ? cw.yearsRemaining : null) ?? b?.yearsRemaining ?? 1,
         hasNMC:         b?.hasNMC  ?? false,
         hasNTC:         b?.hasNTC  ?? false,
         canRetain:      b?.hasNMC  ? false : true,
@@ -295,11 +288,20 @@ async function loadContracts(): Promise<Record<string, any>> {
     }
   }
 
-  // Apply manual overrides last — corrects known stale bundled data
+  // Code-level overrides (back-loaded extensions where scraper age math fails)
   for (const [name, override] of Object.entries(CONTRACT_OVERRIDES)) {
     if (merged[name]) {
       if (override.capHit        !== undefined) merged[name].capHit        = override.capHit;
       if (override.yearsRemaining !== undefined) merged[name].yearsRemaining = override.yearsRemaining;
+    }
+  }
+
+  // Admin overrides from contracts.admin.json — highest priority, editable via /admin/contracts UI
+  const adminOverrides = loadAdminOverrides();
+  for (const [name, ad] of Object.entries(adminOverrides)) {
+    if (merged[name]) {
+      if ((ad as any).capHit         != null) merged[name].capHit         = (ad as any).capHit;
+      if ((ad as any).yearsRemaining != null) merged[name].yearsRemaining = (ad as any).yearsRemaining;
     }
   }
 
@@ -320,6 +322,15 @@ function loadBundled(): Record<string, any> {
     console.error("[Bundled] FAILED:", e.message);
   }
   return {};
+}
+
+function loadAdminOverrides(): Record<string, any> {
+  try {
+    const fs   = require("fs");
+    const path = require("path");
+    const file = path.join(process.cwd(), "app/data/contracts.admin.json");
+    return JSON.parse(fs.readFileSync(file, "utf-8"));
+  } catch (_) { return {}; }
 }
 
 function loadExtensions(): Record<string, any> {
