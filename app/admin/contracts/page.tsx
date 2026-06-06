@@ -235,9 +235,10 @@ export default function AdminContractsPage() {
   const [editing, setEditing]     = useState<ContractRow | null>(null);
   const [toast, setToast]         = useState<string | null>(null);
 
-  const load = () => {
+  const load = (withScrape = false) => {
     setLoading(true);
-    fetch("/api/admin/contracts")
+    const url = withScrape ? "/api/admin/contracts?scrape=1" : "/api/admin/contracts";
+    fetch(url)
       .then(r => r.json())
       .then(d => { setContracts(d.contracts ?? []); setLoading(false); })
       .catch(() => setLoading(false));
@@ -323,10 +324,17 @@ export default function AdminContractsPage() {
             cursor: syncing ? "default" : "pointer", letterSpacing: "0.1em" }}>
           {syncing ? "SYNCING..." : "SYNC CAPWAGES"}
         </button>
-        <button onClick={load} style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
+        <button onClick={() => load(false)} style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
           background: "#2a1e0a", border: "1px solid #5a4a2a", color: "#c8b890",
           cursor: "pointer", letterSpacing: "0.1em" }}>
           REFRESH
+        </button>
+        <button onClick={() => load(true)} disabled={loading}
+          style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
+            background: "#1a1a2a", border: "1px solid #3a3a5a",
+            color: loading ? "#3a3a5a" : "#9a9acf",
+            cursor: loading ? "default" : "pointer", letterSpacing: "0.1em" }}>
+          + LIVE DELTA
         </button>
       </div>
 

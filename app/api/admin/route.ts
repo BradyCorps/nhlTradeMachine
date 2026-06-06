@@ -7,8 +7,7 @@ const BUNDLED_PATH = path.join(process.cwd(), "app/data/contracts.bundled.json")
 const ADMIN_PATH   = path.join(process.cwd(), "app/data/contracts.admin.json");
 
 const CONTRACT_OVERRIDES: Record<string, { yearsRemaining?: number; position?: string }> = {
-  "Quinton Byfield": { position: "C" },
-  "Mark Scheifele":  { yearsRemaining: 5 },
+  "Quinton Byfield": { position: "C" }
 };
 
 function loadJSON(p: string): Record<string, any> {
@@ -17,10 +16,15 @@ function loadJSON(p: string): Record<string, any> {
 }
 
 // GET /api/admin/contracts — full audit table
-export async function GET() {
+export async function GET(req: Request) {
   const bundled = loadJSON(BUNDLED_PATH);
   const admin   = loadJSON(ADMIN_PATH);
-  const scraped = await scrapeCapWages();
+
+  // Skip live scrape unless ?scrape=1 — bundled+admin loads instantly
+  const url    = new URL(req.url);
+  const scraped = url.searchParams.get("scrape") === "1"
+    ? await scrapeCapWages()
+    : {};
 
   const allNames = new Set<string>();
   Object.keys(bundled).forEach(n => allNames.add(n));
