@@ -5,11 +5,12 @@ import TradePanel from "@/app/components/TradePanel";
 import AssetDropdown from "@/app/components/AssetDropdown";
 import TugBar from "@/app/components/TugBar";
 import { MicroBar, DeltaRow } from "@/app/components/MicroBar";
-import { ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
+import { SEASON, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
 import TeamStrand, { CHAMP_TEMPLATE, TeamStrandData } from "@/app/components/TeamStrand";
 import LineupCard from "@/app/components/LineupCard";
 import WhatWeNeed from "@/app/components/WhatWeNeed";
+import ContentionQuadrant from "@/app/components/ContentionQuadrant";
 import {
   PLAYER_PEDIGREE, PROSPECT_TIERS, SHUTDOWN_D_PEDIGREE, INJURY_RISK,
 } from "@/app/lib/player-data";
@@ -280,7 +281,7 @@ export default function TradeMachine() {
 
   // ── Live NAV totals for trade blocks ─────────────────────────
 
-  const CAP_CEILING = 104.0; // NHL salary cap ceiling
+  const CAP_CEILING = SEASON.capCeiling; // NHL salary cap ceiling
 
   // ── Execute Trade — moves players between teams in db state ──
   const executeTrade = useCallback(() => {
@@ -1488,8 +1489,8 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                   <p className="mt-0.5">On-ice expected goals against vs off-ice, relative to teammates. Positive = team leaks fewer chances with this player on ice. Range -1.5 to +1.5. The defensive counterpart to xG — how well does this player prevent quality shots against?</p>
                 </div>
                 <div>
-                  <span className="font-black font-mono">QoC — Quality of Competition</span>
-                  <p className="mt-0.5">Rank of opponents faced by ice time. Lower rank = harder matchups. Rank 1 faces the toughest competition in the league every night. A player with QoC rank 50 and good SUPP is genuinely shutting down the opposition's best players.</p>
+                  <span className="font-black font-mono">QoC — Opponent Ice-Time Rank</span>
+<p className="mt-0.5">Rank of opponents faced by ice time — a measure of deployment difficulty, not raw opponent quality. Lower rank = harder matchups. Rank 1 faces the toughest competition in the league every night. A player with QoC rank 50 and good SUPP is genuinely shutting down the opposition's best players.</p>
                 </div>
                 <div>
                   <span className="font-black font-mono">DZ% — Defensive Zone Starts</span>
@@ -2031,7 +2032,19 @@ function TeamDNA({
               </div>
             ) : null)}
           </div>
+                    {/* ── Contention Quadrant ── */}
+          {homeTeam && partnerTeam && (
+            <div style={{ marginBottom: 16 }}>
+              <ContentionQuadrant
+                home={homeContention}
+                partner={partnerContention}
+                homeTeamName={homeTeam.name}
+                partnerTeamName={partnerTeam.name}
+              />
+            </div>
+          )}
                     <div className="strands-gaps-header">
+
             {homeTeam?.name} — Roster Gaps vs Playoff & Championship Thresholds{hasActiveTrade ? " (post-trade)" : ""}
           </div>
 

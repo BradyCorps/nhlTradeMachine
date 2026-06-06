@@ -10,7 +10,7 @@
 //   • Exponential Retention Tax
 //   • Rental discount on age penalty (1yr = 75% reduction, 2yr = 40%)
 
-import { LEAGUE, FRANCHISE, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
+import { SEASON, LEAGUE, FRANCHISE, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 
 export const DPS_NAV_MULTIPLIER = 15; // dps * 15 = defPS for NAV (not 120 — the *8 bug is removed)
 
@@ -163,7 +163,7 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   
   const fmvCapPctG = LEAGUE_MIN_PCT_G + (MAX_CAP_PCT_G - LEAGUE_MIN_PCT_G) / (1 + Math.exp(-K_FACTOR_G * (trueMarketValueG - MIDPOINT_G)));
 
-  const BASE_CAP_CEILING = 104.0;
+  const BASE_CAP_CEILING = SEASON.capCeiling;
   const CAP_GROWTH_RATE  = 1.04;
 
   let capSumG = 0;
@@ -351,7 +351,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const navYears         = extCapHit ? (asset.extensionYears ?? asset.yearsRemaining) : asset.yearsRemaining;
   const contractYears    = Math.max(1, navYears || 1);
 
-  const BASE_CAP_CEILING = 104.0; // Current cap space
+  const BASE_CAP_CEILING = SEASON.capCeiling; // Current cap space
   const CAP_GROWTH_RATE  = 1.04;  // 4% annual growth
 
   // Loop through contract term to calculate the multi-year compound surplus sum:

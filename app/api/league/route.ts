@@ -8,8 +8,8 @@ import { teams as teamsTable } from "@/app/db/schema";
 
 export const dynamic = "force-dynamic";
 
-const CAP_CEILING = 104.0;
-const CAP_FLOOR   = 70.6;
+const CAP_CEILING = SEASON.capCeiling;
+const CAP_FLOOR   = SEASON.capFloor;
 
 const TEAMS_CACHE_TTL     = 6  * 60 * 60; // 6 hours (in seconds for Redis)
 const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours

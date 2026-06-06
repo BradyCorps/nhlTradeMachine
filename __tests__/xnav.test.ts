@@ -25,13 +25,14 @@ const inRange = (val: number, min: number, max: number, label: string) => {
 // GOALIE TESTS
 // ─────────────────────────────────────────────────────────────────────────────
 describe("G-NAV — Elite Starters", () => {
-  it("Hellebuyck: elite starter on good team → 150-220 NAV", () => {
+  it("Hellebuyck: elite starter on good team → 190-250 NAV", () => {
     const result = calcGoalieNAV({
       id: "hellebuyck", name: "Connor Hellebuyck", position: "G",
       age: 33, capHit: 8.5, yearsRemaining: 5,
       gsax: 18.5, gamesStarted: 60, teamXga60: 2.35,
     });
-    inRange(result.total, 220, 280, "Hellebuyck NAV");
+    // Cap ceiling corrected to 95.5 (from inflated 104) — FMV dollars are proportionally lower
+    inRange(result.total, 190, 250, "Hellebuyck NAV");
   });
 
   it("Saros: solid starter on average team → 90-130 NAV", () => {
@@ -54,14 +55,16 @@ describe("G-NAV — Elite Starters", () => {
 });
 
 describe("G-NAV — Young Controlled Goalies", () => {
-  it("Wolf (with extension): cheap now but big commitment → 20-45 NAV", () => {
+  it("Wolf (with extension): cheap now but big commitment → 10-45 NAV", () => {
     const result = calcGoalieNAV({
       id: "wolf", name: "Dustin Wolf", position: "G",
       age: 25, capHit: 0.875, yearsRemaining: 1,
       gsax: -1.8, gamesStarted: 57, teamXga60: 2.85,
       extensionCapHit: 7.5, extensionYears: 7,
     });
-    inRange(result.total, 20, 45, "Wolf (extension) NAV");
+    // Negative GSAX + $7.5M extension is below-market at the corrected 95.5 cap ceiling;
+    // modest positive total is correct — the cheap controlled year saves it from being negative.
+    inRange(result.total, 10, 45, "Wolf (extension) NAV");
   });
 
   it("Wolf (no extension): cheap controlled starter → 40-70 NAV", () => {
@@ -71,7 +74,7 @@ describe("G-NAV — Young Controlled Goalies", () => {
       gsax: -1.8, gamesStarted: 57, teamXga60: 2.85,
     });
     inRange(result.total, 80, 120, "Wolf (no ext) NAV");
-    expect(result.total).toBeGreaterThan(20); // must exceed raw negative GSAx
+    expect(result.total).toBeGreaterThan(20);
   });
 
   it("Askarov: young tandem on terrible team → 25-55 NAV via floor", () => {
@@ -81,7 +84,7 @@ describe("G-NAV — Young Controlled Goalies", () => {
       gsax: -9.5, gamesStarted: 47, teamXga60: 3.10,
     });
     inRange(result.total, 25, 55, "Askarov NAV");
-    expect(result.total).toBeGreaterThan(0); // bad team context should prevent negative
+    expect(result.total).toBeGreaterThan(0);
   });
 });
 
@@ -93,7 +96,6 @@ describe("G-NAV — Backup/Tandem Edge Cases", () => {
       gsax: 23.1, gamesStarted: 45, teamXga60: 2.35,
       extensionCapHit: 2.5, extensionYears: 1,
     });
-    // 45 games = TANDEM, hard capped at 60
     expect(result.total).toBeLessThanOrEqual(60);
     inRange(result.total, 30, 60, "Wedgewood NAV");
   });
@@ -104,7 +106,6 @@ describe("G-NAV — Backup/Tandem Edge Cases", () => {
       age: 27, capHit: 1.5, yearsRemaining: 1,
       gsax: 8.0, gamesStarted: 20, teamXga60: 2.55,
     });
-    // 20 games backup — confidence should heavily regress this
     expect(result.total).toBeLessThan(35);
     inRange(result.total, 0, 35, "Elite backup (20gp) NAV");
   });
@@ -115,7 +116,7 @@ describe("G-NAV — Backup/Tandem Edge Cases", () => {
       age: 30, capHit: 2.0, yearsRemaining: 1,
       gsax: 15.0, gamesStarted: 30, teamXga60: 2.30,
     });
-    expect(result.total).toBeLessThanOrEqual(35); // backup cap
+    expect(result.total).toBeLessThanOrEqual(35);
   });
 });
 
@@ -258,13 +259,13 @@ describe("X-NAV — Elite Defencemen", () => {
     const result = calcSkaterNAV({
       id: "morrissey", name: "Josh Morrissey", position: "D",
       age: 29, capHit: 6.25, yearsRemaining: 6,
-      ptsPace: 58, xGPace: 12, defRate: 0.0, // suppressed — NOIV present
+      ptsPace: 58, xGPace: 12, defRate: 0.0,
       avgTOI: 24.7, qocRank: 106,
       xgRelTM: 3.5, xgaRelTM: -0.38, dzPct: 0.42,
       games: 77, ops: 3.5, dps: 5.0,
     });
-    expect(result.def).toBeGreaterThan(0);   // not negative from suppression artifact
-    expect(result.def).toBeGreaterThan(10);  // meaningful positive — not just noise
+    expect(result.def).toBeGreaterThan(0);
+    expect(result.def).toBeGreaterThan(10);
   });
 
   it("Karlsson-type: offensive liability on D — DEF bar negative", () => {
@@ -273,10 +274,10 @@ describe("X-NAV — Elite Defencemen", () => {
       age: 34, capHit: 7.0, yearsRemaining: 1,
       ptsPace: 65, xGPace: 18, defRate: -0.2,
       avgTOI: 21, qocRank: 280,
-      xgRelTM: 5, xgaRelTM: 0.30, // bleeds goals against
+      xgRelTM: 5, xgaRelTM: 0.30,
       games: 70, ops: 6.5, dps: 1.2,
     });
-    expect(result.def).toBeLessThan(0); // defensive liability should show negative
+    expect(result.def).toBeLessThan(0);
   });
 
   it("Low-minute depth player: DEF capped by TOI reliability — cannot exceed primary D-man", () => {
@@ -304,12 +305,12 @@ describe("X-NAV — Elite Defencemen", () => {
       id: "cirelli", name: "Anthony Cirelli", position: "C",
       age: 27, capHit: 6.5, yearsRemaining: 5,
       ptsPace: 42, xGPace: 8, defRate: 0.35,
-      avgTOI: 17.2, qocRank: 105, dzPct: null, // no zone data — uses defRate path
-      xgRelTM: -1.0, xgaRelTM: 1.2,            // positive xgaRelTM from hard matchups
+      avgTOI: 17.2, qocRank: 105, dzPct: null,
+      xgRelTM: -1.0, xgaRelTM: 1.2,
       games: 75,
     });
-    expect(result.def).toBeGreaterThan(0);   // must be positive for a Selke candidate
-    expect(result.def).toBeGreaterThan(8);   // meaningful, not just +1-2
+    expect(result.def).toBeGreaterThan(0);
+    expect(result.def).toBeGreaterThan(8);
   });
 
   it("Selke candidate with DZ% data: bonus kicks in", () => {
@@ -317,12 +318,11 @@ describe("X-NAV — Elite Defencemen", () => {
       id: "cirelli-dz", name: "Cirelli DZ", position: "C",
       age: 27, capHit: 6.5, yearsRemaining: 5,
       ptsPace: 42, xGPace: 8, defRate: 0.35,
-      avgTOI: 17.2, qocRank: 105, dzPct: 0.56, // real DZ data available
+      avgTOI: 17.2, qocRank: 105, dzPct: 0.56,
       xgRelTM: -1.0, xgaRelTM: 1.2,
       games: 75,
     });
     expect(result.def).toBeGreaterThan(0);
-    // DZ% bonus should push it higher than no-data version
     const noDZResult = calcSkaterNAV({
       id: "cirelli-nodz", name: "Cirelli NoDZ", position: "C",
       age: 27, capHit: 6.5, yearsRemaining: 5,
@@ -373,7 +373,7 @@ describe("X-NAV — Elite Defencemen", () => {
     expect(selke.def).toBeGreaterThan(offC.def);
   });
 
-  it("Shutdown D: low pts but high defensive value → 130-200 NAV", () => {
+  it("Shutdown D: low pts but high defensive value → 130-220 NAV", () => {
     const result = calcSkaterNAV({
       id: "slavin", name: "Jaccob Slavin", position: "D",
       age: 32, capHit: 5.3, yearsRemaining: 2,
@@ -381,8 +381,9 @@ describe("X-NAV — Elite Defencemen", () => {
       avgTOI: 22, qocRank: 90, xgRelTM: 1, xgaRelTM: -0.8,
       games: 78, ops: 2.8, dps: 6.5,
     });
+    // D-adjusted FMV midpoint (120 vs old 180) correctly values a $5.3M elite shutdown D
+    // — Slavin's cap surplus drives the total well above the old suppressed ceiling of 160.
     inRange(result.total, 130, 220, "Slavin NAV");
-    // DEF must be meaningfully positive — xgaRelTM-0.8 at 22min = elite suppression
     expect(result.def).toBeGreaterThan(25);
   });
 });
@@ -436,7 +437,7 @@ describe("Sanity Guards — Values that should never happen", () => {
     const result = calcGoalieNAV({
       id: "tandem-max", name: "Tandem G", position: "G",
       age: 25, capHit: 1.0, yearsRemaining: 2,
-      gsax: 50.0, gamesStarted: 45, teamXga60: 2.55, // absurd GSAx, should still be capped
+      gsax: 50.0, gamesStarted: 45, teamXga60: 2.55,
     });
     expect(result.total).toBeLessThanOrEqual(60);
   });
@@ -476,7 +477,6 @@ describe("Sanity Guards — Values that should never happen", () => {
       xgRelTM:3,xgaRelTM:0,games:72,
     });
     const sum = r.off + r.def + r.age + r.cap;
-    // Total should be within 20% of component sum (multiplier / rounding can differ)
     expect(Math.abs(r.total - sum)).toBeLessThan(Math.abs(sum) * 0.3 + 30);
   });
 });
@@ -491,14 +491,12 @@ describe("compressPackage — age-tiered", () => {
 
   it("veteran depth (age 33) — heavy compression", () => {
     const fourVets = Array(4).fill(null).map(() => ({ nav: 270, isPick: false, age: 33 }));
-    // δ=0.55: 270 + 270×0.55 + 270×0.30 + 270×0.17 ≈ 545; penalty 3×60=180 → ~365
     expect(compressPackage(fourVets)).toBeLessThan(450);
     expect(compressPackage(fourVets)).toBeGreaterThan(200);
   });
 
   it("blue-chip prospects (age 21) — mild compression", () => {
     const prospects = Array(3).fill(null).map(() => ({ nav: 270, isPick: false, age: 21 }));
-    // δ=0.80: 270 + 270×0.80 + 270×0.64 = 658.8; penalty 2×10=20 → 638.8
     expect(compressPackage(prospects)).toBeGreaterThan(580);
     expect(compressPackage(prospects)).toBeCloseTo(638.8, 0);
   });
@@ -518,11 +516,10 @@ describe("compressPackage — age-tiered", () => {
 
   it("mixed: prime player + prospect + pick — each age tier applied correctly", () => {
     const mixed = [
-      { nav: 300, isPick: false, age: 30 }, // prime: δ=0.60 at i=0 → 300
-      { nav: 80,  isPick: true             }, // pick: linear → 80
-      { nav: 100, isPick: false, age: 22 }, // prospect at i=1: 100×0.80=80, penalty 15
+      { nav: 300, isPick: false, age: 30 },
+      { nav: 80,  isPick: true             },
+      { nav: 100, isPick: false, age: 22 },
     ];
-    // player sum: 300 + 80 - 10 = 370; pick: 80; total: 450
     expect(compressPackage(mixed)).toBeCloseTo(450, 0);
   });
 });
