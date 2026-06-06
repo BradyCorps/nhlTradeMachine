@@ -227,20 +227,25 @@ function AddPlayerForm({ onAdded }: { onAdded: () => void }) {
 }
 
 export default function AdminContractsPage() {
-  const [contracts, setContracts] = useState<ContractRow[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [syncing, setSyncing]     = useState(false);
-  const [search, setSearch]       = useState("");
-  const [filter, setFilter]       = useState<"all" | "flagged" | "admin">("all");
-  const [editing, setEditing]     = useState<ContractRow | null>(null);
-  const [toast, setToast]         = useState<string | null>(null);
+  const [contracts, setContracts]   = useState<ContractRow[]>([]);
+  const [scrapedRaw, setScrapedRaw] = useState<Record<string, any> | null>(null);
+  const [loading, setLoading]       = useState(true);
+  const [syncing, setSyncing]       = useState(false);
+  const [search, setSearch]         = useState("");
+  const [filter, setFilter]         = useState<"all" | "flagged" | "admin">("all");
+  const [editing, setEditing]       = useState<ContractRow | null>(null);
+  const [toast, setToast]           = useState<string | null>(null);
 
   const load = (withScrape = false) => {
     setLoading(true);
     const url = withScrape ? "/api/admin/contracts?scrape=1" : "/api/admin/contracts";
     fetch(url)
       .then(r => r.json())
-      .then(d => { setContracts(d.contracts ?? []); setLoading(false); })
+      .then(d => {
+        setContracts(d.contracts ?? []);
+        if (d.scrapedRaw && Object.keys(d.scrapedRaw).length > 0) setScrapedRaw(d.scrapedRaw);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   };
 
@@ -274,14 +279,23 @@ export default function AdminContractsPage() {
   };
 
   const handleSync = async () => {
+    if (!scrapedRaw) {
+      showToast("Load live data first — click + LIVE DELTA, then sync");
+      return;
+    }
     setSyncing(true);
     try {
-      const res  = await fetch("/api/admin/contracts", { method: "PUT" });
+      const res  = await fetch("/api/admin/contracts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ players: scrapedRaw }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      showToast(`Synced from CapWages — ${data.added} new players added (${data.total} total)`);
+      showToast(`Synced — ${data.added} new players added (${data.total} total)`);
       load();
-    } catch {
-      showToast("Sync failed — check console");
+    } catch (e: any) {
+      showToast(`Sync failed: ${e.message}`);
     } finally {
       setSyncing(false);
     }
@@ -317,11 +331,13 @@ export default function AdminContractsPage() {
         <span style={{ fontSize: 11, color: "#8a7a5a", marginLeft: "auto" }}>
           {contracts.length} players · {flaggedCount} flagged · {adminCount} overrides
         </span>
-        <button onClick={handleSync} disabled={syncing}
+        <button onClick={handleSync} disabled={syncing || !scrapedRaw}
+          title={!scrapedRaw ? "Click + LIVE DELTA first to load CapWages data" : ""}
           style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
-            background: syncing ? "#1a1a0a" : "#1e3a1e", border: "1px solid #2a5a2a",
-            color: syncing ? "#5a7a5a" : "#6bcf6b",
-            cursor: syncing ? "default" : "pointer", letterSpacing: "0.1em" }}>
+            background: syncing ? "#1a1a0a" : scrapedRaw ? "#1e3a1e" : "#1a1a1a",
+            border: `1px solid ${scrapedRaw ? "#2a5a2a" : "#2a2a2a"}`,
+            color: syncing ? "#5a7a5a" : scrapedRaw ? "#6bcf6b" : "#3a3a3a",
+            cursor: (syncing || !scrapedRaw) ? "default" : "pointer", letterSpacing: "0.1em" }}>
           {syncing ? "SYNCING..." : "SYNC CAPWAGES"}
         </button>
         <button onClick={() => load(false)} style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",

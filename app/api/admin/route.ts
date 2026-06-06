@@ -7,7 +7,8 @@ const BUNDLED_PATH = path.join(process.cwd(), "app/data/contracts.bundled.json")
 const ADMIN_PATH   = path.join(process.cwd(), "app/data/contracts.admin.json");
 
 const CONTRACT_OVERRIDES: Record<string, { yearsRemaining?: number; position?: string }> = {
-  "Quinton Byfield": { position: "C" }
+  "Quinton Byfield": { position: "C" },
+  
 };
 
 function loadJSON(p: string): Record<string, any> {
@@ -73,7 +74,15 @@ export async function GET(req: Request) {
 
   rows.sort((a, b) => (b.delta ?? -1) - (a.delta ?? -1) || a.name.localeCompare(b.name));
 
-  return NextResponse.json({ generatedAt: new Date().toISOString(), total: rows.length, contracts: rows });
+  // Include raw scraped map when scrape=1 so client can pass it back for sync
+  const scrapedRaw: Record<string, { capHit: number; yearsRemaining: number }> = {};
+  if (url.searchParams.get("scrape") === "1") {
+    for (const [k, v] of Object.entries(scraped)) {
+      if (!k.includes("__") && v.capHit) scrapedRaw[k] = { capHit: v.capHit, yearsRemaining: v.yearsRemaining };
+    }
+  }
+
+  return NextResponse.json({ generatedAt: new Date().toISOString(), total: rows.length, contracts: rows, scrapedRaw });
 }
 
 // POST /api/admin/contracts
@@ -138,20 +147,27 @@ export async function POST(req: Request) {
   }
 }
 
-// POST /api/admin/contracts/sync — bulk-import all CapWages players not yet in bundled.json
-export async function PUT() {
+// PUT /api/admin/contracts — bulk-import scraped players not yet in bundled.json
+// Body: { players: Record<string, { capHit, yearsRemaining }> } (client passes data
+// it already fetched via GET?scrape=1 so no second live scrape is needed server-side)
+export async function PUT(req: Request) {
   const bundled = loadJSON(BUNDLED_PATH);
-  const scraped = await scrapeCapWages();
+
+  let body: { players?: Record<string, any> } = {};
+  try { body = await req.json(); } catch { /* no body */ }
+
+  // Use client-supplied data if present; fall back to a fresh scrape only as last resort
+  let source: Record<string, any> = body.players ?? {};
+  if (Object.keys(source).length === 0) {
+    source = await scrapeCapWages();
+  }
 
   let added = 0;
   const newEntries: string[] = [];
 
-  for (const [key, cw] of Object.entries(scraped)) {
-    // Skip compound keys (name__position, name__team)
+  for (const [key, cw] of Object.entries(source)) {
     if (key.includes("__")) continue;
-    // Skip if already in bundled
     if (key in bundled) continue;
-    // Skip implausible cap hits (same guard as scraper)
     if (!cw.capHit || cw.capHit < 0.5 || cw.capHit > 16) continue;
 
     bundled[key] = {
