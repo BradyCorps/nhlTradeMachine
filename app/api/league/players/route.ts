@@ -53,7 +53,7 @@ const parseCSVRow = (row: string): string[] => {
 
 const slugify = (n: string) =>
   n.toLowerCase().normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9 ]/g, "")
     .trim().replace(/\s+/g, "-");
 
@@ -650,7 +650,7 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
       "VGK":"Vegas Golden Knights","WSH":"Washington Capitals","WPG":"Winnipeg Jets",
     };
 
-    const normalise = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const normalise = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const teamByName = new Map<string, NHLTeamRow>();
     for (const t of teams) teamByName.set(normalise(t.teamFullName), t);
     const teamByAbbrev = new Map<string, NHLTeamRow>();
@@ -981,7 +981,7 @@ export async function GET() {
              ?? analyticsMap.get(truncSlug);
       }
 
-      const normalName  = p.name.normalize("NFD").replace(/[̀-ͯ]/g, "");
+      const normalName  = p.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       const posKey      = `${p.name}__${p.position}`;
       const teamKey     = `${p.name}__${teamId.toLowerCase()}`;
       const normPosKey  = `${normalName}__${p.position}`;
