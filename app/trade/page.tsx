@@ -1012,7 +1012,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
       <div className="relative w-full max-w-[1700px] mx-auto px-4 lg:px-6 py-6 lg:py-8 flex flex-col gap-5 overflow-x-hidden">
 
         <Header activeTab="trade" />
-        <TradeHistoryBar />
+        <TradeHistoryBar db={db.players.length > 0 ? db : null} />
 
         {/* ── Team Strands — full width above trade grid ── */}
         {teams[0] && teams[1] && (
