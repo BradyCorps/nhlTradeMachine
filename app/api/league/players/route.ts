@@ -16,7 +16,7 @@ const PS_CACHE_TTL        = 12 * 60 * 60; // 12 hours
 // is unreliable (e.g. back-loaded extensions where ageSigned ≠ effective start year).
 const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: number; position?: string }> = {
   "Quinton Byfield":  { position: "C" },          // NHL API sometimes tags as "LW"
-  "Mark Scheifele":   { yearsRemaining: 5 },       // 8yr/2023→2031; scraper age math gives 1
+
 };
 
 const NHL_HEADERS = {
@@ -508,6 +508,9 @@ async function loadFromDB(): Promise<Record<string, any>> {
         hasNTC:            row.hasNtc  ?? false,
         canRetain:         row.hasNmc  ? false : true,
         secondaryPosition: row.secondaryPosition ?? null,
+        extensionCapHit:   row.extensionCapHit   ?? null,
+        extensionYears:    row.extensionYears     ?? null,
+        hasExtension:      !!(row.extensionCapHit || row.extensionYears),
       };
     }
     return result;
@@ -566,6 +569,9 @@ async function loadContracts(): Promise<Record<string, any>> {
       hasNTC:            b.hasNTC  ?? false,
       canRetain:         b.hasNMC  ? false : true,
       secondaryPosition: b.secondaryPosition ?? null,
+      extensionCapHit:   b.extensionCapHit   ?? null,
+      extensionYears:    b.extensionYears     ?? null,
+      hasExtension:      b.hasExtension       ?? false,
     };
   }
 
@@ -1030,9 +1036,10 @@ export async function GET() {
       const finalNMC     = override?.hasNMC  ?? (nameCollision ? false : (fin?.hasNMC  ?? false));
       const finalNTC     = override?.hasNTC  ?? (nameCollision ? false : (fin?.hasNTC  ?? false));
       const finalRetain  = override?.canRetain ?? (nameCollision ? true : (fin?.canRetain ?? true));
-      const hasExtension    = override?.hasExtension    ?? false;
-      const extensionCapHit = override?.extensionCapHit ?? undefined;
-      const extensionYears  = override?.extensionYears  ?? undefined;
+      // DB extensions take priority over the legacy JSON file
+      const hasExtension    = fin?.hasExtension    ?? override?.hasExtension    ?? false;
+      const extensionCapHit = (fin?.extensionCapHit ?? override?.extensionCapHit) ?? undefined;
+      const extensionYears  = (fin?.extensionYears  ?? override?.extensionYears)  ?? undefined;
       const intangibleMult  = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
 
       const LEAGUE_AVG_XGA60 = 2.55;

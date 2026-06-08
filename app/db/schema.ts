@@ -30,4 +30,8 @@ export const players = sqliteTable("players", {
   // Custom manual flags
   injuryStatus: text("injury_status"),
   secondaryPosition: text("secondary_position"),
+
+  // Pending contract extensions (set via admin panel)
+  extensionCapHit: real("extension_cap_hit"),
+  extensionYears:  integer("extension_years"),
 });

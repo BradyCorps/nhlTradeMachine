@@ -3,21 +3,23 @@
 import React, { useEffect, useState, useMemo } from "react";
 
 interface ContractRow {
-  name:          string;
-  team:          string | null;
-  position:      string | null;
-  finalYears:    number;
-  finalCap:      number | null;
-  bundledYears:  number | null;
-  scrapedYears:  number | null;
-  adminYears:    number | null;
-  adminCap:      number | null;
-  overrideYears: number | null;
-  hasNMC:        boolean;
-  hasNTC:        boolean;
-  expiryStatus:  string | null;
-  delta:         number | null;
-  source:        string;
+  name:             string;
+  team:             string | null;
+  position:         string | null;
+  finalYears:       number;
+  finalCap:         number | null;
+  bundledYears:     number | null;
+  scrapedYears:     number | null;
+  adminYears:       number | null;
+  adminCap:         number | null;
+  overrideYears:    number | null;
+  hasNMC:           boolean;
+  hasNTC:           boolean;
+  expiryStatus:     string | null;
+  extensionCapHit:  number | null;
+  extensionYears:   number | null;
+  delta:            number | null;
+  source:           string;
 }
 
 function SourceBadge({ source }: { source: string }) {
@@ -39,25 +41,46 @@ function SourceBadge({ source }: { source: string }) {
 
 function EditModal({ row, onSave, onClear, onClose }: {
   row:     ContractRow;
-  onSave:  (name: string, years: number | null, cap: number | null) => Promise<void>;
+  onSave:  (name: string, years: number | null, cap: number | null, extCapHit: number | null, extYears: number | null) => Promise<void>;
   onClear: (name: string) => Promise<void>;
   onClose: () => void;
 }) {
-  const [years, setYears] = useState(String(row.adminYears ?? row.finalYears ?? ""));
-  const [cap,   setCap]   = useState(String(row.adminCap   ?? row.finalCap   ?? ""));
-  const [saving, setSaving] = useState(false);
+  const [years,   setYears]   = useState(String(row.adminYears ?? row.finalYears ?? ""));
+  const [cap,     setCap]     = useState(String(row.adminCap   ?? row.finalCap   ?? ""));
+  const [hasExt,  setHasExt]  = useState(!!(row.extensionCapHit || row.extensionYears));
+  const [extCap,  setExtCap]  = useState(String(row.extensionCapHit ?? ""));
+  const [extYrs,  setExtYrs]  = useState(String(row.extensionYears  ?? ""));
+  const [saving,  setSaving]  = useState(false);
 
   const handle = async (clear = false) => {
     setSaving(true);
     if (clear) {
       await onClear(row.name);
     } else {
-      const y = parseFloat(years);
-      const c = parseFloat(cap);
-      await onSave(row.name, isNaN(y) ? null : y, isNaN(c) ? null : c);
+      const y  = parseFloat(years);
+      const c  = parseFloat(cap);
+      const ec = hasExt ? parseFloat(extCap) : NaN;
+      const ey = hasExt ? parseInt(extYrs)   : NaN;
+      await onSave(
+        row.name,
+        isNaN(y) ? null : y,
+        isNaN(c) ? null : c,
+        hasExt && !isNaN(ec) ? ec : null,
+        hasExt && !isNaN(ey) ? ey : null,
+      );
     }
     setSaving(false);
     onClose();
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%", background: "#2a1e0a", border: "1px solid #5a4a2a",
+    color: "#e4d8b8", padding: "6px 10px", fontSize: 13,
+    fontFamily: "'Courier Prime', monospace", boxSizing: "border-box",
+  };
+  const labelStyle: React.CSSProperties = {
+    display: "block", fontSize: 10, color: "#8a7a5a",
+    textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5,
   };
 
   return (
@@ -67,8 +90,10 @@ function EditModal({ row, onSave, onClear, onClose }: {
     }} onClick={onClose}>
       <div style={{
         background: "#1a1208", border: "1px solid #5a4a2a",
-        padding: "24px", minWidth: 340, maxWidth: 420,
+        padding: "24px", minWidth: 360, maxWidth: 440,
       }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
         <div style={{ fontSize: 14, fontWeight: 900, color: "#e4d8b8", marginBottom: 16,
           fontFamily: "'Courier Prime', monospace", letterSpacing: "0.05em" }}>
           {row.name}
@@ -77,10 +102,11 @@ function EditModal({ row, onSave, onClear, onClose }: {
           </span>
         </div>
 
+        {/* Reference data */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
           {[
-            { label: "Bundled", val: row.bundledYears, cap: null },
-            { label: "Scraped", val: row.scrapedYears, cap: null },
+            { label: "Bundled", val: row.bundledYears },
+            { label: "Scraped", val: row.scrapedYears },
           ].map(s => (
             <div key={s.label} style={{ background: "#2a1e0a", border: "1px solid #3a2e1a", padding: "8px 10px" }}>
               <div style={{ fontSize: 10, color: "#8a7a5a", textTransform: "uppercase", letterSpacing: "0.1em" }}>{s.label}</div>
@@ -91,35 +117,49 @@ function EditModal({ row, onSave, onClear, onClose }: {
           ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+        {/* Current contract override */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "#8a7a5a", textTransform: "uppercase",
-              letterSpacing: "0.1em", marginBottom: 5 }}>
-              Years Remaining
-            </label>
-            <input
-              type="number" min={0} max={12} step={1}
-              value={years}
-              onChange={e => setYears(e.target.value)}
-              style={{ width: "100%", background: "#2a1e0a", border: "1px solid #5a4a2a",
-                color: "#e4d8b8", padding: "6px 10px", fontSize: 13, fontFamily: "'Courier Prime', monospace" }}
-            />
+            <label style={labelStyle}>Years Remaining</label>
+            <input type="number" min={0} max={12} step={1} value={years}
+              onChange={e => setYears(e.target.value)} style={inputStyle} />
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "#8a7a5a", textTransform: "uppercase",
-              letterSpacing: "0.1em", marginBottom: 5 }}>
-              Cap Hit ($M)
-            </label>
-            <input
-              type="number" min={0} max={20} step={0.001}
-              value={cap}
-              onChange={e => setCap(e.target.value)}
-              style={{ width: "100%", background: "#2a1e0a", border: "1px solid #5a4a2a",
-                color: "#e4d8b8", padding: "6px 10px", fontSize: 13, fontFamily: "'Courier Prime', monospace" }}
-            />
+            <label style={labelStyle}>Cap Hit ($M)</label>
+            <input type="number" min={0} max={20} step={0.001} value={cap}
+              onChange={e => setCap(e.target.value)} style={inputStyle} />
           </div>
         </div>
 
+        {/* Extension section */}
+        <div style={{ borderTop: "1px solid #2a1e0a", paddingTop: 14, marginBottom: 16 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+            fontSize: 10, color: hasExt ? "#f0a500" : "#8a7a5a", fontWeight: 900,
+            textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: hasExt ? 12 : 0 }}>
+            <input type="checkbox" checked={hasExt} onChange={e => setHasExt(e.target.checked)}
+              style={{ accentColor: "#f0a500", width: 13, height: 13 }} />
+            PENDING EXTENSION
+          </label>
+
+          {hasExt && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={{ ...labelStyle, color: "#b8900a" }}>Ext. Cap Hit ($M)</label>
+                <input type="number" min={0} max={20} step={0.001} value={extCap}
+                  onChange={e => setExtCap(e.target.value)}
+                  style={{ ...inputStyle, border: "1px solid #8a6a1a", background: "#201800" }} />
+              </div>
+              <div>
+                <label style={{ ...labelStyle, color: "#b8900a" }}>Ext. Years</label>
+                <input type="number" min={1} max={12} step={1} value={extYrs}
+                  onChange={e => setExtYrs(e.target.value)}
+                  style={{ ...inputStyle, border: "1px solid #8a6a1a", background: "#201800" }} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => handle(false)} disabled={saving}
             style={{ flex: 1, padding: "8px 0", background: "#1a3a1a", border: "1px solid #2a6a2a",
@@ -127,14 +167,14 @@ function EditModal({ row, onSave, onClear, onClose }: {
               letterSpacing: "0.1em", fontFamily: "'Courier Prime', monospace" }}>
             {saving ? "SAVING..." : "SAVE"}
           </button>
-          {row.adminYears != null || row.adminCap != null ? (
+          {(row.adminYears != null || row.adminCap != null || row.extensionCapHit != null || row.extensionYears != null) && (
             <button onClick={() => handle(true)} disabled={saving}
               style={{ padding: "8px 16px", background: "#3a1a1a", border: "1px solid #6a2a2a",
                 color: "#cf6b6b", fontSize: 12, fontWeight: 900, cursor: "pointer",
                 letterSpacing: "0.1em", fontFamily: "'Courier Prime', monospace" }}>
               CLEAR
             </button>
-          ) : null}
+          )}
           <button onClick={onClose}
             style={{ padding: "8px 16px", background: "#2a1e0a", border: "1px solid #3a2e1a",
               color: "#8a7a5a", fontSize: 12, fontWeight: 900, cursor: "pointer",
@@ -256,15 +296,21 @@ export default function AdminContractsPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const handleSave = async (name: string, yearsRemaining: number | null, capHit: number | null) => {
+  const handleSave = async (
+    name: string,
+    yearsRemaining: number | null,
+    capHit: number | null,
+    extensionCapHit: number | null,
+    extensionYears: number | null,
+  ) => {
     const res  = await fetch("/api/admin/contracts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, yearsRemaining, capHit }),
+      body: JSON.stringify({ name, yearsRemaining, capHit, extensionCapHit, extensionYears }),
     });
     const data = await res.json();
-    const dest = data.destination === "bundled" ? " → written to bundled.json" : " → admin override";
-    showToast(`Saved ${name}${dest}`);
+    const extNote = extensionCapHit ? ` · ext $${extensionCapHit}M/${extensionYears}yr` : "";
+    showToast(`Saved ${name}${extNote}`);
     load();
   };
 
@@ -426,6 +472,8 @@ export default function AdminContractsPage() {
               {row.name}
               {row.hasNMC && <span style={{ fontSize: 9, color: "#cf4040", border: "1px solid #cf404050",
                 padding: "0 3px", marginLeft: 5 }}>NMC</span>}
+              {row.extensionCapHit != null && <span style={{ fontSize: 9, color: "#f0a500",
+                border: "1px solid #f0a50050", padding: "0 3px", marginLeft: 5 }}>EXT</span>}
             </div>
 
             <div style={{ textAlign: "center", color: "#8a7a5a" }}>{row.position ?? "—"}</div>

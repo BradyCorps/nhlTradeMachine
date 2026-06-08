@@ -53,18 +53,20 @@ export async function GET(req: Request) {
 
     return {
       name,
-      team:          cw?.teamSlug  ?? null,
-      position:      ov?.position  ?? cw?.position ?? null,
-      finalYears:    baseYears,
-      finalCap:      baseCap,
-      bundledYears:  dbYears,
+      team:             cw?.teamSlug  ?? null,
+      position:         ov?.position  ?? cw?.position ?? null,
+      finalYears:       baseYears,
+      finalCap:         baseCap,
+      bundledYears:     dbYears,
       scrapedYears,
-      adminYears:    null,
-      adminCap:      null,
-      overrideYears: ov?.yearsRemaining ?? null,
-      hasNMC:        b?.hasNmc  ?? false,
-      hasNTC:        b?.hasNtc  ?? false,
-      expiryStatus:  cw?.expiryStatus ?? null,
+      adminYears:       null,
+      adminCap:         null,
+      overrideYears:    ov?.yearsRemaining ?? null,
+      hasNMC:           b?.hasNmc  ?? false,
+      hasNTC:           b?.hasNtc  ?? false,
+      expiryStatus:     cw?.expiryStatus ?? null,
+      extensionCapHit:  b?.extensionCapHit ?? null,
+      extensionYears:   b?.extensionYears  ?? null,
       delta,
       source: ov?.yearsRemaining ? "override"
              : scrapedYears      ? "scraper"
@@ -88,13 +90,15 @@ export async function GET(req: Request) {
 // Upserts to Turso DB — persists across Vercel deployments
 export async function POST(req: Request) {
   const body = await req.json();
-  const { name, yearsRemaining, capHit, hasNMC, hasNTC, clear } = body as {
-    name:            string;
-    yearsRemaining?: number;
-    capHit?:         number;
-    hasNMC?:         boolean;
-    hasNTC?:         boolean;
-    clear?:          boolean;
+  const { name, yearsRemaining, capHit, hasNMC, hasNTC, clear, extensionCapHit, extensionYears } = body as {
+    name:              string;
+    yearsRemaining?:   number;
+    capHit?:           number;
+    hasNMC?:           boolean;
+    hasNTC?:           boolean;
+    clear?:            boolean;
+    extensionCapHit?:  number | null;
+    extensionYears?:   number | null;
   };
 
   if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
@@ -106,7 +110,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, cleared: true });
   }
 
-  if (yearsRemaining == null && capHit == null && hasNMC == null && hasNTC == null) {
+  const hasUpdate = yearsRemaining != null || capHit != null || hasNMC != null || hasNTC != null
+    || extensionCapHit !== undefined || extensionYears !== undefined;
+  if (!hasUpdate) {
     return NextResponse.json({ error: "provide at least one field to update" }, { status: 400 });
   }
 
@@ -114,10 +120,12 @@ export async function POST(req: Request) {
 
   if (existing.length > 0) {
     const updates: Record<string, any> = {};
-    if (yearsRemaining != null) updates.yearsRemaining = yearsRemaining;
-    if (capHit         != null) updates.capHit         = capHit;
-    if (hasNMC         != null) updates.hasNmc         = hasNMC;
-    if (hasNTC         != null) updates.hasNtc         = hasNTC;
+    if (yearsRemaining  != null)     updates.yearsRemaining  = yearsRemaining;
+    if (capHit          != null)     updates.capHit          = capHit;
+    if (hasNMC          != null)     updates.hasNmc          = hasNMC;
+    if (hasNTC          != null)     updates.hasNtc          = hasNTC;
+    if (extensionCapHit !== undefined) updates.extensionCapHit = extensionCapHit;
+    if (extensionYears  !== undefined) updates.extensionYears  = extensionYears;
     await db.update(playersTable).set(updates).where(eq(playersTable.id, id));
     return NextResponse.json({ ok: true, destination: "db-update", name });
   } else {
@@ -129,6 +137,8 @@ export async function POST(req: Request) {
       yearsRemaining: yearsRemaining ?? 1,
       hasNmc:         hasNMC         ?? false,
       hasNtc:         hasNTC         ?? false,
+      extensionCapHit: extensionCapHit ?? null,
+      extensionYears:  extensionYears  ?? null,
     });
     return NextResponse.json({ ok: true, destination: "db-insert", name });
   }

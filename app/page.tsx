@@ -113,34 +113,48 @@ export default function WelcomePage() {
             </div>
           </div>
         </Link>
+      </div>
         
-        <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 opacity-50"
+      <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 opacity-50"
             style={{ background: "var(--paper-card)", border: "2px solid var(--paper)" }}>
-            <div>
-              <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
+        <div>
+          <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
                 style={{ color: "var(--ledger-violet)" }}>Feature Three</div><div>Coming Soon</div>
-              <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
+          <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
                 Fantasy Hockey Expansion
-              </h2>
-              <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
+          </h2>
+          <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
                 Built for fantasy managers who want to draft smarter, execute flawless trades, and dominate the waiver wire using front-office data.
-              </p>
-            </div>
-          </div>
-          <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 opacity-50"
-            style={{ background: "var(--paper-card)", border: "2px solid var(--paper)" }}>
-            <div>
-              <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
-                style={{ color: "var(--ledger-violet)" }}>Feature Four</div><div>Coming Soon</div>
-              <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
-                Micro-Context Prop Engine
-              </h2>
-              <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
-                Built for sharp bettors who want a mathematically grounded, daily mispricing matrix to consistently beat the closing lines on player props.
-              </p>
-            </div>
+          </p>
           </div>
         </div>
+        <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 opacity-50"
+            style={{ background: "var(--paper-card)", border: "2px solid var(--paper)" }}>
+          <div>
+            <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
+                style={{ color: "var(--ledger-violet)" }}>Feature Four</div><div>Coming Soon</div>
+            <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
+                Micro-Context Prop Engine
+            </h2>
+            <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
+                Built for sharp bettors who want a mathematically grounded, daily mispricing matrix to consistently beat the closing lines on player props.
+            </p>
+        </div>
+      </div>
+      <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 opacity-50"
+            style={{ background: "var(--paper-card)", border: "2px solid var(--paper)" }}>
+        <div>
+          <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
+                style={{ color: "var(--ledger-violet)" }}>Feature Five</div><div>Coming Soon</div>
+          <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
+                3 Year simulation model
+          </h2>
+          <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
+                See how your trades stack up over 3 years, get a better sense of GM logic by making long term decisions for your franchise.
+          </p>
+          </div>
+      </div>
+          
         
 
       {/* ── Explainer strip ──────────────────────────────────── */}
