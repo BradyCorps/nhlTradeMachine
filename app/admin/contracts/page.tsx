@@ -292,7 +292,7 @@ export default function AdminContractsPage() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      showToast(`Synced — ${data.added} new players added (${data.total} total)`);
+      showToast(`Synced — ${data.added} added, ${data.updated} updated (${data.total} total)`);
       load();
     } catch (e: any) {
       showToast(`Sync failed: ${e.message}`);

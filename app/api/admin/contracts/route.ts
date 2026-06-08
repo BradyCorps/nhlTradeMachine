@@ -134,8 +134,8 @@ export async function POST(req: Request) {
   }
 }
 
-// PUT /api/admin/contracts — bulk-import scraped players not yet in DB
-// body: { players: Record<string, { capHit, yearsRemaining }> }
+// PUT /api/admin/contracts — bulk-import scraped players + update changed contracts
+// body: { players: Record<string, { capHit, yearsRemaining, secondaryPosition }> }
 export async function PUT(req: Request) {
   let body: { players?: Record<string, any> } = {};
   try { body = await req.json(); } catch { /* no body */ }
@@ -145,33 +145,53 @@ export async function PUT(req: Request) {
     source = await scrapeCapWages();
   }
 
-  const existing = await db.select({ id: playersTable.id }).from(playersTable);
-  const existingIds = new Set(existing.map(r => r.id));
+  const existingRows = await db.select().from(playersTable);
+  const existingMap  = new Map(existingRows.map(r => [r.id, r]));
 
-  let added = 0;
-  const newEntries: string[] = [];
+  let added   = 0;
+  let updated = 0;
+  const newEntries:     string[] = [];
+  const updatedEntries: string[] = [];
 
   for (const [key, cw] of Object.entries(source)) {
     if (key.includes("__")) continue;
     const id = makeId(key);
-    if (existingIds.has(id)) continue;
     if (!cw.capHit || cw.capHit < 0.5 || cw.capHit > 16) continue;
 
-    await db.insert(playersTable).values({
-      id,
-      name:              key,
-      position:          "Unknown",
-      capHit:            cw.capHit,
-      yearsRemaining:    cw.yearsRemaining > 0 ? cw.yearsRemaining : 1,
-      hasNmc:            false,
-      hasNtc:            false,
-      secondaryPosition: cw.secondaryPosition ?? null,
-    }).onConflictDoNothing();
+    const existing = existingMap.get(id);
 
-    newEntries.push(key);
-    added++;
+    if (!existing) {
+      // New player — insert
+      await db.insert(playersTable).values({
+        id,
+        name:              key,
+        position:          "Unknown",
+        capHit:            cw.capHit,
+        yearsRemaining:    cw.yearsRemaining > 0 ? cw.yearsRemaining : 1,
+        hasNmc:            false,
+        hasNtc:            false,
+        secondaryPosition: cw.secondaryPosition ?? null,
+      }).onConflictDoNothing();
+      newEntries.push(key);
+      added++;
+    } else {
+      // Existing player — update if capHit or yearsRemaining changed meaningfully
+      const capChanged   = Math.abs((existing.capHit ?? 0) - cw.capHit) > 0.05;
+      const yearsChanged = Math.abs((existing.yearsRemaining ?? 1) - (cw.yearsRemaining ?? 1)) >= 1;
+      if (capChanged || yearsChanged) {
+        await db.update(playersTable)
+          .set({
+            capHit:         cw.capHit,
+            yearsRemaining: cw.yearsRemaining > 0 ? cw.yearsRemaining : 1,
+            ...(cw.secondaryPosition != null ? { secondaryPosition: cw.secondaryPosition } : {}),
+          })
+          .where(eq(playersTable.id, id));
+        updatedEntries.push(key);
+        updated++;
+      }
+    }
   }
 
   const total = await db.select({ id: playersTable.id }).from(playersTable);
-  return NextResponse.json({ ok: true, added, total: total.length, newEntries });
+  return NextResponse.json({ ok: true, added, updated, total: total.length, newEntries, updatedEntries });
 }
