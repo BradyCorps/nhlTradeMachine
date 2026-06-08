@@ -35,3 +35,12 @@ export const players = sqliteTable("players", {
   extensionCapHit: real("extension_cap_hit"),
   extensionYears:  integer("extension_years"),
 });
+
+export const tradeBlock = sqliteTable("trade_block", {
+  id:        text("id").primaryKey(),   // makeId(name)
+  name:      text("name").notNull(),
+  teamId:    text("team_id"),
+  status:    text("status").notNull(),  // 'requested' | 'available' | 'blocked' | 'untouchable'
+  note:      text("note"),
+  updatedAt: integer("updated_at"),
+});

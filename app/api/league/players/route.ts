@@ -4,7 +4,7 @@ import { TEAMS_DB } from "@/app/lib/db";
 import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
-import { players as playersTable } from "@/app/db/schema";
+import { players as playersTable, tradeBlock as tradeBlockTable, teams as teamsTable } from "@/app/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,8 @@ const PS_CACHE_TTL        = 12 * 60 * 60; // 12 hours
 // is unreliable (e.g. back-loaded extensions where ageSigned ≠ effective start year).
 const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: number; position?: string }> = {
   "Quinton Byfield":  { position: "C" },          // NHL API sometimes tags as "LW"
-
+  "Mark Scheifele":   { yearsRemaining: 5 },       // 8yr/2023→2031; scraper age math gives 1
+  "Aaron Ekblad":     { capHit: 6.1, yearsRemaining: 8 }, // 8yr/2025→2033; extension announced 2024 so ageSigned is off by 1
 };
 
 const NHL_HEADERS = {
@@ -751,6 +752,51 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
   return psMap;
 }
 
+// ── Trade Block auto-algorithm ─────────────────────────────────────────────
+function autoTradeBlockStatus(
+  p: { age: number; capHit: number; yearsRemaining: number; ptsPace: number; position: string; name: string },
+  phase: string,
+  topTwo: Set<string>,
+): 'available' | 'untouchable' | null {
+  if (p.position === 'Pick' || p.position === 'G') {
+    // Goalies: only flag obvious rental starters
+    if (p.position === 'G') {
+      if (['Rebuilding','Tanking'].includes(phase) && p.age >= 30 && p.capHit >= 5.0) return 'available';
+      if (p.yearsRemaining === 1 && p.capHit >= 6.0) return 'available';
+    }
+    return null;
+  }
+
+  const { age, capHit, yearsRemaining } = p;
+  const isTopTwo     = topTwo.has(p.name);
+  const isRebuilding = ['Rebuilding', 'Tanking'].includes(phase);
+  const isRetooling  = phase === 'Retooling';
+  const isContender  = phase === 'Contender';
+
+  // UNTOUCHABLE: franchise cornerstones in their prime
+  if (isTopTwo && age <= 29) return 'untouchable';
+  if (age <= 22 && capHit <= 1.1) return 'untouchable';
+
+  // AVAILABLE — rebuilding teams move any veteran with trade value
+  if (isRebuilding) {
+    if (age >= 29 && capHit >= 4.0 && yearsRemaining >= 2) return 'available';
+    if (age >= 32) return 'available';
+    if (yearsRemaining === 1 && capHit >= 4.0 && !isTopTwo) return 'available';
+  }
+
+  // AVAILABLE — retooling teams move expensive aging players
+  if (isRetooling) {
+    if (age >= 33 && capHit >= 5.0 && yearsRemaining >= 2) return 'available';
+    if (yearsRemaining === 1 && capHit >= 6.0 && !isTopTwo) return 'available';
+  }
+
+  // AVAILABLE — universal: old expensive contracts + rentals on any team
+  if (!isContender && age >= 35 && capHit >= 5.0) return 'available';
+  if (yearsRemaining === 1 && capHit >= 6.5 && !isTopTwo) return 'available';
+
+  return null;
+}
+
 export async function GET() {
   const [CONTRACTS, PS_MAP] = await Promise.all([
     loadContracts(),
@@ -1094,6 +1140,49 @@ export async function GET() {
       });
     });
   });
+
+  // ── Trade Block: load overrides + auto-compute status ─────────────────────
+  let tbOverrides = new Map<string, { status: string; note: string | null }>();
+  try {
+    const rows = await db.select().from(tradeBlockTable);
+    for (const r of rows) tbOverrides.set(r.name, { status: r.status, note: r.note ?? null });
+  } catch (_) {}
+
+  // Team phase map: DB override → TEAMS_DB fallback
+  const teamPhaseMap = new Map<string, string>(TEAMS_DB.map(t => [t.id, t.phase]));
+  try {
+    const dbTeams = await db.select().from(teamsTable);
+    for (const t of dbTeams) { if (t.phaseOverride) teamPhaseMap.set(t.id, t.phaseOverride); }
+  } catch (_) {}
+
+  // Top-2 skaters per team by ptsPace (to guard franchise cornerstones)
+  const teamRosterPts = new Map<string, { name: string; ptsPace: number }[]>();
+  for (const p of players) {
+    if (p.position === 'Pick') continue;
+    const list = teamRosterPts.get(p.teamId) ?? [];
+    list.push({ name: p.name, ptsPace: p.ptsPace ?? 0 });
+    teamRosterPts.set(p.teamId, list);
+  }
+  const teamTopTwo = new Map<string, Set<string>>();
+  teamRosterPts.forEach((list, tid) => {
+    const sorted = [...list].sort((a, b) => b.ptsPace - a.ptsPace);
+    teamTopTwo.set(tid, new Set(sorted.slice(0, 2).map(x => x.name)));
+  });
+
+  // Apply status to each player
+  for (const p of players) {
+    if (p.position === 'Pick') continue;
+    const override = tbOverrides.get(p.name);
+    if (override) {
+      (p as any).tradeBlockStatus = override.status === 'blocked' ? null : override.status;
+      (p as any).tradeBlockNote   = override.note;
+    } else {
+      const phase  = teamPhaseMap.get(p.teamId) ?? 'Bubble';
+      const topTwo = teamTopTwo.get(p.teamId)   ?? new Set<string>();
+      (p as any).tradeBlockStatus = autoTradeBlockStatus(p as any, phase, topTwo);
+      (p as any).tradeBlockNote   = null;
+    }
+  }
 
   return NextResponse.json({
     players,

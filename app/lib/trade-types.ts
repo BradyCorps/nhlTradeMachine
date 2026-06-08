@@ -8,7 +8,6 @@ export interface Asset {
   teamId: string;
   name: string;
   position: string;
-  secondaryPosition?: string | null;
   age: number;
   games: number;
   ptsPace: number;
@@ -55,6 +54,10 @@ export interface Asset {
   baselinePtsPace?: number;
   baselineGameScore?: number;
   baselineDpsProxy?: number;
+
+  // Trade block
+  tradeBlockStatus?: 'requested' | 'available' | 'untouchable' | null;
+  tradeBlockNote?: string | null;
 }
 
 export interface Team {
