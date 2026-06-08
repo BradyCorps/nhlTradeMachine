@@ -3,6 +3,8 @@ import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
+import { db } from "@/app/db/client";
+import { players as playersTable } from "@/app/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -494,7 +496,28 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["NYI","Ilya Sorokin","G","1995-08-04"],
 ];
 
-function loadBundled(): Record<string, any> {
+async function loadFromDB(): Promise<Record<string, any>> {
+  try {
+    const rows = await db.select().from(playersTable);
+    const result: Record<string, any> = {};
+    for (const row of rows) {
+      result[row.name] = {
+        capHit:            row.capHit,
+        yearsRemaining:    row.yearsRemaining,
+        hasNMC:            row.hasNmc  ?? false,
+        hasNTC:            row.hasNtc  ?? false,
+        canRetain:         row.hasNmc  ? false : true,
+        secondaryPosition: row.secondaryPosition ?? null,
+      };
+    }
+    return result;
+  } catch (e: any) {
+    console.warn("[DB] loadFromDB failed, falling back to bundled.json:", e.message);
+    return loadBundledFallback();
+  }
+}
+
+function loadBundledFallback(): Record<string, any> {
   try {
     const fs   = require("fs");
     const path = require("path");
@@ -504,15 +527,6 @@ function loadBundled(): Record<string, any> {
     console.error("[Bundled] FAILED:", e.message);
   }
   return {};
-}
-
-function loadAdminOverrides(): Record<string, any> {
-  try {
-    const fs   = require("fs");
-    const path = require("path");
-    const file = path.join(process.cwd(), "app/data/contracts.admin.json");
-    return JSON.parse(fs.readFileSync(file, "utf-8"));
-  } catch (_) { return {}; }
 }
 
 function loadExtensions(): Record<string, any> {
@@ -539,18 +553,15 @@ async function loadContracts(): Promise<Record<string, any>> {
     if (cached && Object.keys(cached).length > 200) return cached;
   }
 
-  const bundled = loadBundled();
+  const dbData  = await loadFromDB();
   const fresh   = await scrapeCapWages();
   const merged: Record<string, any> = {};
 
   if (Object.keys(fresh).length > 200) {
     for (const [name, cw] of Object.entries(fresh)) {
       const baseName = name.includes("__") ? name.split("__")[0] : name;
-      const b = bundled[baseName];
-      // CapWages years are live; bundled years go stale as seasons pass.
-      // Prefer CapWages unless it computed 0 or undefined (totalLength missing).
-      // Bundled wins only via CONTRACT_OVERRIDES for edge cases (back-loaded extensions).
-      const entry = {
+      const b = dbData[baseName];
+      merged[name] = {
         capHit:         cw.capHit,
         yearsRemaining: (cw.yearsRemaining > 0 ? cw.yearsRemaining : null) ?? b?.yearsRemaining ?? 1,
         hasNMC:         b?.hasNMC  ?? false,
@@ -559,17 +570,16 @@ async function loadContracts(): Promise<Record<string, any>> {
         expiryStatus:   cw.expiryStatus,
         position:       cw.position,
       };
-      merged[name] = entry;
     }
   } else {
-    for (const [name, b] of Object.entries(bundled)) {
+    for (const [name, b] of Object.entries(dbData)) {
       merged[name] = {
         capHit:         b.capHit,
         yearsRemaining: b.yearsRemaining ?? 1,
         hasNMC:         b.hasNMC  ?? false,
         hasNTC:         b.hasNTC  ?? false,
         canRetain:      b.hasNMC  ? false : true,
-        expiryStatus:   b.expiryStatus ?? "UFA",
+        expiryStatus:   "UFA",
       };
     }
   }
@@ -578,15 +588,6 @@ async function loadContracts(): Promise<Record<string, any>> {
     if (merged[name]) {
       if (override.capHit         !== undefined) merged[name].capHit         = override.capHit;
       if (override.yearsRemaining !== undefined) merged[name].yearsRemaining = override.yearsRemaining;
-    }
-  }
-
-  // Admin overrides from contracts.admin.json — highest priority, editable via /admin/contracts UI
-  const adminOverrides = loadAdminOverrides();
-  for (const [name, ad] of Object.entries(adminOverrides)) {
-    if (merged[name]) {
-      if ((ad as any).capHit         != null) merged[name].capHit         = (ad as any).capHit;
-      if ((ad as any).yearsRemaining != null) merged[name].yearsRemaining = (ad as any).yearsRemaining;
     }
   }
 
@@ -1095,8 +1096,9 @@ export async function GET() {
         xgRelTM:     stats?.xgRelTM   ?? null,
         xgaRelTM:    stats?.xgaRelTM  ?? null,
         dzPct:       stats?.dzPct     ?? null,
-        goalsPace:   stats?.goalsPace,
-        assistsPace: stats?.assistsPace,
+        goalsPace:         stats?.goalsPace,
+        assistsPace:       stats?.assistsPace,
+        secondaryPosition: fin?.secondaryPosition ?? null,
       });
     });
   });

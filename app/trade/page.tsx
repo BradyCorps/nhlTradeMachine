@@ -1,72 +1,36 @@
 "use client";
 
-import AssetCard from "@/app/components/AssetCard";
 import TradePanel from "@/app/components/TradePanel";
-import AssetDropdown from "@/app/components/AssetDropdown";
-import TradeHistoryBar from "@/app/components/TradeHistoryBar";
 import TugBar from "@/app/components/TugBar";
-import { MicroBar, DeltaRow } from "@/app/components/MicroBar";
-import { SEASON, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
+import { ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
 import TeamStrand, { CHAMP_TEMPLATE, TeamStrandData } from "@/app/components/TeamStrand";
 import LineupCard from "@/app/components/LineupCard";
 import WhatWeNeed from "@/app/components/WhatWeNeed";
 import ContentionQuadrant from "@/app/components/ContentionQuadrant";
-import {
-  PLAYER_PEDIGREE, PROSPECT_TIERS, SHUTDOWN_D_PEDIGREE, INJURY_RISK,
-} from "@/app/lib/player-data";
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
-
-// Lazy-load heavy components — defers their JS from the initial bundle.
-// Each one is only parsed/executed when first rendered.
-// Shared with xnav-engine.ts — change both together (or move to player-data.ts)
-const DPS_NAV_MULTIPLIER = 120; // dps * 15 (display) * 8 (NAV) = dps * 120
-
-const TradeProposalEngine = lazy(() => import("@/app/components/TradeProposal"));
-const PlayerComparison    = lazy(() => import("@/app/components/PlayerComparison"));
-const CapProjection       = lazy(() => import("@/app/components/CapProjection"));
-const LedgerDropdown      = lazy(() => import("@/app/components/LedgerDropdown"));
-import { 
-  HISTORICAL_MAX_OFF, 
-  HISTORICAL_MAX_DEF 
-} from "../lib/historical-benchmarks";
 import { useTradeStore } from "@/app/store/tradeStore";
-
 import Header from "@/app/components/Header";
+import TradeHistoryBar from "@/app/components/TradeHistoryBar";
 import Footer from "@/app/components/Footer";
 import type {
-  Asset, Team, XNAVResult, GmFlag, FlagSeverity, FlagCategory,
-  TradeVerdict, TradeStatus, TradeMetrics,
+  Asset, Team, XNAVResult, GmFlag, TradeVerdict,
 } from "@/app/lib/trade-types";
 import {
   fetchNavMap, fetchTradeVerdict, clearNavCache, getCachedNav,
 } from "@/app/lib/evaluate-client";
+import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 
-// ── Display-only constants (labels/badges only — no math) ────
-// The real valuation data lives server-side in /api/evaluate.
-// These are purely for rendering badges in the UI.
+const TradeProposalEngine = lazy(() => import("@/app/components/TradeProposal"));
+const PlayerComparison    = lazy(() => import("@/app/components/PlayerComparison"));
+const CapProjection       = lazy(() => import("@/app/components/CapProjection"));
 
+const safe = (n: number) => (isNaN(n) || !isFinite(n) ? 0 : n);
+const fmt  = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
 
-const safe  = (n: number) => (isNaN(n) || !isFinite(n) ? 0 : n);
-const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
-const fmt   = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
-
-// Synchronous NAV lookup — reads from client-side cache populated by /api/evaluate
-// Falls back to 0 for assets not yet fetched (shouldn't happen after initial load)
 const getXNAV = (asset: Asset): XNAVResult =>
   getCachedNav(asset) ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
-
-
-// ============================================================
-// UTILS
-// ============================================================
-const nullMetrics = () => ({
-  navOut: 0, navIn: 0, homeNetGain: 0, ptsGain: 0,
-  defGain: 0, capDelta: 0, variance: 0, ewaHome: 0, cwiYears: 0,
-});
-
-import VerdictPanel, { SEVERITY_STYLES, STATUS_CONFIG } from "@/app/components/VerdictPanel";
 
 // ============================================================
 // MAIN COMPONENT
@@ -288,10 +252,6 @@ export default function TradeMachine() {
         setBooting(false);
       });
   }, []);
-
-  // ── Live NAV totals for trade blocks ─────────────────────────
-
-  const CAP_CEILING = SEASON.capCeiling; // NHL salary cap ceiling
 
   // ── Execute Trade — moves players between teams in db state ──
   const executeTrade = useCallback(() => {
@@ -1012,6 +972,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
       <div className="relative w-full max-w-[1700px] mx-auto px-4 lg:px-6 py-6 lg:py-8 flex flex-col gap-5 overflow-x-hidden">
 
         <Header activeTab="trade" />
+
         <TradeHistoryBar db={db.players.length > 0 ? db : null} />
 
         {/* ── Team Strands — full width above trade grid ── */}
@@ -1726,34 +1687,6 @@ RULES: No invented context. No speculation about players not in this trade. Comp
   </>
   );
 }
-
-// ============================================================
-// TRADE PANEL
-// ============================================================
-
-// ============================================================
-// ASSET CARD — with retention slider and contract details
-// ============================================================
-// ============================================================
-// ASSET CARD — with retention slider and contract details
-// ============================================================
-
-// ============================================================
-// STRAND™ — Stylistic Trait & Rating Analysis for NHL Development
-// A double-helix visualization of a player's offensive/defensive DNA.
-// Strand A (top): Offensive traits — scoring, playmaking, xG generation
-// Strand B (bottom): Defensive traits — suppression, compete, zone starts
-// The two strands intertwine — balanced players have a tight helix,
-// one-dimensional players show one strand dominating.
-// ============================================================
-
-// ============================================================
-// ASSET DROPDOWN
-// ============================================================
-
-// ============================================================
-// TUG-OF-WAR BAR
-// ============================================================
 
 // ── UI-only team classification ────────────────────────────────
 // The real classifyTeam logic runs server-side. This stub just reads

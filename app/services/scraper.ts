@@ -60,6 +60,18 @@ export async function scrapeCapWages(): Promise<Record<string, any>> {
       const teamSlug     = (p[2] as string ?? "").toLowerCase().replace(/\s+/g, "_");
       const position     = (p[3] as string ?? "").toUpperCase();
       const ageNow       = p[8]  as number;
+
+      // Debug: log first 3 players' p[3]–p[6] to confirm secondary position index
+      if (scraped < 3) {
+        console.log(`[CapWages Debug] ${normaliseName(rawName)}: p[3]=${JSON.stringify(p[3])} p[4]=${JSON.stringify(p[4])} p[5]=${JSON.stringify(p[5])} p[6]=${JSON.stringify(p[6])}`);
+      }
+
+      // Secondary position — p[4] is the candidate; confirmed via debug log above
+      const VALID_POS = new Set(["C", "W", "L", "R", "LW", "RW", "D", "G", "F"]);
+      const rawSecondary      = p[4] as string | null | undefined;
+      const secondaryPosition = (typeof rawSecondary === "string" && VALID_POS.has(rawSecondary.toUpperCase()))
+        ? rawSecondary.toUpperCase()
+        : null;
       const totalLength  = p[15] as number;
 
       if (!rawName || !capRaw || capRaw <= 0) {
@@ -72,10 +84,10 @@ export async function scrapeCapWages(): Promise<Record<string, any>> {
       const capHit = Math.round((capRaw / 10) * 1000) / 1000;
 
       // ── Sanity check — reject implausible cap hits ────────────
-      // Floor: lowest realistic NHL salary ($0.8M = league minimum band)
+      // Floor: ELC minimum is $0.775M (2024-25 CBA); use 0.75 for margin
       // Ceiling: highest ever signed (~$16M, Draisaitl 2025)
       // Anything outside this range signals a parse error; skip and fall back to bundled.
-      const CAP_MIN = 0.8;
+      const CAP_MIN = 0.75;
       const CAP_MAX = 16.0;
       if (capHit < CAP_MIN || capHit > CAP_MAX) {
         skipReasons[name] = `capHit=${capHit} out of range [${CAP_MIN},${CAP_MAX}] — falling back to bundled`;
@@ -94,6 +106,7 @@ export async function scrapeCapWages(): Promise<Record<string, any>> {
         expiryStatus,
         position,
         teamSlug,
+        secondaryPosition,
       };
 
       contracts[name] = contractData;

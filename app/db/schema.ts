@@ -29,4 +29,5 @@ export const players = sqliteTable("players", {
   
   // Custom manual flags
   injuryStatus: text("injury_status"),
+  secondaryPosition: text("secondary_position"),
 });

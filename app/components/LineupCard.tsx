@@ -8,6 +8,7 @@ interface Player {
   id: string;
   name: string;
   position: string;
+  secondaryPosition?: string | null;
   avgTOI?: number;
   ptsPace?: number;
   capHit?: number;
@@ -52,14 +53,25 @@ function buildLineup(roster: Player[], outgoing: Player[], incoming: Player[]) {
   ];
 
   const isC = (p: Player) => p.position === "C";
-  const isW = (p: Player) => ["W", "L", "R", "LW", "RW"].includes(p.position);
+  const isW = (p: Player) =>
+    ["W", "L", "R", "LW", "RW"].includes(p.position) ||
+    p.secondaryPosition === "W";
   const isD = (p: Player) => p.position === "D";
   const isG = (p: Player) => p.position === "G";
 
-  const centers  = sortByIce(effective.filter(isC)).slice(0, 4);
-  const wingers  = sortByIce(effective.filter(isW)).slice(0, 8);
-  const dmen     = sortByIce(effective.filter(isD)).slice(0, 6);
-  const goalies  = sortByGames(effective.filter(isG)).slice(0, 2);
+  // Centers: top 4 by TOI
+  const centers   = sortByIce(effective.filter(isC)).slice(0, 4);
+  const centerIds = new Set(centers.map(p => p.id));
+
+  // Wingers: primary wingers first; if short, flex in centers not already in top-4 slots
+  const primaryW = sortByIce(effective.filter(isW));
+  const flexC    = primaryW.length < 8
+    ? sortByIce(effective.filter(p => isC(p) && !centerIds.has(p.id)))
+    : [];
+  const wingers = [...primaryW, ...flexC].slice(0, 8);
+
+  const dmen   = sortByIce(effective.filter(isD)).slice(0, 6);
+  const goalies = sortByGames(effective.filter(isG)).slice(0, 2);
 
   const statusOf = (p: Player): SlotStatus =>
     inIds.has(p.id) ? "in" : outIds.has(p.id) ? "out" : "normal";
@@ -69,8 +81,13 @@ function buildLineup(roster: Player[], outgoing: Player[], incoming: Player[]) {
 
   // Check if an outgoing player occupied a position
   // For original roster players that are going out — show them as "out" in position
-  const origCenters = sortByIce(roster.filter(isC)).slice(0, 4);
-  const origWingers = sortByIce(roster.filter(isW)).slice(0, 8);
+  const origCenters   = sortByIce(roster.filter(isC)).slice(0, 4);
+  const origCenterIds = new Set(origCenters.map(p => p.id));
+  const origPrimW     = sortByIce(roster.filter(isW));
+  const origFlexC     = origPrimW.length < 8
+    ? sortByIce(roster.filter(p => isC(p) && !origCenterIds.has(p.id)))
+    : [];
+  const origWingers = [...origPrimW, ...origFlexC].slice(0, 8);
   const origDmen    = sortByIce(roster.filter(isD)).slice(0, 6);
   const origGoalies = sortByGames(roster.filter(isG)).slice(0, 2);
 
