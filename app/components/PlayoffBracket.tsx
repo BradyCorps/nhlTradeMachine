@@ -89,16 +89,16 @@ export default function PlayoffBracket({ bracket }: { bracket: BracketData }) {
       {/* Bracket columns */}
       <div style={{ display: "flex", height: H, alignItems: "stretch" }}>
 
-        {/* Eastern R1 — 4 series, each ¼ height */}
-        <RoundCol items={bracket.eastern.r1} />
+        {/* western R1 — 4 series, each ¼ height */}
+        <RoundCol items={bracket.western.r1} />
 
-        {/* Eastern R2 — 2 series, each ½ height → naturally centers on R1 pairs */}
-        <RoundCol items={bracket.eastern.r2} />
+        {/* western R2 — 2 series, each ½ height → naturally centers on R1 pairs */}
+        <RoundCol items={bracket.western.r2} />
 
-        {/* Eastern CF — 1 series, full height → naturally centered */}
+        {/* western CF — 1 series, full height → naturally centered */}
         <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
           <div style={{ flex: 1, display: "flex", alignItems: "center", padding: "2px 2px" }}>
-            <MatchCard s={bracket.eastern.cf} />
+            <MatchCard s={bracket.western.cf} />
           </div>
         </div>
 
@@ -119,26 +119,26 @@ export default function PlayoffBracket({ bracket }: { bracket: BracketData }) {
           </div>
         </div>
 
-        {/* Western CF */}
+        {/* eastern CF */}
         <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
           <div style={{ flex: 1, display: "flex", alignItems: "center", padding: "2px 2px" }}>
-            <MatchCard s={bracket.western.cf} flip />
+            <MatchCard s={bracket.eastern.cf} flip />
           </div>
         </div>
 
-        {/* Western R2 */}
-        <RoundCol items={bracket.western.r2} flip />
+        {/* eastern R2 */}
+        <RoundCol items={bracket.eastern.r2} flip />
 
-        {/* Western R1 */}
-        <RoundCol items={bracket.western.r1} flip />
+        {/* eastern R1 */}
+        <RoundCol items={bracket.eastern.r1} flip />
       </div>
 
       {/* Conference labels */}
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5,
                     fontSize: 7, fontWeight: 900, color: FAINT, textTransform: "uppercase",
                     letterSpacing: "0.08em", fontFamily: MONO }}>
-        <span>◀ Eastern Conference</span>
-        <span>Western Conference ▶</span>
+        <span>◀ Western Conference</span>
+        <span>Eastern Conference ▶</span>
       </div>
     </div>
   );

@@ -553,35 +553,20 @@ async function loadContracts(): Promise<Record<string, any>> {
     if (cached && Object.keys(cached).length > 200) return cached;
   }
 
-  const dbData  = await loadFromDB();
-  const fresh   = await scrapeCapWages();
+  // DB is the source of truth — CapWages sync happens only in /admin.
+  // Never scrape live on the page-load path (adds 3-4s and burns CapWages quota).
+  const dbData = await loadFromDB();
   const merged: Record<string, any> = {};
 
-  if (Object.keys(fresh).length > 200) {
-    for (const [name, cw] of Object.entries(fresh)) {
-      const baseName = name.includes("__") ? name.split("__")[0] : name;
-      const b = dbData[baseName];
-      merged[name] = {
-        capHit:         cw.capHit,
-        yearsRemaining: (cw.yearsRemaining > 0 ? cw.yearsRemaining : null) ?? b?.yearsRemaining ?? 1,
-        hasNMC:         b?.hasNMC  ?? false,
-        hasNTC:         b?.hasNTC  ?? false,
-        canRetain:      b?.hasNMC  ? false : true,
-        expiryStatus:   cw.expiryStatus,
-        position:       cw.position,
-      };
-    }
-  } else {
-    for (const [name, b] of Object.entries(dbData)) {
-      merged[name] = {
-        capHit:         b.capHit,
-        yearsRemaining: b.yearsRemaining ?? 1,
-        hasNMC:         b.hasNMC  ?? false,
-        hasNTC:         b.hasNTC  ?? false,
-        canRetain:      b.hasNMC  ? false : true,
-        expiryStatus:   "UFA",
-      };
-    }
+  for (const [name, b] of Object.entries(dbData)) {
+    merged[name] = {
+      capHit:            b.capHit,
+      yearsRemaining:    b.yearsRemaining ?? 1,
+      hasNMC:            b.hasNMC  ?? false,
+      hasNTC:            b.hasNTC  ?? false,
+      canRetain:         b.hasNMC  ? false : true,
+      secondaryPosition: b.secondaryPosition ?? null,
+    };
   }
 
   for (const [name, override] of Object.entries(CONTRACT_OVERRIDES)) {

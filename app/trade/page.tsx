@@ -153,6 +153,8 @@ export default function TradeMachine() {
   const simAbortRef  = useRef<AbortController | null>(null);
   const memoAbortRef = useRef<AbortController | null>(null);
   const evalAbortRef = useRef<AbortController | null>(null);
+  // Guard against React StrictMode double-invocation in dev mode
+  const loadedRef = useRef(false);
 
   // ── Server-fetched NAV map ────────────────────────────────────
   // Populated by /api/evaluate — engine runs server-side only.
@@ -222,6 +224,8 @@ export default function TradeMachine() {
   }, [blocks]);
 
   useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
     Promise.all([
       fetch("/api/league/teams").then((r) => r.json()),
       fetch("/api/league/players").then((r) => r.json()),
@@ -347,6 +351,7 @@ export default function TradeMachine() {
           partnerTeamId: teams[1]?.id ?? "",
           teams:   db.teams,
           players: db.players,
+          navMap:  Object.fromEntries(Object.entries(navMap).map(([id, r]) => [id, r.total])),
           trades:  executedTrades.map(t => ({
             homeTeamId:    db.teams.find(x => x.name === t.homeTeamName)?.id ?? "",
             partnerTeamId: db.teams.find(x => x.name === t.partnerTeamName)?.id ?? "",

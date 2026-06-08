@@ -14,6 +14,7 @@ interface SimPlayer {
   gsax?: number;
   savePct?: number;
   gamesStarted?: number;
+  games?: number;
   teamId: string;
 }
 
@@ -63,6 +64,7 @@ interface SimRequest {
   teams: SimTeam[];
   players: SimPlayer[];
   trades: TradeRecord[];
+  navMap?: Record<string, number>;
   seed?: number;
 }
 
@@ -154,8 +156,8 @@ function projectTeamPoints(
     pacedPts = PHASE_BASELINE[team.phase] ?? 88;
   }
 
-  // Trade impact: roughly 7 NAV equivalent pts delta = 1 win = 2 standings pts
-  const tradeImpact = tradeNavDelta / 3.5;
+  // Trade impact: ~14 NAV = 1 win = 2 standings pts (NAV scale, not ptsPace)
+  const tradeImpact = tradeNavDelta / 7;
 
   // Phase variance — wild cards get wider range
   const isWildCard = WILD_CARD_TEAMS.has(team.id);
@@ -180,7 +182,7 @@ function projectTopScorer(
   const skaters = roster
     .filter(p => p.position !== "Pick" && p.position !== "G"
       && p.ptsPace > 0
-      && (p as any).games >= 20)  // minimum games threshold — kills Oliver Bonk problem
+      && (p.games ?? 0) >= 20)
     .sort((a, b) => b.ptsPace - a.ptsPace);
 
   if (skaters.length === 0) return null;
@@ -266,7 +268,7 @@ function projectGoalie(
 
 // ── Project top defenseman (Norris candidate) ───────────────────
 function projectTopDefenseman(roster: SimPlayer[], rand: () => number): { name: string; projectedPts: number } | null {
-  const dmen = roster.filter(p => p.position === "D" && p.ptsPace > 0 && (p as any).games >= 10)
+  const dmen = roster.filter(p => p.position === "D" && p.ptsPace > 0 && (p.games ?? 0) >= 10)
     .sort((a, b) => b.ptsPace - a.ptsPace);
   if (dmen.length === 0) return null;
   const top = dmen[0];
@@ -446,6 +448,7 @@ function simulatePlayoffs(standings: SimTeamResult[], rand: () => number): Playo
 function findLeagueLeaders(
   standings: SimTeamResult[],
   rand: () => number,
+  cupChampionId: string,
 ): {
   topScorer: { name: string; team: string; pts: number } | null;
   topGoalie:     { name: string; team: string; gaa: number; svp: number } | null;
@@ -456,22 +459,9 @@ function findLeagueLeaders(
   assistsLeader: { name: string; team: string; assists: number } | null;
   connSmythe:    { name: string; team: string } | null;
   presidentsTrophy: SimTeamResult;
-  cupWinner: SimTeamResult;
   draftLottery: SimTeamResult;
 } {
   const presidentsTrophy = standings[0];
-  const playoffTeams = standings.filter(t => t.madePlayoffs);
-  const sortedPlayoff = [...playoffTeams].sort((a, b) => b.projectedPoints - a.projectedPoints);
-
-  // Top team wins ~25% of time, weighted by finish position
-  const cupIndex = Math.min(
-    sortedPlayoff.length - 1,
-    Math.floor(Math.pow(rand(), 1.8) * sortedPlayoff.length)
-  );
-  const rawCupWinner = sortedPlayoff[cupIndex];
-  const cupWinner = rawCupWinner?.teamId === "FLA"
-    ? sortedPlayoff.find(t => t.teamId !== "FLA") ?? rawCupWinner
-    : rawCupWinner;
 
   // Top scorer across all teams
   let topScorerResult: { name: string; team: string; pts: number } | null = null;
@@ -545,7 +535,7 @@ function findLeagueLeaders(
   }
 
   // ── Conn Smythe — Cup winner's top scorer ─────────────────────────────────
-  const cupTeam          = standings.find(t => t.teamId === cupWinner?.teamId);
+  const cupTeam          = standings.find(t => t.teamId === cupChampionId);
   const connSmytheResult = cupTeam?.topScorer
     ? { name: cupTeam.topScorer.name, team: cupTeam.teamName }
     : null;
@@ -559,7 +549,7 @@ function findLeagueLeaders(
     topScorer: topScorerResult, topGoalie: topGoalieResult,
     vezina: vezinaResult, hart: hartResult, norris: norrisResult,
     goalsLeader, assistsLeader, connSmythe: connSmytheResult,
-    presidentsTrophy, cupWinner, draftLottery,
+    presidentsTrophy, draftLottery,
   };
 }
 
@@ -604,17 +594,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Calculate NAV delta per team from all trades
-    // Positive = team gained NAV, negative = gave up NAV
+    // Calculate NAV delta per team from all trades.
+    // Uses navMap totals when provided (includes picks, defensive value, cap surplus).
+    // Falls back to ptsPace * 2 as a rough NAV proxy for backwards compatibility.
+    const navMap = body.navMap ?? {};
+    const assetNav = (p: SimPlayer) =>
+      navMap[p.id] ?? (p.position === "Pick" ? 30 : p.ptsPace * 2);
+
     const tradeNavDeltas = new Map<string, number>();
     for (const trade of trades) {
-      // Simple approximation: sum ptsPace differential as proxy for NAV delta
-      const outPts = trade.outgoing.filter(p => p.position !== "Pick")
-        .reduce((s, p) => s + p.ptsPace, 0);
-      const inPts = trade.incoming.filter(p => p.position !== "Pick")
-        .reduce((s, p) => s + p.ptsPace, 0);
-      const delta = inPts - outPts;
-      tradeNavDeltas.set(trade.homeTeamId, (tradeNavDeltas.get(trade.homeTeamId) ?? 0) + delta);
+      const outNav = trade.outgoing.reduce((s, p) => s + assetNav(p), 0);
+      const inNav  = trade.incoming.reduce((s, p) => s + assetNav(p), 0);
+      const delta  = inNav - outNav;
+      tradeNavDeltas.set(trade.homeTeamId,    (tradeNavDeltas.get(trade.homeTeamId)    ?? 0) + delta);
       tradeNavDeltas.set(trade.partnerTeamId, (tradeNavDeltas.get(trade.partnerTeamId) ?? 0) - delta);
     }
 
@@ -624,10 +616,15 @@ export async function POST(req: NextRequest) {
     // Run simulation
     const rawStandings = simulateLeague(teams, playersByTeam, tradeNavDeltas, liveStandings, rand);
     const standings = assignPlayoffSeeds(rawStandings);
-    const leaders = findLeagueLeaders(standings, rand);
+
+    // Playoffs runs before findLeagueLeaders so connSmythe uses the actual bracket champion
+    const playoffBracket = simulatePlayoffs(standings, rand);
+    const cupWinner = standings.find(t => t.teamId === playoffBracket.champion.teamId) ?? standings[0];
+
+    const leaders = findLeagueLeaders(standings, rand, playoffBracket.champion.teamId);
 
     // Extract home and partner team results
-    const homeResult   = standings.find(t => t.teamId === homeTeamId);
+    const homeResult    = standings.find(t => t.teamId === homeTeamId);
     const partnerResult = standings.find(t => t.teamId === partnerTeamId);
 
     // Build division standings for context
@@ -638,29 +635,29 @@ export async function POST(req: NextRequest) {
         .sort((a, b) => b.projectedPoints - a.projectedPoints);
     }
 
-    // Calder — dynamic: best projected scorer among players age ≤ 22 (ELC-tier rookie).
-    // Schaefer is no longer hardcoded — if he's on the roster and projects well, he wins it;
-    // if trades change the roster composition, the award goes to whoever actually earns it.
+    // Calder — best scorer among genuine rookies (age ≤ 22, < 14 NHL games played).
+    // Falls back to youngest high-upside player on any roster; never hardcodes a name.
     const rookieCandidates = [...playersByTeam.entries()].flatMap(([teamId, roster]) =>
       roster
-        .filter(p => p.age <= 22 && p.position !== "G" && p.ptsPace > 0)
+        .filter(p => p.age <= 22 && p.position !== "G" && p.ptsPace > 0 && (p.games ?? 0) < 14)
         .map(p => ({ ...p, teamId }))
     );
     const calderWinner = (() => {
-      if (rookieCandidates.length === 0) return { name: "Matthew Schaefer", team: "New York Islanders", note: "—" };
-      // Sort by adjusted ptsPace with variance so it's not always the same player
-      const sorted = rookieCandidates
+      const pool = rookieCandidates.length > 0
+        ? rookieCandidates
+        : [...playersByTeam.entries()].flatMap(([teamId, roster]) =>
+            roster
+              .filter(p => p.age <= 21 && p.position !== "G" && p.ptsPace > 0)
+              .map(p => ({ ...p, teamId }))
+          );
+      if (pool.length === 0) return { name: "TBD", team: "—", note: "No eligible candidates" };
+      const sorted = pool
         .map(p => ({ p, score: p.ptsPace * (0.50 + rand() * 1.00) }))
         .sort((a, b) => b.score - a.score);
       const winner = sorted[0].p;
       const teamName = teams.find(t => t.id === winner.teamId)?.name ?? winner.teamId;
       return { name: winner.name, team: teamName, note: `${Math.round(winner.ptsPace * 0.9)}-${Math.round(winner.ptsPace * 0.9 * 0.55)} in projected first full season` };
     })();
-
-    const playoffBracket = simulatePlayoffs(standings, rand);
-
-    // Override cupWinner from leaders with bracket result (more accurate)
-    const cupWinner = standings.find(t => t.teamId === playoffBracket.champion.teamId) ?? leaders.cupWinner;
 
     return NextResponse.json({
       seed,
