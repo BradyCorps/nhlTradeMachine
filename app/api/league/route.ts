@@ -357,16 +357,6 @@ function loadBundledFallback(): Record<string, any> {
   return {};
 }
 
-function loadExtensions(): Record<string, any> {
-  try {
-    const fs   = require("fs");
-    const path = require("path");
-    const file = path.join(process.cwd(), "app/data/contracts.extensions.json");
-    return JSON.parse(fs.readFileSync(file, "utf-8"));
-  } catch (e: any) {
-    return {};
-  }
-}
 
 function loadBaselines(): Record<string, any> {
   try {
@@ -1085,7 +1075,6 @@ export async function GET() {
     loadTeams(),
     fetchPointShares(),
   ]);
-  const EXTENSIONS = loadExtensions();
   const BASELINES = loadBaselines();
   // ── 1. MoneyPuck analytics — skaters + goalies ─────────────
   // Cached for 4 hours — MP updates roughly twice daily.
@@ -1422,41 +1411,33 @@ export async function GET() {
         return u.charAt(0);
       };
 
-      // ── THE OVERRIDE LAYER (Highest Priority) ───────────────
-      const override         = EXTENSIONS[p.name]    ?? EXTENSIONS[normalName];
       const contractOverride = CONTRACT_OVERRIDES[p.name] ?? CONTRACT_OVERRIDES[normalName];
-      // Position override must be resolved before isGoalie/defaultTOI/defaultPts
       const finalPosition    = contractOverride?.position ?? p.position;
 
       const isGoalie   = finalPosition === "G";
       const defaultTOI = isGoalie ? 0 : finalPosition === "D" ? 18.5 : 13.5;
       const defaultPts = isGoalie ? 0 : finalPosition === "D" ? 22 : finalPosition === "C" ? 32 : 28;
 
-      // Merge goalie-specific stats — try full name slug, then last name only
       const goalieSlug      = slugify(p.name);
       const goalieSlugLast  = slugify(p.name.split(" ").pop() ?? "");
       const goalieStats     = isGoalie
         ? (goalieMap.get(goalieSlug) ?? goalieMap.get(goalieSlugLast) ?? null)
         : null;
 
-      // Contract sanity check
       const rawCapHit     = isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925);
-      // nameCollision: young player with a high cap hit whose contract position
-      // doesn't match their NHL position — likely inherited a veteran's contract.
-      // Use normContractPos so "RW, LW" → "W" matches "W" (fixes Slafkovsky and all wingers).
       const nameCollision = p.age <= 23
         && rawCapHit > 3.0
         && normContractPos(fin?.position) !== p.position;
 
-      const finalCapHit   = contractOverride?.capHit ?? override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
-      const finalYears    = override?.yearsRemaining ?? (nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1)));
-      const finalNMC      = override?.hasNMC ?? (nameCollision ? false : (fin?.hasNMC ?? false));
-      const finalNTC      = override?.hasNTC ?? (nameCollision ? false : (fin?.hasNTC ?? false));
-      const finalRetain   = override?.canRetain ?? (nameCollision ? true  : (fin?.canRetain ?? true));
-      const hasExtension     = override?.hasExtension    ?? fin?.hasExtension    ?? false;
-      const extensionCapHit  = override?.extensionCapHit ?? fin?.extensionCapHit ?? undefined;
-      const extensionYears   = override?.extensionYears  ?? fin?.extensionYears  ?? undefined;
-      const intangibleMult = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
+      const finalCapHit   = contractOverride?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
+      const finalYears    = nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1));
+      const finalNMC      = nameCollision ? false : (fin?.hasNMC ?? false);
+      const finalNTC      = nameCollision ? false : (fin?.hasNTC ?? false);
+      const finalRetain   = nameCollision ? true  : (fin?.canRetain ?? true);
+      const hasExtension     = fin?.hasExtension    ?? false;
+      const extensionCapHit  = fin?.extensionCapHit ?? undefined;
+      const extensionYears   = fin?.extensionYears  ?? undefined;
+      const intangibleMult = fin?.intangibleMultiplier ?? 1.0;
 
       // ── UPSTREAM GOALIE METRICS ─────────────────────────────
       // teamXga60: derived from MoneyPuck xGoals allowed / team games played

@@ -531,14 +531,6 @@ function loadBundledFallback(): Record<string, any> {
   return {};
 }
 
-function loadExtensions(): Record<string, any> {
-  try {
-    const fs   = require("fs");
-    const path = require("path");
-    const file = path.join(process.cwd(), "app/data/contracts.extensions.json");
-    return JSON.parse(fs.readFileSync(file, "utf-8"));
-  } catch (_) { return {}; }
-}
 
 function loadBaselines(): Record<string, any> {
   try {
@@ -789,7 +781,6 @@ export async function GET() {
     loadContracts(),
     fetchPointShares(),
   ]);
-  const EXTENSIONS = loadExtensions();
   const BASELINES  = loadBaselines();
 
   // ── MoneyPuck analytics ─────────────────────────────────────
@@ -1047,7 +1038,6 @@ export async function GET() {
         return u.charAt(0);
       };
 
-      const override         = EXTENSIONS[p.name]    ?? EXTENSIONS[normalName];
       const contractOverride = CONTRACT_OVERRIDES[p.name] ?? CONTRACT_OVERRIDES[normalName];
       const finalPosition    = contractOverride?.position ?? p.position;
 
@@ -1064,15 +1054,15 @@ export async function GET() {
         && rawCapHit > 3.0
         && normContractPos(fin?.position) !== p.position;
 
-      const finalCapHit  = contractOverride?.capHit ?? override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
-      const finalYears   = override?.yearsRemaining ?? (nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1)));
-      const finalNMC     = override?.hasNMC  ?? (nameCollision ? false : (fin?.hasNMC  ?? false));
-      const finalNTC     = override?.hasNTC  ?? (nameCollision ? false : (fin?.hasNTC  ?? false));
-      const finalRetain  = override?.canRetain ?? (nameCollision ? true : (fin?.canRetain ?? true));
-      const hasExtension    = override?.hasExtension    ?? fin?.hasExtension    ?? false;
-      const extensionCapHit = override?.extensionCapHit ?? fin?.extensionCapHit ?? undefined;
-      const extensionYears  = override?.extensionYears  ?? fin?.extensionYears  ?? undefined;
-      const intangibleMult  = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
+      const finalCapHit  = contractOverride?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
+      const finalYears   = nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1));
+      const finalNMC     = nameCollision ? false : (fin?.hasNMC  ?? false);
+      const finalNTC     = nameCollision ? false : (fin?.hasNTC  ?? false);
+      const finalRetain  = nameCollision ? true  : (fin?.canRetain ?? true);
+      const hasExtension    = fin?.hasExtension    ?? false;
+      const extensionCapHit = fin?.extensionCapHit ?? undefined;
+      const extensionYears  = fin?.extensionYears  ?? undefined;
+      const intangibleMult  = fin?.intangibleMultiplier ?? 1.0;
 
       const LEAGUE_AVG_XGA60 = 2.55;
       const teamXgaRaw = teamXgaMap.get(teamId);
