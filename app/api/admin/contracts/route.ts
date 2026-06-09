@@ -6,7 +6,45 @@ import { eq } from "drizzle-orm";
 
 const CONTRACT_OVERRIDES: Record<string, { yearsRemaining?: number; position?: string }> = {
   "Quinton Byfield": { position: "C" },
-  "Mark Scheifele":  { yearsRemaining: 5 },
+
+};
+
+// CapWages returns teamSlug like "winnipeg_jets" — map to DB tricode
+const SLUG_TO_TRICODE: Record<string, string> = {
+  anaheim_ducks:        "ANA",
+  boston_bruins:        "BOS",
+  buffalo_sabres:       "BUF",
+  calgary_flames:       "CGY",
+  carolina_hurricanes:  "CAR",
+  chicago_blackhawks:   "CHI",
+  colorado_avalanche:   "COL",
+  columbus_blue_jackets:"CBJ",
+  dallas_stars:         "DAL",
+  detroit_red_wings:    "DET",
+  edmonton_oilers:      "EDM",
+  florida_panthers:     "FLA",
+  los_angeles_kings:    "LAK",
+  minnesota_wild:       "MIN",
+  montreal_canadiens:   "MTL",
+  nashville_predators:  "NSH",
+  new_jersey_devils:    "NJD",
+  new_york_islanders:   "NYI",
+  new_york_rangers:     "NYR",
+  ottawa_senators:      "OTT",
+  philadelphia_flyers:  "PHI",
+  pittsburgh_penguins:  "PIT",
+  seattle_kraken:       "SEA",
+  san_jose_sharks:      "SJS",
+  "st._louis_blues":    "STL",
+  st_louis_blues:       "STL",
+  tampa_bay_lightning:  "TBL",
+  toronto_maple_leafs:  "TOR",
+  utah_hockey_club:     "UTA",
+  utah_mammoth:         "UTA",
+  vancouver_canucks:    "VAN",
+  vegas_golden_knights: "VGK",
+  washington_capitals:  "WSH",
+  winnipeg_jets:        "WPG",
 };
 
 function makeId(name: string): string {
@@ -32,7 +70,7 @@ export async function GET(req: Request) {
     Object.keys(scraped).filter(n => !n.includes("__")).forEach(n => allNames.add(n));
   }
 
-  const scrapedRaw: Record<string, { capHit: number; yearsRemaining: number; secondaryPosition: string | null }> = {};
+  const scrapedRaw: Record<string, { capHit: number; yearsRemaining: number }> = {};
 
   const rows = Array.from(allNames).sort().map(name => {
     const b  = dbMap.get(name);
@@ -49,24 +87,22 @@ export async function GET(req: Request) {
     const delta = (dbYears != null && scrapedYears != null)
       ? Math.abs(dbYears - scrapedYears) : null;
 
-    if (cw?.capHit) scrapedRaw[name] = { capHit: cw.capHit, yearsRemaining: scrapedYears ?? 1, secondaryPosition: cw.secondaryPosition ?? null };
+    if (cw?.capHit) scrapedRaw[name] = { capHit: cw.capHit, yearsRemaining: scrapedYears ?? 1 };
 
     return {
       name,
-      team:             cw?.teamSlug  ?? null,
-      position:         ov?.position  ?? cw?.position ?? null,
-      finalYears:       baseYears,
-      finalCap:         baseCap,
-      bundledYears:     dbYears,
+      team:          cw?.teamSlug  ?? null,
+      position:      ov?.position  ?? cw?.position ?? null,
+      finalYears:    baseYears,
+      finalCap:      baseCap,
+      bundledYears:  dbYears,
       scrapedYears,
-      adminYears:       null,
-      adminCap:         null,
-      overrideYears:    ov?.yearsRemaining ?? null,
-      hasNMC:           b?.hasNmc  ?? false,
-      hasNTC:           b?.hasNtc  ?? false,
-      expiryStatus:     cw?.expiryStatus ?? null,
-      extensionCapHit:  b?.extensionCapHit ?? null,
-      extensionYears:   b?.extensionYears  ?? null,
+      adminYears:    null,
+      adminCap:      null,
+      overrideYears: ov?.yearsRemaining ?? null,
+      hasNMC:        b?.hasNmc  ?? false,
+      hasNTC:        b?.hasNtc  ?? false,
+      expiryStatus:  cw?.expiryStatus ?? null,
       delta,
       source: ov?.yearsRemaining ? "override"
              : scrapedYears      ? "scraper"
@@ -132,11 +168,11 @@ export async function POST(req: Request) {
     await db.insert(playersTable).values({
       id,
       name,
-      position:       "Unknown",
-      capHit:         capHit         ?? 0.925,
-      yearsRemaining: yearsRemaining ?? 1,
-      hasNmc:         hasNMC         ?? false,
-      hasNtc:         hasNTC         ?? false,
+      position:        "Unknown",
+      capHit:          capHit         ?? 0.925,
+      yearsRemaining:  yearsRemaining ?? 1,
+      hasNmc:          hasNMC         ?? false,
+      hasNtc:          hasNTC         ?? false,
       extensionCapHit: extensionCapHit ?? null,
       extensionYears:  extensionYears  ?? null,
     });
@@ -168,31 +204,33 @@ export async function PUT(req: Request) {
     const id = makeId(key);
     if (!cw.capHit || cw.capHit < 0.5 || cw.capHit > 16) continue;
 
+    const teamId = SLUG_TO_TRICODE[cw.teamSlug as string] ?? null;
     const existing = existingMap.get(id);
 
     if (!existing) {
-      // New player — insert
       await db.insert(playersTable).values({
         id,
         name:              key,
-        position:          "Unknown",
+        position:          cw.position ?? "Unknown",
         capHit:            cw.capHit,
         yearsRemaining:    cw.yearsRemaining > 0 ? cw.yearsRemaining : 1,
         hasNmc:            false,
         hasNtc:            false,
+        teamId,
         secondaryPosition: cw.secondaryPosition ?? null,
       }).onConflictDoNothing();
       newEntries.push(key);
       added++;
     } else {
-      // Existing player — update if capHit or yearsRemaining changed meaningfully
       const capChanged   = Math.abs((existing.capHit ?? 0) - cw.capHit) > 0.05;
       const yearsChanged = Math.abs((existing.yearsRemaining ?? 1) - (cw.yearsRemaining ?? 1)) >= 1;
-      if (capChanged || yearsChanged) {
+      const teamChanged  = existing.teamId == null && teamId != null;
+      if (capChanged || yearsChanged || teamChanged) {
         await db.update(playersTable)
           .set({
             capHit:         cw.capHit,
             yearsRemaining: cw.yearsRemaining > 0 ? cw.yearsRemaining : 1,
+            ...(teamId != null ? { teamId } : {}),
             ...(cw.secondaryPosition != null ? { secondaryPosition: cw.secondaryPosition } : {}),
           })
           .where(eq(playersTable.id, id));

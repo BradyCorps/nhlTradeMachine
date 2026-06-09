@@ -403,6 +403,7 @@ export default function TradeBlockAdmin() {
   const [search,     setSearch]     = useState("");
   const [editing,    setEditing]    = useState<Entry | null | "new">(null);
   const [showBulk,   setShowBulk]   = useState(false);
+  const [patching,   setPatching]   = useState(false);
   const [toast,      setToast]      = useState<string | null>(null);
 
   const load = async () => {
@@ -441,6 +442,16 @@ export default function TradeBlockAdmin() {
       body: JSON.stringify(payload),
     });
     showToast(`Added ${players.length} player${players.length !== 1 ? "s" : ""}`);
+    await load();
+  };
+
+  const patchTeamIds = async () => {
+    setPatching(true);
+    showToast("Scraping team data…");
+    const r = await fetch("/api/admin/patch-team-ids", { method: "POST" });
+    const d = await r.json();
+    showToast(`Patched ${d.patched} players — reload to see roster`);
+    setPatching(false);
     await load();
   };
 
@@ -509,6 +520,16 @@ export default function TradeBlockAdmin() {
           {tabBtn("available",   `AVAILABLE (${counts.available})`)}
           {tabBtn("untouchable", `UNTOUCHABLE (${counts.untouchable})`)}
         </div>
+        {allPlayers.every(p => p.teamId === null) && allPlayers.length > 0 && (
+          <button onClick={patchTeamIds} disabled={patching}
+            style={{
+              padding: "6px 14px", fontSize: 10, fontWeight: 900, cursor: "pointer",
+              letterSpacing: "0.15em", background: "transparent",
+              border: "1px solid var(--amber)", color: "var(--amber)",
+            }}>
+            {patching ? "PATCHING…" : "⚠ PATCH TEAM IDs"}
+          </button>
+        )}
         <button onClick={() => setShowBulk(v => !v)}
           style={{
             padding: "6px 14px", fontSize: 10, fontWeight: 900, cursor: "pointer",
