@@ -3,12 +3,9 @@ import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
-import { teams as teamsTable } from "@/app/db/schema";
+import { teams as teamsTable, siteSettings } from "@/app/db/schema";
 
 export const dynamic = "force-dynamic";
-
-const CAP_CEILING     = SEASON.capCeiling;
-const CAP_FLOOR       = SEASON.capFloor;
 const TEAMS_CACHE_TTL = 6 * 60 * 60; // 6 hours
 
 const TEAM_NEEDS: Record<string, { pos: string; minWar: number; label: string }[]> = {
@@ -52,6 +49,19 @@ const derivePhase = (confRank: number, divRank: number, pointPct: number): strin
   if (pointPct < 0.38) return "Tanking";
   return "Rebuilding";
 };
+
+async function loadSettings(): Promise<{ capCeiling: number; capFloor: number }> {
+  try {
+    const rows = await db.select().from(siteSettings);
+    const m = new Map(rows.map(r => [r.key, r.value]));
+    return {
+      capCeiling: m.has("cap_ceiling") ? parseFloat(m.get("cap_ceiling")!) : SEASON.capCeiling,
+      capFloor:   m.has("cap_floor")   ? parseFloat(m.get("cap_floor")!)   : SEASON.capFloor,
+    };
+  } catch {
+    return { capCeiling: SEASON.capCeiling, capFloor: SEASON.capFloor };
+  }
+}
 
 async function loadTeams(): Promise<any[]> {
   if (redis) {
@@ -178,7 +188,7 @@ async function loadTeams(): Promise<any[]> {
     const confRank = st?.conferenceRank ?? 8;
     const divRank  = st?.divisionRank   ?? 4;
     const pointPct = st?.pointPct       ?? 0.5;
-    const capSpace = capMap.get(t.id)   ?? t.capSpace;
+    const capSpace = capMap.get(t.id) ?? t.capSpace;
 
     const phase = dbTeam?.phaseOverride
       ?? (standingsMap.size >= 28 ? derivePhase(confRank, divRank, pointPct) : t.phase);
@@ -201,7 +211,8 @@ async function loadTeams(): Promise<any[]> {
 }
 
 export async function GET() {
-  const LIVE_TEAMS = await loadTeams();
+  const [LIVE_TEAMS, { capCeiling: CAP_CEILING, capFloor: CAP_FLOOR }] =
+    await Promise.all([loadTeams(), loadSettings()]);
 
   const picks: any[] = [];
   LIVE_TEAMS.forEach((team) => {
