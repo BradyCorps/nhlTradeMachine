@@ -4,7 +4,7 @@ import { TEAMS_DB } from "@/app/lib/db";
 import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
-import { teams as teamsTable } from "@/app/db/schema";
+import { teams as teamsTable, players as playersTable } from "@/app/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -252,56 +252,57 @@ async function loadContracts(): Promise<Record<string, any>> {
   }
 
 
-  const bundled = loadBundled();
+  const dbData  = await loadFromDB();
   const fresh   = await scrapeCapWages();
   const merged: Record<string, any> = {};
 
   if (Object.keys(fresh).length > 200) {
-    // Live CapWages data available — use fresh cap hits and years; bundled for NMC/NTC only.
-    // Bundled years go stale as seasons pass; CapWages years are computed from live data.
+    // Live CapWages data available — use fresh cap hits and years; DB for NMC/NTC only.
     for (const [name, cw] of Object.entries(fresh)) {
-      // Strip any __position or __teamSlug suffix to get the base name
       const baseName = name.includes("__") ? name.split("__")[0] : name;
-      const b = bundled[baseName];
-      const entry = {
+      const b = dbData[baseName];
+      merged[name] = {
         capHit:         cw.capHit,
         yearsRemaining: (cw.yearsRemaining > 0 ? cw.yearsRemaining : null) ?? b?.yearsRemaining ?? 1,
         hasNMC:         b?.hasNMC  ?? false,
         hasNTC:         b?.hasNTC  ?? false,
         canRetain:      b?.hasNMC  ? false : true,
         expiryStatus:   cw.expiryStatus,
-        position:       cw.position, // needed by nameCollision check in player builder
+        position:       cw.position,
       };
-      merged[name] = entry;
+    }
+    // Backfill DB-only players not present in scraper output (manually-managed entries like NTC/NMC holders)
+    for (const [name, b] of Object.entries(dbData)) {
+      if (!merged[name]) {
+        merged[name] = {
+          capHit:         b.capHit,
+          yearsRemaining: b.yearsRemaining ?? 1,
+          hasNMC:         b.hasNMC  ?? false,
+          hasNTC:         b.hasNTC  ?? false,
+          canRetain:      b.hasNMC  ? false : true,
+          expiryStatus:   "UFA",
+        };
+      }
     }
   } else {
-    // CapWages unavailable — use bundled entirely but ensure all fields present
-    for (const [name, b] of Object.entries(bundled)) {
+    // CapWages unavailable — use DB entirely
+    for (const [name, b] of Object.entries(dbData)) {
       merged[name] = {
         capHit:         b.capHit,
         yearsRemaining: b.yearsRemaining ?? 1,
         hasNMC:         b.hasNMC  ?? false,
         hasNTC:         b.hasNTC  ?? false,
         canRetain:      b.hasNMC  ? false : true,
-        expiryStatus:   b.expiryStatus ?? "UFA",
+        expiryStatus:   "UFA",
       };
     }
   }
 
-  // Code-level overrides (back-loaded extensions where scraper age math fails)
+  // Code-level overrides for edge cases (back-loaded extensions where scraper age math fails)
   for (const [name, override] of Object.entries(CONTRACT_OVERRIDES)) {
     if (merged[name]) {
-      if (override.capHit        !== undefined) merged[name].capHit        = override.capHit;
+      if (override.capHit         !== undefined) merged[name].capHit         = override.capHit;
       if (override.yearsRemaining !== undefined) merged[name].yearsRemaining = override.yearsRemaining;
-    }
-  }
-
-  // Admin overrides from contracts.admin.json — highest priority, editable via /admin/contracts UI
-  const adminOverrides = loadAdminOverrides();
-  for (const [name, ad] of Object.entries(adminOverrides)) {
-    if (merged[name]) {
-      if ((ad as any).capHit         != null) merged[name].capHit         = (ad as any).capHit;
-      if ((ad as any).yearsRemaining != null) merged[name].yearsRemaining = (ad as any).yearsRemaining;
     }
   }
 
@@ -312,7 +313,27 @@ async function loadContracts(): Promise<Record<string, any>> {
   return merged;
 }
 
-function loadBundled(): Record<string, any> {
+async function loadFromDB(): Promise<Record<string, any>> {
+  try {
+    const rows = await db.select().from(playersTable);
+    const result: Record<string, any> = {};
+    for (const row of rows) {
+      result[row.name] = {
+        capHit:         row.capHit,
+        yearsRemaining: row.yearsRemaining,
+        hasNMC:         row.hasNmc  ?? false,
+        hasNTC:         row.hasNtc  ?? false,
+        canRetain:      row.hasNmc  ? false : true,
+      };
+    }
+    return result;
+  } catch (e: any) {
+    console.warn("[DB] loadFromDB failed, falling back to bundled.json:", e.message);
+    return loadBundledFallback();
+  }
+}
+
+function loadBundledFallback(): Record<string, any> {
   try {
     const fs   = require("fs");
     const path = require("path");
@@ -322,15 +343,6 @@ function loadBundled(): Record<string, any> {
     console.error("[Bundled] FAILED:", e.message);
   }
   return {};
-}
-
-function loadAdminOverrides(): Record<string, any> {
-  try {
-    const fs   = require("fs");
-    const path = require("path");
-    const file = path.join(process.cwd(), "app/data/contracts.admin.json");
-    return JSON.parse(fs.readFileSync(file, "utf-8"));
-  } catch (_) { return {}; }
 }
 
 function loadExtensions(): Record<string, any> {

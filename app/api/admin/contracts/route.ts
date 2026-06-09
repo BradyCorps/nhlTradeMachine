@@ -3,10 +3,13 @@ import { scrapeCapWages } from "@/app/services/scraper";
 import { db } from "@/app/db/client";
 import { players as playersTable } from "@/app/db/schema";
 import { eq } from "drizzle-orm";
+import { isAuthorized } from "@/app/lib/admin-auth";
+
+export const dynamic = "force-dynamic";
 
 const CONTRACT_OVERRIDES: Record<string, { yearsRemaining?: number; position?: string }> = {
   "Quinton Byfield": { position: "C" },
-
+  "Mark Scheifele":  { yearsRemaining: 5 },
 };
 
 // CapWages returns teamSlug like "winnipeg_jets" — map to DB tricode
@@ -58,7 +61,7 @@ export async function GET(req: Request) {
   const doScrape = url.searchParams.get("scrape") === "1";
 
   const [dbRows, scraped] = await Promise.all([
-    db.select().from(playersTable).catch(() => [] as typeof playersTable.$inferSelect[]),
+    db.select().from(playersTable).catch((e) => { console.error("[contracts GET] DB error:", e); return [] as typeof playersTable.$inferSelect[]; }),
     doScrape ? scrapeCapWages() : Promise.resolve({} as Record<string, any>),
   ]);
 
@@ -125,6 +128,7 @@ export async function GET(req: Request) {
 // body: { name, yearsRemaining?, capHit?, hasNMC?, hasNTC?, clear? }
 // Upserts to Turso DB — persists across Vercel deployments
 export async function POST(req: Request) {
+  if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await req.json();
   const { name, yearsRemaining, capHit, hasNMC, hasNTC, clear, extensionCapHit, extensionYears } = body as {
     name:              string;
@@ -183,6 +187,7 @@ export async function POST(req: Request) {
 // PUT /api/admin/contracts — bulk-import scraped players + update changed contracts
 // body: { players: Record<string, { capHit, yearsRemaining, secondaryPosition }> }
 export async function PUT(req: Request) {
+  if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   let body: { players?: Record<string, any> } = {};
   try { body = await req.json(); } catch { /* no body */ }
 

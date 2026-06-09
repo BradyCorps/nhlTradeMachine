@@ -5,6 +5,8 @@ import { SEASON, LEAGUE, FRANCHISE } from "@/app/lib/season-config";
 import { calcNAV, compressPackage as coreCompress, AssetInput, XNAVResult } from "@/app/lib/xnav-engine";
 import { z } from "zod";
 
+export const dynamic = "force-dynamic";
+
 // ============================================================
 // ZOD SCHEMAS
 // ============================================================
@@ -162,7 +164,7 @@ const DIVISIONS: Record<string, string> = {
   MTL: "Atlantic", OTT: "Atlantic", TBL: "Atlantic", TOR: "Atlantic",
   CAR: "Metropolitan", CBJ: "Metropolitan", NJD: "Metropolitan", NYI: "Metropolitan",
   NYR: "Metropolitan", PHI: "Metropolitan", PIT: "Metropolitan", WSH: "Metropolitan",
-  ARI: "Central", CHI: "Central", COL: "Central", DAL: "Central",
+  CHI: "Central", COL: "Central", DAL: "Central",
   MIN: "Central", NSH: "Central", STL: "Central", UTA: "Central", WPG: "Central",
   ANA: "Pacific", CGY: "Pacific", EDM: "Pacific", LAK: "Pacific",
   SEA: "Pacific", SJS: "Pacific", VAN: "Pacific", VGK: "Pacific",
@@ -996,10 +998,7 @@ export async function POST(req: Request) {
       );
     }
 
-const response = { 
-      navMap: navMap as any, 
-      verdict 
-    } as EvaluateResponse;
+const response: EvaluateResponse = { navMap, verdict };
     
     return NextResponse.json(response);
   } catch (e: any) {

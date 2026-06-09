@@ -4,6 +4,9 @@ import { siteSettings } from "@/app/db/schema";
 import { eq } from "drizzle-orm";
 import { SEASON } from "@/app/lib/season-config";
 import { redis } from "@/app/lib/redis";
+import { isAuthorized } from "@/app/lib/admin-auth";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const rows = await db.select().from(siteSettings).catch(() => []);
@@ -16,6 +19,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await req.json() as {
     action?:     "clear_cache";
     capCeiling?: number | null;

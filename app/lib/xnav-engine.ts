@@ -11,6 +11,7 @@
 //   • Rental discount on age penalty (1yr = 75% reduction, 2yr = 40%)
 
 import { SEASON, LEAGUE, FRANCHISE, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
+import type { FArchetype } from "@/app/lib/trade-types";
 
 export const DPS_NAV_MULTIPLIER = 15; // dps * 15 = defPS for NAV (not 120 — the *8 bug is removed)
 
@@ -62,7 +63,7 @@ export interface XNAVResult {
   cap:         number;
   upside:      number;
   noivImpact?: number;
-  fArchetype?: string;
+  fArchetype?: FArchetype;
   isRFA?:      boolean;
 }
 
@@ -418,7 +419,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
 
   // ── Forward archetype ─────────────────────────────────────────
   const noivImpact = Math.round(noivBonus);
-  let fArchetype = "";
+  let fArchetype: FArchetype = "";
   if (!isD) {
     const psRatio = ops !== null && dps !== null && (ops + dps) > 1
       ? ops / (ops + dps) : null;

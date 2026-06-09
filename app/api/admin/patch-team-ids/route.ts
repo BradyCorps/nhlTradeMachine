@@ -3,6 +3,7 @@ import { db } from "@/app/db/client";
 import { players as playersTable } from "@/app/db/schema";
 import { eq, isNull } from "drizzle-orm";
 import { TEAMS_DB } from "@/app/lib/db";
+import { isAuthorized } from "@/app/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,8 @@ async function fetchRoster(teamId: string): Promise<
 // Sequentially fetches all 32 NHL rosters (200ms gap between each to avoid
 // rate limiting) and writes team_id for every player row still NULL.
 // Safe to re-run — only touches rows where team_id IS NULL.
-export async function POST() {
+export async function POST(req: Request) {
+  if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const nullRows = await db
     .select({ id: playersTable.id, name: playersTable.name })
     .from(playersTable)

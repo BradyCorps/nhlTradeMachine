@@ -570,6 +570,19 @@ async function loadContracts(): Promise<Record<string, any>> {
         position:       cw.position,
       };
     }
+    // Backfill DB-only players not present in scraper output (manually-managed entries like NTC/NMC holders)
+    for (const [name, b] of Object.entries(dbData)) {
+      if (!merged[name]) {
+        merged[name] = {
+          capHit:         b.capHit,
+          yearsRemaining: b.yearsRemaining ?? 1,
+          hasNMC:         b.hasNMC  ?? false,
+          hasNTC:         b.hasNTC  ?? false,
+          canRetain:      b.hasNMC  ? false : true,
+          expiryStatus:   "UFA",
+        };
+      }
+    }
   } else {
     for (const [name, b] of Object.entries(dbData)) {
       merged[name] = {

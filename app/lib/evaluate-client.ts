@@ -87,13 +87,11 @@ export async function fetchTradeVerdict(
     } satisfies EvaluateRequest),
   });
 
-  if (!res.ok) throw new Error(`evaluate API ${res.status}`);
-  const data: EvaluateResponse = await res.json();
-
   if (!res.ok) {
-  if (res.status === 404) throw new Error("evaluate API not found — engine file missing");
-  throw new Error(`evaluate API ${res.status}`);
-}
+    if (res.status === 404) throw new Error("evaluate API not found — engine file missing");
+    throw new Error(`evaluate API ${res.status}`);
+  }
+  const data: EvaluateResponse = await res.json();
 
   // Update cache with all returned nav values
   for (const a of uniqueAssets) {
