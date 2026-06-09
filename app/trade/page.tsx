@@ -21,7 +21,6 @@ import {
   fetchNavMap, fetchTradeVerdict, clearNavCache, getCachedNav,
 } from "@/app/lib/evaluate-client";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
-import TradeBlockPanel from "@/app/components/TradeBlockPanel";
 
 const TradeProposalEngine = lazy(() => import("@/app/components/TradeProposal"));
 const PlayerComparison    = lazy(() => import("@/app/components/PlayerComparison"));
@@ -109,6 +108,25 @@ export default function TradeMachine() {
   }, [db]);
   const [verdictOpen, setVerdictOpen] = useState(false);   // bottom sheet expanded
   const [showTeamSelect, setShowTeamSelect] = useState(false); // Team select modal open
+
+  // Freeze body scroll when verdict panel or team select modal is open
+  React.useEffect(() => {
+    if (verdictOpen || showTeamSelect) {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    } else {
+      document.body.style.paddingRight = '0px';
+      document.body.style.overflow = 'unset';
+      document.documentElement.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.paddingRight = '0px';
+      document.body.style.overflow = 'unset';
+      document.documentElement.style.overflow = 'unset';
+    };
+  }, [verdictOpen, showTeamSelect]);
   const [evaluated, setEvaluated] = useState(false);
   const [expandedFlag,   setExpandedFlag]   = useState<number | null>(null);
   const [tradeRequest,   setTradeRequest]   = useState<Asset[] | null>(null);
@@ -129,29 +147,7 @@ export default function TradeMachine() {
   const [simLoading, setSimLoading] = useState(false);
   const [simData, setSimData]       = useState<any | null>(null);
   const [showSimPanel, setShowSimPanel] = useState(false);
-  const [showMemo,        setShowMemo]        = useState(false);
-  const [tradeBlockOpen,  setTradeBlockOpen]  = useState(false);
-
-  // Freeze body scroll when any modal/overlay is open
-  React.useEffect(() => {
-    const anyOpen = verdictOpen || showTeamSelect || showMemo || tradeBlockOpen
-      || (tradeRequest != null && tradeRequest.length > 0);
-    if (anyOpen) {
-      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-      document.body.style.paddingRight = `${scrollbarWidth}px`;
-      document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
-    } else {
-      document.body.style.paddingRight = '0px';
-      document.body.style.overflow = 'unset';
-      document.documentElement.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.paddingRight = '0px';
-      document.body.style.overflow = 'unset';
-      document.documentElement.style.overflow = 'unset';
-    };
-  }, [verdictOpen, showTeamSelect, showMemo, tradeBlockOpen, tradeRequest]);
+  const [showMemo, setShowMemo] = useState(false);
 
   // ── Abort controllers — cancel stale Claude requests ─────────
   const simAbortRef  = useRef<AbortController | null>(null);
@@ -758,21 +754,6 @@ RULES: No invented context. No speculation about players not in this trade. Comp
         />
         </Suspense>
       )}
-      {/* ── Trade Block Panel ───────────────────────────────────── */}
-      {tradeBlockOpen && db.players.length > 0 && (
-        <TradeBlockPanel
-          players={db.players}
-          teams={db.teams}
-          onSelectTeam={(teamId) => {
-            const partnerTeam = db.teams.find(t => t.id === teamId) ?? null;
-            setTeams([teams[0], partnerTeam]);
-            setBlocks([[], []]);
-            setVerdict(null);
-          }}
-          onClose={() => setTradeBlockOpen(false)}
-        />
-      )}
-
       {/* ── Team Selection Modal ─────────────────────────────────── */}
       {showTeamSelect && db.teams.length > 0 && typeof document !== 'undefined' && createPortal(
         (
@@ -992,7 +973,7 @@ RULES: No invented context. No speculation about players not in this trade. Comp
 
         <Header activeTab="trade" />
 
-        <TradeHistoryBar db={db.players.length > 0 ? db : null} />
+        <TradeHistoryBar />
 
         {/* ── Team Strands — full width above trade grid ── */}
         {teams[0] && teams[1] && (
@@ -1104,23 +1085,6 @@ RULES: No invented context. No speculation about players not in this trade. Comp
                 onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
                 onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
                 {matchLoading ? "Finding matches…" : "◈ Who Wants This Package?"}
-              </button>
-            )}
-
-            {/* ── Trade Block ── */}
-            {db.players.length > 0 && (
-              <button
-                onClick={() => setTradeBlockOpen(true)}
-                className="w-full py-2.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 active:scale-[0.97]"
-                style={{
-                  background: 'var(--red-dim)',
-                  color: 'var(--red)',
-                  border: '1px solid rgba(166,53,36,0.4)',
-                  fontFamily: 'monospace',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
-                onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
-                ◉ Trade Block
               </button>
             )}
 

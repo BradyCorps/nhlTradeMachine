@@ -68,17 +68,12 @@ export default function AdminSettings() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--paper)", color: "var(--ledger-ink)", fontFamily: "'Courier Prime', monospace" }}>
+    <div style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)", color: "var(--ledger-ink)", fontFamily: "'Courier Prime', monospace" }}>
 
-      {/* Header */}
-      <div style={{ borderBottom: "1px solid var(--rule)", padding: "14px 24px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-        <a href="/admin/contracts"   style={{ fontSize: 10, color: "var(--ledger-ink-faint)", textDecoration: "none", letterSpacing: "0.1em" }}>← CONTRACTS</a>
-        <span style={{ color: "var(--rule)" }}>|</span>
-        <a href="/admin/trade-block" style={{ fontSize: 10, color: "var(--ledger-ink-faint)", textDecoration: "none", letterSpacing: "0.1em" }}>TRADE BLOCK</a>
-        <span style={{ color: "var(--rule)" }}>|</span>
-        <a href="/admin/teams"       style={{ fontSize: 10, color: "var(--ledger-ink-faint)", textDecoration: "none", letterSpacing: "0.1em" }}>TEAMS</a>
-        <span style={{ color: "var(--rule)" }}>|</span>
-        <span style={{ fontSize: 13, fontWeight: 900, letterSpacing: "0.15em" }}>SETTINGS</span>
+      {/* Page header */}
+      <div style={{ borderBottom: "1px solid var(--rule)", padding: "14px 24px" }}>
+        <div style={{ fontSize: 9, letterSpacing: "0.3em", color: "var(--ledger-ink-faint)", marginBottom: 2 }}>ADMIN</div>
+        <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: "0.18em" }}>SETTINGS</div>
       </div>
 
       <div style={{ maxWidth: 500, padding: "32px 24px", display: "flex", flexDirection: "column", gap: 20 }}>

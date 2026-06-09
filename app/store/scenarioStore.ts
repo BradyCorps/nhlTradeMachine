@@ -1,13 +1,21 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
+export interface ScenarioAsset {
+  name:     string;
+  position: string;
+  capHit:   number;
+  age?:     number;
+}
+
 export interface SavedScenario {
   id:          string;
   name:        string;
-  url:         string;           // full ?home=...&out=...&in=... query string
-  homeTeam:    string | null;    // display only
-  partnerTeam: string | null;    // display only
   savedAt:     number;
+  homeTeam:    { id: string; name: string } | null;
+  partnerTeam: { id: string; name: string } | null;
+  outgoing:    ScenarioAsset[];
+  incoming:    ScenarioAsset[];
 }
 
 interface ScenarioState {
@@ -26,7 +34,7 @@ export const useScenarioStore = create<ScenarioState>()(
         savedScenarios: [
           { ...s, id: Math.random().toString(36).slice(2, 9), savedAt: Date.now() },
           ...state.savedScenarios,
-        ].slice(0, 25), // cap at 25 saved scenarios
+        ].slice(0, 25),
       })),
 
       deleteScenario: (id) => set(state => ({

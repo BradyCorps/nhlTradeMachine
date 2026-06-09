@@ -138,16 +138,15 @@ export default function AdminTeams() {
   const hasOverride = (t: TeamRow) => t.phaseOverride !== null || t.standingOverride !== null;
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--paper)", color: "var(--ledger-ink)", fontFamily: "'Courier Prime', monospace" }}>
+    <div style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)", color: "var(--ledger-ink)", fontFamily: "'Courier Prime', monospace" }}>
+
+      {/* Page header */}
       <div style={{ borderBottom: "1px solid var(--rule)", padding: "14px 24px",
         display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-        <a href="/admin/contracts"   style={{ fontSize: 10, color: "var(--ledger-ink-faint)", textDecoration: "none", letterSpacing: "0.1em" }}>← CONTRACTS</a>
-        <span style={{ color: "var(--rule)" }}>|</span>
-        <a href="/admin/trade-block" style={{ fontSize: 10, color: "var(--ledger-ink-faint)", textDecoration: "none", letterSpacing: "0.1em" }}>TRADE BLOCK</a>
-        <span style={{ color: "var(--rule)" }}>|</span>
-        <a href="/admin/settings"    style={{ fontSize: 10, color: "var(--ledger-ink-faint)", textDecoration: "none", letterSpacing: "0.1em" }}>SETTINGS</a>
-        <span style={{ color: "var(--rule)" }}>|</span>
-        <span style={{ fontSize: 13, fontWeight: 900, letterSpacing: "0.15em" }}>TEAM OVERRIDES</span>
+        <div>
+          <div style={{ fontSize: 9, letterSpacing: "0.3em", color: "var(--ledger-ink-faint)", marginBottom: 2 }}>ADMIN</div>
+          <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: "0.18em" }}>TEAM OVERRIDES</div>
+        </div>
         <span style={{ fontSize: 10, color: "var(--ledger-ink-faint)", marginLeft: "auto" }}>
           {teams.filter(hasOverride).length} overrides active
         </span>
@@ -158,18 +157,18 @@ export default function AdminTeams() {
         </button>
       </div>
 
-      <div style={{ padding: "10px 24px", borderBottom: "1px solid var(--rule-light)" }}>
+      <div style={{ padding: "10px 24px", borderBottom: "1px solid var(--rule)" }}>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search team…"
-          style={{ fontSize: 11, padding: "6px 12px", background: "var(--paper-card)",
+          style={{ fontSize: 11, padding: "6px 12px", background: "var(--paper)",
             border: "1px solid var(--rule)", color: "var(--ledger-ink)", outline: "none",
             minWidth: 200, fontFamily: "'Courier Prime', monospace" }} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "70px 1fr 120px 90px 50px",
-        gap: 8, padding: "7px 24px", borderBottom: "1px solid var(--rule-light)",
+        gap: 8, padding: "7px 24px", borderBottom: "1px solid var(--rule)",
         fontSize: 8, color: "var(--ledger-ink-faint)", fontWeight: 900,
         textTransform: "uppercase", letterSpacing: "0.12em",
-        position: "sticky", top: 0, background: "var(--paper-card)", zIndex: 10 }}>
+        position: "sticky", top: 42, background: "var(--paper)", zIndex: 10 }}>
         <div>ID</div><div>NAME</div>
         <div style={{ textAlign: "center" }}>PHASE</div>
         <div style={{ textAlign: "center" }}>STANDING</div>
@@ -180,11 +179,11 @@ export default function AdminTeams() {
         <div style={{ padding: "60px 24px", textAlign: "center", color: "var(--ledger-ink-faint)", letterSpacing: "0.2em", fontSize: 11 }}>LOADING…</div>
       ) : filtered.map(t => (
         <div key={t.id} style={{ display: "grid", gridTemplateColumns: "70px 1fr 120px 90px 50px",
-          gap: 8, padding: "7px 24px", borderBottom: "1px solid var(--rule-light)",
+          gap: 8, padding: "7px 24px", borderBottom: "1px solid var(--rule)",
           fontSize: 11, alignItems: "center",
           background: hasOverride(t) ? "rgba(148,105,20,0.04)" : "transparent" }}>
           <div style={{ fontWeight: 900, letterSpacing: "0.1em" }}>{t.id}</div>
-          <div style={{ color: "var(--ledger-ink-body)" }}>{t.name}</div>
+          <div style={{ color: "var(--ledger-ink-faint)" }}>{t.name}</div>
           <div style={{ textAlign: "center", fontSize: 10 }}>
             {t.phaseOverride
               ? <span style={{ color: "var(--amber)", fontWeight: 900 }}>{t.phaseOverride} ✎</span>

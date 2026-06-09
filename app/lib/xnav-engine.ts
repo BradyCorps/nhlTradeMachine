@@ -50,6 +50,8 @@ export interface AssetInput {
   baselinePtsPace?: number;
   baselineGameScore?: number;
   baselineDpsProxy?: number;
+  hasNMC?: boolean;
+  hasNTC?: boolean;
 }
 
 export interface XNAVResult {
@@ -68,6 +70,21 @@ export interface XNAVResult {
 export const safe  = (n: number): number => (isNaN(n) || !isFinite(n) ? 0 : n);
 export const clamp = (n: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, n));
+
+// NHL buyout heuristic: 1/3 salary for <26, 2/3 for 26+, spread over 2× remaining term.
+// Returns the normalized NAV penalty (always ≤ 0). Used to bound negative cap values so
+// a horrible contract never rates worse than its real-world buyout cost.
+function calcBuyoutNavPenalty(capHit: number, yearsRemaining: number, age: number): number {
+  if (yearsRemaining === 0) return 0;
+  const buyoutRatio    = age < 26 ? 1 / 3 : 2 / 3;
+  const totalBuyout    = capHit * yearsRemaining * buyoutRatio;
+  const annualDeadCap  = totalBuyout / (yearsRemaining * 2);
+  let sum = 0;
+  for (let i = 0; i < yearsRemaining * 2; i++) {
+    sum -= annualDeadCap * 12 * Math.pow(0.92, i);
+  }
+  return sum / (yearsRemaining * 2);
+}
 
 // ── Pick NAV ──────────────────────────────────────────────────────────────────
 export function calcPickNAV(asset: AssetInput): XNAVResult {
@@ -112,10 +129,7 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const isBackup    = gamesG < 38;
   const isTandem    = !isStarter && !isBackup;
 
-  // 2025-26 GSAX inflation: MoneyPuck short-misses tracking change credited ~44 extra
-  // goals league-wide. Discount live GSAX ~18% to restore pre-change baseline.
-  const GSAX_DISCOUNT    = 0.82;
-  const gsaxRaw          = safe(asset.gsax ?? 0) * GSAX_DISCOUNT;
+  const gsaxRaw          = safe(asset.gsax ?? 0);
   const gsaxPerGame      = gsaxRaw / gamesG;
   const perGameCap       = isStarter ? 0.48 : isTandem ? 0.35 : 0.22;
   const gsaxPerGameCapped = gsaxPerGame > 0 ? Math.min(gsaxPerGame, perGameCap) : gsaxPerGame;
@@ -187,11 +201,13 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const multiplierToApplyG = baselineCapComponentNormalizedG < 0 ? 1.0 : singleSlotMultiplierG;
   const baselineCapComponentG = baselineCapComponentNormalizedG * multiplierToApplyG;
 
-  const retentionSev   = Math.pow((asset.retainedPct || 0) * 100, 1.25);
-  const retainedBonus  = retentionSev * asset.capHit * 0.06;
-  const capTotalG      = safe(baselineCapComponentG + retainedBonus);
-  
-  const rawTotal       = safe(trueMarketValueG + capTotalG);
+  const retentionSev      = Math.pow((asset.retainedPct || 0) * 100, 1.25);
+  const retainedBonus     = retentionSev * asset.capHit * 0.06;
+  const capTotalG         = safe(baselineCapComponentG + retainedBonus);
+  const buyoutFloorG      = calcBuyoutNavPenalty(asset.capHit, contractYears, asset.age);
+  const boundedCapTotalG  = Math.max(capTotalG, buyoutFloorG);
+
+  const rawTotal          = safe(trueMarketValueG + boundedCapTotalG);
 
   const isYoungControlled = asset.age <= 26 && effectiveCap <= 3.5 && !extCapHit;
   const youngFloor = isYoungControlled && (isStarter || isTandem)
@@ -199,29 +215,15 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
         + Math.min(15, (gamesG / 82) * 20) + (isTandem ? -8 : 0))
     : 0;
 
-  // Role minimum: NHL starters/tandem goalies always carry baseline trade value
-  const roleFloor  = isStarter ? 15 : isTandem ? 8 : 0;
-  const hardRoleCap = isBackup ? 35 : isTandem ? 60 : Infinity;
-  const flooredTotal = Math.max(rawTotal, youngFloor, roleFloor);
-  const boundedTotal = Math.min(flooredTotal, hardRoleCap);
-
-  // ── Feathered starter ceiling ────────────────────────────────────────────────
-  // Replace the hard 250 wall with a soft asymptote: kicks in at 150, feathers
-  // toward ~220 max. Prevents elite goalies on long deals from pinning at 250
-  // when on-ice impact + multi-year surplus add up aggressively.
-  let cappedTotal = boundedTotal;
-  if (isStarter && boundedTotal > 150) {
-    const L      = 70; // 150 + 70*(1 − e^−x) → asymptotes toward ~220
-    const excess = boundedTotal - 150;
-    cappedTotal  = 150 + L * (1 - Math.exp(-excess / L));
-  }
+  const roleCap     = isBackup ? 35 : isTandem ? 60 : 250;
+  const cappedTotal = Math.min(Math.max(rawTotal, youngFloor), roleCap);
 
   return {
-    total:  Math.round(cappedTotal),
+    total:  cappedTotal,
     off:    0,
     def:    safe(goalieImpact * ageFactor),
     age:    -agePenalty,
-    cap:    Math.round(capTotalG),
+    cap:    Math.round(boundedCapTotalG),
     upside: youngFloor > 0 ? youngFloor * 0.4 : 0,
     noivImpact: 0,
     fArchetype: "",
@@ -250,18 +252,14 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const dps    = asset.dps != null ? safe(asset.dps) * paceMultiplier : null;
 
   const effectiveCap = asset.capHit * (1 - (asset.retainedPct || 0));
-  // When hasLiveStats is explicitly false (injured/no data), rely entirely on baselines.
-  const noLiveData   = asset.hasLiveStats === false;
-  const liveWeight   = noLiveData ? 0.0 : 0.4;
-  const baseWeight   = noLiveData ? 1.0 : 0.6;
-  const confidence   = noLiveData ? 0.0 : clamp(games / 65, 0.3, 1.0);
+  const confidence   = clamp(games / 65, 0.3, 1.0);
 
   // ── Baseline Blending ─────────────────────────────────────────
   // MoneyPuck 3-year weighted baselines anchor valuations, especially
   // early in the season or during anomalous/injury-shortened years.
   const baselinePtsPace = asset.baselinePtsPace;
   const blendedPts = baselinePtsPace !== undefined && baselinePtsPace > 0
-    ? (pts * liveWeight + baselinePtsPace * baseWeight)
+    ? (pts * 0.4 + baselinePtsPace * 0.6)
     : pts;
 
   const ptsScale  = isD ? 0.75 : 1.0;
@@ -269,7 +267,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
 
   const baselineDpsProxy = asset.baselineDpsProxy;
   const blendedDps = baselineDpsProxy !== undefined && baselineDpsProxy > 0
-    ? (dps !== null ? dps * liveWeight + baselineDpsProxy * baseWeight : baselineDpsProxy)
+    ? (dps !== null ? dps * 0.4 + baselineDpsProxy * 0.6 : baselineDpsProxy)
     : dps;
   const noivBonus = clamp(xgRel * 3.5, -20, 25);
   const offPS     = ops !== null ? ops * 17 : null;
@@ -361,7 +359,12 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   
   const LEAGUE_MIN_PCT = 0.009; // 0.9%
   const MAX_CAP_PCT    = 0.20;  // 20.0%
-  const MIDPOINT       = isD ? 120 : 180;   // The ON_ICE_NAV where a player deserves ~10.4% (e.g. low 1st liner)
+  // Defensemen's 25% scoring penalty and the DEF asymptote mean elite D-men top out at
+  // 115–135 on-ice NAV, well below the forward-calibrated 180 midpoint. Using 180 for
+  // both positions makes $8–9M contracts look "overpriced" for top-pair D — which is
+  // wrong. D midpoint of 120: a defensive specialist at ~95 on-ice breaks even at ~$8.4M,
+  // and an elite offensive D at ~125 on-ice earns meaningful positive surplus.
+  const MIDPOINT       = isD ? 120 : 180;
   const K_FACTOR       = 0.022; // Steepness of the S-curve
   
   const fmvCapPct = LEAGUE_MIN_PCT + (MAX_CAP_PCT - LEAGUE_MIN_PCT) / (1 + Math.exp(-K_FACTOR * (trueMarketValue - MIDPOINT)));
@@ -387,7 +390,9 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     // 8% annual financial discount: future cap space/penalties matter less today
     const timeDiscount = Math.pow(0.92, i);
     
-    // gamma_RFA applies organizational premium for cost-controlled years
+    // gamma_RFA rewards organizations holding cost-controlled positive surplus.
+    // Only apply the 1.25x premium when surplus is positive — amplifying a penalty
+    // on young players who are slightly above-market double-counts the damage.
     const ageAtYear = asset.age + i;
     const gammaRFA = (ageAtYear <= 27 && annualSurplus > 0) ? 1.25 : 1.0;
     
@@ -405,9 +410,11 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const baselineCapComponent = baselineCapComponentNormalized * multiplierToApply;
 
   // Retention tax (exponential — absorbing dead cap still commands a premium)
-  const retentionSev  = Math.pow((asset.retainedPct || 0) * 100, 1.25);
-  const retainedBonus = retentionSev * asset.capHit * 0.08;
-  const capTotal      = safe(baselineCapComponent + retainedBonus);
+  const retentionSev     = Math.pow((asset.retainedPct || 0) * 100, 1.25);
+  const retainedBonus    = retentionSev * asset.capHit * 0.08;
+  const capTotal         = safe(baselineCapComponent + retainedBonus);
+  const buyoutFloor      = calcBuyoutNavPenalty(asset.capHit, contractYears, asset.age);
+  const boundedCapTotal  = Math.max(capTotal, buyoutFloor);
 
   // ── Forward archetype ─────────────────────────────────────────
   const noivImpact = Math.round(noivBonus);
@@ -434,7 +441,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const isTopPairD       = isD && toi > 22;
   const positionalPremium = asset.position === "C" ? 1.15 : isTopPairD ? 1.20 : 1.0;
   const mult             = asset.multiplier ?? 1.0;
-  const rawTotal         = safe((trueMarketValue * positionalPremium + capTotal) * mult);
+  const rawTotal         = safe((trueMarketValue + boundedCapTotal) * mult * positionalPremium);
 
   // ── Development Risk Discount ─────────────────────────────────
   // Young players on ELCs have significant bust probability that the cap surplus
@@ -469,12 +476,43 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
 
   const discountedTotal = rawTotal * developmentDiscount;
 
+  // ── Trade Protection Leverage Discount ────────────────────────
+  // NMC/NTC reduces bidding competition, not on-ice value. Applied after the
+  // development discount so young cost-controlled players aren't double-penalized.
+  // Full NMC (player controls their destination): –12%.
+  // NTC (partial list, GM has limited options): –6%.
+  const tradeProtectionFactor = asset.hasNMC ? 0.88 : asset.hasNTC ? 0.94 : 1.0;
+  const protectedTotal = discountedTotal * tradeProtectionFactor;
+
   // ── Franchise Cornerstone Floor ───────────────────────────────
-  // Uses blendedPts so injured franchise players (ptsPace=0 this season but strong
-  // baseline) still qualify. Floor uses -Infinity for non-qualifiers so bad contracts
+  // A proven franchise player can never be worth less than their floor in a trade,
+  // regardless of contract situation. Any GM would take Draisaitl at $14M — the
+  // surplus model shouldn't be able to drag him below this floor.
+  //
+  // Qualification:
+  //   Forwards: age ≥ 27 AND ptsPace ≥ 90 (proven multi-year elite scorer)
+  //   D-men:    age ≥ 27 AND ptsPace ≥ 65 AND avgTOI > 22 (proven top-pair anchor)
+  //
+  // The floor reflects the "blockbuster required" principle: acquiring a franchise
+  // cornerstone demands a premium roster player + elite prospect + 1st-round pick.
+  // No package of depth players and ELC wildcards should be able to match them.
+  // ── Franchise Cornerstone Floor ───────────────────────────────
+  // A proven franchise player can never be worth less than their floor in a trade,
+  // regardless of contract situation. The surplus model shouldn't be able to 
+  // drag them below this floor due to data gaps or partial-season stats.
+  //
+  // Qualification criteria:
+  //   Forwards: ptsPace ≥ 80 OR ops ≥ 5.0
+  //   D-men:    ptsPace ≥ 65 AND avgTOI > 22 OR ops ≥ 4.0
+  //
+  // The floor embodies the "blockbuster required" principle. Elite young players
+  // (under 26) have significantly higher floors due to prime years and team control.
+  // No ELC-heavy package should match them alone.
+  //
+  // Floor uses -Infinity for non-qualifying players so negative NAV contracts
   // are NOT accidentally floored at zero.
-  const qualifiesEliteForward  = !isD && (blendedPts >= 80 || (ops !== null && ops >= 5.0));
-  const qualifiesEliteDefender =  isD && (blendedPts >= 65 || (ops !== null && ops >= 4.0)) && toi > 22;
+  const qualifiesEliteForward  = !isD && (pts >= 80 || (ops !== null && ops >= 5.0));
+  const qualifiesEliteDefender =  isD && (pts >= 65 || (ops !== null && ops >= 4.0)) && toi > 22;
 
   let franchiseFloor = -Infinity;
   if (qualifiesEliteForward) {
@@ -483,14 +521,14 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     franchiseFloor = age <= 24 ? 240 : age <= 26 ? 200 : 160;
   }
 
-  const total = Math.max(discountedTotal, franchiseFloor);
+  const total = Math.max(protectedTotal, franchiseFloor);
 
   return {
     total:  Math.round(total),
     off:    Math.round(offTotal),
     def:    Math.round(defDisplay),
     age:    Math.round(ageTotal),
-    cap:    Math.round(capTotal),
+    cap:    Math.round(boundedCapTotal),
     upside: Math.round(Math.max(0, ageTotal)),
     noivImpact,
     fArchetype,
@@ -503,6 +541,28 @@ export function calcNAV(asset: AssetInput): XNAVResult {
   if (asset.position === "Pick") return calcPickNAV(asset);
   if (asset.position === "G")    return calcGoalieNAV(asset);
   return calcSkaterNAV(asset);
+}
+
+// ── Team context ─────────────────────────────────────────────────────────────
+export type TeamContext = "CONTENDER" | "REBUILDING" | "CAP_FLOOR";
+
+// ── Trade package evaluator ───────────────────────────────────────────────────
+// Sums a pre-computed package of XNAVResults with optional receiving-team context.
+// CAP_FLOOR teams flip negative cap liabilities into mild assets: a bad contract
+// helps them reach the mandatory floor without burning a real roster slot.
+export function evaluateTrade(
+  assets: XNAVResult[],
+  receivingTeamContext: TeamContext = "CONTENDER",
+): number {
+  return assets.reduce((sum, asset) => {
+    let adjustedTotal = asset.total;
+    if (receivingTeamContext === "CAP_FLOOR" && asset.cap < 0) {
+      // Swap out the baked-in negative cap penalty for the context-adjusted value,
+      // preserving positional scarcity, development discount, NMC/NTC haircut, etc.
+      adjustedTotal = (asset.total - asset.cap) + Math.abs(asset.cap) * 0.5;
+    }
+    return sum + adjustedTotal;
+  }, 0);
 }
 
 // ── Package compression ───────────────────────────────────────────────────────

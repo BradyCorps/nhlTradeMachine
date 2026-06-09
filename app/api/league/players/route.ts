@@ -4,7 +4,7 @@ import { TEAMS_DB } from "@/app/lib/db";
 import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
-import { players as playersTable, tradeBlock as tradeBlockTable, teams as teamsTable } from "@/app/db/schema";
+import { players as playersTable } from "@/app/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,6 @@ const PS_CACHE_TTL        = 12 * 60 * 60; // 12 hours
 const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: number; position?: string }> = {
   "Quinton Byfield":  { position: "C" },          // NHL API sometimes tags as "LW"
   "Mark Scheifele":   { yearsRemaining: 5 },       // 8yr/2023→2031; scraper age math gives 1
-  "Aaron Ekblad":     { capHit: 6.1, yearsRemaining: 8 }, // 8yr/2025→2033; extension announced 2024 so ageSigned is off by 1
 };
 
 const NHL_HEADERS = {
@@ -503,15 +502,11 @@ async function loadFromDB(): Promise<Record<string, any>> {
     const result: Record<string, any> = {};
     for (const row of rows) {
       result[row.name] = {
-        capHit:            row.capHit,
-        yearsRemaining:    row.yearsRemaining,
-        hasNMC:            row.hasNmc  ?? false,
-        hasNTC:            row.hasNtc  ?? false,
-        canRetain:         row.hasNmc  ? false : true,
-        secondaryPosition: row.secondaryPosition ?? null,
-        extensionCapHit:   row.extensionCapHit   ?? null,
-        extensionYears:    row.extensionYears     ?? null,
-        hasExtension:      !!(row.extensionCapHit || row.extensionYears),
+        capHit:         row.capHit,
+        yearsRemaining: row.yearsRemaining,
+        hasNMC:         row.hasNmc  ?? false,
+        hasNTC:         row.hasNtc  ?? false,
+        canRetain:      row.hasNmc  ? false : true,
       };
     }
     return result;
@@ -557,23 +552,35 @@ async function loadContracts(): Promise<Record<string, any>> {
     if (cached && Object.keys(cached).length > 200) return cached;
   }
 
-  // DB is the source of truth — CapWages sync happens only in /admin.
-  // Never scrape live on the page-load path (adds 3-4s and burns CapWages quota).
-  const dbData = await loadFromDB();
+  const dbData  = await loadFromDB();
+  const fresh   = await scrapeCapWages();
   const merged: Record<string, any> = {};
 
-  for (const [name, b] of Object.entries(dbData)) {
-    merged[name] = {
-      capHit:            b.capHit,
-      yearsRemaining:    b.yearsRemaining ?? 1,
-      hasNMC:            b.hasNMC  ?? false,
-      hasNTC:            b.hasNTC  ?? false,
-      canRetain:         b.hasNMC  ? false : true,
-      secondaryPosition: b.secondaryPosition ?? null,
-      extensionCapHit:   b.extensionCapHit   ?? null,
-      extensionYears:    b.extensionYears     ?? null,
-      hasExtension:      b.hasExtension       ?? false,
-    };
+  if (Object.keys(fresh).length > 200) {
+    for (const [name, cw] of Object.entries(fresh)) {
+      const baseName = name.includes("__") ? name.split("__")[0] : name;
+      const b = dbData[baseName];
+      merged[name] = {
+        capHit:         cw.capHit,
+        yearsRemaining: (cw.yearsRemaining > 0 ? cw.yearsRemaining : null) ?? b?.yearsRemaining ?? 1,
+        hasNMC:         b?.hasNMC  ?? false,
+        hasNTC:         b?.hasNTC  ?? false,
+        canRetain:      b?.hasNMC  ? false : true,
+        expiryStatus:   cw.expiryStatus,
+        position:       cw.position,
+      };
+    }
+  } else {
+    for (const [name, b] of Object.entries(dbData)) {
+      merged[name] = {
+        capHit:         b.capHit,
+        yearsRemaining: b.yearsRemaining ?? 1,
+        hasNMC:         b.hasNMC  ?? false,
+        hasNTC:         b.hasNTC  ?? false,
+        canRetain:      b.hasNMC  ? false : true,
+        expiryStatus:   "UFA",
+      };
+    }
   }
 
   for (const [name, override] of Object.entries(CONTRACT_OVERRIDES)) {
@@ -750,51 +757,6 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
   }
 
   return psMap;
-}
-
-// ── Trade Block auto-algorithm ─────────────────────────────────────────────
-function autoTradeBlockStatus(
-  p: { age: number; capHit: number; yearsRemaining: number; ptsPace: number; position: string; name: string },
-  phase: string,
-  topTwo: Set<string>,
-): 'available' | 'untouchable' | null {
-  if (p.position === 'Pick' || p.position === 'G') {
-    // Goalies: only flag obvious rental starters
-    if (p.position === 'G') {
-      if (['Rebuilding','Tanking'].includes(phase) && p.age >= 30 && p.capHit >= 5.0) return 'available';
-      if (p.yearsRemaining === 1 && p.capHit >= 6.0) return 'available';
-    }
-    return null;
-  }
-
-  const { age, capHit, yearsRemaining } = p;
-  const isTopTwo     = topTwo.has(p.name);
-  const isRebuilding = ['Rebuilding', 'Tanking'].includes(phase);
-  const isRetooling  = phase === 'Retooling';
-  const isContender  = phase === 'Contender';
-
-  // UNTOUCHABLE: franchise cornerstones in their prime
-  if (isTopTwo && age <= 29) return 'untouchable';
-  if (age <= 22 && capHit <= 1.1) return 'untouchable';
-
-  // AVAILABLE — rebuilding teams move any veteran with trade value
-  if (isRebuilding) {
-    if (age >= 29 && capHit >= 4.0 && yearsRemaining >= 2) return 'available';
-    if (age >= 32) return 'available';
-    if (yearsRemaining === 1 && capHit >= 4.0 && !isTopTwo) return 'available';
-  }
-
-  // AVAILABLE — retooling teams move expensive aging players
-  if (isRetooling) {
-    if (age >= 33 && capHit >= 5.0 && yearsRemaining >= 2) return 'available';
-    if (yearsRemaining === 1 && capHit >= 6.0 && !isTopTwo) return 'available';
-  }
-
-  // AVAILABLE — universal: old expensive contracts + rentals on any team
-  if (!isContender && age >= 35 && capHit >= 5.0) return 'available';
-  if (yearsRemaining === 1 && capHit >= 6.5 && !isTopTwo) return 'available';
-
-  return null;
 }
 
 export async function GET() {
@@ -1082,10 +1044,9 @@ export async function GET() {
       const finalNMC     = override?.hasNMC  ?? (nameCollision ? false : (fin?.hasNMC  ?? false));
       const finalNTC     = override?.hasNTC  ?? (nameCollision ? false : (fin?.hasNTC  ?? false));
       const finalRetain  = override?.canRetain ?? (nameCollision ? true : (fin?.canRetain ?? true));
-      // DB extensions take priority over the legacy JSON file
-      const hasExtension    = fin?.hasExtension    ?? override?.hasExtension    ?? false;
-      const extensionCapHit = (fin?.extensionCapHit ?? override?.extensionCapHit) ?? undefined;
-      const extensionYears  = (fin?.extensionYears  ?? override?.extensionYears)  ?? undefined;
+      const hasExtension    = override?.hasExtension    ?? false;
+      const extensionCapHit = override?.extensionCapHit ?? undefined;
+      const extensionYears  = override?.extensionYears  ?? undefined;
       const intangibleMult  = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
 
       const LEAGUE_AVG_XGA60 = 2.55;
@@ -1134,55 +1095,11 @@ export async function GET() {
         xgRelTM:     stats?.xgRelTM   ?? null,
         xgaRelTM:    stats?.xgaRelTM  ?? null,
         dzPct:       stats?.dzPct     ?? null,
-        goalsPace:         stats?.goalsPace,
-        assistsPace:       stats?.assistsPace,
-        secondaryPosition: fin?.secondaryPosition ?? null,
+        goalsPace:   stats?.goalsPace,
+        assistsPace: stats?.assistsPace,
       });
     });
   });
-
-  // ── Trade Block: load overrides + auto-compute status ─────────────────────
-  let tbOverrides = new Map<string, { status: string; note: string | null }>();
-  try {
-    const rows = await db.select().from(tradeBlockTable);
-    for (const r of rows) tbOverrides.set(r.name, { status: r.status, note: r.note ?? null });
-  } catch (_) {}
-
-  // Team phase map: DB override → TEAMS_DB fallback
-  const teamPhaseMap = new Map<string, string>(TEAMS_DB.map(t => [t.id, t.phase]));
-  try {
-    const dbTeams = await db.select().from(teamsTable);
-    for (const t of dbTeams) { if (t.phaseOverride) teamPhaseMap.set(t.id, t.phaseOverride); }
-  } catch (_) {}
-
-  // Top-2 skaters per team by ptsPace (to guard franchise cornerstones)
-  const teamRosterPts = new Map<string, { name: string; ptsPace: number }[]>();
-  for (const p of players) {
-    if (p.position === 'Pick') continue;
-    const list = teamRosterPts.get(p.teamId) ?? [];
-    list.push({ name: p.name, ptsPace: p.ptsPace ?? 0 });
-    teamRosterPts.set(p.teamId, list);
-  }
-  const teamTopTwo = new Map<string, Set<string>>();
-  teamRosterPts.forEach((list, tid) => {
-    const sorted = [...list].sort((a, b) => b.ptsPace - a.ptsPace);
-    teamTopTwo.set(tid, new Set(sorted.slice(0, 2).map(x => x.name)));
-  });
-
-  // Apply status to each player
-  for (const p of players) {
-    if (p.position === 'Pick') continue;
-    const override = tbOverrides.get(p.name);
-    if (override) {
-      (p as any).tradeBlockStatus = override.status === 'blocked' ? null : override.status;
-      (p as any).tradeBlockNote   = override.note;
-    } else {
-      const phase  = teamPhaseMap.get(p.teamId) ?? 'Bubble';
-      const topTwo = teamTopTwo.get(p.teamId)   ?? new Set<string>();
-      (p as any).tradeBlockStatus = autoTradeBlockStatus(p as any, phase, topTwo);
-      (p as any).tradeBlockNote   = null;
-    }
-  }
 
   return NextResponse.json({
     players,
