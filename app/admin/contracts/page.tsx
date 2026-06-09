@@ -3,21 +3,23 @@
 import React, { useEffect, useState, useMemo } from "react";
 
 interface ContractRow {
-  name:          string;
-  team:          string | null;
-  position:      string | null;
-  finalYears:    number;
-  finalCap:      number | null;
-  bundledYears:  number | null;
-  scrapedYears:  number | null;
-  adminYears:    number | null;
-  adminCap:      number | null;
-  overrideYears: number | null;
-  hasNMC:        boolean;
-  hasNTC:        boolean;
-  expiryStatus:  string | null;
-  delta:         number | null;
-  source:        string;
+  name:            string;
+  team:            string | null;
+  position:        string | null;
+  finalYears:      number;
+  finalCap:        number | null;
+  bundledYears:    number | null;
+  scrapedYears:    number | null;
+  adminYears:      number | null;
+  adminCap:        number | null;
+  overrideYears:   number | null;
+  hasNMC:          boolean;
+  hasNTC:          boolean;
+  extensionCapHit: number | null;
+  extensionYears:  number | null;
+  expiryStatus:    string | null;
+  delta:           number | null;
+  source:          string;
 }
 
 // ── Source badge ──────────────────────────────────────────────────────────────
@@ -45,22 +47,32 @@ function SourceBadge({ source }: { source: string }) {
 // ── Edit modal ────────────────────────────────────────────────────────────────
 function EditModal({ row, onSave, onClear, onClose }: {
   row:     ContractRow;
-  onSave:  (name: string, years: number | null, cap: number | null) => Promise<void>;
+  onSave:  (name: string, years: number | null, cap: number | null, extCap: number | null, extYears: number | null) => Promise<void>;
   onClear: (name: string) => Promise<void>;
   onClose: () => void;
 }) {
-  const [years,  setYears]  = useState(String(row.adminYears ?? row.finalYears ?? ""));
-  const [cap,    setCap]    = useState(String(row.adminCap   ?? row.finalCap   ?? ""));
-  const [saving, setSaving] = useState(false);
+  const [years,    setYears]    = useState(String(row.adminYears ?? row.finalYears ?? ""));
+  const [cap,      setCap]      = useState(String(row.adminCap   ?? row.finalCap   ?? ""));
+  const [extCap,   setExtCap]   = useState(String(row.extensionCapHit ?? ""));
+  const [extYears, setExtYears] = useState(String(row.extensionYears  ?? ""));
+  const [saving,   setSaving]   = useState(false);
 
   const handle = async (clear = false) => {
     setSaving(true);
     if (clear) {
       await onClear(row.name);
     } else {
-      const y = parseFloat(years);
-      const c = parseFloat(cap);
-      await onSave(row.name, isNaN(y) ? null : y, isNaN(c) ? null : c);
+      const y  = parseFloat(years);
+      const c  = parseFloat(cap);
+      const ec = parseFloat(extCap);
+      const ey = parseInt(extYears);
+      await onSave(
+        row.name,
+        isNaN(y)  ? null : y,
+        isNaN(c)  ? null : c,
+        isNaN(ec) ? null : ec,
+        isNaN(ey) ? null : ey,
+      );
     }
     setSaving(false);
     onClose();
@@ -112,7 +124,7 @@ function EditModal({ row, onSave, onClear, onClose }: {
         </div>
 
         {/* Edit fields */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
           <div>
             <label style={lbl}>Years Remaining</label>
             <input type="number" min={0} max={12} step={1} value={years}
@@ -122,6 +134,24 @@ function EditModal({ row, onSave, onClear, onClose }: {
             <label style={lbl}>Cap Hit ($M)</label>
             <input type="number" min={0} max={20} step={0.001} value={cap}
               onChange={e => setCap(e.target.value)} style={inp} />
+          </div>
+        </div>
+
+        {/* Extension fields */}
+        <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)", letterSpacing: "0.15em",
+          textTransform: "uppercase", marginBottom: 6 }}>
+          Extension (leave blank to clear)
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+          <div>
+            <label style={lbl}>Extension Cap Hit ($M)</label>
+            <input type="number" min={0} max={25} step={0.001} value={extCap}
+              onChange={e => setExtCap(e.target.value)} style={inp} placeholder="e.g. 17.000" />
+          </div>
+          <div>
+            <label style={lbl}>Extension Years</label>
+            <input type="number" min={1} max={12} step={1} value={extYears}
+              onChange={e => setExtYears(e.target.value)} style={inp} placeholder="e.g. 8" />
           </div>
         </div>
 
@@ -316,10 +346,16 @@ export default function AdminContractsPage() {
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
 
-  const handleSave = async (name: string, yearsRemaining: number | null, capHit: number | null) => {
+  const handleSave = async (
+    name: string,
+    yearsRemaining: number | null,
+    capHit: number | null,
+    extensionCapHit: number | null,
+    extensionYears: number | null,
+  ) => {
     const res  = await fetch("/api/admin/contracts", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, yearsRemaining, capHit }),
+      body: JSON.stringify({ name, yearsRemaining, capHit, extensionCapHit, extensionYears }),
     });
     const data = await res.json();
     showToast(`Saved ${name}${data.destination === "db-insert" ? " (new entry)" : ""}`);

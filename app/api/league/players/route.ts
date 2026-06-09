@@ -502,11 +502,14 @@ async function loadFromDB(): Promise<Record<string, any>> {
     const result: Record<string, any> = {};
     for (const row of rows) {
       result[row.name] = {
-        capHit:         row.capHit,
-        yearsRemaining: row.yearsRemaining,
-        hasNMC:         row.hasNmc  ?? false,
-        hasNTC:         row.hasNtc  ?? false,
-        canRetain:      row.hasNmc  ? false : true,
+        capHit:          row.capHit,
+        yearsRemaining:  row.yearsRemaining,
+        hasNMC:          row.hasNmc  ?? false,
+        hasNTC:          row.hasNtc  ?? false,
+        canRetain:       row.hasNmc  ? false : true,
+        hasExtension:    row.extensionCapHit != null && row.extensionYears != null,
+        extensionCapHit: row.extensionCapHit ?? undefined,
+        extensionYears:  row.extensionYears  ?? undefined,
       };
     }
     return result;
@@ -561,37 +564,46 @@ async function loadContracts(): Promise<Record<string, any>> {
       const baseName = name.includes("__") ? name.split("__")[0] : name;
       const b = dbData[baseName];
       merged[name] = {
-        capHit:         cw.capHit,
-        yearsRemaining: (cw.yearsRemaining > 0 ? cw.yearsRemaining : null) ?? b?.yearsRemaining ?? 1,
-        hasNMC:         b?.hasNMC  ?? false,
-        hasNTC:         b?.hasNTC  ?? false,
-        canRetain:      b?.hasNMC  ? false : true,
-        expiryStatus:   cw.expiryStatus,
-        position:       cw.position,
+        capHit:          cw.capHit,
+        yearsRemaining:  (cw.yearsRemaining > 0 ? cw.yearsRemaining : null) ?? b?.yearsRemaining ?? 1,
+        hasNMC:          b?.hasNMC  ?? false,
+        hasNTC:          b?.hasNTC  ?? false,
+        canRetain:       b?.hasNMC  ? false : true,
+        expiryStatus:    cw.expiryStatus,
+        position:        cw.position,
+        hasExtension:    b?.hasExtension    ?? false,
+        extensionCapHit: b?.extensionCapHit ?? undefined,
+        extensionYears:  b?.extensionYears  ?? undefined,
       };
     }
     // Backfill DB-only players not present in scraper output (manually-managed entries like NTC/NMC holders)
     for (const [name, b] of Object.entries(dbData)) {
       if (!merged[name]) {
         merged[name] = {
-          capHit:         b.capHit,
-          yearsRemaining: b.yearsRemaining ?? 1,
-          hasNMC:         b.hasNMC  ?? false,
-          hasNTC:         b.hasNTC  ?? false,
-          canRetain:      b.hasNMC  ? false : true,
-          expiryStatus:   "UFA",
+          capHit:          b.capHit,
+          yearsRemaining:  b.yearsRemaining ?? 1,
+          hasNMC:          b.hasNMC  ?? false,
+          hasNTC:          b.hasNTC  ?? false,
+          canRetain:       b.hasNMC  ? false : true,
+          expiryStatus:    "UFA",
+          hasExtension:    b.hasExtension    ?? false,
+          extensionCapHit: b.extensionCapHit ?? undefined,
+          extensionYears:  b.extensionYears  ?? undefined,
         };
       }
     }
   } else {
     for (const [name, b] of Object.entries(dbData)) {
       merged[name] = {
-        capHit:         b.capHit,
-        yearsRemaining: b.yearsRemaining ?? 1,
-        hasNMC:         b.hasNMC  ?? false,
-        hasNTC:         b.hasNTC  ?? false,
-        canRetain:      b.hasNMC  ? false : true,
-        expiryStatus:   "UFA",
+        capHit:          b.capHit,
+        yearsRemaining:  b.yearsRemaining ?? 1,
+        hasNMC:          b.hasNMC  ?? false,
+        hasNTC:          b.hasNTC  ?? false,
+        canRetain:       b.hasNMC  ? false : true,
+        expiryStatus:    "UFA",
+        hasExtension:    b.hasExtension    ?? false,
+        extensionCapHit: b.extensionCapHit ?? undefined,
+        extensionYears:  b.extensionYears  ?? undefined,
       };
     }
   }
@@ -1057,9 +1069,9 @@ export async function GET() {
       const finalNMC     = override?.hasNMC  ?? (nameCollision ? false : (fin?.hasNMC  ?? false));
       const finalNTC     = override?.hasNTC  ?? (nameCollision ? false : (fin?.hasNTC  ?? false));
       const finalRetain  = override?.canRetain ?? (nameCollision ? true : (fin?.canRetain ?? true));
-      const hasExtension    = override?.hasExtension    ?? false;
-      const extensionCapHit = override?.extensionCapHit ?? undefined;
-      const extensionYears  = override?.extensionYears  ?? undefined;
+      const hasExtension    = override?.hasExtension    ?? fin?.hasExtension    ?? false;
+      const extensionCapHit = override?.extensionCapHit ?? fin?.extensionCapHit ?? undefined;
+      const extensionYears  = override?.extensionYears  ?? fin?.extensionYears  ?? undefined;
       const intangibleMult  = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
 
       const LEAGUE_AVG_XGA60 = 2.55;

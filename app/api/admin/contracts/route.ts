@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const CONTRACT_OVERRIDES: Record<string, { yearsRemaining?: number; position?: string }> = {
   "Quinton Byfield": { position: "C" },
-  "Mark Scheifele":  { yearsRemaining: 5 },
+
 };
 
 // CapWages returns teamSlug like "winnipeg_jets" — map to DB tricode
@@ -94,18 +94,20 @@ export async function GET(req: Request) {
 
     return {
       name,
-      team:          cw?.teamSlug  ?? null,
-      position:      ov?.position  ?? cw?.position ?? null,
-      finalYears:    baseYears,
-      finalCap:      baseCap,
-      bundledYears:  dbYears,
+      team:            cw?.teamSlug  ?? null,
+      position:        ov?.position  ?? cw?.position ?? null,
+      finalYears:      baseYears,
+      finalCap:        baseCap,
+      bundledYears:    dbYears,
       scrapedYears,
-      adminYears:    null,
-      adminCap:      null,
-      overrideYears: ov?.yearsRemaining ?? null,
-      hasNMC:        b?.hasNmc  ?? false,
-      hasNTC:        b?.hasNtc  ?? false,
-      expiryStatus:  cw?.expiryStatus ?? null,
+      adminYears:      null,
+      adminCap:        null,
+      overrideYears:   ov?.yearsRemaining ?? null,
+      hasNMC:          b?.hasNmc  ?? false,
+      hasNTC:          b?.hasNtc  ?? false,
+      extensionCapHit: b?.extensionCapHit ?? null,
+      extensionYears:  b?.extensionYears  ?? null,
+      expiryStatus:    cw?.expiryStatus ?? null,
       delta,
       source: ov?.yearsRemaining ? "override"
              : scrapedYears      ? "scraper"
