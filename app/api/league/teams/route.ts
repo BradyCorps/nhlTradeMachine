@@ -3,9 +3,12 @@ import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
-import { teams as teamsTable, siteSettings } from "@/app/db/schema";
+import { teams as teamsTable } from "@/app/db/schema";
 
 export const dynamic = "force-dynamic";
+
+const CAP_CEILING     = SEASON.capCeiling;
+const CAP_FLOOR       = SEASON.capFloor;
 const TEAMS_CACHE_TTL = 6 * 60 * 60; // 6 hours
 
 const TEAM_NEEDS: Record<string, { pos: string; minWar: number; label: string }[]> = {
@@ -16,19 +19,6 @@ const TEAM_NEEDS: Record<string, { pos: string; minWar: number; label: string }[
   SJS: [{ pos: "C", minWar: 2.0, label: "Top 6 C" }],
 };
 
-const CW_SLUGS: Record<string, string> = {
-  ANA: "anaheim_ducks",     BOS: "boston_bruins",      BUF: "buffalo_sabres",
-  CGY: "calgary_flames",    CAR: "carolina_hurricanes", CHI: "chicago_blackhawks",
-  COL: "colorado_avalanche",CBJ: "columbus_blue_jackets",DAL: "dallas_stars",
-  DET: "detroit_red_wings", EDM: "edmonton_oilers",     FLA: "florida_panthers",
-  LAK: "los_angeles_kings", MIN: "minnesota_wild",      MTL: "montreal_canadiens",
-  NSH: "nashville_predators",NJD: "new_jersey_devils",  NYI: "new_york_islanders",
-  NYR: "new_york_rangers",  OTT: "ottawa_senators",     PHI: "philadelphia_flyers",
-  PIT: "pittsburgh_penguins",SEA: "seattle_kraken",     SJS: "san_jose_sharks",
-  STL: "st_louis_blues",    TBL: "tampa_bay_lightning", TOR: "toronto_maple_leafs",
-  UTA: "utah_mammoth",      VAN: "vancouver_canucks",   VGK: "vegas_golden_knights",
-  WSH: "washington_capitals",WPG: "winnipeg_jets",
-};
 
 const fetchWithTimeout = (url: string, ms = 8000, extraHeaders: Record<string, string> = {}): Promise<Response> => {
   const ctrl = new AbortController();
@@ -49,19 +39,6 @@ const derivePhase = (confRank: number, divRank: number, pointPct: number): strin
   if (pointPct < 0.38) return "Tanking";
   return "Rebuilding";
 };
-
-async function loadSettings(): Promise<{ capCeiling: number; capFloor: number }> {
-  try {
-    const rows = await db.select().from(siteSettings);
-    const m = new Map(rows.map(r => [r.key, r.value]));
-    return {
-      capCeiling: m.has("cap_ceiling") ? parseFloat(m.get("cap_ceiling")!) : SEASON.capCeiling,
-      capFloor:   m.has("cap_floor")   ? parseFloat(m.get("cap_floor")!)   : SEASON.capFloor,
-    };
-  } catch {
-    return { capCeiling: SEASON.capCeiling, capFloor: SEASON.capFloor };
-  }
-}
 
 async function loadTeams(): Promise<any[]> {
   if (redis) {
@@ -148,32 +125,9 @@ async function loadTeams(): Promise<any[]> {
     }
   } catch (_) {}
 
-  const capMap = new Map<string, number>();
-  const teamIds = Object.keys(CW_SLUGS);
-
-  for (let i = 0; i < teamIds.length; i += 8) {
-    const batch = teamIds.slice(i, i + 8);
-    await Promise.allSettled(batch.map(async (id) => {
-      try {
-        const slug = CW_SLUGS[id];
-        const res  = await fetchWithTimeout(
-          `https://capwages.com/teams/${slug}`,
-          8000,
-          { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
-        );
-        if (!res.ok) return;
-        const html  = await res.text();
-        const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-        if (!match) return;
-        const nextData = JSON.parse(match[1]);
-        const summary  = nextData?.props?.pageProps?.teamSummary;
-        if (summary?.capSpace !== undefined) {
-          capMap.set(id, Math.round((summary.capSpace / 1_000_000) * 10) / 10);
-        }
-      } catch (_) {}
-    }));
-    if (i + 8 < teamIds.length) await new Promise(r => setTimeout(r, 300));
-  }
+  // Cap space comes from TEAMS_DB (curated for start of 2025-26 season).
+  // We no longer scrape CapWages for cap space — post-season it returns 2026-27
+  // offseason projections which are wrong for this trade machine's context.
 
   let dbTeams: any[] = [];
   try {
@@ -188,7 +142,7 @@ async function loadTeams(): Promise<any[]> {
     const confRank = st?.conferenceRank ?? 8;
     const divRank  = st?.divisionRank   ?? 4;
     const pointPct = st?.pointPct       ?? 0.5;
-    const capSpace = capMap.get(t.id) ?? t.capSpace;
+    const capSpace = t.capSpace;
 
     const phase = dbTeam?.phaseOverride
       ?? (standingsMap.size >= 28 ? derivePhase(confRank, divRank, pointPct) : t.phase);
@@ -211,8 +165,7 @@ async function loadTeams(): Promise<any[]> {
 }
 
 export async function GET() {
-  const [LIVE_TEAMS, { capCeiling: CAP_CEILING, capFloor: CAP_FLOOR }] =
-    await Promise.all([loadTeams(), loadSettings()]);
+  const LIVE_TEAMS = await loadTeams();
 
   const picks: any[] = [];
   LIVE_TEAMS.forEach((team) => {
