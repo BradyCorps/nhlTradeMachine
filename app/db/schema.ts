@@ -10,8 +10,9 @@ export const teams = sqliteTable("teams", {
 export const players = sqliteTable("players", {
   id:              text("id").primaryKey(),
   name:            text("name").notNull(),
-  position:        text("position").notNull(),
-  teamId:          text("team_id").references(() => teams.id),
+  position:          text("position").notNull(),
+  secondaryPosition: text("secondary_position"),
+  teamId:            text("team_id").references(() => teams.id),
   age:             integer("age"),
   capHit:          real("cap_hit").notNull(),
   yearsRemaining:  integer("years_remaining").notNull(),
