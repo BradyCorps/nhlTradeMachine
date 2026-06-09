@@ -447,10 +447,20 @@ export default function TradeBlockAdmin() {
 
   const patchTeamIds = async () => {
     setPatching(true);
-    showToast("Scraping team data…");
-    const r = await fetch("/api/admin/patch-team-ids", { method: "POST" });
-    const d = await r.json();
-    showToast(`Patched ${d.patched} players — reload to see roster`);
+    showToast("Fetching NHL rosters…");
+    try {
+      const r = await fetch("/api/admin/patch-team-ids", { method: "POST" });
+      const d = await r.json();
+      if (d.failedTeams?.length > 0) {
+        showToast(`Patched ${d.patched} · ${d.skipped} skipped · failed: ${d.failedTeams.join(", ")}`);
+      } else if (d.patched === 0 && d.totalFromNHL === 0) {
+        showToast("NHL API returned no data — check console for errors");
+      } else {
+        showToast(`Patched ${d.patched} players (${d.skipped} unmatched)`);
+      }
+    } catch {
+      showToast("Patch request failed — check network/server logs");
+    }
     setPatching(false);
     await load();
   };
@@ -520,7 +530,7 @@ export default function TradeBlockAdmin() {
           {tabBtn("available",   `AVAILABLE (${counts.available})`)}
           {tabBtn("untouchable", `UNTOUCHABLE (${counts.untouchable})`)}
         </div>
-        {allPlayers.every(p => p.teamId === null) && allPlayers.length > 0 && (
+        {allPlayers.some(p => p.teamId === null) && allPlayers.length > 0 && (
           <button onClick={patchTeamIds} disabled={patching}
             style={{
               padding: "6px 14px", fontSize: 10, fontWeight: 900, cursor: "pointer",
