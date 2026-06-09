@@ -11,15 +11,22 @@ export async function GET() {
   return NextResponse.json({
     capCeiling: m.has("cap_ceiling") ? parseFloat(m.get("cap_ceiling")!) : null,
     capFloor:   m.has("cap_floor")   ? parseFloat(m.get("cap_floor")!)   : null,
-    defaults: { capCeiling: SEASON.capCeiling, capFloor: SEASON.capFloor, label: SEASON.label },
+    defaults:   { capCeiling: SEASON.capCeiling, capFloor: SEASON.capFloor, label: SEASON.label },
   });
 }
 
 export async function POST(req: Request) {
   const body = await req.json() as {
+    action?:     "clear_cache";
     capCeiling?: number | null;
     capFloor?:   number | null;
   };
+
+  // Dedicated cache-bust action
+  if (body.action === "clear_cache") {
+    if (redis) await redis.del("cache:teams").catch(() => {});
+    return NextResponse.json({ ok: true, cleared: true });
+  }
 
   const upsert = async (key: string, val: number | null | undefined) => {
     if (val === undefined) return;
@@ -40,8 +47,6 @@ export async function POST(req: Request) {
     upsert("cap_floor",   body.capFloor),
   ]);
 
-  // Bust the teams cache so next page load picks up new ceiling
   if (redis) await redis.del("cache:teams").catch(() => {});
-
   return NextResponse.json({ ok: true });
 }

@@ -7,12 +7,6 @@ export const teams = sqliteTable("teams", {
   standingOverride: integer("standing_override"),
 });
 
-// Global key-value settings — e.g. cap_ceiling, cap_floor
-export const siteSettings = sqliteTable("site_settings", {
-  key:   text("key").primaryKey(),
-  value: text("value").notNull(),
-});
-
 export const players = sqliteTable("players", {
   id:              text("id").primaryKey(),
   name:            text("name").notNull(),
@@ -31,6 +25,12 @@ export const players = sqliteTable("players", {
   injuryStatus:    text("injury_status"),
   extensionCapHit: real("extension_cap_hit"),
   extensionYears:  integer("extension_years"),
+});
+
+// Global key-value config — cap_ceiling, cap_floor, etc.
+export const siteSettings = sqliteTable("site_settings", {
+  key:   text("key").primaryKey(),
+  value: text("value").notNull(),
 });
 
 export const tradeBlock = sqliteTable("trade_block", {
