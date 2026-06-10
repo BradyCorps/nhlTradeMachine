@@ -235,6 +235,7 @@ export default function AdminContractsPage() {
   const [filter, setFilter]         = useState<"all" | "flagged" | "admin">("all");
   const [editing, setEditing]       = useState<ContractRow | null>(null);
   const [toast, setToast]           = useState<string | null>(null);
+  const [dbError, setDbError]       = useState<string | null>(null);
 
   const load = (withScrape = false) => {
     setLoading(true);
@@ -243,6 +244,7 @@ export default function AdminContractsPage() {
       .then(r => r.json())
       .then(d => {
         setContracts(d.contracts ?? []);
+        setDbError(d.dbError ?? null);
         if (d.scrapedRaw && Object.keys(d.scrapedRaw).length > 0) setScrapedRaw(d.scrapedRaw);
         setLoading(false);
       })
@@ -353,6 +355,14 @@ export default function AdminContractsPage() {
           + LIVE DELTA
         </button>
       </div>
+
+      {/* DB error banner */}
+      {dbError && (
+        <div style={{ padding: "10px 24px", background: "#3a1a1a", borderBottom: "1px solid #6a2a2a",
+          color: "#cf6b6b", fontSize: 11, fontWeight: 900, letterSpacing: "0.05em" }}>
+          ⚠ DATABASE READ FAILED — {dbError}
+        </div>
+      )}
 
       {/* Add player */}
       <div style={{ padding: "10px 24px", borderBottom: "1px solid #2a1e0a" }}>

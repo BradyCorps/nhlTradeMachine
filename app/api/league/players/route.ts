@@ -498,15 +498,27 @@ const STATIC_ROSTER: [string, string, string, string][] = [
 
 async function loadFromDB(): Promise<Record<string, any>> {
   try {
-    const rows = await db.select().from(playersTable);
+    // Explicit column list — a full select() breaks with "no such column" whenever
+    // schema.ts declares a column the live Turso table doesn't have yet.
+    const rows = await db.select({
+      name:            playersTable.name,
+      capHit:          playersTable.capHit,
+      yearsRemaining:  playersTable.yearsRemaining,
+      hasNmc:          playersTable.hasNmc,
+      hasNtc:          playersTable.hasNtc,
+      extensionCapHit: playersTable.extensionCapHit,
+      extensionYears:  playersTable.extensionYears,
+    }).from(playersTable);
     const result: Record<string, any> = {};
     for (const row of rows) {
       result[row.name] = {
-        capHit:         row.capHit,
-        yearsRemaining: row.yearsRemaining,
-        hasNMC:         row.hasNmc  ?? false,
-        hasNTC:         row.hasNtc  ?? false,
-        canRetain:      row.hasNmc  ? false : true,
+        capHit:          row.capHit,
+        yearsRemaining:  row.yearsRemaining,
+        hasNMC:          row.hasNmc  ?? false,
+        hasNTC:          row.hasNtc  ?? false,
+        canRetain:       row.hasNmc  ? false : true,
+        extensionCapHit: row.extensionCapHit ?? null,
+        extensionYears:  row.extensionYears  ?? null,
       };
     }
     return result;
@@ -561,37 +573,43 @@ async function loadContracts(): Promise<Record<string, any>> {
       const baseName = name.includes("__") ? name.split("__")[0] : name;
       const b = dbData[baseName];
       merged[name] = {
-        capHit:         cw.capHit,
-        yearsRemaining: (cw.yearsRemaining > 0 ? cw.yearsRemaining : null) ?? b?.yearsRemaining ?? 1,
-        hasNMC:         b?.hasNMC  ?? false,
-        hasNTC:         b?.hasNTC  ?? false,
-        canRetain:      b?.hasNMC  ? false : true,
-        expiryStatus:   cw.expiryStatus,
-        position:       cw.position,
+        capHit:          cw.capHit,
+        yearsRemaining:  (cw.yearsRemaining > 0 ? cw.yearsRemaining : null) ?? b?.yearsRemaining ?? 1,
+        hasNMC:          b?.hasNMC  ?? false,
+        hasNTC:          b?.hasNTC  ?? false,
+        canRetain:       b?.hasNMC  ? false : true,
+        expiryStatus:    cw.expiryStatus,
+        position:        cw.position,
+        extensionCapHit: b?.extensionCapHit ?? null,
+        extensionYears:  b?.extensionYears  ?? null,
       };
     }
     // Backfill: DB players the scraper rejected or skipped (cap out-of-range, index drift, etc.)
     for (const [name, b] of Object.entries(dbData)) {
       if (!merged[name]) {
         merged[name] = {
-          capHit:         b.capHit,
-          yearsRemaining: b.yearsRemaining ?? 1,
-          hasNMC:         b.hasNMC  ?? false,
-          hasNTC:         b.hasNTC  ?? false,
-          canRetain:      b.hasNMC  ? false : true,
-          expiryStatus:   "UFA",
+          capHit:          b.capHit,
+          yearsRemaining:  b.yearsRemaining ?? 1,
+          hasNMC:          b.hasNMC  ?? false,
+          hasNTC:          b.hasNTC  ?? false,
+          canRetain:       b.hasNMC  ? false : true,
+          expiryStatus:    "UFA",
+          extensionCapHit: b.extensionCapHit ?? null,
+          extensionYears:  b.extensionYears  ?? null,
         };
       }
     }
   } else {
     for (const [name, b] of Object.entries(dbData)) {
       merged[name] = {
-        capHit:         b.capHit,
-        yearsRemaining: b.yearsRemaining ?? 1,
-        hasNMC:         b.hasNMC  ?? false,
-        hasNTC:         b.hasNTC  ?? false,
-        canRetain:      b.hasNMC  ? false : true,
-        expiryStatus:   "UFA",
+        capHit:          b.capHit,
+        yearsRemaining:  b.yearsRemaining ?? 1,
+        hasNMC:          b.hasNMC  ?? false,
+        hasNTC:          b.hasNTC  ?? false,
+        canRetain:       b.hasNMC  ? false : true,
+        expiryStatus:    "UFA",
+        extensionCapHit: b.extensionCapHit ?? null,
+        extensionYears:  b.extensionYears  ?? null,
       };
     }
   }
@@ -1057,9 +1075,9 @@ export async function GET() {
       const finalNMC     = override?.hasNMC  ?? (nameCollision ? false : (fin?.hasNMC  ?? false));
       const finalNTC     = override?.hasNTC  ?? (nameCollision ? false : (fin?.hasNTC  ?? false));
       const finalRetain  = override?.canRetain ?? (nameCollision ? true : (fin?.canRetain ?? true));
-      const hasExtension    = override?.hasExtension    ?? false;
-      const extensionCapHit = override?.extensionCapHit ?? undefined;
-      const extensionYears  = override?.extensionYears  ?? undefined;
+      const extensionCapHit = override?.extensionCapHit ?? fin?.extensionCapHit ?? undefined;
+      const extensionYears  = override?.extensionYears  ?? fin?.extensionYears  ?? undefined;
+      const hasExtension    = override?.hasExtension    ?? (extensionCapHit != null && extensionYears != null);
       const intangibleMult  = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
 
       const LEAGUE_AVG_XGA60 = 2.55;

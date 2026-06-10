@@ -73,10 +73,11 @@ export async function scrapeCapWages(): Promise<Record<string, any>> {
 
       // ── Sanity check — reject implausible cap hits ────────────
       // Floor: ELC minimum is $0.775M (2024-25 CBA); use 0.75 for margin
-      // Ceiling: highest ever signed (~$16M, Draisaitl 2025)
-      // Anything outside this range signals a parse error; skip and fall back to bundled.
+      // Ceiling: CBA max is 20% of the cap ceiling ($104M × 0.20 = $20.8M for 2026-27).
+      // Kaprizov's $17M extension is live as of 2026-27 — a $16 ceiling rejects real deals.
+      // Anything outside this range signals a parse error; skip and fall back to DB/bundled.
       const CAP_MIN = 0.75;
-      const CAP_MAX = 16.0;
+      const CAP_MAX = 20.8;
       if (capHit < CAP_MIN || capHit > CAP_MAX) {
         skipReasons[name] = `capHit=${capHit} out of range [${CAP_MIN},${CAP_MAX}] — falling back to bundled`;
         console.warn(`[CapWages Scraper] ⚠ ${name}: capHit=${capHit} rejected, will use bundled value`);

@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 
 const CONTRACT_OVERRIDES: Record<string, { yearsRemaining?: number; position?: string }> = {
   "Quinton Byfield": { position: "C" },
-  "Mark Scheifele":  { yearsRemaining: 5 },
+
 };
 
 function makeId(name: string): string {
@@ -19,8 +19,21 @@ export async function GET(req: Request) {
   const url    = new URL(req.url);
   const doScrape = url.searchParams.get("scrape") === "1";
 
+  // Explicit column list — a full select() breaks with "no such column" whenever
+  // schema.ts declares a column the live Turso table doesn't have yet.
+  let dbError: string | null = null;
   const [dbRows, scraped] = await Promise.all([
-    db.select().from(playersTable).catch(() => [] as typeof playersTable.$inferSelect[]),
+    db.select({
+      name:           playersTable.name,
+      capHit:         playersTable.capHit,
+      yearsRemaining: playersTable.yearsRemaining,
+      hasNmc:         playersTable.hasNmc,
+      hasNtc:         playersTable.hasNtc,
+    }).from(playersTable).catch((e: any) => {
+      dbError = e?.message ?? String(e);
+      console.error("[Admin Contracts] DB read failed:", dbError);
+      return [] as { name: string; capHit: number; yearsRemaining: number; hasNmc: boolean | null; hasNtc: boolean | null }[];
+    }),
     doScrape ? scrapeCapWages() : Promise.resolve({} as Record<string, any>),
   ]);
 
@@ -80,6 +93,7 @@ export async function GET(req: Request) {
     total: rows.length,
     contracts: rows,
     scrapedRaw: doScrape ? scrapedRaw : {},
+    dbError,
   });
 }
 
