@@ -876,8 +876,40 @@ const evaluateTrade = (
 
   const teamStanding = teamHome?.standing ?? 16;
   const marginFactor = teamStanding >= 25 ? 1.0 : teamStanding >= 17 ? 0.85 : teamStanding >= 9  ? 0.70 : 0.55;
-  const ewaPerNav = 1 / 7;
-  const ewaHome = homeNetGain * ewaPerNav * marginFactor;
+
+  // ── Estimated Wins Added — on-ice contribution, NOT NAV ──────
+  // NAV bundles cap surplus, age, and contract efficiency — none of which score
+  // goals. A star on a bad contract still wins you games. EWA uses the same
+  // on-ice value model as the season sim (pts-equivalent units):
+  //   Skaters — stable scoring (40/60 current/multi-season blend, persistence-
+  //   validated r=0.86), plus driver credit for D-men and PK usage for forwards.
+  //   Goalies — stable GSAX → pts-equivalent (~6 goals = 1 win = 2 pts) + HDSV%.
+  // Conversion: pts-equivalent / 3.5 = standings pts, / 2 = wins → divide by 7.
+  const onIceValue = (a: Asset): number => {
+    if (a.position === "Pick") return 0;
+    if (a.position === "G") {
+      const gsaxStable = a.baselineGsax != null && a.baselineGsax !== 0
+        ? (a.gsax ?? 0) * 0.4 + a.baselineGsax * 0.6
+        : (a.gsax ?? 0);
+      const hdsvKicker = a.baselineHdsvPct != null
+        ? clamp((a.baselineHdsvPct - 0.815) * 400, -8, 12)
+        : 0;
+      return gsaxStable * 1.2 + hdsvKicker;
+    }
+    const pts = a.baselinePtsPace && a.baselinePtsPace > 0
+      ? (a.ptsPace ?? 0) * 0.4 + a.baselinePtsPace * 0.6
+      : (a.ptsPace ?? 0);
+    const driverBonus = a.position === "D" && a.pairDriverScore != null
+      ? clamp(a.pairDriverScore * 0.5, -5, 10)
+      : 0;
+    const pkBonus = a.pkTimeShare != null && a.pkTimeShare >= 0.10
+      ? Math.min(5, a.pkTimeShare * 30)
+      : 0;
+    return pts + driverBonus + pkBonus;
+  };
+  const onIceDelta = incoming.reduce((s, a) => s + onIceValue(a), 0)
+                   - outgoing.reduce((s, a) => s + onIceValue(a), 0);
+  const ewaHome = (onIceDelta / 7) * marginFactor;
 
   const calcAssetWindowImpact = (assets: Asset[], direction: 1 | -1): number => {
     return assets.reduce((sum, a) => {

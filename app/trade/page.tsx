@@ -5,7 +5,7 @@ import TugBar from "@/app/components/TugBar";
 import { ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
 import TeamStrand, { CHAMP_TEMPLATE, TeamStrandData } from "@/app/components/TeamStrand";
-import LineupCard from "@/app/components/LineupCard";
+import LineupEditor from "@/app/components/LineupEditor";
 import WhatWeNeed from "@/app/components/WhatWeNeed";
 import ContentionQuadrant from "@/app/components/ContentionQuadrant";
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from "react";
@@ -1004,6 +1004,25 @@ RULES: No invented context. No speculation about players not in this trade. Comp
               partnerBlocks={blocks[1]}
               navMap={navMap}
               db={db}
+            />
+          </div>
+        )}
+
+        {/* ── Lineups — editable depth charts, own section ── */}
+        {teams[0] && teams[1] && (
+          <div className="mb-4">
+            <LineupEditor
+              home={{
+                teamName: teams[0]!.name, label: "Your Franchise",
+                roster: allHomeRoster, outgoing: blocks[0],
+                incoming: blocks[1].filter(a => a.position !== "Pick"),
+              }}
+              partner={{
+                teamName: teams[1]!.name, label: "Trade Partner",
+                roster: allPartnerRoster, outgoing: blocks[1],
+                incoming: blocks[0].filter(a => a.position !== "Pick"),
+              }}
+              hasActiveTrade={blocks[0].length > 0 || blocks[1].length > 0}
             />
           </div>
         )}
@@ -2025,22 +2044,6 @@ function TeamDNA({
 
           <div className="strands-gaps-header">
             {homeTeam?.name} — Roster Gaps vs Playoff & Championship Thresholds{hasActiveTrade ? " (post-trade)" : ""}
-          </div>
-
-          {/* ── Lineup Depth Charts ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: 12, marginBottom: 16 }}>
-            {[
-              { team: homeTeam,    roster: homeRoster,    out: homeBlocks,    inc: partnerBlocks.filter(a => a.position !== 'Pick'), label: 'Your Franchise' },
-              { team: partnerTeam, roster: partnerRoster, out: partnerBlocks, inc: homeBlocks.filter(a => a.position !== 'Pick'),    label: 'Trade Partner' },
-            ].filter(x => x.team).map(({ team, roster, out, inc, label }) => (
-              <div key={team!.id} style={{ background: 'var(--ledger-cream)', border: '1px solid #c8b890', padding: '10px 12px' }}>
-                <div style={{ fontSize: 9, fontWeight: 900, color: 'var(--ledger-ink)', fontFamily: "'Courier Prime', monospace", marginBottom: 6, letterSpacing: '0.05em' }}>
-                  {team!.name}
-                  <span style={{ color: 'var(--ledger-ink-faint)', fontWeight: 400 }}> — {label}</span>
-                </div>
-                <LineupCard roster={roster} outgoing={out} incoming={inc} />
-              </div>
-            ))}
           </div>
 
           {/* Metric explanations + WhatWeNeed */}

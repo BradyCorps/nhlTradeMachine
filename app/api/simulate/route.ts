@@ -15,6 +15,14 @@ interface SimPlayer {
   savePct?: number;
   gamesStarted?: number;
   teamId: string;
+  games?: number;
+  // Multi-season baselines (stamped by league routes; client passes them through)
+  baselinePtsPace?: number;
+  baselineGsax?: number;
+  baselineHdsvPct?: number;
+  pkTimeShare?: number;
+  pairDriverScore?: number;
+  prospectPtsPace?: number;
 }
 
 interface SimTeam {
@@ -86,12 +94,35 @@ const pythagorean = (gf: number, ga: number): number => {
   return gfP / (gfP + gaP);
 };
 
+// ── Stable production estimate ────────────────────────────────
+// 40% current pace / 60% multi-season baseline — same blend the X-NAV engine
+// uses. YoY persistence audit (2022-26, n=1667): single-season r=0.864, so a
+// hot or injury-skewed season shouldn't fully drive the projection.
+const stablePts = (p: SimPlayer): number =>
+  p.baselinePtsPace && p.baselinePtsPace > 0
+    ? p.ptsPace * 0.4 + p.baselinePtsPace * 0.6
+    : p.ptsPace;
+
+// Stable GSAX on the same blend — baselineGsax is a weighted season-scale value
+const stableGsax = (p: SimPlayer): number => {
+  const cur = p.gsax ?? 0;
+  return p.baselineGsax != null && p.baselineGsax !== 0
+    ? cur * 0.4 + p.baselineGsax * 0.6
+    : cur;
+};
+
 // ── Age decay factor ──────────────────────────────────────────
+// Cohort audit (2022-26): forwards decline ≈ -2.5 pts/82 per year from 28,
+// steepening to -6+/yr by 34. The flat per-year rate matches the early phase;
+// the 33+ tail needs to be ~2.5x steeper than the old linear extension.
 const ageDecay = (age: number, position: string): number => {
   const peak = position === "D" ? 27 : position === "G" ? 29 : 26;
   if (age <= peak) return 1.0 + Math.max(0, (peak - age) * 0.005);
-  const decline = (age - peak) * (position === "D" ? 0.018 : 0.022);
-  return Math.max(0.55, 1.0 - decline);
+  const baseRate  = position === "D" ? 0.018 : 0.022;
+  const earlyYears = Math.min(age, 33) - peak;
+  const lateYears  = Math.max(0, age - 33);
+  const decline = earlyYears * baseRate + lateYears * baseRate * 2.5;
+  return Math.max(0.50, 1.0 - decline);
 };
 
 // ── Wild card teams — higher variance ────────────────────────
@@ -181,7 +212,7 @@ function projectTopScorer(
     .filter(p => p.position !== "Pick" && p.position !== "G"
       && p.ptsPace > 0
       && (p as any).games >= 20)
-    .sort((a, b) => b.ptsPace - a.ptsPace);
+    .sort((a, b) => stablePts(b) - stablePts(a));
 
   if (skaters.length === 0) return null;
 
@@ -195,7 +226,7 @@ function projectTopScorer(
     gamesPlayed = Math.max(5, gamesPlayed - Math.round(30 + rand() * 30));
   }
 
-  const rawPts       = (top.ptsPace / 82) * gamesPlayed * decay;
+  const rawPts       = (stablePts(top) / 82) * gamesPlayed * decay;
   const variance     = 0.88 + rand() * 0.24;
   const projectedPts = Math.round(rawPts * variance);
 
@@ -217,11 +248,19 @@ function projectGoalie(
   if (goalies.length === 0) return null;
 
   const g    = goalies[0];
-  const gsax = g.gsax ?? 0;
+  // Multi-season blend — single-season GSAX is noisy; the baseline (when
+  // present) anchors the projection the same way the X-NAV engine blends it
+  const gsax = stableGsax(g);
 
   const gsaxSVP  = 0.910 + (gsax / 20) * 0.015;
   const currentSVP = g.savePct ?? 0.910;
-  const baseSVP    = gsaxSVP * 0.70 + currentSVP * 0.30;
+  let baseSVP    = gsaxSVP * 0.70 + currentSVP * 0.30;
+
+  // HDSV% anchor: high-danger save % is the most repeatable goalie skill.
+  // A goalie at .835 HDSV (elite) gets ~+0.004 SVP pull; .795 gets ~-0.004.
+  if (g.baselineHdsvPct != null) {
+    baseSVP += (g.baselineHdsvPct - 0.815) * 0.20;
+  }
 
   const teamContext  = (teamWinPct - 0.5) * 0.008;
   const age          = g.age ?? 28;
@@ -231,9 +270,11 @@ function projectGoalie(
   // Depth/call-up penalty: a goalie with very few career starts has an unknown
   // quality floor. Widen variance significantly and anchor closer to league average
   // so a 0-start call-up doesn't silently inherit a .910 baseline.
+  // A multi-season HDSV% baseline is proven skill — it narrows the band.
   const careerStarts  = g.gamesStarted ?? 0;
-  const isUnproven    = careerStarts < 20;
+  const isUnproven    = careerStarts < 20 && g.baselineHdsvPct == null;
   const varianceWidth = isUnproven    ? 0.028 :  // wide: could be .880 or .935
+                        g.baselineHdsvPct != null ? 0.010 :
                         Math.abs(gsax) > 15 ? 0.008 :
                         Math.abs(gsax) > 5  ? 0.012 : 0.018;
 
@@ -261,12 +302,15 @@ function projectGoalie(
 
 // ── Project top defenseman (Norris candidate) ───────────────────
 function projectTopDefenseman(roster: SimPlayer[], rand: () => number): { name: string; projectedPts: number } | null {
+  // Norris ranking: stable scoring + pairing driver score — voters reward
+  // two-way anchors, not just point producers on the top PP unit
+  const norrisScore = (p: SimPlayer) => stablePts(p) + (p.pairDriverScore ?? 0) * 0.8;
   const dmen = roster.filter(p => p.position === "D" && p.ptsPace > 0 && (p as any).games >= 10)
-    .sort((a, b) => b.ptsPace - a.ptsPace);
+    .sort((a, b) => norrisScore(b) - norrisScore(a));
   if (dmen.length === 0) return null;
   const top  = dmen[0];
   const decay = ageDecay(top.age, top.position);
-  const proj  = Math.round((top.ptsPace / 82) * (72 + rand() * 10) * decay * (0.85 + rand() * 0.30));
+  const proj  = Math.round((stablePts(top) / 82) * (72 + rand() * 10) * decay * (0.85 + rand() * 0.30));
   return { name: top.name, projectedPts: proj };
 }
 
@@ -623,19 +667,46 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // NAV delta (ptsPace proxy) and cap delta per team
+    // Trade impact and cap delta per team.
+    // Per-player on-ice value in "ptsPace-equivalent" units:
+    //   Skaters — stable (baseline-blended) scoring pace, plus a D-man driver
+    //   bonus: pairing data shows drivers lift partners' xGF% beyond their own
+    //   point production (Fox-tier ≈ +20 driver score ≈ +10 pts-equivalent).
+    //   Two-way forwards get a small PK-usage credit for the same reason.
+    //   Goalies — previously contributed ZERO (no ptsPace), so goalie trades
+    //   never moved the sim. Stable GSAX converts to pts-equivalent: ~6 goals
+    //   ≈ 1 win ≈ 2 standings pts, and tradeImpact divides by 3.5, so
+    //   gsax * 1.2 lands a +20 GSAX starter at ≈ +7 projected standings pts.
+    //   HDSV% above league average (.815) adds a stable-skill kicker.
+    const onIceValue = (p: SimPlayer): number => {
+      if (p.position === "Pick") return 0;
+      if (p.position === "G") {
+        const hdsvKicker = p.baselineHdsvPct != null
+          ? Math.max(-8, Math.min(12, (p.baselineHdsvPct - 0.815) * 400))
+          : 0;
+        return stableGsax(p) * 1.2 + hdsvKicker;
+      }
+      const driverBonus = p.position === "D" && p.pairDriverScore != null
+        ? Math.max(-5, Math.min(10, p.pairDriverScore * 0.5))
+        : 0;
+      const pkBonus = p.pkTimeShare != null && p.pkTimeShare >= 0.10
+        ? Math.min(5, p.pkTimeShare * 30)
+        : 0;
+      return stablePts(p) + driverBonus + pkBonus;
+    };
+
     const tradeNavDeltas = new Map<string, number>();
     const capDeltas      = new Map<string, number>();
     for (const trade of trades) {
       const skaters = (arr: SimPlayer[]) => arr.filter(p => p.position !== "Pick");
-      const outPts = skaters(trade.outgoing).reduce((s, p) => s + p.ptsPace, 0);
-      const inPts  = skaters(trade.incoming).reduce((s, p) => s + p.ptsPace, 0);
+      const outVal = skaters(trade.outgoing).reduce((s, p) => s + onIceValue(p), 0);
+      const inVal  = skaters(trade.incoming).reduce((s, p) => s + onIceValue(p), 0);
       const outCap = skaters(trade.outgoing).reduce((s, p) => s + p.capHit,  0);
       const inCap  = skaters(trade.incoming).reduce((s, p) => s + p.capHit,  0);
-      const ptsDelta = inPts  - outPts;
+      const valDelta = inVal  - outVal;
       const capDelta = inCap  - outCap;
-      tradeNavDeltas.set(trade.homeTeamId,    (tradeNavDeltas.get(trade.homeTeamId)    ?? 0) + ptsDelta);
-      tradeNavDeltas.set(trade.partnerTeamId, (tradeNavDeltas.get(trade.partnerTeamId) ?? 0) - ptsDelta);
+      tradeNavDeltas.set(trade.homeTeamId,    (tradeNavDeltas.get(trade.homeTeamId)    ?? 0) + valDelta);
+      tradeNavDeltas.set(trade.partnerTeamId, (tradeNavDeltas.get(trade.partnerTeamId) ?? 0) - valDelta);
       capDeltas.set(trade.homeTeamId,         (capDeltas.get(trade.homeTeamId)         ?? 0) + capDelta);
       capDeltas.set(trade.partnerTeamId,      (capDeltas.get(trade.partnerTeamId)      ?? 0) - capDelta);
     }
@@ -656,19 +727,24 @@ export async function POST(req: NextRequest) {
         .sort((a, b) => b.projectedPoints - a.projectedPoints);
     }
 
+    // Draftees with no NHL games carry an NHLe-translated prospectPtsPace —
+    // they belong in the Calder pool alongside rookies with live stats
+    const rookiePace = (p: SimPlayer): number =>
+      p.ptsPace > 0 ? p.ptsPace : (p.prospectPtsPace ?? 0) * 0.7; // NHLe haircut for jump risk
     const rookieCandidates = [...playersByTeam.entries()].flatMap(([teamId, roster]) =>
       roster
-        .filter(p => p.age <= 22 && p.position !== "G" && p.ptsPace > 0)
+        .filter(p => p.age <= 22 && p.position !== "G" && rookiePace(p) > 0)
         .map(p => ({ ...p, teamId }))
     );
     const calderWinner = (() => {
       if (rookieCandidates.length === 0) return { name: "Matthew Schaefer", team: "New York Islanders", note: "—" };
       const sorted = rookieCandidates
-        .map(p => ({ p, score: p.ptsPace * (0.50 + rand() * 1.00) }))
+        .map(p => ({ p, score: rookiePace(p) * (0.50 + rand() * 1.00) }))
         .sort((a, b) => b.score - a.score);
       const winner   = sorted[0].p;
       const teamName = teams.find(t => t.id === winner.teamId)?.name ?? winner.teamId;
-      return { name: winner.name, team: teamName, note: `${Math.round(winner.ptsPace * 0.9)}-${Math.round(winner.ptsPace * 0.9 * 0.55)} in projected first full season` };
+      const pace     = rookiePace(winner);
+      return { name: winner.name, team: teamName, note: `${Math.round(pace * 0.9)}-${Math.round(pace * 0.9 * 0.55)} in projected first full season` };
     })();
 
     const playoffBracket = simulatePlayoffs(standings, rand);
