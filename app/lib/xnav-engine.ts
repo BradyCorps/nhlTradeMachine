@@ -11,7 +11,6 @@
 //   • Rental discount on age penalty (1yr = 75% reduction, 2yr = 40%)
 
 import { SEASON, LEAGUE, FRANCHISE, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
-import type { FArchetype } from "@/app/lib/trade-types";
 
 export const DPS_NAV_MULTIPLIER = 15; // dps * 15 = defPS for NAV (not 120 — the *8 bug is removed)
 
@@ -44,8 +43,6 @@ export interface AssetInput {
   round?:         number;
   year?:          number;
   teamStanding?:  number;
-  draftOverall?:    number;        // overall draft slot — triggers pedigree NAV for unproven prospects
-  prospectPtsPace?: number;        // NHLe-translated junior scoring pace
   isProtected?:   boolean;
   multiplier?:    number;
   hasLiveStats?:  boolean;
@@ -53,8 +50,15 @@ export interface AssetInput {
   baselinePtsPace?: number;
   baselineGameScore?: number;
   baselineDpsProxy?: number;
-  hasNMC?: boolean;
-  hasNTC?: boolean;
+  baselineXgRel?:    number;
+  ppPtsPace82?:      number;
+  pkTimeShare?:      number;
+  baselineIxg82?:    number;
+  baselineHits82?:   number;
+  baselineBlocks82?: number;
+  pairXgfPct?:       number;
+  pairDriverScore?:  number;
+  baselineHdsvPct?:  number;
 }
 
 export interface XNAVResult {
@@ -65,7 +69,7 @@ export interface XNAVResult {
   cap:         number;
   upside:      number;
   noivImpact?: number;
-  fArchetype?: FArchetype;
+  fArchetype?: string;
   isRFA?:      boolean;
 }
 
@@ -74,28 +78,12 @@ export const safe  = (n: number): number => (isNaN(n) || !isFinite(n) ? 0 : n);
 export const clamp = (n: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, n));
 
-// NHL buyout heuristic: 1/3 salary for <26, 2/3 for 26+, spread over 2× remaining term.
-// Returns the normalized NAV penalty (always ≤ 0). Used to bound negative cap values so
-// a horrible contract never rates worse than its real-world buyout cost.
-function calcBuyoutNavPenalty(capHit: number, yearsRemaining: number, age: number): number {
-  if (yearsRemaining === 0) return 0;
-  const buyoutRatio    = age < 26 ? 1 / 3 : 2 / 3;
-  const totalBuyout    = capHit * yearsRemaining * buyoutRatio;
-  const annualDeadCap  = totalBuyout / (yearsRemaining * 2);
-  let sum = 0;
-  for (let i = 0; i < yearsRemaining * 2; i++) {
-    sum -= annualDeadCap * 12 * Math.pow(0.92, i);
-  }
-  return sum / (yearsRemaining * 2);
-}
-
 // ── Pick NAV ──────────────────────────────────────────────────────────────────
 export function calcPickNAV(asset: AssetInput): XNAVResult {
   const round    = asset.round    ?? 1;
-  const year     = asset.year     ?? SEASON.draftYear;
+  const year     = asset.year     ?? 2026;
   const standing = asset.teamStanding ?? 16;
-  // Decay relative to the upcoming draft — a pick N years out is worth 0.88^N of a current-year pick
-  const yearDecay = Math.pow(0.88, Math.max(0, year - SEASON.draftYear));
+  const yearDecay = Math.pow(0.88, year - 2026);
 
   let baseValue: number;
   if (round === 1) {
@@ -173,9 +161,16 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   // RFA Cliff: cost-controlled goalie years carry a premium
   const isRFA       = asset.age + navYears <= 27;
 
+  // High-danger save % adjustment: HDSV% is the most repeatable goalie skill
+  // signal, far less polluted by team defense than raw GSAX.
+  // Anchored at league-average ~.815. Capped so it refines rather than competes with GSAX.
+  const hdsvAdj = asset.baselineHdsvPct != null
+    ? clamp((asset.baselineHdsvPct - 0.815) * 600, -12, 18)
+    : 0;
+
   // ── Logistic S-Curve FMV Cap Percentage (Goalies) ──────────────
   // The max cap for a goalie is historically around 12% of the cap.
-  const trueMarketValueG = (goalieImpact + workloadBonus) * ageFactor;
+  const trueMarketValueG = (goalieImpact + workloadBonus + hdsvAdj) * ageFactor;
   
   const LEAGUE_MIN_PCT_G = 0.009; // 0.9%
   const MAX_CAP_PCT_G    = 0.12;  // 12.0%
@@ -195,8 +190,8 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
     const timeDiscount = Math.pow(0.92, i);
     
     const ageAtYear = asset.age + i;
-    const gammaRFA = (ageAtYear <= 27 && annualSurplus > 0) ? 1.25 : 1.0;
-
+    const gammaRFA = ageAtYear <= 27 ? 1.25 : 1.0;
+    
     capSumG += annualSurplus * 12 * gammaRFA * timeDiscount;
   }
   
@@ -205,13 +200,11 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const multiplierToApplyG = baselineCapComponentNormalizedG < 0 ? 1.0 : singleSlotMultiplierG;
   const baselineCapComponentG = baselineCapComponentNormalizedG * multiplierToApplyG;
 
-  const retentionSev      = Math.pow((asset.retainedPct || 0) * 100, 1.25);
-  const retainedBonus     = retentionSev * asset.capHit * 0.06;
-  const capTotalG         = safe(baselineCapComponentG + retainedBonus);
-  const buyoutFloorG      = calcBuyoutNavPenalty(asset.capHit, contractYears, asset.age);
-  const boundedCapTotalG  = Math.max(capTotalG, buyoutFloorG);
-
-  const rawTotal          = safe(trueMarketValueG + boundedCapTotalG);
+  const retentionSev   = Math.pow((asset.retainedPct || 0) * 100, 1.25);
+  const retainedBonus  = retentionSev * asset.capHit * 0.06;
+  const capTotalG      = safe(baselineCapComponentG + retainedBonus);
+  
+  const rawTotal       = safe(trueMarketValueG + capTotalG);
 
   const isYoungControlled = asset.age <= 26 && effectiveCap <= 3.5 && !extCapHit;
   const youngFloor = isYoungControlled && (isStarter || isTandem)
@@ -227,7 +220,7 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
     off:    0,
     def:    safe(goalieImpact * ageFactor),
     age:    -agePenalty,
-    cap:    Math.round(boundedCapTotalG),
+    cap:    Math.round(capTotalG),
     upside: youngFloor > 0 ? youngFloor * 0.4 : 0,
     noivImpact: 0,
     fArchetype: "",
@@ -273,7 +266,13 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const blendedDps = baselineDpsProxy !== undefined && baselineDpsProxy > 0
     ? (dps !== null ? dps * 0.4 + baselineDpsProxy * 0.6 : baselineDpsProxy)
     : dps;
-  const noivBonus = clamp(xgRel * 3.5, -20, 25);
+  // baselineXgRel is a fraction (e.g. 0.05 = +5 pct pts); xgRel is already in pct pts.
+  // Blending damps single-season PDO luck the same way blendedPts damps scoring spikes.
+  const baselineXgRelPts = asset.baselineXgRel != null ? asset.baselineXgRel * 100 : null;
+  const blendedXgRel = baselineXgRelPts !== null
+    ? (asset.xgRelTM != null ? xgRel * 0.4 + baselineXgRelPts * 0.6 : baselineXgRelPts)
+    : xgRel;
+  const noivBonus = clamp(blendedXgRel * 3.5, -20, 25);
   const offPS     = ops !== null ? ops * 17 : null;
 
   // Power-law curve: elite players separate more than linear pts * 1.6
@@ -302,10 +301,18 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const dzVal  = clamp((dzPct - 0.3) * 40, 0, 12);
 
   // dps * 15 (not * 120 — the old * 15 * 8 compounding bug is removed)
-  const defRaw = blendedDps !== null
+  const defRawBase = blendedDps !== null
     ? blendedDps * 15 * confidence + (def * 20 + qocVal + toiD) * (1 - confidence)
     : def * 20 + qocVal + toiD + dzVal - xgaRel * 4;
-  
+
+  // Pairing driver score (D only): how much better do partners perform with this
+  // player vs. without them? Fox-tier drivers sit ~+20, passengers go negative.
+  // Cap tightly so it refines the dps signal, never replaces it.
+  const driverAdj = isD && asset.pairDriverScore != null
+    ? clamp(asset.pairDriverScore * 0.8, -8, 12)
+    : 0;
+  const defRaw = defRawBase + driverAdj;
+
   let defTotal = safe(defRaw);
   // ── Larry Robinson Defensive Asymptote ──────────────────────────
   // Max 150 UI ceiling.
@@ -414,15 +421,13 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const baselineCapComponent = baselineCapComponentNormalized * multiplierToApply;
 
   // Retention tax (exponential — absorbing dead cap still commands a premium)
-  const retentionSev     = Math.pow((asset.retainedPct || 0) * 100, 1.25);
-  const retainedBonus    = retentionSev * asset.capHit * 0.08;
-  const capTotal         = safe(baselineCapComponent + retainedBonus);
-  const buyoutFloor      = calcBuyoutNavPenalty(asset.capHit, contractYears, asset.age);
-  const boundedCapTotal  = Math.max(capTotal, buyoutFloor);
+  const retentionSev  = Math.pow((asset.retainedPct || 0) * 100, 1.25);
+  const retainedBonus = retentionSev * asset.capHit * 0.08;
+  const capTotal      = safe(baselineCapComponent + retainedBonus);
 
   // ── Forward archetype ─────────────────────────────────────────
   const noivImpact = Math.round(noivBonus);
-  let fArchetype: FArchetype = "";
+  let fArchetype = "";
   if (!isD) {
     const psRatio = ops !== null && dps !== null && (ops + dps) > 1
       ? ops / (ops + dps) : null;
@@ -439,13 +444,26 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
         : pts > 50 ? "PLAYMAKER"
         : "SCORER";
     }
+
+    // Situational refinement from NST/MoneyPuck baselines — overrides inference
+    // when real usage data is available and clear-cut.
+    const hits82  = asset.baselineHits82;
+    const pkShare = asset.pkTimeShare;
+    const ppPace  = asset.ppPtsPace82;
+    if (hits82 != null && hits82 >= 140 && blendedPts < 40) {
+      fArchetype = "GRINDER";
+    } else if (pkShare != null && pkShare >= 0.12 && blendedPts >= 35 && fArchetype !== "SNIPER") {
+      fArchetype = "TWO_WAY";
+    } else if (ppPace != null && ppPace >= 22 && blendedPts >= 55 && fArchetype === "SCORER") {
+      fArchetype = "SNIPER";
+    }
   }
 
   // ── Positional Scarcity Premium ───────────────────────────────
   const isTopPairD       = isD && toi > 22;
   const positionalPremium = asset.position === "C" ? 1.15 : isTopPairD ? 1.20 : 1.0;
   const mult             = asset.multiplier ?? 1.0;
-  const rawTotal         = safe((trueMarketValue + boundedCapTotal) * mult * positionalPremium);
+  const rawTotal         = safe((trueMarketValue + capTotal) * mult * positionalPremium);
 
   // ── Development Risk Discount ─────────────────────────────────
   // Young players on ELCs have significant bust probability that the cap surplus
@@ -479,14 +497,6 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   }
 
   const discountedTotal = rawTotal * developmentDiscount;
-
-  // ── Trade Protection Leverage Discount ────────────────────────
-  // NMC/NTC reduces bidding competition, not on-ice value. Applied after the
-  // development discount so young cost-controlled players aren't double-penalized.
-  // Full NMC (player controls their destination): –12%.
-  // NTC (partial list, GM has limited options): –6%.
-  const tradeProtectionFactor = asset.hasNMC ? 0.88 : asset.hasNTC ? 0.94 : 1.0;
-  const protectedTotal = discountedTotal * tradeProtectionFactor;
 
   // ── Franchise Cornerstone Floor ───────────────────────────────
   // A proven franchise player can never be worth less than their floor in a trade,
@@ -525,14 +535,14 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     franchiseFloor = age <= 24 ? 240 : age <= 26 ? 200 : 160;
   }
 
-  const total = Math.max(protectedTotal, franchiseFloor);
+  const total = Math.max(discountedTotal, franchiseFloor);
 
   return {
     total:  Math.round(total),
     off:    Math.round(offTotal),
     def:    Math.round(defDisplay),
     age:    Math.round(ageTotal),
-    cap:    Math.round(boundedCapTotal),
+    cap:    Math.round(capTotal),
     upside: Math.round(Math.max(0, ageTotal)),
     noivImpact,
     fArchetype,
@@ -540,74 +550,11 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   };
 }
 
-// ── Prospect NAV (pedigree-based) ─────────────────────────────────────────────
-// A drafted prospect with no meaningful NHL sample is valued as the pick that
-// selected him, with the lottery uncertainty resolved (+10%). Optional NHLe
-// stats (junior production translated to NHL pace at import time) modulate
-// the pedigree value ±15%. Once the player logs 14+ NHL games, the normal
-// stats-driven path takes over.
-export function calcProspectNAV(asset: AssetInput): XNAVResult {
-  const overall = asset.draftOverall ?? 32;
-  const round   = Math.max(1, Math.ceil(overall / 32));
-  const slotInRound = overall - (round - 1) * 32;
-
-  // Reuse the calibrated pick-slot curve: slot 1 ≙ worst standing (32)
-  const pick = calcPickNAV({
-    ...asset,
-    position:     "Pick",
-    round,
-    year:         SEASON.draftYear, // no future-year decay — the player exists now
-    teamStanding: clamp(33 - slotInRound, 1, 32),
-  });
-
-  const certainty = 1.10; // lottery risk resolved — he IS the #N pick
-  // NHLe modulation: 70 translated points ≈ elite junior production
-  const nhle = asset.prospectPtsPace != null
-    ? clamp(0.85 + 0.30 * (asset.prospectPtsPace / 70), 0.85, 1.15)
-    : 1.0;
-  // Goalie prospects are the least projectable asset in hockey
-  const goalieDiscount = asset.position === "G" ? 0.80 : 1.0;
-
-  const total = Math.round(pick.total * certainty * nhle * goalieDiscount);
-  return {
-    total,
-    off: 0, def: 0, age: 0, cap: 0,
-    upside: Math.round(total * 0.70),
-  };
-}
-
 // ── Entry point ───────────────────────────────────────────────────────────────
 export function calcNAV(asset: AssetInput): XNAVResult {
   if (asset.position === "Pick") return calcPickNAV(asset);
-  // Drafted prospect without an NHL sample — pedigree valuation
-  // (14-game threshold matches the rookie small-sample logic elsewhere)
-  if (asset.draftOverall != null && (asset.games ?? 0) < 14 && !asset.hasLiveStats) {
-    return calcProspectNAV(asset);
-  }
   if (asset.position === "G")    return calcGoalieNAV(asset);
   return calcSkaterNAV(asset);
-}
-
-// ── Team context ─────────────────────────────────────────────────────────────
-export type TeamContext = "CONTENDER" | "REBUILDING" | "CAP_FLOOR";
-
-// ── Trade package evaluator ───────────────────────────────────────────────────
-// Sums a pre-computed package of XNAVResults with optional receiving-team context.
-// CAP_FLOOR teams flip negative cap liabilities into mild assets: a bad contract
-// helps them reach the mandatory floor without burning a real roster slot.
-export function evaluateTrade(
-  assets: XNAVResult[],
-  receivingTeamContext: TeamContext = "CONTENDER",
-): number {
-  return assets.reduce((sum, asset) => {
-    let adjustedTotal = asset.total;
-    if (receivingTeamContext === "CAP_FLOOR" && asset.cap < 0) {
-      // Swap out the baked-in negative cap penalty for the context-adjusted value,
-      // preserving positional scarcity, development discount, NMC/NTC haircut, etc.
-      adjustedTotal = (asset.total - asset.cap) + Math.abs(asset.cap) * 0.5;
-    }
-    return sum + adjustedTotal;
-  }, 0);
 }
 
 // ── Package compression ───────────────────────────────────────────────────────

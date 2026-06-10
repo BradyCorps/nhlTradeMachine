@@ -5,8 +5,6 @@ import { SEASON, LEAGUE, FRANCHISE } from "@/app/lib/season-config";
 import { calcNAV, compressPackage as coreCompress, AssetInput, XNAVResult } from "@/app/lib/xnav-engine";
 import { z } from "zod";
 
-export const dynamic = "force-dynamic";
-
 // ============================================================
 // ZOD SCHEMAS
 // ============================================================
@@ -45,6 +43,15 @@ const AssetSchema = z.object({
   baselinePtsPace: z.number().nullish(),
   baselineGameScore: z.number().nullish(),
   baselineDpsProxy: z.number().nullish(),
+  baselineXgRel: z.number().nullish(),
+  ppPtsPace82: z.number().nullish(),
+  pkTimeShare: z.number().nullish(),
+  baselineIxg82: z.number().nullish(),
+  baselineHits82: z.number().nullish(),
+  baselineBlocks82: z.number().nullish(),
+  pairXgfPct: z.number().nullish(),
+  pairDriverScore: z.number().nullish(),
+  baselineHdsvPct: z.number().nullish(),
   teamId: z.string().nullish(),
   hasNMC: z.boolean().nullish(),
   hasNTC: z.boolean().nullish(),
@@ -114,8 +121,6 @@ const getAssetNAV = (asset: Asset): XNAVResult => {
     round: asset.round,
     year: asset.year,
     teamStanding: asset.teamStanding,
-    draftOverall: asset.draftOverall ?? undefined,
-    prospectPtsPace: asset.prospectPtsPace ?? undefined,
     isProtected: asset.isProtected,
     multiplier: asset.multiplier,
     hasLiveStats: asset.hasLiveStats,
@@ -123,6 +128,15 @@ const getAssetNAV = (asset: Asset): XNAVResult => {
     baselinePtsPace: asset.baselinePtsPace,
     baselineGameScore: asset.baselineGameScore,
     baselineDpsProxy: asset.baselineDpsProxy,
+    baselineXgRel: asset.baselineXgRel,
+    ppPtsPace82: asset.ppPtsPace82,
+    pkTimeShare: asset.pkTimeShare,
+    baselineIxg82: asset.baselineIxg82,
+    baselineHits82: asset.baselineHits82,
+    baselineBlocks82: asset.baselineBlocks82,
+    pairXgfPct: asset.pairXgfPct,
+    pairDriverScore: asset.pairDriverScore,
+    baselineHdsvPct: asset.baselineHdsvPct,
   };
   return calcNAV(input);
 };
@@ -166,7 +180,7 @@ const DIVISIONS: Record<string, string> = {
   MTL: "Atlantic", OTT: "Atlantic", TBL: "Atlantic", TOR: "Atlantic",
   CAR: "Metropolitan", CBJ: "Metropolitan", NJD: "Metropolitan", NYI: "Metropolitan",
   NYR: "Metropolitan", PHI: "Metropolitan", PIT: "Metropolitan", WSH: "Metropolitan",
-  CHI: "Central", COL: "Central", DAL: "Central",
+  ARI: "Central", CHI: "Central", COL: "Central", DAL: "Central",
   MIN: "Central", NSH: "Central", STL: "Central", UTA: "Central", WPG: "Central",
   ANA: "Pacific", CGY: "Pacific", EDM: "Pacific", LAK: "Pacific",
   SEA: "Pacific", SJS: "Pacific", VAN: "Pacific", VGK: "Pacific",
@@ -1000,7 +1014,10 @@ export async function POST(req: Request) {
       );
     }
 
-const response: EvaluateResponse = { navMap, verdict };
+const response = { 
+      navMap: navMap as any, 
+      verdict 
+    } as EvaluateResponse;
     
     return NextResponse.json(response);
   } catch (e: any) {

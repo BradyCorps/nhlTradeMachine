@@ -33,8 +33,6 @@ export interface Asset {
   year?: number;
   teamStanding?: number;
   isProtected?: boolean;
-  draftOverall?: number | null;    // overall draft slot — pedigree NAV for unproven prospects
-  prospectPtsPace?: number | null; // NHLe-translated junior scoring pace
   gsax?: number;
   savePct?: number;
   gamesStarted?: number;
@@ -57,9 +55,16 @@ export interface Asset {
   baselineGameScore?: number;
   baselineDpsProxy?: number;
 
-  // Trade block
-  tradeBlockStatus?: 'requested' | 'available' | 'untouchable' | null;
-  tradeBlockNote?: string | null;
+  // Multi-season situational baselines (MoneyPuck per-season + NST 2022-26)
+  baselineXgRel?: number;
+  ppPtsPace82?: number;
+  pkTimeShare?: number;
+  baselineIxg82?: number;
+  baselineHits82?: number;
+  baselineBlocks82?: number;
+  pairXgfPct?: number;
+  pairDriverScore?: number;
+  baselineHdsvPct?: number;
 }
 
 export interface Team {
