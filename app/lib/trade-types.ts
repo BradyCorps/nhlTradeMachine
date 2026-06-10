@@ -65,6 +65,10 @@ export interface Asset {
   pairXgfPct?: number;
   pairDriverScore?: number;
   baselineHdsvPct?: number;
+
+  // Trade block (admin-managed, stamped by league routes from the tradeBlock table)
+  tradeBlockStatus?: "requested" | "available" | "blocked" | "untouchable" | null;
+  tradeBlockNote?: string | null;
 }
 
 export interface Team {

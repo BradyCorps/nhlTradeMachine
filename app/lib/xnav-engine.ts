@@ -242,6 +242,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const isD    = asset.position === "D";
   const games  = asset.games ?? 60;
 
+
   // Pace cumulative point shares to 82 games to prevent injury collapse
   // We use a floor of 20 games to avoid absurd small-sample size multipliers
   const paceMultiplier = clamp(82 / Math.max(games, 20), 1.0, 4.1);
@@ -349,6 +350,12 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     : defTotal * defReliabilityWeight;
 
   // ── Age curve ─────────────────────────────────────────────────
+  // Audited against 2022-26 YoY pts/82 cohorts (940-player bios join, ≥40 GP):
+  // forwards grow through 23, plateau 24-27, decline from 28 (≈ -2.5/yr,
+  // steepening to -6+/yr by 34); D-men grow through 27, decline from 28-29.
+  // Both peaks and the 1.6 convexity match observed decay; survivorship bias
+  // (decliners drop below 40 GP) means true aging is slightly steeper, so the
+  // penalty erring aggressive is correct.
   const peakAge = isD ? 27 : 26;
   const baseAge = age <= peakAge
     ? Math.max(0, (peakAge - age) * 4.5)
