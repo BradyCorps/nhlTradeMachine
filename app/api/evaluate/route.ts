@@ -114,6 +114,8 @@ const getAssetNAV = (asset: Asset): XNAVResult => {
     round: asset.round,
     year: asset.year,
     teamStanding: asset.teamStanding,
+    draftOverall: asset.draftOverall ?? undefined,
+    prospectPtsPace: asset.prospectPtsPace ?? undefined,
     isProtected: asset.isProtected,
     multiplier: asset.multiplier,
     hasLiveStats: asset.hasLiveStats,

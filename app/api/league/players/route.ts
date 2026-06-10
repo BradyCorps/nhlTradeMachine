@@ -5,6 +5,7 @@ import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
 import { players as playersTable } from "@/app/db/schema";
+import { isNotNull } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -993,6 +994,36 @@ export async function GET() {
       })));
     });
   } catch (_) {}
+
+  // ── Append imported draftees ────────────────────────────────
+  // Players imported via /api/admin/import-draft-class carry a draftYear.
+  // They aren't on NHL API rosters yet, so add them here. Their ELC
+  // contracts come through the normal CONTRACTS merge (keyed by name).
+  try {
+    const draftees = await db.select({
+      id:       playersTable.id,
+      name:     playersTable.name,
+      position: playersTable.position,
+      teamId:   playersTable.teamId,
+      age:      playersTable.age,
+    }).from(playersTable).where(isNotNull(playersTable.draftYear));
+
+    for (const d of draftees) {
+      if (!d.teamId) continue;
+      const list = rosterMap.get(d.teamId) ?? [];
+      if (list.some((p: any) => p.name === d.name)) continue; // already on live roster
+      list.push({
+        id:       d.id,
+        name:     d.name,
+        position: normalisePos(d.position),
+        age:      d.age ?? 18,
+        headshot: null,
+      });
+      rosterMap.set(d.teamId, list);
+    }
+  } catch (e: any) {
+    console.warn("[Draftees] append failed:", e.message);
+  }
 
   // ── Build player objects ────────────────────────────────────
   const players: any[] = [];

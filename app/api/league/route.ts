@@ -5,6 +5,7 @@ import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
 import { teams as teamsTable, players as playersTable } from "@/app/db/schema";
+import { isNotNull } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -1355,6 +1356,40 @@ export async function GET() {
     });
   } catch (_) { /* NHL API blocked — static roster already set */ }
 
+  // ── Append imported draftees ────────────────────────────────
+  // Players imported via /api/admin/import-draft-class carry a draftYear.
+  // They aren't on NHL API rosters yet, so add them here. Their ELC
+  // contracts come through the normal CONTRACTS merge (keyed by name).
+  try {
+    const draftees = await db.select({
+      id:              playersTable.id,
+      name:            playersTable.name,
+      position:        playersTable.position,
+      teamId:          playersTable.teamId,
+      age:             playersTable.age,
+      draftOverall:    playersTable.draftOverall,
+      prospectPtsPace: playersTable.prospectPtsPace,
+    }).from(playersTable).where(isNotNull(playersTable.draftYear));
+
+    for (const d of draftees) {
+      if (!d.teamId) continue;
+      const list = rosterMap.get(d.teamId) ?? [];
+      if (list.some((p: any) => p.name === d.name)) continue; // already on live roster
+      list.push({
+        id:              d.id,
+        name:            d.name,
+        position:        normalisePos(d.position),
+        age:             d.age ?? 18,
+        headshot:        null,
+        draftOverall:    d.draftOverall,
+        prospectPtsPace: d.prospectPtsPace,
+      });
+      rosterMap.set(d.teamId, list);
+    }
+  } catch (e: any) {
+    console.warn("[Draftees] append failed:", e.message);
+  }
+
   // ── 3. Build player objects ─────────────────────────────────
   const players: any[] = [];
 
@@ -1461,7 +1496,11 @@ export async function GET() {
         position:       finalPosition,
         age:            p.age,
         headshot:       p.headshot ?? null,
-        games:          stats?.games    ?? goalieStats?.gamesStarted ?? 40,
+        // Draftees have no NHL games — don't let the 40-game default mask that,
+        // it would block the pedigree NAV path (requires games < 14)
+        games:          p.draftOverall != null ? (stats?.games ?? 0) : (stats?.games ?? goalieStats?.gamesStarted ?? 40),
+        draftOverall:    p.draftOverall    ?? null,
+        prospectPtsPace: p.prospectPtsPace ?? null,
         ptsPace:        stats?.ptsPace  ?? defaultPts,
         xGPace:         stats?.xGPace   ?? 0,
         defRate:        stats?.defRate  ?? 0.08,
@@ -1504,14 +1543,16 @@ export async function GET() {
   });
 
   // ── 4. Draft picks ──────────────────────────────────────────
+  // Pick inventory derived from SEASON.draftYear — rolls forward automatically.
   const picks: any[] = [];
+  const Y = SEASON.draftYear;
   LIVE_TEAMS.forEach((team) => {
     [
-      { round: 1, year: 2026 }, { round: 1, year: 2027 },
-      { round: 2, year: 2026 }, { round: 2, year: 2027 },
-      { round: 3, year: 2026 }, { round: 3, year: 2027 },
-      { round: 4, year: 2026 },
-      { round: 5, year: 2026 },
+      { round: 1, year: Y }, { round: 1, year: Y + 1 },
+      { round: 2, year: Y }, { round: 2, year: Y + 1 },
+      { round: 3, year: Y }, { round: 3, year: Y + 1 },
+      { round: 4, year: Y },
+      { round: 5, year: Y },
     ].forEach(({ round, year }) => {
       const roundLabel = round === 1 ? "1st" : round === 2 ? "2nd" : round === 3 ? "3rd" : `${round}th`;
       picks.push({

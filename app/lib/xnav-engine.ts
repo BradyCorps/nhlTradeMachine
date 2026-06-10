@@ -44,6 +44,8 @@ export interface AssetInput {
   round?:         number;
   year?:          number;
   teamStanding?:  number;
+  draftOverall?:    number;        // overall draft slot — triggers pedigree NAV for unproven prospects
+  prospectPtsPace?: number;        // NHLe-translated junior scoring pace
   isProtected?:   boolean;
   multiplier?:    number;
   hasLiveStats?:  boolean;
@@ -90,9 +92,10 @@ function calcBuyoutNavPenalty(capHit: number, yearsRemaining: number, age: numbe
 // ── Pick NAV ──────────────────────────────────────────────────────────────────
 export function calcPickNAV(asset: AssetInput): XNAVResult {
   const round    = asset.round    ?? 1;
-  const year     = asset.year     ?? 2026;
+  const year     = asset.year     ?? SEASON.draftYear;
   const standing = asset.teamStanding ?? 16;
-  const yearDecay = Math.pow(0.88, year - 2026);
+  // Decay relative to the upcoming draft — a pick N years out is worth 0.88^N of a current-year pick
+  const yearDecay = Math.pow(0.88, Math.max(0, year - SEASON.draftYear));
 
   let baseValue: number;
   if (round === 1) {
@@ -537,9 +540,50 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   };
 }
 
+// ── Prospect NAV (pedigree-based) ─────────────────────────────────────────────
+// A drafted prospect with no meaningful NHL sample is valued as the pick that
+// selected him, with the lottery uncertainty resolved (+10%). Optional NHLe
+// stats (junior production translated to NHL pace at import time) modulate
+// the pedigree value ±15%. Once the player logs 14+ NHL games, the normal
+// stats-driven path takes over.
+export function calcProspectNAV(asset: AssetInput): XNAVResult {
+  const overall = asset.draftOverall ?? 32;
+  const round   = Math.max(1, Math.ceil(overall / 32));
+  const slotInRound = overall - (round - 1) * 32;
+
+  // Reuse the calibrated pick-slot curve: slot 1 ≙ worst standing (32)
+  const pick = calcPickNAV({
+    ...asset,
+    position:     "Pick",
+    round,
+    year:         SEASON.draftYear, // no future-year decay — the player exists now
+    teamStanding: clamp(33 - slotInRound, 1, 32),
+  });
+
+  const certainty = 1.10; // lottery risk resolved — he IS the #N pick
+  // NHLe modulation: 70 translated points ≈ elite junior production
+  const nhle = asset.prospectPtsPace != null
+    ? clamp(0.85 + 0.30 * (asset.prospectPtsPace / 70), 0.85, 1.15)
+    : 1.0;
+  // Goalie prospects are the least projectable asset in hockey
+  const goalieDiscount = asset.position === "G" ? 0.80 : 1.0;
+
+  const total = Math.round(pick.total * certainty * nhle * goalieDiscount);
+  return {
+    total,
+    off: 0, def: 0, age: 0, cap: 0,
+    upside: Math.round(total * 0.70),
+  };
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 export function calcNAV(asset: AssetInput): XNAVResult {
   if (asset.position === "Pick") return calcPickNAV(asset);
+  // Drafted prospect without an NHL sample — pedigree valuation
+  // (14-game threshold matches the rookie small-sample logic elsewhere)
+  if (asset.draftOverall != null && (asset.games ?? 0) < 14 && !asset.hasLiveStats) {
+    return calcProspectNAV(asset);
+  }
   if (asset.position === "G")    return calcGoalieNAV(asset);
   return calcSkaterNAV(asset);
 }

@@ -4,13 +4,13 @@
 // All other modules import from here — no magic numbers in logic files.
 
 export const SEASON = {
-  label:          "2025-26",
-  apiSeasonId:    "20252026",
-  capCeiling:     95.5,          // NHL salary cap ceiling ($M)
-  capFloor:       65.0,          // NHL salary cap floor ($M)
-  draftYear:      2026,          // Current draft class year
-  mpSeason:       "2025",        // MoneyPuck URL path segment
-  nhleSeasonId:   "20252026",    // NHL API season identifier
+  label:          "2026-27",
+  apiSeasonId:    "20262027",
+  capCeiling:     104.0,         // NHL salary cap ceiling ($M) — 2026-27 announced upper limit
+  capFloor:       76.9,          // NHL salary cap floor ($M) — 2026-27 announced lower limit
+  draftYear:      2027,          // Next tradeable draft class (2026 class is drafted — import via mock draft)
+  mpSeason:       "2025",        // MoneyPuck URL path segment — last completed season is the stats baseline
+  nhleSeasonId:   "20252026",    // NHL API roster fallback — keep at last completed season until 2026-27 rosters exist
 } as const;
 
 export const LEAGUE = {

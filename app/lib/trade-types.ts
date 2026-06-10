@@ -33,6 +33,8 @@ export interface Asset {
   year?: number;
   teamStanding?: number;
   isProtected?: boolean;
+  draftOverall?: number | null;    // overall draft slot — pedigree NAV for unproven prospects
+  prospectPtsPace?: number | null; // NHLe-translated junior scoring pace
   gsax?: number;
   savePct?: number;
   gamesStarted?: number;

@@ -23,6 +23,8 @@ export const players = sqliteTable("players", {
   retainedSalary:  real("retained_salary").default(0),
   draftYear:       integer("draft_year"),
   draftRound:      integer("draft_round"),
+  draftOverall:    integer("draft_overall"),     // overall pick number — drives pedigree NAV for prospects
+  prospectPtsPace: real("prospect_pts_pace"),    // NHLe-translated junior/college scoring pace
   injuryStatus:    text("injury_status"),
   extensionCapHit: real("extension_cap_hit"),
   extensionYears:  integer("extension_years"),
