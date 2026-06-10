@@ -62,6 +62,24 @@ export default function AssetCard({
             <div className="font-black leading-tight flex flex-wrap items-center gap-1.5"
               style={{ fontSize: '13px', color: 'var(--ledger-ink)' }}>
               <span className="truncate max-w-full">{asset.name}</span>
+              {asset.tradeBlockStatus === 'untouchable' && (
+                <span className="text-2xs px-1 font-black shrink-0" title="Flagged untouchable — excluded from partner matching"
+                  style={{ color: 'var(--blue)', border: '1px solid rgba(43,63,102,0.5)', background: 'var(--blue-dim)' }}>
+                  ⛔ UNTOUCHABLE
+                </span>
+              )}
+              {asset.tradeBlockStatus === 'requested' && (
+                <span className="text-2xs px-1 font-black shrink-0" title={asset.tradeBlockNote ?? "Formal trade request"}
+                  style={{ color: 'var(--red)', border: '1px solid rgba(166,53,36,0.5)', background: 'var(--red-dim)' }}>
+                  ◉ REQUESTED
+                </span>
+              )}
+              {asset.tradeBlockStatus === 'available' && (
+                <span className="text-2xs px-1 font-black shrink-0" title={asset.tradeBlockNote ?? "Being shopped"}
+                  style={{ color: 'var(--amber)', border: '1px solid rgba(148,105,20,0.5)', background: 'var(--amber-dim)' }}>
+                  ◉ SHOPPED
+                </span>
+              )}
               {asset.hasNMC && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-red)', border: '1px solid #b83020' }}>NMC</span>}
               {asset.hasNTC && !asset.hasNMC && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-amber)', border: '1px solid #8a5c00' }}>NTC</span>}
               {!asset.hasLiveStats && !isPick && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-ink-faint)', border: '1px solid #b8a070' }}>EST</span>}

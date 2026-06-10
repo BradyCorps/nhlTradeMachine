@@ -153,12 +153,32 @@ export async function POST(req: NextRequest) {
         score += 10; fit.push("Elite piece completes contender's window");
       }
 
+      // ── 5b. ADMIN TRADE BLOCK SIGNAL ────────────────────────
+      // Teams actively shopping players (admin-flagged) are more willing partners.
+      // Untouchables are removed from the give-up pool entirely — a partner whose
+      // value is locked behind untouchables can't actually complete the deal.
+      const shopped = roster.filter(p =>
+        p.tradeBlockStatus === "available" || p.tradeBlockStatus === "requested");
+      if (shopped.length > 0 && packageNAV > 0) {
+        score += Math.min(12, shopped.length * 4);
+        fit.push(`Actively shopping ${shopped.length === 1 ? shopped[0].name : `${shopped.length} players`}`);
+      }
+
       // ── 6. YOUNG CORE UNTRADEABLE CHECK ─────────────────────
       // If the partner's only matching-value players are their young core
       // (age ≤ 24, ptsPace > 55), this proposal will fail the GM audit.
       // Penalise heavily so it drops below the threshold and doesn't surface.
       if (packageNAV > 0) {
-        const partnerTopPlayers = roster
+        const tradeablePool = roster.filter(p => p.tradeBlockStatus !== "untouchable");
+        if (tradeablePool.length < roster.length) {
+          const lockedNAV   = roster.reduce((s, p) => s + (p.tradeBlockStatus === "untouchable" ? (navMap[p.id]?.total ?? 0) : 0), 0);
+          const tradeableNAV = tradeablePool.reduce((s, p) => s + (navMap[p.id]?.total ?? 0), 0);
+          if (lockedNAV > tradeableNAV) {
+            score -= 25;
+            warn.push("Best return pieces are flagged untouchable");
+          }
+        }
+        const partnerTopPlayers = tradeablePool
           .filter(p => p.position !== "Pick" && p.position !== "G")
           .sort((a, b) => (navMap[b.id]?.total ?? 0) - (navMap[a.id]?.total ?? 0))
           .slice(0, 5);

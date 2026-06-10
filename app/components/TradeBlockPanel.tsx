@@ -14,7 +14,21 @@ const STATUS_CONFIG = {
   requested:   { color: "var(--red)",   bg: "var(--red-dim)",   border: "rgba(166,53,36,0.35)",  label: "REQUESTED"   },
   available:   { color: "var(--amber)",  bg: "var(--amber-dim)", border: "rgba(148,105,20,0.35)", label: "AVAILABLE"   },
   untouchable: { color: "var(--blue)",   bg: "var(--blue-dim)",  border: "rgba(43,63,102,0.35)",  label: "UNTOUCHABLE" },
+  auto:        { color: "var(--ledger-ink-faint)", bg: "transparent", border: "var(--rule)",      label: "AUTO"        },
 };
+
+// Computer-determined sell candidates — the "what teams could give up" half of
+// the trade block. Classic deadline profile: veteran on an expiring-ish deal,
+// on a team selling (Rebuilding/Tanking/Retooling), real cap hit, not admin-flagged.
+function isAutoAvailable(p: Asset, phase: string | undefined): boolean {
+  if (p.tradeBlockStatus) return false;
+  if (p.position === "Pick") return false;
+  const selling = phase === "Rebuilding" || phase === "Tanking" || phase === "Retooling";
+  return selling
+    && (p.age ?? 0) >= 29
+    && (p.yearsRemaining ?? 99) <= 2
+    && (p.capHit ?? 0) >= 3;
+}
 
 const POSITION_TABS = ["ALL", "C", "W", "D", "G"] as const;
 type PosFilter = typeof POSITION_TABS[number];
@@ -47,18 +61,19 @@ export default function TradeBlockPanel({ players, teams, onSelectTeam, onClose 
 
     return players
       .filter(p => p.position !== "Pick")
-      .filter(p => statusSet.has(p.tradeBlockStatus ?? ""))
+      .filter(p => statusSet.has(p.tradeBlockStatus ?? "")
+        || isAutoAvailable(p, teamMap.get(p.teamId)?.phase))
       .filter(p => posFilter === "ALL" || p.position === posFilter)
       .filter(p => !search.trim() || p.name.toLowerCase().includes(search.toLowerCase())
         || p.teamId.toLowerCase().includes(search.toLowerCase()))
       .sort((a, b) => {
         const rank = (s: string | null | undefined) =>
-          s === "requested" ? 0 : s === "available" ? 1 : 2;
+          s === "requested" ? 0 : s === "available" ? 1 : s === "untouchable" ? 2 : 3;
         const r = rank(a.tradeBlockStatus) - rank(b.tradeBlockStatus);
         if (r !== 0) return r;
         return (b.capHit ?? 0) - (a.capHit ?? 0);
       });
-  }, [players, posFilter, showStatus, search]);
+  }, [players, posFilter, showStatus, search, teamMap]);
 
   const counts = useMemo(() => ({
     requested: players.filter(p => p.tradeBlockStatus === "requested").length,
@@ -68,10 +83,11 @@ export default function TradeBlockPanel({ players, teams, onSelectTeam, onClose 
   const requested   = filtered.filter(p => p.tradeBlockStatus === "requested");
   const available   = filtered.filter(p => p.tradeBlockStatus === "available");
   const untouchable = filtered.filter(p => p.tradeBlockStatus === "untouchable");
+  const autoFlagged = filtered.filter(p => !p.tradeBlockStatus);
 
   const renderPlayer = (p: Asset) => {
     const team = teamMap.get(p.teamId);
-    const cfg  = STATUS_CONFIG[p.tradeBlockStatus as keyof typeof STATUS_CONFIG];
+    const cfg  = STATUS_CONFIG[(p.tradeBlockStatus ?? "auto") as keyof typeof STATUS_CONFIG];
     if (!cfg) return null;
 
     return (
@@ -321,6 +337,7 @@ export default function TradeBlockPanel({ players, teams, onSelectTeam, onClose 
             <>
               {renderSection("Formal Trade Requests", requested, "var(--red)")}
               {renderSection("Available / Being Shopped", available, "var(--amber)")}
+              {renderSection("Computer Flagged — Likely Sellers", autoFlagged, "var(--ledger-ink-faint)")}
               {renderSection("Untouchable", untouchable, "var(--blue)")}
             </>
           )}
