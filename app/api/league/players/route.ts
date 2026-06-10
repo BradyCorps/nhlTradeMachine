@@ -663,13 +663,17 @@ export async function GET() {
     skaters.forEach((p: any) => {
       const slug    = slugify(p.name);
       const posSlug = `${slug}__${(p.position ?? "").toUpperCase()}`;
+      const isDraftee = p.draftOverall != null;
       let stats = analyticsMap.get(posSlug) ?? analyticsMap.get(slug);
-      if (!stats) {
+      // Fuzzy fallbacks (last-name, truncated-slug) recover MoneyPuck name
+      // quirks but produce false positives for draftees who share a surname
+      // with an NHL player — a draftee can't have last-season NHL stats.
+      if (!stats && !isDraftee) {
         const last = slug.split("-").slice(-1)[0];
         const fb   = fbMap.get(last);
         if (fb !== null && fb !== undefined) stats = fb;
       }
-      if (!stats && slug.length > 4) {
+      if (!stats && !isDraftee && slug.length > 4) {
         const truncSlug = slug.slice(0, -1);
         stats = analyticsMap.get(`${truncSlug}__${(p.position ?? "").toUpperCase()}`)
              ?? analyticsMap.get(truncSlug);
@@ -707,7 +711,9 @@ export async function GET() {
       const defaultPts = isGoalie ? 0 : finalPosition === "D" ? 22 : finalPosition === "C" ? 32 : 28;
 
       const goalieStats = isGoalie
-        ? (goalieMap.get(slugify(p.name)) ?? goalieMap.get(slugify(p.name.split(" ").pop() ?? "")) ?? null)
+        ? (goalieMap.get(slugify(p.name))
+            ?? (isDraftee ? null : goalieMap.get(slugify(p.name.split(" ").pop() ?? "")))
+            ?? null)
         : null;
 
       const rawCapHit     = isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925);

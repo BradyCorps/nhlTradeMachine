@@ -1019,8 +1019,12 @@ export async function GET() {
       const slug = slugify(p.name);
       // Try position-specific key first to handle same-name players (e.g. two Petterssons)
       const posSlug = `${slug}__${(p.position ?? "").toUpperCase()}`;
+      const isDraftee = p.draftOverall != null;
       let stats = analyticsMap.get(posSlug) ?? analyticsMap.get(slug);
-      if (!stats) {
+      // Fuzzy fallbacks (last-name, truncated-slug) recover MoneyPuck name
+      // quirks but produce false positives for draftees who share a surname
+      // with an NHL player — a draftee can't have last-season NHL stats.
+      if (!stats && !isDraftee) {
         const last = slug.split("-").slice(-1)[0];
         const fb   = fbMap.get(last);
         if (fb !== null && fb !== undefined) stats = fb;
@@ -1028,7 +1032,7 @@ export async function GET() {
       // Fallback: MoneyPuck sometimes drops accented characters entirely
       // e.g. "Slafkovský" → "Slafkovsk" in CSV (ý stripped, not converted to y).
       // Try slug minus its last character to recover these truncated entries.
-      if (!stats && slug.length > 4) {
+      if (!stats && !isDraftee && slug.length > 4) {
         const truncSlug = slug.slice(0, -1);
         stats = analyticsMap.get(`${truncSlug}__${(p.position ?? "").toUpperCase()}`)
              ?? analyticsMap.get(truncSlug);
@@ -1078,7 +1082,7 @@ export async function GET() {
       const goalieSlug      = slugify(p.name);
       const goalieSlugLast  = slugify(p.name.split(" ").pop() ?? "");
       const goalieStats     = isGoalie
-        ? (goalieMap.get(goalieSlug) ?? goalieMap.get(goalieSlugLast) ?? null)
+        ? (goalieMap.get(goalieSlug) ?? (isDraftee ? null : goalieMap.get(goalieSlugLast)) ?? null)
         : null;
 
       // Contract sanity check

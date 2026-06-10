@@ -1,28 +1,59 @@
 import React from "react";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 import { PLAYER_PEDIGREE, INJURY_RISK, PROSPECT_TIERS, SHUTDOWN_D_PEDIGREE } from "@/app/lib/player-data";
+import { FRANCHISE } from "@/app/lib/season-config";
 
 export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult }) {
   const isPick = asset.position === "Pick";
 
+  // NAV-driven franchise tier — same thresholds the GM audit uses (season-config)
+  const isMegalodon = !isPick && xnav.total >= FRANCHISE.megalodon;
+  const isFranchise = !isPick && xnav.total >= FRANCHISE.threshold;
+
+  // Collapse awards to one chip: lead award + "+N" overflow with full list on hover
+  const awardList = PLAYER_PEDIGREE[asset.name]?.awards ?? [];
+  const awardEntries = Array.from(new Set(awardList)).map(award => ({
+    award,
+    count: awardList.filter(a => a === award).length,
+  }));
+  const awardLabel = (e: { award: string; count: number }) =>
+    `${e.count > 1 ? `${e.count}× ` : ""}${e.award}`;
+
   return (
     <div className="asset-badges flex flex-wrap gap-1 mt-1">
-      {/* Awards badges */}
-      {PLAYER_PEDIGREE[asset.name]?.awards && PLAYER_PEDIGREE[asset.name].awards!.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {Array.from(new Set(PLAYER_PEDIGREE[asset.name].awards)).map((award) => {
-            const count = PLAYER_PEDIGREE[asset.name].awards!.filter(a => a === award).length;
-            return (
-              <span key={award} className="text-2xs px-1 py-0.5 font-black" style={{ color: 'var(--ledger-amber)', border: '1px solid rgba(138,92,0,0.4)' }}>
-                {count > 1 ? `${count}× ` : ""}{award}
-              </span>
-            );
-          })}
-        </div>
+      {/* Franchise tier — drives the GM audit's blockbuster rules */}
+      {isFranchise && (
+        <span className="text-2xs px-1 py-0.5 font-black" style={{
+          color: isMegalodon ? 'var(--paper)' : 'var(--ledger-ink)',
+          background: isMegalodon ? 'var(--ledger-ink)' : 'transparent',
+          border: '1px solid var(--ledger-ink)',
+        }} title={isMegalodon
+          ? `NAV ${xnav.total} ≥ ${FRANCHISE.megalodon} — megalodon tier. The GM audit rejects any deal for this player without a franchise return, 2+ firsts with an elite prospect, or expiring-contract leverage.`
+          : `NAV ${xnav.total} ≥ ${FRANCHISE.threshold} — franchise tier. The GM audit requires a blockbuster-grade return to move this player.`}>
+          {isMegalodon ? "♛ MEGALODON" : "★ FRANCHISE"}
+        </span>
       )}
-      
-      {/* Prospect tier badge */}
-      {PROSPECT_TIERS[asset.name] && (
+
+      {/* Awards — single chip with overflow count */}
+      {awardEntries.length > 0 && (
+        <>
+          <span className="text-2xs px-1 py-0.5 font-black"
+            style={{ color: 'var(--ledger-amber)', border: '1px solid rgba(138,92,0,0.4)' }}
+            title={awardEntries.map(awardLabel).join(" · ")}>
+            {awardLabel(awardEntries[0])}
+          </span>
+          {awardEntries.length > 1 && (
+            <span className="text-2xs px-1 py-0.5 font-black"
+              style={{ color: 'var(--ledger-amber)', border: '1px solid rgba(138,92,0,0.4)' }}
+              title={awardEntries.slice(1).map(awardLabel).join(" · ")}>
+              +{awardEntries.length - 1}
+            </span>
+          )}
+        </>
+      )}
+
+      {/* Prospect tier badge (name-list) — skip when the NAV tier already says franchise */}
+      {PROSPECT_TIERS[asset.name] && !isFranchise && (
         <span className="text-2xs px-1 py-0.5 font-black" style={{
           color: PROSPECT_TIERS[asset.name].tier === 1 ? 'var(--ledger-navy)' : PROSPECT_TIERS[asset.name].tier === 2 ? 'var(--ledger-green)' : 'var(--ledger-brown)',
           border: `1px solid ${PROSPECT_TIERS[asset.name].tier === 1 ? 'rgba(26,46,92,0.4)' : PROSPECT_TIERS[asset.name].tier === 2 ? 'rgba(26,92,46,0.4)' : 'rgba(107,80,48,0.4)'}`,
@@ -68,8 +99,9 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
         );
       })()}
 
-      {/* Forward archetype badge */}
-      {["C","W","L","R"].includes(asset.position) && !isPick && xnav.fArchetype && (() => {
+      {/* Forward archetype badge — skip the FRANCHISE archetype when the NAV tier chip already shows it */}
+      {["C","W","L","R"].includes(asset.position) && !isPick && xnav.fArchetype
+        && !(xnav.fArchetype === "FRANCHISE" && isFranchise) && (() => {
         const archMap: Record<string, { color: string; title: string }> = {
           FRANCHISE:  { color: 'var(--ledger-ink)', title: "Franchise — elite production with dominant creative or NOIV impact" },
           SNIPER:     { color: 'var(--ledger-navy)', title: "Sniper — goal-first scorer, goal ratio > 53% of points" },
