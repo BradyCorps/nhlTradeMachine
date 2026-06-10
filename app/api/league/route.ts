@@ -5,7 +5,6 @@ import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
 import { teams as teamsTable, players as playersTable } from "@/app/db/schema";
-import { isNotNull } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -263,31 +262,25 @@ async function loadContracts(): Promise<Record<string, any>> {
       const baseName = name.includes("__") ? name.split("__")[0] : name;
       const b = dbData[baseName];
       merged[name] = {
-        capHit:          cw.capHit,
-        yearsRemaining:  (cw.yearsRemaining > 0 ? cw.yearsRemaining : null) ?? b?.yearsRemaining ?? 1,
-        hasNMC:          b?.hasNMC  ?? false,
-        hasNTC:          b?.hasNTC  ?? false,
-        canRetain:       b?.hasNMC  ? false : true,
-        expiryStatus:    cw.expiryStatus,
-        position:        cw.position,
-        hasExtension:    b?.hasExtension    ?? false,
-        extensionCapHit: b?.extensionCapHit ?? undefined,
-        extensionYears:  b?.extensionYears  ?? undefined,
+        capHit:         cw.capHit,
+        yearsRemaining: (cw.yearsRemaining > 0 ? cw.yearsRemaining : null) ?? b?.yearsRemaining ?? 1,
+        hasNMC:         b?.hasNMC  ?? false,
+        hasNTC:         b?.hasNTC  ?? false,
+        canRetain:      b?.hasNMC  ? false : true,
+        expiryStatus:   cw.expiryStatus,
+        position:       cw.position,
       };
     }
-    // Backfill DB-only players not present in scraper output (manually-managed entries like NTC/NMC holders)
+    // Backfill: DB players the scraper rejected or skipped (cap out-of-range, index drift, etc.)
     for (const [name, b] of Object.entries(dbData)) {
       if (!merged[name]) {
         merged[name] = {
-          capHit:          b.capHit,
-          yearsRemaining:  b.yearsRemaining ?? 1,
-          hasNMC:          b.hasNMC  ?? false,
-          hasNTC:          b.hasNTC  ?? false,
-          canRetain:       b.hasNMC  ? false : true,
-          expiryStatus:    "UFA",
-          hasExtension:    b.hasExtension    ?? false,
-          extensionCapHit: b.extensionCapHit ?? undefined,
-          extensionYears:  b.extensionYears  ?? undefined,
+          capHit:         b.capHit,
+          yearsRemaining: b.yearsRemaining ?? 1,
+          hasNMC:         b.hasNMC  ?? false,
+          hasNTC:         b.hasNTC  ?? false,
+          canRetain:      b.hasNMC  ? false : true,
+          expiryStatus:   "UFA",
         };
       }
     }
@@ -295,15 +288,12 @@ async function loadContracts(): Promise<Record<string, any>> {
     // CapWages unavailable — use DB entirely
     for (const [name, b] of Object.entries(dbData)) {
       merged[name] = {
-        capHit:          b.capHit,
-        yearsRemaining:  b.yearsRemaining ?? 1,
-        hasNMC:          b.hasNMC  ?? false,
-        hasNTC:          b.hasNTC  ?? false,
-        canRetain:       b.hasNMC  ? false : true,
-        expiryStatus:    "UFA",
-        hasExtension:    b.hasExtension    ?? false,
-        extensionCapHit: b.extensionCapHit ?? undefined,
-        extensionYears:  b.extensionYears  ?? undefined,
+        capHit:         b.capHit,
+        yearsRemaining: b.yearsRemaining ?? 1,
+        hasNMC:         b.hasNMC  ?? false,
+        hasNTC:         b.hasNTC  ?? false,
+        canRetain:      b.hasNMC  ? false : true,
+        expiryStatus:   "UFA",
       };
     }
   }
@@ -329,14 +319,11 @@ async function loadFromDB(): Promise<Record<string, any>> {
     const result: Record<string, any> = {};
     for (const row of rows) {
       result[row.name] = {
-        capHit:          row.capHit,
-        yearsRemaining:  row.yearsRemaining,
-        hasNMC:          row.hasNmc  ?? false,
-        hasNTC:          row.hasNtc  ?? false,
-        canRetain:       row.hasNmc  ? false : true,
-        hasExtension:    row.extensionCapHit != null && row.extensionYears != null,
-        extensionCapHit: row.extensionCapHit ?? undefined,
-        extensionYears:  row.extensionYears  ?? undefined,
+        capHit:         row.capHit,
+        yearsRemaining: row.yearsRemaining,
+        hasNMC:         row.hasNmc  ?? false,
+        hasNTC:         row.hasNtc  ?? false,
+        canRetain:      row.hasNmc  ? false : true,
       };
     }
     return result;
@@ -358,6 +345,16 @@ function loadBundledFallback(): Record<string, any> {
   return {};
 }
 
+function loadExtensions(): Record<string, any> {
+  try {
+    const fs   = require("fs");
+    const path = require("path");
+    const file = path.join(process.cwd(), "app/data/contracts.extensions.json");
+    return JSON.parse(fs.readFileSync(file, "utf-8"));
+  } catch (e: any) {
+    return {};
+  }
+}
 
 function loadBaselines(): Record<string, any> {
   try {
@@ -1076,6 +1073,7 @@ export async function GET() {
     loadTeams(),
     fetchPointShares(),
   ]);
+  const EXTENSIONS = loadExtensions();
   const BASELINES = loadBaselines();
   // ── 1. MoneyPuck analytics — skaters + goalies ─────────────
   // Cached for 4 hours — MP updates roughly twice daily.
@@ -1356,40 +1354,6 @@ export async function GET() {
     });
   } catch (_) { /* NHL API blocked — static roster already set */ }
 
-  // ── Append imported draftees ────────────────────────────────
-  // Players imported via /api/admin/import-draft-class carry a draftYear.
-  // They aren't on NHL API rosters yet, so add them here. Their ELC
-  // contracts come through the normal CONTRACTS merge (keyed by name).
-  try {
-    const draftees = await db.select({
-      id:              playersTable.id,
-      name:            playersTable.name,
-      position:        playersTable.position,
-      teamId:          playersTable.teamId,
-      age:             playersTable.age,
-      draftOverall:    playersTable.draftOverall,
-      prospectPtsPace: playersTable.prospectPtsPace,
-    }).from(playersTable).where(isNotNull(playersTable.draftYear));
-
-    for (const d of draftees) {
-      if (!d.teamId) continue;
-      const list = rosterMap.get(d.teamId) ?? [];
-      if (list.some((p: any) => p.name === d.name)) continue; // already on live roster
-      list.push({
-        id:              d.id,
-        name:            d.name,
-        position:        normalisePos(d.position),
-        age:             d.age ?? 18,
-        headshot:        null,
-        draftOverall:    d.draftOverall,
-        prospectPtsPace: d.prospectPtsPace,
-      });
-      rosterMap.set(d.teamId, list);
-    }
-  } catch (e: any) {
-    console.warn("[Draftees] append failed:", e.message);
-  }
-
   // ── 3. Build player objects ─────────────────────────────────
   const players: any[] = [];
 
@@ -1446,33 +1410,41 @@ export async function GET() {
         return u.charAt(0);
       };
 
+      // ── THE OVERRIDE LAYER (Highest Priority) ───────────────
+      const override         = EXTENSIONS[p.name]    ?? EXTENSIONS[normalName];
       const contractOverride = CONTRACT_OVERRIDES[p.name] ?? CONTRACT_OVERRIDES[normalName];
+      // Position override must be resolved before isGoalie/defaultTOI/defaultPts
       const finalPosition    = contractOverride?.position ?? p.position;
 
       const isGoalie   = finalPosition === "G";
       const defaultTOI = isGoalie ? 0 : finalPosition === "D" ? 18.5 : 13.5;
       const defaultPts = isGoalie ? 0 : finalPosition === "D" ? 22 : finalPosition === "C" ? 32 : 28;
 
+      // Merge goalie-specific stats — try full name slug, then last name only
       const goalieSlug      = slugify(p.name);
       const goalieSlugLast  = slugify(p.name.split(" ").pop() ?? "");
       const goalieStats     = isGoalie
         ? (goalieMap.get(goalieSlug) ?? goalieMap.get(goalieSlugLast) ?? null)
         : null;
 
+      // Contract sanity check
       const rawCapHit     = isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925);
+      // nameCollision: young player with a high cap hit whose contract position
+      // doesn't match their NHL position — likely inherited a veteran's contract.
+      // Use normContractPos so "RW, LW" → "W" matches "W" (fixes Slafkovsky and all wingers).
       const nameCollision = p.age <= 23
         && rawCapHit > 3.0
         && normContractPos(fin?.position) !== p.position;
 
-      const finalCapHit   = contractOverride?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
-      const finalYears    = nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1));
-      const finalNMC      = nameCollision ? false : (fin?.hasNMC ?? false);
-      const finalNTC      = nameCollision ? false : (fin?.hasNTC ?? false);
-      const finalRetain   = nameCollision ? true  : (fin?.canRetain ?? true);
-      const hasExtension     = fin?.hasExtension    ?? false;
-      const extensionCapHit  = fin?.extensionCapHit ?? undefined;
-      const extensionYears   = fin?.extensionYears  ?? undefined;
-      const intangibleMult = fin?.intangibleMultiplier ?? 1.0;
+      const finalCapHit   = contractOverride?.capHit ?? override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
+      const finalYears    = override?.yearsRemaining ?? (nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1)));
+      const finalNMC      = override?.hasNMC ?? (nameCollision ? false : (fin?.hasNMC ?? false));
+      const finalNTC      = override?.hasNTC ?? (nameCollision ? false : (fin?.hasNTC ?? false));
+      const finalRetain   = override?.canRetain ?? (nameCollision ? true  : (fin?.canRetain ?? true));
+      const hasExtension     = override?.hasExtension ?? false;
+      const extensionCapHit  = override?.extensionCapHit ?? undefined;
+      const extensionYears   = override?.extensionYears ?? undefined;
+      const intangibleMult = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
 
       // ── UPSTREAM GOALIE METRICS ─────────────────────────────
       // teamXga60: derived from MoneyPuck xGoals allowed / team games played
@@ -1496,11 +1468,7 @@ export async function GET() {
         position:       finalPosition,
         age:            p.age,
         headshot:       p.headshot ?? null,
-        // Draftees have no NHL games — don't let the 40-game default mask that,
-        // it would block the pedigree NAV path (requires games < 14)
-        games:          p.draftOverall != null ? (stats?.games ?? 0) : (stats?.games ?? goalieStats?.gamesStarted ?? 40),
-        draftOverall:    p.draftOverall    ?? null,
-        prospectPtsPace: p.prospectPtsPace ?? null,
+        games:          stats?.games    ?? goalieStats?.gamesStarted ?? 40,
         ptsPace:        stats?.ptsPace  ?? defaultPts,
         xGPace:         stats?.xGPace   ?? 0,
         defRate:        stats?.defRate  ?? 0.08,
@@ -1543,16 +1511,14 @@ export async function GET() {
   });
 
   // ── 4. Draft picks ──────────────────────────────────────────
-  // Pick inventory derived from SEASON.draftYear — rolls forward automatically.
   const picks: any[] = [];
-  const Y = SEASON.draftYear;
   LIVE_TEAMS.forEach((team) => {
     [
-      { round: 1, year: Y }, { round: 1, year: Y + 1 },
-      { round: 2, year: Y }, { round: 2, year: Y + 1 },
-      { round: 3, year: Y }, { round: 3, year: Y + 1 },
-      { round: 4, year: Y },
-      { round: 5, year: Y },
+      { round: 1, year: 2026 }, { round: 1, year: 2027 },
+      { round: 2, year: 2026 }, { round: 2, year: 2027 },
+      { round: 3, year: 2026 }, { round: 3, year: 2027 },
+      { round: 4, year: 2026 },
+      { round: 5, year: 2026 },
     ].forEach(({ round, year }) => {
       const roundLabel = round === 1 ? "1st" : round === 2 ? "2nd" : round === 3 ? "3rd" : `${round}th`;
       picks.push({

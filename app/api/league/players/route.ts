@@ -5,7 +5,6 @@ import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
 import { players as playersTable } from "@/app/db/schema";
-import { isNotNull } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -503,14 +502,11 @@ async function loadFromDB(): Promise<Record<string, any>> {
     const result: Record<string, any> = {};
     for (const row of rows) {
       result[row.name] = {
-        capHit:          row.capHit,
-        yearsRemaining:  row.yearsRemaining,
-        hasNMC:          row.hasNmc  ?? false,
-        hasNTC:          row.hasNtc  ?? false,
-        canRetain:       row.hasNmc  ? false : true,
-        hasExtension:    row.extensionCapHit != null && row.extensionYears != null,
-        extensionCapHit: row.extensionCapHit ?? undefined,
-        extensionYears:  row.extensionYears  ?? undefined,
+        capHit:         row.capHit,
+        yearsRemaining: row.yearsRemaining,
+        hasNMC:         row.hasNmc  ?? false,
+        hasNTC:         row.hasNtc  ?? false,
+        canRetain:      row.hasNmc  ? false : true,
       };
     }
     return result;
@@ -532,6 +528,14 @@ function loadBundledFallback(): Record<string, any> {
   return {};
 }
 
+function loadExtensions(): Record<string, any> {
+  try {
+    const fs   = require("fs");
+    const path = require("path");
+    const file = path.join(process.cwd(), "app/data/contracts.extensions.json");
+    return JSON.parse(fs.readFileSync(file, "utf-8"));
+  } catch (_) { return {}; }
+}
 
 function loadBaselines(): Record<string, any> {
   try {
@@ -557,46 +561,37 @@ async function loadContracts(): Promise<Record<string, any>> {
       const baseName = name.includes("__") ? name.split("__")[0] : name;
       const b = dbData[baseName];
       merged[name] = {
-        capHit:          cw.capHit,
-        yearsRemaining:  (cw.yearsRemaining > 0 ? cw.yearsRemaining : null) ?? b?.yearsRemaining ?? 1,
-        hasNMC:          b?.hasNMC  ?? false,
-        hasNTC:          b?.hasNTC  ?? false,
-        canRetain:       b?.hasNMC  ? false : true,
-        expiryStatus:    cw.expiryStatus,
-        position:        cw.position,
-        hasExtension:    b?.hasExtension    ?? false,
-        extensionCapHit: b?.extensionCapHit ?? undefined,
-        extensionYears:  b?.extensionYears  ?? undefined,
+        capHit:         cw.capHit,
+        yearsRemaining: (cw.yearsRemaining > 0 ? cw.yearsRemaining : null) ?? b?.yearsRemaining ?? 1,
+        hasNMC:         b?.hasNMC  ?? false,
+        hasNTC:         b?.hasNTC  ?? false,
+        canRetain:      b?.hasNMC  ? false : true,
+        expiryStatus:   cw.expiryStatus,
+        position:       cw.position,
       };
     }
-    // Backfill DB-only players not present in scraper output (manually-managed entries like NTC/NMC holders)
+    // Backfill: DB players the scraper rejected or skipped (cap out-of-range, index drift, etc.)
     for (const [name, b] of Object.entries(dbData)) {
       if (!merged[name]) {
         merged[name] = {
-          capHit:          b.capHit,
-          yearsRemaining:  b.yearsRemaining ?? 1,
-          hasNMC:          b.hasNMC  ?? false,
-          hasNTC:          b.hasNTC  ?? false,
-          canRetain:       b.hasNMC  ? false : true,
-          expiryStatus:    "UFA",
-          hasExtension:    b.hasExtension    ?? false,
-          extensionCapHit: b.extensionCapHit ?? undefined,
-          extensionYears:  b.extensionYears  ?? undefined,
+          capHit:         b.capHit,
+          yearsRemaining: b.yearsRemaining ?? 1,
+          hasNMC:         b.hasNMC  ?? false,
+          hasNTC:         b.hasNTC  ?? false,
+          canRetain:      b.hasNMC  ? false : true,
+          expiryStatus:   "UFA",
         };
       }
     }
   } else {
     for (const [name, b] of Object.entries(dbData)) {
       merged[name] = {
-        capHit:          b.capHit,
-        yearsRemaining:  b.yearsRemaining ?? 1,
-        hasNMC:          b.hasNMC  ?? false,
-        hasNTC:          b.hasNTC  ?? false,
-        canRetain:       b.hasNMC  ? false : true,
-        expiryStatus:    "UFA",
-        hasExtension:    b.hasExtension    ?? false,
-        extensionCapHit: b.extensionCapHit ?? undefined,
-        extensionYears:  b.extensionYears  ?? undefined,
+        capHit:         b.capHit,
+        yearsRemaining: b.yearsRemaining ?? 1,
+        hasNMC:         b.hasNMC  ?? false,
+        hasNTC:         b.hasNTC  ?? false,
+        canRetain:      b.hasNMC  ? false : true,
+        expiryStatus:   "UFA",
       };
     }
   }
@@ -782,6 +777,7 @@ export async function GET() {
     loadContracts(),
     fetchPointShares(),
   ]);
+  const EXTENSIONS = loadExtensions();
   const BASELINES  = loadBaselines();
 
   // ── MoneyPuck analytics ─────────────────────────────────────
@@ -995,36 +991,6 @@ export async function GET() {
     });
   } catch (_) {}
 
-  // ── Append imported draftees ────────────────────────────────
-  // Players imported via /api/admin/import-draft-class carry a draftYear.
-  // They aren't on NHL API rosters yet, so add them here. Their ELC
-  // contracts come through the normal CONTRACTS merge (keyed by name).
-  try {
-    const draftees = await db.select({
-      id:       playersTable.id,
-      name:     playersTable.name,
-      position: playersTable.position,
-      teamId:   playersTable.teamId,
-      age:      playersTable.age,
-    }).from(playersTable).where(isNotNull(playersTable.draftYear));
-
-    for (const d of draftees) {
-      if (!d.teamId) continue;
-      const list = rosterMap.get(d.teamId) ?? [];
-      if (list.some((p: any) => p.name === d.name)) continue; // already on live roster
-      list.push({
-        id:       d.id,
-        name:     d.name,
-        position: normalisePos(d.position),
-        age:      d.age ?? 18,
-        headshot: null,
-      });
-      rosterMap.set(d.teamId, list);
-    }
-  } catch (e: any) {
-    console.warn("[Draftees] append failed:", e.message);
-  }
-
   // ── Build player objects ────────────────────────────────────
   const players: any[] = [];
 
@@ -1069,6 +1035,7 @@ export async function GET() {
         return u.charAt(0);
       };
 
+      const override         = EXTENSIONS[p.name]    ?? EXTENSIONS[normalName];
       const contractOverride = CONTRACT_OVERRIDES[p.name] ?? CONTRACT_OVERRIDES[normalName];
       const finalPosition    = contractOverride?.position ?? p.position;
 
@@ -1085,15 +1052,15 @@ export async function GET() {
         && rawCapHit > 3.0
         && normContractPos(fin?.position) !== p.position;
 
-      const finalCapHit  = contractOverride?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
-      const finalYears   = nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1));
-      const finalNMC     = nameCollision ? false : (fin?.hasNMC  ?? false);
-      const finalNTC     = nameCollision ? false : (fin?.hasNTC  ?? false);
-      const finalRetain  = nameCollision ? true  : (fin?.canRetain ?? true);
-      const hasExtension    = fin?.hasExtension    ?? false;
-      const extensionCapHit = fin?.extensionCapHit ?? undefined;
-      const extensionYears  = fin?.extensionYears  ?? undefined;
-      const intangibleMult  = fin?.intangibleMultiplier ?? 1.0;
+      const finalCapHit  = contractOverride?.capHit ?? override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
+      const finalYears   = override?.yearsRemaining ?? (nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1)));
+      const finalNMC     = override?.hasNMC  ?? (nameCollision ? false : (fin?.hasNMC  ?? false));
+      const finalNTC     = override?.hasNTC  ?? (nameCollision ? false : (fin?.hasNTC  ?? false));
+      const finalRetain  = override?.canRetain ?? (nameCollision ? true : (fin?.canRetain ?? true));
+      const hasExtension    = override?.hasExtension    ?? false;
+      const extensionCapHit = override?.extensionCapHit ?? undefined;
+      const extensionYears  = override?.extensionYears  ?? undefined;
+      const intangibleMult  = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
 
       const LEAGUE_AVG_XGA60 = 2.55;
       const teamXgaRaw = teamXgaMap.get(teamId);

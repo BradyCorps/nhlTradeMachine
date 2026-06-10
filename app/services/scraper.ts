@@ -60,18 +60,6 @@ export async function scrapeCapWages(): Promise<Record<string, any>> {
       const teamSlug     = (p[2] as string ?? "").toLowerCase().replace(/\s+/g, "_");
       const position     = (p[3] as string ?? "").toUpperCase();
       const ageNow       = p[8]  as number;
-
-      // Debug: log first 3 players' p[3]–p[6] to confirm secondary position index
-      if (scraped < 3) {
-        console.log(`[CapWages Debug] ${normaliseName(rawName)}: p[3]=${JSON.stringify(p[3])} p[4]=${JSON.stringify(p[4])} p[5]=${JSON.stringify(p[5])} p[6]=${JSON.stringify(p[6])}`);
-      }
-
-      // Secondary position — p[4] is the candidate; confirmed via debug log above
-      const VALID_POS = new Set(["C", "W", "L", "R", "LW", "RW", "D", "G", "F"]);
-      const rawSecondary      = p[4] as string | null | undefined;
-      const secondaryPosition = (typeof rawSecondary === "string" && VALID_POS.has(rawSecondary.toUpperCase()))
-        ? rawSecondary.toUpperCase()
-        : null;
       const totalLength  = p[15] as number;
 
       if (!rawName || !capRaw || capRaw <= 0) {
@@ -106,7 +94,6 @@ export async function scrapeCapWages(): Promise<Record<string, any>> {
         expiryStatus,
         position,
         teamSlug,
-        secondaryPosition,
       };
 
       contracts[name] = contractData;
