@@ -5,6 +5,7 @@ import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
 import { players as playersTable } from "@/app/db/schema";
+import { isNotNull } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -1009,6 +1010,39 @@ export async function GET() {
     });
   } catch (_) {}
 
+  // ── Inject drafted prospects from DB ─────────────────────────
+  // Mock-draft imports live only in the DB; NHL API rosters don't know them.
+  try {
+    const draftees = await db.select({
+      id:              playersTable.id,
+      name:            playersTable.name,
+      position:        playersTable.position,
+      teamId:          playersTable.teamId,
+      age:             playersTable.age,
+      draftOverall:    playersTable.draftOverall,
+      prospectPtsPace: playersTable.prospectPtsPace,
+    }).from(playersTable).where(isNotNull(playersTable.draftOverall));
+
+    for (const d of draftees) {
+      if (!d.teamId) continue;
+      const list = rosterMap.get(d.teamId) ?? [];
+      if (!list.some((x: any) => x.name === d.name)) {
+        list.push({
+          id:              d.id,
+          name:            d.name,
+          position:        normalisePos(d.position),
+          age:             d.age ?? 18,
+          headshot:        null,
+          draftOverall:    d.draftOverall,
+          prospectPtsPace: d.prospectPtsPace,
+        });
+      }
+      rosterMap.set(d.teamId, list);
+    }
+  } catch (e: any) {
+    console.warn("[Draftees] injection skipped:", e.message);
+  }
+
   // ── Build player objects ────────────────────────────────────
   const players: any[] = [];
 
@@ -1097,7 +1131,8 @@ export async function GET() {
         position:       finalPosition,
         age:            p.age,
         headshot:       p.headshot ?? null,
-        games:          stats?.games    ?? goalieStats?.gamesStarted ?? 40,
+        // Draftees default to 0 games so the pedigree NAV path (games < 14) triggers
+        games:          p.draftOverall != null ? (stats?.games ?? 0) : (stats?.games ?? goalieStats?.gamesStarted ?? 40),
         ptsPace:        stats?.ptsPace  ?? defaultPts,
         xGPace:         stats?.xGPace   ?? 0,
         defRate:        stats?.defRate  ?? 0.08,
@@ -1119,6 +1154,8 @@ export async function GET() {
         hasNMC:    finalNMC,
         hasNTC:    finalNTC,
         canRetain: finalRetain,
+        draftOverall:    p.draftOverall    ?? null,
+        prospectPtsPace: p.prospectPtsPace ?? null,
         retainedPct: 0,
         multiplier:  intangibleMult,
         ops:  PS_MAP.get(p.name)?.ops ?? PS_MAP.get(`id:${p.id}`)?.ops ?? PS_MAP.get(slugify(p.name))?.ops ?? null,

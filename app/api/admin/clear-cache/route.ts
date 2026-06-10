@@ -6,8 +6,11 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const cleared: string[] = [];
   if (redis) {
-    await redis.del("cache:teams").catch(() => {});
+    for (const key of ["cache:teams", "cache:contracts"]) {
+      await redis.del(key).then(() => cleared.push(key)).catch(() => {});
+    }
   }
-  return NextResponse.json({ ok: true, message: "cache:teams cleared — reload the trade machine" });
+  return NextResponse.json({ ok: true, cleared, message: "caches cleared — reload the trade machine" });
 }
