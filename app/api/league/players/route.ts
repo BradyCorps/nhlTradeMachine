@@ -496,6 +496,30 @@ const STATIC_ROSTER: [string, string, string, string][] = [
   ["NYI","Ilya Sorokin","G","1995-08-04"],
 ];
 
+// ── QoC Index (0-100): quantified deployment difficulty ──────────────────
+// Replaces the old "qocRank", which was MoneyPuck's raw iceTimeRank SUM — a
+// number that scaled with games played and measured nothing. Components:
+//   45% — average per-game ice-time rank (coach trust; F scaled 1-12, D 1-6)
+//   35% — PK ice-time share (PK minutes are minutes vs opponents' top PP units)
+//   20% — defensive-zone start share (shutdown deployment)
+// Higher = tougher minutes. ~75+ shutdown/top-pair usage, ~40 middle six, <20 sheltered.
+function calcQocIndex(
+  position: string,
+  iceRankAvg: number | null | undefined,
+  pkTimeShare: number | null | undefined,
+  dzPct: number | null | undefined,
+): number | null {
+  if (position === "G") return null;
+  if (iceRankAvg == null && pkTimeShare == null && dzPct == null) return null;
+  const slots = position === "D" ? 6 : 12;
+  const rankScore = iceRankAvg != null
+    ? Math.max(0, Math.min(1, (slots + 1 - iceRankAvg) / slots))
+    : 0.4; // unknown deployment → assume mid-roster
+  const pkScore = Math.max(0, Math.min(1, (pkTimeShare ?? 0) / 0.20));
+  const dzScore = Math.max(0, Math.min(1, ((dzPct ?? 0.5) - 0.35) / 0.30));
+  return Math.round(100 * (0.45 * rankScore + 0.35 * pkScore + 0.20 * dzScore));
+}
+
 async function loadFromDB(): Promise<Record<string, any>> {
   try {
     const rows = await db.select().from(playersTable);
@@ -883,16 +907,20 @@ export async function GET() {
         const rawXgPace  = (parseFloat(c[xgI]) / g) * 82;
         const xGPace     = rawXgPace * sampleWeight + (pos.startsWith("D") ? 6 : 10) * (1 - sampleWeight);
 
+        // MoneyPuck's iceTimeRank column is the SUM of per-game ranks over the
+        // season (rank 1 = team's most-used F/D that night; F and D ranked
+        // separately). Dividing by games gives the average per-game rank —
+        // a real deployment number: ~1-3 = top line/pair, ~10-12 = 4th line.
+        // The old code used the raw sum, which scaled with GP and meant nothing.
+        const iceRankAvg = g >= 5 ? (parseFloat(c[rkI]) || 0) / g : null;
+
         const entry = {
           ptsPace, xGPace,
           defRate:  offA - onA,
           avgTOI:   iceSec / g / 60,
           xgRelTM:  xgRelTM  * Math.min(1.0, g / 30),
           xgaRelTM: xgaRelTM * Math.min(1.0, g / 30),
-          qocRank:  Math.round(
-            (parseFloat(c[rkI]) || 500) * Math.min(1.0, g / 20) +
-            400 * (1 - Math.min(1.0, g / 20))
-          ),
+          iceRankAvg,
           games: g, hasLiveStats: true, dzPct,
           goalsPace:   goalsI >= 0 ? (parseFloat(c[goalsI])   / g) * 82 : undefined,
           assistsPace: goalsI >= 0 ? ((parseFloat(c[pI]) - parseFloat(c[goalsI])) / g) * 82 : undefined,
@@ -1091,7 +1119,7 @@ export async function GET() {
         xGPace:         stats?.xGPace   ?? 0,
         defRate:        stats?.defRate  ?? 0.08,
         avgTOI:         stats?.avgTOI   ?? defaultTOI,
-        qocRank:        stats?.qocRank  ?? 450,
+        qocIndex:       calcQocIndex(finalPosition, stats?.iceRankAvg, baselines.pkTimeShare, stats?.dzPct),
         hasLiveStats:   stats?.hasLiveStats ?? goalieStats?.hasLiveStats ?? false,
         gsax:           goalieStats?.gsax         ?? 0,
         savePct:        goalieStats?.savePct       ?? 0.900,

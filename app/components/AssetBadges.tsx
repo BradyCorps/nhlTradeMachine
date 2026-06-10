@@ -76,7 +76,7 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
       {asset.position === "D" && !isPick && (() => {
         const pts = asset.ptsPace ?? 0;
         const toi = asset.avgTOI ?? 0;
-        const qoc = asset.qocRank ?? 450;
+        const qocIdx = asset.qocIndex ?? 0;
         let arch = "DEPTH D";
         let color = 'var(--ledger-brown)';
         let title = "5th/6th defender — limited deployment";
@@ -86,9 +86,9 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
         } else if (pts >= 28 && toi >= 21) {
           arch = "TWO-WAY D"; color = 'var(--ledger-green)';
           title = "Two-way defenceman — contributes offensively and defensively";
-        } else if (pts < 28 && toi >= 19 && qoc < 220) {
+        } else if (pts < 28 && toi >= 19 && qocIdx >= 60) {
           arch = "SHUTDOWN D"; color = 'var(--ledger-amber)';
-          title = `Shutdown defenceman — faces elite competition (QoC rank: ${qoc}), valued for defensive role not scoring`;
+          title = `Shutdown defenceman — tough deployment (QoC ${qocIdx}/100: heavy minutes, PK, d-zone starts), valued for defensive role not scoring`;
         }
         return (
           <span className="text-2xs px-1 py-0.5 font-black" style={{

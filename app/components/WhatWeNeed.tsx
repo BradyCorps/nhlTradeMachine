@@ -20,7 +20,7 @@ interface Player {
   dps?:      number | null;
   ops?:      number | null;
   xgaRelTM?: number | null;
-  qocRank?:  number;
+  qocIndex?: number | null;
   dzPct?:    number | null;
 }
 
@@ -124,7 +124,7 @@ const TRAIT_METRIC: Record<string, (p: Player) => number> = {
   TOI:   p => p.avgTOI  ?? 0,
   DPS:   p => Math.max(0, p.dps ?? 0),
   SUPP:  p => -(p.xgaRelTM ?? 0),
-  Usage: p => -(p.qocRank ?? 999),
+  Usage: p => p.qocIndex ?? 0,
   OZ:    p => -(p.dzPct ?? 0.5),
 };
 

@@ -23,7 +23,8 @@ export interface Asset {
   multiplier: number;
   headshot?: string;
   hasLiveStats?: boolean;
-  qocRank?: number;
+  qocRank?: number;            // DEPRECATED — legacy iceTimeRank sum; use qocIndex
+  qocIndex?: number | null;    // 0-100 deployment difficulty (higher = tougher minutes)
   xgRelTM?: number | null;
   xgaRelTM?: number | null;
   dzPct?: number | null;

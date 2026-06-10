@@ -47,8 +47,8 @@ export function buildAssetTraits(a: Asset, nav: XNAVResult): {
         ps: dps !== null ? dps.toFixed(1) : null },
       { label: "SUPP", val: norm(-(a.xgaRelTM ?? 0), -1.5, 1.5),
         title: `xGA suppression vs teammates: ${(a.xgaRelTM ?? 0).toFixed(2)}` },
-      { label: "Usage",  val: norm(400 - safe(a.qocRank ?? 400), 50, 380),
-        title: "Ice time rank (usage proxy)" },
+      { label: "Usage",  val: (a.qocIndex ?? 35) / 100,
+        title: `QoC ${a.qocIndex ?? "—"}/100 — deployment difficulty (ice-time rank, PK share, d-zone starts)` },
       { label: "OZ",   val: a.dzPct != null ? 1 - norm(safe(a.dzPct), 0.3, 0.7) : 0.5,
         title: a.dzPct != null
           ? `OZ: ${((1-a.dzPct)*100).toFixed(0)}% offensive zone starts`

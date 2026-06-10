@@ -397,7 +397,7 @@ export default function AssetCard({
               { label: 'TOI',   val: asset.avgTOI?.toFixed(1) ?? '—',   tooltip: 'Average time on ice per game (minutes)' },
               { label: 'xG/82', val: asset.xGPace?.toFixed(1)  ?? '—',  tooltip: 'Expected goals generated per 82 games' },
               { label: 'xG%+', val: asset.xgRelTM != null ? `${(asset.xgRelTM as number) > 0 ? '+' : ''}${(asset.xgRelTM as number).toFixed(1)}` : '—', tooltip: 'xG% relative to teammates — positive means team controls more shots when this player is on ice vs off' },
-              { label: 'QoC',   val: asset.qocRank?.toString() ?? '—',  tooltip: 'Quality of competition rank — lower = harder opponents faced' },
+              { label: 'QoC',   val: asset.qocIndex != null ? asset.qocIndex.toString() : '—',  tooltip: 'Deployment difficulty 0-100: per-game ice-time rank + PK share + d-zone starts. 75+ shutdown/top-pair, ~40 middle six, <20 sheltered' },
             ].map(s => (
               <div key={s.label} className="text-center p-1" title={s.tooltip} style={{ background: 'var(--ledger-warm)', border: '1px solid #b8a070' }}>
                 <div className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">{s.label}</div>

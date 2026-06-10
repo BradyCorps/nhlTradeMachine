@@ -316,6 +316,30 @@ async function loadContracts(): Promise<Record<string, any>> {
   return merged;
 }
 
+// ── QoC Index (0-100): quantified deployment difficulty ──────────────────
+// Replaces the old "qocRank", which was MoneyPuck's raw iceTimeRank SUM — a
+// number that scaled with games played and measured nothing. Components:
+//   45% — average per-game ice-time rank (coach trust; F scaled 1-12, D 1-6)
+//   35% — PK ice-time share (PK minutes are minutes vs opponents' top PP units)
+//   20% — defensive-zone start share (shutdown deployment)
+// Higher = tougher minutes. ~75+ shutdown/top-pair usage, ~40 middle six, <20 sheltered.
+function calcQocIndex(
+  position: string,
+  iceRankAvg: number | null | undefined,
+  pkTimeShare: number | null | undefined,
+  dzPct: number | null | undefined,
+): number | null {
+  if (position === "G") return null;
+  if (iceRankAvg == null && pkTimeShare == null && dzPct == null) return null;
+  const slots = position === "D" ? 6 : 12;
+  const rankScore = iceRankAvg != null
+    ? Math.max(0, Math.min(1, (slots + 1 - iceRankAvg) / slots))
+    : 0.4; // unknown deployment → assume mid-roster
+  const pkScore = Math.max(0, Math.min(1, (pkTimeShare ?? 0) / 0.20));
+  const dzScore = Math.max(0, Math.min(1, ((dzPct ?? 0.5) - 0.35) / 0.30));
+  return Math.round(100 * (0.45 * rankScore + 0.35 * pkScore + 0.20 * dzScore));
+}
+
 async function loadFromDB(): Promise<Record<string, any>> {
   try {
     const rows = await db.select().from(playersTable);
@@ -1129,7 +1153,6 @@ export async function GET() {
         h("games_played"), h("icetime"),
         h("OnIce_A_xGoals"), h("OffIce_A_xGoals"),
         h("iceTimeRank"),  // NOTE: This is ice time VOLUME rank (1=most TOI), NOT quality of competition.
-                           // Stored as asset.qocRank but is a usage proxy only — not true QoC.
         h("OnIce_F_xGoals"), h("OffIce_F_xGoals"),
         h("I_F_dZoneShiftStarts"), h("I_F_oZoneShiftStarts"),
         h("I_F_goals"),
@@ -1208,14 +1231,12 @@ export async function GET() {
           // xgRelTM / xgaRelTM are even noisier than ptsPace — a single shift
           // can produce extreme values. Shrink towards 0 (league mean) using a
           // longer stabilisation window (30 GP vs 25 for counting stats).
-          // qocRank is an ice-time rank — 1 GP can produce rank=1 if the player
-          // happened to log heavy minutes that night. Shrink towards 400 (median).
           xgRelTM:  xgRelTM  * Math.min(1.0, g / 30),
           xgaRelTM: xgaRelTM * Math.min(1.0, g / 30),
-          qocRank:  Math.round(
-            (parseFloat(c[rkI]) || 500) * Math.min(1.0, g / 20) +
-            400 * (1 - Math.min(1.0, g / 20))
-          ),
+          // MoneyPuck's iceTimeRank is the SUM of per-game ranks (1 = team's
+          // most-used F/D that night). Divide by games for the average rank —
+          // ~1-3 = top line/pair, ~10-12 = 4th line. Require 5 GP for signal.
+          iceRankAvg: g >= 5 ? (parseFloat(c[rkI]) || 0) / g : null,
           games:   g,
           hasLiveStats: true,
           dzPct,
@@ -1479,7 +1500,7 @@ export async function GET() {
         xGPace:         stats?.xGPace   ?? 0,
         defRate:        stats?.defRate  ?? 0.08,
         avgTOI:         stats?.avgTOI   ?? defaultTOI,
-        qocRank:        stats?.qocRank  ?? 450,
+        qocIndex:       calcQocIndex(finalPosition, stats?.iceRankAvg, baselines.pkTimeShare, stats?.dzPct),
         hasLiveStats:   stats?.hasLiveStats ?? goalieStats?.hasLiveStats ?? false,
         // Goalie-specific
         gsax:           goalieStats?.gsax         ?? 0,
@@ -1547,7 +1568,7 @@ export async function GET() {
         teamStanding: team.standing,
         isProtected:  false,
         games: 0, ptsPace: 0, xGPace: 0, defRate: 0,
-        avgTOI: 0, qocRank: 999,
+        avgTOI: 0, qocIndex: null,
         capHit: 0, yearsRemaining: 0,
         hasNMC: false, hasNTC: false,
         canRetain: false, retainedPct: 0,

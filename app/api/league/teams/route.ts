@@ -12,11 +12,7 @@ const CAP_FLOOR       = SEASON.capFloor;
 const TEAMS_CACHE_TTL = 6 * 60 * 60; // 6 hours
 
 const TEAM_NEEDS: Record<string, { pos: string; minWar: number; label: string }[]> = {
-  EDM: [{ pos: "D", minWar: 2.0, label: "Top 4 RD" }],
-  CHI: [{ pos: "W", minWar: 2.5, label: "Elite Winger for Bedard" }],
-  VGK: [{ pos: "D", minWar: 2.0, label: "Top 4 D" }],
-  WPG: [{ pos: "W", minWar: 2.0, label: "Top 6 Winger" }, { pos: "D", minWar: 2.0, label: "Top 4 D" }],
-  SJS: [{ pos: "C", minWar: 2.0, label: "Top 6 C" }],
+
 };
 
 
@@ -189,7 +185,7 @@ export async function GET() {
         teamStanding: team.standing,
         isProtected:  false,
         games: 0, ptsPace: 0, xGPace: 0, defRate: 0,
-        avgTOI: 0, qocRank: 999,
+        avgTOI: 0, qocIndex: null,
         capHit: 0, yearsRemaining: 0,
         hasNMC: false, hasNTC: false,
         canRetain: false, retainedPct: 0,

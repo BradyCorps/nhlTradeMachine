@@ -16,7 +16,7 @@ interface Player {
   ptsPace: number;
   xGPace: number;
   avgTOI: number;
-  qocRank: number;
+  qocIndex?: number | null;
   games?: number;
   gsax?: number;
   savePct?: number;
@@ -237,7 +237,7 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
                 xGPace:         player.xGPace,
                 defRate:        player.defRate ?? 0.08,
                 avgTOI:         player.avgTOI,
-                qocRank:        player.qocRank,
+                qocIndex:       player.qocIndex,
                 ops:            player.ops ?? undefined,
                 dps:            player.dps ?? undefined,
                 xgRelTM:        player.xgRelTM ?? undefined,
@@ -300,8 +300,8 @@ function FullStrand({ player }: { player: Player }) {
       title: dps !== null ? `DPS ${dps.toFixed(1)} — Defensive Point Shares` : "Defensive NAV component" },
     { label: "SUPP", val: norm(-(safe(player.xgaRelTM ?? 0)), -1.5, 1.5),
       title: `xGA suppression vs teammates: ${player.xgaRelTM != null ? (player.xgaRelTM as number).toFixed(2) : "—"}` },
-    { label: "Usage",  val: norm(400 - safe(player.qocRank ?? 400), 50, 380),
-      title: `Ice time rank: ${(player.qocRank ?? 0).toFixed(0)} (lower = more ice time)` },
+    { label: "Usage",  val: (player.qocIndex ?? 35) / 100,
+      title: `QoC ${player.qocIndex ?? "—"}/100 — deployment difficulty (ice-time rank, PK share, d-zone starts)` },
     { label: "OZ",   val: ozScore, display: ozRaw, unavailable: !dzAvail,
       title: dzAvail ? `OZ%: ${ozRaw}% offensive zone starts` : "Zone deployment unavailable" },
   ];

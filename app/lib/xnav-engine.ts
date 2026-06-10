@@ -29,7 +29,8 @@ export interface AssetInput {
   xGPace?:        number;
   defRate?:       number;
   avgTOI?:        number;
-  qocRank?:       number;
+  qocRank?:       number;        // DEPRECATED — legacy iceTimeRank sum; use qocIndex
+  qocIndex?:      number | null; // 0-100 deployment difficulty (ice-rank + PK share + dZone starts)
   xgRelTM?:       number | null;
   xgaRelTM?:      number | null;
   dzPct?:         number | null;
@@ -234,7 +235,11 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const xg     = safe(asset.xGPace  ?? 0);
   const def    = safe(asset.defRate ?? 0);
   const toi    = safe(asset.avgTOI  ?? 18);
-  const qoc    = safe(asset.qocRank ?? 300);
+  // QoC Index 0-100 (higher = tougher deployment). Legacy qocRank (an
+  // iceTimeRank sum) is roughly mapped only when the index is absent.
+  const qocIdx = asset.qocIndex != null
+    ? clamp(safe(asset.qocIndex), 0, 100)
+    : clamp((400 - safe(asset.qocRank ?? 300)) / 400, 0, 1) * 100;
   const xgRel  = safe(asset.xgRelTM ?? 0);
   const xgaRel = safe(asset.xgaRelTM ?? 0);
   const dzPct  = safe(asset.dzPct   ?? 0.5);
@@ -298,7 +303,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
 
   // ── Defensive value ───────────────────────────────────────────
   const toiD   = clamp((toi - 15) * 2.5, 0, 30);
-  const qocVal = clamp((400 - qoc) / 400 * 20, 0, 20);
+  const qocVal = (qocIdx / 100) * 20;   // 0-20 NAV contribution, linear in deployment difficulty
   const dzVal  = clamp((dzPct - 0.3) * 40, 0, 12);
 
   // dps * 15 (not * 120 — the old * 15 * 8 compounding bug is removed)
