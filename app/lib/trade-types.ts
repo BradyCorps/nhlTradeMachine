@@ -25,6 +25,8 @@ export interface Asset {
   hasLiveStats?: boolean;
   qocRank?: number;            // DEPRECATED — legacy iceTimeRank sum; use qocIndex
   qocIndex?: number | null;    // 0-100 deployment difficulty (higher = tougher minutes)
+  draftOverall?: number | null;    // overall draft slot — triggers pedigree NAV
+  prospectPtsPace?: number | null; // NHLe-translated junior scoring pace
   xgRelTM?: number | null;
   xgaRelTM?: number | null;
   dzPct?: number | null;
