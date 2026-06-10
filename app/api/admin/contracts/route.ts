@@ -169,7 +169,9 @@ export async function PUT(req: Request) {
     if (key.includes("__")) continue;
     const id = makeId(key);
     if (existingIds.has(id)) continue;
-    if (!cw.capHit || cw.capHit < 0.5 || cw.capHit > 16) continue;
+    // Match scraper's CAP_MAX (CBA max = 20% of $104M ceiling); old 16 silently
+    // dropped Kaprizov-tier contracts from bulk imports
+    if (!cw.capHit || cw.capHit < 0.5 || cw.capHit > 20.8) continue;
 
     await db.insert(playersTable).values({
       id,
