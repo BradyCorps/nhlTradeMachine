@@ -14,9 +14,17 @@ export const SEASON = {
 } as const;
 
 export const LEAGUE = {
-  avgXga60:       2.55,          // League-average xGA/60 (MoneyPuck)
-  avgXgf60:       2.55,          // League-average xGF/60
-  gsaxSd:         8.0,           // GSAX standard deviation (goalie normalisation)
+  // All-situations league xGA/60, audited against 2022-26 MoneyPuck data:
+  // 3.04 / 2.95 / 2.90 / 2.91 by season. The old 2.55 was a 5on5-scale number,
+  // which (combined with a unit bug in the route's teamXga60 formula) pinned the
+  // goalie defCorrection at +0.25 for all 32 teams.
+  avgXga60:       2.92,          // League-average xGA/60 (MoneyPuck, all situations)
+  avgXgf60:       2.92,          // League-average xGF/60 (symmetric by definition)
+  // NOTE: gsaxSd is a tuned scaling knob, not the literal SD. Empirical SD of
+  // starter GSAX-per-60-games (2022-26, n=184, ≥30 GP) is ~17.6 with mean +4.3
+  // (MoneyPuck xG slightly over-predicts goals). The 8.0 value is calibrated
+  // together with the Luongo asymptote and MIDPOINT_G — change all three or none.
+  gsaxSd:         8.0,           // GSAX scaling constant (goalie normalisation)
   peakAge:        27,            // Skater production peak (age curve inflection)
   goaliePeakAge:  30,            // Goalie peak age
 } as const;

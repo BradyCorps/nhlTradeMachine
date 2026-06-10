@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { SEASON } from "@/app/lib/season-config";
+import { SEASON, LEAGUE } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
@@ -1067,7 +1067,7 @@ export async function GET() {
   // Without this cache, every page load downloads two large CSVs (~2MB total).
   const analyticsMap = new Map<string, any>();
   const goalieMap    = new Map<string, any>();
-  const teamXgaMap = new Map<string, { xGoals: number; games: number }>();
+  const teamXgaMap = new Map<string, { xGoals: number; ice: number }>();
   let fbMap = new Map<string, any>();
 
   let skaterCsv: string | null = null;
@@ -1214,8 +1214,10 @@ export async function GET() {
     }
 
     // Parse goalies — same quote-aware CSV parser
-    // Also derive teamXga60 from xGoals allowed per team
-    const teamXgaMap = new Map<string, { xGoals: number; games: number }>();
+    // Also derive teamXga60 from xGoals allowed per team.
+    // NOTE: writes to the outer teamXgaMap — a shadowing redeclaration here
+    // previously discarded all parsed data, leaving the outer map empty and
+    // the goalie defCorrection permanently zeroed in this route.
 
     if (gpRes.status === "fulfilled" && gpRes.value.ok) {
       const csv  = await gpRes.value.text();
@@ -1224,9 +1226,9 @@ export async function GET() {
       const rows = csv.split("\n").filter(Boolean);
       const hdr  = parseCSVRow(rows[0]);
       const h    = (k: string) => hdr.indexOf(k);
-      const [nI, sI, gI, xgI, goalsI, ongoalI, teamI] = [
+      const [nI, sI, gI, xgI, goalsI, ongoalI, teamI, iceI] = [
         h("name"), h("situation"), h("games_played"),
-        h("xGoals"), h("goals"), h("ongoal"), h("team"),
+        h("xGoals"), h("goals"), h("ongoal"), h("team"), h("icetime"),
       ];
       if (nI >= 0 && xgI >= 0) {
         const goalieRows = new Map<string, any>();
@@ -1240,17 +1242,19 @@ export async function GET() {
           const xGoals  = parseFloat(c[xgI])    || 0;
           const goals   = parseFloat(c[goalsI]) || 0;
           const ongoal  = parseFloat(c[ongoalI])|| 0;
+          const ice     = iceI >= 0 ? (parseFloat(c[iceI]) || 0) : 0;
           const gsax    = xGoals - goals;
           const savePct = ongoal > 0 ? (ongoal - goals) / ongoal : 0.900;
 
-          // Accumulate team-level xGA — sum across all goalies on that team
+          // Accumulate team xGA over real goalie icetime (seconds) so xGA/60
+          // has correct units — games-based denominators inflated the ratio
+          // and pinned the defCorrection clamp league-wide.
           const teamAbbr = (c[teamI] ?? "").trim().toUpperCase();
           if (teamAbbr) {
-            const prev = teamXgaMap.get(teamAbbr) ?? { xGoals: 0, games: 0 };
-            // Use max games (starter's GP) as denominator — avoids double-counting
+            const prev = teamXgaMap.get(teamAbbr) ?? { xGoals: 0, ice: 0 };
             teamXgaMap.set(teamAbbr, {
               xGoals: prev.xGoals + xGoals,
-              games:  Math.max(prev.games, g),
+              ice:    prev.ice + ice,
             });
           }
 
@@ -1434,13 +1438,12 @@ export async function GET() {
       const intangibleMult = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
 
       // ── UPSTREAM GOALIE METRICS ─────────────────────────────
-      // teamXga60: derived from MoneyPuck xGoals allowed / team games played
-      // League average is ~2.55 xGA/60. Higher = worse defense = goalie in hostile env.
-      const LEAGUE_AVG_XGA60 = 2.55;
+      // teamXga60: true xGA/60 over goalie icetime. League average ~2.92 (all
+      // situations). Higher = worse defense = goalie in hostile environment.
       const teamXgaRaw = teamXgaMap.get(teamId);
-      const teamXga60 = teamXgaRaw && teamXgaRaw.games > 10
-        ? Math.round((teamXgaRaw.xGoals / teamXgaRaw.games / (30 / 60)) * 100) / 100
-        : LEAGUE_AVG_XGA60;
+      const teamXga60 = teamXgaRaw && teamXgaRaw.ice > 36000
+        ? Math.round((teamXgaRaw.xGoals / (teamXgaRaw.ice / 3600)) * 100) / 100
+        : LEAGUE.avgXga60;
 
       // baselineGsax: current year GSAx — future enhancement will add weighted 3yr avg
       const currentYearGsax = goalieStats?.gsax ?? 0;

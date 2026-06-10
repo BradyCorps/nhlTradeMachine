@@ -29,7 +29,7 @@ describe("G-NAV — Elite Starters", () => {
     const result = calcGoalieNAV({
       id: "hellebuyck", name: "Connor Hellebuyck", position: "G",
       age: 33, capHit: 8.5, yearsRemaining: 5,
-      gsax: 18.5, gamesStarted: 60, teamXga60: 2.35,
+      gsax: 18.5, gamesStarted: 60, teamXga60: 2.72,
     });
     // Cap ceiling corrected to 95.5 (from inflated 104) — FMV dollars are proportionally lower
     inRange(result.total, 190, 250, "Hellebuyck NAV");
@@ -39,7 +39,7 @@ describe("G-NAV — Elite Starters", () => {
     const result = calcGoalieNAV({
       id: "saros", name: "Juuse Saros", position: "G",
       age: 29, capHit: 5.0, yearsRemaining: 4,
-      gsax: 8.2, gamesStarted: 55, teamXga60: 2.60,
+      gsax: 8.2, gamesStarted: 55, teamXga60: 2.97,
     });
     inRange(result.total, 120, 180, "Saros NAV");
   });
@@ -48,7 +48,7 @@ describe("G-NAV — Elite Starters", () => {
     const result = calcGoalieNAV({
       id: "oettinger", name: "Jake Oettinger", position: "G",
       age: 26, capHit: 5.75, yearsRemaining: 4,
-      gsax: 5.1, gamesStarted: 50, teamXga60: 2.45,
+      gsax: 5.1, gamesStarted: 50, teamXga60: 2.82,
     });
     inRange(result.total, 0, 45, "Oettinger NAV");
   });
@@ -59,7 +59,7 @@ describe("G-NAV — Young Controlled Goalies", () => {
     const result = calcGoalieNAV({
       id: "wolf", name: "Dustin Wolf", position: "G",
       age: 25, capHit: 0.875, yearsRemaining: 1,
-      gsax: -1.8, gamesStarted: 57, teamXga60: 2.85,
+      gsax: -1.8, gamesStarted: 57, teamXga60: 3.22,
       extensionCapHit: 7.5, extensionYears: 7,
     });
     // Negative GSAX + $7.5M extension is below-market at the corrected 95.5 cap ceiling;
@@ -71,7 +71,7 @@ describe("G-NAV — Young Controlled Goalies", () => {
     const result = calcGoalieNAV({
       id: "wolf-noext", name: "Dustin Wolf", position: "G",
       age: 25, capHit: 0.875, yearsRemaining: 2,
-      gsax: -1.8, gamesStarted: 57, teamXga60: 2.85,
+      gsax: -1.8, gamesStarted: 57, teamXga60: 3.22,
     });
     inRange(result.total, 80, 120, "Wolf (no ext) NAV");
     expect(result.total).toBeGreaterThan(20);
@@ -81,7 +81,7 @@ describe("G-NAV — Young Controlled Goalies", () => {
     const result = calcGoalieNAV({
       id: "askarov", name: "Yaroslav Askarov", position: "G",
       age: 23, capHit: 2.0, yearsRemaining: 2,
-      gsax: -9.5, gamesStarted: 47, teamXga60: 3.10,
+      gsax: -9.5, gamesStarted: 47, teamXga60: 3.47,
     });
     inRange(result.total, 25, 55, "Askarov NAV");
     expect(result.total).toBeGreaterThan(0);
@@ -93,7 +93,7 @@ describe("G-NAV — Backup/Tandem Edge Cases", () => {
     const result = calcGoalieNAV({
       id: "wedge", name: "Scott Wedgewood", position: "G",
       age: 33, capHit: 2.0, yearsRemaining: 1,
-      gsax: 23.1, gamesStarted: 45, teamXga60: 2.35,
+      gsax: 23.1, gamesStarted: 45, teamXga60: 2.72,
       extensionCapHit: 2.5, extensionYears: 1,
     });
     expect(result.total).toBeLessThanOrEqual(60);
@@ -104,7 +104,7 @@ describe("G-NAV — Backup/Tandem Edge Cases", () => {
     const result = calcGoalieNAV({
       id: "hot-backup", name: "Hot Streak Backup", position: "G",
       age: 27, capHit: 1.5, yearsRemaining: 1,
-      gsax: 8.0, gamesStarted: 20, teamXga60: 2.55,
+      gsax: 8.0, gamesStarted: 20, teamXga60: 2.92,
     });
     expect(result.total).toBeLessThan(35);
     inRange(result.total, 0, 35, "Elite backup (20gp) NAV");
@@ -114,7 +114,7 @@ describe("G-NAV — Backup/Tandem Edge Cases", () => {
     const result = calcGoalieNAV({
       id: "col-backup", name: "Col Backup", position: "G",
       age: 30, capHit: 2.0, yearsRemaining: 1,
-      gsax: 15.0, gamesStarted: 30, teamXga60: 2.30,
+      gsax: 15.0, gamesStarted: 30, teamXga60: 2.67,
     });
     expect(result.total).toBeLessThanOrEqual(35);
   });
@@ -125,7 +125,7 @@ describe("G-NAV — Declining Veterans", () => {
     const result = calcGoalieNAV({
       id: "aging-g", name: "Aging Vet Goalie", position: "G",
       age: 38, capHit: 4.5, yearsRemaining: 2,
-      gsax: -8.0, gamesStarted: 52, teamXga60: 2.55,
+      gsax: -8.0, gamesStarted: 52, teamXga60: 2.92,
     });
     expect(result.total).toBeLessThan(20);
   });
@@ -437,7 +437,7 @@ describe("Sanity Guards — Values that should never happen", () => {
     const result = calcGoalieNAV({
       id: "tandem-max", name: "Tandem G", position: "G",
       age: 25, capHit: 1.0, yearsRemaining: 2,
-      gsax: 50.0, gamesStarted: 45, teamXga60: 2.55,
+      gsax: 50.0, gamesStarted: 45, teamXga60: 2.92,
     });
     expect(result.total).toBeLessThanOrEqual(60);
   });
@@ -446,7 +446,7 @@ describe("Sanity Guards — Values that should never happen", () => {
     const result = calcGoalieNAV({
       id: "backup-max", name: "Backup G", position: "G",
       age: 24, capHit: 0.9, yearsRemaining: 1,
-      gsax: 30.0, gamesStarted: 25, teamXga60: 2.55,
+      gsax: 30.0, gamesStarted: 25, teamXga60: 2.92,
     });
     expect(result.total).toBeLessThanOrEqual(35);
   });
@@ -460,11 +460,11 @@ describe("Sanity Guards — Values that should never happen", () => {
   it("Extension reduces NAV vs cheap current deal", () => {
     const cheap = calcGoalieNAV({
       id:"cheap",name:"G",position:"G",age:25,capHit:0.875,yearsRemaining:2,
-      gsax:3.0,gamesStarted:55,teamXga60:2.55,
+      gsax:3.0,gamesStarted:55,teamXga60: 2.92,
     });
     const extended = calcGoalieNAV({
       id:"ext",name:"G",position:"G",age:25,capHit:0.875,yearsRemaining:1,
-      gsax:3.0,gamesStarted:55,teamXga60:2.55,
+      gsax:3.0,gamesStarted:55,teamXga60: 2.92,
       extensionCapHit:7.5,extensionYears:7,
     });
     expect(extended.total).toBeLessThan(cheap.total);

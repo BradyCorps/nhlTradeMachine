@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { SEASON } from "@/app/lib/season-config";
+import { SEASON, LEAGUE } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
@@ -770,7 +770,7 @@ export async function GET() {
   // ── MoneyPuck analytics ─────────────────────────────────────
   const analyticsMap = new Map<string, any>();
   const goalieMap    = new Map<string, any>();
-  const teamXgaMap   = new Map<string, { xGoals: number; games: number }>();
+  const teamXgaMap   = new Map<string, { xGoals: number; ice: number }>();
   let fbMap = new Map<string, any>();
 
   let skaterCsv: string | null = null;
@@ -893,9 +893,9 @@ export async function GET() {
       const rows = csv.split("\n").filter(Boolean);
       const hdr  = parseCSVRow(rows[0]);
       const h    = (k: string) => hdr.indexOf(k);
-      const [nI, sI, gI, xgI, goalsI, ongoalI, teamI] = [
+      const [nI, sI, gI, xgI, goalsI, ongoalI, teamI, iceI] = [
         h("name"), h("situation"), h("games_played"),
-        h("xGoals"), h("goals"), h("ongoal"), h("team"),
+        h("xGoals"), h("goals"), h("ongoal"), h("team"), h("icetime"),
       ];
       if (nI >= 0 && xgI >= 0) {
         const goalieRows = new Map<string, any>();
@@ -908,15 +908,19 @@ export async function GET() {
           const xGoals = parseFloat(c[xgI])    || 0;
           const goals  = parseFloat(c[goalsI]) || 0;
           const ongoal = parseFloat(c[ongoalI])|| 0;
+          const ice    = iceI >= 0 ? (parseFloat(c[iceI]) || 0) : 0;
           const gsax   = xGoals - goals;
           const savePct = ongoal > 0 ? (ongoal - goals) / ongoal : 0.900;
 
+          // Accumulate team xGA over real goalie icetime (seconds) so xGA/60 has
+          // correct units — the old games-based denominator inflated every team
+          // to 9-13 "xGA/60" and pinned the defCorrection clamp league-wide.
           const teamAbbr = (c[teamI] ?? "").trim().toUpperCase();
           if (teamAbbr) {
-            const prev = teamXgaMap.get(teamAbbr) ?? { xGoals: 0, games: 0 };
+            const prev = teamXgaMap.get(teamAbbr) ?? { xGoals: 0, ice: 0 };
             teamXgaMap.set(teamAbbr, {
               xGoals: prev.xGoals + xGoals,
-              games:  Math.max(prev.games, g),
+              ice:    prev.ice + ice,
             });
           }
 
@@ -1049,11 +1053,11 @@ export async function GET() {
       const extensionYears  = override?.extensionYears  ?? undefined;
       const intangibleMult  = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
 
-      const LEAGUE_AVG_XGA60 = 2.55;
+      // True xGA/60 over goalie icetime; require ≥10 games of ice (36,000s) for signal
       const teamXgaRaw = teamXgaMap.get(teamId);
-      const teamXga60  = teamXgaRaw && teamXgaRaw.games > 10
-        ? Math.round((teamXgaRaw.xGoals / teamXgaRaw.games / (30 / 60)) * 100) / 100
-        : LEAGUE_AVG_XGA60;
+      const teamXga60  = teamXgaRaw && teamXgaRaw.ice > 36000
+        ? Math.round((teamXgaRaw.xGoals / (teamXgaRaw.ice / 3600)) * 100) / 100
+        : LEAGUE.avgXga60;
 
       const currentYearGsax = goalieStats?.gsax ?? 0;
       const baselineKey = p.name.toLowerCase().replace(/[^a-z]/g, "");
