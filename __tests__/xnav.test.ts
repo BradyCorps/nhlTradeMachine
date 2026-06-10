@@ -2,10 +2,6 @@
 // Run with: npx vitest run
 // Watch mode: npx vitest
 //
-// These tests establish NAV baselines for known archetypes.
-// If a change to the engine breaks these ranges, the test fails
-// BEFORE the code reaches production — no more catching Wedgewood
-// at +250 NAV via screenshot.
 //
 // Ranges are intentionally wide (~±20%) to allow for tuning
 // without constant test updates. They're floor/ceiling guards,
