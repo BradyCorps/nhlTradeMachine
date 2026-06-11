@@ -33,6 +33,23 @@ export default function TradeProposalEngine({
   const [generating, setGenerating] = useState(false);
   const [done,       setDone]       = useState(false);
 
+  // Trade-block badge — shows why this player is realistically available
+  const BlockBadge = ({ status }: { status?: string | null }) => {
+    if (status !== "requested" && status !== "available") return null;
+    const isReq = status === "requested";
+    return (
+      <span className="ml-1.5 text-[7px] font-black uppercase tracking-wider px-1 py-0.5 align-middle"
+        style={{
+          background: isReq ? 'rgba(184,48,32,0.10)' : 'rgba(148,105,20,0.12)',
+          border: `1px solid ${isReq ? 'rgba(184,48,32,0.4)' : 'rgba(148,105,20,0.4)'}`,
+          color: isReq ? '#b83020' : '#946914',
+          fontFamily: "'Courier Prime', monospace",
+        }}>
+        {isReq ? "Trade Request" : "On the Block"}
+      </span>
+    );
+  };
+
   const blockNav  = outgoingBlock.reduce((s, a) => s + (navMap[a.id] ?? 0), 0);
   const isDump    = isDumpBlock(outgoingBlock, navMap);
   const rdLabel   = (r?: number) => r===1?"1st":r===2?"2nd":r===3?"3rd":`${r}th`;
@@ -307,6 +324,7 @@ export default function TradeProposalEngine({
                               <span className="ml-1 font-mono text-[9px]" style={{ color: '#9a7d58' }}>
                                 {a.position!=="Pick" && `$${a.capHit}M`}
                               </span>
+                              <BlockBadge status={a.tradeBlockStatus} />
                               {isSweetener && <span className="ml-1 text-[11px]" style={{ color: '#245e39' }}>↑ sweetener</span>}
                             </div>
                             {a.position !== "Pick" && (
@@ -345,6 +363,7 @@ export default function TradeProposalEngine({
                             <span className="ml-1 font-mono text-[9px]" style={{ color: '#9a7d58' }}>
                               {a.position!=="Pick" && `$${a.capHit}M`}
                             </span>
+                            <BlockBadge status={a.tradeBlockStatus} />
                           </div>
                           {a.position !== "Pick" && (
                             <div className="text-[11px] font-mono mt-0.5" style={{ color: '#9a7d58' }}>

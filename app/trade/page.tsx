@@ -110,10 +110,11 @@ export default function TradeMachine() {
   const [verdictOpen, setVerdictOpen] = useState(false);   // bottom sheet expanded
   const [showTeamSelect, setShowTeamSelect] = useState(false); // Team select modal open
   const [tradeBlockOpen, setTradeBlockOpen] = useState(false);
+  const [tradeRequest,   setTradeRequest]   = useState<Asset[] | null>(null);
 
   // Freeze body scroll when any modal/overlay is open
   React.useEffect(() => {
-    if (verdictOpen || showTeamSelect || tradeBlockOpen) {
+    if (verdictOpen || showTeamSelect || tradeBlockOpen || (tradeRequest && tradeRequest.length > 0)) {
       const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       document.body.style.paddingRight = `${scrollbarWidth}px`;
       document.body.style.overflow = 'hidden';
@@ -128,10 +129,9 @@ export default function TradeMachine() {
       document.body.style.overflow = 'unset';
       document.documentElement.style.overflow = 'unset';
     };
-  }, [verdictOpen, showTeamSelect, tradeBlockOpen]);
+  }, [verdictOpen, showTeamSelect, tradeBlockOpen, tradeRequest]);
   const [evaluated, setEvaluated] = useState(false);
   const [expandedFlag,   setExpandedFlag]   = useState<number | null>(null);
-  const [tradeRequest,   setTradeRequest]   = useState<Asset[] | null>(null);
 
   // ── Team lock state ───────────────────────────────────────────
   const [homeTeamLocked, setHomeTeamLocked] = useState(false);
