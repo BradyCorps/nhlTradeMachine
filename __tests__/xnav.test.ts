@@ -480,6 +480,49 @@ describe("Sanity Guards — Values that should never happen", () => {
     expect(Math.abs(r.total - sum)).toBeLessThan(Math.abs(sum) * 0.3 + 30);
   });
 });
+
+// ── Trade-request leverage discount ─────────────────────────────────────────
+describe("Trade block — leverage discount", () => {
+  const base = {
+    id:"req", name:"P", position:"C" as const, age:27, capHit:6.0, yearsRemaining:3,
+    ptsPace:80, xGPace:20, defRate:0.2, avgTOI:19,
+    xgRelTM:3, xgaRelTM:0, games:72,
+  };
+
+  it("'requested' status applies a small NAV haircut (≤8%, capped at 20)", () => {
+    const neutral   = calcNAV(base);
+    const requested = calcNAV({ ...base, tradeBlockStatus: "requested" });
+    expect(requested.total).toBeLessThan(neutral.total);
+    const penalty = neutral.total - requested.total;
+    expect(penalty).toBeLessThanOrEqual(20);
+    expect(penalty).toBeGreaterThan(0);
+    // Components still sum: the haircut comes out of the cap strand
+    expect(requested.cap).toBeLessThan(neutral.cap);
+  });
+
+  it("'available' (being shopped) carries no penalty", () => {
+    const neutral = calcNAV(base);
+    const shopped = calcNAV({ ...base, tradeBlockStatus: "available" });
+    expect(shopped.total).toBe(neutral.total);
+  });
+
+  it("'untouchable' carries no penalty — value is unchanged, availability is the gate", () => {
+    const neutral     = calcNAV(base);
+    const untouchable = calcNAV({ ...base, tradeBlockStatus: "untouchable" });
+    expect(untouchable.total).toBe(neutral.total);
+  });
+
+  it("negative-value contracts are not discounted further", () => {
+    const dump = {
+      id:"dump", name:"V", position:"W" as const, age:35, capHit:9.0, yearsRemaining:4,
+      ptsPace:28, xGPace:5, avgTOI:13, games:70,
+    };
+    const neutral   = calcNAV(dump);
+    const requested = calcNAV({ ...dump, tradeBlockStatus: "requested" });
+    expect(requested.total).toBe(neutral.total);
+  });
+});
+
 // ── Package compression tests ─────────────────────────────────────────────
 import { compressPackage } from "../app/lib/xnav-engine";
 

@@ -60,6 +60,8 @@ const AssetSchema = z.object({
   hasNMC: z.boolean().nullish(),
   hasNTC: z.boolean().nullish(),
   canRetain: z.boolean().nullish(),
+  tradeBlockStatus: z.enum(["requested", "available", "blocked", "untouchable"]).nullish(),
+  tradeBlockNote: z.string().nullish(),
 }).passthrough();
 
 const TeamSchema = z.object({
@@ -145,6 +147,7 @@ const getAssetNAV = (asset: Asset): XNAVResult => {
     pairXgfPct: asset.pairXgfPct,
     pairDriverScore: asset.pairDriverScore,
     baselineHdsvPct: asset.baselineHdsvPct,
+    tradeBlockStatus: asset.tradeBlockStatus,
   };
   return calcNAV(input);
 };
@@ -171,7 +174,7 @@ type FlagCategory =
   | "CONTENDER_LOGIC" | "ASSET_SHAPE_MISMATCH" | "POSITIONAL_REDUNDANCY"
   | "ROSTER_HOLE" | "LEVERAGE_ASYMMETRY" | "RENTAL_TAX" | "AGE_CLIFF"
   | "DEAD_WEIGHT" | "FIRE_SALE" | "LOCKER_ROOM" | "RETAIN_ABUSE" | "GOOD" | "VALUE_VETO"
-  | "FRANCHISE_ANCHOR";
+  | "FRANCHISE_ANCHOR" | "UNTOUCHABLE";
 
 interface GmFlag {
   severity: FlagSeverity;
@@ -253,6 +256,23 @@ const runGmLogic = (
 
   const modeHome = classifyTeam(teamHome, allHomeRoster);
   const modePartner = classifyTeam(teamPartner, allPartnerRoster);
+
+  // ── 0. UNTOUCHABLE — partner GM hard decline ──────────────────
+  // Admin-flagged untouchables are never traded, at any price. The
+  // partner GM hangs up the phone before value is even discussed.
+  for (const a of incoming) {
+    if (a.tradeBlockStatus === "untouchable") {
+      flags.push({
+        severity: "HARD",
+        category: "UNTOUCHABLE",
+        headline: `${a.name} is untouchable — ${teamPartner.name} will not trade him`,
+        explanation: `${teamPartner.name} has designated ${a.name} as untouchable. There is no package that moves this player — the conversation ends before value is discussed.${a.tradeBlockNote ? ` Front office note: ${a.tradeBlockNote}` : ""}`,
+        affectedAsset: a.name,
+        vetoesSide: 1,
+        perspective: "partner",
+      });
+    }
+  }
 
   const navOut   = outgoing.reduce((s, a) => s + getAssetNAV(a).total, 0);
   const navIn    = incoming.reduce((s, a) => s + getAssetNAV(a).total, 0);

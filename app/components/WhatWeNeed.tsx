@@ -22,6 +22,7 @@ interface Player {
   xgaRelTM?: number | null;
   qocIndex?: number | null;
   dzPct?:    number | null;
+  tradeBlockStatus?: "requested" | "available" | "blocked" | "untouchable" | null;
 }
 
 interface Team {
@@ -74,6 +75,13 @@ function attainability(
   srcTeam:   Team | undefined,
   capSpace:  number,
 ): Attainability {
+  // Admin trade block overrides every heuristic: untouchables never move,
+  // and players being shopped / requesting out are the most realistic targets.
+  const block = player.tradeBlockStatus;
+  if (block === "untouchable") {
+    return { score: 0, label: "Off limits", reason: `${srcTeam?.phase ?? "—"} — flagged untouchable, not moving` };
+  }
+
   if (!srcTeam) return { score: 0.40, label: "Possible", reason: "Unknown team" };
 
   const phase = srcTeam.phase ?? "";
@@ -94,6 +102,10 @@ function attainability(
   else if (ops >  8 || ptsPace > 82) score -= 0.30;  // Hughes / Makar tier
   else if (ops >  5 || ptsPace > 68) score -= 0.12;  // solid top-pairing / 2nd-line
 
+  // On the trade block — overrides phase and elite heuristics; the team has
+  // already decided to move him. Cap feasibility below still applies.
+  if (block === "requested" || block === "available") score = Math.max(score, 0.88);
+
   // Cap feasibility — hard to acquire if it busts the cap
   const hit = player.capHit ?? 0;
   if (hit > capSpace * 1.25) score -= 0.30;
@@ -108,6 +120,8 @@ function attainability(
     "Off limits";
 
   const reason =
+    block === "requested" ? "Formal trade request — team has lost leverage" :
+    block === "available" ? "On the trade block — actively shopped" :
     score >= 0.65 ? `${phase} — likely open to offers`   :
     score >= 0.44 ? `${phase} — may deal for right return` :
     score >= 0.22 ? `${phase} — would need an elite package` :

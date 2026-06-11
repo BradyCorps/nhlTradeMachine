@@ -104,6 +104,45 @@ describe("Canary — Team DNA Usage trait", () => {
   });
 });
 
+describe("Canary — trade block mechanics", () => {
+  it("evaluate route hard-declines untouchables from the partner side", () => {
+    const src = read("app/api/evaluate/route.ts");
+    expect(src).toContain('"UNTOUCHABLE"');
+    expect(src).toMatch(/tradeBlockStatus === "untouchable"/);
+    expect(src).toContain("will not trade him");
+  });
+
+  it("evaluate route passes tradeBlockStatus through to the engine", () => {
+    const src = read("app/api/evaluate/route.ts");
+    expect(src).toContain("tradeBlockStatus: asset.tradeBlockStatus");
+  });
+
+  it("engine applies the trade-request leverage discount", () => {
+    const engine = read("app/lib/xnav-engine.ts");
+    expect(engine).toContain("applyTradeRequestDiscount");
+    expect(engine).toMatch(/tradeBlockStatus !== "requested"/);
+  });
+
+  it("proposal generator excludes untouchables from return packages", () => {
+    const src = read("app/lib/trade-logic.ts");
+    expect(src).toMatch(/tradeBlockStatus !== "untouchable"/);
+    // preScreen veto
+    expect(src).toMatch(/partnerSends\.some\(a => a\.tradeBlockStatus === "untouchable"\)/);
+  });
+
+  it("WhatWeNeed surfaces block players and hides untouchables", () => {
+    const src = read("app/components/WhatWeNeed.tsx");
+    expect(src).toContain("tradeBlockStatus");
+    expect(src).toContain("flagged untouchable");
+    expect(src).toContain("On the trade block");
+  });
+
+  it("match route names the best-fitting shopped player as the return", () => {
+    const src = read("app/api/match/route.ts");
+    expect(src).toContain("fits as the return");
+  });
+});
+
 describe("Canary — admin cache flush", () => {
   it("clear-cache flushes BOTH the teams and contracts caches", () => {
     const src = read("app/api/admin/clear-cache/route.ts");

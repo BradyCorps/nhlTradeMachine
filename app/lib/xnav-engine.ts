@@ -63,6 +63,10 @@ export interface AssetInput {
   pairDriverScore?:  number;
   baselineHdsvPct?:  number;
   teamHdca60?:       number;   // team HD chances against per 60 min (from team_baselines.json)
+  // Admin trade-block status (stamped by league routes). "requested" = formal
+  // public trade request → small leverage discount. "available" (quietly
+  // shopped) carries no penalty — the team controls that narrative.
+  tradeBlockStatus?: "requested" | "available" | "blocked" | "untouchable" | null;
 }
 
 export interface XNAVResult {
@@ -628,16 +632,29 @@ export function calcProspectNAV(asset: AssetInput): XNAVResult {
   };
 }
 
+// ── Trade-request leverage discount ───────────────────────────────────────────
+// A formal, public trade request strips the team of negotiating leverage — the
+// whole league knows they have to move him, so offers come in light. Small
+// haircut on positive value (8%, capped at 20 NAV). Deducted from the cap
+// component so the off/def/age/cap sum invariant holds. Negative-value
+// contracts are unaffected: there is no leverage left to lose.
+export function applyTradeRequestDiscount(result: XNAVResult, asset: AssetInput): XNAVResult {
+  if (asset.tradeBlockStatus !== "requested" || result.total <= 0) return result;
+  const penalty = Math.round(Math.min(20, result.total * 0.08));
+  if (penalty <= 0) return result;
+  return { ...result, total: result.total - penalty, cap: result.cap - penalty };
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 export function calcNAV(asset: AssetInput): XNAVResult {
   if (asset.position === "Pick") return calcPickNAV(asset);
   // Drafted prospect without an NHL sample — pedigree valuation
   // (14-game threshold matches the rookie small-sample logic elsewhere)
   if (asset.draftOverall != null && (asset.games ?? 0) < 14 && !asset.hasLiveStats) {
-    return calcProspectNAV(asset);
+    return applyTradeRequestDiscount(calcProspectNAV(asset), asset);
   }
-  if (asset.position === "G")    return calcGoalieNAV(asset);
-  return calcSkaterNAV(asset);
+  if (asset.position === "G")    return applyTradeRequestDiscount(calcGoalieNAV(asset), asset);
+  return applyTradeRequestDiscount(calcSkaterNAV(asset), asset);
 }
 
 // ── Package compression ───────────────────────────────────────────────────────

@@ -70,7 +70,8 @@ export default function TradeProposalEngine({
 
         // Sometimes partner sends back a cheap depth player to make it a real trade
         const cheapReturn = roster
-          .filter(p => !p.hasNMC && getNav(p, navMap) >= -10 && getNav(p, navMap) <= 20 && p.capHit < 2.5)
+          .filter(p => !p.hasNMC && p.tradeBlockStatus !== "untouchable"
+            && getNav(p, navMap) >= -10 && getNav(p, navMap) <= 20 && p.capHit < 2.5)
           .sort((a,b) => getNav(b,navMap)-getNav(a,navMap))[0];
 
         candidates.push({
@@ -84,7 +85,8 @@ export default function TradeProposalEngine({
         // Neg-for-neg swap: both teams trading contracts they want to move
         // Common in real NHL — teams swap bad contracts hoping for change of scenery
         const partnerNegPlayers = roster
-          .filter(p => !p.hasNMC && getNav(p, navMap) < -5 && getNav(p, navMap) > -50)
+          .filter(p => !p.hasNMC && p.tradeBlockStatus !== "untouchable"
+            && getNav(p, navMap) < -5 && getNav(p, navMap) > -50)
           .sort((a,b) => getNav(b,navMap)-getNav(a,navMap));
 
         if (partnerNegPlayers.length === 0) {

@@ -133,8 +133,11 @@ export const buildReturnPackages = (
   const n = (a: Asset) => getNav(a, navMap);
   const packages: { pkg: Asset[]; score: number }[] = [];
 
+  // Untouchables never appear in generated return packages — their GM
+  // won't discuss them at any price.
   const tradeable = roster
-    .filter(p => !p.hasNMC && p.position !== "Pick" && n(p) > -15)
+    .filter(p => !p.hasNMC && p.position !== "Pick" && n(p) > -15
+      && p.tradeBlockStatus !== "untouchable")
     .sort((a, b) => n(b) - n(a));
   const sortedPicks = [...picks]
     .filter(p => (p.year ?? 9999) <= 2028)
@@ -154,7 +157,11 @@ export const buildReturnPackages = (
     const sizePenalty = (pkg.length - 1) * 0.08;
     const pickCount = pkg.filter(a => a.position === "Pick").length;
     const pickBonus = pickCount > 0 ? 0.05 : 0;
-    return Math.max(0, 1 - navDiff - sizePenalty + pickBonus);
+    // Players the partner is already shopping (admin trade block) are the most
+    // realistic return pieces — boost packages built around them.
+    const shoppedBonus = pkg.some(a =>
+      a.tradeBlockStatus === "available" || a.tradeBlockStatus === "requested") ? 0.12 : 0;
+    return Math.max(0, 1 - navDiff - sizePenalty + pickBonus + shoppedBonus);
   };
 
   const seen = new Set<string>();
@@ -375,6 +382,9 @@ export const preScreenProposal = (
   }
 
   if (partnerSends.some(a => a.hasNMC)) return false;
+
+  // Untouchables are a hard decline — the partner GM will not move them
+  if (partnerSends.some(a => a.tradeBlockStatus === "untouchable")) return false;
 
   const partnerPlayers = partnerSends.filter(a => a.position !== "Pick");
   if (partnerTeam.needs && partnerPlayers.length > 0) {

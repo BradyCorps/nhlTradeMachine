@@ -161,7 +161,19 @@ export async function POST(req: NextRequest) {
         p.tradeBlockStatus === "available" || p.tradeBlockStatus === "requested");
       if (shopped.length > 0 && packageNAV > 0) {
         score += Math.min(12, shopped.length * 4);
-        fit.push(`Actively shopping ${shopped.length === 1 ? shopped[0].name : `${shopped.length} players`}`);
+        // Name the shopped player whose value best matches the package — that's
+        // the most realistic return piece this partner can actually offer.
+        const bestFit = [...shopped].sort((a, b) =>
+          Math.abs((navMap[a.id]?.total ?? 0) - packageNAV)
+          - Math.abs((navMap[b.id]?.total ?? 0) - packageNAV))[0];
+        const bestFitNav = navMap[bestFit.id]?.total ?? 0;
+        const valueMatches = Math.abs(bestFitNav - packageNAV) <= Math.max(30, packageNAV * 0.45);
+        if (valueMatches) {
+          score += 6;
+          fit.push(`${bestFit.name} is ${bestFit.tradeBlockStatus === "requested" ? "requesting a trade" : "on the block"} — fits as the return`);
+        } else {
+          fit.push(`Actively shopping ${shopped.length === 1 ? shopped[0].name : `${shopped.length} players`}`);
+        }
       }
 
       // ── 6. YOUNG CORE UNTRADEABLE CHECK ─────────────────────
