@@ -94,6 +94,16 @@ describe("Canary — engine inputs", () => {
   });
 });
 
+describe("Canary — Team DNA Usage trait", () => {
+  it("computeRosterStrand uses qocIndex, not the dead legacy qocRank", () => {
+    const src = read("app/trade/page.tsx");
+    // qocRank is null on every player now — norm(400 - 400) pinned every
+    // team's Usage at 0, producing a constant -62 gap vs the champ template.
+    expect(src).not.toContain("qocRank ?? 400");
+    expect(src).toContain("def.Usage+= norm(p.qocIndex ?? 35, 0, 100)");
+  });
+});
+
 describe("Canary — admin cache flush", () => {
   it("clear-cache flushes BOTH the teams and contracts caches", () => {
     const src = read("app/api/admin/clear-cache/route.ts");

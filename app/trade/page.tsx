@@ -1805,7 +1805,7 @@ function computeRosterStrand(roster: Asset[], navMap: Record<string, XNAVResult>
     off.TOI  += norm(safe(p.avgTOI), 10, 27);
     def.DPS  += dps != null ? norm(dps, 0, dpsMax) : norm(xnav.def, -60, 150);
     def.SUPP += norm(-(p.xgaRelTM ?? 0), -1.5, 1.5);
-    def.Usage+= norm(400 - safe(p.qocRank ?? 400), 50, 380);
+    def.Usage+= norm(p.qocIndex ?? 35, 0, 100);
     def.OZ   += p.dzPct != null ? 1 - norm(safe(p.dzPct), 0.3, 0.7) : 0.5;
   }
 
