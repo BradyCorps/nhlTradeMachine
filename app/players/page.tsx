@@ -164,14 +164,14 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
   ];
 
   return (
-    <div style={{
+    <div className="player-expanded-panel" style={{
       background: "#d6c8a5", borderTop: "1px solid #b8a070",
       padding: "12px 16px",
     }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+      <div className="expanded-player-grid">
         {/* Left — stats */}
         <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginBottom: "10px" }}>
+          <div className="stat-grid-4" style={{ marginBottom: "10px" }}>
             {stats.map(s => (
               <div key={s.label} style={{
                 background: "#e4d8b8", border: "1px solid #b8a070",
@@ -204,7 +204,7 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
               )}
             </div>
           )}
-          <div style={{ marginTop: "10px", fontSize: "11px", color: "var(--ink-faint)" }}>
+          <div className="player-expanded-contract" style={{ marginTop: "10px", fontSize: "11px", color: "var(--ink-faint)" }}>
             <span style={{ color: "var(--rule)", marginRight: "6px" }}>CONTRACT</span>
             ${player.capHit}M × {player.yearsRemaining}yr
             {player.hasNMC && <span style={{ marginLeft: "8px", color: "var(--red)", border: "1px solid var(--red)", padding: "0 3px" }}>NMC</span>}
@@ -219,7 +219,7 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
               <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "6px" }}>
                 STRAND Profile
               </div>
-              <div style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px", marginBottom: "12px" }}>
+              <div className="strand-svg-wrap" style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px", marginBottom: "12px" }}>
                 <FullStrand player={player} />
               </div>
             </>
@@ -496,7 +496,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
         </div>
 
         {/* Line 2: rank pill + stats row */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0", paddingLeft: "46px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0", paddingLeft: "46px", minWidth: 0 }}>
           {/* Rank */}
           <span style={{
             fontSize: "10px", color: "var(--rule)",
@@ -507,7 +507,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
           <div style={{ width: "1px", height: "28px", background: "var(--rule-light)", marginRight: "10px", flexShrink: 0 }} />
 
           {/* Stats */}
-          <div style={{ display: "flex", gap: "14px", alignItems: "center", flex: 1 }}>
+          <div className="player-mobile-stat-row">
             <StatPill value={primaryVal} label={primaryLabel} accent />
             <StatPill value={secondaryVal} label={secondaryLabel} />
             {/* Always show TOI for context unless TOI IS the primary/secondary */}
@@ -763,7 +763,7 @@ export default function PlayersPage() {
 
             {/* Skaters */}
             {(posFilter === "ALL" || posFilter === "F" || posFilter === "D") && skaters.length > 0 && (
-              <div style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
+              <div className="section-shell" style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
                 <SectionHeader label="Skaters" count={skaters.length} />
                 {skaters.map((p, i) => (
                   <PlayerRow key={p.id} player={p} team={teamMap.get(p.teamId)} rank={i + 1} sortKey={sortKey} actualPPG={actualPPG} />
@@ -773,7 +773,7 @@ export default function PlayersPage() {
 
             {/* Goalies */}
             {(posFilter === "ALL" || posFilter === "G") && goalies.length > 0 && (
-              <div style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
+              <div className="section-shell" style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
                 {starters.length > 0 && (
                   <>
                     <SectionHeader label="Starters · 40+ GP" count={starters.length} />

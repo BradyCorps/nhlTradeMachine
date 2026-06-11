@@ -72,6 +72,27 @@ html, body {
   text-shadow: 0 0 0.1px rgba(0,0,0,0.1);
 }
 
+html {
+  overflow-x: hidden;
+}
+
+body {
+  min-width: 320px;
+  overflow-x: clip;
+}
+
+img, svg, canvas, video {
+  max-width: 100%;
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+button, a, select {
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* ── Aged paper grain ────────────────────────────────────────── */
 body::before {
   content: '';
@@ -219,6 +240,48 @@ input[type="range"] { accent-color: var(--red); }
 
 .font-serif { font-family: 'Libre Baskerville', Georgia, serif !important; }
 .font-press { font-family: 'Courier Prime', 'Courier New', monospace !important; }
+
+.newspaper-kicker {
+  letter-spacing: 0.32em;
+  overflow-wrap: anywhere;
+}
+
+.feature-line {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.65;
+}
+
+.nav-divider {
+  display: none;
+}
+
+@media (min-width: 420px) {
+  .feature-line {
+    flex-direction: row;
+    gap: 8px;
+    line-height: 1.25;
+  }
+
+  .nav-divider {
+    display: inline;
+  }
+}
+
+@media (max-width: 539px) {
+  .newspaper-kicker,
+  .tracking-\[0\.4em\] {
+    letter-spacing: 0.18em !important;
+  }
+
+  .tracking-\[0\.3em\] {
+    letter-spacing: 0.16em !important;
+  }
+
+  .tracking-widest {
+    letter-spacing: 0.12em !important;
+  }
+}
 
 /* ── Component classes ───────────────────────────────────────── */
 .masthead-rule  { border-top: 4px double var(--ink); border-bottom: 4px double var(--ink); }
@@ -755,6 +818,35 @@ select.ledger-select {
 /* STRAND SVG — never overflow */
 .strand-svg-wrap { width: 100%; overflow: hidden; }
 .strand-svg-wrap svg { width: 100%; height: auto; display: block; }
+
+.player-mobile-stat-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.player-mobile-stat-row::-webkit-scrollbar { display: none; }
+
+@media (max-width: 539px) {
+  .player-expanded-panel {
+    padding: 10px 12px !important;
+  }
+
+  .player-expanded-contract {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+  }
+
+  .section-shell {
+    border-left: none !important;
+    border-right: none !important;
+  }
+}
 
 /* Trade proposal sends — stack on mobile */
 .proposal-sends {

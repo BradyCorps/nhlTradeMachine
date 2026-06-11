@@ -38,13 +38,13 @@ export default function WelcomePage() {
       </div>
 
       {/* ── Route cards ──────────────────────────────────────── */}
-      <div className="max-w-3xl mx-auto px-5 pb-10 grid grid-cols-1 sm:grid-cols-2 gap-5">
+      <div className="max-w-5xl mx-auto px-4 sm:px-5 pb-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
 
         <Link href="/trade" className="no-underline group">
           <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 group-hover:opacity-80"
             style={{ background: "var(--ledger-card)", border: "2px solid var(--ledger-rule)" }}>
             <div>
-              <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
+              <div className="newspaper-kicker font-black text-2xs uppercase mb-3 font-mono"
                 style={{ color: "var(--ledger-red)" }}>Feature One</div>
               <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
                 Trade Machine
@@ -63,16 +63,16 @@ export default function WelcomePage() {
                 ["Who Wants This?", "Ranks all 32 teams as partners for your package"],
                 ["Sim Engine",      "Project the season after any trade combination"],
               ].map(([label, desc]) => (
-                <div key={label} className="flex gap-2 text-2xs font-mono"
+                <div key={label} className="feature-line text-2xs font-mono"
                   style={{ color: "var(--ledger-ink-body)" }}>
                   <span className="font-black shrink-0" style={{ color: "var(--ledger-ink-body)" }}>{label}</span>
                   <span>— {desc}</span>
                 </div>
               ))}
             </div>
-            <div className="mt-2 py-3 text-center font-black text-2xs uppercase tracking-[0.3em] font-mono"
+            <div className="mt-2 py-3 px-2 text-center font-black text-2xs uppercase tracking-[0.18em] sm:tracking-[0.3em] font-mono"
               style={{ background: "var(--ledger-red)", color: "white" }}>
-              Open Trade Machine →
+              Open Trade Machine
             </div>
           </div>
         </Link>
@@ -81,7 +81,7 @@ export default function WelcomePage() {
           <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 group-hover:opacity-80"
             style={{ background: "var(--ledger-card)", border: "2px solid var(--ledger-rule)" }}>
             <div>
-              <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
+              <div className="newspaper-kicker font-black text-2xs uppercase mb-3 font-mono"
                 style={{ color: "var(--ledger-navy)" }}>Feature Two</div>
               <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
                 Player Analytics
@@ -100,65 +100,58 @@ export default function WelcomePage() {
                 ["Cap & Contract","Years remaining, NMC/NTC flags, cap hit"],
                 ["Goalie Tiers", "Starter / Tandem / Backup by GSAX"],
               ].map(([label, desc]) => (
-                <div key={label} className="flex gap-2 text-2xs font-mono"
+                <div key={label} className="feature-line text-2xs font-mono"
                   style={{ color: "var(--ledger-ink-body)" }}>
                   <span className="font-black shrink-0" style={{ color: "var(--ledger-ink-body)" }}>{label}</span>
                   <span>— {desc}</span>
                 </div>
               ))}
             </div>
-            <div className="mt-2 py-3 text-center font-black text-2xs uppercase tracking-[0.3em] font-mono"
+            <div className="mt-2 py-3 px-2 text-center font-black text-2xs uppercase tracking-[0.18em] sm:tracking-[0.3em] font-mono"
               style={{ background: "var(--ledger-navy)", color: "white" }}>
-              Open Player Analytics →
+              Open Player Analytics
             </div>
           </div>
         </Link>
-      </div>
-        
-      <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 opacity-50"
-            style={{ background: "var(--paper-card)", border: "2px solid var(--paper)" }}>
-        <div>
-          <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
-                style={{ color: "var(--ledger-violet)" }}>Feature Three</div><div>Coming Soon</div>
-          <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
-                Fantasy Hockey Expansion
-          </h2>
-          <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
-                Built for fantasy managers who want to draft smarter, execute flawless trades, and dominate the waiver wire using front-office data.
-          </p>
+
+        {[
+          {
+            feature: "Feature Three",
+            title: "Fantasy Hockey Expansion",
+            body: "Built for fantasy managers who want to draft smarter, execute cleaner trades, and work the waiver wire with front-office data.",
+          },
+          {
+            feature: "Feature Four",
+            title: "Micro-Context Prop Engine",
+            body: "Built for sharper daily reads on player-prop markets through matchup, role, pace, and usage context.",
+          },
+          {
+            feature: "Feature Five",
+            title: "Three-Year Simulation Model",
+            body: "See how trades compound over three seasons and pressure-test long-term franchise decisions.",
+          },
+        ].map(({ feature, title, body }) => (
+          <div key={feature} className="rounded-sm p-6 h-full flex flex-col gap-4 opacity-60"
+            style={{ background: "var(--paper-card)", border: "1px dashed var(--ledger-rule)" }}>
+            <div>
+              <div className="newspaper-kicker font-black text-2xs uppercase mb-2 font-mono"
+                style={{ color: "var(--ledger-violet)" }}>{feature}</div>
+              <div className="text-2xs uppercase tracking-[0.2em] mb-3 font-mono"
+                style={{ color: "var(--ledger-ink-faint)" }}>Coming Soon</div>
+              <h2 className="font-black text-lg leading-tight mb-2" style={{ color: "var(--ink)" }}>
+                {title}
+              </h2>
+              <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
+                {body}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 opacity-50"
-            style={{ background: "var(--paper-card)", border: "2px solid var(--paper)" }}>
-          <div>
-            <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
-                style={{ color: "var(--ledger-violet)" }}>Feature Four</div><div>Coming Soon</div>
-            <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
-                Micro-Context Prop Engine
-            </h2>
-            <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
-                Built for sharp bettors who want a mathematically grounded, daily mispricing matrix to consistently beat the closing lines on player props.
-            </p>
-        </div>
+        ))}
       </div>
-      <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 opacity-50"
-            style={{ background: "var(--paper-card)", border: "2px solid var(--paper)" }}>
-        <div>
-          <div className="font-black text-2xs uppercase tracking-[0.4em] mb-3 font-mono"
-                style={{ color: "var(--ledger-violet)" }}>Feature Five</div><div>Coming Soon</div>
-          <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
-                3 Year simulation model
-          </h2>
-          <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
-                See how your trades stack up over 3 years, get a better sense of GM logic by making long term decisions for your franchise.
-          </p>
-          </div>
-      </div>
-          
         
 
       {/* ── Explainer strip ──────────────────────────────────── */}
-      <div className="border-y py-8" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-inset)" }}>
+      <div className="border-y py-8" style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
         <div className="max-w-3xl mx-auto px-5">
           <p className="text-2xs uppercase tracking-[0.4em] font-mono text-center mb-5"
             style={{ color: "var(--ledger-ink-faint)" }}>How the engine works</p>

@@ -44,11 +44,11 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
             </p>
 
             {/* Nav tabs */}
-            <nav className="mt-2 flex items-center justify-center gap-4">
+            <nav className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 px-2">
               <a
                 href="/players"
                 className={[
-                  "text-[12px] font-black uppercase tracking-[0.2em] font-mono no-underline transition-colors",
+                  "text-[11px] sm:text-[12px] font-black uppercase tracking-[0.14em] sm:tracking-[0.2em] font-mono no-underline transition-colors",
                   activeTab === "players"
                     ? "text-ledger-ink"
                     : "text-ledger-ink-faint hover:text-ledger-ink",
@@ -56,11 +56,11 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
               >
                 {activeTab === "players" ? "◆" : "◇"} Player Analytics
               </a>
-              <span className="text-ledger-rule-light">|</span>
+              <span className="nav-divider text-ledger-rule-light">|</span>
               <a
                 href="/trade"
                 className={[
-                  "text-[12px] font-black uppercase tracking-[0.2em] font-mono no-underline transition-colors",
+                  "text-[11px] sm:text-[12px] font-black uppercase tracking-[0.14em] sm:tracking-[0.2em] font-mono no-underline transition-colors",
                   activeTab === "trade"
                     ? "text-ledger-ink"
                     : "text-ledger-ink-faint hover:text-ledger-ink",
