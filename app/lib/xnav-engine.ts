@@ -139,9 +139,13 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const defCorrection = clamp((teamXga60 - LEAGUE.avgXga60) * 0.40 + hdRateCorr, -0.18, 0.30);
   const gsaxPer60     = (gsaxPerGameCapped + defCorrection) * 60;
   const careerMean    = asset.baselineGsax ?? 0;
-  // Young goalies (≤26) are still developing: cap confidence so the prior stays
-  // meaningful and one bad season doesn't fully define their trajectory.
-  const confidenceAdj = asset.age <= 26 ? Math.min(confidenceG, 0.75) : confidenceG;
+  // Single-season GSAX variance is very high for goalies. Cap confidence at 0.80
+  // for all starters so the career baseline always carries 20% weight — a proven
+  // elite on a down year (Hellebuyck) shouldn't fully lose his track record.
+  // Young goalies (≤26) get a tighter cap (0.75) for even stronger regression.
+  const confidenceAdj = isStarter
+    ? (asset.age <= 26 ? Math.min(confidenceG, 0.75) : Math.min(confidenceG, 0.80))
+    : confidenceG;
   const expGSAx       = gsaxPer60 * confidenceAdj + careerMean * (1 - confidenceAdj);
 
   let goalieImpact = expGSAx >= 0

@@ -1,744 +1,744 @@
 {
-  "ANAHEIM DUCKS": {
-    "season": "2025;26",
+  "ANA": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.22,
-    "xga60": 0.06,
-    "xgf60": 0.06,
+    "hdca60": 13.28,
+    "xga60": 3.49,
+    "xgf60": 3.49,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.22,
-        "xga60": 0.06,
-        "xgf60": 0.06
+        "hdca60": 13.28,
+        "xga60": 3.49,
+        "xgf60": 3.49
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.24,
-        "xga60": 0.06,
-        "xgf60": 0.04
+        "hdca60": 14.31,
+        "xga60": 3.59,
+        "xgf60": 2.68
       }
     ]
   },
   "UTA": {
-    "season": "2025;26",
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.2,
-    "xga60": 0.05,
-    "xgf60": 0.05,
+    "hdca60": 11.89,
+    "xga60": 3.23,
+    "xgf60": 3.23,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.2,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.89,
+        "xga60": 3.23,
+        "xgf60": 3.23
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 164,
-        "hdca60": 0.22,
-        "xga60": 0.06,
-        "xgf60": 0.04
+        "hdca60": 13.14,
+        "xga60": 3.41,
+        "xgf60": 2.69
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 82,
-        "hdca60": 0.18,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 10.63,
+        "xga60": 3,
+        "xgf60": 3.1
       }
     ]
   },
-  "BOSTON BRUINS": {
-    "season": "2025;26",
+  "BOS": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.23,
-    "xga60": 0.06,
-    "xgf60": 0.05,
+    "hdca60": 13.52,
+    "xga60": 3.57,
+    "xgf60": 3.09,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.23,
-        "xga60": 0.06,
-        "xgf60": 0.05
+        "hdca60": 13.52,
+        "xga60": 3.57,
+        "xgf60": 3.09
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.19,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.6,
+        "xga60": 2.95,
+        "xgf60": 3.04
       }
     ]
   },
-  "BUFFALO SABRES": {
-    "season": "2025;26",
+  "BUF": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.21,
-    "xga60": 0.05,
-    "xgf60": 0.05,
+    "hdca60": 12.32,
+    "xga60": 3.3,
+    "xgf60": 3.27,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.21,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 12.32,
+        "xga60": 3.3,
+        "xgf60": 3.27
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.21,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 12.63,
+        "xga60": 3.22,
+        "xgf60": 3.02
       }
     ]
   },
-  "CAROLINA HURRICANES": {
-    "season": "2025;26",
+  "CAR": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.19,
-    "xga60": 0.05,
-    "xgf60": 0.06,
+    "hdca60": 11.46,
+    "xga60": 2.89,
+    "xgf60": 3.71,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.19,
-        "xga60": 0.05,
-        "xgf60": 0.06
+        "hdca60": 11.46,
+        "xga60": 2.89,
+        "xgf60": 3.71
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.18,
-        "xga60": 0.04,
-        "xgf60": 0.06
+        "hdca60": 10.9,
+        "xga60": 2.69,
+        "xgf60": 3.47
       }
     ]
   },
-  "COLUMBUS BLUE JACKETS": {
-    "season": "2025;26",
+  "CBJ": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.2,
-    "xga60": 0.05,
-    "xgf60": 0.05,
+    "hdca60": 12.25,
+    "xga60": 3.18,
+    "xgf60": 3.19,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.2,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 12.25,
+        "xga60": 3.18,
+        "xgf60": 3.19
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.22,
-        "xga60": 0.06,
-        "xgf60": 0.05
+        "hdca60": 13.1,
+        "xga60": 3.37,
+        "xgf60": 2.89
       }
     ]
   },
-  "CALGARY FLAMES": {
-    "season": "2025;26",
+  "CGY": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.22,
-    "xga60": 0.06,
-    "xgf60": 0.05,
+    "hdca60": 13.05,
+    "xga60": 3.38,
+    "xgf60": 2.94,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.22,
-        "xga60": 0.06,
-        "xgf60": 0.05
+        "hdca60": 13.05,
+        "xga60": 3.38,
+        "xgf60": 2.94
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.19,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.39,
+        "xga60": 2.94,
+        "xgf60": 3.15
       }
     ]
   },
-  "CHICAGO BLACKHAWKS": {
-    "season": "2025;26",
+  "CHI": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.24,
-    "xga60": 0.06,
-    "xgf60": 0.04,
+    "hdca60": 14.19,
+    "xga60": 3.45,
+    "xgf60": 2.62,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.24,
-        "xga60": 0.06,
-        "xgf60": 0.04
+        "hdca60": 14.19,
+        "xga60": 3.45,
+        "xgf60": 2.62
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.22,
-        "xga60": 0.05,
-        "xgf60": 0.04
+        "hdca60": 13.26,
+        "xga60": 3.3,
+        "xgf60": 2.49
       }
     ]
   },
-  "COLORADO AVALANCHE": {
-    "season": "2025;26",
+  "COL": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.19,
-    "xga60": 0.05,
-    "xgf60": 0.06,
+    "hdca60": 11.23,
+    "xga60": 2.92,
+    "xgf60": 3.73,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.19,
-        "xga60": 0.05,
-        "xgf60": 0.06
+        "hdca60": 11.23,
+        "xga60": 2.92,
+        "xgf60": 3.73
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.19,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.63,
+        "xga60": 2.94,
+        "xgf60": 3.13
       }
     ]
   },
-  "DALLAS STARS": {
-    "season": "2025;26",
+  "DAL": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.18,
-    "xga60": 0.05,
-    "xgf60": 0.05,
+    "hdca60": 10.98,
+    "xga60": 2.96,
+    "xgf60": 3.23,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.18,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 10.98,
+        "xga60": 2.96,
+        "xgf60": 3.23
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.18,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11,
+        "xga60": 2.84,
+        "xgf60": 3.3
       }
     ]
   },
-  "DETROIT RED WINGS": {
-    "season": "2025;26",
+  "DET": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.2,
-    "xga60": 0.05,
-    "xgf60": 0.06,
+    "hdca60": 11.71,
+    "xga60": 3.13,
+    "xgf60": 3.31,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.2,
-        "xga60": 0.05,
-        "xgf60": 0.06
+        "hdca60": 11.71,
+        "xga60": 3.13,
+        "xgf60": 3.31
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.2,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.95,
+        "xga60": 3.07,
+        "xgf60": 2.87
       }
     ]
   },
-  "EDMONTON OILERS": {
-    "season": "2025;26",
+  "EDM": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.2,
-    "xga60": 0.05,
-    "xgf60": 0.06,
+    "hdca60": 11.93,
+    "xga60": 3.18,
+    "xgf60": 3.42,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.2,
-        "xga60": 0.05,
-        "xgf60": 0.06
+        "hdca60": 11.93,
+        "xga60": 3.18,
+        "xgf60": 3.42
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.18,
-        "xga60": 0.05,
-        "xgf60": 0.06
+        "hdca60": 10.54,
+        "xga60": 2.87,
+        "xgf60": 3.53
       }
     ]
   },
-  "FLORIDA PANTHERS": {
-    "season": "2025;26",
+  "FLA": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.2,
-    "xga60": 0.05,
-    "xgf60": 0.06,
+    "hdca60": 12.03,
+    "xga60": 3.28,
+    "xgf60": 3.42,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.2,
-        "xga60": 0.05,
-        "xgf60": 0.06
+        "hdca60": 12.03,
+        "xga60": 3.28,
+        "xgf60": 3.42
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.19,
-        "xga60": 0.05,
-        "xgf60": 0.06
+        "hdca60": 11.36,
+        "xga60": 2.91,
+        "xgf60": 3.53
       }
     ]
   },
   "LAK": {
-    "season": "2025;26",
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.19,
-    "xga60": 0.05,
-    "xgf60": 0.05,
+    "hdca60": 11.49,
+    "xga60": 2.92,
+    "xgf60": 3.2,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.19,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.49,
+        "xga60": 2.92,
+        "xgf60": 3.2
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.18,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 10.57,
+        "xga60": 2.74,
+        "xgf60": 3.06
       }
     ]
   },
-  "MINNESOTA WILD": {
-    "season": "2025;26",
+  "MIN": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.2,
-    "xga60": 0.05,
-    "xgf60": 0.06,
+    "hdca60": 11.84,
+    "xga60": 3.1,
+    "xgf60": 3.37,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.2,
-        "xga60": 0.05,
-        "xgf60": 0.06
+        "hdca60": 11.84,
+        "xga60": 3.1,
+        "xgf60": 3.37
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.18,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 10.59,
+        "xga60": 2.79,
+        "xgf60": 2.95
       }
     ]
   },
-  "MONTREAL CANADIENS": {
-    "season": "2025;26",
+  "MTL": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.22,
-    "xga60": 0.06,
-    "xgf60": 0.06,
+    "hdca60": 13.06,
+    "xga60": 3.46,
+    "xgf60": 3.3,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.22,
-        "xga60": 0.06,
-        "xgf60": 0.06
+        "hdca60": 13.06,
+        "xga60": 3.46,
+        "xgf60": 3.3
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.23,
-        "xga60": 0.06,
-        "xgf60": 0.05
+        "hdca60": 13.68,
+        "xga60": 3.5,
+        "xgf60": 2.77
       }
     ]
   },
   "NJD": {
-    "season": "2025;26",
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.2,
-    "xga60": 0.05,
-    "xgf60": 0.06,
+    "hdca60": 12.1,
+    "xga60": 3.14,
+    "xgf60": 3.3,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.2,
-        "xga60": 0.05,
-        "xgf60": 0.06
+        "hdca60": 12.1,
+        "xga60": 3.14,
+        "xgf60": 3.3
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.18,
-        "xga60": 0.05,
-        "xgf60": 0.06
+        "hdca60": 11.08,
+        "xga60": 2.97,
+        "xgf60": 3.32
       }
     ]
   },
-  "NASHVILLE PREDATORS": {
-    "season": "2025;26",
+  "NSH": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.21,
-    "xga60": 0.05,
-    "xgf60": 0.05,
+    "hdca60": 12.47,
+    "xga60": 3.29,
+    "xgf60": 3.19,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.21,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 12.47,
+        "xga60": 3.29,
+        "xgf60": 3.19
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.2,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.82,
+        "xga60": 3.12,
+        "xgf60": 3.16
       }
     ]
   },
-  "NEW YORK ISLANDERS": {
-    "season": "2025;26",
+  "NYI": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.23,
-    "xga60": 0.06,
-    "xgf60": 0.05,
+    "hdca60": 13.68,
+    "xga60": 3.6,
+    "xgf60": 3.19,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.23,
-        "xga60": 0.06,
-        "xgf60": 0.05
+        "hdca60": 13.68,
+        "xga60": 3.6,
+        "xgf60": 3.19
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.21,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 12.34,
+        "xga60": 3.13,
+        "xgf60": 3.01
       }
     ]
   },
-  "NEW YORK RANGERS": {
-    "season": "2025;26",
+  "NYR": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.19,
-    "xga60": 0.06,
-    "xgf60": 0.05,
+    "hdca60": 11.67,
+    "xga60": 3.37,
+    "xgf60": 2.99,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.19,
-        "xga60": 0.06,
-        "xgf60": 0.05
+        "hdca60": 11.67,
+        "xga60": 3.37,
+        "xgf60": 2.99
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.2,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 12.27,
+        "xga60": 3.07,
+        "xgf60": 3.18
       }
     ]
   },
-  "OTTAWA SENATORS": {
-    "season": "2025;26",
+  "OTT": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.17,
-    "xga60": 0.05,
-    "xgf60": 0.06,
+    "hdca60": 10.33,
+    "xga60": 2.82,
+    "xgf60": 3.38,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.17,
-        "xga60": 0.05,
-        "xgf60": 0.06
+        "hdca60": 10.33,
+        "xga60": 2.82,
+        "xgf60": 3.38
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.19,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.6,
+        "xga60": 3.01,
+        "xgf60": 3.21
       }
     ]
   },
-  "PHILADELPHIA FLYERS": {
-    "season": "2025;26",
+  "PHI": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.17,
-    "xga60": 0.05,
-    "xgf60": 0.05,
+    "hdca60": 10.48,
+    "xga60": 2.86,
+    "xgf60": 3.08,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.17,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 10.48,
+        "xga60": 2.86,
+        "xgf60": 3.08
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.19,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.35,
+        "xga60": 2.91,
+        "xgf60": 2.85
       }
     ]
   },
-  "PITTSBURGH PENGUINS": {
-    "season": "2025;26",
+  "PIT": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.21,
-    "xga60": 0.05,
-    "xgf60": 0.06,
+    "hdca60": 12.47,
+    "xga60": 3.22,
+    "xgf60": 3.4,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.21,
-        "xga60": 0.05,
-        "xgf60": 0.06
+        "hdca60": 12.47,
+        "xga60": 3.22,
+        "xgf60": 3.4
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.2,
-        "xga60": 0.05,
-        "xgf60": 0.06
+        "hdca60": 12,
+        "xga60": 3.12,
+        "xgf60": 3.4
       }
     ]
   },
   "SJS": {
-    "season": "2025;26",
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.21,
-    "xga60": 0.06,
-    "xgf60": 0.05,
+    "hdca60": 12.81,
+    "xga60": 3.32,
+    "xgf60": 2.9,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.21,
-        "xga60": 0.06,
-        "xgf60": 0.05
+        "hdca60": 12.81,
+        "xga60": 3.32,
+        "xgf60": 2.9
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.22,
-        "xga60": 0.06,
-        "xgf60": 0.05
+        "hdca60": 13.16,
+        "xga60": 3.49,
+        "xgf60": 2.72
       }
     ]
   },
   "SEA": {
-    "season": "2025;26",
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.21,
-    "xga60": 0.06,
-    "xgf60": 0.05,
+    "hdca60": 12.37,
+    "xga60": 3.34,
+    "xgf60": 2.8,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.21,
-        "xga60": 0.06,
-        "xgf60": 0.05
+        "hdca60": 12.37,
+        "xga60": 3.34,
+        "xgf60": 2.8
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.19,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.11,
+        "xga60": 2.93,
+        "xgf60": 2.84
       }
     ]
   },
-  "ST LOUIS BLUES": {
-    "season": "2025;26",
+  "STL": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.19,
-    "xga60": 0.05,
-    "xgf60": 0.05,
+    "hdca60": 11.42,
+    "xga60": 2.99,
+    "xgf60": 2.82,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.19,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.42,
+        "xga60": 2.99,
+        "xgf60": 2.82
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.2,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 12.11,
+        "xga60": 3.14,
+        "xgf60": 2.74
       }
     ]
   },
   "TBL": {
-    "season": "2025;26",
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.18,
-    "xga60": 0.05,
-    "xgf60": 0.06,
+    "hdca60": 10.84,
+    "xga60": 2.98,
+    "xgf60": 3.5,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.18,
-        "xga60": 0.05,
-        "xgf60": 0.06
+        "hdca60": 10.84,
+        "xga60": 2.98,
+        "xgf60": 3.5
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.19,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.31,
+        "xga60": 3.02,
+        "xgf60": 3.19
       }
     ]
   },
-  "TORONTO MAPLE LEAFS": {
-    "season": "2025;26",
+  "TOR": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.22,
-    "xga60": 0.06,
-    "xgf60": 0.05,
+    "hdca60": 13.42,
+    "xga60": 3.57,
+    "xgf60": 2.93,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.22,
-        "xga60": 0.06,
-        "xgf60": 0.05
+        "hdca60": 13.42,
+        "xga60": 3.57,
+        "xgf60": 2.93
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.19,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.68,
+        "xga60": 3.03,
+        "xgf60": 3.25
       }
     ]
   },
-  "VANCOUVER CANUCKS": {
-    "season": "2025;26",
+  "VAN": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.23,
-    "xga60": 0.06,
-    "xgf60": 0.05,
+    "hdca60": 13.52,
+    "xga60": 3.46,
+    "xgf60": 2.95,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.23,
-        "xga60": 0.06,
-        "xgf60": 0.05
+        "hdca60": 13.52,
+        "xga60": 3.46,
+        "xgf60": 2.95
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.19,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.61,
+        "xga60": 2.93,
+        "xgf60": 2.95
       }
     ]
   },
   "VGK": {
-    "season": "2025;26",
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.17,
-    "xga60": 0.05,
-    "xgf60": 0.05,
+    "hdca60": 9.99,
+    "xga60": 2.72,
+    "xgf60": 3.28,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.17,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 9.99,
+        "xga60": 2.72,
+        "xgf60": 3.28
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.18,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 10.89,
+        "xga60": 2.83,
+        "xgf60": 3.06
       }
     ]
   },
   "WPG": {
-    "season": "2025;26",
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.21,
-    "xga60": 0.05,
-    "xgf60": 0.05,
+    "hdca60": 12.32,
+    "xga60": 3.26,
+    "xgf60": 3.06,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.21,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 12.32,
+        "xga60": 3.26,
+        "xgf60": 3.06
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.19,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.54,
+        "xga60": 2.94,
+        "xgf60": 3.1
       }
     ]
   },
-  "WASHINGTON CAPITALS": {
-    "season": "2025;26",
+  "WSH": {
+    "season": "2025;26_teamstats_all",
     "gp": 82,
-    "hdca60": 0.21,
-    "xga60": 0.06,
-    "xgf60": 0.06,
+    "hdca60": 12.59,
+    "xga60": 3.39,
+    "xgf60": 3.45,
     "allSeasons": [
       {
-        "season": "2025;26",
+        "season": "2025;26_teamstats_all",
         "gp": 82,
-        "hdca60": 0.21,
-        "xga60": 0.06,
-        "xgf60": 0.06
+        "hdca60": 12.59,
+        "xga60": 3.39,
+        "xgf60": 3.45
       },
       {
-        "season": "2022;23;24;25",
+        "season": "2022;23;24;25_teamstats_all",
         "gp": 246,
-        "hdca60": 0.2,
-        "xga60": 0.05,
-        "xgf60": 0.05
+        "hdca60": 11.71,
+        "xga60": 3.11,
+        "xgf60": 3.05
       }
     ]
   }

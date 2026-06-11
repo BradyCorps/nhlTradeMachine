@@ -21,14 +21,16 @@ const inRange = (val: number, min: number, max: number, label: string) => {
 // GOALIE TESTS
 // ─────────────────────────────────────────────────────────────────────────────
 describe("G-NAV — Elite Starters", () => {
-  it("Hellebuyck: elite starter on good team → 190-250 NAV", () => {
+  it("Hellebuyck: elite starter on good team → 130-200 NAV", () => {
     const result = calcGoalieNAV({
       id: "hellebuyck", name: "Connor Hellebuyck", position: "G",
       age: 33, capHit: 8.5, yearsRemaining: 5,
       gsax: 18.5, gamesStarted: 60, teamXga60: 2.72,
     });
-    // Cap ceiling corrected to 95.5 (from inflated 104) — FMV dollars are proportionally lower
-    inRange(result.total, 190, 250, "Hellebuyck NAV");
+    // Confidence cap at 0.80 for all starters means even a full 60-game season
+    // retains 20% weight on the career baseline — slightly lowers the ceiling for
+    // strong single-season stats but prevents a single down year from tanking elite goalies.
+    inRange(result.total, 130, 200, "Hellebuyck NAV");
   });
 
   it("Saros: solid starter on average team → 90-130 NAV", () => {
