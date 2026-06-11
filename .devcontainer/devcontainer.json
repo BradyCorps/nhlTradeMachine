@@ -1,0 +1,4 @@
+{
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:20",
+  "postCreateCommand": "curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh && export PATH=\"$HOME/.local/bin:$PATH\" && rtk init -g --codex"
+}
