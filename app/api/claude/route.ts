@@ -76,8 +76,59 @@ const TradeMemoPayloadSchema = z.object({
   flags: z.array(FlagSummarySchema),
 });
 
+const TeamResultSchema = z.object({
+  teamId: z.string().optional(),
+  teamName: z.string().optional(),
+  projectedPoints: z.number().nullable().optional(),
+  leagueRank: z.number().nullable().optional(),
+  madePlayoffs: z.boolean().nullable().optional(),
+  topScorer: z.any().optional(),
+  goalie: z.any().optional(),
+}).passthrough();
+
+const TradedPlayerOutcomeSchema = z.object({
+  name: z.string(),
+  position: z.string(),
+  oldTeamName: z.string(),
+  newTeamName: z.string(),
+  projectedPts: z.number().nullable().optional(),
+  projectedGoals: z.number().nullable().optional(),
+  gamesPlayed: z.number().nullable().optional(),
+  projectedGAA: z.number().nullable().optional(),
+  projectedSVP: z.number().nullable().optional(),
+  gamesStarted: z.number().nullable().optional(),
+}).passthrough();
+
+const ExecutedTradeSummarySchema = z.object({
+  homeTeamName: z.string(),
+  partnerTeamName: z.string(),
+  outgoing: z.array(AssetSummarySchema),
+  incoming: z.array(AssetSummarySchema),
+});
+
 const SeasonRecapPayloadSchema = z.object({
-  lockedReport: z.string(),
+  simulationMode: z.string(),
+  replaySeason: z.string(),
+  rosterMoveWindow: z.string(),
+  homeTeamName: z.string(),
+  partnerTeamName: z.string().nullable().optional(),
+  homeTeam: TeamResultSchema.nullable().optional(),
+  partnerTeam: TeamResultSchema.nullable().optional(),
+  leaders: z.record(z.string(), z.any()),
+  playoffBracket: z.any().nullable().optional(),
+  playoffTeams: z.array(z.string()),
+  tradedPlayerOutcomes: z.array(TradedPlayerOutcomeSchema),
+  executedTrades: z.array(ExecutedTradeSummarySchema),
+  homeRoster: z.array(z.string()),
+  homePhase: z.string().nullable().optional(),
+  homeContention: z.object({
+    present: z.number(),
+    future: z.number(),
+  }),
+  seasonStartOutlook: z.string(),
+  isRebuilding: z.boolean(),
+  seed: z.number().nullable().optional(),
+  generatedLabel: z.string().optional(),
 });
 
 const ClaudeRequestSchema = z.discriminatedUnion("kind", [
@@ -142,12 +193,86 @@ Rules: Use only the locked numbers above. Do not calculate new values. Complete 
 }
 
 function buildSeasonRecapPrompt(payload: z.infer<typeof SeasonRecapPayloadSchema>): string {
+  const tradesSummary = payload.executedTrades.map(t => [
+    `OFFSEASON MOVE: ${t.homeTeamName} <-> ${t.partnerTeamName}`,
+    `  ${t.homeTeamName} MOVED: ${describeAssets(t.outgoing)}`,
+    `  ${t.homeTeamName} ACQUIRED: ${describeAssets(t.incoming)}`,
+  ].join("\n")).join("\n\n");
+
+  const tradedOutcomeLines = payload.tradedPlayerOutcomes.map((o) => {
+    if (o.position === "G") {
+      return `${o.name}: ${o.oldTeamName} -> ${o.newTeamName}, ${o.gamesStarted ?? "?"} starts, ${o.projectedGAA ?? "?"} GAA, ${o.projectedSVP ?? "?"} SV%`;
+    }
+    return `${o.name}: ${o.oldTeamName} -> ${o.newTeamName}, ${o.gamesPlayed ?? "?"} GP, ${o.projectedGoals ?? "?"} G, ${o.projectedPts ?? "?"} pts`;
+  });
+
+  const lockedFacts = {
+    simulationMode: payload.simulationMode,
+    replaySeason: payload.replaySeason,
+    rosterMoveWindow: payload.rosterMoveWindow,
+    homeTeam: payload.homeTeam,
+    partnerTeam: payload.partnerTeam,
+    leaders: payload.leaders,
+    playoffBracket: payload.playoffBracket,
+    playoffTeams: payload.playoffTeams,
+    tradedPlayerOutcomes: payload.tradedPlayerOutcomes,
+    seed: payload.seed,
+  };
+
   return `You are a senior NHL beat reporter writing an end-of-season alternate-history recap.
 
-Use ONLY the locked pre-calculated report below. Do not estimate, calculate, infer missing values, invent injuries, invent off-ice stories, or change standings/playoff results. Treat executed deals as ${SEASON.rosterMoveWindow} roster moves, never as trade-deadline moves. If a fact is not in the report, omit it.
+Use ONLY the locked pre-calculated JSON and summaries below. Do not estimate, calculate, infer missing values, invent injuries, invent off-ice stories, or change standings/playoff results. Treat executed deals as ${payload.rosterMoveWindow} roster moves, never as trade-deadline moves. If a fact is not in the locked data, omit it.
 
-LOCKED REPORT:
-${payload.lockedReport}`;
+LOCKED JSON:
+${JSON.stringify(lockedFacts, null, 2)}
+
+LOCKED MOVE SUMMARY:
+${tradesSummary || "No executed trades supplied."}
+
+${payload.homeTeamName} OPENING-NIGHT ROSTER AFTER MOVES (top 12):
+${payload.homeRoster.join("\n") || "No roster summary supplied."}
+Phase entering replay: ${payload.homePhase ?? "Unknown"}
+Contention ratings (X-NAV derived): Present ${payload.homeContention.present.toFixed(1)}/10 · Future ${payload.homeContention.future.toFixed(1)}/10
+Season-start outlook: ${payload.seasonStartOutlook}
+
+TRADED PLAYER OUTCOMES (LOCKED):
+${tradedOutcomeLines.length > 0 ? tradedOutcomeLines.join("\n") : "No traded player stat outcomes available."}
+
+LOCKED FACTS:
+- Florida Panthers did NOT win the Cup (won 2023, 2024, 2025).
+- Utah Hockey Club is now the Utah Mammoth (UTA). Arizona Coyotes do not exist.
+- These are ${payload.rosterMoveWindow} moves. Never describe them as deadline deals or say a team sat at any ranking at the deadline.
+- Conn Smythe must be from the Stanley Cup champion listed in LOCKED JSON.
+
+NHL STRUCTURE:
+Eastern: Atlantic (BOS,BUF,DET,FLA,MTL,OTT,TBL,TOR) · Metro (CAR,CBJ,NJD,NYI,NYR,PHI,PIT,WSH)
+Western: Central (UTA,CHI,COL,DAL,MIN,NSH,STL,WPG) · Pacific (ANA,CGY,EDM,LAK,SEA,SJS,VAN,VGK)
+
+Write 6 sections. Every number comes from the locked data above — do not estimate, approximate, or invent stats.
+
+**THE TRADE, ONE YEAR LATER**
+3-4 sentences. Frame the deal as an offseason/opening-night roster move. Use the locked traded-player outcomes above for every moved player you discuss. If a traded player's projected stat line is not listed, describe the team-level effect only.
+
+**${payload.homeTeamName.toUpperCase()}'S SEASON**
+${payload.isRebuilding
+  ? `4-5 sentences. Use the exact finish position from the locked projection. Paint the narrative around those numbers — low point, bright spot, draft pick significance.`
+  : `4-5 sentences. Use the exact finish and playoff result from the locked bracket. Describe one defining result from the listed bracket or standings.`}
+
+**AROUND THE LEAGUE**
+4-5 sentences. Use 3 storylines from the standings, bracket, awards, and leader facts above. Do not invent injuries or off-ice stories.
+
+**THE YEAR IN NUMBERS**
+Use ONLY the numbers provided. Do not approximate, estimate, or calculate anything not given here.
+
+**THE DRAFT LOTTERY**
+${payload.homeTeam && payload.homeTeam.madePlayoffs === false
+  ? `${payload.homeTeamName} missed the playoffs. Use the locked league rank and points from JSON. Do not name a prospect unless listed above.`
+  : `Use the locked draftLottery team from JSON. Do not name a prospect unless listed above.`}
+
+**VERDICT**
+Two sentences per team — what went right or wrong, definitive judgment on the GM's call.
+
+Simulation #${payload.seed ?? "—"} · ${payload.generatedLabel ?? ""}. Write like someone who watched every game.`;
 }
 
 export async function POST(req: Request) {

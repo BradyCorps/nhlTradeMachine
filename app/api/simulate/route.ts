@@ -759,6 +759,9 @@ export async function POST(req: NextRequest) {
 
     const playoffBracket = simulatePlayoffs(standings, rand);
     const cupWinner = standings.find(t => t.teamId === playoffBracket.champion.teamId) ?? leaders.cupWinner;
+    const connSmythe = cupWinner?.topScorer
+      ? { name: cupWinner.topScorer.name, team: cupWinner.teamName }
+      : null;
     const tradedPlayerOutcomes = buildTradedPlayerOutcomes(trades, teams, standings, seed);
 
     return NextResponse.json({
@@ -770,6 +773,7 @@ export async function POST(req: NextRequest) {
       leaders: {
         ...leaders,
         cupWinner,
+        connSmythe,
         calder: calderWinner,
       },
       playoffBracket,

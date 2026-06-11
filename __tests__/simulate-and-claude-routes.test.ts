@@ -93,6 +93,34 @@ describe("simulate route", () => {
     );
   });
 
+  it("awards Conn Smythe to a player on the simulated Cup champion", async () => {
+    const depth = teamIds.flatMap((teamId) => [
+      player(`${teamId}-f1`, `${teamId} Forward`, teamId, 42, "C"),
+      player(`${teamId}-d1`, `${teamId} Defender`, teamId, 25, "D"),
+      {
+        ...player(`${teamId}-g1`, `${teamId} Goalie`, teamId, 0, "G"),
+        gsax: 0,
+        gamesStarted: 45,
+        savePct: 0.905,
+      },
+    ]);
+
+    const res = await simulatePOST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      body: JSON.stringify({
+        homeTeamId: "WPG",
+        partnerTeamId: "CGY",
+        teams,
+        players: depth,
+        seed: 18,
+        trades: [],
+      }),
+    }) as any);
+    const body = await res.json();
+
+    expect(body.leaders.connSmythe.team).toBe(body.playoffBracket.champion.teamName);
+  });
+
   it("derives a stable seed when one is not supplied", async () => {
     const connor = player("connor", "Kyle Connor", "WPG", 92, "W");
     const andersson = player("andersson", "Rasmus Andersson", "CGY", 45, "D");
@@ -168,10 +196,11 @@ describe("claude narrative route contract", () => {
     expect(body.error).toBe("Invalid narrative request");
   });
 
-  it("accepts locked season recap payloads", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
+  it("accepts structured locked season recap payloads", async () => {
+    const fetchMock = vi.fn(async () => Response.json({
       content: [{ text: "Locked recap." }],
-    })));
+    }));
+    vi.stubGlobal("fetch", fetchMock);
 
     const req = new Request("http://localhost/api/claude", {
       method: "POST",
@@ -180,7 +209,53 @@ describe("claude narrative route contract", () => {
         model: "claude-sonnet-4-5",
         max_tokens: 300,
         payload: {
-          lockedReport: `Simulation mode: ${SEASON.simulationMode}\nKyle Connor: 76 GP, 84 pts`,
+          simulationMode: SEASON.simulationMode,
+          replaySeason: SEASON.replaySeason,
+          rosterMoveWindow: SEASON.rosterMoveWindow,
+          homeTeamName: "Winnipeg Jets",
+          partnerTeamName: "Calgary Flames",
+          homeTeam: {
+            teamName: "Winnipeg Jets",
+            projectedPoints: 101,
+            leagueRank: 7,
+            madePlayoffs: true,
+          },
+          partnerTeam: {
+            teamName: "Calgary Flames",
+            projectedPoints: 88,
+            leagueRank: 18,
+            madePlayoffs: false,
+          },
+          leaders: {
+            cupWinner: { teamName: "Winnipeg Jets" },
+            connSmythe: { name: "Kyle Connor", team: "Winnipeg Jets" },
+          },
+          playoffBracket: {
+            champion: { teamName: "Winnipeg Jets" },
+          },
+          playoffTeams: ["WPG"],
+          tradedPlayerOutcomes: [{
+            name: "Kyle Connor",
+            position: "W",
+            oldTeamName: "Winnipeg Jets",
+            newTeamName: "Calgary Flames",
+            gamesPlayed: 76,
+            projectedGoals: 38,
+            projectedPts: 84,
+          }],
+          executedTrades: [{
+            homeTeamName: "Winnipeg Jets",
+            partnerTeamName: "Calgary Flames",
+            outgoing: [{ name: "Kyle Connor", position: "W", age: 29, capHit: 7.1, yearsRemaining: 1 }],
+            incoming: [],
+          }],
+          homeRoster: ["Mark Scheifele (C, age 33)"],
+          homePhase: "Contender",
+          homeContention: { present: 8.1, future: 5.4 },
+          seasonStartOutlook: "opening the year with a roster built to contend immediately",
+          isRebuilding: false,
+          seed: 18,
+          generatedLabel: "June 2026",
         },
       }),
     });
@@ -190,5 +265,8 @@ describe("claude narrative route contract", () => {
 
     expect(res.status).toBe(200);
     expect(body.content[0].text).toBe("Locked recap.");
+    const anthropicBody = JSON.parse(((fetchMock as any).mock.calls[0][1] as RequestInit).body as string);
+    expect(anthropicBody.messages[0].content).toContain("LOCKED JSON");
+    expect(anthropicBody.messages[0].content).toContain("Conn Smythe must be from the Stanley Cup champion");
   });
 });

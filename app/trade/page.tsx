@@ -410,146 +410,15 @@ export default function TradeMachine() {
     const partnerTeam = teams[1];
     const isRebuilding = ["Rebuilding","Tanking","Retooling"].includes(teams[0]!.phase ?? "");
 
-    const tradedOutcomeLines = (sim.tradedPlayerOutcomes ?? []).map((o: any) => {
-      if (o.position === "G") {
-        return `${o.name}: ${o.oldTeamName} -> ${o.newTeamName}, ${o.gamesStarted ?? "?"} starts, ${o.projectedGAA ?? "?"} GAA, ${o.projectedSVP ?? "?"} SV%`;
-      }
-      return `${o.name}: ${o.oldTeamName} -> ${o.newTeamName}, ${o.gamesPlayed ?? "?"} GP, ${o.projectedGoals ?? "?"} G, ${o.projectedPts ?? "?"} pts`;
-    });
-
-    // ── Step 3: Build structured prompt ───────────────────────
-    // Claude gets exact numbers from the deterministic sim and writes narrative only.
-    const simContext = `
-PROJECTED SEASON RESULTS — USE THESE EXACT NUMBERS, DO NOT INVENT ALTERNATIVES:
-	Simulation mode: ${sim.simulationMode ?? SEASON.simulationMode}
-	Premise: take each current roster as it stands now, move the selected trade(s) to opening night, and replay the full ${SEASON.replaySeason} season from the beginning.
-
-${teams[0]!.name}: ${sim.homeTeam?.projectedPoints ?? "?"} pts · Finished #${sim.homeTeam?.leagueRank ?? "?"}/32 · ${sim.homeTeam?.madePlayoffs ? "MADE PLAYOFFS" : "MISSED PLAYOFFS"}
-  Top scorer: ${sim.homeTeam?.topScorer?.name ?? "—"} — ${sim.homeTeam?.topScorer?.projectedPts ?? "—"} pts
-  Starting goalie: ${sim.homeTeam?.goalie?.name ?? "—"} — ${sim.homeTeam?.goalie?.projectedGAA ?? "—"} GAA / ${sim.homeTeam?.goalie?.projectedSVP ?? "—"} SV%
-
-${partnerTeam?.name ?? ""}: ${sim.partnerTeam?.projectedPoints ?? "?"} pts · Finished #${sim.partnerTeam?.leagueRank ?? "?"}/32 · ${sim.partnerTeam?.madePlayoffs ? "MADE PLAYOFFS" : "MISSED PLAYOFFS"}
-  Top scorer: ${sim.partnerTeam?.topScorer?.name ?? "—"} — ${sim.partnerTeam?.topScorer?.projectedPts ?? "—"} pts
-  Starting goalie: ${sim.partnerTeam?.goalie?.name ?? "—"} — ${sim.partnerTeam?.goalie?.projectedGAA ?? "—"} GAA / ${sim.partnerTeam?.goalie?.projectedSVP ?? "—"} SV%
-
-LEAGUE RESULTS (LOCKED — do not contradict):
-  Presidents' Trophy: ${sim.leaders?.presidentsTrophy?.teamName ?? "—"} — ${sim.leaders?.presidentsTrophy?.projectedPoints ?? "—"} pts
-  Stanley Cup Champion: ${sim.leaders?.cupWinner?.teamName ?? "—"} 
-  Points Leader: ${sim.leaders?.topScorer?.name ?? "—"}, ${sim.leaders?.topScorer?.team ?? "—"} — ${sim.leaders?.topScorer?.pts ?? "—"} pts
-  GAA Leader: ${sim.leaders?.topGoalie?.name ?? "—"}, ${sim.leaders?.topGoalie?.team ?? "—"} — ${sim.leaders?.topGoalie?.gaa ?? "—"} GAA
-  SV% Leader: ${sim.leaders?.topGoalie?.name ?? "—"}, ${sim.leaders?.topGoalie?.team ?? "—"} — ${sim.leaders?.topGoalie?.svp ?? "—"} SV%
-  Calder Trophy: ${sim.leaders?.calder?.name ?? "—"}, ${sim.leaders?.calder?.team ?? "—"} — ${sim.leaders?.calder?.note ?? ""}
-  Vezina Trophy: ${sim.leaders?.vezina?.name ?? "—"}, ${sim.leaders?.vezina?.team ?? "—"} — ${sim.leaders?.vezina?.gaa ?? "—"} GAA
-  Hart Trophy (MVP): ${sim.leaders?.hart?.name ?? "—"}, ${sim.leaders?.hart?.team ?? "—"} — ${sim.leaders?.hart?.pts ?? "—"} pts
-  Norris Trophy: ${sim.leaders?.norris?.name ?? "—"}, ${sim.leaders?.norris?.team ?? "—"} — ${sim.leaders?.norris?.pts ?? "—"} pts
-  Draft Lottery: ${sim.leaders?.draftLottery?.teamName ?? "—"} finished last (${sim.leaders?.draftLottery?.projectedPoints ?? "—"} pts)
-  Simulation seed: #${sim.seed ?? "—"}
-
-TRADED PLAYER OUTCOMES (LOCKED):
-${tradedOutcomeLines.length > 0 ? tradedOutcomeLines.join("\n") : "No traded player stat outcomes available."}
-
-CRITICAL ACCURACY RULES:
-- Every stat (pts, GAA, SV%) must match the exact number above — no rounding, no approximating
-- Do not add stats for players not listed above
-- Do not add context (injuries, feuds, locker room issues) not in the data above
-
-PLAYOFF TEAMS: ${sim.playoffTeams?.join(", ") ?? "—"}
-
-YOUR ROLE: Write the narrative column using ONLY these numbers.
-Do not invent standings, stat lines, or results.
-Claude is the storyteller — the simulation engine is the source of truth.`;
-
-    const prompt = (() => {
-      const allTradedNames = executedTrades.flatMap(t => [
-        ...t.outgoing.map(a => a.name),
-        ...t.incoming.map(a => a.name),
-      ]);
-      const franchiseMoved = (name: string) => allTradedNames.includes(name);
-
-      const teamNarrative = (t: Team): string => {
-        const p = t.phase;
-        if (p === "Tanking" || p === "Rebuilding") return "opening the year with a future-first roster construction";
-        if (p === "Retooling") return "opening the year trying to turn a transitional roster into a playoff-calibre group";
-        if (p === "Bubble") return "opening the year with a roster built to chase a playoff spot";
-        if (p === "Contender") return "opening the year with a roster built to contend immediately";
-        return "opening the year with an unsettled organizational direction";
-      };
-
-      return `You are a senior NHL beat reporter writing the definitive end-of-season alternate-history column.
-${simContext}
-
-	THE OFFSEASON ROSTER MOVE IS THE DIVERGENCE POINT. Treat every executed deal as completed before opening night of the ${SEASON.replaySeason} season, not at the trade deadline.
-${franchiseMoved("Auston Matthews") ? "Matthews changed teams before opening night — Toronto's full-season result is reflected in the numbers above." : ""}
-${franchiseMoved("Connor Hellebuyck") ? "Hellebuyck changed teams before opening night — Winnipeg's full-season identity is reflected in the numbers above." : ""}
-
-LOCKED FACTS:
-- Florida Panthers did NOT win the Cup (won 2023, 2024, 2025).
-- Utah Hockey Club is now the Utah Mammoth (UTA). Arizona Coyotes do not exist.
-- These are ${SEASON.rosterMoveWindow} moves. Never describe them as deadline deals or say a team sat at any ranking at the deadline.
-
-NHL STRUCTURE:
-Eastern: Atlantic (BOS,BUF,DET,FLA,MTL,OTT,TBL,TOR) · Metro (CAR,CBJ,NJD,NYI,NYR,PHI,PIT,WSH)
-Western: Central (UTA,CHI,COL,DAL,MIN,NSH,STL,WPG) · Pacific (ANA,CGY,EDM,LAK,SEA,SJS,VAN,VGK)
-
-OFFSEASON MOVE SUMMARY:
-${tradesSummary}
-
-${teams[0]!.name} OPENING-NIGHT ROSTER AFTER MOVES (top 12):
-${homeRoster.join("\n")}
-Phase entering replay: ${teams[0]!.phase}
-Contention ratings (X-NAV derived): Present ${computeContention(db.players.filter(p => p.teamId === teams[0]!.id), navMap).present.toFixed(1)}/10 · Future ${computeContention(db.players.filter(p => p.teamId === teams[0]!.id), navMap).future.toFixed(1)}/10
-Season-start outlook: ${teamNarrative(teams[0]!)}
-
-${sim?.playoffBracket ? `PLAYOFF BRACKET (simulated):
-Eastern: ${sim.playoffBracket.eastern.r1.map((s: any) => `${s.home.teamName} ${s.homeWins}-${s.awayWins} ${s.away.teamName}`).join(' | ')}
-  → ${sim.playoffBracket.eastern.r2.map((s: any) => `${s.winner.teamName}`).join(' def ')} · ECF: ${sim.playoffBracket.eastern.cf.home.teamName} ${sim.playoffBracket.eastern.cf.homeWins}-${sim.playoffBracket.eastern.cf.awayWins} ${sim.playoffBracket.eastern.cf.away.teamName} → ${sim.playoffBracket.eastern.champion.teamName} advance
-Western: ${sim.playoffBracket.western.r1.map((s: any) => `${s.home.teamName} ${s.homeWins}-${s.awayWins} ${s.away.teamName}`).join(' | ')}
-  → ${sim.playoffBracket.western.r2.map((s: any) => `${s.winner.teamName}`).join(' def ')} · WCF: ${sim.playoffBracket.western.cf.home.teamName} ${sim.playoffBracket.western.cf.homeWins}-${sim.playoffBracket.western.cf.awayWins} ${sim.playoffBracket.western.cf.away.teamName} → ${sim.playoffBracket.western.champion.teamName} advance
-Stanley Cup Final: ${sim.playoffBracket.final.home.teamName} ${sim.playoffBracket.final.homeWins}-${sim.playoffBracket.final.awayWins} ${sim.playoffBracket.final.away.teamName} → ${sim.playoffBracket.champion.teamName} WIN THE CUP` : ''}
-
-Write 6 sections. Every number comes from the sim data above — do not estimate, approximate, or invent stats.
-
-**THE TRADE, ONE YEAR LATER**
-3-4 sentences. Frame the deal as an offseason/opening-night roster move. Use the locked traded-player outcomes above for every moved player you discuss. If a traded player's projected stat line is not listed, describe the team-level effect only.
-
-**${teams[0]!.name.toUpperCase()}'S SEASON**
-${isRebuilding
-  ? `4-5 sentences. Use the exact finish position from the projection above. Paint the narrative around those numbers — low point, bright spot, draft pick significance.`
-  : `4-5 sentences. Use the exact finish and playoff result from the bracket above. Describe one defining result from the listed bracket or standings.`}
-
-**AROUND THE LEAGUE**
-4-5 sentences. Use 3 storylines from the standings, bracket, awards, and leader facts above. Do not invent injuries or off-ice stories.
-
-**THE YEAR IN NUMBERS**
-Use ONLY the numbers provided. Do not approximate, estimate, or calculate anything not given here.
-- **Points leader:** ${sim?.leaders?.topScorer?.name ?? "—"}, ${sim?.leaders?.topScorer?.team ?? ""} — ${sim?.leaders?.topScorer?.pts ?? "??"} pts
-- **Goals leader:** ${sim?.leaders?.goalsLeader?.name ?? "—"}, ${sim?.leaders?.goalsLeader?.team ?? ""} — ${sim?.leaders?.goalsLeader?.goals ?? "?"} G
-- **Assists leader:** ${sim?.leaders?.assistsLeader?.name ?? "—"}, ${sim?.leaders?.assistsLeader?.team ?? ""} — ${sim?.leaders?.assistsLeader?.assists ?? "?"} A
-- **GAA leader:** ${sim?.leaders?.topGoalie?.name ?? "—"}, ${sim?.leaders?.topGoalie?.team ?? ""} — ${sim?.leaders?.topGoalie?.gaa ?? "??"} GAA / .${String(Math.round((sim?.leaders?.topGoalie?.svp ?? 0) * 1000)).padStart(3,"0")} SV%
-- **Presidents' Trophy:** ${sim?.leaders?.presidentsTrophy?.teamName ?? "—"} — ${sim?.leaders?.presidentsTrophy?.projectedPoints ?? "??"} pts
-- **Stanley Cup Champion:** ${sim?.playoffBracket?.champion?.teamName ?? sim?.leaders?.cupWinner?.teamName ?? "—"} def ${sim?.playoffBracket?.final ? `${sim.playoffBracket.final.home.teamName === sim.playoffBracket.champion.teamName ? sim.playoffBracket.final.away.teamName : sim.playoffBracket.final.home.teamName} ${sim.playoffBracket.final.homeWins}-${sim.playoffBracket.final.awayWins}` : "—"}
-- **Hart Trophy (MVP):** ${sim?.leaders?.hart?.name ?? "—"}, ${sim?.leaders?.hart?.team ?? ""} — ${sim?.leaders?.hart?.pts ?? "?"} pts
-- **Norris Trophy (best D):** ${sim?.leaders?.norris?.name ?? "—"}, ${sim?.leaders?.norris?.team ?? ""} — ${sim?.leaders?.norris?.pts ?? "?"} pts
-- **Vezina Trophy (best G):** ${sim?.leaders?.vezina?.name ?? "—"}, ${sim?.leaders?.vezina?.team ?? ""} — ${sim?.leaders?.vezina?.gaa ?? "??"} GAA
-- **Conn Smythe:** ${sim?.leaders?.connSmythe?.name ?? "—"}, ${sim?.leaders?.connSmythe?.team ?? ""}
-- **Calder Trophy:** ${sim?.leaders?.calder?.name ?? "—"}, ${sim?.leaders?.calder?.team ?? ""}
-
-**THE DRAFT LOTTERY**
-${(() => {
-  const tradedAwayPick = executedTrades.some((t: any) =>
-    t.outgoing.some((a: any) => a.position === "Pick" && (a.round ?? 1) === 1)
-  );
-  if (tradedAwayPick) return `${teams[0]!.name} traded away their 1st round pick. 2 sentences about watching another team use it.`;
-  if (sim?.homeTeam && !sim.homeTeam.madePlayoffs)
-    return `${teams[0]!.name} finished #${sim.homeTeam.leagueRank}/32 with ${sim.homeTeam.projectedPoints} pts. 3 sentences on what that lottery position means. Do not name a prospect unless listed above.`;
-  return `2 sentences. ${sim?.leaders?.draftLottery?.teamName ?? "The worst team"} won the lottery. Do not name a prospect unless listed above.`;
-})()}
-
-**VERDICT**
-Two sentences per team — what went right or wrong, definitive judgment on the GM's call.
-
-Simulation #${sim?.seed ?? "—"} · ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}. Write like someone who watched every game.`;
-    })();
+    const teamNarrative = (t: Team): string => {
+      const p = t.phase;
+      if (p === "Tanking" || p === "Rebuilding") return "opening the year with a future-first roster construction";
+      if (p === "Retooling") return "opening the year trying to turn a transitional roster into a playoff-calibre group";
+      if (p === "Bubble") return "opening the year with a roster built to chase a playoff spot";
+      if (p === "Contender") return "opening the year with a roster built to contend immediately";
+      return "opening the year with an unsettled organizational direction";
+    };
+    const homeContention = computeContention(db.players.filter(p => p.teamId === teams[0]!.id), navMap);
 
     if (simAbortRef.current) simAbortRef.current.abort();
     simAbortRef.current = new AbortController();
@@ -563,7 +432,32 @@ Simulation #${sim?.seed ?? "—"} · ${new Date().toLocaleDateString('en-US', { 
           kind: "season_recap",
           model: "claude-sonnet-4-5",
           max_tokens: 1800,
-          payload: { lockedReport: prompt },
+          payload: {
+            simulationMode: sim.simulationMode ?? SEASON.simulationMode,
+            replaySeason: SEASON.replaySeason,
+            rosterMoveWindow: SEASON.rosterMoveWindow,
+            homeTeamName: teams[0]!.name,
+            partnerTeamName: partnerTeam?.name ?? null,
+            homeTeam: sim.homeTeam ?? null,
+            partnerTeam: sim.partnerTeam ?? null,
+            leaders: sim.leaders ?? {},
+            playoffBracket: sim.playoffBracket ?? null,
+            playoffTeams: sim.playoffTeams ?? [],
+            tradedPlayerOutcomes: sim.tradedPlayerOutcomes ?? [],
+            executedTrades: executedTrades.map(t => ({
+              homeTeamName: t.homeTeamName,
+              partnerTeamName: t.partnerTeamName,
+              outgoing: t.outgoing,
+              incoming: t.incoming,
+            })),
+            homeRoster,
+            homePhase: teams[0]!.phase,
+            homeContention,
+            seasonStartOutlook: teamNarrative(teams[0]!),
+            isRebuilding,
+            seed: sim.seed ?? null,
+            generatedLabel: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' }),
+          },
         }),
       });
       const data = await res.json();
