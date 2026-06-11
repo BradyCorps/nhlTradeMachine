@@ -6,7 +6,7 @@
 // UPDATE SCHEDULE:
 //   PLAYER_PEDIGREE:    add new stars as they emerge
 //   PROSPECT_TIERS:     refresh each September (draft + development)
-//   SHUTDOWN_D_PEDIGREE: update after each trade deadline
+//   SHUTDOWN_D_PEDIGREE: update after each major roster movement window
 //   INJURY_RISK:        update when players return/retire
 
 import type { Asset, XNAVResult, FArchetype } from "@/app/lib/trade-types";

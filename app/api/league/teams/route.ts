@@ -53,7 +53,7 @@ async function loadTeams(): Promise<any[]> {
 
   try {
     const res = await fetchWithTimeout(
-      "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId=20252026%20and%20gameTypeId=2",
+      `https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId=${SEASON.nhleSeasonId}%20and%20gameTypeId=2`,
       8000
     );
     if (res.ok) {

@@ -402,10 +402,10 @@ const runGmLogic = (
   });
 
   const newCapUsedHome = SEASON.capCeiling - projCapHome;
-  if (newCapUsedHome < 65 && capDeltaHome < -3) flags.push({
+  if (newCapUsedHome < SEASON.capFloor && capDeltaHome < -3) flags.push({
     severity: "HARD", category: "FLOOR_VIOLATION",
     headline: "Cap Floor Violation",
-    explanation: `${teamHome.name} would fall below the NHL's $65M cap floor.`,
+    explanation: `${teamHome.name} would fall below the NHL's $${SEASON.capFloor.toFixed(1)}M cap floor.`,
     vetoesSide: 0,
   });
 

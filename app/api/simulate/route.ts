@@ -1,4 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { SEASON } from "@/app/lib/season-config";
+import {
+  ageDecay,
+  hashString,
+  mulberry32,
+  projectSkaterSeason,
+  projectTopScorer,
+  scenarioSeed,
+  stablePts,
+} from "@/app/lib/sim-engine";
 
 // ── Types ─────────────────────────────────────────────────────
 interface SimPlayer {
@@ -65,6 +75,24 @@ interface TradeRecord {
   incoming: SimPlayer[];
 }
 
+interface TradedPlayerOutcome {
+  playerId: string;
+  name: string;
+  position: string;
+  oldTeamId: string;
+  newTeamId: string;
+  oldTeamName: string;
+  newTeamName: string;
+  projectedPts?: number;
+  projectedGoals?: number;
+  gamesPlayed?: number;
+  projectedGAA?: number;
+  projectedSVP?: number;
+  gamesStarted?: number;
+  gsax?: number;
+  role: string;
+}
+
 interface SimRequest {
   homeTeamId: string;
   partnerTeamId: string;
@@ -74,35 +102,6 @@ interface SimRequest {
   seed?: number;
 }
 
-// ── Seeded PRNG — mulberry32 ──────────────────────────────────
-// Deterministic randomness so same seed = same sim result
-function mulberry32(seed: number) {
-  return function() {
-    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
-    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  };
-}
-
-// ── Pythagorean win expectation ───────────────────────────────
-// Classic hockey formula: GF^2.37 / (GF^2.37 + GA^2.37)
-const pythagorean = (gf: number, ga: number): number => {
-  const exp = 2.37;
-  const gfP = Math.pow(Math.max(gf, 1), exp);
-  const gaP = Math.pow(Math.max(ga, 1), exp);
-  return gfP / (gfP + gaP);
-};
-
-// ── Stable production estimate ────────────────────────────────
-// 40% current pace / 60% multi-season baseline — same blend the X-NAV engine
-// uses. YoY persistence audit (2022-26, n=1667): single-season r=0.864, so a
-// hot or injury-skewed season shouldn't fully drive the projection.
-const stablePts = (p: SimPlayer): number =>
-  p.baselinePtsPace && p.baselinePtsPace > 0
-    ? p.ptsPace * 0.4 + p.baselinePtsPace * 0.6
-    : p.ptsPace;
-
 // Stable GSAX on the same blend — baselineGsax is a weighted season-scale value
 const stableGsax = (p: SimPlayer): number => {
   const cur = p.gsax ?? 0;
@@ -111,18 +110,21 @@ const stableGsax = (p: SimPlayer): number => {
     : cur;
 };
 
-// ── Age decay factor ──────────────────────────────────────────
-// Cohort audit (2022-26): forwards decline ≈ -2.5 pts/82 per year from 28,
-// steepening to -6+/yr by 34. The flat per-year rate matches the early phase;
-// the 33+ tail needs to be ~2.5x steeper than the old linear extension.
-const ageDecay = (age: number, position: string): number => {
-  const peak = position === "D" ? 27 : position === "G" ? 29 : 26;
-  if (age <= peak) return 1.0 + Math.max(0, (peak - age) * 0.005);
-  const baseRate  = position === "D" ? 0.018 : 0.022;
-  const earlyYears = Math.min(age, 33) - peak;
-  const lateYears  = Math.max(0, age - 33);
-  const decline = earlyYears * baseRate + lateYears * baseRate * 2.5;
-  return Math.max(0.50, 1.0 - decline);
+const onIceValue = (p: SimPlayer): number => {
+  if (p.position === "Pick") return 0;
+  if (p.position === "G") {
+    const hdsvKicker = p.baselineHdsvPct != null
+      ? Math.max(-8, Math.min(12, (p.baselineHdsvPct - 0.815) * 400))
+      : 0;
+    return stableGsax(p) * 1.2 + hdsvKicker;
+  }
+  const driverBonus = p.position === "D" && p.pairDriverScore != null
+    ? Math.max(-5, Math.min(10, p.pairDriverScore * 0.5))
+    : 0;
+  const pkBonus = p.pkTimeShare != null && p.pkTimeShare >= 0.10
+    ? Math.min(5, p.pkTimeShare * 30)
+    : 0;
+  return stablePts(p) + driverBonus + pkBonus;
 };
 
 // ── Wild card teams — higher variance ────────────────────────
@@ -134,55 +136,48 @@ const PHASE_BASELINE: Record<string, number> = {
   "Rebuilding": 76,  "Tanking": 65,
 };
 
-// ── Fetch live standings from NHL API ────────────────────────
-async function fetchLiveStandings(): Promise<Map<string, { points: number; gamesPlayed: number; goalsFor: number; goalsAgainst: number }>> {
-  const map = new Map<string, { points: number; gamesPlayed: number; goalsFor: number; goalsAgainst: number }>();
-  try {
-    const res = await fetch(
-      "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId=20252026%20and%20gameTypeId=2&limit=32",
-      { signal: AbortSignal.timeout(8000), cache: "no-store" }
-    );
-    if (!res.ok) return map;
-    const data = await res.json();
-    const NHL_ID_TO_TRICODE: Record<number, string> = {
-      1:"NJD",2:"NYI",3:"NYR",4:"PHI",5:"PIT",6:"BOS",7:"BUF",8:"MTL",9:"OTT",10:"TOR",
-      12:"CAR",13:"FLA",14:"TBL",15:"WSH",16:"CHI",17:"DET",18:"NSH",19:"STL",20:"CGY",
-      21:"COL",22:"EDM",23:"VAN",24:"ANA",25:"DAL",26:"LAK",28:"SJS",29:"CBJ",30:"MIN",
-      52:"WPG",54:"VGK",55:"SEA",68:"UTA",
-    };
-    for (const t of data.data ?? []) {
-      const id = NHL_ID_TO_TRICODE[t.teamId];
-      if (id) map.set(id, {
-        points:       t.points       ?? 0,
-        gamesPlayed:  t.gamesPlayed  ?? 1,
-        goalsFor:     t.goalsFor     ?? 150,
-        goalsAgainst: t.goalsAgainst ?? 150,
-      });
-    }
-  } catch (_) {}
-  return map;
-}
-
 // ── Project a team's full season points ──────────────────────
 function projectTeamPoints(
   team: SimTeam,
-  liveStats: { points: number; gamesPlayed: number; goalsFor: number; goalsAgainst: number } | undefined,
+  roster: SimPlayer[],
   tradeNavDelta: number,
   capSpaceAfterTrade: number,
   rand: () => number,
 ): number {
-  let pacedPts: number;
-  if (liveStats && liveStats.gamesPlayed > 10) {
-    const gp         = liveStats.gamesPlayed;
-    const remaining  = 82 - gp;
-    const winPct     = pythagorean(liveStats.goalsFor, liveStats.goalsAgainst);
-    pacedPts         = liveStats.points + remaining * winPct * 2;
-  } else {
-    pacedPts = PHASE_BASELINE[team.phase] ?? 88;
-  }
+  const phaseBaseline = PHASE_BASELINE[team.phase] ?? 88;
 
-  // Trade impact: ptsPace delta → standings pts
-  const tradeImpact = tradeNavDelta / 3.5;
+  const skaters = roster.filter(p => p.position !== "Pick" && p.position !== "G");
+  const forwards = skaters
+    .filter(p => p.position !== "D")
+    .sort((a, b) => onIceValue(b) - onIceValue(a));
+  const dmen = skaters
+    .filter(p => p.position === "D")
+    .sort((a, b) => onIceValue(b) - onIceValue(a));
+  const goalies = roster
+    .filter(p => p.position === "G")
+    .sort((a, b) => onIceValue(b) - onIceValue(a));
+
+  const avg = (arr: SimPlayer[], n: number) =>
+    arr.length === 0 ? 0 : arr.slice(0, n).reduce((s, p) => s + onIceValue(p), 0) / Math.min(n, arr.length);
+
+  const topSixF = avg(forwards, 6);
+  const topNineF = avg(forwards, 9);
+  const topFourD = avg(dmen, 4);
+  const starterG = goalies[0] ? onIceValue(goalies[0]) : -4;
+  const depthPenalty = forwards.length < 10 ? (10 - forwards.length) * 1.4 : 0;
+  const dPenalty = dmen.length < 6 ? (6 - dmen.length) * 1.2 : 0;
+
+  // Season-start replay: roster quality nudges phase baseline. Trade delta is
+  // retained as a small context adjustment because it captures PK/goalie/driver
+  // effects not fully visible in raw scoring depth.
+  const rosterStrength =
+    (topSixF - 55) * 0.20 +
+    (topNineF - 42) * 0.18 +
+    (topFourD - 32) * 0.20 +
+    starterG * 0.18 -
+    depthPenalty -
+    dPenalty;
+  const tradeContext = Math.max(-8, Math.min(8, tradeNavDelta / 12));
 
   // Hard cap enforcement: teams over the ceiling are forced to shed cap mid-season.
   // Roster disruption from emergency moves costs wins.
@@ -200,39 +195,7 @@ function projectTeamPoints(
   if (phase === "Contender") varianceMid = 2;
   const variance = varianceMid + (rand() * varianceRange - varianceRange / 2);
 
-  return Math.round(Math.max(55, Math.min(135, pacedPts + tradeImpact + variance - capPenalty)));
-}
-
-// ── Project top scorer for a team ────────────────────────────
-function projectTopScorer(
-  roster: SimPlayer[],
-  rand: () => number,
-): { name: string; projectedPts: number; projectedGoals: number; position: string } | null {
-  const skaters = roster
-    .filter(p => p.position !== "Pick" && p.position !== "G"
-      && p.ptsPace > 0
-      && (p as any).games >= 20)
-    .sort((a, b) => stablePts(b) - stablePts(a));
-
-  if (skaters.length === 0) return null;
-
-  const top   = skaters[0];
-  const decay = ageDecay(top.age, top.position);
-
-  // Catastrophic injury variance: 5% chance of losing 30-60 games.
-  // Forces the sim to test depth — a McDavid injury tanks EDM, Carolina survives.
-  let gamesPlayed = Math.round(72 + rand() * 10);
-  if (rand() < 0.05) {
-    gamesPlayed = Math.max(5, gamesPlayed - Math.round(30 + rand() * 30));
-  }
-
-  const rawPts       = (stablePts(top) / 82) * gamesPlayed * decay;
-  const variance     = 0.88 + rand() * 0.24;
-  const projectedPts = Math.round(rawPts * variance);
-
-  const goalPct      = top.position === "D" ? 0.25 : 0.40;
-  const projectedGoals = Math.round(projectedPts * goalPct * (0.90 + rand() * 0.20));
-  return { name: top.name, projectedPts, projectedGoals, position: top.position };
+  return Math.round(Math.max(55, Math.min(135, phaseBaseline + rosterStrength + tradeContext + variance - capPenalty)));
 }
 
 // ── Project starting goalie ───────────────────────────────────
@@ -320,17 +283,16 @@ function simulateLeague(
   playersByTeam: Map<string, SimPlayer[]>,
   tradeNavDeltas: Map<string, number>,
   capDeltas: Map<string, number>,
-  liveStandings: Map<string, { points: number; gamesPlayed: number; goalsFor: number; goalsAgainst: number }>,
   rand: () => number,
+  seed: number,
 ): SimTeamResult[] {
   return teams.map(team => {
     const roster     = playersByTeam.get(team.id) ?? [];
     const navDelta   = tradeNavDeltas.get(team.id) ?? 0;
     const capDelta   = capDeltas.get(team.id) ?? 0;
     const capSpaceAfterTrade = team.capSpace - capDelta;
-    const liveStats  = liveStandings.get(team.id);
-    const projectedPoints = projectTeamPoints(team, liveStats, navDelta, capSpaceAfterTrade, rand);
-    const topScorer  = projectTopScorer(roster, rand);
+    const projectedPoints = projectTeamPoints(team, roster, navDelta, capSpaceAfterTrade, rand);
+    const topScorer  = projectTopScorer(roster, team.id, seed);
     const winPct     = projectedPoints / 164;
     const goalie     = projectGoalie(roster, winPct, rand);
     const topDefenseman = projectTopDefenseman(roster, rand);
@@ -633,13 +595,88 @@ function findLeagueLeaders(
   };
 }
 
+function buildTradedPlayerOutcomes(
+  trades: TradeRecord[],
+  teams: SimTeam[],
+  standings: SimTeamResult[],
+  seed: number,
+): TradedPlayerOutcome[] {
+  const teamName = (id: string) => teams.find(t => t.id === id)?.name ?? id;
+  const teamWinPct = (id: string) =>
+    (standings.find(t => t.teamId === id)?.projectedPoints
+      ?? PHASE_BASELINE[teams.find(t => t.id === id)?.phase ?? "Retooling"]
+      ?? 88) / 164;
+  const outcomes: TradedPlayerOutcome[] = [];
+
+  const addOutcome = (p: SimPlayer, oldTeamId: string, newTeamId: string) => {
+    if (p.position === "Pick") return;
+    if (p.position === "G") {
+      const winPctAnchor = teamWinPct(newTeamId);
+      const goalie = projectGoalie([p], winPctAnchor, mulberry32(seed + hashString(`${newTeamId}:${p.id}:goalie-outcome`)));
+      outcomes.push({
+        playerId: p.id,
+        name: p.name,
+        position: p.position,
+        oldTeamId,
+        newTeamId,
+        oldTeamName: teamName(oldTeamId),
+        newTeamName: teamName(newTeamId),
+        projectedGAA: goalie?.projectedGAA,
+        projectedSVP: goalie?.projectedSVP,
+        gamesStarted: goalie?.gamesStarted,
+        gsax: goalie?.gsax,
+        role: (p.gamesStarted ?? p.games ?? 0) >= 45 ? "starter goalie" : "goalie",
+      });
+      return;
+    }
+
+    const skater = projectSkaterSeason(p, newTeamId, seed);
+    outcomes.push({
+      playerId: p.id,
+      name: p.name,
+      position: p.position,
+      oldTeamId,
+      newTeamId,
+      oldTeamName: teamName(oldTeamId),
+      newTeamName: teamName(newTeamId),
+      projectedPts: skater.projectedPts,
+      projectedGoals: skater.projectedGoals,
+      gamesPlayed: skater.gamesPlayed,
+      role: p.position === "D" ? "defenceman" : "skater",
+    });
+  };
+
+  for (const trade of trades) {
+    trade.outgoing.forEach(p => addOutcome(p, trade.homeTeamId, trade.partnerTeamId));
+    trade.incoming.forEach(p => addOutcome(p, trade.partnerTeamId, trade.homeTeamId));
+  }
+
+  const seen = new Set<string>();
+  return outcomes.filter(o => {
+    const key = `${o.playerId}:${o.oldTeamId}:${o.newTeamId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 // ── Main handler ──────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     const body: SimRequest = await req.json();
     const { homeTeamId, partnerTeamId, teams, players, trades } = body;
 
-    const seed = body.seed ?? Math.floor(Math.random() * 100000);
+    const seed = body.seed ?? scenarioSeed({
+      mode: SEASON.simulationMode,
+      homeTeamId,
+      partnerTeamId,
+      trades: trades.map(t => ({
+        homeTeamId: t.homeTeamId,
+        partnerTeamId: t.partnerTeamId,
+        outgoing: t.outgoing.map(p => ({ id: p.id, retainedPct: (p as any).retainedPct ?? 0 })),
+        incoming: t.incoming.map(p => ({ id: p.id, retainedPct: (p as any).retainedPct ?? 0 })),
+      })),
+    });
     const rand = mulberry32(seed);
 
     // Build player roster map — apply trades
@@ -667,34 +704,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Trade impact and cap delta per team.
-    // Per-player on-ice value in "ptsPace-equivalent" units:
-    //   Skaters — stable (baseline-blended) scoring pace, plus a D-man driver
-    //   bonus: pairing data shows drivers lift partners' xGF% beyond their own
-    //   point production (Fox-tier ≈ +20 driver score ≈ +10 pts-equivalent).
-    //   Two-way forwards get a small PK-usage credit for the same reason.
-    //   Goalies — previously contributed ZERO (no ptsPace), so goalie trades
-    //   never moved the sim. Stable GSAX converts to pts-equivalent: ~6 goals
-    //   ≈ 1 win ≈ 2 standings pts, and tradeImpact divides by 3.5, so
-    //   gsax * 1.2 lands a +20 GSAX starter at ≈ +7 projected standings pts.
-    //   HDSV% above league average (.815) adds a stable-skill kicker.
-    const onIceValue = (p: SimPlayer): number => {
-      if (p.position === "Pick") return 0;
-      if (p.position === "G") {
-        const hdsvKicker = p.baselineHdsvPct != null
-          ? Math.max(-8, Math.min(12, (p.baselineHdsvPct - 0.815) * 400))
-          : 0;
-        return stableGsax(p) * 1.2 + hdsvKicker;
-      }
-      const driverBonus = p.position === "D" && p.pairDriverScore != null
-        ? Math.max(-5, Math.min(10, p.pairDriverScore * 0.5))
-        : 0;
-      const pkBonus = p.pkTimeShare != null && p.pkTimeShare >= 0.10
-        ? Math.min(5, p.pkTimeShare * 30)
-        : 0;
-      return stablePts(p) + driverBonus + pkBonus;
-    };
-
+    // Trade impact and cap delta per team. The season-start replay uses the
+    // post-trade roster for team strength, with this delta retained as a small
+    // context adjustment for special-teams, goalie, and driver effects.
     const tradeNavDeltas = new Map<string, number>();
     const capDeltas      = new Map<string, number>();
     for (const trade of trades) {
@@ -711,9 +723,7 @@ export async function POST(req: NextRequest) {
       capDeltas.set(trade.partnerTeamId,      (capDeltas.get(trade.partnerTeamId)      ?? 0) - capDelta);
     }
 
-    const liveStandings = await fetchLiveStandings();
-
-    const rawStandings = simulateLeague(teams, playersByTeam, tradeNavDeltas, capDeltas, liveStandings, rand);
+    const rawStandings = simulateLeague(teams, playersByTeam, tradeNavDeltas, capDeltas, rand, seed);
     const standings    = assignPlayoffSeeds(rawStandings);
     const leaders      = findLeagueLeaders(standings, rand);
 
@@ -749,6 +759,7 @@ export async function POST(req: NextRequest) {
 
     const playoffBracket = simulatePlayoffs(standings, rand);
     const cupWinner = standings.find(t => t.teamId === playoffBracket.champion.teamId) ?? leaders.cupWinner;
+    const tradedPlayerOutcomes = buildTradedPlayerOutcomes(trades, teams, standings, seed);
 
     return NextResponse.json({
       seed,
@@ -763,6 +774,8 @@ export async function POST(req: NextRequest) {
       },
       playoffBracket,
       playoffTeams: standings.filter(t => t.madePlayoffs).map(t => t.teamId),
+      tradedPlayerOutcomes,
+      simulationMode: SEASON.simulationMode,
       generatedAt: new Date().toISOString(),
     });
 

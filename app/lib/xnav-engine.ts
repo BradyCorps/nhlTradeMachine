@@ -89,9 +89,10 @@ export const clamp = (n: number, min: number, max: number): number =>
 // ── Pick NAV ──────────────────────────────────────────────────────────────────
 export function calcPickNAV(asset: AssetInput): XNAVResult {
   const round    = asset.round    ?? 1;
-  const year     = asset.year     ?? 2026;
+  const baseYear = SEASON.draftYear;
+  const year     = asset.year     ?? baseYear;
   const standing = asset.teamStanding ?? 16;
-  const yearDecay = Math.pow(0.88, year - 2026);
+  const yearDecay = Math.pow(0.88, Math.max(0, year - baseYear));
 
   let baseValue: number;
   if (round === 1) {

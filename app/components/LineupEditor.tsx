@@ -22,7 +22,7 @@ interface Player {
 interface TeamProps {
   teamName: string;
   label?: string;
-  roster: Player[];      // pre-trade roster
+  roster: Player[];      // roster before the active move is applied
   outgoing: Player[];    // leaving in the active trade
   incoming: Player[];    // arriving in the active trade
 }

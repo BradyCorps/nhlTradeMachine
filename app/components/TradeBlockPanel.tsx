@@ -18,7 +18,7 @@ const STATUS_CONFIG = {
 };
 
 // Computer-determined sell candidates — the "what teams could give up" half of
-// the trade block. Classic deadline profile: veteran on an expiring-ish deal,
+// the trade block. Classic availability profile: veteran on an expiring-ish deal,
 // on a team selling (Rebuilding/Tanking/Retooling), real cap hit, not admin-flagged.
 function isAutoAvailable(p: Asset, phase: string | undefined): boolean {
   if (p.tradeBlockStatus) return false;

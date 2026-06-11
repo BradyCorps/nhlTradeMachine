@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import type { Asset, Team } from "@/app/lib/trade-types";
+import { mulberry32, scenarioSeed } from "@/app/lib/sim-engine";
 import {
   TradeProposal,
   getNav,
@@ -63,6 +64,13 @@ export default function TradeProposalEngine({
   const generate = async () => {
     if (!homeTeam) return;
     setGenerating(true); setDone(false); setProposals([]);
+    const rand = mulberry32(scenarioSeed({
+      mode: "trade-proposal-engine",
+      homeTeamId: homeTeam.id,
+      outgoing: outgoingBlock.map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0 })),
+      playerCount: allPlayers.length,
+      teamCount: allTeams.length,
+    }));
 
     const candidates: { team: Team; fitScore: number; homeSends: Asset[]; partnerSends: Asset[]; isDump: boolean; dumpSweetener: Asset[] }[] = [];
 
@@ -113,7 +121,7 @@ export default function TradeProposalEngine({
           const pkgs = buildReturnPackages(blockNav, roster, picks, navMap);
           if (pkgs.length === 0) continue;
           for (const pkg of pkgs.slice(0, 4)) {
-            candidates.push({ team, fitScore: fit * (0.85 + Math.random() * 0.15), homeSends: outgoingBlock, partnerSends: pkg, isDump: false, dumpSweetener: [] });
+            candidates.push({ team, fitScore: Math.round(fit * (0.85 + rand() * 0.15)), homeSends: outgoingBlock, partnerSends: pkg, isDump: false, dumpSweetener: [] });
           }
           continue;
         }
@@ -158,7 +166,7 @@ export default function TradeProposalEngine({
         // Cap at 4 packages per team to avoid one team dominating the pool
         for (const pkg of pkgs.slice(0, 4)) {
           // Slightly vary fitScore per package so weighted random picks different ones
-          const pkgFit = Math.round(fit * (0.85 + Math.random() * 0.15));
+          const pkgFit = Math.round(fit * (0.85 + rand() * 0.15));
           candidates.push({
             team, fitScore: pkgFit,
             homeSends: outgoingBlock,
@@ -188,7 +196,7 @@ export default function TradeProposalEngine({
       const remaining = [...pool];
       while (picked.length < count && remaining.length > 0) {
         const totalWeight = remaining.reduce((s, c) => s + Math.pow(Math.max(1, c.fitScore), 1.5), 0);
-        let r = Math.random() * totalWeight;
+        let r = rand() * totalWeight;
         let idx = 0;
         for (let i = 0; i < remaining.length; i++) {
           r -= Math.pow(Math.max(1, remaining[i].fitScore), 1.5);

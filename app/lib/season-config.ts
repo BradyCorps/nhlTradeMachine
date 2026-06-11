@@ -5,6 +5,9 @@
 
 export const SEASON = {
   label:          "2026-27",
+  simulationMode: "2025-26 season-start replay",
+  replaySeason:   "2025-26",
+  rosterMoveWindow: "2025 offseason/opening-night",
   apiSeasonId:    "20262027",
   capCeiling:     104.0,         // NHL salary cap ceiling ($M) — 2026-27 announced upper limit
   capFloor:       76.9,          // NHL salary cap floor ($M) — 2026-27 announced lower limit

@@ -2,7 +2,7 @@
 
 import TradePanel from "@/app/components/TradePanel";
 import TugBar from "@/app/components/TugBar";
-import { ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
+import { SEASON, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
 import TeamStrand, { CHAMP_TEMPLATE, TeamStrandData } from "@/app/components/TeamStrand";
 import LineupEditor from "@/app/components/LineupEditor";
@@ -20,6 +20,7 @@ import type {
 import {
   fetchNavMap, fetchTradeVerdict, clearNavCache, getCachedNav,
 } from "@/app/lib/evaluate-client";
+import { scenarioSeed } from "@/app/lib/sim-engine";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import TradeBlockPanel from "@/app/components/TradeBlockPanel";
 
@@ -331,7 +332,7 @@ export default function TradeMachine() {
     }
   }, [originalDb]);
 
-  // ── Sim a Year — Claude Haiku projects one season forward ─────
+  // ── Sim a Year — native engine projects, Claude narrates only ─────
   const simYear = useCallback(async () => {
     if (!teams[0] || executedTrades.length === 0) return;
     setSimLoading(true);
@@ -341,20 +342,36 @@ export default function TradeMachine() {
     // ── Step 1: Run projection engine ─────────────────────────
     let sim: any = null;
     try {
+      const simTeams = originalDb?.teams ?? db.teams;
+      const simPlayers = originalDb?.players ?? db.players;
+      const simTrades = executedTrades.map(t => ({
+        homeTeamId:    simTeams.find(x => x.name === t.homeTeamName)?.id ?? "",
+        partnerTeamId: simTeams.find(x => x.name === t.partnerTeamName)?.id ?? "",
+        outgoing: t.outgoing,
+        incoming: t.incoming,
+      }));
+      const seed = scenarioSeed({
+        mode: SEASON.simulationMode,
+        homeTeamId: teams[0]!.id,
+        partnerTeamId: teams[1]?.id ?? "",
+        trades: simTrades.map(t => ({
+          homeTeamId: t.homeTeamId,
+          partnerTeamId: t.partnerTeamId,
+          outgoing: t.outgoing.map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0 })),
+          incoming: t.incoming.map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0 })),
+        })),
+      });
+
       const simRes = await fetch("/api/simulate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           homeTeamId:    teams[0]!.id,
           partnerTeamId: teams[1]?.id ?? "",
-          teams:   db.teams,
-          players: db.players,
-          trades:  executedTrades.map(t => ({
-            homeTeamId:    db.teams.find(x => x.name === t.homeTeamName)?.id ?? "",
-            partnerTeamId: db.teams.find(x => x.name === t.partnerTeamName)?.id ?? "",
-            outgoing: t.outgoing,
-            incoming: t.incoming,
-          })),
+          teams:   simTeams,
+          players: simPlayers,
+          trades:  simTrades,
+          seed,
         }),
       });
       if (simRes.ok) {
@@ -362,6 +379,12 @@ export default function TradeMachine() {
         setSimData(sim);
       }
     } catch (_) {}
+
+    if (!sim) {
+      setSimResult("Simulation unavailable — deterministic projection engine did not return results.");
+      setSimLoading(false);
+      return;
+    }
 
     // ── Step 2: Build trade summary ────────────────────────────
     const tradesSummary = executedTrades.map(t => {
@@ -372,9 +395,9 @@ export default function TradeMachine() {
         ? `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : "3rd"} round pick`
         : `${a.name} (${a.position}, $${a.capHit}M)`).join(", ");
       return [
-        `TRADE: ${t.homeTeamName} ↔ ${t.partnerTeamName}`,
-        `  ${t.homeTeamName} GAVE AWAY: ${outNames}`,
-        `  ${t.homeTeamName} RECEIVED: ${inNames}`,
+        `OFFSEASON MOVE: ${t.homeTeamName} ↔ ${t.partnerTeamName}`,
+        `  ${t.homeTeamName} MOVED: ${outNames}`,
+        `  ${t.homeTeamName} ACQUIRED: ${inNames}`,
       ].join("\n");
     }).join("\n\n");
 
@@ -382,16 +405,24 @@ export default function TradeMachine() {
       .filter(p => p.teamId === teams[0]!.id && p.position !== "Pick")
       .sort((a, b) => b.ptsPace - a.ptsPace)
       .slice(0, 12)
-      .map(p => `${p.name} (${p.position}, ${p.ptsPace.toFixed(0)}pts/82, age ${p.age})`);
+      .map(p => `${p.name} (${p.position}, age ${p.age})`);
 
     const partnerTeam = teams[1];
     const isRebuilding = ["Rebuilding","Tanking","Retooling"].includes(teams[0]!.phase ?? "");
 
+    const tradedOutcomeLines = (sim.tradedPlayerOutcomes ?? []).map((o: any) => {
+      if (o.position === "G") {
+        return `${o.name}: ${o.oldTeamName} -> ${o.newTeamName}, ${o.gamesStarted ?? "?"} starts, ${o.projectedGAA ?? "?"} GAA, ${o.projectedSVP ?? "?"} SV%`;
+      }
+      return `${o.name}: ${o.oldTeamName} -> ${o.newTeamName}, ${o.gamesPlayed ?? "?"} GP, ${o.projectedGoals ?? "?"} G, ${o.projectedPts ?? "?"} pts`;
+    });
+
     // ── Step 3: Build structured prompt ───────────────────────
-    // If sim engine succeeded, Claude gets exact numbers and writes narrative only.
-    // If sim engine failed, Claude falls back to its own projection (old behavior).
-    const simContext = sim ? `
+    // Claude gets exact numbers from the deterministic sim and writes narrative only.
+    const simContext = `
 PROJECTED SEASON RESULTS — USE THESE EXACT NUMBERS, DO NOT INVENT ALTERNATIVES:
+	Simulation mode: ${sim.simulationMode ?? SEASON.simulationMode}
+	Premise: take each current roster as it stands now, move the selected trade(s) to opening night, and replay the full ${SEASON.replaySeason} season from the beginning.
 
 ${teams[0]!.name}: ${sim.homeTeam?.projectedPoints ?? "?"} pts · Finished #${sim.homeTeam?.leagueRank ?? "?"}/32 · ${sim.homeTeam?.madePlayoffs ? "MADE PLAYOFFS" : "MISSED PLAYOFFS"}
   Top scorer: ${sim.homeTeam?.topScorer?.name ?? "—"} — ${sim.homeTeam?.topScorer?.projectedPts ?? "—"} pts
@@ -414,6 +445,9 @@ LEAGUE RESULTS (LOCKED — do not contradict):
   Draft Lottery: ${sim.leaders?.draftLottery?.teamName ?? "—"} finished last (${sim.leaders?.draftLottery?.projectedPoints ?? "—"} pts)
   Simulation seed: #${sim.seed ?? "—"}
 
+TRADED PLAYER OUTCOMES (LOCKED):
+${tradedOutcomeLines.length > 0 ? tradedOutcomeLines.join("\n") : "No traded player stat outcomes available."}
+
 CRITICAL ACCURACY RULES:
 - Every stat (pts, GAA, SV%) must match the exact number above — no rounding, no approximating
 - Do not add stats for players not listed above
@@ -423,8 +457,7 @@ PLAYOFF TEAMS: ${sim.playoffTeams?.join(", ") ?? "—"}
 
 YOUR ROLE: Write the narrative column using ONLY these numbers.
 Do not invent standings, stat lines, or results.
-Claude is the storyteller — the simulation engine is the source of truth.` : `
-NOTE: Projection engine unavailable. Use your best judgment for outcomes but follow all constraints below.`;
+Claude is the storyteller — the simulation engine is the source of truth.`;
 
     const prompt = (() => {
       const allTradedNames = executedTrades.flatMap(t => [
@@ -432,43 +465,40 @@ NOTE: Projection engine unavailable. Use your best judgment for outcomes but fol
         ...t.incoming.map(a => a.name),
       ]);
       const franchiseMoved = (name: string) => allTradedNames.includes(name);
-      const WILD_CARDS = ["WPG","TOR","CGY","EDM","NYR"];
-      const homeIsWildCard    = WILD_CARDS.includes(teams[0]!.id);
-      const partnerIsWildCard = teams[1] && WILD_CARDS.includes(teams[1].id);
 
       const teamNarrative = (t: Team): string => {
-        const p = t.phase; const s = t.standing;
-        if (p === "Tanking" || p === "Rebuilding") return "deep in a rebuild — draft positioning is the only currency that matters";
-        if (s <= 3)  return "legitimate Presidents' Trophy contender — Cup or bust";
-        if (s <= 8)  return "locked into the playoff race with real Cup upside";
-        if (s <= 14) return "bubble team fighting to survive the final weeks";
-        if (s <= 20) return "underperforming their talent — fans restless, GM on notice";
-        return "fading season — playing for draft lottery position";
+        const p = t.phase;
+        if (p === "Tanking" || p === "Rebuilding") return "opening the year with a future-first roster construction";
+        if (p === "Retooling") return "opening the year trying to turn a transitional roster into a playoff-calibre group";
+        if (p === "Bubble") return "opening the year with a roster built to chase a playoff spot";
+        if (p === "Contender") return "opening the year with a roster built to contend immediately";
+        return "opening the year with an unsettled organizational direction";
       };
 
-      return `You are a senior NHL beat reporter writing the definitive end-of-season trade retrospective column.
+      return `You are a senior NHL beat reporter writing the definitive end-of-season alternate-history column.
 ${simContext}
 
-THE TRADE IS THE DIVERGENCE POINT. Honor it above all real-world events.
-${franchiseMoved("Auston Matthews") ? "Matthews was TRADED — Toronto's season is reflected in the numbers above." : ""}
-${franchiseMoved("Connor Hellebuyck") ? "Hellebuyck was TRADED — Winnipeg's identity changed." : ""}
+	THE OFFSEASON ROSTER MOVE IS THE DIVERGENCE POINT. Treat every executed deal as completed before opening night of the ${SEASON.replaySeason} season, not at the trade deadline.
+${franchiseMoved("Auston Matthews") ? "Matthews changed teams before opening night — Toronto's full-season result is reflected in the numbers above." : ""}
+${franchiseMoved("Connor Hellebuyck") ? "Hellebuyck changed teams before opening night — Winnipeg's full-season identity is reflected in the numbers above." : ""}
 
-LOCKED FACTS (pre-deadline, cannot change):
+LOCKED FACTS:
 - Florida Panthers did NOT win the Cup (won 2023, 2024, 2025).
 - Utah Hockey Club is now the Utah Mammoth (UTA). Arizona Coyotes do not exist.
+- These are ${SEASON.rosterMoveWindow} moves. Never describe them as deadline deals or say a team sat at any ranking at the deadline.
 
 NHL STRUCTURE:
 Eastern: Atlantic (BOS,BUF,DET,FLA,MTL,OTT,TBL,TOR) · Metro (CAR,CBJ,NJD,NYI,NYR,PHI,PIT,WSH)
 Western: Central (UTA,CHI,COL,DAL,MIN,NSH,STL,WPG) · Pacific (ANA,CGY,EDM,LAK,SEA,SJS,VAN,VGK)
 
-TRADE SUMMARY:
+OFFSEASON MOVE SUMMARY:
 ${tradesSummary}
 
-${teams[0]!.name} ROSTER (top 12):
+${teams[0]!.name} OPENING-NIGHT ROSTER AFTER MOVES (top 12):
 ${homeRoster.join("\n")}
-Phase: ${teams[0]!.phase} · Pre-trade standing: #${teams[0]!.standing}/32
+Phase entering replay: ${teams[0]!.phase}
 Contention ratings (X-NAV derived): Present ${computeContention(db.players.filter(p => p.teamId === teams[0]!.id), navMap).present.toFixed(1)}/10 · Future ${computeContention(db.players.filter(p => p.teamId === teams[0]!.id), navMap).future.toFixed(1)}/10
-Narrative entering second half: ${teamNarrative(teams[0]!)}
+Season-start outlook: ${teamNarrative(teams[0]!)}
 
 ${sim?.playoffBracket ? `PLAYOFF BRACKET (simulated):
 Eastern: ${sim.playoffBracket.eastern.r1.map((s: any) => `${s.home.teamName} ${s.homeWins}-${s.awayWins} ${s.away.teamName}`).join(' | ')}
@@ -480,15 +510,15 @@ Stanley Cup Final: ${sim.playoffBracket.final.home.teamName} ${sim.playoffBracke
 Write 6 sections. Every number comes from the sim data above — do not estimate, approximate, or invent stats.
 
 **THE TRADE, ONE YEAR LATER**
-3-4 sentences. Use the projected stats above. How did the key players perform for their NEW teams?
+3-4 sentences. Frame the deal as an offseason/opening-night roster move. Use the locked traded-player outcomes above for every moved player you discuss. If a traded player's projected stat line is not listed, describe the team-level effect only.
 
 **${teams[0]!.name.toUpperCase()}'S SEASON**
 ${isRebuilding
   ? `4-5 sentences. Use the exact finish position from the projection above. Paint the narrative around those numbers — low point, bright spot, draft pick significance.`
-  : `4-5 sentences. Use the exact finish and playoff result from the bracket above. One defining moment. One unexpected development.`}
+  : `4-5 sentences. Use the exact finish and playoff result from the bracket above. Describe one defining result from the listed bracket or standings.`}
 
 **AROUND THE LEAGUE**
-4-5 sentences. 3 storylines — one surprise (refer to the standings and bracket above), one injury, one off-ice story.
+4-5 sentences. Use 3 storylines from the standings, bracket, awards, and leader facts above. Do not invent injuries or off-ice stories.
 
 **THE YEAR IN NUMBERS**
 Use ONLY the numbers provided. Do not approximate, estimate, or calculate anything not given here.
@@ -511,8 +541,8 @@ ${(() => {
   );
   if (tradedAwayPick) return `${teams[0]!.name} traded away their 1st round pick. 2 sentences about watching another team use it.`;
   if (sim?.homeTeam && !sim.homeTeam.madePlayoffs)
-    return `${teams[0]!.name} finished #${sim.homeTeam.leagueRank}/32 with ${sim.homeTeam.projectedPoints} pts. 3 sentences on what their lottery position means and who they might draft.`;
-  return `2 sentences. ${sim?.leaders?.draftLottery?.teamName ?? "The worst team"} won the lottery. Who is the top prospect?`;
+    return `${teams[0]!.name} finished #${sim.homeTeam.leagueRank}/32 with ${sim.homeTeam.projectedPoints} pts. 3 sentences on what that lottery position means. Do not name a prospect unless listed above.`;
+  return `2 sentences. ${sim?.leaders?.draftLottery?.teamName ?? "The worst team"} won the lottery. Do not name a prospect unless listed above.`;
 })()}
 
 **VERDICT**
@@ -530,9 +560,10 @@ Simulation #${sim?.seed ?? "—"} · ${new Date().toLocaleDateString('en-US', { 
         headers: { "Content-Type": "application/json" },
         signal: simAbortRef.current.signal,
         body: JSON.stringify({
+          kind: "season_recap",
           model: "claude-sonnet-4-5",
           max_tokens: 1800,
-          messages: [{ role: "user", content: prompt }],
+          payload: { lockedReport: prompt },
         }),
       });
       const data = await res.json();
@@ -542,7 +573,7 @@ Simulation #${sim?.seed ?? "—"} · ${new Date().toLocaleDateString('en-US', { 
       setSimResult("Simulation unavailable — please try again.");
     }
     setSimLoading(false);
-  }, [teams, db, executedTrades]);
+  }, [teams, db, originalDb, executedTrades]);
   useEffect(() => {
     // Issue 10: Don't auto-evaluate. Clear old verdict so user must click "Make the call" again.
     if (evaluated) {
@@ -561,46 +592,6 @@ Simulation #${sim?.seed ?? "—"} · ${new Date().toLocaleDateString('en-US', { 
     const outgoing = blocks[0];
     const incoming = blocks[1];
 
-    const describeAssets = (assets: Asset[]) =>
-      assets.map(a =>
-        a.position === "Pick"
-          ? `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : `${a.round}th`} round pick`
-          : `${a.name} (${a.position}, age ${a.age}, $${a.capHit}M x ${a.yearsRemaining}yr, ${a.ptsPace.toFixed(0)} pts/82)`
-      ).join(", ");
-
-    const flagSummary = verdict.flags
-      .filter(f => f.severity === "HARD" || f.severity === "SOFT")
-      .map(f => `• [${f.severity}] ${f.headline}`)
-      .join("\n");
-
-    const prompt = `You are a senior NHL front office analyst writing an internal trade evaluation memo. Base your analysis ONLY on the data provided — do not invent injuries, contract disputes, locker room issues, or league context not shown here.
-
-TRADE DETAILS:
-${teams[0].name} (${teams[0].phase}, #${teams[0].standing}/32, $${teams[0].capSpace}M cap space) sends:
-  ${describeAssets(outgoing)}
-
-${teams[1].name} (${teams[1].phase}, #${teams[1].standing}/32, $${teams[1].capSpace}M cap space) sends:
-  ${describeAssets(incoming)}
-
-ANALYTICS:
-- NAV balance: ${teams[0].name} nets ${verdict.metrics.homeNetGain > 0 ? "+" : ""}${verdict.metrics.homeNetGain.toFixed(0)} NAV points
-- Estimated Wins Added: ${verdict.metrics.ewaHome > 0 ? "+" : ""}${verdict.metrics.ewaHome.toFixed(1)} wins in the standings
-- Contention Window Shift: ${verdict.metrics.cwiYears > 0 ? "opens/extends by" : verdict.metrics.cwiYears < 0 ? "shortens by" : "neutral,"} ${Math.abs(verdict.metrics.cwiYears).toFixed(1)} years
-- Production delta: ${verdict.metrics.ptsGain > 0 ? "+" : ""}${verdict.metrics.ptsGain.toFixed(1)} pts/82
-- Cap impact: ${verdict.metrics.capDelta > 0 ? "+" : ""}${verdict.metrics.capDelta.toFixed(1)}M
-- Value imbalance: ${verdict.metrics.variance.toFixed(0)}%
-- Verdict: ${verdict.status}
-
-GM LOGIC FLAGS:
-${flagSummary || "None — trade passes all logic checks"}
-
-Write a concise 3-paragraph front office memo. Each paragraph maximum 4 sentences.
-1. What each team's organizational motivation is based on their phase and standing — stick to what the data shows
-2. Whether the analytics support the trade for BOTH teams — use the NAV/EWA/CWI numbers directly
-3. One clear recommendation — accept, reject, or counter with specific conditions
-
-RULES: No invented context. No speculation about players not in this trade. Complete every sentence. Use the numbers provided.`;
-
     if (memoAbortRef.current) memoAbortRef.current.abort();
     memoAbortRef.current = new AbortController();
 
@@ -610,9 +601,21 @@ RULES: No invented context. No speculation about players not in this trade. Comp
         headers: { "Content-Type": "application/json" },
         signal: memoAbortRef.current.signal,
         body: JSON.stringify({
+          kind: "trade_memo",
           model: "claude-sonnet-4-5",
           max_tokens: 700,
-          messages: [{ role: "user", content: prompt }],
+          payload: {
+            homeTeam: teams[0],
+            partnerTeam: teams[1],
+            outgoing,
+            incoming,
+            metrics: verdict.metrics,
+            status: verdict.status,
+            flags: verdict.flags.map(f => ({
+              severity: f.severity,
+              headline: f.headline,
+            })),
+          },
         }),
       });
       const data = await res.json();

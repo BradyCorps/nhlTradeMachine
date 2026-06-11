@@ -1,0 +1,2593 @@
+diff --git a/app/api/claude/route.ts b/app/api/claude/route.ts
+index 4b2e850..68ea904 100644
+--- a/app/api/claude/route.ts
++++ b/app/api/claude/route.ts
+@@ -1,6 +1,11 @@
+ import { NextResponse } from "next/server";
++import { z } from "zod";
++import { SEASON } from "@/app/lib/season-config";
++
++// Narrative-only Claude endpoint.
++// The client sends locked, pre-calculated facts; this route builds the prompt.
++// Do not accept raw `messages` here, or the LLM boundary becomes unenforceable.
+ 
+-// Allowlist of models the client is permitted to request
+ const ALLOWED_MODELS = new Set([
+   "claude-haiku-4-5",
+   "claude-sonnet-4-5",
+@@ -8,23 +13,20 @@ const ALLOWED_MODELS = new Set([
+   "claude-haiku-4-5-20251001",
+ ]);
+ 
+-const MAX_TOKENS_LIMIT = 1500;
++const MAX_TOKENS_LIMIT = 1800;
+ 
+-// ── In-memory rate limiter — 10 req/min per IP ────────────────
+-// Persists across warm serverless invocations via global.
+-// For multi-region deploys, replace with Redis/Upstash KV.
+ declare global {
+   var __rateLimitMap: Map<string, { count: number; resetAt: number }> | undefined;
+ }
+ if (!global.__rateLimitMap) global.__rateLimitMap = new Map();
+ 
+ function checkRateLimit(ip: string): boolean {
+-  const now    = Date.now();
+-  const window = 60_000; // 1 minute
+-  const limit  = 10;
+-  const entry  = global.__rateLimitMap!.get(ip);
++  const now = Date.now();
++  const windowMs = 60_000;
++  const limit = 10;
++  const entry = global.__rateLimitMap!.get(ip);
+   if (!entry || now > entry.resetAt) {
+-    global.__rateLimitMap!.set(ip, { count: 1, resetAt: now + window });
++    global.__rateLimitMap!.set(ip, { count: 1, resetAt: now + windowMs });
+     return true;
+   }
+   if (entry.count >= limit) return false;
+@@ -32,63 +34,171 @@ function checkRateLimit(ip: string): boolean {
+   return true;
+ }
+ 
++const AssetSummarySchema = z.object({
++  name: z.string(),
++  position: z.string(),
++  age: z.number().nullable().optional(),
++  capHit: z.number().nullable().optional(),
++  yearsRemaining: z.number().nullable().optional(),
++  ptsPace: z.number().nullable().optional(),
++  round: z.number().nullable().optional(),
++  year: z.number().nullable().optional(),
++});
++
++const TeamSummarySchema = z.object({
++  name: z.string(),
++  phase: z.string().nullable().optional(),
++  standing: z.number().nullable().optional(),
++  capSpace: z.number().nullable().optional(),
++});
++
++const FlagSummarySchema = z.object({
++  severity: z.enum(["HARD", "SOFT", "WARN", "INFO"]),
++  headline: z.string(),
++});
++
++const MetricsSchema = z.object({
++  homeNetGain: z.number(),
++  ewaHome: z.number(),
++  cwiYears: z.number(),
++  ptsGain: z.number(),
++  capDelta: z.number(),
++  variance: z.number(),
++});
++
++const TradeMemoPayloadSchema = z.object({
++  homeTeam: TeamSummarySchema,
++  partnerTeam: TeamSummarySchema,
++  outgoing: z.array(AssetSummarySchema),
++  incoming: z.array(AssetSummarySchema),
++  metrics: MetricsSchema,
++  status: z.string(),
++  flags: z.array(FlagSummarySchema),
++});
++
++const SeasonRecapPayloadSchema = z.object({
++  lockedReport: z.string(),
++});
++
++const ClaudeRequestSchema = z.discriminatedUnion("kind", [
++  z.object({
++    kind: z.literal("trade_memo"),
++    model: z.string().optional(),
++    max_tokens: z.number().optional(),
++    payload: TradeMemoPayloadSchema,
++  }),
++  z.object({
++    kind: z.literal("season_recap"),
++    model: z.string().optional(),
++    max_tokens: z.number().optional(),
++    payload: SeasonRecapPayloadSchema,
++  }),
++]);
++
++function describeAssets(assets: z.infer<typeof AssetSummarySchema>[]): string {
++  if (assets.length === 0) return "No assets";
++  return assets.map((a) => {
++    if (a.position === "Pick") {
++      const roundLabel = a.round === 1 ? "1st" : a.round === 2 ? "2nd" : a.round === 3 ? "3rd" : `${a.round ?? "?"}th`;
++      return `${a.year ?? "Future"} ${roundLabel} round pick`;
++    }
++    return `${a.name} (${a.position}, age ${a.age ?? "?"}, $${(a.capHit ?? 0).toFixed(1)}M x ${a.yearsRemaining ?? "?"}yr, ${Math.round(a.ptsPace ?? 0)} pts/82)`;
++  }).join(", ");
++}
++
++function buildTradeMemoPrompt(payload: z.infer<typeof TradeMemoPayloadSchema>): string {
++  const flagSummary = payload.flags
++    .filter((f) => f.severity === "HARD" || f.severity === "SOFT")
++    .map((f) => `- [${f.severity}] ${f.headline}`)
++    .join("\n");
++
++  return `You are a senior NHL front office analyst writing an internal trade evaluation memo. Base your analysis ONLY on the locked data provided. Do not invent injuries, contract disputes, locker room issues, player values, standings, or league context not shown here.
++
++TRADE DETAILS:
++${payload.homeTeam.name} (${payload.homeTeam.phase ?? "Unknown"}, #${payload.homeTeam.standing ?? "?"}/32, $${payload.homeTeam.capSpace ?? "?"}M cap space) sends:
++  ${describeAssets(payload.outgoing)}
++
++${payload.partnerTeam.name} (${payload.partnerTeam.phase ?? "Unknown"}, #${payload.partnerTeam.standing ?? "?"}/32, $${payload.partnerTeam.capSpace ?? "?"}M cap space) sends:
++  ${describeAssets(payload.incoming)}
++
++LOCKED ANALYTICS:
++- NAV balance: ${payload.homeTeam.name} nets ${payload.metrics.homeNetGain > 0 ? "+" : ""}${payload.metrics.homeNetGain.toFixed(0)} NAV points
++- Estimated Wins Added: ${payload.metrics.ewaHome > 0 ? "+" : ""}${payload.metrics.ewaHome.toFixed(1)} wins in the standings
++- Contention Window Shift: ${payload.metrics.cwiYears > 0 ? "opens/extends by" : payload.metrics.cwiYears < 0 ? "shortens by" : "neutral,"} ${Math.abs(payload.metrics.cwiYears).toFixed(1)} years
++- Production delta: ${payload.metrics.ptsGain > 0 ? "+" : ""}${payload.metrics.ptsGain.toFixed(1)} pts/82
++- Cap impact: ${payload.metrics.capDelta > 0 ? "+" : ""}${payload.metrics.capDelta.toFixed(1)}M
++- Value imbalance: ${payload.metrics.variance.toFixed(0)}%
++- Verdict: ${payload.status}
++
++GM LOGIC FLAGS:
++${flagSummary || "None - trade passes all logic checks"}
++
++Write a concise 3-paragraph front office memo. Each paragraph maximum 4 sentences.
++1. What each team's organizational motivation is based on phase and standing.
++2. Whether the locked analytics support the trade for both teams.
++3. One clear recommendation: accept, reject, or counter with specific conditions.
++
++Rules: Use only the locked numbers above. Do not calculate new values. Complete every sentence.`;
++}
++
++function buildSeasonRecapPrompt(payload: z.infer<typeof SeasonRecapPayloadSchema>): string {
++  return `You are a senior NHL beat reporter writing an end-of-season alternate-history recap.
++
++Use ONLY the locked pre-calculated report below. Do not estimate, calculate, infer missing values, invent injuries, invent off-ice stories, or change standings/playoff results. Treat executed deals as ${SEASON.rosterMoveWindow} roster moves, never as trade-deadline moves. If a fact is not in the report, omit it.
++
++LOCKED REPORT:
++${payload.lockedReport}`;
++}
++
+ export async function POST(req: Request) {
+   const apiKey = process.env.ANTHROPIC_API_KEY;
+   if (!apiKey) {
+     return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
+   }
+ 
+-  // Rate limit by IP — 10 requests per minute
+   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+   if (!checkRateLimit(ip)) {
+-    return NextResponse.json({ error: "Rate limit exceeded — try again in a minute" }, { status: 429 });
++    return NextResponse.json({ error: "Rate limit exceeded - try again in a minute" }, { status: 429 });
+   }
+ 
+-  let body: any;
++  let rawBody: unknown;
+   try {
+-    body = await req.json();
++    rawBody = await req.json();
+   } catch {
+     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+   }
+ 
+-  // ── Validate and sanitize — never trust the client payload ───
+-  const requestedModel = typeof body.model === "string" ? body.model : "";
+-  const safeModel = ALLOWED_MODELS.has(requestedModel)
+-    ? requestedModel
+-    : "claude-sonnet-4-5";  // safe default
+-
+-  const requestedTokens = typeof body.max_tokens === "number" ? body.max_tokens : 700;
+-  const safeTokens = Math.min(Math.max(1, requestedTokens), MAX_TOKENS_LIMIT);
+-
+-  // Validate messages array — must exist and be non-empty
+-  if (!Array.isArray(body.messages) || body.messages.length === 0) {
+-    return NextResponse.json({ error: "messages must be a non-empty array" }, { status: 400 });
++  const parsed = ClaudeRequestSchema.safeParse(rawBody);
++  if (!parsed.success) {
++    return NextResponse.json(
++      { error: "Invalid narrative request", details: parsed.error.format() },
++      { status: 400 }
++    );
+   }
+ 
+-  // Sanitize each message — only allow role/content strings
+-  const safeMessages = body.messages
+-    .filter((m: any) => m && typeof m.role === "string" && typeof m.content === "string")
+-    .map((m: any) => ({ role: m.role, content: m.content }));
++  const body = parsed.data;
++  const safeModel = body.model && ALLOWED_MODELS.has(body.model)
++    ? body.model
++    : "claude-sonnet-4-5";
++  const safeTokens = Math.min(Math.max(1, body.max_tokens ?? 700), MAX_TOKENS_LIMIT);
+ 
+-  if (safeMessages.length === 0) {
+-    return NextResponse.json({ error: "No valid messages" }, { status: 400 });
+-  }
+-
+-  const safePayload = {
+-    model:      safeModel,
+-    max_tokens: safeTokens,
+-    messages:   safeMessages,
+-  };
++  const prompt = body.kind === "trade_memo"
++    ? buildTradeMemoPrompt(body.payload)
++    : buildSeasonRecapPrompt(body.payload);
+ 
+   try {
+     const res = await fetch("https://api.anthropic.com/v1/messages", {
+-      method:  "POST",
++      method: "POST",
+       headers: {
+-        "Content-Type":      "application/json",
+-        "x-api-key":         apiKey,
++        "Content-Type": "application/json",
++        "x-api-key": apiKey,
+         "anthropic-version": "2023-06-01",
+       },
+-      body: JSON.stringify(safePayload),
++      body: JSON.stringify({
++        model: safeModel,
++        max_tokens: safeTokens,
++        messages: [{ role: "user", content: prompt }],
++      }),
+     });
+ 
+     const data = await res.json();
+@@ -96,4 +206,4 @@ export async function POST(req: Request) {
+   } catch (e: any) {
+     return NextResponse.json({ error: e.message }, { status: 500 });
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/app/api/evaluate/route.ts b/app/api/evaluate/route.ts
+index e48c216..7e7bc85 100644
+--- a/app/api/evaluate/route.ts
++++ b/app/api/evaluate/route.ts
+@@ -402,10 +402,10 @@ const runGmLogic = (
+   });
+ 
+   const newCapUsedHome = SEASON.capCeiling - projCapHome;
+-  if (newCapUsedHome < 65 && capDeltaHome < -3) flags.push({
++  if (newCapUsedHome < SEASON.capFloor && capDeltaHome < -3) flags.push({
+     severity: "HARD", category: "FLOOR_VIOLATION",
+     headline: "Cap Floor Violation",
+-    explanation: `${teamHome.name} would fall below the NHL's $65M cap floor.`,
++    explanation: `${teamHome.name} would fall below the NHL's $${SEASON.capFloor.toFixed(1)}M cap floor.`,
+     vetoesSide: 0,
+   });
+ 
+@@ -1084,4 +1084,4 @@ const response = {
+     console.error("[evaluate] Error:", e.message);
+     return NextResponse.json({ error: e.message }, { status: 500 });
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/app/api/league/players/route.ts b/app/api/league/players/route.ts
+index 9ff8e5c..f8f72ca 100644
+--- a/app/api/league/players/route.ts
++++ b/app/api/league/players/route.ts
+@@ -78,424 +78,6 @@ const calcAge = (birthDate: string): number => {
+   return age;
+ };
+ 
+-// ============================================================
+-// STATIC ROSTER — ~15 players per team, no duplicates
+-// Format: [teamId, name, position, birthDate]
+-// ============================================================
+-const STATIC_ROSTER: [string, string, string, string][] = [
+-  // ANA
+-  ["ANA","Mason McTavish","C","2003-01-30"],
+-  ["ANA","Leo Carlsson","C","2004-04-09"],
+-  ["ANA","Trevor Zegras","C","2001-03-20"],
+-  ["ANA","Troy Terry","W","1997-09-10"],
+-  ["ANA","Frank Vatrano","W","1994-03-14"],
+-  ["ANA","Alex Killorn","W","1989-09-14"],
+-  ["ANA","Brock McGinn","W","1994-02-02"],
+-  ["ANA","Cam Fowler","D","1991-12-05"],
+-  ["ANA","Jackson LaCombe","D","2001-06-12"],
+-  ["ANA","Radko Gudas","D","1990-06-05"],
+-  ["ANA","Urho Vaakanainen","D","1999-03-20"],
+-  ["ANA","Pavel Mintyukov","D","2003-10-05"],
+-  ["ANA","Brian Dumoulin","D","1991-09-06"],
+-  // BOS
+-  ["BOS","David Pastrnak","W","1996-05-25"],
+-  ["BOS","Brad Marchand","W","1988-05-11"],
+-  ["BOS","Morgan Geekie","C","1998-07-20"],
+-  ["BOS","Pavel Zacha","C","1997-04-06"],
+-  ["BOS","Elias Lindholm","C","1994-12-02"],
+-  ["BOS","Casey Mittelstadt","C","1998-11-22"],
+-  ["BOS","Fraser Minten","C","2004-03-05"],
+-  ["BOS","Charlie McAvoy","D","1997-12-21"],
+-  ["BOS","Hampus Lindholm","D","1993-01-20"],
+-  ["BOS","Mason Lohrei","D","2001-09-06"],
+-  ["BOS","Nikita Zadorov","D","1995-04-16"],
+-  ["BOS","Andrew Peeke","D","1997-03-17"],
+-  // BUF
+-  ["BUF","Tage Thompson","C","1997-10-30"],
+-  ["BUF","Dylan Cozens","C","2001-02-09"],
+-  ["BUF","JJ Peterka","W","2002-01-14"],
+-  ["BUF","Jack Quinn","W","2001-09-19"],
+-  ["BUF","Alex Tuch","W","1996-02-17"],
+-  ["BUF","Zach Benson","W","2004-05-12"],
+-  ["BUF","Jason Zucker","W","1992-01-16"],
+-  ["BUF","Rasmus Dahlin","D","2000-04-13"],
+-  ["BUF","Owen Power","D","2002-11-22"],
+-  ["BUF","Bowen Byram","D","2001-06-13"],
+-  ["BUF","Mattias Samuelsson","D","1999-03-17"],
+-  ["BUF","Henri Jokiharju","D","1999-06-17"],
+-  // CGY
+-  ["CGY","Nazem Kadri","C","1990-10-06"],
+-  ["CGY","Yegor Sharangovich","C","1998-06-06"],
+-  ["CGY","Jonathan Huberdeau","W","1993-06-04"],
+-  ["CGY","Blake Coleman","W","1991-11-28"],
+-  ["CGY","Matt Coronato","W","2002-10-11"],
+-  ["CGY","Joel Farabee","W","1999-08-25"],
+-  ["CGY","MacKenzie Weegar","D","1994-01-07"],
+-  ["CGY","Rasmus Andersson","D","1996-10-27"],
+-  ["CGY","Kevin Bahl","D","2000-05-27"],
+-  ["CGY","Zayne Parekh","D","2005-04-02"],
+-  // CAR
+-  ["CAR","Sebastian Aho","C","1997-07-26"],
+-  ["CAR","Seth Jarvis","C","2002-02-01"],
+-  ["CAR","Jordan Staal","C","1988-09-10"],
+-  ["CAR","Andrei Svechnikov","W","2000-03-26"],
+-  ["CAR","Nikolaj Ehlers","W","1996-02-14"],
+-  ["CAR","Taylor Hall","W","1991-11-14"],
+-  ["CAR","Jaccob Slavin","D","1994-05-01"],
+-  ["CAR","Shayne Gostisbehere","D","1993-04-20"],
+-  ["CAR","Brady Skjei","D","1994-03-26"],
+-  ["CAR","KAndre Miller","D","1999-01-21"],
+-  ["CAR","Sean Walker","D","1994-11-05"],
+-  // CHI
+-  ["CHI","Connor Bedard","C","2005-07-17"],
+-  ["CHI","Frank Nazar","C","2003-06-10"],
+-  ["CHI","Ryan Greene","C","2003-04-16"],
+-  ["CHI","Tyler Bertuzzi","W","1995-02-24"],
+-  ["CHI","Ilya Mikheyev","W","1994-10-10"],
+-  ["CHI","Nick Lardis","W","2004-08-05"],
+-  ["CHI","Seth Jones","D","1994-10-03"],
+-  ["CHI","Alex Vlasic","D","2002-07-10"],
+-  ["CHI","Kevin Korchinski","D","2003-09-09"],
+-  ["CHI","Artyom Levshunov","D","2005-02-08"],
+-  ["CHI","Wyatt Kaiser","D","2002-03-01"],
+-  // COL
+-  ["COL","Nathan MacKinnon","C","1995-09-01"],
+-  ["COL","Martin Necas","C","1999-01-15"],
+-  ["COL","Nazem Kadri","C","1990-10-06"],
+-  ["COL","Mikko Rantanen","W","1996-10-29"],
+-  ["COL","Valeri Nichushkin","W","1995-03-04"],
+-  ["COL","Artturi Lehkonen","W","1995-07-04"],
+-  ["COL","Gabriel Landeskog","W","1992-11-23"],
+-  ["COL","Cale Makar","D","1998-10-30"],
+-  ["COL","Devon Toews","D","1994-02-27"],
+-  ["COL","Josh Manson","D","1991-10-07"],
+-  ["COL","Brent Burns","D","1985-03-09"],
+-  // CBJ
+-  ["CBJ","Adam Fantilli","C","2004-01-13"],
+-  ["CBJ","Sean Monahan","C","1994-10-12"],
+-  ["CBJ","Kirill Marchenko","W","2000-08-08"],
+-  ["CBJ","Dmitri Voronkov","W","1999-07-28"],
+-  ["CBJ","Ivan Provorov","D","1997-01-13"],
+-  ["CBJ","Zach Werenski","D","1996-07-19"],
+-  ["CBJ","David Jiricek","D","2003-04-09"],
+-  ["CBJ","Jake Bean","D","1998-06-09"],
+-  // DAL
+-  ["DAL","Jason Robertson","W","1999-07-22"],
+-  ["DAL","Roope Hintz","C","1997-03-03"],
+-  ["DAL","Wyatt Johnston","C","2003-05-14"],
+-  ["DAL","Tyler Seguin","C","1992-01-31"],
+-  ["DAL","Matt Duchene","C","1991-01-16"],
+-  ["DAL","Logan Stankoven","C","2002-11-16"],
+-  ["DAL","Miro Heiskanen","D","1999-07-18"],
+-  ["DAL","Thomas Harley","D","2002-08-19"],
+-  ["DAL","Esa Lindell","D","1994-05-23"],
+-  ["DAL","Brendan Smith","D","1988-02-08"],
+-  // DET
+-  ["DET","Dylan Larkin","C","1996-07-30"],
+-  ["DET","Alex DeBrincat","W","1997-12-18"],
+-  ["DET","Lucas Raymond","W","2002-03-28"],
+-  ["DET","Patrick Kane","W","1988-11-19"],
+-  ["DET","Andrew Copp","C","1994-07-08"],
+-  ["DET","Robby Fabbri","C","1996-01-22"],
+-  ["DET","Moritz Seider","D","2001-04-06"],
+-  ["DET","Simon Edvinsson","D","2003-02-13"],
+-  ["DET","Ben Chiarot","D","1991-05-09"],
+-  ["DET","Jeff Petry","D","1987-12-09"],
+-  // EDM
+-  ["EDM","Connor McDavid","C","1997-01-13"],
+-  ["EDM","Leon Draisaitl","C","1995-10-27"],
+-  ["EDM","Ryan Nugent-Hopkins","C","1992-04-12"],
+-  ["EDM","Zach Hyman","W","1992-06-09"],
+-  ["EDM","Vasily Podkolzin","W","2001-06-24"],
+-  ["EDM","Kasperi Kapanen","W","1996-07-23"],
+-  ["EDM","Matt Savoie","C","2003-07-17"],
+-  ["EDM","Jack Roslovic","C","1996-01-29"],
+-  ["EDM","Evan Bouchard","D","1999-10-20"],
+-  ["EDM","Darnell Nurse","D","1995-02-04"],
+-  ["EDM","Mattias Ekholm","D","1990-05-03"],
+-  ["EDM","Brett Kulak","D","1994-01-06"],
+-  ["EDM","Connor Murphy","D","1992-03-26"],
+-  // FLA
+-  ["FLA","Aleksander Barkov","C","1995-09-02"],
+-  ["FLA","Sam Reinhart","W","1995-11-06"],
+-  ["FLA","Matthew Tkachuk","W","1997-12-11"],
+-  ["FLA","Carter Verhaeghe","W","1995-08-14"],
+-  ["FLA","Evan Rodrigues","C","1993-07-28"],
+-  ["FLA","Eetu Luostarinen","C","1998-09-02"],
+-  ["FLA","Aaron Ekblad","D","1996-02-07"],
+-  ["FLA","Gustav Forsling","D","1996-06-12"],
+-  ["FLA","Niko Mikkola","D","1996-04-26"],
+-  ["FLA","Brandon Montour","D","1994-04-11"],
+-  // LAK
+-  ["LAK","Anze Kopitar","C","1987-08-24"],
+-  ["LAK","Quinton Byfield","C","2002-08-13"],
+-  ["LAK","Kevin Fiala","W","1996-07-22"],
+-  ["LAK","Adrian Kempe","W","1996-09-20"],
+-  ["LAK","Artemi Panarin","W","1991-10-30"],
+-  ["LAK","Alex Laferriere","W","2001-12-08"],
+-  ["LAK","Trevor Moore","W","1995-01-31"],
+-  ["LAK","Drew Doughty","D","1989-12-08"],
+-  ["LAK","Mikey Anderson","D","1999-05-07"],
+-  ["LAK","Brandt Clarke","D","2002-11-27"],
+-  ["LAK","Joel Edmundson","D","1993-09-28"],
+-  // MIN
+-  ["MIN","Kirill Kaprizov","W","1997-04-26"],
+-  ["MIN","Matt Boldy","W","2001-04-05"],
+-  ["MIN","Joel Eriksson Ek","C","1997-07-29"],
+-  ["MIN","Marco Rossi","C","2002-06-23"],
+-  ["MIN","Ryan Hartman","W","1994-09-20"],
+-  ["MIN","Marcus Johansson","W","1990-10-06"],
+-  ["MIN","Mats Zuccarello","W","1987-09-01"],
+-  ["MIN","Quinn Hughes","D","2000-10-14"],
+-  ["MIN","Jonas Brodin","D","1993-07-12"],
+-  ["MIN","Brock Faber","D","2002-05-28"],
+-  ["MIN","Jake Middleton","D","1996-02-04"],
+-  ["MIN","Jared Spurgeon","D","1989-11-29"],
+-  // MTL
+-  ["MTL","Nick Suzuki","C","1999-08-10"],
+-  ["MTL","Cole Caufield","W","2001-01-02"],
+-  ["MTL","Juraj Slafkovsky","W","2004-03-30"],
+-  ["MTL","Ivan Demidov","W","2005-10-14"],
+-  ["MTL","Kirby Dach","C","2001-01-21"],
+-  ["MTL","Phillip Danault","C","1993-04-24"],
+-  ["MTL","Alex Newhook","C","2001-01-28"],
+-  ["MTL","Jake Evans","C","1996-06-02"],
+-  ["MTL","Lane Hutson","D","2003-02-12"],
+-  ["MTL","Mike Matheson","D","1994-02-27"],
+-  ["MTL","Kaiden Guhle","D","2002-01-18"],
+-  ["MTL","Noah Dobson","D","2000-01-07"],
+-  ["MTL","Alexandre Carrier","D","1997-10-08"],
+-  // NSH
+-  ["NSH","Filip Forsberg","W","1994-08-13"],
+-  ["NSH","Ryan O'Reilly","C","1991-02-07"],
+-  ["NSH","Steven Stamkos","C","1990-02-07"],
+-  ["NSH","Jonathan Marchessault","C","1990-12-27"],
+-  ["NSH","Luke Evangelista","W","2001-12-25"],
+-  ["NSH","Roman Josi","D","1990-06-01"],
+-  ["NSH","Brady Skjei","D","1994-03-26"],
+-  ["NSH","Alexandre Carrier","D","1997-10-08"],
+-  ["NSH","Nick Perbix","D","1997-12-14"],
+-  // NJD
+-  ["NJD","Jack Hughes","C","2001-05-14"],
+-  ["NJD","Nico Hischier","C","1999-01-04"],
+-  ["NJD","Timo Meier","W","1996-10-08"],
+-  ["NJD","Jesper Bratt","W","1998-07-30"],
+-  ["NJD","Dawson Mercer","C","2002-10-27"],
+-  ["NJD","Stefan Noesen","W","1993-02-26"],
+-  ["NJD","Dougie Hamilton","D","1993-06-17"],
+-  ["NJD","Jonas Siegenthaler","D","1997-05-06"],
+-  ["NJD","Luke Hughes","D","2003-09-09"],
+-  ["NJD","Brendan Smith","D","1988-02-08"],
+-  // NYI
+-  ["NYI","Mathew Barzal","C","1997-05-26"],
+-  ["NYI","Bo Horvat","C","1995-04-05"],
+-  ["NYI","Jean-Gabriel Pageau","C","1992-11-11"],
+-  ["NYI","Brock Nelson","C","1991-10-15"],
+-  ["NYI","Simon Holmstrom","W","2001-10-15"],
+-  ["NYI","Anders Lee","W","1990-07-03"],
+-  ["NYI","Noah Dobson","D","2000-01-07"],
+-  ["NYI","Ryan Pulock","D","1994-10-18"],
+-  ["NYI","Adam Pelech","D","1994-08-16"],
+-  ["NYI","Alexander Romanov","D","2000-02-06"],
+-  ["NYI","Matthew Schaefer","D","2007-02-13"],
+-  // NYR
+-  ["NYR","Mika Zibanejad","C","1993-04-18"],
+-  ["NYR","Vincent Trocheck","C","1993-07-11"],
+-  ["NYR","Artemi Panarin","W","1991-10-30"],
+-  ["NYR","Alexis Lafreniere","W","2001-10-11"],
+-  ["NYR","Chris Kreider","W","1991-04-30"],
+-  ["NYR","Will Cuylle","W","2002-02-05"],
+-  ["NYR","Gabe Perreault","W","2004-08-02"],
+-  ["NYR","JT Miller","C","1993-03-14"],
+-  ["NYR","Adam Fox","D","1998-02-17"],
+-  ["NYR","Braden Schneider","D","2001-09-20"],
+-  ["NYR","Vladislav Gavrikov","D","1995-11-15"],
+-  ["NYR","K'Andre Miller","D","1999-01-21"],
+-  // OTT
+-  ["OTT","Tim Stutzle","C","2002-01-15"],
+-  ["OTT","Brady Tkachuk","W","1999-09-16"],
+-  ["OTT","Drake Batherson","W","1998-04-27"],
+-  ["OTT","Dylan Cozens","C","2001-02-09"],
+-  ["OTT","Claude Giroux","W","1988-01-12"],
+-  ["OTT","Shane Pinto","C","2000-11-07"],
+-  ["OTT","Ridly Greig","C","2002-08-08"],
+-  ["OTT","Jake Sanderson","D","2002-07-08"],
+-  ["OTT","Thomas Chabot","D","1997-01-30"],
+-  ["OTT","Artem Zub","D","1995-10-03"],
+-  ["OTT","Jordan Spence","D","2000-09-28"],
+-  // PHI
+-  ["PHI","Sean Couturier","C","1992-12-07"],
+-  ["PHI","Travis Konecny","W","1997-03-11"],
+-  ["PHI","Matvei Michkov","W","2004-11-06"],
+-  ["PHI","Owen Tippett","W","1999-02-16"],
+-  ["PHI","Joel Farabee","W","1999-08-25"],
+-  ["PHI","Morgan Frost","C","1999-05-14"],
+-  ["PHI","Travis Sanheim","D","1996-03-29"],
+-  ["PHI","Cam York","D","2001-01-05"],
+-  ["PHI","Ivan Provorov","D","1997-01-13"],
+-  ["PHI","Sean Walker","D","1994-11-05"],
+-  // PIT
+-  ["PIT","Sidney Crosby","C","1987-08-07"],
+-  ["PIT","Evgeni Malkin","C","1986-07-31"],
+-  ["PIT","Rickard Rakell","W","1993-05-05"],
+-  ["PIT","Bryan Rust","W","1991-05-11"],
+-  ["PIT","Reilly Smith","W","1991-04-01"],
+-  ["PIT","Kris Letang","D","1987-04-24"],
+-  ["PIT","Erik Karlsson","D","1990-05-31"],
+-  ["PIT","Marcus Pettersson","D","1996-05-08"],
+-  ["PIT","Matt Grzelcyk","D","1994-01-05"],
+-  // SEA
+-  ["SEA","Matty Beniers","C","2002-11-05"],
+-  ["SEA","Jared McCann","C","1996-05-31"],
+-  ["SEA","Jordan Eberle","W","1990-05-15"],
+-  ["SEA","Chandler Stephenson","C","1993-08-09"],
+-  ["SEA","Eeli Tolvanen","W","1998-04-02"],
+-  ["SEA","Kaapo Kakko","W","2001-02-15"],
+-  ["SEA","Shane Wright","C","2003-01-05"],
+-  ["SEA","Vince Dunn","D","1996-10-29"],
+-  ["SEA","Adam Larsson","D","1992-11-12"],
+-  ["SEA","Brandon Montour","D","1994-04-11"],
+-  ["SEA","Ryker Evans","D","2001-11-06"],
+-  // SJS
+-  ["SJS","Macklin Celebrini","C","2006-01-05"],
+-  ["SJS","Will Smith","C","2004-02-21"],
+-  ["SJS","William Eklund","W","2003-10-12"],
+-  ["SJS","Tyler Toffoli","W","1992-04-24"],
+-  ["SJS","Fabian Zetterlund","W","1999-08-26"],
+-  ["SJS","Alexander Wennberg","C","1994-09-22"],
+-  ["SJS","Collin Graf","W","2002-07-07"],
+-  ["SJS","Mario Ferraro","D","1998-09-17"],
+-  ["SJS","Dmitry Orlov","D","1991-07-23"],
+-  ["SJS","Jake Walman","D","1996-02-10"],
+-  ["SJS","Sam Dickinson","D","2005-11-15"],
+-  // STL
+-  ["STL","Robert Thomas","C","1999-07-02"],
+-  ["STL","Jordan Kyrou","W","1998-05-05"],
+-  ["STL","Pavel Buchnevich","W","1995-04-17"],
+-  ["STL","Dylan Holloway","W","2002-01-23"],
+-  ["STL","Jake Neighbours","W","2002-03-30"],
+-  ["STL","Jimmy Snuggerud","W","2004-06-25"],
+-  ["STL","Colton Parayko","D","1993-05-12"],
+-  ["STL","Philip Broberg","D","2001-07-11"],
+-  ["STL","Cam Fowler","D","1991-12-05"],
+-  ["STL","Logan Mailloux","D","2002-09-22"],
+-  // TBL
+-  ["TBL","Nikita Kucherov","W","1993-06-17"],
+-  ["TBL","Brayden Point","C","1996-03-13"],
+-  ["TBL","Brandon Hagel","W","1998-08-27"],
+-  ["TBL","Jake Guentzel","C","1994-10-06"],
+-  ["TBL","Anthony Cirelli","C","1997-07-15"],
+-  ["TBL","Steven Stamkos","C","1990-02-07"],
+-  ["TBL","Yanni Gourde","C","1991-12-15"],
+-  ["TBL","Victor Hedman","D","1990-12-18"],
+-  ["TBL","Mikhail Sergachev","D","1998-06-25"],
+-  ["TBL","Erik Cernak","D","1997-05-28"],
+-  ["TBL","Darren Raddysh","D","1995-08-10"],
+-  // TOR
+-  ["TOR","Auston Matthews","C","1997-09-17"],
+-  ["TOR","Mitch Marner","W","1997-05-05"],
+-  ["TOR","William Nylander","W","1996-05-01"],
+-  ["TOR","John Tavares","C","1990-09-20"],
+-  ["TOR","Matthew Knies","W","2003-03-25"],
+-  ["TOR","Max Domi","C","1995-03-02"],
+-  ["TOR","Nicholas Robertson","W","2001-09-11"],
+-  ["TOR","Morgan Rielly","D","1994-03-09"],
+-  ["TOR","Jake McCabe","D","1993-10-12"],
+-  ["TOR","Chris Tanev","D","1989-12-20"],
+-  ["TOR","Timothy Liljegren","D","1999-04-30"],
+-  // UTA
+-  ["UTA","Clayton Keller","C","1998-07-29"],
+-  ["UTA","Nick Schmaltz","C","1996-02-15"],
+-  ["UTA","Logan Cooley","C","2003-05-04"],
+-  ["UTA","Lawson Crouse","W","1997-06-23"],
+-  ["UTA","Dylan Guenther","W","2003-06-24"],
+-  ["UTA","Mikhail Sergachev","D","1998-06-25"],
+-  ["UTA","Juuso Valimaki","D","1998-10-06"],
+-  ["UTA","Sean Durzi","D","1998-10-03"],
+-  ["UTA","Ian Cole","D","1989-02-21"],
+-  // VAN
+-  ["VAN","Elias Pettersson","C","1998-11-12"],
+-  ["VAN","JT Miller","C","1993-03-14"],
+-  ["VAN","Brock Boeser","W","1997-02-25"],
+-  ["VAN","Jake DeBrusk","W","1999-10-17"],
+-  ["VAN","Conor Garland","W","1996-03-11"],
+-  ["VAN","Nils Hoglander","W","2000-10-20"],
+-  ["VAN","Quinn Hughes","D","2000-10-14"],
+-  ["VAN","Filip Hronek","D","1997-11-02"],
+-  ["VAN","Marcus Pettersson","D","1996-05-08"],
+-  ["VAN","Nikita Zadorov","D","1995-04-16"],
+-  ["VAN","Tom Willander","D","2004-06-05"],
+-  // VGK
+-  ["VGK","Jack Eichel","C","1996-10-28"],
+-  ["VGK","Mitch Marner","W","1997-05-05"],
+-  ["VGK","Mark Stone","W","1992-05-13"],
+-  ["VGK","Ivan Barbashev","W","1995-12-08"],
+-  ["VGK","William Karlsson","C","1993-01-08"],
+-  ["VGK","Pavel Dorofeyev","W","2000-11-21"],
+-  ["VGK","Tomas Hertl","C","1993-11-12"],
+-  ["VGK","Shea Theodore","D","1995-08-03"],
+-  ["VGK","Rasmus Andersson","D","1996-10-27"],
+-  ["VGK","Noah Hanifin","D","1997-01-25"],
+-  ["VGK","Brayden McNabb","D","1991-01-21"],
+-  // WSH
+-  ["WSH","Alexander Ovechkin","W","1985-09-17"],
+-  ["WSH","Dylan Strome","C","1997-03-07"],
+-  ["WSH","Tom Wilson","W","1994-03-26"],
+-  ["WSH","Lars Eller","C","1989-05-08"],
+-  ["WSH","Aliaksei Protas","C","2001-01-06"],
+-  ["WSH","Pierre-Luc Dubois","C","1998-06-24"],
+-  ["WSH","John Carlson","D","1990-01-10"],
+-  ["WSH","Matt Roy","D","1995-04-05"],
+-  ["WSH","Trevor van Riemsdyk","D","1991-07-24"],
+-  ["WSH","Jakob Chychrun","D","1998-03-31"],
+-  // WPG
+-  ["WPG","Mark Scheifele","C","1993-03-15"],
+-  ["WPG","Kyle Connor","W","1996-12-09"],
+-  ["WPG","Gabriel Vilardi","C","2000-08-16"],
+-  ["WPG","Adam Lowry","C","1992-03-29"],
+-  ["WPG","Cole Perfetti","C","2002-01-01"],
+-  ["WPG","Josh Morrissey","D","1995-03-28"],
+-  ["WPG","Dylan DeMelo","D","1993-05-01"],
+-  ["WPG","Neal Pionk","D","1995-07-29"],
+-  // GOALIES
+-  ["WPG","Connor Hellebuyck","G","1993-05-19"],
+-  ["EDM","Stuart Skinner","G","1998-11-01"],
+-  ["EDM","Calvin Pickard","G","1992-04-15"],
+-  ["FLA","Sergei Bobrovsky","G","1988-09-20"],
+-  ["TBL","Andrei Vasilevskiy","G","1994-07-25"],
+-  ["CAR","Pyotr Kochetkov","G","1999-06-25"],
+-  ["COL","Alexandar Georgiev","G","1996-02-10"],
+-  ["DAL","Jake Oettinger","G","1998-12-18"],
+-  ["NYR","Igor Shesterkin","G","1995-12-30"],
+-  ["VGK","Adin Hill","G","1996-05-11"],
+-  ["TOR","Joseph Woll","G","1998-07-12"],
+-  ["TOR","Anthony Stolarz","G","1994-01-20"],
+-  ["BOS","Jeremy Swayman","G","1998-11-16"],
+-  ["MIN","Filip Gustavsson","G","1998-06-07"],
+-  ["NSH","Juuse Saros","G","1995-04-19"],
+-  ["OTT","Linus Ullmark","G","1993-07-31"],
+-  ["NJD","Jacob Markstrom","G","1990-01-31"],
+-  ["SEA","Philipp Grubauer","G","1991-11-25"],
+-  ["BUF","Ukko-Pekka Luukkonen","G","1999-03-09"],
+-  ["MTL","Sam Montembeault","G","1996-10-30"],
+-  ["VAN","Kevin Lankinen","G","1995-04-28"],
+-  ["LAK","Darcy Kuemper","G","1990-05-05"],
+-  ["PIT","Tristan Jarry","G","1995-04-29"],
+-  ["STL","Jordan Binnington","G","1993-07-11"],
+-  ["ANA","Lukas Dostal","G","2000-06-22"],
+-  ["CHI","Petr Mrazek","G","1992-02-14"],
+-  ["DET","Cam Talbot","G","1987-07-05"],
+-  ["PHI","Samuel Ersson","G","2000-02-26"],
+-  ["NYI","Semyon Varlamov","G","1988-04-27"],
+-  ["SJS","Mackenzie Blackwood","G","1996-12-09"],
+-  ["CBJ","Elvis Merzlikins","G","1994-04-13"],
+-  ["UTA","Connor Ingram","G","1997-04-09"],
+-  ["CGY","Dustin Wolf","G","2001-04-16"],
+-  ["WSH","Logan Thompson","G","1997-02-25"],
+-  ["BOS","Linus Ullmark","G","1993-07-31"],
+-  ["CAR","Frederik Andersen","G","1989-10-02"],
+-  ["NYI","Ilya Sorokin","G","1995-08-04"],
+-];
+ 
+ // ── QoC Index (0-100): quantified deployment difficulty ──────────────────
+ // Replaces the old "qocRank", which was MoneyPuck's raw iceTimeRank SUM — a
+@@ -679,11 +261,11 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
+   try {
+     const [skatersRes, teamsRes] = await Promise.allSettled([
+       fetchWithTimeout(
+-        "https://api.nhle.com/stats/rest/en/skater/summary?cayenneExp=seasonId%3D20252026%20and%20gameTypeId%3D2&limit=-1",
++        `https://api.nhle.com/stats/rest/en/skater/summary?cayenneExp=seasonId%3D${SEASON.nhleSeasonId}%20and%20gameTypeId%3D2&limit=-1`,
+         10000
+       ),
+       fetchWithTimeout(
+-        "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId%3D20252026%20and%20gameTypeId%3D2&limit=32",
++        `https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId%3D${SEASON.nhleSeasonId}%20and%20gameTypeId%3D2&limit=32`,
+         8000
+       ),
+     ]);
+@@ -998,13 +580,12 @@ export async function GET() {
+     }
+   } catch (_) {}
+ 
+-  // ── Build roster from static list ──────────────────────────
++  // ── Build roster from live NHL API only ─────────────────────
++  // Static player rosters were removed because they drift quickly and conflict
++  // with the DB/live-data source of truth. If the NHL API is unavailable, this
++  // route returns DB-injected draftees plus picks from /api/league instead of
++  // manufacturing stale active rosters.
+   const rosterMap = new Map<string, any[]>();
+-  for (const [teamId, name, position, birthDate] of STATIC_ROSTER) {
+-    const list = rosterMap.get(teamId) ?? [];
+-    list.push({ id: `${teamId}-${slugify(name)}`, name, position: normalisePos(position), age: calcAge(birthDate), headshot: null });
+-    rosterMap.set(teamId, list);
+-  }
+ 
+   try {
+     const results = await Promise.allSettled(
+@@ -1035,7 +616,9 @@ export async function GET() {
+         headshot: p.headshot ?? null,
+       })));
+     });
+-  } catch (_) {}
++  } catch (_) {
++    console.warn("[NHL roster] live roster fetch failed; no static player fallback is used.");
++  }
+ 
+   // ── Inject drafted prospects from DB ─────────────────────────
+   // Mock-draft imports live only in the DB; NHL API rosters don't know them.
+diff --git a/app/api/league/route.ts b/app/api/league/route.ts
+index 7830681..783e767 100644
+--- a/app/api/league/route.ts
++++ b/app/api/league/route.ts
+@@ -99,8 +99,8 @@ async function loadTeams(): Promise<any[]> {
+   points: number;
+ }>();
+   try {
+-    const res = await fetchWithTimeout(
+-      "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId=20252026%20and%20gameTypeId=2",
++    const res = await fetchWithTimeout(
++      `https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId=${SEASON.nhleSeasonId}%20and%20gameTypeId=2`,
+       8000
+     );
+     if (res.ok) {
+@@ -464,424 +464,6 @@ const calcAge = (birthDate: string): number => {
+   return age;
+ };
+ 
+-// ============================================================
+-// STATIC ROSTER — ~15 players per team, no duplicates
+-// Format: [teamId, name, position, birthDate]
+-// ============================================================
+-const STATIC_ROSTER: [string, string, string, string][] = [
+-  // ANA
+-  ["ANA","Mason McTavish","C","2003-01-30"],
+-  ["ANA","Leo Carlsson","C","2004-04-09"],
+-  ["ANA","Trevor Zegras","C","2001-03-20"],
+-  ["ANA","Troy Terry","W","1997-09-10"],
+-  ["ANA","Frank Vatrano","W","1994-03-14"],
+-  ["ANA","Alex Killorn","W","1989-09-14"],
+-  ["ANA","Brock McGinn","W","1994-02-02"],
+-  ["ANA","Cam Fowler","D","1991-12-05"],
+-  ["ANA","Jackson LaCombe","D","2001-06-12"],
+-  ["ANA","Radko Gudas","D","1990-06-05"],
+-  ["ANA","Urho Vaakanainen","D","1999-03-20"],
+-  ["ANA","Pavel Mintyukov","D","2003-10-05"],
+-  ["ANA","Brian Dumoulin","D","1991-09-06"],
+-  // BOS
+-  ["BOS","David Pastrnak","W","1996-05-25"],
+-  ["BOS","Brad Marchand","W","1988-05-11"],
+-  ["BOS","Morgan Geekie","C","1998-07-20"],
+-  ["BOS","Pavel Zacha","C","1997-04-06"],
+-  ["BOS","Elias Lindholm","C","1994-12-02"],
+-  ["BOS","Casey Mittelstadt","C","1998-11-22"],
+-  ["BOS","Fraser Minten","C","2004-03-05"],
+-  ["BOS","Charlie McAvoy","D","1997-12-21"],
+-  ["BOS","Hampus Lindholm","D","1993-01-20"],
+-  ["BOS","Mason Lohrei","D","2001-09-06"],
+-  ["BOS","Nikita Zadorov","D","1995-04-16"],
+-  ["BOS","Andrew Peeke","D","1997-03-17"],
+-  // BUF
+-  ["BUF","Tage Thompson","C","1997-10-30"],
+-  ["BUF","Dylan Cozens","C","2001-02-09"],
+-  ["BUF","JJ Peterka","W","2002-01-14"],
+-  ["BUF","Jack Quinn","W","2001-09-19"],
+-  ["BUF","Alex Tuch","W","1996-02-17"],
+-  ["BUF","Zach Benson","W","2004-05-12"],
+-  ["BUF","Jason Zucker","W","1992-01-16"],
+-  ["BUF","Rasmus Dahlin","D","2000-04-13"],
+-  ["BUF","Owen Power","D","2002-11-22"],
+-  ["BUF","Bowen Byram","D","2001-06-13"],
+-  ["BUF","Mattias Samuelsson","D","1999-03-17"],
+-  ["BUF","Henri Jokiharju","D","1999-06-17"],
+-  // CGY
+-  ["CGY","Nazem Kadri","C","1990-10-06"],
+-  ["CGY","Yegor Sharangovich","C","1998-06-06"],
+-  ["CGY","Jonathan Huberdeau","W","1993-06-04"],
+-  ["CGY","Blake Coleman","W","1991-11-28"],
+-  ["CGY","Matt Coronato","W","2002-10-11"],
+-  ["CGY","Joel Farabee","W","1999-08-25"],
+-  ["CGY","MacKenzie Weegar","D","1994-01-07"],
+-  ["CGY","Rasmus Andersson","D","1996-10-27"],
+-  ["CGY","Kevin Bahl","D","2000-05-27"],
+-  ["CGY","Zayne Parekh","D","2005-04-02"],
+-  // CAR
+-  ["CAR","Sebastian Aho","C","1997-07-26"],
+-  ["CAR","Seth Jarvis","C","2002-02-01"],
+-  ["CAR","Jordan Staal","C","1988-09-10"],
+-  ["CAR","Andrei Svechnikov","W","2000-03-26"],
+-  ["CAR","Nikolaj Ehlers","W","1996-02-14"],
+-  ["CAR","Taylor Hall","W","1991-11-14"],
+-  ["CAR","Jaccob Slavin","D","1994-05-01"],
+-  ["CAR","Shayne Gostisbehere","D","1993-04-20"],
+-  ["CAR","Brady Skjei","D","1994-03-26"],
+-  ["CAR","KAndre Miller","D","1999-01-21"],
+-  ["CAR","Sean Walker","D","1994-11-05"],
+-  // CHI
+-  ["CHI","Connor Bedard","C","2005-07-17"],
+-  ["CHI","Frank Nazar","C","2003-06-10"],
+-  ["CHI","Ryan Greene","C","2003-04-16"],
+-  ["CHI","Tyler Bertuzzi","W","1995-02-24"],
+-  ["CHI","Ilya Mikheyev","W","1994-10-10"],
+-  ["CHI","Nick Lardis","W","2004-08-05"],
+-  ["CHI","Seth Jones","D","1994-10-03"],
+-  ["CHI","Alex Vlasic","D","2002-07-10"],
+-  ["CHI","Kevin Korchinski","D","2003-09-09"],
+-  ["CHI","Artyom Levshunov","D","2005-02-08"],
+-  ["CHI","Wyatt Kaiser","D","2002-03-01"],
+-  // COL
+-  ["COL","Nathan MacKinnon","C","1995-09-01"],
+-  ["COL","Martin Necas","C","1999-01-15"],
+-  ["COL","Nazem Kadri","C","1990-10-06"],
+-  ["COL","Mikko Rantanen","W","1996-10-29"],
+-  ["COL","Valeri Nichushkin","W","1995-03-04"],
+-  ["COL","Artturi Lehkonen","W","1995-07-04"],
+-  ["COL","Gabriel Landeskog","W","1992-11-23"],
+-  ["COL","Cale Makar","D","1998-10-30"],
+-  ["COL","Devon Toews","D","1994-02-27"],
+-  ["COL","Josh Manson","D","1991-10-07"],
+-  ["COL","Brent Burns","D","1985-03-09"],
+-  // CBJ
+-  ["CBJ","Adam Fantilli","C","2004-01-13"],
+-  ["CBJ","Sean Monahan","C","1994-10-12"],
+-  ["CBJ","Kirill Marchenko","W","2000-08-08"],
+-  ["CBJ","Dmitri Voronkov","W","1999-07-28"],
+-  ["CBJ","Ivan Provorov","D","1997-01-13"],
+-  ["CBJ","Zach Werenski","D","1996-07-19"],
+-  ["CBJ","David Jiricek","D","2003-04-09"],
+-  ["CBJ","Jake Bean","D","1998-06-09"],
+-  // DAL
+-  ["DAL","Jason Robertson","W","1999-07-22"],
+-  ["DAL","Roope Hintz","C","1997-03-03"],
+-  ["DAL","Wyatt Johnston","C","2003-05-14"],
+-  ["DAL","Tyler Seguin","C","1992-01-31"],
+-  ["DAL","Matt Duchene","C","1991-01-16"],
+-  ["DAL","Logan Stankoven","C","2002-11-16"],
+-  ["DAL","Miro Heiskanen","D","1999-07-18"],
+-  ["DAL","Thomas Harley","D","2002-08-19"],
+-  ["DAL","Esa Lindell","D","1994-05-23"],
+-  ["DAL","Brendan Smith","D","1988-02-08"],
+-  // DET
+-  ["DET","Dylan Larkin","C","1996-07-30"],
+-  ["DET","Alex DeBrincat","W","1997-12-18"],
+-  ["DET","Lucas Raymond","W","2002-03-28"],
+-  ["DET","Patrick Kane","W","1988-11-19"],
+-  ["DET","Andrew Copp","C","1994-07-08"],
+-  ["DET","Robby Fabbri","C","1996-01-22"],
+-  ["DET","Moritz Seider","D","2001-04-06"],
+-  ["DET","Simon Edvinsson","D","2003-02-13"],
+-  ["DET","Ben Chiarot","D","1991-05-09"],
+-  ["DET","Jeff Petry","D","1987-12-09"],
+-  // EDM
+-  ["EDM","Connor McDavid","C","1997-01-13"],
+-  ["EDM","Leon Draisaitl","C","1995-10-27"],
+-  ["EDM","Ryan Nugent-Hopkins","C","1992-04-12"],
+-  ["EDM","Zach Hyman","W","1992-06-09"],
+-  ["EDM","Vasily Podkolzin","W","2001-06-24"],
+-  ["EDM","Kasperi Kapanen","W","1996-07-23"],
+-  ["EDM","Matt Savoie","C","2003-07-17"],
+-  ["EDM","Jack Roslovic","C","1996-01-29"],
+-  ["EDM","Evan Bouchard","D","1999-10-20"],
+-  ["EDM","Darnell Nurse","D","1995-02-04"],
+-  ["EDM","Mattias Ekholm","D","1990-05-03"],
+-  ["EDM","Brett Kulak","D","1994-01-06"],
+-  ["EDM","Connor Murphy","D","1992-03-26"],
+-  // FLA
+-  ["FLA","Aleksander Barkov","C","1995-09-02"],
+-  ["FLA","Sam Reinhart","W","1995-11-06"],
+-  ["FLA","Matthew Tkachuk","W","1997-12-11"],
+-  ["FLA","Carter Verhaeghe","W","1995-08-14"],
+-  ["FLA","Evan Rodrigues","C","1993-07-28"],
+-  ["FLA","Eetu Luostarinen","C","1998-09-02"],
+-  ["FLA","Aaron Ekblad","D","1996-02-07"],
+-  ["FLA","Gustav Forsling","D","1996-06-12"],
+-  ["FLA","Niko Mikkola","D","1996-04-26"],
+-  ["FLA","Brandon Montour","D","1994-04-11"],
+-  // LAK
+-  ["LAK","Anze Kopitar","C","1987-08-24"],
+-  ["LAK","Quinton Byfield","C","2002-08-13"],
+-  ["LAK","Kevin Fiala","W","1996-07-22"],
+-  ["LAK","Adrian Kempe","W","1996-09-20"],
+-  ["LAK","Artemi Panarin","W","1991-10-30"],
+-  ["LAK","Alex Laferriere","W","2001-12-08"],
+-  ["LAK","Trevor Moore","W","1995-01-31"],
+-  ["LAK","Drew Doughty","D","1989-12-08"],
+-  ["LAK","Mikey Anderson","D","1999-05-07"],
+-  ["LAK","Brandt Clarke","D","2002-11-27"],
+-  ["LAK","Joel Edmundson","D","1993-09-28"],
+-  // MIN
+-  ["MIN","Kirill Kaprizov","W","1997-04-26"],
+-  ["MIN","Matt Boldy","W","2001-04-05"],
+-  ["MIN","Joel Eriksson Ek","C","1997-07-29"],
+-  ["MIN","Marco Rossi","C","2002-06-23"],
+-  ["MIN","Ryan Hartman","W","1994-09-20"],
+-  ["MIN","Marcus Johansson","W","1990-10-06"],
+-  ["MIN","Mats Zuccarello","W","1987-09-01"],
+-  ["MIN","Quinn Hughes","D","2000-10-14"],
+-  ["MIN","Jonas Brodin","D","1993-07-12"],
+-  ["MIN","Brock Faber","D","2002-05-28"],
+-  ["MIN","Jake Middleton","D","1996-02-04"],
+-  ["MIN","Jared Spurgeon","D","1989-11-29"],
+-  // MTL
+-  ["MTL","Nick Suzuki","C","1999-08-10"],
+-  ["MTL","Cole Caufield","W","2001-01-02"],
+-  ["MTL","Juraj Slafkovsky","W","2004-03-30"],
+-  ["MTL","Ivan Demidov","W","2005-10-14"],
+-  ["MTL","Kirby Dach","C","2001-01-21"],
+-  ["MTL","Phillip Danault","C","1993-04-24"],
+-  ["MTL","Alex Newhook","C","2001-01-28"],
+-  ["MTL","Jake Evans","C","1996-06-02"],
+-  ["MTL","Lane Hutson","D","2003-02-12"],
+-  ["MTL","Mike Matheson","D","1994-02-27"],
+-  ["MTL","Kaiden Guhle","D","2002-01-18"],
+-  ["MTL","Noah Dobson","D","2000-01-07"],
+-  ["MTL","Alexandre Carrier","D","1997-10-08"],
+-  // NSH
+-  ["NSH","Filip Forsberg","W","1994-08-13"],
+-  ["NSH","Ryan O'Reilly","C","1991-02-07"],
+-  ["NSH","Steven Stamkos","C","1990-02-07"],
+-  ["NSH","Jonathan Marchessault","C","1990-12-27"],
+-  ["NSH","Luke Evangelista","W","2001-12-25"],
+-  ["NSH","Roman Josi","D","1990-06-01"],
+-  ["NSH","Brady Skjei","D","1994-03-26"],
+-  ["NSH","Alexandre Carrier","D","1997-10-08"],
+-  ["NSH","Nick Perbix","D","1997-12-14"],
+-  // NJD
+-  ["NJD","Jack Hughes","C","2001-05-14"],
+-  ["NJD","Nico Hischier","C","1999-01-04"],
+-  ["NJD","Timo Meier","W","1996-10-08"],
+-  ["NJD","Jesper Bratt","W","1998-07-30"],
+-  ["NJD","Dawson Mercer","C","2002-10-27"],
+-  ["NJD","Stefan Noesen","W","1993-02-26"],
+-  ["NJD","Dougie Hamilton","D","1993-06-17"],
+-  ["NJD","Jonas Siegenthaler","D","1997-05-06"],
+-  ["NJD","Luke Hughes","D","2003-09-09"],
+-  ["NJD","Brendan Smith","D","1988-02-08"],
+-  // NYI
+-  ["NYI","Mathew Barzal","C","1997-05-26"],
+-  ["NYI","Bo Horvat","C","1995-04-05"],
+-  ["NYI","Jean-Gabriel Pageau","C","1992-11-11"],
+-  ["NYI","Brock Nelson","C","1991-10-15"],
+-  ["NYI","Simon Holmstrom","W","2001-10-15"],
+-  ["NYI","Anders Lee","W","1990-07-03"],
+-  ["NYI","Noah Dobson","D","2000-01-07"],
+-  ["NYI","Ryan Pulock","D","1994-10-18"],
+-  ["NYI","Adam Pelech","D","1994-08-16"],
+-  ["NYI","Alexander Romanov","D","2000-02-06"],
+-  ["NYI","Matthew Schaefer","D","2007-02-13"],
+-  // NYR
+-  ["NYR","Mika Zibanejad","C","1993-04-18"],
+-  ["NYR","Vincent Trocheck","C","1993-07-11"],
+-  ["NYR","Artemi Panarin","W","1991-10-30"],
+-  ["NYR","Alexis Lafreniere","W","2001-10-11"],
+-  ["NYR","Chris Kreider","W","1991-04-30"],
+-  ["NYR","Will Cuylle","W","2002-02-05"],
+-  ["NYR","Gabe Perreault","W","2004-08-02"],
+-  ["NYR","JT Miller","C","1993-03-14"],
+-  ["NYR","Adam Fox","D","1998-02-17"],
+-  ["NYR","Braden Schneider","D","2001-09-20"],
+-  ["NYR","Vladislav Gavrikov","D","1995-11-15"],
+-  ["NYR","K'Andre Miller","D","1999-01-21"],
+-  // OTT
+-  ["OTT","Tim Stutzle","C","2002-01-15"],
+-  ["OTT","Brady Tkachuk","W","1999-09-16"],
+-  ["OTT","Drake Batherson","W","1998-04-27"],
+-  ["OTT","Dylan Cozens","C","2001-02-09"],
+-  ["OTT","Claude Giroux","W","1988-01-12"],
+-  ["OTT","Shane Pinto","C","2000-11-07"],
+-  ["OTT","Ridly Greig","C","2002-08-08"],
+-  ["OTT","Jake Sanderson","D","2002-07-08"],
+-  ["OTT","Thomas Chabot","D","1997-01-30"],
+-  ["OTT","Artem Zub","D","1995-10-03"],
+-  ["OTT","Jordan Spence","D","2000-09-28"],
+-  // PHI
+-  ["PHI","Sean Couturier","C","1992-12-07"],
+-  ["PHI","Travis Konecny","W","1997-03-11"],
+-  ["PHI","Matvei Michkov","W","2004-11-06"],
+-  ["PHI","Owen Tippett","W","1999-02-16"],
+-  ["PHI","Joel Farabee","W","1999-08-25"],
+-  ["PHI","Morgan Frost","C","1999-05-14"],
+-  ["PHI","Travis Sanheim","D","1996-03-29"],
+-  ["PHI","Cam York","D","2001-01-05"],
+-  ["PHI","Ivan Provorov","D","1997-01-13"],
+-  ["PHI","Sean Walker","D","1994-11-05"],
+-  // PIT
+-  ["PIT","Sidney Crosby","C","1987-08-07"],
+-  ["PIT","Evgeni Malkin","C","1986-07-31"],
+-  ["PIT","Rickard Rakell","W","1993-05-05"],
+-  ["PIT","Bryan Rust","W","1991-05-11"],
+-  ["PIT","Reilly Smith","W","1991-04-01"],
+-  ["PIT","Kris Letang","D","1987-04-24"],
+-  ["PIT","Erik Karlsson","D","1990-05-31"],
+-  ["PIT","Marcus Pettersson","D","1996-05-08"],
+-  ["PIT","Matt Grzelcyk","D","1994-01-05"],
+-  // SEA
+-  ["SEA","Matty Beniers","C","2002-11-05"],
+-  ["SEA","Jared McCann","C","1996-05-31"],
+-  ["SEA","Jordan Eberle","W","1990-05-15"],
+-  ["SEA","Chandler Stephenson","C","1993-08-09"],
+-  ["SEA","Eeli Tolvanen","W","1998-04-02"],
+-  ["SEA","Kaapo Kakko","W","2001-02-15"],
+-  ["SEA","Shane Wright","C","2003-01-05"],
+-  ["SEA","Vince Dunn","D","1996-10-29"],
+-  ["SEA","Adam Larsson","D","1992-11-12"],
+-  ["SEA","Brandon Montour","D","1994-04-11"],
+-  ["SEA","Ryker Evans","D","2001-11-06"],
+-  // SJS
+-  ["SJS","Macklin Celebrini","C","2006-01-05"],
+-  ["SJS","Will Smith","C","2004-02-21"],
+-  ["SJS","William Eklund","W","2003-10-12"],
+-  ["SJS","Tyler Toffoli","W","1992-04-24"],
+-  ["SJS","Fabian Zetterlund","W","1999-08-26"],
+-  ["SJS","Alexander Wennberg","C","1994-09-22"],
+-  ["SJS","Collin Graf","W","2002-07-07"],
+-  ["SJS","Mario Ferraro","D","1998-09-17"],
+-  ["SJS","Dmitry Orlov","D","1991-07-23"],
+-  ["SJS","Jake Walman","D","1996-02-10"],
+-  ["SJS","Sam Dickinson","D","2005-11-15"],
+-  // STL
+-  ["STL","Robert Thomas","C","1999-07-02"],
+-  ["STL","Jordan Kyrou","W","1998-05-05"],
+-  ["STL","Pavel Buchnevich","W","1995-04-17"],
+-  ["STL","Dylan Holloway","W","2002-01-23"],
+-  ["STL","Jake Neighbours","W","2002-03-30"],
+-  ["STL","Jimmy Snuggerud","W","2004-06-25"],
+-  ["STL","Colton Parayko","D","1993-05-12"],
+-  ["STL","Philip Broberg","D","2001-07-11"],
+-  ["STL","Cam Fowler","D","1991-12-05"],
+-  ["STL","Logan Mailloux","D","2002-09-22"],
+-  // TBL
+-  ["TBL","Nikita Kucherov","W","1993-06-17"],
+-  ["TBL","Brayden Point","C","1996-03-13"],
+-  ["TBL","Brandon Hagel","W","1998-08-27"],
+-  ["TBL","Jake Guentzel","C","1994-10-06"],
+-  ["TBL","Anthony Cirelli","C","1997-07-15"],
+-  ["TBL","Steven Stamkos","C","1990-02-07"],
+-  ["TBL","Yanni Gourde","C","1991-12-15"],
+-  ["TBL","Victor Hedman","D","1990-12-18"],
+-  ["TBL","Mikhail Sergachev","D","1998-06-25"],
+-  ["TBL","Erik Cernak","D","1997-05-28"],
+-  ["TBL","Darren Raddysh","D","1995-08-10"],
+-  // TOR
+-  ["TOR","Auston Matthews","C","1997-09-17"],
+-  ["TOR","Mitch Marner","W","1997-05-05"],
+-  ["TOR","William Nylander","W","1996-05-01"],
+-  ["TOR","John Tavares","C","1990-09-20"],
+-  ["TOR","Matthew Knies","W","2003-03-25"],
+-  ["TOR","Max Domi","C","1995-03-02"],
+-  ["TOR","Nicholas Robertson","W","2001-09-11"],
+-  ["TOR","Morgan Rielly","D","1994-03-09"],
+-  ["TOR","Jake McCabe","D","1993-10-12"],
+-  ["TOR","Chris Tanev","D","1989-12-20"],
+-  ["TOR","Timothy Liljegren","D","1999-04-30"],
+-  // UTA
+-  ["UTA","Clayton Keller","C","1998-07-29"],
+-  ["UTA","Nick Schmaltz","C","1996-02-15"],
+-  ["UTA","Logan Cooley","C","2003-05-04"],
+-  ["UTA","Lawson Crouse","W","1997-06-23"],
+-  ["UTA","Dylan Guenther","W","2003-06-24"],
+-  ["UTA","Mikhail Sergachev","D","1998-06-25"],
+-  ["UTA","Juuso Valimaki","D","1998-10-06"],
+-  ["UTA","Sean Durzi","D","1998-10-03"],
+-  ["UTA","Ian Cole","D","1989-02-21"],
+-  // VAN
+-  ["VAN","Elias Pettersson","C","1998-11-12"],
+-  ["VAN","JT Miller","C","1993-03-14"],
+-  ["VAN","Brock Boeser","W","1997-02-25"],
+-  ["VAN","Jake DeBrusk","W","1999-10-17"],
+-  ["VAN","Conor Garland","W","1996-03-11"],
+-  ["VAN","Nils Hoglander","W","2000-10-20"],
+-  ["VAN","Quinn Hughes","D","2000-10-14"],
+-  ["VAN","Filip Hronek","D","1997-11-02"],
+-  ["VAN","Marcus Pettersson","D","1996-05-08"],
+-  ["VAN","Nikita Zadorov","D","1995-04-16"],
+-  ["VAN","Tom Willander","D","2004-06-05"],
+-  // VGK
+-  ["VGK","Jack Eichel","C","1996-10-28"],
+-  ["VGK","Mitch Marner","W","1997-05-05"],
+-  ["VGK","Mark Stone","W","1992-05-13"],
+-  ["VGK","Ivan Barbashev","W","1995-12-08"],
+-  ["VGK","William Karlsson","C","1993-01-08"],
+-  ["VGK","Pavel Dorofeyev","W","2000-11-21"],
+-  ["VGK","Tomas Hertl","C","1993-11-12"],
+-  ["VGK","Shea Theodore","D","1995-08-03"],
+-  ["VGK","Rasmus Andersson","D","1996-10-27"],
+-  ["VGK","Noah Hanifin","D","1997-01-25"],
+-  ["VGK","Brayden McNabb","D","1991-01-21"],
+-  // WSH
+-  ["WSH","Alexander Ovechkin","W","1985-09-17"],
+-  ["WSH","Dylan Strome","C","1997-03-07"],
+-  ["WSH","Tom Wilson","W","1994-03-26"],
+-  ["WSH","Lars Eller","C","1989-05-08"],
+-  ["WSH","Aliaksei Protas","C","2001-01-06"],
+-  ["WSH","Pierre-Luc Dubois","C","1998-06-24"],
+-  ["WSH","John Carlson","D","1990-01-10"],
+-  ["WSH","Matt Roy","D","1995-04-05"],
+-  ["WSH","Trevor van Riemsdyk","D","1991-07-24"],
+-  ["WSH","Jakob Chychrun","D","1998-03-31"],
+-  // WPG
+-  ["WPG","Mark Scheifele","C","1993-03-15"],
+-  ["WPG","Kyle Connor","W","1996-12-09"],
+-  ["WPG","Gabriel Vilardi","C","2000-08-16"],
+-  ["WPG","Adam Lowry","C","1992-03-29"],
+-  ["WPG","Cole Perfetti","C","2002-01-01"],
+-  ["WPG","Josh Morrissey","D","1995-03-28"],
+-  ["WPG","Dylan DeMelo","D","1993-05-01"],
+-  ["WPG","Neal Pionk","D","1995-07-29"],
+-  // GOALIES — one starter per team minimum
+-  ["WPG","Connor Hellebuyck","G","1993-05-19"],
+-  ["EDM","Stuart Skinner","G","1998-11-01"],
+-  ["EDM","Calvin Pickard","G","1992-04-15"],
+-  ["FLA","Sergei Bobrovsky","G","1988-09-20"],
+-  ["TBL","Andrei Vasilevskiy","G","1994-07-25"],
+-  ["CAR","Pyotr Kochetkov","G","1999-06-25"],
+-  ["COL","Alexandar Georgiev","G","1996-02-10"],
+-  ["DAL","Jake Oettinger","G","1998-12-18"],
+-  ["NYR","Igor Shesterkin","G","1995-12-30"],
+-  ["VGK","Adin Hill","G","1996-05-11"],
+-  ["TOR","Joseph Woll","G","1998-07-12"],
+-  ["TOR","Anthony Stolarz","G","1994-01-20"],
+-  ["BOS","Jeremy Swayman","G","1998-11-16"],
+-  ["MIN","Filip Gustavsson","G","1998-06-07"],
+-  ["NSH","Juuse Saros","G","1995-04-19"],
+-  ["OTT","Linus Ullmark","G","1993-07-31"],
+-  ["NJD","Jacob Markstrom","G","1990-01-31"],
+-  ["SEA","Philipp Grubauer","G","1991-11-25"],
+-  ["BUF","Ukko-Pekka Luukkonen","G","1999-03-09"],
+-  ["MTL","Sam Montembeault","G","1996-10-30"],
+-  ["VAN","Kevin Lankinen","G","1995-04-28"],
+-  ["LAK","Darcy Kuemper","G","1990-05-05"],
+-  ["PIT","Tristan Jarry","G","1995-04-29"],
+-  ["STL","Jordan Binnington","G","1993-07-11"],
+-  ["ANA","Lukas Dostal","G","2000-06-22"],
+-  ["CHI","Petr Mrazek","G","1992-02-14"],
+-  ["DET","Cam Talbot","G","1987-07-05"],
+-  ["PHI","Samuel Ersson","G","2000-02-26"],
+-  ["NYI","Semyon Varlamov","G","1988-04-27"],
+-  ["SJS","Mackenzie Blackwood","G","1996-12-09"],
+-  ["CBJ","Elvis Merzlikins","G","1994-04-13"],
+-  ["UTA","Connor Ingram","G","1997-04-09"],
+-  ["CGY","Dustin Wolf","G","2001-04-16"],
+-  ["WSH","Logan Thompson","G","1997-02-25"],
+-  ["BOS","Linus Ullmark","G","1993-07-31"],
+-  ["CAR","Frederik Andersen","G","1989-10-02"],
+-  ["NYI","Ilya Sorokin","G","1995-08-04"],
+-];
+ 
+ // ── Point Shares computation ─────────────────────────────────
+ // Computes OPS (Offensive) and DPS (Defensive) Point Shares
+@@ -928,12 +510,12 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
+   try {
+     // Fetch skater summary and team summary in parallel
+     const [skatersRes, teamsRes] = await Promise.allSettled([
+-      fetchWithTimeout(
+-        "https://api.nhle.com/stats/rest/en/skater/summary?cayenneExp=seasonId%3D20252026%20and%20gameTypeId%3D2&limit=-1",
++      fetchWithTimeout(
++        `https://api.nhle.com/stats/rest/en/skater/summary?cayenneExp=seasonId%3D${SEASON.nhleSeasonId}%20and%20gameTypeId%3D2&limit=-1`,
+         10000
+       ),
+-      fetchWithTimeout(
+-        "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId%3D20252026%20and%20gameTypeId%3D2&limit=32",
++      fetchWithTimeout(
++        `https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId%3D${SEASON.nhleSeasonId}%20and%20gameTypeId%3D2&limit=32`,
+         8000
+       ),
+     ]);
+@@ -1327,26 +909,15 @@ export async function GET() {
+     }
+   } catch (_) { /* external APIs blocked */ }
+ 
+-  // ── 2. Build roster from static list (guaranteed) ──────────
+-  // Then try to enrich with NHL API headshots
+-  const rosterMap = new Map<string, any[]>();
+-
+-  // First populate from static roster — this always works
+-  for (const [teamId, name, position, birthDate] of STATIC_ROSTER) {
+-    const list = rosterMap.get(teamId) ?? [];
+-    list.push({
+-      id:       `${teamId}-${slugify(name)}`,
+-      name,
+-      position: normalisePos(position),
+-      age:      calcAge(birthDate),
+-      headshot: null,
+-    });
+-    rosterMap.set(teamId, list);
+-  }
+-
+-  // Then try NHL API to get headshots and update IDs (optional enrichment)
+-  // Try /current first (always reflects active roster), fall back to season-specific
+-  try {
++  // ── 2. Build roster from live NHL API only ─────────────────
++  // Static player rosters were removed because they drift quickly and conflict
++  // with the DB/live-data source of truth. If the NHL API is unavailable, this
++  // route returns DB-injected draftees and draft picks rather than stale active
++  // player rows.
++  const rosterMap = new Map<string, any[]>();
++
++  // Try /current first (always reflects active roster), fall back to season-specific.
++  try {
+     const results = await Promise.allSettled(
+       LIVE_TEAMS.map((t) =>
+         fetchWithTimeout(
+@@ -1380,8 +951,7 @@ export async function GET() {
+ 
+       if (skaters.length < 5) return; // skip bad responses
+ 
+-      // Replace static roster with live roster for this team
+-      const liveList = skaters.map((p: any) => ({
++      const liveList = skaters.map((p: any) => ({
+         id:       p.id.toString(),
+         name:     `${p.firstName.default} ${p.lastName.default}`,
+         position: normalisePos(p.positionCode),
+@@ -1389,9 +959,11 @@ export async function GET() {
+         headshot: p.headshot ?? null,
+       }));
+ 
+-      rosterMap.set(teamId, liveList);
+-    });
+-  } catch (_) { /* NHL API blocked — static roster already set */ }
++      rosterMap.set(teamId, liveList);
++    });
++  } catch (_) {
++    console.warn("[NHL roster] live roster fetch failed; no static player fallback is used.");
++  }
+ 
+   // ── Inject drafted prospects from DB ─────────────────────────
+   // Mock-draft imports live only in the DB; NHL API rosters don't know them.
+@@ -1609,15 +1181,17 @@ export async function GET() {
+     });
+   });
+ 
+-  // ── 4. Draft picks ──────────────────────────────────────────
+-  const picks: any[] = [];
+-  LIVE_TEAMS.forEach((team) => {
+-    [
+-      { round: 1, year: 2026 }, { round: 1, year: 2027 },
+-      { round: 2, year: 2026 }, { round: 2, year: 2027 },
+-      { round: 3, year: 2026 }, { round: 3, year: 2027 },
+-      { round: 4, year: 2026 },
+-      { round: 5, year: 2026 },
++  // ── 4. Draft picks ──────────────────────────────────────────
++  const picks: any[] = [];
++  const currentDraftYear = SEASON.draftYear;
++  const nextDraftYear = currentDraftYear + 1;
++  LIVE_TEAMS.forEach((team) => {
++    [
++      { round: 1, year: currentDraftYear }, { round: 1, year: nextDraftYear },
++      { round: 2, year: currentDraftYear }, { round: 2, year: nextDraftYear },
++      { round: 3, year: currentDraftYear }, { round: 3, year: nextDraftYear },
++      { round: 4, year: currentDraftYear },
++      { round: 5, year: currentDraftYear },
+     ].forEach(({ round, year }) => {
+       const roundLabel = round === 1 ? "1st" : round === 2 ? "2nd" : round === 3 ? "3rd" : `${round}th`;
+       picks.push({
+@@ -1662,4 +1236,4 @@ export async function GET() {
+       analyticsCount: analyticsMap.size,
+     },
+   });
+-}
+\ No newline at end of file
++}
+diff --git a/app/api/league/teams/route.ts b/app/api/league/teams/route.ts
+index 7379968..5d99d50 100644
+--- a/app/api/league/teams/route.ts
++++ b/app/api/league/teams/route.ts
+@@ -53,7 +53,7 @@ async function loadTeams(): Promise<any[]> {
+ 
+   try {
+     const res = await fetchWithTimeout(
+-      "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId=20252026%20and%20gameTypeId=2",
++      `https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId=${SEASON.nhleSeasonId}%20and%20gameTypeId=2`,
+       8000
+     );
+     if (res.ok) {
+diff --git a/app/api/simulate/route.ts b/app/api/simulate/route.ts
+index 2d72131..2f3499a 100644
+--- a/app/api/simulate/route.ts
++++ b/app/api/simulate/route.ts
+@@ -1,4 +1,14 @@
+ import { NextRequest, NextResponse } from "next/server";
++import { SEASON } from "@/app/lib/season-config";
++import {
++  ageDecay,
++  hashString,
++  mulberry32,
++  projectSkaterSeason,
++  projectTopScorer,
++  scenarioSeed,
++  stablePts,
++} from "@/app/lib/sim-engine";
+ 
+ // ── Types ─────────────────────────────────────────────────────
+ interface SimPlayer {
+@@ -65,6 +75,24 @@ interface TradeRecord {
+   incoming: SimPlayer[];
+ }
+ 
++interface TradedPlayerOutcome {
++  playerId: string;
++  name: string;
++  position: string;
++  oldTeamId: string;
++  newTeamId: string;
++  oldTeamName: string;
++  newTeamName: string;
++  projectedPts?: number;
++  projectedGoals?: number;
++  gamesPlayed?: number;
++  projectedGAA?: number;
++  projectedSVP?: number;
++  gamesStarted?: number;
++  gsax?: number;
++  role: string;
++}
++
+ interface SimRequest {
+   homeTeamId: string;
+   partnerTeamId: string;
+@@ -74,35 +102,6 @@ interface SimRequest {
+   seed?: number;
+ }
+ 
+-// ── Seeded PRNG — mulberry32 ──────────────────────────────────
+-// Deterministic randomness so same seed = same sim result
+-function mulberry32(seed: number) {
+-  return function() {
+-    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+-    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+-  };
+-}
+-
+-// ── Pythagorean win expectation ───────────────────────────────
+-// Classic hockey formula: GF^2.37 / (GF^2.37 + GA^2.37)
+-const pythagorean = (gf: number, ga: number): number => {
+-  const exp = 2.37;
+-  const gfP = Math.pow(Math.max(gf, 1), exp);
+-  const gaP = Math.pow(Math.max(ga, 1), exp);
+-  return gfP / (gfP + gaP);
+-};
+-
+-// ── Stable production estimate ────────────────────────────────
+-// 40% current pace / 60% multi-season baseline — same blend the X-NAV engine
+-// uses. YoY persistence audit (2022-26, n=1667): single-season r=0.864, so a
+-// hot or injury-skewed season shouldn't fully drive the projection.
+-const stablePts = (p: SimPlayer): number =>
+-  p.baselinePtsPace && p.baselinePtsPace > 0
+-    ? p.ptsPace * 0.4 + p.baselinePtsPace * 0.6
+-    : p.ptsPace;
+-
+ // Stable GSAX on the same blend — baselineGsax is a weighted season-scale value
+ const stableGsax = (p: SimPlayer): number => {
+   const cur = p.gsax ?? 0;
+@@ -111,18 +110,21 @@ const stableGsax = (p: SimPlayer): number => {
+     : cur;
+ };
+ 
+-// ── Age decay factor ──────────────────────────────────────────
+-// Cohort audit (2022-26): forwards decline ≈ -2.5 pts/82 per year from 28,
+-// steepening to -6+/yr by 34. The flat per-year rate matches the early phase;
+-// the 33+ tail needs to be ~2.5x steeper than the old linear extension.
+-const ageDecay = (age: number, position: string): number => {
+-  const peak = position === "D" ? 27 : position === "G" ? 29 : 26;
+-  if (age <= peak) return 1.0 + Math.max(0, (peak - age) * 0.005);
+-  const baseRate  = position === "D" ? 0.018 : 0.022;
+-  const earlyYears = Math.min(age, 33) - peak;
+-  const lateYears  = Math.max(0, age - 33);
+-  const decline = earlyYears * baseRate + lateYears * baseRate * 2.5;
+-  return Math.max(0.50, 1.0 - decline);
++const onIceValue = (p: SimPlayer): number => {
++  if (p.position === "Pick") return 0;
++  if (p.position === "G") {
++    const hdsvKicker = p.baselineHdsvPct != null
++      ? Math.max(-8, Math.min(12, (p.baselineHdsvPct - 0.815) * 400))
++      : 0;
++    return stableGsax(p) * 1.2 + hdsvKicker;
++  }
++  const driverBonus = p.position === "D" && p.pairDriverScore != null
++    ? Math.max(-5, Math.min(10, p.pairDriverScore * 0.5))
++    : 0;
++  const pkBonus = p.pkTimeShare != null && p.pkTimeShare >= 0.10
++    ? Math.min(5, p.pkTimeShare * 30)
++    : 0;
++  return stablePts(p) + driverBonus + pkBonus;
+ };
+ 
+ // ── Wild card teams — higher variance ────────────────────────
+@@ -134,55 +136,48 @@ const PHASE_BASELINE: Record<string, number> = {
+   "Rebuilding": 76,  "Tanking": 65,
+ };
+ 
+-// ── Fetch live standings from NHL API ────────────────────────
+-async function fetchLiveStandings(): Promise<Map<string, { points: number; gamesPlayed: number; goalsFor: number; goalsAgainst: number }>> {
+-  const map = new Map<string, { points: number; gamesPlayed: number; goalsFor: number; goalsAgainst: number }>();
+-  try {
+-    const res = await fetch(
+-      "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId=20252026%20and%20gameTypeId=2&limit=32",
+-      { signal: AbortSignal.timeout(8000), cache: "no-store" }
+-    );
+-    if (!res.ok) return map;
+-    const data = await res.json();
+-    const NHL_ID_TO_TRICODE: Record<number, string> = {
+-      1:"NJD",2:"NYI",3:"NYR",4:"PHI",5:"PIT",6:"BOS",7:"BUF",8:"MTL",9:"OTT",10:"TOR",
+-      12:"CAR",13:"FLA",14:"TBL",15:"WSH",16:"CHI",17:"DET",18:"NSH",19:"STL",20:"CGY",
+-      21:"COL",22:"EDM",23:"VAN",24:"ANA",25:"DAL",26:"LAK",28:"SJS",29:"CBJ",30:"MIN",
+-      52:"WPG",54:"VGK",55:"SEA",68:"UTA",
+-    };
+-    for (const t of data.data ?? []) {
+-      const id = NHL_ID_TO_TRICODE[t.teamId];
+-      if (id) map.set(id, {
+-        points:       t.points       ?? 0,
+-        gamesPlayed:  t.gamesPlayed  ?? 1,
+-        goalsFor:     t.goalsFor     ?? 150,
+-        goalsAgainst: t.goalsAgainst ?? 150,
+-      });
+-    }
+-  } catch (_) {}
+-  return map;
+-}
+-
+ // ── Project a team's full season points ──────────────────────
+ function projectTeamPoints(
+   team: SimTeam,
+-  liveStats: { points: number; gamesPlayed: number; goalsFor: number; goalsAgainst: number } | undefined,
++  roster: SimPlayer[],
+   tradeNavDelta: number,
+   capSpaceAfterTrade: number,
+   rand: () => number,
+ ): number {
+-  let pacedPts: number;
+-  if (liveStats && liveStats.gamesPlayed > 10) {
+-    const gp         = liveStats.gamesPlayed;
+-    const remaining  = 82 - gp;
+-    const winPct     = pythagorean(liveStats.goalsFor, liveStats.goalsAgainst);
+-    pacedPts         = liveStats.points + remaining * winPct * 2;
+-  } else {
+-    pacedPts = PHASE_BASELINE[team.phase] ?? 88;
+-  }
+-
+-  // Trade impact: ptsPace delta → standings pts
+-  const tradeImpact = tradeNavDelta / 3.5;
++  const phaseBaseline = PHASE_BASELINE[team.phase] ?? 88;
++
++  const skaters = roster.filter(p => p.position !== "Pick" && p.position !== "G");
++  const forwards = skaters
++    .filter(p => p.position !== "D")
++    .sort((a, b) => onIceValue(b) - onIceValue(a));
++  const dmen = skaters
++    .filter(p => p.position === "D")
++    .sort((a, b) => onIceValue(b) - onIceValue(a));
++  const goalies = roster
++    .filter(p => p.position === "G")
++    .sort((a, b) => onIceValue(b) - onIceValue(a));
++
++  const avg = (arr: SimPlayer[], n: number) =>
++    arr.length === 0 ? 0 : arr.slice(0, n).reduce((s, p) => s + onIceValue(p), 0) / Math.min(n, arr.length);
++
++  const topSixF = avg(forwards, 6);
++  const topNineF = avg(forwards, 9);
++  const topFourD = avg(dmen, 4);
++  const starterG = goalies[0] ? onIceValue(goalies[0]) : -4;
++  const depthPenalty = forwards.length < 10 ? (10 - forwards.length) * 1.4 : 0;
++  const dPenalty = dmen.length < 6 ? (6 - dmen.length) * 1.2 : 0;
++
++  // Season-start replay: roster quality nudges phase baseline. Trade delta is
++  // retained as a small context adjustment because it captures PK/goalie/driver
++  // effects not fully visible in raw scoring depth.
++  const rosterStrength =
++    (topSixF - 55) * 0.20 +
++    (topNineF - 42) * 0.18 +
++    (topFourD - 32) * 0.20 +
++    starterG * 0.18 -
++    depthPenalty -
++    dPenalty;
++  const tradeContext = Math.max(-8, Math.min(8, tradeNavDelta / 12));
+ 
+   // Hard cap enforcement: teams over the ceiling are forced to shed cap mid-season.
+   // Roster disruption from emergency moves costs wins.
+@@ -200,39 +195,7 @@ function projectTeamPoints(
+   if (phase === "Contender") varianceMid = 2;
+   const variance = varianceMid + (rand() * varianceRange - varianceRange / 2);
+ 
+-  return Math.round(Math.max(55, Math.min(135, pacedPts + tradeImpact + variance - capPenalty)));
+-}
+-
+-// ── Project top scorer for a team ────────────────────────────
+-function projectTopScorer(
+-  roster: SimPlayer[],
+-  rand: () => number,
+-): { name: string; projectedPts: number; projectedGoals: number; position: string } | null {
+-  const skaters = roster
+-    .filter(p => p.position !== "Pick" && p.position !== "G"
+-      && p.ptsPace > 0
+-      && (p as any).games >= 20)
+-    .sort((a, b) => stablePts(b) - stablePts(a));
+-
+-  if (skaters.length === 0) return null;
+-
+-  const top   = skaters[0];
+-  const decay = ageDecay(top.age, top.position);
+-
+-  // Catastrophic injury variance: 5% chance of losing 30-60 games.
+-  // Forces the sim to test depth — a McDavid injury tanks EDM, Carolina survives.
+-  let gamesPlayed = Math.round(72 + rand() * 10);
+-  if (rand() < 0.05) {
+-    gamesPlayed = Math.max(5, gamesPlayed - Math.round(30 + rand() * 30));
+-  }
+-
+-  const rawPts       = (stablePts(top) / 82) * gamesPlayed * decay;
+-  const variance     = 0.88 + rand() * 0.24;
+-  const projectedPts = Math.round(rawPts * variance);
+-
+-  const goalPct      = top.position === "D" ? 0.25 : 0.40;
+-  const projectedGoals = Math.round(projectedPts * goalPct * (0.90 + rand() * 0.20));
+-  return { name: top.name, projectedPts, projectedGoals, position: top.position };
++  return Math.round(Math.max(55, Math.min(135, phaseBaseline + rosterStrength + tradeContext + variance - capPenalty)));
+ }
+ 
+ // ── Project starting goalie ───────────────────────────────────
+@@ -320,17 +283,16 @@ function simulateLeague(
+   playersByTeam: Map<string, SimPlayer[]>,
+   tradeNavDeltas: Map<string, number>,
+   capDeltas: Map<string, number>,
+-  liveStandings: Map<string, { points: number; gamesPlayed: number; goalsFor: number; goalsAgainst: number }>,
+   rand: () => number,
++  seed: number,
+ ): SimTeamResult[] {
+   return teams.map(team => {
+     const roster     = playersByTeam.get(team.id) ?? [];
+     const navDelta   = tradeNavDeltas.get(team.id) ?? 0;
+     const capDelta   = capDeltas.get(team.id) ?? 0;
+     const capSpaceAfterTrade = team.capSpace - capDelta;
+-    const liveStats  = liveStandings.get(team.id);
+-    const projectedPoints = projectTeamPoints(team, liveStats, navDelta, capSpaceAfterTrade, rand);
+-    const topScorer  = projectTopScorer(roster, rand);
++    const projectedPoints = projectTeamPoints(team, roster, navDelta, capSpaceAfterTrade, rand);
++    const topScorer  = projectTopScorer(roster, team.id, seed);
+     const winPct     = projectedPoints / 164;
+     const goalie     = projectGoalie(roster, winPct, rand);
+     const topDefenseman = projectTopDefenseman(roster, rand);
+@@ -633,13 +595,88 @@ function findLeagueLeaders(
+   };
+ }
+ 
++function buildTradedPlayerOutcomes(
++  trades: TradeRecord[],
++  teams: SimTeam[],
++  standings: SimTeamResult[],
++  seed: number,
++): TradedPlayerOutcome[] {
++  const teamName = (id: string) => teams.find(t => t.id === id)?.name ?? id;
++  const teamWinPct = (id: string) =>
++    (standings.find(t => t.teamId === id)?.projectedPoints
++      ?? PHASE_BASELINE[teams.find(t => t.id === id)?.phase ?? "Retooling"]
++      ?? 88) / 164;
++  const outcomes: TradedPlayerOutcome[] = [];
++
++  const addOutcome = (p: SimPlayer, oldTeamId: string, newTeamId: string) => {
++    if (p.position === "Pick") return;
++    if (p.position === "G") {
++      const winPctAnchor = teamWinPct(newTeamId);
++      const goalie = projectGoalie([p], winPctAnchor, mulberry32(seed + hashString(`${newTeamId}:${p.id}:goalie-outcome`)));
++      outcomes.push({
++        playerId: p.id,
++        name: p.name,
++        position: p.position,
++        oldTeamId,
++        newTeamId,
++        oldTeamName: teamName(oldTeamId),
++        newTeamName: teamName(newTeamId),
++        projectedGAA: goalie?.projectedGAA,
++        projectedSVP: goalie?.projectedSVP,
++        gamesStarted: goalie?.gamesStarted,
++        gsax: goalie?.gsax,
++        role: (p.gamesStarted ?? p.games ?? 0) >= 45 ? "starter goalie" : "goalie",
++      });
++      return;
++    }
++
++    const skater = projectSkaterSeason(p, newTeamId, seed);
++    outcomes.push({
++      playerId: p.id,
++      name: p.name,
++      position: p.position,
++      oldTeamId,
++      newTeamId,
++      oldTeamName: teamName(oldTeamId),
++      newTeamName: teamName(newTeamId),
++      projectedPts: skater.projectedPts,
++      projectedGoals: skater.projectedGoals,
++      gamesPlayed: skater.gamesPlayed,
++      role: p.position === "D" ? "defenceman" : "skater",
++    });
++  };
++
++  for (const trade of trades) {
++    trade.outgoing.forEach(p => addOutcome(p, trade.homeTeamId, trade.partnerTeamId));
++    trade.incoming.forEach(p => addOutcome(p, trade.partnerTeamId, trade.homeTeamId));
++  }
++
++  const seen = new Set<string>();
++  return outcomes.filter(o => {
++    const key = `${o.playerId}:${o.oldTeamId}:${o.newTeamId}`;
++    if (seen.has(key)) return false;
++    seen.add(key);
++    return true;
++  });
++}
++
+ // ── Main handler ──────────────────────────────────────────────
+ export async function POST(req: NextRequest) {
+   try {
+     const body: SimRequest = await req.json();
+     const { homeTeamId, partnerTeamId, teams, players, trades } = body;
+ 
+-    const seed = body.seed ?? Math.floor(Math.random() * 100000);
++    const seed = body.seed ?? scenarioSeed({
++      mode: SEASON.simulationMode,
++      homeTeamId,
++      partnerTeamId,
++      trades: trades.map(t => ({
++        homeTeamId: t.homeTeamId,
++        partnerTeamId: t.partnerTeamId,
++        outgoing: t.outgoing.map(p => ({ id: p.id, retainedPct: (p as any).retainedPct ?? 0 })),
++        incoming: t.incoming.map(p => ({ id: p.id, retainedPct: (p as any).retainedPct ?? 0 })),
++      })),
++    });
+     const rand = mulberry32(seed);
+ 
+     // Build player roster map — apply trades
+@@ -667,34 +704,9 @@ export async function POST(req: NextRequest) {
+       }
+     }
+ 
+-    // Trade impact and cap delta per team.
+-    // Per-player on-ice value in "ptsPace-equivalent" units:
+-    //   Skaters — stable (baseline-blended) scoring pace, plus a D-man driver
+-    //   bonus: pairing data shows drivers lift partners' xGF% beyond their own
+-    //   point production (Fox-tier ≈ +20 driver score ≈ +10 pts-equivalent).
+-    //   Two-way forwards get a small PK-usage credit for the same reason.
+-    //   Goalies — previously contributed ZERO (no ptsPace), so goalie trades
+-    //   never moved the sim. Stable GSAX converts to pts-equivalent: ~6 goals
+-    //   ≈ 1 win ≈ 2 standings pts, and tradeImpact divides by 3.5, so
+-    //   gsax * 1.2 lands a +20 GSAX starter at ≈ +7 projected standings pts.
+-    //   HDSV% above league average (.815) adds a stable-skill kicker.
+-    const onIceValue = (p: SimPlayer): number => {
+-      if (p.position === "Pick") return 0;
+-      if (p.position === "G") {
+-        const hdsvKicker = p.baselineHdsvPct != null
+-          ? Math.max(-8, Math.min(12, (p.baselineHdsvPct - 0.815) * 400))
+-          : 0;
+-        return stableGsax(p) * 1.2 + hdsvKicker;
+-      }
+-      const driverBonus = p.position === "D" && p.pairDriverScore != null
+-        ? Math.max(-5, Math.min(10, p.pairDriverScore * 0.5))
+-        : 0;
+-      const pkBonus = p.pkTimeShare != null && p.pkTimeShare >= 0.10
+-        ? Math.min(5, p.pkTimeShare * 30)
+-        : 0;
+-      return stablePts(p) + driverBonus + pkBonus;
+-    };
+-
++    // Trade impact and cap delta per team. The season-start replay uses the
++    // post-trade roster for team strength, with this delta retained as a small
++    // context adjustment for special-teams, goalie, and driver effects.
+     const tradeNavDeltas = new Map<string, number>();
+     const capDeltas      = new Map<string, number>();
+     for (const trade of trades) {
+@@ -711,9 +723,7 @@ export async function POST(req: NextRequest) {
+       capDeltas.set(trade.partnerTeamId,      (capDeltas.get(trade.partnerTeamId)      ?? 0) - capDelta);
+     }
+ 
+-    const liveStandings = await fetchLiveStandings();
+-
+-    const rawStandings = simulateLeague(teams, playersByTeam, tradeNavDeltas, capDeltas, liveStandings, rand);
++    const rawStandings = simulateLeague(teams, playersByTeam, tradeNavDeltas, capDeltas, rand, seed);
+     const standings    = assignPlayoffSeeds(rawStandings);
+     const leaders      = findLeagueLeaders(standings, rand);
+ 
+@@ -749,6 +759,7 @@ export async function POST(req: NextRequest) {
+ 
+     const playoffBracket = simulatePlayoffs(standings, rand);
+     const cupWinner = standings.find(t => t.teamId === playoffBracket.champion.teamId) ?? leaders.cupWinner;
++    const tradedPlayerOutcomes = buildTradedPlayerOutcomes(trades, teams, standings, seed);
+ 
+     return NextResponse.json({
+       seed,
+@@ -763,6 +774,8 @@ export async function POST(req: NextRequest) {
+       },
+       playoffBracket,
+       playoffTeams: standings.filter(t => t.madePlayoffs).map(t => t.teamId),
++      tradedPlayerOutcomes,
++      simulationMode: SEASON.simulationMode,
+       generatedAt: new Date().toISOString(),
+     });
+ 
+diff --git a/app/components/LineupEditor.tsx b/app/components/LineupEditor.tsx
+index a738625..2135608 100644
+--- a/app/components/LineupEditor.tsx
++++ b/app/components/LineupEditor.tsx
+@@ -22,7 +22,7 @@ interface Player {
+ interface TeamProps {
+   teamName: string;
+   label?: string;
+-  roster: Player[];      // pre-trade roster
++  roster: Player[];      // roster before the active move is applied
+   outgoing: Player[];    // leaving in the active trade
+   incoming: Player[];    // arriving in the active trade
+ }
+diff --git a/app/components/TradeBlockPanel.tsx b/app/components/TradeBlockPanel.tsx
+index 11878ee..32a14f0 100644
+--- a/app/components/TradeBlockPanel.tsx
++++ b/app/components/TradeBlockPanel.tsx
+@@ -18,7 +18,7 @@ const STATUS_CONFIG = {
+ };
+ 
+ // Computer-determined sell candidates — the "what teams could give up" half of
+-// the trade block. Classic deadline profile: veteran on an expiring-ish deal,
++// the trade block. Classic availability profile: veteran on an expiring-ish deal,
+ // on a team selling (Rebuilding/Tanking/Retooling), real cap hit, not admin-flagged.
+ function isAutoAvailable(p: Asset, phase: string | undefined): boolean {
+   if (p.tradeBlockStatus) return false;
+diff --git a/app/components/TradeProposal.tsx b/app/components/TradeProposal.tsx
+index 1ac41ee..a8bf3d3 100644
+--- a/app/components/TradeProposal.tsx
++++ b/app/components/TradeProposal.tsx
+@@ -3,6 +3,7 @@
+ import { useState } from "react";
+ 
+ import type { Asset, Team } from "@/app/lib/trade-types";
++import { mulberry32, scenarioSeed } from "@/app/lib/sim-engine";
+ import {
+   TradeProposal,
+   getNav,
+@@ -63,6 +64,13 @@ export default function TradeProposalEngine({
+   const generate = async () => {
+     if (!homeTeam) return;
+     setGenerating(true); setDone(false); setProposals([]);
++    const rand = mulberry32(scenarioSeed({
++      mode: "trade-proposal-engine",
++      homeTeamId: homeTeam.id,
++      outgoing: outgoingBlock.map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0 })),
++      playerCount: allPlayers.length,
++      teamCount: allTeams.length,
++    }));
+ 
+     const candidates: { team: Team; fitScore: number; homeSends: Asset[]; partnerSends: Asset[]; isDump: boolean; dumpSweetener: Asset[] }[] = [];
+ 
+@@ -113,7 +121,7 @@ export default function TradeProposalEngine({
+           const pkgs = buildReturnPackages(blockNav, roster, picks, navMap);
+           if (pkgs.length === 0) continue;
+           for (const pkg of pkgs.slice(0, 4)) {
+-            candidates.push({ team, fitScore: fit * (0.85 + Math.random() * 0.15), homeSends: outgoingBlock, partnerSends: pkg, isDump: false, dumpSweetener: [] });
++            candidates.push({ team, fitScore: Math.round(fit * (0.85 + rand() * 0.15)), homeSends: outgoingBlock, partnerSends: pkg, isDump: false, dumpSweetener: [] });
+           }
+           continue;
+         }
+@@ -158,7 +166,7 @@ export default function TradeProposalEngine({
+         // Cap at 4 packages per team to avoid one team dominating the pool
+         for (const pkg of pkgs.slice(0, 4)) {
+           // Slightly vary fitScore per package so weighted random picks different ones
+-          const pkgFit = Math.round(fit * (0.85 + Math.random() * 0.15));
++          const pkgFit = Math.round(fit * (0.85 + rand() * 0.15));
+           candidates.push({
+             team, fitScore: pkgFit,
+             homeSends: outgoingBlock,
+@@ -188,7 +196,7 @@ export default function TradeProposalEngine({
+       const remaining = [...pool];
+       while (picked.length < count && remaining.length > 0) {
+         const totalWeight = remaining.reduce((s, c) => s + Math.pow(Math.max(1, c.fitScore), 1.5), 0);
+-        let r = Math.random() * totalWeight;
++        let r = rand() * totalWeight;
+         let idx = 0;
+         for (let i = 0; i < remaining.length; i++) {
+           r -= Math.pow(Math.max(1, remaining[i].fitScore), 1.5);
+@@ -457,4 +465,4 @@ export default function TradeProposalEngine({
+       </div>
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/app/lib/player-data.ts b/app/lib/player-data.ts
+index 1010382..c32c857 100644
+--- a/app/lib/player-data.ts
++++ b/app/lib/player-data.ts
+@@ -6,7 +6,7 @@
+ // UPDATE SCHEDULE:
+ //   PLAYER_PEDIGREE:    add new stars as they emerge
+ //   PROSPECT_TIERS:     refresh each September (draft + development)
+-//   SHUTDOWN_D_PEDIGREE: update after each trade deadline
++//   SHUTDOWN_D_PEDIGREE: update after each major roster movement window
+ //   INJURY_RISK:        update when players return/retire
+ 
+ import type { Asset, XNAVResult, FArchetype } from "@/app/lib/trade-types";
+@@ -265,4 +265,4 @@ export const INJURY_RISK: Record<string, { level: "HIGH"|"MODERATE"; note: strin
+   "Cam Fowler":          { level: "MODERATE", note: "Knee surgery history" },
+   "Jonathan Toews":      { level: "HIGH",     note: "Chronic Immune condition" },
+   "Brady Tkachuk":       { level: "MODERATE", note: "Wrist injury history" },
+-};
+\ No newline at end of file
++};
+diff --git a/app/lib/season-config.ts b/app/lib/season-config.ts
+index 75bd0d9..54ca781 100644
+--- a/app/lib/season-config.ts
++++ b/app/lib/season-config.ts
+@@ -5,6 +5,9 @@
+ 
+ export const SEASON = {
+   label:          "2026-27",
++  simulationMode: "2025-26 season-start replay",
++  replaySeason:   "2025-26",
++  rosterMoveWindow: "2025 offseason/opening-night",
+   apiSeasonId:    "20262027",
+   capCeiling:     104.0,         // NHL salary cap ceiling ($M) — 2026-27 announced upper limit
+   capFloor:       76.9,          // NHL salary cap floor ($M) — 2026-27 announced lower limit
+@@ -58,4 +61,4 @@ export const ageSlotPenalty = (age: number): number =>
+   age <= 23 ? COMPRESSION.penaltyProspect
+   : age <= 27 ? COMPRESSION.penaltyYoung
+   : age <= 31 ? COMPRESSION.penaltyPrime
+-  : COMPRESSION.penaltyVeteran;
+\ No newline at end of file
++  : COMPRESSION.penaltyVeteran;
+diff --git a/app/lib/trade-types.ts b/app/lib/trade-types.ts
+index cc65b01..27528e1 100644
+--- a/app/lib/trade-types.ts
++++ b/app/lib/trade-types.ts
+@@ -107,7 +107,7 @@ export type FlagCategory =
+   | "CONTENDER_LOGIC" | "ASSET_SHAPE_MISMATCH" | "POSITIONAL_REDUNDANCY"
+   | "ROSTER_HOLE" | "LEVERAGE_ASYMMETRY" | "RENTAL_TAX" | "AGE_CLIFF"
+   | "DEAD_WEIGHT" | "FIRE_SALE" | "LOCKER_ROOM" | "RETAIN_ABUSE" | "GOOD" | "VALUE_VETO"
+-  | "FRANCHISE_ANCHOR";
++  | "FRANCHISE_ANCHOR" | "UNTOUCHABLE";
+ 
+ export interface GmFlag {
+   severity: FlagSeverity;
+@@ -157,4 +157,4 @@ export interface EvaluateRequest {
+ export interface EvaluateResponse {
+   navMap:   Record<string, XNAVResult>; // id → XNAVResult for all requested assets
+   verdict?: TradeVerdict;              // only present when runTrade=true
+-}
+\ No newline at end of file
++}
+diff --git a/app/lib/xnav-engine.ts b/app/lib/xnav-engine.ts
+index 23032ef..e4dcbd6 100644
+--- a/app/lib/xnav-engine.ts
++++ b/app/lib/xnav-engine.ts
+@@ -89,9 +89,10 @@ export const clamp = (n: number, min: number, max: number): number =>
+ // ── Pick NAV ──────────────────────────────────────────────────────────────────
+ export function calcPickNAV(asset: AssetInput): XNAVResult {
+   const round    = asset.round    ?? 1;
+-  const year     = asset.year     ?? 2026;
++  const baseYear = SEASON.draftYear;
++  const year     = asset.year     ?? baseYear;
+   const standing = asset.teamStanding ?? 16;
+-  const yearDecay = Math.pow(0.88, year - 2026);
++  const yearDecay = Math.pow(0.88, Math.max(0, year - baseYear));
+ 
+   let baseValue: number;
+   if (round === 1) {
+@@ -674,4 +675,4 @@ export function compressPackage(
+     if (i > 0) penaltySum += ageSlotPenalty(age);
+   });
+   return pickValue + Math.max(0, decaySum - penaltySum);
+-}
+\ No newline at end of file
++}
+diff --git a/app/store/scenarioStore.ts b/app/store/scenarioStore.ts
+index 046c91b..eda9c07 100644
+--- a/app/store/scenarioStore.ts
++++ b/app/store/scenarioStore.ts
+@@ -1,5 +1,6 @@
+ import { create } from 'zustand';
+ import { persist, createJSONStorage } from 'zustand/middleware';
++import { scenarioSeed } from '@/app/lib/sim-engine';
+ 
+ export interface ScenarioAsset {
+   name:     string;
+@@ -30,12 +31,16 @@ export const useScenarioStore = create<ScenarioState>()(
+     (set) => ({
+       savedScenarios: [],
+ 
+-      saveScenario: (s) => set(state => ({
+-        savedScenarios: [
+-          { ...s, id: Math.random().toString(36).slice(2, 9), savedAt: Date.now() },
+-          ...state.savedScenarios,
+-        ].slice(0, 25),
+-      })),
++      saveScenario: (s) => set(state => {
++        const savedAt = Date.now();
++        const id = scenarioSeed({ ...s, savedAt, index: state.savedScenarios.length }).toString(36);
++        return {
++          savedScenarios: [
++            { ...s, id, savedAt },
++            ...state.savedScenarios,
++          ].slice(0, 25),
++        };
++      }),
+ 
+       deleteScenario: (id) => set(state => ({
+         savedScenarios: state.savedScenarios.filter(s => s.id !== id),
+diff --git a/app/trade/page.tsx b/app/trade/page.tsx
+index e055806..b308fa0 100644
+--- a/app/trade/page.tsx
++++ b/app/trade/page.tsx
+@@ -2,7 +2,7 @@
+ 
+ import TradePanel from "@/app/components/TradePanel";
+ import TugBar from "@/app/components/TugBar";
+-import { ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
++import { SEASON, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
+ import PlayoffBracket from "@/app/components/PlayoffBracket";
+ import TeamStrand, { CHAMP_TEMPLATE, TeamStrandData } from "@/app/components/TeamStrand";
+ import LineupEditor from "@/app/components/LineupEditor";
+@@ -20,6 +20,7 @@ import type {
+ import {
+   fetchNavMap, fetchTradeVerdict, clearNavCache, getCachedNav,
+ } from "@/app/lib/evaluate-client";
++import { scenarioSeed } from "@/app/lib/sim-engine";
+ import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
+ import TradeBlockPanel from "@/app/components/TradeBlockPanel";
+ 
+@@ -331,7 +332,7 @@ export default function TradeMachine() {
+     }
+   }, [originalDb]);
+ 
+-  // ── Sim a Year — Claude Haiku projects one season forward ─────
++  // ── Sim a Year — native engine projects, Claude narrates only ─────
+   const simYear = useCallback(async () => {
+     if (!teams[0] || executedTrades.length === 0) return;
+     setSimLoading(true);
+@@ -341,20 +342,36 @@ export default function TradeMachine() {
+     // ── Step 1: Run projection engine ─────────────────────────
+     let sim: any = null;
+     try {
++      const simTeams = originalDb?.teams ?? db.teams;
++      const simPlayers = originalDb?.players ?? db.players;
++      const simTrades = executedTrades.map(t => ({
++        homeTeamId:    simTeams.find(x => x.name === t.homeTeamName)?.id ?? "",
++        partnerTeamId: simTeams.find(x => x.name === t.partnerTeamName)?.id ?? "",
++        outgoing: t.outgoing,
++        incoming: t.incoming,
++      }));
++      const seed = scenarioSeed({
++        mode: SEASON.simulationMode,
++        homeTeamId: teams[0]!.id,
++        partnerTeamId: teams[1]?.id ?? "",
++        trades: simTrades.map(t => ({
++          homeTeamId: t.homeTeamId,
++          partnerTeamId: t.partnerTeamId,
++          outgoing: t.outgoing.map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0 })),
++          incoming: t.incoming.map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0 })),
++        })),
++      });
++
+       const simRes = await fetch("/api/simulate", {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({
+           homeTeamId:    teams[0]!.id,
+           partnerTeamId: teams[1]?.id ?? "",
+-          teams:   db.teams,
+-          players: db.players,
+-          trades:  executedTrades.map(t => ({
+-            homeTeamId:    db.teams.find(x => x.name === t.homeTeamName)?.id ?? "",
+-            partnerTeamId: db.teams.find(x => x.name === t.partnerTeamName)?.id ?? "",
+-            outgoing: t.outgoing,
+-            incoming: t.incoming,
+-          })),
++          teams:   simTeams,
++          players: simPlayers,
++          trades:  simTrades,
++          seed,
+         }),
+       });
+       if (simRes.ok) {
+@@ -363,6 +380,12 @@ export default function TradeMachine() {
+       }
+     } catch (_) {}
+ 
++    if (!sim) {
++      setSimResult("Simulation unavailable — deterministic projection engine did not return results.");
++      setSimLoading(false);
++      return;
++    }
++
+     // ── Step 2: Build trade summary ────────────────────────────
+     const tradesSummary = executedTrades.map(t => {
+       const outNames = t.outgoing.map(a => a.position === "Pick"
+@@ -372,9 +395,9 @@ export default function TradeMachine() {
+         ? `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : "3rd"} round pick`
+         : `${a.name} (${a.position}, $${a.capHit}M)`).join(", ");
+       return [
+-        `TRADE: ${t.homeTeamName} ↔ ${t.partnerTeamName}`,
+-        `  ${t.homeTeamName} GAVE AWAY: ${outNames}`,
+-        `  ${t.homeTeamName} RECEIVED: ${inNames}`,
++        `OFFSEASON MOVE: ${t.homeTeamName} ↔ ${t.partnerTeamName}`,
++        `  ${t.homeTeamName} MOVED: ${outNames}`,
++        `  ${t.homeTeamName} ACQUIRED: ${inNames}`,
+       ].join("\n");
+     }).join("\n\n");
+ 
+@@ -382,16 +405,24 @@ export default function TradeMachine() {
+       .filter(p => p.teamId === teams[0]!.id && p.position !== "Pick")
+       .sort((a, b) => b.ptsPace - a.ptsPace)
+       .slice(0, 12)
+-      .map(p => `${p.name} (${p.position}, ${p.ptsPace.toFixed(0)}pts/82, age ${p.age})`);
++      .map(p => `${p.name} (${p.position}, age ${p.age})`);
+ 
+     const partnerTeam = teams[1];
+     const isRebuilding = ["Rebuilding","Tanking","Retooling"].includes(teams[0]!.phase ?? "");
+ 
++    const tradedOutcomeLines = (sim.tradedPlayerOutcomes ?? []).map((o: any) => {
++      if (o.position === "G") {
++        return `${o.name}: ${o.oldTeamName} -> ${o.newTeamName}, ${o.gamesStarted ?? "?"} starts, ${o.projectedGAA ?? "?"} GAA, ${o.projectedSVP ?? "?"} SV%`;
++      }
++      return `${o.name}: ${o.oldTeamName} -> ${o.newTeamName}, ${o.gamesPlayed ?? "?"} GP, ${o.projectedGoals ?? "?"} G, ${o.projectedPts ?? "?"} pts`;
++    });
++
+     // ── Step 3: Build structured prompt ───────────────────────
+-    // If sim engine succeeded, Claude gets exact numbers and writes narrative only.
+-    // If sim engine failed, Claude falls back to its own projection (old behavior).
+-    const simContext = sim ? `
++    // Claude gets exact numbers from the deterministic sim and writes narrative only.
++    const simContext = `
+ PROJECTED SEASON RESULTS — USE THESE EXACT NUMBERS, DO NOT INVENT ALTERNATIVES:
++	Simulation mode: ${sim.simulationMode ?? SEASON.simulationMode}
++	Premise: take each current roster as it stands now, move the selected trade(s) to opening night, and replay the full ${SEASON.replaySeason} season from the beginning.
+ 
+ ${teams[0]!.name}: ${sim.homeTeam?.projectedPoints ?? "?"} pts · Finished #${sim.homeTeam?.leagueRank ?? "?"}/32 · ${sim.homeTeam?.madePlayoffs ? "MADE PLAYOFFS" : "MISSED PLAYOFFS"}
+   Top scorer: ${sim.homeTeam?.topScorer?.name ?? "—"} — ${sim.homeTeam?.topScorer?.projectedPts ?? "—"} pts
+@@ -414,6 +445,9 @@ LEAGUE RESULTS (LOCKED — do not contradict):
+   Draft Lottery: ${sim.leaders?.draftLottery?.teamName ?? "—"} finished last (${sim.leaders?.draftLottery?.projectedPoints ?? "—"} pts)
+   Simulation seed: #${sim.seed ?? "—"}
+ 
++TRADED PLAYER OUTCOMES (LOCKED):
++${tradedOutcomeLines.length > 0 ? tradedOutcomeLines.join("\n") : "No traded player stat outcomes available."}
++
+ CRITICAL ACCURACY RULES:
+ - Every stat (pts, GAA, SV%) must match the exact number above — no rounding, no approximating
+ - Do not add stats for players not listed above
+@@ -423,8 +457,7 @@ PLAYOFF TEAMS: ${sim.playoffTeams?.join(", ") ?? "—"}
+ 
+ YOUR ROLE: Write the narrative column using ONLY these numbers.
+ Do not invent standings, stat lines, or results.
+-Claude is the storyteller — the simulation engine is the source of truth.` : `
+-NOTE: Projection engine unavailable. Use your best judgment for outcomes but follow all constraints below.`;
++Claude is the storyteller — the simulation engine is the source of truth.`;
+ 
+     const prompt = (() => {
+       const allTradedNames = executedTrades.flatMap(t => [
+@@ -432,43 +465,40 @@ NOTE: Projection engine unavailable. Use your best judgment for outcomes but fol
+         ...t.incoming.map(a => a.name),
+       ]);
+       const franchiseMoved = (name: string) => allTradedNames.includes(name);
+-      const WILD_CARDS = ["WPG","TOR","CGY","EDM","NYR"];
+-      const homeIsWildCard    = WILD_CARDS.includes(teams[0]!.id);
+-      const partnerIsWildCard = teams[1] && WILD_CARDS.includes(teams[1].id);
+ 
+       const teamNarrative = (t: Team): string => {
+-        const p = t.phase; const s = t.standing;
+-        if (p === "Tanking" || p === "Rebuilding") return "deep in a rebuild — draft positioning is the only currency that matters";
+-        if (s <= 3)  return "legitimate Presidents' Trophy contender — Cup or bust";
+-        if (s <= 8)  return "locked into the playoff race with real Cup upside";
+-        if (s <= 14) return "bubble team fighting to survive the final weeks";
+-        if (s <= 20) return "underperforming their talent — fans restless, GM on notice";
+-        return "fading season — playing for draft lottery position";
++        const p = t.phase;
++        if (p === "Tanking" || p === "Rebuilding") return "opening the year with a future-first roster construction";
++        if (p === "Retooling") return "opening the year trying to turn a transitional roster into a playoff-calibre group";
++        if (p === "Bubble") return "opening the year with a roster built to chase a playoff spot";
++        if (p === "Contender") return "opening the year with a roster built to contend immediately";
++        return "opening the year with an unsettled organizational direction";
+       };
+ 
+-      return `You are a senior NHL beat reporter writing the definitive end-of-season trade retrospective column.
++      return `You are a senior NHL beat reporter writing the definitive end-of-season alternate-history column.
+ ${simContext}
+ 
+-THE TRADE IS THE DIVERGENCE POINT. Honor it above all real-world events.
+-${franchiseMoved("Auston Matthews") ? "Matthews was TRADED — Toronto's season is reflected in the numbers above." : ""}
+-${franchiseMoved("Connor Hellebuyck") ? "Hellebuyck was TRADED — Winnipeg's identity changed." : ""}
++	THE OFFSEASON ROSTER MOVE IS THE DIVERGENCE POINT. Treat every executed deal as completed before opening night of the ${SEASON.replaySeason} season, not at the trade deadline.
++${franchiseMoved("Auston Matthews") ? "Matthews changed teams before opening night — Toronto's full-season result is reflected in the numbers above." : ""}
++${franchiseMoved("Connor Hellebuyck") ? "Hellebuyck changed teams before opening night — Winnipeg's full-season identity is reflected in the numbers above." : ""}
+ 
+-LOCKED FACTS (pre-deadline, cannot change):
++LOCKED FACTS:
+ - Florida Panthers did NOT win the Cup (won 2023, 2024, 2025).
+ - Utah Hockey Club is now the Utah Mammoth (UTA). Arizona Coyotes do not exist.
++- These are ${SEASON.rosterMoveWindow} moves. Never describe them as deadline deals or say a team sat at any ranking at the deadline.
+ 
+ NHL STRUCTURE:
+ Eastern: Atlantic (BOS,BUF,DET,FLA,MTL,OTT,TBL,TOR) · Metro (CAR,CBJ,NJD,NYI,NYR,PHI,PIT,WSH)
+ Western: Central (UTA,CHI,COL,DAL,MIN,NSH,STL,WPG) · Pacific (ANA,CGY,EDM,LAK,SEA,SJS,VAN,VGK)
+ 
+-TRADE SUMMARY:
++OFFSEASON MOVE SUMMARY:
+ ${tradesSummary}
+ 
+-${teams[0]!.name} ROSTER (top 12):
++${teams[0]!.name} OPENING-NIGHT ROSTER AFTER MOVES (top 12):
+ ${homeRoster.join("\n")}
+-Phase: ${teams[0]!.phase} · Pre-trade standing: #${teams[0]!.standing}/32
++Phase entering replay: ${teams[0]!.phase}
+ Contention ratings (X-NAV derived): Present ${computeContention(db.players.filter(p => p.teamId === teams[0]!.id), navMap).present.toFixed(1)}/10 · Future ${computeContention(db.players.filter(p => p.teamId === teams[0]!.id), navMap).future.toFixed(1)}/10
+-Narrative entering second half: ${teamNarrative(teams[0]!)}
++Season-start outlook: ${teamNarrative(teams[0]!)}
+ 
+ ${sim?.playoffBracket ? `PLAYOFF BRACKET (simulated):
+ Eastern: ${sim.playoffBracket.eastern.r1.map((s: any) => `${s.home.teamName} ${s.homeWins}-${s.awayWins} ${s.away.teamName}`).join(' | ')}
+@@ -480,15 +510,15 @@ Stanley Cup Final: ${sim.playoffBracket.final.home.teamName} ${sim.playoffBracke
+ Write 6 sections. Every number comes from the sim data above — do not estimate, approximate, or invent stats.
+ 
+ **THE TRADE, ONE YEAR LATER**
+-3-4 sentences. Use the projected stats above. How did the key players perform for their NEW teams?
++3-4 sentences. Frame the deal as an offseason/opening-night roster move. Use the locked traded-player outcomes above for every moved player you discuss. If a traded player's projected stat line is not listed, describe the team-level effect only.
+ 
+ **${teams[0]!.name.toUpperCase()}'S SEASON**
+ ${isRebuilding
+   ? `4-5 sentences. Use the exact finish position from the projection above. Paint the narrative around those numbers — low point, bright spot, draft pick significance.`
+-  : `4-5 sentences. Use the exact finish and playoff result from the bracket above. One defining moment. One unexpected development.`}
++  : `4-5 sentences. Use the exact finish and playoff result from the bracket above. Describe one defining result from the listed bracket or standings.`}
+ 
+ **AROUND THE LEAGUE**
+-4-5 sentences. 3 storylines — one surprise (refer to the standings and bracket above), one injury, one off-ice story.
++4-5 sentences. Use 3 storylines from the standings, bracket, awards, and leader facts above. Do not invent injuries or off-ice stories.
+ 
+ **THE YEAR IN NUMBERS**
+ Use ONLY the numbers provided. Do not approximate, estimate, or calculate anything not given here.
+@@ -511,8 +541,8 @@ ${(() => {
+   );
+   if (tradedAwayPick) return `${teams[0]!.name} traded away their 1st round pick. 2 sentences about watching another team use it.`;
+   if (sim?.homeTeam && !sim.homeTeam.madePlayoffs)
+-    return `${teams[0]!.name} finished #${sim.homeTeam.leagueRank}/32 with ${sim.homeTeam.projectedPoints} pts. 3 sentences on what their lottery position means and who they might draft.`;
+-  return `2 sentences. ${sim?.leaders?.draftLottery?.teamName ?? "The worst team"} won the lottery. Who is the top prospect?`;
++    return `${teams[0]!.name} finished #${sim.homeTeam.leagueRank}/32 with ${sim.homeTeam.projectedPoints} pts. 3 sentences on what that lottery position means. Do not name a prospect unless listed above.`;
++  return `2 sentences. ${sim?.leaders?.draftLottery?.teamName ?? "The worst team"} won the lottery. Do not name a prospect unless listed above.`;
+ })()}
+ 
+ **VERDICT**
+@@ -530,9 +560,10 @@ Simulation #${sim?.seed ?? "—"} · ${new Date().toLocaleDateString('en-US', {
+         headers: { "Content-Type": "application/json" },
+         signal: simAbortRef.current.signal,
+         body: JSON.stringify({
++          kind: "season_recap",
+           model: "claude-sonnet-4-5",
+           max_tokens: 1800,
+-          messages: [{ role: "user", content: prompt }],
++          payload: { lockedReport: prompt },
+         }),
+       });
+       const data = await res.json();
+@@ -542,7 +573,7 @@ Simulation #${sim?.seed ?? "—"} · ${new Date().toLocaleDateString('en-US', {
+       setSimResult("Simulation unavailable — please try again.");
+     }
+     setSimLoading(false);
+-  }, [teams, db, executedTrades]);
++  }, [teams, db, originalDb, executedTrades]);
+   useEffect(() => {
+     // Issue 10: Don't auto-evaluate. Clear old verdict so user must click "Make the call" again.
+     if (evaluated) {
+@@ -561,46 +592,6 @@ Simulation #${sim?.seed ?? "—"} · ${new Date().toLocaleDateString('en-US', {
+     const outgoing = blocks[0];
+     const incoming = blocks[1];
+ 
+-    const describeAssets = (assets: Asset[]) =>
+-      assets.map(a =>
+-        a.position === "Pick"
+-          ? `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : `${a.round}th`} round pick`
+-          : `${a.name} (${a.position}, age ${a.age}, $${a.capHit}M x ${a.yearsRemaining}yr, ${a.ptsPace.toFixed(0)} pts/82)`
+-      ).join(", ");
+-
+-    const flagSummary = verdict.flags
+-      .filter(f => f.severity === "HARD" || f.severity === "SOFT")
+-      .map(f => `• [${f.severity}] ${f.headline}`)
+-      .join("\n");
+-
+-    const prompt = `You are a senior NHL front office analyst writing an internal trade evaluation memo. Base your analysis ONLY on the data provided — do not invent injuries, contract disputes, locker room issues, or league context not shown here.
+-
+-TRADE DETAILS:
+-${teams[0].name} (${teams[0].phase}, #${teams[0].standing}/32, $${teams[0].capSpace}M cap space) sends:
+-  ${describeAssets(outgoing)}
+-
+-${teams[1].name} (${teams[1].phase}, #${teams[1].standing}/32, $${teams[1].capSpace}M cap space) sends:
+-  ${describeAssets(incoming)}
+-
+-ANALYTICS:
+-- NAV balance: ${teams[0].name} nets ${verdict.metrics.homeNetGain > 0 ? "+" : ""}${verdict.metrics.homeNetGain.toFixed(0)} NAV points
+-- Estimated Wins Added: ${verdict.metrics.ewaHome > 0 ? "+" : ""}${verdict.metrics.ewaHome.toFixed(1)} wins in the standings
+-- Contention Window Shift: ${verdict.metrics.cwiYears > 0 ? "opens/extends by" : verdict.metrics.cwiYears < 0 ? "shortens by" : "neutral,"} ${Math.abs(verdict.metrics.cwiYears).toFixed(1)} years
+-- Production delta: ${verdict.metrics.ptsGain > 0 ? "+" : ""}${verdict.metrics.ptsGain.toFixed(1)} pts/82
+-- Cap impact: ${verdict.metrics.capDelta > 0 ? "+" : ""}${verdict.metrics.capDelta.toFixed(1)}M
+-- Value imbalance: ${verdict.metrics.variance.toFixed(0)}%
+-- Verdict: ${verdict.status}
+-
+-GM LOGIC FLAGS:
+-${flagSummary || "None — trade passes all logic checks"}
+-
+-Write a concise 3-paragraph front office memo. Each paragraph maximum 4 sentences.
+-1. What each team's organizational motivation is based on their phase and standing — stick to what the data shows
+-2. Whether the analytics support the trade for BOTH teams — use the NAV/EWA/CWI numbers directly
+-3. One clear recommendation — accept, reject, or counter with specific conditions
+-
+-RULES: No invented context. No speculation about players not in this trade. Complete every sentence. Use the numbers provided.`;
+-
+     if (memoAbortRef.current) memoAbortRef.current.abort();
+     memoAbortRef.current = new AbortController();
+ 
+@@ -610,9 +601,21 @@ RULES: No invented context. No speculation about players not in this trade. Comp
+         headers: { "Content-Type": "application/json" },
+         signal: memoAbortRef.current.signal,
+         body: JSON.stringify({
++          kind: "trade_memo",
+           model: "claude-sonnet-4-5",
+           max_tokens: 700,
+-          messages: [{ role: "user", content: prompt }],
++          payload: {
++            homeTeam: teams[0],
++            partnerTeam: teams[1],
++            outgoing,
++            incoming,
++            metrics: verdict.metrics,
++            status: verdict.status,
++            flags: verdict.flags.map(f => ({
++              severity: f.severity,
++              headline: f.headline,
++            })),
++          },
+         }),
+       });
+       const data = await res.json();
+@@ -2262,4 +2265,4 @@ function ErrorScreen({ msg }: { msg: string }) {
+       <div className="text-zinc-700 text-xs">Check that /api/league/teams and /api/league/players are deployed and reachable.</div>
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/__tests__/simulate-and-claude-routes.test.ts b/__tests__/simulate-and-claude-routes.test.ts
+new file mode 100644
+index 0000000..99ebf59
+--- /dev/null
++++ b/__tests__/simulate-and-claude-routes.test.ts
+@@ -0,0 +1,194 @@
++import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
++import { POST as simulatePOST } from "../app/api/simulate/route";
++import { POST as claudePOST } from "../app/api/claude/route";
++import { projectTopScorer, scenarioSeed } from "../app/lib/sim-engine";
++import { SEASON } from "../app/lib/season-config";
++
++const teamIds = [
++  "BOS","BUF","DET","FLA","MTL","OTT","TBL","TOR",
++  "CAR","CBJ","NJD","NYI","NYR","PHI","PIT","WSH",
++  "UTA","CHI","COL","DAL","MIN","NSH","STL","WPG",
++  "ANA","CGY","EDM","LAK","SEA","SJS","VAN","VGK",
++];
++
++const teams = teamIds.map((id, i) => ({
++  id,
++  name: id,
++  phase: i < 8 ? "Contender" : i < 16 ? "Bubble" : i < 24 ? "Retooling" : "Rebuilding",
++  standing: i + 1,
++  capSpace: 8,
++}));
++
++const player = (id: string, name: string, teamId: string, ptsPace: number, position = "W") => ({
++  id,
++  name,
++  teamId,
++  position,
++  age: 28,
++  ptsPace,
++  baselinePtsPace: ptsPace,
++  xGPace: 20,
++  avgTOI: 18,
++  capHit: 5,
++  yearsRemaining: 3,
++  games: 82,
++});
++
++describe("simulate route", () => {
++  it("selects the actual projected top scorer after injury variance", () => {
++    const scheifele = player("scheifele", "Mark Scheifele", "WPG", 95, "C");
++    const connor = player("connor", "Kyle Connor", "WPG", 92, "W");
++
++    const top = projectTopScorer([scheifele, connor], "WPG", 18);
++
++    expect(top?.name).toBe("Kyle Connor");
++    expect(top?.projectedPts).toBeGreaterThan(80);
++  });
++
++  it("returns locked traded-player outcomes for moved players", async () => {
++    const connor = player("connor", "Kyle Connor", "WPG", 92, "W");
++    const andersson = player("andersson", "Rasmus Andersson", "CGY", 45, "D");
++    const depth = teamIds.flatMap((teamId) => [
++      player(`${teamId}-f1`, `${teamId} Forward`, teamId, 42, "C"),
++      player(`${teamId}-d1`, `${teamId} Defender`, teamId, 25, "D"),
++      {
++        ...player(`${teamId}-g1`, `${teamId} Goalie`, teamId, 0, "G"),
++        gsax: 0,
++        gamesStarted: 45,
++        savePct: 0.905,
++      },
++    ]);
++
++    const req = new Request("http://localhost/api/simulate", {
++      method: "POST",
++      body: JSON.stringify({
++        homeTeamId: "WPG",
++        partnerTeamId: "CGY",
++        teams,
++        players: [...depth, connor, andersson],
++        seed: 18,
++        trades: [{
++          homeTeamId: "WPG",
++          partnerTeamId: "CGY",
++          outgoing: [connor],
++          incoming: [andersson],
++        }],
++      }),
++    });
++
++    const res = await simulatePOST(req as any);
++    const body = await res.json();
++
++    expect(body.simulationMode).toBe(SEASON.simulationMode);
++    expect(body.tradedPlayerOutcomes).toEqual(
++      expect.arrayContaining([
++        expect.objectContaining({
++          playerId: "connor",
++          name: "Kyle Connor",
++          oldTeamId: "WPG",
++          newTeamId: "CGY",
++          projectedPts: expect.any(Number),
++        }),
++      ])
++    );
++  });
++
++  it("derives a stable seed when one is not supplied", async () => {
++    const connor = player("connor", "Kyle Connor", "WPG", 92, "W");
++    const andersson = player("andersson", "Rasmus Andersson", "CGY", 45, "D");
++    const depth = teamIds.flatMap((teamId) => [
++      player(`${teamId}-f1`, `${teamId} Forward`, teamId, 42, "C"),
++      player(`${teamId}-d1`, `${teamId} Defender`, teamId, 25, "D"),
++      {
++        ...player(`${teamId}-g1`, `${teamId} Goalie`, teamId, 0, "G"),
++        gsax: 0,
++        gamesStarted: 45,
++        savePct: 0.905,
++      },
++    ]);
++    const body = {
++      homeTeamId: "WPG",
++      partnerTeamId: "CGY",
++      teams,
++      players: [...depth, connor, andersson],
++      trades: [{
++        homeTeamId: "WPG",
++        partnerTeamId: "CGY",
++        outgoing: [connor],
++        incoming: [andersson],
++      }],
++    };
++
++    const first = await simulatePOST(new Request("http://localhost/api/simulate", {
++      method: "POST",
++      body: JSON.stringify(body),
++    }) as any);
++    const second = await simulatePOST(new Request("http://localhost/api/simulate", {
++      method: "POST",
++      body: JSON.stringify(body),
++    }) as any);
++
++    const firstBody = await first.json();
++    const secondBody = await second.json();
++
++    expect(firstBody.seed).toBe(secondBody.seed);
++    expect(firstBody.homeTeam.projectedPoints).toBe(secondBody.homeTeam.projectedPoints);
++  });
++
++  it("uses order-insensitive object keys for scenario seeds", () => {
++    expect(scenarioSeed({ b: 2, a: 1 })).toBe(scenarioSeed({ a: 1, b: 2 }));
++  });
++});
++
++describe("claude narrative route contract", () => {
++  const originalKey = process.env.ANTHROPIC_API_KEY;
++
++  beforeEach(() => {
++    process.env.ANTHROPIC_API_KEY = "test-key";
++  });
++
++  afterEach(() => {
++    process.env.ANTHROPIC_API_KEY = originalKey;
++    vi.restoreAllMocks();
++  });
++
++  it("rejects raw Anthropic messages from clients", async () => {
++    const req = new Request("http://localhost/api/claude", {
++      method: "POST",
++      body: JSON.stringify({
++        model: "claude-sonnet-4-5",
++        messages: [{ role: "user", content: "Please simulate a season" }],
++      }),
++    });
++
++    const res = await claudePOST(req);
++    const body = await res.json();
++
++    expect(res.status).toBe(400);
++    expect(body.error).toBe("Invalid narrative request");
++  });
++
++  it("accepts locked season recap payloads", async () => {
++    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
++      content: [{ text: "Locked recap." }],
++    })));
++
++    const req = new Request("http://localhost/api/claude", {
++      method: "POST",
++      body: JSON.stringify({
++        kind: "season_recap",
++        model: "claude-sonnet-4-5",
++        max_tokens: 300,
++        payload: {
++          lockedReport: `Simulation mode: ${SEASON.simulationMode}\nKyle Connor: 76 GP, 84 pts`,
++        },
++      }),
++    });
++
++    const res = await claudePOST(req);
++    const body = await res.json();
++
++    expect(res.status).toBe(200);
++    expect(body.content[0].text).toBe("Locked recap.");
++  });
++});
+diff --git a/app/lib/sim-engine.ts b/app/lib/sim-engine.ts
+new file mode 100644
+index 0000000..fdd2e2c
+--- /dev/null
++++ b/app/lib/sim-engine.ts
+@@ -0,0 +1,100 @@
++export interface SimEnginePlayer {
++  id: string;
++  name: string;
++  position: string;
++  age: number;
++  ptsPace: number;
++  games?: number;
++  baselinePtsPace?: number;
++}
++
++export function mulberry32(seed: number) {
++  return function() {
++    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
++    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
++    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
++    return ((t ^ t >>> 14) >>> 0) / 4294967296;
++  };
++}
++
++export function hashString(input: string): number {
++  let h = 2166136261;
++  for (let i = 0; i < input.length; i++) {
++    h ^= input.charCodeAt(i);
++    h = Math.imul(h, 16777619);
++  }
++  return h >>> 0;
++}
++
++export function stableStringify(value: unknown): string {
++  if (value == null || typeof value !== "object") return JSON.stringify(value);
++  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
++
++  const obj = value as Record<string, unknown>;
++  return `{${Object.keys(obj).sort().map((key) =>
++    `${JSON.stringify(key)}:${stableStringify(obj[key])}`
++  ).join(",")}}`;
++}
++
++export function scenarioSeed(value: unknown): number {
++  return hashString(stableStringify(value)) % 100000 + 1;
++}
++
++export const stablePts = (p: SimEnginePlayer): number =>
++  p.baselinePtsPace && p.baselinePtsPace > 0
++    ? p.ptsPace * 0.4 + p.baselinePtsPace * 0.6
++    : p.ptsPace;
++
++export const ageDecay = (age: number, position: string): number => {
++  const peak = position === "D" ? 27 : position === "G" ? 29 : 26;
++  if (age <= peak) return 1.0 + Math.max(0, (peak - age) * 0.005);
++  const baseRate = position === "D" ? 0.018 : 0.022;
++  const earlyYears = Math.min(age, 33) - peak;
++  const lateYears = Math.max(0, age - 33);
++  const decline = earlyYears * baseRate + lateYears * baseRate * 2.5;
++  return Math.max(0.50, 1.0 - decline);
++};
++
++export function projectSkaterSeason(
++  p: SimEnginePlayer,
++  teamId: string,
++  seed: number,
++): { name: string; projectedPts: number; projectedGoals: number; gamesPlayed: number; position: string } {
++  const rand = mulberry32(seed + hashString(`${teamId}:${p.id}:skater`));
++  const decay = ageDecay(p.age, p.position);
++
++  let gamesPlayed = Math.round(72 + rand() * 10);
++  if (rand() < 0.05) {
++    gamesPlayed = Math.max(5, gamesPlayed - Math.round(30 + rand() * 30));
++  }
++
++  const rawPts = (stablePts(p) / 82) * gamesPlayed * decay;
++  const variance = 0.88 + rand() * 0.24;
++  const projectedPts = Math.round(rawPts * variance);
++
++  const goalPct = p.position === "D" ? 0.25 : 0.40;
++  const projectedGoals = Math.round(projectedPts * goalPct * (0.90 + rand() * 0.20));
++  return { name: p.name, projectedPts, projectedGoals, gamesPlayed, position: p.position };
++}
++
++export function projectTopScorer(
++  roster: SimEnginePlayer[],
++  teamId: string,
++  seed: number,
++): { name: string; projectedPts: number; projectedGoals: number; position: string } | null {
++  const skaters = roster
++    .filter(p => p.position !== "Pick" && p.position !== "G"
++      && p.ptsPace > 0
++      && (p.games ?? 0) >= 20);
++
++  if (skaters.length === 0) return null;
++
++  const projected = skaters.map((p) => projectSkaterSeason(p, teamId, seed));
++
++  projected.sort((a, b) =>
++    b.projectedPts !== a.projectedPts
++      ? b.projectedPts - a.projectedPts
++      : a.name.localeCompare(b.name)
++  );
++  return projected[0];
++}
