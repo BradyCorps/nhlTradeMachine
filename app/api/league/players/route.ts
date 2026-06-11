@@ -571,6 +571,15 @@ function loadBaselines(): Record<string, any> {
   } catch (_) { return {}; }
 }
 
+function loadTeamBaselines(): Record<string, any> {
+  try {
+    const fs   = require("fs");
+    const path = require("path");
+    const file = path.join(process.cwd(), "app/data/team_baselines.json");
+    return JSON.parse(fs.readFileSync(file, "utf-8"));
+  } catch (_) { return {}; }
+}
+
 async function loadContracts(): Promise<Record<string, any>> {
   if (redis) {
     const cached = await redis.get<Record<string, any>>("cache:contracts");
@@ -805,8 +814,9 @@ export async function GET() {
     loadContracts(),
     fetchPointShares(),
   ]);
-  const EXTENSIONS = loadExtensions();
-  const BASELINES  = loadBaselines();
+  const EXTENSIONS     = loadExtensions();
+  const BASELINES      = loadBaselines();
+  const TEAM_BASELINES = loadTeamBaselines();
 
   // ── MoneyPuck analytics ─────────────────────────────────────
   const analyticsMap = new Map<string, any>();
@@ -1174,6 +1184,7 @@ export async function GET() {
         gamesStarted:   goalieStats?.gamesStarted  ?? 0,
         shotsPerGame:   goalieStats?.shotsPerGame  ?? 0,
         teamXga60,
+        teamHdca60:     TEAM_BASELINES[teamId]?.hdca60 ?? null,
         baselineGsax:      baselines.baselineGsax      ?? currentYearGsax,
         baselinePtsPace:   baselines.baselinePtsPace,
         baselineGameScore: baselines.baselineGameScore,

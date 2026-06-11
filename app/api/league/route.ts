@@ -395,6 +395,15 @@ function loadBaselines(): Record<string, any> {
   }
 }
 
+function loadTeamBaselines(): Record<string, any> {
+  try {
+    const fs   = require("fs");
+    const path = require("path");
+    const file = path.join(process.cwd(), "app/data/team_baselines.json");
+    return JSON.parse(fs.readFileSync(file, "utf-8"));
+  } catch (_) { return {}; }
+}
+
 // Proper CSV row parser — handles quoted fields containing commas.
 // Prevents silent data corruption when player names contain commas.
 const parseCSVRow = (row: string): string[] => {
@@ -1102,7 +1111,8 @@ export async function GET() {
     fetchPointShares(),
   ]);
   const EXTENSIONS = loadExtensions();
-  const BASELINES = loadBaselines();
+  const BASELINES      = loadBaselines();
+  const TEAM_BASELINES = loadTeamBaselines();
   // ── 1. MoneyPuck analytics — skaters + goalies ─────────────
   // Cached for 4 hours — MP updates roughly twice daily.
   // Without this cache, every page load downloads two large CSVs (~2MB total).
@@ -1555,8 +1565,9 @@ export async function GET() {
         savePct:        goalieStats?.savePct       ?? 0.900,
         gamesStarted:   goalieStats?.gamesStarted  ?? 0,
         shotsPerGame:   goalieStats?.shotsPerGame  ?? 0,
-        teamXga60:      teamXga60,     // NEW
-        baselineGsax:   baselines.baselineGsax ?? currentYearGsax,  // NEW
+        teamXga60:      teamXga60,
+        teamHdca60:     TEAM_BASELINES[teamId]?.hdca60 ?? null,
+        baselineGsax:   baselines.baselineGsax ?? currentYearGsax,
         baselinePtsPace: baselines.baselinePtsPace,
         baselineGameScore: baselines.baselineGameScore,
         baselineDpsProxy: baselines.baselineDpsProxy,

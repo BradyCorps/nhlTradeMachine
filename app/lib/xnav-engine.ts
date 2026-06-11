@@ -62,6 +62,7 @@ export interface AssetInput {
   pairXgfPct?:       number;
   pairDriverScore?:  number;
   baselineHdsvPct?:  number;
+  teamHdca60?:       number;   // team HD chances against per 60 min (from team_baselines.json)
 }
 
 export interface XNAVResult {
@@ -129,11 +130,19 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const perGameCap       = isStarter ? 0.48 : isTandem ? 0.35 : 0.22;
   const gsaxPerGameCapped = gsaxPerGame > 0 ? Math.min(gsaxPerGame, perGameCap) : gsaxPerGame;
 
+  // Team HD rate correction: goalies behind high-HD-volume teams face a harder job.
+  // hdCaRatio > 1 = team allows more HD shots than league avg → easier-than-actual raw GSAX.
+  const teamHdca60    = asset.teamHdca60 ?? LEAGUE.avgHdca60;
+  const hdCaRatio     = teamHdca60 / LEAGUE.avgHdca60;
+  const hdRateCorr    = clamp((hdCaRatio - 1.0) * 0.18, -0.10, 0.20);
   const teamXga60     = asset.teamXga60 ?? LEAGUE.avgXga60;
-  const defCorrection = clamp((teamXga60 - LEAGUE.avgXga60) * 0.40, -0.15, 0.25);
+  const defCorrection = clamp((teamXga60 - LEAGUE.avgXga60) * 0.40 + hdRateCorr, -0.18, 0.30);
   const gsaxPer60     = (gsaxPerGameCapped + defCorrection) * 60;
   const careerMean    = asset.baselineGsax ?? 0;
-  const expGSAx       = gsaxPer60 * confidenceG + careerMean * (1 - confidenceG);
+  // Young goalies (≤26) are still developing: cap confidence so the prior stays
+  // meaningful and one bad season doesn't fully define their trajectory.
+  const confidenceAdj = asset.age <= 26 ? Math.min(confidenceG, 0.75) : confidenceG;
+  const expGSAx       = gsaxPer60 * confidenceAdj + careerMean * (1 - confidenceAdj);
 
   let goalieImpact = expGSAx >= 0
     ? Math.pow(expGSAx / LEAGUE.gsaxSd, 1.5) * 80
@@ -164,23 +173,38 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   // RFA Cliff: cost-controlled goalie years carry a premium
   const isRFA       = asset.age + navYears <= 27;
 
-  // High-danger save % adjustment: HDSV% is the most repeatable goalie skill
-  // signal, far less polluted by team defense than raw GSAX.
-  // Anchored at league-average ~.815. Capped so it refines rather than competes with GSAX.
+  // High-danger save %: most repeatable goalie skill but still team-context sensitive.
+  // Teams that allow a higher volume of HD shots depress HDSV% independently of skill
+  // (more HD shots = more of the hardest saves, shrinking HDSV% through selection).
+  // Shift the league-average anchor down proportionally to the team's HD shot rate.
+  const hdsvAnchor = 0.815 + (hdCaRatio - 1.0) * (-0.05);   // e.g. +20% HD rate → anchor 0.805
   const hdsvAdj = asset.baselineHdsvPct != null
-    ? clamp((asset.baselineHdsvPct - 0.815) * 600, -12, 18)
+    ? clamp((asset.baselineHdsvPct - hdsvAnchor) * 600, -12, 18)
     : 0;
 
   // ── Logistic S-Curve FMV Cap Percentage (Goalies) ──────────────
   // The max cap for a goalie is historically around 12% of the cap.
   const trueMarketValueG = (goalieImpact + workloadBonus + hdsvAdj) * ageFactor;
+
+  // Starter market floor: even a below-replacement NHL starter commands a real
+  // cap number. The sigmoid at low-but-positive TMV undershoots the true market
+  // floor (~$3.5-4M for a 50+ game starter). Apply a floor only to the FMV
+  // calculation — the GNAV/def component still reflects true on-ice performance.
+  // The floor degrades with age (ageFactor) so a 38-year-old bad goalie on an
+  // overpaid deal can still produce negative-value outcomes.
+  const starterTmvFloor = isStarter && gamesG >= 50
+    ? Math.max(0, 65 * Math.min(ageFactor, 1.0))
+    : isTandem ? 30 : 0;
+  const fmvTmv = Math.max(trueMarketValueG, starterTmvFloor);
   
   const LEAGUE_MIN_PCT_G = 0.009; // 0.9%
   const MAX_CAP_PCT_G    = 0.12;  // 12.0%
   const MIDPOINT_G       = 100;   // The ON_ICE_NAV where a goalie deserves ~6% (elite starter)
   const K_FACTOR_G       = 0.025; // Steepness of the S-curve
   
-  const fmvCapPctG = LEAGUE_MIN_PCT_G + (MAX_CAP_PCT_G - LEAGUE_MIN_PCT_G) / (1 + Math.exp(-K_FACTOR_G * (trueMarketValueG - MIDPOINT_G)));
+  // fmvTmv applies the starter/tandem market floor so the sigmoid doesn't
+  // undershoot the real market. trueMarketValueG is kept for total/def output.
+  const fmvCapPctG = LEAGUE_MIN_PCT_G + (MAX_CAP_PCT_G - LEAGUE_MIN_PCT_G) / (1 + Math.exp(-K_FACTOR_G * (fmvTmv - MIDPOINT_G)));
 
   const BASE_CAP_CEILING = SEASON.capCeiling;
   const CAP_GROWTH_RATE  = 1.04;
@@ -207,7 +231,7 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const retainedBonus  = retentionSev * asset.capHit * 0.06;
   const capTotalG      = safe(baselineCapComponentG + retainedBonus);
   
-  const rawTotal       = safe(trueMarketValueG + capTotalG);
+  const rawTotal       = safe(fmvTmv + capTotalG);
 
   const isYoungControlled = asset.age <= 26 && effectiveCap <= 3.5 && !extCapHit;
   const youngFloor = isYoungControlled && (isStarter || isTandem)

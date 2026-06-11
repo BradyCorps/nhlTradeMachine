@@ -40,13 +40,15 @@ describe("G-NAV — Elite Starters", () => {
     inRange(result.total, 120, 180, "Saros NAV");
   });
 
-  it("Oettinger: decent starter on defensive team → 15-45 NAV", () => {
+  it("Oettinger: decent starter on defensive team → 15-65 NAV", () => {
     const result = calcGoalieNAV({
       id: "oettinger", name: "Jake Oettinger", position: "G",
       age: 26, capHit: 5.75, yearsRemaining: 4,
       gsax: 5.1, gamesStarted: 50, teamXga60: 2.82,
     });
-    inRange(result.total, 0, 45, "Oettinger NAV");
+    // Upper bound raised: starter FMV floor lifts young goalies who were
+    // undershooting the real market ($3.5-4M floor for 50+ game starters).
+    inRange(result.total, 15, 65, "Oettinger NAV");
   });
 });
 

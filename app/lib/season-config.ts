@@ -25,6 +25,9 @@ export const LEAGUE = {
   // (MoneyPuck xG slightly over-predicts goals). The 8.0 value is calibrated
   // together with the Luongo asymptote and MIDPOINT_G — change all three or none.
   gsaxSd:         8.0,           // GSAX scaling constant (goalie normalisation)
+  // NST all-situations HD chances against per 60 min (5v5+PP+PK combined).
+  // Audited against 2022-26 NST team stats: range 10.8–16.4, mean ~13.1.
+  avgHdca60:      13.1,          // League-average HD chances against per 60 min
   peakAge:        27,            // Skater production peak (age curve inflection)
   goaliePeakAge:  30,            // Goalie peak age
 } as const;

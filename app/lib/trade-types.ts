@@ -47,8 +47,9 @@ export interface Asset {
   ops?: number | null;  // Offensive Point Shares — current season
   dps?: number | null;  // Defensive Point Shares — current season
 
-  teamXga60?: number;      
-  baselineGsax?: number;   
+  teamXga60?: number;
+  teamHdca60?: number;
+  baselineGsax?: number;
   hasExtension?: boolean;
   extensionCapHit?: number;   // future AAV once extension kicks in
   extensionYears?: number;    // length of the extension
