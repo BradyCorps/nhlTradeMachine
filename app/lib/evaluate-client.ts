@@ -9,12 +9,29 @@ import type {
   EvaluateRequest, EvaluateResponse
 } from "@/app/lib/trade-types";
 
-// Cache for navMap results — keyed by a hash of the asset IDs + retainedPct
+// Cache for navMap results. Include model version + valuation inputs so
+// deployment/math changes cannot reuse stale results while the app is open.
 // Prevents redundant API calls when assets haven't changed
 const _navCache = new Map<string, XNAVResult>();
+const XNAV_CLIENT_CACHE_VERSION = "xnav-2.0-deployment-bypass-v2";
 
 function assetCacheKey(a: Asset): string {
-  return `${a.id}:${a.retainedPct ?? 0}`;
+  return [
+    XNAV_CLIENT_CACHE_VERSION,
+    a.id,
+    a.retainedPct ?? 0,
+    a.capHit ?? 0,
+    a.yearsRemaining ?? 0,
+    a.extensionCapHit ?? 0,
+    a.extensionYears ?? 0,
+    a.ptsPace ?? 0,
+    a.baselinePtsPace ?? 0,
+    a.avgTOI ?? 0,
+    a.qocIndex ?? "",
+    a.dzPct ?? "",
+    a.pkTimeShare ?? 0,
+    a.games ?? 0,
+  ].join(":");
 }
 
 // Fetch NAV values for a list of assets
@@ -111,4 +128,3 @@ export function clearNavCache(): void {
 export function getCachedNav(asset: Asset): XNAVResult | null {
   return _navCache.get(assetCacheKey(asset)) ?? null;
 }
-

@@ -294,7 +294,10 @@ export default function AdminContractsPage() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      showToast(`Synced — ${data.added} new players added (${data.total} total)`);
+      const watched = Object.entries(data.watch ?? {})
+        .map(([name, info]: [string, any]) => `${name}: ${info.resolvedTeamId ?? "no-team"}`)
+        .join(" · ");
+      showToast(`Synced — ${data.added} added, ${data.updated ?? 0} updated (${data.total} total)${watched ? ` · ${watched}` : ""}`);
       load();
     } catch (e: any) {
       showToast(`Sync failed: ${e.message}`);

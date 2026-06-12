@@ -63,9 +63,10 @@ export default function AssetCard({
               style={{ fontSize: '13px', color: 'var(--ledger-ink)' }}>
               <span className="truncate max-w-full">{asset.name}</span>
               {asset.tradeBlockStatus === 'untouchable' && (
-                <span className="text-2xs px-1 font-black shrink-0" title="Flagged untouchable — excluded from partner matching"
-                  style={{ color: 'var(--blue)', border: '1px solid rgba(43,63,102,0.5)', background: 'var(--blue-dim)' }}>
-                  ⛔ UNTOUCHABLE
+                <span className="text-2xs font-black shrink-0 inline-flex items-center justify-center rounded-sm"
+                  title="Untouchable — excluded from partner matching"
+                  style={{ color: 'var(--blue)', border: '1px solid rgba(43,63,102,0.5)', background: 'var(--blue-dim)', width: 18, height: 18 }}>
+                  ◈
                 </span>
               )}
               {asset.tradeBlockStatus === 'requested' && (

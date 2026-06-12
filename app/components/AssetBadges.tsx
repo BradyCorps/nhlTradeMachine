@@ -3,12 +3,212 @@ import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 import { PLAYER_PEDIGREE, INJURY_RISK, PROSPECT_TIERS, SHUTDOWN_D_PEDIGREE } from "@/app/lib/player-data";
 import { FRANCHISE } from "@/app/lib/season-config";
 
+const badgeStyle = (color: string, background = "transparent"): React.CSSProperties => ({
+  color,
+  background,
+  border: `1px solid ${color}40`,
+});
+
+const iconBadgeStyle = (color: string, background = "transparent"): React.CSSProperties => ({
+  color,
+  background,
+  border: `1px solid ${color}66`,
+  minWidth: 18,
+  height: 18,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+});
+
+const isForward = (position: string) => ["C", "W", "L", "R", "F"].includes(position);
+
+const wingLabel = (position: string) => position === "C" ? "CENTRE" : "WINGER";
+
+function getGoalieRoleTag(asset: Asset, xnav: XNAVResult): { label: string; color: string; title: string } {
+  const starts = asset.gamesStarted ?? asset.games ?? 0;
+  const gsax = asset.gsax ?? 0;
+  const savePct = asset.savePct ?? 0;
+  const eliteSignal = xnav.total >= 100 || gsax >= 10 || savePct >= 0.915;
+
+  if (starts >= 50 && eliteSignal) {
+    return {
+      label: "ELITE STARTER",
+      color: "var(--ledger-ink)",
+      title: "Elite starter — full starter workload with high-end xNAV, GSAX, or save-percentage signal.",
+    };
+  }
+
+  if (starts >= 45 || (starts >= 38 && xnav.total >= 70)) {
+    return {
+      label: "STARTER",
+      color: "var(--ledger-navy)",
+      title: "Starter — primary netminder workload with clear No. 1 usage.",
+    };
+  }
+
+  if (starts >= 32 || xnav.total >= 45) {
+    return {
+      label: "FRINGE STARTER",
+      color: "var(--ledger-green)",
+      title: "Fringe starter — between tandem and No. 1 usage, or valued close to starter territory.",
+    };
+  }
+
+  if (starts >= 20) {
+    return {
+      label: "TANDEM",
+      color: "var(--ledger-brown)",
+      title: "Tandem goalie — meaningful split workload without clear full-starter usage.",
+    };
+  }
+
+  return {
+    label: "BACKUP",
+    color: "var(--ledger-brown)",
+    title: "Backup goalie — limited workload or depth role.",
+  };
+}
+
+function getRoleTag(asset: Asset, xnav: XNAVResult): { label: string; color: string; title: string } | null {
+  if (asset.position === "Pick") return null;
+  if (asset.position === "G") return getGoalieRoleTag(asset, xnav);
+
+  const pts = asset.ptsPace ?? 0;
+  const toi = asset.avgTOI ?? 0;
+  const qocIdx = asset.qocIndex ?? 0;
+  const ppPace = asset.ppPtsPace82 ?? 0;
+  const pkShare = asset.pkTimeShare ?? 0;
+  const tier = xnav.rosterTier ?? asset.rosterTier;
+  const posLabel = wingLabel(asset.position);
+  const completeForward = isForward(asset.position)
+    && pts >= 55
+    && (xnav.def >= 12 || qocIdx >= 62 || pkShare >= 0.10)
+    && toi >= 17;
+
+  if (asset.position === "D") {
+    if (ppPace >= 18 && pts >= 40) {
+      return {
+        label: "POWERPLAY D",
+        color: "var(--ledger-navy)",
+        title: "Powerplay defenceman — meaningful production driven by special-teams offense.",
+      };
+    }
+    if (toi >= 22 && pts >= 35) {
+      return {
+        label: "TOP PAIR D",
+        color: "var(--ledger-green)",
+        title: "Top-pair defenceman — heavy minutes with enough production to carry first-pair usage.",
+      };
+    }
+    if ((tier === "ELITE_SHUTDOWN" || SHUTDOWN_D_PEDIGREE[asset.name]) || (pts < 30 && toi >= 19 && qocIdx >= 60)) {
+      return {
+        label: "SHUTDOWN D",
+        color: "var(--ledger-amber)",
+        title: `Shutdown defenceman — tough 5v5 deployment (EV QoC ${qocIdx}/100) with defensive usage value.`,
+      };
+    }
+    if (toi >= 18) {
+      return {
+        label: "SECOND PAIR D",
+        color: "var(--ledger-brown)",
+        title: "Second-pair defenceman — regular NHL deployment without elite top-pair indicators.",
+      };
+    }
+    return {
+      label: "DEPTH D",
+      color: "var(--ledger-brown)",
+      title: "Depth defenceman — limited deployment.",
+    };
+  }
+
+  if (!isForward(asset.position)) return null;
+
+  if (xnav.total >= FRANCHISE.threshold) {
+    return {
+      label: asset.position === "C" ? "1ST LINE CENTRE" : "1ST LINE WINGER",
+      color: "var(--ledger-ink)",
+      title: "Franchise-level NAV — current valuation supports a first-line role even when current production or minutes are distributed.",
+    };
+  }
+
+  if (completeForward) {
+    return {
+      label: "COMPLETE PLAYER",
+      color: "var(--ledger-green)",
+      title: "Complete player — top-six offense with credible defensive or matchup usage.",
+    };
+  }
+
+  if (ppPace >= 22 && pts >= 45 && pkShare < 0.08) {
+    return {
+      label: "POWERPLAY SPECIALIST",
+      color: "var(--ledger-navy)",
+      title: "Powerplay specialist — a major share of value comes from man-advantage production.",
+    };
+  }
+
+  if (tier === "ELITE_1ST_LINE") {
+    return {
+      label: `1ST LINE ${posLabel}`,
+      color: "var(--ledger-ink)",
+      title: "First-line player — elite normalized production and workload.",
+    };
+  }
+
+  if (tier === "1ST_LINE_HIGH_2C") {
+    return {
+      label: asset.position === "C" ? "HIGH-END 2C" : "1ST LINE WINGER",
+      color: "var(--ledger-navy)",
+      title: "High-end top-six player — first-line winger profile or strong second-line centre profile.",
+    };
+  }
+
+  if (tier === "FRINGE_1ST_LINE_2C") {
+    return {
+      label: "FRINGE 1ST LINE",
+      color: "var(--ledger-navy)",
+      title: "Fringe first-line player — strong top-six production below clear first-line thresholds.",
+    };
+  }
+
+  if (tier === "ELITE_SHUTDOWN") {
+    return {
+      label: "ELITE SHUTDOWN",
+      color: "var(--ledger-amber)",
+      title: "Elite shutdown forward — high EV QoC, defensive-zone deployment, regular EV minutes, and PK leverage.",
+    };
+  }
+
+  if (tier === "PK_SPECIALIST") {
+    return {
+      label: "PK SPECIALIST",
+      color: "var(--ledger-amber)",
+      title: "Penalty-kill specialist — strong short-handed usage without regular top-nine EV minutes.",
+    };
+  }
+
+  if (tier === "MIDDLE_SIX" || pts >= 35 || toi >= 14) {
+    return {
+      label: asset.position === "C" ? "3C / MIDDLE SIX" : "2ND LINE WINGER",
+      color: "var(--ledger-brown)",
+      title: "Middle-six player — useful NHL production or deployment below clear top-line thresholds.",
+    };
+  }
+
+  return {
+    label: "BOTTOM SIX",
+    color: "var(--ledger-brown)",
+    title: "Bottom-six player — depth role or limited offensive production.",
+  };
+}
+
 export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult }) {
   const isPick = asset.position === "Pick";
 
   // NAV-driven franchise tier — same thresholds the GM audit uses (season-config)
   const isMegalodon = !isPick && xnav.total >= FRANCHISE.megalodon;
   const isFranchise = !isPick && xnav.total >= FRANCHISE.threshold;
+  const roleTag = getRoleTag(asset, xnav);
 
   // Collapse awards to one chip: lead award + "+N" overflow with full list on hover
   const awardList = PLAYER_PEDIGREE[asset.name]?.awards ?? [];
@@ -19,18 +219,73 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
   const awardLabel = (e: { award: string; count: number }) =>
     `${e.count > 1 ? `${e.count}× ` : ""}${e.award}`;
 
+  const hasProspectTier = Boolean(PROSPECT_TIERS[asset.name] && !isFranchise);
+  const hasInjuryRisk = Boolean(INJURY_RISK[asset.name]);
+  const hasChangeOfScenery = !isPick && xnav.total < -5 && xnav.total > -40 && asset.age <= 32;
+  const hasSalaryDump = !isPick && xnav.total <= -40;
+  const hasShutdownPedigree = Boolean(SHUTDOWN_D_PEDIGREE[asset.name]);
+  const hasLedger = asset.tradeBlockStatus === "requested"
+    || asset.tradeBlockStatus === "available"
+    || awardEntries.length > 0
+    || hasProspectTier
+    || hasInjuryRisk
+    || hasChangeOfScenery
+    || hasSalaryDump
+    || hasShutdownPedigree;
+
   return (
-    <div className="asset-badges flex flex-wrap gap-1 mt-1">
-      {/* Franchise tier — drives the GM audit's blockbuster rules */}
-      {isFranchise && (
-        <span className="text-2xs px-1 py-0.5 font-black" style={{
-          color: isMegalodon ? 'var(--paper)' : 'var(--ledger-ink)',
-          background: isMegalodon ? 'var(--ledger-ink)' : 'transparent',
-          border: '1px solid var(--ledger-ink)',
-        }} title={isMegalodon
-          ? `NAV ${xnav.total} ≥ ${FRANCHISE.megalodon} — megalodon tier. The GM audit rejects any deal for this player without a franchise return, 2+ firsts with an elite prospect, or expiring-contract leverage.`
-          : `NAV ${xnav.total} ≥ ${FRANCHISE.threshold} — franchise tier. The GM audit requires a blockbuster-grade return to move this player.`}>
-          {isMegalodon ? "♛ MEGALODON" : "★ FRANCHISE"}
+    <div className="asset-badges mt-1 flex flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-1">
+        {isMegalodon && (
+          <span className="text-2xs font-black rounded-sm" style={iconBadgeStyle("var(--ledger-amber)", "rgba(138,92,0,0.10)")}
+            title={`Megalodon tier — NAV ${xnav.total} ≥ ${FRANCHISE.megalodon}.`}>
+            ♛
+          </span>
+        )}
+
+        {!isMegalodon && isFranchise && (
+          <span className="text-2xs font-black rounded-sm" style={iconBadgeStyle("var(--ledger-ink)")}
+            title={`Franchise tier — NAV ${xnav.total} ≥ ${FRANCHISE.threshold}.`}>
+            ◆
+          </span>
+        )}
+
+        {!isPick && (() => {
+          const effectiveCap = asset.capHit * (1 - (asset.retainedPct || 0));
+          const isSurplus = xnav.cap > 0 && xnav.total > effectiveCap * 18 && xnav.total > 50;
+          if (!isSurplus) return null;
+          return (
+            <span className="text-2xs font-black rounded-sm" style={iconBadgeStyle("var(--ledger-green)", "rgba(26,92,46,0.10)")}
+              title="Surplus contract — on-ice value significantly exceeds cap hit.">
+              ★
+            </span>
+          );
+        })()}
+
+        {roleTag && (
+          <span className="text-2xs px-1.5 py-0.5 font-black uppercase rounded-sm"
+            style={badgeStyle(roleTag.color)}
+            title={roleTag.title}>
+            {roleTag.label}
+          </span>
+        )}
+      </div>
+
+      {hasLedger && (
+      <div className="flex flex-wrap items-center gap-1 pl-1 border-l" style={{ borderColor: "rgba(107,80,48,0.35)" }}>
+      <span className="text-[8px] font-black uppercase text-ledger-ink-faint">Ledger</span>
+
+      {asset.tradeBlockStatus === "requested" && (
+        <span className="text-2xs px-1 py-0.5 font-black" style={badgeStyle("var(--ledger-red)", "var(--red-dim)")}
+          title={asset.tradeBlockNote ?? "Formal trade request"}>
+          REQUESTED
+        </span>
+      )}
+
+      {asset.tradeBlockStatus === "available" && (
+        <span className="text-2xs px-1 py-0.5 font-black" style={badgeStyle("var(--ledger-amber)", "var(--amber-dim)")}
+          title={asset.tradeBlockNote ?? "Being shopped"}>
+          SHOPPED
         </span>
       )}
 
@@ -53,7 +308,7 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
       )}
 
       {/* Prospect tier badge (name-list) — skip when the NAV tier already says franchise */}
-      {PROSPECT_TIERS[asset.name] && !isFranchise && (
+      {hasProspectTier && (
         <span className="text-2xs px-1 py-0.5 font-black" style={{
           color: PROSPECT_TIERS[asset.name].tier === 1 ? 'var(--ledger-navy)' : PROSPECT_TIERS[asset.name].tier === 2 ? 'var(--ledger-green)' : 'var(--ledger-brown)',
           border: `1px solid ${PROSPECT_TIERS[asset.name].tier === 1 ? 'rgba(26,46,92,0.4)' : PROSPECT_TIERS[asset.name].tier === 2 ? 'rgba(26,92,46,0.4)' : 'rgba(107,80,48,0.4)'}`,
@@ -63,7 +318,7 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
       )}
       
       {/* Injury risk badge */}
-      {INJURY_RISK[asset.name] && (
+      {hasInjuryRisk && (
         <span className="text-2xs px-1 py-0.5 font-black" style={{
           color: 'var(--ledger-red)',
           border: '1px solid rgba(184,48,32,0.4)'
@@ -72,58 +327,8 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
         </span>
       )}
 
-      {/* D-man archetype badge */}
-      {asset.position === "D" && !isPick && (() => {
-        const pts = asset.ptsPace ?? 0;
-        const toi = asset.avgTOI ?? 0;
-        const qocIdx = asset.qocIndex ?? 0;
-        let arch = "DEPTH D";
-        let color = 'var(--ledger-brown)';
-        let title = "5th/6th defender — limited deployment";
-        if (pts >= 45) {
-          arch = "OFFENSIVE D"; color = 'var(--ledger-navy)';
-          title = "Offensive defenceman — primary value from scoring and powerplay";
-        } else if (pts >= 28 && toi >= 21) {
-          arch = "TWO-WAY D"; color = 'var(--ledger-green)';
-          title = "Two-way defenceman — contributes offensively and defensively";
-        } else if (pts < 28 && toi >= 19 && qocIdx >= 60) {
-          arch = "SHUTDOWN D"; color = 'var(--ledger-amber)';
-          title = `Shutdown defenceman — tough deployment (QoC ${qocIdx}/100: heavy minutes, PK, d-zone starts), valued for defensive role not scoring`;
-        }
-        return (
-          <span className="text-2xs px-1 py-0.5 font-black" style={{
-            color, border: `1px solid ${color}40`
-          }} title={title}>
-            {arch}
-          </span>
-        );
-      })()}
-
-      {/* Forward archetype badge — skip the FRANCHISE archetype when the NAV tier chip already shows it */}
-      {["C","W","L","R"].includes(asset.position) && !isPick && xnav.fArchetype
-        && !(xnav.fArchetype === "FRANCHISE" && isFranchise) && (() => {
-        const archMap: Record<string, { color: string; title: string }> = {
-          FRANCHISE:  { color: 'var(--ledger-ink)', title: "Franchise — elite production with dominant creative or NOIV impact" },
-          SNIPER:     { color: 'var(--ledger-navy)', title: "Sniper — goal-first scorer, goal ratio > 53% of points" },
-          PLAYMAKER:  { color: 'var(--ledger-green)', title: "Playmaker — primary value from assist generation and play-driving" },
-          TWO_WAY:    { color: 'var(--ledger-amber)', title: "Two-Way Forward — balanced offense with strong defensive suppression" },
-          GRINDER:    { color: 'var(--ledger-red)', title: "Grinder — defensive deployment, physical play, limited offensive upside" },
-          SCORER:     { color: 'var(--ledger-navy)', title: "Scoring Forward — balanced offensive production" },
-        };
-        const cfg = archMap[xnav.fArchetype];
-        if (!cfg) return null;
-        return (
-          <span className="text-2xs px-1 py-0.5 font-black" style={{
-            color: cfg.color,
-            border: `1px solid ${cfg.color}40`,
-          }} title={cfg.title}>
-            {xnav.fArchetype.replace("_", " ")}
-          </span>
-        );
-      })()}
-
       {/* Change of scenery badge — negative NAV players that might thrive elsewhere */}
-      {!isPick && xnav.total < -5 && xnav.total > -40 && asset.age <= 32 && (
+      {hasChangeOfScenery && (
         <span className="text-2xs px-1 py-0.5 font-black" style={{
           color: 'var(--ledger-gold)',
           border: '1px solid rgba(148,105,20,0.45)',
@@ -133,7 +338,7 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
       )}
 
       {/* Salary dump badge — deeply negative, hard to move */}
-      {!isPick && xnav.total <= -40 && (
+      {hasSalaryDump && (
         <span className="text-2xs px-1 py-0.5 font-black" style={{
           color: 'var(--ledger-red)',
           border: '1px solid rgba(184,48,32,0.45)',
@@ -142,29 +347,16 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
         </span>
       )}
 
-      {/* Surplus contract stamp */}
-      {!isPick && (() => {
-        const effectiveCap = asset.capHit * (1 - (asset.retainedPct || 0));
-        const isSurplus = xnav.total > effectiveCap * 18 && xnav.total > 50;
-        if (!isSurplus) return null;
-        return (
-          <span className="text-2xs px-1 py-0.5 font-black" style={{
-            color: 'var(--ledger-green)',
-            border: '1px solid rgba(26,92,46,0.5)',
-          }} title="Surplus contract — this player's on-ice value significantly exceeds their cap hit.">
-            ★ SURPLUS CONTRACT
-          </span>
-        );
-      })()}
-
       {/* Shutdown D pedigree badge */}
-      {SHUTDOWN_D_PEDIGREE[asset.name] && (
+      {hasShutdownPedigree && (
         <span className="text-2xs px-1 py-0.5 font-black" style={{
           color: 'var(--ledger-amber)',
           border: '1px solid rgba(138,92,0,0.5)'
         }} title={SHUTDOWN_D_PEDIGREE[asset.name].note}>
           ★ ELITE SHUTDOWN
         </span>
+      )}
+      </div>
       )}
     </div>
   );

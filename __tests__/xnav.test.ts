@@ -8,7 +8,7 @@
 // not precision assertions.
 
 import { describe, it, expect } from "vitest";
-import { calcNAV, calcGoalieNAV, calcPickNAV, calcSkaterNAV } from "../app/lib/xnav-engine";
+import { calcNAV, calcDeploymentMultiplier, calcGoalieNAV, calcPickNAV, calcSkaterNAV } from "../app/lib/xnav-engine";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const inRange = (val: number, min: number, max: number, label: string) => {
@@ -204,10 +204,10 @@ describe("X-NAV — Franchise Centers", () => {
       avgTOI: 22, qocRank: 80, xgRelTM: 12, xgaRelTM: -0.3,
       games: 78, ops: 12.5, dps: 2.1,
     });
-    inRange(result.total, 550, 750, "McDavid NAV");
+    inRange(result.total, 550, 760, "McDavid NAV");
   });
 
-  it("Barkov: two-way C, fair contract → 200-360 NAV", () => {
+  it("Barkov: two-way C, fair contract → 450-600 NAV", () => {
     const result = calcSkaterNAV({
       id: "barkov", name: "Aleksander Barkov", position: "C",
       age: 29, capHit: 10, yearsRemaining: 6,
@@ -215,7 +215,7 @@ describe("X-NAV — Franchise Centers", () => {
       avgTOI: 21, qocRank: 95, xgRelTM: 8, xgaRelTM: -0.4,
       games: 70, ops: 6.5, dps: 3.5,
     });
-    inRange(result.total, 300, 450, "Barkov NAV");
+    inRange(result.total, 450, 600, "Barkov NAV");
   });
 });
 
@@ -244,7 +244,7 @@ describe("X-NAV — Overpaid Veterans", () => {
 });
 
 describe("X-NAV — Elite Defencemen", () => {
-  it("Makar-tier: elite offensive D, strong contract → 500-700 NAV", () => {
+  it("Makar-tier: elite offensive D, strong contract → 500-650 NAV", () => {
     const result = calcSkaterNAV({
       id: "makar", name: "Cale Makar", position: "D",
       age: 26, capHit: 9, yearsRemaining: 3,
@@ -252,7 +252,7 @@ describe("X-NAV — Elite Defencemen", () => {
       avgTOI: 25, qocRank: 90, xgRelTM: 10, xgaRelTM: -0.2,
       games: 75, ops: 9.0, dps: 4.5,
     });
-    inRange(result.total, 350, 500, "Makar NAV");
+    inRange(result.total, 500, 650, "Makar NAV");
   });
 
   it("Morrissey: two-way D with NOIV data — DEF bar positive, not an artifact", () => {
@@ -371,6 +371,70 @@ describe("X-NAV — Elite Defencemen", () => {
       xgRelTM: 3.0, xgaRelTM: -0.3, games: 76,
     });
     expect(selke.def).toBeGreaterThan(offC.def);
+  });
+
+  it("M_dep neutralizes offensive-zone penalty for high-QoC possession drivers", () => {
+    const hedged = calcDeploymentMultiplier(0.31, 60);
+    const neutralZoneStarts = calcDeploymentMultiplier(0.50, 60);
+    expect(hedged).toBeCloseTo(neutralZoneStarts, 5);
+    expect(hedged).toBeCloseTo(1.035, 5);
+  });
+
+  it("M_dep still applies offensive-zone penalty below the high-QoC hedge", () => {
+    const sheltered = calcDeploymentMultiplier(0.31, 54);
+    expect(sheltered).toBeCloseTo(0.9, 5);
+  });
+
+  it("production bypass keeps high-QoC distributed-minute centres out of middle six", () => {
+    const result = calcSkaterNAV({
+      id: "aho-shape", name: "Aho Shape", position: "C",
+      age: 28, capHit: 9.75, yearsRemaining: 9,
+      ptsPace: 55, xGPace: 20, defRate: 0.1,
+      avgTOI: 16.6, qocIndex: 60, dzPct: 0.31,
+      games: 70, baselinePtsPace: 55,
+    });
+    expect(result.rosterTier).toBe("FRINGE_1ST_LINE_2C");
+  });
+
+  it("SLF does not inflate low-EV pure PK specialists", () => {
+    const base = {
+      id: "pk-specialist", name: "PK Specialist", position: "C" as const,
+      age: 28, capHit: 1.2, yearsRemaining: 1,
+      ptsPace: 24, xGPace: 5, defRate: 0.2,
+      avgTOI: 11.0, qocIndex: 65, dzPct: 0.58,
+      games: 70,
+    };
+    const noPk = calcSkaterNAV({ ...base, pkTimeShare: 0 });
+    const heavyPk = calcSkaterNAV({ ...base, pkTimeShare: 0.25 });
+    expect(heavyPk.total).toBe(noPk.total);
+    expect(heavyPk.rosterTier).toBe("PK_SPECIALIST");
+  });
+
+  it("SLF applies only after regular EV rotation minutes", () => {
+    const base = {
+      id: "regular-pk", name: "Regular PK Forward", position: "C" as const,
+      age: 28, capHit: 2.0, yearsRemaining: 2,
+      ptsPace: 40, xGPace: 9, defRate: 0.25,
+      avgTOI: 16.0, qocIndex: 65, dzPct: 0.54,
+      games: 70,
+    };
+    const noPk = calcSkaterNAV({ ...base, pkTimeShare: 0 });
+    const heavyPk = calcSkaterNAV({ ...base, pkTimeShare: 0.15 });
+    expect(heavyPk.total).toBeGreaterThan(noPk.total);
+  });
+
+  it("Elite shutdown tier requires high EV QoC", () => {
+    const base = {
+      id: "shutdown-c", name: "Shutdown C", position: "C" as const,
+      age: 28, capHit: 4.0, yearsRemaining: 3,
+      ptsPace: 40, xGPace: 8, defRate: 0.35,
+      avgTOI: 16.0, dzPct: 0.58, pkTimeShare: 0.12,
+      games: 70,
+    };
+    const highEvQoc = calcSkaterNAV({ ...base, qocIndex: 65 });
+    const ordinaryEvQoc = calcSkaterNAV({ ...base, qocIndex: 50 });
+    expect(highEvQoc.rosterTier).toBe("ELITE_SHUTDOWN");
+    expect(ordinaryEvQoc.rosterTier).not.toBe("ELITE_SHUTDOWN");
   });
 
   it("Shutdown D: low pts but high defensive value → 130-220 NAV", () => {

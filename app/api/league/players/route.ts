@@ -5,11 +5,12 @@ import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
 import { players as playersTable, tradeBlock as tradeBlockTable } from "@/app/db/schema";
-import { isNotNull } from "drizzle-orm";
+import { resolveRosterTier } from "@/app/lib/xnav-engine";
 
 export const dynamic = "force-dynamic";
 
 const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
+const CONTRACTS_CACHE_KEY = "cache:contracts:v2";
 const MONEYPUCK_CACHE_TTL =  4 * 60 * 60; // 4 hours
 const PS_CACHE_TTL        = 12 * 60 * 60; // 12 hours
 
@@ -79,28 +80,26 @@ const calcAge = (birthDate: string): number => {
 };
 
 
-// ── QoC Index (0-100): quantified deployment difficulty ──────────────────
+// ── EV QoC Index (0-100): quantified even-strength deployment difficulty ──
 // Replaces the old "qocRank", which was MoneyPuck's raw iceTimeRank SUM — a
 // number that scaled with games played and measured nothing. Components:
-//   45% — average per-game ice-time rank (coach trust; F scaled 1-12, D 1-6)
-//   35% — PK ice-time share (PK minutes are minutes vs opponents' top PP units)
-//   20% — defensive-zone start share (shutdown deployment)
-// Higher = tougher minutes. ~75+ shutdown/top-pair usage, ~40 middle six, <20 sheltered.
+//   65% — average per-game ice-time rank (coach trust; F scaled 1-12, D 1-6)
+//   35% — defensive-zone start share (shutdown deployment)
+// PK deployment is intentionally excluded; X-NAV applies SH leverage separately.
+// Higher = tougher 5v5 minutes. ~75+ shutdown/top-pair usage, ~40 middle six, <20 sheltered.
 function calcQocIndex(
   position: string,
   iceRankAvg: number | null | undefined,
-  pkTimeShare: number | null | undefined,
   dzPct: number | null | undefined,
 ): number | null {
   if (position === "G") return null;
-  if (iceRankAvg == null && pkTimeShare == null && dzPct == null) return null;
+  if (iceRankAvg == null && dzPct == null) return null;
   const slots = position === "D" ? 6 : 12;
   const rankScore = iceRankAvg != null
     ? Math.max(0, Math.min(1, (slots + 1 - iceRankAvg) / slots))
     : 0.4; // unknown deployment → assume mid-roster
-  const pkScore = Math.max(0, Math.min(1, (pkTimeShare ?? 0) / 0.20));
   const dzScore = Math.max(0, Math.min(1, ((dzPct ?? 0.5) - 0.35) / 0.30));
-  return Math.round(100 * (0.45 * rankScore + 0.35 * pkScore + 0.20 * dzScore));
+  return Math.round(100 * (0.65 * rankScore + 0.35 * dzScore));
 }
 
 async function loadFromDB(): Promise<Record<string, any>> {
@@ -109,11 +108,20 @@ async function loadFromDB(): Promise<Record<string, any>> {
     const result: Record<string, any> = {};
     for (const row of rows) {
       result[row.name] = {
+        id:             row.id,
+        name:           row.name,
+        position:       row.position,
+        teamId:         row.teamId,
+        age:            row.age,
         capHit:         row.capHit,
         yearsRemaining: row.yearsRemaining,
         hasNMC:         row.hasNmc  ?? false,
         hasNTC:         row.hasNtc  ?? false,
         canRetain:      row.hasNmc  ? false : true,
+        draftOverall:   row.draftOverall,
+        prospectPtsPace: row.prospectPtsPace,
+        extensionCapHit: row.extensionCapHit,
+        extensionYears:  row.extensionYears,
       };
     }
     return result;
@@ -164,7 +172,7 @@ function loadTeamBaselines(): Record<string, any> {
 
 async function loadContracts(): Promise<Record<string, any>> {
   if (redis) {
-    const cached = await redis.get<Record<string, any>>("cache:contracts");
+    const cached = await redis.get<Record<string, any>>(CONTRACTS_CACHE_KEY);
     if (cached && Object.keys(cached).length > 200) return cached;
   }
 
@@ -177,13 +185,15 @@ async function loadContracts(): Promise<Record<string, any>> {
       const baseName = name.includes("__") ? name.split("__")[0] : name;
       const b = dbData[baseName];
       merged[name] = {
-        capHit:         cw.capHit,
-        yearsRemaining: (cw.yearsRemaining > 0 ? cw.yearsRemaining : null) ?? b?.yearsRemaining ?? 1,
+        capHit:         b?.capHit ?? cw.capHit,
+        yearsRemaining: b?.yearsRemaining ?? (cw.yearsRemaining > 0 ? cw.yearsRemaining : 1),
         hasNMC:         b?.hasNMC  ?? false,
         hasNTC:         b?.hasNTC  ?? false,
         canRetain:      b?.hasNMC  ? false : true,
         expiryStatus:   cw.expiryStatus,
-        position:       cw.position,
+        position:       b?.position ?? cw.position,
+        extensionCapHit: b?.extensionCapHit,
+        extensionYears:  b?.extensionYears,
       };
     }
     // Backfill: DB players the scraper rejected or dropped (expired deals at
@@ -199,6 +209,9 @@ async function loadContracts(): Promise<Record<string, any>> {
           hasNTC:         b.hasNTC  ?? false,
           canRetain:      b.hasNMC  ? false : true,
           expiryStatus:   "UFA",
+          position:       b.position,
+          extensionCapHit: b.extensionCapHit,
+          extensionYears:  b.extensionYears,
         };
       }
     }
@@ -209,9 +222,12 @@ async function loadContracts(): Promise<Record<string, any>> {
         yearsRemaining: b.yearsRemaining ?? 1,
         hasNMC:         b.hasNMC  ?? false,
         hasNTC:         b.hasNTC  ?? false,
-        canRetain:      b.hasNMC  ? false : true,
-        expiryStatus:   "UFA",
-      };
+          canRetain:      b.hasNMC  ? false : true,
+          expiryStatus:   "UFA",
+          position:       b.position,
+          extensionCapHit: b.extensionCapHit,
+          extensionYears:  b.extensionYears,
+        };
     }
   }
 
@@ -223,7 +239,7 @@ async function loadContracts(): Promise<Record<string, any>> {
   }
 
   if (redis && Object.keys(merged).length > 200) {
-    await redis.setex("cache:contracts", CONTRACTS_CACHE_TTL, merged);
+    await redis.setex(CONTRACTS_CACHE_KEY, CONTRACTS_CACHE_TTL, merged);
   }
 
   return merged;
@@ -620,10 +636,12 @@ export async function GET() {
     console.warn("[NHL roster] live roster fetch failed; no static player fallback is used.");
   }
 
-  // ── Inject drafted prospects from DB ─────────────────────────
-  // Mock-draft imports live only in the DB; NHL API rosters don't know them.
+  // ── Inject DB roster rows ────────────────────────────────────
+  // Admin DB rows cover mock-draft prospects and roster players missing from
+  // the live NHL roster feed. Deduplicate by id and normalized name so DB rows
+  // augment the live roster instead of creating duplicates.
   try {
-    const draftees = await db.select({
+    const dbPlayers = await db.select({
       id:              playersTable.id,
       name:            playersTable.name,
       position:        playersTable.position,
@@ -631,12 +649,13 @@ export async function GET() {
       age:             playersTable.age,
       draftOverall:    playersTable.draftOverall,
       prospectPtsPace: playersTable.prospectPtsPace,
-    }).from(playersTable).where(isNotNull(playersTable.draftOverall));
+    }).from(playersTable);
 
-    for (const d of draftees) {
+    for (const d of dbPlayers) {
       if (!d.teamId) continue;
       const list = rosterMap.get(d.teamId) ?? [];
-      if (!list.some((x: any) => x.name === d.name)) {
+      const dbSlug = slugify(d.name);
+      if (!list.some((x: any) => String(x.id) === String(d.id) || slugify(x.name) === dbSlug)) {
         list.push({
           id:              d.id,
           name:            d.name,
@@ -650,7 +669,7 @@ export async function GET() {
       rosterMap.set(d.teamId, list);
     }
   } catch (e: any) {
-    console.warn("[Draftees] injection skipped:", e.message);
+    console.warn("[DB roster] injection skipped:", e.message);
   }
 
   // ── Trade block statuses (admin-managed, keyed by name) ──────
@@ -732,9 +751,9 @@ export async function GET() {
       const finalNMC     = override?.hasNMC  ?? (nameCollision ? false : (fin?.hasNMC  ?? false));
       const finalNTC     = override?.hasNTC  ?? (nameCollision ? false : (fin?.hasNTC  ?? false));
       const finalRetain  = override?.canRetain ?? (nameCollision ? true : (fin?.canRetain ?? true));
-      const hasExtension    = override?.hasExtension    ?? false;
-      const extensionCapHit = override?.extensionCapHit ?? undefined;
-      const extensionYears  = override?.extensionYears  ?? undefined;
+      const hasExtension    = override?.hasExtension    ?? (fin?.extensionCapHit != null);
+      const extensionCapHit = override?.extensionCapHit ?? fin?.extensionCapHit ?? undefined;
+      const extensionYears  = override?.extensionYears  ?? fin?.extensionYears  ?? undefined;
       const intangibleMult  = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
 
       // True xGA/60 over goalie icetime; require ≥10 games of ice (36,000s) for signal
@@ -746,6 +765,10 @@ export async function GET() {
       const currentYearGsax = goalieStats?.gsax ?? 0;
       const baselineKey = p.name.toLowerCase().replace(/[^a-z]/g, "");
       const baselines   = BASELINES[baselineKey] || {};
+      const qocIndex = calcQocIndex(finalPosition, stats?.iceRankAvg, stats?.dzPct);
+      const games = p.draftOverall != null ? (stats?.games ?? 0) : (stats?.games ?? goalieStats?.gamesStarted ?? 40);
+      const ptsPace = stats?.ptsPace ?? defaultPts;
+      const avgTOI = stats?.avgTOI ?? defaultTOI;
 
       players.push({
         id:             p.id,
@@ -755,12 +778,26 @@ export async function GET() {
         age:            p.age,
         headshot:       p.headshot ?? null,
         // Draftees default to 0 games so the pedigree NAV path (games < 14) triggers
-        games:          p.draftOverall != null ? (stats?.games ?? 0) : (stats?.games ?? goalieStats?.gamesStarted ?? 40),
-        ptsPace:        stats?.ptsPace  ?? defaultPts,
+        games,
+        ptsPace,
         xGPace:         stats?.xGPace   ?? 0,
         defRate:        stats?.defRate  ?? 0.08,
-        avgTOI:         stats?.avgTOI   ?? defaultTOI,
-        qocIndex:       calcQocIndex(finalPosition, stats?.iceRankAvg, baselines.pkTimeShare, stats?.dzPct),
+        avgTOI,
+        qocIndex,
+        rosterTier:     resolveRosterTier({
+          id: p.id,
+          name: p.name,
+          position: finalPosition as "C" | "W" | "D" | "G" | "Pick",
+          age: p.age,
+          capHit: CONTRACT_OVERRIDES[p.name]?.capHit ?? finalCapHit,
+          yearsRemaining: CONTRACT_OVERRIDES[p.name]?.yearsRemaining ?? finalYears,
+          ptsPace,
+          avgTOI,
+          qocIndex,
+          dzPct: stats?.dzPct ?? null,
+          pkTimeShare: baselines.pkTimeShare,
+          baselinePtsPace: baselines.baselinePtsPace,
+        }),
         hasLiveStats:   stats?.hasLiveStats ?? goalieStats?.hasLiveStats ?? false,
         gsax:           goalieStats?.gsax         ?? 0,
         savePct:        goalieStats?.savePct       ?? 0.900,

@@ -22,6 +22,7 @@ export interface AssetInput {
   age:            number;
   capHit:         number;
   yearsRemaining: number;
+  capCeiling?:     number;
   retainedPct?:   number;
   extensionCapHit?: number;
   extensionYears?:  number;
@@ -30,7 +31,7 @@ export interface AssetInput {
   defRate?:       number;
   avgTOI?:        number;
   qocRank?:       number;        // DEPRECATED — legacy iceTimeRank sum; use qocIndex
-  qocIndex?:      number | null; // 0-100 deployment difficulty (ice-rank + PK share + dZone starts)
+  qocIndex?:      number | null; // 0-100 EV deployment difficulty (ice-rank + dZone starts)
   draftOverall?:    number;      // overall draft slot — triggers pedigree NAV for unproven prospects
   prospectPtsPace?: number;      // NHLe-translated junior scoring pace
   xgRelTM?:       number | null;
@@ -78,6 +79,7 @@ export interface XNAVResult {
   upside:      number;
   noivImpact?: number;
   fArchetype?: string;
+  rosterTier?: RosterTier;
   isRFA?:      boolean;
 }
 
@@ -85,6 +87,94 @@ export interface XNAVResult {
 export const safe  = (n: number): number => (isNaN(n) || !isFinite(n) ? 0 : n);
 export const clamp = (n: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, n));
+
+export type RosterTier =
+  | "ELITE_1ST_LINE"
+  | "1ST_LINE_HIGH_2C"
+  | "ELITE_SHUTDOWN"
+  | "PK_SPECIALIST"
+  | "FRINGE_1ST_LINE_2C"
+  | "MIDDLE_SIX"
+  | "BOTTOM_SIX";
+
+export function calcDeploymentMultiplier(evDzPct: number, evQoc: number): number {
+  const zDzCalc = evQoc >= 55 && evDzPct < 0.50 ? 0.50 : evDzPct;
+  return 1 + (zDzCalc - 0.50) * 0.60 + ((evQoc - 50) / 100) * 0.35;
+}
+
+export function calcArchetypeStrainIndex(pointsPace: number, toi: number, evDzPct: number, evQoc: number): number {
+  if (pointsPace < 65 || toi < 19.0) return 1.0;
+  return 1 + Math.max(0, evDzPct - 0.50) * 1.5 + Math.max(0, evQoc - 60) / 100;
+}
+
+export function calcShortHandedLeverageFactor(evToi: number, shToi: number): number {
+  if (evToi < 11.5) return 1.0;
+  return 1 + Math.max(0, shToi - 1.5) / 15;
+}
+
+export function classifyRosterTier(
+  toi: number,
+  normalizedPts: number,
+  evMdep: number,
+  evQoc: number,
+  evToi: number,
+  shToi: number,
+): RosterTier {
+  switch (true) {
+    case normalizedPts >= 80 || (toi >= 19.0 && normalizedPts >= 75):
+      return "ELITE_1ST_LINE";
+    case normalizedPts >= 68 || (toi >= 18.0 && normalizedPts >= 65):
+      return "1ST_LINE_HIGH_2C";
+    case normalizedPts >= 55 || (toi >= 17.0 && normalizedPts >= 50):
+      return "FRINGE_1ST_LINE_2C";
+    case evQoc >= 65 && evMdep >= 1.05 && evToi >= 12.5 && shToi >= 1.5
+      && toi >= 13.5 && normalizedPts >= 30:
+      return "ELITE_SHUTDOWN";
+    case shToi >= 2.0 && evToi < 12.0:
+      return "PK_SPECIALIST";
+    case normalizedPts >= 35 || toi >= 14.0:
+      return "MIDDLE_SIX";
+    default:
+      return "BOTTOM_SIX";
+  }
+}
+
+export function calcSkaterDeploymentContext(asset: AssetInput): {
+  evMdep: number;
+  asi: number;
+  slf: number;
+  normalizedPts: number;
+  evQoc: number;
+  evToi: number;
+  shToi: number;
+} {
+  const pts = safe(asset.ptsPace ?? 0);
+  const toi = safe(asset.avgTOI ?? 18);
+  const evQoc = asset.qocIndex != null
+    ? clamp(safe(asset.qocIndex), 0, 100)
+    : clamp((400 - safe(asset.qocRank ?? 300)) / 400, 0, 1) * 100;
+  const evDzPct = safe(asset.dzPct ?? 0.5);
+  const shToi = clamp(toi * safe(asset.pkTimeShare ?? 0), 0, toi);
+  const evToi = Math.max(0, toi - shToi);
+  const baselinePtsPace = asset.baselinePtsPace;
+  const blendedPts = baselinePtsPace !== undefined && baselinePtsPace > 0
+    ? (pts * 0.4 + baselinePtsPace * 0.6)
+    : pts;
+
+  const evMdep = calcDeploymentMultiplier(evDzPct, evQoc);
+  const asi = calcArchetypeStrainIndex(blendedPts, toi, evDzPct, evQoc);
+  const slf = calcShortHandedLeverageFactor(evToi, shToi);
+  const normalizedPts = blendedPts * clamp(evMdep * asi * slf, 0.80, 1.25);
+
+  return { evMdep, asi, slf, normalizedPts, evQoc, evToi, shToi };
+}
+
+export function resolveRosterTier(asset: AssetInput): RosterTier | undefined {
+  if (asset.position === "G" || asset.position === "Pick") return undefined;
+  const toi = safe(asset.avgTOI ?? 18);
+  const { normalizedPts, evMdep, evQoc, evToi, shToi } = calcSkaterDeploymentContext(asset);
+  return classifyRosterTier(toi, normalizedPts, evMdep, evQoc, evToi, shToi);
+}
 
 // ── Pick NAV ──────────────────────────────────────────────────────────────────
 export function calcPickNAV(asset: AssetInput): XNAVResult {
@@ -215,7 +305,7 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   // undershoot the real market. trueMarketValueG is kept for total/def output.
   const fmvCapPctG = LEAGUE_MIN_PCT_G + (MAX_CAP_PCT_G - LEAGUE_MIN_PCT_G) / (1 + Math.exp(-K_FACTOR_G * (fmvTmv - MIDPOINT_G)));
 
-  const BASE_CAP_CEILING = SEASON.capCeiling;
+  const BASE_CAP_CEILING = asset.capCeiling ?? SEASON.capCeiling;
   const CAP_GROWTH_RATE  = 1.04;
 
   let capSumG = 0;
@@ -300,8 +390,10 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     ? (pts * 0.4 + baselinePtsPace * 0.6)
     : pts;
 
+  const { evMdep, normalizedPts, evToi, shToi } = calcSkaterDeploymentContext(asset);
+
   const ptsScale  = isD ? 0.75 : 1.0;
-  const ptsVal    = blendedPts * ptsScale;
+  const ptsVal    = normalizedPts * ptsScale;
 
   const baselineDpsProxy = asset.baselineDpsProxy;
   const blendedDps = baselineDpsProxy !== undefined && baselineDpsProxy > 0
@@ -422,7 +514,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   // both positions makes $8–9M contracts look "overpriced" for top-pair D — which is
   // wrong. D midpoint of 120: a defensive specialist at ~95 on-ice breaks even at ~$8.4M,
   // and an elite offensive D at ~125 on-ice earns meaningful positive surplus.
-  const MIDPOINT       = isD ? 120 : 180;
+  const MIDPOINT       = isD ? 120 : 155;
   const K_FACTOR       = 0.022; // Steepness of the S-curve
   
   const fmvCapPct = LEAGUE_MIN_PCT + (MAX_CAP_PCT - LEAGUE_MIN_PCT) / (1 + Math.exp(-K_FACTOR * (trueMarketValue - MIDPOINT)));
@@ -433,7 +525,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const navYears         = extCapHit ? (asset.extensionYears ?? asset.yearsRemaining) : asset.yearsRemaining;
   const contractYears    = Math.max(1, navYears || 1);
 
-  const BASE_CAP_CEILING = SEASON.capCeiling; // Current cap space
+  const BASE_CAP_CEILING = asset.capCeiling ?? SEASON.capCeiling; // Current cap space
   const CAP_GROWTH_RATE  = 1.04;  // 4% annual growth
 
   // Loop through contract term to calculate the multi-year compound surplus sum:
@@ -474,6 +566,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
 
   // ── Forward archetype ─────────────────────────────────────────
   const noivImpact = Math.round(noivBonus);
+  const rosterTier = classifyRosterTier(toi, normalizedPts, evMdep, qocIdx, evToi, shToi);
   let fArchetype = "";
   if (!isD) {
     const psRatio = ops !== null && dps !== null && (ops + dps) > 1
@@ -593,6 +686,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     upside: Math.round(Math.max(0, ageTotal)),
     noivImpact,
     fArchetype,
+    rosterTier,
     isRFA,
   };
 }

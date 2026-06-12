@@ -17,12 +17,15 @@ interface Player {
   xGPace: number;
   avgTOI: number;
   qocIndex?: number | null;
+  rosterTier?: string;
   games?: number;
   gsax?: number;
   savePct?: number;
   gamesStarted?: number;
   ops?: number | null;
   dps?: number | null;
+  baselinePtsPace?: number | null;
+  pkTimeShare?: number | null;
   xgRelTM?: number | null;
   xgaRelTM?: number | null;
   dzPct?: number | null;
@@ -238,6 +241,8 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
                 defRate:        player.defRate ?? 0.08,
                 avgTOI:         player.avgTOI,
                 qocIndex:       player.qocIndex,
+                baselinePtsPace: player.baselinePtsPace ?? undefined,
+                pkTimeShare:    player.pkTimeShare ?? undefined,
                 ops:            player.ops ?? undefined,
                 dps:            player.dps ?? undefined,
                 xgRelTM:        player.xgRelTM ?? undefined,

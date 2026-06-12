@@ -2303,7 +2303,7 @@ function LoadingScreen() {
         Syncing NHL Data Core
       </div>
       <div className="text-2xs text-zinc-800 font-black uppercase tracking-widest">
-        MoneyPuck · NHL API · X-NAV 1.1
+        MoneyPuck · NHL API · X-NAV 2.0
       </div>
     </div>
   );

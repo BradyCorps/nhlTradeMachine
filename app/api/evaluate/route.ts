@@ -4,6 +4,8 @@ import type { Asset, EvaluateRequest, EvaluateResponse, FArchetype } from "@/app
 import { SEASON, LEAGUE, FRANCHISE } from "@/app/lib/season-config";
 import { calcNAV, compressPackage as coreCompress, AssetInput, XNAVResult } from "@/app/lib/xnav-engine";
 import { z } from "zod";
+import { db } from "@/app/db/client";
+import { siteSettings } from "@/app/db/schema";
 
 // ============================================================
 // ZOD SCHEMAS
@@ -15,6 +17,7 @@ const AssetSchema = z.object({
   age: z.number().nullish().default(27),
   capHit: z.number().nullish().default(0),
   yearsRemaining: z.number().nullish().default(1),
+  capCeiling: z.number().nullish(),
   retainedPct: z.number().nullish(),
   extensionCapHit: z.number().nullish(),
   extensionYears: z.number().nullish(),
@@ -82,6 +85,7 @@ const EvaluateRequestSchema = z.object({
   partnerTeam: TeamSchema.optional(),
   allHomeRoster: z.array(AssetSchema).optional(),
   allPartnerRoster: z.array(AssetSchema).optional(),
+  capCeiling: z.number().nullish(),
 });
 
 
@@ -97,8 +101,16 @@ const safe  = (n: number) => (isNaN(n) || !isFinite(n) ? 0 : n);
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 const fmt   = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
 
+const getLiveCapCeiling = async (requestCapCeiling?: number | null): Promise<number> => {
+  if (requestCapCeiling != null && Number.isFinite(requestCapCeiling)) return requestCapCeiling;
+  const rows = await db.select().from(siteSettings).catch(() => []);
+  const row = rows.find((r) => r.key === "cap_ceiling");
+  const cap = row ? parseFloat(row.value) : NaN;
+  return Number.isFinite(cap) ? cap : SEASON.capCeiling;
+};
+
 // ── Adapter: Maps raw client Asset to strict engine AssetInput ──
-const getAssetNAV = (asset: Asset): XNAVResult => {
+const getAssetNAV = (asset: Asset, capCeiling: number = SEASON.capCeiling): XNAVResult => {
   const input: AssetInput = {
     id: asset.id,
     name: asset.name,
@@ -106,6 +118,7 @@ const getAssetNAV = (asset: Asset): XNAVResult => {
     age: asset.age ?? 27,
     capHit: asset.capHit ?? 0,
     yearsRemaining: asset.yearsRemaining ?? 1,
+    capCeiling: asset.capCeiling ?? capCeiling,
     retainedPct: asset.retainedPct,
     extensionCapHit: asset.extensionCapHit,
     extensionYears: asset.extensionYears,
@@ -153,10 +166,10 @@ const getAssetNAV = (asset: Asset): XNAVResult => {
 };
 
 // ── Package compression (Delegated to xnav-engine.ts) ──
-const compressPackage = (assets: Asset[]): number => {
+const compressPackage = (assets: Asset[], capCeiling: number = SEASON.capCeiling): number => {
   if (assets.length === 0) return 0;
   const mappedAssets = assets.map(a => ({
-    nav: getAssetNAV(a).total,
+    nav: getAssetNAV(a, capCeiling).total,
     isPick: a.position === "Pick",
     age: a.age
   }));
@@ -249,10 +262,12 @@ const runGmLogic = (
   teamHome: Team | null,
   teamPartner: Team | null,
   allHomeRoster: Asset[],
-  allPartnerRoster: Asset[]
+  allPartnerRoster: Asset[],
+  capCeiling: number = SEASON.capCeiling
 ): GmFlag[] => {
   const flags: GmFlag[] = [];
   if (!teamHome || !teamPartner) return flags;
+  const navOf = (asset: Asset): number => getAssetNAV(asset, capCeiling).total;
 
   const modeHome = classifyTeam(teamHome, allHomeRoster);
   const modePartner = classifyTeam(teamPartner, allPartnerRoster);
@@ -274,10 +289,10 @@ const runGmLogic = (
     }
   }
 
-  const navOut   = outgoing.reduce((s, a) => s + getAssetNAV(a).total, 0);
-  const navIn    = incoming.reduce((s, a) => s + getAssetNAV(a).total, 0);
-  const cNavOut  = compressPackage(outgoing);
-  const cNavIn   = compressPackage(incoming);
+  const navOut   = outgoing.reduce((s, a) => s + navOf(a), 0);
+  const navIn    = incoming.reduce((s, a) => s + navOf(a), 0);
+  const cNavOut  = compressPackage(outgoing, capCeiling);
+  const cNavIn   = compressPackage(incoming, capCeiling);
   const homeNetGain = cNavIn - cNavOut;
   const maxNav = Math.max(Math.abs(cNavOut), Math.abs(cNavIn), 1);
   const imbalancePct = (Math.abs(homeNetGain) / maxNav) * 100;
@@ -305,14 +320,14 @@ const runGmLogic = (
     });
   }
 
-  const outFranchise = outgoing.filter(a => getAssetNAV(a).total >= FRANCHISE_THRESHOLD);
+  const outFranchise = outgoing.filter(a => navOf(a) >= FRANCHISE_THRESHOLD);
   for (const asset of outFranchise) {
-    const nav       = getAssetNAV(asset).total;
+    const nav       = navOf(asset);
     const isMegalodon = nav >= MEGALODON_THRESHOLD;
 
     const contractLeverage = asset.yearsRemaining <= 1;
     const franchiseReturn = incoming.some(a =>
-      getAssetNAV(a).total >= FRANCHISE_THRESHOLD && a.position !== "Pick");
+      navOf(a) >= FRANCHISE_THRESHOLD && a.position !== "Pick");
 
     const firstRoundPicks = incoming.filter(a =>
       a.position === "Pick" && (a.round ?? 99) === 1).length;
@@ -467,8 +482,8 @@ const runGmLogic = (
 
   const isShoppedAsset = (a: Asset): boolean =>
     a.tradeBlockStatus === "available" || a.tradeBlockStatus === "requested";
-  const partnerElites = incoming.filter((a) => getAssetNAV(a).total > 260 && !isShoppedAsset(a));
-  const homeElites    = outgoing.filter((a) => getAssetNAV(a).total > 200);
+  const partnerElites = incoming.filter((a) => navOf(a) > 260 && !isShoppedAsset(a));
+  const homeElites    = outgoing.filter((a) => navOf(a) > 200);
   if (partnerElites.length > 0 && homeElites.length === 0) {
     const requiredOverpay = navIn * 0.18;
     if (navOut < navIn + requiredOverpay) flags.push({
@@ -501,10 +516,10 @@ const runGmLogic = (
 
   const isStarUpgrade = (assets: Asset[]): boolean => {
     const playerUpgrade = assets.some(a =>
-      a.position !== "Pick" && (a.ptsPace > 65 || getAssetNAV(a).total > 180 || (a.position === "G" && (a.gsax ?? 0) > 12))
+      a.position !== "Pick" && (a.ptsPace > 65 || navOf(a) > 180 || (a.position === "G" && (a.gsax ?? 0) > 12))
     );
-    const totalNav = assets.reduce((s, a) => s + getAssetNAV(a).total, 0);
-    const hasValuablePick = assets.some(a => a.position === "Pick" && getAssetNAV(a).total > 35);
+    const totalNav = assets.reduce((s, a) => s + navOf(a), 0);
+    const hasValuablePick = assets.some(a => a.position === "Pick" && navOf(a) > 35);
     return playerUpgrade || (hasValuablePick && totalNav > 60);
   };
 
@@ -541,8 +556,8 @@ const runGmLogic = (
       const incomingAtPos  = inPlayers.filter(a => normalisePos(a.position) === pos);
       const incomingFills  = incomingAtPos.length > 0;
 
-      const leavingNav   = homeGivingUp.filter(a => normalisePos(a.position) === pos).reduce((s, a) => s + getAssetNAV(a).total, 0);
-      const incomingNav  = incomingAtPos.reduce((s, a) => s + getAssetNAV(a).total, 0);
+      const leavingNav   = homeGivingUp.filter(a => normalisePos(a.position) === pos).reduce((s, a) => s + navOf(a), 0);
+      const incomingNav  = incomingAtPos.reduce((s, a) => s + navOf(a), 0);
       const hasRetained  = incomingAtPos.some(a => (a.retainedPct || 0) > 0);
       const bothNearZero = Math.abs(leavingNav) < 15 && Math.abs(incomingNav) < 15;
       const isDirectSwap = incomingFills && (incomingNav >= leavingNav * 0.5 || bothNearZero || hasRetained);
@@ -573,8 +588,8 @@ const runGmLogic = (
       const playersLeaving = partnerGivingUp.filter(a => normalisePos(a.position) === pos).map(a => a.name).join(" and ");
       const incomingAtPos = outPlayers.filter(a => normalisePos(a.position) === pos);
       const incomingFills = incomingAtPos.length > 0;
-      const leavingNav    = partnerGivingUp.filter(a => normalisePos(a.position) === pos).reduce((s, a) => s + getAssetNAV(a).total, 0);
-      const incomingNav   = incomingAtPos.reduce((s, a) => s + getAssetNAV(a).total, 0);
+      const leavingNav    = partnerGivingUp.filter(a => normalisePos(a.position) === pos).reduce((s, a) => s + navOf(a), 0);
+      const incomingNav   = incomingAtPos.reduce((s, a) => s + navOf(a), 0);
       const hasRetained   = incomingAtPos.some(a => (a.retainedPct || 0) > 0);
       const bothNearZero  = Math.abs(leavingNav) < 15 && Math.abs(incomingNav) < 15;
       const swapThreshold = hasRetained ? 0.15 : 0.5;
@@ -601,10 +616,10 @@ const runGmLogic = (
   const tradingAwayD = outPlayers.filter((a) => a.position === "D");
   if (tradingAwayD.length > 0) {
     const depScore          = defensiveDependencyScore(allHomeRoster);
-    const eliteDBeingTraded = tradingAwayD.filter((a) => a.avgTOI > 22 || getAssetNAV(a).total > 100);
+    const eliteDBeingTraded = tradingAwayD.filter((a) => a.avgTOI > 22 || navOf(a) > 100);
     const dComingBack       = inPlayers.filter(a => a.position === "D");
-    const leavingDNav       = eliteDBeingTraded.reduce((s, a) => s + getAssetNAV(a).total, 0);
-    const incomingDNav      = dComingBack.reduce((s, a) => s + getAssetNAV(a).total, 0);
+    const leavingDNav       = eliteDBeingTraded.reduce((s, a) => s + navOf(a), 0);
+    const incomingDNav      = dComingBack.reduce((s, a) => s + navOf(a), 0);
     const isDForD           = dComingBack.length > 0 && incomingDNav >= leavingDNav * 0.4;
     const allDBeingTradedAreVeterans = eliteDBeingTraded.every(a => a.age >= 28);
     const isRebuildingVeteranMove    = (modeHome === "REBUILDING" || modeHome === "TANKING") && allDBeingTradedAreVeterans;
@@ -623,10 +638,10 @@ const runGmLogic = (
   const partnerTradingAwayD = partnerGivingUp.filter((a) => a.position === "D");
   if (partnerTradingAwayD.length > 0) {
     const depScore          = defensiveDependencyScore(allPartnerRoster);
-    const eliteDBeingTraded = partnerTradingAwayD.filter((a) => a.avgTOI > 22 || getAssetNAV(a).total > 100);
+    const eliteDBeingTraded = partnerTradingAwayD.filter((a) => a.avgTOI > 22 || navOf(a) > 100);
     const dComingBack       = outPlayers.filter(a => a.position === "D");
-    const leavingDNav       = eliteDBeingTraded.reduce((s, a) => s + getAssetNAV(a).total, 0);
-    const incomingDNav      = dComingBack.reduce((s, a) => s + getAssetNAV(a).total, 0);
+    const leavingDNav       = eliteDBeingTraded.reduce((s, a) => s + navOf(a), 0);
+    const incomingDNav      = dComingBack.reduce((s, a) => s + navOf(a), 0);
     const isDForD           = dComingBack.length > 0 && incomingDNav >= leavingDNav * 0.4;
     const allEliteDareVeterans    = eliteDBeingTraded.every(a => a.age >= 28);
     const isRebuildingVeteranMove = (modePartner === "REBUILDING" || modePartner === "TANKING") && allEliteDareVeterans;
@@ -644,14 +659,14 @@ const runGmLogic = (
   }
 
   const partnerIsContending = modePartner === "CONTENDER" || modePartner === "BUBBLE";
-  const partnerHighNavOut   = partnerGivingUp.filter(a => getAssetNAV(a).total > 100);
+  const partnerHighNavOut   = partnerGivingUp.filter(a => navOf(a) > 100);
   const homeHasPicksOrProsp = outPlayers.some(a => a.position === "Pick" || (PROSPECT_TIERS[a.name] != null));
-  const partnerGivingNav    = partnerHighNavOut.reduce((s, a) => s + getAssetNAV(a).total, 0);
+  const partnerGivingNav    = partnerHighNavOut.reduce((s, a) => s + navOf(a), 0);
   const partnerReceiving    = navOut; 
   const partnerGetsEnough   = partnerReceiving >= partnerGivingNav * 0.90;
 
   if (partnerIsContending && partnerHighNavOut.length > 0 && !homeHasPicksOrProsp && !partnerGetsEnough) {
-    const topAsset = partnerHighNavOut.sort((a,b) => getAssetNAV(b).total - getAssetNAV(a).total)[0];
+    const topAsset = partnerHighNavOut.sort((a,b) => navOf(b) - navOf(a))[0];
     flags.push({
       severity: "HARD", category: "TIMELINE_MISMATCH",
       headline: `${teamPartner.name} requires future assets to move ${topAsset.name}`, perspective: "partner" as const,
@@ -667,7 +682,7 @@ const runGmLogic = (
     const isF   = ["C","W","L","R"].includes(player.position);
     const minTOI = isD ? 18 : isF ? 14 : 12;
     const minNAV = 30;
-    const playerNav  = getAssetNAV(player).total;
+    const playerNav  = navOf(player);
     const meetsQuality = player.avgTOI >= minTOI && playerNav >= minNAV;
     if (!meetsQuality) continue;
 
@@ -771,7 +786,7 @@ const runGmLogic = (
     }
   }
 
-  const bestIn = [...inPlayers].sort((a,b) => getAssetNAV(b).total - getAssetNAV(a).total)[0];
+  const bestIn = [...inPlayers].sort((a,b) => navOf(b) - navOf(a))[0];
   if (bestIn && (bestIn.yearsRemaining || 0) <= 1 && bestIn.ptsPace > 55 && outPicks.length > 0) flags.push({
     severity: "WARN", category: "RENTAL_TAX",
     headline: `Rental premium risk — ${bestIn.name.split(" ").pop()}`,
@@ -807,10 +822,10 @@ const runGmLogic = (
     affectedAsset: baggage.name, vetoesSide: 1,
   });
 
-  const dumpPlayers = outPlayers.filter(a => getAssetNAV(a).total < -5);
+  const dumpPlayers = outPlayers.filter(a => navOf(a) < -5);
   if (dumpPlayers.length > 0) {
-    const deepDumps  = dumpPlayers.filter(a => getAssetNAV(a).total < -30);
-    const cosPlayers = dumpPlayers.filter(a => getAssetNAV(a).total >= -30);
+    const deepDumps  = dumpPlayers.filter(a => navOf(a) < -30);
+    const cosPlayers = dumpPlayers.filter(a => navOf(a) >= -30);
     if (deepDumps.length > 0) {
       const d = deepDumps[0];
       flags.push({
@@ -831,7 +846,7 @@ const runGmLogic = (
     }
   }
 
-  if (homeNetGain > 60 && getAssetNAV(incoming[0] || outgoing[0]).total > 200) flags.push({
+  if (homeNetGain > 60 && navOf(incoming[0] || outgoing[0]) > 200) flags.push({
     severity: "INFO", category: "FIRE_SALE",
     headline: "Suspiciously favourable return",
     explanation: `Trades this lopsided only happen in real life when there is context the public doesn't know about.`,
@@ -885,17 +900,18 @@ const evaluateTrade = (
   teamHome: Team | null,
   teamPartner: Team | null,
   allHomeRoster: Asset[],
-  allPartnerRoster: Asset[]
+  allPartnerRoster: Asset[],
+  capCeiling: number = SEASON.capCeiling
 ): TradeVerdict => {
   if (!outgoing.length && !incoming.length) {
     return { status: "IDLE", message: "Add assets to evaluate", flags: [], metrics: nullMetrics() };
   }
 
-  const navOut = outgoing.reduce((s, a) => s + getAssetNAV(a).total, 0);
-  const navIn  = incoming.reduce((s, a) => s + getAssetNAV(a).total, 0);
+  const navOut = outgoing.reduce((s, a) => s + getAssetNAV(a, capCeiling).total, 0);
+  const navIn  = incoming.reduce((s, a) => s + getAssetNAV(a, capCeiling).total, 0);
 
-  const cNavOut = compressPackage(outgoing);
-  const cNavIn  = compressPackage(incoming);
+  const cNavOut = compressPackage(outgoing, capCeiling);
+  const cNavIn  = compressPackage(incoming, capCeiling);
 
   const homeNetGain = cNavIn - cNavOut;
   const ptsGain = incoming.reduce((s,a) => s+a.ptsPace,0) - outgoing.reduce((s,a) => s+a.ptsPace,0);
@@ -947,7 +963,7 @@ const evaluateTrade = (
         const pickValue = a.round === 1 ? 2.5 : a.round === 2 ? 1.0 : 0.3;
         return sum + direction * pickValue;
       }
-      const nav = getAssetNAV(a).total;
+      const nav = getAssetNAV(a, capCeiling).total;
       if (nav <= 0) return sum;
 
       const peakAge = a.position === "G" ? 30 : 28;
@@ -967,7 +983,7 @@ const evaluateTrade = (
   const cwiGain = calcAssetWindowImpact(incoming, 1) + calcAssetWindowImpact(outgoing, -1);
   const cwiYears = cwiGain / 3.0;
 
-  const flags = runGmLogic(outgoing, incoming, teamHome, teamPartner, allHomeRoster, allPartnerRoster);
+  const flags = runGmLogic(outgoing, incoming, teamHome, teamPartner, allHomeRoster, allPartnerRoster, capCeiling);
   const hardFlags = flags.filter((f) => f.severity === "HARD");
   const softFlags = flags.filter((f) => f.severity === "SOFT");
 
@@ -1050,12 +1066,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid payload structure", details: parsed.error.format() }, { status: 400 });
     }
     const body = parsed.data as unknown as EvaluateRequest;
+    const liveCapCeiling = await getLiveCapCeiling(body.capCeiling);
 
     const navMap: Record<string, XNAVResult> = {};
     if (Array.isArray(body.assets)) {
       for (const asset of body.assets) {
         if (asset?.id) {
-          navMap[asset.id] = getAssetNAV(asset);
+          navMap[asset.id] = getAssetNAV(asset, liveCapCeiling);
         }
       }
     }
@@ -1072,7 +1089,8 @@ export async function POST(req: Request) {
         body.homeTeam,
         body.partnerTeam,
         body.allHomeRoster ?? [],
-        body.allPartnerRoster ?? []
+        body.allPartnerRoster ?? [],
+        liveCapCeiling
       );
     }
 

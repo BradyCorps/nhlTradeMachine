@@ -49,8 +49,15 @@ describe("Canary — league route features (source-level)", () => {
     describe(route, () => {
       const src = read(route);
 
-      it("injects drafted prospects from the DB", () => {
-        expect(src).toContain("isNotNull(playersTable.draftOverall)");
+      it("injects team-assigned DB players missing from the live roster feed", () => {
+        expect(src).toContain("Inject DB roster rows");
+        expect(src).toContain("}).from(playersTable);");
+        expect(src).toContain("slugify(x.name) === dbSlug");
+      });
+
+      it("uses DB contract fields ahead of scraper values for matching players", () => {
+        expect(src).toContain("capHit:         b?.capHit ?? cw.capHit");
+        expect(src).toContain("yearsRemaining: b?.yearsRemaining ??");
       });
 
       it("stamps trade block status onto players", () => {
@@ -120,7 +127,7 @@ describe("Canary — trade block mechanics", () => {
   it("evaluate route does not protect elite assets that are being shopped", () => {
     const src = read("app/api/evaluate/route.ts");
     expect(src).toContain('a.tradeBlockStatus === "available" || a.tradeBlockStatus === "requested"');
-    expect(src).toMatch(/getAssetNAV\(a\)\.total > 260 && !isShoppedAsset\(a\)/);
+    expect(src).toMatch(/navOf\(a\) > 260 && !isShoppedAsset\(a\)/);
   });
 
   it("engine applies the trade-request leverage discount", () => {
@@ -171,5 +178,40 @@ describe("Canary — admin cache flush", () => {
     const src = read("app/api/admin/clear-cache/route.ts");
     expect(src).toContain("cache:teams");
     expect(src).toContain("cache:contracts");
+    expect(src).toContain("cache:contracts:v2");
+  });
+});
+
+describe("Canary — admin contract sync", () => {
+  const route = read("app/api/admin/contracts/route.ts");
+  const page = read("app/admin/contracts/page.tsx");
+
+  it("live delta keeps scraper team and position metadata for sync", () => {
+    expect(route).toContain("position: cw.position");
+    expect(route).toContain("teamSlug: cw.teamSlug");
+  });
+
+  it("sync updates existing rows instead of only inserting missing players", () => {
+    expect(route).toContain("existingById");
+    expect(route).toContain("existingByName");
+    expect(route).toContain("existingById.get(id) ?? existingByName.get(id)");
+    expect(route).toContain(".normalize(\"NFD\")");
+    expect(route).toContain("await db.update(playersTable).set(updates)");
+    expect(route).toContain("updatedEntries");
+  });
+
+  it("sync backfills scraper metadata when the client payload is stale", () => {
+    expect(route).toContain("needsMetadata");
+    expect(route).toContain("teamSlug: cw.teamSlug ?? live.teamSlug");
+  });
+
+  it("sync falls back to NHL rosters when CapWages has no team", () => {
+    expect(route).toContain("fetchNhlRosterTeamMap");
+    expect(route).toContain("teamIdFromSlug(cw.teamSlug) ?? rosterFallback?.teamId");
+  });
+
+  it("sync reports updated counts in the admin toast", () => {
+    expect(page).toContain("${data.added} added, ${data.updated ?? 0} updated");
+    expect(page).toContain("resolvedTeamId");
   });
 });

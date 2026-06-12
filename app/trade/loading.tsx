@@ -20,7 +20,7 @@ export default function TradeLoading() {
           The Hockey Ledger
         </div>
         <div className="text-2xs text-ledger-rule font-mono mt-1 uppercase tracking-widest animate-pulse">
-          Loading Trade Machine · X-NAV 1.1
+          Loading Trade Machine · X-NAV 2.0
         </div>
       </div>
 

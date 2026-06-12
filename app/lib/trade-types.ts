@@ -16,6 +16,7 @@ export interface Asset {
   avgTOI: number;
   capHit: number;
   yearsRemaining: number;
+  capCeiling?: number;
   hasNMC: boolean;
   hasNTC: boolean;
   canRetain: boolean;
@@ -24,7 +25,8 @@ export interface Asset {
   headshot?: string;
   hasLiveStats?: boolean;
   qocRank?: number;            // DEPRECATED — legacy iceTimeRank sum; use qocIndex
-  qocIndex?: number | null;    // 0-100 deployment difficulty (higher = tougher minutes)
+  qocIndex?: number | null;    // 0-100 EV deployment difficulty (higher = tougher 5v5 minutes)
+  rosterTier?: RosterTier;
   draftOverall?: number | null;    // overall draft slot — triggers pedigree NAV
   prospectPtsPace?: number | null; // NHLe-translated junior scoring pace
   xgRelTM?: number | null;
@@ -94,10 +96,20 @@ export interface XNAVResult {
   upside: number;
   noivImpact?: number;
   fArchetype?: FArchetype;
+  rosterTier?: RosterTier;
 }
 
 // Forward archetypes — used for STRAND helix and DEF display routing
 export type FArchetype = "FRANCHISE" | "SNIPER" | "SCORER" | "PLAYMAKER" | "TWO_WAY" | "GRINDER" | "";
+
+export type RosterTier =
+  | "ELITE_1ST_LINE"
+  | "1ST_LINE_HIGH_2C"
+  | "ELITE_SHUTDOWN"
+  | "PK_SPECIALIST"
+  | "FRINGE_1ST_LINE_2C"
+  | "MIDDLE_SIX"
+  | "BOTTOM_SIX";
 
 export type FlagSeverity = "HARD" | "SOFT" | "WARN" | "INFO";
 
@@ -151,6 +163,7 @@ export interface EvaluateRequest {
   partnerTeam?:    Team | null;
   allHomeRoster?:  Asset[];
   allPartnerRoster?: Asset[];
+  capCeiling?:     number | null;       // live admin cap ceiling override for NAV math
   runTrade?:       boolean;            // whether to run full evaluateTrade
 }
 
