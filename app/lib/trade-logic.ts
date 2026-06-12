@@ -7,6 +7,8 @@ export interface TradeProposal {
   fitScore:       number;
   isDump:         boolean;
   dumpSweetener:  Asset[];
+  marketRank?:    number;
+  alternativeCount?: number;
 }
 
 export const getNav = (a: Asset, navMap: Record<string, number>): number => navMap[a.id] ?? 0;

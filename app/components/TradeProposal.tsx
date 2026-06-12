@@ -3,9 +3,8 @@
 import { useState } from "react";
 
 import type { Asset, Team } from "@/app/lib/trade-types";
-import { mulberry32, scenarioSeed } from "@/app/lib/sim-engine";
+import type { TradeProposal } from "@/app/lib/trade-logic";
 import {
-  TradeProposal,
   getNav,
   isDumpBlock,
   dumpFitScore,
@@ -27,12 +26,24 @@ interface Props {
   onLoadTrade:   (partner: Team, outgoing: Asset[], incoming: Asset[]) => void;
 }
 
+type Candidate = {
+  team: Team;
+  fitScore: number;
+  homeSends: Asset[];
+  partnerSends: Asset[];
+  isDump: boolean;
+  dumpSweetener: Asset[];
+};
+
 export default function TradeProposalEngine({
   outgoingBlock, homeTeam, allTeams, allPlayers, navMap, onClose, onLoadTrade
 }: Props) {
   const [proposals,  setProposals]  = useState<TradeProposal[]>([]);
   const [generating, setGenerating] = useState(false);
   const [done,       setDone]       = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [slideDirection, setSlideDirection] = useState<"next" | "prev">("next");
+  const [marketStats, setMarketStats] = useState({ reviewed: 0, viable: 0 });
 
   // Trade-block badge — shows why this player is realistically available
   const BlockBadge = ({ status }: { status?: string | null }) => {
@@ -63,16 +74,9 @@ export default function TradeProposalEngine({
 
   const generate = async () => {
     if (!homeTeam) return;
-    setGenerating(true); setDone(false); setProposals([]);
-    const rand = mulberry32(scenarioSeed({
-      mode: "trade-proposal-engine",
-      homeTeamId: homeTeam.id,
-      outgoing: outgoingBlock.map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0 })),
-      playerCount: allPlayers.length,
-      teamCount: allTeams.length,
-    }));
+    setGenerating(true); setDone(false); setProposals([]); setActiveIndex(0);
 
-    const candidates: { team: Team; fitScore: number; homeSends: Asset[]; partnerSends: Asset[]; isDump: boolean; dumpSweetener: Asset[] }[] = [];
+    const candidates: Candidate[] = [];
 
     const negNav = Math.abs(Math.min(0, blockNav));
     // Also check if this could be a neg-for-neg swap even if not a "dump"
@@ -121,7 +125,7 @@ export default function TradeProposalEngine({
           const pkgs = buildReturnPackages(blockNav, roster, picks, navMap);
           if (pkgs.length === 0) continue;
           for (const pkg of pkgs.slice(0, 4)) {
-            candidates.push({ team, fitScore: Math.round(fit * (0.85 + rand() * 0.15)), homeSends: outgoingBlock, partnerSends: pkg, isDump: false, dumpSweetener: [] });
+            candidates.push({ team, fitScore: fit, homeSends: outgoingBlock, partnerSends: pkg, isDump: false, dumpSweetener: [] });
           }
           continue;
         }
@@ -165,10 +169,8 @@ export default function TradeProposalEngine({
         // Add each valid package as a separate candidate
         // Cap at 4 packages per team to avoid one team dominating the pool
         for (const pkg of pkgs.slice(0, 4)) {
-          // Slightly vary fitScore per package so weighted random picks different ones
-          const pkgFit = Math.round(fit * (0.85 + rand() * 0.15));
           candidates.push({
-            team, fitScore: pkgFit,
+            team, fitScore: fit,
             homeSends: outgoingBlock,
             partnerSends: pkg,
             isDump: false,
@@ -188,47 +190,60 @@ export default function TradeProposalEngine({
       preScreenProposal(c.homeSends, c.partnerSends, homeTeam!, c.team, navMap)
     );
 
+    setMarketStats({ reviewed: Math.max(0, allTeams.length - 1), viable: viable.length });
+
     if (!viable.length) { setGenerating(false); setDone(true); return; }
 
-    // Weighted random selection from top 10 viable candidates
-    const weightedPick = (pool: typeof candidates, count: number) => {
-      const picked: typeof candidates = [];
-      const remaining = [...pool];
-      while (picked.length < count && remaining.length > 0) {
-        const totalWeight = remaining.reduce((s, c) => s + Math.pow(Math.max(1, c.fitScore), 1.5), 0);
-        let r = rand() * totalWeight;
-        let idx = 0;
-        for (let i = 0; i < remaining.length; i++) {
-          r -= Math.pow(Math.max(1, remaining[i].fitScore), 1.5);
-          if (r <= 0) { idx = i; break; }
+    const byTeam = new Map<string, Candidate & { alternativeCount: number }>();
+    for (const candidate of viable) {
+      const existing = byTeam.get(candidate.team.id);
+      if (!existing) {
+        byTeam.set(candidate.team.id, { ...candidate, alternativeCount: 1 });
+      } else {
+        existing.alternativeCount += 1;
+        if (candidate.fitScore > existing.fitScore) {
+          byTeam.set(candidate.team.id, {
+            ...candidate,
+            alternativeCount: existing.alternativeCount,
+          });
         }
-        picked.push(remaining[idx]);
-        remaining.splice(idx, 1);
       }
-      return picked;
-    };
+    }
 
-    // Larger pool = more variety across runs
-    const pool = viable.slice(0, Math.min(20, viable.length));
-    const top  = weightedPick(pool, Math.min(3, pool.length));
+    const ranked = [...byTeam.values()].sort((a, b) =>
+      b.fitScore - a.fitScore
+      || (a.team.standing ?? 99) - (b.team.standing ?? 99)
+      || a.team.name.localeCompare(b.team.name)
+    );
 
-    const initial: TradeProposal[] = top.map(c => ({
+    const initial: TradeProposal[] = ranked.map((c, index) => ({
       partner:       c.team,
       homeSends:     c.homeSends,
       partnerSends:  c.partnerSends,
       fitScore:      c.fitScore,
       isDump:        c.isDump,
       dumpSweetener: c.dumpSweetener,
+      marketRank:    index + 1,
+      alternativeCount: c.alternativeCount,
     }));
     setProposals(initial);
+    setActiveIndex(0);
     setGenerating(false);
     setDone(true);
+  };
+
+  const activeProposal = proposals[activeIndex];
+  const goToFile = (nextIndex: number) => {
+    if (!proposals.length) return;
+    const wrapped = (nextIndex + proposals.length) % proposals.length;
+    setSlideDirection(wrapped > activeIndex || (activeIndex === proposals.length - 1 && wrapped === 0) ? "next" : "prev");
+    setActiveIndex(wrapped);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(28,20,10,0.80)', backdropFilter: 'blur(3px)' }}>
-      <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+      <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto"
         style={{ background: '#f0e6cc', border: '2px solid #b8a070', borderRadius: '3px' }}>
 
         {/* Header */}
@@ -264,7 +279,7 @@ export default function TradeProposalEngine({
               className="w-full py-3.5 font-black text-sm uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 btn-stamp">
               {generating
                 ? <><div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin"/>Searching 31 teams...</>
-                : <>⚡ Generate Trade Proposals</>}
+                : <>Open Market Ledger</>}
             </button>
           </div>
         )}
@@ -282,17 +297,66 @@ export default function TradeProposalEngine({
 
         {proposals.length > 0 && (
           <div className="p-4 sm:p-6 space-y-4">
-            <div className="text-[9px] font-black uppercase tracking-[0.4em] mb-4"
-              style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
-              {proposals.length} Trade Scenario{proposals.length > 1 ? "s" : ""}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between mb-4">
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-[0.4em]"
+                  style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
+                  Partner Case Files
+                </div>
+                <div className="text-[10px] mt-1" style={{ color: '#7f6740', fontFamily: "'Courier Prime', monospace" }}>
+                  {proposals.length} clubs filed a realistic offer from {marketStats.reviewed} reviewed teams.
+                  {" "}{marketStats.viable} total package{marketStats.viable === 1 ? "" : "s"} passed the audit.
+                </div>
+              </div>
+              {proposals.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => goToFile(activeIndex - 1)}
+                    className="trade-file-arrow"
+                    aria-label="Previous trade file">
+                    ‹
+                  </button>
+                  <div className="text-[10px] font-black uppercase tracking-widest min-w-20 text-center"
+                    style={{ color: '#7f6740', fontFamily: "'Courier Prime', monospace" }}>
+                    {activeIndex + 1} / {proposals.length}
+                  </div>
+                  <button
+                    onClick={() => goToFile(activeIndex + 1)}
+                    className="trade-file-arrow"
+                    aria-label="Next trade file">
+                    ›
+                  </button>
+                </div>
+              )}
             </div>
 
-            {proposals.map((p, i) => {
+            {proposals.length > 1 && (
+              <div className="trade-file-tabs" aria-label="Trade partner files">
+                {proposals.map((p, i) => (
+                  <button
+                    key={p.partner.id}
+                    onClick={() => goToFile(i)}
+                    className={i === activeIndex ? "active" : ""}
+                    aria-label={`Open file ${i + 1}: ${p.partner.name}`}>
+                    {String(i + 1).padStart(2, "0")}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {activeProposal && (() => {
+              const p = activeProposal;
+              const i = activeIndex;
               const homeNavOut  = p.homeSends.reduce((s,a) => s+(navMap[a.id]??0), 0);
               const partnerNavOut = p.partnerSends.reduce((s,a) => s+(navMap[a.id]??0), 0);
 
               return (
-                <div key={i} className="p-4" style={{ background: '#e8dab8', border: '1px solid #b8a070', borderRadius: '2px' }}>
+                <div key={`${p.partner.id}-${slideDirection}`} className={`trade-file-card slide-${slideDirection} relative p-4 pt-5`}
+                  style={{ background: '#e8dab8', border: '1px solid #b8a070', borderRadius: '2px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)' }}>
+                  <div className="absolute left-3 -top-3 px-3 py-1 text-[8px] font-black uppercase tracking-widest"
+                    style={{ background: '#d8c493', border: '1px solid #b8a070', borderBottom: 0, color: '#7f6740', fontFamily: "'Courier Prime', monospace", borderRadius: '2px 2px 0 0' }}>
+                    File #{String(p.marketRank ?? i + 1).padStart(2, "0")}
+                  </div>
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <div className="font-black text-sm" style={{ fontFamily: "'Libre Baskerville', serif", color: '#1c140a' }}>
@@ -302,6 +366,7 @@ export default function TradeProposalEngine({
                         style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                         {p.partner.phase} · #{p.partner.standing} · ${p.partner.capSpace.toFixed(1)}M cap
                         {p.isDump && <span style={{ color: '#b83020' }}> · ABSORBS CONTRACT</span>}
+                        {(p.alternativeCount ?? 0) > 1 && <span> · {p.alternativeCount} package options</span>}
                       </div>
                     </div>
                     <div className="text-[10px] font-black px-2 py-1" style={{
@@ -454,12 +519,26 @@ export default function TradeProposalEngine({
 
                 </div>
               );
-            })}
+            })()}
 
-            <button onClick={() => { setDone(false); setProposals([]); }}
-              className="w-full py-2.5 font-black text-[10px] uppercase tracking-widest transition-colors btn-ghost mt-2">
-              Generate New Proposals
-            </button>
+            <div className="grid gap-2 sm:grid-cols-[auto_1fr_auto]">
+              <button
+                onClick={() => goToFile(activeIndex - 1)}
+                disabled={proposals.length < 2}
+                className="w-full py-2.5 px-4 font-black text-[10px] uppercase tracking-widest transition-colors btn-ghost disabled:opacity-40">
+                Previous File
+              </button>
+              <button onClick={() => { setDone(false); setProposals([]); setActiveIndex(0); }}
+                className="w-full py-2.5 px-4 font-black text-[10px] uppercase tracking-widest transition-colors btn-ghost">
+                Rebuild Market Ledger
+              </button>
+              <button
+                onClick={() => goToFile(activeIndex + 1)}
+                disabled={proposals.length < 2}
+                className="w-full py-2.5 px-4 font-black text-[10px] uppercase tracking-widest transition-colors btn-ghost disabled:opacity-40">
+                Next File
+              </button>
+            </div>
           </div>
         )}
       </div>

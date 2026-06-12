@@ -1,8 +1,12 @@
-# Agent Instructions
+# Environment Context
+- This environment is a headless GitHub Codespace. 
+- DO NOT start the development server (`npm run dev`) or attempt to `curl localhost` to verify UI changes. 
+- The user will handle all visual and UI testing manually in the browser. 
 
-Use npm unless the repo has another lockfile.
-Run tests before finalizing changes.
-Do not commit directly to main.
-Do not commit at all
-Produce .ts files to download or release the full code change so I can copy and paste the changes into the codespace. This will prevent logic breaks.
-Prefer small PRs.
+# Workflow Rules
+- Use npm as the package manager.
+- Run tests (`npm run test`) to verify logic changes before finalizing your work.
+- Do not commit directly to main. Prefer small PRs.
+
+# Tools Integration
+@/home/codespace/.codex/RTK.md

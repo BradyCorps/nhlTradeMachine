@@ -25,6 +25,7 @@ export interface TeamMatch {
   teamName:      string;
   phase:         string;
   score:         number;
+  fitTier:       "LEAD" | "CAP_CLEAR" | "LONG_SHOT" | "BLOCKED";
   navDelta:      number;
   capFit:        "FITS" | "TIGHT" | "OVER";
   fitReasons:    string[];
@@ -217,11 +218,20 @@ export async function POST(req: NextRequest) {
         isDump           ? "Cap relief + conditional pick" :
                            "Salary retained — minimal return";
 
+      const finalScore = Math.max(0, Math.min(100, Math.round(score)));
+      const fitTier: TeamMatch["fitTier"] =
+        capFit === "OVER"             ? "BLOCKED" :
+        finalScore >= 60              ? "LEAD" :
+        capFit === "FITS"             ? "CAP_CLEAR" :
+        finalScore >= 35              ? "LONG_SHOT" :
+                                        "BLOCKED";
+
       return {
         teamId:    team.id,
         teamName:  team.name,
         phase,
-        score:     Math.max(0, Math.min(100, Math.round(score))),
+        score:     finalScore,
+        fitTier,
         navDelta:  packageNAV,
         capFit,
         fitReasons:  fit.slice(0, 3),
@@ -229,9 +239,8 @@ export async function POST(req: NextRequest) {
         returnProfile,
       };
     })
-    .filter(m => m !== null && m.score >= 12)   // minimum threshold — below 12 the trade would almost certainly fail
-    .sort((a, b) => b!.score - a!.score)
-    .slice(0, 8) as TeamMatch[];
+    .filter(m => m !== null)
+    .sort((a, b) => b!.score - a!.score) as TeamMatch[];
 
   return NextResponse.json({ matches, packageNAV, packageCap, avgAge });
 }
