@@ -65,7 +65,7 @@ function TugBar({ homeNetGain, navA, navB, cNavA, cNavB }: TugBarProps) {
           <span className={`hidden sm:inline ${homeNetGain < -5 ? "text-rose-500" : ""}`}>Outgoing Value</span>
           <span className={`sm:hidden ${homeNetGain < -5 ? "text-rose-500" : ""}`}>OUT</span>
           <span className="bg-zinc-950 text-zinc-300 px-3 py-1 rounded-lg border border-zinc-800 font-mono text-2xs tracking-tight">
-            {(cNavA ?? navA).toFixed(0)} ←→ {(cNavB ?? navB).toFixed(0)} NAV
+            {dispA.toFixed(0)} ←→ {dispB.toFixed(0)} NAV
           </span>
           <span className={`hidden sm:inline ${homeNetGain > 5 ? "text-emerald-400" : ""}`}>Incoming Value</span>
           <span className={`sm:hidden ${homeNetGain > 5 ? "text-emerald-400" : ""}`}>IN</span>

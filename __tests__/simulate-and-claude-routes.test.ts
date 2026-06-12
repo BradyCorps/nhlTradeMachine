@@ -163,6 +163,130 @@ describe("simulate route", () => {
     expect(firstBody.homeTeam.projectedPoints).toBe(secondBody.homeTeam.projectedPoints);
   });
 
+  it("keeps projections stable when input team and player order changes", async () => {
+    const depth = teamIds.flatMap((teamId, i) => [
+      player(`${teamId}-f1`, `${teamId} Forward`, teamId, 38 + (i % 12), "C"),
+      player(`${teamId}-d1`, `${teamId} Defender`, teamId, 21 + (i % 9), "D"),
+      {
+        ...player(`${teamId}-g1`, `${teamId} Goalie`, teamId, 0, "G"),
+        gsax: i % 7 - 3,
+        gamesStarted: 35 + (i % 20),
+        savePct: 0.900 + (i % 8) / 1000,
+      },
+    ]);
+
+    const payload = {
+      homeTeamId: "WPG",
+      partnerTeamId: "CGY",
+      teams,
+      players: depth,
+      seed: 2027,
+      trades: [],
+    };
+
+    const first = await simulatePOST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }) as any);
+    const second = await simulatePOST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      body: JSON.stringify({
+        ...payload,
+        teams: [...teams].reverse(),
+        players: [...depth].reverse(),
+      }),
+    }) as any);
+
+    const firstBody = await first.json();
+    const secondBody = await second.json();
+    const byTeam = (body: any) => Object.fromEntries(
+      body.standings.map((t: any) => [t.teamId, {
+        points: t.projectedPoints,
+        topScorer: t.topScorer?.name,
+        goalie: t.goalie?.name,
+      }])
+    );
+
+    expect(byTeam(secondBody)).toEqual(byTeam(firstBody));
+    expect(secondBody.playoffBracket.champion).toEqual(firstBody.playoffBracket.champion);
+    expect(secondBody.leaders.connSmythe).toEqual(firstBody.leaders.connSmythe);
+  });
+
+  it("derives scoring leaders from projected player seasons, not only team top scorers", async () => {
+    const depth = teamIds.flatMap((teamId) => [
+      {
+        ...player(`${teamId}-playmaker`, `${teamId} Playmaker`, teamId, 78, "C"),
+        xGPace: 10,
+      },
+      {
+        ...player(`${teamId}-sniper`, `${teamId} Sniper`, teamId, 68, "W"),
+        xGPace: 60,
+      },
+      player(`${teamId}-d1`, `${teamId} Defender`, teamId, 25, "D"),
+      {
+        ...player(`${teamId}-g1`, `${teamId} Goalie`, teamId, 0, "G"),
+        gsax: 0,
+        gamesStarted: 45,
+        savePct: 0.905,
+      },
+    ]);
+
+    const res = await simulatePOST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      body: JSON.stringify({
+        homeTeamId: "WPG",
+        partnerTeamId: "CGY",
+        teams,
+        players: depth,
+        seed: 404,
+        trades: [],
+      }),
+    }) as any);
+    const body = await res.json();
+
+    expect(body.leaders.topScorer.name).toContain("Playmaker");
+    expect(body.leaders.goalsLeader.name).toContain("Sniper");
+    expect(body.leaders.assistsLeader.name).toContain("Playmaker");
+  });
+
+  it("allows productive older stars to maintain high-end output", async () => {
+    const olderStar = {
+      ...player("older-star", "Sidney Scheifele", "WPG", 92, "C"),
+      age: 36,
+      avgTOI: 19.5,
+      games: 78,
+      baselinePtsPace: 90,
+      xGPace: 32,
+    };
+    const depth = teamIds.flatMap((teamId) => [
+      player(`${teamId}-f1`, `${teamId} Forward`, teamId, 42, "C"),
+      player(`${teamId}-d1`, `${teamId} Defender`, teamId, 25, "D"),
+      {
+        ...player(`${teamId}-g1`, `${teamId} Goalie`, teamId, 0, "G"),
+        gsax: 0,
+        gamesStarted: 45,
+        savePct: 0.905,
+      },
+    ]);
+
+    const res = await simulatePOST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      body: JSON.stringify({
+        homeTeamId: "WPG",
+        partnerTeamId: "CGY",
+        teams,
+        players: [...depth, olderStar],
+        seed: 19,
+        trades: [],
+      }),
+    }) as any);
+    const body = await res.json();
+    const projected = body.homeTeam.projectedSkaters.find((p: any) => p.playerId === "older-star");
+
+    expect(projected.projectedPts).toBeGreaterThanOrEqual(70);
+    expect(projected.breakoutTag).not.toBe("REGRESSION");
+  });
+
   it("uses order-insensitive object keys for scenario seeds", () => {
     expect(scenarioSeed({ b: 2, a: 1 })).toBe(scenarioSeed({ a: 1, b: 2 }));
   });

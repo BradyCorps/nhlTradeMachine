@@ -465,7 +465,9 @@ const runGmLogic = (
     explanation: `The NHL CBA prohibits retaining more than 50% of any player's cap hit.`,
   });
 
-  const partnerElites = incoming.filter((a) => getAssetNAV(a).total > 260);
+  const isShoppedAsset = (a: Asset): boolean =>
+    a.tradeBlockStatus === "available" || a.tradeBlockStatus === "requested";
+  const partnerElites = incoming.filter((a) => getAssetNAV(a).total > 260 && !isShoppedAsset(a));
   const homeElites    = outgoing.filter((a) => getAssetNAV(a).total > 200);
   if (partnerElites.length > 0 && homeElites.length === 0) {
     const requiredOverpay = navIn * 0.18;

@@ -4,8 +4,6 @@ import {
   ageDecay,
   hashString,
   mulberry32,
-  projectSkaterSeason,
-  projectTopScorer,
   scenarioSeed,
   stablePts,
 } from "@/app/lib/sim-engine";
@@ -48,6 +46,18 @@ interface SimTeam {
   points?: number;
 }
 
+interface ProjectedSkaterSeason {
+  playerId: string;
+  name: string;
+  position: string;
+  age: number;
+  projectedPts: number;
+  projectedGoals: number;
+  projectedAssists: number;
+  gamesPlayed: number;
+  breakoutTag?: "BREAKOUT" | "REGRESSION" | "VETERAN_HOLD";
+}
+
 interface PlayoffSeries {
   home:     { teamId: string; teamName: string; pts: number };
   away:     { teamId: string; teamName: string; pts: number };
@@ -85,6 +95,7 @@ interface TradedPlayerOutcome {
   newTeamName: string;
   projectedPts?: number;
   projectedGoals?: number;
+  projectedAssists?: number;
   gamesPlayed?: number;
   projectedGAA?: number;
   projectedSVP?: number;
@@ -263,18 +274,86 @@ function projectGoalie(
   };
 }
 
-// ── Project top defenseman (Norris candidate) ───────────────────
-function projectTopDefenseman(roster: SimPlayer[], rand: () => number): { name: string; projectedPts: number } | null {
-  // Norris ranking: stable scoring + pairing driver score — voters reward
-  // two-way anchors, not just point producers on the top PP unit
-  const norrisScore = (p: SimPlayer) => stablePts(p) + (p.pairDriverScore ?? 0) * 0.8;
-  const dmen = roster.filter(p => p.position === "D" && p.ptsPace > 0 && (p as any).games >= 10)
-    .sort((a, b) => norrisScore(b) - norrisScore(a));
-  if (dmen.length === 0) return null;
-  const top  = dmen[0];
-  const decay = ageDecay(top.age, top.position);
-  const proj  = Math.round((stablePts(top) / 82) * (72 + rand() * 10) * decay * (0.85 + rand() * 0.30));
-  return { name: top.name, projectedPts: proj };
+const clamp = (value: number, min: number, max: number): number =>
+  Math.max(min, Math.min(max, value));
+
+// ── Project skater seasons across a full roster ───────────────
+// This keeps last-season scoring as the anchor, but lets age, prospect NHLe,
+// prior usage, and controlled variance create believable breakouts/regressions.
+function projectSkaterOutcome(p: SimPlayer, teamId: string, seed: number): ProjectedSkaterSeason {
+  const rand = mulberry32(seed + hashString(`${teamId}:${p.id}:skater-season`));
+  const priorGames = p.games ?? 82;
+  const prospectPace = p.prospectPtsPace != null ? p.prospectPtsPace * 0.72 : 0;
+  const stablePace = p.ptsPace > 0
+    ? stablePts(p)
+    : prospectPace;
+
+  const isProspectProfile = p.age <= 22 && (priorGames < 45 || prospectPace > stablePace);
+  const isYoungRegular    = p.age <= 24 && priorGames >= 20;
+  const isPrime           = p.age >= 25 && p.age <= 29;
+  const isDeclineRisk     = p.age >= 32;
+  const isAgingWell       = p.age >= 31
+    && stablePace >= 65
+    && (p.avgTOI ?? 0) >= (p.position === "D" ? 21 : 17)
+    && priorGames >= 45;
+
+  let development = ageDecay(p.age, p.position);
+  if (isProspectProfile) development *= 0.94 + rand() * 0.34;
+  else if (isYoungRegular) development *= 0.96 + rand() * 0.24;
+  else if (isPrime) development *= 0.96 + rand() * 0.12;
+  else if (isAgingWell) development *= 1.04 + rand() * 0.12;
+  else development *= 0.90 + rand() * 0.18;
+
+  let breakoutTag: ProjectedSkaterSeason["breakoutTag"];
+  const breakoutChance =
+    isProspectProfile ? 0.24 :
+    isYoungRegular    ? 0.16 :
+    p.age <= 26 && stablePace < 55 ? 0.08 :
+    0.03;
+  const regressionChance =
+    isAgingWell ? 0.07 :
+    isDeclineRisk ? 0.18 :
+    stablePace >= 85 ? 0.10 :
+    isProspectProfile ? 0.12 :
+    0.05;
+
+  const eventRoll = rand();
+  if (eventRoll < breakoutChance) {
+    development *= 1.14 + rand() * (isProspectProfile ? 0.24 : 0.16);
+    breakoutTag = "BREAKOUT";
+  } else if (eventRoll > 1 - regressionChance) {
+    development *= 0.78 + rand() * 0.14;
+    breakoutTag = "REGRESSION";
+  } else if (isAgingWell && eventRoll > 0.55) {
+    development *= 1.02 + rand() * 0.08;
+    breakoutTag = "VETERAN_HOLD";
+  }
+
+  let gamesPlayed = Math.round(70 + rand() * 12);
+  if (isProspectProfile) gamesPlayed = Math.round(55 + rand() * 27);
+  if (rand() < (isAgingWell ? 0.04 : isDeclineRisk ? 0.10 : 0.055)) {
+    gamesPlayed = Math.max(8, gamesPlayed - Math.round((isAgingWell ? 10 : 18) + rand() * (isAgingWell ? 18 : 38)));
+  }
+
+  const paceVariance = isAgingWell ? 0.98 + rand() * 0.14 : 0.91 + rand() * 0.18;
+  const projectedPts = Math.max(0, Math.round((stablePace / 82) * gamesPlayed * development * paceVariance));
+  const xgGoalShare = stablePace > 0
+    ? clamp((p.xGPace ?? 0) / Math.max(stablePace, 1), 0.22, p.position === "D" ? 0.36 : 0.55)
+    : p.position === "D" ? 0.24 : 0.38;
+  const roleGoalShare = p.position === "D" ? 0.24 : xgGoalShare;
+  const projectedGoals = Math.max(0, Math.min(projectedPts, Math.round(projectedPts * roleGoalShare * (0.88 + rand() * 0.24))));
+
+  return {
+    playerId: p.id,
+    name: p.name,
+    position: p.position,
+    age: p.age,
+    projectedPts,
+    projectedGoals,
+    projectedAssists: Math.max(0, projectedPts - projectedGoals),
+    gamesPlayed,
+    breakoutTag,
+  };
 }
 
 // ── Simulate full league standings ────────────────────────────
@@ -283,7 +362,6 @@ function simulateLeague(
   playersByTeam: Map<string, SimPlayer[]>,
   tradeNavDeltas: Map<string, number>,
   capDeltas: Map<string, number>,
-  rand: () => number,
   seed: number,
 ): SimTeamResult[] {
   return teams.map(team => {
@@ -291,14 +369,37 @@ function simulateLeague(
     const navDelta   = tradeNavDeltas.get(team.id) ?? 0;
     const capDelta   = capDeltas.get(team.id) ?? 0;
     const capSpaceAfterTrade = team.capSpace - capDelta;
-    const projectedPoints = projectTeamPoints(team, roster, navDelta, capSpaceAfterTrade, rand);
-    const topScorer  = projectTopScorer(roster, team.id, seed);
+    const teamSeed = seed + hashString(`team:${team.id}`);
+    const projectedPoints = projectTeamPoints(
+      team,
+      roster,
+      navDelta,
+      capSpaceAfterTrade,
+      mulberry32(teamSeed + hashString("points")),
+    );
+    const projectedSkaters = roster
+      .filter(p => p.position !== "Pick" && p.position !== "G"
+        && (p.ptsPace > 0 || (p.prospectPtsPace ?? 0) > 0)
+        && ((p.games ?? 0) >= 5 || (p.prospectPtsPace ?? 0) > 0))
+      .map(p => projectSkaterOutcome(p, team.id, seed))
+      .sort((a, b) =>
+        b.projectedPts !== a.projectedPts
+          ? b.projectedPts - a.projectedPts
+          : a.name.localeCompare(b.name)
+      );
+    const topScorer  = projectedSkaters[0] ?? null;
     const winPct     = projectedPoints / 164;
-    const goalie     = projectGoalie(roster, winPct, rand);
-    const topDefenseman = projectTopDefenseman(roster, rand);
+    const goalie     = projectGoalie(roster, winPct, mulberry32(teamSeed + hashString("goalie")));
+    const topDefenseman = projectedSkaters
+      .filter(p => p.position === "D")
+      .sort((a, b) =>
+        b.projectedPts !== a.projectedPts
+          ? b.projectedPts - a.projectedPts
+          : a.name.localeCompare(b.name)
+      )[0] ?? null;
     return {
       teamId: team.id, teamName: team.name, phase: team.phase,
-      projectedPoints, topScorer, goalie, topDefenseman,
+      projectedPoints, topScorer, projectedSkaters: projectedSkaters.slice(0, 18), goalie, topDefenseman,
       madePlayoffs: false, divisionRank: 0, leagueRank: 0, division: "",
     };
   });
@@ -309,9 +410,10 @@ interface SimTeamResult {
   teamName: string;
   phase: string;
   projectedPoints: number;
-  topScorer: { name: string; projectedPts: number; projectedGoals: number; position: string } | null;
+  topScorer: ProjectedSkaterSeason | null;
+  projectedSkaters: ProjectedSkaterSeason[];
   goalie: { name: string; projectedGAA: number; projectedSVP: number; gamesStarted: number; gsax: number } | null;
-  topDefenseman: { name: string; projectedPts: number } | null;
+  topDefenseman: ProjectedSkaterSeason | null;
   madePlayoffs: boolean;
   divisionRank: number;
   leagueRank: number;
@@ -516,12 +618,24 @@ function findLeagueLeaders(
     ? sortedPlayoff.find(t => t.teamId !== "FLA") ?? rawCupWinner
     : rawCupWinner;
 
-  let topScorerResult: { name: string; team: string; pts: number } | null = null;
-  for (const team of standings) {
-    if (team.topScorer && (!topScorerResult || team.topScorer.projectedPts > topScorerResult.pts)) {
-      topScorerResult = { name: team.topScorer.name, team: team.teamName, pts: team.topScorer.projectedPts };
-    }
-  }
+  const skaterPool = standings.flatMap(team =>
+    team.projectedSkaters.map(p => ({
+      ...p,
+      teamId: team.teamId,
+      teamName: team.teamName,
+      teamRank: team.leagueRank,
+      madePlayoffs: team.madePlayoffs,
+    }))
+  );
+
+  const topScorer = [...skaterPool].sort((a, b) =>
+    b.projectedPts !== a.projectedPts
+      ? b.projectedPts - a.projectedPts
+      : a.name.localeCompare(b.name)
+  )[0];
+  const topScorerResult = topScorer
+    ? { name: topScorer.name, team: topScorer.teamName, pts: topScorer.projectedPts }
+    : null;
 
   let topGoalieResult: { name: string; team: string; gaa: number; svp: number } | null = null;
   for (const team of standings) {
@@ -547,35 +661,35 @@ function findLeagueLeaders(
 
   let hartResult: { name: string; team: string; pts: number } | null = null;
   let bestHart = -Infinity;
-  for (const team of standings) {
-    if (!team.topScorer) continue;
-    const bonus = team.madePlayoffs ? 1.10 + (1 / (team.leagueRank + 1)) * 0.20 : 0.80;
-    const score = team.topScorer.projectedPts * bonus * (0.88 + rand() * 0.24);
+  for (const p of skaterPool.filter(p => p.projectedPts >= 65)) {
+    const teamBonus = p.madePlayoffs ? 1.10 + (1 / (p.teamRank + 1)) * 0.20 : 0.78;
+    const breakoutBonus = p.breakoutTag === "BREAKOUT" ? 1.04 : 1.0;
+    const score = p.projectedPts * teamBonus * breakoutBonus * (0.90 + rand() * 0.20);
     if (score > bestHart) {
       bestHart = score;
-      hartResult = { name: team.topScorer.name, team: team.teamName, pts: team.topScorer.projectedPts };
+      hartResult = { name: p.name, team: p.teamName, pts: p.projectedPts };
     }
   }
 
   let norrisResult: { name: string; team: string; pts: number } | null = null;
   let bestNorris = -Infinity;
-  for (const team of standings) {
-    if (!team.topDefenseman) continue;
-    const score = team.topDefenseman.projectedPts * (0.82 + rand() * 0.36);
+  for (const p of skaterPool.filter(p => p.position === "D" && p.projectedPts >= 35)) {
+    const score = p.projectedPts * (0.84 + rand() * 0.32);
     if (score > bestNorris) {
       bestNorris = score;
-      norrisResult = { name: team.topDefenseman.name, team: team.teamName, pts: team.topDefenseman.projectedPts };
+      norrisResult = { name: p.name, team: p.teamName, pts: p.projectedPts };
     }
   }
 
   let goalsLeader:   { name: string; team: string; goals: number } | null = null;
   let assistsLeader: { name: string; team: string; assists: number } | null = null;
-  for (const team of standings) {
-    if (!team.topScorer) continue;
-    const goals   = team.topScorer.projectedGoals ?? Math.round(team.topScorer.projectedPts * 0.40);
-    const assists = team.topScorer.projectedPts - goals;
-    if (!goalsLeader   || goals   > goalsLeader.goals)    goalsLeader   = { name: team.topScorer.name, team: team.teamName, goals };
-    if (!assistsLeader || assists > assistsLeader.assists) assistsLeader = { name: team.topScorer.name, team: team.teamName, assists };
+  for (const p of skaterPool) {
+    if (!goalsLeader || p.projectedGoals > goalsLeader.goals) {
+      goalsLeader = { name: p.name, team: p.teamName, goals: p.projectedGoals };
+    }
+    if (!assistsLeader || p.projectedAssists > assistsLeader.assists) {
+      assistsLeader = { name: p.name, team: p.teamName, assists: p.projectedAssists };
+    }
   }
 
   const cupTeam          = standings.find(t => t.teamId === cupWinner?.teamId);
@@ -630,7 +744,7 @@ function buildTradedPlayerOutcomes(
       return;
     }
 
-    const skater = projectSkaterSeason(p, newTeamId, seed);
+    const skater = projectSkaterOutcome(p, newTeamId, seed);
     outcomes.push({
       playerId: p.id,
       name: p.name,
@@ -641,6 +755,7 @@ function buildTradedPlayerOutcomes(
       newTeamName: teamName(newTeamId),
       projectedPts: skater.projectedPts,
       projectedGoals: skater.projectedGoals,
+      projectedAssists: skater.projectedAssists,
       gamesPlayed: skater.gamesPlayed,
       role: p.position === "D" ? "defenceman" : "skater",
     });
@@ -723,7 +838,7 @@ export async function POST(req: NextRequest) {
       capDeltas.set(trade.partnerTeamId,      (capDeltas.get(trade.partnerTeamId)      ?? 0) - capDelta);
     }
 
-    const rawStandings = simulateLeague(teams, playersByTeam, tradeNavDeltas, capDeltas, rand, seed);
+    const rawStandings = simulateLeague(teams, playersByTeam, tradeNavDeltas, capDeltas, seed);
     const standings    = assignPlayoffSeeds(rawStandings);
     const leaders      = findLeagueLeaders(standings, rand);
 
@@ -737,24 +852,22 @@ export async function POST(req: NextRequest) {
         .sort((a, b) => b.projectedPoints - a.projectedPoints);
     }
 
-    // Draftees with no NHL games carry an NHLe-translated prospectPtsPace —
-    // they belong in the Calder pool alongside rookies with live stats
-    const rookiePace = (p: SimPlayer): number =>
-      p.ptsPace > 0 ? p.ptsPace : (p.prospectPtsPace ?? 0) * 0.7; // NHLe haircut for jump risk
-    const rookieCandidates = [...playersByTeam.entries()].flatMap(([teamId, roster]) =>
-      roster
-        .filter(p => p.age <= 22 && p.position !== "G" && rookiePace(p) > 0)
-        .map(p => ({ ...p, teamId }))
+    const rookieCandidates = standings.flatMap(team =>
+      team.projectedSkaters
+        .filter(p => p.age <= 22 && p.gamesPlayed >= 35)
+        .map(p => ({ ...p, teamName: team.teamName }))
     );
     const calderWinner = (() => {
       if (rookieCandidates.length === 0) return { name: "Matthew Schaefer", team: "New York Islanders", note: "—" };
       const sorted = rookieCandidates
-        .map(p => ({ p, score: rookiePace(p) * (0.50 + rand() * 1.00) }))
+        .map(p => ({ p, score: p.projectedPts + (p.breakoutTag === "BREAKOUT" ? 8 : 0) + rand() * 10 }))
         .sort((a, b) => b.score - a.score);
-      const winner   = sorted[0].p;
-      const teamName = teams.find(t => t.id === winner.teamId)?.name ?? winner.teamId;
-      const pace     = rookiePace(winner);
-      return { name: winner.name, team: teamName, note: `${Math.round(pace * 0.9)}-${Math.round(pace * 0.9 * 0.55)} in projected first full season` };
+      const winner = sorted[0].p;
+      return {
+        name: winner.name,
+        team: winner.teamName,
+        note: `${winner.projectedGoals}-${winner.projectedAssists}-${winner.projectedPts} in projected rookie season`,
+      };
     })();
 
     const playoffBracket = simulatePlayoffs(standings, rand);

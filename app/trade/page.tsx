@@ -619,7 +619,9 @@ export default function TradeMachine() {
   const navB = blocks[1].reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);
   const cNavA = compressBlock(blocks[0]);
   const cNavB = compressBlock(blocks[1]);
-  const homeNetGain = cNavB - cNavA;
+  const displayNavA = cNavA > 0 ? cNavA : navA;
+  const displayNavB = cNavB > 0 ? cNavB : navB;
+  const homeNetGain = displayNavB - displayNavA;
 
   // Always pull live cap space from db — teams state can be stale after trade execution
   const liveHome    = db.teams.find(t => t.id === teams[0]?.id) ?? teams[0];
@@ -1308,102 +1310,8 @@ export default function TradeMachine() {
               ))}
             </div>
 
-            {/* Sim result */}
-            {/* ── Projected Season Breakdown ── */}
-            {simData && (
-              <div style={{ borderTop: '1px solid #b8a070', padding: '16px 20px 12px' }}>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[11px] font-black uppercase tracking-widest text-ledger-ink-faint font-mono">
-                    ⚡ Season Results
-                  </span>
-                  <span className="text-2xs text-ledger-rule font-mono">
-                    Simulation #{simData.seed}
-                  </span>
-                </div>
-
-                {/* Two team cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                  {[simData.homeTeam, simData.partnerTeam].filter(Boolean).map((t: any) => (
-                    <div key={t.teamId} style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070', padding: '10px 12px' }}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-black text-[12px] text-ledger-ink font-serif">{t.teamName}</span>
-                        <span className={`text-2xs font-black px-1.5 py-0.5`} style={{
-                          color: t.madePlayoffs ? 'var(--ledger-green)' : 'var(--ledger-red)',
-                          border: `1px solid ${t.madePlayoffs ? 'rgba(26,92,46,0.4)' : 'rgba(184,48,32,0.4)'}`,
-                        }}>
-                          {t.madePlayoffs ? '✓ PLAYOFFS' : '✗ MISSED'}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {[
-                          { label: 'PTS', val: t.projectedPoints },
-                          { label: 'RANK', val: `#${t.leagueRank}` },
-                          { label: 'TOP SCORER', val: t.topScorer ? `${t.topScorer.name.split(' ').pop()} ${t.topScorer.projectedPts}pts` : '—' },
-                          { label: 'GOALIE', val: t.goalie?.name.split(' ').pop() ?? '—' },
-                          { label: 'GAA', val: t.goalie?.projectedGAA ?? '—' },
-                          { label: 'SV%', val: t.goalie?.projectedSVP?.toFixed(3) ?? '—' },
-                        ].map((s: any) => (
-                          <div key={s.label} style={{ background: 'var(--ledger-cream)', border: '1px solid #c8b890', padding: '4px 6px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '6px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.label}</div>
-                            <div style={{ fontSize: '9px', fontWeight: 900, color: 'var(--ledger-ink)', marginTop: '1px' }}>{s.val}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* League results strip */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                  {[
-                    { label: "Presidents' Trophy", val: `${simData.leaders?.presidentsTrophy?.teamName} (${simData.leaders?.presidentsTrophy?.projectedPoints}pts)` },
-                    { label: "Stanley Cup", val: simData.playoffBracket?.champion?.teamName ?? simData.leaders?.cupWinner?.teamName },
-                    { label: "Points Leader", val: `${simData.leaders?.topScorer?.name?.split(' ').pop()} ${simData.leaders?.topScorer?.pts}pts` },
-                    { label: "Draft Lottery", val: `${simData.leaders?.draftLottery?.teamName} (${simData.leaders?.draftLottery?.projectedPoints}pts)` },
-                  ].map((s: any) => (
-                    <div key={s.label} style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070', padding: '6px 8px' }}>
-                      <div style={{ fontSize: '6.5px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>{s.label}</div>
-                      <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--ledger-ink)' }}>{s.val}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* ── Playoff Bracket ── */}
-                {simData.playoffBracket && (
-                  <PlayoffBracket bracket={simData.playoffBracket} />
-                )}
-              </div>
-            )}
-
-            {simResult && (
-              <div className="px-5 py-5" style={{ borderTop: '1px solid #b8a070' }}>
-                <div className="flex items-center gap-2 mb-4" style={{ borderBottom: '1px solid #c8b890', paddingBottom: '8px' }}>
-                  <span className="text-ledger-red">⚡</span>
-                  <span className="text-2xs font-black uppercase tracking-widest text-ledger-ink-faint font-mono">
-                    Claude · One Year Later
-                  </span>
-                </div>
-                <div className="space-y-4">
-                  {simResult.split('\n').map((line, i) => {
-                    if (line.startsWith('## ') || line.startsWith('**THE ') || line.startsWith('**EDMONTON') || line.startsWith('**AROUND') || line.startsWith('**THE YEAR') || line.startsWith('**DRAFT') || line.startsWith('**VERDICT')) {
-                      const text = line.replace(/^\#{1,3}\s+/, '').replace(/\*\*/g, '');
-                      return <div key={i} className="font-black text-[11px] uppercase tracking-widest mt-4 mb-1" style={{ color: 'var(--ledger-ink)', borderBottom: '1px solid #c8b890', paddingBottom: '4px' }}>{text}</div>;
-                    }
-                    if (line.startsWith('- **') || line.startsWith('- ')) {
-                      const text = line.replace(/^-\s+/, '').replace(/\*\*(.*?)\*\*/g, '$1');
-                      return <div key={i} className="text-[11px] leading-relaxed pl-3" style={{ color: 'var(--ledger-ink-mid)', borderLeft: '2px solid #b8a070' }}>{text}</div>;
-                    }
-                    if (line.trim() === '' || line.startsWith('#')) return null;
-                    // Split on **bold** markers and render with <strong> — no dangerouslySetInnerHTML
-                    const boldParts = line.split(/\*\*(.*?)\*\*/g);
-                    return (
-                      <p key={i} className="text-[11px] leading-[1.8]" style={{ color: 'var(--ledger-ink-mid)' }}>
-                        {boldParts.map((part, j) => j % 2 === 0 ? part : <strong key={j}>{part}</strong>)}
-                      </p>
-                    );
-                  })}
-                </div>
-              </div>
+            {(simData || simResult) && (
+              <SeasonResultsPager simData={simData} simResult={simResult} />
             )}
           </div>
         )}
@@ -2190,6 +2098,181 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
             })}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+function SeasonResultsPager({ simData, simResult }: { simData: any | null; simResult: string | null }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [slideDirection, setSlideDirection] = useState<"next" | "prev">("next");
+
+  const renderRecapLine = (line: string, i: number) => {
+    if (line.startsWith('## ') || line.startsWith('**THE ') || line.startsWith('**EDMONTON') || line.startsWith('**AROUND') || line.startsWith('**THE YEAR') || line.startsWith('**DRAFT') || line.startsWith('**VERDICT')) {
+      const text = line.replace(/^\#{1,3}\s+/, '').replace(/\*\*/g, '');
+      return <div key={i} className="font-black text-[11px] uppercase tracking-widest mt-4 mb-1" style={{ color: 'var(--ledger-ink)', borderBottom: '1px solid #c8b890', paddingBottom: '4px' }}>{text}</div>;
+    }
+    if (line.startsWith('- **') || line.startsWith('- ')) {
+      const text = line.replace(/^-\s+/, '').replace(/\*\*(.*?)\*\*/g, '$1');
+      return <div key={i} className="text-[11px] leading-relaxed pl-3" style={{ color: 'var(--ledger-ink-mid)', borderLeft: '2px solid #b8a070' }}>{text}</div>;
+    }
+    if (line.trim() === '' || line.startsWith('#')) return null;
+    const boldParts = line.split(/\*\*(.*?)\*\*/g);
+    return (
+      <p key={i} className="text-[11px] leading-[1.8]" style={{ color: 'var(--ledger-ink-mid)' }}>
+        {boldParts.map((part, j) => j % 2 === 0 ? part : <strong key={j}>{part}</strong>)}
+      </p>
+    );
+  };
+
+  const shortName = (name?: string) => name?.split(' ').pop() ?? '—';
+  const playerLine = (p: any, suffix = "pts") => p ? `${shortName(p.name)} ${p.projectedPts ?? p.pts}${suffix}` : '—';
+  const StatCell = ({ label, val }: { label: string; val: any }) => (
+    <div style={{ background: 'var(--ledger-cream)', border: '1px solid #c8b890', padding: '5px 6px', textAlign: 'center' }}>
+      <div style={{ fontSize: '6px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</div>
+      <div style={{ fontSize: '9px', fontWeight: 900, color: 'var(--ledger-ink)', marginTop: '1px' }}>{val ?? '—'}</div>
+    </div>
+  );
+  const TeamNumbers = ({ t }: { t: any }) => {
+    const skaters = t.projectedSkaters ?? [];
+    const goalsLeader = [...skaters].sort((a, b) => (b.projectedGoals ?? 0) - (a.projectedGoals ?? 0))[0];
+    const assistsLeader = [...skaters].sort((a, b) => (b.projectedAssists ?? 0) - (a.projectedAssists ?? 0))[0];
+    const breakout = skaters.find((p: any) => p.breakoutTag === "BREAKOUT" || p.breakoutTag === "VETERAN_HOLD");
+    const regression = skaters.find((p: any) => p.breakoutTag === "REGRESSION");
+    const topSixPts = skaters.slice(0, 6).reduce((s: number, p: any) => s + (p.projectedPts ?? 0), 0);
+    const topNinePts = skaters.slice(0, 9).reduce((s: number, p: any) => s + (p.projectedPts ?? 0), 0);
+    const dPts = skaters.filter((p: any) => p.position === "D").reduce((s: number, p: any) => s + (p.projectedPts ?? 0), 0);
+    const avgAge = skaters.length
+      ? (skaters.reduce((s: number, p: any) => s + (p.age ?? 0), 0) / skaters.length).toFixed(1)
+      : '—';
+
+    return (
+      <div style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070', padding: '10px 12px' }}>
+        <div className="flex items-center justify-between mb-2 gap-2">
+          <div>
+            <div className="font-black text-[12px] text-ledger-ink font-serif">{t.teamName}</div>
+            <div className="text-[8px] uppercase tracking-widest text-ledger-ink-faint font-mono mt-0.5">
+              {t.phase ?? 'Unknown'} · #{t.leagueRank} league · #{t.divisionRank} {t.division}
+            </div>
+          </div>
+          <span className="text-2xs font-black px-1.5 py-0.5 shrink-0" style={{
+            color: t.madePlayoffs ? 'var(--ledger-green)' : 'var(--ledger-red)',
+            border: `1px solid ${t.madePlayoffs ? 'rgba(26,92,46,0.4)' : 'rgba(184,48,32,0.4)'}`,
+          }}>
+            {t.madePlayoffs ? 'PLAYOFFS' : 'MISSED'}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+          <StatCell label="Points" val={t.projectedPoints} />
+          <StatCell label="Top Scorer" val={playerLine(t.topScorer)} />
+          <StatCell label="Goals" val={goalsLeader ? `${shortName(goalsLeader.name)} ${goalsLeader.projectedGoals}G` : '—'} />
+          <StatCell label="Assists" val={assistsLeader ? `${shortName(assistsLeader.name)} ${assistsLeader.projectedAssists}A` : '—'} />
+          <StatCell label="Top 6 Pts" val={topSixPts} />
+          <StatCell label="Top 9 Pts" val={topNinePts} />
+          <StatCell label="D Pts" val={dPts} />
+          <StatCell label="Avg Age" val={avgAge} />
+          <StatCell label="Top D" val={playerLine(t.topDefenseman)} />
+          <StatCell label="Goalie" val={t.goalie?.name ? shortName(t.goalie.name) : '—'} />
+          <StatCell label="GAA" val={t.goalie?.projectedGAA ?? '—'} />
+          <StatCell label="SV%" val={t.goalie?.projectedSVP?.toFixed(3) ?? '—'} />
+          <StatCell label="Breakout" val={breakout ? `${shortName(breakout.name)} ${breakout.projectedPts}pts` : '—'} />
+          <StatCell label="Risk" val={regression ? `${shortName(regression.name)} ${regression.projectedPts}pts` : '—'} />
+          <StatCell label="Skater Pool" val={`${skaters.length} tracked`} />
+          <StatCell label="Seed" val={simData?.seed ?? '—'} />
+        </div>
+      </div>
+    );
+  };
+
+  const teamPage = simData ? {
+    label: "Team Numbers",
+    node: (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {[simData.homeTeam, simData.partnerTeam].filter(Boolean).map((t: any) => <TeamNumbers key={t.teamId} t={t} />)}
+      </div>
+    ),
+  } : null;
+
+  const leaguePage = simData ? {
+    label: "League Numbers",
+    node: (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+        {[
+          { label: "Presidents' Trophy", val: `${simData.leaders?.presidentsTrophy?.teamName} (${simData.leaders?.presidentsTrophy?.projectedPoints}pts)` },
+          { label: "Stanley Cup", val: simData.playoffBracket?.champion?.teamName ?? simData.leaders?.cupWinner?.teamName },
+          { label: "Points Leader", val: `${simData.leaders?.topScorer?.name?.split(' ').pop()} ${simData.leaders?.topScorer?.pts}pts` },
+          { label: "Goals Leader", val: `${simData.leaders?.goalsLeader?.name?.split(' ').pop()} ${simData.leaders?.goalsLeader?.goals}G` },
+          { label: "Assists Leader", val: `${simData.leaders?.assistsLeader?.name?.split(' ').pop()} ${simData.leaders?.assistsLeader?.assists}A` },
+          { label: "Hart", val: `${simData.leaders?.hart?.name?.split(' ').pop()} ${simData.leaders?.hart?.pts}pts` },
+          { label: "Norris", val: `${simData.leaders?.norris?.name?.split(' ').pop()} ${simData.leaders?.norris?.pts}pts` },
+          { label: "Vezina", val: `${simData.leaders?.vezina?.name?.split(' ').pop()} ${simData.leaders?.vezina?.svp?.toFixed?.(3) ?? simData.leaders?.vezina?.svp}` },
+          { label: "Calder", val: `${simData.leaders?.calder?.name?.split(' ').pop()} · ${simData.leaders?.calder?.team}` },
+          { label: "Draft Lottery", val: `${simData.leaders?.draftLottery?.teamName} (${simData.leaders?.draftLottery?.projectedPoints}pts)` },
+        ].map((s: any) => (
+          <div key={s.label} style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070', padding: '6px 8px' }}>
+            <div style={{ fontSize: '6.5px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>{s.label}</div>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--ledger-ink)' }}>{s.val}</div>
+          </div>
+        ))}
+      </div>
+    ),
+  } : null;
+
+  const playoffPage = simData?.playoffBracket ? {
+    label: "Bracket",
+    node: <PlayoffBracket bracket={simData.playoffBracket} />,
+  } : null;
+
+  const recapPage = simResult ? {
+    label: "Recap",
+    node: <div className="space-y-4">{simResult.split('\n').map(renderRecapLine)}</div>,
+  } : null;
+
+  const pages = [teamPage, leaguePage, playoffPage, recapPage].filter(Boolean) as Array<{ label: string; node: React.ReactNode }>;
+  const activePage = pages[activeIndex] ?? pages[0];
+  const goToPage = (nextIndex: number) => {
+    if (!pages.length) return;
+    const wrapped = (nextIndex + pages.length) % pages.length;
+    setSlideDirection(wrapped > activeIndex || (activeIndex === pages.length - 1 && wrapped === 0) ? "next" : "prev");
+    setActiveIndex(wrapped);
+  };
+
+  if (!activePage) return null;
+
+  return (
+    <div style={{ borderTop: '1px solid #b8a070', padding: '16px 20px 12px' }}>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+        <div>
+          <div className="text-[11px] font-black uppercase tracking-widest text-ledger-ink-faint font-mono">
+            Season Results
+          </div>
+          <div className="text-2xs text-ledger-rule font-mono mt-1">
+            Simulation #{simData?.seed ?? "—"}
+          </div>
+        </div>
+        {pages.length > 1 && (
+          <div className="flex items-center gap-2">
+            <button onClick={() => goToPage(activeIndex - 1)} className="trade-file-arrow" aria-label="Previous season result">‹</button>
+            <div className="text-[10px] font-black uppercase tracking-widest min-w-20 text-center" style={{ color: '#7f6740', fontFamily: "'Courier Prime', monospace" }}>
+              {activeIndex + 1} / {pages.length}
+            </div>
+            <button onClick={() => goToPage(activeIndex + 1)} className="trade-file-arrow" aria-label="Next season result">›</button>
+          </div>
+        )}
+      </div>
+
+      {pages.length > 1 && (
+        <div className="trade-file-tabs" aria-label="Season result sections">
+          {pages.map((page, i) => (
+            <button key={page.label} onClick={() => goToPage(i)} className={i === activeIndex ? "active" : ""}>
+              {page.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div key={`${activePage.label}-${slideDirection}`} className={`trade-file-card slide-${slideDirection}`} style={{ background: '#e8dab8', border: '1px solid #b8a070', padding: '12px' }}>
+        {activePage.node}
       </div>
     </div>
   );

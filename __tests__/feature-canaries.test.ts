@@ -117,6 +117,12 @@ describe("Canary — trade block mechanics", () => {
     expect(src).toContain("tradeBlockStatus: asset.tradeBlockStatus");
   });
 
+  it("evaluate route does not protect elite assets that are being shopped", () => {
+    const src = read("app/api/evaluate/route.ts");
+    expect(src).toContain('a.tradeBlockStatus === "available" || a.tradeBlockStatus === "requested"');
+    expect(src).toMatch(/getAssetNAV\(a\)\.total > 260 && !isShoppedAsset\(a\)/);
+  });
+
   it("engine applies the trade-request leverage discount", () => {
     const engine = read("app/lib/xnav-engine.ts");
     expect(engine).toContain("applyTradeRequestDiscount");
@@ -140,6 +146,17 @@ describe("Canary — trade block mechanics", () => {
   it("match route names the best-fitting shopped player as the return", () => {
     const src = read("app/api/match/route.ts");
     expect(src).toContain("fits as the return");
+  });
+});
+
+describe("Canary — trade UI negative NAV", () => {
+  it("TugBar and trade page preserve all-negative package values instead of displaying compressed zero", () => {
+    const tradePage = read("app/trade/page.tsx");
+    const tugBar = read("app/components/TugBar.tsx");
+    expect(tradePage).toContain("const displayNavA = cNavA > 0 ? cNavA : navA");
+    expect(tradePage).toContain("const displayNavB = cNavB > 0 ? cNavB : navB");
+    expect(tradePage).toContain("const homeNetGain = displayNavB - displayNavA");
+    expect(tugBar).toContain("{dispA.toFixed(0)} ←→ {dispB.toFixed(0)} NAV");
   });
 });
 
