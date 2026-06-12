@@ -287,6 +287,54 @@ describe("simulate route", () => {
     expect(projected.breakoutTag).not.toBe("REGRESSION");
   });
 
+  it("excludes players with more than 14 preseason NHL games from Calder voting", async () => {
+    const celebrini = {
+      ...player("celebrini", "Macklin Celebrini", "SJS", 98, "C"),
+      age: 19,
+      games: 70,
+      baselinePtsPace: 95,
+      xGPace: 42,
+    };
+    const trueRookie = {
+      ...player("true-rookie", "True Rookie", "NYI", 72, "D"),
+      age: 18,
+      games: 0,
+      baselinePtsPace: 0,
+      prospectPtsPace: 70,
+      xGPace: 24,
+    };
+    const depth = teamIds.flatMap((teamId) => [
+      player(`${teamId}-f1`, `${teamId} Forward`, teamId, 42, "C"),
+      player(`${teamId}-d1`, `${teamId} Defender`, teamId, 25, "D"),
+      {
+        ...player(`${teamId}-g1`, `${teamId} Goalie`, teamId, 0, "G"),
+        gsax: 0,
+        gamesStarted: 45,
+        savePct: 0.905,
+      },
+    ]);
+
+    const res = await simulatePOST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      body: JSON.stringify({
+        homeTeamId: "WPG",
+        partnerTeamId: "CGY",
+        teams,
+        players: [...depth, celebrini, trueRookie],
+        seed: 27,
+        trades: [],
+      }),
+    }) as any);
+    const body = await res.json();
+
+    expect(body.leaders.calder.name).not.toBe("Macklin Celebrini");
+    expect(body.leaders.calder.name).toBe("True Rookie");
+    const projectedCelebrini = body.standings
+      .find((t: any) => t.teamId === "SJS")
+      .projectedSkaters.find((p: any) => p.playerId === "celebrini");
+    expect(projectedCelebrini.calderEligible).toBe(false);
+  });
+
   it("uses order-insensitive object keys for scenario seeds", () => {
     expect(scenarioSeed({ b: 2, a: 1 })).toBe(scenarioSeed({ a: 1, b: 2 }));
   });

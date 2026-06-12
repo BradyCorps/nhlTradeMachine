@@ -88,7 +88,11 @@ export async function POST(req: NextRequest) {
 
       // ── 2. CAP FIT ──────────────────────────────────────────
       let capFit: TeamMatch["capFit"] = "FITS";
-      if (packageCap > capSpace) {
+      const retentionCanSolveCap = isNegNAV && packageCap * 0.5 <= capSpace;
+      if (packageCap > capSpace && retentionCanSolveCap) {
+        capFit = "TIGHT"; score -= 10;
+        warn.push(`Needs retention — $${(packageCap - capSpace).toFixed(1)}M over at full freight`);
+      } else if (packageCap > capSpace) {
         capFit = "OVER"; score -= 25;
         warn.push(`Over cap by $${(packageCap - capSpace).toFixed(1)}M`);
       } else if (packageCap > capSpace * 0.75) {
@@ -144,8 +148,12 @@ export async function POST(req: NextRequest) {
 
       // ── 5. CONTEXT BONUS — the "hidden gem" angle ───────────
       // Negative NAV to a team with space = cap game play (LTIR, buyout leverage)
-      if (isDump && capSpace > packageCap * 1.5) {
-        score += 6; fit.push("Enough space to absorb and manage out");
+      if (isNegNAV && capSpace >= packageCap) {
+        score += isDump ? 10 : 12;
+        fit.push(isDump ? "Enough space to absorb and manage out" : "Cap room to buy low");
+      } else if (isNegNAV && retentionCanSolveCap) {
+        score += 6;
+        fit.push("Works with salary retained");
       }
       if (standing >= 25 && packageNAV > 0) {
         score += 8; fit.push("Immediate roster upgrade for a bottom team");
@@ -215,8 +223,9 @@ export async function POST(req: NextRequest) {
         packageNAV > 80  ? "Roster player + first-round pick" :
         packageNAV > 30  ? "Roster player + mid-round pick" :
         packageNAV > 0   ? "Depth piece or late pick" :
-        isDump           ? "Cap relief + conditional pick" :
-                           "Salary retained — minimal return";
+        isDump           ? "Cap relief + sweetener required" :
+        packageCap > capSpace ? "Salary retained + conditional pick" :
+                           "Minimal return or future considerations";
 
       const finalScore = Math.max(0, Math.min(100, Math.round(score)));
       const fitTier: TeamMatch["fitTier"] =

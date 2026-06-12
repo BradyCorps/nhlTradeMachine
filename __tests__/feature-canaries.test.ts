@@ -137,7 +137,7 @@ describe("Canary — trade block mechanics", () => {
   });
 
   it("WhatWeNeed surfaces block players and hides untouchables", () => {
-    const src = read("app/components/WhatWeNeed.tsx");
+    const src = read("app/lib/need-targets.ts");
     expect(src).toContain("tradeBlockStatus");
     expect(src).toContain("flagged untouchable");
     expect(src).toContain("On the trade block");
@@ -157,6 +157,12 @@ describe("Canary — trade UI negative NAV", () => {
     expect(tradePage).toContain("const displayNavB = cNavB > 0 ? cNavB : navB");
     expect(tradePage).toContain("const homeNetGain = displayNavB - displayNavA");
     expect(tugBar).toContain("{dispA.toFixed(0)} ←→ {dispB.toFixed(0)} NAV");
+  });
+
+  it("AssetCard only shows the proposal lightning action on the home side", () => {
+    const src = read("app/components/AssetCard.tsx");
+    expect(src).toContain("!isPick && idx === 0");
+    expect(src).toContain("onRequestTrade?.(asset)");
   });
 });
 

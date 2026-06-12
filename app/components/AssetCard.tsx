@@ -157,7 +157,7 @@ export default function AssetCard({
             </span>
           )}
           </div>
-          {!isPick && (
+          {!isPick && idx === 0 && (
             <button onClick={() => onRequestTrade?.(asset)} title="Generate trade proposals"
               className="font-bold leading-none transition-colors text-ink-faint text-[11px]">
               ⚡

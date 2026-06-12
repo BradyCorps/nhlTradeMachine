@@ -51,6 +51,8 @@ interface ProjectedSkaterSeason {
   name: string;
   position: string;
   age: number;
+  preseasonGames: number;
+  calderEligible: boolean;
   projectedPts: number;
   projectedGoals: number;
   projectedAssists: number;
@@ -348,6 +350,8 @@ function projectSkaterOutcome(p: SimPlayer, teamId: string, seed: number): Proje
     name: p.name,
     position: p.position,
     age: p.age,
+    preseasonGames: priorGames,
+    calderEligible: p.age <= 22 && priorGames <= 14,
     projectedPts,
     projectedGoals,
     projectedAssists: Math.max(0, projectedPts - projectedGoals),
@@ -854,7 +858,7 @@ export async function POST(req: NextRequest) {
 
     const rookieCandidates = standings.flatMap(team =>
       team.projectedSkaters
-        .filter(p => p.age <= 22 && p.gamesPlayed >= 35)
+        .filter(p => p.calderEligible && p.gamesPlayed >= 35)
         .map(p => ({ ...p, teamName: team.teamName }))
     );
     const calderWinner = (() => {
