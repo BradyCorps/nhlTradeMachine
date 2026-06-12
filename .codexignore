@@ -1,0 +1,34 @@
+# 1. Massive Data Directories (The biggest token drains)
+MoneyPuckData/
+OtherData/
+
+# 2. Bundled & Seed JSON Data
+app/data/*.bundled.json
+app/data/*.data.json
+app/data/moneypuck_baselines.json
+app/data/team_baselines.json
+app/data/draft-class-2026.json
+
+# 3. Next.js Build & Cache
+.next/
+out/
+cache/
+build/
+
+# 4. Dependencies
+node_modules/
+
+# 5. Environment & IDE Context
+.env
+.env.*
+.vscode/
+.devcontainer/
+.git/
+
+# 6. Static Assets (SVGs, Images, Icons)
+public/
+
+# 7. Logs & External Outputs
+*.log
+repomix-output.txt
+repomix-output.xml
