@@ -147,7 +147,13 @@ export default function TradeMachine() {
       document.documentElement.style.overflow = 'unset';
     };
   }, [verdictOpen, showTeamSelect, tradeBlockOpen, tradeRequest]);
-  const [evaluated, setEvaluated] = useState(false);
+  const tradeInputKey = useMemo(() => JSON.stringify({
+    homeTeamId,
+    partnerTeamId,
+    outgoing: outgoingBlock.map(a => `${a.id}:${a.retainedPct ?? 0}`),
+    incoming: incomingBlock.map(a => `${a.id}:${a.retainedPct ?? 0}`),
+  }), [homeTeamId, partnerTeamId, outgoingBlock, incomingBlock]);
+  const previousTradeInputKey = useRef(tradeInputKey);
   const [expandedFlag,   setExpandedFlag]   = useState<number | null>(null);
 
   // ── Team lock state ───────────────────────────────────────────
@@ -327,7 +333,6 @@ export default function TradeMachine() {
     // Clear the blocks and verdict
     setBlocks([[], []]);
     setVerdict(null);
-    setEvaluated(false);
     setSimResult(null);
     setShowSimPanel(true);
   }, [homeTeam, partnerTeam, outgoingBlock, incomingBlock, setBlocks]);
@@ -485,12 +490,12 @@ export default function TradeMachine() {
   }, [homeTeam, partnerTeam, db, originalDb, executedTrades, navMap]);
   useEffect(() => {
     // Issue 10: Don't auto-evaluate. Clear old verdict so user must click "Make the call" again.
-    if (evaluated) {
-      setEvaluated(false);
+    if (previousTradeInputKey.current !== tradeInputKey) {
+      previousTradeInputKey.current = tradeInputKey;
       setVerdict(null);
       setVerdictOpen(false);
     }
-  }, [blocks, teams, evaluated]);
+  }, [tradeInputKey]);
 
   // ── Claude GM Analysis ────────────────────────────────────────
   const generateClaudeAnalysis = useCallback(async () => {
@@ -592,7 +597,7 @@ export default function TradeMachine() {
         allHomeRoster, allPartnerRoster,
         evalAbortRef.current.signal
       );
-      if (v) { setVerdict(v); setEvaluated(true); setVerdictOpen(true); }
+      if (v) { setVerdict(v); setVerdictOpen(true); }
     } catch (e: any) {
       if (e.name !== "AbortError") console.error("[runEval]", e.message);
     }
@@ -671,7 +676,6 @@ export default function TradeMachine() {
             setTeams([teams[0], partnerTeam]);
             setBlocks([outgoing, incoming]);
             setTradeRequest(null);
-            setEvaluated(false);
             setVerdict(null);
           }}
         />
@@ -992,7 +996,7 @@ export default function TradeMachine() {
                   <div className={`py-3 lg:py-0 ${verdict && verdict.status !== "IDLE" ? "hidden lg:block" : ""}`}>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => { runEval(); setVerdictOpen(true); }}
+                        onClick={runEval}
                         disabled={!ready}
                         className="flex-grow py-3.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 disabled:opacity-40 md:disabled:opacity-25 md:disabled:cursor-not-allowed disabled:pointer-events-none active:scale-[0.98]"
                         style={{ background: 'var(--ledger-ink)', color: 'var(--ledger-card-light)', borderRadius: '2px' }}
