@@ -54,6 +54,12 @@ export default function TradeMachine() {
   const setTeams = useTradeStore(s => s.setTeams);
   const blocks = useTradeStore(s => s.blocks);
   const setBlocks = useTradeStore(s => s.setBlocks);
+  const homeTeam = teams[0];
+  const partnerTeam = teams[1];
+  const outgoingBlock = blocks[0];
+  const incomingBlock = blocks[1];
+  const homeTeamId = homeTeam?.id;
+  const partnerTeamId = partnerTeam?.id;
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [matchResults, setMatchResults] = useState<null | {
     matches: Array<{
@@ -176,12 +182,12 @@ export default function TradeMachine() {
 
   // Memoized rosters — stable references stop useEffect churn
   const allHomeRoster = useMemo(
-    () => db.players.filter(p => p.teamId === teams[0]?.id),
-    [db.players, teams[0]?.id]
+    () => db.players.filter(p => p.teamId === homeTeamId),
+    [db.players, homeTeamId]
   );
   const allPartnerRoster = useMemo(
-    () => db.players.filter(p => p.teamId === teams[1]?.id),
-    [db.players, teams[1]?.id]
+    () => db.players.filter(p => p.teamId === partnerTeamId),
+    [db.players, partnerTeamId]
   );
 
   // Fetch NAV from server whenever db.players changes (after load or trade execution)
@@ -193,20 +199,20 @@ export default function TradeMachine() {
       .then(map => { setNavMap(map); setNavLoading(false); })
       .catch(e => { if (e.name !== "AbortError") setNavLoading(false); });
     return () => ctrl.abort();
-  }, [db.players]);
+  }, [db.players, setNavMap]);
 
   // Re-fetch NAV for any block assets with retention applied.
   // Clear trade partner match results whenever the outgoing package changes —
   // stale "who wants this" results from a previous package should never persist.
-  useEffect(() => { setMatchResults(null); }, [blocks[0]]);
+  useEffect(() => { setMatchResults(null); }, [outgoingBlock]);
 
   // When retention returns to 0, immediately restore the original cached value
   // so the display doesn't stay stuck showing the retained NAV.
   // Debounced for non-zero retention to avoid API hammering on every slider tick.
   useEffect(() => {
-    const retainedAssets = [...blocks[0], ...blocks[1]]
+    const retainedAssets = [...outgoingBlock, ...incomingBlock]
       .filter(a => a.position !== "Pick" && (a.retainedPct || 0) > 0);
-    const zeroedAssets = [...blocks[0], ...blocks[1]]
+    const zeroedAssets = [...outgoingBlock, ...incomingBlock]
       .filter(a => a.position !== "Pick" && (a.retainedPct || 0) === 0);
 
     // Immediately restore zero-retention assets from cache — no debounce needed
@@ -232,7 +238,7 @@ export default function TradeMachine() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [blocks]);
+  }, [outgoingBlock, incomingBlock, setNavMap]);
 
   useEffect(() => {
     Promise.all([
@@ -264,20 +270,20 @@ export default function TradeMachine() {
         setError(`Network error: ${e.message}`);
         setBooting(false);
       });
-  }, []);
+  }, [setTeams]);
 
   // ── Execute Trade — moves players between teams in db state ──
   const executeTrade = useCallback(() => {
-    if (!teams[0] || !teams[1] || (!blocks[0].length && !blocks[1].length)) return;
+    if (!homeTeam || !partnerTeam || (!outgoingBlock.length && !incomingBlock.length)) return;
 
-    const outIds = new Set(blocks[0].map(a => a.id));
-    const inIds  = new Set(blocks[1].map(a => a.id));
+    const outIds = new Set(outgoingBlock.map(a => a.id));
+    const inIds  = new Set(incomingBlock.map(a => a.id));
 
     setDb(prev => {
       // Update player teamIds
       const updatedPlayers = prev.players.map(p => {
-        if (outIds.has(p.id)) return { ...p, teamId: teams[1]!.id };
-        if (inIds.has(p.id))  return { ...p, teamId: teams[0]!.id };
+        if (outIds.has(p.id)) return { ...p, teamId: partnerTeam.id };
+        if (inIds.has(p.id))  return { ...p, teamId: homeTeam.id };
         return p;
       });
 
@@ -285,18 +291,18 @@ export default function TradeMachine() {
       // The API cap space already accounts for LTIR, retained salaries, bonuses etc.
       // Rebuilding from CAP_CEILING - rosterCap ignores all of that complexity.
       // Delta approach: add outgoing cap hits back, subtract incoming cap hits.
-      const outCapHome = blocks[0]
+      const outCapHome = outgoingBlock
         .filter(a => a.position !== "Pick")
         .reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0);
-      const inCapHome = blocks[1]
+      const inCapHome = incomingBlock
         .filter(a => a.position !== "Pick")
         .reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0);
 
       const updatedTeams = prev.teams.map(team => {
-        if (team.id === teams[0]!.id) {
+        if (team.id === homeTeam.id) {
           return { ...team, capSpace: Math.round((team.capSpace + outCapHome - inCapHome) * 10) / 10 };
         }
-        if (team.id === teams[1]!.id) {
+        if (team.id === partnerTeam.id) {
           return { ...team, capSpace: Math.round((team.capSpace + inCapHome - outCapHome) * 10) / 10 };
         }
         return team;
@@ -308,10 +314,10 @@ export default function TradeMachine() {
     // Record the trade
     setExecutedTrades(prev => [...prev, {
       id:              `trade-${Date.now()}`,
-      homeTeamName:    teams[0]!.name,
-      partnerTeamName: teams[1]!.name,
-      outgoing:        blocks[0],
-      incoming:        blocks[1],
+      homeTeamName:    homeTeam.name,
+      partnerTeamName: partnerTeam.name,
+      outgoing:        outgoingBlock,
+      incoming:        incomingBlock,
       timestamp:       Date.now(),
     }]);
 
@@ -324,7 +330,7 @@ export default function TradeMachine() {
     setEvaluated(false);
     setSimResult(null);
     setShowSimPanel(true);
-  }, [teams, blocks]);
+  }, [homeTeam, partnerTeam, outgoingBlock, incomingBlock, setBlocks]);
 
   // ── Reset to original rosters ─────────────────────────────────
   const resetTrades = useCallback(() => {
@@ -340,11 +346,11 @@ export default function TradeMachine() {
       setHomeTeamLocked(false);
       setShowTeamSelect(true);
     }
-  }, [originalDb]);
+  }, [originalDb, setBlocks]);
 
   // ── Sim a Year — native engine projects, Claude narrates only ─────
   const simYear = useCallback(async () => {
-    if (!teams[0] || executedTrades.length === 0) return;
+    if (!homeTeam || executedTrades.length === 0) return;
     setSimLoading(true);
     setSimResult(null);
     setSimData(null);
@@ -362,8 +368,8 @@ export default function TradeMachine() {
       }));
       const seed = scenarioSeed({
         mode: SEASON.simulationMode,
-        homeTeamId: teams[0]!.id,
-        partnerTeamId: teams[1]?.id ?? "",
+        homeTeamId: homeTeam.id,
+        partnerTeamId: partnerTeam?.id ?? "",
         trades: simTrades.map(t => ({
           homeTeamId: t.homeTeamId,
           partnerTeamId: t.partnerTeamId,
@@ -376,8 +382,8 @@ export default function TradeMachine() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          homeTeamId:    teams[0]!.id,
-          partnerTeamId: teams[1]?.id ?? "",
+          homeTeamId:    homeTeam.id,
+          partnerTeamId: partnerTeam?.id ?? "",
           teams:   simTeams,
           players: simPlayers,
           trades:  simTrades,
@@ -412,13 +418,12 @@ export default function TradeMachine() {
     }).join("\n\n");
 
     const homeRoster = db.players
-      .filter(p => p.teamId === teams[0]!.id && p.position !== "Pick")
+      .filter(p => p.teamId === homeTeam.id && p.position !== "Pick")
       .sort((a, b) => b.ptsPace - a.ptsPace)
       .slice(0, 12)
       .map(p => `${p.name} (${p.position}, age ${p.age})`);
 
-    const partnerTeam = teams[1];
-    const isRebuilding = ["Rebuilding","Tanking","Retooling"].includes(teams[0]!.phase ?? "");
+    const isRebuilding = ["Rebuilding","Tanking","Retooling"].includes(homeTeam.phase ?? "");
 
     const teamNarrative = (t: Team): string => {
       const p = t.phase;
@@ -428,7 +433,7 @@ export default function TradeMachine() {
       if (p === "Contender") return "opening the year with a roster built to contend immediately";
       return "opening the year with an unsettled organizational direction";
     };
-    const homeContention = computeContention(db.players.filter(p => p.teamId === teams[0]!.id), navMap);
+    const homeContention = computeContention(db.players.filter(p => p.teamId === homeTeam.id), navMap);
 
     if (simAbortRef.current) simAbortRef.current.abort();
     simAbortRef.current = new AbortController();
@@ -446,7 +451,7 @@ export default function TradeMachine() {
             simulationMode: sim.simulationMode ?? SEASON.simulationMode,
             replaySeason: SEASON.replaySeason,
             rosterMoveWindow: SEASON.rosterMoveWindow,
-            homeTeamName: teams[0]!.name,
+            homeTeamName: homeTeam.name,
             partnerTeamName: partnerTeam?.name ?? null,
             homeTeam: sim.homeTeam ?? null,
             partnerTeam: sim.partnerTeam ?? null,
@@ -461,9 +466,9 @@ export default function TradeMachine() {
               incoming: t.incoming,
             })),
             homeRoster,
-            homePhase: teams[0]!.phase,
+            homePhase: homeTeam.phase,
             homeContention,
-            seasonStartOutlook: teamNarrative(teams[0]!),
+            seasonStartOutlook: teamNarrative(homeTeam),
             isRebuilding,
             seed: sim.seed ?? null,
             generatedLabel: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' }),
@@ -477,7 +482,7 @@ export default function TradeMachine() {
       setSimResult("Simulation unavailable — please try again.");
     }
     setSimLoading(false);
-  }, [teams, db, originalDb, executedTrades]);
+  }, [homeTeam, partnerTeam, db, originalDb, executedTrades, navMap]);
   useEffect(() => {
     // Issue 10: Don't auto-evaluate. Clear old verdict so user must click "Make the call" again.
     if (evaluated) {
@@ -485,7 +490,7 @@ export default function TradeMachine() {
       setVerdict(null);
       setVerdictOpen(false);
     }
-  }, [blocks, teams]);
+  }, [blocks, teams, evaluated]);
 
   // ── Claude GM Analysis ────────────────────────────────────────
   const generateClaudeAnalysis = useCallback(async () => {

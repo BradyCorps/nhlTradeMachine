@@ -50,8 +50,8 @@ export function parseCapWagesPlayerRow(row: unknown): CapWagesParseResult {
   if (!Array.isArray(row) || row.length < 30) return { ok: false, reason: "row is not a 30-field CapWages player tuple" };
 
   const rawName = typeof row[0] === "string" ? row[0].trim() : "";
-  const name = rawName ? normaliseName(rawName) : undefined;
   if (!rawName) return { ok: false, reason: "missing player name" };
+  const name = normaliseName(rawName);
 
   const rawTeam = typeof row[2] === "string" ? row[2].trim() : "";
   const teamSlug = rawTeam.toLowerCase().replace(/[\s-]+/g, "_");

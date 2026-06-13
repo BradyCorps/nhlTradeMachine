@@ -170,7 +170,7 @@ const playerNameFromRow = (row: NhlSkaterSummaryRow): string => {
   return parts.join(" ");
 };
 
-export function buildNhlSkaterSummaryUrl(seasonId = SEASON.nhleSeasonId): string {
+export function buildNhlSkaterSummaryUrl(seasonId: string = SEASON.nhleSeasonId): string {
   return `https://api.nhle.com/stats/rest/en/skater/summary?cayenneExp=seasonId%3D${seasonId}%20and%20gameTypeId%3D2&limit=-1`;
 }
 
@@ -179,7 +179,7 @@ export function seasonLabelFromNhlSeasonId(seasonId: string): string {
   return `${seasonId.slice(0, 4)}-${seasonId.slice(6, 8)}`;
 }
 
-export function buildRecentNhlSeasonIds(endSeasonId = SEASON.nhleSeasonId, count = 3): string[] {
+export function buildRecentNhlSeasonIds(endSeasonId: string = SEASON.nhleSeasonId, count = 3): string[] {
   if (!/^\d{8}$/.test(endSeasonId) || count <= 0) return [];
   const endStart = Number(endSeasonId.slice(0, 4));
   const result: string[] = [];
@@ -193,7 +193,7 @@ export function buildRecentNhlSeasonIds(endSeasonId = SEASON.nhleSeasonId, count
 export function ageForSeason(
   currentAge: number | undefined,
   targetSeasonId: string,
-  currentSeasonId = SEASON.nhleSeasonId,
+  currentSeasonId: string = SEASON.nhleSeasonId,
 ): number | undefined {
   if (currentAge == null || !/^\d{8}$/.test(targetSeasonId) || !/^\d{8}$/.test(currentSeasonId)) {
     return currentAge;

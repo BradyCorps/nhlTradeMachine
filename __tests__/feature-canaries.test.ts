@@ -234,7 +234,7 @@ describe("Canary — development profile route exposure", () => {
       expect(src).toContain("buildDevelopmentInputFromPlayerPayload");
       expect(src).toContain("calcDevelopmentProfile(developmentInput)");
       expect(src).toContain("developmentProfile,");
-      expect(src).not.toMatch(/calcNAV\([^)]*developmentProfile/s);
+      expect(src).not.toMatch(/calcNAV\([^)]*developmentProfile[\s\S]*/);
     });
   }
 
@@ -258,7 +258,7 @@ describe("Canary — development profile trade audit", () => {
     expect(src).toContain("is selling a future-core profile");
     expect(src).toContain("development variance");
     expect(src).toContain("fits a win-now window");
-    expect(src).not.toMatch(/calcNAV\([^)]*developmentProfile/s);
+    expect(src).not.toMatch(/calcNAV\([^)]*developmentProfile[\s\S]*/);
   });
 
   it("uses development profile in proposal fit/copy/risk without feeding X-NAV", () => {
@@ -269,7 +269,7 @@ describe("Canary — development profile trade audit", () => {
     expect(tradeLogic).toContain("future-core profile");
     expect(tradeLogic).toContain("DEV VARIANCE");
     expect(tradeLogic).toContain("peak-window player");
-    expect(tradeLogic).not.toMatch(/calcNAV\([^)]*developmentProfile/s);
+    expect(tradeLogic).not.toMatch(/calcNAV\([^)]*developmentProfile[\s\S]*/);
   });
 });
 
