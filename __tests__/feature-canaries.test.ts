@@ -78,6 +78,15 @@ describe("Canary — league route features (source-level)", () => {
       it("defaults draftees to 0 games so the pedigree NAV path triggers", () => {
         expect(src).toMatch(/draftOverall != null \? \(stats\?\.games \?\? 0\)/);
       });
+
+      it("merges DB pedigree fields onto matching live roster rows", () => {
+        expect(src).toContain("draftYear:       playersTable.draftYear");
+        expect(src).toContain("const existing = list.find");
+        expect(src).toContain("existing.draftYear = existing.draftYear ?? d.draftYear");
+        expect(src).toContain("existing.draftOverall = existing.draftOverall ?? d.draftOverall");
+        expect(src).toContain("existing.prospectPtsPace = existing.prospectPtsPace ?? d.prospectPtsPace");
+        expect(src).toContain("draftYear: p.draftYear ?? null");
+      });
     });
   }
 });
@@ -171,6 +180,25 @@ describe("Canary — trade UI negative NAV", () => {
     expect(src).toContain("!isPick && idx === 0");
     expect(src).toContain("onRequestTrade?.(asset)");
   });
+
+  it("AssetCard exposes development profile as its own tab without affecting NAV controls", () => {
+    const card = read("app/components/AssetCard.tsx");
+    const src = read("app/components/DevelopmentProfilePanel.tsx");
+    expect(card).toContain('type AssetCardView = "STATS" | "STRAND" | "TIMELINE" | "DEV"');
+    expect(card).toContain('...(hasDevelopmentProfile ? ["DEV"] : [])');
+    expect(card).toContain('view === "DEV" && hasDevelopmentProfile');
+    expect(card).toContain("<DevelopmentProfilePanel asset={asset} />");
+    expect(src).toContain("export function DevelopmentProfilePanel");
+    expect(src).toContain("asset.developmentProfile");
+    expect(src).toContain("profile.developmentPhase");
+    expect(src).toContain("profile.dynastyScore");
+    expect(src).toContain("profile.boomBustSignal");
+    expect(src).toContain("boomBustLabel");
+    expect(src).toContain("Boom ${boomScore}/100");
+    expect(src).toContain("{boomScore}</span>");
+    expect(src).toContain("{bustScore}</span>");
+    expect(src).toContain("band.floorPts82");
+  });
 });
 
 describe("Canary — admin cache flush", () => {
@@ -180,6 +208,68 @@ describe("Canary — admin cache flush", () => {
     expect(src).toContain("cache:contracts");
     expect(src).toContain("cache:contracts:v2");
     expect(src).toContain("cache:nhl_skater_summary_stats");
+    expect(src).toContain("DEVELOPMENT_NHL_SUMMARY_CACHE_KEY");
+    expect(src).toContain("DEVELOPMENT_TIMELINE_CACHE_KEY");
+  });
+});
+
+describe("Canary — development profile diagnostics", () => {
+  const src = read("app/api/admin/development-profile/route.ts");
+
+  it("accepts external timeline rows diagnostically without changing trade value", () => {
+    expect(src).toContain("export async function POST");
+    expect(src).toContain("externalTimelineRows");
+    expect(src).toContain("parseExternalTimelineRows");
+    expect(src).toContain("externalRejectedRows");
+    expect(src).toContain("fetchCachedNhlSkaterTimelineRowsForPlayer");
+    expect(src).toContain("cache: timelineResult.cache");
+    expect(src).toContain("tradeValueChanged: false");
+  });
+});
+
+describe("Canary — development profile route exposure", () => {
+  for (const route of LEAGUE_ROUTES) {
+    it(`${route} exposes developmentProfile without feeding it into NAV`, () => {
+      const src = read(route);
+      expect(src).toContain("buildDevelopmentInputFromPlayerPayload");
+      expect(src).toContain("calcDevelopmentProfile(developmentInput)");
+      expect(src).toContain("developmentProfile,");
+      expect(src).not.toMatch(/calcNAV\([^)]*developmentProfile/s);
+    });
+  }
+
+  it("Asset type carries the diagnostic development profile field", () => {
+    const src = read("app/lib/trade-types.ts");
+    expect(src).toContain("import type { DevelopmentProfile }");
+    expect(src).toContain("draftYear?: number | null");
+    expect(src).toContain("developmentProfile?: DevelopmentProfile | null");
+  });
+});
+
+describe("Canary — development profile trade audit", () => {
+  const src = read("app/api/evaluate/route.ts");
+  const tradeLogic = read("app/lib/trade-logic.ts");
+
+  it("uses development profile in GM timeline reasoning without feeding X-NAV", () => {
+    expect(src).toContain("const isFutureCoreAsset");
+    expect(src).toContain("const isDevelopmentRiskAsset");
+    expect(src).toContain("const isPeakWindowAsset");
+    expect(src).toContain("developmentProfile");
+    expect(src).toContain("is selling a future-core profile");
+    expect(src).toContain("development variance");
+    expect(src).toContain("fits a win-now window");
+    expect(src).not.toMatch(/calcNAV\([^)]*developmentProfile/s);
+  });
+
+  it("uses development profile in proposal fit/copy/risk without feeding X-NAV", () => {
+    expect(tradeLogic).toContain("const isFutureCoreAsset");
+    expect(tradeLogic).toContain("const isDevelopmentRiskAsset");
+    expect(tradeLogic).toContain("const isPeakWindowAsset");
+    expect(tradeLogic).toContain("developmentProfile");
+    expect(tradeLogic).toContain("future-core profile");
+    expect(tradeLogic).toContain("DEV VARIANCE");
+    expect(tradeLogic).toContain("peak-window player");
+    expect(tradeLogic).not.toMatch(/calcNAV\([^)]*developmentProfile/s);
   });
 });
 

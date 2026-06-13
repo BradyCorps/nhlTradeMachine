@@ -56,6 +56,8 @@ A separate model for goaltenders built around:
 - **Pedigree floor** — elite goalies with Vezina/Hart history maintain a minimum floor value even in down years
 - **Contract dynamics** — same CAP penalty structure as skaters
 
+Goalie development is intentionally **not** part of the first Development Timeline layer. Goalie aging curves, late breakouts, team defensive environment, and save-quality volatility require a separate timeline model from skaters. The current development profile type accepts `G` only as a placeholder for future compatibility; Sprint 1 fixtures and scoring are skater-oriented. G-NAV remains the production valuation layer for goalies until a dedicated goalie development model exists.
+
 ---
 
 ## Point Shares (OPS / DPS)
@@ -226,42 +228,172 @@ NHL Edge data can help distinguish young-player development paths that box-score
 
 ### Implementation Target
 
-Add a `development-profile` module that consumes current player data plus timeline snapshots and returns:
+Sprint 1 adds `app/lib/development-profile.ts`, a read-only module that consumes current player data plus timeline snapshots and returns:
 
 ```ts
 {
+  currentFantasyScore,
+  dynastyScore,
   developmentPhase,
+  timelineTrend,
   breakoutProbability,
   regressionRisk,
-  dynastyScore,
-  projectionBand
+  projectionBand,
+  volatility,
+  boomBustScore,
+  nhlExperienceScore,
+  pedigreeScore,
+  productionScore,
+  roleGrowthScore,
+  tags,
+  rationale
 }
 ```
 
-The trade simulator can use this as a future-value modifier. The fantasy manager can use it directly as the core keeper/dynasty signal.
+This module does **not** currently change X-NAV, trade evaluation, proposal generation, or the live league API response. That is the Sprint 1/Sprint 2 integration boundary: the model is tested and importable, but it remains opt-in until source adapters can populate timeline inputs consistently.
+
+The trade simulator can later use this as a future-value modifier beside current X-NAV. The fantasy manager can use it more directly as the core keeper/dynasty signal.
+
+### Current Contract
+
+The live Sprint 1 input contract is:
+
+```ts
+type DevelopmentProfileInput = {
+  id: string;
+  name: string;
+  position: "C" | "W" | "D" | "G";
+  age: number;
+  nhlGames: number;
+  ptsPace: number;
+  avgTOI?: number;
+  draftOverall?: number;
+  draftYear?: number;
+  internationalScore?: number;
+  teamContext?: "STRONG" | "AVERAGE" | "WEAK";
+  linemateContext?: "STRONG" | "AVERAGE" | "WEAK";
+  snapshots?: PlayerSeasonSnapshot[];
+};
+```
+
+Key interpretation rules:
+- `nhlGames` controls sample confidence and limited-experience risk.
+- `ptsPace` is the current NHL points-per-82 pace for skaters.
+- `snapshots[].nhlePtsPace` is the preferred cross-league trend input.
+- `draftOverall` and `internationalScore` drive pedigree and early ceiling.
+- `teamContext` and `linemateContext` lower near-term breakout confidence but should not erase long-term dynasty value for elite players.
+- `position: "G"` is reserved for future goalie support; current scoring is not a validated goalie development model.
+
+### Sprint 1 Fixture Canaries
+
+The fixture suite now covers the first development archetypes:
+
+| Fixture | Expected Signal |
+|---|---|
+| Brad Lambert | Limited NHL experience, wide projection band, explicit `BOOM_BUST` tag |
+| Quinton Byfield | Similar age to Lambert, materially more bankable due to NHL sample and success |
+| Macklin Celebrini | Elite emerging stud with high pedigree and early NHL/international signal |
+| Connor Bedard | Elite emerging stud whose weak team and linemate context lowers near-term breakout certainty |
+| Ivar Stenberg | Draft-year/pre-NHL emerging profile with low confidence |
+| Moritz Seider | Established young defenseman in `PEAK_WINDOW` |
+| Matthew Schaefer | Emerging high-pedigree defenseman after a Calder-level season |
+| Mark Scheifele | Age-33 career-year profile flagged for regression risk |
+| Connor McDavid | Generational modern baseline in peak window |
+| Claude Giroux / Patrick Kane | Late-career declining profiles |
+
+These tests are canaries for the model's behavior, not claims that the fixture numbers are authoritative live projections. Sprint 2 should replace hard-coded fixture inputs with source-backed adapters and schema guards.
+
+### Sprint 2 Integration Boundary
+
+Sprint 2 should wire the model into the data pipeline without changing trade outcomes yet:
+
+1. Add a timeline adapter that returns `PlayerSeasonSnapshot[]` for a player ID.
+2. Add an NHL summary/game-log adapter for age, NHL games, current points pace, current role, and TOI.
+3. Add a draft/pedigree adapter for draft year, overall pick, and optional international score.
+4. Add source diagnostics for missing snapshots, suspicious ages, missing NHL IDs, and stale league/team mappings.
+5. Expose `developmentProfile` beside player data in an admin or diagnostics route first. Initial endpoint: `/api/admin/development-profile?id={playerId}`.
+6. Keep X-NAV unchanged until the profile output is visible, cached, and reviewed against live players.
+
+The first production integration should be diagnostic-only. Once the output looks stable across live rosters, the trade sim can consume it as a separate future-value panel rather than silently blending it into X-NAV.
+
+### Diagnostic Endpoint
+
+Development Timeline output can be inspected without changing trade value:
+
+```http
+GET /api/admin/development-profile?id=8483471
+```
+
+For source-audit work, external AHL/CHL/NCAA/Europe rows can be posted into the same diagnostic path:
+
+```json
+{
+  "id": "8483471",
+  "seasons": 4,
+  "externalTimelineRows": [
+    {
+      "season": "2023-24",
+      "age": 20,
+      "league": "AHL",
+      "teamId": "MB",
+      "games": 64,
+      "goals": 21,
+      "assists": 34,
+      "points": 55
+    }
+  ]
+}
+```
+
+The response includes:
+- `developmentInput`
+- `developmentProfile`
+- `diagnostics`
+- `externalTimeline.acceptedRows`
+- `externalTimeline.rejectedRows`
+- `externalTimeline.rejected[]` with row-level rejection reasons
+- `sourceCoverage.cache` with cache-enabled/cache-hit/live-fetch details
+- `sourceCoverage.tradeValueChanged: false`
+
+This endpoint is intentionally an audit surface, not a valuation integration point.
+
+Development diagnostics use two Redis cache keys when Redis is configured:
+
+| Cache Key | Purpose |
+|---|---|
+| `cache:development:nhl_skater_summary:v1` | NHL skater summary rows keyed by season ID |
+| `cache:development:timeline:v1` | Per-player matched NHL timeline rows keyed by player ID and requested seasons |
+
+`/api/admin/clear-cache` clears both keys along with the existing teams/contracts/stat fallback caches.
 
 ### Sprint Roadmap
 
-**Sprint 1 — Data Contracts and Fixtures**
-- Define `PlayerSeasonSnapshot`, `DevelopmentPhase`, `ProjectionBand`, and `FantasyProfile` in a shared module.
-- Add fixture tests for Brad Lambert, Aatu Raty, a peak veteran, and an aging regression-risk veteran.
-- Keep this sprint read-only: no valuation changes until the derived fields are stable.
+**Sprint 1 — Data Contracts and Fixtures — Code Complete**
+- Defined `PlayerSeasonSnapshot`, `DevelopmentPhase`, `ProjectionBand`, `FantasyProfile`, `DevelopmentProfileInput`, and `DevelopmentProfile` in `app/lib/development-profile.ts`.
+- Added fixture tests for volatile prospects, bankable young players, elite emerging players, young defensemen, peak-window stars, regression-risk veterans, and declining veterans.
+- Kept this sprint read-only: no valuation changes or route response changes.
+- Explicitly deferred goalie development to a dedicated future model.
 
-**Sprint 2 — Source Adapters**
-- Add NHL summary/game-log adapter for career and season production.
+**Sprint 2 — Source Adapters — In Progress**
+- Add NHL summary/game-log adapter for career and season production. Initial NHL skater summary and multi-season timeline adapters live in `app/lib/development-sources.ts`.
+- Add DB draft/pedigree wiring for development inputs. Initial DB player assembly lives in `buildDevelopmentInputForDbPlayer`.
+- Add diagnostic admin surface before valuation integration. Initial endpoint lives at `/api/admin/development-profile`.
 - Add NHL Edge adapter or endpoint notes using `nhl-api-py` as the discovery reference.
-- Add timeline import shape for AHL/CHL/NCAA/Europe once a source is selected.
-- Add cache keys and admin diagnostics for missing or suspicious timeline rows.
+- Add timeline import shape for AHL/CHL/NCAA/Europe once a source is selected. Guarded `ExternalTimelineRow` parsing and NHLe defaults now live in `app/lib/development-sources.ts`.
+- Add cache keys and admin diagnostics for missing or suspicious timeline rows. Development summary/timeline cache keys are wired into `/api/admin/clear-cache`.
 
-**Sprint 3 — Development Profile Engine**
-- Compute NHLe-adjusted trend, role growth, NHL sample confidence, breakout probability, and regression risk.
-- Return projection bands instead of single-point certainty for limited-sample players.
-- Keep X-NAV unchanged except for exposing the new profile beside the player.
+**Sprint 3 — Development Profile Engine — Code Complete**
+- Computes NHLe-adjusted trend, role growth, NHL sample confidence, breakout probability, and regression risk.
+- Returns projection bands instead of single-point certainty for limited-sample players.
+- Exposes `developmentProfile` beside league player payloads while keeping X-NAV unchanged.
 
-**Sprint 4 — Trade Sim Integration**
-- Add future-value badges to asset cards and trade audit reasoning.
-- Let GM logic reference development phase when judging rebuilders, contenders, and prospect-for-veteran swaps.
-- Audit whether youth optionality in X-NAV should be reduced once the development profile carries that information explicitly.
+**Sprint 4 — Trade Sim Integration — Code Complete**
+- Added a DEV tab to asset cards for development phase, dynasty value, projection band, confidence, and boom/bust direction.
+- Let GM logic reference development phase, dynasty score, boom/bust direction, and regression risk when judging rebuilders, contenders, and prospect-for-veteran swaps.
+- Let proposal generation score and explain future-core profiles, peak-window targets, and development-variance swings without changing asset value.
+- Added proposal risk labels for premium assets spent on high-variance/bust-lean profiles and for selling future-core players for veteran term without picks.
+- Kept X-NAV unchanged; development profile is trade-facing reasoning only.
+- Still to audit: whether youth optionality in X-NAV should be reduced once the development profile carries that information explicitly.
 
 **Sprint 5 — Fantasy Manager Extension**
 - Build fantasy-specific scoring on top of the development profile.

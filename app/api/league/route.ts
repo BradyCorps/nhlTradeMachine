@@ -6,6 +6,8 @@ import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
 import { teams as teamsTable, players as playersTable, tradeBlock as tradeBlockTable } from "@/app/db/schema";
 import { resolveRosterTier } from "@/app/lib/xnav-engine";
+import { calcDevelopmentProfile } from "@/app/lib/development-profile";
+import { buildDevelopmentInputFromPlayerPayload } from "@/app/lib/development-sources";
 
 export const dynamic = "force-dynamic";
 
@@ -1043,6 +1045,7 @@ export async function GET() {
       position:        playersTable.position,
       teamId:          playersTable.teamId,
       age:             playersTable.age,
+      draftYear:       playersTable.draftYear,
       draftOverall:    playersTable.draftOverall,
       prospectPtsPace: playersTable.prospectPtsPace,
     }).from(playersTable);
@@ -1051,13 +1054,19 @@ export async function GET() {
       if (!isValidTeamId(d.teamId)) continue;
       const list = rosterMap.get(d.teamId) ?? [];
       const dbSlug = slugify(d.name);
-      if (!list.some((x: any) => String(x.id) === String(d.id) || slugify(x.name) === dbSlug)) {
+      const existing = list.find((x: any) => String(x.id) === String(d.id) || slugify(x.name) === dbSlug);
+      if (existing) {
+        existing.draftYear = existing.draftYear ?? d.draftYear;
+        existing.draftOverall = existing.draftOverall ?? d.draftOverall;
+        existing.prospectPtsPace = existing.prospectPtsPace ?? d.prospectPtsPace;
+      } else {
         list.push({
           id:              d.id,
           name:            d.name,
           position:        normalisePos(d.position),
           age:             d.age ?? 18,
           headshot:        null,
+          draftYear:       d.draftYear,
           draftOverall:    d.draftOverall,
           prospectPtsPace: d.prospectPtsPace,
         });
@@ -1193,6 +1202,19 @@ export async function GET() {
       const games = p.draftOverall != null ? (stats?.games ?? 0) : (stats?.games ?? goalieStats?.gamesStarted ?? 40);
       const ptsPace = stats?.ptsPace ?? defaultPts;
       const avgTOI = stats?.avgTOI ?? defaultTOI;
+      const developmentInput = buildDevelopmentInputFromPlayerPayload({
+        id: p.id,
+        name: p.name,
+        position: finalPosition,
+        age: p.age,
+        games,
+        ptsPace,
+        avgTOI,
+        draftYear: p.draftYear ?? null,
+        draftOverall: p.draftOverall ?? null,
+        prospectPtsPace: p.prospectPtsPace ?? null,
+      });
+      const developmentProfile = developmentInput ? calcDevelopmentProfile(developmentInput) : null;
 
       players.push({
         id:             p.id,
@@ -1252,8 +1274,10 @@ export async function GET() {
         hasNMC:         finalNMC,
         hasNTC:         finalNTC,
         canRetain:      finalRetain,
+        draftYear:        p.draftYear       ?? null,
         draftOverall:     p.draftOverall    ?? null,
         prospectPtsPace:  p.prospectPtsPace ?? null,
+        developmentProfile,
         tradeBlockStatus: blockMap.get(p.name)?.status ?? null,
         tradeBlockNote:   blockMap.get(p.name)?.note   ?? null,
         retainedPct:    0,

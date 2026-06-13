@@ -21,6 +21,44 @@ export const isDumpBlock = (block: Asset[], navMap: Record<string, number>): boo
   return hasNegative && totalNav < 15;
 };
 
+const isRebuildPhase = (phase: string): boolean =>
+  phase === "Rebuilding" || phase === "Tanking";
+
+const isWinNowPhase = (phase: string): boolean =>
+  phase === "Contender" || phase === "Bubble";
+
+const lastName = (asset: Asset): string =>
+  asset.name.split(" ").pop() ?? asset.name;
+
+const isFutureCoreAsset = (asset: Asset): boolean => {
+  const p = asset.developmentProfile;
+  if (!p || asset.position === "Pick" || asset.position === "G" || asset.age > 25) return false;
+  return p.dynastyScore >= 62
+    || p.boomBustSignal === "BOOM_LEAN"
+    || p.developmentPhase === "EMERGING"
+    || (p.developmentPhase === "BREAKOUT_CANDIDATE" && p.breakoutProbability >= 55);
+};
+
+const isDevelopmentRiskAsset = (asset: Asset): boolean => {
+  const p = asset.developmentProfile;
+  if (!p || asset.position === "Pick" || asset.position === "G" || asset.age > 25) return false;
+  return p.boomBustSignal === "BUST_LEAN"
+    || (p.boomBustSignal === "HIGH_VARIANCE" && p.bustScore >= p.boomScore && p.projectionBand.confidence < 50);
+};
+
+const isPeakWindowAsset = (asset: Asset): boolean => {
+  const p = asset.developmentProfile;
+  if (!p || asset.position === "Pick" || asset.position === "G") return false;
+  return p.developmentPhase === "PEAK_WINDOW" && p.regressionRisk < 45;
+};
+
+const hasPremiumSpend = (assets: Asset[], navMap: Record<string, number>): boolean =>
+  assets.some(a => a.position === "Pick" && a.round === 1)
+  || assets.some(a => a.position !== "Pick" && getNav(a, navMap) > 60);
+
+const hasVeteranTerm = (assets: Asset[]): boolean =>
+  assets.some(a => a.position !== "Pick" && a.age >= 30 && a.yearsRemaining >= 2);
+
 // Score how willing a team is to absorb a negative contract
 export const dumpFitScore = (
   team: Team,
@@ -69,6 +107,8 @@ export const blockFitsTeam = (
 ): number => {
   let score = 0;
   const phase = team.phase ?? "Retooling";
+  const rebuilding = isRebuildPhase(phase);
+  const winNow = isWinNowPhase(phase);
   const blockCap = block.filter(a => a.position !== "Pick")
     .reduce((s, a) => s + a.capHit * (1-(a.retainedPct||0)), 0);
 
@@ -78,14 +118,18 @@ export const blockFitsTeam = (
 
   for (const player of block) {
     if (player.position === "Pick") {
-      if (phase === "Rebuilding" || phase === "Tanking") score += 15;
+      if (rebuilding) score += 15;
       else if (phase === "Retooling") score += 8;
       continue;
     }
     const pos = ["L","R"].includes(player.position) ? "W" : player.position;
-    if (player.age <= 28 && (phase === "Rebuilding" || phase === "Retooling")) score += 15;
-    if (player.age >= 27 && player.age <= 33 && (phase === "Contender" || phase === "Bubble")) score += 15;
-    if (player.age > 33 && (phase === "Rebuilding" || phase === "Tanking")) score -= 15;
+    if (player.age <= 28 && (rebuilding || phase === "Retooling")) score += 15;
+    if (player.age >= 27 && player.age <= 33 && winNow) score += 15;
+    if (player.age > 33 && rebuilding) score -= 15;
+    if (rebuilding && isFutureCoreAsset(player)) score += 20;
+    if (rebuilding && isDevelopmentRiskAsset(player)) score += 5;
+    if (winNow && isPeakWindowAsset(player)) score += 18;
+    if (winNow && isDevelopmentRiskAsset(player)) score -= 12;
     const posCount = teamRoster.filter(p => {
       const pp = ["L","R"].includes(p.position) ? "W" : p.position;
       return pp === pos;
@@ -268,15 +312,23 @@ export const getMotivation = (
   const sendNav  = sends.reduce((s,a) => s + (navMap[a.id]??0), 0);
   const recvNav  = receives.reduce((s,a) => s + (navMap[a.id]??0), 0);
   const netGain  = recvNav - sendNav;
+  const futureCoreIn = recvPlayers.find(isFutureCoreAsset);
+  const futureCoreOut = sendPlayers.find(isFutureCoreAsset);
+  const devRiskIn = recvPlayers.find(isDevelopmentRiskAsset);
+  const peakWindowIn = recvPlayers.find(isPeakWindowAsset);
 
   const avgSendAge = sendPlayers.length > 0
     ? sendPlayers.reduce((s,a) => s + a.age, 0) / sendPlayers.length : 0;
   const avgRecvAge = recvPlayers.length > 0
     ? recvPlayers.reduce((s,a) => s + a.age, 0) / recvPlayers.length : 0;
 
-  if (phase === "Contender" || standing <= 8) {
+  if (isWinNowPhase(phase) || standing <= 8) {
     if (isDump && recvPlayers.length > 0)
-      return `Absorbs ${recvPlayers[0]?.name.split(" ").pop()}'s contract to add depth — playoff window justifies cap risk.`;
+      return `Absorbs ${lastName(recvPlayers[0])}'s contract to add depth — playoff window justifies cap risk.`;
+    if (peakWindowIn)
+      return `Adds ${lastName(peakWindowIn)} as a peak-window player with low regression risk — clean win-now fit.`;
+    if (devRiskIn && hasPremiumSpend(sends, navMap))
+      return `Takes a development swing on ${lastName(devRiskIn)} — upside is real, but the price needs conviction.`;
     if (netGain > 20 && avgRecvAge < 30)
       return `Adds a younger, high-value piece without mortgaging the future — fits the win-now mandate.`;
     if (sendPicks.length > 0)
@@ -284,7 +336,13 @@ export const getMotivation = (
     return `Improves the roster margin on a contending team; every point matters in a tight playoff race.`;
   }
 
-  if (phase === "Rebuilding" || phase === "Tanking" || standing >= 25) {
+  if (isRebuildPhase(phase) || standing >= 25) {
+    if (futureCoreIn) {
+      const p = futureCoreIn.developmentProfile!;
+      return `Adds ${lastName(futureCoreIn)} as a future-core profile — ${p.dynastyScore}/100 dynasty score and ${p.boomBustSignal.toLowerCase().replace("_", " ")} arc.`;
+    }
+    if (futureCoreOut && hasVeteranTerm(receives) && recvPicks.length === 0)
+      return `This is hard to justify: ${lastName(futureCoreOut)} carries future-core value, but the return leans veteran term.`;
     if (recvPicks.length > 0)
       return `Collects draft capital during the rebuild — ${recvPicks.length} pick${recvPicks.length>1?"s":""} accelerate the timeline.`;
     if (sendPlayers.length > 0 && sendPlayers[0].age >= 30)
@@ -311,9 +369,27 @@ export const getRisk = (
   const recvPlayers = receives.filter(a => a.position !== "Pick");
   const sendPlayers = sends.filter(a => a.position !== "Pick");
 
+  const devRiskIncoming = recvPlayers.find(isDevelopmentRiskAsset);
+  if (devRiskIncoming && hasPremiumSpend(sends, navMap)) {
+    const p = devRiskIncoming.developmentProfile!;
+    return {
+      label: "DEV VARIANCE",
+      detail: `${lastName(devRiskIncoming)} has boom ${p.boomScore}/100, bust ${p.bustScore}/100, ${p.projectionBand.confidence}/100 confidence`,
+    };
+  }
+
+  const futureCoreOutgoing = sendPlayers.find(isFutureCoreAsset);
+  if (futureCoreOutgoing && hasVeteranTerm(receives) && !receives.some(a => a.position === "Pick")) {
+    const p = futureCoreOutgoing.developmentProfile!;
+    return {
+      label: "FUTURE CORE",
+      detail: `Moving ${lastName(futureCoreOutgoing)}'s ${p.dynastyScore}/100 dynasty profile without draft capital back`,
+    };
+  }
+
   const oldIncoming = recvPlayers.find(a => a.age >= 33 && a.yearsRemaining >= 3);
   if (oldIncoming)
-    return { label: "AGE CLIFF", detail: `${oldIncoming.name.split(" ").pop()} is ${oldIncoming.age} with ${oldIncoming.yearsRemaining}yr left` };
+    return { label: "AGE CLIFF", detail: `${lastName(oldIncoming)} is ${oldIncoming.age} with ${oldIncoming.yearsRemaining}yr left` };
 
   const sendNav = sends.reduce((s,a) => s+(navMap[a.id]??0), 0);
   const recvNav = receives.reduce((s,a) => s+(navMap[a.id]??0), 0);
@@ -369,14 +445,18 @@ export const preScreenProposal = (
   }
 
   const partnerPhase = partnerTeam.phase ?? "";
-  if (partnerPhase === "Rebuilding" || partnerPhase === "Tanking") {
+  if (isRebuildPhase(partnerPhase)) {
     const sendingOldVet = homeSends.some(a =>
       a.position !== "Pick" && a.age >= 32 && a.yearsRemaining >= 3
     );
     if (sendingOldVet) return false;
+
+    const partnerSellingFutureCore = partnerSends.some(isFutureCoreAsset);
+    const homeSendingNoPicks = !homeSends.some(a => a.position === "Pick");
+    if (partnerSellingFutureCore && homeSendingNoPicks && hasVeteranTerm(homeSends)) return false;
   }
 
-  if (partnerPhase === "Contender" || partnerPhase === "Bubble") {
+  if (isWinNowPhase(partnerPhase)) {
     const sendingNegativeContract = homeSends.some(a =>
       a.position !== "Pick" && (navMap[a.id] ?? 0) < -30
     );
@@ -412,7 +492,7 @@ export const preScreenProposal = (
   if (Math.abs(homeNavOut - partnerNavOut) > 120) return false;
 
   const homePhase = homeTeam.phase ?? "";
-  if (homePhase === "Rebuilding" || homePhase === "Tanking") {
+  if (isRebuildPhase(homePhase)) {
     const givingAwayYoungStar = homeSends.some(a =>
       a.position !== "Pick" && a.age <= 25 && (navMap[a.id]??0) > 80
     );
@@ -420,6 +500,10 @@ export const preScreenProposal = (
       a.position !== "Pick" && a.age >= 32 && a.yearsRemaining >= 3
     );
     if (givingAwayYoungStar && gettingOldVet) return false;
+
+    const homeSellingFutureCore = homeSends.some(isFutureCoreAsset);
+    const partnerSendingNoPicks = !partnerSends.some(a => a.position === "Pick");
+    if (homeSellingFutureCore && partnerSendingNoPicks && hasVeteranTerm(partnerSends)) return false;
   }
 
   return true;

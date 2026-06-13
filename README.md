@@ -70,6 +70,7 @@ See [ANALYTICS.md](./ANALYTICS.md) for full documentation of:
 - X-NAV 2.0 model components (OFF, DEF, YNG, CAP, NOIV)
 - Point Shares formula and implementation
 - STRAND™ node definitions (SCR, xG, SUPP, QoC, DZ%, AGE, TOI+)
+- Development Timeline layer contracts, fixture canaries, and integration boundary
 - GM Logic Engine flag categories
 - Contract data architecture and known limitations
 

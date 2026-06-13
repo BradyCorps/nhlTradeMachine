@@ -3,6 +3,8 @@
 // Keep this file free of business logic — types only.
 // ============================================================
 
+import type { DevelopmentProfile } from "@/app/lib/development-profile";
+
 export interface Asset {
   id: string;
   teamId: string;
@@ -27,8 +29,10 @@ export interface Asset {
   qocRank?: number;            // DEPRECATED — legacy iceTimeRank sum; use qocIndex
   qocIndex?: number | null;    // 0-100 EV deployment difficulty (higher = tougher 5v5 minutes)
   rosterTier?: RosterTier;
+  draftYear?: number | null;
   draftOverall?: number | null;    // overall draft slot — triggers pedigree NAV
   prospectPtsPace?: number | null; // NHLe-translated junior scoring pace
+  developmentProfile?: DevelopmentProfile | null; // diagnostic future-value layer; not blended into X-NAV
   xgRelTM?: number | null;
   xgaRelTM?: number | null;
   dzPct?: number | null;

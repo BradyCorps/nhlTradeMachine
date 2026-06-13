@@ -9,8 +9,10 @@ import StrandView from "@/app/components/StrandView";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
 import { useTradeStore } from "@/app/store/tradeStore";
 import { AssetBadges } from "@/app/components/AssetBadges";
+import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
 
 const fmt = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
+type AssetCardView = "STATS" | "STRAND" | "TIMELINE" | "DEV";
 
 export default function AssetCard({
   asset, idx, onRequestTrade, navResult
@@ -26,7 +28,7 @@ export default function AssetCard({
   const removeAssetFromStore = useTradeStore(s => s.removeAsset);
   const setRetainedPctStore = useTradeStore(s => s.setRetainedPct);
 
-  const [view, setView] = React.useState<"STATS" | "STRAND" | "TIMELINE">("STATS");
+  const [view, setView] = React.useState<AssetCardView>("STATS");
   const [compareId, setCompareId] = React.useState<string>("");
   const xnav   = navResult ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
   const isPick = asset.position === "Pick";
@@ -38,6 +40,7 @@ export default function AssetCard({
   const compareXnav  = compareAsset
     ? (navMap?.[compareAsset.id] ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 })
     : null;
+  const hasDevelopmentProfile = Boolean(asset.developmentProfile && !isPick && asset.position !== "G");
 
   const updateAsset = (partial: Partial<Asset>) => {
     updateBlock(idx, blocks[idx].map((a) => a.id === asset.id ? { ...a, ...partial } : a));
@@ -173,11 +176,12 @@ export default function AssetCard({
       {/* STRAND / STATS tab toggle — only for skaters with live data */}
       {!isPick && (
         <div className="flex gap-0 mb-2" style={{ borderBottom: '1px solid #c8b890' }}>
-                    {([
+          {([
             "STATS",
             ...(asset.position !== "G" && asset.hasLiveStats ? ["STRAND"] : []),
+            ...(hasDevelopmentProfile ? ["DEV"] : []),
             "TIMELINE",
-          ] as const).map((v: any) => (
+          ] as AssetCardView[]).map((v) => (
             <button key={v} onClick={() => setView(v)}
               className="flex items-center gap-1 text-2xs font-black uppercase tracking-widest px-3 py-1.5 transition-all"
               style={{
@@ -240,6 +244,9 @@ export default function AssetCard({
         <div className="py-1">
                     <PlayerTimeline asset={asset as any} /> 
         </div>
+      )}
+      {view === "DEV" && hasDevelopmentProfile && (
+        <DevelopmentProfilePanel asset={asset} />
       )}
       {/* Standard STATS view */}
       {(view === "STATS" || isPick || asset.position === "G") && (<>

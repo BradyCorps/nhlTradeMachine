@@ -253,6 +253,28 @@ const defensiveDependencyScore = (roster: Asset[]): number => {
   return eliteD.length <= 1 ? 0.9 : eliteD.length === 2 ? 0.6 : 0.3;
 };
 
+const isFutureCoreAsset = (asset: Asset): boolean => {
+  const p = asset.developmentProfile;
+  if (!p || asset.position === "Pick" || asset.position === "G" || asset.age > 25) return false;
+  return p.dynastyScore >= 62
+    || p.boomBustSignal === "BOOM_LEAN"
+    || p.developmentPhase === "EMERGING"
+    || (p.developmentPhase === "BREAKOUT_CANDIDATE" && p.breakoutProbability >= 55);
+};
+
+const isDevelopmentRiskAsset = (asset: Asset): boolean => {
+  const p = asset.developmentProfile;
+  if (!p || asset.position === "Pick" || asset.position === "G" || asset.age > 25) return false;
+  return p.boomBustSignal === "BUST_LEAN"
+    || (p.boomBustSignal === "HIGH_VARIANCE" && p.bustScore >= p.boomScore && p.projectionBand.confidence < 50);
+};
+
+const isPeakWindowAsset = (asset: Asset): boolean => {
+  const p = asset.developmentProfile;
+  if (!p || asset.position === "Pick" || asset.position === "G") return false;
+  return p.developmentPhase === "PEAK_WINDOW" && p.regressionRisk < 45;
+};
+
 const FRANCHISE_THRESHOLD = FRANCHISE.threshold;
 const MEGALODON_THRESHOLD = FRANCHISE.megalodon;
 
@@ -707,6 +729,7 @@ const runGmLogic = (
     const youngGoingOut  = partnerGivingUp.filter(a => a.position !== "Pick" && a.age <= 25);
     const veteranComing  = inPlayers.filter(a => a.age >= 25 && (a.yearsRemaining ?? 0) >= 3 && !PROSPECT_TIERS[a.name]);
     const picksComingIn  = inPicks.length > 0;
+    const futureCoreGoingOut = partnerGivingUp.filter(isFutureCoreAsset);
 
     if (youngGoingOut.length > 0 && veteranComing.length > 0 && !picksComingIn) {
       flags.push({
@@ -714,6 +737,16 @@ const runGmLogic = (
         headline: `${teamPartner.name} shouldn't trade young core for a veteran`, perspective: "partner" as const,
         explanation: `${teamPartner.name} is rebuilding around youth. This trade sets the rebuild back by years.`,
         affectedAsset: youngGoingOut[0].name, vetoesSide: 1,
+      });
+    } else if (futureCoreGoingOut.length > 0 && veteranComing.length > 0 && !picksComingIn) {
+      const core = futureCoreGoingOut[0];
+      const p = core.developmentProfile!;
+      flags.push({
+        severity: "HARD", category: "TIMELINE_MISMATCH",
+        headline: `${teamPartner.name} is selling a future-core profile`,
+        perspective: "partner" as const,
+        explanation: `${core.name} carries a ${p.developmentPhase.toLowerCase().replace(/_/g, " ")} development profile with ${p.dynastyScore}/100 dynasty value and a ${p.boomBustSignal.toLowerCase().replace(/_/g, " ")} arc. Rebuilders do not move that profile for veteran term without picks coming back.`,
+        affectedAsset: core.name, vetoesSide: 1,
       });
     } else if (outPlayers.length > 0 && outPicks.length === 0 && !outgoing.some((a) => a.age <= 23 && a.position !== "Pick") && outPlayers.every((a) => a.age > 28)) {
       flags.push({
@@ -736,6 +769,21 @@ const runGmLogic = (
     });
   }
 
+  if (modeHome === "REBUILDING" || modeHome === "TANKING") {
+    const futureCoreGoingOut = outPlayers.filter(isFutureCoreAsset);
+    const veteranComing = inPlayers.filter(a => a.age >= 27 && (a.yearsRemaining ?? 0) >= 2 && !PROSPECT_TIERS[a.name]);
+    if (futureCoreGoingOut.length > 0 && veteranComing.length > 0 && inPicks.length === 0) {
+      const core = futureCoreGoingOut[0];
+      const p = core.developmentProfile!;
+      flags.push({
+        severity: "HARD", category: "REBUILD_LOGIC",
+        headline: `${teamHome.name} shouldn't cash out ${core.name}'s development runway`,
+        explanation: `${core.name} carries ${p.dynastyScore}/100 dynasty value with a ${p.boomBustSignal.toLowerCase().replace(/_/g, " ")} arc. A rebuilding team should not convert that runway into veteran term unless premium future assets are attached.`,
+        affectedAsset: core.name, vetoesSide: 0,
+      });
+    }
+  }
+
   if (modeHome === "CONTENDER" && outPicks.length > 0) {
     const decliners = inPlayers.filter((a) => a.age > 33 && a.ptsPace < 45);
     if (decliners.length > 0) flags.push({
@@ -744,6 +792,31 @@ const runGmLogic = (
       explanation: `Contenders that mortgage their futures for players on the wrong side of the age curve almost always regret it.`,
       affectedAsset: decliners[0].name, vetoesSide: 0,
     });
+  }
+
+  if (modeHome === "CONTENDER" || modeHome === "BUBBLE") {
+    const riskyDevelopmentBuy = inPlayers.find(isDevelopmentRiskAsset);
+    const firstsOutgoing = outPicks.filter(p => (p.round || 3) === 1).length;
+    if (riskyDevelopmentBuy && (firstsOutgoing > 0 || outPlayers.some(a => navOf(a) > 60))) {
+      const p = riskyDevelopmentBuy.developmentProfile!;
+      flags.push({
+        severity: "WARN", category: "CONTENDER_LOGIC",
+        headline: `${teamHome.name} is paying win-now assets for development variance`,
+        explanation: `${riskyDevelopmentBuy.name} is a ${p.boomBustSignal.toLowerCase().replace(/_/g, " ")} profile with boom ${p.boomScore}/100, bust ${p.bustScore}/100, and ${p.projectionBand.confidence}/100 confidence. That can be worth the swing, but it is not clean deadline certainty.`,
+        affectedAsset: riskyDevelopmentBuy.name, vetoesSide: 0,
+      });
+    }
+
+    const peakHelp = inPlayers.find(isPeakWindowAsset);
+    if (peakHelp && outPicks.length > 0) {
+      const p = peakHelp.developmentProfile!;
+      flags.push({
+        severity: "INFO", category: "GOOD",
+        headline: `${peakHelp.name} fits a win-now window`,
+        explanation: `${peakHelp.name} is in a peak-window development phase with ${p.regressionRisk}/100 regression risk. This is the type of profile contenders can justify spending futures on.`,
+        affectedAsset: peakHelp.name,
+      });
+    }
   }
 
   for (const asset of inPlayers) {
