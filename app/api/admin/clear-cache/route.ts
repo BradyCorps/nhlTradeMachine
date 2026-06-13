@@ -8,7 +8,7 @@ export async function GET(req: Request) {
   if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const cleared: string[] = [];
   if (redis) {
-    for (const key of ["cache:teams", "cache:contracts", "cache:contracts:v2"]) {
+    for (const key of ["cache:teams", "cache:contracts", "cache:contracts:v2", "cache:nhl_skater_summary_stats"]) {
       await redis.del(key).then(() => cleared.push(key)).catch(() => {});
     }
   }

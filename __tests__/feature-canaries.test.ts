@@ -179,16 +179,29 @@ describe("Canary — admin cache flush", () => {
     expect(src).toContain("cache:teams");
     expect(src).toContain("cache:contracts");
     expect(src).toContain("cache:contracts:v2");
+    expect(src).toContain("cache:nhl_skater_summary_stats");
   });
 });
 
 describe("Canary — admin contract sync", () => {
   const route = read("app/api/admin/contracts/route.ts");
   const page = read("app/admin/contracts/page.tsx");
+  const scraper = read("app/services/scraper.ts");
 
   it("live delta keeps scraper team and position metadata for sync", () => {
     expect(route).toContain("position: cw.position");
     expect(route).toContain("teamSlug: cw.teamSlug");
+  });
+
+  it("sync treats dash position placeholders as missing metadata", () => {
+    expect(route).toContain("pos === \"-\"");
+    expect(route).toContain("first === \"-\"");
+  });
+
+  it("scraper carries age and uses contract expiry year for remaining years", () => {
+    expect(scraper).toContain("yearsRemainingFromExpiry");
+    expect(scraper).toContain("SEASON.label.slice(0, 4)");
+    expect(scraper).toContain("age: ageNow");
   });
 
   it("sync updates existing rows instead of only inserting missing players", () => {
@@ -210,8 +223,55 @@ describe("Canary — admin contract sync", () => {
     expect(route).toContain("teamIdFromSlug(cw.teamSlug) ?? rosterFallback?.teamId");
   });
 
+  it("sync resolves AHL affiliate slugs to NHL parent teams", () => {
+    expect(route).toContain("manitoba_moose: \"WPG\"");
+    expect(route).toContain("abbotsford_canucks: \"VAN\"");
+  });
+
+  it("sync resolves lowercase NHL team abbreviations from CapWages", () => {
+    expect(route).toContain("const direct = slug.trim().toUpperCase()");
+    expect(route).toContain("if (isValidTeamId(direct)) return direct");
+  });
+
+  it("sync preserves an existing valid DB team when live sources do not resolve", () => {
+    expect(route).toContain("const currentTeamId = isValidTeamId(current?.teamId) ? current.teamId : null");
+    expect(route).toContain("?? currentTeamId ?? null");
+  });
+
+  it("sync writes scraped age into DB rows", () => {
+    expect(route).toContain("age:            playersTable.age");
+    expect(route).toContain("if (values.age && current.age !== values.age) updates.age = values.age");
+    expect(route).toContain("age:            values.age");
+  });
+
   it("sync reports updated counts in the admin toast", () => {
     expect(page).toContain("${data.added} added, ${data.updated ?? 0} updated");
     expect(page).toContain("resolvedTeamId");
+    expect(page).toContain("info.resolvedTeamId ?? info.currentTeamId ?? \"no-team\"");
+  });
+
+  it("sync invalidates league caches after DB metadata updates", () => {
+    expect(route).toContain("SYNC_CACHE_KEYS");
+    expect(route).toContain("await redis.del(key)");
+    expect(route).toContain("clearedCacheKeys");
+    expect(route).toContain("cache:nhl_skater_summary_stats");
+  });
+
+  it("league roster injection ignores placeholder team ids", () => {
+    const leaguePlayers = read("app/api/league/players/route.ts");
+    const league = read("app/api/league/route.ts");
+    expect(leaguePlayers).toContain("const isValidTeamId");
+    expect(leaguePlayers).toContain("if (!isValidTeamId(d.teamId)) continue;");
+    expect(league).toContain("const isValidTeamId");
+    expect(league).toContain("if (!isValidTeamId(d.teamId)) continue;");
+  });
+
+  it("league routes fall back to NHL summary stats when MoneyPuck misses a real skater", () => {
+    const leaguePlayers = read("app/api/league/players/route.ts");
+    const league = read("app/api/league/route.ts");
+    expect(leaguePlayers).toContain("fetchNhlSkaterStatsFallback");
+    expect(leaguePlayers).toContain("NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug)");
+    expect(league).toContain("fetchNhlSkaterStatsFallback");
+    expect(league).toContain("NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug)");
   });
 });

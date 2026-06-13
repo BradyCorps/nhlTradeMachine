@@ -70,6 +70,11 @@ const buildFallbackMap = (map: Map<string, any>) => {
 const normalisePos = (code: string) =>
   code === "L" || code === "R" ? "W" : code;
 
+const VALID_TEAM_IDS = new Set(TEAMS_DB.map(t => t.id));
+
+const isValidTeamId = (teamId: string | null | undefined): teamId is string =>
+  Boolean(teamId && VALID_TEAM_IDS.has(teamId));
+
 const calcAge = (birthDate: string): number => {
   const b = new Date(birthDate);
   const n = new Date();
@@ -407,10 +412,55 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
   return psMap;
 }
 
+async function fetchNhlSkaterStatsFallback(): Promise<Map<string, any>> {
+  const cacheKey = "cache:nhl_skater_summary_stats";
+  if (redis) {
+    const cached = await redis.get<Record<string, any>>(cacheKey);
+    if (cached) return new Map(Object.entries(cached));
+  }
+
+  const statsMap = new Map<string, any>();
+  try {
+    const res = await fetchWithTimeout(
+      `https://api.nhle.com/stats/rest/en/skater/summary?cayenneExp=seasonId%3D${SEASON.nhleSeasonId}%20and%20gameTypeId%3D2&limit=-1`,
+      10000
+    );
+    if (!res.ok) return statsMap;
+
+    const skaterData: { data: NHLSkaterRow[] } = await res.json();
+    for (const s of skaterData.data ?? []) {
+      if (!s.skaterFullName || s.gamesPlayed <= 0) continue;
+      const position = normalisePos(s.positionCode);
+      const games = Math.max(1, s.gamesPlayed);
+      const entry = {
+        ptsPace: ((s.goals + s.assists) / games) * 82,
+        xGPace: 0,
+        defRate: 0.08,
+        avgTOI: s.timeOnIcePerGame / 60,
+        games,
+        hasLiveStats: true,
+        goalsPace: (s.goals / games) * 82,
+        assistsPace: (s.assists / games) * 82,
+      };
+      const slug = slugify(s.skaterFullName);
+      statsMap.set(slug, entry);
+      statsMap.set(`${slug}__${position}`, entry);
+    }
+
+    if (redis && statsMap.size > 100) {
+      await redis.setex(cacheKey, PS_CACHE_TTL, Object.fromEntries(statsMap));
+    }
+  } catch (e: any) {
+    console.warn("[NHL skater fallback] failed:", e.message);
+  }
+  return statsMap;
+}
+
 export async function GET() {
-  const [CONTRACTS, PS_MAP] = await Promise.all([
+  const [CONTRACTS, PS_MAP, NHL_SKATER_STATS] = await Promise.all([
     loadContracts(),
     fetchPointShares(),
+    fetchNhlSkaterStatsFallback(),
   ]);
   const EXTENSIONS     = loadExtensions();
   const BASELINES      = loadBaselines();
@@ -652,7 +702,7 @@ export async function GET() {
     }).from(playersTable);
 
     for (const d of dbPlayers) {
-      if (!d.teamId) continue;
+      if (!isValidTeamId(d.teamId)) continue;
       const list = rosterMap.get(d.teamId) ?? [];
       const dbSlug = slugify(d.name);
       if (!list.some((x: any) => String(x.id) === String(d.id) || slugify(x.name) === dbSlug)) {
@@ -704,6 +754,9 @@ export async function GET() {
         const truncSlug = slug.slice(0, -1);
         stats = analyticsMap.get(`${truncSlug}__${(p.position ?? "").toUpperCase()}`)
              ?? analyticsMap.get(truncSlug);
+      }
+      if (!stats && !isDraftee) {
+        stats = NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug);
       }
 
       const normalName  = p.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");

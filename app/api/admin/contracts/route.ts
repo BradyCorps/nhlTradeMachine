@@ -4,6 +4,7 @@ import { db } from "@/app/db/client";
 import { players as playersTable } from "@/app/db/schema";
 import { eq } from "drizzle-orm";
 import { TEAMS_DB } from "@/app/lib/db";
+import { redis } from "@/app/lib/redis";
 
 const CONTRACT_OVERRIDES: Record<string, { yearsRemaining?: number; position?: string }> = {
   "Quinton Byfield": { position: "C" },
@@ -12,44 +13,83 @@ const CONTRACT_OVERRIDES: Record<string, { yearsRemaining?: number; position?: s
 
 const CW_TEAM_TO_ID: Record<string, string> = {
   anaheim_ducks: "ANA",
+  san_diego_gulls: "ANA",
   boston_bruins: "BOS",
+  providence_bruins: "BOS",
   buffalo_sabres: "BUF",
+  rochester_americans: "BUF",
   calgary_flames: "CGY",
+  calgary_wranglers: "CGY",
   carolina_hurricanes: "CAR",
+  chicago_wolves: "CAR",
   chicago_blackhawks: "CHI",
+  rockford_icehogs: "CHI",
   colorado_avalanche: "COL",
+  colorado_eagles: "COL",
   columbus_blue_jackets: "CBJ",
+  cleveland_monsters: "CBJ",
   dallas_stars: "DAL",
+  texas_stars: "DAL",
   detroit_red_wings: "DET",
+  grand_rapids_griffins: "DET",
   edmonton_oilers: "EDM",
+  bakersfield_condors: "EDM",
   florida_panthers: "FLA",
+  charlotte_checkers: "FLA",
   los_angeles_kings: "LAK",
+  ontario_reign: "LAK",
   minnesota_wild: "MIN",
+  iowa_wild: "MIN",
   montreal_canadiens: "MTL",
+  laval_rocket: "MTL",
   nashville_predators: "NSH",
+  milwaukee_admirals: "NSH",
   new_jersey_devils: "NJD",
+  utica_comets: "NJD",
   new_york_islanders: "NYI",
+  bridgeport_islanders: "NYI",
   new_york_rangers: "NYR",
+  hartford_wolf_pack: "NYR",
   ottawa_senators: "OTT",
+  belleville_senators: "OTT",
   philadelphia_flyers: "PHI",
+  lehigh_valley_phantoms: "PHI",
   pittsburgh_penguins: "PIT",
+  wilkes_barre_scranton_penguins: "PIT",
   san_jose_sharks: "SJS",
+  san_jose_barracuda: "SJS",
   seattle_kraken: "SEA",
+  coachella_valley_firebirds: "SEA",
   st_louis_blues: "STL",
+  springfield_thunderbirds: "STL",
   tampa_bay_lightning: "TBL",
+  syracuse_crunch: "TBL",
   toronto_maple_leafs: "TOR",
+  toronto_marlies: "TOR",
   utah_mammoth: "UTA",
   utah_hockey_club: "UTA",
+  tucson_roadrunners: "UTA",
   vancouver_canucks: "VAN",
+  abbotsford_canucks: "VAN",
   vegas_golden_knights: "VGK",
+  henderson_silver_knights: "VGK",
   washington_capitals: "WSH",
+  hershey_bears: "WSH",
   winnipeg_jets: "WPG",
+  manitoba_moose: "WPG",
 };
 
+const SYNC_CACHE_KEYS = ["cache:teams", "cache:contracts", "cache:contracts:v2", "cache:nhl_skater_summary_stats"];
+const VALID_TEAM_IDS = new Set(TEAMS_DB.map(t => t.id));
+
+function isValidTeamId(teamId: string | null | undefined): teamId is string {
+  return Boolean(teamId && VALID_TEAM_IDS.has(teamId));
+}
+
 function normalisePosition(pos: string | null | undefined): string | null {
-  if (!pos || pos === "Unknown") return null;
+  if (!pos || pos === "Unknown" || pos === "-" || pos === "—") return null;
   const first = pos.toUpperCase().split(",").map(p => p.trim()).filter(Boolean)[0];
-  if (!first) return null;
+  if (!first || first === "-" || first === "—") return null;
   if (first.includes("G")) return "G";
   if (first.includes("D")) return "D";
   if (first.includes("C")) return "C";
@@ -59,6 +99,8 @@ function normalisePosition(pos: string | null | undefined): string | null {
 
 function teamIdFromSlug(slug: string | null | undefined): string | null {
   if (!slug) return null;
+  const direct = slug.trim().toUpperCase();
+  if (isValidTeamId(direct)) return direct;
   const key = slug.toLowerCase().replace(/[\s-]+/g, "_");
   return CW_TEAM_TO_ID[key] ?? null;
 }
@@ -163,7 +205,7 @@ export async function GET(req: Request) {
     Object.keys(scraped).filter(n => !n.includes("__")).forEach(n => allNames.add(n));
   }
 
-  const scrapedRaw: Record<string, { capHit: number; yearsRemaining: number; position?: string; teamSlug?: string }> = {};
+  const scrapedRaw: Record<string, { capHit: number; yearsRemaining: number; position?: string; teamSlug?: string; age?: number | null }> = {};
 
   const rows = Array.from(allNames).sort().map(name => {
     const b  = dbMap.get(name);
@@ -186,6 +228,7 @@ export async function GET(req: Request) {
         yearsRemaining: scrapedYears ?? 1,
         position: cw.position,
         teamSlug: cw.teamSlug,
+        age: cw.age ?? null,
       };
     }
 
@@ -308,6 +351,7 @@ export async function PUT(req: Request) {
     name:           playersTable.name,
     position:       playersTable.position,
     teamId:         playersTable.teamId,
+    age:            playersTable.age,
     capHit:         playersTable.capHit,
     yearsRemaining: playersTable.yearsRemaining,
   }).from(playersTable);
@@ -330,25 +374,30 @@ export async function PUT(req: Request) {
     if (!cw.capHit || cw.capHit < 0.5 || cw.capHit > 20.8) continue;
 
     const rosterFallback = rosterTeamMap.get(id);
+    const current = existingById.get(id) ?? existingByName.get(id);
     const position = normalisePosition(cw.position) ?? rosterFallback?.position ?? "Unknown";
-    const teamId = teamIdFromSlug(cw.teamSlug) ?? rosterFallback?.teamId ?? null;
+    const currentTeamId = isValidTeamId(current?.teamId) ? current.teamId : null;
+    const teamId = teamIdFromSlug(cw.teamSlug) ?? rosterFallback?.teamId ?? currentTeamId ?? null;
     if (!teamId) metadataMisses.push(key);
     const values = {
       position,
       teamId,
+      age:            Number.isFinite(cw.age) && cw.age > 0 ? cw.age : null,
       capHit:         cw.capHit,
       yearsRemaining: cw.yearsRemaining > 0 ? cw.yearsRemaining : 1,
     };
-    const current = existingById.get(id) ?? existingByName.get(id);
     if (watchNames.has(key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""))) {
       watch[key] = {
         matchedExisting: Boolean(current),
         currentId: current?.id ?? null,
+        currentTeamId,
         sourceTeamSlug: cw.teamSlug ?? null,
         rosterFallbackTeamId: rosterFallback?.teamId ?? null,
         resolvedTeamId: teamId,
         sourcePosition: cw.position ?? null,
         resolvedPosition: position,
+        sourceAge: cw.age ?? null,
+        resolvedAge: values.age ?? current?.age ?? null,
       };
     }
     if (current) {
@@ -360,6 +409,7 @@ export async function PUT(req: Request) {
         updates.position = position;
       }
       if (teamId && current.teamId !== teamId) updates.teamId = teamId;
+      if (values.age && current.age !== values.age) updates.age = values.age;
 
       await db.update(playersTable).set(updates).where(eq(playersTable.id, current.id));
       updatedEntries.push(key);
@@ -372,6 +422,7 @@ export async function PUT(req: Request) {
       name:           key,
       position:       values.position,
       teamId:         values.teamId,
+      age:            values.age,
       capHit:         values.capHit,
       yearsRemaining: values.yearsRemaining,
       hasNmc:         false,
@@ -383,6 +434,13 @@ export async function PUT(req: Request) {
   }
 
   const total = await db.select({ id: playersTable.id }).from(playersTable);
+  const clearedCacheKeys: string[] = [];
+  if (redis) {
+    for (const key of SYNC_CACHE_KEYS) {
+      await redis.del(key).then(() => clearedCacheKeys.push(key)).catch(() => {});
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     added,
@@ -393,5 +451,6 @@ export async function PUT(req: Request) {
     metadataMisses: metadataMisses.slice(0, 25),
     metadataMissCount: metadataMisses.length,
     watch,
+    clearedCacheKeys,
   });
 }
