@@ -372,6 +372,26 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const isD    = asset.position === "D";
   const games  = asset.games ?? 60;
 
+  const hasNhlSignal = Boolean(asset.hasLiveStats) || games >= 14;
+  const hasProspectSignal =
+    asset.draftOverall != null ||
+    (asset.prospectPtsPace != null && asset.prospectPtsPace > 0) ||
+    (asset.baselinePtsPace != null && asset.baselinePtsPace > 0);
+  if (!hasNhlSignal && !hasProspectSignal) {
+    return {
+      total: 0,
+      off: 0,
+      def: 0,
+      age: 0,
+      cap: 0,
+      upside: 0,
+      noivImpact: 0,
+      fArchetype: "",
+      rosterTier: "BOTTOM_SIX",
+      isRFA: asset.age + asset.yearsRemaining <= 27,
+    };
+  }
+
 
   // Pace cumulative point shares to 82 games to prevent injury collapse
   // We use a floor of 20 games to avoid absurd small-sample size multipliers
@@ -698,7 +718,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
 // the pedigree value ±15%. Once the player logs 14+ NHL games, the normal
 // stats-driven path takes over.
 export function calcProspectNAV(asset: AssetInput): XNAVResult {
-  const overall = asset.draftOverall ?? 32;
+  const overall = asset.draftOverall ?? 224;
   const round   = Math.max(1, Math.ceil(overall / 32));
   const slotInRound = overall - (round - 1) * 32;
 
@@ -719,7 +739,12 @@ export function calcProspectNAV(asset: AssetInput): XNAVResult {
   // Goalie prospects are the least projectable asset in hockey
   const goalieDiscount = asset.position === "G" ? 0.80 : 1.0;
 
-  const total = Math.round(pick.total * certainty * nhle * goalieDiscount);
+  const nhlePace = asset.prospectPtsPace ?? 0;
+  const productionFloor = nhlePace > 0
+    ? Math.pow(clamp((nhlePace - 15) / 45, 0, 1), 1.2) * 35
+    : 0;
+
+  const total = Math.round(Math.max(pick.total * certainty * nhle, productionFloor) * goalieDiscount);
   return {
     total,
     off: 0, def: 0, age: 0, cap: 0,
@@ -745,7 +770,7 @@ export function calcNAV(asset: AssetInput): XNAVResult {
   if (asset.position === "Pick") return calcPickNAV(asset);
   // Drafted prospect without an NHL sample — pedigree valuation
   // (14-game threshold matches the rookie small-sample logic elsewhere)
-  if (asset.draftOverall != null && (asset.games ?? 0) < 14 && !asset.hasLiveStats) {
+  if ((asset.draftOverall != null || (asset.prospectPtsPace != null && asset.prospectPtsPace > 0)) && (asset.games ?? 0) < 14 && !asset.hasLiveStats) {
     return applyTradeRequestDiscount(calcProspectNAV(asset), asset);
   }
   if (asset.position === "G")    return applyTradeRequestDiscount(calcGoalieNAV(asset), asset);

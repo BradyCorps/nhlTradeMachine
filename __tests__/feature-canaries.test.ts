@@ -9,6 +9,7 @@ import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
 import { calcNAV, calcProspectNAV } from "../app/lib/xnav-engine";
+import { parseWikipediaDraftProspects } from "../app/lib/prospect-enrichment";
 
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
 
@@ -42,6 +43,19 @@ describe("Canary — engine prospect path", () => {
     expect(draftee.total).toBeGreaterThan(200);
     expect(draftee.total).toBeGreaterThan(sameButUndrafted.total + 100);
   });
+
+  it("calcNAV routes NHLe-only prospects through modest prospect value, not ELC surplus", () => {
+    const kevinHeStyle = calcNAV({
+      id: "kevin-he", name: "Kevin He", position: "W", age: 19,
+      capHit: 0.925, yearsRemaining: 3,
+      prospectPtsPace: 32, games: 0, hasLiveStats: false,
+    });
+
+    expect(kevinHeStyle.total).toBeGreaterThan(5);
+    expect(kevinHeStyle.total).toBeLessThan(25);
+    expect(kevinHeStyle.cap).toBe(0);
+    expect(kevinHeStyle.age).toBe(0);
+  });
 });
 
 describe("Canary — league route features (source-level)", () => {
@@ -69,6 +83,12 @@ describe("Canary — league route features (source-level)", () => {
         expect(src).toContain("!isDraftee");
       });
 
+      it("does not use surname-only skater stats fallbacks", () => {
+        expect(src).not.toContain("buildFallbackMap");
+        expect(src).not.toContain("fbMap.get(last)");
+        expect(src).toContain("hasDiacritics(p.name)");
+      });
+
       it("backfills DB contracts when the scraper drops a player", () => {
         // The loop that rescues admin-edited contracts for players CapWages
         // no longer lists (expired deals at rollover, parse rejects)
@@ -76,7 +96,8 @@ describe("Canary — league route features (source-level)", () => {
       });
 
       it("defaults draftees to 0 games so the pedigree NAV path triggers", () => {
-        expect(src).toMatch(/draftOverall != null \? \(stats\?\.games \?\? 0\)/);
+        expect(src).toContain("const games = draftOverall != null");
+        expect(src).toContain("? (stats?.games ?? 0)");
       });
 
       it("merges DB pedigree fields onto matching live roster rows", () => {
@@ -85,10 +106,46 @@ describe("Canary — league route features (source-level)", () => {
         expect(src).toContain("existing.draftYear = existing.draftYear ?? d.draftYear");
         expect(src).toContain("existing.draftOverall = existing.draftOverall ?? d.draftOverall");
         expect(src).toContain("existing.prospectPtsPace = existing.prospectPtsPace ?? d.prospectPtsPace");
-        expect(src).toContain("draftYear: p.draftYear ?? null");
+        expect(src).toContain("draftYear: draftYear ?? null");
+      });
+
+      it("filters DB-only older no-signal minor-league players out of trade assets", () => {
+        expect(src).toContain("injectedFromDb:   true");
+        expect(src).toContain("const hasProspectSignal");
+        expect(src).toContain("p.injectedFromDb && !stats && !goalieStats && !hasProspectSignal && p.age >= 24");
+        expect(src).toContain("stats?.games ?? goalieStats?.gamesStarted ?? 0");
+      });
+
+      it("enriches known synced prospects before NAV evaluation", () => {
+        expect(src).toContain("fetchProspectEnrichmentMap");
+        expect(src).toContain("PROSPECT_ENRICHMENT[slug]");
+        expect(src).toContain("const draftOverall = p.draftOverall ?? prospectOverride?.draftOverall");
+        expect(src).toContain("prospectPtsPace:  prospectPtsPace ?? null");
       });
     });
   }
+});
+
+describe("Canary — draft prospect enrichment", () => {
+  const src = read("app/lib/prospect-enrichment.ts");
+
+  it("parses public draft tables into normalized prospect pedigree", () => {
+    const parsed = parseWikipediaDraftProspects(`
+      <table><tbody>
+        <tr><th>23</th><td><a href="/wiki/Stian_Solberg">Stian Solberg</a> (D)</td><td>Anaheim Ducks</td></tr>
+        <tr><th>109</th><td><a href="/wiki/Kevin_He">Kevin He</a> (LW)</td><td>Winnipeg Jets</td></tr>
+      </tbody></table>
+    `, 2024);
+
+    expect(parsed["stian-solberg"]).toEqual({ draftYear: 2024, draftOverall: 23 });
+    expect(parsed["kevin-he"]).toEqual({ draftYear: 2024, draftOverall: 109 });
+  });
+
+  it("does not contain name-specific prospect production overrides", () => {
+    expect(src).not.toContain("MANUAL_NHLE");
+    expect(src).not.toContain("kevin-he");
+    expect(src).not.toContain("stian-solberg");
+  });
 });
 
 describe("Canary — engine inputs", () => {
@@ -246,6 +303,16 @@ describe("Canary — development profile route exposure", () => {
   });
 });
 
+describe("Canary — NAV client cache keys", () => {
+  const client = read("app/lib/evaluate-client.ts");
+
+  it("includes prospect valuation inputs so NHLe updates do not reuse stale NAV", () => {
+    expect(client).toContain("xnav-2.1-prospect-nhle");
+    expect(client).toContain("a.draftOverall ??");
+    expect(client).toContain("a.prospectPtsPace ??");
+  });
+});
+
 describe("Canary — development profile trade audit", () => {
   const src = read("app/api/evaluate/route.ts");
   const tradeLogic = read("app/lib/trade-logic.ts");
@@ -345,6 +412,14 @@ describe("Canary — admin contract sync", () => {
     expect(route).toContain("await redis.del(key)");
     expect(route).toContain("clearedCacheKeys");
     expect(route).toContain("cache:nhl_skater_summary_stats");
+  });
+
+  it("contract admin can persist prospect NHLe signal for synced prospects", () => {
+    expect(route).toContain("NHLE_FACTORS");
+    expect(route).toContain("prospectPtsPace");
+    expect(route).toContain("calculatedProspectPtsPace");
+    expect(route).toContain("updates.draftOverall");
+    expect(route).toContain("updates.prospectPtsPace");
   });
 
   it("league roster injection ignores placeholder team ids", () => {

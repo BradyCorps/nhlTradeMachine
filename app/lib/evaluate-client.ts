@@ -13,7 +13,7 @@ import type {
 // deployment/math changes cannot reuse stale results while the app is open.
 // Prevents redundant API calls when assets haven't changed
 const _navCache = new Map<string, XNAVResult>();
-const XNAV_CLIENT_CACHE_VERSION = "xnav-2.0-deployment-bypass-v2";
+const XNAV_CLIENT_CACHE_VERSION = "xnav-2.1-prospect-nhle-v1";
 
 function assetCacheKey(a: Asset): string {
   return [
@@ -30,6 +30,8 @@ function assetCacheKey(a: Asset): string {
     a.qocIndex ?? "",
     a.dzPct ?? "",
     a.pkTimeShare ?? 0,
+    a.draftOverall ?? "",
+    a.prospectPtsPace ?? "",
     a.games ?? 0,
   ].join(":");
 }

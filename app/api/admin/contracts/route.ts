@@ -82,6 +82,13 @@ const CW_TEAM_TO_ID: Record<string, string> = {
 const SYNC_CACHE_KEYS = ["cache:teams", "cache:contracts", "cache:contracts:v2", "cache:nhl_skater_summary_stats"];
 const VALID_TEAM_IDS = new Set(TEAMS_DB.map(t => t.id));
 
+const NHLE_FACTORS: Record<string, number> = {
+  NHL: 1.00, AHL: 0.47, KHL: 0.77, SHL: 0.59, LIIGA: 0.54,
+  NL: 0.46, CZECHIA: 0.49, DEL: 0.44, NCAA: 0.41, USHL: 0.27,
+  OHL: 0.30, WHL: 0.28, QMJHL: 0.28, USNTDP: 0.35,
+  J20: 0.19, MHL: 0.18, U18: 0.15,
+};
+
 function isValidTeamId(teamId: string | null | undefined): teamId is string {
   return Boolean(teamId && VALID_TEAM_IDS.has(teamId));
 }
@@ -266,7 +273,7 @@ export async function GET(req: Request) {
 }
 
 // POST /api/admin/contracts
-// body: { name, yearsRemaining?, capHit?, hasNMC?, hasNTC?, clear? }
+// body: { name, yearsRemaining?, capHit?, hasNMC?, hasNTC?, draftOverall?, prospectPtsPace?, clear? }
 // Upserts to Turso DB — persists across Vercel deployments
 export async function POST(req: Request) {
   const body = await req.json();
@@ -278,6 +285,20 @@ export async function POST(req: Request) {
     hasNTC?:         boolean;
     clear?:          boolean;
   };
+  const teamId = typeof body.teamId === "string" ? teamIdFromSlug(body.teamId) : null;
+  const position = normalisePosition(body.position);
+  const age = Number.isFinite(Number(body.age)) ? Number(body.age) : null;
+  const draftYear = Number.isFinite(Number(body.draftYear)) ? Number(body.draftYear) : null;
+  const draftRound = Number.isFinite(Number(body.draftRound)) ? Number(body.draftRound) : null;
+  const draftOverall = Number.isFinite(Number(body.draftOverall)) ? Number(body.draftOverall) : null;
+  const explicitProspectPtsPace = Number.isFinite(Number(body.prospectPtsPace)) ? Number(body.prospectPtsPace) : null;
+  const league = typeof body.league === "string" ? body.league.toUpperCase() : null;
+  const points = Number.isFinite(Number(body.points)) ? Number(body.points) : null;
+  const games = Number.isFinite(Number(body.games)) ? Number(body.games) : null;
+  const calculatedProspectPtsPace = league && points != null && games != null && games > 0 && NHLE_FACTORS[league] != null
+    ? Math.round((points / games) * NHLE_FACTORS[league] * 82 * 10) / 10
+    : null;
+  const prospectPtsPace = explicitProspectPtsPace ?? calculatedProspectPtsPace;
 
   if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
 
@@ -288,7 +309,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, cleared: true });
   }
 
-  if (yearsRemaining == null && capHit == null && hasNMC == null && hasNTC == null) {
+  if (
+    yearsRemaining == null && capHit == null && hasNMC == null && hasNTC == null &&
+    !teamId && !position && age == null && draftYear == null && draftRound == null &&
+    draftOverall == null && prospectPtsPace == null
+  ) {
     return NextResponse.json({ error: "provide at least one field to update" }, { status: 400 });
   }
 
@@ -300,17 +325,30 @@ export async function POST(req: Request) {
     if (capHit         != null) updates.capHit         = capHit;
     if (hasNMC         != null) updates.hasNmc         = hasNMC;
     if (hasNTC         != null) updates.hasNtc         = hasNTC;
+    if (teamId)                  updates.teamId         = teamId;
+    if (position)                updates.position       = position;
+    if (age           != null)   updates.age            = age;
+    if (draftYear     != null)   updates.draftYear      = draftYear;
+    if (draftRound    != null)   updates.draftRound     = draftRound;
+    if (draftOverall  != null)   updates.draftOverall   = draftOverall;
+    if (prospectPtsPace != null) updates.prospectPtsPace = prospectPtsPace;
     await db.update(playersTable).set(updates).where(eq(playersTable.id, id));
     return NextResponse.json({ ok: true, destination: "db-update", name });
   } else {
     await db.insert(playersTable).values({
       id,
       name,
-      position:       "Unknown",
+      position:       position ?? "Unknown",
+      teamId:         teamId ?? undefined,
+      age:            age ?? undefined,
       capHit:         capHit         ?? 0.925,
       yearsRemaining: yearsRemaining ?? 1,
       hasNmc:         hasNMC         ?? false,
       hasNtc:         hasNTC         ?? false,
+      draftYear:      draftYear      ?? undefined,
+      draftRound:     draftRound     ?? undefined,
+      draftOverall:   draftOverall   ?? undefined,
+      prospectPtsPace: prospectPtsPace ?? undefined,
     });
     return NextResponse.json({ ok: true, destination: "db-insert", name });
   }

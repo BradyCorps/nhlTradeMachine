@@ -464,6 +464,18 @@ describe("X-NAV — Young Surplus Contracts", () => {
     expect(result.total).toBeGreaterThan(140);
   });
 
+  it("No-signal ELC skater does not get cap or age surplus by default", () => {
+    const result = calcSkaterNAV({
+      id: "ahl-elc", name: "AHL ELC", position: "W",
+      age: 21, capHit: 0.925, yearsRemaining: 1,
+      games: 0, ptsPace: 0, avgTOI: 0, hasLiveStats: false,
+    });
+
+    expect(result.total).toBe(0);
+    expect(result.cap).toBe(0);
+    expect(result.age).toBe(0);
+  });
+
   it("Age curve: younger player worth more than identical older player", () => {
     const base = {
       id: "base", name: "Player", position: "C" as const,

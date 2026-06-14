@@ -8,6 +8,7 @@ import { players as playersTable, tradeBlock as tradeBlockTable } from "@/app/db
 import { resolveRosterTier } from "@/app/lib/xnav-engine";
 import { calcDevelopmentProfile } from "@/app/lib/development-profile";
 import { buildDevelopmentInputFromPlayerPayload } from "@/app/lib/development-sources";
+import { fetchProspectEnrichmentMap } from "@/app/lib/prospect-enrichment";
 
 export const dynamic = "force-dynamic";
 
@@ -60,17 +61,11 @@ const slugify = (n: string) =>
     .replace(/[^a-z0-9 ]/g, "")
     .trim().replace(/\s+/g, "-");
 
-const buildFallbackMap = (map: Map<string, any>) => {
-  const fb = new Map<string, any>();
-  map.forEach((val, slug) => {
-    const last = slug.split("-").slice(-1)[0];
-    fb.set(last, fb.has(last) ? null : val);
-  });
-  return fb;
-};
-
 const normalisePos = (code: string) =>
   code === "L" || code === "R" ? "W" : code;
+
+const hasDiacritics = (name: string): boolean =>
+  name.normalize("NFD") !== name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 const VALID_TEAM_IDS = new Set(TEAMS_DB.map(t => t.id));
 
@@ -459,10 +454,11 @@ async function fetchNhlSkaterStatsFallback(): Promise<Map<string, any>> {
 }
 
 export async function GET() {
-  const [CONTRACTS, PS_MAP, NHL_SKATER_STATS] = await Promise.all([
+  const [CONTRACTS, PS_MAP, NHL_SKATER_STATS, PROSPECT_ENRICHMENT] = await Promise.all([
     loadContracts(),
     fetchPointShares(),
     fetchNhlSkaterStatsFallback(),
+    fetchProspectEnrichmentMap(),
   ]);
   const EXTENSIONS     = loadExtensions();
   const BASELINES      = loadBaselines();
@@ -472,8 +468,6 @@ export async function GET() {
   const analyticsMap = new Map<string, any>();
   const goalieMap    = new Map<string, any>();
   const teamXgaMap   = new Map<string, { xGoals: number; ice: number }>();
-  let fbMap = new Map<string, any>();
-
   let skaterCsv: string | null = null;
   let goalieCsv: string | null = null;
 
@@ -589,7 +583,6 @@ export async function GET() {
         analyticsMap.set(mapKey, entry);
         if (pos) analyticsMap.set(slugify(name), entry);
       });
-      fbMap = buildFallbackMap(analyticsMap);
     }
 
     if (gpRes.status === "fulfilled" && gpRes.value.ok) {
@@ -723,6 +716,7 @@ export async function GET() {
           draftYear:       d.draftYear,
           draftOverall:    d.draftOverall,
           prospectPtsPace: d.prospectPtsPace,
+          injectedFromDb:   true,
         });
       }
       rosterMap.set(d.teamId, list);
@@ -748,18 +742,18 @@ export async function GET() {
 
     skaters.forEach((p: any) => {
       const slug    = slugify(p.name);
+      const prospectOverride = PROSPECT_ENRICHMENT[slug];
+      const draftYear = p.draftYear ?? prospectOverride?.draftYear;
+      const draftOverall = p.draftOverall ?? prospectOverride?.draftOverall;
+      const prospectPtsPace = p.prospectPtsPace ?? prospectOverride?.prospectPtsPace;
       const posSlug = `${slug}__${(p.position ?? "").toUpperCase()}`;
-      const isDraftee = p.draftOverall != null;
+      const isDraftee = draftOverall != null;
       let stats = analyticsMap.get(posSlug) ?? analyticsMap.get(slug);
-      // Fuzzy fallbacks (last-name, truncated-slug) recover MoneyPuck name
-      // quirks but produce false positives for draftees who share a surname
-      // with an NHL player — a draftee can't have last-season NHL stats.
-      if (!stats && !isDraftee) {
-        const last = slug.split("-").slice(-1)[0];
-        const fb   = fbMap.get(last);
-        if (fb !== null && fb !== undefined) stats = fb;
-      }
-      if (!stats && !isDraftee && slug.length > 4) {
+      // MoneyPuck sometimes drops accented characters entirely
+      // (Slafkovský -> slafkovsk). Only use this loose match when the roster
+      // name actually contains a diacritic; surname-only matching assigns NHL
+      // stats to unrelated minor-league players with common names.
+      if (!stats && !isDraftee && hasDiacritics(p.name) && slug.length > 4) {
         const truncSlug = slug.slice(0, -1);
         stats = analyticsMap.get(`${truncSlug}__${(p.position ?? "").toUpperCase()}`)
              ?? analyticsMap.get(truncSlug);
@@ -803,6 +797,11 @@ export async function GET() {
         ? (goalieMap.get(slugify(p.name)) ?? goalieMap.get(slugify(p.name.split(" ").pop() ?? "")) ?? null)
         : null;
 
+      const hasProspectSignal = draftOverall != null || (prospectPtsPace != null && prospectPtsPace > 0);
+      if (p.injectedFromDb && !stats && !goalieStats && !hasProspectSignal && p.age >= 24) {
+        return;
+      }
+
       const rawCapHit     = isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925);
       const nameCollision = p.age <= 23
         && rawCapHit > 3.0
@@ -828,9 +827,12 @@ export async function GET() {
       const baselineKey = p.name.toLowerCase().replace(/[^a-z]/g, "");
       const baselines   = BASELINES[baselineKey] || {};
       const qocIndex = calcQocIndex(finalPosition, stats?.iceRankAvg, stats?.dzPct);
-      const games = p.draftOverall != null ? (stats?.games ?? 0) : (stats?.games ?? goalieStats?.gamesStarted ?? 40);
-      const ptsPace = stats?.ptsPace ?? defaultPts;
-      const avgTOI = stats?.avgTOI ?? defaultTOI;
+      const hasSkaterStats = Boolean(stats);
+      const games = draftOverall != null
+        ? (stats?.games ?? 0)
+        : (stats?.games ?? goalieStats?.gamesStarted ?? 0);
+      const ptsPace = stats?.ptsPace ?? (hasSkaterStats ? defaultPts : 0);
+      const avgTOI = stats?.avgTOI ?? (hasSkaterStats ? defaultTOI : 0);
       const developmentInput = buildDevelopmentInputFromPlayerPayload({
         id: p.id,
         name: p.name,
@@ -839,9 +841,9 @@ export async function GET() {
         games,
         ptsPace,
         avgTOI,
-        draftYear: p.draftYear ?? null,
-        draftOverall: p.draftOverall ?? null,
-        prospectPtsPace: p.prospectPtsPace ?? null,
+        draftYear: draftYear ?? null,
+        draftOverall: draftOverall ?? null,
+        prospectPtsPace: prospectPtsPace ?? null,
       });
       const developmentProfile = developmentInput ? calcDevelopmentProfile(developmentInput) : null;
 
@@ -899,9 +901,9 @@ export async function GET() {
         hasNMC:    finalNMC,
         hasNTC:    finalNTC,
         canRetain: finalRetain,
-        draftYear:        p.draftYear       ?? null,
-        draftOverall:     p.draftOverall    ?? null,
-        prospectPtsPace:  p.prospectPtsPace ?? null,
+        draftYear:        draftYear       ?? null,
+        draftOverall:     draftOverall    ?? null,
+        prospectPtsPace:  prospectPtsPace ?? null,
         developmentProfile,
         tradeBlockStatus: blockMap.get(p.name)?.status ?? null,
         tradeBlockNote:   blockMap.get(p.name)?.note   ?? null,
