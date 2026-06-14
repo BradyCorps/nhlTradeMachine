@@ -102,6 +102,12 @@ function scoreExperience(nhlGames: number): number {
   return clamp((nhlGames / 320) * 100);
 }
 
+function totalNhlGamesFromSnapshots(snapshots: PlayerSeasonSnapshot[]): number {
+  return snapshots
+    .filter(s => s.league === "NHL")
+    .reduce((sum, s) => sum + Math.max(0, s.games || 0), 0);
+}
+
 function scoreProduction(input: DevelopmentProfileInput): number {
   if (input.position === "G") return 50;
   return clamp((input.ptsPace / productionScale(input.position)) * 100);
@@ -216,17 +222,17 @@ function classifyBoomBust(opts: {
   return { boomBustSignal: "HIGH_VARIANCE", boomScore: Math.round(boomScore), bustScore: Math.round(bustScore) };
 }
 
-function experienceRationale(input: DevelopmentProfileInput): string {
-  if (input.nhlGames === 0) {
+function experienceRationale(input: DevelopmentProfileInput, careerNhlGames = input.nhlGames): string {
+  if (careerNhlGames === 0) {
     return "No NHL sample yet; development read leans on pedigree, age, and any stored prospect production.";
   }
-  if (input.nhlGames < 40) {
-    return `Small NHL sample (${input.nhlGames} games); confidence stays guarded until the role stabilizes.`;
+  if (careerNhlGames < 40) {
+    return `Small NHL sample (${careerNhlGames} games); confidence stays guarded until the role stabilizes.`;
   }
-  if (input.nhlGames < 120) {
-    return `Partial NHL track record (${input.nhlGames} games); enough signal to start separating role from projection.`;
+  if (careerNhlGames < 120) {
+    return `Partial NHL track record (${careerNhlGames} games); enough signal to start separating role from projection.`;
   }
-  return `Established NHL sample (${input.nhlGames} games); current role carries more weight than projection.`;
+  return `Established NHL sample (${careerNhlGames} games); current role carries more weight than projection.`;
 }
 
 function productionRationale(input: DevelopmentProfileInput, latest: number | null): string {
@@ -258,8 +264,9 @@ function trendRationale(trend: TimelineTrend, volatility: number, snapshots: Pla
 
 export function calcDevelopmentProfile(input: DevelopmentProfileInput): DevelopmentProfile {
   const snapshots = input.snapshots ?? [];
+  const careerNhlGames = Math.max(input.nhlGames, totalNhlGamesFromSnapshots(snapshots));
   const pedigree = scorePedigree(input.draftOverall, input.internationalScore);
-  const experience = scoreExperience(input.nhlGames);
+  const experience = scoreExperience(careerNhlGames);
   const production = scoreProduction(input);
   const trend = trendFromSnapshots(snapshots);
   const role = roleGrowthScore(snapshots, input.avgTOI);
@@ -267,7 +274,7 @@ export function calcDevelopmentProfile(input: DevelopmentProfileInput): Developm
   const contextPenalty = (input.teamContext === "WEAK" ? 8 : 0) + (input.linemateContext === "WEAK" ? 10 : 0);
   const sampleRisk = clamp(65 - experience * 0.65);
   const ageDeclineRisk = input.age >= 36 ? 75 : input.age >= 33 ? 58 : input.age >= 30 ? 30 : 10;
-  const volatility = clamp(trend.volatility + (input.nhlGames < 100 ? 18 : 0) + (input.age <= 23 && production < 45 ? 12 : 0));
+  const volatility = clamp(trend.volatility + (careerNhlGames < 100 ? 18 : 0) + (input.age <= 23 && production < 45 ? 12 : 0));
   const regressionRisk = clamp(ageDeclineRisk + sampleRisk * 0.35 + (trend.trend === "FALLING" ? 22 : 0) + (input.age >= 32 && trend.trend === "RISING" ? 12 : 0));
   const breakoutProbability = clamp(
     pedigree * 0.24 +
@@ -278,7 +285,7 @@ export function calcDevelopmentProfile(input: DevelopmentProfileInput): Developm
     contextPenalty
   );
   const confidence = clamp(30 + experience * 0.38 + snapshots.length * 7 + (input.internationalScore ? 8 : 0) - volatility * 0.15);
-  const lowExperienceBoomBustBonus = input.age <= 23 && input.nhlGames < 80 ? 16 : 0;
+  const lowExperienceBoomBustBonus = input.age <= 23 && careerNhlGames < 80 ? 16 : 0;
   const boomBustScore = clamp(volatility * 0.55 + pedigree * 0.25 + (100 - confidence) * 0.25 + lowExperienceBoomBustBonus);
   const boomBust = classifyBoomBust({
     pedigree,
@@ -311,7 +318,7 @@ export function calcDevelopmentProfile(input: DevelopmentProfileInput): Developm
   if (input.teamContext === "WEAK" || input.linemateContext === "WEAK") tags.push("CONTEXT_DRAG");
 
   const rationale = [
-    experienceRationale(input),
+    experienceRationale(input, careerNhlGames),
     productionRationale(input, latest),
     trendRationale(trend.trend, volatility, snapshots),
   ];

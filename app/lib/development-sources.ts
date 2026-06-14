@@ -63,6 +63,14 @@ export interface NhlTimelineFetchOptions extends Omit<DevelopmentSourceFetchOpti
   useCache?: boolean;
 }
 
+export interface NhlBulkTimelineFetchOptions extends Omit<DevelopmentSourceFetchOptions, "seasonId"> {
+  playerIds?: Array<string | number>;
+  seasonIds?: string[];
+  endSeasonId?: string;
+  seasonCount?: number;
+  useCache?: boolean;
+}
+
 export interface CachedNhlTimelineResult {
   matches: NhlSeasonSummaryMatch[];
   cache: {
@@ -733,6 +741,43 @@ export async function fetchCachedNhlSkaterTimelineRowsForPlayer(
       liveFetches: summaryResults.filter(r => r.source === "live").map(r => r.seasonId),
     },
   };
+}
+
+export async function fetchCachedNhlSkaterTimelineRowsForPlayers(
+  opts: NhlBulkTimelineFetchOptions = {},
+): Promise<Map<string, NhlSeasonSummaryMatch[]>> {
+  const seasonIds = opts.seasonIds ?? buildRecentNhlSeasonIds(opts.endSeasonId, opts.seasonCount ?? 3);
+  const targetIds = opts.playerIds
+    ? new Set(opts.playerIds.map(id => String(id)))
+    : null;
+  const matchesByPlayer = new Map<string, NhlSeasonSummaryMatch[]>();
+
+  const summaryResults = await Promise.all(seasonIds.map(async seasonId => ({
+    seasonId,
+    ...(await fetchNhlSkaterSummaryRowsWithCache({
+      fetcher: opts.fetcher,
+      seasonId,
+      timeoutMs: opts.timeoutMs,
+      useCache: opts.useCache,
+    })),
+  })));
+
+  for (const { seasonId, rows } of summaryResults) {
+    for (const row of rows) {
+      if (row.playerId == null) continue;
+      const playerId = String(row.playerId);
+      if (targetIds && !targetIds.has(playerId)) continue;
+      const existing = matchesByPlayer.get(playerId) ?? [];
+      existing.push({ seasonId, row });
+      matchesByPlayer.set(playerId, existing);
+    }
+  }
+
+  for (const [playerId, matches] of matchesByPlayer) {
+    matchesByPlayer.set(playerId, matches.sort((a, b) => a.seasonId.localeCompare(b.seasonId)));
+  }
+
+  return matchesByPlayer;
 }
 
 function isKnownDevelopmentLeague(league: DevelopmentLeague): boolean {

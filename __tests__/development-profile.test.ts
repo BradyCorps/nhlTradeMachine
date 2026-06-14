@@ -233,6 +233,28 @@ describe("Development Timeline Layer — fixture archetypes", () => {
     expect(p.boomBustSignal).not.toBe("BUST_LEAN");
   });
 
+  it("uses NHL timeline games as career experience when the route only has current-season GP", () => {
+    const p = profile({
+      id: "trocheck-route",
+      name: "Vincent Trocheck",
+      position: "C",
+      age: 32,
+      nhlGames: 68,
+      ptsPace: 62,
+      avgTOI: 18,
+      draftOverall: 64,
+      snapshots: [
+        { season: "2023-24", age: 30, league: "NHL", games: 82, goals: 25, assists: 52, points: 77, ptsPerGame: 0.939, nhlePtsPace: 77, avgTOI: 19 },
+        { season: "2024-25", age: 31, league: "NHL", games: 80, goals: 26, assists: 33, points: 59, ptsPerGame: 0.738, nhlePtsPace: 60, avgTOI: 18.5 },
+        { season: "2025-26", age: 32, league: "NHL", games: 68, goals: 20, assists: 31, points: 51, ptsPerGame: 0.75, nhlePtsPace: 62, avgTOI: 18 },
+      ],
+    });
+
+    expect(p.nhlExperienceScore).toBeGreaterThan(65);
+    expect(p.developmentPhase).not.toBe("BREAKOUT_CANDIDATE");
+    expect(p.rationale[0]).toContain("Established NHL sample");
+  });
+
   it("Giroux and Patrick Kane are late-career declining profiles", () => {
     for (const veteran of [
       { name: "Claude Giroux", position: "C" as const, ptsPace: 48 },

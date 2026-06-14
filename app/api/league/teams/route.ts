@@ -164,17 +164,13 @@ export async function GET() {
   const LIVE_TEAMS = await loadTeams();
 
   const picks: any[] = [];
-  // Pick inventory derived from SEASON.draftYear — rounds 1-5 of the upcoming
-  // draft, rounds 1-3 of the following year. Rolls forward automatically.
+  // Pick inventory derived from SEASON.draftYear — rounds 1-5 for the next
+  // three drafts. Rolls forward automatically and stays sorted by year.
   const Y = SEASON.draftYear;
   LIVE_TEAMS.forEach((team) => {
-    [
-      { round: 1, year: Y }, { round: 1, year: Y + 1 },
-      { round: 2, year: Y }, { round: 2, year: Y + 1 },
-      { round: 3, year: Y }, { round: 3, year: Y + 1 },
-      { round: 4, year: Y },
-      { round: 5, year: Y },
-    ].forEach(({ round, year }) => {
+    [Y, Y + 1, Y + 2].flatMap(year =>
+      [1, 2, 3, 4, 5].map(round => ({ round, year }))
+    ).forEach(({ round, year }) => {
       const roundLabel = round === 1 ? "1st" : round === 2 ? "2nd" : round === 3 ? "3rd" : `${round}th`;
       picks.push({
         id:           `pick-${team.id}-${year}-${round}`,

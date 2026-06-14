@@ -59,6 +59,14 @@ const hasPremiumSpend = (assets: Asset[], navMap: Record<string, number>): boole
 const hasVeteranTerm = (assets: Asset[]): boolean =>
   assets.some(a => a.position !== "Pick" && a.age >= 30 && a.yearsRemaining >= 2);
 
+const isShoppedAsset = (asset: Asset): boolean =>
+  asset.tradeBlockStatus === "available" || asset.tradeBlockStatus === "requested";
+
+const isPremiumLotteryPick = (asset: Asset, navMap: Record<string, number>): boolean =>
+  asset.position === "Pick"
+  && (asset.round ?? 99) === 1
+  && ((asset.teamStanding ?? 16) >= 30 || getNav(asset, navMap) >= 300);
+
 // Score how willing a team is to absorb a negative contract
 export const dumpFitScore = (
   team: Team,
@@ -151,7 +159,6 @@ export const buildDumpSweetener = (
   navMap:    Record<string, number>,
 ): Asset[] => {
   const sortedPicks = [...homePicks]
-    .filter(p => (p.year ?? 9999) <= 2028)
     .sort((a, b) => getNav(b, navMap) - getNav(a, navMap));
 
   const pkg: Asset[] = [];
@@ -186,7 +193,6 @@ export const buildReturnPackages = (
       && p.tradeBlockStatus !== "untouchable")
     .sort((a, b) => n(b) - n(a));
   const sortedPicks = [...picks]
-    .filter(p => (p.year ?? 9999) <= 2028)
     .sort((a, b) => n(b) - n(a));
 
   const fwds = tradeable.filter(p => ["W","C","L","R"].includes(p.position));
@@ -454,6 +460,13 @@ export const preScreenProposal = (
     const partnerSellingFutureCore = partnerSends.some(isFutureCoreAsset);
     const homeSendingNoPicks = !homeSends.some(a => a.position === "Pick");
     if (partnerSellingFutureCore && homeSendingNoPicks && hasVeteranTerm(homeSends)) return false;
+
+    const partnerSellingPremiumPick = partnerSends.some(a => isPremiumLotteryPick(a, navMap));
+    const homeReturnNav = homeSends.reduce((s, a) => s + (navMap[a.id] ?? 0), 0);
+    const partnerPickNav = partnerSends
+      .filter(a => isPremiumLotteryPick(a, navMap))
+      .reduce((s, a) => s + (navMap[a.id] ?? 0), 0);
+    if (partnerSellingPremiumPick && homeReturnNav < partnerPickNav * 1.35) return false;
   }
 
   if (isWinNowPhase(partnerPhase)) {
@@ -490,6 +503,10 @@ export const preScreenProposal = (
   const homeNavOut    = homeSends.reduce((s,a) => s+(navMap[a.id]??0), 0);
   const partnerNavOut = partnerSends.reduce((s,a) => s+(navMap[a.id]??0), 0);
   if (Math.abs(homeNavOut - partnerNavOut) > 120) return false;
+  const partnerAskedToLose = partnerNavOut - homeNavOut;
+  const allPartnerAssetsShopped = partnerSends.length > 0 && partnerSends.every(isShoppedAsset);
+  const maxPartnerConcession = allPartnerAssetsShopped ? 40 : isRebuildPhase(partnerPhase) ? 18 : 28;
+  if (partnerAskedToLose > maxPartnerConcession) return false;
 
   const homePhase = homeTeam.phase ?? "";
   if (isRebuildPhase(homePhase)) {

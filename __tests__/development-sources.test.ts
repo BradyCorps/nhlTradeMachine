@@ -10,6 +10,7 @@ import {
   confidenceFromAdapterCoverage,
   diagnoseDevelopmentInput,
   fetchCachedNhlSkaterTimelineRowsForPlayer,
+  fetchCachedNhlSkaterTimelineRowsForPlayers,
   fetchNhlSkaterSummaryRows,
   fetchNhlSkaterTimelineRowsForPlayer,
   mergeTimelineSnapshots,
@@ -334,6 +335,58 @@ describe("Development source adapters", () => {
       summaryCacheHits: [],
       liveFetches: ["20252026"],
     });
+  });
+
+  it("builds a bulk NHL timeline map from one summary fetch per season", async () => {
+    const calls: string[] = [];
+    const map = await fetchCachedNhlSkaterTimelineRowsForPlayers({
+      playerIds: [8483471, "byfield"],
+      seasonIds: ["20242025", "20252026"],
+      fetcher: (async (url: RequestInfo | URL) => {
+        const season = String(url).includes("20242025") ? "20242025" : "20252026";
+        calls.push(season);
+        return {
+          ok: true,
+          json: async () => ({
+            data: [
+              {
+                playerId: 8483471,
+                skaterFullName: "Brad Lambert",
+                teamAbbrevs: "WPG",
+                positionCode: "C",
+                gamesPlayed: season === "20242025" ? 4 : 25,
+                goals: season === "20242025" ? 1 : 4,
+                assists: season === "20242025" ? 0 : 4,
+              },
+              {
+                playerId: "byfield",
+                skaterFullName: "Quinton Byfield",
+                teamAbbrevs: "LAK",
+                positionCode: "C",
+                gamesPlayed: season === "20242025" ? 78 : 78,
+                goals: season === "20242025" ? 23 : 25,
+                assists: season === "20242025" ? 38 : 34,
+              },
+              {
+                playerId: "ignored",
+                skaterFullName: "Ignored Player",
+                teamAbbrevs: "ANA",
+                positionCode: "C",
+                gamesPlayed: 82,
+                goals: 1,
+                assists: 1,
+              },
+            ],
+          }),
+        } as Response;
+      }) as typeof fetch,
+      useCache: false,
+    });
+
+    expect(calls).toEqual(["20242025", "20252026"]);
+    expect([...map.keys()].sort()).toEqual(["8483471", "byfield"]);
+    expect(map.get("8483471")?.map(match => match.seasonId)).toEqual(["20242025", "20252026"]);
+    expect(map.get("byfield")?.map(match => match.row.skaterFullName)).toEqual(["Quinton Byfield", "Quinton Byfield"]);
   });
 
   it("wires DB pedigree into NHL timeline-backed development input", () => {

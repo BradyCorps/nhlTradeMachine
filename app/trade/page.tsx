@@ -79,6 +79,16 @@ export default function TradeMachine() {
   // where id2:50 means 50% retention. Updates without a full navigation.
   const [linkCopied, setLinkCopied] = useState(false);
 
+  useEffect(() => {
+    if (!db.teams.length || (!homeTeamId && !partnerTeamId)) return;
+    setTeams(prev => {
+      const nextHome = homeTeamId ? db.teams.find(t => t.id === homeTeamId) ?? prev[0] : prev[0];
+      const nextPartner = partnerTeamId ? db.teams.find(t => t.id === partnerTeamId) ?? prev[1] : prev[1];
+      if (nextHome === prev[0] && nextPartner === prev[1]) return prev;
+      return [nextHome, nextPartner];
+    });
+  }, [db.teams, homeTeamId, partnerTeamId, setTeams]);
+
   // Sync state → URL on every trade change
   useEffect(() => {
     if (!teams[0] && !teams[1] && !blocks[0].length && !blocks[1].length) return;
@@ -283,14 +293,30 @@ export default function TradeMachine() {
   const executeTrade = useCallback(() => {
     if (!homeTeam || !partnerTeam || (!outgoingBlock.length && !incomingBlock.length)) return;
 
-    const outIds = new Set(outgoingBlock.map(a => a.id));
-    const inIds  = new Set(incomingBlock.map(a => a.id));
+    const outgoingById = new Map(outgoingBlock.map(a => [a.id, a]));
+    const incomingById = new Map(incomingBlock.map(a => [a.id, a]));
+    const outIds = new Set(outgoingById.keys());
+    const inIds  = new Set(incomingById.keys());
 
     setDb(prev => {
       // Update player teamIds
       const updatedPlayers = prev.players.map(p => {
-        if (outIds.has(p.id)) return { ...p, teamId: partnerTeam.id };
-        if (inIds.has(p.id))  return { ...p, teamId: homeTeam.id };
+        const outgoingAsset = outgoingById.get(p.id);
+        if (outgoingAsset) {
+          return {
+            ...p,
+            teamId: partnerTeam.id,
+            retainedPct: outgoingAsset.retainedPct ?? p.retainedPct ?? 0,
+          };
+        }
+        const incomingAsset = incomingById.get(p.id);
+        if (incomingAsset) {
+          return {
+            ...p,
+            teamId: homeTeam.id,
+            retainedPct: incomingAsset.retainedPct ?? p.retainedPct ?? 0,
+          };
+        }
         return p;
       });
 
@@ -305,17 +331,60 @@ export default function TradeMachine() {
         .filter(a => a.position !== "Pick")
         .reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0);
 
+      const strengthByTeam = new Map<string, number>();
+      for (const team of prev.teams) {
+        const roster = updatedPlayers
+          .filter(p => p.teamId === team.id && p.position !== "Pick")
+          .map(p => {
+            if (p.position === "G") return Math.max(0, (p.gsax ?? 0) * 2 + (p.gamesStarted ?? 0) * 0.5);
+            const toiCredit = Math.max(0, (p.avgTOI ?? 0) - 10) * 2;
+            return (p.ptsPace ?? 0) + toiCredit + Math.max(0, p.defRate ?? 0) * 12;
+          })
+          .sort((a, b) => b - a);
+        strengthByTeam.set(team.id, roster.slice(0, 18).reduce((s, v, i) => s + v * Math.pow(0.93, i), 0));
+      }
+      const projectedStandingByTeam = new Map(
+        [...strengthByTeam.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .map(([teamId], index) => [teamId, index + 1])
+      );
+      const phaseFromStanding = (standing: number): string =>
+        standing <= 6 ? "Contender" :
+        standing <= 10 ? "Bubble" :
+        standing <= 23 ? "Retooling" :
+        standing <= 29 ? "Rebuilding" :
+        "Tanking";
+
       const updatedTeams = prev.teams.map(team => {
+        const projectedStanding = projectedStandingByTeam.get(team.id) ?? team.standing;
+        const projectedPhase = phaseFromStanding(projectedStanding);
         if (team.id === homeTeam.id) {
-          return { ...team, capSpace: Math.round((team.capSpace + outCapHome - inCapHome) * 10) / 10 };
+          return {
+            ...team,
+            capSpace: Math.round((team.capSpace + outCapHome - inCapHome) * 10) / 10,
+            standing: projectedStanding,
+            phase: projectedPhase,
+          };
         }
         if (team.id === partnerTeam.id) {
-          return { ...team, capSpace: Math.round((team.capSpace + inCapHome - outCapHome) * 10) / 10 };
+          return {
+            ...team,
+            capSpace: Math.round((team.capSpace + inCapHome - outCapHome) * 10) / 10,
+            standing: projectedStanding,
+            phase: projectedPhase,
+          };
         }
-        return team;
+        return { ...team, standing: projectedStanding, phase: projectedPhase };
       });
 
-      return { players: updatedPlayers, teams: updatedTeams };
+      const standingByOwner = new Map(updatedTeams.map(team => [team.id, team.standing]));
+      const playersWithDynamicPickValues = updatedPlayers.map(p =>
+        p.position === "Pick"
+          ? { ...p, teamStanding: standingByOwner.get(p.teamId) ?? p.teamStanding }
+          : p
+      );
+
+      return { players: playersWithDynamicPickValues, teams: updatedTeams };
     });
 
     // Record the trade

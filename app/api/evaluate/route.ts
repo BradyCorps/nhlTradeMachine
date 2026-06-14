@@ -504,6 +504,9 @@ const runGmLogic = (
 
   const isShoppedAsset = (a: Asset): boolean =>
     a.tradeBlockStatus === "available" || a.tradeBlockStatus === "requested";
+  const isPremiumLotteryPick = (a: Asset): boolean =>
+    a.position === "Pick" && (a.round ?? 99) === 1
+    && ((a.teamStanding ?? 16) >= 30 || navOf(a) >= 300);
   const partnerElites = incoming.filter((a) => navOf(a) > 260 && !isShoppedAsset(a));
   const homeElites    = outgoing.filter((a) => navOf(a) > 200);
   if (partnerElites.length > 0 && homeElites.length === 0) {
@@ -607,7 +610,10 @@ const runGmLogic = (
     const after  = qualityCountAfter(allPartnerRoster, partnerGivingUp, pos);
 
     if (after < min) {
-      const playersLeaving = partnerGivingUp.filter(a => normalisePos(a.position) === pos).map(a => a.name).join(" and ");
+      const playersAtPosLeaving = partnerGivingUp.filter(a => normalisePos(a.position) === pos);
+      if (playersAtPosLeaving.length > 0 && playersAtPosLeaving.every(isShoppedAsset)) continue;
+
+      const playersLeaving = playersAtPosLeaving.map(a => a.name).join(" and ");
       const incomingAtPos = outPlayers.filter(a => normalisePos(a.position) === pos);
       const incomingFills = incomingAtPos.length > 0;
       const leavingNav    = partnerGivingUp.filter(a => normalisePos(a.position) === pos).reduce((s, a) => s + navOf(a), 0);
@@ -698,6 +704,7 @@ const runGmLogic = (
   }
 
   for (const player of partnerGivingUp) {
+    if (isShoppedAsset(player)) continue;
     const need = teamPartner.needs?.find((n: { pos: string; minWar: number; label: string }) => n.pos === player.position || n.pos === "Any");
     if (!need) continue;
     const isD   = player.position === "D";
@@ -730,8 +737,18 @@ const runGmLogic = (
     const veteranComing  = inPlayers.filter(a => a.age >= 25 && (a.yearsRemaining ?? 0) >= 3 && !PROSPECT_TIERS[a.name]);
     const picksComingIn  = inPicks.length > 0;
     const futureCoreGoingOut = partnerGivingUp.filter(isFutureCoreAsset);
+    const premiumPicksGoingOut = inPicks.filter(isPremiumLotteryPick);
 
-    if (youngGoingOut.length > 0 && veteranComing.length > 0 && !picksComingIn) {
+    if (premiumPicksGoingOut.length > 0 && navOut < premiumPicksGoingOut.reduce((s, a) => s + navOf(a), 0) * 1.35) {
+      flags.push({
+        severity: "HARD", category: "REBUILD_LOGIC",
+        headline: `${teamPartner.name} protects a premium lottery pick`,
+        perspective: "partner" as const,
+        explanation: `A rebuilding team does not sell a likely top-of-draft first unless the return is exceptional.`,
+        affectedAsset: premiumPicksGoingOut[0].name,
+        vetoesSide: 1,
+      });
+    } else if (youngGoingOut.length > 0 && veteranComing.length > 0 && !picksComingIn) {
       flags.push({
         severity: "HARD", category: "TIMELINE_MISMATCH",
         headline: `${teamPartner.name} shouldn't trade young core for a veteran`, perspective: "partner" as const,
@@ -936,7 +953,7 @@ const runGmLogic = (
 
   const navGapPct = Math.abs(homeNetGain) / Math.max(Math.abs(navOut), Math.abs(navIn), 1) * 100;
   const absGap = Math.abs(homeNetGain);
-  if (absGap > 30 && navGapPct > 25) {
+  if ((absGap > 30 && navGapPct > 15) || absGap > 50) {
     const losingTeam  = homeNetGain < 0 ? teamHome  : teamPartner;
     const losingNav   = homeNetGain < 0 ? navOut : navIn;
     const gainingNav  = homeNetGain < 0 ? navIn  : navOut;

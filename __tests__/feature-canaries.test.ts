@@ -259,6 +259,17 @@ describe("Canary — trade UI negative NAV", () => {
   });
 });
 
+describe("Canary — draft pick inventory", () => {
+  it("league routes create rounds 1-5 for three draft years", () => {
+    const league = read("app/api/league/route.ts");
+    const teams = read("app/api/league/teams/route.ts");
+    expect(league).toContain("[currentDraftYear, currentDraftYear + 1, currentDraftYear + 2]");
+    expect(teams).toContain("[Y, Y + 1, Y + 2]");
+    expect(league).toContain("[1, 2, 3, 4, 5].map(round => ({ round, year }))");
+    expect(teams).toContain("[1, 2, 3, 4, 5].map(round => ({ round, year }))");
+  });
+});
+
 describe("Canary — admin cache flush", () => {
   it("clear-cache flushes BOTH the teams and contracts caches", () => {
     const src = read("app/api/admin/clear-cache/route.ts");
@@ -312,6 +323,9 @@ describe("Canary — development profile route exposure", () => {
   for (const route of LEAGUE_ROUTES) {
     it(`${route} exposes developmentProfile without feeding it into NAV`, () => {
       const src = read(route);
+      expect(src).toContain("fetchCachedNhlSkaterTimelineRowsForPlayers");
+      expect(src).toContain("buildDevelopmentInputFromNhlTimeline");
+      expect(src).toContain("developmentTimelineMap.get(String(p.id))");
       expect(src).toContain("buildDevelopmentInputFromPlayerPayload");
       expect(src).toContain("calcDevelopmentProfile(developmentInput)");
       expect(src).toContain("developmentProfile,");

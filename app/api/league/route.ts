@@ -7,7 +7,11 @@ import { db } from "@/app/db/client";
 import { teams as teamsTable, players as playersTable, tradeBlock as tradeBlockTable } from "@/app/db/schema";
 import { resolveRosterTier } from "@/app/lib/xnav-engine";
 import { calcDevelopmentProfile } from "@/app/lib/development-profile";
-import { buildDevelopmentInputFromPlayerPayload } from "@/app/lib/development-sources";
+import {
+  buildDevelopmentInputFromNhlTimeline,
+  buildDevelopmentInputFromPlayerPayload,
+  fetchCachedNhlSkaterTimelineRowsForPlayers,
+} from "@/app/lib/development-sources";
 import { fetchProspectEnrichmentMap } from "@/app/lib/prospect-enrichment";
 
 export const dynamic = "force-dynamic";
@@ -1080,6 +1084,21 @@ export async function GET() {
     console.warn("[TradeBlock] read skipped:", e.message);
   }
 
+  const activePlayerIds = [...new Set(
+    [...rosterMap.values()]
+      .flat()
+      .filter((p: any) => p?.id != null)
+      .map((p: any) => String(p.id))
+  )];
+  const developmentTimelineMap = await fetchCachedNhlSkaterTimelineRowsForPlayers({
+    playerIds: activePlayerIds,
+    seasonCount: 5,
+    timeoutMs: 10000,
+  }).catch((e: any) => {
+    console.warn("[Development timeline] bulk fetch skipped:", e.message);
+    return new Map();
+  });
+
   // ── 3. Build player objects ─────────────────────────────────
   const players: any[] = [];
 
@@ -1201,18 +1220,25 @@ export async function GET() {
         : (stats?.games ?? goalieStats?.gamesStarted ?? 0);
       const ptsPace = stats?.ptsPace ?? (hasSkaterStats ? defaultPts : 0);
       const avgTOI = stats?.avgTOI ?? (hasSkaterStats ? defaultTOI : 0);
-      const developmentInput = buildDevelopmentInputFromPlayerPayload({
-        id: p.id,
-        name: p.name,
-        position: finalPosition,
-        age: p.age,
-        games,
-        ptsPace,
-        avgTOI,
-        draftYear: draftYear ?? null,
-        draftOverall: draftOverall ?? null,
-        prospectPtsPace: prospectPtsPace ?? null,
-      });
+      const timelineMatches = developmentTimelineMap.get(String(p.id)) ?? [];
+      const developmentInput = timelineMatches.length > 0
+        ? buildDevelopmentInputFromNhlTimeline(timelineMatches, {
+            age: p.age,
+            draftYear: draftYear ?? undefined,
+            draftOverall: draftOverall ?? undefined,
+          })
+        : buildDevelopmentInputFromPlayerPayload({
+            id: p.id,
+            name: p.name,
+            position: finalPosition,
+            age: p.age,
+            games,
+            ptsPace,
+            avgTOI,
+            draftYear: draftYear ?? null,
+            draftOverall: draftOverall ?? null,
+            prospectPtsPace: prospectPtsPace ?? null,
+          });
       const developmentProfile = developmentInput ? calcDevelopmentProfile(developmentInput) : null;
 
       players.push({
@@ -1298,15 +1324,10 @@ export async function GET() {
   // ── 4. Draft picks ──────────────────────────────────────────
   const picks: any[] = [];
   const currentDraftYear = SEASON.draftYear;
-  const nextDraftYear = currentDraftYear + 1;
   LIVE_TEAMS.forEach((team) => {
-    [
-      { round: 1, year: currentDraftYear }, { round: 1, year: nextDraftYear },
-      { round: 2, year: currentDraftYear }, { round: 2, year: nextDraftYear },
-      { round: 3, year: currentDraftYear }, { round: 3, year: nextDraftYear },
-      { round: 4, year: currentDraftYear },
-      { round: 5, year: currentDraftYear },
-    ].forEach(({ round, year }) => {
+    [currentDraftYear, currentDraftYear + 1, currentDraftYear + 2].flatMap(year =>
+      [1, 2, 3, 4, 5].map(round => ({ round, year }))
+    ).forEach(({ round, year }) => {
       const roundLabel = round === 1 ? "1st" : round === 2 ? "2nd" : round === 3 ? "3rd" : `${round}th`;
       picks.push({
         id:           `pick-${team.id}-${year}-${round}`,

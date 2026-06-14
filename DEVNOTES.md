@@ -33,6 +33,58 @@
 - Result: `173` tests passing.
 - Dev server was not started in Codespace, per project instructions.
 
+## 2026-06-14 Audit Follow-Up
+
+### Completed Today
+
+- Wired the DEV tab to multi-season NHL history instead of current-season stats only.
+  - Added `fetchCachedNhlSkaterTimelineRowsForPlayers(...)` in `app/lib/development-sources.ts`.
+  - The helper fetches each recent NHL skater-summary season once, then builds a `playerId -> timeline matches` map.
+  - `app/api/league/route.ts` and `app/api/league/players/route.ts` now prefer `buildDevelopmentInputFromNhlTimeline(...)` when timeline rows exist.
+  - Current payload fallback remains in place when NHL history is unavailable.
+  - Route timeline depth is currently `seasonCount: 5`.
+- Updated the development model so career NHL experience is derived from summed NHL timeline snapshots when present.
+  - This prevents established players from being treated as low-sample rookies just because the current season has fewer than 82 GP.
+  - Added a Vincent Trocheck-style regression test for this behavior.
+- Tightened trade approval/proposal screening.
+  - Proposal pre-screen now rejects partner NAV concessions beyond a tighter band.
+  - Shopped/available players are allowed a larger concession band.
+  - Rebuilding/tanking teams now protect premium lottery firsts unless the return is exceptional.
+  - Evaluation logic now flags large NAV gaps earlier.
+- Improved shopped-player handling in GM logic.
+  - Players marked `available` or `requested` bypass partner-side “can’t afford to lose” / stated-need vetoes.
+- Fixed retained salary session persistence after trade execution.
+  - Moved assets now carry their `retainedPct` into the post-trade roster state.
+- Added dynamic post-trade team context.
+  - Completing a trade recalculates team standing/phase from updated roster strength.
+  - Draft picks inherit updated `teamStanding`, so pick NAV can change after major roster moves.
+  - Selected home/partner team objects sync back to updated `db.teams`.
+- Expanded generated draft pick inventory.
+  - League routes now generate rounds 1-5 for the next three drafts: 2027, 2028, and 2029.
+  - Proposal builders no longer filter out 2029 picks.
+- Added tests/canaries for:
+  - Bulk DEV timeline fetches.
+  - Timeline-backed DEV route exposure.
+  - Career NHL experience from snapshots.
+  - Tightened proposal NAV screening.
+  - Shopped-player concession exception.
+  - Premium lottery pick protection.
+  - Three-year, rounds 1-5 draft pick inventory.
+
+### Verification
+
+- `npm run test`
+- Result: `179` tests passing.
+- Dev server was not started in Codespace, per project instructions.
+
+### Notes For Next Agent
+
+- The DEV tab should now be substantially more accurate for established NHLers, but it depends on NHL stats API timeline availability and cache freshness.
+- If DEV still shows limited history for a specific player, inspect whether that player has NHL `playerId` timeline matches in the recent skater-summary seasons.
+- Goalies still return no DEV profile through `buildDevelopmentInputFromPlayerPayload`; the development model remains skater-focused.
+- The dynamic post-trade team phase calculation is intentionally lightweight and session-local. It is not yet the full contention-quadrant model.
+- `AUDIT.md` is user-provided and currently untracked.
+
 ## Next Project
 
 ### Prospect Production Import

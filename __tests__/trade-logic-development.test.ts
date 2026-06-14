@@ -151,4 +151,47 @@ describe("development profile trade proposal logic", () => {
     expect(preScreenProposal([veteran], [futureCore], home, partner, { vet: 45, core: 50 }))
       .toBe(false);
   });
+
+  it("screens out partner concessions beyond the tightened NAV approval band", () => {
+    const home = team({ id: "EDM", name: "Edmonton Oilers", phase: "Contender", standing: 3 });
+    const partner = team({ id: "NSH", name: "Nashville Predators", phase: "Retooling", standing: 20 });
+    const depth = asset({ id: "depth", name: "Depth Player", teamId: home.id });
+    const better = asset({ id: "better", name: "Better Player", teamId: partner.id });
+
+    expect(preScreenProposal([depth], [better], home, partner, { depth: 40, better: 75 }))
+      .toBe(false);
+  });
+
+  it("allows a larger concession when every partner asset is actively shopped", () => {
+    const home = team({ id: "EDM", name: "Edmonton Oilers", phase: "Contender", standing: 3 });
+    const partner = team({ id: "NSH", name: "Nashville Predators", phase: "Retooling", standing: 20 });
+    const depth = asset({ id: "depth", name: "Depth Player", teamId: home.id });
+    const shopped = asset({
+      id: "shopped",
+      name: "Shopped Player",
+      teamId: partner.id,
+      tradeBlockStatus: "available",
+    });
+
+    expect(preScreenProposal([depth], [shopped], home, partner, { depth: 40, shopped: 75 }))
+      .toBe(true);
+  });
+
+  it("blocks tanking teams from selling premium lottery firsts without an exceptional return", () => {
+    const home = team({ id: "EDM", name: "Edmonton Oilers", phase: "Contender", standing: 3 });
+    const partner = team({ id: "VAN", name: "Vancouver Canucks", phase: "Tanking", standing: 32 });
+    const strongReturn = asset({ id: "strong", name: "Strong Player", teamId: home.id });
+    const likelyFirst = asset({
+      id: "van-2027-1",
+      name: "2027 1st Round Pick (VAN)",
+      teamId: partner.id,
+      position: "Pick",
+      round: 1,
+      year: 2027,
+      teamStanding: 32,
+    });
+
+    expect(preScreenProposal([strongReturn], [likelyFirst], home, partner, { strong: 420, "van-2027-1": 400 }))
+      .toBe(false);
+  });
 });
