@@ -216,6 +216,46 @@ function classifyBoomBust(opts: {
   return { boomBustSignal: "HIGH_VARIANCE", boomScore: Math.round(boomScore), bustScore: Math.round(bustScore) };
 }
 
+function experienceRationale(input: DevelopmentProfileInput): string {
+  if (input.nhlGames === 0) {
+    return "No NHL sample yet; development read leans on pedigree, age, and any stored prospect production.";
+  }
+  if (input.nhlGames < 40) {
+    return `Small NHL sample (${input.nhlGames} games); confidence stays guarded until the role stabilizes.`;
+  }
+  if (input.nhlGames < 120) {
+    return `Partial NHL track record (${input.nhlGames} games); enough signal to start separating role from projection.`;
+  }
+  return `Established NHL sample (${input.nhlGames} games); current role carries more weight than projection.`;
+}
+
+function productionRationale(input: DevelopmentProfileInput, latest: number | null): string {
+  const pace = Math.round(input.ptsPace);
+  if (input.nhlGames === 0 && pace === 0 && latest == null) {
+    return "No NHL or imported production sample is attached yet, so scoring impact remains unproven.";
+  }
+  if (input.nhlGames === 0 && latest != null) {
+    return `Prospect production translates to roughly ${Math.round(latest)} NHLe pts/82 before NHL scoring data arrives.`;
+  }
+  if (pace === 0) {
+    return "Current NHL production is not showing yet; value comes from role, pedigree, or defensive context.";
+  }
+  return `Current scoring pace sits around ${pace} pts/82, adjusted against position and role.`;
+}
+
+function trendRationale(trend: TimelineTrend, volatility: number, snapshots: PlayerSeasonSnapshot[]): string {
+  if (snapshots.filter(s => s.games >= 5).length < 2) {
+    return `Limited timeline history; projection range stays wide until more season snapshots are available.`;
+  }
+  const trendLabel =
+    trend === "RISING" ? "rising" :
+    trend === "FALLING" ? "falling" :
+    trend === "VOLATILE" ? "volatile" :
+    "steady";
+  const riskLabel = volatility >= 65 ? "high-variance" : volatility >= 45 ? "moderate-variance" : "stable";
+  return `Recent timeline looks ${trendLabel}; ${riskLabel} profile keeps the projection band flexible.`;
+}
+
 export function calcDevelopmentProfile(input: DevelopmentProfileInput): DevelopmentProfile {
   const snapshots = input.snapshots ?? [];
   const pedigree = scorePedigree(input.draftOverall, input.internationalScore);
@@ -271,11 +311,11 @@ export function calcDevelopmentProfile(input: DevelopmentProfileInput): Developm
   if (input.teamContext === "WEAK" || input.linemateContext === "WEAK") tags.push("CONTEXT_DRAG");
 
   const rationale = [
-    `${input.nhlGames} NHL games drives experience score ${Math.round(experience)}`,
-    `production score ${Math.round(production)} from ${Math.round(input.ptsPace)} pts/82 pace`,
-    `timeline trend ${trend.trend.toLowerCase()} with volatility ${Math.round(volatility)}`,
+    experienceRationale(input),
+    productionRationale(input, latest),
+    trendRationale(trend.trend, volatility, snapshots),
   ];
-  if (input.draftOverall != null) rationale.push(`draft pedigree ${input.draftOverall} overall`);
+  if (input.draftOverall != null) rationale.push(`Draft pedigree: ${input.draftOverall} overall.`);
   if (input.teamContext === "WEAK" || input.linemateContext === "WEAK") rationale.push("weak context lowers near-term breakout certainty");
 
   return {

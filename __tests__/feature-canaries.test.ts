@@ -10,6 +10,7 @@ import fs from "fs";
 import path from "path";
 import { calcNAV, calcProspectNAV } from "../app/lib/xnav-engine";
 import { parseWikipediaDraftProspects } from "../app/lib/prospect-enrichment";
+import { calcDevelopmentProfile } from "../app/lib/development-profile";
 
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
 
@@ -281,6 +282,29 @@ describe("Canary — development profile diagnostics", () => {
     expect(src).toContain("fetchCachedNhlSkaterTimelineRowsForPlayer");
     expect(src).toContain("cache: timelineResult.cache");
     expect(src).toContain("tradeValueChanged: false");
+  });
+});
+
+describe("Canary — development profile rationale copy", () => {
+  const src = read("app/lib/development-profile.ts");
+
+  it("uses scouting notes instead of raw score arithmetic for no-NHL-sample players", () => {
+    const profile = calcDevelopmentProfile({
+      id: "no-nhl-sample",
+      name: "No NHL Sample",
+      position: "W",
+      age: 19,
+      nhlGames: 0,
+      ptsPace: 0,
+    });
+
+    expect(profile.rationale[0]).toContain("No NHL sample yet");
+    expect(profile.rationale[1]).toContain("No NHL or imported production sample");
+    expect(profile.rationale[2]).toContain("Limited timeline history");
+    expect(profile.rationale.join(" ")).not.toContain("experience score");
+    expect(profile.rationale.join(" ")).not.toContain("production score");
+    expect(profile.rationale.join(" ")).not.toContain("timeline trend");
+    expect(src).not.toContain("NHL games drives experience score");
   });
 });
 
