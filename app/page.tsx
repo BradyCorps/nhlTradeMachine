@@ -159,15 +159,15 @@ export default function WelcomePage() {
             {[
               {
                 label: "What is NAV?",
-                body:  "Net Asset Value — how much a player is worth in a trade relative to their cap hit. A $6M player producing at $10M value = +NAV. A $10M player producing at $6M = −NAV.",
+                body:  "Net Asset Value: a trade-value estimate that combines on-ice impact, role, age, cap hit, term, control, and market context. Prospects use draft pedigree and stored NHLe production, not automatic ELC surplus.",
               },
               {
                 label: "What is STRAND™?",
-                body:  "A 10-trait DNA helix showing offensive and defensive profile across scoring, xGoals, ice time, NOIV suppression, and zone deployment. Compare two teams to see where a trade moves each.",
+                body:  "A roster DNA view showing how a player changes team identity: scoring pressure, defensive strain, usage, timeline fit, and role balance.",
               },
               {
                 label: "What is the GM Audit?",
-                body:  "The logic engine that flags what a real front office would reject — hard clause blocks, cap floor violations, negative retention, surplus mismatches, and contention window alignment.",
+                body:  "The rule layer that checks what a front office would care about: clauses, cap legality, retention, roster slots, surplus gaps, and contention-window alignment.",
               },
             ].map(({ label, body }) => (
               <div key={label}>

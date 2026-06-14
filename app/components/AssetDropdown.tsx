@@ -95,8 +95,7 @@ function AssetDropdown({
   }, [open]);
 
   useEffect(() => {
-    if (open) setTimeout(() => searchRef.current?.focus(), 60);
-    else setSearch("");
+    if (!open) setSearch("");
   }, [open]);
 
   const eligible = useMemo(() =>
@@ -191,6 +190,7 @@ function AssetDropdown({
                 ref={searchRef}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
+                onFocus={() => searchRef.current?.scrollIntoView({ block: "nearest" })}
                 placeholder="Search by name…"
                 className="w-full text-[11px] font-mono outline-none"
                 style={{

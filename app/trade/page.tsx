@@ -126,6 +126,7 @@ export default function TradeMachine() {
   }, [db]);
   const [verdictOpen, setVerdictOpen] = useState(false);   // bottom sheet expanded
   const [showTeamSelect, setShowTeamSelect] = useState(false); // Team select modal open
+  const [selectingTeamId, setSelectingTeamId] = useState<string | null>(null);
   const [tradeBlockOpen, setTradeBlockOpen] = useState(false);
   const [tradeRequest,   setTradeRequest]   = useState<Asset[] | null>(null);
 
@@ -627,6 +628,7 @@ export default function TradeMachine() {
 
   const navA = blocks[0].reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);
   const navB = blocks[1].reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);
+  const navBootLoading = navLoading && Object.keys(navMap).length === 0;
   const cNavA = compressBlock(blocks[0]);
   const cNavB = compressBlock(blocks[1]);
   const displayNavA = cNavA > 0 ? cNavA : navA;
@@ -740,12 +742,13 @@ export default function TradeMachine() {
                       phase === "Retooling"  ? 'var(--ledger-amber)' :
                       phase === "Rebuilding" ? 'var(--ledger-red)' :
                       'var(--ledger-brown)';
-                    const cityName = t.name.split(' ').slice(0, -1).join(' ');
-                    const teamName = t.name.split(' ').slice(-1)[0];
+                    const isSelecting = selectingTeamId === t.id;
                     return (
                       <button
                         key={t.id}
+                        disabled={Boolean(selectingTeamId)}
                         onClick={() => {
+                          setSelectingTeamId(t.id);
                           setTeams(prev => {
                             const partner = prev[1]?.id === t.id
                               ? db.teams.find(x => x.id !== t.id) ?? null
@@ -753,12 +756,18 @@ export default function TradeMachine() {
                             return [t, partner];
                           });
                           setBlocks([[], []]);
+                          setHomeTeamLocked(true);
+                          window.setTimeout(() => {
+                            setShowTeamSelect(false);
+                            setSelectingTeamId(null);
+                          }, 120);
                         }}
-                        className="p-2 text-left transition-all"
+                        className="p-2 text-left transition-all disabled:cursor-wait"
                         style={{
                           background: isSelected ? 'var(--ledger-ink)' : 'var(--ledger-card)',
                           border: `1px solid ${isSelected ? 'var(--ledger-ink)' : 'var(--ledger-rule-mid)'}`,
                           borderRadius: '2px',
+                          opacity: selectingTeamId && !isSelecting ? 0.45 : 1,
                         }}
                       >
                         <div className="flex flex-col items-center justify-center gap-1.5 py-1">
@@ -767,7 +776,7 @@ export default function TradeMachine() {
                             color: isSelected ? 'var(--ledger-ink-faint)' : phaseColor,
                             lineHeight: 1.1
                           }}>
-                            {phase}
+                            {isSelecting ? "Loading" : phase}
                           </div>
                         </div>
                       </button>
@@ -775,45 +784,8 @@ export default function TradeMachine() {
                   })}
               </div>
 
-              {/* Selected team summary */}
-              {teams[0] && (
-                <div className="mb-4 p-3" style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070' }}>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="font-black text-[14px] text-ledger-ink font-serif">
-                        {teams[0].name}
-                      </div>
-                      <div className="text-[11px] mt-0.5 text-ledger-ink-faint font-mono">
-                        #{teams[0].standing}/32 · {teams[0].phase} · ${teams[0].capSpace.toFixed(1)}M cap space
-                      </div>
-                    </div>
-                    <div className="text-2xs font-black px-2 py-1" style={{
-                      color: 'var(--ledger-red)', border: '1px solid rgba(184,48,32,0.4)',
-                    }}>
-                      YOUR FRANCHISE
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <button
-                disabled={!teams[0]}
-                onClick={() => {
-                  setHomeTeamLocked(true); // lock immediately on confirm
-                  setShowTeamSelect(false);
-                }}
-                className="w-full py-3.5 font-black uppercase tracking-widest text-[11px] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                style={{
-                  background: teams[0] ? 'var(--ledger-ink)' : 'var(--ledger-rule-mid)',
-                  color: 'var(--ledger-card-light)',
-                  borderRadius: '2px',
-                }}
-              >
-                {teams[0] ? `✦ Take Control of the ${teams[0].name} ✦` : 'Select a team to begin'}
-              </button>
-
               <p className="text-center mt-2 text-[11px] text-ledger-rule font-mono">
-                Your franchise locks in when you confirm. Reset via Void All Trades.
+                Tap a team to take control. Reset via Void All Trades.
               </p>
             </div>
           </div>
@@ -916,6 +888,17 @@ export default function TradeMachine() {
         <Header activeTab="trade" />
 
         <TradeHistoryBar />
+
+        {navBootLoading && (
+          <div className="border px-4 py-2 text-center font-mono text-[9px] font-black uppercase tracking-[0.22em]"
+            style={{
+              background: "var(--paper-inset)",
+              borderColor: "var(--ledger-rule)",
+              color: "var(--ledger-ink-faint)",
+            }}>
+            Calculating player values before roster selection finishes
+          </div>
+        )}
 
         {/* ── Team Strands — full width above trade grid ── */}
         {teams[0] && teams[1] && (
@@ -1347,135 +1330,7 @@ export default function TradeMachine() {
         )}
 
         {(blocks[0].length > 0 || blocks[1].length > 0) && <BreakdownTable blocks={blocks} navMap={navMap} />}
-        {/* ── Footer — Glossary & Methodology ── */}
-        <footer className="mt-12 pt-8" style={{ borderTop: '2px solid #1c140a' }}>
-          <div className="text-center mb-6">
-            <div className="text-2xs uppercase tracking-[0.5em] mb-1 text-ledger-ink-faint font-mono">
-              Methodology & Glossary
-            </div>
-            <h2 className="text-xl font-black" style={{ color: 'var(--ledger-ink)' }}>
-              How The Hockey Ledger Works
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
-            {/* Valuation */}
-            <div>
-              <div className="font-black text-sm mb-3 pb-1" style={{ color: 'var(--ledger-ink)', borderBottom: '1px solid #b8a070' }}>
-                Player Valuation
-              </div>
-              <div className="space-y-3 text-[11px] text-ledger-ink-body leading-relaxed">
-                <div>
-                  <span className="font-black font-mono">NAV (Net Asset Value)</span>
-                  <p className="mt-0.5">A player's overall trade value on a scale from roughly -100 to +1000. Combines offensive production, defensive contribution, contract cost, and age. Think of it as "how much is this player worth versus what they cost?" Positive NAV = providing more value than salary. Negative NAV = contract liability.</p>
-                </div>
-                <div>
-                  <span className="font-black font-mono">NOIV (Net On-Ice Value)</span>
-                  <p className="mt-0.5">A contextual multiplier based on how much a player elevates their teammates. Measures xG% relative to teammates on ice vs off, xGA suppression, and defensive zone deployment. A player with NOIV significantly above their raw stats is a hidden gem whose impact outstrips the box score.</p>
-                </div>
-                <div>
-                  <span className="font-black font-mono">OPS · DPS · PS</span>
-                  <p className="mt-0.5">Offensive and Defensive Point Shares — computed dynamically from the NHL Stats API using the Kubatko marginal goals framework. OPS measures offensive contribution to team points; DPS measures defensive contribution. These replace heuristic OFF/DEF estimates when live data is available.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* STRAND metrics */}
-            <div>
-              <div className="font-black text-sm mb-3 pb-1" style={{ color: 'var(--ledger-ink)', borderBottom: '1px solid #b8a070' }}>
-                STRAND™ Node Glossary
-              </div>
-              <div className="space-y-2 text-[11px] text-ledger-ink-body leading-relaxed">
-                <div>
-                  <span className="font-black font-mono">SCR — Scoring Pace</span>
-                  <p className="mt-0.5">Points per 82 games, normalized by position. D-men scored against a 0-80 scale; forwards against 0-100. A 73 SCR for a defenceman means he scores at the top of the D-man range — not that he scores like a forward.</p>
-                </div>
-                <div>
-                  <span className="font-black font-mono">xG — Expected Goals</span>
-                  <p className="mt-0.5">Shot quality and volume generated per 82 games. Accounts for where shots come from, not just how many. A player who generates high-danger chances scores higher than one who fires from the perimeter.</p>
-                </div>
-                <div>
-                  <span className="font-black font-mono">TOI+ — Ice Time</span>
-                  <p className="mt-0.5">Average time on ice per game. Normalized 10-27 minutes. Reflects coach trust and role deployment — players earning 24+ minutes are being used in every situation. Normalized so 27+ min = 100.</p>
-                </div>
-                <div>
-                  <span className="font-black font-mono">SUPP — xGA Suppression</span>
-                  <p className="mt-0.5">On-ice expected goals against vs off-ice, relative to teammates. Positive = team leaks fewer chances with this player on ice. Range -1.5 to +1.5. The defensive counterpart to xG — how well does this player prevent quality shots against?</p>
-                </div>
-                <div>
-                  <span className="font-black font-mono">QoC — Opponent Ice-Time Rank</span>
-                  <p className="mt-0.5">Rank of opponents faced by ice time — a measure of deployment difficulty, not raw opponent quality. Lower rank = harder matchups. Rank 1 faces the toughest competition in the league every night. A player with QoC rank 50 and good SUPP is genuinely shutting down the opposition's best players.</p>
-                </div>
-                <div>
-                  <span className="font-black font-mono">DZ% — Defensive Zone Starts</span>
-                  <p className="mt-0.5">Percentage of shifts starting in the defensive zone. High DZ% means the coach deploys this player specifically to protect their own net — a mark of trust in their defensive reliability. Inverted in STRAND so higher score = more defensive deployment.</p>
-                </div>
-                <div>
-                  <span className="font-black font-mono">AGE — Age Curve</span>
-                  <p className="mt-0.5">The trajectory of a player's value over the life of their contract. Young players show positive age curves (improving). Veterans past their peak show negative curves (declining). Used in the defensive strand to show whether a player's contribution will grow or shrink.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Archetypes & GM Logic */}
-            <div>
-              <div className="font-black text-sm mb-3 pb-1" style={{ color: 'var(--ledger-ink)', borderBottom: '1px solid #b8a070' }}>
-                Archetypes & GM Logic
-              </div>
-              <div className="space-y-3 text-[11px] text-ledger-ink-body leading-relaxed">
-                <div>
-                  <span className="font-black font-mono">D-Man Archetypes</span>
-                  <p className="mt-0.5"><strong>Offensive D</strong> — 45+ pts/82, valued for scoring and powerplay (Makar, Bouchard). <strong>Two-Way D</strong> — 28-45 pts/82 with heavy minutes and balanced PS ratio (Morrissey, Josi). <strong>Shutdown D</strong> — under 28 pts/82 but faces elite competition, DPS dominates OPS (Slavin). <strong>Depth D</strong> — sheltered deployment, standard evaluation.</p>
-                </div>
-                <div>
-                  <span className="font-black font-mono">EWA (Estimated Wins Added)</span>
-                  <p className="mt-0.5">Translates NAV into actual standings wins. Roughly 7 NAV points equals one win above replacement, adjusted for where the team sits in the standings.</p>
-                </div>
-                <div>
-                  <span className="font-black font-mono">CWI (Contention Window Index)</span>
-                  <p className="mt-0.5">Estimates how a trade affects a team's championship window in years. Young players on cheap deals push CWI up. Aging veterans on long contracts push it down.</p>
-                </div>
-                <div>
-                  <span className="font-black font-mono">GM Flags</span>
-                  <p className="mt-0.5">The audit engine checks 15+ real-world factors: cap compliance, positional depth, NMC/NTC clause probability, timeline mismatch, defensive dependency, same-division conflicts. HARD flags block; SOFT flags warn. DECLINED means the model believes one side's GM wouldn't sign off — not that the trade is bad hockey.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* STRAND visualization */}
-            <div>
-              <div className="font-black text-sm mb-3 pb-1" style={{ color: 'var(--ledger-ink)', borderBottom: '1px solid #b8a070' }}>
-                STRAND™ Visualization
-              </div>
-              <div className="space-y-3 text-[11px] text-ledger-ink-body leading-relaxed">
-                <div>
-                  <span className="font-black font-mono">What is STRAND™?</span>
-                  <p className="mt-0.5">STRAND — Stylistic Trait & Rating Analysis for NHL Development — is a proprietary double-helix visualization encoding a player's complete on-ice identity into two intertwined strands. Navy = offensive profile. Red = defensive profile.</p>
-                </div>
-                <div>
-                  <span className="font-black font-mono">Reading the Helix</span>
-                  <p className="mt-0.5">A tight symmetric helix signals an elite two-way player. A helix where one strand dominates reveals a specialist — not a weakness, a definition. Slavin's helix is almost entirely red. That's not a criticism; it's the most accurate visual description of what makes him valuable. Node size scales with trait strength. Values shown directly on each node.</p>
-                </div>
-                <div>
-                  <span className="font-black font-mono">Archetype Classification</span>
-                  <p className="mt-0.5">When Point Shares data is available, the OPS/DPS ratio directly determines archetype: players with psRatio {'>'} 0.62 are Offensive, {'<'} 0.38 are Defensive, 0.38-0.62 with strong both strands are Two-Way or Elite Two-Way. Heuristic scoring fills in when PS data isn't available.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Value vs Worth note */}
-          <div className="mb-6 p-4" style={{ border: '1px solid #b8a070', background: 'var(--ledger-card)' }}>
-            <div className="text-2xs uppercase tracking-[0.4em] mb-2 text-ledger-ink-faint font-mono">
-              A Note on Value vs Worth
-            </div>
-            <p className="text-[11px]" style={{ color: 'var(--ledger-ink-body)', lineHeight: 1.8, fontStyle: 'italic' }}>
-              Every player in this database plays in the NHL. That alone puts them in the top 0.1% of hockey players on earth. A negative NAV does not mean a negative player — it means the contract represents negative trade value relative to production and term. Hockey is rooted in reality: every player who dresses for an NHL game is fundamentally one of the best athletes in the world at what they do. These numbers measure tradeable asset value, not human worth. Use them as a starting point for conversation, not a final verdict.
-            </p>
-          </div>
-
-          <Footer />
-        </footer>
+        <Footer />
 
       </div>
     </main>

@@ -313,6 +313,54 @@ describe("Canary — NAV client cache keys", () => {
   });
 });
 
+describe("Canary — footer glossary", () => {
+  const footer = read("app/components/Footer.tsx");
+  const tradePage = read("app/trade/page.tsx");
+
+  it("combines methodology and glossary into wide footer disclosure sections", () => {
+    expect(footer).toContain("methodologySections");
+    expect(footer).toContain("<details");
+    expect(footer).toContain("Player Valuation");
+    expect(footer).toContain("STRAND Glossary");
+    expect(footer).toContain("grid grid-cols-1 md:grid-cols-2");
+    expect(footer).toContain("Prospect NAV");
+    expect(footer).toContain("NHLe");
+  });
+
+  it("keeps the icon key visible instead of hiding it in a dropdown", () => {
+    expect(footer).toContain("const iconKey");
+    expect(footer).toContain('aria-label="Icon key"');
+    expect(footer).toContain("Megalodon");
+    expect(footer).toContain("Salary Dump");
+    expect(footer).not.toMatch(/title:\s*"Icon Key"/);
+  });
+
+  it("does not keep a second trade-page methodology block", () => {
+    expect(tradePage).not.toContain("Methodology & Glossary");
+    expect(tradePage).not.toContain("How The Hockey Ledger Works");
+    expect(tradePage).toContain("<Footer />");
+  });
+});
+
+describe("Canary — trade UX loading and mobile focus", () => {
+  const tradePage = read("app/trade/page.tsx");
+  const assetDropdown = read("app/components/AssetDropdown.tsx");
+
+  it("selects the franchise from one team-grid click instead of requiring a second confirm click", () => {
+    expect(tradePage).toContain("selectingTeamId");
+    expect(tradePage).toContain("setHomeTeamLocked(true)");
+    expect(tradePage).toContain("setShowTeamSelect(false)");
+    expect(tradePage).not.toContain("Take Control of the");
+    expect(tradePage).toContain("Calculating player values before roster selection finishes");
+  });
+
+  it("does not autofocus asset search when the add-asset modal opens", () => {
+    expect(assetDropdown).not.toContain("setTimeout(() => searchRef.current?.focus()");
+    expect(assetDropdown).not.toContain("if (open) setTimeout");
+    expect(assetDropdown).toContain("onFocus={() => searchRef.current?.scrollIntoView");
+  });
+});
+
 describe("Canary — development profile trade audit", () => {
   const src = read("app/api/evaluate/route.ts");
   const tradeLogic = read("app/lib/trade-logic.ts");
