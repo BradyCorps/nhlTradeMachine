@@ -21,6 +21,8 @@ function navColor(n: number): string {
 }
 
 function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number; onClick: () => void }) {
+  const termLabel = p.position === "Pick" ? `${p.year ?? ""}` : `${p.yearsRemaining ?? 0}yr`;
+
   return (
     <button
       onClick={onClick}
@@ -46,6 +48,9 @@ function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number; onClick: () => 
       <div className="flex items-center gap-3 shrink-0 ml-2 font-mono">
         <span className="text-[10px]" style={{ color: "var(--ledger-ink-faint)" }}>
           ${p.capHit.toFixed(2)}M
+        </span>
+        <span className="text-[10px] w-8 text-right" style={{ color: "var(--ledger-ink-faint)" }}>
+          {termLabel}
         </span>
         <span className="text-[10px] font-black w-10 text-right" style={{ color: navColor(nav) }}>
           {nav > 0 ? "+" : ""}{nav.toFixed(0)}

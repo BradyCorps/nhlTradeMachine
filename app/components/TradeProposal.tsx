@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import type { Asset, Team } from "@/app/lib/trade-types";
+import { fetchTradeVerdict } from "@/app/lib/evaluate-client";
 import type { TradeProposal } from "@/app/lib/trade-logic";
 import {
   getNav,
@@ -35,6 +36,11 @@ type Candidate = {
   dumpSweetener: Asset[];
 };
 
+const tradePassesFullAudit = (status?: string): boolean =>
+  status !== "BLOCKED" && status !== "DECLINED";
+
+const AUDIT_CONCURRENCY = 6;
+
 export default function TradeProposalEngine({
   outgoingBlock, homeTeam, allTeams, allPlayers, navMap, onClose, onLoadTrade
 }: Props) {
@@ -44,6 +50,7 @@ export default function TradeProposalEngine({
   const [activeIndex, setActiveIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState<"next" | "prev">("next");
   const [marketStats, setMarketStats] = useState({ reviewed: 0, viable: 0 });
+  const [auditProgress, setAuditProgress] = useState<{ checked: number; total: number } | null>(null);
 
   // Trade-block badge — shows why this player is realistically available
   const BlockBadge = ({ status }: { status?: string | null }) => {
@@ -74,7 +81,7 @@ export default function TradeProposalEngine({
 
   const generate = async () => {
     if (!homeTeam) return;
-    setGenerating(true); setDone(false); setProposals([]); setActiveIndex(0);
+    setGenerating(true); setDone(false); setProposals([]); setActiveIndex(0); setAuditProgress(null);
 
     const candidates: Candidate[] = [];
 
@@ -186,25 +193,72 @@ export default function TradeProposalEngine({
     // Catches cap violations, NMC blocks, and self-defeating logic
     // before surfacing to the user. Better to show fewer clean proposals
     // than more with declined verdicts.
-    const viable = candidates.filter(c =>
+    const preScreened = candidates.filter(c =>
       preScreenProposal(c.homeSends, c.partnerSends, homeTeam!, c.team, navMap)
     );
 
+    setAuditProgress({ checked: 0, total: preScreened.length });
+
+    const verifyCandidate = async (candidate: Candidate): Promise<Candidate | null> => {
+      const partnerRoster = allPlayers.filter(p => p.teamId === candidate.team.id);
+      const homeRoster = allPlayers.filter(p => p.teamId === homeTeam.id);
+
+      try {
+        const verdict = await fetchTradeVerdict(
+          candidate.homeSends,
+          candidate.partnerSends,
+          homeTeam,
+          candidate.team,
+          homeRoster,
+          partnerRoster,
+        );
+        return tradePassesFullAudit(verdict?.status) ? candidate : null;
+      } catch (e) {
+        console.error("[TradeProposal] full audit verification failed", e);
+        return null;
+      }
+    };
+
+    const viable: Candidate[] = [];
+    const verifiedCounts = new Map<string, number>();
+    let cursor = 0;
+    let checked = 0;
+    const workerCount = Math.min(AUDIT_CONCURRENCY, preScreened.length);
+
+    await Promise.all(Array.from({ length: workerCount }, async () => {
+      while (cursor < preScreened.length) {
+        const candidate = preScreened[cursor++];
+        const verified = await verifyCandidate(candidate);
+        checked += 1;
+        setAuditProgress({ checked, total: preScreened.length });
+        if (verified) {
+          viable.push(verified);
+          verifiedCounts.set(verified.team.id, (verifiedCounts.get(verified.team.id) ?? 0) + 1);
+        }
+      }
+    }));
+
+    if (preScreened.length === 0) {
+      setAuditProgress({ checked: 0, total: 0 });
+    }
+
     setMarketStats({ reviewed: Math.max(0, allTeams.length - 1), viable: viable.length });
 
-    if (!viable.length) { setGenerating(false); setDone(true); return; }
+    if (!viable.length) { setGenerating(false); setAuditProgress(null); setDone(true); return; }
 
     const byTeam = new Map<string, Candidate & { alternativeCount: number }>();
     for (const candidate of viable) {
       const existing = byTeam.get(candidate.team.id);
       if (!existing) {
-        byTeam.set(candidate.team.id, { ...candidate, alternativeCount: 1 });
+        byTeam.set(candidate.team.id, {
+          ...candidate,
+          alternativeCount: verifiedCounts.get(candidate.team.id) ?? 1,
+        });
       } else {
-        existing.alternativeCount += 1;
         if (candidate.fitScore > existing.fitScore) {
           byTeam.set(candidate.team.id, {
             ...candidate,
-            alternativeCount: existing.alternativeCount,
+            alternativeCount: verifiedCounts.get(candidate.team.id) ?? existing.alternativeCount,
           });
         }
       }
@@ -229,6 +283,7 @@ export default function TradeProposalEngine({
     setProposals(initial);
     setActiveIndex(0);
     setGenerating(false);
+    setAuditProgress(null);
     setDone(true);
   };
 
@@ -278,9 +333,20 @@ export default function TradeProposalEngine({
             <button onClick={generate} disabled={generating}
               className="w-full py-3.5 font-black text-sm uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 btn-stamp">
               {generating
-                ? <><div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin"/>Searching 31 teams...</>
+                ? <><div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin"/>{auditProgress ? `Now calling all GMs ${auditProgress.checked}/${auditProgress.total}...` : "Now calling all GMs..."}</>
                 : <>Open Market Ledger</>}
             </button>
+            {generating && auditProgress && auditProgress.total > 0 && (
+              <div className="mt-3 h-1.5 overflow-hidden" style={{ background: '#d8c493', border: '1px solid #b8a070' }}>
+                <div
+                  className="h-full transition-all"
+                  style={{
+                    width: `${Math.min(100, Math.round((auditProgress.checked / auditProgress.total) * 100))}%`,
+                    background: 'var(--ledger-green)',
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
 

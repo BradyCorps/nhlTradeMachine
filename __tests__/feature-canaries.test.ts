@@ -221,6 +221,35 @@ describe("Canary — trade block mechanics", () => {
     const src = read("app/api/match/route.ts");
     expect(src).toContain("fits as the return");
   });
+
+  it("executed trades clear moved players from the session trade block", () => {
+    const tradePage = read("app/trade/page.tsx");
+    expect(tradePage).toContain("clearSessionTradeBlock");
+    expect(tradePage).toContain("tradeBlockStatus: null");
+    expect(tradePage).toContain("tradeBlockNote: null");
+    expect(tradePage).toContain("teamId: partnerTeam.id");
+    expect(tradePage).toContain("teamId: homeTeam.id");
+  });
+});
+
+describe("Canary — trade proposal audit verification", () => {
+  it("generated proposals run the full evaluate verdict before being shown", () => {
+    const src = read("app/components/TradeProposal.tsx");
+    expect(src).toContain("fetchTradeVerdict");
+    expect(src).toContain("tradePassesFullAudit");
+    expect(src).toContain("AUDIT_CONCURRENCY");
+    expect(src).toContain("auditProgress");
+    expect(src).toContain('status !== "BLOCKED" && status !== "DECLINED"');
+    expect(src).toContain("const partnerRoster = allPlayers.filter(p => p.teamId === candidate.team.id)");
+    expect(src).toContain("candidate.homeSends");
+    expect(src).toContain("candidate.partnerSends");
+  });
+
+  it("verdict requests do not rebuild returned NAV for full rosters", () => {
+    const src = read("app/lib/evaluate-client.ts");
+    expect(src).toContain("const allAssets = [...outgoing, ...incoming]");
+    expect(src).not.toContain("const allAssets = [...outgoing, ...incoming, ...allHomeRoster, ...allPartnerRoster]");
+  });
 });
 
 describe("Canary — trade UI negative NAV", () => {
@@ -256,6 +285,15 @@ describe("Canary — trade UI negative NAV", () => {
     expect(src).toContain("{boomScore}</span>");
     expect(src).toContain("{bustScore}</span>");
     expect(src).toContain("band.floorPts82");
+  });
+
+  it("uses tap-based salary retention controls instead of a drag slider", () => {
+    const card = read("app/components/AssetCard.tsx");
+    expect(card).toContain("setRetentionPct");
+    expect(card).toContain("Decrease salary retention by 5 percent");
+    expect(card).toContain("Increase salary retention by 5 percent");
+    expect(card).toContain("[0, 25, 50].map");
+    expect(card).not.toContain('type="range"');
   });
 });
 
@@ -382,6 +420,7 @@ describe("Canary — footer glossary", () => {
 
 describe("Canary — trade UX loading and mobile focus", () => {
   const tradePage = read("app/trade/page.tsx");
+  const tradeLoading = read("app/trade/loading.tsx");
   const assetDropdown = read("app/components/AssetDropdown.tsx");
 
   it("selects the franchise from one team-grid click instead of requiring a second confirm click", () => {
@@ -396,6 +435,29 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(assetDropdown).not.toContain("setTimeout(() => searchRef.current?.focus()");
     expect(assetDropdown).not.toContain("if (open) setTimeout");
     expect(assetDropdown).toContain("onFocus={() => searchRef.current?.scrollIntoView");
+  });
+
+  it("keeps the trade UI gated until initial player values are loaded", () => {
+    expect(tradePage).toContain("initialNavReady");
+    expect(tradePage).toContain("initialNavReadyRef");
+    expect(tradePage).toContain("Player valuation load incomplete");
+    expect(tradePage).toContain("if (booting || !dataReady || !initialNavReady)");
+    expect(tradePage).toContain("Confirming Full Player Load");
+    expect(tradePage).toContain("Trade machine unlocks after every roster value is ready.");
+  });
+
+  it("uses one consistent trade preloader without skeleton bars", () => {
+    expect(tradeLoading).toContain("Confirming Full Player Load");
+    expect(tradeLoading).toContain("Player Values");
+    expect(tradeLoading).toContain("Trade machine unlocks after every roster value is ready.");
+    expect(tradeLoading).not.toContain("Content skeleton bars");
+    expect(tradeLoading).not.toContain("bg-ledger-card");
+  });
+
+  it("shows contract years remaining before adding an asset", () => {
+    expect(assetDropdown).toContain("termLabel");
+    expect(assetDropdown).toContain("p.yearsRemaining");
+    expect(assetDropdown).toContain("{termLabel}");
   });
 });
 
@@ -521,8 +583,10 @@ describe("Canary — admin contract sync", () => {
     const leaguePlayers = read("app/api/league/players/route.ts");
     const league = read("app/api/league/route.ts");
     expect(leaguePlayers).toContain("fetchNhlSkaterStatsFallback");
-    expect(leaguePlayers).toContain("NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug)");
+    expect(leaguePlayers).toContain("statsMap.set(`id:${s.playerId}`, entry)");
+    expect(leaguePlayers).toContain("NHL_SKATER_STATS.get(`id:${p.id}`) ?? NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug)");
     expect(league).toContain("fetchNhlSkaterStatsFallback");
-    expect(league).toContain("NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug)");
+    expect(league).toContain("statsMap.set(`id:${s.playerId}`, entry)");
+    expect(league).toContain("NHL_SKATER_STATS.get(`id:${p.id}`) ?? NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug)");
   });
 });

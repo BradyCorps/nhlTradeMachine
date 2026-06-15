@@ -1,38 +1,39 @@
 // app/trade/loading.tsx
 // Shown by Next.js App Router during initial route navigation to /trade.
-// Matches the brand aesthetic so the transition feels seamless.
+// Mirrors the in-page startup gate so users do not see two different preloaders.
 
 export default function TradeLoading() {
+  const Row = ({ label }: { label: string }) => (
+    <div className="flex items-center justify-between gap-6 text-[10px] font-black uppercase tracking-widest">
+      <span className="text-zinc-600">Loading</span>
+      <span className="text-zinc-800">{label}</span>
+    </div>
+  );
+
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center gap-4"
+      className="min-h-screen flex flex-col items-center justify-center gap-4 px-6"
       style={{ background: 'var(--paper)' }}
     >
-      {/* Spinner */}
       <div className="relative w-12 h-12">
         <div className="absolute inset-0 rounded-full border-2 border-ledger-rule" />
         <div className="absolute inset-0 rounded-full border-2 border-t-ledger-red animate-spin" />
       </div>
 
-      {/* Masthead skeleton */}
-      <div className="text-center mt-2">
-        <div className="text-2xs font-black uppercase tracking-[0.5em] text-ledger-ink-faint font-mono animate-pulse">
-          The Hockey Ledger
-        </div>
-        <div className="text-2xs text-ledger-rule font-mono mt-1 uppercase tracking-widest animate-pulse">
-          Loading Trade Machine · X-NAV 2.0
-        </div>
+      <div className="text-2xs font-black uppercase tracking-[0.5em] text-zinc-600 animate-pulse">
+        Confirming Full Player Load
+      </div>
+      <div className="text-2xs text-zinc-800 font-black uppercase tracking-widest">
+        MoneyPuck · NHL API · X-NAV 2.0
       </div>
 
-      {/* Content skeleton bars */}
-      <div className="w-full max-w-2xl px-6 mt-4 space-y-3">
-        {[80, 60, 90, 50].map((w, i) => (
-          <div
-            key={i}
-            className="h-2 rounded-full animate-pulse bg-ledger-card"
-            style={{ width: `${w}%`, animationDelay: `${i * 100}ms` }}
-          />
-        ))}
+      <div className="mt-2 w-full max-w-md space-y-2 border border-zinc-300 bg-white/35 p-4">
+        <Row label="Teams" />
+        <Row label="Player Assets" />
+        <Row label="Player Values" />
+      </div>
+      <div className="text-[10px] text-zinc-600 font-black uppercase tracking-widest text-center">
+        Trade machine unlocks after every roster value is ready.
       </div>
     </div>
   );

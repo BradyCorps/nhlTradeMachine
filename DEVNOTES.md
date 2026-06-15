@@ -62,6 +62,31 @@
 - Expanded generated draft pick inventory.
   - League routes now generate rounds 1-5 for the next three drafts: 2027, 2028, and 2029.
   - Proposal builders no longer filter out 2029 picks.
+- Made generated trade proposals pass the full GM audit before display.
+  - `TradeProposalEngine` still applies the fast local proposal pre-screen first.
+  - Pre-screened candidates now run through `fetchTradeVerdict(...)` with the candidate partner roster.
+  - Proposals with `BLOCKED` or `DECLINED` verdicts are filtered out before they can be loaded.
+  - Full-audit checks run concurrently and show package-audit progress in the modal.
+  - Verdict requests no longer ask the server to return NAV for full rosters on every proposal check.
+- Added a startup readiness gate before the trade UI unlocks.
+  - The loading screen now confirms teams, player assets, and player values.
+  - Team selection/trading stays blocked until the first full `fetchNavMap(...)` pass returns values for every loaded asset.
+  - Incomplete or failed initial valuation loads now surface a data-pipeline error instead of opening with partial player data.
+  - The route-level `/trade` loader now matches the same readiness screen and no longer flashes skeleton bars first.
+- Reworked salary retention controls for mobile.
+  - Replaced the drag range slider with tap-based stepper and preset buttons.
+  - Retention still moves in 5% increments from 0% to 50%.
+  - A passive progress bar shows the selected retention without being draggable during scroll.
+- Removed traded players from the session trade block after trade execution.
+  - Moved non-pick assets keep their new team and retained-salary state.
+  - Their `tradeBlockStatus` and `tradeBlockNote` are cleared session-locally so they no longer appear as active block/request entries after moving.
+- Added explicit player-ID fallback for NHL skater summary stats.
+  - Both league routes now store fallback stats under `id:<playerId>`.
+  - Roster assembly checks player ID before position/name slug fallback when MoneyPuck stats are missing.
+  - This completes the Lafreniere/accent/missing-stat inflation audit item.
+- Added contract term to the select-asset screen.
+  - Asset rows now show years remaining before the user adds a player to the trade.
+  - Pick rows continue to show the draft year in the same metadata slot.
 - Added tests/canaries for:
   - Bulk DEV timeline fetches.
   - Timeline-backed DEV route exposure.
@@ -70,11 +95,19 @@
   - Shopped-player concession exception.
   - Premium lottery pick protection.
   - Three-year, rounds 1-5 draft pick inventory.
+  - Full-audit verification for generated trade proposals.
+  - Proposal audit progress/concurrency and lean verdict payloads.
+  - Startup gate for complete initial player valuation load.
+  - Consistent `/trade` preloader with no skeleton flash.
+  - Tap-based salary retention controls replacing the mobile-prone slider.
+  - Session trade-block cleanup after executing a trade.
+  - Player-ID fallback for NHL skater summary stats.
+  - Years-remaining display in the select-asset modal.
 
 ### Verification
 
 - `npm run test`
-- Result: `179` tests passing.
+- Result: `186` tests passing.
 - Dev server was not started in Codespace, per project instructions.
 
 ### Notes For Next Agent
@@ -83,7 +116,39 @@
 - If DEV still shows limited history for a specific player, inspect whether that player has NHL `playerId` timeline matches in the recent skater-summary seasons.
 - Goalies still return no DEV profile through `buildDevelopmentInputFromPlayerPayload`; the development model remains skater-focused.
 - The dynamic post-trade team phase calculation is intentionally lightweight and session-local. It is not yet the full contention-quadrant model.
-- `AUDIT.md` is user-provided and currently untracked.
+- `AUDIT.md` has been marked with `Done`, `Partial`, and `Open` statuses as of this pass.
+
+### Current Audit Position
+
+Completed from `AUDIT.md`:
+
+- DEV tab now uses multi-season NHL timeline/career experience.
+- NAV approval thresholds and contextual proposal screening are tighter.
+- Retained salary persists through executed trades and affects session cap state.
+- Post-trade team status and draft pick standings update session-locally.
+- 2027-2029 rounds 1-5 pick inventory is generated.
+- Tanking/rebuilding teams protect premium lottery firsts.
+- Generated trade proposals are full-audit verified before display.
+- Salary retention mobile UX no longer uses a drag slider.
+- Shopped/requested players bypass the relevant partner vetoes.
+- Traded players are removed from the active trade block for the current session.
+- Startup loading now gates the trade UI until initial player values are complete.
+- Lafreniere/accent handling is backed by explicit player-ID skater stat fallback.
+- Select-asset rows show contract years remaining before adding.
+
+Partial:
+
+- Dynamic draft pick values update from session-local standings, but deeper projection inputs remain open.
+
+Remaining queue:
+
+- Contention quadrant depth weighting.
+- Change-of-scenery upside logic.
+- Top prospect trade reluctance.
+- Lineup/simulation validation.
+- Defensive defenseman valuation, including Jaccob Slavin-style profiles.
+- Ledger copy UX.
+- Mobile line change UX.
 
 ## Next Project
 

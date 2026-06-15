@@ -47,6 +47,7 @@ const getXNAV = (asset: Asset): XNAVResult =>
 // ============================================================
 export default function TradeMachine() {
   const [booting, setBooting] = useState(true);
+  const [initialNavReady, setInitialNavReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [db, setDb] = useState<{ teams: Team[]; players: Asset[] }>({ teams: [], players: [] });
   const [originalDb, setOriginalDb] = useState<{ teams: Team[]; players: Asset[] } | null>(null);
@@ -189,6 +190,7 @@ export default function TradeMachine() {
   const simAbortRef  = useRef<AbortController | null>(null);
   const memoAbortRef = useRef<AbortController | null>(null);
   const evalAbortRef = useRef<AbortController | null>(null);
+  const initialNavReadyRef = useRef(false);
 
   // ── Server-fetched NAV map ────────────────────────────────────
   // Populated by /api/evaluate — engine runs server-side only.
@@ -213,8 +215,28 @@ export default function TradeMachine() {
     setNavLoading(true);
     const ctrl = new AbortController();
     fetchNavMap(db.players, ctrl.signal)
-      .then(map => { setNavMap(map); setNavLoading(false); })
-      .catch(e => { if (e.name !== "AbortError") setNavLoading(false); });
+      .then(map => {
+        setNavMap(map);
+        setNavLoading(false);
+        if (!initialNavReadyRef.current) {
+          const expected = db.players.length;
+          const actual = Object.keys(map).length;
+          if (actual >= expected) {
+            initialNavReadyRef.current = true;
+            setInitialNavReady(true);
+          } else {
+            setError(`Player valuation load incomplete: ${actual}/${expected} values ready`);
+          }
+        }
+      })
+      .catch(e => {
+        if (e.name !== "AbortError") {
+          setNavLoading(false);
+          if (!initialNavReadyRef.current) {
+            setError(`Player valuation load failed: ${e.message}`);
+          }
+        }
+      });
     return () => ctrl.abort();
   }, [db.players, setNavMap]);
 
@@ -299,23 +321,28 @@ export default function TradeMachine() {
     const inIds  = new Set(incomingById.keys());
 
     setDb(prev => {
+      const clearSessionTradeBlock = (p: Asset): Asset =>
+        p.position === "Pick"
+          ? p
+          : { ...p, tradeBlockStatus: null, tradeBlockNote: null };
+
       // Update player teamIds
       const updatedPlayers = prev.players.map(p => {
         const outgoingAsset = outgoingById.get(p.id);
         if (outgoingAsset) {
-          return {
+          return clearSessionTradeBlock({
             ...p,
             teamId: partnerTeam.id,
             retainedPct: outgoingAsset.retainedPct ?? p.retainedPct ?? 0,
-          };
+          });
         }
         const incomingAsset = incomingById.get(p.id);
         if (incomingAsset) {
-          return {
+          return clearSessionTradeBlock({
             ...p,
             teamId: homeTeam.id,
             retainedPct: incomingAsset.retainedPct ?? p.retainedPct ?? 0,
-          };
+          });
         }
         return p;
       });
@@ -718,8 +745,19 @@ export default function TradeMachine() {
         - blocks[0].reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0)
     : 0;
 
-  if (booting) return <LoadingScreen />;
   if (error) return <ErrorScreen msg={error} />;
+  const dataReady = db.teams.length > 0 && db.players.length > 0;
+  if (booting || !dataReady || !initialNavReady) {
+    return (
+      <LoadingScreen
+        teamsReady={db.teams.length > 0}
+        playersReady={db.players.length > 0}
+        navReady={initialNavReady}
+        playerCount={db.players.length}
+        navCount={Object.keys(navMap).length}
+      />
+    );
+  }
 
   const sc = verdict ? STATUS_CONFIG[verdict.status] : STATUS_CONFIG.IDLE;
 
@@ -2225,18 +2263,46 @@ function MiniStat({ label, val }: { label: string; val: string }) {
   );
 }
 
-function LoadingScreen() {
+function LoadingScreen({
+  teamsReady = false,
+  playersReady = false,
+  navReady = false,
+  playerCount = 0,
+  navCount = 0,
+}: {
+  teamsReady?: boolean;
+  playersReady?: boolean;
+  navReady?: boolean;
+  playerCount?: number;
+  navCount?: number;
+}) {
+  const Check = ({ ready, label, detail }: { ready: boolean; label: string; detail?: string }) => (
+    <div className="flex items-center justify-between gap-6 text-[10px] font-black uppercase tracking-widest">
+      <span className={ready ? "text-emerald-700" : "text-zinc-600"}>{ready ? "Loaded" : "Loading"}</span>
+      <span className="text-zinc-800">{label}</span>
+      {detail && <span className="text-zinc-500 font-mono">{detail}</span>}
+    </div>
+  );
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
       <div className="relative">
         <div className="w-12 h-12 border-2 border-zinc-800 rounded-full" />
         <div className="w-12 h-12 border-2 border-t-cyan-500 rounded-full animate-spin absolute inset-0" />
       </div>
       <div className="text-2xs font-black uppercase tracking-[0.5em] text-zinc-600 animate-pulse">
-        Syncing NHL Data Core
+        Confirming Full Player Load
       </div>
       <div className="text-2xs text-zinc-800 font-black uppercase tracking-widest">
         MoneyPuck · NHL API · X-NAV 2.0
+      </div>
+      <div className="mt-2 w-full max-w-md space-y-2 border border-zinc-300 bg-white/35 p-4">
+        <Check ready={teamsReady} label="Teams" />
+        <Check ready={playersReady} label="Player Assets" detail={playerCount ? `${playerCount}` : undefined} />
+        <Check ready={navReady} label="Player Values" detail={playerCount ? `${Math.min(navCount, playerCount)}/${playerCount}` : undefined} />
+      </div>
+      <div className="text-[10px] text-zinc-600 font-black uppercase tracking-widest text-center">
+        Trade machine unlocks after every roster value is ready.
       </div>
     </div>
   );

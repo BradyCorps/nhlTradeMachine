@@ -86,8 +86,10 @@ export async function fetchTradeVerdict(
 ): Promise<TradeVerdict | null> {
   if (!homeTeam || !partnerTeam) return null;
 
-  // All assets in one call — nav + verdict together
-  const allAssets = [...outgoing, ...incoming, ...allHomeRoster, ...allPartnerRoster];
+  // Only the traded assets need returned NAV values. The server still receives
+  // full rosters for GM logic, but it can compute roster context internally
+  // without rebuilding the whole client NAV cache on every verdict call.
+  const allAssets = [...outgoing, ...incoming];
   const uniqueAssets = Array.from(new Map(allAssets.map(a => [a.id, a])).values());
 
   const res = await fetch("/api/evaluate", {

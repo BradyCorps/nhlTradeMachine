@@ -444,6 +444,7 @@ async function fetchNhlSkaterStatsFallback(): Promise<Map<string, any>> {
         assistsPace: (s.assists / games) * 82,
       };
       const slug = slugify(s.skaterFullName);
+      statsMap.set(`id:${s.playerId}`, entry);
       statsMap.set(slug, entry);
       statsMap.set(`${slug}__${position}`, entry);
     }
@@ -778,7 +779,7 @@ export async function GET() {
              ?? analyticsMap.get(truncSlug);
       }
       if (!stats && !isDraftee) {
-        stats = NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug);
+        stats = NHL_SKATER_STATS.get(`id:${p.id}`) ?? NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug);
       }
 
       const normalName  = p.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");

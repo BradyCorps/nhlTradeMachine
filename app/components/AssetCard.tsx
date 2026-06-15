@@ -41,6 +41,11 @@ export default function AssetCard({
     ? (navMap?.[compareAsset.id] ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 })
     : null;
   const hasDevelopmentProfile = Boolean(asset.developmentProfile && !isPick && asset.position !== "G");
+  const retentionPct = Math.round((asset.retainedPct || 0) * 100);
+  const setRetentionPct = (pct: number) => {
+    const clamped = Math.max(0, Math.min(50, Math.round(pct / 5) * 5));
+    updateAsset({ retainedPct: clamped / 100 });
+  };
 
   const updateAsset = (partial: Partial<Asset>) => {
     updateBlock(idx, blocks[idx].map((a) => a.id === asset.id ? { ...a, ...partial } : a));
@@ -416,27 +421,57 @@ export default function AssetCard({
         </div>
       )}
 
-      {/* Retention slider (only for eligible players) */}
+      {/* Retention controls (only for eligible players) */}
       {asset.canRetain && !isPick && (
         <div className="mt-2 border-t border-zinc-800/50 pt-2">
           <div className="flex justify-between items-center mb-1">
             <span className="text-2xs text-zinc-600 font-black uppercase tracking-wider">Salary Retention</span>
             <span className="text-2xs font-mono text-zinc-400 font-black">
-              {(asset.retainedPct * 100).toFixed(0)}% (${(asset.capHit * asset.retainedPct).toFixed(2)}M)
+              {retentionPct}% (${(asset.capHit * (asset.retainedPct || 0)).toFixed(2)}M)
             </span>
           </div>
-          <input
-            type="range"
-            min="0"
-            max="50"
-            step="5"
-            value={(asset.retainedPct * 100).toFixed(0)}
-            onChange={(e) => updateAsset({ retainedPct: (parseFloat(e.target.value) || 0) / 100 })}
-            className="w-full h-1 rounded-full appearance-none cursor-pointer"
-          
-          />
-          <div className="flex justify-between text-2xs text-zinc-700 font-black mt-0.5">
-            <span>0%</span><span>25%</span><span>50% MAX</span>
+          <div className="grid grid-cols-[auto_1fr_auto] gap-1.5">
+            <button
+              type="button"
+              onClick={() => setRetentionPct(retentionPct - 5)}
+              disabled={retentionPct <= 0}
+              className="h-9 w-9 border border-zinc-700 bg-zinc-900 text-zinc-200 font-black disabled:opacity-30"
+              aria-label="Decrease salary retention by 5 percent">
+              -
+            </button>
+            <div className="grid grid-cols-3 gap-1.5">
+              {[0, 25, 50].map(pct => (
+                <button
+                  key={pct}
+                  type="button"
+                  onClick={() => setRetentionPct(pct)}
+                  className="h-9 border font-black text-[10px] uppercase tracking-wider"
+                  style={{
+                    borderColor: retentionPct === pct ? 'var(--ledger-green)' : '#3f3f46',
+                    background: retentionPct === pct ? 'rgba(36,94,57,0.18)' : '#18181b',
+                    color: retentionPct === pct ? 'var(--ledger-green)' : '#d4d4d8',
+                  }}>
+                  {pct === 50 ? "50 Max" : `${pct}%`}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setRetentionPct(retentionPct + 5)}
+              disabled={retentionPct >= 50}
+              className="h-9 w-9 border border-zinc-700 bg-zinc-900 text-zinc-200 font-black disabled:opacity-30"
+              aria-label="Increase salary retention by 5 percent">
+              +
+            </button>
+          </div>
+          <div className="mt-1.5 h-1.5 overflow-hidden bg-zinc-900 border border-zinc-700">
+            <div
+              className="h-full transition-all"
+              style={{
+                width: `${retentionPct * 2}%`,
+                background: 'var(--ledger-green)',
+              }}
+            />
           </div>
         </div>
       )}
