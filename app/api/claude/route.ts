@@ -110,6 +110,18 @@ const SeasonRecapPayloadSchema = z.object({
   simulationMode: z.string(),
   replaySeason: z.string(),
   rosterMoveWindow: z.string(),
+  latestCompleted: z.object({
+    season: z.string(),
+    stanleyCupChampion: z.object({
+      teamId: z.string(),
+      teamName: z.string(),
+    }),
+    connSmythe: z.object({
+      name: z.string(),
+      teamId: z.string(),
+      teamName: z.string(),
+    }),
+  }).optional(),
   homeTeamName: z.string(),
   partnerTeamName: z.string().nullable().optional(),
   homeTeam: TeamResultSchema.nullable().optional(),
@@ -210,6 +222,7 @@ function buildSeasonRecapPrompt(payload: z.infer<typeof SeasonRecapPayloadSchema
     simulationMode: payload.simulationMode,
     replaySeason: payload.replaySeason,
     rosterMoveWindow: payload.rosterMoveWindow,
+    latestCompleted: payload.latestCompleted,
     homeTeam: payload.homeTeam,
     partnerTeam: payload.partnerTeam,
     leaders: payload.leaders,
@@ -239,7 +252,10 @@ TRADED PLAYER OUTCOMES (LOCKED):
 ${tradedOutcomeLines.length > 0 ? tradedOutcomeLines.join("\n") : "No traded player stat outcomes available."}
 
 LOCKED FACTS:
-- Florida Panthers did NOT win the Cup (won 2023, 2024, 2025).
+- Latest completed NHL season: ${payload.latestCompleted?.season ?? payload.replaySeason}.
+- Latest Stanley Cup champion: ${payload.latestCompleted?.stanleyCupChampion.teamName ?? "Unknown"}.
+- Latest Conn Smythe winner: ${payload.latestCompleted?.connSmythe.name ?? "Unknown"} (${payload.latestCompleted?.connSmythe.teamName ?? "Unknown"}).
+- Florida Panthers did NOT win the ${payload.latestCompleted?.season ?? payload.replaySeason} Cup.
 - Utah Hockey Club is now the Utah Mammoth (UTA). Arizona Coyotes do not exist.
 - These are ${payload.rosterMoveWindow} moves. Never describe them as deadline deals or say a team sat at any ranking at the deadline.
 - Conn Smythe must be from the Stanley Cup champion listed in LOCKED JSON.

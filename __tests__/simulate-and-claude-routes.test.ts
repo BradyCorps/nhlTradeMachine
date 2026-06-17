@@ -80,6 +80,7 @@ describe("simulate route", () => {
     const body = await res.json();
 
     expect(body.simulationMode).toBe(SEASON.simulationMode);
+    expect(body.latestCompleted).toEqual(SEASON.latestCompleted);
     expect(body.tradedPlayerOutcomes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -384,6 +385,7 @@ describe("claude narrative route contract", () => {
           simulationMode: SEASON.simulationMode,
           replaySeason: SEASON.replaySeason,
           rosterMoveWindow: SEASON.rosterMoveWindow,
+          latestCompleted: SEASON.latestCompleted,
           homeTeamName: "Winnipeg Jets",
           partnerTeamName: "Calgary Flames",
           homeTeam: {
@@ -439,6 +441,8 @@ describe("claude narrative route contract", () => {
     expect(body.content[0].text).toBe("Locked recap.");
     const anthropicBody = JSON.parse(((fetchMock as any).mock.calls[0][1] as RequestInit).body as string);
     expect(anthropicBody.messages[0].content).toContain("LOCKED JSON");
+    expect(anthropicBody.messages[0].content).toContain("Latest Stanley Cup champion: Carolina Hurricanes");
+    expect(anthropicBody.messages[0].content).toContain("Latest Conn Smythe winner: Jordan Staal");
     expect(anthropicBody.messages[0].content).toContain("Conn Smythe must be from the Stanley Cup champion");
   });
 });

@@ -897,6 +897,9 @@ export async function POST(req: NextRequest) {
       playoffTeams: standings.filter(t => t.madePlayoffs).map(t => t.teamId),
       tradedPlayerOutcomes,
       simulationMode: SEASON.simulationMode,
+      replaySeason: SEASON.replaySeason,
+      rosterMoveWindow: SEASON.rosterMoveWindow,
+      latestCompleted: SEASON.latestCompleted,
       generatedAt: new Date().toISOString(),
     });
 

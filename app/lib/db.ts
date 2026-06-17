@@ -8,7 +8,6 @@
 //
 // Contract data
 //   - app/data/contracts.bundled.json  (primary)
-//   - app/data/contracts.extensions.json (in-season extensions)
 //   - app/data/contracts.json (additional overrides)
 
 // ============================================================

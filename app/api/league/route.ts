@@ -284,8 +284,6 @@ async function loadContracts(): Promise<Record<string, any>> {
         canRetain:      b?.hasNMC  ? false : true,
         expiryStatus:   cw.expiryStatus,
         position:       b?.position ?? cw.position,
-        extensionCapHit: b?.extensionCapHit,
-        extensionYears:  b?.extensionYears,
       };
     }
     // Backfill: DB players the scraper rejected or dropped (expired deals at
@@ -302,8 +300,6 @@ async function loadContracts(): Promise<Record<string, any>> {
           canRetain:      b.hasNMC  ? false : true,
           expiryStatus:   "UFA",
           position:       b.position,
-          extensionCapHit: b.extensionCapHit,
-          extensionYears:  b.extensionYears,
         };
       }
     }
@@ -318,8 +314,6 @@ async function loadContracts(): Promise<Record<string, any>> {
         canRetain:      b.hasNMC  ? false : true,
         expiryStatus:   "UFA",
         position:       b.position,
-        extensionCapHit: b.extensionCapHit,
-        extensionYears:  b.extensionYears,
       };
     }
   }
@@ -379,8 +373,6 @@ async function loadFromDB(): Promise<Record<string, any>> {
         canRetain:      row.hasNmc  ? false : true,
         draftOverall:   row.draftOverall,
         prospectPtsPace: row.prospectPtsPace,
-        extensionCapHit: row.extensionCapHit,
-        extensionYears:  row.extensionYears,
       };
     }
     return result;
@@ -400,17 +392,6 @@ function loadBundledFallback(): Record<string, any> {
     console.error("[Bundled] FAILED:", e.message);
   }
   return {};
-}
-
-function loadExtensions(): Record<string, any> {
-  try {
-    const fs   = require("fs");
-    const path = require("path");
-    const file = path.join(process.cwd(), "app/data/contracts.extensions.json");
-    return JSON.parse(fs.readFileSync(file, "utf-8"));
-  } catch (e: any) {
-    return {};
-  }
 }
 
 function loadBaselines(): Record<string, any> {
@@ -753,16 +734,66 @@ async function fetchNhlSkaterStatsFallback(): Promise<Map<string, any>> {
   return statsMap;
 }
 
+async function fetchNhlGoalieStatsFallback(): Promise<Map<string, any>> {
+  const cacheKey = "cache:nhl_goalie_summary_stats";
+  if (redis) {
+    const cached = await redis.get<Record<string, any>>(cacheKey);
+    if (cached) return new Map(Object.entries(cached));
+  }
+
+  const statsMap = new Map<string, any>();
+  try {
+    const res = await fetchWithTimeout(
+      `https://api.nhle.com/stats/rest/en/goalie/summary?cayenneExp=seasonId%3D${SEASON.nhleSeasonId}%20and%20gameTypeId%3D2&limit=-1`,
+      10000
+    );
+    if (!res.ok) return statsMap;
+
+    const goalieData: { data: any[] } = await res.json();
+    for (const g of goalieData.data ?? []) {
+      const name = String(g.goalieFullName ?? g.fullName ?? g.name ?? "").trim();
+      const games = Number(g.gamesPlayed ?? g.games ?? 0);
+      if (!name || games <= 0) continue;
+      const shotsAgainst = Number(g.shotsAgainst ?? g.shotsAgainstCount ?? 0);
+      const goalsAgainst = Number(g.goalsAgainst ?? 0);
+      const savePctRaw = Number(g.savePct ?? g.savePercentage ?? 0);
+      const savePct = savePctRaw > 1 ? savePctRaw / 100 : savePctRaw > 0
+        ? savePctRaw
+        : shotsAgainst > 0 ? (shotsAgainst - goalsAgainst) / shotsAgainst : 0.900;
+      const entry = {
+        gsax: 0,
+        savePct: Math.round(savePct * 10000) / 10000,
+        shotsPerGame: shotsAgainst > 0 ? shotsAgainst / games : 0,
+        gamesStarted: Number(g.gamesStarted ?? g.starts ?? games),
+        xGoalsAllowed: 0,
+        hasLiveStats: true,
+      };
+      const slug = slugify(name);
+      statsMap.set(`id:${g.playerId ?? g.goalieId ?? ""}`, entry);
+      statsMap.set(slug, entry);
+      const parts = name.split(" ");
+      if (parts.length >= 2) statsMap.set(slugify(parts[parts.length - 1]), entry);
+    }
+
+    if (redis && statsMap.size > 50) {
+      await redis.setex(cacheKey, PS_CACHE_TTL, Object.fromEntries(statsMap));
+    }
+  } catch (e: any) {
+    console.warn("[NHL goalie fallback] failed:", e.message);
+  }
+  return statsMap;
+}
+
 export async function GET() {
   // Load contracts, teams, and point shares in parallel
-  const [CONTRACTS, LIVE_TEAMS, PS_MAP, NHL_SKATER_STATS, PROSPECT_ENRICHMENT] = await Promise.all([
+  const [CONTRACTS, LIVE_TEAMS, PS_MAP, NHL_SKATER_STATS, NHL_GOALIE_STATS, PROSPECT_ENRICHMENT] = await Promise.all([
     loadContracts(),
     loadTeams(),
     fetchPointShares(),
     fetchNhlSkaterStatsFallback(),
+    fetchNhlGoalieStatsFallback(),
     fetchProspectEnrichmentMap(),
   ]);
-  const EXTENSIONS = loadExtensions();
   const BASELINES      = loadBaselines();
   const TEAM_BASELINES = loadTeamBaselines();
   // ── 1. MoneyPuck analytics — skaters + goalies ─────────────
@@ -1116,17 +1147,18 @@ export async function GET() {
       // Try position-specific key first to handle same-name players (e.g. two Petterssons)
       const posSlug = `${slug}__${(p.position ?? "").toUpperCase()}`;
       const isDraftee = draftOverall != null;
+      const isUnprovenDraftee = isDraftee && p.age <= 22;
       let stats = analyticsMap.get(posSlug) ?? analyticsMap.get(slug);
       // Fallback: MoneyPuck sometimes drops accented characters entirely
       // e.g. "Slafkovský" → "Slafkovsk" in CSV (ý stripped, not converted to y).
       // Try slug minus its last character only for names that actually contain
       // diacritics. Surname-only matching is too risky for minor-league rows.
-      if (!stats && !isDraftee && hasDiacritics(p.name) && slug.length > 4) {
+      if (!stats && !isUnprovenDraftee && hasDiacritics(p.name) && slug.length > 4) {
         const truncSlug = slug.slice(0, -1);
         stats = analyticsMap.get(`${truncSlug}__${(p.position ?? "").toUpperCase()}`)
              ?? analyticsMap.get(truncSlug);
       }
-      if (!stats && !isDraftee) {
+      if (!stats && !isUnprovenDraftee) {
         stats = NHL_SKATER_STATS.get(`id:${p.id}`) ?? NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug);
       }
 
@@ -1161,7 +1193,7 @@ export async function GET() {
       };
 
       // ── THE OVERRIDE LAYER (Highest Priority) ───────────────
-      const override         = EXTENSIONS[p.name]    ?? EXTENSIONS[normalName];
+      const override: any    = undefined;
       const contractOverride = CONTRACT_OVERRIDES[p.name] ?? CONTRACT_OVERRIDES[normalName];
       // Position override must be resolved before isGoalie/defaultTOI/defaultPts
       const finalPosition    = contractOverride?.position ?? p.position;
@@ -1174,7 +1206,7 @@ export async function GET() {
       const goalieSlug      = slugify(p.name);
       const goalieSlugLast  = slugify(p.name.split(" ").pop() ?? "");
       const goalieStats     = isGoalie
-        ? (goalieMap.get(goalieSlug) ?? goalieMap.get(goalieSlugLast) ?? null)
+        ? (goalieMap.get(goalieSlug) ?? goalieMap.get(goalieSlugLast) ?? NHL_GOALIE_STATS.get(`id:${p.id}`) ?? NHL_GOALIE_STATS.get(goalieSlug) ?? NHL_GOALIE_STATS.get(goalieSlugLast) ?? null)
         : null;
 
       const hasProspectSignal = draftOverall != null || (prospectPtsPace != null && prospectPtsPace > 0);
@@ -1196,9 +1228,6 @@ export async function GET() {
       const finalNMC      = override?.hasNMC ?? (nameCollision ? false : (fin?.hasNMC ?? false));
       const finalNTC      = override?.hasNTC ?? (nameCollision ? false : (fin?.hasNTC ?? false));
       const finalRetain   = override?.canRetain ?? (nameCollision ? true  : (fin?.canRetain ?? true));
-      const hasExtension     = override?.hasExtension ?? (fin?.extensionCapHit != null);
-      const extensionCapHit  = override?.extensionCapHit ?? fin?.extensionCapHit ?? undefined;
-      const extensionYears   = override?.extensionYears  ?? fin?.extensionYears  ?? undefined;
       const intangibleMult = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
 
       // ── UPSTREAM GOALIE METRICS ─────────────────────────────
@@ -1294,9 +1323,9 @@ export async function GET() {
         // Contract
         capHit:         CONTRACT_OVERRIDES[p.name]?.capHit         ?? finalCapHit,
         yearsRemaining: CONTRACT_OVERRIDES[p.name]?.yearsRemaining ?? finalYears,
-        hasExtension:   hasExtension,
-        extensionCapHit: extensionCapHit,
-        extensionYears:  extensionYears,
+        hasExtension:   false,
+        extensionCapHit: undefined,
+        extensionYears:  undefined,
         hasNMC:         finalNMC,
         hasNTC:         finalNTC,
         canRetain:      finalRetain,

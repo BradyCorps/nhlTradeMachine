@@ -19,18 +19,22 @@ interface Player {
   games?: number;
 }
 
+type NavLike = { total?: number };
+
 interface TeamProps {
   teamName: string;
   label?: string;
   roster: Player[];      // roster before the active move is applied
   outgoing: Player[];    // leaving in the active trade
   incoming: Player[];    // arriving in the active trade
+  navMap?: Record<string, NavLike>;
 }
 
 interface Props {
   home: TeamProps | null;
   partner: TeamProps | null;
   hasActiveTrade: boolean;
+  navMap?: Record<string, NavLike>;
 }
 
 const MONO = "'Courier Prime', monospace";
@@ -85,7 +89,16 @@ const STATUS_COLOR = {
   empty:  "var(--ledger-ink-faint)",
 } as const;
 
-function TeamLineup({ teamName, label, roster, outgoing, incoming }: TeamProps) {
+const navOf = (p: Player | undefined, navMap?: Record<string, NavLike>) =>
+  p ? Math.round(navMap?.[p.id]?.total ?? 0) : 0;
+
+const navColor = (nav: number) =>
+  nav >= 160 ? "var(--ledger-ink)"
+  : nav >= 50 ? "#2a5a8f"
+  : nav >= 0 ? "#7a5a20"
+  : "#b83020";
+
+function TeamLineup({ teamName, label, roster, outgoing, incoming, navMap }: TeamProps) {
   const outIds = useMemo(() => new Set(outgoing.map(p => p.id)), [outgoing]);
   const inIds  = useMemo(() => new Set(incoming.map(p => p.id)), [incoming]);
 
@@ -150,23 +163,68 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming }: TeamProps) 
     const p  = id ? byId.get(id) : undefined;
     const isSel = selected?.group === group && selected.idx === idx;
     const status: keyof typeof STATUS_COLOR = !p ? "empty" : inIds.has(p.id) ? "in" : "normal";
+    const nav = navOf(p, navMap);
+    const meta = p
+      ? p.position === "G"
+        ? `${p.games ?? 0} GP`
+        : `${Math.round(p.ptsPace ?? 0)} P82 · ${(p.avgTOI ?? 0).toFixed(1)} TOI`
+      : "";
     return (
       <td
         onClick={() => clickSlot(group, idx)}
-        title={p ? `${p.name} — ${p.ptsPace ?? 0} pts/82 pace · click to swap` : "Empty slot — click to swap a player in"}
+        title={p ? `${p.name} · ${p.position} · NAV ${nav}` : "Empty lineup slot"}
         style={{
-          padding: "2px 5px", fontFamily: MONO, fontSize: 9,
+          padding: 3, fontFamily: MONO,
           color: STATUS_COLOR[status],
-          fontWeight: status === "in" ? 900 : status === "normal" ? 700 : 400,
           cursor: "pointer", userSelect: "none",
-          background: isSel ? "rgba(180,140,40,0.25)" : "transparent",
-          outline: isSel ? "1px dashed #a08020" : "none",
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          verticalAlign: "top",
         }}
       >
-        <span style={{ fontSize: 7, opacity: 0.55, marginRight: 3, fontWeight: 900 }}>{pos}</span>
-        {p ? abbr(p.name) : "—"}
-        {status === "in" && <span style={{ fontSize: 6, marginLeft: 3, color: "#2a7a44" }}>▲</span>}
+        <div style={{
+          minHeight: 50,
+          border: isSel ? "1px solid #a08020" : "1px solid rgba(184,160,112,0.7)",
+          background: isSel ? "rgba(180,140,40,0.20)" : p ? "rgba(255,255,255,0.20)" : "rgba(184,160,112,0.12)",
+          padding: "6px 7px",
+          display: "grid",
+          gridTemplateRows: "auto 1fr auto",
+          gap: 3,
+          boxShadow: isSel ? "inset 0 0 0 1px rgba(160,128,32,0.35)" : "none",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 5 }}>
+            <span style={{
+              fontSize: 8, fontWeight: 900, color: "var(--ledger-ink-faint)",
+              letterSpacing: 0,
+            }}>{pos.trim()}</span>
+            {p && (
+              <span style={{
+                fontSize: 8, fontWeight: 900, color: navColor(nav),
+                whiteSpace: "nowrap",
+              }}>NAV {nav}</span>
+            )}
+          </div>
+          <div style={{
+            fontSize: 11,
+            lineHeight: 1.12,
+            fontWeight: status === "in" ? 900 : status === "normal" ? 800 : 500,
+            color: STATUS_COLOR[status],
+            overflow: "hidden",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflowWrap: "anywhere",
+          }}>
+            {p ? p.name : "Empty"}
+            {status === "in" && <span style={{ fontSize: 8, marginLeft: 4, color: "#2a7a44" }}>▲</span>}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 5 }}>
+            <span style={{
+              fontSize: 8, fontWeight: 900, color: p ? "var(--ledger-ink)" : "var(--ledger-ink-faint)",
+              border: "1px solid rgba(184,160,112,0.8)", padding: "0 4px", lineHeight: "13px",
+              minWidth: 20, textAlign: "center",
+            }}>{p?.position ?? "--"}</span>
+            <span style={{ fontSize: 8, color: "var(--ledger-ink-faint)", whiteSpace: "nowrap" }}>{meta}</span>
+          </div>
+        </div>
       </td>
     );
   };
@@ -175,7 +233,7 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming }: TeamProps) 
     <tr>
       <td colSpan={4} style={{
         fontFamily: MONO, fontSize: 6, fontWeight: 900, color: "var(--ledger-ink-faint)",
-        textTransform: "uppercase", letterSpacing: "0.15em", paddingTop: 6, paddingBottom: 2,
+        textTransform: "uppercase", letterSpacing: 0, paddingTop: 6, paddingBottom: 2,
         borderBottom: "1px solid #c8b890",
       }}>
         {children}
@@ -199,13 +257,13 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming }: TeamProps) 
   return (
     <div style={{ fontFamily: MONO }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-        <div style={{ fontSize: 9, fontWeight: 900, color: "var(--ledger-ink)", letterSpacing: "0.05em" }}>
+        <div style={{ fontSize: 9, fontWeight: 900, color: "var(--ledger-ink)", letterSpacing: 0 }}>
           {teamName}
           {label && <span style={{ color: "var(--ledger-ink-faint)", fontWeight: 400 }}> — {label}</span>}
         </div>
         {edited && (
           <button onClick={reset} style={{
-            fontFamily: MONO, fontSize: 7, fontWeight: 900, letterSpacing: "0.1em",
+            fontFamily: MONO, fontSize: 7, fontWeight: 900, letterSpacing: 0,
             color: "#b83020", background: "none", border: "1px solid #b83020",
             padding: "1px 6px", cursor: "pointer", textTransform: "uppercase",
           }}>
@@ -254,7 +312,7 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming }: TeamProps) 
       {benchIds.length > 0 && (
         <div style={{ marginTop: 6 }}>
           <div style={{ fontSize: 6, fontWeight: 900, color: "var(--ledger-ink-faint)",
-                        textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 3 }}>
+                        textTransform: "uppercase", letterSpacing: 0, marginBottom: 3 }}>
             Bench / Scratches
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -262,17 +320,20 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming }: TeamProps) 
               const p = byId.get(id);
               if (!p) return null;
               const isSel = selected?.group === group && selected.idx === idx;
+              const nav = navOf(p, navMap);
               return (
                 <span key={id} onClick={() => clickSlot(group, idx)}
-                  title={`${p.name} — click, then click a ${group === "D" ? "defense" : "forward"} slot to insert`}
+                  title={`${p.name} · ${p.position} · NAV ${nav}`}
                   style={{
-                    fontFamily: MONO, fontSize: 8, fontWeight: 700, cursor: "pointer",
-                    padding: "1px 5px", border: "1px solid #c8b890", userSelect: "none",
+                    fontFamily: MONO, fontSize: 9, fontWeight: 800, cursor: "pointer",
+                    padding: "4px 7px", border: "1px solid #c8b890", userSelect: "none",
                     color: inIds.has(id) ? "#2a7a44" : "var(--ledger-ink)",
                     background: isSel ? "rgba(180,140,40,0.25)" : "var(--ledger-cream)",
                     outline: isSel ? "1px dashed #a08020" : "none",
                   }}>
-                  {abbr(p.name)}<span style={{ fontSize: 6, opacity: 0.6, marginLeft: 3 }}>{p.position}</span>
+                  {abbr(p.name)}
+                  <span style={{ fontSize: 7, opacity: 0.65, marginLeft: 5 }}>{p.position}</span>
+                  <span style={{ fontSize: 7, color: navColor(nav), marginLeft: 5 }}>NAV {nav}</span>
                 </span>
               );
             })}
@@ -293,7 +354,7 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming }: TeamProps) 
   );
 }
 
-export default function LineupEditor({ home, partner, hasActiveTrade }: Props) {
+export default function LineupEditor({ home, partner, hasActiveTrade, navMap }: Props) {
   const [expanded, setExpanded] = useState(true);
   if (!home && !partner) return null;
 
@@ -316,21 +377,15 @@ export default function LineupEditor({ home, partner, hasActiveTrade }: Props) {
 
       {expanded && (
         <div className="strands-body">
-          <p className="strands-context">
-            Post-trade depth charts. Click a player, then click another slot to swap them —
-            or click a bench player and then a lineup slot to insert them. Forwards swap with
-            forwards, defensemen with defensemen, goalies with goalies.
-            {hasActiveTrade ? " Incoming players are marked ▲." : ""}
-          </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(430px, 100%), 1fr))", gap: 12 }}>
             {home && (
               <div style={{ background: "var(--ledger-cream)", border: "1px solid #c8b890", padding: "10px 12px" }}>
-                <TeamLineup {...home} />
+                <TeamLineup {...home} navMap={navMap} />
               </div>
             )}
             {partner && (
               <div style={{ background: "var(--ledger-cream)", border: "1px solid #c8b890", padding: "10px 12px" }}>
-                <TeamLineup {...partner} />
+                <TeamLineup {...partner} navMap={navMap} />
               </div>
             )}
           </div>

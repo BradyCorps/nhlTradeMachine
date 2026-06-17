@@ -14,6 +14,11 @@ export const SEASON = {
   draftYear:      2027,          // Next tradeable draft class (2026 class is drafted — import via mock draft)
   mpSeason:       "2025",        // MoneyPuck URL path segment — last completed season is the stats baseline
   nhleSeasonId:   "20252026",    // NHL API roster fallback — keep at last completed season until 2026-27 rosters exist
+  latestCompleted: {
+    season: "2025-26",
+    stanleyCupChampion: { teamId: "CAR", teamName: "Carolina Hurricanes" },
+    connSmythe: { name: "Jordan Staal", teamId: "CAR", teamName: "Carolina Hurricanes" },
+  },
 } as const;
 
 export const LEAGUE = {

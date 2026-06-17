@@ -16,6 +16,7 @@ export const AWARD_BONUS: Record<string, number> = {
   "Hart":         18,
   "Vezina":       14,
   "Norris":       12,
+  "Selke":        12,
   "Ted Lindsay":  10,
   "Conn Smythe":  10,
   "Art Ross":     8,
@@ -151,7 +152,7 @@ export const getHistoricalFloor = (name: string, currentNAV: number): number => 
   if (!pedigree) return currentNAV;
 
   const awardBonus = (pedigree.awards ?? []).reduce((sum, award) => {
-    return sum + (AWARD_BONUS[award] ?? 0) * 0.4;
+    return sum + (AWARD_BONUS[award] ?? 0) * 0.8;
   }, 0);
   const allStarBonus = (pedigree.allStarYears ?? 0) * 3;
   const awardCount   = (pedigree.awards ?? []).length;
@@ -169,7 +170,10 @@ export const getHistoricalFloor = (name: string, currentNAV: number): number => 
 
   // Standard skater floor: based on peak pts pace
   if (pedigree.peakPtsPace) {
-    const historicalFloorNAV = (pedigree.peakPtsPace / 82) * 25 * floorPct;
+    const isEstablishedElite = pedigree.peakPtsPace >= 88 || awardCount >= 2 || (pedigree.allStarYears ?? 0) >= 3;
+    const historicalFloorNAV = isEstablishedElite
+      ? pedigree.peakPtsPace * 1.65
+      : (pedigree.peakPtsPace / 82) * 25 * floorPct;
     return Math.max(currentNAV, historicalFloorNAV + awardBonus + allStarBonus);
   }
 

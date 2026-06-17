@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PROSPECT_TIERS, INJURY_RISK } from "@/app/lib/player-data";
+import { PROSPECT_TIERS, INJURY_RISK, getHistoricalFloor } from "@/app/lib/player-data";
 import type { Asset, EvaluateRequest, EvaluateResponse, FArchetype } from "@/app/lib/trade-types";
 import { SEASON, LEAGUE, FRANCHISE } from "@/app/lib/season-config";
 import { calcNAV, compressPackage as coreCompress, AssetInput, XNAVResult } from "@/app/lib/xnav-engine";
@@ -162,7 +162,18 @@ const getAssetNAV = (asset: Asset, capCeiling: number = SEASON.capCeiling): XNAV
     baselineHdsvPct: asset.baselineHdsvPct,
     tradeBlockStatus: asset.tradeBlockStatus,
   };
-  return calcNAV(input);
+  const result = calcNAV(input);
+  if (asset.position === "Pick") return result;
+
+  const historicalFloor = getHistoricalFloor(asset.name, result.total);
+  if (historicalFloor <= result.total) return result;
+
+  const liftedTotal = Math.round(historicalFloor);
+  return {
+    ...result,
+    total: liftedTotal,
+    cap: result.cap + (liftedTotal - result.total),
+  };
 };
 
 // ── Package compression (Delegated to xnav-engine.ts) ──

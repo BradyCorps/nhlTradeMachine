@@ -374,7 +374,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
 
   const hasNhlSignal = Boolean(asset.hasLiveStats) || games >= 14;
   const hasProspectSignal =
-    asset.draftOverall != null ||
+    (asset.draftOverall != null && asset.age <= 22) ||
     (asset.prospectPtsPace != null && asset.prospectPtsPace > 0) ||
     (asset.baselinePtsPace != null && asset.baselinePtsPace > 0);
   if (!hasNhlSignal && !hasProspectSignal) {
@@ -770,7 +770,7 @@ export function calcNAV(asset: AssetInput): XNAVResult {
   if (asset.position === "Pick") return calcPickNAV(asset);
   // Drafted prospect without an NHL sample — pedigree valuation
   // (14-game threshold matches the rookie small-sample logic elsewhere)
-  if ((asset.draftOverall != null || (asset.prospectPtsPace != null && asset.prospectPtsPace > 0)) && (asset.games ?? 0) < 14 && !asset.hasLiveStats) {
+  if (((asset.draftOverall != null && asset.age <= 22) || (asset.prospectPtsPace != null && asset.prospectPtsPace > 0)) && (asset.games ?? 0) < 14 && !asset.hasLiveStats) {
     return applyTradeRequestDiscount(calcProspectNAV(asset), asset);
   }
   if (asset.position === "G")    return applyTradeRequestDiscount(calcGoalieNAV(asset), asset);

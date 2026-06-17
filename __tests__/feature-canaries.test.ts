@@ -80,8 +80,9 @@ describe("Canary — league route features (source-level)", () => {
         expect(src).toContain("tradeBlockStatus");
       });
 
-      it("skips fuzzy stats fallbacks for draftees (false-positive guard)", () => {
-        expect(src).toContain("!isDraftee");
+      it("skips fuzzy stats fallbacks only for unproven draftees", () => {
+        expect(src).toContain("const isUnprovenDraftee = isDraftee && p.age <= 22");
+        expect(src).toContain("!isUnprovenDraftee");
       });
 
       it("does not use surname-only skater stats fallbacks", () => {
@@ -389,6 +390,16 @@ describe("Canary — NAV client cache keys", () => {
   });
 });
 
+describe("Canary — evaluate route historical NAV floors", () => {
+  const evaluateRoute = read("app/api/evaluate/route.ts");
+
+  it("applies player pedigree floors on the server NAV path", () => {
+    expect(evaluateRoute).toContain("getHistoricalFloor");
+    expect(evaluateRoute).toContain("const historicalFloor = getHistoricalFloor(asset.name, result.total)");
+    expect(evaluateRoute).toContain("total: liftedTotal");
+  });
+});
+
 describe("Canary — footer glossary", () => {
   const footer = read("app/components/Footer.tsx");
   const tradePage = read("app/trade/page.tsx");
@@ -422,6 +433,7 @@ describe("Canary — trade UX loading and mobile focus", () => {
   const tradePage = read("app/trade/page.tsx");
   const tradeLoading = read("app/trade/loading.tsx");
   const assetDropdown = read("app/components/AssetDropdown.tsx");
+  const lineupEditor = read("app/components/LineupEditor.tsx");
 
   it("selects the franchise from one team-grid click instead of requiring a second confirm click", () => {
     expect(tradePage).toContain("selectingTeamId");
@@ -458,6 +470,15 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(assetDropdown).toContain("termLabel");
     expect(assetDropdown).toContain("p.yearsRemaining");
     expect(assetDropdown).toContain("{termLabel}");
+  });
+
+  it("lineup editor shows position and NAV on larger mobile-friendly player tiles", () => {
+    expect(tradePage).toContain("navMap={navMap}");
+    expect(lineupEditor).toContain("navMap?: Record<string, NavLike>");
+    expect(lineupEditor).toContain("NAV {nav}");
+    expect(lineupEditor).toContain("p?.position ?? \"--\"");
+    expect(lineupEditor).toContain("minHeight: 50");
+    expect(lineupEditor).not.toContain("Click a player, then click another slot");
   });
 });
 
@@ -588,5 +609,28 @@ describe("Canary — admin contract sync", () => {
     expect(league).toContain("fetchNhlSkaterStatsFallback");
     expect(league).toContain("statsMap.set(`id:${s.playerId}`, entry)");
     expect(league).toContain("NHL_SKATER_STATS.get(`id:${p.id}`) ?? NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug)");
+  });
+
+  it("league routes fall back to NHL goalie summary stats when MoneyPuck misses a goalie", () => {
+    const leaguePlayers = read("app/api/league/players/route.ts");
+    const league = read("app/api/league/route.ts");
+    for (const src of [leaguePlayers, league]) {
+      expect(src).toContain("fetchNhlGoalieStatsFallback");
+      expect(src).toContain("cache:nhl_goalie_summary_stats");
+      expect(src).toContain("NHL_GOALIE_STATS.get(`id:${p.id}`)");
+      expect(src).toContain("hasLiveStats: true");
+    }
+  });
+
+  it("league roster routes do not apply retired contract extension overlays", () => {
+    for (const routePath of LEAGUE_ROUTES) {
+      const src = read(routePath);
+      expect(src).not.toContain("contracts.extensions.json");
+      expect(src).not.toContain("loadExtensions");
+      expect(src).not.toContain("EXTENSIONS");
+      expect(src).toContain("hasExtension");
+      expect(src).toContain("extensionCapHit: undefined");
+      expect(src).toContain("extensionYears");
+    }
   });
 });

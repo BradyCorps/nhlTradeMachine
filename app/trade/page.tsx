@@ -551,8 +551,9 @@ export default function TradeMachine() {
           max_tokens: 1800,
           payload: {
             simulationMode: sim.simulationMode ?? SEASON.simulationMode,
-            replaySeason: SEASON.replaySeason,
-            rosterMoveWindow: SEASON.rosterMoveWindow,
+            replaySeason: sim.replaySeason ?? SEASON.replaySeason,
+            rosterMoveWindow: sim.rosterMoveWindow ?? SEASON.rosterMoveWindow,
+            latestCompleted: sim.latestCompleted ?? SEASON.latestCompleted,
             homeTeamName: homeTeam.name,
             partnerTeamName: partnerTeam?.name ?? null,
             homeTeam: sim.homeTeam ?? null,
@@ -1038,6 +1039,7 @@ export default function TradeMachine() {
                 incoming: blocks[0].filter(a => a.position !== "Pick"),
               }}
               hasActiveTrade={blocks[0].length > 0 || blocks[1].length > 0}
+              navMap={navMap}
             />
           </div>
         )}
@@ -2170,6 +2172,7 @@ function SeasonResultsPager({ simData, simResult }: { simData: any | null; simRe
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
         {[
           { label: "Presidents' Trophy", val: `${simData.leaders?.presidentsTrophy?.teamName} (${simData.leaders?.presidentsTrophy?.projectedPoints}pts)` },
+          { label: "Reigning Cup", val: simData.latestCompleted?.stanleyCupChampion?.teamName ?? SEASON.latestCompleted.stanleyCupChampion.teamName },
           { label: "Stanley Cup", val: simData.playoffBracket?.champion?.teamName ?? simData.leaders?.cupWinner?.teamName },
           { label: "Points Leader", val: `${simData.leaders?.topScorer?.name?.split(' ').pop()} ${simData.leaders?.topScorer?.pts}pts` },
           { label: "Goals Leader", val: `${simData.leaders?.goalsLeader?.name?.split(' ').pop()} ${simData.leaders?.goalsLeader?.goals}G` },

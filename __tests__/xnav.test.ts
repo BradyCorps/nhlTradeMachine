@@ -9,6 +9,7 @@
 
 import { describe, it, expect } from "vitest";
 import { calcNAV, calcDeploymentMultiplier, calcGoalieNAV, calcPickNAV, calcSkaterNAV } from "../app/lib/xnav-engine";
+import { getHistoricalFloor } from "../app/lib/player-data";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const inRange = (val: number, min: number, max: number, label: string) => {
@@ -216,6 +217,31 @@ describe("X-NAV — Franchise Centers", () => {
       games: 70, ops: 6.5, dps: 3.5,
     });
     inRange(result.total, 450, 600, "Barkov NAV");
+  });
+
+  it("Barkov historical pedigree prevents stale current inputs from collapsing NAV", () => {
+    const staleCurrent = calcNAV({
+      id: "barkov-stale", name: "Aleksander Barkov", position: "C",
+      age: 30, capHit: 10, yearsRemaining: 3,
+      ptsPace: 25, xGPace: 10, defRate: 0.1,
+      avgTOI: 16, qocIndex: 50,
+      games: 70, hasLiveStats: true,
+    });
+    const floored = getHistoricalFloor("Aleksander Barkov", staleCurrent.total);
+
+    expect(staleCurrent.total).toBeLessThan(50);
+    expect(floored).toBeGreaterThanOrEqual(185);
+  });
+
+  it("older drafted NHLers with missing stats do not use first-overall prospect NAV", () => {
+    const result = calcNAV({
+      id: "lafreniere-missing-stats", name: "Alexis Lafreniere", position: "W",
+      age: 24, capHit: 7.45, yearsRemaining: 7,
+      draftOverall: 1, games: 0, hasLiveStats: false,
+    });
+
+    expect(result.total).toBeLessThan(100);
+    expect(result.upside).toBe(0);
   });
 });
 

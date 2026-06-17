@@ -292,6 +292,8 @@ Current issue:
   * Other accented NHL player names
 * [x] Prevent missing stats from inflating NAV incorrectly.
 * [x] Add fallback matching by player ID if available.
+* [x] Reopen/fix Lafrenière regression where drafted NHLers skipped fallback stats and were still valued as unproven first-overall prospects.
+* [x] Add NHL goalie summary fallback so Devon Levi-style goalies with NHL GP/SV% do not show as EST when MoneyPuck misses them.
 
 ---
 
@@ -421,7 +423,7 @@ The asset selection screen should display contract years remaining.
 
 ## Line Change UX
 
-**Status: Open**
+**Status: Done - first mobile readability pass**
 
 ### Mobile UX Needs Rework
 
@@ -429,12 +431,14 @@ The line change UX is not intuitive, especially on mobile.
 
 ### Action Items
 
-* [ ] Rework line editing flow for mobile.
-* [ ] Improve drag/drop or tap-to-swap behavior.
-* [ ] Make player movement clearer.
+* [x] Rework line editing flow for mobile.
+* [x] Improve drag/drop or tap-to-swap behavior.
+* [x] Make player movement clearer.
 * [ ] Add visual confirmation after a line change.
-* [ ] Reduce accidental moves.
-* [ ] Consider a dedicated mobile lineup editor layout.
+* [x] Reduce accidental moves.
+* [x] Consider a dedicated mobile lineup editor layout.
+* [x] Enlarge lineup slots and bench chips for mobile readability.
+* [x] Show each player's main position and NAV in the lineup editor.
 
 ---
 
@@ -449,7 +453,9 @@ The line change UX is not intuitive, especially on mobile.
 * [~] Add dynamic draft pick values. Session-local dynamic standings are done; deeper projection inputs remain.
 * [x] Fix Lafrenière stat lookup / NAV inflation.
 * [x] Improve mobile salary retention UX.
-
+* [x] Aleksander Barkov coming up as EST, receiving a NAV of 27. Fixed by applying historical elite-skater floors in server-side NAV evaluation so stale current inputs cannot collapse proven top two-way centres.
+* [x] Newest Stanley Cup Champion Carolina Hurricanes (2026), Jordan Staal (Conn Smythe Winner). Added latest-completed-season metadata to season config, sim response, UI league context, and Claude recap prompt without forcing simulated playoff winners.
+* [x] Admin Panel no longer has extensions, so now Kyle Connor shows his 8 year contract but with an 8 year extension flag. Fixed by retiring extension overlays from league roster payloads while preserving normal cap hit / years remaining.
 ## Medium Priority
 
 * [x] Recalculate team status dynamically after trades.
@@ -463,7 +469,7 @@ The line change UX is not intuitive, especially on mobile.
 
 * [ ] Add copy functionality to the ledger.
 * [x] Add years remaining to select asset screen.
-* [ ] Rework line change UX, especially on mobile.
+* [x] Rework line change UX, especially on mobile.
 
 ## Current Remaining Audit Queue
 
@@ -474,4 +480,4 @@ The line change UX is not intuitive, especially on mobile.
 * Lineup/simulation validation.
 * Defensive defenseman valuation, including Jaccob Slavin-style profiles.
 * Ledger copy UX.
-* Mobile line change UX.
+* Line change visual confirmation after swap.
