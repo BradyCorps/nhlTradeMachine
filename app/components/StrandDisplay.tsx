@@ -55,6 +55,7 @@ function buildAvgPath(W: number, H: number, amplitude: number, isOff: boolean, n
 function buildStrandPath(traits: StrandTrait[], W: number, H: number, amplitude: number, isOff: boolean) {
   const cy   = H / 2;
   const n    = traits.length;
+  if (n === 0) return `M 0 ${cy.toFixed(1)} L ${W.toFixed(1)} ${cy.toFixed(1)}`;
   const freq = (2 * Math.PI) / W;
   const sm   = sineM(n);
   const pts: string[] = [];
@@ -127,7 +128,7 @@ export default function StrandDisplay({
             fontWeight="bold" opacity="0.55">AVG</text>
 
           {/* Compare strands (dashed) */}
-          {compareOff && compareDef && (<>
+          {compareOff && compareDef && compareOff.length > 0 && compareDef.length > 0 && (<>
             <path d={buildStrandPath(compareOff, W, H, amplitude, true)}  fill="none"
               stroke={offColor} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.5" strokeLinecap="round"/>
             <path d={buildStrandPath(compareDef, W, H, amplitude, false)} fill="none"
@@ -135,7 +136,7 @@ export default function StrandDisplay({
           </>)}
 
           {/* Rungs connecting the two strands */}
-          {Array.from({ length: 18 }, (_, i) => {
+          {offTraits.length > 0 && defTraits.length > 0 && Array.from({ length: 18 }, (_, i) => {
             const t     = (i + 0.5) / 18;
             const x     = t * W;
             const sm    = sineM(offTraits.length);

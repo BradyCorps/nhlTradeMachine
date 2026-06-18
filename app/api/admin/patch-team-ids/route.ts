@@ -17,6 +17,7 @@ function sleep(ms: number): Promise<void> {
 
 async function fetchRoster(teamId: string): Promise<
   { firstName: { default: string }; lastName: { default: string } }[]
+  | null
 > {
   const url = `https://api-web.nhle.com/v1/roster/${teamId}/current`;
 
@@ -33,7 +34,7 @@ async function fetchRoster(teamId: string): Promise<
         await sleep(3000); // wait 3s then retry
         continue;
       }
-      if (!res.ok) return [];
+      if (!res.ok) return null;
 
       const data = await res.json() as {
         forwards?:   { firstName: { default: string }; lastName: { default: string } }[];
@@ -49,7 +50,7 @@ async function fetchRoster(teamId: string): Promise<
       clearTimeout(t);
     }
   }
-  return [];
+  return null;
 }
 
 // POST /api/admin/patch-team-ids
@@ -80,6 +81,10 @@ export async function POST(req: Request) {
   for (const team of TEAMS_DB) {
     await sleep(200);
     const roster = await fetchRoster(team.id);
+    if (roster === null) {
+      teamResults[team.id] = -1;
+      continue;
+    }
 
     let matched = 0;
     for (const p of roster) {

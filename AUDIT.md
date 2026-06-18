@@ -981,3 +981,221 @@ The two big pages are mostly correct line-by-line; the real risks are async life
     #10 is the altitude capstone: the absence of a shared useLeagueData/useNavMap/useTradeVerdict hook is why the same package can show a different NAV and a different status color depending on which trade surface you're on. That single extraction would collapse a large share of findings across Batches 2, 4, and 5.
 
 Already-filed roots the cross-file pass re-surfaced (don't double-count, but flag for Codex): the cache:teams key collision now has a concrete page-level symptom — the players page (/api/league, live-scraped cap) and the trade machine (/api/league/teams, static cap) can show different cap space for the same team — and the twin player-build pipelines mean a player's ptsPace/dps/qocIndex can differ between the table and the trade card.
+
+## Batch 6 (extra)
+[
+  {
+    "file": "app/api/admin/import-draft-class/route.ts",
+    "line": 108,
+    "summary": "import-draft-class upserts by normalized name and, on an existing id, overwrites the row with ELC defaults, wiping a real player's contract.",
+    "failure_scenario": "makeId(p.name) (92) collides with an existing NHLer's id; the update path sets capHit=ELC (0.975), yearsRemaining=3, hasNmc/Ntc=false, draftRound unconditionally (93-106) with no 'only if prospect' guard, so a veteran's real cap hit/term/clauses are clobbered with prospect defaults on import."
+  },
+  {
+    "file": "app/api/admin/settings/route.ts",
+    "line": 35,
+    "summary": "The settings POST persists the cap ceiling with no validation, so 0 or a negative value is stored and read back as the live cap.",
+    "failure_scenario": "Admin posts capCeiling: 0 (or a negative typo); upsert stores String(val) unchecked, and getLiveCapCeiling (evaluate/route.ts:105-109) accepts any finite number, so every trade evaluation computes cap space against a $0 ceiling — every team is massively over the cap and all cap-validity logic breaks."
+  },
+  {
+    "file": "app/components/StrandDisplay.tsx",
+    "line": 71,
+    "summary": "buildStrandPath / the rung loop index traits[lo] and divide by traits.length with no empty-array guard, producing NaN coordinates or a crash.",
+    "failure_scenario": "A caller passes offTraits=[] or defTraits=[] (a player with no off/def metrics); traits[0].val on an empty array throws, and computeStrandType (StrandView:67) divides by offTraits.length=0 -> NaN, so the SVG path becomes 'M x NaN ...' and the strand fails to render."
+  },
+  {
+    "file": "app/api/admin/clear-cache/route.ts",
+    "line": 15,
+    "summary": "clear-cache omits five live cache keys, so admin edits leave stale data until natural TTL.",
+    "failure_scenario": "The cleared set misses cache:pointshares, cache:mp_skaters, cache:mp_goalies, cache:nhl_goalie_summary_stats, and cache:prospect_enrichment:v1 (all read in the league routes / prospect-enrichment.ts). After importing a draft class or editing a prospect, 'clear cache' leaves prospect enrichment and point-share NAV stale for hours."
+  },
+  {
+    "file": "app/api/admin/patch-team-ids/route.ts",
+    "line": 107,
+    "summary": "The failedTeams filter (v < 0) can never match because the stored value is a non-negative match count, so a failed roster fetch is reported as success.",
+    "failure_scenario": "The NHL API rate-limits several teams; their roster fetch returns [] (matched=0), the filter .filter(([,v]) => v < 0) yields failedTeams: [], and the admin believes the patch fully succeeded while those players are silently left with NULL teamId."
+  },
+  {
+    "file": "app/api/admin/trade-block/route.ts",
+    "line": 30,
+    "summary": "trade-block writes/deletes rows keyed by client-supplied id, but the league route builds blockMap keyed by name, so a block silently never attaches.",
+    "failure_scenario": "Admin saves a block with name 'Auston Matthews' but a hand-derived id (admin/trade-block/page.tsx:78 slugifies separately); league/players.ts:770 does blockMap.get(p.name) by exact name, so the block never appears on the player, and a later 'clear' by a different id can't remove it."
+  },
+  {
+    "file": "app/api/admin/trade-block/route.ts",
+    "line": 35,
+    "summary": "The trade-block POST writes body.status with no enum validation against requested|available|blocked|untouchable.",
+    "failure_scenario": "A typo'd status 'untouchble' is stored and stamped onto the asset; every engine guard (!== 'untouchable', === 'available') silently treats the player as freely tradeable, so the intended block is a no-op (the evaluate route validates with z.enum but the admin write does not)."
+  },
+  {
+    "file": "app/components/CapProjection.tsx",
+    "line": 99,
+    "summary": "Post-trade cap math sums raw capHit and ignores retainedPct, overstating cap relief on retention trades.",
+    "failure_scenario": "A team trades out a player retaining 50% salary; currentCapUsed/outCap/inCap use full capHit (unlike PlayerComparison:173-174 which uses effective cap), so postCapUsed is understated by the retained amount and the bar/+$X.XM figure reports more cap space than the team actually has."
+  },
+  {
+    "file": "app/components/PlayerComparison.tsx",
+    "line": 51,
+    "summary": "StatBar normalizes by per-row max, so for 'lower is better' rows (Cap Hit, Avg Age) the winning side renders the shorter bar — visually inverted.",
+    "failure_scenario": "Outgoing $9.0M vs incoming $3.0M: incoming 'wins' (cheaper, shown green) but its bar is 33% width while the losing $9.0M side fills 100%, so the longer bar is the loser for every higherIsBetter=false stat."
+  },
+  {
+    "file": "app/components/CapProjection.tsx",
+    "line": 168,
+    "summary": "The struck-through 'departing' list appends outgoing players by position match without checking they belonged to that roster, and the count label excludes them.",
+    "failure_scenario": "On the partner column (outgoing/incoming are swapped at :209), the departing list can render players who were never on that team, while the (players.length) count at :154 excludes them, so the displayed count mismatches the rendered rows."
+  }
+]
+
+Lower-severity (noted, not in top 10): contracts insert stores position: "Unknown" → un-positioned player downstream (contracts/route.ts:341); PlayerTimeline never draws the EXT marker when the extension AAV equals the current cap hit (PlayerTimeline.tsx:38); TugBar's 40-NAV compression heuristic misfires on 2-asset blockbusters (TugBar.tsx:30-42). Clean: prune-stale (good guards), LineupEditor/LineupCard (no double-slotting), PlayoffBracket/TeamStrand/ContentionQuadrant.
+UX/UI review
+
+🔴 High-impact
+1. Verdict color is unreliable across surfaces — QuickTradeMachine.tsx:314-318 colors WIN and FAIR both green and LOSS amber, while VerdictPanel.tsx:14-22 makes FAIR navy, WIN emerald, LOSS amber. The same trade looks "good/green" in the Quick machine and "neutral/blue" in Armchair GM. Define one shared STATUS_CONFIG.
+2. Status is conveyed by color + glyph only, no plain-language outcome (VerdictPanel.tsx:42-52, TugBar.tsx:51). ~8% of the male core audience is red/green colorblind and can't tell WIN from LOSS. Add a redundant phrase ("Favors you / Even / Favors them") and a signed label on net gain ("+12 in your favor").
+3. Severity tiers (HARD/SOFT/WARN/INFO) are never explained (VerdictPanel.tsx:49-51, footer glossary defines NAV/STRAND but not severity). Add a one-line legend: "HARD = illegal/blocked · SOFT = a GM would decline · WARN = caution."
+4. Dev-flavored dead-end errors — armchair-gm/page.tsx:302/2307-2315 shows "Network error: …" and leaks endpoint paths with no Retry; QuickTradeMachine surfaces raw ${event.message}. Friendly message + Retry button; log technicals to console.
+5. Mobile hides the audit/share controls after a verdict — armchair-gm/page.tsx:1081 applies hidden lg:block to the action block once a verdict exists, so phone users (Reddit/Discord traffic) must scroll past both rosters and lose the copy-link affordance. Keep a persistent compact Re-audit/Copy bar on mobile.
+
+🟡 Medium
+6. No "Copied!" feedback in QuickTradeMachine's share copy (:658-665) — Armchair GM does it right (:1096-1110); mirror it and fall back to selecting the input if navigator.clipboard is undefined.
+7. Modal + rows lack a11y — the proposal modal (TradeProposal.tsx:299-329) has no role="dialog"/focus trap/Esc; player rows (players/page.tsx:351/461) are clickable divs with no role="button"/tabIndex/key handler/aria-expanded.
+8. Players table: no pagination + blank sticky header (players/page.tsx:749-767 renders empty <div/> header cells; :773 maps all skaters). Covered by the build below.
+9. Disabled CTAs at opacity-25 read as broken (armchair-gm/page.tsx:1086, QuickTradeMachine.tsx:625-630) — keep ≥0.5 and attach the unlock hint to the button.
+10. Untouchable players are still selectable in AssetPicker (QuickTradeMachine.tsx:87-96) with no flag, then produce a confusing verdict. Flag them in the picker.
+11. AssetCard headshot fallback just hides (AssetCard.tsx:64-67) leaving a gap; reuse the initials-circle fallback from players/page.tsx:415-420.
+
+🟢 Polish
+12. Sub-11px labels (AssetCard.tsx:302/308/314 text-[6.5px], many [9px]) bypass the stated 11px minimum — raise to the 2xs token. 13. Low-contrast --ledger-ink-faint/--rule on cream may fail WCAG AA — darken ink-faint for text. 14. The 🔗 emoji copy icon (armchair-gm/page.tsx:1110) clashes with the glyph design system and renders inconsistently across OSes.
+Implementation task (append to audit for Codex)
+
+    Add the DEV component into app/players/page.tsx, plus pagination so that top 25 forwards, top 10 defencemen, and top 5 goalies appear rather than the entire league.
+
+    1. Dev panel in the expanded row.
+
+        import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel" and import type { DevelopmentProfile } from "@/app/lib/development-profile".
+        Add developmentProfile?: DevelopmentProfile | null to the Player interface (line ~9). The /api/league payload already emits this field at runtime — it's only missing from the local type.
+        In ExpandedPlayer (line ~150), after the expanded-player-grid closes and before the panel's outer </div>, render it for skaters only:
+
+        {player.position !== "G" && player.developmentProfile && (
+          <div style={{ marginTop: "12px", background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px 12px" }}>
+            <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.15em" }}>Development Outlook</div>
+            <DevelopmentProfilePanel asset={{ ...player } as any} />
+          </div>
+        )}
+
+        (DevelopmentProfilePanel already returns null for G/Pick, so goalies render nothing — the position !== "G" guard just avoids an empty header.)
+
+    2. Pagination / capped sections.
+
+        Split the current combined "Skaters" section into Forwards and Defence: from the sorted skaters, derive forwards = skaters.filter(p => p.position !== "D") and defence = skaters.filter(p => p.position === "D").
+        Add three "show all" toggles: const [showAllF, setShowAllF] = useState(false) (and …D, …G), defaulting to collapsed.
+        Default caps: forwards 25, defence 10, goalies 5. Render forwards.slice(0, showAllF ? forwards.length : 25), etc. Rank within each section (i + 1).
+        For goalies, show a single flat top-5 by GSAx section when collapsed (the STARTER/TANDEM/BACKUP tier is already shown per row via ArchetypeBadge); reveal the rest on "show all". This replaces the three tier sub-sections.
+        Section visibility by posFilter: ALL shows all three; F → forwards only; D → defence only; G → goalies only.
+        Under each capped section, add a "Show all N · / Show top X" button (reuse .filter-btn styling) that toggles the corresponding showAll*.
+        Reset all three toggles to false in a useEffect on [search, posFilter, teamFilter, sortKey, sortDir] so narrowing the list doesn't strand the user on an expanded view.
+        Populate the currently-empty sticky desktop column header (:749-767) with the real column labels (Rank / primary stat / secondary / etc.) while you're in here (UX finding #8).
+
+# Batch Audit the Batch Audit
+
+## Standing preamble — reuse for each task:
+## IMPORTANT NOTE: READ THIS
+
+  * You are making ONE scoped change to this Next.js/TypeScript repo (vitest for tests). 
+      Rules:
+      - Only touch what this task names. Do not refactor, rename, or "improve" unrelated code.
+      - Run 1 task at a time, do not move forward to the next task without user prompt and the preamble in place.
+      - Run npm test before and after; report pass/fail counts. If there are no tests for the area, say so.
+      - Keep the diff minimal and reviewable — one logical change.
+      - If a correct fix would change behavior beyond what's stated, stop and ask instead of guessing.
+      - Match the surrounding code style. Do not add dependencies.
+
+  * Line numbers are approximate:
+    - Line numbers in tasks are approximate (the code has moved since the audit). Locate the change by the described symbol/behavior, not the literal line number. If you can't find what's described, stop and say so rather than editing the closest-looking line.
+
+  * Typecheck, not just tests:
+    - After changes, ensure it typechecks (npx tsc --noEmit or npm run build), not just npm test. Vitest won't catch a type error, and several tasks add imports/types
+
+
+
+
+## Task 0: apply five independent, low-risk bug fixes. Do not refactor — each is a targeted change. Run the test suite after.
+
+  1. BreakdownTable crash — app/armchair-gm/page.tsx (~lines 2042/2046/2050): a.ptsPace.toFixed, a.avgTOI.toFixed, and a.capHit.toFixed are called unguarded for non-Pick/non-G assets. Guard each with ?? 0 like the adjacent xG cell, so a stats-less skater can't crash the table.
+  2. Settings cap-ceiling validation — app/api/admin/settings/route.ts (~line 35): reject non-finite, ≤ 0, or absurd (>120) cap-ceiling values before persisting; add the same  guard where getLiveCapCeiling reads it (app/api/evaluate/route.ts ~105).
+  3. import-draft-class overwrite — app/api/admin/import-draft-class/route.ts (~line 108): on an existing id, only apply ELC defaults (capHit/years/clauses) when the existing row is actually a prospect; never overwrite a row that already has a real capHit or NMC/NTC.
+  4. clear-cache missing keys — app/api/admin/clear-cache/route.ts (~line 15): also delete cache:pointshares, cache:mp_skaters, cache:mp_goalies, cache:nhl_goalie_summary_stats, and cache:prospect_enrichment:v1.
+  5. trade-block keying — app/api/admin/trade-block/route.ts: validate status against the 4-value enum (requested|available|blocked|untouchable, plus the "clear" delete sentinel), and key rows by name so they match how app/api/league/players/route.ts reads blockMap by player name.
+
+(Note: the cross-team duplicate dedup in app/api/league/players/route.ts is already in place — verify it exists; do not re-implement.)
+
+## Task 1a: 
+- Write golden/characterization tests for calcNAV in app/lib/xnav-engine.ts covering a representative set: an elite forward, a top-pair D, a starting goalie, a 1st-round pick, an ELC prospect, a fringe callup, and a retained-salary case. Snapshot the full XNAVResult for each. Do NOT change engine code — these pin current behavior.
+
+## Task 1b: 
+- Write integration tests that POST representative trades to /api/evaluate (import the route's POST handler directly, as __tests__/evaluate-route.test.ts already does) and assert status, the flags categories/severities, and metrics. Cover: a fair swap, a cap-ceiling breach, an untouchable, a contender-needs-futures case, and a lopsided overpay. No route changes.
+
+## Task 1c: 
+- Write tests for the /api/league/players roster assembly: a player on two teams' feeds dedups to one, DB-injection augments without duplicating, and name/stat matching attaches the right stats. Mock the fetches; assert the emitted player list. Do NOT change route logic
+
+## Task 2:
+Task: add the Development panel to the players page, switch its data source to the canonical routes, and paginate the table to top 25 forwards / 10 defencemen / 5 goalies with a "show all" toggle per section. File: app/players/page.tsx. Keep all existing styling and the expand/collapse behavior; this is additive plus a fetch swap.
+
+1. Imports + type.
+
+    Add: import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel"; and import type { DevelopmentProfile } from "@/app/lib/development-profile";
+    Add developmentProfile?: DevelopmentProfile | null; to the Player interface. (The API already returns this field at runtime; it's just missing from the local type.)
+
+2. Fetch swap — use the same routes as the trade machine (aligns dynasty/NAV numbers and drops the drift-prone bare route). Replace the useEffect that does fetch("/api/league") with:
+
+useEffect(() => {
+  Promise.all([
+    fetch("/api/league/teams").then(r => r.json()),
+    fetch("/api/league/players").then(r => r.json()),
+  ])
+    .then(([td, pd]) => {
+      setPlayers((pd.players ?? []).filter((p: Player) => p.position !== "Pick"));
+      setTeams(td.teams ?? []);
+      setLoading(false);
+    })
+    .catch(() => setLoading(false));
+}, []);
+
+3. Development panel in the expanded row. In ExpandedPlayer, just before the final closing </div> of the .player-expanded-panel, add (skaters only — the panel itself returns null for G/Pick, so the guard just avoids an empty header):
+
+{player.position !== "G" && player.developmentProfile && (
+  <div style={{ marginTop: 12, background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px 12px" }}>
+    <div style={{ fontSize: 11, color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.15em" }}>
+      Development Outlook
+    </div>
+    <DevelopmentProfilePanel asset={{ ...player } as any} />
+  </div>
+)}
+
+4. Pagination — three capped sections.
+
+    Add state: const [showAllF, setShowAllF] = useState(false); and the same for showAllD, showAllG. Defaults collapsed.
+    Reset them whenever the view changes, so narrowing the list never strands the user on an expanded page:
+
+    useEffect(() => { setShowAllF(false); setShowAllD(false); setShowAllG(false); },
+      [search, posFilter, teamFilter, sortKey, sortDir]);
+
+    From the already-sorted skaters, derive const forwards = skaters.filter(p => p.position !== "D"); and const defence = skaters.filter(p => p.position === "D");. goalies is already sorted by GSAx.
+    Caps: forwards 25, defence 10, goalies 5. Render forwards.slice(0, showAllF ? forwards.length : 25), etc. Rank within each section (i + 1).
+    Replace the current single "Skaters" section and the three goalie tier sub-sections with three sections: Forwards, Defence, Goalies (a single flat list, top-5 by GSAx — the STARTER/TANDEM/BACKUP tier is already shown per row by ArchetypeBadge, so the tier sub-headers are redundant once capped).
+    Section visibility by posFilter: ALL → all three; F → Forwards only; D → Defence only; G → Goalies only.
+    Under each section that has more rows than its cap, render a full-width toggle button (reuse the existing .filter-btn style) that flips the matching showAll*:
+        collapsed label: Show all {n} forwards ▾ (etc.)
+        expanded label: Show top 25 ▴
+        Example:
+
+    {forwards.length > 25 && (
+      <button className="filter-btn" style={{ width: "100%", padding: "8px" }}
+        onClick={() => setShowAllF(v => !v)}>
+        {showAllF ? "Show top 25 ▴" : `Show all ${forwards.length} forwards ▾`}
+      </button>
+    )}
+
+5. Polish (UX). The sticky desktop column header (the grid of empty <div/> cells, ~line 750) currently shows no labels. Populate it with the real column labels matching the row grid (Rank · [headshot] · Player · Helix · primary stat · secondary stat) so a desktop user scrolling a long list keeps a column legend. Update the count line so it reflects forwards + defence + goalies.
+
+Acceptance: With no filters, the page shows ≤25 forwards, ≤10 defencemen, ≤5 goalies, each with a working "show all / show top N" toggle; expanding a skater row shows the Development Outlook panel; expanding a goalie shows no dev panel; dynasty/stat numbers match what the trade machine shows for the same player. npm test still passes.

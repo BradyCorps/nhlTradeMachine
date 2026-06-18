@@ -63,6 +63,7 @@ export function computeStrandType(
   offTraits: StrandTrait[], defTraits: StrandTrait[],
   ops: number | null, dps: number | null
 ): string {
+  if (offTraits.length === 0 || defTraits.length === 0) return "UNAVAILABLE";
   const offAvg = offTraits.reduce((s, t) => s + t.val, 0) / offTraits.length;
   const defAvg = defTraits.reduce((s, t) => s + t.val, 0) / defTraits.length;
   const balance = Math.abs(offAvg - defAvg);

@@ -1,5 +1,40 @@
 # Development Notes
 
+## 2026-06-18 Batch 6 Admin / Players Ledger Audit
+
+### Completed Today
+
+- Completed Batch 6 edits from `AUDIT.md` across admin import/settings/cache routes, trade-block writes, roster patch reporting, STRAND rendering, cap projection, player comparison, and the players ledger.
+- Guarded draft-class imports so existing NHL contract rows are not overwritten with ELC cap/term/clauses when a normalized prospect id collides with a real player.
+- Added cap ceiling/floor validation in admin settings so zero, negative, non-finite, and inverted cap values are rejected before persistence.
+- Hardened STRAND rendering and strand-type classification against empty trait arrays to avoid NaN SVG paths and divide-by-zero classifications.
+- Expanded admin cache clearing to flush point shares, MoneyPuck skater/goalie CSV caches, NHL goalie summary stats, and versioned prospect enrichment caches.
+- Changed patch-team-ids roster fetch failures to use a negative sentinel so failed NHL API fetches appear in `failedTeams`.
+- Normalized trade-block row ids from player names on the server and validated statuses against `requested | available | blocked | untouchable`.
+- Fixed post-trade cap projection to use effective retained cap hits and to strike through only players that belong to the displayed roster, with count labels matching rendered rows.
+- Fixed lower-is-better comparison bars so cheaper and younger sides render as the longer winning bar.
+- Added the development outlook panel to expanded skater rows on the players page.
+- Split the players ledger into capped Forwards, Defence, and flat GSAx Goalies sections with show-all toggles and populated desktop sticky column labels.
+- Added Batch 6 canaries covering each fixed audit path.
+
+### Deferred
+
+- Batch 6 lower-severity UX items not directly covered by the implementation task remain open: shared verdict color/status copy, QuickTradeMachine copied feedback, modal/row a11y improvements, disabled CTA affordance cleanup, AssetPicker untouchable flags, and AssetCard headshot fallback polish.
+
+* Revision: Higher-impact: severity-tier legend (HARD/SOFT/WARN/INFO); plain-language + colorblind-safe verdict/net-gain labels; mobile audit/share controls hidden after a verdict; dead-end error messaging (friendly copy + Retry, no leaked endpoint paths).
+Medium: shared verdict color/status config; QuickTradeMachine copied feedback; modal/row a11y; disabled-CTA affordance; AssetPicker untouchable flags; AssetCard headshot fallback.
+Polish: sub-11px typography; ink-faint/rule contrast (WCAG); emoji copy icon.
+
+### Verification
+
+- `npx tsc --noEmit`
+- Result: no TypeScript errors.
+- `npm run test -- __tests__/feature-canaries.test.ts`
+- Result: `112` tests passing.
+- `npm run test`
+- Result: `250` tests passing.
+- Dev server was not started in Codespace, per project instructions.
+
 ## 2026-06-18 Batch 5 UI State / Async Robustness Audit
 
 ### Completed Today

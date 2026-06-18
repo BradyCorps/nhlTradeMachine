@@ -1,6 +1,8 @@
 "use client";
 import StrandDisplay from "@/app/components/StrandDisplay";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
+import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
+import type { DevelopmentProfile } from "@/app/lib/development-profile";
 import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
@@ -37,6 +39,7 @@ interface Player {
   hasNMC?: boolean;
   hasNTC?: boolean;
   hasLiveStats?: boolean;
+  developmentProfile?: DevelopmentProfile | null;
 }
 
 interface Team {
@@ -261,6 +264,14 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
         </div>
     
       </div>
+      {player.position !== "G" && player.developmentProfile && (
+        <div style={{ marginTop: "12px", background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px 12px" }}>
+          <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "6px" }}>
+            Development Outlook
+          </div>
+          <DevelopmentProfilePanel asset={{ ...player } as any} />
+        </div>
+      )}
     </div>
   );
 }
@@ -549,6 +560,22 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
   );
 }
 
+function SectionToggle({ total, visible, expanded, onToggle }: {
+  total: number;
+  visible: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  if (total <= visible) return null;
+  return (
+    <div style={{ padding: "10px 12px", borderTop: "1px solid var(--rule-light)", background: "#f2ecd7" }}>
+      <button className="filter-btn" onClick={onToggle}>
+        {expanded ? `Show top ${visible}` : `Show all ${total}`}
+      </button>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────
 export default function PlayersPage() {
   const [players, setPlayers]   = useState<Player[]>([]);
@@ -561,6 +588,9 @@ export default function PlayersPage() {
   const [teamFilter, setTeamFilter] = useState<string>("ALL");
   const [sortKey, setSortKey] = useState<"ppg" | "pts" | "toi" | "ops" | "dps" | "age" | "cap">("ppg");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
+  const [showAllF, setShowAllF] = useState(false);
+  const [showAllD, setShowAllD] = useState(false);
+  const [showAllG, setShowAllG] = useState(false);
 
   const handleSortKey = (k: typeof sortKey) => {
     if (k === sortKey) {
@@ -636,8 +666,14 @@ export default function PlayersPage() {
     return list;
   }, [players, deferredSearch, posFilter, teamFilter]);
 
+  useEffect(() => {
+    setShowAllF(false);
+    setShowAllD(false);
+    setShowAllG(false);
+  }, [search, posFilter, teamFilter, sortKey, sortDir]);
+
   // Sort and split into sections
-  const { skaters, goalies } = useMemo(() => {
+  const { forwards, defence, skaters, goalies } = useMemo(() => {
     const sk = filtered.filter(p => p.position !== "G");
     const go = filtered.filter(p => p.position === "G");
 
@@ -668,16 +704,24 @@ export default function PlayersPage() {
       || a.teamId.localeCompare(b.teamId)
       || String(a.id).localeCompare(String(b.id));
 
+    const sortedSkaters = [...sk].sort(sortFn);
     return {
-      skaters: [...sk].sort(sortFn),
+      skaters: sortedSkaters,
+      forwards: sortedSkaters.filter(p => p.position !== "D"),
+      defence: sortedSkaters.filter(p => p.position === "D"),
       goalies: [...go].sort(goalieSort),
     };
   }, [filtered, sortKey, sortDir]);
 
-  const starters = goalies.filter(g => goalieTeir(g.gamesStarted ?? 0) === "STARTER");
-  const tandems  = goalies.filter(g => goalieTeir(g.gamesStarted ?? 0) === "TANDEM");
-  const backups  = goalies.filter(g => goalieTeir(g.gamesStarted ?? 0) === "BACKUP");
-  const goalieRank = new Map(goalies.map((g, i) => [`${g.id}::${g.teamId}`, i + 1]));
+  const FORWARD_CAP = 25;
+  const DEFENCE_CAP = 10;
+  const GOALIE_CAP = 5;
+  const visibleForwards = showAllF ? forwards : forwards.slice(0, FORWARD_CAP);
+  const visibleDefence = showAllD ? defence : defence.slice(0, DEFENCE_CAP);
+  const visibleGoalies = showAllG ? goalies : goalies.slice(0, GOALIE_CAP);
+  const showForwards = (posFilter === "ALL" || posFilter === "F") && forwards.length > 0;
+  const showDefence = (posFilter === "ALL" || posFilter === "D") && defence.length > 0;
+  const showGoalies = (posFilter === "ALL" || posFilter === "G") && goalies.length > 0;
 
   return (
     <main style={{ minHeight: "100vh", background: "var(--paper)", color: "var(--ink)" }}>
@@ -788,45 +832,47 @@ export default function PlayersPage() {
                 position: "sticky", top: 0, zIndex: 10,
                 borderTop: "1px solid #b8a070",
               }}>
-                <div/>
-                <div/>
-                <div/>
-                
-                <div/>
+                <div style={{ fontSize: "10px", color: "var(--rule)", textAlign: "right", textTransform: "uppercase", fontWeight: 900 }}>Rank</div>
+                <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Photo</div>
+                <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Player</div>
+                <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "center" }}>Strand</div>
+                <button className={`col-header${sortKey === "ppg" ? " active" : ""}`} onClick={() => handleSortKey("ppg")}>
+                  Primary {sortKey === "ppg" ? (sortDir === "desc" ? "▼" : "▲") : ""}
+                </button>
+                <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "right" }}>Secondary</div>
               </div>
             )}
 
-            {/* Skaters */}
-            {(posFilter === "ALL" || posFilter === "F" || posFilter === "D") && skaters.length > 0 && (
+            {/* Forwards */}
+            {showForwards && (
               <div className="section-shell" style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
-                <SectionHeader label="Skaters" count={skaters.length} />
-                {skaters.map((p, i) => (
+                <SectionHeader label="Forwards" count={forwards.length} />
+                {visibleForwards.map((p, i) => (
                   <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={i + 1} sortKey={sortKey} actualPPG={actualPPG} />
                 ))}
+                <SectionToggle total={forwards.length} visible={FORWARD_CAP} expanded={showAllF} onToggle={() => setShowAllF(v => !v)} />
+              </div>
+            )}
+
+            {/* Defence */}
+            {showDefence && (
+              <div className="section-shell" style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
+                <SectionHeader label="Defence" count={defence.length} />
+                {visibleDefence.map((p, i) => (
+                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={i + 1} sortKey={sortKey} actualPPG={actualPPG} />
+                ))}
+                <SectionToggle total={defence.length} visible={DEFENCE_CAP} expanded={showAllD} onToggle={() => setShowAllD(v => !v)} />
               </div>
             )}
 
             {/* Goalies */}
-            {(posFilter === "ALL" || posFilter === "G") && goalies.length > 0 && (
+            {showGoalies && (
               <div className="section-shell" style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
-                {starters.length > 0 && (
-                  <>
-                    <SectionHeader label="Starters · 40+ GP" count={starters.length} />
-                    {starters.map((p) => <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={goalieRank.get(`${p.id}::${p.teamId}`) ?? 0} sortKey={sortKey} actualPPG={actualPPG} />)}
-                  </>
-                )}
-                {tandems.length > 0 && (
-                  <>
-                    <SectionHeader label="Tandems · 25–39 GP" count={tandems.length} />
-                    {tandems.map((p) => <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={goalieRank.get(`${p.id}::${p.teamId}`) ?? 0} sortKey={sortKey} actualPPG={actualPPG} />)}
-                  </>
-                )}
-                {backups.length > 0 && (
-                  <>
-                    <SectionHeader label="Backups · Under 25 GP" count={backups.length} />
-                    {backups.map((p) => <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={goalieRank.get(`${p.id}::${p.teamId}`) ?? 0} sortKey={sortKey} actualPPG={actualPPG} />)}
-                  </>
-                )}
+                <SectionHeader label="Goalies · GSAx" count={goalies.length} />
+                {visibleGoalies.map((p, i) => (
+                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={i + 1} sortKey={sortKey} actualPPG={actualPPG} />
+                ))}
+                <SectionToggle total={goalies.length} visible={GOALIE_CAP} expanded={showAllG} onToggle={() => setShowAllG(v => !v)} />
               </div>
             )}
 

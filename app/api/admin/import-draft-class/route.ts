@@ -105,8 +105,27 @@ export async function POST(req: Request) {
       prospectPtsPace,
     };
 
-    const existing = await db.select({ id: playersTable.id }).from(playersTable).where(eq(playersTable.id, id));
+    const existing = await db.select({
+      id: playersTable.id,
+      draftYear: playersTable.draftYear,
+      age: playersTable.age,
+      capHit: playersTable.capHit,
+      yearsRemaining: playersTable.yearsRemaining,
+      hasNmc: playersTable.hasNmc,
+      hasNtc: playersTable.hasNtc,
+    }).from(playersTable).where(eq(playersTable.id, id));
     if (existing.length > 0) {
+      const current = existing[0];
+      const isProspectRow = current.draftYear != null
+        || ((current.age ?? 99) <= 22
+          && current.capHit <= 1.15
+          && current.yearsRemaining <= ELC_YEARS
+          && !current.hasNmc
+          && !current.hasNtc);
+      if (!isProspectRow) {
+        errors.push(`${p.name}: skipped existing NHL contract row; draft import will not overwrite cap/term/clauses`);
+        continue;
+      }
       await db.update(playersTable).set(row).where(eq(playersTable.id, id));
       updated++;
     } else {

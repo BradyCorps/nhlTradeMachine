@@ -52,8 +52,14 @@ const StatBar = ({ label, homeVal, partnerVal, higherIsBetter = true, unit = "" 
 }) => {
   const max      = Math.max(Math.abs(homeVal), Math.abs(partnerVal), 0.01);
   const homeWins = higherIsBetter ? homeVal >= partnerVal : homeVal <= partnerVal;
-  const homePct  = Math.abs(homeVal)   / max * 100;
-  const partPct  = Math.abs(partnerVal) / max * 100;
+  const lowerIsBetterPct = (value: number) => {
+    const worst = Math.max(homeVal, partnerVal);
+    const best = Math.min(homeVal, partnerVal);
+    if (worst === best) return 100;
+    return Math.max(8, ((worst - value) / (worst - best)) * 100);
+  };
+  const homePct  = higherIsBetter ? Math.abs(homeVal) / max * 100 : lowerIsBetterPct(homeVal);
+  const partPct  = higherIsBetter ? Math.abs(partnerVal) / max * 100 : lowerIsBetterPct(partnerVal);
 
   const fmt = (v: number) => {
     if (Math.abs(v) >= 100) return v.toFixed(0);

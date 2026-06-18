@@ -37,6 +37,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, cleared: true });
   }
 
+  const validateCapValue = (label: string, value: number | null | undefined) => {
+    if (value === undefined || value === null) return null;
+    if (!Number.isFinite(value) || value <= 0) {
+      return `${label} must be a positive number`;
+    }
+    return null;
+  };
+  const capError = validateCapValue("capCeiling", body.capCeiling)
+    ?? validateCapValue("capFloor", body.capFloor);
+  if (capError) {
+    return NextResponse.json({ error: capError }, { status: 400 });
+  }
+  if (body.capCeiling != null && body.capFloor != null && body.capFloor > body.capCeiling) {
+    return NextResponse.json({ error: "capFloor cannot exceed capCeiling" }, { status: 400 });
+  }
+
   const upsert = async (key: string, val: number | null | undefined) => {
     if (val === undefined) return;
     if (val === null) {

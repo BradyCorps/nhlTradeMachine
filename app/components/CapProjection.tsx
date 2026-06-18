@@ -46,6 +46,9 @@ const posLabel: Record<string, string> = {
   D: "Defence", G: "Goalies",
 };
 
+const assetKey = (a: Asset) => `${a.id}::${a.teamId ?? ""}`;
+const effectiveCapHit = (a: Asset) => (a.capHit || 0) * (1 - (a.retainedPct || 0));
+
 const RosterSlot = ({ player, isNew, isLeaving }: {
   player: Asset;
   isNew?: boolean;
@@ -66,7 +69,7 @@ const RosterSlot = ({ player, isNew, isLeaving }: {
         {player.name}
       </div>
       <div className="text-[11px] text-zinc-700 font-bold">
-        ${player.capHit.toFixed(1)}M · {player.yearsRemaining}yr
+        ${effectiveCapHit(player).toFixed(1)}M · {player.yearsRemaining}yr
       </div>
     </div>
     <div className={`text-[9px] font-black font-mono ${isNew ? "text-emerald-400" : isLeaving ? "text-rose-500" : "text-zinc-600"}`}>
@@ -82,23 +85,25 @@ const TeamProjection = ({ team, currentRoster, outgoing, incoming, label }: {
   incoming: Asset[];
   label: string;
 }) => {
-  const outIds = new Set(outgoing.map(a => a.id));
-  const inIds  = new Set(incoming.map(a => a.id));
+  const outKeys = new Set(outgoing.map(assetKey));
+  const inKeys  = new Set(incoming.map(assetKey));
+  const currentKeys = new Set(currentRoster.map(assetKey));
 
   // Build post-trade roster — deduplicated by id to handle any stale state
   const seenIds = new Set<string>();
   const postRoster = [
-    ...currentRoster.filter(a => !outIds.has(a.id)),
+    ...currentRoster.filter(a => !outKeys.has(assetKey(a))),
     ...incoming.filter(a => a.position !== "Pick"),
   ].filter(a => {
-    if (seenIds.has(a.id)) return false;
-    seenIds.add(a.id);
+    const key = assetKey(a);
+    if (seenIds.has(key)) return false;
+    seenIds.add(key);
     return true;
   });
 
   const currentCapUsed = currentRoster.reduce((s, a) => s + (a.capHit || 0), 0);
-  const outCap  = outgoing.reduce((s, a) => s + (a.capHit || 0), 0);
-  const inCap   = incoming.filter(a => a.position !== "Pick").reduce((s, a) => s + (a.capHit || 0), 0);
+  const outCap  = outgoing.reduce((s, a) => s + effectiveCapHit(a), 0);
+  const inCap   = incoming.filter(a => a.position !== "Pick").reduce((s, a) => s + effectiveCapHit(a), 0);
   const postCapUsed = currentCapUsed - outCap + inCap;
   const postCapSpace = CAP_CEILING - postCapUsed;
 
@@ -147,11 +152,14 @@ const TeamProjection = ({ team, currentRoster, outgoing, incoming, label }: {
       <div className="space-y-3">
         {["C", "W", "D", "G"].map(pos => {
           const players = postGroups[pos] ?? [];
-          if (!players.length) return null;
+          const departing = outgoing
+            .filter(a => currentKeys.has(assetKey(a)))
+            .filter(a => (a.position === "L" || a.position === "R" ? "W" : a.position) === pos);
+          if (!players.length && !departing.length) return null;
           return (
             <div key={pos}>
               <div className="text-[11px] font-black uppercase tracking-widest text-zinc-700 mb-1.5">
-                {posLabel[pos]} ({players.length})
+                {posLabel[pos]} ({players.length + departing.length})
               </div>
               <div className="space-y-1">
                 {players
@@ -160,14 +168,12 @@ const TeamProjection = ({ team, currentRoster, outgoing, incoming, label }: {
                     <RosterSlot
                       key={`post-${pos}-${p.id}`}
                       player={p}
-                      isNew={inIds.has(p.id)}
+                      isNew={inKeys.has(assetKey(p))}
                       isLeaving={false}
                     />
                   ))}
                 {/* Show departing players as struck through */}
-                {outgoing
-                  .filter(a => (a.position === "L" || a.position === "R" ? "W" : a.position) === pos)
-                  .map(p => (
+                {departing.map(p => (
                     <RosterSlot key={`out-${pos}-${p.id}`} player={p} isLeaving={true} />
                   ))}
               </div>

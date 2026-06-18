@@ -6,6 +6,12 @@ import { isAuthorized } from "@/app/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
+const TRADE_BLOCK_STATUSES = new Set(["requested", "available", "blocked", "untouchable"]);
+
+function makeId(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 export async function GET() {
   const [entries, teamRows, playerRows] = await Promise.all([
     db.select().from(tradeBlock).catch((e) => { console.error("[trade-block GET] DB error:", e); return []; }),
@@ -26,19 +32,25 @@ async function upsertEntry(body: {
   id: string; name: string; teamId?: string | null;
   status: string; note?: string | null;
 }) {
+  const entryId = makeId(body.name || body.id);
+  if (!entryId) throw new Error("name is required");
   if (body.status === "clear") {
-    await db.delete(tradeBlock).where(eq(tradeBlock.id, body.id)).catch(() => {});
+    await db.delete(tradeBlock).where(eq(tradeBlock.id, entryId)).catch(() => {});
+    if (body.id && body.id !== entryId) {
+      await db.delete(tradeBlock).where(eq(tradeBlock.id, body.id)).catch(() => {});
+    }
     return;
   }
-  const existing = await db.select().from(tradeBlock).where(eq(tradeBlock.id, body.id)).catch(() => []);
+  if (!TRADE_BLOCK_STATUSES.has(body.status)) throw new Error(`Invalid trade-block status: ${body.status}`);
+  const existing = await db.select().from(tradeBlock).where(eq(tradeBlock.id, entryId)).catch(() => []);
   if (existing.length > 0) {
     await db.update(tradeBlock).set({
       name: body.name, teamId: body.teamId ?? null,
       status: body.status, note: body.note ?? null, updatedAt: Date.now(),
-    }).where(eq(tradeBlock.id, body.id));
+    }).where(eq(tradeBlock.id, entryId));
   } else {
     await db.insert(tradeBlock).values({
-      id: body.id, name: body.name, teamId: body.teamId ?? null,
+      id: entryId, name: body.name, teamId: body.teamId ?? null,
       status: body.status, note: body.note ?? null, updatedAt: Date.now(),
     });
   }
@@ -52,10 +64,18 @@ export async function POST(req: Request) {
 
   // Bulk upsert
   if (Array.isArray(body)) {
-    await Promise.all(body.map(upsertEntry));
+    try {
+      await Promise.all(body.map(upsertEntry));
+    } catch (e: any) {
+      return NextResponse.json({ error: e?.message ?? "Invalid trade block entry" }, { status: 400 });
+    }
     return NextResponse.json({ ok: true, count: body.length });
   }
 
-  await upsertEntry(body);
+  try {
+    await upsertEntry(body);
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message ?? "Invalid trade block entry" }, { status: 400 });
+  }
   return NextResponse.json({ ok: true });
 }

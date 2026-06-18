@@ -16,7 +16,7 @@ export const slugifyProspectName = (name: string): string =>
     .trim()
     .replace(/\s+/g, "-");
 
-const CACHE_KEY = `cache:prospect_enrichment:v2:${Math.max(2020, SEASON.draftYear - 7)}:${SEASON.draftYear - 1}`;
+export const PROSPECT_ENRICHMENT_CACHE_KEY = `cache:prospect_enrichment:v2:${Math.max(2020, SEASON.draftYear - 7)}:${SEASON.draftYear - 1}`;
 const CACHE_TTL = 7 * 24 * 60 * 60;
 
 function decodeHtml(value: string): string {
@@ -79,7 +79,7 @@ async function fetchWikipediaDraftProspects(year: number): Promise<Record<string
 
 export async function fetchProspectEnrichmentMap(): Promise<Record<string, ProspectEnrichment>> {
   if (redis) {
-    const cached = await redis.get<Record<string, ProspectEnrichment>>(CACHE_KEY);
+    const cached = await redis.get<Record<string, ProspectEnrichment>>(PROSPECT_ENRICHMENT_CACHE_KEY);
     if (cached && Object.keys(cached).length > 50) return cached;
   }
 
@@ -98,7 +98,7 @@ export async function fetchProspectEnrichmentMap(): Promise<Record<string, Prosp
   }
 
   if (redis && Object.keys(merged).length > 50) {
-    await redis.setex(CACHE_KEY, CACHE_TTL, merged);
+    await redis.setex(PROSPECT_ENRICHMENT_CACHE_KEY, CACHE_TTL, merged);
   }
 
   return merged;

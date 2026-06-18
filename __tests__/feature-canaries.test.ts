@@ -547,7 +547,8 @@ describe("Canary — Batch 5 UI state robustness", () => {
     expect(src).toContain("if (!r.ok) throw new Error");
     expect(src).toContain("PLAYER LEDGER LOAD FAILED");
     expect(src).toContain("const compare = (av: number | null | undefined, bv: number | null | undefined)");
-    expect(src).toContain("goalieRank");
+    expect(src).toContain("const visibleGoalies");
+    expect(src).toContain('SectionHeader label="Goalies · GSAx"');
     expect(src).not.toContain("?? -99");
   });
 
@@ -853,5 +854,91 @@ describe("Canary — admin contract sync", () => {
       expect(src).toContain("extensionCapHit: undefined");
       expect(src).toContain("extensionYears");
     }
+  });
+});
+
+describe("Canary — Batch 6 audit fixes", () => {
+  it("draft-class import will not overwrite existing veteran contract rows with ELC defaults", () => {
+    const src = read("app/api/admin/import-draft-class/route.ts");
+    expect(src).toContain("skipped existing NHL contract row");
+    expect(src).toContain("current.draftYear != null");
+    expect(src).toContain("current.capHit <= 1.15");
+    expect(src).toContain("!current.hasNmc");
+    expect(src).toContain("!current.hasNtc");
+  });
+
+  it("admin cap settings reject zero, negative, and inverted cap values", () => {
+    const src = read("app/api/admin/settings/route.ts");
+    expect(src).toContain("validateCapValue");
+    expect(src).toContain("!Number.isFinite(value) || value <= 0");
+    expect(src).toContain("capFloor cannot exceed capCeiling");
+    expect(src).toContain("{ status: 400 }");
+  });
+
+  it("Strand rendering guards empty trait arrays before indexing or dividing", () => {
+    const display = read("app/components/StrandDisplay.tsx");
+    const view = read("app/components/StrandView.tsx");
+    expect(display).toContain("if (n === 0) return");
+    expect(display).toContain("offTraits.length > 0 && defTraits.length > 0");
+    expect(display).toContain("compareOff.length > 0 && compareDef.length > 0");
+    expect(view).toContain('return "UNAVAILABLE"');
+  });
+
+  it("admin cache flush includes all live roster/stat/enrichment cache keys", () => {
+    const src = read("app/api/admin/clear-cache/route.ts");
+    expect(src).toContain("cache:pointshares");
+    expect(src).toContain("cache:mp_skaters");
+    expect(src).toContain("cache:mp_goalies");
+    expect(src).toContain("cache:nhl_goalie_summary_stats");
+    expect(src).toContain("cache:prospect_enrichment:v1");
+    expect(src).toContain("PROSPECT_ENRICHMENT_CACHE_KEY");
+    expect(read("app/lib/prospect-enrichment.ts")).toContain("export const PROSPECT_ENRICHMENT_CACHE_KEY");
+  });
+
+  it("patch-team-ids reports failed roster fetches instead of zero-match success", () => {
+    const src = read("app/api/admin/patch-team-ids/route.ts");
+    expect(src).toContain("| null");
+    expect(src).toContain("teamResults[team.id] = -1");
+    expect(src).toContain(".filter(([, v]) => v < 0)");
+  });
+
+  it("trade-block admin writes canonical name-derived ids and validates status enum", () => {
+    const src = read("app/api/admin/trade-block/route.ts");
+    expect(src).toContain("TRADE_BLOCK_STATUSES");
+    expect(src).toContain('["requested", "available", "blocked", "untouchable"]');
+    expect(src).toContain("const entryId = makeId(body.name || body.id)");
+    expect(src).toContain("Invalid trade-block status");
+    expect(src).toContain("id: entryId");
+  });
+
+  it("cap projection uses retained effective cap and only strikes through players from the current roster", () => {
+    const src = read("app/components/CapProjection.tsx");
+    expect(src).toContain("const effectiveCapHit =");
+    expect(src).toContain("(1 - (a.retainedPct || 0))");
+    expect(src).toContain("currentKeys.has(assetKey(a))");
+    expect(src).toContain("players.length + departing.length");
+    expect(src).toContain("outKeys.has(assetKey(a))");
+  });
+
+  it("lower-is-better comparison bars give the cheaper/younger side the longer bar", () => {
+    const src = read("app/components/PlayerComparison.tsx");
+    expect(src).toContain("lowerIsBetterPct");
+    expect(src).toContain("((worst - value) / (worst - best)) * 100");
+    expect(src).toContain('higherIsBetter={false}');
+  });
+
+  it("players page renders development profiles and capped position sections", () => {
+    const src = read("app/players/page.tsx");
+    expect(src).toContain("DevelopmentProfilePanel");
+    expect(src).toContain("developmentProfile?: DevelopmentProfile | null");
+    expect(src).toContain("Development Outlook");
+    expect(src).toContain("const [showAllF");
+    expect(src).toContain("const FORWARD_CAP = 25");
+    expect(src).toContain("const DEFENCE_CAP = 10");
+    expect(src).toContain("const GOALIE_CAP = 5");
+    expect(src).toContain("forwards: sortedSkaters.filter");
+    expect(src).toContain('SectionHeader label="Goalies · GSAx"');
+    expect(src).toContain("Rank</div>");
+    expect(src).toContain("Primary");
   });
 });
