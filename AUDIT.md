@@ -507,7 +507,7 @@ Bugs (cited, fixed 2026-06-18)
 3. [x] Stale division data — route.ts:218-219. The DIVISIONS map still lists ARI: "Central" (Arizona relocated to Utah in 2024) alongside UTA, leaving Central with 9 entries. Meanwhile trade-logic.ts:441 lists only UTA. Harmless for live data (no ARI team exists), but it's an inconsistency between the two division tables and dead data.
 What I'd consider missing / critical
 
-🔴 No integration test for the /api/evaluate route. Per the project's own review guideline (missing integration test for an API route = Critical), this is the headline gap. The __tests__/feature-canaries.test.ts cases that reference the route (:183-256) are source-string assertions — they read() the file and check it .toContain(...) a substring. They never POST a payload or assert that, e.g., a cap-ceiling breach actually returns BLOCKED, or that an untouchable yields a HARD veto. The entire verdict engine (evaluateTrade, runGmLogic, status mapping at route.ts:1124-1150) has zero behavioral coverage. This is the single most important thing to add.
+✅ Integration test for the /api/evaluate route added 2026-06-18. `__tests__/evaluate-route.test.ts` now POSTs real payloads to the route handler and asserts behavioral verdict output for cap-ceiling breach → `BLOCKED`, untouchable partner asset → hard veto, and balanced low-risk swap → `FAIR`.
 
 Other functional gaps (not bugs, but notable absences for a "trade machine"):
 
@@ -515,3 +515,28 @@ Other functional gaps (not bugs, but notable absences for a "trade machine"):
     No same-player guard. Team selectors exclude each other, so you can't trade within a team, but there's nothing stopping odd inputs beyond that — minor.
     Verdict flag display is lossy. VerdictSummary (:341-355) slices to 4 flags and drops perspective/category, so "whose problem is this" and overflow flags are invisible in the Trade Machine view (the Armchair GM components like VerdictPanel presumably show more).
     No empty-NAV/error fallback messaging when fetchNavMap returns zeros for an unknown asset — it silently shows 0 NAV.
+
+
+## XNAV / YOUNG PLAYERS / GOALIE CALCULATION AUDIT
+
+Status: Complete as of 2026-06-18.
+
+Skater fixes completed:
+
+1. Prospect pedigree no longer gets a blanket certainty premium. Unsupported drafted prospects are discounted below equivalent fresh-pick value for burned development time, while NHLe production can pull the multiplier back toward or slightly above slot value.
+2. The 14-game valuation cliff is replaced with a 14-60 game transition band that blends prospect pedigree into skater NAV instead of flipping all at once.
+3. Young-skater development risk is now track-record-aware. The age bucket remains the base, but NHL games and established role/production relieve the discount for ordinary proven young players.
+4. Positive age value is gated by projection signal from production, role, pedigree, and sample size. Youth alone no longer creates full independent NAV.
+5. OPS/DPS pace extrapolation is damped by sample confidence so a 20-game hot start does not fully annualize into the point-share channel.
+
+Goalie fixes completed:
+
+1. Tandem/backup caps now include an ascending-goalie path. Young, controlled, high-rate 1B profiles can exceed the old 60 NAV tandem cap, while veteran tandems remain capped.
+2. The 50-game starter market floor is rate-gated, reducing bad-volume starter inflation.
+3. Goalie NAV now emits a `volatility` score, and `/api/evaluate` surfaces high goalie variance as an `ASSET_SHAPE_MISMATCH` GM warning.
+4. Post-30 goalie aging was softened from the prior steep convex penalty to better reflect the position's wider veteran aging band.
+
+Verification added:
+
+- `__tests__/xnav.test.ts` covers discounted unsupported prospects, 14-60 prospect blending, track-record relief, signal-gated youth upside, small-sample point-share damping, ascending 1B goalie caps, veteran tandem caps, and goalie volatility.
+- `__tests__/evaluate-route.test.ts` covers the route-level goalie volatility warning in a real `/api/evaluate` POST flow.

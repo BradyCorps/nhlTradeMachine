@@ -101,6 +101,7 @@ export interface XNAVResult {
   noivImpact?: number;
   fArchetype?: FArchetype;
   rosterTier?: RosterTier;
+  volatility?: number;
 }
 
 // Forward archetypes — used for STRAND helix and DEF display routing

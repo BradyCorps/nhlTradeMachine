@@ -8,7 +8,7 @@
 // not precision assertions.
 
 import { describe, it, expect } from "vitest";
-import { calcNAV, calcDeploymentMultiplier, calcGoalieNAV, calcPickNAV, calcSkaterNAV } from "../app/lib/xnav-engine";
+import { calcNAV, calcDeploymentMultiplier, calcGoalieNAV, calcPickNAV, calcProspectNAV, calcSkaterNAV } from "../app/lib/xnav-engine";
 import { getHistoricalFloor } from "../app/lib/player-data";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -43,20 +43,20 @@ describe("G-NAV — Elite Starters", () => {
     inRange(result.total, 120, 180, "Saros NAV");
   });
 
-  it("Oettinger: decent starter on defensive team → 15-65 NAV", () => {
+  it("Oettinger: decent starter on defensive team → modest positive NAV", () => {
     const result = calcGoalieNAV({
       id: "oettinger", name: "Jake Oettinger", position: "G",
       age: 26, capHit: 5.75, yearsRemaining: 4,
       gsax: 5.1, gamesStarted: 50, teamXga60: 2.82,
     });
-    // Upper bound raised: starter FMV floor lifts young goalies who were
-    // undershooting the real market ($3.5-4M floor for 50+ game starters).
-    inRange(result.total, 15, 65, "Oettinger NAV");
+    // Starter floor is rate-gated now; a defensive-team starter with only decent
+    // rate output stays modest instead of floating on volume alone.
+    inRange(result.total, 0, 65, "Oettinger NAV");
   });
 });
 
 describe("G-NAV — Young Controlled Goalies", () => {
-  it("Wolf (with extension): cheap now but big commitment → 10-45 NAV", () => {
+  it("Wolf (with extension): cheap now but big commitment → low positive NAV", () => {
     const result = calcGoalieNAV({
       id: "wolf", name: "Dustin Wolf", position: "G",
       age: 25, capHit: 0.875, yearsRemaining: 1,
@@ -64,17 +64,18 @@ describe("G-NAV — Young Controlled Goalies", () => {
       extensionCapHit: 7.5, extensionYears: 7,
     });
     // Negative GSAX + $7.5M extension is below-market at the corrected 95.5 cap ceiling;
-    // modest positive total is correct — the cheap controlled year saves it from being negative.
-    inRange(result.total, 10, 45, "Wolf (extension) NAV");
+    // the moderated starter floor prevents a bad-volume starter from floating too high.
+    inRange(result.total, 0, 45, "Wolf (extension) NAV");
+    expect(result.volatility).toBeGreaterThanOrEqual(40);
   });
 
-  it("Wolf (no extension): cheap controlled starter → 40-70 NAV", () => {
+  it("Wolf (no extension): cheap controlled starter → 75-120 NAV", () => {
     const result = calcGoalieNAV({
       id: "wolf-noext", name: "Dustin Wolf", position: "G",
       age: 25, capHit: 0.875, yearsRemaining: 2,
       gsax: -1.8, gamesStarted: 57, teamXga60: 3.22,
     });
-    inRange(result.total, 80, 120, "Wolf (no ext) NAV");
+    inRange(result.total, 75, 120, "Wolf (no ext) NAV");
     expect(result.total).toBeGreaterThan(20);
   });
 
@@ -90,7 +91,7 @@ describe("G-NAV — Young Controlled Goalies", () => {
 });
 
 describe("G-NAV — Backup/Tandem Edge Cases", () => {
-  it("Wedgewood: tandem goalie — hard cap at 60 NAV max", () => {
+  it("Wedgewood: veteran tandem goalie — capped at 60 NAV max", () => {
     const result = calcGoalieNAV({
       id: "wedge", name: "Scott Wedgewood", position: "G",
       age: 33, capHit: 2.0, yearsRemaining: 1,
@@ -118,6 +119,16 @@ describe("G-NAV — Backup/Tandem Edge Cases", () => {
       gsax: 15.0, gamesStarted: 30, teamXga60: 2.67,
     });
     expect(result.total).toBeLessThanOrEqual(35);
+  });
+
+  it("Ascending 1B can exceed the old tandem cap when rate and control support it", () => {
+    const result = calcGoalieNAV({
+      id: "ascending-1b", name: "Ascending 1B", position: "G",
+      age: 25, capHit: 1.0, yearsRemaining: 2,
+      gsax: 50.0, gamesStarted: 45, teamXga60: 2.92,
+    });
+    expect(result.total).toBeGreaterThan(60);
+    expect(result.total).toBeLessThanOrEqual(95);
   });
 });
 
@@ -514,6 +525,76 @@ describe("X-NAV — Young Surplus Contracts", () => {
     const old   = calcSkaterNAV({ ...base, id: "old",   age: 34 });
     expect(young.total).toBeGreaterThan(old.total);
   });
+
+  it("Low-production youth does not receive full age upside without projection signal", () => {
+    const result = calcSkaterNAV({
+      id: "low-signal-young", name: "Low Signal Young", position: "W",
+      age: 20, capHit: 0.925, yearsRemaining: 2,
+      ptsPace: 6, xGPace: 2, defRate: -0.1,
+      avgTOI: 8, games: 14, hasLiveStats: true,
+      ops: 0.3, dps: 0.2,
+    });
+    expect(result.age).toBeLessThan(8);
+    expect(result.total).toBeLessThan(30);
+  });
+
+  it("Young NHL track record relieves development discount versus same-age small sample", () => {
+    const base = {
+      id: "ordinary-young", name: "Ordinary Young", position: "C" as const,
+      age: 23, capHit: 3.5, yearsRemaining: 3,
+      ptsPace: 50, xGPace: 14, defRate: 0.05,
+      avgTOI: 16, qocRank: 220, xgRelTM: 1, xgaRelTM: 0,
+    };
+    const established = calcSkaterNAV({ ...base, id: "established", games: 300 });
+    const smallSample = calcSkaterNAV({ ...base, id: "small-sample", games: 20 });
+    expect(established.total).toBeGreaterThan(smallSample.total);
+  });
+
+  it("Small-sample point shares are damped before full-season extrapolation", () => {
+    const base = {
+      id: "hot-start", name: "Hot Start", position: "W" as const,
+      age: 22, capHit: 0.925, yearsRemaining: 2,
+      ptsPace: 65, xGPace: 20, defRate: 0.0,
+      avgTOI: 17, qocRank: 200, xgRelTM: 2, xgaRelTM: 0,
+      ops: 4.5, dps: 1.2,
+    };
+    const hotStart = calcSkaterNAV({ ...base, games: 20 });
+    const fullSeason = calcSkaterNAV({ ...base, games: 82 });
+    expect(hotStart.off).toBeLessThan(fullSeason.off + 20);
+  });
+});
+
+describe("X-NAV — Prospect Transition", () => {
+  it("Unsupported prospect pedigree is discounted below the equivalent fresh pick", () => {
+    const pick = calcPickNAV({
+      id: "fresh-5", name: "Fresh 5th Overall", position: "Pick",
+      age: 0, capHit: 0, yearsRemaining: 0,
+      round: 1, year: 2026, teamStanding: 28,
+    });
+    const prospect = calcProspectNAV({
+      id: "stalled-5", name: "Stalled 5th Overall", position: "C",
+      age: 20, capHit: 0.925, yearsRemaining: 2,
+      draftOverall: 5, games: 0, hasLiveStats: false,
+    });
+    expect(prospect.total).toBeLessThan(pick.total);
+  });
+
+  it("Prospect-to-skater valuation blends through 14-60 NHL games", () => {
+    const base = {
+      id: "transition-prospect", name: "Transition Prospect", position: "W" as const,
+      age: 20, capHit: 0.925, yearsRemaining: 2,
+      draftOverall: 5,
+      ptsPace: 16, xGPace: 5, defRate: -0.05,
+      avgTOI: 10, qocRank: 330, games: 0,
+      hasLiveStats: false,
+    };
+    const game13 = calcNAV({ ...base, games: 13 });
+    const game14 = calcNAV({ ...base, games: 14 });
+    const game60 = calcNAV({ ...base, games: 60 });
+
+    expect(Math.abs(game14.total - game13.total)).toBeLessThan(game13.total * 0.35);
+    expect(game60.total).toBeLessThan(game14.total);
+  });
 });
 
 describe("X-NAV — Salary Retention", () => {
@@ -535,10 +616,10 @@ describe("X-NAV — Salary Retention", () => {
 // SANITY / REGRESSION GUARDS
 // ─────────────────────────────────────────────────────────────────────────────
 describe("Sanity Guards — Values that should never happen", () => {
-  it("No tandem goalie should exceed 60 NAV", () => {
+  it("Veteran tandem goalie should not exceed 60 NAV", () => {
     const result = calcGoalieNAV({
       id: "tandem-max", name: "Tandem G", position: "G",
-      age: 25, capHit: 1.0, yearsRemaining: 2,
+      age: 31, capHit: 1.0, yearsRemaining: 2,
       gsax: 50.0, gamesStarted: 45, teamXga60: 2.92,
     });
     expect(result.total).toBeLessThanOrEqual(60);

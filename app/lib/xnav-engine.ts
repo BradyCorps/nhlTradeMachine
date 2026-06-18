@@ -81,12 +81,31 @@ export interface XNAVResult {
   fArchetype?: string;
   rosterTier?: RosterTier;
   isRFA?:      boolean;
+  volatility?: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 export const safe  = (n: number): number => (isNaN(n) || !isFinite(n) ? 0 : n);
 export const clamp = (n: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, n));
+
+function blendNavResults(lowSample: XNAVResult, established: XNAVResult, establishedWeight: number): XNAVResult {
+  const w = clamp(establishedWeight, 0, 1);
+  const blend = (a: number, b: number) => Math.round(a * (1 - w) + b * w);
+  return {
+    total: blend(lowSample.total, established.total),
+    off: blend(lowSample.off, established.off),
+    def: blend(lowSample.def, established.def),
+    age: blend(lowSample.age, established.age),
+    cap: blend(lowSample.cap, established.cap),
+    upside: blend(lowSample.upside, established.upside),
+    noivImpact: blend(lowSample.noivImpact ?? 0, established.noivImpact ?? 0),
+    fArchetype: established.fArchetype || lowSample.fArchetype,
+    rosterTier: established.rosterTier ?? lowSample.rosterTier,
+    isRFA: established.isRFA ?? lowSample.isRFA,
+    volatility: Math.max(lowSample.volatility ?? 0, established.volatility ?? 0),
+  };
+}
 
 export type RosterTier =
   | "ELITE_1ST_LINE"
@@ -260,7 +279,7 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
     : Math.min(5, (gamesG / 60) * 5);
 
   const peakAge    = 30;
-  const agePenalty = asset.age > peakAge ? Math.pow(asset.age - peakAge, 1.8) * 1.2 : 0;
+  const agePenalty = asset.age > peakAge ? Math.pow(asset.age - peakAge, 1.55) * 0.95 : 0;
   const ageFactor  = Math.max(0.3, 1.05 - agePenalty / 100);
 
   const effectiveCap = asset.capHit * (1 - (asset.retainedPct || 0));
@@ -291,8 +310,9 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   // calculation — the GNAV/def component still reflects true on-ice performance.
   // The floor degrades with age (ageFactor) so a 38-year-old bad goalie on an
   // overpaid deal can still produce negative-value outcomes.
+  const starterFloorSignal = clamp((expGSAx + 6) / 18, 0.55, 1.0);
   const starterTmvFloor = isStarter && gamesG >= 50
-    ? Math.max(0, 65 * Math.min(ageFactor, 1.0))
+    ? Math.max(0, 65 * Math.min(ageFactor, 1.0) * starterFloorSignal)
     : isTandem ? 30 : 0;
   const fmvTmv = Math.max(trueMarketValueG, starterTmvFloor);
   
@@ -331,6 +351,8 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const capTotalG      = safe(baselineCapComponentG + retainedBonus);
   
   const rawTotal       = safe(fmvTmv + capTotalG);
+  const rateSignal     = gsaxPerGameCapped + defCorrection;
+  const isAscendingGoalie = asset.age <= 27 && gamesG >= 34 && rateSignal >= 0.12 && effectiveCap <= 4.0 && !extCapHit;
 
   const isYoungControlled = asset.age <= 26 && effectiveCap <= 3.5 && !extCapHit;
   const youngFloor = isYoungControlled && (isStarter || isTandem)
@@ -338,8 +360,16 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
         + Math.min(15, (gamesG / 82) * 20) + (isTandem ? -8 : 0))
     : 0;
 
-  const roleCap     = isBackup ? 35 : isTandem ? 60 : 250;
+  const roleCap     = isBackup ? (isAscendingGoalie ? 50 : 35) : isTandem ? (isAscendingGoalie ? 95 : 60) : 250;
   const cappedTotal = Math.min(Math.max(rawTotal, youngFloor), roleCap);
+  const volatility = Math.round(clamp(
+    (1 - confidenceAdj) * 60
+      + (gamesG < 50 ? 18 : 8)
+      + (asset.age <= 26 ? 12 : 0)
+      + (Math.abs(expGSAx) < 6 ? 6 : 0),
+    8,
+    85,
+  ));
 
   return {
     total:  cappedTotal,
@@ -351,6 +381,7 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
     noivImpact: 0,
     fArchetype: "",
     isRFA,
+    volatility,
   };
 }
 
@@ -393,9 +424,11 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   }
 
 
-  // Pace cumulative point shares to 82 games to prevent injury collapse
-  // We use a floor of 20 games to avoid absurd small-sample size multipliers
-  const paceMultiplier = clamp(82 / Math.max(games, 20), 1.0, 4.1);
+  // Pace cumulative point shares toward 82 games, with sample damping so a
+  // 20-game hot start does not fully annualize through the OPS/DPS channel.
+  const rawPaceMultiplier = clamp(82 / Math.max(games, 20), 1.0, 4.1);
+  const paceConfidence = clamp(games / 82, 0.25, 1.0);
+  const paceMultiplier = 1 + (rawPaceMultiplier - 1) * paceConfidence * 0.60;
   const ops    = asset.ops != null ? safe(asset.ops) * paceMultiplier : null;
   const dps    = asset.dps != null ? safe(asset.dps) * paceMultiplier : null;
 
@@ -515,7 +548,16 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   // Rental discount: 1yr contract = 75% age penalty reduction; 2yr = 40%
   const yrs          = asset.yearsRemaining || 3;
   const rentalFactor = yrs <= 1 ? 0.25 : yrs <= 2 ? 0.60 : 1.0;
-  const ageVal       = baseAge < 0 ? baseAge * rentalFactor : baseAge;
+  const productionSignal = clamp((blendedPts - 20) / 45, 0, 1);
+  const roleSignal = clamp((toi - 11) / 7, 0, 1);
+  const pedigreeSignal = asset.draftOverall != null && asset.draftOverall <= 32 ? 0.65 : 0;
+  const sampleSignal = clamp(games / 82, 0, 1);
+  const youthProjectionSignal = clamp(
+    Math.max(productionSignal, roleSignal, pedigreeSignal) * (0.45 + 0.55 * sampleSignal),
+    0,
+    1,
+  );
+  const ageVal       = baseAge < 0 ? baseAge * rentalFactor : baseAge * youthProjectionSignal;
   const ageTotal     = safe(ageVal);
 
   // ── On-Ice Core ───────────────────────────────────────────────
@@ -630,7 +672,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   // model ignores. A 21-year-old D-man might become Makar — or might plateau as a
   // solid #2. This discount prices that uncertainty into their trade value.
   //
-  // Graduated by age (players 26+ are considered fully established):
+  // Graduated by age, then relieved by games/role track record:
   //   ≤21: ×0.68  — ELC, limited NHL track record, high variance
   //   22:  ×0.76  — first full contract year, still developing
   //   23:  ×0.82  — showing signs but not proven elite
@@ -646,6 +688,15 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     age <= 24 ? 0.88 :
     age <= 25 ? 0.93 :
     1.0;
+
+  if (age <= 25) {
+    const gameRelief = clamp((games - 40) / 180, 0, 1);
+    const establishedRoleRelief = games >= 160 && (blendedPts >= 35 || toi >= 14)
+      ? 0.65
+      : 0;
+    const relief = Math.max(gameRelief, establishedRoleRelief);
+    developmentDiscount += (1.0 - developmentDiscount) * relief;
+  }
 
   // Generational Exemption:
   // If a young player is already producing at a top-tier pace, they are proven.
@@ -712,11 +763,9 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
 }
 
 // ── Prospect NAV (pedigree-based) ─────────────────────────────────────────────
-// A drafted prospect with no meaningful NHL sample is valued as the pick that
-// selected him, with the lottery uncertainty resolved (+10%). Optional NHLe
-// stats (junior production translated to NHL pace at import time) modulate
-// the pedigree value ±15%. Once the player logs 14+ NHL games, the normal
-// stats-driven path takes over.
+// A drafted prospect with no meaningful NHL sample is valued from the pick that
+// selected him, discounted for burned development time unless NHLe production
+// supports holding or exceeding the original slot value.
 export function calcProspectNAV(asset: AssetInput): XNAVResult {
   const overall = asset.draftOverall ?? 224;
   const round   = Math.max(1, Math.ceil(overall / 32));
@@ -731,7 +780,12 @@ export function calcProspectNAV(asset: AssetInput): XNAVResult {
     teamStanding: clamp(33 - slotInRound, 1, 32),
   });
 
-  const certainty = 1.10; // lottery risk resolved — he IS the #N pick
+  const yearsSinceDraft = clamp(asset.age - 18, 0, 5);
+  const hasNhleSignal = asset.prospectPtsPace != null && asset.prospectPtsPace > 0;
+  const developmentTimeDiscount = 1 - yearsSinceDraft * 0.06;
+  const certainty = hasNhleSignal
+    ? clamp(0.90 + (asset.prospectPtsPace ?? 0) / 140, 0.90, 1.08)
+    : clamp(developmentTimeDiscount, 0.68, 0.95);
   // NHLe modulation: 70 translated points ≈ elite junior production
   const nhle = asset.prospectPtsPace != null
     ? clamp(0.85 + 0.30 * (asset.prospectPtsPace / 70), 0.85, 1.15)
@@ -768,12 +822,18 @@ export function applyTradeRequestDiscount(result: XNAVResult, asset: AssetInput)
 // ── Entry point ───────────────────────────────────────────────────────────────
 export function calcNAV(asset: AssetInput): XNAVResult {
   if (asset.position === "Pick") return calcPickNAV(asset);
-  // Drafted prospect without an NHL sample — pedigree valuation
-  // (14-game threshold matches the rookie small-sample logic elsewhere)
-  if (((asset.draftOverall != null && asset.age <= 22) || (asset.prospectPtsPace != null && asset.prospectPtsPace > 0)) && (asset.games ?? 0) < 14 && !asset.hasLiveStats) {
+  const games = asset.games ?? 0;
+  const hasProspectValuation =
+    (asset.draftOverall != null && asset.age <= 22) ||
+    (asset.prospectPtsPace != null && asset.prospectPtsPace > 0);
+  if (asset.position !== "G" && hasProspectValuation && !asset.hasLiveStats && games < 14) {
     return applyTradeRequestDiscount(calcProspectNAV(asset), asset);
   }
   if (asset.position === "G")    return applyTradeRequestDiscount(calcGoalieNAV(asset), asset);
+  if (hasProspectValuation && games >= 14 && games < 60) {
+    const transitionWeight = clamp((games - 14) / 46, 0, 1);
+    return applyTradeRequestDiscount(blendNavResults(calcProspectNAV(asset), calcSkaterNAV(asset), transitionWeight), asset);
+  }
   return applyTradeRequestDiscount(calcSkaterNAV(asset), asset);
 }
 

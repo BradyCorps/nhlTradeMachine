@@ -1,5 +1,41 @@
 # Development Notes
 
+## 2026-06-18 XNAV Young Player / Goalie Audit
+
+### Completed Today
+
+- Completed the `XNAV / YOUNG PLAYERS / GOALIE CALCULATION AUDIT` in `AUDIT.md`.
+- Reworked prospect NAV so unsupported drafted prospects are discounted for burned development time instead of receiving a blanket certainty premium.
+- Added a 14-60 NHL game transition band that blends prospect pedigree into skater NAV, removing the hard 14-game valuation cliff.
+- Made young-skater development risk track-record-aware by relieving the age-bucket discount when games played, role, or production supports it.
+- Gated positive youth age value behind projection signals from production, role, pedigree, and sample size.
+- Dampened small-sample OPS/DPS pace extrapolation so hot starts do not fully annualize through the point-share channel.
+- Updated goalie NAV so young, controlled, high-rate 1B profiles can exceed the old tandem cap while veteran tandems remain capped.
+- Rate-gated the starter market floor to reduce bad-volume starter inflation.
+- Softened post-30 goalie aging and added a goalie `volatility` score.
+- Surfaced high goalie volatility in `/api/evaluate` GM logic as an `ASSET_SHAPE_MISMATCH` warning.
+- Added focused coverage for:
+  - unsupported prospect discounting
+  - 14-60 prospect/skater blending
+  - track-record-aware development discount relief
+  - signal-gated youth upside
+  - small-sample point-share damping
+  - ascending 1B goalie caps
+  - veteran tandem caps
+  - route-level goalie volatility warnings
+
+### Verification
+
+- `npm run test -- __tests__/xnav.test.ts`
+- Result: `63` tests passing.
+- `npm run test -- __tests__/evaluate-route.test.ts`
+- Result: `4` tests passing.
+- `npm run test`
+- Result: `211` tests passing.
+- `npx tsc --noEmit`
+- Result: no TypeScript errors.
+- Dev server was not started in Codespace, per project instructions.
+
 ## 2026-06-18 Product Split Phase 5
 
 ### Completed Today
@@ -36,6 +72,11 @@
 - Tightened direct GM Audit verdicts for extreme NAV surplus.
 - Added a lopsided-surplus `VALUE_VETO` when one side is conceding more compressed NAV than a real GM would normally tolerate.
 - This prevents trades like a 90 NAV package for a 189 NAV return from being labeled as a clean `WIN`; the partner GM now rejects that structure unless the value gap stays inside a realistic concession band.
+- Added real `/api/evaluate` integration coverage in `__tests__/evaluate-route.test.ts`.
+- The route test now POSTs behavioral payloads directly to the handler and verifies:
+  - cap-ceiling breach returns `BLOCKED`
+  - untouchable partner asset returns a hard partner veto
+  - balanced low-risk swap returns `FAIR`
 
 ### Phase Notes
 
@@ -48,7 +89,7 @@
 ### Verification
 
 - `npm run test`
-- Result: `200` tests passing.
+- Result: `204` tests passing.
 - `npx tsc --noEmit`
 - Result: no TypeScript errors.
 - Dev server was not started in Codespace, per project instructions.

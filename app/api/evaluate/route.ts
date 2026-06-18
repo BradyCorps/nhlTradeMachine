@@ -394,6 +394,20 @@ const runGmLogic = (
   const outPicks   = outgoing.filter((a) => a.position === "Pick");
   const inPicks    = incoming.filter((a) => a.position === "Pick");
 
+  for (const goalie of [...outPlayers, ...inPlayers].filter((a) => a.position === "G")) {
+    const volatility = getAssetNAV(goalie, capCeiling).volatility ?? 0;
+    if (volatility >= 40) {
+      flags.push({
+        severity: "WARN",
+        category: "ASSET_SHAPE_MISMATCH",
+        headline: `${goalie.name.split(" ").pop()} carries goalie-value variance`,
+        explanation: `${goalie.name}'s goalie NAV is a wider band than a skater point estimate because workload, age, and single-season save results are less stable. Treat the ${Math.round(volatility)}/100 volatility score as a risk adjustment in package construction.`,
+        affectedAsset: goalie.name,
+      });
+      break;
+    }
+  }
+
   if (incoming.length > 0 && outgoing.length === 0 && cNavIn > 0) {
     flags.push({
       severity: "HARD", category: "VALUE_VETO",
