@@ -20,6 +20,11 @@ import type {
 import {
   fetchNavMap, fetchTradeVerdict, clearNavCache, getCachedNav,
 } from "@/app/lib/evaluate-client";
+import {
+  buildTradeQueryString,
+  parseTradeQueryState,
+  resolveTradeShareAssets,
+} from "@/app/lib/trade-share";
 import { scenarioSeed } from "@/app/lib/sim-engine";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import TradeBlockPanel from "@/app/components/TradeBlockPanel";
@@ -93,41 +98,26 @@ export default function TradeMachine() {
   // Sync state → URL on every trade change
   useEffect(() => {
     if (!teams[0] && !teams[1] && !blocks[0].length && !blocks[1].length) return;
-    const p = new URLSearchParams();
-    if (teams[0]) p.set('home', teams[0].id);
-    if (teams[1]) p.set('partner', teams[1].id);
-    if (blocks[0].length) p.set('out', blocks[0].map(a =>
-      (a.retainedPct ?? 0) > 0 ? `${a.id}:${Math.round(a.retainedPct! * 100)}` : a.id
-    ).join(','));
-    if (blocks[1].length) p.set('in', blocks[1].map(a => a.id).join(','));
-    const newUrl = `${window.location.pathname}?${p.toString()}`;
+    const query = buildTradeQueryString({
+      homeTeamId: teams[0]?.id ?? null,
+      partnerTeamId: teams[1]?.id ?? null,
+      outgoing: blocks[0].map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0 })),
+      incoming: blocks[1].map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0 })),
+    });
+    const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
     window.history.replaceState({}, '', newUrl);
   }, [teams, blocks]);
 
   // Parse URL → state on cold load (after db is ready)
   useEffect(() => {
     if (!db || db.players.length === 0) return;
-    const p = new URLSearchParams(window.location.search);
-    const homeId    = p.get('home');
-    const partnerId = p.get('partner');
-    const outStr    = p.get('out');
-    const inStr     = p.get('in');
-    if (!homeId && !partnerId && !outStr && !inStr) return;
+    const parsed = parseTradeQueryState(window.location.search);
+    if (!parsed.homeTeamId && !parsed.partnerTeamId && !parsed.outgoing.length && !parsed.incoming.length) return;
 
-    const parseBlock = (str: string | null): Asset[] => {
-      if (!str) return [];
-      return str.split(',').flatMap(token => {
-        const [id, retStr] = token.split(':');
-        const asset = db.players.find(pl => pl.id === id);
-        if (!asset) return [];
-        return [{ ...asset, retainedPct: retStr ? parseInt(retStr) / 100 : 0 }];
-      });
-    };
-
-    const homeTeam    = homeId    ? db.teams.find(t => t.id === homeId)    ?? null : null;
-    const partnerTeam = partnerId ? db.teams.find(t => t.id === partnerId) ?? null : null;
-    const outgoing    = parseBlock(outStr);
-    const incoming    = parseBlock(inStr);
+    const homeTeam    = parsed.homeTeamId    ? db.teams.find(t => t.id === parsed.homeTeamId)    ?? null : null;
+    const partnerTeam = parsed.partnerTeamId ? db.teams.find(t => t.id === parsed.partnerTeamId) ?? null : null;
+    const outgoing    = resolveTradeShareAssets(parsed.outgoing, db.players);
+    const incoming    = resolveTradeShareAssets(parsed.incoming, db.players);
 
     if (homeTeam || partnerTeam || outgoing.length || incoming.length) {
       setTeams([homeTeam, partnerTeam]);
@@ -219,13 +209,16 @@ export default function TradeMachine() {
         setNavMap(map);
         setNavLoading(false);
         if (!initialNavReadyRef.current) {
-          const expected = db.players.length;
-          const actual = Object.keys(map).length;
+          const expectedIds = new Set(db.players.map(asset => asset.id));
+          const expected = expectedIds.size;
+          const actual = Object.keys(map).filter(id => expectedIds.has(id)).length;
           if (actual >= expected) {
             initialNavReadyRef.current = true;
             setInitialNavReady(true);
           } else {
-            setError(`Player valuation load incomplete: ${actual}/${expected} values ready`);
+            const missingIds = [...expectedIds].filter(id => !map[id]).slice(0, 5);
+            const missingSuffix = missingIds.length ? ` Missing: ${missingIds.join(", ")}` : "";
+            setError(`Player valuation load incomplete: ${actual}/${expected} unique values ready.${missingSuffix}`);
           }
         }
       })

@@ -30,17 +30,16 @@ export default function WelcomePage() {
       {/* ── Lede ─────────────────────────────────────────────── */}
       <div className="max-w-2xl mx-auto px-5 py-8 text-center">
         <p className="text-[14px] leading-[1.85]" style={{ color: "var(--ledger-ink-body)" }}>
-          The Hockey Ledger evaluates NHL trades the way a front office does —
-          surplus value, cap context, contention window, and player fit.
-          Every number is derived from live NHL data, MoneyPuck analytics,
-          and the X-NAV engine built for this.
+          The Hockey Ledger separates fast trade debate from full front-office
+          control. Build one transaction in Trade Machine, or take the chair in
+          Armchair GM and manage the roster consequences that follow.
         </p>
       </div>
 
       {/* ── Route cards ──────────────────────────────────────── */}
       <div className="max-w-5xl mx-auto px-4 sm:px-5 pb-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
 
-        <Link href="/trade" className="no-underline group">
+        <Link href="/trade-machine" className="no-underline group">
           <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 group-hover:opacity-80"
             style={{ background: "var(--ledger-card)", border: "2px solid var(--ledger-rule)" }}>
             <div>
@@ -50,18 +49,16 @@ export default function WelcomePage() {
                 Trade Machine
               </h2>
               <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
-                Build any trade, add retention, evaluate it against the X-NAV engine.
-                Run the GM Audit to see what a front office would flag — cap violations,
-                clause issues, surplus value, and window fit.
+                Build a single trade, add retention, and test the package
+                against X-NAV and the GM Audit. This is the quick social trade
+                surface that will own share codes and replay links.
               </p>
             </div>
             <div className="space-y-2 mt-auto">
               {[
-                ["X-NAV",           "Surplus value over cap cost, per player"],
-                ["STRAND™ DNA",     "10-trait helix — offensive & defensive profile"],
-                ["GM Audit",        "Hard flags: NMC, cap floor, negative retention"],
-                ["Who Wants This?", "Ranks all 32 teams as partners for your package"],
-                ["Sim Engine",      "Project the season after any trade combination"],
+                ["One Trade",       "Fast package construction"],
+                ["GM Audit",        "Cap, clause, value, and fit checks"],
+                ["Share Code",      "Locked verdict replay in the next phase"],
               ].map(([label, desc]) => (
                 <div key={label} className="feature-line text-2xs font-mono"
                   style={{ color: "var(--ledger-ink-body)" }}>
@@ -77,12 +74,47 @@ export default function WelcomePage() {
           </div>
         </Link>
 
+        <Link href="/armchair-gm" className="no-underline group">
+          <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 group-hover:opacity-80"
+            style={{ background: "var(--ledger-card)", border: "2px solid var(--ledger-rule)" }}>
+            <div>
+              <div className="newspaper-kicker font-black text-2xs uppercase mb-3 font-mono"
+                style={{ color: "var(--ledger-green)" }}>Feature Two</div>
+              <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
+                Armchair GM
+              </h2>
+              <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
+                Take over a franchise, make multiple moves, inspect roster DNA,
+                manage cap consequences, and see whether you can run the room
+                better than the actual front office.
+              </p>
+            </div>
+            <div className="space-y-2 mt-auto">
+              {[
+                ["Roster Control",  "Multi-move franchise session"],
+                ["Who Wants This?", "Ranks all 32 teams as partners"],
+                ["Sim Engine",      "Projects the season after your moves"],
+              ].map(([label, desc]) => (
+                <div key={label} className="feature-line text-2xs font-mono"
+                  style={{ color: "var(--ledger-ink-body)" }}>
+                  <span className="font-black shrink-0" style={{ color: "var(--ledger-ink-body)" }}>{label}</span>
+                  <span>— {desc}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 py-3 px-2 text-center font-black text-2xs uppercase tracking-[0.18em] sm:tracking-[0.3em] font-mono"
+              style={{ background: "var(--ledger-green)", color: "white" }}>
+              Enter Armchair GM
+            </div>
+          </div>
+        </Link>
+
         <Link href="/players" className="no-underline group">
           <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 group-hover:opacity-80"
             style={{ background: "var(--ledger-card)", border: "2px solid var(--ledger-rule)" }}>
             <div>
               <div className="newspaper-kicker font-black text-2xs uppercase mb-3 font-mono"
-                style={{ color: "var(--ledger-navy)" }}>Feature Two</div>
+                style={{ color: "var(--ledger-navy)" }}>Feature Three</div>
               <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
                 Player Analytics
               </h2>
@@ -116,17 +148,17 @@ export default function WelcomePage() {
 
         {[
           {
-            feature: "Feature Three",
+            feature: "Feature Four",
             title: "Fantasy Hockey Expansion",
             body: "Built for fantasy managers who want to draft smarter, execute cleaner trades, and work the waiver wire with front-office data.",
           },
           {
-            feature: "Feature Four",
+            feature: "Feature Five",
             title: "Micro-Context Prop Engine",
             body: "Built for sharper daily reads on player-prop markets through matchup, role, pace, and usage context.",
           },
           {
-            feature: "Feature Five",
+            feature: "Feature Six",
             title: "Three-Year Simulation Model",
             body: "See how trades compound over three seasons and pressure-test long-term franchise decisions.",
           },

@@ -1,14 +1,19 @@
 "use client";
 // ── Header — The Hockey Ledger masthead ─────────────────────
-// Shared across Trade Machine and Player Analytics pages.
-// activeTab: "trade" | "players" — highlights the current nav item.
+// Shared across product mode and analytics pages.
+
+import { usePathname } from "next/navigation";
 
 interface HeaderProps {
-  activeTab?: "trade" | "players";
+  activeTab?: "trade" | "armchair-gm" | "players";
   showLiveFeed?: boolean;
 }
 
 export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) {
+  const pathname = usePathname();
+  const resolvedActiveTab =
+    pathname?.startsWith("/armchair-gm") ? "armchair-gm" : activeTab;
+
   return (
     <header className="flex flex-col pb-5 border-b border-ledger-rule">
       <div className="w-full">
@@ -40,7 +45,7 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
               </h1>
             </a>
             <p className="text-[11px] uppercase tracking-[0.3em] mt-1.5 hidden sm:block font-mono text-ledger-ink-faint">
-              X-NAV Analytics &nbsp;·&nbsp; xG Suppression &nbsp;·&nbsp; GM Logic Engine &nbsp;·&nbsp; Live Statistics
+              X-NAV Analytics &nbsp;·&nbsp; Trade Machine &nbsp;·&nbsp; Armchair GM &nbsp;·&nbsp; Live Statistics
             </p>
 
             {/* Nav tabs */}
@@ -49,24 +54,36 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
                 href="/players"
                 className={[
                   "text-[11px] sm:text-[12px] font-black uppercase tracking-[0.14em] sm:tracking-[0.2em] font-mono no-underline transition-colors",
-                  activeTab === "players"
+                  resolvedActiveTab === "players"
                     ? "text-ledger-ink"
                     : "text-ledger-ink-faint hover:text-ledger-ink",
                 ].join(" ")}
               >
-                {activeTab === "players" ? "◆" : "◇"} Player Analytics
+                {resolvedActiveTab === "players" ? "◆" : "◇"} Player Analytics
               </a>
               <span className="nav-divider text-ledger-rule-light">|</span>
               <a
-                href="/trade"
+                href="/trade-machine"
                 className={[
                   "text-[11px] sm:text-[12px] font-black uppercase tracking-[0.14em] sm:tracking-[0.2em] font-mono no-underline transition-colors",
-                  activeTab === "trade"
+                  resolvedActiveTab === "trade"
                     ? "text-ledger-ink"
                     : "text-ledger-ink-faint hover:text-ledger-ink",
                 ].join(" ")}
               >
-                {activeTab === "trade" ? "◆" : "◇"} Trade Machine
+                {resolvedActiveTab === "trade" ? "◆" : "◇"} Trade Machine
+              </a>
+              <span className="nav-divider text-ledger-rule-light">|</span>
+              <a
+                href="/armchair-gm"
+                className={[
+                  "text-[11px] sm:text-[12px] font-black uppercase tracking-[0.14em] sm:tracking-[0.2em] font-mono no-underline transition-colors",
+                  resolvedActiveTab === "armchair-gm"
+                    ? "text-ledger-ink"
+                    : "text-ledger-ink-faint hover:text-ledger-ink",
+                ].join(" ")}
+              >
+                {resolvedActiveTab === "armchair-gm" ? "◆" : "◇"} Armchair GM
               </a>
             </nav>
           </div>

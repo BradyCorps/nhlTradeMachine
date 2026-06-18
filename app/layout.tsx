@@ -23,19 +23,19 @@ const courier = Courier_Prime({
 // so we don't lose the masthead fraktur style
 
 export const metadata: Metadata = {
-  title: 'The Hockey Ledger — NHL Trade Machine',
-  description: 'X-NAV Analytics · xG Suppression · GM Logic Engine. Evaluate NHL trades with advanced analytics.',
-  keywords: ['NHL', 'trade machine', 'hockey analytics', 'X-NAV', 'xG', 'cap hit'],
+  title: 'The Hockey Ledger — Trade Machine & Armchair GM',
+  description: 'X-NAV Analytics · Trade Machine · Armchair GM. Evaluate NHL trades and front-office decisions with advanced analytics.',
+  keywords: ['NHL', 'trade machine', 'armchair GM', 'hockey analytics', 'X-NAV', 'xG', 'cap hit'],
   openGraph: {
-    title: 'The Hockey Ledger — NHL Trade Machine',
-    description: 'Evaluate NHL trades like a front office. X-NAV · STRAND™ · GM Logic Engine.',
+    title: 'The Hockey Ledger — Trade Machine & Armchair GM',
+    description: 'Build NHL trades, test front-office logic, and run Armchair GM scenarios. X-NAV · STRAND™ · GM Logic Engine.',
     type: 'website',
     siteName: 'The Hockey Ledger',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'The Hockey Ledger — NHL Trade Machine',
-    description: 'Evaluate NHL trades like a front office. X-NAV · STRAND™ · GM Logic Engine.',
+    title: 'The Hockey Ledger — Trade Machine & Armchair GM',
+    description: 'Build NHL trades, test front-office logic, and run Armchair GM scenarios. X-NAV · STRAND™ · GM Logic Engine.',
   },
 };
 

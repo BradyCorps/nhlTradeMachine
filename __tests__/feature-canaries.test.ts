@@ -434,6 +434,10 @@ describe("Canary — trade UX loading and mobile focus", () => {
   const tradeLoading = read("app/trade/loading.tsx");
   const assetDropdown = read("app/components/AssetDropdown.tsx");
   const lineupEditor = read("app/components/LineupEditor.tsx");
+  const header = read("app/components/Header.tsx");
+  const quickTradeMachine = read("app/components/QuickTradeMachine.tsx");
+  const tradeMachineRoute = read("app/trade-machine/page.tsx");
+  const sharedTradeRoute = read("app/t/[code]/page.tsx");
 
   it("selects the franchise from one team-grid click instead of requiring a second confirm click", () => {
     expect(tradePage).toContain("selectingTeamId");
@@ -453,6 +457,8 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(tradePage).toContain("initialNavReady");
     expect(tradePage).toContain("initialNavReadyRef");
     expect(tradePage).toContain("Player valuation load incomplete");
+    expect(tradePage).toContain("const expectedIds = new Set(db.players.map(asset => asset.id))");
+    expect(tradePage).toContain("unique values ready");
     expect(tradePage).toContain("if (booting || !dataReady || !initialNavReady)");
     expect(tradePage).toContain("Confirming Full Player Load");
     expect(tradePage).toContain("Trade machine unlocks after every roster value is ready.");
@@ -479,6 +485,15 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(lineupEditor).toContain("p?.position ?? \"--\"");
     expect(lineupEditor).toContain("minHeight: 50");
     expect(lineupEditor).not.toContain("Click a player, then click another slot");
+  });
+
+  it("exposes the focused Trade Machine and shared trade routes", () => {
+    expect(header).toContain('href="/trade-machine"');
+    expect(tradeMachineRoute).toContain("QuickTradeMachine");
+    expect(sharedTradeRoute).toContain("SharedTradeView");
+    expect(quickTradeMachine).toContain("Run a single trade without the full Armchair GM workspace");
+    expect(quickTradeMachine).toContain("Generate Share Link");
+    expect(quickTradeMachine).toContain("/t/");
   });
 });
 

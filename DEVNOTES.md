@@ -1,5 +1,112 @@
 # Development Notes
 
+## 2026-06-17 Startup Valuation Gate Fix
+
+### Completed Today
+
+- Fixed the initial player valuation readiness gate so it compares against unique asset IDs instead of raw asset row count.
+- This prevents duplicate asset IDs in the league payload from producing false `Player valuation load incomplete` errors when the NAV map is actually complete.
+- Improved the incomplete-load error message to report unique-value counts and include a short missing-ID sample when values are genuinely absent.
+- Added a canary to keep the unique-ID readiness behavior in place.
+
+### Verification
+
+- `npm run test`
+- Result: `196` tests passing.
+- Dev server was not started in Codespace, per project instructions.
+
+## 2026-06-17 Product Split Phase 1
+
+### Completed Today
+
+- Added the initial product shell for the Trade Machine / Armchair GM split.
+- Added `/armchair-gm` as the branded route for the current deeper roster-management experience.
+- Reused the existing trade workspace for `/armchair-gm` so the large UI is not forked during the split.
+- Expanded the shared header navigation to include:
+  - Player Analytics
+  - Trade Machine
+  - Armchair GM
+- Updated the front page to position:
+  - Trade Machine as the quick, one-off, share-first trade surface.
+  - Armchair GM as the deeper franchise-control mode.
+- Updated global metadata so The Hockey Ledger is no longer described only as an NHL Trade Machine.
+- Captured the answered CHANGES.md open questions as direction for later phases.
+
+### Phase Notes
+
+- `/trade` still serves the current full trade workspace during Phase 1.
+- `/trade` should become the quick Trade Machine route in a later phase.
+- `/armchair-gm` now gives the deeper experience its long-term branded route before the current `/trade` behavior is changed.
+
+### Verification
+
+- `npm run test`
+- Result: `192` tests passing.
+- Dev server was not started in Codespace, per project instructions.
+
+## 2026-06-17 Product Split Phase 2
+
+### Completed Today
+
+- Added `app/lib/trade-share.ts` as the versioned share-state contract for trade payloads.
+- Defined `trade-share.v1` with:
+  - team IDs
+  - outgoing and incoming asset references
+  - retained salary selections
+  - optional locked verdict snapshot
+  - optional value timeline points for future three-year tracking
+- Added base64url encode/decode helpers for compact share-code style payloads.
+- Added query-string serialize/parse helpers for the current `/trade` state.
+- Updated the current trade workspace URL sync and cold-load reconstruction to use the new share helpers.
+- Added asset reconstruction support from share references so saved selections can rehydrate from the live asset list.
+- Added tests covering payload creation, locked verdict preservation, base64url round trips, query-state parsing, and asset reconstruction.
+- Corrected the homepage feature grid to max out at three columns instead of four.
+
+### Phase Notes
+
+- Phase 2 creates the share schema and local encode/decode foundation; it does not yet add persisted public share records or a read-only replay route.
+- The schema assumes locked verdicts at creation time, matching the product direction in `CHANGES.md`.
+- The optional value timeline field is ready for later value-over-time display without forcing that UI into this phase.
+
+### Verification
+
+- `npm run test`
+- Result: `196` tests passing.
+- Dev server was not started in Codespace, per project instructions.
+
+## 2026-06-17 Product Split Phase 3
+
+### Completed Today
+
+- Added `/trade-machine` as the focused one-off Trade Machine route.
+- Added a lean Trade Machine UI for:
+  - choosing the two teams
+  - adding outgoing and incoming assets
+  - selecting retained salary
+  - running the GM Audit
+  - generating a locked share link
+- Added `/t/[code]` as the read-only shared trade reconstruction route.
+- Shared trades decode the Phase 2 payload, rehydrate assets from the live asset list, and display the locked verdict snapshot.
+- Updated public navigation and the homepage Trade Machine card to point to `/trade-machine`.
+- Kept `/trade` untouched as a compatibility path while `/armchair-gm` continues to expose the deeper workspace.
+- Added a canary for the focused route, shared route, and navigation link.
+
+### Phase Notes
+
+- This is the first usable focused Trade Machine version.
+- Share links currently use encoded payloads in the URL path. A persisted compact-code backend can replace that later without changing the user-facing `/t/:shareCode` route.
+- Social preview metadata is not yet personalized per shared trade because `/t/[code]` is currently a client-side reconstruction route.
+
+### Verification
+
+- `npm run lint`
+- Result: no warnings or errors.
+- `npx tsc --noEmit`
+- Result: no TypeScript errors.
+- `npm run test`
+- Result: `197` tests passing.
+- Dev server was not started in Codespace, per project instructions.
+
 ## 2026-06-14 Wrap-Up
 
 ### Completed Tonight
