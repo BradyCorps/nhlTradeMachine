@@ -1,4 +1,15 @@
 import type { Asset, Team } from "@/app/lib/trade-types";
+import {
+  areSameDivision,
+  hasVeteranTerm,
+  isDevelopmentRiskAsset,
+  isFutureCoreAsset,
+  isPeakWindowAsset,
+  isPremiumLotteryPick,
+  isShoppedAsset,
+  normalizePosition,
+} from "@/app/lib/trade-classification";
+import { compressPackage } from "@/app/lib/xnav-engine";
 
 export interface TradeProposal {
   partner:        Team;
@@ -30,42 +41,16 @@ const isWinNowPhase = (phase: string): boolean =>
 const lastName = (asset: Asset): string =>
   asset.name.split(" ").pop() ?? asset.name;
 
-const isFutureCoreAsset = (asset: Asset): boolean => {
-  const p = asset.developmentProfile;
-  if (!p || asset.position === "Pick" || asset.position === "G" || asset.age > 25) return false;
-  return p.dynastyScore >= 62
-    || p.boomBustSignal === "BOOM_LEAN"
-    || p.developmentPhase === "EMERGING"
-    || (p.developmentPhase === "BREAKOUT_CANDIDATE" && p.breakoutProbability >= 55);
-};
-
-const isDevelopmentRiskAsset = (asset: Asset): boolean => {
-  const p = asset.developmentProfile;
-  if (!p || asset.position === "Pick" || asset.position === "G" || asset.age > 25) return false;
-  return p.boomBustSignal === "BUST_LEAN"
-    || (p.boomBustSignal === "HIGH_VARIANCE" && p.bustScore >= p.boomScore && p.projectionBand.confidence < 50);
-};
-
-const isPeakWindowAsset = (asset: Asset): boolean => {
-  const p = asset.developmentProfile;
-  if (!p || asset.position === "Pick" || asset.position === "G") return false;
-  return p.developmentPhase === "PEAK_WINDOW" && p.regressionRisk < 45;
-};
-
 const hasPremiumSpend = (assets: Asset[], navMap: Record<string, number>): boolean =>
   assets.some(a => a.position === "Pick" && a.round === 1)
   || assets.some(a => a.position !== "Pick" && getNav(a, navMap) > 60);
 
-const hasVeteranTerm = (assets: Asset[]): boolean =>
-  assets.some(a => a.position !== "Pick" && a.age >= 30 && a.yearsRemaining >= 2);
-
-const isShoppedAsset = (asset: Asset): boolean =>
-  asset.tradeBlockStatus === "available" || asset.tradeBlockStatus === "requested";
-
-const isPremiumLotteryPick = (asset: Asset, navMap: Record<string, number>): boolean =>
-  asset.position === "Pick"
-  && (asset.round ?? 99) === 1
-  && ((asset.teamStanding ?? 16) >= 30 || getNav(asset, navMap) >= 300);
+const compressedNav = (assets: Asset[], navMap: Record<string, number>): number =>
+  compressPackage(assets.map(a => ({
+    nav: getNav(a, navMap),
+    isPick: a.position === "Pick",
+    age: a.age,
+  })));
 
 // Score how willing a team is to absorb a negative contract
 export const dumpFitScore = (
@@ -91,9 +76,9 @@ export const dumpFitScore = (
 
   // Check if they actually need the position
   for (const p of negPlayers) {
-    const pos = ["L","R"].includes(p.position) ? "W" : p.position;
+    const pos = normalizePosition(p.position);
     const posCount = teamRoster.filter(r => {
-      const rp = ["L","R"].includes(r.position) ? "W" : r.position;
+      const rp = normalizePosition(r.position);
       return rp === pos;
     }).length;
     if (posCount < 3) score += 20; // real positional need
@@ -130,7 +115,7 @@ export const blockFitsTeam = (
       else if (phase === "Retooling") score += 8;
       continue;
     }
-    const pos = ["L","R"].includes(player.position) ? "W" : player.position;
+    const pos = normalizePosition(player.position);
     if (player.age <= 28 && (rebuilding || phase === "Retooling")) score += 15;
     if (player.age >= 27 && player.age <= 33 && winNow) score += 15;
     if (player.age > 33 && rebuilding) score -= 15;
@@ -435,16 +420,7 @@ export const preScreenProposal = (
 
   if (homeSends.some(a => a.hasNMC)) return false;
 
-  const DIVISIONS: Record<string, string[]> = {
-    Atlantic:     ["BOS","BUF","DET","FLA","MTL","OTT","TBL","TOR"],
-    Metropolitan: ["CAR","CBJ","NJD","NYI","NYR","PHI","PIT","WSH"],
-    Central:      ["UTA","CHI","COL","DAL","MIN","NSH","STL","WPG"],
-    Pacific:      ["ANA","CGY","EDM","LAK","SEA","SJS","VAN","VGK"],
-  };
-  const inSameDivision = Object.values(DIVISIONS).some(div =>
-    div.includes(homeTeam.id) && div.includes(partnerTeam.id)
-  );
-  if (inSameDivision &&
+  if (areSameDivision(homeTeam, partnerTeam) &&
     (partnerTeam.phase === "Contender" || partnerTeam.phase === "Bubble") &&
     (homeTeam.phase === "Contender" || homeTeam.phase === "Bubble")) {
     return false;
@@ -461,10 +437,10 @@ export const preScreenProposal = (
     const homeSendingNoPicks = !homeSends.some(a => a.position === "Pick");
     if (partnerSellingFutureCore && homeSendingNoPicks && hasVeteranTerm(homeSends)) return false;
 
-    const partnerSellingPremiumPick = partnerSends.some(a => isPremiumLotteryPick(a, navMap));
+    const partnerSellingPremiumPick = partnerSends.some(a => isPremiumLotteryPick(a, asset => getNav(asset, navMap)));
     const homeReturnNav = homeSends.reduce((s, a) => s + (navMap[a.id] ?? 0), 0);
     const partnerPickNav = partnerSends
-      .filter(a => isPremiumLotteryPick(a, navMap))
+      .filter(a => isPremiumLotteryPick(a, asset => getNav(asset, navMap)))
       .reduce((s, a) => s + (navMap[a.id] ?? 0), 0);
     if (partnerSellingPremiumPick && homeReturnNav < partnerPickNav * 1.35) return false;
   }
@@ -483,29 +459,23 @@ export const preScreenProposal = (
 
   const partnerPlayers = partnerSends.filter(a => a.position !== "Pick");
   if (partnerTeam.needs && partnerPlayers.length > 0) {
-    const givingAwayNeed = partnerPlayers.every(a => {
-      const pos = ["L","R"].includes(a.position) ? "W" : a.position;
-      return partnerTeam.needs!.some(n => n.pos === pos || n.pos === "Any");
-    });
-    const gettingBackPos = homeSends
+    const gettingBackPos = new Set(homeSends
       .filter(a => a.position !== "Pick")
-      .map(a => ["L","R"].includes(a.position) ? "W" : a.position);
-    if (givingAwayNeed && partnerTeam.needs.some(n =>
-      partnerPlayers.some(a => {
-        const pos = ["L","R"].includes(a.position) ? "W" : a.position;
-        return n.pos === pos;
-      }) && !gettingBackPos.includes(partnerTeam.needs!.find(nn =>
-        partnerPlayers.some(a => ["L","R"].includes(a.position) ? "W" === nn.pos : a.position === nn.pos)
-      )?.pos ?? "")
-    )) return false;
+      .map(a => normalizePosition(a.position)));
+    const givingAwayUnreplacedNeed = partnerPlayers.some(a => {
+      const pos = normalizePosition(a.position);
+      return partnerTeam.needs!.some(n => n.pos === pos)
+        && !gettingBackPos.has(pos);
+    });
+    if (givingAwayUnreplacedNeed) return false;
   }
 
-  const homeNavOut    = homeSends.reduce((s,a) => s+(navMap[a.id]??0), 0);
-  const partnerNavOut = partnerSends.reduce((s,a) => s+(navMap[a.id]??0), 0);
-  if (Math.abs(homeNavOut - partnerNavOut) > 120) return false;
-  const partnerAskedToLose = partnerNavOut - homeNavOut;
+  const homeCompressedOut = compressedNav(homeSends, navMap);
+  const partnerCompressedOut = compressedNav(partnerSends, navMap);
+  if (Math.abs(homeCompressedOut - partnerCompressedOut) > 120) return false;
+  const partnerAskedToLose = partnerCompressedOut - homeCompressedOut;
   const allPartnerAssetsShopped = partnerSends.length > 0 && partnerSends.every(isShoppedAsset);
-  const maxPartnerConcession = allPartnerAssetsShopped ? 40 : isRebuildPhase(partnerPhase) ? 18 : 28;
+  const maxPartnerConcession = allPartnerAssetsShopped ? 70 : 45;
   if (partnerAskedToLose > maxPartnerConcession) return false;
 
   const homePhase = homeTeam.phase ?? "";

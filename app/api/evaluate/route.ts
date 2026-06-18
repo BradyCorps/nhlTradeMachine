@@ -3,6 +3,16 @@ import { PROSPECT_TIERS, INJURY_RISK, getHistoricalFloor } from "@/app/lib/playe
 import type { Asset, EvaluateRequest, EvaluateResponse, FArchetype } from "@/app/lib/trade-types";
 import { SEASON, LEAGUE, FRANCHISE } from "@/app/lib/season-config";
 import { calcNAV, compressPackage as coreCompress, AssetInput, XNAVResult } from "@/app/lib/xnav-engine";
+import {
+  DIVISION_BY_TEAM,
+  hasVeteranTerm,
+  isDevelopmentRiskAsset,
+  isFutureCoreAsset,
+  isPeakWindowAsset,
+  isPremiumLotteryPick,
+  isShoppedAsset,
+  normalizePosition,
+} from "@/app/lib/trade-classification";
 import { z } from "zod";
 import { db } from "@/app/db/client";
 import { siteSettings } from "@/app/db/schema";
@@ -210,17 +220,6 @@ interface GmFlag {
   perspective?: "home" | "partner"; 
 }
 
-const DIVISIONS: Record<string, string> = {
-  BOS: "Atlantic", BUF: "Atlantic", DET: "Atlantic", FLA: "Atlantic",
-  MTL: "Atlantic", OTT: "Atlantic", TBL: "Atlantic", TOR: "Atlantic",
-  CAR: "Metropolitan", CBJ: "Metropolitan", NJD: "Metropolitan", NYI: "Metropolitan",
-  NYR: "Metropolitan", PHI: "Metropolitan", PIT: "Metropolitan", WSH: "Metropolitan",
-  CHI: "Central", COL: "Central", DAL: "Central",
-  MIN: "Central", NSH: "Central", STL: "Central", UTA: "Central", WPG: "Central",
-  ANA: "Pacific", CGY: "Pacific", EDM: "Pacific", LAK: "Pacific",
-  SEA: "Pacific", SJS: "Pacific", VAN: "Pacific", VGK: "Pacific",
-};
-
 type TeamMode = "CONTENDER" | "BUBBLE" | "RETOOLING" | "REBUILDING" | "TANKING";
 
 const classifyTeam = (team: Team, roster: Asset[]): TeamMode => {
@@ -241,9 +240,11 @@ const classifyTeam = (team: Team, roster: Asset[]): TeamMode => {
 
 const positionalDepth = (assets: Asset[], position: string): number =>
   assets.filter((a) => {
-    if (position === "C") return a.position === "C" && (a.ptsPace > 25 || a.avgTOI > 13);
-    if (position === "D") return a.position === "D" && a.avgTOI > 18;
-    return (a.position === "W" || a.position === "L" || a.position === "R") && (a.ptsPace > 20 || a.avgTOI > 11);
+    const ptsPace = a.ptsPace ?? 0;
+    const avgTOI = a.avgTOI ?? 0;
+    if (position === "C") return a.position === "C" && (ptsPace > 25 || avgTOI > 13);
+    if (position === "D") return a.position === "D" && avgTOI > 18;
+    return (a.position === "W" || a.position === "L" || a.position === "R") && (ptsPace > 20 || avgTOI > 11);
   }).length;
 
 const rosterDepthAfterTrade = (fullRoster: Asset[], outgoing: Asset[], position: string): number => {
@@ -260,30 +261,8 @@ const teamNeedsPosition = (team: Team, position: string): boolean => {
 
 const defensiveDependencyScore = (roster: Asset[]): number => {
   const dmen = roster.filter((p) => p.position === "D");
-  const eliteD = dmen.filter((p) => p.avgTOI > 22 && p.ptsPace > 35);
+  const eliteD = dmen.filter((p) => (p.avgTOI ?? 0) > 22 && (p.ptsPace ?? 0) > 35);
   return eliteD.length <= 1 ? 0.9 : eliteD.length === 2 ? 0.6 : 0.3;
-};
-
-const isFutureCoreAsset = (asset: Asset): boolean => {
-  const p = asset.developmentProfile;
-  if (!p || asset.position === "Pick" || asset.position === "G" || asset.age > 25) return false;
-  return p.dynastyScore >= 62
-    || p.boomBustSignal === "BOOM_LEAN"
-    || p.developmentPhase === "EMERGING"
-    || (p.developmentPhase === "BREAKOUT_CANDIDATE" && p.breakoutProbability >= 55);
-};
-
-const isDevelopmentRiskAsset = (asset: Asset): boolean => {
-  const p = asset.developmentProfile;
-  if (!p || asset.position === "Pick" || asset.position === "G" || asset.age > 25) return false;
-  return p.boomBustSignal === "BUST_LEAN"
-    || (p.boomBustSignal === "HIGH_VARIANCE" && p.bustScore >= p.boomScore && p.projectionBand.confidence < 50);
-};
-
-const isPeakWindowAsset = (asset: Asset): boolean => {
-  const p = asset.developmentProfile;
-  if (!p || asset.position === "Pick" || asset.position === "G") return false;
-  return p.developmentPhase === "PEAK_WINDOW" && p.regressionRisk < 45;
 };
 
 const FRANCHISE_THRESHOLD = FRANCHISE.threshold;
@@ -486,7 +465,7 @@ const runGmLogic = (
     vetoesSide: 1,
   });
 
-  const newCapUsedHome = SEASON.capCeiling - projCapHome;
+  const newCapUsedHome = capCeiling - projCapHome;
   if (newCapUsedHome < SEASON.capFloor && capDeltaHome < -3) flags.push({
     severity: "HARD", category: "FLOOR_VIOLATION",
     headline: "Cap Floor Violation",
@@ -550,11 +529,6 @@ const runGmLogic = (
     explanation: `The NHL CBA prohibits retaining more than 50% of any player's cap hit.`,
   });
 
-  const isShoppedAsset = (a: Asset): boolean =>
-    a.tradeBlockStatus === "available" || a.tradeBlockStatus === "requested";
-  const isPremiumLotteryPick = (a: Asset): boolean =>
-    a.position === "Pick" && (a.round ?? 99) === 1
-    && ((a.teamStanding ?? 16) >= 30 || navOf(a) >= 300);
   const partnerElites = incoming.filter((a) => navOf(a) > 260 && !isShoppedAsset(a));
   const homeElites    = outgoing.filter((a) => navOf(a) > 200);
   if (partnerElites.length > 0 && homeElites.length === 0) {
@@ -567,8 +541,8 @@ const runGmLogic = (
     });
   }
 
-  const divHome    = DIVISIONS[teamHome.id];
-  const divPartner = DIVISIONS[teamPartner.id];
+  const divHome    = DIVISION_BY_TEAM[teamHome.id];
+  const divPartner = DIVISION_BY_TEAM[teamPartner.id];
   if (divHome && divPartner && divHome === divPartner) {
     const bothCompetitive = (modeHome !== "REBUILDING" && modeHome !== "TANKING") &&
                             (modePartner !== "REBUILDING" && modePartner !== "TANKING");
@@ -589,21 +563,19 @@ const runGmLogic = (
 
   const isStarUpgrade = (assets: Asset[]): boolean => {
     const playerUpgrade = assets.some(a =>
-      a.position !== "Pick" && (a.ptsPace > 65 || navOf(a) > 180 || (a.position === "G" && (a.gsax ?? 0) > 12))
+      a.position !== "Pick" && ((a.ptsPace ?? 0) > 65 || navOf(a) > 180 || (a.position === "G" && (a.gsax ?? 0) > 12))
     );
     const totalNav = assets.reduce((s, a) => s + navOf(a), 0);
     const hasValuablePick = assets.some(a => a.position === "Pick" && navOf(a) > 35);
     return playerUpgrade || (hasValuablePick && totalNav > 60);
   };
 
-  const normalisePos = (pos: string) => pos === "L" || pos === "R" ? "W" : pos;
-
   const qualityCount = (roster: Asset[], pos: string): number => {
-    const p = normalisePos(pos);
-    if (p === "C") return roster.filter(a => normalisePos(a.position) === "C" && (a.ptsPace > 25 || a.avgTOI > 13)).length;
-    if (p === "W") return roster.filter(a => normalisePos(a.position) === "W" && (a.ptsPace > 20 || a.avgTOI > 11)).length;
-    if (p === "D") return roster.filter(a => normalisePos(a.position) === "D" && a.avgTOI > 18).length;
-    if (p === "G") return roster.filter(a => normalisePos(a.position) === "G" && (a.gamesStarted ?? a.games) > 10).length;
+    const p = normalizePosition(pos);
+    if (p === "C") return roster.filter(a => normalizePosition(a.position) === "C" && ((a.ptsPace ?? 0) > 25 || (a.avgTOI ?? 0) > 13)).length;
+    if (p === "W") return roster.filter(a => normalizePosition(a.position) === "W" && ((a.ptsPace ?? 0) > 20 || (a.avgTOI ?? 0) > 11)).length;
+    if (p === "D") return roster.filter(a => normalizePosition(a.position) === "D" && (a.avgTOI ?? 0) > 18).length;
+    if (p === "G") return roster.filter(a => normalizePosition(a.position) === "G" && (a.gamesStarted ?? a.games ?? 0) > 10).length;
     return 0;
   };
 
@@ -613,7 +585,7 @@ const runGmLogic = (
   };
 
   const homeGivingUp = outPlayers;
-  const positionsHomeLosing = [...new Set(homeGivingUp.map(a => normalisePos(a.position)))];
+  const positionsHomeLosing = [...new Set(homeGivingUp.map(a => normalizePosition(a.position)))];
 
   for (const pos of positionsHomeLosing) {
     if (!POSITION_MINIMUMS[pos]) continue;
@@ -622,14 +594,14 @@ const runGmLogic = (
     const after  = qualityCountAfter(allHomeRoster, homeGivingUp, pos);
 
     if (after < min) {
-      const veteransLeaving = homeGivingUp.filter(a => normalisePos(a.position) === pos && a.age >= 28);
+      const veteransLeaving = homeGivingUp.filter(a => normalizePosition(a.position) === pos && a.age >= 28);
       if ((modeHome === "REBUILDING" || modeHome === "TANKING") && veteransLeaving.length > 0) continue;
 
-      const playersLeaving = homeGivingUp.filter(a => normalisePos(a.position) === pos).map(a => a.name).join(" and ");
-      const incomingAtPos  = inPlayers.filter(a => normalisePos(a.position) === pos);
+      const playersLeaving = homeGivingUp.filter(a => normalizePosition(a.position) === pos).map(a => a.name).join(" and ");
+      const incomingAtPos  = inPlayers.filter(a => normalizePosition(a.position) === pos);
       const incomingFills  = incomingAtPos.length > 0;
 
-      const leavingNav   = homeGivingUp.filter(a => normalisePos(a.position) === pos).reduce((s, a) => s + navOf(a), 0);
+      const leavingNav   = homeGivingUp.filter(a => normalizePosition(a.position) === pos).reduce((s, a) => s + navOf(a), 0);
       const incomingNav  = incomingAtPos.reduce((s, a) => s + navOf(a), 0);
       const hasRetained  = incomingAtPos.some(a => (a.retainedPct || 0) > 0);
       const bothNearZero = Math.abs(leavingNav) < 15 && Math.abs(incomingNav) < 15;
@@ -649,7 +621,7 @@ const runGmLogic = (
   }
 
   const partnerGivingUp = inPlayers.filter((a) => a.position !== "Pick");
-  const positionsPartnerLosing = [...new Set(partnerGivingUp.map(a => normalisePos(a.position)))];
+  const positionsPartnerLosing = [...new Set(partnerGivingUp.map(a => normalizePosition(a.position)))];
 
   for (const pos of positionsPartnerLosing) {
     if (!POSITION_MINIMUMS[pos]) continue;
@@ -658,13 +630,13 @@ const runGmLogic = (
     const after  = qualityCountAfter(allPartnerRoster, partnerGivingUp, pos);
 
     if (after < min) {
-      const playersAtPosLeaving = partnerGivingUp.filter(a => normalisePos(a.position) === pos);
+      const playersAtPosLeaving = partnerGivingUp.filter(a => normalizePosition(a.position) === pos);
       if (playersAtPosLeaving.length > 0 && playersAtPosLeaving.every(isShoppedAsset)) continue;
 
       const playersLeaving = playersAtPosLeaving.map(a => a.name).join(" and ");
-      const incomingAtPos = outPlayers.filter(a => normalisePos(a.position) === pos);
+      const incomingAtPos = outPlayers.filter(a => normalizePosition(a.position) === pos);
       const incomingFills = incomingAtPos.length > 0;
-      const leavingNav    = partnerGivingUp.filter(a => normalisePos(a.position) === pos).reduce((s, a) => s + navOf(a), 0);
+      const leavingNav    = partnerGivingUp.filter(a => normalizePosition(a.position) === pos).reduce((s, a) => s + navOf(a), 0);
       const incomingNav   = incomingAtPos.reduce((s, a) => s + navOf(a), 0);
       const hasRetained   = incomingAtPos.some(a => (a.retainedPct || 0) > 0);
       const bothNearZero  = Math.abs(leavingNav) < 15 && Math.abs(incomingNav) < 15;
@@ -672,7 +644,7 @@ const runGmLogic = (
       const isDirectSwap  = incomingFills && (incomingNav >= leavingNav * swapThreshold || bothNearZero || hasRetained);
 
       if (modePartner === "REBUILDING" || modePartner === "TANKING") {
-        const givingAwayYouth = partnerGivingUp.filter(a => normalisePos(a.position) === pos).every(a => a.age <= 25);
+        const givingAwayYouth = partnerGivingUp.filter(a => normalizePosition(a.position) === pos).every(a => a.age <= 25);
         if (!givingAwayYouth) continue; 
       }
 
@@ -692,7 +664,7 @@ const runGmLogic = (
   const tradingAwayD = outPlayers.filter((a) => a.position === "D");
   if (tradingAwayD.length > 0) {
     const depScore          = defensiveDependencyScore(allHomeRoster);
-    const eliteDBeingTraded = tradingAwayD.filter((a) => a.avgTOI > 22 || navOf(a) > 100);
+    const eliteDBeingTraded = tradingAwayD.filter((a) => (a.avgTOI ?? 0) > 22 || navOf(a) > 100);
     const dComingBack       = inPlayers.filter(a => a.position === "D");
     const leavingDNav       = eliteDBeingTraded.reduce((s, a) => s + navOf(a), 0);
     const incomingDNav      = dComingBack.reduce((s, a) => s + navOf(a), 0);
@@ -714,7 +686,7 @@ const runGmLogic = (
   const partnerTradingAwayD = partnerGivingUp.filter((a) => a.position === "D");
   if (partnerTradingAwayD.length > 0) {
     const depScore          = defensiveDependencyScore(allPartnerRoster);
-    const eliteDBeingTraded = partnerTradingAwayD.filter((a) => a.avgTOI > 22 || navOf(a) > 100);
+    const eliteDBeingTraded = partnerTradingAwayD.filter((a) => (a.avgTOI ?? 0) > 22 || navOf(a) > 100);
     const dComingBack       = outPlayers.filter(a => a.position === "D");
     const leavingDNav       = eliteDBeingTraded.reduce((s, a) => s + navOf(a), 0);
     const incomingDNav      = dComingBack.reduce((s, a) => s + navOf(a), 0);
@@ -738,7 +710,7 @@ const runGmLogic = (
   const partnerHighNavOut   = partnerGivingUp.filter(a => navOf(a) > 100);
   const homeHasPicksOrProsp = outPlayers.some(a => a.position === "Pick" || (PROSPECT_TIERS[a.name] != null));
   const partnerGivingNav    = partnerHighNavOut.reduce((s, a) => s + navOf(a), 0);
-  const partnerReceiving    = navOut; 
+  const partnerReceiving    = cNavOut;
   const partnerGetsEnough   = partnerReceiving >= partnerGivingNav * 0.90;
 
   if (partnerIsContending && partnerHighNavOut.length > 0 && !homeHasPicksOrProsp && !partnerGetsEnough) {
@@ -753,14 +725,15 @@ const runGmLogic = (
 
   for (const player of partnerGivingUp) {
     if (isShoppedAsset(player)) continue;
-    const need = teamPartner.needs?.find((n: { pos: string; minWar: number; label: string }) => n.pos === player.position || n.pos === "Any");
+    const playerPos = normalizePosition(player.position);
+    const need = teamPartner.needs?.find((n: { pos: string; minWar: number; label: string }) => n.pos === playerPos);
     if (!need) continue;
     const isD   = player.position === "D";
     const isF   = ["C","W","L","R"].includes(player.position);
     const minTOI = isD ? 18 : isF ? 14 : 12;
     const minNAV = 30;
     const playerNav  = navOf(player);
-    const meetsQuality = player.avgTOI >= minTOI && playerNav >= minNAV;
+    const meetsQuality = ((player.avgTOI ?? 0) >= minTOI || playerNav >= minNAV * 1.35) && playerNav >= minNAV;
     if (!meetsQuality) continue;
 
     flags.push({
@@ -782,10 +755,10 @@ const runGmLogic = (
 
   if (modePartner === "REBUILDING" || modePartner === "TANKING") {
     const youngGoingOut  = partnerGivingUp.filter(a => a.position !== "Pick" && a.age <= 25);
-    const veteranComing  = inPlayers.filter(a => a.age >= 25 && (a.yearsRemaining ?? 0) >= 3 && !PROSPECT_TIERS[a.name]);
+    const veteranComing  = inPlayers.filter(a => hasVeteranTerm([a]) && !PROSPECT_TIERS[a.name]);
     const picksComingIn  = inPicks.length > 0;
     const futureCoreGoingOut = partnerGivingUp.filter(isFutureCoreAsset);
-    const premiumPicksGoingOut = inPicks.filter(isPremiumLotteryPick);
+    const premiumPicksGoingOut = inPicks.filter(a => isPremiumLotteryPick(a, navOf));
 
     if (premiumPicksGoingOut.length > 0 && navOut < premiumPicksGoingOut.reduce((s, a) => s + navOf(a), 0) * 1.35) {
       flags.push({
@@ -836,7 +809,7 @@ const runGmLogic = (
 
   if (modeHome === "REBUILDING" || modeHome === "TANKING") {
     const futureCoreGoingOut = outPlayers.filter(isFutureCoreAsset);
-    const veteranComing = inPlayers.filter(a => a.age >= 27 && (a.yearsRemaining ?? 0) >= 2 && !PROSPECT_TIERS[a.name]);
+    const veteranComing = inPlayers.filter(a => hasVeteranTerm([a]) && !PROSPECT_TIERS[a.name]);
     if (futureCoreGoingOut.length > 0 && veteranComing.length > 0 && inPicks.length === 0) {
       const core = futureCoreGoingOut[0];
       const p = core.developmentProfile!;
@@ -850,7 +823,7 @@ const runGmLogic = (
   }
 
   if (modeHome === "CONTENDER" && outPicks.length > 0) {
-    const decliners = inPlayers.filter((a) => a.age > 33 && a.ptsPace < 45);
+    const decliners = inPlayers.filter((a) => a.age > 33 && (a.ptsPace ?? 0) < 45);
     if (decliners.length > 0) flags.push({
       severity: "SOFT", category: "CONTENDER_LOGIC",
       headline: "Picks for a declining player",
@@ -1052,8 +1025,10 @@ const evaluateTrade = (
   const cNavIn  = compressPackage(incoming, capCeiling);
 
   const homeNetGain = cNavIn - cNavOut;
-  const ptsGain = incoming.reduce((s,a) => s+a.ptsPace,0) - outgoing.reduce((s,a) => s+a.ptsPace,0);
-  const defGain = incoming.reduce((s,a) => s+a.defRate*(a.avgTOI/18),0) - outgoing.reduce((s,a) => s+a.defRate*(a.avgTOI/18),0);
+  const ptsGain = incoming.reduce((s,a) => s + (a.ptsPace ?? 0), 0)
+    - outgoing.reduce((s,a) => s + (a.ptsPace ?? 0), 0);
+  const defGain = incoming.reduce((s,a) => s + ((a.defRate ?? 0) * ((a.avgTOI ?? 0) / 18)), 0)
+    - outgoing.reduce((s,a) => s + ((a.defRate ?? 0) * ((a.avgTOI ?? 0) / 18)), 0);
   const capDelta = incoming.reduce((s,a) => s+a.capHit*(1-(a.retainedPct||0)),0) - outgoing.reduce((s,a) => s+a.capHit*(1-(a.retainedPct||0)),0);
   const maxNav = Math.max(Math.abs(cNavOut), Math.abs(cNavIn), 1);
   const variance = (Math.abs(homeNetGain) / maxNav) * 100;

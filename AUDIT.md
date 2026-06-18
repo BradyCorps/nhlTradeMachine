@@ -566,3 +566,191 @@ Verification added:
 
 - `__tests__/development-profile.test.ts` now verifies that an established, more productive Seth Jarvis profile ranks ahead of an established Alexis Lafreniere profile after pedigree decay.
 - `__tests__/feature-canaries.test.ts` protects the sample-decay model and the visible panel input/trajectory context.
+
+## Audit Xnav Line by line
+[
+  {
+    "file": "app/lib/xnav-engine.ts",
+    "line": 763,
+    "summary": "Hard clamp-to-4 is a discontinuous bandaid instead of the sample/ice-time confidence scaling used everywhere else in this engine, creating a cliff at the gate boundaries.",
+    "failure_scenario": "Two near-identical callups: one at avgTOI 8.9 is floored to total 4; one at avgTOI 9.0 keeps its full ~20-35 uncapped NAV. Same one-game/one-minute difference flips value by an order of magnitude — unlike goalie confidenceAdj, paceConfidence, the 14-60 transition band, or pedigree decay, which all scale continuously."
+  },
+  {
+    "file": "app/lib/xnav-engine.ts",
+    "line": 769,
+    "summary": "total is clamped to 4 but off/def/age are returned at full magnitude, so the component breakdown no longer reconciles with the headline.",
+    "failure_scenario": "A clamped callup with offTotal 30, defTotal 20, ageTotal -10 returns total:4 while AssetCard.tsx (MicroBars at ~331/341/356) renders OFF 30 / DEF 20 alongside headline NAV 4 — the bars visibly contradict the total a user is reading."
+  },
+  {
+    "file": "app/lib/xnav-engine.ts",
+    "line": 765,
+    "summary": "displayedCap = min(capTotal, max(0,total)) silently discards real cap-surplus information for clamped callups.",
+    "failure_scenario": "A cheap-ELC callup with genuine capTotal 25 and clamped total 4 shows cap 4 in the CAP bar (AssetCard.tsx:356) — 21 points of real surplus erased. The patch also only adjusts cap (not off/def/age), so it can't actually restore the component-sum invariant it appears to be defending."
+  },
+  {
+    "file": "app/lib/xnav-engine.ts",
+    "line": 757,
+    "summary": "The gate inspects only points/TOI/baseline/age and never off/def/cap, so a low-minutes player whose value the engine itself credits via defense or cap can be floored to 4.",
+    "failure_scenario": "A 28-year-old recalled D, 12 GP at 8.8 TOI, ptsPace ~8, no MoneyPuck baseline ≥ the thresholds, draftOverall null: all gates pass, uncappedTotal ~35 (from defTotal + cheap-cap surplus) collapses to 4. Partly mitigated by the baselineDpsProxy ≥ 1.5 clause, but only for players who already have a stored defensive baseline."
+  },
+  {
+    "file": "app/lib/xnav-engine.ts",
+    "line": 762,
+    "summary": "The `draftOverall == null` conjunct adds almost no selectivity and misrepresents itself as a pedigree guard.",
+    "failure_scenario": "The live roster feed (app/api/league/players/route.ts) never populates draftOverall, and enrichment only covers the 2020-2026 classes — so for age>=26 players draftOverall is null essentially always. The condition is true for nearly everyone reaching the block; meanwhile the age>=26 gate already excludes recent prospects, so this term protects no one it claims to."
+  },
+  {
+    "file": "app/lib/xnav-engine.ts",
+    "line": 763,
+    "summary": "Magic number 4 and uncommented thresholds (26/14/9/15) in a six-term boolean, inconsistent with the documented constants elsewhere in the file.",
+    "failure_scenario": "Unlike the developmentDiscount ladder, franchise floors, and goalie confidence caps (all commented with rationale), a future maintainer retuning the callup heuristic can't tell why total caps at 4, why TOI 9, or how the six conditions interact — raising the risk of an incorrect retune."
+  }
+]
+
+# Batch auditing path
+1	Core valuation + trade verdict	xnav-engine.ts, evaluate/route.ts, trade-logic.ts, trade-types.ts	The money path. Already partly covered; highest blast radius.
+2	Trade UI surface	QuickTradeMachine.tsx, TradeProposal.tsx, TradePanel.tsx, VerdictPanel.tsx, evaluate-client.ts, trade-share.ts	User-facing trade flow + share encoding (where the stale-verdict class of bug lived).
+3	Dev/analytics layer	development-profile.ts, development-sources.ts, DevelopmentProfilePanel.tsx, prospect-enrichment.ts, player-data.ts	Just touched; data-derivation bugs hide here.
+4	League data + sim	league/route.ts, league/players/route.ts, simulate/route.ts, sim-engine.ts	Big files (1400/990/910 LOC), data-shape and pace bugs.
+5	Armchair GM page	armchair-gm/page.tsx (2315 LOC) + players/page.tsx	The two largest UI files; deserve their own pass each, honestly.
+6	Admin + remaining components	admin/*, leftover components	Lower priority — and admin auth is your known-out item, so I'd scope that pass to logic only, not the open-DB issue.
+
+## Batch 1
+[
+  {
+    "file": "app/lib/xnav-engine.ts",
+    "line": 873,
+    "summary": "compressPackage is non-monotonic: adding a low-value player REDUCES the compressed package NAV because the flat per-slot penalty (penaltyVeteran=35) dwarfs the throw-in's decayed contribution.",
+    "failure_scenario": "Home sends a 300-NAV star; cNavOut=300. Attaching one age-33 depth player worth 2 NAV makes cNavOut = max(0, ~301 - 35) = 266; five of them -> 127. Since evaluateTrade uses cNavOut/cNavIn, adding a sweetener you are GIVING AWAY raises homeNetGain (cNavIn - cNavOut) by ~34 and can flip a verdict from FAIR/LOSS toward WIN — the opposite of reality."
+  },
+  {
+    "file": "app/lib/trade-logic.ts",
+    "line": 484,
+    "summary": "The partner-need block in preScreenProposal is logically broken in three ways, so it screens proposals on garbage truth values.",
+    "failure_scenario": "Lines 497-499: the predicate `[\"L\",\"R\"].includes(a.position) ? \"W\" === nn.pos : ...` returns whether the *need slot* is literally \"W\", ignoring the winger entirely. Line 486-489: `givingAwayNeed = partnerPlayers.every(...)` plus an `n.pos===\"Any\"` escape makes the guard trivially true (any \"Any\" need) or skipped (one non-need player). Lines 493-500: the `.includes(needs.find(...)?.pos)` tests a different need than the `n` being iterated. Net: trades where the partner gives away a stated need without getting the position back are passed or blocked essentially at random."
+  },
+  {
+    "file": "app/api/evaluate/route.ts",
+    "line": 489,
+    "summary": "Cap-floor check hardcodes SEASON.capCeiling instead of the live/passed capCeiling, so the floor veto is computed against the wrong baseline when the DB overrides the ceiling.",
+    "failure_scenario": "Admin sets cap_ceiling=92 in the DB; getLiveCapCeiling returns 92 and NAV math uses it, but `newCapUsedHome = SEASON.capCeiling(88) - projCapHome` reconstructs cap usage against 88 while teamHome.capSpace was measured against 92. A trade near the floor mis-fires or mis-suppresses the HARD FLOOR_VIOLATION."
+  },
+  {
+    "file": "app/api/evaluate/route.ts",
+    "line": 728,
+    "summary": "The contender 'requires future assets' HARD veto compares LINEAR navOut against the partner's outgoing NAV, so a depth-padded package with high linear but low compressed value dodges the veto.",
+    "failure_scenario": "Partner is CONTENDER giving up a 120-NAV player; home sends five 25-NAV depth players (linear navOut=125, compressed ~80) and no picks/prospects. partnerGetsEnough = 125 >= 108 -> true, so the HARD TIMELINE_MISMATCH veto never fires even though the partner effectively gets an 80-NAV compressed return with zero futures."
+  },
+  {
+    "file": "app/lib/trade-logic.ts",
+    "line": 59,
+    "summary": "Propose/judge 'veteran term' threshold drift: the generator's hasVeteranTerm (age>=30 & yrs>=2) does not match the verdict's veteranComing cutoffs (age>=25 & yrs>=3, and age>=27 & yrs>=2).",
+    "failure_scenario": "A proposal sending a future-core player for a 26-year-old on a 3-year deal passes preScreenProposal (not a 'veteran' at >=30) but is HARD-declined by runGmLogic at route.ts:799-805/840 — the generator surfaces trades the verdict instantly kills."
+  },
+  {
+    "file": "app/lib/trade-logic.ts",
+    "line": 505,
+    "summary": "Propose/judge concession-limit drift with a units mismatch: the generator caps partner concession at 18/28/40 on LINEAR nav while the verdict tolerates 45/70 on COMPRESSED nav.",
+    "failure_scenario": "A non-rebuild partner conceding 30 linear NAV is rejected by preScreenProposal (>28) even though the verdict would have accepted up to 45 compressed; a rebuild partner conceding 20 is killed by pre-screen (>18) but allowed by the verdict. The two stages threshold different quantities, so the generated proposal set and the verdict's accept band never line up."
+  },
+  {
+    "file": "app/api/evaluate/route.ts",
+    "line": 267,
+    "summary": "isFutureCoreAsset / isDevelopmentRiskAsset / isPeakWindowAsset (and the DIVISIONS map) are duplicated verbatim in route.ts and trade-logic.ts, on opposite sides of the propose/judge gate.",
+    "failure_scenario": "They are byte-identical today (route.ts:267-287 vs trade-logic.ts:33-53; DIVISIONS at route.ts:213-222 vs trade-logic.ts:438-443). Any future edit to one threshold (e.g. dynastyScore>=62 -> 65) silently makes the generator classify a player as future-core while the verdict does not, producing proposals the verdict contradicts. The duplication is the latent defect."
+  },
+  {
+    "file": "app/api/evaluate/route.ts",
+    "line": 1041,
+    "summary": "ptsGain and defGain become NaN whenever a draft Pick (or any asset without ptsPace/defRate/avgTOI) is in the trade, because evaluateTrade reduces over raw nullish fields.",
+    "failure_scenario": "AssetSchema declares ptsPace/defRate/avgTOI as z.number().nullish() with no default; a Pick has none. `incoming.reduce((s,a)=>s+a.ptsPace,0)` -> s+undefined -> NaN, returned unguarded in metrics.ptsGain/defGain (serialized as null). Verdict status is unaffected but the metrics block is corrupted for any trade containing picks."
+  },
+  {
+    "file": "app/lib/xnav-engine.ts",
+    "line": 314,
+    "summary": "The goalie starter market floor is only partially rate-gated: starterFloorSignal clamps to a 0.55 minimum, so a genuinely below-replacement young starter still floors at ~36 TMV.",
+    "failure_scenario": "A 29-year-old 55-game starter with expGSAx = -40 (bottom-of-league) gets starterFloorSignal clamped to 0.55, so starterTmvFloor ~= 65*1.0*0.55 ~= 36 feeds the sigmoid -> positive FMV cap% -> positive NAV, despite the comment's intent that bad goalies can go negative (which only triggers via ageFactor for older goalies)."
+  },
+  {
+    "file": "app/api/evaluate/route.ts",
+    "line": 749,
+    "summary": "Missing optional data silently bypasses value/need guards across the path (null avgTOI, getNav ?? 0, teamStanding default).",
+    "failure_scenario": "route.ts:749 `player.avgTOI >= minTOI` is false when avgTOI is null, so a 40-NAV centre with un-hydrated TOI bypasses the partner-need DECLINE veto. Similarly trade-logic.ts:14 `getNav ?? 0` treats an unvalued pick as 0, undercounting partnerNavOut so the concession cap (line 509) and the premium-pick 1.35x floor (isPremiumLotteryPick, teamStanding default 16) never engage for unstamped premium assets."
+  }
+]
+
+## Batch 2
+[
+  {
+    "file": "app/components/QuickTradeMachine.tsx",
+    "line": 506,
+    "summary": "runVerdict has no AbortController/run-id, so an in-flight audit can re-set a verdict AFTER the edit-clear effect wiped it — reopening the stale-verdict/stale-share bug.",
+    "failure_scenario": "User clicks Run GM Audit; before it resolves, edits the package. The [outgoing,incoming] effect (line 489) clears verdict and disables Share. The slow audit then resolves and setVerdict (line 513) reinstates the OLD verdict for the NEW package, re-enabling Share; createShare locks a verdict that doesn't match the embedded assets."
+  },
+  {
+    "file": "app/lib/evaluate-client.ts",
+    "line": 18,
+    "summary": "assetCacheKey is a hand-maintained allow-list that omits NAV-affecting inputs (capCeiling, age, defRate/xG/ops/dps/multiplier/pairDriverScore, etc.), and fetchNavMap never sends capCeiling, so cached NAV goes stale when those change.",
+    "failure_scenario": "An admin changes the live cap_ceiling (the engine uses it via BASE_CAP_CEILING) but assetCacheKey doesn't include capCeiling and fetchNavMap doesn't send it, so every previously-cached asset returns its old cap-adjusted NAV with no refetch. More broadly, any future engine input not added to this list silently fails to invalidate the cache."
+  },
+  {
+    "file": "app/components/TradeProposal.tsx",
+    "line": 82,
+    "summary": "Proposal generation (dozens of async fetchTradeVerdict calls) has no AbortController or run-id guard, so results from a previous team/navMap render into the live UI.",
+    "failure_scenario": "User opens the Market Ledger, then switches home team (or the parent refreshes navMap) while audits are still resolving. The closure captured the old homeTeam/navMap; when promises resolve, setProposals (line 283) writes proposals computed against the stale team/valuations over the current selection."
+  },
+  {
+    "file": "app/components/TradeProposal.tsx",
+    "line": 96,
+    "summary": "The dump branch sizes the sweetener/fit against only the negative-value players but ships the entire outgoing block, so a [bad contract + good player] selection generates an 'absorbs contract' proposal that gives the good player away too.",
+    "failure_scenario": "Outgoing block = one -20 NAV contract + one +30 NAV player. isDumpBlock (trade-logic.ts:21) sees totalNav 10 < 15 with a negative present -> isDump=true. negPlayers/negNav use only the -20 contract, so the sweetener is sized for it, but homeSends = [...outgoingBlock, ...sweetener] (line 105) still ships the +30 player — a proposal labeled 'ABSORBS CONTRACT' that actually surrenders a valuable asset plus picks."
+  },
+  {
+    "file": "app/components/QuickTradeMachine.tsx",
+    "line": 476,
+    "summary": "The NAV fetch effect's .then calls setNavMap without checking ctrl.signal.aborted, so a resolved-but-aborted earlier fetch can clobber a newer response with a stale subset.",
+    "failure_scenario": "Add asset A (fetch1 starts), immediately add B (cleanup aborts fetch1, fetch2 starts). If fetch1 already resolved res.json() before abort took effect, its .then runs setNavMap with the A-only map after fetch2 set the A+B map; B's NAV column falls back to 0 until the next change."
+  },
+  {
+    "file": "app/lib/evaluate-client.ts",
+    "line": 70,
+    "summary": "When a server response omits an asset id, the merge substitutes {total:0,...}, masking a failed/dropped NAV as a legitimate zero-value asset.",
+    "failure_scenario": "A valid player whose NAV errors server-side (or whose id the server can't match) is rendered as a 0-NAV asset; package totals and the trade verdict are silently corrupted instead of surfacing an error. The fallback object also omits the newer XNAVResult fields (volatility/noivImpact/rosterTier), so a cache-miss asset has a different shape than a real one."
+  },
+  {
+    "file": "app/components/TradeProposal.tsx",
+    "line": 196,
+    "summary": "Every pre-screened candidate gets its own /api/evaluate POST; concurrency is capped at 6 but the total request count is unbounded.",
+    "failure_scenario": "With a full league, pre-screen can leave 60-120 candidates, firing 60-120 POSTs per 'Open Market Ledger' click (and again on 'Rebuild Market Ledger'), producing a multi-second audit that hammers the evaluate endpoint."
+  },
+  {
+    "file": "app/lib/trade-share.ts",
+    "line": 163,
+    "summary": "resolveTradeShareAssets matches stored ids via find() and flatMaps misses away, so a shared card silently drops assets whose id left the dataset and first-matches on duplicate ids (players are merged with picks).",
+    "failure_scenario": "A shared link's traded player later leaves /api/league/players -> find returns undefined -> the asset is dropped from the rendered package, so the shared card shows fewer assets than the lockedVerdict was computed on. If a pick and player ever share an id (the players+picks merge at QuickTradeMachine.tsx:383), find returns the wrong one."
+  },
+  {
+    "file": "app/components/VerdictPanel.tsx",
+    "line": 81,
+    "summary": "Flag rows use flags.indexOf(flag) as the React key and a single shared expandedFlag index across both the home and partner sub-lists.",
+    "failure_scenario": "Both sub-lists map over the same flags array with indexOf; expandedFlag is one shared number, so expanding a home flag at global index 2 also expands whatever partner flag resolves to index 2. If flags reorder/filter between renders, the wrong flag expands; equal-reference flags produce duplicate keys."
+  },
+  {
+    "file": "app/components/AssetCard.tsx",
+    "line": 107,
+    "summary": "Pick-round labels are re-implemented in four places with diverging behavior; AssetCard has no 4th+ branch and mislabels any pick past round 3 as '3rd'.",
+    "failure_scenario": "A 4th/5th/6th/7th-round pick renders correctly ('4th') in QuickTradeMachine (line 34) and TradeProposal (line 74) but shows '3rd' in AssetCard (line 107). The same surface also duplicates effective-cap math and status->color (VerdictPanel STATUS_CONFIG vs QuickTradeMachine's ad-hoc map), so a FAIR/LOSS trade is colored differently in the shared view than in the live panel."
+  }
+]
+
+Summary
+
+The trade UI is mostly solid; the theme this batch is async lifecycle correctness and cache/serialization fidelity, not broken rendering math.
+
+    #1 is the one I'd fix first — it's a genuine reopening of the stale-verdict class we thought was closed two commits ago. The earlier fix clears the verdict on edit, but nothing cancels an in-flight runVerdict, so a slow audit can reinstate a stale verdict and re-arm the Share button. An AbortSignal + run-id check in runVerdict (and passing the signal through, which fetchTradeVerdict already accepts) closes it.
+    #2 (cache key) and #6 (zero-fallback) are the silent-wrong-value risks: an allow-list cache key that must be hand-synced to the engine's inputs will drift, and capCeiling is a concrete live path that already isn't tracked.
+    #3/#5/#7 are the same root in two components: long async flows with no cancellation/run-id (proposal generation and the NAV effect) plus an unbounded request fan-out.
+    #4 is a real generator logic bug worth fixing alongside the Batch-1 trade-logic work, since it straddles both.
+    #8–#10 are fidelity/robustness/duplication (shared-view asset drift, flag-key fragility, the 4th-round mislabel).
+
+Two lower-confidence items I'll note rather than rank: fmtCap(asset.capHit) will throw if any player record arrives without capHit (typed required, so depends on the /api/league/players payload — worth a guard), and a share version bump throws with no migration path (callers catch it, so it degrades to "could not be decoded" rather than crashing).

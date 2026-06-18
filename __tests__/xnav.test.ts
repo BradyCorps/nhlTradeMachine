@@ -781,4 +781,21 @@ describe("compressPackage — age-tiered", () => {
     ];
     expect(compressPackage(mixed)).toBeCloseTo(450, 0);
   });
+
+  it("adding low-value throw-ins never reduces compressed package value", () => {
+    const starOnly = compressPackage([{ nav: 300, isPick: false, age: 28 }]);
+    const withVeteranThrowIn = compressPackage([
+      { nav: 300, isPick: false, age: 28 },
+      { nav: 2, isPick: false, age: 33 },
+    ]);
+    const withManyThrowIns = compressPackage([
+      { nav: 300, isPick: false, age: 28 },
+      { nav: 2, isPick: false, age: 33 },
+      { nav: 2, isPick: false, age: 33 },
+      { nav: 2, isPick: false, age: 33 },
+    ]);
+
+    expect(withVeteranThrowIn).toBeGreaterThanOrEqual(starOnly);
+    expect(withManyThrowIns).toBeGreaterThanOrEqual(starOnly);
+  });
 });

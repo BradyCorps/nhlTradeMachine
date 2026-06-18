@@ -3,6 +3,7 @@
 import TradePanel from "@/app/components/TradePanel";
 import TugBar from "@/app/components/TugBar";
 import { SEASON, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
+import { formatPickRound } from "@/app/lib/trade-format";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
 import TeamStrand, { CHAMP_TEMPLATE, TeamStrandData } from "@/app/components/TeamStrand";
 import LineupEditor from "@/app/components/LineupEditor";
@@ -54,8 +55,8 @@ export default function ArmchairGmPage() {
   const [booting, setBooting] = useState(true);
   const [initialNavReady, setInitialNavReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [db, setDb] = useState<{ teams: Team[]; players: Asset[] }>({ teams: [], players: [] });
-  const [originalDb, setOriginalDb] = useState<{ teams: Team[]; players: Asset[] } | null>(null);
+  const [db, setDb] = useState<{ teams: Team[]; players: Asset[]; capCeiling?: number | null }>({ teams: [], players: [] });
+  const [originalDb, setOriginalDb] = useState<{ teams: Team[]; players: Asset[]; capCeiling?: number | null } | null>(null);
   const teams = useTradeStore(s => s.teams);
   const setTeams = useTradeStore(s => s.setTeams);
   const blocks = useTradeStore(s => s.blocks);
@@ -204,7 +205,7 @@ export default function ArmchairGmPage() {
     if (db.players.length === 0) return;
     setNavLoading(true);
     const ctrl = new AbortController();
-    fetchNavMap(db.players, ctrl.signal)
+    fetchNavMap(db.players, ctrl.signal, db.capCeiling)
       .then(map => {
         setNavMap(map);
         setNavLoading(false);
@@ -231,7 +232,7 @@ export default function ArmchairGmPage() {
         }
       });
     return () => ctrl.abort();
-  }, [db.players, setNavMap]);
+  }, [db.players, db.capCeiling, setNavMap]);
 
   // Re-fetch NAV for any block assets with retention applied.
   // Clear trade partner match results whenever the outgoing package changes —
@@ -252,7 +253,7 @@ export default function ArmchairGmPage() {
       setNavMap(prev => {
         const updated = { ...prev };
         for (const a of zeroedAssets) {
-          const original = getCachedNav({ ...a, retainedPct: 0 });
+          const original = getCachedNav({ ...a, retainedPct: 0 }, db.capCeiling);
           if (original) updated[a.id] = original;
         }
         return updated;
@@ -263,14 +264,14 @@ export default function ArmchairGmPage() {
 
     const timer = setTimeout(() => {
       const ctrl = new AbortController();
-      fetchNavMap(retainedAssets, ctrl.signal)
+      fetchNavMap(retainedAssets, ctrl.signal, db.capCeiling)
         .then(fresh => setNavMap(prev => ({ ...prev, ...fresh })))
         .catch(() => {});
       return () => ctrl.abort();
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [outgoingBlock, incomingBlock, setNavMap]);
+  }, [outgoingBlock, incomingBlock, setNavMap, db.capCeiling]);
 
   useEffect(() => {
     Promise.all([
@@ -500,10 +501,10 @@ export default function ArmchairGmPage() {
     // ── Step 2: Build trade summary ────────────────────────────
     const tradesSummary = executedTrades.map(t => {
       const outNames = t.outgoing.map(a => a.position === "Pick"
-        ? `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : "3rd"} round pick`
+        ? `${a.year} ${formatPickRound(a.round)} round pick`
         : `${a.name} (${a.position}, $${a.capHit}M)`).join(", ");
       const inNames = t.incoming.map(a => a.position === "Pick"
-        ? `${a.year} ${a.round === 1 ? "1st" : a.round === 2 ? "2nd" : "3rd"} round pick`
+        ? `${a.year} ${formatPickRound(a.round)} round pick`
         : `${a.name} (${a.position}, $${a.capHit}M)`).join(", ");
       return [
         `OFFSEASON MOVE: ${t.homeTeamName} ↔ ${t.partnerTeamName}`,
@@ -686,13 +687,14 @@ export default function ArmchairGmPage() {
       const v = await fetchTradeVerdict(
         blocks[0], blocks[1], liveT0, liveT1,
         allHomeRoster, allPartnerRoster,
-        evalAbortRef.current.signal
+        evalAbortRef.current.signal,
+        db.capCeiling
       );
       if (v) { setVerdict(v); setVerdictOpen(true); }
     } catch (e: any) {
       if (e.name !== "AbortError") console.error("[runEval]", e.message);
     }
-  }, [blocks, teams, db.teams, allHomeRoster, allPartnerRoster]);
+  }, [blocks, teams, db.teams, db.capCeiling, allHomeRoster, allPartnerRoster]);
 
   // Client-side package compression — mirrors evaluate/route.ts compressPackage
   // Shows users the roster-slot-aware value as they build, so the audit result

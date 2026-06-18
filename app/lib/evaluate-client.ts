@@ -13,48 +13,47 @@ import type {
 // deployment/math changes cannot reuse stale results while the app is open.
 // Prevents redundant API calls when assets haven't changed
 const _navCache = new Map<string, XNAVResult>();
-const XNAV_CLIENT_CACHE_VERSION = "xnav-2.1-prospect-nhle-v1";
+const XNAV_CLIENT_CACHE_VERSION = "xnav-2.2-full-input-key-v1";
 
-function assetCacheKey(a: Asset): string {
-  return [
+function stableStringify(value: unknown): string {
+  if (typeof value === "undefined") return "undefined";
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map(key => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
+    .join(",")}}`;
+}
+
+function assetCacheKey(a: Asset, capCeiling?: number | null): string {
+  return stableStringify({
     XNAV_CLIENT_CACHE_VERSION,
-    a.id,
-    a.retainedPct ?? 0,
-    a.capHit ?? 0,
-    a.yearsRemaining ?? 0,
-    a.extensionCapHit ?? 0,
-    a.extensionYears ?? 0,
-    a.ptsPace ?? 0,
-    a.baselinePtsPace ?? 0,
-    a.avgTOI ?? 0,
-    a.qocIndex ?? "",
-    a.dzPct ?? "",
-    a.pkTimeShare ?? 0,
-    a.draftOverall ?? "",
-    a.prospectPtsPace ?? "",
-    a.games ?? 0,
-  ].join(":");
+    capCeiling: capCeiling ?? a.capCeiling ?? null,
+    asset: a,
+  });
 }
 
 // Fetch NAV values for a list of assets
 // Uses cache for unchanged assets, only fetches stale/new ones
 export async function fetchNavMap(
   assets: Asset[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  capCeiling?: number | null
 ): Promise<Record<string, XNAVResult>> {
   // Split into cached and uncached
-  const uncached = assets.filter(a => !_navCache.has(assetCacheKey(a)));
+  const uncached = assets.filter(a => !_navCache.has(assetCacheKey(a, capCeiling)));
   
   // Return cached results immediately if nothing new
   if (uncached.length === 0) {
-    return Object.fromEntries(assets.map(a => [a.id, _navCache.get(assetCacheKey(a))!]));
+    return Object.fromEntries(assets.map(a => [a.id, _navCache.get(assetCacheKey(a, capCeiling))!]));
   }
 
   const res = await fetch("/api/evaluate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal,
-    body: JSON.stringify({ assets: uncached } satisfies EvaluateRequest),
+    body: JSON.stringify({ assets: uncached, capCeiling } satisfies EvaluateRequest),
   });
 
   if (!res.ok) throw new Error(`evaluate API ${res.status}`);
@@ -63,15 +62,16 @@ export async function fetchNavMap(
   // Store new results in cache
   for (const a of uncached) {
     const result = data.navMap[a.id];
-    if (result) _navCache.set(assetCacheKey(a), result);
+    if (!result) throw new Error(`evaluate API omitted NAV for ${a.name || a.id}`);
+    _navCache.set(assetCacheKey(a, capCeiling), result);
   }
 
   // Return merged cached + fresh
-  return Object.fromEntries(
-    assets.map(a => [a.id, data.navMap[a.id] ?? _navCache.get(assetCacheKey(a)) ?? {
-      total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0
-    }])
-  );
+  return Object.fromEntries(assets.map(a => {
+    const result = data.navMap[a.id] ?? _navCache.get(assetCacheKey(a, capCeiling));
+    if (!result) throw new Error(`evaluate API omitted NAV for ${a.name || a.id}`);
+    return [a.id, result];
+  }));
 }
 
 // Run full trade evaluation (GM logic + verdict)
@@ -82,7 +82,8 @@ export async function fetchTradeVerdict(
   partnerTeam: Team | null,
   allHomeRoster: Asset[],
   allPartnerRoster: Asset[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  capCeiling?: number | null
 ): Promise<TradeVerdict | null> {
   if (!homeTeam || !partnerTeam) return null;
 
@@ -104,6 +105,7 @@ export async function fetchTradeVerdict(
       partnerTeam,
       allHomeRoster,
       allPartnerRoster,
+      capCeiling,
       runTrade:          true,
     } satisfies EvaluateRequest),
   });
@@ -117,7 +119,7 @@ export async function fetchTradeVerdict(
   // Update cache with all returned nav values
   for (const a of uniqueAssets) {
     const result = data.navMap[a.id];
-    if (result) _navCache.set(assetCacheKey(a), result);
+    if (result) _navCache.set(assetCacheKey(a, capCeiling), result);
   }
 
   return data.verdict ?? null;
@@ -129,6 +131,6 @@ export function clearNavCache(): void {
 }
 
 // Get a single asset's NAV synchronously from cache (after initial load)
-export function getCachedNav(asset: Asset): XNAVResult | null {
-  return _navCache.get(assetCacheKey(asset)) ?? null;
+export function getCachedNav(asset: Asset, capCeiling?: number | null): XNAVResult | null {
+  return _navCache.get(assetCacheKey(asset, capCeiling)) ?? null;
 }

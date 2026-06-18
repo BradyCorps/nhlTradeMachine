@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPickRound } from "@/app/lib/trade-format";
+
 // ============================================================
 // PLAYER COMPARISON PANEL
 // Side-by-side breakdown of outgoing vs incoming assets.
@@ -116,7 +118,7 @@ const PlayerCard = ({ asset, nav, side }: { asset: Asset; nav: NavBreakdown; sid
           <div className="font-black text-white text-[12px] truncate">{asset.name}</div>
           <div className="text-[9px] text-zinc-600 font-bold">
             {isPick
-              ? `${asset.year} ${asset.round === 1 ? "1st" : asset.round === 2 ? "2nd" : `${asset.round}th`} Round Pick`
+              ? `${asset.year} ${formatPickRound(asset.round)} Round Pick`
               : (() => {
                   const effective = asset.capHit * (1 - (asset.retainedPct || 0));
                   const hasRetention = (asset.retainedPct || 0) > 0;

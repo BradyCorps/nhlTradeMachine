@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import type { Asset, Team, TradeVerdict, XNAVResult } from "@/app/lib/trade-types";
@@ -11,8 +11,9 @@ import {
   resolveTradeShareAssets,
   type TradeSharePayload,
 } from "@/app/lib/trade-share";
+import { formatPickRound } from "@/app/lib/trade-format";
 
-type LeagueData = { teams: Team[]; players: Asset[] };
+type LeagueData = { teams: Team[]; players: Asset[]; capCeiling?: number | null };
 type VerdictDisplay = Pick<TradeVerdict, "status" | "message" | "metrics"> & {
   flags: Array<Pick<TradeVerdict["flags"][number], "severity" | "headline" | "explanation">>;
 };
@@ -31,10 +32,10 @@ const fmtSigned = (value: number, digits = 1) => value > 0 ? `+${value.toFixed(d
 
 function assetLabel(asset: Asset): string {
   if (asset.position === "Pick") {
-    const round = asset.round === 1 ? "1st" : asset.round === 2 ? "2nd" : asset.round === 3 ? "3rd" : `${asset.round ?? ""}th`;
+    const round = formatPickRound(asset.round);
     return `${asset.year ?? ""} ${round} round pick`;
   }
-  return `${asset.name} · ${asset.position} · ${fmtCap(asset.capHit)}`;
+  return `${asset.name} · ${asset.position} · ${fmtCap(asset.capHit ?? 0)}`;
 }
 
 function TeamSelect({
@@ -380,7 +381,11 @@ export function SharedTradeView({ code }: { code: string }) {
       fetch("/api/league/players").then(response => response.json()),
     ])
       .then(([teamData, playerData]) => {
-        setData({ teams: teamData.teams ?? [], players: [...(playerData.players ?? []), ...(teamData.picks ?? [])] });
+        setData({
+          teams: teamData.teams ?? [],
+          players: [...(playerData.players ?? []), ...(teamData.picks ?? [])],
+          capCeiling: teamData.capCeiling ?? null,
+        });
       })
       .catch(() => setError("Trade data could not be loaded."));
   }, []);
@@ -442,6 +447,9 @@ export default function QuickTradeMachine() {
   const [shareUrl, setShareUrl] = useState("");
   const [navMap, setNavMap] = useState<Record<string, XNAVResult>>({});
   const [navLoading, setNavLoading] = useState(false);
+  const navRunRef = useRef(0);
+  const verdictRunRef = useRef(0);
+  const verdictAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -474,9 +482,13 @@ export default function QuickTradeMachine() {
       return;
     }
     const ctrl = new AbortController();
+    const runId = ++navRunRef.current;
     setNavLoading(true);
-    fetchNavMap(selectedAssets, ctrl.signal)
-      .then(nextMap => setNavMap(nextMap))
+    fetchNavMap(selectedAssets, ctrl.signal, data.capCeiling)
+      .then(nextMap => {
+        if (ctrl.signal.aborted || runId !== navRunRef.current) return;
+        setNavMap(nextMap);
+      })
       .catch(event => {
         if (event.name !== "AbortError") setError(`Player values could not be loaded: ${event.message}`);
       })
@@ -484,12 +496,16 @@ export default function QuickTradeMachine() {
         if (!ctrl.signal.aborted) setNavLoading(false);
       });
     return () => ctrl.abort();
-  }, [selectedAssets]);
+  }, [selectedAssets, data.capCeiling]);
 
   useEffect(() => {
+    verdictAbortRef.current?.abort();
+    verdictRunRef.current += 1;
     setVerdict(null);
     setShareUrl("");
   }, [outgoing, incoming]);
+
+  useEffect(() => () => verdictAbortRef.current?.abort(), []);
 
   useEffect(() => {
     setOutgoing([]);
@@ -505,16 +521,32 @@ export default function QuickTradeMachine() {
 
   const runVerdict = async () => {
     if (!homeTeam || !partnerTeam || !canEvaluate) return;
+    verdictAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    verdictAbortRef.current = ctrl;
+    const runId = ++verdictRunRef.current;
+    const outgoingSnapshot = outgoing;
+    const incomingSnapshot = incoming;
     setEvaluating(true);
     setError(null);
     setShareUrl("");
     try {
-      const nextVerdict = await fetchTradeVerdict(outgoing, incoming, homeTeam, partnerTeam, allHomeRoster, allPartnerRoster);
+      const nextVerdict = await fetchTradeVerdict(
+        outgoingSnapshot,
+        incomingSnapshot,
+        homeTeam,
+        partnerTeam,
+        allHomeRoster,
+        allPartnerRoster,
+        ctrl.signal,
+        data.capCeiling,
+      );
+      if (ctrl.signal.aborted || runId !== verdictRunRef.current) return;
       setVerdict(nextVerdict);
     } catch (event: any) {
-      setError(`Trade audit failed: ${event.message}`);
+      if (event.name !== "AbortError") setError(`Trade audit failed: ${event.message}`);
     } finally {
-      setEvaluating(false);
+      if (!ctrl.signal.aborted && runId === verdictRunRef.current) setEvaluating(false);
     }
   };
 

@@ -1,5 +1,69 @@
 # Development Notes
 
+## 2026-06-18 Batch 2 Trade UI / Share Fidelity Audit
+
+### Completed Today
+
+- Completed Batch 2 edits from `AUDIT.md` for the trade UI, proposal, evaluation-client, verdict, and share surfaces.
+- Added abort/run-id guards to focused Trade Machine NAV loading and GM Audit runs so stale async responses cannot restore old verdicts or clobber newer NAV maps.
+- Reworked client NAV cache keys to serialize the full asset valuation payload plus cap ceiling instead of relying on a hand-maintained allow-list.
+- Passed live cap ceiling through Trade Machine and Armchair GM NAV/verdict requests.
+- Changed missing NAV handling so omitted server NAV ids throw an error instead of silently becoming legitimate zero-value assets.
+- Added proposal-generation abort/run-id guards and capped full audit verification fan-out with `MAX_AUDIT_CANDIDATES`.
+- Fixed salary-dump proposal generation so dump proposals send only negative-value contracts plus sweeteners, not unrelated positive-value players in the selected block.
+- Preserved missing shared-trade assets as placeholders during share reconstruction so locked shared packages do not silently lose assets.
+- Fixed verdict flag expansion keys to use stable global indices instead of `flags.indexOf(flag)`.
+- Added shared pick-round formatting for trade UI surfaces so 4th+ round picks no longer display as 3rd-round picks or malformed ordinals.
+- Added regression/source coverage for stale async guards, capped proposal audits, dump-package construction, share placeholders, NAV cache fidelity, VerdictPanel keys, and shared pick-round formatting.
+
+### Verification
+
+- `npm run test -- __tests__/trade-share.test.ts`
+- Result: `5` tests passing.
+- `npm run test -- __tests__/feature-canaries.test.ts`
+- Result: `89` tests passing.
+- `npm run test`
+- Result: `222` tests passing.
+- `npx tsc --noEmit`
+- Result: no TypeScript errors.
+- Dev server was not started in Codespace, per project instructions.
+
+## 2026-06-18 Batch 1 Core Valuation / Trade Verdict Audit
+
+### Completed Today
+
+- Completed Batch 1 edits from `AUDIT.md` for the core valuation and trade verdict path.
+- Made package compression monotonic so adding low-value throw-ins can no longer reduce the compressed NAV of the package being sent away.
+- Moved shared trade classification rules into `app/lib/trade-classification.ts` so `/api/evaluate` and proposal generation use the same:
+  - division map
+  - position normalization
+  - future-core / development-risk / peak-window classifiers
+  - veteran-term thresholds
+  - shopped-asset and premium-lottery-pick checks
+- Fixed proposal pre-screen partner-needs logic so a partner trading away an unreplaced stated position need is rejected deterministically.
+- Aligned generated proposal concession limits with the verdict engine by comparing compressed NAV against the verdict's 45 / 70 concession bands.
+- Fixed cap-floor checks in `/api/evaluate` to use the live/requested cap ceiling instead of the static season ceiling.
+- Updated contender timeline checks to compare against compressed return NAV so depth-padded packages cannot dodge future-asset vetoes.
+- Guarded trade metrics against missing optional fields so picks no longer corrupt `ptsGain` or `defGain`.
+- Reduced bad-starter goalie floor inflation by allowing the starter floor signal to fall to zero for genuinely poor rate performance.
+- Added regression coverage for monotonic compression, partner need screening, compressed concession bands, and pick-safe evaluate metrics.
+
+### Verification
+
+- `npm run test -- __tests__/xnav.test.ts`
+- Result: `66` tests passing.
+- `npm run test -- __tests__/trade-logic-development.test.ts`
+- Result: `8` tests passing.
+- `npm run test -- __tests__/evaluate-route.test.ts`
+- Result: `5` tests passing.
+- `npm run test -- __tests__/feature-canaries.test.ts`
+- Result: `85` tests passing.
+- `npm run test`
+- Result: `218` tests passing.
+- `npx tsc --noEmit`
+- Result: no TypeScript errors.
+- Dev server was not started in Codespace, per project instructions.
+
 ## 2026-06-18 Replacement Callup NAV Guard
 
 ### Completed Today

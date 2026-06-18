@@ -310,7 +310,7 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   // calculation — the GNAV/def component still reflects true on-ice performance.
   // The floor degrades with age (ageFactor) so a 38-year-old bad goalie on an
   // overpaid deal can still produce negative-value outcomes.
-  const starterFloorSignal = clamp((expGSAx + 6) / 18, 0.55, 1.0);
+  const starterFloorSignal = clamp((expGSAx + 6) / 18, 0, 1.0);
   const starterTmvFloor = isStarter && gamesG >= 50
     ? Math.max(0, 65 * Math.min(ageFactor, 1.0) * starterFloorSignal)
     : isTandem ? 30 : 0;
@@ -864,11 +864,13 @@ export function compressPackage(
   const pickValue = picks.reduce((sum, a) => sum + a.nav, 0);
   if (players.length === 0) return pickValue;
   const sorted = [...players].sort((a, b) => b.nav - a.nav);
-  let decaySum = 0, penaltySum = 0;
+  let decaySum = 0;
   sorted.forEach((a, i) => {
     const age = a.age ?? 27;
-    decaySum  += a.nav * Math.pow(ageDecayRate(age), i);
-    if (i > 0) penaltySum += ageSlotPenalty(age);
+    const marginalValue = i === 0
+      ? a.nav
+      : (a.nav * Math.pow(ageDecayRate(age), i)) - ageSlotPenalty(age);
+    decaySum += Math.max(0, marginalValue);
   });
-  return pickValue + Math.max(0, decaySum - penaltySum);
+  return pickValue + Math.max(0, decaySum);
 }

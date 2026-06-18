@@ -118,7 +118,7 @@ describe("trade share payload", () => {
     });
   });
 
-  it("reconstructs selected assets from share references without failing on missing assets", () => {
+  it("reconstructs selected assets and preserves placeholders for missing assets", () => {
     const resolved = resolveTradeShareAssets(
       [
         { id: "player-out", retainedPct: 0.25 },
@@ -127,8 +127,13 @@ describe("trade share payload", () => {
       [asset("player-out", "WPG")],
     );
 
-    expect(resolved).toHaveLength(1);
+    expect(resolved).toHaveLength(2);
     expect(resolved[0]).toMatchObject({ id: "player-out", retainedPct: 0.25 });
+    expect(resolved[1]).toMatchObject({
+      id: "missing-player",
+      name: "Unavailable asset (missing-player)",
+      retainedPct: 0,
+    });
   });
 
   it("summarizes a shared trade for social previews", () => {

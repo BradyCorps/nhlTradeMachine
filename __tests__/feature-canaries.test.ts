@@ -239,6 +239,9 @@ describe("Canary — trade proposal audit verification", () => {
     expect(src).toContain("fetchTradeVerdict");
     expect(src).toContain("tradePassesFullAudit");
     expect(src).toContain("AUDIT_CONCURRENCY");
+    expect(src).toContain("MAX_AUDIT_CANDIDATES");
+    expect(src).toContain("generateRunRef");
+    expect(src).toContain("generateAbortRef");
     expect(src).toContain("auditProgress");
     expect(src).toContain('status !== "BLOCKED" && status !== "DECLINED"');
     expect(src).toContain("const partnerRoster = allPlayers.filter(p => p.teamId === candidate.team.id)");
@@ -252,6 +255,29 @@ describe("Canary — trade proposal audit verification", () => {
     expect(src).not.toContain("const allAssets = [...outgoing, ...incoming, ...allHomeRoster, ...allPartnerRoster]");
   });
 
+  it("focused trade machine ignores stale async NAV and verdict responses", () => {
+    const src = read("app/components/QuickTradeMachine.tsx");
+    expect(src).toContain("navRunRef");
+    expect(src).toContain("verdictRunRef");
+    expect(src).toContain("verdictAbortRef");
+    expect(src).toContain("ctrl.signal.aborted || runId !== verdictRunRef.current");
+    expect(src).toContain("ctrl.signal.aborted || runId !== navRunRef.current");
+  });
+
+  it("salary dump proposals only ship negative contracts plus sweeteners", () => {
+    const src = read("app/components/TradeProposal.tsx");
+    expect(src).toContain("const dumpNav = negPlayers.reduce");
+    expect(src).toContain("const homeSends = [...negPlayers, ...sweetener]");
+    expect(src).not.toContain("const homeSends = [...outgoingBlock, ...sweetener]");
+  });
+
+  it("verdict flag expansion uses stable global indices instead of indexOf keys", () => {
+    const src = read("app/components/VerdictPanel.tsx");
+    expect(src).toContain("flagEntries");
+    expect(src).toContain("key: `${flag.perspective");
+    expect(src).not.toContain("flags.indexOf(flag)");
+  });
+
   it("direct GM audit declines extreme NAV surplus instead of calling it a win", () => {
     const src = read("app/api/evaluate/route.ts");
     expect(src).toContain("partnerConcessionLimit");
@@ -261,7 +287,7 @@ describe("Canary — trade proposal audit verification", () => {
   });
 
   it("does not keep retired Arizona division data in the direct audit engine", () => {
-    const src = read("app/api/evaluate/route.ts");
+    const src = read("app/lib/trade-classification.ts");
     expect(src).not.toContain('ARI: "Central"');
     expect(src).toContain('UTA: "Central"');
   });
@@ -281,6 +307,20 @@ describe("Canary — trade UI negative NAV", () => {
     const src = read("app/components/AssetCard.tsx");
     expect(src).toContain("!isPick && idx === 0");
     expect(src).toContain("onRequestTrade?.(asset)");
+  });
+
+  it("uses shared pick-round formatting for 4th and later round picks", () => {
+    const assetCard = read("app/components/AssetCard.tsx");
+    const quickTrade = read("app/components/QuickTradeMachine.tsx");
+    const proposal = read("app/components/TradeProposal.tsx");
+    const comparison = read("app/components/PlayerComparison.tsx");
+    const shared = read("app/lib/trade-format.ts");
+    expect(shared).toContain("formatPickRound");
+    expect(shared).toContain("return `${round}th`");
+    expect(assetCard).toContain("formatPickRound(asset.round)");
+    expect(quickTrade).toContain("formatPickRound(asset.round)");
+    expect(proposal).toContain("const rdLabel   = formatPickRound");
+    expect(comparison).toContain("formatPickRound(asset.round)");
   });
 
   it("AssetCard exposes development profile as its own tab without affecting NAV controls", () => {
@@ -408,10 +448,13 @@ describe("Canary — development profile route exposure", () => {
 describe("Canary — NAV client cache keys", () => {
   const client = read("app/lib/evaluate-client.ts");
 
-  it("includes prospect valuation inputs so NHLe updates do not reuse stale NAV", () => {
-    expect(client).toContain("xnav-2.1-prospect-nhle");
-    expect(client).toContain("a.draftOverall ??");
-    expect(client).toContain("a.prospectPtsPace ??");
+  it("keys NAV cache entries from full valuation inputs and cap ceiling", () => {
+    expect(client).toContain("xnav-2.2-full-input-key");
+    expect(client).toContain("stableStringify");
+    expect(client).toContain("capCeiling: capCeiling ?? a.capCeiling ?? null");
+    expect(client).toContain("asset: a");
+    expect(client).toContain("evaluate API omitted NAV");
+    expect(client).not.toContain("total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0");
   });
 });
 
@@ -545,12 +588,16 @@ describe("Canary — trade UX loading and mobile focus", () => {
 describe("Canary — development profile trade audit", () => {
   const src = read("app/api/evaluate/route.ts");
   const tradeLogic = read("app/lib/trade-logic.ts");
+  const sharedTradeClassification = read("app/lib/trade-classification.ts");
 
   it("uses development profile in GM timeline reasoning without feeding X-NAV", () => {
-    expect(src).toContain("const isFutureCoreAsset");
-    expect(src).toContain("const isDevelopmentRiskAsset");
-    expect(src).toContain("const isPeakWindowAsset");
-    expect(src).toContain("developmentProfile");
+    expect(src).toContain("isFutureCoreAsset");
+    expect(src).toContain("isDevelopmentRiskAsset");
+    expect(src).toContain("isPeakWindowAsset");
+    expect(sharedTradeClassification).toContain("const isFutureCoreAsset");
+    expect(sharedTradeClassification).toContain("const isDevelopmentRiskAsset");
+    expect(sharedTradeClassification).toContain("const isPeakWindowAsset");
+    expect(sharedTradeClassification).toContain("developmentProfile");
     expect(src).toContain("is selling a future-core profile");
     expect(src).toContain("development variance");
     expect(src).toContain("fits a win-now window");
@@ -558,10 +605,10 @@ describe("Canary — development profile trade audit", () => {
   });
 
   it("uses development profile in proposal fit/copy/risk without feeding X-NAV", () => {
-    expect(tradeLogic).toContain("const isFutureCoreAsset");
-    expect(tradeLogic).toContain("const isDevelopmentRiskAsset");
-    expect(tradeLogic).toContain("const isPeakWindowAsset");
-    expect(tradeLogic).toContain("developmentProfile");
+    expect(tradeLogic).toContain("isFutureCoreAsset");
+    expect(tradeLogic).toContain("isDevelopmentRiskAsset");
+    expect(tradeLogic).toContain("isPeakWindowAsset");
+    expect(sharedTradeClassification).toContain("developmentProfile");
     expect(tradeLogic).toContain("future-core profile");
     expect(tradeLogic).toContain("DEV VARIANCE");
     expect(tradeLogic).toContain("peak-window player");

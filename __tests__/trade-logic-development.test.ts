@@ -152,13 +152,29 @@ describe("development profile trade proposal logic", () => {
       .toBe(false);
   });
 
-  it("screens out partner concessions beyond the tightened NAV approval band", () => {
+  it("screens out partner concessions beyond the verdict-aligned compressed NAV approval band", () => {
     const home = team({ id: "EDM", name: "Edmonton Oilers", phase: "Contender", standing: 3 });
     const partner = team({ id: "NSH", name: "Nashville Predators", phase: "Retooling", standing: 20 });
     const depth = asset({ id: "depth", name: "Depth Player", teamId: home.id });
     const better = asset({ id: "better", name: "Better Player", teamId: partner.id });
 
-    expect(preScreenProposal([depth], [better], home, partner, { depth: 40, better: 75 }))
+    expect(preScreenProposal([depth], [better], home, partner, { depth: 40, better: 95 }))
+      .toBe(false);
+  });
+
+  it("screens out a partner trading away an unreplaced stated position need", () => {
+    const home = team({ id: "EDM", name: "Edmonton Oilers", phase: "Contender", standing: 3 });
+    const partner = team({
+      id: "NSH",
+      name: "Nashville Predators",
+      phase: "Retooling",
+      standing: 20,
+      needs: [{ pos: "W", minWar: 1, label: "Top-nine winger" }],
+    });
+    const center = asset({ id: "center", name: "Return Center", teamId: home.id, position: "C" });
+    const winger = asset({ id: "winger", name: "Needed Winger", teamId: partner.id, position: "R" });
+
+    expect(preScreenProposal([center], [winger], home, partner, { center: 60, winger: 60 }))
       .toBe(false);
   });
 

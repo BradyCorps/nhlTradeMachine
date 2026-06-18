@@ -30,6 +30,11 @@ export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFla
   onOpenMemo: () => void;
 }) {
   const flags = verdict.flags;
+  const flagEntries = flags.map((flag, index) => ({
+    flag,
+    index,
+    key: `${flag.perspective ?? "home"}-${flag.severity}-${flag.category}-${flag.headline}-${index}`,
+  }));
   const hardCount = flags.filter((f) => f.severity === "HARD").length;
   const softCount = flags.filter((f) => f.severity === "SOFT").length;
   const warnCount = flags.filter((f) => f.severity === "WARN").length;
@@ -77,14 +82,13 @@ export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFla
         {flags.length === 0 && <div className="text-2xs text-zinc-700 italic">No flags raised.</div>}
 
         {/* Home-team flags — your concerns */}
-        {flags.filter(f => f.perspective !== "partner").map((flag, i) => {
-          const globalIdx = flags.indexOf(flag);
+        {flagEntries.filter(entry => entry.flag.perspective !== "partner").map(({ flag, index, key }) => {
           const fs = SEVERITY_STYLES[flag.severity];
-          const isOpen = expandedFlag === globalIdx;
+          const isOpen = expandedFlag === index;
           return (
-            <div key={globalIdx}
+            <div key={key}
               className={`rounded-lg border overflow-hidden cursor-pointer transition-all duration-200 ${fs.bg} ${fs.border} hover:opacity-90`}
-              onClick={() => setExpandedFlag(isOpen ? null : globalIdx)}>
+              onClick={() => setExpandedFlag(isOpen ? null : index)}>
               <div className="flex items-center gap-2 px-3 py-2">
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${fs.dot}`} />
                 <span className={`text-2xs font-black uppercase tracking-tight flex-1 leading-tight ${fs.text}`}>
@@ -117,14 +121,13 @@ export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFla
             <div className="text-2xs font-black text-zinc-600 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
               <span style={{ opacity: 0.5 }}>◈</span> Concerns for the other side
             </div>
-            {flags.filter(f => f.perspective === "partner").map((flag, i) => {
-              const globalIdx = flags.indexOf(flag);
-              const isOpen = expandedFlag === globalIdx;
+            {flagEntries.filter(entry => entry.flag.perspective === "partner").map(({ flag, index, key }) => {
+              const isOpen = expandedFlag === index;
               return (
-                <div key={globalIdx}
+                <div key={key}
                   className="rounded-lg border overflow-hidden cursor-pointer transition-all duration-200 hover:opacity-90 mb-1.5"
                   style={{ background: 'rgba(28,20,10,0.04)', borderColor: 'var(--ledger-rule-mid)', opacity: 0.85 }}
-                  onClick={() => setExpandedFlag(isOpen ? null : globalIdx)}>
+                  onClick={() => setExpandedFlag(isOpen ? null : index)}>
                   <div className="flex items-center gap-2 px-3 py-2">
                     <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--ledger-ink-faint)' }} />
                     <span className="text-2xs font-black uppercase tracking-tight flex-1 leading-tight"

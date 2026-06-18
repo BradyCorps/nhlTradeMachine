@@ -10,6 +10,7 @@ import PlayerTimeline from "@/app/components/PlayerTimeline";
 import { useTradeStore } from "@/app/store/tradeStore";
 import { AssetBadges } from "@/app/components/AssetBadges";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
+import { formatPickRound } from "@/app/lib/trade-format";
 
 const fmt = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
 type AssetCardView = "STATS" | "STRAND" | "TIMELINE" | "DEV";
@@ -104,7 +105,7 @@ export default function AssetCard({
             
             <div className="text-2xs font-bold uppercase tracking-wider mt-0.5 text-ledger-ink-faint font-mono">
               {isPick
-                ? `${asset.year} · ${asset.round === 1 ? "1st" : asset.round === 2 ? "2nd" : "3rd"} Round`
+                ? `${asset.year} · ${formatPickRound(asset.round)} Round`
                 : (() => {
                     const expiryYear = new Date().getFullYear() + (asset.yearsRemaining ?? 1);
                     const extCap   = (asset as any).extensionCapHit;

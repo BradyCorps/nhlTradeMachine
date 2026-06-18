@@ -187,4 +187,31 @@ describe("evaluate route integration", () => {
       }),
     ]));
   });
+
+  it("keeps production metrics numeric when a draft pick is included", async () => {
+    const home = team({ id: "WPG", name: "Winnipeg Jets", capSpace: 10, phase: "Retooling", standing: 16 });
+    const partner = team({ id: "SJS", name: "San Jose Sharks", capSpace: 10, phase: "Rebuilding", standing: 29 });
+    const outgoing = [
+      asset({ id: "wpg-wing", name: "WPG Wing", teamId: "WPG", ptsPace: 40, defRate: 1, avgTOI: 14 }),
+    ];
+    const incoming = [
+      asset({ id: "sjs-2027-2", name: "2027 2nd Round Pick (SJS)", teamId: "SJS", position: "Pick", round: 2, year: 2027 }),
+    ];
+
+    const { response, body } = await postEvaluate({
+      assets: [...outgoing, ...incoming],
+      tradeOutgoing: outgoing,
+      tradeIncoming: incoming,
+      homeTeam: home,
+      partnerTeam: partner,
+      allHomeRoster: outgoing,
+      allPartnerRoster: [],
+      runTrade: true,
+      capCeiling: 95.5,
+    });
+
+    expect(response.status).toBe(200);
+    expect(Number.isFinite(body.verdict.metrics.ptsGain)).toBe(true);
+    expect(Number.isFinite(body.verdict.metrics.defGain)).toBe(true);
+  });
 });

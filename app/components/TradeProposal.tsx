@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Asset, Team } from "@/app/lib/trade-types";
 import { fetchTradeVerdict } from "@/app/lib/evaluate-client";
@@ -16,6 +16,7 @@ import {
   getRisk,
   preScreenProposal
 } from "@/app/lib/trade-logic";
+import { formatPickRound } from "@/app/lib/trade-format";
 
 interface Props {
   outgoingBlock: Asset[];
@@ -40,6 +41,7 @@ const tradePassesFullAudit = (status?: string): boolean =>
   status !== "BLOCKED" && status !== "DECLINED";
 
 const AUDIT_CONCURRENCY = 6;
+const MAX_AUDIT_CANDIDATES = 36;
 
 export default function TradeProposalEngine({
   outgoingBlock, homeTeam, allTeams, allPlayers, navMap, onClose, onLoadTrade
@@ -51,6 +53,19 @@ export default function TradeProposalEngine({
   const [slideDirection, setSlideDirection] = useState<"next" | "prev">("next");
   const [marketStats, setMarketStats] = useState({ reviewed: 0, viable: 0 });
   const [auditProgress, setAuditProgress] = useState<{ checked: number; total: number } | null>(null);
+  const generateAbortRef = useRef<AbortController | null>(null);
+  const generateRunRef = useRef(0);
+
+  useEffect(() => () => generateAbortRef.current?.abort(), []);
+  useEffect(() => {
+    generateAbortRef.current?.abort();
+    generateRunRef.current += 1;
+    setProposals([]);
+    setDone(false);
+    setActiveIndex(0);
+    setGenerating(false);
+    setAuditProgress(null);
+  }, [homeTeam?.id, outgoingBlock, navMap]);
 
   // Trade-block badge — shows why this player is realistically available
   const BlockBadge = ({ status }: { status?: string | null }) => {
@@ -71,7 +86,7 @@ export default function TradeProposalEngine({
 
   const blockNav  = outgoingBlock.reduce((s, a) => s + (navMap[a.id] ?? 0), 0);
   const isDump    = isDumpBlock(outgoingBlock, navMap);
-  const rdLabel   = (r?: number) => r===1?"1st":r===2?"2nd":r===3?"3rd":`${r}th`;
+  const rdLabel   = formatPickRound;
   const blockSummary = outgoingBlock.length === 1 ? outgoingBlock[0].name : `${outgoingBlock.length}-piece package`;
 
   // Home team's picks (for sweetening dumps)
@@ -81,11 +96,14 @@ export default function TradeProposalEngine({
 
   const generate = async () => {
     if (!homeTeam) return;
+    generateAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    generateAbortRef.current = ctrl;
+    const runId = ++generateRunRef.current;
     setGenerating(true); setDone(false); setProposals([]); setActiveIndex(0); setAuditProgress(null);
 
     const candidates: Candidate[] = [];
 
-    const negNav = Math.abs(Math.min(0, blockNav));
     // Also check if this could be a neg-for-neg swap even if not a "dump"
     const hasNegPlayer = outgoingBlock.some(a => a.position !== "Pick" && getNav(a, navMap) < -5);
 
@@ -100,9 +118,10 @@ export default function TradeProposalEngine({
         const fit = dumpFitScore(team, negPlayers, roster, navMap);
         if (fit < 20) continue;
 
-        const sweetener = buildDumpSweetener(negNav, homePicks, navMap);
+        const dumpNav = negPlayers.reduce((s, a) => s + getNav(a, navMap), 0);
+        const sweetener = buildDumpSweetener(Math.abs(dumpNav), homePicks, navMap);
 
-        const homeSends = [...outgoingBlock, ...sweetener];
+        const homeSends = [...negPlayers, ...sweetener];
 
         // Sometimes partner sends back a cheap depth player to make it a real trade
         const cheapReturn = roster
@@ -193,9 +212,9 @@ export default function TradeProposalEngine({
     // Catches cap violations, NMC blocks, and self-defeating logic
     // before surfacing to the user. Better to show fewer clean proposals
     // than more with declined verdicts.
-    const preScreened = candidates.filter(c =>
-      preScreenProposal(c.homeSends, c.partnerSends, homeTeam!, c.team, navMap)
-    );
+    const preScreened = candidates
+      .filter(c => preScreenProposal(c.homeSends, c.partnerSends, homeTeam!, c.team, navMap))
+      .slice(0, MAX_AUDIT_CANDIDATES);
 
     setAuditProgress({ checked: 0, total: preScreened.length });
 
@@ -211,6 +230,7 @@ export default function TradeProposalEngine({
           candidate.team,
           homeRoster,
           partnerRoster,
+          ctrl.signal,
         );
         return tradePassesFullAudit(verdict?.status) ? candidate : null;
       } catch (e) {
@@ -227,8 +247,10 @@ export default function TradeProposalEngine({
 
     await Promise.all(Array.from({ length: workerCount }, async () => {
       while (cursor < preScreened.length) {
+        if (ctrl.signal.aborted || runId !== generateRunRef.current) return;
         const candidate = preScreened[cursor++];
         const verified = await verifyCandidate(candidate);
+        if (ctrl.signal.aborted || runId !== generateRunRef.current) return;
         checked += 1;
         setAuditProgress({ checked, total: preScreened.length });
         if (verified) {
@@ -237,6 +259,8 @@ export default function TradeProposalEngine({
         }
       }
     }));
+
+    if (ctrl.signal.aborted || runId !== generateRunRef.current) return;
 
     if (preScreened.length === 0) {
       setAuditProgress({ checked: 0, total: 0 });

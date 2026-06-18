@@ -164,9 +164,32 @@ export function resolveTradeShareAssets(
   refs: TradeShareAssetRef[],
   assets: Asset[],
 ): Asset[] {
-  return refs.flatMap(ref => {
-    const asset = assets.find(candidate => candidate.id === ref.id);
-    return asset ? [{ ...asset, retainedPct: ref.retainedPct }] : [];
+  const byId = new Map<string, Asset>();
+  for (const asset of assets) {
+    if (!byId.has(asset.id)) byId.set(asset.id, asset);
+  }
+
+  return refs.map(ref => {
+    const asset = byId.get(ref.id);
+    if (asset) return { ...asset, retainedPct: ref.retainedPct };
+    return {
+      id: ref.id,
+      teamId: "",
+      name: `Unavailable asset (${ref.id})`,
+      position: "Pick",
+      age: 0,
+      games: 0,
+      ptsPace: 0,
+      defRate: 0,
+      avgTOI: 0,
+      capHit: 0,
+      yearsRemaining: 0,
+      hasNMC: false,
+      hasNTC: false,
+      canRetain: false,
+      retainedPct: ref.retainedPct,
+      multiplier: 1,
+    };
   });
 }
 
