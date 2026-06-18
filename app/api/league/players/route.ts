@@ -875,8 +875,10 @@ export async function GET() {
       const defaultTOI = isGoalie ? 0 : finalPosition === "D" ? 18.5 : 13.5;
       const defaultPts = isGoalie ? 0 : finalPosition === "D" ? 22 : finalPosition === "C" ? 32 : 28;
 
+      const nhlG = NHL_GOALIE_STATS.get(`id:${p.id}`) ?? NHL_GOALIE_STATS.get(slugify(p.name));
+      const mpG  = goalieMap.get(slugify(p.name));
       const goalieStats = isGoalie
-        ? (NHL_GOALIE_STATS.get(`id:${p.id}`) ?? goalieMap.get(slugify(p.name)) ?? NHL_GOALIE_STATS.get(slugify(p.name)) ?? null)
+        ? (mpG || nhlG ? { ...(nhlG ?? {}), ...(mpG ?? {}), gsax: mpG?.gsax ?? nhlG?.gsax ?? 0 } : null)
         : null;
 
       const hasProspectSignal = draftOverall != null || (prospectPtsPace != null && prospectPtsPace > 0);

@@ -138,6 +138,17 @@ describe("Canary — league route features (source-level)", () => {
         expect(src).toContain("NHL_GOALIE_STATS.get(`id:${p.id}`)");
         expect(src).toContain("goalieMap.get(");
       });
+
+      it("keeps MoneyPuck goalie GSAX ahead of NHL fallback stats", () => {
+        if (route !== "app/api/league/players/route.ts") {
+          expect(src).toContain("NHL_GOALIE_STATS.get");
+          return;
+        }
+        expect(src).toContain("const gsax   = xGoals - goals;");
+        expect(src).toContain("const nhlG = NHL_GOALIE_STATS.get(`id:${p.id}`) ?? NHL_GOALIE_STATS.get(slugify(p.name));");
+        expect(src).toContain("const mpG  = goalieMap.get(slugify(p.name));");
+        expect(src).toContain("...(nhlG ?? {}), ...(mpG ?? {}), gsax: mpG?.gsax ?? nhlG?.gsax ?? 0");
+      });
     });
   }
 });
