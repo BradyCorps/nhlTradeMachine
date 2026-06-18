@@ -746,14 +746,31 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     franchiseFloor = age <= 24 ? 240 : age <= 26 ? 200 : 160;
   }
 
-  const total = Math.max(discountedTotal, franchiseFloor);
+  const uncappedTotal = Math.max(discountedTotal, franchiseFloor);
+  const hasMeaningfulBaseline =
+    safe(asset.baselinePtsPace ?? 0) >= 25 ||
+    safe(asset.baselineGameScore ?? 0) >= 25 ||
+    safe(asset.baselineDpsProxy ?? 0) >= 1.5;
+  const approximateSamplePoints = games > 0 ? (pts / 82) * games : 0;
+  const hasOnlyTinySampleProduction = games < 8 && approximateSamplePoints <= 2 && pts < 45;
+  const isReplacementCallup =
+    age >= 26 &&
+    games < 14 &&
+    toi < 9 &&
+    (blendedPts < 15 || hasOnlyTinySampleProduction) &&
+    !hasMeaningfulBaseline &&
+    asset.draftOverall == null;
+  const total = isReplacementCallup ? Math.min(uncappedTotal, 4) : uncappedTotal;
+  const displayedCap = isReplacementCallup
+    ? Math.min(capTotal, Math.max(0, total))
+    : capTotal;
 
   return {
     total:  Math.round(total),
     off:    Math.round(offTotal),
     def:    Math.round(defDisplay),
     age:    Math.round(ageTotal),
-    cap:    Math.round(capTotal),
+    cap:    Math.round(displayedCap),
     upside: Math.round(Math.max(0, ageTotal)),
     noivImpact,
     fArchetype,

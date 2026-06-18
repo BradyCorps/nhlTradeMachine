@@ -538,6 +538,39 @@ describe("X-NAV — Young Surplus Contracts", () => {
     expect(result.total).toBeLessThan(30);
   });
 
+  it("Replacement-level injury callup does not get league-minimum surplus NAV", () => {
+    const result = calcSkaterNAV({
+      id: "macewen-shape", name: "Zack MacEwen Shape", position: "W",
+      age: 29, capHit: 0.775, yearsRemaining: 1,
+      ptsPace: 0, xGPace: 0, defRate: 0,
+      avgTOI: 6, games: 3, hasLiveStats: true,
+    });
+
+    expect(result.rosterTier).toBe("BOTTOM_SIX");
+    expect(result.total).toBeLessThanOrEqual(4);
+    expect(result.cap).toBeLessThanOrEqual(4);
+  });
+
+  it("Replacement-level callup with weak baseline and one tiny-sample point still does not get surplus NAV", () => {
+    const result = calcSkaterNAV({
+      id: "zack-macewen", name: "Zack MacEwen", position: "W",
+      age: 29, capHit: 0.775, yearsRemaining: 1,
+      ptsPace: 82 / 3, xGPace: 0, defRate: 0,
+      avgTOI: 6, games: 3, hasLiveStats: true,
+      baselinePtsPace: 10.95,
+      baselineGameScore: 14.63,
+      baselineDpsProxy: 0.8,
+      baselineXgRel: -0.03,
+      baselineHits82: 194.65,
+      baselineBlocks82: 27.59,
+    });
+
+    expect(result.rosterTier).toBe("BOTTOM_SIX");
+    expect(result.total).toBeLessThanOrEqual(4);
+    expect(result.cap).toBeLessThanOrEqual(4);
+    expect(result.fArchetype).toBe("GRINDER");
+  });
+
   it("Young NHL track record relieves development discount versus same-age small sample", () => {
     const base = {
       id: "ordinary-young", name: "Ordinary Young", position: "C" as const,

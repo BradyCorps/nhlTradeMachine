@@ -1,5 +1,26 @@
 # Development Notes
 
+## 2026-06-18 Replacement Callup NAV Guard
+
+### Completed Today
+
+- Added a replacement-level callup ceiling to skater X-NAV.
+- Low-minute, tiny-sample, age-26+ skaters with no meaningful baseline/pedigree signal no longer receive meaningful positive NAV from league-minimum cap surplus alone.
+- This addresses profiles like a 29-year-old injury callup playing ~3 games at ~6 minutes TOI being valued as a real trade asset.
+- Corrected the exact `Zack MacEwen` case where a weak MoneyPuck baseline existed but should not count as a meaningful established-player baseline.
+- Added explicit tiny-sample production handling so one point in three games does not turn into a meaningful pts/82 signal for a 6-minute replacement callup.
+- Added regression tests for a `Zack MacEwen`-shaped league-minimum callup with and without weak baseline data.
+
+### Verification
+
+- `npm run test -- __tests__/xnav.test.ts`
+- Result: `65` tests passing.
+- `npm run test`
+- Result: `215` tests passing.
+- `npx tsc --noEmit`
+- Result: no TypeScript errors.
+- Dev server was not started in Codespace, per project instructions.
+
 ## 2026-06-18 Development Profile Panel Audit
 
 ### Completed Today
