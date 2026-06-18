@@ -53,8 +53,12 @@ export interface DevelopmentProfile extends FantasyProfile {
   bustScore: number;
   nhlExperienceScore: number;
   pedigreeScore: number;
+  effectivePedigreeScore?: number;
+  pedigreeWeight?: number;
   productionScore: number;
   roleGrowthScore: number;
+  confidenceScore?: number;
+  scoringTrajectory?: string[];
   tags: string[];
   rationale: string[];
 }
@@ -78,9 +82,10 @@ export interface DevelopmentProfileInput {
 const clamp = (n: number, lo = 0, hi = 100): number => Math.max(lo, Math.min(hi, n));
 
 function productionScale(position: DevelopmentProfileInput["position"]): number {
-  if (position === "D") return 55;
+  if (position === "D") return 65;
   if (position === "G") return 0;
-  return 75;
+  if (position === "C") return 95;
+  return 90;
 }
 
 function scorePedigree(draftOverall: number | undefined, internationalScore = 0): number {
@@ -102,6 +107,10 @@ function scoreExperience(nhlGames: number): number {
   return clamp((nhlGames / 320) * 100);
 }
 
+function pedigreeSampleWeight(nhlGames: number): number {
+  return clamp(1 - Math.max(0, nhlGames - 20) / 180, 0, 1);
+}
+
 function totalNhlGamesFromSnapshots(snapshots: PlayerSeasonSnapshot[]): number {
   return snapshots
     .filter(s => s.league === "NHL")
@@ -119,6 +128,18 @@ function latestNhle(snapshots: PlayerSeasonSnapshot[]): number | null {
     .map(s => s.nhlePtsPace ?? (s.league === "NHL" ? s.ptsPerGame * 82 : undefined))
     .filter((n): n is number => Number.isFinite(n));
   return values.length ? values[values.length - 1] : null;
+}
+
+function scoringTrajectoryLabels(snapshots: PlayerSeasonSnapshot[]): string[] {
+  return snapshots
+    .filter(s => s.games >= 5)
+    .slice(-3)
+    .map((s) => {
+      const pace = s.nhlePtsPace ?? (s.league === "NHL" ? s.ptsPerGame * 82 : null);
+      return pace == null
+        ? `${s.season}: ${s.points} pts`
+        : `${s.season}: ${Math.round(pace)} pts/82`;
+    });
 }
 
 function trendFromSnapshots(snapshots: PlayerSeasonSnapshot[]): { trend: TimelineTrend; volatility: number; growth: number } {
@@ -258,14 +279,33 @@ function trendRationale(trend: TimelineTrend, volatility: number, snapshots: Pla
     trend === "FALLING" ? "falling" :
     trend === "VOLATILE" ? "volatile" :
     "steady";
-  const riskLabel = volatility >= 65 ? "high-variance" : volatility >= 45 ? "moderate-variance" : "stable";
-  return `Recent timeline looks ${trendLabel}; ${riskLabel} profile keeps the projection band flexible.`;
+  const riskLabel = volatility >= 65 ? "high-variance scoring pattern" : volatility >= 45 ? "moderate scoring variance" : "stable scoring pattern";
+  return `Recent scoring trajectory looks ${trendLabel}; ${riskLabel} affects the projection band separately from sample confidence.`;
+}
+
+function pedigreeProductionRationale(opts: {
+  rawPedigree: number;
+  effectivePedigree: number;
+  production: number;
+  careerNhlGames: number;
+}): string | null {
+  if (opts.careerNhlGames < 120) return null;
+  if (opts.rawPedigree >= 80 && opts.production < opts.rawPedigree - 20) {
+    return `Draft pedigree is mostly historical now; ${opts.careerNhlGames} NHL games shift the read toward current production and role.`;
+  }
+  if (opts.production >= opts.effectivePedigree + 20) {
+    return `Recent NHL production is driving the profile more than draft slot at this sample size.`;
+  }
+  return null;
 }
 
 export function calcDevelopmentProfile(input: DevelopmentProfileInput): DevelopmentProfile {
   const snapshots = input.snapshots ?? [];
   const careerNhlGames = Math.max(input.nhlGames, totalNhlGamesFromSnapshots(snapshots));
-  const pedigree = scorePedigree(input.draftOverall, input.internationalScore);
+  const rawPedigree = scorePedigree(input.draftOverall, input.internationalScore);
+  const pedigreeWeight = pedigreeSampleWeight(careerNhlGames);
+  const pedigree = rawPedigree * pedigreeWeight;
+  const establishedWeight = 1 - pedigreeWeight;
   const experience = scoreExperience(careerNhlGames);
   const production = scoreProduction(input);
   const trend = trendFromSnapshots(snapshots);
@@ -302,17 +342,19 @@ export function calcDevelopmentProfile(input: DevelopmentProfileInput): Developm
   const projectionBand = buildProjectionBand(input, { pedigree, confidence, volatility, latestNhle: latest });
   const currentFantasyScore = Math.round(clamp(production * 0.7 + experience * 0.2 + role * 0.1 - regressionRisk * 0.08));
   const dynastyScore = Math.round(clamp(
-    production * 0.28 +
-    pedigree * 0.28 +
-    breakoutProbability * 0.22 +
-    (100 - regressionRisk) * 0.12 +
+    production * (0.30 + establishedWeight * 0.10) +
+    pedigree * 0.24 +
+    breakoutProbability * 0.20 +
+    role * (0.08 + establishedWeight * 0.06) +
+    confidence * establishedWeight * 0.10 +
+    (100 - regressionRisk) * 0.08 +
     (input.age <= 23 ? 12 : input.age <= 26 ? 6 : input.age >= 33 ? -18 : 0)
   ));
 
   const tags: string[] = [];
-  if (boomBustScore >= 65) tags.push("BOOM_BUST");
+  if (Math.round(boomBustScore) >= 65) tags.push("BOOM_BUST");
   if (breakoutProbability >= 65) tags.push("BREAKOUT");
-  if (pedigree >= 90) tags.push("ELITE_PEDIGREE");
+  if (rawPedigree >= 90 && pedigreeWeight >= 0.25) tags.push("ELITE_PEDIGREE");
   if (confidence < 45) tags.push("LOW_CONFIDENCE");
   if (regressionRisk >= 60) tags.push("REGRESSION_RISK");
   if (input.teamContext === "WEAK" || input.linemateContext === "WEAK") tags.push("CONTEXT_DRAG");
@@ -322,7 +364,11 @@ export function calcDevelopmentProfile(input: DevelopmentProfileInput): Developm
     productionRationale(input, latest),
     trendRationale(trend.trend, volatility, snapshots),
   ];
-  if (input.draftOverall != null) rationale.push(`Draft pedigree: ${input.draftOverall} overall.`);
+  const signalRationale = pedigreeProductionRationale({ rawPedigree, effectivePedigree: pedigree, production, careerNhlGames });
+  if (signalRationale) rationale.push(signalRationale);
+  if (input.draftOverall != null) {
+    rationale.push(`Draft pedigree: ${input.draftOverall} overall; current sample weight ${Math.round(pedigreeWeight * 100)}%.`);
+  }
   if (input.teamContext === "WEAK" || input.linemateContext === "WEAK") rationale.push("weak context lowers near-term breakout certainty");
 
   return {
@@ -339,9 +385,13 @@ export function calcDevelopmentProfile(input: DevelopmentProfileInput): Developm
     boomScore: boomBust.boomScore,
     bustScore: boomBust.bustScore,
     nhlExperienceScore: Math.round(experience),
-    pedigreeScore: Math.round(pedigree),
+    pedigreeScore: Math.round(rawPedigree),
+    effectivePedigreeScore: Math.round(pedigree),
+    pedigreeWeight: Math.round(pedigreeWeight * 100),
     productionScore: Math.round(production),
     roleGrowthScore: Math.round(role),
+    confidenceScore: Math.round(confidence),
+    scoringTrajectory: scoringTrajectoryLabels(snapshots),
     tags,
     rationale,
   };

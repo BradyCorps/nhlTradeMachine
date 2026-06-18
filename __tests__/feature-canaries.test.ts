@@ -351,6 +351,7 @@ describe("Canary — development profile diagnostics", () => {
 
 describe("Canary — development profile rationale copy", () => {
   const src = read("app/lib/development-profile.ts");
+  const panelSrc = read("app/components/DevelopmentProfilePanel.tsx");
 
   it("uses scouting notes instead of raw score arithmetic for no-NHL-sample players", () => {
     const profile = calcDevelopmentProfile({
@@ -369,6 +370,16 @@ describe("Canary — development profile rationale copy", () => {
     expect(profile.rationale.join(" ")).not.toContain("production score");
     expect(profile.rationale.join(" ")).not.toContain("timeline trend");
     expect(src).not.toContain("NHL games drives experience score");
+  });
+
+  it("decays pedigree with NHL sample and surfaces the panel inputs", () => {
+    expect(src).toContain("pedigreeSampleWeight");
+    expect(src).toContain("effectivePedigreeScore");
+    expect(src).toContain("scoringTrajectoryLabels");
+    expect(panelSrc).toContain("pedigreeWeight");
+    expect(panelSrc).toContain("3-Year Scoring");
+    expect(panelSrc).toContain("SAMPLE CONF");
+    expect(panelSrc).toContain("MiniScore");
   });
 });
 

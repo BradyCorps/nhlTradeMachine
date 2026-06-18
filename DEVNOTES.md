@@ -1,5 +1,38 @@
 # Development Notes
 
+## 2026-06-18 Development Profile Panel Audit
+
+### Completed Today
+
+- Completed the `DEVELOPMENTPROFILEPANEL AUDIT 2026-06-18` in `AUDIT.md`.
+- Changed dynasty scoring so draft pedigree decays with NHL sample instead of remaining a permanent 28% input.
+- Added sample-adjusted pedigree outputs:
+  - `effectivePedigreeScore`
+  - `pedigreeWeight`
+- Shifted established-player dynasty weight toward production, role, and confidence.
+- Raised forward production scaling so strong NHL producers do not clamp at 100 too early.
+- Added `confidenceScore` and `scoringTrajectory` to development profiles.
+- Reworded trajectory rationale to separate scoring volatility from sample confidence.
+- Added an explicit rationale line when draft pedigree and established production disagree.
+- Expanded the Development tab panel with:
+  - production, role, sample-adjusted pedigree, and experience inputs
+  - pedigree sample weight and confidence
+  - 3-year scoring trajectory
+  - up to five rationale lines instead of three
+- Added regression coverage for the Lafreniere/Jarvis issue so a more productive established NHLer is not ranked below a less productive player solely because of old draft slot.
+
+### Verification
+
+- `npm run test -- __tests__/development-profile.test.ts`
+- Result: `10` tests passing.
+- `npm run test -- __tests__/feature-canaries.test.ts`
+- Result: `85` tests passing.
+- `npm run test`
+- Result: `213` tests passing.
+- `npx tsc --noEmit`
+- Result: no TypeScript errors.
+- Dev server was not started in Codespace, per project instructions.
+
 ## 2026-06-18 XNAV Young Player / Goalie Audit
 
 ### Completed Today

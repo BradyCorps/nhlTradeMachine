@@ -540,3 +540,29 @@ Verification added:
 
 - `__tests__/xnav.test.ts` covers discounted unsupported prospects, 14-60 prospect blending, track-record relief, signal-gated youth upside, small-sample point-share damping, ascending 1B goalie caps, veteran tandem caps, and goalie volatility.
 - `__tests__/evaluate-route.test.ts` covers the route-level goalie volatility warning in a real `/api/evaluate` POST flow.
+
+## DEVELOPMENTPROFILEPANEL AUDIT 2026-06-18
+
+Status: Complete as of 2026-06-18.
+
+Completed fixes:
+
+1. Draft pedigree now decays with NHL sample. `calcDevelopmentProfile` keeps raw pedigree for context, but dynasty scoring uses a sample-adjusted `effectivePedigreeScore` that falls toward zero after roughly 200 NHL games.
+2. Dynasty scoring shifts mature-player weight toward production, role, and confidence instead of leaving draft slot as a permanent headline input.
+3. Forward production scaling was raised so strong NHL producers no longer clamp at 100 too early.
+4. Sample confidence now contributes to established-player dynasty scoring and is labeled separately from scoring volatility in the panel.
+5. The trend rationale now describes scoring trajectory/volatility as a separate axis from sample confidence.
+6. The panel now surfaces the hidden component context:
+   - production score
+   - role score
+   - sample-adjusted pedigree score
+   - NHL experience score
+   - pedigree sample weight
+   - confidence input
+   - 3-year scoring trajectory
+7. The rationale includes an explicit line when draft pedigree and established production disagree.
+
+Verification added:
+
+- `__tests__/development-profile.test.ts` now verifies that an established, more productive Seth Jarvis profile ranks ahead of an established Alexis Lafreniere profile after pedigree decay.
+- `__tests__/feature-canaries.test.ts` protects the sample-decay model and the visible panel input/trajectory context.

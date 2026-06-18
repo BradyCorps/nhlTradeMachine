@@ -255,6 +255,46 @@ describe("Development Timeline Layer — fixture archetypes", () => {
     expect(p.rationale[0]).toContain("Established NHL sample");
   });
 
+  it("decays draft pedigree once established NHL production is more predictive", () => {
+    const lafreniere = profile({
+      id: "lafreniere",
+      name: "Alexis Lafreniere",
+      position: "W",
+      age: 24,
+      nhlGames: 420,
+      ptsPace: 53,
+      avgTOI: 16.5,
+      draftOverall: 1,
+      snapshots: [
+        { season: "2023-24", age: 22, league: "NHL", games: 82, goals: 28, assists: 29, points: 57, ptsPerGame: 0.70, nhlePtsPace: 57, avgTOI: 16 },
+        { season: "2024-25", age: 23, league: "NHL", games: 82, goals: 17, assists: 28, points: 45, ptsPerGame: 0.55, nhlePtsPace: 45, avgTOI: 15.8 },
+        { season: "2025-26", age: 24, league: "NHL", games: 82, goals: 24, assists: 33, points: 57, ptsPerGame: 0.70, nhlePtsPace: 57, avgTOI: 16.5 },
+      ],
+    });
+    const jarvis = profile({
+      id: "jarvis",
+      name: "Seth Jarvis",
+      position: "W",
+      age: 24,
+      nhlGames: 390,
+      ptsPace: 73,
+      avgTOI: 18.5,
+      draftOverall: 13,
+      snapshots: [
+        { season: "2023-24", age: 22, league: "NHL", games: 81, goals: 33, assists: 34, points: 67, ptsPerGame: 0.83, nhlePtsPace: 68, avgTOI: 17.9 },
+        { season: "2024-25", age: 23, league: "NHL", games: 73, goals: 32, assists: 35, points: 67, ptsPerGame: 0.92, nhlePtsPace: 75, avgTOI: 18.3 },
+        { season: "2025-26", age: 24, league: "NHL", games: 72, goals: 28, assists: 38, points: 66, ptsPerGame: 0.92, nhlePtsPace: 75, avgTOI: 18.5 },
+      ],
+    });
+
+    expect(lafreniere.pedigreeScore).toBeGreaterThan(jarvis.pedigreeScore);
+    expect(lafreniere.effectivePedigreeScore).toBe(0);
+    expect(jarvis.productionScore).toBeGreaterThan(lafreniere.productionScore);
+    expect(jarvis.dynastyScore).toBeGreaterThan(lafreniere.dynastyScore);
+    expect(lafreniere.rationale.join(" ")).toContain("Draft pedigree is mostly historical now");
+    expect(jarvis.scoringTrajectory).toHaveLength(3);
+  });
+
   it("Giroux and Patrick Kane are late-career declining profiles", () => {
     for (const veteran of [
       { name: "Claude Giroux", position: "C" as const, ptsPace: 48 },
