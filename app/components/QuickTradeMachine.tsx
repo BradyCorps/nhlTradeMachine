@@ -280,7 +280,7 @@ function TeamTradeSummary({
         <SummaryMetric label="Cap Delta" value={team ? `${fmtSigned(capDelta)}M` : "--"} tone={capDelta >= 0 ? "good" : undefined} />
         <SummaryMetric label="Production" value={`${fmtSigned(productionDelta, 0)} pts/82`} tone={productionDelta >= 0 ? "good" : "bad"} />
         <SummaryMetric label="NOIV" value={sends.count || receives.count ? fmtSigned(noivDelta, 1) : "--"} tone={noivDelta >= 0 ? "good" : "bad"} />
-        <SummaryMetric label="Package NAV" value={navLoading ? "Loading" : fmtSigned(navDelta, 1)} tone={navDelta >= 0 ? "good" : "bad"} />
+        <SummaryMetric label="Linear NAV" value={navLoading ? "Loading" : fmtSigned(navDelta, 1)} tone={navDelta >= 0 ? "good" : "bad"} />
       </div>
     </div>
   );
@@ -304,7 +304,7 @@ function TradeBalanceStrip({
       style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
       <SummaryMetric label="Total Cap In Play" value={fmtCap(capMoved)} />
       <SummaryMetric label="Production In Play" value={`${productionMoved.toFixed(0)} pts/82`} />
-      <SummaryMetric label="NAV Balance" value={navLoading ? "Loading" : fmtSigned(navGap, 1)} tone={Math.abs(navGap) <= 10 ? "good" : undefined} />
+      <SummaryMetric label="Linear NAV Balance" value={navLoading ? "Loading" : fmtSigned(navGap, 1)} tone={Math.abs(navGap) <= 10 ? "good" : undefined} />
       <SummaryMetric label="GM Audit" value="Required" />
     </section>
   );
@@ -485,6 +485,11 @@ export default function QuickTradeMachine() {
       });
     return () => ctrl.abort();
   }, [selectedAssets]);
+
+  useEffect(() => {
+    setVerdict(null);
+    setShareUrl("");
+  }, [outgoing, incoming]);
 
   useEffect(() => {
     setOutgoing([]);

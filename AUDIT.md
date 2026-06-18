@@ -481,3 +481,37 @@ The line change UX is not intuitive, especially on mobile.
 * Defensive defenseman valuation, including Jaccob Slavin-style profiles.
 * Ledger copy UX.
 * Line change visual confirmation after swap.
+
+
+## Audit QuickTradeMachine 2026/06/18
+
+The Trade Machine is a thin page (app/trade-machine/page.tsx) that renders QuickTradeMachine. The flow is:
+
+    QuickTradeMachine.tsx — UI: two team selectors, asset pickers, retention dropdowns, live cap/production/NAV summaries, "Run GM Audit", and "Generate Share Link".
+    evaluate-client.ts — fetchNavMap (cached per-asset valuations) and fetchTradeVerdict (full audit). All math is server-side.
+    app/api/evaluate/route.ts — the real engine: getAssetNAV → calcNAV, compressPackage, runGmLogic (~700 lines of GM heuristics → GmFlag[]), and evaluateTrade (maps flags to a WIN/LOSS/FAIR/BLOCKED/DECLINED status + metrics).
+
+One thing worth clearing up: app/lib/trade-logic.ts is not used by the Trade Machine. It's consumed by TradeProposal.tsx (Armchair GM auto-generation). So "Trade Machine logic" really lives in route.ts. I reviewed both.
+What's solid
+
+    The GM-logic engine is genuinely impressive in coverage: cap ceiling/floor, NMC waive probability, untouchables hard-decline, franchise-anchor tiers, positional-minimum protection on both sides, division-rival friction, rebuild/contend timeline mismatches, rental tax, age cliff, salary-dump sweetener prompts, compression-loss "you're overpaying with depth" warnings. Two-sided perspective (vetoesSide/perspective) is a nice touch.
+    NAV caching keys on the actual valuation inputs + a version string (evaluate-client.ts:16-37) — correctly invalidates on contract/retention edits.
+    Verdict fetch only sends unique traded assets but full rosters for context; AbortController cancels in-flight nav fetches. Clean.
+
+Bugs (cited, fixed 2026-06-18)
+
+1. [x] Stale verdict can be shared — QuickTradeMachine.tsx:489-499. The useEffects clear verdict only when homeTeamId/partnerTeamId change. Adding/removing/retaining an asset (setOutgoing/setIncoming) does not clear the verdict. So a user can: Run Audit → edit the package → the old verdict still renders, and createShare (:516-530) will lock that now-mismatched verdict into the share payload alongside the edited assets. The shared link will show assets that don't match its verdict. Recommend clearing verdict/shareUrl whenever outgoing/incoming change.
+
+2. [x] Headline NAV number disagrees with the verdict — QuickTradeMachine.tsx:221 & 298-307. summarizePackage sums raw navMap[id].total, so the "NAV Balance" strip and "Package NAV" deltas are linear sums. The verdict's homeNetGain (route.ts:1040) uses compressed NAV. For multi-player packages these can diverge substantially, and the only thing reconciling them is a SOFT flag buried in the verdict list. A user reading "+15 NAV" on the strip but getting a LOSS verdict will be confused. At minimum the strip should label it "linear" or surface the compressed figure.
+
+3. [x] Stale division data — route.ts:218-219. The DIVISIONS map still lists ARI: "Central" (Arizona relocated to Utah in 2024) alongside UTA, leaving Central with 9 entries. Meanwhile trade-logic.ts:441 lists only UTA. Harmless for live data (no ARI team exists), but it's an inconsistency between the two division tables and dead data.
+What I'd consider missing / critical
+
+🔴 No integration test for the /api/evaluate route. Per the project's own review guideline (missing integration test for an API route = Critical), this is the headline gap. The __tests__/feature-canaries.test.ts cases that reference the route (:183-256) are source-string assertions — they read() the file and check it .toContain(...) a substring. They never POST a payload or assert that, e.g., a cap-ceiling breach actually returns BLOCKED, or that an untouchable yields a HARD veto. The entire verdict engine (evaluateTrade, runGmLogic, status mapping at route.ts:1124-1150) has zero behavioral coverage. This is the single most important thing to add.
+
+Other functional gaps (not bugs, but notable absences for a "trade machine"):
+
+    Retention CBA rules are incomplete. The engine blocks >50% retention (route.ts:533) but doesn't enforce the max 3 retained contracts per team, nor the double-retention / re-trade rules. There's also no UI for a third-party broker taking salary.
+    No same-player guard. Team selectors exclude each other, so you can't trade within a team, but there's nothing stopping odd inputs beyond that — minor.
+    Verdict flag display is lossy. VerdictSummary (:341-355) slices to 4 flags and drops perspective/category, so "whose problem is this" and overflow flags are invisible in the Trade Machine view (the Armchair GM components like VerdictPanel presumably show more).
+    No empty-NAV/error fallback messaging when fetchNavMap returns zeros for an unknown asset — it silently shows 0 NAV.

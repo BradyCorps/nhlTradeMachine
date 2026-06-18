@@ -259,6 +259,12 @@ describe("Canary — trade proposal audit verification", () => {
     expect(src).toContain("homeNetGain > partnerConcessionLimit && imbalancePct > 22");
     expect(src).toContain('category: "VALUE_VETO"');
   });
+
+  it("does not keep retired Arizona division data in the direct audit engine", () => {
+    const src = read("app/api/evaluate/route.ts");
+    expect(src).not.toContain('ARI: "Central"');
+    expect(src).toContain('UTA: "Central"');
+  });
 });
 
 describe("Canary — trade UI negative NAV", () => {
@@ -517,7 +523,9 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(quickTradeMachine).toContain("Projected Cap");
     expect(quickTradeMachine).toContain("Production");
     expect(quickTradeMachine).toContain("NOIV");
-    expect(quickTradeMachine).toContain("Package NAV");
+    expect(quickTradeMachine).toContain("Linear NAV");
+    expect(quickTradeMachine).toContain("Linear NAV Balance");
+    expect(quickTradeMachine).toContain("setShareUrl(\"\")");
     expect(quickTradeMachine).toContain("GM Logic Signal");
     expect(quickTradeMachine).toContain("TradeBalanceStrip");
   });
