@@ -31,7 +31,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           opacity: 0.7,
           whiteSpace: "nowrap",
         }}>
-          NHL TRADE MACHINE
+          THE HOCKEY LEDGER
         </span>
         <span style={{ color: "rgba(255,255,255,0.18)", marginRight: 20, fontSize: 14 }}>|</span>
         <div style={{ display: "flex", alignItems: "stretch", height: "100%", gap: 2 }}>
@@ -56,7 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
         <div style={{ flex: 1 }} />
         <a
-          href="/trade"
+          href="/armchair-gm"
           style={{
             color: "rgba(255,255,255,0.3)",
             fontSize: 9,
@@ -64,7 +64,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             letterSpacing: "0.12em",
           }}
         >
-          ← TRADE MACHINE
+          ← ARMCHAIR GM
         </a>
       </nav>
       {children}

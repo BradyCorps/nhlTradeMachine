@@ -327,8 +327,8 @@ export default function AdminContractsPage() {
       {/* Header */}
       <div style={{ borderBottom: "1px solid #3a2e1a", padding: "16px 24px",
         display: "flex", alignItems: "center", gap: 16 }}>
-        <a href="/trade" style={{ fontSize: 11, color: "#8a7a5a", textDecoration: "none",
-          letterSpacing: "0.1em" }}>← TRADE MACHINE</a>
+        <a href="/armchair-gm" style={{ fontSize: 11, color: "#8a7a5a", textDecoration: "none",
+          letterSpacing: "0.1em" }}>← ARMCHAIR GM</a>
         <span style={{ color: "#3a2e1a" }}>|</span>
         <span style={{ fontSize: 14, fontWeight: 900, letterSpacing: "0.2em" }}>
           CONTRACT ADMIN

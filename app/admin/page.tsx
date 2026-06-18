@@ -38,7 +38,7 @@ export default async function AdminDashboard() {
     {
       href:  "/admin/trade-block",
       label: "TRADE BLOCK",
-      desc:  "Flag players as formally requested, available, or untouchable. Powers the Trade Block panel in the trade machine.",
+      desc:  "Flag players as formally requested, available, or untouchable. Powers the Trade Block panel in Armchair GM.",
       stat:  tradeBlockCount > 0 ? `${tradeBlockCount} entr${tradeBlockCount !== 1 ? "ies" : "y"}` : "Empty",
     },
     {

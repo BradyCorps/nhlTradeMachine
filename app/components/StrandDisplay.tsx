@@ -1,12 +1,12 @@
 "use client";
 // ── StrandDisplay — shared STRAND renderer ───────────────────
-// Used by both the trade machine (StrandView.tsx) and player analytics
+// Used by both Armchair GM (StrandView.tsx) and player analytics
 // (players/page.tsx). Takes pre-computed traits — callers are responsible
 // for normalising their data source to StrandTrait[].
 //
 // Why shared: the SVG helix, trait bars, league-avg baseline, and legend
 // are identical regardless of whether data comes from Asset+XNAVResult
-// (trade machine) or a raw Player object (player analytics).
+// (Armchair GM) or a raw Player object (player analytics).
 import React from "react";
 
 export interface StrandTrait {
@@ -27,7 +27,7 @@ interface Props {
   compareOff?:  StrandTrait[];
   compareDef?:  StrandTrait[];
   compareLabel?: string;
-  // SVG dimensions — trade machine uses larger canvas, players page uses smaller
+  // SVG dimensions — Armchair GM uses larger canvas, players page uses smaller
   W?:      number;
   H?:      number;
   amplitude?: number;
@@ -35,7 +35,7 @@ interface Props {
 
 // sineM = n/2: each trait occupies exactly one half-cycle.
 // Nodes sit at sine peaks/troughs — clean helix for any trait count.
-// 5 traits → 2.5 cycles (trade machine)  |  4 traits → 2.0 cycles (players page)
+// 5 traits → 2.5 cycles (Armchair GM)  |  4 traits → 2.0 cycles (players page)
 const sineM = (n: number) => n / 2;
 
 function buildAvgPath(W: number, H: number, amplitude: number, isOff: boolean, n: number) {

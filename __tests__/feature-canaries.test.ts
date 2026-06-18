@@ -171,7 +171,7 @@ describe("Canary — engine inputs", () => {
 
 describe("Canary — Team DNA Usage trait", () => {
   it("computeRosterStrand uses qocIndex, not the dead legacy qocRank", () => {
-    const src = read("app/trade/page.tsx");
+    const src = read("app/armchair-gm/page.tsx");
     // qocRank is null on every player now — norm(400 - 400) pinned every
     // team's Usage at 0, producing a constant -62 gap vs the champ template.
     expect(src).not.toContain("qocRank ?? 400");
@@ -224,7 +224,7 @@ describe("Canary — trade block mechanics", () => {
   });
 
   it("executed trades clear moved players from the session trade block", () => {
-    const tradePage = read("app/trade/page.tsx");
+    const tradePage = read("app/armchair-gm/page.tsx");
     expect(tradePage).toContain("clearSessionTradeBlock");
     expect(tradePage).toContain("tradeBlockStatus: null");
     expect(tradePage).toContain("tradeBlockNote: null");
@@ -251,11 +251,19 @@ describe("Canary — trade proposal audit verification", () => {
     expect(src).toContain("const allAssets = [...outgoing, ...incoming]");
     expect(src).not.toContain("const allAssets = [...outgoing, ...incoming, ...allHomeRoster, ...allPartnerRoster]");
   });
+
+  it("direct GM audit declines extreme NAV surplus instead of calling it a win", () => {
+    const src = read("app/api/evaluate/route.ts");
+    expect(src).toContain("partnerConcessionLimit");
+    expect(src).toContain("rejects lopsided surplus");
+    expect(src).toContain("homeNetGain > partnerConcessionLimit && imbalancePct > 22");
+    expect(src).toContain('category: "VALUE_VETO"');
+  });
 });
 
 describe("Canary — trade UI negative NAV", () => {
   it("TugBar and trade page preserve all-negative package values instead of displaying compressed zero", () => {
-    const tradePage = read("app/trade/page.tsx");
+    const tradePage = read("app/armchair-gm/page.tsx");
     const tugBar = read("app/components/TugBar.tsx");
     expect(tradePage).toContain("const displayNavA = cNavA > 0 ? cNavA : navA");
     expect(tradePage).toContain("const displayNavB = cNavB > 0 ? cNavB : navB");
@@ -402,7 +410,7 @@ describe("Canary — evaluate route historical NAV floors", () => {
 
 describe("Canary — footer glossary", () => {
   const footer = read("app/components/Footer.tsx");
-  const tradePage = read("app/trade/page.tsx");
+  const tradePage = read("app/armchair-gm/page.tsx");
 
   it("combines methodology and glossary into wide footer disclosure sections", () => {
     expect(footer).toContain("methodologySections");
@@ -430,14 +438,15 @@ describe("Canary — footer glossary", () => {
 });
 
 describe("Canary — trade UX loading and mobile focus", () => {
-  const tradePage = read("app/trade/page.tsx");
-  const tradeLoading = read("app/trade/loading.tsx");
+  const tradePage = read("app/armchair-gm/page.tsx");
+  const tradeLoading = read("app/armchair-gm/loading.tsx");
   const assetDropdown = read("app/components/AssetDropdown.tsx");
   const lineupEditor = read("app/components/LineupEditor.tsx");
   const header = read("app/components/Header.tsx");
   const quickTradeMachine = read("app/components/QuickTradeMachine.tsx");
   const tradeMachineRoute = read("app/trade-machine/page.tsx");
   const sharedTradeRoute = read("app/t/[code]/page.tsx");
+  const sharedTradeImageRoute = read("app/t/[code]/opengraph-image.tsx");
 
   it("selects the franchise from one team-grid click instead of requiring a second confirm click", () => {
     expect(tradePage).toContain("selectingTeamId");
@@ -461,13 +470,13 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(tradePage).toContain("unique values ready");
     expect(tradePage).toContain("if (booting || !dataReady || !initialNavReady)");
     expect(tradePage).toContain("Confirming Full Player Load");
-    expect(tradePage).toContain("Trade machine unlocks after every roster value is ready.");
+    expect(tradePage).toContain("Armchair GM unlocks after every roster value is ready.");
   });
 
   it("uses one consistent trade preloader without skeleton bars", () => {
     expect(tradeLoading).toContain("Confirming Full Player Load");
     expect(tradeLoading).toContain("Player Values");
-    expect(tradeLoading).toContain("Trade machine unlocks after every roster value is ready.");
+    expect(tradeLoading).toContain("Armchair GM unlocks after every roster value is ready.");
     expect(tradeLoading).not.toContain("Content skeleton bars");
     expect(tradeLoading).not.toContain("bg-ledger-card");
   });
@@ -488,12 +497,29 @@ describe("Canary — trade UX loading and mobile focus", () => {
   });
 
   it("exposes the focused Trade Machine and shared trade routes", () => {
+    const tradeRedirectRoute = read("app/trade/page.tsx");
     expect(header).toContain('href="/trade-machine"');
+    expect(tradeRedirectRoute).toContain('redirect("/trade-machine")');
     expect(tradeMachineRoute).toContain("QuickTradeMachine");
     expect(sharedTradeRoute).toContain("SharedTradeView");
+    expect(sharedTradeRoute).toContain("generateMetadata");
+    expect(sharedTradeRoute).toContain("summarizeTradeSharePayload");
+    expect(sharedTradeImageRoute).toContain("ImageResponse");
+    expect(sharedTradeImageRoute).toContain("Verdict Locked At Creation");
     expect(quickTradeMachine).toContain("Run a single trade without the full Armchair GM workspace");
     expect(quickTradeMachine).toContain("Generate Share Link");
     expect(quickTradeMachine).toContain("/t/");
+  });
+
+  it("shows industry-style cap, production, NOIV, NAV, and GM audit context in the focused Trade Machine", () => {
+    expect(quickTradeMachine).toContain("fetchNavMap");
+    expect(quickTradeMachine).toContain("TeamTradeSummary");
+    expect(quickTradeMachine).toContain("Projected Cap");
+    expect(quickTradeMachine).toContain("Production");
+    expect(quickTradeMachine).toContain("NOIV");
+    expect(quickTradeMachine).toContain("Package NAV");
+    expect(quickTradeMachine).toContain("GM Logic Signal");
+    expect(quickTradeMachine).toContain("TradeBalanceStrip");
   });
 });
 

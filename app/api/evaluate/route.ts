@@ -413,6 +413,14 @@ const runGmLogic = (
   if (cNavIn > 0 && cNavOut > 0) {
     const isHomeRobbing    = cNavOut < cNavIn  * 0.45 && (cNavIn  - cNavOut) > 10;
     const isPartnerRobbing = cNavIn  < cNavOut * 0.45 && (cNavOut - cNavIn)  > 10;
+    const allIncomingShopped = incoming.length > 0 && incoming.every(a =>
+      a.tradeBlockStatus === "available" || a.tradeBlockStatus === "requested"
+    );
+    const allOutgoingShopped = outgoing.length > 0 && outgoing.every(a =>
+      a.tradeBlockStatus === "available" || a.tradeBlockStatus === "requested"
+    );
+    const partnerConcessionLimit = allIncomingShopped ? 70 : 45;
+    const homeConcessionLimit = allOutgoingShopped ? 70 : 45;
 
     if (isHomeRobbing) {
       flags.push({
@@ -426,6 +434,21 @@ const runGmLogic = (
         severity: "SOFT", category: "VALUE_VETO",
         headline: `${teamHome.name} rejects massive underpayment`,
         explanation: `${teamHome.name} is being asked to give up ${navOut.toFixed(0)} NAV while only receiving ${navIn.toFixed(0)} NAV. This is a gross underpayment and gets rejected.`,
+        vetoesSide: 0,
+      });
+    } else if (homeNetGain > partnerConcessionLimit && imbalancePct > 22) {
+      flags.push({
+        severity: "SOFT", category: "VALUE_VETO",
+        headline: `${teamPartner.name} rejects lopsided surplus`,
+        explanation: `${teamPartner.name} is conceding ${homeNetGain.toFixed(0)} compressed NAV in this structure. Even when a player is being shopped, real GMs rarely accept this much surplus without major hidden leverage, contract pressure, or additional compensation.`,
+        vetoesSide: 1,
+        perspective: "partner",
+      });
+    } else if (-homeNetGain > homeConcessionLimit && imbalancePct > 22) {
+      flags.push({
+        severity: "SOFT", category: "VALUE_VETO",
+        headline: `${teamHome.name} rejects lopsided surplus`,
+        explanation: `${teamHome.name} is conceding ${Math.abs(homeNetGain).toFixed(0)} compressed NAV in this structure. The value gap is beyond a normal GM tolerance band without major contextual leverage.`,
         vetoesSide: 0,
       });
     }

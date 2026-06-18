@@ -54,7 +54,7 @@ export default function AdminSettings() {
       body: JSON.stringify({ action: "clear_cache" }),
     });
     setSaving(false);
-    showToast("Redis cache cleared — reload the trade machine to see fresh data");
+    showToast("Redis cache cleared — reload Armchair GM to see fresh data");
   };
 
   const def        = settings?.defaults;

@@ -1,5 +1,91 @@
 # Development Notes
 
+## 2026-06-18 Product Split Phase 5
+
+### Completed Today
+
+- Added social-preview polish for shared Trade Machine links.
+- Added `summarizeTradeSharePayload(...)` so share metadata and image cards use one stable summary of:
+  - matchup
+  - outgoing and incoming asset counts
+  - locked verdict status
+  - created date
+  - home-team NAV swing when a locked verdict exists
+- Added server-side metadata generation for `/t/[code]`.
+- Shared trade links now emit richer title, description, Open Graph, and Twitter card metadata from the encoded payload.
+- Added `/t/[code]/opengraph-image` as a generated share card using `next/og`.
+- The share card displays:
+  - The Hockey Ledger branding
+  - the team matchup
+  - package counts for each side
+  - the locked verdict stamp
+  - the creation date
+- Kept the shared trade page itself on the existing read-only reconstruction flow.
+- Added tests/canaries for the preview summary helper, metadata route, and generated Open Graph image route.
+- Added an industry-style cap and production context pass to the focused Trade Machine.
+- Reused the existing server NAV pipeline through `fetchNavMap(...)` so selected packages show X-NAV/G-NAV value before the user runs the full GM Audit.
+- Added team-side summary panels showing:
+  - current cap space
+  - projected post-trade cap
+  - cap delta
+  - production delta
+  - NOIV delta
+  - package NAV delta
+- Added a trade balance strip showing total cap in play, production in play, NAV balance, and that the GM Audit remains required.
+- Kept the GM Audit as the authoritative logic layer while surfacing cap, production, NOIV, and NAV context earlier in the workflow.
+- Tightened direct GM Audit verdicts for extreme NAV surplus.
+- Added a lopsided-surplus `VALUE_VETO` when one side is conceding more compressed NAV than a real GM would normally tolerate.
+- This prevents trades like a 90 NAV package for a 189 NAV return from being labeled as a clean `WIN`; the partner GM now rejects that structure unless the value gap stays inside a realistic concession band.
+
+### Phase Notes
+
+- This completes the first Phase 5 polish slice: useful social previews for shared trades.
+- This also completes the requested cap/production/statistical breakdown pass for the focused Trade Machine, using the Box Score Junkie-style trade-machine pattern as a reference while keeping The Hockey Ledger's NAV, NOIV, and GM logic model.
+- The direct GM Audit now treats extreme NAV surplus as a realism problem, not just a user-side win.
+- Public reactions or "who won?" voting remain intentionally unimplemented because they should not block the core share flow.
+- The new preview path still works with encoded payload URLs; a future persisted compact-code backend can reuse the same summary helper.
+
+### Verification
+
+- `npm run test`
+- Result: `200` tests passing.
+- `npx tsc --noEmit`
+- Result: no TypeScript errors.
+- Dev server was not started in Codespace, per project instructions.
+
+## 2026-06-18 Product Split Phase 4
+
+### Completed Today
+
+- Moved the broader roster-control experience to `/armchair-gm` as the canonical Armchair GM route.
+- Changed `/trade` into a compatibility redirect to `/trade-machine`, matching the answered product direction that `/trade` should become the quick Trade Machine path long-term.
+- Made `/armchair-gm` own the full workspace implementation instead of re-exporting `/trade`.
+- Made `/armchair-gm/loading` own the full startup loader, while `/trade/loading` remains a compatibility shim.
+- Updated the shared header active state so the deeper workspace highlights Armchair GM instead of Trade Machine.
+- Updated admin navigation, contract admin links, cache revalidation, and cache-clear copy to point users back to Armchair GM.
+- Updated Trade Proposal loading copy from "Load into Trade Machine" to "Load into Armchair GM" for the deeper proposal workflow.
+- Reworded stale source comments and loading copy that referred to the deeper workspace as the trade machine.
+- Updated source canaries so route-level behavior is protected under the new split:
+  - Armchair GM canaries now read `app/armchair-gm/page.tsx`.
+  - `/trade` is now covered as a redirect to `/trade-machine`.
+  - The Armchair GM loader text is covered under the canonical route.
+
+### Phase Notes
+
+- Phase 4 completes the route ownership inversion started in Phase 1:
+  - `/trade-machine` owns the focused one-off builder.
+  - `/t/[code]` owns shared read-only trade reconstruction.
+  - `/armchair-gm` owns the deeper franchise-control workspace.
+  - `/trade` now preserves old links by sending users to the quick Trade Machine path.
+- Trade-specific controls inside Armchair GM still use plain trade language where that is the correct local action.
+- The broader product umbrella remains The Hockey Ledger, with Trade Machine and Armchair GM as distinct modes.
+
+### Verification
+
+- `npm run test`
+- Result: `197` tests passing.
+- Dev server was not started in Codespace, per project instructions.
+
 ## 2026-06-17 Startup Valuation Gate Fix
 
 ### Completed Today

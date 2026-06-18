@@ -137,6 +137,9 @@ Status: Done for the first usable version. `/trade-machine` now owns the focused
 - Add share cards or image previews if social embedding needs stronger presentation.
 - Consider lightweight public reactions or "who won?" voting later, but do not block the core share flow on it.
 - Keep Armchair GM focused on deeper roster consequences and multi-step management.
+- Add in team cap and align it more as industry standard using https://boxscorejunkie.com/trade-machine as a reference. This includes adding in current cap, production, utilizing our NOIV and NAV logic and statistical breakdowns and our GM logic
+
+Status: Social-preview polish started. `/t/:shareCode` now emits payload-aware metadata and a generated Open Graph image card for shared trade links. The focused Trade Machine also now shows current cap, projected cap, production, NOIV, package NAV, and GM audit context while building the trade. Direct GM Audit now rejects extreme lopsided NAV surplus instead of labeling unrealistic +NAV gaps as clean wins.
 
 ### Open Questions
 

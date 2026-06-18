@@ -1,5 +1,5 @@
 "use client";
-// ── TradePanel — one side of the trade machine ────────────────
+// ── TradePanel — one side of an Armchair GM trade ─────────────
 import React, { Suspense } from "react";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import AssetCard from "@/app/components/AssetCard";

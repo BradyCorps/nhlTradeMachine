@@ -1,5 +1,5 @@
 "use client";
-// ── StrandView — STRAND wrapper for the trade machine ─────────
+// ── StrandView — STRAND wrapper for Armchair GM ────────────────
 // Computes traits from Asset + XNAVResult, then delegates rendering
 // to StrandDisplay. The players page uses its own trait builder
 // (computePlayerTraits) and also renders StrandDisplay directly.
@@ -16,7 +16,7 @@ const norm = (val: number, mn: number, mx: number) =>
   Math.max(0, Math.min(1, (val - mn) / (mx - mn)));
 
 // ── Trait builder: Asset + XNAVResult → StrandTrait[] ────────
-// Called by StrandView (trade machine). 10 traits: 5 OFF + 5 DEF.
+// Called by StrandView (Armchair GM). 10 traits: 5 OFF + 5 DEF.
 export function buildAssetTraits(a: Asset, nav: XNAVResult): {
   off: StrandTrait[]; def: StrandTrait[]
 } {
@@ -86,7 +86,7 @@ export function computeStrandType(
     : "BALANCED";
 }
 
-// ── StrandView — trade machine entry point ────────────────────
+// ── StrandView — Armchair GM entry point ───────────────────────
 export default function StrandView({ asset, xnav, compareAsset, compareXnav }: {
   asset: Asset;
   xnav: XNAVResult;

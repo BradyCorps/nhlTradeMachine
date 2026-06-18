@@ -23,5 +23,5 @@ export async function GET(req: Request) {
       await redis.del(key).then(() => cleared.push(key)).catch(() => {});
     }
   }
-  return NextResponse.json({ ok: true, cleared, message: "caches cleared — reload the trade machine" });
+  return NextResponse.json({ ok: true, cleared, message: "caches cleared — reload Armchair GM" });
 }

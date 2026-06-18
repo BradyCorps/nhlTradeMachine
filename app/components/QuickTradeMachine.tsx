@@ -3,8 +3,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
-import type { Asset, Team, TradeVerdict } from "@/app/lib/trade-types";
-import { fetchTradeVerdict } from "@/app/lib/evaluate-client";
+import type { Asset, Team, TradeVerdict, XNAVResult } from "@/app/lib/trade-types";
+import { fetchNavMap, fetchTradeVerdict } from "@/app/lib/evaluate-client";
 import {
   createTradeSharePayload,
   encodeTradeSharePayload,
@@ -16,8 +16,18 @@ type LeagueData = { teams: Team[]; players: Asset[] };
 type VerdictDisplay = Pick<TradeVerdict, "status" | "message" | "metrics"> & {
   flags: Array<Pick<TradeVerdict["flags"][number], "severity" | "headline" | "explanation">>;
 };
+type PackageSummary = {
+  cap: number;
+  production: number;
+  goals: number;
+  xg: number;
+  noiv: number;
+  nav: number;
+  count: number;
+};
 
 const fmtCap = (value: number) => `$${value.toFixed(2)}M`;
+const fmtSigned = (value: number, digits = 1) => value > 0 ? `+${value.toFixed(digits)}` : value.toFixed(digits);
 
 function assetLabel(asset: Asset): string {
   if (asset.position === "Pick") {
@@ -199,6 +209,107 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function summarizePackage(assets: Asset[], navMap: Record<string, XNAVResult>): PackageSummary {
+  const players = assets.filter(asset => asset.position !== "Pick");
+  const cap = players.reduce((sum, asset) => sum + asset.capHit * (1 - (asset.retainedPct || 0)), 0);
+  const production = players.reduce((sum, asset) => sum + (asset.ptsPace ?? 0), 0);
+  const goals = players.reduce((sum, asset) => sum + (asset.goalsPace ?? 0), 0);
+  const xg = players.reduce((sum, asset) => sum + (asset.xGPace ?? 0), 0);
+  const noiv = players.length
+    ? players.reduce((sum, asset) => sum + (asset.xgRelTM ?? 0), 0) / players.length
+    : 0;
+  const nav = assets.reduce((sum, asset) => sum + (navMap[asset.id]?.total ?? 0), 0);
+  return { cap, production, goals, xg, noiv, nav, count: assets.length };
+}
+
+function SummaryMetric({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
+  const color = tone === "good"
+    ? "var(--ledger-green)"
+    : tone === "bad"
+      ? "var(--ledger-red)"
+      : "var(--ledger-ink)";
+
+  return (
+    <div className="border px-3 py-2" style={{ borderColor: "var(--ledger-rule-light)", background: "rgba(255,255,255,0.22)" }}>
+      <div className="text-[9px] uppercase tracking-[0.18em] text-ledger-ink-faint font-mono">{label}</div>
+      <div className="text-[14px] font-black font-mono" style={{ color }}>{value}</div>
+    </div>
+  );
+}
+
+function TeamTradeSummary({
+  label,
+  team,
+  sends,
+  receives,
+  navLoading,
+}: {
+  label: string;
+  team: Team | null;
+  sends: PackageSummary;
+  receives: PackageSummary;
+  navLoading: boolean;
+}) {
+  const currentCap = team?.capSpace ?? 0;
+  const projectedCap = team ? currentCap + sends.cap - receives.cap : 0;
+  const capDelta = sends.cap - receives.cap;
+  const productionDelta = receives.production - sends.production;
+  const noivDelta = receives.noiv - sends.noiv;
+  const navDelta = receives.nav - sends.nav;
+  const capTone = projectedCap >= 0 ? "good" : "bad";
+
+  return (
+    <div className="border p-3 flex flex-col gap-3" style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[9px] font-black uppercase tracking-[0.24em] font-mono text-ledger-ink-faint">
+            {label}
+          </div>
+          <div className="text-[16px] font-black" style={{ color: "var(--ledger-ink)" }}>
+            {team?.name ?? "Select Team"}
+          </div>
+        </div>
+        <div className="text-right text-[9px] font-black uppercase tracking-[0.16em] font-mono text-ledger-ink-faint">
+          GM Logic Signal
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        <SummaryMetric label="Current Cap" value={team ? fmtCap(currentCap) : "--"} tone={currentCap >= 0 ? "good" : "bad"} />
+        <SummaryMetric label="Projected Cap" value={team ? fmtCap(projectedCap) : "--"} tone={capTone} />
+        <SummaryMetric label="Cap Delta" value={team ? `${fmtSigned(capDelta)}M` : "--"} tone={capDelta >= 0 ? "good" : undefined} />
+        <SummaryMetric label="Production" value={`${fmtSigned(productionDelta, 0)} pts/82`} tone={productionDelta >= 0 ? "good" : "bad"} />
+        <SummaryMetric label="NOIV" value={sends.count || receives.count ? fmtSigned(noivDelta, 1) : "--"} tone={noivDelta >= 0 ? "good" : "bad"} />
+        <SummaryMetric label="Package NAV" value={navLoading ? "Loading" : fmtSigned(navDelta, 1)} tone={navDelta >= 0 ? "good" : "bad"} />
+      </div>
+    </div>
+  );
+}
+
+function TradeBalanceStrip({
+  outgoing,
+  incoming,
+  navLoading,
+}: {
+  outgoing: PackageSummary;
+  incoming: PackageSummary;
+  navLoading: boolean;
+}) {
+  const navGap = incoming.nav - outgoing.nav;
+  const capMoved = outgoing.cap + incoming.cap;
+  const productionMoved = outgoing.production + incoming.production;
+
+  return (
+    <section className="border p-4 grid grid-cols-1 md:grid-cols-4 gap-2"
+      style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
+      <SummaryMetric label="Total Cap In Play" value={fmtCap(capMoved)} />
+      <SummaryMetric label="Production In Play" value={`${productionMoved.toFixed(0)} pts/82`} />
+      <SummaryMetric label="NAV Balance" value={navLoading ? "Loading" : fmtSigned(navGap, 1)} tone={Math.abs(navGap) <= 10 ? "good" : undefined} />
+      <SummaryMetric label="GM Audit" value="Required" />
+    </section>
+  );
+}
+
 function VerdictSummary({ verdict }: { verdict: VerdictDisplay }) {
   const statusColor =
     verdict.status === "WIN" || verdict.status === "FAIR" ? "var(--ledger-green)" :
@@ -329,6 +440,8 @@ export default function QuickTradeMachine() {
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [evaluating, setEvaluating] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
+  const [navMap, setNavMap] = useState<Record<string, XNAVResult>>({});
+  const [navLoading, setNavLoading] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -350,6 +463,28 @@ export default function QuickTradeMachine() {
   const allHomeRoster = useMemo(() => data.players.filter(player => player.teamId === homeTeamId), [data.players, homeTeamId]);
   const allPartnerRoster = useMemo(() => data.players.filter(player => player.teamId === partnerTeamId), [data.players, partnerTeamId]);
   const canEvaluate = Boolean(homeTeam && partnerTeam && (outgoing.length || incoming.length));
+  const selectedAssets = useMemo(() => [...outgoing, ...incoming], [outgoing, incoming]);
+  const outgoingSummary = useMemo(() => summarizePackage(outgoing, navMap), [outgoing, navMap]);
+  const incomingSummary = useMemo(() => summarizePackage(incoming, navMap), [incoming, navMap]);
+
+  useEffect(() => {
+    if (selectedAssets.length === 0) {
+      setNavMap({});
+      setNavLoading(false);
+      return;
+    }
+    const ctrl = new AbortController();
+    setNavLoading(true);
+    fetchNavMap(selectedAssets, ctrl.signal)
+      .then(nextMap => setNavMap(nextMap))
+      .catch(event => {
+        if (event.name !== "AbortError") setError(`Player values could not be loaded: ${event.message}`);
+      })
+      .finally(() => {
+        if (!ctrl.signal.aborted) setNavLoading(false);
+      });
+    return () => ctrl.abort();
+  }, [selectedAssets]);
 
   useEffect(() => {
     setOutgoing([]);
@@ -445,6 +580,13 @@ export default function QuickTradeMachine() {
                   onRemove={assetId => setOutgoing(prev => prev.filter(asset => asset.id !== assetId))}
                   onRetain={(assetId, retainedPct) => setOutgoing(prev => prev.map(asset => asset.id === assetId ? { ...asset, retainedPct } : asset))}
                 />
+                <TeamTradeSummary
+                  label="Team cap and production"
+                  team={homeTeam}
+                  sends={outgoingSummary}
+                  receives={incomingSummary}
+                  navLoading={navLoading}
+                />
               </div>
               <div className="border p-4 flex flex-col gap-4" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card-light)" }}>
                 <TeamSelect label="Team sending return" teams={data.teams} value={partnerTeamId} excludeId={homeTeamId} onChange={setPartnerTeamId} />
@@ -455,8 +597,17 @@ export default function QuickTradeMachine() {
                   onRemove={assetId => setIncoming(prev => prev.filter(asset => asset.id !== assetId))}
                   onRetain={(assetId, retainedPct) => setIncoming(prev => prev.map(asset => asset.id === assetId ? { ...asset, retainedPct } : asset))}
                 />
+                <TeamTradeSummary
+                  label="Team cap and production"
+                  team={partnerTeam}
+                  sends={incomingSummary}
+                  receives={outgoingSummary}
+                  navLoading={navLoading}
+                />
               </div>
             </section>
+
+            <TradeBalanceStrip outgoing={outgoingSummary} incoming={incomingSummary} navLoading={navLoading} />
 
             <section className="border p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
               style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>

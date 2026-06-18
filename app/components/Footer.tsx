@@ -1,5 +1,5 @@
 // ── Footer — methodology, glossary, icon key, data credits ───
-// Shared across Trade Machine and Player Analytics pages.
+// Shared across Armchair GM, Trade Machine, and Player Analytics pages.
 
 const iconKey = [
   ["♛", "Megalodon", "Extreme franchise-value tier above the top NAV threshold."],

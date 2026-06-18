@@ -14,7 +14,7 @@ export async function updateTeamPhase(teamId: string, phase: string | null) {
     
     // Clear the cache so the frontend picks up the change immediately
     revalidatePath("/admin");
-    revalidatePath("/trade");
+    revalidatePath("/armchair-gm");
     return { success: true };
   } catch (e: any) {
     console.error("Failed to update team phase:", e);

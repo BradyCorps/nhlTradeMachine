@@ -123,7 +123,7 @@ async function loadTeams(): Promise<any[]> {
 
   // Cap space comes from TEAMS_DB (curated for start of 2025-26 season).
   // We no longer scrape CapWages for cap space — post-season it returns 2026-27
-  // offseason projections which are wrong for this trade machine's context.
+  // offseason projections which are wrong for this trade audit context.
 
   let dbTeams: any[] = [];
   try {

@@ -66,6 +66,15 @@ export const TradeSharePayloadSchema = z.object({
 
 export type TradeShareAssetRef = z.infer<typeof TradeShareAssetRefSchema>;
 export type TradeSharePayload = z.infer<typeof TradeSharePayloadSchema>;
+export type TradeSharePreview = {
+  title: string;
+  description: string;
+  matchupLabel: string;
+  packageLabel: string;
+  verdictLabel: string;
+  createdLabel: string;
+  imageAlt: string;
+};
 
 export type TradeQueryState = {
   homeTeamId: string | null;
@@ -161,6 +170,30 @@ export function resolveTradeShareAssets(
   });
 }
 
+export function summarizeTradeSharePayload(payload: TradeSharePayload): TradeSharePreview {
+  const homeTeamId = payload.teams.homeTeamId;
+  const partnerTeamId = payload.teams.partnerTeamId;
+  const verdictLabel = payload.lockedVerdict?.status ?? "PENDING";
+  const outgoingCount = payload.blocks.outgoing.length;
+  const incomingCount = payload.blocks.incoming.length;
+  const matchupLabel = `${homeTeamId} / ${partnerTeamId}`;
+  const packageLabel = `${homeTeamId} sends ${assetCountLabel(outgoingCount)}; ${partnerTeamId} sends ${assetCountLabel(incomingCount)}`;
+  const createdLabel = formatShareDate(payload.createdAt);
+  const navSwing = payload.lockedVerdict
+    ? ` Net value for ${homeTeamId}: ${formatSigned(payload.lockedVerdict.metrics.homeNetGain)} NAV.`
+    : "";
+
+  return {
+    title: `${matchupLabel} Trade: ${verdictLabel}`,
+    description: `${packageLabel}. Verdict locked at creation.${navSwing}`,
+    matchupLabel,
+    packageLabel,
+    verdictLabel,
+    createdLabel,
+    imageAlt: `The Hockey Ledger shared trade card for ${matchupLabel}, verdict ${verdictLabel}`,
+  };
+}
+
 function encodeAssetRefs(refs: TradeShareAssetRef[]): string {
   return refs
     .map(ref => {
@@ -180,6 +213,20 @@ function parseAssetRefs(value: string | null): TradeShareAssetRef[] {
       retainedPct: retainedPct ? normalizeRetainedPct(Number.parseInt(retainedPct, 10) / 100) : 0,
     }];
   });
+}
+
+function assetCountLabel(count: number): string {
+  return `${count} ${count === 1 ? "asset" : "assets"}`;
+}
+
+function formatSigned(value: number): string {
+  return value > 0 ? `+${value.toFixed(0)}` : value.toFixed(0);
+}
+
+function formatShareDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Date unavailable";
+  return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
 function base64UrlEncode(value: string): string {

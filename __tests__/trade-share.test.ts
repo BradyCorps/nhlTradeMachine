@@ -6,6 +6,7 @@ import {
   encodeTradeSharePayload,
   parseTradeQueryState,
   resolveTradeShareAssets,
+  summarizeTradeSharePayload,
   TRADE_SHARE_SCHEMA,
 } from "@/app/lib/trade-share";
 import type { Asset, Team, TradeVerdict } from "@/app/lib/trade-types";
@@ -128,5 +129,23 @@ describe("trade share payload", () => {
 
     expect(resolved).toHaveLength(1);
     expect(resolved[0]).toMatchObject({ id: "player-out", retainedPct: 0.25 });
+  });
+
+  it("summarizes a shared trade for social previews", () => {
+    const payload = createTradeSharePayload({
+      homeTeam: team("WPG"),
+      partnerTeam: team("SJS"),
+      outgoing: [asset("player-out", "WPG")],
+      incoming: [asset("player-in", "SJS"), asset("pick-in", "SJS")],
+      verdict,
+      createdAt: "2026-06-18T00:00:00.000Z",
+    });
+
+    const preview = summarizeTradeSharePayload(payload);
+
+    expect(preview.title).toBe("WPG / SJS Trade: FAIR");
+    expect(preview.description).toContain("WPG sends 1 asset; SJS sends 2 assets");
+    expect(preview.description).toContain("Net value for WPG: +2 NAV");
+    expect(preview.imageAlt).toContain("verdict FAIR");
   });
 });

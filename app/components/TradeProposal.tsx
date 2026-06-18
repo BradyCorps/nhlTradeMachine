@@ -579,7 +579,7 @@ export default function TradeProposalEngine({
                     <button
                       onClick={() => onLoadTrade(p.partner, p.homeSends, p.partnerSends)}
                       className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 btn-stamp">
-                      Load into Trade Machine ↗
+                      Load into Armchair GM ↗
                     </button>
                   </div>
 
