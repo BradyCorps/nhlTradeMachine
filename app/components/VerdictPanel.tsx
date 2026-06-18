@@ -11,14 +11,14 @@ export const SEVERITY_STYLES: Record<FlagSeverity, { dot: string; bg: string; bo
   INFO:  { dot: "bg-sky-400",    bg: "bg-sky-950/15",    border: "border-sky-800/30",    text: "text-sky-300",    label: "bg-sky-900/40 text-sky-300 border-sky-800/50" },
 };
 
-export const STATUS_CONFIG: Record<TradeStatus, { border: string; headerText: string; icon: string; bg: string; cssColor: string }> = {
-  IDLE:     { border: "border-zinc-800",       headerText: "text-zinc-500",    icon: "—", bg: "bg-zinc-900/40",    cssColor: "var(--ledger-rule)"       },
-  PENDING:  { border: "border-zinc-700",       headerText: "text-zinc-300",    icon: "…", bg: "bg-zinc-900/40",    cssColor: "var(--ledger-ink-faint)"  },
-  FAIR:     { border: "border-sky-600/50",     headerText: "text-sky-300",     icon: "⚖", bg: "bg-sky-950/15",    cssColor: "var(--ledger-navy)"       },
-  WIN:      { border: "border-emerald-600/50", headerText: "text-emerald-400", icon: "↑", bg: "bg-emerald-950/15", cssColor: "var(--ledger-green)"      },
-  LOSS:     { border: "border-amber-600/50",   headerText: "text-amber-400",   icon: "↓", bg: "bg-amber-950/15",  cssColor: "var(--ledger-amber)"      },
-  BLOCKED:  { border: "border-red-600/50",     headerText: "text-rose-400",    icon: "✕", bg: "bg-red-950/20",    cssColor: "var(--ledger-red)"        },
-  DECLINED: { border: "border-orange-600/50",  headerText: "text-ledger-red-deep", icon: "✗", bg: "bg-orange-950/20", cssColor: "var(--ledger-orange)" },
+export const STATUS_CONFIG: Record<TradeStatus, { border: string; headerText: string; icon: string; bg: string; cssColor: string; outcome: string }> = {
+  IDLE:     { border: "border-zinc-800",       headerText: "text-zinc-500",    icon: "—", bg: "bg-zinc-900/40",    cssColor: "var(--ledger-rule)",      outcome: "Awaiting audit" },
+  PENDING:  { border: "border-zinc-700",       headerText: "text-zinc-300",    icon: "…", bg: "bg-zinc-900/40",    cssColor: "var(--ledger-ink-faint)", outcome: "Auditing" },
+  FAIR:     { border: "border-sky-600/50",     headerText: "text-sky-300",     icon: "⚖", bg: "bg-sky-950/15",    cssColor: "var(--ledger-navy)",      outcome: "Even" },
+  WIN:      { border: "border-emerald-600/50", headerText: "text-emerald-400", icon: "↑", bg: "bg-emerald-950/15", cssColor: "var(--ledger-green)",     outcome: "Favors you" },
+  LOSS:     { border: "border-amber-600/50",   headerText: "text-amber-400",   icon: "↓", bg: "bg-amber-950/15",  cssColor: "var(--ledger-amber)",     outcome: "Favors them" },
+  BLOCKED:  { border: "border-red-600/50",     headerText: "text-rose-400",    icon: "✕", bg: "bg-red-950/20",    cssColor: "var(--ledger-red)",       outcome: "Won't happen" },
+  DECLINED: { border: "border-orange-600/50",  headerText: "text-ledger-red-deep", icon: "✗", bg: "bg-orange-950/20", cssColor: "var(--ledger-orange)", outcome: "Won't happen" },
 };
 
 export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestClaudeAnalysis, onOpenMemo }: {
@@ -44,8 +44,13 @@ export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFla
       {/* Status header */}
       <div className="px-5 py-4 border-b border-zinc-800/30">
         <div className="flex items-center justify-between mb-1">
-          <div className={`text-2xl font-black italic uppercase leading-none tracking-tight ${sc.headerText}`}>
-            {verdict.status}
+          <div className="flex items-baseline gap-2 min-w-0">
+            <div className={`text-2xl font-black italic uppercase leading-none tracking-tight ${sc.headerText}`}>
+              {verdict.status}
+            </div>
+            <div className="text-2xs font-black uppercase tracking-widest text-zinc-500">
+              {sc.outcome}
+            </div>
           </div>
           <div className={`text-lg font-black font-mono ${sc.headerText}`}>{sc.icon}</div>
         </div>
@@ -78,6 +83,9 @@ export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFla
       <div className="px-4 py-3 space-y-1.5 border-b border-zinc-800/30">
         <div className="text-2xs font-black text-zinc-700 uppercase tracking-widest mb-2">
           GM Intelligence Flags — click to expand
+        </div>
+        <div className="text-2xs font-bold text-zinc-600 uppercase tracking-wide mb-2">
+          HARD = trade blocked · SOFT = a GM would decline · WARN = proceed with caution · INFO = note
         </div>
         {flags.length === 0 && <div className="text-2xs text-zinc-700 italic">No flags raised.</div>}
 

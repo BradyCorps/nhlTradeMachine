@@ -85,6 +85,12 @@ export default function ArmchairGmPage() {
   // Format: ?home=WPG&partner=SJS&out=id1,id2:50&in=id3
   // where id2:50 means 50% retention. Updates without a full navigation.
   const [linkCopied, setLinkCopied] = useState(false);
+  const copyTradeLink = useCallback(() => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  }, []);
 
   useEffect(() => {
     if (!db.teams.length || (!homeTeamId && !partnerTeamId)) return;
@@ -220,7 +226,8 @@ export default function ArmchairGmPage() {
           } else {
             const missingIds = [...expectedIds].filter(id => !map[id]).slice(0, 5);
             const missingSuffix = missingIds.length ? ` Missing: ${missingIds.join(", ")}` : "";
-            setError(`Player valuation load incomplete: ${actual}/${expected} unique values ready.${missingSuffix}`);
+            console.error("[initial NAV]", `Player valuation load incomplete: ${actual}/${expected} unique values ready.${missingSuffix}`);
+            setError("Couldn't load league data");
           }
         }
       })
@@ -228,7 +235,8 @@ export default function ArmchairGmPage() {
         if (e.name !== "AbortError") {
           setNavLoading(false);
           if (!initialNavReadyRef.current) {
-            setError(`Player valuation load failed: ${e.message}`);
+            console.error("[initial NAV]", e);
+            setError("Couldn't load league data");
           }
         }
       });
@@ -280,7 +288,14 @@ export default function ArmchairGmPage() {
     };
   }, [outgoingBlock, incomingBlock, setNavMap, db.capCeiling]);
 
-  useEffect(() => {
+  const loadLeagueData = useCallback(() => {
+    setBooting(true);
+    setError(null);
+    setDb({ teams: [], players: [] });
+    setOriginalDb({ teams: [], players: [] });
+    setNavMap({});
+    setInitialNavReady(false);
+    initialNavReadyRef.current = false;
     const loadJson = async (url: string) => {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`${url} returned ${res.status}`);
@@ -310,7 +325,8 @@ export default function ArmchairGmPage() {
           liveStats:  pd.liveStats,
         };
         if (!Array.isArray(data.teams) || !Array.isArray(data.players) || data.teams.length === 0 || data.players.length === 0) {
-          setError(`API returned invalid data`);
+          console.error("[league boot] API returned invalid data", data);
+          setError("Couldn't load league data");
           setBooting(false);
           return;
         }
@@ -323,10 +339,15 @@ export default function ArmchairGmPage() {
         setBooting(false);
       })
       .catch((e) => {
-        setError(`Network error: ${e.message}`);
+        console.error("[league boot]", e);
+        setError("Couldn't load league data");
         setBooting(false);
       });
-  }, [setTeams]);
+  }, [setTeams, setNavMap]);
+
+  useEffect(() => {
+    loadLeagueData();
+  }, [loadLeagueData]);
 
   // ── Execute Trade — moves players between teams in db state ──
   const executeTrade = useCallback(() => {
@@ -770,7 +791,7 @@ export default function ArmchairGmPage() {
         - blocks[0].reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0)
     : 0;
 
-  if (error) return <ErrorScreen msg={error} />;
+  if (error) return <ErrorScreen onRetry={loadLeagueData} />;
   const dataReady = db.teams.length > 0 && db.players.length > 0;
   if (booting || !dataReady || !initialNavReady) {
     return (
@@ -1123,12 +1144,7 @@ export default function ArmchairGmPage() {
                       
                       {(teams[0] || teams[1] || blocks[0].length > 0) && (
                         <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(window.location.href).then(() => {
-                              setLinkCopied(true);
-                              setTimeout(() => setLinkCopied(false), 2000);
-                            });
-                          }}
+                          onClick={copyTradeLink}
                           className="shrink-0 flex items-center justify-center w-12 transition-all duration-200"
                           style={{
                             background: 'transparent',
@@ -1543,6 +1559,29 @@ export default function ArmchairGmPage() {
         {verdictOpen && (
           <div className="overflow-y-auto px-4 sm:px-6 pb-6 pt-1"
             style={{ maxHeight: 'calc(70vh - 52px)', scrollbarWidth: 'thin', scrollbarColor: 'var(--ledger-rule) transparent' }}>
+            <div className="lg:hidden grid grid-cols-2 gap-2 mb-3">
+              <button
+                onClick={runEval}
+                className="py-2.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 active:scale-[0.98]"
+                style={{
+                  background: 'var(--ledger-ink)',
+                  color: 'var(--ledger-card-light)',
+                  borderRadius: '2px',
+                }}>
+                Re-audit
+              </button>
+              <button
+                onClick={copyTradeLink}
+                className="py-2.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 active:scale-[0.98]"
+                style={{
+                  background: 'transparent',
+                  border: `1px solid ${linkCopied ? 'var(--ledger-green)' : 'var(--ledger-rule)'}`,
+                  color: linkCopied ? 'var(--ledger-green)' : 'var(--ledger-ink-faint)',
+                  borderRadius: '2px',
+                }}>
+                {linkCopied ? 'Copied' : 'Copy link'}
+              </button>
+            </div>
             <VerdictPanel
               verdict={v}
               sc={sc}
@@ -2339,12 +2378,18 @@ function LoadingScreen({
   );
 }
 
-function ErrorScreen({ msg }: { msg: string }) {
+function ErrorScreen({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-3">
-      <div className="text-rose-500 font-black text-lg">Data Pipeline Error</div>
-      <div className="text-zinc-600 text-sm font-mono">{msg}</div>
-      <div className="text-zinc-700 text-xs">Check that /api/league/teams and /api/league/players are deployed and reachable.</div>
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 text-center">
+      <div className="text-rose-500 font-black text-lg">Couldn't load league data</div>
+      <div className="text-zinc-600 text-sm font-mono">Something went wrong while loading teams and players.</div>
+      <button
+        onClick={onRetry}
+        className="px-5 py-2.5 font-black uppercase tracking-widest text-[11px] transition-all active:scale-[0.98]"
+        style={{ background: "var(--ledger-ink)", color: "var(--ledger-card-light)", borderRadius: "2px" }}
+      >
+        Retry
+      </button>
     </div>
   );
 }

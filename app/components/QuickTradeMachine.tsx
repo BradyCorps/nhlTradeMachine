@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import type { Asset, Team, TradeVerdict, XNAVResult } from "@/app/lib/trade-types";
@@ -37,6 +37,37 @@ function assetLabel(asset: Asset): string {
     return `${asset.year ?? ""} ${round} round pick`;
   }
   return `${asset.name} · ${asset.position} · ${fmtCap(asset.capHit ?? 0)}`;
+}
+
+function ErrorNotice({
+  onRetry,
+  title = "Couldn't load league data",
+  detail = "Something went wrong while loading teams and players.",
+}: {
+  onRetry?: () => void;
+  title?: string;
+  detail?: string;
+}) {
+  return (
+    <div className="border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+      style={{ borderColor: "var(--ledger-red)", color: "var(--ledger-red)", background: "var(--ledger-card-light)" }}>
+      <div>
+        <div className="text-[12px] font-black uppercase tracking-[0.18em]">{title}</div>
+        <div className="mt-1 text-[11px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+          {detail}
+        </div>
+      </div>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] transition-all active:scale-[0.98]"
+          style={{ background: "var(--ledger-ink)", color: "var(--ledger-card-light)", borderRadius: "2px" }}
+        >
+          Retry
+        </button>
+      )}
+    </div>
+  );
 }
 
 function TeamSelect({
@@ -389,10 +420,17 @@ export function SharedTradeView({ code }: { code: string }) {
     return () => { mounted = false; };
   }, [code]);
 
-  useEffect(() => {
+  const loadSharedLeagueData = useCallback(() => {
+    setError(null);
     Promise.all([
-      fetch("/api/league/teams").then(response => response.json()),
-      fetch("/api/league/players").then(response => response.json()),
+      fetch("/api/league/teams").then(response => {
+        if (!response.ok) throw new Error(`/api/league/teams returned ${response.status}`);
+        return response.json();
+      }),
+      fetch("/api/league/players").then(response => {
+        if (!response.ok) throw new Error(`/api/league/players returned ${response.status}`);
+        return response.json();
+      }),
     ])
       .then(([teamData, playerData]) => {
         setData({
@@ -401,8 +439,15 @@ export function SharedTradeView({ code }: { code: string }) {
           capCeiling: teamData.capCeiling ?? null,
         });
       })
-      .catch(() => setError("Trade data could not be loaded."));
+      .catch(event => {
+        console.error("[quick shared league load]", event);
+        setError("Couldn't load league data");
+      });
   }, []);
+
+  useEffect(() => {
+    loadSharedLeagueData();
+  }, [loadSharedLeagueData]);
 
   const homeTeam = payload ? data.teams.find(team => team.id === payload.teams.homeTeamId) ?? null : null;
   const partnerTeam = payload ? data.teams.find(team => team.id === payload.teams.partnerTeamId) ?? null : null;
@@ -427,11 +472,9 @@ export function SharedTradeView({ code }: { code: string }) {
           )}
         </section>
 
-        {error && (
-          <div className="border p-4 text-[12px] font-black uppercase tracking-[0.18em]" style={{ borderColor: "var(--ledger-red)", color: "var(--ledger-red)" }}>
-            {error}
-          </div>
-        )}
+        {error && (error === "Couldn't load league data"
+          ? <ErrorNotice onRetry={loadSharedLeagueData} />
+          : <ErrorNotice title="This trade link couldn't be opened" detail="The shared trade link is invalid or expired." />)}
 
         {payload && (
           <>
@@ -465,20 +508,41 @@ export default function QuickTradeMachine() {
   const verdictRunRef = useRef(0);
   const verdictAbortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
+  const loadTradeMachineData = useCallback(() => {
+    setBooting(true);
+    setError(null);
     Promise.all([
-      fetch("/api/league/teams").then(response => response.json()),
-      fetch("/api/league/players").then(response => response.json()),
+      fetch("/api/league/teams").then(response => {
+        if (!response.ok) throw new Error(`/api/league/teams returned ${response.status}`);
+        return response.json();
+      }),
+      fetch("/api/league/players").then(response => {
+        if (!response.ok) throw new Error(`/api/league/players returned ${response.status}`);
+        return response.json();
+      }),
     ])
       .then(([teamData, playerData]) => {
-        setData({ teams: teamData.teams ?? [], players: [...(playerData.players ?? []), ...(teamData.picks ?? [])] });
+        const nextData = {
+          teams: teamData.teams ?? [],
+          players: [...(playerData.players ?? []), ...(teamData.picks ?? [])],
+          capCeiling: teamData.capCeiling ?? null,
+        };
+        if (!Array.isArray(nextData.teams) || !Array.isArray(nextData.players) || nextData.teams.length === 0 || nextData.players.length === 0) {
+          throw new Error("league API returned invalid data");
+        }
+        setData(nextData);
         setBooting(false);
       })
       .catch(event => {
-        setError(`Trade data could not be loaded: ${event.message}`);
+        console.error("[quick trade load]", event);
+        setError("Couldn't load league data");
         setBooting(false);
       });
   }, []);
+
+  useEffect(() => {
+    loadTradeMachineData();
+  }, [loadTradeMachineData]);
 
   const homeTeam = data.teams.find(team => team.id === homeTeamId) ?? null;
   const partnerTeam = data.teams.find(team => team.id === partnerTeamId) ?? null;
@@ -504,7 +568,10 @@ export default function QuickTradeMachine() {
         setNavMap(nextMap);
       })
       .catch(event => {
-        if (event.name !== "AbortError") setError(`Player values could not be loaded: ${event.message}`);
+        if (event.name !== "AbortError") {
+          console.error("[quick trade NAV]", event);
+          setError("Couldn't load player values. Try again in a moment.");
+        }
       })
       .finally(() => {
         if (!ctrl.signal.aborted) setNavLoading(false);
@@ -558,7 +625,10 @@ export default function QuickTradeMachine() {
       if (ctrl.signal.aborted || runId !== verdictRunRef.current) return;
       setVerdict(nextVerdict);
     } catch (event: any) {
-      if (event.name !== "AbortError") setError(`Trade audit failed: ${event.message}`);
+      if (event.name !== "AbortError") {
+        console.error("[quick trade audit]", event);
+        setError("Couldn't run the trade audit. Try again in a moment.");
+      }
     } finally {
       if (!ctrl.signal.aborted && runId === verdictRunRef.current) setEvaluating(false);
     }
@@ -609,9 +679,13 @@ export default function QuickTradeMachine() {
         </section>
 
         {error && (
-          <div className="border p-4 text-[12px] font-black uppercase tracking-[0.18em]" style={{ borderColor: "var(--ledger-red)", color: "var(--ledger-red)" }}>
-            {error}
-          </div>
+          <ErrorNotice
+            title={error}
+            detail={error === "Couldn't load league data"
+              ? "Something went wrong while loading teams and players."
+              : "The technical details were logged. You can try the action again."}
+            onRetry={error === "Couldn't load league data" ? loadTradeMachineData : undefined}
+          />
         )}
 
         {booting ? (

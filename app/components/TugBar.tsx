@@ -3,6 +3,7 @@
 import React from "react";
 function clamp(n: number, mn: number, mx: number) { return Math.min(mx, Math.max(mn, n)); }
 const fmt = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
+const NET_GAIN_TOLERANCE = 5;
 
 interface TugBarProps {
   homeNetGain: number; // compressed NAV delta
@@ -23,6 +24,11 @@ function TugBar({ homeNetGain, navA, navB, cNavA, cNavB }: TugBarProps) {
   const absB  = Math.abs(dispB);
   const total = Math.max(absA + absB, 1);
   const leftPct = clamp((absA / total) * 100, 5, 95);
+  const netGainLabel = Math.abs(homeNetGain) < NET_GAIN_TOLERANCE
+    ? "Even"
+    : homeNetGain > 0
+      ? `${fmt(homeNetGain, 1)} in your favor`
+      : `${Math.abs(homeNetGain).toFixed(1)} in their favor`;
 
   // Show compression note when the slot penalty meaningfully reduces a package
   const deltaA = navA - (cNavA ?? navA);
@@ -48,8 +54,8 @@ function TugBar({ homeNetGain, navA, navB, cNavA, cNavB }: TugBarProps) {
         <span className="text-2xs uppercase tracking-[0.35em] font-black text-ledger-ink-faint font-mono">
           Home Net Gain
         </span>
-        <span className={`text-xl font-black font-mono tabular-nums transition-colors duration-500 ${Math.abs(homeNetGain) < 5 ? "text-sky-400" : homeNetGain > 0 ? "text-emerald-400" : "text-rose-500"}`}>
-          {fmt(homeNetGain, 1)}
+        <span className={`text-xl font-black font-mono tabular-nums transition-colors duration-500 ${Math.abs(homeNetGain) < NET_GAIN_TOLERANCE ? "text-sky-400" : homeNetGain > 0 ? "text-emerald-400" : "text-rose-500"}`}>
+          {netGainLabel}
         </span>
         <span className="text-2xs font-bold text-ledger-ink-faint">NAV</span>
       </div>
