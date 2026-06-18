@@ -8,6 +8,12 @@ import { players as playersTable, tradeBlock as tradeBlockTable } from "@/app/db
 import { resolveRosterTier } from "@/app/lib/xnav-engine";
 import { calcDevelopmentProfile } from "@/app/lib/development-profile";
 import {
+  canonicalNameSlug,
+  dedupePlayersByAuthority,
+  removePlayerFromOtherRosters,
+  safeNhlRosterPlayer,
+} from "@/app/lib/player-identity";
+import {
   buildDevelopmentInputFromNhlTimeline,
   buildDevelopmentInputFromPlayerPayload,
   fetchCachedNhlSkaterTimelineRowsForPlayers,
@@ -78,12 +84,32 @@ const isValidTeamId = (teamId: string | null | undefined): teamId is string =>
 
 const calcAge = (birthDate: string): number => {
   const b = new Date(birthDate);
+  if (!Number.isFinite(b.getTime())) return 27;
   const n = new Date();
   let age = n.getFullYear() - b.getFullYear();
   const m = n.getMonth() - b.getMonth();
   if (m < 0 || (m === 0 && n.getDate() < b.getDate())) age--;
   return age;
 };
+
+const developmentLinemateContext = (
+  position: string,
+  avgTOI: number,
+  qocIndex: number | null,
+): "STRONG" | "AVERAGE" | "WEAK" => {
+  if (qocIndex != null && qocIndex >= 68) return "STRONG";
+  if (position === "D" && avgTOI >= 21) return "STRONG";
+  if (position !== "D" && avgTOI >= 17) return "STRONG";
+  if (qocIndex != null && qocIndex <= 32) return "WEAK";
+  if (position === "D" && avgTOI > 0 && avgTOI < 14) return "WEAK";
+  if (position !== "D" && avgTOI > 0 && avgTOI < 10) return "WEAK";
+  return "AVERAGE";
+};
+
+const developmentInternationalScore = (prospectPtsPace: number | null | undefined): number | undefined =>
+  prospectPtsPace != null && prospectPtsPace > 0
+    ? Math.max(20, Math.min(100, prospectPtsPace * 1.4))
+    : undefined;
 
 
 // ── EV QoC Index (0-100): quantified even-strength deployment difficulty ──
@@ -478,8 +504,6 @@ async function fetchNhlGoalieStatsFallback(): Promise<Map<string, any>> {
       const slug = slugify(name);
       statsMap.set(`id:${g.playerId ?? g.goalieId ?? ""}`, entry);
       statsMap.set(slug, entry);
-      const parts = name.split(" ");
-      if (parts.length >= 2) statsMap.set(slugify(parts[parts.length - 1]), entry);
     }
 
     if (redis && statsMap.size > 50) {
@@ -672,8 +696,6 @@ export async function GET() {
 
         goalieRows.forEach((stats, name) => {
           goalieMap.set(slugify(name), stats);
-          const parts = name.split(" ");
-          if (parts.length >= 2) goalieMap.set(slugify(parts[parts.length - 1]), stats);
         });
       }
     }
@@ -707,13 +729,16 @@ export async function GET() {
       const skaters = [...(data.forwards || []), ...(data.defensemen || []), ...(data.goalies || [])];
       if (skaters.length < 5) return;
 
-      rosterMap.set(teamId, skaters.map((p: any) => ({
-        id:       p.id.toString(),
-        name:     `${p.firstName.default} ${p.lastName.default}`,
-        position: normalisePos(p.positionCode),
-        age:      calcAge(p.birthDate),
-        headshot: p.headshot ?? null,
-      })));
+      rosterMap.set(teamId, skaters.flatMap((raw: any) => {
+        const p = safeNhlRosterPlayer(raw);
+        return p ? [{
+          id:       p.id,
+          name:     p.name,
+          position: normalisePos(p.position),
+          age:      calcAge(p.birthDate),
+          headshot: p.headshot,
+        }] : [];
+      }));
     });
   } catch (_) {
     console.warn("[NHL roster] live roster fetch failed; no static player fallback is used.");
@@ -723,6 +748,7 @@ export async function GET() {
   // Admin DB rows cover mock-draft prospects and roster players missing from
   // the live NHL roster feed. Deduplicate by id and normalized name so DB rows
   // augment the live roster instead of creating duplicates.
+  const dbTeamBySlug = new Map<string, string>();
   try {
     const dbPlayers = await db.select({
       id:              playersTable.id,
@@ -737,8 +763,10 @@ export async function GET() {
 
     for (const d of dbPlayers) {
       if (!isValidTeamId(d.teamId)) continue;
+      const dbSlug = canonicalNameSlug(d.name);
+      dbTeamBySlug.set(dbSlug, d.teamId);
+      removePlayerFromOtherRosters(rosterMap, d.teamId, d);
       const list = rosterMap.get(d.teamId) ?? [];
-      const dbSlug = slugify(d.name);
       const existing = list.find((x: any) => String(x.id) === String(d.id) || slugify(x.name) === dbSlug);
       if (existing) {
         existing.draftYear = existing.draftYear ?? d.draftYear;
@@ -788,7 +816,7 @@ export async function GET() {
   });
 
   // ── Build player objects ────────────────────────────────────
-  const players: any[] = [];
+  let players: any[] = [];
 
   rosterMap.forEach((skaters, teamId) => {
     if (!TEAMS_DB.find(t => t.id === teamId)) return;
@@ -848,7 +876,7 @@ export async function GET() {
       const defaultPts = isGoalie ? 0 : finalPosition === "D" ? 22 : finalPosition === "C" ? 32 : 28;
 
       const goalieStats = isGoalie
-        ? (goalieMap.get(slugify(p.name)) ?? goalieMap.get(slugify(p.name.split(" ").pop() ?? "")) ?? NHL_GOALIE_STATS.get(`id:${p.id}`) ?? NHL_GOALIE_STATS.get(slugify(p.name)) ?? NHL_GOALIE_STATS.get(slugify(p.name.split(" ").pop() ?? "")) ?? null)
+        ? (NHL_GOALIE_STATS.get(`id:${p.id}`) ?? goalieMap.get(slugify(p.name)) ?? NHL_GOALIE_STATS.get(slugify(p.name)) ?? null)
         : null;
 
       const hasProspectSignal = draftOverall != null || (prospectPtsPace != null && prospectPtsPace > 0);
@@ -857,9 +885,13 @@ export async function GET() {
       }
 
       const rawCapHit     = isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925);
+      const contractPos = normContractPos(fin?.position);
+      const rosterPos = normContractPos(finalPosition);
       const nameCollision = p.age <= 23
         && rawCapHit > 3.0
-        && normContractPos(fin?.position) !== p.position;
+        && contractPos !== ""
+        && rosterPos !== ""
+        && contractPos !== rosterPos;
 
       const finalCapHit  = contractOverride?.capHit ?? override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
       const finalYears   = override?.yearsRemaining ?? (nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1)));
@@ -884,12 +916,16 @@ export async function GET() {
         : (stats?.games ?? goalieStats?.gamesStarted ?? 0);
       const ptsPace = stats?.ptsPace ?? (hasSkaterStats ? defaultPts : 0);
       const avgTOI = stats?.avgTOI ?? (hasSkaterStats ? defaultTOI : 0);
+      const internationalScore = developmentInternationalScore(prospectPtsPace);
+      const linemateContext = developmentLinemateContext(finalPosition, avgTOI, qocIndex);
       const timelineMatches = developmentTimelineMap.get(String(p.id)) ?? [];
       const developmentInput = timelineMatches.length > 0
         ? buildDevelopmentInputFromNhlTimeline(timelineMatches, {
             age: p.age,
             draftYear: draftYear ?? undefined,
             draftOverall: draftOverall ?? undefined,
+            internationalScore,
+            linemateContext,
           })
         : buildDevelopmentInputFromPlayerPayload({
             id: p.id,
@@ -902,6 +938,8 @@ export async function GET() {
             draftYear: draftYear ?? null,
             draftOverall: draftOverall ?? null,
             prospectPtsPace: prospectPtsPace ?? null,
+            internationalScore: internationalScore ?? null,
+            linemateContext,
           });
       const developmentProfile = developmentInput ? calcDevelopmentProfile(developmentInput) : null;
 
@@ -979,6 +1017,8 @@ export async function GET() {
       });
     });
   });
+
+  players = dedupePlayersByAuthority(players, dbTeamBySlug);
 
   return NextResponse.json({
     players,

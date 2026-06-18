@@ -11,6 +11,20 @@
 
 import type { Asset, XNAVResult, FArchetype } from "@/app/lib/trade-types";
 
+export const canonicalStaticPlayerName = (name: string): string =>
+  name.toLowerCase().normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9 ]/g, "")
+    .trim()
+    .replace(/\s+/g, " ");
+
+function normalizedLookup<T>(map: Record<string, T>, name: string): T | undefined {
+  const direct = map[name];
+  if (direct) return direct;
+  const key = canonicalStaticPlayerName(name);
+  return Object.entries(map).find(([candidate]) => canonicalStaticPlayerName(candidate) === key)?.[1];
+}
+
 // ── Award bonus weights ───────────────────────────────────────
 export const AWARD_BONUS: Record<string, number> = {
   "Hart":         18,
@@ -147,8 +161,30 @@ export const PLAYER_PEDIGREE: Record<string, {
 // ── Award hardware multipliers ────────────────────────────────
 
 // ── Historical floor calculator ───────────────────────────────
-export const getHistoricalFloor = (name: string, currentNAV: number): number => {
-  const pedigree = PLAYER_PEDIGREE[name];
+export const getPlayerPedigree = (name: string) => normalizedLookup(PLAYER_PEDIGREE, name);
+export const getProspectTier = (name: string) => normalizedLookup(PROSPECT_TIERS, name);
+export const getShutdownDPedigree = (name: string) => normalizedLookup(SHUTDOWN_D_PEDIGREE, name);
+export const getInjuryRisk = (name: string) => normalizedLookup(INJURY_RISK, name);
+
+function historicalFloorMultiplier(asset?: Pick<Asset, "age" | "games" | "ptsPace" | "position">): number {
+  if (!asset) return 1;
+  const age = Number.isFinite(asset.age) ? asset.age : 27;
+  const games = Number.isFinite(asset.games) ? asset.games ?? 82 : 82;
+  const ptsPace = Number.isFinite(asset.ptsPace) ? asset.ptsPace ?? 0 : 0;
+  const peakAge = asset.position === "G" ? 31 : asset.position === "D" ? 29 : 28;
+  const ageDecay = age <= peakAge ? 1 : Math.max(0.30, 1 - (age - peakAge) * 0.09);
+  const availability = games >= 65 ? 1 : games >= 40 ? 0.85 : games >= 20 ? 0.65 : 0.45;
+  const currentProduction = asset.position === "G" ? 1 : ptsPace >= 65 ? 1 : ptsPace >= 40 ? 0.85 : 0.65;
+  return Math.max(0.25, ageDecay * availability * currentProduction);
+}
+
+// ── Historical floor calculator ───────────────────────────────
+export const getHistoricalFloor = (
+  name: string,
+  currentNAV: number,
+  asset?: Pick<Asset, "age" | "games" | "ptsPace" | "position">,
+): number => {
+  const pedigree = getPlayerPedigree(name);
   if (!pedigree) return currentNAV;
 
   const awardBonus = (pedigree.awards ?? []).reduce((sum, award) => {
@@ -157,6 +193,8 @@ export const getHistoricalFloor = (name: string, currentNAV: number): number => 
   const allStarBonus = (pedigree.allStarYears ?? 0) * 3;
   const awardCount   = (pedigree.awards ?? []).length;
   const floorPct     = Math.min(0.80, 0.55 + awardCount * 0.04);
+  const decay = historicalFloorMultiplier(asset);
+  const decayedBonus = (awardBonus + allStarBonus) * Math.max(0.4, decay);
 
   // For shutdown D-men: anchor floor to peak DPS (more reliable than pts pace)
   // Slavin peak DPS 5.7 → floor = 5.7 * 15 * 0.65 = 55.6 + awards/allstar
@@ -165,7 +203,7 @@ export const getHistoricalFloor = (name: string, currentNAV: number): number => 
     const ptsFloor = pedigree.peakPtsPace
       ? (pedigree.peakPtsPace / 82) * 25 * floorPct
       : 0;
-    return Math.max(currentNAV, Math.max(dpsFloor, ptsFloor) + awardBonus + allStarBonus);
+    return Math.max(currentNAV, Math.max(dpsFloor, ptsFloor) * decay + decayedBonus);
   }
 
   // Standard skater floor: based on peak pts pace
@@ -174,10 +212,10 @@ export const getHistoricalFloor = (name: string, currentNAV: number): number => 
     const historicalFloorNAV = isEstablishedElite
       ? pedigree.peakPtsPace * 1.65
       : (pedigree.peakPtsPace / 82) * 25 * floorPct;
-    return Math.max(currentNAV, historicalFloorNAV + awardBonus + allStarBonus);
+    return Math.max(currentNAV, historicalFloorNAV * decay + decayedBonus);
   }
 
-  return currentNAV + awardBonus + allStarBonus;
+  return currentNAV + decayedBonus;
 };
 
 // ── Prospect tiers — NAV floor by development stage ──────────

@@ -103,6 +103,7 @@ export interface DevelopmentPlayerPayloadSeed {
   draftOverall?: number | null;
   draftYear?: number | null;
   prospectPtsPace?: number | null;
+  internationalScore?: number | null;
   teamContext?: DevelopmentProfileInput["teamContext"];
   linemateContext?: DevelopmentProfileInput["linemateContext"];
 }
@@ -450,7 +451,7 @@ export function buildDevelopmentInputFromPlayerPayload(
 
   if (!position || position === "G" || age == null) return null;
 
-  const currentPtsPace = games > 0 ? livePtsPace : prospectPtsPace ?? livePtsPace;
+  const currentPtsPace = games >= 40 ? livePtsPace : prospectPtsPace ?? livePtsPace;
   const snapshots: PlayerSeasonSnapshot[] = [];
 
   if (prospectPtsPace != null && games < 40) {
@@ -496,6 +497,7 @@ export function buildDevelopmentInputFromPlayerPayload(
     avgTOI,
     draftOverall: player.draftOverall ?? undefined,
     draftYear: player.draftYear ?? undefined,
+    internationalScore: asNumber(player.internationalScore) ?? undefined,
     teamContext: player.teamContext,
     linemateContext: player.linemateContext,
     snapshots: mergeTimelineSnapshots(snapshots),

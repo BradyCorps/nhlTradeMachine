@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import type { Asset, Team, XNAVResult } from '@/app/lib/trade-types';
 
+export const tradeAssetKey = (asset: Pick<Asset, 'id' | 'teamId'>): string =>
+  `${asset.id}::${asset.teamId ?? ""}`;
+
 type Snapshot = {
   teams: [Team | null, Team | null];
   blocks: [Asset[], Asset[]];
@@ -20,8 +23,8 @@ interface TradeState {
   updateBlock:   (idx: 0 | 1, block: Asset[]) => void;
   setNavMap:     (navMap: Record<string, XNAVResult> | ((prev: Record<string, XNAVResult>) => Record<string, XNAVResult>)) => void;
   clearTrade:    () => void;
-  setRetainedPct:(assetId: string, idx: 0 | 1, pct: number) => void;
-  removeAsset:   (assetId: string, idx: 0 | 1) => void;
+  setRetainedPct:(assetId: string, idx: 0 | 1, pct: number, teamId?: string) => void;
+  removeAsset:   (assetId: string, idx: 0 | 1, teamId?: string) => void;
   addAsset:      (asset: Asset, idx: 0 | 1) => void;
   undo:          () => void;
   redo:          () => void;
@@ -76,22 +79,24 @@ export const useTradeStore = create<TradeState>((set) => ({
     ...pushHistory(state),
   })),
 
-  setRetainedPct: (assetId, idx, pct) => set((state) => {
+  setRetainedPct: (assetId, idx, pct, teamId) => set((state) => {
+    const targetKey = `${assetId}::${teamId ?? ""}`;
     const newBlocks = [...state.blocks] as [Asset[], Asset[]];
     newBlocks[idx] = newBlocks[idx].map(a =>
-      a.id === assetId ? { ...a, retainedPct: pct } : a
+      (teamId ? tradeAssetKey(a) === targetKey : a.id === assetId) ? { ...a, retainedPct: pct } : a
     );
     return { blocks: newBlocks, ...pushHistory(state) };
   }),
 
-  removeAsset: (assetId, idx) => set((state) => {
+  removeAsset: (assetId, idx, teamId) => set((state) => {
+    const targetKey = `${assetId}::${teamId ?? ""}`;
     const newBlocks = [...state.blocks] as [Asset[], Asset[]];
-    newBlocks[idx] = newBlocks[idx].filter(a => a.id !== assetId);
+    newBlocks[idx] = newBlocks[idx].filter(a => teamId ? tradeAssetKey(a) !== targetKey : a.id !== assetId);
     return { blocks: newBlocks, ...pushHistory(state) };
   }),
 
   addAsset: (asset, idx) => set((state) => {
-    if (state.blocks[idx].find(a => a.id === asset.id)) return state;
+    if (state.blocks[idx].find(a => tradeAssetKey(a) === tradeAssetKey(asset))) return state;
     const newBlocks = [...state.blocks] as [Asset[], Asset[]];
     newBlocks[idx] = [...newBlocks[idx], asset];
     return { blocks: newBlocks, ...pushHistory(state) };

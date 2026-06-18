@@ -244,6 +244,21 @@ describe("X-NAV — Franchise Centers", () => {
     expect(floored).toBeGreaterThanOrEqual(185);
   });
 
+  it("historical floors decay for injured or declining veterans when current context is supplied", () => {
+    const current = 25;
+    const peakOnly = getHistoricalFloor("Erik Karlsson", current);
+    const decayed = getHistoricalFloor("Erik Karlsson", current, {
+      position: "D",
+      age: 36,
+      games: 38,
+      ptsPace: 34,
+    });
+
+    expect(peakOnly).toBeGreaterThan(decayed);
+    expect(decayed).toBeGreaterThanOrEqual(current);
+    expect(decayed).toBeLessThan(peakOnly * 0.65);
+  });
+
   it("older drafted NHLers with missing stats do not use first-overall prospect NAV", () => {
     const result = calcNAV({
       id: "lafreniere-missing-stats", name: "Alexis Lafreniere", position: "W",

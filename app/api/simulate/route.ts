@@ -502,6 +502,12 @@ function simulateSeries(high: SimTeamResult, low: SimTeamResult, rand: () => num
   };
 }
 
+function simulateSeriesByStrength(a: SimTeamResult, b: SimTeamResult, rand: () => number): PlayoffSeries {
+  return a.projectedPoints >= b.projectedPoints
+    ? simulateSeries(a, b, rand)
+    : simulateSeries(b, a, rand);
+}
+
 // ── Simulate conference playoff bracket (NHL format since 2014) ──
 // Round 1: Top div winner vs WC2 · Other div winner vs WC1
 //          Top div 2nd vs 3rd   · Other div 2nd vs 3rd
@@ -512,61 +518,86 @@ function simulateConference(
   conf: "E" | "W",
   rand: () => number,
 ): ConferenceBracket {
-  if (seeds.length < 8) {
-    while (seeds.length < 8) seeds.push(seeds[seeds.length - 1]);
+  const uniqueSeeds = Array.from(
+    new Map(seeds.map((team) => [team.teamId, team])).values()
+  ).sort((a, b) =>
+    b.projectedPoints !== a.projectedPoints
+      ? b.projectedPoints - a.projectedPoints
+      : a.teamId.localeCompare(b.teamId)
+  );
+
+  if (uniqueSeeds.length < 2) {
+    throw new Error("Cannot simulate conference playoffs with fewer than two unique teams");
   }
 
   const divNames = conf === "E"
     ? ["Atlantic", "Metropolitan"]
     : ["Central", "Pacific"];
 
-  // Fallback to last seed if a slot can't be filled (handles edge-case missing teams)
-  const last = seeds[seeds.length - 1];
-  const find = (div: string, rank: number): SimTeamResult =>
-    seeds.find(t => t.division === div && t.divisionRank === rank) ?? last;
+  const seedById = new Map(uniqueSeeds.map((team) => [team.teamId, team]));
+  const usedSlots = new Set<string>();
+  const takeFallback = (avoidTeamId?: string): SimTeamResult => {
+    const team = uniqueSeeds.find(t => t.teamId !== avoidTeamId && !usedSlots.has(t.teamId))
+      ?? uniqueSeeds.find(t => t.teamId !== avoidTeamId)
+      ?? uniqueSeeds[0];
+    usedSlots.add(team.teamId);
+    return team;
+  };
+  const takeSlot = (preferred: SimTeamResult | undefined, avoidTeamId?: string): SimTeamResult => {
+    if (preferred && preferred.teamId !== avoidTeamId && !usedSlots.has(preferred.teamId)) {
+      usedSlots.add(preferred.teamId);
+      return preferred;
+    }
+    return takeFallback(avoidTeamId);
+  };
+  const find = (div: string, rank: number): SimTeamResult | undefined =>
+    uniqueSeeds.find(t => t.division === div && t.divisionRank === rank);
 
-  const divAWin = find(divNames[0], 1);
-  const divBWin = find(divNames[1], 1);
+  const divAWin = takeSlot(find(divNames[0], 1));
+  const divBWin = takeSlot(find(divNames[1], 1), divAWin.teamId);
 
   // Top conference seed = better record among the two division winners
   const [topWin, otherWin] = divAWin.projectedPoints >= divBWin.projectedPoints
     ? [divAWin, divBWin]
     : [divBWin, divAWin];
 
-  const topDiv2   = find(topWin.division,   2);
-  const topDiv3   = find(topWin.division,   3);
-  const otherDiv2 = find(otherWin.division, 2);
-  const otherDiv3 = find(otherWin.division, 3);
+  const topDiv2   = takeSlot(find(topWin.division,   2), topWin.teamId);
+  const topDiv3   = takeSlot(find(topWin.division,   3), topDiv2.teamId);
+  const otherDiv2 = takeSlot(find(otherWin.division, 2), otherWin.teamId);
+  const otherDiv3 = takeSlot(find(otherWin.division, 3), otherDiv2.teamId);
 
   // Wildcards sorted best→worst; WC1 is the better wildcard
-  const wcs = seeds
+  const wcs = uniqueSeeds
     .filter(t => t.divisionRank > 3)
     .sort((a, b) =>
       b.projectedPoints !== a.projectedPoints
         ? b.projectedPoints - a.projectedPoints
         : a.teamId.localeCompare(b.teamId)
     );
-  const wc1 = wcs[0] ?? last;
-  const wc2 = wcs[1] ?? last;
+  const wc1 = takeSlot(wcs[0]);
+  const wc2 = takeSlot(wcs[1], wc1.teamId);
 
   // Round 1
   const r1 = [
-    simulateSeries(topWin,   wc2,      rand), // best conf seed vs WC2
-    simulateSeries(otherWin, wc1,      rand), // other div winner vs WC1
-    simulateSeries(topDiv2,  topDiv3,  rand), // top div's 2nd vs 3rd
-    simulateSeries(otherDiv2, otherDiv3, rand), // other div's 2nd vs 3rd
+    simulateSeriesByStrength(topWin,   wc2,      rand), // best conf seed vs WC2
+    simulateSeriesByStrength(otherWin, wc1,      rand), // other div winner vs WC1
+    simulateSeriesByStrength(topDiv2,  topDiv3,  rand), // top div's 2nd vs 3rd
+    simulateSeriesByStrength(otherDiv2, otherDiv3, rand), // other div's 2nd vs 3rd
   ];
 
-  const getW = (s: PlayoffSeries): SimTeamResult =>
-    seeds.find(t => t.teamId === s.winner.teamId) ?? last;
+  const getW = (s: PlayoffSeries): SimTeamResult => {
+    const winner = seedById.get(s.winner.teamId);
+    if (!winner) throw new Error(`Playoff winner ${s.winner.teamId} was not found in conference seeds`);
+    return winner;
+  };
 
   // Round 2 — bracket stays on same side, no re-seeding
   const r2 = [
-    simulateSeries(getW(r1[0]), getW(r1[2]), rand), // top div winner's side
-    simulateSeries(getW(r1[1]), getW(r1[3]), rand), // other div winner's side
+    simulateSeriesByStrength(getW(r1[0]), getW(r1[2]), rand), // top div winner's side
+    simulateSeriesByStrength(getW(r1[1]), getW(r1[3]), rand), // other div winner's side
   ];
 
-  const cf = simulateSeries(getW(r2[0]), getW(r2[1]), rand);
+  const cf = simulateSeriesByStrength(getW(r2[0]), getW(r2[1]), rand);
   return { r1, r2, cf, champion: cf.winner };
 }
 

@@ -8,7 +8,6 @@
 //                StrandView/computePlayerTraits own data normalisation.
 import React from "react";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
-import { PLAYER_PEDIGREE, INJURY_RISK } from "@/app/lib/player-data";
 import StrandDisplay, { StrandTrait } from "@/app/components/StrandDisplay";
 
 function safe(n: number) { return isNaN(n) || !isFinite(n) ? 0 : n; }

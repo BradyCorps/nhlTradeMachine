@@ -1,12 +1,16 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { scenarioSeed } from '@/app/lib/sim-engine';
 
 export interface ScenarioAsset {
+  id?:       string;
   name:     string;
+  teamId?:   string;
   position: string;
   capHit:   number;
   age?:     number;
+  retainedPct?: number;
+  round?:    number | null;
+  year?:     number | null;
 }
 
 export interface SavedScenario {
@@ -26,6 +30,39 @@ interface ScenarioState {
   renameScenario: (id: string, name: string) => void;
 }
 
+const safeScenarioStorage = {
+  getItem: (name: string): string | null => {
+    try {
+      const value = localStorage.getItem(name);
+      if (!value) return null;
+      if (value.length > 512_000) {
+        localStorage.removeItem(name);
+        return null;
+      }
+      JSON.parse(value);
+      return value;
+    } catch {
+      try { localStorage.removeItem(name); } catch {}
+      return null;
+    }
+  },
+  setItem: (name: string, value: string): void => {
+    try {
+      localStorage.setItem(name, value);
+    } catch {}
+  },
+  removeItem: (name: string): void => {
+    try {
+      localStorage.removeItem(name);
+    } catch {}
+  },
+};
+
+const scenarioId = (): string =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+
 export const useScenarioStore = create<ScenarioState>()(
   persist(
     (set) => ({
@@ -33,10 +70,9 @@ export const useScenarioStore = create<ScenarioState>()(
 
       saveScenario: (s) => set(state => {
         const savedAt = Date.now();
-        const id = scenarioSeed({ ...s, savedAt, index: state.savedScenarios.length }).toString(36);
         return {
           savedScenarios: [
-            { ...s, id, savedAt },
+            { ...s, id: scenarioId(), savedAt },
             ...state.savedScenarios,
           ].slice(0, 25),
         };
@@ -54,7 +90,7 @@ export const useScenarioStore = create<ScenarioState>()(
     }),
     {
       name:    'nhl-trade-scenarios',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => safeScenarioStorage),
     }
   )
 );

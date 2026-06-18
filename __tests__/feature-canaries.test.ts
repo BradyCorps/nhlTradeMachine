@@ -124,8 +124,57 @@ describe("Canary — league route features (source-level)", () => {
         expect(src).toContain("const draftOverall = p.draftOverall ?? prospectOverride?.draftOverall");
         expect(src).toContain("prospectPtsPace:  prospectPtsPace ?? null");
       });
+
+      it("dedupes live roster rows against DB authority before returning players", () => {
+        expect(src).toContain("safeNhlRosterPlayer");
+        expect(src).toContain("removePlayerFromOtherRosters");
+        expect(src).toContain("dedupePlayersByAuthority");
+        expect(src).toContain("players = dedupePlayersByAuthority(players, dbTeamBySlug)");
+      });
+
+      it("does not use surname-only goalie stat fallbacks", () => {
+        expect(src).not.toContain("goalieSlugLast");
+        expect(src).not.toContain("parts[parts.length - 1]");
+        expect(src).toContain("NHL_GOALIE_STATS.get(`id:${p.id}`)");
+        expect(src).toContain("goalieMap.get(");
+      });
     });
   }
+});
+
+describe("Canary — league cache keys", () => {
+  it("keeps league and trade team cache payloads isolated", () => {
+    const league = read("app/api/league/route.ts");
+    const teams = read("app/api/league/teams/route.ts");
+    expect(league).toContain('"cache:league:teams:v1"');
+    expect(teams).toContain('"cache:trade:teams:v1"');
+    expect(league).not.toContain('"cache:teams"');
+    expect(teams).not.toContain('"cache:teams"');
+  });
+});
+
+describe("Canary — playoff simulation bracket", () => {
+  const src = read("app/api/simulate/route.ts");
+
+  it("does not pad playoff seeds by duplicating the last team", () => {
+    expect(src).not.toContain("while (seeds.length < 8)");
+    expect(src).toContain("uniqueSeeds");
+    expect(src).toContain("fewer than two unique teams");
+  });
+
+  it("simulates later rounds by team strength, not bracket argument order", () => {
+    expect(src).toContain("function simulateSeriesByStrength");
+    expect(src).toContain("simulateSeriesByStrength(getW(r1[0]), getW(r1[2]), rand)");
+    expect(src).toContain("simulateSeriesByStrength(getW(r2[0]), getW(r2[1]), rand)");
+  });
+});
+
+describe("Canary — simulation engine numeric guards", () => {
+  it("stablePts sanitizes missing current and baseline scoring paces", () => {
+    const src = read("app/lib/sim-engine.ts");
+    expect(src).toContain("Number.isFinite(p.ptsPace)");
+    expect(src).toContain("Number.isFinite(p.baselinePtsPace)");
+  });
 });
 
 describe("Canary — draft prospect enrichment", () => {
@@ -366,7 +415,8 @@ describe("Canary — draft pick inventory", () => {
 describe("Canary — admin cache flush", () => {
   it("clear-cache flushes BOTH the teams and contracts caches", () => {
     const src = read("app/api/admin/clear-cache/route.ts");
-    expect(src).toContain("cache:teams");
+    expect(src).toContain("cache:league:teams:v1");
+    expect(src).toContain("cache:trade:teams:v1");
     expect(src).toContain("cache:contracts");
     expect(src).toContain("cache:contracts:v2");
     expect(src).toContain("cache:nhl_skater_summary_stats");
@@ -458,12 +508,76 @@ describe("Canary — NAV client cache keys", () => {
   });
 });
 
+describe("Canary — Batch 5 UI state robustness", () => {
+  it("trade store mutations disambiguate duplicate player ids by team", () => {
+    const store = read("app/store/tradeStore.ts");
+    const card = read("app/components/AssetCard.tsx");
+    const armchair = read("app/armchair-gm/page.tsx");
+    expect(store).toContain("tradeAssetKey");
+    expect(store).toContain("teamId ? tradeAssetKey(a) === targetKey : a.id === assetId");
+    expect(store).toContain("tradeAssetKey(a) === tradeAssetKey(asset)");
+    expect(card).toContain("removeAssetFromStore(asset.id, idx, asset.teamId)");
+    expect(armchair).toContain("outgoingByKey");
+    expect(armchair).toContain("incomingByKey");
+  });
+
+  it("armchair async requests abort stale retention and match fetches", () => {
+    const src = read("app/armchair-gm/page.tsx");
+    expect(src).toContain("const ctrl = new AbortController();");
+    expect(src).toContain("ctrl.abort();");
+    expect(src).toContain("matchAbortRef.current?.abort()");
+    expect(src).toContain("matchAbortRef.current !== ctrl");
+    expect(src).toContain("Promise.allSettled");
+    expect(src).toContain("if (!res.ok) throw new Error");
+  });
+
+  it("armchair breakdown table guards optional skater metrics", () => {
+    const src = read("app/armchair-gm/page.tsx");
+    expect(src).toContain("const ptsPace = a.ptsPace ?? 0");
+    expect(src).toContain("const avgTOI = a.avgTOI ?? 0");
+    expect(src).toContain("const capHit = a.capHit ?? 0");
+    expect(src).not.toContain("a.ptsPace.toFixed");
+    expect(src).not.toContain("a.avgTOI.toFixed");
+    expect(src).not.toContain("a.capHit.toFixed");
+  });
+
+  it("players page handles failed league loads and deterministic sorting", () => {
+    const src = read("app/players/page.tsx");
+    expect(src).toContain("useDeferredValue");
+    expect(src).toContain("if (!r.ok) throw new Error");
+    expect(src).toContain("PLAYER LEDGER LOAD FAILED");
+    expect(src).toContain("const compare = (av: number | null | undefined, bv: number | null | undefined)");
+    expect(src).toContain("goalieRank");
+    expect(src).not.toContain("?? -99");
+  });
+
+  it("saved scenarios persist real asset identity and guarded storage", () => {
+    const store = read("app/store/scenarioStore.ts");
+    const history = read("app/components/TradeHistoryBar.tsx");
+    expect(store).toContain("id?:");
+    expect(store).toContain("teamId?:");
+    expect(store).toContain("retainedPct?:");
+    expect(store).toContain("safeScenarioStorage");
+    expect(store).toContain("crypto.randomUUID");
+    expect(history).toContain("retainedPct: a.retainedPct ?? 0");
+    expect(history).toContain("teamId:   a.teamId");
+  });
+
+  it("focused trade machine uses package NAV, not linear NAV", () => {
+    const src = read("app/components/QuickTradeMachine.tsx");
+    expect(src).toContain("ageDecayRate");
+    expect(src).toContain("ageSlotPenalty");
+    expect(src).toContain("Package NAV");
+    expect(src).not.toContain("Linear NAV");
+  });
+});
+
 describe("Canary — evaluate route historical NAV floors", () => {
   const evaluateRoute = read("app/api/evaluate/route.ts");
 
   it("applies player pedigree floors on the server NAV path", () => {
     expect(evaluateRoute).toContain("getHistoricalFloor");
-    expect(evaluateRoute).toContain("const historicalFloor = getHistoricalFloor(asset.name, result.total)");
+    expect(evaluateRoute).toContain("const historicalFloor = getHistoricalFloor(asset.name, result.total, asset)");
     expect(evaluateRoute).toContain("total: liftedTotal");
   });
 });
@@ -577,8 +691,8 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(quickTradeMachine).toContain("Projected Cap");
     expect(quickTradeMachine).toContain("Production");
     expect(quickTradeMachine).toContain("NOIV");
-    expect(quickTradeMachine).toContain("Linear NAV");
-    expect(quickTradeMachine).toContain("Linear NAV Balance");
+    expect(quickTradeMachine).toContain("Package NAV");
+    expect(quickTradeMachine).toContain("Package NAV Balance");
     expect(quickTradeMachine).toContain("setShareUrl(\"\")");
     expect(quickTradeMachine).toContain("GM Logic Signal");
     expect(quickTradeMachine).toContain("TradeBalanceStrip");

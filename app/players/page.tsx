@@ -1,7 +1,7 @@
 "use client";
 import StrandDisplay from "@/app/components/StrandDisplay";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 
@@ -554,7 +554,9 @@ export default function PlayersPage() {
   const [players, setPlayers]   = useState<Player[]>([]);
   const [teams, setTeams]       = useState<Team[]>([]);
   const [loading, setLoading]   = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch]     = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [posFilter, setPosFilter] = useState<"ALL" | "F" | "D" | "G">("ALL");
   const [teamFilter, setTeamFilter] = useState<string>("ALL");
   const [sortKey, setSortKey] = useState<"ppg" | "pts" | "toi" | "ops" | "dps" | "age" | "cap">("ppg");
@@ -579,20 +581,30 @@ export default function PlayersPage() {
   // Simpler: derive actual points from ptsPace and games
   const actualPPG = (p: Player): number => {
     const gp = p.games ?? 0;
-    if (gp < 5) return 0;
+    if (gp <= 0) return 0;
     const actualPts = (p.ptsPace / 82) * gp;
     return actualPts / gp;
   };
 
   useEffect(() => {
     fetch("/api/league")
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`/api/league returned ${r.status}`);
+        return r.json();
+      })
       .then(d => {
-        setPlayers((d.players ?? []).filter((p: Player) => p.position !== "Pick"));
-        setTeams(d.teams ?? []);
+        const nextPlayers = (d.players ?? []).filter((p: Player) => p.position !== "Pick");
+        const nextTeams = d.teams ?? [];
+        if (!Array.isArray(nextPlayers) || !Array.isArray(nextTeams)) throw new Error("API returned invalid league payload");
+        setPlayers(nextPlayers);
+        setTeams(nextTeams);
+        setLoadError(null);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((e: any) => {
+        setLoadError(e?.message ?? "Failed to load players");
+        setLoading(false);
+      });
   }, []);
 
   const teamMap = useMemo(() => {
@@ -604,8 +616,8 @@ export default function PlayersPage() {
   const filtered = useMemo(() => {
     let list = players;
 
-    if (search.trim()) {
-      const q = search.toLowerCase();
+    if (deferredSearch.trim()) {
+      const q = deferredSearch.toLowerCase();
       list = list.filter(p =>
         p.name.toLowerCase().includes(q) ||
         p.teamId.toLowerCase().includes(q)
@@ -622,7 +634,7 @@ export default function PlayersPage() {
     }
 
     return list;
-  }, [players, search, posFilter, teamFilter]);
+  }, [players, deferredSearch, posFilter, teamFilter]);
 
   // Sort and split into sections
   const { skaters, goalies } = useMemo(() => {
@@ -630,28 +642,42 @@ export default function PlayersPage() {
     const go = filtered.filter(p => p.position === "G");
 
     const sortFn = (a: Player, b: Player): number => {
-      const dir = sortDir === "desc" ? 1 : -1;
+      const tie = a.name.localeCompare(b.name) || a.teamId.localeCompare(b.teamId) || String(a.id).localeCompare(String(b.id));
+      const compare = (av: number | null | undefined, bv: number | null | undefined): number => {
+        const aHas = Number.isFinite(av);
+        const bHas = Number.isFinite(bv);
+        if (!aHas && !bHas) return tie;
+        if (!aHas) return 1;
+        if (!bHas) return -1;
+        return (sortDir === "desc" ? bv! - av! : av! - bv!) || tie;
+      };
       switch (sortKey) {
-        case "ppg": return dir * (actualPPG(b) - actualPPG(a));
-        case "pts": return dir * (b.ptsPace - a.ptsPace);
-        case "toi": return dir * (b.avgTOI - a.avgTOI);
-        case "ops": return dir * ((b.ops ?? -99) - (a.ops ?? -99));
-        case "dps": return dir * ((b.dps ?? -99) - (a.dps ?? -99));
-        case "age": return dir * (a.age - b.age);
-        case "cap": return dir * (b.capHit - a.capHit);
-        default:    return dir * (actualPPG(b) - actualPPG(a));
+        case "ppg": return compare(actualPPG(a), actualPPG(b));
+        case "pts": return compare(a.ptsPace, b.ptsPace);
+        case "toi": return compare(a.avgTOI, b.avgTOI);
+        case "ops": return compare(a.ops, b.ops);
+        case "dps": return compare(a.dps, b.dps);
+        case "age": return compare(a.age, b.age);
+        case "cap": return compare(a.capHit, b.capHit);
+        default:    return compare(actualPPG(a), actualPPG(b));
       }
     };
+    const goalieSort = (a: Player, b: Player): number =>
+      ((b.gsax ?? Number.NEGATIVE_INFINITY) - (a.gsax ?? Number.NEGATIVE_INFINITY))
+      || a.name.localeCompare(b.name)
+      || a.teamId.localeCompare(b.teamId)
+      || String(a.id).localeCompare(String(b.id));
 
     return {
-      skaters: sk.sort(sortFn),
-      goalies: go.sort((a, b) => (b.gsax ?? 0) - (a.gsax ?? 0)),
+      skaters: [...sk].sort(sortFn),
+      goalies: [...go].sort(goalieSort),
     };
   }, [filtered, sortKey, sortDir]);
 
   const starters = goalies.filter(g => goalieTeir(g.gamesStarted ?? 0) === "STARTER");
   const tandems  = goalies.filter(g => goalieTeir(g.gamesStarted ?? 0) === "TANDEM");
   const backups  = goalies.filter(g => goalieTeir(g.gamesStarted ?? 0) === "BACKUP");
+  const goalieRank = new Map(goalies.map((g, i) => [`${g.id}::${g.teamId}`, i + 1]));
 
   return (
     <main style={{ minHeight: "100vh", background: "var(--paper)", color: "var(--ink)" }}>
@@ -724,6 +750,10 @@ export default function PlayersPage() {
           <div style={{ padding: "60px 20px", textAlign: "center", fontSize: "11px", color: "var(--rule)", letterSpacing: "0.2em" }}>
             LOADING ROSTER DATA...
           </div>
+        ) : loadError ? (
+          <div style={{ padding: "40px 20px", textAlign: "center", fontSize: "11px", color: "var(--red)", letterSpacing: "0.12em" }}>
+            PLAYER LEDGER LOAD FAILED: {loadError}
+          </div>
         ) : (
           <>
             {/* Mobile sort strip — only visible on mobile when skaters shown */}
@@ -771,7 +801,7 @@ export default function PlayersPage() {
               <div className="section-shell" style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
                 <SectionHeader label="Skaters" count={skaters.length} />
                 {skaters.map((p, i) => (
-                  <PlayerRow key={p.id} player={p} team={teamMap.get(p.teamId)} rank={i + 1} sortKey={sortKey} actualPPG={actualPPG} />
+                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={i + 1} sortKey={sortKey} actualPPG={actualPPG} />
                 ))}
               </div>
             )}
@@ -782,19 +812,19 @@ export default function PlayersPage() {
                 {starters.length > 0 && (
                   <>
                     <SectionHeader label="Starters · 40+ GP" count={starters.length} />
-                    {starters.map((p, i) => <PlayerRow key={p.id} player={p} team={teamMap.get(p.teamId)} rank={i + 1} sortKey={sortKey} actualPPG={actualPPG} />)}
+                    {starters.map((p) => <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={goalieRank.get(`${p.id}::${p.teamId}`) ?? 0} sortKey={sortKey} actualPPG={actualPPG} />)}
                   </>
                 )}
                 {tandems.length > 0 && (
                   <>
                     <SectionHeader label="Tandems · 25–39 GP" count={tandems.length} />
-                    {tandems.map((p, i) => <PlayerRow key={p.id} player={p} team={teamMap.get(p.teamId)} rank={i + 1} sortKey={sortKey} actualPPG={actualPPG} />)}
+                    {tandems.map((p) => <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={goalieRank.get(`${p.id}::${p.teamId}`) ?? 0} sortKey={sortKey} actualPPG={actualPPG} />)}
                   </>
                 )}
                 {backups.length > 0 && (
                   <>
                     <SectionHeader label="Backups · Under 25 GP" count={backups.length} />
-                    {backups.map((p, i) => <PlayerRow key={p.id} player={p} team={teamMap.get(p.teamId)} rank={i + 1} sortKey={sortKey} actualPPG={actualPPG} />)}
+                    {backups.map((p) => <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={goalieRank.get(`${p.id}::${p.teamId}`) ?? 0} sortKey={sortKey} actualPPG={actualPPG} />)}
                   </>
                 )}
               </div>

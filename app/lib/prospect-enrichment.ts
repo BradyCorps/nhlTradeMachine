@@ -16,7 +16,7 @@ export const slugifyProspectName = (name: string): string =>
     .trim()
     .replace(/\s+/g, "-");
 
-const CACHE_KEY = "cache:prospect_enrichment:v1";
+const CACHE_KEY = `cache:prospect_enrichment:v2:${Math.max(2020, SEASON.draftYear - 7)}:${SEASON.draftYear - 1}`;
 const CACHE_TTL = 7 * 24 * 60 * 60;
 
 function decodeHtml(value: string): string {
@@ -59,7 +59,9 @@ export function parseWikipediaDraftProspects(html: string, draftYear: number): R
     const name = cleanDraftedPlayerName(cells[1]);
     if (!name || /^\d+$/.test(name)) continue;
 
-    result[slugifyProspectName(name)] = { draftYear, draftOverall: overall };
+    const slug = slugifyProspectName(name);
+    if (result[slug]) continue;
+    result[slug] = { draftYear, draftOverall: overall };
   }
 
   return result;
@@ -90,7 +92,9 @@ export async function fetchProspectEnrichmentMap(): Promise<Record<string, Prosp
   const merged: Record<string, ProspectEnrichment> = {};
   for (const item of yearly) {
     if (item.status !== "fulfilled") continue;
-    Object.assign(merged, item.value);
+    for (const [slug, prospect] of Object.entries(item.value)) {
+      if (!merged[slug]) merged[slug] = prospect;
+    }
   }
 
   if (redis && Object.keys(merged).length > 50) {

@@ -165,6 +165,11 @@ function trendFromSnapshots(snapshots: PlayerSeasonSnapshot[]): { trend: Timelin
 function roleGrowthScore(snapshots: PlayerSeasonSnapshot[], currentToi = 0): number {
   const tois = snapshots.map(s => s.avgTOI).filter((n): n is number => Number.isFinite(n));
   if (tois.length < 2 && !currentToi) return 40;
+  if (tois.length < 2) {
+    const referenceToi = tois[0] ?? currentToi;
+    const rawGrowth = currentToi - referenceToi;
+    return clamp(45 + rawGrowth * 3, 25, 70);
+  }
   const first = tois[0] ?? currentToi;
   const last = currentToi || tois[tois.length - 1] || first;
   return clamp(45 + (last - first) * 8);
@@ -184,6 +189,7 @@ function classifyPhase(input: DevelopmentProfileInput, scores: {
   if (input.age <= 21 && (scores.pedigree >= 75 || scores.production >= 60)) return "EMERGING";
   if (input.age <= 19 && input.nhlGames < 20) return "EMERGING";
   if (input.age <= 25 && (scores.production >= 45 || scores.pedigree >= 50 || scores.trend === "RISING")) return "BREAKOUT_CANDIDATE";
+  if (input.age >= 26 && input.age <= 31) return "PEAK_WINDOW";
   if (input.age <= 23) return "EMERGING";
   return "UNKNOWN";
 }
@@ -237,7 +243,7 @@ function classifyBoomBust(opts: {
   const spread = boomScore - bustScore;
   const highVariance = opts.volatility >= 62 || Math.max(boomScore, bustScore) >= 62;
 
-  if (!highVariance && opts.confidence >= 60) return { boomBustSignal: "STABLE", boomScore: Math.round(boomScore), bustScore: Math.round(bustScore) };
+  if (!highVariance && (opts.confidence >= 50 || opts.volatility <= 35)) return { boomBustSignal: "STABLE", boomScore: Math.round(boomScore), bustScore: Math.round(bustScore) };
   if (spread >= 12) return { boomBustSignal: "BOOM_LEAN", boomScore: Math.round(boomScore), bustScore: Math.round(bustScore) };
   if (spread <= -12) return { boomBustSignal: "BUST_LEAN", boomScore: Math.round(boomScore), bustScore: Math.round(bustScore) };
   return { boomBustSignal: "HIGH_VARIANCE", boomScore: Math.round(boomScore), bustScore: Math.round(bustScore) };

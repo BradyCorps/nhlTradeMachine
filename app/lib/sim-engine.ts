@@ -40,10 +40,13 @@ export function scenarioSeed(value: unknown): number {
   return hashString(stableStringify(value)) % 100000 + 1;
 }
 
-export const stablePts = (p: SimEnginePlayer): number =>
-  p.baselinePtsPace && p.baselinePtsPace > 0
-    ? p.ptsPace * 0.4 + p.baselinePtsPace * 0.6
-    : p.ptsPace;
+export const stablePts = (p: SimEnginePlayer): number => {
+  const current = Number.isFinite(p.ptsPace) ? p.ptsPace : 0;
+  const baseline = Number.isFinite(p.baselinePtsPace) ? p.baselinePtsPace ?? 0 : 0;
+  return baseline > 0
+    ? current * 0.4 + baseline * 0.6
+    : current;
+};
 
 export const ageDecay = (age: number, position: string): number => {
   const peak = position === "D" ? 27 : position === "G" ? 29 : 26;

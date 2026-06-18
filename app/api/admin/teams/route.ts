@@ -8,6 +8,8 @@ import { isAuthorized } from "@/app/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
+const TEAM_CACHE_KEYS = ["cache:league:teams:v1", "cache:trade:teams:v1"];
+
 export async function GET() {
   const dbRows = await db.select().from(teams).catch((e) => { console.error("[teams GET] DB error:", e); return []; });
   const dbMap  = new Map(dbRows.map(r => [r.id, r]));
@@ -53,6 +55,9 @@ export async function POST(req: Request) {
     });
   }
 
-  if (redis) await redis.del("cache:teams").catch(() => {});
+  if (redis) {
+    const cache = redis;
+    await Promise.all(TEAM_CACHE_KEYS.map(key => cache.del(key).catch(() => {})));
+  }
   return NextResponse.json({ ok: true });
 }

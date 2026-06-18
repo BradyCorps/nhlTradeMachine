@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 const CAP_CEILING     = SEASON.capCeiling;
 const CAP_FLOOR       = SEASON.capFloor;
 const TEAMS_CACHE_TTL = 6 * 60 * 60; // 6 hours
+const TRADE_TEAMS_CACHE_KEY = "cache:trade:teams:v1";
 
 const TEAM_NEEDS: Record<string, { pos: string; minWar: number; label: string }[]> = {
 
@@ -38,7 +39,7 @@ const derivePhase = (confRank: number, divRank: number, pointPct: number): strin
 
 async function loadTeams(): Promise<any[]> {
   if (redis) {
-    const cached = await redis.get<any[]>("cache:teams");
+    const cached = await redis.get<any[]>(TRADE_TEAMS_CACHE_KEY);
     if (cached && Array.isArray(cached) && cached.length > 0) return cached;
   }
 
@@ -70,11 +71,13 @@ async function loadTeams(): Promise<any[]> {
         55: "SEA", 68: "UTA",
       };
 
-      teams.sort((a, b) =>
-        b.points !== a.points
-          ? b.points - a.points
-          : (b.regulationWins ?? 0) - (a.regulationWins ?? 0)
-      );
+      teams.sort((a, b) => {
+        const pointsA = Number.isFinite(a.points) ? a.points : -1;
+        const pointsB = Number.isFinite(b.points) ? b.points : -1;
+        return pointsB !== pointsA
+          ? pointsB - pointsA
+          : (b.regulationWins ?? 0) - (a.regulationWins ?? 0);
+      });
 
       teams.forEach((t, i) => {
         t.overallRank = i + 1;
@@ -154,7 +157,7 @@ async function loadTeams(): Promise<any[]> {
   });
 
   if (redis && teams.length > 0) {
-    await redis.setex("cache:teams", TEAMS_CACHE_TTL, teams);
+    await redis.setex(TRADE_TEAMS_CACHE_KEY, TEAMS_CACHE_TTL, teams);
   }
 
   return teams;

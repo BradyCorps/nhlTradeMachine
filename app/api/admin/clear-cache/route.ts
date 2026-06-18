@@ -13,7 +13,8 @@ export async function GET(req: Request) {
   const cleared: string[] = [];
   if (redis) {
     for (const key of [
-      "cache:teams",
+      "cache:league:teams:v1",
+      "cache:trade:teams:v1",
       "cache:contracts",
       "cache:contracts:v2",
       "cache:nhl_skater_summary_stats",

@@ -79,7 +79,13 @@ const CW_TEAM_TO_ID: Record<string, string> = {
   manitoba_moose: "WPG",
 };
 
-const SYNC_CACHE_KEYS = ["cache:teams", "cache:contracts", "cache:contracts:v2", "cache:nhl_skater_summary_stats"];
+const SYNC_CACHE_KEYS = [
+  "cache:league:teams:v1",
+  "cache:trade:teams:v1",
+  "cache:contracts",
+  "cache:contracts:v2",
+  "cache:nhl_skater_summary_stats",
+];
 const VALID_TEAM_IDS = new Set(TEAMS_DB.map(t => t.id));
 
 const NHLE_FACTORS: Record<string, number> = {

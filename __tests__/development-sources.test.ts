@@ -485,6 +485,36 @@ describe("Development source adapters", () => {
     ]);
   });
 
+  it("keeps prospect pace as the headline for rookies below 40 games", () => {
+    const input = buildDevelopmentInputFromPlayerPayload({
+      id: "rookie-heater",
+      name: "Rookie Heater",
+      position: "C",
+      age: 19,
+      games: 10,
+      ptsPace: 120,
+      avgTOI: 14,
+      draftOverall: 8,
+      draftYear: 2025,
+      prospectPtsPace: 42,
+      internationalScore: 70,
+      teamContext: "WEAK",
+      linemateContext: "WEAK",
+    });
+
+    expect(input).toMatchObject({
+      nhlGames: 10,
+      ptsPace: 42,
+      internationalScore: 70,
+      teamContext: "WEAK",
+      linemateContext: "WEAK",
+    });
+    expect(input?.snapshots).toEqual(expect.arrayContaining([
+      expect.objectContaining({ league: "INTL", nhlePtsPace: 42 }),
+      expect.objectContaining({ league: "NHL", nhlePtsPace: 120 }),
+    ]));
+  });
+
   it("normalizes guarded external AHL/CHL/NCAA timeline rows with NHLe defaults", () => {
     const parsed = parseExternalTimelineRows([
       {

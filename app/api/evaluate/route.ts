@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PROSPECT_TIERS, INJURY_RISK, getHistoricalFloor } from "@/app/lib/player-data";
+import { getHistoricalFloor, getInjuryRisk, getProspectTier } from "@/app/lib/player-data";
 import type { Asset, EvaluateRequest, EvaluateResponse, FArchetype } from "@/app/lib/trade-types";
 import { SEASON, LEAGUE, FRANCHISE } from "@/app/lib/season-config";
 import { calcNAV, compressPackage as coreCompress, AssetInput, XNAVResult } from "@/app/lib/xnav-engine";
@@ -175,7 +175,7 @@ const getAssetNAV = (asset: Asset, capCeiling: number = SEASON.capCeiling): XNAV
   const result = calcNAV(input);
   if (asset.position === "Pick") return result;
 
-  const historicalFloor = getHistoricalFloor(asset.name, result.total);
+  const historicalFloor = getHistoricalFloor(asset.name, result.total, asset);
   if (historicalFloor <= result.total) return result;
 
   const liftedTotal = Math.round(historicalFloor);
@@ -708,7 +708,7 @@ const runGmLogic = (
 
   const partnerIsContending = modePartner === "CONTENDER" || modePartner === "BUBBLE";
   const partnerHighNavOut   = partnerGivingUp.filter(a => navOf(a) > 100);
-  const homeHasPicksOrProsp = outPlayers.some(a => a.position === "Pick" || (PROSPECT_TIERS[a.name] != null));
+  const homeHasPicksOrProsp = outPlayers.some(a => a.position === "Pick" || (getProspectTier(a.name) != null));
   const partnerGivingNav    = partnerHighNavOut.reduce((s, a) => s + navOf(a), 0);
   const partnerReceiving    = cNavOut;
   const partnerGetsEnough   = partnerReceiving >= partnerGivingNav * 0.90;
@@ -755,7 +755,7 @@ const runGmLogic = (
 
   if (modePartner === "REBUILDING" || modePartner === "TANKING") {
     const youngGoingOut  = partnerGivingUp.filter(a => a.position !== "Pick" && a.age <= 25);
-    const veteranComing  = inPlayers.filter(a => hasVeteranTerm([a]) && !PROSPECT_TIERS[a.name]);
+    const veteranComing  = inPlayers.filter(a => hasVeteranTerm([a]) && !getProspectTier(a.name));
     const picksComingIn  = inPicks.length > 0;
     const futureCoreGoingOut = partnerGivingUp.filter(isFutureCoreAsset);
     const premiumPicksGoingOut = inPicks.filter(a => isPremiumLotteryPick(a, navOf));
@@ -809,7 +809,7 @@ const runGmLogic = (
 
   if (modeHome === "REBUILDING" || modeHome === "TANKING") {
     const futureCoreGoingOut = outPlayers.filter(isFutureCoreAsset);
-    const veteranComing = inPlayers.filter(a => hasVeteranTerm([a]) && !PROSPECT_TIERS[a.name]);
+    const veteranComing = inPlayers.filter(a => hasVeteranTerm([a]) && !getProspectTier(a.name));
     if (futureCoreGoingOut.length > 0 && veteranComing.length > 0 && inPicks.length === 0) {
       const core = futureCoreGoingOut[0];
       const p = core.developmentProfile!;
@@ -871,7 +871,7 @@ const runGmLogic = (
   }
 
   for (const asset of inPlayers) {
-    const risk = INJURY_RISK[asset.name];
+    const risk = getInjuryRisk(asset.name);
     if (risk && asset.capHit >= 4) {
       flags.push({
         severity: risk.level === "HIGH" ? "WARN" : "INFO",
@@ -1083,7 +1083,7 @@ const evaluateTrade = (
       const yearsOfPeak = Math.max(0, peakAge - a.age + (a.yearsRemaining || 1));
       const ageFactor = Math.min(3.0, yearsOfPeak / 4);
 
-      const prospect = PROSPECT_TIERS[a.name];
+      const prospect = getProspectTier(a.name);
       const prospectBonus = prospect ? prospect.tier === 1 ? 3.0 : prospect.tier === 2 ? 1.5 : 0.5 : 0;
 
       const surplus = Math.max(0, nav) / Math.max(1, a.capHit);

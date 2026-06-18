@@ -2,12 +2,12 @@
 // ── AssetCard — individual player/pick card in trade panels ───
 import React from "react";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
-import { PLAYER_PEDIGREE } from "@/app/lib/player-data";
+import { getPlayerPedigree } from "@/app/lib/player-data";
 import { HISTORICAL_MAX_OFF, HISTORICAL_MAX_DEF } from "@/app/lib/historical-benchmarks";
 import { MicroBar } from "@/app/components/MicroBar";
 import StrandView from "@/app/components/StrandView";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
-import { useTradeStore } from "@/app/store/tradeStore";
+import { tradeAssetKey, useTradeStore } from "@/app/store/tradeStore";
 import { AssetBadges } from "@/app/components/AssetBadges";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
 import { formatPickRound } from "@/app/lib/trade-format";
@@ -30,6 +30,7 @@ export default function AssetCard({
   const setRetainedPctStore = useTradeStore(s => s.setRetainedPct);
 
   const [view, setView] = React.useState<AssetCardView>("STATS");
+  const pedigree = getPlayerPedigree(asset.name);
   const [compareId, setCompareId] = React.useState<string>("");
   const xnav   = navResult ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
   const isPick = asset.position === "Pick";
@@ -49,11 +50,12 @@ export default function AssetCard({
   };
 
   const updateAsset = (partial: Partial<Asset>) => {
-    updateBlock(idx, blocks[idx].map((a) => a.id === asset.id ? { ...a, ...partial } : a));
+    const targetKey = tradeAssetKey(asset);
+    updateBlock(idx, blocks[idx].map((a) => tradeAssetKey(a) === targetKey ? { ...a, ...partial } : a));
   };
 
   const removeAsset = () => {
-    removeAssetFromStore(asset.id, idx);
+    removeAssetFromStore(asset.id, idx, asset.teamId);
   };
 
   const navColor = xnav.total > 80 ? 'var(--ledger-green)' : xnav.total > 20 ? 'var(--ledger-navy)' : xnav.total > -20 ? 'var(--ledger-brown)' : 'var(--ledger-red)';
@@ -283,9 +285,9 @@ export default function AssetCard({
                 </span>
               );
             })()}
-            {PLAYER_PEDIGREE[asset.name]?.careerGsax && (
+            {pedigree?.careerGsax && (
               <span className="text-2xs font-black text-ledger-navy font-mono">
-                +{PLAYER_PEDIGREE[asset.name].careerGsax} career · Peak {PLAYER_PEDIGREE[asset.name].peakGsax}
+                +{pedigree.careerGsax} career · Peak {pedigree.peakGsax}
               </span>
             )}
           </div>
@@ -358,11 +360,11 @@ export default function AssetCard({
               tooltip="Contract cost — overpaid contracts drag total NAV. Negative = cap hit exceeds on-ice value" />
           </div>
           {/* Peak pts for established skaters with pedigree */}
-          {PLAYER_PEDIGREE[asset.name]?.peakPtsPace && (
+          {pedigree?.peakPtsPace && (
             <div className="mt-1.5 px-1 py-1 flex justify-between items-center" style={{ borderTop: '1px solid #c8b890' }}>
               <span className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">Career Peak</span>
               <span className="text-2xs font-black text-ledger-navy font-mono">
-                {PLAYER_PEDIGREE[asset.name].peakPtsPace} pts/82
+                {pedigree.peakPtsPace} pts/82
               </span>
             </div>
           )}

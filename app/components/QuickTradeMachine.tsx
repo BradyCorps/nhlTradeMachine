@@ -12,6 +12,7 @@ import {
   type TradeSharePayload,
 } from "@/app/lib/trade-share";
 import { formatPickRound } from "@/app/lib/trade-format";
+import { ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 
 type LeagueData = { teams: Team[]; players: Asset[]; capCeiling?: number | null };
 type VerdictDisplay = Pick<TradeVerdict, "status" | "message" | "metrics"> & {
@@ -219,7 +220,20 @@ function summarizePackage(assets: Asset[], navMap: Record<string, XNAVResult>): 
   const noiv = players.length
     ? players.reduce((sum, asset) => sum + (asset.xgRelTM ?? 0), 0) / players.length
     : 0;
-  const nav = assets.reduce((sum, asset) => sum + (navMap[asset.id]?.total ?? 0), 0);
+  const picks = assets.filter(asset => asset.position === "Pick");
+  const pickValue = picks.reduce((sum, asset) => sum + (navMap[asset.id]?.total ?? 0), 0);
+  const sortedPlayers = [...players]
+    .map(asset => ({ nav: navMap[asset.id]?.total ?? 0, age: asset.age ?? 27 }))
+    .sort((a, b) => b.nav - a.nav);
+  const compressedPlayers = sortedPlayers.reduce((sum, asset, index) => {
+    const marginalValue = index === 0
+      ? asset.nav
+      : (asset.nav * Math.pow(ageDecayRate(asset.age), index)) - ageSlotPenalty(asset.age);
+    return sum + Math.max(0, marginalValue);
+  }, 0);
+  const linearNav = assets.reduce((sum, asset) => sum + (navMap[asset.id]?.total ?? 0), 0);
+  const compressedNav = pickValue + compressedPlayers;
+  const nav = compressedNav > 0 ? compressedNav : linearNav;
   return { cap, production, goals, xg, noiv, nav, count: assets.length };
 }
 
@@ -281,7 +295,7 @@ function TeamTradeSummary({
         <SummaryMetric label="Cap Delta" value={team ? `${fmtSigned(capDelta)}M` : "--"} tone={capDelta >= 0 ? "good" : undefined} />
         <SummaryMetric label="Production" value={`${fmtSigned(productionDelta, 0)} pts/82`} tone={productionDelta >= 0 ? "good" : "bad"} />
         <SummaryMetric label="NOIV" value={sends.count || receives.count ? fmtSigned(noivDelta, 1) : "--"} tone={noivDelta >= 0 ? "good" : "bad"} />
-        <SummaryMetric label="Linear NAV" value={navLoading ? "Loading" : fmtSigned(navDelta, 1)} tone={navDelta >= 0 ? "good" : "bad"} />
+        <SummaryMetric label="Package NAV" value={navLoading ? "Loading" : fmtSigned(navDelta, 1)} tone={navDelta >= 0 ? "good" : "bad"} />
       </div>
     </div>
   );
@@ -305,7 +319,7 @@ function TradeBalanceStrip({
       style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
       <SummaryMetric label="Total Cap In Play" value={fmtCap(capMoved)} />
       <SummaryMetric label="Production In Play" value={`${productionMoved.toFixed(0)} pts/82`} />
-      <SummaryMetric label="Linear NAV Balance" value={navLoading ? "Loading" : fmtSigned(navGap, 1)} tone={Math.abs(navGap) <= 10 ? "good" : undefined} />
+      <SummaryMetric label="Package NAV Balance" value={navLoading ? "Loading" : fmtSigned(navGap, 1)} tone={Math.abs(navGap) <= 10 ? "good" : undefined} />
       <SummaryMetric label="GM Audit" value="Required" />
     </section>
   );

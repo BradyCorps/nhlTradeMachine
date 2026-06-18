@@ -185,10 +185,15 @@ export default function TradeHistoryBar() {
 
   const handleSave = (name: string) => {
     const toAsset = (a: any): ScenarioAsset => ({
+      id:       a.id,
       name:     a.name,
+      teamId:   a.teamId,
       position: a.position ?? "",
       capHit:   a.capHit   ?? 0,
       age:      a.age,
+      retainedPct: a.retainedPct ?? 0,
+      round:    a.round ?? null,
+      year:     a.year ?? null,
     });
 
     saveScenario({

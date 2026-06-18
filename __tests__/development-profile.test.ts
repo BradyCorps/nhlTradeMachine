@@ -4,6 +4,59 @@ import { calcDevelopmentProfile, type DevelopmentProfileInput } from "../app/lib
 const profile = (input: DevelopmentProfileInput) => calcDevelopmentProfile(input);
 
 describe("Development Timeline Layer — fixture archetypes", () => {
+  it("labels ordinary mid-career players as peak-window instead of UNKNOWN", () => {
+    const p = profile({
+      id: "mid-career",
+      name: "Middle Six Forward",
+      position: "W",
+      age: 27,
+      nhlGames: 310,
+      ptsPace: 38,
+      avgTOI: 13,
+      snapshots: [
+        { season: "2024-25", age: 26, league: "NHL", games: 72, goals: 13, assists: 21, points: 34, ptsPerGame: 0.47, nhlePtsPace: 38, avgTOI: 13 },
+      ],
+    });
+
+    expect(p.developmentPhase).toBe("PEAK_WINDOW");
+  });
+
+  it("does not call low-volatility low-confidence profiles high variance", () => {
+    const p = profile({
+      id: "stable-small-sample",
+      name: "Stable Small Sample",
+      position: "W",
+      age: 24,
+      nhlGames: 55,
+      ptsPace: 32,
+      avgTOI: 12,
+      snapshots: [
+        { season: "2024-25", age: 23, league: "NHL", games: 25, goals: 4, assists: 6, points: 10, ptsPerGame: 0.4, nhlePtsPace: 32, avgTOI: 11.5 },
+        { season: "2025-26", age: 24, league: "NHL", games: 30, goals: 5, assists: 7, points: 12, ptsPerGame: 0.4, nhlePtsPace: 32, avgTOI: 12 },
+      ],
+    });
+
+    expect(p.volatility).toBeLessThanOrEqual(35);
+    expect(p.boomBustSignal).not.toBe("HIGH_VARIANCE");
+  });
+
+  it("dampens one-snapshot role growth instead of saturating it", () => {
+    const p = profile({
+      id: "single-role-jump",
+      name: "Single Role Jump",
+      position: "C",
+      age: 22,
+      nhlGames: 30,
+      ptsPace: 36,
+      avgTOI: 16,
+      snapshots: [
+        { season: "2025-26", age: 22, league: "NHL", games: 30, goals: 5, assists: 8, points: 13, ptsPerGame: 0.43, nhlePtsPace: 36, avgTOI: 9 },
+      ],
+    });
+
+    expect(p.roleGrowthScore).toBeLessThan(80);
+  });
+
   it("Brad Lambert is volatile boom-or-bust with limited NHL experience", () => {
     const p = profile({
       id: "8483471",

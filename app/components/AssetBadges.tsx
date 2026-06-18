@@ -1,6 +1,11 @@
 import React from "react";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
-import { PLAYER_PEDIGREE, INJURY_RISK, PROSPECT_TIERS, SHUTDOWN_D_PEDIGREE } from "@/app/lib/player-data";
+import {
+  getInjuryRisk,
+  getPlayerPedigree,
+  getProspectTier,
+  getShutdownDPedigree,
+} from "@/app/lib/player-data";
 import { FRANCHISE } from "@/app/lib/season-config";
 
 const badgeStyle = (color: string, background = "transparent"): React.CSSProperties => ({
@@ -100,7 +105,7 @@ function getRoleTag(asset: Asset, xnav: XNAVResult): { label: string; color: str
         title: "Top-pair defenceman — heavy minutes with enough production to carry first-pair usage.",
       };
     }
-    if ((tier === "ELITE_SHUTDOWN" || SHUTDOWN_D_PEDIGREE[asset.name]) || (pts < 30 && toi >= 19 && qocIdx >= 60)) {
+    if ((tier === "ELITE_SHUTDOWN" || getShutdownDPedigree(asset.name)) || (pts < 30 && toi >= 19 && qocIdx >= 60)) {
       return {
         label: "SHUTDOWN D",
         color: "var(--ledger-amber)",
@@ -211,7 +216,11 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
   const roleTag = getRoleTag(asset, xnav);
 
   // Collapse awards to one chip: lead award + "+N" overflow with full list on hover
-  const awardList = PLAYER_PEDIGREE[asset.name]?.awards ?? [];
+  const pedigree = getPlayerPedigree(asset.name);
+  const prospectTier = getProspectTier(asset.name);
+  const injuryRisk = getInjuryRisk(asset.name);
+  const shutdownPedigree = getShutdownDPedigree(asset.name);
+  const awardList = pedigree?.awards ?? [];
   const awardEntries = Array.from(new Set(awardList)).map(award => ({
     award,
     count: awardList.filter(a => a === award).length,
@@ -219,11 +228,11 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
   const awardLabel = (e: { award: string; count: number }) =>
     `${e.count > 1 ? `${e.count}× ` : ""}${e.award}`;
 
-  const hasProspectTier = Boolean(PROSPECT_TIERS[asset.name] && !isFranchise);
-  const hasInjuryRisk = Boolean(INJURY_RISK[asset.name]);
+  const hasProspectTier = Boolean(prospectTier && !isFranchise);
+  const hasInjuryRisk = Boolean(injuryRisk);
   const hasChangeOfScenery = !isPick && xnav.total < -5 && xnav.total > -40 && asset.age <= 32;
   const hasSalaryDump = !isPick && xnav.total <= -40;
-  const hasShutdownPedigree = Boolean(SHUTDOWN_D_PEDIGREE[asset.name]);
+  const hasShutdownPedigree = Boolean(shutdownPedigree);
   const hasLedger = asset.tradeBlockStatus === "requested"
     || asset.tradeBlockStatus === "available"
     || awardEntries.length > 0
@@ -310,10 +319,10 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
       {/* Prospect tier badge (name-list) — skip when the NAV tier already says franchise */}
       {hasProspectTier && (
         <span className="text-2xs px-1 py-0.5 font-black" style={{
-          color: PROSPECT_TIERS[asset.name].tier === 1 ? 'var(--ledger-navy)' : PROSPECT_TIERS[asset.name].tier === 2 ? 'var(--ledger-green)' : 'var(--ledger-brown)',
-          border: `1px solid ${PROSPECT_TIERS[asset.name].tier === 1 ? 'rgba(26,46,92,0.4)' : PROSPECT_TIERS[asset.name].tier === 2 ? 'rgba(26,92,46,0.4)' : 'rgba(107,80,48,0.4)'}`,
+          color: prospectTier!.tier === 1 ? 'var(--ledger-navy)' : prospectTier!.tier === 2 ? 'var(--ledger-green)' : 'var(--ledger-brown)',
+          border: `1px solid ${prospectTier!.tier === 1 ? 'rgba(26,46,92,0.4)' : prospectTier!.tier === 2 ? 'rgba(26,92,46,0.4)' : 'rgba(107,80,48,0.4)'}`,
         }}>
-          {PROSPECT_TIERS[asset.name].tier === 1 ? "★ FRANCHISE" : PROSPECT_TIERS[asset.name].tier === 2 ? "◆ TOP PROSPECT" : "◇ PROSPECT"}
+          {prospectTier!.tier === 1 ? "★ FRANCHISE" : prospectTier!.tier === 2 ? "◆ TOP PROSPECT" : "◇ PROSPECT"}
         </span>
       )}
       
@@ -322,8 +331,8 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
         <span className="text-2xs px-1 py-0.5 font-black" style={{
           color: 'var(--ledger-red)',
           border: '1px solid rgba(184,48,32,0.4)'
-        }} title={INJURY_RISK[asset.name].note}>
-          ⚕ {INJURY_RISK[asset.name].level} RISK
+        }} title={injuryRisk!.note}>
+          ⚕ {injuryRisk!.level} RISK
         </span>
       )}
 
@@ -352,7 +361,7 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
         <span className="text-2xs px-1 py-0.5 font-black" style={{
           color: 'var(--ledger-amber)',
           border: '1px solid rgba(138,92,0,0.5)'
-        }} title={SHUTDOWN_D_PEDIGREE[asset.name].note}>
+        }} title={shutdownPedigree!.note}>
           ★ ELITE SHUTDOWN
         </span>
       )}

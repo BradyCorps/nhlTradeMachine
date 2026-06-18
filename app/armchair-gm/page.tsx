@@ -11,7 +11,7 @@ import WhatWeNeed from "@/app/components/WhatWeNeed";
 import ContentionQuadrant from "@/app/components/ContentionQuadrant";
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
-import { useTradeStore } from "@/app/store/tradeStore";
+import { tradeAssetKey, useTradeStore } from "@/app/store/tradeStore";
 import Header from "@/app/components/Header";
 import TradeHistoryBar from "@/app/components/TradeHistoryBar";
 import Footer from "@/app/components/Footer";
@@ -181,6 +181,7 @@ export default function ArmchairGmPage() {
   const simAbortRef  = useRef<AbortController | null>(null);
   const memoAbortRef = useRef<AbortController | null>(null);
   const evalAbortRef = useRef<AbortController | null>(null);
+  const matchAbortRef = useRef<AbortController | null>(null);
   const initialNavReadyRef = useRef(false);
 
   // ── Server-fetched NAV map ────────────────────────────────────
@@ -262,22 +263,44 @@ export default function ArmchairGmPage() {
 
     if (retainedAssets.length === 0) return;
 
+    const ctrl = new AbortController();
     const timer = setTimeout(() => {
-      const ctrl = new AbortController();
       fetchNavMap(retainedAssets, ctrl.signal, db.capCeiling)
-        .then(fresh => setNavMap(prev => ({ ...prev, ...fresh })))
-        .catch(() => {});
-      return () => ctrl.abort();
+        .then(fresh => {
+          if (!ctrl.signal.aborted) setNavMap(prev => ({ ...prev, ...fresh }));
+        })
+        .catch((e) => {
+          if (e?.name !== "AbortError") console.warn("[retention NAV]", e);
+        });
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+    };
   }, [outgoingBlock, incomingBlock, setNavMap, db.capCeiling]);
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/league/teams").then((r) => r.json()),
-      fetch("/api/league/players").then((r) => r.json()),
+    const loadJson = async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`${url} returned ${res.status}`);
+      return res.json();
+    };
+    Promise.allSettled([
+      loadJson("/api/league/teams"),
+      loadJson("/api/league/players"),
     ])
+      .then((results) => {
+        const [teamResult, playerResult] = results;
+        if (teamResult.status !== "fulfilled" || playerResult.status !== "fulfilled") {
+          const failures = results
+            .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+            .map(r => r.reason?.message ?? "unknown API error")
+            .join("; ");
+          throw new Error(failures || "league data request failed");
+        }
+        return [teamResult.value, playerResult.value] as const;
+      })
       .then(([td, pd]) => {
         const data = {
           teams:      td.teams,
@@ -286,7 +309,7 @@ export default function ArmchairGmPage() {
           capFloor:   td.capFloor,
           liveStats:  pd.liveStats,
         };
-        if (!data.teams || !data.players) {
+        if (!Array.isArray(data.teams) || !Array.isArray(data.players) || data.teams.length === 0 || data.players.length === 0) {
           setError(`API returned invalid data`);
           setBooting(false);
           return;
@@ -309,10 +332,8 @@ export default function ArmchairGmPage() {
   const executeTrade = useCallback(() => {
     if (!homeTeam || !partnerTeam || (!outgoingBlock.length && !incomingBlock.length)) return;
 
-    const outgoingById = new Map(outgoingBlock.map(a => [a.id, a]));
-    const incomingById = new Map(incomingBlock.map(a => [a.id, a]));
-    const outIds = new Set(outgoingById.keys());
-    const inIds  = new Set(incomingById.keys());
+    const outgoingByKey = new Map(outgoingBlock.map(a => [tradeAssetKey(a), a]));
+    const incomingByKey = new Map(incomingBlock.map(a => [tradeAssetKey(a), a]));
 
     setDb(prev => {
       const clearSessionTradeBlock = (p: Asset): Asset =>
@@ -322,7 +343,7 @@ export default function ArmchairGmPage() {
 
       // Update player teamIds
       const updatedPlayers = prev.players.map(p => {
-        const outgoingAsset = outgoingById.get(p.id);
+        const outgoingAsset = outgoingByKey.get(tradeAssetKey(p));
         if (outgoingAsset) {
           return clearSessionTradeBlock({
             ...p,
@@ -330,7 +351,7 @@ export default function ArmchairGmPage() {
             retainedPct: outgoingAsset.retainedPct ?? p.retainedPct ?? 0,
           });
         }
-        const incomingAsset = incomingById.get(p.id);
+        const incomingAsset = incomingByKey.get(tradeAssetKey(p));
         if (incomingAsset) {
           return clearSessionTradeBlock({
             ...p,
@@ -643,6 +664,9 @@ export default function ArmchairGmPage() {
   // "Who wants this package?" — scores all 32 teams on fit
   const findMatches = useCallback(async (packageBlocks: Asset[]) => {
     if (!packageBlocks.length || !teams[0]) return;
+    matchAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    matchAbortRef.current = ctrl;
     setMatchLoading(true);
     setMatchResults(null);
     try {
@@ -660,19 +684,24 @@ export default function ArmchairGmPage() {
             }])
           ),
         }),
+        signal: ctrl.signal,
       });
       if (res.ok) {
         const data = await res.json();
+        if (ctrl.signal.aborted || matchAbortRef.current !== ctrl) return;
         setMatchResults(data);
         const firstPopulated = MATCH_FOLDERS.find(f =>
           data.matches?.some((m: { fitTier: MatchFolder }) => m.fitTier === f.id)
         );
         setMatchFolder(firstPopulated?.id ?? "LEAD");
       }
-    } catch (e) {
-      console.error("[findMatches]", e);
+    } catch (e: any) {
+      if (e?.name !== "AbortError") console.error("[findMatches]", e);
     } finally {
-      setMatchLoading(false);
+      if (matchAbortRef.current === ctrl) {
+        matchAbortRef.current = null;
+        setMatchLoading(false);
+      }
     }
   }, [teams, db, navMap]);
 
@@ -1795,18 +1824,17 @@ function TeamDNA({
   // Post-trade roster: remove outgoing, add incoming
   // This makes the panel react live to trade changes
   const effectiveHomeRoster = React.useMemo(() => {
-    const outIds = new Set(homeBlocks.map(a => a.id));
-    const inIds  = new Set(partnerBlocks.map(a => a.id));
+    const outKeys = new Set(homeBlocks.map(tradeAssetKey));
     return [
-      ...homeRoster.filter(p => !outIds.has(p.id)),
+      ...homeRoster.filter(p => !outKeys.has(tradeAssetKey(p))),
       ...partnerBlocks.filter(a => a.position !== "Pick"),
     ];
   }, [homeRoster, homeBlocks, partnerBlocks]);
 
   const effectivePartnerRoster = React.useMemo(() => {
-    const outIds = new Set(partnerBlocks.map(a => a.id));
+    const outKeys = new Set(partnerBlocks.map(tradeAssetKey));
     return [
-      ...partnerRoster.filter(p => !outIds.has(p.id)),
+      ...partnerRoster.filter(p => !outKeys.has(tradeAssetKey(p))),
       ...homeBlocks.filter(a => a.position !== "Pick"),
     ];
   }, [partnerRoster, homeBlocks, partnerBlocks]);
@@ -2031,8 +2059,13 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
             {allAssets.map((a) => {
               const xnav = navMap[a.id] ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
               const isOut = a.side === "OUT";
+              const ptsPace = a.ptsPace ?? 0;
+              const xgPace = a.xGPace ?? 0;
+              const defRate = a.defRate ?? 0;
+              const avgTOI = a.avgTOI ?? 0;
+              const capHit = a.capHit ?? 0;
               return (
-                <tr key={a.id} className={`border-b border-zinc-900 hover:bg-zinc-800/20 transition-colors ${isOut ? "bg-rose-950/5" : "bg-emerald-950/5"}`}>
+                <tr key={`${a.side}:${tradeAssetKey(a)}`} className={`border-b border-zinc-900 hover:bg-zinc-800/20 transition-colors ${isOut ? "bg-rose-950/5" : "bg-emerald-950/5"}`}>
                   <td className="px-3 py-2">
                     <span className={`text-2xs font-black px-1.5 py-0.5 rounded ${isOut ? "bg-rose-900/30 text-rose-400" : "bg-emerald-900/30 text-emerald-400"}`}>
                       {a.side}
@@ -2041,15 +2074,15 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
                   <td className="px-3 py-2 font-sans font-black text-white text-[11px] whitespace-nowrap">{a.name}</td>
                   <td className="px-3 py-2 text-zinc-500">{a.position}</td>
                   <td className="px-3 py-2 text-zinc-400">{a.age}</td>
-                  <td className="px-3 py-2 text-cyan-400">{a.position === "Pick" ? "—" : a.position === "G" ? `${(a.savePct ?? 0).toFixed(3)}` : a.ptsPace.toFixed(1)}</td>
-                  <td className="px-3 py-2 text-violet-400">{a.position === "Pick" ? "—" : a.position === "G" ? `${(a.gsax ?? 0).toFixed(1)} GSAx` : (a.xGPace ?? 0).toFixed(1)}</td>
-                  <td className={`px-3 py-2 ${a.defRate > 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                    {a.position === "Pick" ? "—" : fmt(a.defRate, 2)}
+                  <td className="px-3 py-2 text-cyan-400">{a.position === "Pick" ? "—" : a.position === "G" ? `${(a.savePct ?? 0).toFixed(3)}` : ptsPace.toFixed(1)}</td>
+                  <td className="px-3 py-2 text-violet-400">{a.position === "Pick" ? "—" : a.position === "G" ? `${(a.gsax ?? 0).toFixed(1)} GSAx` : xgPace.toFixed(1)}</td>
+                  <td className={`px-3 py-2 ${defRate > 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    {a.position === "Pick" ? "—" : fmt(defRate, 2)}
                   </td>
-                  <td className="px-3 py-2 text-zinc-400">{a.position === "Pick" ? "—" : a.avgTOI.toFixed(1)}</td>
+                  <td className="px-3 py-2 text-zinc-400">{a.position === "Pick" ? "—" : avgTOI.toFixed(1)}</td>
                   {/* ── NEW: Extension styling on the Cap Hit column ── */}
                   <td className={`px-3 py-2 ${a.hasExtension ? "text-amber-500 font-bold" : "text-amber-400"}`} title={a.hasExtension ? "Valuation based on future extension AAV" : undefined}>
-                    {a.position === "Pick" ? "—" : `$${a.capHit.toFixed(2)}M${a.hasExtension ? '*' : ''}`}
+                    {a.position === "Pick" ? "—" : `$${capHit.toFixed(2)}M${a.hasExtension ? '*' : ''}`}
                   </td>
                   <td className="px-3 py-2 text-zinc-500">{a.position === "Pick" ? "—" : `${a.yearsRemaining}yr`}</td>
                   <td className={`px-3 py-2 font-black text-[12px] ${xnav.total > 0 ? "text-emerald-400" : "text-rose-400"}`}>

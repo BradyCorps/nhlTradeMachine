@@ -8,6 +8,12 @@ import { teams as teamsTable, players as playersTable, tradeBlock as tradeBlockT
 import { resolveRosterTier } from "@/app/lib/xnav-engine";
 import { calcDevelopmentProfile } from "@/app/lib/development-profile";
 import {
+  canonicalNameSlug,
+  dedupePlayersByAuthority,
+  removePlayerFromOtherRosters,
+  safeNhlRosterPlayer,
+} from "@/app/lib/player-identity";
+import {
   buildDevelopmentInputFromNhlTimeline,
   buildDevelopmentInputFromPlayerPayload,
   fetchCachedNhlSkaterTimelineRowsForPlayers,
@@ -20,6 +26,7 @@ const CAP_CEILING = SEASON.capCeiling;
 const CAP_FLOOR   = SEASON.capFloor;
 
 const TEAMS_CACHE_TTL     = 6  * 60 * 60; // 6 hours (in seconds for Redis)
+const LEAGUE_TEAMS_CACHE_KEY = "cache:league:teams:v1";
 const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
 const CONTRACTS_CACHE_KEY = "cache:contracts:v2";
 const MONEYPUCK_CACHE_TTL = 4  * 60 * 60; // 4 hours
@@ -29,6 +36,31 @@ const VALID_TEAM_IDS = new Set(TEAMS_DB.map(t => t.id));
 
 const isValidTeamId = (teamId: string | null | undefined): teamId is string =>
   Boolean(teamId && VALID_TEAM_IDS.has(teamId));
+
+const developmentTeamContext = (phase: string | undefined, standing: number | undefined): "STRONG" | "AVERAGE" | "WEAK" => {
+  if (phase === "Contender" || phase === "Bubble" || (standing != null && standing <= 10)) return "STRONG";
+  if (phase === "Rebuilding" || phase === "Tanking" || (standing != null && standing >= 25)) return "WEAK";
+  return "AVERAGE";
+};
+
+const developmentLinemateContext = (
+  position: string,
+  avgTOI: number,
+  qocIndex: number | null,
+): "STRONG" | "AVERAGE" | "WEAK" => {
+  if (qocIndex != null && qocIndex >= 68) return "STRONG";
+  if (position === "D" && avgTOI >= 21) return "STRONG";
+  if (position !== "D" && avgTOI >= 17) return "STRONG";
+  if (qocIndex != null && qocIndex <= 32) return "WEAK";
+  if (position === "D" && avgTOI > 0 && avgTOI < 14) return "WEAK";
+  if (position !== "D" && avgTOI > 0 && avgTOI < 10) return "WEAK";
+  return "AVERAGE";
+};
+
+const developmentInternationalScore = (prospectPtsPace: number | null | undefined): number | undefined =>
+  prospectPtsPace != null && prospectPtsPace > 0
+    ? Math.max(20, Math.min(100, prospectPtsPace * 1.4))
+    : undefined;
 
 
 // ── Team metadata that needs human curation ──────────────────
@@ -98,7 +130,7 @@ const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: num
 
 async function loadTeams(): Promise<any[]> {
   if (redis) {
-    const cached = await redis.get<any[]>("cache:teams");
+    const cached = await redis.get<any[]>(LEAGUE_TEAMS_CACHE_KEY);
     if (cached && Array.isArray(cached) && cached.length > 0) return cached;
   }
 
@@ -132,11 +164,13 @@ async function loadTeams(): Promise<any[]> {
 
       // 1. Sort globally by NHL tiebreakers (Points -> RW -> ROW)
       // Note: NHL changed tiebreakers, Regulation Wins (RW) comes before ROW now!
-      teams.sort((a, b) =>
-        b.points !== a.points
-          ? b.points - a.points
-          : (b.regulationWins ?? 0) - (a.regulationWins ?? 0)
-      );
+      teams.sort((a, b) => {
+        const pointsA = Number.isFinite(a.points) ? a.points : -1;
+        const pointsB = Number.isFinite(b.points) ? b.points : -1;
+        return pointsB !== pointsA
+          ? pointsB - pointsA
+          : (b.regulationWins ?? 0) - (a.regulationWins ?? 0);
+      });
 
       // 2. Assign overall standing and map standard points
       teams.forEach((t, i) => {
@@ -252,7 +286,7 @@ async function loadTeams(): Promise<any[]> {
 
   // ── Cache result ──────────────────────────────────────────────
   if (redis && teams.length > 0) {
-    await redis.setex("cache:teams", TEAMS_CACHE_TTL, teams);
+    await redis.setex(LEAGUE_TEAMS_CACHE_KEY, TEAMS_CACHE_TTL, teams);
   }
 
 
@@ -461,6 +495,7 @@ const normalisePos = (code: string) =>
 
 const calcAge = (birthDate: string): number => {
   const b = new Date(birthDate);
+  if (!Number.isFinite(b.getTime())) return 27;
   const n = new Date();
   let age = n.getFullYear() - b.getFullYear();
   const m = n.getMonth() - b.getMonth();
@@ -771,8 +806,6 @@ async function fetchNhlGoalieStatsFallback(): Promise<Map<string, any>> {
       const slug = slugify(name);
       statsMap.set(`id:${g.playerId ?? g.goalieId ?? ""}`, entry);
       statsMap.set(slug, entry);
-      const parts = name.split(" ");
-      if (parts.length >= 2) statsMap.set(slugify(parts[parts.length - 1]), entry);
     }
 
     if (redis && statsMap.size > 50) {
@@ -998,10 +1031,6 @@ export async function GET() {
 
         goalieRows.forEach((stats, name) => {
           goalieMap.set(slugify(name), stats);
-          const parts = name.split(" ");
-          if (parts.length >= 2) {
-            goalieMap.set(slugify(parts[parts.length - 1]), stats);
-          }
         });
       }
     }
@@ -1049,13 +1078,16 @@ export async function GET() {
 
       if (skaters.length < 5) return; // skip bad responses
 
-      const liveList = skaters.map((p: any) => ({
-        id:       p.id.toString(),
-        name:     `${p.firstName.default} ${p.lastName.default}`,
-        position: normalisePos(p.positionCode),
-        age:      calcAge(p.birthDate),
-        headshot: p.headshot ?? null,
-      }));
+      const liveList = skaters.flatMap((raw: any) => {
+        const p = safeNhlRosterPlayer(raw);
+        return p ? [{
+          id:       p.id,
+          name:     p.name,
+          position: normalisePos(p.position),
+          age:      calcAge(p.birthDate),
+          headshot: p.headshot,
+        }] : [];
+      });
 
       rosterMap.set(teamId, liveList);
     });
@@ -1067,6 +1099,7 @@ export async function GET() {
   // Admin DB rows cover mock-draft prospects and roster players missing from
   // the live NHL roster feed. Deduplicate by id and normalized name so DB rows
   // augment the live roster instead of creating duplicates.
+  const dbTeamBySlug = new Map<string, string>();
   try {
     const dbPlayers = await db.select({
       id:              playersTable.id,
@@ -1081,8 +1114,10 @@ export async function GET() {
 
     for (const d of dbPlayers) {
       if (!isValidTeamId(d.teamId)) continue;
+      const dbSlug = canonicalNameSlug(d.name);
+      dbTeamBySlug.set(dbSlug, d.teamId);
+      removePlayerFromOtherRosters(rosterMap, d.teamId, d);
       const list = rosterMap.get(d.teamId) ?? [];
-      const dbSlug = slugify(d.name);
       const existing = list.find((x: any) => String(x.id) === String(d.id) || slugify(x.name) === dbSlug);
       if (existing) {
         existing.draftYear = existing.draftYear ?? d.draftYear;
@@ -1132,7 +1167,7 @@ export async function GET() {
   });
 
   // ── 3. Build player objects ─────────────────────────────────
-  const players: any[] = [];
+  let players: any[] = [];
 
   rosterMap.forEach((skaters, teamId) => {
     const team = LIVE_TEAMS.find((t) => t.id === teamId);
@@ -1202,11 +1237,10 @@ export async function GET() {
       const defaultTOI = isGoalie ? 0 : finalPosition === "D" ? 18.5 : 13.5;
       const defaultPts = isGoalie ? 0 : finalPosition === "D" ? 22 : finalPosition === "C" ? 32 : 28;
 
-      // Merge goalie-specific stats — try full name slug, then last name only
+      // Merge goalie-specific stats by stable id or full-name slug.
       const goalieSlug      = slugify(p.name);
-      const goalieSlugLast  = slugify(p.name.split(" ").pop() ?? "");
       const goalieStats     = isGoalie
-        ? (goalieMap.get(goalieSlug) ?? goalieMap.get(goalieSlugLast) ?? NHL_GOALIE_STATS.get(`id:${p.id}`) ?? NHL_GOALIE_STATS.get(goalieSlug) ?? NHL_GOALIE_STATS.get(goalieSlugLast) ?? null)
+        ? (NHL_GOALIE_STATS.get(`id:${p.id}`) ?? goalieMap.get(goalieSlug) ?? NHL_GOALIE_STATS.get(goalieSlug) ?? null)
         : null;
 
       const hasProspectSignal = draftOverall != null || (prospectPtsPace != null && prospectPtsPace > 0);
@@ -1219,9 +1253,13 @@ export async function GET() {
       // nameCollision: young player with a high cap hit whose contract position
       // doesn't match their NHL position — likely inherited a veteran's contract.
       // Use normContractPos so "RW, LW" → "W" matches "W" (fixes Slafkovsky and all wingers).
+      const contractPos = normContractPos(fin?.position);
+      const rosterPos = normContractPos(finalPosition);
       const nameCollision = p.age <= 23
         && rawCapHit > 3.0
-        && normContractPos(fin?.position) !== p.position;
+        && contractPos !== ""
+        && rosterPos !== ""
+        && contractPos !== rosterPos;
 
       const finalCapHit   = contractOverride?.capHit ?? override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
       const finalYears    = override?.yearsRemaining ?? (nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1)));
@@ -1250,12 +1288,19 @@ export async function GET() {
         : (stats?.games ?? goalieStats?.gamesStarted ?? 0);
       const ptsPace = stats?.ptsPace ?? (hasSkaterStats ? defaultPts : 0);
       const avgTOI = stats?.avgTOI ?? (hasSkaterStats ? defaultTOI : 0);
+      const developmentTeam = LIVE_TEAMS.find((t: any) => t.id === teamId);
+      const teamContext = developmentTeamContext(developmentTeam?.phase, developmentTeam?.standing);
+      const internationalScore = developmentInternationalScore(prospectPtsPace);
+      const linemateContext = developmentLinemateContext(finalPosition, avgTOI, qocIndex);
       const timelineMatches = developmentTimelineMap.get(String(p.id)) ?? [];
       const developmentInput = timelineMatches.length > 0
         ? buildDevelopmentInputFromNhlTimeline(timelineMatches, {
             age: p.age,
             draftYear: draftYear ?? undefined,
             draftOverall: draftOverall ?? undefined,
+            internationalScore,
+            teamContext,
+            linemateContext,
           })
         : buildDevelopmentInputFromPlayerPayload({
             id: p.id,
@@ -1268,6 +1313,9 @@ export async function GET() {
             draftYear: draftYear ?? null,
             draftOverall: draftOverall ?? null,
             prospectPtsPace: prospectPtsPace ?? null,
+            internationalScore: internationalScore ?? null,
+            teamContext,
+            linemateContext,
           });
       const developmentProfile = developmentInput ? calcDevelopmentProfile(developmentInput) : null;
 
@@ -1387,6 +1435,8 @@ export async function GET() {
     phase:    t.phase,
     needs:    t.needs ?? [],
   }));
+
+  players = dedupePlayersByAuthority(players, dbTeamBySlug);
 
   return NextResponse.json({
     teams,

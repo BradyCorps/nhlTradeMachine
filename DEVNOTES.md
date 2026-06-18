@@ -1,5 +1,99 @@
 # Development Notes
 
+## 2026-06-18 Batch 5 UI State / Async Robustness Audit
+
+### Completed Today
+
+- Completed Batch 5 edits from `AUDIT.md` for Armchair GM, the players page, trade state, focused trade machine summaries, and saved scenarios.
+- Added composite trade asset identity via `tradeAssetKey(id + teamId)` and applied it to trade-store add/remove/retention, AssetCard updates, trade execution, and post-trade lineup previews so duplicate-id rows can be selected and moved independently.
+- Fixed Armchair GM retention NAV fetch cleanup so debounced requests are actually aborted and cannot re-inject stale retained NAV.
+- Hardened Armchair GM league boot loading with `response.ok` checks, `Promise.allSettled`, empty payload validation, and clearer error reporting.
+- Added abort/request-token guards to `findMatches` so stale "Who Wants This Package?" results cannot overwrite a newer package or clear the newer spinner.
+- Guarded BreakdownTable optional skater metrics before `.toFixed()` calls so stats-less skaters cannot crash the table.
+- Fixed players-page fetch error handling, deterministic sort tie-breaks, null-last OPS/DPS sorting, low-game PPG handling, deferred search filtering, duplicate-safe row keys, and continuous goalie ranks across goalie subsections.
+- Expanded saved scenario snapshots to include asset id, teamId, retainedPct, round, and year; replaced content-hash ids with unique ids; and added guarded localStorage hydration for corrupt or oversized persisted JSON.
+- Aligned QuickTradeMachine package summaries with Armchair GM's compression-aware package NAV and updated labels away from "Linear NAV".
+- Added Batch 5 source canaries covering duplicate-id state operations, async abort guards, guarded metrics, players-page load/sort behavior, scenario persistence, and package NAV display.
+
+### Deferred
+
+- The full shared `useLeagueData` / `useNavMap` / `useTradeVerdict` hook extraction remains open. Batch 5 aligned the concrete package-value drift and hardened duplicated lifecycles, but a broad hook extraction would be a larger structural refactor.
+
+### Verification
+
+- `npx tsc --noEmit`
+- Result: no TypeScript errors.
+- `npm run test -- __tests__/feature-canaries.test.ts`
+- Result: `103` tests passing.
+- `npm run test -- __tests__/trade-share.test.ts`
+- Result: `5` tests passing.
+- `npm run test -- __tests__/evaluate-route.test.ts`
+- Result: `5` tests passing.
+- `npm run test`
+- Result: `241` tests passing.
+- Dev server was not started in Codespace, per project instructions.
+
+## 2026-06-18 Batch 3 Development / Static Pedigree Audit
+
+### Completed Today
+
+- Completed Batch 3 edits from `AUDIT.md` for the development-profile and static pedigree data paths.
+- Added normalized static player-data lookups so accent/spelling variants such as `Tim Stutzle` resolve the same pedigree, prospect-tier, injury-risk, and shutdown-D records as their canonical keyed names.
+- Updated evaluate logic, asset badges, and asset cards to use the normalized static lookup helpers instead of exact-name map indexing.
+- Changed historical NAV floors to decay with age, availability, and current production when asset context is available, so declined or injured veterans are no longer re-inflated to peak value by a static floor.
+- Wired development profile context inputs through league routes, including inferred international score, team context, and linemate/usage context where route data supports it.
+- Fixed development profile classifier edge cases so ordinary 26-31 year-old NHLers do not render as `UNKNOWN`, low-volatility low-confidence profiles can be `STABLE`, and one-snapshot TOI changes cannot saturate role growth.
+- Fixed rookie route-payload development inputs so players under 40 NHL games keep prospect NHLe as the headline pace while retaining the live NHL sample in the timeline.
+- Versioned the prospect-enrichment Redis key by draft-year window and made slug merging first-write-wins to avoid silent same-slug overwrites.
+- Added regression coverage for decayed historical floors, mid-career phase classification, boom/bust labeling, role-growth damping, and rookie small-sample pace handling.
+
+### Verification
+
+- `npx tsc --noEmit`
+- Result: no TypeScript errors.
+- `npm run test -- __tests__/development-profile.test.ts`
+- Result: `13` tests passing.
+- `npm run test -- __tests__/development-sources.test.ts`
+- Result: `21` tests passing.
+- `npm run test -- __tests__/xnav.test.ts`
+- Result: `67` tests passing.
+- `npm run test -- __tests__/feature-canaries.test.ts`
+- Result: `97` tests passing.
+- `npm run test`
+- Result: `235` tests passing.
+- Dev server was not started in Codespace, per project instructions.
+
+## 2026-06-18 Batch 4 League Roster / Simulation Audit
+
+### Completed Today
+
+- Completed the concrete Batch 4 edits from `AUDIT.md` across league roster assembly, cache isolation, and playoff simulation.
+- Added shared player identity helpers in `app/lib/player-identity.ts` for canonical name keys, safe NHL roster row parsing, DB-authoritative roster removal, and final player dedupe.
+- Applied DB-authoritative player dedupe in both `app/api/league/players/route.ts` and `app/api/league/route.ts`, so admin-assigned players such as a moved Joseph Woll cannot be emitted for both old and new teams.
+- Made live roster ingestion skip malformed NHL rows instead of aborting the rest of the team loop.
+- Fixed young-player contract collision handling so position-only overrides, such as Quinton Byfield's center override, do not strip real contracts down to ELC terms.
+- Split the Redis team caches into `cache:league:teams:v1` and `cache:trade:teams:v1`, guarded standings sorts against missing points, and updated admin cache invalidation to clear both keys.
+- Removed surname-only goalie stat fallbacks from league roster routes to avoid same-surname goalie stat collisions.
+- Hardened playoff simulation so conference seeds are not padded with duplicate teams, winner lookups fail visibly instead of advancing the last seed, and later rounds sort series sides by projected strength before calculating win probability.
+- Guarded `stablePts` against missing or non-finite scoring pace values so simulation standings cannot become `NaN`.
+- Added canaries for roster dedupe, isolated team cache keys, goalie fallback behavior, playoff bracket safety, and simulation numeric guards.
+
+### Deferred
+
+- Batch 4's traded-pick origin/ownership item remains open. The current app only has synthetic pick generation and no local traded-pick ownership source or schema, so fixing that correctly requires a real ownership data model/feed rather than guessing pick origins.
+
+### Verification
+
+- `npx tsc --noEmit`
+- Result: no TypeScript errors.
+- `npm run test -- __tests__/feature-canaries.test.ts`
+- Result: `97` tests passing.
+- `npm run test -- __tests__/simulate-and-claude-routes.test.ts`
+- Result: `11` tests passing.
+- `npm run test`
+- Result: `230` tests passing.
+- Dev server was not started in Codespace, per project instructions.
+
 ## 2026-06-18 Batch 2 Trade UI / Share Fidelity Audit
 
 ### Completed Today

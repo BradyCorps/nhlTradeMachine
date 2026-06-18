@@ -8,6 +8,8 @@ import { isAuthorized } from "@/app/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
+const TEAM_CACHE_KEYS = ["cache:league:teams:v1", "cache:trade:teams:v1"];
+
 export async function GET() {
   const rows = await db.select().from(siteSettings).catch(() => []);
   const m = new Map(rows.map(r => [r.key, r.value]));
@@ -28,7 +30,10 @@ export async function POST(req: Request) {
 
   // Dedicated cache-bust action
   if (body.action === "clear_cache") {
-    if (redis) await redis.del("cache:teams").catch(() => {});
+    if (redis) {
+      const cache = redis;
+      await Promise.all(TEAM_CACHE_KEYS.map(key => cache.del(key).catch(() => {})));
+    }
     return NextResponse.json({ ok: true, cleared: true });
   }
 
@@ -51,6 +56,9 @@ export async function POST(req: Request) {
     upsert("cap_floor",   body.capFloor),
   ]);
 
-  if (redis) await redis.del("cache:teams").catch(() => {});
+  if (redis) {
+    const cache = redis;
+    await Promise.all(TEAM_CACHE_KEYS.map(key => cache.del(key).catch(() => {})));
+  }
   return NextResponse.json({ ok: true });
 }
