@@ -754,3 +754,78 @@ The trade UI is mostly solid; the theme this batch is async lifecycle correctnes
     #8–#10 are fidelity/robustness/duplication (shared-view asset drift, flag-key fragility, the 4th-round mislabel).
 
 Two lower-confidence items I'll note rather than rank: fmtCap(asset.capHit) will throw if any player record arrives without capHit (typed required, so depends on the /api/league/players payload — worth a guard), and a share version bump throws with no migration path (callers catch it, so it degrades to "could not be decoded" rather than crashing).
+
+## Batch 4
+[
+  {
+    "file": "app/api/league/players/route.ts",
+    "line": 793,
+    "summary": "No global dedup by player id across teams: the player list is built per-team from rosterMap and DB injection only dedups within the destination team's list, so a traded player appears on both teams (the Joseph Woll bug).",
+    "failure_scenario": "Admin DB moves Woll to PHI; DB injection (738-761) finds no Woll in PHI's live-roster list and pushes him there (injectedFromDb), while the live NHL feed still lists him on his old team. The final loop (793-981) emits one object per (team,player) with no cross-team dedup, so Woll appears twice. The same happens with zero DB involvement whenever the live feed lists a player on two rosters during a trade transition. Admin contracts shows one Woll because it reads the contract table directly."
+  },
+  {
+    "file": "app/api/league/route.ts",
+    "line": 255,
+    "summary": "Two different routes read/write the same Redis key 'cache:teams' with different payload shapes and different capSpace bases, so served team data is non-deterministic for 6h.",
+    "failure_scenario": "route.ts writes 'cache:teams' with live-CapWages capSpace (and its own object shape); teams/route.ts (lines 41/157) writes the same key with static TEAMS_DB.capSpace. /api/league (Players page) and /api/league/teams (trade machine) both hit this key. Whichever populates it first wins for TEAMS_CACHE_TTL, so the trade engine can compute cap penalties against a stale/static cap basis (or even the wrong object shape) depending on which page was loaded first."
+  },
+  {
+    "file": "app/api/league/players/route.ts",
+    "line": 711,
+    "summary": "Unguarded field access while mapping the live roster (p.id.toString(), p.firstName.default, calcAge(p.birthDate)) throws inside results.forEach, and the outer catch only logs — dropping every team after the bad row.",
+    "failure_scenario": "The NHL feed returns one roster entry missing firstName.default or id. p.firstName.default throws inside the forEach (702-717); the catch at 718 only warns, so the forEach aborts mid-iteration and every team whose index hadn't been processed is silently omitted from rosterMap — one malformed call-up on team #3 erases teams #3-#32."
+  },
+  {
+    "file": "app/api/league/players/route.ts",
+    "line": 860,
+    "summary": "The nameCollision heuristic strips a real contract from a legitimately mis-positioned young player, forcing ELC terms.",
+    "failure_scenario": "A <=23 player with a real >$3M deal whose roster position differs from the contract position (e.g. Byfield: NHL feed 'LW', contract 'C') triggers nameCollision (normContractPos('C') !== 'W'), wiping his real cap hit to elcCapHit/1yr. The CONTRACT_OVERRIDES rescue (864) only applies capHit if the override defines one; a position-only override (line 27) leaves the ELC value in place."
+  },
+  {
+    "file": "app/api/simulate/route.ts",
+    "line": 516,
+    "summary": "Playoff bracket padding pushes duplicate team references and find/getW fall back to the weakest seed, so a team can play itself or the wrong team can advance.",
+    "failure_scenario": "When a conference resolves <8 seeds, the loop pads with seeds[last] (same object reference) repeatedly; simulateSeries can be called with high===low (team vs itself). When a series winner's teamId isn't found, getW returns last (526/549-561), silently advancing the weakest seed to the next round and possibly to champion."
+  },
+  {
+    "file": "app/api/simulate/route.ts",
+    "line": 490,
+    "summary": "Series win-probability in later rounds is keyed to bracket position, not team strength, so the stronger team can be assigned the underdog probability.",
+    "failure_scenario": "Round 2/CF pass getW(...) winners as (high, low) by bracket line without re-sorting by points (564-569). If the lower bracket line holds the stronger team, gap = high.projectedPoints - low.projectedPoints is negative and winProb clamps to max(0.35, ...) = 0.35 for the better team — a systematic bias against it. Separately, a player payload missing ptsPace makes stablePts return NaN (sim-engine.ts), which propagates to projectedPoints=NaN and corrupts every standings sort."
+  },
+  {
+    "file": "app/api/league/route.ts",
+    "line": 135,
+    "summary": "The standings sort comparator (b.points - a.points) is unguarded, so a missing points value yields NaN and an undefined ordering.",
+    "failure_scenario": "If the NHL summary omits points for any team (partial payload / relocated row), the comparator returns NaN, the sort order is garbage, and every derived overallRank/standing — including the teamStanding stamped onto picks (where 32=worst drives pick value) — is silently wrong."
+  },
+  {
+    "file": "app/api/league/route.ts",
+    "line": 1357,
+    "summary": "Picks are generated as an identical full grid per team stamped with the owner's current standing, ignoring traded-pick origin and ownership.",
+    "failure_scenario": "A 1st-round pick a contender (standing 3) acquired from a tanker (standing 32) is stamped teamStanding:3 and valued as a late 1st instead of a top pick. And because every team gets the same 3yr x 5rd grid, a pick already traded away still appears in the original team's assets — league-wide phantom pick inventory."
+  },
+  {
+    "file": "app/api/league/players/route.ts",
+    "line": 851,
+    "summary": "Goalie stats fall back to an unconditional surname-only key, with none of the diacritic/quality guards the skater path uses, so same-surname goalies get each other's numbers.",
+    "failure_scenario": "Two goalies named 'Smith' both resolve goalieMap.get(slugify('smith')); the Map holds whichever was inserted last (674/676), so both players display the same savePct/gsax. The skater path guards surname matching (810-813); the goalie path (482/676/851) does not."
+  },
+  {
+    "file": "app/api/league/route.ts",
+    "line": 1137,
+    "summary": "The entire ~200-line player-build pipeline and all identity normalizers are duplicated between route.ts and players/route.ts, with divergent name normalization, so fixes drift and a name can match a stat key but miss the contract key.",
+    "failure_scenario": "route.ts:1137-1352 is a near-twin of players/route.ts:793-981 (the Woll dedup fix would have to be made in both). slugify (route.ts:432 / players:62), an inline NFD strip (route.ts:1168 / players:819, keeps case+spaces), and a third 'normalise' (route.ts:566 / players:308) normalize the same name three different ways, so a player can match the slug-keyed MoneyPuck stats but miss the NFD-keyed contract lookup (or vice versa), getting live stats with a default $0.925M contract."
+  }
+]
+
+Summary & the Woll fix
+
+The Woll duplicate (#1) is the headline and the fix direction is clear: make the admin DB authoritative for team assignment and add a global dedup by canonical player id. Concretely —
+
+    When injecting a DB player onto team X, first remove any instance of that player (by id or name-slug) from every other team's list, not just check the destination list (line 742 only looks at the destination). The DB is what "correctly shows PHI," so it should win.
+    Add a final dedup pass by canonical id before the return (line 983), since the live feed itself can double-list a player mid-trade even with no DB row involved. Keep the instance whose teamId matches the DB/admin record.
+
+A wrinkle to hand Codex: ids aren't uniform — live rows use id: p.id.toString() (string) while DB-injected rows use id: d.id raw (line 749), so the dedup must match on a normalized id and name-slug, not strict id equality.
+
+The two structural findings worth pairing with it: #2 (the cache:teams key collision — two routes, two cap-space bases, one key) and #10 (the whole player-build pipeline exists in two divergent copies). Fixing the Woll dedup in players/route.ts alone leaves the twin in route.ts still duplicating on the Players page — so the durable fix is to extract one shared roster-merge/dedup module both routes call, which also closes #2's divergence.
