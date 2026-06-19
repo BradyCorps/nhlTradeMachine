@@ -1,6 +1,7 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 
 export default function LedgerDropdown({ teams, selectedId, onSelect }: {
   teams: any[];
@@ -9,25 +10,7 @@ export default function LedgerDropdown({ teams, selectedId, onSelect }: {
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const selected = teams.find(t => t.id === selectedId);
-
-  // Lock background scroll & prevent layout shift from scrollbar disappearing
-  useEffect(() => {
-    if (isOpen) {
-      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-      document.body.style.paddingRight = `${scrollbarWidth}px`;
-      document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
-    } else {
-      document.body.style.paddingRight = '0px';
-      document.body.style.overflow = 'unset';
-      document.documentElement.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.paddingRight = '0px';
-      document.body.style.overflow = 'unset';
-      document.documentElement.style.overflow = 'unset';
-    };
-  }, [isOpen]);
+  useBodyScrollLock(isOpen);
 
   return (
     <div className="relative flex-1 min-w-0">

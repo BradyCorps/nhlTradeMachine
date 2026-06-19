@@ -29,6 +29,7 @@ import {
 import { scenarioSeed } from "@/app/lib/sim-engine";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import TradeBlockPanel from "@/app/components/TradeBlockPanel";
+import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 
 const TradeProposalEngine = lazy(() => import("@/app/components/TradeProposal"));
 const PlayerComparison    = lazy(() => import("@/app/components/PlayerComparison"));
@@ -138,24 +139,6 @@ export default function ArmchairGmPage() {
   const [tradeBlockOpen, setTradeBlockOpen] = useState(false);
   const [tradeRequest,   setTradeRequest]   = useState<Asset[] | null>(null);
 
-  // Freeze body scroll when any modal/overlay is open
-  React.useEffect(() => {
-    if (verdictOpen || showTeamSelect || tradeBlockOpen || (tradeRequest && tradeRequest.length > 0)) {
-      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-      document.body.style.paddingRight = `${scrollbarWidth}px`;
-      document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
-    } else {
-      document.body.style.paddingRight = '0px';
-      document.body.style.overflow = 'unset';
-      document.documentElement.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.paddingRight = '0px';
-      document.body.style.overflow = 'unset';
-      document.documentElement.style.overflow = 'unset';
-    };
-  }, [verdictOpen, showTeamSelect, tradeBlockOpen, tradeRequest]);
   const tradeInputKey = useMemo(() => JSON.stringify({
     homeTeamId,
     partnerTeamId,
@@ -182,6 +165,8 @@ export default function ArmchairGmPage() {
   const [simData, setSimData]       = useState<any | null>(null);
   const [showSimPanel, setShowSimPanel] = useState(false);
   const [showMemo, setShowMemo] = useState(false);
+
+  useBodyScrollLock(verdictOpen || showTeamSelect || tradeBlockOpen || showMemo || Boolean(tradeRequest?.length));
 
   // ── Abort controllers — cancel stale Claude requests ─────────
   const simAbortRef  = useRef<AbortController | null>(null);
@@ -1391,7 +1376,8 @@ export default function ArmchairGmPage() {
                       {verdict.metrics.homeNetGain > 0 ? "+" : ""}
                       {verdict.metrics.homeNetGain.toFixed(0)}
                       <span style={{ fontSize: 9, fontWeight: 400, marginLeft: 3,
-                                     color: "var(--ledger-ink-faint)" }}>NAV</span>
+                                     color: "var(--ledger-ink-faint)" }}
+                                  title="Net Asset Value — the player's tradeable value">NAV</span>
                     </div>
                   </div>
                 )}
@@ -2089,8 +2075,9 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
         <table className="w-full text-[11px] font-mono">
           <thead>
             <tr className="border-b border-zinc-800/30">
-              {["Side", "Player", "Pos", "Age", "Pts/82", "xG/82", "DefRate", "Avg TOI", "Cap", "Term", "X-NAV", "Off", "Def", "Age/YNG", "Cap Cost"].map((h) => (
-                <th key={h} className="px-3 py-2.5 text-left text-2xs font-black uppercase tracking-wider text-zinc-600">{h}</th>
+              {["Side", "Player", "Pos", "Age", "Pts/82", "xG/82", "DefRate", "Avg TOI", "Cap", "Term", "X-NAV", "Off", "Def", "Age/YNG", "Cap Cost", "Floor"].map((h) => (
+                <th key={h} className="px-3 py-2.5 text-left text-2xs font-black uppercase tracking-wider text-zinc-600"
+                  title={h === "X-NAV" ? "Net Asset Value — the player's tradeable value" : h === "Floor" ? "Franchise/career floor applied" : undefined}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -2103,6 +2090,7 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
               const defRate = a.defRate ?? 0;
               const avgTOI = a.avgTOI ?? 0;
               const capHit = a.capHit ?? 0;
+              const floorAdj = Math.round(xnav.total) - Math.round(xnav.off + xnav.def + xnav.age + xnav.cap);
               return (
                 <tr key={`${a.side}:${tradeAssetKey(a)}`} className={`border-b border-zinc-900 hover:bg-zinc-800/20 transition-colors ${isOut ? "bg-rose-950/5" : "bg-emerald-950/5"}`}>
                   <td className="px-3 py-2">
@@ -2133,6 +2121,9 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
                     {fmt(xnav.age, 0)}
                   </td>
                   <td className="px-3 py-2 text-rose-500">{xnav.cap.toFixed(0)}</td>
+                  <td className="px-3 py-2 text-amber-500" title="Franchise/career floor applied">
+                    {Math.abs(floorAdj) >= 1 ? fmt(floorAdj, 0) : "—"}
+                  </td>
                 </tr>
               );
             })}

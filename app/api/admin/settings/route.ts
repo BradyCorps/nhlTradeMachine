@@ -9,6 +9,7 @@ import { isAuthorized } from "@/app/lib/admin-auth";
 export const dynamic = "force-dynamic";
 
 const TEAM_CACHE_KEYS = ["cache:league:teams:v1", "cache:trade:teams:v1"];
+const MAX_CAP_CEILING = 120;
 
 export async function GET() {
   const rows = await db.select().from(siteSettings).catch(() => []);
@@ -41,6 +42,9 @@ export async function POST(req: Request) {
     if (value === undefined || value === null) return null;
     if (!Number.isFinite(value) || value <= 0) {
       return `${label} must be a positive number`;
+    }
+    if (label === "capCeiling" && value > MAX_CAP_CEILING) {
+      return `capCeiling must be no greater than ${MAX_CAP_CEILING}`;
     }
     return null;
   };

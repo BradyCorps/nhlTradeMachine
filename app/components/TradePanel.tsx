@@ -77,7 +77,8 @@ function TradePanel({
             <div className="font-black leading-none" style={{ fontSize: '1.4rem', color: 'var(--ledger-ink)', fontStyle: 'italic' }}>
               {nav.toFixed(1)}
             </div>
-            <div className="text-2xs font-black uppercase tracking-widest">NAV</div>
+            <div className="text-2xs font-black uppercase tracking-widest"
+              title="Net Asset Value — the player's tradeable value">NAV</div>
             <div className="text-2xs font-black px-1.5 py-0.5 mt-0.5" style={{
               color: capSpace < 0 ? 'var(--ledger-red)' : 'var(--ledger-green)',
               background: capSpace < 0 ? 'rgba(184,48,32,0.08)' : 'rgba(26,92,46,0.08)',

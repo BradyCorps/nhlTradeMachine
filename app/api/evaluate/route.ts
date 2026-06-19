@@ -110,13 +110,15 @@ type Team = import("@/app/lib/trade-types").Team;
 const safe  = (n: number) => (isNaN(n) || !isFinite(n) ? 0 : n);
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 const fmt   = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
+const MAX_CAP_CEILING = 120;
+const isValidCapCeiling = (cap: number): boolean => Number.isFinite(cap) && cap > 0 && cap <= MAX_CAP_CEILING;
 
 const getLiveCapCeiling = async (requestCapCeiling?: number | null): Promise<number> => {
-  if (requestCapCeiling != null && Number.isFinite(requestCapCeiling)) return requestCapCeiling;
+  if (requestCapCeiling != null && isValidCapCeiling(requestCapCeiling)) return requestCapCeiling;
   const rows = await db.select().from(siteSettings).catch(() => []);
   const row = rows.find((r) => r.key === "cap_ceiling");
   const cap = row ? parseFloat(row.value) : NaN;
-  return Number.isFinite(cap) ? cap : SEASON.capCeiling;
+  return isValidCapCeiling(cap) ? cap : SEASON.capCeiling;
 };
 
 // ── Adapter: Maps raw client Asset to strict engine AssetInput ──

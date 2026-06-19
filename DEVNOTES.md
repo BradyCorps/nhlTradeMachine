@@ -1,5 +1,68 @@
 # Development Notes
 
+## 2026-06-19 UX and UI Polish — Tasks U1-U7
+
+### Completed Today
+
+- Completed the `AUDIT.md` UX and UI Polish section from Task U1 through Task U7.
+- Kept MoneyPuck goalie GSAx authoritative on both league roster routes by merging NHL goalie fallback stats with MoneyPuck `goalieMap` stats and preserving `mpG.gsax` when available.
+- Added shared `useBodyScrollLock(isOpen)` in `app/lib/use-body-scroll-lock.ts` and applied it to the trade proposal, ledger dropdown, trade block panel, asset dropdown, trade history save modal, and Armchair GM modal overlays.
+- Reworked Player Analytics to fetch canonical teams and players routes, use a denser desktop stat table, label/sort stat columns, and page sections at 25 forwards, 10 defencemen, and 5 goalies with Prev/Page/Next controls.
+- Added visible `FLOOR` residual rows to NAV breakdowns so floored assets reconcile their visible components to headline NAV.
+- Strengthened the active header tab with red active text and an underline while keeping the filled diamond.
+- Added point-of-use `NAV` tooltips on asset cards and Armchair GM card/table labels.
+- Raised sub-11px data labels in the dense AssetCard and lineup bench/scratch zones to the 11px `text-2xs`/equivalent floor.
+- Updated feature canaries for the goalie GSAx merge, paged Player Analytics table, scroll lock hook, NAV floor residuals/tooltips, and active navigation styling.
+
+### Verification
+
+- `npm run test`
+- Result: `256` tests passing across `11` test files.
+- `npx tsc --noEmit`
+- Result: no TypeScript errors.
+- Dev server was not started in Codespace, per project instructions.
+
+## 2026-06-19 Batch Audit the Batch Audit — Task 0
+
+### Completed Today
+
+- Started at the `AUDIT.md` `# Batch Audit the Batch Audit` section and completed Task 0 only, per the standing preamble.
+- Ran the baseline test suite before edits: `npm run test` passed with `253` tests across `11` files.
+- Verified the following Task 0 items were already present in the current tree:
+  - BreakdownTable optional metric guards in `app/armchair-gm/page.tsx`.
+  - Draft-class import protection for existing NHL contract rows in `app/api/admin/import-draft-class/route.ts`.
+  - Expanded admin cache clearing keys in `app/api/admin/clear-cache/route.ts`.
+  - Trade-block name-derived keying and status enum validation in `app/api/admin/trade-block/route.ts`.
+  - Cross-team duplicate player dedupe in `app/api/league/players/route.ts`.
+- Completed the remaining Task 0 gap: cap-ceiling validation now rejects absurd values above `120` before admin persistence and ignores invalid request/DB cap ceilings in `app/api/evaluate/route.ts`.
+- Updated the existing Batch 6 source canary in `__tests__/feature-canaries.test.ts` to cover absurd cap-ceiling validation on both admin settings and evaluate route reads.
+
+### Verification
+
+- `npm run test`
+- Result: `253` tests passing across `11` test files.
+- `npx tsc --noEmit`
+- Result: no TypeScript errors.
+- Dev server was not started in Codespace, per project instructions.
+
+## 2026-06-19 Batch Audit Follow-up
+
+### Completed Today
+
+- Worked through the `AUDIT.md` "Batch Audit" notes against the current codebase and verified that most previously listed Batch 1-6 discrepancies were already addressed in the tree.
+- Completed the remaining concrete discrepancy found in `app/components/CapProjection.tsx`: current roster cap usage now sums effective retained cap hits, matching the incoming/outgoing retained-cap math already used for post-trade deltas.
+- Completed the remaining young-player contract collision discrepancy in both league roster builders:
+  - `app/api/league/players/route.ts`
+  - `app/api/league/route.ts`
+- The contract collision guard now tracks whether a contract matched by position, team, or generic name. It only applies the ELC fallback for young players when the risky match was generic name-only, so legitimate position/team-specific contracts are preserved even when roster position metadata differs.
+- Added source canaries in `__tests__/feature-canaries.test.ts` for retained-cap current roster usage and for preserving young-player contracts when only position metadata disagrees.
+
+### Verification
+
+- `npm run test`
+- Result: `253` tests passing across `11` test files.
+- Dev server was not started in Codespace, per project instructions.
+
 ## 2026-06-18 Batch 6 Admin / Players Ledger Audit
 
 ### Completed Today

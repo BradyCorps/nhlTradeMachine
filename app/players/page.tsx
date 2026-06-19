@@ -353,6 +353,31 @@ function StatPill({ value, label, accent }: { value: string; label: string; acce
   );
 }
 
+function statSortLabel(sortKey: string): string {
+  return sortKey === "ppg" ? "PPG"
+    : sortKey === "pts" ? "P/82"
+    : sortKey === "toi" ? "TOI"
+    : sortKey === "ops" ? "OPS"
+    : sortKey === "dps" ? "DPS"
+    : sortKey === "age" ? "Age"
+    : sortKey === "cap" ? "Cap"
+    : "PPG";
+}
+
+function SortHeader({ k, label, active, dir, onClick }: {
+  k: "ppg" | "pts" | "toi" | "ops" | "dps" | "age" | "cap";
+  label: string;
+  active: boolean;
+  dir: "desc" | "asc";
+  onClick: (k: "ppg" | "pts" | "toi" | "ops" | "dps" | "age" | "cap") => void;
+}) {
+  return (
+    <button className={`col-header${active ? " active" : ""}`} onClick={() => onClick(k)}>
+      {label} {active ? (dir === "desc" ? "▼" : "▲") : ""}
+    </button>
+  );
+}
+
 // ── Player row ────────────────────────────────────────────────
 function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
   player: Player; team?: Team; rank: number;
@@ -410,7 +435,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
         className="player-row player-row-desktop"
         style={{
           display: "grid",
-          gridTemplateColumns: "32px 36px 1fr 80px 72px 64px",
+          gridTemplateColumns: "36px 40px minmax(210px,1.2fr) 88px minmax(52px,0.55fr) repeat(8,minmax(52px,0.55fr)) 24px",
           alignItems: "center",
           gap: "8px",
           padding: "8px 12px",
@@ -458,13 +483,30 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
           <div style={{ fontSize: "11px", color: "var(--rule)", textTransform: "uppercase" }}>{primaryLabel}</div>
         </div>
 
-        <div style={{ textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
-          <div>
-            <div style={{ fontSize: "11px", color: "var(--ink-light)" }}>{secondaryVal}</div>
-            <div style={{ fontSize: "11px", color: "var(--rule)", textTransform: "uppercase" }}>{secondaryLabel}</div>
-          </div>
-          <span style={{ fontSize: "11px", color: "var(--rule)" }}>{expanded ? "▲" : "▼"}</span>
-        </div>
+        {isG ? (
+          <>
+            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink)", fontWeight: 900 }}>{player.savePct?.toFixed(3) ?? "—"}</div>
+            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)" }}>{player.gamesStarted ?? 0}</div>
+            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)" }}>{player.age}</div>
+            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)" }}>${player.capHit}M</div>
+            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)" }}>{player.yearsRemaining}yr</div>
+            <div />
+            <div />
+            <div />
+          </>
+        ) : (
+          <>
+            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink)", fontWeight: sortKey === "ppg" ? 900 : 700 }}>{actualPPG(player).toFixed(3)}</div>
+            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink)", fontWeight: sortKey === "pts" ? 900 : 700 }}>{player.ptsPace.toFixed(1)}</div>
+            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--blue)", fontWeight: sortKey === "ops" ? 900 : 700 }}>{player.ops != null ? player.ops.toFixed(1) : "—"}</div>
+            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--red)", fontWeight: sortKey === "dps" ? 900 : 700 }}>{player.dps != null ? player.dps.toFixed(1) : "—"}</div>
+            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)", fontWeight: sortKey === "toi" ? 900 : 700 }}>{player.avgTOI.toFixed(1)}</div>
+            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)", fontWeight: sortKey === "age" ? 900 : 700 }}>{player.age}</div>
+            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)", fontWeight: sortKey === "cap" ? 900 : 700 }}>${player.capHit}M</div>
+            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)" }}>{player.yearsRemaining}yr</div>
+          </>
+        )}
+        <span style={{ fontSize: "11px", color: "var(--rule)", textAlign: "right" }}>{expanded ? "▲" : "▼"}</span>
       </div>
 
       {/* ── Mobile card (≤539px) — 2-line layout with labelled stats ── */}
@@ -560,18 +602,27 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
   );
 }
 
-function SectionToggle({ total, visible, expanded, onToggle }: {
+function SectionPager({ total, pageSize, page, onPage }: {
   total: number;
-  visible: number;
-  expanded: boolean;
-  onToggle: () => void;
+  pageSize: number;
+  page: number;
+  onPage: (page: number) => void;
 }) {
-  if (total <= visible) return null;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  if (pageCount <= 1) return null;
   return (
     <div style={{ padding: "10px 12px", borderTop: "1px solid var(--rule-light)", background: "#f2ecd7" }}>
-      <button className="filter-btn" onClick={onToggle}>
-        {expanded ? `Show top ${visible}` : `Show all ${total}`}
-      </button>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: "8px", alignItems: "center" }}>
+        <button className="filter-btn" style={{ width: "100%", padding: "8px" }} disabled={page <= 1} onClick={() => onPage(Math.max(1, page - 1))}>
+          ‹ Prev
+        </button>
+        <span style={{ fontSize: "11px", fontWeight: 900, color: "var(--rule)", textTransform: "uppercase", letterSpacing: "0.12em", whiteSpace: "nowrap" }}>
+          Page {page} of {pageCount}
+        </span>
+        <button className="filter-btn" style={{ width: "100%", padding: "8px" }} disabled={page >= pageCount} onClick={() => onPage(Math.min(pageCount, page + 1))}>
+          Next ›
+        </button>
+      </div>
     </div>
   );
 }
@@ -588,9 +639,9 @@ export default function PlayersPage() {
   const [teamFilter, setTeamFilter] = useState<string>("ALL");
   const [sortKey, setSortKey] = useState<"ppg" | "pts" | "toi" | "ops" | "dps" | "age" | "cap">("ppg");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
-  const [showAllF, setShowAllF] = useState(false);
-  const [showAllD, setShowAllD] = useState(false);
-  const [showAllG, setShowAllG] = useState(false);
+  const [forwardPage, setForwardPage] = useState(1);
+  const [defencePage, setDefencePage] = useState(1);
+  const [goaliePage, setGoaliePage] = useState(1);
 
   const handleSortKey = (k: typeof sortKey) => {
     if (k === sortKey) {
@@ -617,14 +668,19 @@ export default function PlayersPage() {
   };
 
   useEffect(() => {
-    fetch("/api/league")
-      .then(r => {
-        if (!r.ok) throw new Error(`/api/league returned ${r.status}`);
+    Promise.all([
+      fetch("/api/league/teams").then(r => {
+        if (!r.ok) throw new Error(`/api/league/teams returned ${r.status}`);
         return r.json();
-      })
-      .then(d => {
-        const nextPlayers = (d.players ?? []).filter((p: Player) => p.position !== "Pick");
-        const nextTeams = d.teams ?? [];
+      }),
+      fetch("/api/league/players").then(r => {
+        if (!r.ok) throw new Error(`/api/league/players returned ${r.status}`);
+        return r.json();
+      }),
+    ])
+      .then(([td, pd]) => {
+        const nextPlayers = (pd.players ?? []).filter((p: Player) => p.position !== "Pick");
+        const nextTeams = td.teams ?? [];
         if (!Array.isArray(nextPlayers) || !Array.isArray(nextTeams)) throw new Error("API returned invalid league payload");
         setPlayers(nextPlayers);
         setTeams(nextTeams);
@@ -667,9 +723,9 @@ export default function PlayersPage() {
   }, [players, deferredSearch, posFilter, teamFilter]);
 
   useEffect(() => {
-    setShowAllF(false);
-    setShowAllD(false);
-    setShowAllG(false);
+    setForwardPage(1);
+    setDefencePage(1);
+    setGoaliePage(1);
   }, [search, posFilter, teamFilter, sortKey, sortDir]);
 
   // Sort and split into sections
@@ -716,9 +772,11 @@ export default function PlayersPage() {
   const FORWARD_CAP = 25;
   const DEFENCE_CAP = 10;
   const GOALIE_CAP = 5;
-  const visibleForwards = showAllF ? forwards : forwards.slice(0, FORWARD_CAP);
-  const visibleDefence = showAllD ? defence : defence.slice(0, DEFENCE_CAP);
-  const visibleGoalies = showAllG ? goalies : goalies.slice(0, GOALIE_CAP);
+  const pageSlice = <T,>(items: T[], page: number, pageSize: number): T[] =>
+    items.slice((page - 1) * pageSize, page * pageSize);
+  const visibleForwards = pageSlice(forwards, forwardPage, FORWARD_CAP);
+  const visibleDefence = pageSlice(defence, defencePage, DEFENCE_CAP);
+  const visibleGoalies = pageSlice(goalies, goaliePage, GOALIE_CAP);
   const showForwards = (posFilter === "ALL" || posFilter === "F") && forwards.length > 0;
   const showDefence = (posFilter === "ALL" || posFilter === "D") && defence.length > 0;
   const showGoalies = (posFilter === "ALL" || posFilter === "G") && goalies.length > 0;
@@ -821,10 +879,10 @@ export default function PlayersPage() {
               </div>
             )}
             {/* Column headers — desktop only */}
-            {(posFilter === "ALL" || posFilter === "F" || posFilter === "D") && skaters.length > 0 && (
+            {filtered.length > 0 && (
               <div className="players-column-header" style={{
                 display: "grid",
-                gridTemplateColumns: "32px 36px 1fr 80px 72px 64px",
+                gridTemplateColumns: "36px 40px minmax(210px,1.2fr) 88px minmax(52px,0.55fr) repeat(8,minmax(52px,0.55fr)) 24px",
                 gap: "8px",
                 padding: "6px 12px",
                 borderBottom: "2px solid #1c140a",
@@ -836,10 +894,16 @@ export default function PlayersPage() {
                 <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Photo</div>
                 <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Player</div>
                 <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "center" }}>Strand</div>
-                <button className={`col-header${sortKey === "ppg" ? " active" : ""}`} onClick={() => handleSortKey("ppg")}>
-                  Primary {sortKey === "ppg" ? (sortDir === "desc" ? "▼" : "▲") : ""}
-                </button>
-                <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "right" }}>Secondary</div>
+                <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "right" }}>{posFilter === "G" ? "GSAx" : statSortLabel(sortKey)}</div>
+                <SortHeader k="ppg" label="PPG" active={sortKey === "ppg"} dir={sortDir} onClick={handleSortKey} />
+                <SortHeader k="pts" label="P/82" active={sortKey === "pts"} dir={sortDir} onClick={handleSortKey} />
+                <SortHeader k="ops" label="OPS" active={sortKey === "ops"} dir={sortDir} onClick={handleSortKey} />
+                <SortHeader k="dps" label="DPS" active={sortKey === "dps"} dir={sortDir} onClick={handleSortKey} />
+                <SortHeader k="toi" label="TOI" active={sortKey === "toi"} dir={sortDir} onClick={handleSortKey} />
+                <SortHeader k="age" label="Age" active={sortKey === "age"} dir={sortDir} onClick={handleSortKey} />
+                <SortHeader k="cap" label="Cap" active={sortKey === "cap"} dir={sortDir} onClick={handleSortKey} />
+                <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "right" }}>Term</div>
+                <div />
               </div>
             )}
 
@@ -848,9 +912,9 @@ export default function PlayersPage() {
               <div className="section-shell" style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
                 <SectionHeader label="Forwards" count={forwards.length} />
                 {visibleForwards.map((p, i) => (
-                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={i + 1} sortKey={sortKey} actualPPG={actualPPG} />
+                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(forwardPage - 1) * FORWARD_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} />
                 ))}
-                <SectionToggle total={forwards.length} visible={FORWARD_CAP} expanded={showAllF} onToggle={() => setShowAllF(v => !v)} />
+                <SectionPager total={forwards.length} pageSize={FORWARD_CAP} page={forwardPage} onPage={setForwardPage} />
               </div>
             )}
 
@@ -859,9 +923,9 @@ export default function PlayersPage() {
               <div className="section-shell" style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
                 <SectionHeader label="Defence" count={defence.length} />
                 {visibleDefence.map((p, i) => (
-                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={i + 1} sortKey={sortKey} actualPPG={actualPPG} />
+                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(defencePage - 1) * DEFENCE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} />
                 ))}
-                <SectionToggle total={defence.length} visible={DEFENCE_CAP} expanded={showAllD} onToggle={() => setShowAllD(v => !v)} />
+                <SectionPager total={defence.length} pageSize={DEFENCE_CAP} page={defencePage} onPage={setDefencePage} />
               </div>
             )}
 
@@ -870,9 +934,9 @@ export default function PlayersPage() {
               <div className="section-shell" style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
                 <SectionHeader label="Goalies · GSAx" count={goalies.length} />
                 {visibleGoalies.map((p, i) => (
-                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={i + 1} sortKey={sortKey} actualPPG={actualPPG} />
+                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(goaliePage - 1) * GOALIE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} />
                 ))}
-                <SectionToggle total={goalies.length} visible={GOALIE_CAP} expanded={showAllG} onToggle={() => setShowAllG(v => !v)} />
+                <SectionPager total={goalies.length} pageSize={GOALIE_CAP} page={goaliePage} onPage={setGoaliePage} />
               </div>
             )}
 

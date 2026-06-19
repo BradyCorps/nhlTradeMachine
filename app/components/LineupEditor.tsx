@@ -192,12 +192,12 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming, navMap }: Tea
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 5 }}>
             <span style={{
-              fontSize: 8, fontWeight: 900, color: "var(--ledger-ink-faint)",
+              fontSize: 11, fontWeight: 900, color: "var(--ledger-ink-faint)",
               letterSpacing: 0,
             }}>{pos.trim()}</span>
             {p && (
               <span style={{
-                fontSize: 8, fontWeight: 900, color: navColor(nav),
+                fontSize: 11, fontWeight: 900, color: navColor(nav),
                 whiteSpace: "nowrap",
               }}>NAV {nav}</span>
             )}
@@ -214,15 +214,15 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming, navMap }: Tea
             overflowWrap: "anywhere",
           }}>
             {p ? p.name : "Empty"}
-            {status === "in" && <span style={{ fontSize: 8, marginLeft: 4, color: "#2a7a44" }}>▲</span>}
+            {status === "in" && <span style={{ fontSize: 11, marginLeft: 4, color: "#2a7a44" }}>▲</span>}
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 5 }}>
             <span style={{
-              fontSize: 8, fontWeight: 900, color: p ? "var(--ledger-ink)" : "var(--ledger-ink-faint)",
+              fontSize: 11, fontWeight: 900, color: p ? "var(--ledger-ink)" : "var(--ledger-ink-faint)",
               border: "1px solid rgba(184,160,112,0.8)", padding: "0 4px", lineHeight: "13px",
               minWidth: 20, textAlign: "center",
             }}>{p?.position ?? "--"}</span>
-            <span style={{ fontSize: 8, color: "var(--ledger-ink-faint)", whiteSpace: "nowrap" }}>{meta}</span>
+            <span style={{ fontSize: 11, color: "var(--ledger-ink-faint)", whiteSpace: "nowrap" }}>{meta}</span>
           </div>
         </div>
       </td>
@@ -232,7 +232,7 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming, navMap }: Tea
   const SectionHead = ({ children }: { children: React.ReactNode }) => (
     <tr>
       <td colSpan={4} style={{
-        fontFamily: MONO, fontSize: 6, fontWeight: 900, color: "var(--ledger-ink-faint)",
+        fontFamily: MONO, fontSize: 11, fontWeight: 900, color: "var(--ledger-ink-faint)",
         textTransform: "uppercase", letterSpacing: 0, paddingTop: 6, paddingBottom: 2,
         borderBottom: "1px solid #c8b890",
       }}>
@@ -242,7 +242,7 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming, navMap }: Tea
   );
 
   const RowLabel = ({ text }: { text: string }) => (
-    <td style={{ fontFamily: MONO, fontSize: 7, fontWeight: 900,
+    <td style={{ fontFamily: MONO, fontSize: 11, fontWeight: 900,
                  color: "var(--ledger-ink-faint)", paddingRight: 4, whiteSpace: "nowrap", width: 36 }}>
       {text}
     </td>
@@ -257,13 +257,13 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming, navMap }: Tea
   return (
     <div style={{ fontFamily: MONO }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-        <div style={{ fontSize: 9, fontWeight: 900, color: "var(--ledger-ink)", letterSpacing: 0 }}>
+        <div style={{ fontSize: 11, fontWeight: 900, color: "var(--ledger-ink)", letterSpacing: 0 }}>
           {teamName}
           {label && <span style={{ color: "var(--ledger-ink-faint)", fontWeight: 400 }}> — {label}</span>}
         </div>
         {edited && (
           <button onClick={reset} style={{
-            fontFamily: MONO, fontSize: 7, fontWeight: 900, letterSpacing: 0,
+            fontFamily: MONO, fontSize: 11, fontWeight: 900, letterSpacing: 0,
             color: "#b83020", background: "none", border: "1px solid #b83020",
             padding: "1px 6px", cursor: "pointer", textTransform: "uppercase",
           }}>
@@ -325,15 +325,15 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming, navMap }: Tea
                 <span key={id} onClick={() => clickSlot(group, idx)}
                   title={`${p.name} · ${p.position} · NAV ${nav}`}
                   style={{
-                    fontFamily: MONO, fontSize: 9, fontWeight: 800, cursor: "pointer",
+                    fontFamily: MONO, fontSize: 11, fontWeight: 800, cursor: "pointer",
                     padding: "4px 7px", border: "1px solid #c8b890", userSelect: "none",
                     color: inIds.has(id) ? "#2a7a44" : "var(--ledger-ink)",
                     background: isSel ? "rgba(180,140,40,0.25)" : "var(--ledger-cream)",
                     outline: isSel ? "1px dashed #a08020" : "none",
                   }}>
                   {abbr(p.name)}
-                  <span style={{ fontSize: 7, opacity: 0.65, marginLeft: 5 }}>{p.position}</span>
-                  <span style={{ fontSize: 7, color: navColor(nav), marginLeft: 5 }}>NAV {nav}</span>
+                  <span style={{ fontSize: 11, opacity: 0.65, marginLeft: 5 }}>{p.position}</span>
+                  <span style={{ fontSize: 11, color: navColor(nav), marginLeft: 5 }}>NAV {nav}</span>
                 </span>
               );
             })}
@@ -343,7 +343,7 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming, navMap }: Tea
 
       {/* Departing players (read-only) */}
       {outgoing.filter(p => p.position !== "Pick").length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6, fontSize: 7 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6, fontSize: 11 }}>
           <span style={{ color: "#b83020", fontWeight: 900 }}>▼ departing:</span>
           {outgoing.filter(p => p.position !== "Pick").map(p => (
             <span key={p.id} style={{ color: "#b83020", textDecoration: "line-through" }}>{abbr(p.name)}</span>

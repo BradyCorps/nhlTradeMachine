@@ -849,10 +849,15 @@ export async function GET() {
       const teamKey     = `${p.name}__${teamId.toLowerCase()}`;
       const normPosKey  = `${normalName}__${p.position}`;
       const normTeamKey = `${normalName}__${teamId.toLowerCase()}`;
-      const fin = CONTRACTS[posKey]     ?? CONTRACTS[teamKey]
-               ?? CONTRACTS[normPosKey] ?? CONTRACTS[normTeamKey]
-               ?? CONTRACTS[p.name]     ?? CONTRACTS[normalName]
-               ?? null;
+      const contractMatch =
+        CONTRACTS[posKey]     ? { row: CONTRACTS[posKey],     source: "position" } :
+        CONTRACTS[teamKey]    ? { row: CONTRACTS[teamKey],    source: "team" } :
+        CONTRACTS[normPosKey]  ? { row: CONTRACTS[normPosKey],  source: "position" } :
+        CONTRACTS[normTeamKey] ? { row: CONTRACTS[normTeamKey], source: "team" } :
+        CONTRACTS[p.name]     ? { row: CONTRACTS[p.name],     source: "name" } :
+        CONTRACTS[normalName] ? { row: CONTRACTS[normalName], source: "name" } :
+        null;
+      const fin = contractMatch?.row ?? null;
 
       const isLikelyELC = !fin && p.age <= 23;
       const elcCapHit   = p.age <= 22 ? 0.8775 : 0.925;
@@ -891,6 +896,7 @@ export async function GET() {
       const rosterPos = normContractPos(finalPosition);
       const nameCollision = p.age <= 23
         && rawCapHit > 3.0
+        && contractMatch?.source === "name"
         && contractPos !== ""
         && rosterPos !== ""
         && contractPos !== rosterPos;

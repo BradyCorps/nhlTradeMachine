@@ -149,15 +149,15 @@ function PlayerCell({ slot, pos }: { slot: Slot; pos: string }) {
   const name  = slot.player ? abbr(slot.player.name) : "—";
   return (
     <td style={{
-      padding: "2px 5px", fontFamily: MONO, fontSize: 9, color,
+      padding: "2px 5px", fontFamily: MONO, fontSize: 11, color,
       fontWeight: slot.status === "in" ? 900 : slot.status === "normal" ? 700 : 400,
       textDecoration: slot.status === "out" ? "line-through" : "none",
       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
     }}>
-      <span style={{ fontSize: 7, opacity: 0.55, marginRight: 3, fontWeight: 900 }}>{pos}</span>
+      <span style={{ fontSize: 11, opacity: 0.55, marginRight: 3, fontWeight: 900 }}>{pos}</span>
       {name}
-      {slot.status === "in"  && <span style={{ fontSize: 6, marginLeft: 3, color: "#2a7a44" }}>▲</span>}
-      {slot.status === "out" && <span style={{ fontSize: 6, marginLeft: 3, color: "#b83020" }}>▼</span>}
+      {slot.status === "in"  && <span style={{ fontSize: 11, marginLeft: 3, color: "#2a7a44" }}>▲</span>}
+      {slot.status === "out" && <span style={{ fontSize: 11, marginLeft: 3, color: "#b83020" }}>▼</span>}
     </td>
   );
 }
@@ -168,7 +168,7 @@ export default function LineupCard({ roster, outgoing, incoming, label }: Props)
   const SectionHead = ({ children }: { children: React.ReactNode }) => (
     <tr>
       <td colSpan={4} style={{
-        fontFamily: MONO, fontSize: 6, fontWeight: 900, color: "var(--ledger-ink-faint)",
+        fontFamily: MONO, fontSize: 11, fontWeight: 900, color: "var(--ledger-ink-faint)",
         textTransform: "uppercase", letterSpacing: "0.15em", paddingTop: 6, paddingBottom: 2,
         borderBottom: "1px solid #c8b890",
       }}>
@@ -179,7 +179,7 @@ export default function LineupCard({ roster, outgoing, incoming, label }: Props)
 
   const LineLabel = ({ n, ordinal }: { n: number; ordinal: string }) => (
     <td style={{
-      fontFamily: MONO, fontSize: 7, fontWeight: 900, color: "var(--ledger-ink-faint)",
+      fontFamily: MONO, fontSize: 11, fontWeight: 900, color: "var(--ledger-ink-faint)",
       paddingRight: 4, whiteSpace: "nowrap", width: 36,
     }}>
       {ordinal}
@@ -191,7 +191,7 @@ export default function LineupCard({ roster, outgoing, incoming, label }: Props)
   return (
     <div style={{ fontFamily: MONO }}>
       {label && (
-        <div style={{ fontSize: 8, fontWeight: 900, color: "var(--ledger-ink-faint)",
+        <div style={{ fontSize: 11, fontWeight: 900, color: "var(--ledger-ink-faint)",
                       textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 6 }}>
           {label}
         </div>
@@ -233,7 +233,7 @@ export default function LineupCard({ roster, outgoing, incoming, label }: Props)
       </table>
 
       {/* Legend */}
-      <div style={{ display: "flex", gap: 10, marginTop: 5, fontSize: 7, fontFamily: MONO }}>
+      <div style={{ display: "flex", gap: 10, marginTop: 5, fontSize: 11, fontFamily: MONO }}>
         <span style={{ color: "#2a7a44", fontWeight: 900 }}>▲ incoming</span>
         <span style={{ color: "#b83020", fontWeight: 900 }}>▼ outgoing</span>
       </div>

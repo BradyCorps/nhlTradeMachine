@@ -1205,10 +1205,15 @@ export async function GET() {
       const teamKey = `${p.name}__${teamId.toLowerCase()}`;
       const normPosKey  = `${normalName}__${p.position}`;
       const normTeamKey = `${normalName}__${teamId.toLowerCase()}`;
-      const fin = CONTRACTS[posKey]     ?? CONTRACTS[teamKey]
-               ?? CONTRACTS[normPosKey] ?? CONTRACTS[normTeamKey]
-               ?? CONTRACTS[p.name]     ?? CONTRACTS[normalName]
-               ?? null;
+      const contractMatch =
+        CONTRACTS[posKey]     ? { row: CONTRACTS[posKey],     source: "position" } :
+        CONTRACTS[teamKey]    ? { row: CONTRACTS[teamKey],    source: "team" } :
+        CONTRACTS[normPosKey]  ? { row: CONTRACTS[normPosKey],  source: "position" } :
+        CONTRACTS[normTeamKey] ? { row: CONTRACTS[normTeamKey], source: "team" } :
+        CONTRACTS[p.name]     ? { row: CONTRACTS[p.name],     source: "name" } :
+        CONTRACTS[normalName] ? { row: CONTRACTS[normalName], source: "name" } :
+        null;
+      const fin = contractMatch?.row ?? null;
 
       // If no contract found and player is young (≤23), assume ELC rates
       // rather than inheriting a same-name veteran's contract
@@ -1239,8 +1244,10 @@ export async function GET() {
 
       // Merge goalie-specific stats by stable id or full-name slug.
       const goalieSlug      = slugify(p.name);
-      const goalieStats     = isGoalie
-        ? (NHL_GOALIE_STATS.get(`id:${p.id}`) ?? goalieMap.get(goalieSlug) ?? NHL_GOALIE_STATS.get(goalieSlug) ?? null)
+      const nhlG = NHL_GOALIE_STATS.get(`id:${p.id}`) ?? NHL_GOALIE_STATS.get(goalieSlug);
+      const mpG  = goalieMap.get(goalieSlug);
+      const goalieStats = isGoalie
+        ? (mpG || nhlG ? { ...(nhlG ?? {}), ...(mpG ?? {}), gsax: mpG?.gsax ?? nhlG?.gsax ?? 0 } : null)
         : null;
 
       const hasProspectSignal = draftOverall != null || (prospectPtsPace != null && prospectPtsPace > 0);
@@ -1257,6 +1264,7 @@ export async function GET() {
       const rosterPos = normContractPos(finalPosition);
       const nameCollision = p.age <= 23
         && rawCapHit > 3.0
+        && contractMatch?.source === "name"
         && contractPos !== ""
         && rosterPos !== ""
         && contractPos !== rosterPos;

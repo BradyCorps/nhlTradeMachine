@@ -140,13 +140,8 @@ describe("Canary — league route features (source-level)", () => {
       });
 
       it("keeps MoneyPuck goalie GSAX ahead of NHL fallback stats", () => {
-        if (route !== "app/api/league/players/route.ts") {
-          expect(src).toContain("NHL_GOALIE_STATS.get");
-          return;
-        }
-        expect(src).toContain("const gsax   = xGoals - goals;");
-        expect(src).toContain("const nhlG = NHL_GOALIE_STATS.get(`id:${p.id}`) ?? NHL_GOALIE_STATS.get(slugify(p.name));");
-        expect(src).toContain("const mpG  = goalieMap.get(slugify(p.name));");
+        expect(src).toContain("const nhlG = NHL_GOALIE_STATS.get(`id:${p.id}`) ?? NHL_GOALIE_STATS.get");
+        expect(src).toContain("const mpG  = goalieMap.get");
         expect(src).toContain("...(nhlG ?? {}), ...(mpG ?? {}), gsax: mpG?.gsax ?? nhlG?.gsax ?? 0");
       });
     });
@@ -878,12 +873,18 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(src).toContain("!current.hasNtc");
   });
 
-  it("admin cap settings reject zero, negative, and inverted cap values", () => {
+  it("admin and evaluate cap settings reject zero, negative, absurd, and inverted cap values", () => {
     const src = read("app/api/admin/settings/route.ts");
+    const evaluate = read("app/api/evaluate/route.ts");
     expect(src).toContain("validateCapValue");
     expect(src).toContain("!Number.isFinite(value) || value <= 0");
+    expect(src).toContain("value > MAX_CAP_CEILING");
     expect(src).toContain("capFloor cannot exceed capCeiling");
     expect(src).toContain("{ status: 400 }");
+    expect(evaluate).toContain("const MAX_CAP_CEILING = 120");
+    expect(evaluate).toContain("cap > 0 && cap <= MAX_CAP_CEILING");
+    expect(evaluate).toContain("isValidCapCeiling(requestCapCeiling)");
+    expect(evaluate).toContain("isValidCapCeiling(cap)");
   });
 
   it("Strand rendering guards empty trait arrays before indexing or dividing", () => {
@@ -926,9 +927,22 @@ describe("Canary — Batch 6 audit fixes", () => {
     const src = read("app/components/CapProjection.tsx");
     expect(src).toContain("const effectiveCapHit =");
     expect(src).toContain("(1 - (a.retainedPct || 0))");
+    expect(src).toContain("currentRoster.reduce((s, a) => s + effectiveCapHit(a), 0)");
     expect(src).toContain("currentKeys.has(assetKey(a))");
     expect(src).toContain("players.length + departing.length");
     expect(src).toContain("outKeys.has(assetKey(a))");
+  });
+
+  it("league routes preserve young-player contracts when only position metadata disagrees", () => {
+    for (const routePath of LEAGUE_ROUTES) {
+      const src = read(routePath);
+      expect(src).toContain("const contractMatch =");
+      expect(src).toContain('source: "position"');
+      expect(src).toContain('source: "team"');
+      expect(src).toContain('source: "name"');
+      expect(src).toContain('contractMatch?.source === "name"');
+      expect(src).toContain("nameCollision ? elcCapHit : rawCapHit");
+    }
   });
 
   it("lower-is-better comparison bars give the cheaper/younger side the longer bar", () => {
@@ -938,18 +952,60 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(src).toContain('higherIsBetter={false}');
   });
 
-  it("players page renders development profiles and capped position sections", () => {
+  it("players page renders development profiles and paged position sections", () => {
     const src = read("app/players/page.tsx");
     expect(src).toContain("DevelopmentProfilePanel");
     expect(src).toContain("developmentProfile?: DevelopmentProfile | null");
     expect(src).toContain("Development Outlook");
-    expect(src).toContain("const [showAllF");
+    expect(src).toContain('fetch("/api/league/teams")');
+    expect(src).toContain('fetch("/api/league/players")');
+    expect(src).toContain("const [forwardPage");
+    expect(src).toContain("function SectionPager");
     expect(src).toContain("const FORWARD_CAP = 25");
     expect(src).toContain("const DEFENCE_CAP = 10");
     expect(src).toContain("const GOALIE_CAP = 5");
+    expect(src).toContain("pageSlice(forwards, forwardPage, FORWARD_CAP)");
     expect(src).toContain("forwards: sortedSkaters.filter");
     expect(src).toContain('SectionHeader label="Goalies · GSAx"');
     expect(src).toContain("Rank</div>");
-    expect(src).toContain("Primary");
+    expect(src).toContain("SortHeader");
+  });
+});
+
+describe("Canary — UX and UI polish", () => {
+  it("uses a shared body scroll lock hook for modal overlays", () => {
+    const hook = read("app/lib/use-body-scroll-lock.ts");
+    expect(hook).toContain("export function useBodyScrollLock");
+    expect(hook).toContain('document.body.style.overflow = "hidden"');
+    for (const path of [
+      "app/components/TradeProposal.tsx",
+      "app/components/LedgerDropdown.tsx",
+      "app/components/TradeBlockPanel.tsx",
+      "app/components/AssetDropdown.tsx",
+      "app/components/TradeHistoryBar.tsx",
+      "app/armchair-gm/page.tsx",
+    ]) {
+      expect(read(path)).toContain("useBodyScrollLock");
+    }
+  });
+
+  it("surfaces NAV residual floors and NAV tooltips at point of use", () => {
+    const card = read("app/components/AssetCard.tsx");
+    const panel = read("app/components/TradePanel.tsx");
+    const armchair = read("app/armchair-gm/page.tsx");
+    expect(card).toContain("const floorAdj =");
+    expect(card).toContain('label="FLOOR"');
+    expect(card).toContain("Franchise/career floor applied");
+    expect(card).toContain("Net Asset Value");
+    expect(panel).toContain("Net Asset Value");
+    expect(armchair).toContain("Franchise/career floor applied");
+  });
+
+  it("makes active header navigation visually distinct", () => {
+    const src = read("app/components/Header.tsx");
+    expect(src).toContain("border-b-2");
+    expect(src).toContain("text-ledger-red");
+    expect(src).toContain("border-ledger-red");
+    expect(src).toContain("◆");
   });
 });

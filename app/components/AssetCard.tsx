@@ -34,6 +34,8 @@ export default function AssetCard({
   const [compareId, setCompareId] = React.useState<string>("");
   const xnav   = navResult ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
   const isPick = asset.position === "Pick";
+  const displayedDef = asset.dps != null ? Math.round(asset.dps * 15) : xnav.def;
+  const floorAdj = Math.round(xnav.total) - Math.round(xnav.off + displayedDef + xnav.age + xnav.cap);
 
   const otherBlock = blocks[1 - idx].filter(a =>
     a.position !== "Pick" && a.position !== "G" && a.id !== asset.id
@@ -157,7 +159,7 @@ export default function AssetCard({
             fontSize: '1.1rem',
             fontStyle: 'italic',
             color: xnav.total > 80 ? 'var(--ledger-green)' : xnav.total > 20 ? 'var(--ledger-navy)' : xnav.total > -20 ? 'var(--ledger-brown)' : 'var(--ledger-red)',
-          }}>
+          }} title="Net Asset Value — the player's tradeable value">
             {fmt(xnav.total, 0)}
           </span>
           {xnav.noivImpact !== undefined && Math.abs(xnav.noivImpact) >= 2 && (
@@ -302,26 +304,27 @@ export default function AssetCard({
             <div className="flex gap-1.5 mb-1.5">
               {asset.ops != null && (
                 <div className="flex items-center gap-1 px-1.5 py-0.5" style={{ background: 'rgba(26,46,92,0.08)', border: '1px solid rgba(26,46,92,0.2)', borderRadius: '2px' }}>
-                  <span className="text-[6.5px] font-black uppercase tracking-wider text-ledger-ink-faint font-mono">OPS</span>
+                  <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">OPS</span>
                   <span className="text-2xs font-black text-ledger-navy font-mono">{asset.ops.toFixed(1)}</span>
                 </div>
               )}
               {asset.dps != null && (
                 <div className="flex items-center gap-1 px-1.5 py-0.5" style={{ background: 'rgba(184,48,32,0.08)', border: '1px solid rgba(184,48,32,0.2)', borderRadius: '2px' }}>
-                  <span className="text-[6.5px] font-black uppercase tracking-wider text-ledger-ink-faint font-mono">DPS</span>
+                  <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">DPS</span>
                   <span className="text-2xs font-black" style={{ color: 'var(--ledger-red)' }}>{asset.dps.toFixed(1)}</span>
                 </div>
               )}
               {asset.ops != null && asset.dps != null && (asset.ops + asset.dps) > 0 && (
                 <div className="flex items-center gap-1 px-1.5 py-0.5" style={{ background: 'rgba(107,80,48,0.08)', border: '1px solid rgba(107,80,48,0.2)', borderRadius: '2px' }}>
-                  <span className="text-[6.5px] font-black uppercase tracking-wider text-ledger-ink-faint font-mono">PS</span>
+                  <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">PS</span>
                   <span className="text-2xs font-black" style={{ color: 'var(--ledger-brown)' }}>{(asset.ops + asset.dps).toFixed(1)}</span>
                 </div>
               )}
             </div>
           )}
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">NAV Breakdown</span>
+            <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono"
+              title="Net Asset Value — the player's tradeable value">NAV Breakdown</span>
             <span
               className="text-2xs font-black rounded-full w-4 h-4 flex items-center justify-center cursor-help shrink-0"
               style={{ color: 'var(--ledger-ink-faint)', border: '1px solid #c8b890' }}
@@ -338,11 +341,7 @@ export default function AssetCard({
 />
             <MicroBar
     label="DEF"
-    val={asset.dps != null
-    // Changed multiplier from 16 to 15 to perfectly match the xnav-engine math!
-    ? Math.round(asset.dps * 15)
-    : xnav.def
-    }
+    val={displayedDef}
     // Now that the scales are mathematically synced, the max is 148 either way
     max={HISTORICAL_MAX_DEF}
     color="emerald"
@@ -358,6 +357,10 @@ export default function AssetCard({
                 : "Age penalty — decline curve discount for veterans past peak age"} />
             <MicroBar label="CAP" val={xnav.cap} max={100} color="rose" invert
               tooltip="Contract cost — overpaid contracts drag total NAV. Negative = cap hit exceeds on-ice value" />
+            {Math.abs(floorAdj) >= 1 && (
+              <MicroBar label="FLOOR" val={floorAdj} max={100} color="amber"
+                tooltip="Franchise/career floor applied" />
+            )}
           </div>
           {/* Peak pts for established skaters with pedigree */}
           {pedigree?.peakPtsPace && (
@@ -448,7 +451,7 @@ export default function AssetCard({
                   key={pct}
                   type="button"
                   onClick={() => setRetentionPct(pct)}
-                  className="h-9 border font-black text-[10px] uppercase tracking-wider"
+                  className="h-9 border font-black text-2xs uppercase tracking-wider"
                   style={{
                     borderColor: retentionPct === pct ? 'var(--ledger-green)' : '#3f3f46',
                     background: retentionPct === pct ? 'rgba(36,94,57,0.18)' : '#18181b',
@@ -516,7 +519,7 @@ function StatItem({ val, pct, label, good, invert, note }: { val: string; pct: n
   
   return (
     <div className="flex justify-between items-center group relative cursor-help">
-      <span className="text-[10px] font-black uppercase tracking-widest text-ledger-ink-faint">{label}</span>
+      <span className="text-2xs font-black uppercase tracking-widest text-ledger-ink-faint">{label}</span>
       <div className="flex items-center gap-2">
         <span className="text-[11px] font-bold" style={{ color }}>{val}</span>
         <div className="w-12 h-1 rounded-full overflow-hidden shrink-0" style={{ background: 'var(--ledger-rule-light)' }}>
@@ -525,7 +528,7 @@ function StatItem({ val, pct, label, good, invert, note }: { val: string; pct: n
       </div>
       {note && (
         <div className="absolute right-0 bottom-full mb-1 w-48 p-2 bg-ledger-cream border border-ledger-rule shadow-sm 
-                        text-[9px] text-ledger-ink-faint font-medium rounded opacity-0 group-hover:opacity-100 pointer-events-none z-10 transition-opacity">
+                        text-2xs text-ledger-ink-faint font-medium rounded opacity-0 group-hover:opacity-100 pointer-events-none z-10 transition-opacity">
           {note}
         </div>
       )}

@@ -17,6 +17,7 @@ import {
   preScreenProposal
 } from "@/app/lib/trade-logic";
 import { formatPickRound } from "@/app/lib/trade-format";
+import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 
 interface Props {
   outgoingBlock: Asset[];
@@ -55,6 +56,7 @@ export default function TradeProposalEngine({
   const [auditProgress, setAuditProgress] = useState<{ checked: number; total: number } | null>(null);
   const generateAbortRef = useRef<AbortController | null>(null);
   const generateRunRef = useRef(0);
+  useBodyScrollLock(true);
 
   useEffect(() => () => generateAbortRef.current?.abort(), []);
   useEffect(() => {

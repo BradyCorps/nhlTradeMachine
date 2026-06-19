@@ -1129,6 +1129,56 @@ Implementation task (append to audit for Codex)
 
 (Note: the cross-team duplicate dedup in app/api/league/players/route.ts is already in place — verify it exists; do not re-implement.)
 
+## UX and UI Polish
+
+  ### Task U1: GSAX fix must persist on BOTH league routes (supersedes the earlier single-route GSAX task)
+
+      The players page fetches /api/league (bare route), whose goalie-stats resolution at app/api/league/route.ts:1243 has the same bug as app/api/league/players/route.ts:879: it prefers NHL_GOALIE_STATS (which hardcodes gsax: 0) over the MoneyPuck goalieMap (real gsax = xGoals − goals), so every goalie's GSAX is 0. Apply the merge fix to both routes so GSAX always comes from goalieMap when available, NHL source as fallback for save%/games:
+
+      const nhlG = NHL_GOALIE_STATS.get(`id:${p.id}`) ?? NHL_GOALIE_STATS.get(goalieSlug);
+      const mpG  = goalieMap.get(goalieSlug);
+      const goalieStats = isGoalie
+      ? (mpG || nhlG ? { ...(nhlG ?? {}), ...(mpG ?? {}), gsax: mpG?.gsax ?? nhlG?.gsax ?? 0 } : null)
+      : null;
+
+      (use the local slug variable name each file already has). Acceptance: curl …/api/league and …/api/league/players, filter goalies — top starters (Hellebuyck/Sorokin/Vasilevskiy) show non-zero gsax. npm test + typecheck pass.
+
+  ### Task U2: freeze background scroll on ALL modals
+
+    Several modals let the page scroll behind them. Create one shared hook useBodyScrollLock(isOpen: boolean) (sets document.body.style.overflow = "hidden" while open, restores the prior value on close/unmount) and apply it in every modal/overlay component when its open state is true:
+
+        app/components/TradeProposal.tsx (overlay ~line 323)
+        app/components/LedgerDropdown.tsx (~57)
+        app/components/TradeBlockPanel.tsx (~174)
+        app/components/AssetDropdown.tsx (~156)
+        app/components/TradeHistoryBar.tsx SaveModal (~18)
+        app/armchair-gm/page.tsx team-select (~857) and front-office memo (~952) modals — there's already a freeze attempt at ~line 141; reconcile to use the shared hook rather than duplicating.
+        Do NOT lock for the ContractSyncer toast (it's a corner notification, not a modal). Acceptance: opening any modal prevents the main page from scrolling; closing restores scroll position. npm test + typecheck pass.
+
+  ### Task U3: Player Analytics rework — fill the dead space + real pagination
+
+      File: app/players/page.tsx. Two problems visible in desktop view: large empty horizontal space, and a "SHOW ALL" dump instead of pagination.
+
+        Collapsed rows: the grid 32px 36px 1fr 80px 72px 64px lets the 1fr name column absorb all slack, leaving a big gap before the STRAND/PRIMARY/SECONDARY columns. Rework into a denser, sortable desktop table that uses the width — surface several stat columns inline (the sort keys already exist: PPG, P/82, OPS, DPS, TOI, Age, Cap, and GSAX/SV% for goalies) as proper aligned columns, and wire the existing sticky header (currently empty <div/> cells) to label and sort them.
+        Expanded view: the two-column expanded-player-grid leaves the left half blank while strand/dev/contract pile on the right. Rebalance — e.g. left column: stat grid + OPS/DPS/PS + contract + Development Outlook; right column: STRAND profile + timeline + contract projection — or make the lower panels full-width so no column is empty.
+        Pagination instead of "SHOW ALL": replace the per-section show-all toggle with real pagination — page size = the section cap (25 forwards / 10 defence / 5 goalies, or a uniform 25), with ‹ Prev · Page X of N · Next › controls; reset to page 1 whenever search/position/team/sort changes.
+        Keep the broadsheet styling and the expand-on-click behavior. Acceptance: no large empty gaps on desktop at any width; each section pages through its players with Prev/Next; npm test + typecheck pass.
+
+  ### Task U4: Make the NAV breakdown reconcile to the headline NAV
+      In the HOME/PARTNER panels of app/armchair-gm/page.tsx (and the matching OFF/DEF/AGE/CAP MicroBar breakdown in app/components/AssetCard.tsx), the four components can sum to less than the displayed total when the franchise/career floor or historical floor is active — e.g. Scheifele shows NAV 353 but OFF +211 · DEF +33 · AGE −40 · CAP +101 = 305, a 48-pt gap with no explanation. Compute the residual adj = Math.round(total) − (off + def + age + cap) and, when Math.abs(adj) >= 1, render it as an extra labeled item in the breakdown (label "FLOOR", same bar/number styling as the others, with a title like "Franchise/career floor applied"). After this, the visible components always add up to the headline NAV.
+
+  ### Task U5: Strengthen the active-tab indicator.
+      In app/components/Header.tsx, the active nav item is currently distinguished only by a filled vs hollow diamond (◆/◇) in the same ink color, which is easy to miss. Give the active tab a stronger cue — add a color change (e.g. the red/ink accent) plus an underline or heavier weight — while keeping the diamond. The current page must be obvious at a glance.
+
+  ### Task U6: Explain "NAV" at the point of use
+      "NAV" is the dominant number on every asset card but is only defined in the glossary at the bottom of the page. Add a title tooltip (e.g. "Net Asset Value — the player's tradeable value") to the NAV label wherever it's rendered on the asset cards (app/components/AssetCard.tsx, and the per-card NAV labels in app/armchair-gm/page.tsx). No layout change — tooltip only.
+  
+  ### Task U7: Raise sub-11px type in the dense zones to the 11px floor
+      Several spots render below the project's stated 11px minimum and are hard to read: text-[6.5px] OPS/DPS/PS labels in app/components/AssetCard.tsx (~lines 302/308/314), and any inline fontSize of 9px/10px or text-[9px]/[10px] in the bench/scratch chips and NAV-breakdown values. Bump these to the text-2xs token (11px). Don't touch genuinely decorative kickers if raising them breaks the masthead layout — only the data-bearing labels.
+
+Acceptance: the NAV breakdown's visible parts sum to the headline NAV (incl. floored players); the active nav tab is clearly distinct; hovering a NAV label shows its definition; no data label renders below 11px; npm test and typecheck pass.
+
+
 ## Task 1a: 
 - Write golden/characterization tests for calcNAV in app/lib/xnav-engine.ts covering a representative set: an elite forward, a top-pair D, a starting goalie, a 1st-round pick, an ELC prospect, a fringe callup, and a retained-salary case. Snapshot the full XNAVResult for each. Do NOT change engine code — these pin current behavior.
 

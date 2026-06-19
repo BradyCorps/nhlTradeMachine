@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import type { Asset, Team } from "@/app/lib/trade-types";
+import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 
 interface Props {
   players: Asset[];
@@ -37,19 +38,7 @@ export default function TradeBlockPanel({ players, teams, onSelectTeam, onClose 
   const [posFilter,  setPosFilter]  = useState<PosFilter>("ALL");
   const [showStatus, setShowStatus] = useState<"available_requested" | "all">("available_requested");
   const [search,     setSearch]     = useState("");
-
-  // Freeze body scroll while open
-  useEffect(() => {
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    document.body.style.paddingRight = `${scrollbarWidth}px`;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-    return () => {
-      document.body.style.paddingRight = "0px";
-      document.body.style.overflow = "unset";
-      document.documentElement.style.overflow = "unset";
-    };
-  }, []);
+  useBodyScrollLock(true);
 
   const teamMap = useMemo(() =>
     new Map(teams.map(t => [t.id, t])), [teams]);

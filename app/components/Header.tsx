@@ -13,6 +13,12 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
   const pathname = usePathname();
   const resolvedActiveTab =
     pathname?.startsWith("/armchair-gm") ? "armchair-gm" : activeTab;
+  const navClass = (tab: "trade" | "armchair-gm" | "players") => [
+    "text-[11px] sm:text-[12px] uppercase tracking-[0.14em] sm:tracking-[0.2em] font-mono no-underline transition-colors border-b-2 pb-0.5",
+    resolvedActiveTab === tab
+      ? "text-ledger-red font-black border-ledger-red"
+      : "text-ledger-ink-faint font-black border-transparent hover:text-ledger-ink hover:border-ledger-rule",
+  ].join(" ");
 
   return (
     <header className="flex flex-col pb-5 border-b border-ledger-rule">
@@ -52,36 +58,21 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
             <nav className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 px-2">
               <a
                 href="/players"
-                className={[
-                  "text-[11px] sm:text-[12px] font-black uppercase tracking-[0.14em] sm:tracking-[0.2em] font-mono no-underline transition-colors",
-                  resolvedActiveTab === "players"
-                    ? "text-ledger-ink"
-                    : "text-ledger-ink-faint hover:text-ledger-ink",
-                ].join(" ")}
+                className={navClass("players")}
               >
                 {resolvedActiveTab === "players" ? "◆" : "◇"} Player Analytics
               </a>
               <span className="nav-divider text-ledger-rule-light">|</span>
               <a
                 href="/trade-machine"
-                className={[
-                  "text-[11px] sm:text-[12px] font-black uppercase tracking-[0.14em] sm:tracking-[0.2em] font-mono no-underline transition-colors",
-                  resolvedActiveTab === "trade"
-                    ? "text-ledger-ink"
-                    : "text-ledger-ink-faint hover:text-ledger-ink",
-                ].join(" ")}
+                className={navClass("trade")}
               >
                 {resolvedActiveTab === "trade" ? "◆" : "◇"} Trade Machine
               </a>
               <span className="nav-divider text-ledger-rule-light">|</span>
               <a
                 href="/armchair-gm"
-                className={[
-                  "text-[11px] sm:text-[12px] font-black uppercase tracking-[0.14em] sm:tracking-[0.2em] font-mono no-underline transition-colors",
-                  resolvedActiveTab === "armchair-gm"
-                    ? "text-ledger-ink"
-                    : "text-ledger-ink-faint hover:text-ledger-ink",
-                ].join(" ")}
+                className={navClass("armchair-gm")}
               >
                 {resolvedActiveTab === "armchair-gm" ? "◆" : "◇"} Armchair GM
               </a>

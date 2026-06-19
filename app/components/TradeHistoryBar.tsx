@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useTradeStore } from "@/app/store/tradeStore";
 import { useScenarioStore, type SavedScenario, type ScenarioAsset } from "@/app/store/scenarioStore";
+import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 
 // ── SaveModal ─────────────────────────────────────────────────
 function SaveModal({ onSave, onClose }: {
@@ -11,6 +12,7 @@ function SaveModal({ onSave, onClose }: {
 }) {
   const [name, setName] = useState("");
   const ref = useRef<HTMLInputElement>(null);
+  useBodyScrollLock(true);
   useEffect(() => { ref.current?.focus(); }, []);
   const submit = () => { if (name.trim()) onSave(name.trim()); };
 

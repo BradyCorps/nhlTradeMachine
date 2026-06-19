@@ -101,7 +101,7 @@ const TeamProjection = ({ team, currentRoster, outgoing, incoming, label }: {
     return true;
   });
 
-  const currentCapUsed = currentRoster.reduce((s, a) => s + (a.capHit || 0), 0);
+  const currentCapUsed = currentRoster.reduce((s, a) => s + effectiveCapHit(a), 0);
   const outCap  = outgoing.reduce((s, a) => s + effectiveCapHit(a), 0);
   const inCap   = incoming.filter(a => a.position !== "Pick").reduce((s, a) => s + effectiveCapHit(a), 0);
   const postCapUsed = currentCapUsed - outCap + inCap;

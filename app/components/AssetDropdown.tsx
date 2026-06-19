@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import type { Asset, Team } from "@/app/lib/trade-types";
 import { useTradeStore } from "@/app/store/tradeStore";
+import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 
 const CORE_COUNT = 8;
 
@@ -32,7 +33,7 @@ function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number; onClick: () => 
       onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
     >
       <div className="flex items-center gap-2 min-w-0">
-        <span className="text-[8px] font-black w-5 shrink-0 font-mono"
+        <span className="text-2xs font-black w-5 shrink-0 font-mono"
           style={{ color: "var(--ledger-ink-faint)" }}>
           {p.position}
         </span>
@@ -40,19 +41,19 @@ function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number; onClick: () => 
           style={{ color: "var(--ledger-ink)" }}>
           {p.name}
         </span>
-        <span className="text-[9px] shrink-0 font-mono"
+        <span className="text-2xs shrink-0 font-mono"
           style={{ color: "var(--ledger-ink-faint)" }}>
           {p.age}
         </span>
       </div>
       <div className="flex items-center gap-3 shrink-0 ml-2 font-mono">
-        <span className="text-[10px]" style={{ color: "var(--ledger-ink-faint)" }}>
+        <span className="text-2xs" style={{ color: "var(--ledger-ink-faint)" }}>
           ${p.capHit.toFixed(2)}M
         </span>
-        <span className="text-[10px] w-8 text-right" style={{ color: "var(--ledger-ink-faint)" }}>
+        <span className="text-2xs w-8 text-right" style={{ color: "var(--ledger-ink-faint)" }}>
           {termLabel}
         </span>
-        <span className="text-[10px] font-black w-10 text-right" style={{ color: navColor(nav) }}>
+        <span className="text-2xs font-black w-10 text-right" style={{ color: navColor(nav) }}>
           {nav > 0 ? "+" : ""}{nav.toFixed(0)}
         </span>
       </div>
@@ -64,11 +65,11 @@ function SectionHead({ label, count, icon }: { label: string; count: number; ico
   return (
     <div className="px-3 py-1.5 flex items-center justify-between sticky top-0"
       style={{ background: "var(--ledger-card)", borderBottom: "1px solid var(--ledger-rule)", borderTop: "1px solid var(--ledger-rule)" }}>
-      <span className="text-[8px] font-black uppercase tracking-[0.25em] font-mono"
+      <span className="text-2xs font-black uppercase tracking-[0.25em] font-mono"
         style={{ color: "var(--ledger-ink-faint)" }}>
         {icon} {label}
       </span>
-      <span className="text-[8px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+      <span className="text-2xs font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
         {count}
       </span>
     </div>
@@ -89,6 +90,7 @@ function AssetDropdown({
   const [open,   setOpen]   = useState(false);
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+  useBodyScrollLock(open);
 
   const label = idx === 0 ? "+ Add Outgoing Asset" : "+ Request Incoming Asset";
 
@@ -173,7 +175,7 @@ function AssetDropdown({
             <div className="px-4 py-3 flex items-center justify-between shrink-0"
               style={{ borderBottom: "2px double var(--ledger-ink)" }}>
               <div>
-                <div className="text-[9px] uppercase tracking-[0.35em] font-mono mb-0.5"
+                <div className="text-2xs uppercase tracking-[0.35em] font-mono mb-0.5"
                   style={{ color: "var(--ledger-ink-faint)" }}>
                   {idx === 0 ? "Outgoing" : "Incoming"} · {team.name}
                 </div>
@@ -247,7 +249,7 @@ function AssetDropdown({
               )}
 
               {total === 0 && picks.length === 0 && (
-                <div className="px-4 py-8 text-center text-[10px] uppercase tracking-[0.2em]"
+                <div className="px-4 py-8 text-center text-2xs uppercase tracking-[0.2em]"
                   style={{ color: "var(--ledger-ink-faint)" }}>
                   {search ? "No players match" : "No available assets"}
                 </div>
@@ -255,7 +257,7 @@ function AssetDropdown({
             </div>
 
             {/* Footer */}
-            <div className="px-4 py-1.5 text-[8px] font-mono text-center shrink-0"
+            <div className="px-4 py-1.5 text-2xs font-mono text-center shrink-0"
               style={{ borderTop: "1px solid var(--ledger-rule)", color: "var(--ledger-ink-faint)" }}>
               {total} players · {picks.length} picks — click to add
             </div>
