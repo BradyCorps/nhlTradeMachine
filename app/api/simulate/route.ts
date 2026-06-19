@@ -112,6 +112,9 @@ interface SimRequest {
   teams: SimTeam[];
   players: SimPlayer[];
   trades: TradeRecord[];
+  lineup?: {
+    startingGoalies?: Record<string, string | null | undefined>;
+  };
   seed?: number;
 }
 
@@ -156,6 +159,7 @@ function projectTeamPoints(
   tradeNavDelta: number,
   capSpaceAfterTrade: number,
   rand: () => number,
+  startingGoalieId?: string | null,
 ): number {
   const phaseBaseline = PHASE_BASELINE[team.phase] ?? 88;
 
@@ -169,6 +173,10 @@ function projectTeamPoints(
   const goalies = roster
     .filter(p => p.position === "G")
     .sort((a, b) => onIceValue(b) - onIceValue(a));
+  const startingGoalie = startingGoalieId
+    ? goalies.find(g => g.id === startingGoalieId)
+    : null;
+  const projectedStarter = startingGoalie ?? goalies[0] ?? null;
 
   const avg = (arr: SimPlayer[], n: number) =>
     arr.length === 0 ? 0 : arr.slice(0, n).reduce((s, p) => s + onIceValue(p), 0) / Math.min(n, arr.length);
@@ -176,7 +184,7 @@ function projectTeamPoints(
   const topSixF = avg(forwards, 6);
   const topNineF = avg(forwards, 9);
   const topFourD = avg(dmen, 4);
-  const starterG = goalies[0] ? onIceValue(goalies[0]) : -4;
+  const starterG = projectedStarter ? onIceValue(projectedStarter) : -4;
   const depthPenalty = forwards.length < 10 ? (10 - forwards.length) * 1.4 : 0;
   const dPenalty = dmen.length < 6 ? (6 - dmen.length) * 1.2 : 0;
 
@@ -216,6 +224,7 @@ function projectGoalie(
   roster: SimPlayer[],
   teamWinPct: number,
   rand: () => number,
+  startingGoalieId?: string | null,
 ): { name: string; projectedGAA: number; projectedSVP: number; gamesStarted: number; gsax: number } | null {
   const goalies = roster
     .filter(p => p.position === "G")
@@ -223,7 +232,7 @@ function projectGoalie(
 
   if (goalies.length === 0) return null;
 
-  const g    = goalies[0];
+  const g    = (startingGoalieId ? goalies.find(p => p.id === startingGoalieId) : null) ?? goalies[0];
   // Multi-season blend — single-season GSAX is noisy; the baseline (when
   // present) anchors the projection the same way the X-NAV engine blends it
   const gsax = stableGsax(g);
@@ -367,6 +376,7 @@ function simulateLeague(
   tradeNavDeltas: Map<string, number>,
   capDeltas: Map<string, number>,
   seed: number,
+  lineup?: SimRequest["lineup"],
 ): SimTeamResult[] {
   return teams.map(team => {
     const roster     = playersByTeam.get(team.id) ?? [];
@@ -374,12 +384,14 @@ function simulateLeague(
     const capDelta   = capDeltas.get(team.id) ?? 0;
     const capSpaceAfterTrade = team.capSpace - capDelta;
     const teamSeed = seed + hashString(`team:${team.id}`);
+    const startingGoalieId = lineup?.startingGoalies?.[team.id] ?? null;
     const projectedPoints = projectTeamPoints(
       team,
       roster,
       navDelta,
       capSpaceAfterTrade,
       mulberry32(teamSeed + hashString("points")),
+      startingGoalieId,
     );
     const projectedSkaters = roster
       .filter(p => p.position !== "Pick" && p.position !== "G"
@@ -393,7 +405,7 @@ function simulateLeague(
       );
     const topScorer  = projectedSkaters[0] ?? null;
     const winPct     = projectedPoints / 164;
-    const goalie     = projectGoalie(roster, winPct, mulberry32(teamSeed + hashString("goalie")));
+    const goalie     = projectGoalie(roster, winPct, mulberry32(teamSeed + hashString("goalie")), startingGoalieId);
     const topDefenseman = projectedSkaters
       .filter(p => p.position === "D")
       .sort((a, b) =>
@@ -814,7 +826,7 @@ function buildTradedPlayerOutcomes(
 export async function POST(req: NextRequest) {
   try {
     const body: SimRequest = await req.json();
-    const { homeTeamId, partnerTeamId, teams, players, trades } = body;
+    const { homeTeamId, partnerTeamId, teams, players, trades, lineup } = body;
 
     const seed = body.seed ?? scenarioSeed({
       mode: SEASON.simulationMode,
@@ -873,7 +885,7 @@ export async function POST(req: NextRequest) {
       capDeltas.set(trade.partnerTeamId,      (capDeltas.get(trade.partnerTeamId)      ?? 0) - capDelta);
     }
 
-    const rawStandings = simulateLeague(teams, playersByTeam, tradeNavDeltas, capDeltas, seed);
+    const rawStandings = simulateLeague(teams, playersByTeam, tradeNavDeltas, capDeltas, seed, lineup);
     const standings    = assignPlayoffSeeds(rawStandings);
     const leaders      = findLeagueLeaders(standings, rand);
 

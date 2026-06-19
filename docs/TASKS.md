@@ -12,13 +12,13 @@ Legend: `[ ]` to-do · `[~]` partial / verify-then-close
 
 ## Correctness
 
-### [ ] Task 0.3 — import-draft-class overwrite guard
+### [x] Task 0.3 — import-draft-class overwrite guard
 File: `app/api/admin/import-draft-class/route.ts`. On an existing id, only apply ELC
 defaults (capHit/years/clauses) when the existing row is actually a prospect; never
 overwrite a row that already has a real `capHit` or NMC/NTC.
 Acceptance: re-importing a draft class never clobbers an established player's contract; `npm test` + typecheck pass.
 
-### [ ] V2-1 — team phases shuffle league-wide after a trade
+### [x] V2-1 — team phases shuffle league-wide after a trade
 Root: `executeTrade` (`app/armchair-gm/page.tsx` ~393–420) re-ranks all 32 teams by
 `strengthByTeam`, assigns standings 1..32, and overwrites every team's `standing`/`phase`
 via a crude `phaseFromStanding` map that disagrees with the server's `derivePhase` +
@@ -31,7 +31,7 @@ respect `phaseOverride`. No league-wide standing→phase remap.
 Acceptance: a trade changes only the two teams' cap (and optionally their own phase);
 every other team's phase/standing unchanged; `npm test` + typecheck pass.
 
-### [ ] V2-2 — admin cap-ceiling override not reaching Armchair GM
+### [x] V2-2 — admin cap-ceiling override not reaching Armchair GM
 Root: `/api/league/teams/route.ts` uses a hardcoded `CAP_CEILING = SEASON.capCeiling`
 (~10, returned ~208) and never reads the live `cap_ceiling` from `siteSettings`. Only
 `/api/evaluate`'s `getLiveCapCeiling` reads the DB override, so the 2026-27 cap updates
@@ -43,7 +43,7 @@ from `siteSettings`) and returns it as `capCeiling`; ensure `clear-cache` busts
 Acceptance: changing `cap_ceiling` + busting cache → `/api/league/teams` returns the new
 ceiling and Armchair GM reflects it; `npm test` + typecheck pass.
 
-### [ ] V2-3 — depth-depletion flag misfires for unproven prospects
+### [x] V2-3 — depth-depletion flag misfires for unproven prospects
 Root: the "D corps can't absorb losing X" flag (`app/api/evaluate/route.ts` ~668–681 and
 the partner-side twin) qualifies "elite D being traded" with `(a.avgTOI ?? 0) > 22 ||
 navOf(a) > 100`. A 2026 draft prospect has 0 NHL games but a high *pedigree* NAV (>100 via
@@ -55,7 +55,7 @@ both home and partner sides.
 Acceptance: trading for an unproven prospect D (0 NHL games) does not fire "can't absorb
 losing him"; trading an established 22-min D still does; `npm test` + typecheck pass.
 
-### [ ] V2-4 — acquired goalies invisible on the bench
+### [x] V2-4 — acquired goalies invisible on the bench
 Root: `app/components/LineupEditor.tsx` builds the bench skaters-only — `bench =
 effective.filter(p => isF(p) …)` (~82) and `benchIds = [...fBench, ...dBench]` (~252–255)
 include only F and D. A 3rd goalie never appears on the bench, so he can't be swapped into
@@ -65,7 +65,28 @@ slots valid swap targets so a bench goalie can be moved into starter/backup.
 Acceptance: an acquired 3rd goalie appears on the bench and can be moved into the
 starting/backup slot; `npm test` + typecheck pass.
 
-### [ ] V2-5 — sim ignores user lineup / starting goalie (larger; may split)
+### [x] V2-4.5 — phase classification collapses EMERGING / REGRESSION_RISK into PEAK_WINDOW
+Root: in `classifyPhase` (`app/lib/development-profile.ts` ~190–202) the elite-production
+rule `if (scores.production >= 80 && scores.trend !== "FALLING") return "PEAK_WINDOW"`
+(~192, added to keep generational vets in their peak window) sits ABOVE the young-EMERGING
+checks (~196–197) and the `age >= 32 && regressionRisk >= 55` REGRESSION_RISK check (~193).
+So it intercepts two groups it shouldn't: elite teenagers (Celebrini/Schaefer, age 19,
+production ≥ 80 → should be EMERGING) and aging career-year outliers (Scheifele, 33, RISING
+96-pt season, regressionRisk ≥ 60 → should be REGRESSION_RISK). This is a real model
+regression — the test fixtures are correct canaries; do NOT edit the tests, and do NOT add
+new phases (the five existing phases are right).
+Fix: reorder `classifyPhase` so the young-EMERGING checks (`age <= 21 …`, `age <= 19 &&
+nhlGames < 20`) and the `age >= 32 && regressionRisk >= 55` REGRESSION_RISK check run BEFORE
+the `production >= 80` PEAK_WINDOW rule. Keep the elite-production rule (it's the only thing
+that keeps a genuinely-peak 32–33yo low-regression scorer out of UNKNOWN); just let the
+younger/aging-outlier branches win first. Change ordering only — do not alter thresholds.
+Verify McDavid (29) stays PEAK_WINDOW and Byfield (23) stays BREAKOUT_CANDIDATE.
+Acceptance: the 3 failing cases pass (Celebrini/Schaefer → EMERGING, Scheifele →
+REGRESSION_RISK) and the other 10 dev-profile tests stay green; no test edits; `npm test` +
+typecheck pass.
+
+
+### [x] V2-5 — sim ignores user lineup / starting goalie (larger; may split)
 Root: `projectStartingGoalie` (`app/api/simulate/route.ts` ~220–226) picks the starter by
 sorting on `gamesStarted` desc and taking `[0]` — it never reads the user's lineup, so a
 designated starter (Levi) is ignored and Comrie (more GP) is used. Team-strength also sorts
@@ -83,7 +104,7 @@ Armchair GM call site. If the diff balloons, split into "thread lineup into payl
 
 ## Valuation
 
-### [ ] R3 — defensive-D undervaluation (the Parayko case)
+### [x] R3 — defensive-D undervaluation (the Parayko case)
 File: `app/lib/xnav-engine.ts` (`calcSkaterNAV`). A shutdown top-pair D — ~22+ TOI, modest
 points (~25–30), strong suppression, ~$6.5M long deal — computes to negative NAV, yet the
 market pays a mid/late 1st + a prospect (≈150–180 NAV). Two stacked biases:
@@ -107,7 +128,8 @@ Acceptance: shutdown top-pair D no longer reads negative; weak D unaffected; off
 unchanged; existing NAV tests stay green (update only the intentionally-shifted shutdown-D
 values); `npm test` + typecheck pass.
 
-### [~] R1 — finish expanded-card de-dup (verify, then close)
+### [x] R1 — finish expanded-card de-dup (verify, then close)
+Adjustment: PTS and TERM are unable to be sorted by, these should be able to be sorted by. <div style="font-size: 10px; color: var(--rule); text-transform: uppercase; font-weight: 900; text-align: right;">PTS</div> and <div style="font-size: 10px; color: var(--rule); text-transform: uppercase; font-weight: 900; text-align: right;">Term</div> should be buttons no different than <button class="col-header">P/82 </button>
 Done already: SEASON POINTS duplicate removed, "Now" tile added, "? STRAND trait guide"
 collapsed. **Remaining to verify in `app/players/page.tsx` + `app/components/StrandDisplay.tsx`:**
 (a) the STRAND **helix vs OFFENSE/DEFENSE bar block** still renders the same 8 values twice
@@ -116,6 +138,24 @@ short deals — compact it to a stat/sparkline. If both are already addressed, m
 CONFIRMEDFIXES.
 
 ---
+## UI/UX Fixes
+
+### [] UI1 - `app/players/page.tsx` button font is too small. 
+- Need this to be readable for people who arent aware of what is going on. PTS, PPG, buttons are illegiable.
+
+### [] UI2 - `app/players/page.tsx` players names need to be listed at full at all times. 
+- We can apply the ICON key to this page. Players page still follows the PlayerMaker, Sniper, Scorer Architype so we will have to add icons there. 
+
+### [] UI3 - `app/players/page.tsx` defence and goalie headers need to have their own sorting. 
+- Defence and goalies need to have their own listed categories. For Defence we should have PTS, OPS, DPS, TOI, AGE, CONTRACT, YRS LEFT and SUPP to replace PPG. Goalies should have GSAX, SV%, GAA, Contract, Yrs left and GP.
+
+### [] UI4 - `app/players/page.tsx` needs to follow to have the same icons fed into it like on the Armchair GM Asset Card. 
+- Megalodon, Frachise, Surplus, Pedigree, etc. 
+
+### [] UI5 - `app/players/page.tsx` although duplicate, needs the icon key found at the top.
+- Users need reference to what they are looking at, at the page load, not having to scroll down to the glossary.
+
+
 
 ## Development Outlook
 

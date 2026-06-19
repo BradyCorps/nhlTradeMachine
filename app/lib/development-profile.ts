@@ -188,13 +188,13 @@ function classifyPhase(input: DevelopmentProfileInput, scores: {
   regressionRisk: number;
 }): DevelopmentPhase {
   if (input.age >= 36 || (input.age >= 34 && scores.trend === "FALLING")) return "DECLINING";
-  // elite, non-falling production keeps a veteran in their peak window even past 32
-  if (scores.production >= 80 && scores.trend !== "FALLING") return "PEAK_WINDOW";
-  if (input.age >= 32 && scores.regressionRisk >= 55) return "REGRESSION_RISK";
-  if (input.age >= 24 && input.age <= 31 && (scores.production >= 85 || (scores.pedigree >= 90 && scores.production >= 65))) return "PEAK_WINDOW";
-  if (input.age >= 24 && input.age <= 31 && scores.experience >= 65 && scores.production >= 55) return "PEAK_WINDOW";
   if (input.age <= 21 && (scores.pedigree >= 75 || scores.production >= 60)) return "EMERGING";
   if (input.age <= 19 && input.nhlGames < 20) return "EMERGING";
+  if (input.age >= 32 && scores.regressionRisk >= 55) return "REGRESSION_RISK";
+  // elite, non-falling production keeps a veteran in their peak window even past 32
+  if (scores.production >= 80 && scores.trend !== "FALLING") return "PEAK_WINDOW";
+  if (input.age >= 24 && input.age <= 31 && (scores.production >= 85 || (scores.pedigree >= 90 && scores.production >= 65))) return "PEAK_WINDOW";
+  if (input.age >= 24 && input.age <= 31 && scores.experience >= 65 && scores.production >= 55) return "PEAK_WINDOW";
   if (input.age <= 25 && (scores.production >= 45 || scores.pedigree >= 50 || scores.trend === "RISING")) return "BREAKOUT_CANDIDATE";
   if (input.age >= 26 && input.age <= 31) return "PEAK_WINDOW";
   if (input.age <= 23) return "EMERGING";

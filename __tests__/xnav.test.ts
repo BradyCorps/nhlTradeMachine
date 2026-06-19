@@ -502,6 +502,48 @@ describe("X-NAV — Elite Defencemen", () => {
     inRange(result.total, 130, 220, "Slavin NAV");
     expect(result.def).toBeGreaterThan(25);
   });
+
+  it("Parayko-type shutdown top-pair D clears market floor despite modest points", () => {
+    const result = calcSkaterNAV({
+      id: "parayko-type", name: "Parayko Type", position: "D",
+      age: 32, capHit: 6.5, yearsRemaining: 5,
+      ptsPace: 28, xGPace: 7, defRate: 0.35,
+      avgTOI: 22.8, qocIndex: 76, dzPct: 0.52,
+      xgRelTM: 0.5, xgaRelTM: -0.55,
+      games: 78, ops: 2.0, dps: 4.8, pairDriverScore: 12,
+    });
+
+    expect(result.total).toBeGreaterThanOrEqual(120);
+    expect(result.def).toBeGreaterThan(25);
+  });
+
+  it("live Parayko-shaped DPS signal clears the shutdown floor", () => {
+    const result = calcSkaterNAV({
+      id: "colton-parayko-live-shape", name: "Colton Parayko", position: "D",
+      age: 32, capHit: 6.5, yearsRemaining: 5,
+      ptsPace: 28, xGPace: 7, defRate: 0.08,
+      avgTOI: 22.8, qocIndex: 60, dzPct: 0.50,
+      xgRelTM: null, xgaRelTM: null,
+      games: 78, ops: 1.5, dps: 3.4,
+    });
+
+    expect(result.total).toBeGreaterThanOrEqual(120);
+    expect(result.def).toBeGreaterThan(45);
+  });
+
+  it("weak top-minute low-point D does not get the shutdown floor", () => {
+    const result = calcSkaterNAV({
+      id: "weak-top-minutes", name: "Weak Top Minutes D", position: "D",
+      age: 30, capHit: 6.5, yearsRemaining: 5,
+      ptsPace: 28, xGPace: 7, defRate: 0.05,
+      avgTOI: 22.8, qocIndex: 50, dzPct: 0.44,
+      xgRelTM: -2, xgaRelTM: 0.15,
+      games: 78, ops: 2.0, dps: 1.4, pairDriverScore: -4,
+    });
+
+    expect(result.total).toBeLessThan(40);
+    expect(result.def).toBeLessThan(10);
+  });
 });
 
 describe("X-NAV — Young Surplus Contracts", () => {

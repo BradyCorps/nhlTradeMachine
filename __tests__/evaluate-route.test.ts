@@ -214,4 +214,84 @@ describe("evaluate route integration", () => {
     expect(Number.isFinite(body.verdict.metrics.ptsGain)).toBe(true);
     expect(Number.isFinite(body.verdict.metrics.defGain)).toBe(true);
   });
+
+  it("does not treat pedigree-only prospect defensemen as established depletion losses", async () => {
+    const home = team({ id: "WPG", name: "Winnipeg Jets", capSpace: 10, phase: "Contender", standing: 4 });
+    const partner = team({ id: "FLA", name: "Florida Panthers", capSpace: 10, phase: "Contender", standing: 5 });
+    const outgoing = [asset({ id: "wpg-wing", name: "WPG Wing", teamId: "WPG", ptsPace: 40, capHit: 4 })];
+    const incoming = [asset({
+      id: "future-d",
+      name: "Future D",
+      teamId: "FLA",
+      position: "D",
+      age: 18,
+      games: 0,
+      ptsPace: 0,
+      avgTOI: 0,
+      draftOverall: 2,
+      hasLiveStats: false,
+      capHit: 0.975,
+      yearsRemaining: 3,
+    })];
+
+    const { response, body } = await postEvaluate({
+      assets: [...outgoing, ...incoming],
+      tradeOutgoing: outgoing,
+      tradeIncoming: incoming,
+      homeTeam: home,
+      partnerTeam: partner,
+      allHomeRoster: outgoing,
+      allPartnerRoster: incoming,
+      runTrade: true,
+      capCeiling: 95.5,
+    });
+
+    expect(response.status).toBe(200);
+    expect(body.verdict.flags).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        category: "ASSET_SHAPE_MISMATCH",
+        headline: expect.stringContaining("D corps can't absorb losing Future D"),
+      }),
+    ]));
+  });
+
+  it("still flags established top-pair defensemen as depletion losses", async () => {
+    const home = team({ id: "WPG", name: "Winnipeg Jets", capSpace: 10, phase: "Contender", standing: 4 });
+    const partner = team({ id: "FLA", name: "Florida Panthers", capSpace: 10, phase: "Contender", standing: 5 });
+    const outgoing = [asset({ id: "wpg-wing", name: "WPG Wing", teamId: "WPG", ptsPace: 40, capHit: 4 })];
+    const incoming = [asset({
+      id: "top-pair-d",
+      name: "Top Pair D",
+      teamId: "FLA",
+      position: "D",
+      age: 27,
+      games: 70,
+      ptsPace: 44,
+      avgTOI: 23,
+      hasLiveStats: true,
+      capHit: 6,
+      yearsRemaining: 3,
+    })];
+
+    const { response, body } = await postEvaluate({
+      assets: [...outgoing, ...incoming],
+      tradeOutgoing: outgoing,
+      tradeIncoming: incoming,
+      homeTeam: home,
+      partnerTeam: partner,
+      allHomeRoster: outgoing,
+      allPartnerRoster: incoming,
+      runTrade: true,
+      capCeiling: 95.5,
+    });
+
+    expect(response.status).toBe(200);
+    expect(body.verdict.flags).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        category: "ASSET_SHAPE_MISMATCH",
+        headline: "Florida Panthers's D corps can't absorb losing Top Pair D",
+        affectedAsset: "Top Pair D",
+      }),
+    ]));
+  });
 });

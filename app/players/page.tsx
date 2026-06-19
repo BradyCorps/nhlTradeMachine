@@ -343,12 +343,14 @@ function StatPill({ value, label, accent }: { value: string; label: string; acce
   );
 }
 
+type PlayerSortKey = "seasonPts" | "ppg" | "pts" | "toi" | "ops" | "dps" | "age" | "cap" | "term";
+
 function SortHeader({ k, label, active, dir, onClick }: {
-  k: "ppg" | "pts" | "toi" | "ops" | "dps" | "age" | "cap";
+  k: PlayerSortKey;
   label: string;
   active: boolean;
   dir: "desc" | "asc";
-  onClick: (k: "ppg" | "pts" | "toi" | "ops" | "dps" | "age" | "cap") => void;
+  onClick: (k: PlayerSortKey) => void;
 }) {
   return (
     <button className={`col-header${active ? " active" : ""}`} onClick={() => onClick(k)}>
@@ -370,6 +372,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
   const seasonPoints = Math.round((player.ptsPace / 82) * (player.games ?? 82));
   const primaryVal = isG
     ? (player.gsax ?? 0).toFixed(1)
+    : sortKey === "seasonPts" ? seasonPoints.toString()
     : sortKey === "ppg"   ? actualPPG(player).toFixed(3)
     : sortKey === "pts"   ? player.ptsPace.toFixed(1)
     : sortKey === "ops"   ? (player.ops != null ? player.ops.toFixed(1) : "—")
@@ -380,6 +383,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
     : actualPPG(player).toFixed(3);
 
   const primaryLabel = isG ? "GSAx"
+    : sortKey === "seasonPts" ? "PTS"
     : sortKey === "ppg" ? "PPG"
     : sortKey === "pts" ? "P/82"
     : sortKey === "ops" ? "OPS"
@@ -392,16 +396,20 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
   const secondaryVal = isG
     ? (player.savePct?.toFixed(3) ?? "—")
     : sortKey === "dps" || sortKey === "ops" ? player.ptsPace.toFixed(1)
+    : sortKey === "seasonPts" ? player.ptsPace.toFixed(1)
     : sortKey === "toi"   ? actualPPG(player).toFixed(3)
     : sortKey === "age"   ? `$${player.capHit}M`
     : sortKey === "cap"   ? `${player.yearsRemaining}yr`
+    : sortKey === "term"  ? `$${player.capHit}M`
     : player.avgTOI.toFixed(1);
 
   const secondaryLabel = isG ? "SV%"
     : sortKey === "dps" || sortKey === "ops" ? "P/82"
+    : sortKey === "seasonPts" ? "P/82"
     : sortKey === "toi"   ? "PPG"
     : sortKey === "age"   ? "Cap"
     : sortKey === "cap"   ? "Left"
+    : sortKey === "term"  ? "Cap"
     : "TOI";
 
   // Abbreviated team name for mobile (use teamId which is already short)
@@ -483,7 +491,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
             <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)", fontWeight: sortKey === "toi" ? 900 : 700 }}>{player.avgTOI.toFixed(1)}</div>
             <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)", fontWeight: sortKey === "age" ? 900 : 700 }}>{player.age}</div>
             <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)", fontWeight: sortKey === "cap" ? 900 : 700 }}>${player.capHit}M</div>
-            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)" }}>{player.yearsRemaining}yr</div>
+            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)", fontWeight: sortKey === "term" ? 900 : 700 }}>{player.yearsRemaining}yr</div>
           </>
         )}
         <span style={{ fontSize: "11px", color: "var(--rule)", textAlign: "right" }}>{expanded ? "▲" : "▼"}</span>
@@ -617,7 +625,7 @@ export default function PlayersPage() {
   const deferredSearch = useDeferredValue(search);
   const [posFilter, setPosFilter] = useState<"ALL" | "F" | "D" | "G">("ALL");
   const [teamFilter, setTeamFilter] = useState<string>("ALL");
-  const [sortKey, setSortKey] = useState<"ppg" | "pts" | "toi" | "ops" | "dps" | "age" | "cap">("ppg");
+  const [sortKey, setSortKey] = useState<PlayerSortKey>("ppg");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [forwardPage, setForwardPage] = useState(1);
   const [defencePage, setDefencePage] = useState(1);
@@ -723,7 +731,9 @@ export default function PlayersPage() {
         if (!bHas) return -1;
         return (sortDir === "desc" ? bv! - av! : av! - bv!) || tie;
       };
+      const seasonPts = (p: Player) => Math.round((p.ptsPace / 82) * (p.games ?? 82));
       switch (sortKey) {
+        case "seasonPts": return compare(seasonPts(a), seasonPts(b));
         case "ppg": return compare(actualPPG(a), actualPPG(b));
         case "pts": return compare(a.ptsPace, b.ptsPace);
         case "toi": return compare(a.avgTOI, b.avgTOI);
@@ -731,14 +741,25 @@ export default function PlayersPage() {
         case "dps": return compare(a.dps, b.dps);
         case "age": return compare(a.age, b.age);
         case "cap": return compare(a.capHit, b.capHit);
+        case "term": return compare(a.yearsRemaining, b.yearsRemaining);
         default:    return compare(actualPPG(a), actualPPG(b));
       }
     };
-    const goalieSort = (a: Player, b: Player): number =>
-      ((b.gsax ?? Number.NEGATIVE_INFINITY) - (a.gsax ?? Number.NEGATIVE_INFINITY))
-      || a.name.localeCompare(b.name)
-      || a.teamId.localeCompare(b.teamId)
-      || String(a.id).localeCompare(String(b.id));
+    const goalieSort = (a: Player, b: Player): number => {
+      const tie = a.name.localeCompare(b.name) || a.teamId.localeCompare(b.teamId) || String(a.id).localeCompare(String(b.id));
+      const compare = (av: number | null | undefined, bv: number | null | undefined): number => {
+        const aHas = Number.isFinite(av);
+        const bHas = Number.isFinite(bv);
+        if (!aHas && !bHas) return tie;
+        if (!aHas) return 1;
+        if (!bHas) return -1;
+        return (sortDir === "desc" ? bv! - av! : av! - bv!) || tie;
+      };
+      if (sortKey === "age") return compare(a.age, b.age);
+      if (sortKey === "cap") return compare(a.capHit, b.capHit);
+      if (sortKey === "term") return compare(a.yearsRemaining, b.yearsRemaining);
+      return ((b.gsax ?? Number.NEGATIVE_INFINITY) - (a.gsax ?? Number.NEGATIVE_INFINITY)) || tie;
+    };
 
     const sortedSkaters = [...sk].sort(sortFn);
     return {
@@ -855,7 +876,10 @@ export default function PlayersPage() {
                 <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Photo</div>
                 <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Player</div>
                 <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "center" }}>Strand</div>
-                <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "right" }}>{posFilter === "G" ? "GSAx" : "PTS"}</div>
+                {posFilter === "G"
+                  ? <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "right" }}>GSAx</div>
+                  : <SortHeader k="seasonPts" label="PTS" active={sortKey === "seasonPts"} dir={sortDir} onClick={handleSortKey} />
+                }
                 <SortHeader k="ppg" label="PPG" active={sortKey === "ppg"} dir={sortDir} onClick={handleSortKey} />
                 <SortHeader k="pts" label="P/82" active={sortKey === "pts"} dir={sortDir} onClick={handleSortKey} />
                 <SortHeader k="ops" label="OPS" active={sortKey === "ops"} dir={sortDir} onClick={handleSortKey} />
@@ -863,7 +887,7 @@ export default function PlayersPage() {
                 <SortHeader k="toi" label="TOI" active={sortKey === "toi"} dir={sortDir} onClick={handleSortKey} />
                 <SortHeader k="age" label="Age" active={sortKey === "age"} dir={sortDir} onClick={handleSortKey} />
                 <SortHeader k="cap" label="Cap" active={sortKey === "cap"} dir={sortDir} onClick={handleSortKey} />
-                <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "right" }}>Term</div>
+                <SortHeader k="term" label="Term" active={sortKey === "term"} dir={sortDir} onClick={handleSortKey} />
                 <div />
               </div>
             )}

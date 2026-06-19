@@ -503,7 +503,18 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const driverAdj = isD && asset.pairDriverScore != null
     ? clamp(asset.pairDriverScore * 0.8, -8, 12)
     : 0;
-  const defRaw = defRawBase + driverAdj;
+  const shutdownDSignal = Math.max(
+    blendedDps !== null ? clamp((blendedDps - 3.3) * 5, 0, 12) : 0,
+    clamp((-xgaRel - 0.35) * 18, 0, 10),
+    asset.pairDriverScore != null ? clamp((asset.pairDriverScore - 7) * 1.4, 0, 8) : 0,
+    clamp((def - 0.25) * 20, 0, 7),
+    qocIdx >= 78 ? 5 : 0,
+  );
+  const isShutdownTopPairD = isD && toi >= 22 && games >= 40 && shutdownDSignal > 0;
+  const shutdownDAdj = isShutdownTopPairD
+    ? clamp((toi - 22) * 3 + shutdownDSignal, 4, 18)
+    : 0;
+  const defRaw = defRawBase + driverAdj + shutdownDAdj;
 
   let defTotal = safe(defRaw);
   // ── Larry Robinson Defensive Asymptote ──────────────────────────
@@ -761,6 +772,8 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     franchiseFloor = age <= 24 ? 260 : age <= 26 ? 220 : 180;
   } else if (qualifiesEliteDefender) {
     franchiseFloor = age <= 24 ? 240 : age <= 26 ? 200 : 160;
+  } else if (isShutdownTopPairD) {
+    franchiseFloor = 130 + clamp((toi - 22) * 5 + shutdownDSignal, 0, 20);
   }
 
   const uncappedTotal = Math.max(discountedTotal, franchiseFloor);

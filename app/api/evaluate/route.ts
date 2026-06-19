@@ -282,6 +282,11 @@ const runGmLogic = (
   const flags: GmFlag[] = [];
   if (!teamHome || !teamPartner) return flags;
   const navOf = (asset: Asset): number => getAssetNAV(asset, capCeiling).total;
+  const isEstablishedTopPairD = (asset: Asset): boolean => {
+    if (normalizePosition(asset.position) !== "D") return false;
+    const hasNhlSample = (asset.games ?? 0) >= 20 && asset.hasLiveStats !== false;
+    return hasNhlSample && ((asset.avgTOI ?? 0) > 22 || navOf(asset) > 100);
+  };
 
   const modeHome = classifyTeam(teamHome, allHomeRoster);
   const modePartner = classifyTeam(teamPartner, allPartnerRoster);
@@ -666,7 +671,7 @@ const runGmLogic = (
   const tradingAwayD = outPlayers.filter((a) => a.position === "D");
   if (tradingAwayD.length > 0) {
     const depScore          = defensiveDependencyScore(allHomeRoster);
-    const eliteDBeingTraded = tradingAwayD.filter((a) => (a.avgTOI ?? 0) > 22 || navOf(a) > 100);
+    const eliteDBeingTraded = tradingAwayD.filter(isEstablishedTopPairD);
     const dComingBack       = inPlayers.filter(a => a.position === "D");
     const leavingDNav       = eliteDBeingTraded.reduce((s, a) => s + navOf(a), 0);
     const incomingDNav      = dComingBack.reduce((s, a) => s + navOf(a), 0);
@@ -688,7 +693,7 @@ const runGmLogic = (
   const partnerTradingAwayD = partnerGivingUp.filter((a) => a.position === "D");
   if (partnerTradingAwayD.length > 0) {
     const depScore          = defensiveDependencyScore(allPartnerRoster);
-    const eliteDBeingTraded = partnerTradingAwayD.filter((a) => (a.avgTOI ?? 0) > 22 || navOf(a) > 100);
+    const eliteDBeingTraded = partnerTradingAwayD.filter(isEstablishedTopPairD);
     const dComingBack       = outPlayers.filter(a => a.position === "D");
     const leavingDNav       = eliteDBeingTraded.reduce((s, a) => s + navOf(a), 0);
     const incomingDNav      = dComingBack.reduce((s, a) => s + navOf(a), 0);

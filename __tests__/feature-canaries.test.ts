@@ -91,6 +91,12 @@ describe("Canary — league route features (source-level)", () => {
         expect(src).toContain("hasDiacritics(p.name)");
       });
 
+      it("maps Utah Mammoth for point-share team lookups", () => {
+        expect(src).toContain('const POINT_SHARES_CACHE_KEY = "cache:pointshares:v2"');
+        expect(src).toContain('"ARI":"Utah Mammoth","UTA":"Utah Mammoth"');
+        expect(src).not.toContain('"UTA":"Utah Hockey Club"');
+      });
+
       it("backfills DB contracts when the scraper drops a player", () => {
         // The loop that rescues admin-edited contracts for players CapWages
         // no longer lists (expired deals at rollover, parse rejects)
@@ -547,12 +553,25 @@ describe("Canary — Batch 5 UI state robustness", () => {
     expect(src).not.toContain("a.capHit.toFixed");
   });
 
+  it("executed trades do not re-rank the league or remap team phases client-side", () => {
+    const src = read("app/armchair-gm/page.tsx");
+    expect(src).not.toContain("strengthByTeam");
+    expect(src).not.toContain("projectedStandingByTeam");
+    expect(src).not.toContain("phaseFromStanding");
+    expect(src).toContain("return team;");
+  });
+
   it("players page handles failed league loads and deterministic sorting", () => {
     const src = read("app/players/page.tsx");
     expect(src).toContain("useDeferredValue");
     expect(src).toContain("if (!r.ok) throw new Error");
     expect(src).toContain("PLAYER LEDGER LOAD FAILED");
     expect(src).toContain("const compare = (av: number | null | undefined, bv: number | null | undefined)");
+    expect(src).toContain('type PlayerSortKey = "seasonPts"');
+    expect(src).toContain('<SortHeader k="seasonPts" label="PTS"');
+    expect(src).toContain('<SortHeader k="term" label="Term"');
+    expect(src).toContain('case "seasonPts": return compare(seasonPts(a), seasonPts(b));');
+    expect(src).toContain('case "term": return compare(a.yearsRemaining, b.yearsRemaining);');
     expect(src).toContain("const visibleGoalies");
     expect(src).toContain('SectionHeader label="Goalies · GSAx"');
     expect(src).not.toContain("?? -99");
@@ -675,6 +694,14 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(lineupEditor).toContain("p?.position ?? \"--\"");
     expect(lineupEditor).toContain("minHeight: 50");
     expect(lineupEditor).not.toContain("Click a player, then click another slot");
+  });
+
+  it("lineup editor keeps extra goalies on the swappable bench", () => {
+    expect(lineupEditor).toContain("const gBench = orders.G.slice(2)");
+    expect(lineupEditor).toContain('group: "G" as Group, idx: 2 + i');
+    expect(lineupEditor).toContain('if (prev.group !== group) return { group, idx };');
+    expect(lineupEditor).toContain('<Cell group="G" idx={0} pos="G " />');
+    expect(lineupEditor).toContain('<Cell group="G" idx={1} pos="G " />');
   });
 
   it("exposes the focused Trade Machine and shared trade routes", () => {
@@ -868,14 +895,19 @@ describe("Canary — Batch 6 audit fixes", () => {
     const src = read("app/api/admin/import-draft-class/route.ts");
     expect(src).toContain("skipped existing NHL contract row");
     expect(src).toContain("current.draftYear != null");
-    expect(src).toContain("current.capHit <= 1.15");
-    expect(src).toContain("!current.hasNmc");
-    expect(src).toContain("!current.hasNtc");
+    expect(src).toContain("current.draftOverall != null");
+    expect(src).toContain("current.prospectPtsPace != null");
+    expect(src).toContain("const hasRealContract = current.capHit > 1.15");
+    expect(src).toContain("Boolean(current.hasNmc)");
+    expect(src).toContain("Boolean(current.hasNtc)");
+    expect(src).toContain("if (!isProspectRow || hasRealContract)");
+    expect(src).not.toContain("(current.age ?? 99) <= 22");
   });
 
   it("admin and evaluate cap settings reject zero, negative, absurd, and inverted cap values", () => {
     const src = read("app/api/admin/settings/route.ts");
     const evaluate = read("app/api/evaluate/route.ts");
+    const teams = read("app/api/league/teams/route.ts");
     expect(src).toContain("validateCapValue");
     expect(src).toContain("!Number.isFinite(value) || value <= 0");
     expect(src).toContain("value > MAX_CAP_CEILING");
@@ -885,6 +917,11 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(evaluate).toContain("cap > 0 && cap <= MAX_CAP_CEILING");
     expect(evaluate).toContain("isValidCapCeiling(requestCapCeiling)");
     expect(evaluate).toContain("isValidCapCeiling(cap)");
+    expect(teams).toContain("siteSettings");
+    expect(teams).toContain("const getLiveCapCeiling = async ()");
+    expect(teams).toContain('r.key === "cap_ceiling"');
+    expect(teams).toContain("isValidCapCeiling(cap) ? cap : SEASON.capCeiling");
+    expect(teams).toContain("capCeiling:  liveCapCeiling");
   });
 
   it("Strand rendering guards empty trait arrays before indexing or dividing", () => {
@@ -899,6 +936,7 @@ describe("Canary — Batch 6 audit fixes", () => {
   it("admin cache flush includes all live roster/stat/enrichment cache keys", () => {
     const src = read("app/api/admin/clear-cache/route.ts");
     expect(src).toContain("cache:pointshares");
+    expect(src).toContain("cache:pointshares:v2");
     expect(src).toContain("cache:mp_skaters");
     expect(src).toContain("cache:mp_goalies");
     expect(src).toContain("cache:nhl_goalie_summary_stats");
@@ -999,6 +1037,8 @@ describe("Canary — R0/R1/R2 audit refinements", () => {
     expect(timeline).toContain("estimateNextContractTerm");
     expect(timeline).toContain("Projected next");
     expect(timeline).toContain("fair-market midpoint AAV");
+    expect(timeline).toContain("const compactProjection = years.length <= 3");
+    expect(timeline).toContain("Compact contract projection for short remaining terms.");
   });
 
   it("keeps expanded player cards and STRAND displays de-duplicated", () => {

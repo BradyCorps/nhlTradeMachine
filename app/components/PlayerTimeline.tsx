@@ -41,6 +41,7 @@ export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
   const projectedNextAav = currentNav.fmvAav;
   const projectedNextTerm = estimateNextContractTerm(asset, currentNav);
   const projectedNextStatus = currentNav.isRFA ? "RFA" : "UFA";
+  const compactProjection = years.length <= 3;
 
   const maxNav  = Math.max(...years.map(y => Math.max(y.nav, 10)), 50);
   const minNav  = Math.min(...years.map(y => y.nav), 0);
@@ -56,6 +57,9 @@ export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
 
   // Extension boundary — first year with different capHit
   const extStartYear = years.findIndex((y, i) => i > 0 && y.capHit !== years[0].capHit);
+  const currentYear = years[0];
+  const finalYear = years[years.length - 1];
+  const navDelta = finalYear.nav - currentYear.nav;
 
   return (
     <div>
@@ -88,6 +92,47 @@ export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
           </span>
         </div>
       )}
+      {compactProjection ? (
+        <div
+          title="Compact contract projection for short remaining terms."
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: 5,
+            fontFamily: "'Courier Prime', monospace",
+          }}
+        >
+          {[
+            { label: "Now", value: currentYear.nav > 0 ? `+${currentYear.nav}` : `${currentYear.nav}` },
+            { label: "Final", value: finalYear.nav > 0 ? `+${finalYear.nav}` : `${finalYear.nav}` },
+            { label: "Delta", value: navDelta > 0 ? `+${navDelta}` : `${navDelta}` },
+          ].map(item => (
+            <div key={item.label} style={{
+              background: "var(--ledger-card)",
+              border: "1px solid var(--ledger-rule-mid)",
+              padding: "5px 6px",
+              minWidth: 0,
+            }}>
+              <div style={{ fontSize: 9, fontWeight: 900, color: "var(--ledger-ink-faint)", textTransform: "uppercase" }}>
+                {item.label}
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 900, color: "var(--ledger-ink)", marginTop: 2 }}>
+                {item.value}
+              </div>
+            </div>
+          ))}
+          <div style={{ gridColumn: "1 / -1", display: "flex", gap: 3, alignItems: "end", height: 18 }}>
+            {years.map(y => (
+              <span key={y.year} title={`Yr ${y.year}: NAV ${y.nav}, age ${y.age}`} style={{
+                flex: 1,
+                height: `${Math.max(3, Math.min(18, 4 + Math.abs(y.nav) / Math.max(maxNav, 1) * 14))}px`,
+                background: navColor(y.nav),
+                opacity: 0.85,
+              }} />
+            ))}
+          </div>
+        </div>
+      ) : (
       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block", overflow: "visible" }}>
 
         {/* Y-axis ticks */}
@@ -178,6 +223,7 @@ export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
         </text>
 
       </svg>
+      )}
     </div>
   );
 }

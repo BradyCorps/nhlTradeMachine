@@ -3,12 +3,12 @@ import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
-import { teams as teamsTable } from "@/app/db/schema";
+import { siteSettings, teams as teamsTable } from "@/app/db/schema";
 
 export const dynamic = "force-dynamic";
 
-const CAP_CEILING     = SEASON.capCeiling;
 const CAP_FLOOR       = SEASON.capFloor;
+const MAX_CAP_CEILING = 120;
 const TEAMS_CACHE_TTL = 6 * 60 * 60; // 6 hours
 const TRADE_TEAMS_CACHE_KEY = "cache:trade:teams:v1";
 
@@ -35,6 +35,15 @@ const derivePhase = (confRank: number, divRank: number, pointPct: number): strin
   if (confRank <= 14) return "Retooling";
   if (pointPct < 0.38) return "Tanking";
   return "Rebuilding";
+};
+
+const isValidCapCeiling = (cap: number): boolean => Number.isFinite(cap) && cap > 0 && cap <= MAX_CAP_CEILING;
+
+const getLiveCapCeiling = async (): Promise<number> => {
+  const rows = await db.select().from(siteSettings).catch(() => []);
+  const row = rows.find((r) => r.key === "cap_ceiling");
+  const cap = row ? parseFloat(row.value) : NaN;
+  return isValidCapCeiling(cap) ? cap : SEASON.capCeiling;
 };
 
 async function loadTeams(): Promise<any[]> {
@@ -164,6 +173,7 @@ async function loadTeams(): Promise<any[]> {
 }
 
 export async function GET() {
+  const liveCapCeiling = await getLiveCapCeiling();
   const LIVE_TEAMS = await loadTeams();
 
   const picks: any[] = [];
@@ -205,7 +215,7 @@ export async function GET() {
   return NextResponse.json({
     teams,
     picks,
-    capCeiling:  CAP_CEILING,
+    capCeiling:  liveCapCeiling,
     capFloor:    CAP_FLOOR,
     generatedAt: new Date().toISOString(),
   });

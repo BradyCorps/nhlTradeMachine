@@ -94,6 +94,61 @@ describe("simulate route", () => {
     );
   });
 
+  it("uses a supplied lineup starting goalie instead of the starts heuristic", async () => {
+    const depth = teamIds.flatMap((teamId) => {
+      const base = [
+        player(`${teamId}-f1`, `${teamId} Forward`, teamId, 42, "C"),
+        player(`${teamId}-d1`, `${teamId} Defender`, teamId, 25, "D"),
+      ];
+      if (teamId === "WPG") {
+        return [
+          ...base,
+          {
+            ...player("wpg-volume-goalie", "Volume Starter", teamId, 0, "G"),
+            gsax: 8,
+            gamesStarted: 58,
+            savePct: 0.915,
+          },
+          {
+            ...player("wpg-user-goalie", "User Starter", teamId, 0, "G"),
+            gsax: -2,
+            gamesStarted: 12,
+            savePct: 0.902,
+          },
+        ];
+      }
+      return [
+        ...base,
+        {
+          ...player(`${teamId}-g1`, `${teamId} Goalie`, teamId, 0, "G"),
+          gsax: 0,
+          gamesStarted: 45,
+          savePct: 0.905,
+        },
+      ];
+    });
+
+    const res = await simulatePOST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      body: JSON.stringify({
+        homeTeamId: "WPG",
+        partnerTeamId: "CGY",
+        teams,
+        players: depth,
+        seed: 18,
+        trades: [],
+        lineup: {
+          startingGoalies: {
+            WPG: "wpg-user-goalie",
+          },
+        },
+      }),
+    }) as any);
+    const body = await res.json();
+
+    expect(body.homeTeam.goalie.name).toBe("User Starter");
+  });
+
   it("awards Conn Smythe to a player on the simulated Cup champion", async () => {
     const depth = teamIds.flatMap((teamId) => [
       player(`${teamId}-f1`, `${teamId} Forward`, teamId, 42, "C"),

@@ -113,16 +113,19 @@ export async function POST(req: Request) {
       yearsRemaining: playersTable.yearsRemaining,
       hasNmc: playersTable.hasNmc,
       hasNtc: playersTable.hasNtc,
+      draftOverall: playersTable.draftOverall,
+      prospectPtsPace: playersTable.prospectPtsPace,
     }).from(playersTable).where(eq(playersTable.id, id));
     if (existing.length > 0) {
       const current = existing[0];
       const isProspectRow = current.draftYear != null
-        || ((current.age ?? 99) <= 22
-          && current.capHit <= 1.15
-          && current.yearsRemaining <= ELC_YEARS
-          && !current.hasNmc
-          && !current.hasNtc);
-      if (!isProspectRow) {
+        || current.draftOverall != null
+        || current.prospectPtsPace != null;
+      const hasRealContract = current.capHit > 1.15
+        || current.yearsRemaining > ELC_YEARS
+        || Boolean(current.hasNmc)
+        || Boolean(current.hasNtc);
+      if (!isProspectRow || hasRealContract) {
         errors.push(`${p.name}: skipped existing NHL contract row; draft import will not overwrite cap/term/clauses`);
         continue;
       }

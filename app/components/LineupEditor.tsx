@@ -22,6 +22,7 @@ interface Player {
 type NavLike = { total?: number };
 
 interface TeamProps {
+  teamId: string;
   teamName: string;
   label?: string;
   roster: Player[];      // roster before the active move is applied
@@ -35,6 +36,7 @@ interface Props {
   partner: TeamProps | null;
   hasActiveTrade: boolean;
   navMap?: Record<string, NavLike>;
+  onGoalieStarterChange?: (teamId: string, goalieId: string | null) => void;
 }
 
 const MONO = "'Courier Prime', monospace";
@@ -98,7 +100,16 @@ const navColor = (nav: number) =>
   : nav >= 0 ? "#7a5a20"
   : "#b83020";
 
-function TeamLineup({ teamName, label, roster, outgoing, incoming, navMap }: TeamProps) {
+function TeamLineup({
+  teamId,
+  teamName,
+  label,
+  roster,
+  outgoing,
+  incoming,
+  navMap,
+  onGoalieStarterChange,
+}: TeamProps & Pick<Props, "onGoalieStarterChange">) {
   const outIds = useMemo(() => new Set(outgoing.map(p => p.id)), [outgoing]);
   const inIds  = useMemo(() => new Set(incoming.map(p => p.id)), [incoming]);
 
@@ -130,6 +141,10 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming, navMap }: Tea
     setSelected(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rosterKey]);
+
+  useEffect(() => {
+    onGoalieStarterChange?.(teamId, orders.G[0] ?? null);
+  }, [teamId, orders.G, onGoalieStarterChange]);
 
   const reset = useCallback(() => {
     setOrders({
@@ -251,8 +266,10 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming, navMap }: Tea
   const ordinals = ["1st", "2nd", "3rd", "4th"];
   const fBench = orders.F.slice(12);
   const dBench = orders.D.slice(6);
+  const gBench = orders.G.slice(2);
   const benchIds = [...fBench.map((id, i) => ({ id, group: "F" as Group, idx: 12 + i })),
-                    ...dBench.map((id, i) => ({ id, group: "D" as Group, idx: 6 + i }))];
+                    ...dBench.map((id, i) => ({ id, group: "D" as Group, idx: 6 + i })),
+                    ...gBench.map((id, i) => ({ id, group: "G" as Group, idx: 2 + i }))];
 
   return (
     <div style={{ fontFamily: MONO }}>
@@ -308,7 +325,7 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming, navMap }: Tea
         </tbody>
       </table>
 
-      {/* Bench — extra skaters; click one, then click a lineup slot to insert */}
+      {/* Bench — extra players; click one, then click a matching lineup slot to insert */}
       {benchIds.length > 0 && (
         <div style={{ marginTop: 6 }}>
           <div style={{ fontSize: 6, fontWeight: 900, color: "var(--ledger-ink-faint)",
@@ -354,7 +371,7 @@ function TeamLineup({ teamName, label, roster, outgoing, incoming, navMap }: Tea
   );
 }
 
-export default function LineupEditor({ home, partner, hasActiveTrade, navMap }: Props) {
+export default function LineupEditor({ home, partner, hasActiveTrade, navMap, onGoalieStarterChange }: Props) {
   const [expanded, setExpanded] = useState(true);
   if (!home && !partner) return null;
 
@@ -380,12 +397,12 @@ export default function LineupEditor({ home, partner, hasActiveTrade, navMap }: 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(430px, 100%), 1fr))", gap: 12 }}>
             {home && (
               <div style={{ background: "var(--ledger-cream)", border: "1px solid #c8b890", padding: "10px 12px" }}>
-                <TeamLineup {...home} navMap={navMap} />
+                <TeamLineup {...home} navMap={navMap} onGoalieStarterChange={onGoalieStarterChange} />
               </div>
             )}
             {partner && (
               <div style={{ background: "var(--ledger-cream)", border: "1px solid #c8b890", padding: "10px 12px" }}>
-                <TeamLineup {...partner} navMap={navMap} />
+                <TeamLineup {...partner} navMap={navMap} onGoalieStarterChange={onGoalieStarterChange} />
               </div>
             )}
           </div>

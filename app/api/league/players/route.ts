@@ -26,6 +26,7 @@ const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
 const CONTRACTS_CACHE_KEY = "cache:contracts:v2";
 const MONEYPUCK_CACHE_TTL =  4 * 60 * 60; // 4 hours
 const PS_CACHE_TTL        = 12 * 60 * 60; // 12 hours
+const POINT_SHARES_CACHE_KEY = "cache:pointshares:v2";
 
 // Manual overrides for contracts where the CapWages scraper's age-based year calculation
 // is unreliable (e.g. back-loaded extensions where ageSigned ≠ effective start year).
@@ -283,7 +284,7 @@ interface NHLTeamRow {
 
 async function fetchPointShares(): Promise<Map<string, { ops: number; dps: number }>> {
   if (redis) {
-    const cached = await redis.get<Record<string, { ops: number; dps: number }>>("cache:pointshares");
+    const cached = await redis.get<Record<string, { ops: number; dps: number }>>(POINT_SHARES_CACHE_KEY);
     if (cached) return new Map(Object.entries(cached));
   }
 
@@ -318,7 +319,7 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
     const marginalGoalsPerPoint = leagueGoals / leaguePoints;
 
     const TEAM_ABBREV_MAP: Record<string, string> = {
-      "ANA":"Anaheim Ducks","ARI":"Utah Hockey Club","UTA":"Utah Hockey Club",
+      "ANA":"Anaheim Ducks","ARI":"Utah Mammoth","UTA":"Utah Mammoth",
       "BOS":"Boston Bruins","BUF":"Buffalo Sabres","CGY":"Calgary Flames",
       "CAR":"Carolina Hurricanes","CHI":"Chicago Blackhawks","COL":"Colorado Avalanche",
       "CBJ":"Columbus Blue Jackets","DAL":"Dallas Stars","DET":"Detroit Red Wings",
@@ -413,7 +414,7 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
 
     console.log(`[PS] Computed Point Shares for ${psMap.size / 3} players`);
     if (redis) {
-      await redis.setex("cache:pointshares", PS_CACHE_TTL, Object.fromEntries(psMap));
+      await redis.setex(POINT_SHARES_CACHE_KEY, PS_CACHE_TTL, Object.fromEntries(psMap));
     }
   } catch (e: any) {
     console.warn("[PS] fetchPointShares failed:", e.message);

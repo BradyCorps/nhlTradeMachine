@@ -163,6 +163,7 @@ export default function ArmchairGmPage() {
   const [simLoading, setSimLoading] = useState(false);
   const [simData, setSimData]       = useState<any | null>(null);
   const [showSimPanel, setShowSimPanel] = useState(false);
+  const [lineupStartingGoalies, setLineupStartingGoalies] = useState<Record<string, string | null>>({});
   const [showMemo, setShowMemo] = useState(false);
 
   useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length));
@@ -190,6 +191,12 @@ export default function ArmchairGmPage() {
     () => db.players.filter(p => p.teamId === partnerTeamId),
     [db.players, partnerTeamId]
   );
+
+  const handleGoalieStarterChange = useCallback((teamId: string, goalieId: string | null) => {
+    setLineupStartingGoalies(prev =>
+      prev[teamId] === goalieId ? prev : { ...prev, [teamId]: goalieId }
+    );
+  }, []);
 
   // Fetch NAV from server whenever db.players changes (after load or trade execution)
   useEffect(() => {
@@ -378,50 +385,20 @@ export default function ArmchairGmPage() {
         .filter(a => a.position !== "Pick")
         .reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0);
 
-      const strengthByTeam = new Map<string, number>();
-      for (const team of prev.teams) {
-        const roster = updatedPlayers
-          .filter(p => p.teamId === team.id && p.position !== "Pick")
-          .map(p => {
-            if (p.position === "G") return Math.max(0, (p.gsax ?? 0) * 2 + (p.gamesStarted ?? 0) * 0.5);
-            const toiCredit = Math.max(0, (p.avgTOI ?? 0) - 10) * 2;
-            return (p.ptsPace ?? 0) + toiCredit + Math.max(0, p.defRate ?? 0) * 12;
-          })
-          .sort((a, b) => b - a);
-        strengthByTeam.set(team.id, roster.slice(0, 18).reduce((s, v, i) => s + v * Math.pow(0.93, i), 0));
-      }
-      const projectedStandingByTeam = new Map(
-        [...strengthByTeam.entries()]
-          .sort((a, b) => b[1] - a[1])
-          .map(([teamId], index) => [teamId, index + 1])
-      );
-      const phaseFromStanding = (standing: number): string =>
-        standing <= 6 ? "Contender" :
-        standing <= 10 ? "Bubble" :
-        standing <= 23 ? "Retooling" :
-        standing <= 29 ? "Rebuilding" :
-        "Tanking";
-
       const updatedTeams = prev.teams.map(team => {
-        const projectedStanding = projectedStandingByTeam.get(team.id) ?? team.standing;
-        const projectedPhase = phaseFromStanding(projectedStanding);
         if (team.id === homeTeam.id) {
           return {
             ...team,
             capSpace: Math.round((team.capSpace + outCapHome - inCapHome) * 10) / 10,
-            standing: projectedStanding,
-            phase: projectedPhase,
           };
         }
         if (team.id === partnerTeam.id) {
           return {
             ...team,
             capSpace: Math.round((team.capSpace + inCapHome - outCapHome) * 10) / 10,
-            standing: projectedStanding,
-            phase: projectedPhase,
           };
         }
-        return { ...team, standing: projectedStanding, phase: projectedPhase };
+        return team;
       });
 
       const standingByOwner = new Map(updatedTeams.map(team => [team.id, team.standing]));
@@ -462,6 +439,7 @@ export default function ArmchairGmPage() {
       setExecutedTrades([]);
       setSimResult(null);
       setSimData(null);
+      setLineupStartingGoalies({});
       setShowSimPanel(false);
       setBlocks([[], []]);
       setVerdict(null);
@@ -509,6 +487,9 @@ export default function ArmchairGmPage() {
           teams:   simTeams,
           players: simPlayers,
           trades:  simTrades,
+          lineup: {
+            startingGoalies: lineupStartingGoalies,
+          },
           seed,
         }),
       });
@@ -605,7 +586,7 @@ export default function ArmchairGmPage() {
       setSimResult("Simulation unavailable — please try again.");
     }
     setSimLoading(false);
-  }, [homeTeam, partnerTeam, db, originalDb, executedTrades, navMap]);
+  }, [homeTeam, partnerTeam, db, originalDb, executedTrades, navMap, lineupStartingGoalies]);
   useEffect(() => {
     // Issue 10: Don't auto-evaluate. Clear old verdict so user must click "Make the call" again.
     if (previousTradeInputKey.current !== tradeInputKey) {
@@ -1386,17 +1367,20 @@ export default function ArmchairGmPage() {
           <div className="mt-2 mb-4">
             <LineupEditor
               home={{
+                teamId: teams[0]!.id,
                 teamName: teams[0]!.name, label: "Your Franchise",
                 roster: allHomeRoster, outgoing: blocks[0],
                 incoming: blocks[1].filter(a => a.position !== "Pick"),
               }}
               partner={{
+                teamId: teams[1]!.id,
                 teamName: teams[1]!.name, label: "Trade Partner",
                 roster: allPartnerRoster, outgoing: blocks[1],
                 incoming: blocks[0].filter(a => a.position !== "Pick"),
               }}
               hasActiveTrade={blocks[0].length > 0 || blocks[1].length > 0}
               navMap={navMap}
+              onGoalieStarterChange={handleGoalieStarterChange}
             />
           </div>
         )}

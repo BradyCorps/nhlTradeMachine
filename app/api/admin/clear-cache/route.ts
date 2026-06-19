@@ -19,6 +19,7 @@ export async function GET(req: Request) {
       "cache:contracts",
       "cache:contracts:v2",
       "cache:pointshares",
+      "cache:pointshares:v2",
       "cache:mp_skaters",
       "cache:mp_goalies",
       "cache:nhl_skater_summary_stats",

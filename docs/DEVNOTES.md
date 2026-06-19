@@ -1,5 +1,15 @@
 # Development Notes
-
+- 2026-06-19: Followed up R3 by lowering the shutdown-D DPS signal threshold and adding a live Parayko-shaped regression test so 22+ TOI / 3.4 DPS defenders clear the market floor; touched `app/lib/xnav-engine.ts` and `__tests__/xnav.test.ts`.
+- 2026-06-19: Completed V2-5 by threading LineupEditor starting-goalie selections into `/api/simulate` and honoring them in goalie/team projections; touched `app/components/LineupEditor.tsx`, `app/armchair-gm/page.tsx`, `app/api/simulate/route.ts`, `__tests__/simulate-and-claude-routes.test.ts`, and `docs/TASKS.md`.
+- 2026-06-19: Completed R3 by adding a guarded shutdown top-pair D defensive adjustment/floor for Parayko-type valuations while keeping weak top-minute D and offensive-D guards covered; touched `app/lib/xnav-engine.ts`, `__tests__/xnav.test.ts`, and `docs/TASKS.md`.
+- 2026-06-19: Completed R1 by verifying expanded-card STRAND de-dup, adding sortable PTS/Term players-table headers, and compacting short-term contract projections; touched `app/players/page.tsx`, `app/components/PlayerTimeline.tsx`, `__tests__/feature-canaries.test.ts`, and `docs/TASKS.md`.
+- 2026-06-19: Completed R3 by verifying the guarded shutdown top-pair D floor/adjustment and Parayko/weak-D/Makar characterization tests already in `app/lib/xnav-engine.ts` and `__tests__/xnav.test.ts`; touched `docs/TASKS.md`.
+- 2026-06-19: Completed V2-4.5 by reordering development phase classification so young EMERGING and older REGRESSION_RISK branches beat the elite PEAK_WINDOW fallback; touched `app/lib/development-profile.ts`, `docs/TASKS.md`, and `docs/DEVNOTES.md`.
+- 2026-06-19: Completed V2-4 by adding extra goalies beyond starter/backup to the editable Lineup bench so they can be swapped into goalie slots; touched `app/components/LineupEditor.tsx`, `__tests__/feature-canaries.test.ts`, and `docs/TASKS.md`.
+- 2026-06-19: Completed V2-3 by requiring a 20-game live NHL sample before D-corps depletion flags can treat traded defensemen as established top-pair losses; touched `app/api/evaluate/route.ts`, `__tests__/evaluate-route.test.ts`, and `docs/TASKS.md`.
+- 2026-06-19: Completed V2-2 by making `/api/league/teams` return the live `cap_ceiling` from `siteSettings` with validation/fallback while preserving the existing split team cache bust keys; touched `app/api/league/teams/route.ts`, `__tests__/feature-canaries.test.ts`, and `docs/TASKS.md`.
+- 2026-06-19: Completed Task 0.3 by tightening draft-class import overwrites so only existing rows with prospect metadata and no real contract/clauses receive ELC defaults; touched `app/api/admin/import-draft-class/route.ts`, `__tests__/feature-canaries.test.ts`, and `docs/TASKS.md`.
+- 2026-06-19: Completed V2-1 by removing Armchair GM's client-side league re-rank/phase remap after executed trades, preserving non-involved teams' standings/phases while only applying trader cap deltas; touched `app/armchair-gm/page.tsx`, `__tests__/feature-canaries.test.ts`, and `docs/TASKS.md`.
 
 ---
 
