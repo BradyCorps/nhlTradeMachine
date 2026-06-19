@@ -53,6 +53,8 @@
     Acceptance: every metric on the card is defined in the collapsible key; closed by default; npm test + typecheck pass.
 
 
+
+
 ## Task 0: apply five independent, low-risk bug fixes. Do not refactor — each is a targeted change. Run the test suite after.
 
   1. BreakdownTable crash — app/armchair-gm/page.tsx (~lines 2042/2046/2050): a.ptsPace.toFixed, a.avgTOI.toFixed, and a.capHit.toFixed are called unguarded for non-Pick/non-G assets. Guard each with ?? 0 like the adjacent xG cell, so a stats-less skater can't crash the table.
@@ -127,6 +129,8 @@ Acceptance: loading/auditing several trades in a row never leaves the page unscr
 
 Acceptance: the NAV breakdown's visible parts sum to the headline NAV (incl. floored players); the active nav tab is clearly distinct; hovering a NAV label shows its definition; no data label renders below 11px; npm test and typecheck pass.
 
+## Valuation Audit and Card Audit
+
   ### Task R0: fix overvaluation of low-sample depth players (the Heinola case)
 
   - File: app/lib/xnav-engine.ts. A 25-yo depth D — 5 GP, 1 pt, 14:11 TOI, $0.8M — currently values at NAV 75, which is far too high for an AHL/NHL tweener (realistic ~15–25). The breakdown shows the inflation is CAP +43 (illusory cheap-contract surplus) plus a +28 residual. Root cause: the cap-surplus component credits a full bargain even on a tiny sample, and the existing "replacement callup" clamp (~line 756: age>=26 && games<14 && toi<9 && draftOverall==null) is too narrow — it misses 25-year-old former draftees entirely.
@@ -171,6 +175,26 @@ Acceptance: the NAV breakdown's visible parts sum to the headline NAV (incl. flo
     * Add a characterization test asserting fmvAav is sane for a few archetypes (elite forward in the $11–14M range, depth player near league min, etc.) so the new output is pinned.
 
   - Acceptance: every skater/goalie card shows a plausible projected next AAV × term; existing NAV values are unchanged (Phase 1 NAV tests stay green); npm test + typecheck pass.
+
+  ### Task R3: fix defensive-D undervaluation (the Parayko case)
+  - File: app/lib/xnav-engine.ts (calcSkaterNAV). A shutdown top-pair D — ~22+ TOI, modest points (~25–30), strong suppression, ~$6.5M on a long deal — currently computes to negative NAV, yet the real market pays a mid/late 1st + a prospect (≈150–180 NAV on our scale). Two stacked biases cause it:
+
+    * trueMarketValue is offense-weighted, so a points-light D scores low. offTotal (points power curve) is small for Parayko, and defTotal is only moderate after the deployment terms (toiD, qocVal, suppression) and is then squeezed by the 80-cap asymptote — so a genuine 22-min shutdown D's true value is under-credited.
+    * The cap sigmoid + floor then drag him negative. With a low trueMarketValue, the D fmvCapPct (logistic, MIDPOINT = isD ? 120) maps to an FMV below his $6.5M cap → negative cap surplus → negative capTotal. And the cornerstone floor can't save him: qualifiesEliteDefender requires pts >= 65 (an offensive-D bar), so a low-point shutdown D qualifies for no floor at all.
+
+  - Fix (do both, with a guardrail):
+
+    * Credit shutdown deployment + suppression for high-TOI D. For isD && toi >= 22, increase the defensive contribution from real matchup/suppression signal — deployment (toiD/qocVal), xgaRelTM suppression, and pairDriverScore — so 22+ minute matchup value registers independent of points. Raise (or soften) the defTotal asymptote enough that a true top-pair shutdown D lands in a realistic range rather than being capped at depth-D levels.
+    * Add a shutdown-top-pair-D floor to the cornerstone floor. Extend the qualifier: in addition to the existing pts >= 65 offensive-D path, qualify a D as a top-pair anchor when toi >= 22 && (strong defensive signal: e.g. dps high OR xgaRelTM strongly negative OR qocIndex high). Give it a floor around ~130–150 (below the elite-offensive-D floors of 160–240, since pure shutdown < elite two-way, but enough that a legit top-pair D can't read negative and lands near "mid-1st + prospect").
+    * Guardrail — don't over-credit weak D. The shutdown credit/floor must require both high TOI and a genuinely strong defensive underlying (suppression/dps/QoC), not minutes alone. A low-point D with mediocre underlying numbers (sheltered, bleeding chances) must stay low. This is the mirror of R0: R0 stopped illusory value for unproven cheap players; R3 restores real value the model misses for shutdown D — but neither should reward a player the underlying data doesn't support.
+
+  - Add a characterization test with three pinned cases:
+
+    * Parayko-type — 22+ TOI, ~28 pts, strong xGA suppression, $6.5M × long term → NAV clearly positive and ≥ ~120 (mid-1st + prospect territory), not negative.
+    * Weak low-point D — low TOI, weak/negative underlying, similar points → stays low/negative (guardrail holds).
+    * Elite offensive D (Makar-type, high pts + 22+ TOI) → unchanged vs. current (no regression to the existing floor path).
+
+  - Acceptance: a shutdown top-pair D no longer reads negative and lands near his real market return; weak low-point D unaffected; offensive D unchanged; existing NAV characterization tests stay green (update only the intentionally-shifted shutdown-D values); npm test + typecheck pass.
 
 ## Task 1a: 
 - Write golden/characterization tests for calcNAV in app/lib/xnav-engine.ts covering a representative set: an elite forward, a top-pair D, a starting goalie, a 1st-round pick, an ELC prospect, a fringe callup, and a retained-salary case. Snapshot the full XNAVResult for each. Do NOT change engine code — these pin current behavior.

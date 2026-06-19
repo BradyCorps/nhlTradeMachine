@@ -37,10 +37,3 @@ next-env.d.ts
 
 .env*
 
-# markdown files
-AGENTS.md
-ANALYTICS.md
-AUDIT.md
-CHANGES.md
-CLAUDE.md
-DEVNOTES.md
