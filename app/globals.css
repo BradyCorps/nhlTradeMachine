@@ -398,10 +398,10 @@ select.ledger-select {
 
 .strands-title {
   font-family: 'Courier Prime', monospace;
-  font-size: 8px;
+  font-size: 13px;
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.25em;
+  letter-spacing: 0.18em;
   color: var(--ink);
 }
 
@@ -699,25 +699,19 @@ select.ledger-select {
   .players-filter-row2::-webkit-scrollbar { display: none; }
 }
 
-/* ── Mobile sort strip — only visible on mobile, sticky below filter bar ── */
-.players-column-header { display: grid; }
-@media (max-width: 539px) { .players-column-header { display: none !important; } }
+/* ── Player table header — one sortable header, scrollable on narrow screens ── */
+.players-column-header {
+  display: grid;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
 @media (max-width: 539px) {
-  .players-mobile-sort-strip {
-    display: flex;
-    align-items: center;
-    padding: 6px 12px;
-    background: #f2ecd7;
-    border-bottom: 1px solid #b8a070;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    overflow: hidden;
+  .players-column-header {
+    margin: 0 -12px;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
   }
-  .players-mobile-sort-strip > div {
-    scrollbar-width: none;
-  }
-  .players-mobile-sort-strip > div::-webkit-scrollbar { display: none; }
 }
 
 /* Filter buttons — larger tap targets on mobile */
@@ -800,9 +794,9 @@ select.ledger-select {
   grid-template-columns: 1fr;
   gap: 12px;
 }
-@media (min-width: 540px) {
+@media (min-width: 720px) {
   .expanded-player-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 16px;
   }
 }

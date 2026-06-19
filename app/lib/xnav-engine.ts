@@ -77,6 +77,7 @@ export interface XNAVResult {
   age:         number;
   cap:         number;
   upside:      number;
+  fmvAav?:     number;
   noivImpact?: number;
   fArchetype?: string;
   rosterTier?: RosterTier;
@@ -99,6 +100,9 @@ function blendNavResults(lowSample: XNAVResult, established: XNAVResult, establi
     age: blend(lowSample.age, established.age),
     cap: blend(lowSample.cap, established.cap),
     upside: blend(lowSample.upside, established.upside),
+    fmvAav: lowSample.fmvAav != null && established.fmvAav != null
+      ? lowSample.fmvAav * (1 - w) + established.fmvAav * w
+      : established.fmvAav ?? lowSample.fmvAav,
     noivImpact: blend(lowSample.noivImpact ?? 0, established.noivImpact ?? 0),
     fArchetype: established.fArchetype || lowSample.fArchetype,
     rosterTier: established.rosterTier ?? lowSample.rosterTier,
@@ -327,6 +331,7 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
 
   const BASE_CAP_CEILING = asset.capCeiling ?? SEASON.capCeiling;
   const CAP_GROWTH_RATE  = 1.04;
+  const currentFmvAavG = BASE_CAP_CEILING * fmvCapPctG;
 
   let capSumG = 0;
   for (let i = 0; i < contractYears; i++) {
@@ -378,6 +383,7 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
     age:    -agePenalty,
     cap:    Math.round(capTotalG),
     upside: youngFloor > 0 ? youngFloor * 0.4 : 0,
+    fmvAav: currentFmvAavG,
     noivImpact: 0,
     fArchetype: "",
     isRFA,
@@ -589,6 +595,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
 
   const BASE_CAP_CEILING = asset.capCeiling ?? SEASON.capCeiling; // Current cap space
   const CAP_GROWTH_RATE  = 1.04;  // 4% annual growth
+  const currentFmvAav = BASE_CAP_CEILING * fmvCapPct;
 
   // Loop through contract term to calculate the multi-year compound surplus sum:
   let capSum = 0;
@@ -624,7 +631,17 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   // Retention tax (exponential — absorbing dead cap still commands a premium)
   const retentionSev  = Math.pow((asset.retainedPct || 0) * 100, 1.25);
   const retainedBonus = retentionSev * asset.capHit * 0.08;
-  const capTotal      = safe(baselineCapComponent + retainedBonus);
+  const capEstablishment = clamp(
+    Math.max(
+      games / 40,
+      safe(asset.baselinePtsPace ?? 0) / (isD ? 30 : 45),
+    ),
+    0.2,
+    1.0,
+  );
+  const positiveCapComponent = Math.max(0, baselineCapComponent) * capEstablishment;
+  const negativeCapComponent = Math.min(0, baselineCapComponent);
+  const capTotal      = safe(negativeCapComponent + positiveCapComponent + retainedBonus);
 
   // ── Forward archetype ─────────────────────────────────────────
   const noivImpact = Math.round(noivBonus);
@@ -747,31 +764,16 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   }
 
   const uncappedTotal = Math.max(discountedTotal, franchiseFloor);
-  const hasMeaningfulBaseline =
-    safe(asset.baselinePtsPace ?? 0) >= 25 ||
-    safe(asset.baselineGameScore ?? 0) >= 25 ||
-    safe(asset.baselineDpsProxy ?? 0) >= 1.5;
-  const approximateSamplePoints = games > 0 ? (pts / 82) * games : 0;
-  const hasOnlyTinySampleProduction = games < 8 && approximateSamplePoints <= 2 && pts < 45;
-  const isReplacementCallup =
-    age >= 26 &&
-    games < 14 &&
-    toi < 9 &&
-    (blendedPts < 15 || hasOnlyTinySampleProduction) &&
-    !hasMeaningfulBaseline &&
-    asset.draftOverall == null;
-  const total = isReplacementCallup ? Math.min(uncappedTotal, 4) : uncappedTotal;
-  const displayedCap = isReplacementCallup
-    ? Math.min(capTotal, Math.max(0, total))
-    : capTotal;
+  const total = uncappedTotal;
 
   return {
     total:  Math.round(total),
     off:    Math.round(offTotal),
     def:    Math.round(defDisplay),
     age:    Math.round(ageTotal),
-    cap:    Math.round(displayedCap),
+    cap:    Math.round(capTotal),
     upside: Math.round(Math.max(0, ageTotal)),
+    fmvAav: currentFmvAav,
     noivImpact,
     fArchetype,
     rosterTier,

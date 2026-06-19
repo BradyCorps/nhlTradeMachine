@@ -33,7 +33,6 @@ import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 
 const TradeProposalEngine = lazy(() => import("@/app/components/TradeProposal"));
 const PlayerComparison    = lazy(() => import("@/app/components/PlayerComparison"));
-const CapProjection       = lazy(() => import("@/app/components/CapProjection"));
 
 const safe = (n: number) => (isNaN(n) || !isFinite(n) ? 0 : n);
 const fmt  = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
@@ -166,7 +165,7 @@ export default function ArmchairGmPage() {
   const [showSimPanel, setShowSimPanel] = useState(false);
   const [showMemo, setShowMemo] = useState(false);
 
-  useBodyScrollLock(verdictOpen || showTeamSelect || tradeBlockOpen || showMemo || Boolean(tradeRequest?.length));
+  useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length));
 
   // ── Abort controllers — cancel stale Claude requests ─────────
   const simAbortRef  = useRef<AbortController | null>(null);
@@ -1054,26 +1053,6 @@ export default function ArmchairGmPage() {
           </div>
         )}
 
-        {/* ── Lineups — editable depth charts, own section ── */}
-        {teams[0] && teams[1] && (
-          <div className="mb-4">
-            <LineupEditor
-              home={{
-                teamName: teams[0]!.name, label: "Your Franchise",
-                roster: allHomeRoster, outgoing: blocks[0],
-                incoming: blocks[1].filter(a => a.position !== "Pick"),
-              }}
-              partner={{
-                teamName: teams[1]!.name, label: "Trade Partner",
-                roster: allPartnerRoster, outgoing: blocks[1],
-                incoming: blocks[0].filter(a => a.position !== "Pick"),
-              }}
-              hasActiveTrade={blocks[0].length > 0 || blocks[1].length > 0}
-              navMap={navMap}
-            />
-          </div>
-        )}
-
         <TugBar homeNetGain={homeNetGain} navA={navA} navB={navB} cNavA={cNavA} cNavB={cNavB} />
 
         {/* ── Main Trade Grid ── */}
@@ -1402,6 +1381,26 @@ export default function ArmchairGmPage() {
             onRequestTrade={(a) => setTradeRequest([a])} />
         </div>
 
+        {/* ── Lineups — editable depth charts below the trade ── */}
+        {teams[0] && teams[1] && (
+          <div className="mt-2 mb-4">
+            <LineupEditor
+              home={{
+                teamName: teams[0]!.name, label: "Your Franchise",
+                roster: allHomeRoster, outgoing: blocks[0],
+                incoming: blocks[1].filter(a => a.position !== "Pick"),
+              }}
+              partner={{
+                teamName: teams[1]!.name, label: "Trade Partner",
+                roster: allPartnerRoster, outgoing: blocks[1],
+                incoming: blocks[0].filter(a => a.position !== "Pick"),
+              }}
+              hasActiveTrade={blocks[0].length > 0 || blocks[1].length > 0}
+              navMap={navMap}
+            />
+          </div>
+        )}
+
         {/* ── Executed Trades Log + Sim Panel ── */}
         {(executedTrades.length > 0 || showSimPanel) && (
           <div className="mt-6 bg-zinc-900/30 border border-zinc-800/40 rounded-2xl overflow-hidden">
@@ -1443,24 +1442,14 @@ export default function ArmchairGmPage() {
           </div>
         )}
 
-        {/* ── Player Comparison + Cap Projection ── */}
+        {/* ── Player Comparison ── */}
         {(blocks[0].length > 0 || blocks[1].length > 0) && (
           <Suspense fallback={<div className="h-32 animate-pulse bg-ledger-card rounded" />}>
-            <>
-              <PlayerComparison
-                outgoing={blocks[0]}
-                incoming={blocks[1]}
-                navMap={navMap}
-              />
-              <CapProjection
-                homeTeam={teams[0]}
-                partnerTeam={teams[1]}
-                homeRoster={allHomeRoster}
-                partnerRoster={allPartnerRoster}
-                outgoing={blocks[0]}
-                incoming={blocks[1]}
-              />
-            </>
+            <PlayerComparison
+              outgoing={blocks[0]}
+              incoming={blocks[1]}
+              navMap={navMap}
+            />
           </Suspense>
         )}
 

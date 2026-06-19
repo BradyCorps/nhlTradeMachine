@@ -98,6 +98,7 @@ export interface XNAVResult {
   age: number;
   cap: number;
   upside: number;
+  fmvAav?: number;
   noivImpact?: number;
   fArchetype?: FArchetype;
   rosterTier?: RosterTier;

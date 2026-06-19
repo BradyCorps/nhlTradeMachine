@@ -2,7 +2,7 @@
 
 import React from "react";
 import { calcPlayerTimeline } from "@/app/lib/player-timeline";
-import type { AssetInput } from "@/app/lib/xnav-engine";
+import { calcNAV, type AssetInput } from "@/app/lib/xnav-engine";
 
 const W   = 280;
 const H   = 130;
@@ -19,9 +19,28 @@ function navColor(nav: number): string {
   return "#b83020";                   // negative — red
 }
 
+export function estimateNextContractTerm(asset: AssetInput, nav: { total: number; fmvAav?: number; isRFA?: boolean }): number {
+  const signingAge = asset.age + Math.max(0, asset.yearsRemaining ?? 0);
+  const fmvAav = nav.fmvAav ?? asset.capHit;
+  const isRFA = nav.isRFA ?? signingAge <= 27;
+
+  // Simple market heuristic: term follows team-control status, age at signing,
+  // and whether the player prices as a core asset or a depth/replacement bet.
+  if (fmvAav < 2.5 || nav.total < 35) return signingAge >= 31 ? 1 : 2;
+  if (isRFA && signingAge <= 25 && (nav.total >= 140 || fmvAav >= 8.5)) return 8;
+  if (isRFA && signingAge <= 27) return nav.total >= 75 ? 5 : 3;
+  if (signingAge <= 30) return nav.total >= 100 || fmvAav >= 7.5 ? 6 : 4;
+  if (signingAge <= 33) return nav.total >= 80 || fmvAav >= 6.0 ? 3 : 2;
+  return nav.total >= 65 || fmvAav >= 5.0 ? 2 : 1;
+}
+
 export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
   const years = calcPlayerTimeline(asset);
   if (years.length === 0) return null;
+  const currentNav = calcNAV(asset);
+  const projectedNextAav = currentNav.fmvAav;
+  const projectedNextTerm = estimateNextContractTerm(asset, currentNav);
+  const projectedNextStatus = currentNav.isRFA ? "RFA" : "UFA";
 
   const maxNav  = Math.max(...years.map(y => Math.max(y.nav, 10)), 50);
   const minNav  = Math.min(...years.map(y => y.nav), 0);
@@ -41,12 +60,34 @@ export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
   return (
     <div>
       <div style={{
-        fontSize: 9, fontWeight: 900, color: "var(--ledger-ink-faint)",
+        fontSize: 11, fontWeight: 900, color: "var(--ledger-ink-faint)",
         textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 6,
         fontFamily: "'Courier Prime', monospace",
       }}>
         Contract Projection
       </div>
+      {projectedNextAav != null && (
+        <div
+          title="Projected next contract estimate using current-cap fair-market midpoint AAV, not a player maximum or team minimum."
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 8,
+            padding: "5px 7px",
+            marginBottom: 6,
+            background: "var(--ledger-card)",
+            border: "1px solid var(--ledger-rule-mid)",
+            fontFamily: "'Courier Prime', monospace",
+          }}>
+          <span style={{ fontSize: 11, fontWeight: 900, color: "var(--ledger-ink-faint)", textTransform: "uppercase" }}>
+            Projected next
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 900, color: "var(--ledger-ink)" }}>
+            ${projectedNextAav.toFixed(1)}M × {projectedNextTerm}yr ({projectedNextStatus})
+          </span>
+        </div>
+      )}
       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block", overflow: "visible" }}>
 
         {/* Y-axis ticks */}

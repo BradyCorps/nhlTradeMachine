@@ -230,79 +230,12 @@ export default function StrandDisplay({
         </svg>
       </div>
 
-      {/* ── Trait bars with league average baseline ──────────── */}
-      <div style={{ marginTop: "8px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-        {[
-          { heading: "◆ OFFENSE", traits: offTraits, color: offColor, psVal: ops,  psLabel: "OPS" },
-          { heading: "◆ DEFENSE", traits: defTraits, color: defColor, psVal: dps,  psLabel: "DPS" },
-        ].map(({ heading, traits, color, psVal, psLabel }) => (
-          <div key={heading} style={{ background: "var(--ledger-card)", border: "1px solid #c8b890", padding: "6px 8px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
-              <span style={{ fontSize: "11px", fontWeight: 900, color }}>{heading}</span>
-              {psVal != null && (
-                <span style={{ fontSize: "11px", fontWeight: 900, color }}>
-                  {psLabel} {psVal.toFixed(1)}
-                </span>
-              )}
-            </div>
-            {traits.map(t => {
-              const aboveAvg = !t.unavailable && t.val > 0.5;
-              return (
-                <div key={t.label} title={`${t.title ?? t.label}${!t.unavailable ? ` · Score: ${Math.round(t.val * 100)}/100 · League avg ≈ 50` : ''}`}
-                  style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "3px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 900, width: "28px", flexShrink: 0,
-                    color: t.unavailable ? "var(--ledger-rule-mid)" : "var(--ledger-brown)" }}>
-                    {t.label}
-                  </span>
-                  <div style={{ flex: 1, height: "6px", background: "var(--ledger-rule-mid)",
-                    borderRadius: "3px", position: "relative", overflow: "visible" }}>
-                    <div style={{
-                      width: `${t.val * 100}%`, height: "100%", borderRadius: "3px",
-                      background: t.unavailable ? "var(--ledger-rule-mid)" : color,
-                      opacity: t.unavailable ? 0.3 : aboveAvg ? 0.85 : 0.45,
-                      overflow: "hidden",
-                    }}/>
-                    {/* League average tick — 2px wide, 12px tall, centred at 50% */}
-                    <div style={{
-                      position: "absolute", left: "50%", top: "-3px",
-                      width: "2px", height: "12px",
-                      background: "var(--ledger-ink)", opacity: 0.5,
-                      transform: "translateX(-50%)", borderRadius: "1px",
-                    }}/>
-                  </div>
-                  <span style={{ fontSize: "11px", fontWeight: 900, width: "20px",
-                    textAlign: "right", flexShrink: 0,
-                    color: t.unavailable ? "var(--ledger-rule-mid)"
-                      : aboveAvg ? color : "var(--ledger-ink-faint)" }}>
-                    {displayNum(t)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-
       {/* ── Legend ───────────────────────────────────────────── */}
-      <div className="text-2xs mt-2" style={{ color: "var(--ledger-ink-faint)", lineHeight: 1.6 }}>
-        <div style={{ fontWeight: 900, color: "var(--ledger-brown)", marginBottom: "2px", letterSpacing: "0.1em" }}>
-          STRAND — trait guide
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px",
-          padding: "3px 5px", background: "var(--ledger-card)", border: "1px solid var(--ledger-rule-mid)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
-            <div style={{ width: "36px", height: "4px", background: "var(--ledger-rule-mid)", borderRadius: "2px",
-              position: "relative", overflow: "visible" }}>
-              <div style={{ width: "70%", height: "100%", borderRadius: "2px",
-                background: "var(--ledger-navy)", opacity: 0.7 }}/>
-              <div style={{ position: "absolute", left: "50%", top: "-3px", width: "2px", height: "10px",
-                background: "var(--ledger-ink)", opacity: 0.5, transform: "translateX(-50%)" }}/>
-            </div>
-            <span style={{ fontWeight: 900, color: "var(--ledger-ink-faint)", fontSize: "11px" }}>│</span>
-          </div>
-          <span>Bars normalised 0–100 vs NHL range. <strong style={{ color: "var(--ledger-ink-body)" }}>Tick = league avg ≈ 50.</strong> Above-avg in colour. Dashed helix = avg reference. OZ shows raw OZ%.</span>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
+      <details className="text-2xs mt-2" style={{ color: "var(--ledger-ink-faint)", lineHeight: 1.6 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 900, color: "var(--ledger-brown)", letterSpacing: "0.1em" }}>
+          ? STRAND trait guide
+        </summary>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px", marginTop: "4px" }}>
           {[
             ["OPS",  "Offensive Point Shares (or Pts/82 when unavailable)"],
             ["xG",   "Expected goals generated per 82"],
@@ -319,7 +252,7 @@ export default function StrandDisplay({
             </div>
           ))}
         </div>
-      </div>
+      </details>
     </div>
   );
 }

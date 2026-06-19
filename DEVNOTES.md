@@ -1,5 +1,45 @@
 # Development Notes
 
+## 2026-06-19 Audit Refinements — R0-R2
+
+### Completed Today
+
+- Completed trimmed `AUDIT.md` refinements R0, R1, and R2.
+- R0: Replaced the old hard replacement-callup clamp with establishment-based dampening of positive cap surplus. Cheap-contract surplus now scales by current games and multi-year baseline, while negative cap value is not softened.
+- R0: Added regression coverage for a Heinola-class low-sample depth defender and an established-but-injured star so the depth case stays below premium NAV while strong-baseline players keep cap surplus.
+- R1: Decluttered expanded player cards by removing the standalone Season Points card, dropping duplicate OPS/DPS pills while keeping PS, and rebalancing the expanded panel around stats, STRAND, timeline, and development content.
+- R1: Removed duplicate STRAND offense/defense bar blocks from the shared renderer and collapsed the repeated trait guide behind a small `?` details control.
+- R2: Added `fmvAav` to `XNAVResult` in the engine and shared trade types, populated it for skaters and goalies from the current-cap fair-market AAV calculation, and blended it through prospect transition results.
+- R2: Added a small `estimateNextContractTerm` heuristic and surfaced `Projected next: $X.XM × Yyr (RFA/UFA)` in the shared contract timeline block with a tooltip clarifying fair-market midpoint AAV.
+- Added source canaries and xNAV characterization tests for R0-R2.
+
+### Verification
+
+- `npx tsc --noEmit`
+- Result: no TypeScript errors.
+- `npm run test`
+- Result: `263` tests passing across `11` test files.
+- Dev server was not started in Codespace, per project instructions.
+
+## 2026-06-19 UX and UI Polish — Task U2 Revisited
+
+### Completed Today
+
+- Fixed the page-freeze regression described in `AUDIT.md` Task U2 Revisited.
+- Removed `verdictOpen` from the Armchair GM body scroll-lock condition, so expanding or auto-opening the verdict bottom sheet no longer freezes page scrolling.
+- Limited Armchair GM scroll locking to true blocking overlays: team select, trade block, and active trade-request modal.
+- Converted `useBodyScrollLock` into a module-level reference-counted hook so overlapping modals increment/decrement one shared lock instead of clobbering each other's body overflow restore state.
+- Confirmed direct `document.body.style.overflow` / `document.documentElement.style.overflow` writes now live only in `app/lib/use-body-scroll-lock.ts`.
+- Updated feature canaries to require the reference counter and to prevent `verdictOpen` from returning to the scroll-lock condition.
+
+### Verification
+
+- `npx tsc --noEmit`
+- Result: no TypeScript errors.
+- `npm run test`
+- Result: `257` tests passing across `11` test files.
+- Dev server was not started in Codespace, per project instructions.
+
 ## 2026-06-19 UX and UI Polish — Tasks U1-U7
 
 ### Completed Today
@@ -12,12 +52,18 @@
 - Strengthened the active header tab with red active text and an underline while keeping the filled diamond.
 - Added point-of-use `NAV` tooltips on asset cards and Armchair GM card/table labels.
 - Raised sub-11px data labels in the dense AssetCard and lineup bench/scratch zones to the 11px `text-2xs`/equivalent floor.
-- Updated feature canaries for the goalie GSAx merge, paged Player Analytics table, scroll lock hook, NAV floor residuals/tooltips, and active navigation styling.
+- Confirmed Task U6 completion: NAV labels now expose point-of-use tooltips defining Net Asset Value.
+- Enlarged the shared Team Strands and Lineups headers.
+- Moved Lineups below the main trade grid and removed the old Armchair GM `CapProjection` render; the stale `Post-Trade Roster Projection` heading was removed from the component source.
+- Removed the duplicate `players-mobile-sort-strip` and made `players-column-header` the single sortable player table header, with horizontal scrolling on narrow screens.
+- Replaced the duplicate desktop PPG display slot with total season points and added season points to the expanded player panel.
+- Rebalanced the expanded player panel into responsive stats, STRAND, and timeline/development zones to reduce desktop dead space.
+- Updated feature canaries for the goalie GSAx merge, paged Player Analytics table, scroll lock hook, NAV floor residuals/tooltips, active navigation styling, Lineups placement, removed projection panel, and player table header cleanup.
 
 ### Verification
 
 - `npm run test`
-- Result: `256` tests passing across `11` test files.
+- Result: `257` tests passing across `11` test files.
 - `npx tsc --noEmit`
 - Result: no TypeScript errors.
 - Dev server was not started in Codespace, per project instructions.

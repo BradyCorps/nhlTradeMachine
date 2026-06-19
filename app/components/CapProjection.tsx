@@ -192,7 +192,7 @@ export default function CapProjection({ homeTeam, partnerTeam, homeRoster, partn
   return (
     <div className="mt-4 bg-zinc-900/30 border border-zinc-800/40 rounded-2xl overflow-hidden">
       <div className="px-6 py-3 border-b border-zinc-800/40 flex items-center justify-between">
-        <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600">Post-Trade Roster Projection</span>
+        <span className="text-2xs font-black uppercase tracking-[0.3em] text-zinc-600">Cap Movement</span>
         <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-zinc-700">
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-rose-900/60 border border-rose-800/60 inline-block" />Departing</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-900/60 border border-emerald-800/60 inline-block" />Arriving</span>

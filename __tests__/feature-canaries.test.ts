@@ -969,14 +969,66 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(src).toContain('SectionHeader label="Goalies · GSAx"');
     expect(src).toContain("Rank</div>");
     expect(src).toContain("SortHeader");
+    expect(src).toContain("players-column-header");
+    expect(src).not.toContain("players-mobile-sort-strip");
+    expect(src).toContain("const seasonPoints = Math.round");
+    expect(src).toContain('{ label: "PTS",    val: seasonPoints.toString() }');
+    expect(src).not.toContain(">Season Points<");
+  });
+});
+
+describe("Canary — R0/R1/R2 audit refinements", () => {
+  it("dampens low-sample positive cap surplus without the old hard replacement clamp", () => {
+    const src = read("app/lib/xnav-engine.ts");
+    expect(src).toContain("const capEstablishment = clamp");
+    expect(src).toContain("games / 40");
+    expect(src).toContain("safe(asset.baselinePtsPace ?? 0) / (isD ? 30 : 45)");
+    expect(src).toContain("const positiveCapComponent = Math.max(0, baselineCapComponent) * capEstablishment");
+    expect(src).toContain("const negativeCapComponent = Math.min(0, baselineCapComponent)");
+    expect(src).not.toContain("isReplacementCallup");
+  });
+
+  it("returns fair-market AAV and surfaces projected next contract estimates", () => {
+    const engine = read("app/lib/xnav-engine.ts");
+    const types = read("app/lib/trade-types.ts");
+    const timeline = read("app/components/PlayerTimeline.tsx");
+    expect(engine).toContain("fmvAav?:");
+    expect(engine).toContain("const currentFmvAav = BASE_CAP_CEILING * fmvCapPct");
+    expect(engine).toContain("const currentFmvAavG = BASE_CAP_CEILING * fmvCapPctG");
+    expect(types).toContain("fmvAav?: number");
+    expect(timeline).toContain("estimateNextContractTerm");
+    expect(timeline).toContain("Projected next");
+    expect(timeline).toContain("fair-market midpoint AAV");
+  });
+
+  it("keeps expanded player cards and STRAND displays de-duplicated", () => {
+    const players = read("app/players/page.tsx");
+    const strand = read("app/components/StrandDisplay.tsx");
+    expect(players).toContain('{ label: "PTS",    val: seasonPoints.toString() }');
+    expect(players).not.toContain("Season Points");
+    expect(players).not.toContain(">OPS</span>");
+    expect(players).not.toContain(">DPS</span>");
+    expect(players).toContain(">PS</span>");
+    expect(strand).not.toContain("Trait bars with league average baseline");
+    expect(strand).toContain("? STRAND trait guide");
+    expect(strand).toContain("<details");
   });
 });
 
 describe("Canary — UX and UI polish", () => {
   it("uses a shared body scroll lock hook for modal overlays", () => {
     const hook = read("app/lib/use-body-scroll-lock.ts");
+    const armchair = read("app/armchair-gm/page.tsx");
     expect(hook).toContain("export function useBodyScrollLock");
+    expect(hook).toContain("let lockCount = 0");
+    expect(hook).toContain("lockCount += 1");
+    expect(hook).toContain("lockCount -= 1");
+    expect(hook).toContain("if (lockCount !== 1) return");
+    expect(hook).toContain("if (lockCount !== 0) return");
     expect(hook).toContain('document.body.style.overflow = "hidden"');
+    expect(armchair).toContain("useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length))");
+    expect(armchair).not.toContain("useBodyScrollLock(verdictOpen");
+    expect(armchair).not.toContain("useBodyScrollLock(verdictOpen ||");
     for (const path of [
       "app/components/TradeProposal.tsx",
       "app/components/LedgerDropdown.tsx",
@@ -1007,5 +1059,16 @@ describe("Canary — UX and UI polish", () => {
     expect(src).toContain("text-ledger-red");
     expect(src).toContain("border-ledger-red");
     expect(src).toContain("◆");
+  });
+
+  it("keeps lineups below the trade grid and removes the old roster projection panel", () => {
+    const armchair = read("app/armchair-gm/page.tsx");
+    const styles = read("app/globals.css");
+    expect(armchair).not.toContain("lazy(() => import(\"@/app/components/CapProjection\"))");
+    expect(armchair).not.toContain("<CapProjection");
+    expect(read("app/components/CapProjection.tsx")).not.toContain("Post-Trade Roster Projection");
+    expect(armchair.indexOf("Main Trade Grid")).toBeLessThan(armchair.indexOf("Lineups — editable depth charts below the trade"));
+    expect(styles).toContain("font-size: 13px");
+    expect(styles).not.toContain("players-mobile-sort-strip");
   });
 });

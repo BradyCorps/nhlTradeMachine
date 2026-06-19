@@ -562,8 +562,8 @@ describe("X-NAV — Young Surplus Contracts", () => {
     });
 
     expect(result.rosterTier).toBe("BOTTOM_SIX");
-    expect(result.total).toBeLessThanOrEqual(4);
-    expect(result.cap).toBeLessThanOrEqual(4);
+    expect(result.total).toBeLessThanOrEqual(15);
+    expect(result.cap).toBeLessThanOrEqual(15);
   });
 
   it("Replacement-level callup with weak baseline and one tiny-sample point still does not get surplus NAV", () => {
@@ -581,8 +581,8 @@ describe("X-NAV — Young Surplus Contracts", () => {
     });
 
     expect(result.rosterTier).toBe("BOTTOM_SIX");
-    expect(result.total).toBeLessThanOrEqual(4);
-    expect(result.cap).toBeLessThanOrEqual(4);
+    expect(result.total).toBeLessThanOrEqual(15);
+    expect(result.cap).toBeLessThanOrEqual(15);
     expect(result.fArchetype).toBe("GRINDER");
   });
 
@@ -657,6 +657,73 @@ describe("X-NAV — Salary Retention", () => {
     const noRetain = calcSkaterNAV({ ...base, retainedPct: 0 });
     const retained = calcSkaterNAV({ ...base, retainedPct: 0.5 });
     expect(retained.total).toBeGreaterThan(noRetain.total);
+  });
+});
+
+describe("X-NAV — Low-sample cap surplus dampening", () => {
+  it("keeps Heinola-class low-sample depth defenders out of premium NAV territory", () => {
+    const result = calcNAV({
+      id: "heinola-class", name: "Heinola Class", position: "D",
+      age: 25, capHit: 0.8, yearsRemaining: 1,
+      ptsPace: 16.4, xGPace: 2, defRate: 0.02,
+      avgTOI: 14.18, qocRank: 300, games: 5,
+      baselinePtsPace: 8, draftOverall: 20, hasLiveStats: true,
+    });
+
+    expect(result.total).toBeGreaterThanOrEqual(15);
+    expect(result.total).toBeLessThan(30);
+    expect(result.cap).toBeLessThan(15);
+  });
+
+  it("does not over-damp established stars who only have a tiny current-season sample", () => {
+    const injured = calcNAV({
+      id: "injured-star", name: "Injured Star", position: "C",
+      age: 29, capHit: 9, yearsRemaining: 4,
+      ptsPace: 90, xGPace: 32, defRate: 0.08,
+      avgTOI: 20, games: 5, baselinePtsPace: 95,
+      ops: 7, dps: 3, hasLiveStats: true,
+    });
+    const fullSample = calcNAV({
+      id: "full-star", name: "Full Star", position: "C",
+      age: 29, capHit: 9, yearsRemaining: 4,
+      ptsPace: 90, xGPace: 32, defRate: 0.08,
+      avgTOI: 20, games: 70, baselinePtsPace: 95,
+      ops: 7, dps: 3, hasLiveStats: true,
+    });
+
+    expect(Math.abs(injured.cap - fullSample.cap)).toBeLessThanOrEqual(5);
+    expect(injured.total).toBeGreaterThan(300);
+  });
+});
+
+describe("X-NAV — Fair-market AAV output", () => {
+  it("returns sane fair-market AAVs without changing NAV math inputs", () => {
+    const eliteForward = calcNAV({
+      id: "elite-aav", name: "Elite AAV Forward", position: "C",
+      age: 28, capHit: 8, yearsRemaining: 3,
+      ptsPace: 90, xGPace: 28, defRate: 0.05,
+      avgTOI: 19, games: 70, baselinePtsPace: 90,
+      ops: 5.5, dps: 2, hasLiveStats: true,
+    });
+    const depthForward = calcNAV({
+      id: "depth-aav", name: "Depth AAV Forward", position: "W",
+      age: 28, capHit: 0.9, yearsRemaining: 1,
+      ptsPace: 8, xGPace: 3, defRate: -0.08,
+      avgTOI: 8, games: 40, baselinePtsPace: 10,
+      hasLiveStats: true,
+    });
+    const starterGoalie = calcNAV({
+      id: "starter-aav", name: "Starter AAV Goalie", position: "G",
+      age: 29, capHit: 5, yearsRemaining: 3,
+      gsax: 12, gamesStarted: 55, teamXga60: 2.9,
+    });
+
+    expect(eliteForward.fmvAav).toBeGreaterThanOrEqual(11);
+    expect(eliteForward.fmvAav).toBeLessThanOrEqual(14);
+    expect(depthForward.fmvAav).toBeGreaterThanOrEqual(1);
+    expect(depthForward.fmvAav).toBeLessThanOrEqual(2.5);
+    expect(starterGoalie.fmvAav).toBeGreaterThanOrEqual(6);
+    expect(starterGoalie.fmvAav).toBeLessThanOrEqual(10);
   });
 });
 

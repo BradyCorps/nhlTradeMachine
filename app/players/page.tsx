@@ -152,6 +152,7 @@ function ArchetypeBadge({ player }: { player: Player }) {
 // ── Expanded player row ───────────────────────────────────────
 function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
   const isG = player.position === "G";
+  const seasonPoints = Math.round((player.ptsPace / 82) * (player.games ?? 82));
   const stats = isG ? [
     { label: "GP",    val: player.gamesStarted?.toString() ?? "—" },
     { label: "GSAx",  val: (player.gsax ?? 0).toFixed(1) },
@@ -159,6 +160,7 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
     { label: "Tier",  val: goalieTeir(player.gamesStarted ?? 0) },
   ] : [
     // Standard stats first — what fans recognise immediately
+    { label: "PTS",    val: seasonPoints.toString() },
     { label: "PTS/82", val: player.ptsPace.toFixed(1) },
     { label: "G/82",   val: player.goalsPace != null ? (player.goalsPace as number).toFixed(1) : "—" },
     { label: "A/82",   val: player.assistsPace != null ? (player.assistsPace as number).toFixed(1) : "—" },
@@ -175,7 +177,7 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
       padding: "12px 16px",
     }}>
       <div className="expanded-player-grid">
-        {/* Left — stats */}
+        {/* Stats + contract */}
         <div>
           <div className="stat-grid-4" style={{ marginBottom: "10px" }}>
             {stats.map(s => (
@@ -188,26 +190,12 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
               </div>
             ))}
           </div>
-          {!isG && (player.ops != null || player.dps != null) && (
+          {!isG && player.ops != null && player.dps != null && (
             <div style={{ display: "flex", gap: "6px" }}>
-              {player.ops != null && (
-                <div style={{ padding: "3px 8px", background: "var(--blue-dim)", border: "1px solid rgba(43,63,102,0.3)", fontSize: "11px", fontWeight: 900 }}>
-                  <span style={{ color: "var(--rule)", marginRight: "4px" }}>OPS</span>
-                  <span style={{ color: "var(--blue)" }}>{player.ops.toFixed(1)}</span>
-                </div>
-              )}
-              {player.dps != null && (
-                <div style={{ padding: "3px 8px", background: "var(--red-dim)", border: "1px solid rgba(166,53,36,0.3)", fontSize: "11px", fontWeight: 900 }}>
-                  <span style={{ color: "var(--rule)", marginRight: "4px" }}>DPS</span>
-                  <span style={{ color: "var(--red)" }}>{player.dps.toFixed(1)}</span>
-                </div>
-              )}
-              {player.ops != null && player.dps != null && (
-                <div style={{ padding: "3px 8px", background: "var(--paper-card)", border: "1px solid var(--rule-light)", fontSize: "11px", fontWeight: 900 }}>
-                  <span style={{ color: "var(--rule)", marginRight: "4px" }}>PS</span>
-                  <span style={{ color: "var(--ink)" }}>{(player.ops + player.dps).toFixed(1)}</span>
-                </div>
-              )}
+              <div style={{ padding: "3px 8px", background: "var(--paper-card)", border: "1px solid var(--rule-light)", fontSize: "11px", fontWeight: 900 }}>
+                <span style={{ color: "var(--rule)", marginRight: "4px" }}>PS</span>
+                <span style={{ color: "var(--ink)" }}>{(player.ops + player.dps).toFixed(1)}</span>
+              </div>
             </div>
           )}
           <div className="player-expanded-contract" style={{ marginTop: "10px", fontSize: "11px", color: "var(--ink-faint)" }}>
@@ -218,18 +206,20 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
           </div>
         </div>
 
-        {/* Right — helix + timeline */}
+        {/* Strand profile */}
+        {!isG && (
+          <div>
+            <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "6px" }}>
+              STRAND Profile
+            </div>
+            <div className="strand-svg-wrap" style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px" }}>
+              <FullStrand player={player} />
+            </div>
+          </div>
+        )}
+
+        {/* Timeline + development */}
         <div>
-          {!isG && (
-            <>
-              <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "6px" }}>
-                STRAND Profile
-              </div>
-              <div className="strand-svg-wrap" style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px", marginBottom: "12px" }}>
-                <FullStrand player={player} />
-              </div>
-            </>
-          )}
           {player.yearsRemaining > 0 && (
             <div style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px" }}>
               <PlayerTimeline asset={{
@@ -259,19 +249,18 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
                 retainedPct:    0,
                 multiplier:     1.0,
               }} />
-               </div>
-                    )}
+            </div>
+          )}
+          {player.position !== "G" && player.developmentProfile && (
+            <div style={{ marginTop: "10px", background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px 12px" }}>
+              <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "6px" }}>
+                Development Outlook
+              </div>
+              <DevelopmentProfilePanel asset={{ ...player } as any} />
+            </div>
+          )}
         </div>
-    
       </div>
-      {player.position !== "G" && player.developmentProfile && (
-        <div style={{ marginTop: "12px", background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px 12px" }}>
-          <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "6px" }}>
-            Development Outlook
-          </div>
-          <DevelopmentProfilePanel asset={{ ...player } as any} />
-        </div>
-      )}
     </div>
   );
 }
@@ -353,17 +342,6 @@ function StatPill({ value, label, accent }: { value: string; label: string; acce
   );
 }
 
-function statSortLabel(sortKey: string): string {
-  return sortKey === "ppg" ? "PPG"
-    : sortKey === "pts" ? "P/82"
-    : sortKey === "toi" ? "TOI"
-    : sortKey === "ops" ? "OPS"
-    : sortKey === "dps" ? "DPS"
-    : sortKey === "age" ? "Age"
-    : sortKey === "cap" ? "Cap"
-    : "PPG";
-}
-
 function SortHeader({ k, label, active, dir, onClick }: {
   k: "ppg" | "pts" | "toi" | "ops" | "dps" | "age" | "cap";
   label: string;
@@ -388,6 +366,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
   const isG = player.position === "G";
 
   // Derive labelled stat pairs based on sort key
+  const seasonPoints = Math.round((player.ptsPace / 82) * (player.games ?? 82));
   const primaryVal = isG
     ? (player.gsax ?? 0).toFixed(1)
     : sortKey === "ppg"   ? actualPPG(player).toFixed(3)
@@ -479,8 +458,8 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
         </div>
 
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: "11px", fontWeight: 900, color: "var(--ink)" }}>{primaryVal}</div>
-          <div style={{ fontSize: "11px", color: "var(--rule)", textTransform: "uppercase" }}>{primaryLabel}</div>
+          <div style={{ fontSize: "11px", fontWeight: 900, color: "var(--ink)" }}>{isG ? primaryVal : seasonPoints}</div>
+          <div style={{ fontSize: "11px", color: "var(--rule)", textTransform: "uppercase" }}>{isG ? primaryLabel : "PTS"}</div>
         </div>
 
         {isG ? (
@@ -858,31 +837,12 @@ export default function PlayersPage() {
           </div>
         ) : (
           <>
-            {/* Mobile sort strip — only visible on mobile when skaters shown */}
-            {(posFilter === "ALL" || posFilter === "F" || posFilter === "D") && skaters.length > 0 && (
-              <div className="players-mobile-sort-strip">
-                <span style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", letterSpacing: "0.1em", whiteSpace: "nowrap", marginRight: "6px" }}>Sort:</span>
-                <div style={{ display: "flex", gap: "4px", overflowX: "auto", WebkitOverflowScrolling: "touch" as any }}>
-                  {(["ppg","pts","ops","dps","toi","age","cap"] as const).map(k => (
-                    <button key={k} className={`col-header${sortKey === k ? " active" : ""}`}
-                      onClick={() => handleSortKey(k)}
-                      style={{ flexShrink: 0 }}>
-                      {k === "ppg" ? "PPG" : k === "pts" ? "P/82" : k.toUpperCase()}
-                      {sortKey === k && (
-                        <span style={{ marginLeft: "2px", fontSize: "8px" }}>
-                          {sortDir === "desc" ? "▼" : "▲"}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Column headers — desktop only */}
+            {/* Column headers */}
             {filtered.length > 0 && (
               <div className="players-column-header" style={{
                 display: "grid",
                 gridTemplateColumns: "36px 40px minmax(210px,1.2fr) 88px minmax(52px,0.55fr) repeat(8,minmax(52px,0.55fr)) 24px",
+                minWidth: "880px",
                 gap: "8px",
                 padding: "6px 12px",
                 borderBottom: "2px solid #1c140a",
@@ -894,7 +854,7 @@ export default function PlayersPage() {
                 <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Photo</div>
                 <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Player</div>
                 <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "center" }}>Strand</div>
-                <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "right" }}>{posFilter === "G" ? "GSAx" : statSortLabel(sortKey)}</div>
+                <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "right" }}>{posFilter === "G" ? "GSAx" : "PTS"}</div>
                 <SortHeader k="ppg" label="PPG" active={sortKey === "ppg"} dir={sortDir} onClick={handleSortKey} />
                 <SortHeader k="pts" label="P/82" active={sortKey === "pts"} dir={sortDir} onClick={handleSortKey} />
                 <SortHeader k="ops" label="OPS" active={sortKey === "ops"} dir={sortDir} onClick={handleSortKey} />
