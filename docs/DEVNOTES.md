@@ -1,5 +1,16 @@
 # Development Notes
 
+
+---
+
+## 2026-06 — Docs restructure
+- Moved planning docs under `docs/`: `AUDIT.md` → `docs/TASKS.md` (trimmed to remaining
+  work), `FUTURECONCEPTS.md` → `docs/futures/`, `DEVNOTES.md` → `docs/`.
+- Added `docs/bugs/CONFIRMEDFIXES.md` (shipped items, verified vs f743338) and
+  `docs/bugs/KNOWNBUGS.md` (triage inbox).
+- Moved the task preamble into `AGENTS.md` → "Task Discipline" (single source; auto-loaded).
+- Added Audit V2 bugs (V2-1…V2-5) and the Ledger Trade Tracker spec.
+
 ## 2026-06-19 Audit Refinements — R0-R2
 
 ### Completed Today

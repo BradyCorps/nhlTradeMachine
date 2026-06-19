@@ -162,3 +162,60 @@ Core goal:
 
 * Move beyond immediate season impact and show whether a trade helps or hurts the full competitive window.
 
+
+---
+
+# Ledger Trade Tracker + Admin Trade System
+
+## Concept
+A persistent, NAV-graded record of real NHL trades. Where TSN/PuckPedia list that a trade
+happened, the Ledger grades it: which team won, by how much NAV, or whether it was fair —
+using our X-NAV + GM-audit engine. Public "Ledger Trade Tracker" page + an admin ingestion
+panel. Doubles as a content/marketing hook and a live calibration signal for NAV.
+
+## Grading — dual mode (both, by design)
+Every trade record carries TWO grades:
+- **At-trade (snapshot):** verdict computed at ingestion and FROZEN — "who won the day it
+  was made" (TSN-style locked verdict; reuse the `trade-share` lock shape).
+- **Today (dynamic):** recomputed on read from current data — "how it has aged."
+Show both, e.g. "At trade: EVEN · Today: WPG +30".
+
+## Data model
+`trades` table: `id`, `executedDate`, `source` ("manual"|"scraped"), `sourceUrl`, `season`;
+`sides`: array of `{ teamId, assetsGiven[] }` (model as N teams; render 2 now); each asset
+`{ kind, ref:{id,nameSlug}, retainedPct, inputSnapshot (engine inputs at trade time),
+navAtTrade }`; `conditions` (free-text, v1 notes only); `lockedVerdict`; `gradeAtTrade`.
+Store the input snapshot, not just IDs (stats/contracts move; IDs alone unreliable — the
+Woll dedup issue proves it).
+
+## Ingestion
+v1 manual admin entry (reuse trade-machine asset pickers → grade → freeze on save); later
+assisted/automated import from PuckPedia/CapFriendly/dataset with human confirm.
+
+## v1 scope cuts
+2-team + retention (sides modeled as N for forward-compat). 3-team, conditional picks,
+future considerations: notes/flags in v1; full valuation later.
+
+## Page
+Filterable/sortable list of graded trades (date, team, NAV margin, winner); expanded view
+reuses `VerdictPanel`.
+
+## NAV calibration loop (validation, NOT training)
+Real returns are noisy — DO NOT auto-refit NAV to observed returns. Use as a diagnostic:
+plot NAV-delta-at-trade vs market reality; flag systematic disagreements (e.g. NAV negative
+but a 1st + prospect paid — the Parayko class) as model-refinement candidates. Seed from a
+downloadable trades dataset for sample.
+
+## Dependencies & sequencing
+Build AFTER consolidation (Phase 2) — sits on the canonical NAV + roster/identity layer,
+not the drift-prone twin pipelines — and AFTER auth (write-heavy admin; open admin could
+pollute trade history).
+
+## Reuse map
+evaluate engine (grading) · trade-share snapshot/lock · VerdictPanel · trade-machine asset
+pickers · team/player data layer.
+
+## Open decisions
+- Dynamic re-grade: live every load vs cache + nightly refresh?
+- Conditional-pick valuation (range / expected value).
+- How far back to seed for calibration.
