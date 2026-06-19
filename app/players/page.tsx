@@ -251,7 +251,10 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
               }} />
             </div>
           )}
-          {player.position !== "G" && player.developmentProfile && (
+
+        </div>
+      </div>
+                {player.position !== "G" && player.developmentProfile && (
             <div style={{ marginTop: "10px", background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px 12px" }}>
               <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "6px" }}>
                 Development Outlook
@@ -259,8 +262,6 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
               <DevelopmentProfilePanel asset={{ ...player } as any} />
             </div>
           )}
-        </div>
-      </div>
     </div>
   );
 }

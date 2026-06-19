@@ -1,9 +1,7 @@
-# Trade Engine / Franchise Sim Notes
-
 # Batch Audit the Batch Audit
 
-## Standing preamble — reuse for each task:
-## IMPORTANT NOTE: READ THIS
+# Standing preamble — reuse for each task:
+# IMPORTANT NOTE: READ THIS
 
   * You are making ONE scoped change to this Next.js/TypeScript repo (vitest for tests). 
       Rules:
@@ -21,6 +19,38 @@
     - After changes, ensure it typechecks (npx tsc --noEmit or npm run build), not just npm test. Vitest won't catch a type error, and several tasks add imports/types
 
 
+# Development Outlook Audit
+## D1: development-model accuracy refinements
+
+  - File: app/lib/development-profile.ts. Three calibration fixes so elite players separate and the age curve is smooth:
+
+    * Production no longer flattens at the top — currently productionScale (W 90 / C 95) clamps every ≥90-pt scorer to 100, so McDavid and a 92-pt winger read identically. Either raise the scales (~W 110 / C 115 / D 75) or allow a soft curve above 100 so the truly elite tier separates.
+    * Graduate the dynasty age penalty (currently a cliff: age >= 33 ? -18 : 0) to e.g. >=35 → -18 · >=33 → -12 · >=31 → -5, so value doesn't drop 18 points on a birthday.
+    * Raise the projection-band clamps (buildProjectionBand caps median 140 / ceiling 160) so a 150-pt scorer projects higher than a 135-pt one.
+    * Acceptance: two elite producers with different pts no longer both read production 100; no single-year dynasty cliff; elite projections separate; dev-profile tests updated for the intentional shifts; npm test + typecheck pass.
+
+## D2: durability / games-played as a development input
+  - Files: app/lib/development-profile.ts (and surface in the panel). Right now an 82-game iron-man and an injury-prone star with the same per-82 pace get identical profiles — availability is ignored.
+
+    * Compute a durabilityScore (0–100) in calcDevelopmentProfile from the per-season games already on the NHL snapshots: roughly clamp(mean(NHL season games) / 82 * 100). (Snapshots already carry games, so no new fetch.)
+    * Fold it in modestly: low durability should raise regressionRisk/bustScore and lower confidence a touch; high durability nudges the other way. Keep the weights small so it refines rather than dominates.
+    * Add durabilityScore to the DevelopmentProfile type and show it as a Durability MiniScore in the panel's INPUTS group, with a tooltip ("avg games played per season vs 82").
+    * Acceptance: two players with identical per-82 pace but different season GP get different durability, risk, and confidence; the panel shows a Durability input; existing dev-profile tests stay green (update any expected numbers that shift, intentionally). npm test + typecheck pass.
+
+## D3: Veteran framing for the Development Outlook
+  - Files: app/lib/development-profile.ts, app/components/DevelopmentProfilePanel.tsx. For established veterans the development-oriented metrics ("Breakout") and the prospect-y phase labels don't fit — the relevant questions are decline and runway.
+
+    * Define "established vet" as age >= 29 && careerNhlGames >= 250 (use the same careerNhlGames the profile already computes).
+    * Add a small helper estimatePeakYearsLeft(age, position, productionScore, trend): base = peakEnd - age where peakEnd ≈ 30 (F) / 31 (D) / 33 (G); add ~2 years if productionScore >= 85 && trend !== "FALLING", subtract 1 if FALLING; clamp 0–6. Return it on the profile (e.g. peakYearsLeft?: number).
+    * In the panel, for established vets only, replace the "Breakout" tile with "Peak Left" showing {peakYearsLeft}yr (greener = more years), and prefer veteran phase labels (PEAK_WINDOW / REGRESSION_RISK / DECLINING) over the prospect ones. Non-vets keep the existing "Breakout" tile unchanged.
+    * Acceptance: a 33-yo elite scorer shows "Peak Left" instead of "Breakout"; a 22-yo prospect is unchanged; npm test + typecheck pass.
+
+## D4: Development Outlook glossary / key
+  - File: app/components/DevelopmentProfilePanel.tsx. The panel has no explanation of its metrics. Add a collapsed-by-default "? Outlook key" toggle (mirror the existing "? STRAND trait guide" pattern) that expands a compact legend defining every term shown:
+
+    * Now — current-season value · Dynasty — long-term keeper value (age-discounted) · Breakout / Peak Left — breakout probability (young) or estimated peak years remaining (vets) · Risk — regression risk · Arc — boom/bust signal · Boom / Bust — upside vs downside scores · Inputs (Prod / Role Δ / Pedigree / Exp / Durability) — the components feeding the scores · Projection — floor–ceiling pts/82 with median · phase / trend / sample conf — development stage, scoring trajectory, and how much NHL sample backs it.
+    * Keep it one collapsible block, default closed, so it doesn't bloat every card.
+    Acceptance: every metric on the card is defined in the collapsible key; closed by default; npm test + typecheck pass.
 
 
 ## Task 0: apply five independent, low-risk bug fixes. Do not refactor — each is a targeted change. Run the test suite after.

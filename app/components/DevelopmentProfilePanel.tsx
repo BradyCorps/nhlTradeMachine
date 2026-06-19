@@ -97,8 +97,9 @@ export function DevelopmentProfilePanel({ asset }: { asset: Asset }) {
         </span>
       </div>
 
-      <div className="stat-grid-4 mb-1.5">
-        <Metric label="Dynasty" value={profile.dynastyScore} color={dynastyColor} title={`Current fantasy score ${profile.currentFantasyScore}/100`} />
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-1.5 mb-1.5">
+        <Metric label="Now" value={profile.currentFantasyScore} color={tone(profile.currentFantasyScore)} title="Current-season value (production + role + experience)" />
+        <Metric label="Dynasty" value={profile.dynastyScore} color={dynastyColor} title={`Long-term keeper value · current fantasy score ${profile.currentFantasyScore}/100`} />
         <Metric label="Breakout" value={profile.breakoutProbability} color={breakoutColor} title="Breakout probability" />
         <Metric label="Risk" value={profile.regressionRisk} color={riskColor} title="Regression risk" />
         <Metric label="Arc" value={boomBustLabel(boomBustCall)} color={boomBustTone} title={`Boom ${boomScore}/100 · Bust ${bustScore}/100 · Volatility ${profile.volatility}/100`} />
@@ -134,7 +135,7 @@ export function DevelopmentProfilePanel({ asset }: { asset: Asset }) {
         </div>
         <div className="grid grid-cols-2 gap-1.5">
           <MiniScore label="Prod" value={profile.productionScore} title="Position-adjusted current production" />
-          <MiniScore label="Role" value={profile.roleGrowthScore} title="Role and ice-time growth" />
+          <MiniScore label="Role Δ" value={profile.roleGrowthScore} title="Role Δ and ice-time growth" />
           <MiniScore label="Pedigree" value={effectivePedigree} title={`Raw pedigree ${profile.pedigreeScore}/100, sample-adjusted to ${effectivePedigree}/100`} />
           <MiniScore label="Exp" value={profile.nhlExperienceScore} title="NHL sample and track record" />
         </div>

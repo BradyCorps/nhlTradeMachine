@@ -153,11 +153,16 @@ function trendFromSnapshots(snapshots: PlayerSeasonSnapshot[]): { trend: Timelin
   const deltas = values.slice(1).map((v, i) => v - values[i]);
   const avgDelta = deltas.reduce((s, d) => s + d, 0) / deltas.length;
   const signChanges = deltas.slice(1).filter((d, i) => Math.sign(d) !== Math.sign(deltas[i])).length;
-  const meanAbsDelta = deltas.reduce((s, d) => s + Math.abs(d), 0) / deltas.length;
-  const volatility = clamp(meanAbsDelta * 3 + signChanges * 18);
 
-  if (volatility >= 55 && signChanges > 0) return { trend: "VOLATILE", volatility, growth: avgDelta };
-  if (avgDelta > 5) return { trend: "RISING", volatility, growth: avgDelta };
+  // Volatility is RELATIVE to the player's own scoring level. A 19-pt swing on a
+  // 140-pt scorer (~13%) is normal noise; a 19-pt swing on a 40-pt player (~48%)
+  // is real volatility. Normalising by mean production stops elite high-volume
+  // scorers (Kucherov) from being mislabelled high-variance.
+  const meanValue = values.reduce((s, v) => s + v, 0) / values.length;
+  const meanAbsPctDelta = (deltas.reduce((s, d) => s + Math.abs(d), 0) / deltas.length) / Math.max(meanValue, 1);
+  const volatility = clamp(meanAbsPctDelta * 140 + signChanges * 8);
+
+if (volatility >= 62 && signChanges > 0) return { trend: "VOLATILE", volatility, growth: avgDelta };  if (avgDelta > 5) return { trend: "RISING", volatility, growth: avgDelta };
   if (avgDelta < -5) return { trend: "FALLING", volatility, growth: avgDelta };
   return { trend: "FLAT", volatility, growth: avgDelta };
 }
@@ -183,6 +188,8 @@ function classifyPhase(input: DevelopmentProfileInput, scores: {
   regressionRisk: number;
 }): DevelopmentPhase {
   if (input.age >= 36 || (input.age >= 34 && scores.trend === "FALLING")) return "DECLINING";
+  // elite, non-falling production keeps a veteran in their peak window even past 32
+  if (scores.production >= 80 && scores.trend !== "FALLING") return "PEAK_WINDOW";
   if (input.age >= 32 && scores.regressionRisk >= 55) return "REGRESSION_RISK";
   if (input.age >= 24 && input.age <= 31 && (scores.production >= 85 || (scores.pedigree >= 90 && scores.production >= 65))) return "PEAK_WINDOW";
   if (input.age >= 24 && input.age <= 31 && scores.experience >= 65 && scores.production >= 55) return "PEAK_WINDOW";
@@ -354,7 +361,7 @@ export function calcDevelopmentProfile(input: DevelopmentProfileInput): Developm
     role * (0.08 + establishedWeight * 0.06) +
     confidence * establishedWeight * 0.10 +
     (100 - regressionRisk) * 0.08 +
-    (input.age <= 23 ? 12 : input.age <= 26 ? 6 : input.age >= 33 ? -18 : 0)
+    (input.age <= 23 ? 12 : input.age <= 26 ? 6 : input.age >= 35 ? -18 : input.age >= 33 ? -12 : input.age >= 31 ? -5 : 0)
   ));
 
   const tags: string[] = [];
