@@ -1,7 +1,9 @@
 import { defineConfig } from "drizzle-kit";
 import { config } from "dotenv";
 
-// Explicitly load the .env file so the CLI knows about Turso
+// Load env so the CLI knows about Turso. Prefer .env.local (Next.js convention);
+// fall back to .env. dotenv does not override already-set vars, so the first hit wins.
+config({ path: ".env.local" });
 config({ path: ".env" });
 
 export default defineConfig({
