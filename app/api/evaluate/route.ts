@@ -21,10 +21,19 @@ import { isValidCapCeiling, maxCapCeiling, parseStoredCapCeiling } from "@/app/l
 // ============================================================
 // ZOD SCHEMAS
 // ============================================================
+const normalizeAssetPosition = (position: unknown) => {
+  if (typeof position !== "string") return position;
+  const trimmed = position.trim();
+  if (trimmed.toLowerCase() === "pick") return "Pick";
+  const normalized = trimmed.toUpperCase();
+  if (normalized === "L" || normalized === "R" || normalized === "LW" || normalized === "RW") return "W";
+  return normalized;
+};
+
 const AssetSchema = z.object({
   id: z.string(),
   name: z.string(),
-  position: z.enum(["C", "W", "D", "G", "Pick", "L", "R"]),
+  position: z.preprocess(normalizeAssetPosition, z.enum(["C", "W", "D", "G", "Pick"])),
   age: z.number().nullish().default(27),
   capHit: z.number().nullish().default(0),
   yearsRemaining: z.number().nullish().default(1),

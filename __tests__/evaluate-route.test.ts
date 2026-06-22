@@ -47,6 +47,17 @@ const postEvaluate = async (body: unknown) => {
 };
 
 describe("evaluate route integration", () => {
+  it("normalizes raw wing position labels instead of rejecting the request", async () => {
+    const { response, body } = await postEvaluate({
+      assets: [asset({ id: "raw-wing", name: "Raw Wing", position: "RW" as any })],
+    });
+
+    expect(response.status).toBe(200);
+    expect(body.navMap["raw-wing"]).toEqual(expect.objectContaining({
+      total: expect.any(Number),
+    }));
+  });
+
   it("blocks a trade that puts the home team over the cap ceiling", async () => {
     const home = team({ id: "WPG", name: "Winnipeg Jets", capSpace: 1, phase: "Contender", standing: 4 });
     const partner = team({ id: "SJS", name: "San Jose Sharks", capSpace: 20, phase: "Rebuilding", standing: 29 });

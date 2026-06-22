@@ -307,11 +307,9 @@ Fix (non-destructive, reversible):
 Acceptance: marking Toews retired removes him from rosters / trade machine / players list
 WITHOUT deleting his DB row; un-retiring restores him everywhere; `npm test` + typecheck pass.
 
-### [] A5 - Add back in the extension logic for when a player signs an extension
-
 ## For Future Trade Tracker (Known as The Docket)
 
-### [ ] A3a — shared cap-delta helper
+### [x] A3a — shared cap-delta helper
 Add a pure helper `applyCapDelta(baselineCapSpace, moves)` where `moves` is the per-team set
 of incoming/outgoing assets with `capHit` and `retainedPct`. Returns effective cap space:
 baseline − incoming cap (net of retention held by the other team) + outgoing cap (net of
@@ -323,7 +321,7 @@ pick-only move (no cap change); `npm test` + typecheck pass.
 
 ## Tests
 
-### [ ] 1c — roster-assembly tests for `/api/league/players`
+### [x] 1c — roster-assembly tests for `/api/league/players`
 Tests that a player on two teams' feeds dedups to one, DB-injection augments without
 duplicating, and name/stat matching attaches the right stats. Mock the fetches; assert the
 emitted player list. Do NOT change route logic.
