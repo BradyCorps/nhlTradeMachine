@@ -87,10 +87,15 @@ export async function POST(req: Request) {
     }
   };
 
-  await Promise.all([
-    upsert("cap_ceiling", body.capCeiling),
-    upsert("cap_floor",   body.capFloor),
-  ]);
+  try {
+    await Promise.all([
+      upsert("cap_ceiling", body.capCeiling),
+      upsert("cap_floor",   body.capFloor),
+    ]);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown error";
+    return NextResponse.json({ error: `Failed to save cap settings: ${msg}` }, { status: 500 });
+  }
 
   if (redis) {
     const cache = redis;
