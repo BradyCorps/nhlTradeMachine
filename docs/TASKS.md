@@ -201,6 +201,112 @@ Durability), Projection, phase/trend/sample conf. One collapsible block, default
 Acceptance: every metric is defined in the collapsible key; closed by default; `npm test` +
 typecheck pass.
 
+## Security / Auth
+
+# Security / Auth
+
+> Admin series. A1–A3 are hardening from the admin audit at `3fc1eb3`; A4 is a new admin
+> feature (player retirement). A1 is also The Docket's A1 auth gate. A1.1 is a true
+> prerequisite for A1's fail-closed flip (don't ship fail-closed while the UI fakes success
+> on 401). A2/A3/A4 are independent and can land in any order. (Distinct from The Docket's
+> foundation series in `FUTURECONCEPTS.md` — only A1 is shared; the `A3a` below under the
+> Docket section is the cap-delta helper, unrelated to this A3.)
+
+### [ ] A1 — close the open admin (authentication) — also The Docket's A1 gate
+Audited at `3fc1eb3`. The admin surface is effectively wide open and the existing guard
+can't be turned on without breaking the UI:
+- `app/lib/admin-auth.ts:5` fails OPEN — `if (!key) return true;` — so when `ADMIN_KEY` is
+  unset (the de-facto production state) every `/api/admin/*` request passes.
+- No client code ever sends the key: `x-admin-key` appears ONLY in the server check
+  (`admin-auth.ts:6`) — no admin page/fetch sends it. So setting `ADMIN_KEY` would 401 the
+  admin UI; the guard cannot be enabled as-is.
+- No `middleware.ts` and no page gate: `app/admin/*` renders for anyone who hits the URL.
+- `/api/admin/contracts` GET (183) / POST (284) / PUT (365) call `isAuthorized` NOWHERE —
+  the route that writes individual contracts AND bulk-syncs 100+ players into the DB is
+  unprotected regardless of `ADMIN_KEY`. `/api/admin/db-info` GET and the read GETs on
+  `/api/admin/teams`, `/trade-block`, `/settings` are also unguarded.
+- (Not broken: Drizzle params → no SQLi; input validation + prune >60% guard are fine; no
+  committed `.env`; no `NEXT_PUBLIC_*` secret leakage. The gap is purely authn/authz.)
+Fix — sequence so the admin UI is never left broken:
+1. Give the client a real credential to send: a `/admin/login` page that posts a shared
+   admin password and sets an **httpOnly session cookie**; server validates the cookie.
+   (Recommended over the static header; single-admin app, so avoid heavy NextAuth.)
+2. One gate helper used by EVERY `/api/admin/*` handler — GET and mutations — including
+   `contracts` (GET/POST/PUT) and `db-info`. No route exempt.
+3. Fail **CLOSED**: if no admin secret is configured, deny. Allow a dev-only escape behind
+   an explicit env flag (e.g. `ADMIN_DISABLE_AUTH=1`), never the default.
+4. `middleware.ts` gates `/admin/*` pages — unauthenticated → redirect to `/admin/login`.
+Acceptance: unauthenticated request to any `/api/admin/*` (incl. `contracts` GET/POST/PUT
+and `db-info`) returns 401; visiting `/admin/*` unauthenticated redirects to login; after
+login the admin UI reads AND writes successfully; with no secret configured the routes deny
+(fail closed); `npm test` + typecheck pass.
+NOTE: do **A1.1 first** (or together) — flipping fail-closed while writes fake success (see
+A1.1) means admins get "Saved" on every 401 and silently lose data. If the diff balloons,
+split A1 itself: (a) login + session cookie + client credential plumbing + single gate
+helper on all routes; (b) flip fail-closed + `middleware.ts` page gate. Satisfies The
+Docket's A1 prerequisite (`FUTURECONCEPTS.md`).
+
+### [ ] A1.1 — admin UI write error handling (prereq to A1 fail-closed)
+Root: every mutating admin page does `await fetch(...)` then shows a success toast
+UNCONDITIONALLY — no `res.ok` check. Verified in `app/admin/settings/page.tsx:34-47`
+(`save`/`clearCache`); same shape in `app/admin/contracts/page.tsx`, `app/admin/teams/page.tsx`,
+and `app/admin/trade-block/page.tsx`. A 500/401/network error still reports "Saved", so the
+admin silently loses writes. This becomes acute the moment A1 fails closed (every write 401s
+but looks successful).
+Fix: each admin mutation checks `res.ok` (and the parsed `{error}` body) before the success
+toast; on failure show the server error and do NOT optimistically update / re-`load()` as if
+it worked. Keep it consistent across all four pages (a small shared helper is fine).
+Acceptance: a failing admin write (simulate 401/500) surfaces an error instead of a success
+toast and does not show stale "saved" state; happy path unchanged; `npm test` + typecheck pass.
+
+### [ ] A2 — remove dead admin team-editor code
+Root: `app/admin/AdminTeamRow.tsx` and `app/admin/actions.ts` (`updateTeamPhase`) are unused
+— `AdminTeamRow` is imported nowhere, and `actions.ts` is referenced only by it. They are a
+superseded team-phase editor, replaced by `app/admin/teams/page.tsx` (which fetches
+`/api/admin/teams`). The dead component also alerts success regardless of outcome (the A1.1
+bug), so delete rather than fix.
+Acceptance: both files removed; no remaining imports of `AdminTeamRow`/`updateTeamPhase`; the
+live teams editor (`/admin/teams`) still works; `npm test` + typecheck pass.
+
+### [ ] A3 — admin endpoint & validation cleanup
+Smaller correctness/consistency gaps found in the audit (group into one pass):
+1. **Phantom status:** `app/api/admin/trade-block/route.ts:9` accepts `"blocked"`, but the UI
+   (`app/admin/trade-block/page.tsx`) only offers `requested/available/untouchable` — the API
+   can set a status the UI can't show or clear. Drop `"blocked"` (or surface it in the UI).
+2. **Server-side range validation:** `app/api/admin/contracts/route.ts` POST (single upsert,
+   ~286–351) writes `capHit`/`yearsRemaining` with NO range check — the `0.5–20.8` guard
+   exists only in the PUT bulk-sync (~418). The client modal caps at 12/20 but a direct POST
+   accepts `capHit: 999`. Add the same server-side bounds to the POST path.
+3. **Curl-only endpoints — decide per route:** `clear-cache`, `import-draft-class`,
+   `prune-stale`, `db-info`, `development-profile` have no UI caller. `clear-cache` is
+   redundant with `settings`' `action:"clear_cache"` (remove or surface); `import-draft-class`
+   (incl. DELETE-whole-class) and `prune-stale` (DELETE players) are destructive with no UI —
+   either give them a guarded admin UI or document them as intentional curl-only ops.
+Acceptance: `"blocked"` no longer settable without UI support; contracts POST rejects
+out-of-range cap/years; the curl-only endpoints are either wired to UI or documented; `npm
+test` + typecheck pass. (Splittable per item if a single diff gets large.)
+
+### [ ] A4 — admin: retire a player (roster removal without hard delete)
+Root: when a player retires (e.g., Jonathan Toews, retired 2025) there is no explicit admin
+action to take him out of circulation. Today he only disappears once CapWages/NHL feeds drop
+him and `prune-stale` (curl-only, gated on source health) HARD-DELETES him — so he lingers in
+team rosters, the trade machine, and the players page until then, and deletion loses his
+record. There is no "retired" concept in the schema.
+Fix (non-destructive, reversible):
+1. Add a `retired` flag to the players schema (`app/db/schema.ts`) — e.g. `retired` boolean
+   (+ optional `retiredDate`). A migration; default false.
+2. Admin control to toggle it (reuse the contracts admin page row actions, or a small
+   trade-block-style "Retire / Un-retire" button) → POST to an admin route (extend
+   `/api/admin/contracts` or add `/api/admin/retire`), guarded by A1 auth and with A1.1
+   error handling.
+3. Exclude retired players from roster assembly: team rosters, trade-machine asset pickers,
+   and the players page (or a separate "Retired" view). NOTE twin-pipeline caveat — apply the
+   filter in BOTH `/api/league` and `/api/league/players` until Phase 2 consolidation, or it
+   will drift (same class as the Woll/GSAX issue).
+4. Setting the flag must NOT delete the row, and un-retire must fully restore the player.
+Acceptance: marking Toews retired removes him from rosters / trade machine / players list
+WITHOUT deleting his DB row; un-retiring restores him everywhere; `npm test` + typecheck pass.
+
 ## For Future Trade Tracker (Known as The Docket)
 
 ### [ ] A3a — shared cap-delta helper

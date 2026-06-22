@@ -3,12 +3,12 @@ import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
-import { siteSettings, teams as teamsTable } from "@/app/db/schema";
+import { players as playersTable, siteSettings, teams as teamsTable } from "@/app/db/schema";
+import { buildTeamCapSpaceMap, parseStoredCapCeiling } from "@/app/lib/cap-settings";
 
 export const dynamic = "force-dynamic";
 
 const CAP_FLOOR       = SEASON.capFloor;
-const MAX_CAP_CEILING = 120;
 const TEAMS_CACHE_TTL = 6 * 60 * 60; // 6 hours
 const TRADE_TEAMS_CACHE_KEY = "cache:trade:teams:v1";
 
@@ -37,18 +37,19 @@ const derivePhase = (confRank: number, divRank: number, pointPct: number): strin
   return "Rebuilding";
 };
 
-const isValidCapCeiling = (cap: number): boolean => Number.isFinite(cap) && cap > 0 && cap <= MAX_CAP_CEILING;
-
 const getLiveCapCeiling = async (): Promise<number> => {
   const rows = await db.select().from(siteSettings).catch(() => []);
   const row = rows.find((r) => r.key === "cap_ceiling");
-  const cap = row ? parseFloat(row.value) : NaN;
-  return isValidCapCeiling(cap) ? cap : SEASON.capCeiling;
+  return parseStoredCapCeiling(row?.value, SEASON.capCeiling) ?? SEASON.capCeiling;
 };
 
-async function loadTeams(): Promise<any[]> {
+const teamCacheKey = (capCeiling: number): string =>
+  `${TRADE_TEAMS_CACHE_KEY}:cap:${capCeiling.toFixed(1)}`;
+
+async function loadTeams(capCeiling: number): Promise<any[]> {
+  const cacheKey = teamCacheKey(capCeiling);
   if (redis) {
-    const cached = await redis.get<any[]>(TRADE_TEAMS_CACHE_KEY);
+    const cached = await redis.get<any[]>(cacheKey);
     if (cached && Array.isArray(cached) && cached.length > 0) return cached;
   }
 
@@ -133,15 +134,24 @@ async function loadTeams(): Promise<any[]> {
     }
   } catch (_) {}
 
-  // Cap space comes from TEAMS_DB (curated for start of 2025-26 season).
-  // We no longer scrape CapWages for cap space — post-season it returns 2026-27
-  // offseason projections which are wrong for this trade audit context.
-
   let dbTeams: any[] = [];
   try {
     dbTeams = await db.select().from(teamsTable);
   } catch (_) {}
   const dbTeamMap = new Map(dbTeams.map(t => [t.id, t]));
+
+  // Prefer synced contract rows for cap space. Static TEAMS_DB cap space is only
+  // an emergency fallback when a team's contract table is incomplete.
+  const dbContracts = await db.select({
+    teamId:         playersTable.teamId,
+    position:       playersTable.position,
+    capHit:         playersTable.capHit,
+    yearsRemaining: playersTable.yearsRemaining,
+    isLtir:         playersTable.isLtir,
+    isRetained:     playersTable.isRetained,
+    retainedSalary: playersTable.retainedSalary,
+  }).from(playersTable).catch(() => []);
+  const dbCapSpaceMap = buildTeamCapSpaceMap(dbContracts, capCeiling);
 
   const teams = TEAMS_DB.map((t) => {
     const dbTeam   = dbTeamMap.get(t.id);
@@ -150,7 +160,7 @@ async function loadTeams(): Promise<any[]> {
     const confRank = st?.conferenceRank ?? 8;
     const divRank  = st?.divisionRank   ?? 4;
     const pointPct = st?.pointPct       ?? 0.5;
-    const capSpace = t.capSpace;
+    const capSpace = dbCapSpaceMap.get(t.id) ?? t.capSpace;
 
     const phase = dbTeam?.phaseOverride
       ?? (standingsMap.size >= 28 ? derivePhase(confRank, divRank, pointPct) : t.phase);
@@ -158,7 +168,7 @@ async function loadTeams(): Promise<any[]> {
     return {
       id:       t.id,
       name:     st?.teamFullName ?? dbTeam?.name ?? t.name,
-      capSpace: Math.round(capSpace * 10) / 10,
+      capSpace,
       standing,
       phase,
       needs: TEAM_NEEDS[t.id] ?? [],
@@ -166,7 +176,7 @@ async function loadTeams(): Promise<any[]> {
   });
 
   if (redis && teams.length > 0) {
-    await redis.setex(TRADE_TEAMS_CACHE_KEY, TEAMS_CACHE_TTL, teams);
+    await redis.setex(cacheKey, TEAMS_CACHE_TTL, teams);
   }
 
   return teams;
@@ -174,7 +184,7 @@ async function loadTeams(): Promise<any[]> {
 
 export async function GET() {
   const liveCapCeiling = await getLiveCapCeiling();
-  const LIVE_TEAMS = await loadTeams();
+  const LIVE_TEAMS = await loadTeams(liveCapCeiling);
 
   const picks: any[] = [];
   // Pick inventory derived from SEASON.draftYear — rounds 1-5 for the next

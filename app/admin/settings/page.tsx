@@ -33,7 +33,7 @@ export default function AdminSettings() {
 
   const save = async (clearOverrides = false) => {
     setSaving(true);
-    await fetch("/api/admin/settings", {
+    const res = await fetch("/api/admin/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -42,18 +42,28 @@ export default function AdminSettings() {
       }),
     });
     setSaving(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error ?? "Save failed");
+      return;
+    }
     showToast(clearOverrides ? "Cleared — using season-config defaults" : "Saved · Redis cache busted");
     load();
   };
 
   const clearCache = async () => {
     setSaving(true);
-    await fetch("/api/admin/settings", {
+    const res = await fetch("/api/admin/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "clear_cache" }),
     });
     setSaving(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error ?? "Cache clear failed");
+      return;
+    }
     showToast("Redis cache cleared — reload Armchair GM to see fresh data");
   };
 
@@ -91,7 +101,7 @@ export default function AdminSettings() {
             <div>
               <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)", letterSpacing: "0.12em", marginBottom: 4 }}>CAP CEILING ($M)</div>
               <input value={ceiling} onChange={e => setCeiling(e.target.value)}
-                placeholder={def ? String(def.capCeiling) : "95.5"} type="number" step="0.5" style={inputStyle} />
+                placeholder={def ? String(def.capCeiling) : "104"} type="number" step="0.5" style={inputStyle} />
             </div>
             <div>
               <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)", letterSpacing: "0.12em", marginBottom: 4 }}>CAP FLOOR ($M)</div>
@@ -137,7 +147,7 @@ export default function AdminSettings() {
         </div>
 
         <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)", lineHeight: 1.7, letterSpacing: "0.05em" }}>
-          Cap space values come from TEAMS_DB (app/lib/db.ts) — anchored to start of 2025-26.<br />
+          Cap space values come from TEAMS_DB (app/lib/db.ts) and use the active season cap setting.<br />
           CapWages scraping for cap space has been disabled as it returns post-season offseason projections.
         </div>
       </div>

@@ -29,6 +29,65 @@ Longer-term goal:
 * Treat MoneyPuck as one preferred source, not the only source.
 * Build source diagnostics into admin workflows so data problems are visible before they affect trade valuation.
 
+# Owned Advanced-Metrics Pipeline (xG / RAPM / GAR / WAR)
+
+The heavyweight realization of the data-resilience goal above: instead of depending on a third party (MoneyPuck, or scraping a site like Hockey Alchemy) for advanced player value,
+**compute our own** xG → RAPM → GAR/WAR from the NHL public play-by-play + shift API. We own the inputs end to end and stop being one outage away from broken NAV.
+
+## Why (the case)
+- **Harness the method, not the feed.** Sites like hockeyalchemy.com publish their full
+  methodology but expose NO public API/export (methodology page 403s automated requests).
+  Scraping their computed numbers would be fragile + ToS-risky + would REPEAT the single-source
+  dependency this whole section warns against. The methodology, however, is built entirely on
+  the free NHL PBP + shift API we already use — so we can reproduce it ourselves.
+- **It augments X-NAV, does not replace it.** X-NAV is a *market/cap-value* model (trade
+  value). GAR/WAR is a *talent-in-goals* model (how good a player actually is). GAR becomes a
+  principled **talent input** to NAV, not a competitor.
+- **It fixes weak spots we've already been patching by hand:**
+  - The Parayko class (R3): RAPM defensive coefficients + on-ice xG suppression measure
+    shutdown-D value DIRECTLY — a principled fix for the whole class instead of per-case floors.
+  - The sim (V2-5): team-aggregated GAR predicts standings at R² ≈ 0.76–0.88 — a far better
+    team-strength prior than the current heuristic; shot-level GSAx/xGSAA is a cleaner goalie
+    signal than GP-sorting.
+  - Could replace/augment point shares.
+
+## Architecture — offline precompute, app reads only (NON-NEGOTIABLE)
+You CANNOT train XGBoost or solve multi-season ridge-regression RAPM inside a Next.js/Vercel
+serverless route. The pipeline is an **offline job** (Python) that runs on a schedule and
+writes per-player results to the DB (Turso) or a data blob; the app only ever READS
+precomputed GAR/WAR/xG. Pipeline stages:
+1. Ingest NHL play-by-play + shift data; build 5v5 (and special-teams) on-ice stints via
+   shift-overlap analysis.
+2. Train/score an **xG** model (XGBoost or comparable) on shot distance/angle/type +
+   rebound/rush/strength context.
+3. Solve **RAPM** (ridge / L2) on stints with controls (score state, zone starts, B2B,
+   venue); daisy-chain seasons with decayed Bayesian priors (offense ~0.6, defense ~0.7).
+4. Assemble **GAR** (EVO+EVD+PPO+SHD+penalties) and **WAR** (GAR/~12) vs replacement level;
+   goalie GAR from shot-level xGSAA.
+5. Persist per-player/season outputs; app reads them; refresh nightly/weekly.
+
+## Staging (do NOT boil the ocean)
+- **Phase 1 — xG model (most self-contained, highest immediate ROI).** Improves shot-quality
+  inputs and gives proper goalie GSAx/xGSAA. Prerequisite for everything downstream.
+- **Phase 2 — RAPM** (needs stint construction + xG as a target option).
+- **Phase 3 — GAR/WAR assembly** (needs RAPM + replacement-level calibration).
+- **Phase 4 — wire into X-NAV (as a talent input) and the sim (team-strength prior).**
+
+## Dependencies & cautions
+- Sits on the **canonical roster/identity layer** (Docket A2 / Phase 2 consolidation):
+  GAR-per-player is worthless if identity mapping drifts (same Woll/dedup risk).
+- Validation bar is the hard part, not the plumbing — hold any owned model to standings R²
+  and YoY-repeatability checks before it's allowed to move NAV (mirror the Hockey Alchemy /
+  Evolving Hockey validation discipline). Ship it shadow-mode first; compare against current
+  NAV inputs before switching.
+- New runtime surface: an offline Python job + scheduler + a data-publish step into Turso —
+  more infra than anything currently in the app.
+
+## Reuse / tie-in
+NHL PBP+shift ingestion (already used as fallback) · GSAX surfacing (already in players page)
+· X-NAV engine (GAR as a new input) · sim team-strength (GAR aggregate as prior) · admin
+data diagnostics (source coverage + model-health reporting).
+
 # The Docket — build plan (actionable, gated)
 
 Actionable breakdown of the **The Docket** concept (see `FUTURECONCEPTS.md → The Docket`
