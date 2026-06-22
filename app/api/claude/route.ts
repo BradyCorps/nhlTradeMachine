@@ -232,7 +232,7 @@ function buildSeasonRecapPrompt(payload: z.infer<typeof SeasonRecapPayloadSchema
     seed: payload.seed,
   };
 
-  return `You are a senior NHL beat reporter writing an end-of-season alternate-history recap.
+  return `You are a senior NHL beat reporter writing an end-of-season recap of the PROJECTED ${SEASON.label} NHL season — a forward projection of the upcoming season, NOT a replay of a past one.
 
 Use ONLY the locked pre-calculated JSON and summaries below. Do not estimate, calculate, infer missing values, invent injuries, invent off-ice stories, or change standings/playoff results. Treat executed deals as ${payload.rosterMoveWindow} roster moves, never as trade-deadline moves. If a fact is not in the locked data, omit it.
 
@@ -244,7 +244,7 @@ ${tradesSummary || "No executed trades supplied."}
 
 ${payload.homeTeamName} OPENING-NIGHT ROSTER AFTER MOVES (top 12):
 ${payload.homeRoster.join("\n") || "No roster summary supplied."}
-Phase entering replay: ${payload.homePhase ?? "Unknown"}
+Phase entering ${SEASON.label}: ${payload.homePhase ?? "Unknown"}
 Contention ratings (X-NAV derived): Present ${payload.homeContention.present.toFixed(1)}/10 · Future ${payload.homeContention.future.toFixed(1)}/10
 Season-start outlook: ${payload.seasonStartOutlook}
 
@@ -253,6 +253,7 @@ ${tradedOutcomeLines.length > 0 ? tradedOutcomeLines.join("\n") : "No traded pla
 
 LOCKED FACTS:
 - Latest completed NHL season: ${payload.latestCompleted?.season ?? payload.replaySeason}.
+- This recap covers the PROJECTED ${SEASON.label} season (the upcoming season). The line above is the most recent COMPLETED season — do not conflate them.
 - Latest Stanley Cup champion: ${payload.latestCompleted?.stanleyCupChampion.teamName ?? "Unknown"}.
 - Latest Conn Smythe winner: ${payload.latestCompleted?.connSmythe.name ?? "Unknown"} (${payload.latestCompleted?.connSmythe.teamName ?? "Unknown"}).
 - Florida Panthers did NOT win the ${payload.latestCompleted?.season ?? payload.replaySeason} Cup.

@@ -547,14 +547,14 @@ export async function GET() {
       skaterCsvFresh
         ? Promise.resolve({ ok: true, text: async () => skaterCsv! })
         : fetchWithTimeout(
-            "https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/skaters.csv",
+            `https://moneypuck.com/moneypuck/playerData/seasonSummary/${SEASON.mpSeason}/regular/skaters.csv`,
             8000,
             { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
           ),
       goalieCsvFresh
         ? Promise.resolve({ ok: true, text: async () => goalieCsv! })
         : fetchWithTimeout(
-            "https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/goalies.csv",
+            `https://moneypuck.com/moneypuck/playerData/seasonSummary/${SEASON.mpSeason}/regular/goalies.csv`,
             8000,
             { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
           ),

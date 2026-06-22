@@ -12,7 +12,7 @@ import {
   type TradeSharePayload,
 } from "@/app/lib/trade-share";
 import { formatPickRound } from "@/app/lib/trade-format";
-import { ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
+import { ageDecayRate, ageSlotPenalty, SEASON } from "@/app/lib/season-config";
 
 type LeagueData = { teams: Team[]; players: Asset[]; capCeiling?: number | null };
 type VerdictDisplay = Pick<TradeVerdict, "status" | "message" | "metrics"> & {
@@ -643,7 +643,7 @@ export default function QuickTradeMachine() {
       incoming,
       verdict,
       mode: "trade-machine",
-      season: "2025-26",
+      season: SEASON.label,
     });
     const code = encodeTradeSharePayload(payload);
     const origin = typeof window !== "undefined" ? window.location.origin : "";

@@ -188,7 +188,7 @@ function projectTeamPoints(
   const depthPenalty = forwards.length < 10 ? (10 - forwards.length) * 1.4 : 0;
   const dPenalty = dmen.length < 6 ? (6 - dmen.length) * 1.2 : 0;
 
-  // Season-start replay: roster quality nudges phase baseline. Trade delta is
+  // Season projection: roster quality nudges phase baseline. Trade delta is
   // retained as a small context adjustment because it captures PK/goalie/driver
   // effects not fully visible in raw scoring depth.
   const rosterStrength =

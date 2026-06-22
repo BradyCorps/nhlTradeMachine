@@ -1,5 +1,7 @@
 "use client";
 
+import { SEASON } from "@/app/lib/season-config";
+
 // ============================================================
 // CAP PROJECTION PANEL
 // Shows both rosters before and after the trade, with cap
@@ -38,7 +40,7 @@ interface Props {
   incoming: Asset[];  // home receives
 }
 
-const CAP_CEILING = 95.5; // 2025-26
+const CAP_CEILING = SEASON.capCeiling;
 
 const posOrder = ["C", "W", "L", "R", "D", "G"];
 const posLabel: Record<string, string> = {
