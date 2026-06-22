@@ -9,9 +9,6 @@
 - Do not commit directly to main. Prefer small PRs.
 - Strictly respect the .codexignore file. Do not read files or directories listed within it.
 - Ensure best operation and efficiency in credit usage, while maintaining high quality.
-- Upon reaching 40% credit usage, please respond to the following questions at the end and add them to `docs/DEVNOTES.md`
-    * What are you least confident about right now?
-    * What’s the biggest thing I’m missing about the situation right now. What don’t I realize? 
 
 # Task Discipline (applies to every docs/TASKS.md item)
 - Work the active queue in `docs/TASKS.md`. Make ONE scoped change per task; do not advance
@@ -26,7 +23,7 @@
   finishing; report pass/fail counts. If there are no tests for the area, say so.
 - If a correct fix would change behavior beyond what's stated, stop and ask instead of guessing.
 - On completion: check the task off in `docs/TASKS.md` and append a dated one-line entry to
-  `docs/DEVNOTES.md` (what changed + files touched). Do NOT move tasks between docs — the user
+  `docs/DEVNOTES.md` at the top of the page (what changed + files touched). Do NOT move tasks between docs — the user
   triages KNOWNBUGS → TASKS and TASKS → CONFIRMEDFIXES.
 
 # Tools Integration

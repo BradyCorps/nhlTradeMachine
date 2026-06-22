@@ -259,7 +259,7 @@ it worked. Keep it consistent across all four pages (a small shared helper is fi
 Acceptance: a failing admin write (simulate 401/500) surfaces an error instead of a success
 toast and does not show stale "saved" state; happy path unchanged; `npm test` + typecheck pass.
 
-### [ ] A2 — remove dead admin team-editor code
+### [x] A2 — remove dead admin team-editor code
 Root: `app/admin/AdminTeamRow.tsx` and `app/admin/actions.ts` (`updateTeamPhase`) are unused
 — `AdminTeamRow` is imported nowhere, and `actions.ts` is referenced only by it. They are a
 superseded team-phase editor, replaced by `app/admin/teams/page.tsx` (which fetches
@@ -268,7 +268,7 @@ bug), so delete rather than fix.
 Acceptance: both files removed; no remaining imports of `AdminTeamRow`/`updateTeamPhase`; the
 live teams editor (`/admin/teams`) still works; `npm test` + typecheck pass.
 
-### [ ] A3 — admin endpoint & validation cleanup
+### [x] A3 — admin endpoint & validation cleanup
 Smaller correctness/consistency gaps found in the audit (group into one pass):
 1. **Phantom status:** `app/api/admin/trade-block/route.ts:9` accepts `"blocked"`, but the UI
    (`app/admin/trade-block/page.tsx`) only offers `requested/available/untouchable` — the API

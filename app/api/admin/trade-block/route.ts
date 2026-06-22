@@ -6,7 +6,7 @@ import { requireAdmin } from "@/app/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
-const TRADE_BLOCK_STATUSES = new Set(["requested", "available", "blocked", "untouchable"]);
+const TRADE_BLOCK_STATUSES = new Set(["requested", "available", "untouchable"]);
 
 function makeId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");

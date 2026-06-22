@@ -1003,10 +1003,31 @@ describe("Canary — Batch 6 audit fixes", () => {
   it("trade-block admin writes canonical name-derived ids and validates status enum", () => {
     const src = read("app/api/admin/trade-block/route.ts");
     expect(src).toContain("TRADE_BLOCK_STATUSES");
-    expect(src).toContain('["requested", "available", "blocked", "untouchable"]');
+    expect(src).toContain('["requested", "available", "untouchable"]');
+    expect(src).not.toContain('"blocked"');
     expect(src).toContain("const entryId = makeId(body.name || body.id)");
     expect(src).toContain("Invalid trade-block status");
     expect(src).toContain("id: entryId");
+  });
+
+  it("admin contract POST validates direct cap and term ranges", () => {
+    const src = read("app/api/admin/contracts/route.ts");
+    expect(src).toContain("MIN_CONTRACT_CAP_HIT = 0.5");
+    expect(src).toContain("MAX_CONTRACT_CAP_HIT = 20.8");
+    expect(src).toContain("MAX_CONTRACT_YEARS = 12");
+    expect(src).toContain("capHit must be between");
+    expect(src).toContain("yearsRemaining must be an integer");
+  });
+
+  it("documents intentional curl-only admin endpoints", () => {
+    const src = read("docs/admin-endpoints.md");
+    expect(src).toContain("GET /api/admin/clear-cache");
+    expect(src).toContain("POST /api/admin/import-draft-class");
+    expect(src).toContain("DELETE /api/admin/import-draft-class");
+    expect(src).toContain("DELETE /api/admin/prune-stale");
+    expect(src).toContain("GET /api/admin/db-info");
+    expect(src).toContain("POST /api/admin/development-profile");
+    expect(src).toContain("unauthenticated calls return `401`");
   });
 
   it("cap projection uses retained effective cap and only strikes through players from the current roster", () => {

@@ -88,6 +88,10 @@ const SYNC_CACHE_KEYS = [
   "cache:nhl_skater_summary_stats",
 ];
 const VALID_TEAM_IDS = new Set(TEAMS_DB.map(t => t.id));
+const MIN_CONTRACT_CAP_HIT = 0.5;
+const MAX_CONTRACT_CAP_HIT = 20.8;
+const MIN_CONTRACT_YEARS = 0;
+const MAX_CONTRACT_YEARS = 12;
 
 const NHLE_FACTORS: Record<string, number> = {
   NHL: 1.00, AHL: 0.47, KHL: 0.77, SHL: 0.59, LIIGA: 0.54,
@@ -314,6 +318,18 @@ export async function POST(req: Request) {
   const prospectPtsPace = explicitProspectPtsPace ?? calculatedProspectPtsPace;
 
   if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
+  if (
+    capHit != null &&
+    (!Number.isFinite(capHit) || capHit < MIN_CONTRACT_CAP_HIT || capHit > MAX_CONTRACT_CAP_HIT)
+  ) {
+    return NextResponse.json({ error: `capHit must be between ${MIN_CONTRACT_CAP_HIT} and ${MAX_CONTRACT_CAP_HIT}` }, { status: 400 });
+  }
+  if (
+    yearsRemaining != null &&
+    (!Number.isInteger(yearsRemaining) || yearsRemaining < MIN_CONTRACT_YEARS || yearsRemaining > MAX_CONTRACT_YEARS)
+  ) {
+    return NextResponse.json({ error: `yearsRemaining must be an integer between ${MIN_CONTRACT_YEARS} and ${MAX_CONTRACT_YEARS}` }, { status: 400 });
+  }
 
   const id = makeId(name);
 
