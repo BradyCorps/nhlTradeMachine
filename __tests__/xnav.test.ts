@@ -531,6 +531,27 @@ describe("X-NAV — Elite Defencemen", () => {
     expect(result.def).toBeGreaterThan(45);
   });
 
+  it("real Parayko card profile (blended DPS < 3.3, QoC 76) clears the floor via the QoC gate", () => {
+    // Reproduces the live card that read NAV -34: current DPS is 3.4 but a lower
+    // multi-season baseline blends it to ~3.04 (under the 3.3 DPS gate), and QoC is
+    // 76 (not 78). With xgaRelTM/pairDriverScore absent and defRate low, EVERY other
+    // shutdown gate is 0 — only the QoC gate (lowered 78 -> 74) keeps a genuine
+    // 22+ TOI top-pair shutdown D from free-falling on cap/age penalties.
+    const result = calcSkaterNAV({
+      id: "colton-parayko-real", name: "Colton Parayko", position: "D",
+      age: 33, capHit: 6.5, yearsRemaining: 4,
+      ptsPace: 18, xGPace: 5.5, defRate: 0.05,
+      avgTOI: 22.2, qocIndex: 76, dzPct: 0.50,
+      xgRelTM: null, xgaRelTM: null,
+      games: 77, ops: -0.3, dps: 3.4, baselineDpsProxy: 2.8,
+    });
+
+    // Sanity: the baseline really does pull blendedDps under the 3.3 DPS gate,
+    // so this case can only pass through the QoC gate.
+    expect(3.4 * 0.4 + 2.8 * 0.6).toBeLessThan(3.3);
+    expect(result.total).toBeGreaterThanOrEqual(120);
+  });
+
   it("weak top-minute low-point D does not get the shutdown floor", () => {
     const result = calcSkaterNAV({
       id: "weak-top-minutes", name: "Weak Top Minutes D", position: "D",
