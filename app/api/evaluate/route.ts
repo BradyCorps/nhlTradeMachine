@@ -22,12 +22,15 @@ import { isValidCapCeiling, maxCapCeiling, parseStoredCapCeiling } from "@/app/l
 // ZOD SCHEMAS
 // ============================================================
 const normalizeAssetPosition = (position: unknown) => {
-  if (typeof position !== "string") return position;
+  if (typeof position !== "string") return "C";
   const trimmed = position.trim();
   if (trimmed.toLowerCase() === "pick") return "Pick";
   const normalized = trimmed.toUpperCase();
   if (normalized === "L" || normalized === "R" || normalized === "LW" || normalized === "RW") return "W";
-  return normalized;
+  if (normalized === "C" || normalized === "D" || normalized === "G" || normalized === "W") return normalized;
+  // Coerce any unrecognized/missing position (e.g. "UNKNOWN", "F", "") to a skater
+  // default so one bad roster row can't 400 the entire NAV batch.
+  return "C";
 };
 
 const AssetSchema = z.object({
