@@ -154,7 +154,7 @@ function PlayerCell({ slot, pos }: { slot: Slot; pos: string }) {
       textDecoration: slot.status === "out" ? "line-through" : "none",
       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
     }}>
-      <span style={{ fontSize: 11, opacity: 0.55, marginRight: 3, fontWeight: 900 }}>{pos}</span>
+      <span style={{ fontSize: 9, opacity: 0.55, marginRight: 3, fontWeight: 900 }}>{pos}</span>
       {name}
       {slot.status === "in"  && <span style={{ fontSize: 11, marginLeft: 3, color: "#2a7a44" }}>▲</span>}
       {slot.status === "out" && <span style={{ fontSize: 11, marginLeft: 3, color: "#b83020" }}>▼</span>}
