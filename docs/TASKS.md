@@ -286,7 +286,7 @@ Acceptance: `"blocked"` no longer settable without UI support; contracts POST re
 out-of-range cap/years; the curl-only endpoints are either wired to UI or documented; `npm
 test` + typecheck pass. (Splittable per item if a single diff gets large.)
 
-### [ ] A4 — admin: retire a player (roster removal without hard delete)
+### [x] A4 — admin: retire a player (roster removal without hard delete)
 Root: when a player retires (e.g., Jonathan Toews, retired 2025) there is no explicit admin
 action to take him out of circulation. Today he only disappears once CapWages/NHL feeds drop
 him and `prune-stale` (curl-only, gated on source health) HARD-DELETES him — so he lingers in

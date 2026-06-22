@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { scrapeCapWages } from "@/app/services/scraper";
 import { db } from "@/app/db/client";
 import { players as playersTable } from "@/app/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
 import { requireAdmin } from "@/app/lib/admin-auth";
@@ -92,6 +92,19 @@ const MIN_CONTRACT_CAP_HIT = 0.5;
 const MAX_CONTRACT_CAP_HIT = 20.8;
 const MIN_CONTRACT_YEARS = 0;
 const MAX_CONTRACT_YEARS = 12;
+
+async function ensureRetirementColumns() {
+  for (const col of ["retired INTEGER DEFAULT 0", "retired_date TEXT"]) {
+    try { await db.run(sql.raw(`ALTER TABLE players ADD COLUMN ${col}`)); } catch { /* already exists */ }
+  }
+}
+
+async function clearRosterCaches() {
+  if (!redis) return;
+  for (const key of SYNC_CACHE_KEYS) {
+    await redis.del(key).catch(() => {});
+  }
+}
 
 const NHLE_FACTORS: Record<string, number> = {
   NHL: 1.00, AHL: 0.47, KHL: 0.77, SHL: 0.59, LIIGA: 0.54,
@@ -188,6 +201,7 @@ async function fetchNhlRosterTeamMap(): Promise<Map<string, { teamId: string; po
 export async function GET(req: Request) {
   const unauthorized = await requireAdmin(req);
   if (unauthorized) return unauthorized;
+  await ensureRetirementColumns();
 
   const url    = new URL(req.url);
   const doScrape = url.searchParams.get("scrape") === "1";
@@ -204,10 +218,12 @@ export async function GET(req: Request) {
       yearsRemaining: playersTable.yearsRemaining,
       hasNmc:         playersTable.hasNmc,
       hasNtc:         playersTable.hasNtc,
+      retired:        playersTable.retired,
+      retiredDate:    playersTable.retiredDate,
     }).from(playersTable).catch((e: any) => {
       dbError = e?.message ?? String(e);
       console.error("[Admin Contracts] DB read failed:", dbError);
-      return [] as { name: string; position: string; teamId: string | null; capHit: number; yearsRemaining: number; hasNmc: boolean | null; hasNtc: boolean | null }[];
+      return [] as { name: string; position: string; teamId: string | null; capHit: number; yearsRemaining: number; hasNmc: boolean | null; hasNtc: boolean | null; retired: boolean | null; retiredDate: string | null }[];
     }),
     doScrape ? scrapeCapWages() : Promise.resolve({} as Record<string, any>),
   ]);
@@ -266,6 +282,8 @@ export async function GET(req: Request) {
       overrideYears: ov?.yearsRemaining ?? null,
       hasNMC:        b?.hasNmc  ?? false,
       hasNTC:        b?.hasNtc  ?? false,
+      retired:       b?.retired ?? false,
+      retiredDate:   b?.retiredDate ?? null,
       expiryStatus:  cw?.expiryStatus ?? null,
       delta,
       source: ov?.yearsRemaining ? "override"
@@ -292,14 +310,16 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const unauthorized = await requireAdmin(req);
   if (unauthorized) return unauthorized;
+  await ensureRetirementColumns();
 
   const body = await req.json();
-  const { name, yearsRemaining, capHit, hasNMC, hasNTC, clear } = body as {
+  const { name, yearsRemaining, capHit, hasNMC, hasNTC, retired, clear } = body as {
     name:            string;
     yearsRemaining?: number;
     capHit?:         number;
     hasNMC?:         boolean;
     hasNTC?:         boolean;
+    retired?:        boolean;
     clear?:          boolean;
   };
   const teamId = typeof body.teamId === "string" ? teamIdFromSlug(body.teamId) : null;
@@ -335,11 +355,13 @@ export async function POST(req: Request) {
 
   if (clear) {
     await db.delete(playersTable).where(eq(playersTable.id, id));
+    await clearRosterCaches();
     return NextResponse.json({ ok: true, cleared: true });
   }
 
   if (
     yearsRemaining == null && capHit == null && hasNMC == null && hasNTC == null &&
+    retired == null &&
     !teamId && !position && age == null && draftYear == null && draftRound == null &&
     draftOverall == null && prospectPtsPace == null
   ) {
@@ -354,6 +376,10 @@ export async function POST(req: Request) {
     if (capHit         != null) updates.capHit         = capHit;
     if (hasNMC         != null) updates.hasNmc         = hasNMC;
     if (hasNTC         != null) updates.hasNtc         = hasNTC;
+    if (retired        != null) {
+      updates.retired = retired;
+      updates.retiredDate = retired ? new Date().toISOString().slice(0, 10) : null;
+    }
     if (teamId)                  updates.teamId         = teamId;
     if (position)                updates.position       = position;
     if (age           != null)   updates.age            = age;
@@ -362,6 +388,7 @@ export async function POST(req: Request) {
     if (draftOverall  != null)   updates.draftOverall   = draftOverall;
     if (prospectPtsPace != null) updates.prospectPtsPace = prospectPtsPace;
     await db.update(playersTable).set(updates).where(eq(playersTable.id, id));
+    await clearRosterCaches();
     return NextResponse.json({ ok: true, destination: "db-update", name });
   } else {
     await db.insert(playersTable).values({
@@ -374,11 +401,14 @@ export async function POST(req: Request) {
       yearsRemaining: yearsRemaining ?? 1,
       hasNmc:         hasNMC         ?? false,
       hasNtc:         hasNTC         ?? false,
+      retired:        retired        ?? false,
+      retiredDate:    retired        ? new Date().toISOString().slice(0, 10) : undefined,
       draftYear:      draftYear      ?? undefined,
       draftRound:     draftRound     ?? undefined,
       draftOverall:   draftOverall   ?? undefined,
       prospectPtsPace: prospectPtsPace ?? undefined,
     });
+    await clearRosterCaches();
     return NextResponse.json({ ok: true, destination: "db-insert", name });
   }
 }
@@ -388,6 +418,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   const unauthorized = await requireAdmin(req);
   if (unauthorized) return unauthorized;
+  await ensureRetirementColumns();
 
   let body: { players?: Record<string, any> } = {};
   try { body = await req.json(); } catch { /* no body */ }
@@ -424,6 +455,7 @@ export async function PUT(req: Request) {
     age:            playersTable.age,
     capHit:         playersTable.capHit,
     yearsRemaining: playersTable.yearsRemaining,
+    retired:        playersTable.retired,
   }).from(playersTable);
   const existingById = new Map(existing.map(r => [r.id, r]));
   const existingByName = new Map(existing.map(r => [makeId(r.name), r]));
@@ -471,6 +503,7 @@ export async function PUT(req: Request) {
       };
     }
     if (current) {
+      if (current.retired) continue;
       const updates: Record<string, any> = {
         capHit: values.capHit,
         yearsRemaining: values.yearsRemaining,

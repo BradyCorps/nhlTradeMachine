@@ -1019,6 +1019,32 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(src).toContain("yearsRemaining must be an integer");
   });
 
+  it("admin can retire players without deleting rows and roster routes filter them", () => {
+    const schema = read("app/db/schema.ts");
+    const contracts = read("app/api/admin/contracts/route.ts");
+    const adminPage = read("app/admin/contracts/page.tsx");
+    const league = read("app/api/league/route.ts");
+    const players = read("app/api/league/players/route.ts");
+    const migration = read("drizzle/0001_add_player_retirement.sql");
+
+    expect(schema).toContain('retired:         integer("retired"');
+    expect(schema).toContain('retiredDate:     text("retired_date")');
+    expect(migration).toContain("ADD COLUMN retired INTEGER DEFAULT 0");
+    expect(migration).toContain("ADD COLUMN retired_date TEXT");
+    expect(contracts).toContain("ensureRetirementColumns");
+    expect(contracts).toContain("updates.retired = retired");
+    expect(contracts).toContain("updates.retiredDate = retired ? new Date().toISOString().slice(0, 10) : null");
+    expect(contracts).toContain("clearRosterCaches");
+    expect(adminPage).toContain("handleRetire");
+    expect(adminPage).toContain("RESTORE");
+    for (const route of [league, players]) {
+      expect(route).toContain("removeRetiredPlayersFromRosters");
+      expect(route).toContain("if (row.retired) continue");
+      expect(route).toContain("if (d.retired) continue");
+      expect(route).toContain("retired:         playersTable.retired");
+    }
+  });
+
   it("documents intentional curl-only admin endpoints", () => {
     const src = read("docs/admin-endpoints.md");
     expect(src).toContain("GET /api/admin/clear-cache");

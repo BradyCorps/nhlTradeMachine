@@ -16,6 +16,8 @@ interface ContractRow {
   overrideYears: number | null;
   hasNMC:        boolean;
   hasNTC:        boolean;
+  retired:       boolean;
+  retiredDate:   string | null;
   expiryStatus:  string | null;
   delta:         number | null;
   source:        string;
@@ -298,6 +300,22 @@ export default function AdminContractsPage() {
     }
   };
 
+  const handleRetire = async (row: ContractRow) => {
+    const retired = !row.retired;
+    try {
+      const res = await fetch("/api/admin/contracts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: row.name, retired }),
+      });
+      await readAdminResponse(res, retired ? "Retire failed" : "Un-retire failed");
+      showToast(retired ? `Retired ${row.name}` : `Restored ${row.name}`);
+      load();
+    } catch (e) {
+      showToast(adminErrorMessage(e, retired ? "Retire failed" : "Un-retire failed"));
+    }
+  };
+
   const handleSync = async () => {
     if (!scrapedRaw) {
       showToast("Load live data first — click + LIVE DELTA, then sync");
@@ -421,7 +439,7 @@ export default function AdminContractsPage() {
 
       {/* Column headers */}
       <div style={{ display: "grid",
-        gridTemplateColumns: "200px 60px 60px 70px 70px 70px 70px 70px 80px 60px",
+        gridTemplateColumns: "200px 60px 60px 70px 70px 70px 70px 70px 80px 128px",
         gap: 8, padding: "8px 24px", borderBottom: "1px solid #2a1e0a",
         fontSize: 9, color: "#5a4a2a", fontWeight: 900, textTransform: "uppercase",
         letterSpacing: "0.12em", position: "sticky", top: 0, background: "#0f0c07", zIndex: 10 }}>
@@ -434,7 +452,7 @@ export default function AdminContractsPage() {
         <div style={{ textAlign: "right" }}>SCRAPED</div>
         <div style={{ textAlign: "right" }}>DELTA</div>
         <div style={{ textAlign: "center" }}>SOURCE</div>
-        <div />
+        <div style={{ textAlign: "right" }}>ACTIONS</div>
       </div>
 
       {/* Rows */}
@@ -451,7 +469,7 @@ export default function AdminContractsPage() {
         return (
           <div key={row.name}
             style={{ display: "grid",
-              gridTemplateColumns: "200px 60px 60px 70px 70px 70px 70px 70px 80px 60px",
+              gridTemplateColumns: "200px 60px 60px 70px 70px 70px 70px 70px 80px 128px",
               gap: 8, padding: "7px 24px", borderBottom: "1px solid #1a1208",
               fontSize: 11, background: rowBg, alignItems: "center",
               transition: "background 0.1s" }}>
@@ -487,16 +505,28 @@ export default function AdminContractsPage() {
               {row.delta != null ? (row.delta >= 1 ? `Δ${row.delta}` : "—") : "?"}
             </div>
 
-            <div style={{ textAlign: "center" }}>
-              <SourceBadge source={row.source} />
+          <div style={{ textAlign: "center" }}>
+              {row.retired
+                ? <span title={row.retiredDate ?? undefined} style={{ fontSize: 10, fontWeight: 900, padding: "1px 5px", letterSpacing: "0.1em",
+                  background: "#3a1a1a", color: "#cf6b6b", border: "1px solid #cf6b6b40" }}>RETIRED</span>
+                : <SourceBadge source={row.source} />}
             </div>
 
-            <button onClick={() => setEditing(row)}
-              style={{ fontSize: 10, fontWeight: 900, padding: "3px 8px",
-                background: "transparent", border: "1px solid #3a2e1a",
-                color: "#8a7a5a", cursor: "pointer", letterSpacing: "0.1em" }}>
-              EDIT
-            </button>
+            <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+              <button onClick={() => setEditing(row)}
+                style={{ fontSize: 10, fontWeight: 900, padding: "3px 8px",
+                  background: "transparent", border: "1px solid #3a2e1a",
+                  color: "#8a7a5a", cursor: "pointer", letterSpacing: "0.1em" }}>
+                EDIT
+              </button>
+              <button onClick={() => handleRetire(row)}
+                style={{ fontSize: 10, fontWeight: 900, padding: "3px 8px",
+                  background: row.retired ? "#1a3a1a" : "transparent",
+                  border: `1px solid ${row.retired ? "#2a6a2a" : "#6a2a2a"}`,
+                  color: row.retired ? "#6bcf6b" : "#cf6b6b", cursor: "pointer", letterSpacing: "0.1em" }}>
+                {row.retired ? "RESTORE" : "RETIRE"}
+              </button>
+            </div>
           </div>
         );
       })}

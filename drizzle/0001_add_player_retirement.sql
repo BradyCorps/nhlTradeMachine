@@ -1,0 +1,2 @@
+ALTER TABLE players ADD COLUMN retired INTEGER DEFAULT 0;
+ALTER TABLE players ADD COLUMN retired_date TEXT;

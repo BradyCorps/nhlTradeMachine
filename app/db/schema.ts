@@ -28,6 +28,8 @@ export const players = sqliteTable("players", {
   injuryStatus:    text("injury_status"),
   extensionCapHit: real("extension_cap_hit"),
   extensionYears:  integer("extension_years"),
+  retired:         integer("retired", { mode: "boolean" }).default(false),
+  retiredDate:     text("retired_date"),
 });
 
 // Global key-value config — cap_ceiling, cap_floor, etc.

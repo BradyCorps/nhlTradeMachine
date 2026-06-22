@@ -5,6 +5,7 @@ import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
 import { players as playersTable, tradeBlock as tradeBlockTable } from "@/app/db/schema";
+import { sql } from "drizzle-orm";
 import { resolveRosterTier } from "@/app/lib/xnav-engine";
 import { calcDevelopmentProfile } from "@/app/lib/development-profile";
 import {
@@ -137,9 +138,11 @@ function calcQocIndex(
 
 async function loadFromDB(): Promise<Record<string, any>> {
   try {
+    await ensureRetirementColumns();
     const rows = await db.select().from(playersTable);
     const result: Record<string, any> = {};
     for (const row of rows) {
+      if (row.retired) continue;
       result[row.name] = {
         id:             row.id,
         name:           row.name,
@@ -159,6 +162,24 @@ async function loadFromDB(): Promise<Record<string, any>> {
   } catch (e: any) {
     console.warn("[DB] loadFromDB failed, falling back to bundled.json:", e.message);
     return loadBundledFallback();
+  }
+}
+
+async function ensureRetirementColumns() {
+  for (const col of ["retired INTEGER DEFAULT 0", "retired_date TEXT"]) {
+    try { await db.run(sql.raw(`ALTER TABLE players ADD COLUMN ${col}`)); } catch { /* already exists */ }
+  }
+}
+
+function removeRetiredPlayersFromRosters(rosterMap: Map<string, any[]>, retiredPlayers: { id?: unknown; name?: unknown }[]): void {
+  const retiredIds = new Set(retiredPlayers.map(p => p.id == null ? "" : String(p.id)).filter(Boolean));
+  const retiredSlugs = new Set(retiredPlayers.map(p => typeof p.name === "string" ? canonicalNameSlug(p.name) : "").filter(Boolean));
+  for (const [teamId, list] of rosterMap.entries()) {
+    rosterMap.set(teamId, list.filter(p => {
+      const id = p?.id == null ? "" : String(p.id);
+      const slug = typeof p?.name === "string" ? canonicalNameSlug(p.name) : "";
+      return !(id && retiredIds.has(id)) && !(slug && retiredSlugs.has(slug));
+    }));
   }
 }
 
@@ -751,6 +772,7 @@ export async function GET() {
   // augment the live roster instead of creating duplicates.
   const dbTeamBySlug = new Map<string, string>();
   try {
+    await ensureRetirementColumns();
     const dbPlayers = await db.select({
       id:              playersTable.id,
       name:            playersTable.name,
@@ -760,9 +782,12 @@ export async function GET() {
       draftYear:       playersTable.draftYear,
       draftOverall:    playersTable.draftOverall,
       prospectPtsPace: playersTable.prospectPtsPace,
+      retired:         playersTable.retired,
     }).from(playersTable);
 
+    removeRetiredPlayersFromRosters(rosterMap, dbPlayers.filter(d => d.retired));
     for (const d of dbPlayers) {
+      if (d.retired) continue;
       if (!isValidTeamId(d.teamId)) continue;
       const dbSlug = canonicalNameSlug(d.name);
       dbTeamBySlug.set(dbSlug, d.teamId);

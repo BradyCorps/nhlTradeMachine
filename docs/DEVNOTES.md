@@ -1,4 +1,5 @@
 # Development Notes
+- 2026-06-22: Completed A4 by adding reversible player retirement flags, a contracts-admin Retire/Restore action, cache invalidation, and retired-player filtering in both league roster routes; touched `app/db/schema.ts`, `drizzle/0001_add_player_retirement.sql`, `app/api/admin/contracts/route.ts`, `app/admin/contracts/page.tsx`, `app/api/league/route.ts`, `app/api/league/players/route.ts`, `__tests__/feature-canaries.test.ts`, `docs/TASKS.md`.
 - 2026-06-22: Completed A3 admin endpoint cleanup by dropping unsupported trade-block `blocked` status, adding direct contract POST cap/term bounds, and documenting guarded curl-only admin endpoints; touched `app/api/admin/trade-block/route.ts`, `app/api/admin/contracts/route.ts`, `docs/admin-endpoints.md`, `__tests__/feature-canaries.test.ts`, `docs/TASKS.md`.
 - 2026-06-22: Removed dead superseded admin team editor files; touched `app/admin/AdminTeamRow.tsx`, `app/admin/actions.ts`, `docs/TASKS.md`.
 - 2026-06-22: Fixed admin mutation error handling so failed writes show server errors and skip optimistic success/reloads; touched `app/admin/admin-response.ts`, `app/admin/settings/page.tsx`, `app/admin/contracts/page.tsx`, `app/admin/teams/page.tsx`, `app/admin/trade-block/page.tsx`, `docs/TASKS.md`.
@@ -825,4 +826,3 @@ Reasoning:
   - a random no-signal ELC player
   - an older AHL-only player
 - Revisit later-round prospect draft-pedigree curve after real production data is imported.
-
