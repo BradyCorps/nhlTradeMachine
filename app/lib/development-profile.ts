@@ -57,6 +57,8 @@ export interface DevelopmentProfile extends FantasyProfile {
   pedigreeWeight?: number;
   productionScore: number;
   roleGrowthScore: number;
+  durabilityScore: number;
+  peakYearsLeft?: number;
   confidenceScore?: number;
   scoringTrajectory?: string[];
   tags: string[];
@@ -82,10 +84,10 @@ export interface DevelopmentProfileInput {
 const clamp = (n: number, lo = 0, hi = 100): number => Math.max(lo, Math.min(hi, n));
 
 function productionScale(position: DevelopmentProfileInput["position"]): number {
-  if (position === "D") return 65;
+  if (position === "D") return 75;
   if (position === "G") return 0;
-  if (position === "C") return 95;
-  return 90;
+  if (position === "C") return 115;
+  return 110;
 }
 
 function scorePedigree(draftOverall: number | undefined, internationalScore = 0): number {
@@ -105,6 +107,13 @@ function scorePedigree(draftOverall: number | undefined, internationalScore = 0)
 
 function scoreExperience(nhlGames: number): number {
   return clamp((nhlGames / 320) * 100);
+}
+
+function scoreDurability(snapshots: PlayerSeasonSnapshot[]): number {
+  const nhlSeasons = snapshots.filter(s => s.league === "NHL" && Number.isFinite(s.games));
+  if (nhlSeasons.length === 0) return 60;
+  const meanGames = nhlSeasons.reduce((sum, s) => sum + Math.max(0, s.games || 0), 0) / nhlSeasons.length;
+  return clamp((meanGames / 82) * 100);
 }
 
 function pedigreeSampleWeight(nhlGames: number): number {
@@ -180,6 +189,18 @@ function roleGrowthScore(snapshots: PlayerSeasonSnapshot[], currentToi = 0): num
   return clamp(45 + (last - first) * 8);
 }
 
+function estimatePeakYearsLeft(
+  age: number,
+  position: DevelopmentProfileInput["position"],
+  productionScore: number,
+  trend: TimelineTrend
+): number {
+  const peakEnd = position === "D" ? 31 : position === "G" ? 33 : 30;
+  const eliteBump = productionScore >= 85 && trend !== "FALLING" ? 2 : 0;
+  const declineDrag = trend === "FALLING" ? 1 : 0;
+  return Math.round(clamp(peakEnd - age + eliteBump - declineDrag, 0, 6));
+}
+
 function classifyPhase(input: DevelopmentProfileInput, scores: {
   pedigree: number;
   experience: number;
@@ -210,9 +231,9 @@ function buildProjectionBand(input: DevelopmentProfileInput, opts: {
   const baseline = opts.latestNhle ?? input.ptsPace;
   const upside = (opts.pedigree - 50) * 0.18 + Math.max(0, 24 - input.age) * 1.5;
   const riskSpread = 8 + (100 - opts.confidence) * 0.22 + opts.volatility * 0.12;
-  const median = clamp((baseline * 0.72) + (input.ptsPace * 0.28) + upside * 0.35, 0, 140);
-  const ceiling = clamp(median + riskSpread + Math.max(0, opts.pedigree - 70) * 0.18, 0, 160);
-  const floor = clamp(median - riskSpread * 0.8, 0, 140);
+  const median = clamp((baseline * 0.72) + (input.ptsPace * 0.28) + upside * 0.35, 0, 170);
+  const ceiling = clamp(median + riskSpread + Math.max(0, opts.pedigree - 70) * 0.18, 0, 190);
+  const floor = clamp(median - riskSpread * 0.8, 0, 170);
   return {
     floorPts82: Math.round(floor),
     medianPts82: Math.round(median),
@@ -321,6 +342,7 @@ export function calcDevelopmentProfile(input: DevelopmentProfileInput): Developm
   const establishedWeight = 1 - pedigreeWeight;
   const experience = scoreExperience(careerNhlGames);
   const production = scoreProduction(input);
+  const durability = scoreDurability(snapshots);
   const trend = trendFromSnapshots(snapshots);
   const role = roleGrowthScore(snapshots, input.avgTOI);
   const latest = latestNhle(snapshots);
@@ -328,7 +350,9 @@ export function calcDevelopmentProfile(input: DevelopmentProfileInput): Developm
   const sampleRisk = clamp(65 - experience * 0.65);
   const ageDeclineRisk = input.age >= 36 ? 75 : input.age >= 33 ? 58 : input.age >= 30 ? 30 : 10;
   const volatility = clamp(trend.volatility + (careerNhlGames < 100 ? 18 : 0) + (input.age <= 23 && production < 45 ? 12 : 0));
-  const regressionRisk = clamp(ageDeclineRisk + sampleRisk * 0.35 + (trend.trend === "FALLING" ? 22 : 0) + (input.age >= 32 && trend.trend === "RISING" ? 12 : 0));
+  const durabilityRisk = Math.max(0, 70 - durability) * 0.18;
+  const durabilityCredit = Math.max(0, durability - 78) * 0.08;
+  const regressionRisk = clamp(ageDeclineRisk + sampleRisk * 0.35 + (trend.trend === "FALLING" ? 22 : 0) + (input.age >= 32 && trend.trend === "RISING" ? 12 : 0) + durabilityRisk - durabilityCredit);
   const breakoutProbability = clamp(
     pedigree * 0.24 +
     production * 0.24 +
@@ -337,7 +361,8 @@ export function calcDevelopmentProfile(input: DevelopmentProfileInput): Developm
     (input.age <= 25 ? 12 : input.age >= 32 ? -16 : 0) -
     contextPenalty
   );
-  const confidence = clamp(30 + experience * 0.38 + snapshots.length * 7 + (input.internationalScore ? 8 : 0) - volatility * 0.15);
+  const durabilityConfidence = clamp((durability - 70) * 0.06, -4, 3);
+  const confidence = clamp(30 + experience * 0.38 + snapshots.length * 7 + (input.internationalScore ? 8 : 0) - volatility * 0.15 + durabilityConfidence);
   const lowExperienceBoomBustBonus = input.age <= 23 && careerNhlGames < 80 ? 16 : 0;
   const boomBustScore = clamp(volatility * 0.55 + pedigree * 0.25 + (100 - confidence) * 0.25 + lowExperienceBoomBustBonus);
   const boomBust = classifyBoomBust({
@@ -352,6 +377,10 @@ export function calcDevelopmentProfile(input: DevelopmentProfileInput): Developm
     age: input.age,
   });
   const developmentPhase = classifyPhase(input, { pedigree, experience, production, trend: trend.trend, regressionRisk });
+  const isEstablishedVet = input.age >= 29 && careerNhlGames >= 250;
+  const peakYearsLeft = isEstablishedVet
+    ? estimatePeakYearsLeft(input.age, input.position, production, trend.trend)
+    : undefined;
   const projectionBand = buildProjectionBand(input, { pedigree, confidence, volatility, latestNhle: latest });
   const currentFantasyScore = Math.round(clamp(production * 0.7 + experience * 0.2 + role * 0.1 - regressionRisk * 0.08));
   const dynastyScore = Math.round(clamp(
@@ -403,6 +432,8 @@ export function calcDevelopmentProfile(input: DevelopmentProfileInput): Developm
     pedigreeWeight: Math.round(pedigreeWeight * 100),
     productionScore: Math.round(production),
     roleGrowthScore: Math.round(role),
+    durabilityScore: Math.round(durability),
+    ...(peakYearsLeft != null ? { peakYearsLeft } : {}),
     confidenceScore: Math.round(confidence),
     scoringTrajectory: scoringTrajectoryLabels(snapshots),
     tags,

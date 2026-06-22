@@ -3,6 +3,14 @@ import StrandDisplay from "@/app/components/StrandDisplay";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
 import type { DevelopmentProfile } from "@/app/lib/development-profile";
+import {
+  getInjuryRisk,
+  getPlayerPedigree,
+  getProspectTier,
+  getShutdownDPedigree,
+} from "@/app/lib/player-data";
+import { FRANCHISE, SEASON } from "@/app/lib/season-config";
+import { calcNAV } from "@/app/lib/xnav-engine";
 import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
@@ -24,6 +32,7 @@ interface Player {
   gsax?: number;
   savePct?: number;
   gamesStarted?: number;
+  shotsPerGame?: number | null;
   ops?: number | null;
   dps?: number | null;
   baselinePtsPace?: number | null;
@@ -139,13 +148,188 @@ function ArchetypeBadge({ player }: { player: Player }) {
   }
 
   if (!label) return null;
+  const icon =
+    label === "FRANCHISE" ? "◆"
+    : label === "SNIPER" ? "◎"
+    : label === "PLAYMAKER" ? "↗"
+    : label === "SCORER" || label === "OFF D" ? "●"
+    : label === "SHUTDOWN" || label === "CHECKER" ? "■"
+    : label === "STARTER" ? "G1"
+    : label === "TANDEM" ? "G2"
+    : label === "TWO-WAY" ? "◇"
+    : "•";
+
   return (
-    <span style={{
-      fontSize: "11px", fontWeight: 900,
+    <span title={label} aria-label={label} style={{
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      minWidth: "18px", height: "18px",
+      fontSize: icon.length > 1 ? "8px" : "11px", fontWeight: 900,
       color, border: `1px solid ${color}`,
-      padding: "1px 4px", letterSpacing: "0.1em",
-      opacity: 0.9, whiteSpace: "nowrap",
-    }}>{label}</span>
+      padding: "0 3px", letterSpacing: 0,
+      opacity: 0.9, whiteSpace: "nowrap", flexShrink: 0,
+    }}>{icon}</span>
+  );
+}
+
+function PlayerIconBadges({ player }: { player: Player }) {
+  const position = player.position === "D" || player.position === "G" || player.position === "C" ? player.position : "W";
+  const xnav = useMemo(() => calcNAV({
+    id: player.id,
+    name: player.name,
+    position,
+    age: player.age,
+    capHit: player.capHit,
+    yearsRemaining: player.yearsRemaining,
+    capCeiling: SEASON.capCeiling,
+    ptsPace: player.ptsPace,
+    xGPace: player.xGPace,
+    defRate: player.defRate ?? 0.08,
+    avgTOI: player.avgTOI,
+    qocIndex: player.qocIndex,
+    xgRelTM: player.xgRelTM,
+    xgaRelTM: player.xgaRelTM,
+    dzPct: player.dzPct,
+    ops: player.ops,
+    dps: player.dps,
+    games: player.games ?? 40,
+    gsax: player.gsax,
+    savePct: player.savePct,
+    gamesStarted: player.gamesStarted,
+    hasLiveStats: player.hasLiveStats,
+    baselinePtsPace: player.baselinePtsPace ?? undefined,
+    pkTimeShare: player.pkTimeShare ?? undefined,
+  }), [player, position]);
+
+  const prospectTier = getProspectTier(player.name);
+  const pedigree = getPlayerPedigree(player.name);
+  const injuryRisk = getInjuryRisk(player.name);
+  const shutdownPedigree = getShutdownDPedigree(player.name);
+  const isMegalodon = xnav.total >= FRANCHISE.megalodon;
+  const isFranchise = !isMegalodon && xnav.total >= FRANCHISE.threshold;
+  const isSurplus = xnav.cap > 0 && xnav.total > player.capHit * 18 && xnav.total > 50;
+  const hasAwards = (pedigree?.awards?.length ?? 0) > 0;
+
+  const badges = [
+    isMegalodon ? { key: "megalodon", icon: "♛", color: "var(--ledger-amber)", title: `Megalodon tier — NAV ${xnav.total} ≥ ${FRANCHISE.megalodon}.` } : null,
+    isFranchise ? { key: "franchise", icon: "◆", color: "var(--ledger-ink)", title: `Franchise tier — NAV ${xnav.total} ≥ ${FRANCHISE.threshold}.` } : null,
+    isSurplus ? { key: "surplus", icon: "★", color: "var(--ledger-green)", title: "Surplus contract — on-ice value significantly exceeds cap hit." } : null,
+    prospectTier ? { key: "prospect", icon: prospectTier.tier === 1 ? "★" : prospectTier.tier === 2 ? "◆" : "◇", color: prospectTier.tier === 1 ? "var(--ledger-navy)" : prospectTier.tier === 2 ? "var(--ledger-green)" : "var(--ledger-brown)", title: prospectTier.tier === 1 ? "Franchise prospect pedigree." : prospectTier.tier === 2 ? "Top prospect pedigree." : "Prospect pedigree." } : null,
+    hasAwards ? { key: "awards", icon: "A", color: "var(--ledger-amber)", title: `Award pedigree — ${Array.from(new Set(pedigree!.awards)).join(" · ")}.` } : null,
+    injuryRisk ? { key: "injury", icon: "!", color: "var(--ledger-red)", title: injuryRisk.note } : null,
+    shutdownPedigree ? { key: "shutdown", icon: "■", color: "var(--ledger-amber)", title: shutdownPedigree.note } : null,
+  ].filter(Boolean) as { key: string; icon: string; color: string; title: string }[];
+
+  if (badges.length === 0) return null;
+  return (
+    <>
+      {badges.slice(0, 4).map(badge => (
+        <span key={badge.key} title={badge.title} aria-label={badge.title} style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minWidth: "18px",
+          height: "18px",
+          fontSize: badge.icon.length > 1 ? "8px" : "11px",
+          fontWeight: 900,
+          color: badge.color,
+          border: `1px solid ${badge.color}`,
+          background: "rgba(255,255,255,0.18)",
+          padding: "0 3px",
+          lineHeight: 1,
+          flexShrink: 0,
+        }}>
+          {badge.icon}
+        </span>
+      ))}
+    </>
+  );
+}
+
+const PLAYER_ICON_KEY = [
+  ["♛", "Megalodon", "Extreme franchise-value tier."],
+  ["◆", "Franchise", "Franchise-value player or top prospect marker."],
+  ["★", "Surplus", "Strong surplus contract, prospect pedigree, or elite pedigree signal."],
+  ["◇", "Prospect", "Tracked prospect or depth prospect marker."],
+  ["A", "Awards", "Award pedigree on the player record."],
+  ["!", "Risk", "Elevated injury or availability risk."],
+  ["■", "Shutdown", "Elite shutdown or defensive pedigree signal."],
+] as const;
+
+function PlayersIconKey() {
+  return (
+    <section aria-label="Player icon key" style={{
+      maxWidth: 1100,
+      margin: "10px auto 0",
+      padding: "0 16px",
+      position: "sticky",
+      top: 0,
+      zIndex: 5,
+    }}>
+      <div style={{
+        border: "1px solid #b8a070",
+        background: "var(--paper-card)",
+        padding: "8px 10px",
+        boxShadow: "0 2px 0 rgba(64, 45, 18, 0.12)",
+      }}>
+        <div style={{
+          fontSize: "10px",
+          fontWeight: 900,
+          color: "var(--ledger-ink)",
+          textTransform: "uppercase",
+          letterSpacing: "0.18em",
+          marginBottom: "6px",
+        }}>
+          Icon Key
+        </div>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+          gap: "7px 12px",
+        }}>
+          {PLAYER_ICON_KEY.map(([icon, label, definition]) => (
+            <div key={`${icon}-${label}`} title={definition} style={{ display: "grid", gridTemplateColumns: "22px 1fr", gap: "7px", alignItems: "center" }}>
+              <span style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "20px",
+                height: "20px",
+                border: "1px solid var(--ledger-rule)",
+                color: "var(--ledger-ink)",
+                fontSize: "11px",
+                fontWeight: 900,
+                lineHeight: 1,
+              }}>
+                {icon}
+              </span>
+              <span>
+                <span style={{
+                  display: "block",
+                  fontSize: "10px",
+                  fontWeight: 900,
+                  color: "var(--ledger-ink-light)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                  lineHeight: 1.1,
+                }}>
+                  {label}
+                </span>
+                <span style={{
+                  display: "block",
+                  marginTop: "1px",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  color: "var(--ledger-ink-faint)",
+                  lineHeight: 1.2,
+                }}>
+                  {definition}
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -343,7 +527,89 @@ function StatPill({ value, label, accent }: { value: string; label: string; acce
   );
 }
 
-type PlayerSortKey = "seasonPts" | "ppg" | "pts" | "toi" | "ops" | "dps" | "age" | "cap" | "term";
+type PlayerSortKey =
+  | "seasonPts" | "ppg" | "pts" | "toi" | "ops" | "dps" | "age" | "cap" | "term"
+  | "supp" | "gsax" | "svPct" | "gaa" | "gp";
+type PlayerSection = "F" | "D" | "G";
+type PlayerColumn = { key: PlayerSortKey; label: string };
+
+const PLAYER_COLUMNS: Record<PlayerSection, PlayerColumn[]> = {
+  F: [
+    { key: "seasonPts", label: "PTS" },
+    { key: "ppg",       label: "PPG" },
+    { key: "pts",       label: "P/82" },
+    { key: "ops",       label: "OPS" },
+    { key: "dps",       label: "DPS" },
+    { key: "toi",       label: "TOI" },
+    { key: "age",       label: "Age" },
+    { key: "cap",       label: "Cap" },
+    { key: "term",      label: "Term" },
+  ],
+  D: [
+    { key: "seasonPts", label: "PTS" },
+    { key: "ops",       label: "OPS" },
+    { key: "dps",       label: "DPS" },
+    { key: "toi",       label: "TOI" },
+    { key: "age",       label: "Age" },
+    { key: "cap",       label: "Contract" },
+    { key: "term",      label: "Yrs left" },
+    { key: "supp",      label: "Supp" },
+  ],
+  G: [
+    { key: "gsax",  label: "GSAx" },
+    { key: "svPct", label: "SV%" },
+    { key: "gaa",   label: "GAA" },
+    { key: "cap",   label: "Contract" },
+    { key: "term",  label: "Yrs left" },
+    { key: "gp",    label: "GP" },
+  ],
+};
+
+const playerGridTemplate = (section: PlayerSection): string => {
+  const stats = PLAYER_COLUMNS[section].length;
+  return `36px 40px minmax(210px,1.2fr) 88px repeat(${stats},minmax(58px,0.55fr)) 24px`;
+};
+
+const playerGridMinWidth = (section: PlayerSection): string => {
+  if (section === "G") return "720px";
+  if (section === "D") return "820px";
+  return "880px";
+};
+
+const seasonPointsOf = (p: Player): number => Math.round((p.ptsPace / 82) * (p.games ?? 82));
+const goalieGamesOf = (p: Player): number => p.games ?? p.gamesStarted ?? 0;
+const goalieGaaOf = (p: Player): number | null => {
+  if (p.position !== "G" || p.savePct == null) return null;
+  const shotsPerGame = p.shotsPerGame && p.shotsPerGame > 0 ? p.shotsPerGame : 30;
+  return (1 - p.savePct) * shotsPerGame;
+};
+const suppressionSortValue = (p: Player): number | null =>
+  p.xgaRelTM == null ? null : -p.xgaRelTM;
+
+const signedOneDecimal = (n: number): string => `${n > 0 ? "+" : ""}${n.toFixed(1)}`;
+
+const statDisplay = (p: Player, key: PlayerSortKey, actualPPG: (p: Player) => number): string => {
+  switch (key) {
+    case "seasonPts": return seasonPointsOf(p).toString();
+    case "ppg":       return actualPPG(p).toFixed(3);
+    case "pts":       return p.ptsPace.toFixed(1);
+    case "ops":       return p.ops != null ? p.ops.toFixed(1) : "—";
+    case "dps":       return p.dps != null ? p.dps.toFixed(1) : "—";
+    case "toi":       return p.avgTOI.toFixed(1);
+    case "age":       return `${p.age}`;
+    case "cap":       return `$${p.capHit}M`;
+    case "term":      return `${p.yearsRemaining}yr`;
+    case "supp":      return p.xgaRelTM != null ? signedOneDecimal(p.xgaRelTM) : "—";
+    case "gsax":      return (p.gsax ?? 0).toFixed(1);
+    case "svPct":     return p.savePct?.toFixed(3) ?? "—";
+    case "gaa": {
+      const gaa = goalieGaaOf(p);
+      return gaa != null ? gaa.toFixed(2) : "—";
+    }
+    case "gp":        return `${goalieGamesOf(p)}`;
+    default:          return "—";
+  }
+};
 
 function SortHeader({ k, label, active, dir, onClick }: {
   k: PlayerSortKey;
@@ -353,64 +619,29 @@ function SortHeader({ k, label, active, dir, onClick }: {
   onClick: (k: PlayerSortKey) => void;
 }) {
   return (
-    <button className={`col-header${active ? " active" : ""}`} onClick={() => onClick(k)}>
+    <button
+      className={`col-header${active ? " active" : ""}`}
+      style={{ width: "100%", justifySelf: "stretch", textAlign: "center", fontSize: "11px", letterSpacing: "0.04em" }}
+      onClick={() => onClick(k)}
+    >
       {label} {active ? (dir === "desc" ? "▼" : "▲") : ""}
     </button>
   );
 }
 
 // ── Player row ────────────────────────────────────────────────
-function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
+function PlayerRow({ player, team, rank, sortKey, actualPPG, section }: {
   player: Player; team?: Team; rank: number;
-  sortKey: string;
+  sortKey: PlayerSortKey;
   actualPPG: (p: Player) => number;
+  section: PlayerSection;
 }) {
   const [expanded, setExpanded] = useState(false);
   const isG = player.position === "G";
-
-  // Derive labelled stat pairs based on sort key
-  const seasonPoints = Math.round((player.ptsPace / 82) * (player.games ?? 82));
-  const primaryVal = isG
-    ? (player.gsax ?? 0).toFixed(1)
-    : sortKey === "seasonPts" ? seasonPoints.toString()
-    : sortKey === "ppg"   ? actualPPG(player).toFixed(3)
-    : sortKey === "pts"   ? player.ptsPace.toFixed(1)
-    : sortKey === "ops"   ? (player.ops != null ? player.ops.toFixed(1) : "—")
-    : sortKey === "dps"   ? (player.dps != null ? player.dps.toFixed(1) : "—")
-    : sortKey === "toi"   ? player.avgTOI.toFixed(1)
-    : sortKey === "age"   ? `${player.age}`
-    : sortKey === "cap"   ? `$${player.capHit}M`
-    : actualPPG(player).toFixed(3);
-
-  const primaryLabel = isG ? "GSAx"
-    : sortKey === "seasonPts" ? "PTS"
-    : sortKey === "ppg" ? "PPG"
-    : sortKey === "pts" ? "P/82"
-    : sortKey === "ops" ? "OPS"
-    : sortKey === "dps" ? "DPS"
-    : sortKey === "toi" ? "TOI"
-    : sortKey === "age" ? "Age"
-    : sortKey === "cap" ? "Cap"
-    : "PPG";
-
-  const secondaryVal = isG
-    ? (player.savePct?.toFixed(3) ?? "—")
-    : sortKey === "dps" || sortKey === "ops" ? player.ptsPace.toFixed(1)
-    : sortKey === "seasonPts" ? player.ptsPace.toFixed(1)
-    : sortKey === "toi"   ? actualPPG(player).toFixed(3)
-    : sortKey === "age"   ? `$${player.capHit}M`
-    : sortKey === "cap"   ? `${player.yearsRemaining}yr`
-    : sortKey === "term"  ? `$${player.capHit}M`
-    : player.avgTOI.toFixed(1);
-
-  const secondaryLabel = isG ? "SV%"
-    : sortKey === "dps" || sortKey === "ops" ? "P/82"
-    : sortKey === "seasonPts" ? "P/82"
-    : sortKey === "toi"   ? "PPG"
-    : sortKey === "age"   ? "Cap"
-    : sortKey === "cap"   ? "Left"
-    : sortKey === "term"  ? "Cap"
-    : "TOI";
+  const columns = PLAYER_COLUMNS[section];
+  const primary = columns[0];
+  const secondary = columns[1] ?? columns[0];
+  const tertiary = columns[2];
 
   // Abbreviated team name for mobile (use teamId which is already short)
   const teamAbbr = player.teamId;
@@ -423,7 +654,8 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
         className="player-row player-row-desktop"
         style={{
           display: "grid",
-          gridTemplateColumns: "36px 40px minmax(210px,1.2fr) 88px minmax(52px,0.55fr) repeat(8,minmax(52px,0.55fr)) 24px",
+          gridTemplateColumns: playerGridTemplate(section),
+          minWidth: playerGridMinWidth(section),
           alignItems: "center",
           gap: "8px",
           padding: "8px 12px",
@@ -445,11 +677,12 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
         </div>
 
         <div style={{ minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "nowrap", overflow: "hidden", minWidth: 0 }}>
-            <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%", display: "block" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", minWidth: 0 }}>
+            <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--ink)", whiteSpace: "normal", overflowWrap: "anywhere", lineHeight: 1.15, display: "block" }}>
               {player.name}
             </span>
             <ArchetypeBadge player={player} />
+            <PlayerIconBadges player={player} />
             {player.hasNMC && <span style={{ fontSize: "11px", color: "var(--red)", border: "1px solid var(--red)", padding: "0 3px" }}>NMC</span>}
           </div>
           <div style={{ fontSize: "11px", color: "var(--rule)", marginTop: "1px" }}>
@@ -466,34 +699,19 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
           }
         </div>
 
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: "11px", fontWeight: 900, color: "var(--ink)" }}>{isG ? primaryVal : seasonPoints}</div>
-          <div style={{ fontSize: "11px", color: "var(--rule)", textTransform: "uppercase" }}>{isG ? primaryLabel : "PTS"}</div>
-        </div>
-
-        {isG ? (
-          <>
-            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink)", fontWeight: 900 }}>{player.savePct?.toFixed(3) ?? "—"}</div>
-            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)" }}>{player.gamesStarted ?? 0}</div>
-            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)" }}>{player.age}</div>
-            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)" }}>${player.capHit}M</div>
-            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)" }}>{player.yearsRemaining}yr</div>
-            <div />
-            <div />
-            <div />
-          </>
-        ) : (
-          <>
-            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink)", fontWeight: sortKey === "ppg" ? 900 : 700 }}>{actualPPG(player).toFixed(3)}</div>
-            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink)", fontWeight: sortKey === "pts" ? 900 : 700 }}>{player.ptsPace.toFixed(1)}</div>
-            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--blue)", fontWeight: sortKey === "ops" ? 900 : 700 }}>{player.ops != null ? player.ops.toFixed(1) : "—"}</div>
-            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--red)", fontWeight: sortKey === "dps" ? 900 : 700 }}>{player.dps != null ? player.dps.toFixed(1) : "—"}</div>
-            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)", fontWeight: sortKey === "toi" ? 900 : 700 }}>{player.avgTOI.toFixed(1)}</div>
-            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)", fontWeight: sortKey === "age" ? 900 : 700 }}>{player.age}</div>
-            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)", fontWeight: sortKey === "cap" ? 900 : 700 }}>${player.capHit}M</div>
-            <div style={{ textAlign: "right", fontSize: "11px", color: "var(--ink-light)", fontWeight: sortKey === "term" ? 900 : 700 }}>{player.yearsRemaining}yr</div>
-          </>
-        )}
+        {columns.map(({ key }) => (
+          <div key={key} style={{
+            textAlign: "center",
+            fontSize: "11px",
+            color: key === "ops" || key === "gsax" || key === "svPct" ? "var(--blue)"
+              : key === "dps" || key === "supp" || key === "gaa" ? "var(--red)"
+              : key === "seasonPts" || key === "ppg" || key === "pts" ? "var(--ink)"
+              : "var(--ink-light)",
+            fontWeight: sortKey === key ? 900 : key === "seasonPts" || key === "gsax" ? 900 : 700,
+          }}>
+            {statDisplay(player, key, actualPPG)}
+          </div>
+        ))}
         <span style={{ fontSize: "11px", color: "var(--rule)", textAlign: "right" }}>{expanded ? "▲" : "▼"}</span>
       </div>
 
@@ -523,11 +741,12 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
 
           {/* Name + meta */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "nowrap", overflow: "hidden" }}>
-              <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--ink)", whiteSpace: "normal", overflowWrap: "anywhere", lineHeight: 1.15 }}>
                 {player.name}
               </span>
               <ArchetypeBadge player={player} />
+              <PlayerIconBadges player={player} />
               {player.hasNMC && <span style={{ fontSize: "10px", color: "var(--red)", border: "1px solid var(--red)", padding: "0 3px", flexShrink: 0 }}>NMC</span>}
             </div>
             <div style={{ fontSize: "11px", color: "var(--rule)", marginTop: "2px" }}>
@@ -554,14 +773,15 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG }: {
 
           {/* Stats */}
           <div className="player-mobile-stat-row">
-            <StatPill value={primaryVal} label={primaryLabel} accent />
-            <StatPill value={secondaryVal} label={secondaryLabel} />
-            {/* Always show TOI for context unless TOI IS the primary/secondary */}
-            {!isG && sortKey !== "toi" && secondaryLabel !== "TOI" && (
-              <StatPill value={player.avgTOI.toFixed(1)} label="TOI" />
+            <StatPill value={statDisplay(player, primary.key, actualPPG)} label={primary.label} accent />
+            <StatPill value={statDisplay(player, secondary.key, actualPPG)} label={secondary.label} />
+            {tertiary && (
+              <StatPill value={statDisplay(player, tertiary.key, actualPPG)} label={tertiary.label} />
             )}
             {/* Contract shorthand */}
-            <StatPill value={`$${player.capHit}M`} label={`${player.yearsRemaining}yr`} />
+            {!columns.some(c => c.key === "cap") && (
+              <StatPill value={`$${player.capHit}M`} label={`${player.yearsRemaining}yr`} />
+            )}
           </div>
         </div>
       </div>
@@ -590,6 +810,43 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
   );
 }
 
+function SectionColumnHeader({ section, sortKey, sortDir, onSort }: {
+  section: PlayerSection;
+  sortKey: PlayerSortKey;
+  sortDir: "desc" | "asc";
+  onSort: (k: PlayerSortKey) => void;
+}) {
+  return (
+    <div className="players-column-header" style={{
+      display: "grid",
+      gridTemplateColumns: playerGridTemplate(section),
+      minWidth: playerGridMinWidth(section),
+      gap: "8px",
+      padding: "6px 12px",
+      borderBottom: "1px solid #1c140a",
+      background: "#f2ecd7",
+    }}>
+      <div style={{ fontSize: "10px", color: "var(--rule)", textAlign: "right", textTransform: "uppercase", fontWeight: 900 }}>Rank</div>
+      <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Photo</div>
+      <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Player</div>
+      <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "center" }}>
+        {section === "G" ? "Role" : "Strand"}
+      </div>
+      {PLAYER_COLUMNS[section].map(({ key, label }) => (
+        <SortHeader
+          key={key}
+          k={key}
+          label={label}
+          active={sortKey === key}
+          dir={sortDir}
+          onClick={onSort}
+        />
+      ))}
+      <div />
+    </div>
+  );
+}
+
 function SectionPager({ total, pageSize, page, onPage }: {
   total: number;
   pageSize: number;
@@ -601,13 +858,13 @@ function SectionPager({ total, pageSize, page, onPage }: {
   return (
     <div style={{ padding: "10px 12px", borderTop: "1px solid var(--rule-light)", background: "#f2ecd7" }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: "8px", alignItems: "center" }}>
-        <button className="filter-btn" style={{ width: "100%", padding: "8px" }} disabled={page <= 1} onClick={() => onPage(Math.max(1, page - 1))}>
+        <button className="filter-btn" style={{ width: "100%", padding: "8px", fontSize: "11px", letterSpacing: "0.04em" }} disabled={page <= 1} onClick={() => onPage(Math.max(1, page - 1))}>
           ‹ Prev
         </button>
         <span style={{ fontSize: "11px", fontWeight: 900, color: "var(--rule)", textTransform: "uppercase", letterSpacing: "0.12em", whiteSpace: "nowrap" }}>
           Page {page} of {pageCount}
         </span>
-        <button className="filter-btn" style={{ width: "100%", padding: "8px" }} disabled={page >= pageCount} onClick={() => onPage(Math.min(pageCount, page + 1))}>
+        <button className="filter-btn" style={{ width: "100%", padding: "8px", fontSize: "11px", letterSpacing: "0.04em" }} disabled={page >= pageCount} onClick={() => onPage(Math.min(pageCount, page + 1))}>
           Next ›
         </button>
       </div>
@@ -731,9 +988,8 @@ export default function PlayersPage() {
         if (!bHas) return -1;
         return (sortDir === "desc" ? bv! - av! : av! - bv!) || tie;
       };
-      const seasonPts = (p: Player) => Math.round((p.ptsPace / 82) * (p.games ?? 82));
       switch (sortKey) {
-        case "seasonPts": return compare(seasonPts(a), seasonPts(b));
+        case "seasonPts": return compare(seasonPointsOf(a), seasonPointsOf(b));
         case "ppg": return compare(actualPPG(a), actualPPG(b));
         case "pts": return compare(a.ptsPace, b.ptsPace);
         case "toi": return compare(a.avgTOI, b.avgTOI);
@@ -742,6 +998,7 @@ export default function PlayersPage() {
         case "age": return compare(a.age, b.age);
         case "cap": return compare(a.capHit, b.capHit);
         case "term": return compare(a.yearsRemaining, b.yearsRemaining);
+        case "supp": return compare(suppressionSortValue(a), suppressionSortValue(b));
         default:    return compare(actualPPG(a), actualPPG(b));
       }
     };
@@ -758,7 +1015,15 @@ export default function PlayersPage() {
       if (sortKey === "age") return compare(a.age, b.age);
       if (sortKey === "cap") return compare(a.capHit, b.capHit);
       if (sortKey === "term") return compare(a.yearsRemaining, b.yearsRemaining);
-      return ((b.gsax ?? Number.NEGATIVE_INFINITY) - (a.gsax ?? Number.NEGATIVE_INFINITY)) || tie;
+      if (sortKey === "gsax") return compare(a.gsax, b.gsax);
+      if (sortKey === "svPct") return compare(a.savePct, b.savePct);
+      if (sortKey === "gaa") {
+        const aGaa = goalieGaaOf(a);
+        const bGaa = goalieGaaOf(b);
+        return compare(aGaa == null ? null : -aGaa, bGaa == null ? null : -bGaa);
+      }
+      if (sortKey === "gp") return compare(goalieGamesOf(a), goalieGamesOf(b));
+      return compare(a.gsax, b.gsax);
     };
 
     const sortedSkaters = [...sk].sort(sortFn);
@@ -819,6 +1084,7 @@ export default function PlayersPage() {
             <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
               {(["ALL","F","D","G"] as const).map(p => (
                 <button key={p} className={`filter-btn${posFilter === p ? " active" : ""}`}
+                  style={{ fontSize: "11px", letterSpacing: "0.04em" }}
                   onClick={() => setPosFilter(p)}>
                   {p === "ALL" ? "All" : p === "F" ? "Forwards" : p === "D" ? "Defence" : "Goalies"}
                 </button>
@@ -847,6 +1113,8 @@ export default function PlayersPage() {
         </div>
       </div>
 
+      <PlayersIconKey />
+
       {/* Table */}
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 0 40px" }}>
         {loading ? (
@@ -859,45 +1127,13 @@ export default function PlayersPage() {
           </div>
         ) : (
           <>
-            {/* Column headers */}
-            {filtered.length > 0 && (
-              <div className="players-column-header" style={{
-                display: "grid",
-                gridTemplateColumns: "36px 40px minmax(210px,1.2fr) 88px minmax(52px,0.55fr) repeat(8,minmax(52px,0.55fr)) 24px",
-                minWidth: "880px",
-                gap: "8px",
-                padding: "6px 12px",
-                borderBottom: "2px solid #1c140a",
-                background: "#f2ecd7",
-                position: "sticky", top: 0, zIndex: 10,
-                borderTop: "1px solid #b8a070",
-              }}>
-                <div style={{ fontSize: "10px", color: "var(--rule)", textAlign: "right", textTransform: "uppercase", fontWeight: 900 }}>Rank</div>
-                <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Photo</div>
-                <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Player</div>
-                <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "center" }}>Strand</div>
-                {posFilter === "G"
-                  ? <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "right" }}>GSAx</div>
-                  : <SortHeader k="seasonPts" label="PTS" active={sortKey === "seasonPts"} dir={sortDir} onClick={handleSortKey} />
-                }
-                <SortHeader k="ppg" label="PPG" active={sortKey === "ppg"} dir={sortDir} onClick={handleSortKey} />
-                <SortHeader k="pts" label="P/82" active={sortKey === "pts"} dir={sortDir} onClick={handleSortKey} />
-                <SortHeader k="ops" label="OPS" active={sortKey === "ops"} dir={sortDir} onClick={handleSortKey} />
-                <SortHeader k="dps" label="DPS" active={sortKey === "dps"} dir={sortDir} onClick={handleSortKey} />
-                <SortHeader k="toi" label="TOI" active={sortKey === "toi"} dir={sortDir} onClick={handleSortKey} />
-                <SortHeader k="age" label="Age" active={sortKey === "age"} dir={sortDir} onClick={handleSortKey} />
-                <SortHeader k="cap" label="Cap" active={sortKey === "cap"} dir={sortDir} onClick={handleSortKey} />
-                <SortHeader k="term" label="Term" active={sortKey === "term"} dir={sortDir} onClick={handleSortKey} />
-                <div />
-              </div>
-            )}
-
             {/* Forwards */}
             {showForwards && (
               <div className="section-shell" style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
                 <SectionHeader label="Forwards" count={forwards.length} />
+                <SectionColumnHeader section="F" sortKey={sortKey} sortDir={sortDir} onSort={handleSortKey} />
                 {visibleForwards.map((p, i) => (
-                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(forwardPage - 1) * FORWARD_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} />
+                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(forwardPage - 1) * FORWARD_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="F" />
                 ))}
                 <SectionPager total={forwards.length} pageSize={FORWARD_CAP} page={forwardPage} onPage={setForwardPage} />
               </div>
@@ -907,8 +1143,9 @@ export default function PlayersPage() {
             {showDefence && (
               <div className="section-shell" style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
                 <SectionHeader label="Defence" count={defence.length} />
+                <SectionColumnHeader section="D" sortKey={sortKey} sortDir={sortDir} onSort={handleSortKey} />
                 {visibleDefence.map((p, i) => (
-                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(defencePage - 1) * DEFENCE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} />
+                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(defencePage - 1) * DEFENCE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="D" />
                 ))}
                 <SectionPager total={defence.length} pageSize={DEFENCE_CAP} page={defencePage} onPage={setDefencePage} />
               </div>
@@ -917,9 +1154,10 @@ export default function PlayersPage() {
             {/* Goalies */}
             {showGoalies && (
               <div className="section-shell" style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
-                <SectionHeader label="Goalies · GSAx" count={goalies.length} />
+                <SectionHeader label="Goalies" count={goalies.length} />
+                <SectionColumnHeader section="G" sortKey={sortKey} sortDir={sortDir} onSort={handleSortKey} />
                 {visibleGoalies.map((p, i) => (
-                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(goaliePage - 1) * GOALIE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} />
+                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(goaliePage - 1) * GOALIE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="G" />
                 ))}
                 <SectionPager total={goalies.length} pageSize={GOALIE_CAP} page={goaliePage} onPage={setGoaliePage} />
               </div>

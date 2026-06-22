@@ -655,9 +655,6 @@ select.ledger-select {
 .players-filter-bar {
   background: var(--paper);
   border-bottom: 2px solid var(--ledger-ink);
-  position: sticky;
-  top: 0;
-  z-index: 20;
 }
 
 /* Row 1: count label + search — side by side on desktop, stacked on mobile */

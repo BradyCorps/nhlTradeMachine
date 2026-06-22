@@ -29,79 +29,162 @@ Longer-term goal:
 * Treat MoneyPuck as one preferred source, not the only source.
 * Build source diagnostics into admin workflows so data problems are visible before they affect trade valuation.
 
-# Ledger Trade Tracker + Admin Trade System
+# The Docket — build plan (actionable, gated)
 
-## Concept
-A persistent, NAV-graded record of real NHL trades. Where TSN/PuckPedia list that a
-trade happened, the Ledger grades it: which team won, by how much NAV, or whether it
-was fair — using our own X-NAV + GM-audit engine. Public-facing "Ledger Trade Tracker"
-page + an admin ingestion panel. Doubles as a content/marketing hook (shareable
-"Team X won this deal +38 NAV") and as a live calibration signal for the NAV model.
+Actionable breakdown of the **The Docket** concept (see `FUTURECONCEPTS.md → The Docket`
+for rationale). Follow **AGENTS.md → Task Discipline**: one scoped task per run, minimal
+diff, `npm test` + typecheck before finishing.
 
-## Grading — dual mode (both, by design)
-Every trade record carries TWO grades:
-- **At-trade (snapshot):** the verdict computed at ingestion and FROZEN — "who won the
-  trade the day it was made." This is the TSN-style locked verdict.
-- **Today (dynamic):** recomputed on read from current player data — "how it has aged"
-  (the pick became a stud, the vet declined, etc.).
-The page shows both: e.g. "At trade: EVEN · Today: WPG +30". Dynamic is computed on
-load (optionally cached with a timestamp); snapshot is immutable.
+> NOT in the active queue yet. These are **gated** behind prerequisites (auth + Phase 2
+> consolidation). The user promotes a phase into `docs/TASKS.md` when its gate is met. Do
+> NOT start a Docket write/roster task before its prerequisite phase is done.
 
-## Data model
-`trades` table (one row per transaction):
-- `id`, `executedDate`, `source` ("manual" | "scraped"), `sourceUrl`, `season`
-- `sides`: array of { teamId, assetsGiven[] } — modeled as N teams (render 2 now,
-  structure ready for 3-team)
-- each asset: { kind: "player" | "pick", ref: {id, nameSlug}, retainedPct,
-  **inputSnapshot** (the engine inputs at trade time — capHit, age, pace, etc.),
-  navAtTrade }
-- `conditions`: free-text (conditional picks / future considerations) — v1 is notes only
-- `lockedVerdict`: full evaluate verdict at ingestion (status, metrics, per-side NAV)
-- `gradeAtTrade`: { perTeamNetNav, winner, fairness }
-NOTE: store the **input snapshot**, not just asset IDs — stats/contracts move, and IDs
-alone are unreliable (the Woll cross-team dedup issue proves this). The existing
-`trade-share` payload already snapshots+locks a verdict; reuse that shape.
+Decisions baked in (from review):
+- Renamed Ledger Trade Tracker → **The Docket** (entries are *rulings*, not just a log).
+- A published trade **mutates rosters app-wide** via a **non-destructive transactions
+  overlay** applied at ONE canonical roster-assembly module — never direct DB rewrites
+  (a re-scrape would clobber them).
+- **Dynamic Cap Space is a delta** off the authoritative static `capSpace`, not a full
+  roster recompute (preserves Decision A's accuracy for LTIR/bonuses/buried money).
+- Dual grade: at-trade snapshot (frozen) + today (dynamic on read).
+- Auth + Phase 2 consolidation are HARD prerequisites.
 
-## Ingestion
-- **v1: manual admin entry** — admin builds the trade in a form (same asset pickers as
-  the trade machine), the engine grades it, the snapshot is frozen on save.
-- **later: assisted/automated** — scrape PuckPedia/CapFriendly/TSN or import a dataset;
-  admin confirms before commit. (NHL has no clean trade feed, so human-in-the-loop.)
+Legend: `[ ]` to-do · `[gate]` prerequisite outside this plan.
 
-## v1 scope cuts
-- 2-team trades + salary retention (model `sides` as N for forward-compat).
-- 3-team trades, conditional picks, and future considerations: represent as notes/flags
-  in v1; full valuation in a later phase.
-
-## Ledger Trade Tracker page
-A filterable/sortable list of graded trades (by date, team, NAV margin, winner). Each
-row: the two packages, at-trade verdict, today verdict, and a NAV-margin chip. Reuses
-`VerdictPanel` for the expanded view.
-
-## NAV calibration loop (validation, NOT training)
-Real returns are noisy (cap dumps, locker-room fits, GM error, hidden info), so DO NOT
-auto-refit NAV weights to observed returns — that bakes one-off bad decisions into the
-model. Instead:
-- Plot NAV-delta-at-trade vs. market reality across many deals as a **diagnostic**.
-- Flag systematic disagreements (NAV says negative, market paid a 1st + prospect) as
-  **model-refinement candidates** for a human to review.
-- Seed the historical ledger from a downloadable trades dataset (hockey-reference /
-  PuckPedia exports / Kaggle NHL trades) to get enough sample to calibrate against.
-
-## Dependencies & sequencing
-Build AFTER (1) the consolidation (Phase 2) — a persistent graded ledger must sit on the
-canonical NAV + roster/identity layer, not the drift-prone twin pipelines — and (2) auth,
-since this is a write-heavy admin system and an open admin could pollute trade history.
-
-## Reuse map
-evaluate engine (grading) · trade-share snapshot/lock (per-trade record) · VerdictPanel
-(display) · trade-machine asset pickers (admin ingestion) · team/player data layer.
-
-## Open decisions
-- Dynamic re-grade: recompute live every load, or cache + refresh nightly?
-- Pick valuation for conditional picks (range? expected value?).
-- How far back to seed (recent seasons vs. multi-year history for calibration).
 ---
+
+## Phase A — Prerequisites (gates)
+
+### [gate] A1 — admin auth
+The Docket is write-heavy and mutates league state app-wide; an open admin could corrupt
+rosters/cap for everyone. Real auth on the admin surface must land first. (Tracked
+separately; the current open-admin state is the known out-of-scope item.)
+
+### [gate] A2 — Phase 2 consolidation: canonical roster-assembly module
+A single module that builds the league roster (dedup, DB-injection, stat attachment) used
+by BOTH `/api/league` and `/api/league/players`. The Docket overlay and Dynamic Cap Space
+both attach here; with the current twin pipelines the overlay would apply in one path and
+miss in another (Woll/GSAX drift class). (Tracked as Phase 2 `2a` in the consolidation plan.)
+
+### [ ] A3a — shared cap-delta helper
+Add a pure helper `applyCapDelta(baselineCapSpace, moves)` where `moves` is the per-team set
+of incoming/outgoing assets with `capHit` and `retainedPct`. Returns effective cap space:
+baseline − incoming cap (net of retention held by the other team) + outgoing cap (net of
+retention this team keeps). No I/O; unit-testable in isolation.
+Acceptance: characterization tests cover a straight swap, a retained-salary move, and a
+pick-only move (no cap change); `npm test` + typecheck pass.
+
+### [ ] A3b — wire Dynamic Cap Space into the canonical roster layer + Armchair GM
+Use `applyCapDelta` so cap space reacts to roster moves: the canonical roster module exposes
+effective cap space after any applied overlay (Phase C), and Armchair GM's hypothetical
+trades compute their preview cap via the SAME helper (replacing any ad-hoc inline math).
+Static baseline `capSpace` stays the source of truth when there are no moves (Decision A).
+Acceptance: with no trades, cap space equals today's static value; after a modeled move the
+two involved teams' cap shifts by the correct delta (incl. retention); non-involved teams
+unchanged; `npm test` + typecheck pass.
+
+---
+
+## Phase B — The Docket core (persistence + grading)  [needs A1]
+
+### [ ] B1 — `trades` data model + persistence
+Add a `trades` table: `id`, `executedDate`, `source` ("manual"|"scraped"), `sourceUrl`,
+`season`, `sides` (array of `{ teamId, assetsGiven[] }`, N-team-ready, render 2), each asset
+`{ kind:"player"|"pick", ref:{id,nameSlug}, retainedPct, inputSnapshot, navAtTrade }`,
+`conditions` (free-text), `lockedVerdict`, `gradeAtTrade` `{ perTeamNetNav, winner,
+fairness }`, `published` (bool). Store the **inputSnapshot** (engine inputs at trade time),
+not just IDs — stats/contracts move and IDs alone are unreliable (Woll proves it).
+Acceptance: migration creates the table; a row round-trips through the data layer with the
+snapshot intact; `npm test` + typecheck pass.
+
+### [ ] B2 — grade + freeze at ingestion (reuse trade-share lock)
+On save, run the evaluate engine over the trade, capture the full verdict + per-asset
+`navAtTrade` + `inputSnapshot`, and FREEZE them into `lockedVerdict`/`gradeAtTrade`. Reuse
+the existing `trade-share` snapshot/lock shape rather than inventing a new one.
+Acceptance: saving a trade persists an immutable at-trade verdict that does not change when
+underlying player data later changes; `npm test` + typecheck pass.
+
+### [ ] B3 — admin ingestion panel
+Admin-only form to build a trade with the SAME asset pickers as the trade machine (teams,
+players, picks, retention), preview the grade, then save (B2) as unpublished draft.
+Acceptance: an admin can assemble a 2-team trade with retention, see the grade, and save a
+draft; non-admins can't reach it (A1); `npm test` + typecheck pass.
+
+---
+
+## Phase C — Roster mutation (app-wide)  [needs A2, A3, B1–B3]
+
+### [ ] C1 — transactions overlay at the canonical roster-assembly module
+On read, transform the base scraped roster by applying ordered **published** trades (reuse
+Armchair GM `executeTrade` movement logic, now persisted + global). Non-destructive: scrapes
+keep refreshing stats/contracts; the overlay keeps players on their new teams. Players page,
+team pages, Armchair GM, and sim all read through this module so the move is reflected
+everywhere.
+Acceptance: publishing a trade moves the player across every roster surface; a subsequent
+stat refresh does NOT revert the move; unpublishing restores the base roster; `npm test` +
+typecheck pass.
+
+### [ ] C2 — cap recompute on overlay (via A3 delta)
+After the overlay applies, recompute the involved teams' cap via `applyCapDelta` so cap
+reflects the moved (and retained) salary. Reopens Decision A for traded teams only by design.
+Acceptance: after a published trade, both teams' cap shifts by the correct retention-adjusted
+delta; untraded teams unchanged; `npm test` + typecheck pass.
+
+### [ ] C3 — publish / unpublish / edit + overlay reconciliation
+Admin can publish, unpublish, and edit a trade (the overlay is the unit of revert). Add
+reconciliation: when a later real scrape already shows the player on his new team, the
+overlay detects the match and retires itself instead of double-applying.
+Acceptance: publish/unpublish toggles the app-wide move; a bad entry is fully revertible;
+an already-reconciled trade does not double-move the player; `npm test` + typecheck pass.
+
+---
+
+## Phase D — Public surface  [needs B–C]
+
+### [ ] D1 — public Docket page (list / filter / sort)
+Filterable, sortable list of published graded trades (by date, team, NAV margin, winner).
+Each row: the two packages, at-trade verdict, today verdict, NAV-margin chip.
+Acceptance: the page lists published trades and filters/sorts by the above; drafts are hidden;
+`npm test` + typecheck pass.
+
+### [ ] D2 — expanded entry: full ruling + per-player detail
+Expanded view reuses `VerdictPanel`, and for each player shows NAV metrics (at-trade + today),
+impact metrics (evaluate/sim), **STRAND** (`StrandDisplay`), and **Development Outlook**
+(`DevelopmentProfilePanel`). Picks show pick-curve NAV; conditional picks show as notes.
+Acceptance: expanding an entry shows the verdict plus per-player NAV/impact/STRAND/outlook;
+`npm test` + typecheck pass.
+
+### [ ] D3 — dual-grade dynamic re-grade on read
+Compute the "today" verdict on load from current data (snapshot stays frozen). Render both,
+e.g. "At trade: EVEN · Today: WPG +30". Decide cache vs live (see open decisions).
+Acceptance: the today grade reflects current player data while the at-trade grade is
+unchanged; `npm test` + typecheck pass.
+
+---
+
+## Phase E — Later (post-v1)
+
+### [ ] E1 — NAV calibration diagnostic (validation, NOT training)
+A diagnostic view plotting NAV-delta-at-trade vs. market reality across many deals. Flags
+systematic disagreements (NAV negative but a 1st + prospect paid — the Parayko class) as
+human-review candidates. DO NOT auto-refit NAV weights to observed returns.
+Acceptance: the view surfaces per-trade NAV vs. realized return and flags outliers; no engine
+weights are auto-modified; `npm test` + typecheck pass.
+
+### [ ] E2 — assisted/automated ingestion + historical seed
+Import from PuckPedia/CapFriendly/dataset with admin confirm before commit; seed history from
+a downloadable trades dataset for calibration sample.
+Acceptance: a batch import lands as unpublished drafts for admin review; `npm test` +
+typecheck pass.
+
+---
+
+## Open decisions (carry from concept)
+- Dynamic re-grade (D3): live every load vs. cache + nightly refresh.
+- Cap recompute scope (C2): traded teams only (current plan) vs. league-wide.
+- Conditional-pick valuation: notes-only (v1) vs. expected-value later.
+- Historical seed depth (E2): recent seasons vs. multi-year.
+
 
 ## Fantasy Expansion
 
@@ -161,61 +244,3 @@ Possible directions:
 Core goal:
 
 * Move beyond immediate season impact and show whether a trade helps or hurts the full competitive window.
-
-
----
-
-# Ledger Trade Tracker + Admin Trade System
-
-## Concept
-A persistent, NAV-graded record of real NHL trades. Where TSN/PuckPedia list that a trade
-happened, the Ledger grades it: which team won, by how much NAV, or whether it was fair —
-using our X-NAV + GM-audit engine. Public "Ledger Trade Tracker" page + an admin ingestion
-panel. Doubles as a content/marketing hook and a live calibration signal for NAV.
-
-## Grading — dual mode (both, by design)
-Every trade record carries TWO grades:
-- **At-trade (snapshot):** verdict computed at ingestion and FROZEN — "who won the day it
-  was made" (TSN-style locked verdict; reuse the `trade-share` lock shape).
-- **Today (dynamic):** recomputed on read from current data — "how it has aged."
-Show both, e.g. "At trade: EVEN · Today: WPG +30".
-
-## Data model
-`trades` table: `id`, `executedDate`, `source` ("manual"|"scraped"), `sourceUrl`, `season`;
-`sides`: array of `{ teamId, assetsGiven[] }` (model as N teams; render 2 now); each asset
-`{ kind, ref:{id,nameSlug}, retainedPct, inputSnapshot (engine inputs at trade time),
-navAtTrade }`; `conditions` (free-text, v1 notes only); `lockedVerdict`; `gradeAtTrade`.
-Store the input snapshot, not just IDs (stats/contracts move; IDs alone unreliable — the
-Woll dedup issue proves it).
-
-## Ingestion
-v1 manual admin entry (reuse trade-machine asset pickers → grade → freeze on save); later
-assisted/automated import from PuckPedia/CapFriendly/dataset with human confirm.
-
-## v1 scope cuts
-2-team + retention (sides modeled as N for forward-compat). 3-team, conditional picks,
-future considerations: notes/flags in v1; full valuation later.
-
-## Page
-Filterable/sortable list of graded trades (date, team, NAV margin, winner); expanded view
-reuses `VerdictPanel`.
-
-## NAV calibration loop (validation, NOT training)
-Real returns are noisy — DO NOT auto-refit NAV to observed returns. Use as a diagnostic:
-plot NAV-delta-at-trade vs market reality; flag systematic disagreements (e.g. NAV negative
-but a 1st + prospect paid — the Parayko class) as model-refinement candidates. Seed from a
-downloadable trades dataset for sample.
-
-## Dependencies & sequencing
-Build AFTER consolidation (Phase 2) — sits on the canonical NAV + roster/identity layer,
-not the drift-prone twin pipelines — and AFTER auth (write-heavy admin; open admin could
-pollute trade history).
-
-## Reuse map
-evaluate engine (grading) · trade-share snapshot/lock · VerdictPanel · trade-machine asset
-pickers · team/player data layer.
-
-## Open decisions
-- Dynamic re-grade: live every load vs cache + nightly refresh?
-- Conditional-pick valuation (range / expected value).
-- How far back to seed for calibration.

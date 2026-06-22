@@ -267,6 +267,133 @@ describe("Development Timeline Layer — fixture archetypes", () => {
     expect(mcdavid.projectionBand.confidence).toBeGreaterThan(80);
   });
 
+  it("separates extreme elite scorers in production and projection instead of flattening them", () => {
+    const elite = profile({
+      id: "elite-center",
+      name: "Elite Center",
+      position: "C",
+      age: 27,
+      nhlGames: 520,
+      ptsPace: 92,
+      avgTOI: 20,
+      draftOverall: 3,
+      snapshots: [
+        { season: "2023-24", age: 25, league: "NHL", games: 78, goals: 34, assists: 50, points: 84, ptsPerGame: 1.08, nhlePtsPace: 88, avgTOI: 19.5 },
+        { season: "2024-25", age: 26, league: "NHL", games: 80, goals: 36, assists: 53, points: 89, ptsPerGame: 1.11, nhlePtsPace: 91, avgTOI: 20 },
+        { season: "2025-26", age: 27, league: "NHL", games: 82, goals: 38, assists: 54, points: 92, ptsPerGame: 1.12, nhlePtsPace: 92, avgTOI: 20 },
+      ],
+    });
+    const highElite = profile({
+      id: "high-elite-center",
+      name: "High Elite Center",
+      position: "C",
+      age: 27,
+      nhlGames: 520,
+      ptsPace: 135,
+      avgTOI: 22,
+      draftOverall: 1,
+      internationalScore: 100,
+      snapshots: [
+        { season: "2023-24", age: 25, league: "NHL", games: 78, goals: 43, assists: 74, points: 117, ptsPerGame: 1.5, nhlePtsPace: 123, avgTOI: 21.5 },
+        { season: "2024-25", age: 26, league: "NHL", games: 80, goals: 48, assists: 82, points: 130, ptsPerGame: 1.63, nhlePtsPace: 133, avgTOI: 22 },
+        { season: "2025-26", age: 27, league: "NHL", games: 82, goals: 50, assists: 85, points: 135, ptsPerGame: 1.65, nhlePtsPace: 135, avgTOI: 22 },
+      ],
+    });
+    const generational = profile({
+      id: "generational-center",
+      name: "Generational Center",
+      position: "C",
+      age: 27,
+      nhlGames: 520,
+      ptsPace: 150,
+      avgTOI: 22,
+      draftOverall: 1,
+      internationalScore: 100,
+      snapshots: [
+        { season: "2023-24", age: 25, league: "NHL", games: 78, goals: 48, assists: 82, points: 130, ptsPerGame: 1.67, nhlePtsPace: 137, avgTOI: 21.5 },
+        { season: "2024-25", age: 26, league: "NHL", games: 80, goals: 52, assists: 92, points: 144, ptsPerGame: 1.8, nhlePtsPace: 148, avgTOI: 22 },
+        { season: "2025-26", age: 27, league: "NHL", games: 82, goals: 56, assists: 94, points: 150, ptsPerGame: 1.83, nhlePtsPace: 150, avgTOI: 22 },
+      ],
+    });
+
+    expect(elite.productionScore).toBeLessThan(100);
+    expect(generational.productionScore).toBeGreaterThan(elite.productionScore);
+    expect(generational.projectionBand.medianPts82).toBeGreaterThan(highElite.projectionBand.medianPts82);
+    expect(generational.projectionBand.ceilingPts82).toBeGreaterThan(highElite.projectionBand.ceilingPts82);
+  });
+
+  it("uses games played durability to separate identical per-82 profiles", () => {
+    const durable = profile({
+      id: "durable-wing",
+      name: "Durable Wing",
+      position: "W",
+      age: 27,
+      nhlGames: 246,
+      ptsPace: 70,
+      avgTOI: 18,
+      snapshots: [
+        { season: "2023-24", age: 25, league: "NHL", games: 82, goals: 30, assists: 40, points: 70, ptsPerGame: 0.85, nhlePtsPace: 70, avgTOI: 18 },
+        { season: "2024-25", age: 26, league: "NHL", games: 82, goals: 30, assists: 40, points: 70, ptsPerGame: 0.85, nhlePtsPace: 70, avgTOI: 18 },
+        { season: "2025-26", age: 27, league: "NHL", games: 82, goals: 30, assists: 40, points: 70, ptsPerGame: 0.85, nhlePtsPace: 70, avgTOI: 18 },
+      ],
+    });
+    const injuryProne = profile({
+      id: "injury-prone-wing",
+      name: "Injury Prone Wing",
+      position: "W",
+      age: 27,
+      nhlGames: 90,
+      ptsPace: 70,
+      avgTOI: 18,
+      snapshots: [
+        { season: "2023-24", age: 25, league: "NHL", games: 30, goals: 11, assists: 15, points: 26, ptsPerGame: 0.87, nhlePtsPace: 70, avgTOI: 18 },
+        { season: "2024-25", age: 26, league: "NHL", games: 30, goals: 11, assists: 15, points: 26, ptsPerGame: 0.87, nhlePtsPace: 70, avgTOI: 18 },
+        { season: "2025-26", age: 27, league: "NHL", games: 30, goals: 11, assists: 15, points: 26, ptsPerGame: 0.87, nhlePtsPace: 70, avgTOI: 18 },
+      ],
+    });
+
+    expect(durable.durabilityScore).toBeGreaterThan(injuryProne.durabilityScore);
+    expect(injuryProne.regressionRisk).toBeGreaterThan(durable.regressionRisk);
+    expect(injuryProne.bustScore).toBeGreaterThan(durable.bustScore);
+    expect(durable.projectionBand.confidence).toBeGreaterThan(injuryProne.projectionBand.confidence);
+  });
+
+  it("adds peak-years-left framing only for established veterans", () => {
+    const veteran = profile({
+      id: "veteran-star",
+      name: "Veteran Star",
+      position: "C",
+      age: 33,
+      nhlGames: 850,
+      ptsPace: 102,
+      avgTOI: 20,
+      draftOverall: 4,
+      snapshots: [
+        { season: "2023-24", age: 31, league: "NHL", games: 76, goals: 35, assists: 55, points: 90, ptsPerGame: 1.18, nhlePtsPace: 96, avgTOI: 20 },
+        { season: "2024-25", age: 32, league: "NHL", games: 78, goals: 37, assists: 58, points: 95, ptsPerGame: 1.22, nhlePtsPace: 100, avgTOI: 20 },
+        { season: "2025-26", age: 33, league: "NHL", games: 80, goals: 40, assists: 60, points: 100, ptsPerGame: 1.25, nhlePtsPace: 102, avgTOI: 20 },
+      ],
+    });
+    const prospect = profile({
+      id: "young-prospect",
+      name: "Young Prospect",
+      position: "W",
+      age: 22,
+      nhlGames: 120,
+      ptsPace: 52,
+      avgTOI: 16,
+      draftOverall: 5,
+      snapshots: [
+        { season: "2024-25", age: 21, league: "NHL", games: 58, goals: 16, assists: 20, points: 36, ptsPerGame: 0.62, nhlePtsPace: 51, avgTOI: 15 },
+        { season: "2025-26", age: 22, league: "NHL", games: 62, goals: 18, assists: 21, points: 39, ptsPerGame: 0.63, nhlePtsPace: 52, avgTOI: 16 },
+      ],
+    });
+
+    expect(veteran.peakYearsLeft).toBeDefined();
+    expect(veteran.peakYearsLeft).toBeGreaterThanOrEqual(0);
+    expect(prospect.peakYearsLeft).toBeUndefined();
+  });
+
   it("elite peak players do not fall to UNKNOWN when the route only has current-season games", () => {
     const p = profile({
       id: "mcdavid-route",

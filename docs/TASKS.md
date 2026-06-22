@@ -10,7 +10,7 @@ Legend: `[ ]` to-do · `[~]` partial / verify-then-close
 
 ---
 
-## Correctness
+## [x] Correctness
 
 ### [x] Task 0.3 — import-draft-class overwrite guard
 File: `app/api/admin/import-draft-class/route.ts`. On an existing id, only apply ELC
@@ -102,7 +102,7 @@ Armchair GM call site. If the diff balloons, split into "thread lineup into payl
 
 ---
 
-## Valuation
+## [x] Valuation
 
 ### [x] R3 — defensive-D undervaluation (the Parayko case)
 File: `app/lib/xnav-engine.ts` (`calcSkaterNAV`). A shutdown top-pair D — ~22+ TOI, modest
@@ -138,28 +138,28 @@ short deals — compact it to a stat/sparkline. If both are already addressed, m
 CONFIRMEDFIXES.
 
 ---
-## UI/UX Fixes
+## [x] UI/UX Fixes
 
-### [] UI1 - `app/players/page.tsx` button font is too small. 
+### [x] UI1 - `app/players/page.tsx` button font is too small. 
 - Need this to be readable for people who arent aware of what is going on. PTS, PPG, buttons are illegiable.
 
-### [] UI2 - `app/players/page.tsx` players names need to be listed at full at all times. 
+### [x] UI2 - `app/players/page.tsx` players names need to be listed at full at all times. 
 - We can apply the ICON key to this page. Players page still follows the PlayerMaker, Sniper, Scorer Architype so we will have to add icons there. 
 
-### [] UI3 - `app/players/page.tsx` defence and goalie headers need to have their own sorting. 
+### [x] UI3 - `app/players/page.tsx` defence and goalie headers need to have their own sorting. 
 - Defence and goalies need to have their own listed categories. For Defence we should have PTS, OPS, DPS, TOI, AGE, CONTRACT, YRS LEFT and SUPP to replace PPG. Goalies should have GSAX, SV%, GAA, Contract, Yrs left and GP.
 
-### [] UI4 - `app/players/page.tsx` needs to follow to have the same icons fed into it like on the Armchair GM Asset Card. 
+### [x] UI4 - `app/players/page.tsx` needs to follow to have the same icons fed into it like on the Armchair GM Asset Card. 
 - Megalodon, Frachise, Surplus, Pedigree, etc. 
 
-### [] UI5 - `app/players/page.tsx` although duplicate, needs the icon key found at the top.
+### [x] UI5 - `app/players/page.tsx` although duplicate given there is one in the footer, needs a proper icon key found at the top.
 - Users need reference to what they are looking at, at the page load, not having to scroll down to the glossary.
 
 
 
-## Development Outlook
+## [x] Development Outlook
 
-### [~] D1 — production scale + projection clamps (dynasty cliff already done)
+### [x] D1 — production scale + projection clamps (dynasty cliff already done)
 Remaining only (dynasty age-cliff graduation is already in `development-profile.ts`):
 1. `productionScale` still flattens elite scorers (W 90 / C 95 / D 65) — raise (~W 110 /
    C 115 / D 75) or add a soft curve above 100 so a 150-pt and a 92-pt scorer separate.
@@ -169,7 +169,7 @@ Acceptance: two elite producers with different pts no longer both read productio
 projections separate; dev-profile tests updated for the intentional shifts; `npm test` +
 typecheck pass.
 
-### [ ] D2 — durability / games-played as a development input
+### [x] D2 — durability / games-played as a development input
 File: `app/lib/development-profile.ts` (+ surface in panel). An 82-game iron-man and an
 injury-prone star with the same per-82 pace currently read identically.
 - Compute `durabilityScore` (0–100) in `calcDevelopmentProfile` from per-season `games`
@@ -182,7 +182,7 @@ Acceptance: two players with identical per-82 pace but different season GP get d
 durability/risk/confidence; panel shows Durability; existing dev-profile tests stay green
 (update intentional shifts); `npm test` + typecheck pass.
 
-### [ ] D3 — veteran framing for the Development Outlook
+### [x] D3 — veteran framing for the Development Outlook
 Files: `app/lib/development-profile.ts`, `app/components/DevelopmentProfilePanel.tsx`.
 - "Established vet" = `age >= 29 && careerNhlGames >= 250`.
 - Helper `estimatePeakYearsLeft(age, position, productionScore, trend)`: base =
@@ -193,13 +193,23 @@ Files: `app/lib/development-profile.ts`, `app/components/DevelopmentProfilePanel
 Acceptance: a 33-yo elite scorer shows "Peak Left"; a 22-yo prospect is unchanged;
 `npm test` + typecheck pass.
 
-### [ ] D4 — Development Outlook glossary / key
+### [x] D4 — Development Outlook glossary / key
 File: `app/components/DevelopmentProfilePanel.tsx`. Add a collapsed-by-default
 **"? Outlook key"** toggle (mirror the "? STRAND trait guide" pattern) defining every term:
 Now, Dynasty, Breakout/Peak Left, Risk, Arc, Boom, Bust, Inputs (Prod/Role Δ/Pedigree/Exp/
 Durability), Projection, phase/trend/sample conf. One collapsible block, default closed.
 Acceptance: every metric is defined in the collapsible key; closed by default; `npm test` +
 typecheck pass.
+
+## For Future Trade Tracker (Known as The Docket)
+
+### [ ] A3a — shared cap-delta helper
+Add a pure helper `applyCapDelta(baselineCapSpace, moves)` where `moves` is the per-team set
+of incoming/outgoing assets with `capHit` and `retainedPct`. Returns effective cap space:
+baseline − incoming cap (net of retention held by the other team) + outgoing cap (net of
+retention this team keeps). No I/O; unit-testable in isolation.
+Acceptance: characterization tests cover a straight swap, a retained-salary move, and a
+pick-only move (no cap change); `npm test` + typecheck pass.
 
 ---
 

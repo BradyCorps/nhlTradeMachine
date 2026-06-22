@@ -30,6 +30,7 @@ const profile = (overrides: Partial<DevelopmentProfile> = {}): DevelopmentProfil
   pedigreeScore: 50,
   productionScore: 50,
   roleGrowthScore: 45,
+  durabilityScore: 70,
   tags: [],
   rationale: [],
   ...overrides,
