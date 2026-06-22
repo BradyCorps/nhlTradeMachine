@@ -203,17 +203,18 @@ function TeamLineup({
           display: "grid",
           gridTemplateRows: "auto 1fr auto",
           gap: 3,
+          overflow: "hidden",
           boxShadow: isSel ? "inset 0 0 0 1px rgba(160,128,32,0.35)" : "none",
         }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 5 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, minWidth: 0 }}>
             <span style={{
-              fontSize: 11, fontWeight: 900, color: "var(--ledger-ink-faint)",
-              letterSpacing: 0,
+              fontSize: 9, fontWeight: 900, color: "var(--ledger-ink-faint)",
+              letterSpacing: 0, flexShrink: 0,
             }}>{pos.trim()}</span>
             {p && (
               <span style={{
-                fontSize: 11, fontWeight: 900, color: navColor(nav),
-                whiteSpace: "nowrap",
+                fontSize: 9, fontWeight: 900, color: navColor(nav),
+                whiteSpace: "nowrap", flexShrink: 0,
               }}>NAV {nav}</span>
             )}
           </div>
@@ -231,13 +232,16 @@ function TeamLineup({
             {p ? p.name : "Empty"}
             {status === "in" && <span style={{ fontSize: 11, marginLeft: 4, color: "#2a7a44" }}>▲</span>}
           </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 5 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, minWidth: 0 }}>
             <span style={{
-              fontSize: 11, fontWeight: 900, color: p ? "var(--ledger-ink)" : "var(--ledger-ink-faint)",
+              fontSize: 9, fontWeight: 900, color: p ? "var(--ledger-ink)" : "var(--ledger-ink-faint)",
               border: "1px solid rgba(184,160,112,0.8)", padding: "0 4px", lineHeight: "13px",
-              minWidth: 20, textAlign: "center",
+              minWidth: 18, textAlign: "center", flexShrink: 0,
             }}>{p?.position ?? "--"}</span>
-            <span style={{ fontSize: 11, color: "var(--ledger-ink-faint)", whiteSpace: "nowrap" }}>{meta}</span>
+            <span style={{
+              fontSize: 9, color: "var(--ledger-ink-faint)", whiteSpace: "nowrap",
+              overflow: "hidden", textOverflow: "ellipsis", minWidth: 0,
+            }}>{meta}</span>
           </div>
         </div>
       </td>
