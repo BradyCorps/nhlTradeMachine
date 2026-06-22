@@ -3,12 +3,18 @@ import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
-import { players as playersTable, siteSettings, teams as teamsTable } from "@/app/db/schema";
-import { buildTeamCapSpaceMap, parseStoredCapCeiling } from "@/app/lib/cap-settings";
+import { siteSettings, teams as teamsTable } from "@/app/db/schema";
+import { parseStoredCapCeiling } from "@/app/lib/cap-settings";
 
 export const dynamic = "force-dynamic";
 
 const CAP_FLOOR       = SEASON.capFloor;
+// The curated TEAMS_DB capSpace values are room under the 2025-26 ceiling ($95.5M).
+// Cap space scales 1:1 with the ceiling (a team's roster cost is fixed), so a ceiling
+// change shifts every team's space by the delta. See Decision A: we keep the curated
+// static used-cap accounting (LTIR/burial/bonuses) and only apply the ceiling delta —
+// NOT a naive sum of all contract rows (which overstates used cap → false negatives).
+const CURATED_CAPSPACE_CEILING = 95.5;
 const TEAMS_CACHE_TTL = 6 * 60 * 60; // 6 hours
 const TRADE_TEAMS_CACHE_KEY = "cache:trade:teams:v1";
 
@@ -140,18 +146,9 @@ async function loadTeams(capCeiling: number): Promise<any[]> {
   } catch (_) {}
   const dbTeamMap = new Map(dbTeams.map(t => [t.id, t]));
 
-  // Prefer synced contract rows for cap space. Static TEAMS_DB cap space is only
-  // an emergency fallback when a team's contract table is incomplete.
-  const dbContracts = await db.select({
-    teamId:         playersTable.teamId,
-    position:       playersTable.position,
-    capHit:         playersTable.capHit,
-    yearsRemaining: playersTable.yearsRemaining,
-    isLtir:         playersTable.isLtir,
-    isRetained:     playersTable.isRetained,
-    retainedSalary: playersTable.retainedSalary,
-  }).from(playersTable).catch(() => []);
-  const dbCapSpaceMap = buildTeamCapSpaceMap(dbContracts, capCeiling);
+  // Cap space = curated static room (Decision A — authoritative used-cap accounting)
+  // shifted by the ceiling delta so the live 2026-27 ceiling raises every team's room.
+  const ceilingDelta = capCeiling - CURATED_CAPSPACE_CEILING;
 
   const teams = TEAMS_DB.map((t) => {
     const dbTeam   = dbTeamMap.get(t.id);
@@ -160,7 +157,7 @@ async function loadTeams(capCeiling: number): Promise<any[]> {
     const confRank = st?.conferenceRank ?? 8;
     const divRank  = st?.divisionRank   ?? 4;
     const pointPct = st?.pointPct       ?? 0.5;
-    const capSpace = dbCapSpaceMap.get(t.id) ?? t.capSpace;
+    const capSpace = Math.round((t.capSpace + ceilingDelta) * 10) / 10;
 
     const phase = dbTeam?.phaseOverride
       ?? (standingsMap.size >= 28 ? derivePhase(confRank, divRank, pointPct) : t.phase);

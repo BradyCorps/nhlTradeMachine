@@ -958,9 +958,12 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(teams).toContain("const getLiveCapCeiling = async ()");
     expect(teams).toContain('r.key === "cap_ceiling"');
     expect(teams).toContain("parseStoredCapCeiling(row?.value, SEASON.capCeiling) ?? SEASON.capCeiling");
-    expect(teams).toContain("buildTeamCapSpaceMap(dbContracts, capCeiling)");
-    expect(teams).toContain("playersTable.capHit");
-    expect(teams).toContain("dbCapSpaceMap.get(t.id) ?? t.capSpace");
+    // Cap space = curated static room shifted by the ceiling delta (Decision A),
+    // NOT a naive sum of all contract rows (which overstated used cap → false negatives).
+    expect(teams).toContain("const CURATED_CAPSPACE_CEILING = 95.5");
+    expect(teams).toContain("const ceilingDelta = capCeiling - CURATED_CAPSPACE_CEILING");
+    expect(teams).toContain("Math.round((t.capSpace + ceilingDelta) * 10) / 10");
+    expect(teams).not.toContain("buildTeamCapSpaceMap(dbContracts");
     expect(teams).not.toContain("TEAM_CAP_BASELINE");
     expect(teams).toContain("const cacheKey = teamCacheKey(capCeiling)");
     expect(teams).toContain("loadTeams(liveCapCeiling)");
