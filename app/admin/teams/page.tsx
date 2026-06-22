@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import { adminErrorMessage, readAdminResponse } from "../admin-response";
 
 interface TeamRow {
   id:               string;
@@ -24,17 +25,22 @@ function EditModal({ team, onSave, onClose }: {
 
   const handle = async (clear = false) => {
     setSaving(true);
-    if (clear) {
-      await onSave(team.id, null, null);
-    } else {
-      await onSave(
-        team.id,
-        phase.trim()    !== "" ? phase.trim()       : null,
-        standing.trim() !== "" ? parseInt(standing) : null,
-      );
+    try {
+      if (clear) {
+        await onSave(team.id, null, null);
+      } else {
+        await onSave(
+          team.id,
+          phase.trim()    !== "" ? phase.trim()       : null,
+          standing.trim() !== "" ? parseInt(standing) : null,
+        );
+      }
+      onClose();
+    } catch {
+      // Parent handler reports the failure and keeps this modal open.
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    onClose();
   };
 
   const inputStyle: React.CSSProperties = {
@@ -120,13 +126,19 @@ export default function AdminTeams() {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
   const handleSave = async (id: string, phase: string | null, standing: number | null) => {
-    const res  = await fetch("/api/admin/teams", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, phaseOverride: phase, standingOverride: standing }),
-    });
-    const data = await res.json();
-    if (data.ok) { showToast(`Saved ${id}`); load(); }
+    try {
+      const res = await fetch("/api/admin/teams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, phaseOverride: phase, standingOverride: standing }),
+      });
+      await readAdminResponse(res, "Save failed");
+      showToast(`Saved ${id}`);
+      load();
+    } catch (e) {
+      showToast(adminErrorMessage(e, "Save failed"));
+      throw e;
+    }
   };
 
   const filtered = useMemo(() => {

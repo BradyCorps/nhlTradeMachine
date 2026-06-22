@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { redis } from "@/app/lib/redis";
-import { isAuthorized } from "@/app/lib/admin-auth";
+import { requireAdmin } from "@/app/lib/admin-auth";
 import {
   DEVELOPMENT_NHL_SUMMARY_CACHE_KEY,
   DEVELOPMENT_TIMELINE_CACHE_KEY,
@@ -10,7 +10,8 @@ import { PROSPECT_ENRICHMENT_CACHE_KEY } from "@/app/lib/prospect-enrichment";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
   const cleared: string[] = [];
   if (redis) {
     for (const key of [

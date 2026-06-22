@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/app/db/client";
 import { tradeBlock, teams, players } from "@/app/db/schema";
 import { eq } from "drizzle-orm";
-import { isAuthorized } from "@/app/lib/admin-auth";
+import { requireAdmin } from "@/app/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,10 @@ function makeId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
+
   const [entries, teamRows, playerRows] = await Promise.all([
     db.select().from(tradeBlock).catch((e) => { console.error("[trade-block GET] DB error:", e); return []; }),
     db.select().from(teams).catch((e) => { console.error("[trade-block GET] DB error:", e); return []; }),
@@ -57,7 +60,8 @@ async function upsertEntry(body: {
 }
 
 export async function POST(req: Request) {
-  if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
   const body = await req.json() as
     | { id: string; name: string; teamId?: string | null; status: string; note?: string | null }
     | Array<{ id: string; name: string; teamId?: string | null; status: string; note?: string | null }>;

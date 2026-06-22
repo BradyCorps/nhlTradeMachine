@@ -819,3 +819,6 @@ Reasoning:
   - a random no-signal ELC player
   - an older AHL-only player
 - Revisit later-round prospect draft-pedigree curve after real production data is imported.
+
+- 2026-06-22: Fixed admin mutation error handling so failed writes show server errors and skip optimistic success/reloads; touched `app/admin/admin-response.ts`, `app/admin/settings/page.tsx`, `app/admin/contracts/page.tsx`, `app/admin/teams/page.tsx`, `app/admin/trade-block/page.tsx`, `docs/TASKS.md`.
+- 2026-06-22: Closed admin auth with signed httpOnly session login, fail-closed admin API gates, and `/admin/*` middleware; touched `app/lib/admin-auth.ts`, `app/admin/login/page.tsx`, `middleware.ts`, `app/api/admin/*/route.ts`, `__tests__/admin-auth.test.ts`, `docs/TASKS.md`.

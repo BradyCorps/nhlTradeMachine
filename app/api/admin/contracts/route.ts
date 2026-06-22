@@ -5,6 +5,7 @@ import { players as playersTable } from "@/app/db/schema";
 import { eq } from "drizzle-orm";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
+import { requireAdmin } from "@/app/lib/admin-auth";
 
 const CONTRACT_OVERRIDES: Record<string, { yearsRemaining?: number; position?: string }> = {
   "Quinton Byfield": { position: "C" },
@@ -181,6 +182,9 @@ async function fetchNhlRosterTeamMap(): Promise<Map<string, { teamId: string; po
 // GET /api/admin/contracts — full audit table
 // ?scrape=1 adds live CapWages data (slower, enables delta column + SYNC)
 export async function GET(req: Request) {
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
+
   const url    = new URL(req.url);
   const doScrape = url.searchParams.get("scrape") === "1";
 
@@ -282,6 +286,9 @@ export async function GET(req: Request) {
 // body: { name, yearsRemaining?, capHit?, hasNMC?, hasNTC?, draftOverall?, prospectPtsPace?, clear? }
 // Upserts to Turso DB — persists across Vercel deployments
 export async function POST(req: Request) {
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
+
   const body = await req.json();
   const { name, yearsRemaining, capHit, hasNMC, hasNTC, clear } = body as {
     name:            string;
@@ -363,6 +370,9 @@ export async function POST(req: Request) {
 // PUT /api/admin/contracts — sync scraped players into DB
 // body: { players: Record<string, { capHit, yearsRemaining }> }
 export async function PUT(req: Request) {
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
+
   let body: { players?: Record<string, any> } = {};
   try { body = await req.json(); } catch { /* no body */ }
 

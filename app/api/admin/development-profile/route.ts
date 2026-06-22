@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/app/db/client";
 import { players as playersTable } from "@/app/db/schema";
-import { isAuthorized } from "@/app/lib/admin-auth";
+import { requireAdmin } from "@/app/lib/admin-auth";
 import { calcDevelopmentProfile } from "@/app/lib/development-profile";
 import {
   buildDevelopmentInputForDbPlayer,
@@ -123,7 +123,8 @@ async function buildDiagnosticResponse(args: DevelopmentProfileDiagnosticRequest
 }
 
 export async function GET(req: Request) {
-  if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
 
   const url = new URL(req.url);
   return buildDiagnosticResponse({
@@ -134,7 +135,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
 
   const body = await req.json().catch(() => null) as DevelopmentProfileDiagnosticRequest | null;
   if (!body || typeof body !== "object") {

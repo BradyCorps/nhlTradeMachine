@@ -212,7 +212,7 @@ typecheck pass.
 > foundation series in `FUTURECONCEPTS.md` — only A1 is shared; the `A3a` below under the
 > Docket section is the cap-delta helper, unrelated to this A3.)
 
-### [ ] A1 — close the open admin (authentication) — also The Docket's A1 gate
+### [x] A1 — close the open admin (authentication) — also The Docket's A1 gate
 Audited at `3fc1eb3`. The admin surface is effectively wide open and the existing guard
 can't be turned on without breaking the UI:
 - `app/lib/admin-auth.ts:5` fails OPEN — `if (!key) return true;` — so when `ADMIN_KEY` is
@@ -246,7 +246,7 @@ split A1 itself: (a) login + session cookie + client credential plumbing + singl
 helper on all routes; (b) flip fail-closed + `middleware.ts` page gate. Satisfies The
 Docket's A1 prerequisite (`FUTURECONCEPTS.md`).
 
-### [ ] A1.1 — admin UI write error handling (prereq to A1 fail-closed)
+### [x] A1.1 — admin UI write error handling (prereq to A1 fail-closed)
 Root: every mutating admin page does `await fetch(...)` then shows a success toast
 UNCONDITIONALLY — no `res.ok` check. Verified in `app/admin/settings/page.tsx:34-47`
 (`save`/`clearCache`); same shape in `app/admin/contracts/page.tsx`, `app/admin/teams/page.tsx`,
@@ -306,6 +306,8 @@ Fix (non-destructive, reversible):
 4. Setting the flag must NOT delete the row, and un-retire must fully restore the player.
 Acceptance: marking Toews retired removes him from rosters / trade machine / players list
 WITHOUT deleting his DB row; un-retiring restores him everywhere; `npm test` + typecheck pass.
+
+### [] A5 - Add back in the extension logic for when a player signs an extension
 
 ## For Future Trade Tracker (Known as The Docket)
 

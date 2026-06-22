@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import { adminErrorMessage, readAdminResponse } from "../admin-response";
 
 interface ContractRow {
   name:          string;
@@ -49,15 +50,20 @@ function EditModal({ row, onSave, onClear, onClose }: {
 
   const handle = async (clear = false) => {
     setSaving(true);
-    if (clear) {
-      await onClear(row.name);
-    } else {
-      const y = parseFloat(years);
-      const c = parseFloat(cap);
-      await onSave(row.name, isNaN(y) ? null : y, isNaN(c) ? null : c);
+    try {
+      if (clear) {
+        await onClear(row.name);
+      } else {
+        const y = parseFloat(years);
+        const c = parseFloat(cap);
+        await onSave(row.name, isNaN(y) ? null : y, isNaN(c) ? null : c);
+      }
+      onClose();
+    } catch {
+      // Parent handlers surface the server error.
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    onClose();
   };
 
   return (
@@ -164,18 +170,19 @@ function AddPlayerForm({ onAdded }: { onAdded: () => void }) {
     if (isNaN(c) || c <= 0) { setErr("Valid cap hit required (> 0)"); return; }
     setSaving(true);
     setErr(null);
-    const res = await fetch("/api/admin/contracts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), yearsRemaining: y, capHit: c, hasNMC }),
-    });
-    const data = await res.json();
-    setSaving(false);
-    if (data.ok) {
+    try {
+      const res = await fetch("/api/admin/contracts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), yearsRemaining: y, capHit: c, hasNMC }),
+      });
+      await readAdminResponse(res, "Save failed");
       setName(""); setYears("1"); setCap(""); setHasNMC(false); setOpen(false);
       onAdded();
-    } else {
-      setErr(data.error ?? "Save failed");
+    } catch (e) {
+      setErr(adminErrorMessage(e, "Save failed"));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -259,25 +266,36 @@ export default function AdminContractsPage() {
   };
 
   const handleSave = async (name: string, yearsRemaining: number | null, capHit: number | null) => {
-    const res  = await fetch("/api/admin/contracts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, yearsRemaining, capHit }),
-    });
-    const data = await res.json();
-    const dest = data.destination === "bundled" ? " → written to bundled.json" : " → admin override";
-    showToast(`Saved ${name}${dest}`);
-    load();
+    try {
+      const res = await fetch("/api/admin/contracts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, yearsRemaining, capHit }),
+      });
+      const data = await readAdminResponse<{ destination?: string }>(res, "Save failed");
+      const dest = data.destination === "bundled" ? " → written to bundled.json" : " → admin override";
+      showToast(`Saved ${name}${dest}`);
+      load();
+    } catch (e) {
+      showToast(adminErrorMessage(e, "Save failed"));
+      throw e;
+    }
   };
 
   const handleClear = async (name: string) => {
-    await fetch("/api/admin/contracts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, clear: true }),
-    });
-    showToast(`Cleared admin override for ${name}`);
-    load();
+    try {
+      const res = await fetch("/api/admin/contracts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, clear: true }),
+      });
+      await readAdminResponse(res, "Clear failed");
+      showToast(`Cleared admin override for ${name}`);
+      load();
+    } catch (e) {
+      showToast(adminErrorMessage(e, "Clear failed"));
+      throw e;
+    }
   };
 
   const handleSync = async () => {
@@ -287,20 +305,24 @@ export default function AdminContractsPage() {
     }
     setSyncing(true);
     try {
-      const res  = await fetch("/api/admin/contracts", {
+      const res = await fetch("/api/admin/contracts", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ players: scrapedRaw }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = await readAdminResponse<{
+        added: number;
+        updated?: number;
+        total: number;
+        watch?: Record<string, any>;
+      }>(res, "Sync failed");
       const watched = Object.entries(data.watch ?? {})
         .map(([name, info]: [string, any]) => `${name}: ${info.resolvedTeamId ?? info.currentTeamId ?? "no-team"}`)
         .join(" · ");
       showToast(`Synced — ${data.added} added, ${data.updated ?? 0} updated (${data.total} total)${watched ? ` · ${watched}` : ""}`);
       load();
     } catch (e: any) {
-      showToast(`Sync failed: ${e.message}`);
+      showToast(`Sync failed: ${adminErrorMessage(e, "request failed")}`);
     } finally {
       setSyncing(false);
     }

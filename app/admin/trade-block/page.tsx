@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import { adminErrorMessage, readAdminResponse } from "../admin-response";
 
 type Status = "requested" | "available" | "untouchable";
 
@@ -74,15 +75,20 @@ function EditModal({ entry, onSave, onClose }: {
   const handle = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    await onSave({
-      id:     id.trim() || name.trim().toLowerCase().replace(/\s+/g, "-"),
-      name:   name.trim(),
-      teamId: teamId.trim() || null,
-      status,
-      note:   note.trim() || null,
-    });
-    setSaving(false);
-    onClose();
+    try {
+      await onSave({
+        id:     id.trim() || name.trim().toLowerCase().replace(/\s+/g, "-"),
+        name:   name.trim(),
+        teamId: teamId.trim() || null,
+        status,
+        note:   note.trim() || null,
+      });
+      onClose();
+    } catch {
+      // Parent handler reports the failure and keeps this modal open.
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -206,10 +212,15 @@ function BulkAddPanel({ allTeams, allPlayers, existingIds, onBulkAdd }: {
     const toAdd = allPlayers.filter(p => selected.has(p.id));
     if (!toAdd.length) return;
     setSaving(true);
-    await onBulkAdd(toAdd, status, note);
-    setSelected(new Set());
-    setNote("");
-    setSaving(false);
+    try {
+      await onBulkAdd(toAdd, status, note);
+      setSelected(new Set());
+      setNote("");
+    } catch {
+      // Parent handler reports the failure; keep selected players for retry.
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleTeamSelect = (team: string) => {
@@ -424,12 +435,18 @@ export default function TradeBlockAdmin() {
   };
 
   const save = async (data: Omit<Entry, "updatedAt">) => {
-    await fetch("/api/admin/trade-block", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    showToast("Saved");
-    await load();
+    try {
+      const res = await fetch("/api/admin/trade-block", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      await readAdminResponse(res, "Save failed");
+      showToast("Saved");
+      await load();
+    } catch (e) {
+      showToast(adminErrorMessage(e, "Save failed"));
+      throw e;
+    }
   };
 
   const bulkAdd = async (players: PlayerOption[], status: Status, note: string) => {
@@ -437,12 +454,18 @@ export default function TradeBlockAdmin() {
       id: p.id, name: p.name, teamId: p.teamId,
       status, note: note.trim() || null,
     }));
-    await fetch("/api/admin/trade-block", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    showToast(`Added ${players.length} player${players.length !== 1 ? "s" : ""}`);
-    await load();
+    try {
+      const res = await fetch("/api/admin/trade-block", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      await readAdminResponse(res, "Bulk add failed");
+      showToast(`Added ${players.length} player${players.length !== 1 ? "s" : ""}`);
+      await load();
+    } catch (e) {
+      showToast(adminErrorMessage(e, "Bulk add failed"));
+      throw e;
+    }
   };
 
   const patchTeamIds = async () => {
@@ -450,29 +473,41 @@ export default function TradeBlockAdmin() {
     showToast("Fetching NHL rosters…");
     try {
       const r = await fetch("/api/admin/patch-team-ids", { method: "POST" });
-      const d = await r.json();
-      if (d.failedTeams?.length > 0) {
-        showToast(`Patched ${d.patched} · ${d.skipped} skipped · failed: ${d.failedTeams.join(", ")}`);
+      const d = await readAdminResponse<{
+        failedTeams?: string[];
+        patched: number;
+        skipped: number;
+        totalFromNHL: number;
+      }>(r, "Patch failed");
+      const failedTeams = d.failedTeams ?? [];
+      if (failedTeams.length > 0) {
+        showToast(`Patched ${d.patched} · ${d.skipped} skipped · failed: ${failedTeams.join(", ")}`);
       } else if (d.patched === 0 && d.totalFromNHL === 0) {
         showToast("NHL API returned no data — check console for errors");
       } else {
         showToast(`Patched ${d.patched} players (${d.skipped} unmatched)`);
       }
-    } catch {
-      showToast("Patch request failed — check network/server logs");
+      await load();
+    } catch (e) {
+      showToast(adminErrorMessage(e, "Patch request failed"));
+    } finally {
+      setPatching(false);
     }
-    setPatching(false);
-    await load();
   };
 
   const remove = async (id: string, name: string) => {
     if (!confirm(`Remove "${name}" from the trade block?`)) return;
-    await fetch("/api/admin/trade-block", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, name, status: "clear" }),
-    });
-    showToast("Removed");
-    await load();
+    try {
+      const res = await fetch("/api/admin/trade-block", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, name, status: "clear" }),
+      });
+      await readAdminResponse(res, "Remove failed");
+      showToast("Removed");
+      await load();
+    } catch (e) {
+      showToast(adminErrorMessage(e, "Remove failed"));
+    }
   };
 
   const existingIds = useMemo(() => new Set(entries.map(e => e.id)), [entries]);

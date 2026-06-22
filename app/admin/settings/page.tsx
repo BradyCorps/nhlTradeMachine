@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { adminErrorMessage, readAdminResponse } from "../admin-response";
 
 interface Settings {
   capCeiling: number | null;
@@ -33,38 +34,40 @@ export default function AdminSettings() {
 
   const save = async (clearOverrides = false) => {
     setSaving(true);
-    const res = await fetch("/api/admin/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        capCeiling: clearOverrides ? null : (ceiling.trim() !== "" ? parseFloat(ceiling) : null),
-        capFloor:   clearOverrides ? null : (floor.trim()   !== "" ? parseFloat(floor)   : null),
-      }),
-    });
-    setSaving(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      showToast(data.error ?? "Save failed");
-      return;
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          capCeiling: clearOverrides ? null : (ceiling.trim() !== "" ? parseFloat(ceiling) : null),
+          capFloor:   clearOverrides ? null : (floor.trim()   !== "" ? parseFloat(floor)   : null),
+        }),
+      });
+      await readAdminResponse(res, "Save failed");
+      showToast(clearOverrides ? "Cleared — using season-config defaults" : "Saved · Redis cache busted");
+      load();
+    } catch (e) {
+      showToast(adminErrorMessage(e, "Save failed"));
+    } finally {
+      setSaving(false);
     }
-    showToast(clearOverrides ? "Cleared — using season-config defaults" : "Saved · Redis cache busted");
-    load();
   };
 
   const clearCache = async () => {
     setSaving(true);
-    const res = await fetch("/api/admin/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "clear_cache" }),
-    });
-    setSaving(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      showToast(data.error ?? "Cache clear failed");
-      return;
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clear_cache" }),
+      });
+      await readAdminResponse(res, "Cache clear failed");
+      showToast("Redis cache cleared — reload Armchair GM to see fresh data");
+    } catch (e) {
+      showToast(adminErrorMessage(e, "Cache clear failed"));
+    } finally {
+      setSaving(false);
     }
-    showToast("Redis cache cleared — reload Armchair GM to see fresh data");
   };
 
   const def        = settings?.defaults;

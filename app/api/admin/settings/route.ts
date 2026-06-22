@@ -4,7 +4,7 @@ import { siteSettings } from "@/app/db/schema";
 import { eq } from "drizzle-orm";
 import { SEASON } from "@/app/lib/season-config";
 import { redis } from "@/app/lib/redis";
-import { isAuthorized } from "@/app/lib/admin-auth";
+import { requireAdmin } from "@/app/lib/admin-auth";
 import { isValidCapFloor, maxCapCeiling, parseStoredCapCeiling, parseStoredCapFloor } from "@/app/lib/cap-settings";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,10 @@ const teamCacheKeys = (...capCeilings: number[]): string[] => Array.from(new Set
   ...capCeilings.map(teamCacheKey),
 ]));
 
-export async function GET() {
+export async function GET(req: Request) {
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
+
   const rows = await db.select().from(siteSettings).catch(() => []);
   const m = new Map(rows.map(r => [r.key, r.value]));
   return NextResponse.json({
@@ -35,7 +38,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
   const body = await req.json() as {
     action?:     "clear_cache";
     capCeiling?: number | null;

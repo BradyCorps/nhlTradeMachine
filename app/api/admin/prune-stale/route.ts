@@ -4,7 +4,7 @@ import { players as playersTable } from "@/app/db/schema";
 import { inArray } from "drizzle-orm";
 import { scrapeCapWages } from "@/app/services/scraper";
 import { TEAMS_DB } from "@/app/lib/db";
-import { isAuthorized } from "@/app/lib/admin-auth";
+import { requireAdmin } from "@/app/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +80,8 @@ async function findStale() {
 
 // GET /api/admin/prune-stale — dry run
 export async function GET(req: Request) {
-  if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
   const { rows, stale, activeCount, rostersFetched, sourcesHealthy } = await findStale();
   return NextResponse.json({
     dryRun: true,
@@ -97,7 +98,8 @@ export async function GET(req: Request) {
 
 // DELETE /api/admin/prune-stale — execute the prune
 export async function DELETE(req: Request) {
-  if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
   const { rows, stale, activeCount, rostersFetched, sourcesHealthy } = await findStale();
 
   if (!sourcesHealthy) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/app/db/client";
 import { players as playersTable } from "@/app/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { isAuthorized } from "@/app/lib/admin-auth";
+import { requireAdmin } from "@/app/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +43,8 @@ async function ensureProspectColumns() {
 // with a non-null draftYear onto rosters; the X-NAV engine values them by
 // draft pedigree (overall slot) until they have a real NHL sample.
 export async function POST(req: Request) {
-  if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
 
   const body = await req.json() as {
     draftYear: number;
@@ -144,7 +145,8 @@ export async function POST(req: Request) {
 // body: { draftYear: 2026 }
 // Removes an entire imported class — use when replacing a mock draft with real results.
 export async function DELETE(req: Request) {
-  if (!isAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
 
   const body = await req.json() as { draftYear: number };
   if (!body.draftYear) {
