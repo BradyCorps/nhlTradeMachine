@@ -508,7 +508,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     clamp((-xgaRel - 0.35) * 18, 0, 10),
     asset.pairDriverScore != null ? clamp((asset.pairDriverScore - 7) * 1.4, 0, 8) : 0,
     clamp((def - 0.25) * 20, 0, 7),
-    qocIdx >= 78 ? 5 : 0,
+    qocIdx >= 74 ? 5 : 0,
   );
   const isShutdownTopPairD = isD && toi >= 22 && games >= 40 && shutdownDSignal > 0;
   const shutdownDAdj = isShutdownTopPairD
