@@ -146,19 +146,54 @@ export default function WelcomePage() {
           </div>
         </Link>
 
+        <Link href="/docket" className="no-underline group">
+          <div className="rounded-sm p-6 h-full flex flex-col gap-4 transition-all duration-200 group-hover:opacity-80"
+            style={{ background: "var(--ledger-card)", border: "2px solid var(--ledger-rule)" }}>
+            <div>
+              <div className="newspaper-kicker font-black text-2xs uppercase mb-3 font-mono"
+                style={{ color: "var(--ledger-brown)" }}>Feature Four</div>
+              <h2 className="font-black text-xl leading-tight mb-2" style={{ color: "var(--ink)" }}>
+                The Docket
+              </h2>
+              <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
+                Read the public record of graded trades. Filter published rulings,
+                compare frozen at-trade verdicts against today's live re-grade, and
+                inspect the player detail behind each decision.
+              </p>
+            </div>
+            <div className="space-y-2 mt-auto">
+              {[
+                ["Published Rulings", "Saved Docket trades after admin review"],
+                ["Dual Grade",        "At-trade snapshot plus live today read"],
+                ["Full Detail",       "Verdict, packages, STRAND, and outlook"],
+              ].map(([label, desc]) => (
+                <div key={label} className="feature-line text-2xs font-mono"
+                  style={{ color: "var(--ledger-ink-body)" }}>
+                  <span className="font-black shrink-0" style={{ color: "var(--ledger-ink-body)" }}>{label}</span>
+                  <span>— {desc}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 py-3 px-2 text-center font-black text-2xs uppercase tracking-[0.18em] sm:tracking-[0.3em] font-mono"
+              style={{ background: "var(--ledger-brown)", color: "white" }}>
+              Open The Docket
+            </div>
+          </div>
+        </Link>
+
         {[
           {
-            feature: "Feature Four",
+            feature: "Feature Five",
             title: "Fantasy Hockey Expansion",
             body: "Built for fantasy managers who want to draft smarter, execute cleaner trades, and work the waiver wire with front-office data.",
           },
           {
-            feature: "Feature Five",
+            feature: "Feature Six",
             title: "Micro-Context Prop Engine",
             body: "Built for sharper daily reads on player-prop markets through matchup, role, pace, and usage context.",
           },
           {
-            feature: "Feature Six",
+            feature: "Feature Seven",
             title: "Three-Year Simulation Model",
             body: "See how trades compound over three seasons and pressure-test long-term franchise decisions.",
           },

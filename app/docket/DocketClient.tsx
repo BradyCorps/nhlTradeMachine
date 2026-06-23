@@ -29,10 +29,11 @@ const navFromAsset = (navAtTrade: number | null): XNAVResult => ({
 });
 
 function AssetDetail({ asset }: { asset: DocketEntry["packages"][number]["assets"][number] }) {
-  const nav = navFromAsset(asset.navAtTrade);
-  const traits = buildAssetTraits(asset.asset, nav);
-  const strandType = computeStrandType(traits.off, traits.def, asset.asset.ops ?? null, asset.asset.dps ?? null);
-  const isPick = asset.kind === "pick" || asset.asset.position === "Pick";
+  const detailAsset = asset.currentAsset ?? asset.asset;
+  const nav = navFromAsset(asset.navToday ?? asset.navAtTrade);
+  const traits = buildAssetTraits(detailAsset, nav);
+  const strandType = computeStrandType(traits.off, traits.def, detailAsset.ops ?? null, detailAsset.dps ?? null);
+  const isPick = asset.kind === "pick" || detailAsset.position === "Pick";
 
   return (
     <div style={{ border: "1px solid var(--rule)", padding: 10, display: "grid", gap: 10 }}>
@@ -40,20 +41,21 @@ function AssetDetail({ asset }: { asset: DocketEntry["packages"][number]["assets
         <div>
           <div style={{ fontSize: 12, fontWeight: 900 }}>{asset.name}</div>
           <div style={{ fontSize: 10, color: "var(--ledger-ink-faint)", marginTop: 3 }}>
-            {isPick ? "PICK CURVE NAV" : `${asset.asset.position} · AGE ${asset.asset.age || "NA"} · ${asset.asset.capHit.toFixed(2)}M`}
+            {isPick ? "PICK CURVE NAV" : `${detailAsset.position} · AGE ${detailAsset.age || "NA"} · ${detailAsset.capHit.toFixed(2)}M`}
           </div>
         </div>
-        <div style={{ fontSize: 12, fontWeight: 900, color: "var(--ledger-red)", whiteSpace: "nowrap" }}>
-          {fmtNav(asset.navAtTrade ?? 0)} NAV
+        <div style={{ fontSize: 12, fontWeight: 900, color: "var(--ledger-red)", whiteSpace: "nowrap", textAlign: "right" }}>
+          <div>{fmtNav(asset.navAtTrade ?? 0)} AT TRADE</div>
+          <div style={{ color: "var(--ledger-green)", marginTop: 2 }}>{asset.navToday == null ? "TODAY NA" : `${fmtNav(asset.navToday)} TODAY`}</div>
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 6 }}>
         {[
-          ["Today NAV", "D3 pending"],
-          ["Pts/82", isPick ? "Pick" : asset.asset.ptsPace.toFixed(1)],
-          ["Supp", isPick ? "NA" : asset.asset.defRate.toFixed(2)],
-          ["TOI", isPick ? "NA" : asset.asset.avgTOI.toFixed(1)],
+          ["Today NAV", asset.navToday == null ? "NA" : fmtNav(asset.navToday)],
+          ["Pts/82", isPick ? "Pick" : detailAsset.ptsPace.toFixed(1)],
+          ["Supp", isPick ? "NA" : detailAsset.defRate.toFixed(2)],
+          ["TOI", isPick ? "NA" : detailAsset.avgTOI.toFixed(1)],
         ].map(([label, value]) => (
           <div key={label} style={{ border: "1px solid var(--rule)", padding: "7px 8px" }}>
             <div style={{ fontSize: 9, fontWeight: 900, letterSpacing: "0.12em", color: "var(--ledger-ink-faint)" }}>{label}</div>
@@ -71,14 +73,14 @@ function AssetDetail({ asset }: { asset: DocketEntry["packages"][number]["assets
           <StrandDisplay
             offTraits={traits.off}
             defTraits={traits.def}
-            ops={asset.asset.ops ?? null}
-            dps={asset.asset.dps ?? null}
+            ops={detailAsset.ops ?? null}
+            dps={detailAsset.dps ?? null}
             strandType={strandType}
             W={260}
             H={150}
             amplitude={28}
           />
-          <DevelopmentProfilePanel asset={asset.asset} />
+          <DevelopmentProfilePanel asset={detailAsset} />
         </>
       )}
     </div>
@@ -215,7 +217,7 @@ export default function DocketClient({ entries }: DocketClientProps) {
                   {entry.executedDate} · {entry.teams.join(" / ")}
                 </div>
                 <div style={{ marginTop: 4, fontSize: 10, color: "var(--ledger-ink-faint)", fontWeight: 900, letterSpacing: "0.12em" }}>
-                  AT TRADE: {entry.fairness} · TODAY: {entry.todayVerdict.toUpperCase()} · {entry.rosterMutating ? "ROSTER OVERLAY" : "UI ONLY"}
+                  AT TRADE: {entry.fairness} · TODAY: {entry.todayWinner ?? "EVEN"} {entry.todayNavMargin == null ? "NA" : fmtNav(entry.todayNavMargin)} NAV · {entry.rosterMutating ? "ROSTER OVERLAY" : "UI ONLY"}
                 </div>
               </div>
               <div style={{
@@ -226,7 +228,8 @@ export default function DocketClient({ entries }: DocketClientProps) {
                 letterSpacing: "0.12em",
                 whiteSpace: "nowrap",
               }}>
-                {entry.winner ?? "EVEN"} {fmtNav(entry.navMargin)} NAV
+                <div>{entry.winner ?? "EVEN"} {fmtNav(entry.navMargin)} AT TRADE</div>
+                <div style={{ color: "var(--ledger-green)", marginTop: 3 }}>{entry.todayWinner ?? "EVEN"} {entry.todayNavMargin == null ? "NA" : fmtNav(entry.todayNavMargin)} TODAY</div>
               </div>
             </div>
 
@@ -244,7 +247,7 @@ export default function DocketClient({ entries }: DocketClientProps) {
             </div>
 
             <div style={{ fontSize: 11, color: "var(--ledger-ink-faint)", lineHeight: 1.5 }}>
-              {entry.atTradeVerdict}
+              At trade: {entry.atTradeVerdict} · Today: {entry.todayVerdict}
               {entry.sourceUrl && (
                 <>
                   {" "}

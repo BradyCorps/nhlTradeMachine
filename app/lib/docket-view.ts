@@ -14,8 +14,10 @@ export interface DocketPackageAsset {
   kind: "player" | "pick";
   name: string;
   navAtTrade: number | null;
+  navToday: number | null;
   retainedPct: number;
   asset: Asset;
+  currentAsset: Asset | null;
 }
 
 export interface DocketPackage {
@@ -38,6 +40,9 @@ export interface DocketEntry {
   lockedVerdict: TradeVerdict | null;
   atTradeVerdict: string;
   todayVerdict: string;
+  todayWinner: string | null;
+  todayNavMargin: number | null;
+  todayLockedVerdict: TradeVerdict | null;
   rosterMutating: boolean;
 }
 
@@ -158,8 +163,10 @@ export function tradeToDocketEntry(trade: TradeRecord): DocketEntry | null {
       kind: asset.kind,
       name: assetName(asset),
       navAtTrade: asset.navAtTrade,
+      navToday: null,
       retainedPct: asset.retainedPct ?? 0,
       asset: assetSnapshotToDocketAsset(asset, side.teamId),
+      currentAsset: null,
     }));
     return {
       teamId: side.teamId,
@@ -182,6 +189,9 @@ export function tradeToDocketEntry(trade: TradeRecord): DocketEntry | null {
     lockedVerdict: trade.lockedVerdict ? trade.lockedVerdict as TradeVerdict : null,
     atTradeVerdict: trade.lockedVerdict?.message ?? trade.gradeAtTrade.fairness,
     todayVerdict: "Pending live re-grade",
+    todayWinner: null,
+    todayNavMargin: null,
+    todayLockedVerdict: null,
     rosterMutating: trade.rosterMutating,
   };
 }

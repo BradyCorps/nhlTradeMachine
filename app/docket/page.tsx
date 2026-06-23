@@ -1,6 +1,7 @@
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import DocketClient from "@/app/docket/DocketClient";
+import { attachTodayDocketGrades } from "@/app/lib/docket-today";
 import { buildDocketEntries } from "@/app/lib/docket-view";
 import { listPublishedTrades } from "@/app/lib/trades";
 
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 async function loadDocketEntries() {
   try {
-    return buildDocketEntries(await listPublishedTrades());
+    return attachTodayDocketGrades(buildDocketEntries(await listPublishedTrades()));
   } catch (error) {
     console.warn("[Docket] published trade load failed:", error instanceof Error ? error.message : error);
     return [];

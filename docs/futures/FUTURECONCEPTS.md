@@ -261,10 +261,10 @@ impact metrics (evaluate/sim), **STRAND** (`StrandDisplay`), and **Development O
 Acceptance: expanding an entry shows the verdict plus per-player NAV/impact/STRAND/outlook;
 `npm test` + typecheck pass.
 
-### [ ] D2.5 — add panel to the home page
+### [x] D2.5 — add panel to the home page
 match the current aesthetic and add the page to the home page in the same way we present armchair-gm, trade machine, etc.
 
-### [ ] D3 — dual-grade dynamic re-grade on read
+### [x] D3 — dual-grade dynamic re-grade on read
 Compute the "today" verdict on load from current data (snapshot stays frozen). Render both,
 e.g. "At trade: EVEN · Today: WPG +30". Decide cache vs live (see open decisions).
 Acceptance: the today grade reflects current player data while the at-trade grade is

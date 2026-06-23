@@ -367,12 +367,15 @@ describe("Canary — admin trade ingestion", () => {
 describe("Canary — public Docket page", () => {
   const page = read("app/docket/page.tsx");
   const client = read("app/docket/DocketClient.tsx");
+  const today = read("app/lib/docket-today.ts");
   const view = read("app/lib/docket-view.ts");
   const header = read("app/components/Header.tsx");
+  const home = read("app/page.tsx");
 
   it("loads published trades through the Docket view model", () => {
     expect(page).toContain("listPublishedTrades");
     expect(page).toContain("buildDocketEntries");
+    expect(page).toContain("attachTodayDocketGrades");
     expect(page).toContain("<DocketClient entries={entries} />");
     expect(view).toContain("if (!trade.published || !trade.gradeAtTrade) return null");
   });
@@ -386,16 +389,34 @@ describe("Canary — public Docket page", () => {
     expect(client).toContain("TODAY:");
   });
 
+  it("surfaces The Docket from the home page route cards", () => {
+    expect(home).toContain('href="/docket"');
+    expect(home).toContain("Open The Docket");
+    expect(home).toContain("Published Rulings");
+    expect(home).toContain("Dual Grade");
+  });
+
   it("expands entries with verdict, per-asset detail, STRAND, development outlook, picks, and conditions", () => {
     expect(client).toContain("FULL RULING + PLAYER DETAIL");
     expect(client).toContain("<VerdictPanel");
     expect(client).toContain("<StrandDisplay");
-    expect(client).toContain("<DevelopmentProfilePanel asset={asset.asset} />");
+    expect(client).toContain("<DevelopmentProfilePanel asset={detailAsset} />");
     expect(client).toContain("PICK CURVE NAV");
     expect(client).toContain("CONDITIONS");
     expect(view).toContain("assetSnapshotToDocketAsset");
-    expect(view).toContain("lockedVerdict: trade.lockedVerdict");
+    expect(view).toContain("lockedVerdict: trade.lockedVerdict ? trade.lockedVerdict as TradeVerdict : null");
     expect(view).toContain("conditions: trade.conditions");
+  });
+
+  it("computes today's Docket grade from current canonical data without mutating at-trade snapshots", () => {
+    expect(today).toContain("assembleCanonicalRoster");
+    expect(today).toContain("evaluatePost");
+    expect(today).toContain("runTrade: true");
+    expect(today).toContain("todayLockedVerdict: evaluation.verdict ?? null");
+    expect(today).toContain("navToday");
+    expect(client).toContain("entry.todayWinner");
+    expect(client).toContain("asset.navToday");
+    expect(view).toContain('todayVerdict: "Pending live re-grade"');
   });
 
   it("links The Docket from the shared public masthead", () => {
