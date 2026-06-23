@@ -26,6 +26,7 @@ import {
   parseTradeQueryState,
   resolveTradeShareAssets,
 } from "@/app/lib/trade-share";
+import { applyCapDelta, CapDeltaMoves } from "@/app/lib/cap-delta";
 import { scenarioSeed } from "@/app/lib/sim-engine";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import TradeBlockPanel from "@/app/components/TradeBlockPanel";
@@ -47,6 +48,20 @@ const MATCH_FOLDERS: Array<{ id: MatchFolder; label: string; stamp: string }> = 
 
 const getXNAV = (asset: Asset): XNAVResult =>
   getCachedNav(asset) ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
+
+const buildTradeCapMoves = (
+  outgoing: Asset[],
+  incoming: Asset[],
+): { home: CapDeltaMoves; partner: CapDeltaMoves } => ({
+  home: {
+    incoming: incoming.filter(a => a.position !== "Pick"),
+    outgoing: outgoing.filter(a => a.position !== "Pick"),
+  },
+  partner: {
+    incoming: outgoing.filter(a => a.position !== "Pick"),
+    outgoing: incoming.filter(a => a.position !== "Pick"),
+  },
+});
 
 // ============================================================
 // MAIN COMPONENT
@@ -374,28 +389,19 @@ export default function ArmchairGmPage() {
         return p;
       });
 
-      // Recalculate cap space using DELTA only — not a full rebuild from ceiling.
-      // The API cap space already accounts for LTIR, retained salaries, bonuses etc.
-      // Rebuilding from CAP_CEILING - rosterCap ignores all of that complexity.
-      // Delta approach: add outgoing cap hits back, subtract incoming cap hits.
-      const outCapHome = outgoingBlock
-        .filter(a => a.position !== "Pick")
-        .reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0);
-      const inCapHome = incomingBlock
-        .filter(a => a.position !== "Pick")
-        .reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0);
+      const capMoves = buildTradeCapMoves(outgoingBlock, incomingBlock);
 
       const updatedTeams = prev.teams.map(team => {
         if (team.id === homeTeam.id) {
           return {
             ...team,
-            capSpace: Math.round((team.capSpace + outCapHome - inCapHome) * 10) / 10,
+            capSpace: Math.round(applyCapDelta(team.capSpace, capMoves.home) * 10) / 10,
           };
         }
         if (team.id === partnerTeam.id) {
           return {
             ...team,
-            capSpace: Math.round((team.capSpace + inCapHome - outCapHome) * 10) / 10,
+            capSpace: Math.round(applyCapDelta(team.capSpace, capMoves.partner) * 10) / 10,
           };
         }
         return team;
@@ -745,16 +751,9 @@ export default function ArmchairGmPage() {
   // Always pull live cap space from db — teams state can be stale after trade execution
   const liveHome    = db.teams.find(t => t.id === teams[0]?.id) ?? teams[0];
   const livePartner = db.teams.find(t => t.id === teams[1]?.id) ?? teams[1];
-  const capA = liveHome
-    ? liveHome.capSpace
-        + blocks[0].reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0)
-        - blocks[1].reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0)
-    : 0;
-  const capB = livePartner
-    ? livePartner.capSpace
-        + blocks[1].reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0)
-        - blocks[0].reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0)
-    : 0;
+  const capMoves = buildTradeCapMoves(blocks[0], blocks[1]);
+  const capA = liveHome ? applyCapDelta(liveHome.capSpace, capMoves.home) : 0;
+  const capB = livePartner ? applyCapDelta(livePartner.capSpace, capMoves.partner) : 0;
 
   if (error) return <ErrorScreen onRetry={loadLeagueData} />;
   const dataReady = db.teams.length > 0 && db.players.length > 0;

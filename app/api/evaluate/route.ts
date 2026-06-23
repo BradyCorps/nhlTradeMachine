@@ -133,7 +133,7 @@ const getLiveCapCeiling = async (requestCapCeiling?: number | null): Promise<num
 };
 
 // ── Adapter: Maps raw client Asset to strict engine AssetInput ──
-const getAssetNAV = (asset: Asset, capCeiling: number = SEASON.capCeiling): XNAVResult => {
+export const getAssetNAV = (asset: Asset, capCeiling: number = SEASON.capCeiling): XNAVResult => {
   const input: AssetInput = {
     id: asset.id,
     name: asset.name,
@@ -1023,7 +1023,7 @@ const nullMetrics = () => ({
   defGain: 0, capDelta: 0, variance: 0, ewaHome: 0, cwiYears: 0,
 });
 
-const evaluateTrade = (
+export const evaluateTrade = (
   outgoing: Asset[],
   incoming: Asset[],
   teamHome: Team | null,

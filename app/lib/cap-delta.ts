@@ -8,6 +8,15 @@ export interface CapDeltaMoves {
   outgoing?: CapDeltaAsset[];
 }
 
+export type TeamCapDeltaMap =
+  | Record<string, CapDeltaMoves | undefined>
+  | Map<string, CapDeltaMoves>;
+
+export interface CapDeltaTeam {
+  id: string;
+  capSpace: number;
+}
+
 const retainedCapHit = (asset: CapDeltaAsset): number => {
   const capHit = asset.capHit ?? 0;
   const retainedPct = asset.retainedPct ?? 0;
@@ -24,3 +33,19 @@ export const applyCapDelta = (baselineCapSpace: number, moves: CapDeltaMoves): n
 
   return baselineCapSpace - incomingCap + outgoingCap;
 };
+
+const getTeamMoves = (movesByTeam: TeamCapDeltaMap | undefined, teamId: string): CapDeltaMoves | undefined =>
+  movesByTeam instanceof Map ? movesByTeam.get(teamId) : movesByTeam?.[teamId];
+
+export const applyTeamCapDeltas = <T extends CapDeltaTeam>(
+  teams: T[],
+  movesByTeam?: TeamCapDeltaMap,
+): T[] => teams.map((team) => {
+  const moves = getTeamMoves(movesByTeam, team.id);
+  if (!moves) return team;
+
+  return {
+    ...team,
+    capSpace: Math.round(applyCapDelta(team.capSpace, moves) * 10) / 10,
+  };
+});

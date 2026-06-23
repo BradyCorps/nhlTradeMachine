@@ -19,6 +19,7 @@ import {
   fetchCachedNhlSkaterTimelineRowsForPlayers,
 } from "@/app/lib/development-sources";
 import { fetchProspectEnrichmentMap } from "@/app/lib/prospect-enrichment";
+import { applyTeamCapDeltas, TeamCapDeltaMap } from "@/app/lib/cap-delta";
 
 const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
 const CONTRACTS_CACHE_KEY = "cache:contracts:v2";
@@ -540,7 +541,12 @@ async function fetchNhlGoalieStatsFallback(): Promise<Map<string, any>> {
   return statsMap;
 }
 
-export async function assembleCanonicalRoster(options: { teams?: any[]; includeTeamContext?: boolean } = {}) {
+export async function assembleCanonicalRoster(options: {
+  teams?: any[];
+  includeTeamContext?: boolean;
+  capMovesByTeam?: TeamCapDeltaMap;
+} = {}) {
+  const rosterTeams = applyTeamCapDeltas(options.teams ?? TEAMS_DB, options.capMovesByTeam);
   const [CONTRACTS, PS_MAP, NHL_SKATER_STATS, NHL_GOALIE_STATS, PROSPECT_ENRICHMENT] = await Promise.all([
     loadContracts(),
     fetchPointShares(),
@@ -734,7 +740,6 @@ export async function assembleCanonicalRoster(options: { teams?: any[]; includeT
   const rosterMap = new Map<string, any[]>();
 
   try {
-    const rosterTeams = options.teams ?? TEAMS_DB;
     const results = await Promise.allSettled(
       rosterTeams.map((t) =>
         fetchWithTimeout(`https://api-web.nhle.com/v1/roster/${t.id}/current`, 5000, NHL_HEADERS)
@@ -849,7 +854,6 @@ export async function assembleCanonicalRoster(options: { teams?: any[]; includeT
   let players: any[] = [];
 
   rosterMap.forEach((skaters, teamId) => {
-    const rosterTeams = options.teams ?? TEAMS_DB;
     const developmentTeam = rosterTeams.find((t: any) => t.id === teamId);
     if (!developmentTeam) return;
 
@@ -1064,6 +1068,7 @@ export async function assembleCanonicalRoster(options: { teams?: any[]; includeT
   players = dedupePlayersByAuthority(players, dbTeamBySlug);
 
   return {
+    teams: rosterTeams,
     players,
     rosterMap,
     liveStats: analyticsMap.size > 0,

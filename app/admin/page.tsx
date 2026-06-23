@@ -42,6 +42,12 @@ export default async function AdminDashboard() {
       stat:  tradeBlockCount > 0 ? `${tradeBlockCount} entr${tradeBlockCount !== 1 ? "ies" : "y"}` : "Empty",
     },
     {
+      href:  "/admin/trades",
+      label: "TRADE INGESTION",
+      desc:  "Build a two-team trade with player, pick, and retention controls. Preview and save unpublished Docket drafts.",
+      stat:  "Draft save flow",
+    },
+    {
       href:  "/admin/settings",
       label: "SETTINGS",
       desc:  "Override the global cap ceiling and floor. Clear the Redis teams cache when data looks stale.",

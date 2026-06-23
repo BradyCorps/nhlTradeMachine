@@ -271,7 +271,7 @@ export async function GET() {
     });
   });
 
-  const teams = LIVE_TEAMS.map((t: any) => ({
+  const teams = roster.teams.map((t: any) => ({
     id:       t.id,
     name:     t.name,
     capSpace: t.capSpace,

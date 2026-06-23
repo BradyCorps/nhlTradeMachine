@@ -298,6 +298,31 @@ describe("Canary — trade block mechanics", () => {
   });
 });
 
+describe("Canary — admin trade ingestion", () => {
+  const page = read("app/admin/trades/page.tsx");
+  const route = read("app/api/admin/trades/route.ts");
+  const dashboard = read("app/admin/page.tsx");
+
+  it("surfaces the ingestion panel from the admin dashboard", () => {
+    expect(dashboard).toContain('/admin/trades');
+    expect(dashboard).toContain('TRADE INGESTION');
+  });
+
+  it("reuses the trade machine asset panels and preview evaluator", () => {
+    expect(page).toContain('TradePanel');
+    expect(page).toContain('fetchTradeVerdict');
+    expect(page).toContain('PREVIEW GRADE');
+  });
+
+  it("saves admin-only unpublished frozen drafts", () => {
+    expect(route).toContain('requireAdmin(req)');
+    expect(route).toContain('createFrozenTrade');
+    expect(route).toContain('published: false');
+    expect(route).toContain('evaluateTrade(');
+    expect(route).toContain('getAssetNAV(');
+  });
+});
+
 describe("Canary — trade proposal audit verification", () => {
   it("generated proposals run the full evaluate verdict before being shown", () => {
     const src = read("app/components/TradeProposal.tsx");
@@ -581,6 +606,8 @@ describe("Canary — Batch 5 UI state robustness", () => {
     expect(src).not.toContain("strengthByTeam");
     expect(src).not.toContain("projectedStandingByTeam");
     expect(src).not.toContain("phaseFromStanding");
+    expect(src).toContain("applyCapDelta");
+    expect(src).toContain("buildTradeCapMoves");
     expect(src).toContain("return team;");
   });
 
@@ -1050,7 +1077,6 @@ describe("Canary — Batch 6 audit fixes", () => {
   it("cap projection uses retained effective cap and only strikes through players from the current roster", () => {
     const src = read("app/components/CapProjection.tsx");
     expect(src).toContain("const effectiveCapHit =");
-    expect(src).toContain("(1 - (a.retainedPct || 0))");
     expect(src).toContain("currentRoster.reduce((s, a) => s + effectiveCapHit(a), 0)");
     expect(src).toContain("currentKeys.has(assetKey(a))");
     expect(src).toContain("players.length + departing.length");

@@ -175,7 +175,7 @@ retention this team keeps). No I/O; unit-testable in isolation.
 Acceptance: characterization tests cover a straight swap, a retained-salary move, and a
 pick-only move (no cap change); `npm test` + typecheck pass.
 
-### [ ] A3b — wire Dynamic Cap Space into the canonical roster layer + Armchair GM
+### [x] A3b — wire Dynamic Cap Space into the canonical roster layer + Armchair GM
 Use `applyCapDelta` so cap space reacts to roster moves: the canonical roster module exposes
 effective cap space after any applied overlay (Phase C), and Armchair GM's hypothetical
 trades compute their preview cap via the SAME helper (replacing any ad-hoc inline math).
@@ -205,7 +205,7 @@ the existing `trade-share` snapshot/lock shape rather than inventing a new one.
 Acceptance: saving a trade persists an immutable at-trade verdict that does not change when
 underlying player data later changes; `npm test` + typecheck pass.
 
-### [ ] B3 — admin ingestion panel
+### [x] B3 — admin ingestion panel
 Admin-only form to build a trade with the SAME asset pickers as the trade machine (teams,
 players, picks, retention), preview the grade, then save (B2) as unpublished draft.
 Acceptance: an admin can assemble a 2-team trade with retention, see the grade, and save a
