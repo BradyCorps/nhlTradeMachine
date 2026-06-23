@@ -6,6 +6,7 @@ import type { Asset, Team, TradeVerdict, XNAVResult } from "../app/lib/trade-typ
 import {
   createFrozenTrade,
   createTrade,
+  deleteTrade,
   getTrade,
   listPublishedTrades,
   updateTrade,
@@ -273,5 +274,30 @@ describe("trades data layer", () => {
       rosterMutating: false,
       sides: trade.sides,
     });
+  });
+
+  it("deletes a saved trade by id", async () => {
+    const trade: TradeRecord = {
+      id: "trade-delete-001",
+      executedDate: "2026-07-01",
+      source: "manual",
+      sourceUrl: null,
+      season: "2026-27",
+      sides: [
+        { teamId: "WPG", assetsGiven: [] },
+        { teamId: "CGY", assetsGiven: [] },
+      ],
+      conditions: null,
+      lockedVerdict: null,
+      gradeAtTrade: null,
+      published: true,
+      rosterMutating: true,
+    };
+
+    await createTrade(trade, testDb);
+
+    await expect(deleteTrade(trade.id, testDb)).resolves.toBe(true);
+    await expect(getTrade(trade.id, testDb)).resolves.toBeNull();
+    await expect(deleteTrade(trade.id, testDb)).resolves.toBe(false);
   });
 });

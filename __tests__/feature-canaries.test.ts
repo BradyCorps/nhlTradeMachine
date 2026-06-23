@@ -348,19 +348,37 @@ describe("Canary — admin trade ingestion", () => {
     expect(route).toContain('runTrade: true');
   });
 
-  it("supports publish, unpublish, and edit operations", () => {
+  it("supports publish, unpublish, edit, and delete operations", () => {
     expect(route).toContain("export async function GET");
     expect(route).toContain("export async function PUT");
     expect(route).toContain("export async function PATCH");
+    expect(route).toContain("export async function DELETE");
     expect(route).toContain("updateFrozenTrade");
+    expect(route).toContain("deleteTrade(parsed.data.id)");
     expect(route).toContain("published: parsed.data.published");
     expect(route).toContain("rosterMutating: parsed.data.rosterMutating");
+    expect(route).toContain("clearTradeOverlayCaches");
     const page = read("app/admin/trades/page.tsx");
     expect(page).toContain("SAVED TRADES");
     expect(page).toContain("ROSTER OVERLAY");
     expect(page).toContain("UI ONLY - NO ROSTER OR CAP CHANGE");
+    expect(page).toContain("CONFIRM ROSTER OVERLAY");
+    expect(page).toContain("pendingRosterAction");
     expect(page).toContain("togglePublished");
+    expect(page).toContain("deleteSavedTrade");
     expect(page).toContain("editTrade");
+  });
+
+  it("separates current asset source teams from historical traded-from teams", () => {
+    const tradePanel = read("app/components/TradePanel.tsx");
+    expect(page).toContain("historicalTeams");
+    expect(page).toContain("SIDE A TRADED FROM");
+    expect(page).toContain("SIDE B TRADED FROM");
+    expect(page).toContain('label="Side A current asset source"');
+    expect(page).toContain("allowDuplicateTeams");
+    expect(page).toContain("{ team: historicalHomeTeam, assetsGiven: blocks[0], fullRoster: homeRoster }");
+    expect(tradePanel).toContain("allowDuplicateTeams");
+    expect(tradePanel).toContain("allowDuplicateTeams ? db.teams");
   });
 });
 

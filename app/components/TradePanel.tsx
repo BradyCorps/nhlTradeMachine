@@ -9,7 +9,7 @@ import LedgerDropdown from "@/app/components/LedgerDropdown";
 import { useTradeStore } from "@/app/store/tradeStore";
 
 function TradePanel({
-  idx, team, nav, capSpace, db, label, accent, locked, onRequestTrade, onRequestBlockTrade
+  idx, team, nav, capSpace, db, label, accent, locked, allowDuplicateTeams, onRequestTrade, onRequestBlockTrade
 }: {
   idx: 0 | 1;
   team: Team | null;
@@ -19,6 +19,7 @@ function TradePanel({
   label: string;
   accent: string;
   locked?: boolean;
+  allowDuplicateTeams?: boolean;
   onRequestTrade?: (a: Asset) => void;
   onRequestBlockTrade?: (block: Asset[]) => void;
 }) {
@@ -62,7 +63,7 @@ function TradePanel({
           ) : (
           <Suspense fallback={<div className="h-8 w-48 animate-pulse bg-ledger-card rounded" />}>
           <LedgerDropdown
-            teams={db.teams.filter(t => t.id !== (idx === 0 ? teams[1]?.id : teams[0]?.id))}
+            teams={allowDuplicateTeams ? db.teams : db.teams.filter(t => t.id !== (idx === 0 ? teams[1]?.id : teams[0]?.id))}
             selectedId={team?.id ?? ""}
             onSelect={(id: string) => {
               const found = db.teams.find((t) => t.id === id) ?? null;

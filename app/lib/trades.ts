@@ -278,6 +278,14 @@ export async function getTrade(id: string, database: TradeDatabase = db): Promis
   return rows[0] ? fromRow(rows[0]) : null;
 }
 
+export async function deleteTrade(id: string, database: TradeDatabase = db): Promise<boolean> {
+  await ensureRosterMutatingColumn(database);
+  const existing = await getTrade(id, database);
+  if (!existing) return false;
+  await database.delete(trades).where(eq(trades.id, id));
+  return true;
+}
+
 export async function listPublishedTrades(database: TradeDatabase = db): Promise<TradeRecord[]> {
   await ensureRosterMutatingColumn(database);
   const rows = await database.select().from(trades).where(eq(trades.published, true));

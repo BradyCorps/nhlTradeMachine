@@ -49,6 +49,10 @@ type AdminTradeRecord = {
   rosterMutating: boolean;
 };
 
+type RosterOverlayAction =
+  | { kind: "save" }
+  | { kind: "publish"; trade: AdminTradeRecord };
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 const fmt = (n: number): string => (n > 0 ? `+${n.toFixed(1)}` : n.toFixed(1));
@@ -67,8 +71,10 @@ export default function AdminTradesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftPublished, setDraftPublished] = useState(false);
   const [draftRosterMutating, setDraftRosterMutating] = useState(true);
+  const [historicalTeams, setHistoricalTeams] = useState<[Team | null, Team | null]>([null, null]);
   const [trades, setTrades] = useState<AdminTradeRecord[]>([]);
   const [tradeActionId, setTradeActionId] = useState<string | null>(null);
+  const [pendingRosterAction, setPendingRosterAction] = useState<RosterOverlayAction | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const teams = useTradeStore(s => s.teams);
@@ -80,11 +86,13 @@ export default function AdminTradesPage() {
 
   const homeTeam = teams[0];
   const partnerTeam = teams[1];
-  const homeRoster = useMemo(() => db.players.filter(p => p.teamId === homeTeam?.id), [db.players, homeTeam?.id]);
-  const partnerRoster = useMemo(() => db.players.filter(p => p.teamId === partnerTeam?.id), [db.players, partnerTeam?.id]);
+  const historicalHomeTeam = historicalTeams[0];
+  const historicalPartnerTeam = historicalTeams[1];
+  const homeRoster = useMemo(() => db.players.filter(p => p.teamId === (historicalHomeTeam?.id ?? homeTeam?.id)), [db.players, historicalHomeTeam?.id, homeTeam?.id]);
+  const partnerRoster = useMemo(() => db.players.filter(p => p.teamId === (historicalPartnerTeam?.id ?? partnerTeam?.id)), [db.players, historicalPartnerTeam?.id, partnerTeam?.id]);
   const homeNav = blocks[0].reduce((sum, asset) => sum + (navMap[asset.id]?.total ?? 0), 0);
   const partnerNav = blocks[1].reduce((sum, asset) => sum + (navMap[asset.id]?.total ?? 0), 0);
-  const canPreview = Boolean(homeTeam && partnerTeam && blocks[0].length && blocks[1].length);
+  const canPreview = Boolean(historicalHomeTeam && historicalPartnerTeam && blocks[0].length && blocks[1].length);
 
   const loadTrades = useCallback(async () => {
     const res = await fetch("/api/admin/trades");
@@ -94,6 +102,7 @@ export default function AdminTradesPage() {
 
   useEffect(() => {
     setTeams([null, null]);
+    setHistoricalTeams([null, null]);
     setBlocks([[], []]);
     setNavMap({});
 
@@ -121,10 +130,10 @@ export default function AdminTradesPage() {
   useEffect(() => {
     setPreview(null);
     setSavedId(null);
-  }, [teams, blocks, executedDate, sourceUrl, conditions, draftPublished, draftRosterMutating]);
+  }, [teams, historicalTeams, blocks, executedDate, sourceUrl, conditions, draftPublished, draftRosterMutating]);
 
   const runPreview = useCallback(async () => {
-    if (!homeTeam || !partnerTeam) return;
+    if (!historicalHomeTeam || !historicalPartnerTeam) return;
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -135,8 +144,8 @@ export default function AdminTradesPage() {
       const verdict = await fetchTradeVerdict(
         blocks[0],
         blocks[1],
-        homeTeam,
-        partnerTeam,
+        historicalHomeTeam,
+        historicalPartnerTeam,
         homeRoster,
         partnerRoster,
         ctrl.signal,
@@ -153,10 +162,21 @@ export default function AdminTradesPage() {
         setPreviewLoading(false);
       }
     }
-  }, [blocks, db.capCeiling, homeRoster, homeTeam, partnerRoster, partnerTeam]);
+  }, [blocks, db.capCeiling, historicalHomeTeam, historicalPartnerTeam, homeRoster, partnerRoster]);
 
-  const saveDraft = useCallback(async () => {
-    if (!homeTeam || !partnerTeam) return;
+  const rosterOverlaySummary = useMemo(() => {
+    const sideLabel = (idx: 0 | 1, team: Team | null, assets: Asset[]) => {
+      const names = assets.map(asset => asset.name).filter(Boolean).join(", ");
+      return `${team?.name ?? `Side ${idx === 0 ? "A" : "B"}`} sends ${names || "no assets selected"}`;
+    };
+    return [
+      sideLabel(0, historicalHomeTeam, blocks[0]),
+      sideLabel(1, historicalPartnerTeam, blocks[1]),
+    ];
+  }, [blocks, historicalHomeTeam, historicalPartnerTeam]);
+
+  const performSaveDraft = useCallback(async () => {
+    if (!historicalHomeTeam || !historicalPartnerTeam) return;
     setSaving(true);
     setError(null);
     setSavedId(null);
@@ -175,8 +195,8 @@ export default function AdminTradesPage() {
           rosterMutating: draftRosterMutating,
           capCeiling: db.capCeiling,
           sides: [
-            { team: homeTeam, assetsGiven: blocks[0], fullRoster: homeRoster },
-            { team: partnerTeam, assetsGiven: blocks[1], fullRoster: partnerRoster },
+            { team: historicalHomeTeam, assetsGiven: blocks[0], fullRoster: homeRoster },
+            { team: historicalPartnerTeam, assetsGiven: blocks[1], fullRoster: partnerRoster },
           ],
         }),
       });
@@ -191,7 +211,15 @@ export default function AdminTradesPage() {
     } finally {
       setSaving(false);
     }
-  }, [blocks, conditions, db.capCeiling, draftPublished, draftRosterMutating, editingId, executedDate, homeRoster, homeTeam, loadTrades, partnerRoster, partnerTeam, sourceUrl]);
+  }, [blocks, conditions, db.capCeiling, draftPublished, draftRosterMutating, editingId, executedDate, historicalHomeTeam, historicalPartnerTeam, homeRoster, loadTrades, partnerRoster, sourceUrl]);
+
+  const saveDraft = useCallback(async () => {
+    if (draftPublished && draftRosterMutating) {
+      setPendingRosterAction({ kind: "save" });
+      return;
+    }
+    await performSaveDraft();
+  }, [draftPublished, draftRosterMutating, performSaveDraft]);
 
   const editTrade = useCallback((trade: AdminTradeRecord) => {
     const selectedTeams = trade.sides.map(side => db.teams.find(team => team.id === side.teamId) ?? null);
@@ -206,7 +234,11 @@ export default function AdminTradesPage() {
     setExecutedDate(trade.executedDate);
     setSourceUrl(trade.sourceUrl ?? "");
     setConditions(trade.conditions ?? "");
-    setTeams([selectedTeams[0], selectedTeams[1]] as [Team | null, Team | null]);
+    setHistoricalTeams([selectedTeams[0], selectedTeams[1]] as [Team | null, Team | null]);
+    setTeams([
+      db.teams.find(team => team.id === selectedBlocks[0]?.[0]?.teamId) ?? selectedTeams[0],
+      db.teams.find(team => team.id === selectedBlocks[1]?.[0]?.teamId) ?? selectedTeams[1],
+    ] as [Team | null, Team | null]);
     setBlocks([selectedBlocks[0] ?? [], selectedBlocks[1] ?? []] as [Asset[], Asset[]]);
     setSavedId(null);
     setPreview(null);
@@ -216,6 +248,7 @@ export default function AdminTradesPage() {
     setEditingId(null);
     setDraftPublished(false);
     setDraftRosterMutating(true);
+    setHistoricalTeams([null, null]);
     setExecutedDate(today());
     setSourceUrl("");
     setConditions("");
@@ -225,7 +258,7 @@ export default function AdminTradesPage() {
     setPreview(null);
   }, [setBlocks, setTeams]);
 
-  const togglePublished = useCallback(async (trade: AdminTradeRecord) => {
+  const performTogglePublished = useCallback(async (trade: AdminTradeRecord) => {
     setTradeActionId(trade.id);
     setError(null);
     try {
@@ -243,6 +276,45 @@ export default function AdminTradesPage() {
       setTradeActionId(null);
     }
   }, [editingId, loadTrades]);
+
+  const togglePublished = useCallback(async (trade: AdminTradeRecord) => {
+    if (!trade.published && trade.rosterMutating) {
+      setPendingRosterAction({ kind: "publish", trade });
+      return;
+    }
+    await performTogglePublished(trade);
+  }, [performTogglePublished]);
+
+  const confirmRosterOverlayAction = useCallback(async () => {
+    const action = pendingRosterAction;
+    setPendingRosterAction(null);
+    if (!action) return;
+    if (action.kind === "save") {
+      await performSaveDraft();
+      return;
+    }
+    await performTogglePublished(action.trade);
+  }, [pendingRosterAction, performSaveDraft, performTogglePublished]);
+
+  const deleteSavedTrade = useCallback(async (trade: AdminTradeRecord) => {
+    if (!window.confirm(`Delete saved trade ${trade.id}? This cannot be undone.`)) return;
+    setTradeActionId(trade.id);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/trades", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: trade.id }),
+      });
+      await readAdminResponse(res, "Failed to delete trade");
+      if (editingId === trade.id) newDraft();
+      await loadTrades();
+    } catch (err) {
+      setError(adminErrorMessage(err, "Failed to delete trade"));
+    } finally {
+      setTradeActionId(null);
+    }
+  }, [editingId, loadTrades, newDraft]);
 
   return (
     <div style={{
@@ -329,14 +401,44 @@ export default function AdminTradesPage() {
             style={{ border: "1px solid var(--rule)", padding: "10px", fontSize: 12, background: "var(--ledger-card)", color: "var(--ledger-ink)", resize: "vertical" }} />
         </label>
 
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginBottom: 16 }}>
+          {[0, 1].map((idx) => {
+            const sideIdx = idx as 0 | 1;
+            const selected = historicalTeams[sideIdx];
+            const other = historicalTeams[sideIdx === 0 ? 1 : 0];
+            return (
+              <label key={idx} style={{ display: "grid", gap: 5, fontSize: 10, fontWeight: 900, letterSpacing: "0.16em" }}>
+                {sideIdx === 0 ? "SIDE A TRADED FROM" : "SIDE B TRADED FROM"}
+                <select
+                  value={selected?.id ?? ""}
+                  onChange={e => {
+                    const found = db.teams.find(team => team.id === e.target.value) ?? null;
+                    setHistoricalTeams(prev => {
+                      const next = [...prev] as [Team | null, Team | null];
+                      next[sideIdx] = found;
+                      return next;
+                    });
+                  }}
+                  style={{ border: "1px solid var(--rule)", padding: "9px 10px", fontSize: 12, background: "var(--ledger-card)", color: "var(--ledger-ink)" }}
+                >
+                  <option value="">SELECT HISTORICAL TEAM</option>
+                  {db.teams.filter(team => team.id !== other?.id).map(team => (
+                    <option key={team.id} value={team.id}>{team.name}</option>
+                  ))}
+                </select>
+              </label>
+            );
+          })}
+        </div>
+
         {loading ? (
           <div style={{ border: "1px solid var(--rule)", padding: 28, fontSize: 11, fontWeight: 900, letterSpacing: "0.2em" }}>
             LOADING LEAGUE ASSETS
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}>
-            <TradePanel idx={0} team={homeTeam} nav={homeNav} capSpace={homeTeam?.capSpace ?? 0} db={db} label="Team A gives" accent="A" />
-            <TradePanel idx={1} team={partnerTeam} nav={partnerNav} capSpace={partnerTeam?.capSpace ?? 0} db={db} label="Team B gives" accent="B" />
+            <TradePanel idx={0} team={homeTeam} nav={homeNav} capSpace={homeTeam?.capSpace ?? 0} db={db} label="Side A current asset source" accent="A" allowDuplicateTeams />
+            <TradePanel idx={1} team={partnerTeam} nav={partnerNav} capSpace={partnerTeam?.capSpace ?? 0} db={db} label="Side B current asset source" accent="B" allowDuplicateTeams />
           </div>
         )}
 
@@ -354,7 +456,7 @@ export default function AdminTradesPage() {
               PREVIEW
             </div>
             <div style={{ fontSize: 18, fontWeight: 900, marginTop: 4 }}>
-              {preview ? `${preview.status} · ${preview.message}` : canPreview ? `Net ${fmt(partnerNav - homeNav)} NAV before verdict` : "Select two teams and at least one asset per side"}
+              {preview ? `${preview.status} · ${preview.message}` : canPreview ? `Net ${fmt(partnerNav - homeNav)} NAV before verdict` : "Select historical traded-from teams and at least one asset per side"}
             </div>
             {savedId && (
               <div style={{ fontSize: 11, color: "var(--ledger-green)", marginTop: 6, fontWeight: 900 }}>
@@ -386,7 +488,7 @@ export default function AdminTradesPage() {
           </div>
           <div style={{ display: "grid", gap: 8 }}>
             {trades.map(trade => (
-              <div key={trade.id} style={{ border: "1px solid var(--rule)", padding: "12px 14px", display: "grid", gridTemplateColumns: "1fr auto auto", gap: 10, alignItems: "center" }}>
+              <div key={trade.id} style={{ border: "1px solid var(--rule)", padding: "12px 14px", display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 10, alignItems: "center" }}>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 900 }}>{trade.executedDate} · {trade.sides.map(side => side.teamId).join(" / ")}</div>
                   <div style={{ fontSize: 10, color: "var(--ledger-ink-faint)", marginTop: 3 }}>
@@ -404,6 +506,14 @@ export default function AdminTradesPage() {
                 >
                   {tradeActionId === trade.id ? "SAVING" : trade.published ? "UNPUBLISH" : "PUBLISH"}
                 </button>
+                <button
+                  onClick={() => deleteSavedTrade(trade)}
+                  disabled={tradeActionId === trade.id}
+                  className="btn-ink"
+                  style={{ padding: "8px 12px", fontSize: 10, fontWeight: 900, letterSpacing: "0.14em", opacity: tradeActionId === trade.id ? 0.45 : 1, borderColor: "var(--ledger-red)", color: "var(--ledger-red)" }}
+                >
+                  DELETE
+                </button>
               </div>
             ))}
             {trades.length === 0 && (
@@ -414,6 +524,65 @@ export default function AdminTradesPage() {
           </div>
         </div>
       </div>
+      {pendingRosterAction && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="roster-overlay-confirm-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(18, 16, 12, 0.62)",
+            display: "grid",
+            placeItems: "center",
+            padding: 24,
+            zIndex: 50,
+          }}
+        >
+          <div style={{
+            width: "min(560px, 100%)",
+            border: "2px solid var(--ledger-red)",
+            background: "var(--paper)",
+            color: "var(--ledger-ink)",
+            padding: 22,
+            boxShadow: "0 18px 42px rgba(0, 0, 0, 0.28)",
+          }}>
+            <div id="roster-overlay-confirm-title" style={{ fontSize: 15, fontWeight: 900, letterSpacing: "0.16em", color: "var(--ledger-red)" }}>
+              CONFIRM ROSTER OVERLAY
+            </div>
+            <div style={{ fontSize: 12, lineHeight: 1.6, marginTop: 12, fontWeight: 700 }}>
+              This published Docket trade will move players and cap in Armchair GM. Use this only when the database has not already caught up to the real transaction.
+            </div>
+            <div style={{ display: "grid", gap: 6, marginTop: 14, padding: 12, border: "1px solid var(--rule)", fontSize: 11, fontWeight: 900 }}>
+              {pendingRosterAction.kind === "publish" && (
+                <div>{pendingRosterAction.trade.executedDate} · {pendingRosterAction.trade.sides.map(side => side.teamId).join(" / ")}</div>
+              )}
+              {pendingRosterAction.kind === "save" && rosterOverlaySummary.map(line => (
+                <div key={line}>{line}</div>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, lineHeight: 1.5, marginTop: 12, color: "var(--ledger-ink-faint)", fontWeight: 700 }}>
+              For historical backfills where players are already on their current teams, cancel and switch ROSTER OVERLAY to UI ONLY.
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
+              <button
+                onClick={() => setPendingRosterAction(null)}
+                className="btn-ink"
+                style={{ padding: "9px 12px", fontSize: 10, fontWeight: 900, letterSpacing: "0.14em" }}
+              >
+                CANCEL
+              </button>
+              <button
+                onClick={confirmRosterOverlayAction}
+                className="btn-ink"
+                style={{ padding: "9px 12px", fontSize: 10, fontWeight: 900, letterSpacing: "0.14em", borderColor: "var(--ledger-red)", color: "var(--ledger-red)" }}
+              >
+                CONFIRM ROSTER OVERLAY
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
