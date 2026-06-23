@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { scrapeCapWages } from "@/app/services/scraper";
 import { db } from "@/app/db/client";
 import { players as playersTable } from "@/app/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
 import { requireAdmin } from "@/app/lib/admin-auth";
+import { ensurePlayerColumns } from "@/app/db/ensure-schema";
 
 const CONTRACT_OVERRIDES: Record<string, { yearsRemaining?: number; position?: string }> = {
   "Quinton Byfield": { position: "C" },
@@ -93,10 +94,10 @@ const MAX_CONTRACT_CAP_HIT = 20.8;
 const MIN_CONTRACT_YEARS = 0;
 const MAX_CONTRACT_YEARS = 12;
 
+// Memoized per-process column back-fill (retirement + prospect columns).
+// Kept as a named wrapper so the retirement-column guard stays explicit here.
 async function ensureRetirementColumns() {
-  for (const col of ["retired INTEGER DEFAULT 0", "retired_date TEXT"]) {
-    try { await db.run(sql.raw(`ALTER TABLE players ADD COLUMN ${col}`)); } catch { /* already exists */ }
-  }
+  await ensurePlayerColumns();
 }
 
 async function clearRosterCaches() {

@@ -4,7 +4,7 @@ import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
 import { players as playersTable, tradeBlock as tradeBlockTable } from "@/app/db/schema";
-import { sql } from "drizzle-orm";
+import { ensurePlayerColumns } from "@/app/db/ensure-schema";
 import { resolveRosterTier } from "@/app/lib/xnav-engine";
 import { calcDevelopmentProfile } from "@/app/lib/development-profile";
 import {
@@ -281,7 +281,7 @@ function calcQocIndex(
 
 async function loadFromDB(): Promise<Record<string, any>> {
   try {
-    await ensureRetirementColumns();
+    await ensurePlayerColumns();
     const rows = await db.select().from(playersTable);
     const result: Record<string, any> = {};
     for (const row of rows) {
@@ -305,12 +305,6 @@ async function loadFromDB(): Promise<Record<string, any>> {
   } catch (e: any) {
     console.warn("[DB] loadFromDB failed, falling back to bundled.json:", e.message);
     return loadBundledFallback();
-  }
-}
-
-async function ensureRetirementColumns() {
-  for (const col of ["retired INTEGER DEFAULT 0", "retired_date TEXT"]) {
-    try { await db.run(sql.raw(`ALTER TABLE players ADD COLUMN ${col}`)); } catch { /* already exists */ }
   }
 }
 
@@ -926,7 +920,7 @@ export async function assembleCanonicalRoster(options: {
   // augment the live roster instead of creating duplicates.
   const dbTeamBySlug = new Map<string, string>();
   try {
-    await ensureRetirementColumns();
+    await ensurePlayerColumns();
     const dbPlayers = await db.select({
       id:              playersTable.id,
       name:            playersTable.name,

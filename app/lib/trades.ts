@@ -1,6 +1,7 @@
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/app/db/client";
 import { trades } from "@/app/db/schema";
+import { ensureTradeColumns } from "@/app/db/ensure-schema";
 import type { TradeSharePayload } from "@/app/lib/trade-share";
 import { canonicalNameSlug } from "@/app/lib/player-identity";
 import type { Asset, Team, TradeVerdict, XNAVResult } from "@/app/lib/trade-types";
@@ -191,16 +192,8 @@ const fromRow = (row: typeof trades.$inferSelect): TradeRecord => ({
   rosterMutating: row.rosterMutating ?? true,
 });
 
-async function ensureRosterMutatingColumn(database: TradeDatabase): Promise<void> {
-  try {
-    await database.run(sql.raw("ALTER TABLE trades ADD COLUMN roster_mutating INTEGER NOT NULL DEFAULT 1"));
-  } catch {
-    // Column already exists, or the table will be created by the caller/test setup.
-  }
-}
-
 export async function createTrade(trade: TradeRecord, database: TradeDatabase = db): Promise<TradeRecord> {
-  await ensureRosterMutatingColumn(database);
+  await ensureTradeColumns(database);
   await database.insert(trades).values(toRow(trade));
   return trade;
 }
@@ -250,7 +243,7 @@ export async function updateTrade(
   patch: UpdateTradeInput,
   database: TradeDatabase = db,
 ): Promise<TradeRecord | null> {
-  await ensureRosterMutatingColumn(database);
+  await ensureTradeColumns(database);
   const existing = await getTrade(id, database);
   if (!existing) return null;
 
@@ -273,13 +266,13 @@ export async function updateFrozenTrade(
 }
 
 export async function getTrade(id: string, database: TradeDatabase = db): Promise<TradeRecord | null> {
-  await ensureRosterMutatingColumn(database);
+  await ensureTradeColumns(database);
   const rows = await database.select().from(trades).where(eq(trades.id, id)).limit(1);
   return rows[0] ? fromRow(rows[0]) : null;
 }
 
 export async function deleteTrade(id: string, database: TradeDatabase = db): Promise<boolean> {
-  await ensureRosterMutatingColumn(database);
+  await ensureTradeColumns(database);
   const existing = await getTrade(id, database);
   if (!existing) return false;
   await database.delete(trades).where(eq(trades.id, id));
@@ -287,7 +280,7 @@ export async function deleteTrade(id: string, database: TradeDatabase = db): Pro
 }
 
 export async function listPublishedTrades(database: TradeDatabase = db): Promise<TradeRecord[]> {
-  await ensureRosterMutatingColumn(database);
+  await ensureTradeColumns(database);
   const rows = await database.select().from(trades).where(eq(trades.published, true));
   return rows
     .map(fromRow)
@@ -297,7 +290,7 @@ export async function listPublishedTrades(database: TradeDatabase = db): Promise
 }
 
 export async function listTrades(database: TradeDatabase = db): Promise<TradeRecord[]> {
-  await ensureRosterMutatingColumn(database);
+  await ensureTradeColumns(database);
   const rows = await database.select().from(trades);
   return rows
     .map(fromRow)

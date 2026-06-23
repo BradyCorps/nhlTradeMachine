@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/app/db/client";
 import { players as playersTable } from "@/app/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/app/lib/admin-auth";
+import { ensurePlayerColumns } from "@/app/db/ensure-schema";
 
 export const dynamic = "force-dynamic";
 
@@ -21,14 +22,6 @@ const NHLE_FACTORS: Record<string, number> = {
   OHL: 0.30, WHL: 0.28, QMJHL: 0.28, USNTDP: 0.35,
   J20: 0.19, MHL: 0.18, U18: 0.15,
 };
-
-// Columns added after the original table creation — ensure they exist.
-// SQLite ALTER TABLE ADD COLUMN is idempotent-safe via try/catch.
-async function ensureProspectColumns() {
-  for (const col of ["draft_overall INTEGER", "prospect_pts_pace REAL"]) {
-    try { await db.run(sql.raw(`ALTER TABLE players ADD COLUMN ${col}`)); } catch { /* already exists */ }
-  }
-}
 
 // POST /api/admin/import-draft-class
 // body: {
@@ -66,7 +59,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "draftYear and a non-empty players array are required" }, { status: 400 });
   }
 
-  await ensureProspectColumns();
+  await ensurePlayerColumns();
 
   let added   = 0;
   let updated = 0;

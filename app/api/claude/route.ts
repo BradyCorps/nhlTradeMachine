@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { SEASON } from "@/app/lib/season-config";
+import { redis } from "@/app/lib/redis";
 
 // Narrative-only Claude endpoint.
 // The client sends locked, pre-calculated facts; this route builds the prompt.
@@ -15,23 +16,79 @@ const ALLOWED_MODELS = new Set([
 
 const MAX_TOKENS_LIMIT = 1800;
 
+// ── Rate limiting ────────────────────────────────────────────────────────────
+// This endpoint spends real money on the Anthropic API, so the limiter has to
+// survive both serverless fan-out (many instances) and IP spoofing. When Redis
+// is configured we enforce three windows:
+//   • per-IP — 10 req/min  (normal-use guard)
+//   • global — 60 req/min  (burst guard, resistant to X-Forwarded-For rotation)
+//   • global — 2000 req/day (hard daily spend ceiling)
+// The per-IP window alone is bypassable by rotating X-Forwarded-For, so the
+// global windows are the real protection against cost-exhaustion abuse. Without
+// Redis (local dev / tests) we fall back to a pruned in-memory per-IP limiter.
+
+const PER_IP_PER_MINUTE = 10;
+const GLOBAL_PER_MINUTE = 60;
+const GLOBAL_PER_DAY = 2000;
+
+type RateLimitResult = { ok: true } | { ok: false; reason: string };
+
+// Increment `key`, set its TTL on first write, and report whether it is within
+// `limit` -- one INCR (plus a conditional EXPIRE) per window.
+async function incrWithinLimit(key: string, limit: number, ttlSeconds: number): Promise<boolean> {
+  const count = await redis!.incr(key);
+  if (count === 1) await redis!.expire(key, ttlSeconds);
+  return count <= limit;
+}
+
 declare global {
   var __rateLimitMap: Map<string, { count: number; resetAt: number }> | undefined;
 }
 if (!global.__rateLimitMap) global.__rateLimitMap = new Map();
 
-function checkRateLimit(ip: string): boolean {
+// In-memory fallback for local dev / tests. Prunes expired entries on each call
+// so the map cannot grow without bound (the previous version never deleted any).
+function checkRateLimitInMemory(ip: string): boolean {
   const now = Date.now();
   const windowMs = 60_000;
-  const limit = 10;
-  const entry = global.__rateLimitMap!.get(ip);
+  const map = global.__rateLimitMap!;
+  for (const [key, entry] of map) {
+    if (now > entry.resetAt) map.delete(key);
+  }
+  const entry = map.get(ip);
   if (!entry || now > entry.resetAt) {
-    global.__rateLimitMap!.set(ip, { count: 1, resetAt: now + windowMs });
+    map.set(ip, { count: 1, resetAt: now + windowMs });
     return true;
   }
-  if (entry.count >= limit) return false;
+  if (entry.count >= PER_IP_PER_MINUTE) return false;
   entry.count++;
   return true;
+}
+
+async function checkRateLimit(ip: string): Promise<RateLimitResult> {
+  if (redis) {
+    try {
+      const minuteBucket = Math.floor(Date.now() / 60_000);
+      const dayBucket = Math.floor(Date.now() / 86_400_000);
+      const [ipOk, globalMinuteOk, globalDayOk] = await Promise.all([
+        incrWithinLimit(`rl:claude:ip:${ip}:${minuteBucket}`, PER_IP_PER_MINUTE, 60),
+        incrWithinLimit(`rl:claude:global:min:${minuteBucket}`, GLOBAL_PER_MINUTE, 60),
+        incrWithinLimit(`rl:claude:global:day:${dayBucket}`, GLOBAL_PER_DAY, 86_400),
+      ]);
+      if (!ipOk) return { ok: false, reason: "Rate limit exceeded - try again in a minute" };
+      if (!globalMinuteOk || !globalDayOk) {
+        return { ok: false, reason: "Narrative generation is temporarily rate limited - try again soon" };
+      }
+      return { ok: true };
+    } catch (e) {
+      // A Redis outage should degrade gracefully rather than take the feature
+      // down — fall back to the in-memory per-instance limiter.
+      console.warn("[claude] Redis rate limiter unavailable, using in-memory fallback:", (e as Error).message);
+    }
+  }
+  return checkRateLimitInMemory(ip)
+    ? { ok: true }
+    : { ok: false, reason: "Rate limit exceeded - try again in a minute" };
 }
 
 const AssetSummarySchema = z.object({
@@ -299,8 +356,9 @@ export async function POST(req: Request) {
   }
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!checkRateLimit(ip)) {
-    return NextResponse.json({ error: "Rate limit exceeded - try again in a minute" }, { status: 429 });
+  const rate = await checkRateLimit(ip);
+  if (!rate.ok) {
+    return NextResponse.json({ error: rate.reason }, { status: 429 });
   }
 
   let rawBody: unknown;
