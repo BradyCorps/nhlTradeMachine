@@ -1,0 +1,104 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildDocketEntries,
+  filterAndSortDocketEntries,
+  type DocketEntry,
+} from "../app/lib/docket-view";
+import type { TradeRecord } from "../app/lib/trades";
+
+const trade = (
+  id: string,
+  executedDate: string,
+  published: boolean,
+  winner: string | null,
+  margin: number,
+): TradeRecord => ({
+  id,
+  executedDate,
+  source: "manual",
+  sourceUrl: "https://example.com/source",
+  season: "2026-27",
+  sides: [
+    {
+      teamId: "WPG",
+      assetsGiven: [{
+        kind: "player",
+        ref: { id: `${id}-player`, nameSlug: "winnipeg-player" },
+        retainedPct: 0.25,
+        inputSnapshot: { name: "Winnipeg Player" },
+        navAtTrade: 90,
+      }],
+    },
+    {
+      teamId: "CGY",
+      assetsGiven: [{
+        kind: "pick",
+        ref: { id: `${id}-pick`, nameSlug: "calgary-first" },
+        retainedPct: 0,
+        inputSnapshot: { name: "Calgary First" },
+        navAtTrade: 50,
+      }],
+    },
+  ],
+  conditions: null,
+  lockedVerdict: {
+    status: winner ? "WIN" : "FAIR",
+    message: winner ? `${winner} wins the value ledger` : "Even value at trade",
+    metrics: {
+      navOut: 90,
+      navIn: 50,
+      homeNetGain: margin,
+      ptsGain: 0,
+      defGain: 0,
+      capDelta: 0,
+      variance: 0,
+      ewaHome: 0,
+      cwiYears: 0,
+    },
+    flags: [],
+  },
+  gradeAtTrade: {
+    perTeamNetNav: { WPG: margin, CGY: -margin },
+    winner,
+    fairness: winner ? "WIN" : "FAIR",
+  },
+  published,
+  rosterMutating: true,
+});
+
+describe("Docket view model", () => {
+  it("builds entries only from published graded trades", () => {
+    const draft = trade("draft", "2026-07-01", false, "WPG", 20);
+    const ungraded: TradeRecord = { ...trade("ungraded", "2026-07-02", true, "CGY", 12), gradeAtTrade: null };
+    const published = trade("published", "2026-07-03", true, null, 0);
+
+    expect(buildDocketEntries([draft, ungraded, published])).toMatchObject([{
+      id: "published",
+      winner: null,
+      navMargin: 0,
+      todayVerdict: "Pending live re-grade",
+    }]);
+  });
+
+  it("filters by team, winner, and search query", () => {
+    const entries = buildDocketEntries([
+      trade("one", "2026-07-01", true, "WPG", 24),
+      trade("two", "2026-07-02", true, "CGY", -12),
+    ]);
+
+    expect(filterAndSortDocketEntries(entries, { teamId: "WPG" })).toHaveLength(2);
+    expect(filterAndSortDocketEntries(entries, { winner: "WPG" }).map(e => e.id)).toEqual(["one"]);
+    expect(filterAndSortDocketEntries(entries, { query: "Calgary First" }).map(e => e.id)).toEqual(["two", "one"]);
+  });
+
+  it("sorts by date and NAV margin without mutating the source list", () => {
+    const entries: DocketEntry[] = buildDocketEntries([
+      trade("small", "2026-07-01", true, "CGY", -8),
+      trade("large", "2026-07-02", true, "WPG", 32),
+    ]);
+
+    expect(filterAndSortDocketEntries(entries, { sort: "nav-desc" }).map(e => e.id)).toEqual(["large", "small"]);
+    expect(filterAndSortDocketEntries(entries, { sort: "date-asc" }).map(e => e.id)).toEqual(["small", "large"]);
+    expect(entries.map(e => e.id)).toEqual(["small", "large"]);
+  });
+});

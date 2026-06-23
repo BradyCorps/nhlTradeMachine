@@ -364,6 +364,35 @@ describe("Canary — admin trade ingestion", () => {
   });
 });
 
+describe("Canary — public Docket page", () => {
+  const page = read("app/docket/page.tsx");
+  const client = read("app/docket/DocketClient.tsx");
+  const view = read("app/lib/docket-view.ts");
+  const header = read("app/components/Header.tsx");
+
+  it("loads published trades through the Docket view model", () => {
+    expect(page).toContain("listPublishedTrades");
+    expect(page).toContain("buildDocketEntries");
+    expect(page).toContain("<DocketClient entries={entries} />");
+    expect(view).toContain("if (!trade.published || !trade.gradeAtTrade) return null");
+  });
+
+  it("exposes team, winner, search, and sort controls", () => {
+    expect(client).toContain("filterAndSortDocketEntries");
+    expect(client).toContain("TEAM");
+    expect(client).toContain("WINNER");
+    expect(client).toContain("SEARCH");
+    expect(client).toContain("NAV margin high");
+    expect(client).toContain("TODAY:");
+  });
+
+  it("links The Docket from the shared public masthead", () => {
+    expect(header).toContain('href="/docket"');
+    expect(header).toContain("The Docket");
+    expect(header).toContain('pathname?.startsWith("/docket")');
+  });
+});
+
 describe("Canary — trade proposal audit verification", () => {
   it("generated proposals run the full evaluate verdict before being shown", () => {
     const src = read("app/components/TradeProposal.tsx");

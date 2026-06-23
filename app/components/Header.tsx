@@ -5,15 +5,17 @@
 import { usePathname } from "next/navigation";
 
 interface HeaderProps {
-  activeTab?: "trade" | "armchair-gm" | "players";
+  activeTab?: "trade" | "armchair-gm" | "players" | "docket";
   showLiveFeed?: boolean;
 }
 
 export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) {
   const pathname = usePathname();
   const resolvedActiveTab =
-    pathname?.startsWith("/armchair-gm") ? "armchair-gm" : activeTab;
-  const navClass = (tab: "trade" | "armchair-gm" | "players") => [
+    pathname?.startsWith("/armchair-gm") ? "armchair-gm"
+    : pathname?.startsWith("/docket") ? "docket"
+    : activeTab;
+  const navClass = (tab: "trade" | "armchair-gm" | "players" | "docket") => [
     "text-[11px] sm:text-[12px] uppercase tracking-[0.14em] sm:tracking-[0.2em] font-mono no-underline transition-colors border-b-2 pb-0.5",
     resolvedActiveTab === tab
       ? "text-ledger-red font-black border-ledger-red"
@@ -61,6 +63,13 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
                 className={navClass("players")}
               >
                 {resolvedActiveTab === "players" ? "◆" : "◇"} Player Analytics
+              </a>
+              <span className="nav-divider text-ledger-rule-light">|</span>
+              <a
+                href="/docket"
+                className={navClass("docket")}
+              >
+                {resolvedActiveTab === "docket" ? "◆" : "◇"} The Docket
               </a>
               <span className="nav-divider text-ledger-rule-light">|</span>
               <a

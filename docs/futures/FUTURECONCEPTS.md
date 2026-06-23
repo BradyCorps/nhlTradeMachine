@@ -248,7 +248,7 @@ skip both the roster move and cap delta for that asset."
 
 ## Phase D — Public surface  [needs B–C]
 
-### [ ] D1 — public Docket page (list / filter / sort)
+### [x] D1 — public Docket page (list / filter / sort)
 Filterable, sortable list of published graded trades (by date, team, NAV margin, winner).
 Each row: the two packages, at-trade verdict, today verdict, NAV-margin chip.
 Acceptance: the page lists published trades and filters/sorts by the above; drafts are hidden;
