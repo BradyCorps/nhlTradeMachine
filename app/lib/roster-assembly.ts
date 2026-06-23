@@ -1083,6 +1083,21 @@ export async function assembleCanonicalRoster(options: {
       const finalRetain  = override?.canRetain ?? (nameCollision ? true : (fin?.canRetain ?? true));
       const intangibleMult  = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
 
+      // ── Contract expiry surfacing (off-season / free agency) ──────────────
+      // expiryStatus comes from the CapWages scrape via loadContracts(); carry it
+      // onto the asset and derive a pending-free-agent flag. Heuristic: a final
+      // contract year plus a UFA/RFA expiry, excluding draftees/ELCs. NOTE:
+      // yearsRemaining is floored at 1 upstream (app/services/scraper.ts), so this
+      // reads as "final-year / pending FA", not a precise 2026-vs-2027 distinction.
+      const rawExpiryStatus = typeof fin?.expiryStatus === "string" ? fin.expiryStatus : null;
+      const normExpiry: "UFA" | "RFA" | null = rawExpiryStatus
+        ? (/rfa/i.test(rawExpiryStatus) ? "RFA" : /ufa/i.test(rawExpiryStatus) ? "UFA" : null)
+        : null;
+      const expiresThisOffseason =
+        finalYears <= 1 && normExpiry != null && draftOverall == null && !isLikelyELC;
+      const contractStatus: "UFA" | "RFA" | "SIGNED" =
+        expiresThisOffseason && normExpiry ? normExpiry : "SIGNED";
+
       // True xGA/60 over goalie icetime; require ≥10 games of ice (36,000s) for signal
       const teamXgaRaw = teamXgaMap.get(teamId);
       const teamXga60  = teamXgaRaw && teamXgaRaw.ice > 36000
@@ -1191,6 +1206,9 @@ export async function assembleCanonicalRoster(options: {
         developmentProfile,
         tradeBlockStatus: blockMap.get(p.name)?.status ?? null,
         tradeBlockNote:   blockMap.get(p.name)?.note   ?? null,
+        expiryStatus:     rawExpiryStatus,
+        contractStatus,
+        expiresThisOffseason,
         retainedPct: 0,
         multiplier:  intangibleMult,
         ops:  PS_MAP.get(p.name)?.ops ?? PS_MAP.get(`id:${p.id}`)?.ops ?? PS_MAP.get(slugify(p.name))?.ops ?? null,

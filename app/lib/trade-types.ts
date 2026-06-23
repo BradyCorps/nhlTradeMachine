@@ -79,6 +79,11 @@ export interface Asset {
   // Trade block (admin-managed, stamped by league routes from the tradeBlock table)
   tradeBlockStatus?: "requested" | "available" | "blocked" | "untouchable" | null;
   tradeBlockNote?: string | null;
+
+  // Contract expiry / free agency (surfaced from CapWages expiryStatus by roster-assembly)
+  expiryStatus?: string | null;                       // raw CapWages status (e.g. "UFA", "RFA")
+  contractStatus?: "UFA" | "RFA" | "SIGNED";          // normalized pending status this offseason
+  expiresThisOffseason?: boolean;                     // pending free agent (final-year heuristic)
 }
 
 export interface Team {
