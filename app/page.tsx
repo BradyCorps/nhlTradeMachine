@@ -1,6 +1,5 @@
-"use client";
 // app/page.tsx — The Hockey Ledger · broadsheet on a desk
-import React, { useEffect } from "react";
+import React from "react";
 import Link from "next/link";
 import Footer from "./components/Footer";
 
@@ -94,28 +93,6 @@ const ENGINE = [
 ];
 
 export default function WelcomePage() {
-  // Scroll reveal — each block settles in like a sheet laid onto the desk.
-  useEffect(() => {
-    const els = Array.from(document.querySelectorAll<HTMLElement>(".fp-reveal"));
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      els.forEach((el) => el.classList.add("is-in"));
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-in");
-            io.unobserve(entry.target);
-          }
-        }
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, []);
-
   return (
     <main className="fp-desk min-h-screen font-serif antialiased" style={{ color: "var(--ink)" }}>
       <div className="fp-sheet">

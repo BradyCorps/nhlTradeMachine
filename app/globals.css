@@ -1168,27 +1168,31 @@ select.ledger-select {
 }
 
 /* ── Scroll reveal — a sheet being lifted onto the desk ────────── */
-/* Each block starts low, tilted slightly forward, and settles flat as
-   it enters view (added by an IntersectionObserver). Weighty, no bounce. */
-.fp-reveal {
-  opacity: 0;
-  transform: perspective(1200px) translateY(34px) rotateX(7deg) scale(0.985);
-  transform-origin: 50% 100%;
-  transition:
-    opacity 0.8s var(--fp-ease),
-    transform 0.9s var(--fp-ease);
-  will-change: opacity, transform;
+/* Pure CSS, scroll-linked (no JavaScript): each block lifts and settles
+   as it scrolls into view. Content is fully visible by default, so a slow
+   or failed bundle can never leave the page blank — the animation is
+   layered on only where the browser supports scroll-driven timelines. */
+@keyframes fp-lift {
+  from {
+    opacity: 0;
+    transform: perspective(1200px) translateY(42px) rotateX(8deg) scale(0.984);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1200px) translateY(0) rotateX(0deg) scale(1);
+  }
 }
-.fp-reveal.is-in {
-  opacity: 1;
-  transform: perspective(1200px) translateY(0) rotateX(0deg) scale(1);
-}
-/* No-JS / scripting-disabled: never hide content */
-@media (scripting: none) {
-  .fp-reveal { opacity: 1; transform: none; }
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .fp-reveal {
+      transform-origin: 50% 100%;
+      animation: fp-lift linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 22%;
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .fp-cell, .fp-stamp, .fp-cell:active .fp-stamp { transition: none; transform: none; }
-  .fp-reveal, .fp-reveal.is-in { opacity: 1; transform: none; transition: none; }
 }
