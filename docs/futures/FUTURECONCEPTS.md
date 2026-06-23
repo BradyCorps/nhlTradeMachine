@@ -125,6 +125,46 @@ by BOTH `/api/league` and `/api/league/players`. The Docket overlay and Dynamic 
 both attach here; with the current twin pipelines the overlay would apply in one path and
 miss in another (Woll/GSAX drift class). (Tracked as Phase 2 `2a` in the consolidation plan.)
 
+### [ ] A2A — implement the canonical roster-assembly module (actionable spec for A2)
+**Root.** `/api/league/route.ts` (~1490 lines) and `/api/league/players/route.ts` (~1070) each
+build the league roster independently — ~2,550 lines of near-duplicate logic: CapWages scrape,
+MoneyPuck stats + NHL skater/goalie fallback, DB injection/backfill, identity dedup, trade-block
+stamping, prospect enrichment, development-profile attachment, position/contract resolution. This
+twin-pipeline duplication is the drift source (Woll dedup, GSAX miss) and blocks Phase C + A3b:
+neither has a single place to attach.
+
+**Goal.** Extract the shared pipeline into one module — `app/lib/roster-assembly.ts` — returning
+the canonical player list (and per-team roster map). Both routes import it and become **thin
+handlers** that only shape their own response: `/api/league` → `{ teams, players, picks,
+capCeiling, … }`; `/api/league/players` → the players list. **Pure refactor — no behavior
+change**; emitted player objects must be equivalent to today.
+
+**Approach.**
+1. **Move, don't rewrite.** Lift the duplicated logic into exported functions in
+   `roster-assembly.ts`, reusing existing `app/lib/player-identity.ts`,
+   `development-sources.ts`, `prospect-enrichment.ts`. Keep names/order identical to minimize risk.
+2. **Reconcile drift.** Diff the two routes' version of each step; where they differ, pick the
+   authoritative behavior (prefer the one matching current tests/canaries) and comment any
+   intentional difference (e.g. response shape). Do not "improve" valuation — parity only.
+3. **Thin the routes.** Keep picks/teams/capCeiling assembly in `/api/league` (response-specific),
+   not in the module.
+
+**CRITICAL — update the source-grep canaries (the part that traps agents).**
+`__tests__/feature-canaries.test.ts` greps BOTH route source files for implementation strings in
+five loops (~L63, 508, 911, 1040, 1070). Once the logic moves into `roster-assembly.ts`, repoint
+those assertions to read the **module** source instead of the two route files. Do NOT delete or
+weaken them — they guard load-bearing features (DB injection, dedup, NHL fallbacks, prospect
+enrichment). Leave genuinely route-specific assertions (cache keys, pick inventory) on the routes.
+
+**Acceptance.**
+- One `roster-assembly.ts`; both routes call it; handlers are response-shaping only.
+- Player objects from both routes unchanged (parity) — existing
+  `__tests__/league-players-route.test.ts` (1c) passes without edits to its expectations.
+- Relocated feature canaries pass against the module source; none deleted or weakened.
+- `npm test` + typecheck pass; no change to NAV/stats/dedup/response fields.
+- **Guardrail:** large diff is fine but must be logic-neutral. If it can't be done without
+  touching valuation or a response field, STOP and flag rather than paper over a behavior change.
+
 ### [ ] A3a — shared cap-delta helper
 Add a pure helper `applyCapDelta(baselineCapSpace, moves)` where `moves` is the per-team set
 of incoming/outgoing assets with `capHit` and `retainedPct`. Returns effective cap space:
