@@ -1,6 +1,6 @@
 "use client";
 // app/page.tsx — The Hockey Ledger · broadsheet on a desk
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
 import Footer from "./components/Footer";
 
@@ -94,6 +94,28 @@ const ENGINE = [
 ];
 
 export default function WelcomePage() {
+  // Scroll reveal — each block settles in like a sheet laid onto the desk.
+  useEffect(() => {
+    const els = Array.from(document.querySelectorAll<HTMLElement>(".fp-reveal"));
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      els.forEach((el) => el.classList.add("is-in"));
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-in");
+            io.unobserve(entry.target);
+          }
+        }
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
   return (
     <main className="fp-desk min-h-screen font-serif antialiased" style={{ color: "var(--ink)" }}>
       <div className="fp-sheet">
@@ -109,7 +131,7 @@ export default function WelcomePage() {
         </div>
 
         {/* ── Masthead with ears ─────────────────────────────── */}
-        <header className="masthead-rule">
+        <header className="masthead-rule fp-reveal">
           <div className="px-5 py-7 grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-4">
             <div className="fp-ear hidden md:block">
               Final Edition<br />Vol. I — No. 1
@@ -133,7 +155,7 @@ export default function WelcomePage() {
         </header>
 
         {/* ── Lead editorial ─────────────────────────────────── */}
-        <section className="px-5 sm:px-8 pt-8 pb-7 border-b" style={{ borderColor: "var(--rule)" }}>
+        <section className="fp-reveal px-5 sm:px-8 pt-8 pb-7 border-b" style={{ borderColor: "var(--ink)", transitionDelay: "0.08s" }}>
           <div className="text-center mb-5">
             <div className="newspaper-kicker font-black text-2xs uppercase font-mono mb-1"
               style={{ color: "var(--ledger-red)" }}>
@@ -169,7 +191,7 @@ export default function WelcomePage() {
         </section>
 
         {/* ── The desks (dense ruled broadsheet) ─────────────── */}
-        <section className="px-5 sm:px-8 pt-8">
+        <section className="fp-reveal px-5 sm:px-8 pt-8">
           <div className="fp-section-label mb-5">Inside This Edition</div>
 
           <div className="fp-desks">
@@ -241,16 +263,16 @@ export default function WelcomePage() {
         </section>
 
         {/* ── In development ─────────────────────────────────── */}
-        <section className="px-5 sm:px-8 pt-11">
+        <section className="fp-reveal px-5 sm:px-8 pt-11">
           <div className="fp-section-label mb-5">In Development</div>
           <div className="fp-briefs">
             {BRIEFS.map(({ feature, title, body }) => (
               <div key={feature} className="fp-brief">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="newspaper-kicker font-black text-2xs uppercase font-mono"
-                    style={{ color: "var(--ledger-violet)" }}>{feature}</span>
+                    style={{ color: "var(--fig)" }}>{feature}</span>
                   <span className="text-2xs uppercase tracking-[0.2em] font-mono"
-                    style={{ color: "var(--ledger-ink-faint)" }}>Coming Soon</span>
+                    style={{ color: "var(--fig)", opacity: 0.75 }}>Coming Soon</span>
                 </div>
                 <h2 className="fp-head font-black text-lg leading-tight" style={{ color: "var(--ink)" }}>
                   {title}
@@ -264,7 +286,7 @@ export default function WelcomePage() {
         </section>
 
         {/* ── How the engine works ───────────────────────────── */}
-        <section className="mt-11 border-y py-9"
+        <section className="fp-reveal mt-11 border-y py-9"
           style={{ borderColor: "var(--ink)", background: "var(--paper-inset)" }}>
           <div className="px-5 sm:px-8">
             <div className="fp-section-label mb-7">How the Engine Works</div>
