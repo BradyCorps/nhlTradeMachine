@@ -58,4 +58,5 @@ export const trades = sqliteTable("trades", {
   lockedVerdict: text("locked_verdict"),
   gradeAtTrade:  text("grade_at_trade"),
   published:     integer("published", { mode: "boolean" }).notNull().default(false),
+  rosterMutating: integer("roster_mutating", { mode: "boolean" }).notNull().default(true),
 });

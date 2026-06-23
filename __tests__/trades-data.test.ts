@@ -7,6 +7,8 @@ import {
   createFrozenTrade,
   createTrade,
   getTrade,
+  listPublishedTrades,
+  updateTrade,
   type TradeFreezeEvaluator,
   type TradeRecord,
 } from "../app/lib/trades";
@@ -27,7 +29,8 @@ beforeEach(async () => {
       conditions TEXT,
       locked_verdict TEXT,
       grade_at_trade TEXT,
-      published INTEGER NOT NULL DEFAULT 0
+      published INTEGER NOT NULL DEFAULT 0,
+      roster_mutating INTEGER NOT NULL DEFAULT 1
     )
   `);
 });
@@ -94,6 +97,7 @@ describe("trades data layer", () => {
         fairness: "even",
       },
       published: false,
+      rosterMutating: true,
     };
 
     await createTrade(trade, testDb);
@@ -200,6 +204,74 @@ describe("trades data layer", () => {
       name: "Kyle Connor",
       ptsPace: 82,
       capHit: 7.142857,
+    });
+  });
+
+  it("lists only published trades in deterministic overlay order", async () => {
+    const makeTrade = (id: string, executedDate: string, published: boolean): TradeRecord => ({
+      id,
+      executedDate,
+      source: "manual",
+      sourceUrl: null,
+      season: "2026-27",
+      sides: [
+        { teamId: "WPG", assetsGiven: [] },
+        { teamId: "BUF", assetsGiven: [] },
+      ],
+      conditions: null,
+      lockedVerdict: null,
+      gradeAtTrade: null,
+      published,
+      rosterMutating: true,
+    });
+
+    await createTrade(makeTrade("trade-late", "2026-07-02", true), testDb);
+    await createTrade(makeTrade("trade-draft", "2026-07-01", false), testDb);
+    await createTrade(makeTrade("trade-early-b", "2026-07-01", true), testDb);
+    await createTrade(makeTrade("trade-early-a", "2026-07-01", true), testDb);
+
+    await expect(listPublishedTrades(testDb)).resolves.toMatchObject([
+      { id: "trade-early-a", published: true },
+      { id: "trade-early-b", published: true },
+      { id: "trade-late", published: true },
+    ]);
+  });
+
+  it("updates publish state and editable trade metadata without replacing frozen sides", async () => {
+    const trade: TradeRecord = {
+      id: "trade-edit-001",
+      executedDate: "2026-07-01",
+      source: "manual",
+      sourceUrl: null,
+      season: "2026-27",
+      sides: [
+        { teamId: "WPG", assetsGiven: [{ kind: "player", ref: { id: "100", nameSlug: "player-one" }, inputSnapshot: { name: "Player One" }, navAtTrade: 50 }] },
+        { teamId: "CGY", assetsGiven: [] },
+      ],
+      conditions: null,
+      lockedVerdict: null,
+      gradeAtTrade: null,
+      published: false,
+      rosterMutating: true,
+    };
+
+    await createTrade(trade, testDb);
+    await updateTrade(trade.id, {
+      executedDate: "2026-07-02",
+      sourceUrl: "https://example.com/edit",
+      conditions: "Updated condition",
+      published: true,
+      rosterMutating: false,
+    }, testDb);
+
+    await expect(getTrade(trade.id, testDb)).resolves.toMatchObject({
+      id: trade.id,
+      executedDate: "2026-07-02",
+      sourceUrl: "https://example.com/edit",
+      conditions: "Updated condition",
+      published: true,
+      rosterMutating: false,
+      sides: trade.sides,
     });
   });
 });

@@ -1,0 +1,1 @@
+ALTER TABLE trades ADD COLUMN roster_mutating INTEGER NOT NULL DEFAULT 1;

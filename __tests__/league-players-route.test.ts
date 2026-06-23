@@ -26,9 +26,16 @@ vi.mock("@/app/db/client", () => ({
   db: {
     run: vi.fn(async () => undefined),
     select: vi.fn(() => ({
-      from: vi.fn(async () => {
+      from: vi.fn(() => {
         state.selectCall += 1;
-        return state.selectCall === 3 ? state.tradeBlockRows : state.dbPlayers;
+        const rows = state.selectCall === 1 ? []
+          : state.selectCall === 4 ? state.tradeBlockRows
+          : state.dbPlayers;
+        return {
+          then: (resolve: (value: any[]) => unknown) => Promise.resolve(resolve(rows)),
+          catch: () => Promise.resolve(rows),
+          where: vi.fn(async () => rows),
+        };
       }),
     })),
   },

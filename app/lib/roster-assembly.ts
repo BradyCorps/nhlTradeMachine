@@ -13,13 +13,14 @@ import {
   removePlayerFromOtherRosters,
   safeNhlRosterPlayer,
 } from "@/app/lib/player-identity";
+import { listPublishedTrades, type TradeRecord } from "@/app/lib/trades";
 import {
   buildDevelopmentInputFromNhlTimeline,
   buildDevelopmentInputFromPlayerPayload,
   fetchCachedNhlSkaterTimelineRowsForPlayers,
 } from "@/app/lib/development-sources";
 import { fetchProspectEnrichmentMap } from "@/app/lib/prospect-enrichment";
-import { applyTeamCapDeltas, TeamCapDeltaMap } from "@/app/lib/cap-delta";
+import { applyTeamCapDeltas, type CapDeltaAsset, type CapDeltaMoves, type TeamCapDeltaMap } from "@/app/lib/cap-delta";
 
 const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
 const CONTRACTS_CACHE_KEY = "cache:contracts:v2";
@@ -116,6 +117,144 @@ const developmentInternationalScore = (prospectPtsPace: number | null | undefine
   prospectPtsPace != null && prospectPtsPace > 0
     ? Math.max(20, Math.min(100, prospectPtsPace * 1.4))
     : undefined;
+
+const assetSnapshotName = (snapshot: Record<string, unknown>): string =>
+  typeof snapshot.name === "string" ? snapshot.name : "";
+
+const movedPlayerKeys = (asset: TradeRecord["sides"][number]["assetsGiven"][number]): string[] => {
+  const keys = [
+    asset.ref.id ? `id:${asset.ref.id}` : "",
+    asset.ref.nameSlug ? `slug:${asset.ref.nameSlug}` : "",
+  ];
+  const snapshotSlug = canonicalNameSlug(assetSnapshotName(asset.inputSnapshot));
+  if (snapshotSlug) keys.push(`slug:${snapshotSlug}`);
+  return keys.filter(Boolean);
+};
+
+export function applyPublishedTradeOverlay<T extends {
+  id?: unknown;
+  name?: unknown;
+  teamId?: string;
+  position?: string;
+  retainedPct?: number;
+  tradeBlockStatus?: string | null;
+  tradeBlockNote?: string | null;
+}>(
+  players: T[],
+  publishedTrades: TradeRecord[],
+): T[] {
+  if (publishedTrades.length === 0) return players;
+
+  const destinations = new Map<string, { teamId: string; retainedPct: number }>();
+
+  for (const trade of publishedTrades) {
+    if (!trade.published || !trade.rosterMutating || trade.sides.length !== 2) continue;
+    const [sideA, sideB] = trade.sides;
+    const pairs = [
+      { from: sideA, toTeamId: sideB.teamId },
+      { from: sideB, toTeamId: sideA.teamId },
+    ];
+
+    for (const pair of pairs) {
+      for (const asset of pair.from.assetsGiven) {
+        if (asset.kind !== "player") continue;
+        for (const key of movedPlayerKeys(asset)) {
+          destinations.set(key, {
+            teamId: pair.toTeamId,
+            retainedPct: asset.retainedPct ?? 0,
+          });
+        }
+      }
+    }
+  }
+
+  if (destinations.size === 0) return players;
+
+  return players.map((player) => {
+    const idKey = player.id == null ? "" : `id:${String(player.id)}`;
+    const nameSlug = typeof player.name === "string" ? canonicalNameSlug(player.name) : "";
+    const move = (idKey ? destinations.get(idKey) : undefined)
+      ?? (nameSlug ? destinations.get(`slug:${nameSlug}`) : undefined);
+
+    if (!move || player.teamId === move.teamId) return player;
+
+    return {
+      ...player,
+      teamId: move.teamId,
+      retainedPct: player.position === "Pick" ? player.retainedPct : move.retainedPct,
+      tradeBlockStatus: null,
+      tradeBlockNote: null,
+    };
+  });
+}
+
+const playerMatchesTradeAsset = (
+  player: { id?: unknown; name?: unknown },
+  asset: TradeRecord["sides"][number]["assetsGiven"][number],
+): boolean => {
+  const keys = new Set(movedPlayerKeys(asset));
+  const idKey = player.id == null ? "" : `id:${String(player.id)}`;
+  const nameSlug = typeof player.name === "string" ? canonicalNameSlug(player.name) : "";
+  return Boolean((idKey && keys.has(idKey)) || (nameSlug && keys.has(`slug:${nameSlug}`)));
+};
+
+const isAlreadyReconciled = (
+  basePlayers: Array<{ id?: unknown; name?: unknown; teamId?: string }> | undefined,
+  asset: TradeRecord["sides"][number]["assetsGiven"][number],
+  destinationTeamId: string,
+): boolean =>
+  Boolean(basePlayers?.some((player) =>
+    player.teamId === destinationTeamId && playerMatchesTradeAsset(player, asset)
+  ));
+
+const assetSnapshotCapHit = (snapshot: Record<string, unknown>): number => {
+  const capHit = snapshot.capHit;
+  return typeof capHit === "number" && Number.isFinite(capHit) ? capHit : 0;
+};
+
+const addCapMove = (
+  moves: Record<string, CapDeltaMoves>,
+  teamId: string,
+  side: "incoming" | "outgoing",
+  asset: CapDeltaAsset,
+) => {
+  const current = moves[teamId] ?? {};
+  moves[teamId] = {
+    ...current,
+    [side]: [...(current[side] ?? []), asset],
+  };
+};
+
+export function buildPublishedTradeCapMoves(
+  publishedTrades: TradeRecord[],
+  basePlayers?: Array<{ id?: unknown; name?: unknown; teamId?: string }>,
+): Record<string, CapDeltaMoves> {
+  const moves: Record<string, CapDeltaMoves> = {};
+
+  for (const trade of publishedTrades) {
+    if (!trade.published || !trade.rosterMutating || trade.sides.length !== 2) continue;
+    const [sideA, sideB] = trade.sides;
+    const pairs = [
+      { from: sideA, to: sideB },
+      { from: sideB, to: sideA },
+    ];
+
+    for (const pair of pairs) {
+      for (const asset of pair.from.assetsGiven) {
+        if (asset.kind !== "player") continue;
+        if (isAlreadyReconciled(basePlayers, asset, pair.to.teamId)) continue;
+        const capAsset = {
+          capHit: assetSnapshotCapHit(asset.inputSnapshot),
+          retainedPct: asset.retainedPct ?? 0,
+        };
+        addCapMove(moves, pair.from.teamId, "outgoing", capAsset);
+        addCapMove(moves, pair.to.teamId, "incoming", capAsset);
+      }
+    }
+  }
+
+  return moves;
+}
 
 
 // ── EV QoC Index (0-100): quantified even-strength deployment difficulty ──
@@ -546,6 +685,12 @@ export async function assembleCanonicalRoster(options: {
   includeTeamContext?: boolean;
   capMovesByTeam?: TeamCapDeltaMap;
 } = {}) {
+  let publishedTrades: TradeRecord[] = [];
+  try {
+    publishedTrades = await listPublishedTrades();
+  } catch (e: any) {
+    console.warn("[Trades overlay] published trade overlay skipped:", e.message);
+  }
   const rosterTeams = applyTeamCapDeltas(options.teams ?? TEAMS_DB, options.capMovesByTeam);
   const [CONTRACTS, PS_MAP, NHL_SKATER_STATS, NHL_GOALIE_STATS, PROSPECT_ENRICHMENT] = await Promise.all([
     loadContracts(),
@@ -1067,8 +1212,14 @@ export async function assembleCanonicalRoster(options: {
 
   players = dedupePlayersByAuthority(players, dbTeamBySlug);
 
+  const finalTeams = applyTeamCapDeltas(
+    rosterTeams,
+    buildPublishedTradeCapMoves(publishedTrades, players),
+  );
+  players = applyPublishedTradeOverlay(players, publishedTrades);
+
   return {
-    teams: rosterTeams,
+    teams: finalTeams,
     players,
     rosterMap,
     liveStats: analyticsMap.size > 0,

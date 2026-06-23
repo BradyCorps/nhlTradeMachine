@@ -17,12 +17,36 @@ type LeaguePayload = {
 type SaveResponse = {
   trade?: {
     id: string;
-    gradeAtTrade?: {
-      fairness: string;
-      winner: string | null;
-      perTeamNetNav: Record<string, number>;
-    } | null;
+    published?: boolean;
+    rosterMutating?: boolean;
+    gradeAtTrade?: TradeGradeAtTrade | null;
   };
+};
+
+type TradeGradeAtTrade = {
+  fairness: string;
+  winner: string | null;
+  perTeamNetNav: Record<string, number>;
+};
+
+type AdminTradeRecord = {
+  id: string;
+  executedDate: string;
+  sourceUrl: string | null;
+  season: string;
+  sides: Array<{
+    teamId: string;
+    assetsGiven: Array<{
+      kind: "player" | "pick";
+      retainedPct?: number;
+      inputSnapshot: Record<string, unknown>;
+      navAtTrade: number | null;
+    }>;
+  }>;
+  conditions: string | null;
+  gradeAtTrade: TradeGradeAtTrade | null;
+  published: boolean;
+  rosterMutating: boolean;
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -40,6 +64,11 @@ export default function AdminTradesPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftPublished, setDraftPublished] = useState(false);
+  const [draftRosterMutating, setDraftRosterMutating] = useState(true);
+  const [trades, setTrades] = useState<AdminTradeRecord[]>([]);
+  const [tradeActionId, setTradeActionId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const teams = useTradeStore(s => s.teams);
@@ -57,6 +86,12 @@ export default function AdminTradesPage() {
   const partnerNav = blocks[1].reduce((sum, asset) => sum + (navMap[asset.id]?.total ?? 0), 0);
   const canPreview = Boolean(homeTeam && partnerTeam && blocks[0].length && blocks[1].length);
 
+  const loadTrades = useCallback(async () => {
+    const res = await fetch("/api/admin/trades");
+    const data = await readAdminResponse<{ trades?: AdminTradeRecord[] }>(res, "Failed to load trade drafts");
+    setTrades(data.trades ?? []);
+  }, []);
+
   useEffect(() => {
     setTeams([null, null]);
     setBlocks([[], []]);
@@ -71,6 +106,7 @@ export default function AdminTradesPage() {
       .then(async (payload) => {
         setDb(payload);
         setNavMap(await fetchNavMap(payload.players, ctrl.signal, payload.capCeiling));
+        await loadTrades();
       })
       .catch((err) => {
         if (err?.name !== "AbortError") setError(adminErrorMessage(err, "Failed to load league data"));
@@ -80,12 +116,12 @@ export default function AdminTradesPage() {
       });
 
     return () => ctrl.abort();
-  }, [setBlocks, setNavMap, setTeams]);
+  }, [loadTrades, setBlocks, setNavMap, setTeams]);
 
   useEffect(() => {
     setPreview(null);
     setSavedId(null);
-  }, [teams, blocks, executedDate, sourceUrl, conditions]);
+  }, [teams, blocks, executedDate, sourceUrl, conditions, draftPublished, draftRosterMutating]);
 
   const runPreview = useCallback(async () => {
     if (!homeTeam || !partnerTeam) return;
@@ -127,13 +163,16 @@ export default function AdminTradesPage() {
 
     try {
       const res = await fetch("/api/admin/trades", {
-        method: "POST",
+        method: editingId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: editingId ?? undefined,
           executedDate,
           sourceUrl,
           season: SEASON.label,
           conditions,
+          published: draftPublished,
+          rosterMutating: draftRosterMutating,
           capCeiling: db.capCeiling,
           sides: [
             { team: homeTeam, assetsGiven: blocks[0], fullRoster: homeRoster },
@@ -143,12 +182,67 @@ export default function AdminTradesPage() {
       });
       const data = await readAdminResponse<SaveResponse>(res, "Failed to save trade draft");
       setSavedId(data.trade?.id ?? "saved");
+      setEditingId(data.trade?.id ?? editingId);
+      setDraftPublished(Boolean(data.trade?.published ?? draftPublished));
+      setDraftRosterMutating(Boolean(data.trade?.rosterMutating ?? draftRosterMutating));
+      await loadTrades();
     } catch (err) {
       setError(adminErrorMessage(err, "Failed to save trade draft"));
     } finally {
       setSaving(false);
     }
-  }, [blocks, conditions, db.capCeiling, executedDate, homeRoster, homeTeam, partnerRoster, partnerTeam, sourceUrl]);
+  }, [blocks, conditions, db.capCeiling, draftPublished, draftRosterMutating, editingId, executedDate, homeRoster, homeTeam, loadTrades, partnerRoster, partnerTeam, sourceUrl]);
+
+  const editTrade = useCallback((trade: AdminTradeRecord) => {
+    const selectedTeams = trade.sides.map(side => db.teams.find(team => team.id === side.teamId) ?? null);
+    const selectedBlocks = trade.sides.map(side => side.assetsGiven.map(asset => ({
+      ...asset.inputSnapshot,
+      retainedPct: asset.retainedPct ?? 0,
+    } as unknown as Asset)));
+
+    setEditingId(trade.id);
+    setDraftPublished(trade.published);
+    setDraftRosterMutating(trade.rosterMutating);
+    setExecutedDate(trade.executedDate);
+    setSourceUrl(trade.sourceUrl ?? "");
+    setConditions(trade.conditions ?? "");
+    setTeams([selectedTeams[0], selectedTeams[1]] as [Team | null, Team | null]);
+    setBlocks([selectedBlocks[0] ?? [], selectedBlocks[1] ?? []] as [Asset[], Asset[]]);
+    setSavedId(null);
+    setPreview(null);
+  }, [db.teams, setBlocks, setTeams]);
+
+  const newDraft = useCallback(() => {
+    setEditingId(null);
+    setDraftPublished(false);
+    setDraftRosterMutating(true);
+    setExecutedDate(today());
+    setSourceUrl("");
+    setConditions("");
+    setTeams([null, null]);
+    setBlocks([[], []]);
+    setSavedId(null);
+    setPreview(null);
+  }, [setBlocks, setTeams]);
+
+  const togglePublished = useCallback(async (trade: AdminTradeRecord) => {
+    setTradeActionId(trade.id);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/trades", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: trade.id, published: !trade.published, rosterMutating: trade.rosterMutating }),
+      });
+      await readAdminResponse(res, "Failed to update publish state");
+      if (editingId === trade.id) setDraftPublished(!trade.published);
+      await loadTrades();
+    } catch (err) {
+      setError(adminErrorMessage(err, "Failed to update publish state"));
+    } finally {
+      setTradeActionId(null);
+    }
+  }, [editingId, loadTrades]);
 
   return (
     <div style={{
@@ -171,6 +265,15 @@ export default function AdminTradesPage() {
           </div>
         </div>
 
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.16em", color: "var(--ledger-ink-faint)" }}>
+            {editingId ? `EDITING ${editingId}` : "NEW DRAFT"}
+          </div>
+          <button onClick={newDraft} className="btn-ink" style={{ padding: "8px 12px", fontSize: 10, fontWeight: 900, letterSpacing: "0.14em" }}>
+            NEW DRAFT
+          </button>
+        </div>
+
         {error && (
           <div style={{ border: "1px solid var(--ledger-red)", color: "var(--ledger-red)", padding: 12, marginBottom: 16, fontSize: 11, fontWeight: 900 }}>
             {error}
@@ -190,9 +293,35 @@ export default function AdminTradesPage() {
           </label>
           <div style={{ border: "1px solid var(--rule)", padding: "10px 12px" }}>
             <div style={{ fontSize: 9, fontWeight: 900, letterSpacing: "0.18em", color: "var(--ledger-ink-faint)" }}>DRAFT STATE</div>
-            <div style={{ fontSize: 18, fontWeight: 900, marginTop: 4 }}>UNPUBLISHED</div>
+            <div style={{ fontSize: 18, fontWeight: 900, marginTop: 4 }}>{draftPublished ? "PUBLISHED" : "UNPUBLISHED"}</div>
           </div>
         </div>
+
+        <label style={{
+          border: "1px solid var(--rule)",
+          padding: "10px 12px",
+          marginBottom: 20,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 14,
+          fontSize: 10,
+          fontWeight: 900,
+          letterSpacing: "0.14em",
+        }}>
+          <span>
+            <span style={{ display: "block" }}>ROSTER OVERLAY</span>
+            <span style={{ display: "block", marginTop: 3, color: "var(--ledger-ink-faint)", letterSpacing: "0.08em", fontWeight: 700 }}>
+              {draftRosterMutating ? "PUBLISHING MUTATES ROSTERS AND CAP" : "UI ONLY - NO ROSTER OR CAP CHANGE"}
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={draftRosterMutating}
+            onChange={e => setDraftRosterMutating(e.target.checked)}
+            aria-label="Apply published trade to rosters and cap"
+          />
+        </label>
 
         <label style={{ display: "grid", gap: 5, fontSize: 10, fontWeight: 900, letterSpacing: "0.16em", marginBottom: 20 }}>
           CONDITIONS
@@ -247,8 +376,42 @@ export default function AdminTradesPage() {
             className="btn-ink"
             style={{ padding: "11px 16px", fontSize: 11, fontWeight: 900, letterSpacing: "0.16em", opacity: !canPreview || saving ? 0.45 : 1 }}
           >
-            {saving ? "SAVING" : "SAVE DRAFT"}
+            {saving ? "SAVING" : editingId ? "UPDATE DRAFT" : "SAVE DRAFT"}
           </button>
+        </div>
+
+        <div style={{ marginTop: 30, borderTop: "1px solid var(--rule)", paddingTop: 18 }}>
+          <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: "0.18em", marginBottom: 12 }}>
+            SAVED TRADES
+          </div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {trades.map(trade => (
+              <div key={trade.id} style={{ border: "1px solid var(--rule)", padding: "12px 14px", display: "grid", gridTemplateColumns: "1fr auto auto", gap: 10, alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 900 }}>{trade.executedDate} · {trade.sides.map(side => side.teamId).join(" / ")}</div>
+                  <div style={{ fontSize: 10, color: "var(--ledger-ink-faint)", marginTop: 3 }}>
+                    {trade.published ? "PUBLISHED" : "DRAFT"} · {trade.rosterMutating ? "ROSTER" : "UI ONLY"} · {trade.gradeAtTrade?.fairness ?? "UNGRADED"} · {trade.id}
+                  </div>
+                </div>
+                <button onClick={() => editTrade(trade)} className="btn-ink" style={{ padding: "8px 12px", fontSize: 10, fontWeight: 900, letterSpacing: "0.14em" }}>
+                  EDIT
+                </button>
+                <button
+                  onClick={() => togglePublished(trade)}
+                  disabled={tradeActionId === trade.id}
+                  className="btn-ink"
+                  style={{ padding: "8px 12px", fontSize: 10, fontWeight: 900, letterSpacing: "0.14em", opacity: tradeActionId === trade.id ? 0.45 : 1 }}
+                >
+                  {tradeActionId === trade.id ? "SAVING" : trade.published ? "UNPUBLISH" : "PUBLISH"}
+                </button>
+              </div>
+            ))}
+            {trades.length === 0 && (
+              <div style={{ border: "1px dashed var(--rule)", padding: 18, fontSize: 11, color: "var(--ledger-ink-faint)" }}>
+                No saved trades yet.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

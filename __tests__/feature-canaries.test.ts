@@ -142,6 +142,31 @@ describe("Canary — league route features (source-level)", () => {
         expect(src).toContain("players = dedupePlayersByAuthority(players, dbTeamBySlug)");
       });
 
+      it("applies published trade overlays after canonical roster assembly", () => {
+        expect(src).toContain("listPublishedTrades");
+        expect(src).toContain("applyPublishedTradeOverlay");
+        expect(src).toContain("!trade.rosterMutating");
+        expect(src).toContain("players = applyPublishedTradeOverlay(players, publishedTrades)");
+      });
+
+      it("recomputes involved team cap space from published trade overlays", () => {
+        expect(src).toContain("buildPublishedTradeCapMoves");
+        expect(src).toContain("const finalTeams = applyTeamCapDeltas");
+        expect(src).toContain("buildPublishedTradeCapMoves(publishedTrades, players)");
+        expect(src).toContain("teams: finalTeams");
+      });
+
+      it("skips overlay cap moves when the scrape already reconciled the player", () => {
+        expect(src).toContain("isAlreadyReconciled");
+        expect(src).toContain("player.teamId === destinationTeamId");
+        expect(src).toContain("if (isAlreadyReconciled(basePlayers, asset, pair.to.teamId)) continue");
+      });
+
+      it("skips roster and cap overlays for UI-only published trades", () => {
+        expect(src).toContain("!trade.rosterMutating");
+        expect(src).toContain("if (!trade.published || !trade.rosterMutating || trade.sides.length !== 2) continue");
+      });
+
       it("does not use surname-only goalie stat fallbacks", () => {
         expect(src).not.toContain("goalieSlugLast");
         expect(src).not.toContain("parts[parts.length - 1]");
@@ -317,9 +342,25 @@ describe("Canary — admin trade ingestion", () => {
   it("saves admin-only unpublished frozen drafts", () => {
     expect(route).toContain('requireAdmin(req)');
     expect(route).toContain('createFrozenTrade');
-    expect(route).toContain('published: false');
-    expect(route).toContain('evaluateTrade(');
-    expect(route).toContain('getAssetNAV(');
+    expect(route).toContain('published: body.published ?? false');
+    expect(route).toContain('rosterMutating: body.rosterMutating ?? true');
+    expect(route).toContain('evaluatePost');
+    expect(route).toContain('runTrade: true');
+  });
+
+  it("supports publish, unpublish, and edit operations", () => {
+    expect(route).toContain("export async function GET");
+    expect(route).toContain("export async function PUT");
+    expect(route).toContain("export async function PATCH");
+    expect(route).toContain("updateFrozenTrade");
+    expect(route).toContain("published: parsed.data.published");
+    expect(route).toContain("rosterMutating: parsed.data.rosterMutating");
+    const page = read("app/admin/trades/page.tsx");
+    expect(page).toContain("SAVED TRADES");
+    expect(page).toContain("ROSTER OVERLAY");
+    expect(page).toContain("UI ONLY - NO ROSTER OR CAP CHANGE");
+    expect(page).toContain("togglePublished");
+    expect(page).toContain("editTrade");
   });
 });
 

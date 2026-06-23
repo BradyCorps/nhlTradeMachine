@@ -215,7 +215,7 @@ draft; non-admins can't reach it (A1); `npm test` + typecheck pass.
 
 ## Phase C — Roster mutation (app-wide)  [needs A2, A3, B1–B3]
 
-### [ ] C1 — transactions overlay at the canonical roster-assembly module
+### [x] C1 — transactions overlay at the canonical roster-assembly module
 On read, transform the base scraped roster by applying ordered **published** trades (reuse
 Armchair GM `executeTrade` movement logic, now persisted + global). Non-destructive: scrapes
 keep refreshing stats/contracts; the overlay keeps players on their new teams. Players page,
@@ -225,19 +225,25 @@ Acceptance: publishing a trade moves the player across every roster surface; a s
 stat refresh does NOT revert the move; unpublishing restores the base roster; `npm test` +
 typecheck pass.
 
-### [ ] C2 — cap recompute on overlay (via A3 delta)
+### [x] C2 — cap recompute on overlay (via A3 delta)
 After the overlay applies, recompute the involved teams' cap via `applyCapDelta` so cap
 reflects the moved (and retained) salary. Reopens Decision A for traded teams only by design.
 Acceptance: after a published trade, both teams' cap shifts by the correct retention-adjusted
 delta; untraded teams unchanged; `npm test` + typecheck pass.
 
-### [ ] C3 — publish / unpublish / edit + overlay reconciliation
+### [x] C3 — publish / unpublish / edit + overlay reconciliation
 Admin can publish, unpublish, and edit a trade (the overlay is the unit of revert). Add
 reconciliation: when a later real scrape already shows the player on his new team, the
 overlay detects the match and retires itself instead of double-applying.
 Acceptance: publish/unpublish toggles the app-wide move; a bad entry is fully revertible;
 an already-reconciled trade does not double-move the player; `npm test` + typecheck pass.
 
+### [x] C4 — Add an ability for the trade to be only pushed to the UI and not edit the rosters
+Admin can also switch a toggle to have the trade only be a graphical interface, rather than it 
+actually manipulating the rosters. This would be used for trades that have already gone through.
+This feature might already exist in some capacity on the reconcilaition logic from this note 
+"if the base canonical player already appears on the trade destination team, the overlay will 
+skip both the roster move and cap delta for that asset."
 ---
 
 ## Phase D — Public surface  [needs B–C]
