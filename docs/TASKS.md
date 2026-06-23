@@ -309,6 +309,15 @@ WITHOUT deleting his DB row; un-retiring restores him everywhere; `npm test` + t
 
 ## For Future Trade Tracker (Known as The Docket)
 
+### [x] A2A — implement the canonical roster-assembly module (actionable spec for A2)
+Extract the shared roster pipeline into `app/lib/roster-assembly.ts` so both `/api/league`
+and `/api/league/players` call one canonical module for live roster fetches, DB injection,
+dedup, stats attachment, trade-block stamping, prospect enrichment, and development profiles.
+Keep `/api/league` responsible only for response-specific teams, picks, cap ceiling/floor,
+and metadata shaping.
+Acceptance: one `roster-assembly.ts`; both routes call it; player objects stay equivalent;
+feature canaries point at the module; `npm test` + typecheck pass.
+
 ### [x] A3a — shared cap-delta helper
 Add a pure helper `applyCapDelta(baselineCapSpace, moves)` where `moves` is the per-team set
 of incoming/outgoing assets with `capHit` and `retainedPct`. Returns effective cap space:
@@ -316,6 +325,23 @@ baseline − incoming cap (net of retention held by the other team) + outgoing c
 retention this team keeps). No I/O; unit-testable in isolation.
 Acceptance: characterization tests cover a straight swap, a retained-salary move, and a
 pick-only move (no cap change); `npm test` + typecheck pass.
+
+### [x] B1 — `trades` data model + persistence
+Add a `trades` table: `id`, `executedDate`, `source` ("manual"|"scraped"), `sourceUrl`,
+`season`, `sides` (array of `{ teamId, assetsGiven[] }`, N-team-ready, render 2), each asset
+`{ kind:"player"|"pick", ref:{id,nameSlug}, retainedPct, inputSnapshot, navAtTrade }`,
+`conditions` (free-text), `lockedVerdict`, `gradeAtTrade` `{ perTeamNetNav, winner,
+fairness }`, `published` (bool). Store the **inputSnapshot** (engine inputs at trade time),
+not just IDs — stats/contracts move and IDs alone are unreliable (Woll proves it).
+Acceptance: migration creates the table; a row round-trips through the data layer with the
+snapshot intact; `npm test` + typecheck pass.
+
+### [x] B2 — grade + freeze at ingestion (reuse trade-share lock)
+On save, run the evaluate engine over the trade, capture the full verdict + per-asset
+`navAtTrade` + `inputSnapshot`, and FREEZE them into `lockedVerdict`/`gradeAtTrade`. Reuse
+the existing `trade-share` snapshot/lock shape rather than inventing a new one.
+Acceptance: saving a trade persists an immutable at-trade verdict that does not change when
+underlying player data later changes; `npm test` + typecheck pass.
 
 ---
 

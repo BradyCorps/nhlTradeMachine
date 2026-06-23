@@ -46,3 +46,16 @@ export const tradeBlock = sqliteTable("trade_block", {
   note:      text("note"),
   updatedAt: integer("updated_at"),
 });
+
+export const trades = sqliteTable("trades", {
+  id:            text("id").primaryKey(),
+  executedDate:  text("executed_date").notNull(),
+  source:        text("source").notNull(),
+  sourceUrl:     text("source_url"),
+  season:        text("season").notNull(),
+  sides:         text("sides").notNull(),
+  conditions:    text("conditions"),
+  lockedVerdict: text("locked_verdict"),
+  gradeAtTrade:  text("grade_at_trade"),
+  published:     integer("published", { mode: "boolean" }).notNull().default(false),
+});

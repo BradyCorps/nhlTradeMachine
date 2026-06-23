@@ -19,6 +19,10 @@ const LEAGUE_ROUTES = [
   "app/api/league/route.ts",
 ];
 
+const ROSTER_ASSEMBLY_SOURCES = [
+  "app/lib/roster-assembly.ts",
+];
+
 describe("Canary — engine prospect path", () => {
   it("calcProspectNAV exists and values a #1 overall around first-overall pick value", () => {
     const nav = calcProspectNAV({
@@ -60,9 +64,9 @@ describe("Canary — engine prospect path", () => {
 });
 
 describe("Canary — league route features (source-level)", () => {
-  for (const route of LEAGUE_ROUTES) {
-    describe(route, () => {
-      const src = read(route);
+  for (const source of ROSTER_ASSEMBLY_SOURCES) {
+    describe(source, () => {
+      const src = read(source);
 
       it("injects team-assigned DB players missing from the live roster feed", () => {
         expect(src).toContain("Inject DB roster rows");
@@ -505,9 +509,9 @@ describe("Canary — development profile rationale copy", () => {
 });
 
 describe("Canary — development profile route exposure", () => {
-  for (const route of LEAGUE_ROUTES) {
-    it(`${route} exposes developmentProfile without feeding it into NAV`, () => {
-      const src = read(route);
+  for (const source of ROSTER_ASSEMBLY_SOURCES) {
+    it(`${source} exposes developmentProfile without feeding it into NAV`, () => {
+      const src = read(source);
       expect(src).toContain("fetchCachedNhlSkaterTimelineRowsForPlayers");
       expect(src).toContain("buildDevelopmentInputFromNhlTimeline");
       expect(src).toContain("developmentTimelineMap.get(String(p.id))");
@@ -877,39 +881,29 @@ describe("Canary — admin contract sync", () => {
   });
 
   it("league roster injection ignores placeholder team ids", () => {
-    const leaguePlayers = read("app/api/league/players/route.ts");
-    const league = read("app/api/league/route.ts");
-    expect(leaguePlayers).toContain("const isValidTeamId");
-    expect(leaguePlayers).toContain("if (!isValidTeamId(d.teamId)) continue;");
-    expect(league).toContain("const isValidTeamId");
-    expect(league).toContain("if (!isValidTeamId(d.teamId)) continue;");
+    const rosterAssembly = read("app/lib/roster-assembly.ts");
+    expect(rosterAssembly).toContain("const isValidTeamId");
+    expect(rosterAssembly).toContain("if (!isValidTeamId(d.teamId)) continue;");
   });
 
   it("league routes fall back to NHL summary stats when MoneyPuck misses a real skater", () => {
-    const leaguePlayers = read("app/api/league/players/route.ts");
-    const league = read("app/api/league/route.ts");
-    expect(leaguePlayers).toContain("fetchNhlSkaterStatsFallback");
-    expect(leaguePlayers).toContain("statsMap.set(`id:${s.playerId}`, entry)");
-    expect(leaguePlayers).toContain("NHL_SKATER_STATS.get(`id:${p.id}`) ?? NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug)");
-    expect(league).toContain("fetchNhlSkaterStatsFallback");
-    expect(league).toContain("statsMap.set(`id:${s.playerId}`, entry)");
-    expect(league).toContain("NHL_SKATER_STATS.get(`id:${p.id}`) ?? NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug)");
+    const rosterAssembly = read("app/lib/roster-assembly.ts");
+    expect(rosterAssembly).toContain("fetchNhlSkaterStatsFallback");
+    expect(rosterAssembly).toContain("statsMap.set(`id:${s.playerId}`, entry)");
+    expect(rosterAssembly).toContain("NHL_SKATER_STATS.get(`id:${p.id}`) ?? NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug)");
   });
 
   it("league routes fall back to NHL goalie summary stats when MoneyPuck misses a goalie", () => {
-    const leaguePlayers = read("app/api/league/players/route.ts");
-    const league = read("app/api/league/route.ts");
-    for (const src of [leaguePlayers, league]) {
-      expect(src).toContain("fetchNhlGoalieStatsFallback");
-      expect(src).toContain("cache:nhl_goalie_summary_stats");
-      expect(src).toContain("NHL_GOALIE_STATS.get(`id:${p.id}`)");
-      expect(src).toContain("hasLiveStats: true");
-    }
+    const rosterAssembly = read("app/lib/roster-assembly.ts");
+    expect(rosterAssembly).toContain("fetchNhlGoalieStatsFallback");
+    expect(rosterAssembly).toContain("cache:nhl_goalie_summary_stats");
+    expect(rosterAssembly).toContain("NHL_GOALIE_STATS.get(`id:${p.id}`)");
+    expect(rosterAssembly).toContain("hasLiveStats: true");
   });
 
   it("league roster routes do not apply retired contract extension overlays", () => {
-    for (const routePath of LEAGUE_ROUTES) {
-      const src = read(routePath);
+    for (const source of ROSTER_ASSEMBLY_SOURCES) {
+      const src = read(source);
       expect(src).not.toContain("contracts.extensions.json");
       expect(src).not.toContain("loadExtensions");
       expect(src).not.toContain("EXTENSIONS");
@@ -1023,8 +1017,7 @@ describe("Canary — Batch 6 audit fixes", () => {
     const schema = read("app/db/schema.ts");
     const contracts = read("app/api/admin/contracts/route.ts");
     const adminPage = read("app/admin/contracts/page.tsx");
-    const league = read("app/api/league/route.ts");
-    const players = read("app/api/league/players/route.ts");
+    const rosterAssembly = read("app/lib/roster-assembly.ts");
     const migration = read("drizzle/0001_add_player_retirement.sql");
 
     expect(schema).toContain('retired:         integer("retired"');
@@ -1037,12 +1030,10 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(contracts).toContain("clearRosterCaches");
     expect(adminPage).toContain("handleRetire");
     expect(adminPage).toContain("RESTORE");
-    for (const route of [league, players]) {
-      expect(route).toContain("removeRetiredPlayersFromRosters");
-      expect(route).toContain("if (row.retired) continue");
-      expect(route).toContain("if (d.retired) continue");
-      expect(route).toContain("retired:         playersTable.retired");
-    }
+    expect(rosterAssembly).toContain("removeRetiredPlayersFromRosters");
+    expect(rosterAssembly).toContain("if (row.retired) continue");
+    expect(rosterAssembly).toContain("if (d.retired) continue");
+    expect(rosterAssembly).toContain("retired:         playersTable.retired");
   });
 
   it("documents intentional curl-only admin endpoints", () => {
@@ -1067,8 +1058,8 @@ describe("Canary — Batch 6 audit fixes", () => {
   });
 
   it("league routes preserve young-player contracts when only position metadata disagrees", () => {
-    for (const routePath of LEAGUE_ROUTES) {
-      const src = read(routePath);
+    for (const source of ROSTER_ASSEMBLY_SOURCES) {
+      const src = read(source);
       expect(src).toContain("const contractMatch =");
       expect(src).toContain('source: "position"');
       expect(src).toContain('source: "team"');
