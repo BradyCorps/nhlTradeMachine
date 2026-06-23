@@ -963,155 +963,111 @@ select.ledger-select {
 @media (min-width: 640px) { .modal-outer { padding: 24px; } }
 
 /* ════════════════════════════════════════════════════════════════
-   FRONT PAGE — Tactile Broadsheet (pure-CSS showcase)
-   Analog feel without a literal page turn: paper tooth, stacked-page
-   depth, clippings pinned slightly askew that straighten + lift when
-   you reach for them, editorial focus dimming, ink-press CTAs,
-   halftone ornament, drop cap, column rules, soft fold creases.
+   FRONT PAGE — Broadsheet on a desk (pure-CSS, tactile + heavy)
+   The page is a physical paper SHEET resting on a darker desk: a deep
+   cast shadow, foxed/aged edges, and a stronger grain give it weight.
+   Sections are a dense, hard-ruled broadsheet (a lead story over three
+   columns, divided by ink rules, no floating cards). Hover warms the
+   column like ink catching; CTAs physically ink-press.
    ──────────────────────────────────────────────────────────────── */
 :root {
-  /* deceleration with mass — motion that resists, then settles */
   --fp-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --fp-ink-shadow: rgba(28, 20, 10, 0.18);
+  --fp-ink-shadow: rgba(40, 25, 8, 0.5);
 }
 
-/* Sheet lit from above */
-.fp-page {
+/* ── The desk: a darker warm surface the paper sits on ─────────── */
+.fp-desk {
   position: relative;
+  padding: 16px 0 44px;
   background:
-    radial-gradient(135% 80% at 50% -12%, rgba(255, 255, 255, 0.4), transparent 58%),
-    var(--paper);
+    radial-gradient(130% 95% at 50% -6%, #c8b184 0%, #b39c6f 52%, #9f8a5e 100%);
+}
+@media (min-width: 900px) {
+  .fp-desk { padding: 46px 24px; }
 }
 
-/* Blackletter nameplate */
+/* ── The sheet: a real page lifting off the desk ───────────────── */
+.fp-sheet {
+  position: relative;
+  max-width: 1180px;
+  margin: 0 auto;
+  background: var(--paper);
+  /* deep cast shadow — the weight of the stack */
+  box-shadow:
+    0 1px 2px rgba(40, 25, 8, 0.25),
+    0 16px 36px -12px var(--fp-ink-shadow),
+    0 34px 64px -26px rgba(40, 25, 8, 0.45);
+}
+/* stronger paper grain, only on the reading surface */
+.fp-sheet::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='fpn'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23fpn)' opacity='0.09'/%3E%3C/svg%3E");
+}
+/* foxing — aged darkening that pools toward the edges */
+.fp-sheet::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  box-shadow:
+    inset 0 0 130px rgba(120, 80, 30, 0.10),
+    inset 0 0 34px rgba(120, 80, 30, 0.08);
+}
+
+/* Reverted nameplate — the old bold serif, with ink weight */
 .fp-nameplate {
-  font-family: 'UnifrakturMaguntia', 'Libre Baskerville', serif;
-  letter-spacing: 0.01em;
+  font-family: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   line-height: 0.92;
   color: var(--ink);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3), 0 0.5px 0 rgba(28, 20, 10, 0.25);
 }
 
-/* Halftone ornament rule */
-.fp-halftone {
-  background-image: radial-gradient(var(--ledger-ink) 0.9px, transparent 1.15px);
-  background-size: 5px 5px;
-  opacity: 0.45;
+/* Masthead ears flanking the nameplate */
+.fp-ear {
+  font-family: 'Courier Prime', monospace;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  line-height: 1.7;
+  color: var(--ledger-ink-faint);
+}
+.fp-slogan {
+  font-family: 'Libre Baskerville', Georgia, serif;
+  font-style: italic;
+  color: var(--ledger-ink-light);
 }
 
-/* Soft horizontal fold crease — a valley fold in the sheet */
-.fp-fold {
-  height: 20px;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(28, 20, 10, 0.05) 47%,
-    rgba(28, 20, 10, 0.10) 50%,
-    rgba(255, 255, 255, 0.55) 53%,
-    transparent 100%
-  );
+/* Inky headline weight */
+.fp-head {
+  letter-spacing: -0.015em;
+  text-shadow: 0 0.5px 0 rgba(28, 20, 10, 0.22);
 }
 
-/* Lede: real newspaper columns + fraktur drop cap */
+/* Lede: real newspaper columns + bold serif drop cap */
 .fp-lede {
   text-align: justify;
   hyphens: auto;
 }
 @media (min-width: 720px) {
-  .fp-lede { columns: 2; column-gap: 36px; column-rule: 1px solid var(--rule-light); }
+  .fp-lede { columns: 2; column-gap: 38px; column-rule: 1px solid var(--rule); }
 }
 .fp-lede::first-letter {
-  font-family: 'UnifrakturMaguntia', 'Libre Baskerville', serif;
+  font-family: 'Libre Baskerville', Georgia, serif;
+  font-weight: 700;
   float: left;
-  font-size: 4.1rem;
-  line-height: 0.74;
-  padding: 8px 12px 0 0;
+  font-size: 3.7rem;
+  line-height: 0.7;
+  padding: 7px 11px 0 0;
   color: var(--ledger-red);
-}
-
-/* ── The clipping — tactile centrepiece ───────────────────────── */
-.fp-clip {
-  position: relative;
-  background: var(--ledger-card);
-  border: 1px solid var(--rule);
-  /* stacked-page depth: hard offsets (the edge of the stack) + soft cast */
-  box-shadow:
-    1px 1px 0 var(--ledger-card-light),
-    2px 2px 0 var(--paper-inset),
-    3px 3px 0 var(--paper-dark),
-    7px 9px 18px -7px var(--fp-ink-shadow);
-  transition:
-    transform 0.42s var(--fp-ease),
-    box-shadow 0.42s var(--fp-ease),
-    filter 0.42s var(--fp-ease);
-  will-change: transform;
-  transform-origin: center 88%;
-}
-/* paper tooth — a faint ridge so the sheet reads as having thickness */
-.fp-clip::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    inset 0 -1px 0 rgba(28, 20, 10, 0.07);
-  pointer-events: none;
-}
-/* pinned slightly askew, like clippings on a board */
-.fp-clip[data-skew="a"] { transform: rotate(-0.6deg); }
-.fp-clip[data-skew="b"] { transform: rotate( 0.5deg); }
-.fp-clip[data-skew="c"] { transform: rotate(-0.35deg); }
-.fp-clip[data-skew="d"] { transform: rotate( 0.7deg); }
-
-/* reach for it → it straightens, lifts, and the stack/shadow deepen */
-.fp-clip:hover,
-.fp-clip:focus-within {
-  transform: rotate(0deg) translateY(-9px) scale(1.013);
-  box-shadow:
-    1px 1px 0 var(--ledger-card-light),
-    2px 2px 0 var(--paper-inset),
-    3px 3px 0 var(--paper-dark),
-    4px 4px 0 var(--paper-dark),
-    16px 24px 38px -10px var(--fp-ink-shadow);
-  z-index: 5;
-}
-
-/* editorial focus — hovering one clipping quiets the rest */
-.fp-grid:hover .fp-clip:not(:hover):not(:focus-within) {
-  filter: saturate(0.82) brightness(0.985);
-  opacity: 0.88;
-}
-
-/* ink-press CTA */
-.fp-stamp {
-  display: block;
-  text-align: center;
-  font-family: 'Courier Prime', monospace;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  color: #fff;
-  border: 2px solid rgba(0, 0, 0, 0.16);
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.22);
-  transition: transform 0.12s var(--fp-ease), box-shadow 0.12s var(--fp-ease), filter 0.12s;
-}
-.fp-clip:hover .fp-stamp { filter: brightness(1.05); }
-.fp-clip:active .fp-stamp {
-  transform: translateY(2px);
-  box-shadow: 0 0 0 rgba(0, 0, 0, 0.22);
-}
-
-/* In-development briefs — a lighter spec sheet */
-.fp-brief {
-  position: relative;
-  background: var(--paper-card);
-  border: 1px dashed var(--rule);
-  box-shadow: 2px 3px 10px -6px var(--fp-ink-shadow);
-  transition: transform 0.42s var(--fp-ease), box-shadow 0.42s var(--fp-ease);
-}
-.fp-brief:hover {
-  transform: translateY(-4px);
-  box-shadow: 5px 8px 16px -8px var(--fp-ink-shadow);
 }
 
 /* Section label with flanking rules */
@@ -1131,20 +1087,79 @@ select.ledger-select {
   content: "";
   flex: 1;
   height: 0;
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule-light);
+  border-top: 2px solid var(--ink);
+  border-bottom: 1px solid var(--rule);
+  margin-top: 1px;
+}
+
+/* ── Dense ruled broadsheet — gap shows the ink rule ───────────── */
+.fp-desks {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5px;
+  background: var(--ink);     /* gridlines = heavy ink */
+  border: 2px solid var(--ink);
+}
+@media (min-width: 760px) {
+  .fp-desks { grid-template-columns: repeat(3, 1fr); }
+  .fp-lead { grid-column: 1 / -1; }   /* lead story spans the page */
+}
+
+.fp-cell {
+  position: relative;
+  background: var(--paper);
+  padding: 22px 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: background 0.35s var(--fp-ease);
+}
+.fp-cell:hover,
+.fp-cell:focus-within {
+  background: var(--ledger-card-light);
+}
+.fp-lead { background: var(--ledger-card); }
+.fp-lead:hover,
+.fp-lead:focus-within { background: var(--ledger-card-light); }
+
+/* ink-press CTA stamp */
+.fp-stamp {
+  display: block;
+  text-align: center;
+  font-family: 'Courier Prime', monospace;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: #fff;
+  border: 2px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.24);
+  transition: transform 0.12s var(--fp-ease), box-shadow 0.12s var(--fp-ease), filter 0.12s;
+}
+.fp-cell:hover .fp-stamp { filter: brightness(1.05); }
+.fp-cell:active .fp-stamp {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0.24);
+}
+
+/* In-development briefs — same ruled grid, lighter ink */
+.fp-briefs {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+}
+@media (min-width: 640px) {
+  .fp-briefs { grid-template-columns: repeat(3, 1fr); }
+}
+.fp-brief {
+  background: var(--paper-card);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fp-clip,
-  .fp-clip[data-skew],
-  .fp-clip:hover,
-  .fp-clip:focus-within,
-  .fp-brief,
-  .fp-brief:hover,
-  .fp-stamp,
-  .fp-clip:active .fp-stamp {
-    transition: none;
-    transform: none;
-  }
+  .fp-cell, .fp-stamp, .fp-cell:active .fp-stamp { transition: none; transform: none; }
 }

@@ -1,15 +1,14 @@
 "use client";
-// app/page.tsx — The Hockey Ledger · Tactile Broadsheet front page
+// app/page.tsx — The Hockey Ledger · broadsheet on a desk
 import React from "react";
 import Link from "next/link";
 import Footer from "./components/Footer";
 
-type Skew = "a" | "b" | "c" | "d";
-
-function ClipCard({
-  href, kicker, kickerColor, edition, title, body, lines, cta, ctaColor, skew,
+function Cell({
+  href, lead = false, kicker, kickerColor, edition, title, body, lines, cta, ctaColor,
 }: {
   href: string;
+  lead?: boolean;
   kicker: string;
   kickerColor: string;
   edition: string;
@@ -18,44 +17,45 @@ function ClipCard({
   lines: [string, string][];
   cta: string;
   ctaColor: string;
-  skew: Skew;
 }) {
   return (
-    <Link href={href} className="no-underline block h-full">
-      <article className="fp-clip h-full flex flex-col gap-4 p-6" data-skew={skew}>
-        <div>
-          <div className="flex items-baseline justify-between mb-3 gap-3">
-            <span className="newspaper-kicker font-black text-2xs uppercase font-mono"
-              style={{ color: kickerColor }}>
-              {kicker}
-            </span>
-            <span className="text-2xs uppercase tracking-[0.2em] font-mono shrink-0"
-              style={{ color: "var(--ledger-ink-faint)" }}>
-              {edition}
-            </span>
+    <Link href={href} className={`fp-cell no-underline ${lead ? "fp-lead" : ""}`}>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="newspaper-kicker font-black text-2xs uppercase font-mono"
+          style={{ color: kickerColor }}>
+          {kicker}
+        </span>
+        <span className="text-2xs uppercase tracking-[0.2em] font-mono shrink-0"
+          style={{ color: "var(--ledger-ink-faint)" }}>
+          {edition}
+        </span>
+      </div>
+
+      <h2 className={`fp-head font-black ${lead ? "text-3xl sm:text-4xl" : "text-2xl"} leading-[1.02]`}
+        style={{ color: "var(--ink)" }}>
+        {title}
+      </h2>
+
+      <div className="h-px w-full" style={{ background: "var(--ink)", opacity: 0.5 }} />
+
+      <p className={`${lead ? "text-[14px] sm:columns-2 sm:gap-8" : "text-[12.5px]"} leading-relaxed`}
+        style={{ color: "var(--ledger-ink-body)" }}>
+        {body}
+      </p>
+
+      <div className={`mt-auto ${lead ? "grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-1.5" : "space-y-1.5"}`}>
+        {lines.map(([label, desc]) => (
+          <div key={label} className="feature-line text-2xs font-mono"
+            style={{ color: "var(--ledger-ink-body)" }}>
+            <span className="font-black shrink-0">{label}</span>
+            <span>— {desc}</span>
           </div>
-          <h2 className="font-black text-2xl leading-[1.05] mb-3"
-            style={{ color: "var(--ink)", letterSpacing: "-0.012em" }}>
-            {title}
-          </h2>
-          <div className="h-px w-full mb-3" style={{ background: "var(--rule)" }} />
-          <p className="text-[12.5px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
-            {body}
-          </p>
-        </div>
-        <div className="space-y-1.5 mt-auto">
-          {lines.map(([label, desc]) => (
-            <div key={label} className="feature-line text-2xs font-mono"
-              style={{ color: "var(--ledger-ink-body)" }}>
-              <span className="font-black shrink-0">{label}</span>
-              <span>— {desc}</span>
-            </div>
-          ))}
-        </div>
-        <div className="fp-stamp mt-2 py-3 px-2 text-2xs" style={{ background: ctaColor }}>
-          {cta}
-        </div>
-      </article>
+        ))}
+      </div>
+
+      <div className="fp-stamp py-3 px-2 text-2xs" style={{ background: ctaColor }}>
+        {cta}
+      </div>
     </Link>
   );
 }
@@ -95,191 +95,195 @@ const ENGINE = [
 
 export default function WelcomePage() {
   return (
-    <main className="fp-page min-h-screen font-serif antialiased" style={{ color: "var(--ink)" }}>
+    <main className="fp-desk min-h-screen font-serif antialiased" style={{ color: "var(--ink)" }}>
+      <div className="fp-sheet">
 
-      {/* ── Dateline ─────────────────────────────────────────── */}
-      <div className="border-b" style={{ borderColor: "var(--rule)" }}>
-        <div className="max-w-5xl mx-auto px-5 py-2 flex items-center justify-between text-2xs uppercase tracking-[0.25em] font-mono"
-          style={{ color: "var(--ledger-ink-faint)" }}>
-          <span>Est. 2026</span>
-          <span className="hidden sm:inline">Vol. I &nbsp;·&nbsp; No. 1</span>
-          <span>The Front Page</span>
-          <span className="hidden sm:inline">Price: Free</span>
-        </div>
-      </div>
-
-      {/* ── Masthead ─────────────────────────────────────────── */}
-      <header className="masthead-rule">
-        <div className="max-w-4xl mx-auto px-5 py-7 text-center">
-          <h1 className="fp-nameplate font-black"
-            style={{ fontSize: "clamp(2.8rem, 9vw, 5.5rem)" }}>
-            The Hockey Ledger
-          </h1>
-          <p className="mt-4 text-[11px] uppercase tracking-[0.3em] font-mono"
+        {/* ── Dateline ───────────────────────────────────────── */}
+        <div className="border-b" style={{ borderColor: "var(--rule)" }}>
+          <div className="px-5 py-2 flex items-center justify-between text-2xs uppercase tracking-[0.25em] font-mono"
             style={{ color: "var(--ledger-ink-faint)" }}>
-            X-NAV Analytics &nbsp;·&nbsp; STRAND™ DNA &nbsp;·&nbsp; GM Logic Engine &nbsp;·&nbsp; Live Data
-          </p>
-        </div>
-      </header>
-      <div className="fp-halftone" style={{ height: 9 }} />
-
-      {/* ── Lead editorial ───────────────────────────────────── */}
-      <section className="max-w-4xl mx-auto px-5 pt-9 pb-7">
-        <div className="text-center mb-5">
-          <div className="newspaper-kicker font-black text-2xs uppercase font-mono mb-1"
-            style={{ color: "var(--ledger-red)" }}>
-            Staff Editorial
+            <span>Est. 2026</span>
+            <span className="hidden sm:inline">The Front Page</span>
+            <span>Price: Free</span>
           </div>
-          <p className="text-2xs uppercase tracking-[0.3em] font-mono"
-            style={{ color: "var(--ledger-ink-faint)" }}>
-            On the Business of Building a Hockey Team
-          </p>
         </div>
-        <div className="fp-lede text-[14px] leading-[1.9]" style={{ color: "var(--ledger-ink-body)" }}>
-          <p className="mb-4">
-            Every trade is an argument, and every argument deserves a hearing on
-            the record. The Hockey Ledger exists to put the case in ink: to weigh
-            a deal the way a front office actually weighs it — cap and clause,
-            age and term, the slot a player fills and the window a team is trying
-            to keep open. No hot takes set in disappearing pixels. A ruling you
-            can hold up to the light.
-          </p>
-          <p>
-            Build a single transaction in the Trade Machine and test it against
-            X-NAV and the GM Audit, or take the chair in Armchair GM and live with
-            every consequence that follows. Read the published Docket to see how
-            the calls have aged. The press is open. Turn the page and start
-            running the room.
-          </p>
-        </div>
-        <p className="mt-5 text-2xs uppercase tracking-[0.28em] font-mono text-right"
-          style={{ color: "var(--ledger-ink-faint)" }}>
-          — The Front Office
-        </p>
-      </section>
 
-      <div className="fp-fold" />
-
-      {/* ── The desks ────────────────────────────────────────── */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-5 pt-7">
-        <div className="fp-section-label mb-6">Inside This Edition</div>
-
-        <div className="fp-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
-          <ClipCard
-            href="/trade-machine"
-            skew="a"
-            kicker="Feature One"
-            kickerColor="var(--ledger-red)"
-            edition="The Desk"
-            title="Trade Machine"
-            ctaColor="var(--ledger-red)"
-            cta="Open Trade Machine"
-            body="Build a single trade, add retention, and test the package against X-NAV and the GM Audit. This is the quick social trade surface that owns share codes and replay links."
-            lines={[
-              ["One Trade", "Fast package construction"],
-              ["GM Audit", "Cap, clause, value, and fit checks"],
-              ["Share Code", "Locked verdict replay link"],
-            ]}
-          />
-
-          <ClipCard
-            href="/armchair-gm"
-            skew="b"
-            kicker="Feature Two"
-            kickerColor="var(--ledger-green)"
-            edition="The Chair"
-            title="Armchair GM"
-            ctaColor="var(--ledger-green)"
-            cta="Enter Armchair GM"
-            body="Take over a franchise, make multiple moves, inspect roster DNA, manage cap consequences, and see whether you can run the room better than the actual front office."
-            lines={[
-              ["Roster Control", "Multi-move franchise session"],
-              ["Who Wants This?", "Ranks all 32 teams as partners"],
-              ["Sim Engine", "Projects the season after your moves"],
-            ]}
-          />
-
-          <ClipCard
-            href="/players"
-            skew="c"
-            kicker="Feature Three"
-            kickerColor="var(--ledger-navy)"
-            edition="The Ledger"
-            title="Player Analytics"
-            ctaColor="var(--ledger-navy)"
-            cta="Open Player Analytics"
-            body="Search the full NHL roster. Every player's scoring pace, xGoals, ice time, point shares, and NAV components in one view — sortable, filterable by team and position."
-            lines={[
-              ["Live Roster", "NHL API data — updates every game"],
-              ["MiniHelix", "Compact STRAND™ for every player"],
-              ["OPS / DPS", "Offensive and Defensive Point Shares"],
-              ["Cap & Contract", "Term, NMC/NTC flags, cap hit"],
-            ]}
-          />
-
-          <ClipCard
-            href="/docket"
-            skew="d"
-            kicker="Feature Four"
-            kickerColor="var(--ledger-brown)"
-            edition="The Record"
-            title="The Docket"
-            ctaColor="var(--ledger-brown)"
-            cta="Open The Docket"
-            body="Read the public record of graded trades. Filter published rulings, compare frozen at-trade verdicts against today's live re-grade, and inspect the player detail behind each decision."
-            lines={[
-              ["Published Rulings", "Saved Docket trades after admin review"],
-              ["Dual Grade", "At-trade snapshot plus live today read"],
-              ["Full Detail", "Verdict, packages, STRAND, and outlook"],
-            ]}
-          />
-        </div>
-      </section>
-
-      {/* ── In development ───────────────────────────────────── */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-5 pt-12">
-        <div className="fp-section-label mb-6">In Development</div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          {BRIEFS.map(({ feature, title, body }) => (
-            <div key={feature} className="fp-brief p-6 h-full flex flex-col gap-3">
-              <div className="flex items-baseline justify-between">
-                <span className="newspaper-kicker font-black text-2xs uppercase font-mono"
-                  style={{ color: "var(--ledger-violet)" }}>{feature}</span>
-                <span className="text-2xs uppercase tracking-[0.2em] font-mono"
-                  style={{ color: "var(--ledger-ink-faint)" }}>Coming Soon</span>
-              </div>
-              <h2 className="font-black text-lg leading-tight" style={{ color: "var(--ink)" }}>
-                {title}
-              </h2>
-              <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
-                {body}
+        {/* ── Masthead with ears ─────────────────────────────── */}
+        <header className="masthead-rule">
+          <div className="px-5 py-7 grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-4">
+            <div className="fp-ear hidden md:block">
+              Final Edition<br />Vol. I — No. 1
+            </div>
+            <div className="text-center">
+              <h1 className="fp-nameplate" style={{ fontSize: "clamp(2.4rem, 8vw, 4.6rem)" }}>
+                The Hockey Ledger
+              </h1>
+              <p className="fp-slogan mt-3 text-[12px]">
+                “All the Trades That Are Fit to Print”
+              </p>
+              <p className="mt-2 text-[10px] uppercase tracking-[0.28em] font-mono"
+                style={{ color: "var(--ledger-ink-faint)" }}>
+                X-NAV Analytics · STRAND™ DNA · GM Logic Engine · Live Data
               </p>
             </div>
-          ))}
-        </div>
-      </section>
+            <div className="fp-ear hidden md:block text-right">
+              All Ink,<br />No Pixels
+            </div>
+          </div>
+        </header>
 
-      <div className="fp-fold mt-12" />
+        {/* ── Lead editorial ─────────────────────────────────── */}
+        <section className="px-5 sm:px-8 pt-8 pb-7 border-b" style={{ borderColor: "var(--rule)" }}>
+          <div className="text-center mb-5">
+            <div className="newspaper-kicker font-black text-2xs uppercase font-mono mb-1"
+              style={{ color: "var(--ledger-red)" }}>
+              Staff Editorial
+            </div>
+            <p className="text-2xs uppercase tracking-[0.3em] font-mono"
+              style={{ color: "var(--ledger-ink-faint)" }}>
+              On the Business of Building a Hockey Team
+            </p>
+          </div>
+          <div className="fp-lede text-[14px] leading-[1.9] max-w-3xl mx-auto"
+            style={{ color: "var(--ledger-ink-body)" }}>
+            <p className="mb-4">
+              Every trade is an argument, and every argument deserves a hearing on
+              the record. The Hockey Ledger exists to put the case in ink: to weigh
+              a deal the way a front office actually weighs it — cap and clause,
+              age and term, the slot a player fills and the window a team is trying
+              to keep open. No hot takes set in disappearing pixels. A ruling you
+              can hold up to the light.
+            </p>
+            <p>
+              Build a single transaction in the Trade Machine and test it against
+              X-NAV and the GM Audit, or take the chair in Armchair GM and live with
+              every consequence that follows. Read the published Docket to see how
+              the calls have aged. The press is open. Turn the page and start
+              running the room.
+            </p>
+          </div>
+          <p className="mt-5 text-2xs uppercase tracking-[0.28em] font-mono text-right max-w-3xl mx-auto"
+            style={{ color: "var(--ledger-ink-faint)" }}>
+            — The Front Office
+          </p>
+        </section>
 
-      {/* ── How the engine works ─────────────────────────────── */}
-      <section className="border-y py-9" style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
-        <div className="max-w-3xl mx-auto px-5">
-          <div className="fp-section-label mb-7">How the Engine Works</div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-7 text-center">
-            {ENGINE.map(({ label, body }) => (
-              <div key={label}>
-                <div className="font-black text-[11px] uppercase tracking-[0.2em] mb-2 font-mono"
-                  style={{ color: "var(--ledger-ink-body)" }}>{label}</div>
+        {/* ── The desks (dense ruled broadsheet) ─────────────── */}
+        <section className="px-5 sm:px-8 pt-8">
+          <div className="fp-section-label mb-5">Inside This Edition</div>
+
+          <div className="fp-desks">
+            <Cell
+              href="/trade-machine"
+              lead
+              kicker="Feature One — The Lead"
+              kickerColor="var(--ledger-red)"
+              edition="The Desk"
+              title="Trade Machine"
+              ctaColor="var(--ledger-red)"
+              cta="Open Trade Machine"
+              body="Build a single trade, add retention, and test the package against X-NAV and the GM Audit. This is the quick social trade surface that owns share codes and replay links — the fastest way to put a deal on the record and argue it with numbers instead of noise."
+              lines={[
+                ["One Trade", "Fast package construction"],
+                ["GM Audit", "Cap, clause, value, and fit checks"],
+                ["Share Code", "Locked verdict replay link"],
+              ]}
+            />
+
+            <Cell
+              href="/armchair-gm"
+              kicker="Feature Two"
+              kickerColor="var(--ledger-green)"
+              edition="The Chair"
+              title="Armchair GM"
+              ctaColor="var(--ledger-green)"
+              cta="Enter Armchair GM"
+              body="Take over a franchise, make multiple moves, inspect roster DNA, manage cap consequences, and see whether you can run the room better than the actual front office."
+              lines={[
+                ["Roster Control", "Multi-move session"],
+                ["Who Wants This?", "Ranks all 32 teams"],
+                ["Sim Engine", "Projects the season"],
+              ]}
+            />
+
+            <Cell
+              href="/players"
+              kicker="Feature Three"
+              kickerColor="var(--ledger-navy)"
+              edition="The Ledger"
+              title="Player Analytics"
+              ctaColor="var(--ledger-navy)"
+              cta="Open Player Analytics"
+              body="Search the full NHL roster. Scoring pace, xGoals, ice time, point shares, and NAV components in one sortable, filterable view."
+              lines={[
+                ["Live Roster", "NHL API — every game"],
+                ["MiniHelix", "Compact STRAND™"],
+                ["OPS / DPS", "Point Shares"],
+              ]}
+            />
+
+            <Cell
+              href="/docket"
+              kicker="Feature Four"
+              kickerColor="var(--ledger-brown)"
+              edition="The Record"
+              title="The Docket"
+              ctaColor="var(--ledger-brown)"
+              cta="Open The Docket"
+              body="Read the public record of graded trades. Filter published rulings and compare frozen at-trade verdicts against today's live re-grade."
+              lines={[
+                ["Published Rulings", "After admin review"],
+                ["Dual Grade", "At-trade plus live"],
+                ["Full Detail", "Verdict and STRAND"],
+              ]}
+            />
+          </div>
+        </section>
+
+        {/* ── In development ─────────────────────────────────── */}
+        <section className="px-5 sm:px-8 pt-11">
+          <div className="fp-section-label mb-5">In Development</div>
+          <div className="fp-briefs">
+            {BRIEFS.map(({ feature, title, body }) => (
+              <div key={feature} className="fp-brief">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="newspaper-kicker font-black text-2xs uppercase font-mono"
+                    style={{ color: "var(--ledger-violet)" }}>{feature}</span>
+                  <span className="text-2xs uppercase tracking-[0.2em] font-mono"
+                    style={{ color: "var(--ledger-ink-faint)" }}>Coming Soon</span>
+                </div>
+                <h2 className="fp-head font-black text-lg leading-tight" style={{ color: "var(--ink)" }}>
+                  {title}
+                </h2>
                 <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
                   {body}
                 </p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      <Footer />
+        {/* ── How the engine works ───────────────────────────── */}
+        <section className="mt-11 border-y py-9"
+          style={{ borderColor: "var(--ink)", background: "var(--paper-inset)" }}>
+          <div className="px-5 sm:px-8">
+            <div className="fp-section-label mb-7">How the Engine Works</div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-7 text-center">
+              {ENGINE.map(({ label, body }) => (
+                <div key={label}>
+                  <div className="font-black text-[11px] uppercase tracking-[0.2em] mb-2 font-mono"
+                    style={{ color: "var(--ledger-ink-body)" }}>{label}</div>
+                  <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-light)" }}>
+                    {body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <Footer />
+      </div>
     </main>
   );
 }
