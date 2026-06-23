@@ -254,12 +254,15 @@ Each row: the two packages, at-trade verdict, today verdict, NAV-margin chip.
 Acceptance: the page lists published trades and filters/sorts by the above; drafts are hidden;
 `npm test` + typecheck pass.
 
-### [ ] D2 — expanded entry: full ruling + per-player detail
+### [x] D2 — expanded entry: full ruling + per-player detail
 Expanded view reuses `VerdictPanel`, and for each player shows NAV metrics (at-trade + today),
 impact metrics (evaluate/sim), **STRAND** (`StrandDisplay`), and **Development Outlook**
 (`DevelopmentProfilePanel`). Picks show pick-curve NAV; conditional picks show as notes.
 Acceptance: expanding an entry shows the verdict plus per-player NAV/impact/STRAND/outlook;
 `npm test` + typecheck pass.
+
+### [ ] D2.5 — add panel to the home page
+match the current aesthetic and add the page to the home page in the same way we present armchair-gm, trade machine, etc.
 
 ### [ ] D3 — dual-grade dynamic re-grade on read
 Compute the "today" verdict on load from current data (snapshot stays frozen). Render both,

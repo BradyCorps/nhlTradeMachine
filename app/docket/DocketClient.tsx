@@ -1,8 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
+import StrandDisplay from "@/app/components/StrandDisplay";
+import { buildAssetTraits, computeStrandType } from "@/app/components/StrandView";
+import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import type { DocketEntry, DocketSortKey } from "@/app/lib/docket-view";
 import { filterAndSortDocketEntries } from "@/app/lib/docket-view";
+import type { XNAVResult } from "@/app/lib/trade-types";
 
 const fmtNav = (value: number): string => `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
 
@@ -13,6 +18,109 @@ const assetList = (entryPackage: DocketEntry["packages"][number]): string =>
       return `${asset.name}${retention}`;
     }).join(", ")
     : "Future considerations";
+
+const navFromAsset = (navAtTrade: number | null): XNAVResult => ({
+  total: navAtTrade ?? 0,
+  off: 0,
+  def: 0,
+  age: 0,
+  cap: 0,
+  upside: 0,
+});
+
+function AssetDetail({ asset }: { asset: DocketEntry["packages"][number]["assets"][number] }) {
+  const nav = navFromAsset(asset.navAtTrade);
+  const traits = buildAssetTraits(asset.asset, nav);
+  const strandType = computeStrandType(traits.off, traits.def, asset.asset.ops ?? null, asset.asset.dps ?? null);
+  const isPick = asset.kind === "pick" || asset.asset.position === "Pick";
+
+  return (
+    <div style={{ border: "1px solid var(--rule)", padding: 10, display: "grid", gap: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 900 }}>{asset.name}</div>
+          <div style={{ fontSize: 10, color: "var(--ledger-ink-faint)", marginTop: 3 }}>
+            {isPick ? "PICK CURVE NAV" : `${asset.asset.position} · AGE ${asset.asset.age || "NA"} · ${asset.asset.capHit.toFixed(2)}M`}
+          </div>
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 900, color: "var(--ledger-red)", whiteSpace: "nowrap" }}>
+          {fmtNav(asset.navAtTrade ?? 0)} NAV
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 6 }}>
+        {[
+          ["Today NAV", "D3 pending"],
+          ["Pts/82", isPick ? "Pick" : asset.asset.ptsPace.toFixed(1)],
+          ["Supp", isPick ? "NA" : asset.asset.defRate.toFixed(2)],
+          ["TOI", isPick ? "NA" : asset.asset.avgTOI.toFixed(1)],
+        ].map(([label, value]) => (
+          <div key={label} style={{ border: "1px solid var(--rule)", padding: "7px 8px" }}>
+            <div style={{ fontSize: 9, fontWeight: 900, letterSpacing: "0.12em", color: "var(--ledger-ink-faint)" }}>{label}</div>
+            <div style={{ fontSize: 12, fontWeight: 900, marginTop: 2 }}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      {isPick ? (
+        <div style={{ fontSize: 11, color: "var(--ledger-ink-faint)", lineHeight: 1.5 }}>
+          Pick value is the frozen pick-curve NAV captured at ingestion.
+        </div>
+      ) : (
+        <>
+          <StrandDisplay
+            offTraits={traits.off}
+            defTraits={traits.def}
+            ops={asset.asset.ops ?? null}
+            dps={asset.asset.dps ?? null}
+            strandType={strandType}
+            W={260}
+            H={150}
+            amplitude={28}
+          />
+          <DevelopmentProfilePanel asset={asset.asset} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function ExpandedEntry({ entry }: { entry: DocketEntry }) {
+  const [expandedFlag, setExpandedFlag] = useState<number | null>(null);
+  const verdict = entry.lockedVerdict;
+
+  return (
+    <div style={{ borderTop: "1px solid var(--rule)", paddingTop: 12, display: "grid", gap: 12 }}>
+      {verdict && (
+        <VerdictPanel
+          verdict={verdict}
+          sc={STATUS_CONFIG[verdict.status]}
+          expandedFlag={expandedFlag}
+          setExpandedFlag={setExpandedFlag}
+          onRequestClaudeAnalysis={() => undefined}
+          onOpenMemo={() => undefined}
+        />
+      )}
+
+      {entry.conditions && (
+        <div style={{ border: "1px solid var(--rule)", padding: 10, fontSize: 11, lineHeight: 1.5 }}>
+          <span style={{ fontWeight: 900, letterSpacing: "0.12em" }}>CONDITIONS</span> · {entry.conditions}
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+        {entry.packages.slice(0, 2).map(pkg => (
+          <div key={pkg.teamId} style={{ display: "grid", gap: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.16em", color: "var(--ledger-ink-faint)" }}>
+              {pkg.teamId} PACKAGE DETAIL
+            </div>
+            {pkg.assets.map(asset => <AssetDetail key={`${pkg.teamId}-${asset.name}`} asset={asset} />)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface DocketClientProps {
   entries: DocketEntry[];
@@ -144,6 +252,15 @@ export default function DocketClient({ entries }: DocketClientProps) {
                 </>
               )}
             </div>
+
+            <details>
+              <summary style={{ cursor: "pointer", fontSize: 10, fontWeight: 900, letterSpacing: "0.16em", color: "var(--ledger-red)" }}>
+                FULL RULING + PLAYER DETAIL
+              </summary>
+              <div style={{ marginTop: 12 }}>
+                <ExpandedEntry entry={entry} />
+              </div>
+            </details>
           </article>
         ))}
 

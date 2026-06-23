@@ -25,7 +25,25 @@ const trade = (
         kind: "player",
         ref: { id: `${id}-player`, nameSlug: "winnipeg-player" },
         retainedPct: 0.25,
-        inputSnapshot: { name: "Winnipeg Player" },
+        inputSnapshot: {
+          id: `${id}-player`,
+          teamId: "WPG",
+          name: "Winnipeg Player",
+          position: "C",
+          age: 27,
+          games: 82,
+          ptsPace: 68,
+          defRate: 0.12,
+          avgTOI: 19.2,
+          capHit: 6.2,
+          yearsRemaining: 3,
+          hasNMC: false,
+          hasNTC: false,
+          canRetain: true,
+          retainedPct: 0.25,
+          multiplier: 1,
+          developmentProfile: { developmentPhase: "PEAK_WINDOW" },
+        },
         navAtTrade: 90,
       }],
     },
@@ -76,8 +94,28 @@ describe("Docket view model", () => {
       id: "published",
       winner: null,
       navMargin: 0,
+      lockedVerdict: published.lockedVerdict,
       todayVerdict: "Pending live re-grade",
     }]);
+  });
+
+  it("carries frozen player detail for expanded Docket entries", () => {
+    const [entry] = buildDocketEntries([{ ...trade("detail", "2026-07-04", true, "WPG", 18), conditions: "Pick upgrades if WPG wins a round." }]);
+    const player = entry.packages[0].assets[0];
+    const pick = entry.packages[1].assets[0];
+
+    expect(entry.conditions).toBe("Pick upgrades if WPG wins a round.");
+    expect(player.asset).toMatchObject({
+      id: "detail-player",
+      teamId: "WPG",
+      name: "Winnipeg Player",
+      position: "C",
+      ptsPace: 68,
+      retainedPct: 0.25,
+      developmentProfile: { developmentPhase: "PEAK_WINDOW" },
+    });
+    expect(pick.asset.position).toBe("Pick");
+    expect(pick.navAtTrade).toBe(50);
   });
 
   it("filters by team, winner, and search query", () => {

@@ -386,6 +386,18 @@ describe("Canary — public Docket page", () => {
     expect(client).toContain("TODAY:");
   });
 
+  it("expands entries with verdict, per-asset detail, STRAND, development outlook, picks, and conditions", () => {
+    expect(client).toContain("FULL RULING + PLAYER DETAIL");
+    expect(client).toContain("<VerdictPanel");
+    expect(client).toContain("<StrandDisplay");
+    expect(client).toContain("<DevelopmentProfilePanel asset={asset.asset} />");
+    expect(client).toContain("PICK CURVE NAV");
+    expect(client).toContain("CONDITIONS");
+    expect(view).toContain("assetSnapshotToDocketAsset");
+    expect(view).toContain("lockedVerdict: trade.lockedVerdict");
+    expect(view).toContain("conditions: trade.conditions");
+  });
+
   it("links The Docket from the shared public masthead", () => {
     expect(header).toContain('href="/docket"');
     expect(header).toContain("The Docket");

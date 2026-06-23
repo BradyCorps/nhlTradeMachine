@@ -1,4 +1,5 @@
 import type { TradeRecord } from "@/app/lib/trades";
+import type { Asset, TradeVerdict } from "@/app/lib/trade-types";
 
 export type DocketSortKey = "date-desc" | "date-asc" | "nav-desc" | "nav-asc" | "winner";
 
@@ -14,6 +15,7 @@ export interface DocketPackageAsset {
   name: string;
   navAtTrade: number | null;
   retainedPct: number;
+  asset: Asset;
 }
 
 export interface DocketPackage {
@@ -32,6 +34,8 @@ export interface DocketEntry {
   fairness: string;
   navMargin: number;
   packages: DocketPackage[];
+  conditions: string | null;
+  lockedVerdict: TradeVerdict | null;
   atTradeVerdict: string;
   todayVerdict: string;
   rosterMutating: boolean;
@@ -59,6 +63,93 @@ const navMarginFromGrade = (perTeamNetNav: Record<string, number>): number => {
   return margins.length ? Math.max(...margins) : 0;
 };
 
+const numberFromSnapshot = (
+  snapshot: Record<string, unknown>,
+  key: string,
+  fallback = 0,
+): number => {
+  const value = snapshot[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+};
+
+const boolFromSnapshot = (
+  snapshot: Record<string, unknown>,
+  key: string,
+  fallback = false,
+): boolean => {
+  const value = snapshot[key];
+  return typeof value === "boolean" ? value : fallback;
+};
+
+const stringFromSnapshot = (
+  snapshot: Record<string, unknown>,
+  key: string,
+  fallback: string,
+): string => {
+  const value = snapshot[key];
+  return typeof value === "string" && value.trim() ? value : fallback;
+};
+
+const nullableNumberFromSnapshot = (
+  snapshot: Record<string, unknown>,
+  key: string,
+): number | null => {
+  const value = snapshot[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+};
+
+export function assetSnapshotToDocketAsset(
+  asset: TradeRecord["sides"][number]["assetsGiven"][number],
+  teamId: string,
+): Asset {
+  const snapshot = asset.inputSnapshot;
+  const position = stringFromSnapshot(snapshot, "position", asset.kind === "pick" ? "Pick" : "C");
+
+  return {
+    id: stringFromSnapshot(snapshot, "id", asset.ref.id),
+    teamId: stringFromSnapshot(snapshot, "teamId", teamId),
+    name: assetName(asset),
+    position,
+    age: numberFromSnapshot(snapshot, "age"),
+    games: numberFromSnapshot(snapshot, "games"),
+    ptsPace: numberFromSnapshot(snapshot, "ptsPace"),
+    xGPace: numberFromSnapshot(snapshot, "xGPace"),
+    defRate: numberFromSnapshot(snapshot, "defRate"),
+    avgTOI: numberFromSnapshot(snapshot, "avgTOI"),
+    capHit: numberFromSnapshot(snapshot, "capHit"),
+    yearsRemaining: numberFromSnapshot(snapshot, "yearsRemaining"),
+    capCeiling: numberFromSnapshot(snapshot, "capCeiling"),
+    hasNMC: boolFromSnapshot(snapshot, "hasNMC"),
+    hasNTC: boolFromSnapshot(snapshot, "hasNTC"),
+    canRetain: boolFromSnapshot(snapshot, "canRetain"),
+    retainedPct: asset.retainedPct ?? numberFromSnapshot(snapshot, "retainedPct"),
+    multiplier: numberFromSnapshot(snapshot, "multiplier", 1),
+    qocIndex: nullableNumberFromSnapshot(snapshot, "qocIndex"),
+    rosterTier: typeof snapshot.rosterTier === "string" ? snapshot.rosterTier as Asset["rosterTier"] : undefined,
+    draftYear: nullableNumberFromSnapshot(snapshot, "draftYear"),
+    draftOverall: nullableNumberFromSnapshot(snapshot, "draftOverall"),
+    prospectPtsPace: nullableNumberFromSnapshot(snapshot, "prospectPtsPace"),
+    developmentProfile: typeof snapshot.developmentProfile === "object" && snapshot.developmentProfile != null
+      ? snapshot.developmentProfile as Asset["developmentProfile"]
+      : null,
+    xgRelTM: nullableNumberFromSnapshot(snapshot, "xgRelTM"),
+    xgaRelTM: nullableNumberFromSnapshot(snapshot, "xgaRelTM"),
+    dzPct: nullableNumberFromSnapshot(snapshot, "dzPct"),
+    goalsPace: numberFromSnapshot(snapshot, "goalsPace"),
+    assistsPace: numberFromSnapshot(snapshot, "assistsPace"),
+    round: numberFromSnapshot(snapshot, "round"),
+    year: numberFromSnapshot(snapshot, "year"),
+    teamStanding: numberFromSnapshot(snapshot, "teamStanding"),
+    gsax: numberFromSnapshot(snapshot, "gsax"),
+    savePct: numberFromSnapshot(snapshot, "savePct"),
+    gamesStarted: numberFromSnapshot(snapshot, "gamesStarted"),
+    ops: nullableNumberFromSnapshot(snapshot, "ops"),
+    dps: nullableNumberFromSnapshot(snapshot, "dps"),
+    baselinePtsPace: numberFromSnapshot(snapshot, "baselinePtsPace"),
+    pkTimeShare: numberFromSnapshot(snapshot, "pkTimeShare"),
+  };
+}
+
 export function tradeToDocketEntry(trade: TradeRecord): DocketEntry | null {
   if (!trade.published || !trade.gradeAtTrade) return null;
 
@@ -68,6 +159,7 @@ export function tradeToDocketEntry(trade: TradeRecord): DocketEntry | null {
       name: assetName(asset),
       navAtTrade: asset.navAtTrade,
       retainedPct: asset.retainedPct ?? 0,
+      asset: assetSnapshotToDocketAsset(asset, side.teamId),
     }));
     return {
       teamId: side.teamId,
@@ -86,6 +178,8 @@ export function tradeToDocketEntry(trade: TradeRecord): DocketEntry | null {
     fairness: trade.gradeAtTrade.fairness,
     navMargin: navMarginFromGrade(trade.gradeAtTrade.perTeamNetNav),
     packages,
+    conditions: trade.conditions,
+    lockedVerdict: trade.lockedVerdict ? trade.lockedVerdict as TradeVerdict : null,
     atTradeVerdict: trade.lockedVerdict?.message ?? trade.gradeAtTrade.fairness,
     todayVerdict: "Pending live re-grade",
     rosterMutating: trade.rosterMutating,
