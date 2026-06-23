@@ -4,6 +4,7 @@ import TradePanel from "@/app/components/TradePanel";
 import TugBar from "@/app/components/TugBar";
 import { SEASON, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 import { formatPickRound } from "@/app/lib/trade-format";
+import { pickEffectiveStanding } from "@/app/lib/pick-value";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
 import TeamStrand, { CHAMP_TEMPLATE, TeamStrandData } from "@/app/components/TeamStrand";
 import LineupEditor from "@/app/components/LineupEditor";
@@ -407,12 +408,15 @@ export default function ArmchairGmPage() {
         return team;
       });
 
-      const standingByOwner = new Map(updatedTeams.map(team => [team.id, team.standing]));
-      const playersWithDynamicPickValues = updatedPlayers.map(p =>
-        p.position === "Pick"
-          ? { ...p, teamStanding: standingByOwner.get(p.teamId) ?? p.teamStanding }
-          : p
-      );
+      const teamCtxByOwner = new Map(updatedTeams.map(team => [team.id, team]));
+      const playersWithDynamicPickValues = updatedPlayers.map(p => {
+        if (p.position !== "Pick") return p;
+        const owner = teamCtxByOwner.get(p.teamId);
+        return {
+          ...p,
+          teamStanding: pickEffectiveStanding(owner?.phase, owner?.standing ?? p.teamStanding),
+        };
+      });
 
       return { players: playersWithDynamicPickValues, teams: updatedTeams };
     });

@@ -35,7 +35,7 @@ function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number; onClick: () => 
       <div className="flex items-center gap-2 min-w-0">
         <span className="text-2xs font-black w-5 shrink-0 font-mono"
           style={{ color: "var(--ledger-ink-faint)" }}>
-          {p.position}
+          {p.position === "Pick" ? "" : p.position}
         </span>
         <span className="text-[11px] font-bold truncate"
           style={{ color: "var(--ledger-ink)" }}>

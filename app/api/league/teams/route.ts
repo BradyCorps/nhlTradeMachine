@@ -5,6 +5,7 @@ import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
 import { siteSettings, teams as teamsTable } from "@/app/db/schema";
 import { parseStoredCapCeiling } from "@/app/lib/cap-settings";
+import { pickEffectiveStanding } from "@/app/lib/pick-value";
 
 export const dynamic = "force-dynamic";
 
@@ -198,7 +199,7 @@ export async function GET() {
         name:         `${year} ${roundLabel} Round Pick (${team.id})`,
         position:     "Pick",
         age:          19, round, year,
-        teamStanding: team.standing,
+        teamStanding: pickEffectiveStanding(team.phase, team.standing),
         isProtected:  false,
         games: 0, ptsPace: 0, xGPace: 0, defRate: 0,
         avgTOI: 0, qocIndex: null,
