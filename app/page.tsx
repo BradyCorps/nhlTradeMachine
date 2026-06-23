@@ -113,14 +113,14 @@ export default function WelcomePage() {
         <header className="masthead-rule fp-reveal">
           <div className="px-5 py-7 grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-4">
             <div className="fp-ear hidden md:block">
-              Final Edition<br />Vol. I — No. 1
+              First Edition<br />Vol. I — No. 1
             </div>
             <div className="text-center">
               <h1 className="fp-nameplate" style={{ fontSize: "clamp(2.4rem, 8vw, 4.6rem)" }}>
                 The Hockey Ledger
               </h1>
               <p className="fp-slogan mt-3 text-[12px]">
-                “All the Trades That Are Fit to Print”
+                “Everything a hockey fan could ask for”
               </p>
               <p className="mt-2 text-[10px] uppercase tracking-[0.28em] font-mono"
                 style={{ color: "var(--ledger-ink-faint)" }}>
@@ -128,9 +128,9 @@ export default function WelcomePage() {
               </p>
             </div>
             <div className="flex justify-center md:justify-end">
-              {/* TODO: point href at your Buy Me a Coffee handle, e.g. https://buymeacoffee.com/yourname */}
+              
               <a
-                href="https://www.buymeacoffee.com/"
+                href="https://buymeacoffee.com/hockeyledger"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="fp-stamp-small no-underline"
@@ -157,9 +157,11 @@ export default function WelcomePage() {
             style={{ color: "var(--ledger-ink-body)" }}>
             <p className="mb-4">
               Every trade is an argument, and every argument deserves a hearing on
-              the record. The Hockey Ledger exists to put the case in ink: to weigh
-              a deal the way a front office actually weighs it — cap and clause,
-              age and term, the slot a player fills and the window a team is trying
+              the record. 
+              The Hockey Ledger exists to put the case in ink: to weigh
+              a deal the way a front office actually weighs it.
+              Cap and clause, age and term, value and production.
+              It's all about the slot a player fills and the window a team is trying
               to keep open. No hot takes set in disappearing pixels. A ruling you
               can hold up to the light.
             </p>
