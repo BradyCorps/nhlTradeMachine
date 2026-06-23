@@ -1148,6 +1148,29 @@ select.ledger-select {
   box-shadow: 0 0 0 rgba(0, 0, 0, 0.24);
 }
 
+/* Small fig stamp — masthead support button (Donate / Buy Me a Coffee).
+   Standalone hover/active so it presses on its own, not only inside a cell. */
+.fp-stamp-small {
+  display: inline-block;
+  background: var(--fig);
+  text-align: center;
+  font-family: 'Courier Prime', monospace;
+  font-weight: 900;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: #fff;
+  padding: 10px 18px;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.26);
+  transition: transform 0.2s var(--fp-ease), box-shadow 0.2s var(--fp-ease), filter 0.18s;
+}
+.fp-stamp-small:hover { filter: brightness(1.08); }
+.fp-stamp-small:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0.26);
+}
+
 /* In-development briefs — same ruled grid, lighter ink */
 .fp-briefs {
   display: grid;
@@ -1168,31 +1191,23 @@ select.ledger-select {
 }
 
 /* ── Scroll reveal — a sheet being lifted onto the desk ────────── */
-/* Pure CSS, scroll-linked (no JavaScript): each block lifts and settles
-   as it scrolls into view. Content is fully visible by default, so a slow
-   or failed bundle can never leave the page blank — the animation is
-   layered on only where the browser supports scroll-driven timelines. */
-@keyframes fp-lift {
-  from {
-    opacity: 0;
-    transform: perspective(1200px) translateY(42px) rotateX(8deg) scale(0.984);
-  }
-  to {
-    opacity: 1;
-    transform: perspective(1200px) translateY(0) rotateX(0deg) scale(1);
-  }
+/* Progressive enhancement: content is fully visible by default. A small
+   client island (ScrollReveal) arms only the below-the-fold blocks and
+   animates them in on scroll — so a slow/failed bundle can never blank the
+   page, and it works in every browser (IntersectionObserver, incl. Firefox). */
+.fp-armed {
+  opacity: 0;
+  transform: perspective(1200px) translateY(42px) rotateX(8deg) scale(0.984);
+  transform-origin: 50% 100%;
+  transition: opacity 0.8s var(--fp-ease), transform 0.95s var(--fp-ease);
+  will-change: opacity, transform;
 }
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    .fp-reveal {
-      transform-origin: 50% 100%;
-      animation: fp-lift linear both;
-      animation-timeline: view();
-      animation-range: entry 0% cover 22%;
-    }
-  }
+.fp-armed.fp-in {
+  opacity: 1;
+  transform: perspective(1200px) translateY(0) rotateX(0deg) scale(1);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .fp-cell, .fp-stamp, .fp-cell:active .fp-stamp { transition: none; transform: none; }
+  .fp-armed, .fp-armed.fp-in { opacity: 1; transform: none; transition: none; }
 }

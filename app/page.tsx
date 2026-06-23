@@ -2,6 +2,7 @@
 import React from "react";
 import Link from "next/link";
 import Footer from "./components/Footer";
+import ScrollReveal from "./components/ScrollReveal";
 
 function Cell({
   href, lead = false, kicker, kickerColor, edition, title, body, lines, cta, ctaColor,
@@ -95,6 +96,7 @@ const ENGINE = [
 export default function WelcomePage() {
   return (
     <main className="fp-desk min-h-screen font-serif antialiased" style={{ color: "var(--ink)" }}>
+      <ScrollReveal />
       <div className="fp-sheet">
 
         {/* ── Dateline ───────────────────────────────────────── */}
@@ -125,8 +127,16 @@ export default function WelcomePage() {
                 X-NAV Analytics · STRAND™ DNA · GM Logic Engine · Live Data
               </p>
             </div>
-            <div className="fp-ear hidden md:block text-right">
-              All Ink,<br />No Pixels
+            <div className="flex justify-center md:justify-end">
+              {/* TODO: point href at your Buy Me a Coffee handle, e.g. https://buymeacoffee.com/yourname */}
+              <a
+                href="https://www.buymeacoffee.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="fp-stamp-small no-underline"
+              >
+                Buy Me a Coffee
+              </a>
             </div>
           </div>
         </header>
