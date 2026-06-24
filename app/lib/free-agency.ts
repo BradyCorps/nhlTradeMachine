@@ -29,7 +29,7 @@ export interface ProjectedContract {
 // Co-located with the logic so the model is self-contained and testable.
 export const FA = {
   capMin:        0.775,   // NHL CBA league-minimum AAV ($M)
-  starCeilingPct: 0.16,   // max AAV as a share of the cap ceiling (~$16.6M at $104M)
+  cbaMaxPct:     0.20,    // CBA hard max = 20% of the cap upper limit ($20.8M at $104M)
 
   // Forwards: $/point on stable pace, with progressive top-6 and star premiums
   // so elite producers reach the modern market (a ~90-pt UFA lands ~$13-14M).
@@ -114,7 +114,7 @@ export interface ProjectContext {
 // Project the contract a single pending free agent would command.
 export function projectFreeAgentContract(asset: Asset, ctx: ProjectContext = {}): ProjectedContract {
   const capCeiling = ctx.capCeiling ?? SEASON.capCeiling;
-  const ceiling = Math.floor(capCeiling * FA.starCeilingPct * 20) / 20; // snap onto the $0.05M grid
+  const ceiling = Math.floor(capCeiling * FA.cbaMaxPct * 20) / 20; // CBA max, snapped onto the $0.05M grid
   const rand = mulberry32((ctx.seed ?? 1) + hashString(`fa:${asset.id || asset.name}`));
 
   const pos = asset.position;

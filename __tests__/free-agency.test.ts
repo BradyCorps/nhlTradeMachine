@@ -27,7 +27,7 @@ const mkAsset = (over: Partial<Asset> & { id: string; position: string }): Asset
   ...over,
 });
 
-const STAR_CEILING = SEASON.capCeiling * FA.starCeilingPct;
+const STAR_CEILING = SEASON.capCeiling * FA.cbaMaxPct;
 
 describe("projectFreeAgentContract", () => {
   it("never prices a player below the CBA minimum", () => {
