@@ -21,6 +21,7 @@ import {
 } from "@/app/lib/development-sources";
 import { fetchProspectEnrichmentMap } from "@/app/lib/prospect-enrichment";
 import { applyTeamCapDeltas, type CapDeltaAsset, type CapDeltaMoves, type TeamCapDeltaMap } from "@/app/lib/cap-delta";
+import { seedFreeAgentStatus } from "@/app/lib/free-agent-seed";
 
 const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
 const CONTRACTS_CACHE_KEY = "cache:contracts:v2";
@@ -1262,31 +1263,56 @@ export async function assembleCanonicalRoster(options: {
 
   players = dedupePlayersByAuthority(players, dbTeamBySlug);
 
-  // ── Apply admin FA overrides ─────────────────────────────────────────────────
-  // Overrides can force a player into/out of the expiring pool regardless of what
-  // the scraper detected. "EXCLUDE" removes the player from the roster entirely.
-  if (faOverrideById.size > 0 || faOverrideByName.size > 0) {
+  // ── Apply free-agent status: DB overrides, then the 2026 seed ────────────────
+  // Precedence (highest first):
+  //   1. DB fa_overrides — admin's explicit choice, incl. SIGNED / EXCLUDE
+  //   2. live scrape      — already folded into expiresThisOffseason above
+  //   3. seed             — the known 2026 class, for players the scrape misses
+  // The seed exists because the off-season scrape rarely surfaces 2026-expiring
+  // contracts, so auto-detection alone leaves the FA list empty (see
+  // free-agent-seed.ts). DB overrides win, so the admin can always correct it.
+  {
     const offseasonYear = Number(SEASON.label.slice(0, 4));
     const excluded = new Set<string>();
     players = players.map((p) => {
       const key = p.name?.toLowerCase();
       const ov = faOverrideById.get(String(p.id)) ?? (key ? faOverrideByName.get(key) : undefined);
-      if (!ov) return p;
-      if (ov.forceStatus === "EXCLUDE") {
-        excluded.add(p.id);
-        return p;
+
+      if (ov) {
+        if (ov.forceStatus === "EXCLUDE") {
+          excluded.add(p.id);
+          return p;
+        }
+        const status = ov.forceStatus as "UFA" | "RFA" | "SIGNED";
+        const expiring = status !== "SIGNED";
+        return {
+          ...p,
+          expiryStatus:        expiring ? status : (p.expiryStatus ?? null),
+          contractStatus:      status,
+          expiresThisOffseason: expiring,
+          expiryYear:          expiring ? offseasonYear : p.expiryYear,
+          capHit:              expiring ? 0 : p.capHit,
+          yearsRemaining:      expiring ? 0 : p.yearsRemaining,
+        };
       }
-      const status = ov.forceStatus as "UFA" | "RFA" | "SIGNED";
-      const expiring = status !== "SIGNED";
-      return {
-        ...p,
-        expiryStatus:        expiring ? status : (p.expiryStatus ?? null),
-        contractStatus:      status,
-        expiresThisOffseason: expiring,
-        expiryYear:          expiring ? offseasonYear : p.expiryYear,
-        capHit:              expiring ? 0 : p.capHit,
-        yearsRemaining:      expiring ? 0 : p.yearsRemaining,
-      };
+
+      // No DB override: fall back to the curated seed for players the scrape
+      // didn't already flag. Never touches picks or already-expiring players.
+      if (!p.expiresThisOffseason && p.position !== "Pick") {
+        const seedStatus = seedFreeAgentStatus(p.name);
+        if (seedStatus) {
+          return {
+            ...p,
+            expiryStatus:        seedStatus,
+            contractStatus:      seedStatus,
+            expiresThisOffseason: true,
+            expiryYear:          offseasonYear,
+            capHit:              0,
+            yearsRemaining:      0,
+          };
+        }
+      }
+      return p;
     }).filter((p) => !excluded.has(p.id));
   }
 
