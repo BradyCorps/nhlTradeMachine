@@ -82,6 +82,7 @@ describe("CapWages row parser", () => {
       capHit: 0.887,
       yearsRemaining: 1,
       expiryStatus: "RFA",
+      expiryYear: 2027,
       position: "RW, C",
       teamSlug: "wpg",
       age: 22,
@@ -100,10 +101,24 @@ describe("CapWages row parser", () => {
       capHit: 0.813,
       yearsRemaining: 1,
       expiryStatus: "RFA (Arb)",
+      expiryYear: 2027,
       position: "C",
       teamSlug: "van",
       age: 23,
     });
+  });
+
+  it("surfaces the expiry year as the free-agency signal (yearsRemaining is floored)", () => {
+    const ufa2026 = [...bradLambertRow];
+    ufa2026[24] = "UFA";
+    ufa2026[29] = 26; // expires summer 2026 → pending FA this offseason
+    const parsed = parseCapWagesPlayerRow(ufa2026);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) throw new Error(parsed.reason);
+    expect(parsed.contractData.expiryStatus).toBe("UFA");
+    expect(parsed.contractData.expiryYear).toBe(2026);
+    // floored to 1 by the pipeline — which is exactly why expiryYear is the FA signal
+    expect(parsed.contractData.yearsRemaining).toBe(1);
   });
 
   it("rejects a shifted row before a non-numeric cap becomes believable data", () => {

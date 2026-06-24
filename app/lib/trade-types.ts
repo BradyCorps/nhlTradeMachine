@@ -80,10 +80,11 @@ export interface Asset {
   tradeBlockStatus?: "requested" | "available" | "blocked" | "untouchable" | null;
   tradeBlockNote?: string | null;
 
-  // Contract expiry / free agency (surfaced from CapWages expiryStatus by roster-assembly)
+  // Contract expiry / free agency (surfaced from CapWages by roster-assembly)
   expiryStatus?: string | null;                       // raw CapWages status (e.g. "UFA", "RFA")
+  expiryYear?: number | null;                         // calendar year the deal expires (authoritative FA signal)
   contractStatus?: "UFA" | "RFA" | "SIGNED";          // normalized pending status this offseason
-  expiresThisOffseason?: boolean;                     // pending free agent (final-year heuristic)
+  expiresThisOffseason?: boolean;                     // pending free agent (expiryYear <= projected season start)
 }
 
 export interface Team {

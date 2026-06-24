@@ -371,6 +371,7 @@ async function loadContracts(): Promise<Record<string, any>> {
         hasNTC:         b?.hasNTC  ?? false,
         canRetain:      b?.hasNMC  ? false : true,
         expiryStatus:   cw.expiryStatus,
+        expiryYear:     cw.expiryYear ?? null,
         position:       b?.position ?? cw.position,
       };
     }
@@ -387,6 +388,8 @@ async function loadContracts(): Promise<Record<string, any>> {
           hasNTC:         b.hasNTC  ?? false,
           canRetain:      b.hasNMC  ? false : true,
           expiryStatus:   "UFA",
+          // Dropped from the live scrape = expired at rollover → pending FA now.
+          expiryYear:     Number(SEASON.label.slice(0, 4)),
           position:       b.position,
         };
       }
@@ -400,6 +403,8 @@ async function loadContracts(): Promise<Record<string, any>> {
         hasNTC:         b.hasNTC  ?? false,
           canRetain:      b.hasNMC  ? false : true,
           expiryStatus:   "UFA",
+          // Dropped from the live scrape = expired at rollover → pending FA now.
+          expiryYear:     Number(SEASON.label.slice(0, 4)),
           position:       b.position,
         };
     }
@@ -1084,17 +1089,22 @@ export async function assembleCanonicalRoster(options: {
       const intangibleMult  = override?.intangibleMultiplier ?? (fin?.intangibleMultiplier ?? 1.0);
 
       // ── Contract expiry surfacing (off-season / free agency) ──────────────
-      // expiryStatus comes from the CapWages scrape via loadContracts(); carry it
-      // onto the asset and derive a pending-free-agent flag. Heuristic: a final
-      // contract year plus a UFA/RFA expiry, excluding draftees/ELCs. NOTE:
-      // yearsRemaining is floored at 1 upstream (app/services/scraper.ts), so this
-      // reads as "final-year / pending FA", not a precise 2026-vs-2027 distinction.
+      // expiryStatus + expiryYear come from the CapWages scrape via loadContracts().
+      // A pending free agent = a UFA/RFA whose deal expires in (or before) the
+      // projected season's start year. We key off expiryYear, NOT yearsRemaining:
+      // yearsRemaining is floored to >=1 across the pipeline (scraper, sync,
+      // loadContracts), so it can't tell a 2026 FA from a 2027 one. Fall back to
+      // the final-year heuristic only when no expiry year is known. Draftees/ELCs
+      // are never pending FAs.
+      const offseasonYear = Number(SEASON.label.slice(0, 4));
       const rawExpiryStatus = typeof fin?.expiryStatus === "string" ? fin.expiryStatus : null;
+      const rawExpiryYear = typeof fin?.expiryYear === "number" ? fin.expiryYear : null;
       const normExpiry: "UFA" | "RFA" | null = rawExpiryStatus
         ? (/rfa/i.test(rawExpiryStatus) ? "RFA" : /ufa/i.test(rawExpiryStatus) ? "UFA" : null)
         : null;
       const expiresThisOffseason =
-        finalYears <= 1 && normExpiry != null && draftOverall == null && !isLikelyELC;
+        normExpiry != null && draftOverall == null && !isLikelyELC &&
+        (rawExpiryYear != null ? rawExpiryYear <= offseasonYear : finalYears <= 1);
       const contractStatus: "UFA" | "RFA" | "SIGNED" =
         expiresThisOffseason && normExpiry ? normExpiry : "SIGNED";
 
@@ -1207,6 +1217,7 @@ export async function assembleCanonicalRoster(options: {
         tradeBlockStatus: blockMap.get(p.name)?.status ?? null,
         tradeBlockNote:   blockMap.get(p.name)?.note   ?? null,
         expiryStatus:     rawExpiryStatus,
+        expiryYear:       rawExpiryYear,
         contractStatus,
         expiresThisOffseason,
         retainedPct: 0,

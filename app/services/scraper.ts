@@ -9,6 +9,7 @@ type CapWagesContract = {
   capHit: number;
   yearsRemaining: number;
   expiryStatus: string;
+  expiryYear: number | null;
   position: string;
   teamSlug: string;
   age: number | null;
@@ -93,10 +94,19 @@ export function parseCapWagesPlayerRow(row: unknown): CapWagesParseResult {
     return { ok: false, name, reason: `yearsRemaining=${yearsRemaining} outside [1,${MAX_CONTRACT_YEARS}]` };
   }
 
+  // Calendar year the deal expires (e.g. 27 → 2027). yearsRemaining is floored
+  // to >=1 across the pipeline, so this is the authoritative free-agency signal:
+  // a deal expiring in/at the projected season's start year is a pending FA.
+  const expiryYearShort = Number(row[29]);
+  const expiryYear = Number.isFinite(expiryYearShort) && expiryYearShort >= 20 && expiryYearShort <= 60
+    ? 2000 + expiryYearShort
+    : null;
+
   const contractData = {
     capHit,
     yearsRemaining,
     expiryStatus,
+    expiryYear,
     position,
     teamSlug,
     age: ageNow,
