@@ -27,8 +27,10 @@ import {
   parseTradeQueryState,
   resolveTradeShareAssets,
 } from "@/app/lib/trade-share";
-import { applyCapDelta, CapDeltaMoves } from "@/app/lib/cap-delta";
+import { applyCapDelta, applyTeamCapDeltas, CapDeltaMoves } from "@/app/lib/cap-delta";
 import { scenarioSeed } from "@/app/lib/sim-engine";
+import { resolveLeagueOffseason, type OffseasonPending } from "@/app/lib/free-agency";
+import ResignPhase from "@/app/components/ResignPhase";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import TradeBlockPanel from "@/app/components/TradeBlockPanel";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
@@ -182,7 +184,14 @@ export default function ArmchairGmPage() {
   const [lineupStartingGoalies, setLineupStartingGoalies] = useState<Record<string, string | null>>({});
   const [showMemo, setShowMemo] = useState(false);
 
-  useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length));
+  // ── Off-season / free agency ─────────────────────────────────
+  const [mode, setMode] = useState<"offseason" | "inseason">("offseason");
+  const [resignOpen, setResignOpen] = useState(false);
+  const [userPending, setUserPending] = useState<OffseasonPending[]>([]);
+  const [market, setMarket] = useState<OffseasonPending[]>([]);
+  const offseasonResolvedRef = useRef(false);
+
+  useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length) || resignOpen);
 
   // ── Abort controllers — cancel stale Claude requests ─────────
   const simAbortRef  = useRef<AbortController | null>(null);
@@ -457,6 +466,110 @@ export default function ArmchairGmPage() {
       setShowTeamSelect(true);
     }
   }, [originalDb, setBlocks]);
+
+  // ── Off-Season: resolve the league's pending free agents (once) ──
+  // Auto-handles the other 31 teams (re-signs / walks) and sets the user's own
+  // pending free agents aside for the manual Re-Sign phase. Mirrors the
+  // executeTrade roster/cap mutation pattern.
+  const applyLeagueOffseason = useCallback(() => {
+    if (offseasonResolvedRef.current || !homeTeamId) return;
+    offseasonResolvedRef.current = true;
+
+    const seed = scenarioSeed({ offseason: homeTeamId, season: SEASON.label });
+    const res = resolveLeagueOffseason(db.players, {
+      seed,
+      userTeamId: homeTeamId,
+      capCeiling: db.capCeiling ?? SEASON.capCeiling,
+    });
+    setUserPending(res.userPending);
+    setMarket(res.market);
+
+    const resignById = new Map(res.resignings.map(r => [r.playerId, r.contract]));
+    const walkedIds = new Set(res.walkAways.map(w => w.playerId));
+
+    setDb(prev => {
+      const players = prev.players
+        .filter(p => !walkedIds.has(p.id))
+        .map(p => {
+          const c = resignById.get(p.id);
+          return c
+            ? { ...p, capHit: c.aav, yearsRemaining: c.term, expiresThisOffseason: false, contractStatus: "SIGNED" as const }
+            : p;
+        });
+      const teams = applyTeamCapDeltas(prev.teams, res.teamCapMoves)
+        .map(t => ({ ...t, capSpace: Math.round(t.capSpace * 10) / 10 }));
+      return { ...prev, players, teams };
+    });
+    clearNavCache();
+    setResignOpen(true);
+  }, [db.players, db.capCeiling, homeTeamId]);
+
+  // Re-sign one of your pending free agents at the projected terms.
+  const resignPlayer = useCallback((fa: OffseasonPending) => {
+    setDb(prev => ({
+      ...prev,
+      players: prev.players.map(p =>
+        p.id === fa.player.id
+          ? { ...p, capHit: fa.contract.aav, yearsRemaining: fa.contract.term, expiresThisOffseason: false, contractStatus: "SIGNED" as const }
+          : p),
+      teams: prev.teams.map(t =>
+        t.id === fa.player.teamId
+          ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: fa.player.capHit }], incoming: [{ capHit: fa.contract.aav }] }) * 10) / 10 }
+          : t),
+    }));
+    setUserPending(prev => prev.filter(p => p.player.id !== fa.player.id));
+    clearNavCache();
+  }, []);
+
+  // Let a pending free agent walk — frees his cap, opens a roster hole, and
+  // drops him into the open market.
+  const walkPlayer = useCallback((fa: OffseasonPending) => {
+    setDb(prev => ({
+      ...prev,
+      players: prev.players.filter(p => p.id !== fa.player.id),
+      teams: prev.teams.map(t =>
+        t.id === fa.player.teamId
+          ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: fa.player.capHit }] }) * 10) / 10 }
+          : t),
+    }));
+    setUserPending(prev => prev.filter(p => p.player.id !== fa.player.id));
+    setMarket(prev => [{ player: fa.player, contract: fa.contract }, ...prev]);
+    clearNavCache();
+  }, []);
+
+  // Sign a free agent off the open market onto your roster.
+  const signMarketPlayer = useCallback((fa: OffseasonPending) => {
+    if (!homeTeamId) return;
+    setDb(prev => {
+      const signed: Asset = {
+        ...fa.player, teamId: homeTeamId, capHit: fa.contract.aav, yearsRemaining: fa.contract.term,
+        retainedPct: 0, expiresThisOffseason: false, contractStatus: "SIGNED",
+      };
+      return {
+        ...prev,
+        players: [...prev.players.filter(p => p.id !== fa.player.id), signed],
+        teams: prev.teams.map(t =>
+          t.id === homeTeamId
+            ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { incoming: [{ capHit: fa.contract.aav }] }) * 10) / 10 }
+            : t),
+      };
+    });
+    setMarket(prev => prev.filter(p => p.player.id !== fa.player.id));
+    clearNavCache();
+  }, [homeTeamId]);
+
+  // Commit the off-season as the new baseline and open the trade flow.
+  const finishOffseason = useCallback(() => {
+    setResignOpen(false);
+    setOriginalDb(db);
+  }, [db]);
+
+  // Trigger the league off-season once a franchise is chosen in off-season mode.
+  useEffect(() => {
+    if (mode === "offseason" && homeTeamId && !showTeamSelect && initialNavReady && !offseasonResolvedRef.current) {
+      applyLeagueOffseason();
+    }
+  }, [mode, homeTeamId, showTeamSelect, initialNavReady, applyLeagueOffseason]);
 
   // ── Sim a Year — native engine projects, Claude narrates only ─────
   const simYear = useCallback(async () => {
@@ -843,6 +956,29 @@ export default function ArmchairGmPage() {
             </div>
 
             <div style={{ padding: '16px 28px 20px' }}>
+              {/* Mode picker — off-season runs a re-sign phase first */}
+              <div className="flex gap-2 mb-4">
+                {([
+                  ["offseason", "Off-Season", "Re-sign free agents, then trade"],
+                  ["inseason", "In-Season", "Jump straight to trades"],
+                ] as const).map(([m, label, sub]) => {
+                  const active = mode === m;
+                  return (
+                    <button key={m} onClick={() => setMode(m)}
+                      className="flex-1 text-left px-3 py-2 transition-all"
+                      style={{
+                        background: active ? 'var(--ledger-ink)' : 'var(--ledger-card)',
+                        border: `1px solid ${active ? 'var(--ledger-ink)' : 'var(--ledger-rule-mid)'}`,
+                        borderRadius: '2px',
+                      }}>
+                      <div className="text-[11px] font-black uppercase tracking-wider font-mono"
+                        style={{ color: active ? 'var(--ledger-card-light)' : 'var(--ledger-ink)' }}>{label}</div>
+                      <div className="text-[9px] font-mono"
+                        style={{ color: active ? 'var(--ledger-rule-mid)' : 'var(--ledger-ink-faint)' }}>{sub}</div>
+                    </button>
+                  );
+                })}
+              </div>
               <div className="flex justify-between items-center mb-3">
                 <div className="text-[11px] font-black uppercase tracking-[0.3em] text-ledger-ink-faint font-mono">
                   Select Your Franchise
@@ -913,6 +1049,20 @@ export default function ArmchairGmPage() {
         </div>
         ),
         document.body
+      )}
+
+      {/* ── Off-Season Re-Sign Phase ────────────────────────────── */}
+      {resignOpen && liveHome && (
+        <ResignPhase
+          homeTeam={liveHome}
+          capSpace={liveHome.capSpace ?? 0}
+          pending={userPending}
+          market={market}
+          onResign={resignPlayer}
+          onWalk={walkPlayer}
+          onSign={signMarketPlayer}
+          onDone={finishOffseason}
+        />
       )}
 
       {/* ── Front Office Memo Modal ───────────────────────────── */}
