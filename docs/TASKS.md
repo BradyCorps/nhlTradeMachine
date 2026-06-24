@@ -89,6 +89,9 @@ To help calibrate, here is a partial free agency list from PuckPedia:
 	
 ### [] S2 - Goalie Glitch
 In some instance, goalie value is not generated correctly. One instance Hellebyuck had a +50 NAV, the next instance his 205 NAV populated. Just need to confirm if that was just a load error.
+
+### [] S3 - Need a way to monitor free agents and manually add and remove what is going to be shown for the sims. 
+Right now it is still not showing Alex Tuch, if there is some sort of error we can add him manually if needed. 
 ## [x] Correctness
 
 ### [x] Task 0.3 — import-draft-class overwrite guard
