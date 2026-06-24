@@ -29,21 +29,24 @@ export interface ProjectedContract {
 // Co-located with the logic so the model is self-contained and testable.
 export const FA = {
   capMin:        0.775,   // NHL CBA league-minimum AAV ($M)
-  starCeilingPct: 0.155,  // max AAV as a share of the cap ceiling (~$16.1M at $104M)
+  starCeilingPct: 0.16,   // max AAV as a share of the cap ceiling (~$16.6M at $104M)
 
-  // Forwards: $/point on stable pace, with a star bump above an elite pace.
+  // Forwards: $/point on stable pace, with progressive top-6 and star premiums
+  // so elite producers reach the modern market (a ~90-pt UFA lands ~$13-14M).
   fwdPerPt:      0.105,
-  fwdStarPace:   70,
-  fwdStarBump:   0.03,
+  fwdTopPace:    55,
+  fwdTopBump:    0.07,
+  fwdStarPace:   78,
+  fwdStarBump:   0.14,
 
   // Defensemen: workload (TOI over a replacement floor) + scoring.
   dToiFloor:     12,
-  dToiPerMin:    0.55,
-  dPerPt:        0.07,
+  dToiPerMin:    0.60,
+  dPerPt:        0.085,
 
   // Goalies: base + GSAX + save% over league average + workload.
   gBase:         3.5,
-  gPerGsax:      0.15,
+  gPerGsax:      0.20,
   gSvpAnchor:    0.905,
   gPerSvpPoint:  50,      // per 0.01 of save% over anchor
   gWorkloadDiv:  30,
@@ -111,7 +114,7 @@ export interface ProjectContext {
 // Project the contract a single pending free agent would command.
 export function projectFreeAgentContract(asset: Asset, ctx: ProjectContext = {}): ProjectedContract {
   const capCeiling = ctx.capCeiling ?? SEASON.capCeiling;
-  const ceiling = capCeiling * FA.starCeilingPct;
+  const ceiling = Math.floor(capCeiling * FA.starCeilingPct * 20) / 20; // snap onto the $0.05M grid
   const rand = mulberry32((ctx.seed ?? 1) + hashString(`fa:${asset.id || asset.name}`));
 
   const pos = asset.position;
@@ -129,7 +132,9 @@ export function projectFreeAgentContract(asset: Asset, ctx: ProjectContext = {})
       + stablePace(asset) * FA.dPerPt;
   } else if (isForward(pos)) {
     const pace = stablePace(asset);
-    baseAav = pace * FA.fwdPerPt + Math.max(0, pace - FA.fwdStarPace) * FA.fwdStarBump;
+    baseAav = pace * FA.fwdPerPt
+      + Math.max(0, pace - FA.fwdTopPace) * FA.fwdTopBump
+      + Math.max(0, pace - FA.fwdStarPace) * FA.fwdStarBump;
   } else {
     baseAav = FA.capMin;
   }
@@ -145,8 +150,8 @@ export function projectFreeAgentContract(asset: Asset, ctx: ProjectContext = {})
   const variance = 0.92 + rand() * 0.16; // seeded market noise (+/- ~8%)
 
   let aav = baseAav * ageFactor * statusFactor * variance;
-  aav = clamp(aav, FA.capMin, ceiling);
-  aav = Math.round(aav * 20) / 20; // round to the nearest $0.05M
+  aav = Math.round(aav * 20) / 20;       // snap to the nearest $0.05M
+  aav = clamp(aav, FA.capMin, ceiling);  // then hold within the CBA min and star ceiling
 
   let term = projectTerm(age, status, aav, rand);
   // Scale term to value: depth deals stay short, only top contracts run long.
