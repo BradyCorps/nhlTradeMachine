@@ -411,6 +411,30 @@ async function loadContracts(): Promise<Record<string, any>> {
     }
   }
 
+  // Bundled fallback (lowest priority): a player present in neither the live
+  // scrape nor the DB still gets his last-known curated contract instead of the
+  // 0.925/1yr placeholder the build loop applies when no contract resolves. This
+  // is keyed by base name, which the loop's CONTRACTS[p.name] lookup matches.
+  // loadFromDB() only swaps in bundled.json when the *whole* DB read throws, so
+  // without this a single missing player (e.g. CapWages drops him in the
+  // off-season, or he isn't synced) reads as a 1-year league-minimum deal.
+  const bundledFallback = loadBundledFallback();
+  for (const [name, bc] of Object.entries(bundledFallback)) {
+    if (name.includes("__")) continue;
+    if (merged[name]) continue;
+    if (!bc || typeof bc.capHit !== "number") continue;
+    merged[name] = {
+      capHit:         bc.capHit,
+      yearsRemaining: bc.yearsRemaining ?? 1,
+      hasNMC:         bc.hasNMC ?? false,
+      hasNTC:         bc.hasNTC ?? false,
+      canRetain:      bc.hasNMC ? false : (bc.canRetain ?? true),
+      expiryStatus:   bc.expiryStatus ?? null,
+      expiryYear:     bc.expiryYear ?? null,
+      position:       bc.position ?? null,
+    };
+  }
+
   for (const [name, override] of Object.entries(CONTRACT_OVERRIDES)) {
     if (merged[name]) {
       if (override.capHit         !== undefined) merged[name].capHit         = override.capHit;
