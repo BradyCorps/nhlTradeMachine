@@ -79,6 +79,7 @@ export const draftPickOverrides = sqliteTable("draft_pick_overrides", {
 // regardless of what the scraper returns. Lets the admin fix misdetections (e.g. Tuch).
 export const faOverrides = sqliteTable("fa_overrides", {
   id:          text("id").primaryKey(),              // normalized player name slug
+  playerId:    text("player_id"),                    // canonical player id when selected from DB/admin roster
   playerName:  text("player_name").notNull(),
   teamSlug:    text("team_slug"),                    // optional team filter (match by team)
   forceStatus: text("force_status").notNull(),       // "UFA" | "RFA" | "SIGNED" | "EXCLUDE"

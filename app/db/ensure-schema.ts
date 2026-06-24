@@ -38,6 +38,7 @@ const NEW_TABLE_STATEMENTS = [
   )`,
   `CREATE TABLE IF NOT EXISTS fa_overrides (
     id TEXT PRIMARY KEY,
+    player_id TEXT,
     player_name TEXT NOT NULL,
     team_slug TEXT,
     force_status TEXT NOT NULL,
@@ -45,6 +46,7 @@ const NEW_TABLE_STATEMENTS = [
     notes TEXT,
     updated_at INTEGER
   )`,
+  "ALTER TABLE fa_overrides ADD COLUMN player_id TEXT",
 ];
 
 const TRADE_COLUMN_STATEMENTS = [

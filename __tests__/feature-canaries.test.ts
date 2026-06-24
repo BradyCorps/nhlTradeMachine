@@ -1007,6 +1007,14 @@ describe("Canary — admin contract sync", () => {
     expect(route).toContain("age:            values.age");
   });
 
+  it("manual contract inserts require and send an explicit position", () => {
+    expect(route).toContain("position is required when adding a new DB player");
+    expect(route).toContain("position,");
+    expect(page).toContain("const POSITION_OPTIONS = [\"C\", \"W\", \"D\", \"G\"]");
+    expect(page).toContain("body: JSON.stringify({ name: name.trim(), yearsRemaining: y, capHit: c, position, hasNMC })");
+    expect(page).toContain("body: JSON.stringify({ name, yearsRemaining, capHit, position })");
+  });
+
   it("sync reports updated counts in the admin toast", () => {
     expect(page).toContain("${data.added} added, ${data.updated ?? 0} updated");
     expect(page).toContain("resolvedTeamId");
@@ -1133,6 +1141,26 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(src).toContain("cache:prospect_enrichment:v1");
     expect(src).toContain("PROSPECT_ENRICHMENT_CACHE_KEY");
     expect(read("app/lib/prospect-enrichment.ts")).toContain("export const PROSPECT_ENRICHMENT_CACHE_KEY");
+  });
+
+  it("admin hard reset clears mutable admin data back to scrape defaults", () => {
+    const src = read("app/api/admin/reset/route.ts");
+    const settings = read("app/admin/settings/page.tsx");
+    const dashboard = read("app/admin/page.tsx");
+    expect(src).toContain('const CONFIRMATION = "RESET ADMIN DATA"');
+    expect(src).toContain("players:");
+    expect(src).toContain("teams:");
+    expect(src).toContain("tradeBlock:");
+    expect(src).toContain("draftPickOverrides:");
+    expect(src).toContain("faOverrides:");
+    expect(src).toContain("siteSettings:");
+    expect(src).toContain("if (body.includeTrades)");
+    expect(src).toContain("clearedCacheKeys");
+    expect(settings).toContain("ADMIN DATA RESET");
+    expect(settings).toContain("/api/admin/reset");
+    expect(settings).toContain("includeTrades");
+    expect(dashboard).toContain("/admin/draft-picks");
+    expect(dashboard).toContain("/admin/fa-overrides");
   });
 
   it("patch-team-ids reports failed roster fetches instead of zero-match success", () => {

@@ -9,7 +9,7 @@ import { TEAMS_DB } from "@/app/lib/db";
 import { pickEffectiveStanding } from "@/app/lib/pick-value";
 
 // Generates the canonical pick id used throughout the app.
-export function pickId(origOwner: string, year: number, round: number) {
+function pickId(origOwner: string, year: number, round: number) {
   return `pick-${origOwner}-${year}-${round}`;
 }
 
@@ -31,7 +31,7 @@ function buildDefaultPicks() {
 // GET /api/admin/draft-picks
 // Returns the full merged pick list (defaults + DB overrides).
 export async function GET(req: NextRequest) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (auth) return auth;
 
   try {
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
 // PUT /api/admin/draft-picks
 // Upsert an override: { id, currentOwnerId, isProtected, conditions }
 export async function PUT(req: NextRequest) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (auth) return auth;
 
   try {
@@ -107,7 +107,7 @@ export async function PUT(req: NextRequest) {
 // DELETE /api/admin/draft-picks?id=...
 // Reset a pick override back to default.
 export async function DELETE(req: NextRequest) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (auth) return auth;
 
   try {

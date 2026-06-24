@@ -392,10 +392,13 @@ export async function POST(req: Request) {
     await clearRosterCaches();
     return NextResponse.json({ ok: true, destination: "db-update", name });
   } else {
+    if (!position) {
+      return NextResponse.json({ error: "position is required when adding a new DB player" }, { status: 400 });
+    }
     await db.insert(playersTable).values({
       id,
       name,
-      position:       position ?? "Unknown",
+      position,
       teamId:         teamId ?? undefined,
       age:            age ?? undefined,
       capHit:         capHit         ?? 0.925,

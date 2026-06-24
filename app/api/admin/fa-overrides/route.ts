@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/app/db/client";
-import { faOverrides } from "@/app/db/schema";
+import { faOverrides, players as playersTable } from "@/app/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/app/lib/admin-auth";
 import { ensureNewTables } from "@/app/db/ensure-schema";
@@ -15,13 +15,23 @@ function slugify(name: string) {
 
 // GET /api/admin/fa-overrides
 export async function GET(req: NextRequest) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (auth) return auth;
 
   try {
     await ensureNewTables();
-    const rows = await db.select().from(faOverrides);
-    return NextResponse.json({ overrides: rows });
+    const [rows, playerOptions] = await Promise.all([
+      db.select().from(faOverrides),
+      db.select({
+        id:       playersTable.id,
+        name:     playersTable.name,
+        teamId:   playersTable.teamId,
+        position: playersTable.position,
+        age:      playersTable.age,
+      }).from(playersTable),
+    ]);
+    playerOptions.sort((a, b) => a.name.localeCompare(b.name));
+    return NextResponse.json({ overrides: rows, playerOptions });
   } catch (e: any) {
     console.error("[admin/fa-overrides GET]", e);
     return NextResponse.json({ error: e.message }, { status: 500 });
@@ -29,31 +39,75 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/admin/fa-overrides
-// Add or update an override: { playerName, teamSlug?, forceStatus, notes? }
+// Add or update an override: { playerId, playerName, teamSlug?, forceStatus, notes? }
 export async function POST(req: NextRequest) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (auth) return auth;
 
   try {
     await ensureNewTables();
     const body = await req.json();
-    const { playerName, teamSlug, forceStatus, notes } = body;
+    const { playerId, playerName, teamSlug, forceStatus, notes } = body;
 
-    if (!playerName || !forceStatus) {
-      return NextResponse.json({ error: "playerName and forceStatus are required" }, { status: 400 });
+    if ((!playerId && !playerName) || !forceStatus) {
+      return NextResponse.json({ error: "playerId/playerName and forceStatus are required" }, { status: 400 });
     }
     if (!VALID_STATUSES.includes(forceStatus as ForceStatus)) {
       return NextResponse.json({ error: `forceStatus must be one of: ${VALID_STATUSES.join(", ")}` }, { status: 400 });
     }
 
-    const id = slugify(playerName);
+    let resolvedPlayerName = String(playerName ?? "").trim();
+    let resolvedTeamSlug = teamSlug ?? null;
+    let resolvedPlayerId = typeof playerId === "string" && playerId.trim() ? playerId.trim() : null;
+
+    if (resolvedPlayerId) {
+      const [player] = await db.select({
+        id:     playersTable.id,
+        name:   playersTable.name,
+        teamId: playersTable.teamId,
+      }).from(playersTable).where(eq(playersTable.id, resolvedPlayerId));
+      if (!player) {
+        return NextResponse.json({ error: "Selected player was not found in the DB" }, { status: 400 });
+      }
+      resolvedPlayerName = player.name;
+      resolvedTeamSlug = player.teamId ?? resolvedTeamSlug;
+      resolvedPlayerId = player.id;
+    }
+
+    if (!resolvedPlayerName) {
+      return NextResponse.json({ error: "playerName is required" }, { status: 400 });
+    }
+
+    const id = resolvedPlayerId ?? slugify(resolvedPlayerName);
     await db
       .insert(faOverrides)
-      .values({ id, playerName, teamSlug: teamSlug ?? null, forceStatus, season: SEASON.label, notes: notes ?? null, updatedAt: Date.now() })
+      .values({
+        id,
+        playerId: resolvedPlayerId,
+        playerName: resolvedPlayerName,
+        teamSlug: resolvedTeamSlug,
+        forceStatus,
+        season: SEASON.label,
+        notes: notes ?? null,
+        updatedAt: Date.now(),
+      })
       .onConflictDoUpdate({
         target: faOverrides.id,
-        set: { playerName, teamSlug: teamSlug ?? null, forceStatus, notes: notes ?? null, updatedAt: Date.now() },
+        set: {
+          playerId: resolvedPlayerId,
+          playerName: resolvedPlayerName,
+          teamSlug: resolvedTeamSlug,
+          forceStatus,
+          notes: notes ?? null,
+          updatedAt: Date.now(),
+        },
       });
+    if (resolvedPlayerId) {
+      const legacyId = slugify(resolvedPlayerName);
+      if (legacyId !== id) {
+        await db.delete(faOverrides).where(eq(faOverrides.id, legacyId));
+      }
+    }
 
     return NextResponse.json({ ok: true, id });
   } catch (e: any) {
@@ -64,7 +118,7 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/admin/fa-overrides?id=...
 export async function DELETE(req: NextRequest) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (auth) return auth;
 
   try {

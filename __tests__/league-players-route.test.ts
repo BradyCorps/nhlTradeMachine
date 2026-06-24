@@ -4,6 +4,7 @@ const state = vi.hoisted(() => ({
   selectCall: 0,
   dbPlayers: [] as any[],
   tradeBlockRows: [] as any[],
+  faOverrideRows: [] as any[],
   rosters: {} as Record<string, any>,
   skaterSummaryRows: [] as any[],
   goalieSummaryRows: [] as any[],
@@ -30,6 +31,7 @@ vi.mock("@/app/db/client", () => ({
         state.selectCall += 1;
         const rows = state.selectCall === 1 ? []
           : state.selectCall === 4 ? state.tradeBlockRows
+          : state.selectCall === 5 ? state.faOverrideRows
           : state.dbPlayers;
         return {
           then: (resolve: (value: any[]) => unknown) => Promise.resolve(resolve(rows)),
@@ -85,6 +87,7 @@ describe("league players route roster assembly", () => {
   beforeEach(() => {
     state.selectCall = 0;
     state.tradeBlockRows = [];
+    state.faOverrideRows = [];
     state.skaterSummaryRows = [];
     state.goalieSummaryRows = [];
     state.dbPlayers = [];
@@ -181,5 +184,30 @@ describe("league players route roster assembly", () => {
     });
     expect(rightStats.ptsPace).toBe(82);
     expect(rightStats.avgTOI).toBe(15);
+  });
+
+  it("applies free-agent overrides by DB player id before falling back to name matching", async () => {
+    state.rosters.WPG.forwards = [
+      rosterPlayer("891", "Alex", "Tuch", "R"),
+      ...fillerRoster("WPG"),
+    ];
+    state.faOverrideRows = [{
+      playerId: "891",
+      playerName: "Mismatched Admin Name",
+      teamSlug: "WPG",
+      forceStatus: "UFA",
+    }];
+
+    const { GET } = await import("../app/api/league/players/route");
+    const response = await GET();
+    const body = await response.json();
+
+    const tuch = body.players.find((p: any) => p.id === "891");
+    expect(tuch).toMatchObject({
+      id: "891",
+      name: "Alex Tuch",
+      contractStatus: "UFA",
+      expiresThisOffseason: true,
+    });
   });
 });

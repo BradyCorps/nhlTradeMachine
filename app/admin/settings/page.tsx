@@ -15,6 +15,8 @@ export default function AdminSettings() {
   const [floor,    setFloor]    = useState("");
   const [saving,   setSaving]   = useState(false);
   const [toast,    setToast]    = useState<string | null>(null);
+  const [resetPhrase, setResetPhrase] = useState("");
+  const [includeTrades, setIncludeTrades] = useState(false);
 
   const load = () =>
     fetch("/api/admin/settings")
@@ -65,6 +67,27 @@ export default function AdminSettings() {
       showToast("Redis cache cleared — reload Armchair GM to see fresh data");
     } catch (e) {
       showToast(adminErrorMessage(e, "Cache clear failed"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const hardReset = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation: resetPhrase, includeTrades }),
+      });
+      const data = await readAdminResponse<{ deleted?: Record<string, number> }>(res, "Reset failed");
+      const total = Object.values(data.deleted ?? {}).reduce((sum, value) => sum + value, 0);
+      showToast(`Admin reset complete · ${total} rows removed · caches cleared`);
+      setResetPhrase("");
+      setIncludeTrades(false);
+      load();
+    } catch (e) {
+      showToast(adminErrorMessage(e, "Reset failed"));
     } finally {
       setSaving(false);
     }
@@ -146,6 +169,30 @@ export default function AdminSettings() {
               border: "1px solid var(--rule)", color: "var(--ledger-ink-faint)",
               fontSize: 11, fontWeight: 900, cursor: "pointer", letterSpacing: "0.12em" }}>
             {saving ? "CLEARING…" : "CLEAR TEAMS CACHE"}
+          </button>
+        </div>
+
+        {/* Admin data reset */}
+        <div style={{ border: "1px solid #6a2a2a", borderTop: "3px solid #6a2a2a", padding: "20px 22px" }}>
+          <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.2em", marginBottom: 4, color: "#8a2f2f" }}>ADMIN DATA RESET</div>
+          <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)", letterSpacing: "0.08em", marginBottom: 14, lineHeight: 1.6 }}>
+            Removes mutable admin data so the next roster load falls back to CapWages contracts and NHL roster scrapes.
+            Clears contract DB rows, team overrides, trade-block rows, FA overrides, draft-pick overrides, cap settings, and live caches.
+          </div>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 10, color: "var(--ledger-ink-faint)", lineHeight: 1.5, marginBottom: 12 }}>
+            <input type="checkbox" checked={includeTrades} onChange={e => setIncludeTrades(e.target.checked)} />
+            Also delete saved Docket trades and published roster overlays. Leave this off if you only want player/roster data to return to scrape defaults.
+          </label>
+          <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)", letterSpacing: "0.12em", marginBottom: 4 }}>
+            TYPE RESET ADMIN DATA
+          </div>
+          <input value={resetPhrase} onChange={e => setResetPhrase(e.target.value)}
+            placeholder="RESET ADMIN DATA" style={{ ...inputStyle, marginBottom: 10 }} />
+          <button onClick={hardReset} disabled={saving || resetPhrase !== "RESET ADMIN DATA"}
+            style={{ padding: "9px 18px", background: resetPhrase === "RESET ADMIN DATA" ? "#6a2a2a" : "transparent",
+              border: "1px solid #6a2a2a", color: resetPhrase === "RESET ADMIN DATA" ? "#fff0e8" : "#8a5a5a",
+              fontSize: 11, fontWeight: 900, cursor: resetPhrase === "RESET ADMIN DATA" ? "pointer" : "not-allowed", letterSpacing: "0.12em" }}>
+            {saving ? "RESETTING…" : "HARD RESET ADMIN DATA"}
           </button>
         </div>
 

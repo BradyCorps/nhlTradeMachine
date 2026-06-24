@@ -5,12 +5,21 @@ import { adminErrorMessage, readAdminResponse } from "../admin-response";
 
 interface FaOverrideRow {
   id: string;
+  playerId: string | null;
   playerName: string;
   teamSlug: string | null;
   forceStatus: string;
   season: string;
   notes: string | null;
   updatedAt: number | null;
+}
+
+interface PlayerOption {
+  id: string;
+  name: string;
+  teamId: string | null;
+  position: string;
+  age: number | null;
 }
 
 const STATUS_OPTIONS = ["UFA", "RFA", "SIGNED", "EXCLUDE"] as const;
@@ -32,26 +41,32 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function AddOverrideForm({ onAdded }: { onAdded: () => void }) {
-  const [name, setName] = useState("");
-  const [team, setTeam] = useState("");
+function AddOverrideForm({ players, onAdded }: { players: PlayerOption[]; onAdded: () => void }) {
+  const [playerId, setPlayerId] = useState("");
   const [status, setStatus] = useState<ForceStatus>("UFA");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const handle = async () => {
-    if (!name.trim()) { setError("Player name is required"); return; }
+    const selected = players.find((p) => p.id === playerId);
+    if (!selected) { setError("Select a DB player"); return; }
     setSaving(true);
     setError("");
     try {
       const res = await fetch("/api/admin/fa-overrides", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerName: name.trim(), teamSlug: team.trim() || null, forceStatus: status, notes: notes.trim() || null }),
+        body: JSON.stringify({
+          playerId: selected.id,
+          playerName: selected.name,
+          teamSlug: selected.teamId,
+          forceStatus: status,
+          notes: notes.trim() || null,
+        }),
       });
       await readAdminResponse(res, "Save failed");
-      setName(""); setTeam(""); setStatus("UFA"); setNotes("");
+      setPlayerId(""); setStatus("UFA"); setNotes("");
       onAdded();
     } catch (e) {
       setError(adminErrorMessage(e, "Save failed"));
@@ -66,14 +81,16 @@ function AddOverrideForm({ onAdded }: { onAdded: () => void }) {
       {error && <div style={{ color: "#cf6b6b", fontSize: 12, marginBottom: 10 }}>{error}</div>}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
         <div>
-          <label style={{ color: "#a08060", fontSize: 10, fontWeight: 700, display: "block", marginBottom: 3 }}>PLAYER NAME *</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Alex Tuch"
-            style={{ background: "#2a1e10", border: "1px solid #5a4a2a", color: "#e4d8b8", padding: "6px 10px", fontSize: 13, width: 200 }} />
-        </div>
-        <div>
-          <label style={{ color: "#a08060", fontSize: 10, fontWeight: 700, display: "block", marginBottom: 3 }}>TEAM SLUG (optional)</label>
-          <input value={team} onChange={(e) => setTeam(e.target.value)} placeholder="buffalo_sabres"
-            style={{ background: "#2a1e10", border: "1px solid #5a4a2a", color: "#e4d8b8", padding: "6px 10px", fontSize: 12, width: 160 }} />
+          <label style={{ color: "#a08060", fontSize: 10, fontWeight: 700, display: "block", marginBottom: 3 }}>DB PLAYER *</label>
+          <select value={playerId} onChange={(e) => setPlayerId(e.target.value)}
+            style={{ background: "#2a1e10", border: "1px solid #5a4a2a", color: "#e4d8b8", padding: "6px 8px", fontSize: 13, width: 330 }}>
+            <option value="">Select player…</option>
+            {players.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} · {p.teamId ?? "No team"} · {p.position}{p.age != null ? ` · ${p.age}` : ""}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label style={{ color: "#a08060", fontSize: 10, fontWeight: 700, display: "block", marginBottom: 3 }}>FORCE STATUS *</label>
@@ -93,6 +110,7 @@ function AddOverrideForm({ onAdded }: { onAdded: () => void }) {
         </button>
       </div>
       <div style={{ marginTop: 10, fontSize: 10, color: "#7a6a50", lineHeight: 1.5 }}>
+        Player selection stores the DB player id, so the off-season list receives the same unique asset instead of a name-only copy.{" "}
         <strong>UFA / RFA</strong> — force into expiring pool (shows in off-season re-sign phase) ·
         <strong> SIGNED</strong> — force out of expiring pool ·
         <strong> EXCLUDE</strong> — hide player from rosters entirely
@@ -103,6 +121,7 @@ function AddOverrideForm({ onAdded }: { onAdded: () => void }) {
 
 export default function FaOverridesPage() {
   const [rows, setRows] = useState<FaOverrideRow[]>([]);
+  const [playerOptions, setPlayerOptions] = useState<PlayerOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
@@ -112,8 +131,9 @@ export default function FaOverridesPage() {
     setError("");
     try {
       const res = await fetch("/api/admin/fa-overrides");
-      const data = await readAdminResponse<{ overrides: FaOverrideRow[] }>(res, "Failed to load overrides");
+      const data = await readAdminResponse<{ overrides: FaOverrideRow[]; playerOptions: PlayerOption[] }>(res, "Failed to load overrides");
       setRows(data.overrides);
+      setPlayerOptions(data.playerOptions ?? []);
     } catch (e) {
       setError(adminErrorMessage(e, "Load failed"));
     } finally {
@@ -149,7 +169,7 @@ export default function FaOverridesPage() {
           {error && <div style={{ marginTop: 8, color: "#cf6b6b", fontSize: 12, fontWeight: 700 }}>{error}</div>}
         </div>
 
-        <AddOverrideForm onAdded={load} />
+        <AddOverrideForm players={playerOptions} onAdded={load} />
 
         {loading ? (
           <div style={{ color: "#a08060", fontSize: 12, padding: 20 }}>Loading…</div>
@@ -161,7 +181,7 @@ export default function FaOverridesPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: "2px solid #5a4a2a" }}>
-                {["Player","Team Slug","Status","Season","Notes",""].map((h) => (
+                {["Player","Player ID","Team","Status","Season","Notes",""].map((h) => (
                   <th key={h} style={{ textAlign: "left", padding: "6px 12px", color: "#a08060", fontWeight: 900, fontSize: 10, letterSpacing: "0.12em" }}>{h}</th>
                 ))}
               </tr>
@@ -172,6 +192,7 @@ export default function FaOverridesPage() {
                   onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.03)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                   <td style={{ padding: "8px 12px", fontWeight: 700, color: "#e4d8b8" }}>{r.playerName}</td>
+                  <td style={{ padding: "8px 12px", color: "#7a6a50", fontSize: 10 }}>{r.playerId ?? "legacy name"}</td>
                   <td style={{ padding: "8px 12px", color: "#a08060", fontSize: 11 }}>{r.teamSlug ?? "—"}</td>
                   <td style={{ padding: "8px 12px" }}><StatusBadge status={r.forceStatus} /></td>
                   <td style={{ padding: "8px 12px", color: "#7a6a50", fontSize: 11 }}>{r.season}</td>

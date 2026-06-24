@@ -693,8 +693,9 @@ export async function assembleCanonicalRoster(options: {
 
   // FA override map — populated after the trade block select to avoid shifting the
   // test mock's selectCall counter (which is order-sensitive).
-  type FaOverrideRow = { playerName: string; forceStatus: string; teamSlug: string | null };
-  const faOverrideMap = new Map<string, FaOverrideRow>();
+  type FaOverrideRow = { playerId: string | null; playerName: string; forceStatus: string; teamSlug: string | null };
+  const faOverrideById = new Map<string, FaOverrideRow>();
+  const faOverrideByName = new Map<string, FaOverrideRow>();
 
   const rosterTeams = applyTeamCapDeltas(options.teams ?? TEAMS_DB, options.capMovesByTeam);
   const [CONTRACTS, PS_MAP, NHL_SKATER_STATS, NHL_GOALIE_STATS, PROSPECT_ENRICHMENT] = await Promise.all([
@@ -989,13 +990,17 @@ export async function assembleCanonicalRoster(options: {
   try {
     await ensureNewTables();
     const faOverrideRows = await db.select({
+      playerId:    faOverridesTable.playerId,
       playerName:  faOverridesTable.playerName,
       forceStatus: faOverridesTable.forceStatus,
       teamSlug:    faOverridesTable.teamSlug,
     }).from(faOverridesTable);
     for (const row of faOverrideRows) {
+      if (typeof row?.playerId === "string" && row.playerId) {
+        faOverrideById.set(String(row.playerId), row);
+      }
       if (typeof row?.playerName === "string" && row.playerName) {
-        faOverrideMap.set(row.playerName.toLowerCase(), row);
+        faOverrideByName.set(row.playerName.toLowerCase(), row);
       }
     }
   } catch { /* table not yet provisioned — safe to skip */ }
@@ -1259,13 +1264,12 @@ export async function assembleCanonicalRoster(options: {
   // ── Apply admin FA overrides ─────────────────────────────────────────────────
   // Overrides can force a player into/out of the expiring pool regardless of what
   // the scraper detected. "EXCLUDE" removes the player from the roster entirely.
-  if (faOverrideMap.size > 0) {
+  if (faOverrideById.size > 0 || faOverrideByName.size > 0) {
     const offseasonYear = Number(SEASON.label.slice(0, 4));
     const excluded = new Set<string>();
     players = players.map((p) => {
       const key = p.name?.toLowerCase();
-      if (!key) return p;
-      const ov = faOverrideMap.get(key);
+      const ov = faOverrideById.get(String(p.id)) ?? (key ? faOverrideByName.get(key) : undefined);
       if (!ov) return p;
       if (ov.forceStatus === "EXCLUDE") {
         excluded.add(p.id);

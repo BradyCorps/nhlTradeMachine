@@ -23,6 +23,8 @@ interface ContractRow {
   source:        string;
 }
 
+const POSITION_OPTIONS = ["C", "W", "D", "G"] as const;
+
 function SourceBadge({ source }: { source: string }) {
   const cfg: Record<string, { bg: string; color: string }> = {
     admin:    { bg: "#1e3a5f", color: "#7ec8e3" },
@@ -42,12 +44,13 @@ function SourceBadge({ source }: { source: string }) {
 
 function EditModal({ row, onSave, onClear, onClose }: {
   row:     ContractRow;
-  onSave:  (name: string, years: number | null, cap: number | null) => Promise<void>;
+  onSave:  (name: string, years: number | null, cap: number | null, position: string | null) => Promise<void>;
   onClear: (name: string) => Promise<void>;
   onClose: () => void;
 }) {
   const [years, setYears] = useState(String(row.adminYears ?? row.finalYears ?? ""));
   const [cap,   setCap]   = useState(String(row.adminCap   ?? row.finalCap   ?? ""));
+  const [position, setPosition] = useState(POSITION_OPTIONS.includes(row.position as any) ? String(row.position) : "");
   const [saving, setSaving] = useState(false);
 
   const handle = async (clear = false) => {
@@ -58,7 +61,7 @@ function EditModal({ row, onSave, onClear, onClose }: {
       } else {
         const y = parseFloat(years);
         const c = parseFloat(cap);
-        await onSave(row.name, isNaN(y) ? null : y, isNaN(c) ? null : c);
+        await onSave(row.name, isNaN(y) ? null : y, isNaN(c) ? null : c, position || null);
       }
       onClose();
     } catch {
@@ -99,7 +102,7 @@ function EditModal({ row, onSave, onClear, onClose }: {
           ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
           <div>
             <label style={{ display: "block", fontSize: 10, color: "#8a7a5a", textTransform: "uppercase",
               letterSpacing: "0.1em", marginBottom: 5 }}>
@@ -125,6 +128,21 @@ function EditModal({ row, onSave, onClear, onClose }: {
               style={{ width: "100%", background: "#2a1e0a", border: "1px solid #5a4a2a",
                 color: "#e4d8b8", padding: "6px 10px", fontSize: 13, fontFamily: "'Courier Prime', monospace" }}
             />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 10, color: "#8a7a5a", textTransform: "uppercase",
+              letterSpacing: "0.1em", marginBottom: 5 }}>
+              Position
+            </label>
+            <select
+              value={position}
+              onChange={e => setPosition(e.target.value)}
+              style={{ width: "100%", background: "#2a1e0a", border: "1px solid #5a4a2a",
+                color: "#e4d8b8", padding: "6px 10px", fontSize: 13, fontFamily: "'Courier Prime', monospace" }}
+            >
+              <option value="">Keep</option>
+              {POSITION_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
           </div>
         </div>
 
@@ -160,6 +178,7 @@ function AddPlayerForm({ onAdded }: { onAdded: () => void }) {
   const [name,    setName]    = useState("");
   const [years,   setYears]   = useState("1");
   const [cap,     setCap]     = useState("");
+  const [position, setPosition] = useState("W");
   const [hasNMC,  setHasNMC]  = useState(false);
   const [saving,  setSaving]  = useState(false);
   const [err,     setErr]     = useState<string | null>(null);
@@ -170,16 +189,17 @@ function AddPlayerForm({ onAdded }: { onAdded: () => void }) {
     const c = parseFloat(cap);
     if (isNaN(y) || y < 1) { setErr("Valid years required (≥1)"); return; }
     if (isNaN(c) || c <= 0) { setErr("Valid cap hit required (> 0)"); return; }
+    if (!POSITION_OPTIONS.includes(position as any)) { setErr("Valid position required"); return; }
     setSaving(true);
     setErr(null);
     try {
       const res = await fetch("/api/admin/contracts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), yearsRemaining: y, capHit: c, hasNMC }),
+        body: JSON.stringify({ name: name.trim(), yearsRemaining: y, capHit: c, position, hasNMC }),
       });
       await readAdminResponse(res, "Save failed");
-      setName(""); setYears("1"); setCap(""); setHasNMC(false); setOpen(false);
+      setName(""); setYears("1"); setCap(""); setPosition("W"); setHasNMC(false); setOpen(false);
       onAdded();
     } catch (e) {
       setErr(adminErrorMessage(e, "Save failed"));
@@ -214,6 +234,11 @@ function AddPlayerForm({ onAdded }: { onAdded: () => void }) {
         onChange={e => setCap(e.target.value)}
         style={{ fontSize: 11, padding: "5px 8px", background: "#0f0c07",
           border: "1px solid #3a2e1a", color: "#e4d8b8", outline: "none", width: 70 }} />
+      <select value={position} onChange={e => setPosition(e.target.value)}
+        style={{ fontSize: 11, padding: "5px 8px", background: "#0f0c07",
+          border: "1px solid #3a2e1a", color: "#e4d8b8", outline: "none", width: 58 }}>
+        {POSITION_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+      </select>
       <label style={{ fontSize: 10, color: "#8a7a5a", display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
         <input type="checkbox" checked={hasNMC} onChange={e => setHasNMC(e.target.checked)} />
         NMC
@@ -267,12 +292,12 @@ export default function AdminContractsPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const handleSave = async (name: string, yearsRemaining: number | null, capHit: number | null) => {
+  const handleSave = async (name: string, yearsRemaining: number | null, capHit: number | null, position: string | null) => {
     try {
       const res = await fetch("/api/admin/contracts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, yearsRemaining, capHit }),
+        body: JSON.stringify({ name, yearsRemaining, capHit, position }),
       });
       const data = await readAdminResponse<{ destination?: string }>(res, "Save failed");
       const dest = data.destination === "bundled" ? " → written to bundled.json" : " → admin override";

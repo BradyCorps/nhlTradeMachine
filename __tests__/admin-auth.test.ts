@@ -67,6 +67,7 @@ describe("admin auth", () => {
       "app/api/admin/import-draft-class/route.ts",
       "app/api/admin/patch-team-ids/route.ts",
       "app/api/admin/prune-stale/route.ts",
+      "app/api/admin/reset/route.ts",
       "app/api/admin/settings/route.ts",
       "app/api/admin/teams/route.ts",
       "app/api/admin/trade-block/route.ts",
