@@ -86,12 +86,40 @@ To help calibrate, here is a partial free agency list from PuckPedia:
   Stuart Skinner   Pittsburgh Penguins	0.887
   James Reimer   Ottawa Senators	0.886
   Cam Talbot   Detroit Red Wings	0.883
+
+### [] S1.25 - Have to add RFA with CBA rules
+Players that are RFA's need to be treated as such and are then subjected to RFA rules:
+$1,544,424 or less
+None
+
+Over $1,544,424 to $2,340,037
+Third-round pick
+
+Over $2,340,037 to $4,680,076
+Second-round pick
+
+Over $4,680,076 to $7,020,113
+First- and third-round picks
+
+Over $7,020,113 to $9,360,153
+First-, second-, and third-round picks
+
+Over $9,360,153 to $11,700,192
+Two firsts, one second and one third
+
+Over $11,700,192
+Four first-round picks
+
+### [] S1.5 - Need a way to monitor free agents and manually add and remove what is going to be shown for the sims. 
+Right now it is still not showing Alex Tuch, if there is some sort of error we can add him manually if needed. 
+
+### [] S1.75 - Need to be able to fully track and move draft picks around to match real life
+Right now there is now way to move draft picks and have it persist. Only players. DB needs to be ammended to include Draft Picks and where draft picks are.
 	
 ### [] S2 - Goalie Glitch
 In some instance, goalie value is not generated correctly. One instance Hellebyuck had a +50 NAV, the next instance his 205 NAV populated. Just need to confirm if that was just a load error.
 
-### [] S3 - Need a way to monitor free agents and manually add and remove what is going to be shown for the sims. 
-Right now it is still not showing Alex Tuch, if there is some sort of error we can add him manually if needed. 
+
 ## [x] Correctness
 
 ### [x] Task 0.3 — import-draft-class overwrite guard
