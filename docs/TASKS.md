@@ -10,6 +10,85 @@ Legend: `[ ]` to-do · `[~]` partial / verify-then-close
 
 ---
 
+## [] New Sim Engine/Off season
+
+### [] S1 - UFA are 1 year out of date
+Before we decided to go on this route of a proper off season mode, we added code to add 1 additional year to 2026 UFA's in order to have them persist in the DB. We need to remove this and have them populate in the UFA list. Right now we have a mixture, but Alex Debricat is listed as the top UFA in our sim currently. 
+To help calibrate, here is a partial free agency list from PuckPedia:
+
+2026 RFA Forwards (44)	
+  Jason Robertson   Dallas Stars	96
+  Connor Bedard   Chicago Blackhawks	75
+  Cutter Gauthier   Anaheim Ducks	69
+  Leo Carlsson   Anaheim Ducks	67
+  Trevor Zegras   Philadelphia Flyers	67
+  Pavel Dorofeyev   Vegas Golden Knights	64
+  Adam Fantilli   Columbus Blue Jackets	59
+  Collin Graf   San Jose Sharks	46
+  Connor McMichael   St. Louis Blues	46
+  Zach Benson   Buffalo Sabres	43
+    1-10of44	
+	
+2026 RFA Defence (25)	
+  Brandt Clarke   Los Angeles Kings	40
+  Alexander Nikishin   Carolina Hurricanes	33
+  Jamie Drysdale   Philadelphia Flyers	32
+  Jordan Spence   Ottawa Senators	31
+  Simon Nemec   Calgary Flames	26
+  Simon Edvinsson   Detroit Red Wings	25
+  Pavel Mintyukov   Anaheim Ducks	22
+  Olen Zellweger   Anaheim Ducks	22
+  Braden Schneider   New York Rangers	18
+  Emil Andrae   Toronto Maple Leafs	13
+    1-10of25	
+	
+2026 RFA Goalies (5)	
+  Jet Greaves   Columbus Blue Jackets	0.908
+  Akira Schmid   Vegas Golden Knights	0.893
+  Arturs Silovs   Pittsburgh Penguins	0.887
+  Samuel Ersson   Toronto Maple Leafs	0.87
+  Leevi Merilainen   Ottawa Senators	0.86
+	
+2026 UFA Forwards (88)	
+  Alex Tuch   Buffalo Sabres	66
+  Anthony Mantha   Pittsburgh Penguins	64
+  Alex Ovechkin   Washington Capitals	64
+  Patrick Kane   Detroit Red Wings	57
+  Viktor Arvidsson   Boston Bruins	54
+  Mats Zuccarello   Minnesota Wild	54
+  Marcus Johansson   Minnesota Wild	49
+  Claude Giroux   Ottawa Senators	49
+  Vladimir Tarasenko   Minnesota Wild	47
+  Mason Marchment   Columbus Blue Jackets	45
+    1-10of88	
+	
+2026 UFA Defence (52)	
+  John Carlson   Anaheim Ducks	60
+  Rasmus Andersson   Vegas Golden Knights	47
+  Jacob Trouba   Anaheim Ducks	35
+  Ryan Shea   Pittsburgh Penguins	35
+  Tony DeAngelo   New York Islanders	35
+  Brent Burns   Colorado Avalanche	35
+  John Klingberg   San Jose Sharks	27
+  Logan Stanley   Buffalo Sabres	26
+  Nick Blankenburg   Colorado Avalanche	24
+  Mario Ferraro   San Jose Sharks	23
+    1-10of52	
+	
+2026 UFA Goalies (14)	
+  Matt Murray   Seattle Kraken	0.922
+  Connor Ingram   Edmonton Oilers	0.899
+  Daniil Tarasov   Florida Panthers	0.895
+  David Rittich   New York Islanders	0.894
+  Pheonix Copley   Los Angeles Kings	0.893
+  Jonathan Quick   New York Rangers	0.89
+  Eric Comrie   Winnipeg Jets	0.89
+  Stuart Skinner   Pittsburgh Penguins	0.887
+  James Reimer   Ottawa Senators	0.886
+  Cam Talbot   Detroit Red Wings	0.883
+	
+### [] S2 - Goalie Glitch
+In some instance, goalie value is not generated correctly. One instance Hellebyuck had a +50 NAV, the next instance his 205 NAV populated. Just need to confirm if that was just a load error.
 ## [x] Correctness
 
 ### [x] Task 0.3 — import-draft-class overwrite guard
