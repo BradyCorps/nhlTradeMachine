@@ -24,6 +24,42 @@ const PLAYER_COLUMN_STATEMENTS = [
   "ALTER TABLE players ADD COLUMN prospect_pts_pace REAL",
 ];
 
+const PLAYER_TABLE_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS players (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    position TEXT NOT NULL,
+    secondary_position TEXT,
+    team_id TEXT,
+    age INTEGER,
+    cap_hit REAL NOT NULL,
+    years_remaining INTEGER NOT NULL,
+    has_nmc INTEGER DEFAULT 0,
+    has_ntc INTEGER DEFAULT 0,
+    is_ltir INTEGER DEFAULT 0,
+    is_retained INTEGER DEFAULT 0,
+    retained_salary REAL DEFAULT 0,
+    draft_year INTEGER,
+    draft_round INTEGER,
+    draft_overall INTEGER,
+    prospect_pts_pace REAL,
+    injury_status TEXT,
+    extension_cap_hit REAL,
+    extension_years INTEGER,
+    retired INTEGER DEFAULT 0,
+    retired_date TEXT
+  )`,
+];
+
+const TEAM_TABLE_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS teams (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    phase_override TEXT,
+    standing_override INTEGER
+  )`,
+];
+
 // New tables — use CREATE IF NOT EXISTS so they run cleanly from any starting state.
 const NEW_TABLE_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS draft_pick_overrides (
@@ -54,6 +90,8 @@ const TRADE_COLUMN_STATEMENTS = [
 ];
 
 const playerColumnsEnsured = new WeakMap<object, Promise<void>>();
+const playerTableEnsured   = new WeakMap<object, Promise<void>>();
+const teamTableEnsured     = new WeakMap<object, Promise<void>>();
 const tradeColumnsEnsured = new WeakMap<object, Promise<void>>();
 const newTablesEnsured    = new WeakMap<object, Promise<void>>();
 
@@ -86,6 +124,19 @@ function memoize(
 // and prospect pedigree). Runs at most once per database instance.
 export function ensurePlayerColumns(database: Database = defaultDb): Promise<void> {
   return memoize(playerColumnsEnsured, database, PLAYER_COLUMN_STATEMENTS);
+}
+
+// Create the base players table when running from an empty local DB. The repo has
+// additive migrations but no complete 0000 baseline, so admin recovery flows need
+// this before they can sync CapWages rows into a reset database.
+export function ensurePlayerTable(database: Database = defaultDb): Promise<void> {
+  return memoize(playerTableEnsured, database, PLAYER_TABLE_STATEMENTS);
+}
+
+// Create the base teams table for reset/local recovery paths before player rows
+// with team_id foreign keys are inserted.
+export function ensureTeamTable(database: Database = defaultDb): Promise<void> {
+  return memoize(teamTableEnsured, database, TEAM_TABLE_STATEMENTS);
 }
 
 // Back-fill the trades.roster_mutating column. Runs at most once per instance.

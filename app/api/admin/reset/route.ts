@@ -11,7 +11,8 @@ import {
 } from "@/app/db/schema";
 import { requireAdmin } from "@/app/lib/admin-auth";
 import { redis } from "@/app/lib/redis";
-import { ensureNewTables, ensurePlayerColumns, ensureTradeColumns } from "@/app/db/ensure-schema";
+import { TEAMS_DB } from "@/app/lib/db";
+import { ensureNewTables, ensurePlayerColumns, ensureTeamTable, ensureTradeColumns } from "@/app/db/ensure-schema";
 import {
   DEVELOPMENT_NHL_SUMMARY_CACHE_KEY,
   DEVELOPMENT_TIMELINE_CACHE_KEY,
@@ -58,6 +59,30 @@ async function resetTable(table: any): Promise<number> {
   }
 }
 
+async function resetTeamOverrides(): Promise<number> {
+  await ensureTeamTable().catch(() => {});
+  const count = await countRows(teams);
+  await db.update(teams).set({
+    phaseOverride: null,
+    standingOverride: null,
+  }).catch(() => {});
+
+  const existing = await db.select({ id: teams.id }).from(teams).catch(() => [] as { id: string }[]);
+  const existingIds = new Set(existing.map(team => team.id));
+
+  for (const team of TEAMS_DB) {
+    if (existingIds.has(team.id)) continue;
+    await db.insert(teams).values({
+      id: team.id,
+      name: team.name,
+      phaseOverride: null,
+      standingOverride: null,
+    }).catch(() => {});
+  }
+
+  return count;
+}
+
 async function clearLiveCaches(): Promise<string[]> {
   const cleared: string[] = [];
   if (!redis) return cleared;
@@ -88,7 +113,7 @@ export async function POST(req: Request) {
 
   const deleted: Record<string, number> = {
     players:            await resetTable(players),
-    teams:              await resetTable(teams),
+    teamOverrides:      await resetTeamOverrides(),
     tradeBlock:         await resetTable(tradeBlock),
     draftPickOverrides: await resetTable(draftPickOverrides),
     faOverrides:        await resetTable(faOverrides),

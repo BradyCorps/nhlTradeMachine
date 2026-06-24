@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { scrapeCapWages } from "@/app/services/scraper";
 import { db } from "@/app/db/client";
-import { players as playersTable } from "@/app/db/schema";
+import { players as playersTable, teams as teamsTable } from "@/app/db/schema";
 import { eq } from "drizzle-orm";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
 import { requireAdmin } from "@/app/lib/admin-auth";
-import { ensurePlayerColumns } from "@/app/db/ensure-schema";
+import { ensurePlayerColumns, ensurePlayerTable, ensureTeamTable } from "@/app/db/ensure-schema";
 
 const CONTRACT_OVERRIDES: Record<string, { yearsRemaining?: number; position?: string }> = {
   "Quinton Byfield": { position: "C" },
@@ -97,7 +97,18 @@ const MAX_CONTRACT_YEARS = 12;
 // Memoized per-process column back-fill (retirement + prospect columns).
 // Kept as a named wrapper so the retirement-column guard stays explicit here.
 async function ensureRetirementColumns() {
+  await ensurePlayerTable();
   await ensurePlayerColumns();
+}
+
+async function ensureCanonicalTeamRows() {
+  await ensureTeamTable();
+  const existing = await db.select({ id: teamsTable.id }).from(teamsTable).catch(() => [] as { id: string }[]);
+  const existingIds = new Set(existing.map(t => t.id));
+  for (const team of TEAMS_DB) {
+    if (existingIds.has(team.id)) continue;
+    await db.insert(teamsTable).values({ id: team.id, name: team.name }).catch(() => {});
+  }
 }
 
 async function clearRosterCaches() {
@@ -423,35 +434,37 @@ export async function PUT(req: Request) {
   const unauthorized = await requireAdmin(req);
   if (unauthorized) return unauthorized;
   await ensureRetirementColumns();
+  await ensureCanonicalTeamRows();
 
-  let body: { players?: Record<string, any> } = {};
-  try { body = await req.json(); } catch { /* no body */ }
+  try {
+    let body: { players?: Record<string, any> } = {};
+    try { body = await req.json(); } catch { /* no body */ }
 
-  let source: Record<string, any> = body.players ?? {};
-  if (Object.keys(source).length === 0) {
-    source = await scrapeCapWages();
-  }
-  const needsMetadata = Object.entries(source)
-    .some(([key, cw]) => !key.includes("__") && (!cw.position || !cw.teamSlug));
+    let source: Record<string, any> = body.players ?? {};
+    if (Object.keys(source).length === 0) {
+      source = await scrapeCapWages();
+    }
+    const needsMetadata = Object.entries(source)
+      .some(([key, cw]) => !key.includes("__") && (!cw.position || !cw.teamSlug));
 
-  if (needsMetadata) {
-    const scraped = await scrapeCapWages();
-    source = Object.fromEntries(Object.entries(source).map(([key, cw]) => {
-      if (key.includes("__")) return [key, cw];
-      const live = findScrapedByName(scraped, key) ?? {};
-      return [key, {
-        ...live,
-        ...cw,
-        position: cw.position ?? live.position,
-        teamSlug: cw.teamSlug ?? live.teamSlug,
-      }];
-    }));
-  }
-  const needsRosterFallback = Object.entries(source)
-    .some(([key, cw]) => !key.includes("__") && !teamIdFromSlug(cw.teamSlug));
-  const rosterTeamMap = needsRosterFallback ? await fetchNhlRosterTeamMap() : new Map<string, { teamId: string; position: string | null }>();
+    if (needsMetadata) {
+      const scraped = await scrapeCapWages();
+      source = Object.fromEntries(Object.entries(source).map(([key, cw]) => {
+        if (key.includes("__")) return [key, cw];
+        const live = findScrapedByName(scraped, key) ?? {};
+        return [key, {
+          ...live,
+          ...cw,
+          position: cw.position ?? live.position,
+          teamSlug: cw.teamSlug ?? live.teamSlug,
+        }];
+      }));
+    }
+    const needsRosterFallback = Object.entries(source)
+      .some(([key, cw]) => !key.includes("__") && !teamIdFromSlug(cw.teamSlug));
+    const rosterTeamMap = needsRosterFallback ? await fetchNhlRosterTeamMap() : new Map<string, { teamId: string; position: string | null }>();
 
-  const existing = await db.select({
+    const existing = await db.select({
     id:             playersTable.id,
     name:           playersTable.name,
     position:       playersTable.position,
@@ -548,16 +561,20 @@ export async function PUT(req: Request) {
     }
   }
 
-  return NextResponse.json({
-    ok: true,
-    added,
-    updated,
-    total: total.length,
-    newEntries,
-    updatedEntries,
-    metadataMisses: metadataMisses.slice(0, 25),
-    metadataMissCount: metadataMisses.length,
-    watch,
-    clearedCacheKeys,
-  });
+    return NextResponse.json({
+      ok: true,
+      added,
+      updated,
+      total: total.length,
+      newEntries,
+      updatedEntries,
+      metadataMisses: metadataMisses.slice(0, 25),
+      metadataMissCount: metadataMisses.length,
+      watch,
+      clearedCacheKeys,
+    });
+  } catch (e: any) {
+    console.error("[Admin Contracts] sync failed:", e);
+    return NextResponse.json({ error: e?.message ?? "Contract sync failed" }, { status: 500 });
+  }
 }

@@ -1015,6 +1015,18 @@ describe("Canary — admin contract sync", () => {
     expect(page).toContain("body: JSON.stringify({ name, yearsRemaining, capHit, position })");
   });
 
+  it("contract admin can recover from an empty reset DB by creating the players table", () => {
+    const ensureSchema = read("app/db/ensure-schema.ts");
+    expect(ensureSchema).toContain("CREATE TABLE IF NOT EXISTS players");
+    expect(ensureSchema).toContain("CREATE TABLE IF NOT EXISTS teams");
+    expect(ensureSchema).toContain("export function ensurePlayerTable");
+    expect(ensureSchema).toContain("export function ensureTeamTable");
+    expect(route).toContain("ensurePlayerTable");
+    expect(route).toContain("await ensurePlayerTable()");
+    expect(route).toContain("ensureCanonicalTeamRows");
+    expect(route).toContain("await ensureCanonicalTeamRows()");
+  });
+
   it("sync reports updated counts in the admin toast", () => {
     expect(page).toContain("${data.added} added, ${data.updated ?? 0} updated");
     expect(page).toContain("resolvedTeamId");
@@ -1149,7 +1161,11 @@ describe("Canary — Batch 6 audit fixes", () => {
     const dashboard = read("app/admin/page.tsx");
     expect(src).toContain('const CONFIRMATION = "RESET ADMIN DATA"');
     expect(src).toContain("players:");
-    expect(src).toContain("teams:");
+    expect(src).toContain("teamOverrides:");
+    expect(src).toContain("resetTeamOverrides");
+    expect(src).toContain("phaseOverride: null");
+    expect(src).toContain("standingOverride: null");
+    expect(src).toContain("TEAMS_DB");
     expect(src).toContain("tradeBlock:");
     expect(src).toContain("draftPickOverrides:");
     expect(src).toContain("faOverrides:");
