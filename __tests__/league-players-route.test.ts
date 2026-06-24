@@ -5,6 +5,7 @@ const state = vi.hoisted(() => ({
   dbPlayers: [] as any[],
   tradeBlockRows: [] as any[],
   faOverrideRows: [] as any[],
+  contracts: {} as Record<string, any>,
   rosters: {} as Record<string, any>,
   skaterSummaryRows: [] as any[],
   goalieSummaryRows: [] as any[],
@@ -20,7 +21,7 @@ vi.mock("@/app/lib/db", () => ({
 vi.mock("@/app/lib/redis", () => ({ redis: null }));
 
 vi.mock("@/app/services/scraper", () => ({
-  scrapeCapWages: vi.fn(async () => ({})),
+  scrapeCapWages: vi.fn(async () => state.contracts),
 }));
 
 vi.mock("@/app/db/client", () => ({
@@ -88,6 +89,7 @@ describe("league players route roster assembly", () => {
     state.selectCall = 0;
     state.tradeBlockRows = [];
     state.faOverrideRows = [];
+    state.contracts = {};
     state.skaterSummaryRows = [];
     state.goalieSummaryRows = [];
     state.dbPlayers = [];
@@ -208,6 +210,59 @@ describe("league players route roster assembly", () => {
       name: "Alex Tuch",
       contractStatus: "UFA",
       expiresThisOffseason: true,
+    });
+  });
+
+  it("surfaces CapWages-expired contracts as free agents without a fake ELC year", async () => {
+    state.rosters.WPG.forwards = [
+      rosterPlayer("891", "Alex", "Tuch", "R"),
+      ...fillerRoster("WPG"),
+    ];
+    state.contracts = {
+      "Alex Tuch": {
+        capHit: 4.75,
+        yearsRemaining: 1,
+        expiryStatus: "UFA",
+        expiryYear: 2026,
+        position: "RW",
+        teamSlug: "winnipeg_jets",
+        age: 30,
+      },
+      "Alex Tuch__R": {
+        capHit: 4.75,
+        yearsRemaining: 1,
+        expiryStatus: "UFA",
+        expiryYear: 2026,
+        position: "RW",
+        teamSlug: "winnipeg_jets",
+        age: 30,
+      },
+    };
+    for (let i = 0; i < 205; i++) {
+      state.contracts[`Healthy Scrape ${i}`] = {
+        capHit: 1,
+        yearsRemaining: 2,
+        expiryStatus: "UFA",
+        expiryYear: 2028,
+        position: "C",
+        teamSlug: "winnipeg_jets",
+        age: 25,
+      };
+    }
+
+    const { GET } = await import("../app/api/league/players/route");
+    const response = await GET();
+    const body = await response.json();
+
+    const tuch = body.players.find((p: any) => p.id === "891");
+    expect(tuch).toMatchObject({
+      id: "891",
+      name: "Alex Tuch",
+      contractStatus: "UFA",
+      expiresThisOffseason: true,
+      expiryYear: 2026,
+      capHit: 0,
+      yearsRemaining: 0,
     });
   });
 });

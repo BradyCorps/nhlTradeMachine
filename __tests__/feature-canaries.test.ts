@@ -179,6 +179,14 @@ describe("Canary — league route features (source-level)", () => {
         expect(src).toContain("const mpG  = goalieMap.get");
         expect(src).toContain("...(nhlG ?? {}), ...(mpG ?? {}), gsax: mpG?.gsax ?? nhlG?.gsax ?? 0");
       });
+
+      it("does not present expired UFA/RFA contracts as fake one-year ELC deals", () => {
+        expect(src).toContain("const expiresThisOffseason =");
+        expect(src).toContain("const rawCapHit     = expiresThisOffseason ? 0");
+        expect(src).toContain("expiresThisOffseason ? 0 : (nameCollision ? 1 : preliminaryYears)");
+        expect(src).toContain("capHit:              expiring ? 0 : p.capHit");
+        expect(src).toContain("yearsRemaining:      expiring ? 0 : p.yearsRemaining");
+      });
     });
   }
 });

@@ -1097,7 +1097,20 @@ export async function assembleCanonicalRoster(options: {
         return;
       }
 
-      const rawCapHit     = isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925);
+      const rawExpiryStatus = typeof fin?.expiryStatus === "string" ? fin.expiryStatus : null;
+      const rawExpiryYear = typeof fin?.expiryYear === "number" ? fin.expiryYear : null;
+      const normExpiry: "UFA" | "RFA" | null = rawExpiryStatus
+        ? (/rfa/i.test(rawExpiryStatus) ? "RFA" : /ufa/i.test(rawExpiryStatus) ? "UFA" : null)
+        : null;
+      const offseasonYear = Number(SEASON.label.slice(0, 4));
+      const preliminaryYears = isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1);
+      const expiresThisOffseason =
+        normExpiry != null && draftOverall == null && !isLikelyELC &&
+        (rawExpiryYear != null ? rawExpiryYear <= offseasonYear : preliminaryYears <= 1);
+      const contractStatus: "UFA" | "RFA" | "SIGNED" =
+        expiresThisOffseason && normExpiry ? normExpiry : "SIGNED";
+
+      const rawCapHit     = expiresThisOffseason ? 0 : (isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925));
       const contractPos = normContractPos(fin?.position);
       const rosterPos = normContractPos(finalPosition);
       const nameCollision = p.age <= 23
@@ -1108,7 +1121,7 @@ export async function assembleCanonicalRoster(options: {
         && contractPos !== rosterPos;
 
       const finalCapHit  = contractOverride?.capHit ?? override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
-      const finalYears   = override?.yearsRemaining ?? (nameCollision ? 1 : (isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1)));
+      const finalYears   = override?.yearsRemaining ?? (expiresThisOffseason ? 0 : (nameCollision ? 1 : preliminaryYears));
       const finalNMC     = override?.hasNMC  ?? (nameCollision ? false : (fin?.hasNMC  ?? false));
       const finalNTC     = override?.hasNTC  ?? (nameCollision ? false : (fin?.hasNTC  ?? false));
       const finalRetain  = override?.canRetain ?? (nameCollision ? true : (fin?.canRetain ?? true));
@@ -1122,18 +1135,6 @@ export async function assembleCanonicalRoster(options: {
       // loadContracts), so it can't tell a 2026 FA from a 2027 one. Fall back to
       // the final-year heuristic only when no expiry year is known. Draftees/ELCs
       // are never pending FAs.
-      const offseasonYear = Number(SEASON.label.slice(0, 4));
-      const rawExpiryStatus = typeof fin?.expiryStatus === "string" ? fin.expiryStatus : null;
-      const rawExpiryYear = typeof fin?.expiryYear === "number" ? fin.expiryYear : null;
-      const normExpiry: "UFA" | "RFA" | null = rawExpiryStatus
-        ? (/rfa/i.test(rawExpiryStatus) ? "RFA" : /ufa/i.test(rawExpiryStatus) ? "UFA" : null)
-        : null;
-      const expiresThisOffseason =
-        normExpiry != null && draftOverall == null && !isLikelyELC &&
-        (rawExpiryYear != null ? rawExpiryYear <= offseasonYear : finalYears <= 1);
-      const contractStatus: "UFA" | "RFA" | "SIGNED" =
-        expiresThisOffseason && normExpiry ? normExpiry : "SIGNED";
-
       // True xGA/60 over goalie icetime; require ≥10 games of ice (36,000s) for signal
       const teamXgaRaw = teamXgaMap.get(teamId);
       const teamXga60  = teamXgaRaw && teamXgaRaw.ice > 36000
@@ -1283,6 +1284,8 @@ export async function assembleCanonicalRoster(options: {
         contractStatus:      status,
         expiresThisOffseason: expiring,
         expiryYear:          expiring ? offseasonYear : p.expiryYear,
+        capHit:              expiring ? 0 : p.capHit,
+        yearsRemaining:      expiring ? 0 : p.yearsRemaining,
       };
     }).filter((p) => !excluded.has(p.id));
   }
