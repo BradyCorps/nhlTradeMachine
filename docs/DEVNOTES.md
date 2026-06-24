@@ -1,4 +1,108 @@
 # Development Notes
+
+<!-- ============================================================ -->
+<!-- HANDOFF — 2026-06-24 — DB 500 investigation (for Codex)       -->
+<!-- ============================================================ -->
+
+## 2026-06-24 — DB 500 handoff
+
+Today's work added two new DB tables and several routes that read/write them.
+There is a reported **500 error involving the database**. This section documents
+everything changed today and the most likely culprits so it can be triaged
+without re-deriving context.
+
+### Most likely root cause (start here)
+The two new tables — **`draft_pick_overrides`** and **`fa_overrides`** — were added
+to `app/db/schema.ts` and are provisioned **only** by the runtime DDL helper
+`ensureNewTables()` in `app/db/ensure-schema.ts` (which runs
+`CREATE TABLE IF NOT EXISTS …`). **Unlike every prior table, no committed
+`drizzle/*.sql` migration file was generated for them.** Compare:
+- `trades`            → `drizzle/0002_add_trades.sql` ✅
+- player retirement   → `drizzle/0001_add_player_retirement.sql` ✅
+- `roster_mutating`   → `drizzle/0003_add_trade_roster_mutating.sql` ✅
+- `draft_pick_overrides` / `fa_overrides` → **no migration file** ❌ (runtime DDL only)
+
+So if production Turso is provisioned via `drizzle-kit push` / applied migrations
+at deploy (not via the runtime `ensure*` safety net), the two new tables will be
+**missing**, and any query against them throws `no such table: draft_pick_overrides`
+(or `fa_overrides`) → 500.
+
+**Suspected fix:** generate the missing migration so the tables exist in Turso the
+same way the others do:
+```
+npm run db:generate   # drizzle-kit generate → emits drizzle/0004_*.sql
+npm run db:push        # or apply via the deploy migration step
+```
+Then confirm both tables exist in the Turso instance. The runtime
+`ensureNewTables()` should still serve as the local/dev safety net.
+
+### Why some paths 500 and others don't
+`ensureNewTables()` is **memoized per DB instance via a WeakMap**, and on failure it
+`cache.delete()`s so a later call can retry. The reads are wrapped defensively in
+different ways — this asymmetry explains why only *some* surfaces 500:
+
+| Caller | File | On table-missing |
+|---|---|---|
+| League route pick merge | `app/api/league/route.ts` (~250) | `try/catch` → falls back to default picks (no 500) |
+| Roster assembly FA overrides | `app/lib/roster-assembly.ts` (~987) | `try/catch` → skips overrides (no 500) |
+| Admin draft-picks GET/PUT/DELETE | `app/api/admin/draft-picks/route.ts` | `catch` returns **500** with `{error}` |
+| Admin fa-overrides GET/POST/DELETE | `app/api/admin/fa-overrides/route.ts` | `catch` returns **500** with `{error}` |
+
+So the **admin pages** (`/admin/draft-picks`, `/admin/fa-overrides`) are the most
+likely place a user sees a 500; the public league/roster paths degrade silently.
+Check the server log for the exact thrown message — the routes `console.error`
+with a `[admin/draft-picks …]` / `[admin/fa-overrides …]` prefix.
+
+### Secondary things to verify
+1. **Multi-line `CREATE TABLE` via `db.run(sql.raw(...))`** — `NEW_TABLE_STATEMENTS`
+   in `ensure-schema.ts` are multi-line strings. libSQL accepts these, but confirm
+   the Turso driver doesn't choke on the formatting vs. the single-line ALTERs.
+2. **`onConflictDoUpdate`** is used in both admin write routes. Verify the libSQL
+   dialect supports the emitted `ON CONFLICT … DO UPDATE` for these tables.
+3. **WeakMap memoization of a rejected promise** — if the very first
+   `ensureNewTables()` call throws for a transient reason, the catch deletes the
+   cache entry, so this should self-heal; but if the table-create silently
+   "succeeds" against the wrong DB file (dev `file:local.db` vs Turso), the memo
+   masks the real target. Confirm `DATABASE_URL` / `DATABASE_AUTH_TOKEN` are set in
+   the failing environment (`app/db/client.ts` falls back to `file:local.db`).
+
+### Full inventory of today's changes (2026-06-24)
+**S1 (committed earlier today/prior, context):** FA detection keys on `expiryYear`
+(authoritative) instead of floored `yearsRemaining` — `app/services/scraper.ts`
+surfaces `expiryYear` from CapWages `row[29]`; `app/lib/roster-assembly.ts` derives
+`expiresThisOffseason` / `contractStatus` from it.
+
+**S1.75 — draft pick DB ownership** (commit `ad1207b`):
+- `app/db/schema.ts`: new `draftPickOverrides` table (`id` = `pick-{origOwner}-{year}-{round}`,
+  `currentOwnerId`, `originalOwnerId`, `round`, `year`, `isProtected`, `conditions`, `updatedAt`).
+  Stores **only moved picks** (exceptions); the natural 480-pick set is still generated at runtime.
+- `app/db/ensure-schema.ts`: `ensureNewTables()` + `NEW_TABLE_STATEMENTS` `CREATE TABLE IF NOT EXISTS`.
+- `app/api/admin/draft-picks/route.ts`: GET (merged default+override list), PUT (upsert/auto-reset
+  when owner == original & no flags), DELETE (reset to default). All `requireAdmin`-gated.
+- `app/admin/draft-picks/page.tsx`: full pick board, team/year/round filters, "moved only" toggle,
+  inline transfer modal.
+- `app/api/league/route.ts`: generates all 480 picks by original owner, applies override
+  `currentOwnerId`; pick valuation still uses the **original** team's standing (the real draft slot);
+  label shows "via {origTeam}" when moved.
+
+**S1.5 — FA override admin** (commit `ad1207b`):
+- `app/db/schema.ts`: new `faOverrides` table (`id` = name slug, `playerName`, `teamSlug`,
+  `forceStatus` ∈ {UFA,RFA,SIGNED,EXCLUDE}, `season`, `notes`, `updatedAt`).
+- `app/api/admin/fa-overrides/route.ts`: GET / POST (upsert, validates `forceStatus`) / DELETE.
+- `app/admin/fa-overrides/page.tsx`: add/remove overrides by name; status badge; notes.
+- `app/lib/roster-assembly.ts`: loads overrides **after** the trade-block `db.select()` (ordering
+  matters — the `league-players-route.test.ts` mock counts `selectCall`), applies them before
+  dedup; `EXCLUDE` filters the player out of all rosters entirely.
+
+**S1.25 — RFA offer-sheet compensation** (commit `ad1207b`):
+- `app/lib/free-agency.ts`: `getOfferSheetCompensation(aavMillions)` → CBA Art. 10.3 pick tiers.
+- `app/components/ResignPhase.tsx`: market RFAs show amber "Offer sheet · picks owed" + "Offer Sheet" button.
+
+**Nav/docs:** `app/admin/layout.tsx` (+PICKS, +FREE AGENTS links); `docs/TASKS.md`
+(S1.25/S1.5/S1.75 checked off). Gates at commit time: 321 tests pass, `tsc --noEmit` clean.
+
+<!-- ============================================================ -->
+
 - 2026-06-24: Completed S1.75 (draft pick DB ownership), S1.5 (FA override admin), and S1.25 (RFA offer-sheet compensation). S1.75 adds a `draft_pick_overrides` table and admin board at `/admin/draft-picks` — all 480 picks (32 teams × 3 years × 5 rounds) are shown with their original/current owner; transfers persist to DB and the league route merges overrides at runtime so the trade machine reflects real-life pick moves without touching the runtime generation logic. S1.5 adds a `fa_overrides` table and admin panel at `/admin/fa-overrides` — admins can force any player's free-agent status (UFA/RFA/SIGNED/EXCLUDE) by name to fix CapWages scraper misdetections (e.g. Alex Tuch); EXCLUDE removes a player from rosters entirely. S1.25 adds `getOfferSheetCompensation(aav)` to `free-agency.ts` implementing the seven CBA Article 10.3 tiers (none → 4×1st); the ResignPhase market panel now shows an amber "Offer sheet · picks owed" warning and re-labels the Sign button to "Offer Sheet" for RFAs. Admin nav extended with PICKS and FREE AGENTS links. FA override loading is sequenced after the trade block DB select to preserve the test mock's selectCall ordering. All 321 tests pass; `tsc --noEmit` clean. Touched `app/db/schema.ts`, `app/db/ensure-schema.ts`, `app/api/admin/draft-picks/route.ts`, `app/api/admin/fa-overrides/route.ts`, `app/admin/draft-picks/page.tsx`, `app/admin/fa-overrides/page.tsx`, `app/admin/layout.tsx`, `app/api/league/route.ts`, `app/lib/roster-assembly.ts`, `app/lib/free-agency.ts`, `app/components/ResignPhase.tsx`.
 - 2026-06-23: Added a roster-overlay confirmation modal before mutating Docket publishes and cleared league/team caches after Docket trade save, publish, or delete so UI-only corrections and deletions take effect cleanly; touched `app/admin/trades/page.tsx`, `app/api/admin/trades/route.ts`, `__tests__/feature-canaries.test.ts`, `docs/DEVNOTES.md`.
 - 2026-06-23: Added admin Docket saved-trade deletion with a guarded API route, data-layer delete helper, saved-list delete button, and regression coverage; touched `app/lib/trades.ts`, `app/api/admin/trades/route.ts`, `app/admin/trades/page.tsx`, `__tests__/trades-data.test.ts`, `__tests__/feature-canaries.test.ts`, `docs/DEVNOTES.md`.
