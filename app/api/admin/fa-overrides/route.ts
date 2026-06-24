@@ -61,17 +61,20 @@ export async function POST(req: NextRequest) {
     let resolvedPlayerId = typeof playerId === "string" && playerId.trim() ? playerId.trim() : null;
 
     if (resolvedPlayerId) {
+      // Enrich from the DB players table when the id matches a curated row, but do
+      // NOT require it: most live free agents (e.g. Alex Tuch) are scraped from
+      // CapWages/NHL and never written to the players table. The override is matched
+      // by id OR name during roster assembly, so a name-only override still works.
       const [player] = await db.select({
         id:     playersTable.id,
         name:   playersTable.name,
         teamId: playersTable.teamId,
-      }).from(playersTable).where(eq(playersTable.id, resolvedPlayerId));
-      if (!player) {
-        return NextResponse.json({ error: "Selected player was not found in the DB" }, { status: 400 });
+      }).from(playersTable).where(eq(playersTable.id, resolvedPlayerId)).catch(() => []);
+      if (player) {
+        resolvedPlayerName = player.name;
+        resolvedTeamSlug = player.teamId ?? resolvedTeamSlug;
+        resolvedPlayerId = player.id;
       }
-      resolvedPlayerName = player.name;
-      resolvedTeamSlug = player.teamId ?? resolvedTeamSlug;
-      resolvedPlayerId = player.id;
     }
 
     if (!resolvedPlayerName) {

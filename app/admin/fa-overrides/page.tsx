@@ -43,14 +43,24 @@ function StatusBadge({ status }: { status: string }) {
 
 function AddOverrideForm({ players, onAdded }: { players: PlayerOption[]; onAdded: () => void }) {
   const [playerId, setPlayerId] = useState("");
+  const [playerName, setPlayerName] = useState("");
   const [status, setStatus] = useState<ForceStatus>("UFA");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Picking a DB player pre-fills the name; it stays editable so live-scraped
+  // free agents (who are never in the players table) can be forced by name.
+  const onPickDbPlayer = (id: string) => {
+    setPlayerId(id);
+    const selected = players.find((p) => p.id === id);
+    if (selected) setPlayerName(selected.name);
+  };
+
   const handle = async () => {
     const selected = players.find((p) => p.id === playerId);
-    if (!selected) { setError("Select a DB player"); return; }
+    const name = (selected?.name ?? playerName).trim();
+    if (!name) { setError("Enter a player name or pick a DB player"); return; }
     setSaving(true);
     setError("");
     try {
@@ -58,15 +68,16 @@ function AddOverrideForm({ players, onAdded }: { players: PlayerOption[]; onAdde
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          playerId: selected.id,
-          playerName: selected.name,
-          teamSlug: selected.teamId,
+          // Send the DB id only when the typed name still matches the picked row.
+          playerId: selected && selected.name === name ? selected.id : null,
+          playerName: name,
+          teamSlug: selected && selected.name === name ? selected.teamId : null,
           forceStatus: status,
           notes: notes.trim() || null,
         }),
       });
       await readAdminResponse(res, "Save failed");
-      setPlayerId(""); setStatus("UFA"); setNotes("");
+      setPlayerId(""); setPlayerName(""); setStatus("UFA"); setNotes("");
       onAdded();
     } catch (e) {
       setError(adminErrorMessage(e, "Save failed"));
@@ -81,10 +92,16 @@ function AddOverrideForm({ players, onAdded }: { players: PlayerOption[]; onAdde
       {error && <div style={{ color: "#cf6b6b", fontSize: 12, marginBottom: 10 }}>{error}</div>}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
         <div>
-          <label style={{ color: "#a08060", fontSize: 10, fontWeight: 700, display: "block", marginBottom: 3 }}>DB PLAYER *</label>
-          <select value={playerId} onChange={(e) => setPlayerId(e.target.value)}
-            style={{ background: "#2a1e10", border: "1px solid #5a4a2a", color: "#e4d8b8", padding: "6px 8px", fontSize: 13, width: 330 }}>
-            <option value="">Select player…</option>
+          <label style={{ color: "#a08060", fontSize: 10, fontWeight: 700, display: "block", marginBottom: 3 }}>PLAYER NAME *</label>
+          <input value={playerName} onChange={(e) => { setPlayerName(e.target.value); setPlayerId(""); }}
+            placeholder="Alex Tuch"
+            style={{ background: "#2a1e10", border: "1px solid #5a4a2a", color: "#e4d8b8", padding: "6px 10px", fontSize: 13, width: 220 }} />
+        </div>
+        <div>
+          <label style={{ color: "#a08060", fontSize: 10, fontWeight: 700, display: "block", marginBottom: 3 }}>OR PICK DB PLAYER</label>
+          <select value={playerId} onChange={(e) => onPickDbPlayer(e.target.value)}
+            style={{ background: "#2a1e10", border: "1px solid #5a4a2a", color: "#e4d8b8", padding: "6px 8px", fontSize: 13, width: 300 }}>
+            <option value="">— optional —</option>
             {players.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name} · {p.teamId ?? "No team"} · {p.position}{p.age != null ? ` · ${p.age}` : ""}
@@ -110,7 +127,8 @@ function AddOverrideForm({ players, onAdded }: { players: PlayerOption[]; onAdde
         </button>
       </div>
       <div style={{ marginTop: 10, fontSize: 10, color: "#7a6a50", lineHeight: 1.5 }}>
-        Player selection stores the DB player id, so the off-season list receives the same unique asset instead of a name-only copy.{" "}
+        Type any player name (live free agents like Alex Tuch are never in the DB players table) or pick a curated DB player to pre-fill the name and store its id.
+        Overrides match the off-season roster by id or name.{" "}
         <strong>UFA / RFA</strong> — force into expiring pool (shows in off-season re-sign phase) ·
         <strong> SIGNED</strong> — force out of expiring pool ·
         <strong> EXCLUDE</strong> — hide player from rosters entirely
