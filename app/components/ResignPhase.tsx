@@ -4,6 +4,7 @@ import React, { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Team } from "@/app/lib/trade-types";
 import type { OffseasonPending } from "@/app/lib/free-agency";
+import { getOfferSheetCompensation } from "@/app/lib/free-agency";
 
 // ── Off-Season Re-Sign phase ──────────────────────────────────────────────
 // Presentational only: the page owns the roster/cap state and passes handlers.
@@ -141,19 +142,34 @@ export default function ResignPhase({
           <div className="flex flex-col gap-1">
             {sortedMarket.map((fa) => {
               const affordable = fa.contract.aav <= capSpace;
+              const isRfa = fa.contract.status === "RFA";
+              const offerPicks = isRfa ? getOfferSheetCompensation(fa.contract.aav) : [];
               return (
                 <div key={fa.player.id} className="flex items-center justify-between gap-3 px-3 py-1.5"
                   style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
                   <div className="min-w-0">
                     <div className="font-bold text-[12px] truncate" style={{ color: "var(--ledger-ink)" }}>{fa.player.name}</div>
                     <PlayerMeta p={fa.player} />
+                    {isRfa && offerPicks.length > 0 && (
+                      <span className="text-[9px] font-mono font-black uppercase tracking-wide"
+                        style={{ color: "var(--ledger-amber, #c87941)" }}
+                        title="CBA offer-sheet compensation owed to original team if they don't match">
+                        ⚠ Offer sheet · picks owed: {offerPicks.join(" + ")}
+                      </span>
+                    )}
+                    {isRfa && offerPicks.length === 0 && (
+                      <span className="text-[9px] font-mono uppercase tracking-wide"
+                        style={{ color: "var(--ledger-ink-faint)" }}>
+                        RFA · no comp
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <Terms c={fa.contract} />
                     <button
                       onClick={() => onSign(fa)}
                       disabled={!affordable}
-                      title={affordable ? "Sign to your roster" : "Not enough cap space"}
+                      title={affordable ? (isRfa ? `Sign via offer sheet (${offerPicks.length ? offerPicks.join(" + ") + " compensation" : "no pick comp"})` : "Sign to your roster") : "Not enough cap space"}
                       className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
                       style={{
                         background: affordable ? "var(--ledger-navy)" : "transparent",
@@ -163,7 +179,7 @@ export default function ResignPhase({
                         cursor: affordable ? "pointer" : "not-allowed",
                         opacity: affordable ? 1 : 0.6,
                       }}>
-                      Sign
+                      {isRfa ? "Offer Sheet" : "Sign"}
                     </button>
                   </div>
                 </div>

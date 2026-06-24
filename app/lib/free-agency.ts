@@ -167,6 +167,29 @@ export function projectFreeAgentContract(asset: Asset, ctx: ProjectContext = {})
   };
 }
 
+// ── RFA offer-sheet compensation (CBA Article 10.3) ─────────────────────────
+// When a team signs another team's RFA to an offer sheet, the original team has
+// 7 days to match. If they don't, they receive draft pick compensation:
+//
+// AAV ($)                        Compensation
+// ≤ $1,544,424                   None
+// $1,544,424 – $2,340,037        3rd round
+// $2,340,037 – $4,680,076        2nd round
+// $4,680,076 – $7,020,113        1st + 3rd
+// $7,020,113 – $9,360,153        1st + 2nd + 3rd
+// $9,360,153 – $11,700,192       2× 1st + 2nd + 3rd
+// > $11,700,192                  4× 1st rounds
+export function getOfferSheetCompensation(aavMillions: number): string[] {
+  const aav = aavMillions * 1_000_000;
+  if (aav <= 1_544_424)  return [];
+  if (aav <= 2_340_037)  return ["3rd"];
+  if (aav <= 4_680_076)  return ["2nd"];
+  if (aav <= 7_020_113)  return ["1st", "3rd"];
+  if (aav <= 9_360_153)  return ["1st", "2nd", "3rd"];
+  if (aav <= 11_700_192) return ["1st", "1st", "2nd", "3rd"];
+  return ["1st", "1st", "1st", "1st"];
+}
+
 // ── League-wide resolution ───────────────────────────────────────────────────
 
 export interface OffseasonPending {

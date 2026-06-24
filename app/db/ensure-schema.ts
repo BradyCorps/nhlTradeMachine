@@ -24,12 +24,36 @@ const PLAYER_COLUMN_STATEMENTS = [
   "ALTER TABLE players ADD COLUMN prospect_pts_pace REAL",
 ];
 
+// New tables — use CREATE IF NOT EXISTS so they run cleanly from any starting state.
+const NEW_TABLE_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS draft_pick_overrides (
+    id TEXT PRIMARY KEY,
+    current_owner_id TEXT NOT NULL,
+    original_owner_id TEXT NOT NULL,
+    round INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    is_protected INTEGER DEFAULT 0,
+    conditions TEXT,
+    updated_at INTEGER
+  )`,
+  `CREATE TABLE IF NOT EXISTS fa_overrides (
+    id TEXT PRIMARY KEY,
+    player_name TEXT NOT NULL,
+    team_slug TEXT,
+    force_status TEXT NOT NULL,
+    season TEXT NOT NULL,
+    notes TEXT,
+    updated_at INTEGER
+  )`,
+];
+
 const TRADE_COLUMN_STATEMENTS = [
   "ALTER TABLE trades ADD COLUMN roster_mutating INTEGER NOT NULL DEFAULT 1",
 ];
 
 const playerColumnsEnsured = new WeakMap<object, Promise<void>>();
 const tradeColumnsEnsured = new WeakMap<object, Promise<void>>();
+const newTablesEnsured    = new WeakMap<object, Promise<void>>();
 
 async function runStatements(database: Database, statements: string[]): Promise<void> {
   for (const statement of statements) {
@@ -65,4 +89,9 @@ export function ensurePlayerColumns(database: Database = defaultDb): Promise<voi
 // Back-fill the trades.roster_mutating column. Runs at most once per instance.
 export function ensureTradeColumns(database: Database = defaultDb): Promise<void> {
   return memoize(tradeColumnsEnsured, database, TRADE_COLUMN_STATEMENTS);
+}
+
+// Create the draft_pick_overrides and fa_overrides tables if they don't exist.
+export function ensureNewTables(database: Database = defaultDb): Promise<void> {
+  return memoize(newTablesEnsured, database, NEW_TABLE_STATEMENTS);
 }

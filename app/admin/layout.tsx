@@ -1,11 +1,13 @@
 import React from "react";
 
 const NAV_LINKS = [
-  { href: "/admin",             label: "DASHBOARD"   },
-  { href: "/admin/contracts",   label: "CONTRACTS"   },
-  { href: "/admin/teams",       label: "TEAMS"       },
-  { href: "/admin/trade-block", label: "TRADE BLOCK" },
-  { href: "/admin/settings",    label: "SETTINGS"    },
+  { href: "/admin",               label: "DASHBOARD"   },
+  { href: "/admin/contracts",     label: "CONTRACTS"   },
+  { href: "/admin/teams",         label: "TEAMS"       },
+  { href: "/admin/trade-block",   label: "TRADE BLOCK" },
+  { href: "/admin/draft-picks",   label: "PICKS"       },
+  { href: "/admin/fa-overrides",  label: "FREE AGENTS" },
+  { href: "/admin/settings",      label: "SETTINGS"    },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

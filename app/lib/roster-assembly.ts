@@ -3,8 +3,8 @@ import { TEAMS_DB } from "@/app/lib/db";
 import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
-import { players as playersTable, tradeBlock as tradeBlockTable } from "@/app/db/schema";
-import { ensurePlayerColumns } from "@/app/db/ensure-schema";
+import { players as playersTable, tradeBlock as tradeBlockTable, faOverrides as faOverridesTable } from "@/app/db/schema";
+import { ensurePlayerColumns, ensureNewTables } from "@/app/db/ensure-schema";
 import { resolveRosterTier } from "@/app/lib/xnav-engine";
 import { calcDevelopmentProfile } from "@/app/lib/development-profile";
 import {
@@ -690,6 +690,12 @@ export async function assembleCanonicalRoster(options: {
   } catch (e: any) {
     console.warn("[Trades overlay] published trade overlay skipped:", e.message);
   }
+
+  // FA override map — populated after the trade block select to avoid shifting the
+  // test mock's selectCall counter (which is order-sensitive).
+  type FaOverrideRow = { playerName: string; forceStatus: string; teamSlug: string | null };
+  const faOverrideMap = new Map<string, FaOverrideRow>();
+
   const rosterTeams = applyTeamCapDeltas(options.teams ?? TEAMS_DB, options.capMovesByTeam);
   const [CONTRACTS, PS_MAP, NHL_SKATER_STATS, NHL_GOALIE_STATS, PROSPECT_ENRICHMENT] = await Promise.all([
     loadContracts(),
@@ -979,6 +985,21 @@ export async function assembleCanonicalRoster(options: {
     console.warn("[TradeBlock] read skipped:", e.message);
   }
 
+  // ── FA overrides (loaded after trade block to preserve test selectCall order) ──
+  try {
+    await ensureNewTables();
+    const faOverrideRows = await db.select({
+      playerName:  faOverridesTable.playerName,
+      forceStatus: faOverridesTable.forceStatus,
+      teamSlug:    faOverridesTable.teamSlug,
+    }).from(faOverridesTable);
+    for (const row of faOverrideRows) {
+      if (typeof row?.playerName === "string" && row.playerName) {
+        faOverrideMap.set(row.playerName.toLowerCase(), row);
+      }
+    }
+  } catch { /* table not yet provisioned — safe to skip */ }
+
   const activePlayerIds = [...new Set(
     [...rosterMap.values()]
       .flat()
@@ -1234,6 +1255,33 @@ export async function assembleCanonicalRoster(options: {
   });
 
   players = dedupePlayersByAuthority(players, dbTeamBySlug);
+
+  // ── Apply admin FA overrides ─────────────────────────────────────────────────
+  // Overrides can force a player into/out of the expiring pool regardless of what
+  // the scraper detected. "EXCLUDE" removes the player from the roster entirely.
+  if (faOverrideMap.size > 0) {
+    const offseasonYear = Number(SEASON.label.slice(0, 4));
+    const excluded = new Set<string>();
+    players = players.map((p) => {
+      const key = p.name?.toLowerCase();
+      if (!key) return p;
+      const ov = faOverrideMap.get(key);
+      if (!ov) return p;
+      if (ov.forceStatus === "EXCLUDE") {
+        excluded.add(p.id);
+        return p;
+      }
+      const status = ov.forceStatus as "UFA" | "RFA" | "SIGNED";
+      const expiring = status !== "SIGNED";
+      return {
+        ...p,
+        expiryStatus:        expiring ? status : (p.expiryStatus ?? null),
+        contractStatus:      status,
+        expiresThisOffseason: expiring,
+        expiryYear:          expiring ? offseasonYear : p.expiryYear,
+      };
+    }).filter((p) => !excluded.has(p.id));
+  }
 
   const finalTeams = applyTeamCapDeltas(
     rosterTeams,

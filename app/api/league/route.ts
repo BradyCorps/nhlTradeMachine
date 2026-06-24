@@ -3,9 +3,10 @@ import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
-import { teams as teamsTable } from "@/app/db/schema";
+import { teams as teamsTable, draftPickOverrides } from "@/app/db/schema";
 import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
 import { pickEffectiveStanding } from "@/app/lib/pick-value";
+import { ensureNewTables } from "@/app/db/ensure-schema";
 
 export const dynamic = "force-dynamic";
 
@@ -244,24 +245,47 @@ export async function GET() {
   const LIVE_TEAMS = await loadTeams();
   const roster = await assembleCanonicalRoster({ teams: LIVE_TEAMS, includeTeamContext: true });
 
-  // Draft picks remain response-specific to /api/league.
+  // Draft picks — runtime-generated defaults merged with DB ownership overrides.
+  // Overrides let the admin track real-life pick trades without losing the full pick set.
+  let pickOverrideMap = new Map<string, { currentOwnerId: string; isProtected: boolean; conditions: string | null }>();
+  try {
+    await ensureNewTables();
+    const overrides = await db.select().from(draftPickOverrides);
+    for (const o of overrides) {
+      pickOverrideMap.set(o.id, { currentOwnerId: o.currentOwnerId, isProtected: !!o.isProtected, conditions: o.conditions ?? null });
+    }
+  } catch { /* table not yet created — safe fallback to defaults */ }
+
+  const teamPhaseMap = new Map(LIVE_TEAMS.map((t: any) => [t.id, t]));
   const picks: any[] = [];
   const currentDraftYear = SEASON.draftYear;
-  LIVE_TEAMS.forEach((team: any) => {
+
+  // Always generate all 480 picks by original owner, then apply ownership overrides.
+  TEAMS_DB.forEach((origTeam) => {
     [currentDraftYear, currentDraftYear + 1, currentDraftYear + 2].flatMap(year =>
       [1, 2, 3, 4, 5].map(round => ({ round, year }))
     ).forEach(({ round, year }) => {
+      const id = `pick-${origTeam.id}-${year}-${round}`;
+      const override = pickOverrideMap.get(id);
+      const currentOwnerId = override?.currentOwnerId ?? origTeam.id;
+      const isProtected = override?.isProtected ?? false;
+
+      // Value the pick by the ORIGINAL team's standing (it's their draft slot).
+      const origTeamCtx = teamPhaseMap.get(origTeam.id) ?? origTeam;
+      const teamStanding = pickEffectiveStanding(origTeamCtx.phase, origTeamCtx.standing);
+
       const roundLabel = round === 1 ? "1st" : round === 2 ? "2nd" : round === 3 ? "3rd" : `${round}th`;
+      const ownerSuffix = currentOwnerId !== origTeam.id ? ` via ${origTeam.id}` : ` (${origTeam.id})`;
       picks.push({
-        id:           `pick-${team.id}-${year}-${round}`,
-        teamId:       team.id,
-        name:         `${year} ${roundLabel} Round Pick (${team.id})`,
-        position:     "Pick",
-        age:          19,
+        id,
+        teamId:           currentOwnerId,
+        name:             `${year} ${roundLabel} Round Pick${ownerSuffix}`,
+        position:         "Pick",
+        age:              19,
         round,
         year,
-        teamStanding: pickEffectiveStanding(team.phase, team.standing),
-        isProtected:  false,
+        teamStanding,
+        isProtected,
         games: 0, ptsPace: 0, xGPace: 0, defRate: 0,
         avgTOI: 0, qocIndex: null,
         capHit: 0, yearsRemaining: 0,

@@ -60,3 +60,29 @@ export const trades = sqliteTable("trades", {
   published:     integer("published", { mode: "boolean" }).notNull().default(false),
   rosterMutating: integer("roster_mutating", { mode: "boolean" }).notNull().default(true),
 });
+
+// Draft pick ownership — only stores picks that differ from their natural owner.
+// Natural state: currentOwnerId === originalOwnerId. The league route merges these
+// overrides onto the runtime-generated pick list so the trade machine reflects reality.
+export const draftPickOverrides = sqliteTable("draft_pick_overrides", {
+  id:              text("id").primaryKey(),           // "pick-{origOwner}-{year}-{round}"
+  currentOwnerId:  text("current_owner_id").notNull(),
+  originalOwnerId: text("original_owner_id").notNull(),
+  round:           integer("round").notNull(),
+  year:            integer("year").notNull(),
+  isProtected:     integer("is_protected", { mode: "boolean" }).default(false),
+  conditions:      text("conditions"),
+  updatedAt:       integer("updated_at"),
+});
+
+// Admin-managed free-agency overrides — forces a player into/out of the expiring pool
+// regardless of what the scraper returns. Lets the admin fix misdetections (e.g. Tuch).
+export const faOverrides = sqliteTable("fa_overrides", {
+  id:          text("id").primaryKey(),              // normalized player name slug
+  playerName:  text("player_name").notNull(),
+  teamSlug:    text("team_slug"),                    // optional team filter (match by team)
+  forceStatus: text("force_status").notNull(),       // "UFA" | "RFA" | "SIGNED" | "EXCLUDE"
+  season:      text("season").notNull(),             // e.g. "2026-27"
+  notes:       text("notes"),
+  updatedAt:   integer("updated_at"),
+});
