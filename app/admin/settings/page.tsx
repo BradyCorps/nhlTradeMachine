@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { adminErrorMessage, readAdminResponse } from "../admin-response";
+import { toast } from "@/app/lib/ledger-toast";
 
 interface Settings {
   capCeiling: number | null;
@@ -14,7 +15,6 @@ export default function AdminSettings() {
   const [ceiling,  setCeiling]  = useState("");
   const [floor,    setFloor]    = useState("");
   const [saving,   setSaving]   = useState(false);
-  const [toast,    setToast]    = useState<string | null>(null);
   const [resetPhrase, setResetPhrase] = useState("");
   const [includeTrades, setIncludeTrades] = useState(false);
 
@@ -29,11 +29,6 @@ export default function AdminSettings() {
 
   useEffect(() => { load(); }, []);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  };
-
   const save = async (clearOverrides = false) => {
     setSaving(true);
     try {
@@ -46,10 +41,10 @@ export default function AdminSettings() {
         }),
       });
       await readAdminResponse(res, "Save failed");
-      showToast(clearOverrides ? "Cleared — using season-config defaults" : "Saved · Redis cache busted");
+      toast(clearOverrides ? "Cleared — using season-config defaults" : "Saved · Redis cache busted", "success");
       load();
     } catch (e) {
-      showToast(adminErrorMessage(e, "Save failed"));
+      toast(adminErrorMessage(e, "Save failed"), "error");
     } finally {
       setSaving(false);
     }
@@ -64,9 +59,9 @@ export default function AdminSettings() {
         body: JSON.stringify({ action: "clear_cache" }),
       });
       await readAdminResponse(res, "Cache clear failed");
-      showToast("Redis cache cleared — reload Armchair GM to see fresh data");
+      toast("Redis cache cleared — reload Armchair GM to see fresh data", "success");
     } catch (e) {
-      showToast(adminErrorMessage(e, "Cache clear failed"));
+      toast(adminErrorMessage(e, "Cache clear failed"), "error");
     } finally {
       setSaving(false);
     }
@@ -82,12 +77,12 @@ export default function AdminSettings() {
       });
       const data = await readAdminResponse<{ deleted?: Record<string, number> }>(res, "Reset failed");
       const total = Object.values(data.deleted ?? {}).reduce((sum, value) => sum + value, 0);
-      showToast(`Admin reset complete · ${total} rows removed · caches cleared`);
+      toast(`Admin reset complete · ${total} rows removed · caches cleared`, "success");
       setResetPhrase("");
       setIncludeTrades(false);
       load();
     } catch (e) {
-      showToast(adminErrorMessage(e, "Reset failed"));
+      toast(adminErrorMessage(e, "Reset failed"), "error");
     } finally {
       setSaving(false);
     }
@@ -202,13 +197,6 @@ export default function AdminSettings() {
         </div>
       </div>
 
-      {toast && (
-        <div style={{ position: "fixed", bottom: 24, right: 24, background: "var(--ledger-ink)",
-          color: "var(--paper)", padding: "10px 16px", fontSize: 11, fontWeight: 900,
-          letterSpacing: "0.1em", zIndex: 200, fontFamily: "'Courier Prime', monospace" }}>
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

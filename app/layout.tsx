@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Libre_Baskerville, Courier_Prime } from 'next/font/google';
 import './globals.css';
+import LedgerToaster from './components/LedgerToaster';
 
 // ── next/font: self-hosted, no layout shift, no external request ──
 const baskerville = Libre_Baskerville({
@@ -58,6 +59,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased font-serif">
         {children}
+        <LedgerToaster />
       </body>
     </html>
   );

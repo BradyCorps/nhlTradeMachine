@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { adminErrorMessage, readAdminResponse } from "../admin-response";
+import { toast } from "@/app/lib/ledger-toast";
 
 interface ContractRow {
   name:          string;
@@ -409,7 +410,6 @@ export default function AdminContractsPage() {
   const [search, setSearch]         = useState("");
   const [filter, setFilter]         = useState<"all" | "flagged" | "editor" | "needs">("all");
   const [editing, setEditing]       = useState<ContractRow | null>(null);
-  const [toast, setToast]           = useState<string | null>(null);
   const [dbError, setDbError]       = useState<string | null>(null);
 
   const load = (withScrape = false) => {
@@ -428,11 +428,6 @@ export default function AdminContractsPage() {
 
   useEffect(load, []);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3500);
-  };
-
   const handleSave = async (edit: ContractEdit) => {
     try {
       const res = await fetch("/api/admin/contracts", {
@@ -441,10 +436,10 @@ export default function AdminContractsPage() {
         body: JSON.stringify(edit),
       });
       await readAdminResponse<{ destination?: string }>(res, "Save failed");
-      showToast(`Saved ${edit.name} → editor-curated`);
+      toast(`Saved ${edit.name} → editor-curated`, "success");
       load();
     } catch (e) {
-      showToast(adminErrorMessage(e, "Save failed"));
+      toast(adminErrorMessage(e, "Save failed"), "error");
       throw e;
     }
   };
@@ -453,10 +448,10 @@ export default function AdminContractsPage() {
     try {
       const res = await fetch("/api/admin/seed", { method: "POST" });
       const data = await readAdminResponse<{ inserted: number; filled: number; skipped: number }>(res, "Load baseline failed");
-      showToast(`Baseline loaded — ${data.inserted} added, ${data.filled} FA-filled, ${data.skipped} kept`);
+      toast(`Baseline loaded — ${data.inserted} added, ${data.filled} FA-filled, ${data.skipped} kept`, "success");
       load();
     } catch (e) {
-      showToast(adminErrorMessage(e, "Load baseline failed"));
+      toast(adminErrorMessage(e, "Load baseline failed"), "error");
     }
   };
 
@@ -468,10 +463,10 @@ export default function AdminContractsPage() {
         body: JSON.stringify({ name, clear: true }),
       });
       await readAdminResponse(res, "Clear failed");
-      showToast(`Cleared admin override for ${name}`);
+      toast(`Cleared admin override for ${name}`, "success");
       load();
     } catch (e) {
-      showToast(adminErrorMessage(e, "Clear failed"));
+      toast(adminErrorMessage(e, "Clear failed"), "error");
       throw e;
     }
   };
@@ -485,16 +480,16 @@ export default function AdminContractsPage() {
         body: JSON.stringify({ name: row.name, retired }),
       });
       await readAdminResponse(res, retired ? "Retire failed" : "Un-retire failed");
-      showToast(retired ? `Retired ${row.name}` : `Restored ${row.name}`);
+      toast(retired ? `Retired ${row.name}` : `Restored ${row.name}`, "success");
       load();
     } catch (e) {
-      showToast(adminErrorMessage(e, retired ? "Retire failed" : "Un-retire failed"));
+      toast(adminErrorMessage(e, retired ? "Retire failed" : "Un-retire failed"), "error");
     }
   };
 
   const handleSync = async () => {
     if (!scrapedRaw) {
-      showToast("Load live data first — click + LIVE DELTA, then sync");
+      toast("Load live data first — click + LIVE DELTA, then sync", "error");
       return;
     }
     setSyncing(true);
@@ -513,10 +508,10 @@ export default function AdminContractsPage() {
       const watched = Object.entries(data.watch ?? {})
         .map(([name, info]: [string, any]) => `${name}: ${info.resolvedTeamId ?? info.currentTeamId ?? "no-team"}`)
         .join(" · ");
-      showToast(`Synced — ${data.added} added, ${data.updated ?? 0} updated (${data.total} total)${watched ? ` · ${watched}` : ""}`);
+      toast(`Synced — ${data.added} added, ${data.updated ?? 0} updated (${data.total} total)${watched ? ` · ${watched}` : ""}`, "success");
       load();
     } catch (e: any) {
-      showToast(`Sync failed: ${adminErrorMessage(e, "request failed")}`);
+      toast(`Sync failed: ${adminErrorMessage(e, "request failed")}`, "error");
     } finally {
       setSyncing(false);
     }
@@ -594,8 +589,8 @@ export default function AdminContractsPage() {
 
       {/* Add player + bulk FA */}
       <div style={{ padding: "10px 24px", borderBottom: "1px solid #2a1e0a", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
-        <AddPlayerForm onAdded={() => { load(); showToast("Player added to the DB (editor-curated)"); }} />
-        <BulkFaForm onDone={(msg) => { load(); showToast(msg); }} />
+        <AddPlayerForm onAdded={() => { load(); toast("Player added to the DB (editor-curated)", "success"); }} />
+        <BulkFaForm onDone={(msg) => { load(); toast(msg, "success"); }} />
       </div>
 
       {/* Filter bar */}
@@ -739,14 +734,6 @@ export default function AdminContractsPage() {
         />
       )}
 
-      {toast && (
-        <div style={{ position: "fixed", bottom: 24, right: 24,
-          background: "#1a3a1a", border: "1px solid #2a6a2a",
-          color: "#6bcf6b", padding: "10px 16px", fontSize: 12, fontWeight: 900,
-          letterSpacing: "0.1em", zIndex: 200 }}>
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { adminErrorMessage, readAdminResponse } from "../admin-response";
+import { toast } from "@/app/lib/ledger-toast";
 
 interface TeamRow {
   id:               string;
@@ -111,8 +112,6 @@ export default function AdminTeams() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<TeamRow | null>(null);
   const [search,  setSearch]  = useState("");
-  const [toast,   setToast]   = useState<string | null>(null);
-
   const load = () => {
     setLoading(true);
     fetch("/api/admin/teams")
@@ -123,8 +122,6 @@ export default function AdminTeams() {
 
   useEffect(load, []);
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
-
   const handleSave = async (id: string, phase: string | null, standing: number | null) => {
     try {
       const res = await fetch("/api/admin/teams", {
@@ -133,10 +130,10 @@ export default function AdminTeams() {
         body: JSON.stringify({ id, phaseOverride: phase, standingOverride: standing }),
       });
       await readAdminResponse(res, "Save failed");
-      showToast(`Saved ${id}`);
+      toast(`Saved ${id}`, "success");
       load();
     } catch (e) {
-      showToast(adminErrorMessage(e, "Save failed"));
+      toast(adminErrorMessage(e, "Save failed"), "error");
       throw e;
     }
   };
@@ -216,13 +213,6 @@ export default function AdminTeams() {
 
       {editing && <EditModal team={editing} onSave={handleSave} onClose={() => setEditing(null)} />}
 
-      {toast && (
-        <div style={{ position: "fixed", bottom: 24, right: 24, background: "var(--ledger-ink)",
-          color: "var(--paper)", padding: "10px 16px", fontSize: 11, fontWeight: 900,
-          letterSpacing: "0.1em", zIndex: 200, fontFamily: "'Courier Prime', monospace" }}>
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

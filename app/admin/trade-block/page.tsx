@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { adminErrorMessage, readAdminResponse } from "../admin-response";
+import { toast } from "@/app/lib/ledger-toast";
 
 type Status = "requested" | "available" | "untouchable";
 
@@ -415,8 +416,6 @@ export default function TradeBlockAdmin() {
   const [editing,    setEditing]    = useState<Entry | null | "new">(null);
   const [showBulk,   setShowBulk]   = useState(false);
   const [patching,   setPatching]   = useState(false);
-  const [toast,      setToast]      = useState<string | null>(null);
-
   const load = async () => {
     setLoading(true);
     const r = await fetch("/api/admin/trade-block");
@@ -429,11 +428,6 @@ export default function TradeBlockAdmin() {
 
   useEffect(() => { load(); }, []);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  };
-
   const save = async (data: Omit<Entry, "updatedAt">) => {
     try {
       const res = await fetch("/api/admin/trade-block", {
@@ -441,10 +435,10 @@ export default function TradeBlockAdmin() {
         body: JSON.stringify(data),
       });
       await readAdminResponse(res, "Save failed");
-      showToast("Saved");
+      toast("Saved", "success");
       await load();
     } catch (e) {
-      showToast(adminErrorMessage(e, "Save failed"));
+      toast(adminErrorMessage(e, "Save failed"), "error");
       throw e;
     }
   };
@@ -460,17 +454,17 @@ export default function TradeBlockAdmin() {
         body: JSON.stringify(payload),
       });
       await readAdminResponse(res, "Bulk add failed");
-      showToast(`Added ${players.length} player${players.length !== 1 ? "s" : ""}`);
+      toast(`Added ${players.length} player${players.length !== 1 ? "s" : ""}`, "success");
       await load();
     } catch (e) {
-      showToast(adminErrorMessage(e, "Bulk add failed"));
+      toast(adminErrorMessage(e, "Bulk add failed"), "error");
       throw e;
     }
   };
 
   const patchTeamIds = async () => {
     setPatching(true);
-    showToast("Fetching NHL rosters…");
+    toast("Fetching NHL rosters…");
     try {
       const r = await fetch("/api/admin/patch-team-ids", { method: "POST" });
       const d = await readAdminResponse<{
@@ -481,15 +475,15 @@ export default function TradeBlockAdmin() {
       }>(r, "Patch failed");
       const failedTeams = d.failedTeams ?? [];
       if (failedTeams.length > 0) {
-        showToast(`Patched ${d.patched} · ${d.skipped} skipped · failed: ${failedTeams.join(", ")}`);
+        toast(`Patched ${d.patched} · ${d.skipped} skipped · failed: ${failedTeams.join(", ")}`, "error");
       } else if (d.patched === 0 && d.totalFromNHL === 0) {
-        showToast("NHL API returned no data — check console for errors");
+        toast("NHL API returned no data — check console for errors", "error");
       } else {
-        showToast(`Patched ${d.patched} players (${d.skipped} unmatched)`);
+        toast(`Patched ${d.patched} players (${d.skipped} unmatched)`, "success");
       }
       await load();
     } catch (e) {
-      showToast(adminErrorMessage(e, "Patch request failed"));
+      toast(adminErrorMessage(e, "Patch request failed"), "error");
     } finally {
       setPatching(false);
     }
@@ -503,10 +497,10 @@ export default function TradeBlockAdmin() {
         body: JSON.stringify({ id, name, status: "clear" }),
       });
       await readAdminResponse(res, "Remove failed");
-      showToast("Removed");
+      toast("Removed", "success");
       await load();
     } catch (e) {
-      showToast(adminErrorMessage(e, "Remove failed"));
+      toast(adminErrorMessage(e, "Remove failed"), "error");
     }
   };
 
@@ -691,17 +685,6 @@ export default function TradeBlockAdmin() {
         />
       )}
 
-      {toast && (
-        <div style={{
-          position: "fixed", bottom: 24, right: 24,
-          background: "var(--ledger-ink)", color: "var(--paper)",
-          padding: "10px 16px", fontSize: 11, fontWeight: 900,
-          letterSpacing: "0.1em", zIndex: 300,
-          fontFamily: "'Courier Prime', monospace",
-        }}>
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

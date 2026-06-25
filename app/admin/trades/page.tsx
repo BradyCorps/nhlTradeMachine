@@ -7,6 +7,7 @@ import { SEASON } from "@/app/lib/season-config";
 import type { Asset, Team, TradeVerdict } from "@/app/lib/trade-types";
 import { adminErrorMessage, readAdminResponse } from "@/app/admin/admin-response";
 import { useTradeStore } from "@/app/store/tradeStore";
+import { toast } from "@/app/lib/ledger-toast";
 
 type LeaguePayload = {
   teams: Team[];
@@ -205,6 +206,7 @@ export default function AdminTradesPage() {
       setEditingId(data.trade?.id ?? editingId);
       setDraftPublished(Boolean(data.trade?.published ?? draftPublished));
       setDraftRosterMutating(Boolean(data.trade?.rosterMutating ?? draftRosterMutating));
+      toast("Trade draft saved", "success");
       await loadTrades();
     } catch (err) {
       setError(adminErrorMessage(err, "Failed to save trade draft"));
@@ -269,6 +271,7 @@ export default function AdminTradesPage() {
       });
       await readAdminResponse(res, "Failed to update publish state");
       if (editingId === trade.id) setDraftPublished(!trade.published);
+      toast(trade.published ? "Trade unpublished" : "Trade published", "success");
       await loadTrades();
     } catch (err) {
       setError(adminErrorMessage(err, "Failed to update publish state"));
@@ -307,6 +310,7 @@ export default function AdminTradesPage() {
         body: JSON.stringify({ id: trade.id }),
       });
       await readAdminResponse(res, "Failed to delete trade");
+      toast("Trade deleted", "success");
       if (editingId === trade.id) newDraft();
       await loadTrades();
     } catch (err) {

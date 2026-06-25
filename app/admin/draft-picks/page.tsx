@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { adminErrorMessage, readAdminResponse } from "../admin-response";
+import { toast } from "@/app/lib/ledger-toast";
 
 interface PickRow {
   id: string;
@@ -113,7 +114,6 @@ export default function DraftPicksPage() {
   const [picks, setPicks] = useState<PickRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [msg, setMsg] = useState("");
   const [editing, setEditing] = useState<PickRow | null>(null);
 
   // Filters
@@ -163,16 +163,14 @@ export default function DraftPicksPage() {
       }),
     });
     await readAdminResponse(res, "Save failed");
-    setMsg(`✓ Pick updated`);
-    setTimeout(() => setMsg(""), 3000);
+    toast("Pick updated", "success");
     await load();
   };
 
   const handleReset = async (pick: PickRow) => {
     const res = await fetch(`/api/admin/draft-picks?id=${encodeURIComponent(pick.id)}`, { method: "DELETE" });
     await readAdminResponse(res, "Reset failed");
-    setMsg(`✓ Pick reset to default`);
-    setTimeout(() => setMsg(""), 3000);
+    toast("Pick reset to default", "success");
     await load();
   };
 
@@ -186,7 +184,6 @@ export default function DraftPicksPage() {
           <p style={{ color: "#a08060", fontSize: 12 }}>
             {movedCount} pick{movedCount !== 1 ? "s" : ""} moved from original owner · click any pick to transfer or protect it
           </p>
-          {msg && <div style={{ marginTop: 8, color: "#6bcf6b", fontSize: 12, fontWeight: 700 }}>{msg}</div>}
           {error && <div style={{ marginTop: 8, color: "#cf6b6b", fontSize: 12, fontWeight: 700 }}>{error}</div>}
         </div>
 
