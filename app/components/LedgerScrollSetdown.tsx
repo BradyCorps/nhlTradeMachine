@@ -1,16 +1,16 @@
 "use client";
 
-import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
+import { motion, useScroll, useSpring, useTransform, useReducedMotion } from "framer-motion";
 import type { ReactNode } from "react";
 
 // Scroll-driven "set the ledger down on the desk".
-// The broadsheet should read like it is zooming down into place on the table,
-// not hinging or flipping in 3D. Keep the page flat and readable throughout:
-// scroll controls scale, a small vertical settle, opacity, and shadow depth.
+// The broadsheet should read like it is zooming into place on the table, not
+// hinging or flipping in 3D. Keep the page flat and readable throughout: scroll
+// controls scale, a small vertical settle, opacity, and shadow depth.
 //
 // Animation window: page scroll 0 → 560px.
-//   0 px     → sheet is slightly enlarged/near the camera and invisible
-//   120 px   → sheet is visible and zooming toward its final desk position
+//   0 px     → sheet is smaller/farther away, below the top edge, invisible
+//   120 px   → sheet is visible and zooming into its final desk position
 //   260 px   → nameplate is gone, sheet is readable and nearly settled
 //   420 px   → sheet has reached the desk plane
 //   560 px   → fully settled, dead flat, at rest on the desk
@@ -25,9 +25,11 @@ export default function LedgerScrollSetdown({ children, className, style }: Prop
   const reduced = useReducedMotion();
   const { scrollY } = useScroll();
 
-  const y = useTransform(scrollY, [0, 420, 560], [-64, -6, 0], { clamp: true });
-  const scale = useTransform(scrollY, [0, 560], [1.18, 1.015, 1], { clamp: true });
-  const opacity = useTransform(scrollY, [0, 160], [0, 1], { clamp: true });
+  const rawY = useTransform(scrollY, [0, 420, 560], [96, 8, 0], { clamp: true });
+  const rawScale = useTransform(scrollY, [0, 420, 560], [0.82, 0.985, 1], { clamp: true });
+  const opacity = useTransform(scrollY, [0, 140], [0, 1], { clamp: true });
+  const y = useSpring(rawY, { stiffness: 120, damping: 28, mass: 1.35 });
+  const scale = useSpring(rawScale, { stiffness: 115, damping: 30, mass: 1.45 });
   const boxShadow = useTransform(
     scrollY,
     [0, 420, 560],
@@ -57,10 +59,11 @@ export default function LedgerScrollSetdown({ children, className, style }: Prop
         scale,
         opacity,
         boxShadow,
+        willChange: "transform, opacity, box-shadow",
       }}
       // SSR / first-frame initial state matches scrollY=0 values so there is
       // no layout shift on hydration.
-      initial={{ opacity: 0, y: -64, scale: 1.18 }}
+      initial={{ opacity: 0, y: 96, scale: 0.82 }}
     >
       {children}
     </motion.div>
