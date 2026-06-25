@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import type { Team } from "@/app/lib/trade-types";
+import type { Asset, Team } from "@/app/lib/trade-types";
 import type { OffseasonPending } from "@/app/lib/free-agency";
 import { getOfferSheetCompensation } from "@/app/lib/free-agency";
 
@@ -39,18 +39,22 @@ function PlayerMeta({ p }: { p: OffseasonPending["player"] }) {
 }
 
 export default function ResignPhase({
-  homeTeam, capSpace, pending, market, onResign, onWalk, onSign, onDone,
+  homeTeam, capSpace, pending, market, roster, onResign, onWalk, onSign, onDrop, onDone,
 }: {
   homeTeam: Team;
   capSpace: number;
   pending: OffseasonPending[];
   market: OffseasonPending[];
+  roster: Asset[];
   onResign: (p: OffseasonPending) => void;
   onWalk: (p: OffseasonPending) => void;
   onSign: (p: OffseasonPending) => void;
+  onDrop: (p: Asset) => void;
   onDone: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const [dropQuery, setDropQuery] = useState("");
+  const [showDrop, setShowDrop] = useState(false);
 
   const sortedMarket = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -59,6 +63,18 @@ export default function ResignPhase({
       .sort((a, b) => b.contract.aav - a.contract.aav)
       .slice(0, 60);
   }, [market, query]);
+
+  // Signed players the user can release for cap relief. Pending FAs are handled
+  // above, so exclude them here; picks are never droppable.
+  const pendingIds = useMemo(() => new Set(pending.map((p) => p.player.id)), [pending]);
+  const droppable = useMemo(() => {
+    const q = dropQuery.trim().toLowerCase();
+    return roster
+      .filter((p) => p.position !== "Pick" && !pendingIds.has(p.id))
+      .filter((p) => (q ? p.name.toLowerCase().includes(q) : true))
+      .sort((a, b) => (b.capHit ?? 0) - (a.capHit ?? 0))
+      .slice(0, 60);
+  }, [roster, pendingIds, dropQuery]);
 
   if (typeof document === "undefined") return null;
 
@@ -125,6 +141,47 @@ export default function ResignPhase({
               ))}
             </div>
           )}
+
+          {/* Release a signed player — clean release frees the full cap hit */}
+          <div className="mb-6">
+            <button onClick={() => setShowDrop((s) => !s)}
+              className="text-[10px] font-black uppercase tracking-[0.3em] font-mono mb-2 flex items-center gap-2"
+              style={{ color: "var(--ledger-ink-faint)", background: "transparent", border: "none", cursor: "pointer" }}>
+              <span>{showDrop ? "▾" : "▸"}</span> Release a Player — free cap
+            </button>
+            {showDrop && (
+              <>
+                <input
+                  value={dropQuery}
+                  onChange={(e) => setDropQuery(e.target.value)}
+                  placeholder="Search your roster…"
+                  className="text-[11px] font-mono outline-none px-2 py-1 mb-2 w-full"
+                  style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule)", borderRadius: "2px", color: "var(--ledger-ink)" }}
+                />
+                <div className="flex flex-col gap-1">
+                  {droppable.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between gap-3 px-3 py-1.5"
+                      style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
+                      <div className="min-w-0">
+                        <div className="font-bold text-[12px] truncate" style={{ color: "var(--ledger-ink)" }}>{p.name}</div>
+                        <span className="text-[9px] font-mono uppercase tracking-wide" style={{ color: "var(--ledger-ink-faint)" }}>
+                          {p.position} · age {p.age} · {money(p.capHit ?? 0)} × {p.yearsRemaining ?? 0}yr
+                        </span>
+                      </div>
+                      <button onClick={() => onDrop(p)}
+                        className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono shrink-0"
+                        style={{ background: "transparent", color: "var(--ledger-red)", border: "1px solid var(--ledger-red)", borderRadius: "2px" }}>
+                        Release
+                      </button>
+                    </div>
+                  ))}
+                  {droppable.length === 0 && (
+                    <p className="text-[11px] italic" style={{ color: "var(--ledger-brown)" }}>No rostered players match.</p>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Open market */}
           <div className="flex items-center justify-between gap-3 mb-3">

@@ -31,6 +31,7 @@ import { applyCapDelta, applyTeamCapDeltas, CapDeltaMoves } from "@/app/lib/cap-
 import { scenarioSeed } from "@/app/lib/sim-engine";
 import { resolveLeagueOffseason, type OffseasonPending } from "@/app/lib/free-agency";
 import ResignPhase from "@/app/components/ResignPhase";
+import DraftNight from "@/app/components/DraftNight";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import TradeBlockPanel from "@/app/components/TradeBlockPanel";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
@@ -186,12 +187,13 @@ export default function ArmchairGmPage() {
 
   // ── Off-season / free agency ─────────────────────────────────
   const [mode, setMode] = useState<"offseason" | "inseason">("offseason");
+  const [draftOpen, setDraftOpen] = useState(false);
   const [resignOpen, setResignOpen] = useState(false);
   const [userPending, setUserPending] = useState<OffseasonPending[]>([]);
   const [market, setMarket] = useState<OffseasonPending[]>([]);
   const offseasonResolvedRef = useRef(false);
 
-  useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length) || resignOpen);
+  useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length) || draftOpen || resignOpen);
 
   // ── Abort controllers — cancel stale Claude requests ─────────
   const simAbortRef  = useRef<AbortController | null>(null);
@@ -501,7 +503,8 @@ export default function ArmchairGmPage() {
       return { ...prev, players, teams };
     });
     clearNavCache();
-    setResignOpen(true);
+    // Draft Night runs first (display-only), then the Re-Sign phase.
+    setDraftOpen(true);
   }, [db.players, db.capCeiling, homeTeamId]);
 
   // Re-sign one of your pending free agents at the projected terms.
@@ -534,6 +537,20 @@ export default function ArmchairGmPage() {
     }));
     setUserPending(prev => prev.filter(p => p.player.id !== fa.player.id));
     setMarket(prev => [{ player: fa.player, contract: fa.contract }, ...prev]);
+    clearNavCache();
+  }, []);
+
+  // Release a signed player — clean release frees his full cap hit and removes
+  // him from the roster (no dead-cap retention).
+  const dropPlayer = useCallback((player: Asset) => {
+    setDb(prev => ({
+      ...prev,
+      players: prev.players.filter(p => p.id !== player.id),
+      teams: prev.teams.map(t =>
+        t.id === player.teamId
+          ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: player.capHit }] }) * 10) / 10 }
+          : t),
+    }));
     clearNavCache();
   }, []);
 
@@ -1051,6 +1068,15 @@ export default function ArmchairGmPage() {
         document.body
       )}
 
+      {/* ── Off-Season Draft Night (display-only, before free agency) ── */}
+      {draftOpen && (
+        <DraftNight
+          initialSeed={scenarioSeed({ draft: homeTeamId ?? "", season: SEASON.label })}
+          homeTeamId={homeTeamId}
+          onDone={() => { setDraftOpen(false); setResignOpen(true); }}
+        />
+      )}
+
       {/* ── Off-Season Re-Sign Phase ────────────────────────────── */}
       {resignOpen && liveHome && (
         <ResignPhase
@@ -1058,9 +1084,11 @@ export default function ArmchairGmPage() {
           capSpace={liveHome.capSpace ?? 0}
           pending={userPending}
           market={market}
+          roster={db.players.filter(p => p.teamId === homeTeamId)}
           onResign={resignPlayer}
           onWalk={walkPlayer}
           onSign={signMarketPlayer}
+          onDrop={dropPlayer}
           onDone={finishOffseason}
         />
       )}
