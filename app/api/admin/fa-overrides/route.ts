@@ -119,6 +119,81 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// PUT /api/admin/fa-overrides  — bulk add
+// Body: { names: string[] | string, forceStatus, notes? }
+// `names` may be an array or a newline/comma-separated blob. Each name becomes a
+// name-matched override (roster assembly matches by lowercased name), enriched
+// with a DB player id/team when one matches. Use this to force a whole UFA/RFA
+// class in one shot when the live scrape reports the wrong expiry.
+export async function PUT(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (auth) return auth;
+
+  try {
+    await ensureNewTables();
+    const body = await req.json();
+    const { names, forceStatus, notes } = body;
+
+    if (!forceStatus || !VALID_STATUSES.includes(forceStatus as ForceStatus)) {
+      return NextResponse.json({ error: `forceStatus must be one of: ${VALID_STATUSES.join(", ")}` }, { status: 400 });
+    }
+
+    // Accept an array or a pasted blob (newlines / commas).
+    const rawList: string[] = Array.isArray(names)
+      ? names.map((n) => String(n))
+      : String(names ?? "").split(/[\n,]+/);
+    const cleaned = Array.from(
+      new Set(rawList.map((n) => n.trim()).filter(Boolean))
+    );
+    if (cleaned.length === 0) {
+      return NextResponse.json({ error: "Provide at least one player name" }, { status: 400 });
+    }
+
+    // Build a name → { id, teamId } map for optional enrichment.
+    const dbPlayers = await db
+      .select({ id: playersTable.id, name: playersTable.name, teamId: playersTable.teamId })
+      .from(playersTable)
+      .catch(() => [] as { id: string; name: string; teamId: string | null }[]);
+    const byName = new Map(dbPlayers.map((p) => [p.name.toLowerCase(), p]));
+
+    const now = Date.now();
+    let added = 0;
+    for (const name of cleaned) {
+      const match = byName.get(name.toLowerCase());
+      const resolvedPlayerId = match?.id ?? null;
+      const resolvedTeamSlug = match?.teamId ?? null;
+      const id = resolvedPlayerId ?? slugify(name);
+      const values = {
+        id,
+        playerId: resolvedPlayerId,
+        playerName: name,
+        teamSlug: resolvedTeamSlug,
+        forceStatus,
+        season: SEASON.label,
+        notes: notes ?? null,
+        updatedAt: now,
+      };
+      await db.insert(faOverrides).values(values).onConflictDoUpdate({
+        target: faOverrides.id,
+        set: {
+          playerId: resolvedPlayerId,
+          playerName: name,
+          teamSlug: resolvedTeamSlug,
+          forceStatus,
+          notes: notes ?? null,
+          updatedAt: now,
+        },
+      });
+      added++;
+    }
+
+    return NextResponse.json({ ok: true, added, status: forceStatus });
+  } catch (e: any) {
+    console.error("[admin/fa-overrides PUT]", e);
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
+}
+
 // DELETE /api/admin/fa-overrides?id=...
 export async function DELETE(req: NextRequest) {
   const auth = await requireAdmin(req);

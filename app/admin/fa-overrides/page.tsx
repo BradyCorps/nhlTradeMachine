@@ -41,6 +41,73 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function BulkAddForm({ onAdded }: { onAdded: () => void }) {
+  const [text, setText] = useState("");
+  const [status, setStatus] = useState<ForceStatus>("UFA");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState("");
+
+  const count = text.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean).length;
+
+  const handle = async () => {
+    if (count === 0) { setError("Paste at least one player name"); return; }
+    setSaving(true);
+    setError("");
+    setResult("");
+    try {
+      const res = await fetch("/api/admin/fa-overrides", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ names: text, forceStatus: status, notes: notes.trim() || null }),
+      });
+      const data = await readAdminResponse<{ added: number; status: string }>(res, "Bulk add failed");
+      setResult(`✓ Added/updated ${data.added} player${data.added === 1 ? "" : "s"} as ${data.status}`);
+      setText(""); setNotes("");
+      onAdded();
+    } catch (e) {
+      setError(adminErrorMessage(e, "Bulk add failed"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ background: "#0e1a26", border: "1px solid #2a4a5a", padding: 20, marginBottom: 28 }}>
+      <div style={{ fontSize: 12, fontWeight: 900, color: "#7ec8e3", letterSpacing: "0.15em", marginBottom: 6 }}>BULK ADD TO UFA / RFA LIST</div>
+      <div style={{ fontSize: 10, color: "#6a8a9a", marginBottom: 14, lineHeight: 1.5 }}>
+        Paste one player per line (or comma-separated). Each becomes a forced free agent matched by name —
+        use this to override the scraper when it reports a wrong expiry year (e.g. a 2026 UFA shown as 2027 / 1-year-left).
+      </div>
+      {error && <div style={{ color: "#cf6b6b", fontSize: 12, marginBottom: 10 }}>{error}</div>}
+      {result && <div style={{ color: "#6bcf6b", fontSize: 12, marginBottom: 10, fontWeight: 700 }}>{result}</div>}
+      <textarea value={text} onChange={(e) => setText(e.target.value)}
+        placeholder={"Gustav Nyquist\nAlex Tuch\nJason Robertson"}
+        rows={6}
+        style={{ width: "100%", background: "#0a141c", border: "1px solid #2a4a5a", color: "#cfe8f3", padding: "8px 10px", fontSize: 13, fontFamily: "inherit", resize: "vertical", marginBottom: 12, boxSizing: "border-box" }} />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
+        <div>
+          <label style={{ color: "#6a8a9a", fontSize: 10, fontWeight: 700, display: "block", marginBottom: 3 }}>FORCE STATUS *</label>
+          <select value={status} onChange={(e) => setStatus(e.target.value as ForceStatus)}
+            style={{ background: "#0a141c", border: "1px solid #2a4a5a", color: "#cfe8f3", padding: "6px 8px", fontSize: 13 }}>
+            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={{ color: "#6a8a9a", fontSize: 10, fontWeight: 700, display: "block", marginBottom: 3 }}>NOTES (applied to all)</label>
+          <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="2026 UFA class — scrape override"
+            style={{ background: "#0a141c", border: "1px solid #2a4a5a", color: "#cfe8f3", padding: "6px 10px", fontSize: 12, width: 260 }} />
+        </div>
+        <button onClick={handle} disabled={saving || count === 0}
+          style={{ background: "#1e5f7e", color: "#cfe8f3", border: "none", padding: "8px 18px", fontWeight: 900, fontSize: 11, letterSpacing: "0.1em", cursor: count === 0 ? "not-allowed" : "pointer", opacity: count === 0 ? 0.5 : 1 }}>
+          {saving ? "Saving…" : `BULK ADD ${count || ""} →`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AddOverrideForm({ players, onAdded }: { players: PlayerOption[]; onAdded: () => void }) {
   const [playerId, setPlayerId] = useState("");
   const [playerName, setPlayerName] = useState("");
@@ -143,6 +210,13 @@ export default function FaOverridesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
+  const [filter, setFilter] = useState<"ALL" | ForceStatus>("ALL");
+
+  const counts = STATUS_OPTIONS.reduce(
+    (acc, s) => { acc[s] = rows.filter((r) => r.forceStatus === s).length; return acc; },
+    {} as Record<ForceStatus, number>,
+  );
+  const visibleRows = filter === "ALL" ? rows : rows.filter((r) => r.forceStatus === filter);
 
   const load = async () => {
     setLoading(true);
@@ -187,7 +261,29 @@ export default function FaOverridesPage() {
           {error && <div style={{ marginTop: 8, color: "#cf6b6b", fontSize: 12, fontWeight: 700 }}>{error}</div>}
         </div>
 
+        <BulkAddForm onAdded={load} />
         <AddOverrideForm players={playerOptions} onAdded={load} />
+
+        {/* Status filter — UFA / RFA lists at a glance */}
+        {!loading && rows.length > 0 && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+            {(["ALL", ...STATUS_OPTIONS] as const).map((s) => {
+              const active = filter === s;
+              const n = s === "ALL" ? rows.length : counts[s];
+              return (
+                <button key={s} onClick={() => setFilter(s)}
+                  style={{
+                    background: active ? "#5a4a2a" : "transparent",
+                    color: active ? "#f0e4c0" : "#a08060",
+                    border: "1px solid #5a4a2a", padding: "4px 12px",
+                    fontSize: 10, fontWeight: 900, letterSpacing: "0.1em", cursor: "pointer",
+                  }}>
+                  {s} · {n}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {loading ? (
           <div style={{ color: "#a08060", fontSize: 12, padding: 20 }}>Loading…</div>
@@ -205,7 +301,7 @@ export default function FaOverridesPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {visibleRows.map((r) => (
                 <tr key={r.id} style={{ borderBottom: "1px solid #2a1e10" }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.03)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
