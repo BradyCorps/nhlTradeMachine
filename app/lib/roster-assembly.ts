@@ -1,10 +1,10 @@
 import { SEASON, LEAGUE } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
-import { scrapeCapWages } from "@/app/services/scraper";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
-import { players as playersTable, tradeBlock as tradeBlockTable, faOverrides as faOverridesTable } from "@/app/db/schema";
-import { ensurePlayerColumns, ensureNewTables } from "@/app/db/ensure-schema";
+import { players as playersTable, tradeBlock as tradeBlockTable } from "@/app/db/schema";
+import { ensurePlayerColumns, ensurePlayerTable } from "@/app/db/ensure-schema";
+import { seedPlayersTable } from "@/app/lib/league-seed";
 import { resolveRosterTier } from "@/app/lib/xnav-engine";
 import { calcDevelopmentProfile } from "@/app/lib/development-profile";
 import {
@@ -21,7 +21,6 @@ import {
 } from "@/app/lib/development-sources";
 import { fetchProspectEnrichmentMap } from "@/app/lib/prospect-enrichment";
 import { applyTeamCapDeltas, type CapDeltaAsset, type CapDeltaMoves, type TeamCapDeltaMap } from "@/app/lib/cap-delta";
-import { seedFreeAgentStatus } from "@/app/lib/free-agent-seed";
 
 const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
 const CONTRACTS_CACHE_KEY = "cache:contracts:v2";
@@ -29,12 +28,42 @@ const MONEYPUCK_CACHE_TTL =  4 * 60 * 60; // 4 hours
 const PS_CACHE_TTL        = 12 * 60 * 60; // 12 hours
 const POINT_SHARES_CACHE_KEY = "cache:pointshares:v2";
 
-// Manual overrides for contracts where the CapWages scraper's age-based year calculation
-// is unreliable (e.g. back-loaded extensions where ageSigned ≠ effective start year).
-const CONTRACT_OVERRIDES: Record<string, { capHit?: number; yearsRemaining?: number; position?: string }> = {
-  "Quinton Byfield":  { position: "C" },          // NHL API sometimes tags as "LW"
-  "Mark Scheifele":   { yearsRemaining: 5 },       // 8yr/2023→2031; scraper age math gives 1
+// Roster-identity overrides: the NHL API occasionally mis-tags a player's
+// position. This is an *identity* patch (which slot a player fills), orthogonal
+// to the contract pipeline — contract facts (cap/years/expiry) live in the DB
+// players table, the single source of truth. Keep this list tiny.
+const ROSTER_IDENTITY_OVERRIDES: Record<string, { position?: string }> = {
+  "Quinton Byfield": { position: "C" },           // NHL API sometimes tags as "LW"
 };
+
+// ── Contract-status derivation (pure) ─────────────────────────────────────────
+// Turns the DB's stored contract facts into the read-time free-agency signals.
+// A pending free agent is a UFA/RFA whose deal expires in (or before) the
+// projected season's start year. We key off expiryYear, not yearsRemaining,
+// because yearsRemaining is floored to >=1 across the pipeline and can't tell a
+// 2026 FA from a 2027 one. Draftees and ELCs are never pending FAs.
+export function deriveContractStatus(opts: {
+  expiryStatus?: string | null;
+  expiryYear?: number | null;
+  yearsRemaining?: number | null;
+  draftOverall?: number | null;
+  isELC?: boolean;
+  offseasonYear?: number;
+}): { contractStatus: "UFA" | "RFA" | "SIGNED"; expiresThisOffseason: boolean; normExpiry: "UFA" | "RFA" | null } {
+  const offseasonYear = opts.offseasonYear ?? Number(SEASON.label.slice(0, 4));
+  const raw = typeof opts.expiryStatus === "string" ? opts.expiryStatus : null;
+  const normExpiry: "UFA" | "RFA" | null = raw
+    ? (/rfa/i.test(raw) ? "RFA" : /ufa/i.test(raw) ? "UFA" : null)
+    : null;
+  const rawExpiryYear = typeof opts.expiryYear === "number" ? opts.expiryYear : null;
+  const prelim = opts.isELC ? 1 : (opts.yearsRemaining ?? 1);
+  const expiresThisOffseason =
+    normExpiry != null && opts.draftOverall == null && !opts.isELC &&
+    (rawExpiryYear != null ? rawExpiryYear <= offseasonYear : prelim <= 1);
+  const contractStatus: "UFA" | "RFA" | "SIGNED" =
+    expiresThisOffseason && normExpiry ? normExpiry : "SIGNED";
+  return { contractStatus, expiresThisOffseason, normExpiry };
+}
 
 const NHL_HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -280,35 +309,6 @@ function calcQocIndex(
   return Math.round(100 * (0.65 * rankScore + 0.35 * dzScore));
 }
 
-async function loadFromDB(): Promise<Record<string, any>> {
-  try {
-    await ensurePlayerColumns();
-    const rows = await db.select().from(playersTable);
-    const result: Record<string, any> = {};
-    for (const row of rows) {
-      if (row.retired) continue;
-      result[row.name] = {
-        id:             row.id,
-        name:           row.name,
-        position:       row.position,
-        teamId:         row.teamId,
-        age:            row.age,
-        capHit:         row.capHit,
-        yearsRemaining: row.yearsRemaining,
-        hasNMC:         row.hasNmc  ?? false,
-        hasNTC:         row.hasNtc  ?? false,
-        canRetain:      row.hasNmc  ? false : true,
-        draftOverall:   row.draftOverall,
-        prospectPtsPace: row.prospectPtsPace,
-      };
-    }
-    return result;
-  } catch (e: any) {
-    console.warn("[DB] loadFromDB failed, falling back to bundled.json:", e.message);
-    return loadBundledFallback();
-  }
-}
-
 function removeRetiredPlayersFromRosters(rosterMap: Map<string, any[]>, retiredPlayers: { id?: unknown; name?: unknown }[]): void {
   const retiredIds = new Set(retiredPlayers.map(p => p.id == null ? "" : String(p.id)).filter(Boolean));
   const retiredSlugs = new Set(retiredPlayers.map(p => typeof p.name === "string" ? canonicalNameSlug(p.name) : "").filter(Boolean));
@@ -351,77 +351,15 @@ function loadTeamBaselines(): Record<string, any> {
   } catch (_) { return {}; }
 }
 
-async function loadContracts(): Promise<Record<string, any>> {
-  if (redis) {
-    const cached = await redis.get<Record<string, any>>(CONTRACTS_CACHE_KEY);
-    if (cached && Object.keys(cached).length > 200) return cached;
-  }
-
-  const dbData  = await loadFromDB();
-  const fresh   = await scrapeCapWages();
+// Last-resort fallback used only when the DB read itself throws: build the
+// contract map from the bundled snapshot. Carries no expiry facts (bundled has
+// none), so the off-season FA list will be empty until the DB is reachable again.
+function loadContractsFromBundled(): Record<string, any> {
+  const bundled = loadBundledFallback();
   const merged: Record<string, any> = {};
-
-  if (Object.keys(fresh).length > 200) {
-    for (const [name, cw] of Object.entries(fresh)) {
-      const baseName = name.includes("__") ? name.split("__")[0] : name;
-      const b = dbData[baseName];
-      merged[name] = {
-        capHit:         b?.capHit ?? cw.capHit,
-        yearsRemaining: b?.yearsRemaining ?? (cw.yearsRemaining > 0 ? cw.yearsRemaining : 1),
-        hasNMC:         b?.hasNMC  ?? false,
-        hasNTC:         b?.hasNTC  ?? false,
-        canRetain:      b?.hasNMC  ? false : true,
-        expiryStatus:   cw.expiryStatus,
-        expiryYear:     cw.expiryYear ?? null,
-        position:       b?.position ?? cw.position,
-      };
-    }
-    // Backfill: DB players the scraper rejected or dropped (expired deals at
-    // season rollover, cap out-of-range parses, index drift). Without this,
-    // admin-edited contracts vanish whenever CapWages stops listing the player
-    // and they fall to the 0.925 default.
-    for (const [name, b] of Object.entries(dbData)) {
-      if (!merged[name]) {
-        merged[name] = {
-          capHit:         b.capHit,
-          yearsRemaining: b.yearsRemaining ?? 1,
-          hasNMC:         b.hasNMC  ?? false,
-          hasNTC:         b.hasNTC  ?? false,
-          canRetain:      b.hasNMC  ? false : true,
-          expiryStatus:   "UFA",
-          // Dropped from the live scrape = expired at rollover → pending FA now.
-          expiryYear:     Number(SEASON.label.slice(0, 4)),
-          position:       b.position,
-        };
-      }
-    }
-  } else {
-    for (const [name, b] of Object.entries(dbData)) {
-      merged[name] = {
-        capHit:         b.capHit,
-        yearsRemaining: b.yearsRemaining ?? 1,
-        hasNMC:         b.hasNMC  ?? false,
-        hasNTC:         b.hasNTC  ?? false,
-          canRetain:      b.hasNMC  ? false : true,
-          expiryStatus:   "UFA",
-          // Dropped from the live scrape = expired at rollover → pending FA now.
-          expiryYear:     Number(SEASON.label.slice(0, 4)),
-          position:       b.position,
-        };
-    }
-  }
-
-  // Bundled fallback (lowest priority): a player present in neither the live
-  // scrape nor the DB still gets his last-known curated contract instead of the
-  // 0.925/1yr placeholder the build loop applies when no contract resolves. This
-  // is keyed by base name, which the loop's CONTRACTS[p.name] lookup matches.
-  // loadFromDB() only swaps in bundled.json when the *whole* DB read throws, so
-  // without this a single missing player (e.g. CapWages drops him in the
-  // off-season, or he isn't synced) reads as a 1-year league-minimum deal.
-  const bundledFallback = loadBundledFallback();
-  for (const [name, bc] of Object.entries(bundledFallback)) {
+  for (const [name, raw] of Object.entries(bundled)) {
     if (name.includes("__")) continue;
-    if (merged[name]) continue;
+    const bc = raw as any;
     if (!bc || typeof bc.capHit !== "number") continue;
     merged[name] = {
       capHit:         bc.capHit,
@@ -434,18 +372,64 @@ async function loadContracts(): Promise<Record<string, any>> {
       position:       bc.position ?? null,
     };
   }
+  return merged;
+}
 
-  for (const [name, override] of Object.entries(CONTRACT_OVERRIDES)) {
-    if (merged[name]) {
-      if (override.capHit         !== undefined) merged[name].capHit         = override.capHit;
-      if (override.yearsRemaining !== undefined) merged[name].yearsRemaining = override.yearsRemaining;
-    }
+// ── Contracts: the players table is the single source of truth ────────────────
+// Reads contract + free-agency facts straight from the DB — no live scrape, no
+// bundled merge, no read-time FA seed. Ingestion (sync / Load Baseline) is the
+// only writer; this is a pure read + join key builder. An empty table (fresh
+// boot or post-reset) auto-loads the canonical baseline so reads are never empty.
+async function loadContractsFromDB(): Promise<Record<string, any>> {
+  if (redis) {
+    const cached = await redis.get<Record<string, any>>(CONTRACTS_CACHE_KEY);
+    if (cached && Object.keys(cached).length > 50) return cached;
   }
 
-  if (redis && Object.keys(merged).length > 200) {
+  let rows: any[];
+  try {
+    await ensurePlayerTable();
+    await ensurePlayerColumns();
+    rows = await db.select().from(playersTable);
+    if (rows.length === 0) {
+      await seedPlayersTable().catch((e) => console.warn("[Contracts] auto-seed failed:", e?.message));
+      rows = await db.select().from(playersTable).catch(() => []);
+    }
+  } catch (e: any) {
+    console.warn("[Contracts] DB read failed, falling back to bundled.json:", e?.message);
+    return loadContractsFromBundled();
+  }
+
+  const merged: Record<string, any> = {};
+  for (const row of rows) {
+    if (row.retired || row.excludeFromRoster) continue;
+    // "Unknown" → null so the name-collision heuristic (which keys off a known
+    // contract position) never fires on a seed row of unknown position.
+    const position = row.position && row.position !== "Unknown" ? row.position : null;
+    const rec = {
+      capHit:         row.capHit,
+      yearsRemaining: row.yearsRemaining ?? 1,
+      hasNMC:         row.hasNmc ?? false,
+      hasNTC:         row.hasNtc ?? false,
+      canRetain:      row.hasNmc ? false : true,
+      expiryStatus:   row.expiryStatus ?? null,
+      expiryYear:     row.expiryYear ?? null,
+      position,
+    };
+    const name = row.name;
+    if (!name) continue;
+    const normalName = name.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    merged[name] = rec;
+    if (!(normalName in merged)) merged[normalName] = rec;
+    // Disambiguation aliases the build loop tries first for same-named players.
+    const pos = (position ?? "").toUpperCase();
+    if (pos) merged[`${name}__${pos}`] = rec;
+    if (row.teamId) merged[`${name}__${String(row.teamId).toLowerCase()}`] = rec;
+  }
+
+  if (redis && Object.keys(merged).length > 50) {
     await redis.setex(CONTRACTS_CACHE_KEY, CONTRACTS_CACHE_TTL, merged);
   }
-
   return merged;
 }
 
@@ -716,15 +700,9 @@ export async function assembleCanonicalRoster(options: {
     console.warn("[Trades overlay] published trade overlay skipped:", e.message);
   }
 
-  // FA override map — populated after the trade block select to avoid shifting the
-  // test mock's selectCall counter (which is order-sensitive).
-  type FaOverrideRow = { playerId: string | null; playerName: string; forceStatus: string; teamSlug: string | null };
-  const faOverrideById = new Map<string, FaOverrideRow>();
-  const faOverrideByName = new Map<string, FaOverrideRow>();
-
   const rosterTeams = applyTeamCapDeltas(options.teams ?? TEAMS_DB, options.capMovesByTeam);
   const [CONTRACTS, PS_MAP, NHL_SKATER_STATS, NHL_GOALIE_STATS, PROSPECT_ENRICHMENT] = await Promise.all([
-    loadContracts(),
+    loadContractsFromDB(),
     fetchPointShares(),
     fetchNhlSkaterStatsFallback(),
     fetchNhlGoalieStatsFallback(),
@@ -968,11 +946,15 @@ export async function assembleCanonicalRoster(options: {
       draftOverall:    playersTable.draftOverall,
       prospectPtsPace: playersTable.prospectPtsPace,
       retired:         playersTable.retired,
+      excludeFromRoster: playersTable.excludeFromRoster,
     }).from(playersTable);
 
-    removeRetiredPlayersFromRosters(rosterMap, dbPlayers.filter(d => d.retired));
+    // retired = left the league; excludeFromRoster = editor pulled them off the
+    // roster (the orthogonal replacement for the old fa_override "EXCLUDE").
+    const removedFromRoster = dbPlayers.filter(d => d.retired || d.excludeFromRoster);
+    removeRetiredPlayersFromRosters(rosterMap, removedFromRoster);
     for (const d of dbPlayers) {
-      if (d.retired) continue;
+      if (d.retired || d.excludeFromRoster) continue;
       if (!isValidTeamId(d.teamId)) continue;
       const dbSlug = canonicalNameSlug(d.name);
       dbTeamBySlug.set(dbSlug, d.teamId);
@@ -1011,24 +993,9 @@ export async function assembleCanonicalRoster(options: {
     console.warn("[TradeBlock] read skipped:", e.message);
   }
 
-  // ── FA overrides (loaded after trade block to preserve test selectCall order) ──
-  try {
-    await ensureNewTables();
-    const faOverrideRows = await db.select({
-      playerId:    faOverridesTable.playerId,
-      playerName:  faOverridesTable.playerName,
-      forceStatus: faOverridesTable.forceStatus,
-      teamSlug:    faOverridesTable.teamSlug,
-    }).from(faOverridesTable);
-    for (const row of faOverrideRows) {
-      if (typeof row?.playerId === "string" && row.playerId) {
-        faOverrideById.set(String(row.playerId), row);
-      }
-      if (typeof row?.playerName === "string" && row.playerName) {
-        faOverrideByName.set(row.playerName.toLowerCase(), row);
-      }
-    }
-  } catch { /* table not yet provisioned — safe to skip */ }
+  // Free-agency status is now a fact on the players table (expiryStatus /
+  // expiryYear / excludeFromRoster), resolved at read time straight from the DB
+  // row — there is no separate read-time FA-override pass anymore.
 
   const activePlayerIds = [...new Set(
     [...rosterMap.values()]
@@ -1104,8 +1071,8 @@ export async function assembleCanonicalRoster(options: {
       };
 
       const override: any    = undefined;
-      const contractOverride = CONTRACT_OVERRIDES[p.name] ?? CONTRACT_OVERRIDES[normalName];
-      const finalPosition    = contractOverride?.position ?? p.position;
+      const identityOverride = ROSTER_IDENTITY_OVERRIDES[p.name] ?? ROSTER_IDENTITY_OVERRIDES[normalName];
+      const finalPosition    = identityOverride?.position ?? p.position;
 
       const isGoalie   = finalPosition === "G";
       const defaultTOI = isGoalie ? 0 : finalPosition === "D" ? 18.5 : 13.5;
@@ -1124,16 +1091,18 @@ export async function assembleCanonicalRoster(options: {
 
       const rawExpiryStatus = typeof fin?.expiryStatus === "string" ? fin.expiryStatus : null;
       const rawExpiryYear = typeof fin?.expiryYear === "number" ? fin.expiryYear : null;
-      const normExpiry: "UFA" | "RFA" | null = rawExpiryStatus
-        ? (/rfa/i.test(rawExpiryStatus) ? "RFA" : /ufa/i.test(rawExpiryStatus) ? "UFA" : null)
-        : null;
-      const offseasonYear = Number(SEASON.label.slice(0, 4));
       const preliminaryYears = isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1);
-      const expiresThisOffseason =
-        normExpiry != null && draftOverall == null && !isLikelyELC &&
-        (rawExpiryYear != null ? rawExpiryYear <= offseasonYear : preliminaryYears <= 1);
-      const contractStatus: "UFA" | "RFA" | "SIGNED" =
-        expiresThisOffseason && normExpiry ? normExpiry : "SIGNED";
+      const { contractStatus, expiresThisOffseason } = deriveContractStatus({
+        expiryStatus: rawExpiryStatus,
+        expiryYear: rawExpiryYear,
+        yearsRemaining: preliminaryYears,
+        draftOverall,
+        isELC: isLikelyELC,
+      });
+      // No contract row resolved and not a young ELC/prospect → the 0.925 default
+      // below is a placeholder, not a real deal. Surfaced for the admin's
+      // "needs data" view; does not change pricing.
+      const contractMissing = !fin && !isLikelyELC && draftOverall == null;
 
       const rawCapHit     = expiresThisOffseason ? 0 : (isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925));
       const contractPos = normContractPos(fin?.position);
@@ -1145,7 +1114,7 @@ export async function assembleCanonicalRoster(options: {
         && rosterPos !== ""
         && contractPos !== rosterPos;
 
-      const finalCapHit  = contractOverride?.capHit ?? override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
+      const finalCapHit  = override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
       const finalYears   = override?.yearsRemaining ?? (expiresThisOffseason ? 0 : (nameCollision ? 1 : preliminaryYears));
       const finalNMC     = override?.hasNMC  ?? (nameCollision ? false : (fin?.hasNMC  ?? false));
       const finalNTC     = override?.hasNTC  ?? (nameCollision ? false : (fin?.hasNTC  ?? false));
@@ -1225,8 +1194,8 @@ export async function assembleCanonicalRoster(options: {
           name: p.name,
           position: finalPosition as "C" | "W" | "D" | "G" | "Pick",
           age: p.age,
-          capHit: CONTRACT_OVERRIDES[p.name]?.capHit ?? finalCapHit,
-          yearsRemaining: CONTRACT_OVERRIDES[p.name]?.yearsRemaining ?? finalYears,
+          capHit: finalCapHit,
+          yearsRemaining: finalYears,
           ptsPace,
           avgTOI,
           qocIndex,
@@ -1254,8 +1223,8 @@ export async function assembleCanonicalRoster(options: {
         pairXgfPct:        baselines.pairXgfPct,
         pairDriverScore:   baselines.pairDriverScore,
         baselineHdsvPct:   baselines.baselineHdsvPct,
-        capHit:         CONTRACT_OVERRIDES[p.name]?.capHit         ?? finalCapHit,
-        yearsRemaining: CONTRACT_OVERRIDES[p.name]?.yearsRemaining ?? finalYears,
+        capHit:         finalCapHit,
+        yearsRemaining: finalYears,
         hasExtension: false,
         extensionCapHit: undefined,
         extensionYears: undefined,
@@ -1272,6 +1241,7 @@ export async function assembleCanonicalRoster(options: {
         expiryYear:       rawExpiryYear,
         contractStatus,
         expiresThisOffseason,
+        contractMissing,
         retainedPct: 0,
         multiplier:  intangibleMult,
         ops:  PS_MAP.get(p.name)?.ops ?? PS_MAP.get(`id:${p.id}`)?.ops ?? PS_MAP.get(slugify(p.name))?.ops ?? null,
@@ -1287,58 +1257,10 @@ export async function assembleCanonicalRoster(options: {
 
   players = dedupePlayersByAuthority(players, dbTeamBySlug);
 
-  // ── Apply free-agent status: DB overrides, then the 2026 seed ────────────────
-  // Precedence (highest first):
-  //   1. DB fa_overrides — admin's explicit choice, incl. SIGNED / EXCLUDE
-  //   2. live scrape      — already folded into expiresThisOffseason above
-  //   3. seed             — the known 2026 class, for players the scrape misses
-  // The seed exists because the off-season scrape rarely surfaces 2026-expiring
-  // contracts, so auto-detection alone leaves the FA list empty (see
-  // free-agent-seed.ts). DB overrides win, so the admin can always correct it.
-  {
-    const offseasonYear = Number(SEASON.label.slice(0, 4));
-    const excluded = new Set<string>();
-    players = players.map((p) => {
-      const key = p.name?.toLowerCase();
-      const ov = faOverrideById.get(String(p.id)) ?? (key ? faOverrideByName.get(key) : undefined);
-
-      if (ov) {
-        if (ov.forceStatus === "EXCLUDE") {
-          excluded.add(p.id);
-          return p;
-        }
-        const status = ov.forceStatus as "UFA" | "RFA" | "SIGNED";
-        const expiring = status !== "SIGNED";
-        return {
-          ...p,
-          expiryStatus:        expiring ? status : (p.expiryStatus ?? null),
-          contractStatus:      status,
-          expiresThisOffseason: expiring,
-          expiryYear:          expiring ? offseasonYear : p.expiryYear,
-          capHit:              expiring ? 0 : p.capHit,
-          yearsRemaining:      expiring ? 0 : p.yearsRemaining,
-        };
-      }
-
-      // No DB override: fall back to the curated seed for players the scrape
-      // didn't already flag. Never touches picks or already-expiring players.
-      if (!p.expiresThisOffseason && p.position !== "Pick") {
-        const seedStatus = seedFreeAgentStatus(p.name);
-        if (seedStatus) {
-          return {
-            ...p,
-            expiryStatus:        seedStatus,
-            contractStatus:      seedStatus,
-            expiresThisOffseason: true,
-            expiryYear:          offseasonYear,
-            capHit:              0,
-            yearsRemaining:      0,
-          };
-        }
-      }
-      return p;
-    }).filter((p) => !excluded.has(p.id));
-  }
+  // Free-agency status was resolved per-player straight from the DB contract row
+  // (deriveContractStatus, above). There is no separate FA-override/seed pass —
+  // the players table is the single source of truth, and excludeFromRoster has
+  // already pulled excluded players from the roster map.
 
   const finalTeams = applyTeamCapDeltas(
     rosterTeams,

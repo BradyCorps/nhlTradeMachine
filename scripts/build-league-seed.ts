@@ -42,6 +42,13 @@ interface SeedRow {
   expiryYear: number | null;
 }
 
+// Known contract-fact corrections where the bundled snapshot is wrong (e.g. the
+// old CapWages age-math floored a back-loaded extension to 1 year). Baked into
+// the seed so the fix lives as data, not as a read-time code override.
+const SEED_CORRECTIONS: Record<string, Partial<SeedRow>> = {
+  "Mark Scheifele": { yearsRemaining: 5 },         // 8yr/2023→2031; age math gave 1
+};
+
 const byId = new Map<string, SeedRow>();
 
 // 1. Baseline contract facts from the bundled snapshot.
@@ -91,6 +98,16 @@ for (const { name, status } of FREE_AGENT_SEED_LIST_2026) {
   }
 }
 
+// 3. Apply known contract-fact corrections.
+let corrected = 0;
+for (const [name, patch] of Object.entries(SEED_CORRECTIONS)) {
+  const row = byId.get(makeId(name));
+  if (row) {
+    Object.assign(row, patch);
+    corrected++;
+  }
+}
+
 const rows = Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
 
 const out = {
@@ -108,5 +125,6 @@ console.log(
   `[build-league-seed] wrote ${rows.length} rows → ${outPath}\n` +
   `  bundled rows: ${byId.size - faAdded}\n` +
   `  FA-class expiry set on existing: ${faSet}\n` +
-  `  FA-class new rows added: ${faAdded}`,
+  `  FA-class new rows added: ${faAdded}\n` +
+  `  contract corrections applied: ${corrected}`,
 );

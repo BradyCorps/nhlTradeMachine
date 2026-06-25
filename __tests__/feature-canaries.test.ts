@@ -74,9 +74,11 @@ describe("Canary — league route features (source-level)", () => {
         expect(src).toContain("slugify(x.name) === dbSlug");
       });
 
-      it("uses DB contract fields ahead of scraper values for matching players", () => {
-        expect(src).toContain("capHit:         b?.capHit ?? cw.capHit");
-        expect(src).toContain("yearsRemaining: b?.yearsRemaining ??");
+      it("reads contracts only from the players table (no live scrape at read time)", () => {
+        // Orthogonal backend: the players table is the single source of truth.
+        expect(src).toContain("async function loadContractsFromDB()");
+        expect(src).toContain("loadContractsFromDB(),");
+        expect(src).not.toContain("scrapeCapWages");
       });
 
       it("stamps trade block status onto players", () => {
@@ -101,10 +103,11 @@ describe("Canary — league route features (source-level)", () => {
         expect(src).not.toContain('"UTA":"Utah Hockey Club"');
       });
 
-      it("backfills DB contracts when the scraper drops a player", () => {
-        // The loop that rescues admin-edited contracts for players CapWages
-        // no longer lists (expired deals at rollover, parse rejects)
-        expect(src).toMatch(/Backfill: DB players the scraper/);
+      it("auto-seeds the canonical baseline when the players table is empty", () => {
+        // The DB is never left empty (fresh boot / post-reset): the read path
+        // loads the committed baseline before returning contracts.
+        expect(src).toContain("seedPlayersTable()");
+        expect(src).toContain("rows.length === 0");
       });
 
       it("defaults draftees to 0 games so the pedigree NAV path triggers", () => {
@@ -181,11 +184,14 @@ describe("Canary — league route features (source-level)", () => {
       });
 
       it("does not present expired UFA/RFA contracts as fake one-year ELC deals", () => {
-        expect(src).toContain("const expiresThisOffseason =");
+        expect(src).toContain("const { contractStatus, expiresThisOffseason } = deriveContractStatus({");
         expect(src).toContain("const rawCapHit     = expiresThisOffseason ? 0");
         expect(src).toContain("expiresThisOffseason ? 0 : (nameCollision ? 1 : preliminaryYears)");
-        expect(src).toContain("capHit:              expiring ? 0 : p.capHit");
-        expect(src).toContain("yearsRemaining:      expiring ? 0 : p.yearsRemaining");
+      });
+
+      it("derives free-agency status from stored expiry facts via a pure helper", () => {
+        expect(src).toContain("export function deriveContractStatus(");
+        expect(src).toContain("rawExpiryYear != null ? rawExpiryYear <= offseasonYear");
       });
     });
   }
@@ -1231,8 +1237,8 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(adminPage).toContain("handleRetire");
     expect(adminPage).toContain("RESTORE");
     expect(rosterAssembly).toContain("removeRetiredPlayersFromRosters");
-    expect(rosterAssembly).toContain("if (row.retired) continue");
-    expect(rosterAssembly).toContain("if (d.retired) continue");
+    expect(rosterAssembly).toContain("if (row.retired || row.excludeFromRoster) continue");
+    expect(rosterAssembly).toContain("if (d.retired || d.excludeFromRoster) continue");
     expect(rosterAssembly).toContain("retired:         playersTable.retired");
   });
 

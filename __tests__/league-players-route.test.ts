@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getTableName } from "drizzle-orm";
 
 const state = vi.hoisted(() => ({
-  selectCall: 0,
   dbPlayers: [] as any[],
   tradeBlockRows: [] as any[],
-  faOverrideRows: [] as any[],
-  contracts: {} as Record<string, any>,
   rosters: {} as Record<string, any>,
   skaterSummaryRows: [] as any[],
   goalieSummaryRows: [] as any[],
@@ -20,20 +18,39 @@ vi.mock("@/app/lib/db", () => ({
 
 vi.mock("@/app/lib/redis", () => ({ redis: null }));
 
+// Contracts come from the DB players table now, not the scrape — keep the mock
+// so any residual import resolves, but the read path never calls it.
 vi.mock("@/app/services/scraper", () => ({
-  scrapeCapWages: vi.fn(async () => state.contracts),
+  scrapeCapWages: vi.fn(async () => ({})),
 }));
+
+// Auto-seed must be a no-op in tests (the players table is supplied directly).
+vi.mock("@/app/lib/league-seed", () => ({
+  seedPlayersTable: vi.fn(async () => ({ inserted: 0, filled: 0, skipped: 0, total: 0 })),
+}));
+
+// Table-aware DB mock: returns rows by table identity, so the read path can
+// reorder or add selects without breaking a fragile call counter.
+function rowsForTable(table: any): any[] {
+  switch (getTableName(table)) {
+    case "players":     return state.dbPlayers;
+    case "trade_block": return state.tradeBlockRows;
+    default:            return [];
+  }
+}
 
 vi.mock("@/app/db/client", () => ({
   db: {
     run: vi.fn(async () => undefined),
+    insert: vi.fn(() => ({
+      values: vi.fn(() => ({
+        onConflictDoNothing: vi.fn(async () => undefined),
+        onConflictDoUpdate: vi.fn(async () => undefined),
+      })),
+    })),
     select: vi.fn(() => ({
-      from: vi.fn(() => {
-        state.selectCall += 1;
-        const rows = state.selectCall === 1 ? []
-          : state.selectCall === 4 ? state.tradeBlockRows
-          : state.selectCall === 5 ? state.faOverrideRows
-          : state.dbPlayers;
+      from: vi.fn((table: any) => {
+        const rows = rowsForTable(table);
         return {
           then: (resolve: (value: any[]) => unknown) => Promise.resolve(resolve(rows)),
           catch: () => Promise.resolve(rows),
@@ -86,10 +103,7 @@ const jsonResponse = (body: unknown) => Response.json(body);
 
 describe("league players route roster assembly", () => {
   beforeEach(() => {
-    state.selectCall = 0;
     state.tradeBlockRows = [];
-    state.faOverrideRows = [];
-    state.contracts = {};
     state.skaterSummaryRows = [];
     state.goalieSummaryRows = [];
     state.dbPlayers = [];
@@ -188,67 +202,19 @@ describe("league players route roster assembly", () => {
     expect(rightStats.avgTOI).toBe(15);
   });
 
-  it("applies free-agent overrides by DB player id before falling back to name matching", async () => {
+  it("resolves free-agent status from the DB contract row (expiring UFA, no fake ELC year)", async () => {
     state.rosters.WPG.forwards = [
       rosterPlayer("891", "Alex", "Tuch", "R"),
       ...fillerRoster("WPG"),
     ];
-    state.faOverrideRows = [{
-      playerId: "891",
-      playerName: "Mismatched Admin Name",
-      teamSlug: "WPG",
-      forceStatus: "UFA",
+    // The players table is the single source of truth: a UFA row expiring this
+    // offseason surfaces as a pending free agent with zeroed cap/term.
+    state.dbPlayers = [{
+      id: "tuch", name: "Alex Tuch", position: "RW", teamId: "WPG", age: 30,
+      capHit: 4.75, yearsRemaining: 1, hasNmc: false, hasNtc: false,
+      expiryStatus: "UFA", expiryYear: 2026, excludeFromRoster: false,
+      retired: false, source: "seed",
     }];
-
-    const { GET } = await import("../app/api/league/players/route");
-    const response = await GET();
-    const body = await response.json();
-
-    const tuch = body.players.find((p: any) => p.id === "891");
-    expect(tuch).toMatchObject({
-      id: "891",
-      name: "Alex Tuch",
-      contractStatus: "UFA",
-      expiresThisOffseason: true,
-    });
-  });
-
-  it("surfaces CapWages-expired contracts as free agents without a fake ELC year", async () => {
-    state.rosters.WPG.forwards = [
-      rosterPlayer("891", "Alex", "Tuch", "R"),
-      ...fillerRoster("WPG"),
-    ];
-    state.contracts = {
-      "Alex Tuch": {
-        capHit: 4.75,
-        yearsRemaining: 1,
-        expiryStatus: "UFA",
-        expiryYear: 2026,
-        position: "RW",
-        teamSlug: "winnipeg_jets",
-        age: 30,
-      },
-      "Alex Tuch__R": {
-        capHit: 4.75,
-        yearsRemaining: 1,
-        expiryStatus: "UFA",
-        expiryYear: 2026,
-        position: "RW",
-        teamSlug: "winnipeg_jets",
-        age: 30,
-      },
-    };
-    for (let i = 0; i < 205; i++) {
-      state.contracts[`Healthy Scrape ${i}`] = {
-        capHit: 1,
-        yearsRemaining: 2,
-        expiryStatus: "UFA",
-        expiryYear: 2028,
-        position: "C",
-        teamSlug: "winnipeg_jets",
-        age: 25,
-      };
-    }
 
     const { GET } = await import("../app/api/league/players/route");
     const response = await GET();
@@ -264,5 +230,24 @@ describe("league players route roster assembly", () => {
       capHit: 0,
       yearsRemaining: 0,
     });
+  });
+
+  it("pulls excludeFromRoster players off the roster entirely", async () => {
+    state.rosters.WPG.forwards = [
+      rosterPlayer("891", "Alex", "Tuch", "R"),
+      ...fillerRoster("WPG"),
+    ];
+    state.dbPlayers = [{
+      id: "891", name: "Alex Tuch", position: "RW", teamId: "WPG", age: 30,
+      capHit: 4.75, yearsRemaining: 1, hasNmc: false, hasNtc: false,
+      expiryStatus: null, expiryYear: null, excludeFromRoster: true,
+      retired: false, source: "editor",
+    }];
+
+    const { GET } = await import("../app/api/league/players/route");
+    const response = await GET();
+    const body = await response.json();
+
+    expect(body.players.find((p: any) => p.name === "Alex Tuch")).toBeUndefined();
   });
 });
