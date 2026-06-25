@@ -30,6 +30,15 @@ export const players = sqliteTable("players", {
   extensionYears:  integer("extension_years"),
   retired:         integer("retired", { mode: "boolean" }).default(false),
   retiredDate:     text("retired_date"),
+  // Contract + free-agency facts — the single source of truth for reads. The
+  // roster read path joins these onto live NHL identity; it no longer scrapes,
+  // merges bundled.json, or consults the FA seed at read time.
+  expiryStatus:      text("expiry_status"),                 // "UFA" | "RFA" | null — final-year class
+  expiryYear:        integer("expiry_year"),                // calendar year the deal ends (e.g. 2026)
+  excludeFromRoster: integer("exclude_from_roster", { mode: "boolean" }).default(false),
+  // Provenance: 'seed' = canonical baseline, 'sync' = live CapWages ingest,
+  // 'editor' = hand-curated. Ingestion never clobbers 'editor' rows.
+  source:            text("source").default("seed"),
 });
 
 // Global key-value config — cap_ceiling, cap_floor, etc.

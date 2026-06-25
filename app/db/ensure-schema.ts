@@ -22,6 +22,11 @@ const PLAYER_COLUMN_STATEMENTS = [
   "ALTER TABLE players ADD COLUMN retired_date TEXT",
   "ALTER TABLE players ADD COLUMN draft_overall INTEGER",
   "ALTER TABLE players ADD COLUMN prospect_pts_pace REAL",
+  // Single-source-of-truth contract/FA facts + provenance (orthogonal backend).
+  "ALTER TABLE players ADD COLUMN expiry_status TEXT",
+  "ALTER TABLE players ADD COLUMN expiry_year INTEGER",
+  "ALTER TABLE players ADD COLUMN exclude_from_roster INTEGER DEFAULT 0",
+  "ALTER TABLE players ADD COLUMN source TEXT DEFAULT 'seed'",
 ];
 
 const PLAYER_TABLE_STATEMENTS = [
@@ -47,7 +52,11 @@ const PLAYER_TABLE_STATEMENTS = [
     extension_cap_hit REAL,
     extension_years INTEGER,
     retired INTEGER DEFAULT 0,
-    retired_date TEXT
+    retired_date TEXT,
+    expiry_status TEXT,
+    expiry_year INTEGER,
+    exclude_from_roster INTEGER DEFAULT 0,
+    source TEXT DEFAULT 'seed'
   )`,
 ];
 

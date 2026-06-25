@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "db:push": "drizzle-kit push",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "build:seed": "tsx scripts/build-league-seed.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

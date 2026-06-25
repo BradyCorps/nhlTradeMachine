@@ -13,6 +13,7 @@ import { requireAdmin } from "@/app/lib/admin-auth";
 import { redis } from "@/app/lib/redis";
 import { TEAMS_DB } from "@/app/lib/db";
 import { ensureNewTables, ensurePlayerColumns, ensureTeamTable, ensureTradeColumns } from "@/app/db/ensure-schema";
+import { seedPlayersTable } from "@/app/lib/league-seed";
 import {
   DEVELOPMENT_NHL_SUMMARY_CACHE_KEY,
   DEVELOPMENT_TIMELINE_CACHE_KEY,
@@ -124,14 +125,22 @@ export async function POST(req: Request) {
     deleted.trades = await resetTable(trades);
   }
 
+  // Reload the canonical contract/FA baseline so the players table — the single
+  // source of truth for reads — is never left empty by a reset.
+  const seeded = await seedPlayersTable().catch((e) => {
+    console.error("[admin/reset] reseed failed:", e?.message);
+    return { inserted: 0, filled: 0, skipped: 0, total: 0 };
+  });
+
   const clearedCacheKeys = await clearLiveCaches();
 
   return NextResponse.json({
     ok: true,
     deleted,
+    seeded,
     clearedCacheKeys,
     message: body.includeTrades
-      ? "Admin data and saved trades reset; live data will repopulate from scrapes."
-      : "Admin override data reset; live data will repopulate from scrapes.",
+      ? `Admin data and saved trades reset; players table reseeded (${seeded.inserted} baseline rows).`
+      : `Admin override data reset; players table reseeded (${seeded.inserted} baseline rows).`,
   });
 }

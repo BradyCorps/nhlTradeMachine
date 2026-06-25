@@ -54,6 +54,13 @@ export const FREE_AGENT_SEED_2026: Map<string, SeedFaStatus> = new Map([
   ...RFA.map((n) => [norm(n), "RFA"] as const),
 ]);
 
+// Original-cased name + status, for the seed builder (which needs display names
+// to create rows for FA-class players absent from contracts.bundled.json).
+export const FREE_AGENT_SEED_LIST_2026: { name: string; status: SeedFaStatus }[] = [
+  ...UFA.map((name) => ({ name, status: "UFA" as const })),
+  ...RFA.map((name) => ({ name, status: "RFA" as const })),
+];
+
 export function seedFreeAgentStatus(playerName: string | null | undefined): SeedFaStatus | null {
   if (!playerName) return null;
   return FREE_AGENT_SEED_2026.get(norm(playerName)) ?? null;
