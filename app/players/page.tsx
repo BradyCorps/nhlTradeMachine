@@ -14,6 +14,7 @@ import { calcNAV } from "@/app/lib/xnav-engine";
 import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
+import LedgerSetdown from "@/app/components/LedgerSetdown";
 
 // ── Types ─────────────────────────────────────────────────────
 interface Player {
@@ -1048,7 +1049,7 @@ export default function PlayersPage() {
   const showGoalies = (posFilter === "ALL" || posFilter === "G") && goalies.length > 0;
 
   return (
-    <main className="ledger-setdown" style={{ minHeight: "100vh", background: "var(--paper)", color: "var(--ink)" }}>
+    <LedgerSetdown style={{ minHeight: "100vh", background: "var(--paper)", color: "var(--ink)" }}>
 
       <Header activeTab="players" />
 
@@ -1172,6 +1173,6 @@ export default function PlayersPage() {
         )}
       </div>
       <Footer />
-    </main>
+    </LedgerSetdown>
   );
 }

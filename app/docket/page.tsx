@@ -1,6 +1,7 @@
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import DocketClient from "@/app/docket/DocketClient";
+import LedgerSetdown from "@/app/components/LedgerSetdown";
 import { attachTodayDocketGrades } from "@/app/lib/docket-today";
 import { buildDocketEntries } from "@/app/lib/docket-view";
 import { listPublishedTrades } from "@/app/lib/trades";
@@ -20,7 +21,7 @@ export default async function DocketPage() {
   const entries = await loadDocketEntries();
 
   return (
-    <main className="ledger-setdown" style={{
+    <LedgerSetdown style={{
       minHeight: "100vh",
       background: "var(--paper)",
       color: "var(--ledger-ink)",
@@ -44,6 +45,6 @@ export default async function DocketPage() {
         <DocketClient entries={entries} />
       </div>
       <Footer />
-    </main>
+    </LedgerSetdown>
   );
 }

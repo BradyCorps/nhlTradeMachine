@@ -35,6 +35,7 @@ import DraftNight from "@/app/components/DraftNight";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import TradeBlockPanel from "@/app/components/TradeBlockPanel";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
+import LedgerSetdown from "@/app/components/LedgerSetdown";
 
 const TradeProposalEngine = lazy(() => import("@/app/components/TradeProposal"));
 const PlayerComparison    = lazy(() => import("@/app/components/PlayerComparison"));
@@ -907,7 +908,7 @@ export default function ArmchairGmPage() {
 
   return (
     <>
-    <main className="min-h-screen antialiased select-none overflow-x-hidden bg-paper text-ink font-serif ledger-setdown">
+    <LedgerSetdown className="min-h-screen antialiased select-none overflow-x-hidden bg-paper text-ink font-serif">
 
       {/* Trade Proposal Engine Modal */}
       {tradeRequest && tradeRequest.length > 0 && (
@@ -1622,7 +1623,7 @@ export default function ArmchairGmPage() {
         <Footer />
 
       </div>
-    </main>
+    </LedgerSetdown>
 
     {/* ── Verdict Bottom Sheet ─────────────────────────────────────
         Always anchored to the bottom of the viewport — no scrolling needed.

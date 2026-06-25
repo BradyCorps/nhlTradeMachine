@@ -1,4 +1,5 @@
 import React from "react";
+import LedgerSetdown from "@/app/components/LedgerSetdown";
 
 const NAV_LINKS = [
   { href: "/admin",               label: "DASHBOARD"   },
@@ -69,7 +70,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           ← ARMCHAIR GM
         </a>
       </nav>
-      <div className="ledger-setdown">{children}</div>
+      <LedgerSetdown>{children}</LedgerSetdown>
     </>
   );
 }

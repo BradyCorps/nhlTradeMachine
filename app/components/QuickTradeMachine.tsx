@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
+import LedgerSetdown from "@/app/components/LedgerSetdown";
 import type { Asset, Team, TradeVerdict, XNAVResult } from "@/app/lib/trade-types";
 import { fetchNavMap, fetchTradeVerdict } from "@/app/lib/evaluate-client";
 import {
@@ -455,7 +456,7 @@ export function SharedTradeView({ code }: { code: string }) {
   const incoming = payload ? resolveTradeShareAssets(payload.blocks.incoming, data.players) : [];
 
   return (
-    <main className="min-h-screen font-serif antialiased ledger-setdown" style={{ background: "var(--paper)", color: "var(--ink)" }}>
+    <LedgerSetdown className="min-h-screen font-serif antialiased" style={{ background: "var(--paper)", color: "var(--ink)" }}>
       <div className="relative w-full max-w-5xl mx-auto px-4 lg:px-6 py-6 lg:py-8 flex flex-col gap-5">
         <Header activeTab="trade" />
         <section className="border p-5 sm:p-6" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card)" }}>
@@ -487,7 +488,7 @@ export function SharedTradeView({ code }: { code: string }) {
         )}
         <Footer />
       </div>
-    </main>
+    </LedgerSetdown>
   );
 }
 
@@ -651,7 +652,7 @@ export default function QuickTradeMachine() {
   };
 
   return (
-    <main className="min-h-screen font-serif antialiased ledger-setdown" style={{ background: "var(--paper)", color: "var(--ink)" }}>
+    <LedgerSetdown className="min-h-screen font-serif antialiased" style={{ background: "var(--paper)", color: "var(--ink)" }}>
       <div className="relative w-full max-w-6xl mx-auto px-4 lg:px-6 py-6 lg:py-8 flex flex-col gap-5">
         <Header activeTab="trade" />
 
@@ -791,6 +792,6 @@ export default function QuickTradeMachine() {
 
         <Footer />
       </div>
-    </main>
+    </LedgerSetdown>
   );
 }
