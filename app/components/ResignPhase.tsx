@@ -2,9 +2,11 @@
 
 import React, { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import type { Asset, Team } from "@/app/lib/trade-types";
+import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import type { OffseasonPending } from "@/app/lib/free-agency";
 import { getOfferSheetCompensation } from "@/app/lib/free-agency";
+import StrandView from "@/app/components/StrandView";
+import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
 
 // ── Off-Season Re-Sign phase ──────────────────────────────────────────────
 // Presentational only: the page owns the roster/cap state and passes handlers.
@@ -14,6 +16,36 @@ import { getOfferSheetCompensation } from "@/app/lib/free-agency";
 // flow.
 
 const money = (n: number) => `$${n.toFixed(2)}M`;
+
+// FAs come through without a computed NAV; StrandView derives its axes from the
+// asset's own Point Shares / pace / usage, so a neutral NAV is fine here.
+const ZERO_XNAV: XNAVResult = { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
+
+// Compact last-season (2026) stat line. Skaters: GP · G-A-P pace · TOI.
+// Goalies: GP · SV% · GSAx.
+function StatLine({ p }: { p: Asset }) {
+  const isG = p.position === "G";
+  const bits: string[] = [];
+  if (isG) {
+    if (p.gamesStarted) bits.push(`${p.gamesStarted} GS`);
+    if (p.savePct != null) bits.push(`${(p.savePct * 100).toFixed(1)}% SV`);
+    if (p.gsax != null) bits.push(`${p.gsax > 0 ? "+" : ""}${p.gsax.toFixed(1)} GSAx`);
+  } else {
+    if (p.games) bits.push(`${p.games} GP`);
+    if (p.goalsPace != null && p.assistsPace != null) {
+      bits.push(`${Math.round(p.goalsPace)}G-${Math.round(p.assistsPace)}A-${Math.round(p.ptsPace)}P`);
+    } else if (p.ptsPace) {
+      bits.push(`${Math.round(p.ptsPace)} pts/82`);
+    }
+    if (p.avgTOI) bits.push(`${p.avgTOI.toFixed(1)} TOI`);
+  }
+  if (bits.length === 0) return null;
+  return (
+    <span className="text-[9px] font-mono tracking-wide" style={{ color: "var(--ledger-brown)" }}>
+      &rsquo;26 · {bits.join(" · ")}
+    </span>
+  );
+}
 
 const tierColor = (tier: OffseasonPending["contract"]["tier"]): string =>
   tier === "STAR" ? "var(--ledger-red)"
@@ -57,6 +89,7 @@ export default function ResignPhase({
   const [query, setQuery] = useState("");
   const [dropQuery, setDropQuery] = useState("");
   const [showDrop, setShowDrop] = useState(false);
+  const [detail, setDetail] = useState<Asset | null>(null);
 
   const sortedMarket = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -83,6 +116,7 @@ export default function ResignPhase({
   const overCap = capSpace < 0;
 
   return createPortal(
+    <>
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-6"
       style={{ background: "rgba(28,20,10,0.88)", backdropFilter: "blur(4px)" }}>
       <div className="relative w-full max-w-3xl flex flex-col"
@@ -123,8 +157,13 @@ export default function ResignPhase({
                 <div key={fa.player.id} className="flex items-center justify-between gap-3 px-3 py-2"
                   style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
                   <div className="min-w-0">
-                    <div className="font-black text-[13px] truncate" style={{ color: "var(--ledger-ink)" }}>{fa.player.name}</div>
-                    <PlayerMeta p={fa.player} />
+                    <button onClick={() => setDetail(fa.player)} title="View STRAND & development"
+                      className="font-black text-[13px] truncate text-left hover:underline"
+                      style={{ color: "var(--ledger-ink)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
+                      {fa.player.name}
+                    </button>
+                    <div><PlayerMeta p={fa.player} /></div>
+                    <StatLine p={fa.player} />
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <Terms c={fa.contract} />
@@ -207,8 +246,13 @@ export default function ResignPhase({
                 <div key={fa.player.id} className="flex items-center justify-between gap-3 px-3 py-1.5"
                   style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
                   <div className="min-w-0">
-                    <div className="font-bold text-[12px] truncate" style={{ color: "var(--ledger-ink)" }}>{fa.player.name}</div>
-                    <PlayerMeta p={fa.player} />
+                    <button onClick={() => setDetail(fa.player)} title="View STRAND & development"
+                      className="font-bold text-[12px] truncate text-left hover:underline"
+                      style={{ color: "var(--ledger-ink)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
+                      {fa.player.name}
+                    </button>
+                    <div><PlayerMeta p={fa.player} /></div>
+                    <StatLine p={fa.player} />
                     {isRfa && offerPicks.length > 0 && (
                       <span className="text-[9px] font-mono font-black uppercase tracking-wide"
                         style={{ color: "var(--ledger-amber, #c87941)" }}
@@ -262,7 +306,45 @@ export default function ResignPhase({
           </button>
         </div>
       </div>
-    </div>,
+    </div>
+
+    {/* Player detail — STRAND + development + last-season stats */}
+    {detail && (
+      <div className="fixed inset-0 z-[130] flex items-center justify-center p-3 sm:p-6"
+        style={{ background: "rgba(28,20,10,0.92)", backdropFilter: "blur(5px)" }}
+        onClick={() => setDetail(null)}>
+        <div className="relative w-full max-w-md flex flex-col"
+          style={{ background: "var(--ledger-card-light)", borderRadius: "2px", maxHeight: "92vh", boxShadow: "0 24px 70px rgba(0,0,0,0.6)" }}
+          onClick={(e) => e.stopPropagation()}>
+          <div className="shrink-0 flex items-start justify-between gap-3"
+            style={{ borderTop: "4px double #1c140a", borderBottom: "1px solid #b8a070", padding: "14px 20px 12px" }}>
+            <div className="min-w-0">
+              <h2 className="font-black text-[1.15rem] leading-tight truncate" style={{ color: "var(--ledger-ink)" }}>{detail.name}</h2>
+              <div className="mt-0.5"><PlayerMeta p={detail} /></div>
+              <div><StatLine p={detail} /></div>
+            </div>
+            <button onClick={() => setDetail(null)}
+              className="text-[16px] leading-none shrink-0" aria-label="Close"
+              style={{ background: "transparent", border: "none", color: "var(--ledger-ink-faint)", cursor: "pointer" }}>
+              ✕
+            </button>
+          </div>
+          <div className="overflow-y-auto px-4 py-3" style={{ flex: 1, minHeight: 0 }}>
+            {detail.position !== "G" ? (
+              <StrandView asset={detail} xnav={ZERO_XNAV} />
+            ) : (
+              <p className="text-[11px] font-mono py-2" style={{ color: "var(--ledger-ink-faint)" }}>
+                STRAND is unavailable for goaltenders — see the stat line above.
+              </p>
+            )}
+            {detail.developmentProfile && detail.position !== "G" && (
+              <div className="mt-2"><DevelopmentProfilePanel asset={detail} /></div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+    </>,
     document.body,
   );
 }
