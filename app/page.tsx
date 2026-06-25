@@ -3,7 +3,8 @@ import React from "react";
 import Link from "next/link";
 import Footer from "./components/Footer";
 import ScrollReveal from "./components/ScrollReveal";
-import LedgerSetdown from "./components/LedgerSetdown";
+import ScrollNameplate from "./components/ScrollNameplate";
+import LedgerScrollSetdown from "./components/LedgerScrollSetdown";
 
 function Cell({
   href, lead = false, kicker, kickerColor, edition, title, body, lines, cta, ctaColor,
@@ -98,7 +99,8 @@ export default function WelcomePage() {
   return (
     <main className="fp-desk min-h-screen font-serif antialiased" style={{ color: "var(--ink)" }}>
       <ScrollReveal />
-      <LedgerSetdown className="fp-sheet">
+      <ScrollNameplate />
+      <LedgerScrollSetdown className="fp-sheet">
 
         {/* ── Dateline ───────────────────────────────────────── */}
         <div className="border-b" style={{ borderColor: "var(--rule)" }}>
@@ -295,7 +297,7 @@ export default function WelcomePage() {
         </section>
 
         <Footer />
-      </LedgerSetdown>
+      </LedgerScrollSetdown>
     </main>
   );
 }

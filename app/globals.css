@@ -980,6 +980,9 @@ select.ledger-select {
 /* ── The desk: a deep warm surface with a faint structural grid ── */
 .fp-desk {
   position: relative;
+  /* min-height ensures the desk fills the viewport on first load so the
+     nameplate has a full-screen desk background to sit on. */
+  min-height: 100vh;
   padding: 16px 0 44px;
   background-color: var(--desk);
   background-image:
