@@ -32,6 +32,7 @@ import { scenarioSeed } from "@/app/lib/sim-engine";
 import { resolveLeagueOffseason, type OffseasonPending } from "@/app/lib/free-agency";
 import ResignPhase from "@/app/components/ResignPhase";
 import DraftNight from "@/app/components/DraftNight";
+import { draftedRookieAssets } from "@/app/lib/draft-rookies";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import TradeBlockPanel from "@/app/components/TradeBlockPanel";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
@@ -1073,17 +1074,20 @@ export default function ArmchairGmPage() {
         <DraftNight
           initialSeed={scenarioSeed({ draft: homeTeamId ?? "", season: SEASON.label })}
           homeTeamId={homeTeamId}
-          onDone={() => {
+          onDone={(results) => {
             setDraftOpen(false);
             setResignOpen(true);
-            // The off-season draft just happened — its picks have been spent, so
-            // remove this year's picks from the tradeable asset pool league-wide.
-            setDb(prev => ({
-              ...prev,
-              players: prev.players.filter(
+            setDb(prev => {
+              // The off-season draft just happened: spend this year's picks (drop
+              // them from the tradeable pool) and sign every selection to a default
+              // 3-year ELC so the rookies join their drafting team's roster.
+              const withoutPicks = prev.players.filter(
                 p => !(p.position === "Pick" && p.year === SEASON.draftYear)
-              ),
-            }));
+              );
+              const existingIds = new Set(withoutPicks.map(p => p.id));
+              const rookies = draftedRookieAssets(results).filter(r => !existingIds.has(r.id));
+              return { ...prev, players: [...withoutPicks, ...rookies] };
+            });
             clearNavCache();
           }}
         />

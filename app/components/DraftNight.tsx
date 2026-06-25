@@ -27,7 +27,7 @@ export default function DraftNight({
 }: {
   initialSeed: number;
   homeTeamId?: string | null;
-  onDone: () => void;
+  onDone: (results: DraftResult[]) => void;
 }) {
   const [seed, setSeed]       = useState(Math.floor(initialSeed) || 1);
   const [results, setResults] = useState<DraftResult[]>([]);
@@ -240,7 +240,7 @@ export default function DraftNight({
           <p className="text-[10px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
             {done ? "Re-roll for a different board, or proceed to free agency." : "Watching CPU picks…"}
           </p>
-          <button onClick={onDone}
+          <button onClick={() => onDone(results)}
             className="text-[11px] font-black uppercase tracking-[0.18em] px-5 py-2 font-mono"
             style={{
               background: done ? "var(--ledger-ink)" : "var(--ledger-rule-light)",
