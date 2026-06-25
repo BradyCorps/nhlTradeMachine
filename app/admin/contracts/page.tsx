@@ -29,20 +29,28 @@ interface ContractRow {
 }
 
 const POSITION_OPTIONS = ["C", "W", "D", "G"] as const;
+const MONO = "'Courier Prime', monospace";
+
+// Shared light-paper field styling for inputs/selects/textareas.
+const field: React.CSSProperties = {
+  background: "var(--paper)", border: "1px solid var(--rule)",
+  color: "var(--ledger-ink)", fontFamily: MONO, outline: "none",
+};
 
 function SourceBadge({ source }: { source: string }) {
+  // Light-theme badges: a soft accent tint with the saturated accent text.
   const cfg: Record<string, { bg: string; color: string }> = {
     // DB provenance (the single source of truth).
-    editor:   { bg: "#1e3a5f", color: "#7ec8e3" },
-    sync:     { bg: "#1a3a1a", color: "#6bcf6b" },
-    seed:     { bg: "#2a2a2a", color: "#aaaaaa" },
-    missing:  { bg: "#3a1a1a", color: "#cf6b6b" },
+    editor:   { bg: "#e3e7f1", color: "#1a2e5c" },
+    sync:     { bg: "#e0eee0", color: "#1a5c2e" },
+    seed:     { bg: "#e4d8b8", color: "#6b5030" },
+    missing:  { bg: "#f4e0db", color: "#b83020" },
     // Legacy scrape-preview labels (only when ?scrape=1 delta view is active).
-    admin:    { bg: "#1e3a5f", color: "#7ec8e3" },
-    override: { bg: "#3a2a00", color: "#f0a500" },
-    scraper:  { bg: "#1a3a1a", color: "#6bcf6b" },
-    bundled:  { bg: "#2a2a2a", color: "#aaaaaa" },
-    default:  { bg: "#3a1a1a", color: "#cf6b6b" },
+    admin:    { bg: "#e3e7f1", color: "#1a2e5c" },
+    override: { bg: "#f1e7d0", color: "#8a5c00" },
+    scraper:  { bg: "#e0eee0", color: "#1a5c2e" },
+    bundled:  { bg: "#e4d8b8", color: "#6b5030" },
+    default:  { bg: "#f4e0db", color: "#b83020" },
   };
   const s = cfg[source] ?? cfg.default;
   return (
@@ -56,7 +64,7 @@ function SourceBadge({ source }: { source: string }) {
 function FaBadge({ status, year }: { status: string | null; year: number | null }) {
   if (!status) return null;
   const u = status.toUpperCase();
-  const color = u === "RFA" ? "#f0a500" : "#cf6b6b";
+  const color = u === "RFA" ? "#8a5c00" : "#b83020";
   return (
     <span title={year ? `Expires ${year}` : undefined}
       style={{ fontSize: 9, fontWeight: 900, padding: "0 3px", marginLeft: 5,
@@ -123,17 +131,17 @@ function EditModal({ row, onSave, onClear, onClose }: {
 
   return (
     <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
+      position: "fixed", inset: 0, background: "rgba(28,20,10,0.6)", backdropFilter: "blur(3px)",
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
     }} onClick={onClose}>
       <div style={{
-        background: "#1a1208", border: "1px solid #5a4a2a",
+        background: "var(--ledger-card-light)", border: "1px solid var(--rule)", borderTop: "3px solid var(--ledger-ink)",
         padding: "24px", minWidth: 340, maxWidth: 420,
       }} onClick={e => e.stopPropagation()}>
-        <div style={{ fontSize: 14, fontWeight: 900, color: "#e4d8b8", marginBottom: 16,
-          fontFamily: "'Courier Prime', monospace", letterSpacing: "0.05em" }}>
+        <div style={{ fontSize: 14, fontWeight: 900, color: "var(--ledger-ink)", marginBottom: 16,
+          fontFamily: MONO, letterSpacing: "0.05em" }}>
           {row.name}
-          <span style={{ fontSize: 11, color: "#8a7a5a", marginLeft: 8 }}>
+          <span style={{ fontSize: 11, color: "var(--ledger-ink-faint)", marginLeft: 8 }}>
             {row.position} {row.team && `· ${row.team.toUpperCase()}`}
           </span>
         </div>
@@ -143,9 +151,9 @@ function EditModal({ row, onSave, onClear, onClose }: {
             { label: "Bundled", val: row.bundledYears, cap: null },
             { label: "Scraped", val: row.scrapedYears, cap: null },
           ].map(s => (
-            <div key={s.label} style={{ background: "#2a1e0a", border: "1px solid #3a2e1a", padding: "8px 10px" }}>
-              <div style={{ fontSize: 10, color: "#8a7a5a", textTransform: "uppercase", letterSpacing: "0.1em" }}>{s.label}</div>
-              <div style={{ fontSize: 13, fontWeight: 900, color: "#c8b890", marginTop: 2 }}>
+            <div key={s.label} style={{ background: "var(--paper-inset)", border: "1px solid var(--ledger-rule-light)", padding: "8px 10px" }}>
+              <div style={{ fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{s.label}</div>
+              <div style={{ fontSize: 13, fontWeight: 900, color: "var(--ledger-ink-body)", marginTop: 2 }}>
                 {s.val != null ? `${s.val}yr` : "—"}
               </div>
             </div>
@@ -154,7 +162,7 @@ function EditModal({ row, onSave, onClear, onClose }: {
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "#8a7a5a", textTransform: "uppercase",
+            <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
               letterSpacing: "0.1em", marginBottom: 5 }}>
               Years Remaining
             </label>
@@ -162,12 +170,11 @@ function EditModal({ row, onSave, onClear, onClose }: {
               type="number" min={0} max={12} step={1}
               value={years}
               onChange={e => setYears(e.target.value)}
-              style={{ width: "100%", background: "#2a1e0a", border: "1px solid #5a4a2a",
-                color: "#e4d8b8", padding: "6px 10px", fontSize: 13, fontFamily: "'Courier Prime', monospace" }}
+              style={{ ...field, width: "100%", padding: "6px 10px", fontSize: 13 }}
             />
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "#8a7a5a", textTransform: "uppercase",
+            <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
               letterSpacing: "0.1em", marginBottom: 5 }}>
               Cap Hit ($M)
             </label>
@@ -175,20 +182,18 @@ function EditModal({ row, onSave, onClear, onClose }: {
               type="number" min={0} max={20} step={0.001}
               value={cap}
               onChange={e => setCap(e.target.value)}
-              style={{ width: "100%", background: "#2a1e0a", border: "1px solid #5a4a2a",
-                color: "#e4d8b8", padding: "6px 10px", fontSize: 13, fontFamily: "'Courier Prime', monospace" }}
+              style={{ ...field, width: "100%", padding: "6px 10px", fontSize: 13 }}
             />
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "#8a7a5a", textTransform: "uppercase",
+            <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
               letterSpacing: "0.1em", marginBottom: 5 }}>
               Position
             </label>
             <select
               value={position}
               onChange={e => setPosition(e.target.value)}
-              style={{ width: "100%", background: "#2a1e0a", border: "1px solid #5a4a2a",
-                color: "#e4d8b8", padding: "6px 10px", fontSize: 13, fontFamily: "'Courier Prime', monospace" }}
+              style={{ ...field, width: "100%", padding: "6px 10px", fontSize: 13 }}
             >
               <option value="">Keep</option>
               {POSITION_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
@@ -198,26 +203,26 @@ function EditModal({ row, onSave, onClear, onClose }: {
 
         {/* Free-agency status — first-class DB facts (single source of truth) */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20,
-          background: "#160f06", border: "1px solid #2a2030", padding: "10px 12px" }}>
+          background: "var(--paper-inset)", border: "1px solid var(--ledger-rule-light)", padding: "10px 12px" }}>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "#8a7a5a", textTransform: "uppercase",
+            <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
               letterSpacing: "0.1em", marginBottom: 5 }}>FA Status</label>
             <select value={fa} onChange={e => setFa(e.target.value)}
-              style={{ width: "100%", background: "#2a1e0a", border: "1px solid #5a4a2a",
-                color: "#e4d8b8", padding: "6px 10px", fontSize: 13, fontFamily: "'Courier Prime', monospace" }}>
+              style={{ ...field, width: "100%", padding: "6px 10px", fontSize: 13 }}>
               {FA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "#8a7a5a", textTransform: "uppercase",
+            <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
               letterSpacing: "0.1em", marginBottom: 5 }}>Expiry Yr</label>
             <input type="number" min={2024} max={2035} step={1} value={faYear}
               disabled={fa === "SIGNED"}
               onChange={e => setFaYear(e.target.value)}
-              style={{ width: "100%", background: fa === "SIGNED" ? "#1a1208" : "#2a1e0a", border: "1px solid #5a4a2a",
-                color: fa === "SIGNED" ? "#5a4a2a" : "#e4d8b8", padding: "6px 10px", fontSize: 13, fontFamily: "'Courier Prime', monospace" }} />
+              style={{ ...field, width: "100%", padding: "6px 10px", fontSize: 13,
+                background: fa === "SIGNED" ? "var(--ledger-rule-light)" : "var(--paper)",
+                color: fa === "SIGNED" ? "var(--ledger-ink-faint)" : "var(--ledger-ink)" }} />
           </div>
-          <label style={{ display: "flex", alignItems: "flex-end", gap: 6, fontSize: 11, color: "#cf6b6b", cursor: "pointer", paddingBottom: 7 }}>
+          <label style={{ display: "flex", alignItems: "flex-end", gap: 6, fontSize: 11, color: "var(--ledger-red)", cursor: "pointer", paddingBottom: 7 }}>
             <input type="checkbox" checked={exclude} onChange={e => setExclude(e.target.checked)} />
             Exclude from roster
           </label>
@@ -225,23 +230,23 @@ function EditModal({ row, onSave, onClear, onClose }: {
 
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => handle(false)} disabled={saving}
-            style={{ flex: 1, padding: "8px 0", background: "#1a3a1a", border: "1px solid #2a6a2a",
-              color: "#6bcf6b", fontSize: 12, fontWeight: 900, cursor: "pointer",
-              letterSpacing: "0.1em", fontFamily: "'Courier Prime', monospace" }}>
+            style={{ flex: 1, padding: "8px 0", background: "var(--ledger-green)", border: "1px solid var(--ledger-green)",
+              color: "#fff", fontSize: 12, fontWeight: 900, cursor: "pointer",
+              letterSpacing: "0.1em", fontFamily: MONO }}>
             {saving ? "SAVING..." : "SAVE"}
           </button>
           {row.adminYears != null || row.adminCap != null ? (
             <button onClick={() => handle(true)} disabled={saving}
-              style={{ padding: "8px 16px", background: "#3a1a1a", border: "1px solid #6a2a2a",
-                color: "#cf6b6b", fontSize: 12, fontWeight: 900, cursor: "pointer",
-                letterSpacing: "0.1em", fontFamily: "'Courier Prime', monospace" }}>
+              style={{ padding: "8px 16px", background: "transparent", border: "1px solid var(--ledger-red)",
+                color: "var(--ledger-red)", fontSize: 12, fontWeight: 900, cursor: "pointer",
+                letterSpacing: "0.1em", fontFamily: MONO }}>
               CLEAR
             </button>
           ) : null}
           <button onClick={onClose}
-            style={{ padding: "8px 16px", background: "#2a1e0a", border: "1px solid #3a2e1a",
-              color: "#8a7a5a", fontSize: 12, fontWeight: 900, cursor: "pointer",
-              letterSpacing: "0.1em", fontFamily: "'Courier Prime', monospace" }}>
+            style={{ padding: "8px 16px", background: "transparent", border: "1px solid var(--rule)",
+              color: "var(--ledger-ink-faint)", fontSize: 12, fontWeight: 900, cursor: "pointer",
+              letterSpacing: "0.1em", fontFamily: MONO }}>
             CANCEL
           </button>
         </div>
@@ -288,51 +293,47 @@ function AddPlayerForm({ onAdded }: { onAdded: () => void }) {
   if (!open) return (
     <button onClick={() => setOpen(true)}
       style={{ fontSize: 11, fontWeight: 900, padding: "5px 14px",
-        background: "#1e3a5f", border: "1px solid #2a5a8f",
-        color: "#7ec8e3", cursor: "pointer", letterSpacing: "0.1em" }}>
+        background: "rgba(26,46,92,0.10)", border: "1px solid var(--ledger-navy)",
+        color: "var(--ledger-navy)", cursor: "pointer", letterSpacing: "0.1em" }}>
       + ADD PLAYER
     </button>
   );
 
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap",
-      background: "#1a1208", border: "1px solid #2a5a8f", padding: "10px 14px" }}>
-      <span style={{ fontSize: 10, color: "#7ec8e3", fontWeight: 900, letterSpacing: "0.1em", whiteSpace: "nowrap" }}>
+      background: "var(--ledger-card-light)", border: "1px solid var(--ledger-navy)", padding: "10px 14px" }}>
+      <span style={{ fontSize: 10, color: "var(--ledger-navy)", fontWeight: 900, letterSpacing: "0.1em", whiteSpace: "nowrap" }}>
         NEW PLAYER
       </span>
       <input placeholder="Full name (exact)" value={name} onChange={e => setName(e.target.value)}
-        style={{ fontSize: 11, padding: "5px 8px", background: "#0f0c07",
-          border: "1px solid #3a2e1a", color: "#e4d8b8", outline: "none", minWidth: 180 }} />
+        style={{ ...field, fontSize: 11, padding: "5px 8px", minWidth: 180 }} />
       <input placeholder="Yrs" type="number" min={1} max={12} value={years}
         onChange={e => setYears(e.target.value)}
-        style={{ fontSize: 11, padding: "5px 8px", background: "#0f0c07",
-          border: "1px solid #3a2e1a", color: "#e4d8b8", outline: "none", width: 50 }} />
+        style={{ ...field, fontSize: 11, padding: "5px 8px", width: 50 }} />
       <input placeholder="Cap $M" type="number" min={0.5} max={20} step={0.001} value={cap}
         onChange={e => setCap(e.target.value)}
-        style={{ fontSize: 11, padding: "5px 8px", background: "#0f0c07",
-          border: "1px solid #3a2e1a", color: "#e4d8b8", outline: "none", width: 70 }} />
+        style={{ ...field, fontSize: 11, padding: "5px 8px", width: 70 }} />
       <select value={position} onChange={e => setPosition(e.target.value)}
-        style={{ fontSize: 11, padding: "5px 8px", background: "#0f0c07",
-          border: "1px solid #3a2e1a", color: "#e4d8b8", outline: "none", width: 58 }}>
+        style={{ ...field, fontSize: 11, padding: "5px 8px", width: 58 }}>
         {POSITION_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
       </select>
-      <label style={{ fontSize: 10, color: "#8a7a5a", display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+      <label style={{ fontSize: 10, color: "var(--ledger-ink-faint)", display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
         <input type="checkbox" checked={hasNMC} onChange={e => setHasNMC(e.target.checked)} />
         NMC
       </label>
       <button onClick={submit} disabled={saving}
         style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
-          background: "#1a3a1a", border: "1px solid #2a6a2a",
-          color: "#6bcf6b", cursor: "pointer", letterSpacing: "0.1em" }}>
+          background: "var(--ledger-green)", border: "1px solid var(--ledger-green)",
+          color: "#fff", cursor: "pointer", letterSpacing: "0.1em" }}>
         {saving ? "..." : "SAVE"}
       </button>
       <button onClick={() => { setOpen(false); setErr(null); }}
         style={{ fontSize: 11, fontWeight: 900, padding: "5px 10px",
-          background: "transparent", border: "1px solid #2a1e0a",
-          color: "#5a4a2a", cursor: "pointer" }}>
+          background: "transparent", border: "1px solid var(--rule)",
+          color: "var(--ledger-ink-faint)", cursor: "pointer" }}>
         ✕
       </button>
-      {err && <span style={{ fontSize: 10, color: "#cf4040" }}>{err}</span>}
+      {err && <span style={{ fontSize: 10, color: "var(--ledger-red)" }}>{err}</span>}
     </div>
   );
 }
@@ -366,7 +367,7 @@ function BulkFaForm({ onDone }: { onDone: (msg: string) => void }) {
   if (!open) return (
     <button onClick={() => setOpen(true)}
       style={{ fontSize: 11, fontWeight: 900, padding: "5px 14px",
-        background: "#2a1e3a", border: "1px solid #5a4a8f", color: "#b89aef",
+        background: "rgba(26,46,92,0.10)", border: "1px solid var(--ledger-navy)", color: "var(--ledger-navy)",
         cursor: "pointer", letterSpacing: "0.1em" }}>
       ⇪ BULK FREE AGENTS
     </button>
@@ -374,28 +375,26 @@ function BulkFaForm({ onDone }: { onDone: (msg: string) => void }) {
 
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap",
-      background: "#1a1208", border: "1px solid #5a4a8f", padding: "10px 14px" }}>
-      <span style={{ fontSize: 10, color: "#b89aef", fontWeight: 900, letterSpacing: "0.1em", whiteSpace: "nowrap", paddingTop: 6 }}>
+      background: "var(--ledger-card-light)", border: "1px solid var(--ledger-navy)", padding: "10px 14px" }}>
+      <span style={{ fontSize: 10, color: "var(--ledger-navy)", fontWeight: 900, letterSpacing: "0.1em", whiteSpace: "nowrap", paddingTop: 6 }}>
         BULK FA
       </span>
       <textarea placeholder="One player per line (or comma-separated)…" value={text}
         onChange={e => setText(e.target.value)} rows={3}
-        style={{ fontSize: 11, padding: "5px 8px", background: "#0f0c07",
-          border: "1px solid #3a2e1a", color: "#e4d8b8", outline: "none", minWidth: 260, resize: "vertical" }} />
+        style={{ ...field, fontSize: 11, padding: "5px 8px", minWidth: 260, resize: "vertical" }} />
       <select value={status} onChange={e => setStatus(e.target.value as any)}
-        style={{ fontSize: 11, padding: "5px 8px", background: "#0f0c07",
-          border: "1px solid #3a2e1a", color: "#e4d8b8", outline: "none" }}>
+        style={{ ...field, fontSize: 11, padding: "5px 8px" }}>
         {(["UFA", "RFA", "SIGNED", "EXCLUDE"] as const).map(s => <option key={s} value={s}>{s}</option>)}
       </select>
       <button onClick={submit} disabled={saving || count === 0}
         style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
-          background: "#2a1e3a", border: "1px solid #5a4a8f",
-          color: count === 0 ? "#5a4a6a" : "#b89aef", cursor: count === 0 ? "default" : "pointer", letterSpacing: "0.1em" }}>
+          background: count === 0 ? "transparent" : "var(--ledger-navy)", border: "1px solid var(--ledger-navy)",
+          color: count === 0 ? "var(--ledger-ink-faint)" : "#fff", cursor: count === 0 ? "default" : "pointer", letterSpacing: "0.1em" }}>
         {saving ? "..." : `APPLY (${count})`}
       </button>
       <button onClick={() => { setOpen(false); setText(""); }}
         style={{ fontSize: 11, fontWeight: 900, padding: "5px 10px",
-          background: "transparent", border: "1px solid #2a1e0a", color: "#5a4a2a", cursor: "pointer" }}>
+          background: "transparent", border: "1px solid var(--rule)", color: "var(--ledger-ink-faint)", cursor: "pointer" }}>
         ✕
       </button>
     </div>
@@ -536,46 +535,46 @@ export default function AdminContractsPage() {
   const needsCount   = contracts.filter(r => r.needsData).length;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f0c07", color: "#e4d8b8",
-      fontFamily: "'Courier Prime', monospace" }}>
+    <div style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)", color: "var(--ledger-ink)",
+      fontFamily: MONO }}>
 
       {/* Header */}
-      <div style={{ borderBottom: "1px solid #3a2e1a", padding: "16px 24px",
+      <div style={{ borderBottom: "1px solid var(--rule)", padding: "16px 24px",
         display: "flex", alignItems: "center", gap: 16 }}>
-        <a href="/armchair-gm" style={{ fontSize: 11, color: "#8a7a5a", textDecoration: "none",
-          letterSpacing: "0.1em" }}>← ARMCHAIR GM</a>
-        <span style={{ color: "#3a2e1a" }}>|</span>
+        <a href="/admin" style={{ fontSize: 11, color: "var(--ledger-ink-faint)", textDecoration: "none",
+          letterSpacing: "0.1em" }}>← DASHBOARD</a>
+        <span style={{ color: "var(--rule)" }}>|</span>
         <span style={{ fontSize: 14, fontWeight: 900, letterSpacing: "0.2em" }}>
           CONTRACT ADMIN
         </span>
-        <span style={{ fontSize: 11, color: "#8a7a5a", marginLeft: "auto" }}>
+        <span style={{ fontSize: 11, color: "var(--ledger-ink-faint)", marginLeft: "auto" }}>
           {contracts.length} players · {editorCount} editor · {needsCount} need data
         </span>
         <button onClick={handleSeed}
           title="Load the committed contract/FA baseline into the DB (idempotent; keeps editor rows)"
           style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
-            background: "#2a1e3a", border: "1px solid #5a4a8f", color: "#b89aef",
+            background: "rgba(26,46,92,0.10)", border: "1px solid var(--ledger-navy)", color: "var(--ledger-navy)",
             cursor: "pointer", letterSpacing: "0.1em" }}>
           LOAD BASELINE
         </button>
         <button onClick={handleSync} disabled={syncing || !scrapedRaw}
           title={!scrapedRaw ? "Click + LIVE DELTA first to load CapWages data" : ""}
           style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
-            background: syncing ? "#1a1a0a" : scrapedRaw ? "#1e3a1e" : "#1a1a1a",
-            border: `1px solid ${scrapedRaw ? "#2a5a2a" : "#2a2a2a"}`,
-            color: syncing ? "#5a7a5a" : scrapedRaw ? "#6bcf6b" : "#3a3a3a",
+            background: scrapedRaw && !syncing ? "var(--ledger-green)" : "transparent",
+            border: `1px solid ${scrapedRaw && !syncing ? "var(--ledger-green)" : "var(--rule)"}`,
+            color: scrapedRaw && !syncing ? "#fff" : "var(--ledger-ink-faint)",
             cursor: (syncing || !scrapedRaw) ? "default" : "pointer", letterSpacing: "0.1em" }}>
           {syncing ? "SYNCING..." : "SYNC LIVE"}
         </button>
         <button onClick={() => load(false)} style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
-          background: "#2a1e0a", border: "1px solid #5a4a2a", color: "#c8b890",
+          background: "transparent", border: "1px solid var(--rule)", color: "var(--ledger-ink-body)",
           cursor: "pointer", letterSpacing: "0.1em" }}>
           REFRESH
         </button>
         <button onClick={() => load(true)} disabled={loading}
           style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
-            background: "#1a1a2a", border: "1px solid #3a3a5a",
-            color: loading ? "#3a3a5a" : "#9a9acf",
+            background: "rgba(26,46,92,0.08)", border: "1px solid var(--ledger-navy)",
+            color: loading ? "var(--ledger-ink-faint)" : "var(--ledger-navy)",
             cursor: loading ? "default" : "pointer", letterSpacing: "0.1em" }}>
           + LIVE DELTA
         </button>
@@ -583,42 +582,41 @@ export default function AdminContractsPage() {
 
       {/* DB error banner */}
       {dbError && (
-        <div style={{ padding: "10px 24px", background: "#3a1a1a", borderBottom: "1px solid #6a2a2a",
-          color: "#cf6b6b", fontSize: 11, fontWeight: 900, letterSpacing: "0.05em" }}>
+        <div style={{ padding: "10px 24px", background: "rgba(184,48,32,0.10)", borderBottom: "1px solid var(--ledger-red)",
+          color: "var(--ledger-red)", fontSize: 11, fontWeight: 900, letterSpacing: "0.05em" }}>
           ⚠ DATABASE READ FAILED — {dbError}
         </div>
       )}
 
       {/* Add player + bulk FA */}
-      <div style={{ padding: "10px 24px", borderBottom: "1px solid #2a1e0a", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
+      <div style={{ padding: "10px 24px", borderBottom: "1px solid var(--ledger-rule-light)", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
         <AddPlayerForm onAdded={() => { load(); toast("Player added to the DB (editor-curated)", "success"); }} />
         <BulkFaForm onDone={(msg) => { load(); toast(msg, "success"); }} />
       </div>
 
       {/* Filter bar */}
-      <div style={{ padding: "12px 24px", borderBottom: "1px solid #2a1e0a",
+      <div style={{ padding: "12px 24px", borderBottom: "1px solid var(--ledger-rule-light)",
         display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search player or team..."
-          style={{ fontSize: 12, padding: "6px 12px", background: "#1a1208",
-            border: "1px solid #3a2e1a", color: "#e4d8b8", outline: "none", minWidth: 200 }}
+          style={{ ...field, fontSize: 12, padding: "6px 12px", minWidth: 200 }}
         />
         {(["all", "flagged", "editor", "needs"] as const).map(f => (
           <button key={f} onClick={() => setFilter(f)}
             style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
               letterSpacing: "0.1em", cursor: "pointer",
-              background: filter === f ? "#2a1e0a" : "transparent",
-              border: `1px solid ${filter === f ? "#5a4a2a" : "#2a1e0a"}`,
-              color: filter === f ? "#e4d8b8" : "#8a7a5a" }}>
+              background: filter === f ? "var(--paper-inset)" : "transparent",
+              border: `1px solid ${filter === f ? "var(--rule)" : "var(--ledger-rule-light)"}`,
+              color: filter === f ? "var(--ledger-ink)" : "var(--ledger-ink-faint)" }}>
             {f === "all" ? "ALL"
               : f === "flagged" ? `FLAGGED (${flaggedCount})`
               : f === "editor" ? `EDITOR (${editorCount})`
               : `NEEDS DATA (${needsCount})`}
           </button>
         ))}
-        <span style={{ fontSize: 11, color: "#5a4a2a", marginLeft: "auto" }}>
+        <span style={{ fontSize: 11, color: "var(--ledger-ink-faint)", marginLeft: "auto" }}>
           {filtered.length} shown
         </span>
       </div>
@@ -626,9 +624,9 @@ export default function AdminContractsPage() {
       {/* Column headers */}
       <div style={{ display: "grid",
         gridTemplateColumns: "200px 60px 60px 70px 70px 70px 70px 70px 80px 128px",
-        gap: 8, padding: "8px 24px", borderBottom: "1px solid #2a1e0a",
-        fontSize: 9, color: "#5a4a2a", fontWeight: 900, textTransform: "uppercase",
-        letterSpacing: "0.12em", position: "sticky", top: 0, background: "#0f0c07", zIndex: 10 }}>
+        gap: 8, padding: "8px 24px", borderBottom: "1px solid var(--rule)",
+        fontSize: 9, color: "var(--ledger-ink-faint)", fontWeight: 900, textTransform: "uppercase",
+        letterSpacing: "0.12em", position: "sticky", top: 0, background: "var(--paper)", zIndex: 10 }}>
         <div>PLAYER</div>
         <div style={{ textAlign: "center" }}>POS</div>
         <div style={{ textAlign: "center" }}>TEAM</div>
@@ -643,53 +641,53 @@ export default function AdminContractsPage() {
 
       {/* Rows */}
       {loading ? (
-        <div style={{ padding: "60px 24px", textAlign: "center", color: "#5a4a2a",
+        <div style={{ padding: "60px 24px", textAlign: "center", color: "var(--ledger-ink-faint)",
           letterSpacing: "0.2em", fontSize: 11 }}>
           LOADING LIVE DATA...
         </div>
       ) : filtered.map(row => {
         const hasDelta   = (row.delta ?? 0) >= 1;
         const hasAdmin   = row.source === "admin";
-        const rowBg      = hasAdmin ? "#0d1a0d" : hasDelta ? "#1a0f00" : "transparent";
+        const rowBg      = hasAdmin ? "rgba(26,92,46,0.06)" : hasDelta ? "rgba(148,105,20,0.07)" : "transparent";
 
         return (
           <div key={row.name}
             style={{ display: "grid",
               gridTemplateColumns: "200px 60px 60px 70px 70px 70px 70px 70px 80px 128px",
-              gap: 8, padding: "7px 24px", borderBottom: "1px solid #1a1208",
+              gap: 8, padding: "7px 24px", borderBottom: "1px solid var(--ledger-rule-light)",
               fontSize: 11, background: rowBg, alignItems: "center",
               transition: "background 0.1s" }}>
 
-            <div style={{ fontWeight: 700, color: "#e4d8b8", whiteSpace: "nowrap",
+            <div style={{ fontWeight: 700, color: "var(--ledger-ink)", whiteSpace: "nowrap",
               overflow: "hidden", textOverflow: "ellipsis" }}>
               {row.name}
-              {row.hasNMC && <span style={{ fontSize: 9, color: "#cf4040", border: "1px solid #cf404050",
+              {row.hasNMC && <span style={{ fontSize: 9, color: "#b83020", border: "1px solid #b8302050",
                 padding: "0 3px", marginLeft: 5 }}>NMC</span>}
               <FaBadge status={row.expiryStatus} year={row.expiryYear} />
-              {row.excludeFromRoster && <span style={{ fontSize: 9, color: "#cf6b6b", border: "1px solid #cf6b6b50",
+              {row.excludeFromRoster && <span style={{ fontSize: 9, color: "#b83020", border: "1px solid #b8302050",
                 padding: "0 3px", marginLeft: 5 }}>EXCL</span>}
             </div>
 
-            <div style={{ textAlign: "center", color: "#8a7a5a" }}>{row.position ?? "—"}</div>
-            <div style={{ textAlign: "center", color: "#8a7a5a", fontSize: 10 }}>
+            <div style={{ textAlign: "center", color: "var(--ledger-ink-faint)" }}>{row.position ?? "—"}</div>
+            <div style={{ textAlign: "center", color: "var(--ledger-ink-faint)", fontSize: 10 }}>
               {row.team ? row.team.replace(/_/g, " ").slice(0, 6).toUpperCase() : "—"}
             </div>
 
             <div style={{ textAlign: "right", fontWeight: 900,
-              color: hasAdmin ? "#7ec8e3" : "#e4d8b8" }}>
+              color: hasAdmin ? "var(--ledger-navy)" : "var(--ledger-ink)" }}>
               {row.finalYears}yr
             </div>
-            <div style={{ textAlign: "right", color: "#c8b890" }}>
+            <div style={{ textAlign: "right", color: "var(--ledger-ink-body)" }}>
               {row.finalCap != null ? `$${row.finalCap.toFixed(2)}M` : "—"}
             </div>
-            <div style={{ textAlign: "right", color: "#5a4a2a" }}>
+            <div style={{ textAlign: "right", color: "var(--ledger-ink-faint)" }}>
               {row.bundledYears != null ? `${row.bundledYears}yr` : "—"}
             </div>
-            <div style={{ textAlign: "right", color: "#5a6a5a" }}>
+            <div style={{ textAlign: "right", color: "var(--ledger-ink-faint)" }}>
               {row.scrapedYears != null ? `${row.scrapedYears}yr` : "—"}
             </div>
             <div style={{ textAlign: "right",
-              color: (row.delta ?? 0) >= 3 ? "#cf4040" : (row.delta ?? 0) >= 1 ? "#f0a500" : "#3a2e1a",
+              color: (row.delta ?? 0) >= 3 ? "var(--ledger-red)" : (row.delta ?? 0) >= 1 ? "var(--amber)" : "var(--ledger-rule)",
               fontWeight: (row.delta ?? 0) >= 1 ? 900 : 400 }}>
               {row.delta != null ? (row.delta >= 1 ? `Δ${row.delta}` : "—") : "?"}
             </div>
@@ -697,22 +695,22 @@ export default function AdminContractsPage() {
           <div style={{ textAlign: "center" }}>
               {row.retired
                 ? <span title={row.retiredDate ?? undefined} style={{ fontSize: 10, fontWeight: 900, padding: "1px 5px", letterSpacing: "0.1em",
-                  background: "#3a1a1a", color: "#cf6b6b", border: "1px solid #cf6b6b40" }}>RETIRED</span>
+                  background: "#f4e0db", color: "#b83020", border: "1px solid #b8302040" }}>RETIRED</span>
                 : <SourceBadge source={row.dbSource ?? "missing"} />}
             </div>
 
             <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
               <button onClick={() => setEditing(row)}
                 style={{ fontSize: 10, fontWeight: 900, padding: "3px 8px",
-                  background: "transparent", border: "1px solid #3a2e1a",
-                  color: "#8a7a5a", cursor: "pointer", letterSpacing: "0.1em" }}>
+                  background: "transparent", border: "1px solid var(--rule)",
+                  color: "var(--ledger-ink-faint)", cursor: "pointer", letterSpacing: "0.1em" }}>
                 EDIT
               </button>
               <button onClick={() => handleRetire(row)}
                 style={{ fontSize: 10, fontWeight: 900, padding: "3px 8px",
-                  background: row.retired ? "#1a3a1a" : "transparent",
-                  border: `1px solid ${row.retired ? "#2a6a2a" : "#6a2a2a"}`,
-                  color: row.retired ? "#6bcf6b" : "#cf6b6b", cursor: "pointer", letterSpacing: "0.1em" }}>
+                  background: "transparent",
+                  border: `1px solid ${row.retired ? "var(--ledger-green)" : "var(--ledger-red)"}`,
+                  color: row.retired ? "var(--ledger-green)" : "var(--ledger-red)", cursor: "pointer", letterSpacing: "0.1em" }}>
                 {row.retired ? "RESTORE" : "RETIRE"}
               </button>
             </div>
@@ -721,7 +719,7 @@ export default function AdminContractsPage() {
       })}
 
       {!loading && filtered.length === 0 && (
-        <div style={{ padding: "40px 24px", textAlign: "center", color: "#5a4a2a",
+        <div style={{ padding: "40px 24px", textAlign: "center", color: "var(--ledger-ink-faint)",
           letterSpacing: "0.2em", fontSize: 11 }}>
           NO PLAYERS MATCH
         </div>
