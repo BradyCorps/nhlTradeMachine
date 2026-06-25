@@ -455,7 +455,7 @@ export function SharedTradeView({ code }: { code: string }) {
   const incoming = payload ? resolveTradeShareAssets(payload.blocks.incoming, data.players) : [];
 
   return (
-    <main className="min-h-screen font-serif antialiased" style={{ background: "var(--paper)", color: "var(--ink)" }}>
+    <main className="min-h-screen font-serif antialiased ledger-setdown" style={{ background: "var(--paper)", color: "var(--ink)" }}>
       <div className="relative w-full max-w-5xl mx-auto px-4 lg:px-6 py-6 lg:py-8 flex flex-col gap-5">
         <Header activeTab="trade" />
         <section className="border p-5 sm:p-6" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card)" }}>
@@ -651,7 +651,7 @@ export default function QuickTradeMachine() {
   };
 
   return (
-    <main className="min-h-screen font-serif antialiased" style={{ background: "var(--paper)", color: "var(--ink)" }}>
+    <main className="min-h-screen font-serif antialiased ledger-setdown" style={{ background: "var(--paper)", color: "var(--ink)" }}>
       <div className="relative w-full max-w-6xl mx-auto px-4 lg:px-6 py-6 lg:py-8 flex flex-col gap-5">
         <Header activeTab="trade" />
 

@@ -1211,3 +1211,68 @@ select.ledger-select {
   .fp-cell, .fp-stamp, .fp-cell:active .fp-stamp { transition: none; transform: none; }
   .fp-armed, .fp-armed.fp-in { opacity: 1; transform: none; transition: none; }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   TACTILE LEDGER — "set the page down on the desk" + unified press
+   Every reading surface is laid onto the desk on load: it drops in
+   from just above, the far edge tips down onto the table, and it
+   settles with a small rebound — the feel of setting a newspaper
+   down in front of you. One physical ink-press is shared by every
+   button in the app, from the front page to the admin panel.
+   ──────────────────────────────────────────────────────────────── */
+.ledger-setdown {
+  /* No fill: after it lands the transform clears entirely, so the
+     surface never lingers as a containing block (keeps sticky headers
+     and any fixed children behaving normally). */
+  animation: ledger-setdown 0.82s var(--fp-ease) ;
+  transform-origin: 50% 100%;
+  backface-visibility: hidden;
+}
+@keyframes ledger-setdown {
+  0% {
+    opacity: 0;
+    transform: perspective(1600px) translateY(-40px) rotateX(7deg) scale(1.02);
+  }
+  55% {
+    /* contact — the sheet meets the desk, dipping just past flat */
+    opacity: 1;
+    transform: perspective(1600px) translateY(5px) rotateX(-1.4deg) scale(0.997);
+  }
+  78% {
+    /* small rebound, like paper settling */
+    transform: perspective(1600px) translateY(-2px) rotateX(0.5deg) scale(1.001);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1600px) translateY(0) rotateX(0deg) scale(1);
+  }
+}
+
+/* ── Unified ink-press for the button vocabulary ─────────────────── */
+.btn-stamp, .btn-green-ink {
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.22);
+  transition: transform 0.12s var(--fp-ease), box-shadow 0.12s var(--fp-ease), filter 0.15s, background 0.15s;
+}
+.btn-stamp:active, .btn-green-ink:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0.22);
+}
+.btn-ink, .btn-ghost {
+  transition: transform 0.12s var(--fp-ease), background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn-ink:active, .btn-ghost:active { transform: translateY(1px); }
+.filter-btn:active, .col-header:active { transform: translateY(1px); }
+
+/* Gentle global press so every button reads as physical — including the
+   admin panel's inline-styled buttons. The specific classes above and the
+   element-targeted active rules elsewhere out-rank this, so nothing that
+   already presses is disturbed. */
+button { transition: transform 0.1s var(--fp-ease); }
+button:active:not(:disabled) { transform: translateY(1px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ledger-setdown { animation: none; }
+  .btn-stamp, .btn-green-ink, .btn-ink, .btn-ghost, .filter-btn, .col-header, button { transition: none; }
+  .btn-stamp:active, .btn-green-ink:active, .btn-ink:active, .btn-ghost:active,
+  .filter-btn:active, .col-header:active, button:active:not(:disabled) { transform: none; }
+}

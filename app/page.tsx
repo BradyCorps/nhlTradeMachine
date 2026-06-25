@@ -97,7 +97,7 @@ export default function WelcomePage() {
   return (
     <main className="fp-desk min-h-screen font-serif antialiased" style={{ color: "var(--ink)" }}>
       <ScrollReveal />
-      <div className="fp-sheet">
+      <div className="fp-sheet ledger-setdown">
 
         {/* ── Dateline ───────────────────────────────────────── */}
         <div className="border-b" style={{ borderColor: "var(--rule)" }}>

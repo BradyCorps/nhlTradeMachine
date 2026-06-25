@@ -69,7 +69,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           ← ARMCHAIR GM
         </a>
       </nav>
-      {children}
+      <div className="ledger-setdown">{children}</div>
     </>
   );
 }

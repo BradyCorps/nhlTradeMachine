@@ -20,7 +20,7 @@ export default async function DocketPage() {
   const entries = await loadDocketEntries();
 
   return (
-    <main style={{
+    <main className="ledger-setdown" style={{
       minHeight: "100vh",
       background: "var(--paper)",
       color: "var(--ledger-ink)",

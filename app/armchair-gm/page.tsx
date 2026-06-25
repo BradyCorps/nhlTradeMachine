@@ -907,7 +907,7 @@ export default function ArmchairGmPage() {
 
   return (
     <>
-    <main className="min-h-screen antialiased select-none overflow-x-hidden bg-paper text-ink font-serif">
+    <main className="min-h-screen antialiased select-none overflow-x-hidden bg-paper text-ink font-serif ledger-setdown">
 
       {/* Trade Proposal Engine Modal */}
       {tradeRequest && tradeRequest.length > 0 && (

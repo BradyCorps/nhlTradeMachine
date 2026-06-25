@@ -1048,7 +1048,7 @@ export default function PlayersPage() {
   const showGoalies = (posFilter === "ALL" || posFilter === "G") && goalies.length > 0;
 
   return (
-    <main style={{ minHeight: "100vh", background: "var(--paper)", color: "var(--ink)" }}>
+    <main className="ledger-setdown" style={{ minHeight: "100vh", background: "var(--paper)", color: "var(--ink)" }}>
 
       <Header activeTab="players" />
 
