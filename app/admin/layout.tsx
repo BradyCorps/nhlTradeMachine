@@ -5,6 +5,7 @@ const NAV_LINKS = [
   { href: "/admin/contracts",     label: "CONTRACTS"   },
   { href: "/admin/teams",         label: "TEAMS"       },
   { href: "/admin/trade-block",   label: "TRADE BLOCK" },
+  { href: "/admin/trades",        label: "TRADES"      },
   { href: "/admin/draft-picks",   label: "PICKS"       },
   { href: "/admin/fa-overrides",  label: "FREE AGENTS" },
   { href: "/admin/settings",      label: "SETTINGS"    },
@@ -58,18 +59,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
         <div style={{ flex: 1 }} />
         <a
-          href="/armchair-gm"
+          href="/"
           style={{
-            color: "rgba(255,255,255,0.3)",
+            color: "rgba(255,255,255,0.45)",
             fontSize: 9,
+            fontWeight: 900,
             textDecoration: "none",
-            letterSpacing: "0.12em",
+            letterSpacing: "0.18em",
+            whiteSpace: "nowrap",
           }}
         >
-          ← ARMCHAIR GM
+          ← HOME
         </a>
       </nav>
-      <div>{children}</div>
+      <div style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)" }}>{children}</div>
     </>
   );
 }

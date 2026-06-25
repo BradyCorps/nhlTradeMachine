@@ -26,6 +26,12 @@ const ALL_TEAMS = [
   "WSH","WPG",
 ];
 
+const inputStyle: React.CSSProperties = {
+  width: "100%", background: "var(--paper)", border: "1px solid var(--rule)",
+  color: "var(--ledger-ink)", padding: "6px 8px", fontSize: 13,
+  fontFamily: "'Courier Prime', monospace",
+};
+
 function EditPickModal({
   pick,
   onSave,
@@ -61,47 +67,45 @@ function EditPickModal({
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(28,20,10,0.6)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
       onClick={onClose}>
-      <div style={{ background: "#1a1208", border: "1px solid #5a4a2a", padding: 24, minWidth: 360, maxWidth: 440 }}
+      <div style={{ background: "var(--ledger-card-light)", border: "1px solid var(--rule)", borderTop: "3px solid var(--ledger-ink)", padding: 24, minWidth: 360, maxWidth: 440, fontFamily: "'Courier Prime', monospace" }}
         onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontSize: 14, fontWeight: 900, color: "#e4d8b8", marginBottom: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 900, color: "var(--ledger-ink)", marginBottom: 16 }}>
           {pick.year} {ROUND_LABEL(pick.round)} · {pick.originalOwnerId}
         </div>
-        {error && <div style={{ color: "#cf6b6b", fontSize: 12, marginBottom: 12 }}>{error}</div>}
+        {error && <div style={{ color: "var(--ledger-red)", fontSize: 12, marginBottom: 12 }}>{error}</div>}
 
         <div style={{ marginBottom: 12 }}>
-          <label style={{ color: "#a08060", fontSize: 11, fontWeight: 700, display: "block", marginBottom: 4 }}>CURRENT OWNER</label>
-          <select value={owner} onChange={(e) => setOwner(e.target.value)}
-            style={{ width: "100%", background: "#2a1e10", border: "1px solid #5a4a2a", color: "#e4d8b8", padding: "6px 8px", fontSize: 13 }}>
+          <label style={{ color: "var(--ledger-ink-faint)", fontSize: 11, fontWeight: 700, display: "block", marginBottom: 4 }}>CURRENT OWNER</label>
+          <select value={owner} onChange={(e) => setOwner(e.target.value)} style={inputStyle}>
             {ALL_TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
 
         <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 10 }}>
           <input type="checkbox" id="prot" checked={prot} onChange={(e) => setProt(e.target.checked)} />
-          <label htmlFor="prot" style={{ color: "#a08060", fontSize: 12, fontWeight: 700 }}>PROTECTED</label>
+          <label htmlFor="prot" style={{ color: "var(--ledger-ink-faint)", fontSize: 12, fontWeight: 700 }}>PROTECTED</label>
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ color: "#a08060", fontSize: 11, fontWeight: 700, display: "block", marginBottom: 4 }}>CONDITIONS (optional)</label>
-          <input value={cond} onChange={(e) => setCond(e.target.value)} placeholder="e.g. Top-10 protected 2026"
-            style={{ width: "100%", background: "#2a1e10", border: "1px solid #5a4a2a", color: "#e4d8b8", padding: "6px 8px", fontSize: 12 }} />
+          <label style={{ color: "var(--ledger-ink-faint)", fontSize: 11, fontWeight: 700, display: "block", marginBottom: 4 }}>CONDITIONS (optional)</label>
+          <input value={cond} onChange={(e) => setCond(e.target.value)} placeholder="e.g. Top-10 protected 2026" style={{ ...inputStyle, fontSize: 12 }} />
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => handle(false)} disabled={saving}
-            style={{ flex: 1, background: "#1e3a5f", color: "#7ec8e3", border: "none", padding: "8px 0", fontWeight: 900, fontSize: 11, letterSpacing: "0.1em", cursor: "pointer" }}>
+            style={{ flex: 1, background: "var(--ledger-navy)", color: "#fff", border: "none", padding: "8px 0", fontWeight: 900, fontSize: 11, letterSpacing: "0.1em", cursor: "pointer" }}>
             {saving ? "Saving…" : "SAVE"}
           </button>
           {pick.hasOverride && (
             <button onClick={() => handle(true)} disabled={saving}
-              style={{ flex: 1, background: "#3a1a1a", color: "#cf6b6b", border: "none", padding: "8px 0", fontWeight: 900, fontSize: 11, letterSpacing: "0.1em", cursor: "pointer" }}>
+              style={{ flex: 1, background: "transparent", color: "var(--ledger-red)", border: "1px solid var(--ledger-red)", padding: "8px 0", fontWeight: 900, fontSize: 11, letterSpacing: "0.1em", cursor: "pointer" }}>
               RESET TO DEFAULT
             </button>
           )}
           <button onClick={onClose} disabled={saving}
-            style={{ background: "transparent", color: "#a08060", border: "1px solid #5a4a2a", padding: "8px 12px", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+            style={{ background: "transparent", color: "var(--ledger-ink-faint)", border: "1px solid var(--rule)", padding: "8px 12px", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
             Cancel
           </button>
         </div>
@@ -177,48 +181,49 @@ export default function DraftPicksPage() {
   const movedCount = picks.filter((p) => p.hasOverride).length;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0d0a05", color: "#e4d8b8", fontFamily: "'Courier Prime', monospace", padding: "32px 24px" }}>
+    <div style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)", color: "var(--ledger-ink)", fontFamily: "'Courier Prime', monospace", padding: "32px 24px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 9, letterSpacing: "0.3em", color: "var(--ledger-ink-faint)", marginBottom: 4 }}>ADMIN</div>
           <h1 style={{ fontSize: 22, fontWeight: 900, letterSpacing: "0.12em", marginBottom: 4 }}>DRAFT PICK BOARD</h1>
-          <p style={{ color: "#a08060", fontSize: 12 }}>
+          <p style={{ color: "var(--ledger-ink-faint)", fontSize: 12 }}>
             {movedCount} pick{movedCount !== 1 ? "s" : ""} moved from original owner · click any pick to transfer or protect it
           </p>
-          {error && <div style={{ marginTop: 8, color: "#cf6b6b", fontSize: 12, fontWeight: 700 }}>{error}</div>}
+          {error && <div style={{ marginTop: 8, color: "var(--ledger-red)", fontSize: 12, fontWeight: 700 }}>{error}</div>}
         </div>
 
         {/* Filters */}
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20, alignItems: "center" }}>
           <select value={filterTeam} onChange={(e) => setFilterTeam(e.target.value)}
-            style={{ background: "#2a1e10", border: "1px solid #5a4a2a", color: "#e4d8b8", padding: "5px 8px", fontSize: 12 }}>
+            style={{ ...inputStyle, width: "auto", fontSize: 12 }}>
             <option value="ALL">All Teams</option>
             {ALL_TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
           <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}
-            style={{ background: "#2a1e10", border: "1px solid #5a4a2a", color: "#e4d8b8", padding: "5px 8px", fontSize: 12 }}>
+            style={{ ...inputStyle, width: "auto", fontSize: 12 }}>
             <option value="ALL">All Years</option>
             {years.map((y) => <option key={y} value={String(y)}>{y}</option>)}
           </select>
           <select value={filterRound} onChange={(e) => setFilterRound(e.target.value)}
-            style={{ background: "#2a1e10", border: "1px solid #5a4a2a", color: "#e4d8b8", padding: "5px 8px", fontSize: 12 }}>
+            style={{ ...inputStyle, width: "auto", fontSize: 12 }}>
             <option value="ALL">All Rounds</option>
             {[1,2,3,4,5].map((r) => <option key={r} value={String(r)}>{ROUND_LABEL(r)}</option>)}
           </select>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#a08060", cursor: "pointer" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--ledger-ink-faint)", cursor: "pointer" }}>
             <input type="checkbox" checked={showMovedOnly} onChange={(e) => setShowMovedOnly(e.target.checked)} />
             Moved picks only
           </label>
-          <span style={{ color: "#5a4a2a", fontSize: 12 }}>{filtered.length} picks shown</span>
+          <span style={{ color: "var(--ledger-ink-faint)", fontSize: 12 }}>{filtered.length} picks shown</span>
         </div>
 
         {loading ? (
-          <div style={{ color: "#a08060", fontSize: 12, padding: 20 }}>Loading…</div>
+          <div style={{ color: "var(--ledger-ink-faint)", fontSize: 12, padding: 20 }}>Loading…</div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
-              <tr style={{ borderBottom: "2px solid #5a4a2a" }}>
+              <tr style={{ borderBottom: "2px solid var(--rule)" }}>
                 {["Year","Round","Original","Current Owner","Standing","Protected","Conditions",""].map((h) => (
-                  <th key={h} style={{ textAlign: "left", padding: "6px 10px", color: "#a08060", fontWeight: 900, fontSize: 10, letterSpacing: "0.12em" }}>{h}</th>
+                  <th key={h} style={{ textAlign: "left", padding: "6px 10px", color: "var(--ledger-ink-faint)", fontWeight: 900, fontSize: 10, letterSpacing: "0.12em" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -227,26 +232,26 @@ export default function DraftPicksPage() {
                 const moved = p.currentOwnerId !== p.originalOwnerId;
                 return (
                   <tr key={p.id}
-                    style={{ borderBottom: "1px solid #2a1e10", background: moved ? "rgba(30,58,95,0.15)" : "transparent" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = moved ? "rgba(30,58,95,0.30)" : "rgba(255,255,255,0.03)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = moved ? "rgba(30,58,95,0.15)" : "transparent")}>
-                    <td style={{ padding: "6px 10px", color: "#e4d8b8" }}>{p.year}</td>
+                    style={{ borderBottom: "1px solid var(--ledger-rule-light)", background: moved ? "rgba(40,70,110,0.10)" : "transparent" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = moved ? "rgba(40,70,110,0.18)" : "rgba(40,70,110,0.05)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = moved ? "rgba(40,70,110,0.10)" : "transparent")}>
+                    <td style={{ padding: "6px 10px", color: "var(--ledger-ink)" }}>{p.year}</td>
                     <td style={{ padding: "6px 10px", fontWeight: 900 }}>{ROUND_LABEL(p.round)}</td>
-                    <td style={{ padding: "6px 10px", color: moved ? "#a08060" : "#e4d8b8" }}>{p.originalOwnerId}</td>
-                    <td style={{ padding: "6px 10px", fontWeight: moved ? 900 : 400, color: moved ? "#7ec8e3" : "#e4d8b8" }}>
+                    <td style={{ padding: "6px 10px", color: moved ? "var(--ledger-ink-faint)" : "var(--ledger-ink)" }}>{p.originalOwnerId}</td>
+                    <td style={{ padding: "6px 10px", fontWeight: moved ? 900 : 400, color: moved ? "var(--ledger-navy)" : "var(--ledger-ink)" }}>
                       {p.currentOwnerId}
-                      {moved && <span style={{ fontSize: 9, marginLeft: 6, color: "#7ec8e3", background: "#1e3a5f", padding: "1px 4px" }}>MOVED</span>}
+                      {moved && <span style={{ fontSize: 9, marginLeft: 6, color: "#fff", background: "var(--ledger-navy)", padding: "1px 4px" }}>MOVED</span>}
                     </td>
-                    <td style={{ padding: "6px 10px", color: "#a08060" }}>{p.teamStanding}</td>
+                    <td style={{ padding: "6px 10px", color: "var(--ledger-ink-faint)" }}>{p.teamStanding}</td>
                     <td style={{ padding: "6px 10px" }}>
-                      {p.isProtected && <span style={{ fontSize: 9, color: "#f0a500", background: "#3a2a00", padding: "1px 4px", fontWeight: 900 }}>PROT</span>}
+                      {p.isProtected && <span style={{ fontSize: 9, color: "#fff", background: "var(--amber)", padding: "1px 4px", fontWeight: 900 }}>PROT</span>}
                     </td>
-                    <td style={{ padding: "6px 10px", color: "#7a6a50", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <td style={{ padding: "6px 10px", color: "var(--ledger-brown)", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {p.conditions ?? ""}
                     </td>
                     <td style={{ padding: "6px 10px" }}>
                       <button onClick={() => setEditing(p)}
-                        style={{ background: "transparent", color: "#7ec8e3", border: "1px solid #1e3a5f", padding: "3px 10px", fontSize: 10, fontWeight: 900, letterSpacing: "0.1em", cursor: "pointer" }}>
+                        style={{ background: "transparent", color: "var(--ledger-navy)", border: "1px solid var(--ledger-navy)", padding: "3px 10px", fontSize: 10, fontWeight: 900, letterSpacing: "0.1em", cursor: "pointer" }}>
                         EDIT
                       </button>
                     </td>
