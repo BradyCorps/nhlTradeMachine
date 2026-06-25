@@ -24,6 +24,7 @@ const UFA: string[] = [
   // Forwards
   "Alex Tuch", "Anthony Mantha", "Alex Ovechkin", "Patrick Kane", "Viktor Arvidsson",
   "Mats Zuccarello", "Marcus Johansson", "Claude Giroux", "Vladimir Tarasenko", "Mason Marchment",
+  "Gustav Nyquist",
   // Defence
   "John Carlson", "Rasmus Andersson", "Jacob Trouba", "Ryan Shea", "Tony DeAngelo",
   "Brent Burns", "John Klingberg", "Logan Stanley", "Nick Blankenburg", "Mario Ferraro",
