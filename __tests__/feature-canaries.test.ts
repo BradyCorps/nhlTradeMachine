@@ -1026,7 +1026,9 @@ describe("Canary — admin contract sync", () => {
     expect(route).toContain("position,");
     expect(page).toContain("const POSITION_OPTIONS = [\"C\", \"W\", \"D\", \"G\"]");
     expect(page).toContain("body: JSON.stringify({ name: name.trim(), yearsRemaining: y, capHit: c, position, hasNMC })");
-    expect(page).toContain("body: JSON.stringify({ name, yearsRemaining, capHit, position })");
+    // The editor save now sends the full ContractEdit object (incl. FA facts).
+    expect(page).toContain("body: JSON.stringify(edit)");
+    expect(page).toContain("expiryStatus");
   });
 
   it("contract admin can recover from an empty reset DB by creating the players table", () => {

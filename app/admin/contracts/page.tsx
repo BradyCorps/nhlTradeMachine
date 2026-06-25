@@ -19,6 +19,10 @@ interface ContractRow {
   retired:       boolean;
   retiredDate:   string | null;
   expiryStatus:  string | null;
+  expiryYear:    number | null;
+  excludeFromRoster: boolean;
+  dbSource:      string | null;
+  needsData:     boolean;
   delta:         number | null;
   source:        string;
 }
@@ -27,6 +31,12 @@ const POSITION_OPTIONS = ["C", "W", "D", "G"] as const;
 
 function SourceBadge({ source }: { source: string }) {
   const cfg: Record<string, { bg: string; color: string }> = {
+    // DB provenance (the single source of truth).
+    editor:   { bg: "#1e3a5f", color: "#7ec8e3" },
+    sync:     { bg: "#1a3a1a", color: "#6bcf6b" },
+    seed:     { bg: "#2a2a2a", color: "#aaaaaa" },
+    missing:  { bg: "#3a1a1a", color: "#cf6b6b" },
+    // Legacy scrape-preview labels (only when ?scrape=1 delta view is active).
     admin:    { bg: "#1e3a5f", color: "#7ec8e3" },
     override: { bg: "#3a2a00", color: "#f0a500" },
     scraper:  { bg: "#1a3a1a", color: "#6bcf6b" },
@@ -42,15 +52,44 @@ function SourceBadge({ source }: { source: string }) {
   );
 }
 
+function FaBadge({ status, year }: { status: string | null; year: number | null }) {
+  if (!status) return null;
+  const u = status.toUpperCase();
+  const color = u === "RFA" ? "#f0a500" : "#cf6b6b";
+  return (
+    <span title={year ? `Expires ${year}` : undefined}
+      style={{ fontSize: 9, fontWeight: 900, padding: "0 3px", marginLeft: 5,
+        color, border: `1px solid ${color}50`, letterSpacing: "0.08em" }}>
+      {u}{year ? ` ${year}` : ""}
+    </span>
+  );
+}
+
+interface ContractEdit {
+  name: string;
+  yearsRemaining: number | null;
+  capHit: number | null;
+  position: string | null;
+  expiryStatus: string | null;       // "UFA" | "RFA" | null (SIGNED)
+  expiryYear: number | null;
+  excludeFromRoster: boolean;
+}
+
+const FA_OPTIONS = ["SIGNED", "UFA", "RFA"] as const;
+
 function EditModal({ row, onSave, onClear, onClose }: {
   row:     ContractRow;
-  onSave:  (name: string, years: number | null, cap: number | null, position: string | null) => Promise<void>;
+  onSave:  (edit: ContractEdit) => Promise<void>;
   onClear: (name: string) => Promise<void>;
   onClose: () => void;
 }) {
   const [years, setYears] = useState(String(row.adminYears ?? row.finalYears ?? ""));
   const [cap,   setCap]   = useState(String(row.adminCap   ?? row.finalCap   ?? ""));
   const [position, setPosition] = useState(POSITION_OPTIONS.includes(row.position as any) ? String(row.position) : "");
+  const initFa = (row.expiryStatus ?? "").toUpperCase();
+  const [fa, setFa] = useState<string>(initFa === "UFA" || initFa === "RFA" ? initFa : "SIGNED");
+  const [faYear, setFaYear] = useState(String(row.expiryYear ?? ""));
+  const [exclude, setExclude] = useState(Boolean(row.excludeFromRoster));
   const [saving, setSaving] = useState(false);
 
   const handle = async (clear = false) => {
@@ -61,7 +100,17 @@ function EditModal({ row, onSave, onClear, onClose }: {
       } else {
         const y = parseFloat(years);
         const c = parseFloat(cap);
-        await onSave(row.name, isNaN(y) ? null : y, isNaN(c) ? null : c, position || null);
+        const fy = parseInt(faYear);
+        const expiryStatus = fa === "UFA" || fa === "RFA" ? fa : null;
+        await onSave({
+          name: row.name,
+          yearsRemaining: isNaN(y) ? null : y,
+          capHit: isNaN(c) ? null : c,
+          position: position || null,
+          expiryStatus,
+          expiryYear: expiryStatus ? (isNaN(fy) ? null : fy) : null,
+          excludeFromRoster: exclude,
+        });
       }
       onClose();
     } catch {
@@ -144,6 +193,33 @@ function EditModal({ row, onSave, onClear, onClose }: {
               {POSITION_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
+        </div>
+
+        {/* Free-agency status — first-class DB facts (single source of truth) */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20,
+          background: "#160f06", border: "1px solid #2a2030", padding: "10px 12px" }}>
+          <div>
+            <label style={{ display: "block", fontSize: 10, color: "#8a7a5a", textTransform: "uppercase",
+              letterSpacing: "0.1em", marginBottom: 5 }}>FA Status</label>
+            <select value={fa} onChange={e => setFa(e.target.value)}
+              style={{ width: "100%", background: "#2a1e0a", border: "1px solid #5a4a2a",
+                color: "#e4d8b8", padding: "6px 10px", fontSize: 13, fontFamily: "'Courier Prime', monospace" }}>
+              {FA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 10, color: "#8a7a5a", textTransform: "uppercase",
+              letterSpacing: "0.1em", marginBottom: 5 }}>Expiry Yr</label>
+            <input type="number" min={2024} max={2035} step={1} value={faYear}
+              disabled={fa === "SIGNED"}
+              onChange={e => setFaYear(e.target.value)}
+              style={{ width: "100%", background: fa === "SIGNED" ? "#1a1208" : "#2a1e0a", border: "1px solid #5a4a2a",
+                color: fa === "SIGNED" ? "#5a4a2a" : "#e4d8b8", padding: "6px 10px", fontSize: 13, fontFamily: "'Courier Prime', monospace" }} />
+          </div>
+          <label style={{ display: "flex", alignItems: "flex-end", gap: 6, fontSize: 11, color: "#cf6b6b", cursor: "pointer", paddingBottom: 7 }}>
+            <input type="checkbox" checked={exclude} onChange={e => setExclude(e.target.checked)} />
+            Exclude from roster
+          </label>
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
@@ -260,13 +336,78 @@ function AddPlayerForm({ onAdded }: { onAdded: () => void }) {
   );
 }
 
+function BulkFaForm({ onDone }: { onDone: (msg: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [status, setStatus] = useState<"UFA" | "RFA" | "SIGNED" | "EXCLUDE">("UFA");
+  const [saving, setSaving] = useState(false);
+  const count = text.split(/[\n,]+/).map(s => s.trim()).filter(Boolean).length;
+
+  const submit = async () => {
+    if (count === 0) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/fa-bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ names: text, status }),
+      });
+      const data = await readAdminResponse<{ updated: number; created: number }>(res, "Bulk FA failed");
+      onDone(`Bulk ${status} — ${data.updated} updated, ${data.created} created`);
+      setText(""); setOpen(false);
+    } catch (e) {
+      onDone(adminErrorMessage(e, "Bulk FA failed"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open) return (
+    <button onClick={() => setOpen(true)}
+      style={{ fontSize: 11, fontWeight: 900, padding: "5px 14px",
+        background: "#2a1e3a", border: "1px solid #5a4a8f", color: "#b89aef",
+        cursor: "pointer", letterSpacing: "0.1em" }}>
+      ⇪ BULK FREE AGENTS
+    </button>
+  );
+
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap",
+      background: "#1a1208", border: "1px solid #5a4a8f", padding: "10px 14px" }}>
+      <span style={{ fontSize: 10, color: "#b89aef", fontWeight: 900, letterSpacing: "0.1em", whiteSpace: "nowrap", paddingTop: 6 }}>
+        BULK FA
+      </span>
+      <textarea placeholder="One player per line (or comma-separated)…" value={text}
+        onChange={e => setText(e.target.value)} rows={3}
+        style={{ fontSize: 11, padding: "5px 8px", background: "#0f0c07",
+          border: "1px solid #3a2e1a", color: "#e4d8b8", outline: "none", minWidth: 260, resize: "vertical" }} />
+      <select value={status} onChange={e => setStatus(e.target.value as any)}
+        style={{ fontSize: 11, padding: "5px 8px", background: "#0f0c07",
+          border: "1px solid #3a2e1a", color: "#e4d8b8", outline: "none" }}>
+        {(["UFA", "RFA", "SIGNED", "EXCLUDE"] as const).map(s => <option key={s} value={s}>{s}</option>)}
+      </select>
+      <button onClick={submit} disabled={saving || count === 0}
+        style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
+          background: "#2a1e3a", border: "1px solid #5a4a8f",
+          color: count === 0 ? "#5a4a6a" : "#b89aef", cursor: count === 0 ? "default" : "pointer", letterSpacing: "0.1em" }}>
+        {saving ? "..." : `APPLY (${count})`}
+      </button>
+      <button onClick={() => { setOpen(false); setText(""); }}
+        style={{ fontSize: 11, fontWeight: 900, padding: "5px 10px",
+          background: "transparent", border: "1px solid #2a1e0a", color: "#5a4a2a", cursor: "pointer" }}>
+        ✕
+      </button>
+    </div>
+  );
+}
+
 export default function AdminContractsPage() {
   const [contracts, setContracts]   = useState<ContractRow[]>([]);
   const [scrapedRaw, setScrapedRaw] = useState<Record<string, any> | null>(null);
   const [loading, setLoading]       = useState(true);
   const [syncing, setSyncing]       = useState(false);
   const [search, setSearch]         = useState("");
-  const [filter, setFilter]         = useState<"all" | "flagged" | "admin">("all");
+  const [filter, setFilter]         = useState<"all" | "flagged" | "editor" | "needs">("all");
   const [editing, setEditing]       = useState<ContractRow | null>(null);
   const [toast, setToast]           = useState<string | null>(null);
   const [dbError, setDbError]       = useState<string | null>(null);
@@ -292,20 +433,30 @@ export default function AdminContractsPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const handleSave = async (name: string, yearsRemaining: number | null, capHit: number | null, position: string | null) => {
+  const handleSave = async (edit: ContractEdit) => {
     try {
       const res = await fetch("/api/admin/contracts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, yearsRemaining, capHit, position }),
+        body: JSON.stringify(edit),
       });
-      const data = await readAdminResponse<{ destination?: string }>(res, "Save failed");
-      const dest = data.destination === "bundled" ? " → written to bundled.json" : " → admin override";
-      showToast(`Saved ${name}${dest}`);
+      await readAdminResponse<{ destination?: string }>(res, "Save failed");
+      showToast(`Saved ${edit.name} → editor-curated`);
       load();
     } catch (e) {
       showToast(adminErrorMessage(e, "Save failed"));
       throw e;
+    }
+  };
+
+  const handleSeed = async () => {
+    try {
+      const res = await fetch("/api/admin/seed", { method: "POST" });
+      const data = await readAdminResponse<{ inserted: number; filled: number; skipped: number }>(res, "Load baseline failed");
+      showToast(`Baseline loaded — ${data.inserted} added, ${data.filled} FA-filled, ${data.skipped} kept`);
+      load();
+    } catch (e) {
+      showToast(adminErrorMessage(e, "Load baseline failed"));
     }
   };
 
@@ -378,12 +529,14 @@ export default function AdminContractsPage() {
       list = list.filter(r => r.name.toLowerCase().includes(q) || (r.team ?? "").includes(q));
     }
     if (filter === "flagged") list = list.filter(r => (r.delta ?? 0) >= 1);
-    if (filter === "admin")   list = list.filter(r => r.source === "admin");
+    if (filter === "editor")  list = list.filter(r => r.dbSource === "editor");
+    if (filter === "needs")   list = list.filter(r => r.needsData);
     return list;
   }, [contracts, search, filter]);
 
   const flaggedCount = contracts.filter(r => (r.delta ?? 0) >= 1).length;
-  const adminCount   = contracts.filter(r => r.source === "admin").length;
+  const editorCount  = contracts.filter(r => r.dbSource === "editor").length;
+  const needsCount   = contracts.filter(r => r.needsData).length;
 
   return (
     <div style={{ minHeight: "100vh", background: "#0f0c07", color: "#e4d8b8",
@@ -399,8 +552,15 @@ export default function AdminContractsPage() {
           CONTRACT ADMIN
         </span>
         <span style={{ fontSize: 11, color: "#8a7a5a", marginLeft: "auto" }}>
-          {contracts.length} players · {flaggedCount} flagged · {adminCount} overrides
+          {contracts.length} players · {editorCount} editor · {needsCount} need data
         </span>
+        <button onClick={handleSeed}
+          title="Load the committed contract/FA baseline into the DB (idempotent; keeps editor rows)"
+          style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
+            background: "#2a1e3a", border: "1px solid #5a4a8f", color: "#b89aef",
+            cursor: "pointer", letterSpacing: "0.1em" }}>
+          LOAD BASELINE
+        </button>
         <button onClick={handleSync} disabled={syncing || !scrapedRaw}
           title={!scrapedRaw ? "Click + LIVE DELTA first to load CapWages data" : ""}
           style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
@@ -408,7 +568,7 @@ export default function AdminContractsPage() {
             border: `1px solid ${scrapedRaw ? "#2a5a2a" : "#2a2a2a"}`,
             color: syncing ? "#5a7a5a" : scrapedRaw ? "#6bcf6b" : "#3a3a3a",
             cursor: (syncing || !scrapedRaw) ? "default" : "pointer", letterSpacing: "0.1em" }}>
-          {syncing ? "SYNCING..." : "SYNC CAPWAGES"}
+          {syncing ? "SYNCING..." : "SYNC LIVE"}
         </button>
         <button onClick={() => load(false)} style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
           background: "#2a1e0a", border: "1px solid #5a4a2a", color: "#c8b890",
@@ -432,9 +592,10 @@ export default function AdminContractsPage() {
         </div>
       )}
 
-      {/* Add player */}
-      <div style={{ padding: "10px 24px", borderBottom: "1px solid #2a1e0a" }}>
-        <AddPlayerForm onAdded={() => { load(); showToast("Player added to contracts.bundled.json"); }} />
+      {/* Add player + bulk FA */}
+      <div style={{ padding: "10px 24px", borderBottom: "1px solid #2a1e0a", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <AddPlayerForm onAdded={() => { load(); showToast("Player added to the DB (editor-curated)"); }} />
+        <BulkFaForm onDone={(msg) => { load(); showToast(msg); }} />
       </div>
 
       {/* Filter bar */}
@@ -447,14 +608,17 @@ export default function AdminContractsPage() {
           style={{ fontSize: 12, padding: "6px 12px", background: "#1a1208",
             border: "1px solid #3a2e1a", color: "#e4d8b8", outline: "none", minWidth: 200 }}
         />
-        {(["all", "flagged", "admin"] as const).map(f => (
+        {(["all", "flagged", "editor", "needs"] as const).map(f => (
           <button key={f} onClick={() => setFilter(f)}
             style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
               letterSpacing: "0.1em", cursor: "pointer",
               background: filter === f ? "#2a1e0a" : "transparent",
               border: `1px solid ${filter === f ? "#5a4a2a" : "#2a1e0a"}`,
               color: filter === f ? "#e4d8b8" : "#8a7a5a" }}>
-            {f === "all" ? "ALL" : f === "flagged" ? `FLAGGED (${flaggedCount})` : `ADMIN (${adminCount})`}
+            {f === "all" ? "ALL"
+              : f === "flagged" ? `FLAGGED (${flaggedCount})`
+              : f === "editor" ? `EDITOR (${editorCount})`
+              : `NEEDS DATA (${needsCount})`}
           </button>
         ))}
         <span style={{ fontSize: 11, color: "#5a4a2a", marginLeft: "auto" }}>
@@ -504,6 +668,9 @@ export default function AdminContractsPage() {
               {row.name}
               {row.hasNMC && <span style={{ fontSize: 9, color: "#cf4040", border: "1px solid #cf404050",
                 padding: "0 3px", marginLeft: 5 }}>NMC</span>}
+              <FaBadge status={row.expiryStatus} year={row.expiryYear} />
+              {row.excludeFromRoster && <span style={{ fontSize: 9, color: "#cf6b6b", border: "1px solid #cf6b6b50",
+                padding: "0 3px", marginLeft: 5 }}>EXCL</span>}
             </div>
 
             <div style={{ textAlign: "center", color: "#8a7a5a" }}>{row.position ?? "—"}</div>
@@ -534,7 +701,7 @@ export default function AdminContractsPage() {
               {row.retired
                 ? <span title={row.retiredDate ?? undefined} style={{ fontSize: 10, fontWeight: 900, padding: "1px 5px", letterSpacing: "0.1em",
                   background: "#3a1a1a", color: "#cf6b6b", border: "1px solid #cf6b6b40" }}>RETIRED</span>
-                : <SourceBadge source={row.source} />}
+                : <SourceBadge source={row.dbSource ?? "missing"} />}
             </div>
 
             <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>

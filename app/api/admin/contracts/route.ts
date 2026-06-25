@@ -240,10 +240,14 @@ export async function GET(req: Request) {
       hasNtc:         playersTable.hasNtc,
       retired:        playersTable.retired,
       retiredDate:    playersTable.retiredDate,
+      expiryStatus:   playersTable.expiryStatus,
+      expiryYear:     playersTable.expiryYear,
+      excludeFromRoster: playersTable.excludeFromRoster,
+      source:         playersTable.source,
     }).from(playersTable).catch((e: any) => {
       dbError = e?.message ?? String(e);
       console.error("[Admin Contracts] DB read failed:", dbError);
-      return [] as { name: string; position: string; teamId: string | null; capHit: number; yearsRemaining: number; hasNmc: boolean | null; hasNtc: boolean | null; retired: boolean | null; retiredDate: string | null }[];
+      return [] as any[];
     }),
     doScrape ? scrapeCapWages() : Promise.resolve({} as Record<string, any>),
   ]);
@@ -304,7 +308,15 @@ export async function GET(req: Request) {
       hasNTC:        b?.hasNtc  ?? false,
       retired:       b?.retired ?? false,
       retiredDate:   b?.retiredDate ?? null,
-      expiryStatus:  cw?.expiryStatus ?? null,
+      // FA facts now live on the DB row (single source of truth); fall back to a
+      // live scrape value only when previewing a sync.
+      expiryStatus:  (b as any)?.expiryStatus ?? cw?.expiryStatus ?? null,
+      expiryYear:    (b as any)?.expiryYear ?? null,
+      excludeFromRoster: (b as any)?.excludeFromRoster ?? false,
+      // Provenance straight from the DB: seed | sync | editor (or "missing" when
+      // the rostered player has no DB contract row at all).
+      dbSource:      (b as any)?.source ?? null,
+      needsData:     !b || b.position == null || b.position === "Unknown" || b.capHit == null,
       delta,
       source: ov?.yearsRemaining ? "override"
              : scrapedYears      ? "scraper"
