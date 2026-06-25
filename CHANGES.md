@@ -1,3 +1,47 @@
+# Orthogonal Backend — DB as Single Source of Truth
+
+## 2026-06-25 Players table is the only contract/FA source at read time
+
+### Problem
+
+Contract and free-agency data was resolved at **read time** by merging five
+sources with precedence rules: NHL API → live CapWages scrape → `contracts.bundled.json`
+→ `free-agent-seed.ts` → DB `fa_overrides`. The coupling was non-orthogonal — a
+wrong value in any layer (e.g. Nyquist reading as a 2027 contract) forced you to
+reason about all five to fix it — and because the live scrape behaved differently
+in datacenter vs. live environments, the same code produced different rosters in
+different environments.
+
+### Change (PuckPedia model)
+
+The DB `players` table is now the single editor-curated source of truth for
+contract + FA facts. Ingestion is an explicit **write-time** step; reads are a
+clean join, not a precedence chain:
+
+`rostered players (NHL identity) ⨝ DB contract row ⨝ live stats`
+
+- **Schema**: `players` gains `expiry_status`, `expiry_year`, `exclude_from_roster`,
+  `source` (`seed` | `sync` | `editor`).
+- **Seed**: committed `app/data/league-seed.json` (built by `npm run build:seed`
+  from `contracts.bundled.json` + the 2026 FA seed). `seedPlayersTable()` loads it
+  idempotently; auto-seeds an empty table; a reset reseeds. Never clobbers editor rows.
+- **Read** (`loadContractsFromDB` in `roster-assembly.ts`): reads the players table
+  only — no scrape, no bundled merge, no read-time FA seed/override pass. FA status
+  derives from stored facts via the pure `deriveContractStatus()`. `excludeFromRoster`
+  removes a player; `contractMissing` flags rows with no real deal.
+- **Write**: Sync Live stamps `source='sync'` and never overwrites editor rows or a
+  curated FA mark; the editor (`POST /api/admin/contracts`) stamps `source='editor'`.
+  `POST /api/admin/seed` = Load Baseline; `POST /api/admin/fa-bulk` = bulk FA class.
+- **Admin**: Contract Admin shows provenance + FA, edits FA/expiry/exclude inline,
+  adds Load Baseline / Sync Live / Needs-data filter / Bulk Free Agents. The old
+  `fa-overrides` page is now a signpost.
+
+### Outcome
+
+Test and live environments resolve identical data (no scrape at read). Fixing a
+player is a single DB row edit, locked against re-sync. The Nyquist 2026-UFA fix
+now lives in the seed as data, not as layered read-time code.
+
 # Planned Product Split
 
 ## 2026-06-17 Trade Machine / Armchair GM Direction
