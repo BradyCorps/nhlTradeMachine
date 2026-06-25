@@ -129,6 +129,14 @@ function isValidTeamId(teamId: string | null | undefined): teamId is string {
   return Boolean(teamId && VALID_TEAM_IDS.has(teamId));
 }
 
+function normaliseExpiryStatus(status: string | null | undefined): "UFA" | "RFA" | null {
+  if (!status) return null;
+  const s = status.toUpperCase();
+  if (s === "UFA") return "UFA";
+  if (s === "RFA") return "RFA";
+  return null;
+}
+
 function normalisePosition(pos: string | null | undefined): string | null {
   if (!pos || pos === "Unknown" || pos === "-" || pos === "—") return null;
   const first = pos.toUpperCase().split(",").map(p => p.trim()).filter(Boolean)[0];
@@ -334,6 +342,12 @@ export async function POST(req: Request) {
     retired?:        boolean;
     clear?:          boolean;
   };
+  // Free-agency facts are first-class editor fields now (no separate overrides
+  // table at read time). `expiryStatus: null` is an explicit "force SIGNED".
+  const hasExpiryStatus = "expiryStatus" in body;
+  const expiryStatus = hasExpiryStatus ? normaliseExpiryStatus(body.expiryStatus) : undefined;
+  const expiryYear = Number.isFinite(Number(body.expiryYear)) ? Number(body.expiryYear) : (hasExpiryStatus ? null : undefined);
+  const excludeFromRoster = typeof body.excludeFromRoster === "boolean" ? body.excludeFromRoster : undefined;
   const teamId = typeof body.teamId === "string" ? teamIdFromSlug(body.teamId) : null;
   const position = normalisePosition(body.position);
   const age = Number.isFinite(Number(body.age)) ? Number(body.age) : null;
@@ -373,7 +387,8 @@ export async function POST(req: Request) {
 
   if (
     yearsRemaining == null && capHit == null && hasNMC == null && hasNTC == null &&
-    retired == null &&
+    retired == null && expiryStatus === undefined && expiryYear === undefined &&
+    excludeFromRoster === undefined &&
     !teamId && !position && age == null && draftYear == null && draftRound == null &&
     draftOverall == null && prospectPtsPace == null
   ) {
@@ -383,7 +398,7 @@ export async function POST(req: Request) {
   const existing = await db.select().from(playersTable).where(eq(playersTable.id, id));
 
   if (existing.length > 0) {
-    const updates: Record<string, any> = {};
+    const updates: Record<string, any> = { source: "editor" };
     if (yearsRemaining != null) updates.yearsRemaining = yearsRemaining;
     if (capHit         != null) updates.capHit         = capHit;
     if (hasNMC         != null) updates.hasNmc         = hasNMC;
@@ -399,6 +414,9 @@ export async function POST(req: Request) {
     if (draftRound    != null)   updates.draftRound     = draftRound;
     if (draftOverall  != null)   updates.draftOverall   = draftOverall;
     if (prospectPtsPace != null) updates.prospectPtsPace = prospectPtsPace;
+    if (expiryStatus !== undefined) updates.expiryStatus = expiryStatus;
+    if (expiryYear   !== undefined) updates.expiryYear   = expiryYear;
+    if (excludeFromRoster !== undefined) updates.excludeFromRoster = excludeFromRoster;
     await db.update(playersTable).set(updates).where(eq(playersTable.id, id));
     await clearRosterCaches();
     return NextResponse.json({ ok: true, destination: "db-update", name });
@@ -422,6 +440,10 @@ export async function POST(req: Request) {
       draftRound:     draftRound     ?? undefined,
       draftOverall:   draftOverall   ?? undefined,
       prospectPtsPace: prospectPtsPace ?? undefined,
+      expiryStatus:   expiryStatus ?? undefined,
+      expiryYear:     expiryYear ?? undefined,
+      excludeFromRoster: excludeFromRoster ?? undefined,
+      source:         "editor",
     });
     await clearRosterCaches();
     return NextResponse.json({ ok: true, destination: "db-insert", name });
@@ -473,6 +495,8 @@ export async function PUT(req: Request) {
     capHit:         playersTable.capHit,
     yearsRemaining: playersTable.yearsRemaining,
     retired:        playersTable.retired,
+    source:         playersTable.source,
+    expiryStatus:   playersTable.expiryStatus,
   }).from(playersTable);
   const existingById = new Map(existing.map(r => [r.id, r]));
   const existingByName = new Map(existing.map(r => [makeId(r.name), r]));
@@ -498,12 +522,16 @@ export async function PUT(req: Request) {
     const currentTeamId = isValidTeamId(current?.teamId) ? current.teamId : null;
     const teamId = teamIdFromSlug(cw.teamSlug) ?? rosterFallback?.teamId ?? currentTeamId ?? null;
     if (!teamId) metadataMisses.push(key);
+    const expiryStatus = normaliseExpiryStatus(cw.expiryStatus);
+    const expiryYear = Number.isFinite(cw.expiryYear) && cw.expiryYear > 0 ? cw.expiryYear : null;
     const values = {
       position,
       teamId,
       age:            Number.isFinite(cw.age) && cw.age > 0 ? cw.age : null,
       capHit:         cw.capHit,
       yearsRemaining: cw.yearsRemaining > 0 ? cw.yearsRemaining : 1,
+      expiryStatus,
+      expiryYear,
     };
     if (watchNames.has(key.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""))) {
       watch[key] = {
@@ -521,15 +549,25 @@ export async function PUT(req: Request) {
     }
     if (current) {
       if (current.retired) continue;
+      // Editor-curated rows are locked: a live sync never overwrites hand-fixed
+      // data (this is the orthogonality guarantee — one owner per row).
+      if (current.source === "editor") continue;
       const updates: Record<string, any> = {
         capHit: values.capHit,
         yearsRemaining: values.yearsRemaining,
+        source: "sync",
       };
       if (position !== "Unknown" && (current.position === "Unknown" || current.position !== position)) {
         updates.position = position;
       }
       if (teamId && current.teamId !== teamId) updates.teamId = teamId;
       if (values.age && current.age !== values.age) updates.age = values.age;
+      // Only stamp expiry when the row doesn't already carry a curated FA class,
+      // so the seed's known 2026 UFA/RFA marks survive a live refresh.
+      if (expiryStatus && current.expiryStatus == null) {
+        updates.expiryStatus = expiryStatus;
+        updates.expiryYear = expiryYear;
+      }
 
       await db.update(playersTable).set(updates).where(eq(playersTable.id, current.id));
       updatedEntries.push(key);
@@ -547,6 +585,9 @@ export async function PUT(req: Request) {
       yearsRemaining: values.yearsRemaining,
       hasNmc:         false,
       hasNtc:         false,
+      expiryStatus:   values.expiryStatus,
+      expiryYear:     values.expiryYear,
+      source:         "sync",
     }).onConflictDoNothing();
 
     newEntries.push(key);
