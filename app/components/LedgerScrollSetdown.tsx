@@ -4,15 +4,14 @@ import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion
 import type { ReactNode } from "react";
 
 // Scroll-driven "set the ledger down on the desk".
-// The broadsheet should read as a sheet being lowered onto a table, not as a
-// hinged panel flipping open. Keep the tilt shallow and pivot around the sheet's
-// center so scroll mostly controls height, with the shadow tightening as the
-// paper reaches the desk.
+// The broadsheet should read like it is zooming down into place on the table,
+// not hinging or flipping in 3D. Keep the page flat and readable throughout:
+// scroll controls scale, a small vertical settle, opacity, and shadow depth.
 //
 // Animation window: page scroll 0 → 560px.
-//   0 px     → sheet is just above the desk, lightly tipped away, invisible
-//   120 px   → sheet is visible and clearly descending
-//   260 px   → nameplate is gone, sheet is nearly flat
+//   0 px     → sheet is slightly enlarged/near the camera and invisible
+//   120 px   → sheet is visible and zooming toward its final desk position
+//   260 px   → nameplate is gone, sheet is readable and nearly settled
 //   420 px   → sheet has reached the desk plane
 //   560 px   → fully settled, dead flat, at rest on the desk
 
@@ -26,9 +25,8 @@ export default function LedgerScrollSetdown({ children, className, style }: Prop
   const reduced = useReducedMotion();
   const { scrollY } = useScroll();
 
-  const y = useTransform(scrollY, [0, 420, 560], [-112, -10, 0], { clamp: true });
-  const rotateX = useTransform(scrollY, [0, 320, 560], [-5, -1, 0], { clamp: true });
-  const scale = useTransform(scrollY, [0, 560], [1.018, 1], { clamp: true });
+  const y = useTransform(scrollY, [0, 420, 560], [-64, -6, 0], { clamp: true });
+  const scale = useTransform(scrollY, [0, 560], [1.18, 1.015, 1], { clamp: true });
   const opacity = useTransform(scrollY, [0, 160], [0, 1], { clamp: true });
   const boxShadow = useTransform(
     scrollY,
@@ -54,17 +52,15 @@ export default function LedgerScrollSetdown({ children, className, style }: Prop
       className={className}
       style={{
         ...style,
-        transformPerspective: 1400,
         transformOrigin: "50% 50%",
         y,
-        rotateX,
         scale,
         opacity,
         boxShadow,
       }}
       // SSR / first-frame initial state matches scrollY=0 values so there is
       // no layout shift on hydration.
-      initial={{ opacity: 0, y: -112, rotateX: -5, scale: 1.018 }}
+      initial={{ opacity: 0, y: -64, scale: 1.18 }}
     >
       {children}
     </motion.div>
