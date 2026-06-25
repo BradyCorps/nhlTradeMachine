@@ -71,9 +71,15 @@ export async function seedPlayersTable(database: Database = defaultDb): Promise<
 
   const seed = loadLeagueSeed();
   const existing = await database
-    .select({ id: playersTable.id, source: playersTable.source, expiryStatus: playersTable.expiryStatus })
+    .select({
+      id: playersTable.id,
+      source: playersTable.source,
+      expiryStatus: playersTable.expiryStatus,
+      hasNmc: playersTable.hasNmc,
+      hasNtc: playersTable.hasNtc,
+    })
     .from(playersTable)
-    .catch(() => [] as { id: string; source: string | null; expiryStatus: string | null }[]);
+    .catch(() => [] as { id: string; source: string | null; expiryStatus: string | null; hasNmc: boolean | null; hasNtc: boolean | null }[]);
   const existingById = new Map(existing.map((r) => [r.id, r]));
 
   let inserted = 0;
@@ -91,11 +97,23 @@ export async function seedPlayersTable(database: Database = defaultDb): Promise<
       skipped++;
       continue;
     }
-    // Fill the curated FA class onto a row that doesn't already carry an expiry.
+    // Reconcile the canonical baseline facts the sync can't supply:
+    //   • FA class (expiryStatus/expiryYear) onto a row missing an expiry, and
+    //   • NMC/NTC clauses — the CapWages scrape carries none, so the seed is the
+    //     only clause source. A sync-created row defaults the clauses to false and
+    //     would otherwise lose Ekblad's NTC, Crosby's NMC, etc. forever.
+    const set: Record<string, unknown> = {};
     if (ex.expiryStatus == null && row.expiryStatus != null) {
+      set.expiryStatus = row.expiryStatus;
+      set.expiryYear = row.expiryYear;
+    }
+    if (row.hasNmc && !ex.hasNmc) set.hasNmc = true;
+    if (row.hasNtc && !ex.hasNtc) set.hasNtc = true;
+
+    if (Object.keys(set).length > 0) {
       await database
         .update(playersTable)
-        .set({ expiryStatus: row.expiryStatus, expiryYear: row.expiryYear })
+        .set(set)
         .where(eq(playersTable.id, row.id))
         .catch(() => {});
       filled++;

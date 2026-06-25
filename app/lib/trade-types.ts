@@ -17,6 +17,7 @@ export interface Asset {
   defRate: number;
   avgTOI: number;
   capHit: number;
+  lastCapHit?: number;         // real expiring/last cap hit — never zeroed for pending FAs (capHit goes to 0 for FA pricing)
   yearsRemaining: number;
   capCeiling?: number;
   hasNMC: boolean;

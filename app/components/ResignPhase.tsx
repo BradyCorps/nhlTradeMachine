@@ -31,9 +31,11 @@ function Terms({ c }: { c: OffseasonPending["contract"] }) {
 }
 
 function PlayerMeta({ p }: { p: OffseasonPending["player"] }) {
+  // p.capHit is zeroed for pending FAs; lastCapHit preserves the real expiring deal.
+  const wasCap = p.lastCapHit ?? p.capHit;
   return (
     <span className="text-[9px] font-mono uppercase tracking-wide" style={{ color: "var(--ledger-ink-faint)" }}>
-      {p.position} · age {p.age} · was {money(p.capHit)}
+      {p.position} · age {p.age} · was {money(wasCap)}
     </span>
   );
 }

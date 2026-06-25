@@ -517,7 +517,7 @@ export default function ArmchairGmPage() {
           : p),
       teams: prev.teams.map(t =>
         t.id === fa.player.teamId
-          ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: fa.player.capHit }], incoming: [{ capHit: fa.contract.aav }] }) * 10) / 10 }
+          ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: fa.player.lastCapHit ?? fa.player.capHit }], incoming: [{ capHit: fa.contract.aav }] }) * 10) / 10 }
           : t),
     }));
     setUserPending(prev => prev.filter(p => p.player.id !== fa.player.id));
@@ -532,7 +532,7 @@ export default function ArmchairGmPage() {
       players: prev.players.filter(p => p.id !== fa.player.id),
       teams: prev.teams.map(t =>
         t.id === fa.player.teamId
-          ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: fa.player.capHit }] }) * 10) / 10 }
+          ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: fa.player.lastCapHit ?? fa.player.capHit }] }) * 10) / 10 }
           : t),
     }));
     setUserPending(prev => prev.filter(p => p.player.id !== fa.player.id));

@@ -1105,6 +1105,11 @@ export async function assembleCanonicalRoster(options: {
       const contractMissing = !fin && !isLikelyELC && draftOverall == null;
 
       const rawCapHit     = expiresThisOffseason ? 0 : (isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925));
+      // lastCapHit mirrors rawCapHit but is NEVER zeroed for pending FAs. It is the
+      // real expiring/last contract value, used for the off-season "was $X" display
+      // and — critically — as the cap CREDIT when a pending FA re-signs or walks.
+      // (capHit goes to 0 so FA trade-pricing treats them as a 0-year rental.)
+      const lastCapHitRaw = isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925);
       const contractPos = normContractPos(fin?.position);
       const rosterPos = normContractPos(finalPosition);
       const nameCollision = p.age <= 23
@@ -1224,6 +1229,7 @@ export async function assembleCanonicalRoster(options: {
         pairDriverScore:   baselines.pairDriverScore,
         baselineHdsvPct:   baselines.baselineHdsvPct,
         capHit:         finalCapHit,
+        lastCapHit:     nameCollision ? elcCapHit : lastCapHitRaw,
         yearsRemaining: finalYears,
         hasExtension: false,
         extensionCapHit: undefined,

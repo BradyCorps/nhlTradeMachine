@@ -188,35 +188,35 @@ export default function WelcomePage() {
 
           <div className="fp-desks">
             <Cell
-              href="/trade-machine"
+              href="/armchair-gm"
               lead
               kicker="Feature One — The Lead"
-              kickerColor="var(--ledger-red)"
-              edition="The Desk"
-              title="Trade Machine"
-              ctaColor="var(--ledger-red)"
-              cta="Open Trade Machine"
-              body="Build a single trade, add retention, and test the package against X-NAV and the GM Audit. This is the quick social trade surface that owns share codes and replay links — the fastest way to put a deal on the record and argue it with numbers instead of noise."
-              lines={[
-                ["One Trade", "Fast package construction"],
-                ["GM Audit", "Cap, clause, value, and fit checks"],
-                ["Share Code", "Locked verdict replay link"],
-              ]}
-            />
-
-            <Cell
-              href="/armchair-gm"
-              kicker="Feature Two"
               kickerColor="var(--ledger-green)"
               edition="The Chair"
               title="Armchair GM"
               ctaColor="var(--ledger-green)"
               cta="Enter Armchair GM"
-              body="Take over a franchise, make multiple moves, inspect roster DNA, manage cap consequences, and see whether you can run the room better than the actual front office."
+              body="Take over a franchise, make multiple moves, inspect roster DNA, manage cap consequences, and see whether you can run the room better than the actual front office. The most complete seat in the building — a full multi-move session with the season on the line, every consequence on the record."
               lines={[
                 ["Roster Control", "Multi-move session"],
                 ["Who Wants This?", "Ranks all 32 teams"],
                 ["Sim Engine", "Projects the season"],
+              ]}
+            />
+
+            <Cell
+              href="/trade-machine"
+              kicker="Feature Two"
+              kickerColor="var(--ledger-red)"
+              edition="The Desk"
+              title="Trade Machine"
+              ctaColor="var(--ledger-red)"
+              cta="Open Trade Machine"
+              body="Build a single trade, add retention, and test the package against X-NAV and the GM Audit. The quick social trade surface that owns share codes and replay links — the fastest way to put a deal on the record and argue it with numbers instead of noise."
+              lines={[
+                ["One Trade", "Fast package construction"],
+                ["GM Audit", "Cap, clause, value, and fit"],
+                ["Share Code", "Locked verdict replay link"],
               ]}
             />
 

@@ -236,6 +236,11 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
 
   for (const player of expiring) {
     const contract = projectFreeAgentContract(player, { seed, capCeiling: ctx.capCeiling });
+    // The expiring deal's REAL cap hit (player.capHit is zeroed to 0 for pending
+    // FAs). This is the cap credit when the deal comes off the books — without it
+    // a re-signing team is charged the new AAV with no offset and spirals
+    // tens of millions over the cap.
+    const expiringCapHit = player.lastCapHit ?? player.capHit;
 
     if (ctx.userTeamId && player.teamId === ctx.userTeamId) {
       userPending.push({ player, contract });
@@ -247,12 +252,12 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
 
     if (resign) {
       // Old AAV comes off, the new AAV goes on (net raise reduces cap space).
-      addMove(player.teamId, "outgoing", { capHit: player.capHit });
+      addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
       addMove(player.teamId, "incoming", { capHit: contract.aav });
       resignings.push({ playerId: player.id, teamId: player.teamId, contract });
     } else {
       // Walks: the old AAV is freed; he enters the open market.
-      addMove(player.teamId, "outgoing", { capHit: player.capHit });
+      addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
       const marketContract = { ...contract, term: Math.min(contract.term, MARKET_TERM_CAP) };
       walkAways.push({ playerId: player.id, fromTeamId: player.teamId, contract: marketContract });
       market.push({ player, contract: marketContract });
