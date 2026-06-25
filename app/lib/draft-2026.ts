@@ -113,25 +113,50 @@ export const DRAFT_2026_PROSPECTS: DraftProspect[] = [
 // weighted toward the best available. Small enough to stay realistic.
 const PICK_WEIGHTS = [0.7, 0.2, 0.1];
 
-// Project the first round. Deterministic in `seed`: same seed → same draft.
-export function runDraftNight(seed: number): DraftResult[] {
-  const rand = mulberry32(Math.floor(seed) + hashString("draft-night-2026"));
-  const board = [...DRAFT_2026_PROSPECTS];
-  const results: DraftResult[] = [];
+// Seeded RNG for the draft. Same seed → same CPU board. Kept here so the
+// interactive component and the auto-sim share one definition.
+export function createDraftRng(seed: number): () => number {
+  return mulberry32(Math.floor(seed) + hashString("draft-night-2026"));
+}
 
-  for (const slot of DRAFT_2026_ORDER) {
-    const windowSize = Math.min(PICK_WEIGHTS.length, board.length);
-    const weights = PICK_WEIGHTS.slice(0, windowSize);
-    const total = weights.reduce((s, w) => s + w, 0);
-    let r = rand() * total;
-    let idx = 0;
-    for (let i = 0; i < windowSize; i++) {
-      r -= weights[i];
-      if (r <= 0) { idx = i; break; }
-    }
+// Index into the remaining board for a CPU pick: weighted toward best-available
+// with a small reach/slide window.
+export function cpuPickIndex(boardSize: number, rand: () => number): number {
+  const windowSize = Math.min(PICK_WEIGHTS.length, boardSize);
+  const weights = PICK_WEIGHTS.slice(0, windowSize);
+  const total = weights.reduce((s, w) => s + w, 0);
+  let r = rand() * total;
+  for (let i = 0; i < windowSize; i++) {
+    r -= weights[i];
+    if (r <= 0) return i;
+  }
+  return 0;
+}
+
+// Advance the draft through CPU-controlled slots, mutating `results`/`board` in
+// place, stopping when the next slot belongs to `homeTeamId` (the GM is on the
+// clock) or the round is complete. With no home team it drafts the whole round.
+export function autoCpuPicks(
+  results: DraftResult[],
+  board: DraftProspect[],
+  rand: () => number,
+  homeTeamId?: string | null,
+): void {
+  while (results.length < DRAFT_2026_ORDER.length) {
+    const slot = DRAFT_2026_ORDER[results.length];
+    if (homeTeamId && slot.team === homeTeamId) break; // GM is on the clock
+    const idx = cpuPickIndex(board.length, rand);
     const [prospect] = board.splice(idx, 1);
     results.push({ ...slot, prospect });
   }
+}
 
+// Project the full first round with no GM input (every slot CPU-controlled).
+// Deterministic in `seed`: same seed → same draft.
+export function runDraftNight(seed: number): DraftResult[] {
+  const rand = createDraftRng(seed);
+  const board = [...DRAFT_2026_PROSPECTS];
+  const results: DraftResult[] = [];
+  autoCpuPicks(results, board, rand, null);
   return results;
 }
