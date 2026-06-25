@@ -606,6 +606,27 @@ export async function PUT(req: Request) {
     added++;
   }
 
+  // ── Position backfill ──────────────────────────────────────────────────────
+  // The CapWages scrape only covers active NHL contracts, so seed-only depth and
+  // prospect rows stay position "Unknown" (the admin "needs data" pile). Fill
+  // them from the live NHL rosters, which carry a position for every rostered
+  // player. Editor rows are never touched.
+  let positionsBackfilled = 0;
+  const unknownPosRows = existing.filter(
+    r => r.source !== "editor" && (!r.position || r.position === "Unknown")
+  );
+  if (unknownPosRows.length > 0) {
+    const rosterMap = rosterTeamMap.size > 0 ? rosterTeamMap : await fetchNhlRosterTeamMap();
+    for (const r of unknownPosRows) {
+      const hit = rosterMap.get(r.id) ?? rosterMap.get(makeId(r.name));
+      if (!hit?.position) continue;
+      const upd: Record<string, any> = { position: hit.position };
+      if (hit.teamId && !isValidTeamId(r.teamId)) upd.teamId = hit.teamId;
+      await db.update(playersTable).set(upd).where(eq(playersTable.id, r.id)).catch(() => {});
+      positionsBackfilled++;
+    }
+  }
+
   const total = await db.select({ id: playersTable.id }).from(playersTable);
   const clearedCacheKeys: string[] = [];
   if (redis) {
@@ -618,6 +639,7 @@ export async function PUT(req: Request) {
       ok: true,
       added,
       updated,
+      positionsBackfilled,
       total: total.length,
       newEntries,
       updatedEntries,

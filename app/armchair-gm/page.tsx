@@ -1073,7 +1073,19 @@ export default function ArmchairGmPage() {
         <DraftNight
           initialSeed={scenarioSeed({ draft: homeTeamId ?? "", season: SEASON.label })}
           homeTeamId={homeTeamId}
-          onDone={() => { setDraftOpen(false); setResignOpen(true); }}
+          onDone={() => {
+            setDraftOpen(false);
+            setResignOpen(true);
+            // The off-season draft just happened — its picks have been spent, so
+            // remove this year's picks from the tradeable asset pool league-wide.
+            setDb(prev => ({
+              ...prev,
+              players: prev.players.filter(
+                p => !(p.position === "Pick" && p.year === SEASON.draftYear)
+              ),
+            }));
+            clearNavCache();
+          }}
         />
       )}
 

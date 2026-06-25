@@ -502,13 +502,15 @@ export default function AdminContractsPage() {
       const data = await readAdminResponse<{
         added: number;
         updated?: number;
+        positionsBackfilled?: number;
         total: number;
         watch?: Record<string, any>;
       }>(res, "Sync failed");
       const watched = Object.entries(data.watch ?? {})
         .map(([name, info]: [string, any]) => `${name}: ${info.resolvedTeamId ?? info.currentTeamId ?? "no-team"}`)
         .join(" · ");
-      toast(`Synced — ${data.added} added, ${data.updated ?? 0} updated (${data.total} total)${watched ? ` · ${watched}` : ""}`, "success");
+      const posNote = data.positionsBackfilled ? ` · ${data.positionsBackfilled} positions filled` : "";
+      toast(`Synced — ${data.added} added, ${data.updated ?? 0} updated (${data.total} total)${posNote}${watched ? ` · ${watched}` : ""}`, "success");
       load();
     } catch (e: any) {
       toast(`Sync failed: ${adminErrorMessage(e, "request failed")}`, "error");
