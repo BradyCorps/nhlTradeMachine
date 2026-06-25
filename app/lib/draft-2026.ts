@@ -12,6 +12,7 @@
 // ============================================================
 
 import { mulberry32, hashString } from "@/app/lib/sim-engine";
+import draftOrderData from "@/app/data/draft-2026.json";
 
 export interface DraftPickSlot {
   overall: number;
@@ -36,42 +37,11 @@ export interface DraftResult extends DraftPickSlot {
 }
 
 // ── First-round order (overall, current owner, original owner) ──────────────
-// Trades are already baked in: `originalTeam` is the first club in the pick's
-// ownership chain; `team` is who holds it on draft night.
-export const DRAFT_2026_ORDER: DraftPickSlot[] = [
-  { overall: 1,  team: "TOR", originalTeam: "TOR" },
-  { overall: 2,  team: "SJS", originalTeam: "SJS" },
-  { overall: 3,  team: "VAN", originalTeam: "VAN" },
-  { overall: 4,  team: "BUF", originalTeam: "CHI" },
-  { overall: 5,  team: "NYR", originalTeam: "NYR" },
-  { overall: 6,  team: "CGY", originalTeam: "CGY" },
-  { overall: 7,  team: "SEA", originalTeam: "SEA" },
-  { overall: 8,  team: "WPG", originalTeam: "WPG" },
-  { overall: 9,  team: "SJS", originalTeam: "FLA" },
-  { overall: 10, team: "NSH", originalTeam: "NSH" },
-  { overall: 11, team: "STL", originalTeam: "STL" },
-  { overall: 12, team: "NJD", originalTeam: "NJD" },
-  { overall: 13, team: "NYI", originalTeam: "NYI" },
-  { overall: 14, team: "CBJ", originalTeam: "CBJ" },
-  { overall: 15, team: "STL", originalTeam: "DET" },
-  { overall: 16, team: "STL", originalTeam: "WSH" },
-  { overall: 17, team: "LAK", originalTeam: "LAK" },
-  { overall: 18, team: "WSH", originalTeam: "ANA" },
-  { overall: 19, team: "UTA", originalTeam: "UTA" },
-  { overall: 20, team: "BUF", originalTeam: "EDM" },
-  { overall: 21, team: "PHI", originalTeam: "PHI" },
-  { overall: 22, team: "PIT", originalTeam: "PIT" },
-  { overall: 23, team: "BOS", originalTeam: "BOS" },
-  { overall: 24, team: "VAN", originalTeam: "MIN" },
-  { overall: 25, team: "OTT", originalTeam: "TBL" },
-  { overall: 26, team: "NYR", originalTeam: "DAL" },
-  { overall: 27, team: "SJS", originalTeam: "BUF" },
-  { overall: 28, team: "MTL", originalTeam: "MTL" },
-  { overall: 29, team: "STL", originalTeam: "COL" },
-  { overall: 30, team: "CGY", originalTeam: "VGK" },
-  { overall: 31, team: "CAR", originalTeam: "CAR" },
-  { overall: 32, team: "OTT", originalTeam: "OTT" },
-];
+// Sourced from the official NHL draft-picks endpoint via scripts/build-draft-board.ts
+// (committed to app/data/draft-2026.json). Trades are already baked in:
+// `originalTeam` is the first club in the pick's ownership chain; `team` is who
+// holds it on draft night. Re-run the builder to refresh after trades.
+export const DRAFT_2026_ORDER: DraftPickSlot[] = draftOrderData.order;
 
 // ── Prospect board (ranked 1–32) ────────────────────────────────────────────
 export const DRAFT_2026_PROSPECTS: DraftProspect[] = [

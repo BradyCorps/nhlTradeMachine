@@ -1,0 +1,169 @@
+{
+  "generatedAt": "2026-06-25T18:08:21.810Z",
+  "draftYear": 2026,
+  "source": "sample",
+  "pickState": "fut",
+  "count": 32,
+  "order": [
+    {
+      "overall": 1,
+      "team": "TOR",
+      "originalTeam": "TOR"
+    },
+    {
+      "overall": 2,
+      "team": "SJS",
+      "originalTeam": "SJS"
+    },
+    {
+      "overall": 3,
+      "team": "VAN",
+      "originalTeam": "VAN"
+    },
+    {
+      "overall": 4,
+      "team": "BUF",
+      "originalTeam": "CHI"
+    },
+    {
+      "overall": 5,
+      "team": "NYR",
+      "originalTeam": "NYR"
+    },
+    {
+      "overall": 6,
+      "team": "CGY",
+      "originalTeam": "CGY"
+    },
+    {
+      "overall": 7,
+      "team": "SEA",
+      "originalTeam": "SEA"
+    },
+    {
+      "overall": 8,
+      "team": "WPG",
+      "originalTeam": "WPG"
+    },
+    {
+      "overall": 9,
+      "team": "SJS",
+      "originalTeam": "FLA"
+    },
+    {
+      "overall": 10,
+      "team": "NSH",
+      "originalTeam": "NSH"
+    },
+    {
+      "overall": 11,
+      "team": "STL",
+      "originalTeam": "STL"
+    },
+    {
+      "overall": 12,
+      "team": "NJD",
+      "originalTeam": "NJD"
+    },
+    {
+      "overall": 13,
+      "team": "NYI",
+      "originalTeam": "NYI"
+    },
+    {
+      "overall": 14,
+      "team": "CBJ",
+      "originalTeam": "CBJ"
+    },
+    {
+      "overall": 15,
+      "team": "STL",
+      "originalTeam": "DET"
+    },
+    {
+      "overall": 16,
+      "team": "STL",
+      "originalTeam": "WSH"
+    },
+    {
+      "overall": 17,
+      "team": "LAK",
+      "originalTeam": "LAK"
+    },
+    {
+      "overall": 18,
+      "team": "WSH",
+      "originalTeam": "ANA"
+    },
+    {
+      "overall": 19,
+      "team": "UTA",
+      "originalTeam": "UTA"
+    },
+    {
+      "overall": 20,
+      "team": "BUF",
+      "originalTeam": "EDM"
+    },
+    {
+      "overall": 21,
+      "team": "PHI",
+      "originalTeam": "PHI"
+    },
+    {
+      "overall": 22,
+      "team": "PIT",
+      "originalTeam": "PIT"
+    },
+    {
+      "overall": 23,
+      "team": "BOS",
+      "originalTeam": "BOS"
+    },
+    {
+      "overall": 24,
+      "team": "VAN",
+      "originalTeam": "MIN"
+    },
+    {
+      "overall": 25,
+      "team": "OTT",
+      "originalTeam": "TBL"
+    },
+    {
+      "overall": 26,
+      "team": "NYR",
+      "originalTeam": "DAL"
+    },
+    {
+      "overall": 27,
+      "team": "SJS",
+      "originalTeam": "BUF"
+    },
+    {
+      "overall": 28,
+      "team": "MTL",
+      "originalTeam": "MTL"
+    },
+    {
+      "overall": 29,
+      "team": "STL",
+      "originalTeam": "COL"
+    },
+    {
+      "overall": 30,
+      "team": "CGY",
+      "originalTeam": "VGK"
+    },
+    {
+      "overall": 31,
+      "team": "CAR",
+      "originalTeam": "CAR"
+    },
+    {
+      "overall": 32,
+      "team": "OTT",
+      "originalTeam": "OTT"
+    }
+  ]
+}
