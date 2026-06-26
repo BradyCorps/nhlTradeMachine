@@ -196,6 +196,78 @@ export function getOfferSheetCompensation(aavMillions: number): string[] {
   return ["1st", "1st", "1st", "1st"];
 }
 
+// ── RFA offer-sheet acceptance logic ─────────────────────────────────────────
+// Models whether an RFA would accept an offer sheet from a given team and
+// whether the original team matches. Top players prefer contenders; rebuilders
+// struggle to land elite RFAs.
+
+export type OfferSheetOutcome =
+  | { result: "signed" }
+  | { result: "matched"; reason: string }
+  | { result: "declined"; reason: string };
+
+export interface OfferSheetContext {
+  seed: number;
+  signingTeamPhase?: string;
+  signingTeamStanding?: number;
+  originalTeamPhase?: string;
+}
+
+export function resolveOfferSheet(
+  player: Asset,
+  contract: ProjectedContract,
+  ctx: OfferSheetContext,
+): OfferSheetOutcome {
+  const rand = mulberry32(ctx.seed + hashString(`offer:${player.id}`));
+  const phase = ctx.signingTeamPhase ?? "Retooling";
+  const standing = ctx.signingTeamStanding ?? 16;
+  const origPhase = ctx.originalTeamPhase ?? "Contending";
+
+  // Player willingness — top players don't want to go to bad teams
+  const isRebuilding = phase === "Rebuilding" || phase === "Deep Rebuild";
+  const isBottom = standing >= 26;
+  const isElite = contract.tier === "STAR" || contract.tier === "TOP";
+
+  let acceptChance = 0.85; // baseline: most RFAs take the money
+  if (isElite && isRebuilding) acceptChance = 0.15;
+  else if (isElite && isBottom) acceptChance = 0.30;
+  else if (isElite && phase === "Retooling") acceptChance = 0.55;
+  else if (contract.tier === "MIDDLE" && isRebuilding) acceptChance = 0.50;
+  else if (contract.tier === "MIDDLE" && isBottom) acceptChance = 0.65;
+
+  // Young players are slightly more willing — they want opportunity
+  if ((player.age ?? 25) <= 22) acceptChance = Math.min(1, acceptChance + 0.10);
+
+  if (rand() > acceptChance) {
+    return {
+      result: "declined",
+      reason: isElite
+        ? `${player.name} prefers a contending team`
+        : `${player.name} isn't interested in the situation`,
+    };
+  }
+
+  // Original team matching — based on how much they value the player
+  // Contending teams match more often; rebuilders let RFAs walk for picks
+  let matchChance = 0.50;
+  if (origPhase === "Contending" || origPhase === "Win-Now") {
+    matchChance = isElite ? 0.85 : contract.tier === "MIDDLE" ? 0.60 : 0.30;
+  } else if (origPhase === "Rebuilding" || origPhase === "Deep Rebuild") {
+    matchChance = isElite ? 0.35 : 0.10;
+  } else {
+    matchChance = isElite ? 0.65 : contract.tier === "MIDDLE" ? 0.40 : 0.20;
+  }
+
+  if (rand() < matchChance) {
+    return {
+      result: "matched",
+      reason: `${player.teamId} matched the offer sheet`,
+    };
+  }
+
+  return { result: "signed" };
+}
+
 // ── League-wide resolution ───────────────────────────────────────────────────
 
 export interface OffseasonPending {
@@ -208,7 +280,8 @@ export interface LeagueOffseasonResult {
   userPending: OffseasonPending[];   // the user's team — returned for manual handling, NOT auto-applied
   resignings: Array<{ playerId: string; teamId: string; contract: ProjectedContract }>;
   walkAways: Array<{ playerId: string; fromTeamId: string; contract: ProjectedContract }>;
-  market: OffseasonPending[];        // players who hit the open market (signable)
+  market: OffseasonPending[];        // UFA players who hit the open market (signable)
+  rfaMarket: OffseasonPending[];     // other teams' RFAs available for offer sheets
   teamCapMoves: Record<string, CapDeltaMoves>; // ready for applyTeamCapDeltas()
 }
 
@@ -232,6 +305,7 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
   const resignings: LeagueOffseasonResult["resignings"] = [];
   const walkAways: LeagueOffseasonResult["walkAways"] = [];
   const market: OffseasonPending[] = [];
+  const rfaMarket: OffseasonPending[] = [];
   const teamCapMoves: Record<string, CapDeltaMoves> = {};
 
   const addMove = (teamId: string, side: "incoming" | "outgoing", asset: CapDeltaAsset) => {
@@ -242,33 +316,38 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
 
   for (const player of expiring) {
     const contract = projectFreeAgentContract(player, { seed, capCeiling: ctx.capCeiling });
-    // The expiring deal's REAL cap hit (player.capHit is zeroed to 0 for pending
-    // FAs). This is the cap credit when the deal comes off the books — without it
-    // a re-signing team is charged the new AAV with no offset and spirals
-    // tens of millions over the cap.
     const expiringCapHit = player.lastCapHit ?? player.capHit;
 
     if (ctx.userTeamId && player.teamId === ctx.userTeamId) {
       userPending.push({ player, contract });
-      continue; // user decides manually
+      continue;
     }
 
     const rand = mulberry32(seed + hashString(`resolve:${player.id}`));
-    const resign = contract.status === "RFA" || rand() < contract.resignProbability;
 
-    if (resign) {
-      // Old AAV comes off, the new AAV goes on (net raise reduces cap space).
+    if (contract.status === "RFA") {
+      // RFAs: most re-sign but all are technically available for offer sheets.
+      // The team re-signs them for cap purposes, but we also expose them to the
+      // user's offer sheet phase. If the user offer-sheets one, the page handler
+      // reverses the re-signing and applies the new deal.
       addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
       addMove(player.teamId, "incoming", { capHit: contract.aav });
       resignings.push({ playerId: player.id, teamId: player.teamId, contract });
+      rfaMarket.push({ player, contract });
     } else {
-      // Walks: the old AAV is freed; he enters the open market.
-      addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
-      const marketContract = { ...contract, term: Math.min(contract.term, MARKET_TERM_CAP) };
-      walkAways.push({ playerId: player.id, fromTeamId: player.teamId, contract: marketContract });
-      market.push({ player, contract: marketContract });
+      const resign = rand() < contract.resignProbability;
+      if (resign) {
+        addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
+        addMove(player.teamId, "incoming", { capHit: contract.aav });
+        resignings.push({ playerId: player.id, teamId: player.teamId, contract });
+      } else {
+        addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
+        const marketContract = { ...contract, term: Math.min(contract.term, MARKET_TERM_CAP) };
+        walkAways.push({ playerId: player.id, fromTeamId: player.teamId, contract: marketContract });
+        market.push({ player, contract: marketContract });
+      }
     }
   }
 
-  return { expiringCount: expiring.length, userPending, resignings, walkAways, market, teamCapMoves };
+  return { expiringCount: expiring.length, userPending, resignings, walkAways, market, rfaMarket, teamCapMoves };
 }

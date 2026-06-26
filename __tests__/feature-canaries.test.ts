@@ -578,11 +578,11 @@ describe("Canary — trade UI negative NAV", () => {
 });
 
 describe("Canary — draft pick inventory", () => {
-  it("league routes create rounds 1-5 for three draft years", () => {
+  it("league routes create rounds 1-5 for five draft years", () => {
     const league = read("app/api/league/route.ts");
     const teams = read("app/api/league/teams/route.ts");
-    expect(league).toContain("[currentDraftYear, currentDraftYear + 1, currentDraftYear + 2]");
-    expect(teams).toContain("[Y, Y + 1, Y + 2]");
+    expect(league).toContain("[currentDraftYear, currentDraftYear + 1, currentDraftYear + 2, currentDraftYear + 3, currentDraftYear + 4]");
+    expect(teams).toContain("[Y, Y + 1, Y + 2, Y + 3, Y + 4]");
     expect(league).toContain("[1, 2, 3, 4, 5].map(round => ({ round, year }))");
     expect(teams).toContain("[1, 2, 3, 4, 5].map(round => ({ round, year }))");
   });
@@ -1360,7 +1360,7 @@ describe("Canary — UX and UI polish", () => {
     expect(hook).toContain("if (lockCount !== 1) return");
     expect(hook).toContain("if (lockCount !== 0) return");
     expect(hook).toContain('document.body.style.overflow = "hidden"');
-    expect(armchair).toContain("useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length) || draftOpen || resignOpen)");
+    expect(armchair).toContain("useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length) || draftOpen || resignOpen || offerSheetOpen)");
     expect(armchair).not.toContain("useBodyScrollLock(verdictOpen");
     expect(armchair).not.toContain("useBodyScrollLock(verdictOpen ||");
     for (const path of [

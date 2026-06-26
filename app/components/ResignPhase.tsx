@@ -302,7 +302,7 @@ export default function ResignPhase({
           <button onClick={onDone}
             className="text-[11px] font-black uppercase tracking-[0.18em] px-5 py-2 font-mono"
             style={{ background: "var(--ledger-ink)", color: "var(--ledger-card-light)", borderRadius: "2px" }}>
-            Done — Proceed to Trades →
+            Done — RFA Offer Sheets →
           </button>
         </div>
       </div>

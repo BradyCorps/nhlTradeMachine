@@ -31,6 +31,7 @@ import { applyCapDelta, applyTeamCapDeltas, CapDeltaMoves } from "@/app/lib/cap-
 import { scenarioSeed } from "@/app/lib/sim-engine";
 import { resolveLeagueOffseason, type OffseasonPending } from "@/app/lib/free-agency";
 import ResignPhase from "@/app/components/ResignPhase";
+import OfferSheetPhase from "@/app/components/OfferSheetPhase";
 import DraftNight from "@/app/components/DraftNight";
 import { draftedRookieAssets } from "@/app/lib/draft-rookies";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
@@ -190,11 +191,13 @@ export default function ArmchairGmPage() {
   const [mode, setMode] = useState<"offseason" | "inseason">("offseason");
   const [draftOpen, setDraftOpen] = useState(false);
   const [resignOpen, setResignOpen] = useState(false);
+  const [offerSheetOpen, setOfferSheetOpen] = useState(false);
   const [userPending, setUserPending] = useState<OffseasonPending[]>([]);
   const [market, setMarket] = useState<OffseasonPending[]>([]);
+  const [rfaMarket, setRfaMarket] = useState<OffseasonPending[]>([]);
   const offseasonResolvedRef = useRef(false);
 
-  useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length) || draftOpen || resignOpen);
+  useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length) || draftOpen || resignOpen || offerSheetOpen);
 
   // ── Abort controllers — cancel stale Claude requests ─────────
   const simAbortRef  = useRef<AbortController | null>(null);
@@ -486,6 +489,7 @@ export default function ArmchairGmPage() {
     });
     setUserPending(res.userPending);
     setMarket(res.market);
+    setRfaMarket(res.rfaMarket);
 
     const resignById = new Map(res.resignings.map(r => [r.playerId, r.contract]));
     const walkedIds = new Set(res.walkAways.map(w => w.playerId));
@@ -576,9 +580,53 @@ export default function ArmchairGmPage() {
     clearNavCache();
   }, [homeTeamId]);
 
+  // Re-sign phase done — open offer sheet phase for other teams' RFAs.
+  const proceedToOfferSheets = useCallback(() => {
+    setResignOpen(false);
+    setOfferSheetOpen(true);
+  }, []);
+
+  // Sign an RFA via offer sheet: move player to user's roster, deduct comp picks.
+  const signOfferSheet = useCallback((fa: OffseasonPending, compensation: string[]) => {
+    if (!homeTeamId) return;
+    // Deduct compensation picks from the user's inventory
+    const picksToRemove: string[] = [];
+    const compNeeded = [...compensation];
+    const available = db.players.filter(p => p.position === "Pick" && p.teamId === homeTeamId);
+    for (const roundNeeded of compNeeded) {
+      const roundNum = roundNeeded === "1st" ? 1 : roundNeeded === "2nd" ? 2 : 3;
+      const pick = available.find(p => p.round === roundNum && !picksToRemove.includes(p.id));
+      if (pick) picksToRemove.push(pick.id);
+    }
+
+    setDb(prev => {
+      const signed: Asset = {
+        ...fa.player, teamId: homeTeamId, capHit: fa.contract.aav, yearsRemaining: fa.contract.term,
+        retainedPct: 0, expiresThisOffseason: false, contractStatus: "SIGNED",
+      };
+      return {
+        ...prev,
+        players: [
+          ...prev.players
+            .filter(p => p.id !== fa.player.id)
+            .filter(p => !picksToRemove.includes(p.id)),
+          signed,
+        ],
+        teams: prev.teams.map(t =>
+          t.id === homeTeamId
+            ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { incoming: [{ capHit: fa.contract.aav }] }) * 10) / 10 }
+            : t.id === fa.player.teamId
+              ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: fa.contract.aav }], incoming: [{ capHit: fa.player.lastCapHit ?? fa.player.capHit }] }) * 10) / 10 }
+              : t),
+      };
+    });
+    setRfaMarket(prev => prev.filter(p => p.player.id !== fa.player.id));
+    clearNavCache();
+  }, [homeTeamId, db.players]);
+
   // Commit the off-season as the new baseline and open the trade flow.
   const finishOffseason = useCallback(() => {
-    setResignOpen(false);
+    setOfferSheetOpen(false);
     setOriginalDb(db);
   }, [db]);
 
@@ -1105,6 +1153,19 @@ export default function ArmchairGmPage() {
           onWalk={walkPlayer}
           onSign={signMarketPlayer}
           onDrop={dropPlayer}
+          onDone={proceedToOfferSheets}
+        />
+      )}
+
+      {/* ── Off-Season RFA Offer Sheet Phase ───────────────────── */}
+      {offerSheetOpen && liveHome && (
+        <OfferSheetPhase
+          homeTeam={liveHome}
+          capSpace={liveHome.capSpace ?? 0}
+          rfaMarket={rfaMarket}
+          teams={db.teams}
+          picks={db.players.filter(p => p.position === "Pick")}
+          onSign={signOfferSheet}
           onDone={finishOffseason}
         />
       )}
