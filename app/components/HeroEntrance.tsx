@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { ReactNode, CSSProperties } from "react";
 
@@ -9,9 +10,19 @@ interface AnimProps {
   style?: CSSProperties;
 }
 
+function useHasMounted() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  return mounted;
+}
+
 export function SheetEntrance({ children, className, style }: AnimProps) {
   const reduced = useReducedMotion();
-  if (reduced) return <div className={className} style={style}>{children}</div>;
+  const mounted = useHasMounted();
+
+  if (reduced || !mounted) {
+    return <div className={className} style={style}>{children}</div>;
+  }
 
   return (
     <motion.div
@@ -32,7 +43,11 @@ export function SheetEntrance({ children, className, style }: AnimProps) {
 
 export function FadeUp({ children, className, style, delay = 0 }: AnimProps & { delay?: number }) {
   const reduced = useReducedMotion();
-  if (reduced) return <div className={className} style={style}>{children}</div>;
+  const mounted = useHasMounted();
+
+  if (reduced || !mounted) {
+    return <div className={className} style={style}>{children}</div>;
+  }
 
   return (
     <motion.div
@@ -49,7 +64,11 @@ export function FadeUp({ children, className, style, delay = 0 }: AnimProps & { 
 
 export function ScrollCard({ children, className, index = 0 }: AnimProps & { index?: number }) {
   const reduced = useReducedMotion();
-  if (reduced) return <div className={className}>{children}</div>;
+  const mounted = useHasMounted();
+
+  if (reduced || !mounted) {
+    return <div className={className}>{children}</div>;
+  }
 
   return (
     <motion.div

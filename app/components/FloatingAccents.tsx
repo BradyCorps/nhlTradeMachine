@@ -1,13 +1,17 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
 
 export default function FloatingAccents() {
   const reduced = useReducedMotion();
+  const [mounted, setMounted] = useState(false);
   const { scrollY } = useScroll();
   const opacity = useTransform(scrollY, [0, 400], [1, 0], { clamp: true });
 
-  if (reduced) return null;
+  useEffect(() => setMounted(true), []);
+
+  if (reduced || !mounted) return null;
 
   return (
     <motion.div
@@ -36,8 +40,8 @@ export default function FloatingAccents() {
         <div className="text-[7px] font-mono font-black uppercase tracking-[0.25em] opacity-60">
           Trade Alert
         </div>
-        <div className="text-[11px] font-black mt-1">McDavid &rarr; TOR</div>
-        <div className="text-[8px] font-mono opacity-50 mt-0.5">NAV &Delta; +2.4</div>
+        <div className="text-[11px] font-black mt-1">{`McDavid → TOR`}</div>
+        <div className="text-[8px] font-mono opacity-50 mt-0.5">{`NAV Δ +2.4`}</div>
       </motion.div>
 
       {/* STRAND DNA */}
@@ -53,11 +57,11 @@ export default function FloatingAccents() {
         }}
       >
         <div className="text-[7px] font-mono font-black uppercase tracking-[0.25em] opacity-60">
-          STRAND&trade; DNA
+          {`STRAND™ DNA`}
         </div>
         <div className="text-[10px] font-mono mt-1 opacity-80">Fit: 94%</div>
         <div className="text-[8px] font-mono opacity-50 mt-0.5">
-          &#9679;&#9679;&#9679;&#9679;&#9675;
+          {"●●●●○"}
         </div>
       </motion.div>
 
@@ -76,7 +80,7 @@ export default function FloatingAccents() {
         <div className="text-[7px] font-mono font-black uppercase tracking-[0.25em] opacity-60">
           GM Audit
         </div>
-        <div className="text-[10px] font-mono mt-1 opacity-80">Cap Legal &check;</div>
+        <div className="text-[10px] font-mono mt-1 opacity-80">{`Cap Legal ✓`}</div>
         <div className="text-[8px] font-mono opacity-50 mt-0.5">Window: Open</div>
       </motion.div>
     </motion.div>
