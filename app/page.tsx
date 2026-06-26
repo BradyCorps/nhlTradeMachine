@@ -100,7 +100,9 @@ export default function WelcomePage() {
     <main className="fp-desk fp-desk-deep min-h-screen font-serif antialiased" style={{ color: "var(--ink)" }}>
       <ScrollReveal />
       <ScrollNameplate />
-      <LedgerScrollSetdown className="fp-sheet">
+      <LedgerScrollSetdown className="fp-stack">
+        <div className="fp-stack-extra" aria-hidden="true" />
+        <div className="fp-sheet">
 
         {/* ── Dateline ───────────────────────────────────────── */}
         <div className="border-b" style={{ borderColor: "var(--rule)" }}>
@@ -296,6 +298,7 @@ export default function WelcomePage() {
         </section>
 
         <Footer />
+        </div>
       </LedgerScrollSetdown>
     </main>
   );

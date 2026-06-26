@@ -1003,45 +1003,76 @@ select.ledger-select {
   .fp-desk { padding: 48px 28px; }
 }
 
-/* ── Floating glass accent cards ─────────────────────────────── */
-.hero-float-card {
-  padding: 10px 14px;
-  background: rgba(255, 245, 225, 0.07);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 245, 225, 0.10);
-  border-radius: 6px;
-  color: rgba(255, 245, 225, 0.65);
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.15),
-    0 1px 2px rgba(0, 0, 0, 0.10);
-}
-
-/* ── Editorial glass panel ───────────────────────────────────── */
-.hero-glass-editorial {
-  position: relative;
-  background: rgba(242, 236, 215, 0.55);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-left: 1px solid rgba(242, 236, 215, 0.30);
-  border-right: 1px solid rgba(242, 236, 215, 0.30);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    0 6px 28px rgba(30, 18, 6, 0.06);
-}
-
-/* ── The sheet: a real page lifting off the desk ───────────────── */
-.fp-sheet {
+/* ── Newspaper stack — visible page layers beneath the front page ─ */
+.fp-stack {
   position: relative;
   max-width: 1180px;
   margin: 0 auto;
-  background: var(--paper);
-  border-top: 5px solid var(--fig);   /* fig accent band ties sheet to desk */
-  /* deep cast shadow — the weight of the stack */
+}
+
+/* Heavy stack: 7 visible page edges with increasing offset/rotation,
+   progressively darker and yellower to sell depth */
+.fp-stack::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 3px;
+  right: -4px;
+  bottom: -10px;
+  background: #e6dab8;
+  transform: rotate(0.25deg);
+  transform-origin: 50% 0%;
+  z-index: 0;
   box-shadow:
-    0 2px 3px rgba(30, 18, 6, 0.3),
-    0 20px 44px -14px var(--fp-ink-shadow),
-    0 44px 80px -30px rgba(30, 18, 6, 0.5);
+    /* page 2 */ 3px  5px 0 0 #e4d8b4, 3px  5px 1px rgba(30,18,6,0.06),
+    /* page 3 */ 7px 10px 0 0 #e0d2ae, 7px 10px 1px rgba(30,18,6,0.06),
+    /* page 4 */11px 16px 0 0 #dbcca8, 11px 16px 1px rgba(30,18,6,0.05),
+    /* page 5 */15px 22px 0 0 #d6c6a2, 15px 22px 2px rgba(30,18,6,0.05),
+    /* page 6 */19px 28px 0 0 #d1c09c, 19px 28px 2px rgba(30,18,6,0.04),
+    /* page 7 */23px 34px 0 0 #ccba96, 23px 34px 3px rgba(30,18,6,0.04),
+    /* cast  */ 26px 40px 18px -4px rgba(30,18,6,0.18);
+}
+
+/* Loose inner section peeking out bottom — askew like it was pulled halfway */
+.fp-stack::after {
+  content: "";
+  position: absolute;
+  bottom: -28px;
+  left: 40px;
+  right: -12px;
+  height: 54px;
+  background: linear-gradient(180deg, #d6c8a5 0%, #cabb98 100%);
+  transform: rotate(-0.7deg);
+  transform-origin: 100% 0%;
+  z-index: -1;
+  box-shadow:
+    0 3px 8px rgba(30,18,6,0.18),
+    0 1px 0 0 #c4b490;
+}
+
+/* Extra loose sheet peeking from right side — sold via .fp-stack-extra in markup */
+.fp-stack-extra {
+  position: absolute;
+  top: 60px;
+  right: -16px;
+  bottom: 120px;
+  width: 38px;
+  background: linear-gradient(90deg, #d8caa6 0%, #d0c29e 100%);
+  transform: rotate(0.4deg);
+  transform-origin: 0% 50%;
+  z-index: -1;
+  box-shadow: 3px 0 8px rgba(30,18,6,0.12);
+}
+
+/* ── The front page: sits on top of the stack ────────────────── */
+.fp-sheet {
+  position: relative;
+  z-index: 1;
+  background: var(--paper);
+  border-top: 5px solid var(--fig);
+  box-shadow:
+    0 1px 3px rgba(30,18,6,0.10),
+    -1px 0 0 rgba(30,18,6,0.06);
 }
 /* stronger paper grain, only on the reading surface */
 .fp-sheet::before {
