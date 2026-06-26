@@ -3,8 +3,8 @@ import React from "react";
 import Link from "next/link";
 import Footer from "./components/Footer";
 import ScrollReveal from "./components/ScrollReveal";
-import ScrollNameplate from "./components/ScrollNameplate";
-import LedgerScrollSetdown from "./components/LedgerScrollSetdown";
+import FloatingAccents from "./components/FloatingAccents";
+import { SheetEntrance, FadeUp } from "./components/HeroEntrance";
 
 function Cell({
   href, lead = false, kicker, kickerColor, edition, title, body, lines, cta, ctaColor,
@@ -97,41 +97,51 @@ const ENGINE = [
 
 export default function WelcomePage() {
   return (
-    <main className="fp-desk min-h-screen font-serif antialiased" style={{ color: "var(--ink)" }}>
+    <main className="fp-desk fp-desk-deep min-h-screen font-serif antialiased" style={{ color: "var(--ink)" }}>
       <ScrollReveal />
-      <ScrollNameplate />
-      <LedgerScrollSetdown className="fp-sheet">
+      <FloatingAccents />
+
+      <SheetEntrance className="fp-sheet">
 
         {/* ── Dateline ───────────────────────────────────────── */}
-        <div className="border-b" style={{ borderColor: "var(--rule)" }}>
-          <div className="px-5 py-2 flex items-center justify-between text-2xs uppercase tracking-[0.25em] font-mono"
-            style={{ color: "var(--ledger-ink-faint)" }}>
-            <span>Est. 2026</span>
-            <span className="hidden sm:inline">The Front Page</span>
-            <span>Price: Free</span>
+        <FadeUp delay={0.3}>
+          <div className="border-b" style={{ borderColor: "var(--rule)" }}>
+            <div className="px-5 py-2 flex items-center justify-between text-2xs uppercase tracking-[0.25em] font-mono"
+              style={{ color: "var(--ledger-ink-faint)" }}>
+              <span>Est. 2026</span>
+              <span className="hidden sm:inline">The Front Page</span>
+              <span>Price: Free</span>
+            </div>
           </div>
-        </div>
+        </FadeUp>
 
         {/* ── Masthead with ears ─────────────────────────────── */}
-        <header className="masthead-rule fp-reveal">
+        <header className="masthead-rule">
           <div className="px-5 py-7 grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-4">
-            <div className="fp-ear hidden md:block">
+            <FadeUp delay={0.85} className="fp-ear hidden md:block">
               First Edition<br />Vol. I — No. 1
-            </div>
+            </FadeUp>
+
             <div className="text-center">
-              <h1 className="fp-nameplate" style={{ fontSize: "clamp(2.4rem, 8vw, 4.6rem)" }}>
-                The Hockey Ledger
-              </h1>
-              <p className="fp-slogan mt-3 text-[12px]">
-                “Everything a hockey fan could ask for”
-              </p>
-              <p className="mt-2 text-[10px] uppercase tracking-[0.28em] font-mono"
-                style={{ color: "var(--ledger-ink-faint)" }}>
-                X-NAV Analytics · STRAND™ DNA · GM Logic Engine · Live Data
-              </p>
+              <FadeUp delay={0.45}>
+                <h1 className="fp-nameplate" style={{ fontSize: "clamp(2.4rem, 8vw, 4.6rem)" }}>
+                  The Hockey Ledger
+                </h1>
+              </FadeUp>
+              <FadeUp delay={0.6}>
+                <p className="fp-slogan mt-3 text-[12px]">
+                  &ldquo;Everything a hockey fan could ask for&rdquo;
+                </p>
+              </FadeUp>
+              <FadeUp delay={0.75}>
+                <p className="mt-2 text-[10px] uppercase tracking-[0.28em] font-mono"
+                  style={{ color: "var(--ledger-ink-faint)" }}>
+                  X-NAV Analytics &middot; STRAND&trade; DNA &middot; GM Logic Engine &middot; Live Data
+                </p>
+              </FadeUp>
             </div>
-            <div className="flex justify-center md:justify-end">
-              
+
+            <FadeUp delay={0.9} className="flex justify-center md:justify-end">
               <a
                 href="https://buymeacoffee.com/hockeyledger"
                 target="_blank"
@@ -140,47 +150,50 @@ export default function WelcomePage() {
               >
                 Buy Me a Coffee
               </a>
-            </div>
+            </FadeUp>
           </div>
         </header>
 
-        {/* ── Lead editorial ─────────────────────────────────── */}
-        <section className="fp-reveal px-5 sm:px-8 pt-8 pb-7 border-b" style={{ borderColor: "var(--ink)", transitionDelay: "0.08s" }}>
-          <div className="text-center mb-5">
-            <div className="newspaper-kicker font-black text-2xs uppercase font-mono mb-1"
-              style={{ color: "var(--ledger-red)" }}>
-              Staff Editorial
+        {/* ── Lead editorial — glass panel ───────────────────── */}
+        <FadeUp delay={1.05}>
+          <section className="hero-glass-editorial px-5 sm:px-8 pt-8 pb-7 border-b"
+            style={{ borderColor: "var(--ink)" }}>
+            <div className="text-center mb-5">
+              <div className="newspaper-kicker font-black text-2xs uppercase font-mono mb-1"
+                style={{ color: "var(--ledger-red)" }}>
+                Staff Editorial
+              </div>
+              <p className="text-2xs uppercase tracking-[0.3em] font-mono"
+                style={{ color: "var(--ledger-ink-faint)" }}>
+                On the Business of Building a Hockey Team
+              </p>
             </div>
-            <p className="text-2xs uppercase tracking-[0.3em] font-mono"
+            <div className="fp-lede text-[14px] leading-[1.9] max-w-3xl mx-auto"
+              style={{ color: "var(--ledger-ink-body)" }}>
+              <p className="mb-4">
+                Every trade is an argument, and every argument deserves a hearing on
+                the record.
+                The Hockey Ledger exists to put the case in ink: to weigh
+                a deal the way a front office actually weighs it.
+                Cap and clause, age and term, value and production.
+                It&apos;s all about the slot a player fills and the window a team is trying
+                to keep open. No hot takes set in disappearing pixels. A ruling you
+                can hold up to the light.
+              </p>
+              <p>
+                Build a single transaction in the Trade Machine and test it against
+                X-NAV and the GM Audit, or take the chair in Armchair GM and live with
+                every consequence that follows. Read the published Docket to see how
+                the calls have aged. The press is open. Turn the page and start
+                running the room.
+              </p>
+            </div>
+            <p className="mt-5 text-2xs uppercase tracking-[0.28em] font-mono text-right max-w-3xl mx-auto"
               style={{ color: "var(--ledger-ink-faint)" }}>
-              On the Business of Building a Hockey Team
+              — The Front Office
             </p>
-          </div>
-          <div className="fp-lede text-[14px] leading-[1.9] max-w-3xl mx-auto"
-            style={{ color: "var(--ledger-ink-body)" }}>
-            <p className="mb-4">
-              Every trade is an argument, and every argument deserves a hearing on
-              the record. 
-              The Hockey Ledger exists to put the case in ink: to weigh
-              a deal the way a front office actually weighs it.
-              Cap and clause, age and term, value and production.
-              It's all about the slot a player fills and the window a team is trying
-              to keep open. No hot takes set in disappearing pixels. A ruling you
-              can hold up to the light.
-            </p>
-            <p>
-              Build a single transaction in the Trade Machine and test it against
-              X-NAV and the GM Audit, or take the chair in Armchair GM and live with
-              every consequence that follows. Read the published Docket to see how
-              the calls have aged. The press is open. Turn the page and start
-              running the room.
-            </p>
-          </div>
-          <p className="mt-5 text-2xs uppercase tracking-[0.28em] font-mono text-right max-w-3xl mx-auto"
-            style={{ color: "var(--ledger-ink-faint)" }}>
-            — The Front Office
-          </p>
-        </section>
+          </section>
+        </FadeUp>
 
         {/* ── The desks (dense ruled broadsheet) ─────────────── */}
         <section className="fp-reveal px-5 sm:px-8 pt-8">
@@ -297,7 +310,7 @@ export default function WelcomePage() {
         </section>
 
         <Footer />
-      </LedgerScrollSetdown>
+      </SheetEntrance>
     </main>
   );
 }
