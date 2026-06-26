@@ -15,8 +15,10 @@ const BG: Record<ToastKind, string> = {
 
 export default function LedgerToaster() {
   const [toasts, setToasts] = useState<ToastEvent[]>([]);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     function handler(e: Event) {
       const t = (e as CustomEvent<ToastEvent>).detail;
       setToasts((prev) => [...prev, t]);
@@ -28,7 +30,7 @@ export default function LedgerToaster() {
     return () => window.removeEventListener("ledger-toast", handler);
   }, []);
 
-  if (typeof document === "undefined") return null;
+  if (!mounted) return null;
 
   return createPortal(
     <div style={{
