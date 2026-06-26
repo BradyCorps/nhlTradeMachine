@@ -169,24 +169,30 @@ export function projectFreeAgentContract(asset: Asset, ctx: ProjectContext = {})
 
 // ── RFA offer-sheet compensation (CBA Article 10.3) ─────────────────────────
 // When a team signs another team's RFA to an offer sheet, the original team has
-// 7 days to match. If they don't, they receive draft pick compensation:
-//
-// AAV ($)                        Compensation
-// ≤ $1,544,424                   None
-// $1,544,424 – $2,340,037        3rd round
-// $2,340,037 – $4,680,076        2nd round
-// $4,680,076 – $7,020,113        1st + 3rd
-// $7,020,113 – $9,360,153        1st + 2nd + 3rd
-// $9,360,153 – $11,700,192       2× 1st + 2nd + 3rd
-// > $11,700,192                  4× 1st rounds
+// 7 days to match. If they don't, they receive draft pick compensation.
+// Thresholds updated for the 2025-26 CBA escalation.
+
+export interface OfferSheetTier {
+  ceiling: number;
+  compensation: string[];
+  label: string;
+}
+
+export const OFFER_SHEET_TIERS: OfferSheetTier[] = [
+  { ceiling:  1_575_969, compensation: [],                                  label: "$1,575,969 or less" },
+  { ceiling:  2_387_832, compensation: ["3rd"],                             label: "$1,575,969 – $2,387,832" },
+  { ceiling:  4_775_666, compensation: ["2nd"],                             label: "$2,387,832 – $4,775,666" },
+  { ceiling:  7_163_498, compensation: ["1st", "3rd"],                      label: "$4,775,666 – $7,163,498" },
+  { ceiling:  9_551_332, compensation: ["1st", "2nd", "3rd"],               label: "$7,163,498 – $9,551,332" },
+  { ceiling: 11_939_166, compensation: ["1st", "1st", "2nd", "3rd"],        label: "$9,551,332 – $11,939,166" },
+  { ceiling:   Infinity, compensation: ["1st", "1st", "1st", "1st"],        label: "$11,939,166 or more" },
+];
+
 export function getOfferSheetCompensation(aavMillions: number): string[] {
   const aav = aavMillions * 1_000_000;
-  if (aav <= 1_544_424)  return [];
-  if (aav <= 2_340_037)  return ["3rd"];
-  if (aav <= 4_680_076)  return ["2nd"];
-  if (aav <= 7_020_113)  return ["1st", "3rd"];
-  if (aav <= 9_360_153)  return ["1st", "2nd", "3rd"];
-  if (aav <= 11_700_192) return ["1st", "1st", "2nd", "3rd"];
+  for (const tier of OFFER_SHEET_TIERS) {
+    if (aav <= tier.ceiling) return tier.compensation;
+  }
   return ["1st", "1st", "1st", "1st"];
 }
 

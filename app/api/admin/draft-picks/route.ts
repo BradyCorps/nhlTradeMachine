@@ -18,7 +18,7 @@ function buildDefaultPicks() {
   const { draftYear } = SEASON;
   const picks: Record<string, { originalOwnerId: string; currentOwnerId: string; round: number; year: number; isProtected: boolean }> = {};
   for (const team of TEAMS_DB) {
-    for (const year of [draftYear, draftYear + 1, draftYear + 2]) {
+    for (const year of [draftYear, draftYear + 1, draftYear + 2, draftYear + 3, draftYear + 4]) {
       for (const round of [1, 2, 3, 4, 5]) {
         const id = pickId(team.id, year, round);
         picks[id] = { originalOwnerId: team.id, currentOwnerId: team.id, round, year, isProtected: false };

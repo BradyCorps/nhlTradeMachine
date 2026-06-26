@@ -262,7 +262,7 @@ export async function GET() {
 
   // Always generate all 480 picks by original owner, then apply ownership overrides.
   TEAMS_DB.forEach((origTeam) => {
-    [currentDraftYear, currentDraftYear + 1, currentDraftYear + 2].flatMap(year =>
+    [currentDraftYear, currentDraftYear + 1, currentDraftYear + 2, currentDraftYear + 3, currentDraftYear + 4].flatMap(year =>
       [1, 2, 3, 4, 5].map(round => ({ round, year }))
     ).forEach(({ round, year }) => {
       const id = `pick-${origTeam.id}-${year}-${round}`;

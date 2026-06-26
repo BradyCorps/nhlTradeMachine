@@ -189,7 +189,7 @@ export async function GET() {
   // three drafts. Rolls forward automatically and stays sorted by year.
   const Y = SEASON.draftYear;
   LIVE_TEAMS.forEach((team) => {
-    [Y, Y + 1, Y + 2].flatMap(year =>
+    [Y, Y + 1, Y + 2, Y + 3, Y + 4].flatMap(year =>
       [1, 2, 3, 4, 5].map(round => ({ round, year }))
     ).forEach(({ round, year }) => {
       const roundLabel = round === 1 ? "1st" : round === 2 ? "2nd" : round === 3 ? "3rd" : `${round}th`;
