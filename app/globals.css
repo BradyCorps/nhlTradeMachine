@@ -294,21 +294,6 @@ input[type="range"] { accent-color: var(--red); }
     letter-spacing: 0.12em !important;
   }
 
-  .offer-sheet-table-header,
-  .offer-sheet-table-row,
-  .offer-sheet-card-grid,
-  .offer-sheet-rules-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  .offer-sheet-comp-cell {
-    border-left: none !important;
-    border-top: 1px solid var(--rule-light);
-  }
-
-  .offer-sheet-table-cell {
-    min-width: 0;
-  }
 }
 
 /* ── Admin mobile containment ───────────────────────────────── */

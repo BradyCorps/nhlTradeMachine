@@ -580,8 +580,29 @@ export default function ArmchairGmPage() {
     clearNavCache();
   }, [homeTeamId]);
 
-  // Re-sign phase done — open offer sheet phase for other teams' RFAs.
+  // Re-sign phase done — auto-walk any remaining pending UFAs, then
+  // open offer sheet phase for other teams' RFAs.
   const proceedToOfferSheets = useCallback(() => {
+    setUserPending(prev => {
+      if (prev.length > 0) {
+        const walkIds = new Set(prev.map(fa => fa.player.id));
+        setDb(dbPrev => ({
+          ...dbPrev,
+          players: dbPrev.players.filter(p => !walkIds.has(p.id)),
+          teams: dbPrev.teams.map(t => {
+            const freed = prev
+              .filter(fa => fa.player.teamId === t.id)
+              .reduce((sum, fa) => sum + (fa.player.lastCapHit ?? fa.player.capHit), 0);
+            return freed > 0
+              ? { ...t, capSpace: Math.round((t.capSpace + freed) * 10) / 10 }
+              : t;
+          }),
+        }));
+        setMarket(m => [...prev.map(fa => ({ player: fa.player, contract: fa.contract })), ...m]);
+        clearNavCache();
+      }
+      return [];
+    });
     setResignOpen(false);
     setOfferSheetOpen(true);
   }, []);

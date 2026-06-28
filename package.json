@@ -38,8 +38,11 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@vitest/ui": "^4.1.7",
     "drizzle-kit": "^0.31.10",
+    "playwright-core": "^1.61.1",
+    "ts-jest": "^29.4.11",
     "tsx": "^4.22.4",
     "vitest": "^4.1.7"
   }
