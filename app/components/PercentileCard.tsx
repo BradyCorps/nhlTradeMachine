@@ -130,17 +130,19 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       sortedMaps.set(stat.key, vals);
     }
 
-    const pcts: { key: string; label: string; value: number | null; pct: number; formatted: string }[] = [];
+    const pcts: { key: string; label: string; value: number | null; pct: number; formatted: string; median: string }[] = [];
     for (const stat of statDefs) {
       const raw = stat.extract(player);
       const sorted = sortedMaps.get(stat.key) ?? [];
       const pct = raw !== null ? computePercentile(stat.invert ? -raw : raw, stat.invert ? sorted.map(v => -v).sort((a, b) => a - b) : sorted) : 50;
+      const medianVal = sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)] : null;
       pcts.push({
         key: stat.key,
         label: stat.label,
         value: raw,
         pct,
         formatted: raw !== null ? (stat.format?.(raw) ?? raw.toFixed(1)) : "—",
+        median: medianVal !== null ? (stat.format?.(medianVal) ?? medianVal.toFixed(1)) : "—",
       });
     }
 
@@ -250,10 +252,33 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
 
       {/* Percentile bars */}
       <div style={{ padding: "8px 14px 12px" }}>
+        {/* Column headers */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "52px 1fr 40px 40px",
+          alignItems: "center",
+          gap: "8px",
+          marginBottom: "4px",
+          paddingBottom: "3px",
+          borderBottom: "1px solid var(--ledger-rule-light, #d4c8a8)",
+        }}>
+          <span style={{ fontSize: "8px", fontWeight: 700, color: "var(--ledger-ink-faint, #7a6940)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+            Stat
+          </span>
+          <span style={{ fontSize: "8px", fontWeight: 700, color: "var(--ledger-ink-faint, #7a6940)", textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "center" }}>
+            Percentile
+          </span>
+          <span style={{ fontSize: "8px", fontWeight: 700, color: "var(--ledger-ink-faint, #7a6940)", textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "right" }}>
+            Val
+          </span>
+          <span style={{ fontSize: "8px", fontWeight: 700, color: "var(--ledger-ink-faint, #7a6940)", textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "right" }}>
+            Avg
+          </span>
+        </div>
         {percentiles.map((stat) => (
           <div key={stat.key} style={{
             display: "grid",
-            gridTemplateColumns: "52px 1fr 40px",
+            gridTemplateColumns: "52px 1fr 40px 40px",
             alignItems: "center",
             gap: "8px",
             marginBottom: "5px",
@@ -265,13 +290,16 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
             }}>
               {stat.label}
             </span>
-            <div style={{
-              position: "relative",
-              height: "14px",
-              background: "var(--ledger-rule-light, #d4c8a8)",
-              borderRadius: "2px",
-              overflow: "hidden",
-            }}>
+            <div
+              title={`Position median: ${stat.median}`}
+              style={{
+                position: "relative",
+                height: "14px",
+                background: "var(--ledger-rule-light, #d4c8a8)",
+                borderRadius: "2px",
+                overflow: "hidden",
+              }}
+            >
               <div style={{
                 position: "absolute",
                 top: 0,
@@ -282,16 +310,28 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
                 borderRadius: "2px",
                 transition: "width 0.3s ease",
               }} />
+              {/* 50th percentile median marker */}
+              <div style={{
+                position: "absolute",
+                top: 0,
+                left: "50%",
+                width: "1.5px",
+                height: "100%",
+                background: "var(--ledger-ink, #2a1f0e)",
+                opacity: 0.4,
+                zIndex: 1,
+              }} />
               <span style={{
                 position: "absolute",
                 top: "50%",
-                left: "50%",
+                left: stat.pct > 20 ? `${stat.pct / 2}%` : "50%",
                 transform: "translate(-50%, -50%)",
                 fontSize: "9px",
                 fontWeight: 900,
                 color: stat.pct >= 55 ? "rgba(255,255,255,0.95)" : "var(--ledger-ink, #2a1f0e)",
                 letterSpacing: "0.04em",
                 textShadow: stat.pct >= 55 ? "0 1px 2px rgba(0,0,0,0.3)" : "none",
+                zIndex: 2,
               }}>
                 {stat.pct}th
               </span>
@@ -303,6 +343,15 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
               textAlign: "right",
             }}>
               {stat.formatted}
+            </span>
+            <span style={{
+              fontSize: "9px",
+              fontWeight: 600,
+              color: "var(--ledger-ink-faint, #7a6940)",
+              textAlign: "right",
+              opacity: 0.7,
+            }}>
+              {stat.median}
             </span>
           </div>
         ))}
