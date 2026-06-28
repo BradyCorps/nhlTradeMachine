@@ -91,8 +91,8 @@ function TradePanel({
         </div>
       </div>
 
-      {/* Asset list */}
-      <div className="flex-1 overflow-y-auto flex flex-col gap-2 mb-4 pr-1 min-h-[200px]">
+      {/* Asset list — capped height with internal scroll to prevent page-level scrolling */}
+      <div className="flex-1 overflow-y-auto flex flex-col gap-2 mb-4 pr-1 min-h-[200px] max-h-[420px] lg:max-h-[520px]">
         {!team && idx === 1 && (
           <div className="w-full h-full flex flex-col items-center justify-center gap-3">
             <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textAlign: "center", letterSpacing: "0.2em", textTransform: "uppercase" }}>
