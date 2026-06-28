@@ -1297,22 +1297,6 @@ export default function ArmchairGmPage() {
           </div>
         )}
 
-        {/* ── Team Strands — full width above trade grid ── */}
-        {teams[0] && teams[1] && (
-          <div className="mb-4">
-            <TeamDNA
-              homeTeam={teams[0]}
-              partnerTeam={teams[1]}
-              homeRoster={allHomeRoster}
-              partnerRoster={allPartnerRoster}
-              homeBlocks={blocks[0]}
-              partnerBlocks={blocks[1]}
-              navMap={navMap}
-              db={db}
-            />
-          </div>
-        )}
-
         <TugBar homeNetGain={homeNetGain} navA={navA} navB={navB} cNavA={cNavA} cNavB={cNavB} />
 
         {/* ── Main Trade Grid ── */}
@@ -1642,81 +1626,24 @@ export default function ArmchairGmPage() {
         </div>
 
         {/* ── Lineups — editable depth charts below the trade ── */}
+        {/* ── Analysis Tabs — tabbed sections below the trade grid ── */}
         {teams[0] && teams[1] && (
-          <div className="mt-2 mb-4">
-            <LineupEditor
-              home={{
-                teamId: teams[0]!.id,
-                teamName: teams[0]!.name, label: "Your Franchise",
-                roster: allHomeRoster, outgoing: blocks[0],
-                incoming: blocks[1].filter(a => a.position !== "Pick"),
-              }}
-              partner={{
-                teamId: teams[1]!.id,
-                teamName: teams[1]!.name, label: "Trade Partner",
-                roster: allPartnerRoster, outgoing: blocks[1],
-                incoming: blocks[0].filter(a => a.position !== "Pick"),
-              }}
-              hasActiveTrade={blocks[0].length > 0 || blocks[1].length > 0}
-              navMap={navMap}
-              onGoalieStarterChange={handleGoalieStarterChange}
-            />
-          </div>
+          <GmAnalysisTabs
+            teams={teams as [Team, Team]}
+            allHomeRoster={allHomeRoster}
+            allPartnerRoster={allPartnerRoster}
+            blocks={blocks}
+            navMap={navMap}
+            db={db}
+            handleGoalieStarterChange={handleGoalieStarterChange}
+            executedTrades={executedTrades}
+            showSimPanel={showSimPanel}
+            simYear={simYear}
+            simLoading={simLoading}
+            simData={simData}
+            simResult={simResult}
+          />
         )}
-
-        {/* ── Executed Trades Log + Sim Panel ── */}
-        {(executedTrades.length > 0 || showSimPanel) && (
-          <div className="mt-6 bg-zinc-900/30 border border-zinc-800/40 rounded-2xl overflow-hidden">
-            <div className="px-3 sm:px-6 py-3 border-b border-zinc-800/40 flex items-center justify-between">
-              <span className="text-2xs font-black uppercase tracking-[0.4em] text-zinc-600">
-                Simulated Universe — {executedTrades.length} Trade{executedTrades.length !== 1 ? "s" : ""} Executed
-              </span>
-              <div className="flex items-center gap-2">
-                <button onClick={simYear} disabled={simLoading || executedTrades.length === 0}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-2xs font-black uppercase tracking-widest bg-purple-950 border border-purple-800 text-purple-400 hover:bg-purple-900 disabled:opacity-40 transition-all">
-                  {simLoading
-                    ? <><div className="w-2.5 h-2.5 rounded-full border-2 border-purple-500 border-t-transparent animate-spin"/>Simulating...</>
-                    : <>⚡ Sim a Year</>}
-                </button>
-              </div>
-            </div>
-
-            {/* Trade log */}
-            <div className="px-5 py-3 space-y-2">
-              {executedTrades.map((t) => (
-                <div key={t.id} className="flex items-start gap-3 text-2xs">
-                  <span className="text-emerald-500 font-black shrink-0">✓</span>
-                  <div>
-                    <span className="font-black text-zinc-300">{t.homeTeamName}</span>
-                    <span className="text-zinc-600 mx-1.5">sent</span>
-                    <span className="text-rose-400">{t.outgoing.map(a => a.name).join(", ")}</span>
-                    <span className="text-zinc-600 mx-1.5">→ received</span>
-                    <span className="text-cyan-400">{t.incoming.map(a => a.name).join(", ")}</span>
-                    <span className="text-zinc-600 mx-1.5">from</span>
-                    <span className="font-black text-zinc-300">{t.partnerTeamName}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {(simData || simResult) && (
-              <SeasonResultsPager simData={simData} simResult={simResult} />
-            )}
-          </div>
-        )}
-
-        {/* ── Player Comparison ── */}
-        {(blocks[0].length > 0 || blocks[1].length > 0) && (
-          <Suspense fallback={<div className="h-32 animate-pulse bg-ledger-card rounded" />}>
-            <PlayerComparison
-              outgoing={blocks[0]}
-              incoming={blocks[1]}
-              navMap={navMap}
-            />
-          </Suspense>
-        )}
-
-        {(blocks[0].length > 0 || blocks[1].length > 0) && <BreakdownTable blocks={blocks} navMap={navMap} />}
         <Footer />
 
       </div>
@@ -2082,6 +2009,256 @@ function computeContention(
     future >= 3.0 ? "Limited" : "Bleak";
 
   return { present, future, quadrant, presentLabel, futureLabel };
+}
+
+// ── GM Analysis Tabs ─────────────────────────────────────────
+const GM_PLUM = "#5e3a6e";
+const GM_PLUM_FAINT = "rgba(94, 58, 110, 0.08)";
+const GM_PLUM_LIGHT = "#7a4f8a";
+
+type GmTab = "lineups" | "dna" | "comparison" | "breakdown" | "sim";
+
+function GmTabButton({ label, active, onClick, disabled, badge }: {
+  label: string; active: boolean; onClick: () => void; disabled?: boolean; badge?: number;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        flex: "1 1 0",
+        padding: "10px 6px",
+        fontSize: "11px",
+        fontWeight: 900,
+        fontFamily: "var(--font-mono, 'Courier Prime', monospace)",
+        textTransform: "uppercase",
+        letterSpacing: "0.14em",
+        color: disabled ? "var(--ledger-ink-faint, #7a6940)" : active ? "#fff" : GM_PLUM,
+        background: active ? GM_PLUM : "transparent",
+        border: `2px solid ${active ? GM_PLUM : "var(--ledger-rule, #b8a070)"}`,
+        cursor: disabled ? "default" : "pointer",
+        transition: "all 0.15s ease",
+        whiteSpace: "nowrap",
+        minWidth: 0,
+        opacity: disabled ? 0.4 : 1,
+        position: "relative",
+      }}
+      onMouseEnter={e => {
+        if (!active && !disabled) {
+          (e.target as HTMLElement).style.background = GM_PLUM_FAINT;
+          (e.target as HTMLElement).style.borderColor = GM_PLUM_LIGHT;
+          (e.target as HTMLElement).style.color = GM_PLUM;
+        }
+      }}
+      onMouseLeave={e => {
+        if (!active && !disabled) {
+          (e.target as HTMLElement).style.background = "transparent";
+          (e.target as HTMLElement).style.borderColor = "var(--ledger-rule, #b8a070)";
+          (e.target as HTMLElement).style.color = GM_PLUM;
+        }
+      }}
+    >
+      {label}
+      {badge != null && badge > 0 && (
+        <span style={{
+          marginLeft: "5px",
+          fontSize: "9px",
+          background: active ? "rgba(255,255,255,0.25)" : GM_PLUM,
+          color: active ? "#fff" : "#fff",
+          padding: "1px 4px",
+          borderRadius: "2px",
+          fontWeight: 900,
+        }}>
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function GmAnalysisTabs({
+  teams, allHomeRoster, allPartnerRoster, blocks, navMap, db,
+  handleGoalieStarterChange, executedTrades, showSimPanel,
+  simYear, simLoading, simData, simResult,
+}: {
+  teams: [Team, Team];
+  allHomeRoster: Asset[];
+  allPartnerRoster: Asset[];
+  blocks: [Asset[], Asset[]];
+  navMap: Record<string, XNAVResult>;
+  db: { teams: Team[]; players: Asset[]; capCeiling?: number | null };
+  handleGoalieStarterChange: (teamId: string, goalieId: string | null) => void;
+  executedTrades: { id: string; homeTeamName: string; partnerTeamName: string; outgoing: Asset[]; incoming: Asset[]; timestamp: number; }[];
+  showSimPanel: boolean;
+  simYear: () => void;
+  simLoading: boolean;
+  simData: any;
+  simResult: string | null;
+}) {
+  const [activeTab, setActiveTab] = useState<GmTab>("lineups");
+  const hasAssets = blocks[0].length > 0 || blocks[1].length > 0;
+  const hasSim = executedTrades.length > 0 || showSimPanel;
+
+  const tabs: { key: GmTab; label: string; disabled?: boolean; badge?: number }[] = [
+    { key: "lineups", label: "Lineups" },
+    { key: "dna", label: "Team DNA" },
+    { key: "comparison", label: "Compare", disabled: !hasAssets },
+    { key: "breakdown", label: "Breakdown", disabled: !hasAssets },
+    ...(hasSim ? [{ key: "sim" as GmTab, label: "Sim", badge: executedTrades.length }] : []),
+  ];
+
+  return (
+    <div style={{ marginTop: "8px", marginBottom: "16px" }}>
+      {/* Tab bar */}
+      <div style={{
+        display: "flex",
+        gap: 0,
+        background: "#e4d8b8",
+        borderBottom: `2px solid ${GM_PLUM}`,
+        overflowX: "auto",
+        scrollbarWidth: "none",
+      }}>
+        {tabs.map(t => (
+          <GmTabButton
+            key={t.key}
+            label={t.label}
+            active={activeTab === t.key}
+            onClick={() => !t.disabled && setActiveTab(t.key)}
+            disabled={t.disabled}
+            badge={t.badge}
+          />
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <div style={{
+        borderTop: `3px solid ${GM_PLUM}`,
+        background: "var(--ledger-card-light, #f0e8d0)",
+        padding: "0",
+      }}>
+        {/* ── Lineups tab ────────────────────────── */}
+        {activeTab === "lineups" && (
+          <div style={{ padding: "12px 0" }}>
+            <LineupEditor
+              home={{
+                teamId: teams[0].id,
+                teamName: teams[0].name, label: "Your Franchise",
+                roster: allHomeRoster, outgoing: blocks[0],
+                incoming: blocks[1].filter(a => a.position !== "Pick"),
+              }}
+              partner={{
+                teamId: teams[1].id,
+                teamName: teams[1].name, label: "Trade Partner",
+                roster: allPartnerRoster, outgoing: blocks[1],
+                incoming: blocks[0].filter(a => a.position !== "Pick"),
+              }}
+              hasActiveTrade={blocks[0].length > 0 || blocks[1].length > 0}
+              navMap={navMap}
+              onGoalieStarterChange={handleGoalieStarterChange}
+            />
+          </div>
+        )}
+
+        {/* ── Team DNA tab ───────────────────────── */}
+        {activeTab === "dna" && (
+          <div style={{ padding: "12px 0" }}>
+            <TeamDNA
+              homeTeam={teams[0]}
+              partnerTeam={teams[1]}
+              homeRoster={allHomeRoster}
+              partnerRoster={allPartnerRoster}
+              homeBlocks={blocks[0]}
+              partnerBlocks={blocks[1]}
+              navMap={navMap}
+              db={db}
+            />
+          </div>
+        )}
+
+        {/* ── Comparison tab ─────────────────────── */}
+        {activeTab === "comparison" && hasAssets && (
+          <div style={{ padding: "12px 0" }}>
+            <Suspense fallback={<div className="h-32 animate-pulse bg-ledger-card rounded" />}>
+              <PlayerComparison
+                outgoing={blocks[0]}
+                incoming={blocks[1]}
+                navMap={navMap}
+              />
+            </Suspense>
+          </div>
+        )}
+
+        {/* ── Breakdown tab ──────────────────────── */}
+        {activeTab === "breakdown" && hasAssets && (
+          <div style={{ padding: "12px 0" }}>
+            <BreakdownTable blocks={blocks} navMap={navMap} />
+          </div>
+        )}
+
+        {/* ── Sim tab ────────────────────────────── */}
+        {activeTab === "sim" && hasSim && (
+          <div style={{ overflow: "hidden" }}>
+            <div style={{
+              padding: "12px 16px",
+              borderBottom: "1px solid var(--ledger-rule, #b8a070)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}>
+              <span style={{
+                fontSize: "10px", fontWeight: 900, textTransform: "uppercase",
+                letterSpacing: "0.4em", color: GM_PLUM,
+                fontFamily: "var(--font-mono, monospace)",
+              }}>
+                Simulated Universe — {executedTrades.length} Trade{executedTrades.length !== 1 ? "s" : ""} Executed
+              </span>
+              <button onClick={simYear} disabled={simLoading || executedTrades.length === 0}
+                style={{
+                  padding: "6px 12px",
+                  fontSize: "10px",
+                  fontWeight: 900,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.15em",
+                  background: GM_PLUM,
+                  color: "#fff",
+                  border: `2px solid ${GM_PLUM}`,
+                  cursor: simLoading || executedTrades.length === 0 ? "not-allowed" : "pointer",
+                  opacity: simLoading || executedTrades.length === 0 ? 0.4 : 1,
+                  fontFamily: "var(--font-mono, monospace)",
+                }}>
+                {simLoading ? "Simulating..." : "Sim a Year"}
+              </button>
+            </div>
+
+            <div style={{ padding: "12px 16px" }}>
+              {executedTrades.map((t) => (
+                <div key={t.id} style={{
+                  display: "flex", alignItems: "flex-start", gap: "10px",
+                  fontSize: "11px", marginBottom: "6px",
+                  fontFamily: "var(--font-mono, monospace)",
+                }}>
+                  <span style={{ color: "var(--ledger-green)", fontWeight: 900, flexShrink: 0 }}>✓</span>
+                  <div>
+                    <span style={{ fontWeight: 900, color: "var(--ledger-ink)" }}>{t.homeTeamName}</span>
+                    <span style={{ color: "var(--ledger-ink-faint)", margin: "0 6px" }}>sent</span>
+                    <span style={{ color: "var(--ledger-red)" }}>{t.outgoing.map(a => a.name).join(", ")}</span>
+                    <span style={{ color: "var(--ledger-ink-faint)", margin: "0 6px" }}>→</span>
+                    <span style={{ color: GM_PLUM, fontWeight: 700 }}>{t.incoming.map(a => a.name).join(", ")}</span>
+                    <span style={{ color: "var(--ledger-ink-faint)", margin: "0 6px" }}>from</span>
+                    <span style={{ fontWeight: 900, color: "var(--ledger-ink)" }}>{t.partnerTeamName}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {(simData || simResult) && (
+              <SeasonResultsPager simData={simData} simResult={simResult} />
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function TeamDNA({
