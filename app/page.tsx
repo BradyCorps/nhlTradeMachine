@@ -4,6 +4,7 @@ import Link from "next/link";
 import Footer from "./components/Footer";
 import ScrollReveal from "./components/ScrollReveal";
 import ScrollNameplate from "./components/ScrollNameplate";
+import ScrollSnap from "./components/ScrollSnap";
 import LedgerScrollSetdown from "./components/LedgerScrollSetdown";
 
 function Cell({
@@ -100,6 +101,7 @@ export default function WelcomePage() {
     <main className="fp-desk fp-desk-deep min-h-screen font-serif antialiased" style={{ color: "var(--ink)" }}>
       <ScrollReveal />
       <ScrollNameplate />
+      <ScrollSnap />
       {/* Desk spacer — gives the nameplate a full viewport of desk to sit on */}
       <div className="fp-desk-spacer" aria-hidden="true" />
       <LedgerScrollSetdown className="fp-stack">
