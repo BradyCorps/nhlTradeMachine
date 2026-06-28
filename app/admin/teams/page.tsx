@@ -60,7 +60,7 @@ function EditModal({ team, onSave, onClose }: {
       position: "fixed", inset: 0, background: "rgba(28,20,10,0.72)",
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
     }} onClick={onClose}>
-      <div style={{
+      <div className="admin-modal-card" style={{
         background: "var(--paper)", border: "1px solid var(--rule)",
         borderTop: "3px solid var(--ledger-ink)", padding: 24,
         minWidth: 320, maxWidth: 380, fontFamily: "'Courier Prime', monospace",
@@ -70,7 +70,7 @@ function EditModal({ team, onSave, onClose }: {
           FALLBACK: {team.fallbackPhase} · #{team.fallbackStanding}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
+        <div className="admin-modal-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
           <div>
             <label style={labelStyle}>Phase Override</label>
             <select value={phase} onChange={e => setPhase(e.target.value)} style={{ ...inputStyle, cursor: "pointer" }}>
@@ -85,7 +85,7 @@ function EditModal({ team, onSave, onClose }: {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="admin-dialog-actions" style={{ display: "flex", gap: 8 }}>
           <button onClick={() => handle(false)} disabled={saving}
             style={{ flex: 1, padding: "8px 0", background: "var(--ledger-ink)", border: "none",
               color: "var(--paper)", fontSize: 11, fontWeight: 900, cursor: "pointer", letterSpacing: "0.12em" }}>
@@ -147,10 +147,10 @@ export default function AdminTeams() {
   const hasOverride = (t: TeamRow) => t.phaseOverride !== null || t.standingOverride !== null;
 
   return (
-    <div style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)", color: "var(--ledger-ink)", fontFamily: "'Courier Prime', monospace" }}>
+    <div className="admin-page" style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)", color: "var(--ledger-ink)", fontFamily: "'Courier Prime', monospace" }}>
 
       {/* Page header */}
-      <div style={{ borderBottom: "1px solid var(--rule)", padding: "14px 24px",
+      <div className="admin-toolbar" style={{ borderBottom: "1px solid var(--rule)", padding: "14px 24px",
         display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: 9, letterSpacing: "0.3em", color: "var(--ledger-ink-faint)", marginBottom: 2 }}>ADMIN</div>
@@ -168,11 +168,13 @@ export default function AdminTeams() {
 
       <div style={{ padding: "10px 24px", borderBottom: "1px solid var(--rule)" }}>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search team…"
+          className="admin-fluid-input"
           style={{ fontSize: 11, padding: "6px 12px", background: "var(--paper)",
             border: "1px solid var(--rule)", color: "var(--ledger-ink)", outline: "none",
             minWidth: 200, fontFamily: "'Courier Prime', monospace" }} />
       </div>
 
+      <div className="admin-scroll-table">
       <div style={{ display: "grid", gridTemplateColumns: "70px 1fr 120px 90px 50px",
         gap: 8, padding: "7px 24px", borderBottom: "1px solid var(--rule)",
         fontSize: 8, color: "var(--ledger-ink-faint)", fontWeight: 900,
@@ -210,6 +212,7 @@ export default function AdminTeams() {
           </button>
         </div>
       ))}
+      </div>
 
       {editing && <EditModal team={editing} onSave={handleSave} onClose={() => setEditing(null)} />}
 

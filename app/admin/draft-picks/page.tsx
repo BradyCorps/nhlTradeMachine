@@ -69,7 +69,7 @@ function EditPickModal({
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(28,20,10,0.6)", backdropFilter: "blur(3px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}
       onClick={onClose}>
-      <div style={{ background: "var(--ledger-card-light)", border: "1px solid var(--rule)", borderTop: "3px solid var(--ledger-ink)", padding: 24, minWidth: 360, maxWidth: 440, fontFamily: "'Courier Prime', monospace" }}
+      <div className="admin-modal-card" style={{ background: "var(--ledger-card-light)", border: "1px solid var(--rule)", borderTop: "3px solid var(--ledger-ink)", padding: 24, minWidth: 360, maxWidth: 440, fontFamily: "'Courier Prime', monospace" }}
         onClick={(e) => e.stopPropagation()}>
         <div style={{ fontSize: 14, fontWeight: 900, color: "var(--ledger-ink)", marginBottom: 16 }}>
           {pick.year} {ROUND_LABEL(pick.round)} · {pick.originalOwnerId}
@@ -93,7 +93,7 @@ function EditPickModal({
           <input value={cond} onChange={(e) => setCond(e.target.value)} placeholder="e.g. Top-10 protected 2026" style={{ ...inputStyle, fontSize: 12 }} />
         </div>
 
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="admin-dialog-actions" style={{ display: "flex", gap: 8 }}>
           <button onClick={() => handle(false)} disabled={saving}
             style={{ flex: 1, background: "var(--ledger-navy)", color: "#fff", border: "none", padding: "8px 0", fontWeight: 900, fontSize: 11, letterSpacing: "0.1em", cursor: "pointer" }}>
             {saving ? "Saving…" : "SAVE"}
@@ -181,7 +181,7 @@ export default function DraftPicksPage() {
   const movedCount = picks.filter((p) => p.hasOverride).length;
 
   return (
-    <div style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)", color: "var(--ledger-ink)", fontFamily: "'Courier Prime', monospace", padding: "32px 24px" }}>
+    <div className="admin-page" style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)", color: "var(--ledger-ink)", fontFamily: "'Courier Prime', monospace", padding: "32px 24px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 9, letterSpacing: "0.3em", color: "var(--ledger-ink-faint)", marginBottom: 4 }}>ADMIN</div>
@@ -195,16 +195,19 @@ export default function DraftPicksPage() {
         {/* Filters */}
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20, alignItems: "center" }}>
           <select value={filterTeam} onChange={(e) => setFilterTeam(e.target.value)}
+            className="admin-filter-control"
             style={{ ...inputStyle, width: "auto", fontSize: 12 }}>
             <option value="ALL">All Teams</option>
             {ALL_TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
           <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}
+            className="admin-filter-control"
             style={{ ...inputStyle, width: "auto", fontSize: 12 }}>
             <option value="ALL">All Years</option>
             {years.map((y) => <option key={y} value={String(y)}>{y}</option>)}
           </select>
           <select value={filterRound} onChange={(e) => setFilterRound(e.target.value)}
+            className="admin-filter-control"
             style={{ ...inputStyle, width: "auto", fontSize: 12 }}>
             <option value="ALL">All Rounds</option>
             {[1,2,3,4,5].map((r) => <option key={r} value={String(r)}>{ROUND_LABEL(r)}</option>)}
@@ -219,6 +222,7 @@ export default function DraftPicksPage() {
         {loading ? (
           <div style={{ color: "var(--ledger-ink-faint)", fontSize: 12, padding: 20 }}>Loading…</div>
         ) : (
+          <div className="admin-scroll-table">
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: "2px solid var(--rule)" }}>
@@ -260,6 +264,7 @@ export default function DraftPicksPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

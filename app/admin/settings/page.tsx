@@ -99,7 +99,7 @@ export default function AdminSettings() {
   };
 
   return (
-    <div style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)", color: "var(--ledger-ink)", fontFamily: "'Courier Prime', monospace" }}>
+    <div className="admin-page" style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)", color: "var(--ledger-ink)", fontFamily: "'Courier Prime', monospace" }}>
 
       {/* Page header */}
       <div style={{ borderBottom: "1px solid var(--rule)", padding: "14px 24px" }}>
@@ -118,7 +118,7 @@ export default function AdminSettings() {
               : "Loading…"}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
+          <div className="admin-settings-cap-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
             <div>
               <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)", letterSpacing: "0.12em", marginBottom: 4 }}>CAP CEILING ($M)</div>
               <input value={ceiling} onChange={e => setCeiling(e.target.value)}
@@ -137,7 +137,7 @@ export default function AdminSettings() {
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="admin-settings-actions" style={{ display: "flex", gap: 8 }}>
             <button onClick={() => save(false)} disabled={saving}
               style={{ flex: 1, padding: "9px 0", background: "var(--ledger-ink)", border: "none",
                 color: "var(--paper)", fontSize: 11, fontWeight: 900, cursor: "pointer", letterSpacing: "0.12em" }}>

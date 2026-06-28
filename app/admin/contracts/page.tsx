@@ -134,7 +134,7 @@ function EditModal({ row, onSave, onClear, onClose }: {
       position: "fixed", inset: 0, background: "rgba(28,20,10,0.6)", backdropFilter: "blur(3px)",
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
     }} onClick={onClose}>
-      <div style={{
+      <div className="admin-modal-card" style={{
         background: "var(--ledger-card-light)", border: "1px solid var(--rule)", borderTop: "3px solid var(--ledger-ink)",
         padding: "24px", minWidth: 340, maxWidth: 420,
       }} onClick={e => e.stopPropagation()}>
@@ -146,7 +146,7 @@ function EditModal({ row, onSave, onClear, onClose }: {
           </span>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+        <div className="admin-modal-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
           {[
             { label: "Bundled", val: row.bundledYears, cap: null },
             { label: "Scraped", val: row.scrapedYears, cap: null },
@@ -160,7 +160,7 @@ function EditModal({ row, onSave, onClear, onClose }: {
           ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+        <div className="admin-modal-grid-3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
           <div>
             <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
               letterSpacing: "0.1em", marginBottom: 5 }}>
@@ -202,7 +202,7 @@ function EditModal({ row, onSave, onClear, onClose }: {
         </div>
 
         {/* Free-agency status — first-class DB facts (single source of truth) */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20,
+        <div className="admin-modal-grid-3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20,
           background: "var(--paper-inset)", border: "1px solid var(--ledger-rule-light)", padding: "10px 12px" }}>
           <div>
             <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
@@ -228,7 +228,7 @@ function EditModal({ row, onSave, onClear, onClose }: {
           </label>
         </div>
 
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="admin-dialog-actions" style={{ display: "flex", gap: 8 }}>
           <button onClick={() => handle(false)} disabled={saving}
             style={{ flex: 1, padding: "8px 0", background: "var(--ledger-green)", border: "1px solid var(--ledger-green)",
               color: "#fff", fontSize: 12, fontWeight: 900, cursor: "pointer",
@@ -535,11 +535,11 @@ export default function AdminContractsPage() {
   const needsCount   = contracts.filter(r => r.needsData).length;
 
   return (
-    <div style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)", color: "var(--ledger-ink)",
+    <div className="admin-page" style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)", color: "var(--ledger-ink)",
       fontFamily: MONO }}>
 
       {/* Header */}
-      <div style={{ borderBottom: "1px solid var(--rule)", padding: "16px 24px",
+      <div className="admin-toolbar" style={{ borderBottom: "1px solid var(--rule)", padding: "16px 24px",
         display: "flex", alignItems: "center", gap: 16 }}>
         <a href="/admin" style={{ fontSize: 11, color: "var(--ledger-ink-faint)", textDecoration: "none",
           letterSpacing: "0.1em" }}>← DASHBOARD</a>
@@ -601,6 +601,7 @@ export default function AdminContractsPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search player or team..."
+          className="admin-fluid-input"
           style={{ ...field, fontSize: 12, padding: "6px 12px", minWidth: 200 }}
         />
         {(["all", "flagged", "editor", "needs"] as const).map(f => (
@@ -621,6 +622,7 @@ export default function AdminContractsPage() {
         </span>
       </div>
 
+      <div className="admin-scroll-table">
       {/* Column headers */}
       <div style={{ display: "grid",
         gridTemplateColumns: "200px 60px 60px 70px 70px 70px 70px 70px 80px 128px",
@@ -724,6 +726,7 @@ export default function AdminContractsPage() {
           NO PLAYERS MATCH
         </div>
       )}
+      </div>
 
       {editing && (
         <EditModal

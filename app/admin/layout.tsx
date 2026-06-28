@@ -14,7 +14,7 @@ const NAV_LINKS = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <nav style={{
+      <nav className="admin-nav" style={{
         background: "var(--ledger-ink)",
         padding: "0 24px",
         display: "flex",
@@ -25,7 +25,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         zIndex: 50,
         fontFamily: "'Courier Prime', monospace",
       }}>
-        <span style={{
+        <span className="admin-nav-brand" style={{
           color: "var(--paper)",
           fontSize: 9,
           fontWeight: 900,
@@ -36,12 +36,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }}>
           THE HOCKEY LEDGER
         </span>
-        <span style={{ color: "rgba(255,255,255,0.18)", marginRight: 20, fontSize: 14 }}>|</span>
-        <div style={{ display: "flex", alignItems: "stretch", height: "100%", gap: 2 }}>
+        <span className="admin-nav-separator" style={{ color: "rgba(255,255,255,0.18)", marginRight: 20, fontSize: 14 }}>|</span>
+        <div className="admin-nav-links" style={{ display: "flex", alignItems: "stretch", height: "100%", gap: 2 }}>
           {NAV_LINKS.map(({ href, label }) => (
             <a
               key={href}
               href={href}
+              className="admin-nav-link"
               style={{
                 color: "rgba(255,255,255,0.58)",
                 fontSize: 9,
@@ -57,9 +58,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </a>
           ))}
         </div>
-        <div style={{ flex: 1 }} />
+        <div className="admin-nav-spacer" style={{ flex: 1 }} />
         <a
           href="/"
+          className="admin-nav-home"
           style={{
             color: "rgba(255,255,255,0.45)",
             fontSize: 9,

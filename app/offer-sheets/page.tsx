@@ -57,13 +57,13 @@ export default function OfferSheetsPage() {
             overflow: "hidden",
           }}>
             {/* Table header */}
-            <div style={{
+            <div className="offer-sheet-table-header" style={{
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
               borderBottom: "2px solid var(--ink)",
               background: "var(--paper-inset)",
             }}>
-              <div style={{
+              <div className="offer-sheet-table-cell" style={{
                 padding: "10px 16px",
                 fontSize: 10,
                 fontWeight: 900,
@@ -72,7 +72,7 @@ export default function OfferSheetsPage() {
               }}>
                 Average Annual Value (AAV)
               </div>
-              <div style={{
+              <div className="offer-sheet-table-cell offer-sheet-comp-cell" style={{
                 padding: "10px 16px",
                 fontSize: 10,
                 fontWeight: 900,
@@ -101,13 +101,13 @@ export default function OfferSheetsPage() {
               else if (pickCount >= 1) severityColor = "var(--ledger-navy)";
 
               return (
-                <div key={i} style={{
+                <div key={i} className="offer-sheet-table-row" style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
                   borderBottom: i < OFFER_SHEET_TIERS.length - 1 ? "1px solid var(--rule-light)" : "none",
                   background: isMax ? "rgba(184, 48, 32, 0.04)" : "transparent",
                 }}>
-                  <div style={{
+                  <div className="offer-sheet-table-cell" style={{
                     padding: "12px 16px",
                     fontSize: 13,
                     fontWeight: 900,
@@ -115,7 +115,7 @@ export default function OfferSheetsPage() {
                   }}>
                     {tier.label}
                   </div>
-                  <div style={{
+                  <div className="offer-sheet-table-cell offer-sheet-comp-cell" style={{
                     padding: "12px 16px",
                     fontSize: 12,
                     fontWeight: 700,
@@ -165,7 +165,7 @@ export default function OfferSheetsPage() {
             How Offer Sheets Work
           </div>
 
-          <div style={{
+          <div className="offer-sheet-card-grid" style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
             gap: 16,
@@ -313,7 +313,7 @@ export default function OfferSheetsPage() {
             Key CBA Rules
           </div>
 
-          <div style={{
+          <div className="offer-sheet-rules-grid" style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
             gap: 12,

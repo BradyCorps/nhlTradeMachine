@@ -538,13 +538,13 @@ export default function TradeBlockAdmin() {
   );
 
   return (
-    <div style={{
+    <div className="admin-page" style={{
       background: "var(--paper)", color: "var(--ledger-ink)",
       fontFamily: "'Courier Prime', monospace",
       minHeight: "calc(100vh - 42px)",
     }}>
       {/* Page header */}
-      <div style={{
+      <div className="admin-toolbar" style={{
         borderBottom: "1px solid var(--rule)", padding: "14px 24px",
         display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap",
       }}>
@@ -618,6 +618,7 @@ export default function TradeBlockAdmin() {
               : "No entries match this filter."}
           </div>
         ) : (
+          <div className="admin-scroll-table">
           <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12 }}>
             <thead>
               <tr style={{ borderBottom: "2px solid var(--ledger-ink)" }}>
@@ -674,6 +675,7 @@ export default function TradeBlockAdmin() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

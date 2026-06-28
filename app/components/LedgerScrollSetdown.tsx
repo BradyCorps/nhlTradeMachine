@@ -1,7 +1,7 @@
 "use client";
 
-import { motion, useScroll, useSpring, useTransform, useReducedMotion, useMotionValueEvent } from "framer-motion";
-import { useState, type ReactNode } from "react";
+import { motion, useScroll, useTransform, useReducedMotion, useMotionValueEvent } from "framer-motion";
+import { useRef, useState, type ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
@@ -13,16 +13,17 @@ export default function LedgerScrollSetdown({ children, className, style }: Prop
   const reduced = useReducedMotion();
   const { scrollY } = useScroll();
   const [settled, setSettled] = useState(false);
+  const settledRef = useRef(false);
 
-  const rawY = useTransform(scrollY, [0, 480, 620], [110, 6, 0], { clamp: true });
-  const rawScale = useTransform(scrollY, [0, 480, 620], [0.78, 0.988, 1], { clamp: true });
+  const y = useTransform(scrollY, [0, 480, 620], [110, 6, 0], { clamp: true });
+  const scale = useTransform(scrollY, [0, 480, 620], [0.9, 0.995, 1], { clamp: true });
   const opacity = useTransform(scrollY, [0, 160], [0, 1], { clamp: true });
 
-  const y = useSpring(rawY, { stiffness: 110, damping: 38, mass: 1.4 });
-  const scale = useSpring(rawScale, { stiffness: 105, damping: 40, mass: 1.4 });
-
   useMotionValueEvent(scrollY, "change", (v) => {
-    setSettled(v > 480);
+    const nextSettled = v > 480;
+    if (settledRef.current === nextSettled) return;
+    settledRef.current = nextSettled;
+    setSettled(nextSettled);
   });
 
   if (reduced) {
@@ -39,12 +40,12 @@ export default function LedgerScrollSetdown({ children, className, style }: Prop
       style={{
         ...style,
         transformOrigin: "50% 50%",
-        y,
-        scale,
-        opacity,
-        willChange: "transform, opacity",
+        y: settled ? 0 : y,
+        scale: settled ? 1 : scale,
+        opacity: settled ? 1 : opacity,
+        willChange: settled ? "auto" : "transform, opacity",
       }}
-      initial={{ opacity: 0, y: 110, scale: 0.78 }}
+      initial={{ opacity: 0, y: 110, scale: 0.9 }}
     >
       {children}
     </motion.div>

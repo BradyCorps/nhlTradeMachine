@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
+import { motion, useScroll, useTransform, useReducedMotion, useMotionValueEvent } from "framer-motion";
+import { useRef, useState } from "react";
 
 // ── Desk nameplate overlay ──────────────────────────────────────────────────
 // Fixed overlay that sits ON the desk before the newspaper arrives.
@@ -10,10 +11,19 @@ import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion
 export default function ScrollNameplate() {
   const reduced = useReducedMotion();
   const { scrollY } = useScroll();
+  const [hidden, setHidden] = useState(false);
+  const hiddenRef = useRef(false);
 
   // Fade and drift up as user scrolls 0 → 260px
   const opacity = useTransform(scrollY, [0, 260], [1, 0], { clamp: true });
   const y       = useTransform(scrollY, [0, 260], [0, -28], { clamp: true });
+
+  useMotionValueEvent(scrollY, "change", (v) => {
+    const nextHidden = v > 300;
+    if (hiddenRef.current === nextHidden) return;
+    hiddenRef.current = nextHidden;
+    setHidden(nextHidden);
+  });
 
   if (reduced) return null;
 
@@ -25,7 +35,7 @@ export default function ScrollNameplate() {
         y,
         position: "fixed",
         inset: 0,
-        display: "flex",
+        display: hidden ? "none" : "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
@@ -62,17 +72,19 @@ export default function ScrollNameplate() {
       </div>
 
       {/* Gently bouncing arrow */}
-      <motion.div
-        animate={{ y: [0, 10, 0] }}
-        transition={{ duration: 2.0, repeat: Infinity, ease: "easeInOut" }}
-        style={{
-          marginTop: 18,
-          fontSize: 15,
-          color: "rgba(255,245,225,0.26)",
-        }}
-      >
-        ↓
-      </motion.div>
+      {!hidden && (
+        <motion.div
+          animate={{ y: [0, 10, 0] }}
+          transition={{ duration: 2.0, repeat: Infinity, ease: "easeInOut" }}
+          style={{
+            marginTop: 18,
+            fontSize: 15,
+            color: "rgba(255,245,225,0.26)",
+          }}
+        >
+          ↓
+        </motion.div>
+      )}
     </motion.div>
   );
 }

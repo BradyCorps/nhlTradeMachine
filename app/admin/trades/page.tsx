@@ -321,7 +321,7 @@ export default function AdminTradesPage() {
   }, [editingId, loadTrades, newDraft]);
 
   return (
-    <div style={{
+    <div className="admin-page" style={{
       minHeight: "calc(100vh - 42px)",
       background: "var(--paper)",
       color: "var(--ledger-ink)",
@@ -341,7 +341,7 @@ export default function AdminTradesPage() {
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <div className="admin-toolbar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.16em", color: "var(--ledger-ink-faint)" }}>
             {editingId ? `EDITING ${editingId}` : "NEW DRAFT"}
           </div>
@@ -356,7 +356,7 @@ export default function AdminTradesPage() {
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12, marginBottom: 20 }}>
+        <div className="admin-trades-meta-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12, marginBottom: 20 }}>
           <label style={{ display: "grid", gap: 5, fontSize: 10, fontWeight: 900, letterSpacing: "0.16em" }}>
             EXECUTED
             <input type="date" value={executedDate} onChange={e => setExecutedDate(e.target.value)}
@@ -373,7 +373,7 @@ export default function AdminTradesPage() {
           </div>
         </div>
 
-        <label style={{
+        <label className="admin-trades-overlay-toggle" style={{
           border: "1px solid var(--rule)",
           padding: "10px 12px",
           marginBottom: 20,
@@ -405,7 +405,7 @@ export default function AdminTradesPage() {
             style={{ border: "1px solid var(--rule)", padding: "10px", fontSize: 12, background: "var(--ledger-card)", color: "var(--ledger-ink)", resize: "vertical" }} />
         </label>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginBottom: 16 }}>
+        <div className="admin-trades-sides-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginBottom: 16 }}>
           {[0, 1].map((idx) => {
             const sideIdx = idx as 0 | 1;
             const selected = historicalTeams[sideIdx];
@@ -440,13 +440,13 @@ export default function AdminTradesPage() {
             LOADING LEAGUE ASSETS
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}>
+          <div className="admin-trades-panels-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}>
             <TradePanel idx={0} team={homeTeam} nav={homeNav} capSpace={homeTeam?.capSpace ?? 0} db={db} label="Side A current asset source" accent="A" allowDuplicateTeams />
             <TradePanel idx={1} team={partnerTeam} nav={partnerNav} capSpace={partnerTeam?.capSpace ?? 0} db={db} label="Side B current asset source" accent="B" allowDuplicateTeams />
           </div>
         )}
 
-        <div style={{
+        <div className="admin-trades-preview-bar" style={{
           marginTop: 20,
           borderTop: "2px double var(--ledger-ink)",
           paddingTop: 16,
@@ -492,7 +492,7 @@ export default function AdminTradesPage() {
           </div>
           <div style={{ display: "grid", gap: 8 }}>
             {trades.map(trade => (
-              <div key={trade.id} style={{ border: "1px solid var(--rule)", padding: "12px 14px", display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 10, alignItems: "center" }}>
+              <div key={trade.id} className="admin-trades-saved-row" style={{ border: "1px solid var(--rule)", padding: "12px 14px", display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 10, alignItems: "center" }}>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 900 }}>{trade.executedDate} · {trade.sides.map(side => side.teamId).join(" / ")}</div>
                   <div style={{ fontSize: 10, color: "var(--ledger-ink-faint)", marginTop: 3 }}>
@@ -568,7 +568,7 @@ export default function AdminTradesPage() {
             <div style={{ fontSize: 11, lineHeight: 1.5, marginTop: 12, color: "var(--ledger-ink-faint)", fontWeight: 700 }}>
               For historical backfills where players are already on their current teams, cancel and switch ROSTER OVERLAY to UI ONLY.
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
+            <div className="admin-dialog-actions" style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
               <button
                 onClick={() => setPendingRosterAction(null)}
                 className="btn-ink"

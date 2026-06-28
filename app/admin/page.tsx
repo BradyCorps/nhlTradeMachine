@@ -71,14 +71,14 @@ export default async function AdminDashboard() {
   ];
 
   return (
-    <div style={{
+    <div className="admin-page" style={{
       background: "var(--paper)",
       color: "var(--ledger-ink)",
       fontFamily: "'Courier Prime', monospace",
       minHeight: "calc(100vh - 42px)",
       padding: "36px 32px",
     }}>
-      <div style={{ maxWidth: 820 }}>
+      <div className="admin-dashboard-shell" style={{ maxWidth: 820 }}>
 
         {/* Page title */}
         <div style={{ borderBottom: "1px solid var(--rule)", paddingBottom: 20, marginBottom: 28 }}>
@@ -94,7 +94,7 @@ export default async function AdminDashboard() {
         </div>
 
         {/* Stat strip */}
-        <div style={{
+        <div className="admin-dashboard-stats" style={{
           display: "grid",
           gridTemplateColumns: "repeat(4, 1fr)",
           gap: 1,
@@ -120,7 +120,7 @@ export default async function AdminDashboard() {
         </div>
 
         {/* Section cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div className="admin-dashboard-cards" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {sections.map(({ href, label, desc, stat }) => (
             <a
               key={href}

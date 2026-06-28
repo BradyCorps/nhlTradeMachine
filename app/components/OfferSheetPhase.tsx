@@ -145,7 +145,7 @@ export default function OfferSheetPhase({
               </div>
               <div className="flex flex-col gap-1.5">
                 {results.map((r, i) => (
-                  <div key={`${r.player.id}-${i}`} className="flex items-center justify-between gap-3 px-3 py-2"
+                  <div key={`${r.player.id}-${i}`} className="flex flex-col items-stretch gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                     style={{
                       background: r.outcome.result === "signed" ? "rgba(26,92,46,0.08)"
                         : r.outcome.result === "matched" ? "rgba(184,48,32,0.06)"
@@ -161,7 +161,7 @@ export default function OfferSheetPhase({
                         {money(r.contract.aav)} × {r.contract.term}yr
                       </span>
                     </div>
-                    <div className="shrink-0 text-right">
+                    <div className="shrink-0 text-left sm:text-right">
                       {r.outcome.result === "signed" && (
                         <span className="text-[10px] font-black uppercase tracking-wider font-mono px-2 py-1"
                           style={{ background: "var(--ledger-green)", color: "#fff", borderRadius: "2px" }}>
@@ -206,7 +206,7 @@ export default function OfferSheetPhase({
           )}
 
           {/* Available RFAs */}
-          <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex flex-col items-stretch gap-2 mb-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
               Available RFAs — {rfaMarket.length}
             </div>
@@ -214,8 +214,8 @@ export default function OfferSheetPhase({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by name or team…"
-              className="text-[11px] font-mono outline-none px-2 py-1"
-              style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule)", borderRadius: "2px", color: "var(--ledger-ink)", width: 200 }}
+              className="w-full text-[11px] font-mono outline-none px-2 py-1 sm:w-[200px]"
+              style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule)", borderRadius: "2px", color: "var(--ledger-ink)" }}
             />
           </div>
 
@@ -229,7 +229,7 @@ export default function OfferSheetPhase({
               const origTeam = teamMap.get(fa.player.teamId);
 
               return (
-                <div key={fa.player.id} className="flex items-center justify-between gap-3 px-3 py-2"
+                <div key={fa.player.id} className="flex flex-col items-stretch gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                   style={{
                     background: "var(--paper)",
                     border: "1px solid var(--ledger-rule-light)",
@@ -284,7 +284,7 @@ export default function OfferSheetPhase({
                       : !hasPicks ? "Missing required compensation picks"
                       : `Offer sheet — comp: ${comp.length === 0 ? "none" : comp.join(" + ")}`
                     }
-                    className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono shrink-0"
+                    className="w-full text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono shrink-0 sm:w-auto"
                     style={{
                       background: canOffer ? "var(--ledger-navy)" : "transparent",
                       color: canOffer ? "#fff" : "var(--ledger-ink-faint)",
@@ -307,7 +307,7 @@ export default function OfferSheetPhase({
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 px-5 py-3 flex items-center justify-between gap-3" style={{ borderTop: "1px solid #b8a070" }}>
+        <div className="shrink-0 px-5 py-3 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderTop: "1px solid #b8a070" }}>
           <p className="text-[10px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
             {results.filter(r => r.outcome.result === "signed").length} offer sheet(s) signed
             {results.filter(r => r.outcome.result === "matched").length > 0 &&
@@ -316,7 +316,7 @@ export default function OfferSheetPhase({
               ` · ${results.filter(r => r.outcome.result === "declined").length} declined`}
           </p>
           <button onClick={onDone}
-            className="text-[11px] font-black uppercase tracking-[0.18em] px-5 py-2 font-mono"
+            className="w-full text-[11px] font-black uppercase tracking-[0.18em] px-5 py-2 font-mono sm:w-auto"
             style={{ background: "var(--ledger-ink)", color: "var(--ledger-card-light)", borderRadius: "2px" }}>
             Done — Proceed to Free Agency →
           </button>

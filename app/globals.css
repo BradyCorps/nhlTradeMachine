@@ -262,7 +262,9 @@ input[type="range"] { accent-color: var(--red); }
     gap: 8px;
     line-height: 1.25;
   }
+}
 
+@media (min-width: 640px) {
   .nav-divider {
     display: inline;
   }
@@ -280,6 +282,143 @@ input[type="range"] { accent-color: var(--red); }
 
   .tracking-widest {
     letter-spacing: 0.12em !important;
+  }
+
+  .offer-sheet-table-header,
+  .offer-sheet-table-row,
+  .offer-sheet-card-grid,
+  .offer-sheet-rules-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .offer-sheet-comp-cell {
+    border-left: none !important;
+    border-top: 1px solid var(--rule-light);
+  }
+
+  .offer-sheet-table-cell {
+    min-width: 0;
+  }
+}
+
+/* ── Admin mobile containment ───────────────────────────────── */
+.admin-scroll-table {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-scroll-table > table,
+.admin-scroll-table > div {
+  min-width: max-content;
+}
+
+@media (max-width: 639px) {
+  .admin-nav {
+    height: auto !important;
+    min-height: 42px;
+    padding: 7px 12px !important;
+    flex-wrap: wrap;
+    align-items: stretch !important;
+    gap: 6px;
+  }
+
+  .admin-nav-brand {
+    width: 100%;
+    margin-right: 0 !important;
+    text-align: center;
+  }
+
+  .admin-nav-separator,
+  .admin-nav-spacer {
+    display: none !important;
+  }
+
+  .admin-nav-links {
+    order: 2;
+    width: 100%;
+    height: auto !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-nav-link {
+    min-height: 30px;
+    flex: 0 0 auto;
+    padding: 0 9px !important;
+  }
+
+  .admin-nav-home {
+    order: 1;
+    margin-left: auto;
+    min-height: 24px;
+    display: flex;
+    align-items: center;
+  }
+
+  .admin-page {
+    min-height: calc(100vh - 88px) !important;
+  }
+
+  .admin-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .admin-toolbar > span,
+  .admin-toolbar > div,
+  .admin-toolbar > button {
+    margin-left: 0 !important;
+  }
+
+  .admin-fluid-input,
+  .admin-filter-control {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .admin-dashboard-shell {
+    max-width: none !important;
+  }
+
+  .admin-dashboard-stats,
+  .admin-dashboard-cards,
+  .admin-settings-cap-grid,
+  .admin-trades-meta-grid,
+  .admin-trades-sides-grid,
+  .admin-trades-panels-grid,
+  .admin-trades-preview-bar,
+  .admin-trades-saved-row,
+  .admin-modal-grid-2,
+  .admin-modal-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-trades-overlay-toggle,
+  .admin-trades-preview-bar {
+    align-items: stretch !important;
+  }
+
+  .admin-settings-actions,
+  .admin-dialog-actions {
+    flex-direction: column !important;
+  }
+
+  .admin-settings-actions > button,
+  .admin-dialog-actions > button {
+    width: 100%;
+  }
+
+  .admin-modal-card {
+    width: min(100%, 94vw) !important;
+    min-width: 0 !important;
+    max-width: 94vw !important;
+    max-height: 88vh;
+    overflow-y: auto;
+    padding: 18px !important;
   }
 }
 
@@ -1005,14 +1144,13 @@ select.ledger-select {
 
 /* ── Setdown shadow states (CSS transition, not per-frame JS) ──────── */
 .fp-stack-lifted {
-  filter: drop-shadow(0 24px 32px rgba(30,18,6,0.45))
-          drop-shadow(0 80px 90px rgba(30,18,6,0.30));
-  transition: filter 0.8s cubic-bezier(0.16,1,0.3,1);
+  filter: drop-shadow(0 28px 36px rgba(30,18,6,0.36));
+  transition: none;
 }
 .fp-stack-settled {
   filter: drop-shadow(0 2px 4px rgba(30,18,6,0.30))
           drop-shadow(0 18px 40px rgba(30,18,6,0.40));
-  transition: filter 0.8s cubic-bezier(0.16,1,0.3,1);
+  transition: filter 260ms ease-out;
 }
 
 /* ── Newspaper stack — visible page layers beneath the front page ─ */
@@ -1020,6 +1158,9 @@ select.ledger-select {
   position: relative;
   max-width: 1180px;
   margin: 0 auto;
+  contain: layout paint;
+  isolation: isolate;
+  backface-visibility: hidden;
 }
 
 /* Heavy stack: 7 visible page edges with increasing offset/rotation,
@@ -1076,6 +1217,31 @@ select.ledger-select {
   box-shadow: 3px 0 8px rgba(30,18,6,0.12);
 }
 
+@media (max-width: 639px) {
+  .fp-stack-lifted {
+    filter: drop-shadow(0 18px 22px rgba(30,18,6,0.30));
+  }
+
+  .fp-stack::before {
+    right: 0;
+    bottom: -6px;
+    box-shadow:
+      2px 4px 0 0 #e4d8b4, 2px 4px 1px rgba(30,18,6,0.06),
+      5px 8px 0 0 #e0d2ae, 5px 8px 1px rgba(30,18,6,0.05),
+      8px 12px 0 0 #dbcca8, 8px 12px 1px rgba(30,18,6,0.05),
+      10px 16px 12px -6px rgba(30,18,6,0.16);
+  }
+
+  .fp-stack::after {
+    left: 18px;
+    right: 0;
+  }
+
+  .fp-stack-extra {
+    display: none;
+  }
+}
+
 /* ── The front page: sits on top of the stack ────────────────── */
 .fp-sheet {
   position: relative;
@@ -1095,6 +1261,10 @@ select.ledger-select {
   z-index: 3;
   mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='fpn'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.5' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='320' height='320' filter='url(%23fpn)' opacity='0.17'/%3E%3C/svg%3E");
+}
+
+.fp-stack-lifted .fp-sheet::before {
+  opacity: 0.35;
 }
 /* foxing — aged darkening that pools toward the edges */
 .fp-sheet::after {
