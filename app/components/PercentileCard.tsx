@@ -244,7 +244,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         textTransform: "uppercase", letterSpacing: "0.1em",
       }}>
         <span>${player.capHit}M × {player.yearsRemaining}yr</span>
-        <span>FMV ${(xnav.fmvAav ? xnav.fmvAav / 1_000_000 : 0).toFixed(1)}M</span>
+        <span>FMV ${(xnav.fmvAav ? xnav.fmvAav : 0).toFixed(1)}M</span>
         <span style={{ color: percentileColor(avgPercentile), fontWeight: 900 }}>
           {percentileLabel(avgPercentile)}
         </span>
