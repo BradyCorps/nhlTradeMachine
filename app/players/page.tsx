@@ -14,6 +14,7 @@ import { calcNAV } from "@/app/lib/xnav-engine";
 import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
+import PercentileCard from "@/app/components/PercentileCard";
 
 // ── Types ─────────────────────────────────────────────────────
 interface Player {
@@ -334,7 +335,7 @@ function PlayersIconKey() {
 }
 
 // ── Expanded player row ───────────────────────────────────────
-function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
+function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: Team; allPlayers: Player[] }) {
   const isG = player.position === "G";
   const seasonPoints = Math.round((player.ptsPace / 82) * (player.games ?? 82));
   const stats = isG ? [
@@ -446,6 +447,13 @@ function ExpandedPlayer({ player, team }: { player: Player; team?: Team }) {
               <DevelopmentProfilePanel asset={{ ...player } as any} />
             </div>
           )}
+          <div style={{ marginTop: "10px", display: "flex", justifyContent: "center" }}>
+            <PercentileCard
+              player={player}
+              allPlayers={allPlayers}
+              teamName={team?.name}
+            />
+          </div>
     </div>
   );
 }
@@ -630,11 +638,12 @@ function SortHeader({ k, label, active, dir, onClick }: {
 }
 
 // ── Player row ────────────────────────────────────────────────
-function PlayerRow({ player, team, rank, sortKey, actualPPG, section }: {
+function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers }: {
   player: Player; team?: Team; rank: number;
   sortKey: PlayerSortKey;
   actualPPG: (p: Player) => number;
   section: PlayerSection;
+  allPlayers: Player[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const isG = player.position === "G";
@@ -786,7 +795,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section }: {
         </div>
       </div>
 
-      {expanded && <ExpandedPlayer player={player} team={team} />}
+      {expanded && <ExpandedPlayer player={player} team={team} allPlayers={allPlayers} />}
     </>
   );
 }
@@ -1133,7 +1142,7 @@ export default function PlayersPage() {
                 <SectionHeader label="Forwards" count={forwards.length} />
                 <SectionColumnHeader section="F" sortKey={sortKey} sortDir={sortDir} onSort={handleSortKey} />
                 {visibleForwards.map((p, i) => (
-                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(forwardPage - 1) * FORWARD_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="F" />
+                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(forwardPage - 1) * FORWARD_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="F" allPlayers={players} />
                 ))}
                 <SectionPager total={forwards.length} pageSize={FORWARD_CAP} page={forwardPage} onPage={setForwardPage} />
               </div>
@@ -1145,7 +1154,7 @@ export default function PlayersPage() {
                 <SectionHeader label="Defence" count={defence.length} />
                 <SectionColumnHeader section="D" sortKey={sortKey} sortDir={sortDir} onSort={handleSortKey} />
                 {visibleDefence.map((p, i) => (
-                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(defencePage - 1) * DEFENCE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="D" />
+                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(defencePage - 1) * DEFENCE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="D" allPlayers={players} />
                 ))}
                 <SectionPager total={defence.length} pageSize={DEFENCE_CAP} page={defencePage} onPage={setDefencePage} />
               </div>
@@ -1157,7 +1166,7 @@ export default function PlayersPage() {
                 <SectionHeader label="Goalies" count={goalies.length} />
                 <SectionColumnHeader section="G" sortKey={sortKey} sortDir={sortDir} onSort={handleSortKey} />
                 {visibleGoalies.map((p, i) => (
-                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(goaliePage - 1) * GOALIE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="G" />
+                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(goaliePage - 1) * GOALIE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="G" allPlayers={players} />
                 ))}
                 <SectionPager total={goalies.length} pageSize={GOALIE_CAP} page={goaliePage} onPage={setGoaliePage} />
               </div>

@@ -444,9 +444,13 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   // ── Baseline Blending ─────────────────────────────────────────
   // MoneyPuck 3-year weighted baselines anchor valuations, especially
   // early in the season or during anomalous/injury-shortened years.
+  // When games < 30 (injury), lean harder on the baseline to avoid
+  // small-sample inflation/deflation.
   const baselinePtsPace = asset.baselinePtsPace;
+  const baselineWeight = games < 30 ? 0.80 : 0.60;
+  const currentWeight  = 1 - baselineWeight;
   const blendedPts = baselinePtsPace !== undefined && baselinePtsPace > 0
-    ? (pts * 0.4 + baselinePtsPace * 0.6)
+    ? (pts * currentWeight + baselinePtsPace * baselineWeight)
     : pts;
 
   const { evMdep, normalizedPts, evToi, shToi } = calcSkaterDeploymentContext(asset);
@@ -456,7 +460,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
 
   const baselineDpsProxy = asset.baselineDpsProxy;
   const blendedDps = baselineDpsProxy !== undefined && baselineDpsProxy > 0
-    ? (dps !== null ? dps * 0.4 + baselineDpsProxy * 0.6 : baselineDpsProxy)
+    ? (dps !== null ? dps * currentWeight + baselineDpsProxy * baselineWeight : baselineDpsProxy)
     : dps;
   // baselineXgRel is a fraction (e.g. 0.05 = +5 pct pts); xgRel is already in pct pts.
   // Blending damps single-season PDO luck the same way blendedPts damps scoring spikes.
@@ -512,9 +516,12 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   );
   const isShutdownTopPairD = isD && toi >= 22 && games >= 40 && shutdownDSignal > 0;
   const shutdownDAdj = isShutdownTopPairD
-    ? clamp((toi - 22) * 3 + shutdownDSignal, 4, 18)
+    ? clamp((toi - 22) * 3 + shutdownDSignal, 4, 28)
     : 0;
-  const defRaw = defRawBase + driverAdj + shutdownDAdj;
+  const toiDefFloor = isD && toi >= 20 && games >= 30
+    ? clamp((toi - 20) * 1.8, 0, 12)
+    : 0;
+  const defRaw = defRawBase + driverAdj + shutdownDAdj + toiDefFloor;
 
   let defTotal = safe(defRaw);
   // ── Larry Robinson Defensive Asymptote ──────────────────────────
