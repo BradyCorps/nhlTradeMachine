@@ -334,22 +334,82 @@ function PlayersIconKey() {
   );
 }
 
+// ── Expanded player tab types ─────────────────────────────────
+type PlayerTab = "stats" | "strand" | "card" | "outlook" | "contract";
+
+const PLUM = "#5e3a6e";
+const PLUM_LIGHT = "#7a4f8a";
+const PLUM_FAINT = "rgba(94, 58, 110, 0.08)";
+
+function PlayerTabButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flex: "1 1 0",
+        padding: "10px 6px",
+        fontSize: "11px",
+        fontWeight: 900,
+        fontFamily: "var(--font-mono, monospace)",
+        textTransform: "uppercase",
+        letterSpacing: "0.14em",
+        color: active ? "#fff" : PLUM,
+        background: active ? PLUM : "transparent",
+        border: `2px solid ${active ? PLUM : "var(--ledger-rule, #b8a070)"}`,
+        borderBottom: active ? `2px solid ${PLUM}` : "2px solid var(--ledger-rule, #b8a070)",
+        cursor: "pointer",
+        transition: "all 0.15s ease",
+        whiteSpace: "nowrap",
+        minWidth: 0,
+      }}
+      onMouseEnter={e => {
+        if (!active) {
+          (e.target as HTMLElement).style.background = PLUM_FAINT;
+          (e.target as HTMLElement).style.borderColor = PLUM_LIGHT;
+          (e.target as HTMLElement).style.color = PLUM;
+        }
+      }}
+      onMouseLeave={e => {
+        if (!active) {
+          (e.target as HTMLElement).style.background = "transparent";
+          (e.target as HTMLElement).style.borderColor = "var(--ledger-rule, #b8a070)";
+          (e.target as HTMLElement).style.color = PLUM;
+        }
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 // ── Expanded player row ───────────────────────────────────────
 function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: Team; allPlayers: Player[] }) {
   const isG = player.position === "G";
+  const hasOutlook = player.position !== "G" && !!player.developmentProfile;
+  const hasStrand = !isG;
+  const hasContract = player.yearsRemaining > 0;
+
+  const tabs: { key: PlayerTab; label: string }[] = [
+    { key: "stats", label: "Stats" },
+    ...(hasStrand ? [{ key: "strand" as PlayerTab, label: "Strand" }] : []),
+    { key: "card", label: "Player Card" },
+    ...(hasContract ? [{ key: "contract" as PlayerTab, label: "Contract" }] : []),
+    ...(hasOutlook ? [{ key: "outlook" as PlayerTab, label: "Outlook" }] : []),
+  ];
+
+  const [activeTab, setActiveTab] = useState<PlayerTab>("stats");
+
   const seasonPoints = Math.round((player.ptsPace / 82) * (player.games ?? 82));
-  const stats = isG ? [
+  const statItems = isG ? [
     { label: "GP",    val: player.gamesStarted?.toString() ?? "—" },
     { label: "GSAx",  val: (player.gsax ?? 0).toFixed(1) },
     { label: "SV%",   val: player.savePct?.toFixed(3) ?? "—" },
     { label: "Tier",  val: goalieTeir(player.gamesStarted ?? 0) },
   ] : [
-    // Standard stats first — what fans recognise immediately
     { label: "PTS",    val: seasonPoints.toString() },
     { label: "PTS/82", val: player.ptsPace.toFixed(1) },
     { label: "G/82",   val: player.goalsPace != null ? (player.goalsPace as number).toFixed(1) : "—" },
     { label: "A/82",   val: player.assistsPace != null ? (player.assistsPace as number).toFixed(1) : "—" },
-    // Analytics layer
     { label: "xG/82",  val: player.xGPace.toFixed(1) },
     { label: "TOI",    val: player.avgTOI.toFixed(1) },
     { label: "xG%+",   val: player.xgRelTM != null ? `${(player.xgRelTM as number) > 0 ? "+" : ""}${(player.xgRelTM as number).toFixed(1)}` : "—" },
@@ -358,102 +418,123 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
 
   return (
     <div className="player-expanded-panel" style={{
-      background: "#d6c8a5", borderTop: "1px solid #b8a070",
-      padding: "12px 16px",
+      background: "#d6c8a5", borderTop: `3px solid ${PLUM}`,
     }}>
-      <div className="expanded-player-grid">
-        {/* Stats + contract */}
-        <div>
-          <div className="stat-grid-4" style={{ marginBottom: "10px" }}>
-            {stats.map(s => (
-              <div key={s.label} style={{
-                background: "#e4d8b8", border: "1px solid #b8a070",
-                padding: "6px 8px", textAlign: "center",
-              }}>
-                <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{s.label}</div>
-                <div style={{ fontSize: "11px", fontWeight: 900, color: "var(--ledger-ink)", marginTop: "2px" }}>{s.val}</div>
-              </div>
-            ))}
-          </div>
-          {!isG && player.ops != null && player.dps != null && (
-            <div style={{ display: "flex", gap: "6px" }}>
-              <div style={{ padding: "3px 8px", background: "var(--paper-card)", border: "1px solid var(--rule-light)", fontSize: "11px", fontWeight: 900 }}>
-                <span style={{ color: "var(--rule)", marginRight: "4px" }}>PS</span>
-                <span style={{ color: "var(--ink)" }}>{(player.ops + player.dps).toFixed(1)}</span>
-              </div>
-            </div>
-          )}
-          <div className="player-expanded-contract" style={{ marginTop: "10px", fontSize: "11px", color: "var(--ink-faint)" }}>
-            <span style={{ color: "var(--rule)", marginRight: "6px" }}>CONTRACT</span>
-            ${player.capHit}M × {player.yearsRemaining}yr
-            {player.hasNMC && <span style={{ marginLeft: "8px", color: "var(--red)", border: "1px solid var(--red)", padding: "0 3px" }}>NMC</span>}
-            {player.hasNTC && !player.hasNMC && <span style={{ marginLeft: "8px", color: "#8a5c00", border: "1px solid #8a5c00", padding: "0 3px" }}>NTC</span>}
-          </div>
-        </div>
+      {/* Tab bar */}
+      <div style={{
+        display: "flex",
+        gap: 0,
+        padding: "0",
+        background: "#e4d8b8",
+        borderBottom: `2px solid ${PLUM}`,
+      }}>
+        {tabs.map(t => (
+          <PlayerTabButton
+            key={t.key}
+            label={t.label}
+            active={activeTab === t.key}
+            onClick={() => setActiveTab(t.key)}
+          />
+        ))}
+      </div>
 
-        {/* Strand profile */}
-        {!isG && (
+      {/* Tab content */}
+      <div style={{ padding: "14px 16px" }}>
+
+        {/* ── Stats tab ──────────────────────────── */}
+        {activeTab === "stats" && (
           <div>
-            <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "6px" }}>
-              STRAND Profile
+            <div className="stat-grid-4" style={{ marginBottom: "10px" }}>
+              {statItems.map(s => (
+                <div key={s.label} style={{
+                  background: "#e4d8b8", border: "1px solid #b8a070",
+                  padding: "6px 8px", textAlign: "center",
+                }}>
+                  <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{s.label}</div>
+                  <div style={{ fontSize: "11px", fontWeight: 900, color: "var(--ledger-ink)", marginTop: "2px" }}>{s.val}</div>
+                </div>
+              ))}
             </div>
+            {!isG && player.ops != null && player.dps != null && (
+              <div style={{ display: "flex", gap: "6px" }}>
+                <div style={{ padding: "3px 8px", background: "var(--paper-card)", border: "1px solid var(--rule-light)", fontSize: "11px", fontWeight: 900 }}>
+                  <span style={{ color: "var(--rule)", marginRight: "4px" }}>PS</span>
+                  <span style={{ color: "var(--ink)" }}>{(player.ops + player.dps).toFixed(1)}</span>
+                </div>
+              </div>
+            )}
+            <div className="player-expanded-contract" style={{ marginTop: "10px", fontSize: "11px", color: "var(--ink-faint)" }}>
+              <span style={{ color: PLUM, marginRight: "6px", fontWeight: 900 }}>CONTRACT</span>
+              ${player.capHit}M × {player.yearsRemaining}yr
+              {player.hasNMC && <span style={{ marginLeft: "8px", color: "var(--red)", border: "1px solid var(--red)", padding: "0 3px" }}>NMC</span>}
+              {player.hasNTC && !player.hasNMC && <span style={{ marginLeft: "8px", color: "#8a5c00", border: "1px solid #8a5c00", padding: "0 3px" }}>NTC</span>}
+            </div>
+          </div>
+        )}
+
+        {/* ── Strand tab ─────────────────────────── */}
+        {activeTab === "strand" && hasStrand && (
+          <div>
             <div className="strand-svg-wrap" style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px" }}>
               <FullStrand player={player} />
             </div>
           </div>
         )}
 
-        {/* Timeline + development */}
-        <div>
-          {player.yearsRemaining > 0 && (
-            <div style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px" }}>
-              <PlayerTimeline asset={{
-                id:             player.id,
-                name:           player.name,
-                position:       player.position as any,
-                age:            player.age,
-                capHit:         player.capHit,
-                yearsRemaining: player.yearsRemaining,
-                ptsPace:        player.ptsPace,
-                xGPace:         player.xGPace,
-                defRate:        player.defRate ?? 0.08,
-                avgTOI:         player.avgTOI,
-                qocIndex:       player.qocIndex,
-                baselinePtsPace: player.baselinePtsPace ?? undefined,
-                pkTimeShare:    player.pkTimeShare ?? undefined,
-                ops:            player.ops ?? undefined,
-                dps:            player.dps ?? undefined,
-                xgRelTM:        player.xgRelTM ?? undefined,
-                xgaRelTM:       player.xgaRelTM ?? undefined,
-                dzPct:          player.dzPct ?? undefined,
-                gsax:           player.gsax,
-                savePct:        player.savePct,
-                gamesStarted:   player.gamesStarted,
-                games:          player.games ?? 40,
-                hasLiveStats:   player.hasLiveStats,
-                retainedPct:    0,
-                multiplier:     1.0,
-              }} />
-            </div>
-          )}
-
-        </div>
-      </div>
-                {player.position !== "G" && player.developmentProfile && (
-            <div style={{ marginTop: "10px", background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px 12px" }}>
-              <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "6px" }}>
-                Development Outlook
-              </div>
-              <DevelopmentProfilePanel asset={{ ...player } as any} />
-            </div>
-          )}
-          <div style={{ marginTop: "10px", display: "flex", justifyContent: "center" }}>
+        {/* ── Player Card tab ────────────────────── */}
+        {activeTab === "card" && (
+          <div style={{ display: "flex", justifyContent: "center" }}>
             <PercentileCard
               player={player}
               allPlayers={allPlayers}
               teamName={team?.name}
             />
           </div>
+        )}
+
+        {/* ── Contract tab ───────────────────────── */}
+        {activeTab === "contract" && hasContract && (
+          <div style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px" }}>
+            <PlayerTimeline asset={{
+              id:             player.id,
+              name:           player.name,
+              position:       player.position as any,
+              age:            player.age,
+              capHit:         player.capHit,
+              yearsRemaining: player.yearsRemaining,
+              ptsPace:        player.ptsPace,
+              xGPace:         player.xGPace,
+              defRate:        player.defRate ?? 0.08,
+              avgTOI:         player.avgTOI,
+              qocIndex:       player.qocIndex,
+              baselinePtsPace: player.baselinePtsPace ?? undefined,
+              pkTimeShare:    player.pkTimeShare ?? undefined,
+              ops:            player.ops ?? undefined,
+              dps:            player.dps ?? undefined,
+              xgRelTM:        player.xgRelTM ?? undefined,
+              xgaRelTM:       player.xgaRelTM ?? undefined,
+              dzPct:          player.dzPct ?? undefined,
+              gsax:           player.gsax,
+              savePct:        player.savePct,
+              gamesStarted:   player.gamesStarted,
+              games:          player.games ?? 40,
+              hasLiveStats:   player.hasLiveStats,
+              retainedPct:    0,
+              multiplier:     1.0,
+            }} />
+          </div>
+        )}
+
+        {/* ── Outlook tab ────────────────────────── */}
+        {activeTab === "outlook" && hasOutlook && (
+          <div style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px 12px" }}>
+            <div style={{ fontSize: "11px", color: PLUM, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "6px", fontWeight: 900 }}>
+              Development Outlook
+            </div>
+            <DevelopmentProfilePanel asset={{ ...player } as any} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
