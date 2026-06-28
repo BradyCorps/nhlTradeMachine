@@ -97,9 +97,11 @@ const ENGINE = [
 
 export default function WelcomePage() {
   return (
-    <main className="fp-desk fp-desk-deep min-h-screen font-serif antialiased" style={{ color: "var(--ink)" }}>
+    <main className="fp-desk fp-desk-deep min-h-screen font-serif antialiased fp-snap-container" style={{ color: "var(--ink)" }}>
       <ScrollReveal />
       <ScrollNameplate />
+      {/* Desk spacer — gives the nameplate a full viewport of desk to sit on */}
+      <div className="fp-desk-spacer" aria-hidden="true" />
       <LedgerScrollSetdown className="fp-stack">
         <div className="fp-stack-extra" aria-hidden="true" />
         <div className="fp-sheet">

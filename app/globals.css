@@ -1152,6 +1152,20 @@ select.ledger-select {
   .fp-desk { padding: 48px 28px; }
 }
 
+/* ── Desk spacer — creates a full viewport of desk before the newspaper ── */
+.fp-desk-spacer {
+  height: 70vh;
+}
+
+/* ── Scroll snap — newspaper locks into reading position ── */
+.fp-snap-container {
+  scroll-snap-type: y proximity;
+}
+.fp-stack {
+  scroll-snap-align: start;
+  scroll-snap-stop: normal;
+}
+
 /* ── Setdown shadow states ──────────────────────────────────────────
    box-shadow on .fp-sheet instead of filter: drop-shadow on .fp-stack.
    drop-shadow forces the browser to rasterize the ENTIRE subtree every
@@ -1162,9 +1176,10 @@ select.ledger-select {
   position: relative;
   max-width: 1180px;
   margin: 0 auto;
-  contain: layout paint;
+  contain: layout style;
   isolation: isolate;
   backface-visibility: hidden;
+  overflow: visible;
 }
 
 /* ── CSS scroll-driven setdown animation ───────────────────────────
@@ -1173,16 +1188,16 @@ select.ledger-select {
    Browsers without scroll-timeline support get the JS fallback. ── */
 @supports (animation-timeline: scroll()) {
   @keyframes ledger-setdown {
-    0%   { opacity: 0; transform: translateY(110px) scale(0.9); }
-    25%  { opacity: 1; }
-    77%  { transform: translateY(6px) scale(0.995); }
+    0%   { opacity: 0; transform: translateY(min(60vh, 480px)) scale(0.88); }
+    30%  { opacity: 1; }
+    80%  { transform: translateY(4px) scale(0.998); }
     100% { opacity: 1; transform: translateY(0) scale(1); }
   }
 
   .fp-stack.css-scroll-anim {
     animation: ledger-setdown linear both;
     animation-timeline: scroll();
-    animation-range: 0px 620px;
+    animation-range: 0px 720px;
   }
 }
 
@@ -1190,13 +1205,13 @@ select.ledger-select {
 @supports (animation-timeline: scroll()) {
   @keyframes nameplate-fadeout {
     0%   { opacity: 1; transform: translateY(0); }
-    100% { opacity: 0; transform: translateY(-28px); }
+    100% { opacity: 0; transform: translateY(-36px); }
   }
 
   .nameplate-css-scroll {
     animation: nameplate-fadeout linear both;
     animation-timeline: scroll();
-    animation-range: 0px 260px;
+    animation-range: 0px 320px;
   }
 }
 

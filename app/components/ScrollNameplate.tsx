@@ -59,8 +59,8 @@ function MotionNameplate() {
   const [hidden, setHidden] = useState(false);
   const hiddenRef = useRef(false);
 
-  const opacity = useTransform(scrollY, [0, 260], [1, 0], { clamp: true });
-  const y       = useTransform(scrollY, [0, 260], [0, -28], { clamp: true });
+  const opacity = useTransform(scrollY, [0, 320], [1, 0], { clamp: true });
+  const y       = useTransform(scrollY, [0, 320], [0, -36], { clamp: true });
 
   useMotionValueEvent(scrollY, "change", (v) => {
     const nextHidden = v > 300;
