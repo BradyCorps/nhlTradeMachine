@@ -91,6 +91,34 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
       return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
     }).join(" ");
 
+  // ── DNA crossover helpers ────────────────────────────────────────────────
+  const CROSS_GAP = 8;
+  const crossXs = Array.from({ length: N + 1 }, (_, k) => (k / N) * W);
+
+  const strandYAt = (vals: number[], x: number, flip: boolean): number => {
+    const ti = Math.min(N - 1, Math.floor(Math.min(x, W - 0.01) / W * N));
+    const amp = AMP * (0.28 + vals[ti] * 0.72);
+    return cy + (flip ? 1 : -1) * amp * Math.sin(freq * x * sm);
+  };
+
+  const buildSegPath = (
+    vals: number[], flip: boolean,
+    xStart: number, xEnd: number,
+    trimLeft: number, trimRight: number,
+  ): string => {
+    const xFrom = xStart + trimLeft;
+    const xTo = xEnd - trimRight;
+    return Array.from({ length: STEPS + 1 }, (_, step) => {
+      const x = (step / STEPS) * W;
+      if (x < xFrom - 0.5 || x > xTo + 0.5) return null;
+      const y = strandYAt(vals, x, flip);
+      return `${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+      .filter((s): s is string => s !== null)
+      .map((s, i) => `${i === 0 ? "M" : "L"} ${s}`)
+      .join(" ");
+  };
+
   // ── Node geometry ──────────────────────────────────────────────────────────
   // Peak of i-th half-cycle: x = (2i+1)/(2N)·W
   // At this x, traitIdx = i exactly → amp = vals[i] → node sits on path ✓
@@ -121,6 +149,21 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
   const defVals = toDef(strand);
   const offScore = Math.round(avg(offVals) * 100);
   const defScore = Math.round(avg(defVals) * 100);
+
+  // ── DNA base-pair rungs ────────────────────────────────────────────────────
+  const RUNG_STEP = 14;
+  const RUNG_COLORS = ["#7a9a78", "#8a6f8e", "#b07868", "#6882a0"];
+  const rungData: { x: number; y1: number; y2: number; color: string }[] = [];
+  let rungIdx = 0;
+  for (let rx = RUNG_STEP / 2; rx < W; rx += RUNG_STEP) {
+    if (crossXs.some(cx => Math.abs(rx - cx) < CROSS_GAP + 3)) continue;
+    rungData.push({
+      x: rx,
+      y1: strandYAt(offVals, rx, false),
+      y2: strandYAt(defVals, rx, true),
+      color: RUNG_COLORS[rungIdx++ % RUNG_COLORS.length],
+    });
+  }
 
   return (
     <div style={{ fontFamily: MONO }}>
@@ -166,18 +209,6 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
         <path d={buildRef(avg(toDef(CHAMP_TEMPLATE)), true)} fill="none"
               stroke={GOLD} strokeWidth="1.5" strokeDasharray="6,4" opacity="0.70"/>
 
-        {/* Ladder rungs at zero-crossings */}
-        {[1, 2, 3].map(k => {
-          const x  = (k / N) * W;
-          const oa = AMP * (0.28 + avg(offVals) * 0.72);
-          const da = AMP * (0.28 + avg(defVals) * 0.72);
-          return (
-            <line key={k} x1={x} y1={cy - oa * Math.sin(freq * x * sm)}
-                  x2={x} y2={cy + da * Math.sin(freq * x * sm)}
-                  stroke="var(--ledger-rule, #c8b890)" strokeWidth="1" opacity="0.20"/>
-          );
-        })}
-
         {/* Compare overlay */}
         {compare && (<>
           <path d={buildPath(toOff(compare), false)} fill="none"
@@ -186,11 +217,33 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
                 stroke={RED} strokeWidth="1.5" opacity="0.28" strokeDasharray="5,3"/>
         </>)}
 
-        {/* Main strands — DEF rendered first so OFF sits on top */}
-        <path d={buildPath(defVals, true)} fill="none"
-              stroke={RED} strokeWidth="2.5" strokeLinecap="round" opacity="0.90"/>
-        <path d={buildPath(offVals, false)} fill="none"
-              stroke={NAVY} strokeWidth="2.5" strokeLinecap="round" opacity="0.90"/>
+        {/* DNA crossover — segment-based rendering with base-pair rungs */}
+        {crossXs.slice(0, -1).map((segStart, k) => {
+          const segEnd = crossXs[k + 1];
+          const offFront = k % 2 === 0;
+          const backVals  = offFront ? defVals : offVals;
+          const frontVals = offFront ? offVals : defVals;
+          const backFlip  = offFront;
+          const frontFlip = !offFront;
+          const backColor  = offFront ? RED : NAVY;
+          const frontColor = offFront ? NAVY : RED;
+          const gl = k > 0 ? CROSS_GAP : 0;
+          const gr = k < N - 1 ? CROSS_GAP : 0;
+          const segRungs = rungData.filter(r => r.x >= segStart && r.x <= segEnd);
+
+          return (
+            <g key={`seg-${k}`}>
+              <path d={buildSegPath(backVals, backFlip, segStart, segEnd, gl, gr)}
+                    fill="none" stroke={backColor} strokeWidth="2.5" strokeLinecap="round" opacity="0.90"/>
+              {segRungs.map((r, ri) => (
+                <line key={ri} x1={r.x} y1={r.y1} x2={r.x} y2={r.y2}
+                      stroke={r.color} strokeWidth="2" opacity="0.45" strokeLinecap="round"/>
+              ))}
+              <path d={buildSegPath(frontVals, frontFlip, segStart, segEnd, 0, 0)}
+                    fill="none" stroke={frontColor} strokeWidth="2.5" strokeLinecap="round" opacity="0.90"/>
+            </g>
+          );
+        })}
 
         {/* OFF nodes + labels */}
         {OFF_LABELS.map((lbl, i) => (
