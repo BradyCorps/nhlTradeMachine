@@ -46,12 +46,12 @@ function MotionFallback({ children, className, style }: Props) {
   const [settled, setSettled] = useState(false);
   const settledRef = useRef(false);
 
-  const y = useTransform(scrollY, [0, 560, 720], [480, 4, 0], { clamp: true });
-  const scale = useTransform(scrollY, [0, 560, 720], [0.88, 0.998, 1], { clamp: true });
-  const opacity = useTransform(scrollY, [0, 220], [0, 1], { clamp: true });
+  const y = useTransform(scrollY, [0, 760, 900], [600, 4, 0], { clamp: true });
+  const scale = useTransform(scrollY, [0, 760, 900], [0.88, 0.998, 1], { clamp: true });
+  const opacity = useTransform(scrollY, [0, 225], [0, 1], { clamp: true });
 
   useMotionValueEvent(scrollY, "change", (v) => {
-    const nextSettled = v > 560;
+    const nextSettled = v > 760;
     if (settledRef.current === nextSettled) return;
     settledRef.current = nextSettled;
     setSettled(nextSettled);
@@ -68,7 +68,7 @@ function MotionFallback({ children, className, style }: Props) {
         opacity: settled ? 1 : opacity,
         willChange: settled ? "auto" : "transform, opacity",
       }}
-      initial={{ opacity: 0, y: 480, scale: 0.88 }}
+      initial={{ opacity: 0, y: 600, scale: 0.88 }}
     >
       {children}
     </motion.div>

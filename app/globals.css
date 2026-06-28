@@ -1154,11 +1154,13 @@ select.ledger-select {
 
 /* ── Desk spacer — creates a full viewport of desk before the newspaper ── */
 .fp-desk-spacer {
-  height: 70vh;
+  height: 90vh;
 }
 
-/* ── Scroll snap — newspaper locks into reading position ── */
-.fp-snap-container {
+/* ── Scroll snap — newspaper locks into reading position ──
+   scroll-snap-type must be on the actual scroll container (html),
+   not on <main>, or snap will never fire. ── */
+html {
   scroll-snap-type: y proximity;
 }
 .fp-stack {
@@ -1188,16 +1190,16 @@ select.ledger-select {
    Browsers without scroll-timeline support get the JS fallback. ── */
 @supports (animation-timeline: scroll()) {
   @keyframes ledger-setdown {
-    0%   { opacity: 0; transform: translateY(min(60vh, 480px)) scale(0.88); }
-    30%  { opacity: 1; }
-    80%  { transform: translateY(4px) scale(0.998); }
+    0%   { opacity: 0; transform: translateY(min(80vh, 600px)) scale(0.88); }
+    25%  { opacity: 1; }
+    85%  { transform: translateY(4px) scale(0.998); }
     100% { opacity: 1; transform: translateY(0) scale(1); }
   }
 
   .fp-stack.css-scroll-anim {
     animation: ledger-setdown linear both;
     animation-timeline: scroll();
-    animation-range: 0px 720px;
+    animation-range: 0px 900px;
   }
 }
 
