@@ -101,6 +101,16 @@ body::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
   pointer-events: none;
   z-index: 9999;
+  transform: translateZ(0);
+}
+
+/* ── Nameplate bouncing arrow (pure CSS, no framer-motion) ──── */
+@keyframes nameplate-bounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(10px); }
+}
+.nameplate-bounce-arrow {
+  animation: nameplate-bounce 2s ease-in-out infinite;
 }
 
 /* ── Scrollbar ───────────────────────────────────────────────── */
@@ -1142,16 +1152,10 @@ select.ledger-select {
   .fp-desk { padding: 48px 28px; }
 }
 
-/* ── Setdown shadow states (CSS transition, not per-frame JS) ──────── */
-.fp-stack-lifted {
-  filter: drop-shadow(0 28px 36px rgba(30,18,6,0.36));
-  transition: none;
-}
-.fp-stack-settled {
-  filter: drop-shadow(0 2px 4px rgba(30,18,6,0.30))
-          drop-shadow(0 18px 40px rgba(30,18,6,0.40));
-  transition: filter 260ms ease-out;
-}
+/* ── Setdown shadow states ──────────────────────────────────────────
+   box-shadow on .fp-sheet instead of filter: drop-shadow on .fp-stack.
+   drop-shadow forces the browser to rasterize the ENTIRE subtree every
+   frame; box-shadow is painted once and cached by the compositor. ─── */
 
 /* ── Newspaper stack — visible page layers beneath the front page ─ */
 .fp-stack {
@@ -1161,6 +1165,39 @@ select.ledger-select {
   contain: layout paint;
   isolation: isolate;
   backface-visibility: hidden;
+}
+
+/* ── CSS scroll-driven setdown animation ───────────────────────────
+   Runs ENTIRELY on the compositor — zero JS per scroll frame.
+   The animation timeline is the document scroll position.
+   Browsers without scroll-timeline support get the JS fallback. ── */
+@supports (animation-timeline: scroll()) {
+  @keyframes ledger-setdown {
+    0%   { opacity: 0; transform: translateY(110px) scale(0.9); }
+    25%  { opacity: 1; }
+    77%  { transform: translateY(6px) scale(0.995); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .fp-stack.css-scroll-anim {
+    animation: ledger-setdown linear both;
+    animation-timeline: scroll();
+    animation-range: 0px 620px;
+  }
+}
+
+/* ── Nameplate fade-out via CSS scroll-timeline ── */
+@supports (animation-timeline: scroll()) {
+  @keyframes nameplate-fadeout {
+    0%   { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-28px); }
+  }
+
+  .nameplate-css-scroll {
+    animation: nameplate-fadeout linear both;
+    animation-timeline: scroll();
+    animation-range: 0px 260px;
+  }
 }
 
 /* Heavy stack: 7 visible page edges with increasing offset/rotation,
@@ -1218,10 +1255,6 @@ select.ledger-select {
 }
 
 @media (max-width: 639px) {
-  .fp-stack-lifted {
-    filter: drop-shadow(0 18px 22px rgba(30,18,6,0.30));
-  }
-
   .fp-stack::before {
     right: 0;
     bottom: -6px;
@@ -1249,22 +1282,19 @@ select.ledger-select {
   background: var(--paper);
   border-top: 5px solid var(--fig);
   box-shadow:
-    0 1px 3px rgba(30,18,6,0.10),
+    0 2px 4px rgba(30,18,6,0.22),
+    0 18px 40px rgba(30,18,6,0.32),
     -1px 0 0 rgba(30,18,6,0.06);
 }
-/* stronger paper grain, only on the reading surface */
+/* Paper grain — static texture, no blend mode (blend forces repaint) */
 .fp-sheet::before {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 3;
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='fpn'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.5' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='320' height='320' filter='url(%23fpn)' opacity='0.17'/%3E%3C/svg%3E");
-}
-
-.fp-stack-lifted .fp-sheet::before {
-  opacity: 0.35;
+  opacity: 0.12;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='fpn'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.5' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='320' height='320' filter='url(%23fpn)' opacity='0.22'/%3E%3C/svg%3E");
 }
 /* foxing — aged darkening that pools toward the edges */
 .fp-sheet::after {

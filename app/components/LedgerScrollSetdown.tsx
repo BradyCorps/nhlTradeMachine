@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useScroll, useTransform, useReducedMotion, useMotionValueEvent } from "framer-motion";
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, useEffect, type ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
@@ -11,6 +11,37 @@ interface Props {
 
 export default function LedgerScrollSetdown({ children, className, style }: Props) {
   const reduced = useReducedMotion();
+  const [useCSSTimeline, setUseCSSTimeline] = useState(false);
+
+  useEffect(() => {
+    if (CSS.supports("animation-timeline", "scroll()")) {
+      setUseCSSTimeline(true);
+    }
+  }, []);
+
+  if (reduced) {
+    return (
+      <div className={className} style={style}>
+        {children}
+      </div>
+    );
+  }
+
+  if (useCSSTimeline) {
+    return (
+      <div
+        className={`${className ?? ""} css-scroll-anim`}
+        style={style}
+      >
+        {children}
+      </div>
+    );
+  }
+
+  return <MotionFallback className={className} style={style}>{children}</MotionFallback>;
+}
+
+function MotionFallback({ children, className, style }: Props) {
   const { scrollY } = useScroll();
   const [settled, setSettled] = useState(false);
   const settledRef = useRef(false);
@@ -26,17 +57,9 @@ export default function LedgerScrollSetdown({ children, className, style }: Prop
     setSettled(nextSettled);
   });
 
-  if (reduced) {
-    return (
-      <div className={className} style={style}>
-        {children}
-      </div>
-    );
-  }
-
   return (
     <motion.div
-      className={`${className ?? ""} ${settled ? "fp-stack-settled" : "fp-stack-lifted"}`}
+      className={className ?? ""}
       style={{
         ...style,
         transformOrigin: "50% 50%",

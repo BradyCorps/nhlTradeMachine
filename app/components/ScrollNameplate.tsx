@@ -1,20 +1,64 @@
 "use client";
 
 import { motion, useScroll, useTransform, useReducedMotion, useMotionValueEvent } from "framer-motion";
-import { useRef, useState } from "react";
-
-// ── Desk nameplate overlay ──────────────────────────────────────────────────
-// Fixed overlay that sits ON the desk before the newspaper arrives.
-// Fades and drifts upward as the user scrolls, making room for the sheet.
-// aria-hidden: pure decoration — the masthead inside the sheet is the real h1.
+import { useRef, useState, useEffect } from "react";
 
 export default function ScrollNameplate() {
   const reduced = useReducedMotion();
+  const [useCSSTimeline, setUseCSSTimeline] = useState(false);
+
+  useEffect(() => {
+    if (CSS.supports("animation-timeline", "scroll()")) {
+      setUseCSSTimeline(true);
+    }
+  }, []);
+
+  if (reduced) return null;
+
+  if (useCSSTimeline) return <CSSTimelineNameplate />;
+
+  return <MotionNameplate />;
+}
+
+function CSSTimelineNameplate() {
+  const [hidden, setHidden] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const shouldHide = window.scrollY > 300;
+      setHidden((prev) => (prev === shouldHide ? prev : shouldHide));
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  if (hidden) return null;
+
+  return (
+    <div
+      aria-hidden="true"
+      className="nameplate-css-scroll"
+      style={{
+        position: "fixed",
+        inset: 0,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        pointerEvents: "none",
+        zIndex: 5,
+      }}
+    >
+      <NameplateContent />
+    </div>
+  );
+}
+
+function MotionNameplate() {
   const { scrollY } = useScroll();
   const [hidden, setHidden] = useState(false);
   const hiddenRef = useRef(false);
 
-  // Fade and drift up as user scrolls 0 → 260px
   const opacity = useTransform(scrollY, [0, 260], [1, 0], { clamp: true });
   const y       = useTransform(scrollY, [0, 260], [0, -28], { clamp: true });
 
@@ -25,7 +69,7 @@ export default function ScrollNameplate() {
     setHidden(nextHidden);
   });
 
-  if (reduced) return null;
+  if (hidden) return null;
 
   return (
     <motion.div
@@ -35,7 +79,7 @@ export default function ScrollNameplate() {
         y,
         position: "fixed",
         inset: 0,
-        display: hidden ? "none" : "flex",
+        display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
@@ -43,7 +87,14 @@ export default function ScrollNameplate() {
         zIndex: 5,
       }}
     >
-      {/* Nameplate — same font as fp-nameplate, sized to read clearly on the desk */}
+      <NameplateContent />
+    </motion.div>
+  );
+}
+
+function NameplateContent() {
+  return (
+    <>
       <div style={{
         fontFamily: "'Libre Baskerville', Georgia, 'Times New Roman', serif",
         fontWeight: 700,
@@ -71,20 +122,16 @@ export default function ScrollNameplate() {
         Scroll to read
       </div>
 
-      {/* Gently bouncing arrow */}
-      {!hidden && (
-        <motion.div
-          animate={{ y: [0, 10, 0] }}
-          transition={{ duration: 2.0, repeat: Infinity, ease: "easeInOut" }}
-          style={{
-            marginTop: 18,
-            fontSize: 15,
-            color: "rgba(255,245,225,0.26)",
-          }}
-        >
-          ↓
-        </motion.div>
-      )}
-    </motion.div>
+      <div
+        className="nameplate-bounce-arrow"
+        style={{
+          marginTop: 18,
+          fontSize: 15,
+          color: "rgba(255,245,225,0.26)",
+        }}
+      >
+        ↓
+      </div>
+    </>
   );
 }
