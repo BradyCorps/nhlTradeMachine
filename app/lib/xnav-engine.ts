@@ -560,10 +560,11 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     ? safe((blendedDps - 2.5) * 12 * defReliabilityWeight)
     : null;
   const defTotalDisp = defTotal * defReliabilityWeight;
+  const xgaConf = clamp((games - 20) / 50, 0.15, 1.0);
   const dDefDisplay = xgaDispRaw !== null && dpsDispRaw !== null
-    ? xgaDispRaw * 0.45 + dpsDispRaw * 0.35 + defTotalDisp * 0.20
+    ? xgaDispRaw * (0.45 * xgaConf) + dpsDispRaw * (0.35 + 0.45 * (1 - xgaConf) * 0.55) + defTotalDisp * (0.20 + 0.45 * (1 - xgaConf) * 0.45)
     : xgaDispRaw !== null
-    ? xgaDispRaw * 0.6 + defTotalDisp * 0.4
+    ? xgaDispRaw * (0.6 * xgaConf) + defTotalDisp * (1 - 0.6 * xgaConf)
     : defTotalDisp;
   const defDisplay = isForwardPos ? forwardDef : clamp(dDefDisplay, -40, 50);
 
