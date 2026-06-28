@@ -123,7 +123,7 @@ export default function ResignPhase({
         style={{ background: "var(--ledger-card-light)", borderRadius: "2px", maxHeight: "92vh", boxShadow: "0 24px 70px rgba(0,0,0,0.6)" }}>
 
         {/* Header */}
-        <div className="shrink-0" style={{ borderTop: "4px double #1c140a", borderBottom: "1px solid #b8a070", padding: "16px 24px 12px" }}>
+        <div className="shrink-0" style={{ borderTop: "4px double #1c140a", borderBottom: "1px solid #b8a070", padding: "16px 16px 12px" }}>
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
             <div>
               <div className="text-[10px] uppercase tracking-[0.4em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
@@ -142,7 +142,7 @@ export default function ResignPhase({
           </div>
         </div>
 
-        <div className="overflow-y-auto px-5 py-4" style={{ flex: 1, minHeight: 0 }}>
+        <div className="overflow-y-auto px-3 sm:px-5 py-4" style={{ flex: 1, minHeight: 0 }}>
           {/* Pending free agents */}
           <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono mb-3" style={{ color: "var(--ledger-ink-faint)" }}>
             Your Pending Free Agents — {pending.length}
@@ -154,7 +154,7 @@ export default function ResignPhase({
           ) : (
             <div className="flex flex-col gap-1.5 mb-6">
               {pending.map((fa) => (
-                <div key={fa.player.id} className="flex items-center justify-between gap-3 px-3 py-2"
+                <div key={fa.player.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 px-3 py-2"
                   style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
                   <div className="min-w-0">
                     <button onClick={() => setDetail(fa.player)} title="View STRAND & development"
@@ -162,10 +162,12 @@ export default function ResignPhase({
                       style={{ color: "var(--ledger-ink)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
                       {fa.player.name}
                     </button>
-                    <div><PlayerMeta p={fa.player} /></div>
-                    <StatLine p={fa.player} />
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <PlayerMeta p={fa.player} />
+                      <StatLine p={fa.player} />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                     <Terms c={fa.contract} />
                     <button onClick={() => onResign(fa)}
                       className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
@@ -201,7 +203,7 @@ export default function ResignPhase({
                 />
                 <div className="flex flex-col gap-1">
                   {droppable.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between gap-3 px-3 py-1.5"
+                    <div key={p.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3 px-3 py-1.5"
                       style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
                       <div className="min-w-0">
                         <div className="font-bold text-[12px] truncate" style={{ color: "var(--ledger-ink)" }}>{p.name}</div>
@@ -210,7 +212,7 @@ export default function ResignPhase({
                         </span>
                       </div>
                       <button onClick={() => onDrop(p)}
-                        className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono shrink-0"
+                        className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono shrink-0 self-end sm:self-auto"
                         style={{ background: "transparent", color: "var(--ledger-red)", border: "1px solid var(--ledger-red)", borderRadius: "2px" }}>
                         Release
                       </button>
@@ -243,7 +245,7 @@ export default function ResignPhase({
               const isRfa = fa.contract.status === "RFA";
               const offerPicks = isRfa ? getOfferSheetCompensation(fa.contract.aav) : [];
               return (
-                <div key={fa.player.id} className="flex items-center justify-between gap-3 px-3 py-1.5"
+                <div key={fa.player.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 px-3 py-2"
                   style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
                   <div className="min-w-0">
                     <button onClick={() => setDetail(fa.player)} title="View STRAND & development"
@@ -251,23 +253,29 @@ export default function ResignPhase({
                       style={{ color: "var(--ledger-ink)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
                       {fa.player.name}
                     </button>
-                    <div><PlayerMeta p={fa.player} /></div>
-                    <StatLine p={fa.player} />
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <PlayerMeta p={fa.player} />
+                      <StatLine p={fa.player} />
+                    </div>
                     {isRfa && offerPicks.length > 0 && (
-                      <span className="text-[9px] font-mono font-black uppercase tracking-wide"
-                        style={{ color: "var(--ledger-amber, #c87941)" }}
-                        title="CBA offer-sheet compensation owed to original team if they don't match">
-                        ⚠ Offer sheet · picks owed: {offerPicks.join(" + ")}
-                      </span>
+                      <div>
+                        <span className="text-[9px] font-mono font-black uppercase tracking-wide"
+                          style={{ color: "var(--ledger-amber, #c87941)" }}
+                          title="CBA offer-sheet compensation owed to original team if they don't match">
+                          ⚠ Offer sheet · picks owed: {offerPicks.join(" + ")}
+                        </span>
+                      </div>
                     )}
                     {isRfa && offerPicks.length === 0 && (
-                      <span className="text-[9px] font-mono uppercase tracking-wide"
-                        style={{ color: "var(--ledger-ink-faint)" }}>
-                        RFA · no comp
-                      </span>
+                      <div>
+                        <span className="text-[9px] font-mono uppercase tracking-wide"
+                          style={{ color: "var(--ledger-ink-faint)" }}>
+                          RFA · no comp
+                        </span>
+                      </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                     <Terms c={fa.contract} />
                     <button
                       onClick={() => onSign(fa)}
@@ -295,12 +303,12 @@ export default function ResignPhase({
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 px-5 py-3 flex items-center justify-between gap-3" style={{ borderTop: "1px solid #b8a070" }}>
+        <div className="shrink-0 px-4 sm:px-5 py-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3" style={{ borderTop: "1px solid #b8a070" }}>
           <p className="text-[10px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
             Other teams have resolved their own free agents.
           </p>
           <button onClick={onDone}
-            className="text-[11px] font-black uppercase tracking-[0.18em] px-5 py-2 font-mono"
+            className="text-[11px] font-black uppercase tracking-[0.18em] px-5 py-2 font-mono shrink-0"
             style={{ background: "var(--ledger-ink)", color: "var(--ledger-card-light)", borderRadius: "2px" }}>
             Done — RFA Offer Sheets →
           </button>
