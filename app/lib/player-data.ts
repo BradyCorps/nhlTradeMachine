@@ -10,6 +10,7 @@
 //   INJURY_RISK:        update when players return/retire
 
 import type { Asset, XNAVResult, FArchetype } from "@/app/lib/trade-types";
+import csvAwards from "@/app/data/player-awards.json";
 
 export const canonicalStaticPlayerName = (name: string): string =>
   name.toLowerCase().normalize("NFD")
@@ -25,6 +26,11 @@ function normalizedLookup<T>(map: Record<string, T>, name: string): T | undefine
   return Object.entries(map).find(([candidate]) => canonicalStaticPlayerName(candidate) === key)?.[1];
 }
 
+const _csvAwardsMap = csvAwards as Record<string, string[]>;
+export function getPlayerAwards(name: string): string[] {
+  return normalizedLookup(_csvAwardsMap, name) ?? [];
+}
+
 // ── Award bonus weights ───────────────────────────────────────
 export const AWARD_BONUS: Record<string, number> = {
   "Hart":         18,
@@ -36,6 +42,7 @@ export const AWARD_BONUS: Record<string, number> = {
   "Art Ross":     8,
   "Rocket Richard": 6,
   "Calder":       6,
+  "Lady Byng":    4,
 };
 
 // ── Prospect Tier System ──────────────────────────────────────
@@ -57,111 +64,119 @@ export const PLAYER_PEDIGREE: Record<string, {
   allStarYears?: number;
 }> = {
   // ── ELITE GOALIES ──────────────────────────────────────────
-  "Connor Hellebuyck":  { peakGsax: 28.4, careerGsax: 108, awards: ["Hart","Vezina","Vezina","Vezina"],  allStarYears: 5 },
-  "Igor Shesterkin":    { peakGsax: 25.1, careerGsax: 72,  awards: ["Vezina","Vezina"],                 allStarYears: 4 },
-  "Andrei Vasilevskiy": { peakGsax: 22.8, careerGsax: 95,  awards: ["Vezina","Conn Smythe"],            allStarYears: 3 },
-  "Juuse Saros":        { peakGsax: 20.1, careerGsax: 55,  awards: ["Vezina"],                          allStarYears: 2 },
-  "Jeremy Swayman":     { peakGsax: 18.6, careerGsax: 38,  awards: [],                                  allStarYears: 1 },
-  "Jake Oettinger":     { peakGsax: 16.2, careerGsax: 42,  awards: [],                                  allStarYears: 1 },
-  "Filip Gustavsson":   { peakGsax: 20.4, careerGsax: 38,  awards: ["Vezina"],                          allStarYears: 1 },
-  "Sergei Bobrovsky":   { peakGsax: 24.3, careerGsax: 85,  awards: ["Vezina","Vezina"],                 allStarYears: 3 },
-  "Jordan Binnington":  { peakGsax: 14.2, careerGsax: 32,  awards: ["Conn Smythe"],                     allStarYears: 1 },
-  "Pyotr Kochetkov":    { peakGsax: 14.8, careerGsax: 22,  awards: [],                                  allStarYears: 0 },
-  "Tristan Jarry":      { peakGsax: 10.2, careerGsax: 18,  awards: [],                                  allStarYears: 0 },
-  "Jacob Markstrom":    { peakGsax: 16.8, careerGsax: 44,  awards: [],                                  allStarYears: 2 },
-  "Ilya Sorokin":       { peakGsax: 18.9, careerGsax: 48,  awards: ["Vezina"],                          allStarYears: 2 },
-  "Joseph Woll":        { peakGsax: 12.4, careerGsax: 18,  awards: [],                                  allStarYears: 0 },
-  "Stuart Skinner":     { peakGsax: 8.1,  careerGsax: 14,  awards: [],                                  allStarYears: 0 },
-  "Dustin Wolf":        { peakGsax: 11.2, careerGsax: 16,  awards: [],                                  allStarYears: 0 },
-  "Ukko-Pekka Luukkonen": { peakGsax: 14.6, careerGsax: 24, awards: [],                                 allStarYears: 1 },
+  "Connor Hellebuyck":  { peakGsax: 28.4, careerGsax: 108,  allStarYears: 5 },
+  "Igor Shesterkin":    { peakGsax: 25.1, careerGsax: 72,                 allStarYears: 4 },
+  "Andrei Vasilevskiy": { peakGsax: 22.8, careerGsax: 95,            allStarYears: 3 },
+  "Juuse Saros":        { peakGsax: 20.1, careerGsax: 55,                          allStarYears: 2 },
+  "Jeremy Swayman":     { peakGsax: 18.6, careerGsax: 38,                                  allStarYears: 1 },
+  "Jake Oettinger":     { peakGsax: 16.2, careerGsax: 42,                                  allStarYears: 1 },
+  "Filip Gustavsson":   { peakGsax: 20.4, careerGsax: 38,                          allStarYears: 1 },
+  "Sergei Bobrovsky":   { peakGsax: 24.3, careerGsax: 85,                 allStarYears: 3 },
+  "Jordan Binnington":  { peakGsax: 14.2, careerGsax: 32,                     allStarYears: 1 },
+  "Pyotr Kochetkov":    { peakGsax: 14.8, careerGsax: 22,                                  allStarYears: 0 },
+  "Tristan Jarry":      { peakGsax: 10.2, careerGsax: 18,                                  allStarYears: 0 },
+  "Jacob Markstrom":    { peakGsax: 16.8, careerGsax: 44,                                  allStarYears: 2 },
+  "Ilya Sorokin":       { peakGsax: 18.9, careerGsax: 48,                          allStarYears: 2 },
+  "Joseph Woll":        { peakGsax: 12.4, careerGsax: 18,                                  allStarYears: 0 },
+  "Stuart Skinner":     { peakGsax: 8.1,  careerGsax: 14,                                  allStarYears: 0 },
+  "Dustin Wolf":        { peakGsax: 11.2, careerGsax: 16,                                  allStarYears: 0 },
+  "Ukko-Pekka Luukkonen": { peakGsax: 14.6, careerGsax: 24,                                 allStarYears: 1 },
 
   // ── ELITE SKATERS ──────────────────────────────────────────
-  "Connor McDavid":     { peakPtsPace: 153, awards: ["Hart","Hart","Hart","Ted Lindsay","Ted Lindsay","Ted Lindsay","Calder"], allStarYears: 8 },
-  "Leon Draisaitl":     { peakPtsPace: 128, awards: ["Hart","Ted Lindsay","Art Ross"],                   allStarYears: 5 },
-  "Nathan MacKinnon":   { peakPtsPace: 140, awards: ["Hart","Hart","Ted Lindsay","Ted Lindsay","Norris"], allStarYears: 7 },
-  "Nikita Kucherov":    { peakPtsPace: 144, awards: ["Hart","Ted Lindsay","Art Ross","Conn Smythe"],      allStarYears: 5 },
-  "Cale Makar":         { peakPtsPace: 93,  awards: ["Calder","Norris","Norris","Conn Smythe"],           allStarYears: 4 },
-  "David Pastrnak":     { peakPtsPace: 122, awards: ["Rocket Richard","Rocket Richard"],                  allStarYears: 4 },
-  "Roman Josi":         { peakPtsPace: 96,  awards: ["Norris"],                                           allStarYears: 3 },
-  "Adam Fox":           { peakPtsPace: 102, awards: ["Norris","Norris"],                                  allStarYears: 3 },
-  "Sidney Crosby":      { peakPtsPace: 120, awards: ["Hart","Hart","Hart","Conn Smythe","Conn Smythe"],   allStarYears: 9 },
-  "Alexander Ovechkin": { peakPtsPace: 115, awards: ["Hart","Hart","Hart","Ted Lindsay","Art Ross","Rocket Richard","Rocket Richard","Rocket Richard","Rocket Richard","Rocket Richard"], allStarYears: 13 },
-  "Evgeni Malkin":      { peakPtsPace: 118, awards: ["Hart","Conn Smythe","Art Ross"],                    allStarYears: 6 },
-  "Victor Hedman":      { peakPtsPace: 82,  awards: ["Norris","Norris","Conn Smythe"],                    allStarYears: 4 },
-  "Quinn Hughes":       { peakPtsPace: 102, awards: ["Norris"],                                           allStarYears: 3 },
-  "Rasmus Dahlin":      { peakPtsPace: 102, awards: [],                                                   allStarYears: 2 },
-  "Elias Pettersson":   { peakPtsPace: 102, awards: ["Calder"],                                           allStarYears: 2 },
-  "Josh Morrissey":     { peakPtsPace: 76,  awards: [],                                                   allStarYears: 1 },
-  "Kyle Connor":        { peakPtsPace: 92,  awards: [],                                                   allStarYears: 1 },
-  "Mark Scheifele":     { peakPtsPace: 88,  awards: [],                                                   allStarYears: 1 },
-  "Mikko Rantanen":     { peakPtsPace: 110, awards: ["Conn Smythe"],                                      allStarYears: 3 },
-  "Matthew Tkachuk":    { peakPtsPace: 109, awards: [],                                                   allStarYears: 2 },
-  "Brady Tkachuk":      { peakPtsPace: 80,  awards: [],                                                   allStarYears: 1 },
-  "Auston Matthews":    { peakPtsPace: 124, awards: ["Hart","Calder","Rocket Richard","Rocket Richard","Rocket Richard"], allStarYears: 5 },
-  "Mitch Marner":       { peakPtsPace: 101, awards: [],                                                   allStarYears: 3 },
-  "William Nylander":   { peakPtsPace: 97,  awards: [],                                                   allStarYears: 1 },
-  "Nico Hischier":      { peakPtsPace: 80,  awards: ["Calder"],                                           allStarYears: 1 },
-  "Jack Hughes":        { peakPtsPace: 98,  awards: [],                                                   allStarYears: 2 },
-  "Aleksander Barkov":  { peakPtsPace: 96,  awards: ["Selke","Selke"],                                    allStarYears: 3 },
-  "Jonathan Huberdeau": { peakPtsPace: 115, awards: [],                                                   allStarYears: 2 },
-  "Jakob Chychrun":     { peakPtsPace: 75,  awards: [],                                                   allStarYears: 0 },
+  "Connor McDavid":     { peakPtsPace: 153, allStarYears: 8 },
+  "Leon Draisaitl":     { peakPtsPace: 128,                   allStarYears: 5 },
+  "Nathan MacKinnon":   { peakPtsPace: 140, allStarYears: 7 },
+  "Nikita Kucherov":    { peakPtsPace: 144,      allStarYears: 5 },
+  "Cale Makar":         { peakPtsPace: 93,           allStarYears: 4 },
+  "David Pastrnak":     { peakPtsPace: 122,                  allStarYears: 4 },
+  "Roman Josi":         { peakPtsPace: 96,                                           allStarYears: 3 },
+  "Adam Fox":           { peakPtsPace: 102,                                  allStarYears: 3 },
+  "Sidney Crosby":      { peakPtsPace: 120,   allStarYears: 9 },
+  "Alexander Ovechkin": { peakPtsPace: 115, allStarYears: 13 },
+  "Evgeni Malkin":      { peakPtsPace: 118,                    allStarYears: 6 },
+  "Victor Hedman":      { peakPtsPace: 82,                    allStarYears: 4 },
+  "Quinn Hughes":       { peakPtsPace: 102,                                           allStarYears: 3 },
+  "Rasmus Dahlin":      { peakPtsPace: 102,                                                   allStarYears: 2 },
+  "Elias Pettersson":   { peakPtsPace: 102,                                           allStarYears: 2 },
+  "Josh Morrissey":     { peakPtsPace: 76,                                                   allStarYears: 1 },
+  "Kyle Connor":        { peakPtsPace: 92,                                                   allStarYears: 1 },
+  "Mark Scheifele":     { peakPtsPace: 88,                                                   allStarYears: 1 },
+  "Mikko Rantanen":     { peakPtsPace: 110,                                      allStarYears: 3 },
+  "Matthew Tkachuk":    { peakPtsPace: 109,                                                   allStarYears: 2 },
+  "Brady Tkachuk":      { peakPtsPace: 80,                                                   allStarYears: 1 },
+  "Auston Matthews":    { peakPtsPace: 124, allStarYears: 5 },
+  "Mitch Marner":       { peakPtsPace: 101,                                                   allStarYears: 3 },
+  "William Nylander":   { peakPtsPace: 97,                                                   allStarYears: 1 },
+  "Nico Hischier":      { peakPtsPace: 80,                                           allStarYears: 1 },
+  "Jack Hughes":        { peakPtsPace: 98,                                                   allStarYears: 2 },
+  "Aleksander Barkov":  { peakPtsPace: 96,                                    allStarYears: 3 },
+  "Jonathan Huberdeau": { peakPtsPace: 115,                                                   allStarYears: 2 },
+  "Jakob Chychrun":     { peakPtsPace: 75,                                                   allStarYears: 0 },
   // ── SKATERS — DEFENSIVE D PEDIGREE ───────────────────────────
   // Slavin 2019-20: 43 pts / 68 GP (52 pts/82 pace), OPS 2.2, DPS 5.7
   // Awards: All-Star Game, All-NHL 5th, Norris-5th, Lady Byng-4th
   // E+/-: +16.9 (exceptional defensive impact)
   // NOTE: 2025-26 Slavin only played 38 GP (injury) — current NAV reflects that,
   //   but historical floor honours his peak
-  "Jaccob Slavin":      { peakPtsPace: 52, peakDps: 5.7, peakOps: 2.2,
-                          awards: ["Norris"],  allStarYears: 1 },
+  "Jaccob Slavin":      { peakPtsPace: 52, peakDps: 5.7, peakOps: 2.2,  allStarYears: 1 },
   // Seider 2025-26: played all 82 games — current benchmark for elite defensive D
-  "Moritz Seider":      { peakPtsPace: 68, peakDps: 5.2, peakOps: 4.1,
-                          awards: ["Calder"],  allStarYears: 1 },
+  "Moritz Seider":      { peakPtsPace: 68, peakDps: 5.2, peakOps: 4.1,  allStarYears: 1 },
   // ── Additional skaters ──
-  "Frederik Andersen":  { peakGsax: 18.2, careerGsax: 48,  awards: [], allStarYears: 1 },
-  "Linus Ullmark":      { peakGsax: 22.5, careerGsax: 44,  awards: ["Vezina"], allStarYears: 2 },
-  "Thatcher Demko":     { peakGsax: 18.9, careerGsax: 41,  awards: [], allStarYears: 1 },
-  "Samuel Montembeault":{ peakGsax: 14.2, careerGsax: 28,  awards: [], allStarYears: 0 },
-  "Jake Guentzel":      { peakPtsPace: 84,  awards: [], allStarYears: 1 },
-  "Jason Robertson":    { peakPtsPace: 102, awards: [], allStarYears: 2 },
-  "Brock Boeser":       { peakPtsPace: 82,  awards: [], allStarYears: 1 },
-  "Jesper Bratt":       { peakPtsPace: 92,  awards: [], allStarYears: 1 },
-  "Tage Thompson":      { peakPtsPace: 103, awards: [], allStarYears: 2 },
-  "J.T. Miller":        { peakPtsPace: 99,  awards: [], allStarYears: 1 },
-  "Sebastian Aho":      { peakPtsPace: 94,  awards: [], allStarYears: 2 },
-  "Andrei Svechnikov":  { peakPtsPace: 80,  awards: [], allStarYears: 1 },
-  "Travis Konecny":     { peakPtsPace: 88,  awards: [], allStarYears: 1 },
-  "Kirill Marchenko":   { peakPtsPace: 76,  awards: [], allStarYears: 0 },
-  "Jake Zibanejad":     { peakPtsPace: 92,  awards: [], allStarYears: 2 },
-  "Mika Zibanejad":     { peakPtsPace: 92,  awards: [], allStarYears: 2 },
-  "Vincent Trocheck":   { peakPtsPace: 78,  awards: [], allStarYears: 1 },
-  "Trevor Zegras":      { peakPtsPace: 74,  awards: [], allStarYears: 1 },
-  "Tim Stützle":        { peakPtsPace: 88,  awards: [], allStarYears: 1 },
-  "Dylan Cozens":       { peakPtsPace: 80,  awards: [], allStarYears: 1 },
-  "Roope Hintz":        { peakPtsPace: 88,  awards: [], allStarYears: 1 },
-  "Ryan Nugent-Hopkins":{ peakPtsPace: 84,  awards: [], allStarYears: 1 },
-  "Jack Eichel":        { peakPtsPace: 95,  awards: [], allStarYears: 2 },
-  "Artemi Panarin":     { peakPtsPace: 108, awards: ["Calder"], allStarYears: 4 },
-  "Steven Stamkos":     { peakPtsPace: 98,  awards: ["Rocket Richard"], allStarYears: 4 },
-  "Evan Bouchard":      { peakPtsPace: 82,  awards: [], allStarYears: 1 },
-  "Devon Toews":        { peakPtsPace: 62,  awards: [], allStarYears: 1 },
-  "Dougie Hamilton":    { peakPtsPace: 72,  awards: [], allStarYears: 2 },
-  "Drew Doughty":       { peakPtsPace: 68,  awards: ["Norris","Conn Smythe"], allStarYears: 5 },
-  "Erik Karlsson":      { peakPtsPace: 100, awards: ["Norris","Norris","Norris"], allStarYears: 6 },
-  "Brent Burns":        { peakPtsPace: 76,  awards: ["Norris"], allStarYears: 4 },
-  "Thomas Chabot":      { peakPtsPace: 72,  awards: [], allStarYears: 1 },
-  "Miro Heiskanen":     { peakPtsPace: 68,  awards: [], allStarYears: 2 },
-  "Zach Werenski":      { peakPtsPace: 72,  awards: [], allStarYears: 1 },
-  "Owen Power":         { peakPtsPace: 62,  awards: [], allStarYears: 1 },
-  "Noah Dobson":        { peakPtsPace: 72,  awards: [], allStarYears: 1 },
-  "Mikhail Sergachev":  { peakPtsPace: 66,  awards: [], allStarYears: 1 },
-  "Samuel Girard":      { peakPtsPace: 48,  awards: [], allStarYears: 0 },
-  "Darnell Nurse":      { peakPtsPace: 52,  awards: [], allStarYears: 0 },
+  "Frederik Andersen":  { peakGsax: 18.2, careerGsax: 48, allStarYears: 1 },
+  "Linus Ullmark":      { peakGsax: 22.5, careerGsax: 44, allStarYears: 2 },
+  "Thatcher Demko":     { peakGsax: 18.9, careerGsax: 41, allStarYears: 1 },
+  "Samuel Montembeault":{ peakGsax: 14.2, careerGsax: 28, allStarYears: 0 },
+  "Jake Guentzel":      { peakPtsPace: 84, allStarYears: 1 },
+  "Jason Robertson":    { peakPtsPace: 102, allStarYears: 2 },
+  "Brock Boeser":       { peakPtsPace: 82, allStarYears: 1 },
+  "Jesper Bratt":       { peakPtsPace: 92, allStarYears: 1 },
+  "Tage Thompson":      { peakPtsPace: 103, allStarYears: 2 },
+  "J.T. Miller":        { peakPtsPace: 99, allStarYears: 1 },
+  "Sebastian Aho":      { peakPtsPace: 94, allStarYears: 2 },
+  "Andrei Svechnikov":  { peakPtsPace: 80, allStarYears: 1 },
+  "Travis Konecny":     { peakPtsPace: 88, allStarYears: 1 },
+  "Kirill Marchenko":   { peakPtsPace: 76, allStarYears: 0 },
+  "Jake Zibanejad":     { peakPtsPace: 92, allStarYears: 2 },
+  "Mika Zibanejad":     { peakPtsPace: 92, allStarYears: 2 },
+  "Vincent Trocheck":   { peakPtsPace: 78, allStarYears: 1 },
+  "Trevor Zegras":      { peakPtsPace: 74, allStarYears: 1 },
+  "Tim Stützle":        { peakPtsPace: 88, allStarYears: 1 },
+  "Dylan Cozens":       { peakPtsPace: 80, allStarYears: 1 },
+  "Roope Hintz":        { peakPtsPace: 88, allStarYears: 1 },
+  "Ryan Nugent-Hopkins":{ peakPtsPace: 84, allStarYears: 1 },
+  "Jack Eichel":        { peakPtsPace: 95, allStarYears: 2 },
+  "Artemi Panarin":     { peakPtsPace: 108, allStarYears: 4 },
+  "Steven Stamkos":     { peakPtsPace: 98, allStarYears: 4 },
+  "Evan Bouchard":      { peakPtsPace: 82, allStarYears: 1 },
+  "Devon Toews":        { peakPtsPace: 62, allStarYears: 1 },
+  "Dougie Hamilton":    { peakPtsPace: 72, allStarYears: 2 },
+  "Drew Doughty":       { peakPtsPace: 68, allStarYears: 5 },
+  "Erik Karlsson":      { peakPtsPace: 100, allStarYears: 6 },
+  "Brent Burns":        { peakPtsPace: 76, allStarYears: 4 },
+  "Thomas Chabot":      { peakPtsPace: 72, allStarYears: 1 },
+  "Miro Heiskanen":     { peakPtsPace: 68, allStarYears: 2 },
+  "Zach Werenski":      { peakPtsPace: 72, allStarYears: 1 },
+  "Owen Power":         { peakPtsPace: 62, allStarYears: 1 },
+  "Noah Dobson":        { peakPtsPace: 72, allStarYears: 1 },
+  "Mikhail Sergachev":  { peakPtsPace: 66, allStarYears: 1 },
+  "Samuel Girard":      { peakPtsPace: 48, allStarYears: 0 },
+  "Darnell Nurse":      { peakPtsPace: 52, allStarYears: 0 },
 };
 
 // ── Award hardware multipliers ────────────────────────────────
 
 // ── Historical floor calculator ───────────────────────────────
-export const getPlayerPedigree = (name: string) => normalizedLookup(PLAYER_PEDIGREE, name);
+export const getPlayerPedigree = (name: string) => {
+  const pedigree = normalizedLookup(PLAYER_PEDIGREE, name);
+  const csvAwardList = getPlayerAwards(name);
+  if (pedigree) {
+    return { ...pedigree, awards: csvAwardList.length > 0 ? csvAwardList : pedigree.awards };
+  }
+  if (csvAwardList.length > 0) {
+    return { awards: csvAwardList };
+  }
+  return undefined;
+};
 export const getProspectTier = (name: string) => normalizedLookup(PROSPECT_TIERS, name);
 export const getShutdownDPedigree = (name: string) => normalizedLookup(SHUTDOWN_D_PEDIGREE, name);
 export const getInjuryRisk = (name: string) => normalizedLookup(INJURY_RISK, name);
