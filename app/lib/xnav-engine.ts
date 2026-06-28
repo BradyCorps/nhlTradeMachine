@@ -553,10 +553,19 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     ? Math.min(6, xgaRD * (dzPctVal! - 0.45) * 60) : 0;
 
   const forwardDef = clamp(fwdDzBonus + fwdDefRate + fwdMatchupCredit, -20, 35);
-  const defDisplay = isForwardPos ? forwardDef
-    : (xgaRelDisp !== null && xgaRelDisp !== undefined) && (asset.games ?? 0) >= 20
-    ? clamp(safe(-xgaRelDisp * toiWeightD * 40 * defReliabilityWeight), -40, 50)
-    : defTotal * defReliabilityWeight;
+  const xgaDispRaw = (xgaRelDisp !== null && xgaRelDisp !== undefined) && (asset.games ?? 0) >= 20
+    ? safe(-xgaRelDisp * toiWeightD * 40 * defReliabilityWeight)
+    : null;
+  const dpsDispRaw = blendedDps !== null
+    ? safe((blendedDps - 2.5) * 12 * defReliabilityWeight)
+    : null;
+  const defTotalDisp = defTotal * defReliabilityWeight;
+  const dDefDisplay = xgaDispRaw !== null && dpsDispRaw !== null
+    ? xgaDispRaw * 0.45 + dpsDispRaw * 0.35 + defTotalDisp * 0.20
+    : xgaDispRaw !== null
+    ? xgaDispRaw * 0.6 + defTotalDisp * 0.4
+    : defTotalDisp;
+  const defDisplay = isForwardPos ? forwardDef : clamp(dDefDisplay, -40, 50);
 
   // ── Age curve ─────────────────────────────────────────────────
   // Audited against 2022-26 YoY pts/82 cohorts (940-player bios join, ≥40 GP):
