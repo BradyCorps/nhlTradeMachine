@@ -162,29 +162,13 @@ export default function StrandDisplay({
               stroke={defColor} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.5" strokeLinecap="round"/>
           </>)}
 
-          {/* DNA crossover — segment-based rendering with base-pair rungs */}
+          {/* DNA crossover — segment-based rendering */}
           {offTraits.length > 0 && defTraits.length > 0 && (() => {
             const n = offTraits.length;
-            const sm = sineM(n);
             const CROSS_GAP = 8;
-            const RUNG_COLORS = ["#7a9a78", "#8a6f8e", "#b07868", "#6882a0"];
 
             const crossXs: number[] = [];
             for (let k = 0; k <= 2 * n; k++) crossXs.push((k / (2 * n)) * W);
-
-            const rungData: { x: number; yOff: number; yDef: number; color: string }[] = [];
-            let ri = 0;
-            const RUNG_STEP = 14;
-            for (let rx = RUNG_STEP / 2; rx < W; rx += RUNG_STEP) {
-              if (crossXs.some(cx => Math.abs(rx - cx) < CROSS_GAP + 3)) continue;
-              const t = rx / W;
-              rungData.push({
-                x: rx,
-                yOff: strandYAtSmooth(offTraits, t, W, H, amplitude, true),
-                yDef: strandYAtSmooth(defTraits, t, W, H, amplitude, false),
-                color: RUNG_COLORS[ri++ % RUNG_COLORS.length],
-              });
-            }
 
             return crossXs.slice(0, -1).map((segStart, k) => {
               const segEnd = crossXs[k + 1];
@@ -197,16 +181,11 @@ export default function StrandDisplay({
               const frontColor2 = offFront ? offColor : defColor;
               const gl = k > 0 ? CROSS_GAP : 0;
               const gr = k < 2 * n - 1 ? CROSS_GAP : 0;
-              const segRungs = rungData.filter(r => r.x >= segStart && r.x <= segEnd);
 
               return (
                 <g key={`seg-${k}`}>
                   <path d={buildSegStrandPath(backTraits, W, H, amplitude, backIsOff, segStart, segEnd, gl, gr)}
                         fill="none" stroke={backColor2} strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
-                  {segRungs.map((r, i) => (
-                    <line key={i} x1={r.x} y1={r.yOff} x2={r.x} y2={r.yDef}
-                          stroke={r.color} strokeWidth="2" opacity="0.45" strokeLinecap="round"/>
-                  ))}
                   <path d={buildSegStrandPath(frontTraits, W, H, amplitude, frontIsOff, segStart, segEnd, 0, 0)}
                         fill="none" stroke={frontColor2} strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
                 </g>

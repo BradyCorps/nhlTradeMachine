@@ -150,20 +150,6 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
   const offScore = Math.round(avg(offVals) * 100);
   const defScore = Math.round(avg(defVals) * 100);
 
-  // ── DNA base-pair rungs ────────────────────────────────────────────────────
-  const RUNG_STEP = 14;
-  const RUNG_COLORS = ["#7a9a78", "#8a6f8e", "#b07868", "#6882a0"];
-  const rungData: { x: number; y1: number; y2: number; color: string }[] = [];
-  let rungIdx = 0;
-  for (let rx = RUNG_STEP / 2; rx < W; rx += RUNG_STEP) {
-    if (crossXs.some(cx => Math.abs(rx - cx) < CROSS_GAP + 3)) continue;
-    rungData.push({
-      x: rx,
-      y1: strandYAt(offVals, rx, false),
-      y2: strandYAt(defVals, rx, true),
-      color: RUNG_COLORS[rungIdx++ % RUNG_COLORS.length],
-    });
-  }
 
   return (
     <div style={{ fontFamily: MONO }}>
@@ -229,16 +215,11 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
           const frontColor = offFront ? NAVY : RED;
           const gl = k > 0 ? CROSS_GAP : 0;
           const gr = k < N - 1 ? CROSS_GAP : 0;
-          const segRungs = rungData.filter(r => r.x >= segStart && r.x <= segEnd);
 
           return (
             <g key={`seg-${k}`}>
               <path d={buildSegPath(backVals, backFlip, segStart, segEnd, gl, gr)}
                     fill="none" stroke={backColor} strokeWidth="2.5" strokeLinecap="round" opacity="0.90"/>
-              {segRungs.map((r, ri) => (
-                <line key={ri} x1={r.x} y1={r.y1} x2={r.x} y2={r.y2}
-                      stroke={r.color} strokeWidth="2" opacity="0.45" strokeLinecap="round"/>
-              ))}
               <path d={buildSegPath(frontVals, frontFlip, segStart, segEnd, 0, 0)}
                     fill="none" stroke={frontColor} strokeWidth="2.5" strokeLinecap="round" opacity="0.90"/>
             </g>
