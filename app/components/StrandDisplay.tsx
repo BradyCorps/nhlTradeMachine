@@ -180,13 +180,6 @@ export default function StrandDisplay({
                       fill="none" stroke={offFront ? defColor : offColor}
                       strokeWidth="2.5" opacity="0.9" strokeLinecap="round"/>
               ))}
-              {/* Layer 2: knockout border — background-colored outline on front strand */}
-              {sections.map(({ xS, xE, offFront }, k) => (
-                <path key={`ko-${k}`}
-                      d={sectionPath(offFront ? offTraits : defTraits, offFront, xS, xE)}
-                      fill="none" stroke="var(--ledger-cream, #f5efe0)" strokeWidth="5.5"
-                      strokeLinecap="round"/>
-              ))}
               {/* Layer 3: front strand sections */}
               {sections.map(({ xS, xE, offFront }, k) => (
                 <path key={`fg-${k}`}

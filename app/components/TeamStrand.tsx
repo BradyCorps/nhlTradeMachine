@@ -208,12 +208,6 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
               <path key={`bk-${k}`} d={sectionPath(offFront ? defVals : offVals, offFront, xS, xE)}
                     fill="none" stroke={offFront ? RED : NAVY} strokeWidth="2.5" opacity="0.90"/>
             ))}
-            {/* Layer 2: knockout border — background-colored outline on front strand */}
-            {sections.map(({ xS, xE, offFront }, k) => (
-              <path key={`ko-${k}`} d={sectionPath(offFront ? offVals : defVals, !offFront, xS, xE)}
-                    fill="none" stroke="var(--ledger-cream, #f5efe0)" strokeWidth="5.5"
-                    strokeLinecap="round"/>
-            ))}
             {/* Layer 3: front strand sections */}
             {sections.map(({ xS, xE, offFront }, k) => (
               <path key={`fg-${k}`} d={sectionPath(offFront ? offVals : defVals, !offFront, xS, xE)}
