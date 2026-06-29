@@ -79,6 +79,7 @@ describe("simulate route", () => {
     const res = await simulatePOST(req as any);
     const body = await res.json();
 
+    expect(body.season).toBe("2026-27");
     expect(body.simulationMode).toBe(SEASON.simulationMode);
     expect(body.latestCompleted).toEqual(SEASON.latestCompleted);
     expect(body.tradedPlayerOutcomes).toEqual(
@@ -147,6 +148,138 @@ describe("simulate route", () => {
     const body = await res.json();
 
     expect(body.homeTeam.goalie.name).toBe("User Starter");
+  });
+
+  it("projects newly drafted rookies when they are dressed in the lineup", async () => {
+    const gavinMcKenna = {
+      ...player("draft-2026-1-gavinmckenna", "Gavin McKenna", "WPG", 0, "W"),
+      age: 18,
+      games: 0,
+      baselinePtsPace: 0,
+      prospectPtsPace: 43,
+      draftYear: 2026,
+      draftOverall: 1,
+      hasLiveStats: false,
+    };
+    const ivarStenberg = {
+      ...player("draft-2026-2-ivarstenberg", "Ivar Stenberg", "WPG", 0, "W"),
+      age: 18,
+      games: 0,
+      baselinePtsPace: 0,
+      prospectPtsPace: 38,
+      draftYear: 2026,
+      draftOverall: 2,
+      hasLiveStats: false,
+    };
+    const depth = teamIds.flatMap((teamId) => [
+      player(`${teamId}-f1`, `${teamId} Forward`, teamId, 42, "C"),
+      player(`${teamId}-f2`, `${teamId} Wing`, teamId, 38, "W"),
+      player(`${teamId}-d1`, `${teamId} Defender`, teamId, 25, "D"),
+      {
+        ...player(`${teamId}-g1`, `${teamId} Goalie`, teamId, 0, "G"),
+        gsax: 0,
+        gamesStarted: 45,
+        savePct: 0.905,
+      },
+    ]);
+
+    const res = await simulatePOST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      body: JSON.stringify({
+        homeTeamId: "WPG",
+        partnerTeamId: "CGY",
+        teams,
+        players: [...depth, gavinMcKenna, ivarStenberg],
+        seed: 29,
+        trades: [],
+        lineup: {
+          orders: {
+            WPG: {
+              forwards: [
+                "draft-2026-1-gavinmckenna", "WPG-f1", "draft-2026-2-ivarstenberg",
+                "WPG-f2",
+              ],
+              defense: ["WPG-d1"],
+              goalies: ["WPG-g1"],
+            },
+          },
+        },
+      }),
+    }) as any);
+    const body = await res.json();
+    const projectedGavin = body.homeTeam.projectedSkaters.find((p: any) => p.playerId === gavinMcKenna.id);
+    const projectedIvar = body.homeTeam.projectedSkaters.find((p: any) => p.playerId === ivarStenberg.id);
+
+    expect(projectedGavin.projectedPts).toBeGreaterThan(0);
+    expect(projectedGavin.calderEligible).toBe(true);
+    expect(projectedIvar.projectedPts).toBeGreaterThan(0);
+  });
+
+  it("uses the supplied skater lineup instead of only sorting the full roster by value", async () => {
+    const wpgPlayers = [
+      player("wpg-elite", "Elite Scratch", "WPG", 130, "C"),
+      player("wpg-top-c", "Top Center", "WPG", 82, "C"),
+      player("wpg-top-l", "Top Left", "WPG", 78, "W"),
+      player("wpg-top-r", "Top Right", "WPG", 76, "W"),
+      ...Array.from({ length: 12 }, (_, i) => player(`wpg-depth-${i}`, `Depth ${i}`, "WPG", 12, i % 3 === 0 ? "C" : "W")),
+      player("wpg-d1", "First Pair", "WPG", 48, "D"),
+      player("wpg-d2", "Second Pair", "WPG", 38, "D"),
+      player("wpg-d3", "Third Pair", "WPG", 22, "D"),
+      player("wpg-d4", "Fourth Defender", "WPG", 18, "D"),
+      player("wpg-d5", "Fifth Defender", "WPG", 15, "D"),
+      player("wpg-d6", "Sixth Defender", "WPG", 12, "D"),
+      {
+        ...player("WPG-g1", "WPG Goalie", "WPG", 0, "G"),
+        gsax: 0,
+        gamesStarted: 45,
+        savePct: 0.905,
+      },
+    ];
+    const depth = teamIds.flatMap((teamId) => teamId === "WPG" ? [] : [
+      player(`${teamId}-f1`, `${teamId} Forward`, teamId, 42, "C"),
+      player(`${teamId}-d1`, `${teamId} Defender`, teamId, 25, "D"),
+      {
+        ...player(`${teamId}-g1`, `${teamId} Goalie`, teamId, 0, "G"),
+        gsax: 0,
+        gamesStarted: 45,
+        savePct: 0.905,
+      },
+    ]);
+    const request = (forwards: string[]) => simulatePOST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      body: JSON.stringify({
+        homeTeamId: "WPG",
+        partnerTeamId: "CGY",
+        teams,
+        players: [...depth, ...wpgPlayers],
+        seed: 31,
+        trades: [],
+        lineup: {
+          orders: {
+            WPG: {
+              forwards,
+              defense: ["wpg-d1", "wpg-d2", "wpg-d3", "wpg-d4", "wpg-d5", "wpg-d6"],
+              goalies: ["WPG-g1"],
+            },
+          },
+        },
+      }),
+    }) as any);
+
+    const dressedTopLine = await (await request([
+      "wpg-top-l", "wpg-top-c", "wpg-top-r",
+      "wpg-depth-0", "wpg-depth-1", "wpg-depth-2",
+      "wpg-depth-3", "wpg-depth-4", "wpg-depth-5",
+      "wpg-depth-6", "wpg-depth-7", "wpg-depth-8",
+    ])).json();
+    const scratchedTopLine = await (await request([
+      "wpg-depth-0", "wpg-depth-1", "wpg-depth-2",
+      "wpg-depth-3", "wpg-depth-4", "wpg-depth-5",
+      "wpg-depth-6", "wpg-depth-7", "wpg-depth-8",
+      "wpg-depth-9", "wpg-depth-10", "wpg-depth-11",
+    ])).json();
+
+    expect(dressedTopLine.homeTeam.projectedPoints).toBeGreaterThan(scratchedTopLine.homeTeam.projectedPoints);
   });
 
   it("awards Conn Smythe to a player on the simulated Cup champion", async () => {

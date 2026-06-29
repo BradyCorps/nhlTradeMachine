@@ -6,6 +6,8 @@ export interface SimEnginePlayer {
   ptsPace: number;
   games?: number;
   baselinePtsPace?: number;
+  prospectPtsPace?: number | null;
+  draftOverall?: number | null;
 }
 
 export function mulberry32(seed: number) {
@@ -48,6 +50,14 @@ export const stablePts = (p: SimEnginePlayer): number => {
     : current;
 };
 
+const projectedPtsPace = (p: SimEnginePlayer): number => {
+  const nhlPace = p.ptsPace > 0 ? stablePts(p) : 0;
+  const prospectPace = p.prospectPtsPace != null && p.prospectPtsPace > 0
+    ? p.prospectPtsPace * 0.72
+    : 0;
+  return Math.max(nhlPace, prospectPace);
+};
+
 export const ageDecay = (age: number, position: string): number => {
   const peak = position === "D" ? 27 : position === "G" ? 29 : 26;
   if (age <= peak) return 1.0 + Math.max(0, (peak - age) * 0.005);
@@ -71,7 +81,7 @@ export function projectSkaterSeason(
     gamesPlayed = Math.max(5, gamesPlayed - Math.round(30 + rand() * 30));
   }
 
-  const rawPts = (stablePts(p) / 82) * gamesPlayed * decay;
+  const rawPts = (projectedPtsPace(p) / 82) * gamesPlayed * decay;
   const variance = 0.88 + rand() * 0.24;
   const projectedPts = Math.round(rawPts * variance);
 
@@ -87,8 +97,8 @@ export function projectTopScorer(
 ): { name: string; projectedPts: number; projectedGoals: number; position: string } | null {
   const skaters = roster
     .filter(p => p.position !== "Pick" && p.position !== "G"
-      && p.ptsPace > 0
-      && (p.games ?? 0) >= 20);
+      && (p.ptsPace > 0 || (p.prospectPtsPace ?? 0) > 0)
+      && ((p.games ?? 0) >= 20 || (p.prospectPtsPace ?? 0) > 0));
 
   if (skaters.length === 0) return null;
 

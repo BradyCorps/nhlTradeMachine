@@ -7,7 +7,7 @@ import { formatPickRound } from "@/app/lib/trade-format";
 import { pickEffectiveStanding } from "@/app/lib/pick-value";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
 import TeamStrand, { CHAMP_TEMPLATE, TeamStrandData } from "@/app/components/TeamStrand";
-import LineupEditor from "@/app/components/LineupEditor";
+import LineupEditor, { type LineupOrderPayload } from "@/app/components/LineupEditor";
 import WhatWeNeed from "@/app/components/WhatWeNeed";
 import ContentionQuadrant from "@/app/components/ContentionQuadrant";
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from "react";
@@ -185,6 +185,7 @@ export default function ArmchairGmPage() {
   const [simData, setSimData]       = useState<any | null>(null);
   const [showSimPanel, setShowSimPanel] = useState(false);
   const [lineupStartingGoalies, setLineupStartingGoalies] = useState<Record<string, string | null>>({});
+  const [lineupOrders, setLineupOrders] = useState<Record<string, LineupOrderPayload>>({});
   const [showMemo, setShowMemo] = useState(false);
 
   // ── Off-season / free agency ─────────────────────────────────
@@ -227,6 +228,14 @@ export default function ArmchairGmPage() {
     setLineupStartingGoalies(prev =>
       prev[teamId] === goalieId ? prev : { ...prev, [teamId]: goalieId }
     );
+  }, []);
+
+  const handleLineupChange = useCallback((teamId: string, order: LineupOrderPayload) => {
+    setLineupOrders(prev => {
+      const current = prev[teamId];
+      if (current && JSON.stringify(current) === JSON.stringify(order)) return prev;
+      return { ...prev, [teamId]: order };
+    });
   }, []);
 
   // Fetch NAV from server whenever db.players changes (after load or trade execution)
@@ -687,6 +696,13 @@ export default function ArmchairGmPage() {
           incoming: t.incoming.map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0 })),
         })),
       });
+      const baselinePlayerIds = new Set(simPlayers.map(p => p.id));
+      const newlyAddedPlayers = originalDb
+        ? db.players.filter(p => !baselinePlayerIds.has(p.id))
+        : [];
+      const simPlayerPool = newlyAddedPlayers.length > 0
+        ? [...simPlayers, ...newlyAddedPlayers]
+        : simPlayers;
 
       const simRes = await fetch("/api/simulate", {
         method: "POST",
@@ -695,10 +711,11 @@ export default function ArmchairGmPage() {
           homeTeamId:    homeTeam.id,
           partnerTeamId: partnerTeam?.id ?? "",
           teams:   simTeams,
-          players: simPlayers,
+          players: simPlayerPool,
           trades:  simTrades,
           lineup: {
             startingGoalies: lineupStartingGoalies,
+            orders: lineupOrders,
           },
           seed,
         }),
@@ -796,7 +813,7 @@ export default function ArmchairGmPage() {
       setSimResult("Simulation unavailable — please try again.");
     }
     setSimLoading(false);
-  }, [homeTeam, partnerTeam, db, originalDb, executedTrades, navMap, lineupStartingGoalies]);
+  }, [homeTeam, partnerTeam, db, originalDb, executedTrades, navMap, lineupStartingGoalies, lineupOrders]);
   useEffect(() => {
     // Issue 10: Don't auto-evaluate. Clear old verdict so user must click "Make the call" again.
     if (previousTradeInputKey.current !== tradeInputKey) {
@@ -1636,6 +1653,7 @@ export default function ArmchairGmPage() {
             navMap={navMap}
             db={db}
             handleGoalieStarterChange={handleGoalieStarterChange}
+            handleLineupChange={handleLineupChange}
             executedTrades={executedTrades}
             showSimPanel={showSimPanel}
             simYear={simYear}
@@ -2078,7 +2096,7 @@ function GmTabButton({ label, active, onClick, disabled, badge }: {
 
 function GmAnalysisTabs({
   teams, allHomeRoster, allPartnerRoster, blocks, navMap, db,
-  handleGoalieStarterChange, executedTrades, showSimPanel,
+  handleGoalieStarterChange, handleLineupChange, executedTrades, showSimPanel,
   simYear, simLoading, simData, simResult,
 }: {
   teams: [Team, Team];
@@ -2088,6 +2106,7 @@ function GmAnalysisTabs({
   navMap: Record<string, XNAVResult>;
   db: { teams: Team[]; players: Asset[]; capCeiling?: number | null };
   handleGoalieStarterChange: (teamId: string, goalieId: string | null) => void;
+  handleLineupChange: (teamId: string, order: LineupOrderPayload) => void;
   executedTrades: { id: string; homeTeamName: string; partnerTeamName: string; outgoing: Asset[]; incoming: Asset[]; timestamp: number; }[];
   showSimPanel: boolean;
   simYear: () => void;
@@ -2155,6 +2174,7 @@ function GmAnalysisTabs({
               hasActiveTrade={blocks[0].length > 0 || blocks[1].length > 0}
               navMap={navMap}
               onGoalieStarterChange={handleGoalieStarterChange}
+              onLineupChange={handleLineupChange}
             />
           </div>
         )}

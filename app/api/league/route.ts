@@ -3,10 +3,10 @@ import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
-import { teams as teamsTable, draftPickOverrides } from "@/app/db/schema";
+import { teams as teamsTable } from "@/app/db/schema";
 import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
-import { pickEffectiveStanding } from "@/app/lib/pick-value";
-import { ensureNewTables } from "@/app/db/ensure-schema";
+import { buildDraftPickInventory } from "@/app/lib/draft-pick-inventory";
+import { LEAGUE_TEAMS_CACHE_KEY } from "@/app/lib/team-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,6 @@ const CAP_CEILING = SEASON.capCeiling;
 const CAP_FLOOR   = SEASON.capFloor;
 
 const TEAMS_CACHE_TTL     = 6  * 60 * 60; // 6 hours (in seconds for Redis)
-const LEAGUE_TEAMS_CACHE_KEY = "cache:league:teams:v1";
 
 
 // ── Team metadata that needs human curation ──────────────────
@@ -244,57 +243,7 @@ async function loadTeams(): Promise<any[]> {
 export async function GET() {
   const LIVE_TEAMS = await loadTeams();
   const roster = await assembleCanonicalRoster({ teams: LIVE_TEAMS, includeTeamContext: true });
-
-  // Draft picks — runtime-generated defaults merged with DB ownership overrides.
-  // Overrides let the admin track real-life pick trades without losing the full pick set.
-  let pickOverrideMap = new Map<string, { currentOwnerId: string; isProtected: boolean; conditions: string | null }>();
-  try {
-    await ensureNewTables();
-    const overrides = await db.select().from(draftPickOverrides);
-    for (const o of overrides) {
-      pickOverrideMap.set(o.id, { currentOwnerId: o.currentOwnerId, isProtected: !!o.isProtected, conditions: o.conditions ?? null });
-    }
-  } catch { /* table not yet created — safe fallback to defaults */ }
-
-  const teamPhaseMap = new Map(LIVE_TEAMS.map((t: any) => [t.id, t]));
-  const picks: any[] = [];
-  const currentDraftYear = SEASON.draftYear;
-
-  // Always generate all 480 picks by original owner, then apply ownership overrides.
-  TEAMS_DB.forEach((origTeam) => {
-    [currentDraftYear, currentDraftYear + 1, currentDraftYear + 2, currentDraftYear + 3, currentDraftYear + 4].flatMap(year =>
-      [1, 2, 3, 4, 5].map(round => ({ round, year }))
-    ).forEach(({ round, year }) => {
-      const id = `pick-${origTeam.id}-${year}-${round}`;
-      const override = pickOverrideMap.get(id);
-      const currentOwnerId = override?.currentOwnerId ?? origTeam.id;
-      const isProtected = override?.isProtected ?? false;
-
-      // Value the pick by the ORIGINAL team's standing (it's their draft slot).
-      const origTeamCtx = teamPhaseMap.get(origTeam.id) ?? origTeam;
-      const teamStanding = pickEffectiveStanding(origTeamCtx.phase, origTeamCtx.standing);
-
-      const roundLabel = round === 1 ? "1st" : round === 2 ? "2nd" : round === 3 ? "3rd" : `${round}th`;
-      const ownerSuffix = currentOwnerId !== origTeam.id ? ` via ${origTeam.id}` : ` (${origTeam.id})`;
-      picks.push({
-        id,
-        teamId:           currentOwnerId,
-        name:             `${year} ${roundLabel} Round Pick${ownerSuffix}`,
-        position:         "Pick",
-        age:              19,
-        round,
-        year,
-        teamStanding,
-        isProtected,
-        games: 0, ptsPace: 0, xGPace: 0, defRate: 0,
-        avgTOI: 0, qocIndex: null,
-        capHit: 0, yearsRemaining: 0,
-        hasNMC: false, hasNTC: false,
-        canRetain: false, retainedPct: 0,
-        multiplier: 1.0, hasLiveStats: false,
-      });
-    });
-  });
+  const picks = await buildDraftPickInventory(LIVE_TEAMS);
 
   const teams = roster.teams.map((t: any) => ({
     id:       t.id,

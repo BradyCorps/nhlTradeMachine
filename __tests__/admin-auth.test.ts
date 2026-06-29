@@ -10,6 +10,15 @@ import {
 
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
 
+const listRouteFiles = (dir: string): string[] => {
+  const abs = path.join(process.cwd(), dir);
+  return fs.readdirSync(abs, { withFileTypes: true }).flatMap((entry) => {
+    const rel = path.join(dir, entry.name);
+    if (entry.isDirectory()) return listRouteFiles(rel);
+    return entry.isFile() && entry.name === "route.ts" ? [rel] : [];
+  });
+};
+
 const originalEnv = {
   ADMIN_KEY: process.env.ADMIN_KEY,
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
@@ -59,19 +68,8 @@ describe("admin auth", () => {
   });
 
   it("gates every admin API route through the shared helper", () => {
-    const routes = [
-      "app/api/admin/clear-cache/route.ts",
-      "app/api/admin/contracts/route.ts",
-      "app/api/admin/db-info/route.ts",
-      "app/api/admin/development-profile/route.ts",
-      "app/api/admin/import-draft-class/route.ts",
-      "app/api/admin/patch-team-ids/route.ts",
-      "app/api/admin/prune-stale/route.ts",
-      "app/api/admin/reset/route.ts",
-      "app/api/admin/settings/route.ts",
-      "app/api/admin/teams/route.ts",
-      "app/api/admin/trade-block/route.ts",
-    ];
+    const routes = listRouteFiles("app/api/admin").sort();
+    expect(routes.length).toBeGreaterThan(0);
 
     for (const route of routes) {
       const src = read(route);

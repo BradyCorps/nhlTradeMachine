@@ -6,6 +6,7 @@ import { requireAdmin } from "@/app/lib/admin-auth";
 import { ensurePlayerColumns, ensurePlayerTable } from "@/app/db/ensure-schema";
 import { SEASON } from "@/app/lib/season-config";
 import { redis } from "@/app/lib/redis";
+import { clearTeamCaches } from "@/app/lib/team-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ const VALID = ["UFA", "RFA", "SIGNED", "EXCLUDE"] as const;
 type BulkStatus = (typeof VALID)[number];
 const OFFSEASON_YEAR = Number(SEASON.label.slice(0, 4));
 
-const CACHE_KEYS = ["cache:league:teams:v1", "cache:trade:teams:v1", "cache:contracts", "cache:contracts:v2"];
+const CACHE_KEYS = ["cache:contracts", "cache:contracts:v2"];
 
 function makeId(name: string): string {
   return name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
@@ -84,6 +85,7 @@ export async function POST(req: Request) {
       }
     }
 
+    await clearTeamCaches(redis, db);
     if (redis) for (const k of CACHE_KEYS) await redis.del(k).catch(() => {});
     return NextResponse.json({ ok: true, status, updated, created, total: names.length });
   } catch (e: any) {

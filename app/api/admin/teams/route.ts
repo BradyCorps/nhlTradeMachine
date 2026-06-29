@@ -5,10 +5,9 @@ import { eq } from "drizzle-orm";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
 import { requireAdmin } from "@/app/lib/admin-auth";
+import { clearTeamCaches } from "@/app/lib/team-cache";
 
 export const dynamic = "force-dynamic";
-
-const TEAM_CACHE_KEYS = ["cache:league:teams:v1", "cache:trade:teams:v1"];
 
 export async function GET(req: Request) {
   const unauthorized = await requireAdmin(req);
@@ -59,9 +58,6 @@ export async function POST(req: Request) {
     });
   }
 
-  if (redis) {
-    const cache = redis;
-    await Promise.all(TEAM_CACHE_KEYS.map(key => cache.del(key).catch(() => {})));
-  }
+  await clearTeamCaches(redis, db);
   return NextResponse.json({ ok: true });
 }

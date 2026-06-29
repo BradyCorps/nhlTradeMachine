@@ -201,8 +201,11 @@ describe("Canary — league cache keys", () => {
   it("keeps league and trade team cache payloads isolated", () => {
     const league = read("app/api/league/route.ts");
     const teams = read("app/api/league/teams/route.ts");
-    expect(league).toContain('"cache:league:teams:v1"');
-    expect(teams).toContain('"cache:trade:teams:v1"');
+    const teamCache = read("app/lib/team-cache.ts");
+    expect(league).toContain("LEAGUE_TEAMS_CACHE_KEY");
+    expect(teams).toContain("teamCacheKey(capCeiling)");
+    expect(teamCache).toContain('"cache:league:teams:v1"');
+    expect(teamCache).toContain('"cache:trade:teams:v1"');
     expect(league).not.toContain('"cache:teams"');
     expect(teams).not.toContain('"cache:teams"');
   });
@@ -320,6 +323,12 @@ describe("Canary — trade block mechanics", () => {
     expect(src).toContain("tradeBlockStatus");
     expect(src).toContain("flagged untouchable");
     expect(src).toContain("On the trade block");
+  });
+
+  it("TradeBlockPanel does not expose front-facing admin links", () => {
+    const src = read("app/components/TradeBlockPanel.tsx");
+    expect(src).not.toContain('href="/admin/trade-block"');
+    expect(src).not.toContain("ADMIN →");
   });
 
   it("match route names the best-fitting shopped player as the return", () => {
@@ -581,18 +590,26 @@ describe("Canary — draft pick inventory", () => {
   it("league routes create rounds 1-5 for five draft years", () => {
     const league = read("app/api/league/route.ts");
     const teams = read("app/api/league/teams/route.ts");
-    expect(league).toContain("[currentDraftYear, currentDraftYear + 1, currentDraftYear + 2, currentDraftYear + 3, currentDraftYear + 4]");
-    expect(teams).toContain("[Y, Y + 1, Y + 2, Y + 3, Y + 4]");
-    expect(league).toContain("[1, 2, 3, 4, 5].map(round => ({ round, year }))");
-    expect(teams).toContain("[1, 2, 3, 4, 5].map(round => ({ round, year }))");
+    const helper = read("app/lib/draft-pick-inventory.ts");
+    expect(league).toContain("buildDraftPickInventory(LIVE_TEAMS)");
+    expect(teams).toContain("buildDraftPickInventory(LIVE_TEAMS)");
+    expect(helper).toContain("[currentDraftYear, currentDraftYear + 1, currentDraftYear + 2, currentDraftYear + 3, currentDraftYear + 4]");
+    expect(helper).toContain("[1, 2, 3, 4, 5].map(round => ({ round, year }))");
+    expect(helper).toContain("draftPickOverrides");
+    expect(helper).toContain("currentOwnerId");
+    expect(helper).toContain("via ${origTeam.id}");
   });
 });
 
 describe("Canary — admin cache flush", () => {
   it("clear-cache flushes BOTH the teams and contracts caches", () => {
     const src = read("app/api/admin/clear-cache/route.ts");
-    expect(src).toContain("cache:league:teams:v1");
-    expect(src).toContain("cache:trade:teams:v1");
+    const teamCache = read("app/lib/team-cache.ts");
+    expect(src).toContain("clearTeamCaches(redis)");
+    expect(teamCache).toContain("cache:league:teams:v1");
+    expect(teamCache).toContain("cache:trade:teams:v1");
+    expect(teamCache).toContain("teamCacheKey(SEASON.capCeiling)");
+    expect(teamCache).toContain("teamCacheKey(LEGACY_CURATED_CAP_CEILING)");
     expect(src).toContain("cache:contracts");
     expect(src).toContain("cache:contracts:v2");
     expect(src).toContain("cache:nhl_skater_summary_stats");
@@ -858,6 +875,18 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(assetDropdown).toContain("onFocus={() => searchRef.current?.scrollIntoView");
   });
 
+  it("threads ordered lineup slots from the editor into the sim engine", () => {
+    const simulateRoute = read("app/api/simulate/route.ts");
+    expect(lineupEditor).toContain("onLineupChange");
+    expect(lineupEditor).toContain("forwards: orders.F.slice(0, 12)");
+    expect(tradePage).toContain("lineupOrders");
+    expect(tradePage).toContain("newlyAddedPlayers");
+    expect(tradePage).toContain("simPlayerPool");
+    expect(tradePage).toContain("orders: lineupOrders");
+    expect(simulateRoute).toContain("lineup?.orders?.[team.id]");
+    expect(simulateRoute).toContain("buildDeploymentMap(lineupOrder)");
+  });
+
   it("keeps the trade UI gated until initial player values are loaded", () => {
     expect(tradePage).toContain("initialNavReady");
     expect(tradePage).toContain("initialNavReadyRef");
@@ -1051,9 +1080,17 @@ describe("Canary — admin contract sync", () => {
 
   it("sync invalidates league caches after DB metadata updates", () => {
     expect(route).toContain("SYNC_CACHE_KEYS");
-    expect(route).toContain("await redis.del(key)");
+    expect(route).toContain("clearTeamCaches(redis, db)");
     expect(route).toContain("clearedCacheKeys");
     expect(route).toContain("cache:nhl_skater_summary_stats");
+  });
+
+  it("contract admin can reset editor-curated rows back to sync provenance", () => {
+    expect(route).toContain('action === "reset-source"');
+    expect(route).toContain('source: "sync"');
+    expect(route).toContain('eq(playersTable.source, "editor")');
+    expect(page).toContain("handleResetEditorsToSync");
+    expect(page).toContain("EDITOR → SYNC");
   });
 
   it("contract admin can persist prospect NHLe signal for synced prospects", () => {
@@ -1127,8 +1164,10 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(capSettings).toContain("LEGACY_DEFAULT_CAP_CEILING = 95.5");
     expect(capSettings).toContain("parseStoredCapCeiling");
     expect(capSettings).toContain("cap > 0 && cap <= MAX_CAP_CEILING");
-    expect(src).toContain("teamCacheKey(SEASON.capCeiling)");
-    expect(src).toContain("teamCacheKey(95.5)");
+    const teamCache = read("app/lib/team-cache.ts");
+    expect(src).toContain("clearTeamCaches(redis, db");
+    expect(teamCache).toContain("teamCacheKey(SEASON.capCeiling)");
+    expect(teamCache).toContain("teamCacheKey(LEGACY_CURATED_CAP_CEILING)");
     expect(evaluate).toContain("const MAX_CAP_CEILING = maxCapCeiling()");
     expect(evaluate).toContain("isValidCapCeiling(requestCapCeiling)");
     expect(evaluate).toContain("parseStoredCapCeiling(row?.value, SEASON.capCeiling) ?? SEASON.capCeiling");
@@ -1188,6 +1227,7 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(src).toContain("siteSettings:");
     expect(src).toContain("if (body.includeTrades)");
     expect(src).toContain("clearedCacheKeys");
+    expect(src).toContain("clearTeamCaches(redis, db)");
     expect(settings).toContain("ADMIN DATA RESET");
     expect(settings).toContain("/api/admin/reset");
     expect(settings).toContain("includeTrades");

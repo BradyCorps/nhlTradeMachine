@@ -31,6 +31,9 @@ interface SimPlayer {
   pkTimeShare?: number;
   pairDriverScore?: number;
   prospectPtsPace?: number;
+  draftYear?: number | null;
+  draftOverall?: number | null;
+  hasLiveStats?: boolean;
 }
 
 interface SimTeam {
@@ -114,9 +117,41 @@ interface SimRequest {
   trades: TradeRecord[];
   lineup?: {
     startingGoalies?: Record<string, string | null | undefined>;
+    orders?: Record<string, TeamLineupOrder | undefined>;
   };
   seed?: number;
 }
+
+interface TeamLineupOrder {
+  forwards?: string[];
+  defense?: string[];
+  goalies?: string[];
+  scratches?: string[];
+}
+
+interface SkaterDeployment {
+  active: boolean;
+  slot: number;
+  group: "F" | "D";
+  multiplier: number;
+  gamesFloor: number;
+}
+
+const safeIds = (ids: string[] | undefined): string[] =>
+  Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string" && id.length > 0) : [];
+
+const prospectNhlPace = (p: SimPlayer): number =>
+  p.prospectPtsPace != null && p.prospectPtsPace > 0 ? p.prospectPtsPace * 0.72 : 0;
+
+const skaterPace = (p: SimPlayer): number => {
+  const nhlPace = p.ptsPace > 0 ? stablePts(p) : 0;
+  return Math.max(nhlPace, prospectNhlPace(p));
+};
+
+const draftPedigreeBonus = (p: SimPlayer): number => {
+  if (p.draftOverall == null || p.draftOverall <= 0 || p.draftOverall > 64) return 0;
+  return Math.max(0, (65 - p.draftOverall) / 64) * 7;
+};
 
 // Stable GSAX on the same blend — baselineGsax is a weighted season-scale value
 const stableGsax = (p: SimPlayer): number => {
@@ -140,8 +175,66 @@ const onIceValue = (p: SimPlayer): number => {
   const pkBonus = p.pkTimeShare != null && p.pkTimeShare >= 0.10
     ? Math.min(5, p.pkTimeShare * 30)
     : 0;
-  return stablePts(p) + driverBonus + pkBonus;
+  return skaterPace(p) + draftPedigreeBonus(p) + driverBonus + pkBonus;
 };
+
+const isForward = (p: SimPlayer): boolean => p.position !== "Pick" && p.position !== "G" && p.position !== "D";
+const isDefense = (p: SimPlayer): boolean => p.position === "D";
+
+function orderedLineupPlayers(
+  roster: SimPlayer[],
+  ids: string[] | undefined,
+  predicate: (p: SimPlayer) => boolean,
+  activeLimit: number,
+): SimPlayer[] {
+  const byId = new Map(roster.map(p => [p.id, p]));
+  const used = new Set<string>();
+  const ordered = safeIds(ids)
+    .map(id => byId.get(id))
+    .filter((p): p is SimPlayer => Boolean(p))
+    .filter(predicate)
+    .filter(p => {
+      if (used.has(p.id)) return false;
+      used.add(p.id);
+      return true;
+    });
+
+  if (ordered.length >= activeLimit) return ordered;
+
+  const fallback = roster
+    .filter(p => predicate(p) && !used.has(p.id))
+    .sort((a, b) => onIceValue(b) - onIceValue(a));
+  return [...ordered, ...fallback];
+}
+
+function buildDeploymentMap(order?: TeamLineupOrder): Map<string, SkaterDeployment> {
+  const deployments = new Map<string, SkaterDeployment>();
+  safeIds(order?.forwards).slice(0, 12).forEach((id, slot) => {
+    const line = Math.floor(slot / 3);
+    const multipliers = [1.10, 1.04, 0.98, 0.90];
+    const floors = [74, 68, 60, 48];
+    deployments.set(id, {
+      active: true,
+      slot,
+      group: "F",
+      multiplier: multipliers[line] ?? 0.90,
+      gamesFloor: floors[line] ?? 48,
+    });
+  });
+  safeIds(order?.defense).slice(0, 6).forEach((id, slot) => {
+    const pair = Math.floor(slot / 2);
+    const multipliers = [1.08, 1.00, 0.93];
+    const floors = [74, 66, 56];
+    deployments.set(id, {
+      active: true,
+      slot,
+      group: "D",
+      multiplier: multipliers[pair] ?? 0.93,
+      gamesFloor: floors[pair] ?? 56,
+    });
+  });
+  return deployments;
+}
 
 // ── Wild card teams — higher variance ────────────────────────
 const WILD_CARD_TEAMS = new Set(["WPG", "TOR", "CGY", "EDM", "NYR"]);
@@ -160,16 +253,21 @@ function projectTeamPoints(
   capSpaceAfterTrade: number,
   rand: () => number,
   startingGoalieId?: string | null,
+  lineupOrder?: TeamLineupOrder,
 ): number {
   const phaseBaseline = PHASE_BASELINE[team.phase] ?? 88;
 
   const skaters = roster.filter(p => p.position !== "Pick" && p.position !== "G");
-  const forwards = skaters
-    .filter(p => p.position !== "D")
-    .sort((a, b) => onIceValue(b) - onIceValue(a));
-  const dmen = skaters
-    .filter(p => p.position === "D")
-    .sort((a, b) => onIceValue(b) - onIceValue(a));
+  const forwards = lineupOrder
+    ? orderedLineupPlayers(roster, lineupOrder.forwards, isForward, 12)
+    : skaters
+        .filter(p => p.position !== "D")
+        .sort((a, b) => onIceValue(b) - onIceValue(a));
+  const dmen = lineupOrder
+    ? orderedLineupPlayers(roster, lineupOrder.defense, isDefense, 6)
+    : skaters
+        .filter(p => p.position === "D")
+        .sort((a, b) => onIceValue(b) - onIceValue(a));
   const goalies = roster
     .filter(p => p.position === "G")
     .sort((a, b) => onIceValue(b) - onIceValue(a));
@@ -291,13 +389,16 @@ const clamp = (value: number, min: number, max: number): number =>
 // ── Project skater seasons across a full roster ───────────────
 // This keeps last-season scoring as the anchor, but lets age, prospect NHLe,
 // prior usage, and controlled variance create believable breakouts/regressions.
-function projectSkaterOutcome(p: SimPlayer, teamId: string, seed: number): ProjectedSkaterSeason {
+function projectSkaterOutcome(
+  p: SimPlayer,
+  teamId: string,
+  seed: number,
+  deployment?: SkaterDeployment,
+): ProjectedSkaterSeason {
   const rand = mulberry32(seed + hashString(`${teamId}:${p.id}:skater-season`));
   const priorGames = p.games ?? 82;
-  const prospectPace = p.prospectPtsPace != null ? p.prospectPtsPace * 0.72 : 0;
-  const stablePace = p.ptsPace > 0
-    ? stablePts(p)
-    : prospectPace;
+  const prospectPace = prospectNhlPace(p);
+  const stablePace = skaterPace(p);
 
   const isProspectProfile = p.age <= 22 && (priorGames < 45 || prospectPace > stablePace);
   const isYoungRegular    = p.age <= 24 && priorGames >= 20;
@@ -342,12 +443,16 @@ function projectSkaterOutcome(p: SimPlayer, teamId: string, seed: number): Proje
 
   let gamesPlayed = Math.round(70 + rand() * 12);
   if (isProspectProfile) gamesPlayed = Math.round(55 + rand() * 27);
+  if (deployment?.active) {
+    gamesPlayed = Math.max(gamesPlayed, Math.round(deployment.gamesFloor + rand() * 8));
+  }
   if (rand() < (isAgingWell ? 0.04 : isDeclineRisk ? 0.10 : 0.055)) {
     gamesPlayed = Math.max(8, gamesPlayed - Math.round((isAgingWell ? 10 : 18) + rand() * (isAgingWell ? 18 : 38)));
   }
 
   const paceVariance = isAgingWell ? 0.98 + rand() * 0.14 : 0.91 + rand() * 0.18;
-  const projectedPts = Math.max(0, Math.round((stablePace / 82) * gamesPlayed * development * paceVariance));
+  const deploymentMultiplier = deployment?.active ? deployment.multiplier : 1;
+  const projectedPts = Math.max(0, Math.round((stablePace / 82) * gamesPlayed * development * paceVariance * deploymentMultiplier));
   const xgGoalShare = stablePace > 0
     ? clamp((p.xGPace ?? 0) / Math.max(stablePace, 1), 0.22, p.position === "D" ? 0.36 : 0.55)
     : p.position === "D" ? 0.24 : 0.38;
@@ -384,7 +489,9 @@ function simulateLeague(
     const capDelta   = capDeltas.get(team.id) ?? 0;
     const capSpaceAfterTrade = team.capSpace - capDelta;
     const teamSeed = seed + hashString(`team:${team.id}`);
-    const startingGoalieId = lineup?.startingGoalies?.[team.id] ?? null;
+    const lineupOrder = lineup?.orders?.[team.id];
+    const startingGoalieId = lineup?.startingGoalies?.[team.id] ?? lineupOrder?.goalies?.[0] ?? null;
+    const deploymentByPlayer = buildDeploymentMap(lineupOrder);
     const projectedPoints = projectTeamPoints(
       team,
       roster,
@@ -392,12 +499,13 @@ function simulateLeague(
       capSpaceAfterTrade,
       mulberry32(teamSeed + hashString("points")),
       startingGoalieId,
+      lineupOrder,
     );
     const projectedSkaters = roster
       .filter(p => p.position !== "Pick" && p.position !== "G"
-        && (p.ptsPace > 0 || (p.prospectPtsPace ?? 0) > 0)
+        && (p.ptsPace > 0 || (p.prospectPtsPace ?? 0) > 0 || deploymentByPlayer.has(p.id))
         && ((p.games ?? 0) >= 5 || (p.prospectPtsPace ?? 0) > 0))
-      .map(p => projectSkaterOutcome(p, team.id, seed))
+      .map(p => projectSkaterOutcome(p, team.id, seed, deploymentByPlayer.get(p.id)))
       .sort((a, b) =>
         b.projectedPts !== a.projectedPts
           ? b.projectedPts - a.projectedPts
@@ -939,6 +1047,7 @@ export async function POST(req: NextRequest) {
       playoffBracket,
       playoffTeams: standings.filter(t => t.madePlayoffs).map(t => t.teamId),
       tradedPlayerOutcomes,
+      season: SEASON.label,
       simulationMode: SEASON.simulationMode,
       replaySeason: SEASON.replaySeason,
       rosterMoveWindow: SEASON.rosterMoveWindow,

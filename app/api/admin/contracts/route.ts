@@ -7,6 +7,7 @@ import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
 import { requireAdmin } from "@/app/lib/admin-auth";
 import { ensurePlayerColumns, ensurePlayerTable, ensureTeamTable } from "@/app/db/ensure-schema";
+import { clearTeamCaches } from "@/app/lib/team-cache";
 
 const CONTRACT_OVERRIDES: Record<string, { yearsRemaining?: number; position?: string }> = {
   "Quinton Byfield": { position: "C" },
@@ -82,8 +83,6 @@ const CW_TEAM_TO_ID: Record<string, string> = {
 };
 
 const SYNC_CACHE_KEYS = [
-  "cache:league:teams:v1",
-  "cache:trade:teams:v1",
   "cache:contracts",
   "cache:contracts:v2",
   "cache:nhl_skater_summary_stats",
@@ -111,11 +110,14 @@ async function ensureCanonicalTeamRows() {
   }
 }
 
-async function clearRosterCaches() {
-  if (!redis) return;
+async function clearRosterCaches(): Promise<string[]> {
+  const cleared: string[] = [];
+  cleared.push(...await clearTeamCaches(redis, db));
+  if (!redis) return cleared;
   for (const key of SYNC_CACHE_KEYS) {
-    await redis.del(key).catch(() => {});
+    await redis.del(key).then(() => cleared.push(key)).catch(() => {});
   }
+  return cleared;
 }
 
 const NHLE_FACTORS: Record<string, number> = {
@@ -345,6 +347,36 @@ export async function POST(req: Request) {
   await ensureRetirementColumns();
 
   const body = await req.json();
+  const action = typeof body.action === "string" ? body.action : null;
+  if (action === "reset-source") {
+    const clearCurated = body.clearCurated !== false;
+    const targetName = typeof body.name === "string" && body.name.trim() ? body.name.trim() : null;
+    const updates: Record<string, any> = { source: "sync" };
+    if (clearCurated) {
+      updates.expiryStatus = null;
+      updates.expiryYear = null;
+      updates.excludeFromRoster = false;
+    }
+
+    if (targetName) {
+      const id = makeId(targetName);
+      const existing = await db.select({ id: playersTable.id }).from(playersTable).where(eq(playersTable.id, id));
+      if (existing.length === 0) {
+        return NextResponse.json({ error: "player not found" }, { status: 404 });
+      }
+      await db.update(playersTable).set(updates).where(eq(playersTable.id, id));
+      const clearedCacheKeys = await clearRosterCaches();
+      return NextResponse.json({ ok: true, updated: 1, scope: "player", clearedCacheKeys });
+    }
+
+    const editorRows = await db.select({ id: playersTable.id }).from(playersTable).where(eq(playersTable.source, "editor"));
+    if (editorRows.length > 0) {
+      await db.update(playersTable).set(updates).where(eq(playersTable.source, "editor"));
+    }
+    const clearedCacheKeys = await clearRosterCaches();
+    return NextResponse.json({ ok: true, updated: editorRows.length, scope: "all", clearedCacheKeys });
+  }
+
   const { name, yearsRemaining, capHit, hasNMC, hasNTC, retired, clear } = body as {
     name:            string;
     yearsRemaining?: number;
@@ -629,12 +661,7 @@ export async function PUT(req: Request) {
   }
 
   const total = await db.select({ id: playersTable.id }).from(playersTable);
-  const clearedCacheKeys: string[] = [];
-  if (redis) {
-    for (const key of SYNC_CACHE_KEYS) {
-      await redis.del(key).then(() => clearedCacheKeys.push(key)).catch(() => {});
-    }
-  }
+  const clearedCacheKeys = await clearRosterCaches();
 
     return NextResponse.json({
       ok: true,

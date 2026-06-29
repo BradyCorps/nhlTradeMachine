@@ -37,6 +37,14 @@ interface Props {
   hasActiveTrade: boolean;
   navMap?: Record<string, NavLike>;
   onGoalieStarterChange?: (teamId: string, goalieId: string | null) => void;
+  onLineupChange?: (teamId: string, order: LineupOrderPayload) => void;
+}
+
+export interface LineupOrderPayload {
+  forwards: string[];
+  defense: string[];
+  goalies: string[];
+  scratches: string[];
 }
 
 const MONO = "'Courier Prime', monospace";
@@ -109,7 +117,8 @@ function TeamLineup({
   incoming,
   navMap,
   onGoalieStarterChange,
-}: TeamProps & Pick<Props, "onGoalieStarterChange">) {
+  onLineupChange,
+}: TeamProps & Pick<Props, "onGoalieStarterChange" | "onLineupChange">) {
   const outIds = useMemo(() => new Set(outgoing.map(p => p.id)), [outgoing]);
   const inIds  = useMemo(() => new Set(incoming.map(p => p.id)), [incoming]);
 
@@ -145,6 +154,19 @@ function TeamLineup({
   useEffect(() => {
     onGoalieStarterChange?.(teamId, orders.G[0] ?? null);
   }, [teamId, orders.G, onGoalieStarterChange]);
+
+  useEffect(() => {
+    onLineupChange?.(teamId, {
+      forwards: orders.F.slice(0, 12),
+      defense: orders.D.slice(0, 6),
+      goalies: orders.G.slice(0, 2),
+      scratches: [
+        ...orders.F.slice(12),
+        ...orders.D.slice(6),
+        ...orders.G.slice(2),
+      ],
+    });
+  }, [teamId, orders, onLineupChange]);
 
   const reset = useCallback(() => {
     setOrders({
@@ -375,7 +397,7 @@ function TeamLineup({
   );
 }
 
-export default function LineupEditor({ home, partner, hasActiveTrade, navMap, onGoalieStarterChange }: Props) {
+export default function LineupEditor({ home, partner, hasActiveTrade, navMap, onGoalieStarterChange, onLineupChange }: Props) {
   const [expanded, setExpanded] = useState(true);
   if (!home && !partner) return null;
 
@@ -401,12 +423,12 @@ export default function LineupEditor({ home, partner, hasActiveTrade, navMap, on
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(430px, 100%), 1fr))", gap: 12 }}>
             {home && (
               <div style={{ background: "var(--ledger-cream)", border: "1px solid #c8b890", padding: "10px 12px" }}>
-                <TeamLineup {...home} navMap={navMap} onGoalieStarterChange={onGoalieStarterChange} />
+                <TeamLineup {...home} navMap={navMap} onGoalieStarterChange={onGoalieStarterChange} onLineupChange={onLineupChange} />
               </div>
             )}
             {partner && (
               <div style={{ background: "var(--ledger-cream)", border: "1px solid #c8b890", padding: "10px 12px" }}>
-                <TeamLineup {...partner} navMap={navMap} onGoalieStarterChange={onGoalieStarterChange} />
+                <TeamLineup {...partner} navMap={navMap} onGoalieStarterChange={onGoalieStarterChange} onLineupChange={onLineupChange} />
               </div>
             )}
           </div>

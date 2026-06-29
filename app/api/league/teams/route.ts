@@ -5,7 +5,8 @@ import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
 import { siteSettings, teams as teamsTable } from "@/app/db/schema";
 import { parseStoredCapCeiling } from "@/app/lib/cap-settings";
-import { pickEffectiveStanding } from "@/app/lib/pick-value";
+import { buildDraftPickInventory } from "@/app/lib/draft-pick-inventory";
+import { teamCacheKey } from "@/app/lib/team-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,6 @@ const CAP_FLOOR       = SEASON.capFloor;
 // NOT a naive sum of all contract rows (which overstates used cap → false negatives).
 const CURATED_CAPSPACE_CEILING = 95.5;
 const TEAMS_CACHE_TTL = 6 * 60 * 60; // 6 hours
-const TRADE_TEAMS_CACHE_KEY = "cache:trade:teams:v1";
 
 const TEAM_NEEDS: Record<string, { pos: string; minWar: number; label: string }[]> = {
 
@@ -49,9 +49,6 @@ const getLiveCapCeiling = async (): Promise<number> => {
   const row = rows.find((r) => r.key === "cap_ceiling");
   return parseStoredCapCeiling(row?.value, SEASON.capCeiling) ?? SEASON.capCeiling;
 };
-
-const teamCacheKey = (capCeiling: number): string =>
-  `${TRADE_TEAMS_CACHE_KEY}:cap:${capCeiling.toFixed(1)}`;
 
 async function loadTeams(capCeiling: number): Promise<any[]> {
   const cacheKey = teamCacheKey(capCeiling);
@@ -183,33 +180,7 @@ async function loadTeams(capCeiling: number): Promise<any[]> {
 export async function GET() {
   const liveCapCeiling = await getLiveCapCeiling();
   const LIVE_TEAMS = await loadTeams(liveCapCeiling);
-
-  const picks: any[] = [];
-  // Pick inventory derived from SEASON.draftYear — rounds 1-5 for the next
-  // three drafts. Rolls forward automatically and stays sorted by year.
-  const Y = SEASON.draftYear;
-  LIVE_TEAMS.forEach((team) => {
-    [Y, Y + 1, Y + 2, Y + 3, Y + 4].flatMap(year =>
-      [1, 2, 3, 4, 5].map(round => ({ round, year }))
-    ).forEach(({ round, year }) => {
-      const roundLabel = round === 1 ? "1st" : round === 2 ? "2nd" : round === 3 ? "3rd" : `${round}th`;
-      picks.push({
-        id:           `pick-${team.id}-${year}-${round}`,
-        teamId:       team.id,
-        name:         `${year} ${roundLabel} Round Pick (${team.id})`,
-        position:     "Pick",
-        age:          19, round, year,
-        teamStanding: pickEffectiveStanding(team.phase, team.standing),
-        isProtected:  false,
-        games: 0, ptsPace: 0, xGPace: 0, defRate: 0,
-        avgTOI: 0, qocIndex: null,
-        capHit: 0, yearsRemaining: 0,
-        hasNMC: false, hasNTC: false,
-        canRetain: false, retainedPct: 0,
-        multiplier: 1.0, hasLiveStats: false,
-      });
-    });
-  });
+  const picks = await buildDraftPickInventory(LIVE_TEAMS);
 
   const teams = LIVE_TEAMS.map((t: any) => ({
     id:       t.id,

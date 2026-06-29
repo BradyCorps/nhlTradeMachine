@@ -14,6 +14,7 @@ import { redis } from "@/app/lib/redis";
 import { TEAMS_DB } from "@/app/lib/db";
 import { ensureNewTables, ensurePlayerColumns, ensureTeamTable, ensureTradeColumns } from "@/app/db/ensure-schema";
 import { seedPlayersTable } from "@/app/lib/league-seed";
+import { clearTeamCaches } from "@/app/lib/team-cache";
 import {
   DEVELOPMENT_NHL_SUMMARY_CACHE_KEY,
   DEVELOPMENT_TIMELINE_CACHE_KEY,
@@ -25,8 +26,6 @@ export const dynamic = "force-dynamic";
 const CONFIRMATION = "RESET ADMIN DATA";
 
 const RESET_CACHE_KEYS = [
-  "cache:league:teams:v1",
-  "cache:trade:teams:v1",
   "cache:contracts",
   "cache:contracts:v2",
   "cache:pointshares",
@@ -86,6 +85,7 @@ async function resetTeamOverrides(): Promise<number> {
 
 async function clearLiveCaches(): Promise<string[]> {
   const cleared: string[] = [];
+  cleared.push(...await clearTeamCaches(redis, db));
   if (!redis) return cleared;
   for (const key of RESET_CACHE_KEYS) {
     await redis.del(key).then(() => cleared.push(key)).catch(() => {});

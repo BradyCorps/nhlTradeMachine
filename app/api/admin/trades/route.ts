@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/app/db/client";
-import { siteSettings } from "@/app/db/schema";
 import { requireAdmin } from "@/app/lib/admin-auth";
-import { parseStoredCapCeiling } from "@/app/lib/cap-settings";
 import { redis } from "@/app/lib/redis";
 import { SEASON } from "@/app/lib/season-config";
+import { clearTeamCaches } from "@/app/lib/team-cache";
 import { POST as evaluatePost } from "@/app/api/evaluate/route";
 import {
   createFrozenTrade,
@@ -62,27 +61,8 @@ const SaveTradeSchema = z.object({
 const tradeId = (executedDate: string): string =>
   `trade-${executedDate}-${crypto.randomUUID().slice(0, 8)}`;
 
-const LEAGUE_TEAMS_CACHE_KEY = "cache:league:teams:v1";
-const TRADE_TEAMS_CACHE_KEY = "cache:trade:teams:v1";
-
-const teamCacheKey = (capCeiling: number): string =>
-  `${TRADE_TEAMS_CACHE_KEY}:cap:${capCeiling.toFixed(1)}`;
-
 const clearTradeOverlayCaches = async (capCeilingOverride?: number | null): Promise<void> => {
-  if (!redis) return;
-  const cache = redis;
-  const rows = await db.select().from(siteSettings).catch(() => []);
-  const activeSetting = rows.find((row) => row.key === "cap_ceiling")?.value;
-  const activeCapCeiling = parseStoredCapCeiling(activeSetting, SEASON.capCeiling) ?? SEASON.capCeiling;
-  const keys = Array.from(new Set([
-    LEAGUE_TEAMS_CACHE_KEY,
-    TRADE_TEAMS_CACHE_KEY,
-    teamCacheKey(SEASON.capCeiling),
-    teamCacheKey(95.5),
-    teamCacheKey(activeCapCeiling),
-    ...(capCeilingOverride == null ? [] : [teamCacheKey(capCeilingOverride)]),
-  ]));
-  await Promise.all(keys.map((key) => cache.del(key).catch(() => {})));
+  await clearTeamCaches(redis, db, [capCeilingOverride]);
 };
 
 const buildEvaluator = (capCeilingOverride?: number | null): TradeFreezeEvaluator => {

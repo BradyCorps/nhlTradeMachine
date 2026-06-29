@@ -410,6 +410,7 @@ export default function AdminContractsPage() {
   const [filter, setFilter]         = useState<"all" | "flagged" | "editor" | "needs">("all");
   const [editing, setEditing]       = useState<ContractRow | null>(null);
   const [dbError, setDbError]       = useState<string | null>(null);
+  const [resettingSource, setResettingSource] = useState(false);
 
   const load = (withScrape = false) => {
     setLoading(true);
@@ -518,6 +519,32 @@ export default function AdminContractsPage() {
     }
   };
 
+  const handleResetEditorsToSync = async () => {
+    if (editorCount === 0) {
+      toast("No editor-curated rows to reset", "success");
+      return;
+    }
+    const ok = window.confirm(
+      `Switch ${editorCount} editor-curated player rows back to sync and clear curated FA/exclude flags?`
+    );
+    if (!ok) return;
+    setResettingSource(true);
+    try {
+      const res = await fetch("/api/admin/contracts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset-source", clearCurated: true }),
+      });
+      const data = await readAdminResponse<{ updated: number }>(res, "Source reset failed");
+      toast(`Reset ${data.updated} editor rows back to sync`, "success");
+      load();
+    } catch (e) {
+      toast(adminErrorMessage(e, "Source reset failed"), "error");
+    } finally {
+      setResettingSource(false);
+    }
+  };
+
   const filtered = useMemo(() => {
     let list = contracts;
     if (search.trim()) {
@@ -565,6 +592,15 @@ export default function AdminContractsPage() {
             color: scrapedRaw && !syncing ? "#fff" : "var(--ledger-ink-faint)",
             cursor: (syncing || !scrapedRaw) ? "default" : "pointer", letterSpacing: "0.1em" }}>
           {syncing ? "SYNCING..." : "SYNC LIVE"}
+        </button>
+        <button onClick={handleResetEditorsToSync} disabled={resettingSource || editorCount === 0}
+          title="Switch all editor-curated player rows back to sync and clear curated FA/exclude flags"
+          style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
+            background: editorCount > 0 && !resettingSource ? "rgba(184,48,32,0.08)" : "transparent",
+            border: `1px solid ${editorCount > 0 && !resettingSource ? "var(--ledger-red)" : "var(--rule)"}`,
+            color: editorCount > 0 && !resettingSource ? "var(--ledger-red)" : "var(--ledger-ink-faint)",
+            cursor: editorCount > 0 && !resettingSource ? "pointer" : "default", letterSpacing: "0.1em" }}>
+          {resettingSource ? "RESETTING..." : "EDITOR → SYNC"}
         </button>
         <button onClick={() => load(false)} style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
           background: "transparent", border: "1px solid var(--rule)", color: "var(--ledger-ink-body)",

@@ -211,17 +211,6 @@ export default function TradeBlockPanel({ players, teams, onSelectTeam, onClose 
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-            <a
-              href="/admin/trade-block"
-              target="_blank"
-              style={{
-                fontSize: 9, color: "var(--ledger-ink-faint)", textDecoration: "none",
-                border: "1px solid var(--rule)", padding: "4px 8px",
-                letterSpacing: "0.1em", fontFamily: "monospace", fontWeight: 900,
-              }}
-            >
-              ADMIN →
-            </a>
             <button
               onClick={onClose}
               style={{

@@ -9,10 +9,9 @@
 // detects zero pending free agents and the off-season list is empty.
 //
 // This seed marks the known class so the off-season Re-Sign phase is populated
-// out of the box and survives an admin DB reset. Precedence (highest first):
-//   1. DB fa_overrides  (admin's explicit choice, incl. SIGNED / EXCLUDE)
-//   2. live scrape       (a contract that already reads as expiring)
-//   3. this seed         (fills in the rest of the known class)
+// out of the box and survives an admin DB reset. Runtime FA facts now live on
+// the players table; Contract Admin writes expiry_status / expiry_year /
+// exclude_from_roster, and the committed seed fills missing baseline rows.
 //
 // Season-specific, like season-config. Refresh names each off-season. Keys are
 // matched case-insensitively against assembled-roster player names.

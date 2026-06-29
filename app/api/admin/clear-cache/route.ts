@@ -6,6 +6,7 @@ import {
   DEVELOPMENT_TIMELINE_CACHE_KEY,
 } from "@/app/lib/development-sources";
 import { PROSPECT_ENRICHMENT_CACHE_KEY } from "@/app/lib/prospect-enrichment";
+import { clearTeamCaches } from "@/app/lib/team-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +15,8 @@ export async function GET(req: Request) {
   if (unauthorized) return unauthorized;
   const cleared: string[] = [];
   if (redis) {
+    cleared.push(...await clearTeamCaches(redis));
     for (const key of [
-      "cache:league:teams:v1",
-      "cache:trade:teams:v1",
       "cache:contracts",
       "cache:contracts:v2",
       "cache:pointshares",

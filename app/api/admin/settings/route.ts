@@ -6,23 +6,11 @@ import { SEASON } from "@/app/lib/season-config";
 import { redis } from "@/app/lib/redis";
 import { requireAdmin } from "@/app/lib/admin-auth";
 import { isValidCapFloor, maxCapCeiling, parseStoredCapCeiling, parseStoredCapFloor } from "@/app/lib/cap-settings";
+import { clearTeamCaches } from "@/app/lib/team-cache";
 
 export const dynamic = "force-dynamic";
 
-const LEAGUE_TEAMS_CACHE_KEY = "cache:league:teams:v1";
-const TRADE_TEAMS_CACHE_KEY = "cache:trade:teams:v1";
 const MAX_CAP_CEILING = maxCapCeiling();
-
-const teamCacheKey = (capCeiling: number): string =>
-  `${TRADE_TEAMS_CACHE_KEY}:cap:${capCeiling.toFixed(1)}`;
-
-const teamCacheKeys = (...capCeilings: number[]): string[] => Array.from(new Set([
-  LEAGUE_TEAMS_CACHE_KEY,
-  TRADE_TEAMS_CACHE_KEY,
-  teamCacheKey(SEASON.capCeiling),
-  teamCacheKey(95.5),
-  ...capCeilings.map(teamCacheKey),
-]));
 
 export async function GET(req: Request) {
   const unauthorized = await requireAdmin(req);
@@ -48,13 +36,7 @@ export async function POST(req: Request) {
 
   // Dedicated cache-bust action
   if (body.action === "clear_cache") {
-    if (redis) {
-      const cache = redis;
-      const rows = await db.select().from(siteSettings).catch(() => []);
-      const m = new Map(rows.map(r => [r.key, r.value]));
-      const activeCapCeiling = parseStoredCapCeiling(m.get("cap_ceiling"), SEASON.capCeiling) ?? SEASON.capCeiling;
-      await Promise.all(teamCacheKeys(activeCapCeiling).map(key => cache.del(key).catch(() => {})));
-    }
+    await clearTeamCaches(redis, db);
     return NextResponse.json({ ok: true, cleared: true });
   }
 
@@ -102,9 +84,8 @@ export async function POST(req: Request) {
   }
 
   if (redis) {
-    const cache = redis;
     const nextCapCeiling = body.capCeiling ?? SEASON.capCeiling;
-    await Promise.all(teamCacheKeys(nextCapCeiling).map(key => cache.del(key).catch(() => {})));
+    await clearTeamCaches(redis, db, [nextCapCeiling]);
   }
   return NextResponse.json({ ok: true });
 }

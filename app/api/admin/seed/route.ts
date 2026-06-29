@@ -2,12 +2,11 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/app/lib/admin-auth";
 import { seedPlayersTable } from "@/app/lib/league-seed";
 import { redis } from "@/app/lib/redis";
+import { clearTeamCaches } from "@/app/lib/team-cache";
 
 export const dynamic = "force-dynamic";
 
 const SEED_CACHE_KEYS = [
-  "cache:league:teams:v1",
-  "cache:trade:teams:v1",
   "cache:contracts",
   "cache:contracts:v2",
 ];
@@ -22,6 +21,7 @@ export async function POST(req: Request) {
   try {
     const result = await seedPlayersTable();
     const cleared: string[] = [];
+    cleared.push(...await clearTeamCaches(redis));
     if (redis) {
       for (const key of SEED_CACHE_KEYS) {
         await redis.del(key).then(() => cleared.push(key)).catch(() => {});
