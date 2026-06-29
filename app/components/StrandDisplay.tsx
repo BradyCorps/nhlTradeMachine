@@ -147,6 +147,7 @@ export default function StrandDisplay({
           {offTraits.length > 0 && defTraits.length > 0 && (() => {
             const n = offTraits.length;
             const smN = sineM(n);
+            const OL = 1.5;
 
             const crossXs: number[] = [];
             for (let k = 0; ; k++) {
@@ -159,29 +160,40 @@ export default function StrandDisplay({
             const sectionPath = (traits: StrandTrait[], isOff: boolean, xS: number, xE: number): string =>
               Array.from({ length: 81 }, (_, i) => {
                 const x = (i / 80) * W;
-                if (x < xS - 0.5 || x > xE + 0.5) return null;
+                if (x < xS - OL || x > xE + OL) return null;
                 const t = x / W;
                 const y = strandYAtSmooth(traits, t, W, H, amplitude, isOff);
                 return `${x.toFixed(1)} ${y.toFixed(1)}`;
               }).filter((s): s is string => s !== null)
                 .map((s, i) => `${i === 0 ? "M" : "L"} ${s}`).join(" ");
 
+            const sections = bounds.slice(0, -1).map((xS, k) => ({
+              xS, xE: bounds[k + 1],
+              offFront: Math.cos(freq * ((xS + bounds[k + 1]) / 2) * smN) > 0,
+            }));
+
             return (<>
-              {/* Background — full continuous paths */}
-              <path d={buildStrandPath(offTraits, W, H, amplitude, true)} fill="none"
-                    stroke={offColor} strokeWidth="1.6" opacity="0.35" strokeLinecap="round"/>
-              <path d={buildStrandPath(defTraits, W, H, amplitude, false)} fill="none"
-                    stroke={defColor} strokeWidth="1.6" opacity="0.35" strokeLinecap="round"/>
-              {/* Foreground — thicker where in front */}
-              {bounds.slice(0, -1).map((xS, k) => {
-                const xMid = (xS + bounds[k + 1]) / 2;
-                const offFront = Math.cos(freq * xMid * smN) > 0;
-                const traits = offFront ? offTraits : defTraits;
-                const isOff  = offFront;
-                const color  = offFront ? offColor : defColor;
-                return <path key={`fg-${k}`} d={sectionPath(traits, isOff, xS, bounds[k + 1])}
-                             fill="none" stroke={color} strokeWidth="2.8" opacity="0.92" strokeLinecap="round"/>;
-              })}
+              {/* Layer 1: back strand sections */}
+              {sections.map(({ xS, xE, offFront }, k) => (
+                <path key={`bk-${k}`}
+                      d={sectionPath(offFront ? defTraits : offTraits, !offFront, xS, xE)}
+                      fill="none" stroke={offFront ? defColor : offColor}
+                      strokeWidth="2.5" opacity="0.9" strokeLinecap="round"/>
+              ))}
+              {/* Layer 2: knockout border — background-colored outline on front strand */}
+              {sections.map(({ xS, xE, offFront }, k) => (
+                <path key={`ko-${k}`}
+                      d={sectionPath(offFront ? offTraits : defTraits, offFront, xS, xE)}
+                      fill="none" stroke="var(--ledger-cream, #f5efe0)" strokeWidth="5.5"
+                      strokeLinecap="round"/>
+              ))}
+              {/* Layer 3: front strand sections */}
+              {sections.map(({ xS, xE, offFront }, k) => (
+                <path key={`fg-${k}`}
+                      d={sectionPath(offFront ? offTraits : defTraits, offFront, xS, xE)}
+                      fill="none" stroke={offFront ? offColor : defColor}
+                      strokeWidth="2.5" opacity="0.9" strokeLinecap="round"/>
+              ))}
             </>);
           })()}
 

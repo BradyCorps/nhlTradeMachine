@@ -175,7 +175,7 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
                 stroke={RED} strokeWidth="1.5" opacity="0.28" strokeDasharray="5,3"/>
         </>)}
 
-        {/* 3D helix — continuous paths with depth layering */}
+        {/* 3D helix — full-weight strands with crossover layering */}
         {(() => {
           const crossXs: number[] = [];
           for (let k = 0; ; k++) {
@@ -184,11 +184,12 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
             crossXs.push(x);
           }
           const bounds = [0, ...crossXs, W];
+          const OL = 1.5;
 
           const sectionPath = (vals: number[], flip: boolean, xS: number, xE: number): string =>
             Array.from({ length: STEPS + 1 }, (_, step) => {
               const x = (step / STEPS) * W;
-              if (x < xS - 0.5 || x > xE + 0.5) return null;
+              if (x < xS - OL || x > xE + OL) return null;
               const ti = Math.min(N - 1, Math.floor((x / W) * N));
               const amp = AMP * (0.28 + vals[ti] * 0.72);
               const y = cy + (flip ? 1 : -1) * amp * Math.sin(freq * x * sm);
@@ -196,22 +197,28 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
             }).filter((s): s is string => s !== null)
               .map((s, i) => `${i === 0 ? "M" : "L"} ${s}`).join(" ");
 
+          const sections = bounds.slice(0, -1).map((xS, k) => ({
+            xS, xE: bounds[k + 1],
+            offFront: Math.cos(freq * ((xS + bounds[k + 1]) / 2) * sm) > 0,
+          }));
+
           return (<>
-            {/* Background — full continuous paths, always visible */}
-            <path d={buildPath(offVals, false)} fill="none"
-                  stroke={NAVY} strokeWidth="1.6" opacity="0.35"/>
-            <path d={buildPath(defVals, true)} fill="none"
-                  stroke={RED} strokeWidth="1.6" opacity="0.35"/>
-            {/* Foreground — thicker sections where each strand is in front */}
-            {bounds.slice(0, -1).map((xS, k) => {
-              const xMid = (xS + bounds[k + 1]) / 2;
-              const offFront = Math.cos(freq * xMid * sm) > 0;
-              const vals  = offFront ? offVals : defVals;
-              const flip  = offFront ? false : true;
-              const color = offFront ? NAVY : RED;
-              return <path key={`fg-${k}`} d={sectionPath(vals, flip, xS, bounds[k + 1])}
-                           fill="none" stroke={color} strokeWidth="2.8" opacity="0.92"/>;
-            })}
+            {/* Layer 1: back strand sections */}
+            {sections.map(({ xS, xE, offFront }, k) => (
+              <path key={`bk-${k}`} d={sectionPath(offFront ? defVals : offVals, offFront, xS, xE)}
+                    fill="none" stroke={offFront ? RED : NAVY} strokeWidth="2.5" opacity="0.90"/>
+            ))}
+            {/* Layer 2: knockout border — background-colored outline on front strand */}
+            {sections.map(({ xS, xE, offFront }, k) => (
+              <path key={`ko-${k}`} d={sectionPath(offFront ? offVals : defVals, !offFront, xS, xE)}
+                    fill="none" stroke="var(--ledger-cream, #f5efe0)" strokeWidth="5.5"
+                    strokeLinecap="round"/>
+            ))}
+            {/* Layer 3: front strand sections */}
+            {sections.map(({ xS, xE, offFront }, k) => (
+              <path key={`fg-${k}`} d={sectionPath(offFront ? offVals : defVals, !offFront, xS, xE)}
+                    fill="none" stroke={offFront ? NAVY : RED} strokeWidth="2.5" opacity="0.90"/>
+            ))}
           </>);
         })()}
 
