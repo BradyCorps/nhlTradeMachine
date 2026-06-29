@@ -561,22 +561,23 @@ export async function PUT(req: Request) {
     }
     if (current) {
       if (current.retired) continue;
-      // Editor-curated rows are locked: a live sync never overwrites hand-fixed
-      // data (this is the orthogonality guarantee — one owner per row).
-      if (current.source === "editor") continue;
+      const isEditor = current.source === "editor";
+      // Editor rows: update contract facts (capHit, years, position, team, age)
+      // but never overwrite hand-curated FA fields (expiryStatus, expiryYear,
+      // excludeFromRoster) and keep source as "editor".
       const updates: Record<string, any> = {
         capHit: values.capHit,
         yearsRemaining: values.yearsRemaining,
-        source: "sync",
+        source: isEditor ? "editor" : "sync",
       };
       if (position !== "Unknown" && (current.position === "Unknown" || current.position !== position)) {
         updates.position = position;
       }
       if (teamId && current.teamId !== teamId) updates.teamId = teamId;
       if (values.age && current.age !== values.age) updates.age = values.age;
-      // Only stamp expiry when the row doesn't already carry a curated FA class,
-      // so the seed's known 2026 UFA/RFA marks survive a live refresh.
-      if (expiryStatus && current.expiryStatus == null) {
+      // Only stamp expiry on non-editor rows that don't already carry a curated
+      // FA class, so the seed's known UFA/RFA marks survive a live refresh.
+      if (!isEditor && expiryStatus && current.expiryStatus == null) {
         updates.expiryStatus = expiryStatus;
         updates.expiryYear = expiryYear;
       }
