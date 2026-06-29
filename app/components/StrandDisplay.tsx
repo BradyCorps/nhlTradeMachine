@@ -197,9 +197,9 @@ export default function StrandDisplay({
             const y       = cy - nodeAmp * Math.sin(freq * x * sineM(offTraits.length));
             const isAbove = y <= cy;
             const labelY  = isAbove
-              ? Math.max(8,     y - 10)
-              : Math.min(H - 18, y + 14);
-            const valY    = labelY + 9;
+              ? Math.max(8,     y - 18)
+              : Math.min(H - 22, y + 20);
+            const valY    = labelY + 10;
             return <g key={t.label}>
               <text x={x} y={labelY}  textAnchor="middle" fontSize="7.5" fontWeight="bold"
                 fill={offColor} fontFamily="Courier Prime, monospace">{t.label}</text>
@@ -216,9 +216,9 @@ export default function StrandDisplay({
             const color   = t.unavailable ? "var(--ledger-rule-mid)" : defColor;
             const isAbove = y <= cy;
             const labelY  = isAbove
-              ? Math.max(8,     y - 10)
-              : Math.min(H - 18, y + 14);
-            const valY    = labelY + 9;
+              ? Math.max(8,     y - 18)
+              : Math.min(H - 22, y + 20);
+            const valY    = labelY + 10;
             return <g key={t.label}>
               <text x={x} y={labelY} textAnchor="middle" fontSize="7.5" fontWeight="bold"
                 fill={color} fontFamily="Courier Prime, monospace">{t.label}</text>

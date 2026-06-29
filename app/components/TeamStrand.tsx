@@ -113,8 +113,8 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
     const y     = nodeY(val, i, flip);
     const above = isAbove(i, flip);
     return above
-      ? Math.max(PAD + 6,       y - 8)
-      : Math.min(H - PAD - 2,   y + 14);
+      ? Math.max(PAD + 6,       y - 14)
+      : Math.min(H - PAD - 2,   y + 18);
   };
 
   const offVals = toOff(strand);
