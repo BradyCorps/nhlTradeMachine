@@ -184,25 +184,17 @@ export default function StrandDisplay({
             });
           })()}
 
-          {/* Offensive nodes — label follows node: above centre → label above, below → label below */}
+          {/* Offensive labels — positioned at sine peaks/troughs */}
           {offTraits.map((t, i) => {
             const x       = ((i + 0.5) / offTraits.length) * W;
             const nodeAmp = amplitude * (0.35 + t.val * 0.65);
             const y       = cy - nodeAmp * Math.sin(freq * x * sineM(offTraits.length));
-            const hasPs   = t.ps != null;
-            const r       = hasPs ? 4 : 3;
-            const isAbove = y <= cy;                               // node above centre line
+            const isAbove = y <= cy;
             const labelY  = isAbove
-              ? Math.max(8,     y - 14)                            // above: push label up
-              : Math.min(H - 18, y + 14);                          // below: push label down
+              ? Math.max(8,     y - 10)
+              : Math.min(H - 18, y + 14);
             const valY    = labelY + 9;
-            const lineY1  = isAbove ? y - r : y + r;
-            const lineY2  = isAbove ? labelY + 2 : labelY - 3;
             return <g key={t.label}>
-              <circle cx={x} cy={y} r={t.val * 4 + 2.5} fill={offColor} opacity="0.15"/>
-              <circle cx={x} cy={y} r={r} fill={offColor}/>
-              <line x1={x} y1={lineY1} x2={x} y2={lineY2}
-                stroke={offColor} strokeWidth="0.8" opacity="0.4"/>
               <text x={x} y={labelY}  textAnchor="middle" fontSize="7.5" fontWeight="bold"
                 fill={offColor} fontFamily="Courier Prime, monospace">{t.label}</text>
               <text x={x} y={valY}    textAnchor="middle" fontSize="6.5"
@@ -210,26 +202,18 @@ export default function StrandDisplay({
             </g>;
           })}
 
-          {/* Defensive nodes — same logic */}
+          {/* Defensive labels — positioned at sine peaks/troughs */}
           {defTraits.map((t, i) => {
             const x       = ((i + 0.5) / defTraits.length) * W;
             const nodeAmp = amplitude * (0.35 + t.val * 0.65);
             const y       = cy + nodeAmp * Math.sin(freq * x * sineM(defTraits.length));
-            const hasPs   = t.ps != null;
-            const r       = hasPs ? 4 : 3;
             const color   = t.unavailable ? "var(--ledger-rule-mid)" : defColor;
             const isAbove = y <= cy;
             const labelY  = isAbove
-              ? Math.max(8,     y - 14)
+              ? Math.max(8,     y - 10)
               : Math.min(H - 18, y + 14);
             const valY    = labelY + 9;
-            const lineY1  = isAbove ? y - r : y + r;
-            const lineY2  = isAbove ? labelY + 2 : labelY - 3;
             return <g key={t.label}>
-              <circle cx={x} cy={y} r={t.val * 4 + 2.5} fill={color} opacity="0.15"/>
-              <circle cx={x} cy={y} r={r} fill={color}/>
-              <line x1={x} y1={lineY1} x2={x} y2={lineY2}
-                stroke={color} strokeWidth="0.8" opacity="0.4"/>
               <text x={x} y={labelY} textAnchor="middle" fontSize="7.5" fontWeight="bold"
                 fill={color} fontFamily="Courier Prime, monospace">{t.label}</text>
               <text x={x} y={valY}   textAnchor="middle" fontSize="6.5"

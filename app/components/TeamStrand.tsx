@@ -213,11 +213,9 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
           });
         })()}
 
-        {/* OFF nodes + labels */}
+        {/* OFF labels */}
         {OFF_LABELS.map((lbl, i) => (
           <g key={`off-${i}`}>
-            <circle cx={nodeX(i)} cy={nodeY(offVals[i], i, false)}
-                    r="3.5" fill={NAVY} opacity="0.90"/>
             <text x={labelX(i)} y={labelY(offVals[i], i, false)}
                   textAnchor="middle" fontSize="7.5" fill={NAVY}
                   fontWeight="900" fontFamily={MONO}>
@@ -226,11 +224,9 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
           </g>
         ))}
 
-        {/* DEF nodes + labels */}
+        {/* DEF labels */}
         {DEF_LABELS.map((lbl, i) => (
           <g key={`def-${i}`}>
-            <circle cx={nodeX(i)} cy={nodeY(defVals[i], i, true)}
-                    r="3.5" fill={RED} opacity="0.90"/>
             <text x={labelX(i)} y={labelY(defVals[i], i, true)}
                   textAnchor="middle" fontSize="7.5" fill={RED}
                   fontWeight="900" fontFamily={MONO}>
