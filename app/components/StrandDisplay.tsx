@@ -85,25 +85,6 @@ function buildStrandPath(traits: StrandTrait[], W: number, H: number, amplitude:
   return pts.join(" ");
 }
 
-function buildSegStrandPath(
-  traits: StrandTrait[], W: number, H: number, amplitude: number, isOff: boolean,
-  xStart: number, xEnd: number, trimLeft: number, trimRight: number,
-) {
-  const xFrom = xStart + trimLeft;
-  const xTo   = xEnd - trimRight;
-  const SEGS  = 80;
-  return Array.from({ length: SEGS + 1 }, (_, i) => {
-    const x = (i / SEGS) * W;
-    if (x < xFrom - 0.5 || x > xTo + 0.5) return null;
-    const t = x / W;
-    const y = strandYAtSmooth(traits, t, W, H, amplitude, isOff);
-    return `${x.toFixed(1)} ${y.toFixed(1)}`;
-  })
-    .filter((s): s is string => s !== null)
-    .map((s, i) => `${i === 0 ? "M" : "L"} ${s}`)
-    .join(" ");
-}
-
 export default function StrandDisplay({
   offTraits, defTraits, ops, dps, strandType,
   compareOff, compareDef, compareLabel,
@@ -162,33 +143,43 @@ export default function StrandDisplay({
               stroke={defColor} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.5" strokeLinecap="round"/>
           </>)}
 
-          {/* DNA crossover — segment-based rendering */}
+          {/* 3D helix — depth-sorted segments, cos(θ) drives opacity + width */}
           {offTraits.length > 0 && defTraits.length > 0 && (() => {
             const n = offTraits.length;
-            const CROSS_GAP = 8;
+            const smN = sineM(n);
+            const SEGS = 80;
+            type HSeg = { x1: number; y1: number; x2: number; y2: number;
+                          color: string; depth: number; key: string };
+            const segs: HSeg[] = [];
 
-            const crossXs: number[] = [];
-            for (let k = 0; k <= 2 * n; k++) crossXs.push((k / (2 * n)) * W);
+            const addSegs = (traits: StrandTrait[], isOff: boolean, color: string, id: string) => {
+              for (let s = 0; s < SEGS; s++) {
+                const t1 = s / SEGS;
+                const t2 = (s + 1) / SEGS;
+                const tMid = (t1 + t2) / 2;
+                const x1 = t1 * W;
+                const x2 = t2 * W;
+                const xMid = tMid * W;
+                const y1 = strandYAtSmooth(traits, t1, W, H, amplitude, isOff);
+                const y2 = strandYAtSmooth(traits, t2, W, H, amplitude, isOff);
+                const depth = (isOff ? 1 : -1) * Math.cos(freq * xMid * smN);
+                segs.push({ x1, y1, x2, y2, color, depth, key: `${id}-${s}` });
+              }
+            };
 
-            return crossXs.slice(0, -1).map((segStart, k) => {
-              const segEnd = crossXs[k + 1];
-              const offFront = k % 2 === 0;
-              const backTraits  = offFront ? defTraits : offTraits;
-              const frontTraits = offFront ? offTraits : defTraits;
-              const backIsOff   = !offFront;
-              const frontIsOff  = offFront;
-              const backColor2  = offFront ? defColor : offColor;
-              const frontColor2 = offFront ? offColor : defColor;
-              const gl = k > 0 ? CROSS_GAP : 0;
-              const gr = k < 2 * n - 1 ? CROSS_GAP : 0;
+            addSegs(offTraits, true, offColor, "off");
+            addSegs(defTraits, false, defColor, "def");
+            segs.sort((a, b) => a.depth - b.depth);
 
+            return segs.map(seg => {
+              const sw = 2.2 + seg.depth * 0.8;
+              const op = 0.65 + seg.depth * 0.30;
               return (
-                <g key={`seg-${k}`}>
-                  <path d={buildSegStrandPath(backTraits, W, H, amplitude, backIsOff, segStart, segEnd, gl, gr)}
-                        fill="none" stroke={backColor2} strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
-                  <path d={buildSegStrandPath(frontTraits, W, H, amplitude, frontIsOff, segStart, segEnd, 0, 0)}
-                        fill="none" stroke={frontColor2} strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
-                </g>
+                <line key={seg.key}
+                      x1={seg.x1.toFixed(1)} y1={seg.y1.toFixed(1)}
+                      x2={seg.x2.toFixed(1)} y2={seg.y2.toFixed(1)}
+                      stroke={seg.color} strokeWidth={sw.toFixed(2)}
+                      opacity={op.toFixed(3)} strokeLinecap="round"/>
               );
             });
           })()}
