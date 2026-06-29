@@ -52,29 +52,56 @@ function buildAvgPath(W: number, H: number, amplitude: number, isOff: boolean, n
   return pts.join(" ");
 }
 
+function strandYAtSmooth(
+  traits: StrandTrait[], t: number,
+  W: number, H: number, amplitude: number, isOff: boolean,
+): number {
+  const cy   = H / 2;
+  const n    = traits.length;
+  const freq = (2 * Math.PI) / W;
+  const sm   = sineM(n);
+  const x    = t * W;
+  const normX = t * n - 0.5;
+  const lo    = Math.max(0, Math.floor(normX));
+  const hi    = Math.min(n - 1, lo + 1);
+  const frac  = Math.max(0, Math.min(1, normX - lo));
+  const ease  = frac * frac * (3 - 2 * frac);
+  const val   = traits[lo].val * (1 - ease) + traits[hi].val * ease;
+  const amp   = amplitude * (0.35 + val * 0.65);
+  return cy + (isOff ? -1 : 1) * amp * Math.sin(freq * x * sm);
+}
+
 function buildStrandPath(traits: StrandTrait[], W: number, H: number, amplitude: number, isOff: boolean) {
   const cy   = H / 2;
   const n    = traits.length;
   if (n === 0) return `M 0 ${cy.toFixed(1)} L ${W.toFixed(1)} ${cy.toFixed(1)}`;
-  const freq = (2 * Math.PI) / W;
-  const sm   = sineM(n);
   const pts: string[] = [];
   for (let i = 0; i <= 80; i++) {
-    const t    = i / 80;
-    const x    = t * W;
-    // Smooth cubic interpolation — eliminates kinks at trait boundaries.
-    // Step function caused amplitude to snap mid-oscillation at grid lines.
-    const normX = t * n - 0.5;
-    const lo    = Math.max(0, Math.floor(normX));
-    const hi    = Math.min(n - 1, lo + 1);
-    const frac  = Math.max(0, Math.min(1, normX - lo));
-    const ease  = frac * frac * (3 - 2 * frac);
-    const val   = traits[lo].val * (1 - ease) + traits[hi].val * ease;
-    const amp   = amplitude * (0.35 + val * 0.65);
-    const y     = cy + (isOff ? -1 : 1) * amp * Math.sin(freq * x * sm);
+    const t = i / 80;
+    const x = t * W;
+    const y = strandYAtSmooth(traits, t, W, H, amplitude, isOff);
     pts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`);
   }
   return pts.join(" ");
+}
+
+function buildSegStrandPath(
+  traits: StrandTrait[], W: number, H: number, amplitude: number, isOff: boolean,
+  xStart: number, xEnd: number, trimLeft: number, trimRight: number,
+) {
+  const xFrom = xStart + trimLeft;
+  const xTo   = xEnd - trimRight;
+  const SEGS  = 80;
+  return Array.from({ length: SEGS + 1 }, (_, i) => {
+    const x = (i / SEGS) * W;
+    if (x < xFrom - 0.5 || x > xTo + 0.5) return null;
+    const t = x / W;
+    const y = strandYAtSmooth(traits, t, W, H, amplitude, isOff);
+    return `${x.toFixed(1)} ${y.toFixed(1)}`;
+  })
+    .filter((s): s is string => s !== null)
+    .map((s, i) => `${i === 0 ? "M" : "L"} ${s}`)
+    .join(" ");
 }
 
 export default function StrandDisplay({
@@ -135,34 +162,57 @@ export default function StrandDisplay({
               stroke={defColor} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.5" strokeLinecap="round"/>
           </>)}
 
-          {/* Rungs connecting the two strands */}
-          {offTraits.length > 0 && defTraits.length > 0 && Array.from({ length: 18 }, (_, i) => {
-            const t     = (i + 0.5) / 18;
-            const x     = t * W;
-            const sm    = sineM(offTraits.length);
-            // Use smooth interpolation for rung endpoints (same as strand paths)
-            const normX = t * offTraits.length - 0.5;
-            const lo    = Math.max(0, Math.floor(normX));
-            const hi    = Math.min(offTraits.length - 1, lo + 1);
-            const frac  = Math.max(0, Math.min(1, normX - lo));
-            const ease  = frac * frac * (3 - 2 * frac);
-            const oVal  = offTraits[lo].val * (1 - ease) + offTraits[hi].val * ease;
-            const dVal  = defTraits[lo < defTraits.length ? lo : defTraits.length-1].val * (1 - ease)
-                        + defTraits[hi < defTraits.length ? hi : defTraits.length-1].val * ease;
-            const oA    = amplitude * (0.35 + oVal * 0.65);
-            const dA    = amplitude * (0.35 + dVal * 0.65);
-            const oy    = cy - oA * Math.sin(freq * x * sm);
-            const dy    = cy + dA * Math.sin(freq * x * sm);
-            return <line key={i} x1={x} y1={oy} x2={x} y2={dy}
-              stroke="var(--ledger-ink-faint)" strokeWidth="0.8"
-              opacity={0.12 + Math.abs(Math.sin(freq * x * sm)) * 0.25}/>;
-          })}
+          {/* DNA crossover — segment-based rendering with base-pair rungs */}
+          {offTraits.length > 0 && defTraits.length > 0 && (() => {
+            const n = offTraits.length;
+            const sm = sineM(n);
+            const CROSS_GAP = 8;
+            const RUNG_COLORS = ["#7a9a78", "#8a6f8e", "#b07868", "#6882a0"];
 
-          {/* Player strands */}
-          <path d={buildStrandPath(defTraits, W, H, amplitude, false)} fill="none"
-            stroke={defColor} strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
-          <path d={buildStrandPath(offTraits, W, H, amplitude, true)}  fill="none"
-            stroke={offColor} strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+            const crossXs: number[] = [];
+            for (let k = 0; k <= 2 * n; k++) crossXs.push((k / (2 * n)) * W);
+
+            const rungData: { x: number; yOff: number; yDef: number; color: string }[] = [];
+            let ri = 0;
+            const RUNG_STEP = 14;
+            for (let rx = RUNG_STEP / 2; rx < W; rx += RUNG_STEP) {
+              if (crossXs.some(cx => Math.abs(rx - cx) < CROSS_GAP + 3)) continue;
+              const t = rx / W;
+              rungData.push({
+                x: rx,
+                yOff: strandYAtSmooth(offTraits, t, W, H, amplitude, true),
+                yDef: strandYAtSmooth(defTraits, t, W, H, amplitude, false),
+                color: RUNG_COLORS[ri++ % RUNG_COLORS.length],
+              });
+            }
+
+            return crossXs.slice(0, -1).map((segStart, k) => {
+              const segEnd = crossXs[k + 1];
+              const offFront = k % 2 === 0;
+              const backTraits  = offFront ? defTraits : offTraits;
+              const frontTraits = offFront ? offTraits : defTraits;
+              const backIsOff   = !offFront;
+              const frontIsOff  = offFront;
+              const backColor2  = offFront ? defColor : offColor;
+              const frontColor2 = offFront ? offColor : defColor;
+              const gl = k > 0 ? CROSS_GAP : 0;
+              const gr = k < 2 * n - 1 ? CROSS_GAP : 0;
+              const segRungs = rungData.filter(r => r.x >= segStart && r.x <= segEnd);
+
+              return (
+                <g key={`seg-${k}`}>
+                  <path d={buildSegStrandPath(backTraits, W, H, amplitude, backIsOff, segStart, segEnd, gl, gr)}
+                        fill="none" stroke={backColor2} strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+                  {segRungs.map((r, i) => (
+                    <line key={i} x1={r.x} y1={r.yOff} x2={r.x} y2={r.yDef}
+                          stroke={r.color} strokeWidth="2" opacity="0.45" strokeLinecap="round"/>
+                  ))}
+                  <path d={buildSegStrandPath(frontTraits, W, H, amplitude, frontIsOff, segStart, segEnd, 0, 0)}
+                        fill="none" stroke={frontColor2} strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+                </g>
+              );
+            });
+          })()}
 
           {/* Offensive nodes — label follows node: above centre → label above, below → label below */}
           {offTraits.map((t, i) => {
