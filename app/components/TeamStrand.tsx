@@ -175,42 +175,44 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
                 stroke={RED} strokeWidth="1.5" opacity="0.28" strokeDasharray="5,3"/>
         </>)}
 
-        {/* 3D helix — depth-sorted segments, cos(θ) drives opacity + width */}
+        {/* 3D helix — continuous paths with depth layering */}
         {(() => {
-          const SEGS = 60;
-          type HSeg = { x1: number; y1: number; x2: number; y2: number;
-                        color: string; depth: number; key: string };
-          const segs: HSeg[] = [];
+          const crossXs: number[] = [];
+          for (let k = 0; ; k++) {
+            const x = W * (1 + 2 * k) / (4 * sm);
+            if (x > W) break;
+            crossXs.push(x);
+          }
+          const bounds = [0, ...crossXs, W];
 
-          const addSegs = (vals: number[], flip: boolean, color: string, id: string) => {
-            for (let s = 0; s < SEGS; s++) {
-              const x1 = (s / SEGS) * W;
-              const x2 = ((s + 1) / SEGS) * W;
-              const xMid = (x1 + x2) / 2;
-              const a1 = AMP * (0.28 + vals[Math.min(N - 1, Math.floor((x1 / W) * N))] * 0.72);
-              const a2 = AMP * (0.28 + vals[Math.min(N - 1, Math.floor((x2 / W) * N))] * 0.72);
-              const y1 = cy + (flip ? 1 : -1) * a1 * Math.sin(freq * x1 * sm);
-              const y2 = cy + (flip ? 1 : -1) * a2 * Math.sin(freq * x2 * sm);
-              const depth = (flip ? -1 : 1) * Math.cos(freq * xMid * sm);
-              segs.push({ x1, y1, x2, y2, color, depth, key: `${id}-${s}` });
-            }
-          };
+          const sectionPath = (vals: number[], flip: boolean, xS: number, xE: number): string =>
+            Array.from({ length: STEPS + 1 }, (_, step) => {
+              const x = (step / STEPS) * W;
+              if (x < xS - 0.5 || x > xE + 0.5) return null;
+              const ti = Math.min(N - 1, Math.floor((x / W) * N));
+              const amp = AMP * (0.28 + vals[ti] * 0.72);
+              const y = cy + (flip ? 1 : -1) * amp * Math.sin(freq * x * sm);
+              return `${x.toFixed(1)} ${y.toFixed(1)}`;
+            }).filter((s): s is string => s !== null)
+              .map((s, i) => `${i === 0 ? "M" : "L"} ${s}`).join(" ");
 
-          addSegs(offVals, false, NAVY, "off");
-          addSegs(defVals, true, RED, "def");
-          segs.sort((a, b) => a.depth - b.depth);
-
-          return segs.map(seg => {
-            const sw = 2.2 + seg.depth * 0.8;
-            const op = 0.65 + seg.depth * 0.30;
-            return (
-              <line key={seg.key}
-                    x1={seg.x1.toFixed(1)} y1={seg.y1.toFixed(1)}
-                    x2={seg.x2.toFixed(1)} y2={seg.y2.toFixed(1)}
-                    stroke={seg.color} strokeWidth={sw.toFixed(2)}
-                    opacity={op.toFixed(3)} strokeLinecap="butt"/>
-            );
-          });
+          return (<>
+            {/* Background — full continuous paths, always visible */}
+            <path d={buildPath(offVals, false)} fill="none"
+                  stroke={NAVY} strokeWidth="1.6" opacity="0.35"/>
+            <path d={buildPath(defVals, true)} fill="none"
+                  stroke={RED} strokeWidth="1.6" opacity="0.35"/>
+            {/* Foreground — thicker sections where each strand is in front */}
+            {bounds.slice(0, -1).map((xS, k) => {
+              const xMid = (xS + bounds[k + 1]) / 2;
+              const offFront = Math.cos(freq * xMid * sm) > 0;
+              const vals  = offFront ? offVals : defVals;
+              const flip  = offFront ? false : true;
+              const color = offFront ? NAVY : RED;
+              return <path key={`fg-${k}`} d={sectionPath(vals, flip, xS, bounds[k + 1])}
+                           fill="none" stroke={color} strokeWidth="2.8" opacity="0.92"/>;
+            })}
+          </>);
         })()}
 
         {/* OFF labels */}

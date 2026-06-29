@@ -147,41 +147,42 @@ export default function StrandDisplay({
           {offTraits.length > 0 && defTraits.length > 0 && (() => {
             const n = offTraits.length;
             const smN = sineM(n);
-            const SEGS = 80;
-            type HSeg = { x1: number; y1: number; x2: number; y2: number;
-                          color: string; depth: number; key: string };
-            const segs: HSeg[] = [];
 
-            const addSegs = (traits: StrandTrait[], isOff: boolean, color: string, id: string) => {
-              for (let s = 0; s < SEGS; s++) {
-                const t1 = s / SEGS;
-                const t2 = (s + 1) / SEGS;
-                const tMid = (t1 + t2) / 2;
-                const x1 = t1 * W;
-                const x2 = t2 * W;
-                const xMid = tMid * W;
-                const y1 = strandYAtSmooth(traits, t1, W, H, amplitude, isOff);
-                const y2 = strandYAtSmooth(traits, t2, W, H, amplitude, isOff);
-                const depth = (isOff ? 1 : -1) * Math.cos(freq * xMid * smN);
-                segs.push({ x1, y1, x2, y2, color, depth, key: `${id}-${s}` });
-              }
-            };
+            const crossXs: number[] = [];
+            for (let k = 0; ; k++) {
+              const x = W * (1 + 2 * k) / (4 * smN);
+              if (x > W) break;
+              crossXs.push(x);
+            }
+            const bounds = [0, ...crossXs, W];
 
-            addSegs(offTraits, true, offColor, "off");
-            addSegs(defTraits, false, defColor, "def");
-            segs.sort((a, b) => a.depth - b.depth);
+            const sectionPath = (traits: StrandTrait[], isOff: boolean, xS: number, xE: number): string =>
+              Array.from({ length: 81 }, (_, i) => {
+                const x = (i / 80) * W;
+                if (x < xS - 0.5 || x > xE + 0.5) return null;
+                const t = x / W;
+                const y = strandYAtSmooth(traits, t, W, H, amplitude, isOff);
+                return `${x.toFixed(1)} ${y.toFixed(1)}`;
+              }).filter((s): s is string => s !== null)
+                .map((s, i) => `${i === 0 ? "M" : "L"} ${s}`).join(" ");
 
-            return segs.map(seg => {
-              const sw = 2.2 + seg.depth * 0.8;
-              const op = 0.65 + seg.depth * 0.30;
-              return (
-                <line key={seg.key}
-                      x1={seg.x1.toFixed(1)} y1={seg.y1.toFixed(1)}
-                      x2={seg.x2.toFixed(1)} y2={seg.y2.toFixed(1)}
-                      stroke={seg.color} strokeWidth={sw.toFixed(2)}
-                      opacity={op.toFixed(3)} strokeLinecap="butt"/>
-              );
-            });
+            return (<>
+              {/* Background — full continuous paths */}
+              <path d={buildStrandPath(offTraits, W, H, amplitude, true)} fill="none"
+                    stroke={offColor} strokeWidth="1.6" opacity="0.35" strokeLinecap="round"/>
+              <path d={buildStrandPath(defTraits, W, H, amplitude, false)} fill="none"
+                    stroke={defColor} strokeWidth="1.6" opacity="0.35" strokeLinecap="round"/>
+              {/* Foreground — thicker where in front */}
+              {bounds.slice(0, -1).map((xS, k) => {
+                const xMid = (xS + bounds[k + 1]) / 2;
+                const offFront = Math.cos(freq * xMid * smN) > 0;
+                const traits = offFront ? offTraits : defTraits;
+                const isOff  = offFront;
+                const color  = offFront ? offColor : defColor;
+                return <path key={`fg-${k}`} d={sectionPath(traits, isOff, xS, bounds[k + 1])}
+                             fill="none" stroke={color} strokeWidth="2.8" opacity="0.92" strokeLinecap="round"/>;
+              })}
+            </>);
           })()}
 
           {/* Offensive labels — positioned at sine peaks/troughs */}
