@@ -38,9 +38,6 @@ interface Props {
 export default function MetricTip({ term, children, className }: Props) {
   const [show, setShow] = useState(false);
   const timeout = useRef<ReturnType<typeof setTimeout>>();
-  const tip = GLOSSARY[term];
-  if (!tip) return <span className={className}>{children ?? term}</span>;
-
   const enter = useCallback(() => {
     clearTimeout(timeout.current);
     setShow(true);
@@ -48,6 +45,9 @@ export default function MetricTip({ term, children, className }: Props) {
   const leave = useCallback(() => {
     timeout.current = setTimeout(() => setShow(false), 150);
   }, []);
+
+  const tip = GLOSSARY[term];
+  if (!tip) return <span className={className}>{children ?? term}</span>;
 
   return (
     <span
