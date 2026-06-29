@@ -19,6 +19,8 @@ const norm = (val: number, mn: number, mx: number) =>
 export function buildAssetTraits(a: Asset, nav: XNAVResult): {
   off: StrandTrait[]; def: StrandTrait[]
 } {
+  if (a.position === "G") return buildGoalieTraits(a, nav);
+
   const isD = a.position === "D";
   const ops = a.ops ?? null;
   const dps = a.dps ?? null;
@@ -32,8 +34,9 @@ export function buildAssetTraits(a: Asset, nav: XNAVResult): {
         val: opsNorm ?? norm(safe(a.ptsPace), 0, isD ? 80 : 100),
         title: ops !== null ? `OPS ${ops.toFixed(1)} — Offensive Point Shares` : `Pts/82: ${a.ptsPace.toFixed(1)}`,
         ps: ops !== null ? ops.toFixed(1) : null },
-      { label: "xG",   val: norm(safe(a.xGPace ?? 0), 0, isD ? 25 : 50),
-        title: `xGoals: ${(a.xGPace ?? 0).toFixed(1)}/82` },
+      { label: "xG",   val: a.xGPace != null ? norm(safe(a.xGPace), 0, isD ? 25 : 50) : 0.5,
+        title: a.xGPace != null ? `xGoals: ${a.xGPace.toFixed(1)}/82` : "xG data unavailable",
+        unavailable: a.xGPace == null },
       { label: "NOIV", val: norm(safe(a.xgRelTM ?? 0), -12, 12),
         title: `xG% vs teammates: ${(a.xgRelTM ?? 0).toFixed(1)}` },
       { label: "TOI+", val: norm(safe(a.avgTOI), 10, 27),
@@ -54,6 +57,42 @@ export function buildAssetTraits(a: Asset, nav: XNAVResult): {
           : "Zone deployment unavailable",
         display: a.dzPct != null ? Math.round((1 - a.dzPct) * 100) : undefined,
         unavailable: a.dzPct == null },
+    ],
+  };
+}
+
+function buildGoalieTraits(a: Asset, nav: XNAVResult): {
+  off: StrandTrait[]; def: StrandTrait[]
+} {
+  const gsax = a.gsax ?? null;
+  const svPct = a.savePct ?? null;
+  const gs = a.gamesStarted ?? a.games;
+  const hdsvPct = a.baselineHdsvPct ?? null;
+  const workload = norm(safe(gs), 10, 65);
+
+  return {
+    off: [
+      { label: "GSAX",
+        val: gsax !== null ? norm(safe(gsax), -15, 25) : 0.5,
+        title: gsax !== null ? `GSAX: ${gsax.toFixed(1)} — Goals Saved Above Expected` : "GSAX unavailable",
+        display: gsax !== null ? Math.round(gsax * 10) / 10 : undefined,
+        unavailable: gsax == null },
+      { label: "SV%",
+        val: svPct !== null ? norm(safe(svPct), 0.890, 0.935) : 0.5,
+        title: svPct !== null ? `Save %: ${(svPct * 100).toFixed(1)}%` : "Save % unavailable",
+        display: svPct !== null ? Math.round(svPct * 1000) / 10 : undefined,
+        unavailable: svPct == null },
+    ],
+    def: [
+      { label: "HDSV",
+        val: hdsvPct !== null ? norm(safe(hdsvPct), 0.780, 0.880) : 0.5,
+        title: hdsvPct !== null ? `High-Danger SV%: ${(hdsvPct * 100).toFixed(1)}%` : "HD SV% unavailable",
+        display: hdsvPct !== null ? Math.round(hdsvPct * 1000) / 10 : undefined,
+        unavailable: hdsvPct == null },
+      { label: "WRKLD",
+        val: workload,
+        title: `Games started: ${gs}`,
+        display: gs },
     ],
   };
 }

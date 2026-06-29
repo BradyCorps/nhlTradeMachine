@@ -1,7 +1,8 @@
 // ── Footer — methodology, glossary, icon key, data credits ───
 // Shared across Armchair GM, Trade Machine, and Player Analytics pages.
+import Link from "next/link";
 
-const iconKey = [
+export const iconKey = [
   ["♛", "Megalodon", "Extreme franchise-value tier above the top NAV threshold."],
   ["◆", "Franchise / Core", "Franchise marker on asset cards; core-player section marker in selectors."],
   ["★", "Surplus / Pedigree", "Surplus contract, award signal, prospect marker, or elite shutdown pedigree when paired with text."],
@@ -13,7 +14,7 @@ const iconKey = [
   ["⚠", "Salary Dump", "Deeply negative or high-risk contract warning."],
 ];
 
-const methodologySections = [
+export const methodologySections = [
   {
     title: "Player Valuation",
     intro: "How the app turns a player, contract, and role into tradeable asset value.",
@@ -74,7 +75,7 @@ export default function Footer() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-5 text-center">
           <p className="text-2xs uppercase tracking-[0.16em] sm:tracking-[0.36em] leading-relaxed font-mono text-ledger-ink-faint">
-            Methodology · Glossary · Icon Key
+            <Link href="/methodology" className="underline hover:text-ledger-ink transition-colors">Methodology</Link> · <Link href="/methodology#strand-glossary" className="underline hover:text-ledger-ink transition-colors">Glossary</Link> · Icon Key
           </p>
           <p className="mt-1 text-[9px] uppercase tracking-[0.14em] sm:tracking-[0.24em] font-mono text-ledger-rule">
             X-NAV · G-NAV · NOIV · STRAND™ · GM Audit

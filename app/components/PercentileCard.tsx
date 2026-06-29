@@ -2,6 +2,7 @@
 import React, { useMemo } from "react";
 import { calcNAV } from "@/app/lib/xnav-engine";
 import { SEASON } from "@/app/lib/season-config";
+import MetricTip from "@/app/components/MetricTip";
 
 interface PlayerData {
   id: string;
@@ -229,7 +230,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
             fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.15em",
             opacity: 0.6, marginTop: "2px",
           }}>
-            X-NAV
+            <MetricTip term="X-NAV">X-NAV</MetricTip>
           </div>
         </div>
       </div>
@@ -244,7 +245,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         textTransform: "uppercase", letterSpacing: "0.1em",
       }}>
         <span>${player.capHit}M × {player.yearsRemaining}yr</span>
-        <span>FMV ${(xnav.fmvAav ? xnav.fmvAav : 0).toFixed(1)}M</span>
+        <span><MetricTip term="FMV">FMV</MetricTip> ${(xnav.fmvAav ? xnav.fmvAav : 0).toFixed(1)}M</span>
         <span style={{ color: percentileColor(avgPercentile), fontWeight: 900 }}>
           {percentileLabel(avgPercentile)}
         </span>

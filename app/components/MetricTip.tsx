@@ -1,0 +1,86 @@
+"use client";
+import React, { useState, useRef, useCallback } from "react";
+
+const GLOSSARY: Record<string, string> = {
+  "X-NAV": "Net Asset Value for skaters — offense, defense, age, contract surplus, deployment, and role context.",
+  "G-NAV": "Net Asset Value for goalies — GSAx, workload, save profile, team defense, age, and contract surplus.",
+  "NAV": "Net Asset Value — overall trade value after on-ice impact, age, role, cap hit, term, and team control.",
+  "OPS": "Offensive Point Shares — a player's offensive contribution measured in standings points.",
+  "DPS": "Defensive Point Shares — a player's defensive contribution measured in standings points.",
+  "SCR": "Scoring pace — points per 82 games, normalized by position.",
+  "xG": "Expected goals — goal creation from shot quality and volume, not just shot count.",
+  "NOIV": "Net On-Ice Value — expected goal differential vs teammates when on ice.",
+  "TOI+": "Ice-time trust and role load — heavy minutes imply broader usage and higher coaching trust.",
+  "SUPP": "xGA suppression relative to teammates — positive means fewer chances allowed with this player on ice.",
+  "Usage": "QoC deployment difficulty (0-100) — matchup and usage context at even strength.",
+  "OZ": "Offensive zone start share — high means more offensive deployment.",
+  "DZ%": "Defensive-zone start share — high indicates trusted defensive deployment.",
+  "STRAND": "Stylistic Trait & Rating Analysis for NHL Development — a player/team identity view.",
+  "EWA": "Estimated Wins Added — translates asset value into standings impact.",
+  "CWI": "Contention Window Index — whether a trade extends, compresses, or harms a competitive window.",
+  "FMV": "Fair Market Value — estimated contract AAV a player would command as a free agent.",
+  "CAP": "Contract surplus component — positive means under market value, negative means overpaid.",
+  "YNG": "Youth/upside component for young NHL players with real signal. Not a blanket ELC bonus.",
+  "DEF": "Defensive NAV component — composite of defensive contributions.",
+  "GSAX": "Goals Saved Above Expected — how many goals a goalie prevents vs league-average.",
+  "SV%": "Save percentage — shots saved divided by total shots faced.",
+  "HDSV": "High-Danger Save % — save rate on high-danger scoring chances.",
+  "QoC": "Quality of Competition — measures the difficulty of a player's even-strength matchups.",
+  "GM Audit": "Checks clauses, cap legality, retention, roster slots, surplus gaps, and timeline fit.",
+};
+
+interface Props {
+  term: string;
+  children?: React.ReactNode;
+  className?: string;
+}
+
+export default function MetricTip({ term, children, className }: Props) {
+  const [show, setShow] = useState(false);
+  const timeout = useRef<ReturnType<typeof setTimeout>>();
+  const tip = GLOSSARY[term];
+  if (!tip) return <span className={className}>{children ?? term}</span>;
+
+  const enter = useCallback(() => {
+    clearTimeout(timeout.current);
+    setShow(true);
+  }, []);
+  const leave = useCallback(() => {
+    timeout.current = setTimeout(() => setShow(false), 150);
+  }, []);
+
+  return (
+    <span
+      className={`relative cursor-help ${className ?? ""}`}
+      onMouseEnter={enter}
+      onMouseLeave={leave}
+      onTouchStart={enter}
+      style={{ borderBottom: "1px dotted var(--ledger-rule)", display: "inline" }}
+    >
+      {children ?? term}
+      {show && (
+        <span
+          className="absolute z-50 font-mono text-[10px] leading-snug"
+          style={{
+            bottom: "calc(100% + 6px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "max(200px, min(280px, 60vw))",
+            padding: "6px 8px",
+            background: "var(--ledger-ink, #2c2416)",
+            color: "var(--ledger-cream, #f5efe0)",
+            border: "1px solid var(--ledger-brown, #8b7355)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+            pointerEvents: "none",
+          }}
+        >
+          <strong style={{ letterSpacing: "0.08em" }}>{term}</strong>
+          <br />
+          {tip}
+        </span>
+      )}
+    </span>
+  );
+}
+
+export { GLOSSARY };
