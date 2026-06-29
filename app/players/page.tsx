@@ -546,10 +546,44 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
 // The extra 2 in the trade machine come from evaluate/route.ts
 // (nav.off/def detailed components + nav.age) which needs evaluation.
 function FullStrand({ player }: { player: Player }) {
-  const isD  = player.position === "D";
   const norm = (v: number, lo: number, hi: number) => Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
   const safe = (n: number) => isNaN(n) || !isFinite(n) ? 0 : n;
 
+  if (player.position === "G") {
+    const gsax = player.gsax ?? null;
+    const svPct = player.savePct ?? null;
+    const gs = player.gamesStarted ?? player.games ?? 0;
+    return (
+      <StrandDisplay
+        offTraits={[
+          { label: "GSAX",
+            val: gsax !== null ? norm(safe(gsax), -15, 25) : 0.5,
+            title: gsax !== null ? `GSAX: ${gsax.toFixed(1)} — Goals Saved Above Expected` : "GSAX unavailable",
+            display: gsax !== null ? Math.round(gsax * 10) / 10 : undefined,
+            unavailable: gsax == null },
+          { label: "SV%",
+            val: svPct !== null ? norm(safe(svPct), 0.890, 0.935) : 0.5,
+            title: svPct !== null ? `Save %: ${(svPct * 100).toFixed(1)}%` : "Save % unavailable",
+            display: svPct !== null ? Math.round(svPct * 1000) / 10 : undefined,
+            unavailable: svPct == null },
+        ]}
+        defTraits={[
+          { label: "HDSV",
+            val: 0.5, unavailable: true,
+            title: "High-Danger SV% — unavailable on this view" },
+          { label: "WRKLD",
+            val: norm(safe(gs), 10, 65),
+            title: `Games started: ${gs}`,
+            display: gs },
+        ]}
+        ops={null} dps={null}
+        strandType="GOALTENDER"
+        W={280} H={135} amplitude={34}
+      />
+    );
+  }
+
+  const isD  = player.position === "D";
   const ops = player.ops ?? null;
   const dps = player.dps ?? null;
   const psTotal  = ops !== null && dps !== null ? ops + dps : null;
@@ -564,8 +598,9 @@ function FullStrand({ player }: { player: Player }) {
       val: opsNorm ?? norm(safe(player.ptsPace), 0, isD ? 80 : 100),
       ps: ops?.toFixed(1),
       title: ops !== null ? `OPS ${ops.toFixed(1)} — Offensive Point Shares` : `Pts/82: ${player.ptsPace.toFixed(1)}` },
-    { label: "xG",   val: norm(safe(player.xGPace ?? 0), 0, isD ? 25 : 50),
-      title: `xG/82: ${(player.xGPace ?? 0).toFixed(1)}` },
+    { label: "xG",   val: player.xGPace != null ? norm(safe(player.xGPace), 0, isD ? 25 : 50) : 0.5,
+      title: player.xGPace != null ? `xG/82: ${player.xGPace.toFixed(1)}` : "xG data unavailable",
+      unavailable: player.xGPace == null },
     { label: "NOIV", val: norm(safe(player.xgRelTM ?? 0), -12, 12),
       title: `xG% vs teammates: ${player.xgRelTM != null ? (player.xgRelTM as number).toFixed(1) : "—"}` },
     { label: "TOI+", val: norm(safe(player.avgTOI), 10, 27),
