@@ -208,7 +208,7 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
                     x1={seg.x1.toFixed(1)} y1={seg.y1.toFixed(1)}
                     x2={seg.x2.toFixed(1)} y2={seg.y2.toFixed(1)}
                     stroke={seg.color} strokeWidth={sw.toFixed(2)}
-                    opacity={op.toFixed(3)} strokeLinecap="round"/>
+                    opacity={op.toFixed(3)} strokeLinecap="butt"/>
             );
           });
         })()}
