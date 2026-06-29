@@ -38,7 +38,7 @@ export default function AssetCard({
   const floorAdj = Math.round(xnav.total) - Math.round(xnav.off + displayedDef + xnav.age + xnav.cap);
 
   const otherBlock = blocks[1 - idx].filter(a =>
-    a.position !== "Pick" && a.position !== "G" && a.id !== asset.id
+    a.position !== "Pick" && a.id !== asset.id
   );
   const compareAsset = otherBlock.find(a => a.id === compareId) ?? null;
   const compareXnav  = compareAsset
@@ -188,7 +188,7 @@ export default function AssetCard({
         <div className="flex gap-0 mb-2" style={{ borderBottom: '1px solid #c8b890' }}>
           {([
             "STATS",
-            ...(asset.position !== "G" && asset.hasLiveStats ? ["STRAND"] : []),
+            ...(asset.hasLiveStats ? ["STRAND"] : []),
             ...(hasDevelopmentProfile ? ["DEV"] : []),
             "TIMELINE",
           ] as AssetCardView[]).map((v) => (
@@ -222,7 +222,7 @@ export default function AssetCard({
       )}
 
       {/* STRAND — Stylistic Trait & Rating Analysis for NHL Development */}
-      {view === "STRAND" && !isPick && asset.position !== "G" && (
+      {view === "STRAND" && !isPick && (
         <>
           {otherBlock.length > 0 && (
             <div className="flex items-center gap-2 mb-1.5 px-0.5">
@@ -259,7 +259,7 @@ export default function AssetCard({
         <DevelopmentProfilePanel asset={asset} />
       )}
       {/* Standard STATS view */}
-      {(view === "STATS" || isPick || asset.position === "G") && (<>
+      {(view === "STATS" || isPick) && (<>
       {asset.position === "G" && !isPick && (
         <div className="grid grid-cols-3 gap-1.5 mb-2.5 sm:grid-cols-3">
           {[

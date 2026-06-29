@@ -386,7 +386,7 @@ function PlayerTabButton({ label, active, onClick }: { label: string; active: bo
 function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: Team; allPlayers: Player[] }) {
   const isG = player.position === "G";
   const hasOutlook = player.position !== "G" && !!player.developmentProfile;
-  const hasStrand = !isG;
+  const hasStrand = true;
   const hasContract = player.yearsRemaining > 0;
 
   const tabs: { key: PlayerTab; label: string }[] = [
