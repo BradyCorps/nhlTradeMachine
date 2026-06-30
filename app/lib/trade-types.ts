@@ -159,11 +159,25 @@ export interface TradeMetrics {
   cwiYears: number;
 }
 
+export type TradeSideOutcome = "WIN" | "LOSS" | "EVEN";
+
+export interface TradeSideAssessment {
+  side: "home" | "partner";
+  teamId: string;
+  teamName: string;
+  outcome: TradeSideOutcome;
+  navNet: number;
+  winsAdded: number;
+  windowYears: number;
+  drivers: string[];
+}
+
 export interface TradeVerdict {
   status: TradeStatus;
   message: string;
   flags: GmFlag[];
   metrics: TradeMetrics;
+  sideOutcomes?: TradeSideAssessment[];
   claudeAnalysis?: string;
   claudeLoading?: boolean;
 }

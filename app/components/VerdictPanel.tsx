@@ -21,6 +21,14 @@ export const STATUS_CONFIG: Record<TradeStatus, { border: string; headerText: st
   DECLINED: { border: "border-orange-600/50",  headerText: "text-ledger-red-deep", icon: "✗", bg: "bg-orange-950/20", cssColor: "var(--ledger-orange)", outcome: "Won't happen" },
 };
 
+const SIDE_OUTCOME_STYLE = {
+  WIN:  { text: "text-emerald-400", border: "border-emerald-700/40", bg: "bg-emerald-950/10", label: "Win" },
+  EVEN: { text: "text-sky-300",     border: "border-sky-700/35",     bg: "bg-sky-950/10",     label: "Even" },
+  LOSS: { text: "text-amber-400",   border: "border-amber-700/35",   bg: "bg-amber-950/10",   label: "Loss" },
+} as const;
+
+const signed = (value: number, digits = 1) => `${value > 0 ? "+" : ""}${value.toFixed(digits)}`;
+
 export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestClaudeAnalysis, onOpenMemo }: {
   verdict: TradeVerdict;
   sc: typeof STATUS_CONFIG[TradeStatus];
@@ -61,6 +69,45 @@ export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFla
           {warnCount > 0 && <span className="text-2xs font-black px-2 py-0.5 rounded-full bg-amber-900 text-darkmode border border-amber-800">{warnCount} WARNING{warnCount > 1 ? "S" : ""}</span>}
         </div>
       </div>
+
+      {verdict.sideOutcomes && verdict.sideOutcomes.length > 0 && (
+        <div className="px-5 py-3 border-b border-zinc-800/30">
+          <div className="text-2xs font-black text-zinc-700 uppercase tracking-widest mb-2">
+            Side Read
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {verdict.sideOutcomes.map((side) => {
+              const style = SIDE_OUTCOME_STYLE[side.outcome];
+              return (
+                <div key={`${side.side}-${side.teamId}`} className={`border px-3 py-2 ${style.bg} ${style.border}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-2xs font-black uppercase tracking-widest text-zinc-500">
+                        {side.teamName}
+                      </div>
+                      <div className={`text-sm font-black uppercase italic ${style.text}`}>
+                        {style.label}
+                      </div>
+                    </div>
+                    <div className="text-right font-mono text-2xs text-zinc-500 shrink-0">
+                      <div>{signed(side.navNet, 0)} NAV</div>
+                      <div>{signed(side.winsAdded)} W</div>
+                      <div>{signed(side.windowYears)} yr</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {side.drivers.map((driver) => (
+                      <span key={driver} className="text-2xs font-bold px-1.5 py-0.5 border border-zinc-800/30 text-zinc-500">
+                        {driver}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Metrics */}
       <div className="px-5 py-3 border-b border-zinc-800/30 font-mono space-y-1">

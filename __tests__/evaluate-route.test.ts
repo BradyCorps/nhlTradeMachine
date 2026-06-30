@@ -148,6 +148,97 @@ describe("evaluate route integration", () => {
     expect(Math.abs(body.verdict.metrics.homeNetGain)).toBeLessThanOrEqual(1);
   });
 
+  it("adds per-side win reads for cross-position need trades", async () => {
+    const home = team({
+      id: "WPG",
+      name: "Winnipeg Jets",
+      capSpace: 10,
+      phase: "Bubble",
+      standing: 12,
+      needs: [{ pos: "D", minWar: 1, label: "right-shot defense" }],
+    });
+    const partner = team({
+      id: "PIT",
+      name: "Pittsburgh Penguins",
+      capSpace: 10,
+      phase: "Bubble",
+      standing: 14,
+      needs: [{ pos: "W", minWar: 1, label: "forward depth" }],
+    });
+    const gustafsson = asset({
+      id: "david-gustafsson",
+      name: "David Gustafsson",
+      teamId: "WPG",
+      position: "W",
+      age: 25,
+      ptsPace: 40,
+      baselinePtsPace: 40,
+      avgTOI: 14,
+      capHit: 0.95,
+    });
+    const stIvany = asset({
+      id: "jack-st-ivany",
+      name: "Jack St. Ivany",
+      teamId: "PIT",
+      position: "D",
+      age: 25,
+      ptsPace: 28,
+      baselinePtsPace: 28,
+      defRate: 2.5,
+      avgTOI: 19,
+      pairDriverScore: 8,
+      capHit: 0.95,
+    });
+    const homeRoster = [
+      gustafsson,
+      asset({ id: "wpg-c1", name: "WPG C1", teamId: "WPG", position: "C", ptsPace: 45 }),
+      asset({ id: "wpg-c2", name: "WPG C2", teamId: "WPG", position: "C", ptsPace: 36 }),
+      asset({ id: "wpg-w1", name: "WPG W1", teamId: "WPG", position: "W", ptsPace: 38 }),
+      asset({ id: "wpg-w2", name: "WPG W2", teamId: "WPG", position: "W", ptsPace: 34 }),
+      asset({ id: "wpg-w3", name: "WPG W3", teamId: "WPG", position: "W", ptsPace: 30 }),
+      asset({ id: "wpg-d1", name: "WPG D1", teamId: "WPG", position: "D", avgTOI: 20 }),
+      asset({ id: "wpg-d2", name: "WPG D2", teamId: "WPG", position: "D", avgTOI: 19 }),
+      asset({ id: "wpg-d3", name: "WPG D3", teamId: "WPG", position: "D", avgTOI: 18 }),
+    ];
+    const partnerRoster = [
+      stIvany,
+      asset({ id: "pit-c1", name: "PIT C1", teamId: "PIT", position: "C", ptsPace: 45 }),
+      asset({ id: "pit-c2", name: "PIT C2", teamId: "PIT", position: "C", ptsPace: 36 }),
+      asset({ id: "pit-w1", name: "PIT W1", teamId: "PIT", position: "W", ptsPace: 38 }),
+      asset({ id: "pit-w2", name: "PIT W2", teamId: "PIT", position: "W", ptsPace: 34 }),
+      asset({ id: "pit-w3", name: "PIT W3", teamId: "PIT", position: "W", ptsPace: 30 }),
+      asset({ id: "pit-d1", name: "PIT D1", teamId: "PIT", position: "D", avgTOI: 20 }),
+      asset({ id: "pit-d2", name: "PIT D2", teamId: "PIT", position: "D", avgTOI: 19 }),
+      asset({ id: "pit-d3", name: "PIT D3", teamId: "PIT", position: "D", avgTOI: 18 }),
+    ];
+
+    const { response, body } = await postEvaluate({
+      assets: [gustafsson, stIvany],
+      tradeOutgoing: [gustafsson],
+      tradeIncoming: [stIvany],
+      homeTeam: home,
+      partnerTeam: partner,
+      allHomeRoster: homeRoster,
+      allPartnerRoster: partnerRoster,
+      runTrade: true,
+      capCeiling: 95.5,
+    });
+
+    expect(response.status).toBe(200);
+    expect(body.verdict.sideOutcomes).toEqual([
+      expect.objectContaining({
+        teamId: "WPG",
+        outcome: "WIN",
+        drivers: expect.arrayContaining(["Fills right-shot defense"]),
+      }),
+      expect.objectContaining({
+        teamId: "PIT",
+        outcome: "WIN",
+        drivers: expect.arrayContaining(["Fills forward depth"]),
+      }),
+    ]);
+  });
+
   it("surfaces goalie volatility in trade flags", async () => {
     const home = team({ id: "WPG", name: "Winnipeg Jets", capSpace: 15, phase: "Contender", standing: 6 });
     const partner = team({ id: "CGY", name: "Calgary Flames", capSpace: 15, phase: "Retooling", standing: 18 });

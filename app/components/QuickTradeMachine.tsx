@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
+import TeamStrand, { TeamStrandData } from "@/app/components/TeamStrand";
 import type { Asset, Team, TradeVerdict, XNAVResult } from "@/app/lib/trade-types";
 import { fetchNavMap, fetchTradeVerdict } from "@/app/lib/evaluate-client";
 import {
@@ -15,7 +16,7 @@ import { formatPickRound } from "@/app/lib/trade-format";
 import { ageDecayRate, ageSlotPenalty, SEASON } from "@/app/lib/season-config";
 
 type LeagueData = { teams: Team[]; players: Asset[]; capCeiling?: number | null };
-type VerdictDisplay = Pick<TradeVerdict, "status" | "message" | "metrics"> & {
+type VerdictDisplay = Pick<TradeVerdict, "status" | "message" | "metrics" | "sideOutcomes"> & {
   flags: Array<Pick<TradeVerdict["flags"][number], "severity" | "headline" | "explanation">>;
 };
 type PackageSummary = {
@@ -30,6 +31,8 @@ type PackageSummary = {
 
 const fmtCap = (value: number) => `$${value.toFixed(2)}M`;
 const fmtSigned = (value: number, digits = 1) => value > 0 ? `+${value.toFixed(digits)}` : value.toFixed(digits);
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+const norm = (value: number, min: number, max: number) => clamp01((value - min) / (max - min));
 
 function assetLabel(asset: Asset): string {
   if (asset.position === "Pick") {
@@ -268,6 +271,54 @@ function summarizePackage(assets: Asset[], navMap: Record<string, XNAVResult>): 
   return { cap, production, goals, xg, noiv, nav, count: assets.length };
 }
 
+function computeRosterStrand(roster: Asset[], navMap: Record<string, XNAVResult>): TeamStrandData | null {
+  const fwds = roster
+    .filter(player => ["C", "W", "L", "R"].includes(player.position) && player.hasLiveStats && (player.games ?? 0) >= 20)
+    .sort((a, b) => (b.avgTOI ?? 0) - (a.avgTOI ?? 0))
+    .slice(0, 9);
+  const dmen = roster
+    .filter(player => player.position === "D" && player.hasLiveStats && (player.games ?? 0) >= 20)
+    .sort((a, b) => (b.avgTOI ?? 0) - (a.avgTOI ?? 0))
+    .slice(0, 4);
+  const qualified = [...fwds, ...dmen];
+  if (qualified.length === 0) return null;
+
+  const safe = (value: number | null | undefined) => value ?? 0;
+  const totals = {
+    off: { OPS: 0, xG: 0, NOIV: 0, TOI: 0 },
+    def: { DPS: 0, SUPP: 0, Usage: 0, OZ: 0 },
+  };
+
+  for (const player of qualified) {
+    const isD = player.position === "D";
+    const xnav = navMap[player.id];
+    totals.off.OPS += player.ops != null ? norm(player.ops, 0, 7) : norm(safe(player.ptsPace), 0, isD ? 80 : 100);
+    totals.off.xG += norm(safe(player.xGPace), 0, isD ? 25 : 50);
+    totals.off.NOIV += norm(safe(player.xgRelTM), -12, 12);
+    totals.off.TOI += norm(safe(player.avgTOI), 10, 27);
+    totals.def.DPS += player.dps != null ? norm(player.dps, 0, 4.5) : norm(xnav?.def ?? 0, -60, 150);
+    totals.def.SUPP += norm(-(player.xgaRelTM ?? 0), -1.5, 1.5);
+    totals.def.Usage += norm(player.qocIndex ?? 35, 0, 100);
+    totals.def.OZ += player.dzPct != null ? 1 - norm(safe(player.dzPct), 0.3, 0.7) : 0.5;
+  }
+
+  const n = qualified.length;
+  return {
+    off: {
+      OPS: totals.off.OPS / n,
+      xG: totals.off.xG / n,
+      NOIV: totals.off.NOIV / n,
+      TOI: totals.off.TOI / n,
+    },
+    def: {
+      DPS: totals.def.DPS / n,
+      SUPP: totals.def.SUPP / n,
+      Usage: totals.def.Usage / n,
+      OZ: totals.def.OZ / n,
+    },
+  };
+}
+
 function SummaryMetric({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
   const color = tone === "good"
     ? "var(--ledger-green)"
@@ -384,6 +435,45 @@ function VerdictSummary({ verdict }: { verdict: VerdictDisplay }) {
       <p className="mt-3 text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-body)" }}>
         {verdict.message}
       </p>
+      {verdict.sideOutcomes && verdict.sideOutcomes.length > 0 && (
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {verdict.sideOutcomes.map(side => {
+            const color = side.outcome === "WIN"
+              ? "var(--ledger-green)"
+              : side.outcome === "LOSS"
+                ? "var(--ledger-red)"
+                : "var(--ledger-navy)";
+            return (
+              <div key={`${side.side}-${side.teamId}`} className="border px-3 py-2"
+                style={{ borderColor: "var(--ledger-rule-light)", background: "var(--ledger-card)" }}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-[9px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint">
+                      {side.teamName}
+                    </div>
+                    <div className="text-[15px] font-black uppercase italic" style={{ color }}>
+                      {side.outcome === "EVEN" ? "Even" : side.outcome}
+                    </div>
+                  </div>
+                  <div className="text-right text-[10px] font-mono text-ledger-ink-faint">
+                    <div>{fmtSigned(side.navNet, 0)} NAV</div>
+                    <div>{fmtSigned(side.winsAdded)} W</div>
+                    <div>{fmtSigned(side.windowYears)} yr</div>
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {side.drivers.map(driver => (
+                    <span key={driver} className="border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.12em]"
+                      style={{ borderColor: "var(--ledger-rule-light)", color: "var(--ledger-ink-faint)" }}>
+                      {driver}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
       {verdict.flags.length > 0 && (
         <div className="mt-4 space-y-2">
           {verdict.flags.slice(0, 4).map((flag, index) => (
@@ -400,6 +490,80 @@ function VerdictSummary({ verdict }: { verdict: VerdictDisplay }) {
         </div>
       )}
     </div>
+  );
+}
+
+function TeamStrandPreview({
+  homeTeam,
+  partnerTeam,
+  homeRoster,
+  partnerRoster,
+  outgoing,
+  incoming,
+  navMap,
+}: {
+  homeTeam: Team | null;
+  partnerTeam: Team | null;
+  homeRoster: Asset[];
+  partnerRoster: Asset[];
+  outgoing: Asset[];
+  incoming: Asset[];
+  navMap: Record<string, XNAVResult>;
+}) {
+  const hasActiveTrade = outgoing.length > 0 || incoming.length > 0;
+  const effectiveHomeRoster = useMemo(() => {
+    const outgoingIds = new Set(outgoing.map(asset => asset.id));
+    return [
+      ...homeRoster.filter(asset => !outgoingIds.has(asset.id)),
+      ...incoming.filter(asset => asset.position !== "Pick"),
+    ];
+  }, [homeRoster, outgoing, incoming]);
+  const effectivePartnerRoster = useMemo(() => {
+    const incomingIds = new Set(incoming.map(asset => asset.id));
+    return [
+      ...partnerRoster.filter(asset => !incomingIds.has(asset.id)),
+      ...outgoing.filter(asset => asset.position !== "Pick"),
+    ];
+  }, [partnerRoster, incoming, outgoing]);
+
+  const homeStrand = useMemo(() => computeRosterStrand(effectiveHomeRoster, navMap), [effectiveHomeRoster, navMap]);
+  const partnerStrand = useMemo(() => computeRosterStrand(effectivePartnerRoster, navMap), [effectivePartnerRoster, navMap]);
+  const preTradeHomeStrand = useMemo(() => hasActiveTrade ? computeRosterStrand(homeRoster, navMap) : null, [hasActiveTrade, homeRoster, navMap]);
+  const preTradePartnerStrand = useMemo(() => hasActiveTrade ? computeRosterStrand(partnerRoster, navMap) : null, [hasActiveTrade, partnerRoster, navMap]);
+
+  if (!homeTeam || !partnerTeam || !homeStrand || !partnerStrand) return null;
+
+  return (
+    <section className="border p-4" style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="text-[10px] font-black uppercase tracking-[0.25em] font-mono text-ledger-ink-faint">
+          Team Strands
+        </div>
+        {hasActiveTrade && (
+          <div className="text-[9px] font-black uppercase tracking-[0.18em] font-mono" style={{ color: "var(--ledger-brown)" }}>
+            Pre/Post Delta
+          </div>
+        )}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="border p-3" style={{ borderColor: "var(--ledger-rule-light)", background: "var(--ledger-cream)" }}>
+          <TeamStrand
+            strand={homeStrand}
+            teamName={homeTeam.name}
+            label={hasActiveTrade ? "Post-trade" : undefined}
+            compare={preTradeHomeStrand ?? undefined}
+          />
+        </div>
+        <div className="border p-3" style={{ borderColor: "var(--ledger-rule-light)", background: "var(--ledger-cream)" }}>
+          <TeamStrand
+            strand={partnerStrand}
+            teamName={partnerTeam.name}
+            label={hasActiveTrade ? "Post-trade" : undefined}
+            compare={preTradePartnerStrand ?? undefined}
+          />
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -733,6 +897,16 @@ export default function QuickTradeMachine() {
             </section>
 
             <TradeBalanceStrip outgoing={outgoingSummary} incoming={incomingSummary} navLoading={navLoading} />
+
+            <TeamStrandPreview
+              homeTeam={homeTeam}
+              partnerTeam={partnerTeam}
+              homeRoster={allHomeRoster}
+              partnerRoster={allPartnerRoster}
+              outgoing={outgoing}
+              incoming={incoming}
+              navMap={navMap}
+            />
 
             <section className="border p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
               style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>

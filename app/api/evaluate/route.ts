@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { getHistoricalFloor, getInjuryRisk, getProspectTier } from "@/app/lib/player-data";
-import type { Asset, EvaluateRequest, EvaluateResponse, FArchetype } from "@/app/lib/trade-types";
+import type {
+  Asset,
+  EvaluateRequest,
+  EvaluateResponse,
+  FArchetype,
+  TradeSideAssessment,
+  TradeSideOutcome,
+} from "@/app/lib/trade-types";
 import { SEASON, LEAGUE, FRANCHISE } from "@/app/lib/season-config";
 import { calcNAV, compressPackage as coreCompress, AssetInput, XNAVResult } from "@/app/lib/xnav-engine";
 import {
@@ -1023,6 +1030,75 @@ const nullMetrics = () => ({
   defGain: 0, capDelta: 0, variance: 0, ewaHome: 0, cwiYears: 0,
 });
 
+const sideOutcomeFromScore = (score: number): TradeSideOutcome => (
+  score >= 1 ? "WIN" : score <= -1 ? "LOSS" : "EVEN"
+);
+
+const sideDrivers = (
+  assetsIn: Asset[],
+  assetsOut: Asset[],
+  team: Team | null,
+  navNet: number,
+  winsAdded: number,
+  windowYears: number,
+  capDelta: number
+): { drivers: string[]; fillsNeed: boolean } => {
+  const drivers: string[] = [];
+  const inPositions = new Set(assetsIn.map(a => normalizePosition(a.position)).filter(pos => pos !== "Pick"));
+  const outPositions = new Set(assetsOut.map(a => normalizePosition(a.position)).filter(pos => pos !== "Pick"));
+  const need = team?.needs?.find(n => inPositions.has(normalizePosition(n.pos)));
+  const fillsNeed = Boolean(need);
+
+  if (need) drivers.push(`Fills ${need.label.toLowerCase()}`);
+  else if (inPositions.has("D") && !outPositions.has("D")) drivers.push("Adds blue-line depth");
+  else if ((inPositions.has("C") || inPositions.has("W")) && !outPositions.has("C") && !outPositions.has("W")) drivers.push("Adds forward depth");
+  else if (assetsIn.some(a => a.position === "Pick")) drivers.push("Adds future asset");
+
+  if (navNet >= 10) drivers.push("NAV surplus");
+  else if (navNet <= -10) drivers.push("Pays value premium");
+
+  if (winsAdded >= 0.2) drivers.push("Immediate wins");
+  else if (winsAdded <= -0.2) drivers.push("On-ice giveback");
+
+  if (windowYears >= 0.25) drivers.push("Window value");
+  else if (windowYears <= -0.25) drivers.push("Window cost");
+
+  if (capDelta <= -0.5) drivers.push("Creates cap room");
+  else if (capDelta >= 0.5) drivers.push("Uses cap space");
+
+  if (drivers.length === 0) drivers.push("Balanced exchange");
+  return { drivers: drivers.slice(0, 3), fillsNeed };
+};
+
+const buildSideAssessment = (
+  side: "home" | "partner",
+  team: Team | null,
+  assetsIn: Asset[],
+  assetsOut: Asset[],
+  navNet: number,
+  winsAdded: number,
+  windowYears: number,
+  capDelta: number
+): TradeSideAssessment => {
+  const { drivers, fillsNeed } = sideDrivers(assetsIn, assetsOut, team, navNet, winsAdded, windowYears, capDelta);
+  const score =
+    (navNet >= 10 ? 2 : navNet >= -10 ? 1 : -1) +
+    (winsAdded >= 0.2 ? 1 : winsAdded <= -0.2 ? -1 : 0) +
+    (windowYears >= 0.25 ? 1 : windowYears <= -0.25 ? -1 : 0) +
+    (fillsNeed ? 1 : 0);
+
+  return {
+    side,
+    teamId: team?.id ?? side,
+    teamName: team?.name ?? (side === "home" ? "Home" : "Partner"),
+    outcome: sideOutcomeFromScore(score),
+    navNet,
+    winsAdded,
+    windowYears,
+    drivers,
+  };
+};
+
 const evaluateTrade = (
   outgoing: Asset[],
   incoming: Asset[],
@@ -1113,6 +1189,10 @@ const evaluateTrade = (
 
   const cwiGain = calcAssetWindowImpact(incoming, 1) + calcAssetWindowImpact(outgoing, -1);
   const cwiYears = cwiGain / 3.0;
+  const partnerStanding = teamPartner?.standing ?? 16;
+  const partnerMarginFactor = partnerStanding >= 25 ? 1.0 : partnerStanding >= 17 ? 0.85 : partnerStanding >= 9 ? 0.70 : 0.55;
+  const ewaPartner = (-onIceDelta / 7) * partnerMarginFactor;
+  const cwiPartner = (calcAssetWindowImpact(outgoing, 1) + calcAssetWindowImpact(incoming, -1)) / 3.0;
 
   const flags = runGmLogic(outgoing, incoming, teamHome, teamPartner, allHomeRoster, allPartnerRoster, capCeiling);
   const hardFlags = flags.filter((f) => f.severity === "HARD");
@@ -1156,7 +1236,18 @@ const evaluateTrade = (
     message = `${Math.abs(homeNetGain).toFixed(1)} NAV Overpay`;
   }
 
-  return { status, message, flags, metrics: { navOut, navIn, homeNetGain, ptsGain, defGain, capDelta, variance, ewaHome, cwiYears } };
+  const sideOutcomes = [
+    buildSideAssessment("home", teamHome, incoming, outgoing, homeNetGain, ewaHome, cwiYears, capDelta),
+    buildSideAssessment("partner", teamPartner, outgoing, incoming, -homeNetGain, ewaPartner, cwiPartner, -capDelta),
+  ];
+
+  return {
+    status,
+    message,
+    flags,
+    metrics: { navOut, navIn, homeNetGain, ptsGain, defGain, capDelta, variance, ewaHome, cwiYears },
+    sideOutcomes,
+  };
 };
 
 // ============================================================
@@ -1179,6 +1270,7 @@ interface TradeVerdict {
     ewaHome: number;      
     cwiYears: number;     
   };
+  sideOutcomes?: TradeSideAssessment[];
   claudeAnalysis?: string;
   claudeLoading?: boolean;
 }

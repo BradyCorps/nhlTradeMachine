@@ -250,6 +250,12 @@ CONFIRMEDFIXES.
 ---
 ## [x] UI/UX Fixes
 
+### [x] UI6 - Trade verdict needs a per-side win/loss read
+- Add a compact per-team side assessment to the trade-machine verdict so cross-position trades can show when both teams gain something different, e.g. a forward-for-defense need fit.
+
+### [x] UI7 - Team Strands should show trade-driven +/- deltas
+- Add reusable TeamStrand delta rendering so post-trade team strands show OFF/DEF and trait-level changes versus the pre-trade roster, including the focused trade machine page.
+
 ### [x] UI1 - `app/players/page.tsx` button font is too small. 
 - Need this to be readable for people who arent aware of what is going on. PTS, PPG, buttons are illegiable.
 

@@ -860,6 +860,7 @@ describe("Canary — trade UX loading and mobile focus", () => {
   const tradeMachineRoute = read("app/trade-machine/page.tsx");
   const sharedTradeRoute = read("app/t/[code]/page.tsx");
   const sharedTradeImageRoute = read("app/t/[code]/opengraph-image.tsx");
+  const teamStrand = read("app/components/TeamStrand.tsx");
 
   it("selects the franchise from one team-grid click instead of requiring a second confirm click", () => {
     expect(tradePage).toContain("selectingTeamId");
@@ -947,6 +948,7 @@ describe("Canary — trade UX loading and mobile focus", () => {
   it("shows industry-style cap, production, NOIV, NAV, and GM audit context in the focused Trade Machine", () => {
     expect(quickTradeMachine).toContain("fetchNavMap");
     expect(quickTradeMachine).toContain("TeamTradeSummary");
+    expect(quickTradeMachine).toContain("TeamStrandPreview");
     expect(quickTradeMachine).toContain("Projected Cap");
     expect(quickTradeMachine).toContain("Production");
     expect(quickTradeMachine).toContain("NOIV");
@@ -955,6 +957,21 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(quickTradeMachine).toContain("setShareUrl(\"\")");
     expect(quickTradeMachine).toContain("GM Logic Signal");
     expect(quickTradeMachine).toContain("TradeBalanceStrip");
+  });
+
+  it("shows trade deltas on Team Strands when a pre-trade compare strand is supplied", () => {
+    expect(teamStrand).toContain("signedDelta");
+    expect(teamStrand).toContain("traitDeltas");
+    expect(teamStrand).toContain("compareOffVals");
+    expect(teamStrand).toContain("trade impact");
+    expect(quickTradeMachine).toContain("sideOutcomes");
+    expect(quickTradeMachine).toContain("Team Strands");
+    expect(quickTradeMachine).toContain("Pre/Post Delta");
+    expect(quickTradeMachine).toContain("computeRosterStrand");
+    expect(quickTradeMachine).toContain("compare={preTradeHomeStrand ?? undefined}");
+    expect(tradePage).toContain("preTradeHomeStrand");
+    expect(tradePage).toContain("preTradePartnerStrand");
+    expect(tradePage).toContain("compare={compare ?? undefined}");
   });
 });
 

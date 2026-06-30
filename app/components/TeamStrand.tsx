@@ -46,6 +46,7 @@ const DEF_LABELS = ["DPS", "SUPP", "Use",  "OZ"  ] as const;
 const toOff = (s: TeamStrandData) => [s.off.OPS, s.off.xG, s.off.NOIV, s.off.TOI];
 const toDef = (s: TeamStrandData) => [s.def.DPS, s.def.SUPP, s.def.Usage, s.def.OZ];
 const avg   = (v: number[])       => v.reduce((a, b) => a + b, 0) / v.length;
+const signedDelta = (value: number) => `${value > 0 ? "+" : ""}${Math.round(value)}`;
 
 interface Props {
   strand:   TeamStrandData;
@@ -119,8 +120,20 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
 
   const offVals = toOff(strand);
   const defVals = toDef(strand);
+  const compareOffVals = compare ? toOff(compare) : null;
+  const compareDefVals = compare ? toDef(compare) : null;
   const offScore = Math.round(avg(offVals) * 100);
   const defScore = Math.round(avg(defVals) * 100);
+  const offDelta = compareOffVals ? (avg(offVals) - avg(compareOffVals)) * 100 : 0;
+  const defDelta = compareDefVals ? (avg(defVals) - avg(compareDefVals)) * 100 : 0;
+  const traitDeltas = compareOffVals && compareDefVals
+    ? [
+        ...OFF_LABELS.map((label, i) => ({ label, delta: (offVals[i] - compareOffVals[i]) * 100, color: NAVY })),
+        ...DEF_LABELS.map((label, i) => ({ label, delta: (defVals[i] - compareDefVals[i]) * 100, color: RED })),
+      ].filter(({ delta }) => Math.abs(delta) >= 0.5)
+       .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+       .slice(0, 4)
+    : [];
 
 
   return (
@@ -140,10 +153,39 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
         </span>
         <span style={{ fontSize: 9, fontWeight: 900, flexShrink: 0 }}>
           <span style={{ color: NAVY }}>OFF {offScore}</span>
+          {compare && Math.abs(offDelta) >= 0.5 && (
+            <span style={{ color: offDelta >= 0 ? "#2a7a44" : "var(--ledger-red)", marginLeft: 3 }}>
+              {signedDelta(offDelta)}
+            </span>
+          )}
           <span style={{ color: "var(--ledger-ink-faint)", margin: "0 3px" }}>·</span>
           <span style={{ color: RED }}>DEF {defScore}</span>
+          {compare && Math.abs(defDelta) >= 0.5 && (
+            <span style={{ color: defDelta >= 0 ? "#2a7a44" : "var(--ledger-red)", marginLeft: 3 }}>
+              {signedDelta(defDelta)}
+            </span>
+          )}
         </span>
       </div>
+
+      {traitDeltas.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 5px",
+                      marginBottom: 5, padding: "0 2px" }}>
+          {traitDeltas.map(({ label: deltaLabel, delta, color }) => (
+            <span key={deltaLabel} title={`${deltaLabel} trade impact`}
+                  style={{ display: "inline-flex", alignItems: "baseline", gap: 3,
+                           border: "1px solid var(--ledger-rule-light)",
+                           background: "var(--paper-inset)",
+                           padding: "1px 4px", fontSize: 7, fontWeight: 900,
+                           color }}>
+              <span>{deltaLabel}</span>
+              <span style={{ color: delta >= 0 ? "#2a7a44" : "var(--ledger-red)" }}>
+                {signedDelta(delta)}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Helix SVG */}
       <svg viewBox={`0 0 ${W} ${H}`}

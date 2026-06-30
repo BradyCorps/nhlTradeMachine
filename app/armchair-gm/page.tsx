@@ -2317,6 +2317,8 @@ function TeamDNA({
 
   const homeStrand    = computeRosterStrand(effectiveHomeRoster, navMap);
   const partnerStrand = computeRosterStrand(effectivePartnerRoster, navMap);
+  const preTradeHomeStrand = hasActiveTrade ? computeRosterStrand(homeRoster, navMap) : null;
+  const preTradePartnerStrand = hasActiveTrade ? computeRosterStrand(partnerRoster, navMap) : null;
   if (!homeStrand || !partnerStrand) return null;
 
   // Contention ratings — derived from X-NAV
@@ -2370,12 +2372,12 @@ function TeamDNA({
 
           <div className="flex flex-col sm:flex-row gap-4 mb-4" style={{ overflowX: 'auto' }}>
             {([
-              { strand: homeStrand,    team: homeTeam,    label: hasActiveTrade ? "Post-trade" : undefined },
-              { strand: partnerStrand, team: partnerTeam, label: undefined },
-            ]).map(({ strand, team, label }: { strand: TeamStrandData | null; team: any; label: string | undefined }) => strand && team ? (
+              { strand: homeStrand,    team: homeTeam,    label: hasActiveTrade ? "Post-trade" : undefined, compare: preTradeHomeStrand },
+              { strand: partnerStrand, team: partnerTeam, label: hasActiveTrade ? "Post-trade" : undefined, compare: preTradePartnerStrand },
+            ]).map(({ strand, team, label, compare }: { strand: TeamStrandData | null; team: any; label: string | undefined; compare: TeamStrandData | null }) => strand && team ? (
               <div key={team.id} style={{ flex: 1, minWidth: 260, background: 'var(--ledger-cream)',
                                          border: '1px solid #c8b890', padding: '10px 12px' }}>
-                <TeamStrand strand={strand} teamName={team.name} label={label} />
+                <TeamStrand strand={strand} teamName={team.name} label={label} compare={compare ?? undefined} />
               </div>
             ) : null)}
           </div>
