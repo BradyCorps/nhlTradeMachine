@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { Suspense, useState, useCallback, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import {
@@ -28,16 +29,16 @@ const POS_LABEL: Record<string, string> = {
   C: "CENTER", W: "WING", D: "DEFENSE", G: "GOALIE",
 };
 
-const STORAGE_KEY = "press-box-state";
+function storageKey(dayNum: number) {
+  return `press-box-state-${dayNum}`;
+}
 
 function loadSavedState(dayNum: number) {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey(dayNum));
     if (!raw) return null;
-    const state = JSON.parse(raw);
-    if (state.dayNumber !== dayNum) return null;
-    return state;
+    return JSON.parse(raw);
   } catch {
     return null;
   }
@@ -46,7 +47,7 @@ function loadSavedState(dayNum: number) {
 function saveState(dayNum: number, picks: string[], phase: GamePhase, score?: number) {
   if (typeof window === "undefined") return;
   localStorage.setItem(
-    STORAGE_KEY,
+    storageKey(dayNum),
     JSON.stringify({ dayNumber: dayNum, picks, phase, score })
   );
 }
@@ -221,9 +222,23 @@ function ScoreRow({
 
 // ── Main Page ─────────────────────────────────────────────────
 export default function PressBoxPage() {
-  const dayNum = useMemo(() => dayNumberFromDate(), []);
-  const hand = useMemo(() => dealDailyHand(PRESS_BOX_POOL, dayNum), [dayNum]);
+  return (
+    <Suspense>
+      <PressBoxGame />
+    </Suspense>
+  );
+}
 
+function PressBoxGame() {
+  const searchParams = useSearchParams();
+  const todayNum = useMemo(() => dayNumberFromDate(), []);
+
+  const dayParam = searchParams.get("day");
+  const dayNum = dayParam ? parseInt(dayParam, 10) : todayNum;
+  const isToday = dayNum === todayNum;
+  const isArchive = !isToday;
+
+  const hand = useMemo(() => dealDailyHand(PRESS_BOX_POOL, dayNum), [dayNum]);
   const optimal = useMemo(() => findOptimalScore(hand.dealt, hand.callUp), [hand]);
 
   const [picks, setPicks] = useState<string[]>([]);
@@ -231,6 +246,7 @@ export default function PressBoxPage() {
   const [breakdown, setBreakdown] = useState<ScoringBreakdown | null>(null);
   const [copied, setCopied] = useState(false);
   const [streak, setStreak] = useState({ current: 0, best: 0, lastDay: 0 });
+  const [resetTaps, setResetTaps] = useState(0);
 
   // Restore saved state
   useEffect(() => {
@@ -242,9 +258,35 @@ export default function PressBoxPage() {
         const pickedPlayers = hand.dealt.filter((p) => saved.picks.includes(p.id));
         setBreakdown(scoreHand(pickedPlayers, hand.callUp));
       }
+    } else {
+      setPicks([]);
+      setPhase("DRAFTING");
+      setBreakdown(null);
     }
     setStreak(loadStreak());
   }, [dayNum, hand]);
+
+  // Hidden dev reset: tap day number 5 times
+  const handleDayTap = useCallback(() => {
+    setResetTaps((prev) => {
+      const next = prev + 1;
+      if (next >= 5) {
+        localStorage.removeItem(storageKey(dayNum));
+        setPicks([]);
+        setPhase("DRAFTING");
+        setBreakdown(null);
+        return 0;
+      }
+      return next;
+    });
+  }, [dayNum]);
+
+  // Clear tap counter after 2 seconds of inactivity
+  useEffect(() => {
+    if (resetTaps === 0) return;
+    const timer = setTimeout(() => setResetTaps(0), 2000);
+    return () => clearTimeout(timer);
+  }, [resetTaps]);
 
   const togglePick = useCallback(
     (id: string) => {
@@ -267,9 +309,9 @@ export default function PressBoxPage() {
       setBreakdown(result);
       setPhase("SCORED");
       saveState(dayNum, picks, "SCORED", result.total);
-      setStreak(updateStreak(dayNum));
+      if (isToday) setStreak(updateStreak(dayNum));
     }, 1500);
-  }, [picks, hand, dayNum]);
+  }, [picks, hand, dayNum, isToday]);
 
   const handleShare = useCallback(async () => {
     if (!breakdown) return;
@@ -284,6 +326,10 @@ export default function PressBoxPage() {
   }, [breakdown, dayNum, optimal]);
 
   const rating = breakdown ? starRating(breakdown.total, optimal) : null;
+
+  const lastHandDay = todayNum - 1;
+  const lastHandPlayed = typeof window !== "undefined" && !!loadSavedState(lastHandDay);
+  const todayPlayed = typeof window !== "undefined" && !!loadSavedState(todayNum);
 
   const pickedPlayers = hand.dealt.filter((p) => picks.includes(p.id));
   const waivedPlayers = hand.dealt.filter((p) => !picks.includes(p.id));
@@ -335,7 +381,7 @@ export default function PressBoxPage() {
             className="text-[10px] font-black uppercase tracking-[0.4em] font-mono mb-1"
             style={{ color: "var(--ledger-red)" }}
           >
-            Daily Game
+            {isArchive ? "Archive" : "Daily Game"}
           </div>
           <h2
             className="font-black font-serif leading-none"
@@ -344,12 +390,30 @@ export default function PressBoxPage() {
             Press Box
           </h2>
           <p
-            className="text-[11px] font-mono mt-1 uppercase tracking-[0.15em]"
+            className="text-[11px] font-mono mt-1 uppercase tracking-[0.15em] cursor-pointer select-none"
             style={{ color: "var(--ledger-ink-faint)" }}
+            onClick={handleDayTap}
           >
             #{hand.dayNumber} &nbsp;·&nbsp; {hand.dateLabel}
           </p>
         </div>
+
+        {/* ── Archive banner ────────────────────────────────── */}
+        {isArchive && (
+          <div
+            className="text-center mb-4 py-2 px-4 border text-[11px] font-mono"
+            style={{ borderColor: "var(--ledger-amber)", background: "var(--paper-inset)", borderRadius: 2, color: "var(--ledger-ink-body)" }}
+          >
+            You&apos;re playing hand #{dayNum}.{" "}
+            <a
+              href="/press-box"
+              className="font-black underline"
+              style={{ color: "var(--ledger-red)" }}
+            >
+              Back to today&apos;s hand
+            </a>
+          </div>
+        )}
 
         {/* ── Streak bar ─────────────────────────────────────── */}
         <div
@@ -392,7 +456,7 @@ export default function PressBoxPage() {
               className="text-[10px] font-black uppercase tracking-[0.3em] font-mono pb-1 border-b"
               style={{ color: "var(--ledger-ink-faint)", borderColor: "var(--rule)" }}
             >
-              Today&apos;s Cards
+              {isToday ? "Today's" : `Hand #${dayNum}`} Cards
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {hand.dealt.map((player) => (
@@ -584,6 +648,40 @@ export default function PressBoxPage() {
                 <p><strong>Call-Up Bonus</strong> — 1 pt for each of your picks who share a team with the call-up</p>
               </div>
             </details>
+
+            {/* Navigation to other hands */}
+            <div
+              className="flex items-center justify-center gap-4 py-3 border-y text-[11px] font-mono uppercase tracking-wider"
+              style={{ borderColor: "var(--rule-light)", color: "var(--ledger-ink-faint)" }}
+            >
+              {isToday && lastHandDay >= 1 && !lastHandPlayed && (
+                <a
+                  href={`/press-box?day=${lastHandDay}`}
+                  className="font-black no-underline transition-colors hover:text-[var(--ink)]"
+                  style={{ color: "var(--ledger-red)" }}
+                >
+                  Play the Last Hand
+                </a>
+              )}
+              {isToday && lastHandDay >= 1 && lastHandPlayed && (
+                <a
+                  href={`/press-box?day=${lastHandDay}`}
+                  className="font-black no-underline transition-colors hover:text-[var(--ink)]"
+                  style={{ color: "var(--ledger-ink-faint)" }}
+                >
+                  View Last Hand
+                </a>
+              )}
+              {isArchive && (
+                <a
+                  href="/press-box"
+                  className="font-black no-underline transition-colors hover:text-[var(--ink)]"
+                  style={{ color: todayPlayed ? "var(--ledger-ink-faint)" : "var(--ledger-red)" }}
+                >
+                  {todayPlayed ? "View Today's Result" : "Play Today's Hand"}
+                </a>
+              )}
+            </div>
           </div>
         )}
 
