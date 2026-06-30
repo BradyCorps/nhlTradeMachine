@@ -3,8 +3,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
-import TeamStrand, { TeamStrandData } from "@/app/components/TeamStrand";
+import TeamStrand from "@/app/components/TeamStrand";
 import type { Asset, Team, TradeVerdict, XNAVResult } from "@/app/lib/trade-types";
+import { computeRosterStrand } from "@/app/lib/roster-strand";
 import { fetchNavMap, fetchTradeVerdict } from "@/app/lib/evaluate-client";
 import {
   createTradeSharePayload,
@@ -31,8 +32,6 @@ type PackageSummary = {
 
 const fmtCap = (value: number) => `$${value.toFixed(2)}M`;
 const fmtSigned = (value: number, digits = 1) => value > 0 ? `+${value.toFixed(digits)}` : value.toFixed(digits);
-const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
-const norm = (value: number, min: number, max: number) => clamp01((value - min) / (max - min));
 
 function assetLabel(asset: Asset): string {
   if (asset.position === "Pick") {
@@ -271,53 +270,6 @@ function summarizePackage(assets: Asset[], navMap: Record<string, XNAVResult>): 
   return { cap, production, goals, xg, noiv, nav, count: assets.length };
 }
 
-function computeRosterStrand(roster: Asset[], navMap: Record<string, XNAVResult>): TeamStrandData | null {
-  const fwds = roster
-    .filter(player => ["C", "W", "L", "R"].includes(player.position) && player.hasLiveStats && (player.games ?? 0) >= 20)
-    .sort((a, b) => (b.avgTOI ?? 0) - (a.avgTOI ?? 0))
-    .slice(0, 9);
-  const dmen = roster
-    .filter(player => player.position === "D" && player.hasLiveStats && (player.games ?? 0) >= 20)
-    .sort((a, b) => (b.avgTOI ?? 0) - (a.avgTOI ?? 0))
-    .slice(0, 4);
-  const qualified = [...fwds, ...dmen];
-  if (qualified.length === 0) return null;
-
-  const safe = (value: number | null | undefined) => value ?? 0;
-  const totals = {
-    off: { OPS: 0, xG: 0, NOIV: 0, TOI: 0 },
-    def: { DPS: 0, SUPP: 0, Usage: 0, OZ: 0 },
-  };
-
-  for (const player of qualified) {
-    const isD = player.position === "D";
-    const xnav = navMap[player.id];
-    totals.off.OPS += player.ops != null ? norm(player.ops, 0, 7) : norm(safe(player.ptsPace), 0, isD ? 80 : 100);
-    totals.off.xG += norm(safe(player.xGPace), 0, isD ? 25 : 50);
-    totals.off.NOIV += norm(safe(player.xgRelTM), -12, 12);
-    totals.off.TOI += norm(safe(player.avgTOI), 10, 27);
-    totals.def.DPS += player.dps != null ? norm(player.dps, 0, 4.5) : norm(xnav?.def ?? 0, -60, 150);
-    totals.def.SUPP += norm(-(player.xgaRelTM ?? 0), -1.5, 1.5);
-    totals.def.Usage += norm(player.qocIndex ?? 35, 0, 100);
-    totals.def.OZ += player.dzPct != null ? 1 - norm(safe(player.dzPct), 0.3, 0.7) : 0.5;
-  }
-
-  const n = qualified.length;
-  return {
-    off: {
-      OPS: totals.off.OPS / n,
-      xG: totals.off.xG / n,
-      NOIV: totals.off.NOIV / n,
-      TOI: totals.off.TOI / n,
-    },
-    def: {
-      DPS: totals.def.DPS / n,
-      SUPP: totals.def.SUPP / n,
-      Usage: totals.def.Usage / n,
-      OZ: totals.def.OZ / n,
-    },
-  };
-}
 
 function SummaryMetric({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
   const color = tone === "good"

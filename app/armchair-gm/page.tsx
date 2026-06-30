@@ -6,7 +6,8 @@ import { SEASON, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 import { formatPickRound } from "@/app/lib/trade-format";
 import { pickEffectiveStanding } from "@/app/lib/pick-value";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
-import TeamStrand, { CHAMP_TEMPLATE, TeamStrandData } from "@/app/components/TeamStrand";
+import TeamStrand, { CHAMP_TEMPLATE, type TeamStrandData } from "@/app/components/TeamStrand";
+import { computeRosterStrand } from "@/app/lib/roster-strand";
 import LineupEditor, { type LineupOrderPayload } from "@/app/components/LineupEditor";
 import WhatWeNeed from "@/app/components/WhatWeNeed";
 import ContentionQuadrant from "@/app/components/ContentionQuadrant";
@@ -1866,55 +1867,7 @@ const classifyTeam = (team: Team, _roster: Asset[]): TeamMode => {
 // championship template. Drives Need Score for GM logic.
 // ============================================================
 
-// Championship template — normalized 0-1 values calibrated to tighter ranges
-// Based on Cup winner roster profiles (top-9F + top-4D TOI-weighted averages)
-// computeRosterStrand — aggregates top-13 contributors' analytics into
-// team-level trait scores (4 off + 4 def) using the same normalised 0–1 scale
-// as the player STRAND. Trait order matches TeamStrand component.
-function computeRosterStrand(roster: Asset[], navMap: Record<string, XNAVResult>): TeamStrandData | null {
-  const fwds = roster
-    .filter(p => ["C","W","L","R"].includes(p.position) && p.hasLiveStats && (p.games ?? 0) >= 20)
-    .sort((a, b) => (b.avgTOI ?? 0) - (a.avgTOI ?? 0))
-    .slice(0, 9);
-  const dmen = roster
-    .filter(p => p.position === "D" && p.hasLiveStats && (p.games ?? 0) >= 20)
-    .sort((a, b) => (b.avgTOI ?? 0) - (a.avgTOI ?? 0))
-    .slice(0, 4);
-  const qualified = [...fwds, ...dmen];
-  if (qualified.length === 0) return null;
-
-  const norm = (val: number, mn: number, mx: number) =>
-    Math.max(0, Math.min(1, (val - mn) / (mx - mn)));
-  const safe = (v: number | null | undefined) => v ?? 0;
-
-  let off = { OPS: 0, xG: 0, NOIV: 0, TOI: 0 };
-  let def = { DPS: 0, SUPP: 0, Usage: 0, OZ: 0 };
-  const n = qualified.length;
-
-  for (const p of qualified) {
-    const xnav = navMap[p.id] ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
-    const isD  = p.position === "D";
-    const ops  = (p as any).ops as number | null | undefined;
-    const dps  = (p as any).dps as number | null | undefined;
-    const opsMax = 7, dpsMax = 4.5;   // team averages, not individual player ceilings
-    // OPS: use point shares if available, fall back to scoring pace
-    off.OPS  += ops != null ? norm(ops, 0, opsMax) : norm(safe(p.ptsPace), 0, isD ? 80 : 100);
-    off.xG   += norm(safe(p.xGPace ?? 0), 0, isD ? 25 : 50);
-    off.NOIV += norm(safe(p.xgRelTM ?? 0), -12, 12);
-    off.TOI  += norm(safe(p.avgTOI), 10, 27);
-    def.DPS  += dps != null ? norm(dps, 0, dpsMax) : norm(xnav.def, -60, 150);
-    def.SUPP += norm(-(p.xgaRelTM ?? 0), -1.5, 1.5);
-    def.Usage+= norm(p.qocIndex ?? 35, 0, 100);
-    def.OZ   += p.dzPct != null ? 1 - norm(safe(p.dzPct), 0.3, 0.7) : 0.5;
-  }
-
-  return {
-    off: { OPS: off.OPS/n, xG: off.xG/n, NOIV: off.NOIV/n, TOI: off.TOI/n },
-    def: { DPS: def.DPS/n, SUPP: def.SUPP/n, Usage: def.Usage/n, OZ: def.OZ/n },
-  };
-}
-
-// ── Contention Cycle// ── Contention Cycle Computation ─────────────────────────────
+// ── Contention Cycle Computation ─────────────────────────────
 // Derives Present and Future ratings (0-10) from X-NAV data.
 // Present: what the roster is worth RIGHT NOW
 // Future:  what the roster will be worth in ~3 years (age decay + prospects)

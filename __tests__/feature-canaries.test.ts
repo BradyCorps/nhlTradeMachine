@@ -278,11 +278,9 @@ describe("Canary — engine inputs", () => {
 
 describe("Canary — Team DNA Usage trait", () => {
   it("computeRosterStrand uses qocIndex, not the dead legacy qocRank", () => {
-    const src = read("app/armchair-gm/page.tsx");
-    // qocRank is null on every player now — norm(400 - 400) pinned every
-    // team's Usage at 0, producing a constant -62 gap vs the champ template.
+    const src = read("app/lib/roster-strand.ts");
     expect(src).not.toContain("qocRank ?? 400");
-    expect(src).toContain("def.Usage+= norm(p.qocIndex ?? 35, 0, 100)");
+    expect(src).toContain("totals.def.Usage += norm(p.qocIndex ?? 35, 0, 100)");
   });
 });
 
