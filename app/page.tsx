@@ -66,7 +66,7 @@ function Cell({
 const BRIEFS = [
   {
     feature: "Feature Six",
-    title: "Fantasy Hockey Expansion",
+    title: "Fantasy Hockey Tools",
     body: "Built for fantasy managers who want to draft smarter, execute cleaner trades, and work the waiver wire with front-office data.",
   },
   {
@@ -210,8 +210,25 @@ export default function WelcomePage() {
             />
 
             <Cell
+              href="/press-box"
+              lead
+              kicker="Feature Two — Daily Game"
+              kickerColor="var(--ledger-amber)"
+              edition="The Box"
+              title="Press Box"
+              ctaColor="var(--ledger-amber)"
+              cta="Play Today's Hand"
+              body="A daily hockey card game inspired by cribbage scoring. Pick four from six dealt players, reveal a mystery call-up, and score points for teammates, draft classes, divisions, nationalities, and more. New hand every day — chase the perfect five-star hand and build your streak."
+              lines={[
+                ["Daily Hand", "New cards every day"],
+                ["Crib Scoring", "Seven scoring categories"],
+                ["Streaks", "Track your daily streak"],
+              ]}
+            />
+
+            <Cell
               href="/trade-machine"
-              kicker="Feature Two"
+              kicker="Feature Three"
               kickerColor="var(--ledger-red)"
               edition="The Desk"
               title="Trade Machine"
@@ -227,7 +244,7 @@ export default function WelcomePage() {
 
             <Cell
               href="/players"
-              kicker="Feature Three"
+              kicker="Feature Four"
               kickerColor="var(--ledger-navy)"
               edition="The Ledger"
               title="Player Analytics"
@@ -243,7 +260,7 @@ export default function WelcomePage() {
 
             <Cell
               href="/docket"
-              kicker="Feature Four"
+              kicker="Feature Five"
               kickerColor="var(--ledger-brown)"
               edition="The Record"
               title="The Docket"
@@ -254,22 +271,6 @@ export default function WelcomePage() {
                 ["Published Rulings", "After admin review"],
                 ["Dual Grade", "At-trade plus live"],
                 ["Full Detail", "Verdict and STRAND"],
-              ]}
-            />
-
-            <Cell
-              href="/press-box"
-              kicker="Feature Five — Daily Game"
-              kickerColor="var(--ledger-amber)"
-              edition="The Box"
-              title="Press Box"
-              ctaColor="var(--ledger-amber)"
-              cta="Play Today's Hand"
-              body="A daily hockey card game inspired by cribbage scoring. Pick four from six dealt players, reveal a mystery call-up, and score points for teammates, draft classes, divisions, nationalities, and more. New hand every day — build your streak."
-              lines={[
-                ["Daily Hand", "New cards every day"],
-                ["Crib Scoring", "Seven scoring categories"],
-                ["Streaks", "Track your daily streak"],
               ]}
             />
           </div>
