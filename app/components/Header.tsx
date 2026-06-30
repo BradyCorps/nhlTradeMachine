@@ -5,7 +5,7 @@
 import { usePathname } from "next/navigation";
 
 interface HeaderProps {
-  activeTab?: "trade" | "armchair-gm" | "players" | "docket";
+  activeTab?: "trade" | "armchair-gm" | "players" | "docket" | "press-box";
   showLiveFeed?: boolean;
 }
 
@@ -14,8 +14,9 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
   const resolvedActiveTab =
     pathname?.startsWith("/armchair-gm") ? "armchair-gm"
     : pathname?.startsWith("/docket") ? "docket"
+    : pathname?.startsWith("/press-box") ? "press-box"
     : activeTab;
-  const navClass = (tab: "trade" | "armchair-gm" | "players" | "docket") => [
+  const navClass = (tab: "trade" | "armchair-gm" | "players" | "docket" | "press-box") => [
     "text-[11px] sm:text-[12px] uppercase tracking-[0.14em] sm:tracking-[0.2em] font-mono no-underline transition-colors border-b-2 pb-0.5",
     resolvedActiveTab === tab
       ? "text-ledger-red font-black border-ledger-red"
@@ -84,6 +85,13 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
                 className={navClass("armchair-gm")}
               >
                 {resolvedActiveTab === "armchair-gm" ? "◆" : "◇"} Armchair GM
+              </a>
+              <span className="nav-divider text-ledger-rule-light">|</span>
+              <a
+                href="/press-box"
+                className={navClass("press-box")}
+              >
+                {resolvedActiveTab === "press-box" ? "◆" : "◇"} Press Box
               </a>
             </nav>
           </div>

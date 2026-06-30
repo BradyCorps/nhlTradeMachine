@@ -65,17 +65,17 @@ function Cell({
 
 const BRIEFS = [
   {
-    feature: "Feature Five",
+    feature: "Feature Six",
     title: "Fantasy Hockey Expansion",
     body: "Built for fantasy managers who want to draft smarter, execute cleaner trades, and work the waiver wire with front-office data.",
   },
   {
-    feature: "Feature Six",
+    feature: "Feature Seven",
     title: "Micro-Context Prop Engine",
     body: "Built for sharper daily reads on player-prop markets through matchup, role, pace, and usage context.",
   },
   {
-    feature: "Feature Seven",
+    feature: "Feature Eight",
     title: "Three-Year Simulation Model",
     body: "See how trades compound over three seasons and pressure-test long-term franchise decisions.",
   },
@@ -254,6 +254,22 @@ export default function WelcomePage() {
                 ["Published Rulings", "After admin review"],
                 ["Dual Grade", "At-trade plus live"],
                 ["Full Detail", "Verdict and STRAND"],
+              ]}
+            />
+
+            <Cell
+              href="/press-box"
+              kicker="Feature Five — Daily Game"
+              kickerColor="var(--ledger-amber)"
+              edition="The Box"
+              title="Press Box"
+              ctaColor="var(--ledger-amber)"
+              cta="Play Today's Hand"
+              body="A daily hockey card game inspired by cribbage scoring. Pick four from six dealt players, reveal a mystery call-up, and score points for teammates, draft classes, divisions, nationalities, and more. New hand every day — build your streak."
+              lines={[
+                ["Daily Hand", "New cards every day"],
+                ["Crib Scoring", "Seven scoring categories"],
+                ["Streaks", "Track your daily streak"],
               ]}
             />
           </div>
