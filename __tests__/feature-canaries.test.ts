@@ -962,6 +962,7 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(teamStrand).toContain("traitDeltas");
     expect(teamStrand).toContain("compareOffVals");
     expect(teamStrand).toContain("trade impact");
+    expect(teamStrand).toContain("fontSize: 11");
     expect(quickTradeMachine).toContain("sideOutcomes");
     expect(quickTradeMachine).toContain("Team Strands");
     expect(quickTradeMachine).toContain("Pre/Post Delta");

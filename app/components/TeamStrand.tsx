@@ -169,14 +169,14 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
       </div>
 
       {traitDeltas.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 5px",
-                      marginBottom: 5, padding: "0 2px" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 6px",
+                      marginBottom: 6, padding: "0 2px" }}>
           {traitDeltas.map(({ label: deltaLabel, delta, color }) => (
             <span key={deltaLabel} title={`${deltaLabel} trade impact`}
-                  style={{ display: "inline-flex", alignItems: "baseline", gap: 3,
+                  style={{ display: "inline-flex", alignItems: "baseline", gap: 4,
                            border: "1px solid var(--ledger-rule-light)",
                            background: "var(--paper-inset)",
-                           padding: "1px 4px", fontSize: 7, fontWeight: 900,
+                           padding: "2px 6px", fontSize: 11, fontWeight: 900,
                            color }}>
               <span>{deltaLabel}</span>
               <span style={{ color: delta >= 0 ? "#2a7a44" : "var(--ledger-red)" }}>
