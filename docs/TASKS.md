@@ -10,9 +10,9 @@ Legend: `[ ]` to-do · `[~]` partial / verify-then-close
 
 ---
 
-## [] New Sim Engine/Off season
+## [~] New Sim Engine/Off season
 
-### [] S1 - UFA are 1 year out of date
+### [x] S1 - UFA are 1 year out of date
 Before we decided to go on this route of a proper off season mode, we added code to add 1 additional year to 2026 UFA's in order to have them persist in the DB. We need to remove this and have them populate in the UFA list. Right now we have a mixture, but Alex Debricat is listed as the top UFA in our sim currently. 
 To help calibrate, here is a partial free agency list from PuckPedia:
 
@@ -116,7 +116,7 @@ Right now it is still not showing Alex Tuch, if there is some sort of error we c
 ### [x] S1.75 - Need to be able to fully track and move draft picks around to match real life
 Right now there is now way to move draft picks and have it persist. Only players. DB needs to be ammended to include Draft Picks and where draft picks are.
 	
-### [] S2 - Goalie Glitch
+### [x] S2 - Goalie Glitch
 In some instance, goalie value is not generated correctly. One instance Hellebyuck had a +50 NAV, the next instance his 205 NAV populated. Just need to confirm if that was just a load error.
 
 
