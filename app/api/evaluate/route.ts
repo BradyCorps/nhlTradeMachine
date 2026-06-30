@@ -686,6 +686,36 @@ const runGmLogic = (
     }
   }
 
+  // ── Roster-gutting guard ──
+  // Partner won't send 3+ quality players for a return that doesn't include
+  // a franchise-calibre centrepiece. Morrissey is great; he's not worth
+  // Matheson + Dobson + Newhook + Beck.
+  const qualityPartnerOut = partnerGivingUp.filter(a => navOf(a) >= 40);
+  const returnPlayers     = outPlayers.filter(a => navOf(a) > 0);
+  const bestReturnNav     = returnPlayers.length > 0
+    ? Math.max(...returnPlayers.map(a => navOf(a)))
+    : 0;
+  const returnPickNav     = outPicks.reduce((s, a) => s + navOf(a), 0);
+  const hasFranchiseReturn = bestReturnNav >= FRANCHISE_THRESHOLD || returnPickNav >= 120;
+  const allPartnerOutShopped = qualityPartnerOut.length > 0 && qualityPartnerOut.every(isShoppedAsset);
+
+  if (
+    qualityPartnerOut.length >= 3 &&
+    !hasFranchiseReturn &&
+    !allPartnerOutShopped &&
+    modePartner !== "REBUILDING" && modePartner !== "TANKING"
+  ) {
+    const names = qualityPartnerOut.slice(0, 3).map(a => a.name.split(" ").pop()).join(", ");
+    flags.push({
+      severity: "SOFT",
+      category: "VALUE_VETO",
+      headline: `${teamPartner.name} won't gut their roster for this return`,
+      explanation: `${teamPartner.name} is being asked to move ${qualityPartnerOut.length} quality players (${names}) but the best individual return (${bestReturnNav.toFixed(0)} NAV) isn't a franchise-level centrepiece. GMs don't dismantle multiple roster spots unless the return is transformative — think Fox or Makar, not a strong #1D.`,
+      vetoesSide: 1,
+      perspective: "partner" as const,
+    });
+  }
+
   const tradingAwayD = outPlayers.filter((a) => a.position === "D");
   if (tradingAwayD.length > 0) {
     const depScore          = defensiveDependencyScore(allHomeRoster);
