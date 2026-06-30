@@ -11,6 +11,7 @@ import {
   findOptimalScore,
   starRating,
   buildShareText,
+  MAX_SCORE,
   type PressBoxPlayer,
   type ScoringBreakdown,
 } from "@/app/lib/press-box-engine";
@@ -517,7 +518,7 @@ function PressBoxGame() {
                 {rating.label}
               </div>
               <div className="font-black font-serif" style={{ fontSize: "clamp(2rem, 8vw, 3.5rem)", lineHeight: 1 }}>
-                {breakdown.total}<span className="text-[0.5em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>/{optimal}</span>
+                {breakdown.total}<span className="text-[0.5em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>/{MAX_SCORE}</span>
               </div>
               <div
                 className="text-[11px] font-mono uppercase tracking-wider mt-1"
@@ -610,7 +611,7 @@ function PressBoxGame() {
                   Total
                 </span>
                 <span className="text-[18px] font-black font-mono tabular-nums" style={{ color: "var(--ledger-green)" }}>
-                  {breakdown.total}<span className="text-[12px]" style={{ color: "var(--ledger-ink-faint)" }}>/{optimal}</span>
+                  {breakdown.total}<span className="text-[12px]" style={{ color: "var(--ledger-ink-faint)" }}>/{MAX_SCORE}</span>
                 </span>
               </div>
             </div>

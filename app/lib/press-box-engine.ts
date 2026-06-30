@@ -258,11 +258,14 @@ export function findOptimalScore(dealt: PressBoxPlayer[], callUp: PressBoxPlayer
   return best;
 }
 
-// ── Star rating (relative to optimal) ────────────────────────
+// ── Fixed ceiling (cribbage homage) ──────────────────────────
+export const MAX_SCORE = 15;
+
+// ── Star rating (did you find the optimal combo?) ────────────
 export function starRating(score: number, optimal: number): { stars: number; label: string; color: string } {
-  if (optimal === 0) return { stars: 5, label: "PERFECT GAME", color: "var(--ledger-green)" };
+  if (optimal === 0) return { stars: 5, label: "PERFECT HAND", color: "var(--ledger-green)" };
   const pct = score / optimal;
-  if (pct >= 1)    return { stars: 5, label: "PERFECT GAME", color: "var(--ledger-green)" };
+  if (pct >= 1)    return { stars: 5, label: "PERFECT HAND", color: "var(--ledger-green)" };
   if (pct >= 0.85) return { stars: 4, label: "FRONT PAGE", color: "var(--ledger-green)" };
   if (pct >= 0.65) return { stars: 3, label: "ABOVE THE FOLD", color: "var(--ledger-navy)" };
   if (pct >= 0.40) return { stars: 2, label: "PAGE THREE", color: "var(--ledger-brown)" };
@@ -274,14 +277,5 @@ export function starRating(score: number, optimal: number): { stars: number; lab
 export function buildShareText(dayNum: number, score: number, optimal: number): string {
   const { stars } = starRating(score, optimal);
   const starStr = "★".repeat(stars) + "☆".repeat(5 - stars);
-  return `Press Box #${dayNum}: ${score}/${optimal} pts\n${starStr}\nthehockeyledger.com/press-box`;
-}
-
-// ── Score rating (kept for backward compat) ──────────────────
-export function scoreRating(score: number): { label: string; color: string } {
-  if (score >= 20) return { label: "FRONT PAGE", color: "var(--ledger-green)" };
-  if (score >= 14) return { label: "ABOVE THE FOLD", color: "var(--ledger-navy)" };
-  if (score >= 8) return { label: "PAGE THREE", color: "var(--ledger-brown)" };
-  if (score >= 4) return { label: "CLASSIFIED", color: "var(--ledger-amber)" };
-  return { label: "PRESS RELEASE", color: "var(--ledger-red)" };
+  return `Press Box #${dayNum}: ${score}/${MAX_SCORE} pts\n${starStr}${score === optimal ? " PERFECT HAND" : ""}\nthehockeyledger.com/press-box`;
 }
