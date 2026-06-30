@@ -7,8 +7,9 @@ import {
   dayNumberFromDate,
   dealDailyHand,
   scoreHand,
+  findOptimalScore,
+  starRating,
   buildShareText,
-  scoreRating,
   type PressBoxPlayer,
   type ScoringBreakdown,
 } from "@/app/lib/press-box-engine";
@@ -223,6 +224,8 @@ export default function PressBoxPage() {
   const dayNum = useMemo(() => dayNumberFromDate(), []);
   const hand = useMemo(() => dealDailyHand(PRESS_BOX_POOL, dayNum), [dayNum]);
 
+  const optimal = useMemo(() => findOptimalScore(hand.dealt, hand.callUp), [hand]);
+
   const [picks, setPicks] = useState<string[]>([]);
   const [phase, setPhase] = useState<GamePhase>("DRAFTING");
   const [breakdown, setBreakdown] = useState<ScoringBreakdown | null>(null);
@@ -270,7 +273,7 @@ export default function PressBoxPage() {
 
   const handleShare = useCallback(async () => {
     if (!breakdown) return;
-    const text = buildShareText(dayNum, breakdown.total, breakdown);
+    const text = buildShareText(dayNum, breakdown.total, optimal);
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -278,9 +281,9 @@ export default function PressBoxPage() {
     } catch {
       // Fallback
     }
-  }, [breakdown, dayNum]);
+  }, [breakdown, dayNum, optimal]);
 
-  const rating = breakdown ? scoreRating(breakdown.total) : null;
+  const rating = breakdown ? starRating(breakdown.total, optimal) : null;
 
   const pickedPlayers = hand.dealt.filter((p) => picks.includes(p.id));
   const waivedPlayers = hand.dealt.filter((p) => !picks.includes(p.id));
@@ -450,13 +453,20 @@ export default function PressBoxPage() {
                 {rating.label}
               </div>
               <div className="font-black font-serif" style={{ fontSize: "clamp(2rem, 8vw, 3.5rem)", lineHeight: 1 }}>
-                {breakdown.total}
+                {breakdown.total}<span className="text-[0.5em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>/{optimal}</span>
               </div>
               <div
                 className="text-[11px] font-mono uppercase tracking-wider mt-1"
                 style={{ color: "var(--ledger-ink-faint)" }}
               >
                 Points
+              </div>
+              <div className="mt-2 text-[20px] tracking-[0.15em]" style={{ color: "var(--ledger-amber)" }}>
+                {Array.from({ length: 5 }, (_, i) => (
+                  <span key={i} style={{ color: i < rating.stars ? "var(--ledger-amber)" : "var(--rule-light)" }}>
+                    {i < rating.stars ? "★" : "☆"}
+                  </span>
+                ))}
               </div>
             </div>
 
@@ -535,8 +545,8 @@ export default function PressBoxPage() {
                 <span className="text-[12px] font-black font-mono uppercase" style={{ color: "var(--ink)" }}>
                   Total
                 </span>
-                <span className="text-[18px] font-black font-mono" style={{ color: "var(--ledger-green)" }}>
-                  {breakdown.total}
+                <span className="text-[18px] font-black font-mono tabular-nums" style={{ color: "var(--ledger-green)" }}>
+                  {breakdown.total}<span className="text-[12px]" style={{ color: "var(--ledger-ink-faint)" }}>/{optimal}</span>
                 </span>
               </div>
             </div>

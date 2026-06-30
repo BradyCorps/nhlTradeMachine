@@ -233,21 +233,51 @@ export function scoreHand(
   };
 }
 
-// ── Share text ────────────────────────────────────────────────
-export function buildShareText(dayNum: number, score: number, breakdown: ScoringBreakdown): string {
-  const blocks = [
-    breakdown.teammates.points > 0 ? "🏒" : "·",
-    breakdown.draftClass.points > 0 ? "📋" : "·",
-    breakdown.pipeline.points > 0 ? "📈" : "·",
-    breakdown.divisionFlush.points > 0 ? "🗺" : "·",
-    breakdown.countryClub.points > 0 ? "🌍" : "·",
-    breakdown.positionGroup.points > 0 ? "🎯" : "·",
-    breakdown.callUpBonus.points > 0 ? "⭐" : "·",
-  ];
-  return `Press Box #${dayNum}: ${score} pts\n${blocks.join("")}\nthehockeyledger.com/press-box`;
+// ── Optimal hand (brute-force all C(6,4) = 15 combos) ───────
+function combinations<T>(arr: T[], k: number): T[][] {
+  const result: T[][] = [];
+  function recurse(start: number, combo: T[]) {
+    if (combo.length === k) { result.push([...combo]); return; }
+    for (let i = start; i < arr.length; i++) {
+      combo.push(arr[i]);
+      recurse(i + 1, combo);
+      combo.pop();
+    }
+  }
+  recurse(0, []);
+  return result;
 }
 
-// ── Score rating ──────────────────────────────────────────────
+export function findOptimalScore(dealt: PressBoxPlayer[], callUp: PressBoxPlayer): number {
+  const combos = combinations(dealt, 4);
+  let best = 0;
+  for (const combo of combos) {
+    const result = scoreHand(combo, callUp);
+    if (result.total > best) best = result.total;
+  }
+  return best;
+}
+
+// ── Star rating (relative to optimal) ────────────────────────
+export function starRating(score: number, optimal: number): { stars: number; label: string; color: string } {
+  if (optimal === 0) return { stars: 5, label: "PERFECT GAME", color: "var(--ledger-green)" };
+  const pct = score / optimal;
+  if (pct >= 1)    return { stars: 5, label: "PERFECT GAME", color: "var(--ledger-green)" };
+  if (pct >= 0.85) return { stars: 4, label: "FRONT PAGE", color: "var(--ledger-green)" };
+  if (pct >= 0.65) return { stars: 3, label: "ABOVE THE FOLD", color: "var(--ledger-navy)" };
+  if (pct >= 0.40) return { stars: 2, label: "PAGE THREE", color: "var(--ledger-brown)" };
+  if (pct > 0)     return { stars: 1, label: "CLASSIFIED", color: "var(--ledger-amber)" };
+  return { stars: 0, label: "PRESS RELEASE", color: "var(--ledger-red)" };
+}
+
+// ── Share text ────────────────────────────────────────────────
+export function buildShareText(dayNum: number, score: number, optimal: number): string {
+  const { stars } = starRating(score, optimal);
+  const starStr = "★".repeat(stars) + "☆".repeat(5 - stars);
+  return `Press Box #${dayNum}: ${score}/${optimal} pts\n${starStr}\nthehockeyledger.com/press-box`;
+}
+
+// ── Score rating (kept for backward compat) ──────────────────
 export function scoreRating(score: number): { label: string; color: string } {
   if (score >= 20) return { label: "FRONT PAGE", color: "var(--ledger-green)" };
   if (score >= 14) return { label: "ABOVE THE FOLD", color: "var(--ledger-navy)" };
