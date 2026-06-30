@@ -687,21 +687,22 @@ const runGmLogic = (
   }
 
   // ── Roster-gutting guard ──
-  // Partner won't send 3+ quality players for a return that doesn't include
-  // a franchise-calibre centrepiece. Morrissey is great; he's not worth
-  // Matheson + Dobson + Newhook + Beck.
+  // Partner won't send 3+ quality players unless the centrepiece return is
+  // genuinely transformative. The bar scales with package size: 3 players
+  // requires ~280 NAV (elite #1D/1C), 4+ requires ~320 (true superstar).
   const qualityPartnerOut = partnerGivingUp.filter(a => navOf(a) >= 40);
   const returnPlayers     = outPlayers.filter(a => navOf(a) > 0);
   const bestReturnNav     = returnPlayers.length > 0
     ? Math.max(...returnPlayers.map(a => navOf(a)))
     : 0;
   const returnPickNav     = outPicks.reduce((s, a) => s + navOf(a), 0);
-  const hasFranchiseReturn = bestReturnNav >= FRANCHISE_THRESHOLD || returnPickNav >= 120;
+  const guttingThreshold  = 240 + (qualityPartnerOut.length - 2) * 40;
+  const worthGutting      = bestReturnNav >= guttingThreshold || returnPickNav >= 150;
   const allPartnerOutShopped = qualityPartnerOut.length > 0 && qualityPartnerOut.every(isShoppedAsset);
 
   if (
     qualityPartnerOut.length >= 3 &&
-    !hasFranchiseReturn &&
+    !worthGutting &&
     !allPartnerOutShopped &&
     modePartner !== "REBUILDING" && modePartner !== "TANKING"
   ) {
@@ -710,7 +711,7 @@ const runGmLogic = (
       severity: "SOFT",
       category: "VALUE_VETO",
       headline: `${teamPartner.name} won't gut their roster for this return`,
-      explanation: `${teamPartner.name} is being asked to move ${qualityPartnerOut.length} quality players (${names}) but the best individual return (${bestReturnNav.toFixed(0)} NAV) isn't a franchise-level centrepiece. GMs don't dismantle multiple roster spots unless the return is transformative — think Fox or Makar, not a strong #1D.`,
+      explanation: `${teamPartner.name} is being asked to move ${qualityPartnerOut.length} quality players (${names}) but the best individual return (${bestReturnNav.toFixed(0)} NAV) doesn't clear the ${guttingThreshold} NAV superstar bar needed to justify dismantling ${qualityPartnerOut.length} roster spots. GMs don't send this many pieces unless the return is transformative.`,
       vetoesSide: 1,
       perspective: "partner" as const,
     });
