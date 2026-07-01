@@ -53,23 +53,27 @@ function saveState(dayNum: number, picks: string[], phase: GamePhase, score?: nu
   );
 }
 
-function loadStreak(): { current: number; best: number; lastDay: number } {
-  if (typeof window === "undefined") return { current: 0, best: 0, lastDay: 0 };
+interface StreakData { current: number; best: number; lastDay: number; perfectHands: number }
+
+function loadStreak(): StreakData {
+  if (typeof window === "undefined") return { current: 0, best: 0, lastDay: 0, perfectHands: 0 };
   try {
     const raw = localStorage.getItem("press-box-streak");
-    return raw ? JSON.parse(raw) : { current: 0, best: 0, lastDay: 0 };
+    const data = raw ? JSON.parse(raw) : {};
+    return { current: data.current ?? 0, best: data.best ?? 0, lastDay: data.lastDay ?? 0, perfectHands: data.perfectHands ?? 0 };
   } catch {
-    return { current: 0, best: 0, lastDay: 0 };
+    return { current: 0, best: 0, lastDay: 0, perfectHands: 0 };
   }
 }
 
-function updateStreak(dayNum: number) {
+function updateStreak(dayNum: number, isPerfect: boolean) {
   const streak = loadStreak();
   if (streak.lastDay === dayNum) return streak;
   const isConsecutive = streak.lastDay === dayNum - 1;
   const newCurrent = isConsecutive ? streak.current + 1 : 1;
   const newBest = Math.max(streak.best, newCurrent);
-  const updated = { current: newCurrent, best: newBest, lastDay: dayNum };
+  const perfectHands = streak.perfectHands + (isPerfect ? 1 : 0);
+  const updated: StreakData = { current: newCurrent, best: newBest, lastDay: dayNum, perfectHands };
   localStorage.setItem("press-box-streak", JSON.stringify(updated));
   return updated;
 }
@@ -310,7 +314,7 @@ function PressBoxGame() {
       setBreakdown(result);
       setPhase("SCORED");
       saveState(dayNum, picks, "SCORED", result.total);
-      if (isToday) setStreak(updateStreak(dayNum));
+      if (isToday) setStreak(updateStreak(dayNum, result.total === optimal));
     }, 1500);
   }, [picks, hand, dayNum, isToday]);
 
@@ -427,6 +431,10 @@ function PressBoxGame() {
           <span style={{ color: "var(--rule)" }}>|</span>
           <span>
             Best: <strong style={{ color: "var(--ink)" }}>{streak.best}</strong>
+          </span>
+          <span style={{ color: "var(--rule)" }}>|</span>
+          <span>
+            Perfect Hands: <strong style={{ color: streak.perfectHands > 0 ? "var(--ledger-green)" : "var(--ink)" }}>{streak.perfectHands}</strong>
           </span>
         </div>
 
