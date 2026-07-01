@@ -250,7 +250,7 @@ function PressBoxGame() {
   const [phase, setPhase] = useState<GamePhase>("DRAFTING");
   const [breakdown, setBreakdown] = useState<ScoringBreakdown | null>(null);
   const [copied, setCopied] = useState(false);
-  const [streak, setStreak] = useState({ current: 0, best: 0, lastDay: 0 });
+  const [streak, setStreak] = useState<StreakData>({ current: 0, best: 0, lastDay: 0, perfectHands: 0 });
   const [resetTaps, setResetTaps] = useState(0);
 
   // Restore saved state
@@ -316,7 +316,7 @@ function PressBoxGame() {
       saveState(dayNum, picks, "SCORED", result.total);
       if (isToday) setStreak(updateStreak(dayNum, result.total === optimal));
     }, 1500);
-  }, [picks, hand, dayNum, isToday]);
+  }, [picks, hand, dayNum, isToday, optimal]);
 
   const handleShare = useCallback(async () => {
     if (!breakdown) return;
