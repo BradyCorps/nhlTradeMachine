@@ -8,6 +8,7 @@ const NAV_LINKS = [
   { href: "/admin/trades",        label: "TRADES"      },
   { href: "/admin/draft-picks",   label: "PICKS"       },
   { href: "/admin/fa-overrides",  label: "FREE AGENTS" },
+  { href: "/admin/health",        label: "DATA HEALTH" },
   { href: "/admin/settings",      label: "SETTINGS"    },
 ];
 

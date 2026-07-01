@@ -63,6 +63,12 @@ export default async function AdminDashboard() {
       stat:  faOverrideCount > 0 ? `${faOverrideCount} override${faOverrideCount !== 1 ? "s" : ""}` : "No overrides",
     },
     {
+      href:  "/admin/health",
+      label: "DATA HEALTH",
+      desc:  "Check all external data sources (NHL API, MoneyPuck, CapWages), prune stale DB rows, and re-seed the baseline.",
+      stat:  "Health check · Prune · Seed",
+    },
+    {
       href:  "/admin/settings",
       label: "SETTINGS",
       desc:  "Override the global cap ceiling and floor, clear caches, or hard reset admin data back to scrape defaults.",
