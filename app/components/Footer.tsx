@@ -89,19 +89,21 @@ export default function Footer() {
             style={{ borderColor: "var(--ledger-rule)" }}>
             Icon Key
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-3 p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 p-4">
             {iconKey.map(([icon, label, definition]) => (
-              <div key={`${icon}-${label}`} className="grid grid-cols-[28px_110px_1fr] items-start gap-3">
-                <span className="inline-flex h-6 w-6 items-center justify-center border font-mono text-[12px] font-black"
+              <div key={`${icon}-${label}`} className="flex items-start gap-2.5">
+                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center border font-mono text-[12px] font-black"
                   style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}>
                   {icon}
                 </span>
-                <span className="font-mono text-[9px] font-black uppercase leading-snug text-ledger-ink">
-                  {label}
-                </span>
-                <span className="text-[11px] leading-relaxed text-ledger-ink-light">
-                  {definition}
-                </span>
+                <div className="min-w-0">
+                  <span className="font-mono text-[9px] font-black uppercase leading-snug text-ledger-ink">
+                    {label}
+                  </span>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-ledger-ink-light">
+                    {definition}
+                  </p>
+                </div>
               </div>
             ))}
           </div>
