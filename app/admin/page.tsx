@@ -1,6 +1,6 @@
 import React from "react";
 import { db } from "@/app/db/client";
-import { draftPickOverrides, faOverrides, players, teams, tradeBlock, siteSettings } from "@/app/db/schema";
+import { draftPickOverrides, players, teams, tradeBlock, siteSettings } from "@/app/db/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -9,13 +9,12 @@ async function safeFetch<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 }
 
 export default async function AdminDashboard() {
-  const [allPlayers, tradeBlockRows, teamRows, settingsRows, draftPickRows, faOverrideRows] = await Promise.all([
+  const [allPlayers, tradeBlockRows, teamRows, settingsRows, draftPickRows] = await Promise.all([
     safeFetch(() => db.select({ id: players.id }).from(players), [] as { id: string }[]),
     safeFetch(() => db.select({ id: tradeBlock.id }).from(tradeBlock), [] as { id: string }[]),
     safeFetch(() => db.select({ id: teams.id, phase: teams.phaseOverride }).from(teams), [] as { id: string; phase: string | null }[]),
     safeFetch(() => db.select().from(siteSettings), [] as { key: string; value: string }[]),
     safeFetch(() => db.select({ id: draftPickOverrides.id }).from(draftPickOverrides), [] as { id: string }[]),
-    safeFetch(() => db.select({ id: faOverrides.id }).from(faOverrides), [] as { id: string }[]),
   ]);
 
   const playerCount       = allPlayers.length;
@@ -23,7 +22,6 @@ export default async function AdminDashboard() {
   const teamOverrideCount = teamRows.filter(t => t.phase).length;
   const hasCapOverride    = settingsRows.some(r => r.key === "cap_ceiling" || r.key === "cap_floor");
   const draftPickCount     = draftPickRows.length;
-  const faOverrideCount    = faOverrideRows.length;
 
   const sections = [
     {
@@ -55,12 +53,6 @@ export default async function AdminDashboard() {
       label: "DRAFT PICKS",
       desc:  "Move draft-pick ownership while keeping default pick inventory generated from league/team data.",
       stat:  draftPickCount > 0 ? `${draftPickCount} moved pick${draftPickCount !== 1 ? "s" : ""}` : "All default owners",
-    },
-    {
-      href:  "/admin/fa-overrides",
-      label: "FREE AGENTS",
-      desc:  "Force selected DB players into or out of the off-season free-agent pool by canonical player id.",
-      stat:  faOverrideCount > 0 ? `${faOverrideCount} override${faOverrideCount !== 1 ? "s" : ""}` : "No overrides",
     },
     {
       href:  "/admin/health",
@@ -112,7 +104,7 @@ export default async function AdminDashboard() {
             { label: "PLAYERS IN DB",  value: String(playerCount)       },
             { label: "TRADE BLOCK",    value: String(tradeBlockCount)   },
             { label: "PICK MOVES",     value: String(draftPickCount)    },
-            { label: "FA OVERRIDES",   value: String(faOverrideCount)   },
+            { label: "TEAM OVERRIDES", value: String(teamOverrideCount) },
           ].map(({ label, value }) => (
             <div key={label} style={{ background: "var(--paper)", padding: "14px 18px" }}>
               <div style={{ fontSize: 9, letterSpacing: "0.2em", color: "var(--ledger-ink-faint)", marginBottom: 5 }}>
