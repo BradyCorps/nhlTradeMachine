@@ -43,10 +43,13 @@ const RFA: string[] = [
   "Jet Greaves", "Akira Schmid", "Arturs Silovs", "Samuel Ersson", "Leevi Merilainen",
 ];
 
+import { canonicalName } from "@/app/lib/player-identity";
+
 // Normalized (lowercased) name → status. Accents are stripped so source spelling
-// variants (e.g. "Merilainen" vs "Meriläinen") still match.
+// variants (e.g. "Merilainen" vs "Meriläinen") still match. canonicalName()
+// also resolves known cross-source name variants (e.g. "Alex" → "Alexander" Ovechkin).
 const norm = (name: string): string =>
-  name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  canonicalName(name).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 
 export const FREE_AGENT_SEED_2026: Map<string, SeedFaStatus> = new Map([
   ...UFA.map((n) => [norm(n), "UFA"] as const),

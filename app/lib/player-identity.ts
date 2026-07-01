@@ -1,9 +1,25 @@
+const NAME_ALIASES: Record<string, string> = {
+  "alex ovechkin": "Alexander Ovechkin",
+  "dmitriy simashev": "Dmitri Simashev",
+};
+
+export function canonicalName(name: string): string {
+  return NAME_ALIASES[name.toLowerCase()] ?? name;
+}
+
 export const canonicalNameSlug = (name: string): string =>
-  name.toLowerCase().normalize("NFD")
+  canonicalName(name).toLowerCase().normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9 ]/g, "")
     .trim()
     .replace(/\s+/g, "-");
+
+export function makePlayerId(name: string): string {
+  return canonicalName(name).toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
 
 export const canonicalPlayerKey = (player: { id?: unknown; name?: unknown }): string => {
   const id = player.id == null ? "" : String(player.id).trim();

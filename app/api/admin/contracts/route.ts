@@ -158,12 +158,8 @@ function teamIdFromSlug(slug: string | null | undefined): string | null {
   return CW_TEAM_TO_ID[key] ?? null;
 }
 
-function makeId(name: string): string {
-  return name.toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]/g, "");
-}
+// Shared player-ID function \u2014 single source of truth in player-identity.ts
+import { makePlayerId as makeId } from "@/app/lib/player-identity";
 
 function findScrapedByName(scraped: Record<string, any>, name: string): any | null {
   const direct = scraped[name];

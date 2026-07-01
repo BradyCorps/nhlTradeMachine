@@ -7,9 +7,7 @@ import { requireAdmin } from "@/app/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
-function makeId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
+import { makePlayerId as makeId } from "@/app/lib/player-identity";
 
 function sleep(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms));

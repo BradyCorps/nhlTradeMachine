@@ -8,9 +8,7 @@ export const dynamic = "force-dynamic";
 
 const TRADE_BLOCK_STATUSES = new Set(["requested", "available", "untouchable"]);
 
-function makeId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
+import { makePlayerId as makeId } from "@/app/lib/player-identity";
 
 export async function GET(req: Request) {
   const unauthorized = await requireAdmin(req);

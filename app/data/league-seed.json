@@ -544,17 +544,6 @@
       "expiryYear": null
     },
     {
-      "id": "alexovechkin",
-      "name": "Alex Ovechkin",
-      "position": "Unknown",
-      "capHit": 9.5,
-      "yearsRemaining": 1,
-      "hasNmc": false,
-      "hasNtc": false,
-      "expiryStatus": "UFA",
-      "expiryYear": 2026
-    },
-    {
       "id": "alexpietrangelo",
       "name": "Alex Pietrangelo",
       "position": "Unknown",
@@ -4350,8 +4339,8 @@
       "expiryYear": null
     },
     {
-      "id": "dmitriysimashev",
-      "name": "Dmitriy Simashev",
+      "id": "dmitrisimashev",
+      "name": "Dmitri Simashev",
       "position": "Unknown",
       "capHit": 0.95,
       "yearsRemaining": 3,

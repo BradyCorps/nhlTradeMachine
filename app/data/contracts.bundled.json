@@ -342,13 +342,6 @@
     "hasNTC": false,
     "canRetain": true
   },
-  "Alex Ovechkin": {
-    "capHit": 9.5,
-    "yearsRemaining": 1,
-    "hasNMC": false,
-    "hasNTC": false,
-    "canRetain": true
-  },
   "Alex Pietrangelo": {
     "capHit": 8.8,
     "yearsRemaining": 1,
@@ -2771,7 +2764,7 @@
     "hasNTC": false,
     "canRetain": true
   },
-  "Dmitriy Simashev": {
+  "Dmitri Simashev": {
     "capHit": 0.95,
     "yearsRemaining": 3,
     "hasNMC": false,
@@ -9711,13 +9704,6 @@
   "Tij Iginla": {
     "capHit": 0.943,
     "yearsRemaining": 3,
-    "hasNMC": false,
-    "hasNTC": false,
-    "canRetain": true
-  },
-  "Tim Stutzle": {
-    "capHit": 8.35,
-    "yearsRemaining": 6,
     "hasNMC": false,
     "hasNTC": false,
     "canRetain": true

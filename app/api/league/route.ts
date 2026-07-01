@@ -169,7 +169,9 @@ async function loadTeams(): Promise<any[]> {
         }
       });
     }
-  } catch (_) {}
+  } catch (err) {
+    console.error("[league] Standings API fetch failed:", err instanceof Error ? err.message : err);
+  }
 
   // ── Fetch cap space from CapWages (batch 8 at a time) ────────
   const capMap = new Map<string, number>();
@@ -194,7 +196,9 @@ async function loadTeams(): Promise<any[]> {
         if (summary?.capSpace !== undefined) {
           capMap.set(id, Math.round((summary.capSpace / 1_000_000) * 10) / 10);
         }
-      } catch (_) {}
+      } catch (err) {
+        console.error(`[league] CapWages scrape failed for ${id}:`, err instanceof Error ? err.message : err);
+      }
     }));
     if (i + 8 < teamIds.length) await new Promise(r => setTimeout(r, 300));
   }

@@ -15,13 +15,17 @@ to change safely. The S1/S2 offseason bugs were hard to fix *because* of this fi
 Suggested split: extract `useOffseasonFlow`, `useTradeExecution`, `useSimDispatch` hooks
 and break the render into composable sub-components.
 
-### [ ] CC2 — External data fragility (CapWages + MoneyPuck)
-The app scrapes CapWages HTML (`__NEXT_DATA__` script tags) and fetches MoneyPuck CSVs.
-Both are unsigned, unversioned third-party sources with no contract. Errors are swallowed
-(`catch (_) {}`) — stale/wrong data arrives with no signal.
-Immediate mitigation: a health endpoint or admin dashboard showing last-successful-scrape
-timestamps, source coverage, and match rates. The full fix is the owned xG pipeline in
-FUTURECONCEPTS.md.
+### [x] CC2 — External data fragility (CapWages + MoneyPuck)
+**Mitigated.** Six divergent `makeId()` implementations (some missing NFD normalization)
+replaced with a single `makePlayerId()` in `player-identity.ts`. Duplicate `slugify()` in
+`roster-assembly.ts` replaced with shared `canonicalNameSlug`. Added `NAME_ALIASES` map for
+known cross-source name variants (Alex/Alexander Ovechkin, Dmitriy/Dmitri Simashev). Fixed
+name duplicates in `contracts.bundled.json` and `league-seed.json`. Removed "Jake Zibanejad"
+typo from `player-data.ts`. Added error logging to 7 silent `catch (_) {}` blocks (MoneyPuck
+CSV fetch, baseline loads, standings API, CapWages scrapes, DB queries). Created
+`/api/admin/health` endpoint that probes all five data sources (DB, NHL API roster, NHL API
+stats, MoneyPuck CSV, CapWages HTML) plus static baselines. Removed vestigial empty
+`contracts.data.json`. The full fix (owned xG pipeline) remains in FUTURECONCEPTS.md.
 
 ### [ ] CC3 — `evaluate/route.ts` `runGmLogic` is 763 lines
 Similar to CC1 but on the API side. 50+ flag checks in one function. Extract into

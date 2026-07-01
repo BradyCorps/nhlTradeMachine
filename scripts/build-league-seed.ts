@@ -18,17 +18,9 @@ import path from "path";
 import bundled from "../app/data/contracts.bundled.json";
 import { FREE_AGENT_SEED_LIST_2026 } from "../app/lib/free-agent-seed";
 import { SEASON } from "../app/lib/season-config";
+import { makePlayerId as makeId } from "../app/lib/player-identity";
 
 const OFFSEASON_YEAR = Number(SEASON.label.slice(0, 4)); // 2026
-
-// Match the admin/contracts makeId() exactly so seed rows and synced rows share ids.
-function makeId(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]/g, "");
-}
 
 interface SeedRow {
   id: string;

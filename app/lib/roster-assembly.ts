@@ -96,11 +96,7 @@ const parseCSVRow = (row: string): string[] => {
   return result;
 };
 
-const slugify = (n: string) =>
-  n.toLowerCase().normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9 ]/g, "")
-    .trim().replace(/\s+/g, "-");
+const slugify = canonicalNameSlug;
 
 const normalisePos = (code: string) =>
   code === "L" || code === "R" ? "W" : code;
@@ -339,7 +335,7 @@ function loadBaselines(): Record<string, any> {
     const path = require("path");
     const file = path.join(process.cwd(), "app/data/moneypuck_baselines.json");
     return JSON.parse(fs.readFileSync(file, "utf-8"));
-  } catch (_) { return {}; }
+  } catch (err) { console.error("[roster-assembly] Failed to load moneypuck_baselines.json:", err instanceof Error ? err.message : err); return {}; }
 }
 
 function loadTeamBaselines(): Record<string, any> {
@@ -348,7 +344,7 @@ function loadTeamBaselines(): Record<string, any> {
     const path = require("path");
     const file = path.join(process.cwd(), "app/data/team_baselines.json");
     return JSON.parse(fs.readFileSync(file, "utf-8"));
-  } catch (_) { return {}; }
+  } catch (err) { console.error("[roster-assembly] Failed to load team_baselines.json:", err instanceof Error ? err.message : err); return {}; }
 }
 
 // Last-resort fallback used only when the DB read itself throws: build the
@@ -884,7 +880,9 @@ export async function assembleCanonicalRoster(options: {
         });
       }
     }
-  } catch (_) {}
+  } catch (err) {
+    console.error("[roster-assembly] MoneyPuck CSV fetch/parse failed — analytics will use fallback stats:", err instanceof Error ? err.message : err);
+  }
 
   // ── Build roster from live NHL API only ─────────────────────
   // Static player rosters were removed because they drift quickly and conflict

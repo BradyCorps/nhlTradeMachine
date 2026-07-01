@@ -136,12 +136,16 @@ async function loadTeams(capCeiling: number): Promise<any[]> {
         }
       });
     }
-  } catch (_) {}
+  } catch (err) {
+    console.error("[league/teams] Standings API fetch failed:", err instanceof Error ? err.message : err);
+  }
 
   let dbTeams: any[] = [];
   try {
     dbTeams = await db.select().from(teamsTable);
-  } catch (_) {}
+  } catch (err) {
+    console.error("[league/teams] DB team query failed:", err instanceof Error ? err.message : err);
+  }
   const dbTeamMap = new Map(dbTeams.map(t => [t.id, t]));
 
   // Cap space = curated static room (Decision A — authoritative used-cap accounting)

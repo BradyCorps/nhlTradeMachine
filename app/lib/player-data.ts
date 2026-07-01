@@ -136,7 +136,6 @@ export const PLAYER_PEDIGREE: Record<string, {
   "Andrei Svechnikov":  { peakPtsPace: 80, allStarYears: 1 },
   "Travis Konecny":     { peakPtsPace: 88, allStarYears: 1 },
   "Kirill Marchenko":   { peakPtsPace: 76, allStarYears: 0 },
-  "Jake Zibanejad":     { peakPtsPace: 92, allStarYears: 2 },
   "Mika Zibanejad":     { peakPtsPace: 92, allStarYears: 2 },
   "Vincent Trocheck":   { peakPtsPace: 78, allStarYears: 1 },
   "Trevor Zegras":      { peakPtsPace: 74, allStarYears: 1 },

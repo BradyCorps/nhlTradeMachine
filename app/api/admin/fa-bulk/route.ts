@@ -16,9 +16,7 @@ const OFFSEASON_YEAR = Number(SEASON.label.slice(0, 4));
 
 const CACHE_KEYS = ["cache:contracts", "cache:contracts:v2"];
 
-function makeId(name: string): string {
-  return name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
-}
+import { makePlayerId as makeId } from "@/app/lib/player-identity";
 
 // POST /api/admin/fa-bulk — set free-agency status on player rows in bulk.
 // Body: { names: string[] | string, status: "UFA"|"RFA"|"SIGNED"|"EXCLUDE" }

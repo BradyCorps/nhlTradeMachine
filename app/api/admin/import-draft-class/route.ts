@@ -7,9 +7,7 @@ import { ensurePlayerColumns } from "@/app/db/ensure-schema";
 
 export const dynamic = "force-dynamic";
 
-function makeId(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
+import { makePlayerId as makeId } from "@/app/lib/player-identity";
 
 const ELC_CAP_HIT = 0.975; // standard max ELC AAV ($M)
 const ELC_YEARS   = 3;
