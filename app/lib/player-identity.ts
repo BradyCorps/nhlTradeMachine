@@ -1,6 +1,7 @@
 const NAME_ALIASES: Record<string, string> = {
   "alex ovechkin": "Alexander Ovechkin",
   "dmitriy simashev": "Dmitri Simashev",
+  "john st. ivany": "Jack St. Ivany",
 };
 
 export function canonicalName(name: string): string {
