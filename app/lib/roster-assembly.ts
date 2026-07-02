@@ -1323,6 +1323,21 @@ export async function assembleCanonicalRoster(options: {
     debug: {
       playerCount: players.length,
       analyticsCount: analyticsMap.size,
+      contractsLoaded: Object.keys(CONTRACTS).length,
+      expiringCount: players.filter((p: any) => p.expiresThisOffseason).length,
+      ufaCount: players.filter((p: any) => p.contractStatus === "UFA").length,
+      rfaCount: players.filter((p: any) => p.contractStatus === "RFA").length,
+      contractsWithExpiry: Object.entries(CONTRACTS)
+        .filter(([, c]: [string, any]) => c.expiryStatus)
+        .length,
+      sampleExpiring: players
+        .filter((p: any) => p.expiresThisOffseason)
+        .slice(0, 5)
+        .map((p: any) => `${p.name} (${p.contractStatus}, team:${p.teamId})`),
+      sampleContractFAs: Object.entries(CONTRACTS)
+        .filter(([k, c]: [string, any]) => !k.includes("__") && c.expiryStatus)
+        .slice(0, 5)
+        .map(([k, c]: [string, any]) => `${k}: ${c.expiryStatus} ${c.expiryYear}`),
     },
   };
 }
