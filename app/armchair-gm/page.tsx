@@ -480,6 +480,7 @@ export default function ArmchairGmPage() {
       setVerdict(null);
       setHomeTeamLocked(false);
       setShowTeamSelect(true);
+      offseasonResolvedRef.current = false;
     }
   }, [originalDb, setBlocks]);
 

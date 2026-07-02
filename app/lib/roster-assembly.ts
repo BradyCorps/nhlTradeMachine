@@ -57,8 +57,11 @@ export function deriveContractStatus(opts: {
     : null;
   const rawExpiryYear = typeof opts.expiryYear === "number" ? opts.expiryYear : null;
   const prelim = opts.isELC ? 1 : (opts.yearsRemaining ?? 1);
+  // draftOverall suppresses FA detection only for young ELC-age players (≤23).
+  // Veterans with draftOverall from prospect enrichment should still expire.
+  const isDraftSuppressed = opts.draftOverall != null && opts.isELC;
   const expiresThisOffseason =
-    normExpiry != null && opts.draftOverall == null && !opts.isELC &&
+    normExpiry != null && !isDraftSuppressed &&
     (rawExpiryYear != null ? rawExpiryYear <= offseasonYear : prelim <= 1);
   const contractStatus: "UFA" | "RFA" | "SIGNED" =
     expiresThisOffseason && normExpiry ? normExpiry : "SIGNED";
@@ -947,6 +950,9 @@ export async function assembleCanonicalRoster(options: {
       prospectPtsPace: playersTable.prospectPtsPace,
       retired:         playersTable.retired,
       excludeFromRoster: playersTable.excludeFromRoster,
+      expiryStatus:    playersTable.expiryStatus,
+      expiryYear:      playersTable.expiryYear,
+      capHit:          playersTable.capHit,
     }).from(playersTable);
 
     // retired = left the league; excludeFromRoster = editor pulled them off the
@@ -979,6 +985,39 @@ export async function assembleCanonicalRoster(options: {
         });
       }
       rosterMap.set(d.teamId, list);
+    }
+
+    // ── Pending FA injection ──────────────────────────────────────
+    // DB players with expiryStatus (UFA/RFA) that are not yet on any roster.
+    // Many bulk-FA entries have no teamId; resolve their team from the NHL API
+    // roster map so they flow through the player build and appear in the
+    // off-season market.
+    const slugToTeam = new Map<string, string>();
+    for (const [teamId, list] of rosterMap.entries()) {
+      for (const p of list) slugToTeam.set(canonicalNameSlug(p.name), teamId);
+    }
+    for (const d of dbPlayers) {
+      if (d.retired || d.excludeFromRoster) continue;
+      if (!d.expiryStatus) continue;
+      const dbSlug = canonicalNameSlug(d.name);
+      if (slugToTeam.has(dbSlug)) continue;
+      const resolvedTeam = isValidTeamId(d.teamId) ? d.teamId
+        : dbTeamBySlug.get(dbSlug) ?? null;
+      if (!resolvedTeam) continue;
+      const list = rosterMap.get(resolvedTeam) ?? [];
+      list.push({
+        id:              d.id,
+        name:            d.name,
+        position:        normalisePos(d.position),
+        age:             d.age ?? 25,
+        headshot:        null,
+        draftYear:       d.draftYear,
+        draftOverall:    d.draftOverall,
+        prospectPtsPace: d.prospectPtsPace,
+        injectedFromDb:   true,
+      });
+      rosterMap.set(resolvedTeam, list);
+      dbTeamBySlug.set(dbSlug, resolvedTeam);
     }
   } catch (e: any) {
     console.warn("[DB roster] injection skipped:", e.message);
@@ -1085,7 +1124,8 @@ export async function assembleCanonicalRoster(options: {
         : null;
 
       const hasProspectSignal = draftOverall != null || (prospectPtsPace != null && prospectPtsPace > 0);
-      if (p.injectedFromDb && !stats && !goalieStats && !hasProspectSignal && p.age >= 24) {
+      const hasFaStatus = fin?.expiryStatus != null;
+      if (p.injectedFromDb && !stats && !goalieStats && !hasProspectSignal && !hasFaStatus && p.age >= 24) {
         return;
       }
 
