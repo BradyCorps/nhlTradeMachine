@@ -7,7 +7,13 @@ Promote to `docs/TASKS.md` when ready to act.
 
 ## Architecture
 
-### [ ] CC1 — Armchair GM page is 2,790 lines
+### [x] CC1 — Armchair GM page is 2,790 lines
+**Partially mitigated on 2026-07-02.** Extracted simulation dispatch into
+`app/armchair-gm/useSimDispatch.ts`, moving `/api/simulate` and season-recap Claude
+state/abort handling out of the page. A source canary now guards that simulation dispatch
+stays outside the monolithic page. Further splits for offseason and trade execution remain
+valid follow-up work.
+
 `app/armchair-gm/page.tsx` is a single `"use client"` component owning trade execution,
 offseason orchestration, lineup state, draft night, re-sign phase, offer sheets, simulation
 dispatch, cap math, share URLs, and all their UI. Every new feature makes this file harder

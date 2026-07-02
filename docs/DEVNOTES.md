@@ -1,6 +1,7 @@
 # Development Notes
 
 # POSTCODEX_AUDIT
+- 2026-07-02: Extracted Armchair GM simulation dispatch into `app/armchair-gm/useSimDispatch.ts`, added a source canary for the split, and marked CLAUDECONCERNS CC1 complete. Touched `app/armchair-gm/page.tsx`, `app/armchair-gm/useSimDispatch.ts`, `__tests__/feature-canaries.test.ts`, `docs/CLAUDECONCERNS.md`, `docs/DEVNOTES.md`.
 - 2026-07-02: Added a source canary keeping the dead `ContractSyncer` component and obsolete `/api/contracts` route retired; marked CODEXAUDIT item 6 complete. Touched `__tests__/feature-canaries.test.ts`, `docs/CODEXAUDIT.md`, `docs/DEVNOTES.md`.
 - 2026-07-02: Updated the admin dashboard canary to keep the retired `/admin/fa-overrides` path out while Contract Admin owns FA player-row facts; marked CODEXAUDIT item 5 complete. Touched `__tests__/feature-canaries.test.ts`, `docs/CODEXAUDIT.md`, `docs/DEVNOTES.md`.
 - 2026-07-02: Confirmed the admin auth canary recursively discovers every `app/api/admin/**/route.ts` file and checks each exported handler for `requireAdmin(req)`; marked CODEXAUDIT item 4 complete. Touched `docs/CODEXAUDIT.md`, `docs/DEVNOTES.md`.

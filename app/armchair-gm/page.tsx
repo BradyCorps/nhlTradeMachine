@@ -3,7 +3,6 @@
 import TradePanel from "@/app/components/TradePanel";
 import TugBar from "@/app/components/TugBar";
 import { SEASON, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
-import { formatPickRound } from "@/app/lib/trade-format";
 import { pickEffectiveStanding } from "@/app/lib/pick-value";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
 import TeamStrand, { CHAMP_TEMPLATE, type TeamStrandData } from "@/app/components/TeamStrand";
@@ -38,6 +37,7 @@ import { draftedRookieAssets } from "@/app/lib/draft-rookies";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import TradeBlockPanel from "@/app/components/TradeBlockPanel";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
+import { useSimDispatch } from "./useSimDispatch";
 
 const TradeProposalEngine = lazy(() => import("@/app/components/TradeProposal"));
 const PlayerComparison    = lazy(() => import("@/app/components/PlayerComparison"));
@@ -181,9 +181,6 @@ export default function ArmchairGmPage() {
     incoming: Asset[];
     timestamp: number;
   }[]>([]);
-  const [simResult, setSimResult]   = useState<string | null>(null);
-  const [simLoading, setSimLoading] = useState(false);
-  const [simData, setSimData]       = useState<any | null>(null);
   const [showSimPanel, setShowSimPanel] = useState(false);
   const [lineupStartingGoalies, setLineupStartingGoalies] = useState<Record<string, string | null>>({});
   const [lineupOrders, setLineupOrders] = useState<Record<string, LineupOrderPayload>>({});
@@ -202,7 +199,6 @@ export default function ArmchairGmPage() {
   useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length) || draftOpen || resignOpen || offerSheetOpen);
 
   // ── Abort controllers — cancel stale Claude requests ─────────
-  const simAbortRef  = useRef<AbortController | null>(null);
   const memoAbortRef = useRef<AbortController | null>(null);
   const evalAbortRef = useRef<AbortController | null>(null);
   const matchAbortRef = useRef<AbortController | null>(null);
@@ -214,6 +210,24 @@ export default function ArmchairGmPage() {
   const navMap = useTradeStore(s => s.navMap);
   const setNavMap = useTradeStore(s => s.setNavMap);
   const [navLoading, setNavLoading] = useState(false);
+  const {
+    simResult,
+    simLoading,
+    simData,
+    simYear,
+    clearSimResult,
+    resetSimulation,
+  } = useSimDispatch({
+    homeTeam,
+    partnerTeam,
+    db,
+    originalDb,
+    executedTrades,
+    navMap,
+    lineupStartingGoalies,
+    lineupOrders,
+    computeContention,
+  });
 
   // Memoized rosters — stable references stop useEffect churn
   const allHomeRoster = useMemo(
@@ -462,9 +476,9 @@ export default function ArmchairGmPage() {
     // Clear the blocks and verdict
     setBlocks([[], []]);
     setVerdict(null);
-    setSimResult(null);
+    clearSimResult();
     setShowSimPanel(true);
-  }, [homeTeam, partnerTeam, outgoingBlock, incomingBlock, setBlocks]);
+  }, [homeTeam, partnerTeam, outgoingBlock, incomingBlock, setBlocks, clearSimResult]);
 
   // ── Reset to original rosters ─────────────────────────────────
   const resetTrades = useCallback(() => {
@@ -472,8 +486,7 @@ export default function ArmchairGmPage() {
       clearNavCache();
       setDb(originalDb);
       setExecutedTrades([]);
-      setSimResult(null);
-      setSimData(null);
+      resetSimulation();
       setLineupStartingGoalies({});
       setShowSimPanel(false);
       setBlocks([[], []]);
@@ -482,7 +495,7 @@ export default function ArmchairGmPage() {
       setShowTeamSelect(true);
       offseasonResolvedRef.current = false;
     }
-  }, [originalDb, setBlocks]);
+  }, [originalDb, setBlocks, resetSimulation]);
 
   // ── Off-Season: resolve the league's pending free agents (once) ──
   // Auto-handles the other 31 teams (re-signs / walks) and sets the user's own
@@ -669,153 +682,6 @@ export default function ArmchairGmPage() {
     }
   }, [mode, homeTeamId, showTeamSelect, initialNavReady, applyLeagueOffseason]);
 
-  // ── Sim a Year — native engine projects, Claude narrates only ─────
-  const simYear = useCallback(async () => {
-    if (!homeTeam || executedTrades.length === 0) return;
-    setSimLoading(true);
-    setSimResult(null);
-    setSimData(null);
-
-    // ── Step 1: Run projection engine ─────────────────────────
-    let sim: any = null;
-    try {
-      const simTeams = originalDb?.teams ?? db.teams;
-      const simPlayers = originalDb?.players ?? db.players;
-      const simTrades = executedTrades.map(t => ({
-        homeTeamId:    simTeams.find(x => x.name === t.homeTeamName)?.id ?? "",
-        partnerTeamId: simTeams.find(x => x.name === t.partnerTeamName)?.id ?? "",
-        outgoing: t.outgoing,
-        incoming: t.incoming,
-      }));
-      const seed = scenarioSeed({
-        mode: SEASON.simulationMode,
-        homeTeamId: homeTeam.id,
-        partnerTeamId: partnerTeam?.id ?? "",
-        trades: simTrades.map(t => ({
-          homeTeamId: t.homeTeamId,
-          partnerTeamId: t.partnerTeamId,
-          outgoing: t.outgoing.map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0 })),
-          incoming: t.incoming.map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0 })),
-        })),
-      });
-      const baselinePlayerIds = new Set(simPlayers.map(p => p.id));
-      const newlyAddedPlayers = originalDb
-        ? db.players.filter(p => !baselinePlayerIds.has(p.id))
-        : [];
-      const simPlayerPool = newlyAddedPlayers.length > 0
-        ? [...simPlayers, ...newlyAddedPlayers]
-        : simPlayers;
-
-      const simRes = await fetch("/api/simulate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          homeTeamId:    homeTeam.id,
-          partnerTeamId: partnerTeam?.id ?? "",
-          teams:   simTeams,
-          players: simPlayerPool,
-          trades:  simTrades,
-          lineup: {
-            startingGoalies: lineupStartingGoalies,
-            orders: lineupOrders,
-          },
-          seed,
-        }),
-      });
-      if (simRes.ok) {
-        sim = await simRes.json();
-        setSimData(sim);
-      }
-    } catch (_) {}
-
-    if (!sim) {
-      setSimResult("Simulation unavailable — deterministic projection engine did not return results.");
-      setSimLoading(false);
-      return;
-    }
-
-    // ── Step 2: Build trade summary ────────────────────────────
-    const tradesSummary = executedTrades.map(t => {
-      const outNames = t.outgoing.map(a => a.position === "Pick"
-        ? `${a.year} ${formatPickRound(a.round)} round pick`
-        : `${a.name} (${a.position}, $${a.capHit}M)`).join(", ");
-      const inNames = t.incoming.map(a => a.position === "Pick"
-        ? `${a.year} ${formatPickRound(a.round)} round pick`
-        : `${a.name} (${a.position}, $${a.capHit}M)`).join(", ");
-      return [
-        `OFFSEASON MOVE: ${t.homeTeamName} ↔ ${t.partnerTeamName}`,
-        `  ${t.homeTeamName} MOVED: ${outNames}`,
-        `  ${t.homeTeamName} ACQUIRED: ${inNames}`,
-      ].join("\n");
-    }).join("\n\n");
-
-    const homeRoster = db.players
-      .filter(p => p.teamId === homeTeam.id && p.position !== "Pick")
-      .sort((a, b) => b.ptsPace - a.ptsPace)
-      .slice(0, 12)
-      .map(p => `${p.name} (${p.position}, age ${p.age})`);
-
-    const isRebuilding = ["Rebuilding","Tanking","Retooling"].includes(homeTeam.phase ?? "");
-
-    const teamNarrative = (t: Team): string => {
-      const p = t.phase;
-      if (p === "Tanking" || p === "Rebuilding") return "opening the year with a future-first roster construction";
-      if (p === "Retooling") return "opening the year trying to turn a transitional roster into a playoff-calibre group";
-      if (p === "Bubble") return "opening the year with a roster built to chase a playoff spot";
-      if (p === "Contender") return "opening the year with a roster built to contend immediately";
-      return "opening the year with an unsettled organizational direction";
-    };
-    const homeContention = computeContention(db.players.filter(p => p.teamId === homeTeam.id), navMap);
-
-    if (simAbortRef.current) simAbortRef.current.abort();
-    simAbortRef.current = new AbortController();
-
-    try {
-      const res = await fetch("/api/claude", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: simAbortRef.current.signal,
-        body: JSON.stringify({
-          kind: "season_recap",
-          model: "claude-sonnet-4-5",
-          max_tokens: 1800,
-          payload: {
-            simulationMode: sim.simulationMode ?? SEASON.simulationMode,
-            replaySeason: sim.replaySeason ?? SEASON.replaySeason,
-            rosterMoveWindow: sim.rosterMoveWindow ?? SEASON.rosterMoveWindow,
-            latestCompleted: sim.latestCompleted ?? SEASON.latestCompleted,
-            homeTeamName: homeTeam.name,
-            partnerTeamName: partnerTeam?.name ?? null,
-            homeTeam: sim.homeTeam ?? null,
-            partnerTeam: sim.partnerTeam ?? null,
-            leaders: sim.leaders ?? {},
-            playoffBracket: sim.playoffBracket ?? null,
-            playoffTeams: sim.playoffTeams ?? [],
-            tradedPlayerOutcomes: sim.tradedPlayerOutcomes ?? [],
-            executedTrades: executedTrades.map(t => ({
-              homeTeamName: t.homeTeamName,
-              partnerTeamName: t.partnerTeamName,
-              outgoing: t.outgoing,
-              incoming: t.incoming,
-            })),
-            homeRoster,
-            homePhase: homeTeam.phase,
-            homeContention,
-            seasonStartOutlook: teamNarrative(homeTeam),
-            isRebuilding,
-            seed: sim.seed ?? null,
-            generatedLabel: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' }),
-          },
-        }),
-      });
-      const data = await res.json();
-      setSimResult(data.content?.[0]?.text ?? "Simulation unavailable.");
-    } catch (e: any) {
-      if (e.name === "AbortError") return;
-      setSimResult("Simulation unavailable — please try again.");
-    }
-    setSimLoading(false);
-  }, [homeTeam, partnerTeam, db, originalDb, executedTrades, navMap, lineupStartingGoalies, lineupOrders]);
   useEffect(() => {
     // Issue 10: Don't auto-evaluate. Clear old verdict so user must click "Make the call" again.
     if (previousTradeInputKey.current !== tradeInputKey) {

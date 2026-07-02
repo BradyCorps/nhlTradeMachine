@@ -876,12 +876,13 @@ describe("Canary — trade UX loading and mobile focus", () => {
 
   it("threads ordered lineup slots from the editor into the sim engine", () => {
     const simulateRoute = read("app/api/simulate/route.ts");
+    const simDispatch = read("app/armchair-gm/useSimDispatch.ts");
     expect(lineupEditor).toContain("onLineupChange");
     expect(lineupEditor).toContain("forwards: orders.F.slice(0, 12)");
     expect(tradePage).toContain("lineupOrders");
-    expect(tradePage).toContain("newlyAddedPlayers");
-    expect(tradePage).toContain("simPlayerPool");
-    expect(tradePage).toContain("orders: lineupOrders");
+    expect(simDispatch).toContain("newlyAddedPlayers");
+    expect(simDispatch).toContain("simPlayerPool");
+    expect(simDispatch).toContain("orders: lineupOrders");
     expect(simulateRoute).toContain("lineup?.orders?.[team.id]");
     expect(simulateRoute).toContain("buildDeploymentMap(lineupOrder)");
   });
@@ -1465,5 +1466,19 @@ describe("Canary — UX and UI polish", () => {
     expect(armchair.indexOf("Main Trade Grid")).toBeLessThan(armchair.indexOf("Lineups — editable depth charts below the trade"));
     expect(styles).toContain("font-size: 13px");
     expect(styles).not.toContain("players-mobile-sort-strip");
+  });
+});
+
+describe("Canary — Claude concerns", () => {
+  it("keeps Armchair GM simulation dispatch extracted from the monolithic page", () => {
+    const page = read("app/armchair-gm/page.tsx");
+    const hook = read("app/armchair-gm/useSimDispatch.ts");
+    expect(page).toContain('import { useSimDispatch } from "./useSimDispatch"');
+    expect(page).toContain("} = useSimDispatch({");
+    expect(page).not.toContain('fetch("/api/simulate"');
+    expect(page).not.toContain("const simAbortRef");
+    expect(hook).toContain("export function useSimDispatch");
+    expect(hook).toContain('fetch("/api/simulate"');
+    expect(hook).toContain('kind: "season_recap"');
   });
 });
