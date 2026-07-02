@@ -1248,7 +1248,12 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(settings).toContain("/api/admin/reset");
     expect(settings).toContain("includeTrades");
     expect(dashboard).toContain("/admin/draft-picks");
-    expect(dashboard).toContain("/admin/fa-overrides");
+    expect(dashboard).not.toContain("/admin/fa-overrides");
+  });
+
+  it("keeps dead ContractSyncer and obsolete contracts API retired", () => {
+    expect(fs.existsSync(path.join(process.cwd(), "app/components/ContractSyncer.tsx"))).toBe(false);
+    expect(fs.existsSync(path.join(process.cwd(), "app/api/contracts/route.ts"))).toBe(false);
   });
 
   it("patch-team-ids reports failed roster fetches instead of zero-match success", () => {

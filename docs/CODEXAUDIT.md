@@ -27,7 +27,9 @@ Suggested fix:
 - Use that helper from both `/api/league` and `/api/league/teams`.
 - Add a route-level regression test proving an override like `pick-CGY-2027-1 -> WPG` appears under `teamId: "WPG"` with a `via CGY` label in the `/api/league/teams` payload.
 
-### 2. Team/cache invalidation misses cap-specific team cache keys
+### 2. [x] Team/cache invalidation misses cap-specific team cache keys
+
+Status: fixed on 2026-07-02. Admin team mutations and broad cache flushes use the shared team-cache helper; route-level coverage now verifies base keys plus season, legacy, and active `site_settings.cap_ceiling` trade-team cache keys are cleared.
 
 Severity: medium-high
 
@@ -46,7 +48,9 @@ Suggested fix:
 - Have all admin mutations that affect team payloads clear the base keys plus `teamCacheKey(SEASON.capCeiling)`, `teamCacheKey(95.5)`, and the active `siteSettings.cap_ceiling` key.
 - Add tests that specifically check `app/api/admin/teams/route.ts` and `app/api/admin/clear-cache/route.ts` clear cap-specific keys, not just the base key.
 
-### 3. Contract Admin needs a real "editor back to sync" flow
+### 3. [x] Contract Admin needs a real "editor back to sync" flow
+
+Status: fixed on 2026-07-02. Contract Admin exposes the `EDITOR → SYNC` bulk action backed by `POST /api/admin/contracts` `reset-source`; route-level coverage now verifies editor rows switch to `sync`, curated FA/exclude fields clear, and roster/team caches are invalidated.
 
 Severity: medium-high
 
@@ -71,7 +75,9 @@ Suggested fix:
 - Decide whether reset should preserve or clear `expiryStatus`, `expiryYear`, and `excludeFromRoster`. If the goal is "fully trust sync again," clear curated FA fields too.
 - Add tests for editor-row reset behavior and cache invalidation.
 
-### 4. Admin auth canary does not cover newer admin routes
+### 4. [x] Admin auth canary does not cover newer admin routes
+
+Status: fixed on 2026-07-02. The admin auth canary now discovers `app/api/admin/**/route.ts` recursively and requires every exported HTTP handler to call the shared `requireAdmin(req)` helper, so newer admin routes are covered automatically.
 
 Severity: medium
 
@@ -87,7 +93,9 @@ Suggested fix:
 - Replace the hardcoded list with a filesystem-driven scan of `app/api/admin/**/route.ts`, excluding no routes unless explicitly documented.
 - For each route module, count exported HTTP handlers and require the same count of `await requireAdmin(req)` calls.
 
-### 5. Deprecated FA override API still writes to an unused table
+### 5. [x] Deprecated FA override API still writes to an unused table
+
+Status: fixed on 2026-07-02. The legacy `/admin/fa-overrides` page and `/api/admin/fa-overrides` route are retired, Contract Admin owns FA facts on player rows, `free-agent-seed.ts` documents the current players-table flow, and the dashboard canary now keeps the retired FA override link out.
 
 Severity: medium-low
 
@@ -105,7 +113,9 @@ Suggested fix:
 - Either remove/retire the old API route with a 410-style response pointing to Contract Admin, or wire it to update `players.expiryStatus`, `players.expiryYear`, and `players.excludeFromRoster` instead.
 - Update stale comments in `free-agent-seed.ts` to reflect current precedence: player-row editor facts, sync/seed facts, then fallback seed builder behavior.
 
-### 6. Dead `ContractSyncer` references a missing API route
+### 6. [x] Dead `ContractSyncer` references a missing API route
+
+Status: fixed on 2026-07-02. `ContractSyncer` and the obsolete `/api/contracts` path remain absent; a source canary now guards that the dead component and missing route stay retired.
 
 Severity: low
 
