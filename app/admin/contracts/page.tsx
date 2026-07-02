@@ -21,6 +21,8 @@ interface ContractRow {
   retiredDate:   string | null;
   expiryStatus:  string | null;
   expiryYear:    number | null;
+  extensionCapHit: number | null;
+  extensionYears:  number | null;
   excludeFromRoster: boolean;
   dbSource:      string | null;
   needsData:     boolean;
@@ -81,6 +83,9 @@ interface ContractEdit {
   position: string | null;
   expiryStatus: string | null;       // "UFA" | "RFA" | null (SIGNED)
   expiryYear: number | null;
+  extensionCapHit: number | null;
+  extensionYears: number | null;
+  clearExtension?: boolean;
   excludeFromRoster: boolean;
 }
 
@@ -98,8 +103,11 @@ function EditModal({ row, onSave, onClear, onClose }: {
   const initFa = (row.expiryStatus ?? "").toUpperCase();
   const [fa, setFa] = useState<string>(initFa === "UFA" || initFa === "RFA" ? initFa : "SIGNED");
   const [faYear, setFaYear] = useState(String(row.expiryYear ?? ""));
+  const [extCap, setExtCap] = useState(row.extensionCapHit ? String(row.extensionCapHit) : "");
+  const [extYrs, setExtYrs] = useState(row.extensionYears ? String(row.extensionYears) : "");
   const [exclude, setExclude] = useState(Boolean(row.excludeFromRoster));
   const [saving, setSaving] = useState(false);
+  const hasExt = extCap !== "" && parseFloat(extCap) > 0;
 
   const handle = async (clear = false) => {
     setSaving(true);
@@ -110,7 +118,10 @@ function EditModal({ row, onSave, onClear, onClose }: {
         const y = parseFloat(years);
         const c = parseFloat(cap);
         const fy = parseInt(faYear);
+        const ec = parseFloat(extCap);
+        const ey = parseInt(extYrs);
         const expiryStatus = fa === "UFA" || fa === "RFA" ? fa : null;
+        const hadExtension = row.extensionCapHit != null && row.extensionCapHit > 0;
         await onSave({
           name: row.name,
           yearsRemaining: isNaN(y) ? null : y,
@@ -118,6 +129,9 @@ function EditModal({ row, onSave, onClear, onClose }: {
           position: position || null,
           expiryStatus,
           expiryYear: expiryStatus ? (isNaN(fy) ? null : fy) : null,
+          extensionCapHit: hasExt ? (isNaN(ec) ? null : ec) : null,
+          extensionYears: hasExt ? (isNaN(ey) ? null : ey) : null,
+          clearExtension: hadExtension && !hasExt,
           excludeFromRoster: exclude,
         });
       }
@@ -198,6 +212,46 @@ function EditModal({ row, onSave, onClear, onClose }: {
               <option value="">Keep</option>
               {POSITION_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
+          </div>
+        </div>
+
+        {/* Extension — signed next contract that kicks in after current deal */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20,
+          background: hasExt ? "rgba(26,46,92,0.06)" : "var(--paper-inset)",
+          border: `1px solid ${hasExt ? "var(--ledger-navy)" : "var(--ledger-rule-light)"}`, padding: "10px 12px" }}>
+          <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 10, fontWeight: 900, color: hasExt ? "var(--ledger-navy)" : "var(--ledger-ink-faint)",
+              textTransform: "uppercase", letterSpacing: "0.1em" }}>
+              {hasExt ? "EXTENSION ACTIVE" : "EXTENSION"}
+            </span>
+            {hasExt && <span style={{ fontSize: 9, color: "var(--ledger-navy)", opacity: 0.6 }}>
+              Current deal → then ${extCap}M × {extYrs || "?"}yr
+            </span>}
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
+              letterSpacing: "0.1em", marginBottom: 5 }}>Ext Cap ($M)</label>
+            <input type="number" min={0} max={25} step={0.001} value={extCap}
+              onChange={e => setExtCap(e.target.value)}
+              placeholder="—"
+              style={{ ...field, width: "100%", padding: "6px 10px", fontSize: 13 }} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
+              letterSpacing: "0.1em", marginBottom: 5 }}>Ext Years</label>
+            <input type="number" min={1} max={8} step={1} value={extYrs}
+              onChange={e => setExtYrs(e.target.value)}
+              placeholder="—"
+              style={{ ...field, width: "100%", padding: "6px 10px", fontSize: 13 }} />
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-end", paddingBottom: 7 }}>
+            {hasExt && <button type="button" onClick={() => { setExtCap(""); setExtYrs(""); }}
+              style={{ fontSize: 10, fontWeight: 900, padding: "4px 10px",
+                background: "transparent", border: "1px solid var(--ledger-red)",
+                color: "var(--ledger-red)", cursor: "pointer", letterSpacing: "0.08em",
+                fontFamily: MONO }}>
+              CLEAR EXT
+            </button>}
           </div>
         </div>
 
@@ -407,7 +461,7 @@ export default function AdminContractsPage() {
   const [loading, setLoading]       = useState(true);
   const [syncing, setSyncing]       = useState(false);
   const [search, setSearch]         = useState("");
-  const [filter, setFilter]         = useState<"all" | "flagged" | "editor" | "needs">("all");
+  const [filter, setFilter]         = useState<"all" | "flagged" | "editor" | "needs" | "ext">("all");
   const [editing, setEditing]       = useState<ContractRow | null>(null);
   const [dbError, setDbError]       = useState<string | null>(null);
   const [resettingSource, setResettingSource] = useState(false);
@@ -554,12 +608,14 @@ export default function AdminContractsPage() {
     if (filter === "flagged") list = list.filter(r => (r.delta ?? 0) >= 1);
     if (filter === "editor")  list = list.filter(r => r.dbSource === "editor");
     if (filter === "needs")   list = list.filter(r => r.needsData);
+    if (filter === "ext")     list = list.filter(r => r.extensionCapHit != null && r.extensionCapHit > 0);
     return list;
   }, [contracts, search, filter]);
 
   const flaggedCount = contracts.filter(r => (r.delta ?? 0) >= 1).length;
   const editorCount  = contracts.filter(r => r.dbSource === "editor").length;
   const needsCount   = contracts.filter(r => r.needsData).length;
+  const extCount     = contracts.filter(r => r.extensionCapHit != null && r.extensionCapHit > 0).length;
 
   return (
     <div className="admin-page" style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)", color: "var(--ledger-ink)",
@@ -640,7 +696,7 @@ export default function AdminContractsPage() {
           className="admin-fluid-input"
           style={{ ...field, fontSize: 12, padding: "6px 12px", minWidth: 200 }}
         />
-        {(["all", "flagged", "editor", "needs"] as const).map(f => (
+        {(["all", "flagged", "editor", "needs", "ext"] as const).map(f => (
           <button key={f} onClick={() => setFilter(f)}
             style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
               letterSpacing: "0.1em", cursor: "pointer",
@@ -650,6 +706,7 @@ export default function AdminContractsPage() {
             {f === "all" ? "ALL"
               : f === "flagged" ? `FLAGGED (${flaggedCount})`
               : f === "editor" ? `EDITOR (${editorCount})`
+              : f === "ext" ? `EXT (${extCount})`
               : `NEEDS DATA (${needsCount})`}
           </button>
         ))}
@@ -702,6 +759,8 @@ export default function AdminContractsPage() {
               {row.hasNMC && <span style={{ fontSize: 9, color: "#b83020", border: "1px solid #b8302050",
                 padding: "0 3px", marginLeft: 5 }}>NMC</span>}
               <FaBadge status={row.expiryStatus} year={row.expiryYear} />
+              {row.extensionCapHit != null && row.extensionCapHit > 0 && <span style={{ fontSize: 9, color: "#1a2e5c", border: "1px solid #1a2e5c50",
+                padding: "0 3px", marginLeft: 5, background: "rgba(26,46,92,0.08)" }}>EXT</span>}
               {row.excludeFromRoster && <span style={{ fontSize: 9, color: "#b83020", border: "1px solid #b8302050",
                 padding: "0 3px", marginLeft: 5 }}>EXCL</span>}
             </div>

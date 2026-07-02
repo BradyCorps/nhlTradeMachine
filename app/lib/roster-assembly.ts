@@ -410,6 +410,8 @@ async function loadContractsFromDB(): Promise<Record<string, any>> {
       canRetain:      row.hasNmc ? false : true,
       expiryStatus:   row.expiryStatus ?? null,
       expiryYear:     row.expiryYear ?? null,
+      extensionCapHit: row.extensionCapHit ?? undefined,
+      extensionYears:  row.extensionYears ?? undefined,
       position,
     };
     const name = row.name;
@@ -1229,9 +1231,9 @@ export async function assembleCanonicalRoster(options: {
         capHit:         finalCapHit,
         lastCapHit:     nameCollision ? elcCapHit : lastCapHitRaw,
         yearsRemaining: finalYears,
-        hasExtension: false,
-        extensionCapHit: undefined,
-        extensionYears: undefined,
+        hasExtension: fin?.extensionCapHit != null && fin.extensionCapHit > 0,
+        extensionCapHit: fin?.extensionCapHit ?? undefined,
+        extensionYears: fin?.extensionYears ?? undefined,
         hasNMC:    finalNMC,
         hasNTC:    finalNTC,
         canRetain: finalRetain,

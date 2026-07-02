@@ -241,6 +241,8 @@ export async function GET(req: Request) {
       expiryStatus:   playersTable.expiryStatus,
       expiryYear:     playersTable.expiryYear,
       excludeFromRoster: playersTable.excludeFromRoster,
+      extensionCapHit: playersTable.extensionCapHit,
+      extensionYears:  playersTable.extensionYears,
       source:         playersTable.source,
     }).from(playersTable).catch((e: any) => {
       dbError = e?.message ?? String(e);
@@ -311,6 +313,8 @@ export async function GET(req: Request) {
       expiryStatus:  (b as any)?.expiryStatus ?? cw?.expiryStatus ?? null,
       expiryYear:    (b as any)?.expiryYear ?? null,
       excludeFromRoster: (b as any)?.excludeFromRoster ?? false,
+      extensionCapHit: b?.extensionCapHit ?? null,
+      extensionYears:  b?.extensionYears ?? null,
       // Provenance straight from the DB: seed | sync | editor (or "missing" when
       // the rostered player has no DB contract row at all).
       dbSource:      (b as any)?.source ?? null,
@@ -394,6 +398,9 @@ export async function POST(req: Request) {
   const draftYear = Number.isFinite(Number(body.draftYear)) ? Number(body.draftYear) : null;
   const draftRound = Number.isFinite(Number(body.draftRound)) ? Number(body.draftRound) : null;
   const draftOverall = Number.isFinite(Number(body.draftOverall)) ? Number(body.draftOverall) : null;
+  const extensionCapHit = Number.isFinite(Number(body.extensionCapHit)) && Number(body.extensionCapHit) > 0 ? Number(body.extensionCapHit) : null;
+  const extensionYears = Number.isFinite(Number(body.extensionYears)) && Number(body.extensionYears) > 0 ? Math.round(Number(body.extensionYears)) : null;
+  const clearExtension = body.extensionCapHit === null || body.extensionCapHit === 0 || body.clearExtension === true;
   const explicitProspectPtsPace = Number.isFinite(Number(body.prospectPtsPace)) ? Number(body.prospectPtsPace) : null;
   const league = typeof body.league === "string" ? body.league.toUpperCase() : null;
   const points = Number.isFinite(Number(body.points)) ? Number(body.points) : null;
@@ -428,7 +435,7 @@ export async function POST(req: Request) {
   if (
     yearsRemaining == null && capHit == null && hasNMC == null && hasNTC == null &&
     retired == null && expiryStatus === undefined && expiryYear === undefined &&
-    excludeFromRoster === undefined &&
+    excludeFromRoster === undefined && extensionCapHit == null && !clearExtension &&
     !teamId && !position && age == null && draftYear == null && draftRound == null &&
     draftOverall == null && prospectPtsPace == null
   ) {
@@ -454,6 +461,13 @@ export async function POST(req: Request) {
     if (draftRound    != null)   updates.draftRound     = draftRound;
     if (draftOverall  != null)   updates.draftOverall   = draftOverall;
     if (prospectPtsPace != null) updates.prospectPtsPace = prospectPtsPace;
+    if (extensionCapHit != null) {
+      updates.extensionCapHit = extensionCapHit;
+      updates.extensionYears = extensionYears ?? 1;
+    } else if (clearExtension) {
+      updates.extensionCapHit = null;
+      updates.extensionYears = null;
+    }
     if (expiryStatus !== undefined) updates.expiryStatus = expiryStatus;
     if (expiryYear   !== undefined) updates.expiryYear   = expiryYear;
     if (excludeFromRoster !== undefined) updates.excludeFromRoster = excludeFromRoster;
@@ -483,6 +497,8 @@ export async function POST(req: Request) {
       expiryStatus:   expiryStatus ?? undefined,
       expiryYear:     expiryYear ?? undefined,
       excludeFromRoster: excludeFromRoster ?? undefined,
+      extensionCapHit: extensionCapHit ?? undefined,
+      extensionYears:  extensionYears ?? undefined,
       source:         "editor",
     });
     await clearRosterCaches();

@@ -1138,14 +1138,14 @@ describe("Canary — admin contract sync", () => {
     expect(rosterAssembly).toContain("hasLiveStats: true");
   });
 
-  it("league roster routes do not apply retired contract extension overlays", () => {
+  it("league roster routes read extensions from DB columns, not file overlays", () => {
     for (const source of ROSTER_ASSEMBLY_SOURCES) {
       const src = read(source);
       expect(src).not.toContain("contracts.extensions.json");
       expect(src).not.toContain("loadExtensions");
       expect(src).not.toContain("EXTENSIONS");
       expect(src).toContain("hasExtension");
-      expect(src).toContain("extensionCapHit: undefined");
+      expect(src).toContain("extensionCapHit");
       expect(src).toContain("extensionYears");
     }
   });
