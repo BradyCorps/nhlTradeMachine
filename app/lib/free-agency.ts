@@ -146,7 +146,10 @@ export function projectFreeAgentContract(asset: Asset, ctx: ProjectContext = {})
 
   // Age: a small premium in the early-prime, a discount as production decays.
   const ageFactor = clamp(1.0 - Math.max(0, age - 30) * 0.05 + (age <= 24 ? 0.03 : 0), 0.65, 1.08);
-  const statusFactor = status === "RFA" ? FA.rfaDiscount : 1.0;
+  const preDiscountAav = baseAav * ageFactor;
+  const statusFactor = status === "RFA"
+    ? (preDiscountAav >= 10 ? 0.92 : preDiscountAav >= 6 ? 0.88 : FA.rfaDiscount)
+    : 1.0;
   const variance = 0.92 + rand() * 0.16; // seeded market noise (+/- ~8%)
 
   let aav = baseAav * ageFactor * statusFactor * variance;

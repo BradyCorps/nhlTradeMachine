@@ -1053,6 +1053,7 @@ export async function assembleCanonicalRoster(options: {
 
   // ── Build player objects ────────────────────────────────────
   let players: any[] = [];
+  const _dbg = { ufaMatch: 0, ufaExpires: 0, ufaFiltered: 0, noMatch: 0, noTeam: 0, samples: [] as string[] };
 
   rosterMap.forEach((skaters, teamId) => {
     const developmentTeam = rosterTeams.find((t: any) => t.id === teamId);
@@ -1126,6 +1127,10 @@ export async function assembleCanonicalRoster(options: {
       const hasProspectSignal = draftOverall != null || (prospectPtsPace != null && prospectPtsPace > 0);
       const hasFaStatus = fin?.expiryStatus != null;
       if (p.injectedFromDb && !stats && !goalieStats && !hasProspectSignal && !hasFaStatus && p.age >= 24) {
+        if (/ufa/i.test(String(CONTRACTS[p.name]?.expiryStatus ?? ""))) {
+          _dbg.ufaFiltered++;
+          if (_dbg.samples.length < 5) _dbg.samples.push(`FILTERED ${p.name} (fin:${!!fin},injDb:${p.injectedFromDb})`);
+        }
         return;
       }
 
@@ -1139,6 +1144,15 @@ export async function assembleCanonicalRoster(options: {
         draftOverall,
         isELC: isLikelyELC,
       });
+      if (/ufa/i.test(String(rawExpiryStatus))) {
+        _dbg.ufaMatch++;
+        if (expiresThisOffseason) _dbg.ufaExpires++;
+        else if (_dbg.samples.length < 5) _dbg.samples.push(`NOEXPIRE ${p.name} yr:${rawExpiryYear} yrs:${preliminaryYears} draft:${draftOverall} elc:${isLikelyELC}`);
+      }
+      if (!fin && CONTRACTS[p.name]?.expiryStatus) {
+        _dbg.noMatch++;
+        if (_dbg.samples.length < 5) _dbg.samples.push(`NOMATCH roster:${p.name} pos:${p.position} team:${teamId}`);
+      }
       // No contract row resolved and not a young ELC/prospect → the 0.925 default
       // below is a placeholder, not a real deal. Surfaced for the admin's
       // "needs data" view; does not change pricing.
@@ -1338,6 +1352,10 @@ export async function assembleCanonicalRoster(options: {
         .filter(([k, c]: [string, any]) => !k.includes("__") && c.expiryStatus)
         .slice(0, 5)
         .map(([k, c]: [string, any]) => `${k}: ${c.expiryStatus} ${c.expiryYear}`),
+      ufaContractKeys: Object.entries(CONTRACTS)
+        .filter(([k, c]: [string, any]) => !k.includes("__") && /ufa/i.test(String(c.expiryStatus)))
+        .length,
+      ufaPipeline: _dbg,
     },
   };
 }
