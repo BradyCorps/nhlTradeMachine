@@ -326,13 +326,20 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
       continue;
     }
 
+    // Teamless FA pool entries go straight to market — no team to account against.
+    if (!player.teamId || player.teamId === "FA_POOL") {
+      const marketContract = { ...contract, term: Math.min(contract.term, MARKET_TERM_CAP) };
+      if (contract.status === "RFA") {
+        rfaMarket.push({ player, contract: marketContract });
+      } else {
+        market.push({ player, contract: marketContract });
+      }
+      continue;
+    }
+
     const rand = mulberry32(seed + hashString(`resolve:${player.id}`));
 
     if (contract.status === "RFA") {
-      // RFAs: most re-sign but all are technically available for offer sheets.
-      // The team re-signs them for cap purposes, but we also expose them to the
-      // user's offer sheet phase. If the user offer-sheets one, the page handler
-      // reverses the re-signing and applies the new deal.
       addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
       addMove(player.teamId, "incoming", { capHit: contract.aav });
       resignings.push({ playerId: player.id, teamId: player.teamId, contract });

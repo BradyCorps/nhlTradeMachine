@@ -1317,10 +1317,71 @@ export async function assembleCanonicalRoster(options: {
 
   players = dedupePlayersByAuthority(players, dbTeamBySlug);
 
-  // Free-agency status was resolved per-player straight from the DB contract row
-  // (deriveContractStatus, above). There is no separate FA-override/seed pass —
-  // the players table is the single source of truth, and excludeFromRoster has
-  // already pulled excluded players from the roster map.
+  // ── Free-agent pool: teamless FA entries ───────────────────────────────────
+  // Bulk-FA-created DB rows often have no teamId. They weren't placed on any
+  // roster above, so they never went through the build loop. Inject them as
+  // minimal expiring players so resolveLeagueOffseason puts them in the market.
+  try {
+    const dbPlayers2 = await db.select({
+      id: playersTable.id, name: playersTable.name, position: playersTable.position,
+      age: playersTable.age, expiryStatus: playersTable.expiryStatus,
+      expiryYear: playersTable.expiryYear, capHit: playersTable.capHit,
+      retired: playersTable.retired, excludeFromRoster: playersTable.excludeFromRoster,
+      teamId: playersTable.teamId,
+    }).from(playersTable);
+    const existingSlugs = new Set(players.map((p: any) => slugify(p.name)));
+    let poolCount = 0;
+    for (const d of dbPlayers2) {
+      if (d.retired || d.excludeFromRoster) continue;
+      if (!d.expiryStatus) continue;
+      const dSlug = slugify(d.name);
+      if (existingSlugs.has(dSlug)) continue;
+      const fin = CONTRACTS[d.name] ?? null;
+      const lastCap = fin?.capHit ?? d.capHit ?? 0;
+      const pos = normalisePos(d.position) || "C";
+      const slug = slugify(d.name);
+      const stats = analyticsMap.get(slug) ?? NHL_SKATER_STATS.get(slug) ?? null;
+      const nhlG = NHL_GOALIE_STATS.get(slug);
+      const isGoalie = pos === "G";
+      const ptsPace = stats?.ptsPace ?? 0;
+      const avgTOI = stats?.avgTOI ?? 0;
+      const normExpiry: "UFA" | "RFA" | null = /rfa/i.test(d.expiryStatus) ? "RFA" : /ufa/i.test(d.expiryStatus) ? "UFA" : null;
+      if (!normExpiry) continue;
+      const faTeamId = d.teamId || "FA_POOL";
+      players.push({
+        id: d.id, teamId: faTeamId, name: d.name, position: pos,
+        age: d.age ?? 27, headshot: null, games: stats?.games ?? 0,
+        ptsPace, xGPace: stats?.xGPace ?? 0, defRate: stats?.defRate ?? 0.08,
+        avgTOI, qocIndex: null, rosterTier: undefined,
+        hasLiveStats: stats?.hasLiveStats ?? false,
+        gsax: nhlG?.gsax ?? 0, savePct: nhlG?.savePct ?? 0.900,
+        gamesStarted: nhlG?.gamesStarted ?? 0, shotsPerGame: 0,
+        teamXga60: LEAGUE.avgXga60, teamHdca60: null,
+        baselineGsax: 0, baselinePtsPace: undefined,
+        baselineGameScore: undefined, baselineDpsProxy: undefined,
+        baselineXgRel: undefined, ppPtsPace82: undefined,
+        pkTimeShare: undefined, baselineIxg82: undefined,
+        baselineHits82: undefined, baselineBlocks82: undefined,
+        pairXgfPct: undefined, pairDriverScore: undefined,
+        baselineHdsvPct: undefined,
+        capHit: 0, lastCapHit: lastCap, yearsRemaining: 0,
+        hasExtension: false, hasNMC: false, hasNTC: false, canRetain: true,
+        draftYear: null, draftOverall: null, prospectPtsPace: null,
+        developmentProfile: null,
+        tradeBlockStatus: null, tradeBlockNote: null,
+        expiryStatus: normExpiry, expiryYear: d.expiryYear ?? null,
+        contractStatus: normExpiry, expiresThisOffseason: true,
+        contractMissing: true, retainedPct: 0, multiplier: 1.0,
+        ops: null, dps: null, xgRelTM: null, xgaRelTM: null,
+        dzPct: null, goalsPace: stats?.goalsPace, assistsPace: stats?.assistsPace,
+      });
+      existingSlugs.add(dSlug);
+      poolCount++;
+    }
+    _dbg.noTeam = poolCount;
+  } catch (e: any) {
+    console.warn("[FA pool] injection skipped:", e.message);
+  }
 
   const finalTeams = applyTeamCapDeltas(
     rosterTeams,
