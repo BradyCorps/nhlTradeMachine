@@ -5,8 +5,8 @@
 - Strictly respect the .codexignore file. Do not read files or directories listed within it.
 - Ensure best operation and efficiency in credit usage, while maintaining high quality.
 
-# Task Discipline (applies to every docs/TASKS.md item)
-- Work the active queue in `docs/TASKS.md`. Make ONE scoped change per task; do not advance
+# Task Discipline (applies to every task completed)
+- Work the active queue in asked. Make ONE scoped change per task; do not advance
   to the next task without the user's go-ahead.
 - Only touch what the task names — no refactoring, renaming, or "improving" unrelated code,
   and no new dependencies.
@@ -17,7 +17,7 @@
 - Verify with `npm test` AND a typecheck (`npx tsc --noEmit` or `npm run build`) before
   finishing; report pass/fail counts. If there are no tests for the area, say so.
 - If a correct fix would change behavior beyond what's stated, stop and ask instead of guessing.
-- On completion: check the task off in `docs/TASKS.md` and append a dated one-line entry to
+- On completion: check the task off in task in the asked document and append a dated one-line entry to
   `docs/DEVNOTES.md` at the top of the page (what changed + files touched). Do NOT move tasks between docs — the user
   triages KNOWNBUGS → TASKS and TASKS → CONFIRMEDFIXES.
 

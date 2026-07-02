@@ -6,7 +6,9 @@ Verification: not run. This was a no-code-change audit pass, so the suggested fi
 
 ## Findings
 
-### 1. Draft-pick ownership overrides do not reach the main trade UI
+### 1. [x] Draft-pick ownership overrides do not reach the main trade UI
+
+Status: fixed on 2026-07-02. `/api/league/teams` uses the shared draft-pick inventory helper and route-level coverage now verifies an overridden CGY first-round pick appears under WPG with a `via CGY` label.
 
 Severity: high
 
