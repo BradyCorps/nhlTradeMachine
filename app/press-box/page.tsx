@@ -8,7 +8,8 @@ import {
   dayNumberFromDate,
   dealDailyHand,
   scoreHand,
-  findOptimalScore,
+  findOptimalCombos,
+  overlapWithOptimal,
   starRating,
   buildShareText,
   MAX_SCORE,
@@ -97,7 +98,31 @@ function updateStreak(dayNum: number, isPerfect: boolean) {
   return updated;
 }
 
-// ── Player Card ───────────────────────────────────────────────
+// ── Rubber stamp overlay ──────────────────────────────────────
+function CardStamp({ text, color }: { text: string; color: string }) {
+  return (
+    <span
+      className="absolute z-10 font-mono font-black uppercase pointer-events-none"
+      style={{
+        top: 10,
+        left: "50%",
+        transform: "translateX(-50%) rotate(-6deg)",
+        border: `2px solid ${color}`,
+        color,
+        padding: "1px 5px",
+        fontSize: 9,
+        letterSpacing: "0.12em",
+        borderRadius: 2,
+        background: "var(--paper)",
+        opacity: 0.92,
+      }}
+    >
+      {text}
+    </span>
+  );
+}
+
+// ── Player Card — newspaper-style playing card ────────────────
 function PlayerCard({
   player,
   selected,
@@ -115,91 +140,176 @@ function PlayerCard({
 }) {
   const flag = FLAG_EMOJI[player.nationality] ?? "🏳️";
   const posLabel = POS_LABEL[player.position] ?? player.position;
+  const accent = isCallUp
+    ? "var(--ledger-red)"
+    : selected
+      ? "var(--ledger-green)"
+      : "var(--ink)";
+
+  const cornerIndex = (
+    <>
+      <div className="font-black font-serif text-[15px] leading-none" style={{ color: accent }}>
+        {player.jerseyNumber}
+      </div>
+      <div className="font-mono text-[8px] font-black mt-0.5 leading-none" style={{ color: "var(--ledger-ink-faint)" }}>
+        {player.position}
+      </div>
+    </>
+  );
 
   return (
     <button
       onClick={onClick}
       disabled={disabled && !selected}
       className={[
-        "relative text-left transition-all duration-200 border",
-        "px-3 py-2.5 sm:px-4 sm:py-3",
-        isCallUp
-          ? "border-ledger-red bg-[var(--red-dim)]"
-          : selected
-            ? "border-[var(--ledger-green)] bg-[var(--green-dim)] scale-[1.02]"
-            : disabled
-              ? "border-[var(--rule-light)] opacity-50"
-              : "border-[var(--rule)] hover:border-[var(--ink)] hover:bg-[var(--paper-inset)] cursor-pointer",
+        "relative w-full text-left transition-all duration-200 border select-none",
+        selected && !isCallUp ? "-translate-y-1" : "",
+        !disabled && !selected && onClick ? "cursor-pointer hover:-translate-y-1" : "",
+        disabled && !selected && !isCallUp && onClick ? "opacity-60" : "",
       ].join(" ")}
-      style={{ borderRadius: 2 }}
+      style={{
+        aspectRatio: "5 / 7",
+        background: "var(--paper-inset)",
+        borderColor: accent,
+        borderRadius: 8,
+        boxShadow: selected || isCallUp
+          ? "0 4px 12px rgba(0,0,0,0.18)"
+          : "0 1px 3px rgba(0,0,0,0.12)",
+      }}
     >
-      {selected && !isCallUp && (
-        <span
-          className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center text-[10px] font-black font-mono"
-          style={{ background: "var(--ledger-green)", color: "#fff", borderRadius: 2 }}
-        >
-          IN
-        </span>
-      )}
-      {isCallUp && (
-        <span
-          className="absolute -top-2 -right-2 px-1.5 h-5 flex items-center justify-center text-[9px] font-black font-mono uppercase tracking-wider"
-          style={{ background: "var(--ledger-red)", color: "#fff", borderRadius: 2 }}
-        >
-          Call-Up
-        </span>
-      )}
+      {/* inner frame — classic double-rule card border */}
+      <div
+        className="absolute pointer-events-none border"
+        style={{ inset: 4, borderColor: "var(--rule)", borderRadius: 5 }}
+      />
 
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="font-black text-[13px] sm:text-[14px] leading-tight truncate" style={{ color: "var(--ink)" }}>
-            {player.name}
+      {/* corner indices, mirrored like rank pips */}
+      <div className="absolute top-2 left-2.5 text-center">{cornerIndex}</div>
+      <div className="absolute bottom-2 right-2.5 text-center rotate-180">{cornerIndex}</div>
+
+      {/* stamps */}
+      {selected && !isCallUp && <CardStamp text="In Lineup" color="var(--ledger-green)" />}
+      {isCallUp && <CardStamp text="Call-Up" color="var(--ledger-red)" />}
+
+      {/* card face */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-3 text-center">
+        <div className="text-[17px] leading-none" aria-hidden>{flag}</div>
+        <div
+          className="font-black font-serif text-[13px] leading-tight mt-1.5"
+          style={{ color: "var(--ink)" }}
+        >
+          {player.name}
+        </div>
+        <div className="mt-1.5 flex items-center justify-center gap-1.5">
+          <span
+            className="text-[9px] font-black font-mono uppercase tracking-wider px-1 py-px"
+            style={
+              matchHighlights?.team
+                ? { background: "var(--ledger-green)", color: "#fff", borderRadius: 1 }
+                : { color: "var(--ledger-ink-faint)", background: "var(--paper)", borderRadius: 1, border: "1px solid var(--rule-light)" }
+            }
+          >
+            {player.team}
+          </span>
+          <span
+            className={["text-[9px] font-mono", matchHighlights?.position ? "font-black text-[var(--ledger-green)]" : ""].join(" ")}
+            style={!matchHighlights?.position ? { color: "var(--ledger-ink-faint)" } : {}}
+          >
+            {posLabel}
+          </span>
+        </div>
+
+        <div className="w-8 border-t my-2" style={{ borderColor: "var(--rule)" }} />
+
+        {/* agate lines — box-score fine print */}
+        <div className="space-y-0.5 text-[9px] font-mono leading-tight" style={{ color: "var(--ledger-ink-faint)" }}>
+          <div className={matchHighlights?.nation ? "font-black text-[var(--ledger-green)]" : ""}>
+            {player.nationality} · AGE {player.age}
           </div>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
-            <span
-              className={[
-                "text-[10px] font-black font-mono uppercase tracking-wider px-1 py-px",
-                matchHighlights?.team ? "bg-[var(--ledger-green)] text-[#fff]" : "",
-              ].join(" ")}
-              style={
-                !matchHighlights?.team
-                  ? { color: "var(--ledger-ink-faint)", background: "var(--paper-inset)", borderRadius: 1 }
-                  : { borderRadius: 1 }
-              }
-            >
-              {player.team}
-            </span>
-            <span
-              className={[
-                "text-[10px] font-mono",
-                matchHighlights?.position ? "font-black text-[var(--ledger-green)]" : "",
-              ].join(" ")}
-              style={!matchHighlights?.position ? { color: "var(--ledger-ink-faint)" } : {}}
-            >
-              {posLabel}
-            </span>
+          <div className={matchHighlights?.draft ? "font-black text-[var(--ledger-green)]" : ""}>
+            DRAFT &apos;{String(player.draftYear).slice(2)}
+          </div>
+          <div className={matchHighlights?.division ? "font-black text-[var(--ledger-green)]" : ""}>
+            {player.division}
           </div>
         </div>
-        <div className="text-right shrink-0">
-          <div className="text-[18px] font-black font-mono leading-none" style={{ color: "var(--ink)" }}>
-            #{player.jerseyNumber}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-2 text-[10px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
-        <span className={matchHighlights?.nation ? "font-black text-[var(--ledger-green)]" : ""}>
-          {flag} {player.nationality}
-        </span>
-        <span>AGE {player.age}</span>
-        <span className={matchHighlights?.draft ? "font-black text-[var(--ledger-green)]" : ""}>
-          DRAFT &apos;{String(player.draftYear).slice(2)}
-        </span>
-        <span className={matchHighlights?.division ? "font-black text-[var(--ledger-green)]" : ""}>
-          {player.division}
-        </span>
       </div>
     </button>
+  );
+}
+
+// ── Peg Board — crib-style progress track ─────────────────────
+// Shows how far your pegs are from the target hole without printing
+// a point gap. Front peg (green) = best score, back peg (amber) =
+// latest attempt, red ring = target (the optimal lineup's score).
+function PegBoard({ attempts, optimal }: { attempts: AttemptRecord[]; optimal: number }) {
+  const best = attempts.length > 0 ? Math.max(...attempts.map((a) => a.score)) : null;
+  const latest = attempts.length > 0 ? attempts[attempts.length - 1].score : null;
+
+  return (
+    <div
+      className="border px-3 py-2.5"
+      style={{ borderColor: "var(--rule)", background: "var(--paper-inset)", borderRadius: 2 }}
+    >
+      <div
+        className="text-[9px] font-black uppercase tracking-[0.3em] font-mono mb-2 text-center"
+        style={{ color: "var(--ledger-ink-faint)" }}
+      >
+        Peg Board
+      </div>
+      <div className="flex items-end justify-center">
+        {Array.from({ length: MAX_SCORE + 1 }, (_, i) => {
+          const isTarget = i === optimal;
+          const isBest = best !== null && i === best;
+          const isLatest = latest !== null && i === latest && !isBest;
+          let fill = "transparent";
+          if (isBest) fill = "var(--ledger-green)";
+          else if (isLatest) fill = "var(--ledger-amber)";
+          return (
+            <div
+              key={i}
+              className="flex flex-col items-center"
+              // crib boards group holes in fives — breathe after 5 and 10
+              style={{ marginLeft: i === 0 ? 0 : i % 5 === 1 ? 8 : 3 }}
+            >
+              <div
+                className="rounded-full transition-all duration-300"
+                style={{
+                  width: 11,
+                  height: 11,
+                  background: fill,
+                  border: isTarget
+                    ? "2px solid var(--ledger-red)"
+                    : `1.5px solid ${fill === "transparent" ? "var(--rule)" : fill}`,
+                }}
+              />
+              <div
+                className="text-[7px] font-mono mt-0.5 leading-none"
+                style={{ color: "var(--ledger-ink-faint)", visibility: i % 5 === 0 ? "visible" : "hidden" }}
+              >
+                {i}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div
+        className="flex items-center justify-center gap-3 mt-1.5 text-[8px] font-mono uppercase tracking-wider"
+        style={{ color: "var(--ledger-ink-faint)" }}
+      >
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-2 h-2 rounded-full" style={{ background: "var(--ledger-green)" }} /> Best
+        </span>
+        {latest !== null && latest !== best && (
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-2 h-2 rounded-full" style={{ background: "var(--ledger-amber)" }} /> Last
+          </span>
+        )}
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-2 h-2 rounded-full" style={{ border: "2px solid var(--ledger-red)" }} /> Target
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -283,8 +393,31 @@ function PressBoxGame() {
   const isToday = dayNum === todayNum;
   const isArchive = !isToday;
 
-  const hand = useMemo(() => dealDailyHand(PRESS_BOX_POOL, dayNum), [dayNum]);
-  const optimal = useMemo(() => findOptimalScore(hand.dealt, hand.callUp), [hand]);
+  // The pool comes from the server, where curated identity is overlaid with
+  // live team/age/draft facts from the players table. The bundled pool is
+  // only the fallback so the game still deals if the API is unreachable.
+  const [pool, setPool] = useState<PressBoxPlayer[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/press-box/pool")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!alive) return;
+        const players = Array.isArray(data?.players) ? (data.players as PressBoxPlayer[]) : [];
+        setPool(players.length >= 7 ? players : PRESS_BOX_POOL);
+      })
+      .catch(() => {
+        if (alive) setPool(PRESS_BOX_POOL);
+      });
+    return () => { alive = false; };
+  }, []);
+
+  const hand = useMemo(() => (pool ? dealDailyHand(pool, dayNum) : null), [pool, dayNum]);
+  const optimalResult = useMemo(
+    () => (hand ? findOptimalCombos(hand.dealt, hand.callUp) : null),
+    [hand]
+  );
+  const optimal = optimalResult?.score ?? 0;
 
   const [picks, setPicks] = useState<string[]>([]);
   const [phase, setPhase] = useState<GamePhase>("DRAFTING");
@@ -301,8 +434,16 @@ function PressBoxGame() {
   const foundOptimal = attempts.some((a) => a.score === optimal);
   const attemptsRemaining = MAX_ATTEMPTS - attempts.length;
 
+  // Vague closeness feedback: how many of the last attempt's cards belong
+  // to a perfect lineup (never the exact point gap).
+  const lastOverlap = useMemo(() => {
+    if (!optimalResult || attempts.length === 0) return null;
+    return overlapWithOptimal(attempts[attempts.length - 1].picks, optimalResult.combos);
+  }, [attempts, optimalResult]);
+
   // Restore saved state
   useEffect(() => {
+    if (!hand) return;
     const saved = loadSavedState(dayNum);
     if (saved) {
       if (saved.version === 2 && saved.attempts) {
@@ -387,7 +528,7 @@ function PressBoxGame() {
   );
 
   const handleSubmit = useCallback(() => {
-    if (picks.length !== 4) return;
+    if (picks.length !== 4 || !hand) return;
     setPhase("REVEAL");
     const revealDelay = attempts.length === 0 ? 1500 : 800;
     setTimeout(() => {
@@ -439,12 +580,12 @@ function PressBoxGame() {
   const lastHandPlayed = typeof window !== "undefined" && !!loadSavedState(lastHandDay);
   const todayPlayed = typeof window !== "undefined" && !!loadSavedState(todayNum);
 
-  const pickedPlayers = hand.dealt.filter((p) => picks.includes(p.id));
-  const waivedPlayers = hand.dealt.filter((p) => !picks.includes(p.id));
+  const pickedPlayers = hand ? hand.dealt.filter((p) => picks.includes(p.id)) : [];
+  const waivedPlayers = hand ? hand.dealt.filter((p) => !picks.includes(p.id)) : [];
 
   // Compute match highlights for scored state
   const matchHighlights = useMemo(() => {
-    if (phase !== "SCORED" || !breakdown) return new Map<string, { team: boolean; draft: boolean; nation: boolean; division: boolean; position: boolean }>();
+    if (phase !== "SCORED" || !breakdown || !hand) return new Map<string, { team: boolean; draft: boolean; nation: boolean; division: boolean; position: boolean }>();
     const fullHand = [...pickedPlayers, hand.callUp];
     const highlights = new Map<string, { team: boolean; draft: boolean; nation: boolean; division: boolean; position: boolean }>();
 
@@ -473,7 +614,7 @@ function PressBoxGame() {
       });
     }
     return highlights;
-  }, [phase, breakdown, pickedPlayers, hand.callUp]);
+  }, [phase, breakdown, pickedPlayers, hand]);
 
   return (
     <main
@@ -502,10 +643,21 @@ function PressBoxGame() {
             style={{ color: "var(--ledger-ink-faint)" }}
             onClick={handleDayTap}
           >
-            #{hand.dayNumber} &nbsp;·&nbsp; {hand.dateLabel}
+            #{dayNum} &nbsp;·&nbsp; {hand?.dateLabel ?? " "}
           </p>
         </div>
 
+        {!hand && (
+          <div
+            className="text-center py-24 text-[12px] font-mono uppercase tracking-[0.3em] animate-pulse"
+            style={{ color: "var(--ledger-ink-faint)" }}
+          >
+            Shuffling the deck…
+          </div>
+        )}
+
+        {hand && (
+          <>
         {/* ── Archive banner ────────────────────────────────── */}
         {isArchive && (
           <div
@@ -568,32 +720,23 @@ function PressBoxGame() {
             >
               Call-Up (revealed)
             </div>
-            <PlayerCard
-              player={hand.callUp}
-              selected={false}
-              disabled
-              isCallUp
-            />
-            <div
-              className="flex items-center justify-between mt-3 py-2 px-3 border"
-              style={{ borderColor: "var(--rule)", background: "var(--paper-inset)", borderRadius: 2 }}
-            >
-              <span className="text-[10px] font-black font-mono uppercase tracking-wider" style={{ color: "var(--ledger-ink-faint)" }}>
-                Target Score
-              </span>
-              <span className="text-[16px] font-black font-mono tabular-nums" style={{ color: "var(--ledger-green)" }}>
-                {optimal}<span className="text-[11px]" style={{ color: "var(--ledger-ink-faint)" }}>/{MAX_SCORE}</span>
-              </span>
+            <div className="max-w-[180px] mx-auto">
+              <PlayerCard
+                player={hand.callUp}
+                selected={false}
+                disabled
+                isCallUp
+              />
             </div>
-            {bestScore > 0 && (
+            <div className="mt-3">
+              <PegBoard attempts={attempts} optimal={optimal} />
+            </div>
+            {lastOverlap !== null && !foundOptimal && (
               <div
-                className="flex items-center justify-between mt-1 py-1.5 px-3 text-[10px] font-mono uppercase tracking-wider"
-                style={{ color: "var(--ledger-ink-faint)" }}
+                className="text-center mt-2 text-[11px] font-mono uppercase tracking-wider"
+                style={{ color: "var(--ledger-ink-body)" }}
               >
-                <span>Your Best</span>
-                <span className="font-black" style={{ color: bestScore === optimal ? "var(--ledger-green)" : "var(--ink)" }}>
-                  {bestScore}/{MAX_SCORE}
-                </span>
+                Last attempt: <strong style={{ color: lastOverlap >= 3 ? "var(--ledger-green)" : "var(--ink)" }}>{lastOverlap}/4</strong> cards in the perfect lineup
               </div>
             )}
           </div>
@@ -608,7 +751,7 @@ function PressBoxGame() {
             <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-body)" }}>
               {callUpRevealed ? (
                 <>
-                  <strong>Pick 4 players</strong> to maximize your score.
+                  <strong>Pick 4 cards</strong> to move your peg to the target hole.
                   <br />
                   Use the scoring breakdown to improve your hand.
                 </>
@@ -642,7 +785,7 @@ function PressBoxGame() {
             >
               {isToday ? "Today's" : `Hand #${dayNum}`} Cards
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
               {hand.dealt.map((player) => (
                 <PlayerCard
                   key={player.id}
@@ -744,16 +887,16 @@ function PressBoxGame() {
                   </span>
                 ))}
               </div>
-              {/* Target comparison */}
-              {!foundOptimal && (
-                <div className="mt-3 text-[11px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
-                  Target: <strong style={{ color: "var(--ledger-green)" }}>{optimal}/{MAX_SCORE}</strong>
-                  {breakdown.total < optimal && (
-                    <span> ({optimal - breakdown.total} pts away)</span>
-                  )}
+              {/* Vague closeness feedback — no point gap */}
+              {!foundOptimal && lastOverlap !== null && (
+                <div className="mt-3 text-[11px] font-mono" style={{ color: "var(--ledger-ink-body)" }}>
+                  <strong style={{ color: lastOverlap >= 3 ? "var(--ledger-green)" : "var(--ink)" }}>{lastOverlap}/4</strong> cards in the perfect lineup
                 </div>
               )}
             </div>
+
+            {/* Peg board */}
+            <PegBoard attempts={attempts} optimal={optimal} />
 
             {/* Your lineup */}
             <div>
@@ -763,7 +906,7 @@ function PressBoxGame() {
               >
                 Your Lineup
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
                 {pickedPlayers.map((player) => (
                   <PlayerCard
                     key={player.id}
@@ -784,13 +927,15 @@ function PressBoxGame() {
               >
                 Call-Up{attempts.length === 1 ? " Revealed" : ""}
               </div>
-              <PlayerCard
-                player={hand.callUp}
-                selected={false}
-                disabled
-                isCallUp
-                matchHighlights={matchHighlights.get(hand.callUp.id)}
-              />
+              <div className="max-w-[180px] mx-auto pt-2">
+                <PlayerCard
+                  player={hand.callUp}
+                  selected={false}
+                  disabled
+                  isCallUp
+                  matchHighlights={matchHighlights.get(hand.callUp.id)}
+                />
+              </div>
             </div>
 
             {/* Waived */}
@@ -801,7 +946,7 @@ function PressBoxGame() {
               >
                 Waived
               </div>
-              <div className="grid grid-cols-2 gap-2 opacity-50">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 opacity-50">
                 {waivedPlayers.map((player) => (
                   <PlayerCard key={player.id} player={player} selected={false} disabled />
                 ))}
@@ -959,6 +1104,7 @@ function PressBoxGame() {
               <div className="px-4 pb-3 space-y-1 text-[11px] font-mono" style={{ color: "var(--ledger-ink-body)" }}>
                 <p><strong>You have {MAX_ATTEMPTS} attempts</strong> to find the perfect hand.</p>
                 <p>The call-up is hidden on your first attempt, then revealed.</p>
+                <p>The peg board shows how close your best hand is to the target hole.</p>
                 <p className="mt-2"><strong>Teammates</strong> — 2 pts per pair of players on the same NHL team</p>
                 <p><strong>Draft Class</strong> — 2 pts per pair drafted in the same year</p>
                 <p><strong>Pipeline</strong> — 1 pt per card in a run of 3+ consecutive draft years</p>
@@ -1017,6 +1163,7 @@ function PressBoxGame() {
             <div className="px-4 pb-3 space-y-1 text-[11px] font-mono" style={{ color: "var(--ledger-ink-body)" }}>
               <p><strong>You have {MAX_ATTEMPTS} attempts</strong> to find the perfect hand.</p>
               <p>The call-up is hidden on your first attempt, then revealed.</p>
+              <p>The peg board shows how close your best hand is to the target hole.</p>
               <p className="mt-2"><strong>Teammates</strong> — 2 pts per pair of players on the same NHL team</p>
               <p><strong>Draft Class</strong> — 2 pts per pair drafted in the same year</p>
               <p><strong>Pipeline</strong> — 1 pt per card in a run of 3+ consecutive draft years</p>
@@ -1026,6 +1173,8 @@ function PressBoxGame() {
               <p><strong>Call-Up Bonus</strong> — 1 pt for each of your picks who share a team with the call-up</p>
             </div>
           </details>
+        )}
+          </>
         )}
 
         <div className="mt-8">

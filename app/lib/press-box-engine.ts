@@ -248,12 +248,39 @@ function combinations<T>(arr: T[], k: number): T[][] {
   return result;
 }
 
-export function findOptimalScore(dealt: PressBoxPlayer[], callUp: PressBoxPlayer): number {
+export interface OptimalResult {
+  score: number;
+  combos: string[][]; // player-id sets of every combo that reaches the optimal score
+}
+
+export function findOptimalCombos(dealt: PressBoxPlayer[], callUp: PressBoxPlayer): OptimalResult {
   const combos = combinations(dealt, 4);
   let best = 0;
+  let bestCombos: string[][] = [];
   for (const combo of combos) {
     const result = scoreHand(combo, callUp);
-    if (result.total > best) best = result.total;
+    if (result.total > best) {
+      best = result.total;
+      bestCombos = [combo.map((p) => p.id)];
+    } else if (result.total === best) {
+      bestCombos.push(combo.map((p) => p.id));
+    }
+  }
+  return { score: best, combos: bestCombos };
+}
+
+export function findOptimalScore(dealt: PressBoxPlayer[], callUp: PressBoxPlayer): number {
+  return findOptimalCombos(dealt, callUp).score;
+}
+
+// How close were the picks to a perfect lineup? Max overlap against any
+// optimal combo — the vague "3/4 correct" feedback instead of a point gap.
+export function overlapWithOptimal(pickIds: string[], optimalCombos: string[][]): number {
+  let best = 0;
+  const pickSet = new Set(pickIds);
+  for (const combo of optimalCombos) {
+    const overlap = combo.filter((id) => pickSet.has(id)).length;
+    if (overlap > best) best = overlap;
   }
   return best;
 }

@@ -6,7 +6,7 @@
 
 import type { PressBoxPlayer } from "@/app/lib/press-box-engine";
 
-const DIVISIONS: Record<string, string> = {
+export const DIVISIONS: Record<string, string> = {
   BOS: "Atlantic", BUF: "Atlantic", DET: "Atlantic", FLA: "Atlantic",
   MTL: "Atlantic", OTT: "Atlantic", TBL: "Atlantic", TOR: "Atlantic",
   CAR: "Metro",    CBJ: "Metro",    NJD: "Metro",    NYI: "Metro",
