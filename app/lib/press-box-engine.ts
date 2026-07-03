@@ -12,6 +12,7 @@ export interface PressBoxPlayer {
   draftYear: number;
   jerseyNumber: number;
   division: string;   // "Atlantic" | "Metro" | "Central" | "Pacific"
+  headshot?: string | null; // NHL mugshot URL, overlaid by the pool API when reachable
 }
 
 export interface ScoringBreakdown {

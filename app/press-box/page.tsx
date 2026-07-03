@@ -122,6 +122,32 @@ function CardStamp({ text, color }: { text: string; color: string }) {
   );
 }
 
+// ── Mugshot — sepia newspaper headshot, flag fallback ─────────
+function Mug({ src, alt, flag }: { src?: string | null; alt: string; flag: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return <div className="text-[17px] leading-none" aria-hidden>{flag}</div>;
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="rounded-full shrink-0"
+      style={{
+        width: 44,
+        height: 44,
+        objectFit: "cover",
+        border: "1.5px solid var(--rule)",
+        background: "var(--paper)",
+        filter: "sepia(0.25) contrast(1.05)",
+      }}
+    />
+  );
+}
+
 // ── Player Card — newspaper-style playing card ────────────────
 function PlayerCard({
   player,
@@ -193,7 +219,7 @@ function PlayerCard({
 
       {/* card face */}
       <div className="absolute inset-0 flex flex-col items-center justify-center px-3 text-center">
-        <div className="text-[17px] leading-none" aria-hidden>{flag}</div>
+        <Mug src={player.headshot} alt={player.name} flag={flag} />
         <div
           className="font-black font-serif text-[13px] leading-tight mt-1.5"
           style={{ color: "var(--ink)" }}
@@ -224,7 +250,7 @@ function PlayerCard({
         {/* agate lines — box-score fine print */}
         <div className="space-y-0.5 text-[9px] font-mono leading-tight" style={{ color: "var(--ledger-ink-faint)" }}>
           <div className={matchHighlights?.nation ? "font-black text-[var(--ledger-green)]" : ""}>
-            {player.nationality} · AGE {player.age}
+            {flag} {player.nationality} · AGE {player.age}
           </div>
           <div className={matchHighlights?.draft ? "font-black text-[var(--ledger-green)]" : ""}>
             DRAFT &apos;{String(player.draftYear).slice(2)}
