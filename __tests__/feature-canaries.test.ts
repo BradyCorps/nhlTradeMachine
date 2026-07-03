@@ -127,7 +127,7 @@ describe("Canary — league route features (source-level)", () => {
       it("filters DB-only older no-signal minor-league players out of trade assets", () => {
         expect(src).toContain("injectedFromDb:   true");
         expect(src).toContain("const hasProspectSignal");
-        expect(src).toContain("p.injectedFromDb && !stats && !goalieStats && !hasProspectSignal && p.age >= 24");
+        expect(src).toContain("p.injectedFromDb && !stats && !goalieStats && !hasProspectSignal && !hasFaStatus && p.age >= 24");
         expect(src).toContain("stats?.games ?? goalieStats?.gamesStarted ?? 0");
       });
 

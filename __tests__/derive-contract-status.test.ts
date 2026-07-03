@@ -29,14 +29,19 @@ describe("deriveContractStatus", () => {
     expect(r.expiresThisOffseason).toBe(false);
   });
 
-  it("never flags a draftee (draftOverall set) as a pending FA", () => {
-    const r = deriveContractStatus({ expiryStatus: "RFA", expiryYear: 2026, draftOverall: 5, offseasonYear: OFFSEASON });
+  it("suppresses FA for an ELC draftee (both draftOverall + isELC)", () => {
+    const r = deriveContractStatus({ expiryStatus: "RFA", expiryYear: 2026, draftOverall: 5, isELC: true, offseasonYear: OFFSEASON });
     expect(r.expiresThisOffseason).toBe(false);
   });
 
-  it("never flags an ELC as a pending FA", () => {
+  it("allows a draftee without ELC flag to expire as RFA", () => {
+    const r = deriveContractStatus({ expiryStatus: "RFA", expiryYear: 2026, draftOverall: 5, offseasonYear: OFFSEASON });
+    expect(r.expiresThisOffseason).toBe(true);
+  });
+
+  it("allows an ELC player without draftOverall to expire as RFA", () => {
     const r = deriveContractStatus({ expiryStatus: "RFA", expiryYear: 2026, isELC: true, offseasonYear: OFFSEASON });
-    expect(r.expiresThisOffseason).toBe(false);
+    expect(r.expiresThisOffseason).toBe(true);
   });
 
   it("falls back to the final-year heuristic when no expiry year is known", () => {

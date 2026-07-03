@@ -260,6 +260,7 @@ export function findOptimalScore(dealt: PressBoxPlayer[], callUp: PressBoxPlayer
 
 // ── Fixed ceiling (cribbage homage) ──────────────────────────
 export const MAX_SCORE = 15;
+export const MAX_ATTEMPTS = 5;
 
 // ── Star rating (did you find the optimal combo?) ────────────
 export function starRating(score: number, optimal: number): { stars: number; label: string; color: string } {
@@ -274,8 +275,27 @@ export function starRating(score: number, optimal: number): { stars: number; lab
 }
 
 // ── Share text ────────────────────────────────────────────────
-export function buildShareText(dayNum: number, score: number, optimal: number): string {
-  const { stars } = starRating(score, optimal);
+export function buildShareText(
+  dayNum: number,
+  bestScore: number,
+  optimal: number,
+  attemptScores: number[] = [],
+): string {
+  const { stars } = starRating(bestScore, optimal);
   const starStr = "★".repeat(stars) + "☆".repeat(5 - stars);
-  return `Press Box #${dayNum}: ${score}/${MAX_SCORE} pts\n${starStr}${score === optimal ? " PERFECT HAND" : ""}\nthehockeyledger.com/press-box`;
+  const found = bestScore === optimal;
+  const attemptStr = found
+    ? `${attemptScores.length}/${MAX_ATTEMPTS}`
+    : `X/${MAX_ATTEMPTS}`;
+
+  const blocks = attemptScores.map((s) =>
+    s === optimal ? "🟩" : s >= optimal * 0.7 ? "🟨" : "⬛"
+  ).join("");
+
+  return [
+    `Press Box #${dayNum} ${attemptStr}`,
+    blocks,
+    `${bestScore}/${MAX_SCORE} pts ${starStr}${found ? " PERFECT HAND" : ""}`,
+    "thehockeyledger.com/press-box",
+  ].join("\n");
 }

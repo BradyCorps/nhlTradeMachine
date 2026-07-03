@@ -12,12 +12,18 @@ import {
   starRating,
   buildShareText,
   MAX_SCORE,
+  MAX_ATTEMPTS,
   type PressBoxPlayer,
   type ScoringBreakdown,
 } from "@/app/lib/press-box-engine";
 import { PRESS_BOX_POOL } from "@/app/data/press-box-pool";
 
 type GamePhase = "DRAFTING" | "REVEAL" | "SCORED";
+
+interface AttemptRecord {
+  picks: string[];
+  score: number;
+}
 
 const FLAG_EMOJI: Record<string, string> = {
   CAN: "🇨🇦", USA: "🇺🇸", SWE: "🇸🇪", FIN: "🇫🇮", RUS: "🇷🇺",
@@ -34,7 +40,20 @@ function storageKey(dayNum: number) {
   return `press-box-state-${dayNum}`;
 }
 
-function loadSavedState(dayNum: number) {
+interface SavedState {
+  dayNumber: number;
+  version?: number;
+  // v2 multi-attempt format
+  attempts?: AttemptRecord[];
+  currentPicks?: string[];
+  gameOver?: boolean;
+  // v1 legacy format
+  picks?: string[];
+  phase?: GamePhase;
+  score?: number;
+}
+
+function loadSavedState(dayNum: number): SavedState | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(storageKey(dayNum));
@@ -45,11 +64,11 @@ function loadSavedState(dayNum: number) {
   }
 }
 
-function saveState(dayNum: number, picks: string[], phase: GamePhase, score?: number) {
+function saveState(dayNum: number, attempts: AttemptRecord[], currentPicks: string[], gameOver: boolean) {
   if (typeof window === "undefined") return;
   localStorage.setItem(
     storageKey(dayNum),
-    JSON.stringify({ dayNumber: dayNum, picks, phase, score })
+    JSON.stringify({ dayNumber: dayNum, version: 2, attempts, currentPicks, gameOver })
   );
 }
 
@@ -84,7 +103,6 @@ function PlayerCard({
   selected,
   disabled,
   onClick,
-  revealed,
   isCallUp,
   matchHighlights,
 }: {
@@ -92,7 +110,6 @@ function PlayerCard({
   selected: boolean;
   disabled: boolean;
   onClick?: () => void;
-  revealed?: boolean;
   isCallUp?: boolean;
   matchHighlights?: { team: boolean; draft: boolean; nation: boolean; division: boolean; position: boolean };
 }) {
@@ -116,7 +133,6 @@ function PlayerCard({
       ].join(" ")}
       style={{ borderRadius: 2 }}
     >
-      {/* Selection badge */}
       {selected && !isCallUp && (
         <span
           className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center text-[10px] font-black font-mono"
@@ -134,7 +150,6 @@ function PlayerCard({
         </span>
       )}
 
-      {/* Player info */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="font-black text-[13px] sm:text-[14px] leading-tight truncate" style={{ color: "var(--ink)" }}>
@@ -172,14 +187,13 @@ function PlayerCard({
         </div>
       </div>
 
-      {/* Attributes row */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-2 text-[10px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
         <span className={matchHighlights?.nation ? "font-black text-[var(--ledger-green)]" : ""}>
           {flag} {player.nationality}
         </span>
         <span>AGE {player.age}</span>
         <span className={matchHighlights?.draft ? "font-black text-[var(--ledger-green)]" : ""}>
-          DRAFT '{String(player.draftYear).slice(2)}
+          DRAFT &apos;{String(player.draftYear).slice(2)}
         </span>
         <span className={matchHighlights?.division ? "font-black text-[var(--ledger-green)]" : ""}>
           {player.division}
@@ -225,6 +239,32 @@ function ScoreRow({
   );
 }
 
+// ── Attempt Progress Dots ─────────────────────────────────────
+function AttemptDots({ attempts, maxAttempts, optimal }: { attempts: AttemptRecord[]; maxAttempts: number; optimal: number }) {
+  return (
+    <div className="flex items-center justify-center gap-1.5">
+      {Array.from({ length: maxAttempts }, (_, i) => {
+        const attempt = attempts[i];
+        let bg = "var(--rule-light)";
+        if (attempt) {
+          bg = attempt.score === optimal
+            ? "var(--ledger-green)"
+            : attempt.score >= optimal * 0.7
+              ? "var(--ledger-amber)"
+              : "var(--ledger-red)";
+        }
+        return (
+          <div
+            key={i}
+            className="w-2.5 h-2.5 transition-all duration-300"
+            style={{ background: bg, borderRadius: "50%" }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────
 export default function PressBoxPage() {
   return (
@@ -252,21 +292,61 @@ function PressBoxGame() {
   const [copied, setCopied] = useState(false);
   const [streak, setStreak] = useState<StreakData>({ current: 0, best: 0, lastDay: 0, perfectHands: 0 });
   const [resetTaps, setResetTaps] = useState(0);
+  const [attempts, setAttempts] = useState<AttemptRecord[]>([]);
+  const [gameOver, setGameOver] = useState(false);
+
+  const callUpRevealed = attempts.length > 0;
+  const attemptNumber = attempts.length + 1;
+  const bestScore = attempts.length > 0 ? Math.max(...attempts.map((a) => a.score)) : 0;
+  const foundOptimal = attempts.some((a) => a.score === optimal);
+  const attemptsRemaining = MAX_ATTEMPTS - attempts.length;
 
   // Restore saved state
   useEffect(() => {
     const saved = loadSavedState(dayNum);
     if (saved) {
-      setPicks(saved.picks);
-      setPhase(saved.phase);
-      if (saved.phase === "SCORED") {
-        const pickedPlayers = hand.dealt.filter((p) => saved.picks.includes(p.id));
-        setBreakdown(scoreHand(pickedPlayers, hand.callUp));
+      if (saved.version === 2 && saved.attempts) {
+        setAttempts(saved.attempts);
+        setGameOver(saved.gameOver ?? false);
+        if (saved.gameOver) {
+          const lastAttempt = saved.attempts[saved.attempts.length - 1];
+          if (lastAttempt) {
+            const pickedPlayers = hand.dealt.filter((p) => lastAttempt.picks.includes(p.id));
+            setBreakdown(scoreHand(pickedPlayers, hand.callUp));
+            setPicks(lastAttempt.picks);
+          }
+          setPhase("SCORED");
+        } else {
+          setPicks(saved.currentPicks ?? []);
+          setPhase("DRAFTING");
+          setBreakdown(null);
+        }
+      } else {
+        // Legacy v1 format — treat as completed single-attempt game
+        const legacyPicks = saved.picks ?? [];
+        const legacyScore = saved.score ?? 0;
+        if (saved.phase === "SCORED" && legacyPicks.length > 0) {
+          const legacyAttempts = [{ picks: legacyPicks, score: legacyScore }];
+          setAttempts(legacyAttempts);
+          setGameOver(true);
+          setPicks(legacyPicks);
+          const pickedPlayers = hand.dealt.filter((p) => legacyPicks.includes(p.id));
+          setBreakdown(scoreHand(pickedPlayers, hand.callUp));
+          setPhase("SCORED");
+        } else {
+          setPicks([]);
+          setPhase("DRAFTING");
+          setBreakdown(null);
+          setAttempts([]);
+          setGameOver(false);
+        }
       }
     } else {
       setPicks([]);
       setPhase("DRAFTING");
       setBreakdown(null);
+      setAttempts([]);
+      setGameOver(false);
     }
     setStreak(loadStreak());
   }, [dayNum, hand]);
@@ -280,13 +360,14 @@ function PressBoxGame() {
         setPicks([]);
         setPhase("DRAFTING");
         setBreakdown(null);
+        setAttempts([]);
+        setGameOver(false);
         return 0;
       }
       return next;
     });
   }, [dayNum]);
 
-  // Clear tap counter after 2 seconds of inactivity
   useEffect(() => {
     if (resetTaps === 0) return;
     const timer = setTimeout(() => setResetTaps(0), 2000);
@@ -308,19 +389,41 @@ function PressBoxGame() {
   const handleSubmit = useCallback(() => {
     if (picks.length !== 4) return;
     setPhase("REVEAL");
+    const revealDelay = attempts.length === 0 ? 1500 : 800;
     setTimeout(() => {
       const pickedPlayers = hand.dealt.filter((p) => picks.includes(p.id));
       const result = scoreHand(pickedPlayers, hand.callUp);
       setBreakdown(result);
+
+      const newAttempt: AttemptRecord = { picks: [...picks], score: result.total };
+      const newAttempts = [...attempts, newAttempt];
+      setAttempts(newAttempts);
+
+      const isOptimal = result.total === optimal;
+      const isMaxAttempts = newAttempts.length >= MAX_ATTEMPTS;
+      const over = isOptimal || isMaxAttempts;
+      setGameOver(over);
       setPhase("SCORED");
-      saveState(dayNum, picks, "SCORED", result.total);
-      if (isToday) setStreak(updateStreak(dayNum, result.total === optimal));
-    }, 1500);
-  }, [picks, hand, dayNum, isToday, optimal]);
+      saveState(dayNum, newAttempts, [], over);
+
+      if (isToday && over) {
+        const best = Math.max(...newAttempts.map((a) => a.score));
+        setStreak(updateStreak(dayNum, best === optimal));
+      }
+    }, revealDelay);
+  }, [picks, hand, dayNum, isToday, optimal, attempts]);
+
+  const handleTryAgain = useCallback(() => {
+    setPicks([]);
+    setBreakdown(null);
+    setPhase("DRAFTING");
+    saveState(dayNum, attempts, [], false);
+  }, [dayNum, attempts]);
 
   const handleShare = useCallback(async () => {
-    if (!breakdown) return;
-    const text = buildShareText(dayNum, breakdown.total, optimal);
+    if (attempts.length === 0) return;
+    const best = Math.max(...attempts.map((a) => a.score));
+    const text = buildShareText(dayNum, best, optimal, attempts.map((a) => a.score));
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -328,7 +431,7 @@ function PressBoxGame() {
     } catch {
       // Fallback
     }
-  }, [breakdown, dayNum, optimal]);
+  }, [attempts, dayNum, optimal]);
 
   const rating = breakdown ? starRating(breakdown.total, optimal) : null;
 
@@ -341,9 +444,9 @@ function PressBoxGame() {
 
   // Compute match highlights for scored state
   const matchHighlights = useMemo(() => {
-    if (phase !== "SCORED" || !breakdown) return new Map<string, any>();
+    if (phase !== "SCORED" || !breakdown) return new Map<string, { team: boolean; draft: boolean; nation: boolean; division: boolean; position: boolean }>();
     const fullHand = [...pickedPlayers, hand.callUp];
-    const highlights = new Map<string, any>();
+    const highlights = new Map<string, { team: boolean; draft: boolean; nation: boolean; division: boolean; position: boolean }>();
 
     const teamCounts = new Map<string, number>();
     const draftCounts = new Map<number, number>();
@@ -438,6 +541,64 @@ function PressBoxGame() {
           </span>
         </div>
 
+        {/* ── Attempt progress ──────────────────────────────── */}
+        {(attempts.length > 0 || phase === "SCORED") && (
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <span
+              className="text-[10px] font-black uppercase tracking-[0.2em] font-mono"
+              style={{ color: "var(--ledger-ink-faint)" }}
+            >
+              {gameOver
+                ? foundOptimal
+                  ? `Found in ${attempts.length}/${MAX_ATTEMPTS}`
+                  : `${attempts.length}/${MAX_ATTEMPTS} attempts`
+                : `Attempt ${attemptNumber}/${MAX_ATTEMPTS}`
+              }
+            </span>
+            <AttemptDots attempts={attempts} maxAttempts={MAX_ATTEMPTS} optimal={optimal} />
+          </div>
+        )}
+
+        {/* ── Call-up preview (visible during drafting after first attempt) ── */}
+        {phase === "DRAFTING" && callUpRevealed && (
+          <div className="mb-4">
+            <div
+              className="text-[10px] font-black uppercase tracking-[0.3em] font-mono pb-1 border-b mb-2"
+              style={{ color: "var(--ledger-red)", borderColor: "var(--rule)" }}
+            >
+              Call-Up (revealed)
+            </div>
+            <PlayerCard
+              player={hand.callUp}
+              selected={false}
+              disabled
+              isCallUp
+            />
+            <div
+              className="flex items-center justify-between mt-3 py-2 px-3 border"
+              style={{ borderColor: "var(--rule)", background: "var(--paper-inset)", borderRadius: 2 }}
+            >
+              <span className="text-[10px] font-black font-mono uppercase tracking-wider" style={{ color: "var(--ledger-ink-faint)" }}>
+                Target Score
+              </span>
+              <span className="text-[16px] font-black font-mono tabular-nums" style={{ color: "var(--ledger-green)" }}>
+                {optimal}<span className="text-[11px]" style={{ color: "var(--ledger-ink-faint)" }}>/{MAX_SCORE}</span>
+              </span>
+            </div>
+            {bestScore > 0 && (
+              <div
+                className="flex items-center justify-between mt-1 py-1.5 px-3 text-[10px] font-mono uppercase tracking-wider"
+                style={{ color: "var(--ledger-ink-faint)" }}
+              >
+                <span>Your Best</span>
+                <span className="font-black" style={{ color: bestScore === optimal ? "var(--ledger-green)" : "var(--ink)" }}>
+                  {bestScore}/{MAX_SCORE}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Instructions ───────────────────────────────────── */}
         {phase === "DRAFTING" && (
           <div
@@ -445,9 +606,23 @@ function PressBoxGame() {
             style={{ borderColor: "var(--rule)", background: "var(--paper-inset)", borderRadius: 2 }}
           >
             <p className="text-[12px] leading-relaxed" style={{ color: "var(--ledger-ink-body)" }}>
-              <strong>Draft 4 players</strong> into your lineup. Waive the other 2.
-              <br />
-              A mystery <strong>call-up</strong> will be revealed — score your hand.
+              {callUpRevealed ? (
+                <>
+                  <strong>Pick 4 players</strong> to maximize your score.
+                  <br />
+                  Use the scoring breakdown to improve your hand.
+                </>
+              ) : (
+                <>
+                  <strong>Draft 4 players</strong> into your lineup. Waive the other 2.
+                  <br />
+                  A mystery <strong>call-up</strong> will be revealed — score your hand.
+                  <br />
+                  <span className="text-[10px]" style={{ color: "var(--ledger-ink-faint)" }}>
+                    You have {MAX_ATTEMPTS} attempts to find the perfect hand.
+                  </span>
+                </>
+              )}
             </p>
             <p
               className="text-[10px] font-mono mt-2 uppercase tracking-wider"
@@ -495,7 +670,11 @@ function PressBoxGame() {
               cursor: picks.length === 4 ? "pointer" : "default",
             }}
           >
-            {picks.length === 4 ? "Lock Lineup & Reveal Call-Up" : `Select ${4 - picks.length} more`}
+            {picks.length === 4
+              ? callUpRevealed
+                ? `Lock Lineup (Attempt ${attemptNumber})`
+                : "Lock Lineup & Reveal Call-Up"
+              : `Select ${4 - picks.length} more`}
           </button>
         )}
 
@@ -506,12 +685,12 @@ function PressBoxGame() {
               className="text-[14px] font-black uppercase tracking-[0.3em] font-mono animate-pulse"
               style={{ color: "var(--ledger-red)" }}
             >
-              Revealing call-up...
+              {callUpRevealed ? "Scoring hand..." : "Revealing call-up..."}
             </div>
           </div>
         )}
 
-        {/* ── Scored state ───────────────────────────────────── */}
+        {/* ── Scored / Feedback state ────────────────────────── */}
         {phase === "SCORED" && breakdown && rating && (
           <div className="space-y-5">
             {/* Score headline */}
@@ -519,6 +698,30 @@ function PressBoxGame() {
               className="text-center py-5 border"
               style={{ borderColor: "var(--ink)", background: "var(--paper-inset)", borderRadius: 2 }}
             >
+              {gameOver && foundOptimal && (
+                <div
+                  className="text-[10px] font-black uppercase tracking-[0.4em] font-mono mb-2"
+                  style={{ color: "var(--ledger-green)" }}
+                >
+                  Perfect Hand Found!
+                </div>
+              )}
+              {gameOver && !foundOptimal && (
+                <div
+                  className="text-[10px] font-black uppercase tracking-[0.4em] font-mono mb-2"
+                  style={{ color: "var(--ledger-amber)" }}
+                >
+                  No Attempts Remaining
+                </div>
+              )}
+              {!gameOver && (
+                <div
+                  className="text-[10px] font-black uppercase tracking-[0.4em] font-mono mb-2"
+                  style={{ color: "var(--ledger-ink-faint)" }}
+                >
+                  Attempt {attempts.length} of {MAX_ATTEMPTS}
+                </div>
+              )}
               <div
                 className="text-[10px] font-black uppercase tracking-[0.4em] font-mono mb-1"
                 style={{ color: rating.color }}
@@ -541,6 +744,15 @@ function PressBoxGame() {
                   </span>
                 ))}
               </div>
+              {/* Target comparison */}
+              {!foundOptimal && (
+                <div className="mt-3 text-[11px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+                  Target: <strong style={{ color: "var(--ledger-green)" }}>{optimal}/{MAX_SCORE}</strong>
+                  {breakdown.total < optimal && (
+                    <span> ({optimal - breakdown.total} pts away)</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Your lineup */}
@@ -570,7 +782,7 @@ function PressBoxGame() {
                 className="text-[10px] font-black uppercase tracking-[0.3em] font-mono pb-1 border-b mb-2"
                 style={{ color: "var(--ledger-red)", borderColor: "var(--rule)" }}
               >
-                Call-Up Revealed
+                Call-Up{attempts.length === 1 ? " Revealed" : ""}
               </div>
               <PlayerCard
                 player={hand.callUp}
@@ -624,20 +836,117 @@ function PressBoxGame() {
               </div>
             </div>
 
-            {/* Share button */}
-            <button
-              onClick={handleShare}
-              className="w-full py-3 font-black text-[13px] uppercase tracking-[0.2em] font-mono transition-all border"
-              style={{
-                background: copied ? "var(--ledger-green)" : "var(--ledger-red)",
-                color: "#fff",
-                borderColor: copied ? "var(--ledger-green)" : "var(--ledger-red)",
-                borderRadius: 2,
-                cursor: "pointer",
-              }}
-            >
-              {copied ? "Copied to Clipboard!" : "Share Your Score"}
-            </button>
+            {/* Attempt history */}
+            {attempts.length > 1 && (
+              <div
+                className="border p-4"
+                style={{ borderColor: "var(--rule)", background: "var(--paper-inset)", borderRadius: 2 }}
+              >
+                <div
+                  className="text-[10px] font-black uppercase tracking-[0.3em] font-mono pb-2 border-b mb-2"
+                  style={{ color: "var(--ink)", borderColor: "var(--rule)" }}
+                >
+                  Attempt History
+                </div>
+                {attempts.map((attempt, i) => {
+                  const isBest = attempt.score === bestScore;
+                  const isPerfect = attempt.score === optimal;
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between py-1.5 border-b"
+                      style={{ borderColor: "var(--rule-light)" }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-2 h-2"
+                          style={{
+                            background: isPerfect ? "var(--ledger-green)" : attempt.score >= optimal * 0.7 ? "var(--ledger-amber)" : "var(--ledger-red)",
+                            borderRadius: "50%",
+                          }}
+                        />
+                        <span className="text-[11px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+                          Attempt {i + 1}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="text-[13px] font-black font-mono tabular-nums"
+                          style={{ color: isPerfect ? "var(--ledger-green)" : "var(--ink)" }}
+                        >
+                          {attempt.score}/{MAX_SCORE}
+                        </span>
+                        {isBest && !isPerfect && (
+                          <span
+                            className="text-[8px] font-black font-mono uppercase px-1 py-px"
+                            style={{ background: "var(--ledger-amber)", color: "#fff", borderRadius: 1 }}
+                          >
+                            Best
+                          </span>
+                        )}
+                        {isPerfect && (
+                          <span
+                            className="text-[8px] font-black font-mono uppercase px-1 py-px"
+                            style={{ background: "var(--ledger-green)", color: "#fff", borderRadius: 1 }}
+                          >
+                            Perfect
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Try Again or Share button */}
+            {!gameOver ? (
+              <button
+                onClick={handleTryAgain}
+                className="w-full py-3 font-black text-[13px] uppercase tracking-[0.2em] font-mono transition-all border"
+                style={{
+                  background: "var(--ledger-red)",
+                  color: "#fff",
+                  borderColor: "var(--ledger-red)",
+                  borderRadius: 2,
+                  cursor: "pointer",
+                }}
+              >
+                Try Again ({attemptsRemaining} attempt{attemptsRemaining !== 1 ? "s" : ""} left)
+              </button>
+            ) : (
+              <button
+                onClick={handleShare}
+                className="w-full py-3 font-black text-[13px] uppercase tracking-[0.2em] font-mono transition-all border"
+                style={{
+                  background: copied ? "var(--ledger-green)" : "var(--ledger-red)",
+                  color: "#fff",
+                  borderColor: copied ? "var(--ledger-green)" : "var(--ledger-red)",
+                  borderRadius: 2,
+                  cursor: "pointer",
+                }}
+              >
+                {copied ? "Copied to Clipboard!" : "Share Your Score"}
+              </button>
+            )}
+
+            {/* Best score summary (when game is over and more than 1 attempt) */}
+            {gameOver && attempts.length > 1 && (
+              <div
+                className="text-center py-3 border"
+                style={{ borderColor: "var(--rule)", borderRadius: 2 }}
+              >
+                <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
+                  Final Result
+                </div>
+                <div className="text-[11px] font-mono" style={{ color: "var(--ledger-ink-body)" }}>
+                  Best Score: <strong style={{ color: "var(--ledger-green)" }}>{bestScore}/{MAX_SCORE}</strong>
+                  {" in "}
+                  <strong>{attempts.length}</strong> attempt{attempts.length !== 1 ? "s" : ""}
+                  {foundOptimal && " — Perfect!"}
+                </div>
+              </div>
+            )}
 
             {/* How to play (collapsed) */}
             <details className="border" style={{ borderColor: "var(--rule)", borderRadius: 2 }}>
@@ -648,7 +957,9 @@ function PressBoxGame() {
                 ? How to Score
               </summary>
               <div className="px-4 pb-3 space-y-1 text-[11px] font-mono" style={{ color: "var(--ledger-ink-body)" }}>
-                <p><strong>Teammates</strong> — 2 pts per pair of players on the same NHL team</p>
+                <p><strong>You have {MAX_ATTEMPTS} attempts</strong> to find the perfect hand.</p>
+                <p>The call-up is hidden on your first attempt, then revealed.</p>
+                <p className="mt-2"><strong>Teammates</strong> — 2 pts per pair of players on the same NHL team</p>
                 <p><strong>Draft Class</strong> — 2 pts per pair drafted in the same year</p>
                 <p><strong>Pipeline</strong> — 1 pt per card in a run of 3+ consecutive draft years</p>
                 <p><strong>Division Flush</strong> — 4 pts if all 4 picks share a division (5 if call-up matches)</p>
@@ -704,7 +1015,9 @@ function PressBoxGame() {
               ? How to Score
             </summary>
             <div className="px-4 pb-3 space-y-1 text-[11px] font-mono" style={{ color: "var(--ledger-ink-body)" }}>
-              <p><strong>Teammates</strong> — 2 pts per pair of players on the same NHL team</p>
+              <p><strong>You have {MAX_ATTEMPTS} attempts</strong> to find the perfect hand.</p>
+              <p>The call-up is hidden on your first attempt, then revealed.</p>
+              <p className="mt-2"><strong>Teammates</strong> — 2 pts per pair of players on the same NHL team</p>
               <p><strong>Draft Class</strong> — 2 pts per pair drafted in the same year</p>
               <p><strong>Pipeline</strong> — 1 pt per card in a run of 3+ consecutive draft years</p>
               <p><strong>Division Flush</strong> — 4 pts if all 4 picks share a division (5 if call-up matches)</p>
