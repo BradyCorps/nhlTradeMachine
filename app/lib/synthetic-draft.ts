@@ -8,6 +8,7 @@
 import type { Asset } from "@/app/lib/trade-types";
 import { hashString, mulberry32 } from "./sim-engine";
 import { ROOKIE_ELC_CAP_HIT, ROOKIE_ELC_YEARS } from "./draft-rookies";
+import { FUTURE_DRAFT_CLASSES } from "@/app/data/future-draft-classes";
 
 const FIRST_NAMES = [
   "Alex", "Anton", "Brady", "Carter", "Cole", "Connor", "Dmitri", "Elias",
@@ -59,21 +60,33 @@ export function generateSyntheticDraftClass(
   const picks: Asset[] = [];
   const used = new Set<string>();
 
-  for (let overall = 1; overall <= 32; overall++) {
-    let name = "";
-    do {
-      name = `${FIRST_NAMES[Math.floor(rand() * FIRST_NAMES.length)]} ${LAST_NAMES[Math.floor(rand() * LAST_NAMES.length)]}`;
-    } while (used.has(name));
-    used.add(name);
+  const realClass = FUTURE_DRAFT_CLASSES[year] ?? [];
 
-    const position = pickPosition(rand());
+  for (let overall = 1; overall <= 32; overall++) {
+    // Real curated prospects (best first) take the top of the round;
+    // the generator fills whatever slots remain.
+    const real = realClass[overall - 1];
+    let name: string;
+    let position: "C" | "W" | "D" | "G";
+    if (real) {
+      name = real.name;
+      position = real.pos;
+      used.add(name);
+    } else {
+      do {
+        name = `${FIRST_NAMES[Math.floor(rand() * FIRST_NAMES.length)]} ${LAST_NAMES[Math.floor(rand() * LAST_NAMES.length)]}`;
+      } while (used.has(name));
+      used.add(name);
+      position = pickPosition(rand());
+    }
+
     // NHLe pace by slot: ~1st overall 70s, tailing to ~high 20s by 32,
     // with noise so classes vary. Goalies carry no scoring pace.
     const basePace = 75 * Math.exp(-overall / 22) + 18;
     const noise = (rand() - 0.5) * 12;
     const prospectPtsPace = position === "G"
       ? null
-      : Math.max(15, Math.round((basePace + noise) * 10) / 10);
+      : real?.nhlePace ?? Math.max(15, Math.round((basePace + noise) * 10) / 10);
 
     const team = teamOrder[(overall - 1) % teamOrder.length];
     picks.push({

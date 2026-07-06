@@ -51,6 +51,7 @@ export const tradeBlock = sqliteTable("trade_block", {
   id:        text("id").primaryKey(),
   name:      text("name").notNull(),
   teamId:    text("team_id"),
+  position:  text("position"),         // disambiguates same-name players (two Elias Petterssons)
   status:    text("status").notNull(), // 'requested'|'available'|'blocked'|'untouchable'
   note:      text("note"),
   updatedAt: integer("updated_at"),

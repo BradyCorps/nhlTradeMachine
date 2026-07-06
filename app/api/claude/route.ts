@@ -198,6 +198,20 @@ const SeasonRecapPayloadSchema = z.object({
   isRebuilding: z.boolean(),
   seed: z.number().nullable().optional(),
   generatedLabel: z.string().optional(),
+  // Cup Run Challenge: present only when this recap closes a 3-year run —
+  // the recap becomes the story of the whole arc, not just one season.
+  cupRunStory: z.object({
+    teamName: z.string(),
+    finalYear: z.number(),
+    difficulty: z.string(),
+    wonCup: z.boolean(),
+    priorSeasons: z.array(z.object({
+      seasonLabel: z.string(),
+      championTeamName: z.string(),
+      madePlayoffs: z.boolean(),
+      wonCup: z.boolean(),
+    })),
+  }).nullable().optional(),
 });
 
 const ClaudeRequestSchema = z.discriminatedUnion("kind", [
@@ -289,7 +303,15 @@ function buildSeasonRecapPrompt(payload: z.infer<typeof SeasonRecapPayloadSchema
     seed: payload.seed,
   };
 
-  return `You are a senior NHL beat reporter writing an end-of-season recap of the PROJECTED ${SEASON.label} NHL season — a forward projection of the upcoming season, NOT a replay of a past one.
+  const cupRunPreamble = payload.cupRunStory
+    ? `\nCUP RUN CHALLENGE (LOCKED ARC):
+This recap closes a ${payload.cupRunStory.finalYear}-season "win the Cup in 3 years" run as GM of ${payload.cupRunStory.teamName} (difficulty ${payload.cupRunStory.difficulty}). The run ${payload.cupRunStory.wonCup ? "ENDS IN A STANLEY CUP" : "ends WITHOUT a Cup — the GM is fired"}.
+Prior seasons of the run:
+${payload.cupRunStory.priorSeasons.map((s, i) => `  Year ${i + 1} (${s.seasonLabel}): ${s.wonCup ? "WON THE STANLEY CUP" : s.madePlayoffs ? "made the playoffs" : "missed the playoffs"} — Cup went to ${s.championTeamName}`).join("\n") || "  (this was Year 1)"}
+Tell the story of the ENTIRE run as one arc — the plan, the seasons that built or broke it, and this final season as the climax. Weave the locked single-season data below into that larger narrative. Open with a section titled **THE ${payload.cupRunStory.wonCup ? "DYNASTY DELIVERED" : "FINAL VERDICT"}** (3-4 sentences on the whole run) before the standard sections.\n`
+    : "";
+
+  return `${cupRunPreamble}You are a senior NHL beat reporter writing an end-of-season recap of the PROJECTED ${SEASON.label} NHL season — a forward projection of the upcoming season, NOT a replay of a past one.
 
 Use ONLY the locked pre-calculated JSON and summaries below. Do not estimate, calculate, infer missing values, invent injuries, invent off-ice stories, or change standings/playoff results. Treat executed deals as ${payload.rosterMoveWindow} roster moves, never as trade-deadline moves. If a fact is not in the locked data, omit it.
 

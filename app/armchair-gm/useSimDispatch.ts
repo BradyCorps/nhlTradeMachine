@@ -41,6 +41,7 @@ export function useSimDispatch({
   lineupOrders,
   computeContention,
   lineupContext = false,
+  cupRunContext = null,
 }: {
   homeTeam: Team | null | undefined;
   partnerTeam: Team | null | undefined;
@@ -52,6 +53,14 @@ export function useSimDispatch({
   lineupOrders: Record<string, LineupOrderPayload>;
   computeContention: (roster: Asset[], navMap: Record<string, XNAVResult>) => ContentionSummary;
   lineupContext?: boolean; // Cup Run mode: slot weighting in the sim
+  cupRunContext?: {
+    teamId: string;
+    teamName: string;
+    year: number;               // 1-3
+    difficultyLabel: string;
+    stars: number;
+    seasons: { seasonLabel: string; championTeamName: string; madePlayoffs: boolean; wonCup: boolean }[];
+  } | null;
 }) {
   const [simResult, setSimResult] = useState<string | null>(null);
   const [simLoading, setSimLoading] = useState(false);
@@ -131,6 +140,18 @@ export function useSimDispatch({
       return;
     }
 
+    // Cup Run: the Claude recap only runs when the run ends (Cup won or
+    // year 3 complete) and tells the whole multi-season story. Mid-run
+    // seasons get numbers only — the arc isn't finished yet.
+    const runEndsHere = cupRunContext
+      ? sim.playoffBracket?.champion?.teamId === cupRunContext.teamId || cupRunContext.year >= 3
+      : true;
+    if (cupRunContext && !runEndsHere) {
+      setSimResult(null);
+      setSimLoading(false);
+      return;
+    }
+
     const tradesSummary = executedTrades.map(t => {
       const outNames = t.outgoing.map(a => a.position === "Pick"
         ? `${a.year} ${formatPickRound(a.round)} round pick`
@@ -201,6 +222,13 @@ export function useSimDispatch({
             isRebuilding,
             seed: sim.seed ?? null,
             generatedLabel: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long" }),
+            cupRunStory: cupRunContext ? {
+              teamName: cupRunContext.teamName,
+              finalYear: cupRunContext.year,
+              difficulty: `${cupRunContext.stars}/5 — ${cupRunContext.difficultyLabel}`,
+              wonCup: sim.playoffBracket?.champion?.teamId === cupRunContext.teamId,
+              priorSeasons: cupRunContext.seasons,
+            } : null,
           },
         }),
       });
@@ -222,6 +250,7 @@ export function useSimDispatch({
     lineupOrders,
     computeContention,
     lineupContext,
+    cupRunContext,
   ]);
 
   return {

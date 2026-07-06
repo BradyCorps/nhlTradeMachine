@@ -264,6 +264,19 @@ export default function ArmchairGmPage() {
     lineupOrders,
     computeContention,
     lineupContext: cupRunActive,
+    cupRunContext: cupRunActive && cupRun ? {
+      teamId: cupRun.teamId,
+      teamName: cupRun.teamName,
+      year: cupRun.currentYear,
+      difficultyLabel: cupRun.difficulty.label,
+      stars: cupRun.difficulty.stars,
+      seasons: cupRun.seasons.map(s => ({
+        seasonLabel: s.seasonLabel,
+        championTeamName: s.championTeamName,
+        madePlayoffs: s.madePlayoffs,
+        wonCup: s.wonCup,
+      })),
+    } : null,
   });
 
   // Memoized rosters — stable references stop useEffect churn
@@ -662,8 +675,12 @@ export default function ArmchairGmPage() {
     });
     clearNavCache();
     // Draft Night runs first (display-only), then the Re-Sign phase.
-    setDraftOpen(true);
-  }, [db.players, db.capCeiling, homeTeamId]);
+    // In Cup Run years 2-3 the real 2026 board is history — those drafts
+    // were already resolved at rollover from the standings (synthetic +
+    // curated future classes), so re-running the 2026 broadcast is wrong.
+    const isLaterCupYear = cupRun?.status === "ACTIVE" && cupRun.currentYear > 1;
+    setDraftOpen(!isLaterCupYear);
+  }, [db.players, db.capCeiling, homeTeamId, cupRun]);
 
   // Re-sign one of your pending free agents at the projected terms.
   const resignPlayer = useCallback((fa: OffseasonPending) => {

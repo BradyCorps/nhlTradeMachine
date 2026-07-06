@@ -446,6 +446,7 @@ export default function TradeBlockAdmin() {
   const bulkAdd = async (players: PlayerOption[], status: Status, note: string) => {
     const payload = players.map(p => ({
       id: p.id, name: p.name, teamId: p.teamId,
+      position: p.position || null,
       status, note: note.trim() || null,
     }));
     try {

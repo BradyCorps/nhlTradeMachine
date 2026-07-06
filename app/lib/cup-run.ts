@@ -233,7 +233,24 @@ export function rollLeagueForward(opts: {
   ).filter((id) => teams.some((t) => t.id === id));
   const rookies = generateSyntheticDraftClass(draftYear, rolloverSeed, order);
 
-  let nextPlayers: Asset[] = [...rolled.players, ...rookies];
+  // Flag every contract that has run out so resolveLeagueOffseason picks
+  // it up on re-entry — including rows that were already at 0 years
+  // (stale data would otherwise sit on a roster forever at full cap hit).
+  const flagged = rolled.players.map((p) => {
+    if (p.yearsRemaining > 0 || p.position === "Pick") return p;
+    const expiryStatus: "UFA" | "RFA" = p.expiryStatus === "UFA" || p.expiryStatus === "RFA"
+      ? p.expiryStatus
+      : p.age >= 27 ? "UFA" : "RFA";
+    return {
+      ...p,
+      expiryStatus,
+      expiresThisOffseason: true,
+      contractStatus: expiryStatus,
+      lastCapHit: p.lastCapHit ?? p.capHit,
+    };
+  });
+
+  let nextPlayers: Asset[] = [...flagged, ...rookies];
 
   const countUnit = (roster: Asset[], unit: "F" | "D" | "G") =>
     roster.filter((p) =>

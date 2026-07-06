@@ -1024,10 +1024,19 @@ export async function assembleCanonicalRoster(options: {
   }
 
   // ── Trade block statuses (admin-managed, keyed by name) ──────
+  // Position-suffixed keys win so same-name players (two Elias
+  // Petterssons) never share a block status; plain-name keys remain for
+  // legacy rows without a stored position.
   let blockMap = new Map<string, { status: string; note: string | null }>();
   try {
     const blockRows = await db.select().from(tradeBlockTable);
-    blockMap = new Map(blockRows.map(r => [r.name, { status: r.status, note: r.note ?? null }]));
+    blockMap = new Map();
+    for (const r of blockRows) {
+      const rec = { status: r.status, note: r.note ?? null };
+      const pos = (r as { position?: string | null }).position?.toUpperCase() ?? null;
+      if (pos) blockMap.set(`${r.name}__${pos}`, rec);
+      else if (!blockMap.has(r.name)) blockMap.set(r.name, rec);
+    }
   } catch (e: any) {
     console.warn("[TradeBlock] read skipped:", e.message);
   }
@@ -1295,8 +1304,8 @@ export async function assembleCanonicalRoster(options: {
         draftOverall:     draftOverall    ?? null,
         prospectPtsPace:  prospectPtsPace ?? null,
         developmentProfile,
-        tradeBlockStatus: blockMap.get(p.name)?.status ?? null,
-        tradeBlockNote:   blockMap.get(p.name)?.note   ?? null,
+        tradeBlockStatus: (blockMap.get(`${p.name}__${p.position}`) ?? blockMap.get(p.name))?.status ?? null,
+        tradeBlockNote:   (blockMap.get(`${p.name}__${p.position}`) ?? blockMap.get(p.name))?.note   ?? null,
         expiryStatus:     rawExpiryStatus,
         expiryYear:       rawExpiryYear,
         contractStatus,

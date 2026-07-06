@@ -218,6 +218,33 @@ describe("rollLeagueForward", () => {
     expect(first?.teamId).toBe("VAN");
   });
 
+  it("flags every run-out contract for FA resolution — including stale 0-year rows", () => {
+    const pool = [
+      ...league(),
+      // Nino case: contract already at 0 years, never flagged, sits on
+      // the roster at full cap hit forever without this.
+      asset("stale-zero", { teamId: "CAR", position: "W", age: 32, yearsRemaining: 0, capHit: 4 }),
+      asset("expiring-kid", { teamId: "CAR", position: "W", age: 22, yearsRemaining: 1 }),
+    ];
+    const res = rollLeagueForward({
+      players: pool,
+      seasonStartPlayers: pool,
+      state,
+      teams,
+      capCeiling: 200,
+    });
+    const stale = res.players.find((p) => p.id === "stale-zero");
+    const kid = res.players.find((p) => p.id === "expiring-kid");
+    expect(stale?.expiresThisOffseason).toBe(true);
+    expect(stale?.contractStatus).toBe("UFA");
+    expect(stale?.lastCapHit).toBe(4);
+    expect(kid?.expiresThisOffseason).toBe(true);
+    expect(kid?.contractStatus).toBe("RFA");
+    // signed players untouched
+    const signed = res.players.filter((p) => p.yearsRemaining > 0 && p.position !== "Pick");
+    expect(signed.every((p) => !p.expiresThisOffseason)).toBe(true);
+  });
+
   it("walks an over-cap AI team back under the ceiling", () => {
     const bloated = league().map((p) =>
       p.teamId === "CAR" && p.position !== "Pick" ? { ...p, capHit: 7 } : p

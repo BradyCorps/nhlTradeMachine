@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 const TRADE_BLOCK_STATUSES = new Set(["requested", "available", "untouchable"]);
 
 import { makePlayerId as makeId } from "@/app/lib/player-identity";
+import { ensureTradeBlockColumns } from "@/app/db/ensure-schema";
 
 export async function GET(req: Request) {
   const unauthorized = await requireAdmin(req);
@@ -31,12 +32,21 @@ export async function GET(req: Request) {
 
 async function upsertEntry(body: {
   id: string; name: string; teamId?: string | null;
+  position?: string | null;
   status: string; note?: string | null;
 }) {
-  const entryId = makeId(body.name || body.id);
+  await ensureTradeBlockColumns().catch(() => {});
+  const position = body.position?.trim() || null;
+  // Position salts the entry id so two same-name players (both Elias
+  // Petterssons) can hold independent trade-block entries.
+  const entryId = makeId(body.name || body.id) + (position ? `-${position.toLowerCase()}` : "");
   if (!entryId) throw new Error("name is required");
   if (body.status === "clear") {
     await db.delete(tradeBlock).where(eq(tradeBlock.id, entryId)).catch(() => {});
+    const legacyId = makeId(body.name || body.id);
+    if (legacyId && legacyId !== entryId) {
+      await db.delete(tradeBlock).where(eq(tradeBlock.id, legacyId)).catch(() => {});
+    }
     if (body.id && body.id !== entryId) {
       await db.delete(tradeBlock).where(eq(tradeBlock.id, body.id)).catch(() => {});
     }
@@ -46,12 +56,12 @@ async function upsertEntry(body: {
   const existing = await db.select().from(tradeBlock).where(eq(tradeBlock.id, entryId)).catch(() => []);
   if (existing.length > 0) {
     await db.update(tradeBlock).set({
-      name: body.name, teamId: body.teamId ?? null,
+      name: body.name, teamId: body.teamId ?? null, position,
       status: body.status, note: body.note ?? null, updatedAt: Date.now(),
     }).where(eq(tradeBlock.id, entryId));
   } else {
     await db.insert(tradeBlock).values({
-      id: entryId, name: body.name, teamId: body.teamId ?? null,
+      id: entryId, name: body.name, teamId: body.teamId ?? null, position,
       status: body.status, note: body.note ?? null, updatedAt: Date.now(),
     });
   }
@@ -61,8 +71,8 @@ export async function POST(req: Request) {
   const unauthorized = await requireAdmin(req);
   if (unauthorized) return unauthorized;
   const body = await req.json() as
-    | { id: string; name: string; teamId?: string | null; status: string; note?: string | null }
-    | Array<{ id: string; name: string; teamId?: string | null; status: string; note?: string | null }>;
+    | { id: string; name: string; teamId?: string | null; position?: string | null; status: string; note?: string | null }
+    | Array<{ id: string; name: string; teamId?: string | null; position?: string | null; status: string; note?: string | null }>;
 
   // Bulk upsert
   if (Array.isArray(body)) {

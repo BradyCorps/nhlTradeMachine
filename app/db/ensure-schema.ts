@@ -153,6 +153,16 @@ export function ensureTradeColumns(database: Database = defaultDb): Promise<void
   return memoize(tradeColumnsEnsured, database, TRADE_COLUMN_STATEMENTS);
 }
 
+const TRADE_BLOCK_COLUMN_STATEMENTS = [
+  "ALTER TABLE trade_block ADD COLUMN position TEXT",
+];
+const tradeBlockColumnsEnsured = new WeakMap<object, Promise<void>>();
+
+// Back-fill trade_block.position (same-name player disambiguation).
+export function ensureTradeBlockColumns(database: Database = defaultDb): Promise<void> {
+  return memoize(tradeBlockColumnsEnsured, database, TRADE_BLOCK_COLUMN_STATEMENTS);
+}
+
 // Create the draft_pick_overrides and fa_overrides tables if they don't exist.
 export function ensureNewTables(database: Database = defaultDb): Promise<void> {
   return memoize(newTablesEnsured, database, NEW_TABLE_STATEMENTS);
