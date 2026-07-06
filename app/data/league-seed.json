@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-25T03:16:51.228Z",
+  "generatedAt": "2026-07-06T13:07:57.261Z",
   "season": "2026-27",
   "offseasonYear": 2026,
   "count": 1544,
@@ -650,8 +650,8 @@
       "yearsRemaining": 1,
       "hasNmc": true,
       "hasNtc": false,
-      "expiryStatus": null,
-      "expiryYear": null
+      "expiryStatus": "UFA",
+      "expiryYear": 2026
     },
     {
       "id": "alexanderpetrovic",
@@ -4328,22 +4328,22 @@
       "expiryYear": null
     },
     {
-      "id": "dmitrivoronkov",
-      "name": "Dmitri Voronkov",
+      "id": "dmitrisimashev",
+      "name": "Dmitri Simashev",
       "position": "Unknown",
-      "capHit": 4.175,
-      "yearsRemaining": 2,
+      "capHit": 0.95,
+      "yearsRemaining": 3,
       "hasNmc": false,
       "hasNtc": false,
       "expiryStatus": null,
       "expiryYear": null
     },
     {
-      "id": "dmitrisimashev",
-      "name": "Dmitri Simashev",
+      "id": "dmitrivoronkov",
+      "name": "Dmitri Voronkov",
       "position": "Unknown",
-      "capHit": 0.95,
-      "yearsRemaining": 3,
+      "capHit": 4.175,
+      "yearsRemaining": 2,
       "hasNmc": false,
       "hasNtc": false,
       "expiryStatus": null,
@@ -4836,11 +4836,22 @@
     {
       "id": "eliaspettersson",
       "name": "Elias Pettersson",
-      "position": "Unknown",
+      "position": "C",
       "capHit": 11.6,
       "yearsRemaining": 4,
       "hasNmc": false,
       "hasNtc": true,
+      "expiryStatus": null,
+      "expiryYear": null
+    },
+    {
+      "id": "eliaspettersson-d",
+      "name": "Elias Pettersson",
+      "position": "D",
+      "capHit": 1.05,
+      "yearsRemaining": 2,
+      "hasNmc": false,
+      "hasNtc": false,
       "expiryStatus": null,
       "expiryYear": null
     },
@@ -15241,10 +15252,10 @@
     },
     {
       "id": "timstutzle",
-      "name": "Tim Stutzle",
+      "name": "Tim Stützle",
       "position": "Unknown",
       "capHit": 8.35,
-      "yearsRemaining": 6,
+      "yearsRemaining": 8,
       "hasNmc": false,
       "hasNtc": false,
       "expiryStatus": null,

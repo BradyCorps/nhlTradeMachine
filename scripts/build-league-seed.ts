@@ -39,7 +39,27 @@ interface SeedRow {
 // the seed so the fix lives as data, not as a read-time code override.
 const SEED_CORRECTIONS: Record<string, Partial<SeedRow>> = {
   "Mark Scheifele": { yearsRemaining: 5 },         // 8yr/2023→2031; age math gave 1
+  "Elias Pettersson": { position: "C" },           // disambiguates from the VAN D-man below
 };
+
+// Same-name players collapse to a single makeId, and the bundled snapshot
+// only carries one row per name — the second player's contract is simply
+// missing upstream. Hand-curated rows with position-salted ids restore
+// them; the read path's Name__POS contract keys pick the right one per
+// roster player.
+const SAME_NAME_ADDITIONS: SeedRow[] = [
+  {
+    id: "eliaspettersson-d",
+    name: "Elias Pettersson",
+    position: "D",                                  // VAN defenseman (EP25)
+    capHit: 1.05,
+    yearsRemaining: 2,
+    hasNmc: false,
+    hasNtc: false,
+    expiryStatus: null,
+    expiryYear: null,
+  },
+];
 
 const byId = new Map<string, SeedRow>();
 
@@ -98,6 +118,11 @@ for (const [name, patch] of Object.entries(SEED_CORRECTIONS)) {
     Object.assign(row, patch);
     corrected++;
   }
+}
+
+// 4. Same-name duplicate rows (position-salted ids, never collide with makeId rows).
+for (const row of SAME_NAME_ADDITIONS) {
+  if (!byId.has(row.id)) byId.set(row.id, row);
 }
 
 const rows = Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
