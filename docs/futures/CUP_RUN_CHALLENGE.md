@@ -53,6 +53,15 @@ One seeded roll per player per offseason:
   lineup slot improves (see §3) gets breakout odds doubled. This makes
   the existing change-of-scenery flag a real sim input — buying low on
   a buried player and giving him top-six minutes should sometimes pay.
+- **Luck signal (shot quality vs finishing)**: `Asset` already carries
+  `xGPace` and `goalsPace` from MoneyPuck, so "unlucky" is computable
+  in-house today — finishing well under expected goals (goals < 85% of
+  xG) biases breakout odds up; running hot (> 125% of xG) biases
+  regression up. **Enrichment**: NHL Edge shot-location data (REST
+  endpoints under `api-web.nhle.com`/`edge`, documented in
+  github.com/coreyjs/nhl-api-py — we call the endpoints directly from
+  TS, no Python dependency) can sharpen this later, e.g. high-danger
+  shot share vs finishing rate to separate "bad luck" from "bad shots".
 
 ### 3. Lineup context (lines matter)
 
@@ -107,6 +116,11 @@ CBA-accurate constraints, enforced across the whole 3-year run:
 1. **Phase 1** — `app/lib/season-rollover.ts`: `advanceSeason()` with
    aging, contract decrement, retirement, stat regen, breakout rolls.
    Pure + heavily unit-tested (this is the layer everything trusts).
+   **✅ Implemented 2026-07-06** — includes the xG-vs-goals luck bias
+   and the change-of-scenery hook (`ctx.changeOfScenery`, doubled
+   breakout odds) ready for Phase 3 to feed. 15 tests in
+   `__tests__/season-rollover.test.ts` pin retirement ramps,
+   determinism, roll frequencies, expiry derivation, and pace decay.
 2. **Phase 2** — Multi-year loop in armchair GM: 3× cycle state
    machine, run persistence, synthetic draft classes for 2027/2028.
 3. **Phase 3** — Lineup-context modifiers in the simulate route +
