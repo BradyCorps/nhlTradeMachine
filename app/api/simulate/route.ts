@@ -408,6 +408,7 @@ function projectSkaterOutcome(
   teamId: string,
   seed: number,
   deployment?: SkaterDeployment,
+  benched?: boolean,
 ): ProjectedSkaterSeason {
   const rand = mulberry32(seed + hashString(`${teamId}:${p.id}:skater-season`));
   const priorGames = p.games ?? 82;
@@ -459,13 +460,16 @@ function projectSkaterOutcome(
   if (isProspectProfile) gamesPlayed = Math.round(55 + rand() * 27);
   if (deployment?.active) {
     gamesPlayed = Math.max(gamesPlayed, Math.round(deployment.gamesFloor + rand() * 8));
+  } else if (benched) {
+    // Not in the set lineup: press-box/AHL depth — call-up minutes only.
+    gamesPlayed = Math.min(gamesPlayed, Math.round(18 + rand() * 24));
   }
   if (rand() < (isAgingWell ? 0.04 : isDeclineRisk ? 0.10 : 0.055)) {
     gamesPlayed = Math.max(8, gamesPlayed - Math.round((isAgingWell ? 10 : 18) + rand() * (isAgingWell ? 18 : 38)));
   }
 
   const paceVariance = isAgingWell ? 0.98 + rand() * 0.14 : 0.91 + rand() * 0.18;
-  const deploymentMultiplier = deployment?.active ? deployment.multiplier : 1;
+  const deploymentMultiplier = deployment?.active ? deployment.multiplier : benched ? 0.85 : 1;
   const projectedPts = Math.max(0, Math.round((stablePace / 82) * gamesPlayed * development * paceVariance * deploymentMultiplier));
   const xgGoalShare = stablePace > 0
     ? clamp((p.xGPace ?? 0) / Math.max(stablePace, 1), 0.22, p.position === "D" ? 0.36 : 0.55)
@@ -517,11 +521,15 @@ function simulateLeague(
       lineupOrder,
       lineupContext,
     );
+    // Every skater on the team projects a season — lineup players are
+    // starters (deployment floors/multipliers), everyone else is depth.
+    const hasSetLineup = deploymentByPlayer.size > 0;
     const projectedSkaters = roster
-      .filter(p => p.position !== "Pick" && p.position !== "G"
-        && (p.ptsPace > 0 || (p.prospectPtsPace ?? 0) > 0 || deploymentByPlayer.has(p.id))
-        && ((p.games ?? 0) >= 5 || (p.prospectPtsPace ?? 0) > 0))
-      .map(p => projectSkaterOutcome(p, team.id, seed, deploymentByPlayer.get(p.id)))
+      .filter(p => p.position !== "Pick" && p.position !== "G")
+      .map(p => projectSkaterOutcome(
+        p, team.id, seed, deploymentByPlayer.get(p.id),
+        hasSetLineup && !deploymentByPlayer.has(p.id),
+      ))
       .sort((a, b) =>
         b.projectedPts !== a.projectedPts
           ? b.projectedPts - a.projectedPts
@@ -539,7 +547,7 @@ function simulateLeague(
       )[0] ?? null;
     return {
       teamId: team.id, teamName: team.name, phase: team.phase,
-      projectedPoints, topScorer, projectedSkaters: projectedSkaters.slice(0, 18), goalie, topDefenseman,
+      projectedPoints, topScorer, projectedSkaters, goalie, topDefenseman,
       madePlayoffs: false, divisionRank: 0, leagueRank: 0, division: "",
     };
   });

@@ -209,9 +209,17 @@ function TeamLineup({
   // so the strongest possible lineup is one click. Counts as an edit so
   // it locks through subsequent trades.
   const bestLines = useCallback(() => {
-    const byNav = (ps: Player[]) =>
-      [...ps].sort((a, b) =>
-        (navMap?.[b.id]?.total ?? b.ptsPace ?? 0) - (navMap?.[a.id]?.total ?? a.ptsPace ?? 0));
+    // On-ice rank ≠ trade value. NAV is asset value (contract-weighted),
+    // so a captain on a heavy deal (Lowry-type, negative NAV) still
+    // belongs high in the lineup. Blend NAV with NHL pedigree: coach
+    // deployment trust (career TOI) plus games-played tenure.
+    const onIceRank = (pl: Player) => {
+      const nav = navMap?.[pl.id]?.total ?? pl.ptsPace ?? 0;
+      const toiTrust = Math.max(0, ((pl.avgTOI ?? 0) - 6)) * 14;   // 17.5 TOI ≈ 161
+      const tenure = Math.min(20, (pl.games ?? 0) / 4);            // small veteran nudge
+      return 0.55 * nav + 0.45 * toiTrust + tenure;
+    };
+    const byNav = (ps: Player[]) => [...ps].sort((a, b) => onIceRank(b) - onIceRank(a));
     const goalieByNav = (ps: Player[]) =>
       [...ps].sort((a, b) =>
         (navMap?.[b.id]?.total ?? b.games ?? 0) - (navMap?.[a.id]?.total ?? a.games ?? 0));
