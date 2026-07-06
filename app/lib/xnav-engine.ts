@@ -625,24 +625,46 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const CAP_GROWTH_RATE  = 1.04;  // 4% annual growth
   const currentFmvAav = BASE_CAP_CEILING * fmvCapPct;
 
-  // Loop through contract term to calculate the multi-year compound surplus sum:
+  // Loop through contract term to calculate the multi-year compound surplus sum.
+  //
+  // Growth-adjusted FMV: the player's market value is NOT flat across the
+  // deal. A 23-year-old scoring 41 points is not a 41-point player in years
+  // 2-6 of his contract — those are his prime seasons on the same audited
+  // age curve the ageVal component uses (F grow to 26, D to 27, decline
+  // from 28). Holding FMV at today's number made long team-control deals
+  // for pre-peak players read as years of overpayment, and made aging
+  // 8-year deals look no worse than rentals. Growth is gated by the same
+  // youthProjectionSignal (production/role/pedigree × sample) so fringe
+  // youth don't get star projections, and cumulative drift is clamped.
+  const GROWTH_PER_PREPEAK_YEAR = 0.09 * youthProjectionSignal;
+  const DECLINE_PER_YEAR = 0.03;
   let capSum = 0;
+  let tmvDriftFactor = 1;
   for (let i = 0; i < contractYears; i++) {
     const projectedCapCeiling = BASE_CAP_CEILING * Math.pow(CAP_GROWTH_RATE, i);
-    
+    const ageAtYear = asset.age + i;
+
+    if (i > 0) {
+      if (ageAtYear <= peakAge) tmvDriftFactor *= 1 + GROWTH_PER_PREPEAK_YEAR;
+      else if (ageAtYear >= peakAge + 2) tmvDriftFactor *= 1 - DECLINE_PER_YEAR;
+      tmvDriftFactor = clamp(tmvDriftFactor, 0.70, 1.35);
+    }
+    const fmvCapPctAtYear = LEAGUE_MIN_PCT +
+      (MAX_CAP_PCT - LEAGUE_MIN_PCT) /
+      (1 + Math.exp(-K_FACTOR * (trueMarketValue * tmvDriftFactor - MIDPOINT)));
+
     // Convert FMV% into raw dollars based on the projected cap ceiling for that year
-    const fmvDollars = projectedCapCeiling * fmvCapPct;
+    const fmvDollars = projectedCapCeiling * fmvCapPctAtYear;
     const annualSurplus = fmvDollars - navCapHit;
-    
+
     // 8% annual financial discount: future cap space/penalties matter less today
     const timeDiscount = Math.pow(0.92, i);
-    
+
     // gamma_RFA rewards organizations holding cost-controlled positive surplus.
     // Only apply the 1.25x premium when surplus is positive — amplifying a penalty
     // on young players who are slightly above-market double-counts the damage.
-    const ageAtYear = asset.age + i;
     const gammaRFA = (ageAtYear <= 27 && annualSurplus > 0) ? 1.25 : 1.0;
-    
+
     // Multiply by 12 to convert raw dollars to NAV points ($1M surplus = 12 NAV)
     capSum += annualSurplus * 12 * gammaRFA * timeDiscount;
   }
@@ -669,7 +691,22 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   );
   const positiveCapComponent = Math.max(0, baselineCapComponent) * capEstablishment;
   const negativeCapComponent = Math.min(0, baselineCapComponent);
-  const capTotal      = safe(negativeCapComponent + positiveCapComponent + retainedBonus);
+
+  // ── Team-Control Option Value ─────────────────────────────────
+  // A multi-year deal on a pre-peak player is an option, not just a cash
+  // flow: the downside is capped at a known cap hit while any breakout is
+  // captured at no extra cost. Point-estimate surplus misses that
+  // asymmetry completely — it's why 8 years of a 23-year-old was valuing
+  // barely above 1 year of him. Scaled by the youth signal (so fringe
+  // youth earn little), by the years of control that overlap the growth
+  // window, and by cap establishment. Bounded ≈ 36 NAV for a max-signal
+  // 20-year-old locked through his prime.
+  const controlYears = clamp(Math.min(contractYears, peakAge + 2 - age), 0, 6);
+  const teamControlValue = age <= peakAge
+    ? youthProjectionSignal * controlYears * 6 * capEstablishment
+    : 0;
+
+  const capTotal      = safe(negativeCapComponent + positiveCapComponent + retainedBonus + teamControlValue);
 
   // ── Forward archetype ─────────────────────────────────────────
   const noivImpact = Math.round(noivBonus);
@@ -802,7 +839,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     def:    Math.round(defDisplay),
     age:    Math.round(ageTotal),
     cap:    Math.round(capTotal),
-    upside: Math.round(Math.max(0, ageTotal)),
+    upside: Math.round(Math.max(0, ageTotal) + teamControlValue),
     fmvAav: currentFmvAav,
     noivImpact,
     fArchetype,
