@@ -109,6 +109,22 @@ export default function AdminHealth() {
     }
   };
 
+  const [pushingFa, setPushingFa] = useState(false);
+  const pushLimboToFa = async () => {
+    setPushingFa(true);
+    try {
+      const res = await fetch("/api/admin/prune-stale", { method: "PATCH" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      toast(`Pushed ${data.pushedToFa} limbo contracts into free agency (${data.skippedRfaEligible?.length ?? 0} RFA-eligible left alone)`, "success");
+      setPruneResult(null);
+    } catch (e: any) {
+      toast(e?.message ?? "Push to FA failed", "error");
+    } finally {
+      setPushingFa(false);
+    }
+  };
+
   const executePrune = async () => {
     setPruning(true);
     try {
@@ -329,9 +345,13 @@ export default function AdminHealth() {
             (and not protected as draftees or extension holders) are flagged stale. Dry-run first, then confirm to delete.
           </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button onClick={runPruneDryRun} disabled={pruneLoading} style={btnOutlineStyle}>
               {pruneLoading ? "SCANNING…" : "DRY RUN"}
+            </button>
+            <button onClick={pushLimboToFa} disabled={pushingFa} style={btnStyle}
+              title="0-year / $0 contracts that aren't RFA-eligible or unsigned draftees become UFAs and enter the free-agent market — the gentler alternative to pruning">
+              {pushingFa ? "PUSHING…" : "PUSH LIMBO CONTRACTS TO FA"}
             </button>
           </div>
 

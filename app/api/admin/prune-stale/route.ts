@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/app/db/client";
 import { players as playersTable } from "@/app/db/schema";
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { scrapeCapWages } from "@/app/services/scraper";
 import { TEAMS_DB } from "@/app/lib/db";
 import { requireAdmin } from "@/app/lib/admin-auth";
@@ -18,6 +18,8 @@ export const dynamic = "force-dynamic";
 //
 // GET    → dry run: returns the full candidate list, deletes nothing
 // DELETE → prunes, but only if both sources came back healthy
+// PATCH  → pushes 0-year/$0 limbo contracts into free agency instead of
+//          deleting them (UFAs enter the market via the FA pool)
 
 const NHL_HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -129,5 +131,72 @@ export async function DELETE(req: Request) {
     deleted: ids.length,
     remaining: rows.length - ids.length,
     deletedNames: stale.map(r => r.name).sort(),
+  });
+}
+
+// PATCH /api/admin/prune-stale — the gentler alternative to deletion.
+// Rows sitting on 0 years and $0 are contract limbo: not signed, not
+// free agents, invisible to the market. Push them into free agency:
+//   • age 27+ (or unknown age with no draft pedigree) → UFA
+//   • RFA-eligible (under 27) or unsigned draftees    → left alone,
+//     their teams still hold their rights
+export async function PATCH(req: Request) {
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
+
+  const offseasonYear = 2000 + parseInt(String((await import("@/app/lib/season-config")).SEASON.label).slice(2, 4), 10);
+  const rows = await db.select({
+    id: playersTable.id,
+    name: playersTable.name,
+    age: playersTable.age,
+    capHit: playersTable.capHit,
+    yearsRemaining: playersTable.yearsRemaining,
+    expiryStatus: playersTable.expiryStatus,
+    draftOverall: playersTable.draftOverall,
+    extensionCapHit: playersTable.extensionCapHit,
+    retired: playersTable.retired,
+    excludeFromRoster: playersTable.excludeFromRoster,
+  }).from(playersTable);
+
+  const pushed: string[] = [];
+  const skippedRfaEligible: string[] = [];
+  for (const r of rows) {
+    if (r.retired || r.excludeFromRoster) continue;
+    if ((r.capHit ?? 0) > 0 || (r.yearsRemaining ?? 0) > 0) continue;
+    if (r.expiryStatus) continue;                       // already in the FA flow
+    if (r.extensionCapHit != null && r.extensionCapHit > 0) continue; // extension recorded
+    const age = r.age ?? 0;
+    const isDraftee = r.draftOverall != null;
+    if (isDraftee && age <= 23) continue;               // unsigned prospects are not UFAs
+    if (age > 16 && age < 27) {                         // RFA-eligible — rights belong to a team
+      skippedRfaEligible.push(r.name);
+      continue;
+    }
+    await db.update(playersTable)
+      .set({ expiryStatus: "UFA", expiryYear: offseasonYear })
+      .where(eq(playersTable.id, r.id))
+      .catch(() => {});
+    pushed.push(r.name);
+  }
+
+  const cleared: string[] = [];
+  if (pushed.length > 0) {
+    const { clearTeamCaches } = await import("@/app/lib/team-cache");
+    const { redis } = await import("@/app/lib/redis");
+    cleared.push(...await clearTeamCaches(redis).catch(() => []));
+    if (redis) {
+      for (const key of ["cache:contracts", "cache:contracts:v2"]) {
+        await redis.del(key).then(() => cleared.push(key)).catch(() => {});
+      }
+    }
+  }
+
+  return NextResponse.json({
+    ok: true,
+    pushedToFa: pushed.length,
+    pushed: pushed.slice(0, 100),
+    skippedRfaEligible: skippedRfaEligible.slice(0, 50),
+    offseasonYear,
+    clearedCacheKeys: cleared,
   });
 }
