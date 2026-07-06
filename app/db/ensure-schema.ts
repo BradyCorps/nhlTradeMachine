@@ -153,6 +153,34 @@ export function ensureTradeColumns(database: Database = defaultDb): Promise<void
   return memoize(tradeColumnsEnsured, database, TRADE_COLUMN_STATEMENTS);
 }
 
+const NHL_SNAPSHOT_TABLE_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS nhl_snapshots (
+    id TEXT PRIMARY KEY,
+    player_id INTEGER NOT NULL,
+    name TEXT,
+    season INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    captured_at INTEGER NOT NULL,
+    games_played INTEGER,
+    goals INTEGER,
+    assists INTEGER,
+    points INTEGER,
+    shooting_pctg REAL,
+    oz_pct REAL,
+    hd_shots INTEGER,
+    hd_shooting_pct REAL,
+    hd_finishing_delta REAL,
+    payload TEXT NOT NULL
+  )`,
+  "CREATE INDEX IF NOT EXISTS idx_nhl_snapshots_player ON nhl_snapshots (player_id, season, source)",
+];
+const nhlSnapshotTableEnsured = new WeakMap<object, Promise<void>>();
+
+// Create the historical NHL snapshot table (perpetual first-party feed).
+export function ensureNhlSnapshotTable(database: Database = defaultDb): Promise<void> {
+  return memoize(nhlSnapshotTableEnsured, database, NHL_SNAPSHOT_TABLE_STATEMENTS);
+}
+
 const TRADE_BLOCK_COLUMN_STATEMENTS = [
   "ALTER TABLE trade_block ADD COLUMN position TEXT",
 ];

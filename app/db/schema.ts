@@ -85,6 +85,29 @@ export const draftPickOverrides = sqliteTable("draft_pick_overrides", {
   updatedAt:       integer("updated_at"),
 });
 
+// Historical NHL snapshots — the perpetual first-party feed. One row per
+// player per season per source per capture day (id encodes all four), with
+// key signals extracted into columns and the full payload preserved for
+// future mining. Populated by /api/admin/nhl-feed.
+export const nhlSnapshots = sqliteTable("nhl_snapshots", {
+  id:            text("id").primaryKey(),         // "{playerId}-{season}-{source}-{yyyymmdd}"
+  playerId:      integer("player_id").notNull(),  // NHL numeric id (the {sku})
+  name:          text("name"),
+  season:        integer("season").notNull(),     // e.g. 20252026
+  source:        text("source").notNull(),        // 'landing' | 'edge'
+  capturedAt:    integer("captured_at").notNull(),
+  gamesPlayed:   integer("games_played"),
+  goals:         integer("goals"),
+  assists:       integer("assists"),
+  points:        integer("points"),
+  shootingPctg:  real("shooting_pctg"),
+  ozPct:         real("oz_pct"),
+  hdShots:       integer("hd_shots"),
+  hdShootingPct: real("hd_shooting_pct"),
+  hdFinishingDelta: real("hd_finishing_delta"),   // vs league on high-danger — the luck signal
+  payload:       text("payload").notNull(),       // full raw JSON
+});
+
 // Admin-managed free-agency overrides — forces a player into/out of the expiring pool
 // regardless of what the scraper returns. Lets the admin fix misdetections (e.g. Tuch).
 export const faOverrides = sqliteTable("fa_overrides", {
