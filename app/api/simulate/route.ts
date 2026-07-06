@@ -8,6 +8,7 @@ import {
   stablePts,
 } from "@/app/lib/sim-engine";
 import { slotMultiplier } from "@/app/lib/lineup-context";
+import { leadershipBonus } from "@/app/data/leadership";
 
 // ── Types ─────────────────────────────────────────────────────
 interface SimPlayer {
@@ -180,7 +181,8 @@ const onIceValue = (p: SimPlayer): number => {
   const pkBonus = p.pkTimeShare != null && p.pkTimeShare >= 0.10
     ? Math.min(5, p.pkTimeShare * 30)
     : 0;
-  return skaterPace(p) + draftPedigreeBonus(p) + driverBonus + pkBonus;
+  // Leadership steadier: letters carry small on-ice weight (room, matchups)
+  return skaterPace(p) + draftPedigreeBonus(p) + driverBonus + pkBonus + leadershipBonus(p.name, { c: 3, a: 1.5 });
 };
 
 const isForward = (p: SimPlayer): boolean => p.position !== "Pick" && p.position !== "G" && p.position !== "D";

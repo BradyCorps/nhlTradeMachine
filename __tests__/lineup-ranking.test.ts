@@ -48,3 +48,15 @@ describe("lineupContributionScore", () => {
     );
   });
 });
+
+describe("leadership intangibles", () => {
+  it("lifts a captain above a statistically identical teammate", async () => {
+    const { lineupContributionScore } = await import("../app/lib/lineup-ranking");
+    const base = { position: "C", avgTOI: 17.5, ptsPace: 34, games: 620 };
+    const lowry = lineupContributionScore({ ...base, name: "Adam Lowry" }, -38);
+    const nobody = lineupContributionScore({ ...base, name: "Depth Center" }, -38);
+    expect(lowry - nobody).toBeCloseTo(28, 5);
+    const alternate = lineupContributionScore({ ...base, name: "Mark Scheifele" }, 100);
+    expect(alternate).toBeGreaterThan(lineupContributionScore({ ...base, name: "Depth Center" }, 100));
+  });
+});

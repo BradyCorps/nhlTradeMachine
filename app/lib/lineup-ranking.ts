@@ -1,4 +1,7 @@
+import { leadershipBonus } from "@/app/data/leadership";
+
 export interface LineupRankingPlayer {
+  name?: string;
   position: string;
   secondaryPosition?: string | null;
   avgTOI?: number;
@@ -21,6 +24,10 @@ export function lineupContributionScore(pl: LineupRankingPlayer, navTotal?: numb
     isD(pl) && toi >= 19 ? 10 :
     0;
   const navTiebreaker = navTotal == null ? 0 : clamp(navTotal, -50, 120) * 0.12;
+  // Intangibles: a letter on the sweater is the organization's own
+  // declaration of on-ice worth beyond the stat line (C ≈ a line's worth
+  // of trust, A half that). Never part of trade value — lineup only.
+  const leadership = leadershipBonus(pl.name, { c: 28, a: 14 });
 
-  return production + deploymentTrust + veteranTrust + matchupRole + navTiebreaker;
+  return production + deploymentTrust + veteranTrust + matchupRole + navTiebreaker + leadership;
 }

@@ -14,6 +14,7 @@ import { calcNAV } from "@/app/lib/xnav-engine";
 import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
+import EdgeShotMap from "@/app/components/EdgeShotMap";
 import PercentileCard from "@/app/components/PercentileCard";
 
 // ── Types ─────────────────────────────────────────────────────
@@ -347,7 +348,7 @@ function PlayersIconKey() {
 }
 
 // ── Expanded player tab types ─────────────────────────────────
-type PlayerTab = "stats" | "strand" | "card" | "outlook" | "contract";
+type PlayerTab = "stats" | "strand" | "card" | "outlook" | "contract" | "edge";
 
 const PLUM = "#5e3a6e";
 const PLUM_LIGHT = "#7a4f8a";
@@ -405,6 +406,7 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
     { key: "stats", label: "Stats" },
     ...(hasStrand ? [{ key: "strand" as PlayerTab, label: "Strand" }] : []),
     { key: "card", label: "Player Card" },
+    ...(/^\d+$/.test(String(player.id)) && player.position !== "G" ? [{ key: "edge" as PlayerTab, label: "Edge" }] : []),
     ...(hasContract ? [{ key: "contract" as PlayerTab, label: "Contract" }] : []),
     ...(hasOutlook ? [{ key: "outlook" as PlayerTab, label: "Outlook" }] : []),
   ];
@@ -495,6 +497,10 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
         )}
 
         {/* ── Player Card tab ────────────────────── */}
+        {activeTab === "edge" && (
+          <EdgeShotMap nhlPlayerId={player.id} />
+        )}
+
         {activeTab === "card" && (
           <div style={{ display: "flex", justifyContent: "center" }}>
             <PercentileCard
