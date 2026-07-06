@@ -48,7 +48,7 @@ export default function ContentionQuadrant({
       {/* ── Scatter plot ── */}
       <div style={{ flexShrink: 0 }}>
         <div style={{
-          fontSize: 8, fontWeight: 900, color: "var(--ledger-ink-faint)",
+          fontSize: 10, fontWeight: 900, color: "var(--ledger-ink-faint)",
           textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 5,
           fontFamily: "'Courier Prime', monospace",
         }}>
@@ -133,7 +133,7 @@ export default function ContentionQuadrant({
               padding: "7px 8px",
             }}>
               <div style={{
-                fontSize: 7, fontWeight: 900, color,
+                fontSize: 9, fontWeight: 900, color,
                 fontFamily: "'Courier Prime', monospace",
                 textTransform: "uppercase", letterSpacing: "0.07em",
                 marginBottom: 2, overflow: "hidden",
@@ -149,18 +149,18 @@ export default function ContentionQuadrant({
               </div>
               <div style={{ display: "flex", gap: 10 }}>
                 <div>
-                  <div style={{ fontSize: 6.5, color: "var(--ledger-ink-faint)", fontFamily: "'Courier Prime', monospace", letterSpacing: "0.05em" }}>PRESENT</div>
+                  <div style={{ fontSize: 9.5, color: "var(--ledger-ink-faint)", fontFamily: "'Courier Prime', monospace", letterSpacing: "0.05em" }}>PRESENT</div>
                   <div style={{ fontSize: 12, fontWeight: 900, color: "var(--ledger-ink)", fontFamily: "'Courier Prime', monospace", lineHeight: 1.1 }}>
                     {data.present.toFixed(1)}
                   </div>
-                  <div style={{ fontSize: 6.5, color: "var(--ledger-ink-faint)", fontFamily: "'Courier Prime', monospace" }}>{data.presentLabel}</div>
+                  <div style={{ fontSize: 9.5, color: "var(--ledger-ink-faint)", fontFamily: "'Courier Prime', monospace" }}>{data.presentLabel}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 6.5, color: "var(--ledger-ink-faint)", fontFamily: "'Courier Prime', monospace", letterSpacing: "0.05em" }}>FUTURE</div>
+                  <div style={{ fontSize: 9.5, color: "var(--ledger-ink-faint)", fontFamily: "'Courier Prime', monospace", letterSpacing: "0.05em" }}>FUTURE</div>
                   <div style={{ fontSize: 12, fontWeight: 900, color: "var(--ledger-ink)", fontFamily: "'Courier Prime', monospace", lineHeight: 1.1 }}>
                     {data.future.toFixed(1)}
                   </div>
-                  <div style={{ fontSize: 6.5, color: "var(--ledger-ink-faint)", fontFamily: "'Courier Prime', monospace" }}>{data.futureLabel}</div>
+                  <div style={{ fontSize: 9.5, color: "var(--ledger-ink-faint)", fontFamily: "'Courier Prime', monospace" }}>{data.futureLabel}</div>
                 </div>
               </div>
             </div>

@@ -84,7 +84,7 @@ export default function LedgerDropdown({ teams, selectedId, onSelect }: {
                     </div>
                     {t.phase && (
                       <span style={{
-                        fontSize: 7, fontWeight: 900, textTransform: 'uppercase',
+                        fontSize: 9, fontWeight: 900, textTransform: 'uppercase',
                         letterSpacing: '0.08em', flexShrink: 0,
                         fontFamily: "'Courier Prime', monospace",
                         color:

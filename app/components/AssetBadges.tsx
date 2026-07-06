@@ -282,7 +282,7 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
 
       {hasLedger && (
       <div className="flex flex-wrap items-center gap-1 pl-1 border-l" style={{ borderColor: "rgba(107,80,48,0.35)" }}>
-      <span className="text-[8px] font-black uppercase text-ledger-ink-faint">Ledger</span>
+      <span className="text-[10px] font-black uppercase text-ledger-ink-faint">Ledger</span>
 
       {asset.tradeBlockStatus === "requested" && (
         <span className="text-2xs px-1 py-0.5 font-black" style={badgeStyle("var(--ledger-red)", "var(--red-dim)")}

@@ -110,7 +110,7 @@ export default function TradeBlockPanel({ players, teams, onSelectTeam, onClose 
 
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 10, fontWeight: 900, color: "var(--ledger-ink)", fontFamily: "monospace" }}>{p.teamId}</div>
-          <div style={{ fontSize: 8, color: "var(--ledger-ink-faint)", fontFamily: "monospace" }}>{team?.phase ?? ""}</div>
+          <div style={{ fontSize: 10, color: "var(--ledger-ink-faint)", fontFamily: "monospace" }}>{team?.phase ?? ""}</div>
         </div>
 
         <div style={{ fontSize: 10, color: "var(--ledger-ink-faint)", textAlign: "center", fontFamily: "monospace" }}>
@@ -127,7 +127,7 @@ export default function TradeBlockPanel({ players, teams, onSelectTeam, onClose 
 
         <div style={{ textAlign: "right" }}>
           <span style={{
-            fontSize: 8, fontWeight: 900, padding: "2px 5px",
+            fontSize: 10, fontWeight: 900, padding: "2px 5px",
             background: cfg.bg, color: cfg.color,
             border: `1px solid ${cfg.border}`,
             letterSpacing: "0.08em", fontFamily: "monospace",
@@ -285,7 +285,7 @@ export default function TradeBlockPanel({ players, teams, onSelectTeam, onClose 
           gridTemplateColumns: "1fr 48px 28px 56px 38px 90px",
           gap: 6, padding: "5px 20px",
           borderBottom: "1px solid var(--rule-light)",
-          fontSize: 8, color: "var(--ledger-ink-faint)",
+          fontSize: 10, color: "var(--ledger-ink-faint)",
           fontWeight: 900, letterSpacing: "0.12em",
           textTransform: "uppercase", fontFamily: "monospace",
           flexShrink: 0, background: "var(--paper-card)",
@@ -330,7 +330,7 @@ export default function TradeBlockPanel({ players, teams, onSelectTeam, onClose 
           <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)", fontFamily: "monospace", letterSpacing: "0.1em" }}>
             {filtered.length} PLAYER{filtered.length !== 1 ? "S" : ""} SHOWN
           </div>
-          <div style={{ fontSize: 8, color: "var(--ledger-ink-faint)", fontFamily: "monospace", fontStyle: "italic" }}>
+          <div style={{ fontSize: 10, color: "var(--ledger-ink-faint)", fontFamily: "monospace", fontStyle: "italic" }}>
             Click any player to select as trade partner
           </div>
         </div>

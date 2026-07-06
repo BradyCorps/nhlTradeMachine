@@ -137,7 +137,7 @@ function TradeCard({ s, onDelete, onRename }: {
       <div className="grid grid-cols-2 gap-0 px-4 pb-3">
         {/* Outgoing */}
         <div className="pr-3 border-r" style={{ borderColor: "var(--ledger-rule)" }}>
-          <div className="text-[8px] font-black uppercase tracking-[0.2em] mb-1"
+          <div className="text-[10px] font-black uppercase tracking-[0.2em] mb-1"
             style={{ color: "var(--ledger-ink-faint)" }}>
             {s.homeTeam?.id ?? "—"} sends
           </div>
@@ -148,7 +148,7 @@ function TradeCard({ s, onDelete, onRename }: {
         </div>
         {/* Incoming */}
         <div className="pl-3">
-          <div className="text-[8px] font-black uppercase tracking-[0.2em] mb-1"
+          <div className="text-[10px] font-black uppercase tracking-[0.2em] mb-1"
             style={{ color: "var(--ledger-ink-faint)" }}>
             {s.partnerTeam?.id ?? "—"} sends
           </div>

@@ -136,7 +136,7 @@ export default function PressBoxCalendar({
               {WEEKDAYS.map((d, i) => (
                 <div
                   key={`wd-${i}`}
-                  className="text-center text-[8px] font-mono font-black"
+                  className="text-center text-[10px] font-mono font-black"
                   style={{ color: "var(--ledger-ink-faint)" }}
                 >
                   {d}
@@ -155,7 +155,7 @@ export default function PressBoxCalendar({
                   >
                     {e.date.getUTCDate()}
                     {e.status === "perfect" && (
-                      <span className="absolute -top-1 -right-1 text-[7px]" style={{ color: "var(--ledger-amber)" }}>
+                      <span className="absolute -top-1 -right-1 text-[9px]" style={{ color: "var(--ledger-amber)" }}>
                         ★
                       </span>
                     )}
@@ -168,7 +168,7 @@ export default function PressBoxCalendar({
       </div>
 
       <div
-        className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-[8px] font-mono uppercase tracking-wider"
+        className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-[10px] font-mono uppercase tracking-wider"
         style={{ color: "var(--ledger-ink-faint)" }}
       >
         <span className="flex items-center gap-1">

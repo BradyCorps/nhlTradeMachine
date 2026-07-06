@@ -414,7 +414,7 @@ function TeamLineup({
       {/* Bench — extra players; click one, then click a matching lineup slot to insert */}
       {benchIds.length > 0 && (
         <div style={{ marginTop: 6 }}>
-          <div style={{ fontSize: 6, fontWeight: 900, color: "var(--ledger-ink-faint)",
+          <div style={{ fontSize: 9, fontWeight: 900, color: "var(--ledger-ink-faint)",
                         textTransform: "uppercase", letterSpacing: 0, marginBottom: 3 }}>
             Bench / Scratches
           </div>

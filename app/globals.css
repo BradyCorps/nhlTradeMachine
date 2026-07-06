@@ -12,7 +12,7 @@
   --ledger-ink-deep:     #261e12;
   --ledger-ink-mid:      #3d2e18;
   --ledger-ink-body:     #4a3820;
-  --ledger-ink-faint:    #9a7d58;
+  --ledger-ink-faint:    #6e5a3d;  /* darkened from #9a7d58 — agate must be readable */
   --ledger-card:         #e4d8b8;
   --ledger-card-light:   #ede4cc;
   --ledger-warm:         #e8dab8;
@@ -39,7 +39,7 @@
   --ink:          #261e12;
   --ink-mid:      #403525;
   --ink-light:    #5e4f3a;
-  --ink-faint:    #7a6a50;
+  --ink-faint:    #635340;  /* darkened from #7a6a50 */
   --ink-ghost:    #5c503d;
   --ink-dark-mode: #ebe9e5;
 

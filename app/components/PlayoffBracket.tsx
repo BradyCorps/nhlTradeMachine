@@ -79,7 +79,7 @@ export default function PlayoffBracket({ bracket }: { bracket: BracketData }) {
       </div>
 
       {/* Round labels */}
-      <div style={{ display: "flex", fontSize: 6, fontWeight: 900, textTransform: "uppercase",
+      <div style={{ display: "flex", fontSize: 9, fontWeight: 900, textTransform: "uppercase",
                     letterSpacing: "0.08em", color: FAINT, marginBottom: 3, fontFamily: MONO }}>
         {["R1","R2","CF","","CF","R2","R1"].map((l, i) => (
           <div key={i} style={{ flex: i === 3 ? 1.4 : 1, textAlign: "center" }}>{l}</div>
@@ -106,13 +106,13 @@ export default function PlayoffBracket({ bracket }: { bracket: BracketData }) {
         <div style={{ flex: 1.4, display: "flex", alignItems: "center",
                       justifyContent: "center", padding: "4px 5px" }}>
           <div style={{ textAlign: "center", width: "100%" }}>
-            <div style={{ fontSize: 7, fontWeight: 900, color: "var(--ledger-red)",
+            <div style={{ fontSize: 9, fontWeight: 900, color: "var(--ledger-red)",
                           textTransform: "uppercase", letterSpacing: "0.08em",
                           marginBottom: 4, fontFamily: MONO }}>
               🏆 Cup Final
             </div>
             <MatchCard s={bracket.final} />
-            <div style={{ fontSize: 8, fontWeight: 900, color: "var(--ledger-green)",
+            <div style={{ fontSize: 10, fontWeight: 900, color: "var(--ledger-green)",
                           marginTop: 5, fontFamily: MONO }}>
               {nick(bracket.champion.teamName)} 🏆
             </div>
@@ -135,7 +135,7 @@ export default function PlayoffBracket({ bracket }: { bracket: BracketData }) {
 
       {/* Conference labels */}
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5,
-                    fontSize: 7, fontWeight: 900, color: FAINT, textTransform: "uppercase",
+                    fontSize: 9, fontWeight: 900, color: FAINT, textTransform: "uppercase",
                     letterSpacing: "0.08em", fontFamily: MONO }}>
         <span>◀ Western Conference</span>
         <span>Eastern Conference ▶</span>

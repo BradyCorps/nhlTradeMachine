@@ -1852,7 +1852,7 @@ export default function ArmchairGmPage() {
                     background: "var(--ledger-card)", border: "1px solid #c8b890",
                     fontFamily: "'Courier Prime', monospace",
                   }}>
-                    <div style={{ fontSize: 7, fontWeight: 900, textTransform: "uppercase",
+                    <div style={{ fontSize: 9, fontWeight: 900, textTransform: "uppercase",
                                   letterSpacing: "0.15em", color: "var(--ledger-ink-faint)",
                                   marginBottom: 2 }}>
                       {teams[0]?.name?.split(" ").pop() ?? "Home"} Net Gain
@@ -2677,7 +2677,7 @@ function TeamDNA({
             <span><span style={{ color: 'var(--green)' }}>■</span> Exceeds template</span>
             <span><span className="text-ledger-green">· ·</span> Playoff threshold</span>
             <span><span style={{ color: 'var(--rule)' }}>— —</span> Championship standard</span>
-            <span style={{ color: 'var(--ledger-ink-faint)', fontSize: '7px' }}>Hover metric labels for explanations</span>
+            <span style={{ color: 'var(--ledger-ink-faint)', fontSize: '9px' }}>Hover metric labels for explanations</span>
           </div>
         </div>
       )}
@@ -2819,7 +2819,7 @@ function SeasonResultsPager({ simData, simResult, players = [], navMap = {} }: {
   const playerLine = (p: any, suffix = "pts") => p ? `${shortName(p.name)} ${p.projectedPts ?? p.pts}${suffix}` : '—';
   const StatCell = ({ label, val }: { label: string; val: any }) => (
     <div style={{ background: 'var(--ledger-cream)', border: '1px solid #c8b890', padding: '5px 6px', textAlign: 'center' }}>
-      <div style={{ fontSize: '8px', color: 'var(--ledger-ink-body, var(--ledger-ink))', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</div>
+      <div style={{ fontSize: '10px', color: 'var(--ledger-ink-body, var(--ledger-ink))', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</div>
       <div style={{ fontSize: '11px', fontWeight: 900, color: 'var(--ledger-ink)', marginTop: '2px' }}>{val ?? '—'}</div>
     </div>
   );
@@ -2920,9 +2920,9 @@ function SeasonResultsPager({ simData, simResult, players = [], navMap = {} }: {
                       <td className="text-[11px] py-1.5 px-1.5 text-left">
                         <span className="font-black" style={{ color: 'var(--ledger-ink)' }}>{p.name}</span>
                         {p.calderEligible && (
-                          <span className="ml-1 px-1 text-[8px] font-black" style={{ color: '#fff', background: 'var(--ledger-navy, #2c3e6b)', borderRadius: 1 }}>R</span>
+                          <span className="ml-1 px-1 text-[10px] font-black" style={{ color: '#fff', background: 'var(--ledger-navy, #2c3e6b)', borderRadius: 1 }}>R</span>
                         )}
-                        <div className="text-[8px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--ledger-ink-faint)' }}>
+                        <div className="text-[10px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--ledger-ink-faint)' }}>
                           {p.position} · {p.age ?? '—'}{archetype ? ` · ${archetype}` : ''}
                         </div>
                       </td>
@@ -3042,7 +3042,7 @@ function SeasonResultsPager({ simData, simResult, players = [], navMap = {} }: {
             );
           })()}
 
-          <div className="mt-2 text-[8px] font-mono uppercase tracking-wider leading-relaxed" style={{ color: 'var(--ledger-ink-faint)' }}>
+          <div className="mt-2 text-[10px] font-mono uppercase tracking-wider leading-relaxed" style={{ color: 'var(--ledger-ink-faint)' }}>
             ΔXP — points vs preseason pace over games played · X-NAV — net asset value · NOIV — net on-ice value impact · CAP± — fair market AAV minus cap hit
           </div>
         </details>

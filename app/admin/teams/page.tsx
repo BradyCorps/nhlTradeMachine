@@ -177,7 +177,7 @@ export default function AdminTeams() {
       <div className="admin-scroll-table">
       <div style={{ display: "grid", gridTemplateColumns: "70px 1fr 120px 90px 50px",
         gap: 8, padding: "7px 24px", borderBottom: "1px solid var(--rule)",
-        fontSize: 8, color: "var(--ledger-ink-faint)", fontWeight: 900,
+        fontSize: 10, color: "var(--ledger-ink-faint)", fontWeight: 900,
         textTransform: "uppercase", letterSpacing: "0.12em",
         position: "sticky", top: 42, background: "var(--paper)", zIndex: 10 }}>
         <div>ID</div><div>NAME</div>

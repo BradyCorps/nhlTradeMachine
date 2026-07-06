@@ -292,7 +292,7 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
           { stroke: GRAY,      dash: "2,5", label: "League avg", w: 1.0 },
         ] as const).map(({ stroke, dash, label: l, w }) => (
           <span key={l} style={{ display: "inline-flex", alignItems: "center",
-                                  gap: 3, fontSize: 7, color: stroke,
+                                  gap: 3, fontSize: 9, color: stroke,
                                   fontFamily: MONO, fontWeight: 700 }}>
             <svg width="14" height="7" style={{ flexShrink: 0 }}>
               <line x1="0" y1="3.5" x2="14" y2="3.5"

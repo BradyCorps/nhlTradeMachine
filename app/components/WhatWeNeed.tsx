@@ -84,12 +84,12 @@ export default function WhatWeNeed({ gaps, db, excludeIds, homeCapSpace = 8 }: P
                 textTransform: "uppercase", letterSpacing: "0.08em",
               }}>
                 {gap.label}
-                <span style={{ color: "var(--ledger-red)", marginLeft: 6, fontSize: 8 }}>
+                <span style={{ color: "var(--ledger-red)", marginLeft: 6, fontSize: 10 }}>
                   -{pct}%
                 </span>
               </span>
               <span style={{
-                fontSize: 7, color: "var(--ledger-ink-faint)",
+                fontSize: 9, color: "var(--ledger-ink-faint)",
                 fontFamily: "'Courier Prime', monospace",
               }}>
                 {gap.full}
@@ -97,7 +97,7 @@ export default function WhatWeNeed({ gaps, db, excludeIds, homeCapSpace = 8 }: P
             </div>
 
             <div style={{
-              fontSize: 8, color: "var(--ledger-ink-faint)",
+              fontSize: 10, color: "var(--ledger-ink-faint)",
               fontFamily: "'Courier Prime', monospace", marginBottom: 6,
             }}>
               {gap.need}
@@ -108,7 +108,7 @@ export default function WhatWeNeed({ gaps, db, excludeIds, homeCapSpace = 8 }: P
               <div style={{ borderTop: "1px solid #e0d0b0", paddingTop: 5,
                             display: "flex", flexDirection: "column", gap: 5 }}>
                 <div style={{
-                  fontSize: 7, fontWeight: 900, color: "var(--ledger-ink-faint)",
+                  fontSize: 9, fontWeight: 900, color: "var(--ledger-ink-faint)",
                   textTransform: "uppercase", letterSpacing: "0.12em",
                   fontFamily: "'Courier Prime', monospace", marginBottom: 1,
                 }}>
@@ -134,7 +134,7 @@ export default function WhatWeNeed({ gaps, db, excludeIds, homeCapSpace = 8 }: P
                         {p.name}
                       </span>
                       <span style={{
-                        fontSize: 8, color: "var(--ledger-ink-faint)",
+                        fontSize: 10, color: "var(--ledger-ink-faint)",
                         fontFamily: "'Courier Prime', monospace",
                         flexShrink: 0, marginLeft: 6,
                       }}>
@@ -148,14 +148,14 @@ export default function WhatWeNeed({ gaps, db, excludeIds, homeCapSpace = 8 }: P
                       display: "flex", alignItems: "center", gap: 5,
                     }}>
                       <span style={{
-                        fontSize: 7, color: ATTAIN_COLORS[att.label],
+                        fontSize: 9, color: ATTAIN_COLORS[att.label],
                         fontFamily: "'Courier Prime', monospace",
                         letterSpacing: "0.02em",
                       }}>
                         {ATTAIN_DOTS[att.label]}
                       </span>
                       <span style={{
-                        fontSize: 7, color: ATTAIN_COLORS[att.label],
+                        fontSize: 9, color: ATTAIN_COLORS[att.label],
                         fontFamily: "'Courier Prime', monospace",
                         fontWeight: att.label === "Available" ? 900 : 400,
                       }}>
@@ -167,7 +167,7 @@ export default function WhatWeNeed({ gaps, db, excludeIds, homeCapSpace = 8 }: P
               </div>
             ) : (
               <div style={{
-                fontSize: 8, color: "var(--ledger-ink-faint)",
+                fontSize: 10, color: "var(--ledger-ink-faint)",
                 fontFamily: "'Courier Prime', monospace",
                 borderTop: "1px solid #e0d0b0", paddingTop: 5,
                 fontStyle: "italic",

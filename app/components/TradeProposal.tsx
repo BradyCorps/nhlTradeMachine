@@ -74,7 +74,7 @@ export default function TradeProposalEngine({
     if (status !== "requested" && status !== "available") return null;
     const isReq = status === "requested";
     return (
-      <span className="ml-1.5 text-[7px] font-black uppercase tracking-wider px-1 py-0.5 align-middle"
+      <span className="ml-1.5 text-[9px] font-black uppercase tracking-wider px-1 py-0.5 align-middle"
         style={{
           background: isReq ? 'rgba(184,48,32,0.10)' : 'rgba(148,105,20,0.12)',
           border: `1px solid ${isReq ? 'rgba(184,48,32,0.4)' : 'rgba(148,105,20,0.4)'}`,
@@ -445,7 +445,7 @@ export default function TradeProposalEngine({
               return (
                 <div key={`${p.partner.id}-${slideDirection}`} className={`trade-file-card slide-${slideDirection} relative p-4 pt-5`}
                   style={{ background: '#e8dab8', border: '1px solid #b8a070', borderRadius: '2px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)' }}>
-                  <div className="absolute left-3 -top-3 px-3 py-1 text-[8px] font-black uppercase tracking-widest"
+                  <div className="absolute left-3 -top-3 px-3 py-1 text-[10px] font-black uppercase tracking-widest"
                     style={{ background: '#d8c493', border: '1px solid #b8a070', borderBottom: 0, color: '#7f6740', fontFamily: "'Courier Prime', monospace", borderRadius: '2px 2px 0 0' }}>
                     File #{String(p.marketRank ?? i + 1).padStart(2, "0")}
                   </div>
@@ -556,7 +556,7 @@ export default function TradeProposalEngine({
                     return (
                       <div className="mb-3 space-y-1.5" style={{ borderTop: '1px solid #c8b890', paddingTop: '10px' }}>
                         <div className="flex gap-1.5 items-baseline">
-                          <span className="text-[7px] font-black uppercase tracking-wider shrink-0 w-16"
+                          <span className="text-[9px] font-black uppercase tracking-wider shrink-0 w-16"
                             style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                             {homeTeam?.name.split(" ").pop()}
                           </span>
@@ -565,7 +565,7 @@ export default function TradeProposalEngine({
                           </span>
                         </div>
                         <div className="flex gap-1.5 items-baseline">
-                          <span className="text-[7px] font-black uppercase tracking-wider shrink-0 w-16"
+                          <span className="text-[9px] font-black uppercase tracking-wider shrink-0 w-16"
                             style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
                             {p.partner.name.split(" ").pop()}
                           </span>
@@ -575,7 +575,7 @@ export default function TradeProposalEngine({
                         </div>
                         {risk && (
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[7px] font-black px-1.5 py-0.5 uppercase tracking-wider"
+                            <span className="text-[9px] font-black px-1.5 py-0.5 uppercase tracking-wider"
                               style={{ background: 'rgba(184,48,32,0.10)', border: '1px solid rgba(184,48,32,0.35)', color: '#b83020', fontFamily: "'Courier Prime', monospace" }}>
                               ⚠ {risk.label}
                             </span>

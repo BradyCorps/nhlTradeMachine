@@ -178,7 +178,7 @@ function PlayerCard({
       <div className="font-black font-serif text-[15px] leading-none" style={{ color: accent }}>
         {player.jerseyNumber}
       </div>
-      <div className="font-mono text-[8px] font-black mt-0.5 leading-none" style={{ color: "var(--ledger-ink-faint)" }}>
+      <div className="font-mono text-[10px] font-black mt-0.5 leading-none" style={{ color: "var(--ledger-ink-faint)" }}>
         {player.position}
       </div>
     </>
@@ -311,7 +311,7 @@ function PegBoard({ attempts, optimal }: { attempts: AttemptRecord[]; optimal: n
                 }}
               />
               <div
-                className="text-[7px] font-mono mt-0.5 leading-none"
+                className="text-[9px] font-mono mt-0.5 leading-none"
                 style={{ color: "var(--ledger-ink-faint)", visibility: i % 5 === 0 ? "visible" : "hidden" }}
               >
                 {i}
@@ -321,7 +321,7 @@ function PegBoard({ attempts, optimal }: { attempts: AttemptRecord[]; optimal: n
         })}
       </div>
       <div
-        className="flex items-center justify-center gap-3 mt-1.5 text-[8px] font-mono uppercase tracking-wider"
+        className="flex items-center justify-center gap-3 mt-1.5 text-[10px] font-mono uppercase tracking-wider"
         style={{ color: "var(--ledger-ink-faint)" }}
       >
         <span className="flex items-center gap-1">
@@ -1050,7 +1050,7 @@ function PressBoxGame() {
                         </span>
                         {isBest && !isPerfect && (
                           <span
-                            className="text-[8px] font-black font-mono uppercase px-1 py-px"
+                            className="text-[10px] font-black font-mono uppercase px-1 py-px"
                             style={{ background: "var(--ledger-amber)", color: "#fff", borderRadius: 1 }}
                           >
                             Best
@@ -1058,7 +1058,7 @@ function PressBoxGame() {
                         )}
                         {isPerfect && (
                           <span
-                            className="text-[8px] font-black font-mono uppercase px-1 py-px"
+                            className="text-[10px] font-black font-mono uppercase px-1 py-px"
                             style={{ background: "var(--ledger-green)", color: "#fff", borderRadius: 1 }}
                           >
                             Perfect

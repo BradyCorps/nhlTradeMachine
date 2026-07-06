@@ -355,7 +355,7 @@ function BulkAddPanel({ allTeams, allPlayers, existingIds, onBulkAdd }: {
                     {pos(p.position)}
                   </span>
                   {alreadyIn && (
-                    <span style={{ fontSize: 8, color: "var(--ledger-ink-faint)",
+                    <span style={{ fontSize: 10, color: "var(--ledger-ink-faint)",
                       letterSpacing: "0.08em", marginLeft: 4 }}>
                       IN LIST
                     </span>
