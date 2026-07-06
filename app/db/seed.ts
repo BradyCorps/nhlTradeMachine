@@ -9,7 +9,22 @@ import path from "path";
 
 async function main() {
   const { db } = await import("./client");
+  const { ensureTeamTable, ensurePlayerTable, ensurePlayerColumns } = await import("./ensure-schema");
   console.log("🌱 Starting database seed...");
+
+  if (!process.env.DATABASE_URL) {
+    console.warn(
+      "⚠️  DATABASE_URL is not set — this will seed the LOCAL fallback file (local.db),\n" +
+      "    NOT your hosted Turso database. To seed production, put DATABASE_URL and\n" +
+      "    DATABASE_AUTH_TOKEN in .env (Turso dashboard → your database → credentials),\n" +
+      "    or use the admin panel's Seed button on the deployed site instead."
+    );
+  }
+
+  // Fresh databases (especially the local fallback) have no tables yet.
+  await ensureTeamTable(db);
+  await ensurePlayerTable(db);
+  await ensurePlayerColumns(db);
 
   // 1. Seed Teams
   console.log("Seeding teams...");
