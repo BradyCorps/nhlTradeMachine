@@ -83,3 +83,21 @@ describe("nhl player feed parsers", () => {
     expect(missingPaths(edgeMutated, EDGE_REQUIRED_PATHS)).toContain("zoneTimeDetails.offensiveZonePctg");
   });
 });
+
+describe("player search matching (FA identity backfill)", () => {
+  it("parses hits defensively and only accepts a unique exact-name match", async () => {
+    const { parsePlayerSearch, pickSearchMatch } = await import("../app/lib/nhl-player-feed");
+    const hits = parsePlayerSearch([
+      { playerId: "8474679", name: "Gustav Nyquist", positionCode: "C" },
+      { playerId: 9999999, name: "Gustav Forsling", positionCode: "D" },
+      { id: 1111, name: "Elias Pettersson", position: "C" },
+      { playerId: 2222, name: "Elias Pettersson", positionCode: "D" },
+      { playerId: "bad" },
+    ]);
+    expect(hits).toHaveLength(4);
+    expect(pickSearchMatch(hits, "gustav nyquist")?.playerId).toBe(8474679);
+    // two exact Petterssons → refuse to guess
+    expect(pickSearchMatch(hits, "Elias Pettersson")).toBeNull();
+    expect(pickSearchMatch(hits, "Nobody Real")).toBeNull();
+  });
+});

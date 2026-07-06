@@ -218,3 +218,35 @@ export async function mapWithConcurrency<T, R>(
   await Promise.all(workers);
   return results;
 }
+
+// ── Player search (name → NHL id) ─────────────────────────────
+// Used by the FA identity backfill: teamless free agents never appear
+// in roster snapshots, so their ids resolve via the NHL search API.
+export const PLAYER_SEARCH_URL = (q: string) =>
+  `https://search.d3.nhle.com/api/v1/search/player?culture=en-us&limit=10&q=${encodeURIComponent(q)}`;
+
+export interface PlayerSearchHit { playerId: number; name: string; positionCode: string | null }
+
+export function parsePlayerSearch(raw: unknown): PlayerSearchHit[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((r: any) => ({
+      playerId: Number(r?.playerId ?? r?.id ?? NaN),
+      name: String(r?.name ?? [r?.firstName, r?.lastName].filter(Boolean).join(" ") ?? ""),
+      positionCode: r?.positionCode ?? r?.position ?? null,
+    }))
+    .filter((h) => Number.isFinite(h.playerId) && h.playerId > 0 && h.name.length > 0);
+}
+
+/** Exactly one case-insensitive exact-name match → safe to use.
+ *  Zero or several (the two Elias Petterssons) → null, report instead. */
+export function pickSearchMatch(hits: PlayerSearchHit[], name: string): PlayerSearchHit | null {
+  const target = name.trim().toLowerCase();
+  const exact = hits.filter((h) => h.name.trim().toLowerCase() === target);
+  return exact.length === 1 ? exact[0] : null;
+}
+
+export async function searchPlayer(name: string): Promise<PlayerSearchHit[]> {
+  const raw = await fetchJson(PLAYER_SEARCH_URL(name));
+  return parsePlayerSearch(raw);
+}

@@ -72,6 +72,7 @@ export const FA_KNOWN_FACTS: Record<string, { age?: number; lastCapHit?: number 
   "Cam Talbot":         { age: 38, lastCapHit: 2.5 },
   "Matt Murray":        { age: 32, lastCapHit: 0.875 },
   "James van Riemsdyk": { age: 37, lastCapHit: 0.9 },
+  "Gustav Nyquist":     { age: 36, lastCapHit: 3.185 },
 };
 
 export const FREE_AGENT_SEED_LIST_2026: { name: string; status: SeedFaStatus }[] = [

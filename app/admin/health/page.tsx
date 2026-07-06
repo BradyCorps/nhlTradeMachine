@@ -162,6 +162,23 @@ export default function AdminHealth() {
     }
   };
 
+  const [backfilling, setBackfilling] = useState(false);
+  const runFaBackfill = async () => {
+    setBackfilling(true);
+    try {
+      const res = await fetch("/api/admin/fa-backfill", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      toast(`FA identities: ${data.updated} updated · ${data.notFound?.length ?? 0} not found · ${data.ambiguous?.length ?? 0} ambiguous${data.note ? " · run again" : ""}`, "success");
+      if ((data.ambiguous?.length ?? 0) > 0) console.log("[fa-backfill] ambiguous:", data.ambiguous);
+      if ((data.notFound?.length ?? 0) > 0) console.log("[fa-backfill] not found:", data.notFound);
+    } catch (e: any) {
+      toast(e?.message ?? "Backfill failed", "error");
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   const runSeed = async () => {
     setSeedLoading(true);
     try {
@@ -214,6 +231,10 @@ export default function AdminHealth() {
             />
             <button onClick={runFeedSync} disabled={feedSyncing} style={btnStyle}>
               {feedSyncing ? "CAPTURING…" : "CAPTURE TEAM SNAPSHOTS"}
+            </button>
+            <button onClick={runFaBackfill} disabled={backfilling} style={btnStyle}
+              title="Resolve FA-class rows with age 0 / Unknown position against the NHL search API and write real identities into the players table">
+              {backfilling ? "RESOLVING…" : "BACKFILL FA AGES"}
             </button>
           </div>
           {feedHealth && (
