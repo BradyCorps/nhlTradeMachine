@@ -2570,6 +2570,7 @@ function SeasonResultsPager({ simData, simResult, players = [], navMap = {} }: {
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState<"next" | "prev">("next");
+  const [openPlayer, setOpenPlayer] = useState<string | null>(null);
 
   const renderRecapLine = (line: string, i: number) => {
     if (line.startsWith('## ') || line.startsWith('**THE ') || line.startsWith('**EDMONTON') || line.startsWith('**AROUND') || line.startsWith('**THE YEAR') || line.startsWith('**DRAFT') || line.startsWith('**VERDICT')) {
@@ -2593,8 +2594,8 @@ function SeasonResultsPager({ simData, simResult, players = [], navMap = {} }: {
   const playerLine = (p: any, suffix = "pts") => p ? `${shortName(p.name)} ${p.projectedPts ?? p.pts}${suffix}` : '—';
   const StatCell = ({ label, val }: { label: string; val: any }) => (
     <div style={{ background: 'var(--ledger-cream)', border: '1px solid #c8b890', padding: '5px 6px', textAlign: 'center' }}>
-      <div style={{ fontSize: '6px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</div>
-      <div style={{ fontSize: '9px', fontWeight: 900, color: 'var(--ledger-ink)', marginTop: '1px' }}>{val ?? '—'}</div>
+      <div style={{ fontSize: '8px', color: 'var(--ledger-ink-body, var(--ledger-ink))', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</div>
+      <div style={{ fontSize: '11px', fontWeight: 900, color: 'var(--ledger-ink)', marginTop: '2px' }}>{val ?? '—'}</div>
     </div>
   );
   const TeamNumbers = ({ t }: { t: any }) => {
@@ -2615,7 +2616,7 @@ function SeasonResultsPager({ simData, simResult, players = [], navMap = {} }: {
         <div className="flex items-center justify-between mb-2 gap-2">
           <div>
             <div className="font-black text-[12px] text-ledger-ink font-serif">{t.teamName}</div>
-            <div className="text-[8px] uppercase tracking-widest text-ledger-ink-faint font-mono mt-0.5">
+            <div className="text-[9px] uppercase tracking-widest text-ledger-ink-faint font-mono mt-0.5">
               {t.phase ?? 'Unknown'} · #{t.leagueRank} league · #{t.divisionRank} {t.division}
             </div>
           </div>
@@ -2648,7 +2649,7 @@ function SeasonResultsPager({ simData, simResult, players = [], navMap = {} }: {
         {/* The Ledger Line — season box score joined against the valuation engine */}
         <details className="mt-2.5" open>
           <summary
-            className="cursor-pointer select-none text-[8px] font-black font-mono uppercase tracking-[0.2em] pb-1"
+            className="cursor-pointer select-none text-[10px] font-black font-mono uppercase tracking-[0.2em] pb-1"
             style={{ color: 'var(--ledger-ink-faint)' }}
           >
             Season Stats — The Ledger Line
@@ -2658,7 +2659,7 @@ function SeasonResultsPager({ simData, simResult, players = [], navMap = {} }: {
               <thead>
                 <tr style={{ borderBottom: '1px solid #b8a070' }}>
                   {["#", "Player", "GP", "G", "A", "PTS", "ΔXP", "X-NAV", "NOIV", "CAP±"].map((h, i) => (
-                    <th key={i} className="text-[7px] uppercase tracking-wider py-1 px-1"
+                    <th key={i} className="text-[9px] uppercase tracking-wider py-1 px-1.5"
                       style={{ color: 'var(--ledger-ink-faint)', textAlign: i < 2 ? 'left' : 'right', fontWeight: 900 }}>
                       {h}
                     </th>
@@ -2681,38 +2682,87 @@ function SeasonResultsPager({ simData, simResult, players = [], navMap = {} }: {
                     ? nav.fArchetype.replace(/_/g, " ")
                     : nav?.rosterTier?.replace(/_/g, " ") ?? "";
                   const posNeg = (v: number) => v > 0 ? 'var(--ledger-green)' : v < 0 ? 'var(--ledger-red)' : 'var(--ledger-ink-faint)';
+                  const rowKey = p.playerId ?? `${p.name}-${i}`;
+                  const isOpen = openPlayer === rowKey;
                   return (
-                    <tr key={p.playerId ?? `${p.name}-${i}`} style={{ borderBottom: '1px solid rgba(200,184,144,0.45)' }}>
-                      <td className="text-[8px] py-1 px-1 text-left align-top" style={{ color: 'var(--ledger-ink-faint)' }}>{i + 1}</td>
-                      <td className="text-[9px] py-1 px-1 text-left">
+                    <React.Fragment key={rowKey}>
+                    <tr
+                      style={{ borderBottom: '1px solid rgba(200,184,144,0.45)', cursor: nav ? 'pointer' : 'default', background: isOpen ? 'var(--ledger-cream)' : 'transparent' }}
+                      onClick={() => nav && setOpenPlayer(isOpen ? null : rowKey)}
+                      title={nav ? 'Tap for the valuation breakdown' : undefined}
+                    >
+                      <td className="text-[10px] py-1.5 px-1.5 text-left align-top" style={{ color: 'var(--ledger-ink-faint)' }}>{isOpen ? '▾' : i + 1}</td>
+                      <td className="text-[11px] py-1.5 px-1.5 text-left">
                         <span className="font-black" style={{ color: 'var(--ledger-ink)' }}>{p.name}</span>
                         {p.calderEligible && (
-                          <span className="ml-1 px-0.5 text-[7px] font-black" style={{ color: '#fff', background: 'var(--ledger-navy, #2c3e6b)', borderRadius: 1 }}>R</span>
+                          <span className="ml-1 px-1 text-[8px] font-black" style={{ color: '#fff', background: 'var(--ledger-navy, #2c3e6b)', borderRadius: 1 }}>R</span>
                         )}
-                        <div className="text-[6.5px] uppercase tracking-wider mt-px" style={{ color: 'var(--ledger-ink-faint)' }}>
+                        <div className="text-[8px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--ledger-ink-faint)' }}>
                           {p.position} · {p.age ?? '—'}{archetype ? ` · ${archetype}` : ''}
                         </div>
                       </td>
-                      <td className="text-[8px] py-1 px-1 text-right tabular-nums align-top" style={{ color: 'var(--ledger-ink-faint)' }}>{p.gamesPlayed}</td>
-                      <td className="text-[8px] py-1 px-1 text-right tabular-nums align-top" style={{ color: 'var(--ledger-ink)' }}>{p.projectedGoals}</td>
-                      <td className="text-[8px] py-1 px-1 text-right tabular-nums align-top" style={{ color: 'var(--ledger-ink)' }}>{p.projectedAssists}</td>
-                      <td className="text-[9px] py-1 px-1 text-right tabular-nums font-black align-top" style={{ color: 'var(--ledger-ink)' }}>{p.projectedPts}</td>
-                      <td className="text-[8px] py-1 px-1 text-right tabular-nums font-black align-top" style={{ color: dxp === null ? 'var(--ledger-ink-faint)' : posNeg(dxp) }}>
+                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums align-top" style={{ color: 'var(--ledger-ink-faint)' }}>{p.gamesPlayed}</td>
+                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums align-top" style={{ color: 'var(--ledger-ink)' }}>{p.projectedGoals}</td>
+                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums align-top" style={{ color: 'var(--ledger-ink)' }}>{p.projectedAssists}</td>
+                      <td className="text-[11px] py-1.5 px-1.5 text-right tabular-nums font-black align-top" style={{ color: 'var(--ledger-ink)' }}>{p.projectedPts}</td>
+                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums font-black align-top" style={{ color: dxp === null ? 'var(--ledger-ink-faint)' : posNeg(dxp) }}>
                         {dxp === null ? '—' : dxp > 0 ? `+${dxp}` : dxp}
                         {p.breakoutTag === 'BREAKOUT' && <span title="Breakout season"> ▲</span>}
                         {p.breakoutTag === 'VETERAN_HOLD' && <span title="Held off decline"> ▲</span>}
                         {p.breakoutTag === 'REGRESSION' && <span title="Down year"> ▼</span>}
                       </td>
-                      <td className="text-[9px] py-1 px-1 text-right tabular-nums font-black align-top" style={{ color: 'var(--ledger-ink)' }}>
+                      <td className="text-[11px] py-1.5 px-1.5 text-right tabular-nums font-black align-top" style={{ color: 'var(--ledger-ink)' }}>
                         {nav ? nav.total : '—'}
                       </td>
-                      <td className="text-[8px] py-1 px-1 text-right tabular-nums align-top" style={{ color: nav?.noivImpact != null ? posNeg(nav.noivImpact) : 'var(--ledger-ink-faint)' }}>
+                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums align-top" style={{ color: nav?.noivImpact != null ? posNeg(nav.noivImpact) : 'var(--ledger-ink-faint)' }}>
                         {nav?.noivImpact != null ? (nav.noivImpact > 0 ? `+${nav.noivImpact}` : nav.noivImpact) : '—'}
                       </td>
-                      <td className="text-[8px] py-1 px-1 text-right tabular-nums align-top" style={{ color: capSurplus === null ? 'var(--ledger-ink-faint)' : posNeg(capSurplus) }}>
+                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums align-top" style={{ color: capSurplus === null ? 'var(--ledger-ink-faint)' : posNeg(capSurplus) }}>
                         {capSurplus === null ? '—' : `${capSurplus > 0 ? '+' : ''}${capSurplus.toFixed(1)}M`}
                       </td>
                     </tr>
+                    {isOpen && nav && (
+                      <tr style={{ borderBottom: '1px solid #b8a070', background: 'var(--ledger-cream)' }}>
+                        <td colSpan={10} className="py-2 px-3">
+                          {/* Valuation breakdown — the components behind the X-NAV number */}
+                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-2">
+                            {([
+                              ['Offense', nav.off, 250],
+                              ['Defense', nav.def, 80],
+                              ['Age Curve', nav.age, 40],
+                              ['Contract', nav.cap, 80],
+                              ['Upside', nav.upside, 40],
+                            ] as [string, number, number][]).map(([label, val, scale]) => (
+                              <div key={label}>
+                                <div className="flex items-baseline justify-between">
+                                  <span className="text-[9px] font-black font-mono uppercase tracking-wider" style={{ color: 'var(--ledger-ink)' }}>{label}</span>
+                                  <span className="text-[10px] font-black font-mono tabular-nums" style={{ color: posNeg(val) }}>
+                                    {val > 0 ? `+${val}` : val}
+                                  </span>
+                                </div>
+                                <div className="mt-1 h-1.5 w-full" style={{ background: 'rgba(200,184,144,0.5)', borderRadius: 1 }}>
+                                  <div
+                                    className="h-1.5"
+                                    style={{
+                                      width: `${Math.min(100, Math.abs(val) / scale * 100)}%`,
+                                      background: val >= 0 ? 'var(--ledger-green)' : 'var(--ledger-red)',
+                                      borderRadius: 1,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[9px] font-mono" style={{ color: 'var(--ledger-ink-body, var(--ledger-ink))' }}>
+                            <span>FMV <strong>${nav.fmvAav?.toFixed(1) ?? '—'}M</strong></span>
+                            {roster && <span>Cap Hit <strong>${roster.capHit.toFixed(1)}M × {roster.yearsRemaining}yr</strong></span>}
+                            {nav.rosterTier && <span>Tier <strong>{nav.rosterTier.replace(/_/g, ' ')}</strong></span>}
+                            {expected !== null && <span>Expected <strong>{expected} pts</strong> → Actual <strong>{p.projectedPts}</strong></span>}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -2732,7 +2782,7 @@ function SeasonResultsPager({ simData, simResult, players = [], navMap = {} }: {
                   <thead>
                     <tr style={{ borderBottom: '1px solid #b8a070' }}>
                       {["Goaltender", "GS", "GAA", "SV%", "GSAX", "X-NAV", "CAP±"].map((h, i) => (
-                        <th key={i} className="text-[7px] uppercase tracking-wider py-1 px-1"
+                        <th key={i} className="text-[9px] uppercase tracking-wider py-1 px-1.5"
                           style={{ color: 'var(--ledger-ink-faint)', textAlign: i === 0 ? 'left' : 'right', fontWeight: 900 }}>
                           {h}
                         </th>
@@ -2741,15 +2791,15 @@ function SeasonResultsPager({ simData, simResult, players = [], navMap = {} }: {
                   </thead>
                   <tbody>
                     <tr>
-                      <td className="text-[9px] py-1 px-1 text-left font-black" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.name}</td>
-                      <td className="text-[8px] py-1 px-1 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.gamesStarted ?? '—'}</td>
-                      <td className="text-[8px] py-1 px-1 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.projectedGAA ?? '—'}</td>
-                      <td className="text-[8px] py-1 px-1 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.projectedSVP?.toFixed(3) ?? '—'}</td>
-                      <td className="text-[8px] py-1 px-1 text-right tabular-nums font-black" style={{ color: (t.goalie.gsax ?? 0) >= 0 ? 'var(--ledger-green)' : 'var(--ledger-red)' }}>
+                      <td className="text-[11px] py-1.5 px-1.5 text-left font-black" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.name}</td>
+                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.gamesStarted ?? '—'}</td>
+                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.projectedGAA ?? '—'}</td>
+                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.projectedSVP?.toFixed(3) ?? '—'}</td>
+                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums font-black" style={{ color: (t.goalie.gsax ?? 0) >= 0 ? 'var(--ledger-green)' : 'var(--ledger-red)' }}>
                         {t.goalie.gsax != null ? `${t.goalie.gsax > 0 ? '+' : ''}${t.goalie.gsax.toFixed(2)}` : '—'}
                       </td>
-                      <td className="text-[9px] py-1 px-1 text-right tabular-nums font-black" style={{ color: 'var(--ledger-ink)' }}>{gNav ? gNav.total : '—'}</td>
-                      <td className="text-[8px] py-1 px-1 text-right tabular-nums" style={{ color: gCapSurplus === null ? 'var(--ledger-ink-faint)' : gCapSurplus > 0 ? 'var(--ledger-green)' : 'var(--ledger-red)' }}>
+                      <td className="text-[11px] py-1.5 px-1.5 text-right tabular-nums font-black" style={{ color: 'var(--ledger-ink)' }}>{gNav ? gNav.total : '—'}</td>
+                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums" style={{ color: gCapSurplus === null ? 'var(--ledger-ink-faint)' : gCapSurplus > 0 ? 'var(--ledger-green)' : 'var(--ledger-red)' }}>
                         {gCapSurplus === null ? '—' : `${gCapSurplus > 0 ? '+' : ''}${gCapSurplus.toFixed(1)}M`}
                       </td>
                     </tr>
@@ -2759,7 +2809,7 @@ function SeasonResultsPager({ simData, simResult, players = [], navMap = {} }: {
             );
           })()}
 
-          <div className="mt-1.5 text-[6.5px] font-mono uppercase tracking-wider leading-relaxed" style={{ color: 'var(--ledger-ink-faint)' }}>
+          <div className="mt-2 text-[8px] font-mono uppercase tracking-wider leading-relaxed" style={{ color: 'var(--ledger-ink-faint)' }}>
             ΔXP — points vs preseason pace over games played · X-NAV — net asset value · NOIV — net on-ice value impact · CAP± — fair market AAV minus cap hit
           </div>
         </details>

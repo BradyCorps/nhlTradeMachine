@@ -6,7 +6,7 @@
 // Forwards swap within forwards (C/W flex like real lineups), D within D,
 // G within G. Reset restores the ice-time-sorted default.
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 
 interface Player {
   id: string;
@@ -70,17 +70,23 @@ const isG = (p: Player) => p.position === "G";
 type Group = "F" | "D" | "G";
 const SLOT_COUNT: Record<Group, number> = { F: 12, D: 6, G: 2 };
 
-// Default ordering: centers fill the C column (idx 1,4,7,10), wingers the
+// Ordering engine: centers fill the C column (idx 1,4,7,10), wingers the
 // wings — flattened to a single array so swaps are simple index exchanges.
-function defaultOrder(effective: Player[], group: Group): string[] {
-  if (group === "D") return sortByIce(effective.filter(isD)).map(p => p.id);
-  if (group === "G") return sortByGames(effective.filter(isG)).map(p => p.id);
+// The ranker decides who plays up: ice time by default, NAV for Best Lines.
+function buildOrder(
+  effective: Player[],
+  group: Group,
+  rankSort: (ps: Player[]) => Player[],
+  goalieSort: (ps: Player[]) => Player[] = sortByGames,
+): string[] {
+  if (group === "D") return rankSort(effective.filter(isD)).map(p => p.id);
+  if (group === "G") return goalieSort(effective.filter(isG)).map(p => p.id);
 
-  const centers   = sortByIce(effective.filter(isC));
-  const wingers   = sortByIce(effective.filter(p => isW(p) && !isC(p)));
+  const centers   = rankSort(effective.filter(isC));
+  const wingers   = rankSort(effective.filter(p => isW(p) && !isC(p)));
   const topC      = centers.slice(0, 4);
   const flexC     = centers.slice(4);
-  const wingPool  = sortByIce([...wingers, ...flexC]);
+  const wingPool  = rankSort([...wingers, ...flexC]);
 
   const order: (string | null)[] = new Array(12).fill(null);
   topC.forEach((p, i) => { order[i * 3 + 1] = p.id; });     // C column
@@ -91,6 +97,10 @@ function defaultOrder(effective: Player[], group: Group): string[] {
   const placed = new Set(order.filter(Boolean) as string[]);
   const bench  = effective.filter(p => isF(p) && !placed.has(p.id)).map(p => p.id);
   return [...(order.filter(Boolean) as string[]), ...bench];
+}
+
+function defaultOrder(effective: Player[], group: Group): string[] {
+  return buildOrder(effective, group, sortByIce);
 }
 
 const STATUS_COLOR = {
@@ -139,14 +149,31 @@ function TeamLineup({
   const [orders, setOrders] = useState<Record<Group, string[]>>({ F: [], D: [], G: [] });
   const [edited, setEdited] = useState(false);
   const [selected, setSelected] = useState<{ group: Group; idx: number } | null>(null);
+  const editedRef = useRef(false);
+  useEffect(() => { editedRef.current = edited; }, [edited]);
 
   useEffect(() => {
-    setOrders({
-      F: defaultOrder(effective, "F"),
-      D: defaultOrder(effective, "D"),
-      G: defaultOrder(effective, "G"),
+    setOrders(prev => {
+      const hadOrders = prev.F.length + prev.D.length + prev.G.length > 0;
+      // Hand-set lineups are locked through trades: keep the user's order,
+      // drop departed players, slot arrivals onto the bench/end instead of
+      // resetting the whole sheet.
+      if (hadOrders && editedRef.current) {
+        const ids = new Set(effective.map(p => p.id));
+        const merge = (arr: string[], belongs: (p: Player) => boolean) => {
+          const kept = arr.filter(id => ids.has(id));
+          const present = new Set(kept);
+          const adds = effective.filter(p => belongs(p) && !present.has(p.id)).map(p => p.id);
+          return [...kept, ...adds];
+        };
+        return { F: merge(prev.F, isF), D: merge(prev.D, isD), G: merge(prev.G, isG) };
+      }
+      return {
+        F: defaultOrder(effective, "F"),
+        D: defaultOrder(effective, "D"),
+        G: defaultOrder(effective, "G"),
+      };
     });
-    setEdited(false);
     setSelected(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rosterKey]);
@@ -177,6 +204,25 @@ function TeamLineup({
     setEdited(false);
     setSelected(null);
   }, [effective]);
+
+  // Best Lines: order every unit by X-NAV (falling back to scoring pace)
+  // so the strongest possible lineup is one click. Counts as an edit so
+  // it locks through subsequent trades.
+  const bestLines = useCallback(() => {
+    const byNav = (ps: Player[]) =>
+      [...ps].sort((a, b) =>
+        (navMap?.[b.id]?.total ?? b.ptsPace ?? 0) - (navMap?.[a.id]?.total ?? a.ptsPace ?? 0));
+    const goalieByNav = (ps: Player[]) =>
+      [...ps].sort((a, b) =>
+        (navMap?.[b.id]?.total ?? b.games ?? 0) - (navMap?.[a.id]?.total ?? a.games ?? 0));
+    setOrders({
+      F: buildOrder(effective, "F", byNav),
+      D: buildOrder(effective, "D", byNav),
+      G: buildOrder(effective, "G", byNav, goalieByNav),
+    });
+    setEdited(true);
+    setSelected(null);
+  }, [effective, navMap]);
 
   const clickSlot = useCallback((group: Group, idx: number) => {
     setSelected(prev => {
@@ -304,15 +350,24 @@ function TeamLineup({
           {teamName}
           {label && <span style={{ color: "var(--ledger-ink-faint)", fontWeight: 400 }}> — {label}</span>}
         </div>
-        {edited && (
-          <button onClick={reset} style={{
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={bestLines} title="Order every unit by X-NAV" style={{
             fontFamily: MONO, fontSize: 11, fontWeight: 900, letterSpacing: 0,
-            color: "#b83020", background: "none", border: "1px solid #b83020",
+            color: "#2a5a8f", background: "none", border: "1px solid #2a5a8f",
             padding: "1px 6px", cursor: "pointer", textTransform: "uppercase",
           }}>
-            Reset
+            Best Lines
           </button>
-        )}
+          {edited && (
+            <button onClick={reset} style={{
+              fontFamily: MONO, fontSize: 11, fontWeight: 900, letterSpacing: 0,
+              color: "#b83020", background: "none", border: "1px solid #b83020",
+              padding: "1px 6px", cursor: "pointer", textTransform: "uppercase",
+            }}>
+              Reset
+            </button>
+          )}
+        </div>
       </div>
 
       <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
