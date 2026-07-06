@@ -35,6 +35,7 @@ export interface Asset {
   prospectPtsPace?: number | null; // NHLe-translated junior scoring pace
   developmentProfile?: DevelopmentProfile | null; // diagnostic future-value layer; not blended into X-NAV
   xgRelTM?: number | null;
+  hdFinishingDelta?: number | null; // EDGE high-danger finishing vs league — luck signal from nhl_snapshots
   xgaRelTM?: number | null;
   dzPct?: number | null;
   goalsPace?: number;

@@ -26,6 +26,7 @@ export interface RolloverPlayer {
   prospectPtsPace?: number | null;
   xGPace?: number | null;      // luck signal: expected-goals pace
   goalsPace?: number;          // luck signal: actual goals pace
+  hdFinishingDelta?: number | null; // EDGE high-danger finishing vs league (preferred luck signal)
   expiryStatus?: string | null;   // "UFA" | "RFA" | null (Asset keeps this loose)
 }
 
@@ -74,7 +75,7 @@ export function retirementChance(p: Pick<RolloverPlayer, "age" | "position" | "p
 
 // ── Breakout / regression odds ────────────────────────────────
 export function breakoutOdds(
-  p: Pick<RolloverPlayer, "age" | "xGPace" | "goalsPace">,
+  p: Pick<RolloverPlayer, "age" | "xGPace" | "goalsPace" | "hdFinishingDelta">,
   changedScenery: boolean,
 ): { breakout: number; regression: number } {
   let breakout = 0.08;
@@ -82,13 +83,19 @@ export function breakoutOdds(
   if (p.age <= 23) { breakout = 0.16; regression = 0.06; }
   else if (p.age >= 30) { breakout = 0.04; regression = 0.16; }
 
-  // Luck signal: finishing far below expected goals is positive-
-  // regression fuel; far above is unsustainable shooting percentage.
-  const xg = p.xGPace ?? 0;
-  const goals = p.goalsPace ?? 0;
-  if (xg > 5 && goals > 0) {
-    if (goals < xg * 0.85) breakout += 0.06;
-    else if (goals > xg * 1.25) regression += 0.08;
+  // Luck signal, best source first: NHL EDGE high-danger finishing vs
+  // league (true shot-quality-adjusted luck from nhl_snapshots), falling
+  // back to the coarser xG-vs-goals heuristic when no snapshot exists.
+  if (p.hdFinishingDelta != null) {
+    if (p.hdFinishingDelta <= -0.02) breakout += 0.08;       // unlucky on quality chances
+    else if (p.hdFinishingDelta >= 0.03) regression += 0.08; // running hot
+  } else {
+    const xg = p.xGPace ?? 0;
+    const goals = p.goalsPace ?? 0;
+    if (xg > 5 && goals > 0) {
+      if (goals < xg * 0.85) breakout += 0.06;
+      else if (goals > xg * 1.25) regression += 0.08;
+    }
   }
 
   if (changedScenery) breakout *= 2;

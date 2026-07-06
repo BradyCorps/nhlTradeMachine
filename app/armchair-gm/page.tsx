@@ -2825,6 +2825,14 @@ function SeasonResultsPager({ simData, simResult, players = [], navMap = {} }: {
                             {roster && <span>Cap Hit <strong>${roster.capHit.toFixed(1)}M × {roster.yearsRemaining}yr</strong></span>}
                             {nav.rosterTier && <span>Tier <strong>{nav.rosterTier.replace(/_/g, ' ')}</strong></span>}
                             {expected !== null && <span>Expected <strong>{expected} pts</strong> → Actual <strong>{p.projectedPts}</strong></span>}
+                            {roster?.hdFinishingDelta != null && (
+                              <span title="NHL EDGE: high-danger finishing vs league average — negative means unlucky on quality chances (breakout fuel)">
+                                HD Finish{' '}
+                                <strong style={{ color: roster.hdFinishingDelta <= -0.02 ? 'var(--ledger-green)' : roster.hdFinishingDelta >= 0.03 ? 'var(--ledger-red)' : 'inherit' }}>
+                                  {roster.hdFinishingDelta > 0 ? '+' : ''}{(roster.hdFinishingDelta * 100).toFixed(1)}%
+                                </strong>{' '}vs league
+                              </span>
+                            )}
                           </div>
                         </td>
                       </tr>

@@ -13,6 +13,7 @@ import {
   removePlayerFromOtherRosters,
   safeNhlRosterPlayer,
 } from "@/app/lib/player-identity";
+import { latestEdgeLuckMap } from "@/app/lib/nhl-feed-capture";
 import { listPublishedTrades, type TradeRecord } from "@/app/lib/trades";
 import {
   buildDevelopmentInputFromNhlTimeline,
@@ -1024,6 +1025,9 @@ export async function assembleCanonicalRoster(options: {
   }
 
   // ── Trade block statuses (admin-managed, keyed by name) ──────
+  // ── EDGE luck signal (latest nhl_snapshots per player) ────────
+  const edgeLuck = await latestEdgeLuckMap(Number(SEASON.nhleSeasonId)).catch(() => new Map<string, number>());
+
   // Position-suffixed keys win so same-name players (two Elias
   // Petterssons) never share a block status; plain-name keys remain for
   // legacy rows without a stored position.
@@ -1304,6 +1308,7 @@ export async function assembleCanonicalRoster(options: {
         draftOverall:     draftOverall    ?? null,
         prospectPtsPace:  prospectPtsPace ?? null,
         developmentProfile,
+        hdFinishingDelta: edgeLuck.get(String(p.id)) ?? null,
         tradeBlockStatus: (blockMap.get(`${p.name}__${p.position}`) ?? blockMap.get(p.name))?.status ?? null,
         tradeBlockNote:   (blockMap.get(`${p.name}__${p.position}`) ?? blockMap.get(p.name))?.note   ?? null,
         expiryStatus:     rawExpiryStatus,

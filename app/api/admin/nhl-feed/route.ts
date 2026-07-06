@@ -7,13 +7,13 @@ import { SEASON } from "@/app/lib/season-config";
 import {
   fetchPlayerLanding,
   fetchEdgeDetail,
-  mapWithConcurrency,
   missingPaths,
   LANDING_REQUIRED_PATHS,
   EDGE_REQUIRED_PATHS,
   LANDING_URL,
   EDGE_URL,
 } from "@/app/lib/nhl-player-feed";
+import { capturePlayerSnapshots, rosterPlayerIds } from "@/app/lib/nhl-feed-capture";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -68,88 +68,18 @@ export async function GET(req: Request) {
 
 // POST /api/admin/nhl-feed — capture snapshots into the historical feed.
 // Body: { team?: "EDM" } to sync one team's current roster, or
-//       { ids?: number[] } for explicit NHL player ids (max 40/call so a
-//       sync stays inside one serverless invocation).
+//       { ids?: number[] } for explicit NHL player ids.
 export async function POST(req: Request) {
   const unauthorized = await requireAdmin(req);
   if (unauthorized) return unauthorized;
 
   const body = await req.json().catch(() => ({})) as { team?: string; ids?: number[] };
-  await ensureNhlSnapshotTable();
-
   let ids: number[] = Array.isArray(body.ids) ? body.ids.filter((n) => Number.isFinite(n)) : [];
-  if (ids.length === 0 && body.team) {
-    try {
-      const res = await fetch(`https://api-web.nhle.com/v1/roster/${body.team.toUpperCase()}/current`, {
-        cache: "no-store",
-        headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" },
-      });
-      if (res.ok) {
-        const roster = await res.json();
-        ids = [...(roster.forwards ?? []), ...(roster.defensemen ?? []), ...(roster.goalies ?? [])]
-          .map((p: { id?: number }) => p.id)
-          .filter((n: unknown): n is number => Number.isFinite(n));
-      }
-    } catch { /* roster unreachable */ }
-  }
-  ids = ids.slice(0, 40);
+  if (ids.length === 0 && body.team) ids = await rosterPlayerIds(body.team);
   if (ids.length === 0) {
     return NextResponse.json({ error: "Provide { team } or { ids } — no players resolved." }, { status: 400 });
   }
 
-  const day = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const season = seasonId();
-  let landingStored = 0;
-  let edgeStored = 0;
-  const failures: number[] = [];
-
-  await mapWithConcurrency(ids, 5, async (playerId) => {
-    const [landing, edge] = await Promise.all([
-      fetchPlayerLanding(playerId),
-      fetchEdgeDetail(playerId, season),
-    ]);
-    if (landing.facts && landing.raw) {
-      await db.insert(nhlSnapshots).values({
-        id: `${playerId}-${season}-landing-${day}`,
-        playerId,
-        name: landing.facts.name,
-        season,
-        source: "landing",
-        capturedAt: Date.now(),
-        gamesPlayed: landing.facts.gamesPlayed,
-        goals: landing.facts.goals,
-        assists: landing.facts.assists,
-        points: landing.facts.points,
-        shootingPctg: landing.facts.shootingPctg,
-        payload: JSON.stringify(landing.raw),
-      }).onConflictDoNothing().then(() => { landingStored++; }).catch(() => {});
-    }
-    if (edge.facts && edge.raw) {
-      await db.insert(nhlSnapshots).values({
-        id: `${playerId}-${season}-edge-${day}`,
-        playerId,
-        name: landing.facts?.name ?? null,
-        season,
-        source: "edge",
-        capturedAt: Date.now(),
-        gamesPlayed: edge.facts.gamesPlayed,
-        ozPct: edge.facts.ozPct,
-        hdShots: edge.facts.hdShots,
-        hdShootingPct: edge.facts.hdShootingPct,
-        hdFinishingDelta: edge.facts.hdFinishingDelta,
-        payload: JSON.stringify(edge.raw),
-      }).onConflictDoNothing().then(() => { edgeStored++; }).catch(() => {});
-    }
-    if (!landing.facts && !edge.facts) failures.push(playerId);
-  });
-
-  return NextResponse.json({
-    ok: true,
-    requested: ids.length,
-    landingStored,
-    edgeStored,
-    failures,
-    day,
-    season,
-  });
+  const result = await capturePlayerSnapshots(ids.slice(0, 40), seasonId());
+  return NextResponse.json({ ok: true, season: seasonId(), ...result });
 }

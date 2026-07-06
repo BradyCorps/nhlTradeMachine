@@ -127,6 +127,41 @@ export default function AdminHealth() {
     }
   };
 
+  const [feedHealth, setFeedHealth] = useState<any | null>(null);
+  const [feedLoading, setFeedLoading] = useState(false);
+  const [feedSyncing, setFeedSyncing] = useState(false);
+  const [feedTeam, setFeedTeam] = useState("EDM");
+
+  const runFeedCheck = async () => {
+    setFeedLoading(true);
+    try {
+      const res = await fetch("/api/admin/nhl-feed");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setFeedHealth(await res.json());
+    } catch (e: any) {
+      toast(e?.message ?? "Feed check failed", "error");
+    } finally {
+      setFeedLoading(false);
+    }
+  };
+
+  const runFeedSync = async () => {
+    setFeedSyncing(true);
+    try {
+      const res = await fetch("/api/admin/nhl-feed", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ team: feedTeam.trim().toUpperCase() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      toast(`Captured ${feedTeam.toUpperCase()}: ${data.landingStored} landing + ${data.edgeStored} edge snapshots (${data.failures?.length ?? 0} failures)`, "success");
+    } catch (e: any) {
+      toast(e?.message ?? "Feed sync failed", "error");
+    } finally {
+      setFeedSyncing(false);
+    }
+  };
+
   const runSeed = async () => {
     setSeedLoading(true);
     try {
@@ -154,6 +189,57 @@ export default function AdminHealth() {
       </div>
 
       <div style={{ maxWidth: 700, padding: "32px 24px", display: "flex", flexDirection: "column", gap: 20 }}>
+
+        {/* NHL Feed (landing + EDGE) */}
+        <div style={sectionStyle}>
+          <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.2em", marginBottom: 4 }}>
+            NHL FEED — LANDING + EDGE
+          </div>
+          <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)", letterSpacing: "0.08em", marginBottom: 16, lineHeight: 1.6 }}>
+            First-party api-web.nhle.com pipeline. The check probes a canary player on both endpoints and lists any required field the NHL removed (v1 → v2 drift). Capture stores daily snapshots into nhl_snapshots; the nightly cron rotates 4 teams per run.
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <button onClick={runFeedCheck} disabled={feedLoading} style={btnStyle}>
+              {feedLoading ? "PROBING…" : "CHECK FEED HEALTH"}
+            </button>
+            <input
+              value={feedTeam}
+              onChange={(e) => setFeedTeam(e.target.value)}
+              maxLength={3}
+              style={{
+                width: 56, padding: "6px 8px", fontFamily: "inherit", fontSize: 11, fontWeight: 900,
+                textTransform: "uppercase", background: "var(--paper)", color: "var(--ledger-ink)",
+                border: "1px solid var(--rule)",
+              }}
+            />
+            <button onClick={runFeedSync} disabled={feedSyncing} style={btnStyle}>
+              {feedSyncing ? "CAPTURING…" : "CAPTURE TEAM SNAPSHOTS"}
+            </button>
+          </div>
+          {feedHealth && (
+            <div style={{ marginTop: 14, fontSize: 10, lineHeight: 1.9 }}>
+              {(["landing", "edge"] as const).map((k) => {
+                const src = feedHealth[k];
+                const ok = src?.ok;
+                return (
+                  <div key={k}>
+                    <span style={{ fontWeight: 900, color: ok ? "var(--ledger-green)" : "var(--ledger-red)" }}>
+                      {ok ? "● OK" : "● FAIL"}
+                    </span>{" "}
+                    <span style={{ fontWeight: 900 }}>{k.toUpperCase()}</span>{" "}
+                    <span style={{ color: "var(--ledger-ink-faint)" }}>
+                      {src?.reachable ? "reachable" : "unreachable"}
+                      {src?.missingFields?.length > 0 && ` — missing: ${src.missingFields.join(", ")}`}
+                    </span>
+                  </div>
+                );
+              })}
+              <div style={{ color: "var(--ledger-ink-faint)" }}>
+                Snapshots stored: <strong style={{ color: "var(--ledger-ink)" }}>{feedHealth.snapshotCount ?? "—"}</strong> · Season {feedHealth.season}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Health Check */}
         <div style={sectionStyle}>

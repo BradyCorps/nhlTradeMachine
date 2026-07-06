@@ -65,6 +65,17 @@ describe("breakoutOdds", () => {
     expect(hot.regression).toBeGreaterThan(neutral.regression);
   });
 
+  it("prefers the EDGE high-danger finishing delta over the xG heuristic", () => {
+    // Unlucky by EDGE but hot by xG: EDGE wins — breakout boosted, not regression
+    const edgeUnlucky = breakoutOdds({ age: 26, hdFinishingDelta: -0.04, xGPace: 20, goalsPace: 28 }, false);
+    const xgOnlyHot = breakoutOdds({ age: 26, xGPace: 20, goalsPace: 28 }, false);
+    expect(edgeUnlucky.breakout).toBeGreaterThan(xgOnlyHot.breakout);
+    expect(edgeUnlucky.regression).toBeLessThan(xgOnlyHot.regression);
+    // Running hot by EDGE → regression boosted
+    const edgeHot = breakoutOdds({ age: 26, hdFinishingDelta: 0.05 }, false);
+    expect(edgeHot.regression).toBeGreaterThan(breakoutOdds({ age: 26 }, false).regression);
+  });
+
   it("doubles breakout odds on a change of scenery", () => {
     const stay = breakoutOdds({ age: 26 }, false);
     const moved = breakoutOdds({ age: 26 }, true);
