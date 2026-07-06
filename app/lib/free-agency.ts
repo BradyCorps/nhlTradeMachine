@@ -157,7 +157,14 @@ export function projectFreeAgentContract(asset: Asset, ctx: ProjectContext = {})
       + Math.max(0, pace - FA.fwdTopPace) * FA.fwdTopBump
       + Math.max(0, pace - FA.fwdStarPace) * FA.fwdStarBump;
   } else {
-    baseAav = FA.capMin;
+    // Unknown position (data gap): a producing skater still prices off
+    // his pace via the forward curve rather than collapsing to league min.
+    const pace = paidForPace(asset, age);
+    baseAav = pace > 0
+      ? pace * FA.fwdPerPt
+        + Math.max(0, pace - FA.fwdTopPace) * FA.fwdTopBump
+        + Math.max(0, pace - FA.fwdStarPace) * FA.fwdStarBump
+      : FA.capMin;
   }
 
   // Backup goalies (few starts) are paid well below a starter's base.

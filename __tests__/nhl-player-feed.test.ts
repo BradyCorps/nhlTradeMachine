@@ -66,11 +66,17 @@ describe("nhl player feed parsers", () => {
     expect(f.speedMaxMph).toBeCloseTo(24.6, 1);
   });
 
-  it("flags upstream drift instead of parsing a changed shape", () => {
-    const mutated = { ...landingFixture, featuredStats: { season: 20252026 } };
-    expect(parseLanding(mutated)).toBeNull();
-    const missing = missingPaths(mutated, LANDING_REQUIRED_PATHS);
+  it("flags upstream drift while parsing stat-less rookies with zeros", () => {
+    // No current-season stat line (rookie / zero GP): still parses, zeroed
+    const statless = { ...landingFixture, featuredStats: { season: 20252026 } };
+    const parsed = parseLanding(statless)!;
+    expect(parsed.points).toBe(0);
+    expect(parsed.name).toBe("Connor McDavid");
+    // …but the health-check canary still reports the drift precisely
+    const missing = missingPaths(statless, LANDING_REQUIRED_PATHS);
     expect(missing).toContain("featuredStats.regularSeason.subSeason.points");
+    // Identity loss is a hard parse failure
+    expect(parseLanding({ featuredStats: landingFixture.featuredStats })).toBeNull();
 
     const edgeMutated = { ...edgeFixture, zoneTimeDetails: undefined };
     expect(parseEdge(edgeMutated, 20252026)).toBeNull();

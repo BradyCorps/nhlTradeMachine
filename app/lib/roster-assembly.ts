@@ -1352,10 +1352,23 @@ export async function assembleCanonicalRoster(options: {
       if (existingSlugs.has(dSlug)) continue;
       const fin = CONTRACTS[d.name] ?? null;
       const lastCap = fin?.capHit ?? d.capHit ?? 0;
-      const pos = normalisePos(d.position) || "C";
       const slug = slugify(d.name);
       const stats = analyticsMap.get(slug) ?? NHL_SKATER_STATS.get(slug) ?? null;
       const nhlG = NHL_GOALIE_STATS.get(slug);
+      // Seed rows carry position "Unknown" (truthy — the old || "C" never
+      // fired), which cratered FA pricing to league-min for real veterans.
+      // Infer: goalie stats → G; heavy minutes with modest scoring → D;
+      // any skater stats → W; else C.
+      const rawPos = normalisePos(d.position);
+      const pos = ["C", "W", "D", "G"].includes(rawPos)
+        ? rawPos
+        : nhlG
+          ? "G"
+          : stats && (stats.avgTOI ?? 0) >= 19 && (stats.ptsPace ?? 0) < 35
+            ? "D"
+            : stats
+              ? "W"
+              : "C";
       const isGoalie = pos === "G";
       const ptsPace = stats?.ptsPace ?? 0;
       const avgTOI = stats?.avgTOI ?? 0;

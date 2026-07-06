@@ -118,11 +118,16 @@ const toiToMinutes = (toi: unknown): number | null => {
   return Math.round((m + s / 60) * 10) / 10;
 };
 
+// Identity is mandatory; the current-season stat line is not — rookies
+// and no-GP players have no featuredStats.regularSeason yet, and they
+// should still snapshot (with zeros) instead of counting as failures.
+const LANDING_CORE_PATHS = ["playerId", "position", "birthDate"] as const;
+
 export function parseLanding(raw: unknown): LandingFacts | null {
-  if (missingPaths(raw, LANDING_REQUIRED_PATHS).length > 0) return null;
+  if (missingPaths(raw, LANDING_CORE_PATHS).length > 0) return null;
   const r = raw as any;
-  const sub = r.featuredStats.regularSeason.subSeason;
-  const career = r.careerTotals?.regularSeason ?? r.featuredStats.regularSeason.career ?? {};
+  const sub = r.featuredStats?.regularSeason?.subSeason ?? {};
+  const career = r.careerTotals?.regularSeason ?? r.featuredStats?.regularSeason?.career ?? {};
   const nhlSeasons = new Set(
     (Array.isArray(r.seasonTotals) ? r.seasonTotals : [])
       .filter((s: any) => s?.leagueAbbrev === "NHL" && s?.gameTypeId === 2)
@@ -138,7 +143,7 @@ export function parseLanding(raw: unknown): LandingFacts | null {
     birthCountry: r.birthCountry ?? null,
     draftYear: r.draftDetails?.year ?? null,
     draftOverall: r.draftDetails?.overallPick ?? null,
-    season: Number(r.featuredStats.season),
+    season: Number(r.featuredStats?.season ?? 0),
     gamesPlayed: Number(sub.gamesPlayed ?? 0),
     goals: Number(sub.goals ?? 0),
     assists: Number(sub.assists ?? 0),
