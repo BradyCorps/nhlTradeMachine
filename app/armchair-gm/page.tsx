@@ -38,6 +38,20 @@ import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import TradeBlockPanel from "@/app/components/TradeBlockPanel";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 import { useSimDispatch } from "./useSimDispatch";
+import CupRunPanel from "@/app/components/CupRunPanel";
+import {
+  startCupRun,
+  recordSeason,
+  rollLeagueForward,
+  rollRetentionLedger,
+  retentionCheck,
+  addRetention,
+  seasonLabelForYear,
+  type CupRunState,
+} from "@/app/lib/cup-run";
+import { toast } from "@/app/lib/ledger-toast";
+
+const CUP_RUN_STORAGE_KEY = "cup-run-state-v1";
 
 const TradeProposalEngine = lazy(() => import("@/app/components/TradeProposal"));
 const PlayerComparison    = lazy(() => import("@/app/components/PlayerComparison"));
@@ -196,6 +210,28 @@ export default function ArmchairGmPage() {
   const [rfaMarket, setRfaMarket] = useState<OffseasonPending[]>([]);
   const offseasonResolvedRef = useRef(false);
 
+  // ── Cup Run Challenge (3-year mode) ──────────────────────────
+  const [cupRun, setCupRun] = useState<CupRunState | null>(null);
+  const [cupAdvancing, setCupAdvancing] = useState(false);
+  const cupRunActive = cupRun?.status === "ACTIVE";
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CUP_RUN_STORAGE_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved?.version === 1) setCupRun(saved);
+      }
+    } catch { /* corrupted save — start fresh */ }
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (cupRun) localStorage.setItem(CUP_RUN_STORAGE_KEY, JSON.stringify(cupRun));
+      else localStorage.removeItem(CUP_RUN_STORAGE_KEY);
+    } catch { /* storage unavailable */ }
+  }, [cupRun]);
+
   useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length) || draftOpen || resignOpen || offerSheetOpen);
 
   // ── Abort controllers — cancel stale Claude requests ─────────
@@ -227,6 +263,7 @@ export default function ArmchairGmPage() {
     lineupStartingGoalies,
     lineupOrders,
     computeContention,
+    lineupContext: cupRunActive,
   });
 
   // Memoized rosters — stable references stop useEffect churn
@@ -399,6 +436,31 @@ export default function ArmchairGmPage() {
   const executeTrade = useCallback(() => {
     if (!homeTeam || !partnerTeam || (!outgoingBlock.length && !incomingBlock.length)) return;
 
+    // Cup Run: retention is a scarce cross-season resource. Slots stay
+    // occupied for the retained contract's full term, so the ledger is
+    // checked and charged here at execution time.
+    if (cupRun?.status === "ACTIVE") {
+      const retainedOutgoing = outgoingBlock
+        .filter(a => a.position !== "Pick" && (a.retainedPct ?? 0) > 0)
+        .map(a => ({
+          playerId: a.id,
+          playerName: a.name,
+          pct: a.retainedPct ?? 0,
+          capHit: a.capHit,
+          yearsRemaining: a.yearsRemaining,
+        }));
+      if (retainedOutgoing.length > 0) {
+        const check = retentionCheck(cupRun.retentionLedger, retainedOutgoing, db.capCeiling ?? SEASON.capCeiling);
+        if (!check.ok) {
+          toast(check.reason ?? "Retention limit reached for this run.", "error");
+          return;
+        }
+        setCupRun(prev => prev && prev.status === "ACTIVE"
+          ? { ...prev, retentionLedger: addRetention(prev.retentionLedger, retainedOutgoing) }
+          : prev);
+      }
+    }
+
     const outgoingByKey = new Map(outgoingBlock.map(a => [tradeAssetKey(a), a]));
     const incomingByKey = new Map(incomingBlock.map(a => [tradeAssetKey(a), a]));
 
@@ -478,7 +540,7 @@ export default function ArmchairGmPage() {
     setVerdict(null);
     clearSimResult();
     setShowSimPanel(true);
-  }, [homeTeam, partnerTeam, outgoingBlock, incomingBlock, setBlocks, clearSimResult]);
+  }, [homeTeam, partnerTeam, outgoingBlock, incomingBlock, setBlocks, clearSimResult, cupRun, db.capCeiling]);
 
   // ── Reset to original rosters ─────────────────────────────────
   const resetTrades = useCallback(() => {
@@ -496,6 +558,73 @@ export default function ArmchairGmPage() {
       offseasonResolvedRef.current = false;
     }
   }, [originalDb, setBlocks, resetSimulation]);
+
+  // ── Cup Run lifecycle ─────────────────────────────────────────
+  const handleStartCupRun = useCallback(() => {
+    if (!homeTeam) return;
+    const run = startCupRun(homeTeam);
+    setCupRun(run);
+    setHomeTeamLocked(true);
+    toast(`Cup Run started: ${homeTeam.name} — ${run.difficulty.label} (${run.difficulty.stars}★)`, "info");
+  }, [homeTeam]);
+
+  const handleAbandonCupRun = useCallback(() => {
+    setCupRun(null);
+  }, []);
+
+  const handleCupRunAdvance = useCallback(() => {
+    if (!cupRun || cupRun.status !== "ACTIVE") return;
+    const champion = simData?.playoffBracket?.champion;
+    if (!champion) return;
+
+    const madePlayoffs = (simData.playoffTeams ?? []).includes(cupRun.teamId);
+    const next = recordSeason(cupRun, {
+      championTeamId: champion.teamId,
+      championTeamName: champion.teamName,
+      madePlayoffs,
+    });
+    if (next.status !== "ACTIVE") {
+      setCupRun(next);
+      return;
+    }
+
+    // Roll the whole league into the next season
+    setCupAdvancing(true);
+    try {
+      const standings = (simData.standings ?? []).map((t: { teamId: string }, i: number) => ({
+        teamId: t.teamId,
+        standing: i + 1,
+      }));
+      const rolled = rollLeagueForward({
+        players: db.players,
+        seasonStartPlayers: originalDb?.players ?? db.players,
+        state: next,
+        teams: db.teams,
+        standings,
+        capCeiling: db.capCeiling ?? SEASON.capCeiling,
+      });
+      setCupRun({ ...next, retentionLedger: rollRetentionLedger(next.retentionLedger) });
+      clearNavCache();
+      setDb(prev => ({ ...prev, players: rolled.players }));
+      setOriginalDb({ teams: db.teams, players: rolled.players, capCeiling: db.capCeiling });
+      setExecutedTrades([]);
+      resetSimulation();
+      setLineupOrders({});
+      setLineupStartingGoalies({});
+      setShowSimPanel(false);
+      setBlocks([[], []]);
+      setVerdict(null);
+      offseasonResolvedRef.current = false;   // re-resolve FA for the new year
+      setMode("offseason");
+      const breakouts = rolled.events.filter(e => e.type === "breakout").length;
+      toast(
+        `Welcome to ${seasonLabelForYear(next.currentYear)} — ${rolled.retiredCount} retired, ${rolled.rookieCount} drafted, ${breakouts} breakouts`,
+        "success",
+      );
+    } finally {
+      setCupAdvancing(false);
+    }
+  }, [cupRun, simData, db, originalDb, resetSimulation, setBlocks]);
 
   // ── Off-Season: resolve the league's pending free agents (once) ──
   // Auto-handles the other 31 teams (re-signs / walks) and sets the user's own
@@ -1170,6 +1299,17 @@ export default function ArmchairGmPage() {
         <Header activeTab="armchair-gm" />
 
         <TradeHistoryBar />
+
+        {/* ── Cup Run Challenge HUD ── */}
+        <CupRunPanel
+          run={cupRun}
+          canStart={!!homeTeam}
+          hasSeasonResult={!!simData?.playoffBracket?.champion}
+          advancing={cupAdvancing}
+          onStart={handleStartCupRun}
+          onRecordAndAdvance={handleCupRunAdvance}
+          onAbandon={handleAbandonCupRun}
+        />
 
         {navBootLoading && (
           <div className="border px-4 py-2 text-center font-mono text-[9px] font-black uppercase tracking-[0.22em]"

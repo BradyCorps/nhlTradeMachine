@@ -7,6 +7,7 @@ import {
   scenarioSeed,
   stablePts,
 } from "@/app/lib/sim-engine";
+import { slotMultiplier } from "@/app/lib/lineup-context";
 
 // ── Types ─────────────────────────────────────────────────────
 interface SimPlayer {
@@ -120,6 +121,10 @@ interface SimRequest {
     orders?: Record<string, TeamLineupOrder | undefined>;
   };
   seed?: number;
+  // Cup Run mode: apply lineup-slot weighting so where players slot in
+  // the lineup changes team strength ("lines matter"). Off by default
+  // to keep the classic single-season sim byte-identical.
+  lineupContext?: boolean;
 }
 
 interface TeamLineupOrder {
@@ -254,6 +259,7 @@ function projectTeamPoints(
   rand: () => number,
   startingGoalieId?: string | null,
   lineupOrder?: TeamLineupOrder,
+  lineupContext?: boolean,
 ): number {
   const phaseBaseline = PHASE_BASELINE[team.phase] ?? 88;
 
@@ -276,12 +282,20 @@ function projectTeamPoints(
     : null;
   const projectedStarter = startingGoalie ?? goalies[0] ?? null;
 
-  const avg = (arr: SimPlayer[], n: number) =>
-    arr.length === 0 ? 0 : arr.slice(0, n).reduce((s, p) => s + onIceValue(p), 0) / Math.min(n, arr.length);
+  // Cup Run "lines matter": weight each slot by its multiplier so a
+  // star buried on L4 contributes like a fourth-liner and vice versa.
+  const avg = (arr: SimPlayer[], n: number, unit?: "F" | "D") => {
+    if (arr.length === 0) return 0;
+    const slice = arr.slice(0, n);
+    if (!lineupContext || !unit) {
+      return slice.reduce((s, p) => s + onIceValue(p), 0) / slice.length;
+    }
+    return slice.reduce((s, p, i) => s + onIceValue(p) * slotMultiplier(i, unit), 0) / slice.length;
+  };
 
-  const topSixF = avg(forwards, 6);
-  const topNineF = avg(forwards, 9);
-  const topFourD = avg(dmen, 4);
+  const topSixF = avg(forwards, 6, "F");
+  const topNineF = avg(forwards, 9, "F");
+  const topFourD = avg(dmen, 4, "D");
   const starterG = projectedStarter ? onIceValue(projectedStarter) : -4;
   const depthPenalty = forwards.length < 10 ? (10 - forwards.length) * 1.4 : 0;
   const dPenalty = dmen.length < 6 ? (6 - dmen.length) * 1.2 : 0;
@@ -482,6 +496,7 @@ function simulateLeague(
   capDeltas: Map<string, number>,
   seed: number,
   lineup?: SimRequest["lineup"],
+  lineupContext?: boolean,
 ): SimTeamResult[] {
   return teams.map(team => {
     const roster     = playersByTeam.get(team.id) ?? [];
@@ -500,6 +515,7 @@ function simulateLeague(
       mulberry32(teamSeed + hashString("points")),
       startingGoalieId,
       lineupOrder,
+      lineupContext,
     );
     const projectedSkaters = roster
       .filter(p => p.position !== "Pick" && p.position !== "G"
@@ -934,7 +950,7 @@ function buildTradedPlayerOutcomes(
 export async function POST(req: NextRequest) {
   try {
     const body: SimRequest = await req.json();
-    const { homeTeamId, partnerTeamId, teams, players, trades, lineup } = body;
+    const { homeTeamId, partnerTeamId, teams, players, trades, lineup, lineupContext } = body;
 
     const seed = body.seed ?? scenarioSeed({
       mode: SEASON.simulationMode,
@@ -993,7 +1009,7 @@ export async function POST(req: NextRequest) {
       capDeltas.set(trade.partnerTeamId,      (capDeltas.get(trade.partnerTeamId)      ?? 0) - capDelta);
     }
 
-    const rawStandings = simulateLeague(teams, playersByTeam, tradeNavDeltas, capDeltas, seed, lineup);
+    const rawStandings = simulateLeague(teams, playersByTeam, tradeNavDeltas, capDeltas, seed, lineup, lineupContext);
     const standings    = assignPlayoffSeeds(rawStandings);
     const leaders      = findLeagueLeaders(standings, rand);
 

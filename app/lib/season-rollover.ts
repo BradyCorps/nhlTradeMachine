@@ -26,7 +26,7 @@ export interface RolloverPlayer {
   prospectPtsPace?: number | null;
   xGPace?: number | null;      // luck signal: expected-goals pace
   goalsPace?: number;          // luck signal: actual goals pace
-  expiryStatus?: "UFA" | "RFA" | null;
+  expiryStatus?: string | null;   // "UFA" | "RFA" | null (Asset keeps this loose)
 }
 
 export type RolloverEvent =

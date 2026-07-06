@@ -40,6 +40,7 @@ export function useSimDispatch({
   lineupStartingGoalies,
   lineupOrders,
   computeContention,
+  lineupContext = false,
 }: {
   homeTeam: Team | null | undefined;
   partnerTeam: Team | null | undefined;
@@ -50,6 +51,7 @@ export function useSimDispatch({
   lineupStartingGoalies: Record<string, string | null>;
   lineupOrders: Record<string, LineupOrderPayload>;
   computeContention: (roster: Asset[], navMap: Record<string, XNAVResult>) => ContentionSummary;
+  lineupContext?: boolean; // Cup Run mode: slot weighting in the sim
 }) {
   const [simResult, setSimResult] = useState<string | null>(null);
   const [simLoading, setSimLoading] = useState(false);
@@ -114,6 +116,7 @@ export function useSimDispatch({
             orders: lineupOrders,
           },
           seed,
+          lineupContext,
         }),
       });
       if (simRes.ok) {
@@ -218,6 +221,7 @@ export function useSimDispatch({
     lineupStartingGoalies,
     lineupOrders,
     computeContention,
+    lineupContext,
   ]);
 
   return {

@@ -123,13 +123,32 @@ CBA-accurate constraints, enforced across the whole 3-year run:
    determinism, roll frequencies, expiry derivation, and pace decay.
 2. **Phase 2** — Multi-year loop in armchair GM: 3× cycle state
    machine, run persistence, synthetic draft classes for 2027/2028.
+   **✅ Implemented 2026-07-06** — `app/lib/cup-run.ts` (state machine,
+   `rollLeagueForward` orchestration with roster repair + AI cap pass),
+   `app/lib/synthetic-draft.ts` (seeded 32-pick classes, worst-first),
+   `app/components/CupRunPanel.tsx` HUD wired into the armchair GM with
+   localStorage persistence (`cup-run-state-v1`).
 3. **Phase 3** — Lineup-context modifiers in the simulate route +
    change-of-scenery breakout bias.
+   **✅ Implemented 2026-07-06** — `app/lib/lineup-context.ts`
+   (slot multipliers L1 ×1.08 → L4 ×0.85, pairs ×1.06 → ×0.90;
+   `computeChangeOfScenery` rank-improvement detection). The simulate
+   route applies slot weighting only when the request sets
+   `lineupContext: true` (Cup Run mode), keeping the classic
+   single-season sim byte-identical.
 4. **Phase 4** — Retention ledger + limits, difficulty rating, win/fired
    screens, share card.
+   **✅ Implemented 2026-07-06** — `retentionCheck`/`addRetention`
+   enforce 50% max, 3 cross-season slots, and the 15%-of-cap aggregate
+   at trade execution; the ledger decrements at each rollover.
+   Difficulty stars from phase/standing, WON/FIRED screens and the
+   share card live in `CupRunPanel`.
 
-Phases 1–2 make the mode playable end-to-end (rough edges fine);
-3–4 make it fair and fun. Each phase is independently shippable.
+All four phases shipped; 17 tests in `__tests__/cup-run.test.ts` cover
+the lifecycle, ledger limits, synthetic draft, scenery detection,
+rollover integration, and X-NAV consistency (rolled veterans, synthetic
+rookies, and untouched assets all value finitely with pedigree ordering
+intact).
 
 ## Risks / open questions
 
