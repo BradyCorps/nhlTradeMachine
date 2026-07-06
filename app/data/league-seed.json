@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-06T13:07:57.261Z",
+  "generatedAt": "2026-07-06T13:34:10.720Z",
   "season": "2026-27",
   "offseasonYear": 2026,
   "count": 1544,
@@ -4848,12 +4848,12 @@
       "id": "eliaspettersson-d",
       "name": "Elias Pettersson",
       "position": "D",
-      "capHit": 1.05,
-      "yearsRemaining": 2,
+      "capHit": 0.913,
+      "yearsRemaining": 1,
       "hasNmc": false,
       "hasNtc": false,
-      "expiryStatus": null,
-      "expiryYear": null
+      "expiryStatus": "RFA",
+      "expiryYear": 2027
     },
     {
       "id": "eliassalomonsson",

@@ -52,12 +52,12 @@ const SAME_NAME_ADDITIONS: SeedRow[] = [
     id: "eliaspettersson-d",
     name: "Elias Pettersson",
     position: "D",                                  // VAN defenseman (EP25)
-    capHit: 1.05,
-    yearsRemaining: 2,
+    capHit: 0.913,                                  // $913,333 — year 3 of 3
+    yearsRemaining: 1,                              // 2026-27 is the final year
     hasNmc: false,
     hasNtc: false,
-    expiryStatus: null,
-    expiryYear: null,
+    expiryStatus: "RFA",
+    expiryYear: 2027,
   },
 ];
 
