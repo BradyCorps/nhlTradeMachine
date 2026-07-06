@@ -2232,7 +2232,7 @@ function GmAnalysisTabs({
             </div>
 
             {(simData || simResult) && (
-              <SeasonResultsPager simData={simData} simResult={simResult} />
+              <SeasonResultsPager simData={simData} simResult={simResult} players={db.players} navMap={navMap} />
             )}
           </div>
         )}
@@ -2545,7 +2545,12 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
   );
 }
 
-function SeasonResultsPager({ simData, simResult }: { simData: any | null; simResult: string | null }) {
+function SeasonResultsPager({ simData, simResult, players = [], navMap = {} }: {
+  simData: any | null;
+  simResult: string | null;
+  players?: Asset[];
+  navMap?: Record<string, XNAVResult>;
+}) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState<"next" | "prev">("next");
 
@@ -2623,19 +2628,19 @@ function SeasonResultsPager({ simData, simResult }: { simData: any | null; simRe
           <StatCell label="Seed" val={simData?.seed ?? '—'} />
         </div>
 
-        {/* Franchise-style season box score — every tracked player */}
+        {/* The Ledger Line — season box score joined against the valuation engine */}
         <details className="mt-2.5" open>
           <summary
             className="cursor-pointer select-none text-[8px] font-black font-mono uppercase tracking-[0.2em] pb-1"
             style={{ color: 'var(--ledger-ink-faint)' }}
           >
-            Season Stats — Full Roster
+            Season Stats — The Ledger Line
           </summary>
           <div className="overflow-x-auto">
-            <table className="w-full font-mono" style={{ borderCollapse: 'collapse', minWidth: 360 }}>
+            <table className="w-full font-mono" style={{ borderCollapse: 'collapse', minWidth: 480 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #b8a070' }}>
-                  {["#", "Player", "Pos", "Age", "GP", "G", "A", "PTS", ""].map((h, i) => (
+                  {["#", "Player", "GP", "G", "A", "PTS", "ΔXP", "X-NAV", "NOIV", "CAP±"].map((h, i) => (
                     <th key={i} className="text-[7px] uppercase tracking-wider py-1 px-1"
                       style={{ color: 'var(--ledger-ink-faint)', textAlign: i < 2 ? 'left' : 'right', fontWeight: 900 }}>
                       {h}
@@ -2644,60 +2649,102 @@ function SeasonResultsPager({ simData, simResult }: { simData: any | null; simRe
                 </tr>
               </thead>
               <tbody>
-                {skaters.map((p: any, i: number) => (
-                  <tr key={p.playerId ?? `${p.name}-${i}`} style={{ borderBottom: '1px solid rgba(200,184,144,0.45)' }}>
-                    <td className="text-[8px] py-1 px-1 text-left" style={{ color: 'var(--ledger-ink-faint)' }}>{i + 1}</td>
-                    <td className="text-[9px] py-1 px-1 text-left font-black" style={{ color: 'var(--ledger-ink)' }}>
-                      {p.name}
-                      {p.calderEligible && (
-                        <span className="ml-1 px-0.5 text-[7px] font-black" style={{ color: '#fff', background: 'var(--ledger-navy, #2c3e6b)', borderRadius: 1 }}>R</span>
-                      )}
-                    </td>
-                    <td className="text-[8px] py-1 px-1 text-right" style={{ color: 'var(--ledger-ink-faint)' }}>{p.position}</td>
-                    <td className="text-[8px] py-1 px-1 text-right" style={{ color: 'var(--ledger-ink-faint)' }}>{p.age ?? '—'}</td>
-                    <td className="text-[8px] py-1 px-1 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{p.gamesPlayed}</td>
-                    <td className="text-[8px] py-1 px-1 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{p.projectedGoals}</td>
-                    <td className="text-[8px] py-1 px-1 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{p.projectedAssists}</td>
-                    <td className="text-[9px] py-1 px-1 text-right tabular-nums font-black" style={{ color: 'var(--ledger-ink)' }}>{p.projectedPts}</td>
-                    <td className="text-[8px] py-1 px-1 text-right">
-                      {p.breakoutTag === 'BREAKOUT' && <span title="Breakout season" style={{ color: 'var(--ledger-green)' }}>▲</span>}
-                      {p.breakoutTag === 'VETERAN_HOLD' && <span title="Held off decline" style={{ color: 'var(--ledger-green)' }}>▲</span>}
-                      {p.breakoutTag === 'REGRESSION' && <span title="Down year" style={{ color: 'var(--ledger-red)' }}>▼</span>}
-                    </td>
-                  </tr>
-                ))}
+                {skaters.map((p: any, i: number) => {
+                  const roster = players.find(a => a.id === p.playerId);
+                  const nav = p.playerId ? navMap[p.playerId] : undefined;
+                  // Performance vs preseason expectation, scaled to games actually played
+                  const expected = roster && roster.ptsPace > 0
+                    ? Math.round(roster.ptsPace * (p.gamesPlayed / 82))
+                    : null;
+                  const dxp = expected !== null ? p.projectedPts - expected : null;
+                  const capSurplus = nav?.fmvAav != null && roster
+                    ? nav.fmvAav - roster.capHit * (1 - (roster.retainedPct ?? 0))
+                    : null;
+                  const archetype = nav?.fArchetype
+                    ? nav.fArchetype.replace(/_/g, " ")
+                    : nav?.rosterTier?.replace(/_/g, " ") ?? "";
+                  const posNeg = (v: number) => v > 0 ? 'var(--ledger-green)' : v < 0 ? 'var(--ledger-red)' : 'var(--ledger-ink-faint)';
+                  return (
+                    <tr key={p.playerId ?? `${p.name}-${i}`} style={{ borderBottom: '1px solid rgba(200,184,144,0.45)' }}>
+                      <td className="text-[8px] py-1 px-1 text-left align-top" style={{ color: 'var(--ledger-ink-faint)' }}>{i + 1}</td>
+                      <td className="text-[9px] py-1 px-1 text-left">
+                        <span className="font-black" style={{ color: 'var(--ledger-ink)' }}>{p.name}</span>
+                        {p.calderEligible && (
+                          <span className="ml-1 px-0.5 text-[7px] font-black" style={{ color: '#fff', background: 'var(--ledger-navy, #2c3e6b)', borderRadius: 1 }}>R</span>
+                        )}
+                        <div className="text-[6.5px] uppercase tracking-wider mt-px" style={{ color: 'var(--ledger-ink-faint)' }}>
+                          {p.position} · {p.age ?? '—'}{archetype ? ` · ${archetype}` : ''}
+                        </div>
+                      </td>
+                      <td className="text-[8px] py-1 px-1 text-right tabular-nums align-top" style={{ color: 'var(--ledger-ink-faint)' }}>{p.gamesPlayed}</td>
+                      <td className="text-[8px] py-1 px-1 text-right tabular-nums align-top" style={{ color: 'var(--ledger-ink)' }}>{p.projectedGoals}</td>
+                      <td className="text-[8px] py-1 px-1 text-right tabular-nums align-top" style={{ color: 'var(--ledger-ink)' }}>{p.projectedAssists}</td>
+                      <td className="text-[9px] py-1 px-1 text-right tabular-nums font-black align-top" style={{ color: 'var(--ledger-ink)' }}>{p.projectedPts}</td>
+                      <td className="text-[8px] py-1 px-1 text-right tabular-nums font-black align-top" style={{ color: dxp === null ? 'var(--ledger-ink-faint)' : posNeg(dxp) }}>
+                        {dxp === null ? '—' : dxp > 0 ? `+${dxp}` : dxp}
+                        {p.breakoutTag === 'BREAKOUT' && <span title="Breakout season"> ▲</span>}
+                        {p.breakoutTag === 'VETERAN_HOLD' && <span title="Held off decline"> ▲</span>}
+                        {p.breakoutTag === 'REGRESSION' && <span title="Down year"> ▼</span>}
+                      </td>
+                      <td className="text-[9px] py-1 px-1 text-right tabular-nums font-black align-top" style={{ color: 'var(--ledger-ink)' }}>
+                        {nav ? nav.total : '—'}
+                      </td>
+                      <td className="text-[8px] py-1 px-1 text-right tabular-nums align-top" style={{ color: nav?.noivImpact != null ? posNeg(nav.noivImpact) : 'var(--ledger-ink-faint)' }}>
+                        {nav?.noivImpact != null ? (nav.noivImpact > 0 ? `+${nav.noivImpact}` : nav.noivImpact) : '—'}
+                      </td>
+                      <td className="text-[8px] py-1 px-1 text-right tabular-nums align-top" style={{ color: capSurplus === null ? 'var(--ledger-ink-faint)' : posNeg(capSurplus) }}>
+                        {capSurplus === null ? '—' : `${capSurplus > 0 ? '+' : ''}${capSurplus.toFixed(1)}M`}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {/* Crease */}
-          {t.goalie && (
-            <div className="overflow-x-auto mt-1.5">
-              <table className="w-full font-mono" style={{ borderCollapse: 'collapse', minWidth: 360 }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #b8a070' }}>
-                    {["Goaltender", "GS", "GAA", "SV%", "GSAX"].map((h, i) => (
-                      <th key={i} className="text-[7px] uppercase tracking-wider py-1 px-1"
-                        style={{ color: 'var(--ledger-ink-faint)', textAlign: i === 0 ? 'left' : 'right', fontWeight: 900 }}>
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="text-[9px] py-1 px-1 text-left font-black" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.name}</td>
-                    <td className="text-[8px] py-1 px-1 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.gamesStarted ?? '—'}</td>
-                    <td className="text-[8px] py-1 px-1 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.projectedGAA ?? '—'}</td>
-                    <td className="text-[8px] py-1 px-1 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.projectedSVP?.toFixed(3) ?? '—'}</td>
-                    <td className="text-[8px] py-1 px-1 text-right tabular-nums" style={{ color: (t.goalie.gsax ?? 0) >= 0 ? 'var(--ledger-green)' : 'var(--ledger-red)' }}>
-                      {t.goalie.gsax != null ? (t.goalie.gsax > 0 ? `+${t.goalie.gsax}` : t.goalie.gsax) : '—'}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
+          {t.goalie && (() => {
+            const gRoster = players.find(a => a.name === t.goalie.name && a.position === 'G');
+            const gNav = gRoster ? navMap[gRoster.id] : undefined;
+            const gCapSurplus = gNav?.fmvAav != null && gRoster
+              ? gNav.fmvAav - gRoster.capHit * (1 - (gRoster.retainedPct ?? 0))
+              : null;
+            return (
+              <div className="overflow-x-auto mt-1.5">
+                <table className="w-full font-mono" style={{ borderCollapse: 'collapse', minWidth: 480 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #b8a070' }}>
+                      {["Goaltender", "GS", "GAA", "SV%", "GSAX", "X-NAV", "CAP±"].map((h, i) => (
+                        <th key={i} className="text-[7px] uppercase tracking-wider py-1 px-1"
+                          style={{ color: 'var(--ledger-ink-faint)', textAlign: i === 0 ? 'left' : 'right', fontWeight: 900 }}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="text-[9px] py-1 px-1 text-left font-black" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.name}</td>
+                      <td className="text-[8px] py-1 px-1 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.gamesStarted ?? '—'}</td>
+                      <td className="text-[8px] py-1 px-1 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.projectedGAA ?? '—'}</td>
+                      <td className="text-[8px] py-1 px-1 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.projectedSVP?.toFixed(3) ?? '—'}</td>
+                      <td className="text-[8px] py-1 px-1 text-right tabular-nums font-black" style={{ color: (t.goalie.gsax ?? 0) >= 0 ? 'var(--ledger-green)' : 'var(--ledger-red)' }}>
+                        {t.goalie.gsax != null ? `${t.goalie.gsax > 0 ? '+' : ''}${t.goalie.gsax.toFixed(2)}` : '—'}
+                      </td>
+                      <td className="text-[9px] py-1 px-1 text-right tabular-nums font-black" style={{ color: 'var(--ledger-ink)' }}>{gNav ? gNav.total : '—'}</td>
+                      <td className="text-[8px] py-1 px-1 text-right tabular-nums" style={{ color: gCapSurplus === null ? 'var(--ledger-ink-faint)' : gCapSurplus > 0 ? 'var(--ledger-green)' : 'var(--ledger-red)' }}>
+                        {gCapSurplus === null ? '—' : `${gCapSurplus > 0 ? '+' : ''}${gCapSurplus.toFixed(1)}M`}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+
+          <div className="mt-1.5 text-[6.5px] font-mono uppercase tracking-wider leading-relaxed" style={{ color: 'var(--ledger-ink-faint)' }}>
+            ΔXP — points vs preseason pace over games played · X-NAV — net asset value · NOIV — net on-ice value impact · CAP± — fair market AAV minus cap hit
+          </div>
         </details>
       </div>
     );
