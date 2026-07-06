@@ -63,6 +63,32 @@ describe("Canary — engine prospect path", () => {
   });
 });
 
+describe("Canary — NHL EDGE usage and presentation", () => {
+  it("threads high-danger EDGE luck from snapshots into valuation, rollover, and UI", () => {
+    const capture = read("app/lib/nhl-feed-capture.ts");
+    const roster = read("app/lib/roster-assembly.ts");
+    const types = read("app/lib/trade-types.ts");
+    const xnav = read("app/lib/xnav-engine.ts");
+    const rollover = read("app/lib/season-rollover.ts");
+    const players = read("app/players/page.tsx");
+    const armchair = read("app/armchair-gm/page.tsx");
+    const card = read("app/components/PercentileCard.tsx");
+
+    expect(capture).toContain("hdFinishingDelta: edge.facts.hdFinishingDelta");
+    expect(capture).toContain("export async function latestEdgeLuckMap");
+    expect(roster).toContain("const edgeLuck = await latestEdgeLuckMap");
+    expect(roster).toContain("hdFinishingDelta: edgeLuck.get(String(p.id)) ?? null");
+    expect(types).toContain("hdFinishingDelta?: number | null");
+    expect(xnav).toContain("const edgeLuckAdj = asset.hdFinishingDelta != null");
+    expect(rollover).toContain("if (p.hdFinishingDelta != null)");
+    expect(players).toContain('{ label: "EDGE HD"');
+    expect(players).toContain("NHL EDGE high-danger finishing vs league average");
+    expect(players).toContain("hdFinishingDelta: player.hdFinishingDelta ?? undefined");
+    expect(card).toContain("hdFinishingDelta: player.hdFinishingDelta ?? undefined");
+    expect(armchair).toContain("NHL EDGE HD");
+  });
+});
+
 describe("Canary — league route features (source-level)", () => {
   for (const source of ROSTER_ASSEMBLY_SOURCES) {
     describe(source, () => {

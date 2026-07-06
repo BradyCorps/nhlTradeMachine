@@ -173,6 +173,19 @@ export function cupRunOffseasonEntry(
 
 const isSkaterOrGoalie = (p: Asset) => p.position !== "Pick";
 
+const committedCap = (players: Asset[], teamId: string): number =>
+  players
+    .filter((p) => p.teamId === teamId && isSkaterOrGoalie(p))
+    .reduce((sum, p) => sum + (p.capHit ?? 0) * (1 - (p.retainedPct ?? 0)), 0);
+
+export function reconcileAiTeamCapSpaces(teams: Team[], players: Asset[], capCeiling: number, userTeamId: string): Team[] {
+  return teams.map((team) => {
+    if (team.id === userTeamId) return team;
+    const capSpace = Math.round((capCeiling - committedCap(players, team.id)) * 10) / 10;
+    return { ...team, capSpace };
+  });
+}
+
 // Replacement-level depth so retirement can't leave a team unable to
 // dress a lineup. Cheap one-year deals, deterministic ids.
 function depthPlayer(teamId: string, pos: "C" | "W" | "D" | "G", year: number, n: number): Asset {
@@ -270,30 +283,34 @@ export function rollLeagueForward(opts: {
       unit === "G" ? p.position === "G" : unit === "D" ? p.position === "D" : p.position !== "D" && p.position !== "G"
     ).length;
 
+  const enforceAiCap = () => {
+    const rand = mulberry32(rolloverSeed + hashString("ai-cap-pass"));
+    for (const team of teams) {
+      if (team.id === state.teamId) continue;
+      for (let guard = 0; guard < 8; guard++) {
+        const roster = nextPlayers.filter((p) => p.teamId === team.id && isSkaterOrGoalie(p));
+        const committed = roster.reduce((s, p) => s + (p.capHit ?? 0) * (1 - (p.retainedPct ?? 0)), 0);
+        if (committed <= capCeiling) break;
+        const fCount = countUnit(roster, "F");
+        const dCount = countUnit(roster, "D");
+        // Worst value per dollar among mid/large skater deals; NMC immovable.
+        const candidates = roster
+          .filter((p) => p.capHit >= 2.5 && !p.hasNMC && p.position !== "G")
+          .filter((p) => (p.position === "D" ? dCount > 6 : fCount > 12))
+          .sort((a, b) => (a.ptsPace / a.capHit) - (b.ptsPace / b.capHit));
+        const cut = candidates[Math.floor(rand() * Math.min(2, candidates.length))] ?? candidates[0];
+        if (!cut) break;
+        nextPlayers = nextPlayers.map((p) =>
+          p.id === cut.id ? { ...p, teamId: "FA_POOL", expiryStatus: "UFA" as const, expiresThisOffseason: true } : p
+        );
+      }
+    }
+  };
+
   // 4. AI cap-legality pass — user's team is exempt (their problem to
   // solve). Goalies are never walked (their value isn't in ptsPace),
   // and a cut may not push a team below a dressable lineup.
-  const rand = mulberry32(rolloverSeed + hashString("ai-cap-pass"));
-  for (const team of teams) {
-    if (team.id === state.teamId) continue;
-    for (let guard = 0; guard < 4; guard++) {
-      const roster = nextPlayers.filter((p) => p.teamId === team.id && isSkaterOrGoalie(p));
-      const committed = roster.reduce((s, p) => s + (p.capHit ?? 0) * (1 - (p.retainedPct ?? 0)), 0);
-      if (committed <= capCeiling) break;
-      const fCount = countUnit(roster, "F");
-      const dCount = countUnit(roster, "D");
-      // Worst value per dollar among mid/large skater deals; NMC immovable.
-      const candidates = roster
-        .filter((p) => p.capHit >= 2.5 && !p.hasNMC && p.position !== "G")
-        .filter((p) => (p.position === "D" ? dCount > 6 : fCount > 12))
-        .sort((a, b) => (a.ptsPace / a.capHit) - (b.ptsPace / b.capHit));
-      const cut = candidates[Math.floor(rand() * Math.min(2, candidates.length))] ?? candidates[0];
-      if (!cut) break;
-      nextPlayers = nextPlayers.map((p) =>
-        p.id === cut.id ? { ...p, teamId: "FA_POOL", expiryStatus: "UFA" as const, expiresThisOffseason: true } : p
-      );
-    }
-  }
+  enforceAiCap();
 
   // 5. Roster repair (after cuts) — every team must dress a lineup
   let depthAdded = 0;
@@ -311,6 +328,10 @@ export function rollLeagueForward(opts: {
       }
     }
   }
+
+  // Replacement depth can add cap back after the first cleanup. Run one more
+  // pass so AI clubs do not carry illegal rosters into the next simulated year.
+  enforceAiCap();
 
   return {
     players: [...nextPlayers, ...picks],

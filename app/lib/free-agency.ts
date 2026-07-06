@@ -9,7 +9,7 @@
 // sim uses, so a given (roster, seed) always yields the same off-season.
 // ============================================================
 
-import type { Asset } from "@/app/lib/trade-types";
+import type { Asset, Team } from "@/app/lib/trade-types";
 import type { CapDeltaAsset, CapDeltaMoves } from "@/app/lib/cap-delta";
 import { mulberry32, hashString } from "@/app/lib/sim-engine";
 import { SEASON } from "@/app/lib/season-config";
@@ -311,6 +311,7 @@ export interface LeagueOffseasonResult {
   userPending: OffseasonPending[];   // the user's team — returned for manual handling, NOT auto-applied
   resignings: Array<{ playerId: string; teamId: string; contract: ProjectedContract }>;
   walkAways: Array<{ playerId: string; fromTeamId: string; contract: ProjectedContract }>;
+  marketSignings: Array<{ playerId: string; fromTeamId: string | null; teamId: string; contract: ProjectedContract }>;
   market: OffseasonPending[];        // UFA players who hit the open market (signable)
   rfaMarket: OffseasonPending[];     // other teams' RFAs available for offer sheets
   teamCapMoves: Record<string, CapDeltaMoves>; // ready for applyTeamCapDeltas()
@@ -320,6 +321,7 @@ export interface ResolveContext {
   seed?: number;
   userTeamId?: string | null;
   capCeiling?: number;
+  teams?: Pick<Team, "id" | "phase" | "standing" | "capSpace">[];
 }
 
 const MARKET_TERM_CAP = 7; // open-market deals cap a year below own-team max
@@ -335,14 +337,31 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
   const userPending: OffseasonPending[] = [];
   const resignings: LeagueOffseasonResult["resignings"] = [];
   const walkAways: LeagueOffseasonResult["walkAways"] = [];
+  const marketSignings: LeagueOffseasonResult["marketSignings"] = [];
   const market: OffseasonPending[] = [];
   const rfaMarket: OffseasonPending[] = [];
   const teamCapMoves: Record<string, CapDeltaMoves> = {};
+  const mutableCap = ctx.teams
+    ? new Map(ctx.teams.map((t) => [t.id, t.capSpace ?? 0]))
+    : null;
+  const marketCandidates: OffseasonPending[] = [];
 
   const addMove = (teamId: string, side: "incoming" | "outgoing", asset: CapDeltaAsset) => {
     const moves = teamCapMoves[teamId] ?? {};
     moves[side] = [...(moves[side] ?? []), asset];
     teamCapMoves[teamId] = moves;
+    if (mutableCap) {
+      const delta = (asset.capHit ?? 0) * (1 - (asset.retainedPct ?? 0));
+      mutableCap.set(teamId, (mutableCap.get(teamId) ?? 0) + (side === "outgoing" ? delta : -delta));
+    }
+  };
+
+  const wouldFit = (teamId: string, aav: number): boolean =>
+    !mutableCap || (mutableCap.get(teamId) ?? 0) >= aav;
+
+  const addMarketCandidate = (pending: OffseasonPending) => {
+    marketCandidates.push(pending);
+    market.push(pending);
   };
 
   for (const player of expiring) {
@@ -360,7 +379,7 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
       if (contract.status === "RFA") {
         rfaMarket.push({ player, contract: marketContract });
       } else {
-        market.push({ player, contract: marketContract });
+        addMarketCandidate({ player, contract: marketContract });
       }
       continue;
     }
@@ -368,13 +387,18 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
     const rand = mulberry32(seed + hashString(`resolve:${player.id}`));
 
     if (contract.status === "RFA") {
-      addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
-      addMove(player.teamId, "incoming", { capHit: contract.aav });
-      resignings.push({ playerId: player.id, teamId: player.teamId, contract });
+      if (wouldFit(player.teamId, contract.aav - expiringCapHit)) {
+        addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
+        addMove(player.teamId, "incoming", { capHit: contract.aav });
+        resignings.push({ playerId: player.id, teamId: player.teamId, contract });
+      } else {
+        addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
+        walkAways.push({ playerId: player.id, fromTeamId: player.teamId, contract });
+      }
       rfaMarket.push({ player, contract });
     } else {
       const resign = rand() < contract.resignProbability;
-      if (resign) {
+      if (resign && wouldFit(player.teamId, contract.aav - expiringCapHit)) {
         addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
         addMove(player.teamId, "incoming", { capHit: contract.aav });
         resignings.push({ playerId: player.id, teamId: player.teamId, contract });
@@ -382,10 +406,69 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
         addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
         const marketContract = { ...contract, term: Math.min(contract.term, MARKET_TERM_CAP) };
         walkAways.push({ playerId: player.id, fromTeamId: player.teamId, contract: marketContract });
-        market.push({ player, contract: marketContract });
+        addMarketCandidate({ player, contract: marketContract });
       }
     }
   }
 
-  return { expiringCount: expiring.length, userPending, resignings, walkAways, market, rfaMarket, teamCapMoves };
+  if (mutableCap && ctx.teams) {
+    const signedMarketIds = new Set<string>();
+    const aiTeams = ctx.teams.filter((t) => t.id !== ctx.userTeamId);
+    const phaseScore = (phase?: string) =>
+      phase === "Contender" ? 18 :
+      phase === "Bubble" ? 12 :
+      phase === "Retooling" ? 7 :
+      phase === "Rebuilding" ? 3 :
+      0;
+    const positionNeedScore = (teamId: string, pos: string): number => {
+      const roster = players.filter((p) =>
+        p.teamId === teamId && p.position !== "Pick" && !p.expiresThisOffseason
+      );
+      const f = roster.filter((p) => isForward(p.position)).length;
+      const d = roster.filter((p) => p.position === "D").length;
+      const g = roster.filter((p) => p.position === "G").length;
+      if (pos === "G") return g < 2 ? 20 : 0;
+      if (pos === "D") return d < 6 ? 16 : d < 8 ? 5 : 0;
+      return f < 12 ? 16 : f < 14 ? 5 : 0;
+    };
+
+    for (const pending of [...marketCandidates].sort((a, b) =>
+      b.contract.aav !== a.contract.aav
+        ? b.contract.aav - a.contract.aav
+        : a.player.name.localeCompare(b.player.name)
+    )) {
+      const candidates = aiTeams
+        .filter((team) => (mutableCap.get(team.id) ?? 0) >= pending.contract.aav)
+        .map((team) => {
+          const rand = mulberry32(seed + hashString(`market:${pending.player.id}:${team.id}`));
+          return {
+            team,
+            score:
+              (mutableCap.get(team.id) ?? 0) * 0.6 +
+              phaseScore(team.phase) +
+              positionNeedScore(team.id, pending.player.position) +
+              (33 - (team.standing ?? 16)) * 0.15 +
+              rand() * 3,
+          };
+        })
+        .sort((a, b) => b.score - a.score);
+      const winner = candidates[0]?.team;
+      if (!winner) continue;
+
+      addMove(winner.id, "incoming", { capHit: pending.contract.aav });
+      marketSignings.push({
+        playerId: pending.player.id,
+        fromTeamId: pending.player.teamId && pending.player.teamId !== "FA_POOL" ? pending.player.teamId : null,
+        teamId: winner.id,
+        contract: pending.contract,
+      });
+      signedMarketIds.add(pending.player.id);
+    }
+
+    for (let i = market.length - 1; i >= 0; i--) {
+      if (signedMarketIds.has(market[i].player.id)) market.splice(i, 1);
+    }
+  }
+
+  return { expiringCount: expiring.length, userPending, resignings, walkAways, marketSignings, market, rfaMarket, teamCapMoves };
 }

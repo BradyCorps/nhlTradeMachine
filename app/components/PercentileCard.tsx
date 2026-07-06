@@ -13,6 +13,7 @@ interface PlayerData {
   headshot?: string | null;
   ptsPace: number;
   xGPace: number;
+  hdFinishingDelta?: number | null;
   avgTOI: number;
   qocIndex?: number | null;
   games?: number;
@@ -159,6 +160,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       capCeiling: SEASON.capCeiling,
       ptsPace: player.ptsPace,
       xGPace: player.xGPace,
+      hdFinishingDelta: player.hdFinishingDelta ?? undefined,
       defRate: player.defRate ?? 0.08,
       avgTOI: player.avgTOI,
       qocIndex: player.qocIndex,

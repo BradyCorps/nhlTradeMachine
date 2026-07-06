@@ -67,6 +67,17 @@ const goalieTeir = (gp: number): "STARTER" | "TANDEM" | "BACKUP" => {
   return "BACKUP";
 };
 
+const formatEdgeLuck = (delta: number | null | undefined): string =>
+  delta != null ? `${delta > 0 ? "+" : ""}${(delta * 100).toFixed(1)}%` : "-";
+
+const edgeLuckColor = (delta: number | null | undefined): string =>
+  delta == null ? "var(--ledger-ink)" :
+  delta <= -0.02 ? "var(--ledger-green)" :
+  delta >= 0.03 ? "var(--ledger-red)" :
+  "var(--ledger-ink)";
+
+const EDGE_LUCK_TITLE = "NHL EDGE high-danger finishing vs league average. Negative means unlucky finishing; positive means hot finishing.";
+
 // ── Mini helix SVG ────────────────────────────────────────────
 function MiniHelix({ ops, dps, ptsPace, avgTOI }: {
   ops?: number | null; dps?: number | null;
@@ -401,7 +412,7 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
   const [activeTab, setActiveTab] = useState<PlayerTab>("stats");
 
   const seasonPoints = Math.round((player.ptsPace / 82) * (player.games ?? 82));
-  const statItems = isG ? [
+  const statItems: Array<{ label: string; val: string; title?: string; color?: string }> = isG ? [
     { label: "GP",    val: player.gamesStarted?.toString() ?? "—" },
     { label: "GSAx",  val: (player.gsax ?? 0).toFixed(1) },
     { label: "SV%",   val: player.savePct?.toFixed(3) ?? "—" },
@@ -415,7 +426,7 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
     { label: "TOI",    val: player.avgTOI.toFixed(1) },
     { label: "xG%+",   val: player.xgRelTM != null ? `${(player.xgRelTM as number) > 0 ? "+" : ""}${(player.xgRelTM as number).toFixed(1)}` : "—" },
     { label: "OZ%",    val: player.dzPct != null ? `${(((1 - (player.dzPct as number)) * 100)).toFixed(0)}%` : "—" },
-    { label: "HD LCK", val: player.hdFinishingDelta != null ? `${player.hdFinishingDelta > 0 ? "+" : ""}${(player.hdFinishingDelta * 100).toFixed(1)}%` : "—" },
+    { label: "EDGE HD", val: formatEdgeLuck(player.hdFinishingDelta), title: EDGE_LUCK_TITLE, color: edgeLuckColor(player.hdFinishingDelta) },
   ];
 
   return (
@@ -448,12 +459,12 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
           <div>
             <div className="stat-grid-4" style={{ marginBottom: "10px" }}>
               {statItems.map(s => (
-                <div key={s.label} style={{
+                <div key={s.label} title={s.title} style={{
                   background: "#e4d8b8", border: "1px solid #b8a070",
                   padding: "6px 8px", textAlign: "center",
                 }}>
                   <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{s.label}</div>
-                  <div style={{ fontSize: "11px", fontWeight: 900, color: "var(--ledger-ink)", marginTop: "2px" }}>{s.val}</div>
+                  <div style={{ fontSize: "11px", fontWeight: 900, color: s.color ?? "var(--ledger-ink)", marginTop: "2px" }}>{s.val}</div>
                 </div>
               ))}
             </div>
@@ -511,6 +522,7 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
               qocIndex:       player.qocIndex,
               baselinePtsPace: player.baselinePtsPace ?? undefined,
               pkTimeShare:    player.pkTimeShare ?? undefined,
+              hdFinishingDelta: player.hdFinishingDelta ?? undefined,
               ops:            player.ops ?? undefined,
               dps:            player.dps ?? undefined,
               xgRelTM:        player.xgRelTM ?? undefined,

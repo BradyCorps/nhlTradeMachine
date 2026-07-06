@@ -7,6 +7,7 @@
 // G within G. Reset restores the ice-time-sorted default.
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { lineupContributionScore } from "@/app/lib/lineup-ranking";
 
 interface Player {
   id: string;
@@ -72,7 +73,8 @@ const SLOT_COUNT: Record<Group, number> = { F: 12, D: 6, G: 2 };
 
 // Ordering engine: centers fill the C column (idx 1,4,7,10), wingers the
 // wings — flattened to a single array so swaps are simple index exchanges.
-// The ranker decides who plays up: ice time by default, NAV for Best Lines.
+// The ranker decides who plays up: ice time by default, lineup contribution
+// for Best Lines.
 function buildOrder(
   effective: Player[],
   group: Group,
@@ -205,19 +207,14 @@ function TeamLineup({
     setSelected(null);
   }, [effective]);
 
-  // Best Lines: order every unit by X-NAV (falling back to scoring pace)
-  // so the strongest possible lineup is one click. Counts as an edit so
-  // it locks through subsequent trades.
+  // Best Lines: order every unit by lineup contribution. X-NAV is contract-
+  // weighted asset value, so it is only a light tiebreaker here; production,
+  // deployment trust, matchup roles, and NHL tenure drive who plays up.
+  // Counts as an edit so it locks through subsequent trades.
   const bestLines = useCallback(() => {
-    // On-ice rank ≠ trade value. NAV is asset value (contract-weighted),
-    // so a captain on a heavy deal (Lowry-type, negative NAV) still
-    // belongs high in the lineup. Blend NAV with NHL pedigree: coach
-    // deployment trust (career TOI) plus games-played tenure.
     const onIceRank = (pl: Player) => {
-      const nav = navMap?.[pl.id]?.total ?? pl.ptsPace ?? 0;
-      const toiTrust = Math.max(0, ((pl.avgTOI ?? 0) - 6)) * 14;   // 17.5 TOI ≈ 161
-      const tenure = Math.min(20, (pl.games ?? 0) / 4);            // small veteran nudge
-      return 0.55 * nav + 0.45 * toiTrust + tenure;
+      const nav = navMap?.[pl.id]?.total;
+      return lineupContributionScore(pl, nav);
     };
     const byNav = (ps: Player[]) => [...ps].sort((a, b) => onIceRank(b) - onIceRank(a));
     const goalieByNav = (ps: Player[]) =>
@@ -359,7 +356,7 @@ function TeamLineup({
           {label && <span style={{ color: "var(--ledger-ink-faint)", fontWeight: 400 }}> — {label}</span>}
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={bestLines} title="Order every unit by X-NAV" style={{
+          <button onClick={bestLines} title="Order every unit by lineup contribution" style={{
             fontFamily: MONO, fontSize: 11, fontWeight: 900, letterSpacing: 0,
             color: "#2a5a8f", background: "none", border: "1px solid #2a5a8f",
             padding: "1px 6px", cursor: "pointer", textTransform: "uppercase",

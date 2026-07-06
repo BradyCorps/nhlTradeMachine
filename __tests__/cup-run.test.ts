@@ -6,6 +6,7 @@ import {
   addRetention,
   rollRetentionLedger,
   rollLeagueForward,
+  reconcileAiTeamCapSpaces,
   difficultyForTeam,
   seasonLabelForYear,
   cupRunShareText,
@@ -272,6 +273,24 @@ describe("rollLeagueForward", () => {
     const walked = res.players.filter((p) => p.teamId === "FA_POOL");
     expect(walked.length).toBeGreaterThan(0);
     expect(carCommitted).toBeLessThan(140);
+  });
+
+  it("reconciles AI cap space from rolled rosters while leaving the user ledger alone", () => {
+    const reconciled = reconcileAiTeamCapSpaces(
+      [
+        team("CAR", { capSpace: -38 }),
+        team("VAN", { capSpace: 4 }),
+      ],
+      [
+        asset("car-a", { teamId: "CAR", capHit: 8 }),
+        asset("car-b", { teamId: "CAR", capHit: 2, retainedPct: 0.5 }),
+        asset("van-a", { teamId: "VAN", capHit: 90 }),
+      ],
+      100,
+      "VAN",
+    );
+    expect(reconciled.find((t) => t.id === "CAR")?.capSpace).toBe(91);
+    expect(reconciled.find((t) => t.id === "VAN")?.capSpace).toBe(4);
   });
 });
 

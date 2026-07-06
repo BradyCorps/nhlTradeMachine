@@ -12,6 +12,16 @@ Legend: `[ ]` to-do · `[~]` partial / verify-then-close
 
 ## [~] New Sim Engine/Off season
 
+### [x] S5 - Cup Run AI cap discipline and offseason market signings
+Root: multi-year Cup Run offseasons only auto re-signed/walked expiring players; UFAs who hit market did not sign with other AI teams, and AI teams could re-sign players without checking whether the cap swing fit. Rollover cuts also changed AI rosters without reconciling displayed cap space, so clubs could carry impossible numbers such as Buffalo at -38M into later years.
+Fix: make AI re-signing cap-aware, add an AI open-market signing pass that excludes the user team and teams without room, apply those signings to Armchair GM state, and reconcile non-user team cap space from rolled rosters after Cup Run year advancement.
+Acceptance: AI teams without cap space cannot sign FA, market UFAs can land with cap-compliant AI teams, AI rollover cap space reflects the rolled roster, and `npm test` + typecheck pass.
+
+### [x] S4 - NHL EDGE data must be used and visible
+Root: the NHL EDGE feed was joined into roster assets and used in X-NAV/rollover, but UI presentation was easy to miss (`HD LCK`) and local player-card/contract NAV recalculations did not pass the EDGE field through.
+Fix: make EDGE labels explicit in Players and Armchair GM, thread `hdFinishingDelta` into local Player Card / contract projection NAV calls, and add a source canary covering capture -> roster join -> valuation/rollover -> UI.
+Acceptance: EDGE high-danger luck is visible as NHL EDGE data, affects all local NAV projections that have the field, and `npm test` + typecheck pass.
+
 ### [x] S3 - Cup Run later-year draft/re-sign phase skipped
 Root: after a Cup Run season rolls into Year 2/3, `applyLeagueOffseason` suppresses the old 2026 `DraftNight` modal because future drafts were already resolved during rollover, but it never opens the next re-sign phase. The user's expired contracts are flagged correctly, then stay on the roster at 0 years because the manual phase never appears.
 Fix: expose the rollover draft class for a future-draft summary popup, route later Cup Run offseasons through that summary, and fall back directly to re-signing if no summary exists.

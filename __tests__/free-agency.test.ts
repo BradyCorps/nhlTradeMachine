@@ -135,4 +135,56 @@ describe("resolveLeagueOffseason", () => {
     }
     expect(walked).toBe(true);
   });
+
+  it("does not let an over-cap AI team re-sign a UFA it cannot fit", () => {
+    const ufa = mkAsset({
+      id: "too-expensive",
+      teamId: "BUF",
+      position: "C",
+      age: 28,
+      ptsPace: 82,
+      baselinePtsPace: 82,
+      contractStatus: "UFA",
+      capHit: 1,
+    });
+    const res = resolveLeagueOffseason([ufa], {
+      seed: 4,
+      userTeamId: "WPG",
+      teams: [
+        { id: "BUF", capSpace: 0.5, standing: 20 },
+        { id: "CAR", capSpace: 20, standing: 3, phase: "Contender" },
+      ],
+    });
+    expect(res.resignings.some((r) => r.playerId === ufa.id && r.teamId === "BUF")).toBe(false);
+    expect(res.teamCapMoves.BUF?.outgoing).toEqual([{ capHit: 1 }]);
+    expect(res.teamCapMoves.BUF?.incoming ?? []).toHaveLength(0);
+  });
+
+  it("signs open-market UFAs only to AI teams with enough cap room", () => {
+    const ufa = mkAsset({
+      id: "market-wing",
+      teamId: "FA_POOL",
+      position: "W",
+      age: 29,
+      ptsPace: 55,
+      baselinePtsPace: 55,
+      contractStatus: "UFA",
+      capHit: 0,
+    });
+    const res = resolveLeagueOffseason([ufa], {
+      seed: 9,
+      userTeamId: "WPG",
+      teams: [
+        { id: "BUF", capSpace: 0.2, standing: 22, phase: "Retooling" },
+        { id: "CAR", capSpace: 12, standing: 2, phase: "Contender" },
+        { id: "WPG", capSpace: 20, standing: 5, phase: "Contender" },
+      ],
+    });
+    const signing = res.marketSignings.find((s) => s.playerId === ufa.id);
+    expect(signing?.teamId).toBe("CAR");
+    expect(signing?.teamId).not.toBe("BUF");
+    expect(signing?.teamId).not.toBe("WPG");
+    expect(res.market.some((m) => m.player.id === ufa.id)).toBe(false);
+    expect(res.teamCapMoves.CAR?.incoming?.[0].capHit).toBe(signing?.contract.aav);
+  });
 });
