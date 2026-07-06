@@ -40,8 +40,11 @@ export const FA = {
   fwdStarBump:   0.14,
 
   // Defensemen: workload (TOI over a replacement floor) + scoring.
+  // 0.60/min priced pure-workload D like offensive stars (a 21-minute
+  // defensive D projected ~$7.5M); 0.42 lands them in the real 5-ish
+  // range while elite minutes+points D still reach $12M+.
   dToiFloor:     12,
-  dToiPerMin:    0.60,
+  dToiPerMin:    0.42,
   dPerPt:        0.085,
 
   // Goalies: base + GSAX + save% over league average + workload.
@@ -56,6 +59,13 @@ export const FA = {
   gMaxTerm:      6,       // goalies rarely sign beyond six years
 
   rfaDiscount:   0.82,    // RFA team control suppresses AAV vs open market
+
+  // Ascending-star projection: the market pays young stars for their
+  // prime, not their current pace (Carlsson's 5x$90M offer sheet reset
+  // this — Bedard-tier RFAs now ask Kaprizov money). Below 24, scoring
+  // pace projects forward per year to the paid-for level, capped.
+  youngGrowthPerYr: 0.12,
+  youngGrowthCap:   1.45,
 } as const;
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -67,6 +77,16 @@ const stablePace = (a: Asset): number => {
   const cur = Number.isFinite(a.ptsPace) ? a.ptsPace : 0;
   const base = Number.isFinite(a.baselinePtsPace) ? a.baselinePtsPace ?? 0 : 0;
   return base > 0 ? cur * 0.4 + base * 0.6 : cur;
+};
+
+// The pace a contract actually pays for: current for established players,
+// projected-prime for under-24s (per-year growth, capped) — an ascending
+// 75-pt 21-year-old is priced as the ~100-pt player he's becoming.
+const paidForPace = (asset: Asset, age: number): number => {
+  const pace = stablePace(asset);
+  if (age >= 24) return pace;
+  const growth = Math.min(FA.youngGrowthCap, 1 + FA.youngGrowthPerYr * (24 - age));
+  return pace * growth;
 };
 
 const faStatusOf = (asset: Asset): FaStatus => {
@@ -90,6 +110,7 @@ function projectTerm(age: number, status: FaStatus, aav: number, rand: () => num
 
   if (aav < 1.5) base = Math.min(base, 2);        // depth deals stay short
   else if (aav >= 8) base = Math.min(8, base + 1); // stars push for max term
+  if (status === "RFA" && aav >= 10) base = 8;     // elite RFAs lock in max term (Carlsson precedent)
 
   const jitter = rand() < 0.3 ? -1 : rand() > 0.85 ? 1 : 0;
   // Own-team re-signings can reach 8; the open market caps at 7 (applied by caller).
@@ -129,9 +150,9 @@ export function projectFreeAgentContract(asset: Asset, ctx: ProjectContext = {})
       + Math.min(FA.gWorkloadMax, (asset.gamesStarted ?? 0) / FA.gWorkloadDiv);
   } else if (pos === "D") {
     baseAav = Math.max(0, (asset.avgTOI ?? 0) - FA.dToiFloor) * FA.dToiPerMin
-      + stablePace(asset) * FA.dPerPt;
+      + paidForPace(asset, age) * FA.dPerPt;
   } else if (isForward(pos)) {
-    const pace = stablePace(asset);
+    const pace = paidForPace(asset, age);
     baseAav = pace * FA.fwdPerPt
       + Math.max(0, pace - FA.fwdTopPace) * FA.fwdTopBump
       + Math.max(0, pace - FA.fwdStarPace) * FA.fwdStarBump;
