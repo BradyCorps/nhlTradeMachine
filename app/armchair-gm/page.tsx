@@ -47,6 +47,7 @@ import {
   retentionCheck,
   addRetention,
   seasonLabelForYear,
+  cupRunOffseasonEntry,
   type CupRunState,
 } from "@/app/lib/cup-run";
 import { toast } from "@/app/lib/ledger-toast";
@@ -69,6 +70,103 @@ const MATCH_FOLDERS: Array<{ id: MatchFolder; label: string; stamp: string }> = 
 
 const getXNAV = (asset: Asset): XNAVResult =>
   getCachedNav(asset) ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
+
+type CupDraftSummary = {
+  seasonLabel: string;
+  draftYear: number | null;
+  retiredCount: number;
+  rookieCount: number;
+  depthAddedCount: number;
+  breakoutCount: number;
+  regressionCount: number;
+  topPicks: Array<{ id: string; name: string; teamId: string; position: string; overall: number | null }>;
+};
+
+function CupRunDraftSummaryModal({
+  summary,
+  onDone,
+}: {
+  summary: CupDraftSummary;
+  onDone: () => void;
+}) {
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-6"
+      style={{ background: "rgba(28,20,10,0.88)", backdropFilter: "blur(4px)" }}>
+      <div className="relative w-full max-w-2xl flex flex-col"
+        style={{ background: "var(--ledger-card-light)", borderRadius: "2px", maxHeight: "92vh", boxShadow: "0 24px 70px rgba(0,0,0,0.6)" }}>
+        <div className="shrink-0" style={{ borderTop: "4px double #1c140a", borderBottom: "1px solid #b8a070", padding: "16px 20px 12px" }}>
+          <div className="text-[10px] uppercase tracking-[0.4em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
+            The Hockey Ledger · Cup Run Off-Season
+          </div>
+          <h2 className="font-black" style={{ fontSize: "1.35rem", color: "var(--ledger-ink)", lineHeight: 1.1 }}>
+            {summary.draftYear ? `${summary.draftYear} Draft Complete` : "Draft Complete"}
+          </h2>
+          <p className="text-[11px] font-mono mt-1" style={{ color: "var(--ledger-brown)" }}>
+            League rolled into {summary.seasonLabel}. Review the board, then resolve your expiring contracts.
+          </p>
+        </div>
+
+        <div className="overflow-y-auto px-4 sm:px-5 py-4" style={{ flex: 1, minHeight: 0 }}>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
+            {[
+              ["Rookies", summary.rookieCount],
+              ["Retired", summary.retiredCount],
+              ["Depth", summary.depthAddedCount],
+              ["Breakouts", summary.breakoutCount],
+              ["Regressions", summary.regressionCount],
+            ].map(([label, value]) => (
+              <div key={label} className="px-2 py-2 text-center" style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
+                <div className="text-[9px] uppercase tracking-[0.18em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>{label}</div>
+                <div className="font-mono font-black text-[16px]" style={{ color: "var(--ledger-ink)" }}>{value}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono mb-2" style={{ color: "var(--ledger-ink-faint)" }}>
+            First Round Ledger
+          </div>
+          <div className="flex flex-col gap-1">
+            {summary.topPicks.map((p, i) => (
+              <div key={p.id} className="flex items-center gap-3 px-3 py-2"
+                style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
+                <span className="font-mono font-black text-[12px] shrink-0 text-right"
+                  style={{ width: 28, color: "var(--ledger-ink-faint)" }}>
+                  {p.overall ?? i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="font-black text-[13px] truncate" style={{ color: "var(--ledger-ink)" }}>{p.name}</div>
+                  <div className="font-mono text-[9px] uppercase tracking-wide" style={{ color: "var(--ledger-ink-faint)" }}>
+                    {p.teamId} · {p.position}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {summary.topPicks.length === 0 && (
+              <p className="text-[11px] italic" style={{ color: "var(--ledger-brown)" }}>
+                No drafted rookies were returned for this rollover.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="shrink-0 px-5 py-3 flex items-center justify-between gap-3"
+          style={{ borderTop: "1px solid #b8a070" }}>
+          <p className="text-[10px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+            Drafted players have been added to their clubs on ELCs.
+          </p>
+          <button onClick={onDone}
+            className="text-[11px] font-black uppercase tracking-[0.18em] px-5 py-2 font-mono"
+            style={{ background: "var(--ledger-ink)", color: "var(--ledger-card-light)", borderRadius: "2px" }}>
+            Done — Re-Sign Phase →
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
 
 const buildTradeCapMoves = (
   outgoing: Asset[],
@@ -208,6 +306,7 @@ export default function ArmchairGmPage() {
   const [userPending, setUserPending] = useState<OffseasonPending[]>([]);
   const [market, setMarket] = useState<OffseasonPending[]>([]);
   const [rfaMarket, setRfaMarket] = useState<OffseasonPending[]>([]);
+  const [cupDraftSummary, setCupDraftSummary] = useState<CupDraftSummary | null>(null);
   const offseasonResolvedRef = useRef(false);
 
   // ── Cup Run Challenge (3-year mode) ──────────────────────────
@@ -253,7 +352,7 @@ export default function ArmchairGmPage() {
     });
   }, []);
 
-  useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length) || draftOpen || resignOpen || offerSheetOpen);
+  useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length) || draftOpen || resignOpen || offerSheetOpen || Boolean(cupDraftSummary));
 
   // ── Abort controllers — cancel stale Claude requests ─────────
   const memoAbortRef = useRef<AbortController | null>(null);
@@ -638,6 +737,24 @@ export default function ArmchairGmPage() {
         standings,
         capCeiling: db.capCeiling ?? SEASON.capCeiling,
       });
+      const drafted = [...rolled.draftedRookies]
+        .sort((a, b) => (a.draftOverall ?? 999) - (b.draftOverall ?? 999));
+      setCupDraftSummary({
+        seasonLabel: seasonLabelForYear(next.currentYear),
+        draftYear: drafted[0]?.draftYear ?? null,
+        retiredCount: rolled.retiredCount,
+        rookieCount: rolled.rookieCount,
+        depthAddedCount: rolled.depthAddedCount,
+        breakoutCount: rolled.events.filter(e => e.type === "breakout").length,
+        regressionCount: rolled.events.filter(e => e.type === "regression").length,
+        topPicks: drafted.slice(0, 10).map(p => ({
+          id: p.id,
+          name: p.name,
+          teamId: p.teamId,
+          position: p.position,
+          overall: p.draftOverall ?? null,
+        })),
+      });
       setCupRun({ ...next, retentionLedger: rollRetentionLedger(next.retentionLedger) });
       clearNavCache();
       setDb(prev => ({ ...prev, players: rolled.players }));
@@ -651,6 +768,9 @@ export default function ArmchairGmPage() {
       setVerdict(null);
       offseasonResolvedRef.current = false;   // re-resolve FA for the new year
       setMode("offseason");
+      setDraftOpen(false);
+      setResignOpen(false);
+      setOfferSheetOpen(false);
       const breakouts = rolled.events.filter(e => e.type === "breakout").length;
       toast(
         `Welcome to ${seasonLabelForYear(next.currentYear)} — ${rolled.retiredCount} retired, ${rolled.rookieCount} drafted, ${breakouts} breakouts`,
@@ -696,13 +816,22 @@ export default function ArmchairGmPage() {
       return { ...prev, players, teams };
     });
     clearNavCache();
-    // Draft Night runs first (display-only), then the Re-Sign phase.
-    // In Cup Run years 2-3 the real 2026 board is history — those drafts
-    // were already resolved at rollover from the standings (synthetic +
-    // curated future classes), so re-running the 2026 broadcast is wrong.
-    const isLaterCupYear = cupRun?.status === "ACTIVE" && cupRun.currentYear > 1;
-    setDraftOpen(!isLaterCupYear);
-  }, [db.players, db.capCeiling, homeTeamId, cupRun]);
+    // Draft Night runs first, then the Re-Sign phase. In Cup Run years 2-3
+    // the draft has already been resolved at rollover from the new standings,
+    // so show that summary popup and then continue to re-signing. If no summary
+    // exists (defensive fallback), still open re-signing so 0-year contracts
+    // cannot stay parked on the roster.
+    const entry = cupRunOffseasonEntry(cupRun, Boolean(cupDraftSummary));
+    if (entry === "DRAFT_NIGHT") {
+      setDraftOpen(true);
+    } else if (entry === "DRAFT_SUMMARY") {
+      setDraftOpen(false);
+      setResignOpen(false);
+    } else {
+      setDraftOpen(false);
+      setResignOpen(true);
+    }
+  }, [db.players, db.capCeiling, homeTeamId, cupRun, cupDraftSummary]);
 
   // Re-sign one of your pending free agents at the projected terms.
   const resignPlayer = useCallback((fa: OffseasonPending) => {
@@ -1211,6 +1340,17 @@ export default function ArmchairGmPage() {
               return { ...prev, players: [...withoutPicks, ...rookies] };
             });
             clearNavCache();
+          }}
+        />
+      )}
+
+      {/* ── Cup Run future drafts are resolved during rollover; summarize before FA ── */}
+      {cupDraftSummary && (
+        <CupRunDraftSummaryModal
+          summary={cupDraftSummary}
+          onDone={() => {
+            setCupDraftSummary(null);
+            setResignOpen(true);
           }}
         />
       )}

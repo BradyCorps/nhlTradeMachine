@@ -12,6 +12,11 @@ Legend: `[ ]` to-do · `[~]` partial / verify-then-close
 
 ## [~] New Sim Engine/Off season
 
+### [x] S3 - Cup Run later-year draft/re-sign phase skipped
+Root: after a Cup Run season rolls into Year 2/3, `applyLeagueOffseason` suppresses the old 2026 `DraftNight` modal because future drafts were already resolved during rollover, but it never opens the next re-sign phase. The user's expired contracts are flagged correctly, then stay on the roster at 0 years because the manual phase never appears.
+Fix: expose the rollover draft class for a future-draft summary popup, route later Cup Run offseasons through that summary, and fall back directly to re-signing if no summary exists.
+Acceptance: after Year 1 sim advances, the user sees a draft summary then the re-sign phase; stale 0-year contracts cannot remain unresolved; `npm test` + typecheck pass.
+
 ### [x] S1 - UFA are 1 year out of date
 Before we decided to go on this route of a proper off season mode, we added code to add 1 additional year to 2026 UFA's in order to have them persist in the DB. We need to remove this and have them populate in the UFA list. Right now we have a mixture, but Alex Debricat is listed as the top UFA in our sim currently. 
 To help calibrate, here is a partial free agency list from PuckPedia:

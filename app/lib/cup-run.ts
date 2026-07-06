@@ -155,7 +155,20 @@ export interface RollForwardResult {
   events: RolloverEvent[];
   retiredCount: number;
   rookieCount: number;
+  draftedRookies: Asset[];
   depthAddedCount: number;
+}
+
+export type CupRunOffseasonEntry = "DRAFT_NIGHT" | "DRAFT_SUMMARY" | "RESIGN";
+
+export function cupRunOffseasonEntry(
+  state: CupRunState | null | undefined,
+  hasDraftSummary: boolean,
+): CupRunOffseasonEntry {
+  if (state?.status === "ACTIVE" && state.currentYear > 1) {
+    return hasDraftSummary ? "DRAFT_SUMMARY" : "RESIGN";
+  }
+  return "DRAFT_NIGHT";
 }
 
 const isSkaterOrGoalie = (p: Asset) => p.position !== "Pick";
@@ -304,6 +317,7 @@ export function rollLeagueForward(opts: {
     events: rolled.events,
     retiredCount: rolled.retired.length,
     rookieCount: rookies.length,
+    draftedRookies: rookies,
     depthAddedCount: depthAdded,
   };
 }

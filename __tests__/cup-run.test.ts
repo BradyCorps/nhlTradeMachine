@@ -9,6 +9,7 @@ import {
   difficultyForTeam,
   seasonLabelForYear,
   cupRunShareText,
+  cupRunOffseasonEntry,
   MAX_RETENTION_SLOTS,
 } from "../app/lib/cup-run";
 import { generateSyntheticDraftClass } from "../app/lib/synthetic-draft";
@@ -64,6 +65,14 @@ describe("cup run lifecycle", () => {
     run = recordSeason(run, { championTeamId: "DAL", championTeamName: "Stars", madePlayoffs: true });
     expect(run.status).toBe("FIRED");
     expect(cupRunShareText(run)).toContain("Fired after 3 seasons");
+  });
+
+  it("routes later Cup Run offseasons through draft summary, then re-sign fallback", () => {
+    const yearOne = startCupRun(team("VAN"));
+    const yearTwo = recordSeason(yearOne, { championTeamId: "CAR", championTeamName: "Canes", madePlayoffs: false });
+    expect(cupRunOffseasonEntry(yearOne, false)).toBe("DRAFT_NIGHT");
+    expect(cupRunOffseasonEntry(yearTwo, true)).toBe("DRAFT_SUMMARY");
+    expect(cupRunOffseasonEntry(yearTwo, false)).toBe("RESIGN");
   });
 });
 
@@ -202,6 +211,7 @@ describe("rollLeagueForward", () => {
     });
     expect(res.retiredCount).toBeGreaterThanOrEqual(1); // van-old is 45 post-aging
     expect(res.rookieCount).toBe(32);
+    expect(res.draftedRookies).toHaveLength(32);
     expect(res.players.some((p) => p.id === "pick-1")).toBe(true);
 
     for (const t of teams) {
