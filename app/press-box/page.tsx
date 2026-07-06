@@ -4,6 +4,7 @@ import React, { Suspense, useState, useCallback, useMemo, useEffect } from "reac
 import { useSearchParams } from "next/navigation";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
+import PressBoxCalendar from "./Calendar";
 import {
   dayNumberFromDate,
   dealDailyHand,
@@ -1199,6 +1200,14 @@ function PressBoxGame() {
               <p><strong>Call-Up Bonus</strong> — 1 pt for each of your picks who share a team with the call-up</p>
             </div>
           </details>
+        )}
+        {/* ── Back Issues calendar ───────────────────────────── */}
+        {pool && (
+          <PressBoxCalendar
+            pool={pool}
+            todayNum={todayNum}
+            refreshKey={`${dayNum}:${attempts.length}:${gameOver}`}
+          />
         )}
           </>
         )}
