@@ -46,3 +46,15 @@ describe("x-nav team control and growth-adjusted surplus", () => {
     expect(retained.total).toBeGreaterThan(full.total); // retained salary makes the asset cheaper to hold
   });
 });
+
+describe("EDGE luck adjustment in x-nav", () => {
+  it("discounts hot finishers and credits unlucky ones, bounded", () => {
+    const neutral = calcNAV(skater());
+    const hot = calcNAV(skater({ hdFinishingDelta: 0.06 } as Partial<AssetInput>));
+    const unlucky = calcNAV(skater({ hdFinishingDelta: -0.05 } as Partial<AssetInput>));
+    expect(hot.off).toBeLessThan(neutral.off);
+    expect(unlucky.off).toBeGreaterThan(neutral.off);
+    expect(Math.abs(hot.off - neutral.off)).toBeLessThanOrEqual(10);
+    expect(Math.abs(unlucky.off - neutral.off)).toBeLessThanOrEqual(12);
+  });
+});

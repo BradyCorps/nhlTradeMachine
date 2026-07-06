@@ -58,6 +58,22 @@ export const FREE_AGENT_SEED_2026: Map<string, SeedFaStatus> = new Map([
 
 // Original-cased name + status, for the seed builder (which needs display names
 // to create rows for FA-class players absent from contracts.bundled.json).
+// Known facts for FA-class players whose seed rows carry no age/contract
+// (added with capHit 0). Ages are for the 2026-27 season; lastCapHit is the
+// expiring AAV. Display + market pricing both read these at injection.
+export const FA_KNOWN_FACTS: Record<string, { age?: number; lastCapHit?: number }> = {
+  "Patrick Kane":       { age: 37, lastCapHit: 4.0 },
+  "Claude Giroux":      { age: 38, lastCapHit: 3.25 },
+  "Vladimir Tarasenko": { age: 34, lastCapHit: 4.75 },
+  "Marcus Johansson":   { age: 35, lastCapHit: 2.0 },
+  "Anthony Mantha":     { age: 31, lastCapHit: 3.5 },
+  "John Klingberg":     { age: 33, lastCapHit: 1.75 },
+  "Jonathan Quick":     { age: 40, lastCapHit: 1.275 },
+  "Cam Talbot":         { age: 38, lastCapHit: 2.5 },
+  "Matt Murray":        { age: 32, lastCapHit: 0.875 },
+  "James van Riemsdyk": { age: 37, lastCapHit: 0.9 },
+};
+
 export const FREE_AGENT_SEED_LIST_2026: { name: string; status: SeedFaStatus }[] = [
   ...UFA.map((name) => ({ name, status: "UFA" as const })),
   ...RFA.map((name) => ({ name, status: "RFA" as const })),

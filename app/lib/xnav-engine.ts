@@ -16,6 +16,7 @@ export const DPS_NAV_MULTIPLIER = 15; // dps * 15 = defPS for NAV (not 120 — t
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 export interface AssetInput {
+  hdFinishingDelta?: number | null; // NHL EDGE: high-danger finishing vs league (nhl_snapshots)
   id:             string;
   name:           string;
   position:       "C" | "W" | "D" | "G" | "Pick";
@@ -469,6 +470,12 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     ? (asset.xgRelTM != null ? xgRel * 0.4 + baselineXgRelPts * 0.6 : baselineXgRelPts)
     : xgRel;
   const noivBonus = clamp(blendedXgRel * 3.5, -20, 25);
+  // EDGE luck regression: finishing above league on high-danger chances is
+  // unsustainable (discount), finishing under it hides real value (credit).
+  // Bounded small — this refines the offensive read, never drives it.
+  const edgeLuckAdj = asset.hdFinishingDelta != null
+    ? clamp(-asset.hdFinishingDelta * 150, -8, 10)
+    : 0;
   const offPS     = ops !== null ? ops * 17 : null;
 
   // Power-law curve: elite players separate more than linear pts * 1.6
@@ -476,9 +483,9 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   // We use offPS (Point Shares) to slightly modulate it, but we never let a linear 
   // Point Shares stat overwrite the exponential power curve!
   const baseOffCurve = Math.pow(ptsVal / 45, 1.6) * 55;
-  const offRaw = offPS !== null
+  const offRaw = (offPS !== null
     ? baseOffCurve + (offPS - (ptsVal / 45) * 55) * 0.4 + (noivBonus * 0.25)
-    : baseOffCurve + (xg * 0.5) + noivBonus;
+    : baseOffCurve + (xg * 0.5) + noivBonus) + edgeLuckAdj;
 
   let offTotal = safe(offRaw);
   // ── Lemieux Offensive Asymptote ─────────────────────────────

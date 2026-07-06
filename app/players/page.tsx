@@ -26,6 +26,7 @@ interface Player {
   headshot?: string | null;
   ptsPace: number;
   xGPace: number;
+  hdFinishingDelta?: number | null;
   avgTOI: number;
   qocIndex?: number | null;
   rosterTier?: string;
@@ -414,6 +415,7 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
     { label: "TOI",    val: player.avgTOI.toFixed(1) },
     { label: "xG%+",   val: player.xgRelTM != null ? `${(player.xgRelTM as number) > 0 ? "+" : ""}${(player.xgRelTM as number).toFixed(1)}` : "—" },
     { label: "OZ%",    val: player.dzPct != null ? `${(((1 - (player.dzPct as number)) * 100)).toFixed(0)}%` : "—" },
+    { label: "HD LCK", val: player.hdFinishingDelta != null ? `${player.hdFinishingDelta > 0 ? "+" : ""}${(player.hdFinishingDelta * 100).toFixed(1)}%` : "—" },
   ];
 
   return (

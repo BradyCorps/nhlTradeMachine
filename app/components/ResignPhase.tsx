@@ -67,7 +67,7 @@ function PlayerMeta({ p }: { p: OffseasonPending["player"] }) {
   const wasCap = p.lastCapHit ?? p.capHit;
   return (
     <span className="text-[9px] font-mono uppercase tracking-wide" style={{ color: "var(--ledger-ink-faint)" }}>
-      {p.position} · age {p.age} · was {money(wasCap)}
+      {p.position} · age {p.age}{wasCap > 0 ? ` · was ${money(wasCap)}` : ""}
     </span>
   );
 }

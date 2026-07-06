@@ -14,6 +14,7 @@ import {
   safeNhlRosterPlayer,
 } from "@/app/lib/player-identity";
 import { latestEdgeLuckMap } from "@/app/lib/nhl-feed-capture";
+import { FA_KNOWN_FACTS } from "@/app/lib/free-agent-seed";
 import { listPublishedTrades, type TradeRecord } from "@/app/lib/trades";
 import {
   buildDevelopmentInputFromNhlTimeline,
@@ -1351,7 +1352,8 @@ export async function assembleCanonicalRoster(options: {
       const dSlug = slugify(d.name);
       if (existingSlugs.has(dSlug)) continue;
       const fin = CONTRACTS[d.name] ?? null;
-      const lastCap = fin?.capHit ?? d.capHit ?? 0;
+      const known = FA_KNOWN_FACTS[d.name];
+      const lastCap = fin?.capHit || known?.lastCapHit || d.capHit || 0;
       const slug = slugify(d.name);
       const stats = analyticsMap.get(slug) ?? NHL_SKATER_STATS.get(slug) ?? null;
       const nhlG = NHL_GOALIE_STATS.get(slug);
@@ -1377,7 +1379,7 @@ export async function assembleCanonicalRoster(options: {
       const faTeamId = d.teamId || "FA_POOL";
       players.push({
         id: d.id, teamId: faTeamId, name: d.name, position: pos,
-        age: d.age ?? 27, headshot: null, games: stats?.games ?? 0,
+        age: known?.age ?? (d.age && d.age > 16 ? d.age : 27), headshot: null, games: stats?.games ?? 0,
         ptsPace, xGPace: stats?.xGPace ?? 0, defRate: stats?.defRate ?? 0.08,
         avgTOI, qocIndex: null, rosterTier: undefined,
         hasLiveStats: stats?.hasLiveStats ?? false,
