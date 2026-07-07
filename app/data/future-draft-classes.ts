@@ -1,6 +1,7 @@
 // ── Future Draft Classes — real prospects for Cup Run years 2-3 ──
 // The Cup Run generates synthetic first rounds for 2027/2028. Paste
-// real prospects here (in expected draft order, best first) and the
+// real prospects here (any order — the generator drafts the best 32
+// by NHLe pace; goalies without a pace slot as mid-round talent) and the
 // generator uses them for the top of the round, filling any remaining
 // slots synthetically. Leave a year empty to stay fully synthetic.
 //

@@ -60,7 +60,13 @@ export function generateSyntheticDraftClass(
   const picks: Asset[] = [];
   const used = new Set<string>();
 
-  const realClass = FUTURE_DRAFT_CLASSES[year] ?? [];
+  // Curated classes don't need to be hand-ordered: the first round takes
+  // the best 32 by NHLe pace (goalies slot as mid-round talent when they
+  // carry no pace), so a long alphabetical list still drafts sensibly.
+  const talentOf = (pr: { pos: string; nhlePace?: number }) =>
+    pr.nhlePace ?? (pr.pos === "G" ? 14 : 8);
+  const realClass = [...(FUTURE_DRAFT_CLASSES[year] ?? [])].sort(
+    (a, b) => talentOf(b) - talentOf(a));
 
   for (let overall = 1; overall <= 32; overall++) {
     // Real curated prospects (best first) take the top of the round;

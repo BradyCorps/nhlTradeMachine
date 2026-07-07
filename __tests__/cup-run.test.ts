@@ -332,3 +332,19 @@ describe("x-nav consistency through the cup run", () => {
     expect(Math.abs(navAfter.total - before.total) / before.total).toBeLessThan(0.5);
   });
 });
+
+describe("curated future classes", () => {
+  it("drafts the best curated prospects first regardless of file order", async () => {
+    const { FUTURE_DRAFT_CLASSES } = await import("../app/data/future-draft-classes");
+    const cls2027 = generateSyntheticDraftClass(2027, 5, ["VAN", "SJS"]);
+    const curated = FUTURE_DRAFT_CLASSES[2027] ?? [];
+    if (curated.length >= 32) {
+      const bestPace = Math.max(...curated.map((p) => p.nhlePace ?? 0));
+      // pick 1 carries the strongest curated NHLe, not whoever was listed 10th alphabetically
+      expect(cls2027[0].prospectPtsPace ?? 0).toBeGreaterThanOrEqual(bestPace - 0.01);
+      // every first-rounder is a real curated name (no synthetic filler needed)
+      const names = new Set(curated.map((p) => p.name));
+      expect(cls2027.every((p) => names.has(p.name))).toBe(true);
+    }
+  });
+});
