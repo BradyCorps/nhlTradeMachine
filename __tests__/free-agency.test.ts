@@ -160,7 +160,9 @@ describe("resolveLeagueOffseason", () => {
     expect(res.teamCapMoves.BUF?.incoming ?? []).toHaveLength(0);
   });
 
-  it("signs open-market UFAs only to AI teams with enough cap room", () => {
+  it("keeps the pre-existing FA pool on the board for the user instead of letting AI pre-sign it", () => {
+    // A marquee open-market UFA. The open pool is what the user came to shop —
+    // AI teams must not vacuum it up before the market is ever shown.
     const ufa = mkAsset({
       id: "market-wing",
       teamId: "FA_POOL",
@@ -180,26 +182,26 @@ describe("resolveLeagueOffseason", () => {
         { id: "WPG", capSpace: 20, standing: 5, phase: "Contender" },
       ],
     });
-    const signing = res.marketSignings.find((s) => s.playerId === ufa.id);
-    expect(signing?.teamId).toBe("CAR");
-    expect(signing?.teamId).not.toBe("BUF");
-    expect(signing?.teamId).not.toBe("WPG");
-    expect(res.market.some((m) => m.player.id === ufa.id)).toBe(false);
-    expect(res.teamCapMoves.CAR?.incoming?.[0].capHit).toBe(signing?.contract.aav);
+    expect(res.marketSignings.some((s) => s.playerId === ufa.id)).toBe(false);
+    expect(res.market.some((m) => m.player.id === ufa.id)).toBe(true);
   });
 
-  it("keeps a league-minimum cap cushion when AI teams shop the UFA market", () => {
+  it("keeps a league-minimum cap cushion when AI teams shop walk-away UFAs", () => {
+    // Depth UFAs on a broke team can't be re-signed, so they walk into the
+    // market — that churn is still AI-signable (unlike the pre-existing pool),
+    // and the shopper must leave a league-minimum cushion.
     const marketPlayers = Array.from({ length: 8 }, (_, i) => mkAsset({
-      id: `market-depth-${i}`,
-      teamId: "FA_POOL",
+      id: `walk-depth-${i}`,
+      teamId: "STL",
       position: "W",
       age: 30,
-      ptsPace: 0,
-      baselinePtsPace: 0,
+      ptsPace: 15,
+      baselinePtsPace: 15,
       contractStatus: "UFA",
-      capHit: 0,
+      capHit: 0.1,
     }));
     const teams = [
+      { id: "STL", capSpace: 0, standing: 25, phase: "Rebuilding" },
       { id: "BUF", capSpace: 3.1, standing: 18, phase: "Retooling" },
       { id: "WPG", capSpace: 20, standing: 5, phase: "Contender" },
     ];
@@ -209,7 +211,7 @@ describe("resolveLeagueOffseason", () => {
       teams,
     });
     const spent = res.teamCapMoves.BUF?.incoming?.reduce((sum, m) => sum + (m.capHit ?? 0), 0) ?? 0;
-    const remaining = teams[0].capSpace - spent;
+    const remaining = teams[1].capSpace - spent;
 
     expect(res.marketSignings.some((s) => s.teamId === "BUF")).toBe(true);
     expect(remaining).toBeGreaterThanOrEqual(FA.aiMarketCapReserve - 1e-9);

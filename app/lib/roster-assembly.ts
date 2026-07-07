@@ -14,7 +14,7 @@ import {
   safeNhlRosterPlayer,
 } from "@/app/lib/player-identity";
 import { latestEdgeSignalMap } from "@/app/lib/nhl-feed-capture";
-import { FA_KNOWN_FACTS } from "@/app/lib/free-agent-seed";
+import { FA_KNOWN_FACTS, seedFreeAgentStatus } from "@/app/lib/free-agent-seed";
 import { listPublishedTrades, type TradeRecord } from "@/app/lib/trades";
 import {
   buildDevelopmentInputFromNhlTimeline,
@@ -1353,7 +1353,12 @@ export async function assembleCanonicalRoster(options: {
     let poolCount = 0;
     for (const d of dbPlayers2) {
       if (d.retired || d.excludeFromRoster) continue;
-      if (!d.expiryStatus) continue;
+      // The DB row's own expiryStatus wins, but fall back to the curated
+      // 2026 UFA/RFA class so the marquee free agents (Mantha, Kane,
+      // Tarasenko, Nyquist, Klingberg…) inject into the market even when
+      // their bare seed row never had an expiry flag written.
+      const effectiveExpiry = d.expiryStatus ?? seedFreeAgentStatus(d.name);
+      if (!effectiveExpiry) continue;
       const dSlug = slugify(d.name);
       if (existingSlugs.has(dSlug)) continue;
       const fin = CONTRACTS[d.name] ?? null;
@@ -1379,7 +1384,7 @@ export async function assembleCanonicalRoster(options: {
       const isGoalie = pos === "G";
       const ptsPace = stats?.ptsPace ?? 0;
       const avgTOI = stats?.avgTOI ?? 0;
-      const normExpiry: "UFA" | "RFA" | null = /rfa/i.test(d.expiryStatus) ? "RFA" : /ufa/i.test(d.expiryStatus) ? "UFA" : null;
+      const normExpiry: "UFA" | "RFA" | null = /rfa/i.test(effectiveExpiry) ? "RFA" : /ufa/i.test(effectiveExpiry) ? "UFA" : null;
       if (!normExpiry) continue;
       const faTeamId = d.teamId || "FA_POOL";
       players.push({

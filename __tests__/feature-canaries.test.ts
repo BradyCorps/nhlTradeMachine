@@ -1042,6 +1042,20 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(offerSheetPhase).toContain("tap-target");
   });
 
+  it("surfaces the curated FA class and keeps the open pool available to the user", () => {
+    const roster = read("app/lib/roster-assembly.ts");
+    const freeAgency = read("app/lib/free-agency.ts");
+    // The curated 2026 UFA/RFA class must actually be wired into the FA-pool
+    // injection — it was dead code, so the marquee free agents never showed.
+    expect(roster).toContain("seedFreeAgentStatus");
+    expect(roster).toContain("d.expiryStatus ?? seedFreeAgentStatus(d.name)");
+    // The pre-existing FA pool stays on the board for the user — the pool
+    // branch pushes straight to the visible market instead of the AI-signable
+    // candidate list, so the top free agents aren't auto-signed and hidden.
+    expect(freeAgency).toContain('!player.teamId || player.teamId === "FA_POOL"');
+    expect(freeAgency).toContain("market.push({ player, contract: marketContract });");
+  });
+
   it("exposes the focused Trade Machine and shared trade routes", () => {
     const tradeRedirectRoute = read("app/trade/page.tsx");
     expect(header).toContain('href="/trade-machine"');
