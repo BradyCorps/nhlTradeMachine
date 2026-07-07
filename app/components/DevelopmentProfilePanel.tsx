@@ -207,6 +207,21 @@ export function DevelopmentProfilePanel({ asset }: { asset: Asset }) {
         <div className="h-1.5 overflow-hidden" style={{ background: "var(--ledger-rule-light)", border: "1px solid #c8b890" }}>
           <div className="h-full" style={{ width: `${medianPct}%`, background: dynastyColor }} />
         </div>
+        {asset.hdFinishingDelta != null && (() => {
+          const hd = asset.hdFinishingDelta;
+          const cold = hd <= -0.02;
+          const hot = hd >= 0.03;
+          const luckColor = cold ? "var(--ledger-green)" : hot ? "var(--ledger-red)" : "var(--ledger-ink-faint)";
+          return (
+            <div className="flex items-center justify-between mt-1.5 pt-1.5" style={{ borderTop: "1px solid #c8b890" }}
+              title="NHL EDGE high-danger finishing vs league. Cold shooters project to bounce back; hot shooters project to cool off — this nudges the band separately from the sample.">
+              <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">EDGE Finish Luck</span>
+              <span className="text-2xs font-black font-mono" style={{ color: luckColor }}>
+                {hd > 0 ? "+" : ""}{(hd * 100).toFixed(1)}% · {cold ? "BOUNCE-BACK" : hot ? "COOL-OFF" : "NEUTRAL"}
+              </span>
+            </div>
+          );
+        })()}
       </div>
 
       {scoringTrajectory.length > 0 && (

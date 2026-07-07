@@ -532,6 +532,22 @@ describe("Canary — public Docket page", () => {
     expect(header).toContain("The Docket");
     expect(header).toContain('pathname?.startsWith("/docket")');
   });
+
+  it("tabs the per-asset detail and surfaces NHL EDGE signals", () => {
+    const edgeStrip = read("app/components/EdgeStrip.tsx");
+    // Player detail is tabbed (Stats / Strand / Outlook) instead of dumping
+    // every panel inline, with accessible tab semantics and touch targets.
+    expect(client).toContain('role="tablist"');
+    expect(client).toContain('role="tab"');
+    expect(client).toContain("aria-selected={active}");
+    expect(client).toContain('className="tap-target"');
+    expect(client).toContain("<EdgeStrip asset={detailAsset} />");
+    // EDGE strip surfaces real snapshot fields for skaters and goalies.
+    expect(edgeStrip).toContain("hdFinishingDelta");
+    expect(edgeStrip).toContain("edgeSpeedMaxMph");
+    expect(edgeStrip).toContain("baselineHdsvPct");
+    expect(edgeStrip).toContain("NHL EDGE");
+  });
 });
 
 describe("Canary — trade proposal audit verification", () => {

@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
 import StrandDisplay from "@/app/components/StrandDisplay";
 import { buildAssetTraits, computeStrandType } from "@/app/components/StrandView";
+import EdgeStrip from "@/app/components/EdgeStrip";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import type { DocketEntry, DocketSortKey } from "@/app/lib/docket-view";
 import { filterAndSortDocketEntries } from "@/app/lib/docket-view";
-import type { XNAVResult } from "@/app/lib/trade-types";
+import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 
 const fmtNav = (value: number): string => `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
 
@@ -28,19 +29,71 @@ const navFromAsset = (navAtTrade: number | null): XNAVResult => ({
   upside: 0,
 });
 
+type AssetTab = "STATS" | "STRAND" | "OUTLOOK";
+
+function AssetStats({ asset, detailAsset, isPick }: {
+  asset: DocketEntry["packages"][number]["assets"][number];
+  detailAsset: Asset;
+  isPick: boolean;
+}) {
+  const isGoalie = detailAsset.position === "G";
+  const tiles: [string, string, string][] = isPick
+    ? [["Today NAV", asset.navToday == null ? "NA" : fmtNav(asset.navToday), "NAV today"]]
+    : isGoalie
+      ? [
+        ["Today NAV", asset.navToday == null ? "NA" : fmtNav(asset.navToday), "NAV today"],
+        ["SV%", ((detailAsset.savePct ?? 0.9) * 100).toFixed(1), "Save percentage"],
+        ["GS", String(detailAsset.gamesStarted ?? detailAsset.games ?? 0), "Games started"],
+      ]
+      : [
+        ["Today NAV", asset.navToday == null ? "NA" : fmtNav(asset.navToday), "NAV today"],
+        ["Pts/82", detailAsset.ptsPace.toFixed(1), "Points per 82 games"],
+        ["Supp", detailAsset.defRate.toFixed(2), "Defensive suppression rate"],
+        ["TOI", detailAsset.avgTOI.toFixed(1), "Average time on ice"],
+      ];
+
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(tiles.length, 4)}, minmax(0, 1fr))`, gap: 6 }}>
+        {tiles.map(([label, value, title]) => (
+          <div key={label} title={title} style={{ border: "1px solid var(--rule)", padding: "7px 8px" }}>
+            <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: "0.1em", color: "var(--ledger-ink-faint)" }}>{label}</div>
+            <div style={{ fontSize: 13, fontWeight: 900, marginTop: 2 }}>{value}</div>
+          </div>
+        ))}
+      </div>
+      {isPick
+        ? <div style={{ fontSize: 11, color: "var(--ledger-ink-faint)", lineHeight: 1.5 }}>
+            Pick value is the frozen pick-curve NAV captured at ingestion.
+          </div>
+        : <EdgeStrip asset={detailAsset} />}
+    </div>
+  );
+}
+
 function AssetDetail({ asset }: { asset: DocketEntry["packages"][number]["assets"][number] }) {
   const detailAsset = asset.currentAsset ?? asset.asset;
   const nav = navFromAsset(asset.navToday ?? asset.navAtTrade);
   const traits = buildAssetTraits(detailAsset, nav);
   const strandType = computeStrandType(traits.off, traits.def, detailAsset.ops ?? null, detailAsset.dps ?? null);
   const isPick = asset.kind === "pick" || detailAsset.position === "Pick";
+  const isGoalie = detailAsset.position === "G";
+  const hasOutlook = !isPick && !isGoalie && Boolean(detailAsset.developmentProfile);
+
+  // Tabs keep the card compact — one panel at a time instead of a wall of
+  // strand + outlook for every player. Picks have only the STATS panel.
+  const tabs: AssetTab[] = isPick
+    ? ["STATS"]
+    : hasOutlook ? ["STATS", "STRAND", "OUTLOOK"] : ["STATS", "STRAND"];
+  const [tab, setTab] = useState<AssetTab>("STATS");
+  const activeTab = tabs.includes(tab) ? tab : "STATS";
 
   return (
     <div style={{ border: "1px solid var(--rule)", padding: 10, display: "grid", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
         <div>
-          <div style={{ fontSize: 12, fontWeight: 900 }}>{asset.name}</div>
-          <div style={{ fontSize: 10, color: "var(--ledger-ink-faint)", marginTop: 3 }}>
+          <div style={{ fontSize: 13, fontWeight: 900 }}>{asset.name}</div>
+          <div style={{ fontSize: 11, color: "var(--ledger-ink-faint)", marginTop: 3 }}>
             {isPick ? "PICK CURVE NAV" : `${detailAsset.position} · AGE ${detailAsset.age || "NA"} · ${detailAsset.capHit.toFixed(2)}M`}
           </div>
         </div>
@@ -50,26 +103,40 @@ function AssetDetail({ asset }: { asset: DocketEntry["packages"][number]["assets
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 6 }}>
-        {[
-          ["Today NAV", asset.navToday == null ? "NA" : fmtNav(asset.navToday)],
-          ["Pts/82", isPick ? "Pick" : detailAsset.ptsPace.toFixed(1)],
-          ["Supp", isPick ? "NA" : detailAsset.defRate.toFixed(2)],
-          ["TOI", isPick ? "NA" : detailAsset.avgTOI.toFixed(1)],
-        ].map(([label, value]) => (
-          <div key={label} style={{ border: "1px solid var(--rule)", padding: "7px 8px" }}>
-            <div style={{ fontSize: 9, fontWeight: 900, letterSpacing: "0.12em", color: "var(--ledger-ink-faint)" }}>{label}</div>
-            <div style={{ fontSize: 12, fontWeight: 900, marginTop: 2 }}>{value}</div>
-          </div>
-        ))}
-      </div>
-
-      {isPick ? (
-        <div style={{ fontSize: 11, color: "var(--ledger-ink-faint)", lineHeight: 1.5 }}>
-          Pick value is the frozen pick-curve NAV captured at ingestion.
+      {tabs.length > 1 && (
+        <div role="tablist" aria-label={`${asset.name} detail sections`} style={{ display: "flex", gap: 4 }}>
+          {tabs.map((t) => {
+            const active = t === activeTab;
+            return (
+              <button
+                key={t}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(t)}
+                className="tap-target"
+                style={{
+                  flex: 1,
+                  padding: "8px 6px",
+                  fontSize: 11,
+                  fontWeight: 900,
+                  letterSpacing: "0.12em",
+                  fontFamily: "'Courier Prime', monospace",
+                  cursor: "pointer",
+                  background: active ? "var(--ledger-ink)" : "transparent",
+                  color: active ? "var(--ledger-card-light)" : "var(--ledger-ink-faint)",
+                  border: `1px solid ${active ? "var(--ledger-ink)" : "var(--rule)"}`,
+                }}>
+                {t}
+              </button>
+            );
+          })}
         </div>
-      ) : (
-        <>
+      )}
+
+      {activeTab === "STATS" && <AssetStats asset={asset} detailAsset={detailAsset} isPick={isPick} />}
+
+      {activeTab === "STRAND" && !isPick && (
+        <div style={{ display: "grid", gap: 10 }}>
           <StrandDisplay
             offTraits={traits.off}
             defTraits={traits.def}
@@ -80,8 +147,12 @@ function AssetDetail({ asset }: { asset: DocketEntry["packages"][number]["assets
             H={150}
             amplitude={28}
           />
-          <DevelopmentProfilePanel asset={detailAsset} />
-        </>
+          <EdgeStrip asset={detailAsset} />
+        </div>
+      )}
+
+      {activeTab === "OUTLOOK" && hasOutlook && (
+        <DevelopmentProfilePanel asset={detailAsset} />
       )}
     </div>
   );
@@ -110,7 +181,7 @@ function ExpandedEntry({ entry }: { entry: DocketEntry }) {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+      <div className="docket-pkg-grid">
         {entry.packages.slice(0, 2).map(pkg => (
           <div key={pkg.teamId} style={{ display: "grid", gap: 8 }}>
             <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.16em", color: "var(--ledger-ink-faint)" }}>
@@ -149,12 +220,7 @@ export default function DocketClient({ entries }: DocketClientProps) {
 
   return (
     <section style={{ display: "grid", gap: 18 }}>
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(180px, 1fr) repeat(3, minmax(130px, 180px))",
-        gap: 10,
-        alignItems: "end",
-      }}>
+      <div className="docket-filters">
         <label style={{ display: "grid", gap: 5, fontSize: 10, fontWeight: 900, letterSpacing: "0.16em" }}>
           SEARCH
           <input
@@ -233,7 +299,7 @@ export default function DocketClient({ entries }: DocketClientProps) {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+            <div className="docket-pkg-grid">
               {entry.packages.slice(0, 2).map(pkg => (
                 <div key={pkg.teamId} style={{ borderTop: "1px solid var(--rule)", paddingTop: 9 }}>
                   <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: "0.16em", color: "var(--ledger-ink-faint)" }}>

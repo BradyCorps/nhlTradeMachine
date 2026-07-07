@@ -120,6 +120,27 @@ button, a, select {
   }
 }
 
+/* ── Docket responsive grids — stack on phones ───────────────── */
+.docket-pkg-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.docket-filters {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(130px, 180px));
+  gap: 10px;
+  align-items: end;
+}
+@media (max-width: 639px) {
+  .docket-pkg-grid {
+    grid-template-columns: 1fr;
+  }
+  .docket-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 /* ── Aged paper grain ────────────────────────────────────────── */
 body::before {
   content: '';
