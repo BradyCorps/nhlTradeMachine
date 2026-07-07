@@ -14,6 +14,15 @@ import { calcDevelopmentProfile } from "../app/lib/development-profile";
 
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
 
+const readArmchairAll = () =>
+  [
+    "app/armchair-gm/page.tsx",
+    "app/armchair-gm/SeasonResultsPager.tsx",
+    "app/armchair-gm/GmAnalysisTabs.tsx",
+    "app/armchair-gm/Screens.tsx",
+    "app/armchair-gm/contention.ts",
+    "app/armchair-gm/CupRunDraftSummaryModal.tsx",
+  ].map(read).join("\n");
 const LEAGUE_ROUTES = [
   "app/api/league/players/route.ts",
   "app/api/league/route.ts",
@@ -71,7 +80,7 @@ describe("Canary — NHL EDGE usage and presentation", () => {
     const xnav = read("app/lib/xnav-engine.ts");
     const rollover = read("app/lib/season-rollover.ts");
     const players = read("app/players/page.tsx");
-    const armchair = read("app/armchair-gm/page.tsx");
+    const armchair = readArmchairAll();
     const card = read("app/components/PercentileCard.tsx");
 
     expect(capture).toContain("hdFinishingDelta: edge.facts.hdFinishingDelta");
@@ -768,7 +777,7 @@ describe("Canary — Batch 5 UI state robustness", () => {
   });
 
   it("armchair breakdown table guards optional skater metrics", () => {
-    const src = read("app/armchair-gm/page.tsx");
+    const src = readArmchairAll();
     expect(src).toContain("const ptsPace = a.ptsPace ?? 0");
     expect(src).toContain("const avgTOI = a.avgTOI ?? 0");
     expect(src).toContain("const capHit = a.capHit ?? 0");
@@ -875,7 +884,7 @@ describe("Canary — footer glossary", () => {
 });
 
 describe("Canary — trade UX loading and mobile focus", () => {
-  const tradePage = read("app/armchair-gm/page.tsx");
+  const tradePage = readArmchairAll();
   const tradeLoading = read("app/armchair-gm/loading.tsx");
   const assetDropdown = read("app/components/AssetDropdown.tsx");
   const lineupEditor = read("app/components/LineupEditor.tsx");
@@ -1466,7 +1475,7 @@ describe("Canary — UX and UI polish", () => {
   it("surfaces NAV residual floors and NAV tooltips at point of use", () => {
     const card = read("app/components/AssetCard.tsx");
     const panel = read("app/components/TradePanel.tsx");
-    const armchair = read("app/armchair-gm/page.tsx");
+    const armchair = readArmchairAll();
     expect(card).toContain("const floorAdj =");
     expect(card).toContain('label="FLOOR"');
     expect(card).toContain("Franchise/career floor applied");
