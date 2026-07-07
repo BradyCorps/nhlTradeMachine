@@ -25,6 +25,11 @@ const readArmchairAll = () =>
     "app/armchair-gm/useCupRunLifecycle.ts",
     "app/armchair-gm/useOffseasonFlow.ts",
     "app/armchair-gm/useTradeBench.ts",
+    "app/armchair-gm/TeamSelectModal.tsx",
+    "app/armchair-gm/MemoModal.tsx",
+    "app/armchair-gm/CupRunResumePrompt.tsx",
+    "app/armchair-gm/VerdictSheet.tsx",
+    "app/armchair-gm/MatchResultsPanel.tsx",
   ].map(read).join("\n");
 const LEAGUE_ROUTES = [
   "app/api/league/players/route.ts",

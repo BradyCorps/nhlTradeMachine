@@ -12,14 +12,20 @@ classifyTeam), `contention.ts` (ratings math + plum palette),
 `CupRunDraftSummaryModal.tsx` (+ buildTradeCapMoves), `Screens.tsx`
 (Loading/Error). Source canaries retargeted to the module set.
 
-## Phase 2 — Decompose the main component (next)
-The 1,950-line `ArmchairGmPage` still owns ~30 useState hooks. Extract:
-- `useOffseasonFlow` — resolveLeagueOffseason effect + resign/walk/sign
-  handlers + draft/offer-sheet phase routing
-- `useCupRunLifecycle` — run state, persistence, resume guard, advance
-- `useTradeBench` — blocks, verdict, executeTrade, retention guard
-- `TeamSelectModal`, `TradeControls` as components
-Each hook lands with its own test file.
+## Phase 2 — Decompose the main component ✅ (2026-07-07)
+page.tsx 1,985 → 980 lines; `ArmchairGmPage` no longer owns the
+lifecycle logic. Extracted:
+- `useOffseasonFlow` — resolveLeagueOffseason effect + resign/walk/
+  drop/sign/offer-sheet handlers + draft phase routing
+- `useCupRunLifecycle` — run state, persistence, resume guard, the
+  year-advance league rollover
+- `useTradeBench` — executed trades, lineups, executeTrade (retention
+  guard), resetTrades
+- Components: `TeamSelectModal`, `MemoModal`, `CupRunResumePrompt`,
+  `VerdictSheet`, `MatchResultsPanel` (owns the MATCH_FOLDERS taxonomy)
+Hook-order cycles bridged with render-assigned refs read only in
+handlers (`simDataRef`, `simControlsRef`, `onSeasonRolledRef`).
+Source canaries retargeted to the module set.
 
 ## Phase 3 — Enhanced Draft Night & signing mode
 - Draft Night (year 1) keeps the 2026 broadcast; years 2-3 get an

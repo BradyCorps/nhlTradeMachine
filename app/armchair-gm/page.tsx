@@ -4,13 +4,12 @@ import TradePanel from "@/app/components/TradePanel";
 import TugBar from "@/app/components/TugBar";
 import { SEASON, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from "react";
-import { createPortal } from "react-dom";
 import { useTradeStore } from "@/app/store/tradeStore";
 import Header from "@/app/components/Header";
 import TradeHistoryBar from "@/app/components/TradeHistoryBar";
 import Footer from "@/app/components/Footer";
 import type {
-  Asset, Team, XNAVResult, TradeVerdict,
+  Asset, Team, TradeVerdict,
 } from "@/app/lib/trade-types";
 import {
   fetchNavMap, fetchTradeVerdict, clearNavCache, getCachedNav,
@@ -26,7 +25,6 @@ import ResignPhase from "@/app/components/ResignPhase";
 import OfferSheetPhase from "@/app/components/OfferSheetPhase";
 import DraftNight from "@/app/components/DraftNight";
 import { draftedRookieAssets } from "@/app/lib/draft-rookies";
-import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import TradeBlockPanel from "@/app/components/TradeBlockPanel";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 import { useSimDispatch } from "./useSimDispatch";
@@ -39,24 +37,14 @@ import { LoadingScreen, ErrorScreen } from "./Screens";
 import { useCupRunLifecycle } from "./useCupRunLifecycle";
 import { useOffseasonFlow } from "./useOffseasonFlow";
 import { useTradeBench, type SimControls } from "./useTradeBench";
+import { TeamSelectModal } from "./TeamSelectModal";
+import { MemoModal } from "./MemoModal";
+import { CupRunResumePrompt } from "./CupRunResumePrompt";
+import { VerdictSheet } from "./VerdictSheet";
+import { MatchResultsPanel, MATCH_FOLDERS, type MatchFolder, type TradeMatchResults } from "./MatchResultsPanel";
 
 const TradeProposalEngine = lazy(() => import("@/app/components/TradeProposal"));
 const PlayerComparison    = lazy(() => import("@/app/components/PlayerComparison"));
-
-const safe = (n: number) => (isNaN(n) || !isFinite(n) ? 0 : n);
-const fmt  = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
-type MatchFolder = "LEAD" | "CAP_CLEAR" | "LONG_SHOT" | "BLOCKED";
-
-const MATCH_FOLDERS: Array<{ id: MatchFolder; label: string; stamp: string }> = [
-  { id: "LEAD",      label: "Leads",      stamp: "A" },
-  { id: "CAP_CLEAR", label: "Cap Clear",  stamp: "B" },
-  { id: "LONG_SHOT", label: "Long Shot",  stamp: "C" },
-  { id: "BLOCKED",   label: "Blocked",    stamp: "X" },
-];
-
-const getXNAV = (asset: Asset): XNAVResult =>
-  getCachedNav(asset) ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
-
 
 export default function ArmchairGmPage() {
   const [booting, setBooting] = useState(true);
@@ -75,15 +63,7 @@ export default function ArmchairGmPage() {
   const homeTeamId = homeTeam?.id;
   const partnerTeamId = partnerTeam?.id;
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
-  const [matchResults, setMatchResults] = useState<null | {
-    matches: Array<{
-      teamId: string; teamName: string; phase: string; score: number;
-      fitTier: MatchFolder;
-      navDelta: number; capFit: "FITS"|"TIGHT"|"OVER";
-      fitReasons: string[]; warnReasons: string[]; returnProfile: string;
-    }>;
-    packageNAV: number; packageCap: number; avgAge: number;
-  }>(null);
+  const [matchResults, setMatchResults] = useState<TradeMatchResults | null>(null);
   const [matchLoading,    setMatchLoading]    = useState(false);
   const [approvedOnly,    setApprovedOnly]    = useState(true);
   const [matchFolder,     setMatchFolder]     = useState<MatchFolder>("LEAD");
@@ -141,7 +121,6 @@ export default function ArmchairGmPage() {
   }, [db]);
   const [verdictOpen, setVerdictOpen] = useState(false);   // bottom sheet expanded
   const [showTeamSelect, setShowTeamSelect] = useState(false); // Team select modal open
-  const [selectingTeamId, setSelectingTeamId] = useState<string | null>(null);
   const [tradeBlockOpen, setTradeBlockOpen] = useState(false);
   const [tradeRequest,   setTradeRequest]   = useState<Asset[] | null>(null);
 
@@ -593,8 +572,6 @@ export default function ArmchairGmPage() {
     );
   }
 
-  const sc = verdict ? STATUS_CONFIG[verdict.status] : STATUS_CONFIG.IDLE;
-
   return (
     <>
     <main className="min-h-screen antialiased select-none overflow-x-hidden bg-paper text-ink font-serif">
@@ -640,122 +617,24 @@ export default function ArmchairGmPage() {
       )}
 
       {/* ── Team Selection Modal ─────────────────────────────────── */}
-      {showTeamSelect && db.teams.length > 0 && typeof document !== 'undefined' && createPortal(
-        (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-          style={{ background: 'rgba(28,20,10,0.88)', backdropFilter: 'blur(4px)' }}>
-          <div className="relative w-full max-w-lg"
-            style={{ background: 'var(--ledger-card-light)', borderRadius: '2px', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}>
-
-            {/* Header rule */}
-            <div style={{ borderTop: '4px double #1c140a', borderBottom: '1px solid #b8a070', padding: '20px 28px 14px' }}>
-              <div className="text-center">
-                <div className="text-[11px] uppercase tracking-[0.5em] mb-2 text-ledger-ink-faint font-mono">
-                  The Hockey Ledger · GM Challenge
-                </div>
-                <h2 className="font-black" style={{ fontSize: '1.6rem', color: 'var(--ledger-ink)', lineHeight: 1.1 }}>
-                  Think you can do better<br/>than your GM?
-                </h2>
-                <p className="mt-3 text-[11px] leading-relaxed" style={{ color: 'var(--ledger-brown)', fontStyle: 'italic' }}>
-                  Pick your franchise. Make your moves. Sim a year and find out if you had what it takes — or if your GM was right all along.
-                </p>
-              </div>
-            </div>
-
-            <div style={{ padding: '16px 28px 20px' }}>
-              {/* Mode picker — off-season runs a re-sign phase first */}
-              <div className="flex gap-2 mb-4">
-                {([
-                  ["offseason", "Off-Season", "Re-sign free agents, then trade"],
-                  ["inseason", "In-Season", "Jump straight to trades"],
-                ] as const).map(([m, label, sub]) => {
-                  const active = mode === m;
-                  return (
-                    <button key={m} onClick={() => setMode(m)}
-                      className="flex-1 text-left px-3 py-2 transition-all"
-                      style={{
-                        background: active ? 'var(--ledger-ink)' : 'var(--ledger-card)',
-                        border: `1px solid ${active ? 'var(--ledger-ink)' : 'var(--ledger-rule-mid)'}`,
-                        borderRadius: '2px',
-                      }}>
-                      <div className="text-[11px] font-black uppercase tracking-wider font-mono"
-                        style={{ color: active ? 'var(--ledger-card-light)' : 'var(--ledger-ink)' }}>{label}</div>
-                      <div className="text-[9px] font-mono"
-                        style={{ color: active ? 'var(--ledger-rule-mid)' : 'var(--ledger-ink-faint)' }}>{sub}</div>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="flex justify-between items-center mb-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.3em] text-ledger-ink-faint font-mono">
-                  Select Your Franchise
-                </div>
-                <button onClick={() => setShowTeamSelect(false)} className="text-[10px] uppercase font-bold text-ledger-ink-faint hover:text-ledger-ink transition-colors">
-                  Close ✕
-                </button>
-              </div>
-              <div className="grid grid-cols-4 gap-1.5 mb-4" style={{ maxHeight: '260px', overflowY: 'auto' }}>
-                {db.teams
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map(t => {
-                    const isSelected = teams[0]?.id === t.id;
-                    const phase = t.phase ?? "";
-                    const phaseColor =
-                      phase === "Contender"  ? 'var(--ledger-green)' :
-                      phase === "Bubble"     ? 'var(--ledger-navy)' :
-                      phase === "Retooling"  ? 'var(--ledger-amber)' :
-                      phase === "Rebuilding" ? 'var(--ledger-red)' :
-                      'var(--ledger-brown)';
-                    const isSelecting = selectingTeamId === t.id;
-                    return (
-                      <button
-                        key={t.id}
-                        disabled={Boolean(selectingTeamId)}
-                        onClick={() => {
-                          setSelectingTeamId(t.id);
-                          setTeams(prev => {
-                            const partner = prev[1]?.id === t.id
-                              ? db.teams.find(x => x.id !== t.id) ?? null
-                              : prev[1];
-                            return [t, partner];
-                          });
-                          setBlocks([[], []]);
-                          setHomeTeamLocked(true);
-                          window.setTimeout(() => {
-                            setShowTeamSelect(false);
-                            setSelectingTeamId(null);
-                          }, 120);
-                        }}
-                        className="p-2 text-left transition-all disabled:cursor-wait"
-                        style={{
-                          background: isSelected ? 'var(--ledger-ink)' : 'var(--ledger-card)',
-                          border: `1px solid ${isSelected ? 'var(--ledger-ink)' : 'var(--ledger-rule-mid)'}`,
-                          borderRadius: '2px',
-                          opacity: selectingTeamId && !isSelecting ? 0.45 : 1,
-                        }}
-                      >
-                        <div className="flex flex-col items-center justify-center gap-1.5 py-1">
-                          <img src={`https://assets.nhle.com/logos/nhl/svg/${t.id}_light.svg`} alt={t.id} className="w-8 h-8 opacity-90 mix-blend-multiply" onError={(e) => (e.currentTarget.style.display = 'none')} />
-                          <div className="text-[9px] font-black uppercase tracking-widest text-center leading-tight" style={{
-                            color: isSelected ? 'var(--ledger-ink-faint)' : phaseColor,
-                            lineHeight: 1.1
-                          }}>
-                            {isSelecting ? "Loading" : phase}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-              </div>
-
-              <p className="text-center mt-2 text-[11px] text-ledger-rule font-mono">
-                Tap a team to take control. Reset via Void All Trades.
-              </p>
-            </div>
-          </div>
-        </div>
-        ),
-        document.body
+      {showTeamSelect && db.teams.length > 0 && (
+        <TeamSelectModal
+          teams={db.teams}
+          selectedHomeId={teams[0]?.id}
+          mode={mode}
+          onModeChange={setMode}
+          onSelectTeam={(t) => {
+            setTeams(prev => {
+              const partner = prev[1]?.id === t.id
+                ? db.teams.find(x => x.id !== t.id) ?? null
+                : prev[1];
+              return [t, partner];
+            });
+            setBlocks([[], []]);
+            setHomeTeamLocked(true);
+          }}
+          onClose={() => setShowTeamSelect(false)}
+        />
       )}
 
       {/* ── Off-Season Draft Night (display-only, before free agency) ── */}
@@ -824,89 +703,13 @@ export default function ArmchairGmPage() {
 
       {/* ── Front Office Memo Modal ───────────────────────────── */}
       {showMemo && verdict?.claudeAnalysis && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6"
-          style={{ background: 'rgba(28,20,10,0.75)', backdropFilter: 'blur(3px)' }}
-          onClick={() => setShowMemo(false)}>
-          <div className="relative max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-            style={{ background: 'var(--ledger-card-light)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', borderRadius: '2px' }}
-            onClick={e => e.stopPropagation()}>
-
-            {/* Memo letterhead */}
-            <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-4" style={{ borderBottom: '2px solid #1c140a' }}>
-              <div className="text-center mb-4">
-                <div className="text-2xs uppercase tracking-[0.5em] mb-1 text-ledger-ink-faint font-mono">
-                  Quant Front Office — Internal Memorandum
-                </div>
-                <div className="font-black text-2xl" style={{ color: 'var(--ledger-ink)' }}>
-                  Trade Evaluation Report
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5 text-2xs font-mono">
-                {[
-                  ["TO",      "GM & Hockey Operations Leadership"],
-                  ["FROM",    "Senior Front Office Analyst — Claude"],
-                  ["DATE",    new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })],
-                  ["RE",      `${teams[0]?.name ?? 'Home'} ↔ ${teams[1]?.name ?? 'Partner'} Trade`],
-                  ["VERDICT", verdict.status],
-                  ["NAV",     `${verdict.metrics.homeNetGain > 0 ? '+' : ''}${verdict.metrics.homeNetGain.toFixed(0)} for ${teams[0]?.name ?? 'Home'}`],
-                ].map(([label, val]) => (
-                  <div key={label} className="flex gap-3">
-                    <span className="font-black w-16 shrink-0 text-ledger-brown">{label}:</span>
-                    <span style={{ color: (label === "VERDICT" && (verdict.status === "WIN" || verdict.status === "FAIR")) ? 'var(--ledger-green)'
-                      : (label === "VERDICT" && (verdict.status === "BLOCKED" || verdict.status === "DECLINED")) ? 'var(--ledger-red)'
-                      : 'var(--ledger-ink)' }}>{val}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Memo body */}
-            <div className="px-4 sm:px-8 py-5 sm:py-6 relative">
-              {/* Faint ruled lines like a memo pad */}
-              <div className="absolute inset-0 pointer-events-none" style={{
-                backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, rgba(184,160,112,0.2) 28px)',
-                backgroundSize: '100% 28px',
-                top: '24px'
-              }} />
-              <p className="relative text-[12px] leading-[1.85]" style={{
-                color: 'var(--ledger-ink)',
-                whiteSpace: 'pre-wrap',
-              }}>
-                {verdict.claudeAnalysis}
-              </p>
-            </div>
-
-            {/* Verdict stamp + disclaimer */}
-            <div className="px-4 sm:px-8 pb-5 sm:pb-6 flex items-end justify-between flex-wrap gap-3" style={{ borderTop: '1px solid #b8a070', paddingTop: '16px' }}>
-              <div className="text-2xs" style={{ color: 'var(--ledger-ink-faint)', lineHeight: 1.6 }}>
-                CONFIDENTIAL — Internal Use Only<br />
-                Valuations are analytical estimates only.
-              </div>
-              <div style={{ transform: 'rotate(-4deg)', transformOrigin: 'center' }}>
-                <div className="px-4 py-1.5 text-center font-black text-base uppercase tracking-widest" style={{
-                  border: `3px solid ${['WIN','FAIR'].includes(verdict.status) ? 'var(--ledger-green)' : 'var(--ledger-red)'}`,
-                  color: ['WIN','FAIR'].includes(verdict.status) ? 'var(--ledger-green)' : 'var(--ledger-red)',
-                  opacity: 0.85,
-                }}>
-                  {verdict.status}
-                </div>
-              </div>
-            </div>
-
-            {/* Footer actions */}
-            <div className="px-4 sm:px-8 py-3 flex justify-between items-center flex-wrap gap-2" style={{ borderTop: '1px solid #b8a070' }}>
-              <button onClick={() => { setShowMemo(false); generateClaudeAnalysis(); }}
-                className="text-2xs font-black uppercase tracking-wider transition-opacity hover:opacity-60 text-ledger-ink-faint font-mono">
-                ↺ Regenerate
-              </button>
-              <button onClick={() => setShowMemo(false)}
-                className="text-2xs font-black uppercase tracking-wider px-4 py-1.5"
-                style={{ background: 'var(--ledger-ink)', color: 'var(--ledger-card-light)', borderRadius: '2px' }}>
-                Close ✕
-              </button>
-            </div>
-          </div>
-        </div>
+        <MemoModal
+          verdict={verdict}
+          homeTeamName={teams[0]?.name}
+          partnerTeamName={teams[1]?.name}
+          onClose={() => setShowMemo(false)}
+          onRegenerate={generateClaudeAnalysis}
+        />
       )}
 
       <div className="fixed inset-0 pointer-events-none bg-newsprint" />
@@ -918,49 +721,10 @@ export default function ArmchairGmPage() {
         <TradeHistoryBar />
 
         {/* ── Cup Run resume guard — never restore a mid-run flag silently ── */}
-        {cupRunPrompt && (() => {
-          const resumable = cupRunPrompt.currentYear === 1 && cupRunPrompt.seasons.length === 0;
-          return (
-            <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4" style={{ background: 'rgba(20,16,8,0.55)' }}>
-              <div className="max-w-md w-full border p-5" style={{ background: 'var(--paper, var(--ledger-cream))', borderColor: 'var(--ledger-ink)', borderRadius: 2 }}>
-                <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono mb-2" style={{ color: 'var(--ledger-red)' }}>
-                  Cup Run In Progress
-                </div>
-                <div className="text-[12px] font-serif leading-relaxed mb-1" style={{ color: 'var(--ledger-ink)' }}>
-                  <strong>{cupRunPrompt.teamName}</strong> — Year {cupRunPrompt.currentYear} of 3, {cupRunPrompt.difficulty.label} ({cupRunPrompt.difficulty.stars}★)
-                </div>
-                <div className="text-[11px] font-mono leading-relaxed mb-4" style={{ color: 'var(--ledger-ink-faint)' }}>
-                  {resumable
-                    ? "Your trades from the previous session were lost with the tab, but the run itself can pick up from the Year 1 offseason."
-                    : `The Year ${cupRunPrompt.currentYear} league state (rolled rosters, trades) can't be restored after the tab closed — continuing would leave the GM in a broken half-state. This run has to be abandoned.`}
-                </div>
-                <div className="flex gap-2">
-                  {resumable && (
-                    <button
-                      onClick={() => dismissCupRunPrompt(true)}
-                      className="flex-1 py-2 text-[11px] font-black font-mono uppercase tracking-[0.15em] border"
-                      style={{ background: 'var(--ledger-red)', color: '#fff', borderColor: 'var(--ledger-red)', borderRadius: 2, cursor: 'pointer' }}
-                    >
-                      Resume Run
-                    </button>
-                  )}
-                  <button
-                    onClick={() => dismissCupRunPrompt(false)}
-                    className="flex-1 py-2 text-[11px] font-black font-mono uppercase tracking-[0.15em] border"
-                    style={{
-                      background: resumable ? 'transparent' : 'var(--ledger-red)',
-                      color: resumable ? 'var(--ledger-ink)' : '#fff',
-                      borderColor: resumable ? 'var(--ledger-rule-mid, var(--ledger-ink))' : 'var(--ledger-red)',
-                      borderRadius: 2, cursor: 'pointer',
-                    }}
-                  >
-                    {resumable ? "Abandon & Start Fresh" : "Abandon Run"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+        {cupRunPrompt && (
+          <CupRunResumePrompt prompt={cupRunPrompt} onDismiss={dismissCupRunPrompt} />
+        )}
+
 
         {/* ── Cup Run Challenge HUD ── */}
         <CupRunPanel
@@ -1094,165 +858,16 @@ export default function ArmchairGmPage() {
             )}
 
             {/* ── Match Results ── */}
-            {matchResults && matchResults.matches.length > 0 && (() => {
-              const capScreened = approvedOnly
-                ? matchResults.matches.filter(m => m.capFit !== "OVER")
-                : matchResults.matches;
-              const folderCounts = MATCH_FOLDERS.reduce<Record<MatchFolder, number>>((acc, folder) => {
-                acc[folder.id] = capScreened.filter(m => m.fitTier === folder.id).length;
-                return acc;
-              }, { LEAD: 0, CAP_CLEAR: 0, LONG_SHOT: 0, BLOCKED: 0 });
-              const activeFolder = folderCounts[matchFolder] > 0
-                ? matchFolder
-                : (MATCH_FOLDERS.find(f => folderCounts[f.id] > 0)?.id ?? matchFolder);
-              const displayed = capScreened.filter(m => m.fitTier === activeFolder);
-              const fullCount = matchResults.matches.length;
-              const visibleCount = capScreened.length;
-              return (
-              <div className="mt-3">
-                <div className="flex items-end gap-1 overflow-x-auto pb-0.5"
-                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--ledger-rule) transparent' }}>
-                  {MATCH_FOLDERS.map(folder => {
-                    const active = folder.id === activeFolder;
-                    return (
-                      <button
-                        key={folder.id}
-                        onClick={() => setMatchFolder(folder.id)}
-                        className="shrink-0 px-2.5 py-1.5 text-2xs font-black uppercase font-mono transition-all"
-                        style={{
-                          minWidth: 74,
-                          background: active ? 'var(--ledger-card-light)' : 'var(--ledger-cream)',
-                          color: active ? 'var(--ledger-ink)' : 'var(--ledger-ink-faint)',
-                          border: active ? '2px solid var(--ledger-navy)' : '1px solid var(--ledger-rule)',
-                          borderBottom: active ? '0' : '1px solid var(--ledger-rule)',
-                          borderRadius: '6px 6px 0 0',
-                          transform: active ? 'translateY(1px)' : 'none',
-                        }}>
-                        <span style={{ marginRight: 4, color: active ? 'var(--ledger-red)' : 'var(--ledger-rule)' }}>
-                          {folder.stamp}
-                        </span>
-                        {folder.label}
-                        <span style={{ marginLeft: 5, color: 'var(--ledger-ink-faint)' }}>
-                          {folderCounts[folder.id]}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="p-3"
-                  style={{
-                    background: 'var(--ledger-card-light)',
-                    border: '2px solid var(--ledger-navy)',
-                    boxShadow: 'inset 0 0 0 1px var(--ledger-rule-light)',
-                  }}>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div>
-                      <div className="text-2xs font-black uppercase tracking-[0.35em] font-mono"
-                        style={{ color: 'var(--ledger-navy)' }}>
-                        Partner Dossier
-                      </div>
-                      <div className="text-2xs font-mono mt-1" style={{ color: 'var(--ledger-ink-faint)' }}>
-                        {visibleCount} of {fullCount} clubs filed
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setApprovedOnly(v => !v)}
-                      className="text-2xs font-mono px-2 py-1 transition-colors"
-                      style={{
-                        background: approvedOnly ? 'var(--ledger-green)' : 'var(--ledger-rule-light)',
-                        color: approvedOnly ? 'white' : 'var(--ledger-ink-faint)',
-                        fontWeight: 900, border: '1px solid var(--ledger-rule)', cursor: 'pointer',
-                      }}>
-                      {approvedOnly ? 'CAP SCREEN' : 'ALL CLUBS'}
-                    </button>
-                  </div>
-                  <div className="text-2xs font-mono mb-3 text-center py-1"
-                    style={{
-                      color: 'var(--ledger-ink-faint)',
-                      borderTop: '1px solid var(--ledger-rule-light)',
-                      borderBottom: '1px solid var(--ledger-rule-light)',
-                    }}>
-                    Package: {matchResults.packageNAV > 0 ? "+" : ""}{matchResults.packageNAV.toFixed(0)} NAV
-                    · ${matchResults.packageCap.toFixed(1)}M cap
-                    {matchResults.avgAge > 0 ? ` · avg ${matchResults.avgAge.toFixed(0)} yrs old` : ""}
-                  </div>
-                  {displayed.length === 0 && (
-                    <div className="text-center text-2xs font-mono py-4" style={{ color: 'var(--ledger-ink-faint)' }}>
-                      No clubs in this folder.
-                      {approvedOnly && (
-                        <button onClick={() => setApprovedOnly(false)} className="ml-2 underline">Open full file</button>
-                      )}
-                    </div>
-                  )}
-                  <div className="space-y-2 overflow-y-auto pr-1"
-                    style={{ maxHeight: '440px', scrollbarWidth: 'thin', scrollbarColor: 'var(--ledger-rule) transparent' }}>
-                    {displayed.map((m, i) => (
-                      <div key={m.teamId} className="p-2.5"
-                      style={{
-                        background: i === 0 ? 'rgba(26,46,92,0.08)' : 'var(--ledger-card)',
-                        border: i === 0 ? '1px solid var(--ledger-navy)' : '1px solid var(--ledger-rule)',
-                        borderRadius: 3,
-                      }}>
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-2xs font-black" style={{ color: 'var(--ledger-ink-faint)', fontFamily: 'monospace' }}>
-                            #{i + 1}
-                          </span>
-                          <span className="font-black text-[11px]" style={{ color: 'var(--ledger-ink)' }}>
-                            {m.teamName}
-                          </span>
-                          <span className="text-2xs font-mono px-1.5 py-0.5 rounded"
-                            style={{ background: 'var(--ledger-rule-light)', color: 'var(--ledger-ink-body)' }}>
-                            {m.phase}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-2xs font-mono"
-                            style={{ color: m.capFit === "FITS" ? 'var(--ledger-green)' : m.capFit === "TIGHT" ? 'var(--ledger-amber)' : 'var(--ledger-red)' }}>
-                            {m.capFit}
-                          </span>
-                          {/* Score bar */}
-                          <div className="flex items-center gap-1">
-                            <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--ledger-rule-light)' }}>
-                              <div className="h-full rounded-full"
-                                style={{ width: `${m.score}%`, background: m.score >= 65 ? 'var(--ledger-navy)' : m.score >= 45 ? 'var(--ledger-amber)' : 'var(--ledger-red)' }} />
-                            </div>
-                            <span className="text-2xs font-black font-mono" style={{ color: 'var(--ledger-ink)', minWidth: 24 }}>
-                              {m.score}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      {m.fitReasons.length > 0 && (
-                        <div className="text-2xs font-mono space-y-0.5 mb-1">
-                          {m.fitReasons.map((r, j) => (
-                            <div key={j} style={{ color: 'var(--ledger-green)' }}>✓ {r}</div>
-                          ))}
-                        </div>
-                      )}
-                      {m.warnReasons.length > 0 && (
-                        <div className="text-2xs font-mono space-y-0.5 mb-1">
-                          {m.warnReasons.map((r, j) => (
-                            <div key={j} style={{ color: 'var(--ledger-amber)' }}>⚠ {r}</div>
-                          ))}
-                        </div>
-                      )}
-                      <div className="text-2xs font-mono mt-1 pt-1" style={{ color: 'var(--ledger-ink-faint)', borderTop: '1px solid var(--ledger-rule-light)' }}>
-                        Return profile: {m.returnProfile}
-                      </div>
-                    </div>
-                  ))}
-                  </div>
-                  {displayed.length > 3 && (
-                    <div className="text-2xs font-mono text-center mt-1.5"
-                      style={{ color: 'var(--ledger-ink-faint)' }}>
-                      scroll file · {displayed.length} clubs in folder
-                    </div>
-                  )}
-                  </div>
-              </div>
-              );
-            })()}
+            {matchResults && matchResults.matches.length > 0 && (
+              <MatchResultsPanel
+                matchResults={matchResults}
+                matchFolder={matchFolder}
+                setMatchFolder={setMatchFolder}
+                approvedOnly={approvedOnly}
+                setApprovedOnly={setApprovedOnly}
+              />
+            )}
+
 
             {/* My Team, My Call and Execute Trade moved to Verdict Bottom Sheet */}
 
@@ -1337,172 +952,24 @@ export default function ArmchairGmPage() {
       </div>
     </main>
 
-    {/* ── Verdict Bottom Sheet ─────────────────────────────────────
-        Always anchored to the bottom of the viewport — no scrolling needed.
-        Collapsed: shows status pill + net NAV + tap to expand.
-        Expanded: full VerdictPanel slides up into view.
-        Auto-opens when GM Audit completes. */}
-    {verdict && verdict.status !== "IDLE" && (() => {
-      const v = verdict!; // narrow to non-null for TypeScript
-      return (
-      <div
-        className="fixed bottom-0 left-0 right-0 z-40 transition-all duration-300 ease-out"
-        style={{
-          transform: verdictOpen ? 'translateY(0)' : 'translateY(calc(100% - 52px))',
-          maxHeight: verdictOpen ? '70vh' : '52px',
-          boxShadow: '0 -4px 32px rgba(28,20,10,0.35)',
-          background: 'var(--ledger-card-light)',
-          borderTop: `3px solid ${sc.cssColor}`,
-        }}>
+    {/* ── Verdict Bottom Sheet — see VerdictSheet.tsx ── */}
+    {verdict && verdict.status !== "IDLE" && (
+      <VerdictSheet
+        verdict={verdict}
+        verdictOpen={verdictOpen}
+        setVerdictOpen={setVerdictOpen}
+        homeTeamName={teams[0]?.name}
+        expandedFlag={expandedFlag}
+        setExpandedFlag={setExpandedFlag}
+        onRunEval={runEval}
+        onCopyLink={copyTradeLink}
+        linkCopied={linkCopied}
+        onRequestClaudeAnalysis={generateClaudeAnalysis}
+        onOpenMemo={() => setShowMemo(true)}
+        onExecute={() => { executeTrade(); setHomeTeamLocked(true); setVerdictOpen(false); }}
+      />
+    )}
 
-        {/* ── Handle / collapsed strip ─────────────────────────── */}
-        <button
-          onClick={() => setVerdictOpen(o => !o)}
-          className="w-full flex items-center justify-between px-4 sm:px-6"
-          style={{ height: 52, background: 'transparent' }}>
-          <div className="flex items-center gap-3">
-            {/* Status pill */}
-            <span className="px-2.5 py-0.5 font-black text-2xs uppercase tracking-widest rounded-sm"
-              style={{ background: sc.cssColor, color: 'white', letterSpacing: '0.15em' }}>
-              {v.status}
-            </span>
-
-            {/* Context-aware summary — NAV for WIN/LOSS/FAIR, flags for BLOCKED/DECLINED */}
-            {(v.status === 'WIN' || v.status === 'FAIR' || v.status === 'LOSS') && (
-              <span className="font-black text-[13px]" style={{
-                color: v.status === 'WIN' ? 'var(--ledger-green)' : v.status === 'LOSS' ? 'var(--ledger-red)' : 'var(--ledger-ink)'
-              }}>
-                {v.metrics.homeNetGain > 0 ? '+' : ''}{v.metrics.homeNetGain.toFixed(0)} NAV
-                <span className="font-normal text-2xs ml-2 font-mono" style={{ color: 'var(--ledger-ink-faint)' }}>
-                  for {teams[0]?.name ?? 'Home'}
-                </span>
-              </span>
-            )}
-
-            {(v.status === 'BLOCKED' || v.status === 'DECLINED') && (() => {
-              const hardFlags = v.flags.filter(f => f.severity === 'HARD');
-              const topFlag   = hardFlags[0];
-              return (
-                <span className="font-black text-[13px]" style={{ color: 'var(--ledger-red)' }}>
-                  {topFlag ? topFlag.headline : 'Trade blocked'}
-                  {hardFlags.length > 1 && (
-                    <span className="font-normal text-2xs ml-2 font-mono" style={{ color: 'var(--ledger-ink-faint)' }}>
-                      +{hardFlags.length - 1} more
-                    </span>
-                  )}
-                </span>
-              );
-            })()}
-
-            {/* Soft flag count — shown for all statuses when present */}
-            {v.flags.filter(f => f.severity === 'HARD').length > 0
-              && v.status !== 'BLOCKED' && v.status !== 'DECLINED' && (
-              <span className="text-2xs font-mono px-1.5 py-0.5 rounded"
-                style={{ background: 'rgba(166,53,36,0.12)', color: 'var(--ledger-red)' }}>
-                {v.flags.filter(f => f.severity === 'HARD').length} hard flag{v.flags.filter(f => f.severity === 'HARD').length !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-          <span className="text-2xs font-mono" style={{ color: 'var(--ledger-ink-faint)' }}>
-            {verdictOpen ? 'collapse ↓' : 'expand ↑'}
-          </span>
-        </button>
-
-        {/* ── Expanded content — scrollable ────────────────────── */}
-        {verdictOpen && (
-          <div className="overflow-y-auto px-4 sm:px-6 pb-6 pt-1"
-            style={{ maxHeight: 'calc(70vh - 52px)', scrollbarWidth: 'thin', scrollbarColor: 'var(--ledger-rule) transparent' }}>
-            <div className="lg:hidden grid grid-cols-2 gap-2 mb-3">
-              <button
-                onClick={runEval}
-                className="py-2.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 active:scale-[0.98]"
-                style={{
-                  background: 'var(--ledger-ink)',
-                  color: 'var(--ledger-card-light)',
-                  borderRadius: '2px',
-                }}>
-                Re-audit
-              </button>
-              <button
-                onClick={copyTradeLink}
-                className="py-2.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 active:scale-[0.98]"
-                style={{
-                  background: 'transparent',
-                  border: `1px solid ${linkCopied ? 'var(--ledger-green)' : 'var(--ledger-rule)'}`,
-                  color: linkCopied ? 'var(--ledger-green)' : 'var(--ledger-ink-faint)',
-                  borderRadius: '2px',
-                }}>
-                {linkCopied ? 'Copied' : 'Copy link'}
-              </button>
-            </div>
-            <VerdictPanel
-              verdict={v}
-              sc={sc}
-              expandedFlag={expandedFlag}
-              setExpandedFlag={setExpandedFlag}
-              onRequestClaudeAnalysis={generateClaudeAnalysis}
-              onOpenMemo={() => setShowMemo(true)} />
-
-            {/* ── Execute Trade Actions ── */}
-            <div className="mt-4 flex flex-col gap-2">
-              {(v.status === "FAIR" || v.status === "WIN") && (
-                <button onClick={() => { executeTrade(); setHomeTeamLocked(true); setVerdictOpen(false); }}
-                  className="w-full py-4 font-black uppercase tracking-widest text-[13px] transition-all duration-200 active:scale-[0.97] btn-green-ink rounded shadow-lg">
-                  ✓ Execute Trade — File It
-                </button>
-              )}
-
-              {/* My Team, My Call — override for DECLINED/BLOCKED/LOSS
-                  Cannot override: hard NMC refusal, cap violations, floor violations
-                  Cannot override: Hard flags raised by the opposing GM (they refuse the trade) */}
-              {(v.status === "DECLINED" || v.status === "BLOCKED" || v.status === "LOSS") && (() => {
-                const hasHardNhlRule = v.flags.some(f => f.severity === "HARD" && (
-                  f.category === "CLAUSE" ||
-                  f.category === "CAP_VIOLATION" ||
-                  f.category === "FLOOR_VIOLATION"
-                ));
-                const isVetoCat = (cat: string) => ["POSITIONAL_REDUNDANCY", "TIMELINE_MISMATCH", "CLAUSE", "ASSET_SHAPE_MISMATCH", "ELITE_BLOCKADE", "REBUILD_LOGIC", "VALUE_VETO"].includes(cat);
-                const partnerVetoed = v.flags.some(f => 
-                  (f.vetoesSide === 1 || f.perspective === "partner") && 
-                  (f.severity === "HARD" || isVetoCat(f.category))
-                );
-                
-                const canOverride = !hasHardNhlRule && !partnerVetoed;
-
-                if (canOverride) {
-                  return (
-                    <button onClick={() => { executeTrade(); setHomeTeamLocked(true); setVerdictOpen(false); }}
-                      className="w-full py-3.5 font-black uppercase tracking-widest text-xs transition-all duration-200 active:scale-[0.97] rounded shadow-lg"
-                      style={{
-                        background: 'transparent',
-                        border: '2px solid #b83020',
-                        color: 'var(--ledger-red)',
-                      }}
-                      title="You're giving up value — but it's your team, your call. This trade will be locked in.">
-                      ⚠ My Team, My Call — Override & Execute
-                    </button>
-                  );
-                } else if (partnerVetoed) {
-                  return (
-                    <div className="w-full py-3 text-center font-mono text-[11px] rounded bg-red-950/20 text-red-500 border border-red-900/50">
-                      Opposing GM has vetoed this trade.
-                    </div>
-                  );
-                } else if (hasHardNhlRule) {
-                  return (
-                    <div className="w-full py-3 text-center font-mono text-[11px] rounded bg-red-950/20 text-red-500 border border-red-900/50">
-                      Blocked by CBA regulations.
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-            </div>
-          </div>
-        )}
-      </div>
-      );
-    })()}
 
     {/* Bottom padding so page content isn't hidden behind verdict bar */}
     {verdict && verdict.status !== "IDLE" && <div style={{ height: 52 }} />}
