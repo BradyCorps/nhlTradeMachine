@@ -30,6 +30,7 @@ const readArmchairAll = () =>
     "app/armchair-gm/CupRunResumePrompt.tsx",
     "app/armchair-gm/VerdictSheet.tsx",
     "app/armchair-gm/MatchResultsPanel.tsx",
+    "app/armchair-gm/TeamEdgeTiles.tsx",
   ].map(read).join("\n");
 const LEAGUE_ROUTES = [
   "app/api/league/players/route.ts",
@@ -92,10 +93,15 @@ describe("Canary — NHL EDGE usage and presentation", () => {
     const card = read("app/components/PercentileCard.tsx");
 
     expect(capture).toContain("hdFinishingDelta: edge.facts.hdFinishingDelta");
-    expect(capture).toContain("export async function latestEdgeLuckMap");
-    expect(roster).toContain("const edgeLuck = await latestEdgeLuckMap");
-    expect(roster).toContain("hdFinishingDelta: edgeLuck.get(String(p.id)) ?? null");
+    expect(capture).toContain("export async function latestEdgeSignalMap");
+    expect(capture).toContain("speedMaxMph: fromPayload.speedMaxMph");
+    expect(roster).toContain("const edgeSignals = await latestEdgeSignalMap");
+    expect(roster).toContain("hdFinishingDelta: edgeSignal?.hdFinishingDelta ?? null");
+    expect(roster).toContain("edgeOzPct: edgeSignal?.ozPct ?? null");
+    expect(roster).toContain("edgeSpeedMaxMph: edgeSignal?.speedMaxMph ?? null");
     expect(types).toContain("hdFinishingDelta?: number | null");
+    expect(types).toContain("edgeOzPct?: number | null");
+    expect(types).toContain("edgeSpeedMaxMph?: number | null");
     expect(xnav).toContain("const edgeLuckAdj = asset.hdFinishingDelta != null");
     expect(rollover).toContain("if (p.hdFinishingDelta != null)");
     expect(players).toContain('{ label: "EDGE HD"');
@@ -103,6 +109,8 @@ describe("Canary — NHL EDGE usage and presentation", () => {
     expect(players).toContain("hdFinishingDelta: player.hdFinishingDelta ?? undefined");
     expect(card).toContain("hdFinishingDelta: player.hdFinishingDelta ?? undefined");
     expect(armchair).toContain("NHL EDGE HD");
+    expect(armchair).toContain("computeTeamEdgeProfile");
+    expect(armchair).toContain("Team EDGE Snapshot");
   });
 });
 
@@ -275,6 +283,24 @@ describe("Canary — simulation engine numeric guards", () => {
     const src = read("app/lib/sim-engine.ts");
     expect(src).toContain("Number.isFinite(p.ptsPace)");
     expect(src).toContain("Number.isFinite(p.baselinePtsPace)");
+  });
+});
+
+describe("Canary — Armchair rework Phase 3", () => {
+  it("keeps future draft choice and signing market controls wired", () => {
+    const armchair = readArmchairAll();
+    const futureDraft = read("app/lib/future-draft-choice.ts");
+    const resign = read("app/components/ResignPhase.tsx");
+
+    expect(futureDraft).toContain("futureDraftPromptForUserPick");
+    expect(futureDraft).toContain("applyFutureDraftChoice");
+    expect(armchair).toContain("onSelectUserPick");
+    expect(armchair).toContain("selectFutureDraftPick");
+    expect(resign).toContain('const [marketSort, setMarketSort] = useState<"ask" | "nav" | "age">("ask")');
+    expect(resign).toContain("NAV {nav > 0 ? \"+\" : \"\"}{nav.toFixed(0)}");
+    expect(resign).toContain("EDGE HD");
+    expect(resign).toContain("Age {ageArrow}");
+    expect(resign).toContain("capPct");
   });
 });
 
@@ -921,8 +947,11 @@ describe("Canary — trade UX loading and mobile focus", () => {
     const simulateRoute = read("app/api/simulate/route.ts");
     const simDispatch = read("app/armchair-gm/useSimDispatch.ts");
     expect(lineupEditor).toContain("onLineupChange");
+    expect(lineupEditor).toContain("savedLineupOrders");
+    expect(lineupEditor).toContain("hydrateLineupOrdersForRoster");
     expect(lineupEditor).toContain("forwards: orders.F.slice(0, 12)");
     expect(tradePage).toContain("lineupOrders");
+    expect(tradePage).toContain("savedLineupOrders={lineupOrders}");
     expect(simDispatch).toContain("newlyAddedPlayers");
     expect(simDispatch).toContain("simPlayerPool");
     expect(simDispatch).toContain("orders: lineupOrders");

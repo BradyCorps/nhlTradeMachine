@@ -81,26 +81,75 @@ export async function capturePlayerSnapshots(playerIds: number[], season: number
   return { requested: ids.length, landingStored, edgeStored, failures, day };
 }
 
-/** Latest edge luck signal per NHL player id — joined onto rosters at
- *  read time so the valuation/sim layers see real tracking data. */
-export async function latestEdgeLuckMap(season: number): Promise<Map<string, number>> {
-  const map = new Map<string, number>();
+export interface EdgeSignals {
+  hdFinishingDelta: number | null;
+  ozPct: number | null;
+  ozPercentile: number | null;
+  speedMaxMph: number | null;
+  burstsOver20: number | null;
+}
+
+const finiteOrNull = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const payloadSignals = (payload: string): Omit<EdgeSignals, "hdFinishingDelta"> => {
+  try {
+    const raw = JSON.parse(payload);
+    return {
+      ozPct: finiteOrNull(raw?.zoneTimeDetails?.offensiveZonePctg),
+      ozPercentile: finiteOrNull(raw?.zoneTimeDetails?.offensiveZonePercentile),
+      speedMaxMph: finiteOrNull(raw?.skatingSpeed?.speedMax?.imperial),
+      burstsOver20: finiteOrNull(raw?.skatingSpeed?.burstsOver20?.value),
+    };
+  } catch {
+    return { ozPct: null, ozPercentile: null, speedMaxMph: null, burstsOver20: null };
+  }
+};
+
+/** Latest EDGE signals per NHL player id — joined onto rosters at read time
+ *  so valuation, sim, and team presentation all consume the same snapshot. */
+export async function latestEdgeSignalMap(season: number): Promise<Map<string, EdgeSignals>> {
+  const map = new Map<string, EdgeSignals>();
   try {
     await ensureNhlSnapshotTable();
     const rows = await db.select({
       playerId: nhlSnapshots.playerId,
       capturedAt: nhlSnapshots.capturedAt,
       hdFinishingDelta: nhlSnapshots.hdFinishingDelta,
+      ozPct: nhlSnapshots.ozPct,
+      payload: nhlSnapshots.payload,
       source: nhlSnapshots.source,
       season: nhlSnapshots.season,
     }).from(nhlSnapshots);
-    const latest = new Map<number, { at: number; delta: number }>();
+    const latest = new Map<number, { at: number; signals: EdgeSignals }>();
     for (const r of rows) {
-      if (r.source !== "edge" || r.season !== season || r.hdFinishingDelta == null) continue;
+      if (r.source !== "edge" || r.season !== season) continue;
       const prev = latest.get(r.playerId);
-      if (!prev || r.capturedAt > prev.at) latest.set(r.playerId, { at: r.capturedAt, delta: r.hdFinishingDelta });
+      if (prev && r.capturedAt <= prev.at) continue;
+      const fromPayload = payloadSignals(r.payload);
+      latest.set(r.playerId, {
+        at: r.capturedAt,
+        signals: {
+          hdFinishingDelta: finiteOrNull(r.hdFinishingDelta),
+          ozPct: finiteOrNull(r.ozPct) ?? fromPayload.ozPct,
+          ozPercentile: fromPayload.ozPercentile,
+          speedMaxMph: fromPayload.speedMaxMph,
+          burstsOver20: fromPayload.burstsOver20,
+        },
+      });
     }
-    for (const [id, v] of latest) map.set(String(id), v.delta);
+    for (const [id, v] of latest) map.set(String(id), v.signals);
   } catch { /* feed table unavailable — signal simply absent */ }
+  return map;
+}
+
+/** Back-compat helper for valuation and older call sites that only need the
+ *  high-danger finishing luck signal. */
+export async function latestEdgeLuckMap(season: number): Promise<Map<string, number>> {
+  const signals = await latestEdgeSignalMap(season);
+  const map = new Map<string, number>();
+  for (const [id, s] of signals) {
+    if (s.hdFinishingDelta != null) map.set(id, s.hdFinishingDelta);
+  }
   return map;
 }

@@ -59,6 +59,7 @@ export const FA = {
   gMaxTerm:      6,       // goalies rarely sign beyond six years
 
   rfaDiscount:   0.82,    // RFA team control suppresses AAV vs open market
+  aiMarketCapReserve: 0.775, // AI teams keep one league-min emergency slot when shopping the open market
 
   // Ascending-star projection: the market pays young stars for their
   // prime, not their current pace (Carlsson's 5x$90M offer sheet reset
@@ -414,6 +415,7 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
   if (mutableCap && ctx.teams) {
     const signedMarketIds = new Set<string>();
     const aiTeams = ctx.teams.filter((t) => t.id !== ctx.userTeamId);
+    const marketBudget = (teamId: string) => (mutableCap.get(teamId) ?? 0) - FA.aiMarketCapReserve;
     const phaseScore = (phase?: string) =>
       phase === "Contender" ? 18 :
       phase === "Bubble" ? 12 :
@@ -438,13 +440,13 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
         : a.player.name.localeCompare(b.player.name)
     )) {
       const candidates = aiTeams
-        .filter((team) => (mutableCap.get(team.id) ?? 0) >= pending.contract.aav)
+        .filter((team) => marketBudget(team.id) + 1e-9 >= pending.contract.aav)
         .map((team) => {
           const rand = mulberry32(seed + hashString(`market:${pending.player.id}:${team.id}`));
           return {
             team,
             score:
-              (mutableCap.get(team.id) ?? 0) * 0.6 +
+              marketBudget(team.id) * 0.6 +
               phaseScore(team.phase) +
               positionNeedScore(team.id, pending.player.position) +
               (33 - (team.standing ?? 16)) * 0.15 +

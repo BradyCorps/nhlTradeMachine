@@ -36,6 +36,10 @@ export interface Asset {
   developmentProfile?: DevelopmentProfile | null; // diagnostic future-value layer; not blended into X-NAV
   xgRelTM?: number | null;
   hdFinishingDelta?: number | null; // EDGE high-danger finishing vs league — luck signal from nhl_snapshots
+  edgeOzPct?: number | null;         // EDGE offensive-zone time share from latest snapshot
+  edgeOzPercentile?: number | null;  // EDGE offensive-zone percentile from latest snapshot
+  edgeSpeedMaxMph?: number | null;   // EDGE top skating speed from latest snapshot
+  edgeBurstsOver20?: number | null;  // EDGE 20+ mph bursts from latest snapshot
   xgaRelTM?: number | null;
   dzPct?: number | null;
   goalsPace?: number;

@@ -42,6 +42,7 @@ import { MemoModal } from "./MemoModal";
 import { CupRunResumePrompt } from "./CupRunResumePrompt";
 import { VerdictSheet } from "./VerdictSheet";
 import { MatchResultsPanel, MATCH_FOLDERS, type MatchFolder, type TradeMatchResults } from "./MatchResultsPanel";
+import { applyFutureDraftChoice, type FutureDraftChoice } from "@/app/lib/future-draft-choice";
 
 const TradeProposalEngine = lazy(() => import("@/app/components/TradeProposal"));
 const PlayerComparison    = lazy(() => import("@/app/components/PlayerComparison"));
@@ -558,6 +559,37 @@ export default function ArmchairGmPage() {
   const capA = liveHome ? applyCapDelta(liveHome.capSpace, capMoves.home) : 0;
   const capB = livePartner ? applyCapDelta(livePartner.capSpace, capMoves.partner) : 0;
 
+  const selectFutureDraftPick = (pickId: string, choice: FutureDraftChoice) => {
+    const applyTo = (state: { teams: Team[]; players: Asset[]; capCeiling?: number | null }) => {
+      const res = applyFutureDraftChoice(state.players, pickId, choice);
+      return { next: { ...state, players: res.players }, changedPicks: res.changedPicks };
+    };
+    const current = applyTo(db);
+    setDb(current.next);
+    setOriginalDb(prev => prev ? applyTo(prev).next : prev);
+    setCupDraftSummary(prev => {
+      if (!prev?.userPick) return prev;
+      const changedByOverall = new Map(current.changedPicks.map(p => [p.draftOverall ?? null, p]));
+      const topPicks = prev.topPicks.map(p => {
+        const changed = changedByOverall.get(p.overall);
+        return changed
+          ? { ...p, id: changed.id, name: changed.name, position: changed.position }
+          : p;
+      });
+      return {
+        ...prev,
+        topPicks,
+        userPick: {
+          ...prev.userPick,
+          pickId: current.changedPicks[0]?.id ?? prev.userPick.pickId,
+          currentName: choice.name,
+          selectedName: choice.name,
+        },
+      };
+    });
+    clearNavCache();
+  };
+
   if (error) return <ErrorScreen onRetry={loadLeagueData} />;
   const dataReady = db.teams.length > 0 && db.players.length > 0;
   if (booting || !dataReady || !initialNavReady) {
@@ -665,6 +697,7 @@ export default function ArmchairGmPage() {
       {cupDraftSummary && (
         <CupRunDraftSummaryModal
           summary={cupDraftSummary}
+          onSelectUserPick={selectFutureDraftPick}
           onDone={() => {
             setCupDraftSummary(null);
             setResignOpen(true);
@@ -680,6 +713,7 @@ export default function ArmchairGmPage() {
           pending={userPending}
           market={market}
           roster={db.players.filter(p => p.teamId === homeTeamId)}
+          navMap={navMap}
           onResign={resignPlayer}
           onWalk={walkPlayer}
           onSign={signMarketPlayer}
@@ -937,6 +971,7 @@ export default function ArmchairGmPage() {
             blocks={blocks}
             navMap={navMap}
             db={db}
+            lineupOrders={lineupOrders}
             handleGoalieStarterChange={handleGoalieStarterChange}
             handleLineupChange={handleLineupChange}
             executedTrades={executedTrades}
@@ -976,5 +1011,3 @@ export default function ArmchairGmPage() {
   </>
   );
 }
-
-

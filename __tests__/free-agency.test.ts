@@ -187,4 +187,31 @@ describe("resolveLeagueOffseason", () => {
     expect(res.market.some((m) => m.player.id === ufa.id)).toBe(false);
     expect(res.teamCapMoves.CAR?.incoming?.[0].capHit).toBe(signing?.contract.aav);
   });
+
+  it("keeps a league-minimum cap cushion when AI teams shop the UFA market", () => {
+    const marketPlayers = Array.from({ length: 8 }, (_, i) => mkAsset({
+      id: `market-depth-${i}`,
+      teamId: "FA_POOL",
+      position: "W",
+      age: 30,
+      ptsPace: 0,
+      baselinePtsPace: 0,
+      contractStatus: "UFA",
+      capHit: 0,
+    }));
+    const teams = [
+      { id: "BUF", capSpace: 3.1, standing: 18, phase: "Retooling" },
+      { id: "WPG", capSpace: 20, standing: 5, phase: "Contender" },
+    ];
+    const res = resolveLeagueOffseason(marketPlayers, {
+      seed: 12,
+      userTeamId: "WPG",
+      teams,
+    });
+    const spent = res.teamCapMoves.BUF?.incoming?.reduce((sum, m) => sum + (m.capHit ?? 0), 0) ?? 0;
+    const remaining = teams[0].capSpace - spent;
+
+    expect(res.marketSignings.some((s) => s.teamId === "BUF")).toBe(true);
+    expect(remaining).toBeGreaterThanOrEqual(FA.aiMarketCapReserve - 1e-9);
+  });
 });

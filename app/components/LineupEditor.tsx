@@ -8,17 +8,17 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { lineupContributionScore } from "@/app/lib/lineup-ranking";
+import {
+  defaultLineupOrdersForRoster,
+  hydrateLineupOrdersForRoster,
+  sameLineupGroupOrders,
+  type LineupGroupOrders,
+  type LineupOrderPayload,
+  type LineupPlayer as Player,
+} from "@/app/lib/lineup-order";
 
-interface Player {
-  id: string;
-  name: string;
-  position: string;
-  secondaryPosition?: string | null;
-  avgTOI?: number;
-  ptsPace?: number;
-  capHit?: number;
-  games?: number;
-}
+export { hydrateLineupOrdersForRoster };
+export type { LineupOrderPayload, Player };
 
 type NavLike = { total?: number };
 
@@ -37,15 +37,9 @@ interface Props {
   partner: TeamProps | null;
   hasActiveTrade: boolean;
   navMap?: Record<string, NavLike>;
+  savedLineupOrders?: Record<string, LineupOrderPayload>;
   onGoalieStarterChange?: (teamId: string, goalieId: string | null) => void;
   onLineupChange?: (teamId: string, order: LineupOrderPayload) => void;
-}
-
-export interface LineupOrderPayload {
-  forwards: string[];
-  defense: string[];
-  goalies: string[];
-  scratches: string[];
 }
 
 const MONO = "'Courier Prime', monospace";
@@ -56,8 +50,6 @@ const abbr = (name: string) => {
   return `${parts[0][0]}. ${parts.slice(1).join(" ")}`.slice(0, 15);
 };
 
-const sortByIce = (ps: Player[]) =>
-  [...ps].sort((a, b) => (b.avgTOI ?? b.ptsPace ?? 0) - (a.avgTOI ?? a.ptsPace ?? 0));
 const sortByGames = (ps: Player[]) =>
   [...ps].sort((a, b) => (b.games ?? 0) - (a.games ?? 0));
 
@@ -101,10 +93,6 @@ function buildOrder(
   return [...(order.filter(Boolean) as string[]), ...bench];
 }
 
-function defaultOrder(effective: Player[], group: Group): string[] {
-  return buildOrder(effective, group, sortByIce);
-}
-
 const STATUS_COLOR = {
   normal: "var(--ledger-ink)",
   in:     "#2a7a44",
@@ -128,9 +116,10 @@ function TeamLineup({
   outgoing,
   incoming,
   navMap,
+  savedOrder,
   onGoalieStarterChange,
   onLineupChange,
-}: TeamProps & Pick<Props, "onGoalieStarterChange" | "onLineupChange">) {
+}: TeamProps & Pick<Props, "onGoalieStarterChange" | "onLineupChange"> & { savedOrder?: LineupOrderPayload }) {
   const outIds = useMemo(() => new Set(outgoing.map(p => p.id)), [outgoing]);
   const inIds  = useMemo(() => new Set(incoming.map(p => p.id)), [incoming]);
 
@@ -148,8 +137,11 @@ function TeamLineup({
     [effective]
   );
 
-  const [orders, setOrders] = useState<Record<Group, string[]>>({ F: [], D: [], G: [] });
-  const [edited, setEdited] = useState(false);
+  const initialOrders = useMemo(() => hydrateLineupOrdersForRoster(effective, savedOrder), [effective, savedOrder]);
+  const initialEdited = useMemo(() => !sameLineupGroupOrders(initialOrders, defaultLineupOrdersForRoster(effective)), [effective, initialOrders]);
+
+  const [orders, setOrders] = useState<LineupGroupOrders>(() => initialOrders);
+  const [edited, setEdited] = useState(initialEdited);
   const [selected, setSelected] = useState<{ group: Group; idx: number } | null>(null);
   const editedRef = useRef(false);
   useEffect(() => { editedRef.current = edited; }, [edited]);
@@ -170,11 +162,7 @@ function TeamLineup({
         };
         return { F: merge(prev.F, isF), D: merge(prev.D, isD), G: merge(prev.G, isG) };
       }
-      return {
-        F: defaultOrder(effective, "F"),
-        D: defaultOrder(effective, "D"),
-        G: defaultOrder(effective, "G"),
-      };
+      return defaultLineupOrdersForRoster(effective);
     });
     setSelected(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -198,11 +186,7 @@ function TeamLineup({
   }, [teamId, orders, onLineupChange]);
 
   const reset = useCallback(() => {
-    setOrders({
-      F: defaultOrder(effective, "F"),
-      D: defaultOrder(effective, "D"),
-      G: defaultOrder(effective, "G"),
-    });
+    setOrders(defaultLineupOrdersForRoster(effective));
     setEdited(false);
     setSelected(null);
   }, [effective]);
@@ -457,7 +441,15 @@ function TeamLineup({
   );
 }
 
-export default function LineupEditor({ home, partner, hasActiveTrade, navMap, onGoalieStarterChange, onLineupChange }: Props) {
+export default function LineupEditor({
+  home,
+  partner,
+  hasActiveTrade,
+  navMap,
+  savedLineupOrders,
+  onGoalieStarterChange,
+  onLineupChange,
+}: Props) {
   const [expanded, setExpanded] = useState(true);
   if (!home && !partner) return null;
 
@@ -483,12 +475,24 @@ export default function LineupEditor({ home, partner, hasActiveTrade, navMap, on
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(430px, 100%), 1fr))", gap: 12 }}>
             {home && (
               <div style={{ background: "var(--ledger-cream)", border: "1px solid #c8b890", padding: "10px 12px" }}>
-                <TeamLineup {...home} navMap={navMap} onGoalieStarterChange={onGoalieStarterChange} onLineupChange={onLineupChange} />
+                <TeamLineup
+                  {...home}
+                  navMap={navMap}
+                  savedOrder={savedLineupOrders?.[home.teamId]}
+                  onGoalieStarterChange={onGoalieStarterChange}
+                  onLineupChange={onLineupChange}
+                />
               </div>
             )}
             {partner && (
               <div style={{ background: "var(--ledger-cream)", border: "1px solid #c8b890", padding: "10px 12px" }}>
-                <TeamLineup {...partner} navMap={navMap} onGoalieStarterChange={onGoalieStarterChange} onLineupChange={onLineupChange} />
+                <TeamLineup
+                  {...partner}
+                  navMap={navMap}
+                  savedOrder={savedLineupOrders?.[partner.teamId]}
+                  onGoalieStarterChange={onGoalieStarterChange}
+                  onLineupChange={onLineupChange}
+                />
               </div>
             )}
           </div>

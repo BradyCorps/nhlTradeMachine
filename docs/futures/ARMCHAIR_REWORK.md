@@ -30,15 +30,15 @@ Source canaries retargeted to the module set.
 ## Phase 3 — Enhanced Draft Night & signing mode
 - Draft Night (year 1) keeps the 2026 broadcast; years 2-3 get an
   interactive pick: when the user's slot comes up, choose from the top
-  curated prospects remaining (best-32 pool already sorted by NHLe).
+  curated prospects remaining (best-32 pool already sorted by NHLe). ✅ (2026-07-07)
 - Signing mode: market rows get NAV, EDGE luck chip, age-curve arrow,
-  and a live cap bar; sortable by ask/NAV/age; AA type throughout.
+  and a live cap bar; sortable by ask/NAV/age; AA type throughout. ✅ (2026-07-07)
 
 ## Phase 4 — EDGE everywhere
 - Sim logic: `hdFinishingDelta` biases the single-season breakout roll
   in `/api/simulate` (rollover already consumes it). ✅ (2026-07-07)
 - UI: EDGE tab on armchair AssetCards reusing `EdgeShotMap`. ✅ (2026-07-07)
-- Team-level EDGE: aggregate OZ%/speed tiles on Team DNA.
+- Team-level EDGE: aggregate OZ%/speed tiles on Team DNA. ✅ (2026-07-07)
 
 ## Phase 5 — Mobile + AA sweep
 - Tap targets ≥ 44px on trade/lineup/sim controls; aria-labels on icon

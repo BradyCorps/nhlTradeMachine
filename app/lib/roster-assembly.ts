@@ -13,7 +13,7 @@ import {
   removePlayerFromOtherRosters,
   safeNhlRosterPlayer,
 } from "@/app/lib/player-identity";
-import { latestEdgeLuckMap } from "@/app/lib/nhl-feed-capture";
+import { latestEdgeSignalMap } from "@/app/lib/nhl-feed-capture";
 import { FA_KNOWN_FACTS } from "@/app/lib/free-agent-seed";
 import { listPublishedTrades, type TradeRecord } from "@/app/lib/trades";
 import {
@@ -1026,8 +1026,8 @@ export async function assembleCanonicalRoster(options: {
   }
 
   // ── Trade block statuses (admin-managed, keyed by name) ──────
-  // ── EDGE luck signal (latest nhl_snapshots per player) ────────
-  const edgeLuck = await latestEdgeLuckMap(Number(SEASON.nhleSeasonId)).catch(() => new Map<string, number>());
+  // ── EDGE signals (latest nhl_snapshots per player) ────────────
+  const edgeSignals = await latestEdgeSignalMap(Number(SEASON.nhleSeasonId)).catch(() => new Map());
 
   // Position-suffixed keys win so same-name players (two Elias
   // Petterssons) never share a block status; plain-name keys remain for
@@ -1247,6 +1247,7 @@ export async function assembleCanonicalRoster(options: {
             linemateContext,
           });
       const developmentProfile = developmentInput ? calcDevelopmentProfile(developmentInput) : null;
+      const edgeSignal = edgeSignals.get(String(p.id));
 
       players.push({
         id:             p.id,
@@ -1309,7 +1310,11 @@ export async function assembleCanonicalRoster(options: {
         draftOverall:     draftOverall    ?? null,
         prospectPtsPace:  prospectPtsPace ?? null,
         developmentProfile,
-        hdFinishingDelta: edgeLuck.get(String(p.id)) ?? null,
+        hdFinishingDelta: edgeSignal?.hdFinishingDelta ?? null,
+        edgeOzPct: edgeSignal?.ozPct ?? null,
+        edgeOzPercentile: edgeSignal?.ozPercentile ?? null,
+        edgeSpeedMaxMph: edgeSignal?.speedMaxMph ?? null,
+        edgeBurstsOver20: edgeSignal?.burstsOver20 ?? null,
         tradeBlockStatus: (blockMap.get(`${p.name}__${p.position}`) ?? blockMap.get(p.name))?.status ?? null,
         tradeBlockNote:   (blockMap.get(`${p.name}__${p.position}`) ?? blockMap.get(p.name))?.note   ?? null,
         expiryStatus:     rawExpiryStatus,

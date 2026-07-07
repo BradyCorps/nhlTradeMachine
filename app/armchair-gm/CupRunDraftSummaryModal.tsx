@@ -4,6 +4,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import type { Asset } from "@/app/lib/trade-types";
 import type { CapDeltaMoves } from "@/app/lib/cap-delta";
+import type { FutureDraftChoice, FutureDraftPrompt } from "@/app/lib/future-draft-choice";
 
 export type CupDraftSummary = {
   seasonLabel: string;
@@ -14,14 +15,17 @@ export type CupDraftSummary = {
   breakoutCount: number;
   regressionCount: number;
   topPicks: Array<{ id: string; name: string; teamId: string; position: string; overall: number | null }>;
+  userPick?: FutureDraftPrompt | null;
 };
 
 export function CupRunDraftSummaryModal({
   summary,
   onDone,
+  onSelectUserPick,
 }: {
   summary: CupDraftSummary;
   onDone: () => void;
+  onSelectUserPick?: (pickId: string, choice: FutureDraftChoice) => void;
 }) {
   if (typeof document === "undefined") return null;
 
@@ -43,6 +47,55 @@ export function CupRunDraftSummaryModal({
         </div>
 
         <div className="overflow-y-auto px-4 sm:px-5 py-4" style={{ flex: 1, minHeight: 0 }}>
+          {summary.userPick && (
+            <div className="mb-4 px-3 py-3"
+              style={{ background: "var(--paper)", border: "2px solid var(--ledger-navy)", borderRadius: "2px" }}>
+              <div className="flex items-baseline justify-between gap-3 flex-wrap mb-2">
+                <div>
+                  <div className="text-[9px] uppercase tracking-[0.28em] font-mono font-black" style={{ color: "var(--ledger-navy)" }}>
+                    Pick #{summary.userPick.overall} · You are on the clock
+                  </div>
+                  <div className="text-[10px] font-mono mt-0.5" style={{ color: "var(--ledger-ink-faint)" }}>
+                    Current card: <span className="font-black" style={{ color: "var(--ledger-ink)" }}>{summary.userPick.currentName}</span>
+                  </div>
+                </div>
+                {summary.userPick.selectedName && (
+                  <span className="text-[9px] font-mono font-black uppercase tracking-wider"
+                    style={{ color: "var(--ledger-green)" }}>
+                    Selected {summary.userPick.selectedName}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {summary.userPick.choices.map((choice) => {
+                  const active = summary.userPick?.selectedName === choice.name
+                    || (!summary.userPick?.selectedName && summary.userPick?.currentName === choice.name);
+                  return (
+                    <button key={choice.name} onClick={() => onSelectUserPick?.(summary.userPick!.pickId, choice)}
+                      className="text-left px-3 py-2"
+                      style={{
+                        background: active ? "rgba(37,88,66,0.12)" : "var(--paper-inset)",
+                        border: `1px solid ${active ? "var(--ledger-green)" : "var(--ledger-rule-light)"}`,
+                        borderRadius: "2px",
+                      }}>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-black text-[11px] shrink-0" style={{ color: "var(--ledger-ink-faint)", width: 22 }}>
+                          {choice.rank}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-black text-[12px] truncate" style={{ color: "var(--ledger-ink)" }}>{choice.name}</div>
+                          <div className="font-mono text-[9px] uppercase tracking-wide" style={{ color: "var(--ledger-ink-faint)" }}>
+                            {choice.pos}{choice.nhlePace != null ? ` · ${choice.nhlePace.toFixed(0)} NHLe` : " · goalie"}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
             {[
               ["Rookies", summary.rookieCount],

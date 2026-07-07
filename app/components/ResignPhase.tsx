@@ -73,13 +73,14 @@ function PlayerMeta({ p }: { p: OffseasonPending["player"] }) {
 }
 
 export default function ResignPhase({
-  homeTeam, capSpace, pending, market, roster, onResign, onWalk, onSign, onDrop, onDone,
+  homeTeam, capSpace, pending, market, roster, navMap, onResign, onWalk, onSign, onDrop, onDone,
 }: {
   homeTeam: Team;
   capSpace: number;
   pending: OffseasonPending[];
   market: OffseasonPending[];
   roster: Asset[];
+  navMap?: Record<string, XNAVResult>;
   onResign: (p: OffseasonPending) => void;
   onWalk: (p: OffseasonPending) => void;
   onSign: (p: OffseasonPending) => void;
@@ -90,14 +91,19 @@ export default function ResignPhase({
   const [dropQuery, setDropQuery] = useState("");
   const [showDrop, setShowDrop] = useState(false);
   const [detail, setDetail] = useState<Asset | null>(null);
+  const [marketSort, setMarketSort] = useState<"ask" | "nav" | "age">("ask");
 
   const sortedMarket = useMemo(() => {
     const q = query.trim().toLowerCase();
     return [...market]
       .filter((m) => (q ? m.player.name.toLowerCase().includes(q) : true))
-      .sort((a, b) => b.contract.aav - a.contract.aav)
+      .sort((a, b) => {
+        if (marketSort === "nav") return (navMap?.[b.player.id]?.total ?? 0) - (navMap?.[a.player.id]?.total ?? 0);
+        if (marketSort === "age") return a.player.age - b.player.age;
+        return b.contract.aav - a.contract.aav;
+      })
       .slice(0, 60);
-  }, [market, query]);
+  }, [market, query, marketSort, navMap]);
 
   // Signed players the user can release for cap relief. Pending FAs are handled
   // above, so exclude them here; picks are never droppable.
@@ -228,8 +234,28 @@ export default function ResignPhase({
 
           {/* Open market */}
           <div className="flex items-center justify-between gap-3 mb-3">
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
-              Free-Agent Market — {market.length}
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+                Free-Agent Market — {market.length}
+              </div>
+              <div className="flex gap-1 mt-1">
+                {([
+                  ["ask", "Ask"],
+                  ["nav", "NAV"],
+                  ["age", "Age"],
+                ] as const).map(([key, label]) => (
+                  <button key={key} onClick={() => setMarketSort(key)}
+                    className="text-[9px] font-black uppercase tracking-wider px-2 py-1 font-mono"
+                    style={{
+                      background: marketSort === key ? "var(--ledger-ink)" : "transparent",
+                      color: marketSort === key ? "var(--ledger-card-light)" : "var(--ledger-ink-faint)",
+                      border: "1px solid var(--ledger-rule)",
+                      borderRadius: "2px",
+                    }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
             <input
               value={query}
@@ -244,6 +270,15 @@ export default function ResignPhase({
               const affordable = fa.contract.aav <= capSpace;
               const isRfa = fa.contract.status === "RFA";
               const offerPicks = isRfa ? getOfferSheetCompensation(fa.contract.aav) : [];
+              const nav = navMap?.[fa.player.id]?.total ?? 0;
+              const projectedCap = capSpace - fa.contract.aav;
+              const capPct = capSpace > 0 ? Math.min(100, Math.max(4, (fa.contract.aav / Math.max(capSpace, fa.contract.aav)) * 100)) : 100;
+              const edgeDelta = fa.player.hdFinishingDelta;
+              const edgeLabel = edgeDelta == null
+                ? null
+                : `EDGE HD ${edgeDelta > 0 ? "+" : ""}${(edgeDelta * 100).toFixed(1)}%`;
+              const ageArrow = fa.player.age <= 24 ? "↑" : fa.player.age >= 30 ? "↓" : "→";
+              const ageColor = fa.player.age <= 24 ? "var(--ledger-green)" : fa.player.age >= 30 ? "var(--ledger-red)" : "var(--ledger-ink-faint)";
               return (
                 <div key={fa.player.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 px-3 py-2"
                   style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
@@ -256,6 +291,18 @@ export default function ResignPhase({
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       <PlayerMeta p={fa.player} />
                       <StatLine p={fa.player} />
+                      <span className="text-[10px] font-mono font-black tabular-nums" style={{ color: nav >= 0 ? "var(--ledger-green)" : "var(--ledger-red)" }}>
+                        NAV {nav > 0 ? "+" : ""}{nav.toFixed(0)}
+                      </span>
+                      {edgeLabel && (
+                        <span className="text-[9px] font-mono font-black uppercase tracking-wide"
+                          style={{ color: edgeDelta != null && edgeDelta < 0 ? "var(--ledger-green)" : "var(--ledger-brown)" }}>
+                          {edgeLabel}
+                        </span>
+                      )}
+                      <span className="text-[9px] font-mono font-black uppercase tracking-wide" style={{ color: ageColor }}>
+                        Age {ageArrow}
+                      </span>
                     </div>
                     {isRfa && offerPicks.length > 0 && (
                       <div>
@@ -276,7 +323,21 @@ export default function ResignPhase({
                     )}
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                    <Terms c={fa.contract} />
+                    <div className="min-w-[132px]">
+                      <div className="flex items-center justify-between gap-2">
+                        <Terms c={fa.contract} />
+                        <span className="text-[9px] font-mono tabular-nums" style={{ color: affordable ? "var(--ledger-green)" : "var(--ledger-red)" }}>
+                          {money(projectedCap)}
+                        </span>
+                      </div>
+                      <div className="mt-1 h-1.5" style={{ background: "var(--paper-inset)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
+                        <div style={{
+                          width: `${capPct}%`,
+                          height: "100%",
+                          background: affordable ? "var(--ledger-green)" : "var(--ledger-red)",
+                        }} />
+                      </div>
+                    </div>
                     <button
                       onClick={() => onSign(fa)}
                       disabled={!affordable}

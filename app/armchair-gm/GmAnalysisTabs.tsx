@@ -10,6 +10,8 @@ import ContentionQuadrant from "@/app/components/ContentionQuadrant";
 import { computeContention, GM_PLUM, GM_PLUM_FAINT, GM_PLUM_LIGHT } from "./contention";
 import { tradeAssetKey } from "@/app/store/tradeStore";
 import { SeasonResultsPager } from "./SeasonResultsPager";
+import { computeTeamEdgeProfile } from "@/app/lib/team-edge-profile";
+import TeamEdgeTiles from "./TeamEdgeTiles";
 
 const PlayerComparison = lazy(() => import("@/app/components/PlayerComparison"));
 
@@ -98,7 +100,7 @@ function GmTabButton({ label, active, onClick, disabled, badge }: {
 
 export function GmAnalysisTabs({
   teams, allHomeRoster, allPartnerRoster, blocks, navMap, db,
-  handleGoalieStarterChange, handleLineupChange, executedTrades, showSimPanel,
+  lineupOrders, handleGoalieStarterChange, handleLineupChange, executedTrades, showSimPanel,
   simYear, simLoading, simData, simResult,
 }: {
   teams: [Team, Team];
@@ -107,6 +109,7 @@ export function GmAnalysisTabs({
   blocks: [Asset[], Asset[]];
   navMap: Record<string, XNAVResult>;
   db: { teams: Team[]; players: Asset[]; capCeiling?: number | null };
+  lineupOrders: Record<string, LineupOrderPayload>;
   handleGoalieStarterChange: (teamId: string, goalieId: string | null) => void;
   handleLineupChange: (teamId: string, order: LineupOrderPayload) => void;
   executedTrades: { id: string; homeTeamName: string; partnerTeamName: string; outgoing: Asset[]; incoming: Asset[]; timestamp: number; }[];
@@ -175,6 +178,7 @@ export function GmAnalysisTabs({
               }}
               hasActiveTrade={blocks[0].length > 0 || blocks[1].length > 0}
               navMap={navMap}
+              savedLineupOrders={lineupOrders}
               onGoalieStarterChange={handleGoalieStarterChange}
               onLineupChange={handleLineupChange}
             />
@@ -326,6 +330,8 @@ function TeamDNA({
   // Contention ratings — derived from X-NAV
   const homeContention    = computeContention(effectiveHomeRoster, navMap);
   const partnerContention = computeContention(effectivePartnerRoster, navMap);
+  const homeEdgeProfile = computeTeamEdgeProfile(effectiveHomeRoster);
+  const partnerEdgeProfile = computeTeamEdgeProfile(effectivePartnerRoster);
 
   // Gap vs championship template — negative = below template, positive = above
   const homeGaps = {
@@ -383,6 +389,14 @@ function TeamDNA({
               </div>
             ) : null)}
           </div>
+
+          <TeamEdgeTiles
+            homeTeam={homeTeam}
+            partnerTeam={partnerTeam}
+            homeProfile={homeEdgeProfile}
+            partnerProfile={partnerEdgeProfile}
+            hasActiveTrade={hasActiveTrade}
+          />
 
           {/* ── Contention Quadrant ── */}
           {homeTeam && partnerTeam && (
@@ -586,4 +600,3 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
     </div>
   );
 }
-

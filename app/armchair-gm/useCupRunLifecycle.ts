@@ -24,6 +24,7 @@ import {
 } from "@/app/lib/cup-run";
 import { toast } from "@/app/lib/ledger-toast";
 import type { CupDraftSummary } from "./CupRunDraftSummaryModal";
+import { futureDraftPromptForUserPick } from "@/app/lib/future-draft-choice";
 
 export const CUP_RUN_STORAGE_KEY = "cup-run-state-v1";
 
@@ -155,6 +156,9 @@ export function useCupRunLifecycle({
           position: p.position,
           overall: p.draftOverall ?? null,
         })),
+        userPick: drafted[0]?.draftYear
+          ? futureDraftPromptForUserPick(drafted, drafted[0].draftYear, next.teamId)
+          : null,
       });
       setCupRun({ ...next, retentionLedger: rollRetentionLedger(next.retentionLedger) });
       clearNavCache();
