@@ -785,7 +785,7 @@ export default function ArmchairGmPage() {
         <TugBar homeNetGain={homeNetGain} navA={navA} navB={navB} cNavA={cNavA} cNavB={cNavB} />
 
         {/* ── Main Trade Grid ── */}
-        <div className="flex flex-col lg:grid lg:grid-cols-[1fr_260px_1fr] xl:grid-cols-[1fr_280px_1fr] gap-4 lg:gap-5 items-stretch mt-2">
+        <div className="armchair-trade-flow lg:grid-cols-[1fr_260px_1fr] xl:grid-cols-[1fr_280px_1fr] gap-4 lg:gap-5 items-stretch mt-2">
           {/* Home panel */}
           <TradePanel idx={0} team={teams[0]} nav={navA} capSpace={capA} db={db}
             label="Your Franchise" accent="HOME"
@@ -828,7 +828,8 @@ export default function ArmchairGmPage() {
                       <button
                         onClick={runEval}
                         disabled={!ready}
-                        className="flex-grow py-3.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 disabled:opacity-40 md:disabled:opacity-25 md:disabled:cursor-not-allowed disabled:pointer-events-none active:scale-[0.98]"
+                        aria-label="Run GM audit for the current trade"
+                        className="tap-target flex-grow py-3.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 disabled:opacity-40 md:disabled:opacity-25 md:disabled:cursor-not-allowed disabled:pointer-events-none active:scale-[0.98]"
                         style={{ background: 'var(--ledger-ink)', color: 'var(--ledger-card-light)', borderRadius: '2px' }}
                         onMouseEnter={e => ready && (e.currentTarget.style.opacity = '0.8')}
                         onMouseLeave={e => ready && (e.currentTarget.style.opacity = '1')}>
@@ -838,7 +839,8 @@ export default function ArmchairGmPage() {
                       {(teams[0] || teams[1] || blocks[0].length > 0) && (
                         <button
                           onClick={copyTradeLink}
-                          className="shrink-0 flex items-center justify-center w-12 transition-all duration-200"
+                          aria-label={linkCopied ? "Trade link copied" : "Copy trade link"}
+                          className="tap-target shrink-0 flex items-center justify-center w-12 transition-all duration-200"
                           style={{
                             background: 'transparent',
                             border: `1px solid ${linkCopied ? 'var(--ledger-green)' : 'var(--ledger-rule)'}`,
@@ -866,7 +868,8 @@ export default function ArmchairGmPage() {
               <button
                 onClick={() => findMatches(blocks[0].length > 0 ? blocks[0] : blocks[1])}
                 disabled={matchLoading}
-                className="w-full py-3 font-black uppercase tracking-widest text-[11px] transition-all duration-200 disabled:opacity-50 active:scale-[0.97]"
+                aria-label="Find teams interested in this trade package"
+                className="tap-target w-full py-3 font-black uppercase tracking-widest text-[11px] transition-all duration-200 disabled:opacity-50 active:scale-[0.97]"
                 style={{ background: 'var(--ledger-navy)', color: 'white', border: '2px solid var(--ledger-navy)' }}
                 onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
                 onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
@@ -878,7 +881,8 @@ export default function ArmchairGmPage() {
             {db.players.length > 0 && (
               <button
                 onClick={() => setTradeBlockOpen(true)}
-                className="w-full py-2.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 active:scale-[0.97]"
+                aria-label="Open trade block"
+                className="tap-target w-full py-2.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 active:scale-[0.97]"
                 style={{
                   background: 'var(--red-dim)',
                   color: 'var(--red)',
@@ -907,7 +911,8 @@ export default function ArmchairGmPage() {
 
             {executedTrades.length > 0 && (
               <button onClick={resetTrades}
-                className="w-full py-2 font-black uppercase tracking-widest text-2xs transition-all btn-ghost">
+                aria-label="Void all executed trades"
+                className="tap-target w-full py-2 font-black uppercase tracking-widest text-2xs transition-all btn-ghost">
                 ↺ Void All Trades
               </button>
             )}

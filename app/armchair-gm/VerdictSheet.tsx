@@ -52,7 +52,9 @@ export function VerdictSheet({
       {/* ── Handle / collapsed strip ─────────────────────────── */}
       <button
         onClick={() => setVerdictOpen(o => !o)}
-        className="w-full flex items-center justify-between px-4 sm:px-6"
+        aria-expanded={verdictOpen}
+        aria-label={verdictOpen ? "Collapse trade verdict sheet" : "Expand trade verdict sheet"}
+        className="tap-target w-full flex items-center justify-between px-4 sm:px-6"
         style={{ height: 52, background: 'transparent' }}>
         <div className="flex items-center gap-3">
           {/* Status pill */}
@@ -109,7 +111,8 @@ export function VerdictSheet({
           <div className="lg:hidden grid grid-cols-2 gap-2 mb-3">
             <button
               onClick={onRunEval}
-              className="py-2.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 active:scale-[0.98]"
+              aria-label="Run GM audit again"
+              className="tap-target py-2.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 active:scale-[0.98]"
               style={{
                 background: 'var(--ledger-ink)',
                 color: 'var(--ledger-card-light)',
@@ -119,7 +122,8 @@ export function VerdictSheet({
             </button>
             <button
               onClick={onCopyLink}
-              className="py-2.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 active:scale-[0.98]"
+              aria-label={linkCopied ? "Trade link copied" : "Copy trade link"}
+              className="tap-target py-2.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 active:scale-[0.98]"
               style={{
                 background: 'transparent',
                 border: `1px solid ${linkCopied ? 'var(--ledger-green)' : 'var(--ledger-rule)'}`,
@@ -141,7 +145,8 @@ export function VerdictSheet({
           <div className="mt-4 flex flex-col gap-2">
             {(v.status === "FAIR" || v.status === "WIN") && (
               <button onClick={onExecute}
-                className="w-full py-4 font-black uppercase tracking-widest text-[13px] transition-all duration-200 active:scale-[0.97] btn-green-ink rounded shadow-lg">
+                aria-label="Execute this trade"
+                className="tap-target w-full py-4 font-black uppercase tracking-widest text-[13px] transition-all duration-200 active:scale-[0.97] btn-green-ink rounded shadow-lg">
                 ✓ Execute Trade — File It
               </button>
             )}
@@ -166,7 +171,8 @@ export function VerdictSheet({
               if (canOverride) {
                 return (
                   <button onClick={onExecute}
-                    className="w-full py-3.5 font-black uppercase tracking-widest text-xs transition-all duration-200 active:scale-[0.97] rounded shadow-lg"
+                    aria-label="Override the GM audit and execute this trade"
+                    className="tap-target w-full py-3.5 font-black uppercase tracking-widest text-xs transition-all duration-200 active:scale-[0.97] rounded shadow-lg"
                     style={{
                       background: 'transparent',
                       border: '2px solid #b83020',

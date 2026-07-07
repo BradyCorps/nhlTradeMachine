@@ -928,6 +928,8 @@ describe("Canary — trade UX loading and mobile focus", () => {
   const sharedTradeRoute = read("app/t/[code]/page.tsx");
   const sharedTradeImageRoute = read("app/t/[code]/opengraph-image.tsx");
   const teamStrand = read("app/components/TeamStrand.tsx");
+  const resignPhase = read("app/components/ResignPhase.tsx");
+  const offerSheetPhase = read("app/components/OfferSheetPhase.tsx");
 
   it("selects the franchise from one team-grid click instead of requiring a second confirm click", () => {
     expect(tradePage).toContain("selectingTeamId");
@@ -999,6 +1001,45 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(lineupEditor).toContain('if (prev.group !== group) return { group, idx };');
     expect(lineupEditor).toContain('<Cell group="G" idx={0} pos="G " />');
     expect(lineupEditor).toContain('<Cell group="G" idx={1} pos="G " />');
+  });
+
+  it("Armchair GM Phase 5 keeps mobile controls touch-sized and keyboard-visible", () => {
+    const globals = read("app/globals.css");
+    const tabs = read("app/armchair-gm/GmAnalysisTabs.tsx");
+    const verdictSheet = read("app/armchair-gm/VerdictSheet.tsx");
+    expect(globals).toContain(".tap-target");
+    expect(globals).toContain("min-height: 44px");
+    expect(globals).toContain("[role=\"button\"]):focus-visible");
+    expect(globals).toContain(".armchair-trade-flow");
+    expect(tradePage).toContain("armchair-trade-flow");
+    expect(tradePage).toContain("aria-label=\"Run GM audit for the current trade\"");
+    expect(tabs).toContain("aria-pressed={active}");
+    expect(tabs).toContain("aria-label={`Open ${label} tab`}");
+    expect(tabs).toContain("aria-label=\"Simulate one season\"");
+    expect(verdictSheet).toContain("aria-expanded={verdictOpen}");
+    expect(verdictSheet).toContain("aria-label={verdictOpen ? \"Collapse trade verdict sheet\" : \"Expand trade verdict sheet\"}");
+    expect(lineupEditor).toContain("role=\"button\"");
+    expect(lineupEditor).toContain("tabIndex={0}");
+    expect(lineupEditor).toContain("onKeyDown={(event) => keySlot(event, group, idx)}");
+  });
+
+  it("free-agency modals are accessible and paginate full markets", () => {
+    expect(resignPhase).toContain("MARKET_PAGE_SIZE");
+    expect(resignPhase).toContain("marketPageItems");
+    expect(resignPhase).toContain("Previous free agent page");
+    expect(resignPhase).toContain("Next free agent page");
+    expect(resignPhase).not.toContain(".slice(0, 60)");
+    expect(offerSheetPhase).toContain("RFA_PAGE_SIZE");
+    expect(offerSheetPhase).toContain("visibleRfas");
+    expect(offerSheetPhase).toContain("Previous RFA page");
+    expect(offerSheetPhase).toContain("Next RFA page");
+    expect(offerSheetPhase).not.toContain(".slice(0, 60)");
+    expect(resignPhase).toContain('role="dialog"');
+    expect(resignPhase).toContain('aria-modal="true"');
+    expect(offerSheetPhase).toContain('role="dialog"');
+    expect(offerSheetPhase).toContain('aria-modal="true"');
+    expect(resignPhase).toContain("tap-target");
+    expect(offerSheetPhase).toContain("tap-target");
   });
 
   it("exposes the focused Trade Machine and shared trade routes", () => {

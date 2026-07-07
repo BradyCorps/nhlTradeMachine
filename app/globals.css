@@ -93,6 +93,33 @@ button, a, select {
   -webkit-tap-highlight-color: transparent;
 }
 
+:where(button, a, input, select, textarea, [role="button"]):focus-visible {
+  outline: 3px solid var(--ledger-navy);
+  outline-offset: 3px;
+}
+
+.tap-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.armchair-trade-flow {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 639px) {
+  .armchair-trade-flow {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .armchair-trade-flow {
+    display: grid;
+  }
+}
+
 /* ── Aged paper grain ────────────────────────────────────────── */
 body::before {
   content: '';

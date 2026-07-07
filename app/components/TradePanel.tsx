@@ -122,7 +122,8 @@ function TradePanel({
         {idx === 0 && blocks[0].length > 0 && onRequestBlockTrade && (
           <button
             onClick={() => onRequestBlockTrade(blocks[0])}
-            className="w-full py-2.5 font-black text-2xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 btn-ink"
+            aria-label="Find trade partners for this package"
+            className="tap-target w-full py-2.5 font-black text-2xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 btn-ink"
           >
             ⚡ Find Trade Partners for This Package
           </button>

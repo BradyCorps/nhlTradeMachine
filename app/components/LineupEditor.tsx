@@ -230,6 +230,12 @@ function TeamLineup({
     });
   }, []);
 
+  const keySlot = useCallback((event: React.KeyboardEvent, group: Group, idx: number) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    clickSlot(group, idx);
+  }, [clickSlot]);
+
   const Cell = ({ group, idx, pos }: { group: Group; idx: number; pos: string }) => {
     const id = orders[group][idx];
     const p  = id ? byId.get(id) : undefined;
@@ -244,6 +250,10 @@ function TeamLineup({
     return (
       <td
         onClick={() => clickSlot(group, idx)}
+        onKeyDown={(event) => keySlot(event, group, idx)}
+        role="button"
+        tabIndex={0}
+        aria-label={p ? `Select ${p.name} in ${pos.trim()} slot` : `Select empty ${pos.trim()} slot`}
         title={p ? `${p.name} · ${p.position} · NAV ${nav}` : "Empty lineup slot"}
         style={{
           padding: 3, fontFamily: MONO,
@@ -340,18 +350,18 @@ function TeamLineup({
           {label && <span style={{ color: "var(--ledger-ink-faint)", fontWeight: 400 }}> — {label}</span>}
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={bestLines} title="Order every unit by lineup contribution" style={{
+          <button onClick={bestLines} title="Order every unit by lineup contribution" className="tap-target" style={{
             fontFamily: MONO, fontSize: 11, fontWeight: 900, letterSpacing: 0,
             color: "#2a5a8f", background: "none", border: "1px solid #2a5a8f",
-            padding: "1px 6px", cursor: "pointer", textTransform: "uppercase",
+            padding: "1px 10px", cursor: "pointer", textTransform: "uppercase",
           }}>
             Best Lines
           </button>
           {edited && (
-            <button onClick={reset} style={{
+            <button onClick={reset} className="tap-target" style={{
               fontFamily: MONO, fontSize: 11, fontWeight: 900, letterSpacing: 0,
               color: "#b83020", background: "none", border: "1px solid #b83020",
-              padding: "1px 6px", cursor: "pointer", textTransform: "uppercase",
+              padding: "1px 10px", cursor: "pointer", textTransform: "uppercase",
             }}>
               Reset
             </button>
@@ -410,9 +420,14 @@ function TeamLineup({
               const nav = navOf(p, navMap);
               return (
                 <span key={id} onClick={() => clickSlot(group, idx)}
+                  onKeyDown={(event) => keySlot(event, group, idx)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Select ${p.name} from scratches`}
                   title={`${p.name} · ${p.position} · NAV ${nav}`}
                   style={{
                     fontFamily: MONO, fontSize: 11, fontWeight: 800, cursor: "pointer",
+                    minHeight: 44, display: "inline-flex", alignItems: "center",
                     padding: "4px 7px", border: "1px solid #c8b890", userSelect: "none",
                     color: inIds.has(id) ? "#2a7a44" : "var(--ledger-ink)",
                     background: isSel ? "rgba(180,140,40,0.25)" : "var(--ledger-cream)",

@@ -47,6 +47,9 @@ function GmTabButton({ label, active, onClick, disabled, badge }: {
     <button
       onClick={onClick}
       disabled={disabled}
+      aria-pressed={active}
+      aria-label={`Open ${label} tab`}
+      className="tap-target"
       style={{
         flex: "1 1 0",
         padding: "10px 6px",
@@ -238,7 +241,11 @@ export function GmAnalysisTabs({
               }}>
                 Simulated Universe — {executedTrades.length} Trade{executedTrades.length !== 1 ? "s" : ""} Executed
               </span>
-              <button onClick={simYear} disabled={simLoading || executedTrades.length === 0}
+              <button
+                onClick={simYear}
+                disabled={simLoading || executedTrades.length === 0}
+                aria-label="Simulate one season"
+                className="tap-target"
                 style={{
                   padding: "6px 12px",
                   fontSize: "10px",

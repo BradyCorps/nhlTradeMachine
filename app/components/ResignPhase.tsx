@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import type { OffseasonPending } from "@/app/lib/free-agency";
@@ -16,6 +16,7 @@ import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePane
 // flow.
 
 const money = (n: number) => `$${n.toFixed(2)}M`;
+const MARKET_PAGE_SIZE = 30;
 
 // FAs come through without a computed NAV; StrandView derives its axes from the
 // asset's own Point Shares / pace / usage, so a neutral NAV is fine here.
@@ -92,6 +93,7 @@ export default function ResignPhase({
   const [showDrop, setShowDrop] = useState(false);
   const [detail, setDetail] = useState<Asset | null>(null);
   const [marketSort, setMarketSort] = useState<"ask" | "nav" | "age">("ask");
+  const [marketPage, setMarketPage] = useState(1);
 
   const sortedMarket = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -102,8 +104,19 @@ export default function ResignPhase({
         if (marketSort === "age") return a.player.age - b.player.age;
         return b.contract.aav - a.contract.aav;
       })
-      .slice(0, 60);
   }, [market, query, marketSort, navMap]);
+  const marketPageCount = Math.max(1, Math.ceil(sortedMarket.length / MARKET_PAGE_SIZE));
+  const marketPageItems = useMemo(() => {
+    const start = (marketPage - 1) * MARKET_PAGE_SIZE;
+    return sortedMarket.slice(start, start + MARKET_PAGE_SIZE);
+  }, [sortedMarket, marketPage]);
+  const marketStart = sortedMarket.length === 0 ? 0 : (marketPage - 1) * MARKET_PAGE_SIZE + 1;
+  const marketEnd = Math.min(sortedMarket.length, marketPage * MARKET_PAGE_SIZE);
+
+  useEffect(() => setMarketPage(1), [query, marketSort]);
+  useEffect(() => {
+    setMarketPage((page) => Math.min(page, marketPageCount));
+  }, [marketPageCount]);
 
   // Signed players the user can release for cap relief. Pending FAs are handled
   // above, so exclude them here; picks are never droppable.
@@ -113,8 +126,7 @@ export default function ResignPhase({
     return roster
       .filter((p) => p.position !== "Pick" && !pendingIds.has(p.id))
       .filter((p) => (q ? p.name.toLowerCase().includes(q) : true))
-      .sort((a, b) => (b.capHit ?? 0) - (a.capHit ?? 0))
-      .slice(0, 60);
+      .sort((a, b) => (b.capHit ?? 0) - (a.capHit ?? 0));
   }, [roster, pendingIds, dropQuery]);
 
   if (typeof document === "undefined") return null;
@@ -125,7 +137,11 @@ export default function ResignPhase({
     <>
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-6"
       style={{ background: "rgba(28,20,10,0.88)", backdropFilter: "blur(4px)" }}>
-      <div className="relative w-full max-w-3xl flex flex-col"
+      <div
+        className="relative w-full max-w-3xl flex flex-col"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="resign-phase-title"
         style={{ background: "var(--ledger-card-light)", borderRadius: "2px", maxHeight: "92vh", boxShadow: "0 24px 70px rgba(0,0,0,0.6)" }}>
 
         {/* Header */}
@@ -135,7 +151,7 @@ export default function ResignPhase({
               <div className="text-[10px] uppercase tracking-[0.4em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
                 The Hockey Ledger · Off-Season
               </div>
-              <h2 className="font-black" style={{ fontSize: "1.4rem", color: "var(--ledger-ink)", lineHeight: 1.1 }}>
+              <h2 id="resign-phase-title" className="font-black" style={{ fontSize: "1.4rem", color: "var(--ledger-ink)", lineHeight: 1.1 }}>
                 {homeTeam.name} — Re-Sign Phase
               </h2>
             </div>
@@ -164,7 +180,7 @@ export default function ResignPhase({
                   style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
                   <div className="min-w-0">
                     <button onClick={() => setDetail(fa.player)} title="View STRAND & development"
-                      className="font-black text-[13px] truncate text-left hover:underline"
+                      className="tap-target font-black text-[13px] truncate text-left hover:underline"
                       style={{ color: "var(--ledger-ink)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
                       {fa.player.name}
                     </button>
@@ -176,12 +192,14 @@ export default function ResignPhase({
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                     <Terms c={fa.contract} />
                     <button onClick={() => onResign(fa)}
-                      className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
+                      aria-label={`Re-sign ${fa.player.name}`}
+                      className="tap-target text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
                       style={{ background: "var(--ledger-green)", color: "#fff", borderRadius: "2px" }}>
                       Re-Sign
                     </button>
                     <button onClick={() => onWalk(fa)}
-                      className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
+                      aria-label={`Let ${fa.player.name} walk`}
+                      className="tap-target text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
                       style={{ background: "transparent", color: "var(--ledger-red)", border: "1px solid var(--ledger-red)", borderRadius: "2px" }}>
                       Let Walk
                     </button>
@@ -194,7 +212,9 @@ export default function ResignPhase({
           {/* Release a signed player — clean release frees the full cap hit */}
           <div className="mb-6">
             <button onClick={() => setShowDrop((s) => !s)}
-              className="text-[10px] font-black uppercase tracking-[0.3em] font-mono mb-2 flex items-center gap-2"
+              aria-expanded={showDrop}
+              aria-label={showDrop ? "Hide release player list" : "Show release player list"}
+              className="tap-target text-[10px] font-black uppercase tracking-[0.3em] font-mono mb-2 flex items-center gap-2"
               style={{ color: "var(--ledger-ink-faint)", background: "transparent", border: "none", cursor: "pointer" }}>
               <span>{showDrop ? "▾" : "▸"}</span> Release a Player — free cap
             </button>
@@ -218,7 +238,8 @@ export default function ResignPhase({
                         </span>
                       </div>
                       <button onClick={() => onDrop(p)}
-                        className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono shrink-0 self-end sm:self-auto"
+                        aria-label={`Release ${p.name}`}
+                        className="tap-target text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono shrink-0 self-end sm:self-auto"
                         style={{ background: "transparent", color: "var(--ledger-red)", border: "1px solid var(--ledger-red)", borderRadius: "2px" }}>
                         Release
                       </button>
@@ -236,7 +257,7 @@ export default function ResignPhase({
           <div className="flex items-center justify-between gap-3 mb-3">
             <div>
               <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
-                Free-Agent Market — {market.length}
+                Free-Agent Market — {sortedMarket.length}{query.trim() ? ` of ${market.length}` : ""}
               </div>
               <div className="flex gap-1 mt-1">
                 {([
@@ -245,7 +266,8 @@ export default function ResignPhase({
                   ["age", "Age"],
                 ] as const).map(([key, label]) => (
                   <button key={key} onClick={() => setMarketSort(key)}
-                    className="text-[9px] font-black uppercase tracking-wider px-2 py-1 font-mono"
+                    aria-pressed={marketSort === key}
+                    className="tap-target text-[9px] font-black uppercase tracking-wider px-2 py-1 font-mono"
                     style={{
                       background: marketSort === key ? "var(--ledger-ink)" : "transparent",
                       color: marketSort === key ? "var(--ledger-card-light)" : "var(--ledger-ink-faint)",
@@ -266,7 +288,7 @@ export default function ResignPhase({
             />
           </div>
           <div className="flex flex-col gap-1">
-            {sortedMarket.map((fa) => {
+            {marketPageItems.map((fa) => {
               const affordable = fa.contract.aav <= capSpace;
               const isRfa = fa.contract.status === "RFA";
               const offerPicks = isRfa ? getOfferSheetCompensation(fa.contract.aav) : [];
@@ -284,7 +306,7 @@ export default function ResignPhase({
                   style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
                   <div className="min-w-0">
                     <button onClick={() => setDetail(fa.player)} title="View STRAND & development"
-                      className="font-bold text-[12px] truncate text-left hover:underline"
+                      className="tap-target font-bold text-[12px] truncate text-left hover:underline"
                       style={{ color: "var(--ledger-ink)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
                       {fa.player.name}
                     </button>
@@ -341,8 +363,9 @@ export default function ResignPhase({
                     <button
                       onClick={() => onSign(fa)}
                       disabled={!affordable}
+                      aria-label={`${isRfa ? "Offer sheet" : "Sign"} ${fa.player.name}`}
                       title={affordable ? (isRfa ? `Sign via offer sheet (${offerPicks.length ? offerPicks.join(" + ") + " compensation" : "no pick comp"})` : "Sign to your roster") : "Not enough cap space"}
-                      className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
+                      className="tap-target text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
                       style={{
                         background: affordable ? "var(--ledger-navy)" : "transparent",
                         color: affordable ? "#fff" : "var(--ledger-ink-faint)",
@@ -361,6 +384,46 @@ export default function ResignPhase({
               <p className="text-[11px] italic" style={{ color: "var(--ledger-brown)" }}>No market players match.</p>
             )}
           </div>
+          {sortedMarket.length > MARKET_PAGE_SIZE && (
+            <div className="mt-3 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[10px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+                Showing {marketStart}-{marketEnd} of {sortedMarket.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setMarketPage((page) => Math.max(1, page - 1))}
+                  disabled={marketPage === 1}
+                  aria-label="Previous free agent page"
+                  className="tap-target flex-1 text-[10px] font-black uppercase tracking-wider px-3 py-2 font-mono sm:flex-none"
+                  style={{
+                    background: "transparent",
+                    border: "1px solid var(--ledger-rule)",
+                    color: marketPage === 1 ? "var(--ledger-ink-faint)" : "var(--ledger-ink)",
+                    borderRadius: "2px",
+                    opacity: marketPage === 1 ? 0.5 : 1,
+                  }}>
+                  Previous
+                </button>
+                <span className="text-[10px] font-mono font-black tabular-nums" style={{ color: "var(--ledger-ink)" }}>
+                  {marketPage}/{marketPageCount}
+                </span>
+                <button
+                  onClick={() => setMarketPage((page) => Math.min(marketPageCount, page + 1))}
+                  disabled={marketPage === marketPageCount}
+                  aria-label="Next free agent page"
+                  className="tap-target flex-1 text-[10px] font-black uppercase tracking-wider px-3 py-2 font-mono sm:flex-none"
+                  style={{
+                    background: "transparent",
+                    border: "1px solid var(--ledger-rule)",
+                    color: marketPage === marketPageCount ? "var(--ledger-ink-faint)" : "var(--ledger-ink)",
+                    borderRadius: "2px",
+                    opacity: marketPage === marketPageCount ? 0.5 : 1,
+                  }}>
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -369,7 +432,7 @@ export default function ResignPhase({
             Other teams have resolved their own free agents.
           </p>
           <button onClick={onDone}
-            className="text-[11px] font-black uppercase tracking-[0.18em] px-5 py-2 font-mono shrink-0"
+            className="tap-target text-[11px] font-black uppercase tracking-[0.18em] px-5 py-2 font-mono shrink-0"
             style={{ background: "var(--ledger-ink)", color: "var(--ledger-card-light)", borderRadius: "2px" }}>
             Done — RFA Offer Sheets →
           </button>
@@ -382,18 +445,22 @@ export default function ResignPhase({
       <div className="fixed inset-0 z-[130] flex items-center justify-center p-3 sm:p-6"
         style={{ background: "rgba(28,20,10,0.92)", backdropFilter: "blur(5px)" }}
         onClick={() => setDetail(null)}>
-        <div className="relative w-full max-w-md flex flex-col"
+        <div
+          className="relative w-full max-w-md flex flex-col"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="free-agent-detail-title"
           style={{ background: "var(--ledger-card-light)", borderRadius: "2px", maxHeight: "92vh", boxShadow: "0 24px 70px rgba(0,0,0,0.6)" }}
           onClick={(e) => e.stopPropagation()}>
           <div className="shrink-0 flex items-start justify-between gap-3"
             style={{ borderTop: "4px double #1c140a", borderBottom: "1px solid #b8a070", padding: "14px 20px 12px" }}>
             <div className="min-w-0">
-              <h2 className="font-black text-[1.15rem] leading-tight truncate" style={{ color: "var(--ledger-ink)" }}>{detail.name}</h2>
+              <h2 id="free-agent-detail-title" className="font-black text-[1.15rem] leading-tight truncate" style={{ color: "var(--ledger-ink)" }}>{detail.name}</h2>
               <div className="mt-0.5"><PlayerMeta p={detail} /></div>
               <div><StatLine p={detail} /></div>
             </div>
             <button onClick={() => setDetail(null)}
-              className="text-[16px] leading-none shrink-0" aria-label="Close"
+              className="tap-target text-[16px] leading-none shrink-0" aria-label="Close free agent details"
               style={{ background: "transparent", border: "none", color: "var(--ledger-ink-faint)", cursor: "pointer" }}>
               ✕
             </button>

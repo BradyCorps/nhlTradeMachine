@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Asset, Team } from "@/app/lib/trade-types";
 import type { OffseasonPending } from "@/app/lib/free-agency";
@@ -14,6 +14,7 @@ import { SEASON } from "@/app/lib/season-config";
 import { scenarioSeed } from "@/app/lib/sim-engine";
 
 const money = (n: number) => `$${n.toFixed(2)}M`;
+const RFA_PAGE_SIZE = 30;
 
 const roundLabel = (r: string) =>
   r === "1st" ? "1st" : r === "2nd" ? "2nd" : "3rd";
@@ -45,6 +46,7 @@ export default function OfferSheetPhase({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<OfferResult[]>([]);
   const [showTiers, setShowTiers] = useState(false);
+  const [rfaPage, setRfaPage] = useState(1);
 
   const teamMap = useMemo(() => new Map(teams.map(t => [t.id, t])), [teams]);
 
@@ -73,9 +75,20 @@ export default function OfferSheetPhase({
     const q = query.trim().toLowerCase();
     return [...rfaMarket]
       .filter(m => (q ? m.player.name.toLowerCase().includes(q) || m.player.teamId.toLowerCase().includes(q) : true))
-      .sort((a, b) => b.contract.aav - a.contract.aav)
-      .slice(0, 60);
+      .sort((a, b) => b.contract.aav - a.contract.aav);
   }, [rfaMarket, query]);
+  const rfaPageCount = Math.max(1, Math.ceil(sorted.length / RFA_PAGE_SIZE));
+  const visibleRfas = useMemo(() => {
+    const start = (rfaPage - 1) * RFA_PAGE_SIZE;
+    return sorted.slice(start, start + RFA_PAGE_SIZE);
+  }, [sorted, rfaPage]);
+  const rfaStart = sorted.length === 0 ? 0 : (rfaPage - 1) * RFA_PAGE_SIZE + 1;
+  const rfaEnd = Math.min(sorted.length, rfaPage * RFA_PAGE_SIZE);
+
+  useEffect(() => setRfaPage(1), [query]);
+  useEffect(() => {
+    setRfaPage((page) => Math.min(page, rfaPageCount));
+  }, [rfaPageCount]);
 
   const handleOffer = (fa: OffseasonPending) => {
     const comp = getOfferSheetCompensation(fa.contract.aav);
@@ -103,7 +116,11 @@ export default function OfferSheetPhase({
   return createPortal(
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-6"
       style={{ background: "rgba(28,20,10,0.88)", backdropFilter: "blur(4px)" }}>
-      <div className="relative w-full max-w-4xl flex flex-col"
+      <div
+        className="relative w-full max-w-4xl flex flex-col"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="offer-sheet-phase-title"
         style={{ background: "var(--ledger-card-light)", borderRadius: "2px", maxHeight: "92vh", boxShadow: "0 24px 70px rgba(0,0,0,0.6)" }}>
 
         {/* Header */}
@@ -113,7 +130,7 @@ export default function OfferSheetPhase({
               <div className="text-[10px] uppercase tracking-[0.4em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
                 The Hockey Ledger · Off-Season · CBA Article 10.3
               </div>
-              <h2 className="font-black" style={{ fontSize: "1.4rem", color: "var(--ledger-ink)", lineHeight: 1.1 }}>
+              <h2 id="offer-sheet-phase-title" className="font-black" style={{ fontSize: "1.4rem", color: "var(--ledger-ink)", lineHeight: 1.1 }}>
                 {homeTeam.name} — RFA Offer Sheets
               </h2>
             </div>
@@ -187,7 +204,9 @@ export default function OfferSheetPhase({
 
           {/* Compensation tiers toggle */}
           <button onClick={() => setShowTiers(s => !s)}
-            className="text-[10px] font-black uppercase tracking-[0.3em] font-mono mb-3 flex items-center gap-2"
+            aria-expanded={showTiers}
+            aria-label={showTiers ? "Hide offer sheet compensation reference" : "Show offer sheet compensation reference"}
+            className="tap-target text-[10px] font-black uppercase tracking-[0.3em] font-mono mb-3 flex items-center gap-2"
             style={{ color: "var(--ledger-ink-faint)", background: "transparent", border: "none", cursor: "pointer" }}>
             <span>{showTiers ? "▾" : "▸"}</span> Compensation Reference
           </button>
@@ -208,7 +227,7 @@ export default function OfferSheetPhase({
           {/* Available RFAs */}
           <div className="flex flex-col items-stretch gap-2 mb-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
-              Available RFAs — {rfaMarket.length}
+              Available RFAs — {sorted.length}{query.trim() ? ` of ${rfaMarket.length}` : ""}
             </div>
             <input
               value={query}
@@ -220,7 +239,7 @@ export default function OfferSheetPhase({
           </div>
 
           <div className="flex flex-col gap-1">
-            {sorted.map((fa) => {
+            {visibleRfas.map((fa) => {
               const comp = getOfferSheetCompensation(fa.contract.aav);
               const affordable = fa.contract.aav <= capSpace;
               const hasPicks = hasPicksFor(comp);
@@ -278,13 +297,14 @@ export default function OfferSheetPhase({
                   <button
                     onClick={() => handleOffer(fa)}
                     disabled={!canOffer}
+                    aria-label={`Offer sheet ${fa.player.name}`}
                     title={
                       offered ? "Already offered"
                       : !affordable ? "Not enough cap space"
                       : !hasPicks ? "Missing required compensation picks"
                       : `Offer sheet — comp: ${comp.length === 0 ? "none" : comp.join(" + ")}`
                     }
-                    className="w-full text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono shrink-0 sm:w-auto"
+                    className="tap-target w-full text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono shrink-0 sm:w-auto"
                     style={{
                       background: canOffer ? "var(--ledger-navy)" : "transparent",
                       color: canOffer ? "#fff" : "var(--ledger-ink-faint)",
@@ -304,6 +324,46 @@ export default function OfferSheetPhase({
               </p>
             )}
           </div>
+          {sorted.length > RFA_PAGE_SIZE && (
+            <div className="mt-3 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[10px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+                Showing {rfaStart}-{rfaEnd} of {sorted.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setRfaPage((page) => Math.max(1, page - 1))}
+                  disabled={rfaPage === 1}
+                  aria-label="Previous RFA page"
+                  className="tap-target flex-1 text-[10px] font-black uppercase tracking-wider px-3 py-2 font-mono sm:flex-none"
+                  style={{
+                    background: "transparent",
+                    border: "1px solid var(--ledger-rule)",
+                    color: rfaPage === 1 ? "var(--ledger-ink-faint)" : "var(--ledger-ink)",
+                    borderRadius: "2px",
+                    opacity: rfaPage === 1 ? 0.5 : 1,
+                  }}>
+                  Previous
+                </button>
+                <span className="text-[10px] font-mono font-black tabular-nums" style={{ color: "var(--ledger-ink)" }}>
+                  {rfaPage}/{rfaPageCount}
+                </span>
+                <button
+                  onClick={() => setRfaPage((page) => Math.min(rfaPageCount, page + 1))}
+                  disabled={rfaPage === rfaPageCount}
+                  aria-label="Next RFA page"
+                  className="tap-target flex-1 text-[10px] font-black uppercase tracking-wider px-3 py-2 font-mono sm:flex-none"
+                  style={{
+                    background: "transparent",
+                    border: "1px solid var(--ledger-rule)",
+                    color: rfaPage === rfaPageCount ? "var(--ledger-ink-faint)" : "var(--ledger-ink)",
+                    borderRadius: "2px",
+                    opacity: rfaPage === rfaPageCount ? 0.5 : 1,
+                  }}>
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -316,7 +376,7 @@ export default function OfferSheetPhase({
               ` · ${results.filter(r => r.outcome.result === "declined").length} declined`}
           </p>
           <button onClick={onDone}
-            className="w-full text-[11px] font-black uppercase tracking-[0.18em] px-5 py-2 font-mono sm:w-auto"
+            className="tap-target w-full text-[11px] font-black uppercase tracking-[0.18em] px-5 py-2 font-mono sm:w-auto"
             style={{ background: "var(--ledger-ink)", color: "var(--ledger-card-light)", borderRadius: "2px" }}>
             Done — Proceed to Free Agency →
           </button>

@@ -40,10 +40,10 @@ Source canaries retargeted to the module set.
 - UI: EDGE tab on armchair AssetCards reusing `EdgeShotMap`. ✅ (2026-07-07)
 - Team-level EDGE: aggregate OZ%/speed tiles on Team DNA. ✅ (2026-07-07)
 
-## Phase 5 — Mobile + AA sweep
+## Phase 5 — Mobile + AA sweep ✅ (2026-07-07)
 - Tap targets ≥ 44px on trade/lineup/sim controls; aria-labels on icon
   buttons; focus-visible rings; single-column trade flow under 640px;
-  bottom-sheet verdict already exists — audit the rest.
+  bottom-sheet verdict already exists — audit the rest. ✅ (2026-07-07)
 
 Rules while reworking: every phase ships green (tsc + 424 tests +
 build), no behavior changes inside a "decompose" phase, and new UI
