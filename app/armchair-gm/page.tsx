@@ -3,21 +3,14 @@
 import TradePanel from "@/app/components/TradePanel";
 import TugBar from "@/app/components/TugBar";
 import { SEASON, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
-import { pickEffectiveStanding } from "@/app/lib/pick-value";
-import PlayoffBracket from "@/app/components/PlayoffBracket";
-import TeamStrand, { CHAMP_TEMPLATE, type TeamStrandData } from "@/app/components/TeamStrand";
-import { computeRosterStrand } from "@/app/lib/roster-strand";
-import LineupEditor, { type LineupOrderPayload } from "@/app/components/LineupEditor";
-import WhatWeNeed from "@/app/components/WhatWeNeed";
-import ContentionQuadrant from "@/app/components/ContentionQuadrant";
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
-import { tradeAssetKey, useTradeStore } from "@/app/store/tradeStore";
+import { useTradeStore } from "@/app/store/tradeStore";
 import Header from "@/app/components/Header";
 import TradeHistoryBar from "@/app/components/TradeHistoryBar";
 import Footer from "@/app/components/Footer";
 import type {
-  Asset, Team, XNAVResult, GmFlag, TradeVerdict,
+  Asset, Team, XNAVResult, TradeVerdict,
 } from "@/app/lib/trade-types";
 import {
   fetchNavMap, fetchTradeVerdict, clearNavCache, getCachedNav,
@@ -27,9 +20,8 @@ import {
   parseTradeQueryState,
   resolveTradeShareAssets,
 } from "@/app/lib/trade-share";
-import { applyCapDelta, applyTeamCapDeltas, CapDeltaMoves } from "@/app/lib/cap-delta";
+import { applyCapDelta } from "@/app/lib/cap-delta";
 import { scenarioSeed } from "@/app/lib/sim-engine";
-import { resolveLeagueOffseason, type OffseasonPending } from "@/app/lib/free-agency";
 import ResignPhase from "@/app/components/ResignPhase";
 import OfferSheetPhase from "@/app/components/OfferSheetPhase";
 import DraftNight from "@/app/components/DraftNight";
@@ -39,26 +31,14 @@ import TradeBlockPanel from "@/app/components/TradeBlockPanel";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 import { useSimDispatch } from "./useSimDispatch";
 import CupRunPanel from "@/app/components/CupRunPanel";
-import {
-  startCupRun,
-  recordSeason,
-  rollLeagueForward,
-  rollRetentionLedger,
-  reconcileAiTeamCapSpaces,
-  retentionCheck,
-  addRetention,
-  seasonLabelForYear,
-  cupRunOffseasonEntry,
-  type CupRunState,
-} from "@/app/lib/cup-run";
-import { toast } from "@/app/lib/ledger-toast";
 import { computeContention } from "./contention";
-import { CupRunDraftSummaryModal, buildTradeCapMoves, type CupDraftSummary } from "./CupRunDraftSummaryModal";
+import { CupRunDraftSummaryModal, buildTradeCapMoves } from "./CupRunDraftSummaryModal";
 import { GmAnalysisTabs, ModeBadge } from "./GmAnalysisTabs";
-import { SeasonResultsPager, MiniStat } from "./SeasonResultsPager";
+import { MiniStat } from "./SeasonResultsPager";
 import { LoadingScreen, ErrorScreen } from "./Screens";
-
-const CUP_RUN_STORAGE_KEY = "cup-run-state-v1";
+import { useCupRunLifecycle } from "./useCupRunLifecycle";
+import { useOffseasonFlow } from "./useOffseasonFlow";
+import { useTradeBench, type SimControls } from "./useTradeBench";
 
 const TradeProposalEngine = lazy(() => import("@/app/components/TradeProposal"));
 const PlayerComparison    = lazy(() => import("@/app/components/PlayerComparison"));
@@ -177,73 +157,48 @@ export default function ArmchairGmPage() {
   // ── Team lock state ───────────────────────────────────────────
   const [homeTeamLocked, setHomeTeamLocked] = useState(false);
 
-  // ── Persistent trade simulation state ────────────────────────
-  const [executedTrades, setExecutedTrades] = useState<{
-    id: string;
-    homeTeamName: string;
-    partnerTeamName: string;
-    outgoing: Asset[];
-    incoming: Asset[];
-    timestamp: number;
-  }[]>([]);
-  const [showSimPanel, setShowSimPanel] = useState(false);
-  const [lineupStartingGoalies, setLineupStartingGoalies] = useState<Record<string, string | null>>({});
-  const [lineupOrders, setLineupOrders] = useState<Record<string, LineupOrderPayload>>({});
   const [showMemo, setShowMemo] = useState(false);
 
-  // ── Off-season / free agency ─────────────────────────────────
-  const [mode, setMode] = useState<"offseason" | "inseason">("offseason");
-  const [draftOpen, setDraftOpen] = useState(false);
-  const [resignOpen, setResignOpen] = useState(false);
-  const [offerSheetOpen, setOfferSheetOpen] = useState(false);
-  const [userPending, setUserPending] = useState<OffseasonPending[]>([]);
-  const [market, setMarket] = useState<OffseasonPending[]>([]);
-  const [rfaMarket, setRfaMarket] = useState<OffseasonPending[]>([]);
-  const [cupDraftSummary, setCupDraftSummary] = useState<CupDraftSummary | null>(null);
-  const offseasonResolvedRef = useRef(false);
+  // ── Late-binding refs — bridge hook call order ────────────────
+  // useCupRunLifecycle and useTradeBench need values produced by hooks
+  // that run after them (useSimDispatch, and each other's resets).
+  // These refs are assigned every render below and read only inside
+  // event handlers, which always fire after render.
+  const simDataRef = useRef<any | null>(null);
+  const onSeasonRolledRef = useRef<() => void>(() => {});
+  const simControlsRef = useRef<SimControls | null>(null);
 
   // ── Cup Run Challenge (3-year mode) ──────────────────────────
-  const [cupRun, setCupRun] = useState<CupRunState | null>(null);
-  const [cupAdvancing, setCupAdvancing] = useState(false);
-  // A saved ACTIVE run found on load — held here until the user decides.
-  // Restoring it silently is a trap: the rolled league lives only in
-  // React state, so a reloaded session is a fresh 2026 league wearing a
-  // mid-run flag (offseason popups gated off, everything "broken").
-  const [cupRunPrompt, setCupRunPrompt] = useState<CupRunState | null>(null);
-  const cupRunActive = cupRun?.status === "ACTIVE";
+  const {
+    cupRun, setCupRun, cupRunActive, cupAdvancing, cupRunPrompt,
+    dismissCupRunPrompt, cupDraftSummary, setCupDraftSummary,
+    handleStartCupRun, handleAbandonCupRun, handleCupRunAdvance,
+  } = useCupRunLifecycle({
+    homeTeam, db, originalDb, setDb, setOriginalDb, setHomeTeamLocked,
+    simDataRef, onSeasonRolledRef,
+  });
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(CUP_RUN_STORAGE_KEY);
-      if (raw) {
-        const saved = JSON.parse(raw);
-        if (saved?.version === 1) {
-          if (saved.status === "ACTIVE") setCupRunPrompt(saved);
-          else setCupRun(saved); // WON/FIRED — just shows the final panel
-        }
-      }
-    } catch { /* corrupted save — start fresh */ }
-  }, []);
+  // ── Off-season / free agency ─────────────────────────────────
+  const {
+    mode, setMode, draftOpen, setDraftOpen, resignOpen, setResignOpen,
+    offerSheetOpen, setOfferSheetOpen, userPending, market, rfaMarket,
+    offseasonResolvedRef, resignPlayer, walkPlayer, dropPlayer,
+    signMarketPlayer, proceedToOfferSheets, signOfferSheet, finishOffseason,
+  } = useOffseasonFlow({
+    db, setDb, setOriginalDb, homeTeamId, showTeamSelect, initialNavReady,
+    cupRun, cupDraftSummary,
+  });
 
-  useEffect(() => {
-    try {
-      if (cupRun) localStorage.setItem(CUP_RUN_STORAGE_KEY, JSON.stringify(cupRun));
-    } catch { /* storage unavailable */ }
-  }, [cupRun]);
-
-  const dismissCupRunPrompt = useCallback((resume: boolean) => {
-    setCupRunPrompt(prev => {
-      if (resume && prev) {
-        // Year 1 pre-rollover state matches the fresh league; executed
-        // trades were lost with the session, so the retention ledger
-        // resets with them.
-        setCupRun({ ...prev, retentionLedger: [] });
-      } else {
-        try { localStorage.removeItem(CUP_RUN_STORAGE_KEY); } catch { /* ignore */ }
-      }
-      return null;
-    });
-  }, []);
+  // ── Trade bench — executed trades, lineups, execute/reset ────
+  const {
+    executedTrades, setExecutedTrades, showSimPanel, setShowSimPanel,
+    lineupStartingGoalies, setLineupStartingGoalies, lineupOrders, setLineupOrders,
+    handleGoalieStarterChange, handleLineupChange, executeTrade, resetTrades,
+  } = useTradeBench({
+    homeTeam, partnerTeam, outgoingBlock, incomingBlock, setBlocks, setVerdict,
+    db, setDb, originalDb, setHomeTeamLocked, setShowTeamSelect,
+    cupRun, setCupRun, offseasonResolvedRef, simControlsRef,
+  });
 
   useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length) || draftOpen || resignOpen || offerSheetOpen || Boolean(cupDraftSummary));
 
@@ -302,19 +257,23 @@ export default function ArmchairGmPage() {
     [db.players, partnerTeamId]
   );
 
-  const handleGoalieStarterChange = useCallback((teamId: string, goalieId: string | null) => {
-    setLineupStartingGoalies(prev =>
-      prev[teamId] === goalieId ? prev : { ...prev, [teamId]: goalieId }
-    );
-  }, []);
-
-  const handleLineupChange = useCallback((teamId: string, order: LineupOrderPayload) => {
-    setLineupOrders(prev => {
-      const current = prev[teamId];
-      if (current && JSON.stringify(current) === JSON.stringify(order)) return prev;
-      return { ...prev, [teamId]: order };
-    });
-  }, []);
+  // Late-binding ref assignments — see the refs block above.
+  simDataRef.current = simData;
+  simControlsRef.current = { clearSimResult, resetSimulation };
+  onSeasonRolledRef.current = () => {
+    setExecutedTrades([]);
+    resetSimulation();
+    setLineupOrders({});
+    setLineupStartingGoalies({});
+    setShowSimPanel(false);
+    setBlocks([[], []]);
+    setVerdict(null);
+    offseasonResolvedRef.current = false;   // re-resolve FA for the new year
+    setMode("offseason");
+    setDraftOpen(false);
+    setResignOpen(false);
+    setOfferSheetOpen(false);
+  };
 
   // Fetch NAV from server whenever db.players changes (after load or trade execution)
   useEffect(() => {
@@ -457,437 +416,6 @@ export default function ArmchairGmPage() {
   useEffect(() => {
     loadLeagueData();
   }, [loadLeagueData]);
-
-  // ── Execute Trade — moves players between teams in db state ──
-  const executeTrade = useCallback(() => {
-    if (!homeTeam || !partnerTeam || (!outgoingBlock.length && !incomingBlock.length)) return;
-
-    // Cup Run: retention is a scarce cross-season resource. Slots stay
-    // occupied for the retained contract's full term, so the ledger is
-    // checked and charged here at execution time.
-    if (cupRun?.status === "ACTIVE") {
-      const retainedOutgoing = outgoingBlock
-        .filter(a => a.position !== "Pick" && (a.retainedPct ?? 0) > 0)
-        .map(a => ({
-          playerId: a.id,
-          playerName: a.name,
-          pct: a.retainedPct ?? 0,
-          capHit: a.capHit,
-          yearsRemaining: a.yearsRemaining,
-        }));
-      if (retainedOutgoing.length > 0) {
-        const check = retentionCheck(cupRun.retentionLedger, retainedOutgoing, db.capCeiling ?? SEASON.capCeiling);
-        if (!check.ok) {
-          toast(check.reason ?? "Retention limit reached for this run.", "error");
-          return;
-        }
-        setCupRun(prev => prev && prev.status === "ACTIVE"
-          ? { ...prev, retentionLedger: addRetention(prev.retentionLedger, retainedOutgoing) }
-          : prev);
-      }
-    }
-
-    const outgoingByKey = new Map(outgoingBlock.map(a => [tradeAssetKey(a), a]));
-    const incomingByKey = new Map(incomingBlock.map(a => [tradeAssetKey(a), a]));
-
-    setDb(prev => {
-      const clearSessionTradeBlock = (p: Asset): Asset =>
-        p.position === "Pick"
-          ? p
-          : { ...p, tradeBlockStatus: null, tradeBlockNote: null };
-
-      // Update player teamIds
-      const updatedPlayers = prev.players.map(p => {
-        const outgoingAsset = outgoingByKey.get(tradeAssetKey(p));
-        if (outgoingAsset) {
-          return clearSessionTradeBlock({
-            ...p,
-            teamId: partnerTeam.id,
-            retainedPct: outgoingAsset.retainedPct ?? p.retainedPct ?? 0,
-          });
-        }
-        const incomingAsset = incomingByKey.get(tradeAssetKey(p));
-        if (incomingAsset) {
-          return clearSessionTradeBlock({
-            ...p,
-            teamId: homeTeam.id,
-            retainedPct: incomingAsset.retainedPct ?? p.retainedPct ?? 0,
-          });
-        }
-        return p;
-      });
-
-      const capMoves = buildTradeCapMoves(outgoingBlock, incomingBlock);
-
-      const updatedTeams = prev.teams.map(team => {
-        if (team.id === homeTeam.id) {
-          return {
-            ...team,
-            capSpace: Math.round(applyCapDelta(team.capSpace, capMoves.home) * 10) / 10,
-          };
-        }
-        if (team.id === partnerTeam.id) {
-          return {
-            ...team,
-            capSpace: Math.round(applyCapDelta(team.capSpace, capMoves.partner) * 10) / 10,
-          };
-        }
-        return team;
-      });
-
-      const teamCtxByOwner = new Map(updatedTeams.map(team => [team.id, team]));
-      const playersWithDynamicPickValues = updatedPlayers.map(p => {
-        if (p.position !== "Pick") return p;
-        const owner = teamCtxByOwner.get(p.teamId);
-        return {
-          ...p,
-          teamStanding: pickEffectiveStanding(owner?.phase, owner?.standing ?? p.teamStanding),
-        };
-      });
-
-      return { players: playersWithDynamicPickValues, teams: updatedTeams };
-    });
-
-    // Record the trade
-    setExecutedTrades(prev => [...prev, {
-      id:              `trade-${Date.now()}`,
-      homeTeamName:    homeTeam.name,
-      partnerTeamName: partnerTeam.name,
-      outgoing:        outgoingBlock,
-      incoming:        incomingBlock,
-      timestamp:       Date.now(),
-    }]);
-
-    // Clear nav cache so post-trade rosters get fresh server-side NAV
-    clearNavCache();
-
-    // Clear the blocks and verdict
-    setBlocks([[], []]);
-    setVerdict(null);
-    clearSimResult();
-    setShowSimPanel(true);
-  }, [homeTeam, partnerTeam, outgoingBlock, incomingBlock, setBlocks, clearSimResult, cupRun, db.capCeiling]);
-
-  // ── Reset to original rosters ─────────────────────────────────
-  const resetTrades = useCallback(() => {
-    if (originalDb) {
-      clearNavCache();
-      setDb(originalDb);
-      setExecutedTrades([]);
-      resetSimulation();
-      setLineupStartingGoalies({});
-      setShowSimPanel(false);
-      setBlocks([[], []]);
-      setVerdict(null);
-      setHomeTeamLocked(false);
-      setShowTeamSelect(true);
-      offseasonResolvedRef.current = false;
-    }
-  }, [originalDb, setBlocks, resetSimulation]);
-
-  // ── Cup Run lifecycle ─────────────────────────────────────────
-  const handleStartCupRun = useCallback(() => {
-    if (!homeTeam) return;
-    const run = startCupRun(homeTeam);
-    setCupRun(run);
-    setHomeTeamLocked(true);
-    toast(`Cup Run started: ${homeTeam.name} — ${run.difficulty.label} (${run.difficulty.stars}★)`, "info");
-  }, [homeTeam]);
-
-  const handleAbandonCupRun = useCallback(() => {
-    setCupRun(null);
-    try { localStorage.removeItem(CUP_RUN_STORAGE_KEY); } catch { /* ignore */ }
-  }, []);
-
-  const handleCupRunAdvance = useCallback(() => {
-    if (!cupRun || cupRun.status !== "ACTIVE") return;
-    const champion = simData?.playoffBracket?.champion;
-    if (!champion) return;
-
-    const madePlayoffs = (simData.playoffTeams ?? []).includes(cupRun.teamId);
-    const next = recordSeason(cupRun, {
-      championTeamId: champion.teamId,
-      championTeamName: champion.teamName,
-      madePlayoffs,
-    });
-    if (next.status !== "ACTIVE") {
-      setCupRun(next);
-      return;
-    }
-
-    // Roll the whole league into the next season
-    setCupAdvancing(true);
-    try {
-      const standings = (simData.standings ?? []).map((t: { teamId: string }, i: number) => ({
-        teamId: t.teamId,
-        standing: i + 1,
-      }));
-      const rolled = rollLeagueForward({
-        players: db.players,
-        seasonStartPlayers: originalDb?.players ?? db.players,
-        state: next,
-        teams: db.teams,
-        standings,
-        capCeiling: db.capCeiling ?? SEASON.capCeiling,
-      });
-      const drafted = [...rolled.draftedRookies]
-        .sort((a, b) => (a.draftOverall ?? 999) - (b.draftOverall ?? 999));
-      setCupDraftSummary({
-        seasonLabel: seasonLabelForYear(next.currentYear),
-        draftYear: drafted[0]?.draftYear ?? null,
-        retiredCount: rolled.retiredCount,
-        rookieCount: rolled.rookieCount,
-        depthAddedCount: rolled.depthAddedCount,
-        breakoutCount: rolled.events.filter(e => e.type === "breakout").length,
-        regressionCount: rolled.events.filter(e => e.type === "regression").length,
-        topPicks: drafted.slice(0, 10).map(p => ({
-          id: p.id,
-          name: p.name,
-          teamId: p.teamId,
-          position: p.position,
-          overall: p.draftOverall ?? null,
-        })),
-      });
-      setCupRun({ ...next, retentionLedger: rollRetentionLedger(next.retentionLedger) });
-      clearNavCache();
-      const rolledTeams = reconcileAiTeamCapSpaces(db.teams, rolled.players, db.capCeiling ?? SEASON.capCeiling, next.teamId);
-      setDb(prev => ({ ...prev, teams: rolledTeams, players: rolled.players }));
-      setOriginalDb({ teams: rolledTeams, players: rolled.players, capCeiling: db.capCeiling });
-      setExecutedTrades([]);
-      resetSimulation();
-      setLineupOrders({});
-      setLineupStartingGoalies({});
-      setShowSimPanel(false);
-      setBlocks([[], []]);
-      setVerdict(null);
-      offseasonResolvedRef.current = false;   // re-resolve FA for the new year
-      setMode("offseason");
-      setDraftOpen(false);
-      setResignOpen(false);
-      setOfferSheetOpen(false);
-      const breakouts = rolled.events.filter(e => e.type === "breakout").length;
-      toast(
-        `Welcome to ${seasonLabelForYear(next.currentYear)} — ${rolled.retiredCount} retired, ${rolled.rookieCount} drafted, ${breakouts} breakouts`,
-        "success",
-      );
-    } finally {
-      setCupAdvancing(false);
-    }
-  }, [cupRun, simData, db, originalDb, resetSimulation, setBlocks]);
-
-  // ── Off-Season: resolve the league's pending free agents (once) ──
-  // Auto-handles the other 31 teams (re-signs / walks) and sets the user's own
-  // pending free agents aside for the manual Re-Sign phase. Mirrors the
-  // executeTrade roster/cap mutation pattern.
-  const applyLeagueOffseason = useCallback(() => {
-    if (offseasonResolvedRef.current || !homeTeamId) return;
-    offseasonResolvedRef.current = true;
-
-    const seed = scenarioSeed({ offseason: homeTeamId, season: SEASON.label });
-    const res = resolveLeagueOffseason(db.players, {
-      seed,
-      userTeamId: homeTeamId,
-      capCeiling: db.capCeiling ?? SEASON.capCeiling,
-      teams: db.teams,
-    });
-    setUserPending(res.userPending);
-    setMarket(res.market);
-    setRfaMarket(res.rfaMarket);
-
-    const resignById = new Map(res.resignings.map(r => [r.playerId, r.contract]));
-    const marketSigningById = new Map(res.marketSignings.map(s => [s.playerId, s]));
-    const walkedIds = new Set(res.walkAways
-      .filter(w => !marketSigningById.has(w.playerId))
-      .map(w => w.playerId));
-
-    setDb(prev => {
-      const players = prev.players
-        .filter(p => !walkedIds.has(p.id))
-        .map(p => {
-          const c = resignById.get(p.id);
-          if (c) {
-            return { ...p, capHit: c.aav, yearsRemaining: c.term, expiresThisOffseason: false, contractStatus: "SIGNED" as const };
-          }
-          const marketSigning = marketSigningById.get(p.id);
-          return marketSigning
-            ? {
-                ...p,
-                teamId: marketSigning.teamId,
-                capHit: marketSigning.contract.aav,
-                yearsRemaining: marketSigning.contract.term,
-                retainedPct: 0,
-                expiresThisOffseason: false,
-                contractStatus: "SIGNED" as const,
-              }
-            : p;
-        });
-      const teams = applyTeamCapDeltas(prev.teams, res.teamCapMoves)
-        .map(t => ({ ...t, capSpace: Math.round(t.capSpace * 10) / 10 }));
-      return { ...prev, players, teams };
-    });
-    clearNavCache();
-    // Draft Night runs first, then the Re-Sign phase. In Cup Run years 2-3
-    // the draft has already been resolved at rollover from the new standings,
-    // so show that summary popup and then continue to re-signing. If no summary
-    // exists (defensive fallback), still open re-signing so 0-year contracts
-    // cannot stay parked on the roster.
-    const entry = cupRunOffseasonEntry(cupRun, Boolean(cupDraftSummary));
-    if (entry === "DRAFT_NIGHT") {
-      setDraftOpen(true);
-    } else if (entry === "DRAFT_SUMMARY") {
-      setDraftOpen(false);
-      setResignOpen(false);
-    } else {
-      setDraftOpen(false);
-      setResignOpen(true);
-    }
-  }, [db.players, db.capCeiling, homeTeamId, cupRun, cupDraftSummary]);
-
-  // Re-sign one of your pending free agents at the projected terms.
-  const resignPlayer = useCallback((fa: OffseasonPending) => {
-    setDb(prev => ({
-      ...prev,
-      players: prev.players.map(p =>
-        p.id === fa.player.id
-          ? { ...p, capHit: fa.contract.aav, yearsRemaining: fa.contract.term, expiresThisOffseason: false, contractStatus: "SIGNED" as const }
-          : p),
-      teams: prev.teams.map(t =>
-        t.id === fa.player.teamId
-          ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: fa.player.lastCapHit ?? fa.player.capHit }], incoming: [{ capHit: fa.contract.aav }] }) * 10) / 10 }
-          : t),
-    }));
-    setUserPending(prev => prev.filter(p => p.player.id !== fa.player.id));
-    clearNavCache();
-  }, []);
-
-  // Let a pending free agent walk — frees his cap, opens a roster hole, and
-  // drops him into the open market.
-  const walkPlayer = useCallback((fa: OffseasonPending) => {
-    setDb(prev => ({
-      ...prev,
-      players: prev.players.filter(p => p.id !== fa.player.id),
-      teams: prev.teams.map(t =>
-        t.id === fa.player.teamId
-          ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: fa.player.lastCapHit ?? fa.player.capHit }] }) * 10) / 10 }
-          : t),
-    }));
-    setUserPending(prev => prev.filter(p => p.player.id !== fa.player.id));
-    setMarket(prev => [{ player: fa.player, contract: fa.contract }, ...prev]);
-    clearNavCache();
-  }, []);
-
-  // Release a signed player — clean release frees his full cap hit and removes
-  // him from the roster (no dead-cap retention).
-  const dropPlayer = useCallback((player: Asset) => {
-    setDb(prev => ({
-      ...prev,
-      players: prev.players.filter(p => p.id !== player.id),
-      teams: prev.teams.map(t =>
-        t.id === player.teamId
-          ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: player.capHit }] }) * 10) / 10 }
-          : t),
-    }));
-    clearNavCache();
-  }, []);
-
-  // Sign a free agent off the open market onto your roster.
-  const signMarketPlayer = useCallback((fa: OffseasonPending) => {
-    if (!homeTeamId) return;
-    setDb(prev => {
-      const signed: Asset = {
-        ...fa.player, teamId: homeTeamId, capHit: fa.contract.aav, yearsRemaining: fa.contract.term,
-        retainedPct: 0, expiresThisOffseason: false, contractStatus: "SIGNED",
-      };
-      return {
-        ...prev,
-        players: [...prev.players.filter(p => p.id !== fa.player.id), signed],
-        teams: prev.teams.map(t =>
-          t.id === homeTeamId
-            ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { incoming: [{ capHit: fa.contract.aav }] }) * 10) / 10 }
-            : t),
-      };
-    });
-    setMarket(prev => prev.filter(p => p.player.id !== fa.player.id));
-    clearNavCache();
-  }, [homeTeamId]);
-
-  // Re-sign phase done — auto-walk any remaining pending UFAs, then
-  // open offer sheet phase for other teams' RFAs.
-  const proceedToOfferSheets = useCallback(() => {
-    setUserPending(prev => {
-      if (prev.length > 0) {
-        const walkIds = new Set(prev.map(fa => fa.player.id));
-        setDb(dbPrev => ({
-          ...dbPrev,
-          players: dbPrev.players.filter(p => !walkIds.has(p.id)),
-          teams: dbPrev.teams.map(t => {
-            const freed = prev
-              .filter(fa => fa.player.teamId === t.id)
-              .reduce((sum, fa) => sum + (fa.player.lastCapHit ?? fa.player.capHit), 0);
-            return freed > 0
-              ? { ...t, capSpace: Math.round((t.capSpace + freed) * 10) / 10 }
-              : t;
-          }),
-        }));
-        setMarket(m => [...prev.map(fa => ({ player: fa.player, contract: fa.contract })), ...m]);
-        clearNavCache();
-      }
-      return [];
-    });
-    setResignOpen(false);
-    setOfferSheetOpen(true);
-  }, []);
-
-  // Sign an RFA via offer sheet: move player to user's roster, deduct comp picks.
-  const signOfferSheet = useCallback((fa: OffseasonPending, compensation: string[]) => {
-    if (!homeTeamId) return;
-    // Deduct compensation picks from the user's inventory
-    const picksToRemove: string[] = [];
-    const compNeeded = [...compensation];
-    const available = db.players.filter(p => p.position === "Pick" && p.teamId === homeTeamId);
-    for (const roundNeeded of compNeeded) {
-      const roundNum = roundNeeded === "1st" ? 1 : roundNeeded === "2nd" ? 2 : 3;
-      const pick = available.find(p => p.round === roundNum && !picksToRemove.includes(p.id));
-      if (pick) picksToRemove.push(pick.id);
-    }
-
-    setDb(prev => {
-      const signed: Asset = {
-        ...fa.player, teamId: homeTeamId, capHit: fa.contract.aav, yearsRemaining: fa.contract.term,
-        retainedPct: 0, expiresThisOffseason: false, contractStatus: "SIGNED",
-      };
-      return {
-        ...prev,
-        players: [
-          ...prev.players
-            .filter(p => p.id !== fa.player.id)
-            .filter(p => !picksToRemove.includes(p.id)),
-          signed,
-        ],
-        teams: prev.teams.map(t =>
-          t.id === homeTeamId
-            ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { incoming: [{ capHit: fa.contract.aav }] }) * 10) / 10 }
-            : t.id === fa.player.teamId
-              ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: fa.contract.aav }], incoming: [{ capHit: fa.player.lastCapHit ?? fa.player.capHit }] }) * 10) / 10 }
-              : t),
-      };
-    });
-    setRfaMarket(prev => prev.filter(p => p.player.id !== fa.player.id));
-    clearNavCache();
-  }, [homeTeamId, db.players]);
-
-  // Commit the off-season as the new baseline and open the trade flow.
-  const finishOffseason = useCallback(() => {
-    setOfferSheetOpen(false);
-    setOriginalDb(db);
-  }, [db]);
-
-  // Trigger the league off-season once a franchise is chosen in off-season mode.
-  useEffect(() => {
-    if (mode === "offseason" && homeTeamId && !showTeamSelect && initialNavReady && !offseasonResolvedRef.current) {
-      applyLeagueOffseason();
-    }
-  }, [mode, homeTeamId, showTeamSelect, initialNavReady, applyLeagueOffseason]);
 
   useEffect(() => {
     // Issue 10: Don't auto-evaluate. Clear old verdict so user must click "Make the call" again.

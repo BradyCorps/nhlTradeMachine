@@ -22,6 +22,9 @@ const readArmchairAll = () =>
     "app/armchair-gm/Screens.tsx",
     "app/armchair-gm/contention.ts",
     "app/armchair-gm/CupRunDraftSummaryModal.tsx",
+    "app/armchair-gm/useCupRunLifecycle.ts",
+    "app/armchair-gm/useOffseasonFlow.ts",
+    "app/armchair-gm/useTradeBench.ts",
   ].map(read).join("\n");
 const LEAGUE_ROUTES = [
   "app/api/league/players/route.ts",
@@ -370,7 +373,7 @@ describe("Canary — trade block mechanics", () => {
   });
 
   it("executed trades clear moved players from the session trade block", () => {
-    const tradePage = read("app/armchair-gm/page.tsx");
+    const tradePage = readArmchairAll();
     expect(tradePage).toContain("clearSessionTradeBlock");
     expect(tradePage).toContain("tradeBlockStatus: null");
     expect(tradePage).toContain("tradeBlockNote: null");
@@ -757,7 +760,7 @@ describe("Canary — Batch 5 UI state robustness", () => {
   it("trade store mutations disambiguate duplicate player ids by team", () => {
     const store = read("app/store/tradeStore.ts");
     const card = read("app/components/AssetCard.tsx");
-    const armchair = read("app/armchair-gm/page.tsx");
+    const armchair = readArmchairAll();
     expect(store).toContain("tradeAssetKey");
     expect(store).toContain("teamId ? tradeAssetKey(a) === targetKey : a.id === assetId");
     expect(store).toContain("tradeAssetKey(a) === tradeAssetKey(asset)");
@@ -787,7 +790,7 @@ describe("Canary — Batch 5 UI state robustness", () => {
   });
 
   it("executed trades do not re-rank the league or remap team phases client-side", () => {
-    const src = read("app/armchair-gm/page.tsx");
+    const src = readArmchairAll();
     expect(src).not.toContain("strengthByTeam");
     expect(src).not.toContain("projectedStandingByTeam");
     expect(src).not.toContain("phaseFromStanding");
