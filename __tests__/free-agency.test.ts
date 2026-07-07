@@ -160,9 +160,10 @@ describe("resolveLeagueOffseason", () => {
     expect(res.teamCapMoves.BUF?.incoming ?? []).toHaveLength(0);
   });
 
-  it("keeps the pre-existing FA pool on the board for the user instead of letting AI pre-sign it", () => {
-    // A marquee open-market UFA. The open pool is what the user came to shop —
-    // AI teams must not vacuum it up before the market is ever shown.
+  it("signs an affordable open-market UFA to a contender, not the broke or user team", () => {
+    // The pre-existing FA pool is AI-signable so contenders work through the
+    // board realistically — routed to the affordable contender, never the broke
+    // team and never the user's team.
     const ufa = mkAsset({
       id: "market-wing",
       teamId: "FA_POOL",
@@ -182,23 +183,24 @@ describe("resolveLeagueOffseason", () => {
         { id: "WPG", capSpace: 20, standing: 5, phase: "Contender" },
       ],
     });
-    expect(res.marketSignings.some((s) => s.playerId === ufa.id)).toBe(false);
-    expect(res.market.some((m) => m.player.id === ufa.id)).toBe(true);
+    const signing = res.marketSignings.find((s) => s.playerId === ufa.id);
+    expect(signing?.teamId).toBe("CAR");
+    expect(signing?.teamId).not.toBe("WPG");
+    expect(res.market.some((m) => m.player.id === ufa.id)).toBe(false);
   });
 
-  it("keeps a league-minimum cap cushion when AI teams shop walk-away UFAs", () => {
-    // Depth UFAs on a broke team can't be re-signed, so they walk into the
-    // market — that churn is still AI-signable (unlike the pre-existing pool),
-    // and the shopper must leave a league-minimum cushion.
+  it("keeps a league-minimum cap cushion when AI teams shop the UFA market", () => {
+    // Depth UFAs in the open pool are AI-signable, and the shopper must leave a
+    // league-minimum cushion rather than spending to $0.
     const marketPlayers = Array.from({ length: 8 }, (_, i) => mkAsset({
-      id: `walk-depth-${i}`,
-      teamId: "STL",
+      id: `market-depth-${i}`,
+      teamId: "FA_POOL",
       position: "W",
       age: 30,
       ptsPace: 15,
       baselinePtsPace: 15,
       contractStatus: "UFA",
-      capHit: 0.1,
+      capHit: 0,
     }));
     const teams = [
       { id: "STL", capSpace: 0, standing: 25, phase: "Rebuilding" },

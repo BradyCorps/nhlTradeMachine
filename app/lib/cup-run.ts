@@ -233,7 +233,10 @@ export function rollLeagueForward(opts: {
 }): RollForwardResult {
   const { players, seasonStartPlayers, state, teams, standings, capCeiling } = opts;
   const nextYear = state.currentYear;          // call AFTER recordSeason advanced it
-  const draftYear = parseInt(SEASON.label.slice(0, 4), 10) + nextYear;
+  // The base draft (SEASON.draftYear, e.g. 2026) is played before Year 1.
+  // Rolling INTO Year N drafts the class 2026 + (N-1): Year 2 → 2027,
+  // Year 3 → 2028. The old `+ nextYear` was off by one (Year 2 drafted 2028).
+  const draftYear = SEASON.draftYear + nextYear - 1;
   const rolloverSeed = state.seed + nextYear * 7919;
 
   const picks = players.filter((p) => p.position === "Pick");

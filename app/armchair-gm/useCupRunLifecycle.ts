@@ -11,7 +11,7 @@
 // which fire after every render has assigned them.
 import React, { useState, useEffect, useCallback } from "react";
 import type { Asset, Team } from "@/app/lib/trade-types";
-import { SEASON } from "@/app/lib/season-config";
+import { capForCupYear } from "@/app/lib/season-config";
 import { clearNavCache } from "@/app/lib/evaluate-client";
 import {
   startCupRun,
@@ -127,6 +127,10 @@ export function useCupRunLifecycle({
     // Roll the whole league into the next season
     setCupAdvancing(true);
     try {
+      // The cap ceiling steps up with the new season (2026-27 → 2027-28 →
+      // 2028-29). AI cap-legality and every team's cap space must be judged
+      // against the year the league is entering, not a stale $104M.
+      const nextCap = capForCupYear(next.currentYear).ceiling;
       const standings = (simData.standings ?? []).map((t: { teamId: string }, i: number) => ({
         teamId: t.teamId,
         standing: i + 1,
@@ -137,7 +141,7 @@ export function useCupRunLifecycle({
         state: next,
         teams: db.teams,
         standings,
-        capCeiling: db.capCeiling ?? SEASON.capCeiling,
+        capCeiling: nextCap,
       });
       const drafted = [...rolled.draftedRookies]
         .sort((a, b) => (a.draftOverall ?? 999) - (b.draftOverall ?? 999));
@@ -162,9 +166,9 @@ export function useCupRunLifecycle({
       });
       setCupRun({ ...next, retentionLedger: rollRetentionLedger(next.retentionLedger) });
       clearNavCache();
-      const rolledTeams = reconcileAiTeamCapSpaces(db.teams, rolled.players, db.capCeiling ?? SEASON.capCeiling, next.teamId);
-      setDb(prev => ({ ...prev, teams: rolledTeams, players: rolled.players }));
-      setOriginalDb({ teams: rolledTeams, players: rolled.players, capCeiling: db.capCeiling });
+      const rolledTeams = reconcileAiTeamCapSpaces(db.teams, rolled.players, nextCap, next.teamId);
+      setDb(prev => ({ ...prev, teams: rolledTeams, players: rolled.players, capCeiling: nextCap }));
+      setOriginalDb({ teams: rolledTeams, players: rolled.players, capCeiling: nextCap });
       onSeasonRolledRef.current();
       const breakouts = rolled.events.filter(e => e.type === "breakout").length;
       toast(

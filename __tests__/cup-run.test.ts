@@ -227,6 +227,8 @@ describe("rollLeagueForward", () => {
     // VAN (worst) picks first in the synthetic draft
     const first = res.players.find((p) => p.draftOverall === 1 && (p.draftYear ?? 0) > 2026);
     expect(first?.teamId).toBe("VAN");
+    // Rolling INTO Year 2 drafts the 2027 class, not 2028 (off-by-one fix).
+    expect(res.draftedRookies.every((p) => p.draftYear === 2027)).toBe(true);
   });
 
   it("flags every run-out contract for FA resolution — including stale 0-year rows", () => {
@@ -346,5 +348,36 @@ describe("curated future classes", () => {
       const names = new Set(curated.map((p) => p.name));
       expect(cls2027.every((p) => names.has(p.name))).toBe(true);
     }
+  });
+});
+
+// ── Cap escalation — the ceiling rises with each Cup Run year ──
+import { capForCupYear, CAP_BY_CUP_YEAR } from "../app/lib/season-config";
+
+describe("Cup Run cap escalation", () => {
+  it("steps the ceiling up each year to the real announced numbers", () => {
+    expect(capForCupYear(1).ceiling).toBe(104.0);
+    expect(capForCupYear(2).ceiling).toBe(113.5);
+    expect(capForCupYear(3).ceiling).toBe(123.0);
+    // Floor rises too (2027-28 onward).
+    expect(capForCupYear(2).floor).toBe(83.9);
+  });
+
+  it("holds the last known ceiling past year 3 instead of collapsing", () => {
+    expect(capForCupYear(4).ceiling).toBe(CAP_BY_CUP_YEAR[3].ceiling);
+    expect(capForCupYear(99).ceiling).toBe(123.0);
+  });
+
+  it("gives a fully-committed team positive space once the cap rises", () => {
+    // A team at ~$109M is illegal against the $104M year-1 cap but legal
+    // against the $113.5M year-2 cap — the bug that showed teams -5.5M over.
+    const roster = Array.from({ length: 20 }, (_, i) =>
+      asset(`x${i}`, { teamId: "CAR", capHit: 109 / 20 }));
+    const y1 = reconcileAiTeamCapSpaces(
+      [team("CAR")], roster, capForCupYear(1).ceiling, "VAN");
+    const y2 = reconcileAiTeamCapSpaces(
+      [team("CAR")], roster, capForCupYear(2).ceiling, "VAN");
+    expect(y1[0].capSpace).toBeLessThan(0);
+    expect(y2[0].capSpace).toBeGreaterThan(0);
   });
 });

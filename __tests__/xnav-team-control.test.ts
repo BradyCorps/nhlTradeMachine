@@ -58,3 +58,36 @@ describe("EDGE luck adjustment in x-nav", () => {
     expect(Math.abs(unlucky.off - neutral.off)).toBeLessThanOrEqual(12);
   });
 });
+
+// ── Thin-sample credibility — the recurring "26yo AHLer worth +140" phantom ──
+describe("x-nav thin-sample credibility", () => {
+  const base = (over: Partial<AssetInput> = {}): AssetInput => ({
+    id: "p", teamId: "BOS", name: "Rolled AHLer", position: "C", age: 26,
+    ptsPace: 82, baselinePtsPace: 82, defRate: 0.1, avgTOI: 11, capHit: 0.8,
+    yearsRemaining: 1, hasNMC: false, hasNTC: false, canRetain: true,
+    retainedPct: 0, multiplier: 1, hasLiveStats: true, games: 1,
+    ...over,
+  } as AssetInput);
+
+  it("does not crown a 1-game player an elite scorer off an annualized pace", () => {
+    const phantom = calcNAV(base({ games: 1 }));
+    const proven  = calcNAV(base({ games: 80 }));
+    expect(proven.total).toBeGreaterThan(90);           // real 82-pt season is elite
+    expect(phantom.total).toBeLessThan(proven.total * 0.45); // 1 game is not
+  });
+
+  it("does not apply a franchise-cornerstone floor to a thin sample", () => {
+    // A 95-pt pace on 5 games must not be floored to franchise value. The age-26
+    // forward floor is 220; with the sample gate this player prices well below it.
+    const thin = calcNAV(base({ games: 5, ptsPace: 95, baselinePtsPace: 95 }));
+    expect(thin.total).toBeLessThan(200);
+  });
+
+  it("protects a drafted prospect's value on a thin sample where a no-name AHLer is cut", () => {
+    // Same thin sample; only the draft pedigree differs. The prospect keeps full
+    // credibility (draft slot, age <= 23); the pedigree-less player is regressed.
+    const prospect = calcNAV(base({ games: 8, age: 22, draftOverall: 5, ptsPace: 55, baselinePtsPace: 50 }));
+    const noName   = calcNAV(base({ games: 8, age: 22, ptsPace: 55, baselinePtsPace: 50 }));
+    expect(prospect.total).toBeGreaterThan(noName.total);
+  });
+});

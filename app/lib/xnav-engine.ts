@@ -825,8 +825,14 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   //
   // Floor uses -Infinity for non-qualifying players so negative NAV contracts
   // are NOT accidentally floored at zero.
-  const qualifiesEliteForward  = !isD && (pts >= 80 || (ops !== null && ops >= 5.0));
-  const qualifiesEliteDefender =  isD && (pts >= 65 || (ops !== null && ops >= 4.0)) && toi > 22;
+  // A franchise cornerstone is a PROVEN player — the floor must never fire on
+  // a thin sample. A rolled-forward AHLer can carry an elite per-82 pace off a
+  // 1-game line (displays as "1 GP · 1 PT"); without this gate that pace tripped
+  // the floor and produced absurd +140 NAVs for depth players. Require a real
+  // NHL season of games before any cornerstone floor applies.
+  const provenFranchiseSample = (asset.games ?? 0) >= 40;
+  const qualifiesEliteForward  = provenFranchiseSample && !isD && (pts >= 80 || (ops !== null && ops >= 5.0));
+  const qualifiesEliteDefender =  provenFranchiseSample && isD && (pts >= 65 || (ops !== null && ops >= 4.0)) && toi > 22;
 
   let franchiseFloor = -Infinity;
   if (qualifiesEliteForward) {
@@ -837,8 +843,33 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     franchiseFloor = 130 + clamp((toi - 22) * 5 + shutdownDSignal, 0, 20);
   }
 
-  const uncappedTotal = Math.max(discountedTotal, franchiseFloor);
-  const total = uncappedTotal;
+  const flooredTotal = Math.max(discountedTotal, franchiseFloor);
+
+  // Thin-sample credibility. A player with a handful of NHL games cannot be
+  // trusted at an elite valuation off an annualized pace — this is the recurring
+  // "26yo AHLer worth +140" phantom, where a rolled roster carries a big per-82
+  // pace on a 1-game line. Three exemptions keep this from touching real players:
+  //   • draft pedigree — a genuine drafted prospect (slot + young, or an NHLe
+  //     prospect pace), so real rookies are untouched;
+  //   • established production — meaningful accumulated Point Shares (ops+dps),
+  //     which an injured star carries from prior seasons but a 1-game phantom
+  //     never has (this is the key tell — a phantom's Point Shares are ~0);
+  //   • a real current sample (15+ games).
+  // Otherwise the value regresses TOWARD a replacement anchor (not zero) in
+  // proportion to the sample, so genuine low-value depth stays roughly put while
+  // an inflated phantom collapses.
+  const psTotal = (asset.ops ?? 0) + (asset.dps ?? 0);
+  const hasDraftPedigree =
+    (asset.draftOverall != null && asset.age <= 23) ||
+    (asset.prospectPtsPace != null && asset.prospectPtsPace > 0);
+  const hasEstablishedProduction = psTotal >= 2.0;
+  const REPLACEMENT_NAV = 20;
+  const sampleCredibility = hasDraftPedigree || hasEstablishedProduction || games >= 15
+    ? 1
+    : clamp(games / 15, 0.2, 1);
+  const total = flooredTotal > REPLACEMENT_NAV
+    ? REPLACEMENT_NAV + (flooredTotal - REPLACEMENT_NAV) * sampleCredibility
+    : flooredTotal;
 
   return {
     total:  Math.round(total),

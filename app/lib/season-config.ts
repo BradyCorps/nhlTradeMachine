@@ -56,6 +56,22 @@ export const FRANCHISE = {
   megalodon:  380,
 } as const;
 
+// ── Cup Run cap escalation ────────────────────────────────────
+// The real NHL cap rises sharply over the next three seasons (PuckPedia).
+// A Cup Run rolls the league forward one season per year, so the ceiling
+// (and floor) must step up too — otherwise teams whose salaries grew are
+// measured against a stale $104M and show as illegally over the cap.
+//   Year 1 = 2026-27, Year 2 = 2027-28, Year 3 = 2028-29.
+export const CAP_BY_CUP_YEAR: Record<number, { ceiling: number; floor: number }> = {
+  1: { ceiling: 104.0, floor: 76.9 },
+  2: { ceiling: 113.5, floor: 83.9 },
+  3: { ceiling: 123.0, floor: 83.9 },
+};
+
+/** Cap ceiling/floor for a Cup Run year (holds the last known values past year 3). */
+export const capForCupYear = (year: number): { ceiling: number; floor: number } =>
+  CAP_BY_CUP_YEAR[year] ?? CAP_BY_CUP_YEAR[3];
+
 export const ageDecayRate   = (age: number): number =>
   age <= 23 ? COMPRESSION.decayProspect
   : age <= 27 ? COMPRESSION.decayYoung

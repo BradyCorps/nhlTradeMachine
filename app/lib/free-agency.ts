@@ -374,18 +374,18 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
       continue;
     }
 
-    // Teamless FA pool entries are the open UFA market that already exists at
-    // offseason start (real free agents + limbo contracts pushed to FA). They
-    // stay on the board for the USER to sign — AI teams don't get to vacuum the
-    // marquee names up before the market is ever shown, which was hiding the
-    // top free agents behind a wall of zero-production depth. Players who WALK
-    // from a team during resolution are still AI-signable below (real churn).
+    // Teamless FA pool entries are the open UFA market (real free agents +
+    // limbo contracts pushed to FA). They are AI-signable like any market UFA
+    // so contenders work through the board realistically — the AI's cap room
+    // and positional need (below) naturally leave plenty unsigned for the user
+    // rather than vacuuming the pool. The seasonal cap escalation is what keeps
+    // teams solvent enough to actually sign them.
     if (!player.teamId || player.teamId === "FA_POOL") {
       const marketContract = { ...contract, term: Math.min(contract.term, MARKET_TERM_CAP) };
       if (contract.status === "RFA") {
         rfaMarket.push({ player, contract: marketContract });
       } else {
-        market.push({ player, contract: marketContract });
+        addMarketCandidate({ player, contract: marketContract });
       }
       continue;
     }
