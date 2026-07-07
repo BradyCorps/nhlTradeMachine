@@ -36,6 +36,7 @@ interface SimPlayer {
   draftYear?: number | null;
   draftOverall?: number | null;
   hasLiveStats?: boolean;
+  hdFinishingDelta?: number | null; // NHL EDGE high-danger finishing vs league
 }
 
 interface SimTeam {
@@ -434,17 +435,25 @@ function projectSkaterOutcome(
   else development *= 0.90 + rand() * 0.18;
 
   let breakoutTag: ProjectedSkaterSeason["breakoutTag"];
-  const breakoutChance =
+  let breakoutChance =
     isProspectProfile ? 0.24 :
     isYoungRegular    ? 0.16 :
     p.age <= 26 && stablePace < 55 ? 0.08 :
     0.03;
-  const regressionChance =
+  let regressionChance =
     isAgingWell ? 0.07 :
     isDeclineRisk ? 0.18 :
     stablePace >= 85 ? 0.10 :
     isProspectProfile ? 0.12 :
     0.05;
+  // NHL EDGE luck: finishing well under league on high-danger chances is
+  // breakout fuel; running hot is regression fuel (same thresholds the
+  // Cup Run rollover uses).
+  const hdDelta = p.hdFinishingDelta;
+  if (hdDelta != null) {
+    if (hdDelta <= -0.02) breakoutChance += 0.06;
+    else if (hdDelta >= 0.03) regressionChance += 0.06;
+  }
 
   const eventRoll = rand();
   if (eventRoll < breakoutChance) {
