@@ -672,6 +672,22 @@ describe("Canary — trade UI negative NAV", () => {
     expect(card).toContain("[0, 25, 50].map");
     expect(card).not.toContain('type="range"');
   });
+
+  it("Trade Machine asset rows expand into EDGE scouting (measured profile + strands)", () => {
+    const quick = read("app/components/QuickTradeMachine.tsx");
+    // Expandable per-player row with scouting detail
+    expect(quick).toContain("function AssetRow");
+    expect(quick).toContain("<MeasuredProfile asset={asset} />");
+    expect(quick).toContain("buildAssetTraits(asset, nav)");
+    expect(quick).toContain("<StrandDisplay");
+    // Scannable collapsed stat chip (skater pts pace / goalie SV% + GSAx)
+    expect(quick).toContain("pts/82");
+    expect(quick).toContain("GSAx");
+    expect(quick).toContain("tap a player for scouting");
+    // navMap threaded through every AssetList call site, including the shared link view
+    expect(quick).toContain("navMap?: Record<string, XNAVResult>");
+    expect(quick).toContain('console.error("[quick shared NAV]"');
+  });
 });
 
 describe("Canary — draft pick inventory", () => {

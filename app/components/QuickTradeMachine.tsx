@@ -15,6 +15,11 @@ import {
 } from "@/app/lib/trade-share";
 import { formatPickRound } from "@/app/lib/trade-format";
 import { ageDecayRate, ageSlotPenalty, SEASON } from "@/app/lib/season-config";
+import MeasuredProfile from "@/app/components/MeasuredProfile";
+import StrandDisplay from "@/app/components/StrandDisplay";
+import { buildAssetTraits, computeStrandType } from "@/app/components/StrandView";
+
+const ZERO_NAV: XNAVResult = { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
 
 type LeagueData = { teams: Team[]; players: Asset[]; capCeiling?: number | null };
 type VerdictDisplay = Pick<TradeVerdict, "status" | "message" | "metrics" | "sideOutcomes"> & {
@@ -169,22 +174,134 @@ function AssetPicker({
   );
 }
 
+function AssetRow({
+  asset,
+  navMap,
+  onRemove,
+  onRetain,
+}: {
+  asset: Asset;
+  navMap: Record<string, XNAVResult>;
+  onRemove?: (assetId: string) => void;
+  onRetain?: (assetId: string, retainedPct: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const isPick = asset.position === "Pick";
+  const nav = navMap[asset.id] ?? ZERO_NAV;
+  const traits = !isPick ? buildAssetTraits(asset, nav) : null;
+  const strandType = traits ? computeStrandType(traits.off, traits.def, asset.ops ?? null, asset.dps ?? null) : "";
+  const isGoalie = asset.position === "G";
+
+  // Collapsed subline: position/cap/term, plus a scannable stat chip.
+  const subline = isPick
+    ? asset.teamId
+    : `${asset.position} · ${fmtCap(asset.capHit)} · ${asset.yearsRemaining}yr`;
+  const statChip = isPick
+    ? null
+    : isGoalie
+      ? `${((asset.savePct ?? 0.9) * 100).toFixed(1)} SV% · ${(asset.gsax ?? 0) > 0 ? "+" : ""}${(asset.gsax ?? 0).toFixed(1)} GSAx`
+      : `${(asset.ptsPace ?? 0).toFixed(0)} pts/82 · ${(asset.avgTOI ?? 0).toFixed(1)} TOI`;
+
+  return (
+    <div>
+      <div className="px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          type="button"
+          onClick={() => !isPick && setOpen(o => !o)}
+          aria-expanded={!isPick ? open : undefined}
+          aria-label={isPick ? undefined : `${open ? "Hide" : "Show"} ${asset.name} scouting detail`}
+          className="min-w-0 text-left flex items-start gap-2"
+          style={{ background: "transparent", cursor: isPick ? "default" : "pointer" }}>
+          {!isPick && (
+            <span className="text-[11px] mt-0.5 shrink-0" style={{ color: "var(--ledger-ink-faint)" }}>{open ? "▾" : "▸"}</span>
+          )}
+          <span className="min-w-0">
+            <span className="text-[13px] font-black truncate block" style={{ color: "var(--ledger-ink)" }}>
+              {isPick ? assetLabel(asset) : asset.name}
+            </span>
+            <span className="text-[10px] font-mono uppercase tracking-[0.12em] text-ledger-ink-faint">
+              {subline}{statChip ? ` · ${statChip}` : ""}
+            </span>
+          </span>
+        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {!isPick && (
+            <span className="text-[11px] font-black font-mono tabular-nums" title="Net Asset Value"
+              style={{ color: nav.total > 0 ? "var(--ledger-green)" : nav.total < 0 ? "var(--ledger-red)" : "var(--ledger-ink-faint)" }}>
+              {nav.total > 0 ? "+" : ""}{Math.round(nav.total)} NAV
+            </span>
+          )}
+          {!isPick && onRetain && (
+            <select
+              value={Math.round((asset.retainedPct ?? 0) * 100)}
+              onChange={event => onRetain(asset.id, Number(event.target.value) / 100)}
+              className="border px-2 py-1 text-[10px] font-mono bg-transparent"
+              style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}
+            >
+              {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map(value => (
+                <option key={value} value={value}>{value}% retained</option>
+              ))}
+            </select>
+          )}
+          {onRemove && (
+            <button
+              type="button"
+              onClick={() => onRemove(asset.id)}
+              className="border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]"
+              style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-red)" }}
+            >
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
+      {open && !isPick && (
+        <div className="px-4 pb-4 grid gap-3 sm:grid-cols-2" style={{ background: "var(--paper-inset)" }}>
+          <MeasuredProfile asset={asset} />
+          {traits && (
+            <div className="min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-[0.16em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
+                STRAND · {strandType}
+              </div>
+              <StrandDisplay
+                offTraits={traits.off}
+                defTraits={traits.def}
+                ops={asset.ops ?? null}
+                dps={asset.dps ?? null}
+                strandType={strandType}
+                W={260}
+                H={150}
+                amplitude={28}
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AssetList({
   title,
   assets,
+  navMap = {},
   onRemove,
   onRetain,
 }: {
   title: string;
   assets: Asset[];
+  navMap?: Record<string, XNAVResult>;
   onRemove?: (assetId: string) => void;
   onRetain?: (assetId: string, retainedPct: number) => void;
 }) {
   return (
     <div className="border min-h-[180px]" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card)" }}>
-      <div className="px-4 py-2 border-b text-[10px] font-black uppercase tracking-[0.25em] font-mono text-ledger-ink-faint"
+      <div className="px-4 py-2 border-b flex items-center justify-between text-[10px] font-black uppercase tracking-[0.25em] font-mono text-ledger-ink-faint"
         style={{ borderColor: "var(--ledger-rule)" }}>
-        {title}
+        <span>{title}</span>
+        {assets.some(a => a.position !== "Pick") && (
+          <span className="text-[9px] tracking-[0.12em]" style={{ color: "var(--ledger-ink-faint)" }}>tap a player for scouting</span>
+        )}
       </div>
       <div className="divide-y" style={{ borderColor: "var(--ledger-rule-light)" }}>
         {assets.length === 0 && (
@@ -193,42 +310,7 @@ function AssetList({
           </div>
         )}
         {assets.map(asset => (
-          <div key={asset.id} className="px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <div className="text-[13px] font-black truncate" style={{ color: "var(--ledger-ink)" }}>
-                {asset.position === "Pick" ? assetLabel(asset) : asset.name}
-              </div>
-              <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-ledger-ink-faint">
-                {asset.position === "Pick"
-                  ? asset.teamId
-                  : `${asset.position} · ${fmtCap(asset.capHit)} · ${asset.yearsRemaining}yr`}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {asset.position !== "Pick" && onRetain && (
-                <select
-                  value={Math.round((asset.retainedPct ?? 0) * 100)}
-                  onChange={event => onRetain(asset.id, Number(event.target.value) / 100)}
-                  className="border px-2 py-1 text-[10px] font-mono bg-transparent"
-                  style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}
-                >
-                  {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map(value => (
-                    <option key={value} value={value}>{value}% retained</option>
-                  ))}
-                </select>
-              )}
-              {onRemove && (
-                <button
-                  type="button"
-                  onClick={() => onRemove(asset.id)}
-                  className="border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]"
-                  style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-red)" }}
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-          </div>
+          <AssetRow key={asset.id} asset={asset} navMap={navMap} onRemove={onRemove} onRetain={onRetain} />
         ))}
       </div>
     </div>
@@ -523,6 +605,8 @@ export function SharedTradeView({ code }: { code: string }) {
   const [payload, setPayload] = useState<TradeSharePayload | null>(null);
   const [data, setData] = useState<LeagueData>({ teams: [], players: [] });
   const [error, setError] = useState<string | null>(null);
+  const [navMap, setNavMap] = useState<Record<string, XNAVResult>>({});
+  const navRunRef = useRef(0);
 
   useEffect(() => {
     let mounted = true;
@@ -567,8 +651,27 @@ export function SharedTradeView({ code }: { code: string }) {
 
   const homeTeam = payload ? data.teams.find(team => team.id === payload.teams.homeTeamId) ?? null : null;
   const partnerTeam = payload ? data.teams.find(team => team.id === payload.teams.partnerTeamId) ?? null : null;
-  const outgoing = payload ? resolveTradeShareAssets(payload.blocks.outgoing, data.players) : [];
-  const incoming = payload ? resolveTradeShareAssets(payload.blocks.incoming, data.players) : [];
+  const outgoing = useMemo(() => payload ? resolveTradeShareAssets(payload.blocks.outgoing, data.players) : [], [payload, data.players]);
+  const incoming = useMemo(() => payload ? resolveTradeShareAssets(payload.blocks.incoming, data.players) : [], [payload, data.players]);
+
+  useEffect(() => {
+    const assets = [...outgoing, ...incoming];
+    if (assets.length === 0) {
+      setNavMap({});
+      return;
+    }
+    const ctrl = new AbortController();
+    const runId = ++navRunRef.current;
+    fetchNavMap(assets, ctrl.signal, data.capCeiling)
+      .then(nextMap => {
+        if (ctrl.signal.aborted || runId !== navRunRef.current) return;
+        setNavMap(nextMap);
+      })
+      .catch(event => {
+        if (event.name !== "AbortError") console.error("[quick shared NAV]", event);
+      });
+    return () => ctrl.abort();
+  }, [outgoing, incoming, data.capCeiling]);
 
   return (
     <main className="min-h-screen font-serif antialiased" style={{ background: "var(--paper)", color: "var(--ink)" }}>
@@ -595,8 +698,8 @@ export function SharedTradeView({ code }: { code: string }) {
         {payload && (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <AssetList title={`${homeTeam?.name ?? payload.teams.homeTeamId} sends`} assets={outgoing} />
-              <AssetList title={`${partnerTeam?.name ?? payload.teams.partnerTeamId} sends`} assets={incoming} />
+              <AssetList title={`${homeTeam?.name ?? payload.teams.homeTeamId} sends`} assets={outgoing} navMap={navMap} />
+              <AssetList title={`${partnerTeam?.name ?? payload.teams.partnerTeamId} sends`} assets={incoming} navMap={navMap} />
             </div>
             {payload.lockedVerdict && <VerdictSummary verdict={payload.lockedVerdict} />}
           </>
@@ -818,6 +921,7 @@ export default function QuickTradeMachine() {
                 <AssetList
                   title={homeTeam ? `${homeTeam.name} sends` : "Outgoing package"}
                   assets={outgoing}
+                  navMap={navMap}
                   onRemove={assetId => setOutgoing(prev => prev.filter(asset => asset.id !== assetId))}
                   onRetain={(assetId, retainedPct) => setOutgoing(prev => prev.map(asset => asset.id === assetId ? { ...asset, retainedPct } : asset))}
                 />
@@ -835,6 +939,7 @@ export default function QuickTradeMachine() {
                 <AssetList
                   title={partnerTeam ? `${partnerTeam.name} sends` : "Incoming package"}
                   assets={incoming}
+                  navMap={navMap}
                   onRemove={assetId => setIncoming(prev => prev.filter(asset => asset.id !== assetId))}
                   onRetain={(assetId, retainedPct) => setIncoming(prev => prev.map(asset => asset.id === assetId ? { ...asset, retainedPct } : asset))}
                 />
