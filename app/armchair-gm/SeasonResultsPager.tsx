@@ -110,7 +110,8 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                 </tr>
               </thead>
               <tbody>
-                {skaters.map((p: any, i: number) => {
+                {(() => {
+                const renderRow = (p: any, i: number) => {
                   const roster = players.find(a => a.id === p.playerId);
                   const nav = p.playerId ? navMap[p.playerId] : undefined;
                   // Performance vs preseason expectation, scaled to games actually played
@@ -215,7 +216,29 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                     )}
                     </React.Fragment>
                   );
-                })}
+                };
+                // Split the box score into Forwards and Defense sections for
+                // readability (goalies have their own Crease table below). Rank
+                // restarts per section.
+                const forwards = skaters.filter((p: any) => p.position !== "D");
+                const defense = skaters.filter((p: any) => p.position === "D");
+                const sectionRow = (label: string) => (
+                  <tr key={`section-${label}`} style={{ background: 'var(--ledger-cream)', borderBottom: '1px solid #b8a070' }}>
+                    <td colSpan={10} className="text-[10px] font-black uppercase tracking-[0.22em] py-1.5 px-1.5"
+                      style={{ color: 'var(--ledger-ink)' }}>
+                      {label}
+                    </td>
+                  </tr>
+                );
+                return (
+                  <>
+                    {forwards.length > 0 && sectionRow(`Forwards · ${forwards.length}`)}
+                    {forwards.map((p: any, i: number) => renderRow(p, i))}
+                    {defense.length > 0 && sectionRow(`Defense · ${defense.length}`)}
+                    {defense.map((p: any, i: number) => renderRow(p, i))}
+                  </>
+                );
+                })()}
               </tbody>
             </table>
           </div>
@@ -229,6 +252,10 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
               : null;
             return (
               <div className="overflow-x-auto mt-1.5">
+                <div className="text-[10px] font-black uppercase tracking-[0.22em] py-1.5 px-1.5"
+                  style={{ color: 'var(--ledger-ink)', background: 'var(--ledger-cream)', border: '1px solid #b8a070' }}>
+                  Goaltending
+                </div>
                 <table className="w-full font-mono" style={{ borderCollapse: 'collapse', minWidth: 480 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid #b8a070' }}>
@@ -261,7 +288,10 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
           })()}
 
           <div className="mt-2 text-[10px] font-mono uppercase tracking-wider leading-relaxed" style={{ color: 'var(--ledger-ink-faint)' }}>
-            ΔXP — points vs preseason pace over games played · X-NAV — net asset value · NOIV — net on-ice value impact · CAP± — fair market AAV minus cap hit
+            ΔXP — points vs preseason pace over games played · X-NAV — net asset (trade) value · NOIV — net on-ice value impact · CAP± — fair market AAV minus cap hit
+          </div>
+          <div className="mt-1 text-[10px] font-mono leading-relaxed" style={{ color: 'var(--ledger-ink-faint)' }}>
+            Note: X-NAV is a player&rsquo;s trade value, not their season line. For a young prospect it is weighted toward Upside/pedigree, so the Offense/Defense components can read 0 even after a productive simulated season — that is the trade model, not the sim.
           </div>
         </details>
       </div>
@@ -295,8 +325,8 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
           { label: "Draft Lottery", val: `${simData.leaders?.draftLottery?.teamName} (${simData.leaders?.draftLottery?.projectedPoints}pts)` },
         ].map((s: any) => (
           <div key={s.label} style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070', padding: '6px 8px' }}>
-            <div style={{ fontSize: '6.5px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>{s.label}</div>
-            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--ledger-ink)' }}>{s.val}</div>
+            <div style={{ fontSize: '9px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>{s.label}</div>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--ledger-ink)' }}>{s.val}</div>
           </div>
         ))}
       </div>

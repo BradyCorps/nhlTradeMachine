@@ -244,6 +244,20 @@ function buildDeploymentMap(order?: TeamLineupOrder): Map<string, SkaterDeployme
   return deployments;
 }
 
+// Best-lines lineup for a team the user hasn't hand-set — every AI club (and
+// the user's own team before they touch the sheet) fields its top players by
+// on-ice value: top 12 F, top 6 D, best goalie. This gives every team a proper
+// starter/bench deployment in the projection instead of a flat, lineup-agnostic
+// season where depth plays like top-sixers.
+function defaultLineupOrder(roster: SimPlayer[]): TeamLineupOrder {
+  const byValue = (a: SimPlayer, b: SimPlayer) => onIceValue(b) - onIceValue(a);
+  return {
+    forwards: roster.filter(isForward).sort(byValue).slice(0, 12).map(p => p.id),
+    defense:  roster.filter(isDefense).sort(byValue).slice(0, 6).map(p => p.id),
+    goalies:  roster.filter(p => p.position === "G").sort(byValue).map(p => p.id),
+  };
+}
+
 // ── Wild card teams — higher variance ────────────────────────
 const WILD_CARD_TEAMS = new Set(["WPG", "TOR", "CGY", "EDM", "NYR"]);
 
@@ -519,7 +533,10 @@ function simulateLeague(
     const capDelta   = capDeltas.get(team.id) ?? 0;
     const capSpaceAfterTrade = team.capSpace - capDelta;
     const teamSeed = seed + hashString(`team:${team.id}`);
-    const lineupOrder = lineup?.orders?.[team.id];
+    // Fall back to a best-lines order when the user hasn't hand-set this team,
+    // so every club — AI and the user's own before they edit — fields its best
+    // lineup by default rather than a flat, deployment-less roster.
+    const lineupOrder = lineup?.orders?.[team.id] ?? defaultLineupOrder(roster);
     const startingGoalieId = lineup?.startingGoalies?.[team.id] ?? lineupOrder?.goalies?.[0] ?? null;
     const deploymentByPlayer = buildDeploymentMap(lineupOrder);
     const projectedPoints = projectTeamPoints(

@@ -95,6 +95,31 @@ describe("simulate route", () => {
     );
   });
 
+  it("fields best lines by default: depth beyond the top 12F is benched with no lineup set", async () => {
+    const wpg = [
+      player("wpg-star", "Star", "WPG", 95, "C"),
+      ...Array.from({ length: 11 }, (_, i) => player(`wpg-f${i}`, `Forward ${i}`, "WPG", 40 - i, i % 2 ? "W" : "C")),
+      player("wpg-13th", "Thirteenth Forward", "WPG", 6, "W"), // worst F → benched by best-lines default
+      ...Array.from({ length: 6 }, (_, i) => player(`wpg-d${i}`, `Defender ${i}`, "WPG", 30 - i, "D")),
+      { ...player("WPG-g1", "WPG Goalie", "WPG", 0, "G"), gsax: 0, gamesStarted: 45, savePct: 0.905 },
+    ];
+    const depth = teamIds.flatMap((teamId) => teamId === "WPG" ? [] : [
+      player(`${teamId}-f1`, `${teamId} Forward`, teamId, 42, "C"),
+      player(`${teamId}-d1`, `${teamId} Defender`, teamId, 25, "D"),
+      { ...player(`${teamId}-g1`, `${teamId} Goalie`, teamId, 0, "G"), gsax: 0, gamesStarted: 45, savePct: 0.905 },
+    ]);
+    // No `lineup` key at all — AI/default path must still deploy best lines.
+    const res = await simulatePOST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      body: JSON.stringify({ homeTeamId: "WPG", partnerTeamId: "CGY", teams, players: [...depth, ...wpg], seed: 7, trades: [] }),
+    }) as any);
+    const body = await res.json();
+    const star = body.homeTeam.projectedSkaters.find((p: any) => p.playerId === "wpg-star");
+    const benched = body.homeTeam.projectedSkaters.find((p: any) => p.playerId === "wpg-13th");
+    expect(star.gamesPlayed).toBeGreaterThan(benched.gamesPlayed);
+    expect(benched.gamesPlayed).toBeLessThanOrEqual(48); // press-box depth minutes, not a full slate
+  });
+
   it("uses a supplied lineup starting goalie instead of the starts heuristic", async () => {
     const depth = teamIds.flatMap((teamId) => {
       const base = [

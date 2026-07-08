@@ -1624,3 +1624,32 @@ describe("Canary — Claude concerns", () => {
     expect(hook).toContain('kind: "season_recap"');
   });
 });
+
+describe("Canary — sim without a trade + AI best lines", () => {
+  it("lets a season be simulated with zero trades", () => {
+    const hook = read("app/armchair-gm/useSimDispatch.ts");
+    const tabs = read("app/armchair-gm/GmAnalysisTabs.tsx");
+    // The dispatch no longer requires an executed trade.
+    expect(hook).not.toContain("executedTrades.length === 0) return");
+    expect(hook).toContain("if (!homeTeam) return;");
+    // The Sim tab is always present and the button is not gated on trades.
+    expect(tabs).toContain('{ key: "sim", label: "Sim"');
+    expect(tabs).not.toContain('disabled={simLoading || executedTrades.length === 0}');
+    expect(tabs).toContain("Baseline (No Trades)");
+  });
+
+  it("fields best lines for every team by default in the sim engine", () => {
+    const route = read("app/api/simulate/route.ts");
+    expect(route).toContain("function defaultLineupOrder");
+    expect(route).toContain("lineup?.orders?.[team.id] ?? defaultLineupOrder(roster)");
+  });
+
+  it("splits the season box score into Forwards and Defense sections", () => {
+    const pager = read("app/armchair-gm/SeasonResultsPager.tsx");
+    expect(pager).toContain("const forwards = skaters.filter");
+    expect(pager).toContain("const defense = skaters.filter");
+    expect(pager).toContain("Forwards ·");
+    expect(pager).toContain("Defense ·");
+    expect(pager).toContain("Goaltending");
+  });
+});

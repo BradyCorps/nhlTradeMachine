@@ -103,7 +103,7 @@ function GmTabButton({ label, active, onClick, disabled, badge }: {
 
 export function GmAnalysisTabs({
   teams, allHomeRoster, allPartnerRoster, blocks, navMap, db,
-  lineupOrders, handleGoalieStarterChange, handleLineupChange, executedTrades, showSimPanel,
+  lineupOrders, handleGoalieStarterChange, handleLineupChange, executedTrades,
   simYear, simLoading, simData, simResult,
 }: {
   teams: [Team, Team];
@@ -124,14 +124,15 @@ export function GmAnalysisTabs({
 }) {
   const [activeTab, setActiveTab] = useState<GmTab>("lineups");
   const hasAssets = blocks[0].length > 0 || blocks[1].length > 0;
-  const hasSim = executedTrades.length > 0 || showSimPanel;
 
   const tabs: { key: GmTab; label: string; disabled?: boolean; badge?: number }[] = [
     { key: "lineups", label: "Lineups" },
     { key: "dna", label: "Team DNA" },
     { key: "comparison", label: "Compare", disabled: !hasAssets },
     { key: "breakdown", label: "Breakdown", disabled: !hasAssets },
-    ...(hasSim ? [{ key: "sim" as GmTab, label: "Sim", badge: executedTrades.length }] : []),
+    // The Sim tab is always available — a season can be run on the baseline
+    // league with zero trades. The badge only appears once trades exist.
+    { key: "sim", label: "Sim", badge: executedTrades.length > 0 ? executedTrades.length : undefined },
   ];
 
   return (
@@ -225,7 +226,7 @@ export function GmAnalysisTabs({
         )}
 
         {/* ── Sim tab ────────────────────────────── */}
-        {activeTab === "sim" && hasSim && (
+        {activeTab === "sim" && (
           <div style={{ overflow: "hidden" }}>
             <div style={{
               padding: "12px 16px",
@@ -239,11 +240,13 @@ export function GmAnalysisTabs({
                 letterSpacing: "0.4em", color: GM_PLUM,
                 fontFamily: "var(--font-mono, monospace)",
               }}>
-                Simulated Universe — {executedTrades.length} Trade{executedTrades.length !== 1 ? "s" : ""} Executed
+                {executedTrades.length === 0
+                  ? "Simulated Universe — Baseline (No Trades)"
+                  : `Simulated Universe — ${executedTrades.length} Trade${executedTrades.length !== 1 ? "s" : ""} Executed`}
               </span>
               <button
                 onClick={simYear}
-                disabled={simLoading || executedTrades.length === 0}
+                disabled={simLoading}
                 aria-label="Simulate one season"
                 className="tap-target"
                 style={{
@@ -255,8 +258,8 @@ export function GmAnalysisTabs({
                   background: GM_PLUM,
                   color: "#fff",
                   border: `2px solid ${GM_PLUM}`,
-                  cursor: simLoading || executedTrades.length === 0 ? "not-allowed" : "pointer",
-                  opacity: simLoading || executedTrades.length === 0 ? 0.4 : 1,
+                  cursor: simLoading ? "not-allowed" : "pointer",
+                  opacity: simLoading ? 0.4 : 1,
                   fontFamily: "var(--font-mono, monospace)",
                 }}>
                 {simLoading ? "Simulating..." : "Sim a Year"}

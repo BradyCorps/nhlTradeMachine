@@ -77,7 +77,9 @@ export function useSimDispatch({
   }, []);
 
   const simYear = useCallback(async () => {
-    if (!homeTeam || executedTrades.length === 0) return;
+    // A season can be simulated with zero trades — the baseline league is a
+    // valid scenario. Only a chosen home team is required.
+    if (!homeTeam) return;
     setSimLoading(true);
     setSimResult(null);
     setSimData(null);
