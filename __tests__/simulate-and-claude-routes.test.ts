@@ -120,6 +120,29 @@ describe("simulate route", () => {
     expect(benched.gamesPlayed).toBeLessThanOrEqual(48); // press-box depth minutes, not a full slate
   });
 
+  it("gives an explosive skater (EDGE burst) a rush-offense lift in the projection", async () => {
+    // Same player id + same seed => identical RNG stream, so the ONLY difference
+    // between the two runs is the burst channel. Explosiveness must not lower it
+    // and should lift it.
+    const depth = teamIds.flatMap((teamId) => [
+      player(`${teamId}-f1`, `${teamId} Forward`, teamId, 42, "C"),
+      player(`${teamId}-d1`, `${teamId} Defender`, teamId, 25, "D"),
+      { ...player(`${teamId}-g1`, `${teamId} Goalie`, teamId, 0, "G"), gsax: 0, gamesStarted: 45, savePct: 0.905 },
+    ]);
+    const run = async (edge: Record<string, unknown>) => {
+      const subject = { ...player("burst-subject", "Burst Subject", "WPG", 60, "C"), age: 26, games: 78, avgTOI: 18, ...edge };
+      const res = await simulatePOST(new Request("http://localhost/api/simulate", {
+        method: "POST",
+        body: JSON.stringify({ homeTeamId: "WPG", partnerTeamId: "CGY", teams, players: [...depth, subject], seed: 5, trades: [] }),
+      }) as any);
+      const body = await res.json();
+      return body.homeTeam.projectedSkaters.find((p: any) => p.playerId === "burst-subject").projectedPts;
+    };
+    const explosive = await run({ edgeBurstsOver20: 46, edgeSpeedMaxMph: 23.2 });
+    const cruiser = await run({}); // no EDGE sample — burst is a strict no-op
+    expect(explosive).toBeGreaterThan(cruiser);
+  });
+
   it("uses a supplied lineup starting goalie instead of the starts heuristic", async () => {
     const depth = teamIds.flatMap((teamId) => {
       const base = [

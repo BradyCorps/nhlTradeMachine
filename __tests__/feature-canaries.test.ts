@@ -1649,6 +1649,18 @@ describe("Canary — sim without a trade + AI best lines", () => {
     expect(route).toContain("lineup?.orders?.[team.id] ?? defaultLineupOrder(roster)");
   });
 
+  it("threads the EDGE burst channel into the season projection", () => {
+    const burst = read("app/lib/burst-channel.ts");
+    const route = read("app/api/simulate/route.ts");
+    expect(burst).toContain("export function burstProfile");
+    expect(burst).toContain("rushLift");
+    expect(burst).toContain("varianceKick");
+    // Applied to the projection: rush lift on points, variance kick on the tail.
+    expect(route).toContain("const burst = burstProfile(p);");
+    expect(route).toContain("rand() * burst.varianceKick");
+    expect(route).toContain("* burst.rushLift");
+  });
+
   it("splits the season box score into Forwards and Defense sections", () => {
     const pager = read("app/armchair-gm/SeasonResultsPager.tsx");
     expect(pager).toContain("const forwards = skaters.filter");
