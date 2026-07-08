@@ -1649,6 +1649,21 @@ describe("Canary — sim without a trade + AI best lines", () => {
     expect(route).toContain("lineup?.orders?.[team.id] ?? defaultLineupOrder(roster)");
   });
 
+  it("shows a measured profile (percentiles vs NHL, not a rating) on the player card", () => {
+    const lib = read("app/lib/measured-profile.ts");
+    const comp = read("app/components/MeasuredProfile.tsx");
+    const card = read("app/components/AssetCard.tsx");
+    expect(lib).toContain("export function computeMeasuredProfile");
+    // Sim drivers as dimensions.
+    for (const key of ["production", "opportunity", "burst", "finishing", "pedigree"]) {
+      expect(lib).toContain(`key: "${key}"`);
+    }
+    // No-sample dimensions are flagged, never invented.
+    expect(lib).toContain('"no EDGE sample"');
+    expect(comp).toContain("percentile vs NHL · not a rating");
+    expect(card).toContain("<MeasuredProfile asset={asset} />");
+  });
+
   it("threads the EDGE burst channel into the season projection", () => {
     const burst = read("app/lib/burst-channel.ts");
     const route = read("app/api/simulate/route.ts");

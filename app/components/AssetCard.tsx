@@ -12,6 +12,7 @@ import { AssetBadges } from "@/app/components/AssetBadges";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
 import { formatPickRound } from "@/app/lib/trade-format";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
+import MeasuredProfile from "@/app/components/MeasuredProfile";
 
 const fmt = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
 type AssetCardView = "STATS" | "STRAND" | "TIMELINE" | "DEV" | "EDGE";
@@ -190,7 +191,9 @@ export default function AssetCard({
           {([
             "STATS",
             ...(asset.hasLiveStats ? ["STRAND"] : []),
-            ...(/^\d+$/.test(String(asset.id)) && asset.position !== "G" && asset.position !== "Pick" ? ["EDGE"] : []),
+            // Skaters get the measured EDGE/sim-driver tab (the shot map inside
+            // no-ops for players without a numeric NHL id).
+            ...(asset.position !== "G" && asset.position !== "Pick" ? ["EDGE"] : []),
             ...(hasDevelopmentProfile ? ["DEV"] : []),
             "TIMELINE",
           ] as AssetCardView[]).map((v) => (
@@ -254,6 +257,7 @@ export default function AssetCard({
       )}
       {view === "EDGE" && !isPick && (
         <div className="py-1">
+          <MeasuredProfile asset={asset} />
           <EdgeShotMap nhlPlayerId={asset.id} />
         </div>
       )}
