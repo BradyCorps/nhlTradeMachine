@@ -5,6 +5,123 @@ import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
 import { SEASON } from "@/app/lib/season-config";
 
+// ── League Numbers — award race + full standings by division ──
+const CONFERENCES: { conf: string; divs: string[] }[] = [
+  { conf: "Eastern", divs: ["Atlantic", "Metropolitan"] },
+  { conf: "Western", divs: ["Central", "Pacific"] },
+];
+
+function playoffMark(t: any): { label: string; title: string; color: string } {
+  if ((t.divisionRank ?? 99) <= 3) return { label: "x", title: "Clinched a top-3 division playoff spot", color: 'var(--ledger-green)' };
+  if (t.madePlayoffs) return { label: "WC", title: "In via wildcard", color: 'var(--ledger-navy)' };
+  return { label: "—", title: "Out of the playoffs", color: 'var(--ledger-ink-faint)' };
+}
+
+function DivisionStandings({ division, teams, userIds }: { division: string; teams: any[]; userIds: Set<string> }) {
+  return (
+    <div style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070' }}>
+      <div className="text-[10px] font-black uppercase tracking-[0.2em] px-2 py-1.5"
+        style={{ color: 'var(--ledger-ink)', borderBottom: '1px solid #b8a070', background: 'var(--ledger-cream)' }}>
+        {division}
+      </div>
+      <table className="w-full font-mono" style={{ borderCollapse: 'collapse' }}>
+        <tbody>
+          {teams.map((t: any) => {
+            const isUser = userIds.has(t.teamId);
+            const mark = playoffMark(t);
+            return (
+              <tr key={t.teamId} style={{
+                borderBottom: '1px solid rgba(200,184,144,0.4)',
+                background: isUser ? 'rgba(94,58,110,0.10)' : 'transparent',
+              }}>
+                <td className="text-[10px] py-1 px-2 text-left tabular-nums" style={{ color: 'var(--ledger-ink-faint)', width: 22 }}>{t.divisionRank}</td>
+                <td className="text-[11px] py-1 px-1 text-left" style={{ color: 'var(--ledger-ink)', fontWeight: isUser ? 900 : 700 }}>
+                  {t.teamName ?? t.teamId}
+                </td>
+                <td className="text-[11px] py-1 px-2 text-right tabular-nums font-black" style={{ color: 'var(--ledger-ink)' }}>{t.projectedPoints}</td>
+                <td className="text-[10px] py-1 px-2 text-right tabular-nums font-black" title={mark.title} style={{ color: mark.color, width: 30 }}>{mark.label}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function LeagueNumbers({ simData }: { simData: any }) {
+  const standings: any[] = simData.standings ?? [];
+  const leaders = simData.leaders ?? {};
+  const userIds = new Set<string>(
+    [simData.homeTeam?.teamId, simData.partnerTeam?.teamId].filter(Boolean)
+  );
+  const teamsInDiv = (div: string) =>
+    standings.filter(t => t.division === div).sort((a, b) => (a.divisionRank ?? 99) - (b.divisionRank ?? 99));
+
+  const shortName = (n?: string) => n?.split(' ').pop() ?? '—';
+  const awards = [
+    { label: "Presidents' Trophy", val: `${leaders.presidentsTrophy?.teamName ?? '—'} (${leaders.presidentsTrophy?.projectedPoints ?? '—'}pts)` },
+    { label: "Stanley Cup", val: simData.playoffBracket?.champion?.teamName ?? leaders.cupWinner?.teamName ?? '—' },
+    { label: "Conn Smythe", val: leaders.connSmythe?.name ? shortName(leaders.connSmythe.name) : '—' },
+    { label: "Points (Art Ross)", val: `${shortName(leaders.topScorer?.name)} ${leaders.topScorer?.pts ?? '—'}pts` },
+    { label: "Goals (Richard)", val: `${shortName(leaders.goalsLeader?.name)} ${leaders.goalsLeader?.goals ?? '—'}G` },
+    { label: "Assists", val: `${shortName(leaders.assistsLeader?.name)} ${leaders.assistsLeader?.assists ?? '—'}A` },
+    { label: "Hart (MVP)", val: `${shortName(leaders.hart?.name)} ${leaders.hart?.pts ?? '—'}pts` },
+    { label: "Norris", val: `${shortName(leaders.norris?.name)} ${leaders.norris?.pts ?? '—'}pts` },
+    { label: "Vezina", val: `${shortName(leaders.vezina?.name)} ${leaders.vezina?.svp?.toFixed?.(3) ?? leaders.vezina?.svp ?? '—'}` },
+    { label: "Calder (Rookie)", val: `${shortName(leaders.calder?.name)}${leaders.calder?.team ? ` · ${leaders.calder.team}` : ''}` },
+    { label: "Draft Lottery", val: `${leaders.draftLottery?.teamName ?? '—'} (${leaders.draftLottery?.projectedPoints ?? '—'}pts)` },
+  ];
+
+  return (
+    <div className="grid gap-3">
+      {/* ── Award race ── */}
+      <div>
+        <div className="text-[10px] font-black uppercase tracking-[0.22em] mb-1.5" style={{ color: 'var(--ledger-ink-faint)' }}>
+          Award Race
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+          {awards.map((s) => (
+            <div key={s.label} style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070', padding: '6px 8px' }}>
+              <div style={{ fontSize: '9px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>{s.label}</div>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--ledger-ink)' }}>{s.val}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Full standings by conference / division ── */}
+      {standings.length > 0 && (
+        <div>
+          <div className="flex items-baseline justify-between mb-1.5">
+            <div className="text-[10px] font-black uppercase tracking-[0.22em]" style={{ color: 'var(--ledger-ink-faint)' }}>
+              Final Standings
+            </div>
+            <div className="text-[9px] font-mono" style={{ color: 'var(--ledger-ink-faint)' }}>
+              <span style={{ color: 'var(--ledger-green)', fontWeight: 900 }}>x</span> clinched ·{' '}
+              <span style={{ color: 'var(--ledger-navy)', fontWeight: 900 }}>WC</span> wildcard
+            </div>
+          </div>
+          <div className="grid gap-2.5">
+            {CONFERENCES.map(({ conf, divs }) => (
+              <div key={conf}>
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] mb-1" style={{ color: 'var(--ledger-ink)' }}>
+                  {conf} Conference
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {divs.map((div) => (
+                    <DivisionStandings key={div} division={div} teams={teamsInDiv(div)} userIds={userIds} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function SeasonResultsPager({ simData, simResult, players = [], navMap = {} }: {
   simData: any | null;
   simResult: string | null;
@@ -309,28 +426,7 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
 
   const leaguePage = simData ? {
     label: "League Numbers",
-    node: (
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-        {[
-          { label: "Presidents' Trophy", val: `${simData.leaders?.presidentsTrophy?.teamName} (${simData.leaders?.presidentsTrophy?.projectedPoints}pts)` },
-          { label: "Reigning Cup", val: simData.latestCompleted?.stanleyCupChampion?.teamName ?? SEASON.latestCompleted.stanleyCupChampion.teamName },
-          { label: "Stanley Cup", val: simData.playoffBracket?.champion?.teamName ?? simData.leaders?.cupWinner?.teamName },
-          { label: "Points Leader", val: `${simData.leaders?.topScorer?.name?.split(' ').pop()} ${simData.leaders?.topScorer?.pts}pts` },
-          { label: "Goals Leader", val: `${simData.leaders?.goalsLeader?.name?.split(' ').pop()} ${simData.leaders?.goalsLeader?.goals}G` },
-          { label: "Assists Leader", val: `${simData.leaders?.assistsLeader?.name?.split(' ').pop()} ${simData.leaders?.assistsLeader?.assists}A` },
-          { label: "Hart", val: `${simData.leaders?.hart?.name?.split(' ').pop()} ${simData.leaders?.hart?.pts}pts` },
-          { label: "Norris", val: `${simData.leaders?.norris?.name?.split(' ').pop()} ${simData.leaders?.norris?.pts}pts` },
-          { label: "Vezina", val: `${simData.leaders?.vezina?.name?.split(' ').pop()} ${simData.leaders?.vezina?.svp?.toFixed?.(3) ?? simData.leaders?.vezina?.svp}` },
-          { label: "Calder", val: `${simData.leaders?.calder?.name?.split(' ').pop()} · ${simData.leaders?.calder?.team}` },
-          { label: "Draft Lottery", val: `${simData.leaders?.draftLottery?.teamName} (${simData.leaders?.draftLottery?.projectedPoints}pts)` },
-        ].map((s: any) => (
-          <div key={s.label} style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070', padding: '6px 8px' }}>
-            <div style={{ fontSize: '9px', color: 'var(--ledger-ink-faint)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>{s.label}</div>
-            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--ledger-ink)' }}>{s.val}</div>
-          </div>
-        ))}
-      </div>
-    ),
+    node: <LeagueNumbers simData={simData} />,
   } : null;
 
   const playoffPage = simData?.playoffBracket ? {

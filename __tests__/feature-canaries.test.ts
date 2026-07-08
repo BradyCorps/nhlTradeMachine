@@ -1657,6 +1657,19 @@ describe("Canary — sim without a trade + AI best lines", () => {
     expect(pager).toContain("Defense ·");
     expect(pager).toContain("Goaltending");
   });
+
+  it("renders League Numbers as real standings by conference and division", () => {
+    const pager = read("app/armchair-gm/SeasonResultsPager.tsx");
+    const route = read("app/api/simulate/route.ts");
+    // The sim already returns full standings; the pager renders them grouped.
+    expect(route).toContain("standings:   standings.slice(0, 32)");
+    expect(pager).toContain("function LeagueNumbers");
+    expect(pager).toContain("function DivisionStandings");
+    expect(pager).toContain('conf: "Eastern"');
+    expect(pager).toContain('conf: "Western"');
+    expect(pager).toContain("Final Standings");
+    expect(pager).toContain("function playoffMark");
+  });
 });
 
 describe("Canary — live team timelines", () => {
