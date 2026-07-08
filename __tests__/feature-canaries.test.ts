@@ -88,6 +88,7 @@ describe("Canary — NHL EDGE usage and presentation", () => {
     const types = read("app/lib/trade-types.ts");
     const xnav = read("app/lib/xnav-engine.ts");
     const rollover = read("app/lib/season-rollover.ts");
+    const breakoutModel = read("app/lib/breakout-model.ts");
     const players = read("app/players/page.tsx");
     const armchair = readArmchairAll();
     const card = read("app/components/PercentileCard.tsx");
@@ -103,7 +104,11 @@ describe("Canary — NHL EDGE usage and presentation", () => {
     expect(types).toContain("edgeOzPct?: number | null");
     expect(types).toContain("edgeSpeedMaxMph?: number | null");
     expect(xnav).toContain("const edgeLuckAdj = asset.hdFinishingDelta != null");
-    expect(rollover).toContain("if (p.hdFinishingDelta != null)");
+    // The finishing-luck (and burst) signals now live in the shared breakout
+    // model that both the rollover and the sim route consume.
+    expect(breakoutModel).toContain("if (s.hdFinishingDelta != null)");
+    expect(breakoutModel).toContain("edgeBurstsOver20");
+    expect(rollover).toContain("computeBreakout");
     expect(players).toContain('{ label: "EDGE HD"');
     expect(players).toContain("NHL EDGE high-danger finishing vs league average");
     expect(players).toContain("hdFinishingDelta: player.hdFinishingDelta ?? undefined");

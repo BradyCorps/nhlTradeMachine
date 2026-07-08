@@ -9,6 +9,7 @@ import {
 } from "@/app/lib/sim-engine";
 import { slotMultiplier } from "@/app/lib/lineup-context";
 import { leadershipBonus } from "@/app/data/leadership";
+import { computeBreakout } from "@/app/lib/breakout-model";
 
 // ── Types ─────────────────────────────────────────────────────
 interface SimPlayer {
@@ -37,6 +38,9 @@ interface SimPlayer {
   draftOverall?: number | null;
   hasLiveStats?: boolean;
   hdFinishingDelta?: number | null; // NHL EDGE high-danger finishing vs league
+  goalsPace?: number;               // luck fallback (xG vs goals)
+  edgeBurstsOver20?: number | null; // NHL EDGE explosiveness → breakout burst signal
+  edgeSpeedMaxMph?: number | null;
 }
 
 interface SimTeam {
@@ -449,25 +453,26 @@ function projectSkaterOutcome(
   else development *= 0.90 + rand() * 0.18;
 
   let breakoutTag: ProjectedSkaterSeason["breakoutTag"];
-  let breakoutChance =
-    isProspectProfile ? 0.24 :
-    isYoungRegular    ? 0.16 :
-    p.age <= 26 && stablePace < 55 ? 0.08 :
-    0.03;
-  let regressionChance =
-    isAgingWell ? 0.07 :
-    isDeclineRisk ? 0.18 :
-    stablePace >= 85 ? 0.10 :
-    isProspectProfile ? 0.12 :
-    0.05;
-  // NHL EDGE luck: finishing well under league on high-danger chances is
-  // breakout fuel; running hot is regression fuel (same thresholds the
-  // Cup Run rollover uses).
-  const hdDelta = p.hdFinishingDelta;
-  if (hdDelta != null) {
-    if (hdDelta <= -0.02) breakoutChance += 0.06;
-    else if (hdDelta >= 0.03) regressionChance += 0.06;
-  }
+  // Shared, multi-signal breakout model — opportunity (TOI), pedigree (draft /
+  // NHLe), finishing luck (EDGE), and burst (EDGE explosiveness) — so a young
+  // player pops for reasons tied to his real-life profile, not a coin flip.
+  const odds = computeBreakout({
+    age: p.age,
+    position: p.position,
+    ptsPace: p.ptsPace,
+    stablePace,
+    priorGames,
+    avgTOI: p.avgTOI,
+    xGPace: p.xGPace,
+    goalsPace: p.goalsPace,
+    hdFinishingDelta: p.hdFinishingDelta,
+    prospectPtsPace: p.prospectPtsPace,
+    draftOverall: p.draftOverall,
+    edgeBurstsOver20: p.edgeBurstsOver20,
+    edgeSpeedMaxMph: p.edgeSpeedMaxMph,
+  });
+  let breakoutChance = odds.breakout;
+  let regressionChance = odds.regression;
 
   const eventRoll = rand();
   if (eventRoll < breakoutChance) {

@@ -13,6 +13,7 @@
 // (with a later clock), and decrement contracts.
 
 import { ageDecay, hashString, mulberry32, stablePts } from "./sim-engine";
+import { computeBreakout, type BreakoutResult, type BreakoutSignals } from "./breakout-model";
 
 export interface RolloverPlayer {
   id: string;
@@ -28,11 +29,17 @@ export interface RolloverPlayer {
   goalsPace?: number;          // luck signal: actual goals pace
   hdFinishingDelta?: number | null; // EDGE high-danger finishing vs league (preferred luck signal)
   expiryStatus?: string | null;   // "UFA" | "RFA" | null (Asset keeps this loose)
+  // Breakout-model signals (present on Asset; optional here so lighter callers still fit).
+  games?: number;              // opportunity/sample size
+  avgTOI?: number;             // opportunity — top-six/top-four minutes
+  draftOverall?: number | null; // pedigree
+  edgeBurstsOver20?: number | null; // EDGE explosiveness
+  edgeSpeedMaxMph?: number | null;
 }
 
 export type RolloverEvent =
   | { type: "retired"; playerId: string; name: string; age: number }
-  | { type: "breakout"; playerId: string; name: string; pctChange: number }
+  | { type: "breakout"; playerId: string; name: string; pctChange: number; driver?: string }
   | { type: "regression"; playerId: string; name: string; pctChange: number };
 
 export interface RolloverResult<P extends RolloverPlayer> {
@@ -74,32 +81,18 @@ export function retirementChance(p: Pick<RolloverPlayer, "age" | "position" | "p
 }
 
 // ── Breakout / regression odds ────────────────────────────────
+// Thin adapter over the shared, multi-signal breakout model (opportunity +
+// pedigree + finishing luck + EDGE burst). Kept as a named export so the
+// rollover and its tests keep a stable surface.
 export function breakoutOdds(
-  p: Pick<RolloverPlayer, "age" | "xGPace" | "goalsPace" | "hdFinishingDelta">,
+  p: BreakoutSignals & { priorGames?: number | null; games?: number | null },
   changedScenery: boolean,
-): { breakout: number; regression: number } {
-  let breakout = 0.08;
-  let regression = 0.10;
-  if (p.age <= 23) { breakout = 0.16; regression = 0.06; }
-  else if (p.age >= 30) { breakout = 0.04; regression = 0.16; }
-
-  // Luck signal, best source first: NHL EDGE high-danger finishing vs
-  // league (true shot-quality-adjusted luck from nhl_snapshots), falling
-  // back to the coarser xG-vs-goals heuristic when no snapshot exists.
-  if (p.hdFinishingDelta != null) {
-    if (p.hdFinishingDelta <= -0.02) breakout += 0.08;       // unlucky on quality chances
-    else if (p.hdFinishingDelta >= 0.03) regression += 0.08; // running hot
-  } else {
-    const xg = p.xGPace ?? 0;
-    const goals = p.goalsPace ?? 0;
-    if (xg > 5 && goals > 0) {
-      if (goals < xg * 0.85) breakout += 0.06;
-      else if (goals > xg * 1.25) regression += 0.08;
-    }
-  }
-
-  if (changedScenery) breakout *= 2;
-  return { breakout: Math.min(0.5, breakout), regression: Math.min(0.5, regression) };
+): BreakoutResult {
+  return computeBreakout({
+    ...p,
+    priorGames: p.priorGames ?? p.games ?? null,
+    changedScenery,
+  });
 }
 
 // ── Advance one offseason ─────────────────────────────────────
@@ -132,7 +125,7 @@ export function advanceSeason<P extends RolloverPlayer>(
       const roll = rand();
       if (roll < odds.breakout) {
         rollMult = 1.15 + rand() * 0.20;                       // +15% … +35%
-        events.push({ type: "breakout", playerId: p.id, name: p.name, pctChange: Math.round((rollMult - 1) * 100) });
+        events.push({ type: "breakout", playerId: p.id, name: p.name, pctChange: Math.round((rollMult - 1) * 100), driver: odds.driver });
       } else if (roll < odds.breakout + odds.regression) {
         rollMult = 0.75 + rand() * 0.15;                       // −25% … −10%
         events.push({ type: "regression", playerId: p.id, name: p.name, pctChange: Math.round((rollMult - 1) * 100) });
