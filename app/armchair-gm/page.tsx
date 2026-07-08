@@ -29,7 +29,7 @@ import TradeBlockPanel from "@/app/components/TradeBlockPanel";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 import { useSimDispatch } from "./useSimDispatch";
 import CupRunPanel from "@/app/components/CupRunPanel";
-import { computeContention } from "./contention";
+import { computeContention, deriveTeamPhase } from "./contention";
 import { CupRunDraftSummaryModal, buildTradeCapMoves } from "./CupRunDraftSummaryModal";
 import { GmAnalysisTabs, ModeBadge } from "./GmAnalysisTabs";
 import { MiniStat } from "./SeasonResultsPager";
@@ -335,6 +335,31 @@ export default function ArmchairGmPage() {
       ctrl.abort();
     };
   }, [outgoingBlock, incomingBlock, setNavMap, db.capCeiling]);
+
+  // ── Live team timelines ───────────────────────────────────────
+  // Recompute every team's phase from its current roster whenever rosters or
+  // valuations change (trades, offseason signings, Cup Run rollover). The seed
+  // phase was a static standing snapshot that never moved; this keeps the
+  // HOME/PARTNER timeline badge — and the trade-willingness logic that reads
+  // team.phase server-side — honest about what each roster actually is now.
+  // Depends on players + navMap only, and no-ops when nothing changed, so
+  // writing back to db.teams can't loop.
+  useEffect(() => {
+    if (db.players.length === 0 || Object.keys(navMap).length === 0) return;
+    setDb(prev => {
+      let changed = false;
+      const teams = prev.teams.map(team => {
+        const roster = prev.players.filter(p => p.teamId === team.id);
+        const phase = deriveTeamPhase(roster, navMap);
+        // null = not enough roster signal → keep the seed phase (no regression
+        // to "Tanking" on thin/partial data).
+        if (phase == null || phase === team.phase) return team;
+        changed = true;
+        return { ...team, phase };
+      });
+      return changed ? { ...prev, teams } : prev;
+    });
+  }, [db.players, navMap]);
 
   const loadLeagueData = useCallback(() => {
     setBooting(true);

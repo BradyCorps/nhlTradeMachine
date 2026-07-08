@@ -116,6 +116,40 @@ export function computeContention(
   return { present, future, quadrant, presentLabel, futureLabel };
 }
 
+// ── Live team phase / timeline ───────────────────────────────
+// The seed `phase` in db.ts is a static last-season-standing snapshot, so the
+// HOME/PARTNER timeline badge (and the trade-willingness logic that keys off
+// phase) never moved when a roster was rebuilt or re-signed. deriveTeamPhase
+// reads the CURRENT roster's present-strength rating (same contention math the
+// quadrant already uses) and maps it onto the phase vocabulary, so the timeline
+// tracks the roster in real time — improve the team and it climbs toward
+// Contender; gut it and it slides toward Tanking.
+export type TeamPhase = "Contender" | "Bubble" | "Retooling" | "Rebuilding" | "Tanking";
+
+// Returns null when the roster lacks enough valued, established players to
+// judge — the caller then keeps the existing (seed) phase rather than
+// collapsing a data-thin team to "Tanking". A real NHL roster clears this
+// easily; incomplete/partial data does not, so the live read only kicks in
+// when it's trustworthy.
+const MIN_QUALIFIED_FOR_PHASE = 9;
+
+export function deriveTeamPhase(
+  roster: Asset[],
+  navMap: Record<string, XNAVResult>,
+): TeamPhase | null {
+  const qualified = roster.filter(p =>
+    p.position !== "Pick" && (p.games ?? 0) >= 10 && navMap[p.id] != null
+  );
+  if (qualified.length < MIN_QUALIFIED_FOR_PHASE) return null;
+
+  const { present } = computeContention(roster, navMap);
+  return present >= 6.5 ? "Contender"
+    : present >= 5.0 ? "Bubble"
+    : present >= 3.5 ? "Retooling"
+    : present >= 2.0 ? "Rebuilding"
+    : "Tanking";
+}
+
 // ── GM Analysis Tabs ─────────────────────────────────────────
 export const GM_PLUM = "#5e3a6e";
 export const GM_PLUM_FAINT = "rgba(94, 58, 110, 0.08)";

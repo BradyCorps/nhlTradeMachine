@@ -1653,3 +1653,17 @@ describe("Canary — sim without a trade + AI best lines", () => {
     expect(pager).toContain("Goaltending");
   });
 });
+
+describe("Canary — live team timelines", () => {
+  it("derives each team's phase from its live roster and recomputes on roster/nav change", () => {
+    const contention = read("app/armchair-gm/contention.ts");
+    const page = read("app/armchair-gm/page.tsx");
+    // Pure helper maps present-strength onto the phase vocabulary.
+    expect(contention).toContain("export function deriveTeamPhase");
+    expect(contention).toContain('present >= 6.5 ? "Contender"');
+    // The page recomputes phases into db.teams whenever players/navMap change,
+    // so the timeline badge and server-side willingness both track the roster.
+    expect(page).toContain("deriveTeamPhase(roster, navMap)");
+    expect(page).toContain("}, [db.players, navMap]);");
+  });
+});
