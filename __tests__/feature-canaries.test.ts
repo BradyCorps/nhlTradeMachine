@@ -688,6 +688,22 @@ describe("Canary — trade UI negative NAV", () => {
     expect(quick).toContain("navMap?: Record<string, XNAVResult>");
     expect(quick).toContain('console.error("[quick shared NAV]"');
   });
+
+  it("Trade Machine shows each team's live contention window + buyer/seller stance", () => {
+    const quick = read("app/components/QuickTradeMachine.tsx");
+    // Live phase from the whole roster, seed phase as fallback
+    expect(quick).toContain("deriveTeamPhase");
+    expect(quick).toContain("normalizePhase(homeTeam?.phase)");
+    expect(quick).toContain('console.error("[quick trade roster NAV]"');
+    // Buyer/seller stance vocabulary + the window badge
+    expect(quick).toContain("function TeamWindowBadge");
+    expect(quick).toContain("PHASE_META");
+    expect(quick).toContain('stance: "Buyer"');
+    expect(quick).toContain('stance: "Seller"');
+    // Post-trade window shift feeds the badge
+    expect(quick).toContain("homePostPhase");
+    expect(quick).toContain("partnerPostPhase");
+  });
 });
 
 describe("Canary — draft pick inventory", () => {

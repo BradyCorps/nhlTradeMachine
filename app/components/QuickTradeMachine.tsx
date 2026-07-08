@@ -6,6 +6,7 @@ import Footer from "@/app/components/Footer";
 import TeamStrand from "@/app/components/TeamStrand";
 import type { Asset, Team, TradeVerdict, XNAVResult } from "@/app/lib/trade-types";
 import { computeRosterStrand } from "@/app/lib/roster-strand";
+import { deriveTeamPhase, type TeamPhase } from "@/app/armchair-gm/contention";
 import { fetchNavMap, fetchTradeVerdict } from "@/app/lib/evaluate-client";
 import {
   createTradeSharePayload,
@@ -37,6 +38,51 @@ type PackageSummary = {
 
 const fmtCap = (value: number) => `$${value.toFixed(2)}M`;
 const fmtSigned = (value: number, digits = 1) => value > 0 ? `+${value.toFixed(digits)}` : value.toFixed(digits);
+
+const PHASE_ORDER: TeamPhase[] = ["Tanking", "Rebuilding", "Retooling", "Bubble", "Contender"];
+function normalizePhase(raw: string | null | undefined): TeamPhase | null {
+  if (!raw) return null;
+  const match = PHASE_ORDER.find(p => p.toLowerCase() === raw.toLowerCase());
+  return match ?? null;
+}
+// A team's trade stance follows its window: contenders buy (spend futures for
+// now), rebuilders sell (move vets for picks/youth), the middle is flexible.
+const PHASE_META: Record<TeamPhase, { stance: string; blurb: string; tone: "good" | "bad" | "neutral" }> = {
+  Contender:  { stance: "Buyer",    blurb: "win-now, will spend futures", tone: "good" },
+  Bubble:     { stance: "Buyer",    blurb: "pushing to lock a spot",       tone: "good" },
+  Retooling:  { stance: "Flexible", blurb: "open to deals both ways",      tone: "neutral" },
+  Rebuilding: { stance: "Seller",   blurb: "moving vets for futures",      tone: "bad" },
+  Tanking:    { stance: "Seller",   blurb: "selling now, wants picks/youth", tone: "bad" },
+};
+
+function TeamWindowBadge({ phase, postPhase }: { phase: TeamPhase | null; postPhase: TeamPhase | null }) {
+  if (!phase) return null;
+  const meta = PHASE_META[phase];
+  const color = meta.tone === "good" ? "var(--ledger-green)" : meta.tone === "bad" ? "var(--ledger-amber)" : "var(--ledger-navy)";
+  const shifted = postPhase && postPhase !== phase;
+  const climbed = shifted && PHASE_ORDER.indexOf(postPhase!) > PHASE_ORDER.indexOf(phase);
+  return (
+    <div className="border px-3 py-2 flex items-center justify-between gap-3"
+      style={{ borderColor: "var(--ledger-rule-light)", background: "rgba(255,255,255,0.22)" }}>
+      <div className="min-w-0">
+        <div className="text-[9px] uppercase tracking-[0.18em] text-ledger-ink-faint font-mono">Window</div>
+        <div className="flex items-baseline gap-2">
+          <span className="text-[14px] font-black" style={{ color }}>{phase}</span>
+          <span className="text-[10px] font-black uppercase tracking-[0.14em] font-mono" style={{ color }}>· {meta.stance}</span>
+        </div>
+        <div className="text-[10px] leading-tight text-ledger-ink-faint">{meta.blurb}</div>
+      </div>
+      {shifted && (
+        <div className="text-right shrink-0">
+          <div className="text-[9px] uppercase tracking-[0.16em] text-ledger-ink-faint font-mono">Post-trade</div>
+          <div className="text-[12px] font-black" style={{ color: climbed ? "var(--ledger-green)" : "var(--ledger-red)" }}>
+            {climbed ? "▲" : "▼"} {postPhase}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function assetLabel(asset: Asset): string {
   if (asset.position === "Pick") {
@@ -374,12 +420,16 @@ function TeamTradeSummary({
   sends,
   receives,
   navLoading,
+  phase,
+  postPhase,
 }: {
   label: string;
   team: Team | null;
   sends: PackageSummary;
   receives: PackageSummary;
   navLoading: boolean;
+  phase: TeamPhase | null;
+  postPhase: TeamPhase | null;
 }) {
   const currentCap = team?.capSpace ?? 0;
   const projectedCap = team ? currentCap + sends.cap - receives.cap : 0;
@@ -404,6 +454,8 @@ function TeamTradeSummary({
           GM Logic Signal
         </div>
       </div>
+
+      {team && <TeamWindowBadge phase={phase} postPhase={postPhase} />}
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         <SummaryMetric label="Current Cap" value={team ? fmtCap(currentCap) : "--"} tone={currentCap >= 0 ? "good" : "bad"} />
@@ -723,7 +775,9 @@ export default function QuickTradeMachine() {
   const [shareUrl, setShareUrl] = useState("");
   const [navMap, setNavMap] = useState<Record<string, XNAVResult>>({});
   const [navLoading, setNavLoading] = useState(false);
+  const [rosterNavMap, setRosterNavMap] = useState<Record<string, XNAVResult>>({});
   const navRunRef = useRef(0);
+  const rosterNavRunRef = useRef(0);
   const verdictRunRef = useRef(0);
   const verdictAbortRef = useRef<AbortController | null>(null);
 
@@ -772,6 +826,23 @@ export default function QuickTradeMachine() {
   const outgoingSummary = useMemo(() => summarizePackage(outgoing, navMap), [outgoing, navMap]);
   const incomingSummary = useMemo(() => summarizePackage(incoming, navMap), [incoming, navMap]);
 
+  // Live contention window per team — falls back to the seed phase when the
+  // roster lacks enough valued players to judge (deriveTeamPhase returns null).
+  const fullNav = useMemo(() => ({ ...rosterNavMap, ...navMap }), [rosterNavMap, navMap]);
+  const hasActiveTrade = outgoing.length > 0 || incoming.length > 0;
+  const effHomeRoster = useMemo(() => {
+    const outIds = new Set(outgoing.map(a => a.id));
+    return [...allHomeRoster.filter(a => !outIds.has(a.id)), ...incoming.filter(a => a.position !== "Pick")];
+  }, [allHomeRoster, outgoing, incoming]);
+  const effPartnerRoster = useMemo(() => {
+    const inIds = new Set(incoming.map(a => a.id));
+    return [...allPartnerRoster.filter(a => !inIds.has(a.id)), ...outgoing.filter(a => a.position !== "Pick")];
+  }, [allPartnerRoster, incoming, outgoing]);
+  const homePhase = useMemo(() => deriveTeamPhase(allHomeRoster, fullNav) ?? normalizePhase(homeTeam?.phase), [allHomeRoster, fullNav, homeTeam?.phase]);
+  const partnerPhase = useMemo(() => deriveTeamPhase(allPartnerRoster, fullNav) ?? normalizePhase(partnerTeam?.phase), [allPartnerRoster, fullNav, partnerTeam?.phase]);
+  const homePostPhase = useMemo(() => hasActiveTrade ? (deriveTeamPhase(effHomeRoster, fullNav) ?? homePhase) : null, [hasActiveTrade, effHomeRoster, fullNav, homePhase]);
+  const partnerPostPhase = useMemo(() => hasActiveTrade ? (deriveTeamPhase(effPartnerRoster, fullNav) ?? partnerPhase) : null, [hasActiveTrade, effPartnerRoster, fullNav, partnerPhase]);
+
   useEffect(() => {
     if (selectedAssets.length === 0) {
       setNavMap({});
@@ -797,6 +868,28 @@ export default function QuickTradeMachine() {
       });
     return () => ctrl.abort();
   }, [selectedAssets, data.capCeiling]);
+
+  // Full-roster NAV for both selected teams — powers the live contention
+  // window / buyer-seller read (deriveTeamPhase needs the whole roster valued,
+  // not just the package). Runs once per team pairing, independent of the deal.
+  useEffect(() => {
+    const roster = [...allHomeRoster, ...allPartnerRoster].filter(p => p.position !== "Pick");
+    if (roster.length === 0) {
+      setRosterNavMap({});
+      return;
+    }
+    const ctrl = new AbortController();
+    const runId = ++rosterNavRunRef.current;
+    fetchNavMap(roster, ctrl.signal, data.capCeiling)
+      .then(nextMap => {
+        if (ctrl.signal.aborted || runId !== rosterNavRunRef.current) return;
+        setRosterNavMap(nextMap);
+      })
+      .catch(event => {
+        if (event.name !== "AbortError") console.error("[quick trade roster NAV]", event);
+      });
+    return () => ctrl.abort();
+  }, [allHomeRoster, allPartnerRoster, data.capCeiling]);
 
   useEffect(() => {
     verdictAbortRef.current?.abort();
@@ -931,6 +1024,8 @@ export default function QuickTradeMachine() {
                   sends={outgoingSummary}
                   receives={incomingSummary}
                   navLoading={navLoading}
+                  phase={homePhase}
+                  postPhase={homePostPhase}
                 />
               </div>
               <div className="border p-4 flex flex-col gap-4" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card-light)" }}>
@@ -949,6 +1044,8 @@ export default function QuickTradeMachine() {
                   sends={incomingSummary}
                   receives={outgoingSummary}
                   navLoading={navLoading}
+                  phase={partnerPhase}
+                  postPhase={partnerPostPhase}
                 />
               </div>
             </section>
@@ -962,7 +1059,7 @@ export default function QuickTradeMachine() {
               partnerRoster={allPartnerRoster}
               outgoing={outgoing}
               incoming={incoming}
-              navMap={navMap}
+              navMap={fullNav}
             />
 
             <section className="border p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
