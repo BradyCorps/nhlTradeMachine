@@ -163,6 +163,43 @@ export function classifyRosterTier(
   }
 }
 
+// ── Breakout credibility → dynamic baseline blend ────────────────
+// The engine anchors a player's offensive value to a multi-year baseline so a
+// single hot season doesn't set the price. But a flat blend punishes a real
+// young breakout exactly as hard as a fluky veteran contract-year spike. This
+// decides how much of a season that spikes ABOVE the baseline to believe:
+//   • Corroborated (young, pedigreed, full sample, NOT riding hot HD finishing)
+//     → higher current weight, so a genuine leap counts toward value.
+//   • Uncorroborated (older, thin sample, finishing-luck driven) → anchor to
+//     the established baseline, so a contract year doesn't inflate FMV.
+// Proven stars sit at current ≈ baseline, so the blend barely moves them —
+// McDavid still earns the max; the mirage winger does not.
+export function currentSeasonWeight(asset: AssetInput, defaultWeight: number): number {
+  const base = asset.baselinePtsPace;
+  const curr = safe(asset.ptsPace ?? 0);
+  // No spike (or no baseline to compare against) → leave the blend as-is.
+  if (base == null || base <= 0 || curr <= base * 1.05) return defaultWeight;
+
+  const games = safe(asset.games ?? 40);
+  let cred = 0.5; // neutral prior
+  // Hot high-danger finishing is the clearest "is it luck" tell — a point spike
+  // built on unsustainable finishing shouldn't set the market. Cold/neutral
+  // finishing means the underlying play supports the jump.
+  if (asset.hdFinishingDelta != null) cred += clamp(-asset.hdFinishingDelta * 6, -0.35, 0.35);
+  // Young players genuinely level up; sudden late-career spikes rarely stick.
+  if (asset.age <= 23) cred += 0.18; else if (asset.age >= 29) cred -= 0.18;
+  // Draft pedigree lends a breakout precedent.
+  if (asset.draftOverall != null && asset.draftOverall <= 15) cred += 0.10;
+  // A full season of evidence vs a half-year mirage.
+  cred += (clamp(games / 70, 0, 1) - 0.6) * 0.25;
+  cred = clamp(cred, 0, 1);
+
+  // Mirage → anchor to baseline (weight 0.20); fully corroborated → let the
+  // breakout mostly count (weight 0.58). Never exceeds a believed real leap.
+  const LO = 0.20, HI = 0.58;
+  return LO + (HI - LO) * cred;
+}
+
 export function calcSkaterDeploymentContext(asset: AssetInput): {
   evMdep: number;
   asi: number;
@@ -181,8 +218,11 @@ export function calcSkaterDeploymentContext(asset: AssetInput): {
   const shToi = clamp(toi * safe(asset.pkTimeShare ?? 0), 0, toi);
   const evToi = Math.max(0, toi - shToi);
   const baselinePtsPace = asset.baselinePtsPace;
+  // Dynamic current-season weight: uncorroborated spikes stay near the baseline
+  // (default 0.40 current), corroborated breakouts earn up to 0.58.
+  const cw = currentSeasonWeight(asset, 0.4);
   const blendedPts = baselinePtsPace !== undefined && baselinePtsPace > 0
-    ? (pts * 0.4 + baselinePtsPace * 0.6)
+    ? (pts * cw + baselinePtsPace * (1 - cw))
     : pts;
 
   const evMdep = calcDeploymentMultiplier(evDzPct, evQoc);

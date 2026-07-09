@@ -8,7 +8,7 @@
 // not precision assertions.
 
 import { describe, it, expect } from "vitest";
-import { calcNAV, calcDeploymentMultiplier, calcGoalieNAV, calcPickNAV, calcProspectNAV, calcSkaterNAV } from "../app/lib/xnav-engine";
+import { calcNAV, calcDeploymentMultiplier, calcGoalieNAV, calcPickNAV, calcProspectNAV, calcSkaterNAV, currentSeasonWeight } from "../app/lib/xnav-engine";
 import { getHistoricalFloor } from "../app/lib/player-data";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -942,5 +942,42 @@ describe("compressPackage — age-tiered", () => {
 
     expect(withVeteranThrowIn).toBeGreaterThanOrEqual(starOnly);
     expect(withManyThrowIns).toBeGreaterThanOrEqual(starOnly);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FMV BREAKOUT CREDIBILITY — contract-year spikes vs earned breakouts
+// ─────────────────────────────────────────────────────────────────────────────
+describe("FMV — breakout credibility on the baseline blend", () => {
+  const base = {
+    position: "C" as const, capHit: 6, yearsRemaining: 4, avgTOI: 18, xGPace: 20,
+    defRate: 0.08, qocIndex: 50, games: 78, hasLiveStats: true, capCeiling: 104,
+  };
+
+  it("leaves proven stars alone — current ≈ baseline means the blend barely moves", () => {
+    // A player whose big season matches his multi-year baseline is not a spike;
+    // the dynamic weight returns the default, so FMV stays elite.
+    const star = calcNAV({ ...base, id: "star", name: "Star", ptsPace: 130, baselinePtsPace: 128, age: 28 });
+    expect(star.fmvAav ?? 0).toBeGreaterThan(15); // still near the top of the market
+  });
+
+  it("anchors an uncorroborated veteran contract-year spike toward the baseline", () => {
+    // Same raw spike (42 → 70), but old + hot high-danger finishing = a mirage.
+    const vetSpike = calcNAV({ ...base, id: "vet", name: "Vet Spike", ptsPace: 70, baselinePtsPace: 42, age: 31, hdFinishingDelta: 0.05 });
+    // A young, pedigreed, cold-finishing breakout with the identical raw line.
+    const youngBreak = calcNAV({ ...base, id: "yng", name: "Young Break", ptsPace: 70, baselinePtsPace: 42, age: 22, draftOverall: 3, hdFinishingDelta: -0.03 });
+    // The corroborated breakout should be paid more than the mirage.
+    expect(youngBreak.fmvAav ?? 0).toBeGreaterThan(vetSpike.fmvAav ?? 0);
+  });
+
+  it("currentSeasonWeight: mirage anchors low, corroborated breakout leans current, no-spike is default", () => {
+    const noSpike = currentSeasonWeight({ position: "C", age: 28, capHit: 6, yearsRemaining: 4, ptsPace: 42, baselinePtsPace: 42, games: 78 } as any, 0.4);
+    expect(noSpike).toBeCloseTo(0.4, 5); // unchanged when there is no spike
+
+    const mirage = currentSeasonWeight({ position: "C", age: 31, capHit: 6, yearsRemaining: 4, ptsPace: 70, baselinePtsPace: 42, games: 78, hdFinishingDelta: 0.05 } as any, 0.4);
+    const earned = currentSeasonWeight({ position: "C", age: 22, capHit: 6, yearsRemaining: 4, ptsPace: 70, baselinePtsPace: 42, games: 78, draftOverall: 3, hdFinishingDelta: -0.03 } as any, 0.4);
+    expect(mirage).toBeLessThan(0.4);   // trust the baseline, not the spike
+    expect(earned).toBeGreaterThan(0.4); // let the real leap count
+    expect(earned).toBeLessThanOrEqual(0.58);
   });
 });
