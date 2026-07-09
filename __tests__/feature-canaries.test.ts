@@ -763,6 +763,45 @@ describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 go
   });
 });
 
+describe("Canary — Player Card AA redesign + FMV surplus read", () => {
+  const card = read("app/components/PercentileCard.tsx");
+  const tip = read("app/components/MetricTip.tsx");
+
+  it("renders percentiles as a semantic table with scoped headers and accessible bars", () => {
+    expect(card).toContain("<table");
+    expect(card).toContain("<caption>");
+    expect(card).toContain('scope="col"');
+    expect(card).toContain('scope="row"');
+    // Bars are labelled for assistive tech, not color-only
+    expect(card).toContain('role="img"');
+    expect(card).toContain("th percentile —");
+    // Value breakdown uses a description list, not a bare grid of divs
+    expect(card).toContain("<dl");
+    expect(card).toContain("<dt>");
+    // Card is a labelled group and no longer capped at the cramped 380px
+    expect(card).toContain('role="group"');
+    expect(card).toContain("max-width: 620px");
+  });
+
+  it("reframes FMV as market AAV with an explicit surplus/overpay read", () => {
+    expect(card).toContain("const surplus = fmv - player.capHit");
+    expect(card).toContain('"BARGAIN"');
+    expect(card).toContain('"OVERPAY"');
+    expect(card).toContain("Market AAV");
+    // NAV breakdown values are rounded (goalie def path is not pre-rounded)
+    expect(card).toContain("Math.round(c.val)");
+  });
+
+  it("MetricTip is keyboard + screen-reader accessible", () => {
+    expect(tip).toContain("tabIndex={0}");
+    expect(tip).toContain("onFocus={enter}");
+    expect(tip).toContain("onBlur={leave}");
+    expect(tip).toContain('aria-label={`${term}: ${tip}`}');
+    expect(tip).toContain('role="tooltip"');
+    expect(tip).toContain('e.key === "Escape"');
+  });
+});
+
 describe("Canary — draft pick inventory", () => {
   it("league routes create rounds 1-5 for five draft years", () => {
     const league = read("app/api/league/route.ts");

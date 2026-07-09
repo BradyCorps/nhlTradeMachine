@@ -49,18 +49,28 @@ export default function MetricTip({ term, children, className }: Props) {
   const tip = GLOSSARY[term];
   if (!tip) return <span className={className}>{children ?? term}</span>;
 
+  // Keyboard + screen-reader accessible: the trigger is focusable, opens on
+  // focus, closes on blur or Escape, and carries the definition in aria-label
+  // so assistive tech reads the full meaning without needing the visual popup.
   return (
     <span
       className={`relative cursor-help ${className ?? ""}`}
+      tabIndex={0}
+      role="button"
+      aria-label={`${term}: ${tip}`}
       onMouseEnter={enter}
       onMouseLeave={leave}
+      onFocus={enter}
+      onBlur={leave}
       onTouchStart={enter}
-      style={{ borderBottom: "1px dotted var(--ledger-rule)", display: "inline" }}
+      onKeyDown={e => { if (e.key === "Escape") setShow(false); }}
+      style={{ borderBottom: "1px dotted var(--ledger-rule)", display: "inline", outlineOffset: "2px" }}
     >
       {children ?? term}
       {show && (
         <span
-          className="absolute z-50 font-mono text-[10px] leading-snug"
+          role="tooltip"
+          className="absolute z-50 font-mono text-[11px] leading-snug"
           style={{
             bottom: "calc(100% + 6px)",
             left: "50%",

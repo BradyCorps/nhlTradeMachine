@@ -88,13 +88,16 @@ function computePercentile(value: number, sorted: number[]): number {
   return Math.round((count / sorted.length) * 100);
 }
 
+// Bar-fill tones — darkened so white/dark text and the newsprint ground both
+// clear WCAG AA. These are decorative (the number carries the real value), but
+// kept legible for low-vision users who read the fill.
 function percentileColor(pct: number): string {
-  if (pct >= 90) return "#1a5e1f";
-  if (pct >= 75) return "#3a8f3f";
-  if (pct >= 60) return "#5aaa4f";
-  if (pct >= 40) return "#8a7530";
-  if (pct >= 25) return "#b06030";
-  return "#a83030";
+  if (pct >= 90) return "#146a24";
+  if (pct >= 75) return "#2f7d34";
+  if (pct >= 60) return "#4e7a2c";
+  if (pct >= 40) return "#8a6a1e";
+  if (pct >= 25) return "#a85a24";
+  return "#9c2b1f";
 }
 
 function percentileLabel(pct: number): string {
@@ -185,225 +188,187 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
     percentiles.reduce((s, p) => s + p.pct, 0) / percentiles.length
   );
 
+  const peerLabel = posGroup === "F" ? "all forwards" : posGroup === "D" ? "all defensemen" : "all goalies";
+
+  // FMV → surplus: the market AAV vs what he's actually paid. This is the read
+  // that matters — a big FMV only means "bargain" relative to the cap hit.
+  const fmv = xnav.fmvAav ?? 0;
+  const surplus = fmv - player.capHit;
+  const surplusTone = surplus >= 1 ? "good" : surplus <= -1 ? "bad" : "neutral";
+  const surplusWord = surplus >= 1 ? "BARGAIN" : surplus <= -1 ? "OVERPAY" : "FAIR DEAL";
+  const GOOD = "#146a24", BAD = "#9c2b1f", INK = "#1c140a", BODY = "#4a3820";
+  const toneColor = (t: string) => t === "good" ? GOOD : t === "bad" ? BAD : INK;
+
+  const navCells = [
+    { label: "OFF", val: xnav.off, term: "OFF" },
+    { label: "DEF", val: xnav.def, term: "DEF" },
+    { label: "AGE", val: xnav.age, term: "YNG" },
+    { label: "CAP", val: xnav.cap, term: "CAP" },
+  ];
+
   return (
-    <div style={{
-      background: "var(--paper-card, #e8dcc0)",
-      border: "2px solid var(--ledger-rule, #b8a070)",
-      padding: 0,
-      width: "100%",
-      maxWidth: "380px",
-      fontFamily: "var(--font-mono, monospace)",
-    }}>
+    <div className="pcard" role="group"
+      aria-label={`${player.name} value card — X-NAV ${xnav.total}, ${percentileLabel(avgPercentile)} vs ${peerLabel}`}>
+      <style>{`
+        .pcard { width: 100%; max-width: 620px; margin: 0 auto;
+          background: #ede4cc; border: 2px solid #b8a070; border-radius: 3px;
+          font-family: var(--font-mono, ui-monospace, monospace); color: #1c140a; }
+        .pcard *:focus-visible { outline: 2px solid #1a2e5c; outline-offset: 2px; border-radius: 2px; }
+        .pcard-head { background: #1c140a; color: #efe6cc; padding: 12px 16px;
+          display: flex; align-items: center; gap: 12px; }
+        .pcard-head img { width: 52px; height: 52px; border-radius: 50%;
+          border: 2px solid rgba(255,255,255,0.35); flex-shrink: 0; }
+        .pcard-name { font-size: 16px; font-weight: 900; line-height: 1.15;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pcard-sub { font-size: 11px; color: #d8c9a2; margin-top: 3px;
+          text-transform: uppercase; letter-spacing: 0.1em; }
+        .pcard-nav-total { font-size: 26px; font-weight: 900; line-height: 1; }
+        .pcard-nav-label { font-size: 10px; text-transform: uppercase;
+          letter-spacing: 0.14em; color: #d8c9a2; margin-top: 3px; }
+        .pcard-value-strip { display: grid; grid-template-columns: repeat(3, 1fr);
+          border-bottom: 1px solid #b8a070; }
+        .pcard-vcell { padding: 8px 12px; text-align: center;
+          border-right: 1px solid #d6c8a5; }
+        .pcard-vcell:last-child { border-right: none; }
+        .pcard-vlabel { font-size: 10px; font-weight: 700; color: #4a3820;
+          text-transform: uppercase; letter-spacing: 0.1em; }
+        .pcard-vval { font-size: 16px; font-weight: 900; margin-top: 2px; }
+        .pcard-vnote { font-size: 10px; font-weight: 700; margin-top: 1px;
+          text-transform: uppercase; letter-spacing: 0.08em; }
+        .pcard-body { display: grid; grid-template-columns: 1fr; gap: 0; }
+        @media (min-width: 540px) { .pcard-body { grid-template-columns: 1.55fr 1fr; } }
+        .pcard-tablewrap { padding: 10px 14px 12px; }
+        .pcard-table { width: 100%; border-collapse: collapse; }
+        .pcard-table caption { text-align: left; font-size: 11px; font-weight: 700;
+          color: #4a3820; text-transform: uppercase; letter-spacing: 0.1em;
+          padding-bottom: 6px; }
+        .pcard-table th, .pcard-table td { padding: 3px 4px; vertical-align: middle; }
+        .pcard-table thead th { font-size: 10px; font-weight: 700; color: #4a3820;
+          text-transform: uppercase; letter-spacing: 0.08em;
+          border-bottom: 1px solid #cdbd93; }
+        .pcard-th-stat { text-align: left; }
+        .pcard-th-pct { text-align: left; }
+        .pcard-th-num { text-align: right; }
+        .pcard-stat { font-size: 12px; font-weight: 900; color: #3d2e18;
+          text-transform: uppercase; letter-spacing: 0.04em; text-align: left; white-space: nowrap; }
+        .pcard-barcell { width: 99%; }
+        .pcard-barrow { display: flex; align-items: center; gap: 7px; }
+        .pcard-bar { position: relative; flex: 1; height: 16px; min-width: 60px;
+          background: #d6c8a5; border: 1px solid #c1b088; border-radius: 3px; overflow: hidden; }
+        .pcard-fill { position: absolute; top: 0; left: 0; height: 100%;
+          border-radius: 2px 0 0 2px; transition: width 0.35s ease; }
+        .pcard-median { position: absolute; top: -1px; left: 50%; width: 2px;
+          height: calc(100% + 2px); background: #1c140a; opacity: 0.45; }
+        .pcard-pctnum { font-size: 12px; font-weight: 900; color: #1c140a;
+          font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
+        .pcard-val { font-size: 12px; font-weight: 800; color: #1c140a;
+          text-align: right; font-variant-numeric: tabular-nums; }
+        .pcard-med { font-size: 11px; font-weight: 600; color: #6e5a3d;
+          text-align: right; font-variant-numeric: tabular-nums; }
+        .pcard-side { border-top: 1px solid #b8a070; padding: 10px 14px; }
+        @media (min-width: 540px) { .pcard-side { border-top: none; border-left: 1px solid #b8a070; } }
+        .pcard-side-h { font-size: 10px; font-weight: 700; color: #4a3820;
+          text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 7px; }
+        .pcard-navrow { display: flex; align-items: baseline; justify-content: space-between;
+          padding: 4px 0; border-bottom: 1px solid #ddd0ab; }
+        .pcard-navrow:last-child { border-bottom: none; }
+        .pcard-navrow dt { font-size: 12px; font-weight: 700; color: #4a3820; }
+        .pcard-navrow dd { font-size: 13px; font-weight: 900; margin: 0;
+          font-variant-numeric: tabular-nums; }
+        .pcard-foot { border-top: 1px solid #b8a070; padding: 6px 14px;
+          font-size: 10px; color: #4a3820; text-align: center;
+          text-transform: uppercase; letter-spacing: 0.12em; }
+        @media (prefers-reduced-motion: reduce) { .pcard-fill { transition: none; } }
+      `}</style>
+
       {/* Header */}
-      <div style={{
-        background: "var(--ledger-ink, #2a1f0e)",
-        color: "var(--paper-card, #e8dcc0)",
-        padding: "10px 14px",
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-      }}>
-        {player.headshot && (
-          <img
-            src={player.headshot}
-            alt=""
-            style={{ width: 48, height: 48, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.2)" }}
-          />
-        )}
+      <div className="pcard-head">
+        {player.headshot && <img src={player.headshot} alt="" />}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: "14px", fontWeight: 900, lineHeight: 1.15,
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>
-            {player.name}
-          </div>
-          <div style={{
-            fontSize: "10px", opacity: 0.7, marginTop: "2px",
-            textTransform: "uppercase", letterSpacing: "0.12em",
-          }}>
-            {teamName ?? player.teamId} · {player.position} · Age {player.age}
-          </div>
+          <div className="pcard-name">{player.name}</div>
+          <div className="pcard-sub">{teamName ?? player.teamId} · {player.position} · Age {player.age}</div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontSize: "22px", fontWeight: 900, lineHeight: 1 }}>
-            {xnav.total}
-          </div>
-          <div style={{
-            fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.15em",
-            opacity: 0.6, marginTop: "2px",
-          }}>
-            <MetricTip term="X-NAV">X-NAV</MetricTip>
-          </div>
+          <div className="pcard-nav-total">{xnav.total}</div>
+          <div className="pcard-nav-label"><MetricTip term="X-NAV">X-NAV</MetricTip></div>
         </div>
       </div>
 
-      {/* Contract bar */}
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "6px 14px",
-        borderBottom: "1px solid var(--ledger-rule, #b8a070)",
-        fontSize: "10px", fontWeight: 700,
-        color: "var(--ledger-ink-faint, #7a6940)",
-        textTransform: "uppercase", letterSpacing: "0.1em",
-      }}>
-        <span>${player.capHit}M × {player.yearsRemaining}yr</span>
-        <span><MetricTip term="FMV">FMV</MetricTip> ${(xnav.fmvAav ? xnav.fmvAav : 0).toFixed(1)}M</span>
-        <span style={{ color: percentileColor(avgPercentile), fontWeight: 900 }}>
-          {percentileLabel(avgPercentile)}
-        </span>
-      </div>
-
-      {/* Percentile bars */}
-      <div style={{ padding: "8px 14px 12px" }}>
-        {/* Column headers */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "52px 1fr 40px 40px",
-          alignItems: "center",
-          gap: "8px",
-          marginBottom: "4px",
-          paddingBottom: "3px",
-          borderBottom: "1px solid var(--ledger-rule-light, #d4c8a8)",
-        }}>
-          <span style={{ fontSize: "8px", fontWeight: 700, color: "var(--ledger-ink-faint, #7a6940)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-            Stat
-          </span>
-          <span style={{ fontSize: "8px", fontWeight: 700, color: "var(--ledger-ink-faint, #7a6940)", textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "center" }}>
-            Percentile
-          </span>
-          <span style={{ fontSize: "8px", fontWeight: 700, color: "var(--ledger-ink-faint, #7a6940)", textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "right" }}>
-            Val
-          </span>
-          <span style={{ fontSize: "8px", fontWeight: 700, color: "var(--ledger-ink-faint, #7a6940)", textTransform: "uppercase", letterSpacing: "0.1em", textAlign: "right" }}>
-            Avg
-          </span>
+      {/* Valuation strip: cap hit vs market AAV vs surplus */}
+      <div className="pcard-value-strip">
+        <div className="pcard-vcell">
+          <div className="pcard-vlabel">Cap Hit</div>
+          <div className="pcard-vval" style={{ color: INK }}>${player.capHit.toFixed(1)}M</div>
+          <div className="pcard-vnote" style={{ color: BODY }}>× {player.yearsRemaining}yr</div>
         </div>
-        {percentiles.map((stat) => (
-          <div key={stat.key} style={{
-            display: "grid",
-            gridTemplateColumns: "52px 1fr 40px 40px",
-            alignItems: "center",
-            gap: "8px",
-            marginBottom: "5px",
-          }}>
-            <span style={{
-              fontSize: "10px", fontWeight: 900,
-              color: "var(--ledger-ink-faint, #7a6940)",
-              textTransform: "uppercase", letterSpacing: "0.06em",
-            }}>
-              {stat.label}
-            </span>
-            <div
-              title={`Position median: ${stat.median}`}
-              style={{
-                position: "relative",
-                height: "14px",
-                background: "var(--ledger-rule-light, #d4c8a8)",
-                borderRadius: "2px",
-                overflow: "hidden",
-              }}
-            >
-              <div style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                height: "100%",
-                width: `${stat.pct}%`,
-                background: percentileColor(stat.pct),
-                borderRadius: "2px",
-                transition: "width 0.3s ease",
-              }} />
-              {/* 50th percentile median marker */}
-              <div style={{
-                position: "absolute",
-                top: 0,
-                left: "50%",
-                width: "1.5px",
-                height: "100%",
-                background: "var(--ledger-ink, #2a1f0e)",
-                opacity: 0.4,
-                zIndex: 1,
-              }} />
-              <span style={{
-                position: "absolute",
-                top: "50%",
-                left: stat.pct > 20 ? `${stat.pct / 2}%` : "50%",
-                transform: "translate(-50%, -50%)",
-                fontSize: "9px",
-                fontWeight: 900,
-                color: stat.pct >= 55 ? "rgba(255,255,255,0.95)" : "var(--ledger-ink, #2a1f0e)",
-                letterSpacing: "0.04em",
-                textShadow: stat.pct >= 55 ? "0 1px 2px rgba(0,0,0,0.3)" : "none",
-                zIndex: 2,
-              }}>
-                {stat.pct}th
-              </span>
-            </div>
-            <span style={{
-              fontSize: "10px",
-              fontWeight: 700,
-              color: "var(--ledger-ink, #2a1f0e)",
-              textAlign: "right",
-            }}>
-              {stat.formatted}
-            </span>
-            <span style={{
-              fontSize: "9px",
-              fontWeight: 600,
-              color: "var(--ledger-ink-faint, #7a6940)",
-              textAlign: "right",
-              opacity: 0.7,
-            }}>
-              {stat.median}
-            </span>
+        <div className="pcard-vcell">
+          <div className="pcard-vlabel"><MetricTip term="FMV">Market AAV</MetricTip></div>
+          <div className="pcard-vval" style={{ color: INK }}>${fmv.toFixed(1)}M</div>
+          <div className="pcard-vnote" style={{ color: BODY }}>fair value</div>
+        </div>
+        <div className="pcard-vcell">
+          <div className="pcard-vlabel">Surplus</div>
+          <div className="pcard-vval" style={{ color: toneColor(surplusTone) }}>
+            {surplus > 0 ? "+" : surplus < 0 ? "−" : ""}${Math.abs(surplus).toFixed(1)}M
           </div>
-        ))}
+          <div className="pcard-vnote" style={{ color: toneColor(surplusTone) }}>{surplusWord}</div>
+        </div>
       </div>
 
-      {/* NAV breakdown footer */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(4, 1fr)",
-        borderTop: "1px solid var(--ledger-rule, #b8a070)",
-        textAlign: "center",
-      }}>
-        {[
-          { label: "OFF", val: xnav.off },
-          { label: "DEF", val: xnav.def },
-          { label: "AGE", val: xnav.age },
-          { label: "CAP", val: xnav.cap },
-        ].map(c => (
-          <div key={c.label} style={{
-            padding: "6px 4px",
-            borderRight: c.label !== "CAP" ? "1px solid var(--ledger-rule-light, #d4c8a8)" : "none",
-          }}>
-            <div style={{
-              fontSize: "9px", fontWeight: 700,
-              color: "var(--ledger-ink-faint, #7a6940)",
-              textTransform: "uppercase", letterSpacing: "0.1em",
-            }}>{c.label}</div>
-            <div style={{
-              fontSize: "13px", fontWeight: 900,
-              color: c.val >= 0 ? "var(--ledger-ink, #2a1f0e)" : "var(--ledger-red, #8b0000)",
-              marginTop: "1px",
-            }}>
-              {c.val > 0 ? "+" : ""}{c.val}
-            </div>
-          </div>
-        ))}
+      {/* Body: percentile table + value breakdown */}
+      <div className="pcard-body">
+        <div className="pcard-tablewrap">
+          <table className="pcard-table">
+            <caption>Percentiles vs {peerLabel} (≥20 GP)</caption>
+            <thead>
+              <tr>
+                <th scope="col" className="pcard-th-stat">Stat</th>
+                <th scope="col" className="pcard-th-pct">Percentile</th>
+                <th scope="col" className="pcard-th-num">Val</th>
+                <th scope="col" className="pcard-th-num">Med</th>
+              </tr>
+            </thead>
+            <tbody>
+              {percentiles.map(stat => (
+                <tr key={stat.key}>
+                  <th scope="row" className="pcard-stat">
+                    <MetricTip term={stat.label.replace("/82", "").replace("%+", "")}>{stat.label}</MetricTip>
+                  </th>
+                  <td className="pcard-barcell">
+                    <div className="pcard-barrow">
+                      <div className="pcard-bar" role="img"
+                        aria-label={`${stat.pct}th percentile — ${percentileLabel(stat.pct).toLowerCase()}`}>
+                        <div className="pcard-fill" style={{ width: `${stat.pct}%`, background: percentileColor(stat.pct) }} />
+                        <div className="pcard-median" />
+                      </div>
+                      <span className="pcard-pctnum">{stat.pct}</span>
+                    </div>
+                  </td>
+                  <td className="pcard-val">{stat.formatted}</td>
+                  <td className="pcard-med">{stat.median}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="pcard-side">
+          <div className="pcard-side-h">Value Breakdown</div>
+          <dl style={{ margin: 0 }}>
+            {navCells.map(c => (
+              <div key={c.label} className="pcard-navrow">
+                <dt><MetricTip term={c.term}>{c.label}</MetricTip></dt>
+                <dd style={{ color: Math.round(c.val) >= 0 ? INK : BAD }}>
+                  {c.val >= 0.5 ? "+" : c.val <= -0.5 ? "−" : ""}{Math.abs(Math.round(c.val))}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       </div>
 
-      {/* Position group label */}
-      <div style={{
-        borderTop: "1px solid var(--ledger-rule, #b8a070)",
-        padding: "4px 14px",
-        fontSize: "9px",
-        color: "var(--ledger-ink-faint, #7a6940)",
-        textAlign: "center",
-        textTransform: "uppercase",
-        letterSpacing: "0.15em",
-      }}>
-        Percentiles vs. {posGroup === "F" ? "All Forwards" : posGroup === "D" ? "All Defensemen" : "All Goalies"} (≥20 GP)
+      <div className="pcard-foot">
+        {percentileLabel(avgPercentile)} · avg {avgPercentile}th percentile vs {peerLabel}
       </div>
     </div>
   );
