@@ -706,6 +706,63 @@ describe("Canary — trade UI negative NAV", () => {
   });
 });
 
+describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 goalie)", () => {
+  const display = read("app/components/StrandDisplay.tsx");
+  const view = read("app/components/StrandView.tsx");
+  const edge = read("app/components/EdgeStrip.tsx");
+  const players = read("app/players/page.tsx");
+  const quick = read("app/components/QuickTradeMachine.tsx");
+  const docket = read("app/docket/DocketClient.tsx");
+
+  it("renderer puts labels on fixed rails with one 0–100 index + faint raw, and an EDGE footer slot", () => {
+    // Trait carries a 0–100 index + a raw sub-line
+    expect(display).toContain("idx?:");
+    expect(display).toContain("raw?:");
+    expect(display).toContain("Math.round(t.val * 100)");
+    // Rails own the top/bottom bands and clamp the wave so peaks never hit the text
+    expect(display).toContain("RAIL_ZONE");
+    expect(display).toContain("Math.min(amplitude, cy - RAIL_ZONE - 4)");
+    expect(display).toContain("fixed TOP rail");
+    expect(display).toContain("fixed BOTTOM rail");
+    // EDGE band renders inside the card via the footer slot
+    expect(display).toContain("footer?:");
+    expect(display).toContain("{footer && <div");
+    // Guide is derived from the traits on screen, not a hardcoded skater list
+    expect(display).toContain("TRAIT_GUIDE");
+    expect(display).toContain("guideLabels");
+  });
+
+  it("goalies use a shared 3×3 model with HDSV actually populated (no hardcoded greyed dash)", () => {
+    expect(view).toContain("export function buildGoalieStrandTraits");
+    for (const label of ["GSAX", "SV%", "HDSV", "WRKLD", "BUSY", "GAA"]) {
+      expect(view).toContain(`label: "${label}"`);
+    }
+    // HDSV comes from the real EDGE field, greying out only when truly absent
+    expect(view).toContain("baselineHdsvPct");
+    expect(view).toContain("unavailable: hdsvPct == null");
+    // GAA index is inverted so a stingy goalie reads high
+    expect(view).toContain("1 - norm(safe(gaa)");
+    // The players page no longer hardcodes HDSV to unavailable
+    expect(players).toContain("buildGoalieStrandTraits(player)");
+    expect(players).not.toContain('val: 0.5, unavailable: true');
+  });
+
+  it("EDGE strip takes a structural signal source so both Asset and Player can pass it", () => {
+    expect(edge).toContain("export interface EdgeSignalSource");
+    expect(edge).toContain("asset: EdgeSignalSource");
+  });
+
+  it("every strand surface renders the EDGE band beneath the shape", () => {
+    expect(view).toContain("footer={<EdgeStrip asset={asset} heading={false} />}");
+    expect(players).toContain("footer={<EdgeStrip asset={player} heading={false} />}");
+    expect(quick).toContain("footer={<EdgeStrip asset={asset} heading={false} />}");
+    expect(docket).toContain("footer={<EdgeStrip asset={detailAsset} heading={false} />}");
+    // Goalies get the GOALTENDER badge, not a mislabelled skater archetype
+    expect(quick).toContain('? "GOALTENDER"');
+    expect(docket).toContain('? "GOALTENDER"');
+  });
+});
+
 describe("Canary — draft pick inventory", () => {
   it("league routes create rounds 1-5 for five draft years", () => {
     const league = read("app/api/league/route.ts");

@@ -18,6 +18,7 @@ import { formatPickRound } from "@/app/lib/trade-format";
 import { ageDecayRate, ageSlotPenalty, SEASON } from "@/app/lib/season-config";
 import MeasuredProfile from "@/app/components/MeasuredProfile";
 import StrandDisplay from "@/app/components/StrandDisplay";
+import EdgeStrip from "@/app/components/EdgeStrip";
 import { buildAssetTraits, computeStrandType } from "@/app/components/StrandView";
 
 const ZERO_NAV: XNAVResult = { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
@@ -234,9 +235,11 @@ function AssetRow({
   const [open, setOpen] = useState(false);
   const isPick = asset.position === "Pick";
   const nav = navMap[asset.id] ?? ZERO_NAV;
-  const traits = !isPick ? buildAssetTraits(asset, nav) : null;
-  const strandType = traits ? computeStrandType(traits.off, traits.def, asset.ops ?? null, asset.dps ?? null) : "";
   const isGoalie = asset.position === "G";
+  const traits = !isPick ? buildAssetTraits(asset, nav) : null;
+  const strandType = !traits ? "" : isGoalie
+    ? "GOALTENDER"
+    : computeStrandType(traits.off, traits.def, asset.ops ?? null, asset.dps ?? null);
 
   // Collapsed subline: position/cap/term, plus a scannable stat chip.
   const subline = isPick
@@ -315,9 +318,10 @@ function AssetRow({
                 ops={asset.ops ?? null}
                 dps={asset.dps ?? null}
                 strandType={strandType}
-                W={260}
-                H={150}
-                amplitude={28}
+                footer={<EdgeStrip asset={asset} heading={false} />}
+                W={280}
+                H={200}
+                amplitude={42}
               />
             </div>
           )}

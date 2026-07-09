@@ -74,10 +74,12 @@ function AssetStats({ asset, detailAsset, isPick }: {
 function AssetDetail({ asset }: { asset: DocketEntry["packages"][number]["assets"][number] }) {
   const detailAsset = asset.currentAsset ?? asset.asset;
   const nav = navFromAsset(asset.navToday ?? asset.navAtTrade);
-  const traits = buildAssetTraits(detailAsset, nav);
-  const strandType = computeStrandType(traits.off, traits.def, detailAsset.ops ?? null, detailAsset.dps ?? null);
   const isPick = asset.kind === "pick" || detailAsset.position === "Pick";
   const isGoalie = detailAsset.position === "G";
+  const traits = buildAssetTraits(detailAsset, nav);
+  const strandType = isGoalie
+    ? "GOALTENDER"
+    : computeStrandType(traits.off, traits.def, detailAsset.ops ?? null, detailAsset.dps ?? null);
   const hasOutlook = !isPick && !isGoalie && Boolean(detailAsset.developmentProfile);
 
   // Tabs keep the card compact — one panel at a time instead of a wall of
@@ -136,19 +138,17 @@ function AssetDetail({ asset }: { asset: DocketEntry["packages"][number]["assets
       {activeTab === "STATS" && <AssetStats asset={asset} detailAsset={detailAsset} isPick={isPick} />}
 
       {activeTab === "STRAND" && !isPick && (
-        <div style={{ display: "grid", gap: 10 }}>
-          <StrandDisplay
-            offTraits={traits.off}
-            defTraits={traits.def}
-            ops={detailAsset.ops ?? null}
-            dps={detailAsset.dps ?? null}
-            strandType={strandType}
-            W={260}
-            H={150}
-            amplitude={28}
-          />
-          <EdgeStrip asset={detailAsset} />
-        </div>
+        <StrandDisplay
+          offTraits={traits.off}
+          defTraits={traits.def}
+          ops={detailAsset.ops ?? null}
+          dps={detailAsset.dps ?? null}
+          strandType={strandType}
+          footer={<EdgeStrip asset={detailAsset} heading={false} />}
+          W={280}
+          H={200}
+          amplitude={42}
+        />
       )}
 
       {activeTab === "OUTLOOK" && hasOutlook && (

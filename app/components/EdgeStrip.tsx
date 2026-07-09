@@ -6,7 +6,20 @@
 // expected). Renders nothing when no EDGE signal is present, so it can
 // be dropped into any card without guarding at the call site.
 import React from "react";
-import type { Asset } from "@/app/lib/trade-types";
+
+// Structural subset of the EDGE signal fields — satisfied by both the
+// Trade Machine's Asset and the players page's Player, so the strip can be
+// dropped under either without a type dance.
+export interface EdgeSignalSource {
+  position: string;
+  hdFinishingDelta?: number | null;
+  edgeOzPct?: number | null;
+  edgeOzPercentile?: number | null;
+  edgeSpeedMaxMph?: number | null;
+  edgeBurstsOver20?: number | null;
+  baselineHdsvPct?: number | null;
+  gsax?: number | null;
+}
 
 type Tile = {
   label: string;
@@ -22,7 +35,7 @@ const NEUTRAL = "var(--ledger-navy)";
 const WARN = "var(--ledger-red)";
 const FAINT = "var(--ledger-ink-faint)";
 
-function skaterTiles(a: Asset): Tile[] {
+function skaterTiles(a: EdgeSignalSource): Tile[] {
   const tiles: Tile[] = [];
   const hd = a.hdFinishingDelta;
   if (hd != null) {
@@ -64,7 +77,7 @@ function skaterTiles(a: Asset): Tile[] {
   return tiles;
 }
 
-function goalieTiles(a: Asset): Tile[] {
+function goalieTiles(a: EdgeSignalSource): Tile[] {
   const tiles: Tile[] = [];
   if (a.baselineHdsvPct != null) {
     const pct = a.baselineHdsvPct * 100;
@@ -88,7 +101,7 @@ function goalieTiles(a: Asset): Tile[] {
   return tiles;
 }
 
-export default function EdgeStrip({ asset, heading = true }: { asset: Asset; heading?: boolean }) {
+export default function EdgeStrip({ asset, heading = true }: { asset: EdgeSignalSource; heading?: boolean }) {
   const tiles = asset.position === "G" ? goalieTiles(asset) : skaterTiles(asset);
   if (tiles.length === 0) return null;
 

@@ -1,20 +1,24 @@
 "use client";
 // ── StrandDisplay — shared STRAND renderer ───────────────────
-// Used by both Armchair GM (StrandView.tsx) and player analytics
-// (players/page.tsx). Takes pre-computed traits — callers are responsible
-// for normalising their data source to StrandTrait[].
+// Used by Armchair GM (StrandView.tsx), the Trade Machine (asset rows),
+// and player analytics (players/page.tsx). Takes pre-computed traits —
+// callers normalise their data source to StrandTrait[].
 //
-// Why shared: the SVG helix, trait bars, league-avg baseline, and legend
-// are identical regardless of whether data comes from Asset+XNAVResult
-// (Armchair GM) or a raw Player object (player analytics).
+// The helix is a SILHOUETTE of identity (offensive lean vs defensive lean
+// vs league AVG). To keep that shape legible we do NOT print stats on the
+// wave: labels ride a fixed top rail (offense) and bottom rail (defense),
+// each node shows one consistent 0–100 index (raw value on a faint
+// sub-line), and any EDGE band is rendered beneath the shape via `footer`.
 import React from "react";
 
 export interface StrandTrait {
   label:       string;
   val:         number;        // 0–1 normalised — drives bar width and helix amplitude
   title?:      string;        // tooltip
-  ps?:         string | null; // Point Share value shown on node instead of score (e.g. "12.8")
-  display?:    number;        // override displayed number (e.g. raw OZ% instead of score)
+  idx?:        number;        // 0–100 index shown on the node (defaults to round(val*100))
+  raw?:        string;        // faint raw value shown under the label (e.g. "13.7 OPS")
+  ps?:         string | null; // legacy: Point Share value — used as a raw fallback
+  display?:    number;        // legacy: raw override — used as a raw fallback
   unavailable?: boolean;      // greyed out — data not available
 }
 
@@ -27,15 +31,14 @@ interface Props {
   compareOff?:  StrandTrait[];
   compareDef?:  StrandTrait[];
   compareLabel?: string;
-  // SVG dimensions — Armchair GM uses larger canvas, players page uses smaller
+  footer?:      React.ReactNode; // rendered inside the card, under the SVG (e.g. EDGE band)
+  // SVG dimensions — a rail layout needs vertical room, so keep H ≳ 190.
   W?:      number;
   H?:      number;
   amplitude?: number;
 }
 
 // sineM = n/2: each trait occupies exactly one half-cycle.
-// Nodes sit at sine peaks/troughs — clean helix for any trait count.
-// 5 traits → 2.5 cycles (Armchair GM)  |  4 traits → 2.0 cycles (players page)
 const sineM = (n: number) => n / 2;
 
 function buildAvgPath(W: number, H: number, amplitude: number, isOff: boolean, n: number) {
@@ -85,32 +88,62 @@ function buildStrandPath(traits: StrandTrait[], W: number, H: number, amplitude:
   return pts.join(" ");
 }
 
+// Short plain-language meaning per trait label — filtered to the labels
+// actually on screen, so a goalie strand shows the goalie guide.
+const TRAIT_GUIDE: Record<string, string> = {
+  OPS:  "Offensive Point Shares (or Pts/82 when unavailable)",
+  SCR:  "Scoring rate — Pts/82",
+  xG:   "Expected goals generated per 82",
+  NOIV: "xG% vs teammates on ice — team impact",
+  "TOI+": "Ice time & deployment",
+  DPS:  "Defensive Point Shares",
+  DEF:  "Defensive value component",
+  SUPP: "xGA suppression vs teammates",
+  Usage: "Deployment difficulty — correlates with opponent quality",
+  OZ:   "Offensive zone start % vs league average",
+  GSAX: "Goals Saved Above Expected",
+  "SV%": "Even-strength save percentage",
+  HDSV: "High-danger save % — stopping the chances that matter",
+  WRKLD: "Workload — games started",
+  BUSY: "Shot volume faced per game",
+  GAA:  "Goals-against average (higher index = lower GAA)",
+};
+
+// The rails own the top and bottom bands; clamp the wave so its peaks never
+// climb into the label zone regardless of the height the caller passes.
+const RAIL_ZONE = 46;
+
 export default function StrandDisplay({
   offTraits, defTraits, ops, dps, strandType,
-  compareOff, compareDef, compareLabel,
-  W = 320, H = 210, amplitude = 42,
+  compareOff, compareDef, compareLabel, footer,
+  W = 340, H = 210, amplitude = 44,
 }: Props) {
-  const cy      = H / 2;
-  const freq    = (2 * Math.PI) / W;
+  const cy       = H / 2;
+  const freq     = (2 * Math.PI) / W;
+  const amp      = Math.min(amplitude, cy - RAIL_ZONE - 4);
   const offColor = "var(--ledger-navy)";
   const defColor = "var(--ledger-red)";
 
-  const displayNum = (t: StrandTrait) =>
-    t.unavailable ? "—"
-    : t.ps        ? t.ps
-    : t.display !== undefined ? t.display
-    : Math.round(t.val * 100);
+  const nodeIndex = (t: StrandTrait) =>
+    t.unavailable ? "—" : String(t.idx ?? Math.round(t.val * 100));
+  const rawLabel = (t: StrandTrait) =>
+    t.unavailable ? null
+    : t.raw ?? t.ps ?? (t.display !== undefined ? String(t.display) : null);
+
+  const guideLabels = Array.from(new Set([...offTraits, ...defTraits].map(t => t.label)))
+    .filter(label => TRAIT_GUIDE[label]);
 
   return (
     <div>
       {/* ── SVG Helix ─────────────────────────────────────────── */}
       <div style={{ background: "var(--ledger-cream)", border: "1px solid #c8b890", borderRadius: "2px" }}>
         <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
-          {/* Grid lines */}
-          {[0.25, 0.5, 0.75].map(t => (
-            <line key={t} x1={t*W} y1={12} x2={t*W} y2={H-12}
-              stroke="var(--ledger-rule-mid)" strokeWidth="0.5" strokeDasharray="3,3"/>
-          ))}
+          {/* Per-trait column dividers + centre line */}
+          {offTraits.length > 0 && Array.from({ length: offTraits.length - 1 }, (_, i) => {
+            const x = ((i + 1) / offTraits.length) * W;
+            return <line key={`div-${i}`} x1={x} y1={RAIL_ZONE} x2={x} y2={H - RAIL_ZONE}
+              stroke="var(--ledger-rule-mid)" strokeWidth="0.5" strokeDasharray="2,4" opacity="0.7"/>;
+          })}
           <line x1={0} y1={cy} x2={W} y2={cy} stroke="var(--ledger-rule-mid)" strokeWidth="0.5"/>
 
           {/* Strand type badge */}
@@ -127,23 +160,23 @@ export default function StrandDisplay({
           )}
 
           {/* League average reference helix — dashed, behind player strands */}
-          <path d={buildAvgPath(W, H, amplitude, true, offTraits.length)}  fill="none"
+          <path d={buildAvgPath(W, H, amp, true, offTraits.length)}  fill="none"
             stroke="var(--ledger-ink-faint)" strokeWidth="1" strokeDasharray="4,4" opacity="0.35"/>
-          <path d={buildAvgPath(W, H, amplitude, false, defTraits.length)} fill="none"
+          <path d={buildAvgPath(W, H, amp, false, defTraits.length)} fill="none"
             stroke="var(--ledger-ink-faint)" strokeWidth="1" strokeDasharray="4,4" opacity="0.35"/>
-          <text x={W-4} y={cy - amplitude * 0.65 + 3} textAnchor="end"
+          <text x={W-4} y={cy - amp * 0.65 + 3} textAnchor="end"
             fontSize="5.5" fill="var(--ledger-ink-faint)" fontFamily="Courier Prime, monospace"
             fontWeight="bold" opacity="0.55">AVG</text>
 
           {/* Compare strands (dashed) */}
           {compareOff && compareDef && compareOff.length > 0 && compareDef.length > 0 && (<>
-            <path d={buildStrandPath(compareOff, W, H, amplitude, true)}  fill="none"
+            <path d={buildStrandPath(compareOff, W, H, amp, true)}  fill="none"
               stroke={offColor} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.5" strokeLinecap="round"/>
-            <path d={buildStrandPath(compareDef, W, H, amplitude, false)} fill="none"
+            <path d={buildStrandPath(compareDef, W, H, amp, false)} fill="none"
               stroke={defColor} strokeWidth="1.5" strokeDasharray="5,3" opacity="0.5" strokeLinecap="round"/>
           </>)}
 
-          {/* 3D helix — depth-sorted segments, cos(θ) drives opacity + width */}
+          {/* 3D helix — depth-sorted segments, cos(θ) drives front/back */}
           {offTraits.length > 0 && defTraits.length > 0 && (() => {
             const n = offTraits.length;
             const smN = sineM(n);
@@ -162,7 +195,7 @@ export default function StrandDisplay({
                 const x = (i / 80) * W;
                 if (x < xS - OL || x > xE + OL) return null;
                 const t = x / W;
-                const y = strandYAtSmooth(traits, t, W, H, amplitude, isOff);
+                const y = strandYAtSmooth(traits, t, W, H, amp, isOff);
                 return `${x.toFixed(1)} ${y.toFixed(1)}`;
               }).filter((s): s is string => s !== null)
                 .map((s, i) => `${i === 0 ? "M" : "L"} ${s}`).join(" ");
@@ -190,49 +223,42 @@ export default function StrandDisplay({
             </>);
           })()}
 
-          {/* Offensive labels — positioned at sine peaks/troughs */}
+          {/* Offensive labels — fixed TOP rail */}
           {offTraits.map((t, i) => {
-            const x       = ((i + 0.5) / offTraits.length) * W;
-            const nodeAmp = amplitude * (0.35 + t.val * 0.65);
-            const y       = cy - nodeAmp * Math.sin(freq * x * sineM(offTraits.length));
-            const isAbove = y <= cy;
-            const labelY  = isAbove
-              ? Math.max(8,     y - 18)
-              : Math.min(H - 22, y + 20);
-            const valY    = labelY + 10;
-            return <g key={t.label}>
-              <text x={x} y={labelY}  textAnchor="middle" fontSize="7.5" fontWeight="bold"
-                fill={offColor} fontFamily="Courier Prime, monospace">{t.label}</text>
-              <text x={x} y={valY}    textAnchor="middle" fontSize="6.5"
-                fill={offColor} fontFamily="Courier Prime, monospace" opacity="0.9">{displayNum(t)}</text>
+            const x   = ((i + 0.5) / offTraits.length) * W;
+            const raw = rawLabel(t);
+            const color = t.unavailable ? "var(--ledger-rule-mid)" : offColor;
+            return <g key={`off-${t.label}`}>
+              <text x={x} y={26} textAnchor="middle" fontSize="8" fontWeight="bold"
+                fill={color} fontFamily="Courier Prime, monospace">{t.label}</text>
+              <text x={x} y={36.5} textAnchor="middle" fontSize="10.5" fontWeight="bold"
+                fill={color} fontFamily="Courier Prime, monospace">{nodeIndex(t)}</text>
+              {raw && <text x={x} y={44} textAnchor="middle" fontSize="6"
+                fill="var(--ledger-ink-faint)" fontFamily="Courier Prime, monospace">{raw}</text>}
             </g>;
           })}
 
-          {/* Defensive labels — positioned at sine peaks/troughs */}
+          {/* Defensive labels — fixed BOTTOM rail */}
           {defTraits.map((t, i) => {
-            const x       = ((i + 0.5) / defTraits.length) * W;
-            const nodeAmp = amplitude * (0.35 + t.val * 0.65);
-            const y       = cy + nodeAmp * Math.sin(freq * x * sineM(defTraits.length));
-            const color   = t.unavailable ? "var(--ledger-rule-mid)" : defColor;
-            const isAbove = y <= cy;
-            const labelY  = isAbove
-              ? Math.max(8,     y - 18)
-              : Math.min(H - 22, y + 20);
-            const valY    = labelY + 10;
-            return <g key={t.label}>
-              <text x={x} y={labelY} textAnchor="middle" fontSize="7.5" fontWeight="bold"
+            const x   = ((i + 0.5) / defTraits.length) * W;
+            const raw = rawLabel(t);
+            const color = t.unavailable ? "var(--ledger-rule-mid)" : defColor;
+            return <g key={`def-${t.label}`}>
+              {raw && <text x={x} y={H - 38} textAnchor="middle" fontSize="6"
+                fill="var(--ledger-ink-faint)" fontFamily="Courier Prime, monospace">{raw}</text>}
+              <text x={x} y={H - 25.5} textAnchor="middle" fontSize="10.5" fontWeight="bold"
+                fill={color} fontFamily="Courier Prime, monospace">{nodeIndex(t)}</text>
+              <text x={x} y={H - 14} textAnchor="middle" fontSize="8" fontWeight="bold"
                 fill={color} fontFamily="Courier Prime, monospace">{t.label}</text>
-              <text x={x} y={valY}   textAnchor="middle" fontSize="6.5"
-                fill={color} fontFamily="Courier Prime, monospace" opacity="0.9">{displayNum(t)}</text>
             </g>;
           })}
 
           {/* Compare legend */}
           {compareLabel && (
             <g>
-              <line x1={W-95} y1={H-8} x2={W-81} y2={H-8}
+              <line x1={W-95} y1={H-4} x2={W-81} y2={H-4}
                 stroke={offColor} strokeWidth="1.5" strokeDasharray="4,2"/>
-              <text x={W-78} y={H-4} fontSize="6.5" fill={offColor} fontFamily="Courier Prime, monospace">
+              <text x={W-78} y={H-1} fontSize="6.5" fill={offColor} fontFamily="Courier Prime, monospace">
                 {compareLabel}
               </text>
             </g>
@@ -240,25 +266,19 @@ export default function StrandDisplay({
         </svg>
       </div>
 
-      {/* ── Legend ───────────────────────────────────────────── */}
+      {/* ── EDGE band / footer ───────────────────────────────── */}
+      {footer && <div style={{ marginTop: "6px" }}>{footer}</div>}
+
+      {/* ── Trait guide ──────────────────────────────────────── */}
       <details className="text-2xs mt-2" style={{ color: "var(--ledger-ink-faint)", lineHeight: 1.6 }}>
         <summary style={{ cursor: "pointer", fontWeight: 900, color: "var(--ledger-brown)", letterSpacing: "0.1em" }}>
-          ? STRAND trait guide
+          ? STRAND trait guide · index = 0–100 vs NHL, raw value beneath
         </summary>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px", marginTop: "4px" }}>
-          {[
-            ["OPS",  "Offensive Point Shares (or Pts/82 when unavailable)"],
-            ["xG",   "Expected goals generated per 82"],
-            ["NOIV", "xG% vs teammates on ice — team impact"],
-            ["TOI+", "Ice time & deployment"],
-            ["DPS",  "Defensive Point Shares"],
-            ["SUPP", "xGA suppression vs teammates"],
-            ["Usage","Ice time deployment — correlates with opponent quality"],
-            ["OZ",   "Offensive zone start % vs league average"],
-          ].map(([abbr, desc]) => (
-            <div key={abbr} style={{ display: "flex", gap: "4px" }}>
-              <span style={{ fontWeight: 900, width: "28px", flexShrink: 0, color: "var(--ledger-ink-body)" }}>{abbr}</span>
-              <span style={{ color: "var(--ledger-rule)" }}>{desc}</span>
+          {guideLabels.map(label => (
+            <div key={label} style={{ display: "flex", gap: "4px" }}>
+              <span style={{ fontWeight: 900, width: "34px", flexShrink: 0, color: "var(--ledger-ink-body)" }}>{label}</span>
+              <span style={{ color: "var(--ledger-rule)" }}>{TRAIT_GUIDE[label]}</span>
             </div>
           ))}
         </div>

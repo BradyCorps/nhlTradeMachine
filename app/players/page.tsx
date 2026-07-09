@@ -1,5 +1,7 @@
 "use client";
 import StrandDisplay from "@/app/components/StrandDisplay";
+import EdgeStrip from "@/app/components/EdgeStrip";
+import { buildGoalieStrandTraits } from "@/app/components/StrandView";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
 import type { DevelopmentProfile } from "@/app/lib/development-profile";
@@ -28,6 +30,11 @@ interface Player {
   ptsPace: number;
   xGPace: number;
   hdFinishingDelta?: number | null;
+  edgeOzPct?: number | null;
+  edgeOzPercentile?: number | null;
+  edgeSpeedMaxMph?: number | null;
+  edgeBurstsOver20?: number | null;
+  baselineHdsvPct?: number | null;
   avgTOI: number;
   qocIndex?: number | null;
   rosterTier?: string;
@@ -570,35 +577,15 @@ function FullStrand({ player }: { player: Player }) {
   const safe = (n: number) => isNaN(n) || !isFinite(n) ? 0 : n;
 
   if (player.position === "G") {
-    const gsax = player.gsax ?? null;
-    const svPct = player.savePct ?? null;
-    const gs = player.gamesStarted ?? player.games ?? 0;
+    const goalie = buildGoalieStrandTraits(player);
     return (
       <StrandDisplay
-        offTraits={[
-          { label: "GSAX",
-            val: gsax !== null ? norm(safe(gsax), -15, 25) : 0.5,
-            title: gsax !== null ? `GSAX: ${gsax.toFixed(1)} — Goals Saved Above Expected` : "GSAX unavailable",
-            display: gsax !== null ? Math.round(gsax * 10) / 10 : undefined,
-            unavailable: gsax == null },
-          { label: "SV%",
-            val: svPct !== null ? norm(safe(svPct), 0.890, 0.935) : 0.5,
-            title: svPct !== null ? `Save %: ${(svPct * 100).toFixed(1)}%` : "Save % unavailable",
-            display: svPct !== null ? Math.round(svPct * 1000) / 10 : undefined,
-            unavailable: svPct == null },
-        ]}
-        defTraits={[
-          { label: "HDSV",
-            val: 0.5, unavailable: true,
-            title: "High-Danger SV% — unavailable on this view" },
-          { label: "WRKLD",
-            val: norm(safe(gs), 10, 65),
-            title: `Games started: ${gs}`,
-            display: gs },
-        ]}
+        offTraits={goalie.off}
+        defTraits={goalie.def}
         ops={null} dps={null}
         strandType="GOALTENDER"
-        W={280} H={135} amplitude={34}
+        footer={<EdgeStrip asset={player} heading={false} />}
+        W={300} H={200} amplitude={42}
       />
     );
   }
@@ -616,27 +603,32 @@ function FullStrand({ player }: { player: Player }) {
   const offTraits = [
     { label: ops !== null ? "OPS" : "SCR",
       val: opsNorm ?? norm(safe(player.ptsPace), 0, isD ? 80 : 100),
-      ps: ops?.toFixed(1),
+      raw: ops !== null ? `${ops.toFixed(1)} OPS` : `${player.ptsPace.toFixed(0)} P/82`,
       title: ops !== null ? `OPS ${ops.toFixed(1)} — Offensive Point Shares` : `Pts/82: ${player.ptsPace.toFixed(1)}` },
     { label: "xG",   val: player.xGPace != null ? norm(safe(player.xGPace), 0, isD ? 25 : 50) : 0.5,
+      raw: player.xGPace != null ? `${player.xGPace.toFixed(0)}/82` : undefined,
       title: player.xGPace != null ? `xG/82: ${player.xGPace.toFixed(1)}` : "xG data unavailable",
       unavailable: player.xGPace == null },
     { label: "NOIV", val: norm(safe(player.xgRelTM ?? 0), -12, 12),
+      raw: `${(player.xgRelTM ?? 0) >= 0 ? "+" : ""}${(player.xgRelTM ?? 0).toFixed(1)}`,
       title: `xG% vs teammates: ${player.xgRelTM != null ? (player.xgRelTM as number).toFixed(1) : "—"}` },
     { label: "TOI+", val: norm(safe(player.avgTOI), 10, 27),
+      raw: `${player.avgTOI.toFixed(1)}m`,
       title: `Ice time: ${player.avgTOI.toFixed(1)} min/gm` },
   ];
   const defTraits = [
     { label: dps !== null ? "DPS" : "DEF",
       val: dpsNorm ?? norm(safe(player.defRate ?? 0), -0.3, 0.3),
-      ps: dps?.toFixed(1),
+      raw: dps !== null ? `${dps.toFixed(1)} DPS` : undefined,
       unavailable: dps === null && player.defRate == null,
       title: dps !== null ? `DPS ${dps.toFixed(1)} — Defensive Point Shares` : "Defensive NAV component" },
     { label: "SUPP", val: norm(-(safe(player.xgaRelTM ?? 0)), -1.5, 1.5),
+      raw: `${(player.xgaRelTM ?? 0).toFixed(2)}`,
       title: `xGA suppression vs teammates: ${player.xgaRelTM != null ? (player.xgaRelTM as number).toFixed(2) : "—"}` },
     { label: "Usage",  val: (player.qocIndex ?? 35) / 100,
+      raw: `${player.qocIndex ?? "—"} QoC`,
       title: `QoC ${player.qocIndex ?? "—"}/100 — deployment difficulty (ice-time rank, PK share, d-zone starts)` },
-    { label: "OZ",   val: ozScore, display: ozRaw, unavailable: !dzAvail,
+    { label: "OZ",   val: ozScore, raw: dzAvail ? `${ozRaw}% OZ` : undefined, unavailable: !dzAvail,
       title: dzAvail ? `OZ%: ${ozRaw}% offensive zone starts` : "Zone deployment unavailable" },
   ];
 
@@ -646,9 +638,10 @@ function FullStrand({ player }: { player: Player }) {
       defTraits={defTraits}
       ops={ops}
       dps={dps}
-      W={280}
-      H={135}
-      amplitude={34}
+      footer={<EdgeStrip asset={player} heading={false} />}
+      W={300}
+      H={200}
+      amplitude={42}
     />
   );
 }
