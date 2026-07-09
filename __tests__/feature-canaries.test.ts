@@ -761,6 +761,27 @@ describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 go
     expect(quick).toContain('? "GOALTENDER"');
     expect(docket).toContain('? "GOALTENDER"');
   });
+
+  it("strand numbers are self-explaining: persistent key, real units, clear labels", () => {
+    // Always-visible key answering "what is this number?"
+    expect(display).toContain("0–100 rating vs the NHL field");
+    expect(display).toContain("= the actual stat");
+    // A width cap so a full-bleed page doesn't blow the SVG up
+    expect(display).toContain("maxWidth");
+    expect(players).toContain("maxWidth={460}");
+    // Ice time reads as minutes, not metres; QoC replaces the vague "Usage";
+    // suppression is shown positive (higher = stingier)
+    expect(view).toContain('`${safe(a.avgTOI).toFixed(1)} min`');
+    expect(view).toContain('label: "QoC"');
+    expect(view).not.toContain('label: "Usage"');
+    expect(view).not.toContain('label: "TOI+"');
+    expect(view).toContain("(higher = stingier)");
+  });
+
+  it("EDGE OZ-time percentile is normalized from the feed's 0–1 fraction", () => {
+    expect(edge).toContain("a.edgeOzPercentile <= 1 ? a.edgeOzPercentile * 100");
+    expect(edge).toContain("%ile");
+  });
 });
 
 describe("Canary — Player Card AA redesign + FMV surplus read", () => {
@@ -1681,7 +1702,7 @@ describe("Canary — R0/R1/R2 audit refinements", () => {
     expect(players).not.toContain(">DPS</span>");
     expect(players).toContain(">PS</span>");
     expect(strand).not.toContain("Trait bars with league average baseline");
-    expect(strand).toContain("? STRAND trait guide");
+    expect(strand).toContain("What does each trait mean?");
     expect(strand).toContain("<details");
   });
 });

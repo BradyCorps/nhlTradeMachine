@@ -585,7 +585,7 @@ function FullStrand({ player }: { player: Player }) {
         ops={null} dps={null}
         strandType="GOALTENDER"
         footer={<EdgeStrip asset={player} heading={false} />}
-        W={300} H={200} amplitude={42}
+        W={300} H={200} amplitude={42} maxWidth={460}
       />
     );
   }
@@ -606,14 +606,14 @@ function FullStrand({ player }: { player: Player }) {
       raw: ops !== null ? `${ops.toFixed(1)} OPS` : `${player.ptsPace.toFixed(0)} P/82`,
       title: ops !== null ? `OPS ${ops.toFixed(1)} — Offensive Point Shares` : `Pts/82: ${player.ptsPace.toFixed(1)}` },
     { label: "xG",   val: player.xGPace != null ? norm(safe(player.xGPace), 0, isD ? 25 : 50) : 0.5,
-      raw: player.xGPace != null ? `${player.xGPace.toFixed(0)}/82` : undefined,
+      raw: player.xGPace != null ? `${player.xGPace.toFixed(0)} xG/82` : undefined,
       title: player.xGPace != null ? `xG/82: ${player.xGPace.toFixed(1)}` : "xG data unavailable",
       unavailable: player.xGPace == null },
     { label: "NOIV", val: norm(safe(player.xgRelTM ?? 0), -12, 12),
-      raw: `${(player.xgRelTM ?? 0) >= 0 ? "+" : ""}${(player.xgRelTM ?? 0).toFixed(1)}`,
+      raw: `${(player.xgRelTM ?? 0) >= 0 ? "+" : ""}${(player.xgRelTM ?? 0).toFixed(1)}%`,
       title: `xG% vs teammates: ${player.xgRelTM != null ? (player.xgRelTM as number).toFixed(1) : "—"}` },
-    { label: "TOI+", val: norm(safe(player.avgTOI), 10, 27),
-      raw: `${player.avgTOI.toFixed(1)}m`,
+    { label: "TOI", val: norm(safe(player.avgTOI), 10, 27),
+      raw: `${player.avgTOI.toFixed(1)} min`,
       title: `Ice time: ${player.avgTOI.toFixed(1)} min/gm` },
   ];
   const defTraits = [
@@ -623,11 +623,11 @@ function FullStrand({ player }: { player: Player }) {
       unavailable: dps === null && player.defRate == null,
       title: dps !== null ? `DPS ${dps.toFixed(1)} — Defensive Point Shares` : "Defensive NAV component" },
     { label: "SUPP", val: norm(-(safe(player.xgaRelTM ?? 0)), -1.5, 1.5),
-      raw: `${(player.xgaRelTM ?? 0).toFixed(2)}`,
-      title: `xGA suppression vs teammates: ${player.xgaRelTM != null ? (player.xgaRelTM as number).toFixed(2) : "—"}` },
-    { label: "Usage",  val: (player.qocIndex ?? 35) / 100,
-      raw: `${player.qocIndex ?? "—"} QoC`,
-      title: `QoC ${player.qocIndex ?? "—"}/100 — deployment difficulty (ice-time rank, PK share, d-zone starts)` },
+      raw: `${(-(player.xgaRelTM ?? 0)) >= 0 ? "+" : ""}${(-(player.xgaRelTM ?? 0)).toFixed(2)} xGA`,
+      title: `Chance suppression vs teammates: ${player.xgaRelTM != null ? (-(player.xgaRelTM as number)).toFixed(2) : "—"} (higher = stingier)` },
+    { label: "QoC",  val: (player.qocIndex ?? 35) / 100,
+      raw: undefined,
+      title: `Quality of competition ${player.qocIndex ?? "—"}/100 — how tough his matchups are` },
     { label: "OZ",   val: ozScore, raw: dzAvail ? `${ozRaw}% OZ` : undefined, unavailable: !dzAvail,
       title: dzAvail ? `OZ%: ${ozRaw}% offensive zone starts` : "Zone deployment unavailable" },
   ];
@@ -642,6 +642,7 @@ function FullStrand({ player }: { player: Player }) {
       W={300}
       H={200}
       amplitude={42}
+      maxWidth={460}
     />
   );
 }

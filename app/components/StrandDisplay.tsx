@@ -36,6 +36,7 @@ interface Props {
   W?:      number;
   H?:      number;
   amplitude?: number;
+  maxWidth?: number; // cap the rendered width so a full-bleed container doesn't blow the SVG up
 }
 
 // sineM = n/2: each trait occupies exactly one half-cycle.
@@ -91,22 +92,22 @@ function buildStrandPath(traits: StrandTrait[], W: number, H: number, amplitude:
 // Short plain-language meaning per trait label — filtered to the labels
 // actually on screen, so a goalie strand shows the goalie guide.
 const TRAIT_GUIDE: Record<string, string> = {
-  OPS:  "Offensive Point Shares (or Pts/82 when unavailable)",
-  SCR:  "Scoring rate — Pts/82",
-  xG:   "Expected goals generated per 82",
-  NOIV: "xG% vs teammates on ice — team impact",
-  "TOI+": "Ice time & deployment",
-  DPS:  "Defensive Point Shares",
+  OPS:  "Offensive Point Shares — offense measured in standings points",
+  SCR:  "Scoring rate — points per 82 games",
+  xG:   "Expected goals created per 82 games (shot quality × volume)",
+  NOIV: "Net on-ice value — the team's shot-quality edge with him on the ice",
+  TOI:  "Ice time per game — minutes played, a proxy for coaching trust",
+  DPS:  "Defensive Point Shares — defense measured in standings points",
   DEF:  "Defensive value component",
-  SUPP: "xGA suppression vs teammates",
-  Usage: "Deployment difficulty — correlates with opponent quality",
-  OZ:   "Offensive zone start % vs league average",
-  GSAX: "Goals Saved Above Expected",
+  SUPP: "Suppression — fewer scoring chances allowed than his teammates",
+  QoC:  "Quality of competition — how tough his matchups are (0–100)",
+  OZ:   "Share of his shifts that start in the offensive zone",
+  GSAX: "Goals Saved Above Expected vs an average goalie",
   "SV%": "Even-strength save percentage",
-  HDSV: "High-danger save % — stopping the chances that matter",
+  HDSV: "High-danger save % — stopping the chances that matter most",
   WRKLD: "Workload — games started",
-  BUSY: "Shot volume faced per game",
-  GAA:  "Goals-against average (higher index = lower GAA)",
+  BUSY: "Shot volume — shots faced per game",
+  GAA:  "Goals-against average (higher rating = lower GAA)",
 };
 
 // The rails own the top and bottom bands; clamp the wave so its peaks never
@@ -116,7 +117,7 @@ const RAIL_ZONE = 46;
 export default function StrandDisplay({
   offTraits, defTraits, ops, dps, strandType,
   compareOff, compareDef, compareLabel, footer,
-  W = 340, H = 210, amplitude = 44,
+  W = 340, H = 210, amplitude = 44, maxWidth,
 }: Props) {
   const cy       = H / 2;
   const freq     = (2 * Math.PI) / W;
@@ -134,7 +135,7 @@ export default function StrandDisplay({
     .filter(label => TRAIT_GUIDE[label]);
 
   return (
-    <div>
+    <div style={maxWidth ? { maxWidth, margin: "0 auto" } : undefined}>
       {/* ── SVG Helix ─────────────────────────────────────────── */}
       <div style={{ background: "var(--ledger-cream)", border: "1px solid #c8b890", borderRadius: "2px" }}>
         <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
@@ -229,9 +230,9 @@ export default function StrandDisplay({
             const raw = rawLabel(t);
             const color = t.unavailable ? "var(--ledger-rule-mid)" : offColor;
             return <g key={`off-${t.label}`}>
-              <text x={x} y={26} textAnchor="middle" fontSize="8" fontWeight="bold"
+              <text x={x} y={26} textAnchor="middle" fontSize="7.5" fontWeight="bold"
                 fill={color} fontFamily="Courier Prime, monospace">{t.label}</text>
-              <text x={x} y={36.5} textAnchor="middle" fontSize="10.5" fontWeight="bold"
+              <text x={x} y={36.5} textAnchor="middle" fontSize="9.5" fontWeight="bold"
                 fill={color} fontFamily="Courier Prime, monospace">{nodeIndex(t)}</text>
               {raw && <text x={x} y={44} textAnchor="middle" fontSize="6"
                 fill="var(--ledger-ink-faint)" fontFamily="Courier Prime, monospace">{raw}</text>}
@@ -246,9 +247,9 @@ export default function StrandDisplay({
             return <g key={`def-${t.label}`}>
               {raw && <text x={x} y={H - 38} textAnchor="middle" fontSize="6"
                 fill="var(--ledger-ink-faint)" fontFamily="Courier Prime, monospace">{raw}</text>}
-              <text x={x} y={H - 25.5} textAnchor="middle" fontSize="10.5" fontWeight="bold"
+              <text x={x} y={H - 25.5} textAnchor="middle" fontSize="9.5" fontWeight="bold"
                 fill={color} fontFamily="Courier Prime, monospace">{nodeIndex(t)}</text>
-              <text x={x} y={H - 14} textAnchor="middle" fontSize="8" fontWeight="bold"
+              <text x={x} y={H - 14} textAnchor="middle" fontSize="7.5" fontWeight="bold"
                 fill={color} fontFamily="Courier Prime, monospace">{t.label}</text>
             </g>;
           })}
@@ -269,15 +270,25 @@ export default function StrandDisplay({
       {/* ── EDGE band / footer ───────────────────────────────── */}
       {footer && <div style={{ marginTop: "6px" }}>{footer}</div>}
 
-      {/* ── Trait guide ──────────────────────────────────────── */}
-      <details className="text-2xs mt-2" style={{ color: "var(--ledger-ink-faint)", lineHeight: 1.6 }}>
+      {/* Always-visible key: answers "what is this number?" at a glance */}
+      <div className="mt-2" style={{
+        fontSize: "10px", lineHeight: 1.45, color: "var(--ledger-ink-body)",
+        fontFamily: "Courier Prime, monospace",
+      }}>
+        <span style={{ color: "var(--ledger-navy)", fontWeight: 900 }}>Big number</span> = 0–100 rating vs the NHL field (100 = elite).{" "}
+        <span style={{ color: "var(--ledger-ink-faint)", fontWeight: 900 }}>Small number</span> = the actual stat.{" "}
+        <span style={{ color: "var(--ledger-navy)", fontWeight: 700 }}>Blue = offense</span>, <span style={{ color: "var(--ledger-red)", fontWeight: 700 }}>red = defense</span>.
+      </div>
+
+      {/* ── Trait definitions (expandable) ───────────────────── */}
+      <details className="text-2xs mt-1" style={{ color: "var(--ledger-ink-faint)", lineHeight: 1.6 }}>
         <summary style={{ cursor: "pointer", fontWeight: 900, color: "var(--ledger-brown)", letterSpacing: "0.1em" }}>
-          ? STRAND trait guide · index = 0–100 vs NHL, raw value beneath
+          What does each trait mean?
         </summary>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px", marginTop: "4px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "2px 12px", marginTop: "4px" }}>
           {guideLabels.map(label => (
-            <div key={label} style={{ display: "flex", gap: "4px" }}>
-              <span style={{ fontWeight: 900, width: "34px", flexShrink: 0, color: "var(--ledger-ink-body)" }}>{label}</span>
+            <div key={label} style={{ display: "flex", gap: "6px" }}>
+              <span style={{ fontWeight: 900, width: "42px", flexShrink: 0, color: "var(--ledger-ink-body)" }}>{label}</span>
               <span style={{ color: "var(--ledger-rule)" }}>{TRAIT_GUIDE[label]}</span>
             </div>
           ))}

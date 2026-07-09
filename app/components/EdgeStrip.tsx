@@ -49,13 +49,19 @@ function skaterTiles(a: EdgeSignalSource): Tile[] {
       title: "NHL EDGE high-danger finishing vs league average. Cold shooters (green) are bounce-back candidates; hot shooters (red) are regression risks.",
     });
   }
-  const oz = a.edgeOzPercentile ?? (a.edgeOzPct != null ? Math.round(a.edgeOzPct * 100) : null);
+  // The NHL feed reports offensiveZonePercentile as a 0–1 fraction; earlier code
+  // treated it as 0–100 (printing "0.89%ile" and mis-coloring). Normalize both
+  // scales to a whole-number percentile.
+  const ozPctl = a.edgeOzPercentile != null
+    ? Math.round(a.edgeOzPercentile <= 1 ? a.edgeOzPercentile * 100 : a.edgeOzPercentile)
+    : null;
+  const oz = ozPctl ?? (a.edgeOzPct != null ? Math.round(a.edgeOzPct * 100) : null);
   if (a.edgeOzPct != null) {
     tiles.push({
       label: "OZ Time",
-      value: `${(a.edgeOzPct * 100).toFixed(0)}%${a.edgeOzPercentile != null ? ` · ${a.edgeOzPercentile}%ile` : ""}`,
+      value: `${(a.edgeOzPct * 100).toFixed(0)}%${ozPctl != null ? ` · ${ozPctl}%ile` : ""}`,
       color: (oz ?? 50) >= 55 ? GOOD : (oz ?? 50) <= 40 ? WARN : NEUTRAL,
-      title: "NHL EDGE offensive-zone time share — how much of a player's ice time is spent attacking.",
+      title: "NHL EDGE offensive-zone time share — how much of a player's ice time is spent attacking. Percentile is vs the league.",
     });
   }
   if (a.edgeSpeedMaxMph != null) {
