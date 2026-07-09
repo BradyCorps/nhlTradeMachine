@@ -981,3 +981,46 @@ describe("FMV — breakout credibility on the baseline blend", () => {
     expect(earned).toBeLessThanOrEqual(0.58);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NAV CONSISTENCY FIXES — decline gate, goalie baseline, goalie rounding
+// ─────────────────────────────────────────────────────────────────────────────
+describe("Historical floor — decline gate", () => {
+  const hub = {
+    age: 33, games: 50, position: "W" as const, ptsPace: 41,
+  };
+  it("does not resurrect a star producing far below his peak (Huberdeau)", () => {
+    // Huberdeau: peak ~115, now 41. His talent value (~27) should not be
+    // floored back to prime — the gate collapses the floor near current value.
+    const floored = getHistoricalFloor("Jonathan Huberdeau", 27, hub);
+    expect(floored).toBeLessThan(45); // was ~80 before the gate
+  });
+  it("still floors a star having a true dip near his peak", () => {
+    // Same pedigree, but producing at ~85% of peak = a dip, not a decline.
+    const dip = getHistoricalFloor("Jonathan Huberdeau", 40, { age: 29, games: 78, position: "W" as const, ptsPace: 98 });
+    expect(dip).toBeGreaterThan(60);
+  });
+});
+
+describe("G-NAV — elite goalie down year regresses to career, and total is an integer", () => {
+  const hellebuyck = (gsax: number, withBaseline: boolean) => calcGoalieNAV({
+    id: "hb", name: "Connor Hellebuyck", position: "G", age: 33, capHit: 8.5, yearsRemaining: 5,
+    gsax, savePct: 0.895, gamesStarted: 57, teamXga60: 2.72, teamHdca60: 9.5,
+    ...(withBaseline ? { baselineGsax: 21.15, baselineHdsvPct: 0.823 } : {}),
+  } as any);
+
+  it("keeps a proven elite's talent up on a down year when the career baseline is present", () => {
+    const withBase = hellebuyck(5.5, true);
+    const withoutBase = hellebuyck(5.5, false);
+    // The career baseline lifts the on-ice (def) read well above the
+    // baseline-less version that only sees the down season.
+    expect(withBase.def).toBeGreaterThan(withoutBase.def + 15);
+  });
+
+  it("returns integer components (no raw float leaking into the card header)", () => {
+    const r = hellebuyck(5.5, true);
+    expect(Number.isInteger(r.total)).toBe(true);
+    expect(Number.isInteger(r.def)).toBe(true);
+    expect(Number.isInteger(r.age)).toBe(true);
+  });
+});

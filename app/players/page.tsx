@@ -43,6 +43,9 @@ interface Player {
   savePct?: number;
   gamesStarted?: number;
   shotsPerGame?: number | null;
+  baselineGsax?: number | null;
+  teamXga60?: number | null;
+  teamHdca60?: number | null;
   ops?: number | null;
   dps?: number | null;
   baselinePtsPace?: number | null;

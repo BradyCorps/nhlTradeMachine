@@ -1051,10 +1051,14 @@ describe("Canary — Batch 5 UI state robustness", () => {
 describe("Canary — evaluate route historical NAV floors", () => {
   const evaluateRoute = read("app/api/evaluate/route.ts");
 
-  it("applies player pedigree floors on the server NAV path", () => {
+  it("applies the pedigree floor to talent, preserving contract drag and booking the lift to upside", () => {
     expect(evaluateRoute).toContain("getHistoricalFloor");
-    expect(evaluateRoute).toContain("const historicalFloor = getHistoricalFloor(asset.name, result.total, asset)");
+    // Floor talent (total − cap), not the bottom line, so a pedigree lift can't
+    // cancel a toxic contract; the cap component stays honest.
+    expect(evaluateRoute).toContain("const talent = result.total - contractDrag");
+    expect(evaluateRoute).toContain("getHistoricalFloor(asset.name, talent, asset)");
     expect(evaluateRoute).toContain("total: liftedTotal");
+    expect(evaluateRoute).toContain("upside: (result.upside ?? 0) + (liftedTotal - result.total)");
   });
 });
 

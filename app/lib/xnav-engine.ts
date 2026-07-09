@@ -298,12 +298,19 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const defCorrection = clamp((teamXga60 - LEAGUE.avgXga60) * 0.40 + hdRateCorr, -0.18, 0.30);
   const gsaxPer60     = (gsaxPerGameCapped + defCorrection) * 60;
   const careerMean    = asset.baselineGsax ?? 0;
-  // Single-season GSAX variance is very high for goalies. Cap confidence at 0.80
-  // for all starters so the career baseline always carries 20% weight — a proven
-  // elite on a down year (Hellebuyck) shouldn't fully lose his track record.
-  // Young goalies (≤26) get a tighter cap (0.75) for even stronger regression.
+  // Single-season GSAX variance is enormous — a goalie's one-year GSAx is a
+  // weak predictor of the next. When a proven career baseline exists, cap
+  // starter confidence at 0.68 (≈32% career weight) so an elite on a down
+  // year (Hellebuyck: 5.5 GSAx over a 21+ career mean) regresses toward his
+  // track record instead of cratering to replacement level. Without a
+  // baseline there's nothing to regress to, so trust the season more (0.85).
+  // Young goalies (≤26) regress hardest — least established.
+  const hasGoalieBaseline = (asset.baselineGsax ?? 0) !== 0;
+  const starterCap = !hasGoalieBaseline
+    ? (asset.age <= 26 ? 0.75 : 0.80)   // no career baseline to lean on → unchanged
+    : (asset.age <= 26 ? 0.62 : 0.68);  // real career baseline → regress a down year harder
   const confidenceAdj = isStarter
-    ? (asset.age <= 26 ? Math.min(confidenceG, 0.75) : Math.min(confidenceG, 0.80))
+    ? Math.min(confidenceG, starterCap)
     : confidenceG;
   const expGSAx       = gsaxPer60 * confidenceAdj + careerMean * (1 - confidenceAdj);
 
@@ -418,10 +425,10 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   ));
 
   return {
-    total:  cappedTotal,
+    total:  Math.round(cappedTotal),
     off:    0,
-    def:    safe(goalieImpact * ageFactor),
-    age:    -agePenalty,
+    def:    Math.round(safe(goalieImpact * ageFactor)),
+    age:    Math.round(-agePenalty),
     cap:    Math.round(capTotalG),
     upside: youngFloor > 0 ? youngFloor * 0.4 : 0,
     fmvAav: currentFmvAavG,

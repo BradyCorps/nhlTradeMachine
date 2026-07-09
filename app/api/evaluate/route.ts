@@ -195,14 +195,23 @@ const getAssetNAV = (asset: Asset, capCeiling: number = SEASON.capCeiling): XNAV
   const result = calcNAV(input);
   if (asset.position === "Pick") return result;
 
-  const historicalFloor = getHistoricalFloor(asset.name, result.total, asset);
-  if (historicalFloor <= result.total) return result;
+  // Historical (pedigree) floor guards a star's DOWN YEAR — but it must floor
+  // TALENT (on-ice + age), not the bottom-line total. Flooring the total let a
+  // pedigree lift cancel a toxic contract and, worse, the lift was dumped into
+  // the cap component, so an overpaid vet (Huberdeau: $10.5M, $2M FMV) read as
+  // cap-POSITIVE. Floor the talent, then re-apply the real contract drag; book
+  // any lift to `upside` so off/def/age/cap stay honest.
+  const contractDrag = result.cap;
+  const talent = result.total - contractDrag;
+  const talentFloor = getHistoricalFloor(asset.name, talent, asset);
+  if (talentFloor <= talent) return result;
 
-  const liftedTotal = Math.round(historicalFloor);
+  const liftedTotal = Math.round(talentFloor + contractDrag);
+  if (liftedTotal <= result.total) return result;
   return {
     ...result,
     total: liftedTotal,
-    cap: result.cap + (liftedTotal - result.total),
+    upside: (result.upside ?? 0) + (liftedTotal - result.total),
   };
 };
 

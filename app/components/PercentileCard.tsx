@@ -33,6 +33,13 @@ interface PlayerData {
   hasLiveStats?: boolean;
   baselinePtsPace?: number | null;
   pkTimeShare?: number | null;
+  // Goalie context — without these, calcNAV values a goalie on defaults
+  // (career baseline = 0) and an elite starter reads as replacement level.
+  shotsPerGame?: number | null;
+  baselineGsax?: number | null;
+  baselineHdsvPct?: number | null;
+  teamXga60?: number | null;
+  teamHdca60?: number | null;
 }
 
 type StatDef = {
@@ -179,6 +186,11 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       hasLiveStats: player.hasLiveStats,
       baselinePtsPace: player.baselinePtsPace ?? undefined,
       pkTimeShare: player.pkTimeShare ?? undefined,
+      // Goalie career + team context so an elite starter isn't valued on defaults.
+      baselineGsax: player.baselineGsax ?? undefined,
+      baselineHdsvPct: player.baselineHdsvPct ?? undefined,
+      teamXga60: player.teamXga60 ?? undefined,
+      teamHdca60: player.teamHdca60 ?? undefined,
     });
 
     return { percentiles: pcts, xnav: nav };

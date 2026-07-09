@@ -208,7 +208,21 @@ export const getHistoricalFloor = (
   const awardCount   = (pedigree.awards ?? []).length;
   const floorPct     = Math.min(0.80, 0.55 + awardCount * 0.04);
   const decay = historicalFloorMultiplier(asset);
-  const decayedBonus = (awardBonus + allStarBonus) * Math.max(0.4, decay);
+
+  // ── Decline gate ────────────────────────────────────────────
+  // The pedigree floor exists to keep a star's DOWN YEAR from tanking his
+  // value — not to resurrect a player in a genuine multi-year decline. A
+  // 33-year-old producing at a third of his peak (Huberdeau: 41 vs a 115
+  // peak) is not "a star having a dip," and floating him back to prime value
+  // — then, worse, letting that lift cancel a toxic contract — is wrong.
+  // Scale the floor by how close current production is to peak: near peak
+  // (a true dip) keeps the full floor; far below it collapses toward the
+  // player's real current value.
+  const curPts = Number.isFinite(asset?.ptsPace) ? (asset?.ptsPace ?? 0) : 0;
+  const declineGate = (pedigree.peakPtsPace && curPts > 0 && asset?.position !== "G")
+    ? Math.max(0.15, Math.min(1, (curPts / pedigree.peakPtsPace - 0.30) / 0.50))
+    : 1;
+  const decayedBonus = (awardBonus + allStarBonus) * Math.max(0.4, decay) * declineGate;
 
   // For shutdown D-men: anchor floor to peak DPS (more reliable than pts pace)
   // Slavin peak DPS 5.7 → floor = 5.7 * 15 * 0.65 = 55.6 + awards/allstar
@@ -226,7 +240,7 @@ export const getHistoricalFloor = (
     const historicalFloorNAV = isEstablishedElite
       ? pedigree.peakPtsPace * 1.65
       : (pedigree.peakPtsPace / 82) * 25 * floorPct;
-    return Math.max(currentNAV, historicalFloorNAV * decay + decayedBonus);
+    return Math.max(currentNAV, historicalFloorNAV * decay * declineGate + decayedBonus);
   }
 
   return currentNAV + decayedBonus;
