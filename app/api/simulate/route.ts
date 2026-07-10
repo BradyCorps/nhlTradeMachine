@@ -518,7 +518,16 @@ function projectSkaterOutcome(
   const burst = burstProfile(p);
   const paceVariance = (isAgingWell ? 0.98 + rand() * 0.14 : 0.91 + rand() * 0.18) + rand() * burst.varianceKick;
   const deploymentMultiplier = deployment?.active ? deployment.multiplier : benched ? 0.85 : 1;
-  const projectedPts = Math.max(0, Math.round((effectivePace / 82) * gamesPlayed * development * paceVariance * deploymentMultiplier * burst.rushLift));
+  const rawProjectedPts = (effectivePace / 82) * gamesPlayed * development * paceVariance * deploymentMultiplier * burst.rushLift;
+  // Believable-season ceiling: the breakout/variance/deployment/burst multipliers
+  // can stack to ~1.7x, which let a 33-yo post 156 off a ~95 pace. A season can be
+  // great but not physics-defying — cap it at a role-appropriate multiple of the
+  // player's demonstrated level (generous for young breakouts, tight for vets who
+  // top out near their peak). Prospects still keep a high ceiling for real leaps.
+  const demonstratedLevel = Math.max(effectivePace, stablePace, p.baselinePtsPace ?? 0, prospectPace);
+  const ceilingMult = p.age <= 23 ? 1.9 : p.age <= 26 ? 1.6 : p.age <= 29 ? 1.42 : p.age <= 32 ? 1.3 : 1.22;
+  const ptsCeiling = (demonstratedLevel / 82) * gamesPlayed * ceilingMult;
+  const projectedPts = Math.max(0, Math.round(Math.min(rawProjectedPts, ptsCeiling)));
   const xgGoalShare = stablePace > 0
     ? clamp((p.xGPace ?? 0) / Math.max(stablePace, 1), 0.22, p.position === "D" ? 0.36 : 0.55)
     : p.position === "D" ? 0.24 : 0.38;

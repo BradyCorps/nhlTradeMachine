@@ -373,15 +373,21 @@ export default function AssetCard({
                 tooltip="Franchise/career floor applied" />
             )}
           </div>
-          {/* Peak pts for established skaters with pedigree */}
-          {pedigree?.peakPtsPace && (
-            <div className="mt-1.5 px-1 py-1 flex justify-between items-center" style={{ borderTop: '1px solid #c8b890' }}>
-              <span className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">Career Peak</span>
-              <span className="text-2xs font-black text-ledger-navy font-mono">
-                {pedigree.peakPtsPace} pts/82
-              </span>
-            </div>
-          )}
+          {/* Career peak — real best NHL season (from history) so a stale
+              curated pedigree value can't understate it (Scheifele: 103, not 88). */}
+          {(() => {
+            const realPeak = asset.developmentProfile?.careerPeakPts82 ?? 0;
+            const peak = Math.max(realPeak, pedigree?.peakPtsPace ?? 0);
+            if (peak <= 0) return null;
+            return (
+              <div className="mt-1.5 px-1 py-1 flex justify-between items-center" style={{ borderTop: '1px solid #c8b890' }}>
+                <span className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">Career Peak</span>
+                <span className="text-2xs font-black text-ledger-navy font-mono">
+                  {peak} pts/82
+                </span>
+              </div>
+            );
+          })()}
         </div>
       )}
 

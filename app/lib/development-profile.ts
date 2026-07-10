@@ -61,8 +61,19 @@ export interface DevelopmentProfile extends FantasyProfile {
   peakYearsLeft?: number;
   confidenceScore?: number;
   scoringTrajectory?: string[];
+  careerPeakPts82?: number; // best real NHL season pace (≥5 GP), from actual history
   tags: string[];
   rationale: string[];
+}
+
+// Best real NHL season the player has posted, in pts/82 — the source of truth
+// for "career peak", so a stale curated pedigree value can't understate it.
+export function careerPeakFromSnapshots(snapshots: PlayerSeasonSnapshot[]): number | undefined {
+  const paces = snapshots
+    .filter(s => s.games >= 5 && s.league === "NHL")
+    .map(s => s.nhlePtsPace ?? s.ptsPerGame * 82)
+    .filter((n): n is number => Number.isFinite(n));
+  return paces.length ? Math.round(Math.max(...paces)) : undefined;
 }
 
 export interface DevelopmentProfileInput {
@@ -436,6 +447,7 @@ export function calcDevelopmentProfile(input: DevelopmentProfileInput): Developm
     ...(peakYearsLeft != null ? { peakYearsLeft } : {}),
     confidenceScore: Math.round(confidence),
     scoringTrajectory: scoringTrajectoryLabels(snapshots),
+    careerPeakPts82: careerPeakFromSnapshots(snapshots),
     tags,
     rationale,
   };
