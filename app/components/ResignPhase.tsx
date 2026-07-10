@@ -175,7 +175,13 @@ export default function ResignPhase({
             </p>
           ) : (
             <div className="flex flex-col gap-1.5 mb-6">
-              {pending.map((fa) => (
+              {pending.map((fa) => {
+                // You can't add salary you don't have room for — re-signing is
+                // gated by cap space just like a market signing. (No cap room →
+                // let him walk, or free space via trades/buyouts first.)
+                const affordable = fa.contract.aav <= capSpace;
+                const projectedCap = capSpace - fa.contract.aav;
+                return (
                 <div key={fa.player.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 px-3 py-2"
                   style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
                   <div className="min-w-0">
@@ -190,11 +196,18 @@ export default function ResignPhase({
                     </div>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                    <Terms c={fa.contract} />
-                    <button onClick={() => onResign(fa)}
+                    <div className="text-right">
+                      <Terms c={fa.contract} />
+                      <div className="text-[9px] font-mono tabular-nums" style={{ color: affordable ? "var(--ledger-green)" : "var(--ledger-red)" }}>
+                        {affordable ? money(projectedCap) : "over cap"}
+                      </div>
+                    </div>
+                    <button onClick={() => affordable && onResign(fa)}
+                      disabled={!affordable}
                       aria-label={`Re-sign ${fa.player.name}`}
+                      title={affordable ? "Re-sign to your roster" : "Not enough cap space — let him walk or free room first"}
                       className="tap-target text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
-                      style={{ background: "var(--ledger-green)", color: "#fff", borderRadius: "2px" }}>
+                      style={{ background: affordable ? "var(--ledger-green)" : "var(--ledger-rule)", color: "#fff", borderRadius: "2px", opacity: affordable ? 1 : 0.5, cursor: affordable ? "pointer" : "not-allowed" }}>
                       Re-Sign
                     </button>
                     <button onClick={() => onWalk(fa)}
@@ -205,7 +218,8 @@ export default function ResignPhase({
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

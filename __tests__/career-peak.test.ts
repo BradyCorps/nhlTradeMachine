@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { careerPeakFromSnapshots } from "../app/lib/development-profile";
 
-const snap = (season: string, ptsPerGame: number, games = 82, league = "NHL" as const, nhlePtsPace?: number) =>
+const snap = (season: string, ptsPerGame: number, games = 82, league: string = "NHL", nhlePtsPace?: number) =>
   ({ season, league, games, goals: 0, assists: 0, points: Math.round(ptsPerGame * games), ptsPerGame, nhlePtsPace } as any);
 
 describe("careerPeakFromSnapshots", () => {

@@ -307,6 +307,15 @@ describe("Canary — Armchair rework Phase 3", () => {
     expect(resign).toContain("Age {ageArrow}");
     expect(resign).toContain("capPct");
   });
+
+  it("Phase 3: re-signing your own free agents is gated by cap space", () => {
+    const resign = read("app/components/ResignPhase.tsx");
+    // The pending re-sign rows now compute affordability and disable the button
+    // (previously you could pile salary well past the ceiling).
+    expect(resign).toContain("const affordable = fa.contract.aav <= capSpace");
+    expect(resign).toContain("onClick={() => affordable && onResign(fa)}");
+    expect(resign).toContain('title={affordable ? "Re-sign to your roster" : "Not enough cap space');
+  });
 });
 
 describe("Canary — draft prospect enrichment", () => {
