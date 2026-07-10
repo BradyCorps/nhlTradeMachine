@@ -8,7 +8,7 @@
 // not precision assertions.
 
 import { describe, it, expect } from "vitest";
-import { calcNAV, calcDeploymentMultiplier, calcGoalieNAV, calcPickNAV, calcProspectNAV, calcSkaterNAV, currentSeasonWeight } from "../app/lib/xnav-engine";
+import { calcNAV, calcDeploymentMultiplier, calcGoalieNAV, calcPickNAV, calcProspectNAV, calcSkaterNAV, currentSeasonWeight, classifyRosterTier } from "../app/lib/xnav-engine";
 import { getHistoricalFloor } from "../app/lib/player-data";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1022,5 +1022,28 @@ describe("G-NAV — elite goalie down year regresses to career, and total is an 
     expect(Number.isInteger(r.total)).toBe(true);
     expect(Number.isInteger(r.def)).toBe(true);
     expect(Number.isInteger(r.age)).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROSTER TIER — defensemen get pairing labels, not forward line labels
+// ─────────────────────────────────────────────────────────────────────────────
+describe("classifyRosterTier — position-aware", () => {
+  it("labels a high-minute scoring D as a top pair, never a '2nd-line center'", () => {
+    // 24 min, 45 normalized pts D (Makar/McAvoy shape)
+    const elite = classifyRosterTier(24.4, 48, 1.1, 70, 20, 1.5, true);
+    expect(["ELITE_1ST_PAIR", "TOP_PAIR"]).toContain(elite);
+    expect(elite).not.toContain("LINE");
+    expect(elite).not.toContain("2C");
+    expect(elite).not.toContain("SIX");
+  });
+  it("labels a mid-minute D as a pairing, not MIDDLE_SIX", () => {
+    const mid = classifyRosterTier(18.5, 22, 1.0, 50, 16, 0.5, true);
+    expect(["SECOND_PAIR", "SHUTDOWN_D", "TOP_PAIR"]).toContain(mid);
+    expect(mid).not.toBe("MIDDLE_SIX");
+  });
+  it("still gives forwards forward tiers", () => {
+    expect(classifyRosterTier(20, 82, 1.1, 60, 18, 0.5, false)).toBe("ELITE_1ST_LINE");
+    expect(classifyRosterTier(13, 20, 1.0, 40, 12, 0.5, false)).toBe("BOTTOM_SIX");
   });
 });

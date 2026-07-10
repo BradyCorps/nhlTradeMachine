@@ -1842,6 +1842,25 @@ describe("Canary — sim without a trade + AI best lines", () => {
     expect(pager).toContain("Goaltending");
   });
 
+  it("Phase 1: valuation breakdown reconciles to X-NAV, prospects show ELC, career-year split", () => {
+    const pager = read("app/armchair-gm/SeasonResultsPager.tsx");
+    const engine = read("app/lib/xnav-engine.ts");
+    const sim = read("app/api/simulate/route.ts");
+    // Breakdown now reconciles: off+def+age+contract+ModelAdj = X-NAV
+    expect(pager).toContain("const modelAdj = nav.total - componentSum");
+    expect(pager).toContain("'Model Adj.'");
+    expect(pager).toContain("= <strong>X-NAV {nav.total}</strong>");
+    // Prospects with no market AAV read ELC, not "$—M"
+    expect(pager).toContain("'ELC / n/a'");
+    // Defensemen get pairing labels, not forward line labels
+    expect(engine).toContain("ELITE_1ST_PAIR");
+    expect(engine).toContain("isD = false");
+    expect(engine).toContain("classifyRosterTier(toi, normalizedPts, evMdep, qocIdx, evToi, shToi, isD)");
+    // A veteran over-pace is a career year, not a breakout
+    expect(sim).toContain('breakoutTag = p.age <= 26 ? "BREAKOUT" : "CAREER_YEAR"');
+    expect(pager).toContain("CAREER_YEAR");
+  });
+
   it("renders League Numbers as real standings by conference and division", () => {
     const pager = read("app/armchair-gm/SeasonResultsPager.tsx");
     const route = read("app/api/simulate/route.ts");

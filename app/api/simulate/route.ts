@@ -68,7 +68,7 @@ interface ProjectedSkaterSeason {
   projectedGoals: number;
   projectedAssists: number;
   gamesPlayed: number;
-  breakoutTag?: "BREAKOUT" | "REGRESSION" | "VETERAN_HOLD";
+  breakoutTag?: "BREAKOUT" | "REGRESSION" | "VETERAN_HOLD" | "CAREER_YEAR";
 }
 
 interface PlayoffSeries {
@@ -478,7 +478,9 @@ function projectSkaterOutcome(
   const eventRoll = rand();
   if (eventRoll < breakoutChance) {
     development *= 1.14 + rand() * (isProspectProfile ? 0.24 : 0.16);
-    breakoutTag = "BREAKOUT";
+    // A young player leaping is a breakout; an established vet posting the same
+    // over-pace is a career year, not a "breakout".
+    breakoutTag = p.age <= 26 ? "BREAKOUT" : "CAREER_YEAR";
   } else if (eventRoll > 1 - regressionChance) {
     development *= 0.78 + rand() * 0.14;
     breakoutTag = "REGRESSION";

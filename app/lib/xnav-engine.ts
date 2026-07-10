@@ -113,13 +113,20 @@ function blendNavResults(lowSample: XNAVResult, established: XNAVResult, establi
 }
 
 export type RosterTier =
+  // Forwards
   | "ELITE_1ST_LINE"
   | "1ST_LINE_HIGH_2C"
   | "ELITE_SHUTDOWN"
   | "PK_SPECIALIST"
   | "FRINGE_1ST_LINE_2C"
   | "MIDDLE_SIX"
-  | "BOTTOM_SIX";
+  | "BOTTOM_SIX"
+  // Defensemen — pairing-based, so a D never reads as a "2nd-line center"
+  | "ELITE_1ST_PAIR"
+  | "TOP_PAIR"
+  | "SHUTDOWN_D"
+  | "SECOND_PAIR"
+  | "THIRD_PAIR";
 
 export function calcDeploymentMultiplier(evDzPct: number, evQoc: number): number {
   const zDzCalc = evQoc >= 55 && evDzPct < 0.50 ? 0.50 : evDzPct;
@@ -143,7 +150,26 @@ export function classifyRosterTier(
   evQoc: number,
   evToi: number,
   shToi: number,
+  isD = false,
 ): RosterTier {
+  // Defensemen are ranked by pairing (ice time + usage + scoring), never by
+  // forward line labels — a D scoring 49 pts on 24 minutes is a top-pair anchor,
+  // not a "2nd-line center".
+  if (isD) {
+    switch (true) {
+      case toi >= 23.5 && normalizedPts >= 45:
+        return "ELITE_1ST_PAIR";
+      case toi >= 21.0 && (normalizedPts >= 32 || (evQoc >= 60 && shToi >= 2.0)):
+        return "TOP_PAIR";
+      case evQoc >= 62 && shToi >= 2.2 && toi >= 18.0:
+        return "SHUTDOWN_D";
+      case toi >= 17.0:
+        return "SECOND_PAIR";
+      default:
+        return "THIRD_PAIR";
+    }
+  }
+
   switch (true) {
     case normalizedPts >= 80 || (toi >= 19.0 && normalizedPts >= 75):
       return "ELITE_1ST_LINE";
@@ -237,7 +263,7 @@ export function resolveRosterTier(asset: AssetInput): RosterTier | undefined {
   if (asset.position === "G" || asset.position === "Pick") return undefined;
   const toi = safe(asset.avgTOI ?? 18);
   const { normalizedPts, evMdep, evQoc, evToi, shToi } = calcSkaterDeploymentContext(asset);
-  return classifyRosterTier(toi, normalizedPts, evMdep, evQoc, evToi, shToi);
+  return classifyRosterTier(toi, normalizedPts, evMdep, evQoc, evToi, shToi, asset.position === "D");
 }
 
 // ── Pick NAV ──────────────────────────────────────────────────────────────────
@@ -764,7 +790,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
 
   // ── Forward archetype ─────────────────────────────────────────
   const noivImpact = Math.round(noivBonus);
-  const rosterTier = classifyRosterTier(toi, normalizedPts, evMdep, qocIdx, evToi, shToi);
+  const rosterTier = classifyRosterTier(toi, normalizedPts, evMdep, qocIdx, evToi, shToi, isD);
   let fArchetype = "";
   if (!isD) {
     const psRatio = ops !== null && dps !== null && (ops + dps) > 1

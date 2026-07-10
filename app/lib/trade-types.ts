@@ -128,7 +128,12 @@ export type RosterTier =
   | "PK_SPECIALIST"
   | "FRINGE_1ST_LINE_2C"
   | "MIDDLE_SIX"
-  | "BOTTOM_SIX";
+  | "BOTTOM_SIX"
+  | "ELITE_1ST_PAIR"
+  | "TOP_PAIR"
+  | "SHUTDOWN_D"
+  | "SECOND_PAIR"
+  | "THIRD_PAIR";
 
 export type FlagSeverity = "HARD" | "SOFT" | "WARN" | "INFO";
 

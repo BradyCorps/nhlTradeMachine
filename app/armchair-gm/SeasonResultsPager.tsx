@@ -268,7 +268,8 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                       <td className="text-[11px] py-1.5 px-1.5 text-right tabular-nums font-black align-top" style={{ color: 'var(--ledger-ink)' }}>{p.projectedPts}</td>
                       <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums font-black align-top" style={{ color: dxp === null ? 'var(--ledger-ink-faint)' : posNeg(dxp) }}>
                         {dxp === null ? '—' : dxp > 0 ? `+${dxp}` : dxp}
-                        {p.breakoutTag === 'BREAKOUT' && <span title="Breakout season"> ▲</span>}
+                        {p.breakoutTag === 'BREAKOUT' && <span title="Breakout season (young player leap)"> ▲</span>}
+                        {p.breakoutTag === 'CAREER_YEAR' && <span title="Career year (veteran over-pace)"> ▲</span>}
                         {p.breakoutTag === 'VETERAN_HOLD' && <span title="Held off decline"> ▲</span>}
                         {p.breakoutTag === 'REGRESSION' && <span title="Down year"> ▼</span>}
                       </td>
@@ -285,37 +286,52 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                     {isOpen && nav && (
                       <tr style={{ borderBottom: '1px solid #b8a070', background: 'var(--ledger-cream)' }}>
                         <td colSpan={10} className="py-2 px-3">
-                          {/* Valuation breakdown — the components behind the X-NAV number */}
-                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-2">
-                            {([
-                              ['Offense', nav.off, 250],
-                              ['Defense', nav.def, 80],
-                              ['Age Curve', nav.age, 40],
-                              ['Contract', nav.cap, 80],
-                              ['Upside', nav.upside, 40],
-                            ] as [string, number, number][]).map(([label, val, scale]) => (
-                              <div key={label}>
-                                <div className="flex items-baseline justify-between">
-                                  <span className="text-[9px] font-black font-mono uppercase tracking-wider" style={{ color: 'var(--ledger-ink)' }}>{label}</span>
-                                  <span className="text-[10px] font-black font-mono tabular-nums" style={{ color: posNeg(val) }}>
-                                    {val > 0 ? `+${val}` : val}
-                                  </span>
+                          {/* Valuation breakdown — reconciles to X-NAV. The raw value
+                              drivers (off/def/age/contract) are the pre-adjustment inputs;
+                              Model Adj. is everything the trade model layers on top
+                              (positional scarcity, youth development discount, team-control
+                              upside, and the franchise/prospect floor). The five sum to the
+                              header X-NAV exactly, so nothing is unexplained. */}
+                          {(() => {
+                            const componentSum = nav.off + nav.def + nav.age + nav.cap;
+                            const modelAdj = nav.total - componentSum;
+                            const rows: [string, number, string | undefined][] = [
+                              ['Offense', nav.off, undefined],
+                              ['Defense', nav.def, undefined],
+                              ['Age Curve', nav.age, undefined],
+                              ['Contract', nav.cap, undefined],
+                              ['Model Adj.', modelAdj, 'Positional scarcity, youth development discount, team-control upside, and the franchise/prospect floor — everything the trade model applies on top of the raw value drivers.'],
+                            ];
+                            const scale = Math.max(1, ...rows.map(([, v]) => Math.abs(v)));
+                            return (
+                              <>
+                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-2">
+                                  {rows.map(([label, val, tip]) => (
+                                    <div key={label} title={tip}>
+                                      <div className="flex items-baseline justify-between">
+                                        <span className="text-[10px] font-black font-mono uppercase tracking-wider" style={{ color: 'var(--ledger-ink)' }}>{label}</span>
+                                        <span className="text-[11px] font-black font-mono tabular-nums" style={{ color: posNeg(val) }}>
+                                          {val > 0 ? `+${val}` : val}
+                                        </span>
+                                      </div>
+                                      <div className="mt-1 h-1.5 w-full" style={{ background: 'rgba(200,184,144,0.5)', borderRadius: 1 }}>
+                                        <div className="h-1.5" style={{
+                                          width: `${Math.min(100, Math.abs(val) / scale * 100)}%`,
+                                          background: val >= 0 ? 'var(--ledger-green)' : 'var(--ledger-red)',
+                                          borderRadius: 1,
+                                        }} />
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
-                                <div className="mt-1 h-1.5 w-full" style={{ background: 'rgba(200,184,144,0.5)', borderRadius: 1 }}>
-                                  <div
-                                    className="h-1.5"
-                                    style={{
-                                      width: `${Math.min(100, Math.abs(val) / scale * 100)}%`,
-                                      background: val >= 0 ? 'var(--ledger-green)' : 'var(--ledger-red)',
-                                      borderRadius: 1,
-                                    }}
-                                  />
+                                <div className="mt-2 text-[10px] font-mono" style={{ color: 'var(--ledger-ink-body, var(--ledger-ink))' }}>
+                                  Off {nav.off >= 0 ? '+' : ''}{nav.off} · Def {nav.def >= 0 ? '+' : ''}{nav.def} · Age {nav.age >= 0 ? '+' : ''}{nav.age} · Contract {nav.cap >= 0 ? '+' : ''}{nav.cap} · Adj {modelAdj >= 0 ? '+' : ''}{modelAdj} = <strong>X-NAV {nav.total}</strong>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
+                              </>
+                            );
+                          })()}
                           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[9px] font-mono" style={{ color: 'var(--ledger-ink-body, var(--ledger-ink))' }}>
-                            <span>FMV <strong>${nav.fmvAav?.toFixed(1) ?? '—'}M</strong></span>
+                            <span>FMV <strong>{nav.fmvAav != null ? `$${nav.fmvAav.toFixed(1)}M` : 'ELC / n/a'}</strong></span>
                             {roster && <span>Cap Hit <strong>${roster.capHit.toFixed(1)}M × {roster.yearsRemaining}yr</strong></span>}
                             {nav.rosterTier && <span>Tier <strong>{nav.rosterTier.replace(/_/g, ' ')}</strong></span>}
                             {expected !== null && <span>Expected <strong>{expected} pts</strong> → Actual <strong>{p.projectedPts}</strong></span>}
