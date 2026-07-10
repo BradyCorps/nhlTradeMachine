@@ -177,3 +177,27 @@ describe("advanceSeason", () => {
     expect(movedBreakouts).toBeGreaterThan(stayBreakouts * 1.5);
   });
 });
+
+describe("progression ratchet — developing players compound a good season", () => {
+  // Average the resulting baseline across seeds to wash out the breakout roll.
+  const avgBaseline = (over: Parameters<typeof player>[1]) => {
+    let sum = 0, n = 0;
+    for (let s = 0; s < 300; s++) {
+      const res = advanceSeason([player("p", over)], { seed: s, year: 2027 });
+      if (res.players[0]) { sum += res.players[0].baselinePtsPace ?? 0; n++; }
+    }
+    return n ? sum / n : 0;
+  };
+
+  it("banks a developing riser's baseline UP toward his demonstrated pace", () => {
+    // 20-yo proving a level above his baseline (45 pace vs 30 baseline).
+    const young = avgBaseline({ age: 20, ptsPace: 45, baselinePtsPace: 30, yearsRemaining: 3 });
+    expect(young).toBeGreaterThan(33); // ratchets clearly above the old 30 baseline
+  });
+
+  it("a developing riser banks more than an established vet with the same line", () => {
+    const young = avgBaseline({ age: 20, ptsPace: 45, baselinePtsPace: 30, yearsRemaining: 3 });
+    const vet   = avgBaseline({ age: 30, ptsPace: 45, baselinePtsPace: 30, yearsRemaining: 3 });
+    expect(young).toBeGreaterThan(vet);
+  });
+});

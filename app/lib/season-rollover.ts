@@ -138,7 +138,16 @@ export function advanceSeason<P extends RolloverPlayer>(
     if (posType(p.position) !== "G" && p.ptsPace > 0) {
       const anchored = stablePts({ ...p, position: posType(p.position) });
       ptsPace = Math.max(0, Math.round(anchored * ageDecay(age, posType(p.position)) * rollMult * 10) / 10);
-      baselinePtsPace = Math.round(((p.baselinePtsPace ?? p.ptsPace) * 0.6 + ptsPace * 0.4) * 10) / 10;
+      // Progression ratchet: a developing player (≤23) who proves a higher level
+      // BANKS more of it into his baseline instead of drifting back — so a real
+      // breakout compounds year over year (next season's anchor is 60% baseline)
+      // rather than evaporating. Everyone else keeps the standard 40% drift, and
+      // a young player's down year still regresses normally (the ratchet only
+      // accelerates the upside, it doesn't floor losses).
+      const priorBaseline = p.baselinePtsPace ?? p.ptsPace;
+      const developingRiser = age <= 23 && ptsPace > priorBaseline;
+      const newWeight = developingRiser ? 0.6 : 0.4;
+      baselinePtsPace = Math.round((priorBaseline * (1 - newWeight) + ptsPace * newWeight) * 10) / 10;
     }
 
     // ── Contract decrement ──
