@@ -98,7 +98,7 @@ function OutlookKey() {
   return (
     <details className="text-2xs mb-1.5" style={{ color: "var(--ledger-ink-faint)", lineHeight: 1.55 }}>
       <summary style={{ cursor: "pointer", fontWeight: 900, color: "var(--ledger-brown)", letterSpacing: "0.1em" }}>
-        ? Outlook key
+        What does each score mean?
       </summary>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-1 mt-1.5 p-2" style={{ background: "var(--ledger-cream)", border: "1px solid #c8b890" }}>
         {OUTLOOK_KEY.map(([term, definition]) => (
@@ -138,6 +138,11 @@ export function DevelopmentProfilePanel({ asset }: { asset: Asset }) {
 
   return (
     <div className="py-1">
+      {/* Always-visible scale so the wall of numbers reads without opening the key */}
+      <div className="text-2xs font-mono mb-1.5" style={{ color: "var(--ledger-ink-body)", lineHeight: 1.45 }}>
+        Scores are <b style={{ color: "var(--ledger-navy)" }}>0–100</b> (90+ elite · 45–55 average · under 35 weak/risk).
+        Peak Left is in years; Projection is pts/82.
+      </div>
       <OutlookKey />
 
       <div className="flex items-center justify-between mb-1.5">

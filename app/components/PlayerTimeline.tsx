@@ -4,19 +4,12 @@ import React from "react";
 import { calcPlayerTimeline } from "@/app/lib/player-timeline";
 import { calcNAV, type AssetInput } from "@/app/lib/xnav-engine";
 
-const W   = 280;
-const H   = 130;
-const PAD = { top: 20, right: 10, bottom: 28, left: 28 };
-
-const plotW = W - PAD.left - PAD.right;
-const plotH = H - PAD.top  - PAD.bottom;
-
 function navColor(nav: number): string {
-  if (nav >= 160) return "#2a7a3c";  // elite — green
+  if (nav >= 160) return "#146a24";  // elite — green
   if (nav >= 100) return "#1a5fa8";  // good  — blue
-  if (nav >= 50)  return "#c8913a";  // okay  — amber
-  if (nav >= 0)   return "#7a7a7a";  // poor  — grey
-  return "#b83020";                   // negative — red
+  if (nav >= 50)  return "#8a6a1e";  // okay  — amber
+  if (nav >= 0)   return "#6b5030";  // depth — brown
+  return "#9c2b1f";                   // negative — red
 }
 
 export function estimateNextContractTerm(asset: AssetInput, nav: { total: number; fmvAav?: number; isRFA?: boolean }): number {
@@ -37,193 +30,152 @@ export function estimateNextContractTerm(asset: AssetInput, nav: { total: number
 export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
   const years = calcPlayerTimeline(asset);
   if (years.length === 0) return null;
+
   const currentNav = calcNAV(asset);
-  const projectedNextAav = currentNav.fmvAav;
-  const projectedNextTerm = estimateNextContractTerm(asset, currentNav);
-  const projectedNextStatus = currentNav.isRFA ? "RFA" : "UFA";
-  const compactProjection = years.length <= 3;
+  const nextAav = currentNav.fmvAav ?? asset.capHit;
+  const nextTerm = estimateNextContractTerm(asset, currentNav);
+  const nextStatus = currentNav.isRFA ? "RFA" : "UFA";
+  const signingAge = asset.age + Math.max(0, asset.yearsRemaining ?? 0);
 
-  const maxNav  = Math.max(...years.map(y => Math.max(y.nav, 10)), 50);
-  const minNav  = Math.min(...years.map(y => y.nav), 0);
-  const navSpan = Math.max(maxNav - Math.min(minNav, 0), 10);
+  // Is the CURRENT deal a bargain? Market AAV (FMV) vs what he's actually paid.
+  const surplus = nextAav - asset.capHit;
+  const surplusTone = surplus >= 1 ? "good" : surplus <= -1 ? "bad" : "neutral";
+  const surplusWord = surplus >= 1 ? "BARGAIN" : surplus <= -1 ? "OVERPAY" : "FAIR";
 
-  const n     = years.length;
-  const gap   = 4;
-  const bw    = Math.floor((plotW - gap * (n - 1)) / n);
+  // Trajectory across the deal (first → last projected value).
+  const first = years[0].nav;
+  const last = years[years.length - 1].nav;
+  const delta = last - first;
+  const trajectory = delta >= 15 ? "RISING" : delta <= -15 ? "DECLINING" : "HOLDS STEADY";
+  const trajTone = delta >= 15 ? "good" : delta <= -20 ? "bad" : "neutral";
 
-  // Y axis: 0 baseline or minNav if negative
-  const yZero  = PAD.top + plotH - Math.max(0, (0 - Math.min(minNav, 0)) / navSpan * plotH);
-  const toY    = (nav: number) => PAD.top + plotH - ((nav - Math.min(minNav, 0)) / navSpan * plotH);
+  const maxNav = Math.max(...years.map(y => y.nav), 50);
+  const minNav = Math.min(...years.map(y => y.nav), 0);
+  const span = Math.max(maxNav - Math.min(minNav, 0), 1);
 
-  // Extension boundary — first year with different capHit
-  const extStartYear = years.findIndex((y, i) => i > 0 && y.capHit !== years[0].capHit);
-  const currentYear = years[0];
-  const finalYear = years[years.length - 1];
-  const navDelta = finalYear.nav - currentYear.nav;
+  const GOOD = "#146a24", BAD = "#9c2b1f", INK = "#1c140a", BODY = "#4a3820";
+  const toneColor = (t: string) => t === "good" ? GOOD : t === "bad" ? BAD : "#1a2e5c";
+
+  const avgNav = Math.round(years.reduce((s, y) => s + y.nav, 0) / years.length);
+  const trajSentence = avgNav < 0
+    ? "Negative trade value across the deal — an anchor contract that's hard to move without a sweetener."
+    : delta >= 15
+      ? "Projected trade value climbs across the deal — the term itself is an asset."
+      : delta <= -20
+        ? "Projected trade value falls across the deal — an aging or back-loaded contract."
+        : "Projected trade value holds across the deal — a stable, movable contract.";
 
   return (
-    <div>
-      <div style={{
-        fontSize: 11, fontWeight: 900, color: "var(--ledger-ink-faint)",
-        textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 6,
-        fontFamily: "'Courier Prime', monospace",
-      }}>
-        Contract Projection
-      </div>
-      {projectedNextAav != null && (
-        <div
-          title="Projected next contract estimate using current-cap fair-market midpoint AAV, not a player maximum or team minimum."
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 8,
-            padding: "5px 7px",
-            marginBottom: 6,
-            background: "var(--ledger-card)",
-            border: "1px solid var(--ledger-rule-mid)",
-            fontFamily: "'Courier Prime', monospace",
-          }}>
-          <span style={{ fontSize: 11, fontWeight: 900, color: "var(--ledger-ink-faint)", textTransform: "uppercase" }}>
-            Projected next
-          </span>
-          <span style={{ fontSize: 11, fontWeight: 900, color: "var(--ledger-ink)" }}>
-            ${projectedNextAav.toFixed(1)}M × {projectedNextTerm}yr ({projectedNextStatus})
-          </span>
-        </div>
-      )}
-      {compactProjection ? (
-        <div
-          title="Compact contract projection for short remaining terms."
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-            gap: 5,
-            fontFamily: "'Courier Prime', monospace",
-          }}
-        >
-          {[
-            { label: "Now", value: currentYear.nav > 0 ? `+${currentYear.nav}` : `${currentYear.nav}` },
-            { label: "Final", value: finalYear.nav > 0 ? `+${finalYear.nav}` : `${finalYear.nav}` },
-            { label: "Delta", value: navDelta > 0 ? `+${navDelta}` : `${navDelta}` },
-          ].map(item => (
-            <div key={item.label} style={{
-              background: "var(--ledger-card)",
-              border: "1px solid var(--ledger-rule-mid)",
-              padding: "5px 6px",
-              minWidth: 0,
-            }}>
-              <div style={{ fontSize: 9, fontWeight: 900, color: "var(--ledger-ink-faint)", textTransform: "uppercase" }}>
-                {item.label}
-              </div>
-              <div style={{ fontSize: 12, fontWeight: 900, color: "var(--ledger-ink)", marginTop: 2 }}>
-                {item.value}
-              </div>
-            </div>
-          ))}
-          <div style={{ gridColumn: "1 / -1", display: "flex", gap: 3, alignItems: "end", height: 18 }}>
-            {years.map(y => (
-              <span key={y.year} title={`Yr ${y.year}: NAV ${y.nav}, age ${y.age}`} style={{
-                flex: 1,
-                height: `${Math.max(3, Math.min(18, 4 + Math.abs(y.nav) / Math.max(maxNav, 1) * 14))}px`,
-                background: navColor(y.nav),
-                opacity: 0.85,
-              }} />
-            ))}
+    <div className="ptl">
+      <style>{`
+        .ptl { font-family: 'Courier Prime', ui-monospace, monospace; color: #1c140a; }
+        .ptl *:focus-visible { outline: 2px solid #1a2e5c; outline-offset: 2px; }
+        .ptl-h { font-size: 11px; font-weight: 900; color: #4a3820; text-transform: uppercase;
+          letter-spacing: 0.15em; margin-bottom: 8px; }
+        .ptl-deal { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+          gap: 8px; padding: 8px 10px; background: var(--ledger-card); border: 1px solid var(--ledger-rule-mid);
+          margin-bottom: 10px; }
+        .ptl-deal-label { font-size: 10px; font-weight: 700; color: #4a3820; text-transform: uppercase; letter-spacing: 0.1em; }
+        .ptl-deal-val { font-size: 14px; font-weight: 900; color: #1c140a; }
+        .ptl-chip { font-size: 11px; font-weight: 900; padding: 3px 8px; border: 1px solid var(--ledger-rule); background: rgba(255,255,255,0.3); white-space: nowrap; }
+        .ptl-sech { display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+          font-size: 10px; font-weight: 700; color: #4a3820; text-transform: uppercase; letter-spacing: 0.1em;
+          margin-bottom: 6px; }
+        .ptl-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+        .ptl-table th, .ptl-table td { padding: 4px 6px; }
+        .ptl-table thead th { font-size: 10px; font-weight: 700; color: #4a3820; text-transform: uppercase;
+          letter-spacing: 0.06em; border-bottom: 1px solid #cdbd93; text-align: left; }
+        .ptl-yr { font-size: 12px; font-weight: 900; color: #3d2e18; white-space: nowrap; }
+        .ptl-age { font-size: 12px; font-weight: 700; color: #6e5a3d; font-variant-numeric: tabular-nums; }
+        .ptl-barcell { width: 99%; }
+        .ptl-barrow { display: flex; align-items: center; gap: 8px; }
+        .ptl-bartrack { position: relative; flex: 1; min-width: 70px; height: 16px; background: #e0d3ac;
+          border: 1px solid #c1b088; border-radius: 3px; overflow: hidden; }
+        .ptl-zero { position: absolute; top: 0; height: 100%; width: 2px; background: #1c140a; opacity: 0.4; }
+        .ptl-fill { position: absolute; top: 0; height: 100%; }
+        .ptl-navnum { font-size: 12px; font-weight: 900; font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
+        .ptl-ext { display: inline-block; margin-left: 6px; font-size: 9px; font-weight: 900; color: #8a5c00;
+          border: 1px solid #8a5c00; padding: 0 3px; letter-spacing: 0.08em; }
+        .ptl-next { padding: 9px 10px; background: var(--ledger-warm); border: 1px solid var(--ledger-rule-mid); margin-top: 8px; }
+        .ptl-next-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px; }
+        .ptl-next-label { font-size: 10px; font-weight: 700; color: #4a3820; text-transform: uppercase; letter-spacing: 0.1em; }
+        .ptl-next-val { font-size: 15px; font-weight: 900; color: #1c140a; }
+        .ptl-note { font-size: 11px; line-height: 1.5; color: #4a3820; margin-top: 8px; }
+        .ptl-note b { color: #1c140a; }
+      `}</style>
+
+      <div className="ptl-h">Contract Projection</div>
+
+      {/* Current deal + is it a bargain? */}
+      <div className="ptl-deal">
+        <div>
+          <div className="ptl-deal-label">Current deal</div>
+          <div className="ptl-deal-val">
+            ${asset.capHit.toFixed(2)}M × {asset.yearsRemaining}yr
+            <span style={{ fontSize: 11, fontWeight: 700, color: BODY }}> · ends age {signingAge}</span>
           </div>
         </div>
-      ) : (
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block", overflow: "visible" }}>
+        <div className="ptl-chip" title="Estimated open-market AAV (FMV) vs the player's actual cap hit."
+          style={{ color: toneColor(surplusTone) }}>
+          {surplus > 0 ? "+" : surplus < 0 ? "−" : ""}${Math.abs(surplus).toFixed(1)}M vs market · {surplusWord}
+        </div>
+      </div>
 
-        {/* Y-axis ticks */}
-        {[0, Math.round(maxNav / 2), maxNav].map(tick => {
-          const y = toY(tick);
-          return (
-            <g key={tick}>
-              <line x1={PAD.left - 3} y1={y} x2={PAD.left} y2={y}
-                stroke="#c8b890" strokeWidth={0.5} />
-              <text x={PAD.left - 5} y={y + 3.5} fontSize={6.5} fill="#8a7a5a"
-                textAnchor="end" fontFamily="'Courier Prime', monospace">
-                {tick}
-              </text>
-            </g>
-          );
-        })}
+      {/* Value across the deal */}
+      <div className="ptl-sech">
+        <span>Trade value (NAV) by contract year</span>
+        <span style={{ color: toneColor(trajTone), fontWeight: 900 }}>{trajectory}</span>
+      </div>
+      <table className="ptl-table">
+        <caption className="sr-only">Projected trade value (NAV) for each remaining year of the current contract</caption>
+        <thead>
+          <tr>
+            <th scope="col">Year</th>
+            <th scope="col">Age</th>
+            <th scope="col">Trade value (NAV)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {years.map((y, i) => {
+            const isExt = i > 0 && y.capHit !== years[0].capHit && years[i - 1].capHit === years[0].capHit;
+            const zeroX = (Math.max(0, -Math.min(minNav, 0)) / span) * 100;
+            const fillW = (Math.abs(y.nav) / span) * 100;
+            const fillLeft = y.nav >= 0 ? zeroX : zeroX - fillW;
+            return (
+              <tr key={y.year}>
+                <th scope="row" className="ptl-yr">
+                  Yr {y.year}
+                  {isExt && <span className="ptl-ext" title="Extension — a different cap hit begins here">EXT</span>}
+                </th>
+                <td className="ptl-age">{y.age}</td>
+                <td className="ptl-barcell">
+                  <div className="ptl-barrow">
+                    <div className="ptl-bartrack" role="img" aria-label={`Year ${y.year}, age ${y.age}: trade value ${y.nav} NAV`}>
+                      {minNav < 0 && <div className="ptl-zero" style={{ left: `${zeroX}%` }} />}
+                      <div className="ptl-fill" style={{ left: `${fillLeft}%`, width: `${fillW}%`, background: navColor(y.nav) }} />
+                    </div>
+                    <span className="ptl-navnum" style={{ color: navColor(y.nav) }}>{y.nav > 0 ? `+${y.nav}` : y.nav}</span>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
 
-        {/* Zero baseline */}
-        <line x1={PAD.left} y1={yZero} x2={PAD.left + plotW} y2={yZero}
-          stroke="#c8b890" strokeWidth={0.5} />
+      {/* Projected next contract */}
+      <div className="ptl-next">
+        <div className="ptl-next-top">
+          <span className="ptl-next-label">Projected next contract</span>
+          <span className="ptl-next-val">${nextAav.toFixed(1)}M × {nextTerm}yr ({nextStatus})</span>
+        </div>
+        <div className="ptl-note">
+          Signs at <b>age {signingAge}</b> as a{nextStatus === "RFA" ? "n" : ""} <b>{nextStatus === "RFA" ? "restricted" : "unrestricted"} free agent</b>.
+          The AAV is a <b>fair-market midpoint</b> at today's cap — what the model expects him to command, not a player max or a team-friendly floor. Term follows age and value tier.
+        </div>
+      </div>
 
-        {/* Left axis */}
-        <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + plotH}
-          stroke="#c8b890" strokeWidth={0.5} />
-
-        {/* Extension boundary marker */}
-        {extStartYear > 0 && (
-          <line
-            x1={PAD.left + extStartYear * (bw + gap) - gap / 2}
-            y1={PAD.top}
-            x2={PAD.left + extStartYear * (bw + gap) - gap / 2}
-            y2={PAD.top + plotH}
-            stroke="#c8913a" strokeWidth={0.8} strokeDasharray="2 2" opacity={0.6}
-          />
-        )}
-
-        {/* Bars */}
-        {years.map((y, i) => {
-          const x  = PAD.left + i * (bw + gap);
-          const bh = Math.abs(toY(y.nav) - yZero);
-          const by = y.nav >= 0 ? toY(y.nav) : yZero;
-          const color = navColor(y.nav);
-          const labelY = y.nav >= 0 ? toY(y.nav) - 3 : yZero + bh + 9;
-
-          return (
-            <g key={i}>
-              {/* Bar */}
-              <rect x={x} y={by} width={bw} height={Math.max(bh, 1)} fill={color} opacity={0.85} />
-
-              {/* NAV value label */}
-              <text x={x + bw / 2} y={labelY} fontSize={6.5} fill={color}
-                textAnchor="middle" fontWeight={900}
-                fontFamily="'Courier Prime', monospace">
-                {y.nav > 0 ? `+${y.nav}` : y.nav}
-              </text>
-
-              {/* Year label */}
-              <text x={x + bw / 2} y={H - PAD.bottom + 10} fontSize={7} fill="#8a7a5a"
-                textAnchor="middle" fontFamily="'Courier Prime', monospace">
-                Yr {y.year}
-              </text>
-
-              {/* Age label */}
-              <text x={x + bw / 2} y={H - PAD.bottom + 19} fontSize={6} fill="#b8a070"
-                textAnchor="middle" fontFamily="'Courier Prime', monospace">
-                {y.age}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Extension label */}
-        {extStartYear > 0 && (
-          <text
-            x={PAD.left + extStartYear * (bw + gap)}
-            y={PAD.top - 5}
-            fontSize={6} fill="#c8913a"
-            fontFamily="'Courier Prime', monospace" fontWeight={900}
-          >
-            EXT
-          </text>
-        )}
-
-        {/* Axis label */}
-        <text x={PAD.left + plotW / 2} y={H - 1} fontSize={6.5} fill="#8a7a5a"
-          textAnchor="middle" fontFamily="'Courier Prime', monospace">
-          Contract Year  ·  Age
-        </text>
-
-      </svg>
-      )}
+      <p className="ptl-note">{trajSentence}</p>
     </div>
   );
 }

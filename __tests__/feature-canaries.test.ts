@@ -907,7 +907,7 @@ describe("Canary — development profile rationale copy", () => {
     expect(panelSrc).toContain('label="Peak Left"');
     expect(panelSrc).toContain("VETERAN PEAK");
     expect(panelSrc).toContain("function OutlookKey");
-    expect(panelSrc).toContain("? Outlook key");
+    expect(panelSrc).toContain("What does each score mean?");
     expect(panelSrc).toContain("<details");
     expect(panelSrc).toContain("OUTLOOK_KEY");
     expect(panelSrc).toContain("Score scale");
@@ -1691,10 +1691,14 @@ describe("Canary — R0/R1/R2 audit refinements", () => {
     expect(engine).toContain("const currentFmvAavG = BASE_CAP_CEILING * fmvCapPctG");
     expect(types).toContain("fmvAav?: number");
     expect(timeline).toContain("estimateNextContractTerm");
-    expect(timeline).toContain("Projected next");
-    expect(timeline).toContain("fair-market midpoint AAV");
-    expect(timeline).toContain("const compactProjection = years.length <= 3");
-    expect(timeline).toContain("Compact contract projection for short remaining terms.");
+    expect(timeline).toContain("Projected next contract");
+    expect(timeline).toContain("fair-market midpoint");
+    // Reworked contract tab: accessible table, labelled NAV, current-deal surplus read.
+    expect(timeline).toContain("<table");
+    expect(timeline).toContain('scope="row"');
+    expect(timeline).toContain("Trade value (NAV) by contract year");
+    expect(timeline).toContain("vs market · ");
+    expect(timeline).toContain("Current deal");
   });
 
   it("keeps expanded player cards and STRAND displays de-duplicated", () => {
