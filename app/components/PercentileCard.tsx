@@ -14,6 +14,8 @@ interface PlayerData {
   ptsPace: number;
   xGPace: number;
   hdFinishingDelta?: number | null;
+  edgeSpeedMaxMph?: number | null;
+  edgeBurstsOver20?: number | null;
   avgTOI: number;
   qocIndex?: number | null;
   games?: number;
@@ -171,6 +173,8 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       ptsPace: player.ptsPace,
       xGPace: player.xGPace,
       hdFinishingDelta: player.hdFinishingDelta ?? undefined,
+      edgeSpeedMaxMph: player.edgeSpeedMaxMph ?? undefined,
+      edgeBurstsOver20: player.edgeBurstsOver20 ?? undefined,
       defRate: player.defRate ?? 0.08,
       avgTOI: player.avgTOI,
       qocIndex: player.qocIndex,

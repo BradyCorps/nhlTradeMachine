@@ -11,12 +11,15 @@
 //   • Rental discount on age penalty (1yr = 75% reduction, 2yr = 40%)
 
 import { SEASON, LEAGUE, FRANCHISE, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
+import type { FArchetype } from "@/app/lib/trade-types";
 
 export const DPS_NAV_MULTIPLIER = 15; // dps * 15 = defPS for NAV (not 120 — the *8 bug is removed)
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 export interface AssetInput {
   hdFinishingDelta?: number | null; // NHL EDGE: high-danger finishing vs league (nhl_snapshots)
+  edgeSpeedMaxMph?: number | null;
+  edgeBurstsOver20?: number | null;
   id:             string;
   name:           string;
   position:       "C" | "W" | "D" | "G" | "Pick";
@@ -82,7 +85,7 @@ export interface XNAVResult {
   upside:      number;
   fmvAav?:     number;
   noivImpact?: number;
-  fArchetype?: string;
+  fArchetype?: FArchetype;
   rosterTier?: RosterTier;
   isRFA?:      boolean;
   volatility?: number;
@@ -92,6 +95,65 @@ export interface XNAVResult {
 export const safe  = (n: number): number => (isNaN(n) || !isFinite(n) ? 0 : n);
 export const clamp = (n: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, n));
+
+export interface ForwardArchetypeInput {
+  ptsPace?: number | null;
+  goalsPace?: number | null;
+  assistsPace?: number | null;
+  xGPace?: number | null;
+  offTotal?: number | null;
+  defTotal?: number | null;
+  avgTOI?: number | null;
+  qocIndex?: number | null;
+  xgRelTM?: number | null;
+  noivImpact?: number | null;
+  ops?: number | null;
+  dps?: number | null;
+  ppPtsPace82?: number | null;
+  pkTimeShare?: number | null;
+  baselineHits82?: number | null;
+  edgeSpeedMaxMph?: number | null;
+  edgeBurstsOver20?: number | null;
+}
+
+export function classifyForwardArchetype(input: ForwardArchetypeInput): FArchetype {
+  const pts = safe(input.ptsPace ?? 0);
+  const goals = safe(input.goalsPace ?? 0);
+  const assists = safe(input.assistsPace ?? Math.max(0, pts - goals));
+  const gaTotal = goals + assists;
+  const goalShare = gaTotal > 0 ? goals / gaTotal : null;
+  const assistShare = gaTotal > 0 ? assists / gaTotal : null;
+  const xg = safe(input.xGPace ?? 0);
+  const off = safe(input.offTotal ?? pts * 1.15);
+  const dps = input.dps ?? null;
+  const def = safe(input.defTotal ?? (dps !== null ? dps * 12 : 0));
+  const toi = safe(input.avgTOI ?? 0);
+  const qoc = safe(input.qocIndex ?? 50);
+  const noiv = safe(input.noivImpact ?? (input.xgRelTM != null ? input.xgRelTM * 3.5 : 0));
+  const psRatio = input.ops != null && input.dps != null && (input.ops + input.dps) > 1
+    ? input.ops / (input.ops + input.dps)
+    : null;
+  const ppPace = input.ppPtsPace82 ?? null;
+  const pkShare = input.pkTimeShare ?? null;
+  const hits82 = input.baselineHits82 ?? null;
+  const explosive = (input.edgeBurstsOver20 != null && input.edgeBurstsOver20 >= 40)
+    || (input.edgeSpeedMaxMph != null && input.edgeSpeedMaxMph >= 22.5);
+
+  if (pts >= 110 && (off >= 145 || noiv >= 12 || assists >= 70)) return "HIGH_GRAVITY";
+  if (pts >= 95 && assistShare !== null && assistShare >= 0.58) return "LINE_RAISER";
+  if (pts >= 80 && noiv >= 8 && (assistShare === null || assistShare >= 0.48)) return "LINE_RAISER";
+  if (goalShare !== null && goalShare >= 0.52 && pts >= 35) return "LINE_FINISHER";
+  if ((xg >= 32 || (ppPace != null && ppPace >= 22)) && pts >= 55) return "LINE_FINISHER";
+  if ((def >= 30 && toi >= 15) || (pkShare != null && pkShare >= 0.12 && pts >= 30) || (psRatio !== null && psRatio < 0.35)) {
+    return "DEFENSIVE";
+  }
+  if (explosive) return "SPEED_BURST";
+  if (hits82 != null && hits82 >= 140) return "SPACE_OPENER";
+  if (toi >= 16 && pts >= 40 && (qoc >= 55 || def >= 18)) return "LINE_ESTABLISHER";
+  if (pts >= 55 || off >= 70) return "IMPACT_PLAYER";
+  if (toi >= 13 || pts >= 25) return "LINE_ESTABLISHER";
+  return hits82 != null && hits82 >= 90 ? "SPACE_OPENER" : "";
+}
 
 function blendNavResults(lowSample: XNAVResult, established: XNAVResult, establishedWeight: number): XNAVResult {
   const w = clamp(establishedWeight, 0, 1);
@@ -790,47 +852,30 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
 
   const capTotal      = safe(negativeCapComponent + positiveCapComponent + retainedBonus + teamControlValue);
 
-  // ── Forward archetype ─────────────────────────────────────────
+  // ── Modern forward role taxonomy ──────────────────────────────
   const noivImpact = Math.round(noivBonus);
   const rosterTier = classifyRosterTier(toi, normalizedPts, evMdep, qocIdx, evToi, shToi, isD);
-  let fArchetype = "";
+  let fArchetype: FArchetype = "";
   if (!isD) {
-    // SNIPER vs PLAYMAKER is a goals-vs-assists distinction, NOT an
-    // offense-vs-defense one — the old psRatio tagged assist-heavy players
-    // (Scheifele 28G/79A) as "SNIPER" because their offensive share was high.
-    const goals   = safe(asset.goalsPace ?? 0);
-    const assists = safe(asset.assistsPace ?? Math.max(0, pts - goals));
-    const gaTotal = goals + assists;
-    const goalShare = gaTotal > 0 ? goals / gaTotal : 0.5;
-    const psRatio = ops !== null && dps !== null && (ops + dps) > 1
-      ? ops / (ops + dps) : null;
-    const isOffensive = psRatio !== null ? psRatio > 0.55 : pts >= 45;
-    const isDepth = psRatio !== null ? psRatio < 0.35 : pts < 30;
-
-    if (isDepth) {
-      fArchetype = defTotal > 30 && toi > 15 ? "TWO_WAY" : "GRINDER";
-    } else if (isOffensive) {
-      // Real goal/assist split when we have it, else fall back to xG share.
-      fArchetype = goalShare >= 0.52 ? "SNIPER"
-        : goalShare <= 0.40 ? "PLAYMAKER"
-        : offTotal > 70 ? "PLAYMAKER"
-        : "SCORER";
-    } else {
-      fArchetype = defTotal > 35 && pts >= 35 ? "TWO_WAY" : "SCORER";
-    }
-
-    // Situational refinement from NST/MoneyPuck baselines — overrides inference
-    // when real usage data is available and clear-cut.
-    const hits82  = asset.baselineHits82;
-    const pkShare = asset.pkTimeShare;
-    const ppPace  = asset.ppPtsPace82;
-    if (hits82 != null && hits82 >= 140 && blendedPts < 40) {
-      fArchetype = "GRINDER";
-    } else if (pkShare != null && pkShare >= 0.12 && blendedPts >= 35 && fArchetype !== "SNIPER") {
-      fArchetype = "TWO_WAY";
-    } else if (ppPace != null && ppPace >= 22 && blendedPts >= 55 && fArchetype === "SCORER") {
-      fArchetype = "SNIPER";
-    }
+    fArchetype = classifyForwardArchetype({
+      ptsPace: blendedPts,
+      goalsPace: asset.goalsPace,
+      assistsPace: asset.assistsPace,
+      xGPace: asset.xGPace,
+      offTotal,
+      defTotal,
+      avgTOI: toi,
+      qocIndex: qocIdx,
+      xgRelTM: blendedXgRel,
+      noivImpact,
+      ops,
+      dps,
+      ppPtsPace82: asset.ppPtsPace82,
+      pkTimeShare: asset.pkTimeShare,
+      baselineHits82: asset.baselineHits82,
+      edgeSpeedMaxMph: asset.edgeSpeedMaxMph,
+      edgeBurstsOver20: asset.edgeBurstsOver20,
+    });
   }
 
   // ── Positional Scarcity Premium ───────────────────────────────

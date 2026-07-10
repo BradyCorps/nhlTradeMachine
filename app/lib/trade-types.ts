@@ -118,8 +118,18 @@ export interface XNAVResult {
   volatility?: number;
 }
 
-// Forward archetypes — used for STRAND helix and DEF display routing
-export type FArchetype = "FRANCHISE" | "SNIPER" | "SCORER" | "PLAYMAKER" | "TWO_WAY" | "GRINDER" | "";
+// Modern forward role taxonomy — primary identity label, not an EA-style build.
+export type FArchetype =
+  | "HIGH_GRAVITY"
+  | "LINE_RAISER"
+  | "LINE_ESTABLISHER"
+  | "LINE_FINISHER"
+  | "IMPACT_PLAYER"
+  | "CLUTCH_PLAYER"
+  | "DEFENSIVE"
+  | "SPEED_BURST"
+  | "SPACE_OPENER"
+  | "";
 
 export type RosterTier =
   | "ELITE_1ST_LINE"

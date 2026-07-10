@@ -8,7 +8,7 @@
 // not precision assertions.
 
 import { describe, it, expect } from "vitest";
-import { calcNAV, calcDeploymentMultiplier, calcGoalieNAV, calcPickNAV, calcProspectNAV, calcSkaterNAV, currentSeasonWeight, classifyRosterTier } from "../app/lib/xnav-engine";
+import { calcNAV, calcDeploymentMultiplier, calcGoalieNAV, calcPickNAV, calcProspectNAV, calcSkaterNAV, currentSeasonWeight, classifyForwardArchetype, classifyRosterTier } from "../app/lib/xnav-engine";
 import { getHistoricalFloor } from "../app/lib/player-data";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -646,7 +646,7 @@ describe("X-NAV — Young Surplus Contracts", () => {
     expect(result.rosterTier).toBe("BOTTOM_SIX");
     expect(result.total).toBeLessThanOrEqual(15);
     expect(result.cap).toBeLessThanOrEqual(15);
-    expect(result.fArchetype).toBe("GRINDER");
+    expect(result.fArchetype).toBe("SPACE_OPENER");
   });
 
   it("Young NHL track record relieves development discount versus same-age small sample", () => {
@@ -1049,19 +1049,27 @@ describe("classifyRosterTier — position-aware", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ARCHETYPE — shooter vs playmaker is a goals/assists split
+// ARCHETYPE — modern primary forward roles
 // ─────────────────────────────────────────────────────────────────────────────
 describe("forward archetype", () => {
   const base = {
     position: "C" as const, age: 27, capHit: 8, yearsRemaining: 4, avgTOI: 20,
     ops: 8, dps: 2, qocIndex: 55, games: 80, hasLiveStats: true, capCeiling: 104,
   };
-  it("tags an assist-heavy scorer as a PLAYMAKER, not a SNIPER (Scheifele 28G/79A)", () => {
+  it("tags an assist-heavy scorer as a LINE_RAISER, not a finisher (Scheifele 28G/79A)", () => {
     const nav = calcSkaterNAV({ ...base, id: "s", name: "Scheifele", ptsPace: 107, goalsPace: 28, assistsPace: 79, xGPace: 24 });
-    expect(nav.fArchetype).toBe("PLAYMAKER");
+    expect(nav.fArchetype).toBe("LINE_RAISER");
   });
-  it("tags a goal-heavy scorer as a SNIPER", () => {
-    const nav = calcSkaterNAV({ ...base, id: "g", name: "Sniper", ptsPace: 90, goalsPace: 52, assistsPace: 38, xGPace: 40 });
-    expect(nav.fArchetype).toBe("SNIPER");
+  it("tags a goal-heavy scorer as a LINE_FINISHER", () => {
+    const nav = calcSkaterNAV({ ...base, id: "g", name: "Finisher", ptsPace: 90, goalsPace: 52, assistsPace: 38, xGPace: 40 });
+    expect(nav.fArchetype).toBe("LINE_FINISHER");
+  });
+  it("separates high-gravity stars and speed-burst players from generic impact", () => {
+    expect(classifyForwardArchetype({
+      ptsPace: 126, assistsPace: 82, goalsPace: 44, offTotal: 180, noivImpact: 16, avgTOI: 22,
+    })).toBe("HIGH_GRAVITY");
+    expect(classifyForwardArchetype({
+      ptsPace: 42, goalsPace: 18, assistsPace: 24, avgTOI: 14, edgeBurstsOver20: 44,
+    })).toBe("SPEED_BURST");
   });
 });

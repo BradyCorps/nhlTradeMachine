@@ -12,7 +12,7 @@ import {
   getShutdownDPedigree,
 } from "@/app/lib/player-data";
 import { FRANCHISE, SEASON } from "@/app/lib/season-config";
-import { calcNAV } from "@/app/lib/xnav-engine";
+import { calcNAV, classifyForwardArchetype } from "@/app/lib/xnav-engine";
 import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
@@ -145,46 +145,46 @@ function ArchetypeBadge({ player }: { player: Player }) {
       else                           { label = "DEPTH D";  color = "var(--ink-faint)"; }
     }
   } else {
-    // Forward archetype — uses goals/assists ratio as primary style signal
-    const goals   = player.goalsPace ?? null;
-    const assists = player.assistsPace ?? null;
-    const pts     = player.ptsPace;
-    const assistRatio = goals != null && assists != null && pts > 0 ? assists / pts : null;
-    const goalRatio   = goals != null && assists != null && pts > 0 ? goals   / pts : null;
-
-    if      (pts >= 95 && assistRatio != null && assistRatio >= 0.55)
-      { label = "FRANCHISE"; color = "var(--ledger-ink)"; }
-    else if (pts >= 95 && player.xgRelTM != null && (player.xgRelTM as number) > 4)
-      { label = "FRANCHISE"; color = "var(--ledger-ink)"; }
-    else if (goalRatio != null && goalRatio > 0.53 && pts >= 25)
-      { label = "SNIPER";    color = "var(--blue)"; }
-    else if (assistRatio != null && assistRatio > 0.60 && pts >= 35)
-      { label = "PLAYMAKER"; color = "var(--ledger-green)"; }
-    else if (psRatio !== null) {
-      if (psRatio > 0.65)      { label = "SCORER";   color = "var(--blue)"; }
-      else if (psRatio < 0.35) { label = "CHECKER";  color = "var(--red)"; }
-      else                     { label = "TWO-WAY";  color = "var(--green)"; }
-    } else {
-      if (pts >= 70)               { label = "SCORER";  color = "var(--blue)"; }
-      else if (player.avgTOI >= 16){ label = "TWO-WAY"; color = "var(--green)"; }
-      else                         { label = "DEPTH";   color = "var(--ink-faint)"; }
-    }
+    label = classifyForwardArchetype({
+      ptsPace: player.ptsPace,
+      goalsPace: player.goalsPace,
+      assistsPace: player.assistsPace,
+      xGPace: player.xGPace,
+      avgTOI: player.avgTOI,
+      qocIndex: player.qocIndex,
+      xgRelTM: player.xgRelTM,
+      ops: player.ops,
+      dps: player.dps,
+      pkTimeShare: player.pkTimeShare,
+      edgeSpeedMaxMph: player.edgeSpeedMaxMph,
+      edgeBurstsOver20: player.edgeBurstsOver20,
+    });
+    color = label === "HIGH_GRAVITY" ? "var(--ledger-ink)"
+      : label === "LINE_RAISER" || label === "LINE_ESTABLISHER" ? "var(--ledger-green)"
+      : label === "LINE_FINISHER" || label === "SPEED_BURST" ? "var(--blue)"
+      : label === "DEFENSIVE" ? "var(--red)"
+      : label === "SPACE_OPENER" ? "var(--ledger-amber)"
+      : label === "IMPACT_PLAYER" ? "var(--ledger-navy)"
+      : "var(--ink-faint)";
   }
 
   if (!label) return null;
   const icon =
-    label === "FRANCHISE" ? "◆"
-    : label === "SNIPER" ? "◎"
-    : label === "PLAYMAKER" ? "↗"
-    : label === "SCORER" || label === "OFF D" ? "●"
-    : label === "SHUTDOWN" || label === "CHECKER" ? "■"
+    label === "HIGH_GRAVITY" ? "◆"
+    : label === "LINE_RAISER" ? "↗"
+    : label === "LINE_FINISHER" ? "◎"
+    : label === "SPEED_BURST" ? "≫"
+    : label === "SPACE_OPENER" ? "□"
+    : label === "IMPACT_PLAYER" || label === "OFF D" ? "●"
+    : label === "SHUTDOWN" || label === "DEFENSIVE" ? "■"
     : label === "STARTER" ? "G1"
     : label === "TANDEM" ? "G2"
-    : label === "TWO-WAY" ? "◇"
+    : label === "TWO-WAY" || label === "LINE_ESTABLISHER" ? "◇"
     : "•";
+  const displayLabel = label.replace(/_/g, " ");
 
   return (
-    <span title={label} aria-label={label} style={{
+    <span title={displayLabel} aria-label={displayLabel} style={{
       display: "inline-flex", alignItems: "center", justifyContent: "center",
       minWidth: "18px", height: "18px",
       fontSize: icon.length > 1 ? "8px" : "11px", fontWeight: 900,
@@ -207,6 +207,8 @@ function PlayerIconBadges({ player }: { player: Player }) {
     capCeiling: SEASON.capCeiling,
     ptsPace: player.ptsPace,
     xGPace: player.xGPace,
+    edgeSpeedMaxMph: player.edgeSpeedMaxMph,
+    edgeBurstsOver20: player.edgeBurstsOver20,
     defRate: player.defRate ?? 0.08,
     avgTOI: player.avgTOI,
     qocIndex: player.qocIndex,
