@@ -9,6 +9,7 @@ import {
 } from "@/app/lib/sim-engine";
 import { slotMultiplier } from "@/app/lib/lineup-context";
 import { leadershipBonus } from "@/app/data/leadership";
+import { opportunityPace } from "@/app/lib/young-opportunity";
 import { computeBreakout } from "@/app/lib/breakout-model";
 import { burstProfile } from "@/app/lib/burst-channel";
 
@@ -501,12 +502,23 @@ function projectSkaterOutcome(
     gamesPlayed = Math.max(8, gamesPlayed - Math.round((isAgingWell ? 10 : 18) + rand() * (isAgingWell ? 18 : 38)));
   }
 
+  // Opportunity unlocks a young player's ceiling — a prospect handed a real
+  // scoring role produces toward what that role supports, not just his thin NHL
+  // sample (see young-opportunity.ts). Only ever lifts; veterans are untouched.
+  const effectivePace = opportunityPace({
+    age: p.age, priorGames, stablePace, prospectPace,
+    draftOverall: p.draftOverall, isProspectProfile, isYoungRegular,
+    deploymentActive: deployment?.active ?? false,
+    deploymentGroup: deployment?.group,
+    deploymentSlot: deployment?.slot,
+  });
+
   // Burst channel: explosive skaters carry a fatter upside tail (variance kick
   // adds only to the ceiling) and a small steady rush-offence lift on scoring.
   const burst = burstProfile(p);
   const paceVariance = (isAgingWell ? 0.98 + rand() * 0.14 : 0.91 + rand() * 0.18) + rand() * burst.varianceKick;
   const deploymentMultiplier = deployment?.active ? deployment.multiplier : benched ? 0.85 : 1;
-  const projectedPts = Math.max(0, Math.round((stablePace / 82) * gamesPlayed * development * paceVariance * deploymentMultiplier * burst.rushLift));
+  const projectedPts = Math.max(0, Math.round((effectivePace / 82) * gamesPlayed * development * paceVariance * deploymentMultiplier * burst.rushLift));
   const xgGoalShare = stablePace > 0
     ? clamp((p.xGPace ?? 0) / Math.max(stablePace, 1), 0.22, p.position === "D" ? 0.36 : 0.55)
     : p.position === "D" ? 0.24 : 0.38;
