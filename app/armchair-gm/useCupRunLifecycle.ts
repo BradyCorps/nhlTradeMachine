@@ -11,7 +11,7 @@
 // which fire after every render has assigned them.
 import React, { useState, useEffect, useCallback } from "react";
 import type { Asset, Team } from "@/app/lib/trade-types";
-import { capForCupYear } from "@/app/lib/season-config";
+import { capForCupYear, SEASON } from "@/app/lib/season-config";
 import { clearNavCache } from "@/app/lib/evaluate-client";
 import {
   startCupRun,
@@ -166,9 +166,17 @@ export function useCupRunLifecycle({
       });
       setCupRun({ ...next, retentionLedger: rollRetentionLedger(next.retentionLedger) });
       clearNavCache();
-      const rolledTeams = reconcileAiTeamCapSpaces(db.teams, rolled.players, nextCap, next.teamId);
-      setDb(prev => ({ ...prev, teams: rolledTeams, players: rolled.players, capCeiling: nextCap }));
-      setOriginalDb({ teams: rolledTeams, players: rolled.players, capCeiling: nextCap });
+      // Prune spent draft picks: once the league rolls into a new season, any
+      // pick from a draft that has already happened is gone and must not still
+      // be tradeable (a 2027 pick in the 2028-29 season). The draft for the
+      // season being entered is SEASON.draftYear + currentYear - 1.
+      const currentDraftYear = SEASON.draftYear + next.currentYear - 1;
+      const livePlayers = rolled.players.filter(
+        p => p.position !== "Pick" || (p.year ?? 9999) >= currentDraftYear,
+      );
+      const rolledTeams = reconcileAiTeamCapSpaces(db.teams, livePlayers, nextCap, next.teamId);
+      setDb(prev => ({ ...prev, teams: rolledTeams, players: livePlayers, capCeiling: nextCap }));
+      setOriginalDb({ teams: rolledTeams, players: livePlayers, capCeiling: nextCap });
       onSeasonRolledRef.current();
       const breakouts = rolled.events.filter(e => e.type === "breakout").length;
       toast(
