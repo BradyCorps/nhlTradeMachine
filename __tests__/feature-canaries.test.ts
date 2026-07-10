@@ -47,8 +47,11 @@ describe("Canary — engine prospect path", () => {
       id: "p", name: "Top Pick", position: "C", age: 18,
       capHit: 0.95, yearsRemaining: 3, draftOverall: 1,
     });
-    // #1 overall ≈ 400-pick value × 1.10 certainty
-    expect(nav.total).toBeGreaterThan(300);
+    // #1 overall is an elite prospect, but an UNPROVEN one is capped below the
+    // franchise-star tier (PROSPECT_CEILING) — he shouldn't be worth more than a
+    // proven cornerstone. Blue-chip, not generational-untouchable.
+    expect(nav.total).toBeGreaterThan(200);
+    expect(nav.total).toBeLessThanOrEqual(240);
   });
 
   it("calcNAV routes draftees (games < 14, no live stats) through the pedigree path", () => {

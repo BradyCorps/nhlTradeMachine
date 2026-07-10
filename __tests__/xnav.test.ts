@@ -1047,3 +1047,21 @@ describe("classifyRosterTier — position-aware", () => {
     expect(classifyRosterTier(13, 20, 1.0, 40, 12, 0.5, false)).toBe("BOTTOM_SIX");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ARCHETYPE — shooter vs playmaker is a goals/assists split
+// ─────────────────────────────────────────────────────────────────────────────
+describe("forward archetype", () => {
+  const base = {
+    position: "C" as const, age: 27, capHit: 8, yearsRemaining: 4, avgTOI: 20,
+    ops: 8, dps: 2, qocIndex: 55, games: 80, hasLiveStats: true, capCeiling: 104,
+  };
+  it("tags an assist-heavy scorer as a PLAYMAKER, not a SNIPER (Scheifele 28G/79A)", () => {
+    const nav = calcSkaterNAV({ ...base, id: "s", name: "Scheifele", ptsPace: 107, goalsPace: 28, assistsPace: 79, xGPace: 24 });
+    expect(nav.fArchetype).toBe("PLAYMAKER");
+  });
+  it("tags a goal-heavy scorer as a SNIPER", () => {
+    const nav = calcSkaterNAV({ ...base, id: "g", name: "Sniper", ptsPace: 90, goalsPace: 52, assistsPace: 38, xGPace: 40 });
+    expect(nav.fArchetype).toBe("SNIPER");
+  });
+});

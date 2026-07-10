@@ -28,6 +28,8 @@ export interface AssetInput {
   extensionCapHit?: number;
   extensionYears?:  number;
   ptsPace?:       number;
+  goalsPace?:     number;        // for archetype: shooter (goal-heavy) vs playmaker (assist-heavy)
+  assistsPace?:   number;
   xGPace?:        number;
   defRate?:       number;
   avgTOI?:        number;
@@ -793,20 +795,28 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const rosterTier = classifyRosterTier(toi, normalizedPts, evMdep, qocIdx, evToi, shToi, isD);
   let fArchetype = "";
   if (!isD) {
+    // SNIPER vs PLAYMAKER is a goals-vs-assists distinction, NOT an
+    // offense-vs-defense one — the old psRatio tagged assist-heavy players
+    // (Scheifele 28G/79A) as "SNIPER" because their offensive share was high.
+    const goals   = safe(asset.goalsPace ?? 0);
+    const assists = safe(asset.assistsPace ?? Math.max(0, pts - goals));
+    const gaTotal = goals + assists;
+    const goalShare = gaTotal > 0 ? goals / gaTotal : 0.5;
     const psRatio = ops !== null && dps !== null && (ops + dps) > 1
       ? ops / (ops + dps) : null;
-    if (psRatio !== null) {
-      fArchetype = psRatio > 0.70 ? "SNIPER"
-        : psRatio > 0.58 ? "SCORER"
-        : psRatio < 0.35 ? "GRINDER"
-        : defTotal > 35 && offTotal > 60 ? "TWO_WAY"
+    const isOffensive = psRatio !== null ? psRatio > 0.55 : pts >= 45;
+    const isDepth = psRatio !== null ? psRatio < 0.35 : pts < 30;
+
+    if (isDepth) {
+      fArchetype = defTotal > 30 && toi > 15 ? "TWO_WAY" : "GRINDER";
+    } else if (isOffensive) {
+      // Real goal/assist split when we have it, else fall back to xG share.
+      fArchetype = goalShare >= 0.52 ? "SNIPER"
+        : goalShare <= 0.40 ? "PLAYMAKER"
         : offTotal > 70 ? "PLAYMAKER"
         : "SCORER";
     } else {
-      fArchetype = pts > 80 ? "SNIPER"
-        : def > 0.5 && toi > 20 ? "TWO_WAY"
-        : pts > 50 ? "PLAYMAKER"
-        : "SCORER";
+      fArchetype = defTotal > 35 && pts >= 35 ? "TWO_WAY" : "SCORER";
     }
 
     // Situational refinement from NST/MoneyPuck baselines — overrides inference
@@ -1005,7 +1015,14 @@ export function calcProspectNAV(asset: AssetInput): XNAVResult {
     ? Math.pow(clamp((nhlePace - 15) / 45, 0, 1), 1.2) * 35
     : 0;
 
-  const total = Math.round(Math.max(pick.total * certainty * nhle, productionFloor) * goalieDiscount);
+  // An unproven prospect — however high he was drafted — is NOT a franchise
+  // cornerstone yet: he carries more downside than a proven star (he can still
+  // bust). So he can't be worth MORE than his own draft slot (certainty ≤ 1.0),
+  // and he's capped below the franchise tier. This stops a 19-yo with 2 NHL
+  // points reading as a 300-NAV asset (worth more than most established stars).
+  const PROSPECT_CEILING = 240;
+  const rawTotal = Math.max(pick.total * Math.min(certainty, 1.0) * nhle, productionFloor) * goalieDiscount;
+  const total = Math.round(Math.min(rawTotal, PROSPECT_CEILING));
   return {
     total,
     off: 0, def: 0, age: 0, cap: 0,
