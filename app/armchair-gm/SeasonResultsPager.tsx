@@ -407,7 +407,7 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                       <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.projectedGAA ?? '—'}</td>
                       <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.projectedSVP?.toFixed(3) ?? '—'}</td>
                       <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums font-black" style={{ color: (t.goalie.gsax ?? 0) >= 0 ? 'var(--ledger-green)' : 'var(--ledger-red)' }}>
-                        {t.goalie.gsax != null ? `${t.goalie.gsax > 0 ? '+' : ''}${t.goalie.gsax.toFixed(2)}` : '—'}
+                        {t.goalie.gsax != null ? `${t.goalie.gsax > 0 ? '+' : ''}${t.goalie.gsax.toFixed(1)}` : '—'}
                       </td>
                       <td className="text-[11px] py-1.5 px-1.5 text-right tabular-nums font-black" style={{ color: 'var(--ledger-ink)' }}>{gNav ? gNav.total : '—'}</td>
                       <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums" style={{ color: gCapSurplus === null ? 'var(--ledger-ink-faint)' : gCapSurplus > 0 ? 'var(--ledger-green)' : 'var(--ledger-red)' }}>

@@ -907,11 +907,21 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const qualifiesEliteForward  = provenFranchiseSample && !isD && (pts >= 80 || (ops !== null && ops >= 5.0));
   const qualifiesEliteDefender =  provenFranchiseSample && isD && (pts >= 65 || (ops !== null && ops >= 4.0)) && toi > 22;
 
+  // The floor was three FLAT tiers, so every qualifying star collapsed onto the
+  // same number (a wall of identical "180"s in the box score). Give it a
+  // production slope above the qualification bar so a 115-point player floors
+  // higher than an 80-point one — distinct players, distinct floors. It stays a
+  // pure floor (only ever raised above the base, never below), so it can't drag
+  // anyone down.
   let franchiseFloor = -Infinity;
   if (qualifiesEliteForward) {
-    franchiseFloor = age <= 24 ? 260 : age <= 26 ? 220 : 180;
+    const base = age <= 24 ? 260 : age <= 26 ? 220 : 180;
+    const prodOver = Math.max(pts - 80, (ops ?? 0) * 15 - 80);
+    franchiseFloor = base + clamp(prodOver, 0, 45) * 1.4;
   } else if (qualifiesEliteDefender) {
-    franchiseFloor = age <= 24 ? 240 : age <= 26 ? 200 : 160;
+    const base = age <= 24 ? 240 : age <= 26 ? 200 : 160;
+    const prodOver = Math.max(pts - 65, (ops ?? 0) * 15 - 65);
+    franchiseFloor = base + clamp(prodOver, 0, 40) * 1.4;
   } else if (isShutdownTopPairD) {
     franchiseFloor = 130 + clamp((toi - 22) * 5 + shutdownDSignal, 0, 20);
   }
