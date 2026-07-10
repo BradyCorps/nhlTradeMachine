@@ -259,6 +259,7 @@ describe("simulate route", () => {
     const projectedIvar = body.homeTeam.projectedSkaters.find((p: any) => p.playerId === ivarStenberg.id);
 
     expect(projectedGavin.projectedPts).toBeGreaterThan(0);
+    expect(projectedGavin.projectedTOI).toBeGreaterThan(0);
     expect(projectedGavin.calderEligible).toBe(true);
     expect(projectedIvar.projectedPts).toBeGreaterThan(0);
   });

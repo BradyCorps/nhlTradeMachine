@@ -69,6 +69,7 @@ interface ProjectedSkaterSeason {
   projectedGoals: number;
   projectedAssists: number;
   gamesPlayed: number;
+  projectedTOI: number;
   breakoutTag?: "BREAKOUT" | "REGRESSION" | "VETERAN_HOLD" | "CAREER_YEAR";
 }
 
@@ -423,6 +424,20 @@ function projectGoalie(
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value));
 
+function projectedSkaterToi(p: SimPlayer, deployment?: SkaterDeployment, benched?: boolean): number {
+  if (deployment?.active) {
+    if (deployment.group === "D") {
+      const pair = Math.floor(deployment.slot / 2);
+      return [22.8, 19.4, 16.2][pair] ?? 16.2;
+    }
+    const line = Math.floor(deployment.slot / 3);
+    return [18.4, 15.8, 13.2, 10.8][line] ?? 10.8;
+  }
+
+  if (benched) return Math.max(6, Math.min(p.avgTOI || 8, 9.5));
+  return Math.max(0, Math.round((p.avgTOI ?? 0) * 10) / 10);
+}
+
 // ── Project skater seasons across a full roster ───────────────
 // This keeps last-season scoring as the anchor, but lets age, prospect NHLe,
 // prior usage, and controlled variance create believable breakouts/regressions.
@@ -545,6 +560,7 @@ function projectSkaterOutcome(
     projectedGoals,
     projectedAssists: Math.max(0, projectedPts - projectedGoals),
     gamesPlayed,
+    projectedTOI: projectedSkaterToi(p, deployment, benched),
     breakoutTag,
   };
 }

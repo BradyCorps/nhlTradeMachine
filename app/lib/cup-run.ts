@@ -159,6 +159,15 @@ export interface RollForwardResult {
   depthAddedCount: number;
 }
 
+export interface CupRunSkaterSeason {
+  playerId: string;
+  projectedPts: number;
+  projectedGoals: number;
+  projectedAssists: number;
+  gamesPlayed: number;
+  projectedTOI?: number;
+}
+
 export type CupRunOffseasonEntry = "DRAFT_NIGHT" | "DRAFT_SUMMARY" | "RESIGN";
 
 export function cupRunOffseasonEntry(
@@ -177,6 +186,44 @@ const committedCap = (players: Asset[], teamId: string): number =>
   players
     .filter((p) => p.teamId === teamId && isSkaterOrGoalie(p))
     .reduce((sum, p) => sum + (p.capHit ?? 0) * (1 - (p.retainedPct ?? 0)), 0);
+
+const round1 = (value: number): number => Math.round(value * 10) / 10;
+
+const seasonPace = (count: number, games: number): number =>
+  round1((Math.max(0, count) / Math.max(1, games)) * 82);
+
+const fallbackSeasonToi = (p: Asset, ptsPace: number): number => {
+  if ((p.avgTOI ?? 0) > 0) return p.avgTOI;
+  if (p.position === "D") return ptsPace >= 40 ? 21 : ptsPace >= 25 ? 18 : 16;
+  return ptsPace >= 55 ? 18 : ptsPace >= 35 ? 15 : 12;
+};
+
+function carryForwardSimSkaterStats(players: Asset[], seasons: CupRunSkaterSeason[] = []): Asset[] {
+  if (seasons.length === 0) return players;
+  const byId = new Map(seasons.map((s) => [s.playerId, s]));
+
+  return players.map((p) => {
+    if (p.position === "Pick" || p.position === "G") return p;
+    const season = byId.get(p.id);
+    if (!season || !Number.isFinite(season.gamesPlayed) || season.gamesPlayed <= 0) return p;
+
+    const games = Math.max(1, Math.round(season.gamesPlayed));
+    const ptsPace = seasonPace(season.projectedPts, games);
+    const projectedTOI = Number.isFinite(season.projectedTOI) && (season.projectedTOI ?? 0) > 0
+      ? season.projectedTOI!
+      : fallbackSeasonToi(p, ptsPace);
+
+    return {
+      ...p,
+      games,
+      ptsPace,
+      goalsPace: seasonPace(season.projectedGoals, games),
+      assistsPace: seasonPace(season.projectedAssists, games),
+      avgTOI: round1(projectedTOI),
+      hasLiveStats: true,
+    };
+  });
+}
 
 export function reconcileAiTeamCapSpaces(teams: Team[], players: Asset[], capCeiling: number, userTeamId: string): Team[] {
   return teams.map((team) => {
@@ -230,8 +277,9 @@ export function rollLeagueForward(opts: {
   teams: Team[];
   standings?: { teamId: string; standing: number }[]; // worst-first draft order source
   capCeiling: number;
+  simSkaterSeasons?: CupRunSkaterSeason[];
 }): RollForwardResult {
-  const { players, seasonStartPlayers, state, teams, standings, capCeiling } = opts;
+  const { players, seasonStartPlayers, state, teams, standings, capCeiling, simSkaterSeasons } = opts;
   const nextYear = state.currentYear;          // call AFTER recordSeason advanced it
   // The base draft (SEASON.draftYear, e.g. 2026) is played before Year 1.
   // Rolling INTO Year N drafts the class 2026 + (N-1): Year 2 → 2027,
@@ -240,13 +288,14 @@ export function rollLeagueForward(opts: {
   const rolloverSeed = state.seed + nextYear * 7919;
 
   const picks = players.filter((p) => p.position === "Pick");
-  const skaters = players.filter(isSkaterOrGoalie);
+  const skatersBeforeCarry = players.filter(isSkaterOrGoalie);
 
   // 1. Scenery: changed teams into a better slot during the season just played
   const scenery = computeChangeOfScenery(
     seasonStartPlayers.filter(isSkaterOrGoalie),
-    skaters,
+    skatersBeforeCarry,
   );
+  const skaters = carryForwardSimSkaterStats(skatersBeforeCarry, simSkaterSeasons);
 
   // 2. Age the league one offseason
   const rolled = advanceSeason(skaters, {

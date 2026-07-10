@@ -21,6 +21,7 @@ import {
   reconcileAiTeamCapSpaces,
   seasonLabelForYear,
   type CupRunState,
+  type CupRunSkaterSeason,
 } from "@/app/lib/cup-run";
 import { toast } from "@/app/lib/ledger-toast";
 import type { CupDraftSummary } from "./CupRunDraftSummaryModal";
@@ -29,6 +30,7 @@ import { futureDraftPromptForUserPick } from "@/app/lib/future-draft-choice";
 export const CUP_RUN_STORAGE_KEY = "cup-run-state-v1";
 
 type LeagueDb = { teams: Team[]; players: Asset[]; capCeiling?: number | null };
+type SimStanding = { teamId: string; projectedSkaters?: CupRunSkaterSeason[] };
 
 export function useCupRunLifecycle({
   homeTeam,
@@ -131,10 +133,13 @@ export function useCupRunLifecycle({
       // 2028-29). AI cap-legality and every team's cap space must be judged
       // against the year the league is entering, not a stale $104M.
       const nextCap = capForCupYear(next.currentYear).ceiling;
-      const standings = (simData.standings ?? []).map((t: { teamId: string }, i: number) => ({
+      const standings = (simData.standings ?? []).map((t: SimStanding, i: number) => ({
         teamId: t.teamId,
         standing: i + 1,
       }));
+      const simSkaterSeasons = (simData.standings ?? []).flatMap((t: SimStanding) =>
+        Array.isArray(t.projectedSkaters) ? t.projectedSkaters : [],
+      );
       const rolled = rollLeagueForward({
         players: db.players,
         seasonStartPlayers: originalDb?.players ?? db.players,
@@ -142,6 +147,7 @@ export function useCupRunLifecycle({
         teams: db.teams,
         standings,
         capCeiling: nextCap,
+        simSkaterSeasons,
       });
       const drafted = [...rolled.draftedRookies]
         .sort((a, b) => (a.draftOverall ?? 999) - (b.draftOverall ?? 999));

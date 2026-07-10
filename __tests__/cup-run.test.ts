@@ -258,6 +258,47 @@ describe("rollLeagueForward", () => {
     expect(signed.every((p) => !p.expiresThisOffseason)).toBe(true);
   });
 
+  it("carries simulated prospect production into the rolled roster before development", () => {
+    const pool = [
+      ...league(),
+      asset("bjork", {
+        teamId: "VAN",
+        position: "W",
+        age: 19,
+        games: 0,
+        ptsPace: 0,
+        baselinePtsPace: 0,
+        prospectPtsPace: 42,
+        avgTOI: 0,
+        hasLiveStats: false,
+      }),
+    ];
+    const res = rollLeagueForward({
+      players: pool,
+      seasonStartPlayers: pool,
+      state,
+      teams,
+      capCeiling: 200,
+      simSkaterSeasons: [{
+        playerId: "bjork",
+        projectedPts: 31,
+        projectedGoals: 6,
+        projectedAssists: 25,
+        gamesPlayed: 70,
+        projectedTOI: 15.8,
+      }],
+    });
+
+    const bjork = res.players.find((p) => p.id === "bjork")!;
+    expect(bjork.games).toBe(70);
+    expect(bjork.goalsPace).toBeCloseTo(7, 1);
+    expect(bjork.assistsPace).toBeCloseTo(29.3, 1);
+    expect(bjork.avgTOI).toBe(15.8);
+    expect(bjork.ptsPace).toBeGreaterThan(25);
+    expect(bjork.baselinePtsPace).toBeGreaterThan(15);
+    expect(bjork.hasLiveStats).toBe(true);
+  });
+
   it("walks an over-cap AI team back under the ceiling", () => {
     const bloated = league().map((p) =>
       p.teamId === "CAR" && p.position !== "Pick" ? { ...p, capHit: 7 } : p
