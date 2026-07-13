@@ -1,6 +1,7 @@
 "use client";
 
 import { formatPickRound } from "@/app/lib/trade-format";
+import { displayPosition } from "@/app/lib/display-position";
 
 // ============================================================
 // PLAYER COMPARISON PANEL
@@ -129,8 +130,8 @@ const PlayerCard = ({ asset, nav, side }: { asset: Asset; nav: NavBreakdown; sid
                   const effective = asset.capHit * (1 - (asset.retainedPct || 0));
                   const hasRetention = (asset.retainedPct || 0) > 0;
                   return hasRetention
-                    ? `${asset.position} · Age ${asset.age} · $${effective.toFixed(1)}M × ${asset.yearsRemaining}yr (${Math.round(asset.retainedPct! * 100)}% retained)`
-                    : `${asset.position} · Age ${asset.age} · $${asset.capHit.toFixed(1)}M × ${asset.yearsRemaining}yr`;
+                    ? `${displayPosition(asset.position, asset.secondaryPosition)} · Age ${asset.age} · $${effective.toFixed(1)}M × ${asset.yearsRemaining}yr (${Math.round(asset.retainedPct! * 100)}% retained)`
+                    : `${displayPosition(asset.position, asset.secondaryPosition)} · Age ${asset.age} · $${asset.capHit.toFixed(1)}M × ${asset.yearsRemaining}yr`;
                 })()}
           </div>
         </div>

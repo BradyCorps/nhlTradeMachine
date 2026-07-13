@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Asset, Team } from "@/app/lib/trade-types";
+import { displayPosition } from "@/app/lib/display-position";
 import { fetchTradeVerdict } from "@/app/lib/evaluate-client";
 import type { TradeProposal } from "@/app/lib/trade-logic";
 import {
@@ -339,8 +340,8 @@ export default function TradeProposalEngine({
             </div>
             <div className="text-[10px] mt-1" style={{ color: '#9a7d58', fontFamily: "'Courier Prime', monospace" }}>
               {outgoingBlock.length > 1
-                ? outgoingBlock.map((a: Asset) => `${a.name} (${a.position})`).join(" · ")
-                : `${outgoingBlock[0]?.position} · Age ${outgoingBlock[0]?.age} · $${outgoingBlock[0]?.capHit}M`}
+                ? outgoingBlock.map((a: Asset) => `${a.name} (${displayPosition(a.position, a.secondaryPosition)})`).join(" · ")
+                : `${displayPosition(outgoingBlock[0]?.position, outgoingBlock[0]?.secondaryPosition)} · Age ${outgoingBlock[0]?.age} · $${outgoingBlock[0]?.capHit}M`}
               {" "}· NAV {blockNav.toFixed(0)}
             </div>
             {isDump && (
@@ -494,7 +495,7 @@ export default function TradeProposalEngine({
                             </div>
                             {a.position !== "Pick" && (
                               <div className="text-[11px] font-mono mt-0.5" style={{ color: '#9a7d58' }}>
-                                {a.position} · Age {a.age}
+                                {displayPosition(a.position, a.secondaryPosition)} · Age {a.age}
                                 {a.position === "G"
                                   ? ` · ${a.savePct?.toFixed(3) ?? "—"} SV%`
                                   : ` · ${a.ptsPace?.toFixed(0) ?? "—"} pts/82`}
@@ -532,7 +533,7 @@ export default function TradeProposalEngine({
                           </div>
                           {a.position !== "Pick" && (
                             <div className="text-[11px] font-mono mt-0.5" style={{ color: '#9a7d58' }}>
-                              {a.position} · Age {a.age}
+                              {displayPosition(a.position, a.secondaryPosition)} · Age {a.age}
                               {a.position === "G"
                                 ? ` · ${a.savePct?.toFixed(3) ?? "—"} SV%`
                                 : ` · ${a.ptsPace?.toFixed(0) ?? "—"} pts/82`}

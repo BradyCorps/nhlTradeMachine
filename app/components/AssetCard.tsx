@@ -13,6 +13,7 @@ import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePane
 import { formatPickRound } from "@/app/lib/trade-format";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
 import MeasuredProfile from "@/app/components/MeasuredProfile";
+import { displayPosition } from "@/app/lib/display-position";
 
 const fmt = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
 type AssetCardView = "STATS" | "STRAND" | "TIMELINE" | "DEV" | "EDGE";
@@ -120,7 +121,7 @@ export default function AssetCard({
                       // Show both: current cheap deal + incoming expensive extension
                       return (
                         <span>
-                          {asset.position} · Age {asset.age} ·{' '}
+                          {displayPosition(asset.position, asset.secondaryPosition)} · Age {asset.age} ·{' '}
                           <span className="text-ledger-brown">${asset.capHit.toFixed(2)}M × {asset.yearsRemaining}yr</span>
                           <span className="text-ledger-ink-faint"> → </span>
                           <span className="text-ledger-orange">EXT ${extCap.toFixed(2)}M × {extYears}yr</span>
@@ -130,7 +131,7 @@ export default function AssetCard({
                     if (asset.hasExtension) {
                       return (
                         <span className="text-ledger-orange">
-                          {asset.position} · Age {asset.age} · ${asset.capHit.toFixed(2)}M × {asset.yearsRemaining}yr · EXTENDED
+                          {displayPosition(asset.position, asset.secondaryPosition)} · Age {asset.age} · ${asset.capHit.toFixed(2)}M × {asset.yearsRemaining}yr · EXTENDED
                         </span>
                       );
                     }
@@ -140,13 +141,13 @@ export default function AssetCard({
                       const effectiveCap = asset.capHit * (1 - asset.retainedPct!);
                       return (
                         <span>
-                          {asset.position} · Age {asset.age} ·{' '}
+                          {displayPosition(asset.position, asset.secondaryPosition)} · Age {asset.age} ·{' '}
                           <span className="text-emerald-500">${effectiveCap.toFixed(2)}M × {asset.yearsRemaining}yr</span>
                           <span className="text-ledger-ink-faint text-2xs ml-1">(${asset.capHit.toFixed(2)}M − {Math.round(asset.retainedPct! * 100)}% retained)</span>
                         </span>
                       );
                     }
-                    return `${asset.position} · Age ${asset.age} · $${asset.capHit.toFixed(2)}M × ${asset.yearsRemaining}yr · Exp. ${expiryYear}`;
+                    return `${displayPosition(asset.position, asset.secondaryPosition)} · Age ${asset.age} · $${asset.capHit.toFixed(2)}M × ${asset.yearsRemaining}yr · Exp. ${expiryYear}`;
                   })()}
             </div>
             
@@ -242,7 +243,7 @@ export default function AssetCard({
               >
                 <option value="">— none —</option>
                 {otherBlock.map(a => (
-                  <option key={a.id} value={a.id}>{a.name} ({a.position})</option>
+                  <option key={a.id} value={a.id}>{a.name} ({displayPosition(a.position, a.secondaryPosition)})</option>
                 ))}
               </select>
             </div>

@@ -5,6 +5,7 @@ import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import TeamStrand from "@/app/components/TeamStrand";
 import type { Asset, Team, TradeVerdict, XNAVResult } from "@/app/lib/trade-types";
+import { displayPosition } from "@/app/lib/display-position";
 import { computeRosterStrand } from "@/app/lib/roster-strand";
 import { deriveTeamPhase, type TeamPhase } from "@/app/armchair-gm/contention";
 import { fetchNavMap, fetchTradeVerdict } from "@/app/lib/evaluate-client";
@@ -90,7 +91,7 @@ function assetLabel(asset: Asset): string {
     const round = formatPickRound(asset.round);
     return `${asset.year ?? ""} ${round} round pick`;
   }
-  return `${asset.name} · ${asset.position} · ${fmtCap(asset.capHit ?? 0)}`;
+  return `${asset.name} · ${displayPosition(asset.position, asset.secondaryPosition)} · ${fmtCap(asset.capHit ?? 0)}`;
 }
 
 function ErrorNotice({
@@ -244,7 +245,7 @@ function AssetRow({
   // Collapsed subline: position/cap/term, plus a scannable stat chip.
   const subline = isPick
     ? asset.teamId
-    : `${asset.position} · ${fmtCap(asset.capHit)} · ${asset.yearsRemaining}yr`;
+    : `${displayPosition(asset.position, asset.secondaryPosition)} · ${fmtCap(asset.capHit)} · ${asset.yearsRemaining}yr`;
   const statChip = isPick
     ? null
     : isGoalie

@@ -23,6 +23,7 @@ import {
 } from "@/app/lib/development-sources";
 import { fetchProspectEnrichmentMap } from "@/app/lib/prospect-enrichment";
 import { applyTeamCapDeltas, type CapDeltaAsset, type CapDeltaMoves, type TeamCapDeltaMap } from "@/app/lib/cap-delta";
+import { SECONDARY_POSITIONS } from "@/app/data/secondary-positions";
 
 const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
 const CONTRACTS_CACHE_KEY = "cache:contracts:v2";
@@ -1254,6 +1255,7 @@ export async function assembleCanonicalRoster(options: {
         teamId,
         name:           p.name,
         position:       finalPosition,
+        secondaryPosition: SECONDARY_POSITIONS[p.name] ?? null,
         age:            p.age,
         headshot:       p.headshot ?? null,
         // Draftees default to 0 games so the pedigree NAV path (games < 14) triggers

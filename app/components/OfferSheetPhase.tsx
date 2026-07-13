@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Asset, Team } from "@/app/lib/trade-types";
+import { displayPosition } from "@/app/lib/display-position";
 import type { OffseasonPending } from "@/app/lib/free-agency";
 import {
   getOfferSheetCompensation,
@@ -261,7 +262,7 @@ export default function OfferSheetPhase({
                         {fa.player.name}
                       </span>
                       <span className="text-[9px] font-mono uppercase tracking-wide" style={{ color: "var(--ledger-ink-faint)" }}>
-                        {fa.player.position} · age {fa.player.age} · {fa.player.teamId}
+                        {displayPosition(fa.player.position, fa.player.secondaryPosition)} · age {fa.player.age} · {fa.player.teamId}
                         {origTeam?.phase && ` (${origTeam.phase})`}
                       </span>
                     </div>

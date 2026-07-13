@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
+import { displayPosition } from "@/app/lib/display-position";
 import type { OffseasonPending } from "@/app/lib/free-agency";
 import { getOfferSheetCompensation } from "@/app/lib/free-agency";
 import StrandView from "@/app/components/StrandView";
@@ -68,7 +69,7 @@ function PlayerMeta({ p }: { p: OffseasonPending["player"] }) {
   const wasCap = p.lastCapHit ?? p.capHit;
   return (
     <span className="text-[9px] font-mono uppercase tracking-wide" style={{ color: "var(--ledger-ink-faint)" }}>
-      {p.position} · age {p.age}{wasCap > 0 ? ` · was ${money(wasCap)}` : ""}
+      {displayPosition(p.position, p.secondaryPosition)} · age {p.age}{wasCap > 0 ? ` · was ${money(wasCap)}` : ""}
     </span>
   );
 }
@@ -248,7 +249,7 @@ export default function ResignPhase({
                       <div className="min-w-0">
                         <div className="font-bold text-[12px] truncate" style={{ color: "var(--ledger-ink)" }}>{p.name}</div>
                         <span className="text-[9px] font-mono uppercase tracking-wide" style={{ color: "var(--ledger-ink-faint)" }}>
-                          {p.position} · age {p.age} · {money(p.capHit ?? 0)} × {p.yearsRemaining ?? 0}yr
+                          {displayPosition(p.position, p.secondaryPosition)} · age {p.age} · {money(p.capHit ?? 0)} × {p.yearsRemaining ?? 0}yr
                         </span>
                       </div>
                       <button onClick={() => onDrop(p)}

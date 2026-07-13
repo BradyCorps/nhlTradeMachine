@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import type { Asset, Team } from "@/app/lib/trade-types";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
+import { displayPosition } from "@/app/lib/display-position";
 
 interface Props {
   players: Asset[];
@@ -114,7 +115,7 @@ export default function TradeBlockPanel({ players, teams, onSelectTeam, onClose 
         </div>
 
         <div style={{ fontSize: 10, color: "var(--ledger-ink-faint)", textAlign: "center", fontFamily: "monospace" }}>
-          {p.position}
+          {displayPosition(p.position, p.secondaryPosition)}
         </div>
 
         <div style={{ fontSize: 10, textAlign: "right", fontFamily: "monospace", color: "var(--ledger-ink)" }}>
