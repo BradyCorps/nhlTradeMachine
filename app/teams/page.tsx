@@ -12,15 +12,32 @@ import { lineupContributionScore } from "@/app/lib/lineup-ranking";
 import { displayPosition } from "@/app/lib/display-position";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 
+interface TeamRecord {
+  wins: number;
+  losses: number;
+  otLosses: number;
+  points: number;
+  gamesPlayed: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  powerPlayPct: number;
+  penaltyKillPct: number;
+  shotsForPerGame: number;
+  shotsAgainstPerGame: number;
+  faceoffWinPct: number;
+  regulationWins: number;
+}
+
 interface TeamData {
   id: string;
   name: string;
   capSpace: number;
   standing: number;
   phase: string;
+  record: TeamRecord | null;
 }
 
-type SortKey = "standing" | "present" | "future" | "rosterNAV" | "capSpace" | "speed" | "name";
+type SortKey = "standing" | "present" | "future" | "rosterNAV" | "capSpace" | "goalDiff" | "speed" | "name";
 
 const PHASE_ORDER: Record<string, number> = {
   Contender: 1, Bubble: 2, Retooling: 3, Rebuilding: 4, Tanking: 5,
@@ -320,13 +337,13 @@ function LineupSection({ lines }: { lines: TeamLines }) {
   );
 }
 
-function TeamCard({ profile, expanded, onToggle }: {
+function TeamCard({ profile, expanded, onToggle, capCeiling }: {
   profile: TeamProfile;
   expanded: boolean;
   onToggle: () => void;
+  capCeiling: number;
 }) {
   const { team, contention, edge, strand, rosterNAV, topPlayers, capCommitted, lines, avgAge, rosterSize, ufaCount, rfaCount } = profile;
-  const capCeiling = 104;
 
   return (
     <div
@@ -349,6 +366,7 @@ function TeamCard({ profile, expanded, onToggle }: {
           </div>
           <div className="flex items-center gap-3 mt-1 text-[10px]" style={{ color: "var(--ledger-ink-faint)", fontVariantNumeric: "tabular-nums" }}>
             <span>#{team.standing}</span>
+            {team.record && <span>{team.record.wins}-{team.record.losses}-{team.record.otLosses}</span>}
             <span>Present {contention.present.toFixed(1)}</span>
             <span>Future {contention.future.toFixed(1)}</span>
             <span>NAV {Math.round(rosterNAV)}</span>
@@ -415,6 +433,48 @@ function TeamCard({ profile, expanded, onToggle }: {
             />
           </div>
 
+          {/* Season Record */}
+          {team.record && (
+            <div className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
+              <div className="text-[9px] font-black uppercase tracking-[0.15em] mb-2" style={{ color: "var(--ledger-ink-faint)" }}>
+                Season Record
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                <StatCell
+                  label="Record"
+                  value={`${team.record.wins}-${team.record.losses}-${team.record.otLosses}`}
+                  sub={`${team.record.points} pts`}
+                />
+                <StatCell
+                  label="Goal Diff"
+                  value={`${team.record.goalsFor - team.record.goalsAgainst > 0 ? "+" : ""}${team.record.goalsFor - team.record.goalsAgainst}`}
+                  sub={`${team.record.goalsFor} GF / ${team.record.goalsAgainst} GA`}
+                  tone={(team.record.goalsFor - team.record.goalsAgainst) > 0 ? "var(--ledger-green)" : "var(--ledger-red)"}
+                />
+                <StatCell
+                  label="PP%"
+                  value={`${(team.record.powerPlayPct * 100).toFixed(1)}%`}
+                  tone={team.record.powerPlayPct > 0.22 ? "var(--ledger-green)" : team.record.powerPlayPct < 0.18 ? "var(--ledger-red)" : undefined}
+                />
+                <StatCell
+                  label="PK%"
+                  value={`${(team.record.penaltyKillPct * 100).toFixed(1)}%`}
+                  tone={team.record.penaltyKillPct > 0.82 ? "var(--ledger-green)" : team.record.penaltyKillPct < 0.78 ? "var(--ledger-red)" : undefined}
+                />
+                <StatCell
+                  label="SF/Game"
+                  value={team.record.shotsForPerGame.toFixed(1)}
+                  sub={`${team.record.shotsAgainstPerGame.toFixed(1)} SA`}
+                />
+                <StatCell
+                  label="FO%"
+                  value={`${(team.record.faceoffWinPct * 100).toFixed(1)}%`}
+                  tone={team.record.faceoffWinPct > 0.51 ? "var(--ledger-green)" : team.record.faceoffWinPct < 0.49 ? "var(--ledger-red)" : undefined}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Roster overview strip */}
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
             <StatCell label="Avg Age" value={avgAge.toFixed(1)} />
@@ -430,14 +490,20 @@ function TeamCard({ profile, expanded, onToggle }: {
             </div>
             <div className="flex items-center gap-2 mb-1.5">
               <div className="flex-1 h-3 rounded-sm overflow-hidden" style={{ background: "var(--ledger-rule)" }}>
-                <div
-                  className="h-full rounded-sm"
-                  style={{
-                    width: `${Math.min(100, Math.max(0, (capCommitted / capCeiling) * 100))}%`,
-                    background: capCommitted > capCeiling ? "var(--ledger-red)" : "var(--ledger-green)",
-                    opacity: 0.7,
-                  }}
-                />
+                {(() => {
+                  const effectiveUsed = capCeiling - team.capSpace;
+                  const pct = Math.min(100, Math.max(0, (effectiveUsed / capCeiling) * 100));
+                  return (
+                    <div
+                      className="h-full rounded-sm"
+                      style={{
+                        width: `${pct}%`,
+                        background: team.capSpace < 0 ? "var(--ledger-red)" : "var(--ledger-green)",
+                        opacity: 0.7,
+                      }}
+                    />
+                  );
+                })()}
               </div>
               <span
                 className="text-[10px] font-black font-mono shrink-0"
@@ -450,7 +516,7 @@ function TeamCard({ profile, expanded, onToggle }: {
               </span>
             </div>
             <div className="text-[9px] font-mono" style={{ color: "var(--ledger-ink-faint)", fontVariantNumeric: "tabular-nums" }}>
-              ${capCommitted.toFixed(1)}M committed of ${capCeiling}M ceiling
+              ${(capCeiling - team.capSpace).toFixed(1)}M committed of ${capCeiling}M ceiling
             </div>
           </div>
 
@@ -523,6 +589,7 @@ function TeamCard({ profile, expanded, onToggle }: {
 export default function TeamsPage() {
   const [teams, setTeams] = useState<TeamData[]>([]);
   const [players, setPlayers] = useState<Asset[]>([]);
+  const [capCeiling, setCapCeiling] = useState(104);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("standing");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -534,6 +601,7 @@ export default function TeamsPage() {
       .then((data) => {
         setTeams(data.teams ?? []);
         setPlayers(data.players ?? []);
+        if (data.capCeiling) setCapCeiling(data.capCeiling);
       })
       .catch((err) => console.error("Failed to load league data:", err))
       .finally(() => setLoading(false));
@@ -596,6 +664,11 @@ export default function TeamsPage() {
         case "future": return b.contention.future - a.contention.future;
         case "rosterNAV": return b.rosterNAV - a.rosterNAV;
         case "capSpace": return b.team.capSpace - a.team.capSpace;
+        case "goalDiff": {
+          const aDiff = (a.team.record?.goalsFor ?? 0) - (a.team.record?.goalsAgainst ?? 0);
+          const bDiff = (b.team.record?.goalsFor ?? 0) - (b.team.record?.goalsAgainst ?? 0);
+          return bDiff - aDiff;
+        }
         case "speed": return (b.edge?.avgSpeedMaxMph ?? 0) - (a.edge?.avgSpeedMaxMph ?? 0);
         case "name": return a.team.name.localeCompare(b.team.name);
         default: return 0;
@@ -682,6 +755,7 @@ export default function TeamsPage() {
             ["future", "Future"],
             ["rosterNAV", "NAV"],
             ["capSpace", "Cap Space"],
+            ["goalDiff", "Goal Diff"],
             ["speed", "Speed"],
             ["name", "Name"],
           ] as [SortKey, string][]).map(([key, label]) => (
@@ -708,6 +782,7 @@ export default function TeamsPage() {
               profile={tp}
               expanded={expandedId === tp.team.id}
               onToggle={() => setExpandedId(expandedId === tp.team.id ? null : tp.team.id)}
+              capCeiling={capCeiling}
             />
           ))}
         </div>

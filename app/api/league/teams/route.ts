@@ -140,6 +140,38 @@ async function loadTeams(capCeiling: number): Promise<any[]> {
     console.error("[league/teams] Standings API fetch failed:", err instanceof Error ? err.message : err);
   }
 
+  if (standingsMap.size < 28) {
+    try {
+      const res = await fetchWithTimeout(
+        "https://api-web.nhle.com/v1/standings/now",
+        8000,
+        { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Origin": "https://www.nhl.com", "Referer": "https://www.nhl.com/" }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const entries: any[] = data.standings ?? [];
+        entries.sort((a: any, b: any) => (b.points ?? 0) - (a.points ?? 0));
+        entries.forEach((t: any, i: number) => {
+          const tricode = t.teamAbbrev?.default;
+          if (!tricode || standingsMap.has(tricode)) return;
+          standingsMap.set(tricode, {
+            standing:       i + 1,
+            conferenceRank: t.conferenceSequence ?? 8,
+            divisionRank:   t.divisionSequence ?? 4,
+            points:         t.points ?? 0,
+            pointPct:       t.pointPctg ?? 0.5,
+            teamFullName:   t.teamName?.default ?? tricode,
+          });
+        });
+        if (standingsMap.size >= 28) {
+          console.log("[league/teams] Standings recovered from api-web fallback");
+        }
+      }
+    } catch (err) {
+      console.error("[league/teams] Standings web-API fallback also failed:", err instanceof Error ? err.message : err);
+    }
+  }
+
   let dbTeams: any[] = [];
   try {
     dbTeams = await db.select().from(teamsTable);
