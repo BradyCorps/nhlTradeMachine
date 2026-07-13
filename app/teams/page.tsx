@@ -6,6 +6,9 @@ import Footer from "@/app/components/Footer";
 import { calcNAV } from "@/app/lib/xnav-engine";
 import { computeContention } from "@/app/armchair-gm/contention";
 import { computeTeamEdgeProfile, type TeamEdgeProfile } from "@/app/lib/team-edge-profile";
+import { computeRosterStrand } from "@/app/lib/roster-strand";
+import TeamStrand, { type TeamStrandData } from "@/app/components/TeamStrand";
+import { lineupContributionScore } from "@/app/lib/lineup-ranking";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 
 interface TeamData {
@@ -37,15 +40,37 @@ const QUADRANT_LABEL: Record<string, string> = {
   REBUILDING: "Rebuilding",
 };
 
+interface LineEntry {
+  name: string;
+  position: string;
+  nav: number;
+  capHit: number;
+  age: number;
+  ptsPace: number;
+  avgTOI: number;
+}
+
+interface TeamLines {
+  forwards: LineEntry[][]; // 4 lines of 3
+  defense: LineEntry[][];  // 3 pairs
+  goalies: LineEntry[];
+}
+
 interface TeamProfile {
   team: TeamData;
   roster: Asset[];
   navMap: Record<string, XNAVResult>;
   contention: ReturnType<typeof computeContention>;
   edge: TeamEdgeProfile | null;
+  strand: TeamStrandData | null;
   rosterNAV: number;
   topPlayers: { name: string; nav: number; position: string }[];
   capCommitted: number;
+  lines: TeamLines;
+  avgAge: number;
+  rosterSize: number;
+  ufaCount: number;
+  rfaCount: number;
 }
 
 function PhaseChip({ phase }: { phase: string }) {
@@ -133,12 +158,157 @@ function EdgeMini({ profile }: { profile: TeamEdgeProfile | null }) {
   );
 }
 
+function buildTeamLines(roster: Asset[], navMap: Record<string, XNAVResult>): TeamLines {
+  const toEntry = (p: Asset): LineEntry => ({
+    name: p.name,
+    position: p.position,
+    nav: navMap[p.id]?.total ?? 0,
+    capHit: p.capHit ?? 0,
+    age: p.age ?? 0,
+    ptsPace: p.ptsPace ?? 0,
+    avgTOI: p.avgTOI ?? 0,
+  });
+
+  const score = (p: Asset) => lineupContributionScore(
+    { name: p.name, position: p.position, avgTOI: p.avgTOI, ptsPace: p.ptsPace, games: p.games },
+    navMap[p.id]?.total,
+  );
+
+  const forwards = roster
+    .filter(p => ["C", "W", "L", "R"].includes(p.position))
+    .sort((a, b) => score(b) - score(a))
+    .slice(0, 12);
+
+  const defense = roster
+    .filter(p => p.position === "D")
+    .sort((a, b) => score(b) - score(a))
+    .slice(0, 6);
+
+  const goalies = roster
+    .filter(p => p.position === "G")
+    .sort((a, b) => score(b) - score(a))
+    .slice(0, 2);
+
+  const fwdLines: LineEntry[][] = [];
+  const centers = forwards.filter(p => p.position === "C");
+  const wingers = forwards.filter(p => p.position !== "C");
+  for (let i = 0; i < 4; i++) {
+    const line: Asset[] = [];
+    if (centers[i]) line.push(centers[i]);
+    fwdLines.push([]);
+  }
+
+  const usedFwds = new Set<string>();
+  for (let i = 0; i < 4; i++) {
+    const c = centers[i];
+    const line: LineEntry[] = [];
+    if (c) {
+      line.push(toEntry(c));
+      usedFwds.add(c.id);
+    }
+    fwdLines[i] = line;
+  }
+  const remainingWingers = wingers.filter(w => !usedFwds.has(w.id));
+  for (let i = 0; i < 4; i++) {
+    while (fwdLines[i].length < 3 && remainingWingers.length > 0) {
+      const w = remainingWingers.shift()!;
+      fwdLines[i].push(toEntry(w));
+    }
+  }
+
+  const defPairs: LineEntry[][] = [];
+  for (let i = 0; i < 3; i++) {
+    defPairs.push(defense.slice(i * 2, i * 2 + 2).map(toEntry));
+  }
+
+  return {
+    forwards: fwdLines,
+    defense: defPairs,
+    goalies: goalies.map(toEntry),
+  };
+}
+
+function LineupSection({ lines }: { lines: TeamLines }) {
+  const LINE_NAMES = ["1st Line", "2nd Line", "3rd Line", "4th Line"];
+  const PAIR_NAMES = ["1st Pair", "2nd Pair", "3rd Pair"];
+
+  return (
+    <div>
+      <div className="text-[9px] font-black uppercase tracking-[0.15em] mb-2" style={{ color: "var(--ledger-ink-faint)" }}>
+        Projected Lines
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Forwards */}
+        <div>
+          <div className="text-[8px] font-black uppercase tracking-[0.12em] mb-1.5" style={{ color: "var(--ledger-ink-faint)" }}>
+            Forwards
+          </div>
+          {lines.forwards.map((line, i) => (
+            <div key={i} className="mb-1.5">
+              <div className="text-[8px] font-black uppercase tracking-[0.1em] mb-0.5" style={{ color: "var(--ledger-ink-faint)", opacity: 0.6 }}>
+                {LINE_NAMES[i]}
+              </div>
+              <div className="flex flex-wrap gap-x-2">
+                {line.map((p) => (
+                  <span key={p.name} className="text-[10px] font-mono" style={{ color: "var(--ledger-ink)" }}>
+                    <span className="font-black">{p.name}</span>
+                    <span className="text-[8px] ml-0.5" style={{ color: "var(--ledger-ink-faint)" }}>
+                      {p.position}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Defense + Goalies */}
+        <div>
+          <div className="text-[8px] font-black uppercase tracking-[0.12em] mb-1.5" style={{ color: "var(--ledger-ink-faint)" }}>
+            Defense
+          </div>
+          {lines.defense.map((pair, i) => (
+            <div key={i} className="mb-1.5">
+              <div className="text-[8px] font-black uppercase tracking-[0.1em] mb-0.5" style={{ color: "var(--ledger-ink-faint)", opacity: 0.6 }}>
+                {PAIR_NAMES[i]}
+              </div>
+              <div className="flex flex-wrap gap-x-2">
+                {pair.map((p) => (
+                  <span key={p.name} className="text-[10px] font-mono" style={{ color: "var(--ledger-ink)" }}>
+                    <span className="font-black">{p.name}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <div className="mt-2">
+            <div className="text-[8px] font-black uppercase tracking-[0.12em] mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
+              Goalies
+            </div>
+            <div className="flex flex-wrap gap-x-3">
+              {lines.goalies.map((g, i) => (
+                <span key={g.name} className="text-[10px] font-mono" style={{ color: "var(--ledger-ink)" }}>
+                  <span className="font-black">{g.name}</span>
+                  <span className="text-[8px] ml-1" style={{ color: "var(--ledger-ink-faint)" }}>
+                    {i === 0 ? "Starter" : "Backup"}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TeamCard({ profile, expanded, onToggle }: {
   profile: TeamProfile;
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const { team, contention, edge, rosterNAV, topPlayers, capCommitted } = profile;
+  const { team, contention, edge, strand, rosterNAV, topPlayers, capCommitted, lines, avgAge, rosterSize, ufaCount, rfaCount } = profile;
   const capCeiling = 104;
 
   return (
@@ -228,6 +398,14 @@ function TeamCard({ profile, expanded, onToggle }: {
             />
           </div>
 
+          {/* Roster overview strip */}
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
+            <StatCell label="Avg Age" value={avgAge.toFixed(1)} />
+            <StatCell label="Roster" value={`${rosterSize}`} sub="players" />
+            <StatCell label="Pending UFA" value={`${ufaCount}`} tone={ufaCount > 5 ? "var(--ledger-red)" : undefined} />
+            <StatCell label="Pending RFA" value={`${rfaCount}`} />
+          </div>
+
           {/* Cap situation */}
           <div className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
             <div className="text-[9px] font-black uppercase tracking-[0.15em] mb-2" style={{ color: "var(--ledger-ink-faint)" }}>
@@ -259,6 +437,16 @@ function TeamCard({ profile, expanded, onToggle }: {
             </div>
           </div>
 
+          {/* Team Strand */}
+          {strand && (
+            <div className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
+              <div className="text-[9px] font-black uppercase tracking-[0.15em] mb-2" style={{ color: "var(--ledger-ink-faint)" }}>
+                Team DNA
+              </div>
+              <TeamStrand strand={strand} teamName={team.name} />
+            </div>
+          )}
+
           {/* EDGE Profile */}
           <div className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
             <div className="flex items-center justify-between mb-2">
@@ -272,6 +460,11 @@ function TeamCard({ profile, expanded, onToggle }: {
               )}
             </div>
             <EdgeMini profile={edge} />
+          </div>
+
+          {/* Projected Lines */}
+          <div className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
+            <LineupSection lines={lines} />
           </div>
 
           {/* Top Players */}
@@ -347,15 +540,26 @@ export default function TeamsPage() {
       const roster = players.filter((p) => p.teamId === team.id && p.position !== "Pick");
       const contention = computeContention(roster, navMap);
       const edge = computeTeamEdgeProfile(roster);
+      const strand = computeRosterStrand(roster, navMap);
       const rosterNAV = roster.reduce((s, p) => s + Math.max(0, navMap[p.id]?.total ?? 0), 0);
       const capCommitted = roster.reduce((s, p) => s + (p.capHit ?? 0), 0);
+      const lines = buildTeamLines(roster, navMap);
+
+      const ages = roster.filter(p => p.age).map(p => p.age!);
+      const avgAge = ages.length > 0 ? ages.reduce((a, b) => a + b, 0) / ages.length : 0;
+      const ufaCount = roster.filter(p => p.contractStatus === "UFA").length;
+      const rfaCount = roster.filter(p => p.contractStatus === "RFA").length;
 
       const sorted = roster
         .map((p) => ({ name: p.name, nav: navMap[p.id]?.total ?? 0, position: p.position }))
         .sort((a, b) => b.nav - a.nav)
-        .slice(0, 8);
+        .slice(0, 10);
 
-      return { team, roster, navMap, contention, edge, rosterNAV, topPlayers: sorted, capCommitted };
+      return {
+        team, roster, navMap, contention, edge, strand, rosterNAV,
+        topPlayers: sorted, capCommitted, lines,
+        avgAge, rosterSize: roster.length, ufaCount, rfaCount,
+      };
     });
   }, [teams, players, navMap]);
 
@@ -413,8 +617,7 @@ export default function TeamsPage() {
             Team Analytics
           </h2>
           <p className="text-[11px] mt-1 leading-relaxed" style={{ color: "var(--ledger-ink-faint)" }}>
-            All 32 franchises — contention window, EDGE profile, roster strength, and cap situation.
-            Contention ratings are derived from live X-NAV across the top 6 forwards, 3 defensemen, and starting goalie.
+            All 32 franchises — contention window, team DNA, EDGE profile, projected lines, and cap situation.
           </p>
         </div>
 
@@ -466,9 +669,9 @@ export default function TeamsPage() {
               onClick={() => setSortKey(key)}
               className="text-[10px] font-black uppercase tracking-[0.1em] px-2 py-1 cursor-pointer font-mono"
               style={{
-                background: sortKey === key ? "var(--ledger-ink)" : "transparent",
-                color: sortKey === key ? "var(--paper-bg)" : "var(--ledger-ink-faint)",
-                border: `1px solid ${sortKey === key ? "var(--ledger-ink)" : "var(--ledger-rule)"}`,
+                background: sortKey === key ? "var(--ledger-red, #b83020)" : "transparent",
+                color: sortKey === key ? "#fff" : "var(--ledger-ink-faint)",
+                border: `1px solid ${sortKey === key ? "var(--ledger-red, #b83020)" : "var(--ledger-rule)"}`,
               }}
             >
               {label}
