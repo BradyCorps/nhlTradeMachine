@@ -65,19 +65,14 @@ function Cell({
 
 const BRIEFS = [
   {
-    feature: "Feature Six",
+    feature: "Feature Seven",
     title: "Fantasy Hockey Tools",
     body: "Built for fantasy managers who want to draft smarter, execute cleaner trades, and work the waiver wire with front-office data.",
   },
   {
-    feature: "Feature Seven",
+    feature: "Feature Eight",
     title: "Micro-Context Prop Engine",
     body: "Built for sharper daily reads on player-prop markets through matchup, role, pace, and usage context.",
-  },
-  {
-    feature: "Feature Eight",
-    title: "Three-Year Simulation Model",
-    body: "See how trades compound over three seasons and pressure-test long-term franchise decisions.",
   },
 ];
 
@@ -259,8 +254,24 @@ export default function WelcomePage() {
             />
 
             <Cell
-              href="/docket"
+              href="/teams"
               kicker="Feature Five"
+              kickerColor="var(--ledger-green)"
+              edition="The Room"
+              title="Team Analytics"
+              ctaColor="var(--ledger-green)"
+              cta="Open Team Analytics"
+              body="Browse all 32 franchises. Contention window, roster strength, cap situation, EDGE speed and finishing profiles, and the team's competitive stage — from tanking to Cup contender."
+              lines={[
+                ["Team Stage", "Live contention window"],
+                ["EDGE Profile", "Speed, finishing, zone time"],
+                ["Roster NAV", "Full roster valuation"],
+              ]}
+            />
+
+            <Cell
+              href="/docket"
+              kicker="Feature Six"
               kickerColor="var(--ledger-brown)"
               edition="The Record"
               title="The Docket"

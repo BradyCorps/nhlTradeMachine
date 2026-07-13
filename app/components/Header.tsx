@@ -5,7 +5,7 @@
 import { usePathname } from "next/navigation";
 
 interface HeaderProps {
-  activeTab?: "trade" | "armchair-gm" | "players" | "docket" | "press-box";
+  activeTab?: "trade" | "armchair-gm" | "players" | "teams" | "docket" | "press-box";
   showLiveFeed?: boolean;
 }
 
@@ -13,10 +13,11 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
   const pathname = usePathname();
   const resolvedActiveTab =
     pathname?.startsWith("/armchair-gm") ? "armchair-gm"
+    : pathname?.startsWith("/teams") ? "teams"
     : pathname?.startsWith("/docket") ? "docket"
     : pathname?.startsWith("/press-box") ? "press-box"
     : activeTab;
-  const navClass = (tab: "trade" | "armchair-gm" | "players" | "docket" | "press-box") => [
+  const navClass = (tab: "trade" | "armchair-gm" | "players" | "teams" | "docket" | "press-box") => [
     "text-[11px] sm:text-[12px] uppercase tracking-[0.14em] sm:tracking-[0.2em] font-mono no-underline transition-colors border-b-2 pb-0.5",
     resolvedActiveTab === tab
       ? "text-ledger-red font-black border-ledger-red"
@@ -63,7 +64,14 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
                 href="/players"
                 className={navClass("players")}
               >
-                {resolvedActiveTab === "players" ? "◆" : "◇"} Player Analytics
+                {resolvedActiveTab === "players" ? "◆" : "◇"} Players
+              </a>
+              <span className="nav-divider text-ledger-rule-light">|</span>
+              <a
+                href="/teams"
+                className={navClass("teams")}
+              >
+                {resolvedActiveTab === "teams" ? "◆" : "◇"} Teams
               </a>
               <span className="nav-divider text-ledger-rule-light">|</span>
               <a
