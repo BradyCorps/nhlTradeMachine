@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { lineupContributionScore } from "@/app/lib/lineup-ranking";
+import { displayPosition } from "@/app/lib/display-position";
 import {
   defaultLineupOrdersForRoster,
   hydrateLineupOrdersForRoster,
@@ -254,7 +255,7 @@ function TeamLineup({
         role="button"
         tabIndex={0}
         aria-label={p ? `Select ${p.name} in ${pos.trim()} slot` : `Select empty ${pos.trim()} slot`}
-        title={p ? `${p.name} · ${p.position} · NAV ${nav}` : "Empty lineup slot"}
+        title={p ? `${p.name} · ${displayPosition(p.position, p.secondaryPosition)} · NAV ${nav}` : "Empty lineup slot"}
         style={{
           padding: 3, fontFamily: MONO,
           color: STATUS_COLOR[status],
@@ -434,7 +435,7 @@ function TeamLineup({
                     outline: isSel ? "1px dashed #a08020" : "none",
                   }}>
                   {abbr(p.name)}
-                  <span style={{ fontSize: 11, opacity: 0.65, marginLeft: 5 }}>{p.position}</span>
+                  <span style={{ fontSize: 11, opacity: 0.65, marginLeft: 5 }}>{displayPosition(p.position, p.secondaryPosition)}</span>
                   <span style={{ fontSize: 11, color: navColor(nav), marginLeft: 5 }}>NAV {nav}</span>
                 </span>
               );

@@ -9,6 +9,7 @@ import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import type { DocketEntry, DocketSortKey } from "@/app/lib/docket-view";
 import { filterAndSortDocketEntries } from "@/app/lib/docket-view";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
+import { displayPosition } from "@/app/lib/display-position";
 
 const fmtNav = (value: number): string => `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
 
@@ -96,7 +97,7 @@ function AssetDetail({ asset }: { asset: DocketEntry["packages"][number]["assets
         <div>
           <div style={{ fontSize: 13, fontWeight: 900 }}>{asset.name}</div>
           <div style={{ fontSize: 11, color: "var(--ledger-ink-faint)", marginTop: 3 }}>
-            {isPick ? "PICK CURVE NAV" : `${detailAsset.position} · AGE ${detailAsset.age || "NA"} · ${detailAsset.capHit.toFixed(2)}M`}
+            {isPick ? "PICK CURVE NAV" : `${displayPosition(detailAsset.position, detailAsset.secondaryPosition)} · AGE ${detailAsset.age || "NA"} · ${detailAsset.capHit.toFixed(2)}M`}
           </div>
         </div>
         <div style={{ fontSize: 12, fontWeight: 900, color: "var(--ledger-red)", whiteSpace: "nowrap", textAlign: "right" }}>

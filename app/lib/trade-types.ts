@@ -10,6 +10,7 @@ export interface Asset {
   teamId: string;
   name: string;
   position: string;
+  secondaryPosition?: string | null;
   age: number;
   games: number;
   ptsPace: number;

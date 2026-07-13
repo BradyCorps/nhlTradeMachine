@@ -9,6 +9,7 @@ import { computeTeamEdgeProfile, type TeamEdgeProfile } from "@/app/lib/team-edg
 import { computeRosterStrand } from "@/app/lib/roster-strand";
 import TeamStrand, { type TeamStrandData } from "@/app/components/TeamStrand";
 import { lineupContributionScore } from "@/app/lib/lineup-ranking";
+import { displayPosition } from "@/app/lib/display-position";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 
 interface TeamData {
@@ -161,7 +162,7 @@ function EdgeMini({ profile }: { profile: TeamEdgeProfile | null }) {
 function buildTeamLines(roster: Asset[], navMap: Record<string, XNAVResult>): TeamLines {
   const toEntry = (p: Asset): LineEntry => ({
     name: p.name,
-    position: p.position,
+    position: displayPosition(p.position, p.secondaryPosition),
     nav: navMap[p.id]?.total ?? 0,
     capHit: p.capHit ?? 0,
     age: p.age ?? 0,
@@ -173,6 +174,9 @@ function buildTeamLines(roster: Asset[], navMap: Record<string, XNAVResult>): Te
     { name: p.name, position: p.position, avgTOI: p.avgTOI, ptsPace: p.ptsPace, games: p.games },
     navMap[p.id]?.total,
   );
+
+  const canPlayWing = (p: Asset) =>
+    ["W", "L", "R"].includes(p.position) || p.secondaryPosition === "W";
 
   const forwards = roster
     .filter(p => ["C", "W", "L", "R"].includes(p.position))
@@ -189,29 +193,42 @@ function buildTeamLines(roster: Asset[], navMap: Record<string, XNAVResult>): Te
     .sort((a, b) => score(b) - score(a))
     .slice(0, 2);
 
-  const fwdLines: LineEntry[][] = [];
-  const centers = forwards.filter(p => p.position === "C");
+  // Separate true centers (no wing flex) from flex players
+  const pureCenters = forwards.filter(p => p.position === "C" && !canPlayWing(p));
+  const flexCenters = forwards.filter(p => p.position === "C" && canPlayWing(p));
   const wingers = forwards.filter(p => p.position !== "C");
-  for (let i = 0; i < 4; i++) {
-    const line: Asset[] = [];
-    if (centers[i]) line.push(centers[i]);
-    fwdLines.push([]);
+
+  // Slot top 4 pure centers first, then flex centers fill remaining center slots
+  const centerSlots: (Asset | null)[] = [null, null, null, null];
+  let ci = 0;
+  for (const c of pureCenters) {
+    if (ci >= 4) break;
+    centerSlots[ci++] = c;
+  }
+  for (const c of flexCenters) {
+    if (ci >= 4) break;
+    centerSlots[ci++] = c;
   }
 
-  const usedFwds = new Set<string>();
+  const usedIds = new Set(centerSlots.filter(Boolean).map(c => c!.id));
+  // Flex centers who didn't get a center slot go to the wing pool
+  const wingPool = [
+    ...wingers,
+    ...flexCenters.filter(c => !usedIds.has(c.id)),
+  ].sort((a, b) => score(b) - score(a));
+
+  const fwdLines: LineEntry[][] = [];
   for (let i = 0; i < 4; i++) {
-    const c = centers[i];
     const line: LineEntry[] = [];
-    if (c) {
-      line.push(toEntry(c));
-      usedFwds.add(c.id);
-    }
-    fwdLines[i] = line;
+    const c = centerSlots[i];
+    if (c) line.push(toEntry(c));
+    fwdLines.push(line);
   }
-  const remainingWingers = wingers.filter(w => !usedFwds.has(w.id));
   for (let i = 0; i < 4; i++) {
-    while (fwdLines[i].length < 3 && remainingWingers.length > 0) {
-      const w = remainingWingers.shift()!;
+    while (fwdLines[i].length < 3 && wingPool.length > 0) {
+      const w = wingPool.shift()!;
+      if (usedIds.has(w.id)) continue;
+      usedIds.add(w.id);
       fwdLines[i].push(toEntry(w));
     }
   }
@@ -551,7 +568,11 @@ export default function TeamsPage() {
       const rfaCount = roster.filter(p => p.contractStatus === "RFA").length;
 
       const sorted = roster
-        .map((p) => ({ name: p.name, nav: navMap[p.id]?.total ?? 0, position: p.position }))
+        .map((p) => ({
+          name: p.name,
+          nav: navMap[p.id]?.total ?? 0,
+          position: displayPosition(p.position, p.secondaryPosition),
+        }))
         .sort((a, b) => b.nav - a.nav)
         .slice(0, 10);
 

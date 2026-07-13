@@ -2,6 +2,7 @@
 // GM analysis tab deck: lineups, Team DNA, comparison, trade breakdown, sim.
 import React, { useState, useMemo, Suspense, lazy } from "react";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
+import { displayPosition } from "@/app/lib/display-position";
 import TeamStrand, { CHAMP_TEMPLATE, type TeamStrandData } from "@/app/components/TeamStrand";
 import { computeRosterStrand } from "@/app/lib/roster-strand";
 import LineupEditor, { type LineupOrderPayload } from "@/app/components/LineupEditor";
@@ -576,7 +577,7 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
                     </span>
                   </td>
                   <td className="px-3 py-2 font-sans font-black text-white text-[11px] whitespace-nowrap">{a.name}</td>
-                  <td className="px-3 py-2 text-zinc-500">{a.position}</td>
+                  <td className="px-3 py-2 text-zinc-500">{displayPosition(a.position, a.secondaryPosition)}</td>
                   <td className="px-3 py-2 text-zinc-400">{a.age}</td>
                   <td className="px-3 py-2 text-cyan-400">{a.position === "Pick" ? "—" : a.position === "G" ? `${(a.savePct ?? 0).toFixed(3)}` : ptsPace.toFixed(1)}</td>
                   <td className="px-3 py-2 text-violet-400">{a.position === "Pick" ? "—" : a.position === "G" ? `${(a.gsax ?? 0).toFixed(1)} GSAx` : xgPace.toFixed(1)}</td>

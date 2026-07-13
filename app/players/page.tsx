@@ -18,6 +18,7 @@ import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
 import PercentileCard from "@/app/components/PercentileCard";
+import { displayPosition } from "@/app/lib/display-position";
 
 // ── Types ─────────────────────────────────────────────────────
 interface Player {
@@ -25,6 +26,7 @@ interface Player {
   name: string;
   teamId: string;
   position: string;
+  secondaryPosition?: string | null;
   age: number;
   headshot?: string | null;
   ptsPace: number;
@@ -828,7 +830,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
             {player.hasNMC && <span style={{ fontSize: "11px", color: "var(--red)", border: "1px solid var(--red)", padding: "0 3px" }}>NMC</span>}
           </div>
           <div style={{ fontSize: "11px", color: "var(--rule)", marginTop: "1px" }}>
-            {team?.name ?? player.teamId} · {player.position} · Age {player.age}
+            {team?.name ?? player.teamId} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}
           </div>
         </div>
 
@@ -892,7 +894,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
               {player.hasNMC && <span style={{ fontSize: "10px", color: "var(--red)", border: "1px solid var(--red)", padding: "0 3px", flexShrink: 0 }}>NMC</span>}
             </div>
             <div style={{ fontSize: "11px", color: "var(--rule)", marginTop: "2px" }}>
-              {teamAbbr} · {player.position} · Age {player.age}
+              {teamAbbr} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}
             </div>
           </div>
 

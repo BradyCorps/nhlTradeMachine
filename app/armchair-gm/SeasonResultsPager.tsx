@@ -2,6 +2,7 @@
 // Season Results pager: Team Numbers (Ledger Line), League Numbers, Bracket.
 import React, { useState } from "react";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
+import { displayPosition } from "@/app/lib/display-position";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
 import { SEASON } from "@/app/lib/season-config";
 
@@ -259,7 +260,7 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                           <span className="ml-1 px-1 text-[10px] font-black" style={{ color: '#fff', background: 'var(--ledger-navy, #2c3e6b)', borderRadius: 1 }}>R</span>
                         )}
                         <div className="text-[10px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--ledger-ink-faint)' }}>
-                          {p.position} · {p.age ?? '—'}{archetype ? ` · ${archetype}` : ''}
+                          {displayPosition(p.position, p.secondaryPosition)} · {p.age ?? '—'}{archetype ? ` · ${archetype}` : ''}
                         </div>
                       </td>
                       <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums align-top" style={{ color: 'var(--ledger-ink-faint)' }}>{p.gamesPlayed}</td>

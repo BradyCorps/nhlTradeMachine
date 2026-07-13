@@ -3,12 +3,14 @@ import React, { useMemo } from "react";
 import { calcNAV } from "@/app/lib/xnav-engine";
 import { SEASON } from "@/app/lib/season-config";
 import MetricTip from "@/app/components/MetricTip";
+import { displayPosition } from "@/app/lib/display-position";
 
 interface PlayerData {
   id: string;
   name: string;
   teamId: string;
   position: string;
+  secondaryPosition?: string | null;
   age: number;
   headshot?: string | null;
   ptsPace: number;
@@ -298,7 +300,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         {player.headshot && <img src={player.headshot} alt="" />}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="pcard-name">{player.name}</div>
-          <div className="pcard-sub">{teamName ?? player.teamId} · {player.position} · Age {player.age}</div>
+          <div className="pcard-sub">{teamName ?? player.teamId} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}</div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div className="pcard-nav-total">{xnav.total}</div>
