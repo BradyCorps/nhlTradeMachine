@@ -1891,12 +1891,39 @@ describe("Canary — live team timelines", () => {
   it("derives each team's phase from its live roster and recomputes on roster/nav change", () => {
     const contention = read("app/armchair-gm/contention.ts");
     const page = read("app/armchair-gm/page.tsx");
-    // Pure helper maps present-strength onto the phase vocabulary.
     expect(contention).toContain("export function deriveTeamPhase");
     expect(contention).toContain('present >= 6.5 ? "Contender"');
-    // The page recomputes phases into db.teams whenever players/navMap change,
-    // so the timeline badge and server-side willingness both track the roster.
     expect(page).toContain("deriveTeamPhase(roster, navMap)");
     expect(page).toContain("}, [db.players, navMap]);");
+  });
+});
+
+describe("Canary — ship-readiness infrastructure", () => {
+  it("has error boundary, 404 page, robots.ts, and sitemap.ts", () => {
+    const error = read("app/error.tsx");
+    const notFound = read("app/not-found.tsx");
+    const robots = read("app/robots.ts");
+    const sitemap = read("app/sitemap.ts");
+    expect(error).toContain("Something went wrong");
+    expect(error).toContain("reset");
+    expect(notFound).toContain("No ruling on file");
+    expect(robots).toContain("/admin/");
+    expect(sitemap).toContain("/teams");
+    expect(sitemap).toContain("/trade-machine");
+  });
+
+  it("has Team Analytics page consuming league data with contention + EDGE", () => {
+    const teamsPage = read("app/teams/page.tsx");
+    expect(teamsPage).toContain("computeContention");
+    expect(teamsPage).toContain("computeTeamEdgeProfile");
+    expect(teamsPage).toContain("Team Analytics");
+    expect(teamsPage).toContain("EDGE Profile");
+    expect(teamsPage).toContain("Roster NAV");
+  });
+
+  it("has Teams link in the site-wide nav header", () => {
+    const header = read("app/components/Header.tsx");
+    expect(header).toContain('href="/teams"');
+    expect(header).toContain('"teams"');
   });
 });
