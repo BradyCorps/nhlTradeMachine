@@ -82,13 +82,25 @@ async function loadTeams(): Promise<any[]> {
   }
 
   // ── Fetch standings from NHL stats API ───────────────────────
-  let standingsMap = new Map<string, { 
-  standing: number; 
-  pointPct: number; 
+  let standingsMap = new Map<string, {
+  standing: number;
+  pointPct: number;
   teamFullName: string;
   conferenceRank: number;
-  divisionRank: number; // Add this
+  divisionRank: number;
   points: number;
+  wins: number;
+  losses: number;
+  otLosses: number;
+  gamesPlayed: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  powerPlayPct: number;
+  penaltyKillPct: number;
+  shotsForPerGame: number;
+  shotsAgainstPerGame: number;
+  faceoffWinPct: number;
+  regulationWins: number;
 }>();
   try {
     const res = await fetchWithTimeout(
@@ -159,18 +171,75 @@ async function loadTeams(): Promise<any[]> {
       teams.forEach((t) => {
         if (t.tricode) {
           standingsMap.set(t.tricode, {
-            standing:       t.overallRank,
-            conferenceRank: t.confRank,
-            divisionRank:   t.divRank,
-            points:         t.points,
-            pointPct:       t.pointPct ?? 0.5,
-            teamFullName:   t.teamFullName,
+            standing:           t.overallRank,
+            conferenceRank:     t.confRank,
+            divisionRank:       t.divRank,
+            points:             t.points ?? 0,
+            pointPct:           t.pointPct ?? 0.5,
+            teamFullName:       t.teamFullName,
+            wins:               t.wins ?? 0,
+            losses:             t.losses ?? 0,
+            otLosses:           t.otLosses ?? 0,
+            gamesPlayed:        t.gamesPlayed ?? 82,
+            goalsFor:           t.goalsFor ?? 0,
+            goalsAgainst:       t.goalsAgainst ?? 0,
+            powerPlayPct:       t.powerPlayPct ?? 0,
+            penaltyKillPct:     t.penaltyKillPct ?? 0,
+            shotsForPerGame:    t.shotsForPerGame ?? 0,
+            shotsAgainstPerGame: t.shotsAgainstPerGame ?? 0,
+            faceoffWinPct:      t.faceoffWinPct ?? 0,
+            regulationWins:     t.regulationWins ?? 0,
           });
         }
       });
     }
   } catch (err) {
     console.error("[league] Standings API fetch failed:", err instanceof Error ? err.message : err);
+  }
+
+  // ── Fallback: api-web.nhle.com/v1/standings/now (newer, more stable) ──
+  if (standingsMap.size < 28) {
+    try {
+      const res = await fetchWithTimeout(
+        "https://api-web.nhle.com/v1/standings/now",
+        8000,
+        { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Origin": "https://www.nhl.com", "Referer": "https://www.nhl.com/" }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const entries: any[] = data.standings ?? [];
+        entries.sort((a: any, b: any) => (b.points ?? 0) - (a.points ?? 0));
+        entries.forEach((t: any, i: number) => {
+          const tricode = t.teamAbbrev?.default;
+          if (!tricode || standingsMap.has(tricode)) return;
+          standingsMap.set(tricode, {
+            standing:           i + 1,
+            conferenceRank:     t.conferenceSequence ?? 8,
+            divisionRank:       t.divisionSequence ?? 4,
+            points:             t.points ?? 0,
+            pointPct:           t.pointPctg ?? 0.5,
+            teamFullName:       t.teamName?.default ?? tricode,
+            wins:               t.wins ?? 0,
+            losses:             t.losses ?? 0,
+            otLosses:           t.otLosses ?? 0,
+            gamesPlayed:        t.gamesPlayed ?? 82,
+            goalsFor:           t.goalFor ?? 0,
+            goalsAgainst:       t.goalAgainst ?? 0,
+            powerPlayPct:       t.powerPlayPctg ?? 0,
+            penaltyKillPct:     t.penaltyKillPctg ?? 0,
+            shotsForPerGame:    0,
+            shotsAgainstPerGame: 0,
+            faceoffWinPct:      t.faceoffWinPctg ?? 0,
+            regulationWins:     t.regulationWins ?? 0,
+          });
+        });
+        if (standingsMap.size >= 28) {
+          console.log("[league] Standings recovered from api-web fallback");
+        }
+      }
+    } catch (err) {
+      console.error("[league] Standings web-API fallback also failed:", err instanceof Error ? err.message : err);
+    }
   }
 
   // ── Fetch cap space from CapWages (batch 8 at a time) ────────
@@ -229,9 +298,24 @@ async function loadTeams(): Promise<any[]> {
       id:       t.id,
       name:     st?.teamFullName ?? dbTeam?.name ?? t.name,
       capSpace: Math.round(capSpace * 10) / 10,
-      standing, // Preserves overall league rank for UI sorting
-      phase,    // Now accurately driven by playoff positioning or DB manual override
+      standing,
+      phase,
       needs:    TEAM_NEEDS[t.id] ?? [],
+      record: st ? {
+        wins:               st.wins,
+        losses:             st.losses,
+        otLosses:           st.otLosses,
+        points:             st.points,
+        gamesPlayed:        st.gamesPlayed,
+        goalsFor:           st.goalsFor,
+        goalsAgainst:       st.goalsAgainst,
+        powerPlayPct:       st.powerPlayPct,
+        penaltyKillPct:     st.penaltyKillPct,
+        shotsForPerGame:    st.shotsForPerGame,
+        shotsAgainstPerGame: st.shotsAgainstPerGame,
+        faceoffWinPct:      st.faceoffWinPct,
+        regulationWins:     st.regulationWins,
+      } : null,
     };
   });
 
@@ -256,6 +340,7 @@ export async function GET() {
     standing: t.standing,
     phase:    t.phase,
     needs:    t.needs ?? [],
+    record:   t.record ?? null,
   }));
 
   return NextResponse.json({
