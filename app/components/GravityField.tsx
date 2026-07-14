@@ -64,8 +64,8 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
 
   const ringCount = Math.max(2, Math.min(7, Math.round(absForce * 8) + 2));
   const maxR = 110;
-  const minR = 28;
-  const coreR = 24;
+  const minR = 34;
+  const coreR = 30;
 
   const rings: { r: number; opacity: number }[] = [];
   for (let i = 0; i < ringCount; i++) {
@@ -219,13 +219,20 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
 
       {/* Central mass node — outer glow ring */}
       <circle
-        cx={cx} cy={cy} r={coreR + 4}
+        cx={cx} cy={cy} r={coreR + 6}
+        fill="none"
+        stroke={color}
+        strokeWidth={1}
+        opacity={0.25}
+      />
+      <circle
+        cx={cx} cy={cy} r={coreR + 3}
         fill="none"
         stroke={color}
         strokeWidth={1.5}
-        opacity={0.35}
+        opacity={0.4}
       />
-      {/* Central mass node */}
+      {/* Central mass node — solid white/paper fill for contrast */}
       <circle
         cx={cx} cy={cy} r={coreR}
         fill="var(--paper-bg)"
@@ -238,10 +245,10 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         x={cx} y={cy + 1}
         textAnchor="middle"
         dominantBaseline="middle"
-        fill={color}
+        fill="var(--ledger-ink)"
         fontFamily="'Courier Prime', monospace"
         fontWeight={900}
-        fontSize={18}
+        fontSize={20}
       >
         {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
       </text>

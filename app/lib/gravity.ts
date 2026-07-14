@@ -79,8 +79,10 @@ export function computeGravity(asset: Asset): GravityProfile | null {
     ? currentNoiv * 0.4 + baselineNoiv * 0.6
     : currentNoiv;
 
-  // Normalize to a -1 to +1 scale (±10 pct pts = full range)
-  const noivLift = clamp(blendedNoiv / 10, -1, 1);
+  // Normalize to a -1 to +1 scale. Divisor=15 so that only a truly
+  // transcendent NOIV (blended ≥15) maxes out — prevents the top of
+  // the league from all reading +1.00 and losing differentiation.
+  const noivLift = clamp(blendedNoiv / 15, -1, 1);
 
   // ── Component 2: Zone Pull (the 1/d² term) ────────────────────
   // How much the player drags play into the OZ relative to league avg.
