@@ -93,6 +93,18 @@ export function useOffseasonFlow({
         });
       const teams = applyTeamCapDeltas(prev.teams, res.teamCapMoves)
         .map(t => ({ ...t, capSpace: Math.round(t.capSpace * 10) / 10 }));
+
+      // Free pending FAs' expiring contracts from the user's cap upfront so
+      // the re-sign phase shows true available space (like real NHL July 1).
+      const pendingCap = res.userPending.reduce(
+        (sum, fa) => sum + (fa.player.lastCapHit ?? fa.player.capHit), 0);
+      if (pendingCap > 0 && homeTeamId) {
+        const idx = teams.findIndex(t => t.id === homeTeamId);
+        if (idx >= 0) {
+          teams[idx] = { ...teams[idx], capSpace: Math.round((teams[idx].capSpace + pendingCap) * 10) / 10 };
+        }
+      }
+
       return { ...prev, players, teams };
     });
     clearNavCache();
@@ -114,6 +126,8 @@ export function useOffseasonFlow({
   }, [db.players, db.teams, db.capCeiling, homeTeamId, cupRun, cupDraftSummary, setDb]);
 
   // Re-sign one of your pending free agents at the projected terms.
+  // Old salary was already freed from cap at phase start, so only deduct
+  // the new AAV.
   const resignPlayer = useCallback((fa: OffseasonPending) => {
     setDb(prev => ({
       ...prev,
@@ -123,23 +137,19 @@ export function useOffseasonFlow({
           : p),
       teams: prev.teams.map(t =>
         t.id === fa.player.teamId
-          ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: fa.player.lastCapHit ?? fa.player.capHit }], incoming: [{ capHit: fa.contract.aav }] }) * 10) / 10 }
+          ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { incoming: [{ capHit: fa.contract.aav }] }) * 10) / 10 }
           : t),
     }));
     setUserPending(prev => prev.filter(p => p.player.id !== fa.player.id));
     clearNavCache();
   }, [setDb]);
 
-  // Let a pending free agent walk — frees his cap, opens a roster hole, and
-  // drops him into the open market.
+  // Let a pending free agent walk — opens a roster hole and drops him into
+  // the open market. Cap already freed at phase start.
   const walkPlayer = useCallback((fa: OffseasonPending) => {
     setDb(prev => ({
       ...prev,
       players: prev.players.filter(p => p.id !== fa.player.id),
-      teams: prev.teams.map(t =>
-        t.id === fa.player.teamId
-          ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: fa.player.lastCapHit ?? fa.player.capHit }] }) * 10) / 10 }
-          : t),
     }));
     setUserPending(prev => prev.filter(p => p.player.id !== fa.player.id));
     setMarket(prev => [{ player: fa.player, contract: fa.contract }, ...prev]);
@@ -181,8 +191,8 @@ export function useOffseasonFlow({
     clearNavCache();
   }, [homeTeamId, setDb]);
 
-  // Re-sign phase done — auto-walk any remaining pending UFAs, then
-  // open offer sheet phase for other teams' RFAs.
+  // Re-sign phase done — auto-walk any remaining pending FAs (cap already
+  // freed at phase start), then open offer sheet phase for other teams' RFAs.
   const proceedToOfferSheets = useCallback(() => {
     setUserPending(prev => {
       if (prev.length > 0) {
@@ -190,14 +200,6 @@ export function useOffseasonFlow({
         setDb(dbPrev => ({
           ...dbPrev,
           players: dbPrev.players.filter(p => !walkIds.has(p.id)),
-          teams: dbPrev.teams.map(t => {
-            const freed = prev
-              .filter(fa => fa.player.teamId === t.id)
-              .reduce((sum, fa) => sum + (fa.player.lastCapHit ?? fa.player.capHit), 0);
-            return freed > 0
-              ? { ...t, capSpace: Math.round((t.capSpace + freed) * 10) / 10 }
-              : t;
-          }),
         }));
         setMarket(m => [...prev.map(fa => ({ player: fa.player, contract: fa.contract })), ...m]);
         clearNavCache();

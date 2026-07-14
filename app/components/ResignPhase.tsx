@@ -8,6 +8,8 @@ import type { OffseasonPending } from "@/app/lib/free-agency";
 import { getOfferSheetCompensation } from "@/app/lib/free-agency";
 import StrandView from "@/app/components/StrandView";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
+import { computeGravity } from "@/app/lib/gravity";
+import { CompactGravity } from "@/app/components/GravityField";
 
 // ── Off-Season Re-Sign phase ──────────────────────────────────────────────
 // Presentational only: the page owns the roster/cap state and passes handlers.
@@ -33,11 +35,15 @@ function StatLine({ p }: { p: Asset }) {
     if (p.savePct != null) bits.push(`${(p.savePct * 100).toFixed(1)}% SV`);
     if (p.gsax != null) bits.push(`${p.gsax > 0 ? "+" : ""}${p.gsax.toFixed(1)} GSAx`);
   } else {
-    if (p.games) bits.push(`${p.games} GP`);
-    if (p.goalsPace != null && p.assistsPace != null) {
-      bits.push(`${Math.round(p.goalsPace)}G-${Math.round(p.assistsPace)}A-${Math.round(p.ptsPace)}P`);
-    } else if (p.ptsPace) {
-      bits.push(`${Math.round(p.ptsPace)} pts/82`);
+    const gp = p.games ?? 0;
+    if (gp) bits.push(`${gp} GP`);
+    if (p.goalsPace != null && p.assistsPace != null && gp > 0) {
+      const gf = gp / 82;
+      const g = Math.round(p.goalsPace * gf);
+      const a = Math.round(p.assistsPace * gf);
+      bits.push(`${g}G-${a}A-${g + a}P`);
+    } else if (p.ptsPace && gp > 0) {
+      bits.push(`${Math.round(p.ptsPace * gp / 82)}P`);
     }
     if (p.avgTOI) bits.push(`${p.avgTOI.toFixed(1)} TOI`);
   }
@@ -46,6 +52,90 @@ function StatLine({ p }: { p: Asset }) {
     <span className="text-[9px] font-mono tracking-wide" style={{ color: "var(--ledger-brown)" }}>
       &rsquo;26 · {bits.join(" · ")}
     </span>
+  );
+}
+
+function ExpandedStats({ p, nav }: { p: Asset; nav: XNAVResult }) {
+  const isG = p.position === "G";
+  const gravity = !isG ? computeGravity(p) : null;
+  const fmtPct = (v: number | null | undefined) => v != null ? `${(v * 100).toFixed(1)}%` : "—";
+  const fmtDec = (v: number | null | undefined, sign = false) =>
+    v != null ? `${sign && v > 0 ? "+" : ""}${v.toFixed(1)}` : "—";
+
+  return (
+    <div
+      className="px-3 py-2 mt-1 grid gap-x-4 gap-y-1"
+      style={{
+        background: "var(--paper-inset)",
+        border: "1px solid var(--ledger-rule-light)",
+        borderRadius: "2px",
+        gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+      }}
+      role="region"
+      aria-label={`Advanced stats for ${p.name}`}
+    >
+      {/* X-NAV breakdown */}
+      <div>
+        <div className="text-[8px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>X-NAV</div>
+        <div className="text-[12px] font-black font-mono" style={{ color: nav.total >= 0 ? "var(--ledger-green)" : "var(--ledger-red)" }}>
+          {nav.total > 0 ? "+" : ""}{nav.total.toFixed(0)}
+        </div>
+        <div className="text-[8px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+          Off {fmtDec(nav.off, true)} · Def {fmtDec(nav.def, true)} · Age {fmtDec(nav.age, true)} · Cap {fmtDec(nav.cap, true)}
+        </div>
+      </div>
+
+      {/* Production */}
+      {!isG && (
+        <div>
+          <div className="text-[8px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>Production</div>
+          <div className="text-[9px] font-mono" style={{ color: "var(--ledger-brown)" }}>
+            P/82: {fmtDec(p.ptsPace)} · xG/82: {fmtDec(p.xGPace)}
+          </div>
+          {p.ops != null && <div className="text-[9px] font-mono" style={{ color: "var(--ledger-brown)" }}>OPS: {fmtDec(p.ops)} · DPS: {fmtDec(p.dps)}</div>}
+        </div>
+      )}
+
+      {/* Impact */}
+      {!isG && (
+        <div>
+          <div className="text-[8px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>Impact</div>
+          <div className="text-[9px] font-mono" style={{ color: "var(--ledger-brown)" }}>
+            NOIV: {fmtDec(p.xgRelTM, true)} · xGA Rel: {fmtDec(p.xgaRelTM, true)}
+          </div>
+          {p.dzPct != null && <div className="text-[9px] font-mono" style={{ color: "var(--ledger-brown)" }}>DZ%: {fmtPct(p.dzPct)}</div>}
+        </div>
+      )}
+
+      {/* Goalie */}
+      {isG && (
+        <div>
+          <div className="text-[8px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>Goaltending</div>
+          <div className="text-[9px] font-mono" style={{ color: "var(--ledger-brown)" }}>
+            SV%: {fmtPct(p.savePct)} · GSAx: {fmtDec(p.gsax, true)}
+          </div>
+        </div>
+      )}
+
+      {/* EDGE */}
+      {(p.edgeSpeedMaxMph != null || p.hdFinishingDelta != null) && (
+        <div>
+          <div className="text-[8px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>EDGE</div>
+          <div className="text-[9px] font-mono" style={{ color: "var(--ledger-brown)" }}>
+            {p.edgeSpeedMaxMph != null ? `Speed: ${p.edgeSpeedMaxMph.toFixed(1)} mph` : ""}
+            {p.hdFinishingDelta != null ? ` · HD: ${(p.hdFinishingDelta * 100) > 0 ? "+" : ""}${(p.hdFinishingDelta * 100).toFixed(1)}%` : ""}
+          </div>
+        </div>
+      )}
+
+      {/* Gravity */}
+      {gravity && (
+        <div>
+          <div className="text-[8px] font-black uppercase tracking-[0.12em] font-mono mb-0.5" style={{ color: "var(--ledger-ink-faint)" }}>Gravity</div>
+          <CompactGravity profile={gravity} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -95,6 +185,7 @@ export default function ResignPhase({
   const [detail, setDetail] = useState<Asset | null>(null);
   const [marketSort, setMarketSort] = useState<"ask" | "nav" | "age">("ask");
   const [marketPage, setMarketPage] = useState(1);
+  const [expandedFaId, setExpandedFaId] = useState<string | null>(null);
 
   const sortedMarket = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -316,82 +407,104 @@ export default function ResignPhase({
                 : `EDGE HD ${edgeDelta > 0 ? "+" : ""}${(edgeDelta * 100).toFixed(1)}%`;
               const ageArrow = fa.player.age <= 24 ? "↑" : fa.player.age >= 30 ? "↓" : "→";
               const ageColor = fa.player.age <= 24 ? "var(--ledger-green)" : fa.player.age >= 30 ? "var(--ledger-red)" : "var(--ledger-ink-faint)";
+              const isExpanded = expandedFaId === fa.player.id;
+              const fullNav = navMap?.[fa.player.id] ?? ZERO_XNAV;
               return (
-                <div key={fa.player.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 px-3 py-2"
+                <div key={fa.player.id}
                   style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
-                  <div className="min-w-0">
-                    <button onClick={() => setDetail(fa.player)} title="View STRAND & development"
-                      className="tap-target font-bold text-[12px] truncate text-left hover:underline"
-                      style={{ color: "var(--ledger-ink)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
-                      {fa.player.name}
-                    </button>
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                      <PlayerMeta p={fa.player} />
-                      <StatLine p={fa.player} />
-                      <span className="text-[10px] font-mono font-black tabular-nums" style={{ color: nav >= 0 ? "var(--ledger-green)" : "var(--ledger-red)" }}>
-                        NAV {nav > 0 ? "+" : ""}{nav.toFixed(0)}
-                      </span>
-                      {edgeLabel && (
-                        <span className="text-[9px] font-mono font-black uppercase tracking-wide"
-                          style={{ color: edgeDelta != null && edgeDelta < 0 ? "var(--ledger-green)" : "var(--ledger-brown)" }}>
-                          {edgeLabel}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => setExpandedFaId(isExpanded ? null : fa.player.id)}
+                          aria-expanded={isExpanded}
+                          aria-label={`${isExpanded ? "Collapse" : "Expand"} stats for ${fa.player.name}`}
+                          className="tap-target font-bold text-[12px] truncate text-left hover:underline"
+                          style={{ color: "var(--ledger-ink)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
+                          {fa.player.name}
+                        </button>
+                        <button
+                          onClick={() => setExpandedFaId(isExpanded ? null : fa.player.id)}
+                          aria-hidden="true"
+                          tabIndex={-1}
+                          className="text-[8px] font-mono"
+                          style={{
+                            color: "var(--ledger-ink-faint)", background: "transparent", border: "none",
+                            cursor: "pointer", padding: 0, transform: isExpanded ? "rotate(180deg)" : "none",
+                            transition: "transform 0.15s",
+                          }}>
+                          ▼
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <PlayerMeta p={fa.player} />
+                        <StatLine p={fa.player} />
+                        <span className="text-[10px] font-mono font-black tabular-nums" style={{ color: nav >= 0 ? "var(--ledger-green)" : "var(--ledger-red)" }}>
+                          NAV {nav > 0 ? "+" : ""}{nav.toFixed(0)}
                         </span>
+                        {edgeLabel && (
+                          <span className="text-[9px] font-mono font-black uppercase tracking-wide"
+                            style={{ color: edgeDelta != null && edgeDelta < 0 ? "var(--ledger-green)" : "var(--ledger-brown)" }}>
+                            {edgeLabel}
+                          </span>
+                        )}
+                        <span className="text-[9px] font-mono font-black uppercase tracking-wide" style={{ color: ageColor }}>
+                          Age {ageArrow}
+                        </span>
+                      </div>
+                      {isRfa && offerPicks.length > 0 && (
+                        <div>
+                          <span className="text-[9px] font-mono font-black uppercase tracking-wide"
+                            style={{ color: "var(--ledger-amber, #c87941)" }}
+                            title="CBA offer-sheet compensation owed to original team if they don't match">
+                            ⚠ Offer sheet · picks owed: {offerPicks.join(" + ")}
+                          </span>
+                        </div>
                       )}
-                      <span className="text-[9px] font-mono font-black uppercase tracking-wide" style={{ color: ageColor }}>
-                        Age {ageArrow}
-                      </span>
+                      {isRfa && offerPicks.length === 0 && (
+                        <div>
+                          <span className="text-[9px] font-mono uppercase tracking-wide"
+                            style={{ color: "var(--ledger-ink-faint)" }}>
+                            RFA · no comp
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    {isRfa && offerPicks.length > 0 && (
-                      <div>
-                        <span className="text-[9px] font-mono font-black uppercase tracking-wide"
-                          style={{ color: "var(--ledger-amber, #c87941)" }}
-                          title="CBA offer-sheet compensation owed to original team if they don't match">
-                          ⚠ Offer sheet · picks owed: {offerPicks.join(" + ")}
-                        </span>
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                      <div className="min-w-[132px]">
+                        <div className="flex items-center justify-between gap-2">
+                          <Terms c={fa.contract} />
+                          <span className="text-[9px] font-mono tabular-nums" style={{ color: affordable ? "var(--ledger-green)" : "var(--ledger-red)" }}>
+                            {money(projectedCap)}
+                          </span>
+                        </div>
+                        <div className="mt-1 h-1.5" style={{ background: "var(--paper-inset)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
+                          <div style={{
+                            width: `${capPct}%`,
+                            height: "100%",
+                            background: affordable ? "var(--ledger-green)" : "var(--ledger-red)",
+                          }} />
+                        </div>
                       </div>
-                    )}
-                    {isRfa && offerPicks.length === 0 && (
-                      <div>
-                        <span className="text-[9px] font-mono uppercase tracking-wide"
-                          style={{ color: "var(--ledger-ink-faint)" }}>
-                          RFA · no comp
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                    <div className="min-w-[132px]">
-                      <div className="flex items-center justify-between gap-2">
-                        <Terms c={fa.contract} />
-                        <span className="text-[9px] font-mono tabular-nums" style={{ color: affordable ? "var(--ledger-green)" : "var(--ledger-red)" }}>
-                          {money(projectedCap)}
-                        </span>
-                      </div>
-                      <div className="mt-1 h-1.5" style={{ background: "var(--paper-inset)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
-                        <div style={{
-                          width: `${capPct}%`,
-                          height: "100%",
-                          background: affordable ? "var(--ledger-green)" : "var(--ledger-red)",
-                        }} />
-                      </div>
+                      <button
+                        onClick={() => onSign(fa)}
+                        disabled={!affordable}
+                        aria-label={`${isRfa ? "Offer sheet" : "Sign"} ${fa.player.name}`}
+                        title={affordable ? (isRfa ? `Sign via offer sheet (${offerPicks.length ? offerPicks.join(" + ") + " compensation" : "no pick comp"})` : "Sign to your roster") : "Not enough cap space"}
+                        className="tap-target text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
+                        style={{
+                          background: affordable ? "var(--ledger-navy)" : "transparent",
+                          color: affordable ? "#fff" : "var(--ledger-ink-faint)",
+                          border: affordable ? "none" : "1px solid var(--ledger-rule)",
+                          borderRadius: "2px",
+                          cursor: affordable ? "pointer" : "not-allowed",
+                          opacity: affordable ? 1 : 0.6,
+                        }}>
+                        {isRfa ? "Offer Sheet" : "Sign"}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => onSign(fa)}
-                      disabled={!affordable}
-                      aria-label={`${isRfa ? "Offer sheet" : "Sign"} ${fa.player.name}`}
-                      title={affordable ? (isRfa ? `Sign via offer sheet (${offerPicks.length ? offerPicks.join(" + ") + " compensation" : "no pick comp"})` : "Sign to your roster") : "Not enough cap space"}
-                      className="tap-target text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
-                      style={{
-                        background: affordable ? "var(--ledger-navy)" : "transparent",
-                        color: affordable ? "#fff" : "var(--ledger-ink-faint)",
-                        border: affordable ? "none" : "1px solid var(--ledger-rule)",
-                        borderRadius: "2px",
-                        cursor: affordable ? "pointer" : "not-allowed",
-                        opacity: affordable ? 1 : 0.6,
-                      }}>
-                      {isRfa ? "Offer Sheet" : "Sign"}
-                    </button>
                   </div>
+                  {isExpanded && <ExpandedStats p={fa.player} nav={fullNav} />}
                 </div>
               );
             })}
