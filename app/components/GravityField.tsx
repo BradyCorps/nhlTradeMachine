@@ -22,7 +22,7 @@ const TIER_ICON: Record<GravityTier, string> = {
   SUPERMASSIVE:  "◉",
   STAR:          "●",
   MAIN_SEQUENCE: "◉",
-  DWARF:         "○",
+  SATELLITE:     "○",
   ASTEROID:      "·",
   BLACK_HOLE:    "◎",
 };
@@ -31,7 +31,7 @@ const TIER_LABEL: Record<GravityTier, string> = {
   SUPERMASSIVE:  "Supermassive",
   STAR:          "Star",
   MAIN_SEQUENCE: "Main Sequence",
-  DWARF:         "Dwarf",
+  SATELLITE:     "Satellite",
   ASTEROID:      "Asteroid",
   BLACK_HOLE:    "Black Hole",
 };

@@ -37,7 +37,7 @@ export type GravityTier =
   | "SUPERMASSIVE"    // +0.50+: warps the entire game
   | "STAR"            // +0.35–0.50: elite gravitational field
   | "MAIN_SEQUENCE"   // +0.15–0.35: strong, steady pull
-  | "DWARF"           // +0.05–0.15: detectable but modest
+  | "SATELLITE"       // +0.05–0.15: detectable but modest
   | "ASTEROID"        // -0.05–+0.05: negligible field
   | "BLACK_HOLE";     // < -0.05: absorbs energy from linemates
 
@@ -45,7 +45,7 @@ const TIER_DESC: Record<GravityTier, string> = {
   SUPERMASSIVE:  "Warps the game around himself — linemates orbit",
   STAR:          "Elite gravitational field — elevates everyone nearby",
   MAIN_SEQUENCE: "Strong, steady pull — makes his line better",
-  DWARF:         "Detectable pull — modest but real",
+  SATELLITE:     "Detectable pull — modest but real",
   ASTEROID:      "Negligible gravitational field",
   BLACK_HOLE:    "Absorbs energy — linemates produce less",
 };
@@ -54,7 +54,7 @@ function classifyTier(force: number): GravityTier {
   if (force >= 0.50) return "SUPERMASSIVE";
   if (force >= 0.35) return "STAR";
   if (force >= 0.15) return "MAIN_SEQUENCE";
-  if (force >= 0.05) return "DWARF";
+  if (force >= 0.05) return "SATELLITE";
   if (force >= -0.05) return "ASTEROID";
   return "BLACK_HOLE";
 }
@@ -191,7 +191,7 @@ export function gravityTierColor(tier: GravityTier): string {
     case "SUPERMASSIVE":  return "var(--ledger-green)";
     case "STAR":          return "var(--ledger-green)";
     case "MAIN_SEQUENCE": return "var(--ledger-amber, #d4a017)";
-    case "DWARF":         return "var(--ledger-ink-faint)";
+    case "SATELLITE":     return "var(--ledger-ink-faint)";
     case "ASTEROID":      return "var(--ledger-ink-faint)";
     case "BLACK_HOLE":    return "var(--ledger-red)";
   }
