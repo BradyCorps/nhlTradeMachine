@@ -52,7 +52,13 @@ interface TeamData {
   capBreakdown: CapBreakdown | null;
 }
 
-type SortKey = "standing" | "present" | "future" | "rosterNAV" | "capSpace" | "goalDiff" | "speed" | "name";
+type SortKey = "division" | "standing" | "present" | "future" | "rosterNAV" | "capSpace" | "goalDiff" | "speed" | "name";
+
+const CONFERENCE_ORDER = ["Eastern", "Western"] as const;
+const DIVISION_ORDER: Record<string, string[]> = {
+  Eastern: ["Atlantic", "Metro"],
+  Western: ["Central", "Pacific"],
+};
 
 const PHASE_ORDER: Record<string, number> = {
   Contender: 1, Bubble: 2, Retooling: 3, Rebuilding: 4, Tanking: 5,
@@ -699,7 +705,7 @@ export default function TeamsPage() {
   const [players, setPlayers] = useState<Asset[]>([]);
   const [capCeiling, setCapCeiling] = useState(104);
   const [loading, setLoading] = useState(true);
-  const [sortKey, setSortKey] = useState<SortKey>("standing");
+  const [sortKey, setSortKey] = useState<SortKey>("division");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filterPhase, setFilterPhase] = useState<string>("ALL");
 
@@ -765,13 +771,10 @@ export default function TeamsPage() {
     });
   }, [teams, players, navMap]);
 
-  const filtered = useMemo(() => {
-    let list = teamProfiles;
-    if (filterPhase !== "ALL") {
-      list = list.filter((tp) => tp.team.phase === filterPhase);
-    }
+  const applySort = (list: TeamProfile[], key: SortKey) => {
     list.sort((a, b) => {
-      switch (sortKey) {
+      switch (key) {
+        case "division":
         case "standing": return a.team.standing - b.team.standing;
         case "present": return b.contention.present - a.contention.present;
         case "future": return b.contention.future - a.contention.future;
@@ -788,7 +791,30 @@ export default function TeamsPage() {
       }
     });
     return list;
+  };
+
+  const filtered = useMemo(() => {
+    let list = [...teamProfiles];
+    if (filterPhase !== "ALL") {
+      list = list.filter((tp) => tp.team.phase === filterPhase);
+    }
+    return applySort(list, sortKey);
   }, [teamProfiles, sortKey, filterPhase]);
+
+  const divisionGroups = useMemo(() => {
+    if (sortKey !== "division") return null;
+    const groups: { conference: string; division: string; teams: TeamProfile[] }[] = [];
+    for (const conf of CONFERENCE_ORDER) {
+      for (const div of DIVISION_ORDER[conf]) {
+        let divTeams = filtered.filter((tp) => tp.team.division === div);
+        divTeams = applySort([...divTeams], "standing");
+        if (divTeams.length > 0) {
+          groups.push({ conference: conf, division: div, teams: divTeams });
+        }
+      }
+    }
+    return groups;
+  }, [filtered, sortKey]);
 
   const phaseGroups = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -863,7 +889,8 @@ export default function TeamsPage() {
             Sort by
           </span>
           {([
-            ["standing", "Rank"],
+            ["division", "Division"],
+            ["standing", "All Teams"],
             ["present", "Present"],
             ["future", "Future"],
             ["rosterNAV", "NAV"],
@@ -888,17 +915,63 @@ export default function TeamsPage() {
         </div>
 
         {/* Team cards */}
-        <div className="space-y-2">
-          {filtered.map((tp) => (
-            <TeamCard
-              key={tp.team.id}
-              profile={tp}
-              expanded={expandedId === tp.team.id}
-              onToggle={() => setExpandedId(expandedId === tp.team.id ? null : tp.team.id)}
-              capCeiling={capCeiling}
-            />
-          ))}
-        </div>
+        {divisionGroups ? (
+          <div className="space-y-6">
+            {divisionGroups.map(({ conference, division, teams: divTeams }, gi) => (
+              <div key={division}>
+                <div className="flex items-center gap-3 mb-2">
+                  <h3
+                    className="text-[12px] font-black uppercase tracking-[0.15em] font-mono"
+                    style={{ color: "var(--ledger-ink)" }}
+                  >
+                    {division}
+                  </h3>
+                  <span
+                    className="text-[9px] font-black uppercase tracking-[0.1em] font-mono"
+                    style={{ color: "var(--ledger-ink-faint)" }}
+                  >
+                    {conference} Conference
+                  </span>
+                  {gi > 0 && gi % 2 === 0 && (
+                    <div className="flex-1 h-px" style={{ background: "var(--ledger-ink-faint)", opacity: 0.3 }} />
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  {divTeams.map((tp, rank) => (
+                    <div key={tp.team.id} className="flex items-start gap-0">
+                      <span
+                        className="text-[11px] font-black font-mono shrink-0 w-5 text-right mt-3.5 mr-1.5"
+                        style={{ color: "var(--ledger-ink-faint)", fontVariantNumeric: "tabular-nums" }}
+                      >
+                        {rank + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <TeamCard
+                          profile={tp}
+                          expanded={expandedId === tp.team.id}
+                          onToggle={() => setExpandedId(expandedId === tp.team.id ? null : tp.team.id)}
+                          capCeiling={capCeiling}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filtered.map((tp) => (
+              <TeamCard
+                key={tp.team.id}
+                profile={tp}
+                expanded={expandedId === tp.team.id}
+                onToggle={() => setExpandedId(expandedId === tp.team.id ? null : tp.team.id)}
+                capCeiling={capCeiling}
+              />
+            ))}
+          </div>
+        )}
 
         {filtered.length === 0 && (
           <div
