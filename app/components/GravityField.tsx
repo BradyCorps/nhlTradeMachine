@@ -1,8 +1,5 @@
 "use client";
-// ── GravityField v2 — orbital field diagram + analytical depth ──
-// Top row: SVG field diagram (left) + core component panel (right).
-// Bottom row: full-width analytical depth — mechanisms, gravity
-// assist, partner independence, and predictive stability.
+// ── GravityField v2.1 — AA-accessible orbital field + analytical depth ──
 
 import React from "react";
 import type { GravityProfile, GravityTier, GravityMechanism } from "@/app/lib/gravity";
@@ -35,12 +32,16 @@ const TIER_LABEL: Record<GravityTier, string> = {
 function CompactGravity({ profile }: { profile: GravityProfile }) {
   const color = gravityTierColor(profile.tier);
   return (
-    <span className="inline-flex items-center gap-1.5 font-mono text-[10px]">
+    <span
+      className="inline-flex items-center gap-1.5 font-mono text-[10px]"
+      role="text"
+      aria-label={`Gravity: ${profile.force > 0 ? "+" : ""}${profile.force.toFixed(2)}, tier ${TIER_LABEL[profile.tier]}`}
+    >
       <span className="font-black" style={{ color, fontVariantNumeric: "tabular-nums" }}>
         {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
       </span>
       <span
-        className="text-[8px] font-black uppercase tracking-[0.1em] px-1 py-px border"
+        className="text-[9px] font-black uppercase tracking-[0.1em] px-1 py-px border"
         style={{ color, borderColor: color }}
       >
         {TIER_LABEL[profile.tier]}
@@ -59,10 +60,10 @@ function valueToOrbit(value: number, min: number, max: number): number {
 // ── SVG orbital field diagram ──────────────────────────────────────────────
 
 function FieldDiagram({ profile }: { profile: GravityProfile }) {
-  const W = 300;
-  const H = 300;
+  const W = 320;
+  const H = 310;
   const cx = W / 2;
-  const cy = 150;
+  const cy = 155;
   const absForce = Math.abs(profile.force);
   const isNeg = profile.force < 0;
   const color = gravityTierColor(profile.tier);
@@ -84,7 +85,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
   const gridLines = 8;
   const gridAngleStep = (2 * Math.PI) / gridLines;
 
-  // Primary orbital markers (3 core components)
+  // Primary orbital markers
   const primaryDots = [
     {
       label: "NOIV", value: profile.noivLift,
@@ -100,13 +101,13 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
     },
     {
       label: "Creation", value: profile.creationAmplifier,
-      angle: Math.PI * 0.55,
+      angle: Math.PI * 0.65,
       orbit: valueToOrbit(profile.creationAmplifier, 0.5, 2.0),
       display: `×${profile.creationAmplifier.toFixed(2)}`,
     },
   ];
 
-  // Secondary orbital markers (analytical signals — smaller, outlined)
+  // Secondary markers
   const secondaryDots = [
     {
       label: "Partner", value: profile.partnerIndependence,
@@ -122,7 +123,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
     },
   ];
 
-  // Confidence arc — partner independence as a partial ring around the core
+  // Confidence arc
   const piArc = clampViz(profile.partnerIndependence, 0.5, 1.4);
   const arcFraction = (piArc - 0.5) / 0.9;
   const arcR = coreR + 9;
@@ -139,11 +140,11 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
     <svg
       viewBox={`0 0 ${W} ${H}`}
       className="w-full"
-      style={{ maxWidth: 340 }}
+      style={{ maxWidth: 360 }}
       role="img"
-      aria-label={`Gravity field diagram: force ${profile.force > 0 ? "+" : ""}${profile.force.toFixed(2)}, tier ${TIER_LABEL[profile.tier]}, partner independence ${profile.partnerIndependence.toFixed(2)}, predictive stability ${(profile.predictiveStability * 100).toFixed(0)}%`}
+      aria-label={`Gravity field: force ${profile.force > 0 ? "+" : ""}${profile.force.toFixed(2)}, tier ${TIER_LABEL[profile.tier]}. NOIV lift ${profile.noivLift > 0 ? "+" : ""}${profile.noivLift.toFixed(2)}, zone pull ${profile.zonePull > 0 ? "+" : ""}${profile.zonePull.toFixed(2)}, creation amplifier ×${profile.creationAmplifier.toFixed(2)}, player mass ${profile.playerMass.toFixed(2)}, partner independence ×${profile.partnerIndependence.toFixed(2)}, gravity assist ${profile.gravityAssist.toFixed(2)}, signal confidence ${(profile.predictiveStability * 100).toFixed(0)}%.`}
     >
-      {/* Radial grid lines */}
+      {/* Radial grid */}
       {Array.from({ length: gridLines }).map((_, i) => {
         const angle = i * gridAngleStep;
         const x2 = cx + Math.cos(angle) * (maxR + 5);
@@ -181,7 +182,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         opacity={0.3}
       />
 
-      {/* Orbital paths for primary dots */}
+      {/* Orbital paths */}
       {primaryDots.map(({ orbit }, i) => {
         const orbitR = minR + (maxR - minR) * orbit;
         return (
@@ -197,12 +198,12 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         );
       })}
 
-      {/* Primary component markers (filled dots) */}
+      {/* Primary markers */}
       {primaryDots.map(({ label, angle, orbit, display }, i) => {
         const orbitR = minR + (maxR - minR) * orbit;
         const mx = cx + Math.cos(angle) * orbitR;
         const my = cy + Math.sin(angle) * orbitR;
-        const labelR = maxR + 24;
+        const labelR = maxR + 26;
         const lx = cx + Math.cos(angle) * labelR;
         const ly = cy + Math.sin(angle) * labelR;
         const anchor = lx < cx - 10 ? "end" : lx > cx + 10 ? "start" : "middle";
@@ -224,12 +225,12 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
               opacity={0.9}
             />
             <text
-              x={lx} y={ly - 5}
+              x={lx} y={ly - 6}
               textAnchor={anchor}
               fill="var(--ledger-ink-faint)"
               fontFamily="'Courier Prime', monospace"
               fontWeight={900}
-              fontSize={8}
+              fontSize={9}
               letterSpacing="0.1em"
             >
               {label.toUpperCase()}
@@ -240,7 +241,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
               fill={color}
               fontFamily="'Courier Prime', monospace"
               fontWeight={900}
-              fontSize={12}
+              fontSize={13}
             >
               {display}
             </text>
@@ -248,12 +249,12 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         );
       })}
 
-      {/* Secondary analytical markers (outlined, smaller) */}
+      {/* Secondary markers */}
       {secondaryDots.map(({ label, angle, orbit, display }, i) => {
         const orbitR = minR + (maxR - minR) * orbit;
         const mx = cx + Math.cos(angle) * orbitR;
         const my = cy + Math.sin(angle) * orbitR;
-        const labelR = maxR + 22;
+        const labelR = maxR + 24;
         const lx = cx + Math.cos(angle) * labelR;
         const ly = cy + Math.sin(angle) * labelR;
         const anchor = lx < cx - 10 ? "end" : lx > cx + 10 ? "start" : "middle";
@@ -275,12 +276,12 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
               opacity={0.7}
             />
             <text
-              x={lx} y={ly - 4}
+              x={lx} y={ly - 5}
               textAnchor={anchor}
               fill="var(--ledger-ink-faint)"
               fontFamily="'Courier Prime', monospace"
               fontWeight={900}
-              fontSize={7}
+              fontSize={8}
               letterSpacing="0.08em"
             >
               {label.toUpperCase()}
@@ -291,7 +292,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
               fill={color}
               fontFamily="'Courier Prime', monospace"
               fontWeight={900}
-              fontSize={10}
+              fontSize={11}
               opacity={0.8}
             >
               {display}
@@ -300,7 +301,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         );
       })}
 
-      {/* Confidence arc — partner independence around the core */}
+      {/* Confidence arc */}
       {arcAngleSpan > 0.05 && (
         <path
           d={`M ${arcX1} ${arcY1} A ${arcR} ${arcR} 0 ${largeArc} 1 ${arcX2} ${arcY2}`}
@@ -312,7 +313,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         />
       )}
 
-      {/* Central mass node — outer glow ring */}
+      {/* Central mass node */}
       <circle cx={cx} cy={cy} r={coreR + 6} fill="none" stroke={color} strokeWidth={1} opacity={0.25} />
       <circle cx={cx} cy={cy} r={coreR + 3} fill="none" stroke={color} strokeWidth={1.5} opacity={0.4} />
       <circle cx={cx} cy={cy} r={coreR} fill="var(--paper-bg)" stroke={color} strokeWidth={2.5} />
@@ -330,9 +331,9 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
       </text>
 
-      {/* Tier label — top */}
+      {/* Tier label */}
       <text
-        x={cx} y={20}
+        x={cx} y={22}
         textAnchor="middle"
         fill={color}
         fontFamily="'Courier Prime', monospace"
@@ -345,12 +346,12 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
 
       {/* Mass — below core */}
       <text
-        x={cx} y={cy + coreR + 16}
+        x={cx} y={cy + coreR + 18}
         textAnchor="middle"
         fill="var(--ledger-ink-faint)"
         fontFamily="'Courier Prime', monospace"
         fontWeight={900}
-        fontSize={8}
+        fontSize={9}
         letterSpacing="0.05em"
       >
         m = {profile.playerMass.toFixed(2)}
@@ -358,12 +359,12 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
 
       {/* Bottom title */}
       <text
-        x={cx} y={H - 8}
+        x={cx} y={H - 6}
         textAnchor="middle"
         fill="var(--ledger-ink-faint)"
         fontFamily="'Courier Prime', monospace"
         fontWeight={900}
-        fontSize={7}
+        fontSize={8}
         letterSpacing="0.2em"
       >
         GRAVITATIONAL FIELD ANALYSIS
@@ -372,7 +373,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
   );
 }
 
-// ── Component breakdown panel (right side) ─────────────────────────────────
+// ── Component breakdown panel ─────────────────────────────────────────────
 
 function ComponentPanel({ profile }: { profile: GravityProfile }) {
   const color = gravityTierColor(profile.tier);
@@ -405,28 +406,30 @@ function ComponentPanel({ profile }: { profile: GravityProfile }) {
   ];
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5" role="list" aria-label="Gravity components">
       {items.map(({ label, value, sub }) => (
         <div key={label}
-          className="px-2 py-1.5 border"
+          className="px-2.5 py-2 border"
           style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-bg)" }}
+          role="listitem"
+          aria-label={`${label}: ${value}`}
         >
           <div className="flex items-baseline justify-between gap-2">
             <div
-              className="text-[8px] font-black uppercase tracking-[0.12em] font-mono"
+              className="text-[10px] font-black uppercase tracking-[0.12em] font-mono"
               style={{ color: "var(--ledger-ink-faint)" }}
             >
               {label}
             </div>
             <div
-              className="text-[14px] font-black font-mono leading-tight"
+              className="text-[15px] font-black font-mono leading-tight"
               style={{ color, fontVariantNumeric: "tabular-nums" }}
             >
               {value}
             </div>
           </div>
           <div
-            className="text-[8px] font-mono leading-tight mt-0.5"
+            className="text-[10px] font-mono leading-tight mt-0.5"
             style={{ color: "var(--ledger-ink-faint)" }}
           >
             {sub}
@@ -436,7 +439,7 @@ function ComponentPanel({ profile }: { profile: GravityProfile }) {
 
       {/* Context badge */}
       {profile.contextAdjustment !== 1.0 && (
-        <div className="text-[8px] font-mono font-black px-2" style={{ color: "var(--ledger-ink-faint)" }}>
+        <div className="text-[10px] font-mono font-black px-2.5 mt-0.5" style={{ color: "var(--ledger-ink-faint)" }}>
           Context ×{profile.contextAdjustment.toFixed(2)} (QoC · zone · PP)
         </div>
       )}
@@ -449,15 +452,22 @@ function ComponentPanel({ profile }: { profile: GravityProfile }) {
 function MechanismBar({ label, value, color }: { label: string; value: number; color: string }) {
   const pct = Math.round(clampViz(value, 0, 1) * 100);
   return (
-    <div className="flex items-center gap-2">
+    <div
+      className="flex items-center gap-2"
+      role="meter"
+      aria-label={`${label}: ${value.toFixed(2)} out of 1.00`}
+      aria-valuenow={pct}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
       <div
-        className="text-[8px] font-black uppercase tracking-[0.10em] font-mono shrink-0"
-        style={{ color: "var(--ledger-ink-faint)", width: 90 }}
+        className="text-[10px] font-black uppercase tracking-[0.10em] font-mono shrink-0"
+        style={{ color: "var(--ledger-ink-faint)", width: 100 }}
       >
         {label}
       </div>
       <div
-        className="flex-1 h-[6px]"
+        className="flex-1 h-[7px]"
         style={{ background: "var(--paper-inset)", border: "1px solid var(--ledger-rule-light)", borderRadius: 1 }}
       >
         <div
@@ -471,8 +481,8 @@ function MechanismBar({ label, value, color }: { label: string; value: number; c
         />
       </div>
       <div
-        className="text-[9px] font-black font-mono tabular-nums shrink-0"
-        style={{ color: pct > 60 ? color : "var(--ledger-ink-faint)", width: 28, textAlign: "right" }}
+        className="text-[11px] font-black font-mono tabular-nums shrink-0"
+        style={{ color: pct > 60 ? color : "var(--ledger-ink-faint)", width: 32, textAlign: "right" }}
       >
         {value.toFixed(2)}
       </div>
@@ -480,7 +490,7 @@ function MechanismBar({ label, value, color }: { label: string; value: number; c
   );
 }
 
-// ── Analytical depth section (full-width, below the diagram) ──────────────
+// ── Analytical depth section ─────────────────────────────────────────────
 
 function AnalyticalDepth({ profile }: { profile: GravityProfile }) {
   const color = gravityTierColor(profile.tier);
@@ -492,24 +502,25 @@ function AnalyticalDepth({ profile }: { profile: GravityProfile }) {
     <div
       className="mt-3 border p-3"
       style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-bg)" }}
+      aria-label="Analytical depth"
     >
       <div
-        className="text-[8px] font-black uppercase tracking-[0.15em] font-mono mb-2"
+        className="text-[10px] font-black uppercase tracking-[0.15em] font-mono mb-3"
         style={{ color: "var(--ledger-ink-faint)" }}
       >
         Analytical Depth
       </div>
 
-      <div className="flex gap-4" style={{ flexWrap: "wrap" }}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: "1fr minmax(140px, 180px)" }}>
         {/* Left: mechanism decomposition */}
-        <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+        <div style={{ minWidth: 0 }}>
           <div
-            className="text-[7px] font-black uppercase tracking-[0.12em] font-mono mb-1.5"
+            className="text-[9px] font-black uppercase tracking-[0.12em] font-mono mb-2"
             style={{ color: "var(--ledger-ink-faint)" }}
           >
             Mechanism Decomposition
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             <MechanismBar label="Space Creation" value={m.spaceCreation} color={color} />
             <MechanismBar label="Transition" value={m.transitionControl} color={color} />
             <MechanismBar label="Pace" value={m.paceManipulation} color={color} />
@@ -518,54 +529,56 @@ function AnalyticalDepth({ profile }: { profile: GravityProfile }) {
         </div>
 
         {/* Right: gravity assist + signal confidence */}
-        <div style={{ flex: "0 0 150px" }}>
-          {/* Gravity Assist */}
+        <div className="flex flex-col gap-2">
           <div
-            className="border p-2 mb-2"
+            className="border p-2.5"
             style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
+            role="group"
+            aria-label={`Gravity assist: ${profile.gravityAssist.toFixed(2)}`}
           >
             <div
-              className="text-[7px] font-black uppercase tracking-[0.12em] font-mono"
+              className="text-[9px] font-black uppercase tracking-[0.12em] font-mono"
               style={{ color: "var(--ledger-ink-faint)" }}
             >
               Gravity Assist
             </div>
             <div
-              className="text-[18px] font-black font-mono leading-tight mt-0.5"
+              className="text-[20px] font-black font-mono leading-tight mt-0.5"
               style={{ color: profile.gravityAssist > 0.5 ? color : "var(--ledger-ink-faint)", fontVariantNumeric: "tabular-nums" }}
             >
               {profile.gravityAssist.toFixed(2)}
             </div>
             <div
-              className="text-[7px] font-mono mt-0.5"
+              className="text-[9px] font-mono mt-0.5"
               style={{ color: "var(--ledger-ink-faint)" }}
             >
               Invisible creation
             </div>
           </div>
 
-          {/* Predictive Stability */}
           <div
-            className="border p-2"
+            className="border p-2.5"
             style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
+            role="group"
+            aria-label={`Signal confidence: ${stabPct}%`}
           >
             <div
-              className="text-[7px] font-black uppercase tracking-[0.12em] font-mono"
+              className="text-[9px] font-black uppercase tracking-[0.12em] font-mono"
               style={{ color: "var(--ledger-ink-faint)" }}
             >
               Signal Confidence
             </div>
             <div className="flex items-baseline gap-1 mt-0.5">
               <div
-                className="text-[18px] font-black font-mono leading-tight"
+                className="text-[20px] font-black font-mono leading-tight"
                 style={{ color: stabColor, fontVariantNumeric: "tabular-nums" }}
               >
                 {stabPct}
               </div>
-              <div className="text-[9px] font-black font-mono" style={{ color: stabColor }}>%</div>
+              <div className="text-[11px] font-black font-mono" style={{ color: stabColor }}>%</div>
             </div>
             <div
-              className="text-[7px] font-mono mt-0.5"
+              className="text-[9px] font-mono mt-0.5"
               style={{ color: "var(--ledger-ink-faint)" }}
             >
               Year-over-year stability
@@ -576,7 +589,7 @@ function AnalyticalDepth({ profile }: { profile: GravityProfile }) {
 
       {/* Tier description */}
       <div
-        className="text-[9px] font-mono leading-relaxed mt-2 pt-2"
+        className="text-[11px] font-mono leading-relaxed mt-3 pt-2.5"
         style={{ color: "var(--ledger-ink-faint)", borderTop: "1px solid var(--ledger-rule-light)" }}
       >
         {profile.description}. Net force{" "}
@@ -606,17 +619,17 @@ export default function GravityField({ profile, playerName, mode = "full" }: Pro
   }
 
   return (
-    <div className="font-mono" style={{ maxWidth: 760 }}>
+    <div className="font-mono" role="region" aria-label={`Gravity field analysis for ${playerName}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <span
-          className="text-[10px] font-black uppercase tracking-[0.15em]"
+          className="text-[11px] font-black uppercase tracking-[0.15em]"
           style={{ color: "var(--ledger-ink-faint)" }}
         >
           Gravity Field
         </span>
         <span
-          className="text-[10px] font-black uppercase tracking-[0.1em]"
+          className="text-[11px] font-black uppercase tracking-[0.1em]"
           style={{ color: "var(--ledger-ink-faint)" }}
         >
           {playerName}
@@ -624,20 +637,18 @@ export default function GravityField({ profile, playerName, mode = "full" }: Pro
       </div>
 
       {/* Top: diagram left, core components right */}
-      <div className="flex gap-4" style={{ alignItems: "stretch" }}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}>
         <div
-          className="border p-2 flex-shrink-0"
+          className="border p-2"
           style={{
             borderColor: "var(--ledger-rule)",
             background: "var(--paper-inset)",
-            width: "50%",
-            minWidth: 240,
           }}
         >
           <FieldDiagram profile={profile} />
         </div>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div>
           <ComponentPanel profile={profile} />
         </div>
       </div>

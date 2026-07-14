@@ -270,6 +270,14 @@ export function computeGravity(asset: Asset): GravityProfile | null {
     predictiveStability = sameDir
       ? clamp(0.50 + agreement * 0.45, 0.50, 0.95)
       : clamp(0.30 - (1 - agreement) * 0.15, 0.10, 0.45);
+
+    // Near-zero NOIV = trivially stable — dampen confidence toward 0.50
+    // so a flat-zero player doesn't show 100% "signal confidence"
+    const signalStrength = Math.max(Math.abs(currentNoiv), Math.abs(baselineNoiv));
+    if (signalStrength < 3) {
+      const dampFactor = clamp(signalStrength / 3, 0.2, 1);
+      predictiveStability = 0.50 + (predictiveStability - 0.50) * dampFactor;
+    }
   }
   if (games >= 60) predictiveStability = Math.min(1, predictiveStability + 0.05);
   else if (games < 25) predictiveStability *= 0.75;
