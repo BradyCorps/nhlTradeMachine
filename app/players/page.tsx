@@ -1072,7 +1072,7 @@ export default function PlayersPage() {
   const deferredSearch = useDeferredValue(search);
   const [posFilter, setPosFilter] = useState<"ALL" | "F" | "D" | "G">("ALL");
   const [teamFilter, setTeamFilter] = useState<string>("ALL");
-  const [sortKey, setSortKey] = useState<PlayerSortKey>("ppg");
+  const [sortKey, setSortKey] = useState<PlayerSortKey>("seasonPts");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [forwardPage, setForwardPage] = useState(1);
   const [defencePage, setDefencePage] = useState(1);

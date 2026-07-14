@@ -119,7 +119,14 @@ export function computeGravity(asset: Asset): GravityProfile | null {
     const noivPerGame = Math.abs(blendedNoiv) / 100;
     if (opsImpliedLift > 0.01) {
       const ratio = (noivPerGame + 0.01) / (opsImpliedLift + 0.01);
-      creationAmplifier = clamp(ratio, 0.5, 2.0);
+      // When NOIV is positive, creation only amplifies (floor at 1.0).
+      // A player who produces AND lifts linemates (McDavid) shouldn't be
+      // penalized for high individual production — the amplifier rewards
+      // disproportionate creators without punishing complete players.
+      // When NOIV is negative, allow the full range so black holes
+      // (high production but linemates worse) are correctly exposed.
+      const floor = blendedNoiv > 0 ? 1.0 : 0.5;
+      creationAmplifier = clamp(ratio, floor, 2.0);
     }
   }
 
