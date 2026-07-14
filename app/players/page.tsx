@@ -53,6 +53,7 @@ interface Player {
   ops?: number | null;
   dps?: number | null;
   baselinePtsPace?: number | null;
+  baselineXgRel?: number | null;
   pkTimeShare?: number | null;
   xgRelTM?: number | null;
   xgaRelTM?: number | null;
@@ -447,6 +448,7 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
       edgeOzPct: player.edgeOzPct,
       edgeSpeedMaxMph: player.edgeSpeedMaxMph,
       edgeBurstsOver20: player.edgeBurstsOver20,
+      baselineXgRel: player.baselineXgRel ?? undefined,
     });
   }, [player]);
 
