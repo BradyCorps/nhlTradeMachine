@@ -1,36 +1,56 @@
-// ── Gravity Engine ──────────────────────────────────────────────
+// ── Gravity Engine v2 ───────────────────────────────────────────
 // Quantifies the "gravitational pull" a player exerts on the game —
 // the McDavid/Curry effect where a star warps play around themselves,
 // elevating linemates and dragging the puck into the offensive zone.
 //
-// Rooted in real physics: F = G × m₁ × m₂ / d²
-//   m₁ = player's star power (production, talent, explosiveness)
-//   m₂ = the play / offensive opportunity (what they pull toward them)
-//   d² = zone distance (how far from the OZ the play typically sits)
-//   F  = the net gravitational force — signed, continuous, interpretable
+// v2 adds five analytical layers that move gravity from a derivative
+// stat to a causal, predictive, and actionable metric:
+//
+//   1. Partner Independence — is the elevation real or borrowed from
+//      elite linemates? Measured by multi-season NOIV stability and
+//      (for D) pair-driver score across different partners.
+//   2. Context Adjustment — corrects raw NOIV for quality of
+//      competition, zone-start deployment, and PP inflation so two
+//      players with the same NOIV but different contexts compare fairly.
+//   3. Mechanism Decomposition — four sub-scores explaining WHERE
+//      gravity comes from: space creation, transition control, pace
+//      manipulation, and defensive warping.
+//   4. Gravity Assist — invisible creation beyond the scoresheet:
+//      the fraction of a player's team uplift NOT explained by his own
+//      individual shooting. High = creates opportunities without credit.
+//   5. Predictive Stability — year-over-year signal confidence.
+//      High = the gravity reading should hold into next season.
 //
 // Output is a signed decimal (not a 0-100 index):
 //   +0.40+  = elite gravity (McDavid, MacKinnon)
 //   +0.15–0.40 = meaningful pull (legit first-liners who elevate)
 //   0–0.15  = positive but modest
 //   negative = black hole (linemates worse with you)
-//
-// Three components:
-//   1. NOIV Lift (base force): how much linemates improve with you
-//   2. Zone Pull (1/d²): how much you drag play into the OZ
-//   3. Creation Amplifier: the gap between your own production and
-//      what you create for others (gravity vs mere talent)
 
 import type { Asset } from "./trade-types";
 
+export interface GravityMechanism {
+  spaceCreation:     number;  // 0–1: creating high-quality chances for others
+  transitionControl: number;  // 0–1: carrying play through the neutral zone
+  paceManipulation:  number;  // 0–1: driving shot-attempt frequency
+  defensiveWarping:  number;  // 0–1: forcing opponent overcommitment
+}
+
 export interface GravityProfile {
-  force:              number;   // the final gravity value — signed decimal
-  noivLift:           number;   // Component 1: linemate differential
-  zonePull:           number;   // Component 2: OZ pull factor
-  creationAmplifier:  number;   // Component 3: creation vs self-production
-  playerMass:         number;   // m₁: star power input
+  force:              number;
+  noivLift:           number;
+  zonePull:           number;
+  creationAmplifier:  number;
+  playerMass:         number;
+
+  partnerIndependence: number;   // 0.5–1.4: linemate-isolation strength
+  contextAdjustment:   number;   // net QoC / zone-start / PP correction multiplier
+  gravityAssist:       number;   // 0–1: invisible creation score
+  predictiveStability: number;   // 0–1: year-over-year signal confidence
+  mechanisms:          GravityMechanism;
+
   tier:               GravityTier;
-  description:        string;   // one-line read of the force
+  description:        string;
 }
 
 export type GravityTier =
@@ -59,127 +79,249 @@ function classifyTier(force: number): GravityTier {
   return "BLACK_HOLE";
 }
 
-// League-average OZ% for context (NHL ~50% by definition in 5v5)
 const LEAGUE_AVG_OZ = 0.50;
-
-// Clamp to a range
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const r2 = (v: number) => Math.round(v * 100) / 100;
 
+// ═════════════════════════════════════════════════════════════════
+// computeGravity — the full gravity engine
+// ═════════════════════════════════════════════════════════════════
 export function computeGravity(asset: Asset): GravityProfile | null {
   if (asset.position === "G" || asset.position === "Pick") return null;
   if (!asset.games || asset.games < 10) return null;
 
-  // ── Component 1: NOIV Lift (the base gravitational force) ──────
-  // xgRelTM is the player's on-ice xG% minus off-ice xG%, in pct pts.
-  // Range: roughly -12 to +12. An elite line-driver sits at +5 to +10.
-  // We blend with baseline for stability (same blend ratio as X-NAV).
+  const isD = asset.position === "D";
+  const ptsPace = asset.ptsPace ?? 0;
+  const toi = asset.avgTOI ?? 0;
+  const games = asset.games;
+  const assistsPace = asset.assistsPace ?? 0;
+  const goalsPace = asset.goalsPace ?? 0;
+  const ixg82 = asset.baselineIxg82 ?? 0;
+
+  // ─── NOIV Lift ─────────────────────────────────────────────────
   const currentNoiv = asset.xgRelTM ?? 0;
-  const baselineNoiv = asset.baselineXgRel != null ? asset.baselineXgRel * 100 : null;
+  const baselineNoiv = asset.baselineXgRel != null
+    ? asset.baselineXgRel * 100
+    : null;
   const blendedNoiv = baselineNoiv !== null
     ? currentNoiv * 0.4 + baselineNoiv * 0.6
     : currentNoiv;
+  const rawNoivLift = clamp(blendedNoiv / 15, -1, 1);
 
-  // Normalize to a -1 to +1 scale. Divisor=15 so that only a truly
-  // transcendent NOIV (blended ≥15) maxes out — prevents the top of
-  // the league from all reading +1.00 and losing differentiation.
-  const noivLift = clamp(blendedNoiv / 15, -1, 1);
+  // ─── Context Adjustment ────────────────────────────────────────
+  // QoC: elevated NOIV against tougher competition is worth more
+  const qocMult = asset.qocIndex != null
+    ? 1.0 + clamp((asset.qocIndex - 50) / 250, -0.08, 0.12)
+    : 1.0;
 
-  // ── Component 2: Zone Pull (the 1/d² term) ────────────────────
-  // How much the player drags play into the OZ relative to league avg.
-  // edgeOzPct is the player's OZ time share (0-1). A gravity player
-  // pushes this well above 0.50.
-  const ozPct = asset.edgeOzPct ?? null;
-  let zonePull = 0;
-  if (ozPct !== null) {
-    // Delta from league average, scaled so +10% OZ = +0.5 zone pull
-    zonePull = clamp((ozPct - LEAGUE_AVG_OZ) * 5, -0.5, 0.75);
-  } else {
-    // No EDGE data: use defensive zone start share as a proxy.
-    // Low dzPct = starts in the OZ more = player is trusted offensively.
-    const dzPct = asset.dzPct ?? null;
-    if (dzPct !== null) {
-      zonePull = clamp((0.50 - dzPct) * 3, -0.3, 0.4);
+  // Zone starts: heavy DZ deployment suppresses raw NOIV
+  const zoneStartMult = asset.dzPct != null
+    ? 1.0 + clamp((asset.dzPct - 0.50) * 1.2, -0.06, 0.10)
+    : 1.0;
+
+  // PP inflation: a large PP-production share inflates on/off splits
+  let ppMult = 1.0;
+  if (asset.ppPtsPace82 != null && ptsPace > 10) {
+    const ppShare = asset.ppPtsPace82 / ptsPace;
+    if (ppShare > 0.40) {
+      ppMult = 1.0 - clamp((ppShare - 0.40) * 0.20, 0, 0.08);
     }
   }
 
-  // ── Component 3: Creation Amplifier ────────────────────────────
-  // Gravity vs mere talent: does the player lift others or just produce?
-  // Measured by the gap between NOIV (team uplift) and individual
-  // production (OPS). A player with high OPS but low NOIV is a scorer.
-  // A player with high NOIV relative to OPS is a creator — gravity.
+  const contextAdjustment = r2(qocMult * zoneStartMult * ppMult);
+  const noivLift = clamp(rawNoivLift * contextAdjustment, -1, 1);
+
+  // ─── Partner Independence ──────────────────────────────────────
+  // Multi-season NOIV stability proxies for "real gravity vs borrowed
+  // from elite linemates." If current and baseline agree in sign and
+  // magnitude, the signal is partner-independent.
+  let partnerIndependence = 1.0;
+
+  if (baselineNoiv !== null && games >= 20) {
+    const sameDirection = (currentNoiv >= 0) === (baselineNoiv >= 0);
+    const maxMag = Math.max(Math.abs(currentNoiv), Math.abs(baselineNoiv), 1);
+    const divergence = Math.abs(currentNoiv - baselineNoiv) / maxMag;
+
+    partnerIndependence = sameDirection
+      ? clamp(1.0 + (1 - divergence) * 0.20, 0.90, 1.20)
+      : clamp(0.80 - divergence * 0.10, 0.55, 0.90);
+  }
+
+  // D-pair driver score: direct with/without measurement
+  if (isD && asset.pairDriverScore != null) {
+    const driverBoost = clamp(asset.pairDriverScore / 20, -0.12, 0.20);
+    partnerIndependence = clamp(partnerIndependence + driverBoost, 0.5, 1.4);
+  }
+
+  // Dampen toward 1.0 for small samples
+  if (games < 30) {
+    partnerIndependence = 1.0 + (partnerIndependence - 1.0) * (games / 30);
+  }
+
+  // ─── Zone Pull ─────────────────────────────────────────────────
+  const ozPct = asset.edgeOzPct ?? null;
+  let zonePull = 0;
+  if (ozPct !== null) {
+    zonePull = clamp((ozPct - LEAGUE_AVG_OZ) * 5, -0.5, 0.75);
+  } else if (asset.dzPct != null) {
+    zonePull = clamp((0.50 - asset.dzPct) * 3, -0.3, 0.4);
+  }
+
+  // ─── Creation Amplifier ────────────────────────────────────────
   const ops = asset.ops ?? null;
-  const ptsPace = asset.ptsPace ?? 0;
   let creationAmplifier = 1.0;
 
   if (ops !== null && ptsPace > 0) {
-    // OPS measures individual offensive production (point shares).
-    // NOIV measures how the TEAM improves with you on ice.
-    // If NOIV >> OPS-implied-lift, you're creating through gravity.
-    const opsImpliedLift = ops / 82; // normalize to per-game
+    const opsImpliedLift = ops / 82;
     const noivPerGame = Math.abs(blendedNoiv) / 100;
     if (opsImpliedLift > 0.01) {
       const ratio = (noivPerGame + 0.01) / (opsImpliedLift + 0.01);
-      // When NOIV is positive, creation only amplifies (floor at 1.0).
-      // A player who produces AND lifts linemates (McDavid) shouldn't be
-      // penalized for high individual production — the amplifier rewards
-      // disproportionate creators without punishing complete players.
-      // When NOIV is negative, allow the full range so black holes
-      // (high production but linemates worse) are correctly exposed.
       const floor = blendedNoiv > 0 ? 1.0 : 0.5;
       creationAmplifier = clamp(ratio, floor, 2.0);
     }
   }
 
-  // Assist share as a secondary amplifier — playmakers who set up
-  // others are more gravitational than pure finishers
-  const assistsPace = asset.assistsPace ?? 0;
-  const goalsPace = asset.goalsPace ?? 0;
   if (assistsPace + goalsPace > 0) {
     const assistShare = assistsPace / (assistsPace + goalsPace);
-    // Assist-heavy players get a small creation boost
     creationAmplifier *= (0.85 + assistShare * 0.30);
   }
 
-  // ── Player Mass (m₁) — star power scaling ─────────────────────
-  // The raw components above can give a big number to a 4th-liner with
-  // fluky splits. Scale by the player's actual star power so gravity
-  // requires BOTH the talent to generate the field AND the impact data.
-  const toi = asset.avgTOI ?? 0;
-  const toiScale = clamp(toi / 20, 0.3, 1.2); // 20 min = baseline
-
-  const productionScale = clamp(ptsPace / 70, 0.2, 1.5); // 70 pts/82 = baseline
-
-  // Explosiveness bonus — burst/speed creates transition opportunities
-  let burstBonus = 0;
-  if (asset.edgeBurstsOver20 != null && asset.edgeBurstsOver20 >= 30) {
-    burstBonus += 0.04;
-  }
-  if (asset.edgeSpeedMaxMph != null && asset.edgeSpeedMaxMph >= 22.0) {
-    burstBonus += 0.03;
-  }
-
+  // ─── Player Mass ───────────────────────────────────────────────
+  const toiScale = clamp(toi / 20, 0.3, 1.2);
+  const productionScale = clamp(ptsPace / 70, 0.2, 1.5);
   const playerMass = toiScale * productionScale;
 
-  // ── Assemble: F = noivLift × (1 + zonePull) × creationAmplifier × mass
-  const rawForce = noivLift * (1 + zonePull) * creationAmplifier * playerMass + burstBonus;
+  // ═════════════════════════════════════════════════════════════════
+  // Mechanism Decomposition — WHERE does the gravity come from?
+  // ═════════════════════════════════════════════════════════════════
 
-  // Defensive suppression bonus — a gravity player who also suppresses
-  // chances against (negative xgaRelTM = fewer chances with you on ice)
-  const xgaSuppression = asset.xgaRelTM ?? null;
-  let suppressionBonus = 0;
-  if (xgaSuppression !== null && xgaSuppression < -1) {
-    suppressionBonus = clamp(Math.abs(xgaSuppression) * 0.015, 0, 0.08);
+  // Space Creation: team xG uplift beyond the player's own shooting
+  let spaceCreation = 0;
+  if (blendedNoiv > 0 && ptsPace > 0) {
+    const assistShare = assistsPace / Math.max(1, ptsPace);
+    const selfShootRate = ixg82 / 82;
+    const teamUplift = blendedNoiv / 100;
+    spaceCreation = clamp(
+      (teamUplift - selfShootRate * 0.3) * 8 + assistShare * 0.3,
+      0, 1,
+    );
   }
 
-  const force = Math.round((rawForce + suppressionBonus) * 100) / 100;
+  // Transition Control: skating + zone dominance
+  let transitionControl = 0;
+  {
+    let score = 0;
+    if (asset.edgeSpeedMaxMph != null)
+      score += clamp((asset.edgeSpeedMaxMph - 20) / 4, 0, 0.35);
+    if (asset.edgeBurstsOver20 != null)
+      score += clamp(asset.edgeBurstsOver20 / 80, 0, 0.35);
+    if (ozPct !== null)
+      score += clamp((ozPct - 0.48) * 4, 0, 0.30);
+    transitionControl = clamp(score, 0, 1);
+  }
+
+  // Pace Manipulation: shot-generation rate relative to ice time
+  let paceManipulation = 0;
+  if (toi > 0) {
+    const xgPerMin = (asset.xGPace ?? 0) / 82 / toi;
+    paceManipulation = clamp(xgPerMin * 180, 0, 1);
+  }
+
+  // Defensive Warping: suppressing opponents while maintaining offense
+  let defensiveWarping = 0;
+  {
+    const xgaSup = asset.xgaRelTM ?? 0;
+    if (xgaSup < -0.5 && blendedNoiv > 0) {
+      defensiveWarping = clamp(
+        Math.abs(xgaSup) * 0.3 + (blendedNoiv / 15) * 0.3,
+        0, 1,
+      );
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════════
+  // Gravity Assist — invisible creation beyond the scoresheet
+  // ═════════════════════════════════════════════════════════════════
+  // The fraction of a player's on-ice team uplift that is NOT explained
+  // by his own individual shooting. A pure sniper (high ixG, low NOIV
+  // surplus) scores ~0. A gravitational playmaker who lifts everyone
+  // without needing the puck himself scores ~0.7–1.0.
+  let gravityAssist = 0;
+  if (blendedNoiv > 0.5) {
+    const teamUplift = blendedNoiv / 100;
+    const ixgRate = ixg82 / 82;
+    if (teamUplift > 0.01) {
+      const selfFraction = Math.min(1, ixgRate / (teamUplift * 3));
+      const invisible = 1 - selfFraction;
+      const assistShare = assistsPace / Math.max(1, assistsPace + goalsPace);
+      const assistWeight = assistShare > 0.55 ? 1.15 : assistShare > 0.40 ? 1.0 : 0.85;
+      gravityAssist = clamp(invisible * assistWeight, 0, 1);
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════════
+  // Predictive Stability — year-over-year signal confidence
+  // ═════════════════════════════════════════════════════════════════
+  let predictiveStability = 0.50;
+  if (baselineNoiv !== null) {
+    const sameDir = (currentNoiv >= 0) === (baselineNoiv >= 0);
+    const maxMag = Math.max(Math.abs(currentNoiv), Math.abs(baselineNoiv), 1);
+    const agreement = 1 - Math.abs(currentNoiv - baselineNoiv) / maxMag;
+    predictiveStability = sameDir
+      ? clamp(0.50 + agreement * 0.45, 0.50, 0.95)
+      : clamp(0.30 - (1 - agreement) * 0.15, 0.10, 0.45);
+  }
+  if (games >= 60) predictiveStability = Math.min(1, predictiveStability + 0.05);
+  else if (games < 25) predictiveStability *= 0.75;
+
+  // ═════════════════════════════════════════════════════════════════
+  // Force Assembly
+  // ═════════════════════════════════════════════════════════════════
+
+  let burstBonus = 0;
+  if (asset.edgeBurstsOver20 != null && asset.edgeBurstsOver20 >= 30)
+    burstBonus += 0.04;
+  if (asset.edgeSpeedMaxMph != null && asset.edgeSpeedMaxMph >= 22.0)
+    burstBonus += 0.03;
+
+  let suppressionBonus = 0;
+  if (asset.xgaRelTM != null && asset.xgaRelTM < -1) {
+    suppressionBonus = clamp(Math.abs(asset.xgaRelTM) * 0.015, 0, 0.08);
+  }
+
+  const gaBonus = gravityAssist > 0.5
+    ? clamp((gravityAssist - 0.5) * 0.10, 0, 0.05)
+    : 0;
+
+  const rawForce =
+    noivLift
+    * (1 + zonePull)
+    * creationAmplifier
+    * playerMass
+    * partnerIndependence
+    + burstBonus
+    + suppressionBonus
+    + gaBonus;
+
+  const force = r2(rawForce);
   const tier = classifyTier(force);
 
   return {
     force,
-    noivLift: Math.round(noivLift * 100) / 100,
-    zonePull: Math.round(zonePull * 100) / 100,
-    creationAmplifier: Math.round(creationAmplifier * 100) / 100,
-    playerMass: Math.round(playerMass * 100) / 100,
+    noivLift:            r2(noivLift),
+    zonePull:            r2(zonePull),
+    creationAmplifier:   r2(creationAmplifier),
+    playerMass:          r2(playerMass),
+    partnerIndependence: r2(partnerIndependence),
+    contextAdjustment,
+    gravityAssist:       r2(gravityAssist),
+    predictiveStability: r2(predictiveStability),
+    mechanisms: {
+      spaceCreation:     r2(spaceCreation),
+      transitionControl: r2(transitionControl),
+      paceManipulation:  r2(paceManipulation),
+      defensiveWarping:  r2(defensiveWarping),
+    },
     tier,
     description: TIER_DESC[tier],
   };
