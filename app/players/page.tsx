@@ -287,89 +287,94 @@ const PLAYER_ICON_KEY = [
 ] as const;
 
 function PlayersIconKey() {
+  const [open, setOpen] = useState(false);
   return (
-    <section aria-label="Player icon key" style={{
-      maxWidth: 1100,
-      margin: "10px auto 0",
-      padding: "0 16px",
-      position: "sticky",
-      top: 0,
-      zIndex: 5,
-    }}>
-      <div style={{
-        border: "1px solid #b8a070",
-        background: "var(--paper-card)",
-        padding: "8px 10px",
-        boxShadow: "0 2px 0 rgba(64, 45, 18, 0.12)",
-      }}>
-        <div style={{
-          fontSize: "10px",
+    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 16px" }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "5px",
+          padding: "3px 10px",
+          border: "1px solid var(--ledger-rule)",
+          background: open ? "var(--paper-card)" : "transparent",
+          color: "var(--ledger-ink-faint)",
+          fontSize: "9px",
           fontWeight: 900,
-          color: "var(--ledger-ink)",
+          fontFamily: "'Courier Prime', monospace",
           textTransform: "uppercase",
-          letterSpacing: "0.18em",
-          marginBottom: "6px",
-        }}>
-          Icon Key
-        </div>
+          letterSpacing: "0.12em",
+          cursor: "pointer",
+          lineHeight: 1,
+        }}
+      >
+        <span style={{ fontSize: "11px", fontWeight: 900 }}>?</span>
+        Icon Key
+        <span style={{ fontSize: "8px", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>▼</span>
+      </button>
+      {open && (
         <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-          gap: "7px 12px",
+          border: "1px solid var(--ledger-rule)",
+          borderTop: "none",
+          background: "var(--paper-card)",
+          padding: "8px 10px",
         }}>
-          {PLAYER_ICON_KEY.map(([icon, label, definition]) => (
-            <div key={`${icon}-${label}`} title={definition} style={{ display: "grid", gridTemplateColumns: "22px 1fr", gap: "7px", alignItems: "center" }}>
-              <span style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "20px",
-                height: "20px",
-                border: "1px solid var(--ledger-rule)",
-                color: "var(--ledger-ink)",
-                fontSize: "11px",
-                fontWeight: 900,
-                lineHeight: 1,
-              }}>
-                {icon}
-              </span>
-              <span>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: "6px 12px",
+          }}>
+            {PLAYER_ICON_KEY.map(([icon, label, definition]) => (
+              <div key={`${icon}-${label}`} title={definition} style={{ display: "grid", gridTemplateColumns: "20px 1fr", gap: "6px", alignItems: "center" }}>
                 <span style={{
-                  display: "block",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "18px",
+                  height: "18px",
+                  border: "1px solid var(--ledger-rule)",
+                  color: "var(--ledger-ink)",
                   fontSize: "10px",
                   fontWeight: 900,
-                  color: "var(--ledger-ink-light)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
-                  lineHeight: 1.1,
+                  lineHeight: 1,
                 }}>
-                  {label}
+                  {icon}
                 </span>
-                <span style={{
-                  display: "block",
-                  marginTop: "1px",
-                  fontSize: "10px",
-                  fontWeight: 700,
-                  color: "var(--ledger-ink-faint)",
-                  lineHeight: 1.2,
-                }}>
-                  {definition}
+                <span>
+                  <span style={{
+                    fontSize: "9px",
+                    fontWeight: 900,
+                    color: "var(--ledger-ink-light)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                  }}>
+                    {label}
+                  </span>
+                  {" "}
+                  <span style={{
+                    fontSize: "9px",
+                    fontWeight: 700,
+                    color: "var(--ledger-ink-faint)",
+                  }}>
+                    {definition}
+                  </span>
                 </span>
-              </span>
-            </div>
-          ))}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-    </section>
+      )}
+    </div>
   );
 }
 
 // ── Expanded player tab types ─────────────────────────────────
 type PlayerTab = "stats" | "strand" | "card" | "outlook" | "contract" | "edge" | "gravity";
 
-const PLUM = "#5e3a6e";
-const PLUM_LIGHT = "#7a4f8a";
-const PLUM_FAINT = "rgba(94, 58, 110, 0.08)";
+const PLUM = "var(--fig)";
+const PLUM_LIGHT = "var(--fig-bright)";
+const PLUM_FAINT = "rgba(83, 46, 59, 0.08)";
 
 function PlayerTabButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (

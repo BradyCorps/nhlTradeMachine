@@ -151,7 +151,7 @@ export function deriveTeamPhase(
 }
 
 // ── GM Analysis Tabs ─────────────────────────────────────────
-export const GM_PLUM = "#5e3a6e";
-export const GM_PLUM_FAINT = "rgba(94, 58, 110, 0.08)";
-export const GM_PLUM_LIGHT = "#7a4f8a";
+export const GM_PLUM = "var(--fig)";
+export const GM_PLUM_FAINT = "rgba(83, 46, 59, 0.08)";
+export const GM_PLUM_LIGHT = "var(--fig-bright)";
 

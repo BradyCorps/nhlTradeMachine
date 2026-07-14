@@ -3,6 +3,7 @@ import { Libre_Baskerville, Courier_Prime } from 'next/font/google';
 import './globals.css';
 import LedgerToaster from './components/LedgerToaster';
 import WelcomeModal from './components/WelcomeModal';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 // ── next/font: self-hosted, no layout shift, no external request ──
 const baskerville = Libre_Baskerville({
@@ -62,6 +63,7 @@ export default function RootLayout({
         {children}
         <WelcomeModal />
         <LedgerToaster />
+        <SpeedInsights />
       </body>
     </html>
   );
