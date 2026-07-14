@@ -1430,7 +1430,7 @@ select.ledger-select {
   border: 2px solid var(--ink);
 }
 @media (min-width: 760px) {
-  .fp-desks { grid-template-columns: repeat(3, 1fr); }
+  .fp-desks { grid-template-columns: repeat(2, 1fr); }
   .fp-lead { grid-column: 1 / -1; }   /* lead story spans the page */
 }
 
@@ -1502,7 +1502,7 @@ select.ledger-select {
   border: 1px solid var(--rule);
 }
 @media (min-width: 640px) {
-  .fp-briefs { grid-template-columns: repeat(3, 1fr); }
+  .fp-briefs { grid-template-columns: repeat(2, 1fr); }
 }
 .fp-brief {
   background: var(--paper-card);

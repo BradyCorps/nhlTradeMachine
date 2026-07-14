@@ -1,4 +1,9 @@
 # Development Notes
+# JULY 14
+
+# POSTCODEX_AUDIT
+- 2026-07-14: **Homepage layout — 2x2 feature grid + 2x1 In Development.** The "Inside This Edition" grid was `repeat(3, 1fr)` on desktop, so the 4 non-lead feature cells (Trade Machine, Player Analytics, Team Analytics, The Docket) filled 3 + left 1 alone on its row — dead space. Changed to `repeat(2, 1fr)` so the 4 cells form a clean 2x2 grid. Same fix for the "In Development" briefs grid — was `repeat(3, 1fr)` with only 2 cards, now `repeat(2, 1fr)` so both cards fill the row. Lead cells still span full width. Touched `app/globals.css`.
+
 # JULY 13
 
 # POSTCODEX_AUDIT
