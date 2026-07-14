@@ -245,7 +245,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         x={cx} y={cy + 1}
         textAnchor="middle"
         dominantBaseline="middle"
-        fill="var(--ledger-ink)"
+        fill="var(--ledger-rule)"
         fontFamily="'Courier Prime', monospace"
         fontWeight={900}
         fontSize={20}
