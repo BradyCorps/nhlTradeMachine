@@ -54,46 +54,47 @@ function CompactGravity({ profile }: { profile: GravityProfile }) {
 }
 
 function FieldDiagram({ profile }: { profile: GravityProfile }) {
-  const W = 300;
-  const H = 220;
+  const W = 380;
+  const H = 340;
   const cx = W / 2;
-  const cy = 105;
+  const cy = 170;
   const absForce = Math.abs(profile.force);
   const isNeg = profile.force < 0;
   const color = gravityTierColor(profile.tier);
 
-  // How many field rings to draw (more rings = stronger field)
-  const ringCount = Math.max(2, Math.min(9, Math.round(absForce * 12) + 2));
-  const maxR = 95;
-  const minR = 18;
-  const coreR = 15;
+  const ringCount = Math.max(2, Math.min(7, Math.round(absForce * 8) + 2));
+  const maxR = 110;
+  const minR = 28;
+  const coreR = 24;
 
-  // Ring radii: inverse-square-ish spacing (denser near center)
   const rings: { r: number; opacity: number }[] = [];
   for (let i = 0; i < ringCount; i++) {
     const t = (i + 1) / ringCount;
     const r = minR + (maxR - minR) * Math.pow(t, 0.7);
-    const opBase = 0.08 + (1 - t) * 0.22;
-    const opScale = Math.min(1, absForce * 1.8);
+    const opBase = 0.1 + (1 - t) * 0.25;
+    const opScale = Math.min(1, absForce * 1.5);
     rings.push({ r, opacity: opBase * opScale });
   }
 
-  // Radial grid lines (subtle scientific instrument feel)
-  const gridLines = 12;
+  const gridLines = 8;
   const gridAngleStep = (2 * Math.PI) / gridLines;
 
-  // Component markers on orbital paths
+  // Component data — positioned with generous spacing
+  // Angles chosen to avoid overlap: top-left, top-right, bottom
   const components = [
-    { label: "NOIV", value: profile.noivLift, angle: -Math.PI / 2, orbit: 0.55 },
-    { label: "Zone Pull", value: profile.zonePull, angle: Math.PI / 6, orbit: 0.75 },
-    { label: "Creation", value: profile.creationAmplifier, angle: (5 * Math.PI) / 6, orbit: 0.65 },
+    { label: "NOIV", value: profile.noivLift, angle: -Math.PI * 0.75, orbit: 0.55,
+      isCreation: false },
+    { label: "Zone Pull", value: profile.zonePull, angle: -Math.PI * 0.25, orbit: 0.7,
+      isCreation: false },
+    { label: "Creation", value: profile.creationAmplifier, angle: Math.PI * 0.55, orbit: 0.6,
+      isCreation: true },
   ];
 
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
       className="w-full"
-      style={{ maxWidth: 340 }}
+      style={{ maxWidth: 440 }}
       role="img"
       aria-label={`Gravity field diagram: force ${profile.force > 0 ? "+" : ""}${profile.force.toFixed(2)}, tier ${TIER_LABEL[profile.tier]}`}
     >
@@ -108,35 +109,35 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
             x1={cx} y1={cy} x2={x2} y2={y2}
             stroke="var(--ledger-rule)"
             strokeWidth={0.5}
-            opacity={0.3}
+            opacity={0.2}
           />
         );
       })}
 
-      {/* Field rings — concentric equipotential lines */}
+      {/* Field rings */}
       {rings.map(({ r, opacity }, i) => (
         <circle
           key={`ring-${i}`}
           cx={cx} cy={cy} r={r}
           fill="none"
           stroke={isNeg ? "var(--ledger-red)" : color}
-          strokeWidth={i === 0 ? 1.5 : 1}
+          strokeWidth={i === 0 ? 2 : 1}
           opacity={opacity}
-          strokeDasharray={isNeg ? "4 3" : "none"}
+          strokeDasharray={isNeg ? "5 3" : "none"}
         />
       ))}
 
       {/* Outer boundary */}
       <circle
-        cx={cx} cy={cy} r={maxR + 6}
+        cx={cx} cy={cy} r={maxR + 8}
         fill="none"
         stroke="var(--ledger-rule)"
         strokeWidth={0.5}
-        opacity={0.4}
+        opacity={0.3}
       />
 
       {/* Component orbital paths */}
-      {components.map(({ label, orbit }, i) => {
+      {components.map(({ orbit }, i) => {
         const orbitR = minR + (maxR - minR) * orbit;
         return (
           <circle
@@ -145,60 +146,70 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
             fill="none"
             stroke="var(--ledger-ink-faint)"
             strokeWidth={0.5}
-            strokeDasharray="2 4"
-            opacity={0.25}
+            strokeDasharray="2 5"
+            opacity={0.2}
           />
         );
       })}
 
-      {/* Component markers */}
-      {components.map(({ label, value, angle, orbit }, i) => {
+      {/* Component markers + labels */}
+      {components.map(({ label, value, angle, orbit, isCreation }, i) => {
         const orbitR = minR + (maxR - minR) * orbit;
         const mx = cx + Math.cos(angle) * orbitR;
         const my = cy + Math.sin(angle) * orbitR;
-        const lx = cx + Math.cos(angle) * (orbitR + 16);
-        const ly = cy + Math.sin(angle) * (orbitR + 16);
-        const isCreation = label === "Creation";
-        const displayVal = isCreation ? `×${value.toFixed(2)}` : `${value > 0 ? "+" : ""}${value.toFixed(2)}`;
+
+        // Label position: pushed well outside the rings
+        const labelR = maxR + 30;
+        const lx = cx + Math.cos(angle) * labelR;
+        const ly = cy + Math.sin(angle) * labelR;
+
+        const displayVal = isCreation
+          ? `×${value.toFixed(2)}`
+          : `${value > 0 ? "+" : ""}${value.toFixed(2)}`;
+
+        // Anchor: left/right based on which side of center
+        const anchor = lx < cx - 10 ? "end" : lx > cx + 10 ? "start" : "middle";
 
         return (
           <g key={`comp-${i}`}>
-            {/* Connection line */}
+            {/* Connection line from marker to label */}
             <line
               x1={mx} y1={my} x2={lx} y2={ly}
               stroke="var(--ledger-ink-faint)"
-              strokeWidth={0.5}
-              opacity={0.5}
+              strokeWidth={0.7}
+              opacity={0.35}
+              strokeDasharray="2 2"
             />
             {/* Marker dot */}
             <circle
-              cx={mx} cy={my} r={3.5}
+              cx={mx} cy={my} r={5}
               fill={color}
               stroke="var(--paper-bg)"
-              strokeWidth={1.5}
+              strokeWidth={2}
               opacity={0.9}
             />
-            {/* Label */}
+            {/* Label text */}
             <text
               x={lx}
-              y={ly - 5}
-              textAnchor="middle"
+              y={ly - 6}
+              textAnchor={anchor}
               fill="var(--ledger-ink-faint)"
               fontFamily="'Courier Prime', monospace"
               fontWeight={900}
-              fontSize={7}
-              letterSpacing="0.08em"
+              fontSize={9}
+              letterSpacing="0.1em"
             >
               {label.toUpperCase()}
             </text>
+            {/* Value */}
             <text
               x={lx}
-              y={ly + 6}
-              textAnchor="middle"
+              y={ly + 7}
+              textAnchor={anchor}
               fill={color}
               fontFamily="'Courier Prime', monospace"
               fontWeight={900}
-              fontSize={9}
+              fontSize={13}
             >
               {displayVal}
             </text>
@@ -206,71 +217,72 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         );
       })}
 
-      {/* Central mass node */}
+      {/* Central mass node — outer glow ring */}
       <circle
-        cx={cx} cy={cy} r={coreR + 2}
+        cx={cx} cy={cy} r={coreR + 4}
         fill="none"
         stroke={color}
         strokeWidth={1.5}
-        opacity={0.5}
+        opacity={0.35}
       />
+      {/* Central mass node */}
       <circle
         cx={cx} cy={cy} r={coreR}
         fill="var(--paper-bg)"
         stroke={color}
-        strokeWidth={2}
+        strokeWidth={2.5}
       />
 
-      {/* Force readout */}
+      {/* Force readout — the hero number */}
       <text
-        x={cx} y={cy - 1}
+        x={cx} y={cy + 1}
         textAnchor="middle"
         dominantBaseline="middle"
         fill={color}
         fontFamily="'Courier Prime', monospace"
         fontWeight={900}
-        fontSize={14}
+        fontSize={18}
       >
         {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
       </text>
 
-      {/* Mass indicator */}
+      {/* Tier label — top of diagram */}
       <text
-        x={cx} y={cy + 11}
-        textAnchor="middle"
-        fill="var(--ledger-ink-faint)"
-        fontFamily="'Courier Prime', monospace"
-        fontWeight={900}
-        fontSize={5.5}
-        letterSpacing="0.1em"
-      >
-        m={profile.playerMass.toFixed(2)}
-      </text>
-
-      {/* Title line */}
-      <text
-        x={cx} y={H - 8}
-        textAnchor="middle"
-        fill="var(--ledger-ink-faint)"
-        fontFamily="'Courier Prime', monospace"
-        fontWeight={900}
-        fontSize={7}
-        letterSpacing="0.15em"
-      >
-        GRAVITATIONAL FIELD ANALYSIS
-      </text>
-
-      {/* Tier arc label */}
-      <text
-        x={cx} y={18}
+        x={cx} y={24}
         textAnchor="middle"
         fill={color}
         fontFamily="'Courier Prime', monospace"
         fontWeight={900}
-        fontSize={9}
-        letterSpacing="0.12em"
+        fontSize={12}
+        letterSpacing="0.15em"
       >
         {TIER_ICON[profile.tier]} {TIER_LABEL[profile.tier].toUpperCase()}
+      </text>
+
+      {/* Mass readout — below the central node */}
+      <text
+        x={cx} y={cy + coreR + 18}
+        textAnchor="middle"
+        fill="var(--ledger-ink-faint)"
+        fontFamily="'Courier Prime', monospace"
+        fontWeight={900}
+        fontSize={9}
+        letterSpacing="0.05em"
+      >
+        m = {profile.playerMass.toFixed(2)}
+      </text>
+
+      {/* Bottom title */}
+      <text
+        x={cx} y={H - 12}
+        textAnchor="middle"
+        fill="var(--ledger-ink-faint)"
+        fontFamily="'Courier Prime', monospace"
+        fontWeight={900}
+        fontSize={8}
+        letterSpacing="0.2em"
+      >
+        GRAVITATIONAL FIELD ANALYSIS
       </text>
     </svg>
   );
@@ -306,23 +318,26 @@ function ComponentBreakdown({ profile }: { profile: GravityProfile }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-3">
       {items.map(({ label, value, sub, desc }) => (
-        <div key={label} title={desc}>
+        <div key={label} title={desc}
+          className="p-2 border"
+          style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-bg)" }}
+        >
           <div
-            className="text-[8px] font-black uppercase tracking-[0.12em] font-mono"
+            className="text-[9px] font-black uppercase tracking-[0.12em] font-mono mb-1"
             style={{ color: "var(--ledger-ink-faint)" }}
           >
             {label}
           </div>
           <div
-            className="text-[15px] font-black font-mono leading-tight"
+            className="text-[16px] font-black font-mono leading-tight"
             style={{ color, fontVariantNumeric: "tabular-nums" }}
           >
             {value}
           </div>
           <div
-            className="text-[8px] font-mono leading-tight mt-0.5"
+            className="text-[9px] font-mono leading-tight mt-1"
             style={{ color: "var(--ledger-ink-faint)" }}
           >
             {sub}
@@ -334,9 +349,10 @@ function ComponentBreakdown({ profile }: { profile: GravityProfile }) {
 }
 
 function ForceEquation({ profile }: { profile: GravityProfile }) {
+  const color = gravityTierColor(profile.tier);
   return (
     <div
-      className="text-[9px] font-mono text-center py-1.5 px-3 border mt-2"
+      className="text-[10px] font-mono text-center py-2 px-4 border mt-3"
       style={{
         color: "var(--ledger-ink-faint)",
         borderColor: "var(--ledger-rule)",
@@ -344,12 +360,13 @@ function ForceEquation({ profile }: { profile: GravityProfile }) {
         fontVariantNumeric: "tabular-nums",
       }}
     >
-      <span style={{ color: "var(--ledger-ink)" }}>F</span> ={" "}
+      <span style={{ color: "var(--ledger-ink)", fontWeight: 900 }}>F</span> ={" "}
       <span>NOIV({profile.noivLift > 0 ? "+" : ""}{profile.noivLift.toFixed(2)})</span>{" "}
-      × (1 + <span>ZonePull({profile.zonePull > 0 ? "+" : ""}{profile.zonePull.toFixed(2)})</span>){" "}
+      × (1 + <span>Zone({profile.zonePull > 0 ? "+" : ""}{profile.zonePull.toFixed(2)})</span>){" "}
       × <span>Creation(×{profile.creationAmplifier.toFixed(2)})</span>{" "}
       × <span>Mass({profile.playerMass.toFixed(2)})</span>{" "}
-      = <span className="font-black" style={{ color: gravityTierColor(profile.tier) }}>
+      ={" "}
+      <span className="font-black text-[12px]" style={{ color }}>
         {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
       </span>
     </div>
@@ -364,17 +381,17 @@ export default function GravityField({ profile, playerName, mode = "full" }: Pro
   const color = gravityTierColor(profile.tier);
 
   return (
-    <div className="font-mono" style={{ maxWidth: 420 }}>
-      {/* Player name + tier header */}
-      <div className="flex items-center justify-between mb-1">
+    <div className="font-mono" style={{ maxWidth: 480 }}>
+      {/* Player name + header */}
+      <div className="flex items-center justify-between mb-2">
         <span
-          className="text-[9px] font-black uppercase tracking-[0.15em]"
+          className="text-[10px] font-black uppercase tracking-[0.15em]"
           style={{ color: "var(--ledger-ink-faint)" }}
         >
           Gravity Field
         </span>
         <span
-          className="text-[9px] font-black uppercase tracking-[0.1em]"
+          className="text-[10px] font-black uppercase tracking-[0.1em]"
           style={{ color: "var(--ledger-ink-faint)" }}
         >
           {playerName}
@@ -383,7 +400,7 @@ export default function GravityField({ profile, playerName, mode = "full" }: Pro
 
       {/* SVG orbital diagram */}
       <div
-        className="border p-2"
+        className="border p-3"
         style={{
           borderColor: "var(--ledger-rule)",
           background: "var(--paper-inset)",
@@ -396,13 +413,11 @@ export default function GravityField({ profile, playerName, mode = "full" }: Pro
       <ForceEquation profile={profile} />
 
       {/* Component breakdown */}
-      <div className="mt-3">
-        <ComponentBreakdown profile={profile} />
-      </div>
+      <ComponentBreakdown profile={profile} />
 
       {/* Description */}
       <div
-        className="text-[9px] font-mono mt-2 leading-relaxed"
+        className="text-[10px] font-mono mt-3 leading-relaxed"
         style={{ color: "var(--ledger-ink-faint)" }}
       >
         {profile.description}. Net force{" "}
