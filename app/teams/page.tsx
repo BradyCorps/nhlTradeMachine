@@ -10,6 +10,8 @@ import { computeRosterStrand } from "@/app/lib/roster-strand";
 import TeamStrand, { type TeamStrandData } from "@/app/components/TeamStrand";
 import { lineupContributionScore } from "@/app/lib/lineup-ranking";
 import { displayPosition } from "@/app/lib/display-position";
+import { computeGravity, type GravityProfile } from "@/app/lib/gravity";
+import GravityField from "@/app/components/GravityField";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 
 interface TeamRecord {
@@ -52,7 +54,7 @@ interface TeamData {
   capBreakdown: CapBreakdown | null;
 }
 
-type SortKey = "division" | "standing" | "present" | "future" | "rosterNAV" | "capSpace" | "goalDiff" | "speed" | "name";
+type SortKey = "division" | "standing" | "present" | "future" | "rosterNAV" | "capSpace" | "goalDiff" | "gravity" | "speed" | "name";
 
 const CONFERENCE_ORDER = ["Eastern", "Western"] as const;
 const DIVISION_ORDER: Record<string, string[]> = {
@@ -95,6 +97,11 @@ interface TeamLines {
   goalies: LineEntry[];
 }
 
+interface GravityLeader {
+  name: string;
+  profile: GravityProfile;
+}
+
 interface TeamProfile {
   team: TeamData;
   roster: Asset[];
@@ -110,6 +117,7 @@ interface TeamProfile {
   rosterSize: number;
   ufaCount: number;
   rfaCount: number;
+  gravityLeaders: GravityLeader[];
 }
 
 function PhaseChip({ phase }: { phase: string }) {
@@ -419,7 +427,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
   onToggle: () => void;
   capCeiling: number;
 }) {
-  const { team, contention, edge, strand, rosterNAV, topPlayers, capCommitted, lines, avgAge, rosterSize, ufaCount, rfaCount } = profile;
+  const { team, contention, edge, strand, rosterNAV, topPlayers, capCommitted, lines, avgAge, rosterSize, ufaCount, rfaCount, gravityLeaders } = profile;
 
   return (
     <div
@@ -659,6 +667,65 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
             <EdgeMini profile={edge} />
           </div>
 
+          {/* Gravity Leaders */}
+          {gravityLeaders.length > 0 && (
+            <div className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
+              <div className="text-[9px] font-black uppercase tracking-[0.15em] mb-2" style={{ color: "var(--ledger-ink-faint)" }}>
+                Gravity Leaders
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Top gravity player — full field diagram */}
+                <GravityField
+                  profile={gravityLeaders[0].profile}
+                  playerName={gravityLeaders[0].name}
+                  mode="full"
+                />
+                {/* #2 and #3 — compact readouts */}
+                {gravityLeaders.length > 1 && (
+                  <div className="space-y-3">
+                    <div className="text-[8px] font-black uppercase tracking-[0.1em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+                      Other field generators
+                    </div>
+                    {gravityLeaders.slice(1).map((g) => (
+                      <div key={g.name} className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: "var(--ledger-rule)" }}>
+                        <span className="text-[11px] font-black font-mono truncate" style={{ color: "var(--ledger-ink)" }}>
+                          {g.name}
+                        </span>
+                        <GravityField profile={g.profile} playerName={g.name} mode="compact" />
+                      </div>
+                    ))}
+                    {/* Team gravity summary */}
+                    <div className="mt-2 p-2 border" style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
+                      <div className="text-[8px] font-black uppercase tracking-[0.1em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
+                        Team Gravity Field
+                      </div>
+                      <div className="text-[9px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+                        {(() => {
+                          const avgForce = gravityLeaders.reduce((s, g) => s + g.profile.force, 0) / gravityLeaders.length;
+                          const topForce = gravityLeaders[0].profile.force;
+                          return (
+                            <>
+                              Avg top-{gravityLeaders.length} force:{" "}
+                              <span className="font-black" style={{
+                                color: avgForce >= 0.15 ? "var(--ledger-green)" : avgForce >= 0 ? "var(--ledger-ink)" : "var(--ledger-red)",
+                                fontVariantNumeric: "tabular-nums",
+                              }}>
+                                {avgForce > 0 ? "+" : ""}{avgForce.toFixed(2)}
+                              </span>
+                              {topForce >= 0.35 && (
+                                <span> — franchise-grade gravitational presence</span>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Projected Lines */}
           <div className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
             <LineupSection lines={lines} />
@@ -763,10 +830,20 @@ export default function TeamsPage() {
         .sort((a, b) => b.nav - a.nav)
         .slice(0, 10);
 
+      const gravityLeaders = roster
+        .map((p) => {
+          const g = computeGravity(p);
+          return g ? { name: p.name, profile: g } : null;
+        })
+        .filter((g): g is GravityLeader => g !== null)
+        .sort((a, b) => b.profile.force - a.profile.force)
+        .slice(0, 3);
+
       return {
         team, roster, navMap, contention, edge, strand, rosterNAV,
         topPlayers: sorted, capCommitted, lines,
         avgAge, rosterSize: roster.length, ufaCount, rfaCount,
+        gravityLeaders,
       };
     });
   }, [teams, players, navMap]);
@@ -785,6 +862,7 @@ export default function TeamsPage() {
           const bDiff = (b.team.record?.goalsFor ?? 0) - (b.team.record?.goalsAgainst ?? 0);
           return bDiff - aDiff;
         }
+        case "gravity": return (b.gravityLeaders[0]?.profile.force ?? -1) - (a.gravityLeaders[0]?.profile.force ?? -1);
         case "speed": return (b.edge?.avgSpeedMaxMph ?? 0) - (a.edge?.avgSpeedMaxMph ?? 0);
         case "name": return a.team.name.localeCompare(b.team.name);
         default: return 0;
@@ -896,6 +974,7 @@ export default function TeamsPage() {
             ["rosterNAV", "NAV"],
             ["capSpace", "Cap Space"],
             ["goalDiff", "Goal Diff"],
+            ["gravity", "Gravity"],
             ["speed", "Speed"],
             ["name", "Name"],
           ] as [SortKey, string][]).map(([key, label]) => (

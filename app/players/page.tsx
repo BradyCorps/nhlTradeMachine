@@ -4,6 +4,8 @@ import EdgeStrip from "@/app/components/EdgeStrip";
 import { buildGoalieStrandTraits } from "@/app/components/StrandView";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
+import GravityField from "@/app/components/GravityField";
+import { computeGravity } from "@/app/lib/gravity";
 import type { DevelopmentProfile } from "@/app/lib/development-profile";
 import {
   getInjuryRisk,
@@ -362,7 +364,7 @@ function PlayersIconKey() {
 }
 
 // ── Expanded player tab types ─────────────────────────────────
-type PlayerTab = "stats" | "strand" | "card" | "outlook" | "contract" | "edge";
+type PlayerTab = "stats" | "strand" | "card" | "outlook" | "contract" | "edge" | "gravity";
 
 const PLUM = "#5e3a6e";
 const PLUM_LIGHT = "#7a4f8a";
@@ -416,11 +418,46 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
   const hasStrand = true;
   const hasContract = player.yearsRemaining > 0;
 
+  const gravityProfile = useMemo(() => {
+    if (player.position === "G") return null;
+    return computeGravity({
+      id: player.id,
+      teamId: player.teamId,
+      name: player.name,
+      position: player.position,
+      age: player.age,
+      games: player.games ?? 0,
+      ptsPace: player.ptsPace,
+      xGPace: player.xGPace,
+      defRate: player.defRate ?? 0.08,
+      avgTOI: player.avgTOI,
+      capHit: player.capHit,
+      yearsRemaining: player.yearsRemaining,
+      hasNMC: player.hasNMC ?? false,
+      hasNTC: player.hasNTC ?? false,
+      canRetain: false,
+      retainedPct: 0,
+      multiplier: 1,
+      xgRelTM: player.xgRelTM,
+      xgaRelTM: player.xgaRelTM,
+      dzPct: player.dzPct,
+      ops: player.ops,
+      goalsPace: player.goalsPace ?? undefined,
+      assistsPace: player.assistsPace ?? undefined,
+      edgeOzPct: player.edgeOzPct,
+      edgeSpeedMaxMph: player.edgeSpeedMaxMph,
+      edgeBurstsOver20: player.edgeBurstsOver20,
+    });
+  }, [player]);
+
+  const hasGravity = gravityProfile !== null;
+
   const tabs: { key: PlayerTab; label: string }[] = [
     { key: "stats", label: "Stats" },
     ...(hasStrand ? [{ key: "strand" as PlayerTab, label: "Strand" }] : []),
     { key: "card", label: "Player Card" },
     ...(/^\d+$/.test(String(player.id)) && player.position !== "G" ? [{ key: "edge" as PlayerTab, label: "Edge" }] : []),
+    ...(hasGravity ? [{ key: "gravity" as PlayerTab, label: "Gravity" }] : []),
     ...(hasContract ? [{ key: "contract" as PlayerTab, label: "Contract" }] : []),
     ...(hasOutlook ? [{ key: "outlook" as PlayerTab, label: "Outlook" }] : []),
   ];
@@ -556,6 +593,13 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
               retainedPct:    0,
               multiplier:     1.0,
             }} />
+          </div>
+        )}
+
+        {/* ── Gravity tab ────────────────────────── */}
+        {activeTab === "gravity" && hasGravity && gravityProfile && (
+          <div style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "12px" }}>
+            <GravityField profile={gravityProfile} playerName={player.name} mode="full" />
           </div>
         )}
 

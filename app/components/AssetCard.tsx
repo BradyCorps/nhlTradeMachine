@@ -2,6 +2,8 @@
 // ── AssetCard — individual player/pick card in trade panels ───
 import React from "react";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
+import { computeGravity } from "@/app/lib/gravity";
+import { CompactGravity } from "@/app/components/GravityField";
 import { getPlayerPedigree } from "@/app/lib/player-data";
 import { HISTORICAL_MAX_OFF, HISTORICAL_MAX_DEF } from "@/app/lib/historical-benchmarks";
 import { MicroBar } from "@/app/components/MicroBar";
@@ -386,6 +388,16 @@ export default function AssetCard({
                 <span className="text-2xs font-black text-ledger-navy font-mono">
                   {peak} pts/82
                 </span>
+              </div>
+            );
+          })()}
+          {(() => {
+            const grav = computeGravity(asset);
+            if (!grav) return null;
+            return (
+              <div className="mt-1 px-1 py-1 flex justify-between items-center" style={{ borderTop: '1px solid #c8b890' }}>
+                <span className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">Gravity</span>
+                <CompactGravity profile={grav} />
               </div>
             );
           })()}
