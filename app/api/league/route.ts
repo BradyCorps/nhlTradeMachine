@@ -41,6 +41,15 @@ const CW_SLUGS: Record<string, string> = {
   WSH: "washington_capitals",WPG: "winnipeg_jets",
 };
 
+const DIVISIONS: Record<string, string> = {
+  BOS: "Atlantic", BUF: "Atlantic", DET: "Atlantic", FLA: "Atlantic", MTL: "Atlantic", OTT: "Atlantic", TBL: "Atlantic", TOR: "Atlantic",
+  CAR: "Metro", CBJ: "Metro", NJD: "Metro", NYI: "Metro", NYR: "Metro", PHI: "Metro", PIT: "Metro", WSH: "Metro",
+  CHI: "Central", COL: "Central", DAL: "Central", MIN: "Central", NSH: "Central", STL: "Central", UTA: "Central", WPG: "Central",
+  ANA: "Pacific", CGY: "Pacific", EDM: "Pacific", LAK: "Pacific", SJS: "Pacific", SEA: "Pacific", VAN: "Pacific", VGK: "Pacific",
+};
+
+const WESTERN_TEAMS = new Set(["CHI","COL","DAL","MIN","NSH","STL","UTA","WPG","ANA","CGY","EDM","LAK","SJS","SEA","VAN","VGK"]);
+
 // Derive team phase from standing (1=best, 32=worst) and points percentage
 // Tanking = deliberately non-competitive (< 38% point pct AND bottom 6)
 // Rebuilding = losing but not deliberately tanking (young core, future focus)
@@ -101,6 +110,11 @@ async function loadTeams(): Promise<any[]> {
   shotsAgainstPerGame: number;
   faceoffWinPct: number;
   regulationWins: number;
+  streakCode: string;
+  streakCount: number;
+  l10Record: string;
+  clinchIndicator: string;
+  wildcardSequence: number;
 }>();
   try {
     const res = await fetchWithTimeout(
@@ -137,15 +151,7 @@ async function loadTeams(): Promise<any[]> {
         t.tricode = NHL_ID_TO_TRICODE[t.teamId];
       });
 
-     // 3. Define accurate division blueprints
-      const DIVISIONS: Record<string, string> = {
-        BOS: "Atlantic", BUF: "Atlantic", DET: "Atlantic", FLA: "Atlantic", MTL: "Atlantic", OTT: "Atlantic", TBL: "Atlantic", TOR: "Atlantic",
-        CAR: "Metro", CBJ: "Metro", NJD: "Metro", NYI: "Metro", NYR: "Metro", PHI: "Metro", PIT: "Metro", WSH: "Metro",
-        CHI: "Central", COL: "Central", DAL: "Central", MIN: "Central", NSH: "Central", STL: "Central", UTA: "Central", WPG: "Central",
-        ANA: "Pacific", CGY: "Pacific", EDM: "Pacific", LAK: "Pacific", SJS: "Pacific", SEA: "Pacific", VAN: "Pacific", VGK: "Pacific"
-      };
-
-      const WESTERN_TEAMS = new Set(["CHI","COL","DAL","MIN","NSH","STL","UTA","WPG","ANA","CGY","EDM","LAK","SJS","SEA","VAN","VGK"]);
+     // 3. Division and conference rankings
       
       // 4. Distribute into Conference buckets for ranking
       let westTeams = teams.filter(t => WESTERN_TEAMS.has(t.tricode));
@@ -189,6 +195,11 @@ async function loadTeams(): Promise<any[]> {
             shotsAgainstPerGame: t.shotsAgainstPerGame ?? 0,
             faceoffWinPct:      t.faceoffWinPct ?? 0,
             regulationWins:     t.regulationWins ?? 0,
+            streakCode:         "",
+            streakCount:        0,
+            l10Record:          "",
+            clinchIndicator:    "",
+            wildcardSequence:   0,
           });
         }
       });
@@ -197,21 +208,40 @@ async function loadTeams(): Promise<any[]> {
     console.error("[league] Standings API fetch failed:", err instanceof Error ? err.message : err);
   }
 
-  // ── Fallback: api-web.nhle.com/v1/standings/now (newer, more stable) ──
-  if (standingsMap.size < 28) {
-    try {
-      const res = await fetchWithTimeout(
-        "https://api-web.nhle.com/v1/standings/now",
-        8000,
-        { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Origin": "https://www.nhl.com", "Referer": "https://www.nhl.com/" }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const entries: any[] = data.standings ?? [];
-        entries.sort((a: any, b: any) => (b.points ?? 0) - (a.points ?? 0));
-        entries.forEach((t: any, i: number) => {
-          const tricode = t.teamAbbrev?.default;
-          if (!tricode || standingsMap.has(tricode)) return;
+  // ── Enrich + Fallback: api-web.nhle.com/v1/standings/now ──
+  // Always fetch for streak/L10/clinch data (stats API doesn't have these).
+  // Also serves as a fallback when the primary stats API misses teams.
+  try {
+    const res = await fetchWithTimeout(
+      "https://api-web.nhle.com/v1/standings/now",
+      8000,
+      { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Origin": "https://www.nhl.com", "Referer": "https://www.nhl.com/" }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const entries: any[] = data.standings ?? [];
+      entries.sort((a: any, b: any) => (b.points ?? 0) - (a.points ?? 0));
+      entries.forEach((t: any, i: number) => {
+        const tricode = t.teamAbbrev?.default;
+        if (!tricode) return;
+
+        const streak = t.streakCode ?? "";
+        const streakCount = t.streakCount ?? 0;
+        const l10W = t.l10Wins ?? 0;
+        const l10L = t.l10Losses ?? 0;
+        const l10O = t.l10OtLosses ?? 0;
+        const l10Record = (l10W || l10L || l10O) ? `${l10W}-${l10L}-${l10O}` : "";
+        const clinch = t.clinchIndicator ?? "";
+        const wcSeq = t.wildcardSequence ?? 0;
+
+        const existing = standingsMap.get(tricode);
+        if (existing) {
+          existing.streakCode = streak;
+          existing.streakCount = streakCount;
+          existing.l10Record = l10Record;
+          existing.clinchIndicator = clinch;
+          existing.wildcardSequence = wcSeq;
+        } else {
           standingsMap.set(tricode, {
             standing:           i + 1,
             conferenceRank:     t.conferenceSequence ?? 8,
@@ -231,19 +261,31 @@ async function loadTeams(): Promise<any[]> {
             shotsAgainstPerGame: 0,
             faceoffWinPct:      t.faceoffWinPctg ?? 0,
             regulationWins:     t.regulationWins ?? 0,
+            streakCode:         streak,
+            streakCount:        streakCount,
+            l10Record,
+            clinchIndicator:    clinch,
+            wildcardSequence:   wcSeq,
           });
-        });
-        if (standingsMap.size >= 28) {
-          console.log("[league] Standings recovered from api-web fallback");
         }
+      });
+      if (standingsMap.size >= 28) {
+        console.log("[league] Standings enriched from api-web");
       }
-    } catch (err) {
-      console.error("[league] Standings web-API fallback also failed:", err instanceof Error ? err.message : err);
     }
+  } catch (err) {
+    console.error("[league] Standings web-API enrichment failed:", err instanceof Error ? err.message : err);
   }
 
   // ── Fetch cap space from CapWages (batch 8 at a time) ────────
-  const capMap = new Map<string, number>();
+  interface CapInfo {
+    capSpace: number;
+    ltirUsed: number;
+    deadCap: number;
+    totalCapHit: number;
+    bonuses: number;
+  }
+  const capMap = new Map<string, CapInfo>();
   const teamIds = Object.keys(CW_SLUGS);
 
   for (let i = 0; i < teamIds.length; i += 8) {
@@ -263,7 +305,14 @@ async function loadTeams(): Promise<any[]> {
         const nextData = JSON.parse(match[1]);
         const summary  = nextData?.props?.pageProps?.teamSummary;
         if (summary?.capSpace !== undefined) {
-          capMap.set(id, Math.round((summary.capSpace / 1_000_000) * 10) / 10);
+          const toM = (v: number | undefined) => v != null ? Math.round((v / 1_000_000) * 10) / 10 : 0;
+          capMap.set(id, {
+            capSpace:    toM(summary.capSpace),
+            ltirUsed:    toM(summary.ltirPool ?? summary.ltirUsed ?? summary.ltir),
+            deadCap:     toM(summary.deadCapHit ?? summary.deadCap ?? summary.deadCapSpace),
+            totalCapHit: toM(summary.currentCapHit ?? summary.activeCapHit ?? summary.totalCapHit),
+            bonuses:     toM(summary.performanceBonuses ?? summary.bonuses),
+          });
         }
       } catch (err) {
         console.error(`[league] CapWages scrape failed for ${id}:`, err instanceof Error ? err.message : err);
@@ -289,10 +338,21 @@ async function loadTeams(): Promise<any[]> {
     const confRank = st?.conferenceRank ?? 8;   // Safe baseline fallback if API misses
     const divRank  = st?.divisionRank   ?? 4;   // Safe baseline fallback if API misses
     const pointPct = st?.pointPct       ?? 0.5;
-    const capSpace = capMap.get(t.id)   ?? t.capSpace;
+    const capInfo = capMap.get(t.id);
+    const capSpace = capInfo?.capSpace  ?? t.capSpace;
     
     const phase = dbTeam?.phaseOverride
       ?? (standingsMap.size >= 28 ? derivePhase(confRank, divRank, pointPct) : t.phase);
+
+    const division = DIVISIONS[t.id] ?? "";
+    const conference = WESTERN_TEAMS.has(t.id) ? "Western" : "Eastern";
+
+    let playoffPosition = "";
+    if (divRank <= 3) {
+      playoffPosition = divRank === 1 ? "DIV-1" : divRank === 2 ? "DIV-2" : "DIV-3";
+    } else if (confRank <= 8) {
+      playoffPosition = confRank === 7 ? "WC1" : "WC2";
+    }
 
     return {
       id:       t.id,
@@ -300,7 +360,15 @@ async function loadTeams(): Promise<any[]> {
       capSpace: Math.round(capSpace * 10) / 10,
       standing,
       phase,
+      division,
+      conference,
       needs:    TEAM_NEEDS[t.id] ?? [],
+      capBreakdown: capInfo ? {
+        ltirUsed: capInfo.ltirUsed,
+        deadCap:  capInfo.deadCap,
+        totalCapHit: capInfo.totalCapHit,
+        bonuses:  capInfo.bonuses,
+      } : null,
       record: st ? {
         wins:               st.wins,
         losses:             st.losses,
@@ -315,6 +383,11 @@ async function loadTeams(): Promise<any[]> {
         shotsAgainstPerGame: st.shotsAgainstPerGame,
         faceoffWinPct:      st.faceoffWinPct,
         regulationWins:     st.regulationWins,
+        streakCode:         st.streakCode,
+        streakCount:        st.streakCount,
+        l10Record:          st.l10Record,
+        clinchIndicator:    st.clinchIndicator,
+        playoffPosition,
       } : null,
     };
   });
@@ -339,8 +412,11 @@ export async function GET() {
     capSpace: t.capSpace,
     standing: t.standing,
     phase:    t.phase,
+    division: t.division ?? "",
+    conference: t.conference ?? "",
     needs:    t.needs ?? [],
     record:   t.record ?? null,
+    capBreakdown: t.capBreakdown ?? null,
   }));
 
   return NextResponse.json({

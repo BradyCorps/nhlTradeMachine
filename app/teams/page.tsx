@@ -26,6 +26,18 @@ interface TeamRecord {
   shotsAgainstPerGame: number;
   faceoffWinPct: number;
   regulationWins: number;
+  streakCode: string;
+  streakCount: number;
+  l10Record: string;
+  clinchIndicator: string;
+  playoffPosition: string;
+}
+
+interface CapBreakdown {
+  ltirUsed: number;
+  deadCap: number;
+  totalCapHit: number;
+  bonuses: number;
 }
 
 interface TeamData {
@@ -34,7 +46,10 @@ interface TeamData {
   capSpace: number;
   standing: number;
   phase: string;
+  division: string;
+  conference: string;
   record: TeamRecord | null;
+  capBreakdown: CapBreakdown | null;
 }
 
 type SortKey = "standing" | "present" | "future" | "rosterNAV" | "capSpace" | "goalDiff" | "speed" | "name";
@@ -102,6 +117,61 @@ function PhaseChip({ phase }: { phase: string }) {
       }}
     >
       {phase}
+    </span>
+  );
+}
+
+const DIV_SHORT: Record<string, string> = {
+  Atlantic: "ATL", Metro: "MET", Central: "CEN", Pacific: "PAC",
+};
+
+function DivisionChip({ division, conference }: { division: string; conference: string }) {
+  if (!division) return null;
+  return (
+    <span
+      className="inline-block text-[8px] font-black uppercase tracking-[0.1em] px-1.5 py-0.5 font-mono"
+      style={{
+        color: "var(--ledger-ink-faint)",
+        background: "var(--paper-inset)",
+        border: "1px solid var(--ledger-rule)",
+      }}
+    >
+      {DIV_SHORT[division] ?? division} · {conference === "Western" ? "WEST" : "EAST"}
+    </span>
+  );
+}
+
+function PlayoffChip({ position, clinch }: { position: string; clinch: string }) {
+  if (!position && !clinch) return null;
+
+  let label = "";
+  let color = "";
+
+  if (clinch === "y" || clinch === "z") {
+    label = clinch === "z" ? "Presidents'" : "Div. Champ";
+    color = "var(--ledger-green)";
+  } else if (clinch === "x") {
+    label = "Clinched";
+    color = "var(--ledger-green)";
+  } else if (clinch === "e") {
+    label = "Eliminated";
+    color = "var(--ledger-red)";
+  } else if (position.startsWith("WC")) {
+    label = position;
+    color = "var(--ledger-amber)";
+  } else if (position.startsWith("DIV")) {
+    label = position.replace("DIV-", "Div #");
+    color = "var(--ledger-green)";
+  }
+
+  if (!label) return null;
+
+  return (
+    <span
+      className="inline-block text-[8px] font-black uppercase tracking-[0.1em] px-1.5 py-0.5 font-mono"
+      style={{ color, border: `1px solid ${color}`, background: "transparent" }}
+    >
+      {label}
     </span>
   );
 }
@@ -363,12 +433,18 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
               {team.name}
             </span>
             <PhaseChip phase={team.phase} />
+            <DivisionChip division={team.division} conference={team.conference} />
+            <PlayoffChip position={team.record?.playoffPosition ?? ""} clinch={team.record?.clinchIndicator ?? ""} />
           </div>
-          <div className="flex items-center gap-3 mt-1 text-[10px]" style={{ color: "var(--ledger-ink-faint)", fontVariantNumeric: "tabular-nums" }}>
+          <div className="flex items-center gap-3 mt-1 text-[10px] flex-wrap" style={{ color: "var(--ledger-ink-faint)", fontVariantNumeric: "tabular-nums" }}>
             <span>#{team.standing}</span>
             {team.record && <span>{team.record.wins}-{team.record.losses}-{team.record.otLosses}</span>}
-            <span>Present {contention.present.toFixed(1)}</span>
-            <span>Future {contention.future.toFixed(1)}</span>
+            {team.record?.l10Record && <span>L10: {team.record.l10Record}</span>}
+            {team.record?.streakCode && team.record.streakCount > 0 && (
+              <span style={{ color: team.record.streakCode === "W" ? "var(--ledger-green)" : team.record.streakCode === "L" ? "var(--ledger-red)" : "var(--ledger-ink-faint)" }}>
+                {team.record.streakCode}{team.record.streakCount}
+              </span>
+            )}
             <span>NAV {Math.round(rosterNAV)}</span>
             <span>Cap ${team.capSpace > 0 ? "+" : ""}{team.capSpace.toFixed(1)}M</span>
           </div>
@@ -436,14 +512,30 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
           {/* Season Record */}
           {team.record && (
             <div className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
-              <div className="text-[9px] font-black uppercase tracking-[0.15em] mb-2" style={{ color: "var(--ledger-ink-faint)" }}>
-                Season Record
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[9px] font-black uppercase tracking-[0.15em]" style={{ color: "var(--ledger-ink-faint)" }}>
+                  Season Record
+                </span>
+                <div className="flex items-center gap-3 text-[10px] font-mono" style={{ fontVariantNumeric: "tabular-nums" }}>
+                  {team.record.l10Record && (
+                    <span style={{ color: "var(--ledger-ink-faint)" }}>
+                      L10: <span className="font-black">{team.record.l10Record}</span>
+                    </span>
+                  )}
+                  {team.record.streakCode && team.record.streakCount > 0 && (
+                    <span className="font-black" style={{
+                      color: team.record.streakCode === "W" ? "var(--ledger-green)" : team.record.streakCode === "L" ? "var(--ledger-red)" : "var(--ledger-amber)",
+                    }}>
+                      Streak: {team.record.streakCode}{team.record.streakCount}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                 <StatCell
                   label="Record"
                   value={`${team.record.wins}-${team.record.losses}-${team.record.otLosses}`}
-                  sub={`${team.record.points} pts`}
+                  sub={`${team.record.points} pts · ${team.record.regulationWins} RW`}
                 />
                 <StatCell
                   label="Goal Diff"
@@ -518,6 +610,22 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
             <div className="text-[9px] font-mono" style={{ color: "var(--ledger-ink-faint)", fontVariantNumeric: "tabular-nums" }}>
               ${(capCeiling - team.capSpace).toFixed(1)}M committed of ${capCeiling}M ceiling
             </div>
+            {team.capBreakdown && (
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[9px] font-mono" style={{ color: "var(--ledger-ink-faint)", fontVariantNumeric: "tabular-nums" }}>
+                {team.capBreakdown.ltirUsed > 0 && (
+                  <span>LTIR Relief: <span className="font-black" style={{ color: "var(--ledger-amber)" }}>${team.capBreakdown.ltirUsed.toFixed(1)}M</span></span>
+                )}
+                {team.capBreakdown.deadCap > 0 && (
+                  <span>Dead Cap: <span className="font-black" style={{ color: "var(--ledger-red)" }}>${team.capBreakdown.deadCap.toFixed(1)}M</span></span>
+                )}
+                {team.capBreakdown.bonuses > 0 && (
+                  <span>Bonuses: <span className="font-black">${team.capBreakdown.bonuses.toFixed(1)}M</span></span>
+                )}
+                {team.capBreakdown.totalCapHit > 0 && (
+                  <span>Total Cap Hit: <span className="font-black">${team.capBreakdown.totalCapHit.toFixed(1)}M</span></span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Team Strand */}
@@ -599,7 +707,12 @@ export default function TeamsPage() {
     fetch("/api/league")
       .then((r) => r.json())
       .then((data) => {
-        setTeams(data.teams ?? []);
+        setTeams((data.teams ?? []).map((t: any) => ({
+          ...t,
+          division: t.division ?? "",
+          conference: t.conference ?? "",
+          capBreakdown: t.capBreakdown ?? null,
+        })));
         setPlayers(data.players ?? []);
         if (data.capCeiling) setCapCeiling(data.capCeiling);
       })
