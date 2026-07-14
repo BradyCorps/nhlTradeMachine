@@ -39,13 +39,15 @@ export const FA = {
   fwdStarPace:   78,
   fwdStarBump:   0.14,
 
-  // Defensemen: workload (TOI over a replacement floor) + scoring.
-  // 0.60/min priced pure-workload D like offensive stars (a 21-minute
-  // defensive D projected ~$7.5M); 0.42 lands them in the real 5-ish
-  // range while elite minutes+points D still reach $12M+.
+  // Defensemen: workload (TOI over a replacement floor) + scoring,
+  // with progressive star premiums mirroring the forward curve.
+  // A 90-point, 25-min D (Makar / Fox tier) should land $15-16M,
+  // not the $12-13M the flat rate produced.
   dToiFloor:     12,
   dToiPerMin:    0.42,
   dPerPt:        0.085,
+  dStarPace:     55,      // elite offensive-D threshold (pts pace)
+  dStarBump:     0.08,    // premium per point above threshold
 
   // Goalies: base + GSAX + save% over league average + workload.
   gBase:         3.5,
@@ -150,8 +152,10 @@ export function projectFreeAgentContract(asset: Asset, ctx: ProjectContext = {})
       + ((asset.savePct ?? FA.gSvpAnchor) - FA.gSvpAnchor) * 100 * (FA.gPerSvpPoint / 100)
       + Math.min(FA.gWorkloadMax, (asset.gamesStarted ?? 0) / FA.gWorkloadDiv);
   } else if (pos === "D") {
+    const dPace = paidForPace(asset, age);
     baseAav = Math.max(0, (asset.avgTOI ?? 0) - FA.dToiFloor) * FA.dToiPerMin
-      + paidForPace(asset, age) * FA.dPerPt;
+      + dPace * FA.dPerPt
+      + Math.max(0, dPace - FA.dStarPace) * FA.dStarBump;
   } else if (isForward(pos)) {
     const pace = paidForPace(asset, age);
     baseAav = pace * FA.fwdPerPt
