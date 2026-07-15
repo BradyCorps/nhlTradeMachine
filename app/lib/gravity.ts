@@ -49,6 +49,7 @@ export interface GravityProfile {
   predictiveStability: number;   // 0–1: year-over-year signal confidence
   mechanisms:          GravityMechanism;
 
+  isDefenseman:       boolean;
   tier:               GravityTier;
   description:        string;
 }
@@ -355,6 +356,7 @@ export function computeGravity(asset: Asset): GravityProfile | null {
       paceManipulation:  r2(paceManipulation),
       defensiveWarping:  r2(defensiveWarping),
     },
+    isDefenseman: isD,
     tier,
     description: TIER_DESC[tier],
   };

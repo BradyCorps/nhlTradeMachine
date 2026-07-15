@@ -103,20 +103,111 @@ export function TierIcon({ tier, size = 16, color }: { tier: GravityTier; size?:
   }
 }
 
-// Plain-language glossary
+// Static glossary for mechanism bars and side boxes
 const GLOSSARY: Record<string, string> = {
-  "NOIV Lift": "How much linemates improve with this player vs without. Positive = linemates score more when he's on ice.",
-  "Zone Pull": "Whether this player drags play toward the offensive zone. Positive = more OZ time; negative = tilted defensive.",
-  "Creation": "The gap between team uplift and individual production. Above 1.0 = creates more than his own stats show.",
-  "Mass": "Star power — production weighted by ice time. More minutes + more points = heavier gravitational pull.",
-  "Partner Indep.": "Is the gravity real or borrowed from elite linemates? Above 1.0 = multi-season signal confirms real pull.",
   "Space Creation": "Creating high-quality chances for others beyond his own shooting.",
-  "Transition": "Carrying play through the neutral zone — skating speed and zone entry dominance.",
-  "Pace": "Driving shot-attempt frequency — how much the pace of play quickens when on ice.",
-  "Def. Warping": "Suppressing opponents while maintaining offense — forcing overcommitment.",
+  "Transition": "Neutral-zone carry and zone entry dominance — skating speed and puck transport.",
+  "Pace": "Shot-generation rate relative to position average — how much the tempo quickens when on ice.",
+  "Def. Warping": "xGA suppression, defensive point shares, and PK trust — forcing opponents to overcommit.",
   "Gravity Assist": "Invisible creation beyond the scoresheet. High = lifts team without needing personal credit.",
   "Signal Confidence": "How likely this gravity reading holds next season. Based on year-over-year consistency.",
 };
+
+// Dynamic, value-aware descriptions for the component panel
+interface ComponentContext {
+  qualifier: string;
+  qualColor: string;
+  description: string;
+}
+
+function getComponentContext(label: string, raw: number, profile: GravityProfile): ComponentContext {
+  const isD = profile.isDefenseman;
+  const green = "var(--ledger-green)";
+  const amber = "var(--ledger-amber, #d4a017)";
+  const faint = "var(--ledger-ink-faint)";
+  const red = "var(--ledger-red)";
+
+  switch (label) {
+    case "NOIV Lift": {
+      const v = raw;
+      if (v >= 0.25)
+        return { qualifier: "Elite", qualColor: green, description: `Linemates create significantly more offense with him on ice. A lift this strong is rare — top-of-league territory.` };
+      if (v >= 0.10)
+        return { qualifier: "Strong", qualColor: green, description: `Clear positive effect on linemates — they produce more offense when he's deployed. Above average for a regular.` };
+      if (v >= 0.02)
+        return { qualifier: "Positive", qualColor: amber, description: `Modest lift — linemates are slightly better with him on ice, but the effect isn't commanding.` };
+      if (v >= -0.02)
+        return { qualifier: "Neutral", qualColor: faint, description: `No measurable effect on linemate production. Linemates play roughly the same with or without him.` };
+      if (v >= -0.10)
+        return { qualifier: "Below Avg", qualColor: red, description: `Linemates produce less with him on ice. Could reflect deployment, a style mismatch, or a player who absorbs touches without creating.` };
+      return { qualifier: "Harmful", qualColor: red, description: `Linemates produce significantly less offense with him deployed. Strong negative signal.` };
+    }
+
+    case "Zone Pull": {
+      const v = raw;
+      if (v >= 0.30)
+        return { qualifier: "Strong OZ", qualColor: green, description: `Team spends significantly more time in the offensive zone when he's on ice — he pulls play forward.` };
+      if (v >= 0.10)
+        return { qualifier: "OZ Tilt", qualColor: green, description: `Positive territorial effect — the team plays more in the attacking zone with him deployed.` };
+      if (v >= -0.05)
+        return { qualifier: "Balanced", qualColor: faint, description: `Roughly even zone time — no strong pull toward offense or defense.` };
+      if (v >= -0.20)
+        return { qualifier: "DZ Tilt", qualColor: amber, description: isD
+          ? `Defensive zone tilt is common for stay-at-home defensemen — not necessarily a negative if he's deployed that way on purpose.`
+          : `Team tilts defensive when he's on ice. Can reflect tough matchups, or a player who doesn't drive transition.` };
+      return { qualifier: "Heavy DZ", qualColor: red, description: isD
+        ? `Strong defensive zone tilt. If he's a shutdown D this is expected; otherwise it's limiting his gravity.`
+        : `Team is pinned in its own zone when he plays — a significant drag on territorial control.` };
+    }
+
+    case "Creation": {
+      const v = raw;
+      if (isD) {
+        if (v >= 1.20)
+          return { qualifier: "Transition D", qualColor: green, description: `Rare for a defenseman — his team improves beyond what his own stats suggest. Likely a strong puck-mover who creates through outlet passes and transition.` };
+        if (v >= 0.90)
+          return { qualifier: "Balanced", qualColor: amber, description: `Team lift roughly matches his personal production. Typical for a defenseman who contributes on both ends.` };
+        return { qualifier: "Structure", qualColor: faint, description: `Team lift is less than his personal stats — typical for defensemen whose value comes through defensive structure, gap control, and positioning rather than playmaking.` };
+      }
+      if (v >= 1.30)
+        return { qualifier: "Elite Creator", qualColor: green, description: `Makes everyone around him better — the team improves far more than his personal stats explain. Classic "raises the tide" player.` };
+      if (v >= 1.05)
+        return { qualifier: "Creator", qualColor: green, description: `Team lift exceeds his own production — he opens space and chances for linemates beyond what shows on his own stat line.` };
+      if (v >= 0.85)
+        return { qualifier: "Balanced", qualColor: amber, description: `Team lift roughly matches his personal output — creates as much as his stats suggest, neither pure finisher nor pure playmaker.` };
+      if (v >= 0.60)
+        return { qualifier: "Finisher", qualColor: faint, description: `Personal stats exceed team lift — his value comes more from converting chances than creating them for others.` };
+      return { qualifier: "Pure Scorer", qualColor: faint, description: `Strong individual numbers but team doesn't lift proportionally. A triggerman who needs creators around him.` };
+    }
+
+    case "Mass": {
+      const v = raw;
+      if (v >= 1.00)
+        return { qualifier: "Heavy", qualColor: green, description: `High-minute, high-production player — carries major gravitational weight. His presence shapes a full game.` };
+      if (v >= 0.60)
+        return { qualifier: "Solid", qualColor: amber, description: `Meaningful minutes and production. Enough ice time and output to create a measurable gravitational field.` };
+      if (v >= 0.30)
+        return { qualifier: "Light", qualColor: faint, description: `Moderate usage or production — the gravitational field exists but doesn't dominate. Limited minutes or limited scoring dilute the signal.` };
+      return { qualifier: "Minimal", qualColor: faint, description: `Low minutes and/or production — not enough on-ice presence to create a meaningful gravitational effect.` };
+    }
+
+    case "Partner Indep.": {
+      const v = raw;
+      if (v >= 1.15)
+        return { qualifier: "Confirmed", qualColor: green, description: `Multi-season data shows consistent gravity regardless of linemates — this is real, independent pull, not borrowed from elite partners.` };
+      if (v >= 1.05)
+        return { qualifier: "Likely Real", qualColor: green, description: `Good year-over-year consistency. The gravity signal is probably real, though more seasons would strengthen confidence.` };
+      if (v >= 0.95)
+        return { qualifier: "Baseline", qualColor: faint, description: `Not enough multi-season variation to confirm — the reading could change with different linemates or deployment.` };
+      if (v >= 0.80)
+        return { qualifier: "Uncertain", qualColor: amber, description: `Current and historical signals diverge — the gravity may be partly borrowed from strong linemates. Watch for changes after lineup shifts.` };
+      return { qualifier: "Suspect", qualColor: red, description: `Significant year-over-year inconsistency — this player's gravity reading is likely inflated by elite linemates or specific deployment.` };
+    }
+
+    default:
+      return { qualifier: "", qualColor: faint, description: "" };
+  }
+}
 
 function CompactGravity({ profile }: { profile: GravityProfile }) {
   const color = gravityTierColor(profile.tier);
@@ -518,60 +609,78 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
 
 function ComponentPanel({ profile }: { profile: GravityProfile }) {
   const color = gravityTierColor(profile.tier);
-  const items = [
+  const items: { label: string; value: string; raw: number }[] = [
     {
       label: "NOIV Lift",
       value: `${profile.noivLift > 0 ? "+" : ""}${profile.noivLift.toFixed(2)}`,
+      raw: profile.noivLift,
     },
     {
       label: "Zone Pull",
       value: `${profile.zonePull > 0 ? "+" : ""}${profile.zonePull.toFixed(2)}`,
+      raw: profile.zonePull,
     },
     {
       label: "Creation",
       value: `×${profile.creationAmplifier.toFixed(2)}`,
+      raw: profile.creationAmplifier,
     },
     {
       label: "Mass",
       value: profile.playerMass.toFixed(2),
+      raw: profile.playerMass,
     },
     {
       label: "Partner Indep.",
       value: `×${profile.partnerIndependence.toFixed(2)}`,
+      raw: profile.partnerIndependence,
     },
   ];
 
   return (
     <div className="flex flex-col gap-1.5" role="list" aria-label="Gravity components">
-      {items.map(({ label, value }) => (
-        <div key={label}
-          className="px-2.5 py-2 border"
-          style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-bg)" }}
-          role="listitem"
-          aria-label={`${label}: ${value}. ${GLOSSARY[label] ?? ""}`}
-        >
-          <div className="flex items-baseline justify-between gap-2">
+      {items.map(({ label, value, raw }) => {
+        const ctx = getComponentContext(label, raw, profile);
+        return (
+          <div key={label}
+            className="px-2.5 py-2 border"
+            style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-bg)" }}
+            role="listitem"
+            aria-label={`${label}: ${value}, ${ctx.qualifier}. ${ctx.description}`}
+          >
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div
+                  className="text-[10px] font-black uppercase tracking-[0.12em] font-mono"
+                  style={{ color: "var(--ledger-ink-faint)" }}
+                >
+                  {label}
+                </div>
+                {ctx.qualifier && (
+                  <div
+                    className="text-[8px] font-black uppercase tracking-[0.08em] font-mono px-1 py-px border"
+                    style={{ color: ctx.qualColor, borderColor: ctx.qualColor, lineHeight: 1.3 }}
+                  >
+                    {ctx.qualifier}
+                  </div>
+                )}
+              </div>
+              <div
+                className="text-[15px] font-black font-mono leading-tight"
+                style={{ color, fontVariantNumeric: "tabular-nums" }}
+              >
+                {value}
+              </div>
+            </div>
             <div
-              className="text-[10px] font-black uppercase tracking-[0.12em] font-mono"
+              className="text-[10px] font-mono leading-snug mt-1"
               style={{ color: "var(--ledger-ink-faint)" }}
             >
-              {label}
-            </div>
-            <div
-              className="text-[15px] font-black font-mono leading-tight"
-              style={{ color, fontVariantNumeric: "tabular-nums" }}
-            >
-              {value}
+              {ctx.description}
             </div>
           </div>
-          <div
-            className="text-[10px] font-mono leading-snug mt-0.5"
-            style={{ color: "var(--ledger-ink-faint)" }}
-          >
-            {GLOSSARY[label]}
-          </div>
-        </div>
-      ))}
+        );
+      })}
 
       {/* Context badge */}
       {profile.contextAdjustment !== 1.0 && (
