@@ -80,7 +80,9 @@ function classifyTier(force: number): GravityTier {
   return "BLACK_HOLE";
 }
 
-const LEAGUE_AVG_OZ = 0.50;
+// EDGE zone time is a three-way split: OZ + NZ + DZ = 100%.
+// League-average OZ time is ~43%, NOT 50%.
+const LEAGUE_AVG_OZ_EDGE = 0.43;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
@@ -160,10 +162,12 @@ export function computeGravity(asset: Asset): GravityProfile | null {
   }
 
   // ─── Zone Pull ─────────────────────────────────────────────────
+  // EDGE ozPct is a three-way split (OZ/NZ/DZ sum to 100%), league avg ~43%.
+  // dzPct from MoneyPuck is EV faceoff zone starts, roughly binary, avg ~50%.
   const ozPct = asset.edgeOzPct ?? null;
   let zonePull = 0;
   if (ozPct !== null) {
-    zonePull = clamp((ozPct - LEAGUE_AVG_OZ) * 5, -0.5, 0.75);
+    zonePull = clamp((ozPct - LEAGUE_AVG_OZ_EDGE) * 5, -0.5, 0.75);
   } else if (asset.dzPct != null) {
     zonePull = clamp((0.50 - asset.dzPct) * 3, -0.3, 0.4);
   }
@@ -225,7 +229,7 @@ export function computeGravity(asset: Asset): GravityProfile | null {
     if (asset.edgeBurstsOver20 != null)
       score += clamp(asset.edgeBurstsOver20 / 80, 0, 0.35);
     if (ozPct !== null)
-      score += clamp((ozPct - 0.48) * 4, 0, 0.30);
+      score += clamp((ozPct - LEAGUE_AVG_OZ_EDGE) * 4, 0, 0.30);
     transitionControl = clamp(score, 0, 1);
   }
 
