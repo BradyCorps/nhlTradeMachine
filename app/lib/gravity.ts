@@ -210,12 +210,13 @@ export function computeGravity(asset: Asset): GravityProfile | null {
     // Team uplift (when positive) beyond player's own shooting
     if (blendedNoiv > 0) {
       const teamUplift = blendedNoiv / 100;
-      const selfShootRate = ixg82 / 82;
+      const selfShootRate = (ixg82 > 0 ? ixg82 : goalsPace) / 82;
       score += clamp((teamUplift - selfShootRate * 0.3) * 6, 0, 0.40);
     }
     // Individual xG creation rate
-    if (ixg82 > 0) {
-      score += clamp(ixg82 / (isD ? 20 : 30), 0, 0.25);
+    const effectiveIxg = ixg82 > 0 ? ixg82 : goalsPace;
+    if (effectiveIxg > 0) {
+      score += clamp(effectiveIxg / (isD ? 20 : 30), 0, 0.25);
     }
     spaceCreation = clamp(score, 0, 1);
   }
@@ -281,7 +282,7 @@ export function computeGravity(asset: Asset): GravityProfile | null {
     // Compare individual shooting share against total team uplift.
     // Both need to be in the same unit space: per-game contribution rates.
     const teamUpliftPerGame = blendedNoiv / 100;         // e.g. 0.05 for 5% NOIV
-    const ixgPerGame = ixg82 / 82;                       // e.g. 0.30 for 25 ixG/82
+    const ixgPerGame = ixg82 > 0 ? ixg82 / 82 : goalsPace / 82;
     const assistsPerGame = assistsPace / 82;              // e.g. 0.60 for 50 assists/82
 
     // selfFraction: how much of the player's total offensive output is
