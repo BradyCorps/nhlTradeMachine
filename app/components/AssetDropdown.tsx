@@ -6,20 +6,13 @@ import type { Asset, Team } from "@/app/lib/trade-types";
 import { useTradeStore } from "@/app/store/tradeStore";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 import { displayPosition } from "@/app/lib/display-position";
+import { navColor } from "@/app/lib/display-utils";
 
 const CORE_COUNT = 8;
 
 function isProspect(p: Asset): boolean {
   if (p.position === "Pick") return false;
   return p.age <= 23 && ((p.games ?? 0) < 50 || p.capHit <= 0.925);
-}
-
-function navColor(n: number): string {
-  if (n >= 200) return "var(--ledger-green)";
-  if (n >= 100) return "var(--ledger-navy)";
-  if (n >= 50)  return "var(--ledger-amber)";
-  if (n > 0)    return "var(--ledger-ink-faint)";
-  return "var(--ledger-red)";
 }
 
 function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number; onClick: () => void }) {

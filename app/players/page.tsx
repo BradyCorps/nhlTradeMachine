@@ -1,7 +1,8 @@
 "use client";
 import StrandDisplay from "@/app/components/StrandDisplay";
 import EdgeStrip from "@/app/components/EdgeStrip";
-import { buildGoalieStrandTraits } from "@/app/components/StrandView";
+import { buildAssetTraits, buildGoalieStrandTraits, computeStrandType } from "@/app/components/StrandView";
+import type { Asset } from "@/app/lib/trade-types";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
 import GravityField from "@/app/components/GravityField";
@@ -628,16 +629,9 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
   );
 }
 
-// ── Inline full strand ────────────────────────────────────────
-// Computes Player traits and delegates rendering to the shared
-// StrandDisplay component — same renderer used by the trade machine.
-// Player page uses 8 traits (4+4); trade machine uses 10 (5+5).
-// The extra 2 in the trade machine come from evaluate/route.ts
-// (nav.off/def detailed components + nav.age) which needs evaluation.
-function FullStrand({ player }: { player: Player }) {
-  const norm = (v: number, lo: number, hi: number) => Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
-  const safe = (n: number) => isNaN(n) || !isFinite(n) ? 0 : n;
+const STRAND_NAV_SHIM = { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0, fmvAav: 0, fArchetype: undefined, rosterTier: undefined } as const;
 
+function FullStrand({ player }: { player: Player }) {
   if (player.position === "G") {
     const goalie = buildGoalieStrandTraits(player);
     return (
@@ -652,59 +646,20 @@ function FullStrand({ player }: { player: Player }) {
     );
   }
 
-  const isD  = player.position === "D";
+  const { off, def } = buildAssetTraits(player as unknown as Asset, STRAND_NAV_SHIM);
   const ops = player.ops ?? null;
   const dps = player.dps ?? null;
-  const psTotal  = ops !== null && dps !== null ? ops + dps : null;
-  const opsNorm  = psTotal !== null && psTotal > 0 ? Math.max(0, Math.min(1, ops! / psTotal)) : null;
-  const dpsNorm  = psTotal !== null && psTotal > 0 ? Math.max(0, Math.min(1, dps! / psTotal)) : null;
-  const dzAvail  = player.dzPct != null;
-  const ozRaw    = dzAvail ? Math.round((1 - (player.dzPct as number)) * 100) : undefined;
-  const ozScore  = dzAvail ? 1 - norm(player.dzPct as number, 0.3, 0.7) : 0.5;
-
-  const offTraits = [
-    { label: ops !== null ? "OPS" : "SCR",
-      val: opsNorm ?? norm(safe(player.ptsPace), 0, isD ? 80 : 100),
-      raw: ops !== null ? `${ops.toFixed(1)} OPS` : `${player.ptsPace.toFixed(0)} P/82`,
-      title: ops !== null ? `OPS ${ops.toFixed(1)} — Offensive Point Shares` : `Pts/82: ${player.ptsPace.toFixed(1)}` },
-    { label: "xG",   val: player.xGPace != null ? norm(safe(player.xGPace), 0, isD ? 25 : 50) : 0.5,
-      raw: player.xGPace != null ? `${player.xGPace.toFixed(0)} xG/82` : undefined,
-      title: player.xGPace != null ? `xG/82: ${player.xGPace.toFixed(1)}` : "xG data unavailable",
-      unavailable: player.xGPace == null },
-    { label: "NOIV", val: norm(safe(player.xgRelTM ?? 0), -12, 12),
-      raw: `${(player.xgRelTM ?? 0) >= 0 ? "+" : ""}${(player.xgRelTM ?? 0).toFixed(1)}%`,
-      title: `xG% vs teammates: ${player.xgRelTM != null ? (player.xgRelTM as number).toFixed(1) : "—"}` },
-    { label: "TOI", val: norm(safe(player.avgTOI), 10, 27),
-      raw: `${player.avgTOI.toFixed(1)} min`,
-      title: `Ice time: ${player.avgTOI.toFixed(1)} min/gm` },
-  ];
-  const defTraits = [
-    { label: dps !== null ? "DPS" : "DEF",
-      val: dpsNorm ?? norm(safe(player.defRate ?? 0), -0.3, 0.3),
-      raw: dps !== null ? `${dps.toFixed(1)} DPS` : undefined,
-      unavailable: dps === null && player.defRate == null,
-      title: dps !== null ? `DPS ${dps.toFixed(1)} — Defensive Point Shares` : "Defensive NAV component" },
-    { label: "SUPP", val: norm(-(safe(player.xgaRelTM ?? 0)), -1.5, 1.5),
-      raw: `${(-(player.xgaRelTM ?? 0)) >= 0 ? "+" : ""}${(-(player.xgaRelTM ?? 0)).toFixed(2)} xGA`,
-      title: `Chance suppression vs teammates: ${player.xgaRelTM != null ? (-(player.xgaRelTM as number)).toFixed(2) : "—"} (higher = stingier)` },
-    { label: "QoC",  val: (player.qocIndex ?? 35) / 100,
-      raw: undefined,
-      title: `Quality of competition ${player.qocIndex ?? "—"}/100 — how tough his matchups are` },
-    { label: "OZ",   val: ozScore, raw: dzAvail ? `${ozRaw}% OZ` : undefined, unavailable: !dzAvail,
-      title: dzAvail ? `OZ%: ${ozRaw}% offensive zone starts` : "Zone deployment unavailable" },
-  ];
+  const strandType = computeStrandType(off, def, ops, dps);
 
   return (
     <StrandDisplay
-      offTraits={offTraits}
-      defTraits={defTraits}
+      offTraits={off}
+      defTraits={def}
       ops={ops}
       dps={dps}
+      strandType={strandType}
       footer={<EdgeStrip asset={player} heading={false} />}
-      W={300}
-      H={200}
-      amplitude={42}
-      maxWidth={460}
+      W={300} H={200} amplitude={42} maxWidth={460}
     />
   );
 }
@@ -852,6 +807,11 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
       {/* ── Desktop row (≥540px) — original 6-column grid ── */}
       <div
         onClick={() => setExpanded(e => !e)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(x => !x); } }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        aria-label={`${player.name}, ${displayPosition(player.position, player.secondaryPosition)}, age ${player.age}`}
         className="player-row player-row-desktop"
         style={{
           display: "grid",
@@ -919,6 +879,11 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
       {/* ── Mobile card (≤539px) — 2-line layout with labelled stats ── */}
       <div
         onClick={() => setExpanded(e => !e)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(x => !x); } }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        aria-label={`${player.name}, ${displayPosition(player.position, player.secondaryPosition)}, age ${player.age}`}
         className="player-row player-row-mobile"
         style={{
           padding: "10px 12px",
@@ -1266,13 +1231,13 @@ export default function PlayersPage() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search player or team..."
+              aria-label="Search players by name or team"
               style={{
                 fontSize: "11px",
                 padding: "7px 12px",
                 border: "1px solid #b8a070",
                 background: "#e4d8b8",
                 color: "var(--ledger-ink)",
-                outline: "none",
                 flex: 1,
                 minWidth: "140px",
                 maxWidth: "260px",

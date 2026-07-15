@@ -143,7 +143,11 @@ export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFla
           return (
             <div key={key}
               className={`rounded-lg border overflow-hidden cursor-pointer transition-all duration-200 ${fs.bg} ${fs.border} hover:opacity-90`}
-              onClick={() => setExpandedFlag(isOpen ? null : index)}>
+              onClick={() => setExpandedFlag(isOpen ? null : index)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpandedFlag(isOpen ? null : index); } }}
+              role="button"
+              tabIndex={0}
+              aria-expanded={isOpen}>
               <div className="flex items-center gap-2 px-3 py-2">
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${fs.dot}`} />
                 <span className={`text-2xs font-black uppercase tracking-tight flex-1 leading-tight ${fs.text}`}>
@@ -182,7 +186,11 @@ export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFla
                 <div key={key}
                   className="rounded-lg border overflow-hidden cursor-pointer transition-all duration-200 hover:opacity-90 mb-1.5"
                   style={{ background: 'rgba(28,20,10,0.04)', borderColor: 'var(--ledger-rule-mid)', opacity: 0.85 }}
-                  onClick={() => setExpandedFlag(isOpen ? null : index)}>
+                  onClick={() => setExpandedFlag(isOpen ? null : index)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpandedFlag(isOpen ? null : index); } }}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isOpen}>
                   <div className="flex items-center gap-2 px-3 py-2">
                     <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--ledger-ink-faint)' }} />
                     <span className="text-2xs font-black uppercase tracking-tight flex-1 leading-tight"

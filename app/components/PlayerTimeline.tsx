@@ -4,13 +4,7 @@ import React from "react";
 import { calcPlayerTimeline } from "@/app/lib/player-timeline";
 import { calcNAV, type AssetInput } from "@/app/lib/xnav-engine";
 
-function navColor(nav: number): string {
-  if (nav >= 160) return "#146a24";  // elite — green
-  if (nav >= 100) return "#1a5fa8";  // good  — blue
-  if (nav >= 50)  return "#8a6a1e";  // okay  — amber
-  if (nav >= 0)   return "#6b5030";  // depth — brown
-  return "#9c2b1f";                   // negative — red
-}
+import { navColor } from "@/app/lib/display-utils";
 
 export function estimateNextContractTerm(asset: AssetInput, nav: { total: number; fmvAav?: number; isRFA?: boolean }): number {
   const signingAge = asset.age + Math.max(0, asset.yearsRemaining ?? 0);

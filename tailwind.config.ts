@@ -24,7 +24,7 @@ const config: Config = {
           'ink-mid':    '#3d2e18',
           'ink-body':   '#4a3820',
           'ink-light':  '#5e4f3a',
-          'ink-faint':  '#9a7d58',
+          'ink-faint':  '#6e5a3d',
           // Rule tones
           rule:         '#b8a070',
           'rule-mid':   '#c8b890',

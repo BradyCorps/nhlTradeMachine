@@ -14,6 +14,9 @@ export const iconKey = [
   ["⚕", "Injury Risk", "Ledger note for elevated injury risk."],
   ["⟳", "Change of Scenery", "Negative but recoverable NAV profile that may fit another roster better."],
   ["⚠", "Salary Dump", "Deeply negative or high-risk contract warning."],
+  ["◈", "Untouchable", "Availability gate — player is marked untouchable and will not appear in trade proposals."],
+  ["◉", "Trade Block", "Player has been placed on the trade block by their team."],
+  ["⚡", "Find Partners", "Triggers a league-wide search for the best trade partners for this player."],
 ];
 
 export const gravityTierEntries: [GravityTier, string, string][] = [
