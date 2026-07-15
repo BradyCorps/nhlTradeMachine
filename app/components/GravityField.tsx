@@ -482,12 +482,13 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
       </text>
 
-      {/* Tier icon + label — positioned above the field */}
-      {renderTierIcon(cx - 50, 16)}
+      {/* Tier icon + label — inline, vertically centered */}
+      {renderTierIcon(50, 20)}
       <text
-        x={cx - 28}
-        y={28}
+        x={68}
+        y={20}
         textAnchor="start"
+        dominantBaseline="central"
         fill={color}
         fontFamily="'Courier Prime', monospace"
         fontWeight={900}
@@ -584,13 +585,22 @@ function ComponentPanel({ profile }: { profile: GravityProfile }) {
 
 // ── Mechanism bar ──────────────────────────────────────────────────────────
 
+const LEAGUE_AVG: Record<string, number> = {
+  "Space Creation":  0.22,
+  "Transition":      0.30,
+  "Pace":            0.25,
+  "Def. Warping":    0.20,
+};
+
 function MechanismBar({ label, value, color }: { label: string; value: number; color: string }) {
   const pct = Math.round(clampViz(value, 0, 1) * 100);
+  const avgPct = Math.round((LEAGUE_AVG[label] ?? 0) * 100);
+
   return (
     <div
       className="flex items-center gap-2"
       role="meter"
-      aria-label={`${label}: ${value.toFixed(2)} out of 1.00. ${GLOSSARY[label] ?? ""}`}
+      aria-label={`${label}: ${value.toFixed(2)} out of 1.00, league average ${(LEAGUE_AVG[label] ?? 0).toFixed(2)}. ${GLOSSARY[label] ?? ""}`}
       aria-valuenow={pct}
       aria-valuemin={0}
       aria-valuemax={100}
@@ -603,7 +613,7 @@ function MechanismBar({ label, value, color }: { label: string; value: number; c
         {label}
       </div>
       <div
-        className="flex-1 h-[7px]"
+        className="flex-1 h-[7px] relative"
         style={{ background: "var(--paper-inset)", border: "1px solid var(--ledger-rule-light)", borderRadius: 1 }}
       >
         <div
@@ -615,6 +625,21 @@ function MechanismBar({ label, value, color }: { label: string; value: number; c
             borderRadius: 1,
           }}
         />
+        {avgPct > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              left: `${avgPct}%`,
+              top: -2,
+              bottom: -2,
+              width: 1,
+              background: "var(--ledger-ink)",
+              opacity: 0.35,
+            }}
+            title={`League avg: ${(LEAGUE_AVG[label] ?? 0).toFixed(2)}`}
+            aria-hidden="true"
+          />
+        )}
       </div>
       <div
         className="text-[11px] font-black font-mono tabular-nums shrink-0"
@@ -650,11 +675,19 @@ function AnalyticalDepth({ profile }: { profile: GravityProfile }) {
       <div className="grid gap-4" style={{ gridTemplateColumns: "1fr minmax(140px, 180px)" }}>
         {/* Left: mechanism decomposition */}
         <div style={{ minWidth: 0 }}>
-          <div
-            className="text-[9px] font-black uppercase tracking-[0.12em] font-mono mb-2"
-            style={{ color: "var(--ledger-ink-faint)" }}
-          >
-            Mechanism Decomposition
+          <div className="flex items-center justify-between mb-2">
+            <div
+              className="text-[9px] font-black uppercase tracking-[0.12em] font-mono"
+              style={{ color: "var(--ledger-ink-faint)" }}
+            >
+              Mechanism Decomposition
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div style={{ width: 1, height: 8, background: "var(--ledger-ink)", opacity: 0.35 }} />
+              <div className="text-[8px] font-mono uppercase" style={{ color: "var(--ledger-ink-faint)", letterSpacing: "0.06em" }}>
+                Avg
+              </div>
+            </div>
           </div>
           <div className="flex flex-col gap-1.5">
             <MechanismBar label="Space Creation" value={m.spaceCreation} color={color} />

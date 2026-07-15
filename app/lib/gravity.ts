@@ -195,16 +195,24 @@ export function computeGravity(asset: Asset): GravityProfile | null {
   // Mechanism Decomposition — WHERE does the gravity come from?
   // ═════════════════════════════════════════════════════════════════
 
-  // Space Creation: team xG uplift beyond the player's own shooting
+  // Space Creation: chances created for others beyond own shooting
   let spaceCreation = 0;
-  if (blendedNoiv > 0 && ptsPace > 0) {
-    const assistShare = assistsPace / Math.max(1, ptsPace);
-    const selfShootRate = ixg82 / 82;
-    const teamUplift = blendedNoiv / 100;
-    spaceCreation = clamp(
-      (teamUplift - selfShootRate * 0.3) * 8 + assistShare * 0.3,
-      0, 1,
-    );
+  {
+    const assistShare = ptsPace > 0 ? assistsPace / ptsPace : 0;
+    let score = 0;
+    // Assist-heavy playmaking contributes even with neutral NOIV
+    score += assistShare * 0.40;
+    // Team uplift (when positive) beyond player's own shooting
+    if (blendedNoiv > 0) {
+      const teamUplift = blendedNoiv / 100;
+      const selfShootRate = ixg82 / 82;
+      score += clamp((teamUplift - selfShootRate * 0.3) * 6, 0, 0.40);
+    }
+    // Individual xG creation rate
+    if (ixg82 > 0) {
+      score += clamp(ixg82 / (isD ? 20 : 30), 0, 0.25);
+    }
+    spaceCreation = clamp(score, 0, 1);
   }
 
   // Transition Control: skating + zone dominance
@@ -220,11 +228,18 @@ export function computeGravity(asset: Asset): GravityProfile | null {
     transitionControl = clamp(score, 0, 1);
   }
 
-  // Pace Manipulation: shot-generation rate relative to ice time
+  // Pace Manipulation: shot-generation rate vs position average
   let paceManipulation = 0;
   if (toi > 0) {
-    const xgPerMin = (asset.xGPace ?? 0) / 82 / toi;
-    paceManipulation = clamp(xgPerMin * 180, 0, 1);
+    let xgPace = asset.xGPace ?? 0;
+    // Fallback: estimate from production when xG data is missing
+    if (xgPace === 0 && ptsPace > 0) {
+      xgPace = ptsPace * (isD ? 0.35 : 0.45);
+    }
+    const xgPerMin = xgPace / 82 / toi;
+    // Normalize against position baseline (~0.007 F, ~0.004 D)
+    const baseline = isD ? 0.004 : 0.007;
+    paceManipulation = clamp((xgPerMin / baseline - 0.5) / 2.0, 0, 1);
   }
 
   // Defensive Warping: forcing opponent overcommitment
@@ -257,10 +272,10 @@ export function computeGravity(asset: Asset): GravityProfile | null {
   // surplus) scores ~0. A gravitational playmaker who lifts everyone
   // without needing the puck himself scores ~0.7–1.0.
   let gravityAssist = 0;
-  if (blendedNoiv > 0.5) {
+  if (blendedNoiv > 0) {
     const teamUplift = blendedNoiv / 100;
     const ixgRate = ixg82 / 82;
-    if (teamUplift > 0.01) {
+    if (teamUplift > 0.005) {
       const selfFraction = Math.min(1, ixgRate / (teamUplift * 3));
       const invisible = 1 - selfFraction;
       const assistShare = assistsPace / Math.max(1, assistsPace + goalsPace);
