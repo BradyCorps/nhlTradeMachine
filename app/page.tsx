@@ -6,6 +6,7 @@ import ScrollReveal from "./components/ScrollReveal";
 import ScrollNameplate from "./components/ScrollNameplate";
 import ScrollSnap from "./components/ScrollSnap";
 import LedgerScrollSetdown from "./components/LedgerScrollSetdown";
+import TrendingPlayers from "./components/TrendingPlayers";
 
 function Cell({
   href, lead = false, kicker, kickerColor, edition, title, body, lines, cta, ctaColor,
@@ -285,6 +286,15 @@ export default function WelcomePage() {
               ]}
             />
           </div>
+        </section>
+
+        {/* ── Trending players ────────────────────────────────── */}
+        <section className="fp-reveal px-5 sm:px-8 pt-11" style={{ transitionDelay: "0.14s" }}>
+          <div className="fp-section-label mb-5">Highest-Valued Assets</div>
+          <p className="text-[12px] leading-relaxed mb-5 font-mono" style={{ color: "var(--ledger-ink-light)" }}>
+            The twelve most valuable trade assets in the NHL right now, ranked by X-NAV.
+          </p>
+          <TrendingPlayers />
         </section>
 
         {/* ── In development ─────────────────────────────────── */}
