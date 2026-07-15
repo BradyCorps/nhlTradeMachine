@@ -277,16 +277,28 @@ export function computeGravity(asset: Asset): GravityProfile | null {
   // surplus) scores ~0. A gravitational playmaker who lifts everyone
   // without needing the puck himself scores ~0.7–1.0.
   let gravityAssist = 0;
-  if (blendedNoiv > 0) {
-    const teamUplift = blendedNoiv / 100;
-    const ixgRate = ixg82 / 82;
-    if (teamUplift > 0.005) {
-      const selfFraction = Math.min(1, ixgRate / (teamUplift * 3));
-      const invisible = 1 - selfFraction;
-      const assistShare = assistsPace / Math.max(1, assistsPace + goalsPace);
-      const assistWeight = assistShare > 0.55 ? 1.15 : assistShare > 0.40 ? 1.0 : 0.85;
-      gravityAssist = clamp(invisible * assistWeight, 0, 1);
-    }
+  if (blendedNoiv > 0 && ptsPace > 0) {
+    // Compare individual shooting share against total team uplift.
+    // Both need to be in the same unit space: per-game contribution rates.
+    const teamUpliftPerGame = blendedNoiv / 100;         // e.g. 0.05 for 5% NOIV
+    const ixgPerGame = ixg82 / 82;                       // e.g. 0.30 for 25 ixG/82
+    const assistsPerGame = assistsPace / 82;              // e.g. 0.60 for 50 assists/82
+
+    // selfFraction: how much of the player's total offensive output is
+    // pure individual shooting vs playmaking. Low = creates for others.
+    const totalOutput = ixgPerGame + assistsPerGame * 0.5;
+    const selfShootFraction = totalOutput > 0.01
+      ? ixgPerGame / totalOutput
+      : 0.5;
+
+    // invisible: the complement — how much is "invisible" creation
+    const invisible = 1 - selfShootFraction;
+
+    // Scale by NOIV magnitude — a player with higher team uplift
+    // who ALSO has low self-shooting is a stronger gravity assist
+    const noivScale = clamp(teamUpliftPerGame / 0.08, 0, 1);
+
+    gravityAssist = clamp(invisible * noivScale * 1.4, 0, 1);
   }
 
   // ═════════════════════════════════════════════════════════════════
