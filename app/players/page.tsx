@@ -61,6 +61,7 @@ interface Player {
   defRate?: number | null;
   goalsPace?: number | null;
   assistsPace?: number | null;
+  plusMinus?: number | null;
   capHit: number;
   yearsRemaining: number;
   hasNMC?: boolean;
@@ -471,21 +472,24 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
 
   const [activeTab, setActiveTab] = useState<PlayerTab>("stats");
 
-  const seasonPoints = Math.round((player.ptsPace / 82) * (player.games ?? 82));
+  const gp = player.games ?? 82;
+  const seasonGoals = player.goalsPace != null ? Math.round((player.goalsPace / 82) * gp) : null;
+  const seasonAssists = player.assistsPace != null ? Math.round((player.assistsPace / 82) * gp) : null;
+  const seasonPoints = Math.round((player.ptsPace / 82) * gp);
+  const pm = player.plusMinus;
   const statItems: Array<{ label: string; val: string; title?: string; color?: string }> = isG ? [
     { label: "GP",    val: player.gamesStarted?.toString() ?? "—" },
     { label: "GSAx",  val: (player.gsax ?? 0).toFixed(1) },
     { label: "SV%",   val: player.savePct?.toFixed(3) ?? "—" },
     { label: "Tier",  val: goalieTeir(player.gamesStarted ?? 0) },
   ] : [
+    { label: "GP",     val: gp.toString() },
+    { label: "G",      val: seasonGoals?.toString() ?? "—" },
+    { label: "A",      val: seasonAssists?.toString() ?? "—" },
     { label: "PTS",    val: seasonPoints.toString() },
-    { label: "PTS/82", val: player.ptsPace.toFixed(1) },
-    { label: "G/82",   val: player.goalsPace != null ? (player.goalsPace as number).toFixed(1) : "—" },
-    { label: "A/82",   val: player.assistsPace != null ? (player.assistsPace as number).toFixed(1) : "—" },
-    { label: "xG/82",  val: player.xGPace.toFixed(1) },
+    { label: "+/−",    val: pm != null ? `${pm > 0 ? "+" : ""}${pm}` : "—", color: pm != null ? (pm > 0 ? "var(--ledger-green)" : pm < 0 ? "var(--ledger-red)" : undefined) : undefined },
     { label: "TOI",    val: player.avgTOI.toFixed(1) },
     { label: "xG%+",   val: player.xgRelTM != null ? `${(player.xgRelTM as number) > 0 ? "+" : ""}${(player.xgRelTM as number).toFixed(1)}` : "—" },
-    { label: "OZ%",    val: player.dzPct != null ? `${(((1 - (player.dzPct as number)) * 100)).toFixed(0)}%` : "—" },
     { label: "EDGE HD", val: formatEdgeLuck(player.hdFinishingDelta), title: EDGE_LUCK_TITLE, color: edgeLuckColor(player.hdFinishingDelta) },
   ];
 

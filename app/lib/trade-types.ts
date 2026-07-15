@@ -45,6 +45,7 @@ export interface Asset {
   dzPct?: number | null;
   goalsPace?: number;
   assistsPace?: number;
+  plusMinus?: number | null;
   round?: number;
   year?: number;
   teamStanding?: number;

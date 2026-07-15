@@ -628,6 +628,7 @@ async function fetchNhlSkaterStatsFallback(): Promise<Map<string, any>> {
         hasLiveStats: true,
         goalsPace: (s.goals / games) * 82,
         assistsPace: (s.assists / games) * 82,
+        plusMinus: s.plusMinus,
       };
       const slug = slugify(s.skaterFullName);
       statsMap.set(`id:${s.playerId}`, entry);
@@ -1333,6 +1334,7 @@ export async function assembleCanonicalRoster(options: {
         dzPct:       stats?.dzPct     ?? null,
         goalsPace:   stats?.goalsPace,
         assistsPace: stats?.assistsPace,
+        plusMinus:   stats?.plusMinus ?? null,
       });
     });
   });
@@ -1415,6 +1417,7 @@ export async function assembleCanonicalRoster(options: {
         contractMissing: true, retainedPct: 0, multiplier: 1.0,
         ops: null, dps: null, xgRelTM: null, xgaRelTM: null,
         dzPct: null, goalsPace: stats?.goalsPace, assistsPace: stats?.assistsPace,
+        plusMinus: stats?.plusMinus ?? null,
       });
       existingSlugs.add(dSlug);
       poolCount++;
