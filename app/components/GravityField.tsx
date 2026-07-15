@@ -1,8 +1,9 @@
 "use client";
-// ── GravityField v2.1 — AA-accessible orbital field + analytical depth ──
+// ── GravityField v2.2 — AA-accessible orbital field + analytical depth ──
+// Orbital physics: stronger gravity → data points orbit CLOSER to center.
 
 import React from "react";
-import type { GravityProfile, GravityTier, GravityMechanism } from "@/app/lib/gravity";
+import type { GravityProfile, GravityTier } from "@/app/lib/gravity";
 import { gravityTierColor } from "@/app/lib/gravity";
 
 interface Props {
@@ -29,6 +30,21 @@ const TIER_LABEL: Record<GravityTier, string> = {
   BLACK_HOLE:    "Black Hole",
 };
 
+// Plain-language glossary for each metric
+const GLOSSARY: Record<string, string> = {
+  "NOIV Lift": "How much linemates improve with this player vs without. Positive = linemates score more when he's on ice.",
+  "Zone Pull": "Whether this player drags play toward the offensive zone. Positive = more OZ time; negative = tilted defensive.",
+  "Creation": "The gap between team uplift and individual production. Above 1.0 = creates more than his own stats show.",
+  "Mass": "Star power — production weighted by ice time. More minutes + more points = heavier gravitational pull.",
+  "Partner Indep.": "Is the gravity real or borrowed from elite linemates? Above 1.0 = multi-season signal confirms real pull.",
+  "Space Creation": "Creating high-quality chances for others beyond his own shooting.",
+  "Transition": "Carrying play through the neutral zone — skating speed and zone entry dominance.",
+  "Pace": "Driving shot-attempt frequency — how much the pace of play quickens when on ice.",
+  "Def. Warping": "Suppressing opponents while maintaining offense — forcing overcommitment.",
+  "Gravity Assist": "Invisible creation beyond the scoresheet. High = lifts team without needing personal credit.",
+  "Signal Confidence": "How likely this gravity reading holds next season. Based on year-over-year consistency.",
+};
+
 function CompactGravity({ profile }: { profile: GravityProfile }) {
   const color = gravityTierColor(profile.tier);
   return (
@@ -52,18 +68,19 @@ function CompactGravity({ profile }: { profile: GravityProfile }) {
 
 const clampViz = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+// Stronger values orbit CLOSER to the center (gravitational pull)
 function valueToOrbit(value: number, min: number, max: number): number {
   const t = (value - min) / (max - min);
-  return 0.30 + clampViz(t, 0, 1) * 0.55;
+  return 0.85 - clampViz(t, 0, 1) * 0.55;
 }
 
 // ── SVG orbital field diagram ──────────────────────────────────────────────
 
 function FieldDiagram({ profile }: { profile: GravityProfile }) {
   const W = 320;
-  const H = 310;
+  const H = 300;
   const cx = W / 2;
-  const cy = 155;
+  const cy = 148;
   const absForce = Math.abs(profile.force);
   const isNeg = profile.force < 0;
   const color = gravityTierColor(profile.tier);
@@ -101,7 +118,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
     },
     {
       label: "Creation", value: profile.creationAmplifier,
-      angle: Math.PI * 0.65,
+      angle: Math.PI * 0.70,
       orbit: valueToOrbit(profile.creationAmplifier, 0.5, 2.0),
       display: `×${profile.creationAmplifier.toFixed(2)}`,
     },
@@ -140,9 +157,9 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
     <svg
       viewBox={`0 0 ${W} ${H}`}
       className="w-full"
-      style={{ maxWidth: 360 }}
+      style={{ maxWidth: 360, display: "block", margin: "0 auto" }}
       role="img"
-      aria-label={`Gravity field: force ${profile.force > 0 ? "+" : ""}${profile.force.toFixed(2)}, tier ${TIER_LABEL[profile.tier]}. NOIV lift ${profile.noivLift > 0 ? "+" : ""}${profile.noivLift.toFixed(2)}, zone pull ${profile.zonePull > 0 ? "+" : ""}${profile.zonePull.toFixed(2)}, creation amplifier ×${profile.creationAmplifier.toFixed(2)}, player mass ${profile.playerMass.toFixed(2)}, partner independence ×${profile.partnerIndependence.toFixed(2)}, gravity assist ${profile.gravityAssist.toFixed(2)}, signal confidence ${(profile.predictiveStability * 100).toFixed(0)}%.`}
+      aria-label={`Gravity field: force ${profile.force > 0 ? "+" : ""}${profile.force.toFixed(2)}, tier ${TIER_LABEL[profile.tier]}. NOIV lift ${profile.noivLift > 0 ? "+" : ""}${profile.noivLift.toFixed(2)}, zone pull ${profile.zonePull > 0 ? "+" : ""}${profile.zonePull.toFixed(2)}, creation amplifier times ${profile.creationAmplifier.toFixed(2)}, player mass ${profile.playerMass.toFixed(2)}, partner independence times ${profile.partnerIndependence.toFixed(2)}, gravity assist ${profile.gravityAssist.toFixed(2)}, signal confidence ${(profile.predictiveStability * 100).toFixed(0)} percent.`}
     >
       {/* Radial grid */}
       {Array.from({ length: gridLines }).map((_, i) => {
@@ -331,9 +348,9 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
       </text>
 
-      {/* Tier label */}
+      {/* Tier label — positioned above the outer ring */}
       <text
-        x={cx} y={22}
+        x={cx} y={28}
         textAnchor="middle"
         fill={color}
         fontFamily="'Courier Prime', monospace"
@@ -342,19 +359,6 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         letterSpacing="0.15em"
       >
         {TIER_ICON[profile.tier]} {TIER_LABEL[profile.tier].toUpperCase()}
-      </text>
-
-      {/* Mass — below core */}
-      <text
-        x={cx} y={cy + coreR + 18}
-        textAnchor="middle"
-        fill="var(--ledger-ink-faint)"
-        fontFamily="'Courier Prime', monospace"
-        fontWeight={900}
-        fontSize={9}
-        letterSpacing="0.05em"
-      >
-        m = {profile.playerMass.toFixed(2)}
       </text>
 
       {/* Bottom title */}
@@ -373,7 +377,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
   );
 }
 
-// ── Component breakdown panel ─────────────────────────────────────────────
+// ── Component panel with glossary ─────────────────────────────────────────
 
 function ComponentPanel({ profile }: { profile: GravityProfile }) {
   const color = gravityTierColor(profile.tier);
@@ -381,38 +385,33 @@ function ComponentPanel({ profile }: { profile: GravityProfile }) {
     {
       label: "NOIV Lift",
       value: `${profile.noivLift > 0 ? "+" : ""}${profile.noivLift.toFixed(2)}`,
-      sub: "Context-adjusted linemate differential",
     },
     {
       label: "Zone Pull",
       value: `${profile.zonePull > 0 ? "+" : ""}${profile.zonePull.toFixed(2)}`,
-      sub: "OZ attraction",
     },
     {
       label: "Creation",
       value: `×${profile.creationAmplifier.toFixed(2)}`,
-      sub: "Lift vs self-production",
     },
     {
       label: "Mass",
       value: profile.playerMass.toFixed(2),
-      sub: "Production + ice time",
     },
     {
       label: "Partner Indep.",
       value: `×${profile.partnerIndependence.toFixed(2)}`,
-      sub: "Linemate-isolated signal",
     },
   ];
 
   return (
     <div className="flex flex-col gap-1.5" role="list" aria-label="Gravity components">
-      {items.map(({ label, value, sub }) => (
+      {items.map(({ label, value }) => (
         <div key={label}
           className="px-2.5 py-2 border"
           style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-bg)" }}
           role="listitem"
-          aria-label={`${label}: ${value}`}
+          aria-label={`${label}: ${value}. ${GLOSSARY[label] ?? ""}`}
         >
           <div className="flex items-baseline justify-between gap-2">
             <div
@@ -429,10 +428,10 @@ function ComponentPanel({ profile }: { profile: GravityProfile }) {
             </div>
           </div>
           <div
-            className="text-[10px] font-mono leading-tight mt-0.5"
+            className="text-[10px] font-mono leading-snug mt-0.5"
             style={{ color: "var(--ledger-ink-faint)" }}
           >
-            {sub}
+            {GLOSSARY[label]}
           </div>
         </div>
       ))}
@@ -455,14 +454,15 @@ function MechanismBar({ label, value, color }: { label: string; value: number; c
     <div
       className="flex items-center gap-2"
       role="meter"
-      aria-label={`${label}: ${value.toFixed(2)} out of 1.00`}
+      aria-label={`${label}: ${value.toFixed(2)} out of 1.00. ${GLOSSARY[label] ?? ""}`}
       aria-valuenow={pct}
       aria-valuemin={0}
       aria-valuemax={100}
     >
       <div
         className="text-[10px] font-black uppercase tracking-[0.10em] font-mono shrink-0"
-        style={{ color: "var(--ledger-ink-faint)", width: 100 }}
+        style={{ color: "var(--ledger-ink-faint)", width: 110 }}
+        title={GLOSSARY[label]}
       >
         {label}
       </div>
@@ -534,7 +534,7 @@ function AnalyticalDepth({ profile }: { profile: GravityProfile }) {
             className="border p-2.5"
             style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
             role="group"
-            aria-label={`Gravity assist: ${profile.gravityAssist.toFixed(2)}`}
+            aria-label={`Gravity assist: ${profile.gravityAssist.toFixed(2)}. ${GLOSSARY["Gravity Assist"]}`}
           >
             <div
               className="text-[9px] font-black uppercase tracking-[0.12em] font-mono"
@@ -549,10 +549,10 @@ function AnalyticalDepth({ profile }: { profile: GravityProfile }) {
               {profile.gravityAssist.toFixed(2)}
             </div>
             <div
-              className="text-[9px] font-mono mt-0.5"
+              className="text-[9px] font-mono mt-1 leading-snug"
               style={{ color: "var(--ledger-ink-faint)" }}
             >
-              Invisible creation
+              {GLOSSARY["Gravity Assist"]}
             </div>
           </div>
 
@@ -560,7 +560,7 @@ function AnalyticalDepth({ profile }: { profile: GravityProfile }) {
             className="border p-2.5"
             style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
             role="group"
-            aria-label={`Signal confidence: ${stabPct}%`}
+            aria-label={`Signal confidence: ${stabPct}%. ${GLOSSARY["Signal Confidence"]}`}
           >
             <div
               className="text-[9px] font-black uppercase tracking-[0.12em] font-mono"
@@ -578,10 +578,10 @@ function AnalyticalDepth({ profile }: { profile: GravityProfile }) {
               <div className="text-[11px] font-black font-mono" style={{ color: stabColor }}>%</div>
             </div>
             <div
-              className="text-[9px] font-mono mt-0.5"
+              className="text-[9px] font-mono mt-1 leading-snug"
               style={{ color: "var(--ledger-ink-faint)" }}
             >
-              Year-over-year stability
+              {GLOSSARY["Signal Confidence"]}
             </div>
           </div>
         </div>

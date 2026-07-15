@@ -227,16 +227,26 @@ export function computeGravity(asset: Asset): GravityProfile | null {
     paceManipulation = clamp(xgPerMin * 180, 0, 1);
   }
 
-  // Defensive Warping: suppressing opponents while maintaining offense
+  // Defensive Warping: forcing opponent overcommitment
   let defensiveWarping = 0;
   {
     const xgaSup = asset.xgaRelTM ?? 0;
-    if (xgaSup < -0.5 && blendedNoiv > 0) {
-      defensiveWarping = clamp(
-        Math.abs(xgaSup) * 0.3 + (blendedNoiv / 15) * 0.3,
-        0, 1,
-      );
-    }
+    const dps = asset.dps ?? 0;
+    let score = 0;
+
+    // xGA suppression: any negative value = on-ice defense better than off-ice
+    if (xgaSup < 0)
+      score += clamp(Math.abs(xgaSup) * 0.6, 0, 0.45);
+
+    // Defensive Point Shares — earned defensive value
+    if (dps > 0)
+      score += clamp(dps / 6, 0, 0.35);
+
+    // PK trust — coached defensive role
+    if (asset.pkTimeShare != null && asset.pkTimeShare > 0.02)
+      score += clamp(asset.pkTimeShare * 1.5, 0, 0.20);
+
+    defensiveWarping = clamp(score, 0, 1);
   }
 
   // ═════════════════════════════════════════════════════════════════
@@ -293,8 +303,8 @@ export function computeGravity(asset: Asset): GravityProfile | null {
     burstBonus += 0.03;
 
   let suppressionBonus = 0;
-  if (asset.xgaRelTM != null && asset.xgaRelTM < -1) {
-    suppressionBonus = clamp(Math.abs(asset.xgaRelTM) * 0.015, 0, 0.08);
+  if (defensiveWarping > 0.3) {
+    suppressionBonus = clamp((defensiveWarping - 0.3) * 0.12, 0, 0.08);
   }
 
   const gaBonus = gravityAssist > 0.5
