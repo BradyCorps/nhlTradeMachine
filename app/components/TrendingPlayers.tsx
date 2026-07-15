@@ -1,11 +1,13 @@
 "use client";
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { calcNAV } from "@/app/lib/xnav-engine";
 import { computeGravity, gravityTierColor } from "@/app/lib/gravity";
-import type { GravityTier } from "@/app/lib/gravity";
+import type { GravityProfile, GravityTier } from "@/app/lib/gravity";
 import { TierIcon } from "@/app/components/GravityField";
 import { displayPosition } from "@/app/lib/display-position";
+import { buildAssetTraits, computeStrandType } from "@/app/components/StrandView";
+import type { XNAVResult } from "@/app/lib/trade-types";
 
 interface PlayerData {
   id: string;
@@ -73,7 +75,7 @@ interface TeamData {
 const TIER_LABEL: Record<GravityTier, string> = {
   SUPERMASSIVE: "Supermassive",
   STAR: "Star",
-  MAIN_SEQUENCE: "Main Seq.",
+  MAIN_SEQUENCE: "Main Sequence",
   SATELLITE: "Satellite",
   ASTEROID: "Asteroid",
   BLACK_HOLE: "Black Hole",
@@ -82,18 +84,15 @@ const TIER_LABEL: Record<GravityTier, string> = {
 interface RankedPlayer {
   player: PlayerData;
   nav: number;
-  off: number;
-  def: number;
-  cap: number;
-  fmvAav?: number;
-  gravityTier?: GravityTier;
-  gravityScore?: number;
+  xnav: XNAVResult;
+  gravity: GravityProfile | null;
   teamName: string;
 }
 
 export default function TrendingPlayers() {
   const [ranked, setRanked] = useState<RankedPlayer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,12 +116,8 @@ export default function TrendingPlayers() {
           return {
             player: p,
             nav: xnav.total,
-            off: xnav.off,
-            def: xnav.def,
-            cap: xnav.cap,
-            fmvAav: xnav.fmvAav,
-            gravityTier: grav?.tier,
-            gravityScore: grav?.force,
+            xnav,
+            gravity: grav,
             teamName: teamMap.get(p.teamId) ?? p.teamId,
           };
         });
@@ -130,7 +125,7 @@ export default function TrendingPlayers() {
         results.sort((a, b) => b.nav - a.nav);
         setRanked(results.slice(0, 12));
       } catch {
-        // silent — homepage still works without trending
+        // silent
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -153,14 +148,27 @@ export default function TrendingPlayers() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {ranked.map((r, i) => (
-        <PlayerCard key={r.player.id} rank={i + 1} data={r} />
+        <PlayerCard
+          key={r.player.id}
+          rank={i + 1}
+          data={r}
+          isExpanded={expanded === r.player.id}
+          onToggle={() => setExpanded(expanded === r.player.id ? null : r.player.id)}
+        />
       ))}
     </div>
   );
 }
 
-function PlayerCard({ rank, data }: { rank: number; data: RankedPlayer }) {
-  const { player: p, nav, off, def, cap, fmvAav, gravityTier, gravityScore, teamName } = data;
+function PlayerCard({
+  rank, data, isExpanded, onToggle,
+}: {
+  rank: number;
+  data: RankedPlayer;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const { player: p, nav, xnav, gravity, teamName } = data;
   const gp = p.games ?? 0;
   const goals = p.goalsPace != null ? Math.round((p.goalsPace / 82) * gp) : null;
   const assists = p.assistsPace != null ? Math.round((p.assistsPace / 82) * gp) : null;
@@ -168,16 +176,22 @@ function PlayerCard({ rank, data }: { rank: number; data: RankedPlayer }) {
   const pm = p.plusMinus;
   const pos = displayPosition(p.position, p.secondaryPosition);
   const capStr = p.capHit > 0 ? `$${p.capHit.toFixed(1)}M` : "—";
+  const gravityTier = gravity?.tier;
   const tierColor = gravityTier ? gravityTierColor(gravityTier) : undefined;
 
   return (
-    <Link
-      href="/players"
-      className="no-underline block border transition-colors hover:border-[var(--ledger-ink-faint)]"
+    <div
+      className="border transition-colors cursor-pointer"
       style={{
         background: "var(--paper-card)",
-        borderColor: "var(--ledger-rule)",
+        borderColor: isExpanded ? "var(--ledger-ink-faint)" : "var(--ledger-rule)",
       }}
+      onClick={onToggle}
+      role="button"
+      tabIndex={0}
+      aria-expanded={isExpanded}
+      aria-label={`${p.name} player card`}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); } }}
     >
       {/* Header: rank + identity */}
       <div className="flex items-center gap-3 px-3 pt-3 pb-2">
@@ -207,7 +221,6 @@ function PlayerCard({ rank, data }: { rank: number; data: RankedPlayer }) {
             {teamName} · {pos} · Age {p.age}
           </div>
         </div>
-        {/* NAV badge */}
         <div className="ml-auto shrink-0 text-right">
           <div className="font-mono text-[18px] font-black leading-none" style={{ color: "var(--ledger-ink)" }}>
             {nav}
@@ -218,7 +231,6 @@ function PlayerCard({ rank, data }: { rank: number; data: RankedPlayer }) {
         </div>
       </div>
 
-      {/* Divider */}
       <div className="mx-3" style={{ height: 1, background: "var(--ledger-rule-light)" }} />
 
       {/* Stats row */}
@@ -242,30 +254,27 @@ function PlayerCard({ rank, data }: { rank: number; data: RankedPlayer }) {
         ))}
       </div>
 
-      {/* Divider */}
       <div className="mx-3" style={{ height: 1, background: "var(--ledger-rule-light)" }} />
 
       {/* Bottom row: NAV breakdown + Gravity + Contract */}
       <div className="flex items-center justify-between px-3 py-2 gap-2">
-        {/* NAV components */}
         <div className="flex gap-2">
           {[
-            { label: "OFF", val: off, color: off > 0 ? "var(--ledger-green)" : "var(--ledger-red)" },
-            { label: "DEF", val: def, color: def > 0 ? "var(--ledger-green)" : "var(--ledger-red)" },
-            { label: "CAP", val: cap, color: cap > 0 ? "var(--ledger-green)" : "var(--ledger-red)" },
+            { label: "OFF", val: xnav.off },
+            { label: "DEF", val: xnav.def },
+            { label: "CAP", val: xnav.cap },
           ].map(c => (
             <div key={c.label} className="text-center">
               <div className="font-mono text-[7px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>
                 {c.label}
               </div>
-              <div className="font-mono text-[10px] font-black" style={{ color: c.color }}>
+              <div className="font-mono text-[10px] font-black" style={{ color: c.val > 0 ? "var(--ledger-green)" : c.val < 0 ? "var(--ledger-red)" : "var(--ledger-ink)" }}>
                 {c.val > 0 ? "+" : ""}{c.val}
               </div>
             </div>
           ))}
         </div>
 
-        {/* Gravity tier */}
         {gravityTier && (
           <div className="flex items-center gap-1.5">
             <TierIcon tier={gravityTier} size={14} />
@@ -275,7 +284,6 @@ function PlayerCard({ rank, data }: { rank: number; data: RankedPlayer }) {
           </div>
         )}
 
-        {/* Cap hit */}
         <div className="text-right shrink-0">
           <div className="font-mono text-[7px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>
             CAP HIT
@@ -285,6 +293,164 @@ function PlayerCard({ rank, data }: { rank: number; data: RankedPlayer }) {
           </div>
         </div>
       </div>
-    </Link>
+
+      {/* ── Expanded detail panel ── */}
+      {isExpanded && <ExpandedPanel player={p} xnav={xnav} gravity={gravity} />}
+    </div>
+  );
+}
+
+function ExpandedPanel({
+  player: p, xnav, gravity,
+}: {
+  player: PlayerData;
+  xnav: XNAVResult;
+  gravity: GravityProfile | null;
+}) {
+  const traits = buildAssetTraits(p as any, xnav);
+  const strandType = computeStrandType(traits.off, traits.def, p.ops ?? null, p.dps ?? null);
+  const tierColor = gravity ? gravityTierColor(gravity.tier) : undefined;
+
+  const advancedStats = [
+    { label: "PTS/82", val: p.ptsPace.toFixed(1) },
+    { label: "xG/82", val: (p.xGPace ?? 0).toFixed(1) },
+    { label: "TOI", val: p.avgTOI.toFixed(1) },
+    { label: "xG%+", val: p.xgRelTM != null ? `${p.xgRelTM > 0 ? "+" : ""}${p.xgRelTM.toFixed(1)}` : "—" },
+    { label: "OPS", val: p.ops != null ? p.ops.toFixed(1) : "—" },
+    { label: "DPS", val: p.dps != null ? p.dps.toFixed(1) : "—" },
+  ];
+
+  return (
+    <div
+      className="border-t px-3 py-3 space-y-3"
+      style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
+      onClick={e => e.stopPropagation()}
+    >
+      {/* Advanced stats row */}
+      <div>
+        <div className="font-mono text-[8px] font-black uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--ledger-ink-faint)" }}>
+          Advanced
+        </div>
+        <div className="grid grid-cols-6 gap-0">
+          {advancedStats.map(s => (
+            <div key={s.label} className="text-center">
+              <div className="font-mono text-[7px] uppercase tracking-[0.08em]" style={{ color: "var(--ledger-ink-faint)" }}>
+                {s.label}
+              </div>
+              <div className="font-mono text-[10px] font-black" style={{ color: "var(--ledger-ink)" }}>
+                {s.val}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* STRAND mini */}
+      <div>
+        <div className="flex items-baseline justify-between mb-1.5">
+          <div className="font-mono text-[8px] font-black uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
+            STRAND DNA
+          </div>
+          <div className="font-mono text-[9px] font-black uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink)" }}>
+            {strandType}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+          {[...traits.off, ...traits.def].map(t => (
+            <div key={t.label} className="flex items-center gap-2">
+              <div className="font-mono text-[7px] uppercase tracking-[0.06em] w-[42px] shrink-0 text-right" style={{ color: "var(--ledger-ink-faint)" }}>
+                {t.label}
+              </div>
+              <div className="flex-1 h-[4px] relative" style={{ background: "var(--ledger-rule-light)" }}>
+                <div
+                  className="absolute left-0 top-0 h-full"
+                  style={{
+                    width: `${Math.max(2, t.val * 100)}%`,
+                    background: t.val > 0.6 ? "var(--ledger-green)" : t.val > 0.35 ? "var(--ledger-ink-faint)" : "var(--ledger-rule)",
+                  }}
+                />
+              </div>
+              <div className="font-mono text-[8px] font-black w-[20px] text-right" style={{ color: "var(--ledger-ink)" }}>
+                {t.idx ?? Math.round(t.val * 100)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Gravity mini */}
+      {gravity && (
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="font-mono text-[8px] font-black uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
+              Gravity Field
+            </div>
+            <div className="flex items-center gap-1.5">
+              <TierIcon tier={gravity.tier} size={12} />
+              <span className="font-mono text-[9px] font-black uppercase" style={{ color: tierColor }}>
+                {TIER_LABEL[gravity.tier]}
+              </span>
+              <span className="font-mono text-[9px] font-black" style={{ color: tierColor }}>
+                {gravity.force > 0 ? "+" : ""}{gravity.force.toFixed(2)}
+              </span>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-1">
+            {[
+              { label: "Space", val: gravity.mechanisms.spaceCreation },
+              { label: "Trans.", val: gravity.mechanisms.transitionControl },
+              { label: "Pace", val: gravity.mechanisms.paceManipulation },
+              { label: "Def. Warp", val: gravity.mechanisms.defensiveWarping },
+            ].map(m => (
+              <div key={m.label} className="text-center">
+                <div className="font-mono text-[6px] uppercase tracking-[0.06em]" style={{ color: "var(--ledger-ink-faint)" }}>
+                  {m.label}
+                </div>
+                <div className="mx-auto mt-0.5 h-[3px] relative" style={{ background: "var(--ledger-rule-light)" }}>
+                  <div
+                    className="absolute left-0 top-0 h-full"
+                    style={{
+                      width: `${Math.max(2, m.val * 100)}%`,
+                      background: tierColor,
+                    }}
+                  />
+                </div>
+                <div className="font-mono text-[8px] font-black mt-0.5" style={{ color: "var(--ledger-ink)" }}>
+                  {(m.val * 100).toFixed(0)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Market value row */}
+      {xnav.fmvAav != null && (
+        <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: "var(--ledger-rule-light)" }}>
+          <div>
+            <span className="font-mono text-[8px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>Market AAV </span>
+            <span className="font-mono text-[10px] font-black" style={{ color: "var(--ledger-ink)" }}>
+              ${xnav.fmvAav.toFixed(1)}M
+            </span>
+          </div>
+          <div>
+            <span className="font-mono text-[8px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>Surplus </span>
+            <span className="font-mono text-[10px] font-black" style={{
+              color: (xnav.fmvAav - p.capHit) > 0 ? "var(--ledger-green)" : "var(--ledger-red)",
+            }}>
+              {(xnav.fmvAav - p.capHit) > 0 ? "+" : ""}${(xnav.fmvAav - p.capHit).toFixed(1)}M
+            </span>
+          </div>
+          <Link
+            href="/players"
+            className="font-mono text-[8px] font-black uppercase tracking-[0.1em] no-underline hover:underline"
+            style={{ color: "var(--ledger-ink-faint)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            Full Profile &rarr;
+          </Link>
+        </div>
+      )}
+    </div>
   );
 }

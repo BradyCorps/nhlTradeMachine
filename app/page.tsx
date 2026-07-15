@@ -189,42 +189,9 @@ export default function WelcomePage() {
 
           <div className="fp-desks">
             <Cell
-              href="/armchair-gm"
+              href="/trade-machine"
               lead
               kicker="Feature One — The Lead"
-              kickerColor="var(--ledger-green)"
-              edition="The Chair"
-              title="Armchair GM"
-              ctaColor="var(--ledger-green)"
-              cta="Enter Armchair GM"
-              body="Take over a franchise, make multiple moves, inspect roster DNA, manage cap consequences, and see whether you can run the room better than the actual front office. The most complete seat in the building — a full multi-move session with the season on the line, every consequence on the record."
-              lines={[
-                ["Roster Control", "Multi-move session"],
-                ["Who Wants This?", "Ranks all 32 teams"],
-                ["Sim Engine", "Projects the season"],
-              ]}
-            />
-
-            <Cell
-              href="/press-box"
-              lead
-              kicker="Feature Two — Daily Game"
-              kickerColor="var(--ledger-amber)"
-              edition="The Box"
-              title="Press Box"
-              ctaColor="var(--ledger-amber)"
-              cta="Play Today's Hand"
-              body="A daily hockey card game inspired by cribbage scoring. Pick four from six dealt players, reveal a mystery call-up, and score points for teammates, draft classes, divisions, nationalities, and more. New hand every day — chase the perfect five-star hand and build your streak."
-              lines={[
-                ["Daily Hand", "New cards every day"],
-                ["Crib Scoring", "Seven scoring categories"],
-                ["Streaks", "Track your daily streak"],
-              ]}
-            />
-
-            <Cell
-              href="/trade-machine"
-              kicker="Feature Three"
               kickerColor="var(--ledger-red)"
               edition="The Desk"
               title="Trade Machine"
@@ -240,23 +207,24 @@ export default function WelcomePage() {
 
             <Cell
               href="/players"
-              kicker="Feature Four"
+              lead
+              kicker="Feature Two — Player Intelligence"
               kickerColor="var(--ledger-navy)"
               edition="The Ledger"
               title="Player Analytics"
               ctaColor="var(--ledger-navy)"
               cta="Open Player Analytics"
-              body="Search the full NHL roster. Scoring pace, xGoals, ice time, point shares, and NAV components in one sortable, filterable view."
+              body="Search the full NHL roster. Season totals, advanced analytics, STRAND DNA, Gravity fields, contract valuations, and X-NAV components — the deepest single-player view in hockey."
               lines={[
-                ["Live Roster", "NHL API — every game"],
-                ["MiniHelix", "Compact STRAND™"],
-                ["OPS / DPS", "Point Shares"],
+                ["Gravity™", "On-ice gravitational pull"],
+                ["STRAND DNA", "Stylistic identity profile"],
+                ["X-NAV", "Complete trade valuation"],
               ]}
             />
 
             <Cell
               href="/teams"
-              kicker="Feature Five"
+              kicker="Feature Three"
               kickerColor="var(--ledger-green)"
               edition="The Room"
               title="Team Analytics"
@@ -271,8 +239,24 @@ export default function WelcomePage() {
             />
 
             <Cell
+              href="/armchair-gm"
+              kicker="Feature Four"
+              kickerColor="var(--ledger-green)"
+              edition="The Chair"
+              title="Armchair GM"
+              ctaColor="var(--ledger-green)"
+              cta="Enter Armchair GM"
+              body="Take over a franchise, make multiple moves, inspect roster DNA, manage cap consequences, and see whether you can run the room better than the actual front office. A full multi-move session with the season on the line, every consequence on the record."
+              lines={[
+                ["Roster Control", "Multi-move session"],
+                ["Who Wants This?", "Ranks all 32 teams"],
+                ["Sim Engine", "Projects the season"],
+              ]}
+            />
+
+            <Cell
               href="/docket"
-              kicker="Feature Six"
+              kicker="Feature Five"
               kickerColor="var(--ledger-brown)"
               edition="The Record"
               title="The Docket"
@@ -283,6 +267,22 @@ export default function WelcomePage() {
                 ["Published Rulings", "After admin review"],
                 ["Dual Grade", "At-trade plus live"],
                 ["Full Detail", "Verdict and STRAND"],
+              ]}
+            />
+
+            <Cell
+              href="/press-box"
+              kicker="Feature Six — Daily Game"
+              kickerColor="var(--ledger-amber)"
+              edition="The Box"
+              title="Press Box"
+              ctaColor="var(--ledger-amber)"
+              cta="Play Today's Hand"
+              body="A daily hockey card game inspired by cribbage scoring. Pick four from six dealt players, reveal a mystery call-up, and score points for teammates, draft classes, divisions, nationalities, and more. New hand every day — chase the perfect five-star hand and build your streak."
+              lines={[
+                ["Daily Hand", "New cards every day"],
+                ["Crib Scoring", "Seven scoring categories"],
+                ["Streaks", "Track your daily streak"],
               ]}
             />
           </div>
