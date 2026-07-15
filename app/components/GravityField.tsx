@@ -1,6 +1,5 @@
 "use client";
-// ── GravityField v2.2 — AA-accessible orbital field + analytical depth ──
-// Orbital physics: stronger gravity → data points orbit CLOSER to center.
+// ── GravityField v2.3 — inline SVG tier icons, orbital physics, glossary ──
 
 import React from "react";
 import type { GravityProfile, GravityTier } from "@/app/lib/gravity";
@@ -12,15 +11,6 @@ interface Props {
   mode?: "full" | "compact";
 }
 
-const TIER_ICON: Record<GravityTier, string> = {
-  SUPERMASSIVE:  "◉",
-  STAR:          "●",
-  MAIN_SEQUENCE: "◉",
-  SATELLITE:     "○",
-  ASTEROID:      "·",
-  BLACK_HOLE:    "◎",
-};
-
 const TIER_LABEL: Record<GravityTier, string> = {
   SUPERMASSIVE:  "Supermassive",
   STAR:          "Star",
@@ -30,7 +20,90 @@ const TIER_LABEL: Record<GravityTier, string> = {
   BLACK_HOLE:    "Black Hole",
 };
 
-// Plain-language glossary for each metric
+// ── Inline SVG tier icons (space-themed) ──────────────────────────────────
+// Each renders a 16×16 SVG — usable in HTML and composited into the main SVG.
+
+export function TierIcon({ tier, size = 16, color }: { tier: GravityTier; size?: number; color?: string }) {
+  const c = color ?? gravityTierColor(tier);
+  const s = size;
+  const h = s / 2;
+
+  switch (tier) {
+    // Spiral galaxy — concentric arcs spiraling inward
+    case "SUPERMASSIVE":
+      return (
+        <svg width={s} height={s} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="2" fill={c} />
+          <path d="M8 3a5 5 0 0 1 4.33 2.5" stroke={c} strokeWidth="1.3" strokeLinecap="round" />
+          <path d="M8 13a5 5 0 0 1-4.33-2.5" stroke={c} strokeWidth="1.3" strokeLinecap="round" />
+          <path d="M4.5 4.5a4 4 0 0 1 7 0" stroke={c} strokeWidth="0.8" strokeLinecap="round" opacity="0.5" />
+          <path d="M11.5 11.5a4 4 0 0 1-7 0" stroke={c} strokeWidth="0.8" strokeLinecap="round" opacity="0.5" />
+          <circle cx="8" cy="8" r="6.5" stroke={c} strokeWidth="0.5" opacity="0.25" />
+        </svg>
+      );
+
+    // Star burst — classic 4-pointed star with glow
+    case "STAR":
+      return (
+        <svg width={s} height={s} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <polygon points="8,1.5 9.2,6 14,6.5 10.2,9.5 11.5,14 8,11 4.5,14 5.8,9.5 2,6.5 6.8,6" fill={c} opacity="0.85" />
+          <line x1="8" y1="0" x2="8" y2="3" stroke={c} strokeWidth="0.6" opacity="0.4" />
+          <line x1="8" y1="13" x2="8" y2="16" stroke={c} strokeWidth="0.6" opacity="0.4" />
+          <line x1="0" y1="8" x2="3" y2="8" stroke={c} strokeWidth="0.6" opacity="0.4" />
+          <line x1="13" y1="8" x2="16" y2="8" stroke={c} strokeWidth="0.6" opacity="0.4" />
+        </svg>
+      );
+
+    // Steady sun — circle with small symmetrical rays
+    case "MAIN_SEQUENCE":
+      return (
+        <svg width={s} height={s} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="3.5" fill={c} opacity="0.8" />
+          {[0, 45, 90, 135, 180, 225, 270, 315].map(deg => {
+            const rad = (deg * Math.PI) / 180;
+            const x1 = 8 + Math.cos(rad) * 5;
+            const y1 = 8 + Math.sin(rad) * 5;
+            const x2 = 8 + Math.cos(rad) * 6.8;
+            const y2 = 8 + Math.sin(rad) * 6.8;
+            return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2} stroke={c} strokeWidth="1.2" strokeLinecap="round" opacity="0.6" />;
+          })}
+        </svg>
+      );
+
+    // Small orbiting body with trail
+    case "SATELLITE":
+      return (
+        <svg width={s} height={s} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <ellipse cx="8" cy="8" rx="6" ry="3" stroke={c} strokeWidth="0.8" opacity="0.35" transform="rotate(-20 8 8)" />
+          <circle cx="12.5" cy="6" r="2" fill={c} opacity="0.7" />
+          <circle cx="8" cy="8" r="1" fill={c} opacity="0.3" />
+        </svg>
+      );
+
+    // Small irregular rock
+    case "ASTEROID":
+      return (
+        <svg width={s} height={s} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <polygon points="5,3 10,2 13,5 14,9 11,13 7,14 3,11 2,7" fill={c} opacity="0.4" stroke={c} strokeWidth="0.8" />
+          <circle cx="7" cy="7" r="1" fill={c} opacity="0.3" />
+          <circle cx="10" cy="10" r="0.6" fill={c} opacity="0.25" />
+        </svg>
+      );
+
+    // Dark void with warped accretion ring
+    case "BLACK_HOLE":
+      return (
+        <svg width={s} height={s} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="3" fill={c} opacity="0.9" />
+          <circle cx="8" cy="8" r="2" fill="var(--paper-bg, #1a1a1a)" />
+          <ellipse cx="8" cy="8" rx="6.5" ry="2.5" stroke={c} strokeWidth="1" opacity="0.5" />
+          <ellipse cx="8" cy="8" rx="6.5" ry="2.5" stroke={c} strokeWidth="0.5" opacity="0.25" transform="rotate(30 8 8)" />
+        </svg>
+      );
+  }
+}
+
+// Plain-language glossary
 const GLOSSARY: Record<string, string> = {
   "NOIV Lift": "How much linemates improve with this player vs without. Positive = linemates score more when he's on ice.",
   "Zone Pull": "Whether this player drags play toward the offensive zone. Positive = more OZ time; negative = tilted defensive.",
@@ -57,9 +130,10 @@ function CompactGravity({ profile }: { profile: GravityProfile }) {
         {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
       </span>
       <span
-        className="text-[9px] font-black uppercase tracking-[0.1em] px-1 py-px border"
+        className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.1em] px-1 py-px border"
         style={{ color, borderColor: color }}
       >
+        <TierIcon tier={profile.tier} size={12} />
         {TIER_LABEL[profile.tier]}
       </span>
     </span>
@@ -80,7 +154,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
   const W = 320;
   const H = 300;
   const cx = W / 2;
-  const cy = 148;
+  const cy = 150;
   const absForce = Math.abs(profile.force);
   const isNeg = profile.force < 0;
   const color = gravityTierColor(profile.tier);
@@ -124,7 +198,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
     },
   ];
 
-  // Secondary markers
+  // Secondary markers — Grav Ast positioned lower-right to avoid tier label
   const secondaryDots = [
     {
       label: "Partner", value: profile.partnerIndependence,
@@ -134,7 +208,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
     },
     {
       label: "Grav Ast", value: profile.gravityAssist,
-      angle: -Math.PI * 0.50,
+      angle: Math.PI * 0.42,
       orbit: valueToOrbit(profile.gravityAssist, 0, 1),
       display: profile.gravityAssist.toFixed(2),
     },
@@ -152,6 +226,66 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
   const arcX2 = cx + Math.cos(arcEnd) * arcR;
   const arcY2 = cy + Math.sin(arcEnd) * arcR;
   const largeArc = arcAngleSpan > Math.PI ? 1 : 0;
+
+  // Tier icon SVG fragments — rendered directly inside the diagram SVG
+  function renderTierIcon(x: number, y: number) {
+    const s = 18;
+    const ox = x - s / 2;
+    const oy = y - s / 2;
+
+    switch (profile.tier) {
+      case "SUPERMASSIVE":
+        return (
+          <g transform={`translate(${ox},${oy})`}>
+            <circle cx="9" cy="9" r="2.2" fill={color} />
+            <path d="M9 3.5a5.5 5.5 0 0 1 4.76 2.75" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+            <path d="M9 14.5a5.5 5.5 0 0 1-4.76-2.75" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+            <circle cx="9" cy="9" r="7" stroke={color} strokeWidth="0.5" opacity="0.3" />
+          </g>
+        );
+      case "STAR":
+        return (
+          <g transform={`translate(${ox},${oy})`}>
+            <polygon points="9,2 10.3,6.5 15,7 11.2,10 12.5,14.5 9,11.5 5.5,14.5 6.8,10 3,7 7.7,6.5" fill={color} opacity="0.85" />
+          </g>
+        );
+      case "MAIN_SEQUENCE":
+        return (
+          <g transform={`translate(${ox},${oy})`}>
+            <circle cx="9" cy="9" r="3.5" fill={color} opacity="0.8" />
+            {[0, 90, 180, 270].map(deg => {
+              const rad = (deg * Math.PI) / 180;
+              const x1 = 9 + Math.cos(rad) * 5.2;
+              const y1 = 9 + Math.sin(rad) * 5.2;
+              const x2 = 9 + Math.cos(rad) * 7;
+              const y2 = 9 + Math.sin(rad) * 7;
+              return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth="1.3" strokeLinecap="round" opacity="0.6" />;
+            })}
+          </g>
+        );
+      case "SATELLITE":
+        return (
+          <g transform={`translate(${ox},${oy})`}>
+            <ellipse cx="9" cy="9" rx="6.5" ry="3" stroke={color} strokeWidth="0.8" opacity="0.35" transform="rotate(-20 9 9)" />
+            <circle cx="13" cy="7" r="2" fill={color} opacity="0.7" />
+          </g>
+        );
+      case "ASTEROID":
+        return (
+          <g transform={`translate(${ox},${oy})`}>
+            <polygon points="6,3.5 11,3 14,6 14.5,10 12,14 7.5,14.5 4,12 3,8" fill={color} opacity="0.4" stroke={color} strokeWidth="0.8" />
+          </g>
+        );
+      case "BLACK_HOLE":
+        return (
+          <g transform={`translate(${ox},${oy})`}>
+            <circle cx="9" cy="9" r="3.2" fill={color} opacity="0.9" />
+            <circle cx="9" cy="9" r="2" fill="var(--paper-bg)" />
+            <ellipse cx="9" cy="9" rx="7" ry="2.5" stroke={color} strokeWidth="1" opacity="0.5" />
+          </g>
+        );
+    }
+  }
 
   return (
     <svg
@@ -348,17 +482,19 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
       </text>
 
-      {/* Tier label — positioned above the outer ring */}
+      {/* Tier icon + label — positioned above the field */}
+      {renderTierIcon(cx - 50, 16)}
       <text
-        x={cx} y={28}
-        textAnchor="middle"
+        x={cx - 28}
+        y={28}
+        textAnchor="start"
         fill={color}
         fontFamily="'Courier Prime', monospace"
         fontWeight={900}
         fontSize={11}
-        letterSpacing="0.15em"
+        letterSpacing="0.12em"
       >
-        {TIER_ICON[profile.tier]} {TIER_LABEL[profile.tier].toUpperCase()}
+        {TIER_LABEL[profile.tier].toUpperCase()}
       </text>
 
       {/* Bottom title */}
