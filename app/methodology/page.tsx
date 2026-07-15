@@ -1,7 +1,8 @@
 // app/methodology/page.tsx — The Hockey Ledger: Methodology & Glossary
 import React from "react";
 import Link from "next/link";
-import { iconKey, methodologySections } from "../components/Footer";
+import { iconKey, gravityTierEntries, methodologySections } from "../components/Footer";
+import { TierIcon } from "../components/GravityField";
 
 function slugify(title: string) {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -83,6 +84,22 @@ export default function MethodologyPage() {
                   style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}
                 >
                   {icon}
+                </span>
+                <span className="font-mono text-[9px] font-black uppercase leading-snug text-ledger-ink">
+                  {label}
+                </span>
+                <span className="text-[11px] leading-relaxed text-ledger-ink-light">
+                  {definition}
+                </span>
+              </div>
+            ))}
+            {gravityTierEntries.map(([tier, label, definition]) => (
+              <div key={`grav-${tier}`} className="grid grid-cols-[28px_110px_1fr] items-start gap-3">
+                <span
+                  className="inline-flex h-6 w-6 items-center justify-center border"
+                  style={{ borderColor: "var(--ledger-rule)" }}
+                >
+                  <TierIcon tier={tier} size={14} />
                 </span>
                 <span className="font-mono text-[9px] font-black uppercase leading-snug text-ledger-ink">
                   {label}

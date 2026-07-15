@@ -1,11 +1,10 @@
-"use client";
 // ── Footer — methodology, glossary, icon key, data credits ───
 // Shared across Armchair GM, Trade Machine, and Player Analytics pages.
-import React from "react";
 import Link from "next/link";
 import { TierIcon } from "./GravityField";
+import type { GravityTier } from "@/app/lib/gravity";
 
-export const iconKey: [React.ReactNode, string, string][] = [
+export const iconKey = [
   ["♛", "Megalodon", "Extreme franchise-value tier above the top NAV threshold."],
   ["◆", "Franchise / Core", "Franchise marker on asset cards; core-player section marker in selectors."],
   ["★", "Surplus / Pedigree", "Surplus contract, award signal, prospect marker, or elite shutdown pedigree when paired with text."],
@@ -15,12 +14,15 @@ export const iconKey: [React.ReactNode, string, string][] = [
   ["⚕", "Injury Risk", "Ledger note for elevated injury risk."],
   ["⟳", "Change of Scenery", "Negative but recoverable NAV profile that may fit another roster better."],
   ["⚠", "Salary Dump", "Deeply negative or high-risk contract warning."],
-  [<TierIcon tier="SUPERMASSIVE" size={14} key="sm" />, "Supermassive", "Gravity tier: elite on-ice dominance — linemates improve dramatically, play bends toward the offensive zone."],
-  [<TierIcon tier="STAR" size={14} key="st" />, "Star", "Gravity tier: strong gravitational pull — clear positive impact on linemates and territorial play."],
-  [<TierIcon tier="MAIN_SEQUENCE" size={14} key="ms" />, "Main Sequence", "Gravity tier: steady, reliable on-ice presence — consistent positive influence at even strength."],
-  [<TierIcon tier="SATELLITE" size={14} key="sa" />, "Satellite", "Gravity tier: mild positive pull — contributes but does not drive on-ice results."],
-  [<TierIcon tier="ASTEROID" size={14} key="as" />, "Asteroid", "Gravity tier: near-neutral presence — minimal measurable effect on linemate production or territory."],
-  [<TierIcon tier="BLACK_HOLE" size={14} key="bh" />, "Black Hole", "Gravity tier: negative on-ice gravity — play quality deteriorates when this player is deployed."],
+];
+
+export const gravityTierEntries: [GravityTier, string, string][] = [
+  ["SUPERMASSIVE", "Supermassive", "Gravity tier: elite on-ice dominance — linemates improve dramatically, play bends toward the offensive zone."],
+  ["STAR", "Star", "Gravity tier: strong gravitational pull — clear positive impact on linemates and territorial play."],
+  ["MAIN_SEQUENCE", "Main Sequence", "Gravity tier: steady, reliable on-ice presence — consistent positive influence at even strength."],
+  ["SATELLITE", "Satellite", "Gravity tier: mild positive pull — contributes but does not drive on-ice results."],
+  ["ASTEROID", "Asteroid", "Gravity tier: near-neutral presence — minimal measurable effect on linemate production or territory."],
+  ["BLACK_HOLE", "Black Hole", "Gravity tier: negative on-ice gravity — play quality deteriorates when this player is deployed."],
 ];
 
 export const methodologySections = [
@@ -99,11 +101,27 @@ export default function Footer() {
             Icon Key
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 p-4">
-            {iconKey.map(([icon, label, definition], i) => (
-              <div key={`ik-${i}-${label}`} className="flex items-start gap-2.5">
+            {iconKey.map(([icon, label, definition]) => (
+              <div key={`${icon}-${label}`} className="flex items-start gap-2.5">
                 <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center border font-mono text-[12px] font-black"
                   style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}>
                   {icon}
+                </span>
+                <div className="min-w-0">
+                  <span className="font-mono text-[9px] font-black uppercase leading-snug text-ledger-ink">
+                    {label}
+                  </span>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-ledger-ink-light">
+                    {definition}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {gravityTierEntries.map(([tier, label, definition]) => (
+              <div key={`grav-${tier}`} className="flex items-start gap-2.5">
+                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center border"
+                  style={{ borderColor: "var(--ledger-rule)" }}>
+                  <TierIcon tier={tier} size={14} />
                 </span>
                 <div className="min-w-0">
                   <span className="font-mono text-[9px] font-black uppercase leading-snug text-ledger-ink">
