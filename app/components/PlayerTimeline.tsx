@@ -4,7 +4,49 @@ import React from "react";
 import { calcPlayerTimeline } from "@/app/lib/player-timeline";
 import { calcNAV, type AssetInput } from "@/app/lib/xnav-engine";
 
-import { navColor } from "@/app/lib/display-utils";
+import { navColor, fmtSigned } from "@/app/lib/display-utils";
+
+function NavBreakdown({ nav }: { nav: { off: number; def: number; age: number; cap: number; upside: number; noivImpact?: number } }) {
+  const rows: { label: string; val: number; desc: string }[] = [
+    { label: "OFF", val: nav.off, desc: "Scoring, expected goals, point production" },
+    { label: "DEF", val: nav.def, desc: "Defensive impact, suppression, shutdown value" },
+    { label: nav.age >= 0 ? "YNG" : "AGE", val: nav.age, desc: nav.age >= 0 ? "Youth premium — cost-controlled upside" : "Age curve — decline-phase discount" },
+    { label: "CAP", val: nav.cap, desc: nav.cap >= 0 ? "Contract surplus — paid below market value" : "Contract drag — paid above market value" },
+  ];
+  if (nav.upside > 0) rows.push({ label: "UPS", val: nav.upside, desc: "Upside premium — team control and development" });
+  if (nav.noivImpact && Math.abs(nav.noivImpact) >= 2) rows.push({ label: "NOIV", val: nav.noivImpact, desc: nav.noivImpact > 0 ? "Elevates teammates beyond raw stats" : "On-ice context reduces value vs raw stats" });
+
+  const maxAbs = Math.max(...rows.map(r => Math.abs(r.val)), 1);
+
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div className="ptl-sech"><span>What drives the valuation</span></div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        {rows.map(r => {
+          const pct = (Math.abs(r.val) / maxAbs) * 100;
+          const isPos = r.val >= 0;
+          return (
+            <div key={r.label} title={r.desc} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 32, fontSize: 10, fontWeight: 900, textAlign: "right", color: "#4a3820", letterSpacing: "0.08em" }}>{r.label}</span>
+              <div style={{ flex: 1, height: 14, position: "relative", background: "#e0d3ac", border: "1px solid #c1b088", borderRadius: 3 }}>
+                <div style={{
+                  position: "absolute", top: 0, height: "100%", borderRadius: 2,
+                  width: `${Math.max(pct, 2)}%`,
+                  left: isPos ? 0 : undefined, right: isPos ? undefined : 0,
+                  background: isPos ? "var(--ledger-green)" : "var(--ledger-red)",
+                  opacity: 0.7,
+                }} />
+              </div>
+              <span style={{ width: 44, fontSize: 11, fontWeight: 900, textAlign: "right", fontVariantNumeric: "tabular-nums", color: isPos ? "var(--ledger-green)" : "var(--ledger-red)" }}>
+                {fmtSigned(r.val, 0)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export function estimateNextContractTerm(asset: AssetInput, nav: { total: number; fmvAav?: number; isRFA?: boolean }): number {
   const signingAge = asset.age + Math.max(0, asset.yearsRemaining ?? 0);
@@ -114,6 +156,9 @@ export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
           {surplus > 0 ? "+" : surplus < 0 ? "−" : ""}${Math.abs(surplus).toFixed(1)}M vs market · {surplusWord}
         </div>
       </div>
+
+      {/* NAV component breakdown */}
+      <NavBreakdown nav={currentNav} />
 
       {/* Value across the deal */}
       <div className="ptl-sech">

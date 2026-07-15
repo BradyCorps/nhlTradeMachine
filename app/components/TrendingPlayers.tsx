@@ -6,6 +6,7 @@ import { computeGravity, gravityTierColor } from "@/app/lib/gravity";
 import type { GravityProfile, GravityTier } from "@/app/lib/gravity";
 import { TierIcon } from "@/app/components/GravityField";
 import { displayPosition } from "@/app/lib/display-position";
+import { seasonTotal } from "@/app/lib/display-utils";
 import { buildAssetTraits, computeStrandType } from "@/app/components/StrandView";
 import type { XNAVResult } from "@/app/lib/trade-types";
 
@@ -170,9 +171,9 @@ function PlayerCard({
 }) {
   const { player: p, nav, xnav, gravity, teamName } = data;
   const gp = p.games ?? 0;
-  const goals = p.goalsPace != null ? Math.round((p.goalsPace / 82) * gp) : null;
-  const assists = p.assistsPace != null ? Math.round((p.assistsPace / 82) * gp) : null;
-  const pts = Math.round((p.ptsPace / 82) * gp);
+  const goals = p.goalsPace != null ? seasonTotal(p.goalsPace, gp) : null;
+  const assists = p.assistsPace != null ? seasonTotal(p.assistsPace, gp) : null;
+  const pts = seasonTotal(p.ptsPace, gp);
   const pm = p.plusMinus;
   const pos = displayPosition(p.position, p.secondaryPosition);
   const capStr = p.capHit > 0 ? `$${p.capHit.toFixed(1)}M` : "—";

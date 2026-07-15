@@ -10,15 +10,7 @@ import StrandView from "@/app/components/StrandView";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
 import { computeGravity } from "@/app/lib/gravity";
 import { CompactGravity } from "@/app/components/GravityField";
-
-// ── Off-Season Re-Sign phase ──────────────────────────────────────────────
-// Presentational only: the page owns the roster/cap state and passes handlers.
-// Your pending free agents are re-signed one-click at the engine's suggested
-// terms or let walk; the open market lists players who walked league-wide and
-// can be signed within cap. "Done" commits the off-season and opens the trade
-// flow.
-
-const money = (n: number) => `$${n.toFixed(2)}M`;
+import { formatCapHit as money } from "@/app/lib/display-utils";
 const MARKET_PAGE_SIZE = 30;
 
 // FAs come through without a computed NAV; StrandView derives its axes from the

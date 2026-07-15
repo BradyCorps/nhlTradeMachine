@@ -8,6 +8,7 @@ import type { Asset, Team, TradeVerdict } from "@/app/lib/trade-types";
 import { adminErrorMessage, readAdminResponse } from "@/app/admin/admin-response";
 import { useTradeStore } from "@/app/store/tradeStore";
 import { toast } from "@/app/lib/ledger-toast";
+import { fmtSigned as fmt } from "@/app/lib/display-utils";
 
 type LeaguePayload = {
   teams: Team[];
@@ -55,8 +56,6 @@ type RosterOverlayAction =
   | { kind: "publish"; trade: AdminTradeRecord };
 
 const today = () => new Date().toISOString().slice(0, 10);
-
-const fmt = (n: number): string => (n > 0 ? `+${n.toFixed(1)}` : n.toFixed(1));
 
 export default function AdminTradesPage() {
   const [db, setDb] = useState<LeaguePayload>({ teams: [], players: [] });

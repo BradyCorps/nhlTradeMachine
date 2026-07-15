@@ -26,7 +26,7 @@ export default function LedgerDropdown({ teams, selectedId, onSelect }: {
           fontSize: 'clamp(1.4rem, 3.5vw, 1.8rem)',
         }}>
           {selected?.id && (
-            <img src={`https://assets.nhle.com/logos/nhl/svg/${selected.id}_light.svg`} alt={selected.id} className="w-8 h-8 opacity-90 mix-blend-multiply" onError={(e) => (e.currentTarget.style.display = 'none')} />
+            <img src={`https://assets.nhle.com/logos/nhl/svg/${selected.id}_light.svg`} alt={selected.name || selected.id} className="w-8 h-8 opacity-90 mix-blend-multiply" onError={(e) => (e.currentTarget.style.display = 'none')} />
           )}
           {selected?.name || "Select Team"}
         </span>
@@ -40,8 +40,12 @@ export default function LedgerDropdown({ teams, selectedId, onSelect }: {
             className="fixed inset-0 z-[100] flex items-center justify-center p-4"
             style={{ background: 'rgba(38,30,18,0.4)', backdropFilter: 'blur(2px)' }}
             onClick={() => setIsOpen(false)}
+            onKeyDown={(e) => { if (e.key === "Escape") setIsOpen(false); }}
           >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Select a team"
             className="w-full max-w-sm max-h-[80vh] overflow-y-auto animate-modal-pop"
             style={{
               background: 'var(--paper)',
@@ -79,7 +83,7 @@ export default function LedgerDropdown({ teams, selectedId, onSelect }: {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
                     <div className="flex items-center gap-2">
-                      <img src={`https://assets.nhle.com/logos/nhl/svg/${t.id}_light.svg`} alt={t.id} className="w-5 h-5 opacity-80 mix-blend-multiply" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                      <img src={`https://assets.nhle.com/logos/nhl/svg/${t.id}_light.svg`} alt={t.name || t.id} className="w-5 h-5 opacity-80 mix-blend-multiply" onError={(e) => (e.currentTarget.style.display = 'none')} />
                       <span>{t.name}</span>
                     </div>
                     {t.phase && (

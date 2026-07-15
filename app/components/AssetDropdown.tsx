@@ -193,6 +193,7 @@ function AssetDropdown({
                 onChange={e => setSearch(e.target.value)}
                 onFocus={() => searchRef.current?.scrollIntoView({ block: "nearest" })}
                 placeholder="Search by name…"
+                aria-label="Search players by name"
                 className="w-full text-[11px] font-mono outline-none"
                 style={{
                   background:   "transparent",

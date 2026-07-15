@@ -1,8 +1,8 @@
 "use client";
 // ── TugBar — visual NAV surplus/deficit indicator ─────────────
 import React from "react";
+import { fmtSigned as fmt } from "@/app/lib/display-utils";
 function clamp(n: number, mn: number, mx: number) { return Math.min(mx, Math.max(mn, n)); }
-const fmt = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
 const NET_GAIN_TOLERANCE = 5;
 
 interface TugBarProps {

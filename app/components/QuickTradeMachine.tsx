@@ -21,6 +21,7 @@ import MeasuredProfile from "@/app/components/MeasuredProfile";
 import StrandDisplay from "@/app/components/StrandDisplay";
 import EdgeStrip from "@/app/components/EdgeStrip";
 import { buildAssetTraits, computeStrandType } from "@/app/components/StrandView";
+import { formatCapHit as fmtCap, fmtSigned } from "@/app/lib/display-utils";
 
 const ZERO_NAV: XNAVResult = { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
 
@@ -37,9 +38,6 @@ type PackageSummary = {
   nav: number;
   count: number;
 };
-
-const fmtCap = (value: number) => `$${value.toFixed(2)}M`;
-const fmtSigned = (value: number, digits = 1) => value > 0 ? `+${value.toFixed(digits)}` : value.toFixed(digits);
 
 const PHASE_ORDER: TeamPhase[] = ["Tanking", "Rebuilding", "Retooling", "Bubble", "Contender"];
 function normalizePhase(raw: string | null | undefined): TeamPhase | null {

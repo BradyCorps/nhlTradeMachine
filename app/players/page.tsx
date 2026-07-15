@@ -381,6 +381,8 @@ const PLUM_FAINT = "rgba(83, 46, 59, 0.08)";
 function PlayerTabButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
       style={{
         flex: "1 1 0",
@@ -499,7 +501,7 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
       background: "#d6c8a5", borderTop: `3px solid ${PLUM}`,
     }}>
       {/* Tab bar */}
-      <div style={{
+      <div role="tablist" style={{
         display: "flex",
         gap: 0,
         padding: "0",

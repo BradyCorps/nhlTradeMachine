@@ -13,8 +13,7 @@ import {
 } from "@/app/lib/free-agency";
 import { SEASON } from "@/app/lib/season-config";
 import { scenarioSeed } from "@/app/lib/sim-engine";
-
-const money = (n: number) => `$${n.toFixed(2)}M`;
+import { formatCapHit as money } from "@/app/lib/display-utils";
 const RFA_PAGE_SIZE = 30;
 
 const roundLabel = (r: string) =>

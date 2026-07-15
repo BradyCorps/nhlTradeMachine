@@ -37,7 +37,7 @@ const classifyTeam = (team: Team, _roster: Asset[]): TeamMode => {
 };
 
 
-const fmt = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
+import { fmtSigned as fmt } from "@/app/lib/display-utils";
 
 type GmTab = "lineups" | "dna" | "comparison" | "breakdown" | "sim";
 

@@ -17,7 +17,7 @@ import EdgeShotMap from "@/app/components/EdgeShotMap";
 import MeasuredProfile from "@/app/components/MeasuredProfile";
 import { displayPosition } from "@/app/lib/display-position";
 
-const fmt = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
+import { fmtSigned as fmt } from "@/app/lib/display-utils";
 type AssetCardView = "STATS" | "STRAND" | "TIMELINE" | "DEV" | "EDGE";
 
 export default function AssetCard({
