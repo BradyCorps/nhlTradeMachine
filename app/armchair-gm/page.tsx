@@ -793,7 +793,7 @@ export default function ArmchairGmPage() {
           advancing={cupAdvancing}
           onStart={handleStartCupRun}
           onRecordAndAdvance={handleCupRunAdvance}
-          onAbandon={handleAbandonCupRun}
+          onAbandon={() => { handleAbandonCupRun(); resetTrades(); }}
         />
 
         {navBootLoading && (
