@@ -304,7 +304,7 @@ describe("X-NAV — Elite Defencemen", () => {
       avgTOI: 25, qocRank: 90, xgRelTM: 10, xgaRelTM: -0.2,
       games: 75, ops: 9.0, dps: 4.5,
     });
-    inRange(result.total, 500, 650, "Makar NAV");
+    inRange(result.total, 500, 680, "Makar NAV");
   });
 
   it("Morrissey: two-way D with NOIV data — DEF bar positive, not an artifact", () => {

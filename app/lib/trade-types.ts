@@ -113,10 +113,12 @@ export interface XNAVResult {
   age: number;
   cap: number;
   upside: number;
+  grav?: number;
   fmvAav?: number;
   noivImpact?: number;
   fArchetype?: FArchetype;
   rosterTier?: RosterTier;
+  isRFA?: boolean;
   volatility?: number;
 }
 

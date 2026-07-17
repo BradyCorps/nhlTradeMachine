@@ -12,6 +12,7 @@
 
 import { SEASON, LEAGUE, FRANCHISE, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 import type { FArchetype } from "@/app/lib/trade-types";
+import { computeGravity } from "@/app/lib/gravity";
 
 export const DPS_NAV_MULTIPLIER = 15; // dps * 15 = defPS for NAV (not 120 — the *8 bug is removed)
 
@@ -83,6 +84,7 @@ export interface XNAVResult {
   age:         number;
   cap:         number;
   upside:      number;
+  grav?:       number;
   fmvAav?:     number;
   noivImpact?: number;
   fArchetype?: FArchetype;
@@ -738,8 +740,22 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const ageVal       = baseAge < 0 ? baseAge * rentalFactor : baseAge * youthProjectionSignal;
   const ageTotal     = safe(ageVal);
 
+  // ── Gravity Residual ──────────────────────────────────────────
+  // Gravity captures "invisible" value — creation, zone control, partner
+  // independence — that raw stats (already in off/def) don't fully price.
+  // To avoid double-counting the NOIV signal (already in offTotal via
+  // noivBonus), we subtract the NOIV-attributable portion of force and
+  // scale only the residual into NAV.
+  let gravTotal = 0;
+  const gravProfile = computeGravity(asset as any);
+  if (gravProfile && games >= 20) {
+    const noivPortion = gravProfile.noivLift * gravProfile.playerMass;
+    const residual = gravProfile.force - noivPortion;
+    gravTotal = clamp(residual * 80, -20, 35);
+  }
+
   // ── On-Ice Core ───────────────────────────────────────────────
-  const trueMarketValue = offTotal + defTotal + ageTotal;
+  const trueMarketValue = offTotal + defTotal + ageTotal + gravTotal;
   const isRFA = asset.age + asset.yearsRemaining <= 27;
 
   // ── Logistic S-Curve FMV Cap Percentage ───────────────────────
@@ -1016,6 +1032,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     age:    Math.round(ageTotal),
     cap:    Math.round(capTotal),
     upside: Math.round(Math.max(0, ageTotal) + teamControlValue),
+    grav:   Math.round(gravTotal),
     fmvAav: currentFmvAav,
     noivImpact,
     fArchetype,

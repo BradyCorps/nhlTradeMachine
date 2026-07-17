@@ -90,10 +90,13 @@ interface RankedPlayer {
   teamName: string;
 }
 
+type SortMode = "nav" | "gravity";
+
 export default function TrendingPlayers() {
-  const [ranked, setRanked] = useState<RankedPlayer[]>([]);
+  const [allPlayers, setAllPlayers] = useState<RankedPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [sort, setSort] = useState<SortMode>("nav");
 
   useEffect(() => {
     let cancelled = false;
@@ -123,8 +126,7 @@ export default function TrendingPlayers() {
           };
         });
 
-        results.sort((a, b) => b.nav - a.nav);
-        setRanked(results.slice(0, 10));
+        setAllPlayers(results);
       } catch {
         // silent
       } finally {
@@ -144,7 +146,14 @@ export default function TrendingPlayers() {
     );
   }
 
-  if (ranked.length === 0) return null;
+  if (allPlayers.length === 0) return null;
+
+  const ranked = [...allPlayers]
+    .sort(sort === "nav"
+      ? (a, b) => b.nav - a.nav
+      : (a, b) => (b.gravity?.force ?? -999) - (a.gravity?.force ?? -999)
+    )
+    .slice(0, 10);
 
   const items: React.ReactNode[] = [];
   for (let i = 0; i < ranked.length; i += 2) {
@@ -157,6 +166,7 @@ export default function TrendingPlayers() {
           key={r.player.id}
           rank={i + j + 1}
           data={r}
+          sortMode={sort}
           isExpanded={expanded === r.player.id}
           onToggle={() => setExpanded(expanded === r.player.id ? null : r.player.id)}
         />
@@ -181,17 +191,44 @@ export default function TrendingPlayers() {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {items}
+    <div>
+      {/* Sort toggle */}
+      <div className="flex items-center gap-1 mb-4" role="tablist" aria-label="Sort trending players">
+        {([
+          { mode: "nav" as SortMode, label: "By X-NAV" },
+          { mode: "gravity" as SortMode, label: "By Gravity" },
+        ]).map(tab => (
+          <button
+            key={tab.mode}
+            role="tab"
+            aria-selected={sort === tab.mode}
+            onClick={() => { setSort(tab.mode); setExpanded(null); }}
+            className="font-mono text-[10px] font-black uppercase tracking-[0.14em] px-3 py-1.5 transition-colors"
+            style={{
+              color: sort === tab.mode ? "var(--ledger-ink)" : "var(--ledger-ink-faint)",
+              background: sort === tab.mode ? "var(--paper-card)" : "transparent",
+              border: sort === tab.mode ? "1px solid var(--ledger-rule)" : "1px solid transparent",
+            }}
+          >
+            {tab.mode === "gravity" && <TierIcon tier="SUPERMASSIVE" size={10} />}
+            {" "}{tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {items}
+      </div>
     </div>
   );
 }
 
 function PlayerCard({
-  rank, data, isExpanded, onToggle,
+  rank, data, sortMode, isExpanded, onToggle,
 }: {
   rank: number;
   data: RankedPlayer;
+  sortMode: SortMode;
   isExpanded: boolean;
   onToggle: () => void;
 }) {
@@ -249,12 +286,25 @@ function PlayerCard({
           </div>
         </div>
         <div className="ml-auto shrink-0 text-right">
-          <div className="font-mono text-[18px] font-black leading-none" style={{ color: "var(--ledger-ink)" }}>
-            {nav}
-          </div>
-          <div className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
-            X-NAV
-          </div>
+          {sortMode === "gravity" && gravity ? (
+            <>
+              <div className="font-mono text-[18px] font-black leading-none" style={{ color: tierColor ?? "var(--ledger-ink)" }}>
+                {gravity.force.toFixed(2)}
+              </div>
+              <div className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
+                Force
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="font-mono text-[18px] font-black leading-none" style={{ color: "var(--ledger-ink)" }}>
+                {nav}
+              </div>
+              <div className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
+                X-NAV
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -464,10 +514,11 @@ function ExpandedPanel({
             <div className="font-mono text-[9px] font-black uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--ledger-ink-faint)" }}>
               NAV Components
             </div>
-            <div className="grid grid-cols-5 gap-0">
+            <div className="grid grid-cols-6 gap-0">
               {[
                 { label: "OFF", val: xnav.off },
                 { label: "DEF", val: xnav.def },
+                { label: "GRAV", val: xnav.grav ?? 0 },
                 { label: "AGE", val: xnav.age },
                 { label: "CAP", val: xnav.cap },
                 { label: "UPS", val: xnav.upside },
