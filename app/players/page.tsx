@@ -6,6 +6,7 @@ import type { Asset } from "@/app/lib/trade-types";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
 import GravityField, { TierIcon } from "@/app/components/GravityField";
+import GravityCard from "@/app/components/GravityCard";
 import { gravityTierColor } from "@/app/lib/gravity";
 import { computeGravity } from "@/app/lib/gravity";
 import type { DevelopmentProfile } from "@/app/lib/development-profile";
@@ -487,6 +488,38 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
 
   const hasGravity = gravityProfile !== null;
 
+  const position = player.position === "D" || player.position === "G" || player.position === "C" ? player.position : "W";
+  const xnav = useMemo(() => calcNAV({
+    id: player.id,
+    name: player.name,
+    position,
+    age: player.age,
+    capHit: player.capHit,
+    yearsRemaining: player.yearsRemaining,
+    capCeiling: SEASON.capCeiling,
+    ptsPace: player.ptsPace,
+    xGPace: player.xGPace,
+    edgeSpeedMaxMph: player.edgeSpeedMaxMph,
+    edgeBurstsOver20: player.edgeBurstsOver20,
+    defRate: player.defRate ?? 0.08,
+    avgTOI: player.avgTOI,
+    qocIndex: player.qocIndex,
+    xgRelTM: player.xgRelTM,
+    xgaRelTM: player.xgaRelTM,
+    dzPct: player.dzPct,
+    ops: player.ops,
+    dps: player.dps,
+    games: player.games ?? 40,
+    gsax: player.gsax,
+    savePct: player.savePct,
+    gamesStarted: player.gamesStarted,
+    hasLiveStats: player.hasLiveStats,
+    baselinePtsPace: player.baselinePtsPace ?? undefined,
+    pkTimeShare: player.pkTimeShare ?? undefined,
+  }), [player, position]);
+
+  const [gravityView, setGravityView] = useState<"analysis" | "card">("analysis");
+
   const tabs: { key: PlayerTab; label: string }[] = [
     { key: "stats", label: "Stats" },
     ...(hasStrand ? [{ key: "strand" as PlayerTab, label: "Strand" }] : []),
@@ -637,7 +670,57 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
         {/* ── Gravity tab ────────────────────────── */}
         {activeTab === "gravity" && hasGravity && gravityProfile && (
           <div style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "12px" }}>
-            <GravityField profile={gravityProfile} playerName={player.name} mode="full" />
+            <div style={{ display: "flex", gap: 0, marginBottom: 10 }}>
+              {([
+                { key: "analysis" as const, label: "Analysis" },
+                { key: "card" as const, label: "Share Card" },
+              ]).map(v => (
+                <button
+                  key={v.key}
+                  onClick={() => setGravityView(v.key)}
+                  style={{
+                    fontFamily: "'Courier Prime', monospace",
+                    fontSize: 10,
+                    fontWeight: 900,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.12em",
+                    padding: "5px 12px",
+                    border: "1px solid #b8a070",
+                    borderBottom: gravityView === v.key ? "2px solid #1c140a" : "1px solid #b8a070",
+                    background: gravityView === v.key ? "#e4d8b8" : "transparent",
+                    color: gravityView === v.key ? "#1c140a" : "#6e5a3d",
+                    cursor: "pointer",
+                  }}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+            {gravityView === "analysis" ? (
+              <GravityField profile={gravityProfile} playerName={player.name} mode="full" />
+            ) : (
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <GravityCard
+                  playerName={player.name}
+                  teamName={team?.name ?? player.teamId}
+                  position={displayPosition(player.position, player.secondaryPosition)}
+                  age={player.age}
+                  headshot={player.headshot}
+                  gravity={gravityProfile}
+                  xnav={xnav}
+                  stats={{
+                    gp: player.games ?? 82,
+                    goals: player.goalsPace != null ? Math.round((player.goalsPace / 82) * (player.games ?? 82)) : null,
+                    assists: player.assistsPace != null ? Math.round((player.assistsPace / 82) * (player.games ?? 82)) : null,
+                    pts: Math.round((player.ptsPace / 82) * (player.games ?? 82)),
+                    plusMinus: player.plusMinus,
+                    toi: player.avgTOI,
+                  }}
+                  capHit={player.capHit}
+                  yearsRemaining={player.yearsRemaining}
+                />
+              </div>
+            )}
           </div>
         )}
 
