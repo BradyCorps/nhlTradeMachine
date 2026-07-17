@@ -937,4 +937,4 @@ export default function GravityField({ profile, playerName, mode = "full" }: Pro
   );
 }
 
-export { CompactGravity };
+export { CompactGravity, FieldDiagram };

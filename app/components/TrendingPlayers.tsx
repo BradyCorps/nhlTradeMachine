@@ -4,7 +4,7 @@ import Link from "next/link";
 import { calcNAV } from "@/app/lib/xnav-engine";
 import { computeGravity, gravityTierColor } from "@/app/lib/gravity";
 import type { GravityProfile, GravityTier } from "@/app/lib/gravity";
-import { TierIcon } from "@/app/components/GravityField";
+import { TierIcon, FieldDiagram } from "@/app/components/GravityField";
 import { displayPosition } from "@/app/lib/display-position";
 import { seasonTotal } from "@/app/lib/display-utils";
 import { buildAssetTraits, computeStrandType } from "@/app/components/StrandView";
@@ -146,17 +146,43 @@ export default function TrendingPlayers() {
 
   if (ranked.length === 0) return null;
 
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {ranked.map((r, i) => (
+  const items: React.ReactNode[] = [];
+  for (let i = 0; i < ranked.length; i += 2) {
+    const pair = ranked.slice(i, i + 2);
+    const expandedInRow = pair.find(r => r.player.id === expanded);
+
+    pair.forEach((r, j) => {
+      items.push(
         <PlayerCard
           key={r.player.id}
-          rank={i + 1}
+          rank={i + j + 1}
           data={r}
           isExpanded={expanded === r.player.id}
           onToggle={() => setExpanded(expanded === r.player.id ? null : r.player.id)}
         />
-      ))}
+      );
+    });
+
+    if (expandedInRow) {
+      items.push(
+        <div
+          key={`detail-${expandedInRow.player.id}`}
+          style={{ gridColumn: "1 / -1" }}
+        >
+          <ExpandedPanel
+            player={expandedInRow.player}
+            xnav={expandedInRow.xnav}
+            gravity={expandedInRow.gravity}
+            teamName={expandedInRow.teamName}
+          />
+        </div>
+      );
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {items}
     </div>
   );
 }
@@ -294,23 +320,22 @@ function PlayerCard({
           </div>
         </div>
       </div>
-
-      {/* ── Expanded detail panel ── */}
-      {isExpanded && <ExpandedPanel player={p} xnav={xnav} gravity={gravity} />}
     </div>
   );
 }
 
 function ExpandedPanel({
-  player: p, xnav, gravity,
+  player: p, xnav, gravity, teamName,
 }: {
   player: PlayerData;
   xnav: XNAVResult;
   gravity: GravityProfile | null;
+  teamName: string;
 }) {
   const traits = buildAssetTraits(p as any, xnav);
   const strandType = computeStrandType(traits.off, traits.def, p.ops ?? null, p.dps ?? null);
   const tierColor = gravity ? gravityTierColor(gravity.tier) : undefined;
+  const pos = displayPosition(p.position, p.secondaryPosition);
 
   const advancedStats = [
     { label: "PTS/82", val: p.ptsPace.toFixed(1) },
@@ -323,135 +348,178 @@ function ExpandedPanel({
 
   return (
     <div
-      className="border-t px-3 py-3 space-y-3"
-      style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
-      onClick={e => e.stopPropagation()}
+      className="border px-4 py-4"
+      style={{ borderColor: "var(--ledger-ink-faint)", background: "var(--paper-inset)", marginTop: -16 }}
     >
-      {/* Advanced stats row */}
-      <div>
-        <div className="font-mono text-[9px] font-black uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--ledger-ink-faint)" }}>
-          Advanced
+      {/* Player identity bar */}
+      <div className="flex items-center gap-3 mb-4 pb-3" style={{ borderBottom: "1px solid var(--ledger-rule)" }}>
+        {p.headshot && (
+          <img
+            src={p.headshot}
+            alt=""
+            className="rounded-full shrink-0"
+            style={{ width: 40, height: 40, border: "1.5px solid var(--ledger-rule)", objectFit: "cover" }}
+          />
+        )}
+        <div className="min-w-0">
+          <div className="font-mono text-[13px] font-black leading-tight truncate" style={{ color: "var(--ledger-ink)" }}>
+            {p.name}
+          </div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.12em] leading-snug" style={{ color: "var(--ledger-ink-faint)" }}>
+            {teamName} · {pos} · Age {p.age}
+          </div>
         </div>
-        <div className="grid grid-cols-6 gap-0">
-          {advancedStats.map(s => (
-            <div key={s.label} className="text-center">
-              <div className="font-mono text-[9px] uppercase tracking-[0.08em]" style={{ color: "var(--ledger-ink-faint)" }}>
-                {s.label}
-              </div>
-              <div className="font-mono text-[11px] font-black" style={{ color: "var(--ledger-ink)" }}>
-                {s.val}
-              </div>
-            </div>
-          ))}
+        <div className="ml-auto shrink-0 text-right">
+          <div className="font-mono text-[22px] font-black leading-none" style={{ color: "var(--ledger-ink)" }}>
+            {xnav.total}
+          </div>
+          <div className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
+            X-NAV
+          </div>
         </div>
       </div>
 
-      {/* STRAND mini */}
-      <div>
-        <div className="flex items-baseline justify-between mb-1.5">
-          <div className="font-mono text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
-            STRAND DNA
-          </div>
-          <div className="font-mono text-[9px] font-black uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink)" }}>
-            {strandType}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-          {[...traits.off, ...traits.def].map(t => (
-            <div key={t.label} className="flex items-center gap-2">
-              <div className="font-mono text-[9px] uppercase tracking-[0.06em] w-[46px] shrink-0 text-right" style={{ color: "var(--ledger-ink-faint)" }}>
-                {t.label}
+      {/* Two-column layout: Gravity diagram left, stats right */}
+      <div className="grid gap-5" style={{ gridTemplateColumns: gravity ? "minmax(200px, 280px) 1fr" : "1fr" }}>
+
+        {/* Left: Gravity field diagram */}
+        {gravity && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-mono text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
+                Gravity Field
               </div>
-              <div className="flex-1 h-[5px] relative" style={{ background: "var(--ledger-rule-light)" }}>
-                <div
-                  className="absolute left-0 top-0 h-full"
-                  style={{
-                    width: `${Math.max(2, t.val * 100)}%`,
-                    background: t.val > 0.6 ? "var(--ledger-green)" : t.val > 0.35 ? "var(--ledger-ink-faint)" : "var(--ledger-rule)",
-                  }}
-                />
-              </div>
-              <div className="font-mono text-[9px] font-black w-[22px] text-right" style={{ color: "var(--ledger-ink)" }}>
-                {t.idx ?? Math.round(t.val * 100)}
+              <div className="flex items-center gap-1.5">
+                <TierIcon tier={gravity.tier} size={14} />
+                <span className="font-mono text-[9px] font-black uppercase" style={{ color: tierColor }}>
+                  {TIER_LABEL[gravity.tier]}
+                </span>
               </div>
             </div>
-          ))}
+            <div
+              className="border p-2"
+              style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-bg)" }}
+            >
+              <FieldDiagram profile={gravity} />
+            </div>
+          </div>
+        )}
+
+        {/* Right: stats + STRAND + market */}
+        <div className="space-y-3 min-w-0">
+          {/* Advanced stats */}
+          <div>
+            <div className="font-mono text-[9px] font-black uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--ledger-ink-faint)" }}>
+              Advanced
+            </div>
+            <div className="grid grid-cols-6 gap-0">
+              {advancedStats.map(s => (
+                <div key={s.label} className="text-center">
+                  <div className="font-mono text-[9px] uppercase tracking-[0.08em]" style={{ color: "var(--ledger-ink-faint)" }}>
+                    {s.label}
+                  </div>
+                  <div className="font-mono text-[11px] font-black" style={{ color: "var(--ledger-ink)" }}>
+                    {s.val}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* STRAND DNA */}
+          <div>
+            <div className="flex items-baseline justify-between mb-1.5">
+              <div className="font-mono text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
+                STRAND DNA
+              </div>
+              <div className="font-mono text-[9px] font-black uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink)" }}>
+                {strandType}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+              {[...traits.off, ...traits.def].map(t => (
+                <div key={t.label} className="flex items-center gap-2">
+                  <div className="font-mono text-[9px] uppercase tracking-[0.06em] w-[46px] shrink-0 text-right" style={{ color: "var(--ledger-ink-faint)" }}>
+                    {t.label}
+                  </div>
+                  <div className="flex-1 h-[5px] relative" style={{ background: "var(--ledger-rule-light)" }}>
+                    <div
+                      className="absolute left-0 top-0 h-full"
+                      style={{
+                        width: `${Math.max(2, t.val * 100)}%`,
+                        background: t.val > 0.6 ? "var(--ledger-green)" : t.val > 0.35 ? "var(--ledger-ink-faint)" : "var(--ledger-rule)",
+                      }}
+                    />
+                  </div>
+                  <div className="font-mono text-[9px] font-black w-[22px] text-right" style={{ color: "var(--ledger-ink)" }}>
+                    {t.idx ?? Math.round(t.val * 100)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* NAV breakdown */}
+          <div>
+            <div className="font-mono text-[9px] font-black uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--ledger-ink-faint)" }}>
+              NAV Components
+            </div>
+            <div className="grid grid-cols-5 gap-0">
+              {[
+                { label: "OFF", val: xnav.off },
+                { label: "DEF", val: xnav.def },
+                { label: "AGE", val: xnav.age },
+                { label: "CAP", val: xnav.cap },
+                { label: "UPS", val: xnav.upside },
+              ].map(c => (
+                <div key={c.label} className="text-center">
+                  <div className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>
+                    {c.label}
+                  </div>
+                  <div className="font-mono text-[12px] font-black" style={{
+                    color: c.val > 0 ? "var(--ledger-green)" : c.val < 0 ? "var(--ledger-red)" : "var(--ledger-ink)",
+                  }}>
+                    {c.val > 0 ? "+" : ""}{c.val}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Market value + link */}
+          {xnav.fmvAav != null && (
+            <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: "var(--ledger-rule-light)" }}>
+              <div>
+                <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>Market AAV </span>
+                <span className="font-mono text-[11px] font-black" style={{ color: "var(--ledger-ink)" }}>
+                  ${xnav.fmvAav.toFixed(1)}M
+                </span>
+              </div>
+              <div>
+                <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>Surplus </span>
+                <span className="font-mono text-[11px] font-black" style={{
+                  color: (xnav.fmvAav - p.capHit) > 0 ? "var(--ledger-green)" : "var(--ledger-red)",
+                }}>
+                  {(xnav.fmvAav - p.capHit) > 0 ? "+" : ""}${(xnav.fmvAav - p.capHit).toFixed(1)}M
+                </span>
+              </div>
+              <div>
+                <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>Cap </span>
+                <span className="font-mono text-[11px] font-black" style={{ color: "var(--ledger-ink)" }}>
+                  ${p.capHit.toFixed(1)}M × {p.yearsRemaining}yr
+                </span>
+              </div>
+              <Link
+                href="/players"
+                className="font-mono text-[9px] font-black uppercase tracking-[0.1em] no-underline hover:underline"
+                style={{ color: "var(--ledger-ink-faint)" }}
+              >
+                Full Profile &rarr;
+              </Link>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Gravity mini */}
-      {gravity && (
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="font-mono text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
-              Gravity Field
-            </div>
-            <div className="flex items-center gap-1.5">
-              <TierIcon tier={gravity.tier} size={12} />
-              <span className="font-mono text-[9px] font-black uppercase" style={{ color: tierColor }}>
-                {TIER_LABEL[gravity.tier]}
-              </span>
-              <span className="font-mono text-[9px] font-black" style={{ color: tierColor }}>
-                {gravity.force > 0 ? "+" : ""}{gravity.force.toFixed(2)}
-              </span>
-            </div>
-          </div>
-          <div className="grid grid-cols-4 gap-1">
-            {[
-              { label: "Space", val: gravity.mechanisms.spaceCreation },
-              { label: "Trans.", val: gravity.mechanisms.transitionControl },
-              { label: "Pace", val: gravity.mechanisms.paceManipulation },
-              { label: "Def. Warp", val: gravity.mechanisms.defensiveWarping },
-            ].map(m => (
-              <div key={m.label} className="text-center">
-                <div className="font-mono text-[8px] uppercase tracking-[0.06em]" style={{ color: "var(--ledger-ink-faint)" }}>
-                  {m.label}
-                </div>
-                <div className="mx-auto mt-0.5 h-[4px] relative" style={{ background: "var(--ledger-rule-light)" }}>
-                  <div
-                    className="absolute left-0 top-0 h-full"
-                    style={{
-                      width: `${Math.max(2, m.val * 100)}%`,
-                      background: tierColor,
-                    }}
-                  />
-                </div>
-                <div className="font-mono text-[9px] font-black mt-0.5" style={{ color: "var(--ledger-ink)" }}>
-                  {(m.val * 100).toFixed(0)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Market value row */}
-      {xnav.fmvAav != null && (
-        <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: "var(--ledger-rule-light)" }}>
-          <div>
-            <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>Market AAV </span>
-            <span className="font-mono text-[11px] font-black" style={{ color: "var(--ledger-ink)" }}>
-              ${xnav.fmvAav.toFixed(1)}M
-            </span>
-          </div>
-          <div>
-            <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>Surplus </span>
-            <span className="font-mono text-[11px] font-black" style={{
-              color: (xnav.fmvAav - p.capHit) > 0 ? "var(--ledger-green)" : "var(--ledger-red)",
-            }}>
-              {(xnav.fmvAav - p.capHit) > 0 ? "+" : ""}${(xnav.fmvAav - p.capHit).toFixed(1)}M
-            </span>
-          </div>
-          <Link
-            href="/players"
-            className="font-mono text-[9px] font-black uppercase tracking-[0.1em] no-underline hover:underline"
-            style={{ color: "var(--ledger-ink-faint)" }}
-            onClick={e => e.stopPropagation()}
-          >
-            Full Profile &rarr;
-          </Link>
-        </div>
-      )}
     </div>
   );
 }
