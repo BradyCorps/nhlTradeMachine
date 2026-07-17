@@ -1098,6 +1098,11 @@ export async function assembleCanonicalRoster(options: {
         stats = NHL_SKATER_STATS.get(`id:${p.id}`) ?? NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug);
       }
 
+      if (stats && stats.plusMinus == null) {
+        const nhlEntry = NHL_SKATER_STATS.get(`id:${p.id}`) ?? NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug);
+        if (nhlEntry?.plusMinus != null) stats = { ...stats, plusMinus: nhlEntry.plusMinus };
+      }
+
       const normalName  = p.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       const posKey      = `${p.name}__${p.position}`;
       const teamKey     = `${p.name}__${teamId.toLowerCase()}`;

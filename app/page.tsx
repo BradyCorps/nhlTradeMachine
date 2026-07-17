@@ -292,7 +292,7 @@ export default function WelcomePage() {
         <section className="fp-reveal px-5 sm:px-8 pt-11" style={{ transitionDelay: "0.14s" }}>
           <div className="fp-section-label mb-5">Highest-Valued Assets</div>
           <p className="text-[12px] leading-relaxed mb-5 font-mono" style={{ color: "var(--ledger-ink-light)" }}>
-            The twelve most valuable trade assets in the NHL right now, ranked by X-NAV.
+            The ten most valuable trade assets in the NHL right now, ranked by X-NAV.
           </p>
           <TrendingPlayers />
         </section>

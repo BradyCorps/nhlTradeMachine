@@ -124,7 +124,7 @@ export default function TrendingPlayers() {
         });
 
         results.sort((a, b) => b.nav - a.nav);
-        setRanked(results.slice(0, 12));
+        setRanked(results.slice(0, 10));
       } catch {
         // silent
       } finally {
@@ -218,7 +218,7 @@ function PlayerCard({
           <div className="font-mono text-[11px] font-black leading-tight truncate" style={{ color: "var(--ledger-ink)" }}>
             {p.name}
           </div>
-          <div className="font-mono text-[9px] uppercase tracking-[0.12em] leading-snug truncate" style={{ color: "var(--ledger-ink-faint)" }}>
+          <div className="font-mono text-[10px] uppercase tracking-[0.12em] leading-snug truncate" style={{ color: "var(--ledger-ink-faint)" }}>
             {teamName} · {pos} · Age {p.age}
           </div>
         </div>
@@ -226,7 +226,7 @@ function PlayerCard({
           <div className="font-mono text-[18px] font-black leading-none" style={{ color: "var(--ledger-ink)" }}>
             {nav}
           </div>
-          <div className="font-mono text-[8px] uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
+          <div className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
             X-NAV
           </div>
         </div>
@@ -245,10 +245,10 @@ function PlayerCard({
             color: pm != null ? (pm > 0 ? "var(--ledger-green)" : pm < 0 ? "var(--ledger-red)" : undefined) : undefined },
         ].map(s => (
           <div key={s.label} className="text-center">
-            <div className="font-mono text-[8px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>
+            <div className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>
               {s.label}
             </div>
-            <div className="font-mono text-[11px] font-black" style={{ color: (s as any).color ?? "var(--ledger-ink)" }}>
+            <div className="font-mono text-[12px] font-black" style={{ color: (s as any).color ?? "var(--ledger-ink)" }}>
               {s.val}
             </div>
           </div>
@@ -266,10 +266,10 @@ function PlayerCard({
             { label: "CAP", val: xnav.cap },
           ].map(c => (
             <div key={c.label} className="text-center">
-              <div className="font-mono text-[7px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>
+              <div className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>
                 {c.label}
               </div>
-              <div className="font-mono text-[10px] font-black" style={{ color: c.val > 0 ? "var(--ledger-green)" : c.val < 0 ? "var(--ledger-red)" : "var(--ledger-ink)" }}>
+              <div className="font-mono text-[11px] font-black" style={{ color: c.val > 0 ? "var(--ledger-green)" : c.val < 0 ? "var(--ledger-red)" : "var(--ledger-ink)" }}>
                 {c.val > 0 ? "+" : ""}{c.val}
               </div>
             </div>
@@ -279,17 +279,17 @@ function PlayerCard({
         {gravityTier && (
           <div className="flex items-center gap-1.5">
             <TierIcon tier={gravityTier} size={14} />
-            <div className="font-mono text-[8px] font-black uppercase tracking-[0.08em]" style={{ color: tierColor }}>
+            <div className="font-mono text-[9px] font-black uppercase tracking-[0.08em]" style={{ color: tierColor }}>
               {TIER_LABEL[gravityTier]}
             </div>
           </div>
         )}
 
         <div className="text-right shrink-0">
-          <div className="font-mono text-[7px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>
+          <div className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>
             CAP HIT
           </div>
-          <div className="font-mono text-[10px] font-black" style={{ color: "var(--ledger-ink)" }}>
+          <div className="font-mono text-[11px] font-black" style={{ color: "var(--ledger-ink)" }}>
             {capStr} × {p.yearsRemaining}yr
           </div>
         </div>
@@ -329,16 +329,16 @@ function ExpandedPanel({
     >
       {/* Advanced stats row */}
       <div>
-        <div className="font-mono text-[8px] font-black uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--ledger-ink-faint)" }}>
+        <div className="font-mono text-[9px] font-black uppercase tracking-[0.14em] mb-1.5" style={{ color: "var(--ledger-ink-faint)" }}>
           Advanced
         </div>
         <div className="grid grid-cols-6 gap-0">
           {advancedStats.map(s => (
             <div key={s.label} className="text-center">
-              <div className="font-mono text-[7px] uppercase tracking-[0.08em]" style={{ color: "var(--ledger-ink-faint)" }}>
+              <div className="font-mono text-[9px] uppercase tracking-[0.08em]" style={{ color: "var(--ledger-ink-faint)" }}>
                 {s.label}
               </div>
-              <div className="font-mono text-[10px] font-black" style={{ color: "var(--ledger-ink)" }}>
+              <div className="font-mono text-[11px] font-black" style={{ color: "var(--ledger-ink)" }}>
                 {s.val}
               </div>
             </div>
@@ -349,7 +349,7 @@ function ExpandedPanel({
       {/* STRAND mini */}
       <div>
         <div className="flex items-baseline justify-between mb-1.5">
-          <div className="font-mono text-[8px] font-black uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
+          <div className="font-mono text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
             STRAND DNA
           </div>
           <div className="font-mono text-[9px] font-black uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink)" }}>
@@ -359,10 +359,10 @@ function ExpandedPanel({
         <div className="grid grid-cols-2 gap-x-3 gap-y-1">
           {[...traits.off, ...traits.def].map(t => (
             <div key={t.label} className="flex items-center gap-2">
-              <div className="font-mono text-[7px] uppercase tracking-[0.06em] w-[42px] shrink-0 text-right" style={{ color: "var(--ledger-ink-faint)" }}>
+              <div className="font-mono text-[9px] uppercase tracking-[0.06em] w-[46px] shrink-0 text-right" style={{ color: "var(--ledger-ink-faint)" }}>
                 {t.label}
               </div>
-              <div className="flex-1 h-[4px] relative" style={{ background: "var(--ledger-rule-light)" }}>
+              <div className="flex-1 h-[5px] relative" style={{ background: "var(--ledger-rule-light)" }}>
                 <div
                   className="absolute left-0 top-0 h-full"
                   style={{
@@ -371,7 +371,7 @@ function ExpandedPanel({
                   }}
                 />
               </div>
-              <div className="font-mono text-[8px] font-black w-[20px] text-right" style={{ color: "var(--ledger-ink)" }}>
+              <div className="font-mono text-[9px] font-black w-[22px] text-right" style={{ color: "var(--ledger-ink)" }}>
                 {t.idx ?? Math.round(t.val * 100)}
               </div>
             </div>
@@ -383,7 +383,7 @@ function ExpandedPanel({
       {gravity && (
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <div className="font-mono text-[8px] font-black uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
+            <div className="font-mono text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
               Gravity Field
             </div>
             <div className="flex items-center gap-1.5">
@@ -404,10 +404,10 @@ function ExpandedPanel({
               { label: "Def. Warp", val: gravity.mechanisms.defensiveWarping },
             ].map(m => (
               <div key={m.label} className="text-center">
-                <div className="font-mono text-[6px] uppercase tracking-[0.06em]" style={{ color: "var(--ledger-ink-faint)" }}>
+                <div className="font-mono text-[8px] uppercase tracking-[0.06em]" style={{ color: "var(--ledger-ink-faint)" }}>
                   {m.label}
                 </div>
-                <div className="mx-auto mt-0.5 h-[3px] relative" style={{ background: "var(--ledger-rule-light)" }}>
+                <div className="mx-auto mt-0.5 h-[4px] relative" style={{ background: "var(--ledger-rule-light)" }}>
                   <div
                     className="absolute left-0 top-0 h-full"
                     style={{
@@ -416,7 +416,7 @@ function ExpandedPanel({
                     }}
                   />
                 </div>
-                <div className="font-mono text-[8px] font-black mt-0.5" style={{ color: "var(--ledger-ink)" }}>
+                <div className="font-mono text-[9px] font-black mt-0.5" style={{ color: "var(--ledger-ink)" }}>
                   {(m.val * 100).toFixed(0)}
                 </div>
               </div>
@@ -429,14 +429,14 @@ function ExpandedPanel({
       {xnav.fmvAav != null && (
         <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: "var(--ledger-rule-light)" }}>
           <div>
-            <span className="font-mono text-[8px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>Market AAV </span>
-            <span className="font-mono text-[10px] font-black" style={{ color: "var(--ledger-ink)" }}>
+            <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>Market AAV </span>
+            <span className="font-mono text-[11px] font-black" style={{ color: "var(--ledger-ink)" }}>
               ${xnav.fmvAav.toFixed(1)}M
             </span>
           </div>
           <div>
-            <span className="font-mono text-[8px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>Surplus </span>
-            <span className="font-mono text-[10px] font-black" style={{
+            <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>Surplus </span>
+            <span className="font-mono text-[11px] font-black" style={{
               color: (xnav.fmvAav - p.capHit) > 0 ? "var(--ledger-green)" : "var(--ledger-red)",
             }}>
               {(xnav.fmvAav - p.capHit) > 0 ? "+" : ""}${(xnav.fmvAav - p.capHit).toFixed(1)}M
@@ -444,7 +444,7 @@ function ExpandedPanel({
           </div>
           <Link
             href="/players"
-            className="font-mono text-[8px] font-black uppercase tracking-[0.1em] no-underline hover:underline"
+            className="font-mono text-[9px] font-black uppercase tracking-[0.1em] no-underline hover:underline"
             style={{ color: "var(--ledger-ink-faint)" }}
             onClick={e => e.stopPropagation()}
           >
