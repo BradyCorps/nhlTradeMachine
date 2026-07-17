@@ -352,14 +352,12 @@ function PlayerCard({
           ))}
         </div>
 
-        {gravityTier && (
-          <div className="flex items-center gap-1.5">
-            <TierIcon tier={gravityTier} size={14} />
-            <div className="font-mono text-[9px] font-black uppercase tracking-[0.08em]" style={{ color: tierColor }}>
-              {TIER_LABEL[gravityTier]}
-            </div>
+        <div className="flex items-center gap-1.5">
+          {gravityTier && <TierIcon tier={gravityTier} size={14} />}
+          <div className="font-mono text-[9px] font-black uppercase tracking-[0.08em]" style={{ color: "var(--ledger-ink-faint)" }}>
+            {isExpanded ? "▲ Collapse" : "▼ Expand"}
           </div>
-        )}
+        </div>
 
         <div className="text-right shrink-0">
           <div className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>
@@ -565,7 +563,7 @@ function ExpandedPanel({
                 className="font-mono text-[9px] font-black uppercase tracking-[0.1em] no-underline hover:underline"
                 style={{ color: "var(--ledger-ink-faint)" }}
               >
-                Full Profile &rarr;
+                Player Analytics &rarr;
               </Link>
             </div>
           )}

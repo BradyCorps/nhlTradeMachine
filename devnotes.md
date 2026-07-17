@@ -72,6 +72,14 @@
 - Accessible via "Share Card" sub-view in the Gravity tab on player analytics page
 - Analysis/Share Card toggle within the gravity tab
 
+### Data Fix: Unsigned RFA/UFA Inflation
+- Players with `yearsRemaining === 0` and `capHit ≈ 0` (unsigned RFAs like Robertson)
+  had massively inflated CAP surplus because FMV minus $0 = pure surplus
+- Fix: project unsigned players onto their FMV AAV as their cap hit, yielding ~0 surplus
+- Applied to both skater and goalie NAV paths
+- "Full Profile" link in trending expanded panel renamed to "Player Analytics" (no
+  individual player pages yet — future Phase 3 work)
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

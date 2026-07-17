@@ -428,12 +428,14 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
 
   const effectiveCap = asset.capHit * (1 - (asset.retainedPct || 0));
   const extCapHit    = asset.extensionCapHit;
-  const navCapHit    = extCapHit ? extCapHit * (1 - (asset.retainedPct || 0)) : effectiveCap;
-  const navYears     = extCapHit ? (asset.extensionYears ?? asset.yearsRemaining) : asset.yearsRemaining;
-  const contractYears = Math.max(1, navYears || 1);
+  // navCapHit and navYears are set below after currentFmvAavG is computed,
+  // so unsigned goalies project onto their market AAV instead of $0.
+  let navCapHit: number;
+  let navYears: number;
+  let contractYears: number;
 
-  // RFA Cliff: cost-controlled goalie years carry a premium
-  const isRFA       = asset.age + navYears <= 27;
+  // RFA Cliff: cost-controlled goalie years carry a premium — set after navYears below.
+  let isRFA: boolean;
 
   // High-danger save %: most repeatable goalie skill but still team-context sensitive.
   // Teams that allow a higher volume of HD shots depress HDSV% independently of skill
@@ -472,6 +474,16 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const BASE_CAP_CEILING = asset.capCeiling ?? SEASON.capCeiling;
   const CAP_GROWTH_RATE  = 1.04;
   const currentFmvAavG = BASE_CAP_CEILING * fmvCapPctG;
+
+  const isUnsignedG = !extCapHit && asset.yearsRemaining <= 0 && asset.capHit <= 0.5;
+  navCapHit    = extCapHit ? extCapHit * (1 - (asset.retainedPct || 0))
+               : isUnsignedG ? currentFmvAavG
+               : effectiveCap;
+  navYears     = extCapHit ? (asset.extensionYears ?? asset.yearsRemaining)
+               : isUnsignedG ? 1
+               : asset.yearsRemaining;
+  contractYears = Math.max(1, navYears || 1);
+  isRFA         = asset.age + navYears <= 27;
 
   let capSumG = 0;
   for (let i = 0; i < contractYears; i++) {
@@ -775,15 +787,23 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   
   const fmvCapPct = LEAGUE_MIN_PCT + (MAX_CAP_PCT - LEAGUE_MIN_PCT) / (1 + Math.exp(-K_FACTOR * (trueMarketValue - MIDPOINT)));
 
-  // Use extension cap hit and years if available to align with Goalie NAV and fix extension distortions
-  const extCapHit        = asset.extensionCapHit;
-  const navCapHit        = extCapHit ? extCapHit * (1 - (asset.retainedPct || 0)) : effectiveCap;
-  const navYears         = extCapHit ? (asset.extensionYears ?? asset.yearsRemaining) : asset.yearsRemaining;
-  const contractYears    = Math.max(1, navYears || 1);
-
-  const BASE_CAP_CEILING = asset.capCeiling ?? SEASON.capCeiling; // Current cap space
-  const CAP_GROWTH_RATE  = 1.04;  // 4% annual growth
+  const BASE_CAP_CEILING = asset.capCeiling ?? SEASON.capCeiling;
+  const CAP_GROWTH_RATE  = 1.04;
   const currentFmvAav = BASE_CAP_CEILING * fmvCapPct;
+
+  // Use extension cap hit and years if available to align with Goalie NAV and fix extension distortions.
+  // When a player is unsigned (yearsRemaining === 0, capHit ≈ 0), project them
+  // onto their FMV AAV — an unsigned RFA/UFA will command market value, so the
+  // cap surplus should be ~0 rather than an infinite free lunch.
+  const extCapHit        = asset.extensionCapHit;
+  const isUnsigned       = !extCapHit && asset.yearsRemaining <= 0 && asset.capHit <= 0.5;
+  const navCapHit        = extCapHit ? extCapHit * (1 - (asset.retainedPct || 0))
+                         : isUnsigned ? currentFmvAav
+                         : effectiveCap;
+  const navYears         = extCapHit ? (asset.extensionYears ?? asset.yearsRemaining)
+                         : isUnsigned ? 1
+                         : asset.yearsRemaining;
+  const contractYears    = Math.max(1, navYears || 1);
 
   // Loop through contract term to calculate the multi-year compound surplus sum.
   //
