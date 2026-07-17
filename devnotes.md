@@ -43,11 +43,34 @@
 
 ---
 
-## Phase 2: Gravity as Brand Identity (Next)
+## Phase 2: Gravity as Brand Identity (Complete)
 
-Planned work:
-- Gravity as brand identity throughout the app
-- Gravity integration into X-NAV
+### 2.1 Gravity into X-NAV
+- Gravity residual computation in `calcSkaterNAV` — isolates hidden value beyond NOIV
+  `residual = force - (noivLift × playerMass)`, scaled ×80, capped [-20, +35]
+- Added `grav` and `isRFA` fields to `XNAVResult` in both xnav-engine and trade-types
+- GRAV bar in PlayerTimeline NavBreakdown
+- GRAV column in trending expanded panel NAV Components grid
+
+### 2.2 Visual Motifs
+- Gravity `TierIcon` badges on player rows (STAR and SUPERMASSIVE tiers)
+- Gravity `TierIcon` badges on AssetCards in the trade machine
+- Orbital ring SVG motifs flanking the homepage masthead subtitle
+- Gravity entry added to the players page icon key legend
+
+### 2.3 Gravity Leaderboard Tab
+- Sort toggle ("By X-NAV" / "By Gravity") on trending section
+- Gravity sort: ranked by `force` from GravityProfile
+- Card header shows gravity force score (color-coded by tier) when in gravity mode
+- Updated trending section copy to reference gravity sorting
+
+### 2.4 Shareable Gravity Cards
+- `GravityCard` component — JFresh-style 420px player card with newspaper aesthetic
+- Shows: player identity, gravity tier + force, stats, field diagram, mechanism bars,
+  NAV components, contract, market AAV, branded footer with orbital motif
+- PNG export via html2canvas (client-side, no server)
+- Accessible via "Share Card" sub-view in the Gravity tab on player analytics page
+- Analysis/Share Card toggle within the gravity tab
 
 ## Known Issues / Future Work
 
