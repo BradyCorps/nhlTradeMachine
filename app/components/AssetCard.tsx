@@ -2,8 +2,8 @@
 // ── AssetCard — individual player/pick card in trade panels ───
 import React from "react";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
-import { computeGravity } from "@/app/lib/gravity";
-import { CompactGravity } from "@/app/components/GravityField";
+import { computeGravity, gravityTierColor } from "@/app/lib/gravity";
+import { CompactGravity, TierIcon } from "@/app/components/GravityField";
 import { getPlayerPedigree } from "@/app/lib/player-data";
 import { HISTORICAL_MAX_OFF, HISTORICAL_MAX_DEF } from "@/app/lib/historical-benchmarks";
 import { MicroBar } from "@/app/components/MicroBar";
@@ -49,6 +49,13 @@ export default function AssetCard({
   const compareXnav  = compareAsset
     ? (navMap?.[compareAsset.id] ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 })
     : null;
+  const gravProfile = React.useMemo(() => {
+    if (isPick || asset.position === "G" || (asset.games ?? 0) < 10) return null;
+    return computeGravity(asset as any);
+  }, [asset, isPick]);
+  const gravTier = gravProfile?.tier;
+  const showGravBadge = gravTier === "SUPERMASSIVE" || gravTier === "STAR";
+
   const hasDevelopmentProfile = Boolean(asset.developmentProfile && !isPick && asset.position !== "G");
   const retentionPct = Math.round((asset.retainedPct || 0) * 100);
   const setRetentionPct = (pct: number) => {
@@ -102,12 +109,18 @@ export default function AssetCard({
               {asset.hasNMC && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-red)', border: '1px solid #b83020' }}>NMC</span>}
               {asset.hasNTC && !asset.hasNMC && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-amber)', border: '1px solid #8a5c00' }}>NTC</span>}
               {!asset.hasLiveStats && !isPick && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-ink-faint)', border: '1px solid #b8a070' }}>EST</span>}
-              {/* ── NEW: Extension Badge ── */}
               {asset.hasExtension && (
-                <span className="text-2xs px-1 font-black shrink-0 shadow-sm rounded-sm" 
-                  style={{ background: 'var(--ledger-orange)', color: 'white', border: '1px solid #b45309' }} 
+                <span className="text-2xs px-1 font-black shrink-0 shadow-sm rounded-sm"
+                  style={{ background: 'var(--ledger-orange)', color: 'white', border: '1px solid #b45309' }}
                   title="Future contract extension applied to valuation">
                   EXTENSION
+                </span>
+              )}
+              {showGravBadge && gravTier && (
+                <span className="shrink-0 inline-flex items-center justify-center"
+                  title={`${gravTier === "SUPERMASSIVE" ? "Supermassive" : "Star"} gravity — force ${gravProfile!.force.toFixed(2)}`}
+                  style={{ minWidth: 18, height: 18, border: `1px solid ${gravityTierColor(gravTier)}`, background: "rgba(255,255,255,0.18)", padding: "0 2px" }}>
+                  <TierIcon tier={gravTier} size={14} />
                 </span>
               )}
             </div>

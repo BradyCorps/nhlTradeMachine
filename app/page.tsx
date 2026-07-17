@@ -127,9 +127,21 @@ export default function WelcomePage() {
               <p className="fp-slogan mt-3 text-[12px]">
                 "Everything a hockey fan could ask for"
               </p>
-              <p className="mt-2 text-[10px] uppercase tracking-[0.28em] font-mono"
+              <p className="mt-2 text-[10px] uppercase tracking-[0.28em] font-mono flex items-center justify-center gap-2"
                 style={{ color: "var(--ledger-ink-faint)" }}>
-                X-NAV Analytics · STRAND™ DNA · GM Logic Engine · Live Data
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" style={{ opacity: 0.35, flexShrink: 0 }}>
+                  <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="0.6" />
+                  <circle cx="9" cy="9" r="4.5" stroke="currentColor" strokeWidth="0.5" />
+                  <circle cx="9" cy="9" r="2" stroke="currentColor" strokeWidth="0.4" />
+                  <circle cx="9" cy="9" r="0.8" fill="currentColor" />
+                </svg>
+                <span>X-NAV Analytics · STRAND™ DNA · GM Logic Engine · Live Data</span>
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" style={{ opacity: 0.35, flexShrink: 0 }}>
+                  <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="0.6" />
+                  <circle cx="9" cy="9" r="4.5" stroke="currentColor" strokeWidth="0.5" />
+                  <circle cx="9" cy="9" r="2" stroke="currentColor" strokeWidth="0.4" />
+                  <circle cx="9" cy="9" r="0.8" fill="currentColor" />
+                </svg>
               </p>
             </div>
             <div className="flex justify-center md:justify-end">
@@ -292,7 +304,7 @@ export default function WelcomePage() {
         <section className="fp-reveal px-5 sm:px-8 pt-11" style={{ transitionDelay: "0.14s" }}>
           <div className="fp-section-label mb-5">Highest-Valued Assets</div>
           <p className="text-[12px] leading-relaxed mb-5 font-mono" style={{ color: "var(--ledger-ink-light)" }}>
-            The ten most valuable trade assets in the NHL right now, ranked by X-NAV.
+            The ten most valuable trade assets in the NHL right now, ranked by X-NAV — or sorted by gravitational pull.
           </p>
           <TrendingPlayers />
         </section>

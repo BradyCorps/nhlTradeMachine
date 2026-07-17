@@ -5,7 +5,8 @@ import { buildAssetTraits, buildGoalieStrandTraits, computeStrandType } from "@/
 import type { Asset } from "@/app/lib/trade-types";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
-import GravityField from "@/app/components/GravityField";
+import GravityField, { TierIcon } from "@/app/components/GravityField";
+import { gravityTierColor } from "@/app/lib/gravity";
 import { computeGravity } from "@/app/lib/gravity";
 import type { DevelopmentProfile } from "@/app/lib/development-profile";
 import {
@@ -237,6 +238,13 @@ function PlayerIconBadges({ player }: { player: Player }) {
   const pedigree = getPlayerPedigree(player.name);
   const injuryRisk = getInjuryRisk(player.name);
   const shutdownPedigree = getShutdownDPedigree(player.name);
+  const gravProfile = useMemo(() => {
+    if (player.position === "G" || (player.games ?? 0) < 10) return null;
+    return computeGravity(player as any);
+  }, [player]);
+  const gravTier = gravProfile?.tier;
+  const showGravBadge = gravTier === "SUPERMASSIVE" || gravTier === "STAR";
+
   const isMegalodon = xnav.total >= FRANCHISE.megalodon;
   const isFranchise = !isMegalodon && xnav.total >= FRANCHISE.threshold;
   const isSurplus = xnav.cap > 0 && xnav.total > player.capHit * 18 && xnav.total > 50;
@@ -252,9 +260,24 @@ function PlayerIconBadges({ player }: { player: Player }) {
     shutdownPedigree ? { key: "shutdown", icon: "■", color: "var(--ledger-amber)", title: shutdownPedigree.note } : null,
   ].filter(Boolean) as { key: string; icon: string; color: string; title: string }[];
 
-  if (badges.length === 0) return null;
+  if (badges.length === 0 && !showGravBadge) return null;
   return (
     <>
+      {showGravBadge && gravTier && (
+        <span
+          title={`${gravTier === "SUPERMASSIVE" ? "Supermassive" : "Star"} gravity — force ${gravProfile!.force.toFixed(2)}`}
+          aria-label={`${gravTier === "SUPERMASSIVE" ? "Supermassive" : "Star"} gravity tier`}
+          style={{
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            minWidth: "18px", height: "18px",
+            border: `1px solid ${gravityTierColor(gravTier)}`,
+            background: "rgba(255,255,255,0.18)",
+            padding: "0 2px", flexShrink: 0,
+          }}
+        >
+          <TierIcon tier={gravTier} size={14} />
+        </span>
+      )}
       {badges.slice(0, 4).map(badge => (
         <span key={badge.key} title={badge.title} aria-label={badge.title} style={{
           display: "inline-flex",
@@ -279,6 +302,7 @@ function PlayerIconBadges({ player }: { player: Player }) {
 }
 
 const PLAYER_ICON_KEY = [
+  ["✦", "Gravity", "Supermassive or Star gravity tier — elite gravitational pull."],
   ["♛", "Megalodon", "Extreme franchise-value tier."],
   ["◆", "Franchise", "Franchise-value player or top prospect marker."],
   ["★", "Surplus", "Strong surplus contract, prospect pedigree, or elite pedigree signal."],
