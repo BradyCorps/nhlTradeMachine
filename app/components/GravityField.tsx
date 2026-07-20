@@ -303,13 +303,13 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         NET FORCE
       </text>
 
-      {/* Rink outline */}
+      {/* Rink outline — off-white ice sheet against the paper page */}
       <rect
         x={rinkX} y={rinkY} width={rinkW} height={rinkH} rx={22}
-        fill="var(--paper-inset)"
+        fill="var(--paper-card, var(--paper-bg))"
         stroke="var(--ledger-ink)"
         strokeWidth={1.5}
-        opacity={0.9}
+        opacity={0.95}
       />
 
       {/* Blue lines + center red line */}
@@ -575,7 +575,10 @@ function SignalPanel({ profile }: { profile: GravityProfile }) {
           : profile.force >= -0.22
           ? "effectively neutral — linemates play the same"
           : "a negative field — linemates produce less with him on the ice"
-        }.
+        }.{" "}
+        <a href="/glossary#icon-key" className="underline hover:text-ledger-red transition-colors" style={{ color: "var(--ledger-ink-faint)" }}>
+          Every tier and term is defined in the Glossary →
+        </a>
       </div>
     </div>
   );

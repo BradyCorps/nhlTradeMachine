@@ -722,7 +722,8 @@ describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 go
   const display = read("app/components/StrandDisplay.tsx");
   const view = read("app/components/StrandView.tsx");
   const edge = read("app/components/EdgeStrip.tsx");
-  const players = read("app/players/page.tsx");
+  // PA1 moved the player STRAND surface off the index to the dossier panel
+  const players = read("app/components/PlayerStrandPanel.tsx");
   const quick = read("app/components/QuickTradeMachine.tsx");
   const docket = read("app/docket/DocketClient.tsx");
 

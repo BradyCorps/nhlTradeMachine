@@ -173,8 +173,25 @@
 - H3: trending expand/collapse affordance readability bump (10px, body ink)
 - Footer nav now links Methodology / Glossary / Icon Key to real routes
 
+### Round 3 — PA1/PA4/PA10 + header unification (complete)
+- Header: "Live Data Feed Active" row merged into the Est. line — now reads
+  "Est. 2026 — Vol. I — {date} Data Feed Active" with an inline pulse dot;
+  nav compacted (11px, tighter tracking/gap) so 7 items fit at 1024px;
+  /teams container widened 5xl→6xl to match players/trade-machine
+- PA1: /players index is light — tabs are STATS | CONTRACT | OUTLOOK plus an
+  "Advanced Analytics →" link to /players/{nhlid}; STRAND, Player Card, EDGE,
+  and Gravity tabs removed from the index (~90 lines of dead imports pruned)
+- PA4: contract line removed from the Stats tab (lives in Contract tab)
+- PA10: gravity share-card sub-view retired (analysis only); rink now renders
+  on the off-white paper-card sheet; tier/term definitions linked from the
+  gravity panel to /glossary#icon-key
+- Dossier upgraded: /players/{nhlid} now renders STRAND DNA (new
+  PlayerStrandPanel client component — the canonical strand surface) above
+  the gravity field; STRAND canaries re-pointed at the panel
+
 ### Still open from audit (next rounds)
-- G3 (icon system), G4 (model propagation), TM1/TM3-TM7, PA1-PA12, D1, AG3
+- G3 (icon system), G4 (model propagation), TM1/TM3-TM7, PA2/PA3/PA5-PA9,
+  PA11/PA12, D1, AG3
 
 ## Known Issues / Future Work
 

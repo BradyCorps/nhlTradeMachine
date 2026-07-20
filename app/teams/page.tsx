@@ -916,7 +916,7 @@ export default function TeamsPage() {
 
   return (
     <main className="min-h-screen font-mono" style={{ background: "var(--paper-bg)", color: "var(--ledger-ink)" }}>
-      <div className="mx-auto max-w-5xl px-4 pt-5 pb-8">
+      <div className="mx-auto max-w-6xl px-4 pt-5 pb-8">
         <Header activeTab="teams" />
 
         {/* Page header */}

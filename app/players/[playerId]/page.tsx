@@ -14,6 +14,7 @@ import { computeGravity } from "@/app/lib/gravity";
 import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import GravityField from "@/app/components/GravityField";
+import PlayerStrandPanel from "@/app/components/PlayerStrandPanel";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 
@@ -178,6 +179,16 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
               </div>
             </div>
           )}
+        </div>
+
+        {/* STRAND DNA — stylistic identity profile */}
+        <div className="border p-4 mb-4" style={{ borderColor: rule, background: "var(--paper-card, var(--paper-inset))" }}>
+          <div className="text-[9px] font-black font-mono uppercase tracking-[0.18em] mb-3" style={{ color: faint }}>
+            STRAND DNA
+          </div>
+          <div className="flex justify-center">
+            <PlayerStrandPanel player={player} />
+          </div>
         </div>
 
         {/* Gravity field — computed server-side, rendered client-side from props */}

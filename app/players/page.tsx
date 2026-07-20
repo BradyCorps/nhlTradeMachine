@@ -1,12 +1,7 @@
 "use client";
-import StrandDisplay from "@/app/components/StrandDisplay";
-import EdgeStrip from "@/app/components/EdgeStrip";
-import { buildAssetTraits, buildGoalieStrandTraits, computeStrandType } from "@/app/components/StrandView";
-import type { Asset } from "@/app/lib/trade-types";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
-import GravityField, { TierIcon } from "@/app/components/GravityField";
-import GravityCard from "@/app/components/GravityCard";
+import { TierIcon } from "@/app/components/GravityField";
 import { gravityTierColor } from "@/app/lib/gravity";
 import { computeGravity } from "@/app/lib/gravity";
 import type { DevelopmentProfile } from "@/app/lib/development-profile";
@@ -21,8 +16,6 @@ import { calcNAV, classifyForwardArchetype } from "@/app/lib/xnav-engine";
 import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
-import EdgeShotMap from "@/app/components/EdgeShotMap";
-import PercentileCard from "@/app/components/PercentileCard";
 import { displayPosition } from "@/app/lib/display-position";
 
 // ── Types ─────────────────────────────────────────────────────
@@ -379,7 +372,7 @@ function PlayersIconKey() {
 }
 
 // ── Expanded player tab types ─────────────────────────────────
-type PlayerTab = "stats" | "strand" | "card" | "outlook" | "contract" | "edge" | "gravity";
+type PlayerTab = "stats" | "contract" | "outlook";
 
 const PLUM = "var(--fig)";
 const PLUM_LIGHT = "var(--fig-bright)";
@@ -432,33 +425,13 @@ function PlayerTabButton({ label, active, onClick }: { label: string; active: bo
 function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: Team; allPlayers: Player[] }) {
   const isG = player.position === "G";
   const hasOutlook = player.position !== "G" && !!player.developmentProfile;
-  const hasStrand = true;
   const hasContract = player.yearsRemaining > 0;
-
-  const gravityProfile = useMemo(() => {
-    if (player.position === "G") return null;
-    return computeGravity(player as any);
-  }, [player]);
-
-  const hasGravity = gravityProfile !== null;
-
-  const position = player.position === "D" || player.position === "G" || player.position === "C" ? player.position : "W";
-  const xnav = useMemo(() => calcNAV({
-    ...(player as any),
-    position,
-    capCeiling: SEASON.capCeiling,
-    defRate: player.defRate ?? 0.08,
-    games: player.games ?? 40,
-  }), [player, position]);
-
-  const [gravityView, setGravityView] = useState<"analysis" | "card">("analysis");
+  // Deep analytics (STRAND, Player Card, EDGE, Gravity) live on the
+  // dedicated dossier at /players/{nhlid} — the index stays light.
+  const hasDossier = /^\d+$/.test(String(player.id));
 
   const tabs: { key: PlayerTab; label: string }[] = [
     { key: "stats", label: "Stats" },
-    ...(hasStrand ? [{ key: "strand" as PlayerTab, label: "Strand" }] : []),
-    { key: "card", label: "Player Card" },
-    ...(/^\d+$/.test(String(player.id)) && player.position !== "G" ? [{ key: "edge" as PlayerTab, label: "Edge" }] : []),
-    ...(hasGravity ? [{ key: "gravity" as PlayerTab, label: "Gravity" }] : []),
     ...(hasContract ? [{ key: "contract" as PlayerTab, label: "Contract" }] : []),
     ...(hasOutlook ? [{ key: "outlook" as PlayerTab, label: "Outlook" }] : []),
   ];
@@ -506,6 +479,25 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
             onClick={() => setActiveTab(t.key)}
           />
         ))}
+        {hasDossier && (
+          <a
+            href={`/players/${player.id}`}
+            className="no-underline"
+            style={{
+              fontFamily: "'Courier Prime', monospace",
+              fontSize: 11,
+              fontWeight: 900,
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              padding: "10px 14px",
+              marginLeft: "auto",
+              color: "var(--ledger-red)",
+              borderBottom: "2px solid transparent",
+            }}
+          >
+            Advanced Analytics →
+          </a>
+        )}
       </div>
 
       {/* Tab content */}
@@ -533,36 +525,6 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
                 </div>
               </div>
             )}
-            <div className="player-expanded-contract" style={{ marginTop: "10px", fontSize: "11px", color: "var(--ink-faint)" }}>
-              <span style={{ color: PLUM, marginRight: "6px", fontWeight: 900 }}>CONTRACT</span>
-              ${player.capHit}M × {player.yearsRemaining}yr
-              {player.hasNMC && <span style={{ marginLeft: "8px", color: "var(--red)", border: "1px solid var(--red)", padding: "0 3px" }}>NMC</span>}
-              {player.hasNTC && !player.hasNMC && <span style={{ marginLeft: "8px", color: "#8a5c00", border: "1px solid #8a5c00", padding: "0 3px" }}>NTC</span>}
-            </div>
-          </div>
-        )}
-
-        {/* ── Strand tab ─────────────────────────── */}
-        {activeTab === "strand" && hasStrand && (
-          <div>
-            <div className="strand-svg-wrap" style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px" }}>
-              <FullStrand player={player} />
-            </div>
-          </div>
-        )}
-
-        {/* ── Player Card tab ────────────────────── */}
-        {activeTab === "edge" && (
-          <EdgeShotMap nhlPlayerId={player.id} />
-        )}
-
-        {activeTab === "card" && (
-          <div style={{ display: "flex", justifyContent: "center" }}>
-            <PercentileCard
-              player={player}
-              allPlayers={allPlayers}
-              teamName={team?.name}
-            />
           </div>
         )}
 
@@ -600,63 +562,6 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
           </div>
         )}
 
-        {/* ── Gravity tab ────────────────────────── */}
-        {activeTab === "gravity" && hasGravity && gravityProfile && (
-          <div style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "12px" }}>
-            <div style={{ display: "flex", gap: 0, marginBottom: 10 }}>
-              {([
-                { key: "analysis" as const, label: "Analysis" },
-                { key: "card" as const, label: "Share Card" },
-              ]).map(v => (
-                <button
-                  key={v.key}
-                  onClick={() => setGravityView(v.key)}
-                  style={{
-                    fontFamily: "'Courier Prime', monospace",
-                    fontSize: 10,
-                    fontWeight: 900,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.12em",
-                    padding: "5px 12px",
-                    border: "1px solid #b8a070",
-                    borderBottom: gravityView === v.key ? "2px solid #1c140a" : "1px solid #b8a070",
-                    background: gravityView === v.key ? "#e4d8b8" : "transparent",
-                    color: gravityView === v.key ? "#1c140a" : "#6e5a3d",
-                    cursor: "pointer",
-                  }}
-                >
-                  {v.label}
-                </button>
-              ))}
-            </div>
-            {gravityView === "analysis" ? (
-              <GravityField profile={gravityProfile} playerName={player.name} mode="full" />
-            ) : (
-              <div style={{ display: "flex", justifyContent: "center" }}>
-                <GravityCard
-                  playerName={player.name}
-                  teamName={team?.name ?? player.teamId}
-                  position={displayPosition(player.position, player.secondaryPosition)}
-                  age={player.age}
-                  headshot={player.headshot}
-                  gravity={gravityProfile}
-                  xnav={xnav}
-                  stats={{
-                    gp: player.games ?? 82,
-                    goals: player.goalsPace != null ? Math.round((player.goalsPace / 82) * (player.games ?? 82)) : null,
-                    assists: player.assistsPace != null ? Math.round((player.assistsPace / 82) * (player.games ?? 82)) : null,
-                    pts: Math.round((player.ptsPace / 82) * (player.games ?? 82)),
-                    plusMinus: player.plusMinus,
-                    toi: player.avgTOI,
-                  }}
-                  capHit={player.capHit}
-                  yearsRemaining={player.yearsRemaining}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ── Outlook tab ────────────────────────── */}
         {activeTab === "outlook" && hasOutlook && (
           <div style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px 12px" }}>
@@ -668,41 +573,6 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
         )}
       </div>
     </div>
-  );
-}
-
-const STRAND_NAV_SHIM = { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0, fmvAav: 0, fArchetype: undefined, rosterTier: undefined } as const;
-
-function FullStrand({ player }: { player: Player }) {
-  if (player.position === "G") {
-    const goalie = buildGoalieStrandTraits(player);
-    return (
-      <StrandDisplay
-        offTraits={goalie.off}
-        defTraits={goalie.def}
-        ops={null} dps={null}
-        strandType="GOALTENDER"
-        footer={<EdgeStrip asset={player} heading={false} />}
-        W={300} H={200} amplitude={42} maxWidth={460}
-      />
-    );
-  }
-
-  const { off, def } = buildAssetTraits(player as unknown as Asset, STRAND_NAV_SHIM);
-  const ops = player.ops ?? null;
-  const dps = player.dps ?? null;
-  const strandType = computeStrandType(off, def, ops, dps);
-
-  return (
-    <StrandDisplay
-      offTraits={off}
-      defTraits={def}
-      ops={ops}
-      dps={dps}
-      strandType={strandType}
-      footer={<EdgeStrip asset={player} heading={false} />}
-      W={300} H={200} amplitude={42} maxWidth={460}
-    />
   );
 }
 
