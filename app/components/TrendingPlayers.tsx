@@ -559,11 +559,11 @@ function ExpandedPanel({
                 </span>
               </div>
               <Link
-                href="/players"
+                href={/^\d+$/.test(String(p.id)) ? `/players/${p.id}` : "/players"}
                 className="font-mono text-[9px] font-black uppercase tracking-[0.1em] no-underline hover:underline"
                 style={{ color: "var(--ledger-ink-faint)" }}
               >
-                Player Analytics &rarr;
+                {/^\d+$/.test(String(p.id)) ? "Full Profile" : "Player Analytics"} &rarr;
               </Link>
             </div>
           )}
