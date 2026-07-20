@@ -68,12 +68,11 @@ export default function GravityCard({
     { label: "UPS", val: xnav.upside },
   ];
 
-  const mechanismBars = gravity.mechanisms ? [
-    { name: "Space Creation", value: gravity.mechanisms.spaceCreation },
-    { name: "Transition", value: gravity.mechanisms.transitionControl },
-    { name: "Pace", value: gravity.mechanisms.paceManipulation },
-    { name: "Def. Warping", value: gravity.mechanisms.defensiveWarping },
-  ].sort((a, b) => b.value - a.value) : [];
+  const zoneBars = [
+    { name: "OZ Well", value: gravity.masses.oz },
+    { name: "NZ Well", value: gravity.masses.nz },
+    { name: "DZ Dome", value: gravity.masses.dz },
+  ];
 
   return (
     <div>
@@ -221,38 +220,38 @@ export default function GravityCard({
           </div>
         </div>
 
-        {/* Mechanisms */}
-        {mechanismBars.length > 0 && (
-          <div style={{ padding: "8px 16px", borderBottom: "1px solid #c1b088" }}>
-            <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#6e5a3d", marginBottom: 6 }}>
-              Mechanism Strengths
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              {mechanismBars.map(m => {
-                const pct = Math.max(m.value * 100, 3);
-                return (
-                  <div key={m.name} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ width: 70, fontSize: 9, fontWeight: 900, textAlign: "right", color: "#4a3820", letterSpacing: "0.06em", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {m.name}
-                    </span>
-                    <div style={{ flex: 1, height: 12, position: "relative", background: "#e0d3ac", border: "1px solid #c1b088", borderRadius: 2 }}>
-                      <div style={{
-                        position: "absolute", top: 0, height: "100%", borderRadius: 1,
-                        width: `${pct}%`,
-                        left: 0,
-                        background: m.value >= 0.5 ? "#146a24" : m.value >= 0.25 ? "#1a2e5c" : "#6e5a3d",
-                        opacity: 0.65,
-                      }} />
-                    </div>
-                    <span style={{ width: 30, fontSize: 10, fontWeight: 900, textAlign: "right", fontVariantNumeric: "tabular-nums", color: m.value >= 0.5 ? "#146a24" : "#1c140a" }}>
-                      {(m.value * 100).toFixed(0)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+        {/* Zone masses — the shape of the field */}
+        <div style={{ padding: "8px 16px", borderBottom: "1px solid #c1b088" }}>
+          <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#6e5a3d", marginBottom: 6 }}>
+            Field Masses — Where the Rink Curves
           </div>
-        )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            {zoneBars.map(m => {
+              const mag = Math.min(Math.abs(m.value), 1);
+              const pct = Math.max(mag * 100, 3);
+              const positive = m.value >= 0;
+              return (
+                <div key={m.name} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 70, fontSize: 9, fontWeight: 900, textAlign: "right", color: "#4a3820", letterSpacing: "0.06em", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {m.name}
+                  </span>
+                  <div style={{ flex: 1, height: 12, position: "relative", background: "#e0d3ac", border: "1px solid #c1b088", borderRadius: 2 }}>
+                    <div style={{
+                      position: "absolute", top: 0, height: "100%", borderRadius: 1,
+                      width: `${pct}%`,
+                      left: 0,
+                      background: !positive ? "#9c2b1f" : mag >= 0.5 ? "#146a24" : mag >= 0.25 ? "#1a2e5c" : "#6e5a3d",
+                      opacity: 0.65,
+                    }} />
+                  </div>
+                  <span style={{ width: 36, fontSize: 10, fontWeight: 900, textAlign: "right", fontVariantNumeric: "tabular-nums", color: !positive ? "#9c2b1f" : mag >= 0.5 ? "#146a24" : "#1c140a" }}>
+                    {m.value > 0 ? "+" : ""}{m.value.toFixed(2)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
         {/* NAV Components */}
         <div style={{

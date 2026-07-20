@@ -1,8 +1,10 @@
 "use client";
-// ── GravityField v2.3 — inline SVG tier icons, orbital physics, glossary ──
+// ── GravityField v3 — zone-mass rink diagram, tier icons, glossary ──
+// Renders the Spacetime engine's output: three zone masses (OZ well,
+// NZ well, DZ dome) on a rink strip, with force as the single currency.
 
 import React from "react";
-import type { GravityProfile, GravityTier } from "@/app/lib/gravity";
+import type { GravityProfile, GravityTier, ZoneMasses } from "@/app/lib/gravity";
 import { gravityTierColor } from "@/app/lib/gravity";
 
 interface Props {
@@ -26,7 +28,6 @@ const TIER_LABEL: Record<GravityTier, string> = {
 export function TierIcon({ tier, size = 16, color }: { tier: GravityTier; size?: number; color?: string }) {
   const c = color ?? gravityTierColor(tier);
   const s = size;
-  const h = s / 2;
 
   switch (tier) {
     // Spiral galaxy — concentric arcs spiraling inward
@@ -103,111 +104,60 @@ export function TierIcon({ tier, size = 16, color }: { tier: GravityTier; size?:
   }
 }
 
-// Static glossary for mechanism bars and side boxes
-const GLOSSARY: Record<string, string> = {
-  "Space Creation": "Creating high-quality chances for others beyond his own shooting.",
-  "Transition": "Neutral-zone carry and zone entry dominance — skating speed and puck transport.",
-  "Pace": "Shot-generation rate relative to position average — how much the tempo quickens when on ice.",
-  "Def. Warping": "xGA suppression, defensive point shares, and PK trust — forcing opponents to overcommit.",
-  "Gravity Assist": "Invisible creation beyond the scoresheet. High = lifts team without needing personal credit.",
-  "Signal Confidence": "How likely this gravity reading holds next season. Based on year-over-year consistency.",
+// ── Zone-mass vocabulary ──────────────────────────────────────────────────
+
+const ZONE_GLOSSARY: Record<keyof ZoneMasses, string> = {
+  oz: "Offensive-zone well — chances created, finishing threat, on-ice lift, PP leverage. Play falls toward the opponent's net.",
+  nz: "Neutral-zone well — where play lives vs where he's deployed, plus speed and burst rate. Drags the game through center ice.",
+  dz: "Defensive-zone dome — xGA suppression, defensive value, PK trust. Repulsive curvature: opponents can't set up here.",
 };
 
-// Dynamic, value-aware descriptions for the component panel
-interface ComponentContext {
+const ZONE_TITLE: Record<keyof ZoneMasses, string> = {
+  oz: "OZ Well",
+  nz: "NZ Well",
+  dz: "DZ Dome",
+};
+
+interface ZoneContext {
   qualifier: string;
   qualColor: string;
   description: string;
 }
 
-function getComponentContext(label: string, raw: number, profile: GravityProfile): ComponentContext {
-  const isD = profile.isDefenseman;
+function zoneContext(zone: keyof ZoneMasses, m: number, isD: boolean): ZoneContext {
   const green = "var(--ledger-green)";
   const amber = "var(--ledger-amber, #d4a017)";
   const faint = "var(--ledger-ink-faint)";
   const red = "var(--ledger-red)";
 
-  switch (label) {
-    case "NOIV Lift": {
-      const v = raw;
-      if (v >= 0.25)
-        return { qualifier: "Elite", qualColor: green, description: `Linemates create significantly more offense with him on ice. A lift this strong is rare — top-of-league territory.` };
-      if (v >= 0.10)
-        return { qualifier: "Strong", qualColor: green, description: `Clear positive effect on linemates — they produce more offense when he's deployed. Above average for a regular.` };
-      if (v >= 0.02)
-        return { qualifier: "Positive", qualColor: amber, description: `Modest lift — linemates are slightly better with him on ice, but the effect isn't commanding.` };
-      if (v >= -0.02)
-        return { qualifier: "Neutral", qualColor: faint, description: `No measurable effect on linemate production. Linemates play roughly the same with or without him.` };
-      if (v >= -0.10)
-        return { qualifier: "Below Avg", qualColor: red, description: `Linemates produce less with him on ice. Could reflect deployment, a style mismatch, or a player who absorbs touches without creating.` };
-      return { qualifier: "Harmful", qualColor: red, description: `Linemates produce significantly less offense with him deployed. Strong negative signal.` };
+  switch (zone) {
+    case "oz": {
+      if (m >= 0.75) return { qualifier: "Supermassive", qualColor: green, description: "A deep offensive well — chances, finishing, and on-ice lift all far beyond positional norms. Play collapses toward the opponent's net when he's out." };
+      if (m >= 0.45) return { qualifier: "Strong", qualColor: green, description: "Clear offensive warping — creates and converts well above his position. Defenders must commit extra attention." };
+      if (m >= 0.15) return { qualifier: "Positive", qualColor: amber, description: "A measurable offensive field — above positional average, but not the kind that bends coverage by itself." };
+      if (m >= -0.15) return { qualifier: "Flat", qualColor: faint, description: "Offensive impact near positional average — the attacking zone doesn't curve much either way." };
+      return { qualifier: "Caved", qualColor: red, description: "Offense runs below position when he's on the ice — the attacking-zone field sags." };
     }
-
-    case "Zone Pull": {
-      const v = raw;
-      if (v >= 0.30)
-        return { qualifier: "Strong OZ", qualColor: green, description: `Team spends significantly more time in the offensive zone when he's on ice — he pulls play forward.` };
-      if (v >= 0.10)
-        return { qualifier: "OZ Tilt", qualColor: green, description: `Positive territorial effect — the team plays more in the attacking zone with him deployed.` };
-      if (v >= -0.05)
-        return { qualifier: "Balanced", qualColor: faint, description: `Roughly even zone time — no strong pull toward offense or defense.` };
-      if (v >= -0.20)
-        return { qualifier: "DZ Tilt", qualColor: amber, description: isD
-          ? `Defensive zone tilt is common for stay-at-home defensemen — not necessarily a negative if he's deployed that way on purpose.`
-          : `Team tilts defensive when he's on ice. Can reflect tough matchups, or a player who doesn't drive transition.` };
-      return { qualifier: "Heavy DZ", qualColor: red, description: isD
-        ? `Strong defensive zone tilt. If he's a shutdown D this is expected; otherwise it's limiting his gravity.`
-        : `Team is pinned in its own zone when he plays — a significant drag on territorial control.` };
+    case "nz": {
+      if (m >= 0.6) return { qualifier: "Transition Engine", qualColor: green, description: isD
+        ? "Rare for a defenseman — play gets dragged through the neutral zone when he's deployed. The Quinn Hughes signal: deployment says one end, the puck lives in the other."
+        : "Elite transporter — starts don't matter, the puck ends up going north. Speed and carry volume well beyond position." };
+      if (m >= 0.3) return { qualifier: "Strong Carry", qualColor: green, description: "Real transition pull — moves play up ice beyond what deployment predicts, with the skating to force back-offs." };
+      if (m >= 0.05) return { qualifier: "Detectable", qualColor: amber, description: "Modest neutral-zone influence — some carry signal, but transition isn't the core of his gravity." };
+      if (m >= -0.15) return { qualifier: "Flat", qualColor: faint, description: "Neutral-zone impact around positional average — play moves through center ice at the rate deployment predicts." };
+      return { qualifier: "Anchor", qualColor: red, description: "Play stalls in transit — the team moves the puck north less than deployment predicts with him out there." };
     }
-
-    case "Creation": {
-      const v = raw;
-      if (isD) {
-        if (v >= 1.20)
-          return { qualifier: "Transition D", qualColor: green, description: `Rare for a defenseman — his team improves beyond what his own stats suggest. Likely a strong puck-mover who creates through outlet passes and transition.` };
-        if (v >= 0.90)
-          return { qualifier: "Balanced", qualColor: amber, description: `Team lift roughly matches his personal production. Typical for a defenseman who contributes on both ends.` };
-        return { qualifier: "Structure", qualColor: faint, description: `Team lift is less than his personal stats — typical for defensemen whose value comes through defensive structure, gap control, and positioning rather than playmaking.` };
-      }
-      if (v >= 1.30)
-        return { qualifier: "Elite Creator", qualColor: green, description: `Makes everyone around him better — the team improves far more than his personal stats explain. Classic "raises the tide" player.` };
-      if (v >= 1.05)
-        return { qualifier: "Creator", qualColor: green, description: `Team lift exceeds his own production — he opens space and chances for linemates beyond what shows on his own stat line.` };
-      if (v >= 0.85)
-        return { qualifier: "Balanced", qualColor: amber, description: `Team lift roughly matches his personal output — creates as much as his stats suggest, neither pure finisher nor pure playmaker.` };
-      if (v >= 0.60)
-        return { qualifier: "Finisher", qualColor: faint, description: `Personal stats exceed team lift — his value comes more from converting chances than creating them for others.` };
-      return { qualifier: "Pure Scorer", qualColor: faint, description: `Strong individual numbers but team doesn't lift proportionally. A triggerman who needs creators around him.` };
+    case "dz": {
+      if (m >= 0.6) return { qualifier: "Fortress", qualColor: green, description: "A hard defensive dome — opponent offense can't set up. Suppression, defensive value, and PK trust all elite for the position." };
+      if (m >= 0.3) return { qualifier: "Solid Dome", qualColor: green, description: "Meaningful repulsive curvature — the defensive zone is measurably harder to attack when he's on the ice." };
+      if (m >= 0.05) return { qualifier: "Stable", qualColor: amber, description: "Holds his end at positional norms with a slight edge — not a shutdown profile, not a liability." };
+      if (m >= -0.15) return { qualifier: "Flat", qualColor: faint, description: "Defensive impact near positional average — the home zone neither repels nor invites pressure." };
+      return { qualifier: "Breached", qualColor: red, description: "The defensive zone caves with him deployed — opponents generate more than they should. A well in the wrong end of the ice." };
     }
-
-    case "Mass": {
-      const v = raw;
-      if (v >= 1.00)
-        return { qualifier: "Heavy", qualColor: green, description: `High-minute, high-production player — carries major gravitational weight. His presence shapes a full game.` };
-      if (v >= 0.60)
-        return { qualifier: "Solid", qualColor: amber, description: `Meaningful minutes and production. Enough ice time and output to create a measurable gravitational field.` };
-      if (v >= 0.30)
-        return { qualifier: "Light", qualColor: faint, description: `Moderate usage or production — the gravitational field exists but doesn't dominate. Limited minutes or limited scoring dilute the signal.` };
-      return { qualifier: "Minimal", qualColor: faint, description: `Low minutes and/or production — not enough on-ice presence to create a meaningful gravitational effect.` };
-    }
-
-    case "Partner Indep.": {
-      const v = raw;
-      if (v >= 1.15)
-        return { qualifier: "Confirmed", qualColor: green, description: `Multi-season data shows consistent gravity regardless of linemates — this is real, independent pull, not borrowed from elite partners.` };
-      if (v >= 1.05)
-        return { qualifier: "Likely Real", qualColor: green, description: `Good year-over-year consistency. The gravity signal is probably real, though more seasons would strengthen confidence.` };
-      if (v >= 0.95)
-        return { qualifier: "Baseline", qualColor: faint, description: `Not enough multi-season variation to confirm — the reading could change with different linemates or deployment.` };
-      if (v >= 0.80)
-        return { qualifier: "Uncertain", qualColor: amber, description: `Current and historical signals diverge — the gravity may be partly borrowed from strong linemates. Watch for changes after lineup shifts.` };
-      return { qualifier: "Suspect", qualColor: red, description: `Significant year-over-year inconsistency — this player's gravity reading is likely inflated by elite linemates or specific deployment.` };
-    }
-
-    default:
-      return { qualifier: "", qualColor: faint, description: "" };
   }
 }
+
+// ── CompactGravity — inline force + tier badge ────────────────────────────
 
 function CompactGravity({ profile }: { profile: GravityProfile }) {
   const color = gravityTierColor(profile.tier);
@@ -233,149 +183,72 @@ function CompactGravity({ profile }: { profile: GravityProfile }) {
 
 const clampViz = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-// Stronger values orbit CLOSER to the center (gravitational pull)
-function valueToOrbit(value: number, min: number, max: number): number {
-  const t = (value - min) / (max - min);
-  return 0.85 - clampViz(t, 0, 1) * 0.55;
-}
-
-// ── SVG orbital field diagram ──────────────────────────────────────────────
+// ── FieldDiagram — three-zone rink with mass curvature ────────────────────
+// The rink is drawn left→right as DZ | NZ | OZ (player attacks right).
+// Wells render as concentric rings sinking into the ice; the DZ dome
+// renders as dashed repulsive rings. Ring count and opacity scale with
+// mass. Negative mass in any zone renders red — the field caving in.
 
 function FieldDiagram({ profile }: { profile: GravityProfile }) {
   const W = 320;
-  const H = 300;
-  const cx = W / 2;
-  const cy = 150;
-  const absForce = Math.abs(profile.force);
-  const isNeg = profile.force < 0;
+  const H = 240;
   const color = gravityTierColor(profile.tier);
+  const { oz, nz, dz } = profile.masses;
 
-  const ringCount = Math.max(2, Math.min(7, Math.round(absForce * 8) + 2));
-  const maxR = 100;
-  const minR = 30;
-  const coreR = 26;
+  // Rink geometry
+  const rinkX = 12, rinkY = 52, rinkW = 296, rinkH = 118;
+  const midY = rinkY + rinkH / 2;
+  const blue1 = rinkX + rinkW / 3;
+  const blue2 = rinkX + (rinkW * 2) / 3;
+  const centerX = rinkX + rinkW / 2;
 
-  const rings: { r: number; opacity: number }[] = [];
-  for (let i = 0; i < ringCount; i++) {
-    const t = (i + 1) / ringCount;
-    const r = minR + (maxR - minR) * Math.pow(t, 0.7);
-    const opBase = 0.1 + (1 - t) * 0.25;
-    const opScale = Math.min(1, absForce * 1.5);
-    rings.push({ r, opacity: opBase * opScale });
-  }
-
-  const gridLines = 8;
-  const gridAngleStep = (2 * Math.PI) / gridLines;
-
-  // Primary orbital markers
-  const primaryDots = [
-    {
-      label: "NOIV", value: profile.noivLift,
-      angle: -Math.PI * 0.75,
-      orbit: valueToOrbit(profile.noivLift, -1, 1),
-      display: `${profile.noivLift > 0 ? "+" : ""}${profile.noivLift.toFixed(2)}`,
-    },
-    {
-      label: "Zone Pull", value: profile.zonePull,
-      angle: -Math.PI * 0.25,
-      orbit: valueToOrbit(profile.zonePull, -0.5, 0.75),
-      display: `${profile.zonePull > 0 ? "+" : ""}${profile.zonePull.toFixed(2)}`,
-    },
-    {
-      label: "Creation", value: profile.creationAmplifier,
-      angle: Math.PI * 0.70,
-      orbit: valueToOrbit(profile.creationAmplifier, 0.5, 2.0),
-      display: `×${profile.creationAmplifier.toFixed(2)}`,
-    },
+  const zones: {
+    key: keyof ZoneMasses;
+    m: number;
+    cx: number;
+    repulsive: boolean;
+  }[] = [
+    { key: "dz", m: dz, cx: rinkX + rinkW / 6, repulsive: true },
+    { key: "nz", m: nz, cx: centerX, repulsive: false },
+    { key: "oz", m: oz, cx: rinkX + (rinkW * 5) / 6, repulsive: false },
   ];
 
-  // Secondary markers — Grav Ast positioned lower-right to avoid tier label
-  const secondaryDots = [
-    {
-      label: "Partner", value: profile.partnerIndependence,
-      angle: Math.PI * 0.15,
-      orbit: valueToOrbit(profile.partnerIndependence, 0.5, 1.4),
-      display: `×${profile.partnerIndependence.toFixed(2)}`,
-    },
-    {
-      label: "Grav Ast", value: profile.gravityAssist,
-      angle: Math.PI * 0.42,
-      orbit: valueToOrbit(profile.gravityAssist, 0, 1),
-      display: profile.gravityAssist.toFixed(2),
-    },
-  ];
+  function zoneRings(zone: typeof zones[number]) {
+    const mag = Math.abs(zone.m);
+    if (mag < 0.05) return null;
+    // For dz: positive mass = healthy dome (tier color, dashed = repulsion);
+    // negative = breached (red, solid — a well in the wrong end).
+    // For oz/nz: positive = well (tier color), negative = caved (red).
+    const healthy = zone.m > 0;
+    const ringColor = healthy ? color : "var(--ledger-red)";
+    const dashed = zone.repulsive && healthy;
+    const ringCount = Math.max(1, Math.min(5, Math.round(mag * 5) + 1));
+    const maxRx = 44, maxRy = 34;
 
-  // Confidence arc
-  const piArc = clampViz(profile.partnerIndependence, 0.5, 1.4);
-  const arcFraction = (piArc - 0.5) / 0.9;
-  const arcR = coreR + 9;
-  const arcAngleSpan = Math.PI * 2 * arcFraction;
-  const arcStart = -Math.PI / 2;
-  const arcEnd = arcStart + arcAngleSpan;
-  const arcX1 = cx + Math.cos(arcStart) * arcR;
-  const arcY1 = cy + Math.sin(arcStart) * arcR;
-  const arcX2 = cx + Math.cos(arcEnd) * arcR;
-  const arcY2 = cy + Math.sin(arcEnd) * arcR;
-  const largeArc = arcAngleSpan > Math.PI ? 1 : 0;
-
-  // Tier icon SVG fragments — rendered directly inside the diagram SVG
-  function renderTierIcon(x: number, y: number) {
-    const s = 18;
-    const ox = x - s / 2;
-    const oy = y - s / 2;
-
-    switch (profile.tier) {
-      case "SUPERMASSIVE":
-        return (
-          <g transform={`translate(${ox},${oy})`}>
-            <circle cx="9" cy="9" r="2.2" fill={color} />
-            <path d="M9 3.5a5.5 5.5 0 0 1 4.76 2.75" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
-            <path d="M9 14.5a5.5 5.5 0 0 1-4.76-2.75" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
-            <circle cx="9" cy="9" r="7" stroke={color} strokeWidth="0.5" opacity="0.3" />
-          </g>
-        );
-      case "STAR":
-        return (
-          <g transform={`translate(${ox},${oy})`}>
-            <polygon points="9,2 10.3,6.5 15,7 11.2,10 12.5,14.5 9,11.5 5.5,14.5 6.8,10 3,7 7.7,6.5" fill={color} opacity="0.85" />
-          </g>
-        );
-      case "MAIN_SEQUENCE":
-        return (
-          <g transform={`translate(${ox},${oy})`}>
-            <circle cx="9" cy="9" r="3.5" fill={color} opacity="0.8" />
-            {[0, 90, 180, 270].map(deg => {
-              const rad = (deg * Math.PI) / 180;
-              const x1 = 9 + Math.cos(rad) * 5.2;
-              const y1 = 9 + Math.sin(rad) * 5.2;
-              const x2 = 9 + Math.cos(rad) * 7;
-              const y2 = 9 + Math.sin(rad) * 7;
-              return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth="1.3" strokeLinecap="round" opacity="0.6" />;
-            })}
-          </g>
-        );
-      case "SATELLITE":
-        return (
-          <g transform={`translate(${ox},${oy})`}>
-            <ellipse cx="9" cy="9" rx="6.5" ry="3" stroke={color} strokeWidth="0.8" opacity="0.35" transform="rotate(-20 9 9)" />
-            <circle cx="13" cy="7" r="2" fill={color} opacity="0.7" />
-          </g>
-        );
-      case "ASTEROID":
-        return (
-          <g transform={`translate(${ox},${oy})`}>
-            <polygon points="6,3.5 11,3 14,6 14.5,10 12,14 7.5,14.5 4,12 3,8" fill={color} opacity="0.4" stroke={color} strokeWidth="0.8" />
-          </g>
-        );
-      case "BLACK_HOLE":
-        return (
-          <g transform={`translate(${ox},${oy})`}>
-            <circle cx="9" cy="9" r="3.2" fill={color} opacity="0.9" />
-            <circle cx="9" cy="9" r="2" fill="var(--paper-bg)" />
-            <ellipse cx="9" cy="9" rx="7" ry="2.5" stroke={color} strokeWidth="1" opacity="0.5" />
-          </g>
-        );
-    }
+    return (
+      <g key={zone.key}>
+        {Array.from({ length: ringCount }).map((_, i) => {
+          const t = (i + 1) / ringCount;
+          const rx = 10 + (maxRx - 10) * t;
+          const ry = 8 + (maxRy - 8) * t;
+          const opacity = (0.14 + (1 - t) * 0.30) * clampViz(mag * 1.6, 0.3, 1);
+          return (
+            <ellipse
+              key={i}
+              cx={zone.cx} cy={midY}
+              rx={rx} ry={ry}
+              fill="none"
+              stroke={ringColor}
+              strokeWidth={i === 0 ? 1.8 : 1}
+              strokeDasharray={dashed ? "4 3" : "none"}
+              opacity={opacity}
+            />
+          );
+        })}
+        {/* Core node */}
+        <circle cx={zone.cx} cy={midY} r={4.5} fill={ringColor} opacity={clampViz(0.35 + mag * 0.55, 0, 0.9)} />
+      </g>
+    );
   }
 
   return (
@@ -384,202 +257,12 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
       className="w-full"
       style={{ maxWidth: 360, display: "block", margin: "0 auto" }}
       role="img"
-      aria-label={`Gravity field: force ${profile.force > 0 ? "+" : ""}${profile.force.toFixed(2)}, tier ${TIER_LABEL[profile.tier]}. NOIV lift ${profile.noivLift > 0 ? "+" : ""}${profile.noivLift.toFixed(2)}, zone pull ${profile.zonePull > 0 ? "+" : ""}${profile.zonePull.toFixed(2)}, creation amplifier times ${profile.creationAmplifier.toFixed(2)}, player mass ${profile.playerMass.toFixed(2)}, partner independence times ${profile.partnerIndependence.toFixed(2)}, gravity assist ${profile.gravityAssist.toFixed(2)}, signal confidence ${(profile.predictiveStability * 100).toFixed(0)} percent.`}
+      aria-label={`Gravity field: force ${profile.force > 0 ? "+" : ""}${profile.force.toFixed(2)}, tier ${TIER_LABEL[profile.tier]}. Offensive-zone well ${oz > 0 ? "+" : ""}${oz.toFixed(2)}, neutral-zone well ${nz > 0 ? "+" : ""}${nz.toFixed(2)}, defensive-zone dome ${dz > 0 ? "+" : ""}${dz.toFixed(2)}. Signal confidence ${(profile.confidence * 100).toFixed(0)} percent.`}
     >
-      {/* Radial grid */}
-      {Array.from({ length: gridLines }).map((_, i) => {
-        const angle = i * gridAngleStep;
-        const x2 = cx + Math.cos(angle) * (maxR + 5);
-        const y2 = cy + Math.sin(angle) * (maxR + 5);
-        return (
-          <line
-            key={`grid-${i}`}
-            x1={cx} y1={cy} x2={x2} y2={y2}
-            stroke="var(--ledger-rule)"
-            strokeWidth={0.5}
-            opacity={0.2}
-          />
-        );
-      })}
-
-      {/* Field rings */}
-      {rings.map(({ r, opacity }, i) => (
-        <circle
-          key={`ring-${i}`}
-          cx={cx} cy={cy} r={r}
-          fill="none"
-          stroke={isNeg ? "var(--ledger-red)" : color}
-          strokeWidth={i === 0 ? 2 : 1}
-          opacity={opacity}
-          strokeDasharray={isNeg ? "5 3" : "none"}
-        />
-      ))}
-
-      {/* Outer boundary */}
-      <circle
-        cx={cx} cy={cy} r={maxR + 8}
-        fill="none"
-        stroke="var(--ledger-rule)"
-        strokeWidth={0.5}
-        opacity={0.3}
-      />
-
-      {/* Orbital paths */}
-      {primaryDots.map(({ orbit }, i) => {
-        const orbitR = minR + (maxR - minR) * orbit;
-        return (
-          <circle
-            key={`orbit-p-${i}`}
-            cx={cx} cy={cy} r={orbitR}
-            fill="none"
-            stroke="var(--ledger-ink-faint)"
-            strokeWidth={0.5}
-            strokeDasharray="2 5"
-            opacity={0.2}
-          />
-        );
-      })}
-
-      {/* Primary markers */}
-      {primaryDots.map(({ label, angle, orbit, display }, i) => {
-        const orbitR = minR + (maxR - minR) * orbit;
-        const mx = cx + Math.cos(angle) * orbitR;
-        const my = cy + Math.sin(angle) * orbitR;
-        const labelR = maxR + 26;
-        const lx = cx + Math.cos(angle) * labelR;
-        const ly = cy + Math.sin(angle) * labelR;
-        const anchor = lx < cx - 10 ? "end" : lx > cx + 10 ? "start" : "middle";
-
-        return (
-          <g key={`comp-p-${i}`}>
-            <line
-              x1={mx} y1={my} x2={lx} y2={ly}
-              stroke="var(--ledger-ink-faint)"
-              strokeWidth={0.7}
-              opacity={0.35}
-              strokeDasharray="2 2"
-            />
-            <circle
-              cx={mx} cy={my} r={5}
-              fill={color}
-              stroke="var(--paper-bg)"
-              strokeWidth={2}
-              opacity={0.9}
-            />
-            <text
-              x={lx} y={ly - 6}
-              textAnchor={anchor}
-              fill="var(--ledger-ink-faint)"
-              fontFamily="'Courier Prime', monospace"
-              fontWeight={900}
-              fontSize={9}
-              letterSpacing="0.1em"
-            >
-              {label.toUpperCase()}
-            </text>
-            <text
-              x={lx} y={ly + 7}
-              textAnchor={anchor}
-              fill={color}
-              fontFamily="'Courier Prime', monospace"
-              fontWeight={900}
-              fontSize={13}
-            >
-              {display}
-            </text>
-          </g>
-        );
-      })}
-
-      {/* Secondary markers */}
-      {secondaryDots.map(({ label, angle, orbit, display }, i) => {
-        const orbitR = minR + (maxR - minR) * orbit;
-        const mx = cx + Math.cos(angle) * orbitR;
-        const my = cy + Math.sin(angle) * orbitR;
-        const labelR = maxR + 24;
-        const lx = cx + Math.cos(angle) * labelR;
-        const ly = cy + Math.sin(angle) * labelR;
-        const anchor = lx < cx - 10 ? "end" : lx > cx + 10 ? "start" : "middle";
-
-        return (
-          <g key={`comp-s-${i}`}>
-            <line
-              x1={mx} y1={my} x2={lx} y2={ly}
-              stroke="var(--ledger-ink-faint)"
-              strokeWidth={0.5}
-              opacity={0.25}
-              strokeDasharray="1 3"
-            />
-            <circle
-              cx={mx} cy={my} r={3.5}
-              fill="none"
-              stroke={color}
-              strokeWidth={1.5}
-              opacity={0.7}
-            />
-            <text
-              x={lx} y={ly - 5}
-              textAnchor={anchor}
-              fill="var(--ledger-ink-faint)"
-              fontFamily="'Courier Prime', monospace"
-              fontWeight={900}
-              fontSize={8}
-              letterSpacing="0.08em"
-            >
-              {label.toUpperCase()}
-            </text>
-            <text
-              x={lx} y={ly + 6}
-              textAnchor={anchor}
-              fill={color}
-              fontFamily="'Courier Prime', monospace"
-              fontWeight={900}
-              fontSize={11}
-              opacity={0.8}
-            >
-              {display}
-            </text>
-          </g>
-        );
-      })}
-
-      {/* Confidence arc */}
-      {arcAngleSpan > 0.05 && (
-        <path
-          d={`M ${arcX1} ${arcY1} A ${arcR} ${arcR} 0 ${largeArc} 1 ${arcX2} ${arcY2}`}
-          fill="none"
-          stroke={color}
-          strokeWidth={2}
-          opacity={0.5}
-          strokeLinecap="round"
-        />
-      )}
-
-      {/* Central mass node */}
-      <circle cx={cx} cy={cy} r={coreR + 6} fill="none" stroke={color} strokeWidth={1} opacity={0.25} />
-      <circle cx={cx} cy={cy} r={coreR + 3} fill="none" stroke={color} strokeWidth={1.5} opacity={0.4} />
-      <circle cx={cx} cy={cy} r={coreR} fill="var(--paper-bg)" stroke={color} strokeWidth={2.5} />
-
-      {/* Force readout */}
+      {/* Tier label — top left */}
       <text
-        x={cx} y={cy + 1}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fill="var(--ledger-rule)"
-        fontFamily="'Courier Prime', monospace"
-        fontWeight={900}
-        fontSize={18}
-      >
-        {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
-      </text>
-
-      {/* Tier icon + label — inline, vertically centered */}
-      {renderTierIcon(50, 20)}
-      <text
-        x={68}
-        y={20}
+        x={14} y={22}
         textAnchor="start"
-        dominantBaseline="central"
         fill={color}
         fontFamily="'Courier Prime', monospace"
         fontWeight={900}
@@ -589,9 +272,113 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         {TIER_LABEL[profile.tier].toUpperCase()}
       </text>
 
+      {/* Force readout — top right */}
+      <text
+        x={W - 14} y={22}
+        textAnchor="end"
+        fill={color}
+        fontFamily="'Courier Prime', monospace"
+        fontWeight={900}
+        fontSize={18}
+      >
+        {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
+      </text>
+      <text
+        x={W - 14} y={34}
+        textAnchor="end"
+        fill="var(--ledger-ink-faint)"
+        fontFamily="'Courier Prime', monospace"
+        fontWeight={900}
+        fontSize={7}
+        letterSpacing="0.18em"
+      >
+        NET FORCE
+      </text>
+
+      {/* Rink outline */}
+      <rect
+        x={rinkX} y={rinkY} width={rinkW} height={rinkH} rx={22}
+        fill="var(--paper-inset)"
+        stroke="var(--ledger-ink)"
+        strokeWidth={1.5}
+        opacity={0.9}
+      />
+
+      {/* Blue lines + center red line */}
+      <line x1={blue1} y1={rinkY + 2} x2={blue1} y2={rinkY + rinkH - 2} stroke="var(--ledger-navy, #1a2e5c)" strokeWidth={2.5} opacity={0.45} />
+      <line x1={blue2} y1={rinkY + 2} x2={blue2} y2={rinkY + rinkH - 2} stroke="var(--ledger-navy, #1a2e5c)" strokeWidth={2.5} opacity={0.45} />
+      <line x1={centerX} y1={rinkY + 2} x2={centerX} y2={rinkY + rinkH - 2} stroke="var(--ledger-red)" strokeWidth={1.5} opacity={0.4} strokeDasharray="4 3" />
+
+      {/* Goal lines */}
+      <line x1={rinkX + 12} y1={rinkY + 6} x2={rinkX + 12} y2={rinkY + rinkH - 6} stroke="var(--ledger-red)" strokeWidth={1} opacity={0.3} />
+      <line x1={rinkX + rinkW - 12} y1={rinkY + 6} x2={rinkX + rinkW - 12} y2={rinkY + rinkH - 6} stroke="var(--ledger-red)" strokeWidth={1} opacity={0.3} />
+
+      {/* Zone mass fields */}
+      {zones.map(zoneRings)}
+
+      {/* Zone labels + values below rink */}
+      {zones.map(zone => {
+        const ctx = zoneContext(zone.key, zone.m, profile.isDefenseman);
+        const healthy = zone.m > 0;
+        const valColor = Math.abs(zone.m) < 0.05
+          ? "var(--ledger-ink-faint)"
+          : healthy ? color : "var(--ledger-red)";
+        return (
+          <g key={`label-${zone.key}`}>
+            <text
+              x={zone.cx} y={rinkY + rinkH + 18}
+              textAnchor="middle"
+              fill="var(--ledger-ink-faint)"
+              fontFamily="'Courier Prime', monospace"
+              fontWeight={900}
+              fontSize={9}
+              letterSpacing="0.1em"
+            >
+              {ZONE_TITLE[zone.key].toUpperCase()}
+            </text>
+            <text
+              x={zone.cx} y={rinkY + rinkH + 34}
+              textAnchor="middle"
+              fill={valColor}
+              fontFamily="'Courier Prime', monospace"
+              fontWeight={900}
+              fontSize={14}
+            >
+              {zone.m > 0 ? "+" : ""}{zone.m.toFixed(2)}
+            </text>
+            <text
+              x={zone.cx} y={rinkY + rinkH + 45}
+              textAnchor="middle"
+              fill="var(--ledger-ink-faint)"
+              fontFamily="'Courier Prime', monospace"
+              fontWeight={700}
+              fontSize={7}
+              letterSpacing="0.06em"
+              opacity={0.8}
+            >
+              {ctx.qualifier.toUpperCase()}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Attack direction */}
+      <text
+        x={W - 14} y={rinkY - 6}
+        textAnchor="end"
+        fill="var(--ledger-ink-faint)"
+        fontFamily="'Courier Prime', monospace"
+        fontWeight={700}
+        fontSize={7}
+        letterSpacing="0.14em"
+        opacity={0.7}
+      >
+        ATTACKING →
+      </text>
+
       {/* Bottom title */}
       <text
-        x={cx} y={H - 6}
+        x={W / 2} y={H - 6}
         textAnchor="middle"
         fill="var(--ledger-ink-faint)"
         fontFamily="'Courier Prime', monospace"
@@ -605,48 +392,31 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
   );
 }
 
-// ── Component panel with glossary ─────────────────────────────────────────
+// ── Zone component panel with qualifiers ──────────────────────────────────
 
 function ComponentPanel({ profile }: { profile: GravityProfile }) {
   const color = gravityTierColor(profile.tier);
-  const items: { label: string; value: string; raw: number }[] = [
-    {
-      label: "NOIV Lift",
-      value: `${profile.noivLift > 0 ? "+" : ""}${profile.noivLift.toFixed(2)}`,
-      raw: profile.noivLift,
-    },
-    {
-      label: "Zone Pull",
-      value: `${profile.zonePull > 0 ? "+" : ""}${profile.zonePull.toFixed(2)}`,
-      raw: profile.zonePull,
-    },
-    {
-      label: "Creation",
-      value: `×${profile.creationAmplifier.toFixed(2)}`,
-      raw: profile.creationAmplifier,
-    },
-    {
-      label: "Mass",
-      value: profile.playerMass.toFixed(2),
-      raw: profile.playerMass,
-    },
-    {
-      label: "Partner Indep.",
-      value: `×${profile.partnerIndependence.toFixed(2)}`,
-      raw: profile.partnerIndependence,
-    },
+  const items: { zone: keyof ZoneMasses; m: number }[] = [
+    { zone: "oz", m: profile.masses.oz },
+    { zone: "nz", m: profile.masses.nz },
+    { zone: "dz", m: profile.masses.dz },
   ];
 
   return (
-    <div className="flex flex-col gap-1.5" role="list" aria-label="Gravity components">
-      {items.map(({ label, value, raw }) => {
-        const ctx = getComponentContext(label, raw, profile);
+    <div className="flex flex-col gap-1.5" role="list" aria-label="Gravity zone masses">
+      {items.map(({ zone, m }) => {
+        const ctx = zoneContext(zone, m, profile.isDefenseman);
+        const healthy = m > 0;
+        const valColor = Math.abs(m) < 0.05
+          ? "var(--ledger-ink-faint)"
+          : healthy ? color : "var(--ledger-red)";
         return (
-          <div key={label}
+          <div key={zone}
             className="px-2.5 py-2 border"
             style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-bg)" }}
             role="listitem"
-            aria-label={`${label}: ${value}, ${ctx.qualifier}. ${ctx.description}`}
+            aria-label={`${ZONE_TITLE[zone]}: ${m > 0 ? "+" : ""}${m.toFixed(2)}, ${ctx.qualifier}. ${ctx.description}`}
+            title={ZONE_GLOSSARY[zone]}
           >
             <div className="flex items-baseline justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -654,22 +424,20 @@ function ComponentPanel({ profile }: { profile: GravityProfile }) {
                   className="text-[10px] font-black uppercase tracking-[0.12em] font-mono"
                   style={{ color: "var(--ledger-ink-faint)" }}
                 >
-                  {label}
+                  {ZONE_TITLE[zone]}
                 </div>
-                {ctx.qualifier && (
-                  <div
-                    className="text-[8px] font-black uppercase tracking-[0.08em] font-mono px-1 py-px border"
-                    style={{ color: ctx.qualColor, borderColor: ctx.qualColor, lineHeight: 1.3 }}
-                  >
-                    {ctx.qualifier}
-                  </div>
-                )}
+                <div
+                  className="text-[8px] font-black uppercase tracking-[0.08em] font-mono px-1 py-px border"
+                  style={{ color: ctx.qualColor, borderColor: ctx.qualColor, lineHeight: 1.3 }}
+                >
+                  {ctx.qualifier}
+                </div>
               </div>
               <div
                 className="text-[15px] font-black font-mono leading-tight"
-                style={{ color, fontVariantNumeric: "tabular-nums" }}
+                style={{ color: valColor, fontVariantNumeric: "tabular-nums" }}
               >
-                {value}
+                {m > 0 ? "+" : ""}{m.toFixed(2)}
               </div>
             </div>
             <div
@@ -681,186 +449,75 @@ function ComponentPanel({ profile }: { profile: GravityProfile }) {
           </div>
         );
       })}
-
-      {/* Context badge */}
-      {profile.contextAdjustment !== 1.0 && (
-        <div className="text-[10px] font-mono font-black px-2.5 mt-0.5" style={{ color: "var(--ledger-ink-faint)" }}>
-          Context ×{profile.contextAdjustment.toFixed(2)} (QoC · zone · PP)
-        </div>
-      )}
     </div>
   );
 }
 
-// ── Mechanism bar ──────────────────────────────────────────────────────────
+// ── Signal panel — confidence, partner independence, data coverage ────────
 
-const LEAGUE_AVG: Record<string, number> = {
-  "Space Creation":  0.22,
-  "Transition":      0.30,
-  "Pace":            0.25,
-  "Def. Warping":    0.20,
-};
-
-function MechanismBar({ label, value, color }: { label: string; value: number; color: string }) {
-  const pct = Math.round(clampViz(value, 0, 1) * 100);
-  const avgPct = Math.round((LEAGUE_AVG[label] ?? 0) * 100);
-
-  return (
-    <div
-      className="flex items-center gap-2"
-      role="meter"
-      aria-label={`${label}: ${value.toFixed(2)} out of 1.00, league average ${(LEAGUE_AVG[label] ?? 0).toFixed(2)}. ${GLOSSARY[label] ?? ""}`}
-      aria-valuenow={pct}
-      aria-valuemin={0}
-      aria-valuemax={100}
-    >
-      <div
-        className="text-[10px] font-black uppercase tracking-[0.10em] font-mono shrink-0"
-        style={{ color: "var(--ledger-ink-faint)", width: 110 }}
-        title={GLOSSARY[label]}
-      >
-        {label}
-      </div>
-      <div
-        className="flex-1 h-[7px] relative"
-        style={{ background: "var(--paper-inset)", border: "1px solid var(--ledger-rule-light)", borderRadius: 1 }}
-      >
-        <div
-          style={{
-            width: `${pct}%`,
-            height: "100%",
-            background: pct > 60 ? color : "var(--ledger-ink-faint)",
-            opacity: pct > 60 ? 0.8 : 0.4,
-            borderRadius: 1,
-          }}
-        />
-        {avgPct > 0 && (
-          <div
-            style={{
-              position: "absolute",
-              left: `${avgPct}%`,
-              top: -2,
-              bottom: -2,
-              width: 1,
-              background: "var(--ledger-ink)",
-              opacity: 0.35,
-            }}
-            title={`League avg: ${(LEAGUE_AVG[label] ?? 0).toFixed(2)}`}
-            aria-hidden="true"
-          />
-        )}
-      </div>
-      <div
-        className="text-[11px] font-black font-mono tabular-nums shrink-0"
-        style={{ color: pct > 60 ? color : "var(--ledger-ink-faint)", width: 32, textAlign: "right" }}
-      >
-        {value.toFixed(2)}
-      </div>
-    </div>
-  );
-}
-
-// ── Analytical depth section ─────────────────────────────────────────────
-
-function AnalyticalDepth({ profile }: { profile: GravityProfile }) {
+function SignalPanel({ profile }: { profile: GravityProfile }) {
   const color = gravityTierColor(profile.tier);
-  const m = profile.mechanisms;
-  const stabPct = Math.round(profile.predictiveStability * 100);
-  const stabColor = stabPct >= 75 ? "var(--ledger-green)" : stabPct >= 50 ? "var(--ledger-amber, #d4a017)" : "var(--ledger-red)";
+  const confPct = Math.round(profile.confidence * 100);
+  const confColor = confPct >= 75 ? "var(--ledger-green)" : confPct >= 50 ? "var(--ledger-amber, #d4a017)" : "var(--ledger-red)";
+  const pi = profile.partnerIndependence;
+  const piPct = Math.round(pi * 100);
+  const piColor = pi >= 0.85 ? "var(--ledger-green)" : pi >= 0.65 ? "var(--ledger-amber, #d4a017)" : "var(--ledger-red)";
+  const piLabel = pi >= 0.85 ? "Independent" : pi >= 0.65 ? "Likely Real" : "Borrowed?";
 
   return (
     <div
       className="mt-3 border p-3"
       style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-bg)" }}
-      aria-label="Analytical depth"
+      aria-label="Signal quality"
     >
       <div
         className="text-[10px] font-black uppercase tracking-[0.15em] font-mono mb-3"
         style={{ color: "var(--ledger-ink-faint)" }}
       >
-        Analytical Depth
+        Signal Quality
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: "1fr minmax(140px, 180px)" }}>
-        {/* Left: mechanism decomposition */}
-        <div style={{ minWidth: 0 }}>
-          <div className="flex items-center justify-between mb-2">
-            <div
-              className="text-[9px] font-black uppercase tracking-[0.12em] font-mono"
-              style={{ color: "var(--ledger-ink-faint)" }}
-            >
-              Mechanism Decomposition
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div style={{ width: 1, height: 8, background: "var(--ledger-ink)", opacity: 0.35 }} />
-              <div className="text-[8px] font-mono uppercase" style={{ color: "var(--ledger-ink-faint)", letterSpacing: "0.06em" }}>
-                Avg
-              </div>
-            </div>
+      <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 1fr" }}>
+        <div
+          className="border p-2.5"
+          style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
+          role="group"
+          aria-label={`Signal confidence: ${confPct}%. Sample size, year-over-year stability, and data coverage.`}
+        >
+          <div className="text-[9px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+            Confidence
           </div>
-          <div className="flex flex-col gap-1.5">
-            <MechanismBar label="Space Creation" value={m.spaceCreation} color={color} />
-            <MechanismBar label="Transition" value={m.transitionControl} color={color} />
-            <MechanismBar label="Pace" value={m.paceManipulation} color={color} />
-            <MechanismBar label="Def. Warping" value={m.defensiveWarping} color={color} />
+          <div className="flex items-baseline gap-1 mt-0.5">
+            <div className="text-[20px] font-black font-mono leading-tight" style={{ color: confColor, fontVariantNumeric: "tabular-nums" }}>
+              {confPct}
+            </div>
+            <div className="text-[11px] font-black font-mono" style={{ color: confColor }}>%</div>
+          </div>
+          <div className="text-[9px] font-mono mt-1 leading-snug" style={{ color: "var(--ledger-ink-faint)" }}>
+            Sample size, year-over-year stability, and data coverage.
+            {profile.dataQuality === "partial" && " EDGE zone-time missing — transition read is reduced."}
           </div>
         </div>
 
-        {/* Right: gravity assist + signal confidence */}
-        <div className="flex flex-col gap-2">
-          <div
-            className="border p-2.5"
-            style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
-            role="group"
-            aria-label={`Gravity assist: ${profile.gravityAssist.toFixed(2)}. ${GLOSSARY["Gravity Assist"]}`}
-          >
-            <div
-              className="text-[9px] font-black uppercase tracking-[0.12em] font-mono"
-              style={{ color: "var(--ledger-ink-faint)" }}
-            >
-              Gravity Assist
+        <div
+          className="border p-2.5"
+          style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
+          role="group"
+          aria-label={`Partner independence: ${piPct}%, ${piLabel}. Is the on-ice lift the player's own, or borrowed from elite linemates?`}
+        >
+          <div className="text-[9px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+            Partner Indep.
+          </div>
+          <div className="flex items-baseline gap-1.5 mt-0.5">
+            <div className="text-[20px] font-black font-mono leading-tight" style={{ color: piColor, fontVariantNumeric: "tabular-nums" }}>
+              {piPct}
             </div>
-            <div
-              className="text-[20px] font-black font-mono leading-tight mt-0.5"
-              style={{ color: profile.gravityAssist > 0.5 ? color : "var(--ledger-ink-faint)", fontVariantNumeric: "tabular-nums" }}
-            >
-              {profile.gravityAssist.toFixed(2)}
-            </div>
-            <div
-              className="text-[9px] font-mono mt-1 leading-snug"
-              style={{ color: "var(--ledger-ink-faint)" }}
-            >
-              {GLOSSARY["Gravity Assist"]}
+            <div className="text-[9px] font-black font-mono uppercase tracking-[0.06em]" style={{ color: piColor }}>
+              {piLabel}
             </div>
           </div>
-
-          <div
-            className="border p-2.5"
-            style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
-            role="group"
-            aria-label={`Signal confidence: ${stabPct}%. ${GLOSSARY["Signal Confidence"]}`}
-          >
-            <div
-              className="text-[9px] font-black uppercase tracking-[0.12em] font-mono"
-              style={{ color: "var(--ledger-ink-faint)" }}
-            >
-              Signal Confidence
-            </div>
-            <div className="flex items-baseline gap-1 mt-0.5">
-              <div
-                className="text-[20px] font-black font-mono leading-tight"
-                style={{ color: stabColor, fontVariantNumeric: "tabular-nums" }}
-              >
-                {stabPct}
-              </div>
-              <div className="text-[11px] font-black font-mono" style={{ color: stabColor }}>%</div>
-            </div>
-            <div
-              className="text-[9px] font-mono mt-1 leading-snug"
-              style={{ color: "var(--ledger-ink-faint)" }}
-            >
-              {GLOSSARY["Signal Confidence"]}
-            </div>
+          <div className="text-[9px] font-mono mt-1 leading-snug" style={{ color: "var(--ledger-ink-faint)" }}>
+            Is the on-ice lift his own, or borrowed from elite linemates? Damps the lift input directly.
           </div>
         </div>
       </div>
@@ -874,13 +531,13 @@ function AnalyticalDepth({ profile }: { profile: GravityProfile }) {
         <span className="font-black" style={{ color }}>
           {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
         </span>
-        {" "}— {profile.force >= 0.35
+        {" "}— {profile.force >= 0.40
           ? "a dominant gravitational presence that warps the game"
-          : profile.force >= 0.15
+          : profile.force >= 0.22
           ? "a meaningful pull that lifts his linemates"
-          : profile.force >= 0.05
+          : profile.force >= 0.08
           ? "a modest but measurable gravitational field"
-          : profile.force >= -0.05
+          : profile.force >= -0.22
           ? "effectively neutral — linemates play the same"
           : "a negative field — linemates produce less with him on the ice"
         }.
@@ -914,7 +571,7 @@ export default function GravityField({ profile, playerName, mode = "full" }: Pro
         </span>
       </div>
 
-      {/* Top: diagram left, core components right */}
+      {/* Top: rink diagram left, zone components right */}
       <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}>
         <div
           className="border p-2"
@@ -931,8 +588,8 @@ export default function GravityField({ profile, playerName, mode = "full" }: Pro
         </div>
       </div>
 
-      {/* Bottom: analytical depth */}
-      <AnalyticalDepth profile={profile} />
+      {/* Bottom: signal quality */}
+      <SignalPanel profile={profile} />
     </div>
   );
 }

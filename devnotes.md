@@ -80,6 +80,39 @@
 - "Full Profile" link in trending expanded panel renamed to "Player Analytics" (no
   individual player pages yet — future Phase 3 work)
 
+## Phase 3: Gravity Engine v3 "Spacetime" (Phase A complete)
+
+### Full rewrite — zone-mass model (replaces v2 multiplicative engine)
+- Player modeled as a mass distribution across hockey's three zones:
+  m_OZ (offensive well), m_NZ (neutral/transition well), m_DZ (defensive dome —
+  repulsive curvature)
+- Every input z-scored WITHIN POSITION (D vs F calibration constants) then
+  tanh-squashed to a bounded mass — a defenseman is measured against defensemen
+- Additive assembly: force = 0.45·m_OZ + 0.30·m_NZ + 0.25·m_DZ, bounded (−1, +1)
+  by construction — no more multiplicative blowups (Fox 4.87 → ~0.67)
+- Key NZ signal: transition displacement — EDGE zone time minus deployment
+  expectation (starts in his own end, lives in the O-zone = measured transition
+  gravity; the Quinn Hughes signal)
+- Missing inputs are SKIPPED, never scored as zero (data gap ≠ below-average play)
+- navResidual: OZ creation shape + NZ transition only — the lift input and the
+  entire DZ dome are already priced inside X-NAV (offTotal NOIV, defTotal
+  defRate/DPS, SLF for PK time). X-NAV consumes navResidual × 45, capped [−20, 35]
+- partnerIndependence is now a 0–1 damper on the lift input (not a force
+  multiplier); pairDriverScore gives D direct with/without evidence
+- Tier cutoffs recalibrated for the bounded scale: SUPERMASSIVE ≥ 0.55,
+  STAR ≥ 0.40, MAIN_SEQUENCE ≥ 0.22, SATELLITE ≥ 0.08, ASTEROID ≥ −0.22
+  (wide band — position-normalized scale puts half the league below zero),
+  BLACK_HOLE < −0.22 (reserved for genuinely caving fields)
+- UI: FieldDiagram is now a three-zone rink strip (DZ|NZ|OZ) with ring density
+  per zone mass; dome renders dashed (repulsion), caved zones render red.
+  ComponentPanel shows the three masses with qualifiers; SignalPanel shows
+  confidence + partner independence. GravityCard shows zone-mass bars.
+- New __tests__/gravity.test.ts: archetype shape fixtures (Fox two-zone basin,
+  Hughes-type NZ-dominant, shutdown-D dome, black hole, grinder), bounds,
+  residual exclusions, signal-quality behavior
+- Phase B (next): SpacetimeRink — lattice-warp visualization where the rink
+  grid curves around the zone masses (GR rubber-sheet rendering)
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

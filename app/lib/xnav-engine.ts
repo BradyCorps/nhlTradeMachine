@@ -753,17 +753,14 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const ageTotal     = safe(ageVal);
 
   // ── Gravity Residual ──────────────────────────────────────────
-  // Gravity captures "invisible" value — creation, zone control, partner
-  // independence — that raw stats (already in off/def) don't fully price.
-  // To avoid double-counting the NOIV signal (already in offTotal via
-  // noivBonus), we subtract the NOIV-attributable portion of force and
-  // scale only the residual into NAV.
+  // The v3 engine exposes navResidual: the zone-mass field recomputed
+  // with on-off inputs (lift, suppression) zeroed — exactly the gravity
+  // that offTotal/defTotal have NOT already priced. Bounded (−1, +1),
+  // so the scale factor maps elite residuals (~0.5) to ~+22 NAV.
   let gravTotal = 0;
   const gravProfile = computeGravity(asset as any);
   if (gravProfile && games >= 20) {
-    const noivPortion = gravProfile.noivLift * gravProfile.playerMass;
-    const residual = gravProfile.force - noivPortion;
-    gravTotal = clamp(residual * 80, -20, 35);
+    gravTotal = clamp(gravProfile.navResidual * 45, -20, 35);
   }
 
   // ── On-Ice Core ───────────────────────────────────────────────

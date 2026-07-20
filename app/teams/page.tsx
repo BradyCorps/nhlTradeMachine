@@ -712,7 +712,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
                               }}>
                                 {avgForce > 0 ? "+" : ""}{avgForce.toFixed(2)}
                               </span>
-                              {topForce >= 0.35 && (
+                              {topForce >= 0.40 && (
                                 <span> — franchise-grade gravitational presence</span>
                               )}
                             </>
