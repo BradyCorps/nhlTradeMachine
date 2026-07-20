@@ -16,6 +16,7 @@ import { calcNAV, classifyForwardArchetype } from "@/app/lib/xnav-engine";
 import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
+import PercentileCard from "@/app/components/PercentileCard";
 import { displayPosition } from "@/app/lib/display-position";
 
 // ── Types ─────────────────────────────────────────────────────
@@ -372,7 +373,7 @@ function PlayersIconKey() {
 }
 
 // ── Expanded player tab types ─────────────────────────────────
-type PlayerTab = "stats" | "contract" | "outlook";
+type PlayerTab = "card" | "stats" | "contract" | "outlook";
 
 const PLUM = "var(--fig)";
 const PLUM_LIGHT = "var(--fig-bright)";
@@ -431,12 +432,13 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
   const hasDossier = /^\d+$/.test(String(player.id));
 
   const tabs: { key: PlayerTab; label: string }[] = [
+    { key: "card", label: "Player Card" },
     { key: "stats", label: "Stats" },
     ...(hasContract ? [{ key: "contract" as PlayerTab, label: "Contract" }] : []),
     ...(hasOutlook ? [{ key: "outlook" as PlayerTab, label: "Outlook" }] : []),
   ];
 
-  const [activeTab, setActiveTab] = useState<PlayerTab>("stats");
+  const [activeTab, setActiveTab] = useState<PlayerTab>("card");
 
   const gp = player.games ?? 82;
   const seasonGoals = player.goalsPace != null ? Math.round((player.goalsPace / 82) * gp) : null;
@@ -502,6 +504,17 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
 
       {/* Tab content */}
       <div style={{ padding: "14px 16px" }}>
+
+        {/* ── Player Card tab ────────────────────── */}
+        {activeTab === "card" && (
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <PercentileCard
+              player={player}
+              allPlayers={allPlayers}
+              teamName={team?.name}
+            />
+          </div>
+        )}
 
         {/* ── Stats tab ──────────────────────────── */}
         {activeTab === "stats" && (
