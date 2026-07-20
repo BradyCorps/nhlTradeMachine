@@ -354,7 +354,7 @@ function PlayerCard({
 
         <div className="flex items-center gap-1.5">
           {gravityTier && <TierIcon tier={gravityTier} size={14} />}
-          <div className="font-mono text-[9px] font-black uppercase tracking-[0.08em]" style={{ color: "var(--ledger-ink-faint)" }}>
+          <div className="font-mono text-[10px] font-black uppercase tracking-[0.08em]" style={{ color: "var(--ledger-ink-body, var(--ledger-ink))" }}>
             {isExpanded ? "▲ Collapse" : "▼ Expand"}
           </div>
         </div>

@@ -153,9 +153,28 @@
   filters the prospect board diacritics-insensitively (Björck ≡ Bjorck), so
   already-rostered prospects can't be drafted twice
 
+### Round 2 — Home IA + G1 (complete)
+- H10: two-page IA — /glossary (the "what": grouped icon key, all definition
+  sections, gravity tier key + zone-mass note) and /methodology rewritten as
+  the "why/how" narrative (X-NAV, Gravity — formula stays proprietary, STRAND,
+  GM Audit, sim engine, data pipeline) with Buy Me a Coffee CTA
+- G1: shared Header/Footer now on /glossary, /methodology, /players/[playerId]
+  (trade-machine already had them via QuickTradeMachine)
+- H4-H6/H8: definitions verified against current code — duplicate X-NAV row
+  merged, GRAV/OFF/DEF/UPS components documented, AGE/YNG unified, trade-logic
+  copy now says X-NAV; gravity tier descriptions rewritten for the v3
+  zone-mass scale
+- H5: icon key grouped into Asset Flags / Gravity Tiers sub-sections in both
+  Footer and /glossary; label text bumped 9→10px, definitions ink-body
+- H7: STRAND glossary lives in /glossary (Footer keeps the collapsible copy);
+  HD Finish and 20+ Bursts definitions added
+- H9: Data & Sources rewritten as acknowledgements with active links (NHL,
+  MoneyPuck, CapWages, Hockey-Reference), rendered as real anchors
+- H3: trending expand/collapse affordance readability bump (10px, body ink)
+- Footer nav now links Methodology / Glossary / Icon Key to real routes
+
 ### Still open from audit (next rounds)
-- G1 (shared Header/Footer on every subpage), G3 (icon system), G4 (model
-  propagation), H3-H10, TM1/TM3-TM7, PA1-PA12, D1, AG3
+- G3 (icon system), G4 (model propagation), TM1/TM3-TM7, PA1-PA12, D1, AG3
 
 ## Known Issues / Future Work
 

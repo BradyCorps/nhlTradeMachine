@@ -20,65 +20,81 @@ export const iconKey = [
 ];
 
 export const gravityTierEntries: [GravityTier, string, string][] = [
-  ["SUPERMASSIVE", "Supermassive", "Gravity tier: elite on-ice dominance — linemates improve dramatically, play bends toward the offensive zone."],
-  ["STAR", "Star", "Gravity tier: strong gravitational pull — clear positive impact on linemates and territorial play."],
-  ["MAIN_SEQUENCE", "Main Sequence", "Gravity tier: steady, reliable on-ice presence — consistent positive influence at even strength."],
-  ["SATELLITE", "Satellite", "Gravity tier: mild positive pull — contributes but does not drive on-ice results."],
-  ["ASTEROID", "Asteroid", "Gravity tier: near-neutral presence — minimal measurable effect on linemate production or territory."],
-  ["BLACK_HOLE", "Black Hole", "Gravity tier: negative on-ice gravity — play quality deteriorates when this player is deployed."],
+  ["SUPERMASSIVE", "Supermassive", "Gravity tier: top of the league — the rink visibly curves around this player; linemates orbit and play collapses toward the opponent's net."],
+  ["STAR", "Star", "Gravity tier: elite field — clear warping of play across at least one zone, measured against players at the same position."],
+  ["MAIN_SEQUENCE", "Main Sequence", "Gravity tier: strong, steady pull — a real positive field that makes the line better without dominating the sheet."],
+  ["SATELLITE", "Satellite", "Gravity tier: detectable pull — modest but measurable positive influence for the position."],
+  ["ASTEROID", "Asteroid", "Gravity tier: negligible field — on-ice influence near the positional average, in either direction."],
+  ["BLACK_HOLE", "Black Hole", "Gravity tier: the field caves — linemates produce less and the ice tilts the wrong way with this player deployed."],
 ];
 
-export const methodologySections = [
+export interface MethodologyItem {
+  term: string;
+  definition: string;
+  href?: string;
+}
+
+export interface MethodologySection {
+  title: string;
+  intro: string;
+  items: MethodologyItem[];
+}
+
+export const methodologySections: MethodologySection[] = [
   {
     title: "Player Valuation",
     intro: "How the app turns a player, contract, and role into tradeable asset value.",
     items: [
-      ["X-NAV", "Extended Net Asset Value: the Ledger's trade-value model — on-ice impact, gravity, age, role, cap hit, term, and team control priced together."],
-      ["X-NAV", "Skater model. Offense, defense, age curve, contract surplus, deployment, Point Shares, and role context feed the total."],
-      ["G-NAV", "Goalie model. Built around GSAx, workload, save profile, team defensive context, age, and contract surplus."],
-      ["Prospect NAV", "Pre-NHL value comes from draft pedigree and stored NHLe production. No-signal ELC players do not receive automatic cap or age value."],
-      ["CAP", "Contract component. Positive means the player is under market value; negative means the cap hit or term drags value."],
-      ["YNG", "Youth/upside component for young NHL players who have enough real signal. It is not a blanket ELC bonus."],
-      ["Negative NAV", "Negative value does not mean a bad player. It means the contract is a trade liability relative to expected production, term, and market fit."],
+      { term: "X-NAV", definition: "Extended Net Asset Value: the Ledger's skater trade-value model. Offense, defense, gravity, age curve, contract surplus, deployment, Point Shares, and role context priced into one number." },
+      { term: "G-NAV", definition: "X-NAV for goalies. Built around GSAx, workload, save profile, team defensive context, age, and contract surplus." },
+      { term: "Prospect NAV", definition: "Pre-NHL value comes from draft pedigree and stored NHLe production. No-signal ELC players do not receive automatic cap or age value." },
+      { term: "OFF / DEF", definition: "On-ice components: offensive production and creation on one side, suppression and defensive value on the other, each judged against position." },
+      { term: "GRAV", definition: "The gravity residual — on-ice warping the OFF/DEF components have not already priced, drawn from the Player Gravity system's creation and transition signals." },
+      { term: "CAP", definition: "Contract component. Positive means the player is under market value; negative means the cap hit or term drags value." },
+      { term: "AGE / YNG", definition: "Age-curve component: decline drag for veterans, youth projection for young NHL players with enough real signal. Not a blanket ELC bonus." },
+      { term: "UPS", definition: "Upside component — development ceiling for players whose trajectory has not fully priced into production yet." },
+      { term: "Negative NAV", definition: "Negative value does not mean a bad player. It means the contract is a trade liability relative to expected production, term, and market fit." },
     ],
   },
   {
     title: "STRAND Glossary",
     intro: "The roster-DNA layer that describes style, usage, and development fit.",
     items: [
-      ["STRAND", "Stylistic Trait & Rating Analysis for NHL Development: a team/player identity view for role fit, timeline, and roster balance."],
-      ["SCR", "Scoring pace. Points per 82 games, normalized by position so defencemen and forwards are not judged on the same raw scale."],
-      ["xG", "Expected-goals creation from shot quality and volume, not just shot count."],
-      ["TOI+", "Ice-time trust and role load. Heavy minutes imply broader usage and higher coaching trust."],
-      ["SUPP", "Expected-goals-against suppression relative to teammates. Positive means the team leaks fewer chances with that player on ice."],
-      ["QoC Index", "0-100 even-strength deployment difficulty based on matchup and usage context."],
-      ["DZ%", "Defensive-zone start share. High usage here can indicate trusted defensive deployment."],
-      ["AGE", "Development and decline curve over the life of the contract."],
+      { term: "STRAND", definition: "Stylistic Trait & Rating Analysis for NHL Development: a team/player identity view for role fit, timeline, and roster balance." },
+      { term: "SCR", definition: "Scoring pace. Points per 82 games, normalized by position so defencemen and forwards are not judged on the same raw scale." },
+      { term: "xG", definition: "Expected-goals creation from shot quality and volume, not just shot count." },
+      { term: "TOI+", definition: "Ice-time trust and role load. Heavy minutes imply broader usage and higher coaching trust." },
+      { term: "SUPP", definition: "Expected-goals-against suppression relative to teammates. Positive means the team leaks fewer chances with that player on ice." },
+      { term: "QoC Index", definition: "0-100 even-strength deployment difficulty based on matchup and usage context." },
+      { term: "DZ%", definition: "Defensive-zone start share. High usage here can indicate trusted defensive deployment." },
+      { term: "HD Finish", definition: "High-danger finishing vs league expectation, from NHL EDGE shot-location data. Positive = converts quality chances above league rate." },
+      { term: "20+ Bursts", definition: "Count of 20+ mph skating bursts from NHL EDGE tracking — a direct speed-in-game signal, not a one-off top speed." },
+      { term: "AGE", definition: "Development and decline curve over the life of the contract." },
     ],
   },
   {
     title: "Trade Logic",
     intro: "The audit layer that decides whether a deal is plausible, not just mathematically balanced.",
     items: [
-      ["GM Audit", "Checks clauses, cap legality, retention, roster slots, surplus gaps, timeline alignment, and contention-window fit."],
-      ["EWA", "Estimated Wins Added: translates asset value into standings impact, adjusted by team context."],
-      ["CWI", "Contention Window Index: estimates whether a trade extends, compresses, or harms a team's competitive window."],
-      ["REQUESTED", "Formal trade request. Positive NAV receives a small leverage haircut."],
-      ["SHOPPED", "Available or being explored by the team. No automatic NAV penalty."],
-      ["UNTCH", "Untouchable availability gate. Value remains visible, but proposal logic treats the player as unavailable."],
-      ["Role Tags", "First-line, middle-six, top-pair, shutdown, starter, tandem, backup, and specialist tags summarize usage/value tier."],
+      { term: "GM Audit", definition: "Checks clauses, cap legality, retention, roster slots, surplus gaps, timeline alignment, and contention-window fit." },
+      { term: "EWA", definition: "Estimated Wins Added: translates asset value into standings impact, adjusted by team context." },
+      { term: "CWI", definition: "Contention Window Index: estimates whether a trade extends, compresses, or harms a team's competitive window." },
+      { term: "REQUESTED", definition: "Formal trade request. Positive X-NAV receives a small leverage haircut." },
+      { term: "SHOPPED", definition: "Available or being explored by the team. No automatic X-NAV penalty." },
+      { term: "UNTCH", definition: "Untouchable availability gate. Value remains visible, but proposal logic treats the player as unavailable." },
+      { term: "Role Tags", definition: "First-line, middle-six, top-pair, shutdown, starter, tandem, backup, and specialist tags summarize usage/value tier." },
     ],
   },
   {
     title: "Data & Sources",
-    intro: "Where the app gets its inputs and which parts remain deterministic.",
+    intro: "The Hockey Ledger is only possible because these sources publish world-class hockey data. Sincere thanks to each of them.",
     items: [
-      ["NHL API", "Rosters, positions, ages, game logs, and current-season summary data."],
-      ["MoneyPuck", "Skater and goalie analytics including xG, deployment, on/off impact, and GSAx inputs."],
-      ["CapWages", "Contract, cap hit, term, clause, extension, and roster metadata source."],
-      ["Draft History", "Recent public draft tables enrich synced prospects with draft year and overall pick."],
-      ["NHLe", "Non-NHL production translated to NHL point pace for prospects. It must come from stored or imported production data."],
-      ["AI Notes", "Claude Sonnet is used for narrative explanation only; X-NAV calculations stay in deterministic app code."],
+      { term: "NHL API", definition: "Rosters, positions, ages, game logs, current-season summary data, and NHL EDGE tracking (zone time, speed, shot location).", href: "https://www.nhl.com" },
+      { term: "MoneyPuck", definition: "Skater and goalie analytics including xG, deployment, on/off impact, and GSAx inputs. An indispensable public resource.", href: "https://moneypuck.com" },
+      { term: "CapWages", definition: "Contract, cap hit, term, clause, extension, and roster metadata source.", href: "https://capwages.com" },
+      { term: "Hockey-Reference", definition: "Point Shares and historical context for career baselines.", href: "https://www.hockey-reference.com" },
+      { term: "NHLe", definition: "Non-NHL production translated to NHL point pace for prospects. It must come from stored or imported production data." },
+      { term: "AI Notes", definition: "AI is used for narrative explanation only; X-NAV and Gravity calculations stay in deterministic app code." },
     ],
   },
 ];
@@ -89,7 +105,7 @@ export default function Footer() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-5 text-center">
           <p className="text-2xs uppercase tracking-[0.16em] sm:tracking-[0.36em] leading-relaxed font-mono text-ledger-ink-faint">
-            <Link href="/methodology" className="underline hover:text-ledger-ink transition-colors">Methodology</Link> · <Link href="/methodology#strand-glossary" className="underline hover:text-ledger-ink transition-colors">Glossary</Link> · Icon Key
+            <Link href="/methodology" className="underline hover:text-ledger-ink transition-colors">Methodology</Link> · <Link href="/glossary" className="underline hover:text-ledger-ink transition-colors">Glossary</Link> · <Link href="/glossary#icon-key" className="underline hover:text-ledger-ink transition-colors">Icon Key</Link>
           </p>
           <p className="mt-1 text-[9px] uppercase tracking-[0.14em] sm:tracking-[0.24em] font-mono text-ledger-rule">
             X-NAV · G-NAV · NOIV · STRAND · GM Audit
@@ -103,6 +119,9 @@ export default function Footer() {
             style={{ borderColor: "var(--ledger-rule)" }}>
             Icon Key
           </div>
+          <div className="px-4 pt-3 font-mono text-[9px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint">
+            Asset Flags
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 p-4">
             {iconKey.map(([icon, label, definition]) => (
               <div key={`${icon}-${label}`} className="flex items-start gap-2.5">
@@ -111,15 +130,21 @@ export default function Footer() {
                   {icon}
                 </span>
                 <div className="min-w-0">
-                  <span className="font-mono text-[9px] font-black uppercase leading-snug text-ledger-ink">
+                  <span className="font-mono text-[10px] font-black uppercase leading-snug text-ledger-ink">
                     {label}
                   </span>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-ledger-ink-light">
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-ledger-ink-body">
                     {definition}
                   </p>
                 </div>
               </div>
             ))}
+          </div>
+          <div className="px-4 pt-1 font-mono text-[9px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint border-t"
+            style={{ borderColor: "var(--ledger-rule-light, var(--ledger-rule))" }}>
+            <span className="inline-block pt-2">Gravity Tiers</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 p-4">
             {gravityTierEntries.map(([tier, label, definition]) => (
               <div key={`grav-${tier}`} className="flex items-start gap-2.5">
                 <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center border"
@@ -127,10 +152,10 @@ export default function Footer() {
                   <TierIcon tier={tier} size={14} />
                 </span>
                 <div className="min-w-0">
-                  <span className="font-mono text-[9px] font-black uppercase leading-snug text-ledger-ink">
+                  <span className="font-mono text-[10px] font-black uppercase leading-snug text-ledger-ink">
                     {label}
                   </span>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-ledger-ink-light">
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-ledger-ink-body">
                     {definition}
                   </p>
                 </div>
@@ -151,7 +176,7 @@ export default function Footer() {
                   <div className="font-mono text-[10px] font-black uppercase tracking-[0.22em] text-ledger-ink">
                     {section.title}
                   </div>
-                  <div className="mt-1 text-[11px] leading-relaxed text-ledger-ink-faint">
+                  <div className="mt-1 text-[11px] leading-relaxed text-ledger-ink-body">
                     {section.intro}
                   </div>
                 </div>
@@ -160,12 +185,17 @@ export default function Footer() {
               </summary>
               <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 border-t px-4 py-4"
                 style={{ borderColor: "var(--ledger-rule)" }}>
-                {section.items.map(([term, definition]) => (
+                {section.items.map(({ term, definition, href }) => (
                   <div key={`${section.title}-${term}`} className="grid grid-cols-[96px_1fr] gap-4">
-                    <dt className="font-mono text-[9px] font-black uppercase leading-snug text-ledger-ink">
-                      {term}
+                    <dt className="font-mono text-[10px] font-black uppercase leading-snug text-ledger-ink">
+                      {href ? (
+                        <a href={href} target="_blank" rel="noopener noreferrer"
+                          className="underline hover:text-ledger-red transition-colors text-ledger-ink">
+                          {term}
+                        </a>
+                      ) : term}
                     </dt>
-                    <dd className="text-[11px] leading-relaxed text-ledger-ink-light">
+                    <dd className="text-[11px] leading-relaxed text-ledger-ink-body">
                       {definition}
                     </dd>
                   </div>

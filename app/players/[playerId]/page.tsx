@@ -14,6 +14,8 @@ import { computeGravity } from "@/app/lib/gravity";
 import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import GravityField from "@/app/components/GravityField";
+import Header from "@/app/components/Header";
+import Footer from "@/app/components/Footer";
 
 export const dynamic = "force-dynamic";
 
@@ -88,10 +90,12 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
   return (
     <main className="min-h-screen px-4 py-6" style={{ background: "var(--paper-bg)", color: ink }}>
       <div className="mx-auto" style={{ maxWidth: 760 }}>
-        {/* Masthead strip */}
-        <div className="flex items-center justify-between border-b-2 pb-2 mb-4" style={{ borderColor: ink }}>
+        <Header activeTab="players" />
+
+        {/* Dossier strip */}
+        <div className="flex items-center justify-between border-b-2 pb-2 mb-4 mt-4" style={{ borderColor: ink }}>
           <Link href="/players" className="text-[10px] font-black font-mono uppercase tracking-[0.2em]" style={{ color: faint }}>
-            ← The Hockey Ledger
+            ← All Players
           </Link>
           <span className="text-[9px] font-mono uppercase tracking-[0.2em]" style={{ color: faint }}>
             Player Dossier
@@ -188,6 +192,8 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
             Full League Analytics →
           </Link>
         </div>
+
+        <Footer />
       </div>
     </main>
   );

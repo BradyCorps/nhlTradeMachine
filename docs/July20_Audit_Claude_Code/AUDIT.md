@@ -8,7 +8,7 @@ Use as the implementation backlog. Inspect the repo before changing code; preser
 
 ## 1. Global
 
-- [ ] **G1 — Navigation:** use the shared Header and Footer on every subpage. Exception: `/`, whose own navigation is intentional.
+- [x] **G1 — Navigation:** use the shared Header and Footer on every subpage. Exception: `/`, whose own navigation is intentional.
 - [x] **G2 — Naming:** remove all `™` marks (`STRAND™` → `STRAND`, `GRAVITY™` → `GRAVITY`). Reconcile `NAV` vs `X-NAV`; one name and definition must be used everywhere. Current conflicting copy: NAV is separately defined in “How the Engine Works” and “Player Valuation”; X-NAV is described as the skater model. ![NAV definition](assets/03-engine-nav-definition.png) ![valuation definitions](assets/04-player-valuation-definitions.png)
 - [ ] **G3 — Icons:** use one icon system across all pages; document every icon in the Icon Key. Re-establish rules for flags such as Injury History and Shutdown.
 - [ ] **G4 — Model propagation:** changes to EDGE, GRAVITY, roles, and data models must propagate through X-NAV, NOIV, and the built-in three-year Simulation Engine.
@@ -17,14 +17,14 @@ Use as the implementation backlog. Inspect the repo before changing code; preser
 
 - [x] **H1 — Hero:** move the final scroll-animation resting position upward so the full “The Hockey Ledger” heading remains visible. ![cropped hero](assets/01-home-hero-crop.png)
 - [x] **H2 — Staff Editorial:** replace its paragraph with: “Build your trade in the Trade Machine and test it against the X-NAV engine and the GM Audit or take the chair in Armchair GM and live with every consequence that follows. Explore advanced and enhanced stats on the Player Analytics page, featuring the Hockey Ledger exclusive Player Gravity system, STRAND DNA Identity profiles and a new all-in-one X-NAV model. Read the published Docket to see how the calls have aged. Visit the Press Box and play the daily hockey crib.” Put “The press is open. Turn the page and start running the room.” below it, centered and styled like “On the Business of Building a Hockey Team.” ![editorial](assets/02-home-editorial.png)
-- [ ] **H3 — Highest-Valued Assets:** retain the component; make it AA.
-- [ ] **H4 — Engine content:** retain the readable NAV/STRAND/GM Audit presentation, update it for current logic, and apply G2.
-- [ ] **H5 — Icon Key:** make it AA and easier to scan; include every icon. Tabs by system are acceptable (for example, STRAND and GRAVITY). ![icon key](assets/05-icon-key.png)
-- [ ] **H6 — Player Valuation:** make it AA and verify every definition against current code/model behavior. ![player valuation](assets/06-player-valuation.png)
-- [ ] **H7 — STRAND glossary:** move it to `/glossary`; verify it against the current EDGE API-backed system. ![STRAND glossary](assets/07-strand-glossary.png)
-- [ ] **H8 — Trade Logic:** make it AA; verify against current logic/model and rewrite any mismatch. ![trade logic](assets/08-trade-logic.png)
-- [ ] **H9 — Data Sources:** make it AA; add sincere acknowledgements and active links to every source’s homepage. ![data sources](assets/09-data-sources.png)
-- [ ] **H10 — Information architecture:** reduce Methodology/Glossary/Icon Key to two pages. `/methodology` = why/how the systems and technologies were created/used, plus Buy Me a Coffee CTA. `/glossary` = the current definitions, keys, and explanations (“what”), including current Methodology/STRAND content. ![current methodology](assets/10-methodology-page.png) ![current glossary](assets/11-glossary-page.png)
+- [x] **H3 — Highest-Valued Assets:** retain the component; make it AA.
+- [x] **H4 — Engine content:** retain the readable NAV/STRAND/GM Audit presentation, update it for current logic, and apply G2.
+- [x] **H5 — Icon Key:** make it AA and easier to scan; include every icon. Tabs by system are acceptable (for example, STRAND and GRAVITY). ![icon key](assets/05-icon-key.png)
+- [x] **H6 — Player Valuation:** make it AA and verify every definition against current code/model behavior. ![player valuation](assets/06-player-valuation.png)
+- [x] **H7 — STRAND glossary:** move it to `/glossary`; verify it against the current EDGE API-backed system. ![STRAND glossary](assets/07-strand-glossary.png)
+- [x] **H8 — Trade Logic:** make it AA; verify against current logic/model and rewrite any mismatch. ![trade logic](assets/08-trade-logic.png)
+- [x] **H9 — Data Sources:** make it AA; add sincere acknowledgements and active links to every source’s homepage. ![data sources](assets/09-data-sources.png)
+- [x] **H10 — Information architecture:** reduce Methodology/Glossary/Icon Key to two pages. `/methodology` = why/how the systems and technologies were created/used, plus Buy Me a Coffee CTA. `/glossary` = the current definitions, keys, and explanations (“what”), including current Methodology/STRAND content. ![current methodology](assets/10-methodology-page.png) ![current glossary](assets/11-glossary-page.png)
 
 ## 3. Header
 
