@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/app/lib/admin-auth";
 import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
 import { computeGravity } from "@/app/lib/gravity";
 
@@ -26,7 +27,10 @@ function stats(values: number[]) {
   return { n, mean: r(mean), sd: r(sd), p5: r(pct(5)), p50: r(pct(50)), p95: r(pct(95)) };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const unauthorized = await requireAdmin(req);
+  if (unauthorized) return unauthorized;
+
   const roster = await assembleCanonicalRoster();
   const skaters = (roster.players as any[]).filter(
     p => p.position !== "G" && p.position !== "Pick" && (p.games ?? 0) >= 20,
