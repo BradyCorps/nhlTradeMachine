@@ -154,8 +154,12 @@ function z(value: number, dist: Dist): number {
   return clamp((value - dist.mean) / dist.sd, -3, 3);
 }
 
-/** Squash an accumulated raw z-composite into a bounded mass (−1, +1). */
-const squash = (raw: number) => Math.tanh(raw / 2);
+/** Squash an accumulated raw z-composite into a bounded mass (−1, +1).
+ * The /2.75 divisor is the saturation calibration: at /2 the tanh ceiling
+ * compressed all elite players into 0.77–0.82 force (a three-moderate-mass
+ * profile tied a spiky generational one). Softer saturation preserves
+ * separation at the top of the league while keeping the hard (−1, 1) bound. */
+const squash = (raw: number) => Math.tanh(raw / 2.75);
 
 // ── The engine ───────────────────────────────────────────────────
 
