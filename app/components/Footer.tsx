@@ -33,7 +33,7 @@ export const methodologySections = [
     title: "Player Valuation",
     intro: "How the app turns a player, contract, and role into tradeable asset value.",
     items: [
-      ["NAV", "Net Asset Value: overall trade value after on-ice impact, age, role, cap hit, term, and team control are priced together."],
+      ["X-NAV", "Extended Net Asset Value: the Ledger's trade-value model — on-ice impact, gravity, age, role, cap hit, term, and team control priced together."],
       ["X-NAV", "Skater model. Offense, defense, age curve, contract surplus, deployment, Point Shares, and role context feed the total."],
       ["G-NAV", "Goalie model. Built around GSAx, workload, save profile, team defensive context, age, and contract surplus."],
       ["Prospect NAV", "Pre-NHL value comes from draft pedigree and stored NHLe production. No-signal ELC players do not receive automatic cap or age value."],
@@ -46,7 +46,7 @@ export const methodologySections = [
     title: "STRAND Glossary",
     intro: "The roster-DNA layer that describes style, usage, and development fit.",
     items: [
-      ["STRAND™", "Stylistic Trait & Rating Analysis for NHL Development: a team/player identity view for role fit, timeline, and roster balance."],
+      ["STRAND", "Stylistic Trait & Rating Analysis for NHL Development: a team/player identity view for role fit, timeline, and roster balance."],
       ["SCR", "Scoring pace. Points per 82 games, normalized by position so defencemen and forwards are not judged on the same raw scale."],
       ["xG", "Expected-goals creation from shot quality and volume, not just shot count."],
       ["TOI+", "Ice-time trust and role load. Heavy minutes imply broader usage and higher coaching trust."],
@@ -92,7 +92,7 @@ export default function Footer() {
             <Link href="/methodology" className="underline hover:text-ledger-ink transition-colors">Methodology</Link> · <Link href="/methodology#strand-glossary" className="underline hover:text-ledger-ink transition-colors">Glossary</Link> · Icon Key
           </p>
           <p className="mt-1 text-[9px] uppercase tracking-[0.14em] sm:tracking-[0.24em] font-mono text-ledger-rule">
-            X-NAV · G-NAV · NOIV · STRAND™ · GM Audit
+            X-NAV · G-NAV · NOIV · STRAND · GM Audit
           </p>
         </div>
 

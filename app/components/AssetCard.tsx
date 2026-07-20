@@ -177,7 +177,7 @@ export default function AssetCard({
             fontSize: '1.1rem',
             fontStyle: 'italic',
             color: xnav.total > 80 ? 'var(--ledger-green)' : xnav.total > 20 ? 'var(--ledger-navy)' : xnav.total > -20 ? 'var(--ledger-brown)' : 'var(--ledger-red)',
-          }} title="Net Asset Value — the player's tradeable value">
+          }} title="X-NAV — Extended Net Asset Value, the player’s tradeable value">
             {fmt(xnav.total, 0)}
           </span>
           {xnav.noivImpact !== undefined && Math.abs(xnav.noivImpact) >= 2 && (
@@ -351,7 +351,7 @@ export default function AssetCard({
           )}
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono"
-              title="Net Asset Value — the player's tradeable value">NAV Breakdown</span>
+              title="X-NAV — Extended Net Asset Value, the player’s tradeable value">NAV Breakdown</span>
             <span
               className="text-2xs font-black rounded-full w-4 h-4 flex items-center justify-center cursor-help shrink-0"
               style={{ color: 'var(--ledger-ink-faint)', border: '1px solid #c8b890' }}

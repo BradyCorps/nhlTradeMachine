@@ -4,8 +4,10 @@
 
 import { usePathname } from "next/navigation";
 
+type NavTab = "trade" | "armchair-gm" | "players" | "teams" | "docket" | "press-box" | "fantasy";
+
 interface HeaderProps {
-  activeTab?: "trade" | "armchair-gm" | "players" | "teams" | "docket" | "press-box";
+  activeTab?: NavTab;
   showLiveFeed?: boolean;
 }
 
@@ -16,8 +18,9 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
     : pathname?.startsWith("/teams") ? "teams"
     : pathname?.startsWith("/docket") ? "docket"
     : pathname?.startsWith("/press-box") ? "press-box"
+    : pathname?.startsWith("/fantasy") ? "fantasy"
     : activeTab;
-  const navClass = (tab: "trade" | "armchair-gm" | "players" | "teams" | "docket" | "press-box") => [
+  const navClass = (tab: NavTab) => [
     "text-[11px] sm:text-[12px] uppercase tracking-[0.14em] sm:tracking-[0.2em] font-mono no-underline transition-colors border-b-2 pb-0.5",
     resolvedActiveTab === tab
       ? "text-ledger-red font-black border-ledger-red"
@@ -43,9 +46,6 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
         {/* Masthead */}
         <div className="border-y-[3px] border-double border-ledger-ink py-2 mb-1">
           <div className="text-center">
-            <p className="text-2xs uppercase tracking-[0.4em] mb-1 font-mono text-ledger-ink-faint">
-              Est. 2026 &nbsp;—&nbsp; Vol. I &nbsp;—&nbsp; Trade Edition
-            </p>
             <a href="/" className="no-underline">
               <h1
                 className="font-black leading-none transition-opacity hover:opacity-70 text-ledger-ink font-serif cursor-pointer"
@@ -54,8 +54,9 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
                 The Hockey Ledger
               </h1>
             </a>
-            <p className="text-[11px] uppercase tracking-[0.3em] mt-1.5 hidden sm:block font-mono text-ledger-ink-faint">
-              X-NAV Analytics &nbsp;·&nbsp; Trade Machine &nbsp;·&nbsp; Armchair GM &nbsp;·&nbsp; Live Statistics
+            <p className="text-2xs uppercase tracking-[0.4em] mt-1.5 font-mono text-ledger-ink-faint">
+              Est. 2026 &nbsp;—&nbsp; Vol. I &nbsp;—&nbsp;{" "}
+              {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })} Data Online
             </p>
 
             {/* Nav tabs */}
@@ -93,6 +94,13 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
                 className={navClass("armchair-gm")}
               >
                 {resolvedActiveTab === "armchair-gm" ? "◆" : "◇"} Armchair GM
+              </a>
+              <span className="nav-divider text-ledger-rule-light">|</span>
+              <a
+                href="/fantasy"
+                className={navClass("fantasy")}
+              >
+                {resolvedActiveTab === "fantasy" ? "◆" : "◇"} Fantasy
               </a>
               <span className="nav-divider text-ledger-rule-light">|</span>
               <a

@@ -4,19 +4,19 @@ Use as the implementation backlog. Inspect the repo before changing code; preser
 
 ## 0. Release priority
 
-- [ ] **F0 — Fantasy Hockey Tools:** build, workshop, and test this page first. The season starts in <70 days; it must be strong enough to make Hockey Ledger a primary fantasy research tool. On `/`, make it Feature 3 using the Feature 1/2 design.
+- [ ] **F0 (v1 shipped, workshop pending) — Fantasy Hockey Tools:** build, workshop, and test this page first. The season starts in <70 days; it must be strong enough to make Hockey Ledger a primary fantasy research tool. On `/`, make it Feature 3 using the Feature 1/2 design.
 
 ## 1. Global
 
 - [ ] **G1 — Navigation:** use the shared Header and Footer on every subpage. Exception: `/`, whose own navigation is intentional.
-- [ ] **G2 — Naming:** remove all `™` marks (`STRAND™` → `STRAND`, `GRAVITY™` → `GRAVITY`). Reconcile `NAV` vs `X-NAV`; one name and definition must be used everywhere. Current conflicting copy: NAV is separately defined in “How the Engine Works” and “Player Valuation”; X-NAV is described as the skater model. ![NAV definition](assets/03-engine-nav-definition.png) ![valuation definitions](assets/04-player-valuation-definitions.png)
+- [x] **G2 — Naming:** remove all `™` marks (`STRAND™` → `STRAND`, `GRAVITY™` → `GRAVITY`). Reconcile `NAV` vs `X-NAV`; one name and definition must be used everywhere. Current conflicting copy: NAV is separately defined in “How the Engine Works” and “Player Valuation”; X-NAV is described as the skater model. ![NAV definition](assets/03-engine-nav-definition.png) ![valuation definitions](assets/04-player-valuation-definitions.png)
 - [ ] **G3 — Icons:** use one icon system across all pages; document every icon in the Icon Key. Re-establish rules for flags such as Injury History and Shutdown.
 - [ ] **G4 — Model propagation:** changes to EDGE, GRAVITY, roles, and data models must propagate through X-NAV, NOIV, and the built-in three-year Simulation Engine.
 
 ## 2. Home `/`
 
-- [ ] **H1 — Hero:** move the final scroll-animation resting position upward so the full “The Hockey Ledger” heading remains visible. ![cropped hero](assets/01-home-hero-crop.png)
-- [ ] **H2 — Staff Editorial:** replace its paragraph with: “Build your trade in the Trade Machine and test it against the X-NAV engine and the GM Audit or take the chair in Armchair GM and live with every consequence that follows. Explore advanced and enhanced stats on the Player Analytics page, featuring the Hockey Ledger exclusive Player Gravity system, STRAND DNA Identity profiles and a new all-in-one X-NAV model. Read the published Docket to see how the calls have aged. Visit the Press Box and play the daily hockey crib.” Put “The press is open. Turn the page and start running the room.” below it, centered and styled like “On the Business of Building a Hockey Team.” ![editorial](assets/02-home-editorial.png)
+- [x] **H1 — Hero:** move the final scroll-animation resting position upward so the full “The Hockey Ledger” heading remains visible. ![cropped hero](assets/01-home-hero-crop.png)
+- [x] **H2 — Staff Editorial:** replace its paragraph with: “Build your trade in the Trade Machine and test it against the X-NAV engine and the GM Audit or take the chair in Armchair GM and live with every consequence that follows. Explore advanced and enhanced stats on the Player Analytics page, featuring the Hockey Ledger exclusive Player Gravity system, STRAND DNA Identity profiles and a new all-in-one X-NAV model. Read the published Docket to see how the calls have aged. Visit the Press Box and play the daily hockey crib.” Put “The press is open. Turn the page and start running the room.” below it, centered and styled like “On the Business of Building a Hockey Team.” ![editorial](assets/02-home-editorial.png)
 - [ ] **H3 — Highest-Valued Assets:** retain the component; make it AA.
 - [ ] **H4 — Engine content:** retain the readable NAV/STRAND/GM Audit presentation, update it for current logic, and apply G2.
 - [ ] **H5 — Icon Key:** make it AA and easier to scan; include every icon. Tabs by system are acceptable (for example, STRAND and GRAVITY). ![icon key](assets/05-icon-key.png)
@@ -28,12 +28,12 @@ Use as the implementation backlog. Inspect the repo before changing code; preser
 
 ## 3. Header
 
-- [ ] **HD1 — Simplify:** remove `TRADE EDITION`, `X-NAV Analytics`, `Trade Machine`, `Armchair GM`, and `Live Statistics`. Keep `EST. 2026 — VOL. I — {date/data status}` below the title. Status can be `Data Online`, `Data updated {date}`, or `{day} / {month} Data Online`. ![current header](assets/12-header.png)
+- [x] **HD1 — Simplify:** remove `TRADE EDITION`, `X-NAV Analytics`, `Trade Machine`, `Armchair GM`, and `Live Statistics`. Keep `EST. 2026 — VOL. I — {date/data status}` below the title. Status can be `Data Online`, `Data updated {date}`, or `{day} / {month} Data Online`. ![current header](assets/12-header.png)
 
 ## 4. Trade Machine `/trade-machine`
 
 - [ ] **TM1 — Phase 3 picker:** replace team dropdown/outgoing-asset UX with a visual roster grid and drag-to-trade-block; select team before player (no global alphabetical player list); add side-by-side roster impact; use a performance endpoint for faster loading.
-- [ ] **TM2 — Current assets:** disallow all 2026 draft picks. Drive assets from the latest daily data.
+- [x] **TM2 — Current assets:** disallow all 2026 draft picks. Drive assets from the latest daily data.
 - [ ] **TM3 — Layout:** make asset blocks internally scrollable so their size stays fixed. Move GM Logic Signal outside the “Team Sending Assets” div, between Cap in Play and Team STRANDs. Add goaltending metrics to Team STRANDs; a goalie acquisition must not appear as only an OFF/DEF decline.
 - [ ] **TM4 — Feedback/share:** fix Generate Share Link. Show a progress bar or percentage while loading teams/assets and EDGE data.
 - [ ] **TM5 — GM Audit:** expand contextual reasoning using team needs, trajectory, timeline, roster redundancy, and the calibre/role of assets both ways. Example to test: receiving a franchise goalie plus second-line defenceman can justify moving a franchise defenceman; the current Bruins/McAvoy decision rejects solely because McAvoy cannot be lost, without adequately reasoning about goalie context (including Swayman). ![trade](assets/13-mcavoy-trade.png) ![audit](assets/14-mcavoy-audit.png)
@@ -78,7 +78,7 @@ Use as the implementation backlog. Inspect the repo before changing code; preser
 
 This needs a separate full audit; first fix:
 
-- [ ] **AG1 — UI:** Team Selection and Season Selection states must not use ink-black backgrounds.
-- [ ] **AG2 — Pick persistence:** traded picks must remain unavailable in the relevant future draft (for example, a traded 2027 first cannot still be selected in 2027).
+- [x] **AG1 — UI:** Team Selection and Season Selection states must not use ink-black backgrounds.
+- [x] **AG2 — Pick persistence:** traded picks must remain unavailable in the relevant future draft (for example, a traded 2027 first cannot still be selected in 2027).
 - [ ] **AG3 — Position persistence:** alternative positions must persist into Lineups.
-- [ ] **AG4 — Player identity:** normalize/match diacritics so drafted players are removed and never duplicated (`Viggo Björck` vs `Viggo Bjorck`). ![duplicate draft pick](assets/26-armchair-duplicate-draft-pick.png)
+- [x] **AG4 — Player identity:** normalize/match diacritics so drafted players are removed and never duplicated (`Viggo Björck` vs `Viggo Bjorck`). ![duplicate draft pick](assets/26-armchair-duplicate-draft-pick.png)

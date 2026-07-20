@@ -66,11 +66,6 @@ function Cell({
 
 const BRIEFS = [
   {
-    feature: "Feature Seven",
-    title: "Fantasy Hockey Tools",
-    body: "Built for fantasy managers who want to draft smarter, execute cleaner trades, and work the waiver wire with front-office data.",
-  },
-  {
     feature: "Feature Eight",
     title: "Micro-Context Prop Engine",
     body: "Built for sharper daily reads on player-prop markets through matchup, role, pace, and usage context.",
@@ -79,11 +74,11 @@ const BRIEFS = [
 
 const ENGINE = [
   {
-    label: "What is NAV?",
-    body: "Net Asset Value: a trade-value estimate that combines on-ice impact, role, age, cap hit, term, control, and market context. Prospects use draft pedigree and stored NHLe production, not automatic ELC surplus.",
+    label: "What is X-NAV?",
+    body: "Extended Net Asset Value: the Ledger's trade-value model. It combines on-ice impact, role, age, cap hit, term, control, gravity, and market context into one number. Prospects use draft pedigree and stored NHLe production, not automatic ELC surplus.",
   },
   {
-    label: "What is STRAND™?",
+    label: "What is STRAND?",
     body: "A roster DNA view showing how a player changes team identity: scoring pressure, defensive strain, usage, timeline fit, and role balance.",
   },
   {
@@ -135,7 +130,7 @@ export default function WelcomePage() {
                   <circle cx="9" cy="9" r="2" stroke="currentColor" strokeWidth="0.4" />
                   <circle cx="9" cy="9" r="0.8" fill="currentColor" />
                 </svg>
-                <span>X-NAV Analytics · STRAND™ DNA · GM Logic Engine · Live Data</span>
+                <span>X-NAV Analytics · STRAND DNA · GM Logic Engine · Live Data</span>
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" style={{ opacity: 0.35, flexShrink: 0 }}>
                   <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="0.6" />
                   <circle cx="9" cy="9" r="4.5" stroke="currentColor" strokeWidth="0.5" />
@@ -171,25 +166,21 @@ export default function WelcomePage() {
           </div>
           <div className="fp-lede text-[14px] leading-[1.9] max-w-3xl mx-auto"
             style={{ color: "var(--ledger-ink-body)" }}>
-            <p className="mb-4">
-              Every trade is an argument, and every argument deserves a hearing on
-              the record.
-              The Hockey Ledger exists to put the case in ink: to weigh
-              a deal the way a front office actually weighs it.
-              Cap and clause, age and term, value and production.
-              It's all about the slot a player fills and the window a team is trying
-              to keep open. No hot takes set in disappearing pixels. A ruling you
-              can hold up to the light.
-            </p>
             <p>
-              Build a single transaction in the Trade Machine and test it against
-              X-NAV and the GM Audit, or take the chair in Armchair GM and live with
-              every consequence that follows. Read the published Docket to see how
-              the calls have aged. The press is open. Turn the page and start
-              running the room.
+              Build your trade in the Trade Machine and test it against the X-NAV
+              engine and the GM Audit or take the chair in Armchair GM and live
+              with every consequence that follows. Explore advanced and enhanced
+              stats on the Player Analytics page, featuring the Hockey Ledger
+              exclusive Player Gravity system, STRAND DNA Identity profiles and a
+              new all-in-one X-NAV model. Read the published Docket to see how the
+              calls have aged. Visit the Press Box and play the daily hockey crib.
             </p>
           </div>
-          <p className="mt-5 text-2xs uppercase tracking-[0.28em] font-mono text-right max-w-3xl mx-auto"
+          <p className="mt-5 text-2xs uppercase tracking-[0.3em] font-mono text-center max-w-3xl mx-auto"
+            style={{ color: "var(--ledger-ink-faint)" }}>
+            The press is open. Turn the page and start running the room.
+          </p>
+          <p className="mt-3 text-2xs uppercase tracking-[0.28em] font-mono text-right max-w-3xl mx-auto"
             style={{ color: "var(--ledger-ink-faint)" }}>
             — The Front Office
           </p>
@@ -228,15 +219,32 @@ export default function WelcomePage() {
               cta="Open Player Analytics"
               body="Search the full NHL roster. Season totals, advanced analytics, STRAND DNA, Gravity fields, contract valuations, and X-NAV components — the deepest single-player view in hockey."
               lines={[
-                ["Gravity™", "On-ice gravitational pull"],
+                ["Gravity", "On-ice gravitational pull"],
                 ["STRAND DNA", "Stylistic identity profile"],
                 ["X-NAV", "Complete trade valuation"],
               ]}
             />
 
             <Cell
+              href="/fantasy"
+              lead
+              kicker="Feature Three — The Fantasy Desk"
+              kickerColor="var(--ledger-amber)"
+              edition="The Pool"
+              title="Fantasy Hockey Tools"
+              ctaColor="var(--ledger-amber)"
+              cta="Open Fantasy Tools"
+              body="Draft research built on the Ledger's live data. A full points-league draft board with value over replacement, a regression radar that separates real breakouts from shooting luck, a keeper corner for dynasty leagues, and a goalie board ranked by goals saved above expected."
+              lines={[
+                ["Draft Board", "FP/82 with VBD ranks"],
+                ["Regression Radar", "Buy low, sell high"],
+                ["Keeper Corner", "Dynasty targets by age"],
+              ]}
+            />
+
+            <Cell
               href="/teams"
-              kicker="Feature Three"
+              kicker="Feature Four"
               kickerColor="var(--ledger-green)"
               edition="The Room"
               title="Team Analytics"
@@ -252,7 +260,7 @@ export default function WelcomePage() {
 
             <Cell
               href="/armchair-gm"
-              kicker="Feature Four"
+              kicker="Feature Five"
               kickerColor="var(--ledger-green)"
               edition="The Chair"
               title="Armchair GM"
@@ -268,7 +276,7 @@ export default function WelcomePage() {
 
             <Cell
               href="/docket"
-              kicker="Feature Five"
+              kicker="Feature Six"
               kickerColor="var(--ledger-brown)"
               edition="The Record"
               title="The Docket"
@@ -284,7 +292,7 @@ export default function WelcomePage() {
 
             <Cell
               href="/press-box"
-              kicker="Feature Six — Daily Game"
+              kicker="Feature Seven — Daily Game"
               kickerColor="var(--ledger-amber)"
               edition="The Box"
               title="Press Box"

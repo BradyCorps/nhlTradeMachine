@@ -122,6 +122,41 @@
 - Integration was free: players gravity tab, GravityCard share card, teams page
   gravity leaders, and trending expanded panel all consume FieldDiagram
 
+## July 20 Audit — Round 1 (docs/July20_Audit_Claude_Code/AUDIT.md)
+
+### F0 — Fantasy Hockey Tools (v1 shipped, workshop pending)
+- New /fantasy page: points-league draft board (G×6 A×4 PPP×2 HIT×0.6 BLK×1
+  per-82), VBD vs positional replacement (12-team build: C24/W48/D48),
+  regression radar (G vs xG finishing luck: buy-low / sell-high), keeper corner
+  (age ≤23), goalie board by GSAx. Position filters + search, AA-conscious
+  (real buttons, aria-pressed, scoped table headers, visible loading state)
+- Feature Three lead tile on / ; Fantasy tab added to shared Header nav
+- SOG scoring deferred until a skater shots-on-goal feed exists
+
+### Completed audit items
+- G2: all ™ marks removed; X-NAV = Extended Net Asset Value unified across
+  MetricTip, Footer glossary, WelcomeModal, home ENGINE copy; tooltip titles
+  updated ("NAV" labels now defined as X-NAV shorthand)
+- HD1: header simplified — subtitle line removed, "Est. 2026 — Vol. I —
+  {date} Data Online" moved below the title; Fantasy nav added
+- H1: hero setdown end now viewport-relative (85vh CSS animation-range +
+  matching motion fallback); ScrollSnap also corrects overshoot (negative
+  stack top) so the masthead can't rest cropped
+- H2: editorial replaced with audit copy; centered closing line added
+- TM2: SEASON.firstTradablePickYear (2027) — 2026 picks no longer exist as
+  assets; pick inventory window is [2027..2031]
+- AG1: Team Select modal — ink-black active fills replaced with paper +
+  red-rule accent (mode picker and team tiles), aria-pressed added
+- AG2: cup-run rollover now conveys traded firsts — synthetic draft class
+  remapped from standings-slot team to current pick owner
+- AG4: new app/lib/name-normalize.ts; DraftNight accepts excludeNames and
+  filters the prospect board diacritics-insensitively (Björck ≡ Bjorck), so
+  already-rostered prospects can't be drafted twice
+
+### Still open from audit (next rounds)
+- G1 (shared Header/Footer on every subpage), G3 (icon system), G4 (model
+  propagation), H3-H10, TM1/TM3-TM7, PA1-PA12, D1, AG3
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

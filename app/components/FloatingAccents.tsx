@@ -57,7 +57,7 @@ export default function FloatingAccents() {
         }}
       >
         <div className="text-[9px] font-mono font-black uppercase tracking-[0.25em] opacity-60">
-          {`STRAND™ DNA`}
+          {`STRAND DNA`}
         </div>
         <div className="text-[10px] font-mono mt-1 opacity-80">Fit: 94%</div>
         <div className="text-[10px] font-mono opacity-50 mt-0.5">

@@ -699,6 +699,7 @@ export default function ArmchairGmPage() {
         <DraftNight
           initialSeed={scenarioSeed({ draft: homeTeamId ?? "", season: SEASON.label })}
           homeTeamId={homeTeamId}
+          excludeNames={db.players.filter(p => p.position !== "Pick").map(p => p.name)}
           onDone={(results) => {
             setDraftOpen(false);
             setResignOpen(true);
@@ -966,7 +967,7 @@ export default function ArmchairGmPage() {
                       {verdict.metrics.homeNetGain.toFixed(0)}
                       <span style={{ fontSize: 9, fontWeight: 400, marginLeft: 3,
                                      color: "var(--ledger-ink-faint)" }}
-                                  title="Net Asset Value — the player's tradeable value">NAV</span>
+                                  title="X-NAV — Extended Net Asset Value, the player’s tradeable value">NAV</span>
                     </div>
                   </div>
                 )}

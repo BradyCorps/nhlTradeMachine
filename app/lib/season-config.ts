@@ -11,7 +11,8 @@ export const SEASON = {
   apiSeasonId:    "20262027",
   capCeiling:     104.0,         // NHL salary cap ceiling ($M) — 2026-27 announced upper limit
   capFloor:       76.9,          // NHL salary cap floor ($M) — 2026-27 announced lower limit
-  draftYear:      2026,          // 2026 draft is NOT yet played — picks remain tradeable; run Draft Night to project it
+  draftYear:      2026,          // Draft Night projection year for Armchair GM sim flows
+  firstTradablePickYear: 2027,   // 2026 draft completed June 2026 — its picks no longer exist as assets
   mpSeason:       "2025",        // MoneyPuck URL path segment — last completed season is the stats baseline
   nhleSeasonId:   "20252026",    // NHL API roster fallback — keep at last completed season until 2026-27 rosters exist
   latestCompleted: {

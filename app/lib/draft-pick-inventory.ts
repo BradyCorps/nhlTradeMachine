@@ -39,10 +39,12 @@ export async function buildDraftPickInventory(teams: TeamPickContext[]) {
   const pickOverrideMap = await loadPickOverrideMap();
   const teamPhaseMap = new Map(teams.map((team) => [team.id, team]));
   const picks: any[] = [];
-  const currentDraftYear = SEASON.draftYear;
+  // Picks from already-completed drafts are not assets — the window
+  // starts at the first still-tradable draft year, not SEASON.draftYear.
+  const firstYear = SEASON.firstTradablePickYear;
 
   TEAMS_DB.forEach((origTeam) => {
-    [currentDraftYear, currentDraftYear + 1, currentDraftYear + 2, currentDraftYear + 3, currentDraftYear + 4].flatMap(year =>
+    [firstYear, firstYear + 1, firstYear + 2, firstYear + 3, firstYear + 4].flatMap(year =>
       [1, 2, 3, 4, 5].map(round => ({ round, year }))
     ).forEach(({ round, year }) => {
       const id = `pick-${origTeam.id}-${year}-${round}`;

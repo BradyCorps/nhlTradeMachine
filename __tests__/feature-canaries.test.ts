@@ -842,7 +842,8 @@ describe("Canary — draft pick inventory", () => {
     const helper = read("app/lib/draft-pick-inventory.ts");
     expect(league).toContain("buildDraftPickInventory(LIVE_TEAMS)");
     expect(teams).toContain("buildDraftPickInventory(LIVE_TEAMS)");
-    expect(helper).toContain("[currentDraftYear, currentDraftYear + 1, currentDraftYear + 2, currentDraftYear + 3, currentDraftYear + 4]");
+    expect(helper).toContain("[firstYear, firstYear + 1, firstYear + 2, firstYear + 3, firstYear + 4]");
+    expect(helper).toContain("SEASON.firstTradablePickYear");
     expect(helper).toContain("[1, 2, 3, 4, 5].map(round => ({ round, year }))");
     expect(helper).toContain("draftPickOverrides");
     expect(helper).toContain("currentOwnerId");

@@ -16,7 +16,10 @@ export default function ScrollSnap() {
       const rect = stack.getBoundingClientRect();
       const threshold = 120;
 
-      if (rect.top > 0 && rect.top < threshold) {
+      // Snap when the stack top is near the viewport top — including a
+      // slight overshoot (negative top), which previously left the
+      // masthead heading cropped at the resting position.
+      if (rect.top > -140 && rect.top < threshold && Math.abs(rect.top) > 2) {
         snappedRef.current = true;
         scrollingRef.current = true;
 

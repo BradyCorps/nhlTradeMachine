@@ -2,9 +2,9 @@
 import React, { useState, useRef, useCallback } from "react";
 
 const GLOSSARY: Record<string, string> = {
-  "X-NAV": "Net Asset Value for skaters — offense, defense, age, contract surplus, deployment, and role context.",
-  "G-NAV": "Net Asset Value for goalies — GSAx, workload, save profile, team defense, age, and contract surplus.",
-  "NAV": "Net Asset Value — overall trade value after on-ice impact, age, role, cap hit, term, and team control.",
+  "X-NAV": "Extended Net Asset Value — the Ledger's trade-value model: offense, defense, gravity, age, contract surplus, deployment, and role context.",
+  "G-NAV": "X-NAV for goalies — GSAx, workload, save profile, team defense, age, and contract surplus.",
+  "NAV": "Shorthand for X-NAV — Extended Net Asset Value, the Ledger's overall trade-value model.",
   "OPS": "Offensive Point Shares — a player's offensive contribution measured in standings points.",
   "DPS": "Defensive Point Shares — a player's defensive contribution measured in standings points.",
   "SCR": "Scoring pace — points per 82 games, normalized by position.",

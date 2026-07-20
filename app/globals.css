@@ -1224,7 +1224,10 @@ select.ledger-select {
   .fp-stack.css-scroll-anim {
     animation: ledger-setdown linear both;
     animation-timeline: scroll();
-    animation-range: 0px 900px;
+    /* End must stay below the 90vh desk spacer: a fixed 900px end
+       overshoots on viewports under 1000px and crops the masthead
+       at the animation's resting position. */
+    animation-range: 0px 85vh;
   }
 }
 

@@ -10,6 +10,7 @@ import {
   type DraftProspect,
   type DraftResult,
 } from "@/app/lib/draft-2026";
+import { normalizeName } from "@/app/lib/name-normalize";
 
 // ── Off-Season Draft Night ────────────────────────────────────────────────
 // Two distinct modal modes — never both visible at once:
@@ -23,11 +24,14 @@ import {
 // Nothing here mutates rosters or cap.
 
 export default function DraftNight({
-  initialSeed, homeTeamId, onDone,
+  initialSeed, homeTeamId, onDone, excludeNames,
 }: {
   initialSeed: number;
   homeTeamId?: string | null;
   onDone: (results: DraftResult[]) => void;
+  /** Names already on NHL rosters — matched diacritics-insensitively so
+   * an already-seeded prospect can never be drafted a second time. */
+  excludeNames?: string[];
 }) {
   const [seed, setSeed]       = useState(Math.floor(initialSeed) || 1);
   const [results, setResults] = useState<DraftResult[]>([]);
@@ -35,16 +39,26 @@ export default function DraftNight({
   const [query, setQuery]     = useState("");
   const randRef = useRef<() => number>(() => 0);
 
+  // Stable key so a fresh array identity from the parent doesn't reset a
+  // draft in progress.
+  const excludeKey = useMemo(
+    () => (excludeNames ?? []).map(normalizeName).sort().join("|"),
+    [excludeNames],
+  );
+
   useEffect(() => {
     const rand = createDraftRng(seed);
     randRef.current = rand;
+    const excluded = new Set(excludeKey.split("|").filter(Boolean));
     const startResults: DraftResult[] = [];
-    const startBoard = [...DRAFT_2026_PROSPECTS];
+    const startBoard = DRAFT_2026_PROSPECTS.filter(
+      (p) => !excluded.has(normalizeName(p.name)),
+    );
     autoCpuPicks(startResults, startBoard, rand, homeTeamId);
     setResults(startResults);
     setBoard(startBoard);
     setQuery("");
-  }, [seed, homeTeamId]);
+  }, [seed, homeTeamId, excludeKey]);
 
   const total      = DRAFT_2026_ORDER.length;
   const done       = results.length >= total;

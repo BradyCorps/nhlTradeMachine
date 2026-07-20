@@ -309,7 +309,19 @@ export function rollLeagueForward(opts: {
     ? [...standings].sort((a, b) => b.standing - a.standing).map((s) => s.teamId)
     : teams.map((t) => t.id)
   ).filter((id) => teams.some((t) => t.id === id));
-  const rookies = generateSyntheticDraftClass(draftYear, rolloverSeed, order);
+  const draftedBySlot = generateSyntheticDraftClass(draftYear, rolloverSeed, order);
+  // A first-round rookie belongs to whoever OWNS the pick now, not the
+  // team whose standing created the slot — a traded first must convey.
+  // Pick ids are `pick-{origTeam}-{year}-{round}`; teamId is the owner.
+  const firstRoundOwner = new Map(
+    picks
+      .filter((p) => p.round === 1 && p.year === draftYear)
+      .map((p) => [String(p.id).split("-")[1], p.teamId] as const),
+  );
+  const rookies = draftedBySlot.map((r) => {
+    const owner = firstRoundOwner.get(r.teamId);
+    return owner && owner !== r.teamId ? { ...r, teamId: owner } : r;
+  });
 
   // Flag every contract that has run out so resolveLeagueOffseason picks
   // it up on re-entry — including rows that were already at 0 years

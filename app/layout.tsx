@@ -31,14 +31,14 @@ export const metadata: Metadata = {
   keywords: ['NHL', 'trade machine', 'armchair GM', 'hockey analytics', 'X-NAV', 'xG', 'cap hit'],
   openGraph: {
     title: 'The Hockey Ledger — Trade Machine & Armchair GM',
-    description: 'Build NHL trades, test front-office logic, and run Armchair GM scenarios. X-NAV · STRAND™ · GM Logic Engine.',
+    description: 'Build NHL trades, test front-office logic, and run Armchair GM scenarios. X-NAV · STRAND · GM Logic Engine.',
     type: 'website',
     siteName: 'The Hockey Ledger',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'The Hockey Ledger — Trade Machine & Armchair GM',
-    description: 'Build NHL trades, test front-office logic, and run Armchair GM scenarios. X-NAV · STRAND™ · GM Logic Engine.',
+    description: 'Build NHL trades, test front-office logic, and run Armchair GM scenarios. X-NAV · STRAND · GM Logic Engine.',
   },
 };
 

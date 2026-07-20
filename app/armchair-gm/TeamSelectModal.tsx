@@ -57,15 +57,16 @@ export function TeamSelectModal({
               return (
                 <button key={m} onClick={() => onModeChange(m)}
                   className="flex-1 text-left px-3 py-2 transition-all"
+                  aria-pressed={active}
                   style={{
-                    background: active ? 'var(--ledger-ink)' : 'var(--ledger-card)',
-                    border: `1px solid ${active ? 'var(--ledger-ink)' : 'var(--ledger-rule-mid)'}`,
+                    background: 'var(--ledger-card)',
+                    border: active ? '2px solid var(--ledger-red)' : '1px solid var(--ledger-rule-mid)',
                     borderRadius: '2px',
                   }}>
                   <div className="text-[11px] font-black uppercase tracking-wider font-mono"
-                    style={{ color: active ? 'var(--ledger-card-light)' : 'var(--ledger-ink)' }}>{label}</div>
+                    style={{ color: active ? 'var(--ledger-red)' : 'var(--ledger-ink)' }}>{active ? `◆ ${label}` : label}</div>
                   <div className="text-[9px] font-mono"
-                    style={{ color: active ? 'var(--ledger-rule-mid)' : 'var(--ledger-ink-faint)' }}>{sub}</div>
+                    style={{ color: 'var(--ledger-ink-faint)' }}>{sub}</div>
                 </button>
               );
             })}
@@ -104,17 +105,18 @@ export function TeamSelectModal({
                       }, 120);
                     }}
                     className="p-2 text-left transition-all disabled:cursor-wait"
+                    aria-pressed={isSelected}
                     style={{
-                      background: isSelected ? 'var(--ledger-ink)' : 'var(--ledger-card)',
-                      border: `1px solid ${isSelected ? 'var(--ledger-ink)' : 'var(--ledger-rule-mid)'}`,
+                      background: 'var(--ledger-card)',
+                      border: isSelected ? '2px solid var(--ledger-red)' : '1px solid var(--ledger-rule-mid)',
                       borderRadius: '2px',
                       opacity: selectingTeamId && !isSelecting ? 0.45 : 1,
                     }}
                   >
                     <div className="flex flex-col items-center justify-center gap-1.5 py-1">
-                      <img src={`https://assets.nhle.com/logos/nhl/svg/${t.id}_light.svg`} alt={t.id} className="w-8 h-8 opacity-90 mix-blend-multiply" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                      <img src={`https://assets.nhle.com/logos/nhl/svg/${t.id}_light.svg`} alt={t.name} className="w-8 h-8 opacity-90 mix-blend-multiply" onError={(e) => (e.currentTarget.style.display = 'none')} />
                       <div className="text-[9px] font-black uppercase tracking-widest text-center leading-tight" style={{
-                        color: isSelected ? 'var(--ledger-ink-faint)' : phaseColor,
+                        color: phaseColor,
                         lineHeight: 1.1
                       }}>
                         {isSelecting ? "Loading" : phase}

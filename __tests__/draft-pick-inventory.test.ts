@@ -24,11 +24,11 @@ describe("draft pick inventory", () => {
 
   it("applies DB ownership overrides while preserving original-owner pick context", async () => {
     state.overrides = [{
-      id: `pick-CGY-${SEASON.draftYear}-1`,
+      id: `pick-CGY-${SEASON.firstTradablePickYear}-1`,
       currentOwnerId: "WPG",
       originalOwnerId: "CGY",
       round: 1,
-      year: SEASON.draftYear,
+      year: SEASON.firstTradablePickYear,
       isProtected: true,
       conditions: "top-10 protected",
     }];
@@ -39,10 +39,10 @@ describe("draft pick inventory", () => {
       { id: "WPG", phase: "Contender", standing: 1 },
     ]);
 
-    const moved = picks.find((pick: any) => pick.id === `pick-CGY-${SEASON.draftYear}-1`);
+    const moved = picks.find((pick: any) => pick.id === `pick-CGY-${SEASON.firstTradablePickYear}-1`);
     expect(moved).toMatchObject({
       teamId: "WPG",
-      name: `${SEASON.draftYear} 1st Round Pick via CGY`,
+      name: `${SEASON.firstTradablePickYear} 1st Round Pick via CGY`,
       isProtected: true,
       conditions: "top-10 protected",
     });

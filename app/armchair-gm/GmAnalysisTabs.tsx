@@ -555,7 +555,7 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
             <tr className="border-b border-zinc-800/30">
               {["Side", "Player", "Pos", "Age", "Pts/82", "xG/82", "DefRate", "Avg TOI", "Cap", "Term", "X-NAV", "Off", "Def", "Age/YNG", "Cap Cost", "Floor"].map((h) => (
                 <th key={h} className="px-3 py-2.5 text-left text-2xs font-black uppercase tracking-wider text-zinc-600"
-                  title={h === "X-NAV" ? "Net Asset Value — the player's tradeable value" : h === "Floor" ? "Franchise/career floor applied" : undefined}>{h}</th>
+                  title={h === "X-NAV" ? "X-NAV — Extended Net Asset Value, the player’s tradeable value" : h === "Floor" ? "Franchise/career floor applied" : undefined}>{h}</th>
               ))}
             </tr>
           </thead>

@@ -48,11 +48,11 @@ describe("league teams route", () => {
 
   it("returns draft-pick ownership overrides in the main trade UI payload", async () => {
     state.draftPickOverrides = [{
-      id: `pick-CGY-${SEASON.draftYear}-1`,
+      id: `pick-CGY-${SEASON.firstTradablePickYear}-1`,
       currentOwnerId: "WPG",
       originalOwnerId: "CGY",
       round: 1,
-      year: SEASON.draftYear,
+      year: SEASON.firstTradablePickYear,
       isProtected: false,
       conditions: null,
     }];
@@ -61,10 +61,10 @@ describe("league teams route", () => {
     const response = await GET();
     const body = await response.json();
 
-    const movedPick = body.picks.find((pick: any) => pick.id === `pick-CGY-${SEASON.draftYear}-1`);
+    const movedPick = body.picks.find((pick: any) => pick.id === `pick-CGY-${SEASON.firstTradablePickYear}-1`);
     expect(movedPick).toMatchObject({
       teamId: "WPG",
-      name: `${SEASON.draftYear} 1st Round Pick via CGY`,
+      name: `${SEASON.firstTradablePickYear} 1st Round Pick via CGY`,
     });
   });
 });
