@@ -57,6 +57,9 @@ interface Player {
   dps?: number | null;
   baselinePtsPace?: number | null;
   baselineXgRel?: number | null;
+  baselineIxg82?: number | null;
+  ppPtsPace82?: number | null;
+  pairDriverScore?: number | null;
   pkTimeShare?: number | null;
   xgRelTM?: number | null;
   xgaRelTM?: number | null;
@@ -207,32 +210,11 @@ function ArchetypeBadge({ player }: { player: Player }) {
 function PlayerIconBadges({ player }: { player: Player }) {
   const position = player.position === "D" || player.position === "G" || player.position === "C" ? player.position : "W";
   const xnav = useMemo(() => calcNAV({
-    id: player.id,
-    name: player.name,
+    ...(player as any),
     position,
-    age: player.age,
-    capHit: player.capHit,
-    yearsRemaining: player.yearsRemaining,
     capCeiling: SEASON.capCeiling,
-    ptsPace: player.ptsPace,
-    xGPace: player.xGPace,
-    edgeSpeedMaxMph: player.edgeSpeedMaxMph,
-    edgeBurstsOver20: player.edgeBurstsOver20,
     defRate: player.defRate ?? 0.08,
-    avgTOI: player.avgTOI,
-    qocIndex: player.qocIndex,
-    xgRelTM: player.xgRelTM,
-    xgaRelTM: player.xgaRelTM,
-    dzPct: player.dzPct,
-    ops: player.ops,
-    dps: player.dps,
     games: player.games ?? 40,
-    gsax: player.gsax,
-    savePct: player.savePct,
-    gamesStarted: player.gamesStarted,
-    hasLiveStats: player.hasLiveStats,
-    baselinePtsPace: player.baselinePtsPace ?? undefined,
-    pkTimeShare: player.pkTimeShare ?? undefined,
   }), [player, position]);
 
   const prospectTier = getProspectTier(player.name);
@@ -455,67 +437,18 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
 
   const gravityProfile = useMemo(() => {
     if (player.position === "G") return null;
-    return computeGravity({
-      id: player.id,
-      teamId: player.teamId,
-      name: player.name,
-      position: player.position,
-      age: player.age,
-      games: player.games ?? 0,
-      ptsPace: player.ptsPace,
-      xGPace: player.xGPace,
-      defRate: player.defRate ?? 0.08,
-      avgTOI: player.avgTOI,
-      capHit: player.capHit,
-      yearsRemaining: player.yearsRemaining,
-      hasNMC: player.hasNMC ?? false,
-      hasNTC: player.hasNTC ?? false,
-      canRetain: false,
-      retainedPct: 0,
-      multiplier: 1,
-      xgRelTM: player.xgRelTM,
-      xgaRelTM: player.xgaRelTM,
-      dzPct: player.dzPct,
-      ops: player.ops,
-      goalsPace: player.goalsPace ?? undefined,
-      assistsPace: player.assistsPace ?? undefined,
-      edgeOzPct: player.edgeOzPct,
-      edgeSpeedMaxMph: player.edgeSpeedMaxMph,
-      edgeBurstsOver20: player.edgeBurstsOver20,
-      baselineXgRel: player.baselineXgRel ?? undefined,
-    });
+    return computeGravity(player as any);
   }, [player]);
 
   const hasGravity = gravityProfile !== null;
 
   const position = player.position === "D" || player.position === "G" || player.position === "C" ? player.position : "W";
   const xnav = useMemo(() => calcNAV({
-    id: player.id,
-    name: player.name,
+    ...(player as any),
     position,
-    age: player.age,
-    capHit: player.capHit,
-    yearsRemaining: player.yearsRemaining,
     capCeiling: SEASON.capCeiling,
-    ptsPace: player.ptsPace,
-    xGPace: player.xGPace,
-    edgeSpeedMaxMph: player.edgeSpeedMaxMph,
-    edgeBurstsOver20: player.edgeBurstsOver20,
     defRate: player.defRate ?? 0.08,
-    avgTOI: player.avgTOI,
-    qocIndex: player.qocIndex,
-    xgRelTM: player.xgRelTM,
-    xgaRelTM: player.xgaRelTM,
-    dzPct: player.dzPct,
-    ops: player.ops,
-    dps: player.dps,
     games: player.games ?? 40,
-    gsax: player.gsax,
-    savePct: player.savePct,
-    gamesStarted: player.gamesStarted,
-    hasLiveStats: player.hasLiveStats,
-    baselinePtsPace: player.baselinePtsPace ?? undefined,
-    pkTimeShare: player.pkTimeShare ?? undefined,
   }), [player, position]);
 
   const [gravityView, setGravityView] = useState<"analysis" | "card">("analysis");
