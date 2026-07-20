@@ -213,42 +213,50 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
     { key: "oz", m: oz, cx: rinkX + (rinkW * 5) / 6, repulsive: false },
   ];
 
-  function zoneRings(zone: typeof zones[number]) {
-    const mag = Math.abs(zone.m);
-    if (mag < 0.05) return null;
-    // For dz: positive mass = healthy dome (tier color, dashed = repulsion);
-    // negative = breached (red, solid — a well in the wrong end).
-    // For oz/nz: positive = well (tier color), negative = caved (red).
-    const healthy = zone.m > 0;
-    const ringColor = healthy ? color : "var(--ledger-red)";
-    const dashed = zone.repulsive && healthy;
-    const ringCount = Math.max(1, Math.min(5, Math.round(mag * 5) + 1));
-    const maxRx = 44, maxRy = 34;
+  // ── Spacetime lattice — grid vertices displaced by the zone masses ──
+  // The flat lattice is league-average hockey. Wells (positive oz/nz)
+  // pull vertices inward; the DZ dome (positive dz) pushes them away;
+  // negative mass in any zone inverts its curvature. Inverse-square
+  // falloff with softening — the GR rubber-sheet, on a 296×118 sheet.
+  const COLS = 24, ROWS = 10;
+  const SOFT = 900;   // px² softening keeps displacement finite at the core
+  const K = 520;      // displacement strength per unit mass
+  const MAX_PULL = 11; // px cap so the lattice never folds over itself
 
-    return (
-      <g key={zone.key}>
-        {Array.from({ length: ringCount }).map((_, i) => {
-          const t = (i + 1) / ringCount;
-          const rx = 10 + (maxRx - 10) * t;
-          const ry = 8 + (maxRy - 8) * t;
-          const opacity = (0.14 + (1 - t) * 0.30) * clampViz(mag * 1.6, 0.3, 1);
-          return (
-            <ellipse
-              key={i}
-              cx={zone.cx} cy={midY}
-              rx={rx} ry={ry}
-              fill="none"
-              stroke={ringColor}
-              strokeWidth={i === 0 ? 1.8 : 1}
-              strokeDasharray={dashed ? "4 3" : "none"}
-              opacity={opacity}
-            />
-          );
-        })}
-        {/* Core node */}
-        <circle cx={zone.cx} cy={midY} r={4.5} fill={ringColor} opacity={clampViz(0.35 + mag * 0.55, 0, 0.9)} />
-      </g>
-    );
+  const sources = zones.map(zn => ({
+    x: zn.cx,
+    y: midY,
+    s: (zn.repulsive ? -zn.m : zn.m) * K, // dome repels, well attracts
+  }));
+
+  function warp(px: number, py: number): string {
+    let dx = 0, dy = 0;
+    for (const src of sources) {
+      const vx = src.x - px, vy = src.y - py;
+      const d2 = vx * vx + vy * vy + SOFT;
+      dx += (vx / d2) * src.s;
+      dy += (vy / d2) * src.s;
+    }
+    const mag = Math.hypot(dx, dy);
+    if (mag > MAX_PULL) { dx = (dx / mag) * MAX_PULL; dy = (dy / mag) * MAX_PULL; }
+    return `${(px + dx).toFixed(1)},${(py + dy).toFixed(1)}`;
+  }
+
+  const inX = rinkX + 4, inW = rinkW - 8;
+  const inY = rinkY + 4, inH = rinkH - 8;
+  const rowLines: string[] = [];
+  for (let r = 0; r <= ROWS; r++) {
+    const py = inY + (inH * r) / ROWS;
+    const pts: string[] = [];
+    for (let c = 0; c <= COLS; c++) pts.push(warp(inX + (inW * c) / COLS, py));
+    rowLines.push(pts.join(" "));
+  }
+  const colLines: string[] = [];
+  for (let c = 0; c <= COLS; c++) {
+    const px = inX + (inW * c) / COLS;
+    const pts: string[] = [];
+    for (let r = 0; r <= ROWS; r++) pts.push(warp(px, inY + (inH * r) / ROWS));
+    colLines.push(pts.join(" "));
   }
 
   return (
@@ -313,8 +321,35 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
       <line x1={rinkX + 12} y1={rinkY + 6} x2={rinkX + 12} y2={rinkY + rinkH - 6} stroke="var(--ledger-red)" strokeWidth={1} opacity={0.3} />
       <line x1={rinkX + rinkW - 12} y1={rinkY + 6} x2={rinkX + rinkW - 12} y2={rinkY + rinkH - 6} stroke="var(--ledger-red)" strokeWidth={1} opacity={0.3} />
 
-      {/* Zone mass fields */}
-      {zones.map(zoneRings)}
+      {/* Spacetime lattice */}
+      <g aria-hidden="true">
+        {rowLines.map((pts, i) => (
+          <polyline key={`lr-${i}`} points={pts} fill="none" stroke="var(--ledger-ink)" strokeWidth={0.6} opacity={0.30} />
+        ))}
+        {colLines.map((pts, i) => (
+          <polyline key={`lc-${i}`} points={pts} fill="none" stroke="var(--ledger-ink)" strokeWidth={0.6} opacity={0.30} />
+        ))}
+      </g>
+
+      {/* Mass cores — colored nodes at each zone centroid */}
+      {zones.map(zn => {
+        const mag = Math.abs(zn.m);
+        if (mag < 0.05) return null;
+        const healthy = zn.m > 0;
+        const nodeColor = healthy ? color : "var(--ledger-red)";
+        return (
+          <g key={`core-${zn.key}`}>
+            <circle cx={zn.cx} cy={midY} r={10 + mag * 8} fill={nodeColor} opacity={0.10 + mag * 0.12} />
+            <circle
+              cx={zn.cx} cy={midY} r={3 + mag * 3.5}
+              fill={zn.repulsive && healthy ? "var(--paper-bg)" : nodeColor}
+              stroke={nodeColor}
+              strokeWidth={zn.repulsive && healthy ? 1.6 : 0}
+              opacity={clampViz(0.45 + mag * 0.5, 0, 0.95)}
+            />
+          </g>
+        );
+      })}
 
       {/* Zone labels + values below rink */}
       {zones.map(zone => {

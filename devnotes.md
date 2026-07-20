@@ -110,8 +110,17 @@
 - New __tests__/gravity.test.ts: archetype shape fixtures (Fox two-zone basin,
   Hughes-type NZ-dominant, shutdown-D dome, black hole, grinder), bounds,
   residual exclusions, signal-quality behavior
-- Phase B (next): SpacetimeRink — lattice-warp visualization where the rink
-  grid curves around the zone masses (GR rubber-sheet rendering)
+### Phase B+C: Spacetime lattice rink (complete)
+- FieldDiagram now renders a warped lattice grid: 24×10 vertices displaced by
+  the three zone masses with inverse-square falloff + softening (GR rubber-sheet)
+- Wells pull the grid inward (pinch), the DZ dome pushes it outward (bulge),
+  negative masses invert — the curvature IS the analysis
+- Displacement capped at 11px (below the 12.3px cell pitch) so the lattice can
+  never fold over itself; softening keeps the core finite
+- Mass cores: filled node for wells, ring (hollow) node for the repulsive dome,
+  red for caved zones; halo scales with mass
+- Integration was free: players gravity tab, GravityCard share card, teams page
+  gravity leaders, and trending expanded panel all consume FieldDiagram
 
 ## Known Issues / Future Work
 
