@@ -21,3 +21,51 @@ Tiers are fixed cutoffs on the bounded scale: SUPERMASSIVE ≥ 0.55, STAR ≥ 0.
 The X-NAV handoff (no double counting). X-NAV already prices on-off lift, defense, DPS, and PK time in its OFF/DEF components. So GRAV in the NAV breakdown consumes only the residual — OZ creation shape plus the NZ transition signal — never the full force. That's why McDavid can be +0.76 force but only +27 GRAV: most of his gravity is already priced into his +350 OFF.
 
 What to watch for in testing: shapes, not just numbers. McDavid should be a steep OZ pinch; Hughes a deep center-ice trench; Suzuki a rare balanced three-zone basin; shutdown D mostly dome. Flag anyone whose shape contradicts your eye test — with the engine now additive and skip-missing-data, shape errors point at calibration constants (the per-position means/σ in gravity.ts), which are estimates meant to be refit against a real league sample. That refit is the natural next phase.
+
+Equations:
+Prims
+z(x)        = clamp( (x − μ_pos) / σ_pos , −3, +3 )      ← per-input, per-position (D or F table)
+squash(r)   = tanh( r / 2.75 )                            ← bounds any raw composite to (−1, +1)
+clamp(v,a,b) = min(b, max(a, v))
+
+lift input
+L_blend = 0.4·xgRelTM + 0.6·(baselineXgRel × 100)         (current-only if no baseline)
+
+PI (partner independence, 0.4–1.0):
+  same sign year-over-year:  PI = clamp(1 − 0.3·div, 0.7, 1.0)
+  sign flip:                 PI = clamp(0.7 − 0.3·div, 0.4, 0.7)
+  where div = |cur − base| / max(|cur|, |base|, 1)
+  D only:                    PI += pairDriverScore / 100   (clamp 0.4–1.0)
+  GP < 30:                   PI = 0.75 + (PI − 0.75)·(GP/30)
+  no baseline:               PI = 0.75
+L_eff = L_blend × PI
+
+Context Scaler
+S = C_qoc × C_usage
+C_qoc   = 1 + clamp( (qocIndex − 50) / 200 , −0.10, +0.15 )
+C_usage = clamp( 1 + 0.08·z(avgTOI) , 0.75, 1.15 )
+
+Zone Masses
+m_OZ = squash( S · [ 0.40·z(L_eff) + 0.25·z(A/82) + 0.20·z(ixG/82) + 0.15·z(PP pts/82) ] )
+
+m_NZ = squash( S · [ 0.50·z(Δ) + 0.25·z(v_max) + 0.25·z(bursts/82) ] )
+       Δ = edgeOzPct − [ 0.43 + 0.25·(0.5 − dzStartPct) ]     ← displacement: lives-vs-deployed
+
+m_DZ = squash( S · [ 0.45·z(−xgaRelTM) + 0.35·z(DPS) + 0.20·z(pkTimeShare) ] )
+
+Force and tiers
+FORCE = 0.45·m_OZ + 0.30·m_NZ + 0.25·m_DZ                 ∈ (−1, +1)
+
+SUPERMASSIVE ≥ 0.55 > STAR ≥ 0.40 > MAIN_SEQ ≥ 0.22 > SATELLITE ≥ 0.08
+> ASTEROID ≥ −0.22 > BLACK_HOLE
+
+X NAV Residuals
+m_OZ*  = squash( S · [ 0.25·z(A/82) + 0.20·z(ixG/82) + 0.15·z(PP/82) ] )   ← lift term removed
+RESIDUAL = 0.45·m_OZ* + 0.30·m_NZ                                          ← DZ removed entirely
+GRAV(NAV) = clamp( RESIDUAL × 45 , −20, +35 )
+
+Visual Lattice
+d(v) = Σ_z  s_z · (c_z − v) / (|c_z − v|² + 900)
+s_z  = ±520·m_z   (+ wells pull, − dome pushes)          |d| capped at 11px
+ex.
+FORCE = 0.45(0.87) + 0.30(0.31) + 0.25(0.46) ≈ 0.60 → SUPERMASSIVE.
