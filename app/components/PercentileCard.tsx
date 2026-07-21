@@ -235,7 +235,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
     setExporting(true);
     try {
       const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(cardRef.current, {
+      const rendered = await html2canvas(cardRef.current, {
         scale: 2,
         useCORS: true,
         backgroundColor: "#ede4cc",
@@ -245,11 +245,20 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         width: cardRef.current.offsetWidth,
         windowWidth: cardRef.current.scrollWidth,
       });
+      // Bulletproof solid background: paint the cream ground ourselves and
+      // composite the render on top. JPEG flattens any transparency to
+      // black, so this guarantees a solid card no matter what html2canvas
+      // leaves transparent.
+      const out = document.createElement("canvas");
+      out.width = rendered.width;
+      out.height = rendered.height;
+      const ctx = out.getContext("2d")!;
+      ctx.fillStyle = "#ede4cc";
+      ctx.fillRect(0, 0, out.width, out.height);
+      ctx.drawImage(rendered, 0, 0);
       const link = document.createElement("a");
-      // JPEG so the background is always solid (no transparency) and the
-      // file is small enough to share anywhere.
       link.download = `${player.name.replace(/\s+/g, "-").toLowerCase()}-hockey-ledger-card.jpg`;
-      link.href = canvas.toDataURL("image/jpeg", 0.95);
+      link.href = out.toDataURL("image/jpeg", 0.95);
       link.click();
     } catch (event) {
       console.error("[player card export]", event);
