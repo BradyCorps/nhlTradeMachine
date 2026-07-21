@@ -226,8 +226,30 @@
   automatically; glossary Modern Roles section documents all four
 - 6 new goalie fixtures in player-roles tests (544 total passing)
 
+### Round 6 — TM5/TM6 GM Audit contextual reasoning (complete)
+- New app/lib/gm-audit-context.ts (pure, unit-tested):
+  - isFranchiseCalibre: position-aware bar — a goalie clears at 72% of the
+    skater FRANCHISE threshold (G-NAV runs structurally lower)
+  - assessFranchiseReturn: a return qualifies via one franchise-calibre
+    player OR a near-franchise headliner (≥80% of positional bar) with a
+    legitimate second piece (≥85 NAV) — the audit's "franchise goalie +
+    second-line defenceman" package; always returns a written reason
+  - assessCreaseContext: starter-calibre goalie arriving → LOGJAM when a
+    QUALITY incumbent owns the net (Swayman case; workload alone never
+    blocks an upgrade), UPGRADE when the crease was the open need
+- evaluate route: FRANCHISE_ANCHOR gate consumes the assessment; its
+  explanations now state why the return does/doesn't clear the bar; a new
+  INFO flag puts the franchise-for-franchise justification on the record
+  when the gate opens; crease flags emitted for BOTH receiving sides
+  (WARN/POSITIONAL_REDUNDANCY logjam, INFO/GOOD need-filled)
+- TM6 EWA check: confirmed goalies already price into EWA via stable GSAx
+  (0.4/0.6 blend, ~6 goals = 1 win) + HDSV kicker — no change needed
+- __tests__/gm-audit-context.test.ts: 11 tests pinning the McAvoy package,
+  Swayman logjam, struggling-starter upgrade coherence, and picks-only
+  exclusion (555 total passing)
+
 ### Still open from audit (next rounds)
-- G3 (icon system), G4 (model propagation), TM1/TM3-TM7, PA5-PA9,
+- G3 (icon system), G4 (model propagation), TM1/TM3/TM4/TM7, PA5-PA9,
   PA11/PA12, D1, AG3
 
 ## Known Issues / Future Work

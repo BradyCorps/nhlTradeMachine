@@ -9,6 +9,7 @@ import type {
   TradeSideOutcome,
 } from "@/app/lib/trade-types";
 import { SEASON, LEAGUE, FRANCHISE } from "@/app/lib/season-config";
+import { assessFranchiseReturn, assessCreaseContext } from "@/app/lib/gm-audit-context";
 import { calcNAV, compressPackage as coreCompress, AssetInput, XNAVResult } from "@/app/lib/xnav-engine";
 import {
   DIVISION_BY_TEAM,
@@ -376,14 +377,25 @@ const runGmLogic = (
     });
   }
 
+  // ── Franchise-out gate (TM5) — calibre judged BOTH ways ───────
+  // The return assessment is position-aware (a franchise goalie is
+  // judged on the goalie value scale) and package-aware (near-franchise
+  // headliner + legitimate second piece qualifies — the "franchise
+  // goalie plus second-line defenceman" case).
+  const toCalibre = (a: Asset) => ({
+    name: a.name, position: normalizePosition(a.position), nav: navOf(a),
+    age: a.age, yearsRemaining: a.yearsRemaining,
+    gamesStarted: a.gamesStarted, gsax: a.gsax,
+  });
+  const returnAssessment = assessFranchiseReturn(incoming.map(toCalibre), FRANCHISE_THRESHOLD);
+
   const outFranchise = outgoing.filter(a => navOf(a) >= FRANCHISE_THRESHOLD);
   for (const asset of outFranchise) {
     const nav       = navOf(asset);
     const isMegalodon = nav >= MEGALODON_THRESHOLD;
 
     const contractLeverage = asset.yearsRemaining <= 1;
-    const franchiseReturn = incoming.some(a =>
-      navOf(a) >= FRANCHISE_THRESHOLD && a.position !== "Pick");
+    const franchiseReturn = returnAssessment.qualifies;
 
     const firstRoundPicks = incoming.filter(a =>
       a.position === "Pick" && (a.round ?? 99) === 1).length;
@@ -396,7 +408,7 @@ const runGmLogic = (
         severity: "HARD",
         category: "FRANCHISE_ANCHOR",
         headline: `${asset.name.split(" ").pop()} is a generational franchise anchor`,
-        explanation: `At ${Math.round(nav)} NAV, ${asset.name} is not a tradeable asset under normal circumstances. Generational talents compress the production of an entire top line into one roster slot — trading them requires either imminent UFA status, a franchise-level player in return, or a Lindros-tier package.`,
+        explanation: `At ${Math.round(nav)} NAV, ${asset.name} is not a tradeable asset under normal circumstances. Generational talents compress the production of an entire top line into one roster slot — trading them requires either imminent UFA status, a franchise-level player in return, or a Lindros-tier package. ${returnAssessment.reason}`,
         affectedAsset: asset.name,
         vetoesSide: 0,
       });
@@ -405,12 +417,60 @@ const runGmLogic = (
         severity: "SOFT",
         category: "FRANCHISE_ANCHOR",
         headline: `${asset.name.split(" ").pop()} commands franchise-level return`,
-        explanation: `${asset.name} (${Math.round(nav)} NAV) is an elite franchise cornerstone. Moving him requires either a franchise-calibre player in return, significant contract leverage (final year), or a massive picks/prospects package.`,
+        explanation: `${asset.name} (${Math.round(nav)} NAV) is an elite franchise cornerstone. Moving him requires either a franchise-calibre player in return, significant contract leverage (final year), or a massive picks/prospects package. ${returnAssessment.reason}`,
         affectedAsset: asset.name,
         vetoesSide: 0,
       });
+    } else if (franchiseReturn && !contractLeverage) {
+      // The gate opens — say WHY on the record, not silently.
+      flags.push({
+        severity: "INFO",
+        category: "FRANCHISE_ANCHOR",
+        headline: `Franchise-for-franchise: moving ${asset.name.split(" ").pop()} is defensible`,
+        explanation: `${asset.name} (${Math.round(nav)} NAV) only moves for a franchise-calibre return, and this package clears that bar. ${returnAssessment.reason}`,
+        affectedAsset: asset.name,
+        perspective: "home",
+      });
     }
   }
+
+  // ── Crease context (TM6) — what does the receiving net look like? ──
+  // A starter-calibre goalie arriving at a roster with an elite incumbent
+  // is a logjam, not a need; arriving at an open crease is the single
+  // most valuable hole a team can fill. Judged for both sides.
+  const creaseFlagsFor = (
+    arriving: Asset[], receivingRoster: Asset[], departing: Asset[],
+    teamName: string, perspective: "home" | "partner",
+  ) => {
+    const goalieIn = arriving.filter(a => normalizePosition(a.position) === "G")
+      .sort((a, b) => navOf(b) - navOf(a))[0];
+    if (!goalieIn) return;
+    const remainingGoalies = receivingRoster
+      .filter(p => normalizePosition(p.position) === "G" && !departing.some(o => o.id === p.id) && p.id !== goalieIn.id)
+      .map(toCalibre);
+    const ctx = assessCreaseContext(toCalibre(goalieIn), remainingGoalies);
+    if (ctx.verdict === "LOGJAM") {
+      flags.push({
+        severity: "WARN",
+        category: "POSITIONAL_REDUNDANCY",
+        headline: `Crease logjam in ${teamName} — ${ctx.incumbent!.name.split(" ").pop()} already owns the net`,
+        explanation: ctx.detail,
+        affectedAsset: goalieIn.name,
+        perspective,
+      });
+    } else if (ctx.verdict === "UPGRADE") {
+      flags.push({
+        severity: "INFO",
+        category: "GOOD",
+        headline: `${goalieIn.name.split(" ").pop()} fills ${teamName}'s crease need`,
+        explanation: ctx.detail,
+        affectedAsset: goalieIn.name,
+        perspective,
+      });
+    }
+  };
+  creaseFlagsFor(incoming, allHomeRoster, outgoing, teamHome.name, "home");
+  creaseFlagsFor(outgoing, allPartnerRoster, incoming, teamPartner.name, "partner");
 
   const outPlayers = outgoing.filter((a) => a.position !== "Pick");
   const inPlayers  = incoming.filter((a) => a.position !== "Pick");
