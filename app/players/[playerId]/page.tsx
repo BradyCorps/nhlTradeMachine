@@ -15,6 +15,7 @@ import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import GravityField from "@/app/components/GravityField";
 import PlayerStrandPanel from "@/app/components/PlayerStrandPanel";
+import { derivePlayerRoles } from "@/app/lib/player-roles";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 
@@ -71,6 +72,7 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
     games: player.games ?? 40,
   });
   const gravity = player.position !== "G" ? computeGravity(player) : null;
+  const roles = derivePlayerRoles(player);
 
   const games = player.games ?? 0;
   const goals = player.goalsPace != null ? Math.round((player.goalsPace / 82) * games) : null;
@@ -125,6 +127,28 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
             <div className="text-[9px] font-black font-mono uppercase tracking-[0.18em]" style={{ color: faint }}>X-NAV</div>
           </div>
         </div>
+
+        {/* Modern role identity */}
+        {roles && (
+          <div className="border px-4 py-3 mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-[9px] font-black font-mono uppercase tracking-[0.18em]" style={{ color: faint }}>
+                Role
+              </span>
+              <span className="text-[13px] font-black font-mono" style={{ color: roles.primary.color }}>
+                {roles.primary.icon} {roles.primary.label}
+              </span>
+              {roles.secondary && (
+                <span className="text-[11px] font-black font-mono" style={{ color: faint }}>
+                  · {roles.secondary.icon} {roles.secondary.label}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] font-mono leading-relaxed mt-1" style={{ color: "var(--ledger-ink-body, var(--ledger-ink))" }}>
+              {roles.primary.blurb}
+            </p>
+          </div>
+        )}
 
         {/* Season stats */}
         <div className="grid grid-cols-6 border mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>

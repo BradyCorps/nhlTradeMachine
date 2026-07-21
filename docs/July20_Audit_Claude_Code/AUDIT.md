@@ -43,7 +43,7 @@ Use as the implementation backlog. Inspect the repo before changing code; preser
 ## 5. Player Analytics `/players` and `/players/{nhlid}`
 
 - [x] **PA1 — Lighter index:** keep only basic data on `/players`. Replace `STATS | STRAND | PLAYER CARD | EDGE | GRAVITY | CONTRACT | OUTLOOK` with `STATS | CONTRACT | OUTLOOK | ADVANCED ANALYTICS`; Advanced Analytics opens `/players/{nhlid}`.
-- [ ] **PA2 — Modern roles:** remove legacy roles such as Sniper/Two-Way Defenceman. Derive these from available data:
+- [x] **PA2 — Modern roles:** remove legacy roles such as Sniper/Two-Way Defenceman. Derive these from available data:
   - `Puck-Moving Anchor` — D; clean exits/controlled entries, rarely dumps.
   - `Neutral Zone Engine` — F; carries through neutral ice for controlled entries.
   - `High-Danger Distributor` — seeks cross-seam/low-to-high passes for high-probability chances.

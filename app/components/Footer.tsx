@@ -73,6 +73,24 @@ export const methodologySections: MethodologySection[] = [
     ],
   },
   {
+    title: "Modern Roles",
+    intro: "Derived identity labels — what a player actually does, computed from tracking, deployment, and creation-mix data.",
+    items: [
+      { term: "Puck-Moving Anchor", definition: "D — clean exits and controlled entries; play travels north on his stick, not off the glass." },
+      { term: "Neutral Zone Engine", definition: "F — carries through center ice for controlled entries; the transition game runs through him." },
+      { term: "High-Danger Distributor", definition: "Seeks cross-seam and low-to-high passes that create high-probability chances." },
+      { term: "Rush Weapon", definition: "Counterattack specialist — top-end speed and finishing on odd-man rushes." },
+      { term: "Slot Hunter", definition: "Off-puck movement into soft high-danger slot ice for quick shots and deflections." },
+      { term: "Net-Front Disruptor", definition: "Screens, tips, and low-slot rebounds — goalie sightlines are never clean." },
+      { term: "Volume Shooter", definition: "Drives offense by directing pucks at net relentlessly." },
+      { term: "Forecheck Monster", definition: "Offensive-zone recoveries and forced turnovers sustain possession." },
+      { term: "Perimeter Lockdown", definition: "D — forces rushes outside and denies clean blue-line entries." },
+      { term: "Complete Shutdown", definition: "C — suppresses opponent expected goals while on the ice; the trusted matchup assignment." },
+      { term: "Floor Raiser", definition: "High usage — carries a lineup through transition, minutes, and self-created offense." },
+      { term: "Ceiling Raiser", definition: "Adaptable elite complement — suppression, forechecking, or off-puck play that elevates a top line." },
+    ],
+  },
+  {
     title: "Trade Logic",
     intro: "The audit layer that decides whether a deal is plausible, not just mathematically balanced.",
     items: [

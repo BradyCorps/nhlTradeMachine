@@ -12,7 +12,8 @@ import {
   getShutdownDPedigree,
 } from "@/app/lib/player-data";
 import { FRANCHISE, SEASON } from "@/app/lib/season-config";
-import { calcNAV, classifyForwardArchetype } from "@/app/lib/xnav-engine";
+import { calcNAV } from "@/app/lib/xnav-engine";
+import { derivePlayerRoles } from "@/app/lib/player-roles";
 import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
@@ -126,68 +127,29 @@ function MiniHelix({ ops, dps, ptsPace, avgTOI }: {
   );
 }
 
-// ── Archetype badge ───────────────────────────────────────────
+// ── Modern role badge (PA2) — derived identity, not legacy labels ──
 function ArchetypeBadge({ player }: { player: Player }) {
-  const ops = player.ops ?? null;
-  const dps = player.dps ?? null;
-  const psTotal = ops !== null && dps !== null ? ops + dps : null;
-  const psRatio = psTotal !== null && psTotal > 1 ? ops! / psTotal : null;
-
   let label = "";
+  let icon = "•";
   let color = "var(--ink-faint)";
+  let blurb = "";
 
   if (player.position === "G") {
     const tier = goalieTeir(player.gamesStarted ?? 0);
     label = tier;
+    icon = tier === "STARTER" ? "G1" : tier === "TANDEM" ? "G2" : "G3";
     color = tier === "STARTER" ? "var(--green)" : tier === "TANDEM" ? "var(--blue)" : "var(--ink-faint)";
-  } else if (player.position === "D") {
-    if (psRatio !== null) {
-      if (psRatio > 0.62)       { label = "OFF D";    color = "var(--blue)"; }
-      else if (psRatio < 0.35)  { label = "SHUTDOWN"; color = "var(--red)"; }
-      else                      { label = "TWO-WAY";  color = "var(--green)"; }
-    } else {
-      if (player.ptsPace >= 45)      { label = "OFF D";    color = "var(--blue)"; }
-      else if (player.avgTOI >= 22)  { label = "TWO-WAY";  color = "var(--green)"; }
-      else                           { label = "DEPTH D";  color = "var(--ink-faint)"; }
-    }
   } else {
-    label = classifyForwardArchetype({
-      ptsPace: player.ptsPace,
-      goalsPace: player.goalsPace,
-      assistsPace: player.assistsPace,
-      xGPace: player.xGPace,
-      avgTOI: player.avgTOI,
-      qocIndex: player.qocIndex,
-      xgRelTM: player.xgRelTM,
-      ops: player.ops,
-      dps: player.dps,
-      pkTimeShare: player.pkTimeShare,
-      edgeSpeedMaxMph: player.edgeSpeedMaxMph,
-      edgeBurstsOver20: player.edgeBurstsOver20,
-    });
-    color = label === "HIGH_GRAVITY" ? "var(--ledger-ink)"
-      : label === "LINE_RAISER" || label === "LINE_ESTABLISHER" ? "var(--ledger-green)"
-      : label === "LINE_FINISHER" || label === "SPEED_BURST" ? "var(--blue)"
-      : label === "DEFENSIVE" ? "var(--red)"
-      : label === "SPACE_OPENER" ? "var(--ledger-amber)"
-      : label === "IMPACT_PLAYER" ? "var(--ledger-navy)"
-      : "var(--ink-faint)";
+    const roles = derivePlayerRoles(player);
+    if (!roles) return null;
+    label = roles.primary.label;
+    icon = roles.primary.icon;
+    color = roles.primary.color;
+    blurb = roles.primary.blurb;
   }
 
   if (!label) return null;
-  const icon =
-    label === "HIGH_GRAVITY" ? "◆"
-    : label === "LINE_RAISER" ? "↗"
-    : label === "LINE_FINISHER" ? "◎"
-    : label === "SPEED_BURST" ? "≫"
-    : label === "SPACE_OPENER" ? "□"
-    : label === "IMPACT_PLAYER" || label === "OFF D" ? "●"
-    : label === "SHUTDOWN" || label === "DEFENSIVE" ? "■"
-    : label === "STARTER" ? "G1"
-    : label === "TANDEM" ? "G2"
-    : label === "TWO-WAY" || label === "LINE_ESTABLISHER" ? "◇"
-    : "•";
-  const displayLabel = label.replace(/_/g, " ");
+  const displayLabel = blurb ? `${label} — ${blurb}` : label;
 
   return (
     <span title={displayLabel} aria-label={displayLabel} style={{

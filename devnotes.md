@@ -189,8 +189,26 @@
   PlayerStrandPanel client component — the canonical strand surface) above
   the gravity field; STRAND canaries re-pointed at the panel
 
+### Round 4 — PA2 modern roles (complete)
+- New app/lib/player-roles.ts: twelve audit-specified roles derived from
+  EDGE tracking (speed, bursts, zone-time displacement), on/off splits,
+  deployment, physical play, and creation mix. Evidence-gated scoring
+  (0-1 ramps, primary ≥0.45, optional secondary within 0.18) — missing
+  data lowers a score, so a role claim always has proof; <15 GP → null
+- Legacy display labels removed: OFF D / SHUTDOWN / TWO-WAY chips and the
+  index's use of classifyForwardArchetype (that function remains as internal
+  valuation metadata only — not user-facing)
+- ArchetypeBadge on /players now renders the modern role icon with the full
+  label+blurb as tooltip/aria; goalies keep STARTER/TANDEM/BACKUP tier chips
+- Dossier (/players/{nhlid}) gains a Role plate: primary + secondary role
+  with the identity blurb, computed server-side
+- "Modern Roles" glossary section added (Footer accordion + /glossary)
+- __tests__/player-roles.test.ts: 11 tests pinning archetype fixtures
+  (Hughes→Puck-Moving Anchor, Slavin→Perimeter Lockdown, shutdown C,
+  NZ Engine, HD Distributor, Volume Shooter, Forecheck Monster) + contracts
+
 ### Still open from audit (next rounds)
-- G3 (icon system), G4 (model propagation), TM1/TM3-TM7, PA2/PA3/PA5-PA9,
+- G3 (icon system), G4 (model propagation), TM1/TM3-TM7, PA3/PA5-PA9,
   PA11/PA12, D1, AG3
 
 ## Known Issues / Future Work
