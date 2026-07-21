@@ -56,7 +56,7 @@ Use as the implementation backlog. Inspect the repo before changing code; preser
   - `Complete Shutdown` — C; suppresses opponents’ expected goals while on ice.
   - `Floor Raiser` — high usage; carries weak rosters via transition, minutes, and self-created offense.
   - `Ceiling Raiser` — adaptable elite complement; suppression, forechecking, or off-puck play elevates an elite line.
-- [ ] **PA3 — Goalie EDGE:** extend roles/analysis to goalies. Base: `https://api-web.nhle.com/v1/edge/`. Use these unique source endpoints (source doc repeated several): `goalie-landing/20252026/2`; `goalie-shot-location-top-10/{shots-against|goals-against|save-pctg|saves}/all/20252026/2`; `goalie-shot-location-top-10/goals-against/high/20252026/2`.
+- [x] **PA3 — Goalie EDGE:** extend roles/analysis to goalies. Base: `https://api-web.nhle.com/v1/edge/`. Use these unique source endpoints (source doc repeated several): `goalie-landing/20252026/2`; `goalie-shot-location-top-10/{shots-against|goals-against|save-pctg|saves}/all/20252026/2`; `goalie-shot-location-top-10/goals-against/high/20252026/2`.
 
 ### Tabs/components
 

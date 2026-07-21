@@ -134,18 +134,20 @@ function ArchetypeBadge({ player }: { player: Player }) {
   let color = "var(--ink-faint)";
   let blurb = "";
 
-  if (player.position === "G") {
+  const roles = derivePlayerRoles(player);
+  if (roles) {
+    label = roles.primary.label;
+    icon = roles.primary.icon;
+    color = roles.primary.color;
+    blurb = roles.primary.blurb;
+  } else if (player.position === "G") {
+    // No role evidence yet — fall back to the workload tier chip
     const tier = goalieTeir(player.gamesStarted ?? 0);
     label = tier;
     icon = tier === "STARTER" ? "G1" : tier === "TANDEM" ? "G2" : "G3";
     color = tier === "STARTER" ? "var(--green)" : tier === "TANDEM" ? "var(--blue)" : "var(--ink-faint)";
   } else {
-    const roles = derivePlayerRoles(player);
-    if (!roles) return null;
-    label = roles.primary.label;
-    icon = roles.primary.icon;
-    color = roles.primary.color;
-    blurb = roles.primary.blurb;
+    return null;
   }
 
   if (!label) return null;

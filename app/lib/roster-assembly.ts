@@ -14,6 +14,7 @@ import {
   safeNhlRosterPlayer,
 } from "@/app/lib/player-identity";
 import { latestEdgeSignalMap } from "@/app/lib/nhl-feed-capture";
+import { latestGoalieBoardsMap } from "@/app/lib/goalie-edge";
 import { FA_KNOWN_FACTS, seedFreeAgentStatus } from "@/app/lib/free-agent-seed";
 import { listPublishedTrades, type TradeRecord } from "@/app/lib/trades";
 import {
@@ -1030,6 +1031,7 @@ export async function assembleCanonicalRoster(options: {
   // ── Trade block statuses (admin-managed, keyed by name) ──────
   // ── EDGE signals (latest nhl_snapshots per player) ────────────
   const edgeSignals = await latestEdgeSignalMap(Number(SEASON.nhleSeasonId)).catch(() => new Map());
+  const goalieBoards = await latestGoalieBoardsMap(SEASON.nhleSeasonId).catch(() => new Map());
 
   // Position-suffixed keys win so same-name players (two Elias
   // Petterssons) never share a block status; plain-name keys remain for
@@ -1290,6 +1292,7 @@ export async function assembleCanonicalRoster(options: {
         savePct:        goalieStats?.savePct       ?? 0.900,
         gamesStarted:   goalieStats?.gamesStarted  ?? 0,
         shotsPerGame:   goalieStats?.shotsPerGame  ?? 0,
+        goalieEdgeBoards: finalPosition === "G" ? (goalieBoards.get(String(p.id)) ?? null) : null,
         teamXga60,
         teamHdca60:     TEAM_BASELINES[teamId]?.hdca60 ?? null,
         baselineGsax:      baselines.baselineGsax      ?? currentYearGsax,

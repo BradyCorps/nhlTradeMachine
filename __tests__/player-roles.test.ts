@@ -122,6 +122,55 @@ describe("derivePlayerRoles — archetype shapes", () => {
   });
 });
 
+describe("derivePlayerRoles — goalie roles (PA3)", () => {
+  const goalieBase = { position: "G", games: 60 };
+
+  it("returns null under 12 starts", () => {
+    expect(derivePlayerRoles({ ...goalieBase, gamesStarted: 8, gsax: 5, savePct: 0.92 })).toBeNull();
+  });
+
+  it("franchise starter: Workhorse Wall", () => {
+    const r = derivePlayerRoles({
+      ...goalieBase, gamesStarted: 56, gsax: 22, savePct: 0.923,
+      baselineHdsvPct: 0.845, teamXga60: 2.5,
+      goalieEdgeBoards: [{ board: "saves", rank: 2 }, { board: "shots-against", rank: 4 }],
+    })!;
+    expect(r.primary.key).toBe("WORKHORSE_WALL");
+  });
+
+  it("slot-erasing profile: High-Danger Eraser", () => {
+    const r = derivePlayerRoles({
+      ...goalieBase, gamesStarted: 40, gsax: 12, savePct: 0.919,
+      baselineHdsvPct: 0.868, teamXga60: 2.5,
+      goalieEdgeBoards: [{ board: "save-pctg", rank: 3 }],
+    })!;
+    expect(r.primary.key).toBe("HIGH_DANGER_ERASER");
+  });
+
+  it("great goalie, bad team: Storm Cellar", () => {
+    const r = derivePlayerRoles({
+      ...goalieBase, gamesStarted: 48, gsax: 19, savePct: 0.914,
+      baselineHdsvPct: 0.82, teamXga60: 3.2,
+    })!;
+    expect(r.primary.key).toBe("STORM_CELLAR");
+  });
+
+  it("efficient 1B: Tandem Weapon", () => {
+    const r = derivePlayerRoles({
+      ...goalieBase, gamesStarted: 30, gsax: 10, savePct: 0.924,
+      baselineHdsvPct: 0.83, teamXga60: 2.55,
+    })!;
+    expect(r.primary.key).toBe("TANDEM_WEAPON");
+  });
+
+  it("ordinary backup: no role awarded", () => {
+    expect(derivePlayerRoles({
+      ...goalieBase, gamesStarted: 20, gsax: -4, savePct: 0.896,
+      baselineHdsvPct: 0.79, teamXga60: 2.6,
+    })).toBeNull();
+  });
+});
+
 describe("derivePlayerRoles — output contract", () => {
   it("confidence is bounded and secondary differs from primary", () => {
     const r = derivePlayerRoles({

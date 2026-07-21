@@ -207,8 +207,27 @@
   (Hughes→Puck-Moving Anchor, Slavin→Perimeter Lockdown, shutdown C,
   NZ Engine, HD Distributor, Volume Shooter, Forecheck Monster) + contracts
 
+### Round 5 — PA3 goalie EDGE (complete)
+- New app/lib/goalie-edge.ts: nightly capture of the audit's EDGE goalie
+  endpoints (goalie-landing + 4× shot-location top-10 all + goals-against
+  high) into one nhl_snapshots row (source "goalie-boards"); tolerant
+  shape-based parser so an NHL schema shift degrades to "no data"
+- Cron /api/cron/nhl-feed now captures the boards every night alongside
+  the rotating skater snapshots
+- Roster assembly joins latestGoalieBoardsMap onto goalie assets as
+  goalieEdgeBoards ({board, rank}[]); Asset type extended
+- Four goalie roles added to the modern role engine: Workhorse Wall,
+  High-Danger Eraser, Storm Cellar (positive GSAx behind a leaky defense),
+  Tandem Weapon — derived from starts, GSAx, save profile, HDSV baseline,
+  team xGA context, and board appearances; <12 starts → null; the
+  goals-against-high board acts as negative evidence for the Eraser
+- Players index badge prefers the derived goalie role, falls back to the
+  STARTER/TANDEM/BACKUP tier chip; dossier Role plate covers goalies
+  automatically; glossary Modern Roles section documents all four
+- 6 new goalie fixtures in player-roles tests (544 total passing)
+
 ### Still open from audit (next rounds)
-- G3 (icon system), G4 (model propagation), TM1/TM3-TM7, PA3/PA5-PA9,
+- G3 (icon system), G4 (model propagation), TM1/TM3-TM7, PA5-PA9,
   PA11/PA12, D1, AG3
 
 ## Known Issues / Future Work

@@ -88,6 +88,10 @@ export const methodologySections: MethodologySection[] = [
       { term: "Complete Shutdown", definition: "C — suppresses opponent expected goals while on the ice; the trusted matchup assignment." },
       { term: "Floor Raiser", definition: "High usage — carries a lineup through transition, minutes, and self-created offense." },
       { term: "Ceiling Raiser", definition: "Adaptable elite complement — suppression, forechecking, or off-puck play that elevates a top line." },
+      { term: "Workhorse Wall", definition: "G — starter workload with saves above expected; the net is his every night." },
+      { term: "High-Danger Eraser", definition: "G — elite on grade-A chances; the slot shot that beats most goalies gets erased." },
+      { term: "Storm Cellar", definition: "G — positive GSAx behind a leaky defense; keeps the scoreboard respectable." },
+      { term: "Tandem Weapon", definition: "G — split workload with elite efficiency per start; wins his half of the calendar." },
     ],
   },
   {

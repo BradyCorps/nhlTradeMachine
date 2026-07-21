@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { capturePlayerSnapshots, rosterPlayerIds } from "@/app/lib/nhl-feed-capture";
+import { captureGoalieEdgeBoards } from "@/app/lib/goalie-edge";
 import { isAuthorized } from "@/app/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -29,5 +30,8 @@ export async function GET(req: Request) {
     ? await capturePlayerSnapshots(ids, season)
     : { requested: 0, landingStored: 0, edgeStored: 0, failures: [], day: "" };
 
-  return NextResponse.json({ ok: true, cycleDay, teams: group, season, ...result });
+  // League-wide goalie EDGE boards — one cheap capture per night (PA3)
+  const goalieBoards = await captureGoalieEdgeBoards(SEASON.nhleSeasonId);
+
+  return NextResponse.json({ ok: true, cycleDay, teams: group, season, goalieBoards, ...result });
 }

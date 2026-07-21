@@ -22,7 +22,13 @@ export type PlayerRoleKey =
   | "PERIMETER_LOCKDOWN"     // D — forces rushes wide, denies clean entries
   | "COMPLETE_SHUTDOWN"      // C — suppresses opponent xG while on ice
   | "FLOOR_RAISER"           // any — high usage, carries a lineup via minutes + self-created offense
-  | "CEILING_RAISER";        // any — adaptable elite complement that elevates a top line
+  | "CEILING_RAISER"         // any — adaptable elite complement that elevates a top line
+  // Goalie roles (PA3) — derived from workload, GSAx, save profile,
+  // team defensive context, and NHL EDGE goalie leaderboards
+  | "WORKHORSE_WALL"         // G — starter workload with saves above expected
+  | "HIGH_DANGER_ERASER"     // G — elite high-danger save profile
+  | "STORM_CELLAR"           // G — positive GSAx behind a leaky defense
+  | "TANDEM_WEAPON";         // G — split workload, elite efficiency per start
 
 export interface RoleDef {
   key: PlayerRoleKey;
@@ -81,6 +87,22 @@ export const ROLE_DEFS: Record<PlayerRoleKey, RoleDef> = {
     key: "CEILING_RAISER", label: "Ceiling Raiser", icon: "⬆", color: "var(--ledger-green)",
     blurb: "Adaptable elite complement — suppression, forechecking, or off-puck play that makes a great line greater.",
   },
+  WORKHORSE_WALL: {
+    key: "WORKHORSE_WALL", label: "Workhorse Wall", icon: "▦", color: "var(--ledger-green)",
+    blurb: "Starter workload with saves above expected — the net is his every night and the team banks points for it.",
+  },
+  HIGH_DANGER_ERASER: {
+    key: "HIGH_DANGER_ERASER", label: "High-Danger Eraser", icon: "⊘", color: "var(--ledger-navy, #1a2e5c)",
+    blurb: "Elite on grade-A chances — the slot shot that beats most goalies gets erased here.",
+  },
+  STORM_CELLAR: {
+    key: "STORM_CELLAR", label: "Storm Cellar", icon: "☂", color: "var(--ledger-brown, #6e5a3d)",
+    blurb: "Positive goals saved above expected behind a leaky defense — the reason the scoreboard stays respectable.",
+  },
+  TANDEM_WEAPON: {
+    key: "TANDEM_WEAPON", label: "Tandem Weapon", icon: "◐", color: "var(--ledger-amber, #d4a017)",
+    blurb: "Split workload, elite efficiency per start — a 1B who wins his half of the calendar.",
+  },
 };
 
 export interface RoleResult {
@@ -112,6 +134,13 @@ export interface RoleInput {
   avgTOI?: number | null;
   qocIndex?: number | null;
   hdFinishingDelta?: number | null;
+  // Goalie signals (PA3)
+  gamesStarted?: number | null;
+  gsax?: number | null;
+  savePct?: number | null;
+  baselineHdsvPct?: number | null;
+  teamXga60?: number | null;
+  goalieEdgeBoards?: { board: string; rank: number }[] | null;
 }
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
@@ -120,7 +149,8 @@ const ramp = (v: number | null | undefined, lo: number, hi: number) =>
   v == null ? 0 : clamp01((v - lo) / (hi - lo));
 
 export function derivePlayerRoles(p: RoleInput): RoleResult | null {
-  if (p.position === "G" || p.position === "Pick") return null;
+  if (p.position === "Pick") return null;
+  if (p.position === "G") return deriveGoalieRoles(p);
   const games = p.games ?? 0;
   if (games < 15) return null;
 
@@ -218,6 +248,10 @@ export function derivePlayerRoles(p: RoleInput): RoleResult | null {
     0.15 * ramp(p.qocIndex, 55, 75) +
     0.15 * (ixg != null ? clamp01((20 - ixg) / 12) : 0.5));
 
+  return pickRoles(scores);
+}
+
+function pickRoles(scores: Map<PlayerRoleKey, number>): RoleResult | null {
   const ranked = [...scores.entries()].sort((a, b) => b[1] - a[1]);
   const [primaryKey, primaryScore] = ranked[0] ?? [null, 0];
   if (!primaryKey || primaryScore < 0.45) return null;
@@ -229,4 +263,49 @@ export function derivePlayerRoles(p: RoleInput): RoleResult | null {
     secondary: secondaryEntry ? ROLE_DEFS[secondaryEntry[0]] : null,
     confidence: Math.round(clamp01(primaryScore) * 100) / 100,
   };
+}
+
+// ── Goalie roles (PA3) ───────────────────────────────────────────
+// Workload, GSAx, save profile, team defensive context, and NHL EDGE
+// goalie leaderboard appearances. Save percentage arrives as either
+// 0.9xx or 9x.x depending on the source — normalize before ramping.
+
+function deriveGoalieRoles(p: RoleInput): RoleResult | null {
+  const starts = p.gamesStarted ?? 0;
+  if (starts < 12) return null;
+
+  const gsax = p.gsax ?? 0;
+  const sv = p.savePct != null ? (p.savePct > 1 ? p.savePct / 100 : p.savePct) : null;
+  const boards = p.goalieEdgeBoards ?? [];
+  const onBoard = (name: string) => boards.some(b => b.board === name);
+  // Appearing on the high-danger goals-against board = bleeding grade-A goals
+  const hdLeaky = onBoard("goals-against-high");
+
+  const scores = new Map<PlayerRoleKey, number>();
+
+  scores.set("WORKHORSE_WALL",
+    0.45 * ramp(starts, 32, 55) +
+    0.35 * ramp(gsax, 0, 18) +
+    0.20 * ((onBoard("saves") || onBoard("shots-against")) ? 1 : 0));
+
+  scores.set("HIGH_DANGER_ERASER",
+    0.50 * ramp(p.baselineHdsvPct, 0.80, 0.865) +
+    0.25 * ramp(gsax, 2, 16) +
+    0.25 * ((onBoard("save-pctg") ? 1 : 0) * (hdLeaky ? 0 : 1)));
+
+  scores.set("STORM_CELLAR",
+    0.40 * ramp(p.teamXga60, 2.55, 3.15) +
+    0.45 * ramp(gsax, 3, 20) +
+    0.15 * ramp(starts, 28, 50));
+
+  // Tandem: a tent over the split-workload band, peaking near ~30 starts
+  const tandemFit = starts >= 16 && starts <= 44
+    ? 1 - Math.abs(starts - 30) / 14
+    : 0;
+  scores.set("TANDEM_WEAPON",
+    0.40 * clamp01(tandemFit) +
+    0.40 * ramp(sv, 0.902, 0.922) +
+    0.20 * ramp(gsax, 2, 12));
+
+  return pickRoles(scores);
 }

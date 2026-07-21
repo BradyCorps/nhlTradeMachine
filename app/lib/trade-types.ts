@@ -54,6 +54,8 @@ export interface Asset {
   savePct?: number;
   gamesStarted?: number;
   shotsPerGame?: number;
+  /** NHL EDGE goalie leaderboard appearances (PA3) — board name + rank. */
+  goalieEdgeBoards?: { board: string; rank: number }[] | null;
   careerGsax?: number;
   awards?: string[];
   peakNAV?: number;
