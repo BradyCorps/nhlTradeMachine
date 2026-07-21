@@ -8,7 +8,7 @@ import { calcNAV } from "@/app/lib/xnav-engine";
 import { computeGravity } from "@/app/lib/gravity";
 import { gravityTierColor } from "@/app/lib/gravity";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
-import { TierIcon } from "@/app/components/GravityField";
+import { TierIcon, FieldDiagram } from "@/app/components/GravityField";
 import { SEASON } from "@/app/lib/season-config";
 import MetricTip from "@/app/components/MetricTip";
 import { displayPosition } from "@/app/lib/display-position";
@@ -207,7 +207,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
   const surplus = fmv - player.capHit;
   const surplusTone = surplus >= 1 ? "good" : surplus <= -1 ? "bad" : "neutral";
   const surplusWord = surplus >= 1 ? "BARGAIN" : surplus <= -1 ? "OVERPAY" : "FAIR DEAL";
-  const GOOD = "#146a24", BAD = "#9c2b1f", INK = "#1c140a", BODY = "#4a3820";
+  const GOOD = "#146a24", BAD = "#9c2b1f", INK = "#1c140a";
   const toneColor = (t: string) => t === "good" ? GOOD : t === "bad" ? BAD : INK;
 
   const navCells = [
@@ -254,7 +254,14 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       <style>{`
         .pcard { width: 100%;
           background: #ede4cc; border: 2px solid #1c140a; border-radius: 3px;
-          font-family: var(--font-mono, ui-monospace, monospace); color: #1c140a; }
+          font-family: var(--font-mono, ui-monospace, monospace); color: #1c140a;
+          /* Scope the ledger palette to fixed newspaper tones so the embedded
+             gravity rink renders in-card and exports cleanly in any theme. */
+          --ledger-ink: #1c140a; --ledger-ink-body: #4a3820; --ledger-ink-faint: #6e5a3d;
+          --ledger-rule: #b8a070; --ledger-rule-light: #d6c8a5;
+          --paper-bg: #ede4cc; --paper-card: #ede4cc; --paper-inset: #e4d8b8;
+          --ledger-green: #146a24; --ledger-red: #9c2b1f;
+          --ledger-navy: #1a2e5c; --ledger-amber: #d4a017; --ledger-brown: #6e5a3d; }
         .pcard *:focus-visible { outline: 2px solid #1a2e5c; outline-offset: 2px; border-radius: 2px; }
         .pcard-head { background: #e4d8b8; color: #1c140a; padding: 12px 16px;
           border-bottom: 2px solid #1c140a;
@@ -275,8 +282,12 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         .pcard-contract .lbl { font-size: 9px; font-weight: 700; color: #4a3820;
           text-transform: uppercase; letter-spacing: 0.1em; margin-right: 5px; }
         .pcard-contract .num { font-weight: 900; font-variant-numeric: tabular-nums; }
-        .pcard-gravrow { display: flex; align-items: center; justify-content: space-between; gap: 10px;
-          padding: 7px 16px; border-bottom: 1px solid #b8a070; }
+        .pcard-grav { padding: 10px 12px 6px; border-bottom: 1px solid #b8a070;
+          background: #e4d8b8; }
+        .pcard-grav-h { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+          margin-bottom: 2px; }
+        .pcard-grav-title { font-size: 10px; font-weight: 700; color: #4a3820;
+          text-transform: uppercase; letter-spacing: 0.12em; }
         .pcard-edge { display: grid; grid-template-columns: repeat(4, 1fr);
           border-bottom: 1px solid #b8a070; }
         .pcard-ecell { padding: 6px 8px; text-align: center; border-right: 1px solid #d6c8a5; }
@@ -360,21 +371,19 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         </span></span>
       </div>
 
-      {/* Gravity strip (PA7) */}
+      {/* Gravity field — the full spacetime rink (PA7) */}
       {gravity && (
-        <div className="pcard-gravrow">
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-            <TierIcon tier={gravity.tier} size={16} />
-            <span style={{ fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.08em", color: gravityTierColor(gravity.tier) }}>
-              {gravity.tier.replace(/_/g, " ")}
+        <div className="pcard-grav">
+          <div className="pcard-grav-h">
+            <span className="pcard-grav-title">Player Gravity — Where He Warps the Rink</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <TierIcon tier={gravity.tier} size={14} />
+              <span style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.06em", color: gravityTierColor(gravity.tier) }}>
+                {gravity.tier.replace(/_/g, " ")}
+              </span>
             </span>
-            <span style={{ fontSize: 12, fontWeight: 900, fontVariantNumeric: "tabular-nums", color: INK }}>
-              {gravity.force > 0 ? "+" : ""}{gravity.force.toFixed(2)}
-            </span>
-          </span>
-          <span style={{ fontSize: 10, fontWeight: 700, color: BODY, fontVariantNumeric: "tabular-nums" }}>
-            OZ {gravity.masses.oz > 0 ? "+" : ""}{gravity.masses.oz.toFixed(2)} · NZ {gravity.masses.nz > 0 ? "+" : ""}{gravity.masses.nz.toFixed(2)} · DZ {gravity.masses.dz > 0 ? "+" : ""}{gravity.masses.dz.toFixed(2)}
-          </span>
+          </div>
+          <FieldDiagram profile={gravity} />
         </div>
       )}
 
