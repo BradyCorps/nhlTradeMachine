@@ -10,7 +10,6 @@ import {
   type DraftProspect,
   type DraftResult,
 } from "@/app/lib/draft-2026";
-import { normalizeName } from "@/app/lib/name-normalize";
 
 // ── Off-Season Draft Night ────────────────────────────────────────────────
 // Two distinct modal modes — never both visible at once:
@@ -24,14 +23,11 @@ import { normalizeName } from "@/app/lib/name-normalize";
 // Nothing here mutates rosters or cap.
 
 export default function DraftNight({
-  initialSeed, homeTeamId, onDone, excludeNames,
+  initialSeed, homeTeamId, onDone,
 }: {
   initialSeed: number;
   homeTeamId?: string | null;
   onDone: (results: DraftResult[]) => void;
-  /** Names already on NHL rosters — matched diacritics-insensitively so
-   * an already-seeded prospect can never be drafted a second time. */
-  excludeNames?: string[];
 }) {
   const [seed, setSeed]       = useState(Math.floor(initialSeed) || 1);
   const [results, setResults] = useState<DraftResult[]>([]);
@@ -39,26 +35,20 @@ export default function DraftNight({
   const [query, setQuery]     = useState("");
   const randRef = useRef<() => number>(() => 0);
 
-  // Stable key so a fresh array identity from the parent doesn't reset a
-  // draft in progress.
-  const excludeKey = useMemo(
-    () => (excludeNames ?? []).map(normalizeName).sort().join("|"),
-    [excludeNames],
-  );
-
   useEffect(() => {
     const rand = createDraftRng(seed);
     randRef.current = rand;
-    const excluded = new Set(excludeKey.split("|").filter(Boolean));
+    // The board is exactly the 32-prospect class for the 32-slot order — it
+    // must stay whole so every slot is fillable. Already-rostered prospects
+    // (the Björck-vs-Bjorck duplicate case) are deduped when results are
+    // applied to the roster, not by shrinking the board here.
     const startResults: DraftResult[] = [];
-    const startBoard = DRAFT_2026_PROSPECTS.filter(
-      (p) => !excluded.has(normalizeName(p.name)),
-    );
+    const startBoard = [...DRAFT_2026_PROSPECTS];
     autoCpuPicks(startResults, startBoard, rand, homeTeamId);
     setResults(startResults);
     setBoard(startBoard);
     setQuery("");
-  }, [seed, homeTeamId, excludeKey]);
+  }, [seed, homeTeamId]);
 
   const total      = DRAFT_2026_ORDER.length;
   const done       = results.length >= total;
@@ -224,7 +214,7 @@ export default function DraftNight({
                     <span className="font-normal" style={{ color: "var(--ledger-ink-faint)" }}>{via}</span>
                   </span>
                   <div className="min-w-0 flex-1">
-                    {r ? (
+                    {r?.prospect ? (
                       <>
                         <span className="font-black text-[13px]" style={{ color: "var(--ledger-ink)" }}>{r.prospect.name}</span>
                         <span className="ml-2 font-mono text-[10px] uppercase tracking-wide" style={{ color: "var(--ledger-ink-faint)" }}>
@@ -237,7 +227,7 @@ export default function DraftNight({
                       </span>
                     )}
                   </div>
-                  {r && (
+                  {r?.prospect && (
                     <span className="font-mono text-[10px] shrink-0 text-right" style={{ color: "var(--ledger-brown)" }}>
                       {r.prospect.gp}GP · {r.prospect.pts}P
                     </span>

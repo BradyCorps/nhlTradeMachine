@@ -113,6 +113,7 @@ export function autoCpuPicks(
   while (results.length < DRAFT_2026_ORDER.length) {
     const slot = DRAFT_2026_ORDER[results.length];
     if (homeTeamId && slot.team === homeTeamId) break; // GM is on the clock
+    if (board.length === 0) break; // board exhausted — never push an undefined prospect
     const idx = cpuPickIndex(board.length, rand);
     const [prospect] = board.splice(idx, 1);
     results.push({ ...slot, prospect });

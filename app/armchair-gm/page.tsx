@@ -25,6 +25,7 @@ import ResignPhase from "@/app/components/ResignPhase";
 import OfferSheetPhase from "@/app/components/OfferSheetPhase";
 import DraftNight from "@/app/components/DraftNight";
 import { draftedRookieAssets } from "@/app/lib/draft-rookies";
+import { normalizeName } from "@/app/lib/name-normalize";
 import TradeBlockPanel from "@/app/components/TradeBlockPanel";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 import { useSimDispatch } from "./useSimDispatch";
@@ -699,7 +700,6 @@ export default function ArmchairGmPage() {
         <DraftNight
           initialSeed={scenarioSeed({ draft: homeTeamId ?? "", season: SEASON.label })}
           homeTeamId={homeTeamId}
-          excludeNames={db.players.filter(p => p.position !== "Pick").map(p => p.name)}
           onDone={(results) => {
             setDraftOpen(false);
             setResignOpen(true);
@@ -711,7 +711,13 @@ export default function ArmchairGmPage() {
                 p => !(p.position === "Pick" && p.year === SEASON.draftYear)
               );
               const existingIds = new Set(withoutPicks.map(p => p.id));
-              const rookies = draftedRookieAssets(results).filter(r => !existingIds.has(r.id));
+              // Diacritic-safe dedup (AG4): a prospect already on a roster
+              // (e.g. seeded "Viggo Björck" vs a drafted "Viggo Bjorck") must
+              // not produce a second roster entry. Deduped here — where the
+              // duplicate would land — instead of by shrinking the draft board.
+              const existingNames = new Set(withoutPicks.map(p => normalizeName(p.name)));
+              const rookies = draftedRookieAssets(results.filter(r => r.prospect != null))
+                .filter(r => !existingIds.has(r.id) && !existingNames.has(normalizeName(r.name)));
               return { ...prev, players: [...withoutPicks, ...rookies] };
             });
             clearNavCache();
