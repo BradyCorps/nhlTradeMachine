@@ -3,10 +3,10 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 // ── Headshot proxy ───────────────────────────────────────────────
-// Streams an NHL player mug through our own origin so the shareable
-// card can rasterize it with html2canvas. A cross-origin <img> taints
-// the export canvas (blanking the whole header); a same-origin proxied
-// image renders cleanly with no CORS dependency on assets.nhle.com.
+// Streams an NHL player mug through our own origin. The player page shows
+// it, and the shareable-card export fetches this same-origin URL to inline
+// the mug as a data URL for the server-side card render — no CORS
+// dependency on assets.nhle.com either way.
 export async function GET(req: Request) {
   const raw = new URL(req.url).searchParams.get("u");
   if (!raw) return new NextResponse(null, { status: 400 });

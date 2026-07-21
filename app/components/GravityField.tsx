@@ -202,11 +202,9 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
 
   return (
     // Centered via a text-align wrapper + inline-block SVG with explicit
-    // width/height attributes. html2canvas mis-anchors a viewBox-only SVG
-    // centered with margin:auto (it renders shifted right and clips), but
-    // rasterizes an attribute-sized inline-block correctly — so the
-    // shareable card export stays inside the frame. maxWidth keeps it
-    // responsive on screen.
+    // width/height attributes; maxWidth keeps it responsive on screen. (The
+    // shareable card exports this rink server-side from the same geometry —
+    // see app/lib/gravity-rink.ts — so on-screen layout is the only concern.)
     <div style={{ textAlign: "center", width: "100%" }}>
     <svg
       width={360} height={270}
