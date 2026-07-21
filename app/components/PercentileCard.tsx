@@ -235,16 +235,31 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
     setExporting(true);
     try {
       const html2canvas = (await import("html2canvas")).default;
-      // Minimal, robust config — the fragile width/windowWidth/onclone
-      // options are dropped; this is the plain capture verified to render
-      // the card's real palette. onclone still forces the ground on the
-      // clone so a stray global stylesheet can't blank it.
+      // The card's backgrounds come from a <style> block (class rules).
+      // In some browsers html2canvas renders those class backgrounds black
+      // while inline styles come through fine (the percentile bars prove
+      // this). So force every background-bearing section to an INLINE
+      // !important color on the export clone — inline styles are read
+      // reliably, guaranteeing a solid card no matter the browser.
       const rendered = await html2canvas(cardRef.current, {
         scale: 2,
         useCORS: true,
         backgroundColor: "#ede4cc",
         onclone: (_doc, el) => {
-          (el as HTMLElement).style.setProperty("background", "#ede4cc", "important");
+          const root = el as HTMLElement;
+          root.style.setProperty("background", "#ede4cc", "important");
+          const paint = (sel: string, bg: string) =>
+            root.querySelectorAll<HTMLElement>(sel).forEach(n => n.style.setProperty("background", bg, "important"));
+          paint(".pcard-head", "#e4d8b8");
+          paint(".pcard-contract", "#ede4cc");
+          paint(".pcard-grav", "#e4d8b8");
+          paint(".pcard-edge", "#ede4cc");
+          paint(".pcard-ecell", "#ede4cc");
+          paint(".pcard-tablewrap", "#ede4cc");
+          paint(".pcard-body", "#ede4cc");
+          paint(".pcard-side", "#ede4cc");
+          paint(".pcard-foot", "#ede4cc");
+          paint(".pcard-bar", "#d6c8a5");
         },
       });
       // Composite onto a cream-filled canvas so nothing left unpainted can
