@@ -260,10 +260,17 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
   }
 
   return (
+    // Centered via a text-align wrapper + inline-block SVG with explicit
+    // width/height attributes. html2canvas mis-anchors a viewBox-only SVG
+    // centered with margin:auto (it renders shifted right and clips), but
+    // rasterizes an attribute-sized inline-block correctly — so the
+    // shareable card export stays inside the frame. maxWidth keeps it
+    // responsive on screen.
+    <div style={{ textAlign: "center", width: "100%" }}>
     <svg
+      width={360} height={270}
       viewBox={`0 0 ${W} ${H}`}
-      className="w-full"
-      style={{ maxWidth: 360, display: "block", margin: "0 auto" }}
+      style={{ maxWidth: "100%", height: "auto", display: "inline-block" }}
       role="img"
       aria-label={`Gravity field: force ${profile.force > 0 ? "+" : ""}${profile.force.toFixed(2)}, tier ${TIER_LABEL[profile.tier]}. Offensive-zone well ${oz > 0 ? "+" : ""}${oz.toFixed(2)}, neutral-zone well ${nz > 0 ? "+" : ""}${nz.toFixed(2)}, defensive-zone dome ${dz > 0 ? "+" : ""}${dz.toFixed(2)}. Signal confidence ${(profile.confidence * 100).toFixed(0)} percent.`}
     >
@@ -424,6 +431,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         GRAVITATIONAL FIELD ANALYSIS
       </text>
     </svg>
+    </div>
   );
 }
 

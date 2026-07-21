@@ -346,7 +346,10 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
 
       {/* Header — paper plate, ink reserved for text (PA7) */}
       <div className="pcard-head">
-        {player.headshot && <img src={player.headshot} alt="" />}
+        {/* crossOrigin lets html2canvas rasterize the headshot in CORS mode
+            (NHL assets send Access-Control-Allow-Origin) instead of tainting
+            the canvas — a tainted image blanks the whole header on export. */}
+        {player.headshot && <img src={player.headshot} alt="" crossOrigin="anonymous" />}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="pcard-name">{player.name}</div>
           <div className="pcard-sub">{teamName ?? player.teamId} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}</div>

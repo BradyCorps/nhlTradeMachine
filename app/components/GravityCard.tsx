@@ -113,6 +113,7 @@ export default function GravityCard({
             <img
               src={headshot}
               alt=""
+              crossOrigin="anonymous"
               style={{
                 width: 52, height: 52,
                 borderRadius: "50%",
