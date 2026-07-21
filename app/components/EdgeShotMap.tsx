@@ -80,11 +80,26 @@ export default function EdgeShotMap({ nhlPlayerId }: { nhlPlayerId: string | num
   }, [nhlPlayerId]);
 
   if (state === "loading") {
-    return <div className="py-10 text-center text-[11px] font-mono uppercase tracking-[0.25em]" style={{ color: "var(--ledger-ink-faint)" }}>Pulling EDGE data…</div>;
+    return (
+      <div className="py-10 text-center" role="status" aria-live="polite">
+        <div className="text-[11px] font-mono font-black uppercase tracking-[0.25em]" style={{ color: "var(--ledger-ink-body, var(--ledger-ink))" }}>
+          Pulling EDGE tracking data…
+        </div>
+        <div className="mt-3 mx-auto max-w-xs h-[8px] border relative overflow-hidden"
+          style={{ borderColor: "var(--ledger-ink)", background: "var(--paper-bg)" }} aria-hidden="true">
+          <div className="edge-load-sweep h-full" style={{ width: "35%", background: "var(--ledger-red)", opacity: 0.7 }} />
+        </div>
+        <style>{`
+          .edge-load-sweep { animation: edge-sweep 1.2s ease-in-out infinite alternate; }
+          @keyframes edge-sweep { from { margin-left: 0; } to { margin-left: 65%; } }
+          @media (prefers-reduced-motion: reduce) { .edge-load-sweep { animation: none; margin-left: 32%; } }
+        `}</style>
+      </div>
+    );
   }
   if (state === "empty" || !data) {
     return (
-      <div className="py-10 text-center text-[11px] font-mono uppercase tracking-wider leading-relaxed" style={{ color: "var(--ledger-ink-faint)" }}>
+      <div className="py-10 text-center text-[11px] font-mono uppercase tracking-wider leading-relaxed" style={{ color: "var(--ledger-ink-body, var(--ledger-ink))" }}>
         No EDGE snapshot captured for this player yet.<br />
         The nightly feed covers the league on an 8-day rotation.
       </div>

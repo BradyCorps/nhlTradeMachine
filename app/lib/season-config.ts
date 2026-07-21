@@ -73,6 +73,18 @@ export const CAP_BY_CUP_YEAR: Record<number, { ceiling: number; floor: number }>
 export const capForCupYear = (year: number): { ceiling: number; floor: number } =>
   CAP_BY_CUP_YEAR[year] ?? CAP_BY_CUP_YEAR[3];
 
+/** Projected cap ceiling N seasons ahead of the current one (PA11).
+ * Announced ceilings through 2028-29, then a 5%/yr escalator — a contract
+ * signed at expiry is priced against the cap of THAT season, not today's. */
+export const projectedCapCeiling = (seasonsAhead: number): number => {
+  const known = [CAP_BY_CUP_YEAR[1].ceiling, CAP_BY_CUP_YEAR[2].ceiling, CAP_BY_CUP_YEAR[3].ceiling];
+  if (seasonsAhead <= 0) return known[0];
+  if (seasonsAhead < known.length) return known[seasonsAhead];
+  let cap = known[known.length - 1];
+  for (let i = known.length - 1; i < seasonsAhead; i++) cap *= 1.05;
+  return Math.round(cap * 10) / 10;
+};
+
 export const ageDecayRate   = (age: number): number =>
   age <= 23 ? COMPRESSION.decayProspect
   : age <= 27 ? COMPRESSION.decayYoung

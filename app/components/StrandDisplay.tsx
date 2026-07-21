@@ -275,21 +275,23 @@ export default function StrandDisplay({
         fontSize: "10px", lineHeight: 1.45, color: "var(--ledger-ink-body)",
         fontFamily: "Courier Prime, monospace",
       }}>
-        <span style={{ color: "var(--ledger-navy)", fontWeight: 900 }}>Big number</span> = 0–100 rating vs the NHL field (100 = elite).{" "}
-        <span style={{ color: "var(--ledger-ink-faint)", fontWeight: 900 }}>Small number</span> = the actual stat.{" "}
-        <span style={{ color: "var(--ledger-navy)", fontWeight: 700 }}>Blue = offense</span>, <span style={{ color: "var(--ledger-red)", fontWeight: 700 }}>red = defense</span>.
+        <span style={{ color: "var(--ledger-navy)", fontWeight: 900 }}>Big number</span> = 0–100 rating vs the NHL field (100 = elite; 50 = league median).{" "}
+        <span style={{ color: "var(--ledger-ink-body)", fontWeight: 900 }}>Small number</span> = the actual stat.{" "}
+        <span style={{ color: "var(--ledger-navy)", fontWeight: 700 }}>Blue = offensive traits</span>,{" "}
+        <span style={{ color: "var(--ledger-red)", fontWeight: 700 }}>red = defensive traits</span>{" "}
+        — wave color marks the trait family, never good vs bad.
       </div>
 
       {/* ── Trait definitions (expandable) ───────────────────── */}
-      <details className="text-2xs mt-1" style={{ color: "var(--ledger-ink-faint)", lineHeight: 1.6 }}>
-        <summary style={{ cursor: "pointer", fontWeight: 900, color: "var(--ledger-brown)", letterSpacing: "0.1em" }}>
+      <details className="text-2xs mt-1" style={{ color: "var(--ledger-ink-body)", lineHeight: 1.6 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 900, color: "var(--ledger-ink)", letterSpacing: "0.1em" }}>
           What does each trait mean?
         </summary>
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "2px 12px", marginTop: "4px" }}>
           {guideLabels.map(label => (
             <div key={label} style={{ display: "flex", gap: "6px" }}>
-              <span style={{ fontWeight: 900, width: "42px", flexShrink: 0, color: "var(--ledger-ink-body)" }}>{label}</span>
-              <span style={{ color: "var(--ledger-rule)" }}>{TRAIT_GUIDE[label]}</span>
+              <span style={{ fontWeight: 900, width: "42px", flexShrink: 0, color: "var(--ledger-ink)" }}>{label}</span>
+              <span style={{ color: "var(--ledger-ink-body)" }}>{TRAIT_GUIDE[label]}</span>
             </div>
           ))}
         </div>

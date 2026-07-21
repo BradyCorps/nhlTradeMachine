@@ -3,6 +3,7 @@
 import React from "react";
 import { calcPlayerTimeline } from "@/app/lib/player-timeline";
 import { calcNAV, type AssetInput } from "@/app/lib/xnav-engine";
+import { SEASON, projectedCapCeiling } from "@/app/lib/season-config";
 
 import { navColor, fmtSigned } from "@/app/lib/display-utils";
 
@@ -69,13 +70,21 @@ export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
   if (years.length === 0) return null;
 
   const currentNav = calcNAV(asset);
-  const nextAav = currentNav.fmvAav ?? asset.capHit;
+  const fmvToday = currentNav.fmvAav ?? asset.capHit;
+  // PA11: the next contract signs against the cap of the EXPIRY season, not
+  // today's. FMV is a share of the current ceiling — the same share of the
+  // projected ceiling at expiry is what the market will actually pay.
+  const yearsToExpiry = Math.max(0, asset.yearsRemaining ?? 0);
+  const capAtExpiry = projectedCapCeiling(yearsToExpiry);
+  const capNow = SEASON.capCeiling;
+  const maxAavAtExpiry = capAtExpiry * 0.20; // CBA maximum: 20% of the ceiling
+  const nextAav = Math.min(maxAavAtExpiry, fmvToday * (capAtExpiry / capNow));
   const nextTerm = estimateNextContractTerm(asset, currentNav);
   const nextStatus = currentNav.isRFA ? "RFA" : "UFA";
   const signingAge = asset.age + Math.max(0, asset.yearsRemaining ?? 0);
 
   // Is the CURRENT deal a bargain? Market AAV (FMV) vs what he's actually paid.
-  const surplus = nextAav - asset.capHit;
+  const surplus = fmvToday - asset.capHit;
   const surplusTone = surplus >= 1 ? "good" : surplus <= -1 ? "bad" : "neutral";
   const surplusWord = surplus >= 1 ? "BARGAIN" : surplus <= -1 ? "OVERPAY" : "FAIR";
 
@@ -211,7 +220,7 @@ export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
         </div>
         <div className="ptl-note">
           Signs at <b>age {signingAge}</b> as a{nextStatus === "RFA" ? "n" : ""} <b>{nextStatus === "RFA" ? "restricted" : "unrestricted"} free agent</b>.
-          The AAV is a <b>fair-market midpoint</b> at today's cap — what the model expects him to command, not a player max or a team-friendly floor. Term follows age and value tier.
+          The AAV is a <b>fair-market midpoint priced against the projected ${capAtExpiry.toFixed(1)}M cap at expiry</b>{yearsToExpiry > 0 ? ` (${yearsToExpiry} season${yearsToExpiry === 1 ? "" : "s"} out)` : ""} — not today's ceiling — capped at the CBA maximum of 20% of that cap. Term follows age and value tier.
         </div>
       </div>
 

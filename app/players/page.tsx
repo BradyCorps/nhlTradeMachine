@@ -1102,10 +1102,48 @@ export default function PlayersPage() {
   const showDefence = (posFilter === "ALL" || posFilter === "D") && defence.length > 0;
   const showGoalies = (posFilter === "ALL" || posFilter === "G") && goalies.length > 0;
 
+  const freshInk = useMemo(() =>
+    players
+      .filter(p => (p as any).hasExtension && ((p as any).extensionCapHit ?? 0) > 0)
+      .sort((a, b) => ((b as any).extensionCapHit ?? 0) - ((a as any).extensionCapHit ?? 0))
+      .slice(0, 5),
+    [players]);
+
   return (
     <main style={{ minHeight: "100vh", background: "var(--paper)", color: "var(--ink)" }}>
 
       <Header activeTab="players" />
+
+      {/* ── Hot off the Press — freshest signed extensions (PA8) ── */}
+      {freshInk.length > 0 && (
+        <section aria-label="Hot off the press — latest contract extensions"
+          style={{ maxWidth: 1100, margin: "0 auto", padding: "12px 16px 0" }}>
+          <div className="text-[9px] font-black font-mono uppercase tracking-[0.25em] mb-2" style={{ color: "var(--ledger-red)" }}>
+            ● Hot Off the Press — Fresh Ink
+          </div>
+          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6 }}>
+            {freshInk.map(p => {
+              const ext = (p as any).extensionCapHit as number;
+              const extYears = (p as any).extensionYears as number | undefined;
+              const inner = (
+                <>
+                  <span className="font-mono text-[11px] font-black" style={{ color: "var(--ledger-ink)" }}>{p.name}</span>
+                  <span className="font-mono text-[10px] font-bold ml-2" style={{ color: "var(--ledger-ink-body, var(--ledger-ink))" }}>
+                    ${ext.toFixed(1)}M{extYears ? ` × ${extYears}yr` : ""} extension
+                  </span>
+                </>
+              );
+              const style: React.CSSProperties = {
+                flexShrink: 0, border: "1px solid var(--ledger-rule)", background: "var(--paper-card, #e4d8b8)",
+                padding: "7px 12px", whiteSpace: "nowrap", textDecoration: "none",
+              };
+              return /^\d+$/.test(String(p.id))
+                ? <a key={p.id} href={`/players/${p.id}`} style={style}>{inner}</a>
+                : <div key={p.id} style={style}>{inner}</div>;
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ── Filter bar ── */}
       <div className="players-filter-bar">

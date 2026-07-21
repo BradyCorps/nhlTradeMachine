@@ -3,6 +3,13 @@
 import Link from "next/link";
 import { TierIcon } from "./GravityField";
 import type { GravityTier } from "@/app/lib/gravity";
+import { ROLE_DEFS } from "@/app/lib/player-roles";
+
+// G3: one icon system — every icon rendered anywhere in the product is
+// documented here. Role icons come straight from ROLE_DEFS so the key
+// can never drift from what the badges actually render.
+export const roleIconEntries = Object.values(ROLE_DEFS).map(def =>
+  [def.icon, def.label, def.blurb] as [string, string, string]);
 
 export const iconKey = [
   ["♛", "Megalodon", "Extreme franchise-value tier above the top NAV threshold."],
@@ -147,6 +154,28 @@ export default function Footer() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 p-4">
             {iconKey.map(([icon, label, definition]) => (
               <div key={`${icon}-${label}`} className="flex items-start gap-2.5">
+                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center border font-mono text-[12px] font-black"
+                  style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}>
+                  {icon}
+                </span>
+                <div className="min-w-0">
+                  <span className="font-mono text-[10px] font-black uppercase leading-snug text-ledger-ink">
+                    {label}
+                  </span>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-ledger-ink-body">
+                    {definition}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="px-4 pt-1 font-mono text-[9px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint border-t"
+            style={{ borderColor: "var(--ledger-rule-light, var(--ledger-rule))" }}>
+            <span className="inline-block pt-2">Modern Role Icons</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 p-4">
+            {roleIconEntries.map(([icon, label, definition]) => (
+              <div key={`role-${label}`} className="flex items-start gap-2.5">
                 <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center border font-mono text-[12px] font-black"
                   style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}>
                   {icon}

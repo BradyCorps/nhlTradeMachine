@@ -22,6 +22,8 @@ const GLOSSARY: Record<string, string> = {
   "CAP": "Contract surplus component — positive means under market value, negative means overpaid.",
   "YNG": "Youth/upside component for young NHL players with real signal. Not a blanket ELC bonus.",
   "DEF": "Defensive NAV component — composite of defensive contributions.",
+  "GRAV": "Gravity residual — on-ice warping the OFF/DEF components haven't already priced, from the Player Gravity system.",
+  "OFF": "Offensive NAV component — production and creation priced against position.",
   "GSAX": "Goals Saved Above Expected — how many goals a goalie prevents vs league-average.",
   "SV%": "Save percentage — shots saved divided by total shots faced.",
   "HDSV": "High-Danger Save % — save rate on high-danger scoring chances.",
@@ -37,9 +39,20 @@ interface Props {
 
 export default function MetricTip({ term, children, className }: Props) {
   const [show, setShow] = useState(false);
+  // Edge-aware alignment: a centered tooltip near a card border overflows
+  // the viewport. Measure the trigger on open and pin left/right instead.
+  const [align, setAlign] = useState<"center" | "left" | "right">("center");
+  const anchorRef = useRef<HTMLSpanElement>(null);
   const timeout = useRef<ReturnType<typeof setTimeout>>();
   const enter = useCallback(() => {
     clearTimeout(timeout.current);
+    const rect = anchorRef.current?.getBoundingClientRect();
+    if (rect) {
+      const half = 150; // ~half of max tooltip width
+      const vw = window.innerWidth;
+      const center = rect.left + rect.width / 2;
+      setAlign(center - half < 8 ? "left" : center + half > vw - 8 ? "right" : "center");
+    }
     setShow(true);
   }, []);
   const leave = useCallback(() => {
@@ -54,6 +67,7 @@ export default function MetricTip({ term, children, className }: Props) {
   // so assistive tech reads the full meaning without needing the visual popup.
   return (
     <span
+      ref={anchorRef}
       className={`relative cursor-help ${className ?? ""}`}
       tabIndex={0}
       role="button"
@@ -73,8 +87,11 @@ export default function MetricTip({ term, children, className }: Props) {
           className="absolute z-50 font-mono text-[11px] leading-snug"
           style={{
             bottom: "calc(100% + 6px)",
-            left: "50%",
-            transform: "translateX(-50%)",
+            ...(align === "center"
+              ? { left: "50%", transform: "translateX(-50%)" }
+              : align === "left"
+                ? { left: 0 }
+                : { right: 0 }),
             width: "max(200px, min(280px, 60vw))",
             padding: "6px 8px",
             background: "var(--ledger-ink, #2c2416)",

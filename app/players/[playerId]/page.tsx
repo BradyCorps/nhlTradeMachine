@@ -15,6 +15,7 @@ import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import GravityField from "@/app/components/GravityField";
 import PlayerStrandPanel from "@/app/components/PlayerStrandPanel";
+import EdgeShotMap from "@/app/components/EdgeShotMap";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
@@ -214,6 +215,16 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
             <PlayerStrandPanel player={player} />
           </div>
         </div>
+
+        {/* NHL EDGE shot map — skaters with NHL ids only */}
+        {player.position !== "G" && /^\d+$/.test(params.playerId) && (
+          <div className="border p-4 mb-4" style={{ borderColor: rule, background: "var(--paper-card, var(--paper-inset))" }}>
+            <div className="text-[9px] font-black font-mono uppercase tracking-[0.18em] mb-3" style={{ color: faint }}>
+              NHL EDGE — Shot Locations &amp; Tracking
+            </div>
+            <EdgeShotMap nhlPlayerId={params.playerId} />
+          </div>
+        )}
 
         {/* Gravity field — computed server-side, rendered client-side from props */}
         {gravity && (

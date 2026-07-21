@@ -1,6 +1,14 @@
 "use client";
-import React, { useMemo } from "react";
+// ── PercentileCard — the shareable Hockey Ledger player card ─────
+// PA6/PA7: newspaper plate, free PNG export, branded, and carrying the
+// proprietary read — X-NAV breakdown, gravity field, modern role, and
+// EDGE tracking — alongside percentiles vs the positional field.
+import React, { useMemo, useRef, useCallback, useState } from "react";
 import { calcNAV } from "@/app/lib/xnav-engine";
+import { computeGravity } from "@/app/lib/gravity";
+import { gravityTierColor } from "@/app/lib/gravity";
+import { derivePlayerRoles } from "@/app/lib/player-roles";
+import { TierIcon } from "@/app/components/GravityField";
 import { SEASON } from "@/app/lib/season-config";
 import MetricTip from "@/app/components/MetricTip";
 import { displayPosition } from "@/app/lib/display-position";
@@ -16,6 +24,7 @@ interface PlayerData {
   ptsPace: number;
   xGPace: number;
   hdFinishingDelta?: number | null;
+  edgeOzPct?: number | null;
   edgeSpeedMaxMph?: number | null;
   edgeBurstsOver20?: number | null;
   avgTOI: number;
@@ -128,6 +137,8 @@ interface PercentileCardProps {
 export default function PercentileCard({ player, allPlayers, teamName }: PercentileCardProps) {
   const posGroup = getPositionGroup(player.position);
   const statDefs = posGroup === "G" ? GOALIE_STATS : posGroup === "D" ? DEF_STATS : FWD_STATS;
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
 
   const { percentiles, xnav } = useMemo(() => {
     const peers = allPlayers.filter(p => {
@@ -146,11 +157,15 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       sortedMaps.set(stat.key, vals);
     }
 
-    const pcts: { key: string; label: string; value: number | null; pct: number; formatted: string; median: string }[] = [];
+    // A missing stat renders as "no data" — it never fakes a 50th
+    // percentile (the source of the suspiciously uniform columns).
+    const pcts: { key: string; label: string; value: number | null; pct: number | null; formatted: string; median: string }[] = [];
     for (const stat of statDefs) {
       const raw = stat.extract(player);
       const sorted = sortedMaps.get(stat.key) ?? [];
-      const pct = raw !== null ? computePercentile(stat.invert ? -raw : raw, stat.invert ? sorted.map(v => -v).sort((a, b) => a - b) : sorted) : 50;
+      const pct = raw !== null && sorted.length >= 10
+        ? computePercentile(stat.invert ? -raw : raw, stat.invert ? sorted.map(v => -v).sort((a, b) => a - b) : sorted)
+        : null;
       const medianVal = sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)] : null;
       pcts.push({
         key: stat.key,
@@ -165,51 +180,29 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
     const position = player.position === "D" || player.position === "G" || player.position === "C"
       ? player.position : "W";
     const nav = calcNAV({
-      id: player.id,
-      name: player.name,
+      ...(player as any),
       position,
-      age: player.age,
-      capHit: player.capHit,
-      yearsRemaining: player.yearsRemaining,
       capCeiling: SEASON.capCeiling,
-      ptsPace: player.ptsPace,
-      xGPace: player.xGPace,
-      hdFinishingDelta: player.hdFinishingDelta ?? undefined,
-      edgeSpeedMaxMph: player.edgeSpeedMaxMph ?? undefined,
-      edgeBurstsOver20: player.edgeBurstsOver20 ?? undefined,
       defRate: player.defRate ?? 0.08,
-      avgTOI: player.avgTOI,
-      qocIndex: player.qocIndex,
-      xgRelTM: player.xgRelTM,
-      xgaRelTM: player.xgaRelTM,
-      dzPct: player.dzPct,
-      ops: player.ops,
-      dps: player.dps,
       games: player.games ?? 40,
-      gsax: player.gsax,
-      savePct: player.savePct,
-      gamesStarted: player.gamesStarted,
-      hasLiveStats: player.hasLiveStats,
-      baselinePtsPace: player.baselinePtsPace ?? undefined,
-      pkTimeShare: player.pkTimeShare ?? undefined,
-      // Goalie career + team context so an elite starter isn't valued on defaults.
-      baselineGsax: player.baselineGsax ?? undefined,
-      baselineHdsvPct: player.baselineHdsvPct ?? undefined,
-      teamXga60: player.teamXga60 ?? undefined,
-      teamHdca60: player.teamHdca60 ?? undefined,
     });
 
     return { percentiles: pcts, xnav: nav };
   }, [player, allPlayers, posGroup, statDefs]);
 
-  const avgPercentile = Math.round(
-    percentiles.reduce((s, p) => s + p.pct, 0) / percentiles.length
+  const gravity = useMemo(
+    () => (posGroup === "G" ? null : computeGravity(player as any)),
+    [player, posGroup],
   );
+  const roles = useMemo(() => derivePlayerRoles(player as any), [player]);
+
+  const scored = percentiles.filter(p => p.pct !== null);
+  const avgPercentile = scored.length > 0
+    ? Math.round(scored.reduce((s, p) => s + (p.pct as number), 0) / scored.length)
+    : null;
 
   const peerLabel = posGroup === "F" ? "all forwards" : posGroup === "D" ? "all defensemen" : "all goalies";
 
-  // FMV → surplus: the market AAV vs what he's actually paid. This is the read
-  // that matters — a big FMV only means "bargain" relative to the cap hit.
   const fmv = xnav.fmvAav ?? 0;
   const surplus = fmv - player.capHit;
   const surplusTone = surplus >= 1 ? "good" : surplus <= -1 ? "bad" : "neutral";
@@ -220,39 +213,77 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
   const navCells = [
     { label: "OFF", val: xnav.off, term: "OFF" },
     { label: "DEF", val: xnav.def, term: "DEF" },
+    { label: "GRAV", val: xnav.grav ?? 0, term: "GRAV" },
     { label: "AGE", val: xnav.age, term: "YNG" },
     { label: "CAP", val: xnav.cap, term: "CAP" },
   ];
 
+  // EDGE tracking strip (PA7) — only rows with real data render
+  const edgeCells = [
+    player.edgeOzPct != null ? { label: "OZ Time", val: `${(player.edgeOzPct * 100).toFixed(0)}%` } : null,
+    player.edgeSpeedMaxMph != null ? { label: "Top Speed", val: `${player.edgeSpeedMaxMph.toFixed(1)} mph` } : null,
+    player.edgeBurstsOver20 != null ? { label: "20+ Bursts", val: `${player.edgeBurstsOver20}` } : null,
+    player.hdFinishingDelta != null ? {
+      label: "HD Finish",
+      val: `${player.hdFinishingDelta > 0 ? "+" : ""}${(player.hdFinishingDelta * 100).toFixed(1)}%`,
+      color: player.hdFinishingDelta > 0 ? GOOD : player.hdFinishingDelta < 0 ? BAD : undefined,
+    } : null,
+  ].filter(Boolean) as { label: string; val: string; color?: string }[];
+
+  const exportPng = useCallback(async () => {
+    if (!cardRef.current || exporting) return;
+    setExporting(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(cardRef.current, { scale: 2, useCORS: true, backgroundColor: "#ede4cc" });
+      const link = document.createElement("a");
+      link.download = `${player.name.replace(/\s+/g, "-").toLowerCase()}-hockey-ledger-card.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch (event) {
+      console.error("[player card export]", event);
+    } finally {
+      setExporting(false);
+    }
+  }, [player.name, exporting]);
+
   return (
-    <div className="pcard" role="group"
-      aria-label={`${player.name} value card — X-NAV ${xnav.total}, ${percentileLabel(avgPercentile)} vs ${peerLabel}`}>
+    <div style={{ width: "100%", maxWidth: 620, margin: "0 auto" }}>
+      <div ref={cardRef} className="pcard" role="group"
+        aria-label={`${player.name} value card — X-NAV ${xnav.total}${avgPercentile !== null ? `, ${percentileLabel(avgPercentile)} vs ${peerLabel}` : ""}`}>
       <style>{`
-        .pcard { width: 100%; max-width: 620px; margin: 0 auto;
-          background: #ede4cc; border: 2px solid #b8a070; border-radius: 3px;
+        .pcard { width: 100%;
+          background: #ede4cc; border: 2px solid #1c140a; border-radius: 3px;
           font-family: var(--font-mono, ui-monospace, monospace); color: #1c140a; }
         .pcard *:focus-visible { outline: 2px solid #1a2e5c; outline-offset: 2px; border-radius: 2px; }
-        .pcard-head { background: #1c140a; color: #efe6cc; padding: 12px 16px;
+        .pcard-head { background: #e4d8b8; color: #1c140a; padding: 12px 16px;
+          border-bottom: 2px solid #1c140a;
           display: flex; align-items: center; gap: 12px; }
         .pcard-head img { width: 52px; height: 52px; border-radius: 50%;
-          border: 2px solid rgba(255,255,255,0.35); flex-shrink: 0; }
-        .pcard-name { font-size: 16px; font-weight: 900; line-height: 1.15;
+          border: 2px solid #1c140a; flex-shrink: 0; }
+        .pcard-name { font-size: 16px; font-weight: 900; line-height: 1.15; color: #1c140a;
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .pcard-sub { font-size: 11px; color: #d8c9a2; margin-top: 3px;
+        .pcard-sub { font-size: 11px; color: #4a3820; margin-top: 3px;
           text-transform: uppercase; letter-spacing: 0.1em; }
-        .pcard-nav-total { font-size: 26px; font-weight: 900; line-height: 1; }
-        .pcard-nav-label { font-size: 10px; text-transform: uppercase;
-          letter-spacing: 0.14em; color: #d8c9a2; margin-top: 3px; }
-        .pcard-value-strip { display: grid; grid-template-columns: repeat(3, 1fr);
+        .pcard-role { font-size: 10px; font-weight: 900; margin-top: 3px;
+          text-transform: uppercase; letter-spacing: 0.06em; }
+        .pcard-nav-total { font-size: 26px; font-weight: 900; line-height: 1; color: #1c140a; }
+        .pcard-nav-label { font-size: 8px; text-transform: uppercase;
+          letter-spacing: 0.08em; color: #4a3820; margin-top: 3px; max-width: 110px; }
+        .pcard-contract { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px;
+          padding: 8px 16px; border-bottom: 1px solid #b8a070; font-size: 12px; }
+        .pcard-contract .lbl { font-size: 9px; font-weight: 700; color: #4a3820;
+          text-transform: uppercase; letter-spacing: 0.1em; margin-right: 5px; }
+        .pcard-contract .num { font-weight: 900; font-variant-numeric: tabular-nums; }
+        .pcard-gravrow { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+          padding: 7px 16px; border-bottom: 1px solid #b8a070; }
+        .pcard-edge { display: grid; grid-template-columns: repeat(4, 1fr);
           border-bottom: 1px solid #b8a070; }
-        .pcard-vcell { padding: 8px 12px; text-align: center;
-          border-right: 1px solid #d6c8a5; }
-        .pcard-vcell:last-child { border-right: none; }
-        .pcard-vlabel { font-size: 10px; font-weight: 700; color: #4a3820;
-          text-transform: uppercase; letter-spacing: 0.1em; }
-        .pcard-vval { font-size: 16px; font-weight: 900; margin-top: 2px; }
-        .pcard-vnote { font-size: 10px; font-weight: 700; margin-top: 1px;
+        .pcard-ecell { padding: 6px 8px; text-align: center; border-right: 1px solid #d6c8a5; }
+        .pcard-ecell:last-child { border-right: none; }
+        .pcard-elabel { font-size: 9px; font-weight: 700; color: #4a3820;
           text-transform: uppercase; letter-spacing: 0.08em; }
+        .pcard-eval { font-size: 12px; font-weight: 900; margin-top: 1px; font-variant-numeric: tabular-nums; }
         .pcard-body { display: grid; grid-template-columns: 1fr; gap: 0; }
         @media (min-width: 540px) { .pcard-body { grid-template-columns: 1.55fr 1fr; } }
         .pcard-tablewrap { padding: 10px 14px 12px; }
@@ -279,6 +310,8 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
           height: calc(100% + 2px); background: #1c140a; opacity: 0.45; }
         .pcard-pctnum { font-size: 12px; font-weight: 900; color: #1c140a;
           font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
+        .pcard-nodata { font-size: 10px; font-weight: 700; color: #6e5a3d;
+          text-transform: uppercase; letter-spacing: 0.08em; }
         .pcard-val { font-size: 12px; font-weight: 800; color: #1c140a;
           text-align: right; font-variant-numeric: tabular-nums; }
         .pcard-med { font-size: 11px; font-weight: 600; color: #6e5a3d;
@@ -293,45 +326,69 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         .pcard-navrow dt { font-size: 12px; font-weight: 700; color: #4a3820; }
         .pcard-navrow dd { font-size: 13px; font-weight: 900; margin: 0;
           font-variant-numeric: tabular-nums; }
-        .pcard-foot { border-top: 1px solid #b8a070; padding: 6px 14px;
-          font-size: 10px; color: #4a3820; text-align: center;
+        .pcard-foot { border-top: 2px solid #1c140a; padding: 6px 14px;
+          display: flex; align-items: center; justify-content: space-between; gap: 8px;
+          font-size: 10px; color: #4a3820;
           text-transform: uppercase; letter-spacing: 0.12em; }
         @media (prefers-reduced-motion: reduce) { .pcard-fill { transition: none; } }
       `}</style>
 
-      {/* Header */}
+      {/* Header — paper plate, ink reserved for text (PA7) */}
       <div className="pcard-head">
         {player.headshot && <img src={player.headshot} alt="" />}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="pcard-name">{player.name}</div>
           <div className="pcard-sub">{teamName ?? player.teamId} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}</div>
+          {roles && (
+            <div className="pcard-role" style={{ color: roles.primary.color }}>
+              {roles.primary.icon} {roles.primary.label}
+            </div>
+          )}
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div className="pcard-nav-total">{xnav.total}</div>
-          <div className="pcard-nav-label"><MetricTip term="X-NAV">X-NAV</MetricTip></div>
+          <div className="pcard-nav-label">X-NAV · Extended Net Asset Value</div>
         </div>
       </div>
 
-      {/* Valuation strip: cap hit vs market AAV vs surplus */}
-      <div className="pcard-value-strip">
-        <div className="pcard-vcell">
-          <div className="pcard-vlabel">Cap Hit</div>
-          <div className="pcard-vval" style={{ color: INK }}>${player.capHit.toFixed(1)}M</div>
-          <div className="pcard-vnote" style={{ color: BODY }}>× {player.yearsRemaining}yr</div>
-        </div>
-        <div className="pcard-vcell">
-          <div className="pcard-vlabel"><MetricTip term="FMV">Market AAV</MetricTip></div>
-          <div className="pcard-vval" style={{ color: INK }}>${fmv.toFixed(1)}M</div>
-          <div className="pcard-vnote" style={{ color: BODY }}>fair value</div>
-        </div>
-        <div className="pcard-vcell">
-          <div className="pcard-vlabel">Surplus</div>
-          <div className="pcard-vval" style={{ color: toneColor(surplusTone) }}>
-            {surplus > 0 ? "+" : surplus < 0 ? "−" : ""}${Math.abs(surplus).toFixed(1)}M
-          </div>
-          <div className="pcard-vnote" style={{ color: toneColor(surplusTone) }}>{surplusWord}</div>
-        </div>
+      {/* Contract line — one compact plate (PA7) */}
+      <div className="pcard-contract">
+        <span><span className="lbl">Cap Hit</span><span className="num" style={{ color: INK }}>${player.capHit.toFixed(1)}M × {player.yearsRemaining}yr</span></span>
+        <span><span className="lbl"><MetricTip term="FMV">Fair Market Value</MetricTip></span><span className="num" style={{ color: INK }}>${fmv.toFixed(1)}M</span></span>
+        <span><span className="lbl">Surplus</span><span className="num" style={{ color: toneColor(surplusTone) }}>
+          {surplus > 0 ? "+" : surplus < 0 ? "−" : ""}${Math.abs(surplus).toFixed(1)}M · {surplusWord}
+        </span></span>
       </div>
+
+      {/* Gravity strip (PA7) */}
+      {gravity && (
+        <div className="pcard-gravrow">
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+            <TierIcon tier={gravity.tier} size={16} />
+            <span style={{ fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.08em", color: gravityTierColor(gravity.tier) }}>
+              {gravity.tier.replace(/_/g, " ")}
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 900, fontVariantNumeric: "tabular-nums", color: INK }}>
+              {gravity.force > 0 ? "+" : ""}{gravity.force.toFixed(2)}
+            </span>
+          </span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: BODY, fontVariantNumeric: "tabular-nums" }}>
+            OZ {gravity.masses.oz > 0 ? "+" : ""}{gravity.masses.oz.toFixed(2)} · NZ {gravity.masses.nz > 0 ? "+" : ""}{gravity.masses.nz.toFixed(2)} · DZ {gravity.masses.dz > 0 ? "+" : ""}{gravity.masses.dz.toFixed(2)}
+          </span>
+        </div>
+      )}
+
+      {/* EDGE tracking strip (PA7) */}
+      {edgeCells.length > 0 && (
+        <div className="pcard-edge" style={{ gridTemplateColumns: `repeat(${edgeCells.length}, 1fr)` }}>
+          {edgeCells.map(c => (
+            <div key={c.label} className="pcard-ecell">
+              <div className="pcard-elabel">{c.label}</div>
+              <div className="pcard-eval" style={{ color: c.color ?? INK }}>{c.val}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Body: percentile table + value breakdown */}
       <div className="pcard-body">
@@ -353,14 +410,18 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
                     <MetricTip term={stat.label.replace("/82", "").replace("%+", "")}>{stat.label}</MetricTip>
                   </th>
                   <td className="pcard-barcell">
-                    <div className="pcard-barrow">
-                      <div className="pcard-bar" role="img"
-                        aria-label={`${stat.pct}th percentile — ${percentileLabel(stat.pct).toLowerCase()}`}>
-                        <div className="pcard-fill" style={{ width: `${stat.pct}%`, background: percentileColor(stat.pct) }} />
-                        <div className="pcard-median" />
+                    {stat.pct !== null ? (
+                      <div className="pcard-barrow">
+                        <div className="pcard-bar" role="img"
+                          aria-label={`${stat.pct}th percentile — ${percentileLabel(stat.pct).toLowerCase()}`}>
+                          <div className="pcard-fill" style={{ width: `${stat.pct}%`, background: percentileColor(stat.pct) }} />
+                          <div className="pcard-median" />
+                        </div>
+                        <span className="pcard-pctnum">{stat.pct}</span>
                       </div>
-                      <span className="pcard-pctnum">{stat.pct}</span>
-                    </div>
+                    ) : (
+                      <span className="pcard-nodata">No data</span>
+                    )}
                   </td>
                   <td className="pcard-val">{stat.formatted}</td>
                   <td className="pcard-med">{stat.median}</td>
@@ -386,7 +447,32 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       </div>
 
       <div className="pcard-foot">
-        {percentileLabel(avgPercentile)} · avg {avgPercentile}th percentile vs {peerLabel}
+        <span style={{ fontWeight: 900, color: INK }}>THE HOCKEY LEDGER</span>
+        <span>
+          {avgPercentile !== null
+            ? `${percentileLabel(avgPercentile)} · avg ${avgPercentile}th pct vs ${peerLabel}`
+            : `vs ${peerLabel}`}
+        </span>
+      </div>
+      </div>
+
+      {/* Export control — outside the captured plate (PA6) */}
+      <div style={{ marginTop: 10, display: "flex", justifyContent: "center" }}>
+        <button
+          type="button"
+          onClick={exportPng}
+          disabled={exporting}
+          aria-label={`Export ${player.name}'s card as a PNG image`}
+          style={{
+            fontFamily: "var(--font-mono, ui-monospace, monospace)",
+            fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.14em",
+            padding: "7px 16px", border: "1.5px solid #1c140a",
+            background: "#e4d8b8", color: "#1c140a",
+            cursor: exporting ? "wait" : "pointer", opacity: exporting ? 0.6 : 1,
+          }}
+        >
+          {exporting ? "Rendering…" : "⬇ Export Card PNG"}
+        </button>
       </div>
     </div>
   );

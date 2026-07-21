@@ -267,9 +267,37 @@
   numbered Build→Audit→Share strip; Open Armchair GM CTA removed; canary
   updated to pin the new landing
 
+### Round 8 — PA5-PA11 card revamp + G3 icon system (complete)
+- PA6/PA7 PercentileCard revamp: paper-plate header (INK reserved for text),
+  X-NAV spelled out (Extended Net Asset Value), one compact contract line
+  (Cap Hit · Fair Market Value · Surplus — Market AAV renamed), gravity strip
+  (tier + force + OZ/NZ/DZ masses), EDGE strip (OZ time, top speed, bursts,
+  HD finish), GRAV added to Value Breakdown, modern role under the name,
+  THE HOCKEY LEDGER branded footer, free PNG export via html2canvas
+- Percentile uniformity bug fixed: missing stats render "No data" and are
+  excluded from the average — they no longer fabricate a 50th percentile
+- PA7 tooltip overflow: MetricTip measures its anchor on open and pins
+  left/right at viewport edges instead of center-overflowing
+- PA11: projectedCapCeiling(seasonsAhead) in season-config (announced
+  ceilings 104 → 113.5 → 123, then 5%/yr); Projected Next Contract prices
+  FMV share against the cap AT EXPIRY, capped at the CBA 20% max — McDavid
+  2yr out: ~19.9% of $123M ≈ $24.5M × 8 (the 25×8 scenario)
+- G3: role icons documented from ROLE_DEFS (key can never drift from the
+  badges) — "Modern Role Icons" group in Footer icon key and /glossary
+- PA9: EDGE shot map now on the dossier with an animated, reduced-motion-
+  safe loading sweep + aria-live status; empty state darkened to body ink
+- PA5 (partial): strand key/definitions darkened to AA ink, color rule
+  clarified ("wave color marks the trait family, never good vs bad"),
+  50 = league median added; player-compare dropdown still pending
+- PA8 (v1): "Hot Off the Press — Fresh Ink" strip atop /players from
+  extension-flagged players (top 5 by AAV, linking to dossiers); true
+  "latest five" ordering needs a dated signings feed
+- Hardest-shot metric (PA7 wish) not in the API payload yet — needs the
+  EDGE detail capture to store shot-speed facts
+
 ### Still open from audit (next rounds)
-- G3 (icon system), G4 (model propagation), TM1 (Phase 3 picker), PA5-PA9,
-  PA11/PA12, D1, AG3
+- G4 (model propagation), TM1 (Phase 3 picker), PA5 compare dropdown,
+  PA8 dated feed, PA12, D1, AG3
 
 ## Known Issues / Future Work
 

@@ -115,7 +115,10 @@ describe("Canary — NHL EDGE usage and presentation", () => {
     expect(players).toContain('{ label: "EDGE HD"');
     expect(players).toContain("NHL EDGE high-danger finishing vs league average");
     expect(players).toContain("hdFinishingDelta: player.hdFinishingDelta ?? undefined");
-    expect(card).toContain("hdFinishingDelta: player.hdFinishingDelta ?? undefined");
+    // The card spreads the full player into calcNAV (EDGE fields included)
+    // and renders the EDGE HD finishing read on the plate.
+    expect(card).toContain("...(player as any)");
+    expect(card).toContain("hdFinishingDelta");
     expect(armchair).toContain("NHL EDGE HD");
     expect(armchair).toContain("computeTeamEdgeProfile");
     expect(armchair).toContain("Team EDGE Snapshot");
@@ -814,14 +817,23 @@ describe("Canary — Player Card AA redesign + FMV surplus read", () => {
     expect(card).toContain("<dt>");
     // Card is a labelled group and no longer capped at the cramped 380px
     expect(card).toContain('role="group"');
-    expect(card).toContain("max-width: 620px");
+    expect(card).toContain("maxWidth: 620");
+    // PA6/PA7: exportable, branded, with gravity + EDGE strips on the plate
+    expect(card).toContain("Export Card PNG");
+    expect(card).toContain("THE HOCKEY LEDGER");
+    expect(card).toContain("Fair Market Value");
+    expect(card).toContain("Extended Net Asset Value");
+    // Missing stats read as "No data", never a fabricated 50th percentile
+    expect(card).toContain("No data");
   });
 
   it("reframes FMV as market AAV with an explicit surplus/overpay read", () => {
     expect(card).toContain("const surplus = fmv - player.capHit");
     expect(card).toContain('"BARGAIN"');
     expect(card).toContain('"OVERPAY"');
-    expect(card).toContain("Market AAV");
+    // PA7: renamed Market AAV → Fair Market Value on the card
+    expect(card).toContain("Fair Market Value");
+    expect(card).not.toContain("Market AAV");
     // NAV breakdown values are rounded (goalie def path is not pre-rounded)
     expect(card).toContain("Math.round(c.val)");
   });

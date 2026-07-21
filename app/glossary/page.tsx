@@ -4,7 +4,7 @@
 import React from "react";
 import type { Metadata } from "next";
 import Header from "../components/Header";
-import Footer, { iconKey, gravityTierEntries, methodologySections } from "../components/Footer";
+import Footer, { iconKey, gravityTierEntries, roleIconEntries, methodologySections } from "../components/Footer";
 import { TierIcon } from "../components/GravityField";
 
 export const metadata: Metadata = {
@@ -84,6 +84,30 @@ export default function GlossaryPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3 p-4">
               {iconKey.map(([icon, label, definition]) => (
                 <div key={`${icon}-${label}`} className="grid grid-cols-[28px_110px_1fr] items-start gap-3">
+                  <span
+                    className="inline-flex h-6 w-6 items-center justify-center border font-mono text-[12px] font-black"
+                    style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}
+                  >
+                    {icon}
+                  </span>
+                  <span className="font-mono text-[10px] font-black uppercase leading-snug text-ledger-ink">
+                    {label}
+                  </span>
+                  <span className="text-[11px] leading-relaxed text-ledger-ink-body">
+                    {definition}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <h2 className="px-4 pt-2 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-ledger-ink-body border-t"
+              style={{ borderColor: "var(--ledger-rule)" }}
+            >
+              <span className="inline-block pt-3">Modern Role Icons</span>
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3 p-4">
+              {roleIconEntries.map(([icon, label, definition]) => (
+                <div key={`role-${label}`} className="grid grid-cols-[28px_110px_1fr] items-start gap-3">
                   <span
                     className="inline-flex h-6 w-6 items-center justify-center border font-mono text-[12px] font-black"
                     style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}
