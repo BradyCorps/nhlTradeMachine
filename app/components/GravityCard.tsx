@@ -46,13 +46,14 @@ export default function GravityCard({
     const html2canvas = (await import("html2canvas")).default;
     const rendered = await html2canvas(cardRef.current, {
       scale: 2,
-      backgroundColor: "#ece0be", // solid, matches the plate (JPEG has no alpha)
+      backgroundColor: "#ece0be",
       useCORS: true,
-      width: cardRef.current.offsetWidth,
-      windowWidth: cardRef.current.scrollWidth,
+      onclone: (_doc, el) => {
+        (el as HTMLElement).style.setProperty("background", "#ece0be", "important");
+      },
     });
-    // Composite onto a pre-filled solid canvas so no transparency can
-    // flatten to black in the JPEG.
+    // Composite onto a pre-filled solid canvas so nothing unpainted reads
+    // through as white or black.
     const out = document.createElement("canvas");
     out.width = rendered.width;
     out.height = rendered.height;
@@ -61,8 +62,8 @@ export default function GravityCard({
     ctx.fillRect(0, 0, out.width, out.height);
     ctx.drawImage(rendered, 0, 0);
     const link = document.createElement("a");
-    link.download = `${playerName.replace(/\s+/g, "-").toLowerCase()}-gravity-card.jpg`;
-    link.href = out.toDataURL("image/jpeg", 0.95);
+    link.download = `${playerName.replace(/\s+/g, "-").toLowerCase()}-gravity-card.png`;
+    link.href = out.toDataURL("image/png");
     link.click();
   }, [playerName]);
 

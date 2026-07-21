@@ -235,30 +235,20 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
     setExporting(true);
     try {
       const html2canvas = (await import("html2canvas")).default;
+      // Minimal, robust config — the fragile width/windowWidth/onclone
+      // options are dropped; this is the plain capture verified to render
+      // the card's real palette. onclone still forces the ground on the
+      // clone so a stray global stylesheet can't blank it.
       const rendered = await html2canvas(cardRef.current, {
         scale: 2,
         useCORS: true,
         backgroundColor: "#ede4cc",
-        // Capture the element's real box so right-side columns (VAL/MED,
-        // value-breakdown numbers, X-NAV) can't be clipped by a mis-measured
-        // scroll width.
-        width: cardRef.current.offsetWidth,
-        windowWidth: cardRef.current.scrollWidth,
-        // Force the palette on the clone so no global stylesheet, theme, or
-        // html2canvas quirk can black out the card's backgrounds on export.
         onclone: (_doc, el) => {
-          const set = (sel: string, bg: string) =>
-            el.querySelectorAll<HTMLElement>(sel).forEach(n => n.style.setProperty("background", bg, "important"));
-          el.style.setProperty("background", "#ede4cc", "important");
-          set(".pcard-head", "#e4d8b8");
-          set(".pcard-grav", "#e4d8b8");
-          set(".pcard-bar", "#d6c8a5");
+          (el as HTMLElement).style.setProperty("background", "#ede4cc", "important");
         },
       });
-      // Bulletproof solid background: paint the cream ground ourselves and
-      // composite the render on top. JPEG flattens any transparency to
-      // black, so this guarantees a solid card no matter what html2canvas
-      // leaves transparent.
+      // Composite onto a cream-filled canvas so nothing left unpainted can
+      // read through as white or black. PNG keeps it lossless.
       const out = document.createElement("canvas");
       out.width = rendered.width;
       out.height = rendered.height;
@@ -267,8 +257,8 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       ctx.fillRect(0, 0, out.width, out.height);
       ctx.drawImage(rendered, 0, 0);
       const link = document.createElement("a");
-      link.download = `${player.name.replace(/\s+/g, "-").toLowerCase()}-hockey-ledger-card.jpg`;
-      link.href = out.toDataURL("image/jpeg", 0.95);
+      link.download = `${player.name.replace(/\s+/g, "-").toLowerCase()}-hockey-ledger-card.png`;
+      link.href = out.toDataURL("image/png");
       link.click();
     } catch (event) {
       console.error("[player card export]", event);
@@ -513,7 +503,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
             cursor: exporting ? "wait" : "pointer", opacity: exporting ? 0.6 : 1,
           }}
         >
-          {exporting ? "Rendering…" : "⬇ Export Card (JPG)"}
+          {exporting ? "Rendering…" : "⬇ Export Card (PNG)"}
         </button>
       </div>
     </div>
