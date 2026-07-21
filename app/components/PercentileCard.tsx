@@ -235,10 +235,21 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
     setExporting(true);
     try {
       const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(cardRef.current, { scale: 2, useCORS: true, backgroundColor: "#ede4cc" });
+      const canvas = await html2canvas(cardRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ede4cc",
+        // Capture the element's real box so right-side columns (VAL/MED,
+        // value-breakdown numbers, X-NAV) can't be clipped by a mis-measured
+        // scroll width.
+        width: cardRef.current.offsetWidth,
+        windowWidth: cardRef.current.scrollWidth,
+      });
       const link = document.createElement("a");
-      link.download = `${player.name.replace(/\s+/g, "-").toLowerCase()}-hockey-ledger-card.png`;
-      link.href = canvas.toDataURL("image/png");
+      // JPEG so the background is always solid (no transparency) and the
+      // file is small enough to share anywhere.
+      link.download = `${player.name.replace(/\s+/g, "-").toLowerCase()}-hockey-ledger-card.jpg`;
+      link.href = canvas.toDataURL("image/jpeg", 0.95);
       link.click();
     } catch (event) {
       console.error("[player card export]", event);
@@ -346,10 +357,9 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
 
       {/* Header — paper plate, ink reserved for text (PA7) */}
       <div className="pcard-head">
-        {/* crossOrigin lets html2canvas rasterize the headshot in CORS mode
-            (NHL assets send Access-Control-Allow-Origin) instead of tainting
-            the canvas — a tainted image blanks the whole header on export. */}
-        {player.headshot && <img src={player.headshot} alt="" crossOrigin="anonymous" />}
+        {/* Same-origin proxy so html2canvas can rasterize the headshot: a
+            cross-origin image taints the export canvas and blanks the header. */}
+        {player.headshot && <img src={`/api/headshot?u=${encodeURIComponent(player.headshot)}`} alt="" />}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="pcard-name">{player.name}</div>
           <div className="pcard-sub">{teamName ?? player.teamId} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}</div>
@@ -483,7 +493,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
             cursor: exporting ? "wait" : "pointer", opacity: exporting ? 0.6 : 1,
           }}
         >
-          {exporting ? "Rendering…" : "⬇ Export Card PNG"}
+          {exporting ? "Rendering…" : "⬇ Export Card (JPG)"}
         </button>
       </div>
     </div>

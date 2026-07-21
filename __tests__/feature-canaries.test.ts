@@ -819,7 +819,11 @@ describe("Canary — Player Card AA redesign + FMV surplus read", () => {
     expect(card).toContain('role="group"');
     expect(card).toContain("maxWidth: 620");
     // PA6/PA7: exportable, branded, with gravity + EDGE strips on the plate
-    expect(card).toContain("Export Card PNG");
+    // PA6: free image export — JPEG for a guaranteed solid background
+    expect(card).toContain("Export Card (JPG)");
+    expect(card).toContain('toDataURL("image/jpeg"');
+    // Headshot proxied same-origin so html2canvas doesn't taint the export
+    expect(card).toContain("/api/headshot?u=");
     expect(card).toContain("THE HOCKEY LEDGER");
     expect(card).toContain("Fair Market Value");
     expect(card).toContain("Extended Net Asset Value");

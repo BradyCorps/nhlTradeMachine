@@ -46,12 +46,14 @@ export default function GravityCard({
     const html2canvas = (await import("html2canvas")).default;
     const canvas = await html2canvas(cardRef.current, {
       scale: 2,
-      backgroundColor: null,
+      backgroundColor: "#ece0be", // solid, matches the plate (JPEG has no alpha)
       useCORS: true,
+      width: cardRef.current.offsetWidth,
+      windowWidth: cardRef.current.scrollWidth,
     });
     const link = document.createElement("a");
-    link.download = `${playerName.replace(/\s+/g, "-").toLowerCase()}-gravity-card.png`;
-    link.href = canvas.toDataURL("image/png");
+    link.download = `${playerName.replace(/\s+/g, "-").toLowerCase()}-gravity-card.jpg`;
+    link.href = canvas.toDataURL("image/jpeg", 0.95);
     link.click();
   }, [playerName]);
 
@@ -111,9 +113,8 @@ export default function GravityCard({
         }}>
           {headshot && (
             <img
-              src={headshot}
+              src={`/api/headshot?u=${encodeURIComponent(headshot)}`}
               alt=""
-              crossOrigin="anonymous"
               style={{
                 width: 52, height: 52,
                 borderRadius: "50%",
@@ -342,7 +343,7 @@ export default function GravityCard({
             cursor: "pointer",
           }}
         >
-          Export PNG
+          Export Card (JPG)
         </button>
       </div>
     </div>
