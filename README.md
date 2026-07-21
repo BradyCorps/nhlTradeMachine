@@ -1,6 +1,6 @@
 # The Hockey Ledger
 
-NHL trade machine, roster ledger, player analytics desk, and offseason simulator for the 2026-27 projection season.
+NHL trade machine, roster ledger, player analytics desk, and offseason simulator on a three season sim.
 
 The app is built around one central workflow: assemble real NHL roster, contract, draft-pick, and team-context data; value assets with X-NAV; audit trades with front-office logic; then simulate or publish the outcome.
 
