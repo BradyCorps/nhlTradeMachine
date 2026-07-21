@@ -244,6 +244,16 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         // scroll width.
         width: cardRef.current.offsetWidth,
         windowWidth: cardRef.current.scrollWidth,
+        // Force the palette on the clone so no global stylesheet, theme, or
+        // html2canvas quirk can black out the card's backgrounds on export.
+        onclone: (_doc, el) => {
+          const set = (sel: string, bg: string) =>
+            el.querySelectorAll<HTMLElement>(sel).forEach(n => n.style.setProperty("background", bg, "important"));
+          el.style.setProperty("background", "#ede4cc", "important");
+          set(".pcard-head", "#e4d8b8");
+          set(".pcard-grav", "#e4d8b8");
+          set(".pcard-bar", "#d6c8a5");
+        },
       });
       // Bulletproof solid background: paint the cream ground ourselves and
       // composite the render on top. JPEG flattens any transparency to
@@ -270,6 +280,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
   return (
     <div style={{ width: "100%", maxWidth: 620, margin: "0 auto" }}>
       <div ref={cardRef} className="pcard" role="group"
+        style={{ background: "#ede4cc" }}
         aria-label={`${player.name} value card — X-NAV ${xnav.total}${avgPercentile !== null ? `, ${percentileLabel(avgPercentile)} vs ${peerLabel}` : ""}`}>
       <style>{`
         .pcard { width: 100%;
