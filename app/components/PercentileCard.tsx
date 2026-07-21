@@ -12,6 +12,7 @@ import { TierIcon, FieldDiagram } from "@/app/components/GravityField";
 import { SEASON } from "@/app/lib/season-config";
 import MetricTip from "@/app/components/MetricTip";
 import { displayPosition } from "@/app/lib/display-position";
+import type { CardImagePayload } from "@/app/lib/card-payload";
 
 interface PlayerData {
   id: string;
@@ -231,56 +232,91 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
   ].filter(Boolean) as { label: string; val: string; color?: string }[];
 
   const exportPng = useCallback(async () => {
-    if (!cardRef.current || exporting) return;
+    if (exporting) return;
     setExporting(true);
     try {
-      const html2canvas = (await import("html2canvas")).default;
-      // The card's backgrounds come from a <style> block (class rules).
-      // In some browsers html2canvas renders those class backgrounds black
-      // while inline styles come through fine (the percentile bars prove
-      // this). So force every background-bearing section to an INLINE
-      // !important color on the export clone — inline styles are read
-      // reliably, guaranteeing a solid card no matter the browser.
-      const rendered = await html2canvas(cardRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ede4cc",
-        onclone: (_doc, el) => {
-          const root = el as HTMLElement;
-          root.style.setProperty("background", "#ede4cc", "important");
-          const paint = (sel: string, bg: string) =>
-            root.querySelectorAll<HTMLElement>(sel).forEach(n => n.style.setProperty("background", bg, "important"));
-          paint(".pcard-head", "#e4d8b8");
-          paint(".pcard-contract", "#ede4cc");
-          paint(".pcard-grav", "#e4d8b8");
-          paint(".pcard-edge", "#ede4cc");
-          paint(".pcard-ecell", "#ede4cc");
-          paint(".pcard-tablewrap", "#ede4cc");
-          paint(".pcard-body", "#ede4cc");
-          paint(".pcard-side", "#ede4cc");
-          paint(".pcard-foot", "#ede4cc");
-          paint(".pcard-bar", "#d6c8a5");
-        },
+      // Server-side render (Satori/next-og) rather than a client rasterizer.
+      // The old client path drew black backgrounds in some browsers (Firefox)
+      // because it never honored the card's <style>-block class backgrounds.
+      // Here the browser ships an already-formatted payload and the route
+      // renders a guaranteed-solid PNG — deterministic across every browser.
+
+      // Inline the same-origin-proxied headshot as a data URL so the route
+      // never has to make its own network request to rasterize the mug.
+      let headshotDataUrl: string | null = null;
+      if (player.headshot) {
+        try {
+          const res = await fetch(`/api/headshot?u=${encodeURIComponent(player.headshot)}`);
+          if (res.ok) {
+            const blob = await res.blob();
+            headshotDataUrl = await new Promise<string>((resolve, reject) => {
+              const fr = new FileReader();
+              fr.onload = () => resolve(fr.result as string);
+              fr.onerror = reject;
+              fr.readAsDataURL(blob);
+            });
+          }
+        } catch {
+          /* headshot is optional — the card renders fine without it */
+        }
+      }
+
+      const payload: CardImagePayload = {
+        name: player.name,
+        sub: `${teamName ?? player.teamId} · ${displayPosition(player.position, player.secondaryPosition)} · Age ${player.age}`,
+        roleLabel: roles?.primary.label,
+        roleColor: roles?.primary.color,
+        xnavTotal: xnav.total,
+        capHitLabel: `$${player.capHit.toFixed(1)}M`,
+        yearsLabel: `${player.yearsRemaining} yr`,
+        fmvLabel: `$${fmv.toFixed(1)}M`,
+        surplusLabel: `${surplus > 0 ? "+" : surplus < 0 ? "−" : ""}$${Math.abs(surplus).toFixed(1)}M · ${surplusWord}`,
+        surplusColor: toneColor(surplusTone),
+        gravity: gravity
+          ? {
+              masses: gravity.masses,
+              tier: gravity.tier,
+              force: gravity.force,
+              confidence: gravity.confidence,
+              isDefenseman: gravity.isDefenseman,
+            }
+          : null,
+        edgeCells,
+        stats: percentiles.map(s => ({
+          label: s.label,
+          pct: s.pct,
+          formatted: s.formatted,
+          median: s.median,
+          barColor: s.pct !== null ? percentileColor(s.pct) : null,
+        })),
+        navCells: navCells.map(c => ({ label: c.label, val: c.val })),
+        peerLabel,
+        avgPercentile,
+        headshotDataUrl,
+      };
+
+      const res = await fetch("/api/card-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
-      // Composite onto a cream-filled canvas so nothing left unpainted can
-      // read through as white or black. PNG keeps it lossless.
-      const out = document.createElement("canvas");
-      out.width = rendered.width;
-      out.height = rendered.height;
-      const ctx = out.getContext("2d")!;
-      ctx.fillStyle = "#ede4cc";
-      ctx.fillRect(0, 0, out.width, out.height);
-      ctx.drawImage(rendered, 0, 0);
+      if (!res.ok) throw new Error(`card-image responded ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.download = `${player.name.replace(/\s+/g, "-").toLowerCase()}-hockey-ledger-card.png`;
-      link.href = out.toDataURL("image/png");
+      link.href = url;
       link.click();
+      URL.revokeObjectURL(url);
     } catch (event) {
       console.error("[player card export]", event);
     } finally {
       setExporting(false);
     }
-  }, [player.name, exporting]);
+  }, [
+    player, teamName, roles, xnav, fmv, surplus, surplusWord, surplusTone,
+    gravity, edgeCells, percentiles, navCells, peerLabel, avgPercentile, exporting,
+  ]);
 
   return (
     <div style={{ width: "100%", maxWidth: 620, margin: "0 auto" }}>
@@ -382,8 +418,8 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
 
       {/* Header — paper plate, ink reserved for text (PA7) */}
       <div className="pcard-head">
-        {/* Same-origin proxy so html2canvas can rasterize the headshot: a
-            cross-origin image taints the export canvas and blanks the header. */}
+        {/* Same-origin proxy for the headshot — the export path also fetches
+            this URL and inlines it into the server-rendered card image. */}
         {player.headshot && <img src={`/api/headshot?u=${encodeURIComponent(player.headshot)}`} alt="" />}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="pcard-name">{player.name}</div>

@@ -6,6 +6,7 @@
 import React from "react";
 import type { GravityProfile, GravityTier, ZoneMasses } from "@/app/lib/gravity";
 import { gravityTierColor } from "@/app/lib/gravity";
+import { computeRinkGeometry } from "@/app/lib/gravity-rink";
 
 interface Props {
   profile: GravityProfile;
@@ -190,74 +191,14 @@ const clampViz = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo
 // mass. Negative mass in any zone renders red — the field caving in.
 
 function FieldDiagram({ profile }: { profile: GravityProfile }) {
-  const W = 320;
-  const H = 240;
   const color = gravityTierColor(profile.tier);
   const { oz, nz, dz } = profile.masses;
 
-  // Rink geometry
-  const rinkX = 12, rinkY = 52, rinkW = 296, rinkH = 118;
-  const midY = rinkY + rinkH / 2;
-  const blue1 = rinkX + rinkW / 3;
-  const blue2 = rinkX + (rinkW * 2) / 3;
-  const centerX = rinkX + rinkW / 2;
-
-  const zones: {
-    key: keyof ZoneMasses;
-    m: number;
-    cx: number;
-    repulsive: boolean;
-  }[] = [
-    { key: "dz", m: dz, cx: rinkX + rinkW / 6, repulsive: true },
-    { key: "nz", m: nz, cx: centerX, repulsive: false },
-    { key: "oz", m: oz, cx: rinkX + (rinkW * 5) / 6, repulsive: false },
-  ];
-
-  // ── Spacetime lattice — grid vertices displaced by the zone masses ──
-  // The flat lattice is league-average hockey. Wells (positive oz/nz)
-  // pull vertices inward; the DZ dome (positive dz) pushes them away;
-  // negative mass in any zone inverts its curvature. Inverse-square
-  // falloff with softening — the GR rubber-sheet, on a 296×118 sheet.
-  const COLS = 24, ROWS = 10;
-  const SOFT = 900;   // px² softening keeps displacement finite at the core
-  const K = 520;      // displacement strength per unit mass
-  const MAX_PULL = 11; // px cap so the lattice never folds over itself
-
-  const sources = zones.map(zn => ({
-    x: zn.cx,
-    y: midY,
-    s: (zn.repulsive ? -zn.m : zn.m) * K, // dome repels, well attracts
-  }));
-
-  function warp(px: number, py: number): string {
-    let dx = 0, dy = 0;
-    for (const src of sources) {
-      const vx = src.x - px, vy = src.y - py;
-      const d2 = vx * vx + vy * vy + SOFT;
-      dx += (vx / d2) * src.s;
-      dy += (vy / d2) * src.s;
-    }
-    const mag = Math.hypot(dx, dy);
-    if (mag > MAX_PULL) { dx = (dx / mag) * MAX_PULL; dy = (dy / mag) * MAX_PULL; }
-    return `${(px + dx).toFixed(1)},${(py + dy).toFixed(1)}`;
-  }
-
-  const inX = rinkX + 4, inW = rinkW - 8;
-  const inY = rinkY + 4, inH = rinkH - 8;
-  const rowLines: string[] = [];
-  for (let r = 0; r <= ROWS; r++) {
-    const py = inY + (inH * r) / ROWS;
-    const pts: string[] = [];
-    for (let c = 0; c <= COLS; c++) pts.push(warp(inX + (inW * c) / COLS, py));
-    rowLines.push(pts.join(" "));
-  }
-  const colLines: string[] = [];
-  for (let c = 0; c <= COLS; c++) {
-    const px = inX + (inW * c) / COLS;
-    const pts: string[] = [];
-    for (let r = 0; r <= ROWS; r++) pts.push(warp(px, inY + (inH * r) / ROWS));
-    colLines.push(pts.join(" "));
-  }
+  // Spacetime lattice geometry — shared with the server-side card PNG
+  // route (app/lib/gravity-rink.ts) so the exported image is byte-for-byte
+  // the same warped rink the browser draws.
+  const { W, H, rinkX, rinkY, rinkW, rinkH, midY, centerX, blue1, blue2, rowLines, colLines, zones } =
+    computeRinkGeometry(profile);
 
   return (
     // Centered via a text-align wrapper + inline-block SVG with explicit
