@@ -344,15 +344,17 @@ function AssetList({
   onRetain?: (assetId: string, retainedPct: number) => void;
 }) {
   return (
-    <div className="border min-h-[180px]" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card)" }}>
-      <div className="px-4 py-2 border-b flex items-center justify-between text-[10px] font-black uppercase tracking-[0.25em] font-mono text-ledger-ink-faint"
+    // TM3: fixed height with an internally scrollable list so the block
+    // never resizes the page as assets are added.
+    <div className="border h-[280px] flex flex-col" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card)" }}>
+      <div className="shrink-0 px-4 py-2 border-b flex items-center justify-between text-[10px] font-black uppercase tracking-[0.25em] font-mono text-ledger-ink-faint"
         style={{ borderColor: "var(--ledger-rule)" }}>
         <span>{title}</span>
         {assets.some(a => a.position !== "Pick") && (
           <span className="text-[9px] tracking-[0.12em]" style={{ color: "var(--ledger-ink-faint)" }}>tap a player for scouting</span>
         )}
       </div>
-      <div className="divide-y" style={{ borderColor: "var(--ledger-rule-light)" }}>
+      <div className="flex-1 overflow-y-auto divide-y" style={{ borderColor: "var(--ledger-rule-light)" }}>
         {assets.length === 0 && (
           <div className="px-4 py-10 text-center text-[10px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint">
             No assets selected
@@ -362,6 +364,12 @@ function AssetList({
           <AssetRow key={asset.id} asset={asset} navMap={navMap} onRemove={onRemove} onRetain={onRetain} />
         ))}
       </div>
+      {assets.length > 3 && (
+        <div className="shrink-0 border-t px-4 py-1 text-center text-[8px] font-black uppercase tracking-[0.2em] font-mono text-ledger-ink-faint"
+          style={{ borderColor: "var(--ledger-rule-light)" }} aria-hidden="true">
+          Scroll for {assets.length - 3} more
+        </div>
+      )}
     </div>
   );
 }
@@ -423,16 +431,12 @@ function TeamTradeSummary({
   sends,
   receives,
   navLoading,
-  phase,
-  postPhase,
 }: {
   label: string;
   team: Team | null;
   sends: PackageSummary;
   receives: PackageSummary;
   navLoading: boolean;
-  phase: TeamPhase | null;
-  postPhase: TeamPhase | null;
 }) {
   const currentCap = team?.capSpace ?? 0;
   const projectedCap = team ? currentCap + sends.cap - receives.cap : 0;
@@ -444,21 +448,14 @@ function TeamTradeSummary({
 
   return (
     <div className="border p-3 flex flex-col gap-3" style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[9px] font-black uppercase tracking-[0.24em] font-mono text-ledger-ink-faint">
-            {label}
-          </div>
-          <div className="text-[16px] font-black" style={{ color: "var(--ledger-ink)" }}>
-            {team?.name ?? "Select Team"}
-          </div>
+      <div>
+        <div className="text-[9px] font-black uppercase tracking-[0.24em] font-mono text-ledger-ink-faint">
+          {label}
         </div>
-        <div className="text-right text-[9px] font-black uppercase tracking-[0.16em] font-mono text-ledger-ink-faint">
-          GM Logic Signal
+        <div className="text-[16px] font-black" style={{ color: "var(--ledger-ink)" }}>
+          {team?.name ?? "Select Team"}
         </div>
       </div>
-
-      {team && <TeamWindowBadge phase={phase} postPhase={postPhase} />}
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         <SummaryMetric label="Current Cap" value={team ? fmtCap(currentCap) : "--"} tone={currentCap >= 0 ? "good" : "bad"} />
@@ -469,6 +466,43 @@ function TeamTradeSummary({
         <SummaryMetric label="Package NAV" value={navLoading ? "Loading" : fmtSigned(navDelta, 1)} tone={navDelta >= 0 ? "good" : "bad"} />
       </div>
     </div>
+  );
+}
+
+// TM3: the GM Logic Signal lives between Cap in Play and Team STRANDs —
+// a league-context strip, not a per-column detail.
+function GmLogicSignal({
+  homeTeam, partnerTeam, homePhase, homePostPhase, partnerPhase, partnerPostPhase,
+}: {
+  homeTeam: Team | null;
+  partnerTeam: Team | null;
+  homePhase: TeamPhase | null;
+  homePostPhase: TeamPhase | null;
+  partnerPhase: TeamPhase | null;
+  partnerPostPhase: TeamPhase | null;
+}) {
+  if (!homeTeam && !partnerTeam) return null;
+  return (
+    <section className="border p-4" style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
+      aria-label="GM logic signal — contention window before and after the trade">
+      <div className="mb-2 text-[10px] font-black uppercase tracking-[0.25em] font-mono text-ledger-ink-faint">
+        GM Logic Signal
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {[
+          { team: homeTeam, phase: homePhase, postPhase: homePostPhase },
+          { team: partnerTeam, phase: partnerPhase, postPhase: partnerPostPhase },
+        ].map((side, i) => side.team && (
+          <div key={side.team.id ?? i} className="flex items-center justify-between gap-3 border px-3 py-2"
+            style={{ borderColor: "var(--ledger-rule-light)", background: "var(--ledger-cream)" }}>
+            <span className="text-[12px] font-black font-mono truncate" style={{ color: "var(--ledger-ink)" }}>
+              {side.team.name}
+            </span>
+            <TeamWindowBadge phase={side.phase} postPhase={side.postPhase} />
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -620,7 +654,42 @@ function TeamStrandPreview({
   const preTradeHomeStrand = useMemo(() => hasActiveTrade ? computeRosterStrand(homeRoster, navMap) : null, [hasActiveTrade, homeRoster, navMap]);
   const preTradePartnerStrand = useMemo(() => hasActiveTrade ? computeRosterStrand(partnerRoster, navMap) : null, [hasActiveTrade, partnerRoster, navMap]);
 
+  // TM3: goaltending metric — a goalie acquisition must read as a crease
+  // change, never as only an OFF/DEF skater decline. Stable GSAx (same
+  // 0.4/0.6 blend EWA uses) summed across each roster's goalies.
+  const creaseGsax = (roster: Asset[]) =>
+    roster.filter(p => p.position === "G").reduce((sum, g) => {
+      const stable = g.baselineGsax != null && g.baselineGsax !== 0
+        ? (g.gsax ?? 0) * 0.4 + g.baselineGsax * 0.6
+        : (g.gsax ?? 0);
+      return sum + stable;
+    }, 0);
+  const homeCrease = { pre: creaseGsax(homeRoster), post: creaseGsax(effectiveHomeRoster) };
+  const partnerCrease = { pre: creaseGsax(partnerRoster), post: creaseGsax(effectivePartnerRoster) };
+
   if (!homeTeam || !partnerTeam || !homeStrand || !partnerStrand) return null;
+
+  const CreaseLine = ({ crease }: { crease: { pre: number; post: number } }) => {
+    const delta = crease.post - crease.pre;
+    const deltaColor = delta > 0.5 ? "var(--ledger-green)" : delta < -0.5 ? "var(--ledger-red)" : "var(--ledger-ink-body)";
+    return (
+      <div className="mt-2 flex items-center justify-between border-t pt-2"
+        style={{ borderColor: "var(--ledger-rule-light)" }}>
+        <span className="text-[9px] font-black uppercase tracking-[0.18em] font-mono text-ledger-ink-faint"
+          title="Team goaltending — stable goals saved above expected, summed across the roster's goalies">
+          Crease GSAx
+        </span>
+        <span className="text-[11px] font-black font-mono" style={{ fontVariantNumeric: "tabular-nums", color: "var(--ledger-ink)" }}>
+          {hasActiveTrade ? (
+            <>
+              {crease.pre.toFixed(1)} → {crease.post.toFixed(1)}{" "}
+              <span style={{ color: deltaColor }}>({delta > 0 ? "+" : ""}{delta.toFixed(1)})</span>
+            </>
+          ) : crease.pre.toFixed(1)}
+        </span>
+      </div>
+    );
+  };
 
   return (
     <section className="border p-4" style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
@@ -642,6 +711,7 @@ function TeamStrandPreview({
             label={hasActiveTrade ? "Post-trade" : undefined}
             compare={preTradeHomeStrand ?? undefined}
           />
+          <CreaseLine crease={homeCrease} />
         </div>
         <div className="border p-3" style={{ borderColor: "var(--ledger-rule-light)", background: "var(--ledger-cream)" }}>
           <TeamStrand
@@ -650,6 +720,7 @@ function TeamStrandPreview({
             label={hasActiveTrade ? "Post-trade" : undefined}
             compare={preTradePartnerStrand ?? undefined}
           />
+          <CreaseLine crease={partnerCrease} />
         </div>
       </div>
     </section>
@@ -768,6 +839,8 @@ export function SharedTradeView({ code }: { code: string }) {
 export default function QuickTradeMachine() {
   const [data, setData] = useState<LeagueData>({ teams: [], players: [] });
   const [booting, setBooting] = useState(true);
+  const [bootProgress, setBootProgress] = useState(0);
+  const [shareFeedback, setShareFeedback] = useState<"" | "copied" | "error">("");
   const [error, setError] = useState<string | null>(null);
   const [homeTeamId, setHomeTeamId] = useState("");
   const [partnerTeamId, setPartnerTeamId] = useState("");
@@ -787,17 +860,21 @@ export default function QuickTradeMachine() {
   const loadTradeMachineData = useCallback(() => {
     setBooting(true);
     setError(null);
+    setBootProgress(8);
     Promise.all([
       fetch("/api/league/teams").then(response => {
         if (!response.ok) throw new Error(`/api/league/teams returned ${response.status}`);
+        setBootProgress(prev => Math.max(prev, 45));
         return response.json();
       }),
       fetch("/api/league/players").then(response => {
         if (!response.ok) throw new Error(`/api/league/players returned ${response.status}`);
+        setBootProgress(prev => Math.max(prev, 80));
         return response.json();
       }),
     ])
       .then(([teamData, playerData]) => {
+        setBootProgress(100);
         const nextData = {
           teams: teamData.teams ?? [],
           players: [...(playerData.players ?? []), ...(teamData.picks ?? [])],
@@ -951,18 +1028,47 @@ export default function QuickTradeMachine() {
 
   const createShare = () => {
     if (!homeTeam || !partnerTeam || !verdict) return;
-    const payload = createTradeSharePayload({
-      homeTeam,
-      partnerTeam,
-      outgoing,
-      incoming,
-      verdict,
-      mode: "trade-machine",
-      season: SEASON.label,
-    });
-    const code = encodeTradeSharePayload(payload);
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    setShareUrl(`${origin}/t/${code}`);
+    setShareFeedback("");
+    try {
+      // Slim the verdict for the URL: keep the ruling and the flags that
+      // decide it, trim long-form prose so the link survives Discord,
+      // Reddit, and proxy URL limits.
+      const severityRank: Record<string, number> = { HARD: 0, SOFT: 1, WARN: 2, INFO: 3 };
+      const slimVerdict = {
+        ...verdict,
+        message: (verdict.message ?? "").slice(0, 500),
+        flags: [...(verdict.flags ?? [])]
+          .sort((a: any, b: any) => (severityRank[a.severity] ?? 9) - (severityRank[b.severity] ?? 9))
+          .slice(0, 8)
+          .map((f: any) => ({ ...f, explanation: (f.explanation ?? "").slice(0, 300) })),
+      };
+      const payload = createTradeSharePayload({
+        homeTeam,
+        partnerTeam,
+        outgoing,
+        incoming,
+        verdict: slimVerdict,
+        mode: "trade-machine",
+        season: SEASON.label,
+      });
+      const code = encodeTradeSharePayload(payload);
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      setShareUrl(`${origin}/t/${code}`);
+    } catch (event) {
+      console.error("[quick trade share]", event);
+      setShareUrl("");
+      setError("Couldn't build the share link — re-run the GM Audit and try again.");
+    }
+  };
+
+  const copyShareUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareFeedback("copied");
+      setTimeout(() => setShareFeedback(""), 2500);
+    } catch {
+      setShareFeedback("error");
+    }
   };
 
   return (
@@ -972,25 +1078,35 @@ export default function QuickTradeMachine() {
 
         <section className="border p-5 sm:p-6" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card)" }}>
           <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono text-ledger-ink-faint">
-            One-Off Trade Machine
+            The Trade Desk
           </div>
-          <div className="mt-2 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl sm:text-5xl font-black leading-none" style={{ color: "var(--ledger-ink)" }}>
-                Build. Audit. Share.
-              </h1>
-              <p className="mt-3 max-w-2xl text-[13px] leading-relaxed" style={{ color: "var(--ledger-ink-body)" }}>
-                Run a single trade without the full Armchair GM workspace. The verdict can be locked into a share link for Reddit, Discord, or group chat debate.
-              </p>
-            </div>
-            <a
-              href="/armchair-gm"
-              className="border px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.22em] font-mono no-underline"
-              style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-brown)", background: "var(--ledger-warm)" }}
-            >
-              Open Armchair GM
-            </a>
-          </div>
+          <h1 className="mt-2 text-3xl sm:text-4xl font-black leading-none" style={{ color: "var(--ledger-ink)" }}>
+            Put a deal on the record.
+          </h1>
+          <p className="mt-3 max-w-2xl text-[13px] leading-relaxed" style={{ color: "var(--ledger-ink-body)" }}>
+            One trade, argued with numbers. The X-NAV engine prices both packages, the GM Audit
+            rules on whether the deal survives a real front office, and the locked verdict
+            becomes a share link built for the group-chat debate.
+          </p>
+          <ol className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2" aria-label="How the trade desk works">
+            {[
+              ["1", "Build", "Pick two teams and stack the packages — retention included."],
+              ["2", "Audit", "Run the GM Audit: cap, clauses, calibre, fit, and window."],
+              ["3", "Share", "Lock the verdict into a link that replays the whole case."],
+            ].map(([num, label, desc]) => (
+              <li key={label} className="border px-3 py-2.5 flex items-start gap-2.5"
+                style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
+                <span className="shrink-0 inline-flex h-6 w-6 items-center justify-center border font-mono text-[11px] font-black"
+                  style={{ borderColor: "var(--ledger-ink)", color: "var(--ledger-red)" }} aria-hidden="true">
+                  {num}
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-mono text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: "var(--ledger-ink)" }}>{label}</span>
+                  <span className="block text-[11px] leading-snug mt-0.5" style={{ color: "var(--ledger-ink-body)" }}>{desc}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
         </section>
 
         {error && (
@@ -1004,9 +1120,20 @@ export default function QuickTradeMachine() {
         )}
 
         {booting ? (
-          <div className="border p-8 text-center text-[11px] font-black uppercase tracking-[0.25em] font-mono text-ledger-ink-faint"
+          <div className="border p-8" role="status" aria-live="polite"
             style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
-            Loading teams and assets
+            <div className="text-center text-[11px] font-black uppercase tracking-[0.25em] font-mono" style={{ color: "var(--ledger-ink)" }}>
+              Setting the trade desk — {bootProgress < 45 ? "team ledgers" : bootProgress < 80 ? "player & EDGE data" : "final assembly"}
+            </div>
+            <div className="mt-4 mx-auto max-w-md h-[10px] border relative overflow-hidden"
+              role="progressbar" aria-valuenow={bootProgress} aria-valuemin={0} aria-valuemax={100}
+              style={{ borderColor: "var(--ledger-ink)", background: "var(--paper-bg)" }}>
+              <div className="h-full transition-all duration-500"
+                style={{ width: `${bootProgress}%`, background: "var(--ledger-red)", opacity: 0.75 }} />
+            </div>
+            <div className="mt-1.5 text-center text-[10px] font-black font-mono" style={{ color: "var(--ledger-ink-body)", fontVariantNumeric: "tabular-nums" }}>
+              {bootProgress}%
+            </div>
           </div>
         ) : (
           <>
@@ -1027,8 +1154,6 @@ export default function QuickTradeMachine() {
                   sends={outgoingSummary}
                   receives={incomingSummary}
                   navLoading={navLoading}
-                  phase={homePhase}
-                  postPhase={homePostPhase}
                 />
               </div>
               <div className="border p-4 flex flex-col gap-4" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card-light)" }}>
@@ -1047,13 +1172,20 @@ export default function QuickTradeMachine() {
                   sends={incomingSummary}
                   receives={outgoingSummary}
                   navLoading={navLoading}
-                  phase={partnerPhase}
-                  postPhase={partnerPostPhase}
                 />
               </div>
             </section>
 
             <TradeBalanceStrip outgoing={outgoingSummary} incoming={incomingSummary} navLoading={navLoading} />
+
+            <GmLogicSignal
+              homeTeam={homeTeam}
+              partnerTeam={partnerTeam}
+              homePhase={homePhase}
+              homePostPhase={homePostPhase}
+              partnerPhase={partnerPhase}
+              partnerPostPhase={partnerPostPhase}
+            />
 
             <TeamStrandPreview
               homeTeam={homeTeam}
@@ -1103,16 +1235,23 @@ export default function QuickTradeMachine() {
                   <input
                     readOnly
                     value={shareUrl}
+                    aria-label="Locked verdict share link"
+                    onFocus={e => e.currentTarget.select()}
                     className="flex-1 min-w-0 border px-3 py-3 text-[11px] font-mono bg-transparent"
                     style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}
                   />
                   <button
                     type="button"
-                    onClick={() => navigator.clipboard?.writeText(shareUrl)}
+                    onClick={copyShareUrl}
+                    aria-label="Copy share link to clipboard"
                     className="border px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] font-mono"
-                    style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-brown)", background: "var(--ledger-warm)" }}
+                    style={{
+                      borderColor: shareFeedback === "copied" ? "var(--ledger-green)" : "var(--ledger-rule)",
+                      color: shareFeedback === "copied" ? "var(--ledger-green)" : "var(--ledger-brown)",
+                      background: "var(--ledger-warm)",
+                    }}
                   >
-                    Copy
+                    {shareFeedback === "copied" ? "Copied ✓" : shareFeedback === "error" ? "Select & copy" : "Copy"}
                   </button>
                 </div>
               </section>

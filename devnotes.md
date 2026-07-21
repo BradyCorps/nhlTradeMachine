@@ -248,8 +248,27 @@
   Swayman logjam, struggling-starter upgrade coherence, and picks-only
   exclusion (555 total passing)
 
+### Round 7 — TM3/TM4/TM7 trade machine cluster (complete)
+- TM3a: asset blocks fixed at 280px with internal scroll ("Scroll for N
+  more" hint) — the page never resizes as assets are added
+- TM3b: GM Logic Signal extracted from the team columns into its own strip
+  between Cap in Play and Team STRANDs (both teams' window badges)
+- TM3c: Crease GSAx line under each Team STRAND — stable GSAx (same 0.4/0.6
+  blend EWA uses) summed per roster, pre → post with colored delta; a goalie
+  acquisition now reads as a crease change, not an OFF/DEF decline
+- TM4: Generate Share Link hardened — try/catch with a visible error,
+  verdict slimmed for the URL (top 8 flags by severity, explanations ≤300
+  chars, message ≤500) so links survive Discord/Reddit/proxy limits; Copy
+  button gives "Copied ✓" feedback with a select-fallback; share input
+  labeled and self-selecting
+- TM4: booting state is a real progress bar (teams 45% → players/EDGE 80%
+  → assembly 100%) with role=progressbar + aria-live status
+- TM7: hero reworked — "The Trade Desk / Put a deal on the record." with a
+  numbered Build→Audit→Share strip; Open Armchair GM CTA removed; canary
+  updated to pin the new landing
+
 ### Still open from audit (next rounds)
-- G3 (icon system), G4 (model propagation), TM1/TM3/TM4/TM7, PA5-PA9,
+- G3 (icon system), G4 (model propagation), TM1 (Phase 3 picker), PA5-PA9,
   PA11/PA12, D1, AG3
 
 ## Known Issues / Future Work

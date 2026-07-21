@@ -1253,7 +1253,10 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(sharedTradeRoute).toContain("summarizeTradeSharePayload");
     expect(sharedTradeImageRoute).toContain("ImageResponse");
     expect(sharedTradeImageRoute).toContain("Verdict Locked At Creation");
-    expect(quickTradeMachine).toContain("Run a single trade without the full Armchair GM workspace");
+    // TM7 landing: reworked hero with the three-step strip, no Armchair CTA
+    expect(quickTradeMachine).toContain("Put a deal on the record.");
+    expect(quickTradeMachine).toContain("How the trade desk works");
+    expect(quickTradeMachine).not.toContain("Open Armchair GM");
     expect(quickTradeMachine).toContain("Generate Share Link");
     expect(quickTradeMachine).toContain("/t/");
   });
