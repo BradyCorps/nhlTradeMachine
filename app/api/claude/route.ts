@@ -154,6 +154,10 @@ const TradedPlayerOutcomeSchema = z.object({
   projectedGAA: z.number().nullable().optional(),
   projectedSVP: z.number().nullable().optional(),
   gamesStarted: z.number().nullable().optional(),
+  // G4: modern role label stamped by the sim ("Floor Raiser", "Perimeter
+  // Lockdown") so the recap can talk about what the player IS, not just
+  // his position.
+  role: z.string().optional(),
 }).passthrough();
 
 const ExecutedTradeSummarySchema = z.object({
@@ -283,10 +287,11 @@ function buildSeasonRecapPrompt(payload: z.infer<typeof SeasonRecapPayloadSchema
   ].join("\n")).join("\n\n");
 
   const tradedOutcomeLines = payload.tradedPlayerOutcomes.map((o) => {
+    const roleTag = o.role ? ` (${o.role})` : "";
     if (o.position === "G") {
-      return `${o.name}: ${o.oldTeamName} -> ${o.newTeamName}, ${o.gamesStarted ?? "?"} starts, ${o.projectedGAA ?? "?"} GAA, ${o.projectedSVP ?? "?"} SV%`;
+      return `${o.name}${roleTag}: ${o.oldTeamName} -> ${o.newTeamName}, ${o.gamesStarted ?? "?"} starts, ${o.projectedGAA ?? "?"} GAA, ${o.projectedSVP ?? "?"} SV%`;
     }
-    return `${o.name}: ${o.oldTeamName} -> ${o.newTeamName}, ${o.gamesPlayed ?? "?"} GP, ${o.projectedGoals ?? "?"} G, ${o.projectedPts ?? "?"} pts`;
+    return `${o.name}${roleTag}: ${o.oldTeamName} -> ${o.newTeamName}, ${o.gamesPlayed ?? "?"} GP, ${o.projectedGoals ?? "?"} G, ${o.projectedPts ?? "?"} pts`;
   });
 
   const lockedFacts = {

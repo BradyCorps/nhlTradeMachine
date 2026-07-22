@@ -683,3 +683,77 @@ describe("claude narrative route contract", () => {
     expect(anthropicBody.messages[0].content).toContain("Conn Smythe must be from the Stanley Cup champion");
   });
 });
+
+// ── G4 — gravity + roles propagate into the season simulator ─────
+// The sim's team strength was points-pace-only; the zone-mass field now
+// adds what pace misses (suppression, transition). These tests hold every
+// input identical except the on-ice fields, with a fixed seed, so any
+// difference in output IS the propagation.
+describe("simulate route — G4 gravity and role propagation", () => {
+  // The on-ice block of a heavy shutdown profile: big suppression, PK
+  // trust, tough zone starts. Gravity-positive; barely moves pts pace.
+  const shutdownFields = {
+    xgRelTM: 2, baselineXgRel: 0.01, xgaRelTM: -0.8,
+    baselineIxg82: 3.5, ppPtsPace82: 0.5, assistsPace: 21, goalsPace: 4,
+    dps: 4.8, pkTimeShare: 0.24, pairDriverScore: 8,
+    qocIndex: 80, dzPct: 0.62, edgeOzPct: 0.40,
+  };
+
+  const depth = () => teamIds.flatMap((teamId) => teamId === "WPG" ? [] : [
+    player(`${teamId}-f1`, `${teamId} Forward`, teamId, 42, "C"),
+    player(`${teamId}-d1`, `${teamId} Defender`, teamId, 25, "D"),
+    { ...player(`${teamId}-g1`, `${teamId} Goalie`, teamId, 0, "G"), gsax: 0, gamesStarted: 45, savePct: 0.905 },
+  ]);
+
+  const wpgRoster = (withGravity: boolean) => {
+    const onIce = withGravity ? shutdownFields : {};
+    return [
+      ...Array.from({ length: 12 }, (_, i) =>
+        ({ ...player(`wpg-f${i}`, `WPG Forward ${i}`, "WPG", 55 - i, i % 2 ? "W" : "C"), avgTOI: 18, ...onIce })),
+      ...Array.from({ length: 6 }, (_, i) =>
+        ({ ...player(`wpg-d${i}`, `WPG Defender ${i}`, "WPG", 40 - i, "D"), avgTOI: 21, ...onIce })),
+      { ...player("wpg-g1", "WPG Goalie", "WPG", 0, "G"), gsax: 0, gamesStarted: 45, savePct: 0.905 },
+    ];
+  };
+
+  it("a gravity-rich roster projects more points than a stat-identical data-blank twin", async () => {
+    const run = async (withGravity: boolean) => {
+      const res = await simulatePOST(new Request("http://localhost/api/simulate", {
+        method: "POST",
+        body: JSON.stringify({
+          homeTeamId: "WPG", partnerTeamId: "CGY", teams,
+          players: [...depth(), ...wpgRoster(withGravity)],
+          seed: 11, trades: [],
+        }),
+      }) as any);
+      const body = await res.json();
+      return body.homeTeam.projectedPoints as number;
+    };
+    const withField = await run(true);
+    const blank = await run(false);
+    // Same paces, same seed, same RNG streams — the zone-mass field is the
+    // only difference, and suppression/transition value must show up.
+    expect(withField).toBeGreaterThan(blank);
+  });
+
+  it("stamps the modern role into traded-player outcomes, with generic fallback", async () => {
+    const lockdown = {
+      ...player("lockdown-d", "Lockdown Defender", "CGY", 25, "D"),
+      avgTOI: 21.5, ...shutdownFields,
+    };
+    const bare = player("bare-f", "Bare Forward", "WPG", 60, "W"); // no on-ice data → fallback
+    const res = await simulatePOST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      body: JSON.stringify({
+        homeTeamId: "WPG", partnerTeamId: "CGY", teams,
+        players: [...depth(), ...wpgRoster(false), lockdown, bare],
+        seed: 3,
+        trades: [{ homeTeamId: "WPG", partnerTeamId: "CGY", outgoing: [bare], incoming: [lockdown] }],
+      }),
+    }) as any);
+    const body = await res.json();
+    const moved = (id: string) => body.tradedPlayerOutcomes.find((o: any) => o.playerId === id);
+    expect(moved("lockdown-d").role).toBe("Perimeter Lockdown");
+    expect(moved("bare-f").role).toBe("skater");
+  });
+});

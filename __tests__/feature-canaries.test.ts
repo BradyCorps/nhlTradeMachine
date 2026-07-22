@@ -1952,3 +1952,33 @@ describe("Canary — ship-readiness infrastructure", () => {
     expect(header).toContain('"teams"');
   });
 });
+
+describe("Canary — G4 model propagation", () => {
+  it("evaluate route cannot silently drop the gravity NZ-well input again", () => {
+    // AssetInput declares edgeOzPct, and the evaluate route's field-by-field
+    // adapter maps it — the drift class behind the Fox home-vs-analytics bug.
+    const engine = read("app/lib/xnav-engine.ts");
+    const evaluate = read("app/api/evaluate/route.ts");
+    expect(engine).toContain("edgeOzPct?: number | null;");
+    expect(evaluate).toContain("edgeOzPct: asset.edgeOzPct");
+  });
+
+  it("season simulator feels gravity and speaks modern roles", () => {
+    const sim = read("app/api/simulate/route.ts");
+    // Team strength includes the zone-mass on-ice term…
+    expect(sim).toContain("simOnIceDelta");
+    expect(sim).toContain("computeGravity");
+    expect(sim).toContain("gravityDelta(p)");
+    // …and traded-player outcomes carry evidence-derived role labels.
+    expect(sim).toContain("derivePlayerRoles");
+    // The sim-side term lives in the gravity engine, one formula, one place.
+    const gravity = read("app/lib/gravity.ts");
+    expect(gravity).toContain("export function simOnIceDelta");
+  });
+
+  it("season recap names the traded player's modern role", () => {
+    const claude = read("app/api/claude/route.ts");
+    expect(claude).toContain("role: z.string().optional()");
+    expect(claude).toContain("roleTag");
+  });
+});

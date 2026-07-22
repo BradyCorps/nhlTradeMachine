@@ -21,6 +21,10 @@ export interface AssetInput {
   hdFinishingDelta?: number | null; // NHL EDGE: high-danger finishing vs league (nhl_snapshots)
   edgeSpeedMaxMph?: number | null;
   edgeBurstsOver20?: number | null;
+  // NHL EDGE offensive-zone time share — the gravity NZ well's core input.
+  // G4: declared here so field-by-field callers (evaluate route) can't
+  // silently drop it, which degraded server-side gravity to partial mode.
+  edgeOzPct?: number | null;
   id:             string;
   name:           string;
   position:       "C" | "W" | "D" | "G" | "Pick";

@@ -165,6 +165,7 @@ const getAssetNAV = (asset: Asset, capCeiling: number = SEASON.capCeiling): XNAV
     hdFinishingDelta: asset.hdFinishingDelta,
     edgeSpeedMaxMph: asset.edgeSpeedMaxMph,
     edgeBurstsOver20: asset.edgeBurstsOver20,
+    edgeOzPct: asset.edgeOzPct,
     defRate: asset.defRate,
     avgTOI: asset.avgTOI,
     qocRank: asset.qocRank,

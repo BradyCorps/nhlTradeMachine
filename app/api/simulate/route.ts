@@ -12,6 +12,8 @@ import { leadershipBonus } from "@/app/data/leadership";
 import { opportunityPace } from "@/app/lib/young-opportunity";
 import { computeBreakout } from "@/app/lib/breakout-model";
 import { burstProfile } from "@/app/lib/burst-channel";
+import { computeGravity, simOnIceDelta } from "@/app/lib/gravity";
+import { derivePlayerRoles } from "@/app/lib/player-roles";
 
 // ── Types ─────────────────────────────────────────────────────
 interface SimPlayer {
@@ -43,6 +45,22 @@ interface SimPlayer {
   goalsPace?: number;               // luck fallback (xG vs goals)
   edgeBurstsOver20?: number | null; // NHL EDGE explosiveness → breakout burst signal
   edgeSpeedMaxMph?: number | null;
+  // G4 — gravity propagation. The client sends full Asset objects, so these
+  // on-ice fields already arrive in the payload; declaring them lets the sim
+  // compute each skater's gravity field instead of valuing rosters on
+  // points pace alone. All optional — absent data degrades gracefully
+  // inside computeGravity.
+  xgRelTM?: number | null;          // on-off xG lift (NOIV family)
+  xgaRelTM?: number | null;         // on-off suppression (DZ dome)
+  baselineXgRel?: number;           // multi-season on-off baseline
+  dps?: number | null;              // defensive point shares (DZ dome)
+  ops?: number | null;
+  edgeOzPct?: number | null;        // EDGE zone-time share (NZ displacement core)
+  dzPct?: number | null;            // deployment zone starts
+  assistsPace?: number;
+  qocIndex?: number | null;         // deployment difficulty context
+  ppPtsPace82?: number;
+  baselineIxg82?: number;
 }
 
 interface SimTeam {
@@ -175,6 +193,22 @@ const stableGsax = (p: SimPlayer): number => {
     : cur;
 };
 
+// G4 — the sim feels gravity. Points pace prices scoring; the zone-mass
+// field adds what it misses (suppression, transition drive), so a shutdown
+// defenseman or transition engine finally moves simulated standings, default
+// lineup slots, and playoff odds. Memoized per player object: onIceValue
+// runs inside sort comparators, and the payload objects are fresh each
+// request, so a WeakMap can never serve stale cross-request values.
+const gravityOnIce = new WeakMap<SimPlayer, number>();
+const gravityDelta = (p: SimPlayer): number => {
+  let delta = gravityOnIce.get(p);
+  if (delta === undefined) {
+    delta = simOnIceDelta(computeGravity(p as any));
+    gravityOnIce.set(p, delta);
+  }
+  return delta;
+};
+
 const onIceValue = (p: SimPlayer): number => {
   if (p.position === "Pick") return 0;
   if (p.position === "G") {
@@ -190,7 +224,8 @@ const onIceValue = (p: SimPlayer): number => {
     ? Math.min(5, p.pkTimeShare * 30)
     : 0;
   // Leadership steadier: letters carry small on-ice weight (room, matchups)
-  return skaterPace(p) + draftPedigreeBonus(p) + driverBonus + pkBonus + leadershipBonus(p.name, { c: 3, a: 1.5 });
+  return skaterPace(p) + draftPedigreeBonus(p) + driverBonus + pkBonus
+    + gravityDelta(p) + leadershipBonus(p.name, { c: 3, a: 1.5 });
 };
 
 const isForward = (p: SimPlayer): boolean => p.position !== "Pick" && p.position !== "G" && p.position !== "D";
@@ -977,6 +1012,13 @@ function buildTradedPlayerOutcomes(
       ?? 88) / 164;
   const outcomes: TradedPlayerOutcome[] = [];
 
+  // G4 — modern roles propagate into sim output: a moved player is labeled
+  // by the same evidence-gated role system the analytics pages use
+  // ("Floor Raiser", "Perimeter Lockdown"), not a generic position word.
+  // Falls back to the old generic strings when the data can't derive one.
+  const modernRole = (p: SimPlayer, fallback: string): string =>
+    derivePlayerRoles(p as any)?.primary.label ?? fallback;
+
   const addOutcome = (p: SimPlayer, oldTeamId: string, newTeamId: string) => {
     if (p.position === "Pick") return;
     if (p.position === "G") {
@@ -994,7 +1036,7 @@ function buildTradedPlayerOutcomes(
         projectedSVP: goalie?.projectedSVP,
         gamesStarted: goalie?.gamesStarted,
         gsax: goalie?.gsax,
-        role: (p.gamesStarted ?? p.games ?? 0) >= 45 ? "starter goalie" : "goalie",
+        role: modernRole(p, (p.gamesStarted ?? p.games ?? 0) >= 45 ? "starter goalie" : "goalie"),
       });
       return;
     }
@@ -1012,7 +1054,7 @@ function buildTradedPlayerOutcomes(
       projectedGoals: skater.projectedGoals,
       projectedAssists: skater.projectedAssists,
       gamesPlayed: skater.gamesPlayed,
-      role: p.position === "D" ? "defenceman" : "skater",
+      role: modernRole(p, p.position === "D" ? "defenceman" : "skater"),
     });
   };
 

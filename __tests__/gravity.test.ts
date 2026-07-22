@@ -5,7 +5,7 @@
 // forwards against F, then force is one agnostic currency.
 
 import { describe, it, expect } from "vitest";
-import { computeGravity, classifyTier } from "@/app/lib/gravity";
+import { computeGravity, classifyTier, simOnIceDelta } from "@/app/lib/gravity";
 
 // Minimal asset factory — only fields gravity reads
 function asset(overrides: Record<string, unknown>) {
@@ -213,5 +213,71 @@ describe("classifyTier", () => {
     expect(classifyTier(0.0)).toBe("ASTEROID");
     expect(classifyTier(-0.15)).toBe("ASTEROID");
     expect(classifyTier(-0.30)).toBe("BLACK_HOLE");
+  });
+});
+
+// ── G4 — simOnIceDelta: the sim engine's gravity term ────────────
+// Points pace prices scoring; this term adds what it misses. It must
+// credit defense/transition heavily, scoring shape barely, stay bounded,
+// and shrink with thin data so a 20-game mirage can't move a season sim.
+describe("simOnIceDelta (G4 sim propagation)", () => {
+  const shutdownD = () => computeGravity(asset({
+    position: "D", games: 75, avgTOI: 21.5,
+    ptsPace: 25, goalsPace: 4, assistsPace: 21,
+    xgRelTM: 2, baselineXgRel: 0.01, xgaRelTM: -0.8,
+    baselineIxg82: 3.5, ppPtsPace82: 0.5,
+    dps: 4.8, pkTimeShare: 0.24, pairDriverScore: 8,
+    qocIndex: 80, dzPct: 0.62,
+    edgeOzPct: 0.40, edgeSpeedMaxMph: 21.4, edgeBurstsOver20: 25,
+  }));
+
+  it("returns 0 for null profiles (goalies, picks, tiny samples)", () => {
+    expect(simOnIceDelta(null)).toBe(0);
+    expect(simOnIceDelta(computeGravity(asset({ position: "G", games: 50 })))).toBe(0);
+  });
+
+  it("credits a shutdown D with meaningful on-ice value pts pace misses", () => {
+    const delta = simOnIceDelta(shutdownD());
+    expect(delta).toBeGreaterThan(2);
+    expect(delta).toBeLessThanOrEqual(8);
+  });
+
+  it("penalizes a black hole", () => {
+    const bh = computeGravity(asset({
+      position: "W", games: 55, avgTOI: 13,
+      ptsPace: 22, goalsPace: 10, assistsPace: 12,
+      xgRelTM: -9, baselineXgRel: -0.08, xgaRelTM: 0.7,
+      baselineIxg82: 8, ppPtsPace82: 2,
+      dps: 0.3, pkTimeShare: 0.0, qocIndex: 45, dzPct: 0.48,
+      edgeOzPct: 0.39, edgeSpeedMaxMph: 20.8, edgeBurstsOver20: 10,
+    }));
+    expect(simOnIceDelta(bh)).toBeLessThan(0);
+  });
+
+  it("stays bounded at ±8 even for absurd fields", () => {
+    const max = simOnIceDelta({
+      force: 0.99, masses: { oz: 1, nz: 1, dz: 1 }, navResidual: 0.9,
+      partnerIndependence: 1, confidence: 1, dataQuality: "full",
+      isDefenseman: false, tier: "SUPERMASSIVE", description: "",
+    } as any);
+    expect(Math.abs(max)).toBeLessThanOrEqual(8);
+  });
+
+  it("confidence-damps thin samples: same rate signals, fewer games → smaller delta", () => {
+    // Counting stats scale with games so the per-82 rates are identical —
+    // the ONLY difference between the two runs is sample confidence.
+    const fields = (games: number) => ({
+      position: "D", games, avgTOI: 21.5,
+      ptsPace: 25, goalsPace: 4, assistsPace: 21,
+      xgRelTM: 2, baselineXgRel: 0.01, xgaRelTM: -0.8,
+      baselineIxg82: 3.5, ppPtsPace82: 0.5,
+      dps: 4.8, pkTimeShare: 0.24, pairDriverScore: 8,
+      qocIndex: 80, dzPct: 0.62,
+      edgeOzPct: 0.40, edgeSpeedMaxMph: 21.4,
+      edgeBurstsOver20: Math.round(games * (25 / 75)),
+    });
+    const thin = simOnIceDelta(computeGravity(asset(fields(20))));
+    const full = simOnIceDelta(computeGravity(asset(fields(75))));
+    expect(Math.abs(thin)).toBeLessThan(Math.abs(full));
   });
 });

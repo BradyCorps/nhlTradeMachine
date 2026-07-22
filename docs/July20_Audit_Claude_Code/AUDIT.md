@@ -11,7 +11,7 @@ Use as the implementation backlog. Inspect the repo before changing code; preser
 - [x] **G1 — Navigation:** use the shared Header and Footer on every subpage. Exception: `/`, whose own navigation is intentional.
 - [x] **G2 — Naming:** remove all `™` marks (`STRAND™` → `STRAND`, `GRAVITY™` → `GRAVITY`). Reconcile `NAV` vs `X-NAV`; one name and definition must be used everywhere. Current conflicting copy: NAV is separately defined in “How the Engine Works” and “Player Valuation”; X-NAV is described as the skater model. ![NAV definition](assets/03-engine-nav-definition.png) ![valuation definitions](assets/04-player-valuation-definitions.png)
 - [x] **G3 — Icons:** use one icon system across all pages; document every icon in the Icon Key. Re-establish rules for flags such as Injury History and Shutdown.
-- [ ] **G4 — Model propagation:** changes to EDGE, GRAVITY, roles, and data models must propagate through X-NAV, NOIV, and the built-in three-year Simulation Engine.
+- [x] **G4 — Model propagation:** changes to EDGE, GRAVITY, roles, and data models must propagate through X-NAV, NOIV, and the built-in three-year Simulation Engine.
 
 ## 2. Home `/`
 

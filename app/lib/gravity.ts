@@ -282,6 +282,23 @@ export function computeGravity(asset: Asset): GravityProfile | null {
   };
 }
 
+// ── Sim-engine on-ice term (G4 propagation) ──────────────────────
+// The season simulator's skater currency is points pace, which prices
+// scoring but is blind to the rest of the field: the DZ dome (suppression,
+// PK trust) and most of the NZ well (play-driving that never lands on the
+// scoresheet). This is the sim-side mirror of navResidual — there, X-NAV
+// already prices lift + DZ so the residual excludes them; here, ptsPace
+// already prices scoring, so the on-ice term weights DZ heaviest, NZ next,
+// and OZ barely (creation shape beyond the box score). Confidence-damped
+// so thin data can't swing a simulated season, and bounded to ±8 pace
+// points so gravity nudges a roster rather than replacing the scoresheet.
+export function simOnIceDelta(profile: GravityProfile | null): number {
+  if (!profile) return 0;
+  const { oz, nz, dz } = profile.masses;
+  const raw = (0.55 * dz + 0.35 * nz + 0.10 * oz) * 12 * profile.confidence;
+  return r2(clamp(raw, -8, 8));
+}
+
 // ── Tier color for UI rendering ──────────────────────────────────
 
 export function gravityTierColor(tier: GravityTier): string {

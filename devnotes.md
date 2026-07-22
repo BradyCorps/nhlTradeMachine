@@ -295,8 +295,31 @@
 - Hardest-shot metric (PA7 wish) not in the API payload yet — needs the
   EDGE detail capture to store shot-speed facts
 
+### G4 — Model propagation (complete)
+- Found and closed the drift class behind the old Fox home-vs-analytics
+  bug: `AssetInput` never declared `edgeOzPct`, so the evaluate route's
+  field-by-field adapter silently dropped the gravity NZ-well core input —
+  server-side X-NAV ran gravity in "partial" data mode while the client ran
+  full. Declared + mapped; canary guards it now.
+- The season simulator now feels gravity: new `simOnIceDelta(profile)`
+  exported from the gravity engine (DZ-heavy/NZ/OZ-light weighting —
+  the sim's points-pace currency already prices scoring, so the term adds
+  what pace misses; confidence-damped, bounded ±8 pace points) is added to
+  `onIceValue`, so suppression and transition value move simulated
+  standings, default best-lines deployment, and playoff odds. SimPlayer
+  declares the on-ice fields (they always arrived — client sends full
+  Assets — the route just ignored them).
+- Modern roles propagate into sim output: traded-player outcomes stamp the
+  evidence-derived role label ("Perimeter Lockdown", "Floor Raiser") with
+  the old generic strings as fallback, and the Claude season-recap prompt
+  now includes the role tag per moved player.
+- Tests: simOnIceDelta unit suite (bounds, black-hole negative, confidence
+  damping at equal rates), sim-route A/B test (gravity-rich roster vs
+  stat-identical data-blank twin at fixed seed → more projected points),
+  role-stamp + fallback test, and three canaries.
+
 ### Still open from audit (next rounds)
-- G4 (model propagation), TM1 (Phase 3 picker), PA5 compare dropdown,
+- TM1 (Phase 3 picker), PA5 compare dropdown,
   PA8 dated feed, PA12, D1, AG3
 
 ## Known Issues / Future Work
