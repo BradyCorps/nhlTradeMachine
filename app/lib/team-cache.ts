@@ -9,6 +9,10 @@ type RedisClient = typeof defaultRedis;
 
 export const LEAGUE_TEAMS_CACHE_KEY = "cache:league:teams:v1";
 export const TRADE_TEAMS_CACHE_KEY = "cache:trade:teams:v1";
+// Full assembled players payload for /api/league/players — the expensive
+// (~40s) roster assembly, cached whole. Cleared alongside the team caches so
+// every roster mutation drops it too.
+export const LEAGUE_PLAYERS_CACHE_KEY = "cache:league:players:v1";
 export const LEGACY_CURATED_CAP_CEILING = 95.5;
 
 export function teamCacheKey(capCeiling: number): string {
@@ -19,6 +23,7 @@ export function teamCacheKeys(...capCeilings: number[]): string[] {
   return Array.from(new Set([
     LEAGUE_TEAMS_CACHE_KEY,
     TRADE_TEAMS_CACHE_KEY,
+    LEAGUE_PLAYERS_CACHE_KEY,
     teamCacheKey(SEASON.capCeiling),
     teamCacheKey(LEGACY_CURATED_CAP_CEILING),
     ...capCeilings.map(teamCacheKey),

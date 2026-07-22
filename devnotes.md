@@ -386,9 +386,28 @@
   surfaces where that framing belongs. Verified visually across McDavid /
   young riser / aging vet fixtures.
 
+### Perf — /api/league/players (~43s → cached) + OPS/DPS resilience
+- The players endpoint ran the full roster assembly on EVERY request (~40s
+  cold: 32 live NHL roster fetches, per-player timeline pulls, MoneyPuck CSV
+  parse, valuation for ~900 players) with no result-level cache — only the
+  sub-fetches were cached, so the assembly itself re-ran each time.
+- Now the finished payload is cached whole in Redis (LEAGUE_PLAYERS_CACHE_KEY,
+  15-min TTL) so one request per window pays the cost and the rest are
+  instant; also emits s-maxage/stale-while-revalidate so Vercel's CDN caches
+  it. The key rides the shared team-cache set, so every roster mutation
+  (contracts / trades / seed / reset …) drops it via clearTeamCaches.
+- A health guard (isHealthyRoster) refuses to cache a payload whose
+  point-shares didn't load, so a flaky NHL stats fetch can't pin an
+  OPS/DPS-less roster for the whole window.
+- OPS/DPS root cause: fetchPointShares returned an EMPTY map on any NHL
+  stats API timeout/5xx/thin-data, blanking OPS/DPS. It now keeps a 7-day
+  last-good copy and serves that on failure (fresh failures throw into the
+  catch, then the stale fallback runs) — OPS/DPS survive a flaky upstream.
+- This also delivers the TM1 "performance endpoint" sub-item in spirit
+  (the players load is the Trade Machine's data source).
+
 ### Still open from audit (next rounds)
-- TM1 perf endpoint (deferred sub-item), D1 (docket CSV ingestion),
-  F0 (fantasy workshop — flagged release priority)
+- D1 (docket CSV ingestion), F0 (fantasy workshop — flagged release priority)
 
 ## Known Issues / Future Work
 

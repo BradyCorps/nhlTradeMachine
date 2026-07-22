@@ -30,7 +30,11 @@ const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
 const CONTRACTS_CACHE_KEY = "cache:contracts:v2";
 const MONEYPUCK_CACHE_TTL =  4 * 60 * 60; // 4 hours
 const PS_CACHE_TTL        = 12 * 60 * 60; // 12 hours
+const PS_STALE_TTL        =  7 * 24 * 60 * 60; // 7 days — last-good fallback
 const POINT_SHARES_CACHE_KEY = "cache:pointshares:v2";
+// Long-lived last-good copy. When the NHL stats API times out or 5xxs, we
+// serve this instead of empty so OPS/DPS never silently blank on the page.
+const POINT_SHARES_STALE_KEY = "cache:pointshares:stale:v2";
 
 // Roster-identity overrides: the NHL API occasionally mis-tags a player's
 // position. This is an *identity* patch (which slot a player fills), orthogonal
@@ -480,15 +484,15 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
       ),
     ]);
 
-    if (skatersRes.status !== "fulfilled" || !skatersRes.value.ok) return psMap;
-    if (teamsRes.status  !== "fulfilled" || !teamsRes.value.ok)   return psMap;
+    if (skatersRes.status !== "fulfilled" || !skatersRes.value.ok) throw new Error("skater summary unavailable");
+    if (teamsRes.status  !== "fulfilled" || !teamsRes.value.ok)   throw new Error("team summary unavailable");
 
     const skaterData: { data: NHLSkaterRow[] } = await skatersRes.value.json();
     const teamData:   { data: NHLTeamRow[]   } = await teamsRes.value.json();
     const skaters = skaterData.data ?? [];
     const teams   = teamData.data   ?? [];
 
-    if (skaters.length < 100 || teams.length < 28) return psMap;
+    if (skaters.length < 100 || teams.length < 28) throw new Error("point-shares source returned too few rows");
 
     const leagueGoals  = teams.reduce((s, t) => s + t.goalsFor, 0);
     const leaguePoints = teams.reduce((s, t) => s + t.points, 0);
@@ -592,10 +596,24 @@ async function fetchPointShares(): Promise<Map<string, { ops: number; dps: numbe
 
     console.log(`[PS] Computed Point Shares for ${psMap.size / 3} players`);
     if (redis) {
-      await redis.setex(POINT_SHARES_CACHE_KEY, PS_CACHE_TTL, Object.fromEntries(psMap));
+      const obj = Object.fromEntries(psMap);
+      await redis.setex(POINT_SHARES_CACHE_KEY, PS_CACHE_TTL, obj);
+      // Refresh the long-lived last-good copy on every success.
+      await redis.setex(POINT_SHARES_STALE_KEY, PS_STALE_TTL, obj).catch(() => {});
     }
   } catch (e: any) {
     console.warn("[PS] fetchPointShares failed:", e.message);
+  }
+
+  // The fresh fetch produced nothing (timeout / 5xx / thin data). Serve the
+  // last-good copy so OPS/DPS survive a flaky NHL stats API instead of
+  // blanking out across the whole players page.
+  if (psMap.size === 0 && redis) {
+    const stale = await redis.get<Record<string, { ops: number; dps: number }>>(POINT_SHARES_STALE_KEY).catch(() => null);
+    if (stale && Object.keys(stale).length > 0) {
+      console.warn("[PS] serving stale point-shares (fresh fetch failed)");
+      return new Map(Object.entries(stale));
+    }
   }
 
   return psMap;

@@ -2067,3 +2067,29 @@ describe("Canary — PA12 redefined analytics Outlook", () => {
     expect(lib).not.toContain("dynastyScore");
   });
 });
+
+describe("Canary — /api/league/players performance + OPS/DPS resilience", () => {
+  it("caches the assembled roster payload and only when point-shares loaded", () => {
+    const route = read("app/api/league/players/route.ts");
+    expect(route).toContain("LEAGUE_PLAYERS_CACHE_KEY");
+    expect(route).toContain("redis.get");
+    expect(route).toContain("redis.setex");
+    expect(route).toContain("isHealthyRoster");        // don't cache a blank-OPS/DPS payload
+    expect(route).toContain("stale-while-revalidate"); // CDN cache header
+  });
+
+  it("the players cache is invalidated by every roster mutation", () => {
+    // It rides the shared team-cache key set that clearTeamCaches drops.
+    const teamCache = read("app/lib/team-cache.ts");
+    expect(teamCache).toContain("LEAGUE_PLAYERS_CACHE_KEY");
+    expect(teamCache).toMatch(/teamCacheKeys[\s\S]*LEAGUE_PLAYERS_CACHE_KEY/);
+  });
+
+  it("point-shares serve a last-good copy when the NHL stats API fails", () => {
+    const assembly = read("app/lib/roster-assembly.ts");
+    expect(assembly).toContain("POINT_SHARES_STALE_KEY");
+    expect(assembly).toContain("serving stale point-shares");
+    // failure paths throw into the catch so the stale fallback runs
+    expect(assembly).not.toContain("!skatersRes.value.ok) return psMap");
+  });
+});
