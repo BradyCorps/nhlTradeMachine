@@ -94,10 +94,10 @@ export function edgeReads(edge: OutlookEdgeInput, isVet: boolean): OutlookEdgeRe
     const s = edge.edgeSpeedMaxMph;
     const tone: OutlookTone = s >= 22.8 ? "good" : s >= 21.4 ? "neutral" : "warn";
     const read = s >= 22.8
-      ? (isVet ? "Top gear intact — skating is usually the last thing to go" : "Elite top-end speed")
+      ? (isVet ? "Top gear intact — speed usually fades first with age, so keeping it defies the curve" : "Elite top-end speed")
       : s >= 21.4
         ? "Average top-end speed"
-        : "Below-average burst speed — a decline signal";
+        : "Below-average burst speed — the first sign the legs are going";
     reads.push({ label: "Top Speed", value: `${s.toFixed(1)} mph`, read, tone });
   }
 
