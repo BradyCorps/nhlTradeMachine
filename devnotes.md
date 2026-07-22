@@ -366,9 +366,29 @@
   team picker in the Add New Player row. `teamId` rides the existing
   ContractEdit/add payloads. Un-assigning stays the job of Exclude-from-roster.
 
+### PA12 — Outlook redefined (complete)
+- The analytics Outlook was a fantasy dynasty / boom-bust wall that read as
+  noise on an established star (McDavid: "Dynasty 72 · Boom 39 · Draft Sig 0").
+  Redefined the tab to answer one honest question for prospects and vets
+  alike: where is this player trending, and what does next season look like?
+- New pure `deriveOutlook(profile, edge)` (app/lib/player-outlook.ts) reads
+  the already-computed DevelopmentProfile (engine untouched — it still feeds
+  trade valuation / docket / evaluate) into: a one-call headline verdict
+  (ASCENDING / IN HIS PRIME / AT PEAK — COOLING / REGRESSION RISK / PAST PEAK
+  — DECLINING / PROVEN — HOLDING FORM / UNSETTLED), a next-season projection
+  band, the accumulated multi-season scoring trajectory with a Rising/Steady/
+  Cooling arrow, and — the audit's emphasis — NHL EDGE as leading indicators
+  (top speed, 20+ bursts/82, finishing-luck bounce-back/cool-off, OZ time),
+  each with a plain read of what it predicts. Missing signals are skipped,
+  never faked.
+- New PlayerOutlook.tsx renders it on the /players Outlook tab; the shared
+  DevelopmentProfilePanel (dynasty/boom-bust) stays on the fantasy and docket
+  surfaces where that framing belongs. Verified visually across McDavid /
+  young riser / aging vet fixtures.
+
 ### Still open from audit (next rounds)
-- TM1 perf endpoint (deferred sub-item), PA12 (Outlook),
-  D1 (docket CSV ingestion), F0 (fantasy workshop — flagged release priority)
+- TM1 perf endpoint (deferred sub-item), D1 (docket CSV ingestion),
+  F0 (fantasy workshop — flagged release priority)
 
 ## Known Issues / Future Work
 

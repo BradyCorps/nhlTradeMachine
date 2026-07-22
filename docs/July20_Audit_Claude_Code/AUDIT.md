@@ -68,7 +68,7 @@ Use as the implementation backlog. Inspect the repo before changing code; preser
 - [x] **PA9 — EDGE:** make AA; show loading progress. ![EDGE](assets/22-player-edge.png)
 - [x] **PA10 — GRAVITY:** make AA; use an existing off-white rink background; remove share card; ensure flag copy defines Supermassive, Transition Engine, etc.; define Main Sequence, Star, Black Hole, etc.; assess whether more useful metrics can be derived. ![GRAVITY](assets/23-player-gravity.png)
 - [x] **PA11 — Contract:** keep the concept but model Projected Next Contract using future cap/market at expiry, not today’s market. Test a possible McDavid `25x8` maximum scenario. ![contract](assets/24-player-contract.png)
-- [ ] **PA12 — Outlook:** current output is inaccurate/messy. Redefine its purpose and derive it from accumulated historical/current data, especially EDGE. ![outlook](assets/25-player-outlook.png)
+- [x] **PA12 — Outlook:** current output is inaccurate/messy. Redefine its purpose and derive it from accumulated historical/current data, especially EDGE. ![outlook](assets/25-player-outlook.png)
 
 ## 6. Docket
 

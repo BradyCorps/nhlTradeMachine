@@ -1693,9 +1693,10 @@ describe("Canary — Batch 6 audit fixes", () => {
 
   it("players page renders development profiles and paged position sections", () => {
     const src = read("app/players/page.tsx");
-    expect(src).toContain("DevelopmentProfilePanel");
+    // PA12: the analytics Outlook is the redefined trajectory read now.
+    expect(src).toContain("PlayerOutlook");
     expect(src).toContain("developmentProfile?: DevelopmentProfile | null");
-    expect(src).toContain("Development Outlook");
+    expect(src).toContain("Player Outlook");
     expect(src).toContain('fetch("/api/league/teams")');
     expect(src).toContain('fetch("/api/league/players")');
     expect(src).toContain("const [forwardPage");
@@ -2041,5 +2042,28 @@ describe("Canary — TM1 visual roster grid picker", () => {
     expect(tm).not.toContain("function AssetPicker");
     // Cards are real buttons (keyboard/tap), labelled for assistive tech
     expect(tm).toContain("Add ${isPick ? assetLabel(asset) : asset.name} to the package");
+  });
+});
+
+describe("Canary — PA12 redefined analytics Outlook", () => {
+  it("the Outlook tab reads trajectory + EDGE, not the fantasy dynasty wall", () => {
+    const page = read("app/players/page.tsx");
+    // The analytics tab now renders the redefined Outlook…
+    expect(page).toContain("PlayerOutlook");
+    expect(page).toContain("Player Outlook");
+    // …and no longer the dynasty/boom-bust DevelopmentProfilePanel here
+    expect(page).not.toContain("DevelopmentProfilePanel");
+
+    const outlook = read("app/components/PlayerOutlook.tsx");
+    expect(outlook).toContain("deriveOutlook");
+    expect(outlook).toContain("Next-Season Projection");
+    expect(outlook).toContain("Scoring Trajectory");
+    expect(outlook).toContain("Leading Indicators");
+
+    // The derivation is honest for vets (no dynasty framing) and EDGE-forward
+    const lib = read("app/lib/player-outlook.ts");
+    expect(lib).toContain("export function deriveOutlook");
+    expect(lib).toContain("edgeReads");
+    expect(lib).not.toContain("dynastyScore");
   });
 });

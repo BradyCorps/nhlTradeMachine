@@ -1,6 +1,6 @@
 "use client";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
-import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
+import { PlayerOutlook } from "@/app/components/PlayerOutlook";
 import { TierIcon } from "@/app/components/GravityField";
 import { gravityTierColor } from "@/app/lib/gravity";
 import { computeGravity } from "@/app/lib/gravity";
@@ -544,9 +544,9 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
         {activeTab === "outlook" && hasOutlook && (
           <div style={{ background: "#e4d8b8", border: "1px solid #b8a070", padding: "8px 12px" }}>
             <div style={{ fontSize: "11px", color: PLUM, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "6px", fontWeight: 900 }}>
-              Development Outlook
+              Player Outlook
             </div>
-            <DevelopmentProfilePanel asset={{ ...player } as any} />
+            <PlayerOutlook asset={{ ...player } as any} />
           </div>
         )}
       </div>
