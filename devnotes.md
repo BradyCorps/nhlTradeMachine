@@ -425,8 +425,35 @@
 - Verified in a browser: settings panel, sortable headers, tier chips, and
   tracker all render; empty states hold when the data pool is thin.
 
-### Still open from audit (next rounds)
-- D1 (docket CSV ingestion) — the last open audit item.
+### D1 — CSV trade ingestion (complete; closes the July 20 audit)
+- Recording a real trade used to mean hand-building it asset-by-asset in
+  the trades admin, then separately re-pointing every moved pick in the
+  draft-picks admin. Now: paste a CSV of completed trades and ingest in
+  one pass.
+- Format: one row per asset movement (`date,from,to,asset,retained,
+  conditions`); rows sharing a date + team pair merge into one trade.
+  Picks read naturally ("2027 1st", "2028 R3", "(via SJS)" for another
+  club's pick); retention as "25%". Quoted fields with commas supported.
+- Pure pipeline in app/lib/trade-csv.ts: parseTradeCsv → groupTradeRows →
+  resolveTrades. Players resolve diacritics-insensitively against the
+  canonical roster (the AG4 slug); a team mismatch (roster lagging the
+  trade) warns but ingests; unknown players, one-way trades, and picks
+  from already-completed drafts hard-error per trade. 14-test suite.
+- Route POST /api/admin/trades/ingest-csv (admin-gated, dryRun flag):
+  per valid trade it createFrozenTrade()s through the same evaluator as
+  the manual flow (locked verdict + grade-at-trade), publishes (roster
+  overlay moves the players), upserts draft_pick_overrides for every
+  moved pick (correct original owner via the "via" clause), then drops
+  the overlay caches once. Per-trade report with warnings/errors either
+  way — dry-run writes nothing.
+- Admin trades page: collapsible CSV INGESTION panel with template
+  loader, DRY RUN, and INGEST & PUBLISH, rendering the per-trade report.
+
+### July 20 audit: COMPLETE
+Every item in docs/July20_Audit_Claude_Code/AUDIT.md is checked off.
+Deferred-by-choice footnote: TM1's "performance endpoint" sub-item was
+satisfied via the /api/league/players result cache instead of a separate
+per-team endpoint.
 
 ## Known Issues / Future Work
 

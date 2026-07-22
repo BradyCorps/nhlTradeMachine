@@ -2116,3 +2116,27 @@ describe("Canary — F0 fantasy draft tool workshop", () => {
     expect(lib).toContain("export function replacementRanks");
   });
 });
+
+describe("Canary — D1 CSV trade ingestion", () => {
+  it("the admin can ingest a CSV of completed trades in one pass", () => {
+    const route = read("app/api/admin/trades/ingest-csv/route.ts");
+    // Guarded, dry-runnable, and it does BOTH halves of the manual chore:
+    expect(route).toContain("requireAdmin");
+    expect(route).toContain("dryRun");
+    expect(route).toContain("createFrozenTrade");           // frozen trade record
+    expect(route).toContain("draftPickOverrides");          // pick ownership transfer
+    expect(route).toContain("onConflictDoUpdate");
+    expect(route).toContain("clearTeamCaches");             // overlay caches drop after ingest
+
+    const lib = read("app/lib/trade-csv.ts");
+    expect(lib).toContain("export function parseTradeCsv");
+    expect(lib).toContain("export function parsePickToken");
+    expect(lib).toContain("export function resolveTrades");
+    expect(lib).toContain("canonicalNameSlug");             // diacritics-safe player match
+
+    const page = read("app/admin/trades/page.tsx");
+    expect(page).toContain("CsvIngestPanel");
+    expect(page).toContain("DRY RUN");
+    expect(page).toContain("ingest-csv");
+  });
+});

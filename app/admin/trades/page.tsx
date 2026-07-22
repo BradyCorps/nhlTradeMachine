@@ -57,6 +57,157 @@ type RosterOverlayAction =
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+// ── D1 — CSV ingestion panel ─────────────────────────────────────
+// Paste a CSV export of completed trades; dry-run shows what would be
+// created (with per-trade warnings/errors), Ingest freezes + publishes
+// each trade and transfers every moved draft pick in one pass.
+const CSV_TEMPLATE = `date,from,to,asset,retained,conditions
+2026-06-28,WPG,CGY,Nikolaj Ehlers,25%,
+2026-06-28,CGY,WPG,2027 1st,,
+2026-06-28,CGY,WPG,2028 3rd (via SJS),,top-10 protected`;
+
+type IngestReport = {
+  dryRun: boolean;
+  created: number;
+  total: number;
+  issues: Array<{ line: number | null; message: string }>;
+  trades: Array<{
+    date: string; teams: string; status: string; tradeId?: string;
+    picksTransferred: number; warnings: string[]; errors: string[];
+  }>;
+};
+
+function CsvIngestPanel({ onIngested }: { onIngested: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [csv, setCsv] = useState("");
+  const [running, setRunning] = useState<false | "dry" | "ingest">(false);
+  const [report, setReport] = useState<IngestReport | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const run = async (dryRun: boolean) => {
+    setRunning(dryRun ? "dry" : "ingest");
+    setErr(null);
+    setReport(null);
+    try {
+      const res = await fetch("/api/admin/trades/ingest-csv", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csv, dryRun }),
+      });
+      const data = await readAdminResponse(res, "Ingestion failed") as unknown as IngestReport;
+      setReport(data);
+      if (!dryRun && data.created > 0) {
+        toast(`Ingested ${data.created} trade${data.created === 1 ? "" : "s"}`);
+        onIngested();
+      }
+    } catch (e) {
+      setErr(adminErrorMessage(e, "Ingestion failed"));
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const statusColor = (s: string) =>
+    s === "created" ? "var(--ledger-green)" : s === "would-create" ? "var(--ledger-navy)" : "var(--ledger-red)";
+
+  return (
+    <div style={{ border: "1px solid var(--ledger-navy)", marginBottom: 20 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        style={{
+          width: "100%", textAlign: "left", padding: "10px 12px", cursor: "pointer",
+          background: "rgba(26,46,92,0.08)", border: "none",
+          fontSize: 10, fontWeight: 900, letterSpacing: "0.18em", color: "var(--ledger-navy)",
+          fontFamily: "'Courier Prime', monospace",
+        }}
+      >
+        {open ? "▾" : "▸"} CSV INGESTION — PASTE COMPLETED TRADES, MOVE ASSETS &amp; PICKS IN ONE PASS
+      </button>
+      {open && (
+        <div style={{ padding: "12px" }}>
+          <div style={{ fontSize: 10, color: "var(--ledger-ink-faint)", lineHeight: 1.7, marginBottom: 8 }}>
+            One row per asset movement: <b>date,from,to,asset,retained,conditions</b>.
+            Rows sharing a date and team pair merge into one trade. Picks: &quot;2027 1st&quot;,
+            &quot;2028 R3&quot;, add &quot;(via SJS)&quot; when the pick originally belongs to another club.
+            Retention: &quot;25%&quot;. Dry-run first — nothing is written until Ingest.
+          </div>
+          <textarea
+            value={csv}
+            onChange={e => setCsv(e.target.value)}
+            placeholder={CSV_TEMPLATE}
+            rows={7}
+            aria-label="CSV of completed trades"
+            style={{
+              width: "100%", border: "1px solid var(--rule)", padding: "9px 10px",
+              fontSize: 11, fontFamily: "'Courier Prime', monospace",
+              background: "var(--ledger-card)", color: "var(--ledger-ink)", resize: "vertical",
+            }}
+          />
+          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <button
+              onClick={() => run(true)}
+              disabled={!csv.trim() || running !== false}
+              className="btn-ink"
+              style={{ padding: "8px 14px", fontSize: 10, fontWeight: 900, letterSpacing: "0.14em", opacity: !csv.trim() || running ? 0.5 : 1 }}
+            >
+              {running === "dry" ? "CHECKING…" : "DRY RUN"}
+            </button>
+            <button
+              onClick={() => run(false)}
+              disabled={!csv.trim() || running !== false}
+              style={{
+                padding: "8px 14px", fontSize: 10, fontWeight: 900, letterSpacing: "0.14em",
+                background: "var(--ledger-green)", color: "#fff", border: "1px solid var(--ledger-green)",
+                cursor: "pointer", opacity: !csv.trim() || running ? 0.5 : 1,
+              }}
+            >
+              {running === "ingest" ? "INGESTING…" : "INGEST & PUBLISH"}
+            </button>
+            <button
+              onClick={() => setCsv(CSV_TEMPLATE)}
+              style={{ padding: "8px 10px", fontSize: 10, fontWeight: 900, background: "transparent", border: "1px solid var(--rule)", color: "var(--ledger-ink-faint)", cursor: "pointer" }}
+            >
+              LOAD EXAMPLE
+            </button>
+            {err && <span style={{ fontSize: 10, color: "var(--ledger-red)", fontWeight: 900 }}>{err}</span>}
+          </div>
+
+          {report && (
+            <div style={{ marginTop: 12, border: "1px solid var(--rule)", padding: "10px 12px", background: "var(--paper-inset, var(--ledger-card))" }}>
+              <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: "0.14em", marginBottom: 6 }}>
+                {report.dryRun ? "DRY RUN" : "INGESTED"} — {report.created}/{report.total} trades{report.dryRun ? " would be created" : " created"}
+              </div>
+              {report.issues.map((iss, i) => (
+                <div key={`iss-${i}`} style={{ fontSize: 10, color: "var(--ledger-red)", marginBottom: 2 }}>
+                  {iss.line != null ? `Line ${iss.line}: ` : ""}{iss.message}
+                </div>
+              ))}
+              {report.trades.map((t, i) => (
+                <div key={`t-${i}`} style={{ borderTop: "1px solid var(--rule)", paddingTop: 6, marginTop: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 900 }}>
+                    {t.date} · {t.teams} ·{" "}
+                    <span style={{ color: statusColor(t.status) }}>{t.status.toUpperCase()}</span>
+                    {t.picksTransferred > 0 && ` · ${t.picksTransferred} pick${t.picksTransferred === 1 ? "" : "s"} transferred`}
+                    {t.tradeId && <span style={{ color: "var(--ledger-ink-faint)", fontWeight: 400 }}> · {t.tradeId}</span>}
+                  </div>
+                  {t.warnings.map((w, j) => (
+                    <div key={`w-${j}`} style={{ fontSize: 10, color: "var(--ledger-amber, #b8860b)" }}>⚠ {w}</div>
+                  ))}
+                  {t.errors.map((er, j) => (
+                    <div key={`e-${j}`} style={{ fontSize: 10, color: "var(--ledger-red)" }}>✕ {er}</div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminTradesPage() {
   const [db, setDb] = useState<LeaguePayload>({ teams: [], players: [] });
   const [loading, setLoading] = useState(true);
@@ -336,9 +487,12 @@ export default function AdminTradesPage() {
             TRADE INGESTION
           </div>
           <div style={{ fontSize: 11, color: "var(--ledger-ink-faint)", marginTop: 6, lineHeight: 1.6 }}>
-            Build a historical trade, preview the frozen grade, and save it as an unpublished draft.
+            Build a historical trade, preview the frozen grade, and save it as an unpublished draft —
+            or paste a CSV of completed trades and ingest them all at once.
           </div>
         </div>
+
+        <CsvIngestPanel onIngested={loadTrades} />
 
         <div className="admin-toolbar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.16em", color: "var(--ledger-ink-faint)" }}>

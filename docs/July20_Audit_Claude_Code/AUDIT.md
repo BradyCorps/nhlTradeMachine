@@ -72,7 +72,7 @@ Use as the implementation backlog. Inspect the repo before changing code; preser
 
 ## 6. Docket
 
-- [ ] **D1 — Ingestion:** overhaul the tedious trade-update backend. Preferred direction: ingest a CSV export of completed trades, iterate them, move assets, and correctly transfer draft picks.
+- [x] **D1 — Ingestion:** overhaul the tedious trade-update backend. Preferred direction: ingest a CSV export of completed trades, iterate them, move assets, and correctly transfer draft picks.
 
 ## 7. Armchair GM
 
