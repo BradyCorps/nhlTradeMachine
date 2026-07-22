@@ -10,6 +10,7 @@ import { calcDevelopmentProfile } from "@/app/lib/development-profile";
 import {
   canonicalNameSlug,
   dedupePlayersByAuthority,
+  dedupeSameTeamNicknames,
   removePlayerFromOtherRosters,
   safeNhlRosterPlayer,
 } from "@/app/lib/player-identity";
@@ -1368,6 +1369,10 @@ export async function assembleCanonicalRoster(options: {
   });
 
   players = dedupePlayersByAuthority(players, dbTeamBySlug);
+  // Collapse formal/common first-name duplicates on the same team
+  // (e.g. "Matthew Savoie" + "Matt Savoie" on EDM), which carry different
+  // NHL ids and so survive the id-keyed dedup above.
+  players = dedupeSameTeamNicknames(players);
 
   // ── Free-agent pool: teamless FA entries ───────────────────────────────────
   // Bulk-FA-created DB rows often have no teamId. They weren't placed on any

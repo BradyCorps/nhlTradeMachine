@@ -2179,3 +2179,15 @@ describe("Canary — fantasy research layer (proprietary signals on the board)",
     expect(page).toContain("buildGoalieBoard");
   });
 });
+
+describe("Canary — same-team nickname dedup (Matt / Matthew Savoie)", () => {
+  it("roster assembly collapses formal/common first-name duplicates on one team", () => {
+    const identity = read("app/lib/player-identity.ts");
+    expect(identity).toContain("export function dedupeSameTeamNicknames");
+    expect(identity).toContain("nicknameMergeKey");
+    expect(identity).toContain('matt: "matthew"');
+    const assembly = read("app/lib/roster-assembly.ts");
+    // Runs AFTER the id-keyed authority dedup, since these carry distinct ids
+    expect(assembly).toMatch(/dedupePlayersByAuthority[\s\S]*dedupeSameTeamNicknames/);
+  });
+});

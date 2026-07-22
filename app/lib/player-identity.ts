@@ -70,6 +70,89 @@ export function removePlayerFromOtherRosters(
   }
 }
 
+// ── Nickname-aware same-team dedup ───────────────────────────────
+// Feeds disagree on formal vs common first names: the NHL roster feed
+// gives "Matthew Savoie" while a contract/prospect source gives "Matt
+// Savoie" — different NHL ids, so the id-keyed dedup above never merges
+// them and the same player appears twice on one roster. This maps common
+// short forms to their formal root so both collapse to one merge key.
+// Deliberately conservative and only ever applied WITHIN one team, where
+// two distinct players sharing a last name and a nickname-equivalent first
+// name effectively never occurs.
+const FIRST_NAME_NICKNAMES: Record<string, string> = {
+  matt: "matthew", matty: "matthew", matthias: "matthew",
+  mike: "michael", mikey: "michael",
+  alex: "alexander", alexandre: "alexander", aleksander: "alexander", aleksandr: "alexander",
+  nick: "nicholas", nicky: "nicholas",
+  chris: "christopher",
+  joe: "joseph", joey: "joseph",
+  dan: "daniel", danny: "daniel",
+  tony: "anthony",
+  tom: "thomas", tommy: "thomas",
+  will: "william", bill: "william", billy: "william", willie: "william",
+  rob: "robert", bob: "robert", bobby: "robert", robby: "robert",
+  jake: "jacob",
+  josh: "joshua",
+  zach: "zachary", zack: "zachary", zac: "zachary",
+  ben: "benjamin", benny: "benjamin",
+  sam: "samuel", sammy: "samuel",
+  jim: "james", jimmy: "james",
+  andy: "andrew", drew: "andrew",
+  pat: "patrick", paddy: "patrick",
+  rick: "richard", ricky: "richard", rich: "richard",
+  steve: "steven", stevie: "steven",
+  phil: "philip",
+  gabe: "gabriel",
+  vinny: "vincent", vinnie: "vincent",
+  nate: "nathan",
+  charlie: "charles",
+  freddie: "frederick", fred: "frederick",
+  ed: "edward", eddie: "edward",
+  greg: "gregory",
+  tim: "timothy", timmy: "timothy",
+};
+
+// A team-scoped key that collapses first-name variants ("matt-savoie" and
+// "matthew-savoie" → "matthew-savoie") while keeping the last name intact.
+export function nicknameMergeKey(name: string): string {
+  const slug = canonicalNameSlug(name);
+  const dash = slug.indexOf("-");
+  if (dash < 0) return slug;
+  const first = slug.slice(0, dash);
+  const rest = slug.slice(dash + 1);
+  return `${FIRST_NAME_NICKNAMES[first] ?? first}-${rest}`;
+}
+
+// Which of two records for the same person to keep: the one with the real
+// NHL sample and contract wins (more games, then live stats, then a real
+// cap hit, then the more complete/formal name).
+function preferRecord(a: any, b: any): boolean {
+  const ga = a?.games ?? 0, gb = b?.games ?? 0;
+  if (ga !== gb) return ga > gb;
+  const la = a?.hasLiveStats ? 1 : 0, lb = b?.hasLiveStats ? 1 : 0;
+  if (la !== lb) return la > lb;
+  const ca = a?.capHit ?? 0, cb = b?.capHit ?? 0;
+  if (ca !== cb) return ca > cb;
+  return String(a?.name ?? "").length > String(b?.name ?? "").length;
+}
+
+export function dedupeSameTeamNicknames<T extends { name?: unknown; teamId?: string; position?: string }>(
+  players: T[],
+): T[] {
+  const best = new Map<string, T>();
+  const passthrough: T[] = [];
+  for (const player of players) {
+    const name = typeof player.name === "string" ? player.name : "";
+    const team = player.teamId ?? "";
+    // Picks and teamless/nameless rows never merge.
+    if (!name || !team || player.position === "Pick") { passthrough.push(player); continue; }
+    const key = `${team}::${nicknameMergeKey(name)}`;
+    const current = best.get(key);
+    if (!current || preferRecord(player, current)) best.set(key, player);
+  }
+  return [...best.values(), ...passthrough];
+}
+
 export function dedupePlayersByAuthority<T extends { id?: unknown; name?: unknown; teamId?: string; injectedFromDb?: boolean }>(
   players: T[],
   dbTeamBySlug = new Map<string, string>(),
