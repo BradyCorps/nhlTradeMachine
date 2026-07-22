@@ -2157,4 +2157,25 @@ describe("Canary — fantasy research layer (proprietary signals on the board)",
     expect(lib).toContain("export function buildBreakoutWatch");
     expect(lib).toContain("computeBreakout"); // one breakout model, propagated
   });
+
+  it("everything is position-aware and every number carries context", () => {
+    const lib = read("app/lib/fantasy-board.ts");
+    // Sort is a tested pure fn — the inverted-comparator (least-FP-first) bug stays dead
+    expect(lib).toContain("export function sortRows");
+    // Position-specific breakout stories: a D never gets "the goals are coming"
+    expect(lib).toContain('posGroup === "D"');
+    expect(lib).toContain("blue-line production scales with PP time");
+    // Breakout odds carry a base-rate referent
+    expect(lib).toContain("BREAKOUT_BASE_RATE_PCT");
+    // Goalie board reframed for fantasy: workload + win environment
+    expect(lib).toContain("export function buildGoalieBoard");
+    expect(lib).toContain("goalieWinEnv");
+
+    const page = read("app/fantasy/page.tsx");
+    expect(page).toContain("sortRows");            // uses the tested sorter, not inline math
+    expect(page).toContain("breakout odds");       // labeled, not a naked %
+    expect(page).toContain("Start");               // goalie workload context (Start Share col)
+    expect(page).toContain("Win");                 // win-environment col
+    expect(page).toContain("buildGoalieBoard");
+  });
 });

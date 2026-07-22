@@ -52,6 +52,7 @@ export interface FantasyPlayerInput {
   draftOverall?: number | null;
   edgeBurstsOver20?: number | null;
   edgeSpeedMaxMph?: number | null;
+  edgeOzPct?: number | null;
 }
 
 export interface FantasyRow {
@@ -164,30 +165,99 @@ export function keeperRank(rows: FantasyRow[], maxAge = 23, limit = 10): Fantasy
     .slice(0, limit);
 }
 
+// ── Board sorting ────────────────────────────────────────────────
+// Pure so direction bugs are testable (the page once shipped an inverted
+// comparator — least FP first on load). Nulls sort last either way;
+// ties break by FP descending.
+
+export type BoardSortKey = "fp82" | "vbd" | "g82" | "a82" | "ppp82" | "hit82" | "blk82" | "age";
+
+export function sortRows(rows: FantasyRow[], key: BoardSortKey, desc: boolean): FantasyRow[] {
+  const val = (r: FantasyRow): number | null => {
+    switch (key) {
+      case "age": return r.p.age;
+      case "hit82": return r.hit82;
+      case "blk82": return r.blk82;
+      default: return r[key];
+    }
+  };
+  return rows.slice().sort((a, b) => {
+    const va = val(a);
+    const vb = val(b);
+    if (va == null && vb == null) return b.fp82 - a.fp82;
+    if (va == null) return 1;             // missing data sorts last
+    if (vb == null) return -1;
+    const diff = desc ? vb - va : va - vb;
+    return diff || b.fp82 - a.fp82;
+  });
+}
+
 // ── EDGE Breakout Watch ──────────────────────────────────────────
-// The waiver-wire goldmine: players whose underlying signals (EDGE burst
-// volume and speed, finishing luck, deployment, pedigree) run ahead of
-// their point totals. Powered by the SAME breakout engine the season
-// simulator trusts (computeBreakout) — one model, propagated — with the
-// dominant driver translated into a plain-English reason.
+// The waiver-wire goldmine: players whose underlying signals run ahead of
+// their point totals. The PROBABILITY comes from the same breakout engine
+// the season simulator trusts (computeBreakout — one model, propagated).
+// The REASON is built here, position-aware: a defenseman's fantasy value
+// arrives as assists and power-play production, not goals, so his story
+// is deployment/transition/PP — never "the goals are coming". Evidence
+// chips carry the receipts so the claim is checkable at a glance.
 
 export interface BreakoutWatchEntry {
   p: FantasyPlayerInput;
   posGroup: "C" | "W" | "D";
-  breakoutPct: number; // 0–100
+  breakoutPct: number; // 0–100 modeled odds of a meaningful scoring jump next season
   driver: BreakoutDriver;
   reason: string;
+  evidence: string[];
   hasEdgeSignal: boolean;
 }
 
-const DRIVER_REASON: Record<BreakoutDriver, string> = {
-  BURST: "EDGE burst & speed running ahead of the box score",
-  FINISHING_LUCK: "Finishing cold vs expected — the goals are coming",
-  OPPORTUNITY: "Ice time says a bigger role than the points show",
-  PEDIGREE: "Draft pedigree + NHLe say there's another level",
-  AGE: "Age-curve tailwind — the arrow points up",
-  NONE: "Underlying signals lean positive",
-};
+// League base rate for a meaningful scoring jump — shown beside the odds
+// so "38%" reads as ~4× the field, not a naked number.
+export const BREAKOUT_BASE_RATE_PCT = 10;
+
+const bursts82Of = (p: FantasyPlayerInput): number | null =>
+  p.edgeBurstsOver20 != null && (p.games ?? 0) > 0
+    ? Math.round((p.edgeBurstsOver20 / (p.games as number)) * 82)
+    : null;
+
+function breakoutStory(p: FantasyPlayerInput, posGroup: "C" | "W" | "D"): { reason: string; evidence: string[] } {
+  const evidence: string[] = [];
+  const bursts = bursts82Of(p);
+  const coldFinish = (p.hdFinishingDelta != null && p.hdFinishingDelta <= -0.02)
+    || (p.xGPace != null && p.goalsPace != null && (p.goalsPace as number) <= (p.xGPace as number) - 4);
+  const fastLegs = (p.edgeSpeedMaxMph != null && p.edgeSpeedMaxMph >= 22.5) || (bursts != null && bursts >= 60);
+  const pedigree = (p.draftOverall != null && p.draftOverall <= 15) || (p.prospectPtsPace ?? 0) >= 55;
+
+  if (posGroup === "D") {
+    // Blue-line fantasy value = assists + PP production + minutes.
+    const ppp = p.ppPtsPace82 ?? 0;
+    const toi = p.avgTOI ?? 0;
+    if (ppp >= 12) evidence.push(`${Math.round(ppp)} PP pts/82`);
+    if (toi >= 20) evidence.push(`${toi.toFixed(1)} TOI`);
+    if (p.assistsPace != null) evidence.push(`${Math.round(p.assistsPace)} A/82`);
+    if (p.edgeSpeedMaxMph != null && evidence.length < 3) evidence.push(`${p.edgeSpeedMaxMph.toFixed(1)} mph`);
+
+    if (ppp >= 12) return { reason: "Already running a power play — blue-line production scales with PP time", evidence };
+    if (toi >= 21) return { reason: "Top-pair minutes — that deployment turns into assists", evidence };
+    if (fastLegs) return { reason: "Elite transition legs for a defenseman — carries become assists", evidence };
+    if (pedigree) return { reason: "Pedigree says another offensive level from the blue line", evidence };
+    if (coldFinish) return { reason: "Creating far more than the results show — from the back end that lands as assists", evidence };
+    return { reason: "Underlying play-driving ahead of the point totals", evidence };
+  }
+
+  // Forwards: finishing, volume, speed, deployment.
+  if (p.xGPace != null && p.goalsPace != null) evidence.push(`${Math.round(p.goalsPace)} G on ${Math.round(p.xGPace)} xG`);
+  if (bursts != null) evidence.push(`${bursts} bursts/82`);
+  if (p.edgeOzPct != null && evidence.length < 3) evidence.push(`${Math.round(p.edgeOzPct * 100)}% OZ`);
+  if (p.edgeSpeedMaxMph != null && evidence.length < 3) evidence.push(`${p.edgeSpeedMaxMph.toFixed(1)} mph`);
+
+  if (coldFinish) return { reason: "Finishing cold vs expected — the goals are coming", evidence };
+  if (fastLegs) return { reason: "EDGE burst & speed running ahead of the box score", evidence };
+  if ((p.avgTOI ?? 0) >= 17 && (p.ptsPace ?? 0) < 55) return { reason: "Top-six minutes without top-six points yet — the role says more", evidence };
+  if ((p.edgeOzPct ?? 0) >= 0.55) return { reason: "Prime offensive-zone deployment — the chances will pile up", evidence };
+  if (pedigree) return { reason: "Draft pedigree + NHLe say there's another level", evidence };
+  return { reason: "Underlying signals lean positive", evidence };
+}
 
 export function buildBreakoutWatch(
   players: FantasyPlayerInput[],
@@ -212,17 +282,56 @@ export function buildBreakoutWatch(
         edgeBurstsOver20: p.edgeBurstsOver20,
         edgeSpeedMaxMph: p.edgeSpeedMaxMph,
       });
+      const posGroup = posGroupOf(p.position);
+      const story = breakoutStory(p, posGroup);
       return {
         p,
-        posGroup: posGroupOf(p.position),
+        posGroup,
         breakoutPct: Math.round(result.breakout * 100),
         driver: result.driver,
-        reason: DRIVER_REASON[result.driver],
+        reason: story.reason,
+        evidence: story.evidence.slice(0, 3),
         hasEdgeSignal: result.hasEdgeSignal,
       };
     })
     .filter(e => e.breakoutPct >= 20)
     .sort((a, b) => b.breakoutPct - a.breakoutPct || (b.hasEdgeSignal ? 1 : 0) - (a.hasEdgeSignal ? 1 : 0))
+    .slice(0, limit);
+}
+
+// ── Goalie board (fantasy lens) ──────────────────────────────────
+// What actually wins goalie categories, in order: workload (starts are
+// the scarcest resource), save quality, and the team in front of him
+// (wins are a team stat). Start share and win environment give SV%/GSAx
+// their context.
+
+export interface GoalieBoardEntry {
+  p: FantasyPlayerInput & { savePct?: number | null; gsax?: number | null; gamesStarted?: number | null };
+  startShare: number;       // 0–100, GS / 82
+  winEnv: "STRONG" | "NEUTRAL" | "WEAK"; // from team standing — wins follow team quality
+}
+
+export function goalieWinEnv(standing: number | null | undefined): GoalieBoardEntry["winEnv"] {
+  if (standing == null) return "NEUTRAL";
+  if (standing <= 10) return "STRONG";
+  if (standing <= 20) return "NEUTRAL";
+  return "WEAK";
+}
+
+export function buildGoalieBoard(
+  players: Array<FantasyPlayerInput & { savePct?: number | null; gsax?: number | null; gamesStarted?: number | null }>,
+  standings: Map<string, number>,
+  limit = 15,
+  minStarts = 10,
+): GoalieBoardEntry[] {
+  return players
+    .filter(p => p.position === "G" && (p.gamesStarted ?? 0) >= minStarts)
+    .map(p => ({
+      p,
+      startShare: Math.round(((p.gamesStarted ?? 0) / 82) * 100),
+      winEnv: goalieWinEnv(standings.get(p.teamId)),
+    }))
+    .sort((a, b) => (b.p.gsax ?? -99) - (a.p.gsax ?? -99))
     .slice(0, limit);
 }
 

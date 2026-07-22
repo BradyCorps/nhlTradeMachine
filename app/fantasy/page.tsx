@@ -13,11 +13,15 @@ import Footer from "@/app/components/Footer";
 import {
   buildFantasyBoard,
   buildBreakoutWatch,
+  buildGoalieBoard,
   keeperRank,
   sanitizeSettings,
+  sortRows,
+  BREAKOUT_BASE_RATE_PCT,
   DEFAULT_FANTASY_SETTINGS,
   FANTASY_SETTINGS_KEY,
   FANTASY_TAKEN_KEY,
+  type BoardSortKey,
   type FantasyRow,
   type FantasySettings,
 } from "@/app/lib/fantasy-board";
@@ -35,7 +39,7 @@ interface ApiPlayer {
   developmentProfile?: { dynastyScore?: number } | null;
 }
 
-type SortKey = "fp82" | "vbd" | "g82" | "a82" | "ppp82" | "hit82" | "blk82" | "age";
+type SortKey = BoardSortKey;
 
 const ink = "var(--ledger-ink)";
 const body = "var(--ledger-ink-body, var(--ledger-ink))";
@@ -84,6 +88,7 @@ function Num({ label, value, onChange, step = 1, width = 52 }: {
 export default function FantasyPage() {
   const [players, setPlayers] = useState<ApiPlayer[]>([]);
   const [teamMap, setTeamMap] = useState<Map<string, string>>(new Map());
+  const [standings, setStandings] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [posFilter, setPosFilter] = useState<"ALL" | "C" | "W" | "D">("ALL");
@@ -117,6 +122,7 @@ export default function FantasyPage() {
         if (cancelled) return;
         setPlayers(pd.players ?? []);
         setTeamMap(new Map((td.teams ?? []).map((t: any) => [t.id, t.name])));
+        setStandings(new Map((td.teams ?? []).map((t: any) => [t.id, t.standing])));
       } catch {
         if (!cancelled) setError("League data failed to load — refresh to retry.");
       } finally {
@@ -143,16 +149,9 @@ export default function FantasyPage() {
       (!hideTaken || !taken.has(r.p.id)) &&
       (!q || r.p.name.toLowerCase().includes(q) || teamName(r.p.teamId).toLowerCase().includes(q)),
     );
-    const dir = sortDesc ? -1 : 1;
-    const val = (r: FantasyRow): number => {
-      switch (sortKey) {
-        case "age": return r.p.age;
-        case "hit82": return r.hit82 ?? -1;
-        case "blk82": return r.blk82 ?? -1;
-        default: return r[sortKey];
-      }
-    };
-    return rows.slice().sort((a, b) => (val(a) - val(b)) * -dir || b.fp82 - a.fp82);
+    // sortRows lives in the tested engine — the page once shipped an
+    // inverted comparator (least FP first on load); never again.
+    return sortRows(rows, sortKey, sortDesc);
   }, [board, posFilter, search, sortKey, sortDesc, hideTaken, taken, teamName]);
 
   const { buyLow, sellHigh } = useMemo(() => {
@@ -179,12 +178,9 @@ export default function FantasyPage() {
     return map;
   }, [board]);
 
-  const goalies = useMemo(() =>
-    players
-      .filter(p => p.position === "G" && (p.gamesStarted ?? 0) >= 10)
-      .sort((a, b) => (b.gsax ?? -99) - (a.gsax ?? -99))
-      .slice(0, 15),
-    [players],
+  const goalies = useMemo(
+    () => buildGoalieBoard(players as any[], standings),
+    [players, standings],
   );
 
   const toggleTaken = useCallback((id: string) => {
@@ -331,12 +327,16 @@ export default function FantasyPage() {
             {/* EDGE Breakout Watch */}
             {breakouts.length > 0 && (
               <section className="pt-6" aria-label="EDGE breakout watch">
-                <div className="text-[10px] font-black font-mono uppercase tracking-[0.25em] mb-3" style={{ color: faint }}>
+                <div className="text-[10px] font-black font-mono uppercase tracking-[0.25em] mb-1" style={{ color: faint }}>
                   EDGE Breakout Watch — underlying signals ahead of the points
+                </div>
+                <div className="text-[10px] font-mono mb-3" style={{ color: body }}>
+                  The number is <b>breakout odds</b>: the Ledger model&apos;s probability of a meaningful scoring
+                  jump next season. League base rate is ~{BREAKOUT_BASE_RATE_PCT}%, so 30%+ is three times the field.
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {breakouts.map(e => (
-                    <div key={e.p.id} className="border px-3 py-2 flex items-baseline justify-between gap-3"
+                    <div key={e.p.id} className="border px-3 py-2 flex items-start justify-between gap-3"
                       style={{ borderColor: rule, background: "var(--paper-inset)" }}>
                       <span className="min-w-0">
                         <span className="text-[12px] font-black font-mono">
@@ -350,10 +350,25 @@ export default function FantasyPage() {
                         <span className="block text-[10px] font-mono mt-0.5" style={{ color: body }}>
                           {e.reason}
                         </span>
+                        {e.evidence.length > 0 && (
+                          <span className="flex flex-wrap gap-1 mt-1">
+                            {e.evidence.map(ev => (
+                              <span key={ev} className="text-[9px] font-black font-mono px-1 border"
+                                style={{ color: faint, borderColor: rule, background: "var(--paper-bg)" }}>
+                                {ev}
+                              </span>
+                            ))}
+                          </span>
+                        )}
                       </span>
-                      <span className="text-[13px] font-black font-mono shrink-0" style={{ color: "var(--ledger-green)" }}
-                        title="Breakout probability from the Ledger's breakout model — the same engine the season simulator uses">
-                        {e.breakoutPct}%
+                      <span className="text-right shrink-0"
+                        title={`Modeled probability of a meaningful scoring jump next season. League base rate ≈ ${BREAKOUT_BASE_RATE_PCT}%.`}>
+                        <span className="block text-[15px] font-black font-mono" style={{ color: "var(--ledger-green)" }}>
+                          {e.breakoutPct}%
+                        </span>
+                        <span className="block text-[8px] font-black font-mono uppercase tracking-[0.1em]" style={{ color: faint }}>
+                          breakout odds
+                        </span>
                       </span>
                     </div>
                   ))}
@@ -469,8 +484,11 @@ export default function FantasyPage() {
                           borderColor: "var(--ledger-rule-light, var(--ledger-rule))",
                           color: ink,
                           opacity: isTaken ? 0.45 : 1,
-                        }}>
-                          <td className="px-2 py-1.5 text-center">
+                          cursor: "pointer",
+                        }}
+                          onClick={() => setExpandedId(prev => prev === r.p.id ? null : r.p.id)}
+                          title={`${isExpanded ? "Hide" : "Show"} the Ledger outlook`}>
+                          <td className="px-2 py-1.5 text-center" onClick={e => e.stopPropagation()}>
                             <input
                               type="checkbox"
                               checked={isTaken}
@@ -488,16 +506,21 @@ export default function FantasyPage() {
                           <td className="px-2 py-1.5 font-black" style={{ textDecoration: isTaken ? "line-through" : "none" }}>
                             <button
                               type="button"
-                              onClick={() => setExpandedId(prev => prev === r.p.id ? null : r.p.id)}
+                              onClick={e => { e.stopPropagation(); setExpandedId(prev => prev === r.p.id ? null : r.p.id); }}
                               aria-expanded={isExpanded}
                               aria-label={`${isExpanded ? "Hide" : "Show"} ${r.p.name}'s Ledger outlook`}
-                              className="mr-1.5"
-                              style={{ color: faint, background: "transparent", cursor: "pointer", fontSize: 10 }}
+                              className="mr-1.5 inline-flex items-center justify-center align-middle border"
+                              style={{
+                                width: 26, height: 26, fontSize: 12,
+                                color: isExpanded ? "var(--paper-bg)" : ink,
+                                background: isExpanded ? ink : "var(--paper-inset)",
+                                borderColor: rule, cursor: "pointer",
+                              }}
                             >
                               {isExpanded ? "▾" : "▸"}
                             </button>
                             {/^\d+$/.test(String(r.p.id))
-                              ? <a href={`/players/${r.p.id}`} className="no-underline hover:underline" style={{ color: ink }}>{r.p.name}</a>
+                              ? <a href={`/players/${r.p.id}`} onClick={e => e.stopPropagation()} className="no-underline hover:underline" style={{ color: ink }}>{r.p.name}</a>
                               : r.p.name}
                           </td>
                           <td className="px-2 py-1.5" title={role ? `Ledger role: ${role.label}` : undefined}>
@@ -552,39 +575,60 @@ export default function FantasyPage() {
 
             {/* Goalie board */}
             <section className="pt-7 pb-8" aria-label="Goalie board">
-              <div className="text-[10px] font-black font-mono uppercase tracking-[0.25em] mb-3" style={{ color: faint }}>
-                Goalie Board — ranked by goals saved above expected
+              <div className="text-[10px] font-black font-mono uppercase tracking-[0.25em] mb-1" style={{ color: faint }}>
+                Goalie Board — what wins goalie categories, in order
+              </div>
+              <div className="text-[10px] font-mono mb-3" style={{ color: body }}>
+                Workload first (starts are the scarcest resource in fantasy), save quality second,
+                and the team in front of him third — wins are a team stat.
               </div>
               <div className="border overflow-x-auto" style={{ borderColor: rule }}>
-                <table className="w-full font-mono" style={{ borderCollapse: "collapse", minWidth: 520 }}>
+                <table className="w-full font-mono" style={{ borderCollapse: "collapse", minWidth: 640 }}>
                   <thead>
                     <tr className="text-[9px] font-black uppercase tracking-[0.12em]" style={{ background: "var(--paper-inset)", color: ink }}>
                       <th scope="col" className="text-left px-2 py-2">Rk</th>
                       <th scope="col" className="text-left px-2 py-2">Goalie</th>
                       <th scope="col" className="text-left px-2 py-2">Team</th>
-                      <th scope="col" className="text-right px-2 py-2">GS</th>
+                      <th scope="col" className="text-right px-2 py-2" title="Games started">GS</th>
+                      <th scope="col" className="text-right px-2 py-2" title="Share of his team's 82 games started — the workload signal">Start&nbsp;Share</th>
                       <th scope="col" className="text-right px-2 py-2">SV%</th>
-                      <th scope="col" className="text-right px-2 py-2" title="Goals saved above expected">GSAx</th>
+                      <th scope="col" className="text-right px-2 py-2" title="Goals saved above expected — save quality independent of the defense in front">GSAx</th>
+                      <th scope="col" className="text-center px-2 py-2" title="Win environment from team standing — wins are a team stat">Win&nbsp;Env</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {goalies.map((g, i) => (
-                      <tr key={g.id} className="text-[11px] border-t" style={{ borderColor: "var(--ledger-rule-light, var(--ledger-rule))", color: ink }}>
-                        <td className="px-2 py-1.5 font-black" style={{ color: faint }}>{i + 1}</td>
-                        <td className="px-2 py-1.5 font-black">{g.name}</td>
-                        <td className="px-2 py-1.5" style={{ color: body }}>{teamName(g.teamId)}</td>
-                        <td className="px-2 py-1.5 text-right" style={{ fontVariantNumeric: "tabular-nums", color: body }}>{g.gamesStarted ?? "—"}</td>
-                        <td className="px-2 py-1.5 text-right" style={{ fontVariantNumeric: "tabular-nums", color: body }}>
-                          {g.savePct != null ? (g.savePct > 1 ? g.savePct.toFixed(1) : (g.savePct * 100).toFixed(1)) : "—"}
-                        </td>
-                        <td className="px-2 py-1.5 text-right font-black" style={{
-                          fontVariantNumeric: "tabular-nums",
-                          color: (g.gsax ?? 0) > 0 ? "var(--ledger-green)" : "var(--ledger-red)",
-                        }}>
-                          {g.gsax != null ? `${g.gsax > 0 ? "+" : ""}${g.gsax.toFixed(1)}` : "—"}
-                        </td>
-                      </tr>
-                    ))}
+                    {goalies.map((entry, i) => {
+                      const g = entry.p as any;
+                      const envColor = entry.winEnv === "STRONG" ? "var(--ledger-green)" : entry.winEnv === "WEAK" ? "var(--ledger-red)" : body;
+                      return (
+                        <tr key={g.id} className="text-[11px] border-t" style={{ borderColor: "var(--ledger-rule-light, var(--ledger-rule))", color: ink }}>
+                          <td className="px-2 py-1.5 font-black" style={{ color: faint }}>{i + 1}</td>
+                          <td className="px-2 py-1.5 font-black">{g.name}</td>
+                          <td className="px-2 py-1.5" style={{ color: body }}>{teamName(g.teamId)}</td>
+                          <td className="px-2 py-1.5 text-right" style={{ fontVariantNumeric: "tabular-nums", color: body }}>{g.gamesStarted ?? "—"}</td>
+                          <td className="px-2 py-1.5 text-right font-black" style={{
+                            fontVariantNumeric: "tabular-nums",
+                            color: entry.startShare >= 60 ? "var(--ledger-green)" : entry.startShare >= 40 ? ink : body,
+                          }}>
+                            {entry.startShare}%
+                          </td>
+                          <td className="px-2 py-1.5 text-right" style={{ fontVariantNumeric: "tabular-nums", color: body }}>
+                            {g.savePct != null ? (g.savePct > 1 ? g.savePct.toFixed(1) : (g.savePct * 100).toFixed(1)) : "—"}
+                          </td>
+                          <td className="px-2 py-1.5 text-right font-black" style={{
+                            fontVariantNumeric: "tabular-nums",
+                            color: (g.gsax ?? 0) > 0 ? "var(--ledger-green)" : "var(--ledger-red)",
+                          }}>
+                            {g.gsax != null ? `${g.gsax > 0 ? "+" : ""}${g.gsax.toFixed(1)}` : "—"}
+                          </td>
+                          <td className="px-2 py-1.5 text-center">
+                            <span className="text-[9px] font-black uppercase tracking-[0.08em]" style={{ color: envColor }}>
+                              {entry.winEnv}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

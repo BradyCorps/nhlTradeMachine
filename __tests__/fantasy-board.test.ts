@@ -3,6 +3,9 @@ import { describe, it, expect } from "vitest";
 import {
   buildFantasyBoard,
   buildBreakoutWatch,
+  buildGoalieBoard,
+  goalieWinEnv,
+  sortRows,
   fantasyPoints,
   replacementRanks,
   assignTiers,
@@ -144,5 +147,96 @@ describe("buildBreakoutWatch (EDGE research layer)", () => {
     for (let i = 1; i < watch.length; i++) {
       expect(watch[i - 1].breakoutPct).toBeGreaterThanOrEqual(watch[i].breakoutPct);
     }
+  });
+});
+
+describe("sortRows (regression: default board order)", () => {
+  const rows = buildFantasyBoard([
+    player("low", { goalsPace: 5, assistsPace: 5 }),
+    player("high", { goalsPace: 50, assistsPace: 70 }),
+    player("mid", { goalsPace: 25, assistsPace: 35 }),
+  ]);
+
+  it("descending FP puts the best player FIRST — the inverted-comparator bug stays dead", () => {
+    const sorted = sortRows(rows, "fp82", true);
+    expect(sorted[0].p.id).toBe("high");
+    expect(sorted[sorted.length - 1].p.id).toBe("low");
+  });
+
+  it("ascending flips it; missing values always sort last", () => {
+    const asc = sortRows(rows, "fp82", false);
+    expect(asc[0].p.id).toBe("low");
+    const withNull = buildFantasyBoard([
+      player("has-hits", { baselineHits82: 120 }),
+      player("no-hits", { baselineHits82: null }),
+    ]);
+    expect(sortRows(withNull, "hit82", true).at(-1)!.p.id).toBe("no-hits");
+    expect(sortRows(withNull, "hit82", false).at(-1)!.p.id).toBe("no-hits");
+  });
+});
+
+describe("position-aware breakout reasons", () => {
+  it("a cold-finishing DEFENSEMAN never gets 'the goals are coming' — his value is assists/PP", () => {
+    const [d] = buildBreakoutWatch([player("young-d", {
+      position: "D", age: 20, games: 60,
+      ptsPace: 35, baselinePtsPace: 30, avgTOI: 19,
+      xGPace: 12, goalsPace: 4, hdFinishingDelta: -0.04,
+      assistsPace: 28, ppPtsPace82: 6,
+      edgeBurstsOver20: 30, edgeSpeedMaxMph: 21.8,
+    })]);
+    expect(d).toBeDefined();
+    expect(d.reason).not.toContain("goals are coming");
+    expect(d.reason.toLowerCase()).toMatch(/assist|blue.line|play-driving|power play|pedigree/);
+  });
+
+  it("a PP-quarterback D leads with the power play story and PP evidence", () => {
+    const [d] = buildBreakoutWatch([player("ppqb", {
+      position: "D", age: 22, games: 70,
+      ptsPace: 45, baselinePtsPace: 40, avgTOI: 22,
+      ppPtsPace82: 18, assistsPace: 35,
+      xGPace: 10, goalsPace: 6,
+    })]);
+    expect(d.reason).toContain("power play");
+    expect(d.evidence.some(e => e.includes("PP pts/82"))).toBe(true);
+  });
+
+  it("a cold-finishing FORWARD still gets the goals story, with G-vs-xG receipts", () => {
+    const [f] = buildBreakoutWatch([player("cold-f", {
+      position: "W", age: 22, games: 60,
+      ptsPace: 45, baselinePtsPace: 40, avgTOI: 16,
+      xGPace: 22, goalsPace: 12, hdFinishingDelta: -0.04,
+      edgeBurstsOver20: 70, edgeSpeedMaxMph: 23.0,
+    })]);
+    expect(f.reason).toContain("goals are coming");
+    expect(f.evidence.some(e => e.includes("G on") && e.includes("xG"))).toBe(true);
+  });
+});
+
+describe("goalie board (fantasy lens)", () => {
+  const goalie = (id: string, teamId: string, gs: number, gsax: number) => ({
+    ...player(id, { position: "G", teamId }),
+    gamesStarted: gs, gsax, savePct: 0.912,
+  });
+
+  it("start share and win environment give SV%/GSAx their context", () => {
+    const standings = new Map([["COL", 2], ["SJS", 30], ["WPG", 15]]);
+    const board = buildGoalieBoard([
+      goalie("workhorse", "COL", 62, 20),
+      goalie("cellar", "SJS", 55, 15),
+      goalie("tandem", "WPG", 38, 10),
+      goalie("backup", "WPG", 8, 5),   // under the starts floor
+    ], standings);
+    expect(board.map(e => (e.p as any).id)).toEqual(["workhorse", "cellar", "tandem"]);
+    expect(board[0].startShare).toBe(76); // 62/82
+    expect(board[0].winEnv).toBe("STRONG");
+    expect(board[1].winEnv).toBe("WEAK");
+    expect(board[2].winEnv).toBe("NEUTRAL");
+  });
+
+  it("goalieWinEnv maps standing bands", () => {
+    expect(goalieWinEnv(1)).toBe("STRONG");
+    expect(goalieWinEnv(20)).toBe("NEUTRAL");
+    expect(goalieWinEnv(28)).toBe("WEAK");
+    expect(goalieWinEnv(null)).toBe("NEUTRAL");
   });
 });

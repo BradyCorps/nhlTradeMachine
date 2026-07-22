@@ -449,6 +449,28 @@
 - Admin trades page: collapsible CSV INGESTION panel with template
   loader, DRY RUN, and INGEST & PUBLISH, rendering the per-trade report.
 
+### Fantasy: position-aware context + sort fix (from real-data screenshot)
+- Bug: default board load showed LEAST FP first (Parekh, not McDavid) — the
+  page's inline comparator double-negated direction. Extracted a pure,
+  tested sortRows() (nulls sort last, FP tiebreak) and the page uses it.
+- Breakout Watch was position-blind: a 20-year-old DEFENSEMAN read
+  "Finishing cold — the goals are coming" (goals aren't a D's fantasy
+  value). Reasons are now built position-aware in the engine: a D's story
+  is PP production / top-pair minutes / transition / pedigree (never "goals
+  coming"); forwards keep finishing/volume/speed/deployment. Each entry
+  carries up to 3 evidence chips (e.g. "18 PP pts/82", "22.4 mph",
+  "14 G on 22 xG") so the claim is checkable.
+- "38%" now reads as breakout ODDS with a base-rate referent
+  (BREAKOUT_BASE_RATE_PCT ≈ 10% league rate → 30%+ is ~3× the field),
+  labeled "breakout odds" under the number.
+- Goalie board reframed for fantasy: workload first (Start Share = GS/82,
+  the scarcest resource), then save quality (SV%, GSAx), then Win
+  Environment (STRONG/NEUTRAL/WEAK from team standing — wins are a team
+  stat). buildGoalieBoard + goalieWinEnv, tested.
+- UX: the expand affordance is now a 26px boxed chevron and the whole row
+  is clickable (checkbox/name-link stop propagation) — the old 10px arrow
+  was an unusable tap target.
+
 ### Fantasy research layer (post-audit — the "main research resource" pivot)
 - Product call: /fantasy is a research resource, not a draft app — the
   taken-tracker stays as a utility, but the page now leads with what no
