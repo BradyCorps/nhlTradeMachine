@@ -2093,3 +2093,26 @@ describe("Canary — /api/league/players performance + OPS/DPS resilience", () =
     expect(assembly).not.toContain("!skatersRes.value.ok) return psMap");
   });
 });
+
+describe("Canary — F0 fantasy draft tool workshop", () => {
+  it("the fantasy desk is league-configurable with tiers and a draft tracker", () => {
+    const page = read("app/fantasy/page.tsx");
+    // League settings drive scoring + VBD, persisted per device
+    expect(page).toContain("League Settings");
+    expect(page).toContain("FANTASY_SETTINGS_KEY");
+    expect(page).toContain("sanitizeSettings");
+    // Sortable board, tier chips, draft-night tracker
+    expect(page).toContain("aria-sort");
+    expect(page).toContain("Tier");
+    expect(page).toContain("Hide Taken");
+    expect(page).toContain("Reset Draft");
+    expect(page).toContain("FANTASY_TAKEN_KEY");
+    // Keeper corner leads with the Ledger dynasty signal
+    expect(page).toContain("keeperRank");
+    // The math is the pure, tested engine — not inline page math
+    const lib = read("app/lib/fantasy-board.ts");
+    expect(lib).toContain("export function buildFantasyBoard");
+    expect(lib).toContain("export function assignTiers");
+    expect(lib).toContain("export function replacementRanks");
+  });
+});

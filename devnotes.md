@@ -406,8 +406,27 @@
 - This also delivers the TM1 "performance endpoint" sub-item in spirit
   (the players load is the Trade Machine's data source).
 
+### F0 — Fantasy workshop (complete)
+- Workshopped /fantasy from a static board into a draft-day tool. The math
+  moved to a pure, tested engine (app/lib/fantasy-board.ts):
+  - League Settings: scoring weights (G/A/PPP/HIT/BLK) + league size +
+    roster build, persisted per device (localStorage, sanitized on read).
+    FP/82 and the VBD replacement level (= teams × starters per slot) both
+    derive from them — the board speaks the user's league, not one
+    hardcoded format.
+  - Tier breaks by gap detection: the 7 largest FP drop-offs in the top 100
+    become tier boundaries, shown as T1–T8 chips — drafting is tiers.
+  - Sortable columns (FP/82, VBD, G, A, PPP, HIT, BLK, Age) with aria-sort.
+  - Draft tracker: per-row taken checkbox (strike-through + dim), Hide
+    Taken filter, Reset Draft, persisted so a mid-draft refresh loses
+    nothing.
+  - Keeper Corner now ranks age-23-and-under by the Ledger dynasty signal
+    (developmentProfile.dynastyScore) with FP fallback, showing DYN.
+- Verified in a browser: settings panel, sortable headers, tier chips, and
+  tracker all render; empty states hold when the data pool is thin.
+
 ### Still open from audit (next rounds)
-- D1 (docket CSV ingestion), F0 (fantasy workshop — flagged release priority)
+- D1 (docket CSV ingestion) — the last open audit item.
 
 ## Known Issues / Future Work
 

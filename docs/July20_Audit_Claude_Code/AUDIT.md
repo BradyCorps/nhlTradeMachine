@@ -4,7 +4,7 @@ Use as the implementation backlog. Inspect the repo before changing code; preser
 
 ## 0. Release priority
 
-- [ ] **F0 (v1 shipped, workshop pending) — Fantasy Hockey Tools:** build, workshop, and test this page first. The season starts in <70 days; it must be strong enough to make Hockey Ledger a primary fantasy research tool. On `/`, make it Feature 3 using the Feature 1/2 design.
+- [x] **F0 — Fantasy Hockey Tools:** build, workshop, and test this page first. The season starts in <70 days; it must be strong enough to make Hockey Ledger a primary fantasy research tool. On `/`, make it Feature 3 using the Feature 1/2 design.
 
 ## 1. Global
 
