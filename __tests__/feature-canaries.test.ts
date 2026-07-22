@@ -1408,10 +1408,19 @@ describe("Canary — admin contract sync", () => {
     expect(route).toContain("position is required when adding a new DB player");
     expect(route).toContain("position,");
     expect(page).toContain("const POSITION_OPTIONS = [\"C\", \"W\", \"D\", \"G\"]");
-    expect(page).toContain("body: JSON.stringify({ name: name.trim(), yearsRemaining: y, capHit: c, position, hasNMC })");
+    expect(page).toContain("body: JSON.stringify({ name: name.trim(), yearsRemaining: y, capHit: c, position, hasNMC, teamId: teamId || null })");
     // The editor save now sends the full ContractEdit object (incl. FA facts).
     expect(page).toContain("body: JSON.stringify(edit)");
     expect(page).toContain("expiryStatus");
+  });
+
+  it("admin contracts can place a player on a team (edit + add)", () => {
+    // Team assignment reaches the route, which already validates teamId.
+    expect(page).toContain("import { TEAMS_DB }");
+    expect(page).toContain("teamId: teamId || null");   // edit modal onSave
+    expect(page).toContain("TEAM_OPTIONS.map");          // dropdown of the 32 clubs
+    expect(route).toContain("body.teamId");
+    expect(route).toContain("updates.teamId = teamId");
   });
 
   it("contract admin can recover from an empty reset DB by creating the players table", () => {

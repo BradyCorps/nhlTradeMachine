@@ -3,6 +3,10 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { adminErrorMessage, readAdminResponse } from "../admin-response";
 import { toast } from "@/app/lib/ledger-toast";
+import { TEAMS_DB } from "@/app/lib/db";
+
+// The 32 clubs, alphabetical by name, for the admin team pickers.
+const TEAM_OPTIONS = [...TEAMS_DB].sort((a, b) => a.name.localeCompare(b.name));
 
 interface ContractRow {
   name:          string;
@@ -81,6 +85,7 @@ interface ContractEdit {
   yearsRemaining: number | null;
   capHit: number | null;
   position: string | null;
+  teamId: string | null;
   expiryStatus: string | null;       // "UFA" | "RFA" | null (SIGNED)
   expiryYear: number | null;
   extensionCapHit: number | null;
@@ -100,6 +105,10 @@ function EditModal({ row, onSave, onClear, onClose }: {
   const [years, setYears] = useState(String(row.adminYears ?? row.finalYears ?? ""));
   const [cap,   setCap]   = useState(String(row.adminCap   ?? row.finalCap   ?? ""));
   const [position, setPosition] = useState(POSITION_OPTIONS.includes(row.position as any) ? String(row.position) : "");
+  // Team: default to the row's current club if it maps to a real team id
+  // (row.team may arrive as a slug/abbrev in mixed case).
+  const initTeam = row.team ? (TEAM_OPTIONS.find(t => t.id === row.team!.toUpperCase())?.id ?? "") : "";
+  const [teamId, setTeamId] = useState(initTeam);
   const initFa = (row.expiryStatus ?? "").toUpperCase();
   const [fa, setFa] = useState<string>(initFa === "UFA" || initFa === "RFA" ? initFa : "SIGNED");
   const [faYear, setFaYear] = useState(String(row.expiryYear ?? ""));
@@ -127,6 +136,7 @@ function EditModal({ row, onSave, onClear, onClose }: {
           yearsRemaining: isNaN(y) ? null : y,
           capHit: isNaN(c) ? null : c,
           position: position || null,
+          teamId: teamId || null,
           expiryStatus,
           expiryYear: expiryStatus ? (isNaN(fy) ? null : fy) : null,
           extensionCapHit: hasExt ? (isNaN(ec) ? null : ec) : null,
@@ -213,6 +223,22 @@ function EditModal({ row, onSave, onClear, onClose }: {
               {POSITION_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
+        </div>
+
+        {/* Team assignment — place the player on (or move them between) clubs */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
+            letterSpacing: "0.1em", marginBottom: 5 }}>
+            Team {!initTeam && <span style={{ color: "var(--ledger-red)" }}>· unassigned</span>}
+          </label>
+          <select
+            value={teamId}
+            onChange={e => setTeamId(e.target.value)}
+            style={{ ...field, width: "100%", padding: "6px 10px", fontSize: 13 }}
+          >
+            <option value="">{initTeam ? "Keep current team" : "No team (free agent / unassigned)"}</option>
+            {TEAM_OPTIONS.map(t => <option key={t.id} value={t.id}>{t.name} ({t.id})</option>)}
+          </select>
         </div>
 
         {/* Extension — signed next contract that kicks in after current deal */}
@@ -315,6 +341,7 @@ function AddPlayerForm({ onAdded }: { onAdded: () => void }) {
   const [years,   setYears]   = useState("1");
   const [cap,     setCap]     = useState("");
   const [position, setPosition] = useState("W");
+  const [teamId,  setTeamId]  = useState("");
   const [hasNMC,  setHasNMC]  = useState(false);
   const [saving,  setSaving]  = useState(false);
   const [err,     setErr]     = useState<string | null>(null);
@@ -332,10 +359,10 @@ function AddPlayerForm({ onAdded }: { onAdded: () => void }) {
       const res = await fetch("/api/admin/contracts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), yearsRemaining: y, capHit: c, position, hasNMC }),
+        body: JSON.stringify({ name: name.trim(), yearsRemaining: y, capHit: c, position, hasNMC, teamId: teamId || null }),
       });
       await readAdminResponse(res, "Save failed");
-      setName(""); setYears("1"); setCap(""); setPosition("W"); setHasNMC(false); setOpen(false);
+      setName(""); setYears("1"); setCap(""); setPosition("W"); setTeamId(""); setHasNMC(false); setOpen(false);
       onAdded();
     } catch (e) {
       setErr(adminErrorMessage(e, "Save failed"));
@@ -370,6 +397,11 @@ function AddPlayerForm({ onAdded }: { onAdded: () => void }) {
       <select value={position} onChange={e => setPosition(e.target.value)}
         style={{ ...field, fontSize: 11, padding: "5px 8px", width: 58 }}>
         {POSITION_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+      </select>
+      <select value={teamId} onChange={e => setTeamId(e.target.value)} aria-label="Team"
+        style={{ ...field, fontSize: 11, padding: "5px 8px", width: 130 }}>
+        <option value="">No team</option>
+        {TEAM_OPTIONS.map(t => <option key={t.id} value={t.id}>{t.id} — {t.name}</option>)}
       </select>
       <label style={{ fontSize: 10, color: "var(--ledger-ink-faint)", display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
         <input type="checkbox" checked={hasNMC} onChange={e => setHasNMC(e.target.checked)} />

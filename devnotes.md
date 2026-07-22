@@ -357,6 +357,15 @@
   endpoint with on-demand loading is a separable optimization that would
   touch the whole trade data flow, so it's left as a follow-up.
 
+### Admin — place players on teams (contracts screen)
+- The admin contracts editor had no way to set a player's team. The POST
+  route already accepted + validated `teamId` (teamIdFromSlug → VALID_TEAM_IDS),
+  so this was UI-only: added a Team `<select>` (32 clubs from TEAMS_DB) to
+  the edit modal — defaults to the player's current club, flags "unassigned"
+  when they have none, and "Keep current team" is a no-op — plus a compact
+  team picker in the Add New Player row. `teamId` rides the existing
+  ContractEdit/add payloads. Un-assigning stays the job of Exclude-from-roster.
+
 ### Still open from audit (next rounds)
 - TM1 perf endpoint (deferred sub-item), PA12 (Outlook),
   D1 (docket CSV ingestion), F0 (fantasy workshop — flagged release priority)
