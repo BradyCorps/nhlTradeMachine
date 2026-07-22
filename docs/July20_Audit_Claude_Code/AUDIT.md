@@ -32,7 +32,7 @@ Use as the implementation backlog. Inspect the repo before changing code; preser
 
 ## 4. Trade Machine `/trade-machine`
 
-- [ ] **TM1 — Phase 3 picker:** replace team dropdown/outgoing-asset UX with a visual roster grid and drag-to-trade-block; select team before player (no global alphabetical player list); add side-by-side roster impact; use a performance endpoint for faster loading.
+- [x] **TM1 (perf endpoint deferred) — Phase 3 picker:** replace team dropdown/outgoing-asset UX with a visual roster grid and drag-to-trade-block; select team before player (no global alphabetical player list); add side-by-side roster impact; use a performance endpoint for faster loading.
 - [x] **TM2 — Current assets:** disallow all 2026 draft picks. Drive assets from the latest daily data.
 - [x] **TM3 — Layout:** make asset blocks internally scrollable so their size stays fixed. Move GM Logic Signal outside the “Team Sending Assets” div, between Cap in Play and Team STRANDs. Add goaltending metrics to Team STRANDs; a goalie acquisition must not appear as only an OFF/DEF decline.
 - [x] **TM4 — Feedback/share:** fix Generate Share Link. Show a progress bar or percentage while loading teams/assets and EDGE data.

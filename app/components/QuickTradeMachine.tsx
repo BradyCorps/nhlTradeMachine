@@ -16,6 +16,7 @@ import {
   type TradeSharePayload,
 } from "@/app/lib/trade-share";
 import { formatPickRound } from "@/app/lib/trade-format";
+import { groupTeamRoster, rosterGroupCount, type RosterGroups } from "@/app/lib/roster-picker";
 import { ageDecayRate, ageSlotPenalty, SEASON } from "@/app/lib/season-config";
 import MeasuredProfile from "@/app/components/MeasuredProfile";
 import StrandDisplay from "@/app/components/StrandDisplay";
@@ -156,66 +157,119 @@ function TeamSelect({
   );
 }
 
-function AssetPicker({
+// TM1 — the visual roster grid. Team-first: once a team is picked, its
+// roster shows as tappable cards grouped by position (no global alphabetical
+// player list, no dropdown). Tapping a card sends the player to the block;
+// removing them there returns them here. Fully keyboard-operable.
+function RosterCard({ asset, nav, onAdd }: { asset: Asset; nav: XNAVResult; onAdd: (a: Asset) => void }) {
+  const isPick = asset.position === "Pick";
+  const isGoalie = asset.position === "G";
+  const stat = isPick
+    ? asset.teamId
+    : isGoalie
+      ? `${((asset.savePct ?? 0.9) * 100).toFixed(1)} SV%`
+      : `${(asset.ptsPace ?? 0).toFixed(0)} P82`;
+  const navTone = nav.total > 0 ? "var(--ledger-green)" : nav.total < 0 ? "var(--ledger-red)" : "var(--ledger-ink-faint)";
+  return (
+    <button
+      type="button"
+      onClick={() => onAdd({ ...asset, retainedPct: 0 })}
+      aria-label={`Add ${isPick ? assetLabel(asset) : asset.name} to the package`}
+      title={`Add ${isPick ? assetLabel(asset) : asset.name}`}
+      className="group text-left border px-2.5 py-2 flex flex-col gap-1 transition-colors hover:bg-[var(--paper-inset)] focus:outline-none focus-visible:ring-2"
+      style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-bg)" }}
+    >
+      <span className="flex items-baseline justify-between gap-2">
+        <span className="text-[12px] font-black truncate" style={{ color: "var(--ledger-ink)" }}>
+          {isPick ? assetLabel(asset) : asset.name}
+        </span>
+        {!isPick && (
+          <span className="text-[10px] font-black font-mono tabular-nums shrink-0" style={{ color: navTone }}>
+            {nav.total > 0 ? "+" : ""}{Math.round(nav.total)}
+          </span>
+        )}
+      </span>
+      <span className="flex items-center justify-between gap-2 text-[9px] font-mono uppercase tracking-[0.1em] text-ledger-ink-faint">
+        <span className="truncate">
+          {isPick ? "Draft pick" : `${displayPosition(asset.position, asset.secondaryPosition)} · ${fmtCap(asset.capHit)}`}
+        </span>
+        <span className="shrink-0" style={{ color: "var(--ledger-ink-body)" }}>{stat}</span>
+      </span>
+      <span aria-hidden="true" className="text-[8px] font-black uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity"
+        style={{ color: "var(--ledger-red)" }}>
+        + Add to block
+      </span>
+    </button>
+  );
+}
+
+function RosterGridSection({ heading, assets, navMap, onAdd }: {
+  heading: string;
+  assets: Asset[];
+  navMap: Record<string, XNAVResult>;
+  onAdd: (a: Asset) => void;
+}) {
+  if (assets.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="text-[9px] font-black uppercase tracking-[0.22em] font-mono text-ledger-ink-faint">
+        {heading} <span style={{ color: "var(--ledger-ink-body)" }}>({assets.length})</span>
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        {assets.map(asset => (
+          <RosterCard key={asset.id} asset={asset} nav={navMap[asset.id] ?? ZERO_NAV} onAdd={onAdd} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RosterGridPicker({
   label,
   team,
   assets,
   selected,
+  navMap,
   onAdd,
 }: {
   label: string;
   team: Team | null;
   assets: Asset[];
   selected: Asset[];
+  navMap: Record<string, XNAVResult>;
   onAdd: (asset: Asset) => void;
 }) {
-  const [assetId, setAssetId] = useState("");
-  const available = useMemo(
-    () => assets
-      .filter(asset => asset.teamId === team?.id && !selected.some(item => item.id === asset.id))
-      .sort((a, b) => {
-        if (a.position === "Pick" && b.position !== "Pick") return 1;
-        if (a.position !== "Pick" && b.position === "Pick") return -1;
-        return a.name.localeCompare(b.name);
-      }),
-    [assets, selected, team?.id],
+  const selectedIds = useMemo(() => new Set(selected.map(a => a.id)), [selected]);
+  const groups: RosterGroups = useMemo(
+    () => groupTeamRoster(assets, team?.id, selectedIds, a => (navMap[a.id]?.total ?? 0)),
+    [assets, team?.id, selectedIds, navMap],
   );
-
-  useEffect(() => setAssetId(""), [team?.id]);
+  const total = rosterGroupCount(groups);
 
   return (
     <div className="flex flex-col gap-2">
       <span className="text-[10px] font-black uppercase tracking-[0.25em] font-mono text-ledger-ink-faint">
         {label}
       </span>
-      <div className="flex flex-col sm:flex-row gap-2">
-        <select
-          disabled={!team}
-          value={assetId}
-          onChange={event => setAssetId(event.target.value)}
-          className="min-w-0 flex-1 border px-3 py-3 text-[12px] font-mono bg-transparent outline-none disabled:opacity-50"
-          style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}
-        >
-          <option value="">{team ? "Select asset" : "Select team first"}</option>
-          {available.map(asset => (
-            <option key={asset.id} value={asset.id}>{assetLabel(asset)}</option>
-          ))}
-        </select>
-        <button
-          type="button"
-          disabled={!assetId}
-          onClick={() => {
-            const asset = available.find(item => item.id === assetId);
-            if (!asset) return;
-            onAdd({ ...asset, retainedPct: 0 });
-            setAssetId("");
-          }}
-          className="border px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] font-mono disabled:opacity-40"
-          style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-brown)", background: "var(--ledger-warm)" }}
-        >
-          Add
-        </button>
-      </div>
+      {!team ? (
+        <div className="border px-4 py-8 text-center text-[10px] font-black uppercase tracking-[0.2em] font-mono text-ledger-ink-faint"
+          style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
+          Select a team to see its roster
+        </div>
+      ) : total === 0 ? (
+        <div className="border px-4 py-8 text-center text-[10px] font-black uppercase tracking-[0.2em] font-mono text-ledger-ink-faint"
+          style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
+          Whole roster is on the block
+        </div>
+      ) : (
+        <div className="border p-2.5 flex flex-col gap-3 max-h-[320px] overflow-y-auto"
+          style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card)" }}>
+          <RosterGridSection heading="Forwards" assets={groups.forwards} navMap={navMap} onAdd={onAdd} />
+          <RosterGridSection heading="Defense" assets={groups.defense} navMap={navMap} onAdd={onAdd} />
+          <RosterGridSection heading="Goalies" assets={groups.goalies} navMap={navMap} onAdd={onAdd} />
+          <RosterGridSection heading="Draft Capital" assets={groups.picks} navMap={navMap} onAdd={onAdd} />
+        </div>
+      )}
     </div>
   );
 }
@@ -1140,7 +1194,7 @@ export default function QuickTradeMachine() {
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="border p-4 flex flex-col gap-4" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card-light)" }}>
                 <TeamSelect label="Team sending assets" teams={data.teams} value={homeTeamId} excludeId={partnerTeamId} onChange={setHomeTeamId} />
-                <AssetPicker label="Add outgoing asset" team={homeTeam} assets={data.players} selected={outgoing} onAdd={asset => setOutgoing(prev => [...prev, asset])} />
+                <RosterGridPicker label="Tap a player to add" team={homeTeam} assets={data.players} selected={outgoing} navMap={rosterNavMap} onAdd={asset => setOutgoing(prev => [...prev, asset])} />
                 <AssetList
                   title={homeTeam ? `${homeTeam.name} sends` : "Outgoing package"}
                   assets={outgoing}
@@ -1158,7 +1212,7 @@ export default function QuickTradeMachine() {
               </div>
               <div className="border p-4 flex flex-col gap-4" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card-light)" }}>
                 <TeamSelect label="Team sending return" teams={data.teams} value={partnerTeamId} excludeId={homeTeamId} onChange={setPartnerTeamId} />
-                <AssetPicker label="Add incoming asset" team={partnerTeam} assets={data.players} selected={incoming} onAdd={asset => setIncoming(prev => [...prev, asset])} />
+                <RosterGridPicker label="Tap a player to add" team={partnerTeam} assets={data.players} selected={incoming} navMap={rosterNavMap} onAdd={asset => setIncoming(prev => [...prev, asset])} />
                 <AssetList
                   title={partnerTeam ? `${partnerTeam.name} sends` : "Incoming package"}
                   assets={incoming}

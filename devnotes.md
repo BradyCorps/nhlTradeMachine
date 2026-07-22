@@ -338,9 +338,28 @@
   cross-group secondary would double-deploy the same id in the sim, and the
   editor can't move a player across groups.
 
+### TM1 — Phase 3 visual roster picker (core complete)
+- Replaced the outgoing-asset `<select>` (AssetPicker) with a visual
+  roster grid (RosterGridPicker): team-first, the selected club's roster
+  shows as tappable cards grouped Forwards / Defense / Goalies / Draft
+  Capital, each card showing position · cap · a key stat and a NAV chip,
+  ranked by NAV. Tapping a card adds the player to that side's block;
+  removing them there returns them to the grid. Cards are real <button>s
+  with aria-labels — keyboard and touch, no drag (mobile-safe reading of
+  "drag-to-trade-block"). Grouping is a pure, tested helper
+  (app/lib/roster-picker.ts → groupTeamRoster).
+- Already satisfied by the existing UI: team-before-player with no global
+  alphabetical list (the grid only appears after a team is picked), and
+  side-by-side roster impact (TeamTradeSummary: current/projected cap, cap
+  delta, production, NOIV, package NAV per side).
+- Deferred by choice: the "performance endpoint" sub-item. The page still
+  loads all players up front (with the TM4 progress bar); a roster-by-team
+  endpoint with on-demand loading is a separable optimization that would
+  touch the whole trade data flow, so it's left as a follow-up.
+
 ### Still open from audit (next rounds)
-- TM1 (Phase 3 picker), PA12 (Outlook), D1 (docket CSV ingestion),
-  F0 (fantasy workshop — flagged release priority)
+- TM1 perf endpoint (deferred sub-item), PA12 (Outlook),
+  D1 (docket CSV ingestion), F0 (fantasy workshop — flagged release priority)
 
 ## Known Issues / Future Work
 

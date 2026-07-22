@@ -2020,3 +2020,17 @@ describe("Canary — PA5 STRAND compare + PA8 dated feed + AG3 positions", () =>
     expect(editor).not.toContain('const isC = (p: Player)');
   });
 });
+
+describe("Canary — TM1 visual roster grid picker", () => {
+  it("replaces the outgoing-asset dropdown with a tap-to-add roster grid", () => {
+    const tm = read("app/components/QuickTradeMachine.tsx");
+    // The visual grid, team-first, grouped by position — not a <select> of assets
+    expect(tm).toContain("RosterGridPicker");
+    expect(tm).toContain("groupTeamRoster");
+    expect(tm).toContain("Select a team to see its roster");
+    // The old AssetPicker dropdown component is gone
+    expect(tm).not.toContain("function AssetPicker");
+    // Cards are real buttons (keyboard/tap), labelled for assistive tech
+    expect(tm).toContain("Add ${isPick ? assetLabel(asset) : asset.name} to the package");
+  });
+});
