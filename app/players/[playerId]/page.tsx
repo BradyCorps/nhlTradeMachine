@@ -28,6 +28,28 @@ async function loadPlayer(playerId: string) {
   return player ?? null;
 }
 
+// PA5 — same-position peers for the STRAND compare dropdown. Only the fields
+// the trait build reads are shipped, so the client can overlay a comparison
+// without a second request. Built from the roster PlayerPage already loaded.
+function posGroupOf(pos: string): "F" | "D" | "G" {
+  return pos === "G" ? "G" : pos === "D" ? "D" : "F";
+}
+function buildComparePeers(allPlayers: any[], player: any) {
+  const group = posGroupOf(player.position);
+  return allPlayers
+    .filter(p => String(p.id) !== String(player.id) && p.position !== "Pick")
+    .filter(p => posGroupOf(p.position) === group && (p.games ?? 0) >= 20)
+    .map(p => ({
+      id: String(p.id), name: p.name, position: p.position,
+      ops: p.ops ?? null, dps: p.dps ?? null, ptsPace: p.ptsPace ?? null,
+      xGPace: p.xGPace ?? null, xgRelTM: p.xgRelTM ?? null, avgTOI: p.avgTOI ?? null,
+      xgaRelTM: p.xgaRelTM ?? null, qocIndex: p.qocIndex ?? null, dzPct: p.dzPct ?? null,
+      gsax: p.gsax ?? null, savePct: p.savePct ?? null, baselineHdsvPct: p.baselineHdsvPct ?? null,
+      gamesStarted: p.gamesStarted ?? null, games: p.games ?? null, shotsPerGame: p.shotsPerGame ?? null,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export async function generateMetadata(
   { params }: { params: { playerId: string } },
 ): Promise<Metadata> {
@@ -57,7 +79,8 @@ function StatCell({ label, value, color }: { label: string; value: string; color
 }
 
 export default async function PlayerPage({ params }: { params: { playerId: string } }) {
-  const player = await loadPlayer(params.playerId);
+  const roster = await assembleCanonicalRoster();
+  const player = (roster.players as any[]).find(p => String(p.id) === params.playerId) ?? null;
   if (!player || player.position === "Pick") notFound();
 
   const teamName = TEAMS_DB.find(t => t.id === player.teamId)?.name ?? player.teamId;
@@ -74,6 +97,7 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
   });
   const gravity = player.position !== "G" ? computeGravity(player) : null;
   const roles = derivePlayerRoles(player);
+  const comparePeers = buildComparePeers(roster.players as any[], player);
 
   const games = player.games ?? 0;
   const goals = player.goalsPace != null ? Math.round((player.goalsPace / 82) * games) : null;
@@ -212,7 +236,7 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
             STRAND DNA
           </div>
           <div className="flex justify-center">
-            <PlayerStrandPanel player={player} />
+            <PlayerStrandPanel player={player} peers={comparePeers} />
           </div>
         </div>
 

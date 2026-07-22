@@ -286,12 +286,20 @@
   badges) — "Modern Role Icons" group in Footer icon key and /glossary
 - PA9: EDGE shot map now on the dossier with an animated, reduced-motion-
   safe loading sweep + aria-live status; empty state darkened to body ink
-- PA5 (partial): strand key/definitions darkened to AA ink, color rule
+- PA5 (complete): strand key/definitions darkened to AA ink, color rule
   clarified ("wave color marks the trait family, never good vs bad"),
-  50 = league median added; player-compare dropdown still pending
-- PA8 (v1): "Hot Off the Press — Fresh Ink" strip atop /players from
-  extension-flagged players (top 5 by AAV, linking to dossiers); true
-  "latest five" ordering needs a dated signings feed
+  50 = league median added. Player-compare dropdown added on the dossier —
+  the StrandDisplay already overlaid a second strand (compareOff/compareDef),
+  so PlayerStrandPanel now ships same-position peers (≥20 GP, only the
+  trait-build fields) from the server page and a <select> overlays the
+  chosen peer's strand with a clear button.
+- PA8 (complete): "Hot Off the Press — Fresh Ink" now orders by a real
+  signing date. Added an `extension_signed_at` column (ensure-schema ALTER
+  + drizzle + CREATE-TABLE baseline); the admin contract POST stamps it on
+  set (explicit YYYY-MM-DD or today), roster-assembly threads it, and
+  orderFreshInk() sorts dated signings newest-first with an AAV fallback
+  for undated bundle extensions. Each card shows a recency chip
+  (Today / 3d ago / Jul 18).
 - Hardest-shot metric (PA7 wish) not in the API payload yet — needs the
   EDGE detail capture to store shot-speed facts
 
@@ -318,9 +326,21 @@
   stat-identical data-blank twin at fixed seed → more projected points),
   role-stamp + fallback test, and three canaries.
 
+### AG3 — Position persistence (complete)
+- Alternate positions now persist into Armchair GM lineups. `secondaryPosition`
+  already flowed all the way through (Asset → /api/league/players → editor);
+  the gap was the eligibility logic — only wing honored the secondary, so a
+  winger who also plays center (Lehkonen, Teravainen) could never be slotted
+  at C. Consolidated isC/isW/isF/isD/isG into lineup-order.ts as the single
+  source of truth, now honoring both primary AND secondary for C/W (a generic
+  "F" secondary opens both), and had LineupEditor import them instead of
+  keeping its own divergent copies. D/G stay primary-only on purpose — a
+  cross-group secondary would double-deploy the same id in the sim, and the
+  editor can't move a player across groups.
+
 ### Still open from audit (next rounds)
-- TM1 (Phase 3 picker), PA5 compare dropdown,
-  PA8 dated feed, PA12, D1, AG3
+- TM1 (Phase 3 picker), PA12 (Outlook), D1 (docket CSV ingestion),
+  F0 (fantasy workshop — flagged release priority)
 
 ## Known Issues / Future Work
 

@@ -27,6 +27,7 @@ const PLAYER_COLUMN_STATEMENTS = [
   "ALTER TABLE players ADD COLUMN expiry_year INTEGER",
   "ALTER TABLE players ADD COLUMN exclude_from_roster INTEGER DEFAULT 0",
   "ALTER TABLE players ADD COLUMN source TEXT DEFAULT 'seed'",
+  "ALTER TABLE players ADD COLUMN extension_signed_at TEXT",
 ];
 
 const PLAYER_TABLE_STATEMENTS = [
@@ -51,6 +52,7 @@ const PLAYER_TABLE_STATEMENTS = [
     injury_status TEXT,
     extension_cap_hit REAL,
     extension_years INTEGER,
+    extension_signed_at TEXT,
     retired INTEGER DEFAULT 0,
     retired_date TEXT,
     expiry_status TEXT,

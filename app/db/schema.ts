@@ -28,6 +28,7 @@ export const players = sqliteTable("players", {
   injuryStatus:    text("injury_status"),
   extensionCapHit: real("extension_cap_hit"),
   extensionYears:  integer("extension_years"),
+  extensionSignedAt: text("extension_signed_at"),   // ISO date the extension was signed — drives the dated Hot Off the Press feed (PA8)
   retired:         integer("retired", { mode: "boolean" }).default(false),
   retiredDate:     text("retired_date"),
   // Contract + free-agency facts — the single source of truth for reads. The

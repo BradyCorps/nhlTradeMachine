@@ -61,10 +61,10 @@ Use as the implementation backlog. Inspect the repo before changing code; preser
 ### Tabs/components
 
 - [x] **PA4 — Stats:** retain; remove Contract content. ![stats](assets/16-player-stats.png)
-- [x] **PA5 (compare dropdown pending) — STRAND:** retain core design; add player-compare dropdown. Make “What does each trait mean?” AA (darker, more readable). Improve labels such as `98%ile`. Standardize color meaning without making red ambiguously mean both low performance and defense. Add HD Finish and 20+ Bursts to definitions. Give each value context: denominator/meaning, league average, range/rank, and whether it is good (for example, `HD Finish 2.1%`, `681 20+ Bursts`). ![STRAND](assets/17-player-strand.png)
+- [x] **PA5 — STRAND:** retain core design; add player-compare dropdown. Make “What does each trait mean?” AA (darker, more readable). Improve labels such as `98%ile`. Standardize color meaning without making red ambiguously mean both low performance and defense. Add HD Finish and 20+ Bursts to definitions. Give each value context: denominator/meaning, league average, range/rank, and whether it is good (for example, `HD Finish 2.1%`, `681 20+ Bursts`). ![STRAND](assets/17-player-strand.png)
 - [x] **PA6 — Player Card/share:** export as a shareable image; move export logic here from GRAVITY. It must be free, highly readable, branded, and include proprietary analysis/projections. Use JFresh/Evolving Hockey only as competitive references. ![JFresh reference](assets/18-reference-jfresh-card.png) ![Evolving Hockey reference](assets/19-reference-evolving-hockey-card.png)
 - [x] **PA7 — Player Card design/data:** keep the current concept but make it more newspaper-like. Header background = FIG or paper; reserve INK for text. Spell out X-NAV for social viewers. Combine Cap Hit/FMV/Contract Surplus in one compact div; rename Market AAV → Fair Market Value. Validate suspiciously uniform “Percentiles vs All Forwards.” Retain Value Breakdown and Elite AVG Percentile. Add GRAVITY analysis plus EDGE DEF/NEUTRAL/OFF zone %, top speed, bursts, and hardest shot. Fix tooltip overflow. ![current card](assets/20-current-player-card.png) ![overflow](assets/21-tooltip-overflow.png)
-- [x] **PA8 (v1 — dated signings feed pending) — Hot off the Press:** immediately generate cards for new contracts/extensions; show the latest five atop `/players` in a simple carousel/tab.
+- [x] **PA8 — Hot off the Press:** immediately generate cards for new contracts/extensions; show the latest five atop `/players` in a simple carousel/tab.
 - [x] **PA9 — EDGE:** make AA; show loading progress. ![EDGE](assets/22-player-edge.png)
 - [x] **PA10 — GRAVITY:** make AA; use an existing off-white rink background; remove share card; ensure flag copy defines Supermassive, Transition Engine, etc.; define Main Sequence, Star, Black Hole, etc.; assess whether more useful metrics can be derived. ![GRAVITY](assets/23-player-gravity.png)
 - [x] **PA11 — Contract:** keep the concept but model Projected Next Contract using future cap/market at expiry, not today’s market. Test a possible McDavid `25x8` maximum scenario. ![contract](assets/24-player-contract.png)
@@ -80,5 +80,5 @@ This needs a separate full audit; first fix:
 
 - [x] **AG1 — UI:** Team Selection and Season Selection states must not use ink-black backgrounds.
 - [x] **AG2 — Pick persistence:** traded picks must remain unavailable in the relevant future draft (for example, a traded 2027 first cannot still be selected in 2027).
-- [ ] **AG3 — Position persistence:** alternative positions must persist into Lineups.
+- [x] **AG3 — Position persistence:** alternative positions must persist into Lineups.
 - [x] **AG4 — Player identity:** normalize/match diacritics so drafted players are removed and never duplicated (`Viggo Björck` vs `Viggo Bjorck`). ![duplicate draft pick](assets/26-armchair-duplicate-draft-pick.png)

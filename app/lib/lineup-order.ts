@@ -24,12 +24,27 @@ const sortByIce = (ps: LineupPlayer[]) =>
 const sortByGames = (ps: LineupPlayer[]) =>
   [...ps].sort((a, b) => (b.games ?? 0) - (a.games ?? 0));
 
-const isC = (p: LineupPlayer) => p.position === "C";
-const isW = (p: LineupPlayer) =>
-  ["W", "L", "R", "LW", "RW"].includes(p.position) || p.secondaryPosition === "W";
-const isF = (p: LineupPlayer) => isC(p) || isW(p);
-const isD = (p: LineupPlayer) => p.position === "D";
-const isG = (p: LineupPlayer) => p.position === "G";
+// ── Position eligibility (AG3) ───────────────────────────────────
+// A player's alternate position must persist into the lineup: a winger
+// listed with secondaryPosition "C" (Lehkonen, Teravainen) is eligible at
+// center, a center with "W" (Vilardi, Point…) is eligible on the wing.
+// Both the primary AND secondary positions are checked; a generic "F"
+// secondary means either forward slot. Exported as the single source of
+// truth so the LineupEditor and the default ordering agree.
+//
+// Forward flex only. D and G stay primary-only on purpose: honoring a
+// cross-group secondary (an F who can spot-play D) would place the same
+// id in two group orders at once and double-deploy him in the sim, and
+// the editor can't move a player across groups anyway.
+const WING_TOKENS = new Set(["W", "L", "R", "LW", "RW"]);
+const eligibleAt = (p: LineupPlayer, matches: (pos: string) => boolean): boolean =>
+  matches(p.position) || (p.secondaryPosition != null && matches(p.secondaryPosition));
+
+export const isC = (p: LineupPlayer) => eligibleAt(p, pos => pos === "C" || pos === "F");
+export const isW = (p: LineupPlayer) => eligibleAt(p, pos => WING_TOKENS.has(pos) || pos === "F");
+export const isF = (p: LineupPlayer) => isC(p) || isW(p);
+export const isD = (p: LineupPlayer) => p.position === "D";
+export const isG = (p: LineupPlayer) => p.position === "G";
 
 function buildDefaultOrder(
   effective: LineupPlayer[],

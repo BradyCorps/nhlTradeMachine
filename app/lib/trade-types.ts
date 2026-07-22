@@ -69,6 +69,7 @@ export interface Asset {
   hasExtension?: boolean;
   extensionCapHit?: number;   // future AAV once extension kicks in
   extensionYears?: number;    // length of the extension
+  extensionSignedAt?: string | null; // ISO date the extension was signed (PA8 dated feed)
   
   // MoneyPuck 3-Year Baselines
   baselinePtsPace?: number;

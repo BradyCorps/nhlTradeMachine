@@ -19,6 +19,7 @@ import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import PercentileCard from "@/app/components/PercentileCard";
 import { displayPosition } from "@/app/lib/display-position";
+import { orderFreshInk, signedRecency } from "@/app/lib/fresh-ink";
 
 // ── Types ─────────────────────────────────────────────────────
 interface Player {
@@ -1102,12 +1103,9 @@ export default function PlayersPage() {
   const showDefence = (posFilter === "ALL" || posFilter === "D") && defence.length > 0;
   const showGoalies = (posFilter === "ALL" || posFilter === "G") && goalies.length > 0;
 
-  const freshInk = useMemo(() =>
-    players
-      .filter(p => (p as any).hasExtension && ((p as any).extensionCapHit ?? 0) > 0)
-      .sort((a, b) => ((b as any).extensionCapHit ?? 0) - ((a as any).extensionCapHit ?? 0))
-      .slice(0, 5),
-    [players]);
+  // PA8 — the freshest ink, ordered by when it was actually signed (newest
+  // first), with an AAV fallback for undated bundle extensions.
+  const freshInk = useMemo(() => orderFreshInk(players as any[]), [players]);
 
   return (
     <main style={{ minHeight: "100vh", background: "var(--paper)", color: "var(--ink)" }}>
@@ -1125,12 +1123,18 @@ export default function PlayersPage() {
             {freshInk.map(p => {
               const ext = (p as any).extensionCapHit as number;
               const extYears = (p as any).extensionYears as number | undefined;
+              const signedAt = (p as any).extensionSignedAt as string | null | undefined;
               const inner = (
                 <>
                   <span className="font-mono text-[11px] font-black" style={{ color: "var(--ledger-ink)" }}>{p.name}</span>
                   <span className="font-mono text-[10px] font-bold ml-2" style={{ color: "var(--ledger-ink-body, var(--ledger-ink))" }}>
                     ${ext.toFixed(1)}M{extYears ? ` × ${extYears}yr` : ""} extension
                   </span>
+                  {signedAt && (
+                    <span className="font-mono text-[9px] font-bold ml-2" style={{ color: "var(--ledger-ink-faint)" }}>
+                      · {signedRecency(signedAt)}
+                    </span>
+                  )}
                 </>
               );
               const style: React.CSSProperties = {

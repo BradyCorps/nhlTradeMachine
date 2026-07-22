@@ -401,6 +401,14 @@ export async function POST(req: Request) {
   const extensionCapHit = Number.isFinite(Number(body.extensionCapHit)) && Number(body.extensionCapHit) > 0 ? Number(body.extensionCapHit) : null;
   const extensionYears = Number.isFinite(Number(body.extensionYears)) && Number(body.extensionYears) > 0 ? Math.round(Number(body.extensionYears)) : null;
   const clearExtension = body.extensionCapHit === null || body.extensionCapHit === 0 || body.clearExtension === true;
+  // PA8 — stamp the signing date so the Hot Off the Press feed can order by
+  // true recency. Accepts an explicit YYYY-MM-DD (back-dating a real signing)
+  // or defaults to today when an extension is set without one.
+  const validDate = (v: unknown): string | null =>
+    typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+  const extensionSignedAt = extensionCapHit != null
+    ? (validDate(body.extensionSignedAt) ?? new Date().toISOString().slice(0, 10))
+    : null;
   const explicitProspectPtsPace = Number.isFinite(Number(body.prospectPtsPace)) ? Number(body.prospectPtsPace) : null;
   const league = typeof body.league === "string" ? body.league.toUpperCase() : null;
   const points = Number.isFinite(Number(body.points)) ? Number(body.points) : null;
@@ -464,9 +472,11 @@ export async function POST(req: Request) {
     if (extensionCapHit != null) {
       updates.extensionCapHit = extensionCapHit;
       updates.extensionYears = extensionYears ?? 1;
+      updates.extensionSignedAt = extensionSignedAt;
     } else if (clearExtension) {
       updates.extensionCapHit = null;
       updates.extensionYears = null;
+      updates.extensionSignedAt = null;
     }
     if (expiryStatus !== undefined) updates.expiryStatus = expiryStatus;
     if (expiryYear   !== undefined) updates.expiryYear   = expiryYear;
@@ -499,6 +509,7 @@ export async function POST(req: Request) {
       excludeFromRoster: excludeFromRoster ?? undefined,
       extensionCapHit: extensionCapHit ?? undefined,
       extensionYears:  extensionYears ?? undefined,
+      extensionSignedAt: extensionSignedAt ?? undefined,
       source:         "editor",
     });
     await clearRosterCaches();

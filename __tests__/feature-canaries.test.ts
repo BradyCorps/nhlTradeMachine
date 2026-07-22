@@ -1982,3 +1982,41 @@ describe("Canary — G4 model propagation", () => {
     expect(claude).toContain("roleTag");
   });
 });
+
+describe("Canary — PA5 STRAND compare + PA8 dated feed + AG3 positions", () => {
+  it("PA5: the STRAND dossier panel offers a peer-compare dropdown", () => {
+    const panel = read("app/components/PlayerStrandPanel.tsx");
+    expect(panel).toContain("peers");
+    expect(panel).toContain("compareOff");
+    expect(panel).toContain("<select");
+    // The dossier page feeds same-position peers into it
+    const page = read("app/players/[playerId]/page.tsx");
+    expect(page).toContain("buildComparePeers");
+    expect(page).toContain("peers={comparePeers}");
+  });
+
+  it("PA8: the Hot Off the Press feed orders by signing date with a dated column", () => {
+    const players = read("app/players/page.tsx");
+    expect(players).toContain("orderFreshInk");
+    expect(players).toContain("signedRecency");
+    // signing date is a real, persisted fact, stamped on set and threaded through
+    const schema = read("app/db/schema.ts");
+    expect(schema).toContain("extension_signed_at");
+    const admin = read("app/api/admin/contracts/route.ts");
+    expect(admin).toContain("extensionSignedAt");
+    const assembly = read("app/lib/roster-assembly.ts");
+    expect(assembly).toContain("extensionSignedAt");
+  });
+
+  it("AG3: alternate positions are honored by the shared lineup eligibility", () => {
+    const order = read("app/lib/lineup-order.ts");
+    // secondary position is consulted, and the helpers are exported (single source)
+    expect(order).toContain("secondaryPosition");
+    expect(order).toContain("export const isC");
+    expect(order).toContain("export const isW");
+    // the editor no longer keeps its own divergent copies
+    const editor = read("app/components/LineupEditor.tsx");
+    expect(editor).toContain("isC, isW, isF, isD, isG");
+    expect(editor).not.toContain('const isC = (p: Player)');
+  });
+});

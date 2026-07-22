@@ -13,6 +13,7 @@ import {
   defaultLineupOrdersForRoster,
   hydrateLineupOrdersForRoster,
   sameLineupGroupOrders,
+  isC, isW, isF, isD, isG,
   type LineupGroupOrders,
   type LineupOrderPayload,
   type LineupPlayer as Player,
@@ -54,12 +55,9 @@ const abbr = (name: string) => {
 const sortByGames = (ps: Player[]) =>
   [...ps].sort((a, b) => (b.games ?? 0) - (a.games ?? 0));
 
-const isC = (p: Player) => p.position === "C";
-const isW = (p: Player) =>
-  ["W", "L", "R", "LW", "RW"].includes(p.position) || p.secondaryPosition === "W";
-const isF = (p: Player) => isC(p) || isW(p);
-const isD = (p: Player) => p.position === "D";
-const isG = (p: Player) => p.position === "G";
+// Position eligibility (isC/isW/isF/isD/isG) is imported from lineup-order
+// so the editor and the default-ordering engine honor alternate positions
+// (AG3) identically — one source of truth, no drift.
 
 type Group = "F" | "D" | "G";
 const SLOT_COUNT: Record<Group, number> = { F: 12, D: 6, G: 2 };
