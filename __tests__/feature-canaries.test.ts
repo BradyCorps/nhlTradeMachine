@@ -2140,3 +2140,21 @@ describe("Canary — D1 CSV trade ingestion", () => {
     expect(page).toContain("ingest-csv");
   });
 });
+
+describe("Canary — fantasy research layer (proprietary signals on the board)", () => {
+  it("the fantasy desk surfaces the Ledger stack, not just box-score columns", () => {
+    const page = read("app/fantasy/page.tsx");
+    // Every row expands into the full Ledger outlook (PA12 component reused)
+    expect(page).toContain("PlayerOutlook");
+    expect(page).toContain("aria-expanded");
+    // Modern role badge column (evidence-derived play styles)
+    expect(page).toContain("derivePlayerRoles");
+    // EDGE Breakout Watch — same engine the season simulator trusts
+    expect(page).toContain("buildBreakoutWatch");
+    expect(page).toContain("EDGE Breakout Watch");
+
+    const lib = read("app/lib/fantasy-board.ts");
+    expect(lib).toContain("export function buildBreakoutWatch");
+    expect(lib).toContain("computeBreakout"); // one breakout model, propagated
+  });
+});

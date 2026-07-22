@@ -449,6 +449,24 @@
 - Admin trades page: collapsible CSV INGESTION panel with template
   loader, DRY RUN, and INGEST & PUBLISH, rendering the per-trade report.
 
+### Fantasy research layer (post-audit — the "main research resource" pivot)
+- Product call: /fantasy is a research resource, not a draft app — the
+  taken-tracker stays as a utility, but the page now leads with what no
+  fantasy site on the market has (the Ledger's proprietary stack):
+  - Every draft-board row expands into the full Ledger outlook — the SAME
+    PlayerOutlook component as the dossier (headline verdict, projection
+    band, scoring trajectory, EDGE leading indicators). One tap deep on
+    every player.
+  - Modern role badge column (derivePlayerRoles): "Rush Weapon", "Slot
+    Hunter" — play-style archetypes instead of a bare position letter.
+  - EDGE Breakout Watch: players whose underlying signals run ahead of
+    their points, powered by the same computeBreakout engine the season
+    simulator trusts (one model, propagated), with the dominant driver
+    translated to plain English (burst/speed, finishing luck, opportunity,
+    pedigree) and the breakout probability shown.
+- Known future direction needing NEW data: schedule strength / streaming
+  (games-per-week) — requires an NHL schedule feed.
+
 ### July 20 audit: COMPLETE
 Every item in docs/July20_Audit_Claude_Code/AUDIT.md is checked off.
 Deferred-by-choice footnote: TM1's "performance endpoint" sub-item was

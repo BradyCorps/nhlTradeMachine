@@ -5,6 +5,8 @@
 // size, and the roster build are settings, and everything downstream
 // (FP/82, VBD replacement ranks, tier breaks) derives from them.
 
+import { computeBreakout, type BreakoutDriver } from "./breakout-model";
+
 export interface FantasyScoring {
   G: number;
   A: number;
@@ -41,6 +43,15 @@ export interface FantasyPlayerInput {
   baselineBlocks82?: number | null;
   xGPace?: number;
   developmentProfile?: { dynastyScore?: number } | null;
+  // Breakout Watch inputs (all optional — the model degrades gracefully)
+  ptsPace?: number | null;
+  baselinePtsPace?: number | null;
+  avgTOI?: number | null;
+  hdFinishingDelta?: number | null;
+  prospectPtsPace?: number | null;
+  draftOverall?: number | null;
+  edgeBurstsOver20?: number | null;
+  edgeSpeedMaxMph?: number | null;
 }
 
 export interface FantasyRow {
@@ -150,6 +161,68 @@ export function keeperRank(rows: FantasyRow[], maxAge = 23, limit = 10): Fantasy
       if (da !== db) return db - da;
       return b.fp82 - a.fp82;
     })
+    .slice(0, limit);
+}
+
+// ── EDGE Breakout Watch ──────────────────────────────────────────
+// The waiver-wire goldmine: players whose underlying signals (EDGE burst
+// volume and speed, finishing luck, deployment, pedigree) run ahead of
+// their point totals. Powered by the SAME breakout engine the season
+// simulator trusts (computeBreakout) — one model, propagated — with the
+// dominant driver translated into a plain-English reason.
+
+export interface BreakoutWatchEntry {
+  p: FantasyPlayerInput;
+  posGroup: "C" | "W" | "D";
+  breakoutPct: number; // 0–100
+  driver: BreakoutDriver;
+  reason: string;
+  hasEdgeSignal: boolean;
+}
+
+const DRIVER_REASON: Record<BreakoutDriver, string> = {
+  BURST: "EDGE burst & speed running ahead of the box score",
+  FINISHING_LUCK: "Finishing cold vs expected — the goals are coming",
+  OPPORTUNITY: "Ice time says a bigger role than the points show",
+  PEDIGREE: "Draft pedigree + NHLe say there's another level",
+  AGE: "Age-curve tailwind — the arrow points up",
+  NONE: "Underlying signals lean positive",
+};
+
+export function buildBreakoutWatch(
+  players: FantasyPlayerInput[],
+  limit = 8,
+  minGames = 15,
+): BreakoutWatchEntry[] {
+  return players
+    .filter(p => p.position !== "G" && p.position !== "Pick" && (p.games ?? 0) >= minGames)
+    .map(p => {
+      const result = computeBreakout({
+        age: p.age,
+        position: p.position,
+        ptsPace: p.ptsPace,
+        stablePace: p.baselinePtsPace ?? p.ptsPace,
+        priorGames: p.games,
+        avgTOI: p.avgTOI,
+        xGPace: p.xGPace,
+        goalsPace: p.goalsPace,
+        hdFinishingDelta: p.hdFinishingDelta,
+        prospectPtsPace: p.prospectPtsPace,
+        draftOverall: p.draftOverall,
+        edgeBurstsOver20: p.edgeBurstsOver20,
+        edgeSpeedMaxMph: p.edgeSpeedMaxMph,
+      });
+      return {
+        p,
+        posGroup: posGroupOf(p.position),
+        breakoutPct: Math.round(result.breakout * 100),
+        driver: result.driver,
+        reason: DRIVER_REASON[result.driver],
+        hasEdgeSignal: result.hasEdgeSignal,
+      };
+    })
+    .filter(e => e.breakoutPct >= 20)
+    .sort((a, b) => b.breakoutPct - a.breakoutPct || (b.hasEdgeSignal ? 1 : 0) - (a.hasEdgeSignal ? 1 : 0))
     .slice(0, limit);
 }
 

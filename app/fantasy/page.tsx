@@ -12,6 +12,7 @@ import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import {
   buildFantasyBoard,
+  buildBreakoutWatch,
   keeperRank,
   sanitizeSettings,
   DEFAULT_FANTASY_SETTINGS,
@@ -20,6 +21,8 @@ import {
   type FantasyRow,
   type FantasySettings,
 } from "@/app/lib/fantasy-board";
+import { PlayerOutlook } from "@/app/components/PlayerOutlook";
+import { derivePlayerRoles } from "@/app/lib/player-roles";
 
 interface ApiPlayer {
   id: string; name: string; teamId: string; position: string;
@@ -92,6 +95,7 @@ export default function FantasyPage() {
   const [taken, setTaken] = useState<Set<string>>(new Set());
   const [hideTaken, setHideTaken] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Hydrate league settings + draft state once on the client.
   useEffect(() => {
@@ -162,6 +166,19 @@ export default function FantasyPage() {
 
   const keepers = useMemo(() => keeperRank(board), [board]);
 
+  // EDGE Breakout Watch — same engine the season simulator trusts.
+  const breakouts = useMemo(() => buildBreakoutWatch(players as any[]), [players]);
+
+  // Modern role per board player (evidence-gated; null → no badge).
+  const roleMap = useMemo(() => {
+    const map = new Map<string, { label: string; icon: string; color: string }>();
+    for (const r of board) {
+      const roles = derivePlayerRoles(r.p as any);
+      if (roles) map.set(r.p.id, roles.primary);
+    }
+    return map;
+  }, [board]);
+
   const goalies = useMemo(() =>
     players
       .filter(p => p.position === "G" && (p.gamesStarted ?? 0) >= 10)
@@ -218,9 +235,9 @@ export default function FantasyPage() {
             Fantasy Hockey Tools
           </p>
           <p className="text-[12px] font-mono leading-relaxed mt-2 max-w-3xl" style={{ color: body }}>
-            Draft research built on the Ledger&apos;s live data: projections scored to <b>your league</b>,
-            value over your build&apos;s replacement player, tier breaks where the talent actually drops,
-            and a draft tracker to run on draft night.
+            Fantasy research the box score can&apos;t give you: projections scored to <b>your league</b>,
+            tier breaks where the talent actually drops, NHL EDGE breakout signals, and a full
+            Ledger outlook — role, trajectory, and leading indicators — one tap deep on every player.
           </p>
         </section>
 
@@ -311,6 +328,39 @@ export default function FantasyPage() {
               </div>
             </section>
 
+            {/* EDGE Breakout Watch */}
+            {breakouts.length > 0 && (
+              <section className="pt-6" aria-label="EDGE breakout watch">
+                <div className="text-[10px] font-black font-mono uppercase tracking-[0.25em] mb-3" style={{ color: faint }}>
+                  EDGE Breakout Watch — underlying signals ahead of the points
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {breakouts.map(e => (
+                    <div key={e.p.id} className="border px-3 py-2 flex items-baseline justify-between gap-3"
+                      style={{ borderColor: rule, background: "var(--paper-inset)" }}>
+                      <span className="min-w-0">
+                        <span className="text-[12px] font-black font-mono">
+                          {/^\d+$/.test(String(e.p.id))
+                            ? <a href={`/players/${e.p.id}`} className="no-underline hover:underline" style={{ color: ink }}>{e.p.name}</a>
+                            : e.p.name}
+                          <span className="text-[10px] font-bold ml-1.5" style={{ color: body }}>
+                            {teamName(e.p.teamId)} · {e.posGroup} · {e.p.age}y
+                          </span>
+                        </span>
+                        <span className="block text-[10px] font-mono mt-0.5" style={{ color: body }}>
+                          {e.reason}
+                        </span>
+                      </span>
+                      <span className="text-[13px] font-black font-mono shrink-0" style={{ color: "var(--ledger-green)" }}
+                        title="Breakout probability from the Ledger's breakout model — the same engine the season simulator uses">
+                        {e.breakoutPct}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* Keeper corner */}
             <section className="pt-6" aria-label="Keeper corner">
               <div className="text-[10px] font-black font-mono uppercase tracking-[0.25em] mb-3" style={{ color: faint }}>
@@ -395,6 +445,7 @@ export default function FantasyPage() {
                       <th scope="col" className="text-left px-2 py-2">Rk</th>
                       <th scope="col" className="text-center px-2 py-2" title="Tier — breaks placed at the largest projection drop-offs">Tier</th>
                       <th scope="col" className="text-left px-2 py-2">Player</th>
+                      <th scope="col" className="text-left px-2 py-2" title="Ledger modern role — evidence-derived play style">Role</th>
                       <th scope="col" className="text-left px-2 py-2">Team</th>
                       <th scope="col" className="text-center px-2 py-2">Pos</th>
                       <Th k="age" label="Age" align="center" />
@@ -410,8 +461,11 @@ export default function FantasyPage() {
                   <tbody>
                     {filtered.slice(0, shown).map((r, i) => {
                       const isTaken = taken.has(r.p.id);
+                      const isExpanded = expandedId === r.p.id;
+                      const role = roleMap.get(r.p.id);
                       return (
-                        <tr key={r.p.id} className="text-[11px] border-t" style={{
+                        <React.Fragment key={r.p.id}>
+                        <tr className="text-[11px] border-t" style={{
                           borderColor: "var(--ledger-rule-light, var(--ledger-rule))",
                           color: ink,
                           opacity: isTaken ? 0.45 : 1,
@@ -432,9 +486,28 @@ export default function FantasyPage() {
                             </span>
                           </td>
                           <td className="px-2 py-1.5 font-black" style={{ textDecoration: isTaken ? "line-through" : "none" }}>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedId(prev => prev === r.p.id ? null : r.p.id)}
+                              aria-expanded={isExpanded}
+                              aria-label={`${isExpanded ? "Hide" : "Show"} ${r.p.name}'s Ledger outlook`}
+                              className="mr-1.5"
+                              style={{ color: faint, background: "transparent", cursor: "pointer", fontSize: 10 }}
+                            >
+                              {isExpanded ? "▾" : "▸"}
+                            </button>
                             {/^\d+$/.test(String(r.p.id))
                               ? <a href={`/players/${r.p.id}`} className="no-underline hover:underline" style={{ color: ink }}>{r.p.name}</a>
                               : r.p.name}
+                          </td>
+                          <td className="px-2 py-1.5" title={role ? `Ledger role: ${role.label}` : undefined}>
+                            {role ? (
+                              <span className="text-[9px] font-black uppercase tracking-[0.05em] whitespace-nowrap" style={{ color: role.color }}>
+                                {role.icon} {role.label}
+                              </span>
+                            ) : (
+                              <span style={{ color: faint }}>—</span>
+                            )}
                           </td>
                           <td className="px-2 py-1.5" style={{ color: body }}>{teamName(r.p.teamId)}</td>
                           <td className="px-2 py-1.5 text-center font-black">{r.posGroup}</td>
@@ -452,6 +525,15 @@ export default function FantasyPage() {
                           <td className="px-2 py-1.5 text-right" style={{ fontVariantNumeric: "tabular-nums", color: body }}>{fmt(r.hit82)}</td>
                           <td className="px-2 py-1.5 text-right" style={{ fontVariantNumeric: "tabular-nums", color: body }}>{fmt(r.blk82)}</td>
                         </tr>
+                        {isExpanded && (
+                          <tr className="border-t" style={{ borderColor: "var(--ledger-rule-light, var(--ledger-rule))" }}>
+                            <td colSpan={15} className="px-3 py-3" style={{ background: "var(--paper-inset)" }}>
+                              {/* The full Ledger read — same component as the player dossier */}
+                              <PlayerOutlook asset={r.p as any} />
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
                       );
                     })}
                   </tbody>

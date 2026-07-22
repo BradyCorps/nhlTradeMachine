@@ -2,6 +2,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildFantasyBoard,
+  buildBreakoutWatch,
   fantasyPoints,
   replacementRanks,
   assignTiers,
@@ -109,5 +110,39 @@ describe("sanitizeSettings", () => {
   it("returns pure defaults for non-objects", () => {
     expect(sanitizeSettings(null)).toEqual(DEFAULT_FANTASY_SETTINGS);
     expect(sanitizeSettings("junk")).toEqual(DEFAULT_FANTASY_SETTINGS);
+  });
+});
+
+describe("buildBreakoutWatch (EDGE research layer)", () => {
+  const young = (id: string, over: Partial<FantasyPlayerInput> = {}) => player(id, {
+    age: 22, games: 60, ptsPace: 45, baselinePtsPace: 40, avgTOI: 16,
+    xGPace: 20, goalsPace: 14, hdFinishingDelta: -0.03,
+    edgeBurstsOver20: 70, edgeSpeedMaxMph: 23.0,
+    ...over,
+  });
+
+  it("surfaces signal-rich young players with a driver-based reason", () => {
+    const watch = buildBreakoutWatch([
+      young("riser"),
+      player("old-vet", { age: 34, games: 80, ptsPace: 50 }),
+      player("goalie", { position: "G" }),
+      player("cameo", { games: 5 }),
+    ]);
+    const ids = watch.map(e => e.p.id);
+    expect(ids).toContain("riser");
+    expect(ids).not.toContain("goalie");
+    expect(ids).not.toContain("cameo");
+    const riser = watch.find(e => e.p.id === "riser")!;
+    expect(riser.breakoutPct).toBeGreaterThanOrEqual(20);
+    expect(riser.reason.length).toBeGreaterThan(10);
+  });
+
+  it("ranks by breakout probability and respects the limit", () => {
+    const pool = Array.from({ length: 12 }, (_, i) => young(`y${i}`, { age: 21 + (i % 3) }));
+    const watch = buildBreakoutWatch(pool, 5);
+    expect(watch).toHaveLength(5);
+    for (let i = 1; i < watch.length; i++) {
+      expect(watch[i - 1].breakoutPct).toBeGreaterThanOrEqual(watch[i].breakoutPct);
+    }
   });
 });
