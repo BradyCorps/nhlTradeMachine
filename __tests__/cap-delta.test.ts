@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { applyCapDelta, applyTeamCapDeltas } from "../app/lib/cap-delta";
+import { applyCapDelta, applyTeamCapDeltas, effectiveCapHit } from "../app/lib/cap-delta";
+
+describe("effectiveCapHit — the single source of truth for retention math", () => {
+  it("returns the post-retention cap hit (a $10M player at 50% moves $5M)", () => {
+    expect(effectiveCapHit({ capHit: 10, retainedPct: 0.5 })).toBe(5);
+  });
+
+  it("is the full cap hit with no retention", () => {
+    expect(effectiveCapHit({ capHit: 8.25, retainedPct: 0 })).toBe(8.25);
+    expect(effectiveCapHit({ capHit: 8.25 })).toBe(8.25);
+  });
+
+  it("defaults a missing cap hit to zero (picks / prospects)", () => {
+    expect(effectiveCapHit({ retainedPct: 0.5 })).toBe(0);
+    expect(effectiveCapHit({})).toBe(0);
+  });
+});
 
 describe("applyCapDelta", () => {
   it("applies a straight swap against baseline cap space", () => {

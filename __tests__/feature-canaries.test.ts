@@ -2244,6 +2244,20 @@ describe("Canary — fantasy page AA, pagination, and selection accent", () => {
   });
 });
 
+describe("Canary — SIM retention-aware cap deltas (audit #1)", () => {
+  it("computes trade cap movement via the shared effectiveCapHit, not raw capHit", () => {
+    const route = read("app/api/simulate/route.ts");
+    expect(route).toContain('from "@/app/lib/cap-delta"');
+    // Both sides of the per-trade cap delta use the retention-aware helper.
+    expect(route).toContain("skaters(trade.outgoing).reduce((s, p) => s + effectiveCapHit(p), 0)");
+    expect(route).toContain("skaters(trade.incoming).reduce((s, p) => s + effectiveCapHit(p), 0)");
+    // And never the old raw-capHit sum that ignored retention.
+    expect(route).not.toContain("reduce((s, p) => s + p.capHit,  0)");
+    // The helper is exported from the canonical module.
+    expect(read("app/lib/cap-delta.ts")).toContain("export const effectiveCapHit");
+  });
+});
+
 describe("Canary — drafted rookie keeps its context through dedup (VAL1)", () => {
   it("reconciles by backfilling draft context, not by dropping the rookie", () => {
     const lib = read("app/lib/draft-reconcile.ts");

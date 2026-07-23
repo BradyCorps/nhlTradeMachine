@@ -17,7 +17,11 @@ export interface CapDeltaTeam {
   capSpace: number;
 }
 
-const retainedCapHit = (asset: CapDeltaAsset): number => {
+// The cap a team actually carries for a player after any retained salary. This
+// is the single source of truth for retention math — the SIM must reuse it so
+// its cap deltas can't drift from the trade UI (a $10M player at 50% retention
+// is a $5M movement, not $10M).
+export const effectiveCapHit = (asset: CapDeltaAsset): number => {
   const capHit = asset.capHit ?? 0;
   const retainedPct = asset.retainedPct ?? 0;
 
@@ -25,7 +29,7 @@ const retainedCapHit = (asset: CapDeltaAsset): number => {
 };
 
 const sumEffectiveCap = (assets: CapDeltaAsset[] = []): number =>
-  assets.reduce((sum, asset) => sum + retainedCapHit(asset), 0);
+  assets.reduce((sum, asset) => sum + effectiveCapHit(asset), 0);
 
 export const applyCapDelta = (baselineCapSpace: number, moves: CapDeltaMoves): number => {
   const incomingCap = sumEffectiveCap(moves.incoming);

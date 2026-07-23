@@ -14,6 +14,7 @@ import { computeBreakout } from "@/app/lib/breakout-model";
 import { burstProfile } from "@/app/lib/burst-channel";
 import { computeGravity, simOnIceDelta } from "@/app/lib/gravity";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
+import { effectiveCapHit } from "@/app/lib/cap-delta";
 import {
   DIVISIONS,
   EASTERN,
@@ -34,6 +35,7 @@ interface SimPlayer {
   xGPace: number;
   avgTOI: number;
   capHit: number;
+  retainedPct?: number; // salary retained by the trading-away team (0–1)
   yearsRemaining: number;
   gsax?: number;
   savePct?: number;
@@ -968,8 +970,10 @@ export async function POST(req: NextRequest) {
       const skaters = (arr: SimPlayer[]) => arr.filter(p => p.position !== "Pick");
       const outVal = skaters(trade.outgoing).reduce((s, p) => s + onIceValue(p), 0);
       const inVal  = skaters(trade.incoming).reduce((s, p) => s + onIceValue(p), 0);
-      const outCap = skaters(trade.outgoing).reduce((s, p) => s + p.capHit,  0);
-      const inCap  = skaters(trade.incoming).reduce((s, p) => s + p.capHit,  0);
+      // Retention-aware: a retained-salary player only moves his post-retention
+      // cap hit, matching cap-delta.ts so the SIM and the trade UI never diverge.
+      const outCap = skaters(trade.outgoing).reduce((s, p) => s + effectiveCapHit(p), 0);
+      const inCap  = skaters(trade.incoming).reduce((s, p) => s + effectiveCapHit(p), 0);
       const valDelta = inVal  - outVal;
       const capDelta = inCap  - outCap;
       tradeNavDeltas.set(trade.homeTeamId,    (tradeNavDeltas.get(trade.homeTeamId)    ?? 0) + valDelta);
