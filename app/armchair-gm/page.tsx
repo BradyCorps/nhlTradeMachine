@@ -643,6 +643,7 @@ export default function ArmchairGmPage() {
           homeTeam={teams[0]}
           allTeams={db.teams}
           allPlayers={db.players}
+          capCeiling={db.capCeiling}
           navMap={(() => {
             const base = Object.fromEntries(Object.entries(navMap).map(([id, r]) => [id, r.total]));
             // Retained assets are already updated in navMap via the blocks useEffect

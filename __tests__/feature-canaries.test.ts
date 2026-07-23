@@ -580,7 +580,9 @@ describe("Canary — trade proposal audit verification", () => {
     expect(src).toContain("generateRunRef");
     expect(src).toContain("generateAbortRef");
     expect(src).toContain("auditProgress");
-    expect(src).toContain('status !== "BLOCKED" && status !== "DECLINED"');
+    // The gate now requires a whitelisted accepted status (no more fail-open).
+    expect(src).toContain('from "@/app/lib/trade-proposal-audit"');
+    expect(src).not.toContain('status !== "BLOCKED" && status !== "DECLINED"');
     expect(src).toContain("const partnerRoster = allPlayers.filter(p => p.teamId === candidate.team.id)");
     expect(src).toContain("candidate.homeSends");
     expect(src).toContain("candidate.partnerSends");
@@ -2241,6 +2243,26 @@ describe("Canary — fantasy page AA, pagination, and selection accent", () => {
     // No sub-10px type left on the fantasy board (AA legibility floor).
     expect(page).not.toContain("text-[9px]");
     expect(page).not.toContain("text-[8px]");
+  });
+});
+
+describe("Canary — trade UI state bugs (audit #6/#7)", () => {
+  it("#6: a package change clears the in-flight audit flag so it can't stick on 'Auditing'", () => {
+    const src = read("app/components/QuickTradeMachine.tsx");
+    // The outgoing/incoming effect that aborts the verdict also resets evaluating.
+    expect(src).toMatch(/setVerdict\(null\);\s*\n\s*setShareUrl\(""\);\s*\n[\s\S]*?setEvaluating\(false\);\s*\n\s*\}, \[outgoing, incoming\]\)/);
+  });
+
+  it("#7: generated proposals require a whitelisted accepted status and pass the live cap", () => {
+    const gate = read("app/lib/trade-proposal-audit.ts");
+    expect(gate).toContain('ACCEPTED_AUDIT_STATUSES');
+    expect(gate).toContain('"FAIR", "WIN", "LOSS"');
+    const proposal = read("app/components/TradeProposal.tsx");
+    expect(proposal).toContain('from "@/app/lib/trade-proposal-audit"');
+    // The proposal audit now passes capCeiling, matching the main trade audit.
+    expect(proposal).toMatch(/partnerRoster,\s*\n\s*ctrl\.signal,\s*\n\s*capCeiling,/);
+    // And the old fail-open inline check is gone.
+    expect(proposal).not.toContain('status !== "BLOCKED" && status !== "DECLINED"');
   });
 });
 

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Asset, Team } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
 import { fetchTradeVerdict } from "@/app/lib/evaluate-client";
+import { tradePassesFullAudit } from "@/app/lib/trade-proposal-audit";
 import type { TradeProposal } from "@/app/lib/trade-logic";
 import {
   getNav,
@@ -26,6 +27,7 @@ interface Props {
   allTeams:      Team[];
   allPlayers:    Asset[];
   navMap:        Record<string, number>;
+  capCeiling?:   number | null; // live cap override — must match the main audit
   onClose:       () => void;
   onLoadTrade:   (partner: Team, outgoing: Asset[], incoming: Asset[]) => void;
 }
@@ -39,14 +41,11 @@ type Candidate = {
   dumpSweetener: Asset[];
 };
 
-const tradePassesFullAudit = (status?: string): boolean =>
-  status !== "BLOCKED" && status !== "DECLINED";
-
 const AUDIT_CONCURRENCY = 6;
 const MAX_AUDIT_CANDIDATES = 36;
 
 export default function TradeProposalEngine({
-  outgoingBlock, homeTeam, allTeams, allPlayers, navMap, onClose, onLoadTrade
+  outgoingBlock, homeTeam, allTeams, allPlayers, navMap, capCeiling, onClose, onLoadTrade
 }: Props) {
   const [proposals,  setProposals]  = useState<TradeProposal[]>([]);
   const [generating, setGenerating] = useState(false);
@@ -234,6 +233,7 @@ export default function TradeProposalEngine({
           homeRoster,
           partnerRoster,
           ctrl.signal,
+          capCeiling,
         );
         return tradePassesFullAudit(verdict?.status) ? candidate : null;
       } catch (e) {

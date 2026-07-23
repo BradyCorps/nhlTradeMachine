@@ -1030,6 +1030,10 @@ export default function QuickTradeMachine() {
     verdictRunRef.current += 1;
     setVerdict(null);
     setShareUrl("");
+    // The audit was cancelled and nothing restarts it here — clear the
+    // in-flight flag too, or the button stays stuck on "Auditing" forever
+    // (the aborted request's finally deliberately won't reset it).
+    setEvaluating(false);
   }, [outgoing, incoming]);
 
   useEffect(() => () => verdictAbortRef.current?.abort(), []);
