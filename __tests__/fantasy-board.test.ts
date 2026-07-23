@@ -74,17 +74,48 @@ describe("buildFantasyBoard", () => {
 });
 
 describe("assignTiers", () => {
-  it("places tier breaks at the largest projection drop-offs", () => {
-    // FP: 100, 98, 70, 68, 40 — the two huge gaps are after idx1 and idx3.
+  it("places tier breaks at the real projection drop-offs", () => {
+    // FP: 100, 98, 70, 68, 40 — the two big gaps are before idx2 and idx4.
     const rows = [100, 98, 70, 68, 40].map((fp, i) => ({ fp82: fp, p: { id: `p${i}` } } as FantasyRow));
-    assignTiers(rows, 3, 5);
+    assignTiers(rows, { pool: 5 });
     expect(rows.map(r => r.tier)).toEqual([1, 1, 2, 2, 3]);
   });
 
-  it("players beyond the tiered pool land in the overflow tier", () => {
+  it("does not collapse a dense tail into one mega-tier (the T8 blob fix)", () => {
+    // A few well-separated elites, then 30 near-equal players 2 pts apart —
+    // the exact shape that used to dump everyone past the top few into T8.
+    const elites = [900, 850, 800];
+    const tail = Array.from({ length: 30 }, (_, i) => 600 - i * 2); // 600 … 542
+    const rows = [...elites, ...tail].map((fp, i) => ({ fp82: fp, p: { id: `p${i}` } } as FantasyRow));
+    assignTiers(rows, { pool: rows.length, maxTierSize: 8 });
+
+    const counts = new Map<number, number>();
+    rows.forEach(r => counts.set(r.tier, (counts.get(r.tier) ?? 0) + 1));
+    // No tier exceeds the size cap …
+    expect(Math.max(...counts.values())).toBeLessThanOrEqual(8);
+    // … and the smooth tail spans several tiers, not one.
+    const tailTiers = new Set(rows.slice(3).map(r => r.tier));
+    expect(tailTiers.size).toBeGreaterThanOrEqual(4);
+    // Balanced, not one-player-shaved-off-the-front splits.
+    const tailCounts = [...counts].filter(([t]) => rows.slice(3).some(r => r.tier === t)).map(([, c]) => c);
+    expect(Math.min(...tailCounts)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("keeps the top of the board fine-grained where elites separate", () => {
+    // Three clearly-tiered elites then a pack — the top must not be one tier.
+    const rows = [95, 80, 65, 50, 49, 48, 47].map((fp, i) => ({ fp82: fp, p: { id: `p${i}` } } as FantasyRow));
+    assignTiers(rows, { pool: rows.length, maxTierSize: 8 });
+    expect(rows[0].tier).toBe(1);
+    expect(rows[1].tier).toBe(2);
+    expect(rows[2].tier).toBe(3);
+    expect(new Set(rows.slice(3).map(r => r.tier)).size).toBe(1); // the flat pack is one tier
+  });
+
+  it("players beyond the tiered pool land in a single deep tier", () => {
     const rows = Array.from({ length: 6 }, (_, i) => ({ fp82: 100 - i, p: { id: `p${i}` } } as FantasyRow));
-    assignTiers(rows, 2, 4);
-    expect(rows[5].tier).toBe(3); // tiers+1
+    assignTiers(rows, { pool: 4 });
+    expect(rows[4].tier).toBe(rows[5].tier); // both overflow
+    expect(rows[5].tier).toBeGreaterThan(rows[3].tier);
   });
 });
 

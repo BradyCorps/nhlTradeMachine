@@ -93,25 +93,84 @@ export function replacementRanks(settings: FantasySettings): Record<"C" | "W" | 
   };
 }
 
-// Tier breaks by gap detection: within the top `pool` players, the
-// (tiers − 1) largest FP drop-offs are the boundaries. Drafting is about
-// tiers — "last player in tier 2" matters more than rank 17 vs 19.
-export function assignTiers(rows: FantasyRow[], tiers = 8, pool = 100): void {
-  const n = Math.min(pool, rows.length);
+export interface TierOptions {
+  /** How many top players get real tiers; the rest fall into one "deep" tier. */
+  pool?: number;
+  /** No tier may exceed this — the guard that stops a dense tail collapsing. */
+  maxTierSize?: number;
+  /** Hard ceiling on tier count within the pool. */
+  maxTiers?: number;
+  /** A gap ≥ ratio × the mean gap is a genuine, "natural" tier break. */
+  minGapRatio?: number;
+}
+
+// Tier breaks that stay useful the whole way down the board. The old method
+// took the N largest gaps, so a field with a few well-separated elites and a
+// long, smooth tail dumped ~90 near-equal players into one mega-tier — a T8
+// blob with no drafting value. Instead we split top-down: a run of players
+// earns a break when it holds a real drop-off (a gap well above the field's
+// average) OR when it is simply too long to be one tier (the size cap). The
+// size cap is what carves the smooth tail into interchangeable groups a
+// drafter can actually use — "these eight are a coin flip, then a step down."
+export function assignTiers(rows: FantasyRow[], opts: TierOptions = {}): void {
+  const n = Math.min(opts.pool ?? 120, rows.length);
+  const maxTierSize = opts.maxTierSize ?? 8;
+  const maxTiers = opts.maxTiers ?? 20;
+  const minGapRatio = opts.minGapRatio ?? 1.5;
   if (n === 0) return;
-  const gaps: { idx: number; size: number }[] = [];
-  for (let i = 1; i < n; i++) {
-    gaps.push({ idx: i, size: rows[i - 1].fp82 - rows[i].fp82 });
+
+  const gapBefore = (i: number) => rows[i - 1].fp82 - rows[i].fp82;
+
+  let total = 0;
+  for (let i = 1; i < n; i++) total += gapBefore(i);
+  const meanGap = total / Math.max(1, n - 1);
+  const sigThreshold = meanGap * minGapRatio;
+
+  const boundaries = new Set<number>();
+
+  const segmentsOf = (): [number, number][] => {
+    const bs = [0, ...[...boundaries].sort((a, b) => a - b), n];
+    const segs: [number, number][] = [];
+    for (let k = 1; k < bs.length; k++) segs.push([bs[k - 1], bs[k]]);
+    return segs;
+  };
+
+  // Best place to split a segment: its largest internal gap, and on ties the
+  // one nearest the middle so a run of equal gaps splits into balanced halves
+  // rather than shaving one player off the front each time.
+  const bestSplit = ([s, e]: [number, number]): { idx: number; size: number } | null => {
+    const mid = (s + e) / 2;
+    let best: { idx: number; size: number } | null = null;
+    for (let i = s + 1; i < e; i++) {
+      const g = gapBefore(i);
+      if (
+        !best || g > best.size ||
+        (g === best.size && Math.abs(i - mid) < Math.abs(best.idx - mid))
+      ) best = { idx: i, size: g };
+    }
+    return best;
+  };
+
+  while (boundaries.size + 1 < maxTiers) {
+    let pick: { idx: number; size: number } | null = null;
+    for (const seg of segmentsOf()) {
+      const len = seg[1] - seg[0];
+      if (len < 2) continue;
+      const g = bestSplit(seg);
+      if (!g) continue;
+      const oversized = len > maxTierSize;
+      const significant = g.size >= sigThreshold && g.size > 0;
+      if (!oversized && !significant) continue;
+      if (!pick || g.size > pick.size) pick = g;
+    }
+    if (!pick) break;
+    boundaries.add(pick.idx);
   }
-  const boundaries = new Set(
-    gaps
-      .sort((a, b) => b.size - a.size || a.idx - b.idx)
-      .slice(0, Math.max(0, tiers - 1))
-      .map(g => g.idx),
-  );
+
+  const deepTier = boundaries.size + 2; // pool spans boundaries.size + 1 tiers
   let tier = 1;
   for (let i = 0; i < rows.length; i++) {
-    if (i >= n) { rows[i].tier = tiers + 1; continue; }
+    if (i >= n) { rows[i].tier = deepTier; continue; }
     if (boundaries.has(i)) tier++;
     rows[i].tier = tier;
   }

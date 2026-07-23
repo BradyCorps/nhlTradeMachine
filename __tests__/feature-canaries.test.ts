@@ -2114,6 +2114,8 @@ describe("Canary — F0 fantasy draft tool workshop", () => {
     expect(lib).toContain("export function buildFantasyBoard");
     expect(lib).toContain("export function assignTiers");
     expect(lib).toContain("export function replacementRanks");
+    // Tiers are size-capped so a dense tail can't collapse into one mega-tier.
+    expect(lib).toContain("maxTierSize");
   });
 });
 

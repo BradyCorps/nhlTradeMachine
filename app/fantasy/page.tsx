@@ -527,7 +527,7 @@ export default function FantasyPage() {
                     <tr className="text-[10px] font-black uppercase tracking-[0.12em]" style={{ background: "var(--paper-inset)", color: ink }}>
                       <th scope="col" className="text-center px-2 py-2" title="Mark taken on draft night">✓</th>
                       <th scope="col" className="text-left px-2 py-2">Rk</th>
-                      <th scope="col" className="text-center px-2 py-2" title="Tier — breaks placed at the largest projection drop-offs">Tier</th>
+                      <th scope="col" className="text-center px-2 py-2" title="Tier — a group of interchangeable players; a new tier starts at a real projection drop-off, and no tier runs longer than a draftable cluster">Tier</th>
                       <th scope="col" className="text-left px-2 py-2">Player</th>
                       <th scope="col" className="text-left px-2 py-2" title="Ledger modern role — evidence-derived play style">Role</th>
                       <th scope="col" className="text-left px-2 py-2">Team</th>
