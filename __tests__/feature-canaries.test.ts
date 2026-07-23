@@ -2244,6 +2244,27 @@ describe("Canary — fantasy page AA, pagination, and selection accent", () => {
   });
 });
 
+describe("Canary — SIM RNG determinism (audit #2/#3)", () => {
+  it("uses independent named streams for awards, calder, and playoffs", () => {
+    const route = read("app/api/simulate/route.ts");
+    expect(route).toContain('mulberry32(seed + hashString("awards"))');
+    expect(route).toContain('mulberry32(seed + hashString("calder"))');
+    expect(route).toContain('mulberry32(seed + hashString("playoffs"))');
+    // Playoffs no longer share the awards/calder stream.
+    expect(route).toContain("simulatePlayoffs(standings, playoffRand)");
+    expect(route).toContain("findLeagueLeaders(standings, awardsRand)");
+    expect(route).not.toContain("simulatePlayoffs(standings, rand)");
+  });
+
+  it("folds the Cup Run year + run seed into each season's seed", () => {
+    const hook = read("app/armchair-gm/useSimDispatch.ts");
+    expect(hook).toContain("cupRunSeed: cupRunContext.runSeed");
+    expect(hook).toContain("cupRunYear: cupRunContext.year");
+    // The run seed is threaded from the Cup Run state.
+    expect(read("app/armchair-gm/page.tsx")).toContain("runSeed: cupRun.seed");
+  });
+});
+
 describe("Canary — SIM retention-aware cap deltas (audit #1)", () => {
   it("computes trade cap movement via the shared effectiveCapHit, not raw capHit", () => {
     const route = read("app/api/simulate/route.ts");

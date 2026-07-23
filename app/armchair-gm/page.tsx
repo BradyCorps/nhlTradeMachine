@@ -217,6 +217,7 @@ export default function ArmchairGmPage() {
       teamId: cupRun.teamId,
       teamName: cupRun.teamName,
       year: cupRun.currentYear,
+      runSeed: cupRun.seed,
       difficultyLabel: cupRun.difficulty.label,
       stars: cupRun.difficulty.stars,
       seasons: cupRun.seasons.map(s => ({

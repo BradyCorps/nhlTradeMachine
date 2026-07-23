@@ -934,7 +934,14 @@ export async function POST(req: NextRequest) {
         incoming: t.incoming.map(p => ({ id: p.id, retainedPct: (p as any).retainedPct ?? 0 })),
       })),
     });
-    const rand = mulberry32(seed);
+    // Independent named RNG streams so awards, Calder voting, and playoffs are
+    // each deterministic and never reroll one another. One shared stream meant
+    // adding an award-eligible rookie (more Calder draws) rerolled unrelated
+    // playoff series (audit #2). simulateLeague derives its own per-team streams
+    // from `seed` and is unaffected.
+    const awardsRand  = mulberry32(seed + hashString("awards"));
+    const calderRand  = mulberry32(seed + hashString("calder"));
+    const playoffRand = mulberry32(seed + hashString("playoffs"));
 
     // Build player roster map — apply trades
     const playersByTeam = new Map<string, SimPlayer[]>();
@@ -984,7 +991,7 @@ export async function POST(req: NextRequest) {
 
     const rawStandings = simulateLeague(teams, playersByTeam, tradeNavDeltas, capDeltas, seed, lineup, lineupContext);
     const standings    = assignPlayoffSeeds(rawStandings);
-    const leaders      = findLeagueLeaders(standings, rand);
+    const leaders      = findLeagueLeaders(standings, awardsRand);
 
     const homeResult    = standings.find(t => t.teamId === homeTeamId);
     const partnerResult = standings.find(t => t.teamId === partnerTeamId);
@@ -1004,7 +1011,7 @@ export async function POST(req: NextRequest) {
     const calderWinner = (() => {
       if (rookieCandidates.length === 0) return { name: "Matthew Schaefer", team: "New York Islanders", note: "—" };
       const sorted = rookieCandidates
-        .map(p => ({ p, score: p.projectedPts + (p.breakoutTag === "BREAKOUT" ? 8 : 0) + rand() * 10 }))
+        .map(p => ({ p, score: p.projectedPts + (p.breakoutTag === "BREAKOUT" ? 8 : 0) + calderRand() * 10 }))
         .sort((a, b) => b.score - a.score);
       const winner = sorted[0].p;
       return {
@@ -1014,7 +1021,7 @@ export async function POST(req: NextRequest) {
       };
     })();
 
-    const playoffBracket = simulatePlayoffs(standings, rand);
+    const playoffBracket = simulatePlayoffs(standings, playoffRand);
     const cupWinner = standings.find(t => t.teamId === playoffBracket.champion.teamId) ?? leaders.cupWinner;
     const connSmythe = cupWinner?.topScorer
       ? { name: cupWinner.topScorer.name, team: cupWinner.teamName }

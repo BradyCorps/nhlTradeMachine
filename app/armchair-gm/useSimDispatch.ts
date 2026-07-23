@@ -57,6 +57,7 @@ export function useSimDispatch({
     teamId: string;
     teamName: string;
     year: number;               // 1-3
+    runSeed: number;            // the run's base seed — folded into each season's seed
     difficultyLabel: string;
     stars: number;
     seasons: { seasonLabel: string; championTeamName: string; madePlayoffs: boolean; wonCup: boolean }[];
@@ -98,6 +99,13 @@ export function useSimDispatch({
         mode: SEASON.simulationMode,
         homeTeamId: homeTeam.id,
         partnerTeamId: partnerTeam?.id ?? "",
+        // Cup Run: fold in the run's seed and the season year so Years 1-3 (and
+        // different runs) get independent, reproducible rolls instead of the
+        // same seed every year (audit #3). Omitted outside a run, so ordinary
+        // single-season seeds are unchanged.
+        ...(cupRunContext
+          ? { cupRunSeed: cupRunContext.runSeed, cupRunYear: cupRunContext.year }
+          : {}),
         trades: simTrades.map(t => ({
           homeTeamId: t.homeTeamId,
           partnerTeamId: t.partnerTeamId,
