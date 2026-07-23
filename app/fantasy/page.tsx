@@ -17,6 +17,7 @@ import {
   keeperRank,
   sanitizeSettings,
   sortRows,
+  replacementRanks,
   BREAKOUT_BASE_RATE_PCT,
   DEFAULT_FANTASY_SETTINGS,
   FANTASY_SETTINGS_KEY,
@@ -86,19 +87,21 @@ function writeStorage(key: string, value: unknown): void {
   try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* private mode */ }
 }
 
-// Compact numeric setting input
-function Num({ label, value, onChange, step = 1, width = 52 }: {
-  label: string; value: number; onChange: (v: number) => void; step?: number; width?: number;
+// Compact numeric setting input. `label` is the visible word; `aria` is the
+// full spoken/hover description so a screen reader hears "Goals — points per
+// goal", not just "G".
+function Num({ label, aria, value, onChange, step = 1, width = 56 }: {
+  label: string; aria: string; value: number; onChange: (v: number) => void; step?: number; width?: number;
 }) {
   return (
-    <label className="flex items-center gap-1.5 text-[10px] font-black font-mono uppercase tracking-[0.08em]" style={{ color: body }}>
+    <label className="flex items-center gap-1.5 text-[11px] font-black font-mono uppercase tracking-[0.06em]" style={{ color: body }} title={aria}>
       {label}
       <input
         type="number" value={value} step={step}
         onChange={e => onChange(Number(e.target.value))}
-        className="px-1.5 py-1 border text-[11px] font-mono"
-        style={{ borderColor: rule, background: "var(--paper-bg)", color: ink, width }}
-        aria-label={`${label} setting`}
+        className="px-1.5 py-1 border text-[12px] font-mono focus-visible:outline focus-visible:outline-2"
+        style={{ borderColor: rule, background: "var(--paper-bg)", color: ink, width, outlineColor: accent }}
+        aria-label={aria}
       />
     </label>
   );
@@ -232,7 +235,7 @@ export default function FantasyPage() {
         type="button"
         onClick={() => sortBy(k)}
         title={title}
-        className="font-black uppercase tracking-[0.12em] text-[9px] focus-visible:outline focus-visible:outline-2"
+        className="font-black uppercase tracking-[0.12em] text-[10px] focus-visible:outline focus-visible:outline-2"
         style={{ color: sortKey === k ? accent : ink, background: "transparent", cursor: "pointer", outlineColor: accent }}
         aria-label={`Sort by ${label}`}
       >
@@ -266,33 +269,64 @@ export default function FantasyPage() {
 
         {/* League settings */}
         <section className="pt-4" aria-label="League settings">
-          <details className="border" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
-            <summary className="px-3 py-2 text-[10px] font-black font-mono uppercase tracking-[0.2em]" style={{ color: ink, cursor: "pointer" }}>
+          <details className="border" style={{ borderColor: rule, background: "var(--paper-inset)" }} open>
+            <summary className="px-3 py-2.5 text-[12px] font-black font-mono uppercase tracking-[0.18em]" style={{ color: ink, cursor: "pointer" }}>
               League Settings — {settings.teams} teams · {settings.starters.C}C/{settings.starters.W}W/{settings.starters.D}D ·
               G×{settings.scoring.G} A×{settings.scoring.A} PPP×{settings.scoring.PPP} HIT×{settings.scoring.HIT} BLK×{settings.scoring.BLK}
             </summary>
-            <div className="px-3 pb-3 flex flex-wrap items-end gap-x-4 gap-y-2">
-              <Num label="G" value={settings.scoring.G} onChange={v => set({ scoring: { ...settings.scoring, G: v } })} step={0.5} />
-              <Num label="A" value={settings.scoring.A} onChange={v => set({ scoring: { ...settings.scoring, A: v } })} step={0.5} />
-              <Num label="PPP" value={settings.scoring.PPP} onChange={v => set({ scoring: { ...settings.scoring, PPP: v } })} step={0.5} />
-              <Num label="HIT" value={settings.scoring.HIT} onChange={v => set({ scoring: { ...settings.scoring, HIT: v } })} step={0.1} />
-              <Num label="BLK" value={settings.scoring.BLK} onChange={v => set({ scoring: { ...settings.scoring, BLK: v } })} step={0.1} />
-              <span className="mx-1 border-l self-stretch" style={{ borderColor: rule }} aria-hidden="true" />
-              <Num label="Teams" value={settings.teams} onChange={v => set({ teams: v })} />
-              <Num label="C slots" value={settings.starters.C} onChange={v => set({ starters: { ...settings.starters, C: v } })} />
-              <Num label="W slots" value={settings.starters.W} onChange={v => set({ starters: { ...settings.starters, W: v } })} />
-              <Num label="D slots" value={settings.starters.D} onChange={v => set({ starters: { ...settings.starters, D: v } })} />
-              <button
-                type="button"
-                onClick={() => setSettings(DEFAULT_FANTASY_SETTINGS)}
-                className="tap-target px-3 py-1.5 text-[10px] font-black font-mono uppercase tracking-[0.12em] border"
-                style={{ borderColor: ink, background: "var(--paper-bg)", color: ink, cursor: "pointer" }}
-              >
-                Reset Defaults
-              </button>
-              <span className="text-[10px] font-mono w-full" style={{ color: faint }}>
-                Settings persist on this device. VBD replacement = league size × starters at each slot.
-              </span>
+            <div className="px-3 pb-3.5 pt-1">
+              <p className="text-[12px] font-mono leading-relaxed mb-3.5 max-w-3xl" style={{ color: body }}>
+                Two dials tune the whole board. <b>Scoring</b> sets the points each stat is worth — that drives the
+                <b> FP/82</b> column. <b>Roster &amp; league size</b> sets how many starters get drafted at each
+                position — that draws the replacement line the <b>VOR</b> column is measured against.
+              </p>
+
+              <fieldset className="border p-3 mb-3" style={{ borderColor: rule }}>
+                <legend className="px-1.5 text-[11px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>
+                  Scoring — points per stat
+                </legend>
+                <div className="flex flex-wrap items-end gap-x-5 gap-y-2.5">
+                  <Num label="Goals"   aria="Goals — points awarded per goal"          value={settings.scoring.G}   onChange={v => set({ scoring: { ...settings.scoring, G: v } })}   step={0.5} />
+                  <Num label="Assists" aria="Assists — points awarded per assist"       value={settings.scoring.A}   onChange={v => set({ scoring: { ...settings.scoring, A: v } })}   step={0.5} />
+                  <Num label="PP Pts"  aria="Power-play points — bonus per PP point"     value={settings.scoring.PPP} onChange={v => set({ scoring: { ...settings.scoring, PPP: v } })} step={0.5} />
+                  <Num label="Hits"    aria="Hits — points awarded per hit"             value={settings.scoring.HIT} onChange={v => set({ scoring: { ...settings.scoring, HIT: v } })} step={0.1} />
+                  <Num label="Blocks"  aria="Blocked shots — points awarded per block"  value={settings.scoring.BLK} onChange={v => set({ scoring: { ...settings.scoring, BLK: v } })} step={0.1} />
+                </div>
+              </fieldset>
+
+              <fieldset className="border p-3" style={{ borderColor: rule }}>
+                <legend className="px-1.5 text-[11px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>
+                  Roster &amp; league size — starters drafted at each position
+                </legend>
+                <div className="flex flex-wrap items-end gap-x-5 gap-y-2.5">
+                  <Num label="Teams"    aria="Teams — number of teams in your league"           value={settings.teams}       onChange={v => set({ teams: v })} />
+                  <Num label="C starters" aria="Center starters per team"    value={settings.starters.C} onChange={v => set({ starters: { ...settings.starters, C: v } })} />
+                  <Num label="W starters" aria="Wing starters per team"      value={settings.starters.W} onChange={v => set({ starters: { ...settings.starters, W: v } })} />
+                  <Num label="D starters" aria="Defense starters per team"   value={settings.starters.D} onChange={v => set({ starters: { ...settings.starters, D: v } })} />
+                </div>
+              </fieldset>
+
+              <p className="text-[12px] font-mono leading-relaxed mt-3" style={{ color: body }}>
+                At <b>{settings.teams} teams</b>, replacement level is the{" "}
+                <b>{replacementRanks(settings).C}th</b> center,{" "}
+                <b>{replacementRanks(settings).W}th</b> winger, and{" "}
+                <b>{replacementRanks(settings).D}th</b> defenseman — the last startable player at each spot.
+                A player&apos;s <b>VOR</b> is how many fantasy points he clears that bar by.
+              </p>
+
+              <div className="flex items-center gap-3 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setSettings(DEFAULT_FANTASY_SETTINGS)}
+                  className="tap-target px-3 py-1.5 text-[11px] font-black font-mono uppercase tracking-[0.12em] border focus-visible:outline focus-visible:outline-2"
+                  style={{ borderColor: ink, background: "var(--paper-bg)", color: ink, cursor: "pointer", outlineColor: accent }}
+                >
+                  Reset Defaults
+                </button>
+                <span className="text-[11px] font-mono" style={{ color: faint }}>
+                  Settings persist on this device.
+                </span>
+              </div>
             </div>
           </details>
         </section>
@@ -380,7 +414,7 @@ export default function FantasyPage() {
                         {e.evidence.length > 0 && (
                           <span className="flex flex-wrap gap-1 mt-1">
                             {e.evidence.map(ev => (
-                              <span key={ev} className="text-[9px] font-black font-mono px-1 border"
+                              <span key={ev} className="text-[10px] font-black font-mono px-1 border"
                                 style={{ color: faint, borderColor: rule, background: "var(--paper-bg)" }}>
                                 {ev}
                               </span>
@@ -393,7 +427,7 @@ export default function FantasyPage() {
                         <span className="block text-[15px] font-black font-mono" style={{ color: "var(--ledger-green)" }}>
                           {e.breakoutPct}%
                         </span>
-                        <span className="block text-[8px] font-black font-mono uppercase tracking-[0.1em]" style={{ color: faint }}>
+                        <span className="block text-[10px] font-black font-mono uppercase tracking-[0.1em]" style={{ color: faint }}>
                           breakout odds
                         </span>
                       </span>
@@ -424,8 +458,8 @@ export default function FantasyPage() {
 
             {/* Draft board */}
             <section className="pt-7" aria-label="Draft board">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                <div className="text-[10px] font-black font-mono uppercase tracking-[0.25em]" style={{ color: faint }}>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
+                <div className="text-[11px] font-black font-mono uppercase tracking-[0.22em]" style={{ color: faint }}>
                   Draft Board — {filtered.length} skaters{taken.size > 0 && ` · ${taken.size} taken`}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -481,10 +515,16 @@ export default function FantasyPage() {
                 </div>
               </div>
 
+              <p className="text-[11px] font-mono leading-relaxed mb-3" style={{ color: body }}>
+                <b>FP/82</b> — fantasy points per 82 games under your scoring.{" "}
+                <b>VOR</b> — value over replacement: points above the last startable player at the position.
+                Sort by VOR to draft across positions; a big VOR is scarce value, not just a big raw total.
+              </p>
+
               <div className="border overflow-x-auto" style={{ borderColor: rule }}>
                 <table className="w-full font-mono" style={{ borderCollapse: "collapse", minWidth: 780 }}>
                   <thead>
-                    <tr className="text-[9px] font-black uppercase tracking-[0.12em]" style={{ background: "var(--paper-inset)", color: ink }}>
+                    <tr className="text-[10px] font-black uppercase tracking-[0.12em]" style={{ background: "var(--paper-inset)", color: ink }}>
                       <th scope="col" className="text-center px-2 py-2" title="Mark taken on draft night">✓</th>
                       <th scope="col" className="text-left px-2 py-2">Rk</th>
                       <th scope="col" className="text-center px-2 py-2" title="Tier — breaks placed at the largest projection drop-offs">Tier</th>
@@ -493,8 +533,8 @@ export default function FantasyPage() {
                       <th scope="col" className="text-left px-2 py-2">Team</th>
                       <th scope="col" className="text-center px-2 py-2">Pos</th>
                       <Th k="age" label="Age" align="center" />
-                      <Th k="fp82" label="FP/82" title="Fantasy points per 82 under your league scoring" />
-                      <Th k="vbd" label="VBD" title="Value over the replacement player for your league size and build" />
+                      <Th k="fp82" label="FP/82" title="Fantasy points per 82 games under your league scoring" />
+                      <Th k="vbd" label="VOR" title="Value Over Replacement — fantasy points above the last startable player at the position for your league size" />
                       <Th k="g82" label="G" />
                       <Th k="a82" label="A" />
                       <Th k="ppp82" label="PPP" />
@@ -529,7 +569,7 @@ export default function FantasyPage() {
                           </td>
                           <td className="px-2 py-1.5 font-black" style={{ color: faint }}>{rank}</td>
                           <td className="px-2 py-1.5 text-center">
-                            <span className="text-[9px] font-black px-1 border" style={{ color: tierColor(r.tier), borderColor: tierColor(r.tier) }}>
+                            <span className="text-[10px] font-black px-1 border" style={{ color: tierColor(r.tier), borderColor: tierColor(r.tier) }}>
                               T{r.tier}
                             </span>
                           </td>
@@ -556,7 +596,7 @@ export default function FantasyPage() {
                           </td>
                           <td className="px-2 py-1.5" title={role ? `Ledger role: ${role.label}` : undefined}>
                             {role ? (
-                              <span className="text-[9px] font-black uppercase tracking-[0.05em] whitespace-nowrap" style={{ color: role.color }}>
+                              <span className="text-[10px] font-black uppercase tracking-[0.05em] whitespace-nowrap" style={{ color: role.color }}>
                                 {role.icon} {role.label}
                               </span>
                             ) : (
@@ -655,7 +695,7 @@ export default function FantasyPage() {
               <div className="border overflow-x-auto" style={{ borderColor: rule }}>
                 <table className="w-full font-mono" style={{ borderCollapse: "collapse", minWidth: 640 }}>
                   <thead>
-                    <tr className="text-[9px] font-black uppercase tracking-[0.12em]" style={{ background: "var(--paper-inset)", color: ink }}>
+                    <tr className="text-[10px] font-black uppercase tracking-[0.12em]" style={{ background: "var(--paper-inset)", color: ink }}>
                       <th scope="col" className="text-left px-2 py-2">Rk</th>
                       <th scope="col" className="text-left px-2 py-2">Goalie</th>
                       <th scope="col" className="text-left px-2 py-2">Team</th>
@@ -692,7 +732,7 @@ export default function FantasyPage() {
                             {g.gsax != null ? `${g.gsax > 0 ? "+" : ""}${g.gsax.toFixed(1)}` : "—"}
                           </td>
                           <td className="px-2 py-1.5 text-center">
-                            <span className="text-[9px] font-black uppercase tracking-[0.08em]" style={{ color: envColor }}>
+                            <span className="text-[10px] font-black uppercase tracking-[0.08em]" style={{ color: envColor }}>
                               {entry.winEnv}
                             </span>
                           </td>

@@ -136,7 +136,7 @@ export default function Footer() {
           <p className="text-2xs uppercase tracking-[0.16em] sm:tracking-[0.36em] leading-relaxed font-mono text-ledger-ink-faint">
             <Link href="/methodology" className="underline hover:text-ledger-ink transition-colors">Methodology</Link> · <Link href="/glossary" className="underline hover:text-ledger-ink transition-colors">Glossary</Link> · <Link href="/glossary#icon-key" className="underline hover:text-ledger-ink transition-colors">Icon Key</Link>
           </p>
-          <p className="mt-1 text-[9px] uppercase tracking-[0.14em] sm:tracking-[0.24em] font-mono text-ledger-rule">
+          <p className="mt-1 text-[10px] uppercase tracking-[0.14em] sm:tracking-[0.24em] font-mono text-ledger-rule">
             X-NAV · G-NAV · NOIV · STRAND · GM Audit
           </p>
         </div>
@@ -148,7 +148,7 @@ export default function Footer() {
             style={{ borderColor: "var(--ledger-rule)" }}>
             Icon Key
           </div>
-          <div className="px-4 pt-3 font-mono text-[9px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint">
+          <div className="px-4 pt-3 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint">
             Asset Flags
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 p-4">
@@ -169,7 +169,7 @@ export default function Footer() {
               </div>
             ))}
           </div>
-          <div className="px-4 pt-1 font-mono text-[9px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint border-t"
+          <div className="px-4 pt-1 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint border-t"
             style={{ borderColor: "var(--ledger-rule-light, var(--ledger-rule))" }}>
             <span className="inline-block pt-2">Modern Role Icons</span>
           </div>
@@ -191,7 +191,7 @@ export default function Footer() {
               </div>
             ))}
           </div>
-          <div className="px-4 pt-1 font-mono text-[9px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint border-t"
+          <div className="px-4 pt-1 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint border-t"
             style={{ borderColor: "var(--ledger-rule-light, var(--ledger-rule))" }}>
             <span className="inline-block pt-2">Gravity Tiers</span>
           </div>
@@ -256,7 +256,7 @@ export default function Footer() {
           ))}
         </div>
 
-        <p className="mt-4 text-center text-[9px] leading-relaxed font-mono text-ledger-rule">
+        <p className="mt-4 text-center text-[10px] leading-relaxed font-mono text-ledger-rule">
           Analytical estimates only. Player values move with injury, role, performance, contract status, source coverage, and team context.
         </p>
       </div>

@@ -2220,4 +2220,24 @@ describe("Canary — fantasy page AA, pagination, and selection accent", () => {
     // Keyboard focus is visible on the interactive controls.
     expect(page).toContain("focus-visible:outline");
   });
+
+  it("labels the value-over-replacement column in plain language and explains it", () => {
+    const page = read("app/fantasy/page.tsx");
+    // The column is labeled VOR (not the opaque "VBD") and spelled out somewhere.
+    expect(page).toContain('label="VOR"');
+    expect(page).not.toContain('label="VBD"');
+    expect(page).toContain("Value Over Replacement");
+    // League settings show the live replacement line so the concept is concrete.
+    expect(page).toContain("replacementRanks(settings)");
+    expect(page).toContain("replacement level");
+  });
+
+  it("keeps league settings self-explanatory — grouped scoring vs roster fieldsets", () => {
+    const page = read("app/fantasy/page.tsx");
+    expect(page).toContain("Scoring — points per stat");
+    expect(page).toMatch(/Roster &amp; league size/);
+    // No sub-10px type left on the fantasy board (AA legibility floor).
+    expect(page).not.toContain("text-[9px]");
+    expect(page).not.toContain("text-[8px]");
+  });
 });
