@@ -20,7 +20,7 @@ describe("nicknameMergeKey", () => {
 });
 
 describe("dedupeSameTeamNicknames", () => {
-  const rec = (name: string, teamId: string, over: Record<string, any> = {}) => ({
+  const rec = (name: string, teamId: string, over: Record<string, any> = {}): any => ({
     id: name.toLowerCase().replace(/\s+/g, ""), name, teamId, position: "C", ...over,
   });
 

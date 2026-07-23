@@ -2191,3 +2191,33 @@ describe("Canary — same-team nickname dedup (Matt / Matthew Savoie)", () => {
     expect(assembly).toMatch(/dedupePlayersByAuthority[\s\S]*dedupeSameTeamNicknames/);
   });
 });
+
+describe("Canary — Outlook credibility (confidence cap, trend reconciliation, D-EDGE)", () => {
+  it("keeps the four real-data credibility fixes wired in player-outlook.ts", () => {
+    const src = read("app/lib/player-outlook.ts");
+    // 1) Confidence never reads 100 — capped at 99.
+    expect(src).toMatch(/Math\.min\(\s*99/);
+    // 2) Proportional trajectory threshold — a lone down year off a strong run is not "cooling".
+    expect(src).toContain("trajectoryDirection");
+    // 3) DECLINING age + RISING points reconciles to a high-risk read, not a flat "declining".
+    expect(src).toContain("HIGH RISK");
+    // 4) Defensemen get their own EDGE reads (never finishing luck).
+    expect(src).toContain("defenseEdgeReads");
+    expect(src).toContain("forwardEdgeReads");
+  });
+});
+
+describe("Canary — fantasy page AA, pagination, and selection accent", () => {
+  it("keeps keyboard-visible focus, windowed pagination, and a non-ink selection color", () => {
+    const page = read("app/fantasy/page.tsx");
+    // Pagination replaced the "show 50 more" accumulator.
+    expect(page).toContain("pageNumbers");
+    expect(page).not.toContain("Show 50 More");
+    expect(page).toContain('aria-label="Draft board pagination"');
+    // Selection uses a distinct accent, not the ink color.
+    expect(page).toContain("accentInk");
+    expect(page).toContain("var(--ledger-navy");
+    // Keyboard focus is visible on the interactive controls.
+    expect(page).toContain("focus-visible:outline");
+  });
+});

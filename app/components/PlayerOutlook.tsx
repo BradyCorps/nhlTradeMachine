@@ -30,12 +30,18 @@ export function PlayerOutlook({ asset }: { asset: Asset }) {
     () => profile ? deriveOutlook(profile, {
       age: asset.age,
       games: asset.games,
+      position: asset.position,
       edgeSpeedMaxMph: asset.edgeSpeedMaxMph,
       edgeBurstsOver20: asset.edgeBurstsOver20,
       hdFinishingDelta: asset.hdFinishingDelta,
       edgeOzPct: asset.edgeOzPct,
+      ppPtsPace82: (asset as any).ppPtsPace82,
+      assistsPace: asset.assistsPace,
+      baselineBlocks82: (asset as any).baselineBlocks82,
+      xgaRelTM: asset.xgaRelTM,
+      avgTOI: asset.avgTOI,
     }) : null,
-    [profile, asset.age, asset.games, asset.edgeSpeedMaxMph, asset.edgeBurstsOver20, asset.hdFinishingDelta, asset.edgeOzPct],
+    [profile, asset],
   );
 
   if (!outlook || asset.position === "Pick" || asset.position === "G") {

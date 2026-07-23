@@ -21,10 +21,18 @@ export type TrajectoryDirection = "RISING" | "STEADY" | "COOLING" | "UNKNOWN";
 export interface OutlookEdgeInput {
   age?: number | null;
   games?: number | null;
+  position?: string | null;
   edgeSpeedMaxMph?: number | null;
   edgeBurstsOver20?: number | null;
   hdFinishingDelta?: number | null;
   edgeOzPct?: number | null;
+  // Defenseman-relevant signals — a D's value is transition, power play,
+  // suppression and blocks, not finishing.
+  ppPtsPace82?: number | null;
+  assistsPace?: number | null;
+  baselineBlocks82?: number | null;
+  xgaRelTM?: number | null;   // on-ice chance suppression (lower is better)
+  avgTOI?: number | null;
 }
 
 export interface OutlookSeason {
@@ -67,13 +75,19 @@ export function parseTrajectory(labels: string[] | undefined): OutlookSeason[] {
   return out;
 }
 
-// Direction from first→last pace across the trajectory. An 8 pts/82 swing is
-// the threshold — smaller than that is within season-to-season noise.
+// Direction of the scoring trend. Compares the most recent season to the
+// baseline of the earlier ones, with a threshold PROPORTIONAL to that
+// baseline — a 90-point scorer naturally swings ±8, so one down year off a
+// strong run (Hughes 92 · 92 · 84) is noise, not "cooling," while a 52 → 69
+// climb is a real rise. Absolute floor of 10 keeps low-scorers sane.
 export function trajectoryDirection(seasons: OutlookSeason[]): TrajectoryDirection {
   if (seasons.length < 2) return "UNKNOWN";
-  const delta = seasons[seasons.length - 1].pace - seasons[0].pace;
-  if (delta >= 8) return "RISING";
-  if (delta <= -8) return "COOLING";
+  const recent = seasons[seasons.length - 1].pace;
+  const prior = seasons.slice(0, -1);
+  const baseline = prior.reduce((s, x) => s + x.pace, 0) / prior.length;
+  const threshold = Math.max(10, baseline * 0.13);
+  if (recent >= baseline + threshold) return "RISING";
+  if (recent <= baseline - threshold) return "COOLING";
   return "STEADY";
 }
 
@@ -87,7 +101,80 @@ function bursts82(edge: OutlookEdgeInput): number | null {
 
 // EDGE leading indicators — each present signal becomes a plain read of what
 // it says about next season. Absent signals are skipped, never faked.
+// Position-aware: a defenseman's value is transition, power play, chance
+// suppression and blocks — not finishing luck — so D gets its own reads.
 export function edgeReads(edge: OutlookEdgeInput, isVet: boolean): OutlookEdgeRead[] {
+  return edge.position === "D" ? defenseEdgeReads(edge) : forwardEdgeReads(edge, isVet);
+}
+
+function defenseEdgeReads(edge: OutlookEdgeInput): OutlookEdgeRead[] {
+  const reads: OutlookEdgeRead[] = [];
+
+  // Power play — the single biggest driver of blue-line fantasy points.
+  if (edge.ppPtsPace82 != null) {
+    const pp = edge.ppPtsPace82;
+    const tone: OutlookTone = pp >= 15 ? "good" : pp >= 6 ? "neutral" : "warn";
+    const read = pp >= 15
+      ? "Runs a power play — the engine of blue-line fantasy points"
+      : pp >= 6
+        ? "Secondary power-play role — modest point support"
+        : "Little power-play time — even-strength points only, a low ceiling";
+    reads.push({ label: "Power Play", value: `${Math.round(pp)} PPP/82`, read, tone });
+  }
+
+  // Mobility / transition — for a D, wheels turn into carries and assists.
+  const b82 = bursts82(edge);
+  if (edge.edgeSpeedMaxMph != null || b82 != null) {
+    const s = edge.edgeSpeedMaxMph;
+    const mobile = (s != null && s >= 22.5) || (b82 != null && b82 >= 55);
+    const tone: OutlookTone = mobile ? "good" : "neutral";
+    const value = s != null ? `${s.toFixed(1)} mph` : `${b82}/82`;
+    const read = mobile
+      ? "Mobile puck-mover — activates in the rush, and that transition is where his assists come from"
+      : "Positional over rangy — value leans defensive, not offensive";
+    reads.push({ label: "Mobility", value, read, tone });
+  }
+
+  // Chance suppression — the defensive value the box score hides.
+  if (edge.xgaRelTM != null) {
+    const supp = -edge.xgaRelTM; // higher = stingier
+    const tone: OutlookTone = supp >= 0.3 ? "good" : supp >= -0.1 ? "neutral" : "warn";
+    const read = supp >= 0.3
+      ? "Suppresses chances against — real defensive value beyond the points"
+      : supp >= -0.1
+        ? "Roughly neutral defensively"
+        : "Chances tick up with him on the ice — a defensive liability";
+    reads.push({ label: "Chance Suppression", value: `${supp >= 0 ? "+" : ""}${supp.toFixed(2)}`, read, tone });
+  }
+
+  // Blocks — a real category stat for defensemen.
+  if (edge.baselineBlocks82 != null) {
+    const blk = edge.baselineBlocks82;
+    const tone: OutlookTone = blk >= 140 ? "good" : blk >= 80 ? "neutral" : "warn";
+    const read = blk >= 140
+      ? "Heavy shot-blocking volume — a category asset in peripheral leagues"
+      : blk >= 80
+        ? "Moderate shot-blocking"
+        : "Low block volume";
+    reads.push({ label: "Blocks", value: `${Math.round(blk)}/82`, read, tone });
+  }
+
+  // Deployment as context if there's still room.
+  if (edge.edgeOzPct != null && reads.length < 4) {
+    const oz = edge.edgeOzPct * 100;
+    const tone: OutlookTone = oz >= 55 ? "good" : "neutral";
+    const read = oz >= 55
+      ? "Sheltered for offense — an offensive-role deployment"
+      : oz >= 45
+        ? "Balanced zone deployment"
+        : "Defensive-zone-heavy — a shutdown role (defensively valuable, fantasy-light)";
+    reads.push({ label: "OZ Time", value: `${oz.toFixed(0)}%`, read, tone });
+  }
+
+  return reads;
+}
+
+function forwardEdgeReads(edge: OutlookEdgeInput, isVet: boolean): OutlookEdgeRead[] {
   const reads: OutlookEdgeRead[] = [];
 
   if (edge.edgeSpeedMaxMph != null) {
@@ -173,8 +260,15 @@ function headlineFor(
       if (cooling) return { headline: "AT PEAK — COOLING", tone: "neutral", summary: "Still prime-aged, but the scoring trend has flattened off its high." };
       return { headline: "IN HIS PRIME", tone: "good", summary: peakLeft != null ? `Prime production, roughly ${peakLeft} peak-level year${peakLeft === 1 ? "" : "s"} left in the projection.` : "Peak-window production with the arrow holding level." };
     case "REGRESSION_RISK":
+      if (rising) return { headline: "RISING — BUT REGRESSION-FLAGGED", tone: "warn", summary: "Points are climbing, but the model prices a pullback — a boom-or-bust hold, not a safe one." };
       return { headline: "REGRESSION RISK", tone: "warn", summary: "The projection sits below the recent scoring line — some pullback is priced in." };
     case "DECLINING":
+      // Age says decline, but the recent points are still climbing — don't
+      // print a flat "declining" over a rising line (the Carlson case).
+      // Surface the tension as risk, not a contradiction.
+      if (rising) {
+        return { headline: "DEFYING THE CURVE — HIGH RISK", tone: "warn", summary: (age != null ? `At ${age}, ` : "") + "the points are still rising, but age says bet on the fall coming, not more — a high-variance, short-runway hold." };
+      }
       if (peakLeft != null && peakLeft >= 2 && !cooling) {
         return { headline: "PROVEN — HOLDING FORM", tone: "neutral", summary: "Past the age peak but the production line hasn't cracked yet." };
       }
@@ -195,7 +289,9 @@ export function deriveOutlook(profile: DevelopmentProfile, edge: OutlookEdgeInpu
     headline,
     tone,
     summary,
-    confidence: profile.confidenceScore ?? profile.projectionBand.confidence,
+    // Never claim 100% — no projection is certain. Cap the displayed
+    // confidence just below it.
+    confidence: Math.min(99, profile.confidenceScore ?? profile.projectionBand.confidence),
     trajectory: {
       direction,
       seasons,

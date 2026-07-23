@@ -45,12 +45,31 @@ const ink = "var(--ledger-ink)";
 const body = "var(--ledger-ink-body, var(--ledger-ink))";
 const faint = "var(--ledger-ink-faint)";
 const rule = "var(--ledger-rule)";
+// Selected/active states use a distinct accent — a navy that reads as
+// "selected" — rather than the near-black ink, which was too heavy.
+const accent = "var(--ledger-navy, #1a2e5c)";
+const accentInk = "#f2ecd7";
+const PAGE_SIZE = 50;
 
 const TIER_COLORS = [
   "var(--ledger-red)", "var(--ledger-navy, #1a2e5c)", "var(--ledger-green)",
   "var(--ledger-brown, #6e5a3d)", "var(--ledger-ink)",
 ];
 const tierColor = (t: number) => TIER_COLORS[(t - 1) % TIER_COLORS.length];
+
+// Windowed page list: first, last, and a run around the current page, with
+// "…" gaps — so 15 pages don't print 15 buttons.
+function pageNumbers(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const out: (number | "…")[] = [1];
+  const lo = Math.max(2, current - 1);
+  const hi = Math.min(total - 1, current + 1);
+  if (lo > 2) out.push("…");
+  for (let n = lo; n <= hi; n++) out.push(n);
+  if (hi < total - 1) out.push("…");
+  out.push(total);
+  return out;
+}
 
 function fmt(v: number | null | undefined, d = 0): string {
   return v == null ? "—" : v.toFixed(d);
@@ -93,7 +112,7 @@ export default function FantasyPage() {
   const [error, setError] = useState<string | null>(null);
   const [posFilter, setPosFilter] = useState<"ALL" | "C" | "W" | "D">("ALL");
   const [search, setSearch] = useState("");
-  const [shown, setShown] = useState(50);
+  const [page, setPage] = useState(1);
   const [sortKey, setSortKey] = useState<SortKey>("fp82");
   const [sortDesc, setSortDesc] = useState(true);
   const [settings, setSettings] = useState<FantasySettings>(DEFAULT_FANTASY_SETTINGS);
@@ -154,6 +173,14 @@ export default function FantasyPage() {
     return sortRows(rows, sortKey, sortDesc);
   }, [board, posFilter, search, sortKey, sortDesc, hideTaken, taken, teamName]);
 
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const pageRows = filtered.slice(pageStart, pageStart + PAGE_SIZE);
+
+  // Any change to what's shown resets to the first page.
+  useEffect(() => { setPage(1); }, [posFilter, search, sortKey, sortDesc, hideTaken]);
+
   const { buyLow, sellHigh } = useMemo(() => {
     const qualified = board.filter(r => (r.p.games ?? 0) >= 20 && (r.p.xGPace ?? 0) > 0);
     const withLuck = qualified.map(r => ({ r, luck: (r.g82 ?? 0) - (r.p.xGPace ?? 0) }));
@@ -205,8 +232,8 @@ export default function FantasyPage() {
         type="button"
         onClick={() => sortBy(k)}
         title={title}
-        className="font-black uppercase tracking-[0.12em] text-[9px]"
-        style={{ color: ink, background: "transparent", cursor: "pointer" }}
+        className="font-black uppercase tracking-[0.12em] text-[9px] focus-visible:outline focus-visible:outline-2"
+        style={{ color: sortKey === k ? accent : ink, background: "transparent", cursor: "pointer", outlineColor: accent }}
         aria-label={`Sort by ${label}`}
       >
         {label}{sortKey === k ? (sortDesc ? " ▾" : " ▴") : ""}
@@ -407,12 +434,13 @@ export default function FantasyPage() {
                       key={pos}
                       onClick={() => setPosFilter(pos)}
                       aria-pressed={posFilter === pos}
-                      className="tap-target px-3 py-1 text-[10px] font-black font-mono uppercase tracking-[0.1em] border"
+                      className="tap-target px-3 py-1 text-[10px] font-black font-mono uppercase tracking-[0.1em] border focus-visible:outline focus-visible:outline-2"
                       style={{
-                        background: posFilter === pos ? ink : "var(--paper-inset)",
-                        color: posFilter === pos ? "var(--paper-bg)" : ink,
-                        borderColor: ink,
+                        background: posFilter === pos ? accent : "var(--paper-inset)",
+                        color: posFilter === pos ? accentInk : ink,
+                        borderColor: posFilter === pos ? accent : rule,
                         cursor: "pointer",
+                        outlineColor: accent,
                       }}
                     >
                       {pos}
@@ -421,12 +449,13 @@ export default function FantasyPage() {
                   <button
                     onClick={() => setHideTaken(h => !h)}
                     aria-pressed={hideTaken}
-                    className="tap-target px-3 py-1 text-[10px] font-black font-mono uppercase tracking-[0.1em] border"
+                    className="tap-target px-3 py-1 text-[10px] font-black font-mono uppercase tracking-[0.1em] border focus-visible:outline focus-visible:outline-2"
                     style={{
                       background: hideTaken ? "var(--ledger-red)" : "var(--paper-inset)",
                       color: hideTaken ? "var(--paper-bg)" : ink,
                       borderColor: hideTaken ? "var(--ledger-red)" : ink,
                       cursor: "pointer",
+                      outlineColor: accent,
                     }}
                   >
                     Hide Taken
@@ -434,8 +463,8 @@ export default function FantasyPage() {
                   {taken.size > 0 && (
                     <button
                       onClick={() => setTaken(new Set())}
-                      className="tap-target px-3 py-1 text-[10px] font-black font-mono uppercase tracking-[0.1em] border"
-                      style={{ background: "var(--paper-inset)", color: "var(--ledger-red)", borderColor: rule, cursor: "pointer" }}
+                      className="tap-target px-3 py-1 text-[10px] font-black font-mono uppercase tracking-[0.1em] border focus-visible:outline focus-visible:outline-2"
+                      style={{ background: "var(--paper-inset)", color: "var(--ledger-red)", borderColor: rule, cursor: "pointer", outlineColor: accent }}
                     >
                       Reset Draft
                     </button>
@@ -446,8 +475,8 @@ export default function FantasyPage() {
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Search player or team…"
                     aria-label="Search draft board by player or team name"
-                    className="px-2 py-1 text-[11px] font-mono border"
-                    style={{ borderColor: rule, background: "var(--paper-bg)", color: ink, minWidth: 190 }}
+                    className="px-2 py-1 text-[11px] font-mono border focus-visible:outline focus-visible:outline-2"
+                    style={{ borderColor: rule, background: "var(--paper-bg)", color: ink, minWidth: 190, outlineColor: accent }}
                   />
                 </div>
               </div>
@@ -474,7 +503,8 @@ export default function FantasyPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.slice(0, shown).map((r, i) => {
+                    {pageRows.map((r, i) => {
+                      const rank = pageStart + i + 1;
                       const isTaken = taken.has(r.p.id);
                       const isExpanded = expandedId === r.p.id;
                       const role = roleMap.get(r.p.id);
@@ -497,7 +527,7 @@ export default function FantasyPage() {
                               style={{ cursor: "pointer" }}
                             />
                           </td>
-                          <td className="px-2 py-1.5 font-black" style={{ color: faint }}>{i + 1}</td>
+                          <td className="px-2 py-1.5 font-black" style={{ color: faint }}>{rank}</td>
                           <td className="px-2 py-1.5 text-center">
                             <span className="text-[9px] font-black px-1 border" style={{ color: tierColor(r.tier), borderColor: tierColor(r.tier) }}>
                               T{r.tier}
@@ -509,12 +539,13 @@ export default function FantasyPage() {
                               onClick={e => { e.stopPropagation(); setExpandedId(prev => prev === r.p.id ? null : r.p.id); }}
                               aria-expanded={isExpanded}
                               aria-label={`${isExpanded ? "Hide" : "Show"} ${r.p.name}'s Ledger outlook`}
-                              className="mr-1.5 inline-flex items-center justify-center align-middle border"
+                              className="mr-1.5 inline-flex items-center justify-center align-middle border focus-visible:outline focus-visible:outline-2"
                               style={{
                                 width: 26, height: 26, fontSize: 12,
-                                color: isExpanded ? "var(--paper-bg)" : ink,
-                                background: isExpanded ? ink : "var(--paper-inset)",
-                                borderColor: rule, cursor: "pointer",
+                                color: isExpanded ? accentInk : ink,
+                                background: isExpanded ? accent : "var(--paper-inset)",
+                                borderColor: isExpanded ? accent : rule, cursor: "pointer",
+                                outlineColor: accent,
                               }}
                             >
                               {isExpanded ? "▾" : "▸"}
@@ -562,14 +593,53 @@ export default function FantasyPage() {
                   </tbody>
                 </table>
               </div>
-              {filtered.length > shown && (
-                <button
-                  onClick={() => setShown(s => s + 50)}
-                  className="tap-target mt-3 w-full py-2 text-[10px] font-black font-mono uppercase tracking-[0.2em] border"
-                  style={{ borderColor: ink, background: "var(--paper-inset)", color: ink, cursor: "pointer" }}
-                >
-                  Show 50 More ({filtered.length - shown} remaining)
-                </button>
+              {pageCount > 1 && (
+                <nav className="mt-3 flex flex-wrap items-center justify-between gap-2" aria-label="Draft board pagination">
+                  <span className="text-[10px] font-mono" style={{ color: faint }}>
+                    Showing {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, filtered.length)} of {filtered.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={safePage <= 1}
+                      aria-label="Previous page"
+                      className="tap-target px-3 py-1.5 text-[10px] font-black font-mono uppercase tracking-[0.12em] border focus-visible:outline focus-visible:outline-2 disabled:opacity-40"
+                      style={{ borderColor: rule, background: "var(--paper-inset)", color: ink, cursor: safePage <= 1 ? "default" : "pointer", outlineColor: accent }}
+                    >
+                      ‹ Prev
+                    </button>
+                    {pageNumbers(safePage, pageCount).map((n, idx) =>
+                      n === "…" ? (
+                        <span key={`gap-${idx}`} className="px-1.5 text-[10px] font-mono" style={{ color: faint }} aria-hidden="true">…</span>
+                      ) : (
+                        <button
+                          key={n}
+                          onClick={() => setPage(n as number)}
+                          aria-label={`Page ${n}`}
+                          aria-current={n === safePage ? "page" : undefined}
+                          className="tap-target min-w-[30px] px-2 py-1.5 text-[10px] font-black font-mono border focus-visible:outline focus-visible:outline-2"
+                          style={{
+                            borderColor: n === safePage ? accent : rule,
+                            background: n === safePage ? accent : "var(--paper-inset)",
+                            color: n === safePage ? accentInk : ink,
+                            cursor: "pointer", outlineColor: accent,
+                          }}
+                        >
+                          {n}
+                        </button>
+                      ),
+                    )}
+                    <button
+                      onClick={() => setPage(p => Math.min(pageCount, p + 1))}
+                      disabled={safePage >= pageCount}
+                      aria-label="Next page"
+                      className="tap-target px-3 py-1.5 text-[10px] font-black font-mono uppercase tracking-[0.12em] border focus-visible:outline focus-visible:outline-2 disabled:opacity-40"
+                      style={{ borderColor: rule, background: "var(--paper-inset)", color: ink, cursor: safePage >= pageCount ? "default" : "pointer", outlineColor: accent }}
+                    >
+                      Next ›
+                    </button>
+                  </div>
+                </nav>
               )}
             </section>
 

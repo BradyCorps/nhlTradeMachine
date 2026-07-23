@@ -30,11 +30,25 @@ describe("parseTrajectory + trajectoryDirection", () => {
     ]);
   });
 
-  it("classifies direction on an 8 pts/82 threshold", () => {
+  it("classifies direction with a proportional threshold", () => {
     expect(trajectoryDirection([{ season: "a", pace: 40 }, { season: "b", pace: 60 }])).toBe("RISING");
     expect(trajectoryDirection([{ season: "a", pace: 60 }, { season: "b", pace: 40 }])).toBe("COOLING");
     expect(trajectoryDirection([{ season: "a", pace: 60 }, { season: "b", pace: 63 }])).toBe("STEADY");
     expect(trajectoryDirection([{ season: "a", pace: 60 }])).toBe("UNKNOWN");
+  });
+
+  it("does not call one down year off a strong run 'cooling' (the Hughes case)", () => {
+    // 92 · 92 · 84 — a modest dip on a 90-point scorer is noise, not decline.
+    expect(trajectoryDirection([
+      { season: "23-24", pace: 92 }, { season: "24-25", pace: 92 }, { season: "25-26", pace: 84 },
+    ])).toBe("STEADY");
+  });
+
+  it("still catches a real climb (the Carlson points case)", () => {
+    // 52 · 53 · 69 — the recent year is well above baseline.
+    expect(trajectoryDirection([
+      { season: "23-24", pace: 52 }, { season: "24-25", pace: 53 }, { season: "25-26", pace: 69 },
+    ])).toBe("RISING");
   });
 });
 
@@ -103,5 +117,63 @@ describe("deriveOutlook headline", () => {
     const o = deriveOutlook(baseProfile({ timelineTrend: "VOLATILE" }), { age: 24, games: 18 });
     expect(o.headline).toBe("UNSETTLED");
     expect(o.tone).toBe("warn");
+  });
+});
+
+describe("Outlook credibility fixes (from real-data review)", () => {
+  it("never claims 100% confidence — caps at 99", () => {
+    const o = deriveOutlook(
+      baseProfile({ confidenceScore: 100, projectionBand: { floorPts82: 70, medianPts82: 80, ceilingPts82: 90, confidence: 100 } }),
+      { age: 26, games: 82 },
+    );
+    expect(o.confidence).toBe(99);
+  });
+
+  it("reconciles DECLINING age with a RISING trend as high risk, not a flat 'declining'", () => {
+    // Carlson: age says past-peak, but points 52 · 53 · 69 are climbing.
+    const o = deriveOutlook(
+      baseProfile({
+        developmentPhase: "DECLINING", timelineTrend: "RISING", peakYearsLeft: 0,
+        scoringTrajectory: ["2023-24: 52 pts/82", "2024-25: 53 pts/82", "2025-26: 69 pts/82"],
+      }),
+      { age: 36, games: 78 },
+    );
+    expect(o.trajectory.direction).toBe("RISING");
+    expect(o.headline).toContain("HIGH RISK");
+    expect(o.headline).not.toBe("PAST PEAK — DECLINING");
+    expect(o.tone).toBe("warn");
+  });
+
+  it("a genuinely declining vet still reads PAST PEAK — DECLINING", () => {
+    const o = deriveOutlook(
+      baseProfile({
+        developmentPhase: "DECLINING", timelineTrend: "FALLING", peakYearsLeft: 0,
+        scoringTrajectory: ["2023-24: 70 pts/82", "2024-25: 55 pts/82", "2025-26: 42 pts/82"],
+      }),
+      { age: 36, games: 70 },
+    );
+    expect(o.headline).toBe("PAST PEAK — DECLINING");
+    expect(o.tone).toBe("bad");
+  });
+
+  it("defensemen get D-oriented EDGE reads — power play, mobility, suppression, blocks — not finishing luck", () => {
+    const reads = edgeReads({
+      position: "D",
+      edgeSpeedMaxMph: 22.9, edgeBurstsOver20: 60, games: 82,
+      hdFinishingDelta: -0.05,          // present but must be ignored for a D
+      ppPtsPace82: 18, xgaRelTM: -0.4, baselineBlocks82: 150, edgeOzPct: 0.42,
+    }, false);
+    const labels = reads.map(r => r.label);
+    expect(labels).toContain("Power Play");
+    expect(labels).toContain("Mobility");
+    expect(labels).toContain("Chance Suppression");
+    expect(labels).not.toContain("Finishing Luck");   // never for a D
+    expect(reads.find(r => r.label === "Power Play")!.read).toMatch(/power play/i);
+  });
+
+  it("forwards keep finishing/speed reads (position defaults to forward)", () => {
+    const labels = edgeReads({ hdFinishingDelta: -0.04, edgeSpeedMaxMph: 23 }, false).map(r => r.label);
+    expect(labels).toContain("Finishing Luck");
+    expect(labels).toContain("Top Speed");
   });
 });
