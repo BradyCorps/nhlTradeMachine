@@ -14,6 +14,15 @@ import { computeBreakout } from "@/app/lib/breakout-model";
 import { burstProfile } from "@/app/lib/burst-channel";
 import { computeGravity, simOnIceDelta } from "@/app/lib/gravity";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
+import {
+  DIVISIONS,
+  EASTERN,
+  simulateSeries,
+  simulatePlayoffs,
+  type PlayoffSeries,
+  type ConferenceBracket,
+  type PlayoffBracket,
+} from "@/app/lib/playoff-bracket";
 
 // ── Types ─────────────────────────────────────────────────────
 interface SimPlayer {
@@ -89,26 +98,6 @@ interface ProjectedSkaterSeason {
   gamesPlayed: number;
   projectedTOI: number;
   breakoutTag?: "BREAKOUT" | "REGRESSION" | "VETERAN_HOLD" | "CAREER_YEAR";
-}
-
-interface PlayoffSeries {
-  home:     { teamId: string; teamName: string; pts: number };
-  away:     { teamId: string; teamName: string; pts: number };
-  winner:   { teamId: string; teamName: string };
-  homeWins: number;
-  awayWins: number;
-}
-interface ConferenceBracket {
-  r1:       PlayoffSeries[];
-  r2:       PlayoffSeries[];
-  cf:       PlayoffSeries;
-  champion: { teamId: string; teamName: string };
-}
-interface PlayoffBracket {
-  eastern: ConferenceBracket;
-  western: ConferenceBracket;
-  final:   PlayoffSeries;
-  champion: { teamId: string; teamName: string };
 }
 
 interface TradeRecord {
@@ -679,14 +668,7 @@ interface SimTeamResult {
   division: string;
 }
 
-// ── Division/conference structure ─────────────────────────────
-const DIVISIONS: Record<string, string[]> = {
-  Atlantic:     ["BOS","BUF","DET","FLA","MTL","OTT","TBL","TOR"],
-  Metropolitan: ["CAR","CBJ","NJD","NYI","NYR","PHI","PIT","WSH"],
-  Central:      ["UTA","CHI","COL","DAL","MIN","NSH","STL","WPG"],
-  Pacific:      ["ANA","CGY","EDM","LAK","SEA","SJS","VAN","VGK"],
-};
-const EASTERN = new Set([...DIVISIONS.Atlantic, ...DIVISIONS.Metropolitan]);
+// Division/conference structure + bracket sim live in app/lib/playoff-bracket.ts.
 
 function assignPlayoffSeeds(results: SimTeamResult[]): SimTeamResult[] {
   const byId = new Map(results.map(r => [r.teamId, r]));
@@ -739,145 +721,6 @@ function assignPlayoffSeeds(results: SimTeamResult[]): SimTeamResult[] {
   return results;
 }
 
-// ── Simulate a single playoff series ─────────────────────────
-function simulateSeries(high: SimTeamResult, low: SimTeamResult, rand: () => number): PlayoffSeries {
-  const gap     = high.projectedPoints - low.projectedPoints;
-  const winProb = Math.min(0.72, Math.max(0.35, 0.50 + gap * 0.0025));
-  let highWins = 0, lowWins = 0;
-  while (highWins < 4 && lowWins < 4) {
-    if (rand() < winProb) highWins++; else lowWins++;
-  }
-  const winner = highWins === 4 ? high : low;
-  return {
-    home:     { teamId: high.teamId, teamName: high.teamName, pts: high.projectedPoints },
-    away:     { teamId: low.teamId,  teamName: low.teamName,  pts: low.projectedPoints  },
-    winner:   { teamId: winner.teamId, teamName: winner.teamName },
-    homeWins: highWins,
-    awayWins: lowWins,
-  };
-}
-
-function simulateSeriesByStrength(a: SimTeamResult, b: SimTeamResult, rand: () => number): PlayoffSeries {
-  return a.projectedPoints >= b.projectedPoints
-    ? simulateSeries(a, b, rand)
-    : simulateSeries(b, a, rand);
-}
-
-// ── Simulate conference playoff bracket (NHL format since 2014) ──
-// Round 1: Top div winner vs WC2 · Other div winner vs WC1
-//          Top div 2nd vs 3rd   · Other div 2nd vs 3rd
-// Round 2: Winners stay on their bracket side (no re-seeding)
-// Conf Final: R2 winners
-function simulateConference(
-  seeds: SimTeamResult[],
-  conf: "E" | "W",
-  rand: () => number,
-): ConferenceBracket {
-  const uniqueSeeds = Array.from(
-    new Map(seeds.map((team) => [team.teamId, team])).values()
-  ).sort((a, b) =>
-    b.projectedPoints !== a.projectedPoints
-      ? b.projectedPoints - a.projectedPoints
-      : a.teamId.localeCompare(b.teamId)
-  );
-
-  if (uniqueSeeds.length < 2) {
-    throw new Error("Cannot simulate conference playoffs with fewer than two unique teams");
-  }
-
-  const divNames = conf === "E"
-    ? ["Atlantic", "Metropolitan"]
-    : ["Central", "Pacific"];
-
-  const seedById = new Map(uniqueSeeds.map((team) => [team.teamId, team]));
-  const usedSlots = new Set<string>();
-  const takeFallback = (avoidTeamId?: string): SimTeamResult => {
-    const team = uniqueSeeds.find(t => t.teamId !== avoidTeamId && !usedSlots.has(t.teamId))
-      ?? uniqueSeeds.find(t => t.teamId !== avoidTeamId)
-      ?? uniqueSeeds[0];
-    usedSlots.add(team.teamId);
-    return team;
-  };
-  const takeSlot = (preferred: SimTeamResult | undefined, avoidTeamId?: string): SimTeamResult => {
-    if (preferred && preferred.teamId !== avoidTeamId && !usedSlots.has(preferred.teamId)) {
-      usedSlots.add(preferred.teamId);
-      return preferred;
-    }
-    return takeFallback(avoidTeamId);
-  };
-  const find = (div: string, rank: number): SimTeamResult | undefined =>
-    uniqueSeeds.find(t => t.division === div && t.divisionRank === rank);
-
-  const divAWin = takeSlot(find(divNames[0], 1));
-  const divBWin = takeSlot(find(divNames[1], 1), divAWin.teamId);
-
-  // Top conference seed = better record among the two division winners
-  const [topWin, otherWin] = divAWin.projectedPoints >= divBWin.projectedPoints
-    ? [divAWin, divBWin]
-    : [divBWin, divAWin];
-
-  const topDiv2   = takeSlot(find(topWin.division,   2), topWin.teamId);
-  const topDiv3   = takeSlot(find(topWin.division,   3), topDiv2.teamId);
-  const otherDiv2 = takeSlot(find(otherWin.division, 2), otherWin.teamId);
-  const otherDiv3 = takeSlot(find(otherWin.division, 3), otherDiv2.teamId);
-
-  // Wildcards sorted best→worst; WC1 is the better wildcard
-  const wcs = uniqueSeeds
-    .filter(t => t.divisionRank > 3)
-    .sort((a, b) =>
-      b.projectedPoints !== a.projectedPoints
-        ? b.projectedPoints - a.projectedPoints
-        : a.teamId.localeCompare(b.teamId)
-    );
-  const wc1 = takeSlot(wcs[0]);
-  const wc2 = takeSlot(wcs[1], wc1.teamId);
-
-  // Round 1
-  const r1 = [
-    simulateSeriesByStrength(topWin,   wc2,      rand), // best conf seed vs WC2
-    simulateSeriesByStrength(otherWin, wc1,      rand), // other div winner vs WC1
-    simulateSeriesByStrength(topDiv2,  topDiv3,  rand), // top div's 2nd vs 3rd
-    simulateSeriesByStrength(otherDiv2, otherDiv3, rand), // other div's 2nd vs 3rd
-  ];
-
-  const getW = (s: PlayoffSeries): SimTeamResult => {
-    const winner = seedById.get(s.winner.teamId);
-    if (!winner) throw new Error(`Playoff winner ${s.winner.teamId} was not found in conference seeds`);
-    return winner;
-  };
-
-  // Round 2 — bracket stays on same side, no re-seeding
-  const r2 = [
-    simulateSeriesByStrength(getW(r1[0]), getW(r1[2]), rand), // top div winner's side
-    simulateSeriesByStrength(getW(r1[1]), getW(r1[3]), rand), // other div winner's side
-  ];
-
-  const cf = simulateSeriesByStrength(getW(r2[0]), getW(r2[1]), rand);
-  return { r1, r2, cf, champion: cf.winner };
-}
-
-function simulatePlayoffs(standings: SimTeamResult[], rand: () => number): PlayoffBracket {
-  const playoffTeams = standings.filter(t => t.madePlayoffs);
-  const eastern = playoffTeams
-    .filter(t => EASTERN.has(t.teamId))
-    .sort((a, b) => b.projectedPoints - a.projectedPoints);
-  const western = playoffTeams
-    .filter(t => !EASTERN.has(t.teamId))
-    .sort((a, b) => b.projectedPoints - a.projectedPoints);
-
-  const eastBracket = simulateConference(eastern, "E", rand);
-  const westBracket = simulateConference(western, "W", rand);
-
-  const eastChamp = playoffTeams.find(t => t.teamId === eastBracket.champion.teamId)!;
-  const westChamp = playoffTeams.find(t => t.teamId === westBracket.champion.teamId)!;
-  const final = simulateSeries(
-    eastChamp.projectedPoints >= westChamp.projectedPoints ? eastChamp : westChamp,
-    eastChamp.projectedPoints >= westChamp.projectedPoints ? westChamp : eastChamp,
-    rand
-  );
-
-  return { eastern: eastBracket, western: westBracket, final, champion: final.winner };
-}
 
 function findLeagueLeaders(
   standings: SimTeamResult[],

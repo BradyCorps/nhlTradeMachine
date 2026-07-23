@@ -44,4 +44,4 @@ Implementation backlog. Inspect the repo first. Done = code + regression tests. 
 
 ## 6. Simulation results
 
-- [ ] **SIM1 Bracket:** winners feed the correct next-round slot. Regression: Mammoth + Blackhawks wins must yield Mammoth–Blackhawks, not Wild–Blackhawks. ![SIM1](assets/08-playoff-bracket-advancement.png)
+- [x] **SIM1 Bracket:** winners feed the correct next-round slot. Regression: Mammoth + Blackhawks wins must yield Mammoth–Blackhawks, not Wild–Blackhawks. ![SIM1](assets/08-playoff-bracket-advancement.png) — bracket extracted to `app/lib/playoff-bracket.ts`; R2 now pairs adjacent R1 winners (rows 0+1, 2+3) instead of 0+2/1+3, so a winner feeds the slot drawn beside it. Regression in `__tests__/playoff-bracket.test.ts`.

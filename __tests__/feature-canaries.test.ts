@@ -274,7 +274,7 @@ describe("Canary — league cache keys", () => {
 });
 
 describe("Canary — playoff simulation bracket", () => {
-  const src = read("app/api/simulate/route.ts");
+  const src = read("app/lib/playoff-bracket.ts");
 
   it("does not pad playoff seeds by duplicating the last team", () => {
     expect(src).not.toContain("while (seeds.length < 8)");
@@ -283,8 +283,8 @@ describe("Canary — playoff simulation bracket", () => {
   });
 
   it("simulates later rounds by team strength, not bracket argument order", () => {
-    expect(src).toContain("function simulateSeriesByStrength");
-    expect(src).toContain("simulateSeriesByStrength(getW(r1[0]), getW(r1[2]), rand)");
+    expect(src).toContain("export function simulateSeriesByStrength");
+    // Conference final still takes the two R2 winners by strength.
     expect(src).toContain("simulateSeriesByStrength(getW(r2[0]), getW(r2[1]), rand)");
   });
 });
@@ -2241,5 +2241,21 @@ describe("Canary — fantasy page AA, pagination, and selection accent", () => {
     // No sub-10px type left on the fantasy board (AA legibility floor).
     expect(page).not.toContain("text-[9px]");
     expect(page).not.toContain("text-[8px]");
+  });
+});
+
+describe("Canary — playoff bracket advancement (SIM1)", () => {
+  it("keeps the bracket a pure, tested lib that advances winners by adjacency", () => {
+    const lib = read("app/lib/playoff-bracket.ts");
+    expect(lib).toContain("export function simulateConference");
+    expect(lib).toContain("export function simulatePlayoffs");
+    // R2 pairs adjacent R1 winners (rows 0+1, rows 2+3) — not the old 0+2/1+3
+    // pairing that let the third series' winner jump into the top slot.
+    expect(lib).toMatch(/getW\(r1\[0\]\), getW\(r1\[1\]\)/);
+    expect(lib).toMatch(/getW\(r1\[2\]\), getW\(r1\[3\]\)/);
+    // The route consumes the lib rather than carrying its own copy.
+    const route = read("app/api/simulate/route.ts");
+    expect(route).toContain('from "@/app/lib/playoff-bracket"');
+    expect(route).not.toContain("function simulateConference");
   });
 });
