@@ -15,6 +15,7 @@ import { burstProfile } from "@/app/lib/burst-channel";
 import { computeGravity, simOnIceDelta } from "@/app/lib/gravity";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
 import { effectiveCapHit } from "@/app/lib/cap-delta";
+import { simRequestSchema } from "@/app/lib/sim-request-schema";
 import {
   DIVISIONS,
   EASTERN,
@@ -920,7 +921,19 @@ function buildTradedPlayerOutcomes(
 // ── Main handler ──────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
-    const body: SimRequest = await req.json();
+    const rawBody = await req.json();
+
+    // Validate structure and bounds before any work runs (audit #4). Fields on
+    // players/teams pass through untouched; only the shape, sizes, finite seed,
+    // and id invariants are enforced.
+    const parsed = simRequestSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid simulation request", details: parsed.error.format() },
+        { status: 400 },
+      );
+    }
+    const body = parsed.data as unknown as SimRequest;
     const { homeTeamId, partnerTeamId, teams, players, trades, lineup, lineupContext } = body;
 
     const seed = body.seed ?? scenarioSeed({

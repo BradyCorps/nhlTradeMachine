@@ -2246,6 +2246,21 @@ describe("Canary — fantasy page AA, pagination, and selection accent", () => {
   });
 });
 
+describe("Canary — SIM request validation (audit #4)", () => {
+  it("validates and bounds the request before running the sim", () => {
+    const route = read("app/api/simulate/route.ts");
+    expect(route).toContain('from "@/app/lib/sim-request-schema"');
+    expect(route).toContain("simRequestSchema.safeParse(rawBody)");
+    expect(route).toContain("{ status: 400 }");
+    // No longer a blind cast of req.json() straight to the request type.
+    expect(route).not.toContain("const body: SimRequest = await req.json();");
+    const schema = read("app/lib/sim-request-schema.ts");
+    expect(schema).toContain("MAX_PLAYERS");
+    expect(schema).toContain(".passthrough()");        // engine fields survive
+    expect(schema).toContain("Duplicate player id");     // unique-id guard
+  });
+});
+
 describe("Canary — trade UI state bugs (audit #6/#7)", () => {
   it("#6: a package change clears the in-flight audit flag so it can't stick on 'Auditing'", () => {
     const src = read("app/components/QuickTradeMachine.tsx");
