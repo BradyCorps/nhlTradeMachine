@@ -2244,6 +2244,18 @@ describe("Canary — fantasy page AA, pagination, and selection accent", () => {
   });
 });
 
+describe("Canary — drafted rookie keeps its context through dedup (VAL1)", () => {
+  it("reconciles by backfilling draft context, not by dropping the rookie", () => {
+    const lib = read("app/lib/draft-reconcile.ts");
+    expect(lib).toContain("export function reconcileDraftedRookies");
+    expect(lib).toContain("draftOverall:    p.draftOverall ?? r.draftOverall");
+    // The armchair draft-complete handler uses it instead of the old drop-filter.
+    const page = read("app/armchair-gm/page.tsx");
+    expect(page).toContain("reconcileDraftedRookies(withoutPicks, rookies)");
+    expect(page).not.toMatch(/\.filter\(r => !existingIds\.has\(r\.id\) && !existingNames/);
+  });
+});
+
 describe("Canary — injury year keeps a star's historical floor (VAL4)", () => {
   it("keeps the injury-vs-decline gate in the pedigree floor", () => {
     const src = read("app/lib/player-data.ts");

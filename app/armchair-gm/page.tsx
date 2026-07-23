@@ -25,7 +25,7 @@ import ResignPhase from "@/app/components/ResignPhase";
 import OfferSheetPhase from "@/app/components/OfferSheetPhase";
 import DraftNight from "@/app/components/DraftNight";
 import { draftedRookieAssets } from "@/app/lib/draft-rookies";
-import { normalizeName } from "@/app/lib/name-normalize";
+import { reconcileDraftedRookies } from "@/app/lib/draft-reconcile";
 import TradeBlockPanel from "@/app/components/TradeBlockPanel";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 import { useSimDispatch } from "./useSimDispatch";
@@ -710,15 +710,14 @@ export default function ArmchairGmPage() {
               const withoutPicks = prev.players.filter(
                 p => !(p.position === "Pick" && p.year === SEASON.draftYear)
               );
-              const existingIds = new Set(withoutPicks.map(p => p.id));
-              // Diacritic-safe dedup (AG4): a prospect already on a roster
-              // (e.g. seeded "Viggo Björck" vs a drafted "Viggo Bjorck") must
-              // not produce a second roster entry. Deduped here — where the
-              // duplicate would land — instead of by shrinking the draft board.
-              const existingNames = new Set(withoutPicks.map(p => normalizeName(p.name)));
-              const rookies = draftedRookieAssets(results.filter(r => r.prospect != null))
-                .filter(r => !existingIds.has(r.id) && !existingNames.has(normalizeName(r.name)));
-              return { ...prev, players: [...withoutPicks, ...rookies] };
+              // Diacritic-safe reconcile (AG4/VAL1): a prospect already on a
+              // roster (e.g. seeded "Viggo Bjorck" vs a drafted "Viggo Björck")
+              // must not produce a second entry — but dropping the drafted
+              // rookie discarded its draft context (draftOverall + NHLe pace),
+              // leaving the seeded copy to value at 0. Backfill that context
+              // onto the existing entry instead of dropping the rookie.
+              const rookies = draftedRookieAssets(results.filter(r => r.prospect != null));
+              return { ...prev, players: reconcileDraftedRookies(withoutPicks, rookies) };
             });
             clearNavCache();
           }}
