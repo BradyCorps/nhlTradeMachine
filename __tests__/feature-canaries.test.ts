@@ -2244,6 +2244,17 @@ describe("Canary — fantasy page AA, pagination, and selection accent", () => {
   });
 });
 
+describe("Canary — injury year keeps a star's historical floor (VAL4)", () => {
+  it("keeps the injury-vs-decline gate in the pedigree floor", () => {
+    const src = read("app/lib/player-data.ts");
+    expect(src).toContain("isInjuryShortenedPrime");
+    // The decline gate is skipped for a prime-age injury sample.
+    expect(src).toContain("!isInjuryShortenedPrime(asset)");
+    // The multiplier drops the games/pace collapse for that case.
+    expect(src).toMatch(/isInjuryShortenedPrime\(asset\)\)\s*return Math\.max\(0\.25, ageDecay\)/);
+  });
+});
+
 describe("Canary — playoff bracket advancement (SIM1)", () => {
   it("keeps the bracket a pure, tested lib that advances winners by adjacency", () => {
     const lib = read("app/lib/playoff-bracket.ts");

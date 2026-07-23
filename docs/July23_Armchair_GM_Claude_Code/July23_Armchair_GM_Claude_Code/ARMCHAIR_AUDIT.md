@@ -23,8 +23,8 @@ Implementation backlog. Inspect the repo first. Done = code + regression tests. 
 
 - [ ] **VAL1 Prospect NAV:** Viggo Björck matching is fixed, but the eighth-overall pick has NAV `0`; fix. ![VAL1](assets/02-viggo-bjorck-nav-zero.png)
 - [ ] **VAL2 Duehr:** fix Walker Duehr’s inconsistent `3 GP/0 G/0 A/1 PTS`, unsupported second-line role, and inflated NAV. ![VAL2](assets/05-walker-duehr-valuation.png)
-- [ ] **VAL3 Relative value:** Duehr cannot equal Aleksander Barkov; add this regression test. ![VAL3](assets/06-duehr-barkov-equal-value.png)
-- [ ] **VAL4 Injuries:** an injury-lost latest season cannot erase elite value. Use the most recent full season for Barkov-type cases.
+- [x] **VAL3 Relative value:** Duehr cannot equal Aleksander Barkov; add this regression test. ![VAL3](assets/06-duehr-barkov-equal-value.png) — resolved by VAL4: Barkov's pedigree floor now holds through his injury year, lifting him well clear of an unpedigreed depth callup. Regression in `__tests__/historical-floor-injury.test.ts`.
+- [x] **VAL4 Injuries:** an injury-lost latest season cannot erase elite value. Use the most recent full season for Barkov-type cases. — `isInjuryShortenedPrime` in `player-data.ts`: for a pedigreed player still in his prime window (games < 55 && age ≤ peakAge+2), the depressed counting stats read as injury, not decline, so the historical floor keeps only its age decay and skips the games/pace collapse and the decline gate. A player past his peak with the same low sample is left to decay as before (Karlsson unchanged).
 
 ## 4. Offseason UX and transactions
 

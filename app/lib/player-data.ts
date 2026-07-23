@@ -180,6 +180,21 @@ export const getProspectTier = (name: string) => normalizedLookup(PROSPECT_TIERS
 export const getShutdownDPedigree = (name: string) => normalizedLookup(SHUTDOWN_D_PEDIGREE, name);
 export const getInjuryRisk = (name: string) => normalizedLookup(INJURY_RISK, name);
 
+// An established star can miss most of a season to injury and return the same
+// player. When a pedigreed player is still in his prime window but shows a
+// low-games sample, the depressed counting stats are INJURY, not age decline —
+// so the pedigree floor must not be collapsed by them (the recurring "injured
+// Barkov reads as a depth forward" bug — VAL4). Age still decays the floor; the
+// missed games and the pace they suppressed do not. A player well past his peak
+// age with the same low sample is genuinely declining and is left untouched.
+function isInjuryShortenedPrime(asset?: Pick<Asset, "age" | "games" | "position">): boolean {
+  if (!asset) return false;
+  const age = Number.isFinite(asset.age) ? (asset.age as number) : 27;
+  const games = Number.isFinite(asset.games) ? (asset.games ?? 82) : 82;
+  const peakAge = asset.position === "G" ? 31 : asset.position === "D" ? 29 : 28;
+  return games < 55 && age <= peakAge + 2;
+}
+
 function historicalFloorMultiplier(asset?: Pick<Asset, "age" | "games" | "ptsPace" | "position">): number {
   if (!asset) return 1;
   const age = Number.isFinite(asset.age) ? asset.age : 27;
@@ -187,6 +202,9 @@ function historicalFloorMultiplier(asset?: Pick<Asset, "age" | "games" | "ptsPac
   const ptsPace = Number.isFinite(asset.ptsPace) ? asset.ptsPace ?? 0 : 0;
   const peakAge = asset.position === "G" ? 31 : asset.position === "D" ? 29 : 28;
   const ageDecay = age <= peakAge ? 1 : Math.max(0.30, 1 - (age - peakAge) * 0.09);
+  // Injury in the prime window: only age decays the floor — not the missed
+  // games or the pace they suppressed.
+  if (isInjuryShortenedPrime(asset)) return Math.max(0.25, ageDecay);
   const availability = games >= 65 ? 1 : games >= 40 ? 0.85 : games >= 20 ? 0.65 : 0.45;
   const currentProduction = asset.position === "G" ? 1 : ptsPace >= 65 ? 1 : ptsPace >= 40 ? 0.85 : 0.65;
   return Math.max(0.25, ageDecay * availability * currentProduction);
@@ -219,7 +237,9 @@ export const getHistoricalFloor = (
   // (a true dip) keeps the full floor; far below it collapses toward the
   // player's real current value.
   const curPts = Number.isFinite(asset?.ptsPace) ? (asset?.ptsPace ?? 0) : 0;
-  const declineGate = (pedigree.peakPtsPace && curPts > 0 && asset?.position !== "G")
+  // A prime-age injury year is not decline — its low pace must not gate the
+  // floor down (VAL4). Only a full-season fade off peak collapses it.
+  const declineGate = (!isInjuryShortenedPrime(asset) && pedigree.peakPtsPace && curPts > 0 && asset?.position !== "G")
     ? Math.max(0.15, Math.min(1, (curPts / pedigree.peakPtsPace - 0.30) / 0.50))
     : 1;
   const decayedBonus = (awardBonus + allStarBonus) * Math.max(0.4, decay) * declineGate;
