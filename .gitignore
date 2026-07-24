@@ -39,3 +39,8 @@ next-env.d.ts
 .env.local
 
 local.db
+
+# Frozen Gravity calibration acquisition cache and restricted player-level output.
+/.gravity-calibration-cache/
+/data/gravity-calibration/*/population.json
+/data/gravity-calibration/*/source-crosswalk.json

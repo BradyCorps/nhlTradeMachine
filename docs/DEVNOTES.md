@@ -1,5 +1,7 @@
 # Development Notes
 
+- 2026-07-24: **Player Gravity Release A frozen calibration population.** Added deterministic, cached 2025-26 NHL/MoneyPuck/EDGE/OtherData aggregate acquisition, stable-ID qualification and exact crosswalk handling, machine-readable provenance/coverage evidence, and behavioral population tests without changing tiers or runtime behavior. Touched `.gitignore`, `scripts/gravity-calibration/`, `data/gravity-calibration/2025-26/manifest.json`, `docs/analytics/GRAVITY_V3_RELEASE_A_POPULATION.md`, and `__tests__/gravity-calibration-population.test.ts`.
+
 - 2026-07-24: **Player Gravity Release A public contract.** Corrected public terminology and mixed-situation provenance across the live field, glossary/methodology, card payload, and exported image; added strict v3 runtime validation that rejects caller-supplied v4 Gravity values plus behavioral contract tests. Touched `ANALYTICS.md`, `gravity.md`, `app/lib/gravity.ts`, `app/lib/gravity-rink.ts`, `app/lib/card-payload.ts`, `app/api/card-image/route.tsx`, Gravity public components/pages, and `__tests__/gravity-public-contract.test.ts`.
 
 - 2026-07-24: **Player Gravity Release A core.** Made the v3 X-NAV residual transition-only at the existing ×45 conversion with a ±20 cap, removed QoC/TOI rate inflation, added `signalStability`/`reliability` compatibility aliases and explicit coverage, and added regression tests; Gravity v4 remains inactive and tier thresholds are unchanged. Touched `app/lib/gravity.ts`, `app/lib/xnav-engine.ts`, `__tests__/gravity.test.ts`, and `__tests__/xnav.test.ts`.
