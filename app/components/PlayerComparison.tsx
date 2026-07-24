@@ -2,6 +2,7 @@
 
 import { formatPickRound } from "@/app/lib/trade-format";
 import { displayPosition } from "@/app/lib/display-position";
+import { compareStat } from "@/app/lib/stat-bar-compare";
 
 // ============================================================
 // PLAYER COMPARISON PANEL
@@ -46,23 +47,15 @@ interface Props {
 
 const StatBar = ({ label, homeVal, partnerVal, higherIsBetter = true, unit = "" }: {
   label: string;
-  homeVal: number;
-  partnerVal: number;
+  homeVal: number | null;      // null = this side has no comparable data (e.g. picks only)
+  partnerVal: number | null;
   higherIsBetter?: boolean;
   unit?: string;
 }) => {
-  const max      = Math.max(Math.abs(homeVal), Math.abs(partnerVal), 0.01);
-  const homeWins = higherIsBetter ? homeVal >= partnerVal : homeVal <= partnerVal;
-  const lowerIsBetterPct = (value: number) => {
-    const worst = Math.max(homeVal, partnerVal);
-    const best = Math.min(homeVal, partnerVal);
-    if (worst === best) return 100;
-    return Math.max(8, ((worst - value) / (worst - best)) * 100);
-  };
-  const homePct  = higherIsBetter ? Math.abs(homeVal) / max * 100 : lowerIsBetterPct(homeVal);
-  const partPct  = higherIsBetter ? Math.abs(partnerVal) / max * 100 : lowerIsBetterPct(partnerVal);
+  const { homeWins, partWins, homePct, partPct } = compareStat(homeVal, partnerVal, higherIsBetter);
 
-  const fmt = (v: number) => {
+  const fmt = (v: number | null) => {
+    if (v == null) return "—";
     if (Math.abs(v) >= 100) return v.toFixed(0);
     if (Math.abs(v) >= 10)  return v.toFixed(1);
     return v.toFixed(2);
@@ -94,11 +87,11 @@ const StatBar = ({ label, homeVal, partnerVal, higherIsBetter = true, unit = "" 
         <div className="flex items-center gap-1.5">
           <div className="w-20 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all ${!homeWins ? "bg-cyan-500" : "bg-zinc-600"}`}
+              className={`h-full rounded-full transition-all ${partWins ? "bg-cyan-500" : "bg-zinc-600"}`}
               style={{ width: `${partPct}%` }}
             />
           </div>
-          <span className={`text-[10px] font-black font-mono tabular-nums ${!homeWins ? "text-cyan-400" : "text-zinc-500"}`}>
+          <span className={`text-[10px] font-black font-mono tabular-nums ${partWins ? "text-cyan-400" : "text-zinc-500"}`}>
             {fmt(partnerVal)}{unit}
           </span>
         </div>
@@ -168,16 +161,26 @@ export default function PlayerComparison({ outgoing, incoming, navMap }: Props) 
   const navSum = (assets: Asset[]) =>
     assets.reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);
 
+  // Per-skater average for deployment/profile stats (TOI, age). Returns null
+  // for a side with no skaters so an empty package reads as "—", not a 0 that
+  // would falsely win the youngest/most-rested comparison.
+  const avg = (assets: Asset[], key: keyof Asset): number | null => {
+    const skaters = assets.filter(a => a.position !== "Pick");
+    if (skaters.length === 0) return null;
+    const total = skaters.reduce((s, a) => s + (typeof a[key] === "number" ? (a[key] as number) : 0), 0);
+    return total / skaters.length;
+  };
+
   const outNav  = navSum(outgoing);
   const inNav   = navSum(incoming);
   const outPts  = sum(outgoing, "ptsPace");
   const inPts   = sum(incoming, "ptsPace");
-  const outTOI  = sum(outgoing, "avgTOI");
-  const inTOI   = sum(incoming, "avgTOI");
+  const outTOI  = avg(outgoing, "avgTOI");   // averaged per skater, not summed
+  const inTOI   = avg(incoming, "avgTOI");
   const outxG   = sum(outgoing, "xGPace") || 0;
   const inxG    = sum(incoming, "xGPace") || 0;
-  const outAge  = outgoing.filter(a => a.position !== "Pick").reduce((s, a, _, arr) => s + a.age / arr.length, 0);
-  const inAge   = incoming.filter(a => a.position !== "Pick").reduce((s, a, _, arr) => s + a.age / arr.length, 0);
+  const outAge  = avg(outgoing, "age");
+  const inAge   = avg(incoming, "age");
   // Use effective cap hit (post-retention) so totals match what each team actually pays
   const outCap  = outgoing.reduce((s, a) => s + (a.capHit || 0) * (1 - (a.retainedPct || 0)), 0);
   const inCap   = incoming.reduce((s, a) => s + (a.capHit || 0) * (1 - (a.retainedPct || 0)), 0);

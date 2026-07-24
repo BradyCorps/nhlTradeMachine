@@ -1688,9 +1688,11 @@ describe("Canary — Batch 6 audit fixes", () => {
 
   it("lower-is-better comparison bars give the cheaper/younger side the longer bar", () => {
     const src = read("app/components/PlayerComparison.tsx");
-    expect(src).toContain("lowerIsBetterPct");
-    expect(src).toContain("((worst - value) / (worst - best)) * 100");
+    // The bar math now lives in the tested pure helper.
+    expect(src).toContain("compareStat(homeVal, partnerVal, higherIsBetter)");
     expect(src).toContain('higherIsBetter={false}');
+    const lib = read("app/lib/stat-bar-compare.ts");
+    expect(lib).toContain("((worst - v) / (worst - best)) * 100");
   });
 
   it("players page renders development profiles and paged position sections", () => {
@@ -2243,6 +2245,21 @@ describe("Canary — fantasy page AA, pagination, and selection accent", () => {
     // No sub-10px type left on the fantasy board (AA legibility floor).
     expect(page).not.toContain("text-[9px]");
     expect(page).not.toContain("text-[8px]");
+  });
+});
+
+describe("Canary — PlayerComparison metric fixes (audit #8)", () => {
+  it("averages TOI/age, guards empty sides, and uses the fixed bar geometry", () => {
+    const cmp = read("app/components/PlayerComparison.tsx");
+    // TOI + age are averaged per skater (null for an empty side), not summed.
+    expect(cmp).toContain('avg(outgoing, "avgTOI")');
+    expect(cmp).toContain('avg(outgoing, "age")');
+    expect(cmp).toContain("if (skaters.length === 0) return null");
+    // Bar/winner logic comes from the tested pure helper.
+    expect(cmp).toContain('from "@/app/lib/stat-bar-compare"');
+    expect(cmp).toContain("compareStat(homeVal, partnerVal, higherIsBetter)");
+    // The old abs()-scaled geometry is gone.
+    expect(cmp).not.toContain("Math.abs(homeVal) / max * 100");
   });
 });
 
