@@ -189,6 +189,49 @@ describe("resolveLeagueOffseason", () => {
     expect(res.market.some((m) => m.player.id === ufa.id)).toBe(false);
   });
 
+  it("retains a foundational RFA even when the raise would not 'fit' (AI1/AI3)", () => {
+    // Celebrini-shaped: an elite young RFA on an expiring ELC whose market raise
+    // is larger than the team's tracked cap space. He must still be re-signed —
+    // never left to walk for nothing or dropped from the sim.
+    const celebrini = mkAsset({
+      id: "sjs-celebrini", teamId: "SJS", position: "C", age: 20,
+      ptsPace: 95, baselinePtsPace: 95, contractStatus: "RFA", capHit: 0.95,
+    });
+    const res = resolveLeagueOffseason([celebrini], {
+      seed: 7, userTeamId: "WPG",
+      teams: [
+        { id: "SJS", capSpace: 3, standing: 28, phase: "Rebuilding" }, // can't "fit" the full raise
+        { id: "CAR", capSpace: 25, standing: 2, phase: "Contender" },
+      ],
+    });
+    expect(res.resignings.some((r) => r.playerId === "sjs-celebrini" && r.teamId === "SJS")).toBe(true);
+    expect(res.walkAways.some((w) => w.playerId === "sjs-celebrini")).toBe(false);
+  });
+
+  it("reserves RFA cap so a team can't sign an external UFA at its RFA's expense (AI2)", () => {
+    // SJS has room for its RFA raise OR a big external UFA, not both. The RFA is
+    // retained first, so the external Kucherov-shaped UFA lands elsewhere.
+    const celebrini = mkAsset({
+      id: "sjs-celebrini", teamId: "SJS", position: "C", age: 20,
+      ptsPace: 92, baselinePtsPace: 92, contractStatus: "RFA", capHit: 0.95,
+    });
+    const kucherov = mkAsset({
+      id: "kucherov", teamId: "FA_POOL", position: "W", age: 32,
+      ptsPace: 100, baselinePtsPace: 100, contractStatus: "UFA", capHit: 0,
+    });
+    const res = resolveLeagueOffseason([celebrini, kucherov], {
+      seed: 3, userTeamId: "WPG",
+      teams: [
+        { id: "SJS", capSpace: 12, standing: 26, phase: "Retooling" },
+        { id: "CAR", capSpace: 22, standing: 2, phase: "Contender" },
+      ],
+    });
+    // Celebrini retained by SJS …
+    expect(res.resignings.some((r) => r.playerId === "sjs-celebrini" && r.teamId === "SJS")).toBe(true);
+    // … and SJS did not then sign the external UFA over him.
+    expect(res.marketSignings.some((s) => s.playerId === "kucherov" && s.teamId === "SJS")).toBe(false);
+  });
+
   it("keeps a league-minimum cap cushion when AI teams shop the UFA market", () => {
     // Depth UFAs in the open pool are AI-signable, and the shopper must leave a
     // league-minimum cushion rather than spending to $0.

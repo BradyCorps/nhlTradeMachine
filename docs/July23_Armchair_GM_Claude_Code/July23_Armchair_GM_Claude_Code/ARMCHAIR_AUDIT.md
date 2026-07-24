@@ -38,9 +38,9 @@ Implementation backlog. Inspect the repo first. Done = code + regression tests. 
 
 ## 5. AI cap management and player retention
 
-- [ ] **AI1 Franchise RFAs:** retain foundational RFAs when feasible. San Jose cannot leave Celebrini unsigned or remove him from the sim. ![AI1](assets/11-celebrini-rfa.png)
-- [ ] **AI2 Cap priority:** fix Year 2 league-wide cap exhaustion. Reserve cap for priority RFAs before external UFAs; San Jose cannot sign Kucherov at Celebrini’s expense. ![AI2](assets/14-sjs-kucherov-cap.png)
-- [ ] **AI3 Player lifecycle:** nobody disappears between RFA/UFA/roster/market. Fix Year 3’s empty FA market and missing RFAs despite teams having `$5M+` cap. ![AI3](assets/15-empty-year3-fa-market.png)
+- [x] **AI1 Franchise RFAs:** retain foundational RFAs when feasible. San Jose cannot leave Celebrini unsigned or remove him from the sim. ![AI1](assets/11-celebrini-rfa.png) — `resolveLeagueOffseason` (app/lib/free-agency.ts) now always re-signs AI-team RFAs (team control); an RFA never walks/vanishes on a cap miss. Regression in `__tests__/free-agency.test.ts`.
+- [x] **AI2 Cap priority:** fix Year 2 league-wide cap exhaustion. Reserve cap for priority RFAs before external UFAs; San Jose cannot sign Kucherov at Celebrini’s expense. ![AI2](assets/14-sjs-kucherov-cap.png) — the RFA raise is booked before the UFA-market pass, so the market budget already reflects it; a team can't sign an external UFA at its own RFA's expense. Regression added.
+- [~] **AI3 Player lifecycle:** nobody disappears between RFA/UFA/roster/market. Fix Year 3’s empty FA market and missing RFAs despite teams having `$5M+` cap. ![AI3](assets/15-empty-year3-fa-market.png) — PARTIAL: the "missing RFAs" half is fixed (AI1 retention). The "empty market" half — walked/unsigned players being deleted from `db.players` across rollovers instead of staying in the FA pool — is tracked as CXH3 (§7) and the Cup lifecycle CX5.
 
 ## 6. Simulation results
 

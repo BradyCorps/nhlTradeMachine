@@ -397,14 +397,15 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
     const rand = mulberry32(seed + hashString(`resolve:${player.id}`));
 
     if (contract.status === "RFA") {
-      if (wouldFit(player.teamId, contract.aav - expiringCapHit)) {
-        addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
-        addMove(player.teamId, "incoming", { capHit: contract.aav });
-        resignings.push({ playerId: player.id, teamId: player.teamId, contract });
-      } else {
-        addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
-        walkAways.push({ playerId: player.id, fromTeamId: player.teamId, contract });
-      }
+      // RFAs carry team control and are ALWAYS retained — a foundational RFA is
+      // never left to walk for nothing, nor dropped from the sim (AI1/AI3). And
+      // because his raise is booked here, the UFA-market pass below sees the
+      // reduced budget, so a team can't sign an external UFA at its own RFA's
+      // expense (AI2: no Kucherov at Celebrini's expense). Reserving the cap can
+      // push a team tight, exactly as re-signing a young core does in reality.
+      addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
+      addMove(player.teamId, "incoming", { capHit: contract.aav });
+      resignings.push({ playerId: player.id, teamId: player.teamId, contract });
       rfaMarket.push({ player, contract });
     } else {
       const resign = rand() < contract.resignProbability;
