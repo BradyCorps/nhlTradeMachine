@@ -25,6 +25,10 @@ const iconBadgeStyle = (color: string, background = "transparent"): React.CSSPro
   justifyContent: "center",
 });
 
+// Below this many NHL games, a pace-driven deployment role isn't credible —
+// the player reads as UNPROVEN rather than being handed a settled line role.
+const MIN_ROLE_SAMPLE_GAMES = 15;
+
 const isForward = (position: string) => ["C", "W", "L", "R", "F"].includes(position);
 
 const wingLabel = (position: string) => position === "C" ? "CENTRE" : "WINGER";
@@ -189,6 +193,18 @@ function getRoleTag(asset: Asset, xnav: XNAVResult): { label: string; color: str
       label: "PK SPECIALIST",
       color: "var(--ledger-amber)",
       title: "Penalty-kill specialist — strong short-handed usage without regular top-nine EV minutes.",
+    };
+  }
+
+  // A thin NHL sample can't support a settled deployment role: a 3-GP call-up
+  // whose per-82 pace happens to clear the middle-six bar is not a "2nd line
+  // winger" (VAL2). Franchise/elite-tier reads above already fired, so an
+  // injured star keeps his status; only unproven pace-driven roles are gated.
+  if ((asset.games ?? 0) < MIN_ROLE_SAMPLE_GAMES) {
+    return {
+      label: "UNPROVEN",
+      color: "var(--ledger-brown)",
+      title: `Limited NHL sample (${asset.games ?? 0} GP) — not enough to project a settled role.`,
     };
   }
 

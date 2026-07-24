@@ -5,6 +5,7 @@ import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import { computeGravity, gravityTierColor } from "@/app/lib/gravity";
 import { CompactGravity, TierIcon } from "@/app/components/GravityField";
 import { getPlayerPedigree } from "@/app/lib/player-data";
+import { boxScoreFromPace } from "@/app/lib/box-score";
 import { HISTORICAL_MAX_OFF, HISTORICAL_MAX_DEF } from "@/app/lib/historical-benchmarks";
 import { MicroBar } from "@/app/components/MicroBar";
 import StrandView from "@/app/components/StrandView";
@@ -439,14 +440,17 @@ export default function AssetCard({
       {/* ── Player stat line (skaters only) ───────────────────── */}
       {!isPick && asset.position !== "G" && asset.hasLiveStats && (
         <div className="mt-2 pt-2" style={{ borderTop: '1px solid #c8b890' }}>
-          {/* Box score row */}
+          {/* Box score row — PTS is G + A so a thin sample can't show 0-0-1 */}
           <div className="stat-grid-4 mb-1.5">
-            {[
-              { label: 'GP',    val: asset.games.toString() },
-              { label: 'G',     val: ((asset.goalsPace    ?? 0) * asset.games / 82).toFixed(0) },
-              { label: 'A',     val: ((asset.assistsPace ?? 0) * asset.games / 82).toFixed(0) },
-              { label: 'PTS',   val: (asset.ptsPace ? (asset.ptsPace * asset.games / 82).toFixed(0) : '—') },
-            ].map(s => (
+            {(() => {
+              const box = boxScoreFromPace(asset);
+              return [
+                { label: 'GP',  val: String(box.gp) },
+                { label: 'G',   val: String(box.g) },
+                { label: 'A',   val: String(box.a) },
+                { label: 'PTS', val: String(box.pts) },
+              ];
+            })().map(s => (
               <div key={s.label} className="text-center p-1" style={{ background: 'var(--ledger-cream)', border: '1px solid #b8a070' }}>
                 <div className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">{s.label}</div>
                 <div className="text-[11px] font-black text-ledger-ink font-mono">{s.val}</div>

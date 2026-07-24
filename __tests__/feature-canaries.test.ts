@@ -2248,6 +2248,23 @@ describe("Canary — fantasy page AA, pagination, and selection accent", () => {
   });
 });
 
+describe("Canary — Duehr valuation integrity (VAL2)", () => {
+  it("derives the box score as PTS = G + A (no 0-0-1 lines)", () => {
+    const lib = read("app/lib/box-score.ts");
+    expect(lib).toContain("pts: g + a");
+    const card = read("app/components/AssetCard.tsx");
+    expect(card).toContain("boxScoreFromPace(asset)");
+    // The old independent per-pace rounding of PTS is gone.
+    expect(card).not.toContain("asset.ptsPace ? (asset.ptsPace * asset.games / 82)");
+  });
+
+  it("does not hand a thin-sample forward a settled line role", () => {
+    const badges = read("app/components/AssetBadges.tsx");
+    expect(badges).toContain("MIN_ROLE_SAMPLE_GAMES");
+    expect(badges).toMatch(/asset\.games \?\? 0\) < MIN_ROLE_SAMPLE_GAMES[\s\S]*?UNPROVEN/);
+  });
+});
+
 describe("Canary — PlayerComparison metric fixes (audit #8)", () => {
   it("averages TOI/age, guards empty sides, and uses the fixed bar geometry", () => {
     const cmp = read("app/components/PlayerComparison.tsx");
