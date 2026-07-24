@@ -495,6 +495,44 @@ Deferred-by-choice footnote: TM1's "performance endpoint" sub-item was
 satisfied via the /api/league/players result cache instead of a separate
 per-team endpoint.
 
+### July 23 Armchair audit: IN PROGRESS
+Tracking docs/July23_Armchair_GM_Claude_Code/July23_Armchair_GM_Claude_Code/ARMCHAIR_AUDIT.md.
+- §3 Valuation — COMPLETE.
+  - VAL1: drafted rookie keeps its draft context through the accent-strip dedup
+    (`reconcileDraftedRookies`, app/lib/draft-reconcile.ts) — Björck no longer NAV 0.
+  - VAL3 + VAL4: an injury-shortened prime season no longer collapses a star's
+    pedigree floor (`isInjuryShortenedPrime`, app/lib/player-data.ts) — Barkov
+    clears a depth scrub again.
+  - VAL2: box score derives PTS = G + A (app/lib/box-score.ts); a <15 GP forward
+    reads UNPROVEN instead of "2nd line winger" (AssetBadges.tsx).
+    Deferred by choice: the ~+21 thin-sample NAV (REPLACEMENT_NAV anchor in the
+    shared xnav core — league-wide blast radius; VAL3 already fixed the real
+    absurdity of Duehr == Barkov).
+- §6 SIM1 — COMPLETE. Playoff bracket extracted to app/lib/playoff-bracket.ts;
+  R2 pairs adjacent R1 winners (rows 0+1, 2+3), so a winner feeds the slot drawn
+  beside it (Mammoth–Blackhawks, not Wild–Blackhawks).
+- Not started: §1 State (ST1–3), §2 Roster/cards/lineups (RL1–8),
+  §4 Offseason UX (OFF1–7), §5 AI cap (AI1–3).
+
+### July 23 Codex SIM audit: IN PROGRESS
+A read-only Codex review of the components + SIM. Correctness/robustness items done:
+- #1 Retained salary — SIM per-trade cap delta now uses the shared
+  `effectiveCapHit` (cap-delta.ts) so it matches the trade UI (retention-aware).
+- #2 / #3 RNG determinism — awards / Calder / playoffs use independent named
+  streams (`mulberry32(seed + hashString(name))`); Cup Run folds the run seed +
+  season year into the seed so Years 1–3 aren't correlated.
+- #4 Request validation — /api/simulate validates a Zod schema
+  (app/lib/sim-request-schema.ts, `.passthrough()` on players/teams) with bounds,
+  finite seed, and unique-id / team-reference checks → 400 on bad input.
+- #6 / #7 Trade UI — Quick Trade no longer sticks on "Auditing" after a package
+  change; generated proposals require a whitelisted accepted status
+  (app/lib/trade-proposal-audit.ts) and pass the live capCeiling.
+- #8 PlayerComparison — TOI/age averaged (null for empty side, never "wins");
+  bar geometry anchored at 0 so a more-negative NAV is shorter, not longer
+  (app/lib/stat-bar-compare.ts).
+- Held by choice: #5 (trade-context double-count) — a calibration judgment that
+  needs a historical backtest, not a blind code change.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps
