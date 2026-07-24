@@ -508,11 +508,24 @@ Tracking docs/July23_Armchair_GM_Claude_Code/July23_Armchair_GM_Claude_Code/ARMC
     Deferred by choice: the ~+21 thin-sample NAV (REPLACEMENT_NAV anchor in the
     shared xnav core — league-wide blast radius; VAL3 already fixed the real
     absurdity of Duehr == Barkov).
+- §5 AI cap — COMPLETE (core).
+  - AI1/AI2: `resolveLeagueOffseason` now always re-signs AI-team RFAs (team
+    control), reserving that cap before the UFA-market pass — Celebrini is kept
+    and can't be dropped for Kucherov.
+  - AI3: walked/unsigned players relocate to `FA_POOL` via `applyOffseasonToRoster`
+    instead of being deleted from db.players (keep a NAV, stay signable). Cross-year
+    re-offer of the standing pool remains with CX5.
 - §6 SIM1 — COMPLETE. Playoff bracket extracted to app/lib/playoff-bracket.ts;
   R2 pairs adjacent R1 winners (rows 0+1, 2+3), so a winner feeds the slot drawn
   beside it (Mammoth–Blackhawks, not Wild–Blackhawks).
+- CX6 (RFA offer-sheet compensation) — PARTIAL. `resolveOfferSheetCompensation`
+  surrenders the signing team's OWN picks (current + original owner, soonest year)
+  and CONVEYS them to the original club instead of deleting; original club frees
+  only the RFA's current AAV (no old-deal double-count). Remaining: the match
+  right + the user's-own-walked-RFA market button.
 - Not started: §1 State (ST1–3), §2 Roster/cards/lineups (RL1–8),
-  §4 Offseason UX (OFF1–7), §5 AI cap (AI1–3).
+  §4 Offseason UX (OFF1–7); §7 Codex CX1–5, CX7c/CX8, CXH1–9 (CXH3 done),
+  CXS1–6.
 
 ### July 23 Codex SIM audit: IN PROGRESS
 A read-only Codex review of the components + SIM. Correctness/robustness items done:
