@@ -2248,6 +2248,21 @@ describe("Canary — fantasy page AA, pagination, and selection accent", () => {
   });
 });
 
+describe("Canary — AI offseason RFA retention + no vanishing FAs (AI1–3/CXH3)", () => {
+  it("always re-signs AI RFAs and relocates walked players to the FA pool", () => {
+    const fa = read("app/lib/free-agency.ts");
+    // RFAs are retained unconditionally (no wouldFit walk branch for RFAs).
+    expect(fa).toContain("RFAs carry team control and are ALWAYS retained");
+    // Walked players are relocated, never deleted.
+    expect(fa).toContain("export function applyOffseasonToRoster");
+    expect(fa).toContain('teamId: "FA_POOL"');
+    // The offseason hook uses the shared helper (no delete-filter of walked ids).
+    const hook = read("app/armchair-gm/useOffseasonFlow.ts");
+    expect(hook).toContain("applyOffseasonToRoster(prev.players, res)");
+    expect(hook).not.toContain("filter(p => !walkedIds.has(p.id))");
+  });
+});
+
 describe("Canary — Duehr valuation integrity (VAL2)", () => {
   it("derives the box score as PTS = G + A (no 0-0-1 lines)", () => {
     const lib = read("app/lib/box-score.ts");

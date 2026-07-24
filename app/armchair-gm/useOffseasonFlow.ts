@@ -9,7 +9,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import type { Asset, Team } from "@/app/lib/trade-types";
 import { SEASON } from "@/app/lib/season-config";
 import { scenarioSeed } from "@/app/lib/sim-engine";
-import { resolveLeagueOffseason, type OffseasonPending } from "@/app/lib/free-agency";
+import { resolveLeagueOffseason, applyOffseasonToRoster, type OffseasonPending } from "@/app/lib/free-agency";
 import { applyCapDelta, applyTeamCapDeltas } from "@/app/lib/cap-delta";
 import { clearNavCache } from "@/app/lib/evaluate-client";
 import { cupRunOffseasonEntry, type CupRunState } from "@/app/lib/cup-run";
@@ -64,33 +64,10 @@ export function useOffseasonFlow({
     setMarket(res.market);
     setRfaMarket(res.rfaMarket);
 
-    const resignById = new Map(res.resignings.map(r => [r.playerId, r.contract]));
-    const marketSigningById = new Map(res.marketSignings.map(s => [s.playerId, s]));
-    const walkedIds = new Set(res.walkAways
-      .filter(w => !marketSigningById.has(w.playerId))
-      .map(w => w.playerId));
-
     setDb(prev => {
-      const players = prev.players
-        .filter(p => !walkedIds.has(p.id))
-        .map(p => {
-          const c = resignById.get(p.id);
-          if (c) {
-            return { ...p, capHit: c.aav, yearsRemaining: c.term, expiresThisOffseason: false, contractStatus: "SIGNED" as const };
-          }
-          const marketSigning = marketSigningById.get(p.id);
-          return marketSigning
-            ? {
-                ...p,
-                teamId: marketSigning.teamId,
-                capHit: marketSigning.contract.aav,
-                yearsRemaining: marketSigning.contract.term,
-                retainedPct: 0,
-                expiresThisOffseason: false,
-                contractStatus: "SIGNED" as const,
-              }
-            : p;
-        });
+      // Walked-to-market players are relocated to the FA pool, not deleted, so
+      // they keep a NAV and stay signable across the offseason (CXH3 / AI3).
+      const players = applyOffseasonToRoster(prev.players, res);
       const teams = applyTeamCapDeltas(prev.teams, res.teamCapMoves)
         .map(t => ({ ...t, capSpace: Math.round(t.capSpace * 10) / 10 }));
 

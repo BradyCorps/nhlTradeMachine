@@ -3,6 +3,7 @@ import type { Asset } from "../app/lib/trade-types";
 import {
   projectFreeAgentContract,
   resolveLeagueOffseason,
+  applyOffseasonToRoster,
   FA,
 } from "../app/lib/free-agency";
 import { applyCapDelta } from "../app/lib/cap-delta";
@@ -230,6 +231,47 @@ describe("resolveLeagueOffseason", () => {
     expect(res.resignings.some((r) => r.playerId === "sjs-celebrini" && r.teamId === "SJS")).toBe(true);
     // … and SJS did not then sign the external UFA over him.
     expect(res.marketSignings.some((s) => s.playerId === "kucherov" && s.teamId === "SJS")).toBe(false);
+  });
+
+  it("relocates a walked player to the FA pool instead of deleting him (CXH3/AI3)", () => {
+    const roster: Asset[] = [
+      mkAsset({ id: "resigned", teamId: "STL", contractStatus: "RFA", capHit: 1 }),
+      mkAsset({ id: "walked", teamId: "DAL", contractStatus: "UFA", capHit: 2 }),
+      mkAsset({ id: "signed-elsewhere", teamId: "BUF", contractStatus: "UFA", capHit: 3 }),
+      mkAsset({ id: "untouched", teamId: "TOR", expiresThisOffseason: false }),
+    ];
+    const res = {
+      resignings: [{ playerId: "resigned", teamId: "STL", contract: { aav: 4, term: 3, status: "RFA" as const, tier: "MID" as const, resignProbability: 0.9 } }],
+      marketSignings: [{ playerId: "signed-elsewhere", fromTeamId: "BUF", teamId: "CAR", contract: { aav: 5, term: 4, status: "UFA" as const, tier: "TOP" as const, resignProbability: 0.5 } }],
+      walkAways: [{ playerId: "walked", fromTeamId: "DAL", contract: { aav: 2.5, term: 2, status: "UFA" as const, tier: "MID" as const, resignProbability: 0.4 } }],
+    };
+    const out = applyOffseasonToRoster(roster, res);
+
+    // Nobody is dropped from the league — same count.
+    expect(out).toHaveLength(4);
+    const byId = new Map(out.map((p) => [p.id, p]));
+    // Walked player stays, relocated to the FA pool (keeps a NAV, still signable).
+    expect(byId.get("walked")!.teamId).toBe("FA_POOL");
+    expect(byId.get("walked")!.expiresThisOffseason).toBe(false);
+    // Re-signed player takes his new deal on the same team.
+    expect(byId.get("resigned")!.teamId).toBe("STL");
+    expect(byId.get("resigned")!.capHit).toBe(4);
+    expect(byId.get("resigned")!.contractStatus).toBe("SIGNED");
+    // AI market signing moves teams.
+    expect(byId.get("signed-elsewhere")!.teamId).toBe("CAR");
+    // Untouched player is unchanged.
+    expect(byId.get("untouched")!.teamId).toBe("TOR");
+  });
+
+  it("keeps a walked-then-AI-signed player on his new team, not the FA pool", () => {
+    const roster: Asset[] = [mkAsset({ id: "p", teamId: "DAL", contractStatus: "UFA", capHit: 2 })];
+    const res = {
+      resignings: [],
+      marketSignings: [{ playerId: "p", fromTeamId: "DAL", teamId: "CAR", contract: { aav: 5, term: 4, status: "UFA" as const, tier: "TOP" as const, resignProbability: 0.5 } }],
+      walkAways: [{ playerId: "p", fromTeamId: "DAL", contract: { aav: 5, term: 4, status: "UFA" as const, tier: "TOP" as const, resignProbability: 0.5 } }],
+    };
+    const out = applyOffseasonToRoster(roster, res);
+    expect(out[0].teamId).toBe("CAR");   // signed wins over walked → not FA_POOL
   });
 
   it("keeps a league-minimum cap cushion when AI teams shop the UFA market", () => {

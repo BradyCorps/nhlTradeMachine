@@ -484,3 +484,45 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
 
   return { expiringCount: expiring.length, userPending, resignings, walkAways, marketSignings, market, rfaMarket, teamCapMoves };
 }
+
+// Apply a resolved offseason to the league roster. Re-signings take their new
+// deal; AI market signings move teams; and players who walked to the OPEN
+// market are relocated to the FA pool — NEVER deleted. Deleting them dropped
+// them out of `db.players`, so the NAV map (rebuilt from db.players) had no
+// entry and they displayed/sorted as NAV 0, and by Year 3 they had vanished
+// from the sim entirely (CXH3 / AI3). Keeping them as FA_POOL preserves their
+// NAV and existence; signMarketPlayer filters by id before re-adding, so a
+// later signing can't duplicate them.
+export function applyOffseasonToRoster(
+  players: Asset[],
+  res: Pick<LeagueOffseasonResult, "resignings" | "marketSignings" | "walkAways">,
+): Asset[] {
+  const resignById = new Map(res.resignings.map((r) => [r.playerId, r.contract]));
+  const marketSigningById = new Map(res.marketSignings.map((s) => [s.playerId, s]));
+  const walkedIds = new Set(
+    res.walkAways.filter((w) => !marketSigningById.has(w.playerId)).map((w) => w.playerId),
+  );
+
+  return players.map((p) => {
+    const resign = resignById.get(p.id);
+    if (resign) {
+      return { ...p, capHit: resign.aav, yearsRemaining: resign.term, expiresThisOffseason: false, contractStatus: "SIGNED" as const };
+    }
+    const marketSigning = marketSigningById.get(p.id);
+    if (marketSigning) {
+      return {
+        ...p,
+        teamId: marketSigning.teamId,
+        capHit: marketSigning.contract.aav,
+        yearsRemaining: marketSigning.contract.term,
+        retainedPct: 0,
+        expiresThisOffseason: false,
+        contractStatus: "SIGNED" as const,
+      };
+    }
+    if (walkedIds.has(p.id)) {
+      return { ...p, teamId: "FA_POOL", retainedPct: 0, expiresThisOffseason: false, contractStatus: "UFA" as const };
+    }
+    return p;
+  });
+}
