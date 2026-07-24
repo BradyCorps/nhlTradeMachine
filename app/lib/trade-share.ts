@@ -160,37 +160,57 @@ export function parseTradeQueryState(search: string | URLSearchParams): TradeQue
   };
 }
 
+// Resolve shared-link asset refs against the current league. Pass
+// `expectedTeamId` on any path that can EXECUTE the trade (the armchair bench):
+// then only assets that actually exist AND belong to that team resolve, so a
+// crafted URL can't move a third team's asset or fabricate a nonexistent one
+// (CX2). Without it (read-only social preview) a missing asset keeps a labeled
+// placeholder so the shared card still renders.
 export function resolveTradeShareAssets(
   refs: TradeShareAssetRef[],
   assets: Asset[],
+  expectedTeamId?: string | null,
 ): Asset[] {
   const byId = new Map<string, Asset>();
   for (const asset of assets) {
     if (!byId.has(asset.id)) byId.set(asset.id, asset);
   }
 
-  return refs.map(ref => {
+  const resolved: Asset[] = [];
+  for (const ref of refs) {
     const asset = byId.get(ref.id);
-    if (asset) return { ...asset, retainedPct: ref.retainedPct };
-    return {
-      id: ref.id,
-      teamId: "",
-      name: `Unavailable asset (${ref.id})`,
-      position: "Pick",
-      age: 0,
-      games: 0,
-      ptsPace: 0,
-      defRate: 0,
-      avgTOI: 0,
-      capHit: 0,
-      yearsRemaining: 0,
-      hasNMC: false,
-      hasNTC: false,
-      canRetain: false,
-      retainedPct: ref.retainedPct,
-      multiplier: 1,
-    };
-  });
+    if (expectedTeamId != null) {
+      // Ownership-guarded execution path: drop anything missing or not owned by
+      // the expected team — never fabricate a movable phantom.
+      if (asset && asset.teamId === expectedTeamId) {
+        resolved.push({ ...asset, retainedPct: ref.retainedPct });
+      }
+      continue;
+    }
+    if (asset) {
+      resolved.push({ ...asset, retainedPct: ref.retainedPct });
+    } else {
+      resolved.push({
+        id: ref.id,
+        teamId: "",
+        name: `Unavailable asset (${ref.id})`,
+        position: "Pick",
+        age: 0,
+        games: 0,
+        ptsPace: 0,
+        defRate: 0,
+        avgTOI: 0,
+        capHit: 0,
+        yearsRemaining: 0,
+        hasNMC: false,
+        hasNTC: false,
+        canRetain: false,
+        retainedPct: ref.retainedPct,
+        multiplier: 1,
+      });
+    }
+  }
+  return resolved;
 }
 
 export function summarizeTradeSharePayload(payload: TradeSharePayload): TradeSharePreview {

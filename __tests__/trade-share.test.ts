@@ -136,6 +136,33 @@ describe("trade share payload", () => {
     });
   });
 
+  it("enforces team ownership on the execute path — no third-team or phantom assets (CX2)", () => {
+    const league = [
+      asset("home-player", "WPG"),
+      asset("partner-player", "SJS"),
+      asset("third-team-player", "TOR"),
+    ];
+    // Outgoing must belong to the home team (WPG).
+    const outgoing = resolveTradeShareAssets(
+      [
+        { id: "home-player", retainedPct: 0 },
+        { id: "third-team-player", retainedPct: 0 }, // crafted: a rival's asset
+        { id: "ghost", retainedPct: 0 },             // crafted: nonexistent
+      ],
+      league,
+      "WPG",
+    );
+    expect(outgoing.map(a => a.id)).toEqual(["home-player"]);
+
+    // Incoming must belong to the partner team (SJS).
+    const incoming = resolveTradeShareAssets(
+      [{ id: "partner-player", retainedPct: 0 }, { id: "home-player", retainedPct: 0 }],
+      league,
+      "SJS",
+    );
+    expect(incoming.map(a => a.id)).toEqual(["partner-player"]);
+  });
+
   it("summarizes a shared trade for social previews", () => {
     const payload = createTradeSharePayload({
       homeTeam: team("WPG"),

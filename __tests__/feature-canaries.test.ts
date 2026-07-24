@@ -2248,6 +2248,33 @@ describe("Canary — fantasy page AA, pagination, and selection accent", () => {
   });
 });
 
+describe("Canary — Armchair state integrity (CX1–CX4)", () => {
+  it("CX4: executeTrade preserves db metadata and fully invalidates the sim", () => {
+    const bench = read("app/armchair-gm/useTradeBench.ts");
+    expect(bench).toContain("return { ...prev, players: playersWithDynamicPickValues, teams: updatedTeams }");
+    expect(bench).toContain("simControlsRef.current?.resetSimulation()");
+  });
+  it("CX2: shared-link asset resolution is ownership-guarded on the execute path", () => {
+    const share = read("app/lib/trade-share.ts");
+    expect(share).toContain("expectedTeamId");
+    expect(share).toContain("asset.teamId === expectedTeamId");
+    const page = read("app/armchair-gm/page.tsx");
+    expect(page).toContain("resolveTradeShareAssets(parsed.outgoing, db.players, parsed.homeTeamId)");
+    expect(page).toContain("resolveTradeShareAssets(parsed.incoming, db.players, parsed.partnerTeamId)");
+  });
+  it("CX1: a URL-hydration guard blocks the state→URL sync until the parse runs", () => {
+    const page = read("app/armchair-gm/page.tsx");
+    expect(page).toContain("urlHydratedRef");
+    expect(page).toContain("if (!urlHydratedRef.current) return;");
+  });
+  it("CX3: package changes abort in-flight audit/memo/match and verdict/memo guard staleness", () => {
+    const page = read("app/armchair-gm/page.tsx");
+    expect(page).toMatch(/evalAbortRef\.current\?\.abort\(\);\s*\n\s*memoAbortRef\.current\?\.abort\(\);\s*\n\s*matchAbortRef\.current\?\.abort\(\);/);
+    expect(page).toContain("evalAbortRef.current !== ctrl) return;");
+    expect(page).toContain("memoAbortRef.current !== ctrl) return;");
+  });
+});
+
 describe("Canary — Cup Run lifecycle cap + clean start (CX5)", () => {
   it("reconciles the user's cap on rollover and starts a run from a clean slate", () => {
     const cup = read("app/lib/cup-run.ts");

@@ -174,7 +174,10 @@ export function useTradeBench({
         };
       });
 
-      return { players: playersWithDynamicPickValues, teams: updatedTeams };
+      // Preserve db metadata (capCeiling, etc.) — returning only {players,
+      // teams} dropped the live cap ceiling after the first trade, so later
+      // NAV/audits silently reverted to the static default (CX4).
+      return { ...prev, players: playersWithDynamicPickValues, teams: updatedTeams };
     });
 
     // Record the trade
@@ -190,10 +193,13 @@ export function useTradeBench({
     // Clear nav cache so post-trade rosters get fresh server-side NAV
     clearNavCache();
 
-    // Clear the blocks and verdict
+    // Clear the blocks and verdict, and fully invalidate the simulation — the
+    // roster just changed, so the old standings/bracket in simData are stale and
+    // must not stay eligible for display or Cup-season recording (CX4). Clearing
+    // only the narrative left simData behind.
     setBlocks([[], []]);
     setVerdict(null);
-    simControlsRef.current?.clearSimResult();
+    simControlsRef.current?.resetSimulation();
     setShowSimPanel(true);
   }, [homeTeam, partnerTeam, outgoingBlock, incomingBlock, setBlocks, setVerdict, setDb, cupRun, setCupRun, db.capCeiling, simControlsRef]);
 

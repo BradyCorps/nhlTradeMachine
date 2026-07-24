@@ -74,6 +74,9 @@ export default function ArmchairGmPage() {
   // Format: ?home=WPG&partner=SJS&out=id1,id2:50&in=id3
   // where id2:50 means 50% retention. Updates without a full navigation.
   const [linkCopied, setLinkCopied] = useState(false);
+  // Gates the state→URL sync until the cold-load URL parse has run, so boot
+  // can't overwrite a shared query string before it's read (CX1).
+  const urlHydratedRef = useRef(false);
   const copyTradeLink = useCallback(() => {
     navigator.clipboard.writeText(window.location.href).then(() => {
       setLinkCopied(true);
@@ -91,8 +94,11 @@ export default function ArmchairGmPage() {
     });
   }, [db.teams, homeTeamId, partnerTeamId, setTeams]);
 
-  // Sync state → URL on every trade change
+  // Sync state → URL on every trade change — but ONLY after the cold-load URL
+  // parse has run. Otherwise the default-partner boot fires this first and
+  // replaceState()s over a shared query string before it's ever read (CX1).
   useEffect(() => {
+    if (!urlHydratedRef.current) return;
     if (!teams[0] && !teams[1] && !blocks[0].length && !blocks[1].length) return;
     const query = buildTradeQueryString({
       homeTeamId: teams[0]?.id ?? null,
@@ -104,21 +110,28 @@ export default function ArmchairGmPage() {
     window.history.replaceState({}, '', newUrl);
   }, [teams, blocks]);
 
-  // Parse URL → state on cold load (after db is ready)
+  // Parse URL → state on cold load (after db is ready), then mark hydrated so
+  // the state → URL sync above may safely take over.
   useEffect(() => {
-    if (!db || db.players.length === 0) return;
+    if (!db || db.players.length === 0 || urlHydratedRef.current) return;
     const parsed = parseTradeQueryState(window.location.search);
-    if (!parsed.homeTeamId && !parsed.partnerTeamId && !parsed.outgoing.length && !parsed.incoming.length) return;
+    const hasShared = Boolean(parsed.homeTeamId || parsed.partnerTeamId || parsed.outgoing.length || parsed.incoming.length);
 
-    const homeTeam    = parsed.homeTeamId    ? db.teams.find(t => t.id === parsed.homeTeamId)    ?? null : null;
-    const partnerTeam = parsed.partnerTeamId ? db.teams.find(t => t.id === parsed.partnerTeamId) ?? null : null;
-    const outgoing    = resolveTradeShareAssets(parsed.outgoing, db.players);
-    const incoming    = resolveTradeShareAssets(parsed.incoming, db.players);
+    if (hasShared) {
+      const homeTeam    = parsed.homeTeamId    ? db.teams.find(t => t.id === parsed.homeTeamId)    ?? null : null;
+      const partnerTeam = parsed.partnerTeamId ? db.teams.find(t => t.id === parsed.partnerTeamId) ?? null : null;
+      // Ownership-guarded: outgoing must belong to the home team, incoming to the
+      // partner — a crafted URL can't smuggle in a third team's asset or a phantom
+      // (CX2). This bench can execute the trade, so the guard is required here.
+      const outgoing    = resolveTradeShareAssets(parsed.outgoing, db.players, parsed.homeTeamId);
+      const incoming    = resolveTradeShareAssets(parsed.incoming, db.players, parsed.partnerTeamId);
 
-    if (homeTeam || partnerTeam || outgoing.length || incoming.length) {
-      setTeams([homeTeam, partnerTeam]);
-      setBlocks([outgoing, incoming]);
+      if (homeTeam || partnerTeam || outgoing.length || incoming.length) {
+        setTeams([homeTeam, partnerTeam]);
+        setBlocks([outgoing, incoming]);
+      }
     }
+    urlHydratedRef.current = true;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db]);
   const [verdictOpen, setVerdictOpen] = useState(false);   // bottom sheet expanded
@@ -293,10 +306,8 @@ export default function ArmchairGmPage() {
     return () => ctrl.abort();
   }, [db.players, db.capCeiling, setNavMap]);
 
-  // Re-fetch NAV for any block assets with retention applied.
-  // Clear trade partner match results whenever the outgoing package changes —
-  // stale "who wants this" results from a previous package should never persist.
-  useEffect(() => { setMatchResults(null); }, [outgoingBlock]);
+  // (Partner-match results are cleared on ANY package change by the
+  // tradeInputKey effect below — home, partner, or either block — CX3.)
 
   // When retention returns to 0, immediately restore the original cached value
   // so the display doesn't stay stuck showing the retained NAV.
@@ -428,8 +439,16 @@ export default function ArmchairGmPage() {
     // Issue 10: Don't auto-evaluate. Clear old verdict so user must click "Make the call" again.
     if (previousTradeInputKey.current !== tradeInputKey) {
       previousTradeInputKey.current = tradeInputKey;
+      // Abort any in-flight audit / memo / partner-match so a stale response
+      // can't populate a verdict or match list for the NEW package. tradeInputKey
+      // covers home, partner, and both blocks — so this fires on any package
+      // change, not just the outgoing side (CX3).
+      evalAbortRef.current?.abort();
+      memoAbortRef.current?.abort();
+      matchAbortRef.current?.abort();
       setVerdict(null);
       setVerdictOpen(false);
+      setMatchResults(null);
     }
   }, [tradeInputKey]);
 
@@ -443,13 +462,14 @@ export default function ArmchairGmPage() {
     const incoming = blocks[1];
 
     if (memoAbortRef.current) memoAbortRef.current.abort();
-    memoAbortRef.current = new AbortController();
+    const ctrl = new AbortController();
+    memoAbortRef.current = ctrl;
 
     try {
       const res = await fetch("/api/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        signal: memoAbortRef.current.signal,
+        signal: ctrl.signal,
         body: JSON.stringify({
           kind: "trade_memo",
           model: "claude-sonnet-4-5",
@@ -469,6 +489,9 @@ export default function ArmchairGmPage() {
         }),
       });
       const data = await res.json();
+      // Stale-response guard: a superseded memo must not write onto the current
+      // verdict (CX3).
+      if (ctrl.signal.aborted || memoAbortRef.current !== ctrl) return;
       if (!res.ok) {
         console.error("[Claude memo] API error:", data);
         setVerdict(v => v ? { ...v, claudeAnalysis: "Analysis unavailable — please try again.", claudeLoading: false } : v);
@@ -533,15 +556,19 @@ export default function ArmchairGmPage() {
     const liveT1 = db.teams.find(t => t.id === teams[1]?.id) ?? teams[1];
 
     if (evalAbortRef.current) evalAbortRef.current.abort();
-    evalAbortRef.current = new AbortController();
+    const ctrl = new AbortController();
+    evalAbortRef.current = ctrl;
 
     try {
       const v = await fetchTradeVerdict(
         blocks[0], blocks[1], liveT0, liveT1,
         allHomeRoster, allPartnerRoster,
-        evalAbortRef.current.signal,
+        ctrl.signal,
         db.capCeiling
       );
+      // Stale-response guard: only apply this verdict if it's still the active
+      // request for the current package (CX3) — mirrors the partner-match guard.
+      if (ctrl.signal.aborted || evalAbortRef.current !== ctrl) return;
       if (v) { setVerdict(v); setVerdictOpen(true); }
     } catch (e: any) {
       if (e.name !== "AbortError") console.error("[runEval]", e.message);
