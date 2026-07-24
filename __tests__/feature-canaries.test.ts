@@ -2248,6 +2248,21 @@ describe("Canary — fantasy page AA, pagination, and selection accent", () => {
   });
 });
 
+describe("Canary — Cup Run lifecycle cap + clean start (CX5)", () => {
+  it("reconciles the user's cap on rollover and starts a run from a clean slate", () => {
+    const cup = read("app/lib/cup-run.ts");
+    // The reconcile no longer exempts the user team; it subtracts their retention.
+    expect(cup).toContain("export function reconcileTeamCapSpaces");
+    expect(cup).not.toContain("if (team.id === userTeamId) return team;");
+    expect(cup).toContain("userRetainedAav");
+    const lifecycle = read("app/armchair-gm/useCupRunLifecycle.ts");
+    expect(lifecycle).toContain("reconcileTeamCapSpaces(db.teams, livePlayers, nextCap, next.teamId, userRetainedAav)");
+    // Starting a Cup Run clears pre-run trades + sim first.
+    const page = read("app/armchair-gm/page.tsx");
+    expect(page).toMatch(/onStart=\{\(\) => \{[\s\S]*resetTrades\(\);[\s\S]*resetSimulation\(\);[\s\S]*handleStartCupRun\(\);/);
+  });
+});
+
 describe("Canary — RFA offer-sheet compensation (CX6)", () => {
   it("conveys own picks as compensation instead of deleting them, and frees only the current cap", () => {
     const fa = read("app/lib/free-agency.ts");

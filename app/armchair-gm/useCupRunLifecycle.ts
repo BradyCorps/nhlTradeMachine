@@ -18,7 +18,7 @@ import {
   recordSeason,
   rollLeagueForward,
   rollRetentionLedger,
-  reconcileAiTeamCapSpaces,
+  reconcileTeamCapSpaces,
   seasonLabelForYear,
   type CupRunState,
   type CupRunSkaterSeason,
@@ -180,7 +180,11 @@ export function useCupRunLifecycle({
       const livePlayers = rolled.players.filter(
         p => p.position !== "Pick" || (p.year ?? 9999) >= currentDraftYear,
       );
-      const rolledTeams = reconcileAiTeamCapSpaces(db.teams, livePlayers, nextCap, next.teamId);
+      // The user's team is reconciled too — new ceiling, rolled roster, and its
+      // still-active retained-salary obligations (paid on players it moved).
+      const rolledLedger = rollRetentionLedger(next.retentionLedger);
+      const userRetainedAav = rolledLedger.reduce((s, e) => s + e.aavRetained, 0);
+      const rolledTeams = reconcileTeamCapSpaces(db.teams, livePlayers, nextCap, next.teamId, userRetainedAav);
       setDb(prev => ({ ...prev, teams: rolledTeams, players: livePlayers, capCeiling: nextCap }));
       setOriginalDb({ teams: rolledTeams, players: livePlayers, capCeiling: nextCap });
       onSeasonRolledRef.current();

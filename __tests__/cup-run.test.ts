@@ -6,7 +6,7 @@ import {
   addRetention,
   rollRetentionLedger,
   rollLeagueForward,
-  reconcileAiTeamCapSpaces,
+  reconcileTeamCapSpaces,
   difficultyForTeam,
   seasonLabelForYear,
   cupRunShareText,
@@ -318,8 +318,8 @@ describe("rollLeagueForward", () => {
     expect(carCommitted).toBeLessThan(140);
   });
 
-  it("reconciles AI cap space from rolled rosters while leaving the user ledger alone", () => {
-    const reconciled = reconcileAiTeamCapSpaces(
+  it("reconciles every team's cap from rolled rosters, including the user (CX5)", () => {
+    const reconciled = reconcileTeamCapSpaces(
       [
         team("CAR", { capSpace: -38 }),
         team("VAN", { capSpace: 4 }),
@@ -332,8 +332,21 @@ describe("rollLeagueForward", () => {
       100,
       "VAN",
     );
+    // CAR (AI): 100 − (8 + 2×0.5) = 91.
     expect(reconciled.find((t) => t.id === "CAR")?.capSpace).toBe(91);
-    expect(reconciled.find((t) => t.id === "VAN")?.capSpace).toBe(4);
+    // VAN (user) is reconciled too now: 100 − 90 = 10 (was frozen at 4).
+    expect(reconciled.find((t) => t.id === "VAN")?.capSpace).toBe(10);
+  });
+
+  it("subtracts the user's active retained-salary obligations from their cap (CX5)", () => {
+    const reconciled = reconcileTeamCapSpaces(
+      [team("VAN", { capSpace: 4 })],
+      [asset("van-a", { teamId: "VAN", capHit: 80 })],
+      100,
+      "VAN",
+      6, // $6M retained on players traded away — off-roster, must still count
+    );
+    expect(reconciled.find((t) => t.id === "VAN")?.capSpace).toBe(14); // 100 − 80 − 6
   });
 });
 
@@ -414,9 +427,9 @@ describe("Cup Run cap escalation", () => {
     // against the $113.5M year-2 cap — the bug that showed teams -5.5M over.
     const roster = Array.from({ length: 20 }, (_, i) =>
       asset(`x${i}`, { teamId: "CAR", capHit: 109 / 20 }));
-    const y1 = reconcileAiTeamCapSpaces(
+    const y1 = reconcileTeamCapSpaces(
       [team("CAR")], roster, capForCupYear(1).ceiling, "VAN");
-    const y2 = reconcileAiTeamCapSpaces(
+    const y2 = reconcileTeamCapSpaces(
       [team("CAR")], roster, capForCupYear(2).ceiling, "VAN");
     expect(y1[0].capSpace).toBeLessThan(0);
     expect(y2[0].capSpace).toBeGreaterThan(0);

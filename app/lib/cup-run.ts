@@ -225,10 +225,24 @@ function carryForwardSimSkaterStats(players: Asset[], seasons: CupRunSkaterSeaso
   });
 }
 
-export function reconcileAiTeamCapSpaces(teams: Team[], players: Asset[], capCeiling: number, userTeamId: string): Team[] {
+// Recompute every team's cap space against the season the league is entering:
+// the new ceiling minus committed roster salary. The user's team is reconciled
+// too — it must receive cap-ceiling growth and its rolled roster's commitment
+// changes (aging, drafted rookies, retirements), not stay frozen at last
+// season's number (CX5). The user's active retained-salary obligations (paid on
+// players they traded away — off-roster, so committedCap can't see them) are
+// subtracted on top.
+export function reconcileTeamCapSpaces(
+  teams: Team[],
+  players: Asset[],
+  capCeiling: number,
+  userTeamId: string,
+  userRetainedAav = 0,
+): Team[] {
   return teams.map((team) => {
-    if (team.id === userTeamId) return team;
-    const capSpace = Math.round((capCeiling - committedCap(players, team.id)) * 10) / 10;
+    const committed = committedCap(players, team.id);
+    const retention = team.id === userTeamId ? userRetainedAav : 0;
+    const capSpace = Math.round((capCeiling - committed - retention) * 10) / 10;
     return { ...team, capSpace };
   });
 }

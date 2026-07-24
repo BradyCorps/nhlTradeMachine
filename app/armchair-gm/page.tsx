@@ -799,7 +799,15 @@ export default function ArmchairGmPage() {
           canStart={!!homeTeam}
           hasSeasonResult={!!simData?.playoffBracket?.champion}
           advancing={cupAdvancing}
-          onStart={handleStartCupRun}
+          onStart={() => {
+            // Start from a clean baseline: clear any pre-run trades (so their
+            // retained salary can't evade the Cup retention ledger) and any
+            // pre-run simulation (so it can't be recorded as a Cup season) —
+            // CX5. Then begin the run.
+            resetTrades();
+            resetSimulation();
+            handleStartCupRun();
+          }}
           onRecordAndAdvance={handleCupRunAdvance}
           onAbandon={() => { handleAbandonCupRun(); resetTrades(); }}
         />
