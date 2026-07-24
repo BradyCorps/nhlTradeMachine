@@ -4,6 +4,7 @@ import {
   projectFreeAgentContract,
   resolveLeagueOffseason,
   applyOffseasonToRoster,
+  resolveOfferSheetCompensation,
   FA,
 } from "../app/lib/free-agency";
 import { applyCapDelta } from "../app/lib/cap-delta";
@@ -235,15 +236,15 @@ describe("resolveLeagueOffseason", () => {
 
   it("relocates a walked player to the FA pool instead of deleting him (CXH3/AI3)", () => {
     const roster: Asset[] = [
-      mkAsset({ id: "resigned", teamId: "STL", contractStatus: "RFA", capHit: 1 }),
-      mkAsset({ id: "walked", teamId: "DAL", contractStatus: "UFA", capHit: 2 }),
-      mkAsset({ id: "signed-elsewhere", teamId: "BUF", contractStatus: "UFA", capHit: 3 }),
-      mkAsset({ id: "untouched", teamId: "TOR", expiresThisOffseason: false }),
+      mkAsset({ id: "resigned", position: "C", teamId: "STL", contractStatus: "RFA", capHit: 1 }),
+      mkAsset({ id: "walked", position: "W", teamId: "DAL", contractStatus: "UFA", capHit: 2 }),
+      mkAsset({ id: "signed-elsewhere", position: "D", teamId: "BUF", contractStatus: "UFA", capHit: 3 }),
+      mkAsset({ id: "untouched", position: "C", teamId: "TOR", expiresThisOffseason: false }),
     ];
     const res = {
-      resignings: [{ playerId: "resigned", teamId: "STL", contract: { aav: 4, term: 3, status: "RFA" as const, tier: "MID" as const, resignProbability: 0.9 } }],
+      resignings: [{ playerId: "resigned", teamId: "STL", contract: { aav: 4, term: 3, status: "RFA" as const, tier: "MIDDLE" as const, resignProbability: 0.9 } }],
       marketSignings: [{ playerId: "signed-elsewhere", fromTeamId: "BUF", teamId: "CAR", contract: { aav: 5, term: 4, status: "UFA" as const, tier: "TOP" as const, resignProbability: 0.5 } }],
-      walkAways: [{ playerId: "walked", fromTeamId: "DAL", contract: { aav: 2.5, term: 2, status: "UFA" as const, tier: "MID" as const, resignProbability: 0.4 } }],
+      walkAways: [{ playerId: "walked", fromTeamId: "DAL", contract: { aav: 2.5, term: 2, status: "UFA" as const, tier: "MIDDLE" as const, resignProbability: 0.4 } }],
     };
     const out = applyOffseasonToRoster(roster, res);
 
@@ -264,7 +265,7 @@ describe("resolveLeagueOffseason", () => {
   });
 
   it("keeps a walked-then-AI-signed player on his new team, not the FA pool", () => {
-    const roster: Asset[] = [mkAsset({ id: "p", teamId: "DAL", contractStatus: "UFA", capHit: 2 })];
+    const roster: Asset[] = [mkAsset({ id: "p", position: "C", teamId: "DAL", contractStatus: "UFA", capHit: 2 })];
     const res = {
       resignings: [],
       marketSignings: [{ playerId: "p", fromTeamId: "DAL", teamId: "CAR", contract: { aav: 5, term: 4, status: "UFA" as const, tier: "TOP" as const, resignProbability: 0.5 } }],
@@ -302,5 +303,42 @@ describe("resolveLeagueOffseason", () => {
 
     expect(res.marketSignings.some((s) => s.teamId === "BUF")).toBe(true);
     expect(remaining).toBeGreaterThanOrEqual(FA.aiMarketCapReserve - 1e-9);
+  });
+});
+
+describe("resolveOfferSheetCompensation (CX6)", () => {
+  const pick = (origTeam: string, year: number, round: number, currentOwner = origTeam): Asset =>
+    mkAsset({
+      id: `pick-${origTeam}-${year}-${round}`,
+      position: "Pick", teamId: currentOwner, round, year,
+    });
+
+  it("surrenders the team's own picks, soonest year first, one per round", () => {
+    const picks = [
+      pick("WPG", 2028, 1), pick("WPG", 2027, 1), pick("WPG", 2027, 3),
+    ];
+    const res = resolveOfferSheetCompensation("WPG", picks, ["1st", "3rd"]);
+    expect(res.transferPickIds).toEqual(["pick-WPG-2027-1", "pick-WPG-2027-3"]);
+    expect(res.shortfall).toEqual([]);
+  });
+
+  it("takes two different first-rounders when two 1sts are owed", () => {
+    const picks = [pick("WPG", 2027, 1), pick("WPG", 2028, 1)];
+    const res = resolveOfferSheetCompensation("WPG", picks, ["1st", "1st"]);
+    expect(res.transferPickIds).toEqual(["pick-WPG-2027-1", "pick-WPG-2028-1"]);
+  });
+
+  it("does NOT surrender picks the team merely acquired in a trade", () => {
+    // WPG holds an OTT first (acquired) but not its own — can't use the OTT pick.
+    const picks = [pick("OTT", 2027, 1, "WPG")];
+    const res = resolveOfferSheetCompensation("WPG", picks, ["1st"]);
+    expect(res.transferPickIds).toEqual([]);
+    expect(res.shortfall).toEqual(["1st"]);
+  });
+
+  it("reports a shortfall when the required round isn't owned", () => {
+    const res = resolveOfferSheetCompensation("WPG", [pick("WPG", 2027, 2)], ["1st"]);
+    expect(res.transferPickIds).toEqual([]);
+    expect(res.shortfall).toEqual(["1st"]);
   });
 });

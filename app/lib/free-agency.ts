@@ -232,6 +232,53 @@ export function getOfferSheetCompensation(aavMillions: number): string[] {
   return ["1st", "1st", "1st", "1st"];
 }
 
+// The original owner is baked into a pick id: `pick-{origTeam}-{year}-{round}`.
+const pickOriginalOwner = (id: string): string | null => {
+  const m = /^pick-([A-Za-z0-9]+)-\d+-\d+$/.exec(id);
+  return m ? m[1] : null;
+};
+
+const compRoundNumber = (label: string): number =>
+  label === "1st" ? 1 : label === "2nd" ? 2 : label === "3rd" ? 3 : parseInt(label, 10) || 0;
+
+export interface OfferSheetCompResult {
+  transferPickIds: string[]; // the signing team's OWN picks that convey to the original club
+  shortfall: string[];       // required rounds the signing team can't cover with its own picks
+}
+
+// Pick the compensation an offer-sheeting team must surrender (CBA Art. 10.3).
+// Per the CBA these must be the SIGNING team's OWN draft picks — current owner
+// AND original owner — one per required round, soonest year first. They are
+// returned for TRANSFER to the original club, never deletion (CX6). Picks the
+// team merely acquired in trades don't qualify and are left alone.
+export function resolveOfferSheetCompensation(
+  signingTeamId: string,
+  picks: Asset[],
+  compRounds: string[],
+): OfferSheetCompResult {
+  const own = picks
+    .filter((p) =>
+      p.position === "Pick" &&
+      p.teamId === signingTeamId &&
+      pickOriginalOwner(p.id) === signingTeamId)
+    .sort((a, b) => (a.year ?? 0) - (b.year ?? 0)); // soonest picks convey first
+
+  const used = new Set<string>();
+  const transferPickIds: string[] = [];
+  const shortfall: string[] = [];
+  for (const label of compRounds) {
+    const round = compRoundNumber(label);
+    const pick = own.find((p) => p.round === round && !used.has(p.id));
+    if (pick) {
+      used.add(pick.id);
+      transferPickIds.push(pick.id);
+    } else {
+      shortfall.push(label);
+    }
+  }
+  return { transferPickIds, shortfall };
+}
+
 // ── RFA offer-sheet acceptance logic ─────────────────────────────────────────
 // Models whether an RFA would accept an offer sheet from a given team and
 // whether the original team matches. Top players prefer contenders; rebuilders

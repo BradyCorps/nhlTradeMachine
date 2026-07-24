@@ -9,7 +9,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import type { Asset, Team } from "@/app/lib/trade-types";
 import { SEASON } from "@/app/lib/season-config";
 import { scenarioSeed } from "@/app/lib/sim-engine";
-import { resolveLeagueOffseason, applyOffseasonToRoster, type OffseasonPending } from "@/app/lib/free-agency";
+import { resolveLeagueOffseason, applyOffseasonToRoster, resolveOfferSheetCompensation, type OffseasonPending } from "@/app/lib/free-agency";
 import { applyCapDelta, applyTeamCapDeltas } from "@/app/lib/cap-delta";
 import { clearNavCache } from "@/app/lib/evaluate-client";
 import { cupRunOffseasonEntry, type CupRunState } from "@/app/lib/cup-run";
@@ -187,18 +187,15 @@ export function useOffseasonFlow({
     setOfferSheetOpen(true);
   }, [setDb]);
 
-  // Sign an RFA via offer sheet: move player to user's roster, deduct comp picks.
+  // Sign an RFA via offer sheet: move player to the user's roster; the
+  // compensation picks CONVEY to the original club (not deleted), and the
+  // original club frees the RFA's current cap hit (the already-expired old deal
+  // is not added back — CX6).
   const signOfferSheet = useCallback((fa: OffseasonPending, compensation: string[]) => {
     if (!homeTeamId) return;
-    // Deduct compensation picks from the user's inventory
-    const picksToRemove: string[] = [];
-    const compNeeded = [...compensation];
-    const available = db.players.filter(p => p.position === "Pick" && p.teamId === homeTeamId);
-    for (const roundNeeded of compNeeded) {
-      const roundNum = roundNeeded === "1st" ? 1 : roundNeeded === "2nd" ? 2 : 3;
-      const pick = available.find(p => p.round === roundNum && !picksToRemove.includes(p.id));
-      if (pick) picksToRemove.push(pick.id);
-    }
+    const originalTeamId = fa.player.teamId;
+    const { transferPickIds } = resolveOfferSheetCompensation(homeTeamId, db.players, compensation);
+    const transferSet = new Set(transferPickIds);
 
     setDb(prev => {
       const signed: Asset = {
@@ -207,17 +204,16 @@ export function useOffseasonFlow({
       };
       return {
         ...prev,
-        players: [
-          ...prev.players
-            .filter(p => p.id !== fa.player.id)
-            .filter(p => !picksToRemove.includes(p.id)),
-          signed,
-        ],
+        players: prev.players
+          .filter(p => p.id !== fa.player.id)
+          // Compensation picks convey to the original club instead of vanishing.
+          .map(p => transferSet.has(p.id) ? { ...p, teamId: originalTeamId } : p)
+          .concat(signed),
         teams: prev.teams.map(t =>
           t.id === homeTeamId
             ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { incoming: [{ capHit: fa.contract.aav }] }) * 10) / 10 }
-            : t.id === fa.player.teamId
-              ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: fa.contract.aav }], incoming: [{ capHit: fa.player.lastCapHit ?? fa.player.capHit }] }) * 10) / 10 }
+            : t.id === originalTeamId
+              ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: fa.contract.aav }] }) * 10) / 10 }
               : t),
       };
     });

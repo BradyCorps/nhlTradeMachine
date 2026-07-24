@@ -2248,6 +2248,20 @@ describe("Canary — fantasy page AA, pagination, and selection accent", () => {
   });
 });
 
+describe("Canary — RFA offer-sheet compensation (CX6)", () => {
+  it("conveys own picks as compensation instead of deleting them, and frees only the current cap", () => {
+    const fa = read("app/lib/free-agency.ts");
+    expect(fa).toContain("export function resolveOfferSheetCompensation");
+    expect(fa).toContain("pickOriginalOwner(p.id) === signingTeamId"); // own picks only
+    const hook = read("app/armchair-gm/useOffseasonFlow.ts");
+    expect(hook).toContain("resolveOfferSheetCompensation(homeTeamId, db.players, compensation)");
+    // Picks convey to the original club, not deleted.
+    expect(hook).toContain("transferSet.has(p.id) ? { ...p, teamId: originalTeamId }");
+    // Original club frees only the RFA's current cap (no double-count of the old deal).
+    expect(hook).not.toContain("incoming: [{ capHit: fa.player.lastCapHit ?? fa.player.capHit }]");
+  });
+});
+
 describe("Canary — AI offseason RFA retention + no vanishing FAs (AI1–3/CXH3)", () => {
   it("always re-signs AI RFAs and relocates walked players to the FA pool", () => {
     const fa = read("app/lib/free-agency.ts");
