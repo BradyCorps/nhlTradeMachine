@@ -5,7 +5,11 @@
 // (Satori/next-og, which has no CSS variables and needs concrete hex).
 // Geometry lives here once; both callers map over the same arrays.
 
-import type { GravityProfile, GravityTier, ZoneMasses } from "./gravity";
+import type { GravityTier, ZoneMasses } from "./gravity";
+
+export interface RinkMassProfile {
+  masses: ZoneMasses;
+}
 
 export interface RinkZone {
   key: keyof ZoneMasses;
@@ -40,7 +44,7 @@ const SOFT = 900; // px² softening keeps displacement finite at the core
 const K = 520; // displacement strength per unit mass
 const MAX_PULL = 11; // px cap so the lattice never folds over itself
 
-export function computeRinkGeometry(profile: GravityProfile): RinkGeometry {
+export function computeRinkGeometry(profile: RinkMassProfile): RinkGeometry {
   const W = 320;
   const H = 240;
   const { oz, nz, dz } = profile.masses;

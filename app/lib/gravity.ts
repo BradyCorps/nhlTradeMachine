@@ -3,13 +3,12 @@
 // The rink is a sheet; the player curves it. Three zone masses are the
 // real computed quantities — total force is just their weighted sum.
 //
-//   m_OZ  — offensive-zone well: chances created, finishing threat,
-//           on-ice lift, PP leverage. Play falls toward the opponent's net.
+//   m_OZ  — offensive-zone well: chance-impact and production indicators.
+//           Play falls toward the opponent's net in the model visualization.
 //   m_NZ  — neutral-zone well: transition displacement (where play LIVES
-//           vs where the player is DEPLOYED), speed, burst rate. The
-//           Quinn Hughes signal — dragging play through center ice.
-//   m_DZ  — defensive-zone dome: xGA suppression, defensive point shares,
-//           PK trust. Repulsive curvature — opponents can't dig a well here.
+//           vs where the player is DEPLOYED), speed, burst rate.
+//   m_DZ  — defensive-zone dome: suppression and defensive-role indicators.
+//           Positive values render as repulsive curvature.
 //
 // Every raw input is standardized WITHIN POSITION (z-score against
 // positional calibration constants) before being squashed to a bounded
@@ -60,6 +59,27 @@ export interface GravityCoverage {
   dz: ZoneCoverage;
 }
 
+export type GravitySituationScope =
+  | "5V5"
+  | "ALL SITUATIONS"
+  | "MIXED SITUATIONS"
+  | "UNKNOWN";
+
+/**
+ * V3 combines differently scoped source fields, so it must not be presented
+ * as a single-strength model.
+ */
+export const GRAVITY_V3_SITUATION_SCOPE =
+  "MIXED SITUATIONS" as const satisfies GravitySituationScope;
+
+export const GRAVITY_V3_SITUATION_NOTE =
+  "Current all-situations scoring/on-off and DPS; 5v5 zone starts and baseline on/off (with all-situations fallback); 5-on-4 production; 4-on-5 usage; and regular-season EDGE aggregates without a strength-state tag.";
+
+export const GRAVITY_V3_FIELD_LABEL = "MODELLED FIELD · POSITION-RELATIVE";
+
+export const GRAVITY_V3_FIELD_DISCLAIMER =
+  "Model visualization of Gravity v3 components; not observed player-tracking data.";
+
 export interface GravityProfile {
   /** Weighted zone-mass total, bounded (−1, +1). One currency across positions. */
   force: number;
@@ -93,12 +113,12 @@ export type GravityTier =
   | "BLACK_HOLE";     // absorbs energy from linemates
 
 const TIER_DESC: Record<GravityTier, string> = {
-  SUPERMASSIVE:  "Warps the game around himself — linemates orbit",
-  STAR:          "Elite gravitational field — elevates everyone nearby",
-  MAIN_SEQUENCE: "Strong, steady pull — makes his line better",
-  SATELLITE:     "Detectable pull — modest but real",
-  ASTEROID:      "Negligible gravitational field",
-  BLACK_HOLE:    "Absorbs energy — linemates produce less",
+  SUPERMASSIVE:  "Largest positive position-relative modelled field",
+  STAR:          "Elite positive position-relative modelled field",
+  MAIN_SEQUENCE: "Strong positive territorial influence index",
+  SATELLITE:     "Detectable positive territorial influence index",
+  ASTEROID:      "Territorial influence index near neutral",
+  BLACK_HOLE:    "Strong negative position-relative modelled field",
 };
 
 // Legacy v3 tier cutoffs on the bounded force scale. The calibration route
@@ -201,6 +221,51 @@ export function gravityCoverageRatio(coverage: GravityCoverage): number {
   const present = zones.reduce((sum, zone) => sum + zone.presentWeight, 0);
   const possible = zones.reduce((sum, zone) => sum + zone.possibleWeight, 0);
   return possible > 0 ? clamp(present / possible, 0, 1) : 0;
+}
+
+export interface GravityV3PublicPresentation {
+  fieldLabel: typeof GRAVITY_V3_FIELD_LABEL;
+  fieldDisclaimer: typeof GRAVITY_V3_FIELD_DISCLAIMER;
+  situation: typeof GRAVITY_V3_SITUATION_SCOPE;
+  reliability: {
+    label: "Reliability";
+    index: number;
+    explanation: "Coverage/stability index, not a probability.";
+  };
+  signalStability: {
+    label: "Signal Stability";
+    index: number;
+    explanation: "Current vs baseline agreement; legacy D pair-driver adjustment. Not portability.";
+  };
+  coverage: {
+    label: "Data Coverage";
+    percent: number;
+  };
+}
+
+/** Public-facing v3 labels and values, kept separate from deprecated aliases. */
+export function gravityV3PublicPresentation(
+  profile: GravityProfile,
+): GravityV3PublicPresentation {
+  return {
+    fieldLabel: GRAVITY_V3_FIELD_LABEL,
+    fieldDisclaimer: GRAVITY_V3_FIELD_DISCLAIMER,
+    situation: GRAVITY_V3_SITUATION_SCOPE,
+    reliability: {
+      label: "Reliability",
+      index: Math.round(profile.reliability * 100),
+      explanation: "Coverage/stability index, not a probability.",
+    },
+    signalStability: {
+      label: "Signal Stability",
+      index: Math.round(profile.signalStability * 100),
+      explanation: "Current vs baseline agreement; legacy D pair-driver adjustment. Not portability.",
+    },
+    coverage: {
+      label: "Data Coverage",
+      percent: Math.round(gravityCoverageRatio(profile.coverage) * 100),
+    },
+  };
 }
 
 // ── The engine ───────────────────────────────────────────────────

@@ -27,12 +27,12 @@ export const iconKey = [
 ];
 
 export const gravityTierEntries: [GravityTier, string, string][] = [
-  ["SUPERMASSIVE", "Supermassive", "Gravity tier: top of the league — the rink visibly curves around this player; linemates orbit and play collapses toward the opponent's net."],
-  ["STAR", "Star", "Gravity tier: elite field — clear warping of play across at least one zone, measured against players at the same position."],
-  ["MAIN_SEQUENCE", "Main Sequence", "Gravity tier: strong, steady pull — a real positive field that makes the line better without dominating the sheet."],
-  ["SATELLITE", "Satellite", "Gravity tier: detectable pull — modest but measurable positive influence for the position."],
-  ["ASTEROID", "Asteroid", "Gravity tier: negligible field — on-ice influence near the positional average, in either direction."],
-  ["BLACK_HOLE", "Black Hole", "Gravity tier: the field caves — linemates produce less and the ice tilts the wrong way with this player deployed."],
+  ["SUPERMASSIVE", "Supermassive", "Gravity v3 tier: the largest positive bounded modelled fields in the current position-relative calibration."],
+  ["STAR", "Star", "Gravity v3 tier: an elite positive bounded field across one or more modelled zones."],
+  ["MAIN_SEQUENCE", "Main Sequence", "Gravity v3 tier: a strong positive position-relative territorial influence index."],
+  ["SATELLITE", "Satellite", "Gravity v3 tier: a modest positive position-relative territorial influence index."],
+  ["ASTEROID", "Asteroid", "Gravity v3 tier: a bounded field near the current position-relative reference."],
+  ["BLACK_HOLE", "Black Hole", "Gravity v3 tier: a strongly negative position-relative modelled field."],
 ];
 
 export interface MethodologyItem {
@@ -56,7 +56,12 @@ export const methodologySections: MethodologySection[] = [
       { term: "G-NAV", definition: "X-NAV for goalies. Built around GSAx, workload, save profile, team defensive context, age, and contract surplus." },
       { term: "Prospect NAV", definition: "Pre-NHL value comes from draft pedigree and stored NHLe production. No-signal ELC players do not receive automatic cap or age value." },
       { term: "OFF / DEF", definition: "On-ice components: offensive production and creation on one side, suppression and defensive value on the other, each judged against position." },
-      { term: "GRAV", definition: "The gravity residual — on-ice warping the OFF/DEF components have not already priced, drawn from the Player Gravity system's creation and transition signals." },
+      { term: "GRAV", definition: "The X-NAV handoff from Gravity v3. It contains only the bounded neutral-zone transition proxy; direct offense and defensive suppression are valued elsewhere." },
+      { term: "Modelled Field", definition: "The warped rink is a visualization generated from three model components. It is not an observed tracking heatmap or a map of puck trajectories." },
+      { term: "Signal Stability", definition: "A v3 heuristic based mainly on current-versus-baseline on-off agreement, with a legacy defenseman pair-driver adjustment. It does not estimate portability." },
+      { term: "Reliability", definition: "A 0–100 v3 sample, stability, and data-coverage index. It is not a calibrated probability." },
+      { term: "Data Coverage", definition: "The share of fixed v3 zone weight backed by present inputs. Missing evidence shrinks an estimate toward neutral and lowers reliability." },
+      { term: "Mixed Situations", definition: "Gravity v3 combines all-situations, 5v5, 5-on-4, 4-on-5, and regular-season EDGE aggregate inputs. It is not a single-strength model." },
       { term: "CAP", definition: "Contract component. Positive means the player is under market value; negative means the cap hit or term drags value." },
       { term: "AGE / YNG", definition: "Age-curve component: decline drag for veterans, youth projection for young NHL players with enough real signal. Not a blanket ELC bonus." },
       { term: "UPS", definition: "Upside component — development ceiling for players whose trajectory has not fully priced into production yet." },

@@ -22,11 +22,11 @@ const SECTIONS: { id: string; title: string; paras: string[] }[] = [
   },
   {
     id: "gravity",
-    title: "Player Gravity — the rink as spacetime",
+    title: "Player Gravity — a modelled territorial field",
     paras: [
-      "Great players warp the game the way mass warps spacetime: linemates orbit them, play bends toward the opponent's net, defenders overcommit. Gravity measures that warping from observable signals — how much better the team's chances are with a player on the ice, how far play travels from where a coach deploys him, how the defensive zone holds when he patrols it.",
-      "The system models each skater as three zone masses: an offensive-zone well, a neutral-zone (transition) well, and a defensive-zone dome. Every input is judged against the player's own position before the masses combine, so an offense-driving defenseman is recognized as the rarity he is, and a forward and a defenseman can still be compared on one force scale. The exact formula and calibration are proprietary to the Ledger; the shape of the field — where a player warps the rink — is published on every Gravity tab.",
-      "Gravity feeds X-NAV only through its residual: the portion of the field the offensive and defensive components have not already priced. Nothing is counted twice.",
+      "Player Gravity v3 is a position-relative territorial influence index. It combines on-ice chance impact, transition proxies, and defensive suppression into an offensive-zone well, neutral-zone well, and defensive-zone dome. The rink field is a model visualization of those components, not a literal tracking map.",
+      "The current field force is a bounded display composite, not expected goals and not a direct measurement of defender attention. The public scope is MIXED SITUATIONS because v3 combines all-situations, 5v5, 5-on-4, 4-on-5, and regular-season EDGE aggregate inputs. Signal Stability is based mainly on agreement between current and baseline on-off values, with a legacy defenseman pair-driver adjustment; it is not a fitted portability model. Reliability is a 0–100 coverage/stability index, not a probability. Missing evidence shrinks the estimate toward neutral and lowers reliability.",
+      "X-NAV receives only the transition portion of the current Gravity model. Direct offensive production and defensive suppression are valued elsewhere. Weighting and calibration are Ledger-defined and versioned against the available league population.",
     ],
   },
   {
@@ -57,7 +57,7 @@ const SECTIONS: { id: string; title: string; paras: string[] }[] = [
     id: "data",
     title: "Data pipeline & acknowledgements",
     paras: [
-      "Nightly snapshots combine NHL API rosters and NHL EDGE tracking with MoneyPuck's public analytics and CapWages contract data, layered over multi-season baselines so single-season noise never masquerades as signal. Missing data is skipped, never scored — a gap in coverage is not evidence of bad play.",
+      "Nightly snapshots combine NHL API rosters and NHL EDGE tracking with MoneyPuck's public analytics and CapWages contract data, layered over multi-season baselines so single-season noise never masquerades as signal. In fixed-weight composites such as Gravity v3, missing evidence contributes no term, which shrinks the estimate toward neutral and lowers the reported reliability.",
       "The Ledger stands on the shoulders of the public hockey-data community. Sincere thanks to the NHL, MoneyPuck, CapWages, and Hockey-Reference — their work makes independent analysis like this possible. Full source credits with links are in the Glossary's Data & Sources section.",
     ],
   },

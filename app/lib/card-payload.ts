@@ -6,14 +6,58 @@
 // route, which is a pure renderer. The one structured piece is the slim
 // gravity profile, needed to redraw the identical Spacetime lattice.
 
-import type { GravityTier } from "./gravity";
+import {
+  GRAVITY_V3_FIELD_DISCLAIMER,
+  GRAVITY_V3_FIELD_LABEL,
+  GRAVITY_V3_SITUATION_SCOPE,
+  gravityV3PublicPresentation,
+  type GravityProfile,
+  type GravitySituationScope,
+  type GravityTier,
+} from "./gravity";
+import { z } from "zod";
 
-export interface CardGravityInput {
+interface CardGravityBase {
   masses: { oz: number; nz: number; dz: number };
-  tier: GravityTier;
   force: number;
-  confidence: number;
   isDefenseman: boolean;
+  season: string;
+  situation: GravitySituationScope;
+  fieldLabel: string;
+  fieldDisclaimer: string;
+  gravityPercentile: number | null;
+}
+
+export interface CardGravityV3Input extends CardGravityBase {
+  tier: GravityTier;
+  modelVersion: "3.0";
+  modelLabel: "V3 FALLBACK";
+  reliabilityLabel: string;
+  coverageLabel: string;
+}
+
+export type CardGravityInput = CardGravityV3Input;
+
+export function cardGravityFromV3(
+  profile: GravityProfile,
+  context: { season: string; gravityPercentile: number | null },
+): CardGravityV3Input {
+  const presentation = gravityV3PublicPresentation(profile);
+  return {
+    masses: profile.masses,
+    tier: profile.tier,
+    force: profile.force,
+    isDefenseman: profile.isDefenseman,
+    modelVersion: "3.0",
+    modelLabel: "V3 FALLBACK",
+    season: context.season,
+    situation: presentation.situation,
+    fieldLabel: presentation.fieldLabel,
+    fieldDisclaimer: presentation.fieldDisclaimer,
+    reliabilityLabel: `${presentation.reliability.index} INDEX`,
+    coverageLabel: `${profile.dataQuality.toUpperCase()} · ${presentation.coverage.percent}% WEIGHT`,
+    gravityPercentile: context.gravityPercentile,
+  };
 }
 
 export interface CardStatRow {
@@ -51,4 +95,111 @@ export interface CardImagePayload {
   // Same-origin-proxied headshot the client already loaded, inlined as a
   // data URL so the renderer never has to make its own network request.
   headshotDataUrl?: string | null;
+}
+
+const gravityTierSchema = z.enum([
+  "SUPERMASSIVE",
+  "STAR",
+  "MAIN_SEQUENCE",
+  "SATELLITE",
+  "ASTEROID",
+  "BLACK_HOLE",
+]);
+
+const finiteBoundedMass = z.number().finite().min(-1).max(1);
+const percentileSchema = z.number().finite().min(0).max(100).nullable();
+
+const publicGravityV3Schema = z.object({
+  masses: z.object({
+    oz: finiteBoundedMass,
+    nz: finiteBoundedMass,
+    dz: finiteBoundedMass,
+  }).strict(),
+  tier: gravityTierSchema,
+  force: finiteBoundedMass,
+  isDefenseman: z.boolean(),
+  modelVersion: z.literal("3.0"),
+  modelLabel: z.literal("V3 FALLBACK"),
+  season: z.string().min(1),
+  situation: z.literal(GRAVITY_V3_SITUATION_SCOPE),
+  reliabilityLabel: z.string().regex(/^(?:100|[1-9]?\d) INDEX$/),
+  coverageLabel: z.string().regex(/^(?:FULL|PARTIAL) · (?:100|[1-9]?\d)% WEIGHT$/),
+  gravityPercentile: percentileSchema,
+  fieldLabel: z.literal(GRAVITY_V3_FIELD_LABEL),
+  fieldDisclaimer: z.literal(GRAVITY_V3_FIELD_DISCLAIMER),
+}).strict();
+
+const publicCardImagePayloadSchema = z.object({
+  name: z.string().min(1),
+  sub: z.string(),
+  roleLabel: z.string().optional(),
+  roleColor: z.string().optional(),
+  xnavTotal: z.number().finite(),
+  capHitLabel: z.string(),
+  yearsLabel: z.string(),
+  fmvLabel: z.string(),
+  surplusLabel: z.string(),
+  surplusColor: z.string(),
+  gravity: publicGravityV3Schema.nullable(),
+  edgeCells: z.array(z.object({
+    label: z.string(),
+    val: z.string(),
+    color: z.string().optional(),
+  }).strict()),
+  stats: z.array(z.object({
+    label: z.string(),
+    pct: percentileSchema,
+    formatted: z.string(),
+    median: z.string(),
+    barColor: z.string().nullable(),
+  }).strict()),
+  navCells: z.array(z.object({
+    label: z.string(),
+    val: z.number().finite(),
+  }).strict()),
+  peerLabel: z.string(),
+  avgPercentile: percentileSchema,
+  headshotDataUrl: z.string().nullable().optional(),
+}).strict();
+
+export type PublicCardPayloadValidation =
+  | { success: true; data: CardImagePayload }
+  | {
+      success: false;
+      code: "INVALID_PAYLOAD" | "UNTRUSTED_GRAVITY_V4";
+      message: string;
+    };
+
+/**
+ * The public image endpoint accepts only the production v3 card contract.
+ * A future v4 export must resolve a validated fitted profile server-side;
+ * caller-supplied v4 analytical values are never renderable here.
+ */
+export function validatePublicCardImagePayload(
+  input: unknown,
+): PublicCardPayloadValidation {
+  const gravity = input && typeof input === "object"
+    ? (input as Record<string, unknown>).gravity
+    : null;
+  if (
+    gravity
+    && typeof gravity === "object"
+    && (gravity as Record<string, unknown>).modelVersion === "4.0"
+  ) {
+    return {
+      success: false,
+      code: "UNTRUSTED_GRAVITY_V4",
+      message: "Gravity v4 cards must be resolved server-side from a validated fitted profile.",
+    };
+  }
+
+  const parsed = publicCardImagePayloadSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      code: "INVALID_PAYLOAD",
+      message: "Invalid public card payload.",
+    };
+  }
+  return { success: true, data: parsed.data };
 }

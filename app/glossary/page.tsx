@@ -148,10 +148,15 @@ export default function GlossaryPage() {
               ))}
             </div>
             <p className="px-4 pb-4 text-[11px] leading-relaxed text-ledger-ink-body">
-              Gravity also reports three zone masses — an offensive-zone well, a neutral-zone
-              (transition) well, and a defensive-zone dome — so two players at the same tier can
-              warp the game in completely different places. The field diagram on any player&apos;s
-              Gravity tab shows the shape.
+              Gravity v3 reports three bounded, position-relative zone masses — an offensive-zone
+              well, a neutral-zone transition-proxy well, and a defensive-zone dome. The field is
+              a model visualization of those components, not an observed player-tracking heatmap.
+              Reliability is a coverage/stability index rather than a probability, and missing
+              evidence shrinks the estimate toward neutral. Signal Stability is based mainly on
+              current-versus-baseline on-off agreement, with a legacy defenseman pair-driver
+              adjustment; it is not a fitted portability model. The public situation label is
+              MIXED SITUATIONS because v3 combines all-situations, 5v5, 5-on-4, 4-on-5, and
+              regular-season EDGE aggregate inputs.
             </p>
           </section>
 

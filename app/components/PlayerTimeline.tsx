@@ -14,7 +14,7 @@ function NavBreakdown({ nav }: { nav: { off: number; def: number; age: number; c
     { label: nav.age >= 0 ? "YNG" : "AGE", val: nav.age, desc: nav.age >= 0 ? "Youth premium — cost-controlled upside" : "Age curve — decline-phase discount" },
     { label: "CAP", val: nav.cap, desc: nav.cap >= 0 ? "Contract surplus — paid below market value" : "Contract drag — paid above market value" },
   ];
-  if (nav.grav != null && Math.abs(nav.grav) >= 1) rows.push({ label: "GRAV", val: nav.grav, desc: nav.grav > 0 ? "Hidden gravitational pull — elevates play beyond raw stats" : "Negative field — on-ice impact trails raw production" });
+  if (nav.grav != null && Math.abs(nav.grav) >= 1) rows.push({ label: "GRAV", val: nav.grav, desc: nav.grav > 0 ? "Positive Gravity v3 transition-proxy handoff" : "Negative Gravity v3 transition-proxy handoff" });
   if (nav.upside > 0) rows.push({ label: "UPS", val: nav.upside, desc: "Upside premium — team control and development" });
   if (nav.noivImpact && Math.abs(nav.noivImpact) >= 2) rows.push({ label: "NOIV", val: nav.noivImpact, desc: nav.noivImpact > 0 ? "Elevates teammates beyond raw stats" : "On-ice context reduces value vs raw stats" });
 

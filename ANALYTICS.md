@@ -48,6 +48,25 @@ A player with NOIV significantly higher than their raw stats suggest is a hidden
 
 ---
 
+## Player Gravity — Release A public contract
+
+Gravity v3 is the current production display. It is a position-relative territorial influence index with three bounded zone components: an OZ well, an NZ transition-proxy well, and a DZ dome. The warped rink is a model visualization, not an observed tracking heatmap or a measurement of defender attention.
+
+Its public situation scope is `MIXED SITUATIONS`: current all-situations scoring/on-off and DPS are combined with 5v5 zone starts and baseline on/off (which can fall back to all situations), 5-on-4 production, 4-on-5 usage, and regular-season NHL EDGE aggregates that do not carry a strength-state tag. The v3 output must not be described as an all-situations or 5v5-only model.
+
+Release A keeps v3 rate ability separate from usage: QoC and TOI are descriptive context and no longer multiply zone masses. Every zone exposes fixed-weight coverage. Missing evidence contributes no term, which shrinks the estimate toward neutral and lowers the `Reliability` index. `Signal Stability` is current-versus-baseline on-off agreement; it is not linemate independence or portability.
+
+X-NAV receives only the bounded NZ transition portion:
+
+```text
+navResidual = 0.30 · NZ mass
+GRAV = clamp(navResidual · 45, -20, +20)
+```
+
+Changes to assists, individual xG/goals, power-play production, OZ lift, or the DZ dome do not change the GRAV handoff.
+
+---
+
 ## G-NAV — Goalie Net Asset Value
 
 A separate model for goaltenders built around:

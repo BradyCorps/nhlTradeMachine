@@ -4,9 +4,19 @@
 // NZ well, DZ dome) on a rink strip, with force as the single currency.
 
 import React from "react";
-import type { GravityProfile, GravityTier, ZoneMasses } from "@/app/lib/gravity";
-import { gravityTierColor } from "@/app/lib/gravity";
+import {
+  GRAVITY_V3_FIELD_DISCLAIMER,
+  GRAVITY_V3_FIELD_LABEL,
+  GRAVITY_V3_SITUATION_NOTE,
+  GRAVITY_V3_SITUATION_SCOPE,
+  gravityTierColor,
+  gravityV3PublicPresentation,
+  type GravityProfile,
+  type GravityTier,
+  type ZoneMasses,
+} from "@/app/lib/gravity";
 import { computeRinkGeometry } from "@/app/lib/gravity-rink";
+import { SEASON } from "@/app/lib/season-config";
 
 interface Props {
   profile: GravityProfile;
@@ -108,9 +118,9 @@ export function TierIcon({ tier, size = 16, color }: { tier: GravityTier; size?:
 // ── Zone-mass vocabulary ──────────────────────────────────────────────────
 
 const ZONE_GLOSSARY: Record<keyof ZoneMasses, string> = {
-  oz: "Offensive-zone well — chances created, finishing threat, on-ice lift, PP leverage. Play falls toward the opponent's net.",
-  nz: "Neutral-zone well — where play lives vs where he's deployed, plus speed and burst rate. Drags the game through center ice.",
-  dz: "Defensive-zone dome — xGA suppression, defensive value, PK trust. Repulsive curvature: opponents can't set up here.",
+  oz: "Offensive-zone well — a position-relative v3 composite of on-ice chance impact and direct offensive indicators.",
+  nz: "Neutral-zone well — a transition proxy from zone-time displacement, speed, and burst rate.",
+  dz: "Defensive-zone dome — a position-relative v3 composite of suppression and defensive-role indicators.",
 };
 
 const ZONE_TITLE: Record<keyof ZoneMasses, string> = {
@@ -133,27 +143,27 @@ function zoneContext(zone: keyof ZoneMasses, m: number, isD: boolean): ZoneConte
 
   switch (zone) {
     case "oz": {
-      if (m >= 0.75) return { qualifier: "Supermassive", qualColor: green, description: "A deep offensive well — chances, finishing, and on-ice lift all far beyond positional norms. Play collapses toward the opponent's net when he's out." };
-      if (m >= 0.45) return { qualifier: "Strong", qualColor: green, description: "Clear offensive warping — creates and converts well above his position. Defenders must commit extra attention." };
-      if (m >= 0.15) return { qualifier: "Positive", qualColor: amber, description: "A measurable offensive field — above positional average, but not the kind that bends coverage by itself." };
+      if (m >= 0.75) return { qualifier: "Supermassive", qualColor: green, description: "A deep modelled offensive well — the v3 chance-impact and production indicators sit far above positional norms." };
+      if (m >= 0.45) return { qualifier: "Strong", qualColor: green, description: "A strong position-relative offensive-zone composite. It does not directly measure defender attention." };
+      if (m >= 0.15) return { qualifier: "Positive", qualColor: amber, description: "A measurable positive offensive-zone field relative to the player's position." };
       if (m >= -0.15) return { qualifier: "Flat", qualColor: faint, description: "Offensive impact near positional average — the attacking zone doesn't curve much either way." };
-      return { qualifier: "Caved", qualColor: red, description: "Offense runs below position when he's on the ice — the attacking-zone field sags." };
+      return { qualifier: "Caved", qualColor: red, description: "The v3 offensive-zone composite sits below the positional reference." };
     }
     case "nz": {
       if (m >= 0.6) return { qualifier: "Transition Engine", qualColor: green, description: isD
-        ? "Rare for a defenseman — play gets dragged through the neutral zone when he's deployed. The Quinn Hughes signal: deployment says one end, the puck lives in the other."
-        : "Elite transporter — starts don't matter, the puck ends up going north. Speed and carry volume well beyond position." };
-      if (m >= 0.3) return { qualifier: "Strong Carry", qualColor: green, description: "Real transition pull — moves play up ice beyond what deployment predicts, with the skating to force back-offs." };
-      if (m >= 0.05) return { qualifier: "Detectable", qualColor: amber, description: "Modest neutral-zone influence — some carry signal, but transition isn't the core of his gravity." };
-      if (m >= -0.15) return { qualifier: "Flat", qualColor: faint, description: "Neutral-zone impact around positional average — play moves through center ice at the rate deployment predicts." };
-      return { qualifier: "Anchor", qualColor: red, description: "Play stalls in transit — the team moves the puck north less than deployment predicts with him out there." };
+        ? "A rare defenseman transition-proxy profile: zone-time displacement and skating indicators are far above the D reference."
+        : "A top-end transition-proxy profile from zone-time displacement and skating indicators." };
+      if (m >= 0.3) return { qualifier: "Strong Carry", qualColor: green, description: "Strong positive transition-proxy evidence relative to position." };
+      if (m >= 0.05) return { qualifier: "Detectable", qualColor: amber, description: "Modest positive transition-proxy evidence." };
+      if (m >= -0.15) return { qualifier: "Flat", qualColor: faint, description: "The transition proxy is near the positional reference." };
+      return { qualifier: "Anchor", qualColor: red, description: "The transition proxy sits below the positional reference." };
     }
     case "dz": {
-      if (m >= 0.6) return { qualifier: "Fortress", qualColor: green, description: "A hard defensive dome — opponent offense can't set up. Suppression, defensive value, and PK trust all elite for the position." };
-      if (m >= 0.3) return { qualifier: "Solid Dome", qualColor: green, description: "Meaningful repulsive curvature — the defensive zone is measurably harder to attack when he's on the ice." };
-      if (m >= 0.05) return { qualifier: "Stable", qualColor: amber, description: "Holds his end at positional norms with a slight edge — not a shutdown profile, not a liability." };
+      if (m >= 0.6) return { qualifier: "Fortress", qualColor: green, description: "The v3 suppression and defensive-role indicators are elite for the position." };
+      if (m >= 0.3) return { qualifier: "Solid Dome", qualColor: green, description: "A strong positive defensive-zone composite relative to position." };
+      if (m >= 0.05) return { qualifier: "Stable", qualColor: amber, description: "A modest positive defensive-zone composite relative to position." };
       if (m >= -0.15) return { qualifier: "Flat", qualColor: faint, description: "Defensive impact near positional average — the home zone neither repels nor invites pressure." };
-      return { qualifier: "Breached", qualColor: red, description: "The defensive zone caves with him deployed — opponents generate more than they should. A well in the wrong end of the ice." };
+      return { qualifier: "Breached", qualColor: red, description: "The v3 defensive-zone composite sits below the positional reference." };
     }
   }
 }
@@ -166,7 +176,7 @@ function CompactGravity({ profile }: { profile: GravityProfile }) {
     <span
       className="inline-flex items-center gap-1.5 font-mono text-[10px]"
       role="text"
-      aria-label={`Gravity: ${profile.force > 0 ? "+" : ""}${profile.force.toFixed(2)}, tier ${TIER_LABEL[profile.tier]}`}
+      aria-label={`Gravity v3 modelled field: ${profile.force > 0 ? "+" : ""}${profile.force.toFixed(2)}, tier ${TIER_LABEL[profile.tier]}`}
     >
       <span className="font-black" style={{ color, fontVariantNumeric: "tabular-nums" }}>
         {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
@@ -190,9 +200,30 @@ const clampViz = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo
 // renders as dashed repulsive rings. Ring count and opacity scale with
 // mass. Negative mass in any zone renders red — the field caving in.
 
-function FieldDiagram({ profile }: { profile: GravityProfile }) {
+export interface GravityFieldDiagramProfile {
+  force: number;
+  masses: ZoneMasses;
+  tier: GravityTier;
+  isDefenseman: boolean;
+  reliability: number;
+}
+
+function FieldDiagram({
+  profile,
+  tierLabel,
+  reliabilityLabel,
+  forceLabel = "FIELD FORCE",
+}: {
+  profile: GravityFieldDiagramProfile;
+  tierLabel?: string;
+  reliabilityLabel?: string;
+  forceLabel?: string;
+}) {
   const color = gravityTierColor(profile.tier);
   const { oz, nz, dz } = profile.masses;
+  const displayedTier = tierLabel ?? TIER_LABEL[profile.tier];
+  const displayedReliability = reliabilityLabel
+    ?? `${Math.round(profile.reliability * 100)} out of 100 reliability index`;
 
   // Spacetime lattice geometry — shared with the server-side card PNG
   // route (app/lib/gravity-rink.ts) so the exported image is byte-for-byte
@@ -211,7 +242,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
       viewBox={`0 0 ${W} ${H}`}
       style={{ maxWidth: "100%", height: "auto", display: "inline-block" }}
       role="img"
-      aria-label={`Gravity field: force ${profile.force > 0 ? "+" : ""}${profile.force.toFixed(2)}, tier ${TIER_LABEL[profile.tier]}. Offensive-zone well ${oz > 0 ? "+" : ""}${oz.toFixed(2)}, neutral-zone well ${nz > 0 ? "+" : ""}${nz.toFixed(2)}, defensive-zone dome ${dz > 0 ? "+" : ""}${dz.toFixed(2)}. Signal confidence ${(profile.confidence * 100).toFixed(0)} percent.`}
+      aria-label={`Modelled Gravity field: force ${profile.force > 0 ? "+" : ""}${profile.force.toFixed(2)}, tier ${displayedTier}. Offensive-zone well ${oz > 0 ? "+" : ""}${oz.toFixed(2)}, neutral-zone well ${nz > 0 ? "+" : ""}${nz.toFixed(2)}, defensive-zone dome ${dz > 0 ? "+" : ""}${dz.toFixed(2)}. ${displayedReliability}.`}
     >
       {/* Tier label — top left */}
       <text
@@ -223,7 +254,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         fontSize={11}
         letterSpacing="0.12em"
       >
-        {TIER_LABEL[profile.tier].toUpperCase()}
+        {displayedTier.toUpperCase()}
       </text>
 
       {/* Force readout — top right */}
@@ -246,7 +277,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         fontSize={7}
         letterSpacing="0.18em"
       >
-        NET FORCE
+        {forceLabel}
       </text>
 
       {/* Rink outline — off-white ice sheet against the paper page */}
@@ -367,7 +398,7 @@ function FieldDiagram({ profile }: { profile: GravityProfile }) {
         fontSize={8}
         letterSpacing="0.2em"
       >
-        GRAVITATIONAL FIELD ANALYSIS
+        {GRAVITY_V3_FIELD_LABEL}
       </text>
     </svg>
     </div>
@@ -435,16 +466,23 @@ function ComponentPanel({ profile }: { profile: GravityProfile }) {
   );
 }
 
-// ── Signal panel — confidence, partner independence, data coverage ────────
+// ── Signal panel — reliability, stability, and data coverage ─────────────
 
 function SignalPanel({ profile }: { profile: GravityProfile }) {
   const color = gravityTierColor(profile.tier);
-  const confPct = Math.round(profile.confidence * 100);
-  const confColor = confPct >= 75 ? "var(--ledger-green)" : confPct >= 50 ? "var(--ledger-amber, #d4a017)" : "var(--ledger-red)";
-  const pi = profile.partnerIndependence;
-  const piPct = Math.round(pi * 100);
-  const piColor = pi >= 0.85 ? "var(--ledger-green)" : pi >= 0.65 ? "var(--ledger-amber, #d4a017)" : "var(--ledger-red)";
-  const piLabel = pi >= 0.85 ? "Independent" : pi >= 0.65 ? "Likely Real" : "Borrowed?";
+  const presentation = gravityV3PublicPresentation(profile);
+  const reliabilityIndex = presentation.reliability.index;
+  const reliabilityColor = reliabilityIndex >= 75 ? "var(--ledger-green)" : reliabilityIndex >= 50 ? "var(--ledger-amber, #d4a017)" : "var(--ledger-red)";
+  const stability = profile.signalStability;
+  const stabilityIndex = presentation.signalStability.index;
+  const stabilityColor = stability >= 0.85 ? "var(--ledger-green)" : stability >= 0.65 ? "var(--ledger-amber, #d4a017)" : "var(--ledger-red)";
+  const stabilityLabel = stability >= 0.85 ? "Stable" : stability >= 0.65 ? "Mixed" : "Unstable";
+  const coverageZones = Object.values(profile.coverage);
+  const presentWeight = coverageZones.reduce((sum, zone) => sum + zone.presentWeight, 0);
+  const possibleWeight = coverageZones.reduce((sum, zone) => sum + zone.possibleWeight, 0);
+  const coveragePct = possibleWeight > 0 ? Math.round((presentWeight / possibleWeight) * 100) : 0;
+  const missingCount = coverageZones.reduce((sum, zone) => sum + zone.missingInputs.length, 0);
+  const coverageColor = coveragePct >= 90 ? "var(--ledger-green)" : coveragePct >= 65 ? "var(--ledger-amber, #d4a017)" : "var(--ledger-red)";
 
   return (
     <div
@@ -459,25 +497,24 @@ function SignalPanel({ profile }: { profile: GravityProfile }) {
         Signal Quality
       </div>
 
-      <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 1fr" }}>
+      <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
         <div
           className="border p-2.5"
           style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
           role="group"
-          aria-label={`Signal confidence: ${confPct}%. Sample size, year-over-year stability, and data coverage.`}
+          aria-label={`Reliability index: ${reliabilityIndex} out of 100. This is a coverage and stability index, not a probability.`}
         >
           <div className="text-[9px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
-            Confidence
+            {presentation.reliability.label}
           </div>
           <div className="flex items-baseline gap-1 mt-0.5">
-            <div className="text-[20px] font-black font-mono leading-tight" style={{ color: confColor, fontVariantNumeric: "tabular-nums" }}>
-              {confPct}
+            <div className="text-[20px] font-black font-mono leading-tight" style={{ color: reliabilityColor, fontVariantNumeric: "tabular-nums" }}>
+              {reliabilityIndex}
             </div>
-            <div className="text-[11px] font-black font-mono" style={{ color: confColor }}>%</div>
+            <div className="text-[9px] font-black font-mono" style={{ color: reliabilityColor }}>INDEX</div>
           </div>
           <div className="text-[9px] font-mono mt-1 leading-snug" style={{ color: "var(--ledger-ink-faint)" }}>
-            Sample size, year-over-year stability, and data coverage.
-            {profile.dataQuality === "partial" && " EDGE zone-time missing — transition read is reduced."}
+            {presentation.reliability.explanation}
           </div>
         </div>
 
@@ -485,21 +522,43 @@ function SignalPanel({ profile }: { profile: GravityProfile }) {
           className="border p-2.5"
           style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
           role="group"
-          aria-label={`Partner independence: ${piPct}%, ${piLabel}. Is the on-ice lift the player's own, or borrowed from elite linemates?`}
+          aria-label={`Signal Stability index: ${stabilityIndex} out of 100, ${stabilityLabel}. This primarily measures current and baseline on-off agreement, with the legacy defenseman pair-driver adjustment.`}
         >
           <div className="text-[9px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
-            Partner Indep.
+            {presentation.signalStability.label}
           </div>
           <div className="flex items-baseline gap-1.5 mt-0.5">
-            <div className="text-[20px] font-black font-mono leading-tight" style={{ color: piColor, fontVariantNumeric: "tabular-nums" }}>
-              {piPct}
+            <div className="text-[20px] font-black font-mono leading-tight" style={{ color: stabilityColor, fontVariantNumeric: "tabular-nums" }}>
+              {stabilityIndex}
             </div>
-            <div className="text-[9px] font-black font-mono uppercase tracking-[0.06em]" style={{ color: piColor }}>
-              {piLabel}
+            <div className="text-[9px] font-black font-mono uppercase tracking-[0.06em]" style={{ color: stabilityColor }}>
+              {stabilityLabel}
             </div>
           </div>
           <div className="text-[9px] font-mono mt-1 leading-snug" style={{ color: "var(--ledger-ink-faint)" }}>
-            Is the on-ice lift his own, or borrowed from elite linemates? Damps the lift input directly.
+            {presentation.signalStability.explanation}
+          </div>
+        </div>
+
+        <div
+          className="border p-2.5"
+          style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
+          role="group"
+          aria-label={`Data coverage: ${coveragePct} percent of v3 model weight present, ${missingCount} missing inputs.`}
+        >
+          <div className="text-[9px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+            {presentation.coverage.label}
+          </div>
+          <div className="flex items-baseline gap-1.5 mt-0.5">
+            <div className="text-[20px] font-black font-mono leading-tight" style={{ color: coverageColor, fontVariantNumeric: "tabular-nums" }}>
+              {coveragePct}%
+            </div>
+            <div className="text-[9px] font-black font-mono uppercase tracking-[0.06em]" style={{ color: coverageColor }}>
+              {profile.dataQuality}
+            </div>
+          </div>
+          <div className="text-[9px] font-mono mt-1 leading-snug" style={{ color: "var(--ledger-ink-faint)" }}>
+            Missing evidence shrinks the estimate toward neutral and lowers reliability.
           </div>
         </div>
       </div>
@@ -514,14 +573,14 @@ function SignalPanel({ profile }: { profile: GravityProfile }) {
           {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
         </span>
         {" "}— {profile.force >= 0.40
-          ? "a dominant gravitational presence that warps the game"
+          ? "a dominant positive position-relative modelled field"
           : profile.force >= 0.22
-          ? "a meaningful pull that lifts his linemates"
+          ? "a meaningful positive position-relative modelled field"
           : profile.force >= 0.08
-          ? "a modest but measurable gravitational field"
+          ? "a modest positive position-relative modelled field"
           : profile.force >= -0.22
-          ? "effectively neutral — linemates play the same"
-          : "a negative field — linemates produce less with him on the ice"
+          ? "a position-relative field near neutral"
+          : "a negative position-relative modelled field"
         }.{" "}
         <a href="/glossary#icon-key" className="underline hover:text-ledger-red transition-colors" style={{ color: "var(--ledger-ink-faint)" }}>
           Every tier and term is defined in the Glossary →
@@ -542,12 +601,21 @@ export default function GravityField({ profile, playerName, mode = "full" }: Pro
     <div className="font-mono" role="region" aria-label={`Gravity field analysis for ${playerName}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
-        <span
-          className="text-[11px] font-black uppercase tracking-[0.15em]"
-          style={{ color: "var(--ledger-ink-faint)" }}
-        >
-          Gravity Field
-        </span>
+        <div>
+          <div
+            className="text-[11px] font-black uppercase tracking-[0.15em]"
+            style={{ color: "var(--ledger-ink-faint)" }}
+          >
+            Player Gravity · Modelled Field
+          </div>
+          <div
+            className="text-[9px] font-black uppercase tracking-[0.1em] mt-0.5"
+            style={{ color: "var(--ledger-ink-faint)" }}
+            title={GRAVITY_V3_SITUATION_NOTE}
+          >
+            V3 Fallback · Position-relative · {SEASON.replaySeason} · {GRAVITY_V3_SITUATION_SCOPE}
+          </div>
+        </div>
         <span
           className="text-[11px] font-black uppercase tracking-[0.1em]"
           style={{ color: "var(--ledger-ink-faint)" }}
@@ -566,6 +634,12 @@ export default function GravityField({ profile, playerName, mode = "full" }: Pro
           }}
         >
           <FieldDiagram profile={profile} />
+          <p
+            className="px-2 pb-2 text-[9px] font-mono leading-snug"
+            style={{ color: "var(--ledger-ink-faint)" }}
+          >
+            {GRAVITY_V3_FIELD_DISCLAIMER}
+          </p>
         </div>
 
         <div>
