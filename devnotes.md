@@ -527,9 +527,12 @@ Tracking docs/July23_Armchair_GM_Claude_Code/July23_Armchair_GM_Claude_Code/ARMC
   user's cap on rollover too (ceiling − committed − active retained obligations),
   no longer frozen; starting a run clears pre-run trades + sim (clean baseline).
   Remaining: immutable pre-run baseline for abandon-after-rollover.
+- CX1–CX4 (state integrity) — COMPLETE. CX1 URL-hydration guard; CX2 shared-link
+  ownership guard on the execute path; CX3 package-change aborts audit/memo/match
+  + stale-response guards; CX4 metadata-preserving setDb + full sim invalidation.
 - Not started: §1 State (ST1–3), §2 Roster/cards/lineups (RL1–8),
-  §4 Offseason UX (OFF1–7); §7 Codex CX1–4, CX7c/CX8, CXH1–9 (CXH3 done),
-  CXS1–6.
+  §4 Offseason UX (OFF1–7); §7 Codex CX7c/CX8, CXH1–9 (CXH3 done), CXS1–6.
+  Follow-ups: CX5 abandon-baseline, CX6 offer-sheet match right.
 
 ### July 23 Codex SIM audit: IN PROGRESS
 A read-only Codex review of the components + SIM. Correctness/robustness items done:
