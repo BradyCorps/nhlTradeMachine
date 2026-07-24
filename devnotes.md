@@ -523,8 +523,12 @@ Tracking docs/July23_Armchair_GM_Claude_Code/July23_Armchair_GM_Claude_Code/ARMC
   and CONVEYS them to the original club instead of deleting; original club frees
   only the RFA's current AAV (no old-deal double-count). Remaining: the match
   right + the user's-own-walked-RFA market button.
+- CX5 (Cup Run lifecycle) — PARTIAL. `reconcileTeamCapSpaces` reconciles the
+  user's cap on rollover too (ceiling − committed − active retained obligations),
+  no longer frozen; starting a run clears pre-run trades + sim (clean baseline).
+  Remaining: immutable pre-run baseline for abandon-after-rollover.
 - Not started: §1 State (ST1–3), §2 Roster/cards/lineups (RL1–8),
-  §4 Offseason UX (OFF1–7); §7 Codex CX1–5, CX7c/CX8, CXH1–9 (CXH3 done),
+  §4 Offseason UX (OFF1–7); §7 Codex CX1–4, CX7c/CX8, CXH1–9 (CXH3 done),
   CXS1–6.
 
 ### July 23 Codex SIM audit: IN PROGRESS
