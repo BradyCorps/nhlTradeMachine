@@ -15,6 +15,7 @@ import {
   type GravitySituationScope,
   type GravityTier,
 } from "./gravity";
+import type { GravityProfileV4 } from "./gravity-v4/types";
 import { z } from "zod";
 
 interface CardGravityBase {
@@ -36,7 +37,18 @@ export interface CardGravityV3Input extends CardGravityBase {
   coverageLabel: string;
 }
 
-export type CardGravityInput = CardGravityV3Input;
+export interface CardGravityV4Input extends CardGravityBase {
+  tier: GravityTier | null;
+  modelVersion: "4.0";
+  modelLabel: "V4" | "V4 DIAGNOSTIC FIXTURE";
+  reliabilityLabel: string;
+  coverageLabel: string;
+  netXg82: number | null;
+  netIntervalLabel: string | null;
+  zoneXg82: { oz: number; nz: number; dz: number } | null;
+}
+
+export type CardGravityInput = CardGravityV3Input | CardGravityV4Input;
 
 export function cardGravityFromV3(
   profile: GravityProfile,
@@ -57,6 +69,37 @@ export function cardGravityFromV3(
     reliabilityLabel: `${presentation.reliability.index} INDEX`,
     coverageLabel: `${profile.dataQuality.toUpperCase()} · ${presentation.coverage.percent}% WEIGHT`,
     gravityPercentile: context.gravityPercentile,
+  };
+}
+
+const signed = (value: number) => `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
+
+export function cardGravityFromV4(profile: GravityProfileV4): CardGravityV4Input {
+  return {
+    masses: profile.displayMasses,
+    tier: profile.tier,
+    force: profile.displayForce,
+    isDefenseman: profile.position === "D",
+    modelVersion: "4.0",
+    modelLabel: profile.metadata.artifactKind === "diagnostic_fixture"
+      ? "V4 DIAGNOSTIC FIXTURE"
+      : "V4",
+    season: profile.season,
+    situation: "5V5",
+    fieldLabel: GRAVITY_V3_FIELD_LABEL,
+    fieldDisclaimer: "Model visualization of fitted Gravity components; not observed player-tracking data.",
+    reliabilityLabel: profile.reliability,
+    coverageLabel: `${profile.dataQuality.toUpperCase()} · NZ ${profile.transitionDataQuality.toUpperCase()}`,
+    gravityPercentile: profile.positionPercentile,
+    netXg82: profile.netXg82,
+    netIntervalLabel: profile.netInterval
+      ? `${signed(profile.netInterval.low)} TO ${signed(profile.netInterval.high)}`
+      : null,
+    zoneXg82: {
+      oz: profile.zones.oz.xg82,
+      nz: profile.zones.nz.xg82,
+      dz: profile.zones.dz.xg82,
+    },
   };
 }
 

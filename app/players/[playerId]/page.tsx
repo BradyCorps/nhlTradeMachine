@@ -11,9 +11,12 @@ import Link from "next/link";
 import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
 import { calcNAV } from "@/app/lib/xnav-engine";
 import { computeGravity } from "@/app/lib/gravity";
+import { loadGravityProfileV4 } from "@/app/lib/gravity-v4/load-profile";
+import { GRAVITY_V4_RUNTIME_ARTIFACT } from "@/app/lib/gravity-v4/runtime-artifact";
 import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import GravityField from "@/app/components/GravityField";
+import GravityFieldV4 from "@/app/components/GravityFieldV4";
 import PlayerStrandPanel from "@/app/components/PlayerStrandPanel";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
@@ -95,7 +98,20 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
     defRate: player.defRate ?? 0.08,
     games: player.games ?? 40,
   });
-  const gravity = player.position !== "G" ? computeGravity(player) : null;
+  // Display-only v4 lookup. calcNAV above has already completed and imports no
+  // v4 code, so even a future validated display profile cannot affect X-NAV.
+  const gravityV4Lookup = loadGravityProfileV4({
+    playerId: String(player.id),
+    season: SEASON.replaySeason,
+    position: player.position,
+    artifact: GRAVITY_V4_RUNTIME_ARTIFACT,
+  });
+  const gravityV4 = gravityV4Lookup.status === "ready"
+    ? gravityV4Lookup.profile
+    : null;
+  const gravityV3 = player.position !== "G" && !gravityV4
+    ? computeGravity(player)
+    : null;
   const roles = derivePlayerRoles(player);
   const comparePeers = buildComparePeers(roster.players as any[], player);
 
@@ -251,9 +267,14 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
         )}
 
         {/* Gravity field — computed server-side, rendered client-side from props */}
-        {gravity && (
+        {gravityV4 && (
           <div className="border p-4" style={{ borderColor: rule, background: "var(--paper-card, var(--paper-inset))" }}>
-            <GravityField profile={gravity} playerName={player.name} mode="full" />
+            <GravityFieldV4 profile={gravityV4} playerName={player.name} />
+          </div>
+        )}
+        {gravityV3 && (
+          <div className="border p-4" style={{ borderColor: rule, background: "var(--paper-card, var(--paper-inset))" }}>
+            <GravityField profile={gravityV3} playerName={player.name} mode="full" />
           </div>
         )}
 

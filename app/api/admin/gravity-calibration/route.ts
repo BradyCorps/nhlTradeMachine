@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/app/lib/admin-auth";
 import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
-import { computeGravity } from "@/app/lib/gravity";
+import { computeGravity, gravityCoverageRatio } from "@/app/lib/gravity";
 
 export const dynamic = "force-dynamic";
 
@@ -73,7 +73,16 @@ export async function GET(req: Request) {
   const forces = skaters
     .map(p => ({ name: p.name, position: p.position, teamId: p.teamId, g: computeGravity(p) }))
     .filter(x => x.g !== null)
-    .map(x => ({ name: x.name, position: x.position, teamId: x.teamId, force: x.g!.force, masses: x.g!.masses, tier: x.g!.tier }))
+    .map(x => ({
+      name: x.name,
+      position: x.position,
+      teamId: x.teamId,
+      force: x.g!.force,
+      masses: x.g!.masses,
+      tier: x.g!.tier,
+      reliability: x.g!.reliability,
+      coverage: gravityCoverageRatio(x.g!.coverage),
+    }))
     .sort((a, b) => b.force - a.force);
 
   const forceVals = forces.map(f => f.force);
@@ -87,6 +96,8 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
+    modelVersion: "3-release-a",
+    perRateScale: { qocMultiplier: false, toiMultiplier: false },
     population: { qualifiedSkaters: skaters.length, withGravity: forces.length },
     // Paste-ready: mean/sd per input per position for the CAL table
     suggestedCal: {
@@ -101,6 +112,7 @@ export async function GET(req: Request) {
       p10: r2(pct(10)), p25: r2(pct(25)), p60: r2(pct(60)),
       p80: r2(pct(80)), p92: r2(pct(92)), p98: r2(pct(98)),
     },
+    coverageDistribution: stats(forces.map(f => f.coverage)),
     // Percentile-anchored cutoffs: SUPERMASSIVE = top 2%, STAR = top 8%,
     // MAIN_SEQUENCE = top 20%, SATELLITE = top 40%, BLACK_HOLE = bottom 3%
     suggestedTiers: {

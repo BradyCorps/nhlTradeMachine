@@ -98,7 +98,9 @@ function Label({
 function Rink({ gravity }: { gravity: CardGravityInput }) {
   const geo = computeRinkGeometry({ masses: gravity.masses });
   const { W, H, rinkX, rinkY, rinkW, rinkH, midY, centerX, blue1, blue2, rowLines, colLines, zones } = geo;
-  const color = rinkTierColor(gravity.tier);
+  const renderTier = gravity.tier ?? "ASTEROID";
+  const tierLabel = gravity.tier ? gravity.tier.replace(/_/g, " ") : "UNTIERED";
+  const color = rinkTierColor(renderTier);
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
   const S = RINK_SCALE;
 
@@ -150,7 +152,7 @@ function Rink({ gravity }: { gravity: CardGravityInput }) {
 
       {/* Text overlays */}
       <Label x={14} y={22} size={11} color={color} anchor="start" ls={1} vbW={W}>
-        {gravity.tier.replace(/_/g, " ").toUpperCase()}
+        {tierLabel.toUpperCase()}
       </Label>
       <Label x={W - 14} y={22} size={18} color={color} anchor="end" vbW={W}>
         {gravity.force > 0 ? "+" : ""}
@@ -166,17 +168,22 @@ function Rink({ gravity }: { gravity: CardGravityInput }) {
       {zones.map((zone) => {
         const healthy = zone.m > 0;
         const valColor = Math.abs(zone.m) < 0.05 ? INK_FAINT : healthy ? color : RINK_RED;
+        const analyticalValue = gravity.modelVersion === "4.0"
+          ? gravity.zoneXg82?.[zone.key] ?? null
+          : null;
         return (
           <React.Fragment key={`label-${zone.key}`}>
             <Label x={zone.cx} y={rinkY + rinkH + 18} size={9} color={INK_FAINT} anchor="middle" ls={0.9} vbW={W}>
               {ZONE_TITLE[zone.key].toUpperCase()}
             </Label>
             <Label x={zone.cx} y={rinkY + rinkH + 34} size={14} color={valColor} anchor="middle" vbW={W}>
-              {zone.m > 0 ? "+" : ""}
-              {zone.m.toFixed(2)}
+              {(analyticalValue ?? zone.m) > 0 ? "+" : ""}
+              {(analyticalValue ?? zone.m).toFixed(analyticalValue === null ? 2 : 1)}
             </Label>
             <Label x={zone.cx} y={rinkY + rinkH + 45} size={7} color={INK_FAINT} anchor="middle" ls={0.4} opacity={0.8} vbW={W}>
-              {(zoneQualifier(zone.key, zone.m) ?? "").toUpperCase()}
+              {analyticalValue === null
+                ? (zoneQualifier(zone.key, zone.m) ?? "").toUpperCase()
+                : "XG / 82"}
             </Label>
           </React.Fragment>
         );
@@ -316,6 +323,11 @@ export async function POST(req: Request) {
             <div style={{ display: "flex" }}>RELIABILITY {data.gravity.reliabilityLabel}</div>
             <div style={{ display: "flex" }}>DATA {data.gravity.coverageLabel}</div>
             <div style={{ display: "flex" }}>GRAVITY {ordinal(data.gravity.gravityPercentile)}</div>
+            {data.gravity.modelVersion === "4.0" && data.gravity.netXg82 !== null ? (
+              <div style={{ display: "flex" }}>
+                NET {data.gravity.netXg82 > 0 ? "+" : ""}{data.gravity.netXg82.toFixed(1)} xG/82 · FIELD {data.gravity.force > 0 ? "+" : ""}{data.gravity.force.toFixed(2)}
+              </div>
+            ) : null}
           </div>
           <Rink gravity={data.gravity} />
           <div style={{ display: "flex", width: "100%", justifyContent: "center", padding: "0 26px 4px", fontSize: 9, color: INK_FAINT }}>

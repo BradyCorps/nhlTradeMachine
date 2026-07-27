@@ -48,7 +48,7 @@ A player with NOIV significantly higher than their raw stats suggest is a hidden
 
 ---
 
-## Player Gravity — Release A public contract
+## Player Gravity — v3 Production and v4 Diagnostic Boundary
 
 Gravity v3 is the current production display. It is a position-relative territorial influence index with three bounded zone components: an OZ well, an NZ transition-proxy well, and a DZ dome. The warped rink is a model visualization, not an observed tracking heatmap or a measurement of defender attention.
 
@@ -64,6 +64,10 @@ GRAV = clamp(navResidual · 45, -20, +20)
 ```
 
 Changes to assists, individual xG/goals, power-play production, OZ lift, or the DZ dome do not change the GRAV handoff.
+
+Gravity v4 is a separate 5v5 Territorial Gravity contract expressed in expected goals added or prevented. The application has versioned types, validation, a loader, an off-by-default `GRAVITY_V4_ENABLED` flag, and an explicitly unfitted zero-value admin fixture. The player dossier and share-card contract can render a validated v4 profile without changing X-NAV.
+
+No fitted v4 profile is currently authorized or bundled. Production fitting is blocked pending a legally usable shift/event or possession dataset. Held-out results, correlated-observation uncertainty intervals, league-derived visual scales/tier cutoffs, portability, and incremental X-NAV evidence remain unavailable and must not be inferred from aggregate NHL EDGE speed or zone-time fields.
 
 ---
 

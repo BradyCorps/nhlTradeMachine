@@ -94,3 +94,28 @@ BLACK_HOLE    < -0.22
 ```
 
 Do not describe those fixed numbers as verified season percentiles until that calibration report has been generated and reviewed.
+
+## Gravity v4 infrastructure
+
+Territorial Gravity v4 has a separate versioned contract. Its analytical zones use one common currency:
+
+```text
+ozXg82  = teammate expected goals added per 82
+nzXg82  = transition expected goals added per 82
+dzXg82  = opponent expected goals prevented per 82
+netXg82 = ozXg82 + nzXg82 + dzXg82
+```
+
+Analytical values remain unbounded. The existing rink identity is preserved by deriving display-only masses and force with documented `tanh` scales stored in model metadata.
+
+The repository currently contains only:
+
+- v4 types and runtime validation guards;
+- an off-by-default `GRAVITY_V4_ENABLED` server flag;
+- a loader that rejects player, season, model, and diagnostic-artifact mismatches;
+- a zero-value, explicitly unfitted fixture for the admin diagnostic path;
+- a v4 player-panel and share-card payload adapter that remain diagnostic-only.
+
+There are no fitted v4 player values in production. No v4 value enters X-NAV or the season simulator.
+
+The missing work requires an authorized shift/event or possession dataset: offline fitting, block-bootstrap or posterior intervals, league distribution scales and tier cutoffs, held-out validation, portability analysis, and X-NAV incremental-value tests. Those results must not be fabricated from aggregate NHL EDGE speed or zone-time fields.

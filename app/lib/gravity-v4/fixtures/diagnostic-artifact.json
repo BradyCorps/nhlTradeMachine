@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "gravity-v4-profile-set/1",
+  "artifactKind": "diagnostic_fixture",
+  "generatedAt": "2026-07-24T00:00:00.000Z",
+  "profiles": [
+    {
+      "playerId": "9999999",
+      "playerName": "Diagnostic Skater",
+      "position": "W",
+      "season": "2025-26",
+      "zones": {
+        "oz": {
+          "xg60": 0,
+          "xg82": 0,
+          "interval": null,
+          "positionPercentile": null,
+          "leaguePercentile": null,
+          "dataQuality": "insufficient",
+          "sampleMinutes": 0
+        },
+        "nz": {
+          "xg60": 0,
+          "xg82": 0,
+          "interval": null,
+          "positionPercentile": null,
+          "leaguePercentile": null,
+          "dataQuality": "insufficient",
+          "sampleMinutes": 0
+        },
+        "dz": {
+          "xg60": 0,
+          "xg82": 0,
+          "interval": null,
+          "positionPercentile": null,
+          "leaguePercentile": null,
+          "dataQuality": "insufficient",
+          "sampleMinutes": 0
+        }
+      },
+      "netXg60": 0,
+      "netXg82": 0,
+      "netInterval": null,
+      "positionPercentile": null,
+      "leaguePercentile": null,
+      "seasonContributionXg": 0,
+      "displayForce": 0,
+      "displayMasses": {
+        "oz": 0,
+        "nz": 0,
+        "dz": 0
+      },
+      "tier": null,
+      "reliability": "INSUFFICIENT",
+      "portability": null,
+      "portabilityLabel": "UNKNOWN",
+      "transitionDataQuality": "missing",
+      "dataQuality": "insufficient",
+      "metadata": {
+        "modelVersion": "4.0",
+        "trainedAt": null,
+        "trainingSeasons": [],
+        "targetSeason": "2025-26",
+        "strengthState": "5v5",
+        "sourceVersion": "diagnostic-zero-fixture-v1",
+        "artifactKind": "diagnostic_fixture",
+        "visualScales": {
+          "zoneXg82": 1,
+          "netXg82": 1
+        }
+      }
+    }
+  ]
+}
