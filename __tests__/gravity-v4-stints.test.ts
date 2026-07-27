@@ -21,6 +21,10 @@ import {
   type RosterSpot,
   type PbpEvent,
 } from "@/scripts/gravity-v4/core";
+import {
+  validShiftPayload,
+  validPbpPayload,
+} from "@/scripts/gravity-v4/nhl-source";
 
 const HOME = 10, AWAY = 20;
 
@@ -512,5 +516,31 @@ describe("attribution rule is evidenced, not asserted", () => {
     expect(report.strengthChecked).toBe(1);
     expect(report.strengthAgreedTrailing).toBe(1); // 5v5 stint, matches
     expect(report.strengthAgreedLeading).toBe(0);  // 5v4 stint, does not
+  });
+});
+
+// ── Source payload validation ────────────────────────────────────
+// The NHL endpoints answer HTTP 200 with an empty body under load rather than
+// 429ing. Without a content check those empty responses cache as if they were
+// real, and whole games silently contribute nothing.
+
+describe("payload validators", () => {
+  it("rejects an empty shift chart, accepts a populated one", () => {
+    expect(validShiftPayload({ data: [] })).toMatch(/empty/);
+    expect(validShiftPayload({})).toMatch(/empty/);
+    expect(validShiftPayload(null)).toMatch(/empty/);
+    expect(validShiftPayload({ data: [{ playerId: 1 }] })).toBeNull();
+  });
+
+  it("names which part of a play-by-play payload is missing", () => {
+    const good = {
+      plays: [{ typeDescKey: "faceoff" }],
+      rosterSpots: [{ playerId: 1 }],
+      homeTeam: { id: 10 }, awayTeam: { id: 20 },
+    };
+    expect(validPbpPayload(good)).toBeNull();
+    expect(validPbpPayload({ ...good, plays: [] })).toMatch(/no plays/);
+    expect(validPbpPayload({ ...good, rosterSpots: [] })).toMatch(/rosterSpots/);
+    expect(validPbpPayload({ ...good, homeTeam: {} })).toMatch(/team ids/);
   });
 });

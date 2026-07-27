@@ -70,6 +70,28 @@ Responses cache to `.gravity-v4-cache/`; the report writes to
 `data/gravity-v4/`. **Both are gitignored** — raw responses and player-level
 derived data never enter the repository.
 
+### Empty 200s — the failure mode to know about
+
+Under sustained load these endpoints do not answer 429. They answer **HTTP 200
+with an empty body**. On a 1312-game run that produced contiguous blocks of
+25–100 games with no shift rows at all, cached as if they were real, and the run
+still reported `1312/1312`.
+
+Both scripts therefore content-validate every payload:
+
+- a shift chart must have rows; a play-by-play must have plays, rosterSpots and
+  team ids;
+- an invalid payload is **never cached** — it is backed off and retried like a
+  429;
+- a *cached* payload that fails validation is **deleted and refetched**, so a
+  cache poisoned by an earlier throttled run heals itself on the next online run;
+- a game that reconstructs to zero stints is a **failure**, not a quiet zero, and
+  failures are grouped by cause so hundreds of identical ones read as one
+  problem.
+
+`--gap MS` paces api-web; `--shiftgap MS` paces api.nhle.com (default 400).
+Raise both if the failure list is dominated by empty payloads.
+
 ### What a stint is
 
 Every shift start and end is a change point. Between two adjacent change points
@@ -161,8 +183,8 @@ npx tsx scripts/gravity-v4/build-stints.ts --games 50 --offline    # from cache
 ```
 
 Flags: `--games N` · `--season 20252026` · `--offline` · `--gap MS` ·
-`--even5v5` (emit only true 5v5 rows — smaller file, but the special-teams rows
-are gone for good, so prefer filtering downstream)
+`--shiftgap MS` · `--even5v5` (emit only true 5v5 rows — smaller file, but the
+special-teams rows are gone for good, so prefer filtering downstream)
 
 Output — **both gitignored**, this is player-level derived data:
 

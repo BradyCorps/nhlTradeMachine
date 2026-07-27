@@ -21,6 +21,7 @@ import {
 } from "./core";
 import {
   makeFetcher, collectGameIds, rosterFromPbp, eventsFromPbp, shiftsUrl, pbpUrl,
+  validShiftPayload, validPbpPayload,
 } from "./nhl-source";
 
 const ROOT = process.cwd();
@@ -41,7 +42,11 @@ const LINES_CSV = flag("lines");
 
 const sha256 = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
 
-const fetchCached = makeFetcher({ offline: OFFLINE, apiWebGapMs: Number(flag("gap", "450")) });
+const fetchCached = makeFetcher({
+  offline: OFFLINE,
+  apiWebGapMs: Number(flag("gap", "450")),
+  apiGapMs: Number(flag("shiftgap", "400")),
+});
 
 async function main() {
   console.log(`Gravity v4 coverage spike — season ${SEASON}, target ${GAME_COUNT} games${OFFLINE ? " (offline)" : ""}`);
@@ -59,8 +64,8 @@ async function main() {
     try {
       // Sequential, not concurrent: two simultaneous requests per game is what
       // tripped api-web's rate limiter on the first run.
-      const shiftPayload = await fetchCached(`shifts-${gameId}`, shiftsUrl(gameId));
-      const pbp = await fetchCached(`pbp-${gameId}`, pbpUrl(gameId));
+      const shiftPayload = await fetchCached(`shifts-${gameId}`, shiftsUrl(gameId), validShiftPayload);
+      const pbp = await fetchCached(`pbp-${gameId}`, pbpUrl(gameId), validPbpPayload);
       const rawRows: RawShiftRow[] = shiftPayload?.data ?? [];
       const { roster, homeTeamId, awayTeamId } = rosterFromPbp(pbp);
       if (!homeTeamId || roster.length === 0) throw new Error("missing roster/home team in pbp");

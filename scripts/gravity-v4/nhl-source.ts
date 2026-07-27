@@ -27,22 +27,48 @@ export interface FetcherOptions {
   offline?: boolean;
   /** Per-request floor for api-web.nhle.com, which rate-limits harder. */
   apiWebGapMs?: number;
+  /** Per-request floor for api.nhle.com (the shift charts). */
+  apiGapMs?: number;
 }
 
-export type Fetcher = (key: string, url: string) => Promise<any>;
+/**
+ * Returns a reason string when a payload is unusable, or null when it is fine.
+ *
+ * This exists because the NHL endpoints answer **HTTP 200 with an empty body**
+ * under load rather than 429ing. Without a content check those empty responses
+ * cache as if they were real data, and a game silently contributes nothing —
+ * indistinguishable from a game that legitimately has no events.
+ */
+export type PayloadValidator = (payload: any) => string | null;
+
+export type Fetcher = (key: string, url: string, validate?: PayloadValidator) => Promise<any>;
+
+export const validShiftPayload: PayloadValidator = p =>
+  Array.isArray(p?.data) && p.data.length > 0 ? null : "empty shiftcharts payload";
+
+export const validPbpPayload: PayloadValidator = p =>
+  !Array.isArray(p?.plays) || p.plays.length === 0 ? "play-by-play has no plays"
+  : !Array.isArray(p?.rosterSpots) || p.rosterSpots.length === 0 ? "play-by-play has no rosterSpots"
+  : p?.homeTeam?.id == null || p?.awayTeam?.id == null ? "play-by-play has no team ids"
+  : null;
 
 /**
- * Cached fetch with per-host pacing.
+ * Cached fetch with per-host pacing and content validation.
  *
  * api-web.nhle.com rate-limits noticeably harder than api.nhle.com, so each host
  * gets its own floor between requests plus a cooldown that ratchets up on 429
  * and relaxes again after a clean response. Requests must stay sequential —
  * firing two at once per game is what tripped the limiter originally.
+ *
+ * An invalid payload is retried like a transport error and is **never cached**.
+ * A cache entry that fails validation is deleted and refetched, so a cache
+ * poisoned by an earlier throttled run heals itself on the next online run
+ * instead of silently producing an empty dataset forever.
  */
 export function makeFetcher(opts: FetcherOptions = {}): Fetcher {
   const gapByHost: Record<string, number> = {
     "api-web.nhle.com": opts.apiWebGapMs ?? 450,
-    "api.nhle.com": 250,
+    "api.nhle.com": opts.apiGapMs ?? 400,
   };
   const lastHit: Record<string, number> = {};
   const cooldown: Record<string, number> = {};
@@ -54,10 +80,22 @@ export function makeFetcher(opts: FetcherOptions = {}): Fetcher {
     lastHit[host] = Date.now();
   };
 
-  return async function fetchCached(key: string, url: string): Promise<any> {
+  return async function fetchCached(
+    key: string, url: string, validate?: PayloadValidator,
+  ): Promise<any> {
     const safe = key.replace(/[^a-zA-Z0-9_.-]/g, "_");
     const body = path.join(CACHE_DIR, `${safe}.json`);
-    if (fs.existsSync(body)) return JSON.parse(fs.readFileSync(body, "utf8"));
+
+    if (fs.existsSync(body)) {
+      let cached: any = null, reason: string | null = null;
+      try { cached = JSON.parse(fs.readFileSync(body, "utf8")); }
+      catch { reason = "cached payload is not valid JSON"; }
+      if (!reason && validate) reason = validate(cached);
+      if (!reason) return cached;
+      if (opts.offline) throw new Error(`cached ${key}: ${reason}`);
+      // Poisoned by an earlier throttled run — drop it and fetch again.
+      fs.rmSync(body, { force: true });
+    }
     if (opts.offline) throw new Error(`offline cache miss: ${key}`);
 
     const host = new URL(url).host;
@@ -84,9 +122,21 @@ export function makeFetcher(opts: FetcherOptions = {}): Fetcher {
         if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
 
         const text = await res.text();
+        const payload = JSON.parse(text);
+
+        // An empty 200 is this API's quiet way of saying "slow down". Treat it
+        // exactly like a 429: back the host off, retry, and do not cache it.
+        const reason = validate?.(payload) ?? null;
+        if (reason) {
+          cooldown[host] = Math.min((cooldown[host] ?? 0) + 250, 2000);
+          lastErr = new Error(`${reason} for ${url}`);
+          if (attempt < 5) { await wait(1500 * 2 ** attempt); continue; }
+          throw lastErr;
+        }
+
         fs.writeFileSync(body, text);
         if (cooldown[host]) cooldown[host] = Math.max(0, cooldown[host] - 50);
-        return JSON.parse(text);
+        return payload;
       } catch (e) {
         lastErr = e;
         if (attempt < 5) await wait(1000 * 2 ** attempt);

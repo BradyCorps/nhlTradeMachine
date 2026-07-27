@@ -29,6 +29,7 @@ import {
 } from "./core";
 import {
   makeFetcher, collectGameIds, rosterFromPbp, eventsFromPbp, shiftsUrl, pbpUrl,
+  validShiftPayload, validPbpPayload,
 } from "./nhl-source";
 
 const SCHEMA_VERSION = 1;
@@ -48,7 +49,11 @@ const SEASON = flag("season", "20252026")!;
 const OFFLINE = has("offline");
 const EVEN_5V5_ONLY = has("even5v5");
 
-const fetchCached = makeFetcher({ offline: OFFLINE, apiWebGapMs: Number(flag("gap", "450")) });
+const fetchCached = makeFetcher({
+  offline: OFFLINE,
+  apiWebGapMs: Number(flag("gap", "450")),
+  apiGapMs: Number(flag("shiftgap", "400")),
+});
 
 /** Gzip stream with backpressure honoured, hashing the uncompressed bytes. */
 function openSink(file: string) {
@@ -90,26 +95,36 @@ async function main() {
   const coverage: CoverageReport[] = [];
   const emits: EmitReport[] = [];
   const failures: { gameId: number; reason: string }[] = [];
-  let rowsWritten = 0, rowsSkipped = 0;
+  const perGame: { gameId: number; stints: number; shiftRows: number; unknownRows: number }[] = [];
+  let rowsWritten = 0, rowsSkipped = 0, totalEvents = 0;
 
   for (const [i, gameId] of gameIds.entries()) {
     try {
       // Sequential, not concurrent — two simultaneous requests per game is what
-      // trips api-web's rate limiter.
-      const shiftPayload = await fetchCached(`shifts-${gameId}`, shiftsUrl(gameId));
-      const pbp = await fetchCached(`pbp-${gameId}`, pbpUrl(gameId));
+      // trips api-web's rate limiter. Both payloads are content-validated, so a
+      // throttled empty 200 is retried rather than cached as a silent hole.
+      const shiftPayload = await fetchCached(`shifts-${gameId}`, shiftsUrl(gameId), validShiftPayload);
+      const pbp = await fetchCached(`pbp-${gameId}`, pbpUrl(gameId), validPbpPayload);
       const rawRows: RawShiftRow[] = shiftPayload?.data ?? [];
       const { roster, homeTeamId, awayTeamId } = rosterFromPbp(pbp);
-      if (!homeTeamId || !awayTeamId || roster.length === 0) {
-        throw new Error("missing roster/team ids in pbp");
-      }
 
       const known = new Set(roster.map(r => r.playerId));
       const { shifts, report } = parseShifts(rawRows, known);
       const stints = buildStints(shifts, roster, homeTeamId);
       const events = eventsFromPbp(pbp);
+      totalEvents += events.length;
+
+      // A game that reconstructs to nothing is a failure, not a quiet zero.
+      if (stints.length === 0) {
+        throw new Error(`no stints reconstructed from ${report.shiftRows} shift rows ` +
+          `(${report.unknownPlayerRows} off-roster)`);
+      }
 
       coverage.push(buildCoverageReport({ gameId, parse: report, shifts, stints, events }));
+      perGame.push({
+        gameId, stints: stints.length,
+        shiftRows: report.shiftRows, unknownRows: report.unknownPlayerRows,
+      });
 
       const { rows, report: emit } = buildStintRows({
         season: SEASON, gameId, homeTeamId, awayTeamId, stints, events,
@@ -146,14 +161,18 @@ async function main() {
   const attrLeading = sumE(r => r.strengthAgreedLeading);
   const pct = (n: number, d: number) => (d ? (100 * n) / d : null);
 
+  const unattributed = sumE(r => r.unattributedEvents);
+
   console.log("\n── DATASET ────────────────────────────────────────");
   console.log(`games emitted              ${ok}/${attempted}`);
   console.log(`stint rows written         ${rowsWritten}${rowsSkipped ? `  (${rowsSkipped} non-5v5 skipped)` : ""}`);
+  console.log(`rows per emitted game      ${ok ? (rowsWritten / ok).toFixed(0) : "—"}`);
   console.log(`uncompressed size          ${(uncompressedBytes / 1e6).toFixed(1)} MB`);
   console.log(`on-disk (gzip)             ${(fs.statSync(dataFile).size / 1e6).toFixed(1)} MB`);
   console.log(`shots attributed           ${sumE(r => r.shotsAttributed)}` +
     `  (${sumE(r => r.shotsWithoutShooter)} without a shooter id)`);
-  console.log(`events outside any stint   ${sumE(r => r.unattributedEvents)}`);
+  console.log(`events outside any stint   ${unattributed}` +
+    `  (${pct(unattributed, totalEvents)?.toFixed(2) ?? "—"}% of ${totalEvents})`);
 
   console.log("\n── EVENT ATTRIBUTION ──────────────────────────────");
   console.log("An on-ice event belongs to the lineup that played up to that second,");
@@ -162,10 +181,29 @@ async function main() {
   console.log(`  trailing (used)          ${pct(attrTrailing, attrChecked)?.toFixed(2) ?? "—"}%  (${attrTrailing}/${attrChecked})`);
   console.log(`  leading  (naive)         ${pct(attrLeading, attrChecked)?.toFixed(2) ?? "—"}%  (${attrLeading}/${attrChecked})`);
 
+  // ── Where the roster join is losing rows ───────────────────────
+  // Aggregate percentages hide a handful of catastrophic games behind hundreds
+  // of clean ones, so name the offenders rather than just failing the gate.
+  const offenders = perGame
+    .filter(g => g.unknownRows > 0)
+    .sort((a, b) => b.unknownRows - a.unknownRows);
+  if (offenders.length) {
+    const lost = offenders.reduce((s, g) => s + g.unknownRows, 0);
+    console.log("\n── ROSTER JOIN MISSES ─────────────────────────────");
+    console.log(`${lost} shift rows across ${offenders.length} games did not resolve to a`);
+    console.log("player on that game's play-by-play roster. Worst games:");
+    for (const g of offenders.slice(0, 10)) {
+      console.log(`  ${g.gameId}  ${String(g.unknownRows).padStart(4)} of ${g.shiftRows} rows` +
+        `  (${((100 * g.unknownRows) / Math.max(1, g.shiftRows)).toFixed(1)}%)`);
+    }
+  }
+
   // ── Reconstruction gates (same bar the coverage spike sets) ────
   const tolerant = sumC(r => r.strengthAgreedBoundaryTolerant);
   const checked = sumC(r => r.strengthChecked);
   const gates = [
+    // "Emitted" means the game produced stints. Counting "no exception thrown"
+    // instead let ~500 empty games pass a 1312-game run as a clean 100%.
     ["games emitted ≥95%", ok / Math.max(1, attempted) >= 0.95],
     ["zero tiling gap", sumC(r => r.tilingGapSec) === 0],
     ["impossible skater counts ≤0.1% of stints",
@@ -175,6 +213,10 @@ async function main() {
     ["roster join ≥99.9%", rosterJoinPct != null && rosterJoinPct >= 99.9],
     ["every emitted row carries a shooter-resolvable shot set",
       sumE(r => r.shotsWithoutShooter) / Math.max(1, sumE(r => r.shotsAttributed)) <= 0.01],
+    // Independent of the game count: if whole games are missing their stints,
+    // their events have nowhere to land and this share climbs immediately.
+    ["events landing in a stint ≥97%",
+      totalEvents > 0 && (100 * (totalEvents - unattributed)) / totalEvents >= 97],
   ] as const;
 
   console.log("\n── GATES ──────────────────────────────────────────");
@@ -185,8 +227,19 @@ async function main() {
   }
 
   if (failures.length) {
-    console.log(`\nfailures (${failures.length}):`);
-    for (const f of failures.slice(0, 10)) console.log(`  ${f.gameId}: ${f.reason}`);
+    // Hundreds of identically-caused failures are one problem, not hundreds, so
+    // lead with the shape and keep a few ids for reproduction.
+    const byReason = new Map<string, number[]>();
+    for (const f of failures) {
+      const family = f.reason.replace(/\d{6,}/g, "…").replace(/\b\d+\b/g, "N");
+      const list = byReason.get(family);
+      if (list) list.push(f.gameId); else byReason.set(family, [f.gameId]);
+    }
+    console.log(`\n── FAILURES (${failures.length} of ${attempted} games) ─────────────`);
+    for (const [family, ids] of [...byReason].sort((a, b) => b[1].length - a[1].length)) {
+      console.log(`  ${String(ids.length).padStart(4)} ×  ${family}`);
+      console.log(`         e.g. ${ids.slice(0, 4).join(", ")}`);
+    }
   }
 
   const manifest = {
@@ -218,7 +271,9 @@ async function main() {
       strengthAgreementBoundaryTolerantPct: pct(tolerant, checked),
       shotsAttributed: sumE(r => r.shotsAttributed),
       shotsWithoutShooter: sumE(r => r.shotsWithoutShooter),
-      unattributedEvents: sumE(r => r.unattributedEvents),
+      totalEvents,
+      unattributedEvents: unattributed,
+      rosterJoinOffenders: offenders.slice(0, 25),
       attributionAgreementTrailingPct: pct(attrTrailing, attrChecked),
       attributionAgreementLeadingPct: pct(attrLeading, attrChecked),
     },
