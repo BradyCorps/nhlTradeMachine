@@ -1,10 +1,12 @@
-import fs from 'fs';
-import path from 'path';
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import sourceManifestJson from './moneypuck-baseline-sources.json';
 
 // ── Multi-Season Baseline Builder (MoneyPuck + Natural Stat Trick) ───────────
-// Reads all four season folders in MoneyPuckData/ plus the NST exports in
-// OtherData/ and produces app/data/moneypuck_baselines.json — the multi-year
-// anchor consumed by the X-NAV engine's baseline blending.
+// Reads the exact MoneyPuck and NST files declared in the source manifest and
+// produces app/data/moneypuck_baselines.json — the multi-year anchor consumed
+// by the X-NAV engine's baseline blending.
 //
 // MoneyPuck fields (per-season exponential weighting 0.50/0.30/0.15/0.05):
 //   baselinePtsPace      — weighted pts/82 across seasons (situation: all)
@@ -28,6 +30,10 @@ import path from 'path';
 //                          partner does with everyone else (driver vs passenger)
 //   baselineHdsvPct      — goalies: high-danger save % (skill > team-defense noise)
 //   baselineGsaaPerGame  — goalies: goals saved above average per game
+//
+// The scoped source manifest includes NST skater totals and pairings only.
+// Existing on-ice and goalie enrichments are carried forward by NHL player ID;
+// this builder does not inspect any undeclared OtherData files.
 
 // Weights for exponential decay: most recent season weighted highest
 const SEASON_WEIGHTS: Record<string, number> = {
@@ -56,28 +62,132 @@ interface GoalieSeason {
 }
 
 interface PlayerAggregate {
+  playerId: number;
   name: string;
   position: string;
   isGoalie: boolean;
+  aliases: Set<string>;
+  positions: Set<string>;
+  teams: Set<string>;
   skaterSeasons: Record<string, SkaterSeason>;
   goalieSeasons: Record<string, GoalieSeason>;
 }
 
 const db: Record<string, PlayerAggregate> = {};
 
-function getSeasonKey(folderName: string): string {
-  if (folderName.startsWith("2025")) return "2025";
-  if (folderName.startsWith("2024")) return "2024";
-  if (folderName.startsWith("2023")) return "2023";
-  if (folderName.startsWith("2022")) return "2022";
-  return "";
+interface ManifestSource {
+  path: string;
+  sha256: string;
 }
 
-// Find a file in the folder matching prefix (handles skaters.csv, skaters(1).csv, etc.)
-function findCsv(dir: string, prefix: string): string | null {
-  const files = fs.readdirSync(dir);
-  const match = files.find(f => f.startsWith(prefix) && f.endsWith(".csv"));
-  return match ? path.join(dir, match) : null;
+interface BaselineSourceManifest {
+  schemaVersion: 'moneypuck-baseline-source-manifest-v1';
+  moneyPuckSeasons: Array<{
+    seasonKey: string;
+    seasonLabel: string;
+    skaters: ManifestSource;
+    goalies: ManifestSource;
+  }>;
+  naturalStatTrickBuckets: {
+    current: {
+      skaters: ManifestSource;
+      pairings: ManifestSource;
+    };
+    prior: {
+      skaters: ManifestSource;
+      pairings: ManifestSource;
+    };
+  };
+  runtimeArtifact: {
+    path: string;
+    preserveFields: string[];
+  };
+}
+
+const ROOT = process.cwd();
+const SOURCE_MANIFEST = sourceManifestJson as BaselineSourceManifest;
+const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+const PRESERVED_RUNTIME_FIELDS = [
+  'baselineEsXgfPct',
+  'baselineHdsvPct',
+  'baselineGsaaPerGame',
+] as const;
+
+function resolveRepositoryPath(relativePath: string): string {
+  if (path.isAbsolute(relativePath)) {
+    throw new Error(`Manifest path must be repository-relative: ${relativePath}`);
+  }
+  const absolutePath = path.resolve(ROOT, relativePath);
+  if (!absolutePath.startsWith(`${ROOT}${path.sep}`)) {
+    throw new Error(`Manifest path escapes the repository: ${relativePath}`);
+  }
+  return absolutePath;
+}
+
+function sourceFiles(): ManifestSource[] {
+  return [
+    ...SOURCE_MANIFEST.moneyPuckSeasons.flatMap((season) => [
+      season.skaters,
+      season.goalies,
+    ]),
+    SOURCE_MANIFEST.naturalStatTrickBuckets.current.skaters,
+    SOURCE_MANIFEST.naturalStatTrickBuckets.current.pairings,
+    SOURCE_MANIFEST.naturalStatTrickBuckets.prior.skaters,
+    SOURCE_MANIFEST.naturalStatTrickBuckets.prior.pairings,
+  ];
+}
+
+function validateSourceManifest(): void {
+  if (SOURCE_MANIFEST.schemaVersion !== 'moneypuck-baseline-source-manifest-v1') {
+    throw new Error(`Unsupported baseline source manifest: ${SOURCE_MANIFEST.schemaVersion}`);
+  }
+  const seasonKeys = SOURCE_MANIFEST.moneyPuckSeasons
+    .map((season) => season.seasonKey)
+    .sort();
+  const expectedSeasonKeys = Object.keys(SEASON_WEIGHTS).sort();
+  if (
+    seasonKeys.length !== expectedSeasonKeys.length
+    || seasonKeys.some((season, index) => season !== expectedSeasonKeys[index])
+  ) {
+    throw new Error(`Baseline source manifest seasons must be ${expectedSeasonKeys.join(', ')}`);
+  }
+
+  const sources = sourceFiles();
+  const paths = sources.map((source) => source.path);
+  if (sources.length !== 12 || new Set(paths).size !== sources.length) {
+    throw new Error('Baseline source manifest must contain 12 unique raw files');
+  }
+  for (const source of sources) {
+    resolveRepositoryPath(source.path);
+    if (!SHA256_PATTERN.test(source.sha256)) {
+      throw new Error(`Invalid SHA-256 in baseline source manifest: ${source.path}`);
+    }
+  }
+
+  const preserveFields = [...SOURCE_MANIFEST.runtimeArtifact.preserveFields].sort();
+  const expectedPreserveFields = [...PRESERVED_RUNTIME_FIELDS].sort();
+  if (
+    preserveFields.length !== expectedPreserveFields.length
+    || preserveFields.some((field, index) => field !== expectedPreserveFields[index])
+  ) {
+    throw new Error('Baseline source manifest has an unexpected preserved-field scope');
+  }
+  const outputPath = resolveRepositoryPath(SOURCE_MANIFEST.runtimeArtifact.path);
+  if (paths.some((sourcePath) => resolveRepositoryPath(sourcePath) === outputPath)) {
+    throw new Error('Runtime baseline artifact cannot also be a raw source');
+  }
+}
+
+function readManifestSource(source: ManifestSource): string {
+  const filePath = resolveRepositoryPath(source.path);
+  const body = fs.readFileSync(filePath);
+  const actualSha256 = createHash('sha256').update(body).digest('hex');
+  if (actualSha256 !== source.sha256) {
+    throw new Error(
+      `Baseline source fingerprint mismatch for ${source.path}: expected ${source.sha256}, received ${actualSha256}`,
+    );
+  }
+  return body.toString('utf8');
 }
 
 function parseCSVLine(line: string): string[] {
@@ -111,7 +221,33 @@ function numOrNull(v: string | undefined): number | null {
   return isNaN(n) ? null : n;
 }
 
-const nameKey = (name: string) => name.toLowerCase().replace(/[^a-z]/g, '');
+const legacyNameKey = (name: string) => name.toLowerCase().replace(/[^a-z]/g, '');
+const exactNameKey = (name: string) =>
+  name.normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
+
+function normalizePosition(value: string | null | undefined): string | null {
+  const position = (value ?? '').trim().toUpperCase();
+  if (position === 'D' || position === 'C' || position === 'G') return position;
+  if (['L', 'R', 'W', 'LW', 'RW', 'F'].includes(position)) return 'W';
+  return null;
+}
+
+const TEAM_ALIASES: Record<string, string> = {
+  'L.A': 'LAK',
+  'N.J': 'NJD',
+  'S.J': 'SJS',
+  'T.B': 'TBL',
+  ARI: 'UTA',
+  MON: 'MTL',
+};
+
+function sourceTeams(value: string | null | undefined): string[] {
+  return [...new Set((value ?? '')
+    .split(',')
+    .map((team) => team.trim().toUpperCase())
+    .map((team) => TEAM_ALIASES[team] ?? team)
+    .filter(Boolean))];
+}
 
 // ── Natural Stat Trick enrichment (OtherData/) ───────────────────────────────
 // Two time buckets: "2025;26" current season and "2022;23;24;25" prior span
@@ -120,110 +256,141 @@ const NST_CURRENT_WEIGHT = 0.6;
 const NST_PRIOR_WEIGHT   = 0.4;
 
 interface NstSkater  { gp: number; ixg82: number; hits82: number; blocks82: number; }
-interface NstGoalie  { gp: number; hdsvPct: number | null; gsaaPerGame: number; }
-interface NstOnIce   { toi: number; esXgfPct: number | null; }
 interface NstPairing { player: string; partner: string; toi: number; xgfPct: number; }
 
 interface NstBucket {
   skaters:  Record<string, NstSkater>;
-  goalies:  Record<string, NstGoalie>;
-  onIce:    Record<string, NstOnIce>;
   pairings: NstPairing[];
 }
 
-function readNstCsv(filePath: string): { headers: string[]; rows: string[][] } {
-  const raw = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+interface NstIdentityDiagnostics {
+  unmatchedSkaters: number;
+  unmatchedPairings: number;
+}
+
+function requiredColumn(headers: string[], column: string, sourcePath: string): number {
+  const index = headers.indexOf(column);
+  if (index < 0) throw new Error(`${sourcePath} is missing required column ${column}`);
+  return index;
+}
+
+function readNstCsv(source: ManifestSource): { headers: string[]; rows: string[][] } {
+  const raw = readManifestSource(source).replace(/^\uFEFF/, '');
   const lines = raw.split('\n').filter(l => l.trim());
+  if (lines.length === 0) throw new Error(`NST source is empty: ${source.path}`);
   return {
     headers: parseCSVLine(lines[0]),
     rows: lines.slice(1).map(parseCSVLine),
   };
 }
 
-function loadNstBucket(dir: string, prefix: string): NstBucket {
-  const bucket: NstBucket = { skaters: {}, goalies: {}, onIce: {}, pairings: [] };
-  const files = fs.readdirSync(dir).filter(f => f.startsWith(prefix) && f.endsWith('.csv'));
-
-  const find = (...frags: string[]) =>
-    files.find(f => frags.every(frag => f.includes(frag)));
-
-  // Skater totals (all situations) — ixG, hits, blocks
-  const skaterFile = find('skater', 'totals_all');
-  if (skaterFile) {
-    const { headers, rows } = readNstCsv(path.join(dir, skaterFile));
-    const iName = headers.indexOf('Player');
-    const iGP = headers.indexOf('GP');
-    const iIxg = headers.indexOf('ixG');
-    const iHits = headers.indexOf('Hits');
-    const iBlocks = headers.indexOf('Shots Blocked');
-    for (const r of rows) {
-      const gp = num(r[iGP]);
-      if (gp < 10) continue;
-      const pace = 82 / gp;
-      bucket.skaters[nameKey(r[iName])] = {
-        gp,
-        ixg82:    num(r[iIxg]) * pace,
-        hits82:   num(r[iHits]) * pace,
-        blocks82: num(r[iBlocks]) * pace,
-      };
+function playerIdsByLegacyName(): Map<string, string[]> {
+  const index = new Map<string, string[]>();
+  for (const [playerId, player] of Object.entries(db)) {
+    for (const alias of player.aliases) {
+      const key = legacyNameKey(alias);
+      const ids = index.get(key) ?? [];
+      if (!ids.includes(playerId)) ids.push(playerId);
+      index.set(key, ids);
     }
   }
+  return index;
+}
 
-  // Goalie totals — HDSV% and GSAA (NST header is 'goalie' in one file, 'goalies' in the other)
-  const goalieFile = find('goalie', 'totals_all');
-  if (goalieFile) {
-    const { headers, rows } = readNstCsv(path.join(dir, goalieFile));
-    const iName = headers.indexOf('Player');
-    const iGP = headers.indexOf('GP');
-    const iHdsv = headers.indexOf('HDSV%');
-    const iGsaa = headers.indexOf('GSAA');
-    for (const r of rows) {
-      const gp = num(r[iGP]);
-      if (gp < 8) continue;
-      bucket.goalies[nameKey(r[iName])] = {
-        gp,
-        hdsvPct:     numOrNull(r[iHdsv]),
-        gsaaPerGame: num(r[iGsaa]) / gp,
-      };
+function nstIdentityKey(
+  byName: Map<string, string[]>,
+  name: string,
+  position: string | null,
+  teams: string[],
+): { key: string; matchedPlayerId: boolean } {
+  const sourceNameKey = legacyNameKey(name);
+  let candidates = [...(byName.get(sourceNameKey) ?? [])];
+  if (candidates.length <= 1) {
+    return { key: `name:${sourceNameKey}`, matchedPlayerId: candidates.length === 1 };
+  }
+  const normalizedPosition = normalizePosition(position);
+  if (normalizedPosition) {
+    candidates = candidates.filter((playerId) =>
+      db[playerId].positions.has(normalizedPosition));
+  }
+  if (candidates.length > 1 && teams.length > 0) {
+    const teamMatches = candidates.filter((playerId) =>
+      teams.some((team) => db[playerId].teams.has(team)));
+    if (teamMatches.length > 0) candidates = teamMatches;
+  }
+  return candidates.length === 1
+    ? { key: `id:${candidates[0]}`, matchedPlayerId: true }
+    : { key: `name:${sourceNameKey}`, matchedPlayerId: false };
+}
+
+function nstLookupKeyForPlayer(playerId: string, byName: Map<string, string[]>): string {
+  const sourceNameKey = legacyNameKey(db[playerId].name);
+  return (byName.get(sourceNameKey)?.length ?? 0) > 1
+    ? `id:${playerId}`
+    : `name:${sourceNameKey}`;
+}
+
+function loadNstBucket(
+  sources: { skaters: ManifestSource; pairings: ManifestSource },
+  diagnostics: NstIdentityDiagnostics,
+): NstBucket {
+  const bucket: NstBucket = { skaters: {}, pairings: [] };
+  const byName = playerIdsByLegacyName();
+
+  // Skater totals (all situations) — ixG, hits, blocks.
+  const skaterCsv = readNstCsv(sources.skaters);
+  const iName = requiredColumn(skaterCsv.headers, 'Player', sources.skaters.path);
+  const iTeam = requiredColumn(skaterCsv.headers, 'Team', sources.skaters.path);
+  const iPosition = requiredColumn(skaterCsv.headers, 'Position', sources.skaters.path);
+  const iGP = requiredColumn(skaterCsv.headers, 'GP', sources.skaters.path);
+  const iIxg = requiredColumn(skaterCsv.headers, 'ixG', sources.skaters.path);
+  const iHits = requiredColumn(skaterCsv.headers, 'Hits', sources.skaters.path);
+  const iBlocks = requiredColumn(skaterCsv.headers, 'Shots Blocked', sources.skaters.path);
+  for (const row of skaterCsv.rows) {
+    const gp = num(row[iGP]);
+    if (gp < MIN_GAMES_SKATER) continue;
+    const identity = nstIdentityKey(
+      byName,
+      row[iName],
+      row[iPosition],
+      sourceTeams(row[iTeam]),
+    );
+    if (!identity.matchedPlayerId) {
+      diagnostics.unmatchedSkaters++;
     }
+    const pace = 82 / gp;
+    bucket.skaters[identity.key] = {
+      gp,
+      ixg82:    num(row[iIxg]) * pace,
+      hits82:   num(row[iHits]) * pace,
+      blocks82: num(row[iBlocks]) * pace,
+    };
   }
 
-  // Even-strength on-ice metrics — xGF%
-  const onIceFile = find('onicemetrics');
-  if (onIceFile) {
-    const { headers, rows } = readNstCsv(path.join(dir, onIceFile));
-    const iName = headers.indexOf('Player');
-    const iGP = headers.indexOf('GP');
-    const iToi = headers.indexOf('TOI');
-    const iXgf = headers.indexOf('xGF%');
-    for (const r of rows) {
-      if (num(r[iGP]) < 10) continue;
-      bucket.onIce[nameKey(r[iName])] = {
-        toi: num(r[iToi]),
-        esXgfPct: numOrNull(r[iXgf]),
-      };
+  // Defensive pairings (all situations) — driver/passenger analysis.
+  const pairingCsv = readNstCsv(sources.pairings);
+  const iP1 = requiredColumn(pairingCsv.headers, 'Player', sources.pairings.path);
+  const iP2 = requiredColumn(pairingCsv.headers, 'Player 2', sources.pairings.path);
+  const iPairTeam = requiredColumn(pairingCsv.headers, 'Team', sources.pairings.path);
+  const iToi = requiredColumn(pairingCsv.headers, 'TOI', sources.pairings.path);
+  const iXgf = requiredColumn(pairingCsv.headers, 'xGF%', sources.pairings.path);
+  for (const row of pairingCsv.rows) {
+    const toi = num(row[iToi]);
+    const xgf = numOrNull(row[iXgf]);
+    if (toi < 50 || xgf === null) continue;
+    const teams = sourceTeams(row[iPairTeam]);
+    const player = nstIdentityKey(byName, row[iP1], 'D', teams);
+    const partner = nstIdentityKey(byName, row[iP2], 'D', teams);
+    if (!player.matchedPlayerId || !partner.matchedPlayerId) {
+      diagnostics.unmatchedPairings++;
     }
-  }
-
-  // Defensive pairings (all situations) — driver/passenger analysis
-  const pairFile = find('defensive_pairings_all');
-  if (pairFile) {
-    const { headers, rows } = readNstCsv(path.join(dir, pairFile));
-    const iP1 = headers.indexOf('Player');
-    const iP2 = headers.indexOf('Player 2');
-    const iToi = headers.indexOf('TOI');
-    const iXgf = headers.indexOf('xGF%');
-    for (const r of rows) {
-      const toi = num(r[iToi]);
-      const xgf = numOrNull(r[iXgf]);
-      if (toi < 50 || xgf === null) continue; // ignore tiny-sample pairings
-      bucket.pairings.push({
-        player: nameKey(r[iP1]),
-        partner: nameKey(r[iP2]),
-        toi,
-        xgfPct: xgf,
-      });
-    }
+    if (player.key === partner.key) continue;
+    bucket.pairings.push({
+      player: player.key,
+      partner: partner.key,
+      toi,
+      xgfPct: xgf,
+    });
   }
 
   return bucket;
@@ -276,135 +443,252 @@ function blend(current: number | null | undefined, prior: number | null | undefi
   return c ?? p;
 }
 
-async function processMoneypuckData() {
-  const rootDir = path.join(process.cwd(), 'MoneyPuckData');
-  const folders = fs.readdirSync(rootDir).filter(f => f.match(/^\d{4}_\d{2}$/)).sort();
+function requiredNhlPlayerId(value: string | undefined, sourcePath: string): string {
+  const raw = (value ?? '').trim();
+  const playerId = Number(raw);
+  if (!/^\d+$/.test(raw) || !Number.isSafeInteger(playerId) || playerId <= 0) {
+    throw new Error(`Invalid NHL player ID in ${sourcePath}: ${value ?? ''}`);
+  }
+  return String(playerId);
+}
 
-  for (const folder of folders) {
-    const seasonKey = getSeasonKey(folder);
-    if (!seasonKey) continue;
+function registerPlayer(
+  playerId: string,
+  name: string,
+  position: string,
+  team: string,
+  isGoalie: boolean,
+): PlayerAggregate {
+  const cleanName = name.trim();
+  if (!cleanName) throw new Error(`Missing MoneyPuck player name for NHL player ID ${playerId}`);
+  const normalizedPosition = normalizePosition(position);
+  const existing = db[playerId];
+  if (existing && existing.isGoalie !== isGoalie) {
+    throw new Error(`NHL player ID ${playerId} appears as both skater and goalie`);
+  }
+  const player = existing ?? {
+    playerId: Number(playerId),
+    name: cleanName,
+    position,
+    isGoalie,
+    aliases: new Set<string>(),
+    positions: new Set<string>(),
+    teams: new Set<string>(),
+    skaterSeasons: {},
+    goalieSeasons: {},
+  };
+  player.aliases.add(exactNameKey(cleanName));
+  if (normalizedPosition) player.positions.add(normalizedPosition);
+  for (const teamId of sourceTeams(team)) {
+    if (/^[A-Z]{2,3}$/.test(teamId)) player.teams.add(teamId);
+  }
+  db[playerId] = player;
+  return player;
+}
 
-    const seasonDir = path.join(rootDir, folder);
-    console.log(`Processing season: ${folder} (weight ${SEASON_WEIGHTS[seasonKey]})...`);
+type PreservedRuntimeValues = Partial<Record<
+  typeof PRESERVED_RUNTIME_FIELDS[number],
+  number
+>>;
 
-    // ── Skaters ──────────────────────────────────────────────────
-    const skatersPath = findCsv(seasonDir, 'skaters');
-    if (skatersPath) {
-      const data = fs.readFileSync(skatersPath, 'utf8').split('\n');
-      const headers = parseCSVLine(data[0]);
+function preservedRuntimeValues(): {
+  byPlayerId: Map<string, PreservedRuntimeValues>;
+  ambiguousLegacyKeys: number;
+} {
+  const artifactPath = resolveRepositoryPath(SOURCE_MANIFEST.runtimeArtifact.path);
+  const parsed = JSON.parse(fs.readFileSync(artifactPath, 'utf8')) as unknown;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Runtime baseline artifact must be an object');
+  }
 
-      const idx = (name: string) => headers.indexOf(name);
-      const idxId = idx('playerId');
-      const idxName = idx('name');
-      const idxPos = idx('position');
-      const idxSit = idx('situation');
-      const idxGP = idx('games_played');
-      const idxIce = idx('icetime');
-      const idxPts = idx('I_F_points');
-      const idxGameScore = idx('gameScore');
-      const idxOnXgPct = idx('onIce_xGoalsPercentage');
-      const idxOffXgPct = idx('offIce_xGoalsPercentage');
-
-      // Pass 1: collect per-situation rows keyed by playerId
-      const rows: Record<string, Record<string, string[]>> = {};
-      for (let i = 1; i < data.length; i++) {
-        if (!data[i].trim()) continue;
-        const row = parseCSVLine(data[i]);
-        const id = row[idxId];
-        const sit = row[idxSit];
-        if (!rows[id]) rows[id] = {};
-        rows[id][sit] = row;
-      }
-
-      for (const [id, sits] of Object.entries(rows)) {
-        const all = sits['all'];
-        if (!all) continue;
-
-        const games = num(all[idxGP]);
-        if (games < MIN_GAMES_SKATER) continue;
-
-        const name = all[idxName];
-        if (!db[id]) {
-          db[id] = { name, position: all[idxPos], isGoalie: false, skaterSeasons: {}, goalieSeasons: {} };
-        }
-
-        const es = sits['5on5'];
-        const pp = sits['5on4'];
-        const pk = sits['4on5'];
-
-        // 5on5 is the purest defensive/impact signal; fall back to 'all' if missing
-        const onXg  = es ? num(es[idxOnXgPct])  : num(all[idxOnXgPct]);
-        const offXg = es ? num(es[idxOffXgPct]) : num(all[idxOffXgPct]);
-        const xgRel = onXg - offXg;
-
-        // DPS proxy — same scale as before (xgPct * 5 * games/82) so the engine's
-        // baselineDpsProxy blend weights stay valid, now sourced from 5on5
-        const dpsProxy = (onXg * 5) * (games / 82);
-
-        const totalIce = num(all[idxIce]);
-        const pkIce = pk ? num(pk[idxIce]) : 0;
-
-        db[id].skaterSeasons[seasonKey] = {
-          gamesPlayed: games,
-          points: num(all[idxPts]),
-          gameScore: num(all[idxGameScore]),
-          xgRel,
-          dpsProxy,
-          ppPoints: pp ? num(pp[idxPts]) : 0,
-          pkIceShare: totalIce > 0 ? pkIce / totalIce : 0,
-        };
-      }
-      console.log(`  skaters: ${Object.keys(rows).length} players in ${path.basename(skatersPath)}`);
-    } else {
-      console.warn(`  ⚠ no skaters CSV found in ${folder}`);
-    }
-
-    // ── Goalies ──────────────────────────────────────────────────
-    const goaliesPath = findCsv(seasonDir, 'goalies');
-    if (goaliesPath) {
-      const data = fs.readFileSync(goaliesPath, 'utf8').split('\n');
-      const headers = parseCSVLine(data[0]);
-
-      const idxId = headers.indexOf('playerId');
-      const idxName = headers.indexOf('name');
-      const idxSit = headers.indexOf('situation');
-      const idxGP = headers.indexOf('games_played');
-      const idxGoals = headers.indexOf('goals');
-      const idxXGoals = headers.indexOf('xGoals');
-
-      let count = 0;
-      for (let i = 1; i < data.length; i++) {
-        if (!data[i].trim()) continue;
-        const row = parseCSVLine(data[i]);
-        if (row[idxSit] !== 'all') continue;
-
-        const games = num(row[idxGP]);
-        if (games < MIN_GAMES_GOALIE) continue;
-
-        const id = row[idxId];
-        const name = row[idxName];
-        if (!db[id]) {
-          db[id] = { name, position: "G", isGoalie: true, skaterSeasons: {}, goalieSeasons: {} };
-        }
-        db[id].isGoalie = true;
-
-        // GSAX = expected goals against minus actual goals against
-        db[id].goalieSeasons[seasonKey] = {
-          gamesPlayed: games,
-          gsax: num(row[idxXGoals]) - num(row[idxGoals]),
-        };
-        count++;
-      }
-      console.log(`  goalies: ${count} qualifying in ${path.basename(goaliesPath)}`);
-    } else {
-      console.warn(`  ⚠ no goalies CSV found in ${folder}`);
+  const idsByLegacyName = new Map<string, Set<string>>();
+  for (const [playerId, player] of Object.entries(db)) {
+    for (const alias of player.aliases) {
+      const key = legacyNameKey(alias);
+      const ids = idsByLegacyName.get(key) ?? new Set<string>();
+      ids.add(playerId);
+      idsByLegacyName.set(key, ids);
     }
   }
+
+  const byPlayerId = new Map<string, PreservedRuntimeValues>();
+  let ambiguousLegacyKeys = 0;
+  for (const [artifactKey, value] of Object.entries(parsed as Record<string, unknown>)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const record = value as Record<string, unknown>;
+    const preserved = Object.fromEntries(PRESERVED_RUNTIME_FIELDS.flatMap((field) => {
+      const fieldValue = record[field];
+      return typeof fieldValue === 'number' && Number.isFinite(fieldValue)
+        ? [[field, fieldValue]]
+        : [];
+    })) as PreservedRuntimeValues;
+    if (Object.keys(preserved).length === 0) continue;
+
+    const directKey = /^\d+$/.test(artifactKey) && db[artifactKey]
+      ? artifactKey
+      : null;
+    const embeddedId = typeof record.playerId === 'number'
+      && Number.isSafeInteger(record.playerId)
+      && record.playerId > 0
+      && db[String(record.playerId)]
+      ? String(record.playerId)
+      : null;
+    const legacyKeys = new Set([legacyNameKey(artifactKey)]);
+    if (typeof record.name === 'string') legacyKeys.add(legacyNameKey(record.name));
+    const candidates = new Set<string>();
+    for (const key of legacyKeys) {
+      for (const playerId of idsByLegacyName.get(key) ?? []) candidates.add(playerId);
+    }
+    const playerId = directKey ?? embeddedId
+      ?? (candidates.size === 1 ? [...candidates][0] : null);
+    if (!playerId) {
+      if (candidates.size > 1) {
+        ambiguousLegacyKeys++;
+        continue;
+      }
+      throw new Error(`Unable to preserve runtime enrichment for baseline key ${artifactKey}`);
+    }
+    byPlayerId.set(playerId, {
+      ...(byPlayerId.get(playerId) ?? {}),
+      ...preserved,
+    });
+  }
+  return { byPlayerId, ambiguousLegacyKeys };
+}
+
+async function processMoneypuckData() {
+  validateSourceManifest();
+  for (const playerId of Object.keys(db)) delete db[playerId];
+
+  for (const season of [...SOURCE_MANIFEST.moneyPuckSeasons]
+    .sort((a, b) => a.seasonKey.localeCompare(b.seasonKey))) {
+    const { seasonKey, seasonLabel } = season;
+    console.log(`Processing season: ${seasonLabel} (weight ${SEASON_WEIGHTS[seasonKey]})...`);
+
+    // ── Skaters ──────────────────────────────────────────────────
+    const skaterData = readManifestSource(season.skaters).split('\n');
+    const skaterHeaders = parseCSVLine(skaterData[0]);
+
+    const skaterColumn = (name: string) =>
+      requiredColumn(skaterHeaders, name, season.skaters.path);
+    const idxId = skaterColumn('playerId');
+    const idxName = skaterColumn('name');
+    const idxTeam = skaterColumn('team');
+    const idxPos = skaterColumn('position');
+    const idxSit = skaterColumn('situation');
+    const idxGP = skaterColumn('games_played');
+    const idxIce = skaterColumn('icetime');
+    const idxPts = skaterColumn('I_F_points');
+    const idxGameScore = skaterColumn('gameScore');
+    const idxOnXgPct = skaterColumn('onIce_xGoalsPercentage');
+    const idxOffXgPct = skaterColumn('offIce_xGoalsPercentage');
+
+    // Pass 1: collect per-situation rows keyed by NHL player ID.
+    const rows: Record<string, Record<string, string[]>> = {};
+    for (let index = 1; index < skaterData.length; index++) {
+      if (!skaterData[index].trim()) continue;
+      const row = parseCSVLine(skaterData[index]);
+      const playerId = requiredNhlPlayerId(row[idxId], season.skaters.path);
+      const situation = row[idxSit];
+      if (!rows[playerId]) rows[playerId] = {};
+      if (rows[playerId][situation]) {
+        throw new Error(
+          `Duplicate MoneyPuck situation ${situation} for NHL player ID ${playerId} in ${season.skaters.path}`,
+        );
+      }
+      rows[playerId][situation] = row;
+    }
+
+    for (const [playerId, situations] of Object.entries(rows)) {
+      const all = situations.all;
+      if (!all) continue;
+
+      const games = num(all[idxGP]);
+      if (games < MIN_GAMES_SKATER) continue;
+
+      const player = registerPlayer(
+        playerId,
+        all[idxName],
+        all[idxPos],
+        all[idxTeam],
+        false,
+      );
+
+      const es = situations['5on5'];
+      const pp = situations['5on4'];
+      const pk = situations['4on5'];
+
+      // 5on5 is the purest defensive/impact signal; fall back to 'all' if missing.
+      const onXg  = es ? num(es[idxOnXgPct])  : num(all[idxOnXgPct]);
+      const offXg = es ? num(es[idxOffXgPct]) : num(all[idxOffXgPct]);
+      const xgRel = onXg - offXg;
+
+      // DPS proxy — same scale as before (xgPct * 5 * games/82) so the engine's
+      // baselineDpsProxy blend weights stay valid, now sourced from 5on5.
+      const dpsProxy = (onXg * 5) * (games / 82);
+
+      const totalIce = num(all[idxIce]);
+      const pkIce = pk ? num(pk[idxIce]) : 0;
+
+      player.skaterSeasons[seasonKey] = {
+        gamesPlayed: games,
+        points: num(all[idxPts]),
+        gameScore: num(all[idxGameScore]),
+        xgRel,
+        dpsProxy,
+        ppPoints: pp ? num(pp[idxPts]) : 0,
+        pkIceShare: totalIce > 0 ? pkIce / totalIce : 0,
+      };
+    }
+    console.log(`  skaters: ${Object.keys(rows).length} players in ${path.basename(season.skaters.path)}`);
+
+    // ── Goalies ──────────────────────────────────────────────────
+    const goalieData = readManifestSource(season.goalies).split('\n');
+    const goalieHeaders = parseCSVLine(goalieData[0]);
+    const goalieColumn = (name: string) =>
+      requiredColumn(goalieHeaders, name, season.goalies.path);
+    const goalieId = goalieColumn('playerId');
+    const goalieName = goalieColumn('name');
+    const goalieTeam = goalieColumn('team');
+    const goaliePosition = goalieColumn('position');
+    const goalieSituation = goalieColumn('situation');
+    const goalieGames = goalieColumn('games_played');
+    const goalieGoals = goalieColumn('goals');
+    const goalieExpectedGoals = goalieColumn('xGoals');
+
+    let goalieCount = 0;
+    for (let index = 1; index < goalieData.length; index++) {
+      if (!goalieData[index].trim()) continue;
+      const row = parseCSVLine(goalieData[index]);
+      if (row[goalieSituation] !== 'all') continue;
+
+      const games = num(row[goalieGames]);
+      if (games < MIN_GAMES_GOALIE) continue;
+
+      const playerId = requiredNhlPlayerId(row[goalieId], season.goalies.path);
+      const player = registerPlayer(
+        playerId,
+        row[goalieName],
+        row[goaliePosition],
+        row[goalieTeam],
+        true,
+      );
+      player.goalieSeasons[seasonKey] = {
+        gamesPlayed: games,
+        gsax: num(row[goalieExpectedGoals]) - num(row[goalieGoals]),
+      };
+      goalieCount++;
+    }
+    console.log(`  goalies: ${goalieCount} qualifying in ${path.basename(season.goalies.path)}`);
+  }
+
+  const preserved = preservedRuntimeValues();
 
   // ── Aggregate with season weights ──────────────────────────────
   const outputBaselines: Record<string, any> = {};
 
-  for (const player of Object.values(db)) {
+  for (const [playerId, player] of Object.entries(db)
+    .sort(([a], [b]) => Number(a) - Number(b))) {
     let totalWeight = 0;
     let aggPtsPace = 0, aggGameScore = 0, aggDpsProxy = 0;
     let aggXgRel = 0, aggPpPace = 0, aggPkShare = 0;
@@ -433,9 +717,9 @@ async function processMoneypuckData() {
     if (totalWeight <= 0) continue;
 
     // Normalize by accumulated weight so partial-history players (rookies,
-    // returnees) are restored to a full-strength baseline
-    const key = player.name.toLowerCase().replace(/[^a-z]/g, '');
-    outputBaselines[key] = {
+    // returnees) are restored to a full-strength baseline.
+    outputBaselines[playerId] = {
+      playerId: player.playerId,
       name: player.name,
       baselinePtsPace:   round2(aggPtsPace / totalWeight),
       baselineGameScore: round2(aggGameScore / totalWeight),
@@ -445,64 +729,72 @@ async function processMoneypuckData() {
       ppPtsPace82:       round2(aggPpPace / totalWeight),
       pkTimeShare:       round3(aggPkShare / totalWeight),
       totalSeasonsWeighted: round2(totalWeight),
+      ...(preserved.byPlayerId.get(playerId) ?? {}),
     };
   }
 
   // ── NST enrichment (OtherData/) ────────────────────────────────
-  const nstDir = path.join(process.cwd(), 'OtherData');
+  console.log(`\nProcessing OtherData (NST)...`);
+  const identityDiagnostics: NstIdentityDiagnostics = {
+    unmatchedSkaters: 0,
+    unmatchedPairings: 0,
+  };
+  const current = loadNstBucket(
+    SOURCE_MANIFEST.naturalStatTrickBuckets.current,
+    identityDiagnostics,
+  );
+  const prior = loadNstBucket(
+    SOURCE_MANIFEST.naturalStatTrickBuckets.prior,
+    identityDiagnostics,
+  );
+  console.log(`  current: ${Object.keys(current.skaters).length} skaters, ${current.pairings.length} pairings`);
+  console.log(`  prior:   ${Object.keys(prior.skaters).length} skaters, ${prior.pairings.length} pairings`);
+
+  const pairCurrent = computePairingMetrics(current.pairings);
+  const pairPrior   = computePairingMetrics(prior.pairings);
+  const nstNameIndex = playerIdsByLegacyName();
   let enriched = 0, pairingCount = 0;
-  if (fs.existsSync(nstDir)) {
-    console.log(`\nProcessing OtherData (NST)...`);
-    const current = loadNstBucket(nstDir, '2025;26');
-    const prior   = loadNstBucket(nstDir, '2022;23;24;25');
-    console.log(`  current: ${Object.keys(current.skaters).length} skaters, ${Object.keys(current.goalies).length} goalies, ${current.pairings.length} pairings`);
-    console.log(`  prior:   ${Object.keys(prior.skaters).length} skaters, ${Object.keys(prior.goalies).length} goalies, ${prior.pairings.length} pairings`);
+  for (const [playerId, entry] of Object.entries(outputBaselines)) {
+    const sourceKey = nstLookupKeyForPlayer(playerId, nstNameIndex);
+    const sk = blendFields(current.skaters[sourceKey], prior.skaters[sourceKey]);
+    const pr = blendFields(pairCurrent[sourceKey], pairPrior[sourceKey]);
 
-    const pairCurrent = computePairingMetrics(current.pairings);
-    const pairPrior   = computePairingMetrics(prior.pairings);
-
-    for (const [key, entry] of Object.entries(outputBaselines)) {
-      const sk = blendFields(current.skaters[key], prior.skaters[key]);
-      const gl = blendFields(current.goalies[key], prior.goalies[key]);
-      const oi = blendFields(current.onIce[key],   prior.onIce[key]);
-      const pr = blendFields(pairCurrent[key],     pairPrior[key]);
-
-      let touched = false;
-      if (sk) {
-        entry.baselineIxg82    = round2(sk.ixg82);
-        entry.baselineHits82   = round2(sk.hits82);
-        entry.baselineBlocks82 = round2(sk.blocks82);
-        touched = true;
-      }
-      if (oi && oi.esXgfPct != null) {
-        entry.baselineEsXgfPct = round2(oi.esXgfPct);
-        touched = true;
-      }
-      if (pr) {
-        entry.pairXgfPct      = round2(pr.pairXgfPct);
-        entry.pairDriverScore = round2(pr.driverScore);
-        pairingCount++;
-        touched = true;
-      }
-      if (gl) {
-        if (gl.hdsvPct != null) entry.baselineHdsvPct = round3(gl.hdsvPct);
-        entry.baselineGsaaPerGame = round3(gl.gsaaPerGame);
-        touched = true;
-      }
-      if (touched) enriched++;
+    let touched = false;
+    if (sk) {
+      entry.baselineIxg82    = round2(sk.ixg82);
+      entry.baselineHits82   = round2(sk.hits82);
+      entry.baselineBlocks82 = round2(sk.blocks82);
+      touched = true;
     }
-  } else {
-    console.warn(`\n⚠ OtherData/ not found — skipping NST enrichment`);
+    if (pr) {
+      entry.pairXgfPct      = round2(pr.pairXgfPct);
+      entry.pairDriverScore = round2(pr.driverScore);
+      pairingCount++;
+      touched = true;
+    }
+    if (touched) enriched++;
   }
 
-  const outputPath = path.join(process.cwd(), 'app', 'data', 'moneypuck_baselines.json');
-  fs.writeFileSync(outputPath, JSON.stringify(outputBaselines, null, 2));
+  const outputIds = Object.keys(outputBaselines);
+  if (
+    outputIds.length !== Object.keys(db).length
+    || outputIds.some((playerId) =>
+      !/^\d+$/.test(playerId)
+      || outputBaselines[playerId].playerId !== Number(playerId))
+  ) {
+    throw new Error('Runtime baseline artifact failed NHL player ID integrity checks');
+  }
+
+  const outputPath = resolveRepositoryPath(SOURCE_MANIFEST.runtimeArtifact.path);
+  fs.writeFileSync(outputPath, `${JSON.stringify(outputBaselines, null, 2)}\n`);
 
   const goalieCount = Object.values(db).filter(p => p.isGoalie).length;
   const multiSeason = Object.values(outputBaselines).filter((b: any) => b.totalSeasonsWeighted > 0.5).length;
   console.log(`\n✓ Wrote ${Object.keys(outputBaselines).length} baselines to ${outputPath}`);
   console.log(`  ${goalieCount} goalies | ${multiSeason} players with multi-season history (weight > 0.5)`);
   console.log(`  ${enriched} entries enriched with NST data | ${pairingCount} D-men with pairing metrics`);
+  console.log(`  ${identityDiagnostics.unmatchedSkaters} unmatched NST skater rows | ${identityDiagnostics.unmatchedPairings} unmatched pairing rows`);
+  console.log(`  ${preserved.byPlayerId.size} ID-keyed legacy enrichment records preserved | ${preserved.ambiguousLegacyKeys} ambiguous name keys rejected`);
 }
 
 // Field-wise 60/40 blend of two bucket records (numeric fields only)
@@ -519,4 +811,7 @@ function blendFields<T extends Record<string, any>>(cur: T | undefined, pri: T |
 function round2(n: number) { return Math.round(n * 100) / 100; }
 function round3(n: number) { return Math.round(n * 1000) / 1000; }
 
-processMoneypuckData().catch(console.error);
+processMoneypuckData().catch((error) => {
+  console.error(error instanceof Error ? error.stack ?? error.message : error);
+  process.exitCode = 1;
+});

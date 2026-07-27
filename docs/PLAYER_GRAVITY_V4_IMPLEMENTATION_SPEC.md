@@ -1116,6 +1116,7 @@ docs/analytics/GRAVITY_V4_VALIDATION.md
 - [ ] The card says `MODELLED FIELD`.
 - [ ] Season, situation, reliability, and coverage are visible.
 - [ ] Methodology and glossary no longer make unsupported tracking claims.
+- [x] Runtime baseline inputs are keyed by stable NHL player IDs without a name fallback.
 - [ ] Existing tests are updated and the full relevant suite passes.
 
 ### Release B infrastructure acceptance criteria

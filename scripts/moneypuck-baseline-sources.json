@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "moneypuck-baseline-source-manifest-v1",
+  "moneyPuckSeasons": [
+    {
+      "seasonKey": "2022",
+      "seasonLabel": "2022_23",
+      "skaters": {
+        "path": "MoneyPuckData/2022_23/skaters(3).csv",
+        "sha256": "59a1a409d17ba24018a6b7063299f222b55ac9068221c083b4d5e24ee7bf14c3"
+      },
+      "goalies": {
+        "path": "MoneyPuckData/2022_23/goalies(3).csv",
+        "sha256": "a7f712fd7f50229b5f2ffa607fb0cbb8016b8e84bee034b44399eeca16d2d5a3"
+      }
+    },
+    {
+      "seasonKey": "2023",
+      "seasonLabel": "2023_24",
+      "skaters": {
+        "path": "MoneyPuckData/2023_24/skaters(2).csv",
+        "sha256": "ee8d191d3633064c1f4f76d64c76e04f8a8e555528a4b49caa6d0ecb8bac9299"
+      },
+      "goalies": {
+        "path": "MoneyPuckData/2023_24/goalies(2).csv",
+        "sha256": "9b9ca9dad5f2b4fc9ebb65f3fea09915335fb1bbe3868366f61a7f3075389645"
+      }
+    },
+    {
+      "seasonKey": "2024",
+      "seasonLabel": "2024_25",
+      "skaters": {
+        "path": "MoneyPuckData/2024_25/skaters(1).csv",
+        "sha256": "467260ae6b411621fc3e736ed005588f75dd4470610416626584f2878a463fd4"
+      },
+      "goalies": {
+        "path": "MoneyPuckData/2024_25/goalies(1).csv",
+        "sha256": "a718782ffbeb8d0d05eb6921f4cbea300dbcaa86be8e068930e71be4a22a9d8d"
+      }
+    },
+    {
+      "seasonKey": "2025",
+      "seasonLabel": "2025_26",
+      "skaters": {
+        "path": "MoneyPuckData/2025_26/skaters.csv",
+        "sha256": "9a7e1f1a2f6bc8bc2bf10c5ba32947b47c4b26d5397287e4b30e9d662c4966e4"
+      },
+      "goalies": {
+        "path": "MoneyPuckData/2025_26/goalies.csv",
+        "sha256": "2fe2a2dbf25822cf1650e2ad00388c94ef303681fbfd8a8c7fdcb065212cd2fc"
+      }
+    }
+  ],
+  "naturalStatTrickBuckets": {
+    "current": {
+      "skaters": {
+        "path": "OtherData/2025;26_skater_totals_all.csv",
+        "sha256": "ecbe0fd77dc64a9e90c4484776c85076432c230e2f58e2182d6f0769683acd1e"
+      },
+      "pairings": {
+        "path": "OtherData/2025;26_defensive_pairings_all.csv",
+        "sha256": "9802693052a8c11d4462529ebdced4c8d6ae77df7793d0a142e761e019756825"
+      }
+    },
+    "prior": {
+      "skaters": {
+        "path": "OtherData/2022;23;24;25_skater_totals_all.csv",
+        "sha256": "1f0c653a9179cbde53ee58b0ce8cb2dc06e5485c82ee68772d72c8fd5c6db4a0"
+      },
+      "pairings": {
+        "path": "OtherData/2022;23;24;25_defensive_pairings_all.csv",
+        "sha256": "c8c75d2eba4662d2aee9610f90faf4eff47ae2b24baf000fddc0f9efbbb3f54a"
+      }
+    }
+  },
+  "runtimeArtifact": {
+    "path": "app/data/moneypuck_baselines.json",
+    "preserveFields": [
+      "baselineEsXgfPct",
+      "baselineHdsvPct",
+      "baselineGsaaPerGame"
+    ]
+  }
+}
