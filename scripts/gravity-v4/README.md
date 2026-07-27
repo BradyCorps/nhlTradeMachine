@@ -70,27 +70,44 @@ Responses cache to `.gravity-v4-cache/`; the report writes to
 `data/gravity-v4/`. **Both are gitignored** — raw responses and player-level
 derived data never enter the repository.
 
-### Empty 200s — the failure mode to know about
+### Shift charts do not exist for the whole season
 
-Under sustained load these endpoints do not answer 429. They answer **HTTP 200
-with an empty body**. On a 1312-game run that produced contiguous blocks of
-25–100 games with no shift rows at all, cached as if they were real, and the run
-still reported `1312/1312`.
+**Measured 2026-07-27, 2025-26 season: 807 of 1312 games have a shift chart.
+501 do not.** For those, `shiftcharts` answers `HTTP 200` with
+`{"data":[],"total":0}` — 21 bytes in under 100ms — while the same game's
+play-by-play returns normally. Re-probed live with the cache bypassed: empty
+games are still empty, populated games still return 750–856 rows. It is an
+absence at the source, not throttling, and **not retryable**.
 
-Both scripts therefore content-validate every payload:
+The gaps are nine contiguous blocks of game ids (median 50 games, largest 111).
+Game ids run in schedule order, so those are date ranges — roughly nine windows
+of one to two weeks. Every club plays across every window, which is why the
+per-team coverage spread stays narrow; the run measures it rather than assuming
+it.
 
-- a shift chart must have rows; a play-by-play must have plays, rosterSpots and
-  team ids;
-- an invalid payload is **never cached** — it is backed off and retried like a
-  429;
+Diagnose with the probe, which bypasses the cache entirely:
+
+```bash
+npx tsx scripts/gravity-v4/probe.ts               # audit cache, map the gap
+npx tsx scripts/gravity-v4/probe.ts --compare 4   # empty vs populated, live
+npx tsx scripts/gravity-v4/probe.ts 2025020061    # specific game ids
+```
+
+`--compare` is the one that matters: probing only the failures cannot tell
+"these games have no data" from "the endpoint is down right now".
+
+Separately, payloads *are* content-validated on every fetch, because an empty
+200 is also what throttling would look like:
+
+- an invalid payload is **never cached** — it is backed off and retried;
 - a *cached* payload that fails validation is **deleted and refetched**, so a
-  cache poisoned by an earlier throttled run heals itself on the next online run;
-- a game that reconstructs to zero stints is a **failure**, not a quiet zero, and
-  failures are grouped by cause so hundreds of identical ones read as one
+  cache poisoned by an earlier bad run heals itself;
+- a game with no shift chart is recorded as such (expected); a game that has one
+  but reconstructs to zero stints is a **failure**;
+- failures are grouped by cause so hundreds of identical ones read as one
   problem.
 
 `--gap MS` paces api-web; `--shiftgap MS` paces api.nhle.com (default 400).
-Raise both if the failure list is dominated by empty payloads.
 
 ### What a stint is
 
@@ -107,7 +124,9 @@ The spike prints PASS/FAIL and refuses to bless a backfill unless:
 
 | Gate | Why |
 | --- | --- |
-| games reconstructed ≥ 95% | endpoint reliability |
+| games reconstructed ≥ 95% | endpoint reliability — measured against games that **have** a shift chart, since ~38% of the schedule has none |
+| every team ≥ 30 covered games | a season fit needs enough per club, not every game |
+| no team below 70% of median coverage | whole-window gaps hit all clubs alike; a gap concentrated on a few teams would bias every player effect fitted from it |
 | **zero tiling gap** | stints must exactly cover the shift span, or ice time is being dropped |
 | impossible skater counts ≤ 0.1% of stints | 3–6 skaters a side; a handful survive too-many-men and overlapping-shift quirks, a systematic failure would not |
 | **strength agreement (boundary-tolerant) ≥ 99.5%** | derived on-ice counts vs the game's own `situationCode` — the two come from *different endpoints*, so this is genuine corroboration |

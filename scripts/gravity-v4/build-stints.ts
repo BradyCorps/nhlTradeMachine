@@ -96,18 +96,53 @@ async function main() {
   const emits: EmitReport[] = [];
   const failures: { gameId: number; reason: string }[] = [];
   const perGame: { gameId: number; stints: number; shiftRows: number; unknownRows: number }[] = [];
+  /** Games the NHL simply has no shift chart for — expected, not a failure. */
+  const noShiftChart: number[] = [];
+  /** teamAbbrev -> { played, covered } across every attempted game. */
+  const teamCoverage = new Map<string, { played: number; covered: number }>();
   let rowsWritten = 0, rowsSkipped = 0, totalEvents = 0;
   const startedAt = Date.now();
 
+  const noteTeams = (abbrevs: (string | undefined)[], covered: boolean) => {
+    for (const a of abbrevs) {
+      if (!a) continue;
+      const e = teamCoverage.get(a) ?? { played: 0, covered: 0 };
+      e.played++;
+      if (covered) e.covered++;
+      teamCoverage.set(a, e);
+    }
+  };
+
   for (const [i, gameId] of gameIds.entries()) {
     try {
-      // Sequential, not concurrent — two simultaneous requests per game is what
-      // trips api-web's rate limiter. Both payloads are content-validated, so a
-      // throttled empty 200 is retried rather than cached as a silent hole.
-      const shiftPayload = await fetchCached(`shifts-${gameId}`, shiftsUrl(gameId), validShiftPayload);
+      // Play-by-play FIRST. It is available for every game, so fetching it up
+      // front means a game with no shift chart can still be attributed to the
+      // two teams that played it — without that, missing games are invisible to
+      // the per-team coverage check and bias cannot be measured.
       const pbp = await fetchCached(`pbp-${gameId}`, pbpUrl(gameId), validPbpPayload);
+      const teamAbbrevs = [pbp?.homeTeam?.abbrev, pbp?.awayTeam?.abbrev];
+
+      // Sequential, not concurrent — two simultaneous requests per game is what
+      // trips api-web's rate limiter.
+      let shiftPayload: any;
+      try {
+        shiftPayload = await fetchCached(`shifts-${gameId}`, shiftsUrl(gameId), validShiftPayload);
+      } catch (e) {
+        const reason = e instanceof Error ? e.message : String(e);
+        // The endpoint answers 200 with {"data":[],"total":0} for whole blocks
+        // of the schedule. That is an absence in the source, not an error here,
+        // and retrying it forever only makes the run look broken.
+        if (/empty shiftcharts payload/.test(reason)) {
+          noShiftChart.push(gameId);
+          noteTeams(teamAbbrevs, false);
+          continue;
+        }
+        throw e;
+      }
+
       const rawRows: RawShiftRow[] = shiftPayload?.data ?? [];
       const { roster, homeTeamId, awayTeamId } = rosterFromPbp(pbp);
+      noteTeams(teamAbbrevs, true);
 
       const known = new Set(roster.map(r => r.playerId));
       const { shifts, report } = parseShifts(rawRows, known);
@@ -144,12 +179,13 @@ async function main() {
       // run full of failing games look frozen rather than merely slow.
       console.log(`  ! ${gameId}  ${reason.replace(/ for https?:\/\/\S+/, "")}`);
     }
-    if ((i + 1) % 10 === 0 || i + 1 === gameIds.length) {
+    if ((i + 1) % 50 === 0 || i + 1 === gameIds.length) {
       const elapsed = (Date.now() - startedAt) / 1000;
       const rate = (i + 1) / Math.max(1, elapsed);
       const etaMin = (gameIds.length - (i + 1)) / Math.max(0.001, rate) / 60;
       console.log(`  ${i + 1}/${gameIds.length} games · ${rowsWritten} rows · ` +
-        `${failures.length} failed · ETA ${etaMin.toFixed(0)}m`);
+        `${noShiftChart.length} no shift chart · ${failures.length} failed · ` +
+        `ETA ${etaMin.toFixed(0)}m`);
     }
   }
 
@@ -172,8 +208,40 @@ async function main() {
 
   const unattributed = sumE(r => r.unattributedEvents);
 
+  // ── Source coverage ───────────────────────────────────────────
+  // The NHL has no shift chart for whole blocks of the schedule, so the
+  // question is not "did I get every game?" but "is what I got representative?".
+  // Whole-calendar-window gaps hit all 32 clubs alike; a gap concentrated on a
+  // few teams would bias every player effect fitted from it.
+  const teamRows = [...teamCoverage.entries()]
+    .map(([abbrev, e]) => ({ abbrev, ...e, pct: (100 * e.covered) / Math.max(1, e.played) }))
+    .sort((a, b) => a.pct - b.pct);
+  const teamPcts = teamRows.map(t => t.pct).sort((a, b) => a - b);
+  const medianTeamPct = teamPcts.length
+    ? teamPcts[Math.floor(teamPcts.length / 2)] : 0;
+  const minTeam = teamRows[0];
+  const maxTeam = teamRows[teamRows.length - 1];
+  const minTeamGames = teamRows.length ? Math.min(...teamRows.map(t => t.covered)) : 0;
+
+  if (noShiftChart.length) {
+    console.log("\n── SOURCE COVERAGE ────────────────────────────────");
+    console.log(`games with no shift chart  ${noShiftChart.length}/${attempted}` +
+      `  (${pct(noShiftChart.length, attempted)?.toFixed(1)}%)`);
+    console.log(`  → the NHL returns 200 with {"data":[],"total":0} for these.`);
+    console.log(`    Not retryable; they are absent at the source.`);
+    console.log(`team coverage              median ${medianTeamPct.toFixed(1)}%` +
+      `  ·  worst ${minTeam?.abbrev} ${minTeam?.pct.toFixed(1)}% (${minTeam?.covered}/${minTeam?.played})` +
+      `  ·  best ${maxTeam?.abbrev} ${maxTeam?.pct.toFixed(1)}%`);
+    console.log(`  spread                   ${(maxTeam?.pct - minTeam?.pct).toFixed(1)} points across ${teamRows.length} teams`);
+    console.log("  five thinnest teams:");
+    for (const t of teamRows.slice(0, 5)) {
+      console.log(`    ${t.abbrev.padEnd(4)} ${String(t.covered).padStart(3)}/${String(t.played).padEnd(3)} ${t.pct.toFixed(1)}%`);
+    }
+  }
+
   console.log("\n── DATASET ────────────────────────────────────────");
-  console.log(`games emitted              ${ok}/${attempted}`);
+  console.log(`games emitted              ${ok}/${attempted - noShiftChart.length}` +
+    ` reconstructable  (${attempted} on the schedule)`);
   console.log(`stint rows written         ${rowsWritten}${rowsSkipped ? `  (${rowsSkipped} non-5v5 skipped)` : ""}`);
   console.log(`rows per emitted game      ${ok ? (rowsWritten / ok).toFixed(0) : "—"}`);
   console.log(`uncompressed size          ${(uncompressedBytes / 1e6).toFixed(1)} MB`);
@@ -210,10 +278,17 @@ async function main() {
   // ── Reconstruction gates (same bar the coverage spike sets) ────
   const tolerant = sumC(r => r.strengthAgreedBoundaryTolerant);
   const checked = sumC(r => r.strengthChecked);
+  const reconstructable = Math.max(1, attempted - noShiftChart.length);
   const gates = [
-    // "Emitted" means the game produced stints. Counting "no exception thrown"
-    // instead let ~500 empty games pass a 1312-game run as a clean 100%.
-    ["games emitted ≥95%", ok / Math.max(1, attempted) >= 0.95],
+    // "Emitted" means the game produced stints, measured against the games that
+    // HAVE a shift chart. Counting "no exception thrown" against the full
+    // schedule let ~500 sourceless games pass a 1312-game run as a clean 100%.
+    ["≥95% of games with a shift chart reconstructed", ok / reconstructable >= 0.95],
+    // Coverage is about representativeness, not completeness. A season-long fit
+    // does not need every game; it needs enough per team, evenly spread.
+    ["every team has ≥30 covered games", minTeamGames >= 30],
+    ["no team below 70% of the median team's coverage",
+      teamRows.length === 0 || minTeam.pct >= 0.7 * medianTeamPct],
     ["zero tiling gap", sumC(r => r.tilingGapSec) === 0],
     ["impossible skater counts ≤0.1% of stints",
       (100 * sumC(r => r.invalidSkaterCountStints)) / stintTotal <= 0.1],
@@ -268,6 +343,13 @@ async function main() {
     coverage: {
       gamesAttempted: attempted,
       gamesEmitted: ok,
+      // The sampling frame the fit is actually drawing from. Stage 2 should read
+      // this rather than assuming a full season.
+      gamesWithoutShiftChart: noShiftChart.length,
+      noShiftChartGameIds: noShiftChart,
+      coveredGameIds: perGame.map(g => g.gameId),
+      teamCoverage: teamRows,
+      medianTeamCoveragePct: medianTeamPct,
       shiftRows,
       duplicateRows: sumC(r => r.parse.duplicateRows),
       invalidRows: sumC(r => r.parse.invalidRows),
