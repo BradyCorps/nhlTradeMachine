@@ -372,6 +372,275 @@ export function buildCoverageReport(args: {
   };
 }
 
+// ── Stint emission (the fittable dataset) ───────────────────────
+//
+// The coverage spike answers "is the reconstruction trustworthy?". The emitter
+// answers "give me the rows to fit on". A stint row is one constant-lineup
+// interval plus everything the OZ/NZ/DZ models need to condition on: who was on
+// the ice, the strength state, the score, the zone the shift began in, and the
+// on-ice events that happened during it — each shot carrying its shooter id, so
+// the OZ target can exclude the focal player's own offense as the spec requires.
+
+/** Play-by-play event, projected to the fields the emitter consumes. */
+export interface PbpEvent {
+  period: number;
+  sec: number;
+  typeDescKey?: string;
+  situationCode?: string | null;
+  eventOwnerTeamId?: number | null;
+  shooterId?: number | null;
+  xCoord?: number | null;
+  yCoord?: number | null;
+  zoneCode?: string | null;
+  homeScore?: number | null;
+  awayScore?: number | null;
+}
+
+export type ZoneCode = "O" | "N" | "D";
+
+export interface StintShot {
+  /** Shooting team. */
+  teamId: number;
+  shooterId: number | null;
+  kind: "goal" | "shot-on-goal" | "missed-shot" | "blocked-shot";
+  sec: number;
+  xCoord: number | null;
+  yCoord: number | null;
+}
+
+export interface StintRow {
+  season: string;
+  gameId: number;
+  /** 0-based, ordered by period then start. Stable for a given game. */
+  stintIdx: number;
+  period: number;
+  startSec: number;
+  endSec: number;
+  durationSec: number;
+  /** Elapsed seconds from the opening faceoff — lets rows sort across periods. */
+  gameStartSec: number;
+  homeTeamId: number;
+  awayTeamId: number;
+  homeSkaters: number[];
+  awaySkaters: number[];
+  homeGoalie: number | null;
+  awayGoalie: number | null;
+  strength: string;
+  isEven5v5: boolean;
+  /** Score as it stood when the stint began. */
+  homeScore: number;
+  awayScore: number;
+  /** Zone the stint began in, from the HOME team's perspective. */
+  startZoneHome: ZoneCode | null;
+  startedOnFaceoff: boolean;
+  shots: StintShot[];
+  homeCorsi: number;
+  awayCorsi: number;
+  homeGoals: number;
+  awayGoals: number;
+}
+
+export interface EmitReport {
+  gameId: number;
+  rows: number;
+  /** Events that fell outside every stint — e.g. before the first shift row. */
+  unattributedEvents: number;
+  attributedEvents: number;
+  shotsAttributed: number;
+  shotsWithoutShooter: number;
+  /**
+   * situationCode agreement under each attribution rule, over the same events.
+   * `trailing` is the rule the emitter uses; `leading` is the naive half-open
+   * containment the coverage spike reports. Emitted so the choice is evidenced
+   * rather than asserted.
+   */
+  strengthChecked: number;
+  strengthAgreedTrailing: number;
+  strengthAgreedLeading: number;
+}
+
+const FACEOFF_LIKE = new Set(["faceoff", "period-start", "game-start"]);
+const SHOT_KIND: Record<string, StintShot["kind"]> = {
+  goal: "goal",
+  "shot-on-goal": "shot-on-goal",
+  "missed-shot": "missed-shot",
+  "blocked-shot": "blocked-shot",
+};
+
+/** Regulation periods run 20:00; overtime 5:00. */
+export function gameElapsedSec(period: number, sec: number): number {
+  return period <= 3 ? (period - 1) * 1200 + sec : 3600 + (period - 4) * 300 + sec;
+}
+
+/**
+ * Which lineup owns an event instant.
+ *
+ * An event that *causes* a stoppage — a goal, a shot, a hit — was played by the
+ * lineup that was on the ice up to that second, so it belongs to the stint
+ * ending there: the half-open interval (start, end]. An event that *resumes*
+ * play — a faceoff, a period start — belongs to the lineup taking the ice, so
+ * [start, end). Using one rule for both is exactly what makes a goal look like
+ * it was scored by the players who came over the boards after it.
+ */
+export function attributeEvent(
+  stints: Stint[], period: number, sec: number, mode: "leading" | "trailing",
+): Stint | null {
+  for (const s of stints) {
+    if (s.period !== period) continue;
+    if (mode === "leading" ? sec >= s.startSec && sec < s.endSec
+                           : sec > s.startSec && sec <= s.endSec) return s;
+  }
+  // The first instant of a period has no trailing stint; fall back to leading.
+  return mode === "trailing" ? attributeEvent(stints, period, sec, "leading") : null;
+}
+
+export const eventAttributionMode = (typeDescKey?: string): "leading" | "trailing" =>
+  typeDescKey && FACEOFF_LIKE.has(typeDescKey) ? "leading" : "trailing";
+
+/**
+ * Zone of an event from the HOME team's perspective.
+ *
+ * Derived from the play-by-play's own `zoneCode`, which is relative to the event
+ * owner, so it is flipped when the owner is the away team. Rink orientation is
+ * never assumed — it flips between periods and is not always present in the
+ * payload.
+ */
+export function zoneFromEventHomePerspective(
+  ev: Pick<PbpEvent, "zoneCode" | "eventOwnerTeamId">, homeTeamId: number,
+): ZoneCode | null {
+  const z = ev.zoneCode;
+  if (z !== "O" && z !== "N" && z !== "D") return null;
+  if (z === "N") return "N";
+  if (ev.eventOwnerTeamId == null) return null;
+  if (ev.eventOwnerTeamId === homeTeamId) return z;
+  return z === "O" ? "D" : "O";
+}
+
+/** Running score, keyed by game-elapsed second, from the goal events. */
+export function buildScoreTimeline(events: PbpEvent[]):
+  { at: number; homeScore: number; awayScore: number }[] {
+  return events
+    .filter(e => e.typeDescKey === "goal" && e.homeScore != null && e.awayScore != null)
+    .map(e => ({
+      at: gameElapsedSec(e.period, e.sec),
+      homeScore: e.homeScore as number,
+      awayScore: e.awayScore as number,
+    }))
+    .sort((a, b) => a.at - b.at);
+}
+
+export function scoreAt(
+  timeline: { at: number; homeScore: number; awayScore: number }[], gameSec: number,
+): { homeScore: number; awayScore: number } {
+  let homeScore = 0, awayScore = 0;
+  for (const g of timeline) {
+    if (g.at > gameSec) break;
+    homeScore = g.homeScore; awayScore = g.awayScore;
+  }
+  return { homeScore, awayScore };
+}
+
+/**
+ * Turn one game's stints + play-by-play into fittable rows.
+ *
+ * Deterministic for the same inputs: stints are ordered by period then start,
+ * skater ids are already sorted by `buildStints`, and shots keep play-by-play
+ * order within a stint.
+ */
+export function buildStintRows(args: {
+  season: string;
+  gameId: number;
+  homeTeamId: number;
+  awayTeamId: number;
+  stints: Stint[];
+  events: PbpEvent[];
+}): { rows: StintRow[]; report: EmitReport } {
+  const { season, gameId, homeTeamId, awayTeamId, stints, events } = args;
+
+  const ordered = [...stints].sort((a, b) =>
+    a.period - b.period || a.startSec - b.startSec || a.endSec - b.endSec);
+  const indexOf = new Map<Stint, number>();
+  ordered.forEach((s, i) => indexOf.set(s, i));
+
+  const timeline = buildScoreTimeline(events);
+  const rows: StintRow[] = ordered.map((s, i) => {
+    const gameStartSec = gameElapsedSec(s.period, s.startSec);
+    const { homeScore, awayScore } = scoreAt(timeline, gameStartSec);
+    return {
+      season, gameId, stintIdx: i,
+      period: s.period, startSec: s.startSec, endSec: s.endSec,
+      durationSec: s.durationSec, gameStartSec,
+      homeTeamId, awayTeamId,
+      homeSkaters: s.homeSkaters, awaySkaters: s.awaySkaters,
+      homeGoalie: s.homeGoalie, awayGoalie: s.awayGoalie,
+      strength: s.strength, isEven5v5: s.isEven5v5,
+      homeScore, awayScore,
+      startZoneHome: null, startedOnFaceoff: false,
+      shots: [], homeCorsi: 0, awayCorsi: 0, homeGoals: 0, awayGoals: 0,
+    };
+  });
+
+  const report: EmitReport = {
+    gameId, rows: rows.length,
+    unattributedEvents: 0, attributedEvents: 0,
+    shotsAttributed: 0, shotsWithoutShooter: 0,
+    strengthChecked: 0, strengthAgreedTrailing: 0, strengthAgreedLeading: 0,
+  };
+
+  for (const ev of events) {
+    const mode = eventAttributionMode(ev.typeDescKey);
+    const stint = attributeEvent(ordered, ev.period, ev.sec, mode);
+    if (!stint) { report.unattributedEvents++; continue; }
+    report.attributedEvents++;
+    const row = rows[indexOf.get(stint)!];
+
+    // Evidence for the attribution rule: how often does each rule's lineup
+    // reproduce the strength the play-by-play stamped on this very event?
+    const parsed = parseSituationCode(ev.situationCode);
+    if (parsed) {
+      const matches = (s: Stint | null) => !!s &&
+        s.homeSkaters.length === parsed.homeSkaters &&
+        s.awaySkaters.length === parsed.awaySkaters;
+      report.strengthChecked++;
+      if (matches(stint)) report.strengthAgreedTrailing++;
+      if (matches(attributeEvent(ordered, ev.period, ev.sec, "leading"))) {
+        report.strengthAgreedLeading++;
+      }
+    }
+
+    if (FACEOFF_LIKE.has(ev.typeDescKey ?? "") && ev.sec === stint.startSec) {
+      row.startedOnFaceoff = true;
+      row.startZoneHome = zoneFromEventHomePerspective(ev, homeTeamId) ?? row.startZoneHome;
+    }
+
+    const kind = SHOT_KIND[ev.typeDescKey ?? ""];
+    if (!kind || ev.eventOwnerTeamId == null) continue;
+    // A blocked shot is owned by the BLOCKING team in the NHL feed, so the
+    // attacking side is the other one. Every other shot event is owned by the
+    // shooting team.
+    const shootingTeamId = kind === "blocked-shot"
+      ? (ev.eventOwnerTeamId === homeTeamId ? awayTeamId : homeTeamId)
+      : ev.eventOwnerTeamId;
+    row.shots.push({
+      teamId: shootingTeamId,
+      shooterId: ev.shooterId ?? null,
+      kind, sec: ev.sec,
+      xCoord: ev.xCoord ?? null, yCoord: ev.yCoord ?? null,
+    });
+    report.shotsAttributed++;
+    if (ev.shooterId == null) report.shotsWithoutShooter++;
+    if (shootingTeamId === homeTeamId) {
+      row.homeCorsi++;
+      if (kind === "goal") row.homeGoals++;
+    } else {
+      row.awayCorsi++;
+      if (kind === "goal") row.awayGoals++;
+    }
+  }
+
+  return { rows, report };
+}
+
 // ── Forward-combination TOI (validation against an external line file) ──
 
 /**

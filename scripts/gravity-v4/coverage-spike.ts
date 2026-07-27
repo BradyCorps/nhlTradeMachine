@@ -17,11 +17,13 @@ import crypto from "crypto";
 import {
   parseShifts, buildStints, buildCoverageReport, forwardCombinationToi,
   parseLineLabel, validationNameKey, formatSeconds, parseClock,
-  type RawShiftRow, type RosterSpot, type CoverageReport, type PositionCode,
+  type RawShiftRow, type CoverageReport,
 } from "./core";
+import {
+  makeFetcher, collectGameIds, rosterFromPbp, eventsFromPbp, shiftsUrl, pbpUrl,
+} from "./nhl-source";
 
 const ROOT = process.cwd();
-const CACHE_DIR = path.join(ROOT, ".gravity-v4-cache");
 const OUT_DIR = path.join(ROOT, "data", "gravity-v4");
 
 const args = process.argv.slice(2);
@@ -38,123 +40,13 @@ const TEAM = flag("team");
 const LINES_CSV = flag("lines");
 
 const sha256 = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
-const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-// Per-host pacing. api-web.nhle.com rate-limits noticeably harder than
-// api.nhle.com, so each host gets its own floor between requests and a cooldown
-// that ratchets up when it answers 429.
-const HOST_GAP_MS: Record<string, number> = {
-  "api-web.nhle.com": Number(flag("gap", "450")),
-  "api.nhle.com": 250,
-};
-const lastHit: Record<string, number> = {};
-const hostCooldown: Record<string, number> = {};
-
-async function paceHost(host: string) {
-  const gap = (HOST_GAP_MS[host] ?? 300) + (hostCooldown[host] ?? 0);
-  const since = Date.now() - (lastHit[host] ?? 0);
-  if (since < gap) await wait(gap - since);
-  lastHit[host] = Date.now();
-}
-
-async function fetchCached(key: string, url: string): Promise<any> {
-  const safe = key.replace(/[^a-zA-Z0-9_.-]/g, "_");
-  const body = path.join(CACHE_DIR, `${safe}.json`);
-  if (fs.existsSync(body)) return JSON.parse(fs.readFileSync(body, "utf8"));
-  if (OFFLINE) throw new Error(`offline cache miss: ${key}`);
-
-  const host = new URL(url).host;
-  fs.mkdirSync(CACHE_DIR, { recursive: true });
-  let lastErr: unknown = null;
-
-  for (let attempt = 0; attempt < 6; attempt++) {
-    await paceHost(host);
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 20_000);
-      let res: Response;
-      try { res = await fetch(url, { signal: ctrl.signal }); } finally { clearTimeout(timer); }
-
-      if (res.status === 429) {
-        // Back off hard and slow this host down for the rest of the run.
-        hostCooldown[host] = Math.min((hostCooldown[host] ?? 0) + 250, 2000);
-        const retryAfter = Number(res.headers.get("retry-after"));
-        const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
-          ? retryAfter * 1000
-          : 2000 * 2 ** attempt;
-        if (attempt < 5) { await wait(waitMs); continue; }
-      }
-      if (res.status >= 500 && attempt < 5) { await wait(1000 * 2 ** attempt); continue; }
-      if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-
-      const text = await res.text();
-      fs.writeFileSync(body, text);
-      // A clean response lets the host relax again.
-      if (hostCooldown[host]) hostCooldown[host] = Math.max(0, hostCooldown[host] - 50);
-      return JSON.parse(text);
-    } catch (e) {
-      lastErr = e;
-      if (attempt < 5) await wait(1000 * 2 ** attempt);
-    }
-  }
-  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
-}
-
-const scheduleUrl = (date: string) => `https://api-web.nhle.com/v1/schedule/${date}`;
-const shiftsUrl = (gameId: number) =>
-  `https://api.nhle.com/stats/rest/en/shiftcharts?cayenneExp=gameId=${gameId}`;
-const pbpUrl = (gameId: number) =>
-  `https://api-web.nhle.com/v1/gamecenter/${gameId}/play-by-play`;
-
-/** Walk the schedule forward from the season opener until N final games are collected. */
-async function collectGameIds(count: number): Promise<number[]> {
-  const startYear = Number(SEASON.slice(0, 4));
-  const ids: number[] = [];
-  const cursor = new Date(Date.UTC(startYear, 9, 1)); // Oct 1
-  for (let day = 0; day < 200 && ids.length < count; day++) {
-    const date = cursor.toISOString().slice(0, 10);
-    cursor.setUTCDate(cursor.getUTCDate() + 7);
-    let payload: any;
-    try { payload = await fetchCached(`schedule-${date}`, scheduleUrl(date)); } catch { continue; }
-    for (const week of payload?.gameWeek ?? []) {
-      for (const g of week?.games ?? []) {
-        if (g?.gameType === 2 && (g.gameState === "OFF" || g.gameState === "FINAL")) {
-          if (!ids.includes(g.id)) ids.push(g.id);
-          if (ids.length >= count) break;
-        }
-      }
-      if (ids.length >= count) break;
-    }
-  }
-  return ids.slice(0, count);
-}
-
-function rosterFromPbp(pbp: any): { roster: RosterSpot[]; homeTeamId: number; awayTeamId: number } {
-  const roster: RosterSpot[] = (pbp?.rosterSpots ?? []).map((s: any) => ({
-    playerId: s.playerId,
-    teamId: s.teamId,
-    positionCode: s.positionCode as PositionCode,
-    fullName: `${s.firstName?.default ?? ""} ${s.lastName?.default ?? ""}`.trim(),
-  }));
-  return { roster, homeTeamId: pbp?.homeTeam?.id, awayTeamId: pbp?.awayTeam?.id };
-}
-
-function eventsFromPbp(pbp: any) {
-  return (pbp?.plays ?? []).map((p: any) => ({
-    period: p?.periodDescriptor?.number,
-    sec: parseClock(p?.timeInPeriod) ?? -1,
-    situationCode: p?.situationCode ?? null,
-    typeDescKey: p?.typeDescKey,
-    xCoord: p?.details?.xCoord ?? null,
-    yCoord: p?.details?.yCoord ?? null,
-    zoneCode: p?.details?.zoneCode ?? null,
-  })).filter((e: any) => e.period != null && e.sec >= 0);
-}
+const fetchCached = makeFetcher({ offline: OFFLINE, apiWebGapMs: Number(flag("gap", "450")) });
 
 async function main() {
   console.log(`Gravity v4 coverage spike — season ${SEASON}, target ${GAME_COUNT} games${OFFLINE ? " (offline)" : ""}`);
 
-  const gameIds = await collectGameIds(GAME_COUNT);
+  const gameIds = await collectGameIds(fetchCached, SEASON, GAME_COUNT);
   console.log(`collected ${gameIds.length} final regular-season game ids\n`);
 
   const reports: CoverageReport[] = [];

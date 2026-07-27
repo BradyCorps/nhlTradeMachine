@@ -38,11 +38,15 @@ Until those stages exist and the validation gates pass:
 
 ---
 
-## Stage 1 — `build-stints` (coverage spike)
+## Stage 1 — `build-stints`
 
-Implemented. Reconstructs constant-lineup **stints** from NHL shift charts and
-play-by-play, then reports whether the reconstruction is trustworthy enough to
-fit on. Run this **before** any league-wide backfill.
+Implemented, in two pieces:
+
+- **`coverage-spike.ts`** — reconstructs constant-lineup **stints** from NHL
+  shift charts and play-by-play and reports whether the reconstruction is
+  trustworthy enough to fit on. Run this **before** any league-wide backfill.
+- **`build-stints.ts`** — the producer. Same reconstruction, but writes the
+  fittable rows. Documented under *The emitter* below.
 
 ```bash
 npx tsx scripts/gravity-v4/coverage-spike.ts --games 50
@@ -144,6 +148,70 @@ so the allowance cannot quietly widen into a way of passing broken data.
 Identity is the NHL player id end to end. Names are used **only** in the
 optional `--lines` validation, never as a data join.
 
+### The emitter — `build-stints.ts`
+
+The spike measures; the emitter **produces the dataset**. Same reconstruction,
+same cache, same gates — but it writes one row per stint instead of a metrics
+summary.
+
+```bash
+npx tsx scripts/gravity-v4/build-stints.ts --games 50
+npx tsx scripts/gravity-v4/build-stints.ts --games 1312            # full slate
+npx tsx scripts/gravity-v4/build-stints.ts --games 50 --offline    # from cache
+```
+
+Flags: `--games N` · `--season 20252026` · `--offline` · `--gap MS` ·
+`--even5v5` (emit only true 5v5 rows — smaller file, but the special-teams rows
+are gone for good, so prefer filtering downstream)
+
+Output — **both gitignored**, this is player-level derived data:
+
+```text
+data/gravity-v4/stints-<season>.ndjson.gz
+data/gravity-v4/stints-<season>.manifest.json
+```
+
+The manifest carries the schema version, the settings, per-source coverage and
+the **sha256 of the uncompressed NDJSON**, so a rerun on the same inputs is
+verifiably identical without depending on gzip framing. It also records
+`gatesPassed`; the script exits non-zero when a gate fails, so a bad dataset
+cannot quietly feed the next stage.
+
+#### What a row carries
+
+Everything the OZ/NZ/DZ fits condition on, per §5 of the implementation spec:
+
+| Field | Why the fit needs it |
+| --- | --- |
+| `homeSkaters` / `awaySkaters` / goalies | teammate and opponent terms |
+| `strength`, `isEven5v5` | strength state |
+| `homeScore` / `awayScore` at stint start | score-state control |
+| `startZoneHome`, `startedOnFaceoff` | zone-start control |
+| `durationSec`, `gameStartSec` | exposure weight, ordering across periods |
+| `shots[]` with `shooterId` | **the OZ target excludes the focal player's own offense** — impossible without the shooter |
+| `homeCorsi` / `awayCorsi` / goals | convenience totals for a first-cut target |
+
+Shots carry coordinates and type but **no xG value** — nothing here fits an xG
+model. Attaching expected-goal weight is the next stage's job, and keeping it
+separate means the stint rows stay valid when the xG source changes.
+
+#### Which lineup owns an event
+
+An event that *causes* a stoppage — a goal, a shot, a hit — was played by the
+lineup on the ice **up to** that second, so it belongs to the stint ending there
+(`(start, end]`). An event that *resumes* play — a faceoff, a period start —
+belongs to the lineup taking the ice (`[start, end)`). Using one rule for both is
+exactly what makes a goal look like it was scored by the players who came over
+the boards after it.
+
+That is asserted nowhere: the run prints situationCode agreement under **both**
+rules over the same events, so the choice is evidenced on every dataset it
+produces, and `__tests__/gravity-v4-stints.test.ts` pins the case where they
+diverge.
+
+A blocked shot is owned by the **blocking** team in the NHL feed, so the emitter
+credits the attempt to the other side.
+
 ### Line validation
 
 `--team ANA --lines ANA_FW.csv` rolls derived stints up to forward groups and
@@ -152,9 +220,18 @@ Reported at both all-strengths and 5v5 so you can see which basis the external
 file used. A partial-game spike under-counts in absolute terms — compare the
 *shape* first, then rerun across the full slate for absolute agreement.
 
-Reconstruction logic lives in `scripts/gravity-v4/core.ts` (pure, no I/O) and is
-covered by `__tests__/gravity-v4-stints.test.ts` against synthetic fixtures, so
-correctness is verified without network access.
+### Layout
+
+| File | Role |
+| --- | --- |
+| `core.ts` | reconstruction + emission, **pure** — no I/O, no name joins |
+| `nhl-source.ts` | fetch, cache, per-host pacing, play-by-play projection |
+| `coverage-spike.ts` | measures: is the reconstruction trustworthy? |
+| `build-stints.ts` | produces: the fittable dataset |
+
+All hockey logic is in `core.ts` and covered by
+`__tests__/gravity-v4-stints.test.ts` against synthetic fixtures, so correctness
+is verified without network access.
 
 Background on why stint-level data is required:
 `docs/analytics/GRAVITY_POSITION_CALIBRATION.md`.
