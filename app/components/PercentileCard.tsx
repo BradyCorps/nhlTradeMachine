@@ -6,13 +6,15 @@
 import React, { useMemo, useRef, useCallback, useState } from "react";
 import { calcNAV } from "@/app/lib/xnav-engine";
 import { computeGravity } from "@/app/lib/gravity";
-import { gravityTierColor } from "@/app/lib/gravity";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
-import { TierIcon, FieldDiagram } from "@/app/components/GravityField";
+import { FieldDiagram } from "@/app/components/GravityField";
 import { SEASON } from "@/app/lib/season-config";
 import MetricTip from "@/app/components/MetricTip";
 import { displayPosition } from "@/app/lib/display-position";
-import type { CardImagePayload } from "@/app/lib/card-payload";
+import {
+  cardGravityFromV3,
+  type CardImagePayload,
+} from "@/app/lib/card-payload";
 
 interface PlayerData {
   id: string;
@@ -191,9 +193,30 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
     return { percentiles: pcts, xnav: nav };
   }, [player, allPlayers, posGroup, statDefs]);
 
-  const gravity = useMemo(
-    () => (posGroup === "G" ? null : computeGravity(player as any)),
-    [player, posGroup],
+  const { gravity, gravityPercentile } = useMemo(() => {
+    if (posGroup === "G") return { gravity: null, gravityPercentile: null };
+    const profile = computeGravity(player as any);
+    if (!profile) return { gravity: null, gravityPercentile: null };
+    const peerForces = allPlayers
+      .filter(peer => getPositionGroup(peer.position) === posGroup && (peer.games ?? 0) >= 20)
+      .map(peer => computeGravity(peer as any)?.force)
+      .filter((force): force is number => force != null)
+      .sort((a, b) => a - b);
+    return {
+      gravity: profile,
+      gravityPercentile: peerForces.length >= 10
+        ? computePercentile(profile.force, peerForces)
+        : null,
+    };
+  }, [player, allPlayers, posGroup]);
+  const publicGravity = useMemo(
+    () => gravity
+      ? cardGravityFromV3(gravity, {
+          season: SEASON.replaySeason,
+          gravityPercentile,
+        })
+      : null,
+    [gravity, gravityPercentile],
   );
   const roles = useMemo(() => derivePlayerRoles(player as any), [player]);
 
@@ -272,15 +295,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         fmvLabel: `$${fmv.toFixed(1)}M`,
         surplusLabel: `${surplus > 0 ? "+" : surplus < 0 ? "−" : ""}$${Math.abs(surplus).toFixed(1)}M · ${surplusWord}`,
         surplusColor: toneColor(surplusTone),
-        gravity: gravity
-          ? {
-              masses: gravity.masses,
-              tier: gravity.tier,
-              force: gravity.force,
-              confidence: gravity.confidence,
-              isDefenseman: gravity.isDefenseman,
-            }
-          : null,
+        gravity: publicGravity,
         edgeCells,
         stats: percentiles.map(s => ({
           label: s.label,
@@ -315,7 +330,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
     }
   }, [
     player, teamName, roles, xnav, fmv, surplus, surplusWord, surplusTone,
-    gravity, edgeCells, percentiles, navCells, peerLabel, avgPercentile, exporting,
+    publicGravity, edgeCells, percentiles, navCells, peerLabel, avgPercentile, exporting,
   ]);
 
   return (
@@ -449,15 +464,18 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       {gravity && (
         <div className="pcard-grav">
           <div className="pcard-grav-h">
-            <span className="pcard-grav-title">Player Gravity — Where He Warps the Rink</span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-              <TierIcon tier={gravity.tier} size={14} />
-              <span style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.06em", color: gravityTierColor(gravity.tier) }}>
-                {gravity.tier.replace(/_/g, " ")}
-              </span>
+            <span className="pcard-grav-title">Player Gravity · {publicGravity?.fieldLabel}</span>
+            <span style={{ fontSize: 9, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6e5a3d" }}>
+              {publicGravity?.season} · {publicGravity?.situation}
             </span>
           </div>
+          <div style={{ fontSize: 9, fontWeight: 900, letterSpacing: "0.05em", color: "#6e5a3d", textTransform: "uppercase", marginTop: 3 }}>
+            {publicGravity?.modelLabel} · Reliability {publicGravity?.reliabilityLabel} · Data {publicGravity?.coverageLabel} · Gravity {gravityPercentile != null ? `${gravityPercentile}th pct` : "pct unavailable"}
+          </div>
           <FieldDiagram profile={gravity} />
+          <div style={{ fontSize: 9, color: "#6e5a3d", lineHeight: 1.35, padding: "0 4px 4px" }}>
+            {publicGravity?.fieldDisclaimer}
+          </div>
         </div>
       )}
 

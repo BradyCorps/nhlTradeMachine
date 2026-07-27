@@ -1106,32 +1106,37 @@ docs/analytics/GRAVITY_V4_VALIDATION.md
 
 ### Release A acceptance criteria
 
-- [ ] `navResidual` depends only on the NZ mass.
-- [ ] Direct offensive inputs cannot change X-NAV GRAV when NZ inputs are fixed.
-- [ ] `Partner Independence` is no longer visible to users.
-- [ ] `Signal Stability` is described accurately.
-- [ ] `Confidence` is no longer visible as a probability.
-- [ ] QoC and TOI no longer multiply per-rate zone masses.
-- [ ] Missing-data shrinkage is documented.
-- [ ] The card says `MODELLED FIELD`.
-- [ ] Season, situation, reliability, and coverage are visible.
-- [ ] Methodology and glossary no longer make unsupported tracking claims.
-- [ ] Existing tests are updated and the full relevant suite passes.
+- [x] `navResidual` depends only on the NZ mass.
+- [x] Direct offensive inputs cannot change X-NAV GRAV when NZ inputs are fixed.
+- [x] `Partner Independence` is no longer visible to users.
+- [x] `Signal Stability` is described accurately.
+- [x] `Confidence` is no longer visible as a probability.
+- [x] QoC and TOI no longer multiply per-rate zone masses.
+- [x] Missing-data shrinkage is documented.
+- [x] The card says `MODELLED FIELD`.
+- [x] Season, situation, reliability, and coverage are visible.
+- [x] Methodology and glossary no longer make unsupported tracking claims.
+- [x] Runtime baseline inputs are keyed by stable NHL player IDs without a name fallback.
+- [x] Existing tests are updated and the full relevant suite passes.
+
+Implementation note: the qualified-population tier recalibration required by
+section 4.4 remains data-blocked. The legacy thresholds are retained without a
+percentile-calibration claim until a current authorized population is available.
 
 ### Release B infrastructure acceptance criteria
 
-- [ ] Versioned v4 types exist.
-- [ ] Runtime loader rejects invalid season/model combinations.
+- [x] Versioned v4 types exist.
+- [x] Runtime loader rejects invalid season/model combinations.
 - [ ] Offline pipeline uses stable NHL player IDs.
 - [ ] OZ target excludes the focal player's direct offense.
-- [ ] NZ reports event, proxy, or missing quality.
-- [ ] DZ output is in expected goals prevented.
-- [ ] All zones share expected-goal units.
-- [ ] Net value is the unweighted sum of zone values.
+- [x] NZ reports event, proxy, or missing quality.
+- [x] DZ output is in expected goals prevented.
+- [x] All zones share expected-goal units.
+- [x] Net value is the unweighted sum of zone values.
 - [ ] Uncertainty intervals are generated.
 - [ ] Fitted artifacts include source/model metadata.
-- [ ] Player pages can render v4 without changing X-NAV.
-- [ ] V3 fallback is visibly identified.
+- [x] Player pages can render v4 without changing X-NAV.
+- [x] V3 fallback is visibly identified.
 
 ### Release B public-model acceptance criteria
 

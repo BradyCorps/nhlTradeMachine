@@ -1,6 +1,10 @@
 import React from "react";
 import { ImageResponse } from "next/og";
-import type { CardImagePayload, CardGravityInput } from "@/app/lib/card-payload";
+import {
+  validatePublicCardImagePayload,
+  type CardImagePayload,
+  type CardGravityInput,
+} from "@/app/lib/card-payload";
 import {
   computeRinkGeometry,
   rinkTierColor,
@@ -12,7 +16,6 @@ import {
   RINK_NAVY,
   RINK_ICE,
 } from "@/app/lib/gravity-rink";
-import type { GravityProfile } from "@/app/lib/gravity";
 
 export const runtime = "edge";
 
@@ -93,21 +96,11 @@ function Label({
 }
 
 function Rink({ gravity }: { gravity: CardGravityInput }) {
-  const profile = {
-    force: gravity.force,
-    masses: gravity.masses,
-    tier: gravity.tier,
-    confidence: gravity.confidence,
-    isDefenseman: gravity.isDefenseman,
-    navResidual: 0,
-    partnerIndependence: 1,
-    dataQuality: "full",
-    description: "",
-  } as GravityProfile;
-
-  const geo = computeRinkGeometry(profile);
+  const geo = computeRinkGeometry({ masses: gravity.masses });
   const { W, H, rinkX, rinkY, rinkW, rinkH, midY, centerX, blue1, blue2, rowLines, colLines, zones } = geo;
-  const color = rinkTierColor(gravity.tier);
+  const renderTier = gravity.tier ?? "ASTEROID";
+  const tierLabel = gravity.tier ? gravity.tier.replace(/_/g, " ") : "UNTIERED";
+  const color = rinkTierColor(renderTier);
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
   const S = RINK_SCALE;
 
@@ -159,14 +152,14 @@ function Rink({ gravity }: { gravity: CardGravityInput }) {
 
       {/* Text overlays */}
       <Label x={14} y={22} size={11} color={color} anchor="start" ls={1} vbW={W}>
-        {gravity.tier.replace(/_/g, " ").toUpperCase()}
+        {tierLabel.toUpperCase()}
       </Label>
       <Label x={W - 14} y={22} size={18} color={color} anchor="end" vbW={W}>
         {gravity.force > 0 ? "+" : ""}
         {gravity.force.toFixed(2)}
       </Label>
       <Label x={W - 14} y={34} size={7} color={INK_FAINT} anchor="end" ls={1.3} vbW={W}>
-        NET FORCE
+        FIELD FORCE
       </Label>
       <Label x={W - 14} y={rinkY - 6} size={7} color={INK_FAINT} anchor="end" ls={1} opacity={0.7} vbW={W}>
         ATTACKING →
@@ -175,27 +168,47 @@ function Rink({ gravity }: { gravity: CardGravityInput }) {
       {zones.map((zone) => {
         const healthy = zone.m > 0;
         const valColor = Math.abs(zone.m) < 0.05 ? INK_FAINT : healthy ? color : RINK_RED;
+        const analyticalValue = gravity.modelVersion === "4.0"
+          ? gravity.zoneXg82?.[zone.key] ?? null
+          : null;
         return (
           <React.Fragment key={`label-${zone.key}`}>
             <Label x={zone.cx} y={rinkY + rinkH + 18} size={9} color={INK_FAINT} anchor="middle" ls={0.9} vbW={W}>
               {ZONE_TITLE[zone.key].toUpperCase()}
             </Label>
             <Label x={zone.cx} y={rinkY + rinkH + 34} size={14} color={valColor} anchor="middle" vbW={W}>
-              {zone.m > 0 ? "+" : ""}
-              {zone.m.toFixed(2)}
+              {(analyticalValue ?? zone.m) > 0 ? "+" : ""}
+              {(analyticalValue ?? zone.m).toFixed(analyticalValue === null ? 2 : 1)}
             </Label>
             <Label x={zone.cx} y={rinkY + rinkH + 45} size={7} color={INK_FAINT} anchor="middle" ls={0.4} opacity={0.8} vbW={W}>
-              {(zoneQualifier(zone.key, zone.m) ?? "").toUpperCase()}
+              {analyticalValue === null
+                ? (zoneQualifier(zone.key, zone.m) ?? "").toUpperCase()
+                : "XG / 82"}
             </Label>
           </React.Fragment>
         );
       })}
 
       <Label x={W / 2} y={H - 6} size={8} color={INK_FAINT} anchor="middle" ls={1.6} vbW={W} w={260}>
-        GRAVITATIONAL FIELD ANALYSIS
+        {gravity.fieldLabel}
       </Label>
     </div>
   );
+}
+
+function ordinal(value: number | null): string {
+  if (value === null) return "UNAVAILABLE";
+  const mod100 = value % 100;
+  const suffix = mod100 >= 11 && mod100 <= 13
+    ? "TH"
+    : value % 10 === 1
+      ? "ST"
+      : value % 10 === 2
+        ? "ND"
+        : value % 10 === 3
+          ? "RD"
+          : "TH";
+  return `${value}${suffix} PCT`;
 }
 
 function Stat({ row }: { row: CardImagePayload["stats"][number] }) {
@@ -220,15 +233,17 @@ function Stat({ row }: { row: CardImagePayload["stats"][number] }) {
 }
 
 export async function POST(req: Request) {
-  let data: CardImagePayload;
+  let raw: unknown;
   try {
-    data = (await req.json()) as CardImagePayload;
+    raw = await req.json();
   } catch {
     return new Response("Bad payload", { status: 400 });
   }
-  if (!data || typeof data.name !== "string") {
-    return new Response("Bad payload", { status: 400 });
+  const validation = validatePublicCardImagePayload(raw);
+  if (!validation.success) {
+    return new Response(validation.message, { status: 400 });
   }
+  const data: CardImagePayload = validation.data;
 
   const [regular, bold] = await Promise.all([fontRegular, fontBold]);
 
@@ -238,7 +253,7 @@ export async function POST(req: Request) {
   const CARD_W = 940;
   const headerH = 128;
   const contractH = 60;
-  const gravityH = data.gravity ? 40 + 240 * 1.95 + 8 : 0;
+  const gravityH = data.gravity ? 96 + 240 * 1.95 + 8 : 0;
   const edgeH = data.edgeCells.length > 0 ? 74 : 0;
   const statsBodyH = 46 + data.stats.length * 35 + 20;
   const sideBodyH = 46 + data.navCells.length * 40 + 16;
@@ -300,10 +315,24 @@ export async function POST(req: Request) {
       {data.gravity ? (
         <div style={{ display: "flex", flexDirection: "column", background: TAN, padding: "12px 0 6px", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "0 26px", marginBottom: 4 }}>
-            <div style={{ display: "flex", fontSize: 12, fontWeight: 700, color: INK_BODY, letterSpacing: 1 }}>PLAYER GRAVITY — WHERE HE WARPS THE RINK</div>
-            <div style={{ display: "flex", fontSize: 12, fontWeight: 700, letterSpacing: 1, color: rinkTierColor(data.gravity.tier) }}>{data.gravity.tier.replace(/_/g, " ")}</div>
+            <div style={{ display: "flex", fontSize: 12, fontWeight: 700, color: INK_BODY, letterSpacing: 1 }}>PLAYER GRAVITY · MODELLED FIELD · POSITION-RELATIVE</div>
+            <div style={{ display: "flex", fontSize: 12, fontWeight: 700, letterSpacing: 1, color: INK_BODY }}>{data.gravity.season} · {data.gravity.situation}</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "3px 26px 1px", fontSize: 10, fontWeight: 700, color: INK_FAINT, letterSpacing: 0.5 }}>
+            <div style={{ display: "flex" }}>{data.gravity.modelLabel}</div>
+            <div style={{ display: "flex" }}>RELIABILITY {data.gravity.reliabilityLabel}</div>
+            <div style={{ display: "flex" }}>DATA {data.gravity.coverageLabel}</div>
+            <div style={{ display: "flex" }}>GRAVITY {ordinal(data.gravity.gravityPercentile)}</div>
+            {data.gravity.modelVersion === "4.0" && data.gravity.netXg82 !== null ? (
+              <div style={{ display: "flex" }}>
+                NET {data.gravity.netXg82 > 0 ? "+" : ""}{data.gravity.netXg82.toFixed(1)} xG/82 · FIELD {data.gravity.force > 0 ? "+" : ""}{data.gravity.force.toFixed(2)}
+              </div>
+            ) : null}
           </div>
           <Rink gravity={data.gravity} />
+          <div style={{ display: "flex", width: "100%", justifyContent: "center", padding: "0 26px 4px", fontSize: 9, color: INK_FAINT }}>
+            {data.gravity.fieldDisclaimer}
+          </div>
         </div>
       ) : null}
 

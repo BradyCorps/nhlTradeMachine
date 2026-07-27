@@ -32,3 +32,40 @@ public/
 *.log
 repomix-output.txt
 repomix-output.xml
+
+# Gravity Release A calibration — exact local access allowance
+
+# Re-include the MoneyPuck root, then keep everything blocked by default.
+!MoneyPuckData/
+MoneyPuckData/*
+
+!MoneyPuckData/2022_23/
+MoneyPuckData/2022_23/*
+!MoneyPuckData/2022_23/goalies(3).csv
+!MoneyPuckData/2022_23/skaters(3).csv
+
+!MoneyPuckData/2023_24/
+MoneyPuckData/2023_24/*
+!MoneyPuckData/2023_24/goalies(2).csv
+!MoneyPuckData/2023_24/skaters(2).csv
+
+!MoneyPuckData/2024_25/
+MoneyPuckData/2024_25/*
+!MoneyPuckData/2024_25/goalies(1).csv
+!MoneyPuckData/2024_25/skaters(1).csv
+
+!MoneyPuckData/2025_26/
+MoneyPuckData/2025_26/*
+!MoneyPuckData/2025_26/goalies.csv
+!MoneyPuckData/2025_26/skaters.csv
+
+# Re-include the OtherData root, then allow only four exact inputs.
+!OtherData/
+OtherData/*
+!OtherData/2025;26_skater_totals_all.csv
+!OtherData/2022;23;24;25_skater_totals_all.csv
+!OtherData/2025;26_defensive_pairings_all.csv
+!OtherData/2022;23;24;25_defensive_pairings_all.csv
+
+# Permit the generated runtime baseline artifact.
+!app/data/moneypuck_baselines.json

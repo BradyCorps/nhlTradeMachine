@@ -3,13 +3,12 @@
 // The rink is a sheet; the player curves it. Three zone masses are the
 // real computed quantities — total force is just their weighted sum.
 //
-//   m_OZ  — offensive-zone well: chances created, finishing threat,
-//           on-ice lift, PP leverage. Play falls toward the opponent's net.
+//   m_OZ  — offensive-zone well: chance-impact and production indicators.
+//           Play falls toward the opponent's net in the model visualization.
 //   m_NZ  — neutral-zone well: transition displacement (where play LIVES
-//           vs where the player is DEPLOYED), speed, burst rate. The
-//           Quinn Hughes signal — dragging play through center ice.
-//   m_DZ  — defensive-zone dome: xGA suppression, defensive point shares,
-//           PK trust. Repulsive curvature — opponents can't dig a well here.
+//           vs where the player is DEPLOYED), speed, burst rate.
+//   m_DZ  — defensive-zone dome: suppression and defensive-role indicators.
+//           Positive values render as repulsive curvature.
 //
 // Every raw input is standardized WITHIN POSITION (z-score against
 // positional calibration constants) before being squashed to a bounded
@@ -21,16 +20,14 @@
 //
 //   force = 0.45·m_OZ + 0.30·m_NZ + 0.25·m_DZ
 //
-// navResidual is the portion of gravity X-NAV has NOT already priced.
-// X-NAV's offTotal prices on-off lift (NOIV), defTotal prices on-off
-// suppression (defRate), DPS directly, and PK time via SLF — so the
-// residual excludes the lift input and the ENTIRE DZ dome, keeping only
-// the OZ creation shape and the NZ transition signal. X-NAV consumes
-// navResidual, never force, so nothing is double-counted.
+// navResidual is the transition-only handoff to X-NAV. Direct offensive
+// production and defensive suppression are valued elsewhere in X-NAV, so
+// assists, individual xG/goals, power-play production, lift, and the DZ dome
+// are excluded from this residual.
 //
-// Missing inputs are SKIPPED, never scored: a player with no EDGE data
-// or no PP data simply contributes nothing on that term. Treating
-// absent data as zero would z-score a data gap as below-average play.
+// Missing terms contribute nothing to fixed-weight sums. That behavior
+// shrinks incomplete estimates toward neutral; explicit per-zone coverage
+// records the absent evidence and lowers the reliability index.
 
 import type { Asset } from "./trade-types";
 
@@ -45,19 +42,63 @@ export interface ZoneMasses {
   dz: number;
 }
 
+export interface ZoneCoverage {
+  /** Sum of model weight backed by a present input. */
+  presentWeight: number;
+  /** Total model weight that could be present for the zone. */
+  possibleWeight: number;
+  /** presentWeight / possibleWeight, bounded 0–1. */
+  ratio: number;
+  /** Stable input keys whose evidence was unavailable. */
+  missingInputs: string[];
+}
+
+export interface GravityCoverage {
+  oz: ZoneCoverage;
+  nz: ZoneCoverage;
+  dz: ZoneCoverage;
+}
+
+export type GravitySituationScope =
+  | "5V5"
+  | "ALL SITUATIONS"
+  | "MIXED SITUATIONS"
+  | "UNKNOWN";
+
+/**
+ * V3 combines differently scoped source fields, so it must not be presented
+ * as a single-strength model.
+ */
+export const GRAVITY_V3_SITUATION_SCOPE =
+  "MIXED SITUATIONS" as const satisfies GravitySituationScope;
+
+export const GRAVITY_V3_SITUATION_NOTE =
+  "Current all-situations scoring/on-off and DPS; 5v5 zone starts and baseline on/off (with all-situations fallback); 5-on-4 production; 4-on-5 usage; and regular-season EDGE aggregates without a strength-state tag.";
+
+export const GRAVITY_V3_FIELD_LABEL = "MODELLED FIELD · POSITION-RELATIVE";
+
+export const GRAVITY_V3_FIELD_DISCLAIMER =
+  "Model visualization of Gravity v3 components; not observed player-tracking data.";
+
 export interface GravityProfile {
   /** Weighted zone-mass total, bounded (−1, +1). One currency across positions. */
   force: number;
   /** The shape of the field — where on the rink the warping happens. */
   masses: ZoneMasses;
-  /** Force with on-off inputs (lift, suppression) zeroed — what X-NAV hasn't priced. */
+  /** Transition-only bounded handoff to X-NAV. */
   navResidual: number;
-  /** 0–1 damper applied to on-off lift: is the signal real or borrowed from linemates? */
+  /** Current/baseline on-off agreement, with the legacy D pair-driver adjustment. */
+  signalStability: number;
+  /** @deprecated Use signalStability. */
   partnerIndependence: number;
-  /** 0–1: sample size + year-over-year stability + data coverage. */
+  /** 0–1 model coverage/stability index. This is not a probability. */
+  reliability: number;
+  /** @deprecated Use reliability. This is not a calibrated probability. */
   confidence: number;
-  /** "full" = EDGE zone-time data present; "partial" = deployment-proxy fallback. */
+  /** "full" means every weighted v3 input is present; otherwise "partial". */
   dataQuality: "full" | "partial";
+  /** Per-zone evidence coverage for the fixed-weight v3 composites. */
+  coverage: GravityCoverage;
   isDefenseman: boolean;
   tier: GravityTier;
   description: string;
@@ -72,20 +113,18 @@ export type GravityTier =
   | "BLACK_HOLE";     // absorbs energy from linemates
 
 const TIER_DESC: Record<GravityTier, string> = {
-  SUPERMASSIVE:  "Warps the game around himself — linemates orbit",
-  STAR:          "Elite gravitational field — elevates everyone nearby",
-  MAIN_SEQUENCE: "Strong, steady pull — makes his line better",
-  SATELLITE:     "Detectable pull — modest but real",
-  ASTEROID:      "Negligible gravitational field",
-  BLACK_HOLE:    "Absorbs energy — linemates produce less",
+  SUPERMASSIVE:  "Largest positive position-relative modelled field",
+  STAR:          "Elite positive position-relative modelled field",
+  MAIN_SEQUENCE: "Strong positive territorial influence index",
+  SATELLITE:     "Detectable positive territorial influence index",
+  ASTEROID:      "Territorial influence index near neutral",
+  BLACK_HOLE:    "Strong negative position-relative modelled field",
 };
 
-// Tier cutoffs on the bounded force scale, calibrated so tiers land at
-// intended league percentiles (SUPERMASSIVE ≈ top 2% of skaters). The
-// scale is position-normalized, so ~half the league sits below zero —
-// the ASTEROID band is deliberately wide, and BLACK_HOLE is reserved
-// for fields that genuinely cave (strong negative on-off, all zones
-// sagging), not merely below-average players.
+// Legacy v3 tier cutoffs on the bounded force scale. The calibration route
+// derives season-specific suggestions from the qualified population; these
+// fixed cutoffs must not be described as checked percentiles until that report
+// is rerun against an available current-season population.
 export function classifyTier(force: number): GravityTier {
   if (force >= 0.55) return "SUPERMASSIVE";
   if (force >= 0.40) return "STAR";
@@ -161,6 +200,74 @@ function z(value: number, dist: Dist): number {
  * separation at the top of the league while keeping the hard (−1, 1) bound. */
 const squash = (raw: number) => Math.tanh(raw / 2.75);
 
+function zoneCoverage(
+  inputs: ReadonlyArray<{ key: string; weight: number; present: boolean }>,
+): ZoneCoverage {
+  const possibleWeight = inputs.reduce((sum, input) => sum + input.weight, 0);
+  const presentWeight = inputs.reduce(
+    (sum, input) => sum + (input.present ? input.weight : 0),
+    0,
+  );
+  return {
+    presentWeight: r2(presentWeight),
+    possibleWeight: r2(possibleWeight),
+    ratio: possibleWeight > 0 ? r2(presentWeight / possibleWeight) : 0,
+    missingInputs: inputs.filter(input => !input.present).map(input => input.key),
+  };
+}
+
+export function gravityCoverageRatio(coverage: GravityCoverage): number {
+  const zones = [coverage.oz, coverage.nz, coverage.dz];
+  const present = zones.reduce((sum, zone) => sum + zone.presentWeight, 0);
+  const possible = zones.reduce((sum, zone) => sum + zone.possibleWeight, 0);
+  return possible > 0 ? clamp(present / possible, 0, 1) : 0;
+}
+
+export interface GravityV3PublicPresentation {
+  fieldLabel: typeof GRAVITY_V3_FIELD_LABEL;
+  fieldDisclaimer: typeof GRAVITY_V3_FIELD_DISCLAIMER;
+  situation: typeof GRAVITY_V3_SITUATION_SCOPE;
+  reliability: {
+    label: "Reliability";
+    index: number;
+    explanation: "Coverage/stability index, not a probability.";
+  };
+  signalStability: {
+    label: "Signal Stability";
+    index: number;
+    explanation: "Current vs baseline agreement; legacy D pair-driver adjustment. Not portability.";
+  };
+  coverage: {
+    label: "Data Coverage";
+    percent: number;
+  };
+}
+
+/** Public-facing v3 labels and values, kept separate from deprecated aliases. */
+export function gravityV3PublicPresentation(
+  profile: GravityProfile,
+): GravityV3PublicPresentation {
+  return {
+    fieldLabel: GRAVITY_V3_FIELD_LABEL,
+    fieldDisclaimer: GRAVITY_V3_FIELD_DISCLAIMER,
+    situation: GRAVITY_V3_SITUATION_SCOPE,
+    reliability: {
+      label: "Reliability",
+      index: Math.round(profile.reliability * 100),
+      explanation: "Coverage/stability index, not a probability.",
+    },
+    signalStability: {
+      label: "Signal Stability",
+      index: Math.round(profile.signalStability * 100),
+      explanation: "Current vs baseline agreement; legacy D pair-driver adjustment. Not portability.",
+    },
+    coverage: {
+      label: "Data Coverage",
+      percent: Math.round(gravityCoverageRatio(profile.coverage) * 100),
+    },
+  };
+}
+
 // ── The engine ───────────────────────────────────────────────────
 
 export function computeGravity(asset: Asset): GravityProfile | null {
@@ -180,42 +287,37 @@ export function computeGravity(asset: Asset): GravityProfile | null {
     ? currentLift * 0.4 + baselineLift * 0.6
     : currentLift;
 
-  // ── Partner independence: 0–1 damper on the lift input ─────────
-  // Year-over-year agreement between current and baseline on-off says
-  // whether the lift travels with the player or with his linemates.
-  let partnerIndependence = 0.75; // unknown — partial trust
+  // ── Signal stability: 0–1 damper on the lift input ─────────────
+  // This is agreement between current and baseline on-off values. It is
+  // not a linemate-independence or portability model.
+  let signalStability = 0.75; // unknown — partial trust
   if (baselineLift !== null && games >= 20) {
     const sameDirection = (currentLift >= 0) === (baselineLift >= 0);
     const maxMag = Math.max(Math.abs(currentLift), Math.abs(baselineLift), 1);
     const divergence = Math.abs(currentLift - baselineLift) / maxMag;
-    partnerIndependence = sameDirection
+    signalStability = sameDirection
       ? clamp(1.0 - divergence * 0.3, 0.7, 1.0)
       : clamp(0.7 - divergence * 0.3, 0.4, 0.7);
   }
-  // For D, a measured pair-driver score is direct with/without evidence.
+  // The existing D pair-driver input remains a v3 stability signal.
   if (isD && asset.pairDriverScore != null) {
-    partnerIndependence = clamp(partnerIndependence + asset.pairDriverScore / 100, 0.4, 1.0);
+    signalStability = clamp(signalStability + asset.pairDriverScore / 100, 0.4, 1.0);
   }
   // Small samples: pull toward the unknown prior.
   if (games < 30) {
-    partnerIndependence = 0.75 + (partnerIndependence - 0.75) * (games / 30);
+    signalStability = 0.75 + (signalStability - 0.75) * (games / 30);
   }
 
-  const liftEffective = blendedLift * partnerIndependence;
+  const liftEffective = blendedLift * signalStability;
 
-  // ── Shared context scalars ─────────────────────────────────────
-  // Tough deployment (QoC) makes every zone signal worth slightly more;
-  // sheltered deployment slightly less.
-  const context = asset.qocIndex != null
-    ? 1 + clamp((asset.qocIndex - 50) / 200, -0.10, 0.15)
-    : 1.0;
-  // Usage: a field only warps the game in proportion to time on the sheet.
-  const usage = clamp(1 + z(asset.avgTOI ?? cal.toi.mean, cal.toi) * 0.08, 0.75, 1.15);
-  const scale = context * usage;
+  // QoC and TOI remain descriptive context. They do not inflate per-rate
+  // zone ability; any accumulated seasonal contribution belongs downstream.
+  const scale = 1.0;
 
   // ── m_OZ: offensive-zone well ──────────────────────────────────
   // Present-only accumulation: absent inputs are skipped, not zeroed.
   const hasLift = asset.xgRelTM != null || asset.baselineXgRel != null;
+  const hasIxg = (asset.baselineIxg82 ?? 0) > 0 || asset.goalsPace != null;
   const ixg82 = (asset.baselineIxg82 ?? 0) > 0 ? asset.baselineIxg82! : asset.goalsPace;
   const ozLiftTerm = hasLift ? 0.40 * z(liftEffective, cal.lift) : 0;
   let ozRestTerm = 0;
@@ -223,7 +325,12 @@ export function computeGravity(asset: Asset): GravityProfile | null {
   if (ixg82 != null)             ozRestTerm += 0.20 * z(ixg82, cal.ixg82);
   if (asset.ppPtsPace82 != null) ozRestTerm += 0.15 * z(asset.ppPtsPace82, cal.ppPts82);
   const mOz = squash((ozLiftTerm + ozRestTerm) * scale);
-  const mOzResidual = squash(ozRestTerm * scale);
+  const ozCoverage = zoneCoverage([
+    { key: "onIceLift", weight: 0.40, present: hasLift },
+    { key: "assistsPace", weight: 0.25, present: asset.assistsPace != null },
+    { key: "individualXgOrGoalsPace", weight: 0.20, present: hasIxg },
+    { key: "powerPlayPointsPace", weight: 0.15, present: asset.ppPtsPace82 != null },
+  ]);
 
   // ── m_NZ: neutral-zone / transition well ───────────────────────
   // The core signal is displacement: where play LIVES (EDGE zone time)
@@ -242,6 +349,11 @@ export function computeGravity(asset: Asset): GravityProfile | null {
   if (asset.edgeSpeedMaxMph != null) nzRaw += 0.25 * z(asset.edgeSpeedMaxMph, cal.speedMax);
   if (bursts82 !== null) nzRaw += 0.25 * z(bursts82, cal.bursts82);
   const mNz = squash(nzRaw * scale);
+  const nzCoverage = zoneCoverage([
+    { key: "edgeZoneTimeDisplacement", weight: 0.50, present: hasEdgeZoneTime },
+    { key: "edgeTopSpeed", weight: 0.25, present: asset.edgeSpeedMaxMph != null },
+    { key: "edgeBurstRate", weight: 0.25, present: bursts82 !== null },
+  ]);
 
   // ── m_DZ: defensive-zone dome (repulsive curvature) ────────────
   let dzRaw = 0;
@@ -249,20 +361,29 @@ export function computeGravity(asset: Asset): GravityProfile | null {
   if (asset.dps != null)         dzRaw += 0.35 * z(asset.dps, cal.dps);
   if (asset.pkTimeShare != null) dzRaw += 0.20 * z(asset.pkTimeShare, cal.pkShare);
   const mDz = squash(dzRaw * scale);
+  const dzCoverage = zoneCoverage([
+    { key: "xgaSuppression", weight: 0.45, present: asset.xgaRelTM != null },
+    { key: "defensivePointShares", weight: 0.35, present: asset.dps != null },
+    { key: "penaltyKillTimeShare", weight: 0.20, present: asset.pkTimeShare != null },
+  ]);
+  const coverage: GravityCoverage = {
+    oz: ozCoverage,
+    nz: nzCoverage,
+    dz: dzCoverage,
+  };
 
   // ── Assembly ───────────────────────────────────────────────────
   const force = r2(W_OZ * mOz + W_NZ * mNz + W_DZ * mDz);
 
-  // Residual: OZ creation shape + NZ transition only. The lift input
-  // and the entire DZ dome are already priced inside X-NAV (offTotal
-  // NOIV, defTotal defRate/DPS, SLF for PK time) and stay out.
-  const navResidual = r2(W_OZ * mOzResidual + W_NZ * mNz);
+  // Release A handoff: transition only. Direct offense and defensive
+  // suppression remain in their existing X-NAV components.
+  const navResidual = r2(W_NZ * mNz);
 
-  // ── Confidence ─────────────────────────────────────────────────
+  // ── Reliability index ──────────────────────────────────────────
   const sampleConf = Math.min(games / 60, 1);
-  const stabilityConf = baselineLift !== null ? partnerIndependence : 0.5;
-  const coverageConf = hasEdgeZoneTime ? 1 : 0.6;
-  const confidence = r2(clamp(
+  const stabilityConf = baselineLift !== null ? signalStability : 0.5;
+  const coverageConf = gravityCoverageRatio(coverage);
+  const reliability = r2(clamp(
     0.40 * sampleConf + 0.40 * stabilityConf + 0.20 * coverageConf,
     0, 1,
   ));
@@ -273,9 +394,12 @@ export function computeGravity(asset: Asset): GravityProfile | null {
     force,
     masses: { oz: r2(mOz), nz: r2(mNz), dz: r2(mDz) },
     navResidual,
-    partnerIndependence: r2(partnerIndependence),
-    confidence,
-    dataQuality: hasEdgeZoneTime ? "full" : "partial",
+    signalStability: r2(signalStability),
+    partnerIndependence: r2(signalStability),
+    reliability,
+    confidence: reliability,
+    dataQuality: coverageConf === 1 ? "full" : "partial",
+    coverage,
     isDefenseman: isD,
     tier,
     description: TIER_DESC[tier],
@@ -289,13 +413,13 @@ export function computeGravity(asset: Asset): GravityProfile | null {
 // scoresheet). This is the sim-side mirror of navResidual — there, X-NAV
 // already prices lift + DZ so the residual excludes them; here, ptsPace
 // already prices scoring, so the on-ice term weights DZ heaviest, NZ next,
-// and OZ barely (creation shape beyond the box score). Confidence-damped
+// and OZ barely (creation shape beyond the box score). Reliability-damped
 // so thin data can't swing a simulated season, and bounded to ±8 pace
 // points so gravity nudges a roster rather than replacing the scoresheet.
 export function simOnIceDelta(profile: GravityProfile | null): number {
   if (!profile) return 0;
   const { oz, nz, dz } = profile.masses;
-  const raw = (0.55 * dz + 0.35 * nz + 0.10 * oz) * 12 * profile.confidence;
+  const raw = (0.55 * dz + 0.35 * nz + 0.10 * oz) * 12 * profile.reliability;
   return r2(clamp(raw, -8, 8));
 }
 

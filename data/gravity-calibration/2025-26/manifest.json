@@ -1,0 +1,965 @@
+{
+  "artifacts": {
+    "crosswalkBytes": 767715,
+    "crosswalkPath": "data/gravity-calibration/2025-26/source-crosswalk.json",
+    "crosswalkSha256": "846d0c108f0f846a3b33a7b44b6175a1e60817e2e09d45b8a13ab133fb4ab99c",
+    "crosswalkTracked": false,
+    "durableStoragePlan": "Private versioned object storage keyed by SHA-256; verify against this manifest before calibration.",
+    "populationBytes": 1473530,
+    "populationPath": "data/gravity-calibration/2025-26/population.json",
+    "populationSha256": "6b76883a33802f1fbfc93475ca5240819ad8294bfc5aa5a8f35fd3fe895654f9",
+    "populationTracked": false,
+    "sourceFingerprint": "8faee7bf2cfb35bbd378200047edcbd96feee9d38148280f4dd636e5d23e82f1"
+  },
+  "completenessGates": {
+    "allExclusionsMachineReadable": true,
+    "cachedRerunReproducible": true,
+    "deterministicPlayerIdOrdering": true,
+    "duplicateNhlIdsZero": true,
+    "everyComputeGravityInputExplicit": true,
+    "everySourceJoinClassified": true,
+    "inputSourceMatrixCoversEveryInput": true,
+    "inputSourceMatrixReferencesKnownSources": true,
+    "noOptionalSourceDropsPlayers": true,
+    "normalizedSnapshotFingerprintMatches": true,
+    "officialUniverseRepresented100Pct": true,
+    "qualifiedIdentityPositionGamesComplete": true,
+    "structuralValidationPassed": true
+  },
+  "coverageDistribution": {
+    "buckets": {
+      "100": 714,
+      "0_24": 0,
+      "25_49": 0,
+      "50_74": 1,
+      "75_99": 0
+    },
+    "count": 715,
+    "maximumPct": 100,
+    "meanPct": 99.95,
+    "medianPct": 100,
+    "minimumPct": 66.67,
+    "p25Pct": 100,
+    "p75Pct": 100
+  },
+  "eligibility": {
+    "gravityCalculationMinimumGames": 10,
+    "publicTierMinimumGames": 20
+  },
+  "exclusionReasons": {
+    "BELOW_GRAVITY_CALCULATION_MINIMUM_GAMES": 162,
+    "BELOW_PUBLIC_TIER_MINIMUM_GAMES": 63
+  },
+  "generatedAt": "2026-07-24T21:45:10.482Z",
+  "generationCommand": "npx tsx scripts/gravity-calibration/build-population.ts",
+  "identity": {
+    "crosswalkSchemaVersion": "gravity-v3-release-a-crosswalk-v1",
+    "fuzzyMatching": false,
+    "matchedCrosswalkRows": 2220,
+    "outOfUniverseCrosswalkRows": 547,
+    "unresolvedCrosswalkEntries": [
+      {
+        "method": "POSITION_MISMATCH",
+        "sourceKey": "nst:current:skater:637",
+        "sourceName": "Seth Jarvis",
+        "sourcePosition": "C",
+        "sourceTeams": [
+          "CAR"
+        ]
+      },
+      {
+        "method": "POSITION_MISMATCH",
+        "sourceKey": "nst:prior:pairing:kurtis macdermid",
+        "sourceName": "Kurtis MacDermid",
+        "sourcePosition": "D",
+        "sourceTeams": [
+          "COL"
+        ]
+      },
+      {
+        "method": "POSITION_MISMATCH",
+        "sourceKey": "nst:prior:pairing:sebastian aho",
+        "sourceName": "Sebastian Aho",
+        "sourcePosition": "D",
+        "sourceTeams": [
+          "NYI"
+        ]
+      },
+      {
+        "method": "POSITION_MISMATCH",
+        "sourceKey": "nst:prior:skater:1146",
+        "sourceName": "Ethen Frank",
+        "sourcePosition": "C",
+        "sourceTeams": [
+          "WSH"
+        ]
+      },
+      {
+        "method": "POSITION_MISMATCH",
+        "sourceKey": "nst:prior:skater:160",
+        "sourceName": "Jaden Schwartz",
+        "sourcePosition": "C",
+        "sourceTeams": [
+          "SEA"
+        ]
+      },
+      {
+        "method": "POSITION_MISMATCH",
+        "sourceKey": "nst:prior:skater:399",
+        "sourceName": "Ivan Barbashev",
+        "sourcePosition": "C",
+        "sourceTeams": [
+          "STL",
+          "VGK"
+        ]
+      },
+      {
+        "method": "POSITION_MISMATCH",
+        "sourceKey": "nst:prior:skater:643",
+        "sourceName": "Zach Aston-Reese",
+        "sourcePosition": "C",
+        "sourceTeams": [
+          "CBJ",
+          "DET",
+          "TOR"
+        ]
+      },
+      {
+        "method": "POSITION_MISMATCH",
+        "sourceKey": "nst:prior:skater:698",
+        "sourceName": "Alexandre Texier",
+        "sourcePosition": "C",
+        "sourceTeams": [
+          "CBJ",
+          "STL"
+        ]
+      },
+      {
+        "method": "POSITION_MISMATCH",
+        "sourceKey": "nst:prior:skater:717",
+        "sourceName": "Sebastian Aho",
+        "sourcePosition": "D",
+        "sourceTeams": [
+          "NYI"
+        ]
+      },
+      {
+        "method": "POSITION_MISMATCH",
+        "sourceKey": "nst:prior:skater:818",
+        "sourceName": "Paul Cotter",
+        "sourcePosition": "C",
+        "sourceTeams": [
+          "NJD",
+          "VGK"
+        ]
+      },
+      {
+        "method": "POSITION_MISMATCH",
+        "sourceKey": "nst:prior:skater:824",
+        "sourceName": "Angus Crookshank",
+        "sourcePosition": "L",
+        "sourceTeams": [
+          "OTT"
+        ]
+      },
+      {
+        "method": "POSITION_MISMATCH",
+        "sourceKey": "nst:prior:skater:888",
+        "sourceName": "Connor McMichael",
+        "sourcePosition": "C",
+        "sourceTeams": [
+          "WSH"
+        ]
+      },
+      {
+        "method": "POSITION_MISMATCH",
+        "sourceKey": "nst:prior:skater:912",
+        "sourceName": "Aliaksei Protas",
+        "sourcePosition": "C",
+        "sourceTeams": [
+          "WSH"
+        ]
+      },
+      {
+        "method": "POSITION_MISMATCH",
+        "sourceKey": "nst:prior:skater:951",
+        "sourceName": "Justin Sourdif",
+        "sourcePosition": "R",
+        "sourceTeams": [
+          "FLA"
+        ]
+      },
+      {
+        "method": "POSITION_MISMATCH",
+        "sourceKey": "nst:prior:skater:955",
+        "sourceName": "Seth Jarvis",
+        "sourcePosition": "C",
+        "sourceTeams": [
+          "CAR"
+        ]
+      }
+    ],
+    "unresolvedCrosswalkRows": 15,
+    "unresolvedQualifiedSourceJoins": 0
+  },
+  "inputCoverage": {
+    "officialUniverse": {
+      "assistsPace": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 940,
+        "zero": 129
+      },
+      "avgTOI": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 940,
+        "zero": 0
+      },
+      "baselineIxg82": {
+        "coveragePct": 88.4,
+        "missing": 109,
+        "present": 831,
+        "zero": 0
+      },
+      "baselineXgRel": {
+        "coveragePct": 89.79,
+        "missing": 96,
+        "present": 844,
+        "zero": 23
+      },
+      "dps": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 940,
+        "zero": 105
+      },
+      "dzPct": {
+        "coveragePct": 99.79,
+        "missing": 2,
+        "present": 938,
+        "zero": 18
+      },
+      "edgeBurstsOver20": {
+        "coveragePct": 99.89,
+        "missing": 1,
+        "present": 939,
+        "zero": 39
+      },
+      "edgeOzPct": {
+        "coveragePct": 99.89,
+        "missing": 1,
+        "present": 939,
+        "zero": 0
+      },
+      "edgeSpeedMaxMph": {
+        "coveragePct": 99.89,
+        "missing": 1,
+        "present": 939,
+        "zero": 0
+      },
+      "games": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 940,
+        "zero": 0
+      },
+      "goalsPace": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 940,
+        "zero": 193
+      },
+      "pairDriverScore": {
+        "coveragePct": 30.74,
+        "missing": 651,
+        "present": 289,
+        "zero": 3
+      },
+      "pkTimeShare": {
+        "coveragePct": 89.79,
+        "missing": 96,
+        "present": 844,
+        "zero": 81
+      },
+      "ppPtsPace82": {
+        "coveragePct": 89.79,
+        "missing": 96,
+        "present": 844,
+        "zero": 254
+      },
+      "qocIndex": {
+        "coveragePct": 99.79,
+        "missing": 2,
+        "present": 938,
+        "zero": 0
+      },
+      "xgaRelTM": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 940,
+        "zero": 0
+      },
+      "xgRelTM": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 940,
+        "zero": 0
+      }
+    },
+    "qualified": {
+      "assistsPace": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 715,
+        "zero": 6
+      },
+      "avgTOI": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 715,
+        "zero": 0
+      },
+      "baselineIxg82": {
+        "coveragePct": 97.76,
+        "missing": 16,
+        "present": 699,
+        "zero": 0
+      },
+      "baselineXgRel": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 715,
+        "zero": 16
+      },
+      "dps": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 715,
+        "zero": 10
+      },
+      "dzPct": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 715,
+        "zero": 0
+      },
+      "edgeBurstsOver20": {
+        "coveragePct": 99.86,
+        "missing": 1,
+        "present": 714,
+        "zero": 0
+      },
+      "edgeOzPct": {
+        "coveragePct": 99.86,
+        "missing": 1,
+        "present": 714,
+        "zero": 0
+      },
+      "edgeSpeedMaxMph": {
+        "coveragePct": 99.86,
+        "missing": 1,
+        "present": 714,
+        "zero": 0
+      },
+      "games": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 715,
+        "zero": 0
+      },
+      "goalsPace": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 715,
+        "zero": 31
+      },
+      "pairDriverScore": {
+        "coveragePct": 32.45,
+        "missing": 483,
+        "present": 232,
+        "zero": 1
+      },
+      "pkTimeShare": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 715,
+        "zero": 55
+      },
+      "ppPtsPace82": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 715,
+        "zero": 170
+      },
+      "qocIndex": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 715,
+        "zero": 0
+      },
+      "xgaRelTM": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 715,
+        "zero": 0
+      },
+      "xgRelTM": {
+        "coveragePct": 100,
+        "missing": 0,
+        "present": 715,
+        "zero": 0
+      }
+    }
+  },
+  "inputSourceMatrix": [
+    {
+      "input": "games",
+      "productionMissingRule": "Official GP is required; the universe build rejects a missing or invalid value.",
+      "rawEvidence": [
+        "games_played",
+        "gamesPlayed"
+      ],
+      "releaseAUse": "Calculation eligibility, sample/reliability damping, and EDGE bursts per 82.",
+      "situationScope": "MoneyPuck all situations; NHL regular-season total",
+      "sourceIds": [
+        "moneypuck_skater_summary_2025",
+        "nhl_official_skater_universe"
+      ],
+      "transformation": "MoneyPuck current-season GP with official NHL GP as the stable-ID fallback."
+    },
+    {
+      "input": "avgTOI",
+      "productionMissingRule": "Official TOI/GP fallback is used; otherwise the value remains null.",
+      "rawEvidence": [
+        "icetime",
+        "games_played",
+        "timeOnIcePerGame"
+      ],
+      "releaseAUse": "Descriptive usage only; Release A does not multiply Gravity masses by TOI.",
+      "situationScope": "MoneyPuck all situations; NHL regular-season total",
+      "sourceIds": [
+        "moneypuck_skater_summary_2025",
+        "nhl_official_skater_universe"
+      ],
+      "transformation": "MoneyPuck ice seconds divided by GP and 60; official NHL TOI/GP fallback."
+    },
+    {
+      "input": "qocIndex",
+      "productionMissingRule": "A missing component uses the existing neutral prior; both missing yields null.",
+      "rawEvidence": [
+        "iceTimeRank",
+        "games_played",
+        "I_F_dZoneShiftStarts",
+        "I_F_oZoneShiftStarts"
+      ],
+      "releaseAUse": "Descriptive context only; Release A does not multiply Gravity masses by QoC.",
+      "situationScope": "Mixed: all-situations ice-time rank and 5-on-5 zone starts",
+      "sourceIds": [
+        "moneypuck_skater_summary_2025"
+      ],
+      "transformation": "Position roster-slot rank (65%) plus defensive-zone start context (35%)."
+    },
+    {
+      "input": "xgRelTM",
+      "productionMissingRule": "Null; computeGravity can use baselineXgRel alone or omit lift if both are absent.",
+      "rawEvidence": [
+        "OnIce_F_xGoals",
+        "OnIce_A_xGoals",
+        "OffIce_F_xGoals",
+        "OffIce_A_xGoals"
+      ],
+      "releaseAUse": "Current on/off component of the offensive-zone lift and signal stability.",
+      "situationScope": "All situations",
+      "sourceIds": [
+        "moneypuck_skater_summary_2025"
+      ],
+      "transformation": "On-ice minus off-ice xG share in percentage points, damped by min(1, GP/30)."
+    },
+    {
+      "input": "baselineXgRel",
+      "productionMissingRule": "Null; current xgRelTM remains usable and stability takes the unknown prior.",
+      "rawEvidence": [
+        "onIce_xGoalsPercentage",
+        "offIce_xGoalsPercentage",
+        "games_played"
+      ],
+      "releaseAUse": "Multi-season on/off anchor for offensive lift and signal stability.",
+      "situationScope": "5-on-5 with documented all-situations fallback",
+      "sourceIds": [
+        "moneypuck_skater_summary_2022",
+        "moneypuck_skater_summary_2023",
+        "moneypuck_skater_summary_2024",
+        "moneypuck_skater_summary_2025"
+      ],
+      "transformation": "GP-qualified 2025/2024/2023/2022 weighted blend at 0.50/0.30/0.15/0.05."
+    },
+    {
+      "input": "pairDriverScore",
+      "productionMissingRule": "Null; no legacy defense-pair adjustment is applied.",
+      "rawEvidence": [
+        "Player",
+        "Player 2",
+        "Team",
+        "TOI",
+        "xGF%"
+      ],
+      "releaseAUse": "Defenseman-only legacy adjustment to signal stability, not partner isolation.",
+      "situationScope": "Natural Stat Trick all-situations defensive pair aggregates",
+      "sourceIds": [
+        "nstCurrentPairings",
+        "nstPriorPairings"
+      ],
+      "transformation": "50+ TOI exact-ID-crosswalk pair deltas, then 60% current/40% prior when both exist."
+    },
+    {
+      "input": "assistsPace",
+      "productionMissingRule": "Null; the fixed offensive-zone term is omitted.",
+      "rawEvidence": [
+        "I_F_points",
+        "I_F_goals",
+        "games_played",
+        "assists",
+        "gamesPlayed"
+      ],
+      "releaseAUse": "Displayed offensive-zone mass only; excluded from navResidual.",
+      "situationScope": "All situations",
+      "sourceIds": [
+        "moneypuck_skater_summary_2025",
+        "nhl_official_skater_universe"
+      ],
+      "transformation": "MoneyPuck (points minus goals) per 82; official NHL assists/GP fallback."
+    },
+    {
+      "input": "baselineIxg82",
+      "productionMissingRule": "Null; computeGravity uses goalsPace as its documented fallback.",
+      "rawEvidence": [
+        "Player",
+        "Position",
+        "Team",
+        "GP",
+        "ixG"
+      ],
+      "releaseAUse": "Individual expected-goal component of displayed offensive-zone mass only.",
+      "situationScope": "Natural Stat Trick all-situations skater totals",
+      "sourceIds": [
+        "nstCurrentSkaters",
+        "nstPriorSkaters"
+      ],
+      "transformation": "10+ GP ixG per 82 through the exact crosswalk; 60% current/40% prior blend."
+    },
+    {
+      "input": "goalsPace",
+      "productionMissingRule": "Null; the individual-xG/goals offensive-zone term is omitted.",
+      "rawEvidence": [
+        "I_F_goals",
+        "games_played",
+        "goals",
+        "gamesPlayed"
+      ],
+      "releaseAUse": "Fallback for baselineIxg82 in displayed offensive-zone mass; excluded from navResidual.",
+      "situationScope": "All situations",
+      "sourceIds": [
+        "moneypuck_skater_summary_2025",
+        "nhl_official_skater_universe"
+      ],
+      "transformation": "MoneyPuck goals per 82; official NHL goals/GP fallback."
+    },
+    {
+      "input": "ppPtsPace82",
+      "productionMissingRule": "Null only when no qualifying baseline season exists; an absent 5-on-4 row is zero.",
+      "rawEvidence": [
+        "I_F_points",
+        "games_played"
+      ],
+      "releaseAUse": "Displayed offensive-zone mass only; excluded from navResidual.",
+      "situationScope": "5-on-4 production",
+      "sourceIds": [
+        "moneypuck_skater_summary_2022",
+        "moneypuck_skater_summary_2023",
+        "moneypuck_skater_summary_2024",
+        "moneypuck_skater_summary_2025"
+      ],
+      "transformation": "PP points per 82 in each GP-qualified season, using the normalized baseline weights."
+    },
+    {
+      "input": "edgeOzPct",
+      "productionMissingRule": "Null; the neutral-zone displacement term is omitted.",
+      "rawEvidence": [
+        "zoneTimeDetails.offensiveZonePctg"
+      ],
+      "releaseAUse": "Transition displacement component of neutral-zone mass and navResidual.",
+      "situationScope": "NHL regular-season EDGE aggregate; no strength-state tag",
+      "sourceIds": [
+        "nhl_edge_skater_detail"
+      ],
+      "transformation": "Retained as the NHL EDGE offensive-zone time share."
+    },
+    {
+      "input": "dzPct",
+      "productionMissingRule": "Null; computeGravity uses a neutral 0.5 deployment prior.",
+      "rawEvidence": [
+        "I_F_dZoneShiftStarts",
+        "I_F_oZoneShiftStarts"
+      ],
+      "releaseAUse": "Deployment expectation for neutral-zone displacement; also descriptive QoC context.",
+      "situationScope": "5-on-5 zone starts",
+      "sourceIds": [
+        "moneypuck_skater_summary_2025"
+      ],
+      "transformation": "Defensive starts divided by offensive plus defensive starts."
+    },
+    {
+      "input": "edgeSpeedMaxMph",
+      "productionMissingRule": "Null; the fixed neutral-zone speed term is omitted.",
+      "rawEvidence": [
+        "skatingSpeed.speedMax.imperial"
+      ],
+      "releaseAUse": "Neutral-zone mass and navResidual.",
+      "situationScope": "NHL regular-season EDGE aggregate; no strength-state tag",
+      "sourceIds": [
+        "nhl_edge_skater_detail"
+      ],
+      "transformation": "Retained as maximum skating speed in miles per hour."
+    },
+    {
+      "input": "edgeBurstsOver20",
+      "productionMissingRule": "Null; the fixed neutral-zone burst term is omitted.",
+      "rawEvidence": [
+        "skatingSpeed.burstsOver20.value"
+      ],
+      "releaseAUse": "Neutral-zone mass and navResidual.",
+      "situationScope": "NHL regular-season EDGE aggregate; no strength-state tag",
+      "sourceIds": [
+        "nhl_edge_skater_detail"
+      ],
+      "transformation": "Retained as count; computeGravity converts it to bursts per 82 using games."
+    },
+    {
+      "input": "xgaRelTM",
+      "productionMissingRule": "Null; the fixed defensive-zone suppression term is omitted.",
+      "rawEvidence": [
+        "OnIce_A_xGoals",
+        "OffIce_A_xGoals",
+        "icetime",
+        "games_played"
+      ],
+      "releaseAUse": "Displayed defensive-zone mass only; excluded from navResidual.",
+      "situationScope": "All situations",
+      "sourceIds": [
+        "moneypuck_skater_summary_2025"
+      ],
+      "transformation": "On-ice minus off-ice xGA rate, damped by min(1, GP/30)."
+    },
+    {
+      "input": "dps",
+      "productionMissingRule": "Null and an unresolved source join if the NHL team summary cannot be linked.",
+      "rawEvidence": [
+        "plusMinus",
+        "timeOnIcePerGame",
+        "gamesPlayed",
+        "goalsFor",
+        "goalsAgainst",
+        "points"
+      ],
+      "releaseAUse": "Displayed defensive-zone mass only; excluded from navResidual.",
+      "situationScope": "NHL regular-season all-situations summaries",
+      "sourceIds": [
+        "nhl_official_skater_universe",
+        "nhl_team_summary"
+      ],
+      "transformation": "Existing team marginal-goals, TOI-share, and position-adjusted DPS derivation."
+    },
+    {
+      "input": "pkTimeShare",
+      "productionMissingRule": "Null only when no qualifying baseline season exists; absent 4-on-5 ice is zero.",
+      "rawEvidence": [
+        "4on5.icetime",
+        "all.icetime",
+        "games_played"
+      ],
+      "releaseAUse": "Displayed defensive-zone mass only; excluded from navResidual.",
+      "situationScope": "4-on-5 usage divided by all-situations usage",
+      "sourceIds": [
+        "moneypuck_skater_summary_2022",
+        "moneypuck_skater_summary_2023",
+        "moneypuck_skater_summary_2024",
+        "moneypuck_skater_summary_2025"
+      ],
+      "transformation": "PK ice share in each GP-qualified season, using the normalized baseline weights."
+    }
+  ],
+  "manifestPayloadSha256": "e59c9b8ea35d54b1d7ab8f7d9c94b9f46b8535ee6ffdd3a63d30ebba425e8a04",
+  "modelRelease": "gravity-v3-release-a",
+  "nhlSeasonId": 20252026,
+  "offlineVerificationCommand": "npx tsx scripts/gravity-calibration/build-population.ts --offline",
+  "population": {
+    "duplicatePlayerIds": 0,
+    "gravityCalculationEligible": 778,
+    "gravityIneligible": 162,
+    "officialUniverse": 940,
+    "provisionalNoPublicTier": 63,
+    "publicTierEligible": 715,
+    "qualifiedDefensemen": 239,
+    "qualifiedForwards": 476
+  },
+  "schemaVersion": "gravity-v3-release-a-population-manifest-v1",
+  "season": "2025-26",
+  "sourceJoinCoverage": {
+    "moneyPuckBaseline": {
+      "legitimately_unavailable": 96,
+      "present": 844,
+      "unresolved": 0
+    },
+    "moneyPuckCurrent": {
+      "legitimately_unavailable": 0,
+      "present": 940,
+      "unresolved": 0
+    },
+    "nhlDerivedDps": {
+      "legitimately_unavailable": 0,
+      "present": 940,
+      "unresolved": 0
+    },
+    "nhlEdge": {
+      "legitimately_unavailable": 1,
+      "present": 939,
+      "unresolved": 0
+    },
+    "nhlOfficialUniverse": {
+      "legitimately_unavailable": 0,
+      "present": 940,
+      "unresolved": 0
+    },
+    "nstBaseline": {
+      "legitimately_unavailable": 100,
+      "present": 840,
+      "unresolved": 0
+    }
+  },
+  "sources": [
+    {
+      "bytes": 3522666,
+      "contentTypes": [
+        "text/csv"
+      ],
+      "etags": [
+        "\"35c06a-5f9853aecadbb-gzip\""
+      ],
+      "httpStatusCounts": {
+        "200": 1
+      },
+      "id": "moneypuck_skater_summary_2022",
+      "identifier": "https://moneypuck.com/moneypuck/playerData/seasonSummary/2022/regular/skaters.csv",
+      "kind": "http",
+      "lastModifiedValues": [
+        "Mon, 17 Apr 2023 09:58:18 GMT"
+      ],
+      "requestCount": 1,
+      "retrievalTimestampStatus": "recorded",
+      "retrievedAt": "2026-07-24T21:44:37.532Z",
+      "rowCount": 951,
+      "sha256": "dbab6b12ce45ed3a3c6bcaa78d9c993fe7f4f1de820039a277eb0416d7901c5e"
+    },
+    {
+      "bytes": 3430973,
+      "contentTypes": [
+        "text/csv"
+      ],
+      "etags": [
+        "\"345a3d-616843d1e624d-gzip\""
+      ],
+      "httpStatusCounts": {
+        "200": 1
+      },
+      "id": "moneypuck_skater_summary_2023",
+      "identifier": "https://moneypuck.com/moneypuck/playerData/seasonSummary/2023/regular/skaters.csv",
+      "kind": "http",
+      "lastModifiedValues": [
+        "Sat, 20 Apr 2024 09:57:57 GMT"
+      ],
+      "requestCount": 1,
+      "retrievalTimestampStatus": "recorded",
+      "retrievedAt": "2026-07-24T21:44:37.788Z",
+      "rowCount": 924,
+      "sha256": "f05add93188ffb18b3aaa2d1222a0d2e4bf74e9343b44edb48bd72eca0471156"
+    },
+    {
+      "bytes": 3410678,
+      "contentTypes": [
+        "text/csv"
+      ],
+      "etags": [
+        "\"340af6-6331f76f275d5-gzip\""
+      ],
+      "httpStatusCounts": {
+        "200": 1
+      },
+      "id": "moneypuck_skater_summary_2024",
+      "identifier": "https://moneypuck.com/moneypuck/playerData/seasonSummary/2024/regular/skaters.csv",
+      "kind": "http",
+      "lastModifiedValues": [
+        "Sat, 19 Apr 2025 10:54:52 GMT"
+      ],
+      "requestCount": 1,
+      "retrievalTimestampStatus": "recorded",
+      "retrievedAt": "2026-07-24T21:44:38.064Z",
+      "rowCount": 920,
+      "sha256": "6639c8a638c6acc464e71f4d0a536e3f36c395a4f9d11e95fdd54a6602c05592"
+    },
+    {
+      "bytes": 3483132,
+      "contentTypes": [
+        "text/csv"
+      ],
+      "etags": [
+        "\"3525fc-64fc1ee8492b5-gzip\""
+      ],
+      "httpStatusCounts": {
+        "200": 1
+      },
+      "id": "moneypuck_skater_summary_2025",
+      "identifier": "https://moneypuck.com/moneypuck/playerData/seasonSummary/2025/regular/skaters.csv",
+      "kind": "http",
+      "lastModifiedValues": [
+        "Sat, 18 Apr 2026 20:30:09 GMT"
+      ],
+      "requestCount": 1,
+      "retrievalTimestampStatus": "recorded",
+      "retrievedAt": "2026-07-24T21:44:36.879Z",
+      "rowCount": 940,
+      "sha256": "f0d8959f4575b25e83a1cb791c499cc440ce45d9c69fe886ecc62d16a74db4cb"
+    },
+    {
+      "bytes": 4476045,
+      "contentTypes": [
+        "application/json"
+      ],
+      "etags": [
+        "W/\"6a63dccd--gzip\"",
+        "W/\"6a63dcdc--gzip\"",
+        "W/\"6a63dceb--gzip\""
+      ],
+      "httpStatusCounts": {
+        "200": 939,
+        "404": 1
+      },
+      "id": "nhl_edge_skater_detail",
+      "identifier": "https://api-web.nhle.com/v1/edge/skater-detail/{playerId}/20252026/2",
+      "kind": "http",
+      "lastModifiedValues": [],
+      "requestCount": 940,
+      "retrievalTimestampStatus": "recorded",
+      "retrievedAt": "2026-07-24T21:45:10.482Z",
+      "rowCount": 939,
+      "sha256": "332be24b07d439840b407743c74997750775680a0c7947b8900ac84c8ba3d3f7"
+    },
+    {
+      "bytes": 430713,
+      "contentTypes": [
+        "application/json"
+      ],
+      "etags": [],
+      "httpStatusCounts": {
+        "200": 10
+      },
+      "id": "nhl_official_skater_universe",
+      "identifier": "https://api.nhle.com/stats/rest/en/skater/summary (seasonId=20252026, gameTypeId=2)",
+      "kind": "http",
+      "lastModifiedValues": [],
+      "requestCount": 10,
+      "retrievalTimestampStatus": "recorded",
+      "retrievedAt": "2026-07-24T21:44:35.786Z",
+      "rowCount": 940,
+      "sha256": "d6d6f854662fb55c4641048dc74d75e0ceae636d8cb8dc756a2f76fe6f4e0ba4"
+    },
+    {
+      "bytes": 16854,
+      "contentTypes": [
+        "application/json"
+      ],
+      "etags": [],
+      "httpStatusCounts": {
+        "200": 1
+      },
+      "id": "nhl_team_summary",
+      "identifier": "https://api.nhle.com/stats/rest/en/team/summary (seasonId=20252026, gameTypeId=2)",
+      "kind": "http",
+      "lastModifiedValues": [],
+      "requestCount": 1,
+      "retrievalTimestampStatus": "recorded",
+      "retrievedAt": "2026-07-24T21:44:35.909Z",
+      "rowCount": 32,
+      "sha256": "745e581e5794cf16cd222bada02e81a523c0c1e38b73cab793e148d17cb339d9"
+    },
+    {
+      "bytes": 487651,
+      "contentTypes": [
+        "text/csv"
+      ],
+      "etags": [],
+      "httpStatusCounts": null,
+      "id": "nstCurrentPairings",
+      "identifier": "OtherData/2025;26_defensive_pairings_all.csv",
+      "kind": "tracked_file",
+      "lastModifiedValues": [],
+      "requestCount": 0,
+      "retrievalTimestampStatus": "unavailable",
+      "retrievedAt": null,
+      "rowCount": 1475,
+      "sha256": "9802693052a8c11d4462529ebdced4c8d6ae77df7793d0a142e761e019756825"
+    },
+    {
+      "bytes": 186493,
+      "contentTypes": [
+        "text/csv"
+      ],
+      "etags": [],
+      "httpStatusCounts": null,
+      "id": "nstCurrentSkaters",
+      "identifier": "OtherData/2025;26_skater_totals_all.csv",
+      "kind": "tracked_file",
+      "lastModifiedValues": [],
+      "requestCount": 0,
+      "retrievalTimestampStatus": "unavailable",
+      "retrievedAt": null,
+      "rowCount": 940,
+      "sha256": "ecbe0fd77dc64a9e90c4484776c85076432c230e2f58e2182d6f0769683acd1e"
+    },
+    {
+      "bytes": 1136147,
+      "contentTypes": [
+        "text/csv"
+      ],
+      "etags": [],
+      "httpStatusCounts": null,
+      "id": "nstPriorPairings",
+      "identifier": "OtherData/2022;23;24;25_defensive_pairings_all.csv",
+      "kind": "tracked_file",
+      "lastModifiedValues": [],
+      "requestCount": 0,
+      "retrievalTimestampStatus": "unavailable",
+      "retrievedAt": null,
+      "rowCount": 3413,
+      "sha256": "c8c75d2eba4662d2aee9610f90faf4eff47ae2b24baf000fddc0f9efbbb3f54a"
+    },
+    {
+      "bytes": 249861,
+      "contentTypes": [
+        "text/csv"
+      ],
+      "etags": [],
+      "httpStatusCounts": null,
+      "id": "nstPriorSkaters",
+      "identifier": "OtherData/2022;23;24;25_skater_totals_all.csv",
+      "kind": "tracked_file",
+      "lastModifiedValues": [],
+      "requestCount": 0,
+      "retrievalTimestampStatus": "unavailable",
+      "retrievedAt": null,
+      "rowCount": 1210,
+      "sha256": "1f0c653a9179cbde53ee58b0ce8cb2dc06e5485c82ee68772d72c8fd5c6db4a0"
+    }
+  ],
+  "structuralFailures": []
+}

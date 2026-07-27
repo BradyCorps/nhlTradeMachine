@@ -44,7 +44,7 @@ describe("computeGravity v3 — bounds and structure", () => {
     expect(Math.abs(g.navResidual)).toBeLessThan(1);
   });
 
-  it("navResidual is smaller than force when on-off lift is positive", () => {
+  it("navResidual is smaller than force when the full field is positive", () => {
     const g = computeGravity(asset({
       position: "C", games: 70, avgTOI: 19,
       assistsPace: 50, goalsPace: 30, baselineIxg82: 20,
@@ -53,7 +53,50 @@ describe("computeGravity v3 — bounds and structure", () => {
       edgeOzPct: 0.50, dzPct: 0.45, edgeSpeedMaxMph: 22.3, edgeBurstsOver20: 60,
     }))!;
     expect(g.navResidual).toBeLessThan(g.force);
-    expect(g.navResidual).toBeGreaterThan(0); // creation signals survive
+    expect(g.navResidual).toBeGreaterThan(0); // transition signal survives
+  });
+
+  it("Release A keeps direct offense out of navResidual while OZ remains descriptive", () => {
+    const base = {
+      position: "C", games: 82, avgTOI: 18,
+      assistsPace: 26, goalsPace: 20, baselineIxg82: 12,
+      xgRelTM: 4, baselineXgRel: 0.04, xgaRelTM: -0.1,
+      ppPtsPace82: 8, dps: 1, pkTimeShare: 0.04,
+      edgeOzPct: 0.46, dzPct: 0.48,
+      edgeSpeedMaxMph: 21.8, edgeBurstsOver20: 35,
+    };
+    const original = computeGravity(asset(base))!;
+    const assists = computeGravity(asset({ ...base, assistsPace: 80 }))!;
+    const powerPlay = computeGravity(asset({ ...base, ppPtsPace82: 40 }))!;
+    const individualXg = computeGravity(asset({ ...base, baselineIxg82: 35, goalsPace: 55 }))!;
+    const transition = computeGravity(asset({
+      ...base,
+      edgeOzPct: 0.58,
+      edgeSpeedMaxMph: 23.5,
+      edgeBurstsOver20: 140,
+    }))!;
+
+    expect(assists.masses.oz).not.toBe(original.masses.oz);
+    expect(assists.navResidual).toBe(original.navResidual);
+    expect(powerPlay.navResidual).toBe(original.navResidual);
+    expect(individualXg.navResidual).toBe(original.navResidual);
+    expect(transition.navResidual).not.toBe(original.navResidual);
+  });
+
+  it("QoC and TOI do not inflate per-rate zone masses", () => {
+    const base = {
+      position: "D", games: 70,
+      assistsPace: 30, goalsPace: 8, baselineIxg82: 8,
+      xgRelTM: 5, baselineXgRel: 0.05, xgaRelTM: -0.2,
+      ppPtsPace82: 10, dps: 3, pkTimeShare: 0.1,
+      edgeOzPct: 0.47, dzPct: 0.5,
+      edgeSpeedMaxMph: 21.8, edgeBurstsOver20: 30,
+    };
+    const sheltered = computeGravity(asset({ ...base, avgTOI: 12, qocIndex: 20 }))!;
+    const heavilyUsed = computeGravity(asset({ ...base, avgTOI: 27, qocIndex: 95 }))!;
+
+    expect(heavilyUsed.masses).toEqual(sheltered.masses);
+    expect(heavilyUsed.force).toBe(sheltered.force);
   });
 });
 
@@ -69,11 +112,11 @@ describe("computeGravity v3 — archetype shapes", () => {
     edgeOzPct: 0.48, edgeSpeedMaxMph: 21.1, edgeBurstsOver20: 15,
   }))!;
 
-  it("Fox: supermassive, but bounded — no more 4.87 blowups", () => {
+  it("Fox: high positive field, but bounded — no usage/QoC retuning", () => {
     const g = fox();
-    expect(g.force).toBeGreaterThan(0.5);
+    expect(g.force).toBeGreaterThanOrEqual(0.4);
     expect(g.force).toBeLessThan(0.9);
-    expect(g.tier).toBe("SUPERMASSIVE");
+    expect(["STAR", "SUPERMASSIVE"]).toContain(g.tier);
   });
 
   it("Fox: broad two-zone basin — OZ dominant, DZ dome real, all positive", () => {
@@ -172,7 +215,7 @@ describe("computeGravity v3 — archetype shapes", () => {
 });
 
 describe("computeGravity v3 — signal quality", () => {
-  it("partner independence damps borrowed lift (sign-flip between seasons)", () => {
+  it("signal stability damps conflicting current and baseline lift", () => {
     const base = {
       position: "W", games: 65, avgTOI: 16,
       ptsPace: 55, goalsPace: 22, assistsPace: 33,
@@ -183,11 +226,12 @@ describe("computeGravity v3 — signal quality", () => {
     };
     const stable = computeGravity(asset({ ...base, xgRelTM: 8, baselineXgRel: 0.075 }))!;
     const flipped = computeGravity(asset({ ...base, xgRelTM: 8, baselineXgRel: -0.06 }))!;
-    expect(flipped.partnerIndependence).toBeLessThan(stable.partnerIndependence);
+    expect(flipped.signalStability).toBeLessThan(stable.signalStability);
+    expect(stable.partnerIndependence).toBe(stable.signalStability);
     expect(flipped.force).toBeLessThan(stable.force);
   });
 
-  it("missing EDGE zone time → partial data quality and lower confidence", () => {
+  it("missing EDGE zone time → explicit coverage, partial data, and lower reliability", () => {
     const base = {
       position: "C", games: 70, avgTOI: 18,
       ptsPace: 70, goalsPace: 28, assistsPace: 42,
@@ -200,7 +244,24 @@ describe("computeGravity v3 — signal quality", () => {
     const partial = computeGravity(asset({ ...base, edgeOzPct: null }))!;
     expect(full.dataQuality).toBe("full");
     expect(partial.dataQuality).toBe("partial");
-    expect(partial.confidence).toBeLessThan(full.confidence);
+    expect(partial.coverage.nz.missingInputs).toContain("edgeZoneTimeDisplacement");
+    expect(partial.coverage.nz.presentWeight).toBe(0.5);
+    expect(partial.coverage.nz.possibleWeight).toBe(1);
+    expect(partial.reliability).toBeLessThan(full.reliability);
+    expect(partial.confidence).toBe(partial.reliability);
+  });
+
+  it("records all absent zone evidence as neutral shrinkage", () => {
+    const sparse = computeGravity(asset({
+      position: "W", games: 60, avgTOI: 15,
+    }))!;
+
+    expect(sparse.coverage.oz.ratio).toBe(0);
+    expect(sparse.coverage.nz.ratio).toBe(0);
+    expect(sparse.coverage.dz.ratio).toBe(0);
+    expect(sparse.coverage.oz.missingInputs).toContain("assistsPace");
+    expect(sparse.masses).toEqual({ oz: 0, nz: 0, dz: 0 });
+    expect(sparse.dataQuality).toBe("partial");
   });
 });
 
@@ -257,15 +318,21 @@ describe("simOnIceDelta (G4 sim propagation)", () => {
   it("stays bounded at ±8 even for absurd fields", () => {
     const max = simOnIceDelta({
       force: 0.99, masses: { oz: 1, nz: 1, dz: 1 }, navResidual: 0.9,
-      partnerIndependence: 1, confidence: 1, dataQuality: "full",
+      signalStability: 1, partnerIndependence: 1,
+      reliability: 1, confidence: 1, dataQuality: "full",
+      coverage: {
+        oz: { presentWeight: 1, possibleWeight: 1, ratio: 1, missingInputs: [] },
+        nz: { presentWeight: 1, possibleWeight: 1, ratio: 1, missingInputs: [] },
+        dz: { presentWeight: 1, possibleWeight: 1, ratio: 1, missingInputs: [] },
+      },
       isDefenseman: false, tier: "SUPERMASSIVE", description: "",
     } as any);
     expect(Math.abs(max)).toBeLessThanOrEqual(8);
   });
 
-  it("confidence-damps thin samples: same rate signals, fewer games → smaller delta", () => {
+  it("reliability-damps thin samples: same rate signals, fewer games → smaller delta", () => {
     // Counting stats scale with games so the per-82 rates are identical —
-    // the ONLY difference between the two runs is sample confidence.
+    // the ONLY difference between the two runs is sample reliability.
     const fields = (games: number) => ({
       position: "D", games, avgTOI: 21.5,
       ptsPace: 25, goalsPace: 4, assistsPace: 21,

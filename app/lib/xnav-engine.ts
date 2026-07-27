@@ -756,15 +756,15 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const ageVal       = baseAge < 0 ? baseAge * rentalFactor : baseAge * youthProjectionSignal;
   const ageTotal     = safe(ageVal);
 
-  // ── Gravity Residual ──────────────────────────────────────────
-  // The v3 engine exposes navResidual: the zone-mass field recomputed
-  // with on-off inputs (lift, suppression) zeroed — exactly the gravity
-  // that offTotal/defTotal have NOT already priced. Bounded (−1, +1),
-  // so the scale factor maps elite residuals (~0.5) to ~+22 NAV.
+  // ── Gravity v3 transition handoff ─────────────────────────────
+  // Release A limits navResidual to the bounded NZ transition mass.
+  // Direct offensive production and defensive suppression stay in their
+  // existing X-NAV components. Gravity v4 is intentionally not imported
+  // here and cannot affect X-NAV before its separate validation gates pass.
   let gravTotal = 0;
   const gravProfile = computeGravity(asset as any);
   if (gravProfile && games >= 20) {
-    gravTotal = clamp(gravProfile.navResidual * 45, -20, 35);
+    gravTotal = clamp(gravProfile.navResidual * 45, -20, 20);
   }
 
   // ── On-Ice Core ───────────────────────────────────────────────

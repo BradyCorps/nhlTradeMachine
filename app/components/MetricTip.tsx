@@ -22,7 +22,7 @@ const GLOSSARY: Record<string, string> = {
   "CAP": "Contract surplus component — positive means under market value, negative means overpaid.",
   "YNG": "Youth/upside component for young NHL players with real signal. Not a blanket ELC bonus.",
   "DEF": "Defensive NAV component — composite of defensive contributions.",
-  "GRAV": "Gravity residual — on-ice warping the OFF/DEF components haven't already priced, from the Player Gravity system.",
+  "GRAV": "Gravity v3 transition handoff — only the bounded neutral-zone transition proxy; direct offense and defensive suppression are valued elsewhere.",
   "OFF": "Offensive NAV component — production and creation priced against position.",
   "GSAX": "Goals Saved Above Expected — how many goals a goalie prevents vs league-average.",
   "SV%": "Save percentage — shots saved divided by total shots faced.",

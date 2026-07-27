@@ -1073,3 +1073,66 @@ describe("forward archetype", () => {
     })).toBe("SPEED_BURST");
   });
 });
+
+describe("X-NAV — Gravity Release A boundary", () => {
+  const base = {
+    id: "gravity-boundary",
+    name: "Gravity Boundary",
+    position: "C" as const,
+    age: 27,
+    capHit: 7,
+    yearsRemaining: 3,
+    ptsPace: 75,
+    xGPace: 22,
+    defRate: 0.1,
+    avgTOI: 19,
+    games: 75,
+    hasLiveStats: true,
+    assistsPace: 45,
+    goalsPace: 30,
+    baselineIxg82: 18,
+    ppPtsPace82: 15,
+    xgRelTM: 5,
+    baselineXgRel: 0.05,
+    xgaRelTM: -0.2,
+    dps: 1.5,
+    pkTimeShare: 0.04,
+    edgeOzPct: 0.49,
+    dzPct: 0.48,
+    edgeSpeedMaxMph: 22.3,
+    edgeBurstsOver20: 55,
+  };
+
+  it("direct offensive inputs cannot change GRAV when NZ inputs are fixed", () => {
+    const original = calcSkaterNAV(base);
+    const directOffenseChanged = calcSkaterNAV({
+      ...base,
+      assistsPace: 90,
+      goalsPace: 60,
+      baselineIxg82: 40,
+      ppPtsPace82: 40,
+    });
+
+    expect(directOffenseChanged.grav).toBe(original.grav);
+  });
+
+  it("NZ inputs change GRAV and the temporary handoff remains capped at ±20", () => {
+    const original = calcSkaterNAV(base);
+    const transitionChanged = calcSkaterNAV({
+      ...base,
+      edgeOzPct: 0.65,
+      edgeSpeedMaxMph: 24.5,
+      edgeBurstsOver20: 240,
+    });
+    const transitionCollapsed = calcSkaterNAV({
+      ...base,
+      edgeOzPct: 0,
+      edgeSpeedMaxMph: 0,
+      edgeBurstsOver20: 0,
+    });
+
+    expect(transitionChanged.grav).not.toBe(original.grav);
+    expect(transitionChanged.grav).toBeLessThanOrEqual(20);
+    expect(transitionCollapsed.grav).toBeGreaterThanOrEqual(-20);
+  });
+});

@@ -25,6 +25,7 @@ import {
 } from "@/app/lib/development-sources";
 import { fetchProspectEnrichmentMap } from "@/app/lib/prospect-enrichment";
 import { applyTeamCapDeltas, type CapDeltaAsset, type CapDeltaMoves, type TeamCapDeltaMap } from "@/app/lib/cap-delta";
+import { baselineForNhlPlayerId, type PlayerBaselineMap } from "@/app/lib/player-baselines";
 import { SECONDARY_POSITIONS } from "@/app/data/secondary-positions";
 
 const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
@@ -341,7 +342,7 @@ function loadBundledFallback(): Record<string, any> {
   return {};
 }
 
-function loadBaselines(): Record<string, any> {
+function loadBaselines(): PlayerBaselineMap {
   try {
     const fs   = require("fs");
     const path = require("path");
@@ -1238,8 +1239,7 @@ export async function assembleCanonicalRoster(options: {
         : LEAGUE.avgXga60;
 
       const currentYearGsax = goalieStats?.gsax ?? 0;
-      const baselineKey = p.name.toLowerCase().replace(/[^a-z]/g, "");
-      const baselines   = BASELINES[baselineKey] || {};
+      const baselines = baselineForNhlPlayerId(BASELINES, p.id);
       const qocIndex = calcQocIndex(finalPosition, stats?.iceRankAvg, stats?.dzPct);
       const hasSkaterStats = Boolean(stats);
       const games = draftOverall != null
