@@ -48,11 +48,11 @@ fit on. Run this **before** any league-wide backfill.
 npx tsx scripts/gravity-v4/coverage-spike.ts --games 50
 npx tsx scripts/gravity-v4/coverage-spike.ts --games 50 --offline      # rerun from cache
 npx tsx scripts/gravity-v4/coverage-spike.ts --games 200 --team ANA \
-  --lines /path/to/ANA_FW.csv                                          # + line validation
+  --lines ~/Downloads/ANA_FW.csv                                       # + line validation
 ```
 
 Flags: `--games N` · `--season 20252026` · `--offline` · `--team ABBREV` ·
-`--lines path.csv`
+`--lines path.csv` · `--gap MS` (per-request floor for api-web; raise if you see 429s)
 
 ### Sources
 
@@ -83,9 +83,25 @@ The spike prints PASS/FAIL and refuses to bless a backfill unless:
 | --- | --- |
 | games reconstructed ≥ 95% | endpoint reliability |
 | **zero tiling gap** | stints must exactly cover the shift span, or ice time is being dropped |
-| **zero impossible skater counts** | 3–6 skaters a side; anything else means shift parsing is wrong |
-| **strength agreement ≥ 99%** | derived on-ice counts vs the game's own `situationCode` — the two come from *different endpoints*, so this is a genuine cross-check |
+| impossible skater counts ≤ 0.1% of stints | 3–6 skaters a side; a handful survive too-many-men and overlapping-shift quirks, a systematic failure would not |
+| **strength agreement (boundary-tolerant) ≥ 99.5%** | derived on-ice counts vs the game's own `situationCode` — the two come from *different endpoints*, so this is genuine corroboration |
 | roster join ≥ 99.9% | every shift row resolves to a rostered NHL id |
+
+### Why the strength gate is boundary-tolerant
+
+At a line change the shift chart ends the outgoing shifts and starts the
+incoming ones on the same second, while the play-by-play stamps the event that
+*caused* the stoppage under the **outgoing** lineup. The instant genuinely
+belongs to two lineups, so a strict comparison scores a miss even when the
+reconstruction is correct.
+
+The gate therefore uses the boundary-tolerant figure — an event exactly on a
+boundary may match either adjacent lineup — because that is what measures real
+reconstruction error. Strict agreement is still printed, and the run reports
+where the disagreements sit (on/off boundary, and by event type), so the
+ambiguity is never hidden. Tolerance is deliberately narrow: a mismatch away
+from a boundary still fails, and `__tests__/gravity-v4-stints.test.ts` pins that
+so the allowance cannot quietly widen into a way of passing broken data.
 
 Identity is the NHL player id end to end. Names are used **only** in the
 optional `--lines` validation, never as a data join.

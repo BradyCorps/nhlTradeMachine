@@ -237,6 +237,22 @@ export function findStintAt(stints: Stint[], period: number, sec: number): Stint
   return null;
 }
 
+/**
+ * Every stint touching an instant. At a line change the instant is genuinely
+ * ambiguous: the shift chart ends the outgoing shifts and starts the incoming
+ * ones on the same second, while the play-by-play stamps the event that CAUSED
+ * the stoppage (a goal, a whistle) at that same second — under the previous
+ * lineup. Returning both lets the strength check distinguish "reconstruction is
+ * wrong" from "the instant belongs to two lineups".
+ */
+export function stintsTouching(stints: Stint[], period: number, sec: number): Stint[] {
+  return stints.filter(s =>
+    s.period === period && sec >= s.startSec && sec <= s.endSec);
+}
+
+export const isStintBoundary = (stints: Stint[], period: number, sec: number): boolean =>
+  stints.some(s => s.period === period && (s.startSec === sec || s.endSec === sec));
+
 // ── Coverage report ──────────────────────────────────────────────
 
 export interface CoverageReport {
@@ -254,6 +270,18 @@ export interface CoverageReport {
   strengthChecked: number;
   strengthAgreed: number;
   strengthAgreementPct: number | null;
+  /** Agreement allowing a boundary instant to match either adjacent lineup. */
+  strengthAgreedBoundaryTolerant: number;
+  strengthAgreementBoundaryTolerantPct: number | null;
+  /** Disagreement counts keyed by play-by-play event type. */
+  disagreementsByEventType: Record<string, number>;
+  /** How many disagreements sit exactly on a stint boundary. */
+  disagreementsAtBoundary: number;
+  /** A few worked examples for eyeballing. */
+  disagreementSamples: {
+    period: number; sec: number; typeDescKey?: string;
+    derived: string; claimed: string; atBoundary: boolean;
+  }[];
   rosterJoinPct: number | null;
 }
 
@@ -262,7 +290,7 @@ export function buildCoverageReport(args: {
   parse: ShiftParseReport;
   shifts: Shift[];
   stints: Stint[];
-  events?: { period: number; sec: number; situationCode?: string | null }[];
+  events?: { period: number; sec: number; situationCode?: string | null; typeDescKey?: string }[];
 }): CoverageReport {
   const { gameId, parse, shifts, stints, events = [] } = args;
 
@@ -283,15 +311,40 @@ export function buildCoverageReport(args: {
     s.homeSkaters.length < 3 || s.homeSkaters.length > 6 ||
     s.awaySkaters.length < 3 || s.awaySkaters.length > 6).length;
 
-  let strengthChecked = 0, strengthAgreed = 0;
+  let strengthChecked = 0, strengthAgreed = 0, strengthAgreedBoundaryTolerant = 0;
+  let disagreementsAtBoundary = 0;
+  const disagreementsByEventType: Record<string, number> = {};
+  const disagreementSamples: CoverageReport["disagreementSamples"] = [];
+
   for (const ev of events) {
     const parsed = parseSituationCode(ev.situationCode);
     if (!parsed) continue;
     const stint = findStintAt(stints, ev.period, ev.sec);
     if (!stint) continue;
     strengthChecked++;
-    if (stint.homeSkaters.length === parsed.homeSkaters &&
-        stint.awaySkaters.length === parsed.awaySkaters) strengthAgreed++;
+
+    const matches = (s: Stint) =>
+      s.homeSkaters.length === parsed.homeSkaters &&
+      s.awaySkaters.length === parsed.awaySkaters;
+
+    if (matches(stint)) { strengthAgreed++; strengthAgreedBoundaryTolerant++; continue; }
+
+    // Strict check failed. Does ANY lineup touching this instant match?
+    const touching = stintsTouching(stints, ev.period, ev.sec);
+    if (touching.some(matches)) strengthAgreedBoundaryTolerant++;
+
+    const atBoundary = isStintBoundary(stints, ev.period, ev.sec);
+    if (atBoundary) disagreementsAtBoundary++;
+    const key = ev.typeDescKey ?? "unknown";
+    disagreementsByEventType[key] = (disagreementsByEventType[key] ?? 0) + 1;
+    if (disagreementSamples.length < 8) {
+      disagreementSamples.push({
+        period: ev.period, sec: ev.sec, typeDescKey: ev.typeDescKey,
+        derived: `${stint.awaySkaters.length}v${stint.homeSkaters.length}`,
+        claimed: `${parsed.awaySkaters}v${parsed.homeSkaters}`,
+        atBoundary,
+      });
+    }
   }
 
   return {
@@ -307,6 +360,12 @@ export function buildCoverageReport(args: {
     strengthChecked,
     strengthAgreed,
     strengthAgreementPct: strengthChecked > 0 ? (100 * strengthAgreed) / strengthChecked : null,
+    strengthAgreedBoundaryTolerant,
+    strengthAgreementBoundaryTolerantPct: strengthChecked > 0
+      ? (100 * strengthAgreedBoundaryTolerant) / strengthChecked : null,
+    disagreementsByEventType,
+    disagreementsAtBoundary,
+    disagreementSamples,
     rosterJoinPct: parse.shiftRows > 0
       ? (100 * (parse.shiftRows - parse.unknownPlayerRows)) / parse.shiftRows
       : null,

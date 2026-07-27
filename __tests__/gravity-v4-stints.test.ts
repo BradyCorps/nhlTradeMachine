@@ -171,6 +171,50 @@ describe("situationCode cross-check", () => {
   });
 });
 
+describe("boundary tolerance is narrow, not a blanket excuse", () => {
+  // Home swaps a forward at 0:30. An event stamped exactly at 0:30 is genuinely
+  // ambiguous — the PBP records it under the outgoing lineup, the shift chart
+  // has already started the incoming one.
+  const rows: RawShiftRow[] = [
+    ...[1, 2].map(id => row(id, HOME, "00:00", "01:00")),
+    ...[4, 5, 6].map(id => row(id, HOME, "00:00", "01:00")),
+    row(3, HOME, "00:00", "00:30"),
+    row(7, HOME, "00:30", "01:00"),
+    ...[11, 12, 13, 14, 15, 16].map(id => row(id, AWAY, "00:00", "01:00")),
+  ];
+
+  it("forgives only a genuine boundary instant", () => {
+    const { shifts, report } = parseShifts(rows);
+    const stints = buildStints(shifts, roster, HOME);
+    const cov = buildCoverageReport({
+      gameId: 1, parse: report, shifts, stints,
+      events: [{ period: 1, sec: 30, situationCode: "1551", typeDescKey: "faceoff" }],
+    });
+    // Both adjacent lineups are 5v5 here, so strict already agrees.
+    expect(cov.strengthAgreed).toBe(1);
+    expect(cov.strengthAgreedBoundaryTolerant).toBe(1);
+  });
+
+  it("does NOT forgive a mid-stint mismatch — real errors still fail", () => {
+    // 4 home skaters all period; PBP claims 5v5 at a NON-boundary second.
+    const broken: RawShiftRow[] = [
+      ...[1, 2, 3, 6].map(id => row(id, HOME, "00:00", "01:00")),
+      ...[11, 12, 13, 14, 15, 16].map(id => row(id, AWAY, "00:00", "01:00")),
+    ];
+    const { shifts, report } = parseShifts(broken);
+    const stints = buildStints(shifts, roster, HOME);
+    const cov = buildCoverageReport({
+      gameId: 1, parse: report, shifts, stints,
+      events: [{ period: 1, sec: 25, situationCode: "1551", typeDescKey: "shot-on-goal" }],
+    });
+    expect(cov.strengthAgreed).toBe(0);
+    expect(cov.strengthAgreedBoundaryTolerant).toBe(0); // tolerance must NOT rescue it
+    expect(cov.disagreementsAtBoundary).toBe(0);
+    expect(cov.disagreementsByEventType["shot-on-goal"]).toBe(1);
+    expect(cov.disagreementSamples[0]).toMatchObject({ derived: "5v3", claimed: "5v5" });
+  });
+});
+
 describe("findStintAt", () => {
   it("uses half-open intervals so a boundary belongs to the later stint", () => {
     const rows: RawShiftRow[] = [
