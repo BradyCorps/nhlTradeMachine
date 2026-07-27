@@ -97,6 +97,7 @@ async function main() {
   const failures: { gameId: number; reason: string }[] = [];
   const perGame: { gameId: number; stints: number; shiftRows: number; unknownRows: number }[] = [];
   let rowsWritten = 0, rowsSkipped = 0, totalEvents = 0;
+  const startedAt = Date.now();
 
   for (const [i, gameId] of gameIds.entries()) {
     try {
@@ -137,10 +138,18 @@ async function main() {
         rowsWritten++;
       }
     } catch (e) {
-      failures.push({ gameId, reason: e instanceof Error ? e.message : String(e) });
+      const reason = e instanceof Error ? e.message : String(e);
+      failures.push({ gameId, reason });
+      // Print immediately. A silent 25-game progress interval is what made a
+      // run full of failing games look frozen rather than merely slow.
+      console.log(`  ! ${gameId}  ${reason.replace(/ for https?:\/\/\S+/, "")}`);
     }
-    if ((i + 1) % 25 === 0 || i + 1 === gameIds.length) {
-      console.log(`  ${i + 1}/${gameIds.length} games · ${rowsWritten} rows`);
+    if ((i + 1) % 10 === 0 || i + 1 === gameIds.length) {
+      const elapsed = (Date.now() - startedAt) / 1000;
+      const rate = (i + 1) / Math.max(1, elapsed);
+      const etaMin = (gameIds.length - (i + 1)) / Math.max(0.001, rate) / 60;
+      console.log(`  ${i + 1}/${gameIds.length} games · ${rowsWritten} rows · ` +
+        `${failures.length} failed · ETA ${etaMin.toFixed(0)}m`);
     }
   }
 

@@ -41,6 +41,14 @@ export interface FetcherOptions {
  */
 export type PayloadValidator = (payload: any) => string | null;
 
+/**
+ * How many times to retry an empty-but-valid-HTTP response before giving up.
+ * Deliberately small: an empty payload is as likely to mean "this game has no
+ * shift chart" as "slow down", and spending the full transport backoff ladder on
+ * every such game makes a large run look hung.
+ */
+const EMPTY_PAYLOAD_ATTEMPTS = 3;
+
 export type Fetcher = (key: string, url: string, validate?: PayloadValidator) => Promise<any>;
 
 export const validShiftPayload: PayloadValidator = p =>
@@ -124,13 +132,15 @@ export function makeFetcher(opts: FetcherOptions = {}): Fetcher {
         const text = await res.text();
         const payload = JSON.parse(text);
 
-        // An empty 200 is this API's quiet way of saying "slow down". Treat it
-        // exactly like a 429: back the host off, retry, and do not cache it.
+        // An empty 200 may be throttling — or the game may genuinely have no
+        // shift chart. Retry a couple of times in case it is the former, but on
+        // a short leash: a full backoff ladder per game turns a slate with many
+        // genuinely-empty games into an apparently frozen run. Never cache it.
         const reason = validate?.(payload) ?? null;
         if (reason) {
-          cooldown[host] = Math.min((cooldown[host] ?? 0) + 250, 2000);
+          cooldown[host] = Math.min((cooldown[host] ?? 0) + 250, 1000);
           lastErr = new Error(`${reason} for ${url}`);
-          if (attempt < 5) { await wait(1500 * 2 ** attempt); continue; }
+          if (attempt < EMPTY_PAYLOAD_ATTEMPTS - 1) { await wait(800 * 2 ** attempt); continue; }
           throw lastErr;
         }
 
