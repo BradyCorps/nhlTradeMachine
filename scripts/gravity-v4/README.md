@@ -87,6 +87,44 @@ The spike prints PASS/FAIL and refuses to bless a backfill unless:
 | **strength agreement (boundary-tolerant) ≥ 99.5%** | derived on-ice counts vs the game's own `situationCode` — the two come from *different endpoints*, so this is genuine corroboration |
 | roster join ≥ 99.9% | every shift row resolves to a rostered NHL id |
 
+### Measured result (50 games, 2025-26, run 2026-07-27)
+
+| Metric | Result |
+| --- | --- |
+| games reconstructed | 50/50 (100%) |
+| shift rows kept | 38,569 (69 duplicates, 0 invalid) |
+| roster join | 100.00% |
+| stints built | 20,073 |
+| tiling gap | 0s |
+| impossible skater counts | 9 (0.045%) |
+| 5v5 share of stint time | 75.7% |
+| strength agreement — strict | 96.49% |
+| **strength agreement — boundary-tolerant** | **99.75%** |
+
+All gates pass.
+
+**What the disagreements actually are.** 98.1% sit on a stint boundary, and the
+event-type breakdown is dominated by strength transitions:
+
+| Event | Share of disagreements |
+| --- | ---: |
+| penalty | 66.9% |
+| goal | 15.6% |
+| stoppage | 12.2% |
+| everything else | 5.3% |
+
+At the instant a penalty is called the teams are **still even strength** — the
+play-by-play correctly stamps 5v5 — but the shift chart has already ended the
+penalised player's shift on that second, so reconstruction reads 4v5. The goal
+case is the mirror image: a power-play goal is stamped 4v5 while the shift chart
+has already restored the penalised player, because the penalty ends on the goal.
+Both sources are correct; they describe opposite sides of the same transition.
+
+Residual worth revisiting if the fitted model misbehaves around special teams:
+11 disagreements (0.066%) were **not** on a boundary, and 41 (0.25%) were not
+resolved even allowing either adjacent lineup — likely instants where more than
+two lineups meet.
+
 ### Why the strength gate is boundary-tolerant
 
 At a line change the shift chart ends the outgoing shifts and starts the
