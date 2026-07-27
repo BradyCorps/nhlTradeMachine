@@ -44,3 +44,5 @@ local.db
 /.gravity-calibration-cache/
 /data/gravity-calibration/*/population.json
 /data/gravity-calibration/*/source-crosswalk.json
+/.gravity-v4-cache/
+/data/gravity-v4/
