@@ -4,7 +4,8 @@ import React from "react";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import { computeGravity, gravityTierColor } from "@/app/lib/gravity";
-import { CompactGravity, TierIcon } from "@/app/components/GravityField";
+import GravityField, { CompactGravity, TierIcon } from "@/app/components/GravityField";
+import { PlayerOutlook } from "@/app/components/PlayerOutlook";
 import { getPlayerPedigree } from "@/app/lib/player-data";
 import { boxScoreFromPace } from "@/app/lib/box-score";
 import { HISTORICAL_MAX_OFF, HISTORICAL_MAX_DEF } from "@/app/lib/historical-benchmarks";
@@ -13,7 +14,6 @@ import StrandView from "@/app/components/StrandView";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
 import { tradeAssetKey, useTradeStore } from "@/app/store/tradeStore";
 import { AssetBadges } from "@/app/components/AssetBadges";
-import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
 import { formatPickRound } from "@/app/lib/trade-format";
 import { contractExpiryYear } from "@/app/lib/contract-expiry";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
@@ -21,7 +21,13 @@ import MeasuredProfile from "@/app/components/MeasuredProfile";
 import { displayPosition } from "@/app/lib/display-position";
 
 import { fmtSigned as fmt } from "@/app/lib/display-utils";
-type AssetCardView = "STATS" | "STRAND" | "TIMELINE" | "DEV" | "EDGE";
+// RL3 — DEV is gone from the trade card. The dynasty/boom-bust read it showed
+// is a fantasy question, and it still lives in DevelopmentProfilePanel on the
+// fantasy and docket surfaces; what a GM evaluating a trade needs is the
+// analytics-desk read, which is OUTLOOK (PA12: trajectory + next season, with
+// NHL EDGE as the leading indicator). GRAVITY was a one-line strip buried at
+// the bottom of STATS despite being the model this app is built around.
+type AssetCardView = "STATS" | "STRAND" | "EDGE" | "GRAVITY" | "OUTLOOK" | "TIMELINE";
 
 export default function AssetCard({
   asset, idx, onRequestTrade, navResult, cupYear
@@ -54,6 +60,10 @@ export default function AssetCard({
   const compareXnav  = compareAsset
     ? (navMap?.[compareAsset.id] ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 })
     : null;
+  // One computation, three consumers: the badge, the GRAVITY tab's existence
+  // and its panel. The gate is deliberately strict — a goalie has no gravity
+  // profile, and under 10 games there is not enough signal to draw a field
+  // from. A tab that opens onto nothing is worse than no tab.
   const gravProfile = React.useMemo(() => {
     if (isPick || asset.position === "G" || (asset.games ?? 0) < 10) return null;
     return computeGravity(asset as any);
@@ -61,7 +71,7 @@ export default function AssetCard({
   const gravTier = gravProfile?.tier;
   const showGravBadge = gravTier === "SUPERMASSIVE" || gravTier === "STAR";
 
-  const hasDevelopmentProfile = Boolean(asset.developmentProfile && !isPick && asset.position !== "G");
+  const hasOutlook = Boolean(asset.developmentProfile && !isPick);
   const retentionPct = Math.round((asset.retainedPct || 0) * 100);
   const setRetentionPct = (pct: number) => {
     const clamped = Math.max(0, Math.min(50, Math.round(pct / 5) * 5));
@@ -211,7 +221,8 @@ export default function AssetCard({
             // Skaters get the measured EDGE/sim-driver tab (the shot map inside
             // no-ops for players without a numeric NHL id).
             ...(asset.position !== "G" && asset.position !== "Pick" ? ["EDGE"] : []),
-            ...(hasDevelopmentProfile ? ["DEV"] : []),
+            ...(gravProfile ? ["GRAVITY"] : []),
+            ...(hasOutlook ? ["OUTLOOK"] : []),
             "TIMELINE",
           ] as AssetCardView[]).map((v) => (
             <button key={v} onClick={() => setView(v)}
@@ -283,8 +294,11 @@ export default function AssetCard({
                     <PlayerTimeline asset={asset as any} /> 
         </div>
       )}
-      {view === "DEV" && hasDevelopmentProfile && (
-        <DevelopmentProfilePanel asset={asset} />
+      {view === "GRAVITY" && gravProfile && (
+        <GravityField profile={gravProfile} playerName={asset.name} />
+      )}
+      {view === "OUTLOOK" && hasOutlook && (
+        <PlayerOutlook asset={asset} />
       )}
       {/* Standard STATS view */}
       {(view === "STATS" || isPick) && (<>
@@ -405,16 +419,12 @@ export default function AssetCard({
               </div>
             );
           })()}
-          {(() => {
-            const grav = computeGravity(asset);
-            if (!grav) return null;
-            return (
-              <div className="mt-1 px-1 py-1 flex justify-between items-center" style={{ borderTop: '1px solid #c8b890' }}>
-                <span className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">Gravity</span>
-                <CompactGravity profile={grav} />
-              </div>
-            );
-          })()}
+          {gravProfile && (
+            <div className="mt-1 px-1 py-1 flex justify-between items-center" style={{ borderTop: '1px solid #c8b890' }}>
+              <span className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">Gravity</span>
+              <CompactGravity profile={gravProfile} />
+            </div>
+          )}
         </div>
       )}
 

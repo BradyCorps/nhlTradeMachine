@@ -662,13 +662,25 @@ describe("Canary — trade UI negative NAV", () => {
     expect(comparison).toContain("formatPickRound(asset.round)");
   });
 
-  it("AssetCard exposes development profile as its own tab without affecting NAV controls", () => {
+  it("AssetCard exposes a development-profile tab without affecting NAV controls", () => {
     const card = read("app/components/AssetCard.tsx");
     const src = read("app/components/DevelopmentProfilePanel.tsx");
-    expect(card).toContain('type AssetCardView = "STATS" | "STRAND" | "TIMELINE" | "DEV"');
-    expect(card).toContain('...(hasDevelopmentProfile ? ["DEV"] : [])');
-    expect(card).toContain('view === "DEV" && hasDevelopmentProfile');
-    expect(card).toContain("<DevelopmentProfilePanel asset={asset} />");
+    // RL3 replaced the DEV tab with OUTLOOK. The guarantee this canary was
+    // always making is unchanged — a tab gated on the profile existing, and
+    // NAV controls untouched by it — so it is pinned to that rather than to
+    // the tab's former name. What changed is WHICH read the trade card shows:
+    // OUTLOOK is the analytics-desk trajectory read (PA12); the dynasty and
+    // boom-bust view is a fantasy question and belongs on fantasy surfaces.
+    expect(card).toContain('hasOutlook = Boolean(asset.developmentProfile');
+    expect(card).toContain('...(hasOutlook ? ["OUTLOOK"] : [])');
+    expect(card).toContain('view === "OUTLOOK" && hasOutlook');
+    expect(card).toContain("<PlayerOutlook asset={asset} />");
+    // The trade card must NOT carry the fantasy panel any more.
+    expect(card).not.toContain("<DevelopmentProfilePanel");
+    // ...but it still has to exist, intact, where it is actually used.
+    for (const surface of ["app/docket/DocketClient.tsx", "app/components/OffseasonPlayerAnalytics.tsx"]) {
+      expect(read(surface), surface).toContain("DevelopmentProfilePanel");
+    }
     expect(src).toContain("export function DevelopmentProfilePanel");
     expect(src).toContain("asset.developmentProfile");
     expect(src).toContain("profile.developmentPhase");
@@ -2855,5 +2867,28 @@ describe("Canary — RL4 leadership letters and RL7 goalie tandem", () => {
     const starter = route.indexOf("starter: projectOneGoalie");
     expect(draw).toBeGreaterThan(-1);
     expect(draw).toBeLessThan(starter);
+  });
+});
+
+describe("Canary — RL3 trade-card tabs", () => {
+  it("drops DEV and offers Gravity and Outlook instead", () => {
+    const card = read("app/components/AssetCard.tsx");
+    expect(card).toContain('"GRAVITY"');
+    expect(card).toContain('"OUTLOOK"');
+    expect(card).not.toMatch(/AssetCardView\s*=\s*[^;]*"DEV"/);
+  });
+
+  it("gates the Gravity tab on the profile the panel will render", () => {
+    // The tab's existence, its panel and the STATS strip must agree — a tab
+    // that opens onto nothing is worse than no tab.
+    const card = read("app/components/AssetCard.tsx");
+    expect(card).toContain('...(gravProfile ? ["GRAVITY"] : [])');
+    expect(card).toContain('view === "GRAVITY" && gravProfile');
+  });
+
+  it("computes gravity once rather than per render site", () => {
+    const card = read("app/components/AssetCard.tsx");
+    const calls = card.match(/computeGravity\(/g) ?? [];
+    expect(calls.length).toBe(1);
   });
 });

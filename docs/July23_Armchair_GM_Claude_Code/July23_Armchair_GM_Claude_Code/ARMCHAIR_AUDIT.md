@@ -10,9 +10,9 @@ Implementation backlog. Inspect the repo first. Done = code + regression tests. 
 
 ## 2. Roster, player cards, and lineups
 
-- [ ] **RL1 Styling:** Team/Season Selection states cannot use ink-black backgrounds.
+- [x] **RL1 Styling:** Team/Season Selection states cannot use ink-black backgrounds. — fixed earlier by Codex (confirmed by the owner). Verified on re-audit: season tabs are `#e8dab8`, `TeamSelectModal` uses `--ledger-card` with a red selected border, and `LineupEditor` is cream throughout. The GM tab deck's plum `#532E3B` is the established accent, not ink.
 - [ ] **RL2 Roster:** add `ROSTER` before `LINEUPS`; sort by points; expand rows to current Stats/GRAVITY/Outlook/icons; refresh from the prior sim season. Replace `Team Numbers`. ![RL2](assets/07-team-numbers-roster-data.png)
-- [ ] **RL3 Cards:** update tabs/icons; remove `DEV`, add revamped Outlook and GRAVITY. ![RL3](assets/03-player-card-dev-tab.png)
+- [x] **RL3 Cards:** update tabs/icons; remove `DEV`, add revamped Outlook and GRAVITY. — `DEV` is gone from the trade card: the dynasty/boom-bust read is a fantasy question and still lives in `DevelopmentProfilePanel` on the fantasy and docket surfaces. `OUTLOOK` renders the PA12 analytics read (trajectory + next season, EDGE as leading indicator) off the same `developmentProfile` gate. `GRAVITY` promotes the full field from a one-line strip buried at the bottom of `STATS`, reusing the existing strict memo (no goalies, 10+ GP) so the tab, its panel and the strip cannot disagree. ![RL3](assets/03-player-card-dev-tab.png)
 - [x] **RL4 Leadership:** show Captain + two Alternate Captains from existing data. — `app/data/leadership.ts` had carried the letters all along, but only as a scoring input; nothing displayed them. `teamLeadership()` resolves one C and at most two A's per roster (ranked by the same `lineupContributionScore` the sheet orders on), and the lineup renders the letter. Lookup moved to a slug index — the raw name lookup was the ST3 failure mode. Never letters a goalie, and reports no captain rather than promoting an alternate.
 - [ ] **RL5 Locks:** allow player-to-line locks.
 - [ ] **RL6 Special teams:** add `5-on-5 | Power Play | Penalty Kill`; sim deployment must respect them.
