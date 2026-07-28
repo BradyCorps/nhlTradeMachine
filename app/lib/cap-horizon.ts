@@ -26,6 +26,8 @@ export interface HorizonPlayer {
   yearsRemaining?: number;
   expiryStatus?: string | null;
   teamId?: string;
+  /** Signed early; takes over when the current deal runs out (OFF5). */
+  pendingExtension?: { aav: number; term: number } | null;
 }
 
 export interface HorizonContract {
@@ -80,17 +82,33 @@ export function buildCapHorizon(
 ): HorizonSeason[] {
   const { teamId, startYear, seasons = 3, ceilingFor = projectedCapCeiling } = opts;
   const roster = players.filter(p =>
-    p.teamId === teamId && p.position !== "Pick" && (p.yearsRemaining ?? 0) > 0);
+    p.teamId === teamId && p.position !== "Pick"
+    && ((p.yearsRemaining ?? 0) > 0 || p.pendingExtension));
+
+  // An extension is invisible to today's cap and lands in the seasons after the
+  // current deal ends. Showing it is the entire reason the horizon exists.
+  const chargeFor = (p: HorizonPlayer, offset: number): number | null => {
+    const years = p.yearsRemaining ?? 0;
+    if (offset < years) return effectiveCapHit(p);
+    const ext = p.pendingExtension;
+    if (!ext) return null;
+    return offset < years + ext.term ? ext.aav : null;
+  };
+  const endsAfter = (p: HorizonPlayer, offset: number): boolean => {
+    const years = p.yearsRemaining ?? 0;
+    const ext = p.pendingExtension;
+    return ext ? years + ext.term === offset + 1 : years === offset + 1;
+  };
 
   return Array.from({ length: seasons }, (_, offset) => {
     const contracts: HorizonContract[] = roster
-      .filter(p => (p.yearsRemaining ?? 0) > offset)
+      .filter(p => chargeFor(p, offset) != null)
       .map(p => ({
         id: p.id,
         name: p.name,
         position: p.position,
-        capHit: round1(effectiveCapHit(p)),
-        expiresAfter: (p.yearsRemaining ?? 0) === offset + 1,
+        capHit: round1(chargeFor(p, offset)!),
+        expiresAfter: endsAfter(p, offset),
         expiryStatus: p.expiryStatus ?? null,
       }))
       .sort((a, b) => b.capHit - a.capHit || a.name.localeCompare(b.name));
@@ -99,8 +117,7 @@ export function buildCapHorizon(
     // values compounds the error across a 20-man roster. Space is then derived
     // from the rounded total so the column adds up as displayed.
     const committed = round1(roster
-      .filter(p => (p.yearsRemaining ?? 0) > offset)
-      .reduce((sum, p) => sum + effectiveCapHit(p), 0));
+      .reduce((sum, p) => sum + (chargeFor(p, offset) ?? 0), 0));
     const ceiling = ceilingFor(offset);
     return {
       offset,

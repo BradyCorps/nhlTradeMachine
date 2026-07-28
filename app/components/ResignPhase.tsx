@@ -3,7 +3,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { offseasonCta } from "@/app/lib/offseason-phases";
 import { sortPendingByRights } from "@/app/lib/free-agency";
-import { buildCapHorizon } from "@/app/lib/cap-horizon";
+import { buildCapHorizon, withProjectedSigning } from "@/app/lib/cap-horizon";
+import { isExtensionEligible, projectExtension } from "@/app/lib/extensions";
 import { CapHorizon } from "@/app/components/CapHorizon";
 import { SEASON } from "@/app/lib/season-config";
 import { createPortal } from "react-dom";
@@ -22,7 +23,7 @@ import {
 const MARKET_PAGE_SIZE = 30;
 
 export default function ResignPhase({
-  homeTeam, capSpace, pending, market, roster, navMap, onResign, onWalk, onSign, onDrop, onDone,
+  homeTeam, capSpace, pending, market, roster, navMap, onResign, onWalk, onSign, onDrop, onExtend, onDone,
 }: {
   homeTeam: Team;
   capSpace: number;
@@ -34,6 +35,7 @@ export default function ResignPhase({
   onWalk: (p: OffseasonPending) => void;
   onSign: (p: OffseasonPending) => void;
   onDrop: (p: Asset) => void;
+  onExtend?: (player: Asset, extension: { aav: number; term: number; wouldHaveBeen: "UFA" | "RFA" }) => void;
   onDone: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -83,6 +85,15 @@ export default function ResignPhase({
       startYear: parseInt(SEASON.label.slice(0, 4), 10),
     }),
     [roster, homeTeam.id],
+  );
+
+  // Players still under contract for one more year — extendable before they can
+  // reach the market at all (OFF5).
+  const extendable = useMemo(
+    () => roster.filter(isExtensionEligible)
+      .map(p => ({ player: p, terms: projectExtension(p) }))
+      .sort((a, b) => b.terms.aav - a.terms.aav),
+    [roster],
   );
 
   const pendingIds = useMemo(() => new Set(pending.map((p) => p.player.id)), [pending]);
@@ -222,6 +233,49 @@ export default function ResignPhase({
                 );
               })}
             </ul>
+          )}
+
+          {onExtend && extendable.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
+                Extensions Available — {extendable.length}
+              </h3>
+              <p className="text-[10px] font-mono mb-2" style={{ color: "var(--ledger-brown)" }}>
+                Final-year contracts. An extension costs nothing this season — it
+                begins when the current deal ends, so its bill lands in the
+                seasons below.
+              </p>
+              <ul role="list" className="flex flex-col gap-1.5" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                {extendable.map(({ player, terms }) => (
+                  <li key={player.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 py-2"
+                    style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
+                    <div className="min-w-0">
+                      <span className="font-black text-[13px]" style={{ color: "var(--ledger-ink)" }}>{player.name}</span>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <PlayerMeta p={player} />
+                        <StatLine p={player} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <div className="font-mono text-[11px] font-black" style={{ color: "var(--ledger-ink)" }}>
+                          {money(terms.aav)} × {terms.term}yr
+                        </div>
+                        <div className="text-[10px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+                          would be {terms.wouldHaveBeen} · starts next season
+                        </div>
+                      </div>
+                      <button onClick={() => onExtend(player, terms)}
+                        aria-label={`Extend ${player.name} at ${money(terms.aav)} for ${terms.term} years`}
+                        className="tap-target text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
+                        style={{ background: "var(--ledger-navy)", color: "#fff", borderRadius: "2px" }}>
+                        Extend
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           <CapHorizon horizon={horizon} />

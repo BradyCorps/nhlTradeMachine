@@ -181,7 +181,7 @@ export default function ArmchairGmPage() {
   const {
     mode, setMode, draftOpen, setDraftOpen, resignOpen, setResignOpen,
     offerSheetOpen, setOfferSheetOpen, userPending, market, rfaMarket,
-    offseasonResolvedRef, resignPlayer, walkPlayer, dropPlayer,
+    offseasonResolvedRef, resignPlayer, extendPlayer, walkPlayer, dropPlayer,
     signMarketPlayer, proceedToOfferSheets, signOfferSheet, finishOffseason,
   } = useOffseasonFlow({
     db, setDb, setOriginalDb, homeTeamId, showTeamSelect, initialNavReady,
@@ -801,6 +801,7 @@ export default function ArmchairGmPage() {
           roster={db.players.filter(p => p.teamId === homeTeamId)}
           navMap={navMap}
           onResign={resignPlayer}
+          onExtend={extendPlayer}
           onWalk={walkPlayer}
           onSign={signMarketPlayer}
           onDrop={dropPlayer}

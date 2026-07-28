@@ -96,6 +96,9 @@ export interface Asset {
   expiryYear?: number | null;                         // calendar year the deal expires (authoritative FA signal)
   contractStatus?: "UFA" | "RFA" | "SIGNED";          // normalized pending status this offseason
   expiresThisOffseason?: boolean;                     // pending free agent (expiryYear <= projected season start)
+  // Signed a year early; costs nothing until the current deal runs out, at
+  // which point the season rollover activates it (OFF5).
+  pendingExtension?: { aav: number; term: number; wouldHaveBeen: "UFA" | "RFA" } | undefined;
   contractMissing?: boolean;                          // no contract row on file — using the league-min placeholder
 }
 

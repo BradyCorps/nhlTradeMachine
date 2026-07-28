@@ -12,6 +12,7 @@ import { computeChangeOfScenery } from "./lineup-context";
 import { hashString, mulberry32 } from "./sim-engine";
 import { SEASON } from "./season-config";
 import { planCapCompliance } from "./ai-cap";
+import { activateMaturedExtension } from "./extensions";
 
 // ── Types ─────────────────────────────────────────────────────
 export interface CupRunSeasonRecord {
@@ -341,7 +342,11 @@ export function rollLeagueForward(opts: {
   // Flag every contract that has run out so resolveLeagueOffseason picks
   // it up on re-entry — including rows that were already at 0 years
   // (stale data would otherwise sit on a roster forever at full cap hit).
-  const flagged = rolled.players.map((p) => {
+  const flagged = rolled.players.map((raw) => {
+    // An extension signed a year early matures exactly here. Activate it before
+    // the expiry check, or the contract it was meant to replace flags him as a
+    // pending free agent and he reaches the market anyway (OFF5).
+    const p = activateMaturedExtension(raw);
     if (p.yearsRemaining > 0 || p.position === "Pick") return p;
     const expiryStatus: "UFA" | "RFA" = p.expiryStatus === "UFA" || p.expiryStatus === "RFA"
       ? p.expiryStatus

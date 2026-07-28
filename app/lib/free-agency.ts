@@ -14,6 +14,7 @@ import type { CapDeltaAsset, CapDeltaMoves } from "@/app/lib/cap-delta";
 import { mulberry32, hashString } from "@/app/lib/sim-engine";
 import { SEASON } from "@/app/lib/season-config";
 import { marketBudgetFor } from "@/app/lib/ai-cap";
+import { resolveAiExtensions, type ExtensionOffer } from "@/app/lib/extensions";
 
 export type FaStatus = "UFA" | "RFA";
 export type FaTier = "STAR" | "TOP" | "MIDDLE" | "DEPTH" | "FRINGE";
@@ -389,6 +390,9 @@ export interface LeagueOffseasonResult {
   market: OffseasonPending[];        // UFA players who hit the open market (signable)
   rfaMarket: OffseasonPending[];     // other teams' RFAs available for offer sheets
   teamCapMoves: Record<string, CapDeltaMoves>; // ready for applyTeamCapDeltas()
+  // Players AI clubs re-signed a year early. Costs nothing this season; the
+  // rollover activates them when the current deal runs out (OFF5).
+  aiExtensions: ExtensionOffer[];
 }
 
 export interface ResolveContext {
@@ -556,7 +560,17 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
     }
   }
 
-  return { expiringCount: expiring.length, userPending, resignings, walkAways, marketSignings, market, rfaMarket, teamCapMoves };
+  // Clubs lock up players still under contract for one more year, before they
+  // can reach the market at all. Judged against NEXT season's books — an
+  // extension spends future room, so present cap space is the wrong test.
+  const aiExtensions = ctx.teams
+    ? resolveAiExtensions(players, {
+        teamIds: ctx.teams.map((t) => t.id),
+        userTeamId: ctx.userTeamId ?? undefined,
+      })
+    : [];
+
+  return { expiringCount: expiring.length, userPending, resignings, walkAways, marketSignings, market, rfaMarket, teamCapMoves, aiExtensions };
 }
 
 // Apply a resolved offseason to the league roster. Re-signings take their new
@@ -569,7 +583,8 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
 // later signing can't duplicate them.
 export function applyOffseasonToRoster(
   players: Asset[],
-  res: Pick<LeagueOffseasonResult, "resignings" | "marketSignings" | "walkAways">,
+  res: Pick<LeagueOffseasonResult, "resignings" | "marketSignings" | "walkAways">
+    & Partial<Pick<LeagueOffseasonResult, "aiExtensions">>,
 ): Asset[] {
   const resignById = new Map(res.resignings.map((r) => [r.playerId, r.contract]));
   const marketSigningById = new Map(res.marketSignings.map((s) => [s.playerId, s]));
@@ -577,7 +592,10 @@ export function applyOffseasonToRoster(
     res.walkAways.filter((w) => !marketSigningById.has(w.playerId)).map((w) => w.playerId),
   );
 
-  return players.map((p) => {
+  const extensionById = new Map(res.aiExtensions?.map((e) => [e.playerId, e.extension]) ?? []);
+  return players.map((raw) => {
+    const ext = extensionById.get(raw.id);
+    const p = ext ? { ...raw, pendingExtension: ext } : raw;
     const resign = resignById.get(p.id);
     if (resign) {
       return { ...p, capHit: resign.aav, yearsRemaining: resign.term, expiresThisOffseason: false, contractStatus: "SIGNED" as const };

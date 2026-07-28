@@ -11,6 +11,7 @@ import { SEASON } from "@/app/lib/season-config";
 import { scenarioSeed } from "@/app/lib/sim-engine";
 import { resolveLeagueOffseason, applyOffseasonToRoster, resolveOfferSheetCompensation, type OffseasonPending } from "@/app/lib/free-agency";
 import { applyCapDelta, applyTeamCapDeltas } from "@/app/lib/cap-delta";
+import { applyExtensions } from "@/app/lib/extensions";
 import { clearNavCache } from "@/app/lib/evaluate-client";
 import { cupRunOffseasonEntry, type CupRunState } from "@/app/lib/cup-run";
 import type { CupDraftSummary } from "./CupRunDraftSummaryModal";
@@ -118,6 +119,21 @@ export function useOffseasonFlow({
           : t),
     }));
     setUserPending(prev => prev.filter(p => p.player.id !== fa.player.id));
+    clearNavCache();
+  }, [setDb]);
+
+  // Extend a player who still has a year left. No cap effect now — the deal
+  // starts when the current one ends, so only the horizon changes (OFF5).
+  const extendPlayer = useCallback((
+    player: Asset,
+    extension: { aav: number; term: number; wouldHaveBeen: "UFA" | "RFA" },
+  ) => {
+    setDb((prev) => ({
+      ...prev,
+      players: applyExtensions(prev.players, [
+        { playerId: player.id, teamId: player.teamId, extension },
+      ]),
+    }));
     clearNavCache();
   }, [setDb]);
 
@@ -248,6 +264,7 @@ export function useOffseasonFlow({
     rfaMarket,
     offseasonResolvedRef,
     resignPlayer,
+    extendPlayer,
     walkPlayer,
     dropPlayer,
     signMarketPlayer,
