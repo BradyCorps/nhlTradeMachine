@@ -253,6 +253,27 @@ diverge.
 A blocked shot is owned by the **blocking** team in the NHL feed, so the emitter
 credits the attempt to the other side.
 
+### Shift charts can contain another game's rows
+
+Game **2025020565** (BUF @ NJD) returns a shift chart carrying **667 rows from a
+Vegas–San Jose game** — Eichel, Stone, Pietrangelo on one side, Granlund,
+Toffoli, Ceci on the other — alongside a duplicated copy of the real game's rows.
+
+This is worth understanding rather than just filtering. `buildStints` assigns
+`isHome = teamId === homeTeamId` and treats **everything else as the away team**,
+so those skaters would have been placed on New Jersey's ice and the lineups would
+have been wrong without anything failing. The roster join caught it only by
+accident, and misreported it as a join failure.
+
+`parseShifts` therefore takes the two playing team ids and counts foreign rows
+as their own category, checked *before* the roster join so the join rate stays
+honest. Contamination is reported prominently and recorded in the manifest —
+filtered, never silent. Inspect a suspect game with:
+
+```bash
+npx tsx scripts/gravity-v4/probe.ts --inspect 2025020565
+```
+
 ### Line validation
 
 `--team ANA --lines ANA_FW.csv` rolls derived stints up to forward groups and

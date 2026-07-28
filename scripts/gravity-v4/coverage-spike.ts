@@ -71,7 +71,7 @@ async function main() {
       if (!homeTeamId || roster.length === 0) throw new Error("missing roster/home team in pbp");
 
       const known = new Set(roster.map(r => r.playerId));
-      const { shifts, report } = parseShifts(rawRows, known);
+      const { shifts, report } = parseShifts(rawRows, known, new Set([homeTeamId, awayTeamId]));
       const stints = buildStints(shifts, roster, homeTeamId);
       const events = eventsFromPbp(pbp);
       reports.push(buildCoverageReport({ gameId, parse: report, shifts, stints, events }));

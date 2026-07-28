@@ -544,3 +544,55 @@ describe("payload validators", () => {
     expect(validPbpPayload({ ...good, homeTeam: {} })).toMatch(/team ids/);
   });
 });
+
+// ── Foreign-game contamination ───────────────────────────────────
+// Real case: game 2025020565 (BUF @ NJD) came back with 667 shift rows from a
+// Vegas–San Jose game. buildStints treats any non-home row as the AWAY team, so
+// without a team filter those skaters land on New Jersey's ice.
+
+describe("shift rows from a team that did not play in the game", () => {
+  const FOREIGN = 54;
+  const contaminated: RawShiftRow[] = [
+    ...[1, 2, 3, 4, 5, 6].map(id => row(id, HOME, "00:00", "01:00")),
+    ...[11, 12, 13, 14, 15, 16].map(id => row(id, AWAY, "00:00", "01:00")),
+    // Four skaters from an entirely different game.
+    ...[901, 902, 903, 904].map(id => row(id, FOREIGN, "00:00", "01:00")),
+  ];
+
+  it("counts them separately from roster-join misses", () => {
+    const known = new Set([...roster.map(r => r.playerId), 901, 902, 903, 904]);
+    const { report } = parseShifts(contaminated, known, new Set([HOME, AWAY]));
+    expect(report.foreignTeamRows).toBe(4);
+    // They are foreign, not unknown — the roster-join rate stays honest.
+    expect(report.unknownPlayerRows).toBe(0);
+  });
+
+  it("keeps them off the ice — the failure they would otherwise cause", () => {
+    const known = new Set([...roster.map(r => r.playerId), 901, 902, 903, 904]);
+    const { shifts } = parseShifts(contaminated, known, new Set([HOME, AWAY]));
+    const [stint] = buildStints(shifts, roster, HOME);
+    expect(stint.awaySkaters).toEqual([11, 12, 13, 14, 15]);
+    expect(stint.strength).toBe("5v5");
+    for (const id of [901, 902, 903, 904]) {
+      expect(stint.awaySkaters).not.toContain(id);
+      expect(stint.homeSkaters).not.toContain(id);
+    }
+  });
+
+  it("without the filter, the foreign skaters corrupt the away lineup", () => {
+    // Pinning the bug this guards against: no allowedTeamIds, no roster filter.
+    const { shifts } = parseShifts(contaminated);
+    const [stint] = buildStints(shifts, roster, HOME);
+    expect(stint.awaySkaters.length).toBe(9); // 5 real + 4 foreign
+    expect(stint.strength).toBe("9v5");
+  });
+
+  it("is inert when a game's chart is clean", () => {
+    const { report } = parseShifts(
+      contaminated.filter(r => r.teamId !== FOREIGN),
+      new Set(roster.map(r => r.playerId)),
+      new Set([HOME, AWAY]),
+    );
+    expect(report.foreignTeamRows).toBe(0);
+  });
+});

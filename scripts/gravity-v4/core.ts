@@ -63,6 +63,8 @@ export interface ShiftParseReport {
   duplicateRows: number;
   invalidRows: number;
   unknownPlayerRows: number;
+  /** Rows belonging to a team that did not play in this game — see parseShifts. */
+  foreignTeamRows: number;
 }
 
 // ── Time helpers ─────────────────────────────────────────────────
@@ -85,12 +87,21 @@ const SHIFT_TYPE_CODE = 517;
  * Drops, and counts separately:
  *  - non-shift rows (goal/event rows share the endpoint),
  *  - rows whose clock will not parse or that end at/before they start,
+ *  - **rows for a team that did not play in this game**, when the two team ids
+ *    are supplied,
  *  - exact duplicates (same player, period, start and end),
  *  - rows for players absent from the game roster, when a roster is supplied.
+ *
+ * The foreign-team check is not defensive padding. A real 2025-26 shift chart
+ * (game 2025020565, BUF @ NJD) came back carrying 667 rows from a Vegas–San Jose
+ * game. `buildStints` treats any row that is not the home team as the AWAY team,
+ * so without this filter those skaters would have been placed on New Jersey's
+ * ice — silently corrupting the lineups rather than failing.
  */
 export function parseShifts(
   rows: RawShiftRow[],
   knownPlayerIds?: Set<number>,
+  allowedTeamIds?: Set<number>,
 ): { shifts: Shift[]; report: ShiftParseReport } {
   const report: ShiftParseReport = {
     totalRows: rows.length,
@@ -99,6 +110,7 @@ export function parseShifts(
     duplicateRows: 0,
     invalidRows: 0,
     unknownPlayerRows: 0,
+    foreignTeamRows: 0,
   };
   const seen = new Set<string>();
   const shifts: Shift[] = [];
@@ -114,6 +126,12 @@ export function parseShifts(
     const endSec = parseClock(row.endTime);
     if (startSec == null || endSec == null || endSec <= startSec || row.period == null) {
       report.invalidRows++;
+      continue;
+    }
+    // Checked before the roster join so a foreign game's players are counted as
+    // what they are, rather than inflating the roster-join miss rate.
+    if (allowedTeamIds && !allowedTeamIds.has(row.teamId)) {
+      report.foreignTeamRows++;
       continue;
     }
     if (knownPlayerIds && !knownPlayerIds.has(row.playerId)) {

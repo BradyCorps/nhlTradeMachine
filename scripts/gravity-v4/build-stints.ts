@@ -97,7 +97,8 @@ async function main() {
   const coverage: CoverageReport[] = [];
   const emits: EmitReport[] = [];
   const failures: { gameId: number; reason: string }[] = [];
-  const perGame: { gameId: number; stints: number; shiftRows: number; unknownRows: number }[] = [];
+  const perGame: { gameId: number; stints: number; shiftRows: number; unknownRows: number;
+    foreignRows: number }[] = [];
   /** Games the NHL simply has no shift chart for — expected, not a failure. */
   const noShiftChart: number[] = [];
   /** teamAbbrev -> { played, covered } across every attempted game. */
@@ -146,7 +147,7 @@ async function main() {
       noteTeams(teamAbbrevs, true);
 
       const known = new Set(roster.map(r => r.playerId));
-      const { shifts, report } = parseShifts(rawRows, known);
+      const { shifts, report } = parseShifts(rawRows, known, new Set([homeTeamId, awayTeamId]));
       const stints = buildStints(shifts, roster, homeTeamId);
       const events = eventsFromPbp(pbp);
       totalEvents += events.length;
@@ -161,6 +162,7 @@ async function main() {
       perGame.push({
         gameId, stints: stints.length,
         shiftRows: report.shiftRows, unknownRows: report.unknownPlayerRows,
+        foreignRows: report.foreignTeamRows,
       });
 
       const { rows, report: emit } = buildStintRows({
@@ -265,6 +267,22 @@ async function main() {
   const offenders = perGame
     .filter(g => g.unknownRows > 0)
     .sort((a, b) => b.unknownRows - a.unknownRows);
+  // ── Shift charts contaminated with another game's rows ────────
+  // Filtered out, but reported loudly: this is corruption in the source, and
+  // buildStints would otherwise have placed those skaters on the away team.
+  const contaminated = perGame.filter(g => g.foreignRows > 0)
+    .sort((a, b) => b.foreignRows - a.foreignRows);
+  if (contaminated.length) {
+    const total = contaminated.reduce((s, g) => s + g.foreignRows, 0);
+    console.log("\n── FOREIGN-GAME ROWS (filtered) ───────────────────");
+    console.log(`${total} shift rows across ${contaminated.length} games belonged to a team that`);
+    console.log("did not play in that game — the NHL's shift chart carried another");
+    console.log("game's rows. Dropped before reconstruction.");
+    for (const g of contaminated.slice(0, 10)) {
+      console.log(`  ${g.gameId}  ${String(g.foreignRows).padStart(4)} foreign of ${g.shiftRows + g.foreignRows} rows`);
+    }
+  }
+
   if (offenders.length) {
     const lost = offenders.reduce((s, g) => s + g.unknownRows, 0);
     console.log("\n── ROSTER JOIN MISSES ─────────────────────────────");
@@ -355,6 +373,8 @@ async function main() {
       duplicateRows: sumC(r => r.parse.duplicateRows),
       invalidRows: sumC(r => r.parse.invalidRows),
       unknownPlayerRows: unknown,
+      foreignTeamRows: sumC(r => r.parse.foreignTeamRows),
+      contaminatedGames: contaminated.map(g => ({ gameId: g.gameId, foreignRows: g.foreignRows })),
       rosterJoinPct,
       stints: sumC(r => r.stintCount),
       tilingGapSec: sumC(r => r.tilingGapSec),
