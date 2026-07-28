@@ -26,7 +26,7 @@ import {
 import { fetchProspectEnrichmentMap } from "@/app/lib/prospect-enrichment";
 import { applyTeamCapDeltas, type CapDeltaAsset, type CapDeltaMoves, type TeamCapDeltaMap } from "@/app/lib/cap-delta";
 import { baselineForNhlPlayerId, type PlayerBaselineMap } from "@/app/lib/player-baselines";
-import { SECONDARY_POSITIONS } from "@/app/data/secondary-positions";
+import { secondaryPositionFor } from "@/app/data/secondary-positions";
 
 const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
 const CONTRACTS_CACHE_KEY = "cache:contracts:v2";
@@ -1283,7 +1283,8 @@ export async function assembleCanonicalRoster(options: {
         teamId,
         name:           p.name,
         position:       finalPosition,
-        secondaryPosition: SECONDARY_POSITIONS[p.name] ?? null,
+        // Diacritic-safe: a raw map lookup missed "Teuvo Teräväinen" (ST3).
+        secondaryPosition: secondaryPositionFor(p.name),
         age:            p.age,
         headshot:       p.headshot ?? null,
         // Draftees default to 0 games so the pedigree NAV path (games < 14) triggers

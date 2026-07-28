@@ -2540,3 +2540,28 @@ describe("ST2 — spent draft picks leave every selector", () => {
     expect(lib).toContain("SEASON.draftYear + Math.max(1, cupYear) - 1");
   });
 });
+
+// ── ST3: the alternate-position map is matched by slug, never raw ────────────
+// A raw MAP[p.name] lookup silently missed every mapped player whose feed name
+// carries diacritics — including Teräväinen, the example lineup-order.ts cites.
+describe("ST3 — alternate positions resolve through a normalised key", () => {
+  it("exposes a lookup function and no raw index access survives", () => {
+    const data = read("app/data/secondary-positions.ts");
+    expect(data).toContain("export function secondaryPositionFor");
+    expect(data).toContain("canonicalNameSlug");
+    const assembly = read("app/lib/roster-assembly.ts");
+    expect(assembly).toContain("secondaryPositionFor(p.name)");
+    expect(assembly).not.toMatch(/SECONDARY_POSITIONS\[/);
+  });
+
+  it("keeps eligibility as one shared source of truth", () => {
+    // The editor and the default ordering must agree, or a slot the editor
+    // allows gets re-derived away on the next hydrate.
+    const editor = read("app/components/LineupEditor.tsx");
+    expect(editor).toMatch(/isC, isW, isF, isD, isG,/);
+    expect(editor).toContain('from "@/app/lib/lineup-order"');
+    const order = read("app/lib/lineup-order.ts");
+    expect(order).toContain("export const isC");
+    expect(order).toContain("secondaryPosition");
+  });
+});

@@ -1,11 +1,20 @@
 // Curated secondary-position map for players whose deployment regularly
 // differs from the single positionCode the NHL API provides.
-// Key = player name (must match roster-assembly canonical name).
+// Key = player name, matched through `canonicalNameSlug` — NOT by raw string.
 // Value = secondary position ("W", "C", "D").
+//
+// Lookups MUST go through `secondaryPositionFor`. A raw `MAP[p.name]` misses
+// every player whose feed name carries diacritics: the roster feed says
+// "Teuvo Teräväinen" and "Tomáš Hertl" while this table spells them without
+// accents, so those two silently lost their alternate position — including
+// Teräväinen, who is cited in lineup-order.ts as the example the feature
+// exists for (ST3).
 //
 // A center with secondaryPosition "W" will be eligible for wing slots
 // in lineup ordering — e.g. Vilardi is a natural C but plays RW on
 // Winnipeg's top line with Connor–Scheifele.
+
+import { canonicalNameSlug } from "@/app/lib/player-identity";
 
 export const SECONDARY_POSITIONS: Record<string, string> = {
   // ── Centers who regularly play wing ──────────────────────────────────
@@ -33,3 +42,15 @@ export const SECONDARY_POSITIONS: Record<string, string> = {
   "Artturi Lehkonen":   "C",   // COL — W who takes draws
   "Teuvo Teravainen":   "C",   // CHI/CAR — W with center experience
 };
+
+// Slug-keyed index, built once. Accent-, case- and punctuation-insensitive, so
+// "Teuvo Teräväinen", "teuvo teravainen" and "Teuvo Teravainen" all resolve.
+const BY_SLUG: Record<string, string> = Object.fromEntries(
+  Object.entries(SECONDARY_POSITIONS).map(([name, pos]) => [canonicalNameSlug(name), pos]),
+);
+
+/** The curated alternate position for a player, or null. Diacritic-safe. */
+export function secondaryPositionFor(name: string | null | undefined): string | null {
+  if (!name) return null;
+  return BY_SLUG[canonicalNameSlug(name)] ?? null;
+}
