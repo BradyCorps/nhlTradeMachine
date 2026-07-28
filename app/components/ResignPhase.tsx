@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { offseasonCta } from "@/app/lib/offseason-phases";
 import { createPortal } from "react-dom";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
@@ -554,7 +555,7 @@ export default function ResignPhase({
           <button onClick={onDone}
             className="tap-target text-[11px] font-black uppercase tracking-[0.18em] px-5 py-2 font-mono shrink-0"
             style={{ background: "var(--ledger-ink)", color: "var(--ledger-card-light)", borderRadius: "2px" }}>
-            Done — RFA Offer Sheets →
+            {offseasonCta("RESIGN")}
           </button>
         </div>
       </div>

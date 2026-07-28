@@ -28,7 +28,7 @@ Implementation backlog. Inspect the repo first. Done = code + regression tests. 
 
 ## 4. Offseason UX and transactions
 
-- [ ] **OFF1 CTA:** after RFA, replace `Done — Proceed to Free Agency` with `Start Armchair GM` or the accurate next action. ![OFF1](assets/04-rfa-completion-cta.png)
+- [x] **OFF1 CTA:** after RFA, replace `Done — Proceed to Free Agency` with `Start Armchair GM` or the accurate next action. ![OFF1](assets/04-rfa-completion-cta.png) — the label was promising a phase that had already happened: the real order is Draft Night → **Re-Sign (the open market lives here)** → RFA Offer Sheets → season, so nothing follows offer sheets. Now reads `Done — Start Armchair GM →`. The drift was structural — four phase screens each hardcoded their own description of the next step with nothing tying it to the transition the handler performs — so all four now read from `OFFSEASON_FLOW` in `app/lib/offseason-phases.ts`, which pairs each phase's CTA with its actual destination. 10 tests, including one that walks `next` from every phase and asserts it terminates at the season, and one that asserts each label names the phase it truly leads to.
 - [ ] **OFF2 Re-sign:** make the full screen AA. ![OFF2](assets/09-resign-screen-accessibility.png)
 - [ ] **OFF3 Analytics:** enlarge the advanced-stat dropdown target; make expanded data AA; make offseason decisions more engaging/methodical. ![OFF3](assets/10-advanced-stats-dropdown.png)
 - [ ] **OFF4 RFA data:** match the FA expandable analytics.

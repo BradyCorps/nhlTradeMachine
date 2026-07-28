@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { offseasonCta } from "@/app/lib/offseason-phases";
 import { createPortal } from "react-dom";
 import type { Asset, Team } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
@@ -378,7 +379,7 @@ export default function OfferSheetPhase({
           <button onClick={onDone}
             className="tap-target w-full text-[11px] font-black uppercase tracking-[0.18em] px-5 py-2 font-mono sm:w-auto"
             style={{ background: "var(--ledger-ink)", color: "var(--ledger-card-light)", borderRadius: "2px" }}>
-            Done — Proceed to Free Agency →
+            {offseasonCta("OFFER_SHEETS")}
           </button>
         </div>
       </div>

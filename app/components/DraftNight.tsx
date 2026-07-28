@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { offseasonCta } from "@/app/lib/offseason-phases";
 import { createPortal } from "react-dom";
 import {
   DRAFT_2026_ORDER,
@@ -253,7 +254,7 @@ export default function DraftNight({
               cursor: done ? "pointer" : "not-allowed",
             }}
             disabled={!done}>
-            Done — Proceed to Re-Sign →
+            {offseasonCta("DRAFT_NIGHT")}
           </button>
         </div>
       </div>
