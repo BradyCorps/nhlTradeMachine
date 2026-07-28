@@ -38,6 +38,7 @@ import { LoadingScreen, ErrorScreen } from "./Screens";
 import { useCupRunLifecycle } from "./useCupRunLifecycle";
 import { useOffseasonFlow } from "./useOffseasonFlow";
 import { cloneLeague, type LeagueSnapshot } from "@/app/lib/league-baseline";
+import { dropSpentDraftPicks, draftYearForCupYear } from "@/app/lib/draft-picks";
 import { useTradeBench, type SimControls } from "./useTradeBench";
 import { TeamSelectModal } from "./TeamSelectModal";
 import { MemoModal } from "./MemoModal";
@@ -761,9 +762,9 @@ export default function ArmchairGmPage() {
               // The off-season draft just happened: spend this year's picks (drop
               // them from the tradeable pool) and sign every selection to a default
               // 3-year ELC so the rookies join their drafting team's roster.
-              const withoutPicks = prev.players.filter(
-                p => !(p.position === "Pick" && p.year === SEASON.draftYear)
-              );
+              // Same rule the Cup Run rollover uses: the draft just held spends
+              // that year's picks. Year 1 enters through the base draft.
+              const withoutPicks = dropSpentDraftPicks(prev.players, draftYearForCupYear(1));
               // Diacritic-safe reconcile (AG4/VAL1): a prospect already on a
               // roster (e.g. seeded "Viggo Bjorck" vs a drafted "Viggo Björck")
               // must not produce a second entry — but dropping the drafted

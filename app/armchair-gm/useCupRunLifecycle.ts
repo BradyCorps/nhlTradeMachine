@@ -11,7 +11,8 @@
 // which fire after every render has assigned them.
 import React, { useState, useEffect, useCallback } from "react";
 import type { Asset, Team } from "@/app/lib/trade-types";
-import { capForCupYear, SEASON } from "@/app/lib/season-config";
+import { capForCupYear } from "@/app/lib/season-config";
+import { dropSpentDraftPicks, draftYearForCupYear } from "@/app/lib/draft-picks";
 import { clearNavCache } from "@/app/lib/evaluate-client";
 import {
   startCupRun,
@@ -172,14 +173,13 @@ export function useCupRunLifecycle({
       });
       setCupRun({ ...next, retentionLedger: rollRetentionLedger(next.retentionLedger) });
       clearNavCache();
-      // Prune spent draft picks: once the league rolls into a new season, any
-      // pick from a draft that has already happened is gone and must not still
-      // be tradeable (a 2027 pick in the 2028-29 season). The draft for the
-      // season being entered is SEASON.draftYear + currentYear - 1.
-      const currentDraftYear = SEASON.draftYear + next.currentYear - 1;
-      const livePlayers = rolled.players.filter(
-        p => p.position !== "Pick" || (p.year ?? 9999) >= currentDraftYear,
-      );
+      // Prune spent draft picks. Entering this season HELD a draft — Year 2
+      // holds 2027 — so that year's picks were just converted into rookies and
+      // must leave every selector. The old boundary kept them (`>=` where the
+      // draft year itself is already spent), so a traded 2027 first stayed
+      // tradeable after conveying (ST2).
+      const livePlayers = dropSpentDraftPicks(
+        rolled.players, draftYearForCupYear(next.currentYear));
       // The user's team is reconciled too — new ceiling, rolled roster, and its
       // still-active retained-salary obligations (paid on players it moved).
       const rolledLedger = rollRetentionLedger(next.retentionLedger);

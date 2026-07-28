@@ -2511,3 +2511,32 @@ describe("ST1 — Cup Run start/abandon restore the entry baseline", () => {
     expect(onStart).toContain("restoreEntryBaseline()");
   });
 });
+
+// ── ST2: a held draft spends that year's picks ──────────────────────────────
+// The boundary was written twice with two different comparisons; the rollover's
+// `>=` kept the picks it had just converted into rookies.
+describe("ST2 — spent draft picks leave every selector", () => {
+  it("routes both call sites through the shared rule", () => {
+    const lifecycle = read("app/armchair-gm/useCupRunLifecycle.ts");
+    const page = read("app/armchair-gm/page.tsx");
+    expect(lifecycle).toContain("dropSpentDraftPicks(");
+    expect(page).toContain("dropSpentDraftPicks(");
+    // The off-by-one that let a spent pick stay tradeable.
+    expect(lifecycle).not.toMatch(/\(p\.year \?\? 9999\) >= /);
+    expect(page).not.toMatch(/p\.position === "Pick" && p\.year === SEASON\.draftYear/);
+  });
+
+  it("keeps the boundary inclusive of the draft just held", () => {
+    // Assert the expression itself rather than the absence of ">=", so the
+    // file's own explanation of the old bug cannot trip its canary.
+    const lib = read("app/lib/draft-picks.ts");
+    expect(lib).toContain("export function dropSpentDraftPicks");
+    expect(lib).toContain("(p.year ?? Number.POSITIVE_INFINITY) > completedThroughYear");
+  });
+
+  it("derives the draft year from the run year in one place", () => {
+    const lib = read("app/lib/draft-picks.ts");
+    expect(lib).toContain("export function draftYearForCupYear");
+    expect(lib).toContain("SEASON.draftYear + Math.max(1, cupYear) - 1");
+  });
+});
