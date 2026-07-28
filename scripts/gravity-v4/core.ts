@@ -120,18 +120,20 @@ export function parseShifts(
       report.nonShiftRows++;
       continue;
     }
+    // Checked first, and BEFORE `shiftRows` is counted: a row belonging to some
+    // other game is not one of this game's shift rows at all. Counting it would
+    // put it in the denominator of the roster-join rate, quietly flattering a
+    // metric whose whole job is to notice rows that do not belong.
+    if (allowedTeamIds && !allowedTeamIds.has(row.teamId)) {
+      report.foreignTeamRows++;
+      continue;
+    }
     report.shiftRows++;
 
     const startSec = parseClock(row.startTime);
     const endSec = parseClock(row.endTime);
     if (startSec == null || endSec == null || endSec <= startSec || row.period == null) {
       report.invalidRows++;
-      continue;
-    }
-    // Checked before the roster join so a foreign game's players are counted as
-    // what they are, rather than inflating the roster-join miss rate.
-    if (allowedTeamIds && !allowedTeamIds.has(row.teamId)) {
-      report.foreignTeamRows++;
       continue;
     }
     if (knownPlayerIds && !knownPlayerIds.has(row.playerId)) {

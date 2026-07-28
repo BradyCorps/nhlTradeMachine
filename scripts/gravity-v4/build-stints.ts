@@ -279,7 +279,7 @@ async function main() {
     console.log("did not play in that game — the NHL's shift chart carried another");
     console.log("game's rows. Dropped before reconstruction.");
     for (const g of contaminated.slice(0, 10)) {
-      console.log(`  ${g.gameId}  ${String(g.foreignRows).padStart(4)} foreign of ${g.shiftRows + g.foreignRows} rows`);
+      console.log(`  ${g.gameId}  ${String(g.foreignRows).padStart(4)} foreign dropped, ${g.shiftRows} kept for this game`);
     }
   }
 

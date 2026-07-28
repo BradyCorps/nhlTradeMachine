@@ -596,3 +596,19 @@ describe("shift rows from a team that did not play in the game", () => {
     expect(report.foreignTeamRows).toBe(0);
   });
 });
+
+describe("foreign rows stay out of this game's denominators", () => {
+  it("does not count another game's rows as this game's shift rows", () => {
+    const rows: RawShiftRow[] = [
+      ...[1, 2, 3, 4, 5, 6].map(id => row(id, HOME, "00:00", "01:00")),
+      ...[11, 12, 13, 14, 15, 16].map(id => row(id, AWAY, "00:00", "01:00")),
+      ...[901, 902].map(id => row(id, 54, "00:00", "01:00")),
+    ];
+    const { report } = parseShifts(rows, undefined, new Set([HOME, AWAY]));
+    expect(report.foreignTeamRows).toBe(2);
+    expect(report.shiftRows).toBe(12);          // not 14
+    // The roster-join rate is computed over shiftRows, so a contaminated chart
+    // can neither inflate nor deflate it.
+    expect(report.shiftRows - report.unknownPlayerRows).toBe(12);
+  });
+});

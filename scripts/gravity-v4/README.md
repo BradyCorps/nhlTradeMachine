@@ -236,6 +236,34 @@ Shots carry coordinates and type but **no xG value** — nothing here fits an xG
 model. Attaching expected-goal weight is the next stage's job, and keeping it
 separate means the stint rows stay valid when the xG source changes.
 
+#### Measured result — full 2025-26 slate (run 2026-07-27)
+
+**All nine gates pass.** This is the dataset stage 2 reads.
+
+| Metric | Result |
+| --- | --- |
+| games on the schedule | 1312 |
+| games with no shift chart | 505 (38.5%) — absent at source |
+| games emitted | **807 / 807 reconstructable** |
+| stint rows | **319,806** (396 per game) |
+| team coverage | median 62.2%, range 58.5%–64.6%, **6.1-point spread** |
+| tiling gap | 0s |
+| roster join | 100.00% |
+| shots attributed | 93,947 — **0 without a shooter id** |
+| events landing in a stint | 99.67% |
+| foreign-game rows dropped | 667, all in game 2025020565 |
+| attribution — trailing (used) | **99.16%** |
+| attribution — leading (naive) | 95.34% |
+| on disk | 8.7 MB gzip (165.4 MB raw) |
+
+Two results carry beyond this stage. The **6.1-point coverage spread** across 32
+clubs means the missing 38% costs precision, not validity — no team is
+systematically under-observed, so player effects are not differentially
+shrunk by which club a player happens to play for. And the **3.8-point
+attribution gap** is 9,686 events the naive rule would have credited to the
+wrong five skaters, concentrated on goals and special-teams transitions: the
+highest-leverage events in the set.
+
 #### Which lineup owns an event
 
 An event that *causes* a stoppage — a goal, a shot, a hit — was played by the
