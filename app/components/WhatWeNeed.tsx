@@ -5,6 +5,9 @@
 // so "Usage" shows a Retooling team's veteran D-man, not Quinn Hughes.
 
 import React from "react";
+import { isFreeAgent, teamLabelFor } from "@/app/lib/fa-pool";
+import { projectFreeAgentContract } from "@/app/lib/free-agency";
+import type { Asset } from "@/app/lib/trade-types";
 import { rankNeedTargets, type AttainLabel, type Player, type Team } from "@/app/lib/need-targets";
 
 interface Gap {
@@ -138,9 +141,14 @@ export default function WhatWeNeed({ gaps, db, excludeIds, homeCapSpace = 8 }: P
                         fontFamily: "'Courier Prime', monospace",
                         flexShrink: 0, marginLeft: 6,
                       }}>
-                        {p.position} · {p.teamId ?? "UFA"}
+                        {p.position} · {teamLabelFor(p.teamId)}
                         {p.age ? ` · ${p.age}y` : ""}
-                        {p.capHit ? ` · $${p.capHit.toFixed(1)}M` : ""}
+                        {/* A free agent's old cap hit is an EXPIRED contract —
+                            showing it as his price read "Cale Makar · $9.0M".
+                            Price him at what signing him would actually cost. */}
+                        {isFreeAgent(p)
+                          ? ` · asks ~$${projectFreeAgentContract(p as Asset).aav.toFixed(1)}M`
+                          : p.capHit ? ` · $${p.capHit.toFixed(1)}M` : ""}
                       </span>
                     </div>
                     {/* Attainability row */}

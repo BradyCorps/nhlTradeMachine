@@ -1,3 +1,4 @@
+import { FA_POOL_TEAM_ID } from "@/app/lib/fa-pool";
 export interface Player {
   id:        string;
   name:      string;
@@ -55,6 +56,13 @@ export function attainability(
     return { score: 0, label: "Off limits", reason: `${srcTeam?.phase ?? "—"} — flagged untouchable, not moving` };
   }
 
+  // FA_POOL is the internal holding pen for unsigned players, not a club. A
+  // free agent is the MOST attainable target there is — you sign him, nobody has
+  // to agree — so reporting "Unknown team / Possible" both mislabels and
+  // understates him (OFF6).
+  if (player.teamId === FA_POOL_TEAM_ID) {
+    return { score: 0.95, label: "Available", reason: "Unsigned free agent — signable now" };
+  }
   if (!srcTeam) return { score: 0.40, label: "Possible", reason: "Unknown team" };
 
   const phase = srcTeam.phase ?? "";

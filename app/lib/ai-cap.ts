@@ -49,8 +49,12 @@ export interface CapPlayer {
  */
 export const PROTECTED_CORE = { D: 2, F: 3 } as const;
 
-/** Contracts below this are not worth cutting — the replacement costs as much. */
-const MIN_CUTTABLE_CAP_HIT = 1.0;
+/**
+ * Contracts below this are not worth cutting. A near-replacement body scores an
+ * almost perfect cut-efficiency — he costs nothing to lose — but sheds $0.2M,
+ * so without a floor the plan burns its cuts on players who free no room.
+ */
+const MIN_CUTTABLE_CAP_HIT = 2.0;
 
 const isG = (p: CapPlayer) => p.position === "G";
 const isD = (p: CapPlayer) => p.position === "D";
@@ -76,6 +80,51 @@ export function valuePerDollar(p: CapPlayer): number {
   if (hit <= 0) return Number.POSITIVE_INFINITY; // free — never a cut candidate
   return score / hit;
 }
+
+/**
+ * Value-for-money rank WITHIN a player's own position group, 0 (worst) to 1.
+ *
+ * Comparing a defenceman's value per dollar against a forward's is the original
+ * bug in a subtler form: even with a deployment-aware score, blue-liners and
+ * forwards sit on different scales. Ranking inside the position group asks the
+ * only question a GM actually asks — "is he the worst value among my D?" — so
+ * the club sheds its weakest defenceman rather than simply shedding defencemen.
+ */
+const positionalPeers = (roster: CapPlayer[], p: CapPlayer) =>
+  roster.filter(q => isG(q) === isG(p) && isD(q) === isD(p));
+
+/**
+ * Replacement level for a position group: what the cheapest bodies actually
+ * give you. Computed per position, because a replacement-level defenceman and a
+ * replacement-level forward are not the same player.
+ */
+export function replacementScore(roster: CapPlayer[], p: CapPlayer): number {
+  const peers = positionalPeers(roster, p);
+  if (peers.length === 0) return 0;
+  const cheapest = [...peers]
+    .sort((a, b) => cappedHit(a) - cappedHit(b))
+    .slice(0, Math.max(1, Math.floor(peers.length / 3)));
+  return cheapest.reduce((s, q) => s + lineupContributionScore(q), 0) / cheapest.length;
+}
+
+/**
+ * Contribution LOST per cap dollar SAVED by cutting a player. Lower is a better
+ * cut.
+ *
+ * Value-per-dollar alone cannot answer this: a league-minimum body always beats
+ * a star on that ratio, because the star costs more — so the metric that was
+ * meant to find bad contracts structurally nominated the best players. Measuring
+ * against the replacement you would actually dress instead asks the real
+ * question: how much do you give up, for how much room?
+ */
+export function cutEfficiency(roster: CapPlayer[], p: CapPlayer): number {
+  const saving = cappedHit(p) - REPLACEMENT_CAP_HIT;
+  if (saving <= 0) return Number.POSITIVE_INFINITY;  // frees nothing — never cut
+  const lost = Math.max(0, lineupContributionScore(p) - replacementScore(roster, p));
+  return lost / saving;
+}
+
+const REPLACEMENT_CAP_HIT = 0.8;
 
 /** The ids a club will not cut: its best D and forwards by contribution. */
 export function protectedCore(
@@ -133,13 +182,18 @@ export function planCapCompliance(
   }
 
   const keep = protectedCore(roster, protect);
+  // Rank within the position group, then by raw value as a tiebreak. A club
+  // sheds its weakest defenceman, not simply its defencemen.
   const candidates = roster
     .filter(p => !isG(p))
     .filter(p => !keep.has(p.id))
     .filter(p => !p.hasNMC)
     .filter(p => cappedHit(p) >= MIN_CUTTABLE_CAP_HIT)
-    // Worst value for money among positional peers goes first.
-    .sort((a, b) => valuePerDollar(a) - valuePerDollar(b));
+    // Position-awareness lives in the replacement baseline, not in a percentile
+    // on top of it: normalising within a group let eight near-replacement
+    // forwards drag the forward scale until a $1.2M third-pair D outranked a
+    // $6.5M albatross as "worst in his group".
+    .sort((a, b) => cutEfficiency(roster, a) - cutEfficiency(roster, b));
 
   const cuts: CapPlayer[] = [];
   let committed = committedBefore;

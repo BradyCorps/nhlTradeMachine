@@ -5,8 +5,11 @@
 import { describe, expect, it } from "vitest";
 import {
   planCapCompliance, protectedCore, valuePerDollar, committedCapOf,
-  marketBudgetFor, marketReserveShare, type CapPlayer,
+  marketBudgetFor, marketReserveShare, cutEfficiency, replacementScore,
+  type CapPlayer,
 } from "@/app/lib/ai-cap";
+import { isFreeAgent, teamLabelFor } from "@/app/lib/fa-pool";
+import { attainability } from "@/app/lib/need-targets";
 
 const d = (id: string, capHit: number, ptsPace: number, avgTOI: number, over: Partial<CapPlayer> = {}): CapPlayer =>
   ({ id, name: id, position: "D", capHit, ptsPace, avgTOI, games: 82, ...over });
@@ -162,5 +165,58 @@ describe("marketBudgetFor — the league must not spend itself to zero", () => {
     ];
     const leftover = league.reduce((s, t) => s + (t.space - marketBudgetFor(t.space, t.phase)), 0);
     expect(leftover).toBeGreaterThan(9.0);
+  });
+});
+
+describe("cut ranking is positional through replacement level", () => {
+  it("computes replacement level per position, not league-wide", () => {
+    const r = roster();
+    expect(replacementScore(r, makar)).not.toBe(replacementScore(r, r.find(p => p.id === "star")!));
+  });
+
+  it("does not let a forward's pay scale decide a defenceman's fate", () => {
+    // Identical D corps, different forward groups. The D who gets cut must be
+    // the same either way.
+    const dCorps = [
+      d("elite", 9, 75, 25), d("good", 5, 35, 21),
+      d("meh", 4.5, 12, 17), d("cheap", 2.2, 8, 14),
+      d("filler1", 2.1, 7, 13), d("filler2", 2.0, 6, 13),
+    ];
+    const cut = (fwds: CapPlayer[]) => {
+      const team = [...dCorps, ...fwds, g("g", 4)];
+      return planCapCompliance(team, { ceiling: committedCapOf(team) - 3 })
+        .cuts.filter(c => c.position === "D").map(c => c.id).join(",");
+    };
+    expect(cut(Array.from({ length: 12 }, (_, i) => f(`cf${i}`, 1.0, 25, 12))))
+      .toBe(cut(Array.from({ length: 12 }, (_, i) => f(`rf${i}`, 1.1, 30, 15))));
+  });
+
+  it("ignores contracts too small to free real room", () => {
+    // A $1M depth forward has near-perfect cut efficiency — he costs nothing to
+    // lose — but sheds $0.2M. Spending a cut on him achieves nothing.
+    const plan = planCapCompliance(roster(), { ceiling: committedCapOf(roster()) - 4 });
+    expect(plan.cuts.every(c => (c.capHit ?? 0) >= 2)).toBe(true);
+  });
+});
+
+describe("the free-agent pool is not a club", () => {
+  it("labels FA_POOL for humans and leaves real clubs alone", () => {
+    expect(teamLabelFor("FA_POOL")).toBe("Free Agent");
+    expect(teamLabelFor("WPG")).toBe("WPG");
+    expect(teamLabelFor(null)).toBe("—");
+  });
+
+  it("identifies an unsigned player", () => {
+    expect(isFreeAgent({ teamId: "FA_POOL" })).toBe(true);
+    expect(isFreeAgent({ teamId: "WPG" })).toBe(false);
+    expect(isFreeAgent({})).toBe(false);
+  });
+
+  it("treats a free agent as the most attainable target, not an unknown", () => {
+    const fa = { id: "makar", name: "Cale Makar", position: "D", teamId: "FA_POOL", age: 28 } as never;
+    const att = attainability(fa, undefined, 20);
+    expect(att.label).toBe("Available");
+    expect(att.score).toBeGreaterThan(0.9);
+    expect(att.reason).not.toMatch(/unknown/i);
   });
 });
