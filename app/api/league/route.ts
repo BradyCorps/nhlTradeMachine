@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveTeamCapSpace } from "@/app/lib/team-cap-space";
 import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
@@ -339,7 +340,14 @@ async function loadTeams(): Promise<any[]> {
     const divRank  = st?.divisionRank   ?? 4;   // Safe baseline fallback if API misses
     const pointPct = st?.pointPct       ?? 0.5;
     const capInfo = capMap.get(t.id);
-    const capSpace = capInfo?.capSpace  ?? t.capSpace;
+    // Shared with /api/league/teams. This route previously used the curated
+    // figure raw, so it reported $8.5M less space than the trade machine for
+    // every club — the difference between the curated ceiling and the live one.
+    const capSpace = resolveTeamCapSpace({
+      curatedCapSpace: t.capSpace,
+      capCeiling: CAP_CEILING,
+      liveCapSpace: capInfo?.capSpace,
+    });
     
     const phase = dbTeam?.phaseOverride
       ?? (standingsMap.size >= 28 ? derivePhase(confRank, divRank, pointPct) : t.phase);
@@ -357,7 +365,7 @@ async function loadTeams(): Promise<any[]> {
     return {
       id:       t.id,
       name:     st?.teamFullName ?? dbTeam?.name ?? t.name,
-      capSpace: Math.round(capSpace * 10) / 10,
+      capSpace,
       standing,
       phase,
       division,

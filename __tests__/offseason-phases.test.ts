@@ -154,4 +154,12 @@ describe("run length is chosen before the offseason, not after", () => {
     expect(modes).toContain("CUP_RUN");
     expect(read("app/armchair-gm/ModeSelectModal.tsx")).toContain("GAME_MODES");
   });
+
+  it("does not offer a second way to start a run once Single Season is chosen", () => {
+    // The legacy start button restores the entry baseline, so leaving it on a
+    // Single Season board let a user discard the offseason they had just
+    // played — precisely what asking the question up front was meant to fix.
+    const src = read("app/armchair-gm/page.tsx");
+    expect(src).toMatch(/gameMode === "CUP_RUN" && \(\s*<CupRunPanel/);
+  });
 });

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveTeamCapSpace } from "@/app/lib/team-cap-space";
 import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
@@ -18,7 +19,7 @@ const CAP_FLOOR       = SEASON.capFloor;
 // change shifts every team's space by the delta. See Decision A: we keep the curated
 // static used-cap accounting (LTIR/burial/bonuses) and only apply the ceiling delta —
 // NOT a naive sum of all contract rows (which overstates used cap → false negatives).
-const CURATED_CAPSPACE_CEILING = 95.5;
+// Now shared with /api/league — see app/lib/team-cap-space.ts.
 const TEAMS_CACHE_TTL = 6 * 60 * 60; // 6 hours
 
 const TEAM_NEEDS: Record<string, { pos: string; minWar: number; label: string }[]> = {
@@ -184,7 +185,6 @@ async function loadTeams(capCeiling: number): Promise<any[]> {
 
   // Cap space = curated static room (Decision A — authoritative used-cap accounting)
   // shifted by the ceiling delta so the live 2026-27 ceiling raises every team's room.
-  const ceilingDelta = capCeiling - CURATED_CAPSPACE_CEILING;
 
   const teams = TEAMS_DB.map((t) => {
     const dbTeam   = dbTeamMap.get(t.id);
@@ -193,7 +193,7 @@ async function loadTeams(capCeiling: number): Promise<any[]> {
     const confRank = st?.conferenceRank ?? 8;
     const divRank  = st?.divisionRank   ?? 4;
     const pointPct = st?.pointPct       ?? 0.5;
-    const capSpace = Math.round((t.capSpace + ceilingDelta) * 10) / 10;
+    const capSpace = resolveTeamCapSpace({ curatedCapSpace: t.capSpace, capCeiling });
 
     const phase = dbTeam?.phaseOverride
       ?? (standingsMap.size >= 28 ? derivePhase(confRank, divRank, pointPct) : t.phase);

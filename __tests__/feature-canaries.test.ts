@@ -1545,9 +1545,14 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(teams).toContain("parseStoredCapCeiling(row?.value, SEASON.capCeiling) ?? SEASON.capCeiling");
     // Cap space = curated static room shifted by the ceiling delta (Decision A),
     // NOT a naive sum of all contract rows (which overstated used cap → false negatives).
-    expect(teams).toContain("const CURATED_CAPSPACE_CEILING = 95.5");
-    expect(teams).toContain("const ceilingDelta = capCeiling - CURATED_CAPSPACE_CEILING");
-    expect(teams).toContain("Math.round((t.capSpace + ceilingDelta) * 10) / 10");
+    // Decision A is unchanged; it moved into a shared module because the other
+    // league route did NOT apply the delta and the two disagreed by $8.5M for
+    // every club. Pin the rule where it lives now, and that both routes use it.
+    const capSpaceLib = read("app/lib/team-cap-space.ts");
+    expect(capSpaceLib).toContain("export const CURATED_CAPSPACE_CEILING = 95.5");
+    expect(capSpaceLib).toContain("capCeiling - CURATED_CAPSPACE_CEILING");
+    expect(teams).toContain("resolveTeamCapSpace");
+    expect(read("app/api/league/route.ts")).toContain("resolveTeamCapSpace");
     expect(teams).not.toContain("buildTeamCapSpaceMap(dbContracts");
     expect(teams).not.toContain("TEAM_CAP_BASELINE");
     expect(teams).toContain("const cacheKey = teamCacheKey(capCeiling)");

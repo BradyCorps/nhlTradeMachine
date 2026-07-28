@@ -870,7 +870,12 @@ export default function ArmchairGmPage() {
         )}
 
 
-        {/* ── Cup Run Challenge HUD ── */}
+        {/* ── Cup Run Challenge HUD ──
+            Only for a Cup Run. Leaving the start button on a Single Season
+            board meant the mode question could be answered twice, and pressing
+            it restores the entry baseline — discarding the offseason the user
+            had just played, which is the exact problem asking up front solved. */}
+        {gameMode === "CUP_RUN" && (
         <CupRunPanel
           run={cupRun}
           canStart={!!homeTeam}
@@ -901,6 +906,7 @@ export default function ArmchairGmPage() {
             setShowTeamSelect(true);
           }}
         />
+        )}
 
         {navBootLoading && (
           <div className="border px-4 py-2 text-center font-mono text-[9px] font-black uppercase tracking-[0.22em]"
