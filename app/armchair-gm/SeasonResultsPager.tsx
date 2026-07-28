@@ -383,11 +383,39 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
 
           {/* Crease */}
           {t.goalie && (() => {
-            const gRoster = players.find(a => a.name === t.goalie.name && a.position === 'G');
-            const gNav = gRoster ? navMap[gRoster.id] : undefined;
-            const gCapSurplus = gNav?.fmvAav != null && gRoster
-              ? gNav.fmvAav - gRoster.capHit * (1 - (gRoster.retainedPct ?? 0))
-              : null;
+            // RL7 — the tandem, not just the starter. Both rows are rendered
+            // by one component: two hand-written rows would drift the moment a
+            // column changed, and the whole point is that these are the same
+            // projection applied to two goalies.
+            const goalieRow = (g: typeof t.goalie, role: string) => {
+              if (!g) return null;
+              const gRoster = players.find(a => a.name === g.name && a.position === 'G');
+              const gNav = gRoster ? navMap[gRoster.id] : undefined;
+              const gCapSurplus = gNav?.fmvAav != null && gRoster
+                ? gNav.fmvAav - gRoster.capHit * (1 - (gRoster.retainedPct ?? 0))
+                : null;
+              const isStarter = role === 'Starter';
+              return (
+                <tr key={g.name} style={isStarter ? undefined : { borderTop: '1px solid #d6c8a5' }}>
+                  <td className="text-[11px] py-1.5 px-1.5 text-left font-black" style={{ color: 'var(--ledger-ink)' }}>
+                    {g.name}
+                    <span className="text-[9px] font-mono ml-1.5" style={{ color: 'var(--ledger-ink-faint)', fontWeight: 700 }}>
+                      {role.toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{g.gamesStarted ?? '—'}</td>
+                  <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{g.projectedGAA ?? '—'}</td>
+                  <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{g.projectedSVP?.toFixed(3) ?? '—'}</td>
+                  <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums font-black" style={{ color: (g.gsax ?? 0) >= 0 ? 'var(--ledger-green)' : 'var(--ledger-red)' }}>
+                    {g.gsax != null ? `${g.gsax > 0 ? '+' : ''}${g.gsax.toFixed(1)}` : '—'}
+                  </td>
+                  <td className="text-[11px] py-1.5 px-1.5 text-right tabular-nums font-black" style={{ color: 'var(--ledger-ink)' }}>{gNav ? gNav.total : '—'}</td>
+                  <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums" style={{ color: gCapSurplus === null ? 'var(--ledger-ink-faint)' : gCapSurplus > 0 ? 'var(--ledger-green)' : 'var(--ledger-red)' }}>
+                    {gCapSurplus === null ? '—' : `${gCapSurplus > 0 ? '+' : ''}${gCapSurplus.toFixed(1)}M`}
+                  </td>
+                </tr>
+              );
+            };
             return (
               <div className="overflow-x-auto mt-1.5">
                 <div className="text-[10px] font-black uppercase tracking-[0.22em] py-1.5 px-1.5"
@@ -406,19 +434,8 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td className="text-[11px] py-1.5 px-1.5 text-left font-black" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.name}</td>
-                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.gamesStarted ?? '—'}</td>
-                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.projectedGAA ?? '—'}</td>
-                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums" style={{ color: 'var(--ledger-ink)' }}>{t.goalie.projectedSVP?.toFixed(3) ?? '—'}</td>
-                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums font-black" style={{ color: (t.goalie.gsax ?? 0) >= 0 ? 'var(--ledger-green)' : 'var(--ledger-red)' }}>
-                        {t.goalie.gsax != null ? `${t.goalie.gsax > 0 ? '+' : ''}${t.goalie.gsax.toFixed(1)}` : '—'}
-                      </td>
-                      <td className="text-[11px] py-1.5 px-1.5 text-right tabular-nums font-black" style={{ color: 'var(--ledger-ink)' }}>{gNav ? gNav.total : '—'}</td>
-                      <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums" style={{ color: gCapSurplus === null ? 'var(--ledger-ink-faint)' : gCapSurplus > 0 ? 'var(--ledger-green)' : 'var(--ledger-red)' }}>
-                        {gCapSurplus === null ? '—' : `${gCapSurplus > 0 ? '+' : ''}${gCapSurplus.toFixed(1)}M`}
-                      </td>
-                    </tr>
+                    {goalieRow(t.goalie, 'Starter')}
+                    {goalieRow(t.backupGoalie, 'Backup')}
                   </tbody>
                 </table>
               </div>

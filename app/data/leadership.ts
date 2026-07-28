@@ -5,6 +5,8 @@
 // This is deliberately NOT part of X-NAV trade value — leadership makes
 // a lineup better, it doesn't make a contract tradeable.
 
+import { canonicalNameSlug } from "@/app/lib/player-identity";
+
 export type LeadershipRole = "C" | "A";
 
 export const LEADERSHIP: Record<string, LeadershipRole> = {
@@ -51,8 +53,21 @@ export const LEADERSHIP: Record<string, LeadershipRole> = {
   "Jordan Kyrou": "A",
 };
 
+// Slug-keyed index, built once. Accent-, case- and punctuation-insensitive,
+// so an accented feed name still resolves — the same failure ST3 found in
+// SECONDARY_POSITIONS, where a raw exact-string lookup silently dropped
+// Teräväinen and Hertl. The curated table above is spelled without accents.
+const BY_SLUG: Record<string, LeadershipRole> = Object.fromEntries(
+  Object.entries(LEADERSHIP).map(([name, role]) => [canonicalNameSlug(name), role]),
+);
+
+/** The curated letter for a player, or null. Diacritic-safe. */
+export function leadershipFor(name: string | null | undefined): LeadershipRole | null {
+  if (!name) return null;
+  return BY_SLUG[canonicalNameSlug(name)] ?? null;
+}
+
 export const leadershipBonus = (name: string | undefined, scale: { c: number; a: number }): number => {
-  if (!name) return 0;
-  const role = LEADERSHIP[name];
+  const role = leadershipFor(name);
   return role === "C" ? scale.c : role === "A" ? scale.a : 0;
 };

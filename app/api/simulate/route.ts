@@ -17,6 +17,7 @@ import { derivePlayerRoles } from "@/app/lib/player-roles";
 import { effectiveCapHit } from "@/app/lib/cap-delta";
 import { simRequestSchema } from "@/app/lib/sim-request-schema";
 import { teamWindow } from "@/app/lib/team-window";
+import { splitGoalieStarts } from "@/app/lib/goalie-workload";
 import {
   DIVISIONS,
   EASTERN,
@@ -386,20 +387,17 @@ function projectTeamPoints(
   return Math.round(Math.max(55, Math.min(135, phaseBaseline + rosterStrength + tradeContext + variance - capPenalty)));
 }
 
-// ── Project starting goalie ───────────────────────────────────
-function projectGoalie(
-  roster: SimPlayer[],
+// ── Project one goaltender's season ───────────────────────────
+// Extracted so the backup is projected by the SAME model as the starter (RL7).
+// A separate, simpler formula for the backup would drift from this one on the
+// next tuning pass, and the difference between the two would stop meaning
+// "these are different goalies" and start meaning "these use different math".
+function projectOneGoalie(
+  g: SimPlayer,
   teamWinPct: number,
   rand: () => number,
-  startingGoalieId?: string | null,
-): { name: string; projectedGAA: number; projectedSVP: number; gamesStarted: number; gsax: number } | null {
-  const goalies = roster
-    .filter(p => p.position === "G")
-    .sort((a, b) => (b.gamesStarted ?? 0) - (a.gamesStarted ?? 0));
-
-  if (goalies.length === 0) return null;
-
-  const g    = (startingGoalieId ? goalies.find(p => p.id === startingGoalieId) : null) ?? goalies[0];
+  gamesStarted: number,
+): GoalieProjection {
   // Multi-season blend — single-season GSAX is noisy; the baseline (when
   // present) anchors the projection the same way the X-NAV engine blends it
   const gsax = stableGsax(g);
@@ -441,7 +439,6 @@ function projectGoalie(
 
   const shotsPerGame  = 28 + (1 - teamWinPct) * 8;
   const projectedGAA  = shotsPerGame * (1 - projectedSVP);
-  const gamesStarted  = Math.round(48 + rand() * 20);
 
   return {
     name: g.name,
@@ -449,6 +446,36 @@ function projectGoalie(
     projectedSVP: Math.round(projectedSVP * 1000) / 1000,
     gamesStarted,
     gsax: g.gsax ?? 0,
+  };
+}
+
+// ── Project the goaltending tandem ────────────────────────────
+function projectGoalies(
+  roster: SimPlayer[],
+  teamWinPct: number,
+  rand: () => number,
+  startingGoalieId?: string | null,
+): { starter: GoalieProjection | null; backup: GoalieProjection | null } {
+  const goalies = roster
+    .filter(p => p.position === "G")
+    .sort((a, b) => (b.gamesStarted ?? 0) - (a.gamesStarted ?? 0));
+
+  if (goalies.length === 0) return { starter: null, backup: null };
+
+  const starter = (startingGoalieId ? goalies.find(p => p.id === startingGoalieId) : null) ?? goalies[0];
+  const backup  = goalies.find(g => g.id !== starter.id) ?? null;
+
+  // Drawn BEFORE either projection so the starter consumes the same rand()
+  // sequence position it always did — adding the backup must not change any
+  // starter projection an existing seed already produced.
+  const drawnStarts = Math.round(48 + rand() * 20);
+  const workload = splitGoalieStarts(drawnStarts, backup != null);
+
+  return {
+    starter: projectOneGoalie(starter, teamWinPct, rand, workload.starterStarts),
+    backup: backup
+      ? projectOneGoalie(backup, teamWinPct, rand, workload.backupStarts)
+      : null,
   };
 }
 
@@ -644,7 +671,8 @@ function simulateLeague(
       );
     const topScorer  = projectedSkaters[0] ?? null;
     const winPct     = projectedPoints / 164;
-    const goalie     = projectGoalie(roster, winPct, mulberry32(teamSeed + hashString("goalie")), startingGoalieId);
+    const { starter: goalie, backup: backupGoalie } =
+      projectGoalies(roster, winPct, mulberry32(teamSeed + hashString("goalie")), startingGoalieId);
     const topDefenseman = projectedSkaters
       .filter(p => p.position === "D")
       .sort((a, b) =>
@@ -654,10 +682,18 @@ function simulateLeague(
       )[0] ?? null;
     return {
       teamId: team.id, teamName: team.name, phase: teamWindow(team),
-      projectedPoints, topScorer, projectedSkaters, goalie, topDefenseman,
+      projectedPoints, topScorer, projectedSkaters, goalie, backupGoalie, topDefenseman,
       madePlayoffs: false, divisionRank: 0, leagueRank: 0, division: "",
     };
   });
+}
+
+interface GoalieProjection {
+  name: string;
+  projectedGAA: number;
+  projectedSVP: number;
+  gamesStarted: number;
+  gsax: number;
 }
 
 interface SimTeamResult {
@@ -667,7 +703,9 @@ interface SimTeamResult {
   projectedPoints: number;
   topScorer: ProjectedSkaterSeason | null;
   projectedSkaters: ProjectedSkaterSeason[];
-  goalie: { name: string; projectedGAA: number; projectedSVP: number; gamesStarted: number; gsax: number } | null;
+  goalie: GoalieProjection | null;
+  /** RL7 — the tandem's other half. Null when the roster carries one goalie. */
+  backupGoalie: GoalieProjection | null;
   topDefenseman: ProjectedSkaterSeason | null;
   madePlayoffs: boolean;
   divisionRank: number;
@@ -873,7 +911,7 @@ function buildTradedPlayerOutcomes(
     if (p.position === "Pick") return;
     if (p.position === "G") {
       const winPctAnchor = teamWinPct(newTeamId);
-      const goalie = projectGoalie([p], winPctAnchor, mulberry32(seed + hashString(`${newTeamId}:${p.id}:goalie-outcome`)));
+      const goalie = projectGoalies([p], winPctAnchor, mulberry32(seed + hashString(`${newTeamId}:${p.id}:goalie-outcome`))).starter;
       outcomes.push({
         playerId: p.id,
         name: p.name,

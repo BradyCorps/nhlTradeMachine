@@ -7,8 +7,9 @@
 // G within G. Reset restores the ice-time-sorted default.
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { lineupContributionScore } from "@/app/lib/lineup-ranking";
 import { displayPosition } from "@/app/lib/display-position";
+import { teamLeadership, letterFor } from "@/app/lib/team-leadership";
+import { lineupContributionScore } from "@/app/lib/lineup-ranking";
 import {
   defaultLineupOrdersForRoster,
   hydrateLineupOrdersForRoster,
@@ -130,6 +131,17 @@ function TeamLineup({
 
   const byId = useMemo(() => new Map(effective.map(p => [p.id, p])), [effective]);
 
+  // RL4 — the letters. Ranked by the same contribution score the lineup itself
+  // orders on, so when a roster carries more than two curated alternates the
+  // two that dress are the two nearest the top of the sheet.
+  const leadership = useMemo(
+    () => teamLeadership(effective, candidate => {
+      const player = candidate.id ? byId.get(candidate.id) : undefined;
+      return player ? lineupContributionScore(player, navMap?.[player.id]?.total) : 0;
+    }),
+    [effective, byId, navMap],
+  );
+
   // Roster fingerprint — re-init orders when the trade or roster changes
   const rosterKey = useMemo(
     () => effective.map(p => p.id).sort().join("|"),
@@ -241,6 +253,7 @@ function TeamLineup({
     const isSel = selected?.group === group && selected.idx === idx;
     const status: keyof typeof STATUS_COLOR = !p ? "empty" : inIds.has(p.id) ? "in" : "normal";
     const nav = navOf(p, navMap);
+    const letter = letterFor(p?.name, leadership);
     // RL8 — G and A, not a P/82 rate. A per-82 projection is the right unit
     // for comparing players across different games-played totals, but a lineup
     // card is asking "who is this winger", and counting stats answer that in
@@ -257,7 +270,9 @@ function TeamLineup({
         onKeyDown={(event) => keySlot(event, group, idx)}
         role="button"
         tabIndex={0}
-        aria-label={p ? `Select ${p.name} in ${pos.trim()} slot` : `Select empty ${pos.trim()} slot`}
+        aria-label={p
+          ? `Select ${p.name}${letter === "C" ? ", captain" : letter === "A" ? ", alternate captain" : ""} in ${pos.trim()} slot`
+          : `Select empty ${pos.trim()} slot`}
         title={p ? `${p.name} · ${displayPosition(p.position, p.secondaryPosition)} · NAV ${nav}` : "Empty lineup slot"}
         style={{
           padding: 3, fontFamily: MONO,
@@ -301,6 +316,16 @@ function TeamLineup({
             overflowWrap: "anywhere",
           }}>
             {p ? p.name : "Empty"}
+            {letter && (
+              <span
+                title={letter === "C" ? "Captain" : "Alternate captain"}
+                style={{
+                  fontSize: 8, fontWeight: 900, marginLeft: 4,
+                  border: "1px solid var(--ledger-ink-faint)", padding: "0 3px",
+                  lineHeight: "12px", verticalAlign: "middle",
+                  color: "var(--ledger-ink)",
+                }}>{letter}</span>
+            )}
             {status === "in" && <span style={{ fontSize: 11, marginLeft: 4, color: "#2a7a44" }}>▲</span>}
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, minWidth: 0 }}>

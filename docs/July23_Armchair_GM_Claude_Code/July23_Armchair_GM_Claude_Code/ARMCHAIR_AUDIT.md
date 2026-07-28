@@ -13,10 +13,10 @@ Implementation backlog. Inspect the repo first. Done = code + regression tests. 
 - [ ] **RL1 Styling:** Team/Season Selection states cannot use ink-black backgrounds.
 - [ ] **RL2 Roster:** add `ROSTER` before `LINEUPS`; sort by points; expand rows to current Stats/GRAVITY/Outlook/icons; refresh from the prior sim season. Replace `Team Numbers`. ![RL2](assets/07-team-numbers-roster-data.png)
 - [ ] **RL3 Cards:** update tabs/icons; remove `DEV`, add revamped Outlook and GRAVITY. ![RL3](assets/03-player-card-dev-tab.png)
-- [ ] **RL4 Leadership:** show Captain + two Alternate Captains from existing data.
+- [x] **RL4 Leadership:** show Captain + two Alternate Captains from existing data. — `app/data/leadership.ts` had carried the letters all along, but only as a scoring input; nothing displayed them. `teamLeadership()` resolves one C and at most two A's per roster (ranked by the same `lineupContributionScore` the sheet orders on), and the lineup renders the letter. Lookup moved to a slug index — the raw name lookup was the ST3 failure mode. Never letters a goalie, and reports no captain rather than promoting an alternate.
 - [ ] **RL5 Locks:** allow player-to-line locks.
 - [ ] **RL6 Special teams:** add `5-on-5 | Power Play | Penalty Kill`; sim deployment must respect them.
-- [ ] **RL7 Goalies:** generate backup sim stats.
+- [x] **RL7 Goalies:** generate backup sim stats. — `projectGoalies` returns the tandem; `projectOneGoalie` is shared so the backup is projected by the SAME model rather than a second formula that would drift. `splitGoalieStarts` divides all 82 games, clamped to [42, 68] so the starter always outstarts his backup — a test caught a low draw inverting the tandem. The start draw happens before either projection, so no existing seed's starter reprojects.
 - [x] **RL8 Stats:** replace `P/82` with `G` and `A`. — lineup rows now read `34G · 72A · 19.2 TOI`. `goalsPace`/`assistsPace` are the same 82-game basis `ptsPace` was, so the row still totals to it and the default ordering is unchanged. ![RL8](assets/16-lineups-p82.png)
 
 ## 3. Valuation and data integrity

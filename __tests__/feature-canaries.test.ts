@@ -2822,3 +2822,38 @@ describe("Canary — CXS batch: shared state, recap headings, simulated clock", 
     expect(src).toContain("assistsPace");
   });
 });
+
+describe("Canary — RL4 leadership letters and RL7 goalie tandem", () => {
+  it("RL4 — leadership resolves through a slug, not a raw name index", () => {
+    const data = read("app/data/leadership.ts");
+    expect(data).toContain("canonicalNameSlug");
+    expect(data).toContain("export function leadershipFor");
+    // The raw `LEADERSHIP[name]` lookup is the ST3 failure mode.
+    expect(data).not.toContain("LEADERSHIP[name]");
+  });
+
+  it("RL4 — the lineup shows the letters it already scored with", () => {
+    const src = read("app/components/LineupEditor.tsx");
+    expect(src).toContain("teamLeadership");
+    expect(src).toContain("letterFor");
+    // Identity must not be colour or glyph alone.
+    expect(src).toContain("alternate captain");
+  });
+
+  it("RL7 — starter and backup share one projection model", () => {
+    const route = read("app/api/simulate/route.ts");
+    expect(route).toContain("projectOneGoalie");
+    expect(route).toContain("splitGoalieStarts");
+    expect(route).toContain("backupGoalie");
+  });
+
+  it("RL7 — the start draw happens before either projection", () => {
+    // Adding the backup must not shift the starter's position in the rand()
+    // sequence, or every existing seed reprojects.
+    const route = read("app/api/simulate/route.ts");
+    const draw = route.indexOf("const drawnStarts");
+    const starter = route.indexOf("starter: projectOneGoalie");
+    expect(draw).toBeGreaterThan(-1);
+    expect(draw).toBeLessThan(starter);
+  });
+});
