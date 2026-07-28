@@ -2751,3 +2751,29 @@ describe("Canary — standings tier and roster window are separate facts", () =>
     expect(read("app/teams/page.tsx")).toContain("team.phase");
   });
 });
+
+describe("Canary — Redis is found under either provisioning name", () => {
+  it("accepts the Vercel integration's KV_ names, not just UPSTASH_", () => {
+    const src = read("app/lib/redis-credentials.ts");
+    expect(src).toContain("UPSTASH_REDIS_REST_URL");
+    expect(src).toContain("KV_REST_API_URL");
+    expect(src).toContain("KV_REST_API_TOKEN");
+  });
+
+  it("never reaches for the read-only token or a TCP connection string", () => {
+    // Both sit beside the real credentials in the Upstash panel. Either one
+    // produces a client that fails silently behind the swallowed catch.
+    const resolver = read("app/lib/redis-credentials.ts")
+      .replace(/\/\/.*$/gm, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(resolver).not.toContain("READ_ONLY");
+    expect(resolver).not.toContain("env.KV_URL");
+    expect(resolver).not.toContain("env.REDIS_URL");
+  });
+
+  it("builds the client from the resolver rather than reading env inline", () => {
+    const client = read("app/lib/redis.ts");
+    expect(client).toContain("resolveRedisCredentials");
+    expect(client).not.toContain("process.env.UPSTASH_REDIS_REST_URL");
+  });
+});

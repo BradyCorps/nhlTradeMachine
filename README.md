@@ -88,11 +88,20 @@ No environment variables are required for a basic local boot because the databas
 | `DATABASE_AUTH_TOKEN` | Turso only | Auth token for remote libSQL/Turso. |
 | `UPSTASH_REDIS_REST_URL` | Optional | Enables shared Redis caches and Claude rate-limit windows. |
 | `UPSTASH_REDIS_REST_TOKEN` | Optional | Upstash Redis token. |
+| `KV_REST_API_URL` | Optional | Accepted in place of `UPSTASH_REDIS_REST_URL`. The Vercel Upstash integration provisions this name. |
+| `KV_REST_API_TOKEN` | Optional | Accepted in place of `UPSTASH_REDIS_REST_TOKEN`. |
 | `ADMIN_KEY` or `ADMIN_PASSWORD` | Required for admin | Shared admin secret. API routes fail closed without one unless dev auth is explicitly disabled. |
 | `ADMIN_DISABLE_AUTH` | Local dev only | Set to `1` to bypass admin auth outside production. |
 | `ANTHROPIC_API_KEY` | Optional unless using AI narrative | Enables `/api/claude` trade memo and season recap generation. |
 
 Use `.env.local` for local values. `drizzle.config.ts` loads `.env.local` first, then `.env`.
+
+Redis is optional everywhere: with no credentials the cache layer computes
+directly on every request — slower, never wrong. Two names in the Upstash panel
+look like credentials but are not usable here, and are deliberately ignored:
+`KV_URL` / `REDIS_URL` are `rediss://` strings for a TCP client (the SDK speaks
+HTTP), and `KV_REST_API_READ_ONLY_TOKEN` cannot write, which would leave a cache
+that reads fine and silently never fills.
 
 ## Useful Commands
 

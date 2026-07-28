@@ -1,10 +1,8 @@
 import { Redis } from '@upstash/redis';
+import { resolveRedisCredentials } from '@/app/lib/redis-credentials';
 
-// Only instantiate Redis if the env variables are present.
-// Fallback to null in local dev if they haven't configured it yet.
-export const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
-  ? new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    })
-  : null;
+// Null in local dev when nothing is configured. Callers treat that as "no
+// cache" and compute directly — slow, but always correct.
+const credentials = resolveRedisCredentials(process.env);
+
+export const redis = credentials ? new Redis(credentials) : null;
