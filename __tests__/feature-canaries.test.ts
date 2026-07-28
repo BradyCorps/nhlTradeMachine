@@ -2286,7 +2286,13 @@ describe("Canary — Cup Run lifecycle cap + clean start (CX5)", () => {
     expect(lifecycle).toContain("reconcileTeamCapSpaces(db.teams, livePlayers, nextCap, next.teamId, userRetainedAav)");
     // Starting a Cup Run clears pre-run trades + sim first.
     const page = read("app/armchair-gm/page.tsx");
-    expect(page).toMatch(/onStart=\{\(\) => \{[\s\S]*resetTrades\(\);[\s\S]*resetSimulation\(\);[\s\S]*handleStartCupRun\(\);/);
+    // CX5 required a run to start from a clean slate. ST1 strengthened HOW:
+    // instead of resetTrades() (which also reopened franchise selection), the
+    // handler restores the immutable entry baseline and runs the shared season
+    // reset. Both still clear pre-run trades and the pre-run sim.
+    expect(page).toMatch(/onStart=\{\(\) => \{[\s\S]*restoreEntryBaseline\(\);[\s\S]*resetSeasonState\(\);[\s\S]*handleStartCupRun\(\);/);
+    expect(page).toMatch(/const resetSeasonState = [\s\S]*setExecutedTrades\(\[\]\);/);
+    expect(page).toMatch(/const resetSeasonState = [\s\S]*resetSimulation\(\);/);
   });
 });
 
@@ -2457,5 +2463,51 @@ describe("Canary — playoff bracket advancement (SIM1)", () => {
     const route = read("app/api/simulate/route.ts");
     expect(route).toContain('from "@/app/lib/playoff-bracket"');
     expect(route).not.toContain("function simulateConference");
+  });
+});
+
+// ── ST1: a new Cup Run restarts on the league as first loaded ────────────────
+// `originalDb` is overwritten by every season rollover, so it ages with the run.
+// Without a separate immutable baseline, starting a second run begins on a
+// league a previous run already advanced three years while the run says Year 1.
+describe("ST1 — Cup Run start/abandon restore the entry baseline", () => {
+  const src = () => read("app/armchair-gm/page.tsx");
+
+  it("captures an entry baseline at load and never rewrites it", () => {
+    const s = src();
+    expect(s).toContain("entryBaselineRef");
+    expect(s).toMatch(/entryBaselineRef\.current = cloneLeague\(data\)/);
+    // Exactly one assignment — the whole point is that it is written once.
+    expect(s.match(/entryBaselineRef\.current\s*=/g) ?? []).toHaveLength(1);
+  });
+
+  it("restores that baseline when a run starts and when one is abandoned", () => {
+    const s = src();
+    expect(s).toContain("restoreEntryBaseline");
+    // Both handlers must call it; a run that starts on a rolled league is ST1.
+    expect(s.match(/restoreEntryBaseline\(\)/g) ?? []).toHaveLength(2);
+  });
+
+  it("shares ONE season reset between rollover and new run", () => {
+    // Two parallel reset lists drift: a field gets added to one and forgotten in
+    // the other. The rollover ref must point at the same function the new-run
+    // handler calls.
+    const s = src();
+    expect(s).toContain("const resetSeasonState = ");
+    expect(s).toContain("onSeasonRolledRef.current = resetSeasonState");
+    expect(s).toContain("resetSeasonState()");
+  });
+
+  it("clears a previous run's draft summary on restore", () => {
+    expect(src()).toMatch(/restoreEntryBaseline[\s\S]{0,600}setCupDraftSummary\(null\)/);
+  });
+
+  it("does not reopen franchise selection when a run starts", () => {
+    // resetTrades() sets showTeamSelect(true); calling it from onStart popped the
+    // team picker over a team the user had just chosen.
+    const s = src();
+    const onStart = s.slice(s.indexOf("onStart={"), s.indexOf("onRecordAndAdvance="));
+    expect(onStart).not.toContain("resetTrades()");
+    expect(onStart).toContain("restoreEntryBaseline()");
   });
 });

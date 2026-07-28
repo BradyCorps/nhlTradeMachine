@@ -37,6 +37,7 @@ import { MiniStat } from "./SeasonResultsPager";
 import { LoadingScreen, ErrorScreen } from "./Screens";
 import { useCupRunLifecycle } from "./useCupRunLifecycle";
 import { useOffseasonFlow } from "./useOffseasonFlow";
+import { cloneLeague, type LeagueSnapshot } from "@/app/lib/league-baseline";
 import { useTradeBench, type SimControls } from "./useTradeBench";
 import { TeamSelectModal } from "./TeamSelectModal";
 import { MemoModal } from "./MemoModal";
@@ -161,6 +162,9 @@ export default function ArmchairGmPage() {
   const simDataRef = useRef<any | null>(null);
   const onSeasonRolledRef = useRef<() => void>(() => {});
   const simControlsRef = useRef<SimControls | null>(null);
+  // The league exactly as first loaded. Never written again — a Cup Run
+  // rollover advances db and originalDb, this stays at 2026-27 (ST1).
+  const entryBaselineRef = useRef<LeagueSnapshot | null>(null);
 
   // ── Cup Run Challenge (3-year mode) ──────────────────────────
   const {
@@ -255,7 +259,11 @@ export default function ArmchairGmPage() {
   // Late-binding ref assignments — see the refs block above.
   simDataRef.current = simData;
   simControlsRef.current = { clearSimResult, resetSimulation };
-  onSeasonRolledRef.current = () => {
+  // Everything that must be cleared when the page enters a fresh season —
+  // whether that is the next year of a run or the first year of a new one.
+  // Both paths call THIS, so a field added here can never be handled by one
+  // and forgotten by the other (ST1).
+  const resetSeasonState = () => {
     setExecutedTrades([]);
     resetSimulation();
     setLineupOrders({});
@@ -263,11 +271,25 @@ export default function ArmchairGmPage() {
     setShowSimPanel(false);
     setBlocks([[], []]);
     setVerdict(null);
+    setMatchResults(null);
     offseasonResolvedRef.current = false;   // re-resolve FA for the new year
     setMode("offseason");
     setDraftOpen(false);
     setResignOpen(false);
     setOfferSheetOpen(false);
+  };
+
+  onSeasonRolledRef.current = resetSeasonState;
+
+  // Restore the league as first loaded. Used when a run begins or is abandoned,
+  // so neither inherits a league a previous run already rolled forward.
+  const restoreEntryBaseline = () => {
+    const baseline = entryBaselineRef.current;
+    if (!baseline) return;
+    clearNavCache();
+    setDb(cloneLeague(baseline));
+    setOriginalDb(cloneLeague(baseline));
+    setCupDraftSummary(null);   // a previous run's draft popup must not reappear
   };
 
   // Fetch NAV from server whenever db.players changes (after load or trade execution)
@@ -418,6 +440,9 @@ export default function ArmchairGmPage() {
         }
         setDb(data);
         setOriginalDb(data);
+        // The immutable entry baseline. originalDb is overwritten by each Cup
+        // Run rollover, so it cannot serve as the league to restart from (ST1).
+        entryBaselineRef.current = cloneLeague(data);
         // Don't auto-select teams — show the franchise selection modal
         const wpg = data.teams.find((t: Team) => t.id === "WPG") ?? data.teams[1] ?? null;
         setTeams([null, wpg]);
@@ -827,16 +852,29 @@ export default function ArmchairGmPage() {
           hasSeasonResult={!!simData?.playoffBracket?.champion}
           advancing={cupAdvancing}
           onStart={() => {
-            // Start from a clean baseline: clear any pre-run trades (so their
-            // retained salary can't evade the Cup retention ledger) and any
-            // pre-run simulation (so it can't be recorded as a Cup season) —
-            // CX5. Then begin the run.
-            resetTrades();
-            resetSimulation();
+            // A new run restarts at the 2026-27 offseason on the league as
+            // first loaded — not on whatever a previous run rolled it into
+            // (ST1). This also clears pre-run trades, so their retained salary
+            // can't evade the Cup retention ledger, and the pre-run sim, so it
+            // can't be recorded as a Cup season (CX5).
+            //
+            // Deliberately does not go through the trade-reset path, which
+            // reopens franchise selection — wrong when the user has just
+            // pressed Start for the team they already chose.
+            restoreEntryBaseline();
+            resetSeasonState();
             handleStartCupRun();
           }}
           onRecordAndAdvance={handleCupRunAdvance}
-          onAbandon={() => { handleAbandonCupRun(); resetTrades(); }}
+          onAbandon={() => {
+            // Abandoning after a rollover must give back the true Year-1
+            // league, not the aged one originalDb now holds (ST1 / CX5).
+            handleAbandonCupRun();
+            restoreEntryBaseline();
+            resetSeasonState();
+            setHomeTeamLocked(false);
+            setShowTeamSelect(true);
+          }}
         />
 
         {navBootLoading && (
