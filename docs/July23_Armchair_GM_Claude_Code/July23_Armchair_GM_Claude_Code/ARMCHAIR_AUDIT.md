@@ -93,3 +93,53 @@ _CX1–CX4 done (commit pending): CX1 `urlHydratedRef` gate; CX2 `resolveTradeSh
 3. Offseason/RFA — CX6 + cap/pick conservation tests.
 4. Canonical compression/retention/pick rules everywhere — CX8, CX7c.
 5. Rendered component tests + one full browser journey, then visual polish (CXH7, CXS).
+
+---
+
+## Appendix — original audit, verbatim
+
+The source document (`July_23rd_ArmChair_GM.docx`, 40 observations + 16 screenshots)
+as written, before it was grouped into the ST/RL/VAL/OFF/AI/SIM sections above.
+Kept because the grouping compressed wording and merged related observations —
+every item below is covered, but the original phrasing carries intent the
+summaries do not.
+
+1. Team selection and Season Selection states should not be the ink black
+2. Draft picks don’t persist. Example:
+3. If I trade away the 2027 First round pick, when the 2027 draft comes around I still have that pick selection
+4. Alternative Positions don’t persist to the Lineups component
+5. Should be able to lock a player to a line.
+6. Lineups needs to have special teams and sim engine needs to respect that
+7. Should have a tab in the line ups that says 5 on 5, PowerPlay, Penalty Kill
+8. Viggo Bjork, now is reconciled, but shows a NAV of 0 even though is 8th pick.
+9. Trading Player Cards need to have updated tabs, icons, etc.
+10. DEV tab needs to be retired and removed completely and replaced with the revamped outlook tab
+11. Need to add Gravity Component to Armchair GM
+12. Armchair GM needs to have a ROSTER tab that goes before LINEUPS sorted by players points. Working pretty much like how we have /players where on click you get a dropdown of the players gravity, stats, Outlook, etc.
+13. This roster tab needs to update based on the sim stats from the previous season
+14. This Roster page should have the most recent and updated icons, etc.
+15. In RFA screen says Done – Proceed to Free Agency – when it should say Start ArmChair GM or something like that
+16. Backup goalies need to get sim stats
+17. Some players still have that over hyped NAV. In this instance Walker Duehr a 28 year old AHL player states 3 HP 0 G 0A but some how 1 PTS. Also listed as a 2nd line winger when not proven to be anything but an AHL callup
+18. Worse still he apparently has the same value as Barkov
+19. Barkov is still highly undervalued due to his injury and being out with an injury last year. Best use case for players who were injured is to use the most recent full season stats.
+20. Need to add in the Captain, and 2 Assistants that I believe we have but is not propagated to the UI
+21. Team Numbers can be replaced then with the roster tab as that Roster Tab will have more data in it.
+22. Playoff Bracket a broken in the first round
+23. Shows Blackhawks and Mammoth Winning as the first 2 brackets, but then in R2 the bracket then shows the Wild and Blackhawks. When it should be the Mammoth and Blackhawks.
+24. Resign Screen needs to be AA accessible
+25. Very hard to select the advanced stat dropdown arrow
+26. Advanced Stats needs to be AA accessible. Off Season is a very important and usually the most fun part of a GM sim, so this needs to be a little more exciting and methodical.
+27. Macklin Celebrini is an RFA but often times is not signed by SJS and then therefore just drops off the game. In No possible reality would SJS not resign Celebrini
+28. Let’s TRY to add in AI trades so that teams can free up cap space to sign players during the off season. This will add variability to the SIM and make the game feel alive. The AI logic needs to be just as sound as the flags we have and they should be based in the same reality we have.
+29. I don’t understand what this FA_POOL is, the FA_POOL operates as if it is a ghost team
+30. Need to add in a way to have the human and AI to give players extensions.
+31. RFA should have a dropdown showing analytics like FA has
+32. Second year into a sim and dropdown still shows 2027 draft picks for assets to trade
+33. In year 2 all teams have no cap space
+34. SJS signed Kucherov that lead them to not have space for Celebrini, who is now no longer in the game
+35. This is completely inaccurate
+36. Year 3 SIM shows no players in FA Market
+37. Lineups show P/82, should just be G and A
+38. Year 3 shows a bunch of teams now with 5+ in cap space but a lot of RFA’s are no longer in the sim
+39. New run doesn’t restart the sim at the 2026-27 off season, but rather continues, but the draft selection is the 2026 draft.
