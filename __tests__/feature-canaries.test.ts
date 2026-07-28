@@ -1777,7 +1777,16 @@ describe("Canary — UX and UI polish", () => {
     expect(hook).toContain("if (lockCount !== 1) return");
     expect(hook).toContain("if (lockCount !== 0) return");
     expect(hook).toContain('document.body.style.overflow = "hidden"');
-    expect(armchair).toContain("useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length) || draftOpen || resignOpen || offerSheetOpen || Boolean(cupDraftSummary))");
+    // Pins that every overlay is in the lock, not one frozen argument list —
+    // a new modal still has to be added here, but adding one must not fail this.
+    const lockCall = armchair.slice(armchair.indexOf("useBodyScrollLock("));
+    const lockArgs = lockCall.slice(0, lockCall.indexOf(");"));
+    for (const flag of [
+      "showTeamSelect", "modeSelectOpen", "tradeBlockOpen", "tradeRequest",
+      "draftOpen", "resignOpen", "offerSheetOpen", "cupDraftSummary",
+    ]) {
+      expect(lockArgs, `${flag} must lock body scroll`).toContain(flag);
+    }
     expect(armchair).not.toContain("useBodyScrollLock(verdictOpen");
     expect(armchair).not.toContain("useBodyScrollLock(verdictOpen ||");
     for (const path of [

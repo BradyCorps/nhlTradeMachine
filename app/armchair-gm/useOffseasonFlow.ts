@@ -25,6 +25,7 @@ export function useOffseasonFlow({
   homeTeamId,
   showTeamSelect,
   initialNavReady,
+  modeChosen,
   cupRun,
   cupDraftSummary,
 }: {
@@ -34,6 +35,9 @@ export function useOffseasonFlow({
   homeTeamId: string | undefined;
   showTeamSelect: boolean;
   initialNavReady: boolean;
+  /** Single season or Cup Run — asked before the draft, so the offseason is
+   *  played once for the mode the user actually wants (not replayed after). */
+  modeChosen: boolean;
   cupRun: CupRunState | null;
   cupDraftSummary: CupDraftSummary | null;
 }) {
@@ -245,10 +249,10 @@ export function useOffseasonFlow({
 
   // Trigger the league off-season once a franchise is chosen in off-season mode.
   useEffect(() => {
-    if (mode === "offseason" && homeTeamId && !showTeamSelect && initialNavReady && !offseasonResolvedRef.current) {
+    if (mode === "offseason" && homeTeamId && !showTeamSelect && initialNavReady && modeChosen && !offseasonResolvedRef.current) {
       applyLeagueOffseason();
     }
-  }, [mode, homeTeamId, showTeamSelect, initialNavReady, applyLeagueOffseason]);
+  }, [mode, homeTeamId, showTeamSelect, initialNavReady, modeChosen, applyLeagueOffseason]);
 
   return {
     mode,

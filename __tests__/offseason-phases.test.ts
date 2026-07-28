@@ -111,3 +111,47 @@ describe("OFF4 — offer-sheet rows carry the same analytics as the market", () 
     expect(Math.min(...sizes)).toBeGreaterThanOrEqual(10);
   });
 });
+
+// ── Mode select before the draft ─────────────────────────────────
+// The Cup Run used to start from the trade bench — after the offseason had
+// already been played. Starting a run resets the league to its entry baseline
+// (it must), so the draft, every re-signing and every offer sheet were thrown
+// away and had to be done a second time.
+describe("run length is chosen before the offseason, not after", () => {
+  const page = () => read("app/armchair-gm/page.tsx");
+
+  it("asks once the franchise is picked and before anything else", () => {
+    const src = page();
+    expect(src).toContain("ModeSelectModal");
+    expect(src).toContain("const modeSelectOpen = !showTeamSelect && Boolean(homeTeam) && gameMode == null");
+  });
+
+  it("holds the draft until the mode is known", () => {
+    // Otherwise the offseason resolves under whichever mode happens to be
+    // default, which is the bug being fixed.
+    expect(page()).toContain("modeChosen: gameMode != null");
+    const flow = read("app/armchair-gm/useOffseasonFlow.ts");
+    expect(flow).toMatch(/initialNavReady && modeChosen && !offseasonResolvedRef\.current/);
+  });
+
+  it("starts the run at the choice, so the coming offseason IS year one", () => {
+    expect(page()).toMatch(/mode === "CUP_RUN"\) handleStartCupRun\(\)/);
+  });
+
+  it("asks again whenever the league is reset back to its baseline", () => {
+    // A new run replays the offseason, so the mode question has to return with
+    // it — otherwise the second run silently inherits the first one's answer.
+    expect(page()).toMatch(/restoreEntryBaseline[\s\S]{0,700}setGameMode\(null\)/);
+  });
+
+  it("locks body scroll behind the modal like every other overlay", () => {
+    expect(page()).toMatch(/useBodyScrollLock\([^)]*modeSelectOpen/);
+  });
+
+  it("describes both modes from one definition", () => {
+    const modes = read("app/lib/game-mode.ts");
+    expect(modes).toContain("SINGLE");
+    expect(modes).toContain("CUP_RUN");
+    expect(read("app/armchair-gm/ModeSelectModal.tsx")).toContain("GAME_MODES");
+  });
+});

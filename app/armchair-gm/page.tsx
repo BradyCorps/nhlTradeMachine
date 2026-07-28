@@ -37,6 +37,8 @@ import { MiniStat } from "./SeasonResultsPager";
 import { LoadingScreen, ErrorScreen } from "./Screens";
 import { useCupRunLifecycle } from "./useCupRunLifecycle";
 import { useOffseasonFlow } from "./useOffseasonFlow";
+import { ModeSelectModal } from "./ModeSelectModal";
+import type { GameMode } from "@/app/lib/game-mode";
 import { cloneLeague, type LeagueSnapshot } from "@/app/lib/league-baseline";
 import { dropSpentDraftPicks, draftYearForCupYear } from "@/app/lib/draft-picks";
 import { useTradeBench, type SimControls } from "./useTradeBench";
@@ -152,6 +154,10 @@ export default function ArmchairGmPage() {
 
   // ── Team lock state ───────────────────────────────────────────
   const [homeTeamLocked, setHomeTeamLocked] = useState(false);
+  // Single season or Cup Run, asked after franchise selection and BEFORE the
+  // draft. Choosing on the trade bench meant the offseason had already been
+  // played, and starting a run resets the league — so it had to be played again.
+  const [gameMode, setGameMode] = useState<GameMode | null>(null);
 
   const [showMemo, setShowMemo] = useState(false);
 
@@ -185,6 +191,7 @@ export default function ArmchairGmPage() {
     signMarketPlayer, proceedToOfferSheets, signOfferSheet, finishOffseason,
   } = useOffseasonFlow({
     db, setDb, setOriginalDb, homeTeamId, showTeamSelect, initialNavReady,
+    modeChosen: gameMode != null,
     cupRun, cupDraftSummary,
   });
 
@@ -199,7 +206,8 @@ export default function ArmchairGmPage() {
     cupRun, setCupRun, offseasonResolvedRef, simControlsRef,
   });
 
-  useBodyScrollLock(showTeamSelect || tradeBlockOpen || Boolean(tradeRequest?.length) || draftOpen || resignOpen || offerSheetOpen || Boolean(cupDraftSummary));
+  const modeSelectOpen = !showTeamSelect && Boolean(homeTeam) && gameMode == null;
+  useBodyScrollLock(showTeamSelect || modeSelectOpen || tradeBlockOpen || Boolean(tradeRequest?.length) || draftOpen || resignOpen || offerSheetOpen || Boolean(cupDraftSummary));
 
   // ── Abort controllers — cancel stale Claude requests ─────────
   const memoAbortRef = useRef<AbortController | null>(null);
@@ -291,6 +299,7 @@ export default function ArmchairGmPage() {
     setDb(cloneLeague(baseline));
     setOriginalDb(cloneLeague(baseline));
     setCupDraftSummary(null);   // a previous run's draft popup must not reappear
+    setGameMode(null);          // ask again — the offseason is about to rerun
   };
 
   // Fetch NAV from server whenever db.players changes (after load or trade execution)
@@ -747,6 +756,19 @@ export default function ArmchairGmPage() {
             setHomeTeamLocked(true);
           }}
           onClose={() => setShowTeamSelect(false)}
+        />
+      )}
+
+      {/* ── Mode select — asked before the draft, so it is played once ── */}
+      {modeSelectOpen && homeTeam && (
+        <ModeSelectModal
+          team={homeTeam}
+          onChoose={(mode) => {
+            setGameMode(mode);
+            // A Cup Run begins here, so the offseason about to run IS year one
+            // of the run rather than something discarded when it starts.
+            if (mode === "CUP_RUN") handleStartCupRun();
+          }}
         />
       )}
 
