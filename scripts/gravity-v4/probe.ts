@@ -33,7 +33,9 @@ function auditCache(): { empty: number[]; populated: number[] } {
     console.log(`no cache at ${CACHE_DIR}`);
     return { empty: [], populated: [] };
   }
-  const files = fs.readdirSync(CACHE_DIR).filter(f => f.startsWith("shifts-"));
+  const all = fs.readdirSync(CACHE_DIR);
+  const files = all.filter(f => f.startsWith("shifts-"));
+  const markers = all.filter(f => f.startsWith("absent-shifts-"));
   const empty: number[] = [], populated: number[] = [];
   let unreadable = 0;
   for (const f of files) {
@@ -52,6 +54,13 @@ function auditCache(): { empty: number[]; populated: number[] } {
   console.log(`  populated                ${populated.length}`);
   console.log(`  EMPTY                    ${empty.length}`);
   if (unreadable) console.log(`  unreadable               ${unreadable}`);
+  if (markers.length) {
+    console.log(`  recorded absent          ${markers.length}  (negatively cached; not refetched)`);
+    for (const f of markers) {
+      empty.push(Number(f.replace("absent-shifts-", "").replace(".json", "")));
+    }
+    empty.sort((a, b) => a - b);
+  }
   if (empty.length) {
     console.log(`  first empty game id      ${empty[0]}`);
     console.log(`  last empty game id       ${empty[empty.length - 1]}`);

@@ -9,7 +9,8 @@
 //   npx tsx scripts/gravity-v4/build-stints.ts --games 1312            # full slate
 //   npx tsx scripts/gravity-v4/build-stints.ts --games 50 --offline    # from cache
 //
-// Flags: --games N · --season 20252026 · --offline · --gap MS · --even5v5
+// Flags: --games N · --season 20252026 · --offline · --gap MS · --shiftgap MS ·
+//        --even5v5 · --refresh-absent (re-request games previously found absent)
 //
 // Output (both gitignored — this is player-level derived data):
 //   data/gravity-v4/stints-<season>.ndjson.gz
@@ -29,7 +30,7 @@ import {
 } from "./core";
 import {
   makeFetcher, collectGameIds, rosterFromPbp, eventsFromPbp, shiftsUrl, pbpUrl,
-  validShiftPayload, validPbpPayload,
+  validShiftPayload, validPbpPayload, PayloadAbsentError,
 } from "./nhl-source";
 
 const SCHEMA_VERSION = 1;
@@ -53,6 +54,7 @@ const fetchCached = makeFetcher({
   offline: OFFLINE,
   apiWebGapMs: Number(flag("gap", "450")),
   apiGapMs: Number(flag("shiftgap", "400")),
+  refreshAbsent: has("refresh-absent"),
 });
 
 /** Gzip stream with backpressure honoured, hashing the uncompressed bytes. */
@@ -128,11 +130,10 @@ async function main() {
       try {
         shiftPayload = await fetchCached(`shifts-${gameId}`, shiftsUrl(gameId), validShiftPayload);
       } catch (e) {
-        const reason = e instanceof Error ? e.message : String(e);
         // The endpoint answers 200 with {"data":[],"total":0} for whole blocks
-        // of the schedule. That is an absence in the source, not an error here,
-        // and retrying it forever only makes the run look broken.
-        if (/empty shiftcharts payload/.test(reason)) {
+        // of the schedule. That is an absence in the source, not an error here:
+        // it is recorded once, negatively cached, and never retried.
+        if (e instanceof PayloadAbsentError) {
           noShiftChart.push(gameId);
           noteTeams(teamAbbrevs, false);
           continue;

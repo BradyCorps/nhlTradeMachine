@@ -29,6 +29,8 @@ export interface FetcherOptions {
   apiWebGapMs?: number;
   /** Per-request floor for api.nhle.com (the shift charts). */
   apiGapMs?: number;
+  /** Re-request keys previously recorded as absent at the source. */
+  refreshAbsent?: boolean;
 }
 
 /**
@@ -42,12 +44,27 @@ export interface FetcherOptions {
 export type PayloadValidator = (payload: any) => string | null;
 
 /**
- * How many times to retry an empty-but-valid-HTTP response before giving up.
- * Deliberately small: an empty payload is as likely to mean "this game has no
- * shift chart" as "slow down", and spending the full transport backoff ladder on
- * every such game makes a large run look hung.
+ * How many times to retry an empty-but-valid-HTTP response before concluding the
+ * data is absent. Deliberately small: measurement showed these are genuine
+ * source absences, not throttling, so extra attempts buy nothing and a full
+ * backoff ladder per game turns a large run into hours of waiting.
  */
-const EMPTY_PAYLOAD_ATTEMPTS = 3;
+const EMPTY_PAYLOAD_ATTEMPTS = 2;
+
+/**
+ * The endpoint answered fine but has no data. Distinct from a transport error
+ * because it is **not retryable** — it must escape the retry loop immediately
+ * rather than falling into the generic backoff ladder.
+ */
+export class PayloadAbsentError extends Error {
+  constructor(readonly key: string, message: string) {
+    super(message);
+    this.name = "PayloadAbsentError";
+  }
+}
+
+/** Marker recording that the source has no data for a key. */
+const absentMarkerPath = (safeKey: string) => path.join(CACHE_DIR, `absent-${safeKey}.json`);
 
 export type Fetcher = (key: string, url: string, validate?: PayloadValidator) => Promise<any>;
 
@@ -93,6 +110,15 @@ export function makeFetcher(opts: FetcherOptions = {}): Fetcher {
   ): Promise<any> {
     const safe = key.replace(/[^a-zA-Z0-9_.-]/g, "_");
     const body = path.join(CACHE_DIR, `${safe}.json`);
+    const absent = absentMarkerPath(safe);
+
+    // Negative cache. Without this, every rerun re-requests every game the
+    // source has no data for — 501 games a run, forever, for nothing.
+    if (!opts.refreshAbsent && fs.existsSync(absent)) {
+      let reason = "no data at source";
+      try { reason = JSON.parse(fs.readFileSync(absent, "utf8"))?.reason ?? reason; } catch { /* keep default */ }
+      throw new PayloadAbsentError(key, reason);
+    }
 
     if (fs.existsSync(body)) {
       let cached: any = null, reason: string | null = null;
@@ -100,7 +126,10 @@ export function makeFetcher(opts: FetcherOptions = {}): Fetcher {
       catch { reason = "cached payload is not valid JSON"; }
       if (!reason && validate) reason = validate(cached);
       if (!reason) return cached;
-      if (opts.offline) throw new Error(`cached ${key}: ${reason}`);
+      // Offline, an empty cached payload is indistinguishable from an absence —
+      // report it as one so a cached run classifies games the same way a live
+      // run does, rather than turning every such game into a hard failure.
+      if (opts.offline) throw new PayloadAbsentError(key, reason);
       // Poisoned by an earlier throttled run — drop it and fetch again.
       fs.rmSync(body, { force: true });
     }
@@ -132,22 +161,26 @@ export function makeFetcher(opts: FetcherOptions = {}): Fetcher {
         const text = await res.text();
         const payload = JSON.parse(text);
 
-        // An empty 200 may be throttling — or the game may genuinely have no
-        // shift chart. Retry a couple of times in case it is the former, but on
-        // a short leash: a full backoff ladder per game turns a slate with many
-        // genuinely-empty games into an apparently frozen run. Never cache it.
+        // An empty 200 may be throttling — or the source may genuinely have no
+        // data. Retry briefly in case it is the former, then record the absence.
+        // No host cooldown: measurement showed these are real absences, so
+        // slowing every other request down because of them helps nothing.
         const reason = validate?.(payload) ?? null;
         if (reason) {
-          cooldown[host] = Math.min((cooldown[host] ?? 0) + 250, 1000);
-          lastErr = new Error(`${reason} for ${url}`);
-          if (attempt < EMPTY_PAYLOAD_ATTEMPTS - 1) { await wait(800 * 2 ** attempt); continue; }
-          throw lastErr;
+          if (attempt < EMPTY_PAYLOAD_ATTEMPTS - 1) { await wait(500); continue; }
+          fs.writeFileSync(absent, JSON.stringify({
+            key, url, reason, absentAt: new Date().toISOString(),
+          }, null, 2));
+          throw new PayloadAbsentError(key, reason);
         }
 
         fs.writeFileSync(body, text);
         if (cooldown[host]) cooldown[host] = Math.max(0, cooldown[host] - 50);
         return payload;
       } catch (e) {
+        // An absence is a conclusion, not a transport failure. Letting it fall
+        // into the generic ladder is what turned ~2s per game into ~35s.
+        if (e instanceof PayloadAbsentError) throw e;
         lastErr = e;
         if (attempt < 5) await wait(1000 * 2 ** attempt);
       }
