@@ -833,7 +833,7 @@ describe("Canary — Player Card AA redesign + FMV surplus read", () => {
     // drawn bust removes the dependency rather than merely hiding it.
     expect(card).not.toContain("/api/headshot");
     expect(card).toContain("<PlayerAvatar");
-    expect(card).toContain("THE HOCKEY LEDGER");
+    expect(card).toContain("CAP & CREASE");
     expect(card).toContain("Fair Market Value");
     expect(card).toContain("Extended Net Asset Value");
     // Missing stats read as "No data", never a fabricated 50th percentile
@@ -2630,5 +2630,55 @@ describe("Canary — the app ships no league-owned imagery", () => {
     for (const f of ["app/components/LedgerDropdown.tsx", "app/armchair-gm/TeamSelectModal.tsx"]) {
       expect(read(f), f).toContain("<TeamMark");
     }
+  });
+});
+
+// ── Brand ───────────────────────────────────────────────────────────────────
+// "The Hockey Ledger" collided with two live hockey products (hockeyledger.com,
+// thehockeyledger.ca). The rename touched forty-odd inline strings, which is
+// exactly why the name now lives in one constant.
+describe("Canary — the masthead is Cap & Crease, from one source", () => {
+  it("keeps the brand in a single definition", () => {
+    const brand = read("app/lib/brand.ts");
+    expect(brand).toContain('name: "Cap & Crease"');
+    expect(brand).toContain('domain: "capandcrease.com"');
+    expect(brand).toContain("disclaimer");
+  });
+
+  it("builds page metadata from it rather than a literal", () => {
+    const layout = read("app/layout.tsx");
+    expect(layout).toContain("${BRAND.name}");
+    expect(layout).toContain("siteName: BRAND.name");
+  });
+
+  it("leaves no trace of the old name in shipped code", () => {
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) { walk(full); continue; }
+        if (!/\.(tsx?|jsx?)$/.test(entry.name)) continue;
+        const src = fs.readFileSync(full, "utf8");
+        // brand.ts explains the rename in a comment. The buymeacoffee handle
+        // is an external account under the old name — the owner's to migrate,
+        // and breaking the link would be worse than the stale slug.
+        const shipped = src
+          .replace(/buymeacoffee\.com\/hockeyledger/g, "")
+          .replace(/\/\/.*$/gm, "");
+        if (/hockey.?ledger/i.test(shipped) && !full.endsWith("brand.ts")) offenders.push(full);
+      }
+    };
+    walk(path.join(process.cwd(), "app"));
+    expect(offenders).toEqual([]);
+  });
+
+  it("states non-affiliation where a reader will see it", () => {
+    expect(read("app/components/Footer.tsx")).toContain("BRAND.disclaimer");
+  });
+
+  it("does not build the league's mark into the product's identity", () => {
+    // Descriptive use in a subtitle is defensible; a brand named after it is not.
+    const brand = read("app/lib/brand.ts");
+    expect(brand).toMatch(/name: "(?!.*NHL)/);
   });
 });

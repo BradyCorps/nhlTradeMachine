@@ -106,7 +106,7 @@ function NameplateContent() {
         textShadow: "0 2px 36px rgba(0,0,0,0.5), 0 1px 0 rgba(0,0,0,0.15)",
         userSelect: "none",
       }}>
-        The Hockey Ledger
+        Cap & Crease
       </div>
 
       <div style={{

@@ -450,6 +450,6 @@ export function cupRunShareText(state: CupRunState): string {
     header,
     `Difficulty: ${stars} ${state.difficulty.label}`,
     ...seasonLines,
-    "thehockeyledger.com/armchair-gm",
+    "capandcrease.com/armchair-gm",
   ].join("\n");
 }

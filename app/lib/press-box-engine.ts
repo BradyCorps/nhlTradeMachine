@@ -324,6 +324,6 @@ export function buildShareText(
     `Press Box #${dayNum} ${attemptStr}`,
     blocks,
     `${bestScore}/${MAX_SCORE} pts ${starStr}${found ? " PERFECT HAND" : ""}`,
-    "thehockeyledger.com/press-box",
+    "capandcrease.com/press-box",
   ].join("\n");
 }

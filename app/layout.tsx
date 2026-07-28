@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { BRAND } from "@/app/lib/brand";
 import { Libre_Baskerville, Courier_Prime } from 'next/font/google';
 import './globals.css';
 import LedgerToaster from './components/LedgerToaster';
@@ -26,18 +27,18 @@ const courier = Courier_Prime({
 // so we don't lose the masthead fraktur style
 
 export const metadata: Metadata = {
-  title: 'The Hockey Ledger — Trade Machine & Armchair GM',
+  title: `${BRAND.name} — ${BRAND.descriptor}`,
   description: 'X-NAV Analytics · Trade Machine · Armchair GM. Evaluate NHL trades and front-office decisions with advanced analytics.',
   keywords: ['NHL', 'trade machine', 'armchair GM', 'hockey analytics', 'X-NAV', 'xG', 'cap hit'],
   openGraph: {
-    title: 'The Hockey Ledger — Trade Machine & Armchair GM',
+    title: `${BRAND.name} — ${BRAND.descriptor}`,
     description: 'Build NHL trades, test front-office logic, and run Armchair GM scenarios. X-NAV · STRAND · GM Logic Engine.',
     type: 'website',
-    siteName: 'The Hockey Ledger',
+    siteName: BRAND.name,
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'The Hockey Ledger — Trade Machine & Armchair GM',
+    title: `${BRAND.name} — ${BRAND.descriptor}`,
     description: 'Build NHL trades, test front-office logic, and run Armchair GM scenarios. X-NAV · STRAND · GM Logic Engine.',
   },
 };

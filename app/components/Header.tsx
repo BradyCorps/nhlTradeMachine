@@ -1,5 +1,5 @@
 "use client";
-// ── Header — The Hockey Ledger masthead ─────────────────────
+// ── Header — Cap & Crease masthead ─────────────────────
 // Shared across product mode and analytics pages.
 
 import { usePathname } from "next/navigation";
@@ -38,7 +38,7 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
                 className="font-black leading-none transition-opacity hover:opacity-70 text-ledger-ink font-serif cursor-pointer"
                 style={{ fontSize: 'clamp(1.8rem, 5vw, 3rem)', letterSpacing: '-0.02em', lineHeight: 1 }}
               >
-                The Hockey Ledger
+                Cap & Crease
               </h1>
             </a>
             <p className="flex items-center justify-center gap-2 text-2xs uppercase tracking-[0.3em] mt-1.5 font-mono text-ledger-ink-faint">

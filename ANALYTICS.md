@@ -1,8 +1,8 @@
-# The Hockey Ledger — Analytics Ledger
+# Cap & Crease — Analytics Ledger
 
 Current model: **X-NAV 2.0** · Built and maintained in **2026**.
 
-The Hockey Ledger is now a live NHL trade simulation system, not just a static valuation formula. It combines current roster data, contract sync, admin DB overrides, NHL and MoneyPuck statistics, scraper validation, GM logic checks, STRAND profiles, and AI-assisted season simulation. This document is the operating ledger for how those pieces should fit together and where the next development sprints are headed.
+Cap & Crease is now a live NHL trade simulation system, not just a static valuation formula. It combines current roster data, contract sync, admin DB overrides, NHL and MoneyPuck statistics, scraper validation, GM logic checks, STRAND profiles, and AI-assisted season simulation. This document is the operating ledger for how those pieces should fit together and where the next development sprints are headed.
 
 ---
 
@@ -241,7 +241,7 @@ Trade value cares about cap hit, term, contract surplus, and organizational fit.
 
 The [`coreyjs/nhl-api-py`](https://github.com/coreyjs/nhl-api-py) project is a useful reference for the next data-access sprint. Its README describes a 2025/2026-updated Python wrapper around the new undocumented NHL APIs, including modules for teams, schedules, stats, NHL Edge data, standings, game center, players, and helper utilities. It also calls out access to hidden NHL Edge endpoints such as skating speed and shot-speed data.
 
-The Hockey Ledger is a TypeScript/Next.js app, so this should not automatically become a production Python dependency. The immediate value is endpoint discovery and response-shape reference. If an endpoint is stable and useful, we should prefer a native TypeScript fetch wrapper with fixture tests and schema guards. A Python sidecar or script is only worth considering for offline enrichment jobs, bulk historical imports, or exploratory data audits.
+Cap & Crease is a TypeScript/Next.js app, so this should not automatically become a production Python dependency. The immediate value is endpoint discovery and response-shape reference. If an endpoint is stable and useful, we should prefer a native TypeScript fetch wrapper with fixture tests and schema guards. A Python sidecar or script is only worth considering for offline enrichment jobs, bulk historical imports, or exploratory data audits.
 
 NHL Edge data can help distinguish young-player development paths that box-score stats miss:
 - skating speed and acceleration for transition upside
@@ -476,4 +476,4 @@ Three-layer system:
 
 ---
 
-*The Hockey Ledger · X-NAV 2.0 · STRAND™ · Built 2026*
+*Cap & Crease · X-NAV 2.0 · STRAND™ · Built 2026*

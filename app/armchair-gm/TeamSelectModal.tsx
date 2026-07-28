@@ -36,7 +36,7 @@ export function TeamSelectModal({
         <div style={{ borderTop: '4px double #1c140a', borderBottom: '1px solid #b8a070', padding: '20px 28px 14px' }}>
           <div className="text-center">
             <div className="text-[11px] uppercase tracking-[0.5em] mb-2 text-ledger-ink-faint font-mono">
-              The Hockey Ledger · GM Challenge
+              Cap & Crease · GM Challenge
             </div>
             <h2 className="font-black" style={{ fontSize: '1.6rem', color: 'var(--ledger-ink)', lineHeight: 1.1 }}>
               Think you can do better<br/>than your GM?

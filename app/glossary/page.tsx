@@ -1,4 +1,4 @@
-// app/glossary/page.tsx — The Hockey Ledger: Glossary & Icon Key
+// app/glossary/page.tsx — Cap & Crease: Glossary & Icon Key
 // The "what" reference: every definition, key, and system explanation.
 // The "why/how" narrative lives at /methodology.
 import React from "react";
@@ -8,7 +8,7 @@ import Footer, { iconKey, gravityTierEntries, roleIconEntries, methodologySectio
 import { TierIcon } from "../components/GravityField";
 
 export const metadata: Metadata = {
-  title: "Glossary — The Hockey Ledger",
+  title: "Glossary — Cap & Crease",
   description: "Every definition in the Ledger: X-NAV components, STRAND traits, gravity tiers, trade logic, icon key, and data sources.",
 };
 

@@ -1,4 +1,4 @@
-// app/methodology/page.tsx — The Hockey Ledger: Methodology
+// app/methodology/page.tsx — Cap & Crease: Methodology
 // The "why/how" narrative: why each system exists and how it thinks.
 // Definitions, keys, and the icon key live at /glossary.
 import React from "react";
@@ -7,7 +7,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 
 export const metadata: Metadata = {
-  title: "Methodology — The Hockey Ledger",
+  title: "Methodology — Cap & Crease",
   description: "Why the Ledger's systems exist and how they think: X-NAV, Player Gravity, STRAND DNA, the GM Audit, and the simulation engine.",
 };
 
@@ -104,7 +104,7 @@ export default function MethodologyPage() {
               Keep the Presses Running
             </div>
             <p className="text-[12px] font-serif leading-relaxed text-ledger-ink-body max-w-xl mx-auto mb-4">
-              The Hockey Ledger is free, independent, and built nights-and-weekends. If the
+              Cap & Crease is free, independent, and built nights-and-weekends. If the
               analysis has earned a spot in your bookmarks, a coffee keeps the data flowing.
             </p>
             <a

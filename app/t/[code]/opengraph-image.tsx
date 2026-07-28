@@ -2,18 +2,18 @@ import { ImageResponse } from "next/og";
 import { decodeTradeSharePayload, summarizeTradeSharePayload } from "@/app/lib/trade-share";
 
 export const runtime = "edge";
-export const alt = "The Hockey Ledger shared trade card";
+export const alt = "Cap & Crease shared trade card";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 export default function Image({ params }: { params: { code: string } }) {
   let preview = {
     title: "Shared Trade",
-    description: "Open a shared NHL trade receipt from The Hockey Ledger.",
+    description: "Open a shared NHL trade receipt from Cap & Crease.",
     matchupLabel: "Trade Receipt",
     packageLabel: "Shared trade package",
     verdictLabel: "LOCKED",
-    createdLabel: "The Hockey Ledger",
+    createdLabel: "Cap & Crease",
   };
 
   try {
@@ -38,7 +38,7 @@ export default function Image({ params }: { params: { code: string } }) {
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontSize: 24, letterSpacing: 8, textTransform: "uppercase", color: "#7a1d16" }}>
-            The Hockey Ledger
+            Cap & Crease
           </div>
           <div style={{ fontSize: 22, letterSpacing: 5, textTransform: "uppercase", color: "#6d5b37" }}>
             Shared Trade

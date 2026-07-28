@@ -16,7 +16,7 @@ export default function PlayersLoading() {
       {/* Label */}
       <div className="text-center mt-2">
         <div className="text-2xs font-black uppercase tracking-[0.5em] text-ledger-ink-faint font-mono animate-pulse">
-          The Hockey Ledger
+          Cap & Crease
         </div>
         <div className="text-2xs text-ledger-rule font-mono mt-1 uppercase tracking-widest animate-pulse">
           Loading Player Analytics · Live Data

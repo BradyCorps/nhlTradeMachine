@@ -1,4 +1,4 @@
-// app/page.tsx — The Hockey Ledger · broadsheet on a desk
+// app/page.tsx — Cap & Crease · broadsheet on a desk
 import React from "react";
 import Link from "next/link";
 import Footer from "./components/Footer";
@@ -117,7 +117,7 @@ export default function WelcomePage() {
             </div>
             <div className="text-center">
               <h1 className="fp-nameplate" style={{ fontSize: "clamp(2.4rem, 8vw, 4.6rem)" }}>
-                The Hockey Ledger
+                Cap & Crease
               </h1>
               <p className="fp-slogan mt-3 text-[12px]">
                 "Everything a hockey fan could ask for"
@@ -170,7 +170,7 @@ export default function WelcomePage() {
               Build your trade in the Trade Machine and test it against the X-NAV
               engine and the GM Audit or take the chair in Armchair GM and live
               with every consequence that follows. Explore advanced and enhanced
-              stats on the Player Analytics page, featuring the Hockey Ledger
+              stats on the Player Analytics page, featuring Cap & Crease
               exclusive Player Gravity system, STRAND DNA Identity profiles and a
               new all-in-one X-NAV model. Read the published Docket to see how the
               calls have aged. Visit the Press Box and play the daily hockey crib.

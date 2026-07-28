@@ -57,9 +57,9 @@ export async function generateMetadata(
   { params }: { params: { playerId: string } },
 ): Promise<Metadata> {
   const player = await loadPlayer(params.playerId);
-  if (!player) return { title: "Player not found — The Hockey Ledger" };
+  if (!player) return { title: "Player not found — Cap & Crease" };
   return {
-    title: `${player.name} — The Hockey Ledger`,
+    title: `${player.name} — Cap & Crease`,
     description: `${player.name}: X-NAV valuation, gravity field analysis, contract and market value.`,
   };
 }

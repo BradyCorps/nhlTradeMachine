@@ -135,7 +135,7 @@ export default function OfferSheetPhase({
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
             <div>
               <div className="text-[10px] uppercase tracking-[0.4em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
-                The Hockey Ledger · Off-Season · CBA Article 10.3
+                Cap & Crease · Off-Season · CBA Article 10.3
               </div>
               <h2 id="offer-sheet-phase-title" className="font-black" style={{ fontSize: "1.4rem", color: "var(--ledger-ink)", lineHeight: 1.1 }}>
                 {homeTeam.name} — RFA Offer Sheets

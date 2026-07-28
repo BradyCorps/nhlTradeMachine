@@ -194,7 +194,7 @@ export default function TradeBlockPanel({ players, teams, onSelectTeam, onClose 
               color: "var(--ledger-ink-faint)", fontFamily: "monospace",
               textTransform: "uppercase", marginBottom: 4,
             }}>
-              The Hockey Ledger · League Intelligence
+              Cap & Crease · League Intelligence
             </div>
             <div style={{
               fontSize: 18, fontWeight: 900, letterSpacing: "0.05em",

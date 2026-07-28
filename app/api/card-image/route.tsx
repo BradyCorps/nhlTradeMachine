@@ -408,7 +408,7 @@ export async function POST(req: Request) {
 
       {/* Footer */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: footerH, padding: "0 26px", background: CREAM, borderTop: `2px solid ${INK}` }}>
-        <div style={{ display: "flex", fontSize: 14, fontWeight: 700, letterSpacing: 1, color: BRAND_RED }}>THE HOCKEY LEDGER</div>
+        <div style={{ display: "flex", fontSize: 14, fontWeight: 700, letterSpacing: 1, color: BRAND_RED }}>CAP & CREASE</div>
         <div style={{ display: "flex", fontSize: 12, color: INK_FAINT }}>
           {data.avgPercentile !== null ? `avg ${data.avgPercentile}th pct vs ${data.peerLabel}` : `vs ${data.peerLabel}`}
         </div>

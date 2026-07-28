@@ -84,7 +84,7 @@ export default function DraftNight({
           {/* Pick header */}
           <div className="shrink-0" style={{ borderTop: "4px double #1c140a", borderBottom: "1px solid #b8a070", padding: "14px 20px 12px" }}>
             <div className="text-[9px] uppercase tracking-[0.4em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
-              The Hockey Ledger · 2026 Draft Night
+              Cap & Crease · 2026 Draft Night
             </div>
             <div className="flex items-baseline justify-between gap-3 flex-wrap">
               <div>
@@ -170,7 +170,7 @@ export default function DraftNight({
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
             <div>
               <div className="text-[10px] uppercase tracking-[0.4em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
-                The Hockey Ledger · Off-Season
+                Cap & Crease · Off-Season
               </div>
               <h2 className="font-black" style={{ fontSize: "1.4rem", color: "var(--ledger-ink)", lineHeight: 1.1 }}>
                 2026 Draft Night — First Round

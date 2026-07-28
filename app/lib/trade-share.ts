@@ -233,7 +233,7 @@ export function summarizeTradeSharePayload(payload: TradeSharePayload): TradeSha
     packageLabel,
     verdictLabel,
     createdLabel,
-    imageAlt: `The Hockey Ledger shared trade card for ${matchupLabel}, verdict ${verdictLabel}`,
+    imageAlt: `Cap & Crease shared trade card for ${matchupLabel}, verdict ${verdictLabel}`,
   };
 }
 

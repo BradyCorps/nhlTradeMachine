@@ -125,7 +125,7 @@ export default function ResignPhase({
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
             <div>
               <div className="text-[10px] uppercase tracking-[0.4em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
-                The Hockey Ledger · Off-Season
+                Cap & Crease · Off-Season
               </div>
               <h2 id="resign-phase-title" className="font-black" style={{ fontSize: "1.4rem", color: "var(--ledger-ink)", lineHeight: 1.1 }}>
                 {homeTeam.name} — Re-Sign Phase

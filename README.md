@@ -1,4 +1,4 @@
-# The Hockey Ledger
+# Cap & Crease
 
 NHL trade machine, roster ledger, player analytics desk, and offseason simulator on a three season sim.
 

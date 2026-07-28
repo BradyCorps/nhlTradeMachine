@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
+import { BRAND } from "@/app/lib/brand";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = "https://hockeyledger.com";
+  const base = BRAND.url;
   const now = new Date();
 
   return [

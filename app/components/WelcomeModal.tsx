@@ -1,7 +1,9 @@
 "use client";
 import React, { useState, useEffect } from "react";
 
-const STORAGE_KEY = "hockey-ledger-welcomed";
+// Bumped with the rename: a returning visitor should be told the paper changed
+// its name once, rather than silently finding a different masthead.
+const STORAGE_KEY = "cap-and-crease-welcomed-v1";
 
 export default function WelcomeModal() {
   const [visible, setVisible] = useState(false);
@@ -49,7 +51,7 @@ export default function WelcomeModal() {
             className="mt-1 text-lg font-black uppercase tracking-[0.1em]"
             style={{ color: "var(--ledger-ink, #2c2416)" }}
           >
-            The Hockey Ledger
+            Cap & Crease
           </h2>
           <div className="text-[9px] uppercase tracking-[0.2em]" style={{ color: "var(--ledger-brown)" }}>
             Welcome, Reader
@@ -59,7 +61,7 @@ export default function WelcomeModal() {
         {/* Body */}
         <div className="px-5 py-4 space-y-3 text-[11px] leading-relaxed" style={{ color: "var(--ledger-ink-body, #3d3428)" }}>
           <p>
-            <strong>The Hockey Ledger</strong> is an NHL analytics platform that values every player, contract,
+            <strong>Cap & Crease</strong> is an NHL analytics platform that values every player, contract,
             and trade using proprietary models. Here are the key concepts:
           </p>
 

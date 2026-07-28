@@ -37,7 +37,7 @@ export function CupRunDraftSummaryModal({
         style={{ background: "var(--ledger-card-light)", borderRadius: "2px", maxHeight: "92vh", boxShadow: "0 24px 70px rgba(0,0,0,0.6)" }}>
         <div className="shrink-0" style={{ borderTop: "4px double #1c140a", borderBottom: "1px solid #b8a070", padding: "16px 20px 12px" }}>
           <div className="text-[10px] uppercase tracking-[0.4em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
-            The Hockey Ledger · Cup Run Off-Season
+            Cap & Crease · Cup Run Off-Season
           </div>
           <h2 className="font-black" style={{ fontSize: "1.35rem", color: "var(--ledger-ink)", lineHeight: 1.1 }}>
             {summary.draftYear ? `${summary.draftYear} Draft Complete` : "Draft Complete"}

@@ -34,7 +34,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           opacity: 0.7,
           whiteSpace: "nowrap",
         }}>
-          THE HOCKEY LEDGER
+          CAP & CREASE
         </span>
         <span className="admin-nav-separator" style={{ color: "rgba(255,255,255,0.18)", marginRight: 20, fontSize: 14 }}>|</span>
         <div className="admin-nav-links" style={{ display: "flex", alignItems: "stretch", height: "100%", gap: 2 }}>

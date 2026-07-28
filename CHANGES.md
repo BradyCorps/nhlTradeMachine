@@ -143,7 +143,7 @@ Navigation should communicate two different jobs:
 - **Trade Machine**: quick, shareable, debate-friendly.
 - **Armchair GM**: deeper, session-based, prove-you-can-do-better mode.
 
-The homepage and README should eventually stop using "NHL Trade Machine" as the umbrella product name if that creates confusion. "The Hockey Ledger" can remain the broader product brand, with Trade Machine and Armchair GM as distinct modes.
+The homepage and README should eventually stop using "NHL Trade Machine" as the umbrella product name if that creates confusion. "Cap & Crease" can remain the broader product brand, with Trade Machine and Armchair GM as distinct modes.
 
 ### Implementation Phases
 

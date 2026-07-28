@@ -34,7 +34,7 @@ export function ModeSelectModal({
 
         <div style={{ borderTop: "4px double #1c140a", borderBottom: "1px solid #b8a070", padding: "16px 20px 12px" }}>
           <div className="text-[10px] uppercase tracking-[0.4em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
-            The Hockey Ledger · Armchair GM
+            Cap & Crease · Armchair GM
           </div>
           <h2 id="mode-select-title" className="font-black" style={{ fontSize: "1.35rem", color: "var(--ledger-ink)", lineHeight: 1.1 }}>
             {team.name} — Choose Your Term

@@ -1,5 +1,5 @@
 "use client";
-// ── PercentileCard — the shareable Hockey Ledger player card ─────
+// ── PercentileCard — the shareable Cap & Crease player card ─────
 // PA6/PA7: newspaper plate, free PNG export, branded, and carrying the
 // proprietary read — X-NAV breakdown, gravity field, modern role, and
 // EDGE tracking — alongside percentiles vs the positional field.
@@ -299,7 +299,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.download = `${player.name.replace(/\s+/g, "-").toLowerCase()}-hockey-ledger-card.png`;
+      link.download = `${player.name.replace(/\s+/g, "-").toLowerCase()}-cap-and-crease-card.png`;
       link.href = url;
       link.click();
       URL.revokeObjectURL(url);
@@ -528,7 +528,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       </div>
 
       <div className="pcard-foot">
-        <span style={{ fontWeight: 900, color: INK }}>THE HOCKEY LEDGER</span>
+        <span style={{ fontWeight: 900, color: INK }}>CAP & CREASE</span>
         <span>
           {avgPercentile !== null
             ? `${percentileLabel(avgPercentile)} · avg ${avgPercentile}th pct vs ${peerLabel}`

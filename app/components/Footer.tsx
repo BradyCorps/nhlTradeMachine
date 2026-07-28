@@ -1,6 +1,7 @@
 // ── Footer — methodology, glossary, icon key, data credits ───
 // Shared across Armchair GM, Trade Machine, and Player Analytics pages.
 import Link from "next/link";
+import { BRAND } from "@/app/lib/brand";
 import { TierIcon } from "./GravityField";
 import type { GravityTier } from "@/app/lib/gravity";
 import { ROLE_DEFS } from "@/app/lib/player-roles";
@@ -121,7 +122,7 @@ export const methodologySections: MethodologySection[] = [
   },
   {
     title: "Data & Sources",
-    intro: "The Hockey Ledger is only possible because these sources publish world-class hockey data. Sincere thanks to each of them.",
+    intro: "Cap & Crease is only possible because these sources publish world-class hockey data. Sincere thanks to each of them.",
     items: [
       { term: "NHL API", definition: "Rosters, positions, ages, game logs, current-season summary data, and NHL EDGE tracking (zone time, speed, shot location).", href: "https://www.nhl.com" },
       { term: "MoneyPuck", definition: "Skater and goalie analytics including xG, deployment, on/off impact, and GSAx inputs. An indispensable public resource.", href: "https://moneypuck.com" },
@@ -263,6 +264,11 @@ export default function Footer() {
 
         <p className="mt-4 text-center text-[10px] leading-relaxed font-mono text-ledger-rule">
           Analytical estimates only. Player values move with injury, role, performance, contract status, source coverage, and team context.
+        </p>
+        {/* Nominative use, stated plainly: the league's marks are named to say
+            what the data is about, never to imply endorsement. */}
+        <p className="mt-2 text-center text-[10px] leading-relaxed font-mono text-ledger-rule">
+          {BRAND.disclaimer}
         </p>
       </div>
     </footer>

@@ -6,13 +6,13 @@ export function generateMetadata({ params }: { params: { code: string } }): Meta
   try {
     const preview = summarizeTradeSharePayload(decodeTradeSharePayload(params.code));
     return {
-      title: `${preview.title} | The Hockey Ledger`,
+      title: `${preview.title} | Cap & Crease`,
       description: preview.description,
       openGraph: {
         title: preview.title,
         description: preview.description,
         type: "article",
-        siteName: "The Hockey Ledger",
+        siteName: "Cap & Crease",
         images: [{
           url: `/t/${params.code}/opengraph-image`,
           width: 1200,
@@ -29,8 +29,8 @@ export function generateMetadata({ params }: { params: { code: string } }): Meta
     };
   } catch {
     return {
-      title: "Shared Trade | The Hockey Ledger",
-      description: "Open a shared NHL trade receipt from The Hockey Ledger.",
+      title: "Shared Trade | Cap & Crease",
+      description: "Open a shared NHL trade receipt from Cap & Crease.",
     };
   }
 }
