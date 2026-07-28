@@ -8,6 +8,7 @@
 //   npx tsx scripts/gravity-v4/probe.ts 2025020051       # live-probe game ids
 //   npx tsx scripts/gravity-v4/probe.ts --empties 5      # audit, then probe 5 of them
 //   npx tsx scripts/gravity-v4/probe.ts --compare 4      # 4 empty vs 4 populated
+//   npx tsx scripts/gravity-v4/probe.ts --inspect 2025020565   # why a game fails
 //
 // No pacing games, no retries, no caching — one request per URL so the status
 // code and payload shape are unambiguous.
@@ -24,6 +25,7 @@ const flag = (name: string, fallback?: string) => {
 const ids = args.filter(a => /^\d{10}$/.test(a)).map(Number);
 const probeEmpties = Number(flag("empties", "0"));
 const compare = Number(flag("compare", "0"));
+const inspect = flag("inspect");
 
 const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
 
@@ -88,6 +90,70 @@ function auditCache(): { empty: number[]; populated: number[] } {
     }
   }
   return { empty, populated };
+}
+
+/**
+ * Why does one game's shift rows fail to join its roster? Reads the cached
+ * payloads only — no network — and compares the two sides directly. Shift rows
+ * carry names, so an unresolved player is identifiable rather than just an id.
+ */
+function inspectGame(gameId: number) {
+  const read = (name: string) => {
+    const p = path.join(CACHE_DIR, `${name}-${gameId}.json`);
+    if (!fs.existsSync(p)) { console.log(`  no cached ${name} for ${gameId}`); return null; }
+    try { return JSON.parse(fs.readFileSync(p, "utf8")); }
+    catch { console.log(`  cached ${name} is not valid JSON`); return null; }
+  };
+  const shifts = read("shifts"), pbp = read("pbp");
+  if (!shifts || !pbp) return;
+
+  const homeId = pbp?.homeTeam?.id, awayId = pbp?.awayTeam?.id;
+  console.log(`\n── INSPECT ${gameId} ──────────────────────────────`);
+  console.log(`play-by-play  ${pbp?.awayTeam?.abbrev} (${awayId}) @ ${pbp?.homeTeam?.abbrev} (${homeId})`);
+
+  const rosterByTeam = new Map<number, number>();
+  const known = new Set<number>();
+  for (const s of pbp?.rosterSpots ?? []) {
+    known.add(s.playerId);
+    rosterByTeam.set(s.teamId, (rosterByTeam.get(s.teamId) ?? 0) + 1);
+  }
+  console.log(`rosterSpots   ${known.size} players` +
+    ` — ${[...rosterByTeam].map(([t, n]) => `team ${t}: ${n}`).join(", ")}`);
+
+  const rows = (shifts?.data ?? []).filter((r: any) => r.typeCode == null || r.typeCode === 517);
+  const rowsByTeam = new Map<number, number>();
+  const playersByTeam = new Map<number, Set<number>>();
+  const unresolved = new Map<number, { rows: number; name: string; teamId: number }>();
+  const gamesSeen = new Set<number>();
+
+  for (const r of rows) {
+    rowsByTeam.set(r.teamId, (rowsByTeam.get(r.teamId) ?? 0) + 1);
+    if (!playersByTeam.has(r.teamId)) playersByTeam.set(r.teamId, new Set());
+    playersByTeam.get(r.teamId)!.add(r.playerId);
+    if (r.gameId != null) gamesSeen.add(r.gameId);
+    if (!known.has(r.playerId)) {
+      const e = unresolved.get(r.playerId)
+        ?? { rows: 0, name: `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || "?", teamId: r.teamId };
+      e.rows++;
+      unresolved.set(r.playerId, e);
+    }
+  }
+
+  console.log(`shift rows    ${rows.length} (a normal game is ~770)`);
+  for (const [teamId, n] of [...rowsByTeam].sort((a, b) => b[1] - a[1])) {
+    const side = teamId === homeId ? "home" : teamId === awayId ? "away" : "*** NOT IN THIS GAME ***";
+    console.log(`  team ${String(teamId).padStart(3)}  ${String(n).padStart(5)} rows` +
+      `  ${String(playersByTeam.get(teamId)?.size ?? 0).padStart(3)} players  ${side}`);
+  }
+  if (gamesSeen.size > 1) {
+    console.log(`  !! rows carry ${gamesSeen.size} distinct gameIds: ${[...gamesSeen].join(", ")}`);
+  }
+
+  console.log(`\nunresolved    ${unresolved.size} players, ` +
+    `${[...unresolved.values()].reduce((s, e) => s + e.rows, 0)} rows`);
+  for (const [id, e] of [...unresolved].sort((a, b) => b[1].rows - a[1].rows).slice(0, 15)) {
+    console.log(`  ${String(id).padStart(8)}  ${String(e.rows).padStart(3)} rows  team ${e.teamId}  ${e.name}`);
+  }
 }
 
 async function probeUrl(label: string, url: string): Promise<number | null> {
@@ -173,6 +239,8 @@ async function runCompare(empty: number[], populated: number[], n: number) {
 }
 
 async function main() {
+  if (inspect) { inspectGame(Number(inspect)); return; }
+
   const { empty, populated } = auditCache();
 
   if (compare > 0) {
