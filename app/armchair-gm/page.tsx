@@ -930,6 +930,7 @@ export default function ArmchairGmPage() {
           <TradePanel idx={0} team={teams[0]} nav={navA} capSpace={capA} db={db}
             label="Your Franchise" accent="HOME"
             locked={homeTeamLocked}
+            cupYear={cupRunActive ? cupRun?.currentYear : null}
             onRequestTrade={(a) => setTradeRequest([a])}
             onRequestBlockTrade={(block) => setTradeRequest(block)} />
 
@@ -1103,6 +1104,7 @@ export default function ArmchairGmPage() {
 
           <TradePanel idx={1} team={teams[1]} nav={navB} capSpace={capB} db={db}
             label="Trade Partner" accent="PARTNER"
+            cupYear={cupRunActive ? cupRun?.currentYear : null}
             onRequestTrade={(a) => setTradeRequest([a])} />
         </div>
 

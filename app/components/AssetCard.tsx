@@ -15,6 +15,7 @@ import { tradeAssetKey, useTradeStore } from "@/app/store/tradeStore";
 import { AssetBadges } from "@/app/components/AssetBadges";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
 import { formatPickRound } from "@/app/lib/trade-format";
+import { contractExpiryYear } from "@/app/lib/contract-expiry";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
 import MeasuredProfile from "@/app/components/MeasuredProfile";
 import { displayPosition } from "@/app/lib/display-position";
@@ -23,12 +24,14 @@ import { fmtSigned as fmt } from "@/app/lib/display-utils";
 type AssetCardView = "STATS" | "STRAND" | "TIMELINE" | "DEV" | "EDGE";
 
 export default function AssetCard({
-  asset, idx, onRequestTrade, navResult
+  asset, idx, onRequestTrade, navResult, cupYear
 }: {
   asset: Asset;
   idx: 0 | 1;
   onRequestTrade?: (a: Asset) => void;
   navResult?: XNAVResult;
+  /** Cup Run year (1-3). Omit outside a run — expiry then reads season one. */
+  cupYear?: number | null;
 }) {
   const blocks = useTradeStore(s => s.blocks);
   const navMap = useTradeStore(s => s.navMap);
@@ -127,7 +130,7 @@ export default function AssetCard({
               {isPick
                 ? `${asset.year} · ${formatPickRound(asset.round)} Round`
                 : (() => {
-                    const expiryYear = new Date().getFullYear() + (asset.yearsRemaining ?? 1);
+                    const expiryYear = contractExpiryYear(asset.yearsRemaining, cupYear);
                     const extCap   = (asset as any).extensionCapHit;
                     const extYears = (asset as any).extensionYears;
                     if (asset.hasExtension && extCap) {

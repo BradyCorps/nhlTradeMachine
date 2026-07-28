@@ -2792,3 +2792,33 @@ describe("Canary — Redis is found under either provisioning name", () => {
     expect(client).not.toContain("process.env.UPSTASH_REDIS_REST_URL");
   });
 });
+
+describe("Canary — CXS batch: shared state, recap headings, simulated clock", () => {
+  it("CXS1 — TeamSelectModal copies before sorting shared store state", () => {
+    const src = read("app/armchair-gm/TeamSelectModal.tsx");
+    expect(src).toContain("[...teams]");
+    expect(src).not.toMatch(/\{teams\s*\n?\s*\.sort\(/);
+  });
+
+  it("CXS4 — recap headings are detected structurally, not by club name", () => {
+    // Comments stripped: the fix's own note names the prefixes it removed.
+    const src = read("app/armchair-gm/SeasonResultsPager.tsx")
+      .replace(/\/\/.*$/gm, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(src).not.toContain("EDMONTON");
+    expect(src).not.toContain("**AROUND");
+  });
+
+  it("CXS5 — no simulated surface reads the wall clock for expiry", () => {
+    const card = read("app/components/AssetCard.tsx");
+    expect(card).toContain("contractExpiryYear");
+    expect(card).not.toContain("new Date().getFullYear()");
+  });
+
+  it("RL8 — lineup rows carry counting stats rather than a per-82 rate", () => {
+    const src = read("app/components/LineupEditor.tsx");
+    expect(src).not.toContain("P82");
+    expect(src).toContain("goalsPace");
+    expect(src).toContain("assistsPace");
+  });
+});

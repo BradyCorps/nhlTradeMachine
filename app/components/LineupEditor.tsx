@@ -241,10 +241,15 @@ function TeamLineup({
     const isSel = selected?.group === group && selected.idx === idx;
     const status: keyof typeof STATUS_COLOR = !p ? "empty" : inIds.has(p.id) ? "in" : "normal";
     const nav = navOf(p, navMap);
+    // RL8 — G and A, not a P/82 rate. A per-82 projection is the right unit
+    // for comparing players across different games-played totals, but a lineup
+    // card is asking "who is this winger", and counting stats answer that in
+    // the language the rest of the sport uses. `goalsPace`/`assistsPace` are
+    // the same 82-game basis `ptsPace` was, so the row still totals to it.
     const meta = p
       ? p.position === "G"
         ? `${p.games ?? 0} GP`
-        : `${Math.round(p.ptsPace ?? 0)} P82 · ${(p.avgTOI ?? 0).toFixed(1)} TOI`
+        : `${Math.round(p.goalsPace ?? 0)}G · ${Math.round(p.assistsPace ?? 0)}A · ${(p.avgTOI ?? 0).toFixed(1)} TOI`
       : "";
     return (
       <td

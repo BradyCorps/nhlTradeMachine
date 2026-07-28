@@ -9,7 +9,7 @@ import LedgerDropdown from "@/app/components/LedgerDropdown";
 import { useTradeStore } from "@/app/store/tradeStore";
 
 function TradePanel({
-  idx, team, nav, capSpace, db, label, accent, locked, allowDuplicateTeams, onRequestTrade, onRequestBlockTrade
+  idx, team, nav, capSpace, db, label, accent, locked, allowDuplicateTeams, onRequestTrade, onRequestBlockTrade, cupYear
 }: {
   idx: 0 | 1;
   team: Team | null;
@@ -22,6 +22,8 @@ function TradePanel({
   allowDuplicateTeams?: boolean;
   onRequestTrade?: (a: Asset) => void;
   onRequestBlockTrade?: (block: Asset[]) => void;
+  /** Cup Run year (1-3), so contract expiry reads the simulated season. */
+  cupYear?: number | null;
 }) {
   const isLeft = idx === 0;
   const teams = useTradeStore(s => s.teams);
@@ -113,6 +115,7 @@ function TradePanel({
             idx={idx}
             onRequestTrade={onRequestTrade}
             navResult={navMap[a.id]}
+            cupYear={cupYear}
           />
         ))}
       </div>

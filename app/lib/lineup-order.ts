@@ -5,6 +5,11 @@ export interface LineupPlayer {
   secondaryPosition?: string | null;
   avgTOI?: number;
   ptsPace?: number;
+  // The same 82-game basis as `ptsPace`, split into its parts so a lineup row
+  // can show counting stats (RL8). `ptsPace` stays — the default ordering and
+  // the sim both still rank on it.
+  goalsPace?: number;
+  assistsPace?: number;
   capHit?: number;
   games?: number;
 }

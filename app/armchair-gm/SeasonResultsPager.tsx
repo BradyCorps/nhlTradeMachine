@@ -134,7 +134,11 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
   const [openPlayer, setOpenPlayer] = useState<string | null>(null);
 
   const renderRecapLine = (line: string, i: number) => {
-    if (line.startsWith('## ') || line.startsWith('**THE ') || line.startsWith('**EDMONTON') || line.startsWith('**AROUND') || line.startsWith('**THE YEAR') || line.startsWith('**DRAFT') || line.startsWith('**VERDICT')) {
+    // A heading is a line that is entirely bold, or a markdown `##`. The old
+    // test was an allowlist of prefixes — '**THE ', '**EDMONTON', '**AROUND'
+    // — so a recap for any club except Edmonton had its club-name heading
+    // rendered as body text (CXS4).
+    if (line.startsWith('## ') || /^\*\*[^*]+\*\*:?\s*$/.test(line.trim())) {
       const text = line.replace(/^\#{1,3}\s+/, '').replace(/\*\*/g, '');
       return <div key={i} className="font-black text-[11px] uppercase tracking-widest mt-4 mb-1" style={{ color: 'var(--ledger-ink)', borderBottom: '1px solid #c8b890', paddingBottom: '4px' }}>{text}</div>;
     }

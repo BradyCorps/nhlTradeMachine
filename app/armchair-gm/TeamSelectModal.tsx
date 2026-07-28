@@ -82,7 +82,10 @@ export function TeamSelectModal({
             </button>
           </div>
           <div className="grid grid-cols-4 gap-1.5 mb-4" style={{ maxHeight: '260px', overflowY: 'auto' }}>
-            {teams
+            {/* Copy first — `.sort()` mutates, and `teams` is shared store
+                state. Sorting it here reordered the league for every other
+                consumer as a side effect of opening a modal (CXS1). */}
+            {[...teams]
               .sort((a, b) => a.name.localeCompare(b.name))
               .map(t => {
                 const isSelected = selectedHomeId === t.id;
