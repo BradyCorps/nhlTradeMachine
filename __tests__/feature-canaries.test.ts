@@ -2602,8 +2602,15 @@ describe("ST3 — alternate positions resolve through a normalised key", () => {
 // Club logos were hotlinked from assets.nhle.com and player photos were inlined
 // into the exported card. The card exists to travel, so that exposure was
 // structural. Both are now drawn from our own type and palette.
-describe("Canary — the app ships no league-owned imagery", () => {
-  it("hotlinks no NHL asset host", () => {
+// Policy (owner's call, 2026-07-28): the SITE may hotlink NHL headshots —
+// that displays the league's image from the league's own server, in context.
+// The downloadable PNG may not: baking a copy into a branded file built to be
+// shared is redistribution. These canaries pin that asymmetry. The earlier
+// version of this block claimed the app shipped NO league imagery, which was
+// never true of /players or /press-box — it grepped for hardcoded hostnames
+// and was structurally blind to a URL arriving as data at runtime.
+describe("Canary — league imagery is allowed on the site, never in the export", () => {
+  it("hardcodes no NHL asset host in source", () => {
     const offenders: string[] = [];
     const walk = (dir: string) => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -2635,6 +2642,14 @@ describe("Canary — the app ships no league-owned imagery", () => {
     for (const f of ["app/components/LedgerDropdown.tsx", "app/armchair-gm/TeamSelectModal.tsx"]) {
       expect(read(f), f).toContain("<TeamMark");
     }
+  });
+
+  it("strips a headshot at the export boundary rather than trusting the renderer", () => {
+    // The schema tolerates the key so a stale client bundle isn't rejected,
+    // but the validator must discard it — otherwise the policy holds only
+    // until someone writes `data.headshotDataUrl`.
+    const lib = read("app/lib/card-payload.ts");
+    expect(lib).toContain("headshotDataUrl: _discarded");
   });
 });
 

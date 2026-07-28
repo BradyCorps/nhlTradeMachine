@@ -75,7 +75,6 @@ function validCardPayload(): CardImagePayload {
     navCells: [{ label: "OFF", val: 120 }],
     peerLabel: "all forwards",
     avgPercentile: 82,
-    headshotDataUrl: null,
   };
 }
 
@@ -153,5 +152,25 @@ describe("Gravity Release A public contract", () => {
       success: false,
       code: "INVALID_PAYLOAD",
     });
+  });
+
+  // Policy: the site may hotlink NHL headshots; the downloadable PNG may not.
+  // The card renders a drawn avatar, so no headshot ever enters the export.
+  it("renders a card with no headshot field at all", () => {
+    const payload = validCardPayload();
+    expect(payload).not.toHaveProperty("headshotDataUrl");
+    expect(validatePublicCardImagePayload(payload).success).toBe(true);
+  });
+
+  it("still accepts, and ignores, a stale client that sends one", () => {
+    const result = validatePublicCardImagePayload({
+      ...validCardPayload(),
+      headshotDataUrl: "data:image/png;base64,AAAA",
+    });
+
+    // `.strict()` would otherwise reject the whole export for a browser
+    // running pre-change JS. Accepted — but never carried into the render.
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).not.toHaveProperty("headshotDataUrl");
   });
 });

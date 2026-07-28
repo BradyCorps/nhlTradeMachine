@@ -135,9 +135,18 @@ export interface CardImagePayload {
   peerLabel: string; // "all forwards"
   avgPercentile: number | null;
 
-  // Same-origin-proxied headshot the client already loaded, inlined as a
-  // data URL so the renderer never has to make its own network request.
-  headshotDataUrl?: string | null;
+  // NOTE: there is deliberately no headshot field here.
+  //
+  // The policy is asymmetric on purpose. The site may hotlink NHL headshots —
+  // that displays the league's image from the league's own server, in context.
+  // The exported PNG may not: baking a copy into a branded file built to be
+  // downloaded and shared is redistribution, and travelling is the whole point
+  // of the card. So the renderer draws `PlayerAvatar` instead.
+  //
+  // `headshotDataUrl` used to live here, carrying a proxied headshot inlined as
+  // a data URL. The schema below still ACCEPTS that key so a browser running
+  // pre-change JS doesn't get its export rejected by `.strict()`, but nothing
+  // reads it and it must never be added back to this type.
 }
 
 const gravityTierSchema = z.enum([
@@ -202,6 +211,8 @@ const publicCardImagePayloadSchema = z.object({
   }).strict()),
   peerLabel: z.string(),
   avgPercentile: percentileSchema,
+  // Accepted and ignored — see the note on CardImagePayload. Kept only so a
+  // stale client bundle still sending it isn't rejected by `.strict()`.
   headshotDataUrl: z.string().nullable().optional(),
 }).strict();
 
@@ -244,5 +255,9 @@ export function validatePublicCardImagePayload(
       message: "Invalid public card payload.",
     };
   }
-  return { success: true, data: parsed.data };
+  // Tolerated on the way in, dropped before the renderer can see it. Leaving
+  // it on the validated object would mean the policy held only for as long as
+  // nobody wrote `data.headshotDataUrl` — this makes it unavailable instead.
+  const { headshotDataUrl: _discarded, ...data } = parsed.data;
+  return { success: true, data };
 }
