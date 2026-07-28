@@ -124,8 +124,10 @@ describe("OFF3 — the Re-Sign screen shows the horizon", () => {
   });
 
   it("gives the advanced-stat expander a real touch target", () => {
-    // It was a ~10px glyph with padding: 0 — under the 44px minimum.
-    const src = read("app/components/ResignPhase.tsx");
+    // It was a ~10px glyph with padding: 0 — under the 44px minimum. The
+    // chevron moved into the shared analytics module under OFF4, so the
+    // guarantee now covers the offer-sheet screen too.
+    const src = read("app/components/OffseasonPlayerAnalytics.tsx");
     const chevron = src.slice(src.indexOf('aria-hidden="true"'));
     expect(chevron.slice(0, 400)).toContain("tap-target");
     expect(chevron.slice(0, 400)).not.toContain("padding: 0,");

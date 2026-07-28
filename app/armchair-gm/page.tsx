@@ -814,6 +814,7 @@ export default function ArmchairGmPage() {
           homeTeam={liveHome}
           capSpace={liveHome.capSpace ?? 0}
           rfaMarket={rfaMarket}
+          navMap={navMap}
           teams={db.teams}
           picks={db.players.filter(p => p.position === "Pick")}
           onSign={signOfferSheet}

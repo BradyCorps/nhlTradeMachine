@@ -67,3 +67,47 @@ describe("the phase screens read from the shared table", () => {
     }
   });
 });
+
+// ── OFF4: the RFA screen matches the FA screen's analytics ──────
+// An offer sheet costs picks and cap and can be matched. Committing to one
+// while seeing less about the player than a UFA on the previous screen is
+// backwards.
+describe("OFF4 — offer-sheet rows carry the same analytics as the market", () => {
+  const shared = () => read("app/components/OffseasonPlayerAnalytics.tsx");
+
+  it("has one implementation of the expandable panel, not two", () => {
+    // "Match the FA analytics" is a guarantee that only holds if it is shared.
+    const s = shared();
+    expect(s).toContain("export function ExpandedStats");
+    expect(s).toContain("export function AnalyticsDisclosure");
+    expect(s).toContain("export function StatLine");
+    for (const screen of ["app/components/ResignPhase.tsx", "app/components/OfferSheetPhase.tsx"]) {
+      expect(read(screen), screen).toContain('from "@/app/components/OffseasonPlayerAnalytics"');
+    }
+  });
+
+  it("both screens use the shared disclosure and the shared panel", () => {
+    for (const screen of ["app/components/ResignPhase.tsx", "app/components/OfferSheetPhase.tsx"]) {
+      const src = read(screen);
+      expect(src, screen).toContain("<AnalyticsDisclosure");
+      expect(src, screen).toMatch(/isExpanded && <ExpandedStats/);
+    }
+  });
+
+  it("gives the offer-sheet screen a NAV source so the panel is not blank", () => {
+    expect(read("app/components/OfferSheetPhase.tsx")).toContain("navMap");
+    expect(read("app/armchair-gm/page.tsx")).toMatch(/rfaMarket=\{rfaMarket\}[\s\S]{0,120}navMap=\{navMap\}/);
+  });
+
+  it("keeps the disclosure header-only so the panel can span the row", () => {
+    // Nesting the grid inside the name column made it unreadable.
+    const s = shared();
+    expect(s).not.toMatch(/AnalyticsDisclosure[\s\S]{0,1200}\{expanded && <ExpandedStats/);
+  });
+
+  it("holds the offer-sheet screen to the same 10px AA floor", () => {
+    const sizes = [...read("app/components/OfferSheetPhase.tsx").matchAll(/text-\[(\d+)px\]/g)]
+      .map(m => Number(m[1]));
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(10);
+  });
+});

@@ -3,8 +3,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { offseasonCta } from "@/app/lib/offseason-phases";
 import { createPortal } from "react-dom";
-import type { Asset, Team } from "@/app/lib/trade-types";
+import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
+import {
+  ZERO_XNAV, StatLine, ExpandedStats, AnalyticsDisclosure,
+} from "@/app/components/OffseasonPlayerAnalytics";
 import type { OffseasonPending } from "@/app/lib/free-agency";
 import {
   getOfferSheetCompensation,
@@ -33,6 +36,7 @@ export default function OfferSheetPhase({
   rfaMarket,
   teams,
   picks,
+  navMap,
   onSign,
   onDone,
 }: {
@@ -41,10 +45,12 @@ export default function OfferSheetPhase({
   rfaMarket: OffseasonPending[];
   teams: Team[];
   picks: Asset[];
+  navMap?: Record<string, XNAVResult>;
   onSign: (fa: OffseasonPending, compensation: string[]) => void;
   onDone: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const [expandedRfaId, setExpandedRfaId] = useState<string | null>(null);
   const [results, setResults] = useState<OfferResult[]>([]);
   const [showTiers, setShowTiers] = useState(false);
   const [rfaPage, setRfaPage] = useState(1);
@@ -136,7 +142,7 @@ export default function OfferSheetPhase({
               </h2>
             </div>
             <div className="text-right">
-              <div className="text-[9px] uppercase tracking-[0.2em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>Cap Space</div>
+              <div className="text-[10px] uppercase tracking-[0.2em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>Cap Space</div>
               <div className="font-mono font-black text-lg" style={{ color: capSpace < 0 ? "var(--ledger-red)" : "var(--ledger-green)" }}>
                 {money(capSpace)}
               </div>
@@ -248,23 +254,32 @@ export default function OfferSheetPhase({
               const offered = alreadyOffered.has(fa.player.id);
               const origTeam = teamMap.get(fa.player.teamId);
 
+              const isExpanded = expandedRfaId === fa.player.id;
+
               return (
-                <div key={fa.player.id} className="flex flex-col items-stretch gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+                <div key={fa.player.id}
                   style={{
                     background: "var(--paper)",
                     border: "1px solid var(--ledger-rule-light)",
                     borderRadius: "2px",
                     opacity: offered ? 0.5 : 1,
                   }}>
+                <div className="flex flex-col items-stretch gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                   <div className="min-w-0 flex-1">
+                    {/* Same disclosure the UFA market uses — an offer sheet
+                        costs picks and cap, so it warrants at least as much
+                        information as signing a UFA did (OFF4). */}
+                    <AnalyticsDisclosure
+                      player={fa.player}
+                      expanded={isExpanded}
+                      onToggle={() => setExpandedRfaId(isExpanded ? null : fa.player.id)}
+                    />
                     <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="font-black text-[13px]" style={{ color: "var(--ledger-ink)" }}>
-                        {fa.player.name}
-                      </span>
-                      <span className="text-[9px] font-mono uppercase tracking-wide" style={{ color: "var(--ledger-ink-faint)" }}>
+                      <span className="text-[10px] font-mono uppercase tracking-wide" style={{ color: "var(--ledger-ink-faint)" }}>
                         {displayPosition(fa.player.position, fa.player.secondaryPosition)} · age {fa.player.age} · {fa.player.teamId}
                         {origTeam?.phase && ` (${origTeam.phase})`}
                       </span>
+                      <StatLine p={fa.player} />
                     </div>
                     <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                       <span className="font-mono text-[11px] font-black" style={{
@@ -276,19 +291,19 @@ export default function OfferSheetPhase({
                         {money(fa.contract.aav)} × {fa.contract.term}yr
                       </span>
                       {comp.length > 0 && (
-                        <span className="text-[9px] font-mono font-black uppercase tracking-wide"
+                        <span className="text-[10px] font-mono font-black uppercase tracking-wide"
                           style={{ color: "var(--ledger-amber)" }}>
                           Comp: {comp.map(roundLabel).join(" + ")}
                         </span>
                       )}
                       {comp.length === 0 && (
-                        <span className="text-[9px] font-mono uppercase tracking-wide"
+                        <span className="text-[10px] font-mono uppercase tracking-wide"
                           style={{ color: "var(--ledger-green)" }}>
                           No comp
                         </span>
                       )}
                       {!hasPicks && comp.length > 0 && (
-                        <span className="text-[9px] font-mono font-black uppercase tracking-wide"
+                        <span className="text-[10px] font-mono font-black uppercase tracking-wide"
                           style={{ color: "var(--ledger-red)" }}>
                           Missing picks
                         </span>
@@ -316,6 +331,8 @@ export default function OfferSheetPhase({
                     }}>
                     {offered ? "Offered" : "Offer Sheet"}
                   </button>
+                </div>
+                {isExpanded && <ExpandedStats p={fa.player} nav={navMap?.[fa.player.id] ?? ZERO_XNAV} />}
                 </div>
               );
             })}
