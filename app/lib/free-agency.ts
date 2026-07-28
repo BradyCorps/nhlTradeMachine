@@ -13,6 +13,7 @@ import type { Asset, Team } from "@/app/lib/trade-types";
 import type { CapDeltaAsset, CapDeltaMoves } from "@/app/lib/cap-delta";
 import { mulberry32, hashString } from "@/app/lib/sim-engine";
 import { SEASON } from "@/app/lib/season-config";
+import { marketBudgetFor } from "@/app/lib/ai-cap";
 
 export type FaStatus = "UFA" | "RFA";
 export type FaTier = "STAR" | "TOP" | "MIDDLE" | "DEPTH" | "FRINGE";
@@ -61,7 +62,10 @@ export const FA = {
   gMaxTerm:      6,       // goalies rarely sign beyond six years
 
   rfaDiscount:   0.82,    // RFA team control suppresses AAV vs open market
-  aiMarketCapReserve: 0.775, // AI teams keep one league-min emergency slot when shopping the open market
+  // Superseded by marketReserveFor() in ai-cap.ts — a flat league-minimum
+  // reserve left every club spending down to $0.8M. Kept for the offer-sheet
+  // path, which is a single transaction rather than a spending spree.
+  aiMarketCapReserve: 0.775,
 
   // Ascending-star projection: the market pays young stars for their
   // prime, not their current pace (Carlsson's 5x$90M offer sheet reset
@@ -490,7 +494,12 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
   if (mutableCap && ctx.teams) {
     const signedMarketIds = new Set<string>();
     const aiTeams = ctx.teams.filter((t) => t.id !== ctx.userTeamId);
-    const marketBudget = (teamId: string) => (mutableCap.get(teamId) ?? 0) - FA.aiMarketCapReserve;
+    // Phase-shaped reserve. A flat one-league-minimum reserve meant every club
+    // — contender and rebuild alike — spent down to $0.8M, so the whole league
+    // finished the offseason capped out with no room to absorb anyone cut later.
+    const phaseById = new Map(aiTeams.map((t) => [t.id, t.phase]));
+    const marketBudget = (teamId: string) =>
+      marketBudgetFor(mutableCap.get(teamId) ?? 0, phaseById.get(teamId));
     const phaseScore = (phase?: string) =>
       phase === "Contender" ? 18 :
       phase === "Bubble" ? 12 :

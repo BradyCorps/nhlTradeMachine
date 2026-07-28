@@ -11,6 +11,7 @@ import { generateSyntheticDraftClass } from "./synthetic-draft";
 import { computeChangeOfScenery } from "./lineup-context";
 import { hashString, mulberry32 } from "./sim-engine";
 import { SEASON } from "./season-config";
+import { planCapCompliance } from "./ai-cap";
 
 // ── Types ─────────────────────────────────────────────────────
 export interface CupRunSeasonRecord {
@@ -361,27 +362,30 @@ export function rollLeagueForward(opts: {
       unit === "G" ? p.position === "G" : unit === "D" ? p.position === "D" : p.position !== "D" && p.position !== "G"
     ).length;
 
+  // Clubs that could not reach the ceiling by cutting — surfaced rather than
+  // silently left over the cap.
+  const capNonCompliant: string[] = [];
+
   const enforceAiCap = () => {
-    const rand = mulberry32(rolloverSeed + hashString("ai-cap-pass"));
+    capNonCompliant.length = 0;
     for (const team of teams) {
       if (team.id === state.teamId) continue;
-      for (let guard = 0; guard < 8; guard++) {
-        const roster = nextPlayers.filter((p) => p.teamId === team.id && isSkaterOrGoalie(p));
-        const committed = roster.reduce((s, p) => s + (p.capHit ?? 0) * (1 - (p.retainedPct ?? 0)), 0);
-        if (committed <= capCeiling) break;
-        const fCount = countUnit(roster, "F");
-        const dCount = countUnit(roster, "D");
-        // Worst value per dollar among mid/large skater deals; NMC immovable.
-        const candidates = roster
-          .filter((p) => p.capHit >= 2.5 && !p.hasNMC && p.position !== "G")
-          .filter((p) => (p.position === "D" ? dCount > 6 : fCount > 12))
-          .sort((a, b) => (a.ptsPace / a.capHit) - (b.ptsPace / b.capHit));
-        const cut = candidates[Math.floor(rand() * Math.min(2, candidates.length))] ?? candidates[0];
-        if (!cut) break;
-        nextPlayers = nextPlayers.map((p) =>
-          p.id === cut.id ? { ...p, teamId: "FA_POOL", expiryStatus: "UFA" as const, expiresThisOffseason: true } : p
-        );
-      }
+      const roster = nextPlayers.filter((p) => p.teamId === team.id && isSkaterOrGoalie(p));
+      // Positional ranking with a protected core, and cuts allowed to drop the
+      // roster below minimum because repair refills at $0.8M straight after.
+      // The old pass ranked on points-per-dollar (so elite D always looked like
+      // the worst contract) and refused to cut at 12F/6D (so a repaired roster
+      // had no legal candidate and the club stayed over the cap).
+      const plan = planCapCompliance(roster, { ceiling: capCeiling });
+      if (plan.cuts.length === 0 && !plan.compliant) capNonCompliant.push(team.id);
+      if (plan.cuts.length === 0) continue;
+      const cutIds = new Set(plan.cuts.map((c: { id: string }) => c.id));
+      nextPlayers = nextPlayers.map((p) =>
+        cutIds.has(p.id)
+          ? { ...p, teamId: "FA_POOL", expiryStatus: "UFA" as const, expiresThisOffseason: true }
+          : p
+      );
+      if (!plan.compliant) capNonCompliant.push(team.id);
     }
   };
 
