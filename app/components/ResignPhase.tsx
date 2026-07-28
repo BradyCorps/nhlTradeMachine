@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { offseasonCta } from "@/app/lib/offseason-phases";
+import { sortPendingByRights } from "@/app/lib/free-agency";
 import { createPortal } from "react-dom";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
@@ -42,7 +43,7 @@ function StatLine({ p }: { p: Asset }) {
   }
   if (bits.length === 0) return null;
   return (
-    <span className="text-[9px] font-mono tracking-wide" style={{ color: "var(--ledger-brown)" }}>
+    <span className="text-[10px] font-mono tracking-wide" style={{ color: "var(--ledger-brown)" }}>
       &rsquo;26 · {bits.join(" · ")}
     </span>
   );
@@ -69,11 +70,11 @@ function ExpandedStats({ p, nav }: { p: Asset; nav: XNAVResult }) {
     >
       {/* X-NAV breakdown */}
       <div>
-        <div className="text-[8px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>X-NAV</div>
+        <div className="text-[10px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>X-NAV</div>
         <div className="text-[12px] font-black font-mono" style={{ color: nav.total >= 0 ? "var(--ledger-green)" : "var(--ledger-red)" }}>
           {nav.total > 0 ? "+" : ""}{nav.total.toFixed(0)}
         </div>
-        <div className="text-[8px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+        <div className="text-[10px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
           Off {fmtDec(nav.off, true)} · Def {fmtDec(nav.def, true)} · Age {fmtDec(nav.age, true)} · Cap {fmtDec(nav.cap, true)}
         </div>
       </div>
@@ -81,30 +82,30 @@ function ExpandedStats({ p, nav }: { p: Asset; nav: XNAVResult }) {
       {/* Production */}
       {!isG && (
         <div>
-          <div className="text-[8px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>Production</div>
-          <div className="text-[9px] font-mono" style={{ color: "var(--ledger-brown)" }}>
+          <div className="text-[10px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>Production</div>
+          <div className="text-[10px] font-mono" style={{ color: "var(--ledger-brown)" }}>
             P/82: {fmtDec(p.ptsPace)} · xG/82: {fmtDec(p.xGPace)}
           </div>
-          {p.ops != null && <div className="text-[9px] font-mono" style={{ color: "var(--ledger-brown)" }}>OPS: {fmtDec(p.ops)} · DPS: {fmtDec(p.dps)}</div>}
+          {p.ops != null && <div className="text-[10px] font-mono" style={{ color: "var(--ledger-brown)" }}>OPS: {fmtDec(p.ops)} · DPS: {fmtDec(p.dps)}</div>}
         </div>
       )}
 
       {/* Impact */}
       {!isG && (
         <div>
-          <div className="text-[8px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>Impact</div>
-          <div className="text-[9px] font-mono" style={{ color: "var(--ledger-brown)" }}>
+          <div className="text-[10px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>Impact</div>
+          <div className="text-[10px] font-mono" style={{ color: "var(--ledger-brown)" }}>
             NOIV: {fmtDec(p.xgRelTM, true)} · xGA Rel: {fmtDec(p.xgaRelTM, true)}
           </div>
-          {p.dzPct != null && <div className="text-[9px] font-mono" style={{ color: "var(--ledger-brown)" }}>DZ%: {fmtPct(p.dzPct)}</div>}
+          {p.dzPct != null && <div className="text-[10px] font-mono" style={{ color: "var(--ledger-brown)" }}>DZ%: {fmtPct(p.dzPct)}</div>}
         </div>
       )}
 
       {/* Goalie */}
       {isG && (
         <div>
-          <div className="text-[8px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>Goaltending</div>
-          <div className="text-[9px] font-mono" style={{ color: "var(--ledger-brown)" }}>
+          <div className="text-[10px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>Goaltending</div>
+          <div className="text-[10px] font-mono" style={{ color: "var(--ledger-brown)" }}>
             SV%: {fmtPct(p.savePct)} · GSAx: {fmtDec(p.gsax, true)}
           </div>
         </div>
@@ -113,8 +114,8 @@ function ExpandedStats({ p, nav }: { p: Asset; nav: XNAVResult }) {
       {/* EDGE */}
       {(p.edgeSpeedMaxMph != null || p.hdFinishingDelta != null) && (
         <div>
-          <div className="text-[8px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>EDGE</div>
-          <div className="text-[9px] font-mono" style={{ color: "var(--ledger-brown)" }}>
+          <div className="text-[10px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>EDGE</div>
+          <div className="text-[10px] font-mono" style={{ color: "var(--ledger-brown)" }}>
             {p.edgeSpeedMaxMph != null ? `Speed: ${p.edgeSpeedMaxMph.toFixed(1)} mph` : ""}
             {p.hdFinishingDelta != null ? ` · HD: ${(p.hdFinishingDelta * 100) > 0 ? "+" : ""}${(p.hdFinishingDelta * 100).toFixed(1)}%` : ""}
           </div>
@@ -124,7 +125,7 @@ function ExpandedStats({ p, nav }: { p: Asset; nav: XNAVResult }) {
       {/* Gravity */}
       {gravity && (
         <div>
-          <div className="text-[8px] font-black uppercase tracking-[0.12em] font-mono mb-0.5" style={{ color: "var(--ledger-ink-faint)" }}>Gravity</div>
+          <div className="text-[10px] font-black uppercase tracking-[0.12em] font-mono mb-0.5" style={{ color: "var(--ledger-ink-faint)" }}>Gravity</div>
           <CompactGravity profile={gravity} />
         </div>
       )}
@@ -142,7 +143,7 @@ function Terms({ c }: { c: OffseasonPending["contract"] }) {
   return (
     <span className="font-mono text-[11px] font-black" style={{ color: tierColor(c.tier) }}>
       {money(c.aav)} × {c.term}yr
-      <span className="ml-1.5 text-[9px]" style={{ color: "var(--ledger-ink-faint)" }}>{c.status}</span>
+      <span className="ml-1.5 text-[10px]" style={{ color: "var(--ledger-ink-faint)" }}>{c.status}</span>
     </span>
   );
 }
@@ -151,7 +152,7 @@ function PlayerMeta({ p }: { p: OffseasonPending["player"] }) {
   // p.capHit is zeroed for pending FAs; lastCapHit preserves the real expiring deal.
   const wasCap = p.lastCapHit ?? p.capHit;
   return (
-    <span className="text-[9px] font-mono uppercase tracking-wide" style={{ color: "var(--ledger-ink-faint)" }}>
+    <span className="text-[10px] font-mono uppercase tracking-wide" style={{ color: "var(--ledger-ink-faint)" }}>
       {displayPosition(p.position, p.secondaryPosition)} · age {p.age}{wasCap > 0 ? ` · was ${money(wasCap)}` : ""}
     </span>
   );
@@ -205,6 +206,12 @@ export default function ResignPhase({
 
   // Signed players the user can release for cap relief. Pending FAs are handled
   // above, so exclude them here; picks are never droppable.
+  // RFA business precedes UFA business in a real offseason, and an RFA walked
+  // is team control surrendered — so those decisions come first (OFF2).
+  const orderedPending = useMemo(() => sortPendingByRights(pending), [pending]);
+  const rfaCount = useMemo(
+    () => pending.filter((p) => p.contract.status === "RFA").length, [pending]);
+
   const pendingIds = useMemo(() => new Set(pending.map((p) => p.player.id)), [pending]);
   const droppable = useMemo(() => {
     const q = dropQuery.trim().toLowerCase();
@@ -241,40 +248,76 @@ export default function ResignPhase({
               </h2>
             </div>
             <div className="text-right">
-              <div className="text-[9px] uppercase tracking-[0.2em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>Cap Space</div>
-              <div className="font-mono font-black text-lg" style={{ color: overCap ? "var(--ledger-red)" : "var(--ledger-green)" }}>
-                {money(capSpace)}
+              <div className="text-[10px] uppercase tracking-[0.2em] font-mono" style={{ color: "var(--ledger-ink-faint)" }} id="resign-cap-label">Cap Space</div>
+              <div className="font-mono font-black text-lg"
+                aria-live="polite"
+                aria-labelledby="resign-cap-label"
+                style={{ color: overCap ? "var(--ledger-red)" : "var(--ledger-green)" }}>
+                {money(capSpace)}{overCap ? " over" : ""}
               </div>
             </div>
           </div>
         </div>
 
         <div className="overflow-y-auto px-3 sm:px-5 py-4" style={{ flex: 1, minHeight: 0 }}>
-          {/* Pending free agents */}
-          <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono mb-3" style={{ color: "var(--ledger-ink-faint)" }}>
+          {/* Pending free agents — restricted first, then unrestricted */}
+          <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
             Your Pending Free Agents — {pending.length}
-          </div>
+          </h3>
+          {pending.length > 0 && (
+            <p className="text-[10px] font-mono mb-3" style={{ color: "var(--ledger-brown)" }}>
+              {rfaCount} restricted {rfaCount === 1 ? "right" : "rights"} shown first
+              {pending.length - rfaCount > 0 && `, then ${pending.length - rfaCount} unrestricted`}
+              {" — "}walking an RFA gives up team control.
+            </p>
+          )}
           {pending.length === 0 ? (
             <p className="text-[12px] italic mb-5" style={{ color: "var(--ledger-brown)" }}>
               No expiring contracts to resolve. Sign from the market below or proceed to trades.
             </p>
           ) : (
-            <div className="flex flex-col gap-1.5 mb-6">
-              {pending.map((fa) => {
+            <ul role="list" className="flex flex-col gap-1.5 mb-6" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {orderedPending.map((fa, i) => {
                 // You can't add salary you don't have room for — re-signing is
                 // gated by cap space just like a market signing. (No cap room →
                 // let him walk, or free space via trades/buyouts first.)
                 const affordable = fa.contract.aav <= capSpace;
                 const projectedCap = capSpace - fa.contract.aav;
                 return (
-                <div key={fa.player.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 px-3 py-2"
-                  style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
+                <li key={fa.player.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 px-3 py-2"
+                  style={{
+                    background: "var(--paper)",
+                    border: "1px solid var(--ledger-rule-light)",
+                    borderRadius: "2px",
+                    // A rule between the last RFA and the first UFA, so the two
+                    // groups read as groups without a second heading.
+                    marginTop: i > 0 && fa.contract.status === "UFA"
+                      && orderedPending[i - 1].contract.status === "RFA" ? 10 : 0,
+                    borderTopWidth: i > 0 && fa.contract.status === "UFA"
+                      && orderedPending[i - 1].contract.status === "RFA" ? 3 : 1,
+                    borderTopStyle: "solid",
+                  }}>
                   <div className="min-w-0">
-                    <button onClick={() => setDetail(fa.player)} title="View STRAND & development"
-                      className="tap-target font-black text-[13px] truncate text-left hover:underline"
-                      style={{ color: "var(--ledger-ink)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
-                      {fa.player.name}
-                    </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button onClick={() => setDetail(fa.player)} title="View STRAND & development"
+                        className="tap-target font-black text-[13px] truncate text-left hover:underline"
+                        style={{ color: "var(--ledger-ink)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
+                        {fa.player.name}
+                      </button>
+                      <span
+                        className="text-[10px] font-black uppercase tracking-[0.12em] font-mono px-1.5 py-0.5"
+                        title={fa.contract.status === "RFA"
+                          ? "Restricted — you hold his rights; letting him walk surrenders them"
+                          : "Unrestricted — free to sign anywhere"}
+                        style={{
+                          border: "1px solid var(--ledger-rule)",
+                          borderRadius: "2px",
+                          color: fa.contract.status === "RFA" ? "var(--ledger-ink)" : "var(--ledger-brown)",
+                          background: fa.contract.status === "RFA" ? "var(--paper-inset)" : "transparent",
+                        }}>
+                        {fa.contract.status}
+                      </span>
+                    </div>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       <PlayerMeta p={fa.player} />
                       <StatLine p={fa.player} />
@@ -283,8 +326,8 @@ export default function ResignPhase({
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                     <div className="text-right">
                       <Terms c={fa.contract} />
-                      <div className="text-[9px] font-mono tabular-nums" style={{ color: affordable ? "var(--ledger-green)" : "var(--ledger-red)" }}>
-                        {affordable ? money(projectedCap) : "over cap"}
+                      <div className="text-[10px] font-mono tabular-nums" style={{ color: affordable ? "var(--ledger-green)" : "var(--ledger-red)" }}>
+                        {affordable ? `${money(projectedCap)} left` : "over cap"}
                       </div>
                     </div>
                     <button onClick={() => affordable && onResign(fa)}
@@ -302,10 +345,10 @@ export default function ResignPhase({
                       Let Walk
                     </button>
                   </div>
-                </div>
+                </li>
                 );
               })}
-            </div>
+            </ul>
           )}
 
           {/* Release a signed player — clean release frees the full cap hit */}
@@ -323,7 +366,8 @@ export default function ResignPhase({
                   value={dropQuery}
                   onChange={(e) => setDropQuery(e.target.value)}
                   placeholder="Search your roster…"
-                  className="text-[11px] font-mono outline-none px-2 py-1 mb-2 w-full"
+                  aria-label="Search your roster to release a player"
+                  className="text-[11px] font-mono px-2 py-1 mb-2 w-full"
                   style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule)", borderRadius: "2px", color: "var(--ledger-ink)" }}
                 />
                 <div className="flex flex-col gap-1">
@@ -332,7 +376,7 @@ export default function ResignPhase({
                       style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule-light)", borderRadius: "2px" }}>
                       <div className="min-w-0">
                         <div className="font-bold text-[12px] truncate" style={{ color: "var(--ledger-ink)" }}>{p.name}</div>
-                        <span className="text-[9px] font-mono uppercase tracking-wide" style={{ color: "var(--ledger-ink-faint)" }}>
+                        <span className="text-[10px] font-mono uppercase tracking-wide" style={{ color: "var(--ledger-ink-faint)" }}>
                           {displayPosition(p.position, p.secondaryPosition)} · age {p.age} · {money(p.capHit ?? 0)} × {p.yearsRemaining ?? 0}yr
                         </span>
                       </div>
@@ -355,9 +399,9 @@ export default function ResignPhase({
           {/* Open market */}
           <div className="flex items-center justify-between gap-3 mb-3">
             <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+              <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
                 Free-Agent Market — {sortedMarket.length}{query.trim() ? ` of ${market.length}` : ""}
-              </div>
+              </h3>
               <div className="flex gap-1 mt-1">
                 {([
                   ["ask", "Ask"],
@@ -366,7 +410,7 @@ export default function ResignPhase({
                 ] as const).map(([key, label]) => (
                   <button key={key} onClick={() => setMarketSort(key)}
                     aria-pressed={marketSort === key}
-                    className="tap-target text-[9px] font-black uppercase tracking-wider px-2 py-1 font-mono"
+                    className="tap-target text-[10px] font-black uppercase tracking-wider px-2 py-1 font-mono"
                     style={{
                       background: marketSort === key ? "var(--ledger-ink)" : "transparent",
                       color: marketSort === key ? "var(--ledger-card-light)" : "var(--ledger-ink-faint)",
@@ -382,7 +426,8 @@ export default function ResignPhase({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search market…"
-              className="text-[11px] font-mono outline-none px-2 py-1"
+              aria-label="Search the free-agent market"
+              className="text-[11px] font-mono px-2 py-1"
               style={{ background: "var(--paper)", border: "1px solid var(--ledger-rule)", borderRadius: "2px", color: "var(--ledger-ink)", width: 160 }}
             />
           </div>
@@ -420,7 +465,7 @@ export default function ResignPhase({
                           onClick={() => setExpandedFaId(isExpanded ? null : fa.player.id)}
                           aria-hidden="true"
                           tabIndex={-1}
-                          className="text-[8px] font-mono"
+                          className="text-[10px] font-mono"
                           style={{
                             color: "var(--ledger-ink-faint)", background: "transparent", border: "none",
                             cursor: "pointer", padding: 0, transform: isExpanded ? "rotate(180deg)" : "none",
@@ -436,18 +481,18 @@ export default function ResignPhase({
                           NAV {nav > 0 ? "+" : ""}{nav.toFixed(0)}
                         </span>
                         {edgeLabel && (
-                          <span className="text-[9px] font-mono font-black uppercase tracking-wide"
+                          <span className="text-[10px] font-mono font-black uppercase tracking-wide"
                             style={{ color: edgeDelta != null && edgeDelta < 0 ? "var(--ledger-green)" : "var(--ledger-brown)" }}>
                             {edgeLabel}
                           </span>
                         )}
-                        <span className="text-[9px] font-mono font-black uppercase tracking-wide" style={{ color: ageColor }}>
+                        <span className="text-[10px] font-mono font-black uppercase tracking-wide" style={{ color: ageColor }}>
                           Age {ageArrow}
                         </span>
                       </div>
                       {isRfa && offerPicks.length > 0 && (
                         <div>
-                          <span className="text-[9px] font-mono font-black uppercase tracking-wide"
+                          <span className="text-[10px] font-mono font-black uppercase tracking-wide"
                             style={{ color: "var(--ledger-amber, #c87941)" }}
                             title="CBA offer-sheet compensation owed to original team if they don't match">
                             ⚠ Offer sheet · picks owed: {offerPicks.join(" + ")}
@@ -456,7 +501,7 @@ export default function ResignPhase({
                       )}
                       {isRfa && offerPicks.length === 0 && (
                         <div>
-                          <span className="text-[9px] font-mono uppercase tracking-wide"
+                          <span className="text-[10px] font-mono uppercase tracking-wide"
                             style={{ color: "var(--ledger-ink-faint)" }}>
                             RFA · no comp
                           </span>
@@ -467,7 +512,7 @@ export default function ResignPhase({
                       <div className="min-w-[132px]">
                         <div className="flex items-center justify-between gap-2">
                           <Terms c={fa.contract} />
-                          <span className="text-[9px] font-mono tabular-nums" style={{ color: affordable ? "var(--ledger-green)" : "var(--ledger-red)" }}>
+                          <span className="text-[10px] font-mono tabular-nums" style={{ color: affordable ? "var(--ledger-green)" : "var(--ledger-red)" }}>
                             {money(projectedCap)}
                           </span>
                         </div>

@@ -358,6 +358,24 @@ export interface OffseasonPending {
   contract: ProjectedContract;
 }
 
+/**
+ * Order pending free agents the way the NHL offseason actually runs: restricted
+ * business first, then unrestricted.
+ *
+ * A club qualifies and re-signs its RFAs before the UFA market opens, and RFA
+ * decisions are the ones with real consequences here — walk an RFA and you give
+ * up team control, where a UFA was leaving anyway. Presenting them mixed asks
+ * the user to re-derive that priority from a status chip on every row.
+ *
+ * Within each group the biggest cap commitments come first, since those are the
+ * decisions that determine what room is left for everything below them.
+ */
+export function sortPendingByRights(pending: OffseasonPending[]): OffseasonPending[] {
+  const rank = (p: OffseasonPending) => (p.contract.status === "RFA" ? 0 : 1);
+  return [...pending].sort((a, b) =>
+    rank(a) - rank(b) || b.contract.aav - a.contract.aav || a.player.name.localeCompare(b.player.name));
+}
+
 export interface LeagueOffseasonResult {
   expiringCount: number;
   userPending: OffseasonPending[];   // the user's team — returned for manual handling, NOT auto-applied
