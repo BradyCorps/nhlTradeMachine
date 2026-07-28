@@ -3,6 +3,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { offseasonCta } from "@/app/lib/offseason-phases";
 import { sortPendingByRights } from "@/app/lib/free-agency";
+import { buildCapHorizon } from "@/app/lib/cap-horizon";
+import { CapHorizon } from "@/app/components/CapHorizon";
+import { SEASON } from "@/app/lib/season-config";
 import { createPortal } from "react-dom";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
@@ -212,6 +215,16 @@ export default function ResignPhase({
   const rfaCount = useMemo(
     () => pending.filter((p) => p.contract.status === "RFA").length, [pending]);
 
+  // Forward commitments, so a signing is judged against the seasons it actually
+  // binds rather than only against today's space (OFF3).
+  const horizon = useMemo(
+    () => buildCapHorizon(roster, {
+      teamId: homeTeam.id,
+      startYear: parseInt(SEASON.label.slice(0, 4), 10),
+    }),
+    [roster, homeTeam.id],
+  );
+
   const pendingIds = useMemo(() => new Set(pending.map((p) => p.player.id)), [pending]);
   const droppable = useMemo(() => {
     const q = dropQuery.trim().toLowerCase();
@@ -351,6 +364,8 @@ export default function ResignPhase({
             </ul>
           )}
 
+          <CapHorizon horizon={horizon} />
+
           {/* Release a signed player — clean release frees the full cap hit */}
           <div className="mb-6">
             <button onClick={() => setShowDrop((s) => !s)}
@@ -465,10 +480,11 @@ export default function ResignPhase({
                           onClick={() => setExpandedFaId(isExpanded ? null : fa.player.id)}
                           aria-hidden="true"
                           tabIndex={-1}
-                          className="text-[10px] font-mono"
+                          className="tap-target text-[12px] font-mono flex items-center justify-center shrink-0"
                           style={{
                             color: "var(--ledger-ink-faint)", background: "transparent", border: "none",
-                            cursor: "pointer", padding: 0, transform: isExpanded ? "rotate(180deg)" : "none",
+                            cursor: "pointer", padding: "0 8px",
+                            transform: isExpanded ? "rotate(180deg)" : "none",
                             transition: "transform 0.15s",
                           }}>
                           ▼
