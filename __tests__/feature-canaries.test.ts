@@ -2892,3 +2892,41 @@ describe("Canary — RL3 trade-card tabs", () => {
     expect(calls.length).toBe(1);
   });
 });
+
+describe("Canary — RL5 line locks", () => {
+  it("keeps the lock rules in one pure, tested module", () => {
+    const lib = read("app/lib/lineup-locks.ts");
+    for (const fn of ["applyLocks", "toggleLock", "pruneLocks", "swapLocks"]) {
+      expect(lib).toContain(`export function ${fn}`);
+    }
+  });
+
+  it("re-seats locks on BOTH automatic reorder paths, not just one", () => {
+    // A lock that survives a trade but not Best Lines is not a lock.
+    const src = read("app/components/LineupEditor.tsx");
+    expect(src).toContain("seatLocks(defaultLineupOrdersForRoster(effective))");
+    expect(src).toContain("setOrders(seatLocks({");
+    expect(src).toContain("return seatLocks({ F: merge(");
+  });
+
+  it("carries a lock with its player on a manual swap", () => {
+    const src = read("app/components/LineupEditor.tsx");
+    expect(src).toContain("swapLocks(l[group], prev.idx, idx)");
+  });
+
+  it("prunes locks when the roster changes", () => {
+    const src = read("app/components/LineupEditor.tsx");
+    expect(src).toContain("pruneAllLocks(prev, effective.map(p => p.id))");
+  });
+
+  it("does not nest a state update inside another updater (CXH2)", () => {
+    const src = read("app/components/LineupEditor.tsx");
+    expect(src).not.toMatch(/setOrders\(o => \{[\s\S]{0,200}setLocks\(/);
+  });
+
+  it("states the locked condition in text, never colour alone", () => {
+    const src = read("app/components/LineupEditor.tsx");
+    expect(src).toContain("locked to this slot");
+    expect(src).toContain("locked");
+  });
+});

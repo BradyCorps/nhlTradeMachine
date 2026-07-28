@@ -9,6 +9,10 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { displayPosition } from "@/app/lib/display-position";
 import { teamLeadership, letterFor } from "@/app/lib/team-leadership";
+import {
+  applyLocks, emptyLineupLocks, isLocked, lockCount, pruneAllLocks, swapLocks, toggleLock,
+  type LineupLocks,
+} from "@/app/lib/lineup-locks";
 import { lineupContributionScore } from "@/app/lib/lineup-ranking";
 import {
   defaultLineupOrdersForRoster,
@@ -142,6 +146,12 @@ function TeamLineup({
     [effective, byId, navMap],
   );
 
+  // A lock that outlives its player would re-seat whoever inherits that slot
+  // and is invisible in the UI — there is no player on it to show a badge.
+  useEffect(() => {
+    setLocks(prev => pruneAllLocks(prev, effective.map(p => p.id)));
+  }, [effective]);
+
   // Roster fingerprint — re-init orders when the trade or roster changes
   const rosterKey = useMemo(
     () => effective.map(p => p.id).sort().join("|"),
@@ -154,8 +164,25 @@ function TeamLineup({
   const [orders, setOrders] = useState<LineupGroupOrders>(() => initialOrders);
   const [edited, setEdited] = useState(initialEdited);
   const [selected, setSelected] = useState<{ group: Group; idx: number } | null>(null);
+  // RL5 — line locks. A lock pins one player to one slot so the automatic
+  // re-order that follows every trade/signing/rollover cannot reflow the one
+  // placement the user deliberately made.
+  const [locks, setLocks] = useState<LineupLocks>(emptyLineupLocks);
   const editedRef = useRef(false);
   useEffect(() => { editedRef.current = edited; }, [edited]);
+
+  // Read through a ref so re-seating never has to list `locks` as a dependency
+  // — the roster effect must fire on roster identity, not on every lock toggle.
+  const locksRef = useRef(locks);
+  useEffect(() => { locksRef.current = locks; }, [locks]);
+  const seatLocks = useCallback((next: LineupGroupOrders): LineupGroupOrders => {
+    const current = locksRef.current;
+    return {
+      F: applyLocks(next.F, current.F),
+      D: applyLocks(next.D, current.D),
+      G: applyLocks(next.G, current.G),
+    };
+  }, []);
 
   useEffect(() => {
     setOrders(prev => {
@@ -171,9 +198,11 @@ function TeamLineup({
           const adds = effective.filter(p => belongs(p) && !present.has(p.id)).map(p => p.id);
           return [...kept, ...adds];
         };
-        return { F: merge(prev.F, isF), D: merge(prev.D, isD), G: merge(prev.G, isG) };
+        return seatLocks({ F: merge(prev.F, isF), D: merge(prev.D, isD), G: merge(prev.G, isG) });
       }
-      return defaultLineupOrdersForRoster(effective);
+      // Even a full rebuild honours locks — the whole point is that a roster
+      // change cannot move a player the user pinned.
+      return seatLocks(defaultLineupOrdersForRoster(effective));
     });
     setSelected(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -200,6 +229,9 @@ function TeamLineup({
     setOrders(defaultLineupOrdersForRoster(effective));
     setEdited(false);
     setSelected(null);
+    // Reset means "back to the default sheet". Keeping locks would leave the
+    // sheet neither default nor the user's, which is the worst of both.
+    setLocks(emptyLineupLocks());
   }, [effective]);
 
   // Best Lines: order every unit by lineup contribution. X-NAV is contract-
@@ -215,14 +247,14 @@ function TeamLineup({
     const goalieByNav = (ps: Player[]) =>
       [...ps].sort((a, b) =>
         (navMap?.[b.id]?.total ?? b.games ?? 0) - (navMap?.[a.id]?.total ?? a.games ?? 0));
-    setOrders({
+    setOrders(seatLocks({
       F: buildOrder(effective, "F", byNav),
       D: buildOrder(effective, "D", byNav),
       G: buildOrder(effective, "G", byNav, goalieByNav),
-    });
+    }));
     setEdited(true);
     setSelected(null);
-  }, [effective, navMap]);
+  }, [effective, navMap, seatLocks]);
 
   const clickSlot = useCallback((group: Group, idx: number) => {
     setSelected(prev => {
@@ -236,10 +268,25 @@ function TeamLineup({
         [arr[prev.idx], arr[idx]] = [arr[idx], arr[prev.idx]];
         return { ...o, [group]: arr };
       });
+      // The lock follows the player, not the slot — otherwise a manual move
+      // is silently undone the next time the sheet re-hydrates.
+      setLocks(l => ({ ...l, [group]: swapLocks(l[group], prev.idx, idx) }));
       setEdited(true);
       return null;
     });
   }, []);
+
+  // Reads `orders` directly rather than calling setLocks inside a setOrders
+  // updater — a state update nested in another updater is a side effect in a
+  // reducer, which StrictMode double-invokes and CXH2 flags elsewhere.
+  const totalLocks = lockCount(locks);
+
+  const toggleSlotLock = useCallback((group: Group, idx: number) => {
+    const playerId = orders[group][idx];
+    if (!playerId) return;
+    setLocks(l => ({ ...l, [group]: toggleLock(l[group], idx, playerId) }));
+    setEdited(true);
+  }, [orders]);
 
   const keySlot = useCallback((event: React.KeyboardEvent, group: Group, idx: number) => {
     if (event.key !== "Enter" && event.key !== " ") return;
@@ -254,6 +301,7 @@ function TeamLineup({
     const status: keyof typeof STATUS_COLOR = !p ? "empty" : inIds.has(p.id) ? "in" : "normal";
     const nav = navOf(p, navMap);
     const letter = letterFor(p?.name, leadership);
+    const slotLocked = isLocked(locks[group], idx, p?.id);
     // RL8 — G and A, not a P/82 rate. A per-82 projection is the right unit
     // for comparing players across different games-played totals, but a lineup
     // card is asking "who is this winger", and counting stats answer that in
@@ -271,7 +319,7 @@ function TeamLineup({
         role="button"
         tabIndex={0}
         aria-label={p
-          ? `Select ${p.name}${letter === "C" ? ", captain" : letter === "A" ? ", alternate captain" : ""} in ${pos.trim()} slot`
+          ? `Select ${p.name}${letter === "C" ? ", captain" : letter === "A" ? ", alternate captain" : ""}${slotLocked ? ", locked to this slot" : ""} in ${pos.trim()} slot`
           : `Select empty ${pos.trim()} slot`}
         title={p ? `${p.name} · ${displayPosition(p.position, p.secondaryPosition)} · NAV ${nav}` : "Empty lineup slot"}
         style={{
@@ -298,10 +346,29 @@ function TeamLineup({
               letterSpacing: 0, flexShrink: 0,
             }}>{pos.trim()}</span>
             {p && (
-              <span style={{
-                fontSize: 9, fontWeight: 900, color: navColor(nav),
-                whiteSpace: "nowrap", flexShrink: 0,
-              }}>NAV {nav}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
+                <span style={{
+                  fontSize: 9, fontWeight: 900, color: navColor(nav),
+                  whiteSpace: "nowrap",
+                }}>NAV {nav}</span>
+                <button
+                  type="button"
+                  className="tap-target"
+                  onClick={(event) => { event.stopPropagation(); toggleSlotLock(group, idx); }}
+                  aria-pressed={slotLocked}
+                  aria-label={`${slotLocked ? "Unlock" : "Lock"} ${p.name} to this slot`}
+                  title={slotLocked
+                    ? `${p.name} is locked here — auto-ordering will not move him`
+                    : `Lock ${p.name} to this slot`}
+                  style={{
+                    background: "none", border: "none", padding: "0 1px", cursor: "pointer",
+                    fontSize: 9, lineHeight: "12px",
+                    color: slotLocked ? "var(--ledger-red)" : "var(--ledger-rule)",
+                    fontWeight: 900,
+                  }}>
+                  {slotLocked ? "\u25C6" : "\u25C7"}
+                </button>
+              </span>
             )}
           </div>
           <div style={{
@@ -378,7 +445,18 @@ function TeamLineup({
           {teamName}
           {label && <span style={{ color: "var(--ledger-ink-faint)", fontWeight: 400 }}> — {label}</span>}
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          {totalLocks > 0 && (
+            <span
+              aria-live="polite"
+              title="Locked players keep their slot when the lineup re-orders"
+              style={{
+                fontSize: 10, fontWeight: 900, letterSpacing: "0.1em",
+                color: "var(--ledger-red)", textTransform: "uppercase",
+              }}>
+              {"\u25C6"} {totalLocks} locked
+            </span>
+          )}
           <button onClick={bestLines} title="Order every unit by lineup contribution" className="tap-target" style={{
             fontFamily: MONO, fontSize: 11, fontWeight: 900, letterSpacing: 0,
             color: "#2a5a8f", background: "none", border: "1px solid #2a5a8f",
