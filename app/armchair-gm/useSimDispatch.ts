@@ -6,6 +6,7 @@ import { formatPickRound } from "@/app/lib/trade-format";
 import { scenarioSeed } from "@/app/lib/sim-engine";
 import type { LineupOrderPayload } from "@/app/components/LineupEditor";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
+import { teamWindow } from "@/app/lib/team-window";
 
 type LeagueState = {
   teams: Team[];
@@ -182,10 +183,10 @@ export function useSimDispatch({
       .slice(0, 12)
       .map(p => `${p.name} (${p.position}, age ${p.age})`);
 
-    const isRebuilding = ["Rebuilding","Tanking","Retooling"].includes(homeTeam.phase ?? "");
+    const isRebuilding = ["Rebuilding","Tanking","Retooling"].includes(teamWindow(homeTeam));
 
     const teamNarrative = (t: Team): string => {
-      const p = t.phase;
+      const p = teamWindow(t);
       if (p === "Tanking" || p === "Rebuilding") return "opening the year with a future-first roster construction";
       if (p === "Retooling") return "opening the year trying to turn a transitional roster into a playoff-calibre group";
       if (p === "Bubble") return "opening the year with a roster built to chase a playoff spot";
@@ -226,7 +227,7 @@ export function useSimDispatch({
               incoming: t.incoming,
             })),
             homeRoster,
-            homePhase: homeTeam.phase,
+            homePhase: teamWindow(homeTeam),
             homeContention,
             seasonStartOutlook: teamNarrative(homeTeam),
             isRebuilding,

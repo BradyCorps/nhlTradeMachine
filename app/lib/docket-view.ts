@@ -196,6 +196,50 @@ export function tradeToDocketEntry(trade: TradeRecord): DocketEntry | null {
   };
 }
 
+// ── Which side of the deal is this? ──────────────────────────────
+//
+// A `DocketPackage` holds `side.assetsGiven` — the assets that club SENT. The
+// Docket rendered it under the heading "{team} RECEIVED VALUE", which inverted
+// every entry on the page: the club listed as receiving a haul was the one that
+// paid it. Anyone reading a grade next to that list drew the opposite
+// conclusion from the one the grade supports.
+//
+// Received is not a field on the record, it is derived: in a two-team trade the
+// assets a club receives are exactly the other club's `assetsGiven`. That swap
+// has no meaning in a three-way — the record does not say where each asset
+// landed — so those are labelled by what the data actually is, SENT, rather
+// than guessed at.
+
+export interface DocketReturn {
+  teamId: string;
+  direction: "received" | "sent";
+  assets: DocketPackageAsset[];
+  navTotal: number;
+}
+
+export function docketReturns(entry: DocketEntry): DocketReturn[] {
+  const { packages } = entry;
+
+  if (packages.length === 2) {
+    return packages.map((pkg, i) => {
+      const incoming = packages[1 - i];
+      return {
+        teamId: pkg.teamId,
+        direction: "received" as const,
+        assets: incoming.assets,
+        navTotal: incoming.navTotal,
+      };
+    });
+  }
+
+  return packages.map(pkg => ({
+    teamId: pkg.teamId,
+    direction: "sent" as const,
+    assets: pkg.assets,
+    navTotal: pkg.navTotal,
+  }));
+}
+
 export function buildDocketEntries(trades: TradeRecord[]): DocketEntry[] {
   return trades.flatMap((trade) => {
     const entry = tradeToDocketEntry(trade);

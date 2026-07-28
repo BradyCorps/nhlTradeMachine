@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Asset, Team } from "@/app/lib/trade-types";
+import { teamWindow } from "@/app/lib/team-window";
 
 // ── Trade Partner Finder — "Who wants this package?" ─────────
 // A player's NAV is team-contextual. A $7M 35yr albatross for Tampa
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     .filter(t => t.id !== homeTeamId)
     .map(team => {
       const roster   = allPlayers.filter(p => p.teamId === team.id);
-      const phase    = team.phase ?? "Unknown";
+      const phase    = teamWindow(team) || "Unknown";
       const capSpace = team.capSpace ?? 0;
       const standing = team.standing ?? 16;
 

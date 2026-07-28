@@ -4,10 +4,14 @@ import { ensureNewTables } from "@/app/db/ensure-schema";
 import { TEAMS_DB } from "@/app/lib/db";
 import { pickEffectiveStanding } from "@/app/lib/pick-value";
 import { SEASON } from "@/app/lib/season-config";
+import { teamWindow } from "@/app/lib/team-window";
 
 type TeamPickContext = {
   id: string;
+  /** Standings tier. Pick value reads the window via `teamWindow()`. */
   phase: string;
+  /** Live roster window from Armchair GM, when the caller has one. */
+  rosterWindow?: string;
   standing: number;
 };
 
@@ -54,7 +58,7 @@ export async function buildDraftPickInventory(teams: TeamPickContext[]) {
       const conditions = override?.conditions ?? null;
 
       const origTeamCtx = teamPhaseMap.get(origTeam.id) ?? origTeam;
-      const teamStanding = pickEffectiveStanding(origTeamCtx.phase, origTeamCtx.standing);
+      const teamStanding = pickEffectiveStanding(teamWindow(origTeamCtx), origTeamCtx.standing);
 
       const roundLabel = round === 1 ? "1st" : round === 2 ? "2nd" : round === 3 ? "3rd" : `${round}th`;
       const ownerSuffix = currentOwnerId !== origTeam.id ? ` via ${origTeam.id}` : ` (${origTeam.id})`;

@@ -382,25 +382,28 @@ export default function ArmchairGmPage() {
   }, [outgoingBlock, incomingBlock, setNavMap, db.capCeiling]);
 
   // ── Live team timelines ───────────────────────────────────────
-  // Recompute every team's phase from its current roster whenever rosters or
-  // valuations change (trades, offseason signings, Cup Run rollover). The seed
-  // phase was a static standing snapshot that never moved; this keeps the
-  // HOME/PARTNER timeline badge — and the trade-willingness logic that reads
-  // team.phase server-side — honest about what each roster actually is now.
-  // Depends on players + navMap only, and no-ops when nothing changed, so
-  // writing back to db.teams can't loop.
+  // Recompute every team's competitive window from its current roster whenever
+  // rosters or valuations change (trades, offseason signings, Cup Run
+  // rollover). This keeps the HOME/PARTNER timeline badge — and the
+  // trade-willingness logic that reads it server-side — honest about what each
+  // roster actually is now.
+  //
+  // It writes `rosterWindow`, NOT `phase`: `phase` is the live standings tier
+  // and Team Analytics still needs it intact. Read either one through
+  // `teamWindow()`. Depends on players + navMap only, and no-ops when nothing
+  // changed, so writing back to db.teams can't loop.
   useEffect(() => {
     if (db.players.length === 0 || Object.keys(navMap).length === 0) return;
     setDb(prev => {
       let changed = false;
       const teams = prev.teams.map(team => {
         const roster = prev.players.filter(p => p.teamId === team.id);
-        const phase = deriveTeamPhase(roster, navMap);
-        // null = not enough roster signal → keep the seed phase (no regression
-        // to "Tanking" on thin/partial data).
-        if (phase == null || phase === team.phase) return team;
+        const window = deriveTeamPhase(roster, navMap);
+        // null = not enough roster signal → keep whatever window is already in
+        // place (no regression to "Tanking" on thin/partial data).
+        if (window == null || window === team.rosterWindow) return team;
         changed = true;
-        return { ...team, phase };
+        return { ...team, rosterWindow: window };
       });
       return changed ? { ...prev, teams } : prev;
     });

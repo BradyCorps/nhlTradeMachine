@@ -10,6 +10,7 @@ import type { Asset, Team, TradeVerdict } from "@/app/lib/trade-types";
 import type { LineupOrderPayload } from "@/app/components/LineupEditor";
 import { SEASON } from "@/app/lib/season-config";
 import { pickEffectiveStanding } from "@/app/lib/pick-value";
+import { teamWindow } from "@/app/lib/team-window";
 import { applyCapDelta } from "@/app/lib/cap-delta";
 import { clearNavCache } from "@/app/lib/evaluate-client";
 import { tradeAssetKey } from "@/app/store/tradeStore";
@@ -170,7 +171,7 @@ export function useTradeBench({
         const owner = teamCtxByOwner.get(p.teamId);
         return {
           ...p,
-          teamStanding: pickEffectiveStanding(owner?.phase, owner?.standing ?? p.teamStanding),
+          teamStanding: pickEffectiveStanding(teamWindow(owner), owner?.standing ?? p.teamStanding),
         };
       });
 

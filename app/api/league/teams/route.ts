@@ -10,6 +10,7 @@ import { buildDraftPickInventory } from "@/app/lib/draft-pick-inventory";
 import { teamCacheKey, LEAGUE_TEAMS_PAYLOAD_CACHE_KEY } from "@/app/lib/team-cache";
 import { swrCache } from "@/app/lib/swr-cache";
 import { swrStore } from "@/app/lib/swr-store";
+import { regulationWinsFrom } from "@/app/lib/nhl-standings-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -93,7 +94,7 @@ async function loadTeams(capCeiling: number): Promise<any[]> {
         const pointsB = Number.isFinite(b.points) ? b.points : -1;
         return pointsB !== pointsA
           ? pointsB - pointsA
-          : (b.regulationWins ?? 0) - (a.regulationWins ?? 0);
+          : regulationWinsFrom(b) - regulationWinsFrom(a);
       });
 
       teams.forEach((t, i) => {

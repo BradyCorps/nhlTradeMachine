@@ -107,7 +107,25 @@ export interface Team {
   name: string;
   capSpace: number;
   standing: number;
+  /**
+   * Standings tier — where this club sits in the real NHL table right now,
+   * derived server-side from conference/division rank and points percentage.
+   * Static with respect to anything the user does. This is what the Team
+   * Analytics chip and its filter mean.
+   */
   phase?: string;
+  /**
+   * Competitive window — what this club's CURRENT roster looks like after
+   * trades, signings and Cup Run rollover, derived from roster valuations.
+   * Only ever set inside Armchair GM.
+   *
+   * These were one field. Armchair GM overwrote `phase` in local state, so
+   * "phase" meant the standings tier on one page and the roster window on
+   * another, and no call site could say which it wanted. Read this through
+   * `teamWindow()` (app/lib/team-window.ts) rather than reaching for either
+   * field directly.
+   */
+  rosterWindow?: string;
   needs?: { pos: string; minWar: number; label: string }[];
   prospectPool?: string;
 }

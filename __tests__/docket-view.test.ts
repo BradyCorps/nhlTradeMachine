@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDocketEntries,
+  docketReturns,
   filterAndSortDocketEntries,
   type DocketEntry,
 } from "../app/lib/docket-view";
@@ -138,5 +139,42 @@ describe("Docket view model", () => {
     expect(filterAndSortDocketEntries(entries, { sort: "nav-desc" }).map(e => e.id)).toEqual(["large", "small"]);
     expect(filterAndSortDocketEntries(entries, { sort: "date-asc" }).map(e => e.id)).toEqual(["small", "large"]);
     expect(entries.map(e => e.id)).toEqual(["small", "large"]);
+  });
+
+  // The Docket headed each package "{team} RECEIVED" while listing the assets
+  // that club GAVE — every entry read backwards.
+  it("reports what each club received, not what it sent", () => {
+    const [entry] = buildDocketEntries([trade("one", "2026-07-01", true, "WPG", 24)]);
+    const returns = docketReturns(entry);
+
+    const wpg = returns.find(r => r.teamId === "WPG");
+    const cgy = returns.find(r => r.teamId === "CGY");
+
+    // WPG sent the player and got the pick back.
+    expect(wpg?.direction).toBe("received");
+    expect(wpg?.assets.map(a => a.name)).toEqual(["Calgary First"]);
+    expect(wpg?.navTotal).toBe(50);
+
+    expect(cgy?.direction).toBe("received");
+    expect(cgy?.assets.map(a => a.name)).toEqual(["Winnipeg Player"]);
+    expect(cgy?.navTotal).toBe(90);
+  });
+
+  it("labels a three-way by what the record actually holds", () => {
+    const base = trade("three", "2026-07-01", true, "WPG", 10);
+    const threeWay = {
+      ...base,
+      sides: [...base.sides, { teamId: "TOR", assetsGiven: [] }],
+    } as typeof base;
+
+    const [entry] = buildDocketEntries([threeWay]);
+    const returns = docketReturns(entry);
+
+    // No destination is recorded, so "received" cannot be derived. Say SENT
+    // rather than guess.
+    expect(returns).toHaveLength(3);
+    expect(returns.every(r => r.direction === "sent")).toBe(true);
+    expect(returns.find(r => r.teamId === "WPG")?.assets.map(a => a.name))
+      .toEqual(["Winnipeg Player"]);
   });
 });

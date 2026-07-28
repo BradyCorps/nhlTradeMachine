@@ -6,20 +6,23 @@ import StrandDisplay from "@/app/components/StrandDisplay";
 import { buildAssetTraits, computeStrandType } from "@/app/components/StrandView";
 import EdgeStrip from "@/app/components/EdgeStrip";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
-import type { DocketEntry, DocketSortKey } from "@/app/lib/docket-view";
-import { filterAndSortDocketEntries } from "@/app/lib/docket-view";
+import type { DocketEntry, DocketReturn, DocketSortKey } from "@/app/lib/docket-view";
+import { docketReturns, filterAndSortDocketEntries } from "@/app/lib/docket-view";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
 
 const fmtNav = (value: number): string => `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
 
-const assetList = (entryPackage: DocketEntry["packages"][number]): string =>
-  entryPackage.assets.length
-    ? entryPackage.assets.map((asset) => {
+const assetList = (assets: DocketReturn["assets"]): string =>
+  assets.length
+    ? assets.map((asset) => {
       const retention = asset.retainedPct > 0 ? ` (${Math.round(asset.retainedPct * 100)}% retained)` : "";
       return `${asset.name}${retention}`;
     }).join(", ")
     : "Future considerations";
+
+const directionLabel = (direction: DocketReturn["direction"]): string =>
+  direction === "received" ? "RECEIVED" : "SENT";
 
 const navFromAsset = (navAtTrade: number | null): XNAVResult => ({
   total: navAtTrade ?? 0,
@@ -183,12 +186,12 @@ function ExpandedEntry({ entry }: { entry: DocketEntry }) {
       )}
 
       <div className="docket-pkg-grid">
-        {entry.packages.slice(0, 2).map(pkg => (
-          <div key={pkg.teamId} style={{ display: "grid", gap: 8 }}>
+        {docketReturns(entry).slice(0, 2).map(ret => (
+          <div key={ret.teamId} style={{ display: "grid", gap: 8 }}>
             <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.16em", color: "var(--ledger-ink-faint)" }}>
-              {pkg.teamId} PACKAGE DETAIL
+              {ret.teamId} {directionLabel(ret.direction)} — PACKAGE DETAIL
             </div>
-            {pkg.assets.map(asset => <AssetDetail key={`${pkg.teamId}-${asset.name}`} asset={asset} />)}
+            {ret.assets.map(asset => <AssetDetail key={`${ret.teamId}-${asset.name}`} asset={asset} />)}
           </div>
         ))}
       </div>
@@ -301,13 +304,13 @@ export default function DocketClient({ entries }: DocketClientProps) {
             </div>
 
             <div className="docket-pkg-grid">
-              {entry.packages.slice(0, 2).map(pkg => (
-                <div key={pkg.teamId} style={{ borderTop: "1px solid var(--rule)", paddingTop: 9 }}>
+              {docketReturns(entry).slice(0, 2).map(ret => (
+                <div key={ret.teamId} style={{ borderTop: "1px solid var(--rule)", paddingTop: 9 }}>
                   <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: "0.16em", color: "var(--ledger-ink-faint)" }}>
-                    {pkg.teamId} RECEIVED VALUE {fmtNav(pkg.navTotal)}
+                    {ret.teamId} {directionLabel(ret.direction)} VALUE {fmtNav(ret.navTotal)}
                   </div>
                   <div style={{ marginTop: 5, fontSize: 13, lineHeight: 1.45 }}>
-                    {assetList(pkg)}
+                    {assetList(ret.assets)}
                   </div>
                 </div>
               ))}

@@ -27,6 +27,7 @@ import { fetchProspectEnrichmentMap } from "@/app/lib/prospect-enrichment";
 import { applyTeamCapDeltas, type CapDeltaAsset, type CapDeltaMoves, type TeamCapDeltaMap } from "@/app/lib/cap-delta";
 import { baselineForNhlPlayerId, type PlayerBaselineMap } from "@/app/lib/player-baselines";
 import { secondaryPositionFor } from "@/app/data/secondary-positions";
+import { teamWindow } from "@/app/lib/team-window";
 
 const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
 const CONTRACTS_CACHE_KEY = "cache:contracts:v2";
@@ -1247,7 +1248,7 @@ export async function assembleCanonicalRoster(options: {
         : (stats?.games ?? goalieStats?.gamesStarted ?? 0);
       const ptsPace = stats?.ptsPace ?? (hasSkaterStats ? defaultPts : 0);
       const avgTOI = stats?.avgTOI ?? (hasSkaterStats ? defaultTOI : 0);
-      const teamContext = options.includeTeamContext ? developmentTeamContext(developmentTeam?.phase, developmentTeam?.standing) : undefined;
+      const teamContext = options.includeTeamContext ? developmentTeamContext(teamWindow(developmentTeam), developmentTeam?.standing) : undefined;
       const internationalScore = developmentInternationalScore(prospectPtsPace);
       const linemateContext = developmentLinemateContext(finalPosition, avgTOI, qocIndex);
       const timelineMatches = developmentTimelineMap.get(String(p.id)) ?? [];

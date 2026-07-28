@@ -13,6 +13,7 @@ import { hashString, mulberry32 } from "./sim-engine";
 import { SEASON } from "./season-config";
 import { planCapCompliance } from "./ai-cap";
 import { activateMaturedExtension } from "./extensions";
+import { teamWindow } from "@/app/lib/team-window";
 
 // ── Types ─────────────────────────────────────────────────────
 export interface CupRunSeasonRecord {
@@ -54,8 +55,8 @@ export function seasonLabelForYear(year: number): string {
 }
 
 // ── Difficulty ────────────────────────────────────────────────
-export function difficultyForTeam(team: Pick<Team, "phase" | "standing">): { stars: number; label: string } {
-  const phase = team.phase ?? "";
+export function difficultyForTeam(team: Pick<Team, "phase" | "rosterWindow" | "standing">): { stars: number; label: string } {
+  const phase = teamWindow(team);
   if (phase === "Contender") {
     return team.standing <= 4
       ? { stars: 1, label: "FRONT RUNNER" }

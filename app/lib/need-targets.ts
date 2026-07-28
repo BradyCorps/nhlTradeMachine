@@ -1,4 +1,5 @@
 import { FA_POOL_TEAM_ID } from "@/app/lib/fa-pool";
+import { teamWindow } from "@/app/lib/team-window";
 export interface Player {
   id:        string;
   name:      string;
@@ -25,7 +26,10 @@ export interface Player {
 export interface Team {
   id:       string;
   name:     string;
+  /** Standings tier. Read the window through `teamWindow()`, not this. */
   phase?:   string;
+  /** Live roster window, set by Armchair GM. See app/lib/team-window.ts. */
+  rosterWindow?: string;
   capSpace: number;
   standing: number;
 }
@@ -53,7 +57,7 @@ export function attainability(
 ): Attainability {
   const block = player.tradeBlockStatus;
   if (block === "untouchable") {
-    return { score: 0, label: "Off limits", reason: `${srcTeam?.phase ?? "—"} — flagged untouchable, not moving` };
+    return { score: 0, label: "Off limits", reason: `${teamWindow(srcTeam) || "—"} — flagged untouchable, not moving` };
   }
 
   // FA_POOL is the internal holding pen for unsigned players, not a club. A
@@ -65,7 +69,7 @@ export function attainability(
   }
   if (!srcTeam) return { score: 0.40, label: "Possible", reason: "Unknown team" };
 
-  const phase = srcTeam.phase ?? "";
+  const phase = teamWindow(srcTeam);
   let score = PHASE_BASE[phase] ?? 0.40;
 
   const age = player.age ?? 28;

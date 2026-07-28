@@ -8,6 +8,7 @@ import { teams as teamsTable } from "@/app/db/schema";
 import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
 import { buildDraftPickInventory } from "@/app/lib/draft-pick-inventory";
 import { LEAGUE_TEAMS_CACHE_KEY } from "@/app/lib/team-cache";
+import { regulationWinsFrom } from "@/app/lib/nhl-standings-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -143,7 +144,7 @@ async function loadTeams(): Promise<any[]> {
         const pointsB = Number.isFinite(b.points) ? b.points : -1;
         return pointsB !== pointsA
           ? pointsB - pointsA
-          : (b.regulationWins ?? 0) - (a.regulationWins ?? 0);
+          : regulationWinsFrom(b) - regulationWinsFrom(a);
       });
 
       // 2. Assign overall standing and map standard points
@@ -195,7 +196,7 @@ async function loadTeams(): Promise<any[]> {
             shotsForPerGame:    t.shotsForPerGame ?? 0,
             shotsAgainstPerGame: t.shotsAgainstPerGame ?? 0,
             faceoffWinPct:      t.faceoffWinPct ?? 0,
-            regulationWins:     t.regulationWins ?? 0,
+            regulationWins:     regulationWinsFrom(t),
             streakCode:         "",
             streakCount:        0,
             l10Record:          "",
@@ -261,7 +262,7 @@ async function loadTeams(): Promise<any[]> {
             shotsForPerGame:    0,
             shotsAgainstPerGame: 0,
             faceoffWinPct:      t.faceoffWinPctg ?? 0,
-            regulationWins:     t.regulationWins ?? 0,
+            regulationWins:     regulationWinsFrom(t),
             streakCode:         streak,
             streakCount:        streakCount,
             l10Record,

@@ -2687,3 +2687,67 @@ describe("Canary — the masthead is Cap & Crease, from one source", () => {
     expect(brand).toMatch(/name: "(?!.*NHL)/);
   });
 });
+
+describe("Canary — regulation wins survive the NHL's two field names", () => {
+  it("resolves the field in one place instead of per route", () => {
+    const lib = read("app/lib/nhl-standings-fields.ts");
+    expect(lib).toContain("winsInRegulation");
+    expect(lib).toContain("regulationWins");
+  });
+
+  it("leaves no route reading a single spelling off a raw feed row", () => {
+    for (const route of ["app/api/league/route.ts", "app/api/league/teams/route.ts"]) {
+      const src = read(route);
+      expect(src).toContain("regulationWinsFrom");
+      // `t.regulationWins` / `b.regulationWins` — the raw-row reads that
+      // returned undefined for every stats-endpoint club.
+      expect(src).not.toMatch(/\b[a-z]\.regulationWins\b/);
+    }
+  });
+});
+
+describe("Canary — the Docket says which way the assets went", () => {
+  it("derives received from the other side rather than mislabelling given", () => {
+    const view = read("app/lib/docket-view.ts");
+    expect(view).toContain("docketReturns");
+    expect(view).toContain('direction: "received"');
+    expect(view).toContain('direction: "sent"');
+  });
+
+  it("never heads a package list with a hardcoded RECEIVED", () => {
+    const client = read("app/docket/DocketClient.tsx");
+    expect(client).toContain("docketReturns(entry)");
+    expect(client).not.toContain("RECEIVED VALUE");
+  });
+});
+
+describe("Canary — standings tier and roster window are separate facts", () => {
+  it("keeps both on the team and reads them through one accessor", () => {
+    const types = read("app/lib/trade-types.ts");
+    expect(types).toContain("rosterWindow?: string;");
+    expect(read("app/lib/team-window.ts")).toContain("export function teamWindow");
+  });
+
+  it("does not let Armchair GM destroy the standings tier", () => {
+    const page = read("app/armchair-gm/page.tsx");
+    expect(page).toContain("rosterWindow: window");
+    // The old effect wrote `{ ...team, phase }`, erasing the API's tier.
+    expect(page).not.toMatch(/\{\s*\.\.\.team,\s*phase\s*\}/);
+  });
+
+  it("routes competitive-window readers through the accessor", () => {
+    for (const file of [
+      "app/api/match/route.ts",
+      "app/api/simulate/route.ts",
+      "app/lib/need-targets.ts",
+      "app/lib/cup-run.ts",
+      "app/armchair-gm/GmAnalysisTabs.tsx",
+    ]) {
+      expect(read(file)).toContain("teamWindow");
+    }
+  });
+
+  it("leaves Team Analytics on the standings tier, which is what its chip means", () => {
+    expect(read("app/teams/page.tsx")).toContain("team.phase");
+  });
+});

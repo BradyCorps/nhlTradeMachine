@@ -16,6 +16,7 @@ import { computeGravity, simOnIceDelta } from "@/app/lib/gravity";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
 import { effectiveCapHit } from "@/app/lib/cap-delta";
 import { simRequestSchema } from "@/app/lib/sim-request-schema";
+import { teamWindow } from "@/app/lib/team-window";
 import {
   DIVISIONS,
   EASTERN,
@@ -78,7 +79,10 @@ interface SimPlayer {
 interface SimTeam {
   id: string;
   name: string;
+  /** Standings tier. Read the competitive window via `teamWindow()`. */
   phase: string;
+  /** Live roster window from Armchair GM. See app/lib/team-window.ts. */
+  rosterWindow?: string;
   standing: number;
   capSpace: number;
   // From NHL API stats endpoint
@@ -312,7 +316,7 @@ function projectTeamPoints(
   lineupOrder?: TeamLineupOrder,
   lineupContext?: boolean,
 ): number {
-  const phaseBaseline = PHASE_BASELINE[team.phase] ?? 88;
+  const phaseBaseline = PHASE_BASELINE[teamWindow(team)] ?? 88;
 
   const skaters = roster.filter(p => p.position !== "Pick" && p.position !== "G");
   const forwards = lineupOrder
@@ -373,7 +377,7 @@ function projectTeamPoints(
   // Phase variance — wild cards get wider range
   const isWildCard = WILD_CARD_TEAMS.has(team.id);
   const varianceRange = isWildCard ? 14 : 8;
-  const phase = team.phase ?? "";
+  const phase = teamWindow(team);
   let varianceMid = 0;
   if (phase === "Rebuilding" || phase === "Tanking") varianceMid = -3;
   if (phase === "Contender") varianceMid = 2;
@@ -649,7 +653,7 @@ function simulateLeague(
           : a.name.localeCompare(b.name)
       )[0] ?? null;
     return {
-      teamId: team.id, teamName: team.name, phase: team.phase,
+      teamId: team.id, teamName: team.name, phase: teamWindow(team),
       projectedPoints, topScorer, projectedSkaters, goalie, topDefenseman,
       madePlayoffs: false, divisionRank: 0, leagueRank: 0, division: "",
     };
@@ -854,7 +858,7 @@ function buildTradedPlayerOutcomes(
   const teamName = (id: string) => teams.find(t => t.id === id)?.name ?? id;
   const teamWinPct = (id: string) =>
     (standings.find(t => t.teamId === id)?.projectedPoints
-      ?? PHASE_BASELINE[teams.find(t => t.id === id)?.phase ?? "Retooling"]
+      ?? PHASE_BASELINE[teamWindow(teams.find(t => t.id === id)) || "Retooling"]
       ?? 88) / 164;
   const outcomes: TradedPlayerOutcome[] = [];
 

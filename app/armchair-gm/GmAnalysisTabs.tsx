@@ -17,18 +17,19 @@ import TeamEdgeTiles from "./TeamEdgeTiles";
 const PlayerComparison = lazy(() => import("@/app/components/PlayerComparison"));
 
 // ── UI-only team classification ────────────────────────────────
-// The real classifyTeam logic runs server-side. This stub just reads
-// the phase field that the API already computed and attached to each team.
+// The real classifyTeam logic runs server-side. This stub just reads the
+// club's competitive window — the live roster read when Armchair GM has one,
+// otherwise the standings tier the API attached to each team.
 type TeamMode = "CONTENDER" | "BUBBLE" | "RETOOLING" | "REBUILDING" | "TANKING";
 
 const classifyTeam = (team: Team, _roster: Asset[]): TeamMode => {
-  const phase = team.phase ?? "";
+  const phase = teamWindow(team);
   if (phase === "Contender")  return "CONTENDER";
   if (phase === "Bubble")     return "BUBBLE";
   if (phase === "Retooling")  return "RETOOLING";
   if (phase === "Tanking")    return "TANKING";
   if (phase === "Rebuilding") return "REBUILDING";
-  // Fallback from standing if phase is missing
+  // Fallback from standing if the window is missing
   if (team.standing <= 8)  return "CONTENDER";
   if (team.standing <= 14) return "BUBBLE";
   if (team.standing > 24)  return "TANKING";
@@ -38,6 +39,7 @@ const classifyTeam = (team: Team, _roster: Asset[]): TeamMode => {
 
 
 import { fmtSigned as fmt } from "@/app/lib/display-utils";
+import { teamWindow } from "@/app/lib/team-window";
 
 type GmTab = "lineups" | "dna" | "comparison" | "breakdown" | "sim";
 

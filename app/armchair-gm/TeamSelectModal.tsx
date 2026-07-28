@@ -6,6 +6,7 @@ import React from "react";
 import { TeamMark } from "@/app/components/TeamMark";
 import { createPortal } from "react-dom";
 import type { Team } from "@/app/lib/trade-types";
+import { teamWindow } from "@/app/lib/team-window";
 
 export function TeamSelectModal({
   teams,
@@ -85,7 +86,7 @@ export function TeamSelectModal({
               .sort((a, b) => a.name.localeCompare(b.name))
               .map(t => {
                 const isSelected = selectedHomeId === t.id;
-                const phase = t.phase ?? "";
+                const phase = teamWindow(t);
                 const phaseColor =
                   phase === "Contender"  ? 'var(--ledger-green)' :
                   phase === "Bubble"     ? 'var(--ledger-navy)' :
