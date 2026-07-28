@@ -4,6 +4,7 @@
 // proprietary read — X-NAV breakdown, gravity field, modern role, and
 // EDGE tracking — alongside percentiles vs the positional field.
 import React, { useMemo, useRef, useCallback, useState } from "react";
+import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { calcNAV } from "@/app/lib/xnav-engine";
 import { computeGravity } from "@/app/lib/gravity";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
@@ -264,26 +265,6 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       // Here the browser ships an already-formatted payload and the route
       // renders a guaranteed-solid PNG — deterministic across every browser.
 
-      // Inline the same-origin-proxied headshot as a data URL so the route
-      // never has to make its own network request to rasterize the mug.
-      let headshotDataUrl: string | null = null;
-      if (player.headshot) {
-        try {
-          const res = await fetch(`/api/headshot?u=${encodeURIComponent(player.headshot)}`);
-          if (res.ok) {
-            const blob = await res.blob();
-            headshotDataUrl = await new Promise<string>((resolve, reject) => {
-              const fr = new FileReader();
-              fr.onload = () => resolve(fr.result as string);
-              fr.onerror = reject;
-              fr.readAsDataURL(blob);
-            });
-          }
-        } catch {
-          /* headshot is optional — the card renders fine without it */
-        }
-      }
-
       const payload: CardImagePayload = {
         name: player.name,
         sub: `${teamName ?? player.teamId} · ${displayPosition(player.position, player.secondaryPosition)} · Age ${player.age}`,
@@ -307,7 +288,6 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         navCells: navCells.map(c => ({ label: c.label, val: c.val })),
         peerLabel,
         avgPercentile,
-        headshotDataUrl,
       };
 
       const res = await fetch("/api/card-image", {
@@ -433,9 +413,9 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
 
       {/* Header — paper plate, ink reserved for text (PA7) */}
       <div className="pcard-head">
-        {/* Same-origin proxy for the headshot — the export path also fetches
-            this URL and inlines it into the server-rendered card image. */}
-        {player.headshot && <img src={`/api/headshot?u=${encodeURIComponent(player.headshot)}`} alt="" />}
+        {/* Drawn, not photographed — the exported card carries no league
+            imagery, so nothing in it is anyone else's to take back. */}
+        <PlayerAvatar name={player.name} position={player.position} size={56} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="pcard-name">{player.name}</div>
           <div className="pcard-sub">{teamName ?? player.teamId} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}</div>

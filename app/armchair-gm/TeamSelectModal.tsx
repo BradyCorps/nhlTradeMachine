@@ -3,6 +3,7 @@
 // Portal modal shown on boot (and after Void All Trades). Owns only its
 // per-tap "selecting" flash; franchise/mode state lives with the caller.
 import React from "react";
+import { TeamMark } from "@/app/components/TeamMark";
 import { createPortal } from "react-dom";
 import type { Team } from "@/app/lib/trade-types";
 
@@ -114,7 +115,7 @@ export function TeamSelectModal({
                     }}
                   >
                     <div className="flex flex-col items-center justify-center gap-1.5 py-1">
-                      <img src={`https://assets.nhle.com/logos/nhl/svg/${t.id}_light.svg`} alt={t.name} className="w-8 h-8 opacity-90 mix-blend-multiply" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                      <TeamMark id={t.id} size={32} />
                       <div className="text-[9px] font-black uppercase tracking-widest text-center leading-tight" style={{
                         color: phaseColor,
                         lineHeight: 1.1

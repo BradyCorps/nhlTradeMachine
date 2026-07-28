@@ -1,6 +1,7 @@
 "use client";
 
 import { formatPickRound } from "@/app/lib/trade-format";
+import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { displayPosition } from "@/app/lib/display-position";
 import { compareStat } from "@/app/lib/stat-bar-compare";
 
@@ -109,11 +110,7 @@ const PlayerCard = ({ asset, nav, side }: { asset: Asset; nav: NavBreakdown; sid
   return (
     <div className={`rounded-xl border p-3 ${bgColor} ${borderColor}`}>
       <div className="flex items-center gap-2 mb-2">
-        {asset.headshot && !isPick && (
-          <img src={asset.headshot} alt={asset.name}
-            className="w-7 h-7 rounded-full object-cover border border-zinc-700/50 shrink-0"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-        )}
+        {!isPick && <PlayerAvatar name={asset.name} position={asset.position} size={28} />}
         <div className="min-w-0 flex-1">
           <div className="font-black text-white text-[12px] truncate">{asset.name}</div>
           <div className="text-[9px] text-zinc-600 font-bold">

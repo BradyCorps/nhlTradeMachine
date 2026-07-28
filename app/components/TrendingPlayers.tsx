@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import Link from "next/link";
 import { calcNAV } from "@/app/lib/xnav-engine";
 import { computeGravity, gravityTierColor } from "@/app/lib/gravity";
@@ -269,13 +270,8 @@ function PlayerCard({
         >
           {rank}
         </div>
-        {p.headshot && (
-          <img
-            src={p.headshot}
-            alt=""
-            className="rounded-full shrink-0"
-            style={{ width: 36, height: 36, border: "1.5px solid var(--ledger-rule)", objectFit: "cover" }}
-          />
+        {(
+          <PlayerAvatar name={p.name} position={p.position} size={36} />
         )}
         <div className="min-w-0">
           <div className="font-mono text-[11px] font-black leading-tight truncate" style={{ color: "var(--ledger-ink)" }}>
@@ -401,13 +397,8 @@ function ExpandedPanel({
     >
       {/* Player identity bar */}
       <div className="flex items-center gap-3 mb-4 pb-3" style={{ borderBottom: "1px solid var(--ledger-rule)" }}>
-        {p.headshot && (
-          <img
-            src={p.headshot}
-            alt=""
-            className="rounded-full shrink-0"
-            style={{ width: 40, height: 40, border: "1.5px solid var(--ledger-rule)", objectFit: "cover" }}
-          />
+        {(
+          <PlayerAvatar name={p.name} position={p.position} size={40} />
         )}
         <div className="min-w-0">
           <div className="font-mono text-[13px] font-black leading-tight truncate" style={{ color: "var(--ledger-ink)" }}>

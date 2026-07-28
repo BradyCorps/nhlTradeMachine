@@ -17,6 +17,18 @@ import {
   RINK_ICE,
 } from "@/app/lib/gravity-rink";
 
+/** Two letters from a name — the drawn stand-in for a player photo. */
+function initialsForCard(name: string): string {
+  const parts = (name ?? "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z' -]/g, " ")
+    .split(/[\s-]+/)
+    .filter(Boolean);
+  if (parts.length === 0) return "—";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export const runtime = "edge";
 
 // ── Server-side player-card PNG ─────────────────────────────────────
@@ -29,6 +41,7 @@ export const runtime = "edge";
 
 const CREAM = "#ede4cc";
 const TAN = "#e4d8b8";
+const PAPER_INSET = "#efe7d5";
 const INSET = "#d6c8a5";
 const INK = "#1c140a";
 const INK_BODY = "#4a3820";
@@ -276,12 +289,18 @@ export async function POST(req: Request) {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: TAN, padding: "18px 26px", height: headerH }}>
         <div style={{ display: "flex", alignItems: "center" }}>
-          {data.headshotDataUrl ? (
-            <div style={{ display: "flex", width: 80, height: 80, borderRadius: 40, overflow: "hidden", border: `2px solid ${INK}`, marginRight: 16 }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={data.headshotDataUrl} width={80} height={80} style={{ objectFit: "cover" }} alt="" />
-            </div>
-          ) : null}
+          {/* Drawn, not photographed. This card is built to be shared, so
+              embedding league-owned photography in it was redistribution —
+              structural rather than incidental, because travelling is the
+              point. Initials in type suit the paper better anyway. */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 80, height: 80, borderRadius: 4, marginRight: 16,
+            background: PAPER_INSET, border: `2px solid ${INK}`,
+            fontSize: 30, fontWeight: 700, color: INK,
+          }}>
+            {initialsForCard(data.name)}
+          </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", fontSize: 30, fontWeight: 700, color: INK }}>{data.name}</div>
             <div style={{ display: "flex", fontSize: 15, color: INK_BODY, marginTop: 4 }}>{data.sub}</div>

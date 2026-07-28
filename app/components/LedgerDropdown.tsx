@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from 'react';
+import { TeamMark } from "@/app/components/TeamMark";
 import { createPortal } from 'react-dom';
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 
@@ -26,7 +27,7 @@ export default function LedgerDropdown({ teams, selectedId, onSelect }: {
           fontSize: 'clamp(1.4rem, 3.5vw, 1.8rem)',
         }}>
           {selected?.id && (
-            <img src={`https://assets.nhle.com/logos/nhl/svg/${selected.id}_light.svg`} alt={selected.name || selected.id} className="w-8 h-8 opacity-90 mix-blend-multiply" onError={(e) => (e.currentTarget.style.display = 'none')} />
+            <TeamMark id={selected.id} size={32} />
           )}
           {selected?.name || "Select Team"}
         </span>
@@ -83,7 +84,7 @@ export default function LedgerDropdown({ teams, selectedId, onSelect }: {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
                     <div className="flex items-center gap-2">
-                      <img src={`https://assets.nhle.com/logos/nhl/svg/${t.id}_light.svg`} alt={t.name || t.id} className="w-5 h-5 opacity-80 mix-blend-multiply" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                      <TeamMark id={t.id} size={20} />
                       <span>{t.name}</span>
                     </div>
                     {t.phase && (

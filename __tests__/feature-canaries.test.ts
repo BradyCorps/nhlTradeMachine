@@ -828,8 +828,11 @@ describe("Canary — Player Card AA redesign + FMV surplus read", () => {
     expect(card).toContain("/api/card-image");
     expect(card).not.toContain("html2canvas");
     // Headshot proxied same-origin and inlined as a data URL for the renderer
-    expect(card).toContain("/api/headshot?u=");
-    expect(card).toContain("readAsDataURL");
+    // The headshot proxy is gone on purpose. The card is built to be shared,
+    // so embedding league-owned photography in it was redistribution — and the
+    // drawn bust removes the dependency rather than merely hiding it.
+    expect(card).not.toContain("/api/headshot");
+    expect(card).toContain("<PlayerAvatar");
     expect(card).toContain("THE HOCKEY LEDGER");
     expect(card).toContain("Fair Market Value");
     expect(card).toContain("Extended Net Asset Value");
@@ -2587,5 +2590,45 @@ describe("ST3 — alternate positions resolve through a normalised key", () => {
     const order = read("app/lib/lineup-order.ts");
     expect(order).toContain("export const isC");
     expect(order).toContain("secondaryPosition");
+  });
+});
+
+// ── No third-party imagery anywhere ─────────────────────────────────────────
+// Club logos were hotlinked from assets.nhle.com and player photos were inlined
+// into the exported card. The card exists to travel, so that exposure was
+// structural. Both are now drawn from our own type and palette.
+describe("Canary — the app ships no league-owned imagery", () => {
+  it("hotlinks no NHL asset host", () => {
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) { walk(full); continue; }
+        if (!/\.(tsx?|jsx?)$/.test(entry.name)) continue;
+        const src = fs.readFileSync(full, "utf8");
+        // The TeamMark component names the host in a comment explaining why.
+        if (src.includes("assets.nhle.com") && !full.endsWith("TeamMark.tsx")) {
+          offenders.push(full);
+        }
+      }
+    };
+    walk(path.join(process.cwd(), "app"));
+    expect(offenders).toEqual([]);
+  });
+
+  it("has no headshot proxy route left to fetch through", () => {
+    expect(fs.existsSync(path.join(process.cwd(), "app/api/headshot"))).toBe(false);
+  });
+
+  it("draws the exported card's player mark instead of embedding one", () => {
+    const route = read("app/api/card-image/route.tsx");
+    expect(route).toContain("initialsForCard");
+    expect(route).not.toContain("headshotDataUrl");
+  });
+
+  it("renders club identity as a text mark", () => {
+    for (const f of ["app/components/LedgerDropdown.tsx", "app/armchair-gm/TeamSelectModal.tsx"]) {
+      expect(read(f), f).toContain("<TeamMark");
+    }
   });
 });

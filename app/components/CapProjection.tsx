@@ -1,6 +1,7 @@
 "use client";
 
 import { SEASON } from "@/app/lib/season-config";
+import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 
 // ============================================================
 // CAP PROJECTION PANEL
@@ -61,11 +62,7 @@ const RosterSlot = ({ player, isNew, isLeaving }: {
     isLeaving ? "bg-rose-950/40 border border-rose-900/40 opacity-50" :
     "bg-zinc-900/40 border border-zinc-800/30"
   }`}>
-    {player.headshot && (
-      <img src={player.headshot} alt={player.name}
-        className="w-5 h-5 rounded-full object-cover border border-zinc-700/50 shrink-0"
-        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-    )}
+    <PlayerAvatar name={player.name} position={player.position} size={20} />
     <div className="flex-1 min-w-0">
       <div className={`text-[10px] font-black truncate ${isLeaving ? "line-through text-zinc-600" : isNew ? "text-emerald-300" : "text-zinc-300"}`}>
         {player.name}

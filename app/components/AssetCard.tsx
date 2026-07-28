@@ -1,6 +1,7 @@
 "use client";
 // ── AssetCard — individual player/pick card in trade panels ───
 import React from "react";
+import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import { computeGravity, gravityTierColor } from "@/app/lib/gravity";
 import { CompactGravity, TierIcon } from "@/app/components/GravityField";
@@ -79,11 +80,7 @@ export default function AssetCard({
     <div className="p-3 transition-all">
       <div className="flex justify-between items-start mb-2.5">
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
-          {asset.headshot && (
-            <img src={asset.headshot} alt={asset.name}
-              className="w-8 h-8 object-cover shrink-0"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-          )}
+          <PlayerAvatar name={asset.name} position={asset.position} size={32} />
           <div className="min-w-0">
             <div className="font-black leading-tight flex flex-wrap items-center gap-1.5"
               style={{ fontSize: '13px', color: 'var(--ledger-ink)' }}>
