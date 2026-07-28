@@ -3,6 +3,7 @@ import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
 import { redis } from "@/app/lib/redis";
 import { LEAGUE_PLAYERS_CACHE_KEY } from "@/app/lib/team-cache";
 import { isHealthyRoster } from "@/app/lib/roster-health";
+import { swrCache, type SwrStore } from "@/app/lib/swr-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -11,32 +12,48 @@ export const dynamic = "force-dynamic";
 // every request. Cache the finished payload so only one request per window
 // pays that cost; the rest are served instantly. Invalidated by
 // clearTeamCaches (LEAGUE_PLAYERS_CACHE_KEY) on any roster mutation.
-const PLAYERS_CACHE_TTL = 15 * 60; // 15 min
+// Serve instantly, refresh behind the request. The rebuild is ~40s, so a plain
+// TTL meant whoever arrived first after it lapsed paid the full cost — on a site
+// without constant traffic, that is most visitors. Now only a completely empty
+// or day-old cache blocks.
+const PLAYERS_FRESH_TTL = 15 * 60;          // serve without refreshing
+const PLAYERS_STALE_TTL = 24 * 60 * 60;     // serve stale + refresh in background
 
 const CACHE_HEADERS = {
   // Also let Vercel's CDN cache + revalidate in the background.
   "Cache-Control": "public, s-maxage=300, stale-while-revalidate=900",
 };
 
-export async function GET() {
-  if (redis) {
-    const cached = await redis.get<any>(LEAGUE_PLAYERS_CACHE_KEY).catch(() => null);
-    if (cached) {
-      return NextResponse.json(cached, { headers: { ...CACHE_HEADERS, "x-ledger-cache": "hit" } });
+const store: SwrStore | null = redis
+  ? {
+      get: (key) => redis!.get(key) as Promise<any>,
+      setex: (key, ttl, value) => redis!.setex(key, ttl, value),
+      setnx: async (key, ttl, value) =>
+        (await redis!.set(key, value, { nx: true, ex: ttl })) === "OK",
     }
-  }
+  : null;
 
-  const roster = await assembleCanonicalRoster();
-  const payload = {
-    players: roster.players,
-    liveStats: roster.liveStats,
-    generatedAt: roster.generatedAt,
-    debug: roster.debug,
-  };
+export async function GET() {
+  const { value, state, blocked } = await swrCache({
+    store,
+    key: LEAGUE_PLAYERS_CACHE_KEY,
+    freshSeconds: PLAYERS_FRESH_TTL,
+    staleSeconds: PLAYERS_STALE_TTL,
+    // Never cache a broken assembly — a half-empty roster served for 24 hours
+    // is far worse than a slow rebuild.
+    isCacheable: (p: any) => isHealthyRoster(p?.players ?? []),
+    build: async () => {
+      const roster = await assembleCanonicalRoster();
+      return {
+        players: roster.players,
+        liveStats: roster.liveStats,
+        generatedAt: roster.generatedAt,
+        debug: roster.debug,
+      };
+    },
+  });
 
-  if (redis && isHealthyRoster(roster.players)) {
-    await redis.setex(LEAGUE_PLAYERS_CACHE_KEY, PLAYERS_CACHE_TTL, payload).catch(() => {});
-  }
-
-  return NextResponse.json(payload, { headers: { ...CACHE_HEADERS, "x-ledger-cache": "miss" } });
+  return NextResponse.json(value, {
+    headers: { ...CACHE_HEADERS, "x-ledger-cache": state, "x-ledger-blocked": String(blocked) },
+  });
 }

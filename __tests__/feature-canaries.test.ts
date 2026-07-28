@@ -2074,12 +2074,27 @@ describe("Canary — PA12 redefined analytics Outlook", () => {
 
 describe("Canary — /api/league/players performance + OPS/DPS resilience", () => {
   it("caches the assembled roster payload and only when point-shares loaded", () => {
+    // Pins the intent, not one implementation of it. The route moved from
+    // cache-or-block (redis.get / redis.setex inline) to swrCache, which serves
+    // stale instantly and refreshes behind the request — the guarantee this
+    // canary exists for is stronger now, not weaker.
     const route = read("app/api/league/players/route.ts");
     expect(route).toContain("LEAGUE_PLAYERS_CACHE_KEY");
-    expect(route).toContain("redis.get");
-    expect(route).toContain("redis.setex");
+    expect(route).toContain("swrCache");
     expect(route).toContain("isHealthyRoster");        // don't cache a blank-OPS/DPS payload
     expect(route).toContain("stale-while-revalidate"); // CDN cache header
+  });
+
+  it("never makes a visitor wait for the rebuild when something is servable", () => {
+    // The measured 20-25s cold load: a 15-minute TTL over a ~40s assembly meant
+    // whoever arrived first after it lapsed paid the whole cost.
+    const route = read("app/api/league/players/route.ts");
+    expect(route).toContain("freshSeconds");
+    expect(route).toContain("staleSeconds");
+    const swr = read("app/lib/swr-cache.ts");
+    expect(swr).toContain("export function cacheDecision");
+    // Stale must return without awaiting the rebuild.
+    expect(swr).toMatch(/state === "stale"[\s\S]{0,900}blocked: false/);
   });
 
   it("the players cache is invalidated by every roster mutation", () => {
