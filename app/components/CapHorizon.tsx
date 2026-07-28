@@ -17,13 +17,15 @@ const money = (m: number) => `$${m.toFixed(1)}M`;
 
 interface Props {
   horizon: HorizonSeason[];
+  /** Heading text; defaults to the offseason wording. */
+  title?: string;
   /** Highlighted as a what-if overlay rather than a committed deal. */
   projectionLabel?: string | null;
   /** Collapsed by default — this is reference, not the primary action. */
   defaultOpen?: boolean;
 }
 
-export function CapHorizon({ horizon, projectionLabel = null, defaultOpen = false }: Props) {
+export function CapHorizon({ horizon, title = "Cap Horizon — Roster by Contract Year", projectionLabel = null, defaultOpen = false }: Props) {
   const [open, setOpen] = useState(defaultOpen);
 
   // One row per player, with a cell per season. A player under contract for two
@@ -61,7 +63,7 @@ export function CapHorizon({ horizon, projectionLabel = null, defaultOpen = fals
           borderRadius: "2px",
           color: "var(--ledger-ink)",
         }}>
-        <span>Cap Horizon — Roster by Contract Year</span>
+        <span>{title}</span>
         <span className="text-[11px] font-mono" style={{ color: anyOver ? "var(--ledger-red)" : "var(--ledger-ink-faint)" }}>
           {anyOver ? "OVER IN A FUTURE SEASON" : `${horizon.length} seasons`} {open ? "▲" : "▼"}
         </span>

@@ -3,8 +3,8 @@
 // That consequence existed; nothing surfaced it. These pin the projection.
 import { describe, expect, it } from "vitest";
 import {
-  buildCapHorizon, withProjectedSigning, firstSeasonOverCap, horizonSeasonLabel,
-  type HorizonPlayer,
+  buildCapHorizon, withProjectedSigning, withProjectedTrade, firstSeasonOverCap,
+  horizonSeasonLabel, type HorizonPlayer,
 } from "@/app/lib/cap-horizon";
 
 const p = (
@@ -148,8 +148,7 @@ describe("OFF3 — CapHorizon accessibility", () => {
   });
 
   it("states expiry in words rather than by colour", () => {
-    const s = src();
-    expect(s).toMatch(/RFA.*:.*UFA|"RFA" : "UFA"/s);
+    expect(src()).toContain('row.expiryStatus === "RFA" ? "RFA" : "UFA"');
   });
 
   it("labels over-cap seasons in text, not just red", () => {
@@ -158,5 +157,79 @@ describe("OFF3 — CapHorizon accessibility", () => {
 
   it("exposes the collapse state to assistive tech", () => {
     expect(src()).toContain("aria-expanded={open}");
+  });
+});
+
+describe("withProjectedTrade — term is the thing a cap delta hides", () => {
+  const roster = [
+    p("scheifele", 8.5, 3),
+    p("morrissey", 6.25, 2),
+    p("depth", 1, 1),
+  ];
+  const base = { teamId: "WPG", startYear: 2026, ceilingFor: () => 20 };
+
+  it("removes an outgoing contract from every future season", () => {
+    const after = withProjectedTrade(roster, { ...base, outgoing: [p("scheifele", 8.5, 3)] });
+    expect(after.map(s => s.committed)).toEqual([7.3, 6.3, 0]);
+  });
+
+  it("carries an incoming contract's remaining term, not just this season", () => {
+    const rental = p("rental", 9, 1, { teamId: "SJS" });
+    const anchor = p("anchor", 9, 3, { teamId: "SJS" });
+    const withRental = withProjectedTrade(roster, { ...base, incoming: [rental] });
+    const withAnchor = withProjectedTrade(roster, { ...base, incoming: [anchor] });
+
+    // Identical this season — the number a single-season view would show.
+    expect(withRental[0].committed).toBe(withAnchor[0].committed);
+    // Nothing alike later, which is the whole point.
+    expect(withRental.map(s => s.space)).toEqual([-4.8, 5.2, 11.5]);
+    expect(withAnchor.map(s => s.space)).toEqual([-4.8, -3.8, 2.5]);
+  });
+
+  it("applies retention the sending club kept", () => {
+    const retained = p("retained", 10, 2, { teamId: "SJS", retainedPct: 0.5 });
+    const after = withProjectedTrade(roster, { ...base, incoming: [retained] });
+    expect(after[0].committed).toBe(20.8);   // 15.8 + 5.0, not + 10
+  });
+
+  it("ignores draft picks, which carry no cap", () => {
+    const pick = p("pick-WPG-2027-1", 0, 0, { teamId: "SJS", position: "Pick" });
+    const after = withProjectedTrade(roster, { ...base, incoming: [pick] });
+    expect(after[0].committed).toBe(15.8);
+  });
+
+  it("handles a swap in both directions at once", () => {
+    const after = withProjectedTrade(roster, {
+      ...base,
+      outgoing: [p("morrissey", 6.25, 2)],
+      incoming: [p("newguy", 7, 3, { teamId: "SJS" })],
+    });
+    expect(after.map(s => s.committed)).toEqual([16.5, 15.5, 15.5]);
+    expect(after[0].contracts.map(c => c.id)).not.toContain("morrissey");
+  });
+
+  it("is a no-op with empty blocks", () => {
+    const before = buildCapHorizon(roster, base);
+    const after = withProjectedTrade(roster, base);
+    expect(after.map(s => s.committed)).toEqual(before.map(s => s.committed));
+  });
+});
+
+describe("Trade Machine shows both teams' horizons", () => {
+  const src = () => read("app/components/QuickTradeMachine.tsx");
+
+  it("projects each side through the trade", () => {
+    expect(src()).toContain("withProjectedTrade(data.players");
+    expect(src()).toContain("<CapHorizon");
+  });
+
+  it("mirrors the blocks for the partner — what one side sends the other receives", () => {
+    // Getting this backwards would show both clubs absorbing the same contracts.
+    const s = src();
+    expect(s).toMatch(/partnerHorizon[\s\S]{0,400}incoming: outgoing, outgoing: incoming/);
+  });
+
+  it("marks the table as a projection while a package is on the bench", () => {
+    expect(src()).toContain('projectionLabel={outgoing.length || incoming.length ? "this trade" : null}');
   });
 });

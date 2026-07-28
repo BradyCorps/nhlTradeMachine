@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { withProjectedTrade } from "@/app/lib/cap-horizon";
+import { CapHorizon } from "@/app/components/CapHorizon";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import TeamStrand from "@/app/components/TeamStrand";
@@ -972,6 +974,29 @@ export default function QuickTradeMachine() {
     const inIds = new Set(incoming.map(a => a.id));
     return [...allPartnerRoster.filter(a => !inIds.has(a.id)), ...outgoing.filter(a => a.position !== "Pick")];
   }, [allPartnerRoster, incoming, outgoing]);
+  // Post-trade commitments by season. A cap delta cannot separate a one-year
+  // rental from five years of term; this can.
+  const seasonStartYear = parseInt(SEASON.label.slice(0, 4), 10);
+  const homeHorizon = useMemo(
+    () => homeTeam
+      ? withProjectedTrade(data.players, {
+          teamId: homeTeam.id, startYear: seasonStartYear,
+          incoming, outgoing,
+        })
+      : [],
+    [data.players, homeTeam, incoming, outgoing, seasonStartYear],
+  );
+  const partnerHorizon = useMemo(
+    () => partnerTeam
+      ? withProjectedTrade(data.players, {
+          teamId: partnerTeam.id, startYear: seasonStartYear,
+          // Mirrored: what the home team sends is what the partner receives.
+          incoming: outgoing, outgoing: incoming,
+        })
+      : [],
+    [data.players, partnerTeam, incoming, outgoing, seasonStartYear],
+  );
+
   const homePhase = useMemo(() => deriveTeamPhase(allHomeRoster, fullNav) ?? normalizePhase(homeTeam?.phase), [allHomeRoster, fullNav, homeTeam?.phase]);
   const partnerPhase = useMemo(() => deriveTeamPhase(allPartnerRoster, fullNav) ?? normalizePhase(partnerTeam?.phase), [allPartnerRoster, fullNav, partnerTeam?.phase]);
   const homePostPhase = useMemo(() => hasActiveTrade ? (deriveTeamPhase(effHomeRoster, fullNav) ?? homePhase) : null, [hasActiveTrade, effHomeRoster, fullNav, homePhase]);
@@ -1235,6 +1260,25 @@ export default function QuickTradeMachine() {
             </section>
 
             <TradeBalanceStrip outgoing={outgoingSummary} incoming={incomingSummary} navLoading={navLoading} />
+
+            {(homeTeam || partnerTeam) && (
+              <section className="grid gap-3 md:grid-cols-2">
+                {homeTeam && (
+                  <CapHorizon
+                    title={`${homeTeam.name} — Cap Horizon`}
+                    horizon={homeHorizon}
+                    projectionLabel={outgoing.length || incoming.length ? "this trade" : null}
+                  />
+                )}
+                {partnerTeam && (
+                  <CapHorizon
+                    title={`${partnerTeam.name} — Cap Horizon`}
+                    horizon={partnerHorizon}
+                    projectionLabel={outgoing.length || incoming.length ? "this trade" : null}
+                  />
+                )}
+              </section>
+            )}
 
             <GmLogicSignal
               homeTeam={homeTeam}

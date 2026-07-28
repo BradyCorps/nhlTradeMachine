@@ -148,6 +148,36 @@ export function withProjectedSigning(
 }
 
 /**
+ * The horizon a team would carry AFTER a trade.
+ *
+ * A trade machine that only reports this season's cap delta cannot tell a
+ * one-year rental from five years of term — the two look identical today and
+ * nothing alike in 2028-29. Outgoing contracts leave the books entirely;
+ * incoming ones arrive with their remaining term and any retention already
+ * applied by the sending club.
+ */
+export function withProjectedTrade(
+  players: HorizonPlayer[],
+  opts: {
+    teamId: string;
+    startYear: number;
+    seasons?: number;
+    ceilingFor?: (offset: number) => number;
+    incoming?: HorizonPlayer[];
+    outgoing?: HorizonPlayer[];
+  },
+): HorizonSeason[] {
+  const { incoming = [], outgoing = [], ...rest } = opts;
+  const leaving = new Set(outgoing.map(p => p.id));
+  const after = [
+    ...players.filter(p => !leaving.has(p.id)),
+    // Retag to the acquiring club so the horizon's own team filter keeps them.
+    ...incoming.filter(p => p.position !== "Pick").map(p => ({ ...p, teamId: opts.teamId })),
+  ];
+  return buildCapHorizon(after, rest);
+}
+
+/**
  * The first season a signing would put the team over the ceiling, or null.
  * Used to warn at the point of decision rather than two summers later.
  */
