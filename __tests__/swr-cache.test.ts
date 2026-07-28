@@ -158,3 +158,40 @@ describe("swrCache", () => {
     expect((store.data.k as { value: string }).value).toBe("old");  // not overwritten
   });
 });
+
+// ── Route wiring ─────────────────────────────────────────────────
+import fs from "fs";
+import path from "path";
+const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
+
+describe("both league routes read through the same policy", () => {
+  it("uses one shared store, so lock semantics cannot drift", () => {
+    for (const route of ["app/api/league/players/route.ts", "app/api/league/teams/route.ts"]) {
+      const src = read(route);
+      expect(src, route).toContain("swrCache");
+      expect(src, route).toContain("store: swrStore");
+    }
+    // The lock is what stops a quiet site starting N rebuilds at once.
+    expect(read("app/lib/swr-store.ts")).toContain("nx: true");
+  });
+
+  it("caches the whole teams response, not just the inner team list", () => {
+    // The warm path still hit the DB twice and rebuilt ~800 pick objects.
+    const src = read("app/api/league/teams/route.ts");
+    expect(src).toContain("LEAGUE_TEAMS_PAYLOAD_CACHE_KEY");
+    expect(src).toContain("buildDraftPickInventory");
+    expect(src).toMatch(/build: buildTeamsPayload/);
+  });
+
+  it("drops the teams payload on every roster mutation", () => {
+    // Otherwise an admin cap change leaves a day-old ceiling in the response.
+    const cache = read("app/lib/team-cache.ts");
+    expect(cache).toContain("LEAGUE_TEAMS_PAYLOAD_CACHE_KEY");
+    expect(cache).toMatch(/teamCacheKeys[\s\S]*LEAGUE_TEAMS_PAYLOAD_CACHE_KEY/);
+  });
+
+  it("refuses to cache an empty league", () => {
+    expect(read("app/api/league/teams/route.ts")).toMatch(/isCacheable[\s\S]{0,200}teams\.length > 0/);
+    expect(read("app/api/league/players/route.ts")).toContain("isHealthyRoster");
+  });
+});

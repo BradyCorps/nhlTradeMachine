@@ -6,7 +6,9 @@ import { db } from "@/app/db/client";
 import { siteSettings, teams as teamsTable } from "@/app/db/schema";
 import { parseStoredCapCeiling } from "@/app/lib/cap-settings";
 import { buildDraftPickInventory } from "@/app/lib/draft-pick-inventory";
-import { teamCacheKey } from "@/app/lib/team-cache";
+import { teamCacheKey, LEAGUE_TEAMS_PAYLOAD_CACHE_KEY } from "@/app/lib/team-cache";
+import { swrCache } from "@/app/lib/swr-cache";
+import { swrStore } from "@/app/lib/swr-store";
 
 export const dynamic = "force-dynamic";
 
@@ -213,7 +215,15 @@ async function loadTeams(capCeiling: number): Promise<any[]> {
   return teams;
 }
 
-export async function GET() {
+// Serve instantly, refresh behind the request — the same policy the players
+// route uses. Even on a warm `loadTeams` cache this path still read the cap
+// ceiling from the database, ran ensureNewTables, selected pick overrides and
+// rebuilt ~800 pick objects on EVERY request; caching the assembled response
+// removes all of that from the warm path.
+const TEAMS_FRESH_TTL = 30 * 60;            // serve without refreshing
+const TEAMS_STALE_TTL = 24 * 60 * 60;       // serve stale + refresh in background
+
+async function buildTeamsPayload() {
   const liveCapCeiling = await getLiveCapCeiling();
   const LIVE_TEAMS = await loadTeams(liveCapCeiling);
   const picks = await buildDraftPickInventory(LIVE_TEAMS);
@@ -227,11 +237,32 @@ export async function GET() {
     needs:    t.needs ?? [],
   }));
 
-  return NextResponse.json({
+  return {
     teams,
     picks,
     capCeiling:  liveCapCeiling,
     capFloor:    CAP_FLOOR,
     generatedAt: new Date().toISOString(),
+  };
+}
+
+export async function GET() {
+  const { value, state, blocked } = await swrCache({
+    store: swrStore,
+    key: LEAGUE_TEAMS_PAYLOAD_CACHE_KEY,
+    freshSeconds: TEAMS_FRESH_TTL,
+    staleSeconds: TEAMS_STALE_TTL,
+    // A teamless payload is a failed upstream, not a league — never cache it
+    // for a day. An admin cap change drops this key via clearTeamCaches.
+    isCacheable: (p) => Array.isArray(p?.teams) && p.teams.length > 0,
+    build: buildTeamsPayload,
+  });
+
+  return NextResponse.json(value, {
+    headers: {
+      "Cache-Control": "public, s-maxage=300, stale-while-revalidate=900",
+      "x-ledger-cache": state,
+      "x-ledger-blocked": String(blocked),
+    },
   });
 }

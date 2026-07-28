@@ -13,6 +13,10 @@ export const TRADE_TEAMS_CACHE_KEY = "cache:trade:teams:v1";
 // (~40s) roster assembly, cached whole. Cleared alongside the team caches so
 // every roster mutation drops it too.
 export const LEAGUE_PLAYERS_CACHE_KEY = "cache:league:players:v1";
+// The whole /api/league/teams response — teams, picks and the live ceiling —
+// cached together. The warm path previously still hit the database twice and
+// rebuilt 800 pick objects on every request.
+export const LEAGUE_TEAMS_PAYLOAD_CACHE_KEY = "cache:league:teams:payload:v1";
 export const LEGACY_CURATED_CAP_CEILING = 95.5;
 
 export function teamCacheKey(capCeiling: number): string {
@@ -24,6 +28,7 @@ export function teamCacheKeys(...capCeilings: number[]): string[] {
     LEAGUE_TEAMS_CACHE_KEY,
     TRADE_TEAMS_CACHE_KEY,
     LEAGUE_PLAYERS_CACHE_KEY,
+    LEAGUE_TEAMS_PAYLOAD_CACHE_KEY,
     teamCacheKey(SEASON.capCeiling),
     teamCacheKey(LEGACY_CURATED_CAP_CEILING),
     ...capCeilings.map(teamCacheKey),

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
-import { redis } from "@/app/lib/redis";
 import { LEAGUE_PLAYERS_CACHE_KEY } from "@/app/lib/team-cache";
 import { isHealthyRoster } from "@/app/lib/roster-health";
-import { swrCache, type SwrStore } from "@/app/lib/swr-cache";
+import { swrCache } from "@/app/lib/swr-cache";
+import { swrStore } from "@/app/lib/swr-store";
 
 export const dynamic = "force-dynamic";
 
@@ -24,18 +24,9 @@ const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=300, stale-while-revalidate=900",
 };
 
-const store: SwrStore | null = redis
-  ? {
-      get: (key) => redis!.get(key) as Promise<any>,
-      setex: (key, ttl, value) => redis!.setex(key, ttl, value),
-      setnx: async (key, ttl, value) =>
-        (await redis!.set(key, value, { nx: true, ex: ttl })) === "OK",
-    }
-  : null;
-
 export async function GET() {
   const { value, state, blocked } = await swrCache({
-    store,
+    store: swrStore,
     key: LEAGUE_PLAYERS_CACHE_KEY,
     freshSeconds: PLAYERS_FRESH_TTL,
     staleSeconds: PLAYERS_STALE_TTL,
