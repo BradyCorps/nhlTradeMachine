@@ -70,7 +70,6 @@ export function useTradeBench({
 }) {
   // ── Persistent trade simulation state ────────────────────────
   const [executedTrades, setExecutedTrades] = useState<ExecutedTrade[]>([]);
-  const [showSimPanel, setShowSimPanel] = useState(false);
   const [lineupStartingGoalies, setLineupStartingGoalies] = useState<Record<string, string | null>>({});
   const [lineupOrders, setLineupOrders] = useState<Record<string, LineupOrderPayload>>({});
 
@@ -207,7 +206,6 @@ export function useTradeBench({
     setBlocks([[], []]);
     setVerdict(null);
     simControlsRef.current?.resetSimulation();
-    setShowSimPanel(true);
   }, [homeTeam, partnerTeam, outgoingBlock, incomingBlock, setBlocks, setVerdict, setDb, cupRun, setCupRun, db.capCeiling, simControlsRef]);
 
   // ── Reset to original rosters ─────────────────────────────────
@@ -237,7 +235,6 @@ export function useTradeBench({
       // sheet came back holding men the club had never traded for.
       setLineupStartingGoalies({});
       setLineupOrders({});
-      setShowSimPanel(false);
       setBlocks([[], []]);
       setVerdict(null);
       setHomeTeamLocked(false);
@@ -249,8 +246,6 @@ export function useTradeBench({
   return {
     executedTrades,
     setExecutedTrades,
-    showSimPanel,
-    setShowSimPanel,
     lineupStartingGoalies,
     setLineupStartingGoalies,
     lineupOrders,

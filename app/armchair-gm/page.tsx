@@ -198,7 +198,7 @@ export default function ArmchairGmPage() {
 
   // ── Trade bench — executed trades, lineups, execute/reset ────
   const {
-    executedTrades, setExecutedTrades, showSimPanel, setShowSimPanel,
+    executedTrades, setExecutedTrades,
     lineupStartingGoalies, setLineupStartingGoalies, lineupOrders, setLineupOrders,
     handleGoalieStarterChange, handleLineupChange, executeTrade, resetTrades,
   } = useTradeBench({
@@ -283,7 +283,6 @@ export default function ArmchairGmPage() {
     resetSimulation();
     setLineupOrders({});
     setLineupStartingGoalies({});
-    setShowSimPanel(false);
     setBlocks([[], []]);
     setVerdict(null);
     setMatchResults(null);
@@ -1126,7 +1125,6 @@ export default function ArmchairGmPage() {
             handleGoalieStarterChange={handleGoalieStarterChange}
             handleLineupChange={handleLineupChange}
             executedTrades={executedTrades}
-            showSimPanel={showSimPanel}
             simYear={simYear}
             simLoading={simLoading}
             simData={simData}

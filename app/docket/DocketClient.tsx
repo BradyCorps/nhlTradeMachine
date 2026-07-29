@@ -287,7 +287,11 @@ export default function DocketClient({ entries }: DocketClientProps) {
                   {entry.executedDate} · {entry.teams.join(" / ")}
                 </div>
                 <div style={{ marginTop: 4, fontSize: 10, color: "var(--ledger-ink-faint)", fontWeight: 900, letterSpacing: "0.12em" }}>
-                  AT TRADE: {entry.fairness} · TODAY: {entry.todayWinner ?? "EVEN"} {entry.todayNavMargin == null ? "NA" : fmtNav(entry.todayNavMargin)} NAV · {entry.rosterMutating ? "ROSTER OVERLAY" : "UI ONLY"}
+                  {/* `rosterMutating` describes what publishing did to this
+                      app's own roster state — an admin concern, not provenance
+                      a reader of the ledger can use. It stays in the admin
+                      view, where "ROSTER OVERLAY" vs "UI ONLY" means something. */}
+                  AT TRADE: {entry.fairness} · TODAY: {entry.todayWinner ?? "EVEN"} {entry.todayNavMargin == null ? "NA" : fmtNav(entry.todayNavMargin)} NAV
                 </div>
               </div>
               <div style={{

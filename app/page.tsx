@@ -186,7 +186,7 @@ export default function WelcomePage() {
               Build your trade in the Trade Machine and test it against the X-NAV
               engine and the GM Audit or take the chair in Armchair GM and live
               with every consequence that follows. Explore advanced and enhanced
-              stats on the Player Analytics page, featuring {BRAND.name}
+              stats on the Player Analytics page, featuring the {BRAND.name}{" "}
               exclusive Player Gravity system, STRAND DNA Identity profiles and a
               new all-in-one X-NAV model. Read the published Docket to see how the
               calls have aged. Visit the Press Box and play the daily hockey crib.

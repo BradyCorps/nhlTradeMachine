@@ -112,7 +112,7 @@ function GmTabButton({ label, active, onClick, disabled, badge }: {
 export function GmAnalysisTabs({
   teams, allHomeRoster, allPartnerRoster, blocks, navMap, db,
   lineupOrders, handleGoalieStarterChange, handleLineupChange, executedTrades,
-  showSimPanel, simYear, simLoading, simData, simResult,
+  simYear, simLoading, simData, simResult,
 }: {
   teams: [Team, Team];
   allHomeRoster: Asset[];
@@ -124,7 +124,6 @@ export function GmAnalysisTabs({
   handleGoalieStarterChange: (teamId: string, goalieId: string | null) => void;
   handleLineupChange: (teamId: string, order: LineupOrderPayload) => void;
   executedTrades: { id: string; homeTeamName: string; partnerTeamName: string; outgoing: Asset[]; incoming: Asset[]; timestamp: number; }[];
-  showSimPanel: boolean;
   simYear: () => void;
   simLoading: boolean;
   simData: any;
@@ -151,16 +150,20 @@ export function GmAnalysisTabs({
   // panel is never painted and the selection survives to be restored.
   const activeTab = visibleTab(tabs, selectedTab);
 
-  // A trade's point is its consequences, and those are in the Sim tab. This is
-  // what `showSimPanel` was raised for; it was passed in and never read, so
-  // executing from Compare or Breakdown dropped the user on a dead panel with
-  // nothing saying the trade had gone through. Only the false→true edge moves
-  // them, so a remount does not yank them off a tab they chose since.
-  const simPanelWas = useRef(showSimPanel);
+  // A trade's point is its consequences, and those are in the Sim tab.
+  //
+  // Keyed on the trade COUNT rising, not on a flag. CXH1 first used
+  // `showSimPanel`, which is set true on execute and only cleared on reset — so
+  // it has no edge to detect on a second trade in the same session, and the
+  // user was left on Roster while the Sim tab quietly grew a second entry. A
+  // count answers "did another trade just happen"; a latched boolean cannot.
+  // Comparing against the previous count also means a remount does not yank the
+  // user off a tab they chose since, and a reset (count to zero) does not fire.
+  const tradeCountWas = useRef(executedTrades.length);
   useEffect(() => {
-    if (showSimPanel && !simPanelWas.current) setSelectedTab("sim");
-    simPanelWas.current = showSimPanel;
-  }, [showSimPanel]);
+    if (executedTrades.length > tradeCountWas.current) setSelectedTab("sim");
+    tradeCountWas.current = executedTrades.length;
+  }, [executedTrades.length]);
 
   return (
     <div style={{ marginTop: "8px", marginBottom: "16px" }}>

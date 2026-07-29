@@ -12,9 +12,11 @@
 // panel is painted, and it recovers on its own: put assets back on the block
 // and the tab the user chose returns, because their choice was never discarded.
 //
-// The second half of the same defect is that `showSimPanel` — set the moment a
-// trade executes — was passed into the deck and never read. A trade's whole
-// point is its consequences, and those live in the Sim tab.
+// The second half of the same defect is that a trade's consequences live in the
+// Sim tab and nothing took the user there, so executing from Compare or
+// Breakdown left them on a dead panel with no sign the trade had gone through.
+// The deck moves them when the executed-trade COUNT rises — every trade, not
+// just the first, which a latched "a trade happened" flag could not express.
 
 export type GmTab = "roster" | "lineups" | "dna" | "comparison" | "breakdown" | "sim";
 

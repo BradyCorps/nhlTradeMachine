@@ -3433,11 +3433,26 @@ describe("Canary — CXH1 the analysis deck never shows an empty panel", () => {
     expect(rule).toContain("GM_TAB_FALLBACK");
   });
 
-  it("executing a trade lands the user on the Sim tab", () => {
-    // showSimPanel was passed into the deck and never read, which is why
-    // executing from Compare or Breakdown dropped the user on a dead panel.
-    expect(deck).toContain("showSimPanel, simYear");
-    expect(deck).toContain("if (showSimPanel && !simPanelWas.current) setSelectedTab(\"sim\")");
+  it("EVERY executed trade lands the user on the Sim tab, not just the first", () => {
+    // The first fix keyed on `showSimPanel`, which is set true on execute and
+    // only cleared on reset — so a second trade in the same session had no edge
+    // to detect and left the user on Roster while Sim grew a second entry.
+    // A count answers "did another trade just happen"; a latched flag cannot.
+    expect(deck).toContain("executedTrades.length > tradeCountWas.current");
+    expect(deck).toContain('}, [executedTrades.length]);');
+  });
+
+  it("carries no latched trade flag that can disagree with the trade list", () => {
+    // showSimPanel duplicated a fact already derivable from executedTrades, and
+    // the two could disagree — which is exactly how the second trade was lost.
+    for (const file of [
+      "app/armchair-gm/GmAnalysisTabs.tsx",
+      "app/armchair-gm/useTradeBench.ts",
+      "app/armchair-gm/page.tsx",
+    ]) {
+      const src = read(file).replace(/\/\/.*$/gm, "");
+      expect(src, file).not.toContain("showSimPanel");
+    }
   });
 
   it("keeps the selection so it can come back", () => {

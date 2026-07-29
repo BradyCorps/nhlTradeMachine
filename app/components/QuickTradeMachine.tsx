@@ -514,12 +514,12 @@ function TeamTradeSummary({
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-        <SummaryMetric label="Current Cap" value={team ? fmtCap(currentCap) : "--"} tone={currentCap >= 0 ? "good" : "bad"} />
-        <SummaryMetric label="Projected Cap" value={team ? fmtCap(projectedCap) : "--"} tone={capTone} />
+        <SummaryMetric label="Current Cap Space" value={team ? fmtCap(currentCap) : "--"} tone={currentCap >= 0 ? "good" : "bad"} />
+        <SummaryMetric label="Projected Cap Space" value={team ? fmtCap(projectedCap) : "--"} tone={capTone} />
         <SummaryMetric label="Cap Delta" value={team ? `${fmtSigned(capDelta)}M` : "--"} tone={capDelta >= 0 ? "good" : undefined} />
         <SummaryMetric label="Production" value={`${fmtSigned(productionDelta, 0)} pts/82`} tone={productionDelta >= 0 ? "good" : "bad"} />
         <SummaryMetric label="NOIV" value={sends.count || receives.count ? fmtSigned(noivDelta, 1) : "--"} tone={noivDelta >= 0 ? "good" : "bad"} />
-        <SummaryMetric label="Package NAV" value={navLoading ? "Loading" : fmtSigned(navDelta, 1)} tone={navDelta >= 0 ? "good" : "bad"} />
+        <SummaryMetric label="Net NAV" value={navLoading ? "Loading" : fmtSigned(navDelta, 1)} tone={navDelta >= 0 ? "good" : "bad"} />
       </div>
     </div>
   );

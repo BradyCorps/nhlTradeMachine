@@ -271,3 +271,48 @@ describe("goalie board (fantasy lens)", () => {
     expect(goalieWinEnv(null)).toBe("NEUTRAL");
   });
 });
+
+// ── Breakout copy must agree with the evidence beside it ─────────
+//
+// Reported from the live site: Seth Jarvis read "Finishing cold vs expected"
+// directly above "37 G on 36 xG". `coldFinish` ORed two different
+// measurements — overall goals against overall xG, and high-danger conversion
+// against the league rate — and then headlined both with the overall claim. A
+// player can beat expectation overall while converting his best looks below
+// his own rate, so the evidence was contradicting the claim it was proof of.
+describe("breakout story — a headline may not contradict its evidence", () => {
+  const jarvis = {
+    id: "jarvis", name: "Seth Jarvis", position: "C", age: 24, games: 78,
+    ptsPace: 72, baselinePtsPace: 66, avgTOI: 19.2,
+    goalsPace: 37, xGPace: 36,          // finishing ABOVE expected overall
+    hdFinishingDelta: -0.03,            // but cold on high-danger looks
+    edgeBurstsOver20: 55, edgeSpeedMaxMph: 22.1,
+  };
+
+  const storyFor = (p: Record<string, unknown>) => {
+    const [entry] = buildBreakoutWatch([p as never], 8, 1);
+    return entry;
+  };
+
+  it("does not call a player who beat his xG a cold finisher", () => {
+    const entry = storyFor(jarvis);
+    expect(entry).toBeDefined();
+    expect(entry.reason).not.toContain("Finishing cold vs expected");
+  });
+
+  it("says what it actually measured", () => {
+    expect(storyFor(jarvis).reason).toContain("best looks");
+  });
+
+  it("cites the high-danger number it is talking about", () => {
+    expect(storyFor(jarvis).evidence.join(" ")).toContain("HD finishing");
+  });
+
+  it("still calls a genuinely cold finisher cold", () => {
+    // Goals well under xG — here the overall evidence line agrees with it.
+    const cold = { ...jarvis, goalsPace: 20, xGPace: 30, hdFinishingDelta: -0.03 };
+    const entry = storyFor(cold);
+    expect(entry.reason).toContain("Finishing cold vs expected");
+    expect(entry.evidence.join(" ")).toContain("20 G on 30 xG");
+  });
+});

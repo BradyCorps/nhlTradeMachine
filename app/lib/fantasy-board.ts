@@ -282,8 +282,16 @@ const bursts82Of = (p: FantasyPlayerInput): number | null =>
 function breakoutStory(p: FantasyPlayerInput, posGroup: "C" | "W" | "D"): { reason: string; evidence: string[] } {
   const evidence: string[] = [];
   const bursts = bursts82Of(p);
-  const coldFinish = (p.hdFinishingDelta != null && p.hdFinishingDelta <= -0.02)
-    || (p.xGPace != null && p.goalsPace != null && (p.goalsPace as number) <= (p.xGPace as number) - 4);
+  // Two different measurements, and they are not interchangeable. Overall goals
+  // against overall xG is one claim; high-danger conversion against the league
+  // rate is another, and a player can beat expectation overall while converting
+  // his best looks below his own rate. ORing them into one "cold finishing"
+  // headline put "Finishing cold vs expected" above the line "37 G on 36 xG" —
+  // the evidence directly contradicting the claim it was offered as proof of.
+  const coldOverall = p.xGPace != null && p.goalsPace != null
+    && (p.goalsPace as number) <= (p.xGPace as number) - 4;
+  const coldHighDanger = p.hdFinishingDelta != null && p.hdFinishingDelta <= -0.02;
+  const coldFinish = coldOverall || coldHighDanger;
   const fastLegs = (p.edgeSpeedMaxMph != null && p.edgeSpeedMaxMph >= 22.5) || (bursts != null && bursts >= 60);
   const pedigree = (p.draftOverall != null && p.draftOverall <= 15) || (p.prospectPtsPace ?? 0) >= 55;
 
@@ -306,11 +314,20 @@ function breakoutStory(p: FantasyPlayerInput, posGroup: "C" | "W" | "D"): { reas
 
   // Forwards: finishing, volume, speed, deployment.
   if (p.xGPace != null && p.goalsPace != null) evidence.push(`${Math.round(p.goalsPace)} G on ${Math.round(p.xGPace)} xG`);
-  if (bursts != null) evidence.push(`${bursts} bursts/82`);
+  // Cite the measurement the headline is actually about. Without this the
+  // high-danger case had no evidence line of its own and borrowed the overall
+  // one, which is how the contradiction reached the page.
+  if (coldHighDanger && p.hdFinishingDelta != null) {
+    evidence.push(`${(p.hdFinishingDelta * 100).toFixed(1)}% HD finishing`);
+  }
+  if (bursts != null && evidence.length < 3) evidence.push(`${bursts} bursts/82`);
   if (p.edgeOzPct != null && evidence.length < 3) evidence.push(`${Math.round(p.edgeOzPct * 100)}% OZ`);
   if (p.edgeSpeedMaxMph != null && evidence.length < 3) evidence.push(`${p.edgeSpeedMaxMph.toFixed(1)} mph`);
 
-  if (coldFinish) return { reason: "Finishing cold vs expected — the goals are coming", evidence };
+  // Overall first: it is the stronger and more legible claim, and when it holds
+  // the G-on-xG line above it agrees.
+  if (coldOverall) return { reason: "Finishing cold vs expected — the goals are coming", evidence };
+  if (coldHighDanger) return { reason: "Converting his best looks below the league rate — that gap usually closes", evidence };
   if (fastLegs) return { reason: "EDGE burst & speed running ahead of the box score", evidence };
   if ((p.avgTOI ?? 0) >= 17 && (p.ptsPace ?? 0) < 55) return { reason: "Top-six minutes without top-six points yet — the role says more", evidence };
   if ((p.edgeOzPct ?? 0) >= 0.55) return { reason: "Prime offensive-zone deployment — the chances will pile up", evidence };
