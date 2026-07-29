@@ -284,7 +284,7 @@ export default function OfferSheetPhase({
                     <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                       <span className="font-mono text-[11px] font-black" style={{
                         color: fa.contract.tier === "STAR" ? "var(--ledger-red)"
-                          : fa.contract.tier === "TOP" ? "var(--ledger-navy)"
+                          : fa.contract.tier === "TOP" ? "var(--ledger-ice)"
                           : fa.contract.tier === "MIDDLE" ? "var(--ledger-amber)"
                           : "var(--ledger-ink-faint)",
                       }}>
@@ -322,7 +322,7 @@ export default function OfferSheetPhase({
                     }
                     className="tap-target w-full text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono shrink-0 sm:w-auto"
                     style={{
-                      background: canOffer ? "var(--ledger-navy)" : "transparent",
+                      background: canOffer ? "var(--ledger-ice)" : "transparent",
                       color: canOffer ? "#fff" : "var(--ledger-ink-faint)",
                       border: canOffer ? "none" : "1px solid var(--ledger-rule)",
                       borderRadius: "2px",

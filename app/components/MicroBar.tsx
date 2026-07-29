@@ -12,7 +12,7 @@ function MicroBar({ label, val, max, color, invert = false, tooltip }: {
   const displayVal = val; 
   
   const colorMap: Record<string, string> = {
-    cyan:    "var(--ledger-navy)",
+    cyan:    "var(--ledger-ice)",
     emerald: "var(--ledger-green)",
     violet:  "var(--ledger-violet)",
     amber:   "var(--ledger-amber-dark)",

@@ -40,11 +40,11 @@ export interface RoleDef {
 
 export const ROLE_DEFS: Record<PlayerRoleKey, RoleDef> = {
   PUCK_MOVING_ANCHOR: {
-    key: "PUCK_MOVING_ANCHOR", label: "Puck-Moving Anchor", icon: "⇉", color: "var(--ledger-navy, #1a2e5c)",
+    key: "PUCK_MOVING_ANCHOR", label: "Puck-Moving Anchor", icon: "⇉", color: "var(--ledger-ice, #1a4b5b)",
     blurb: "Defenseman who exits clean and enters controlled — play travels north on his stick, not off the glass.",
   },
   NEUTRAL_ZONE_ENGINE: {
-    key: "NEUTRAL_ZONE_ENGINE", label: "Neutral Zone Engine", icon: "≫", color: "var(--ledger-navy, #1a2e5c)",
+    key: "NEUTRAL_ZONE_ENGINE", label: "Neutral Zone Engine", icon: "≫", color: "var(--ledger-ice, #1a4b5b)",
     blurb: "Forward who carries through center ice for controlled entries — the transition game runs through him.",
   },
   HIGH_DANGER_DISTRIBUTOR: {
@@ -92,7 +92,7 @@ export const ROLE_DEFS: Record<PlayerRoleKey, RoleDef> = {
     blurb: "Starter workload with saves above expected — the net is his every night and the team banks points for it.",
   },
   HIGH_DANGER_ERASER: {
-    key: "HIGH_DANGER_ERASER", label: "High-Danger Eraser", icon: "⊘", color: "var(--ledger-navy, #1a2e5c)",
+    key: "HIGH_DANGER_ERASER", label: "High-Danger Eraser", icon: "⊘", color: "var(--ledger-ice, #1a4b5b)",
     blurb: "Elite on grade-A chances — the slot shot that beats most goalies gets erased here.",
   },
   STORM_CELLAR: {

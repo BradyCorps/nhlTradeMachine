@@ -13,7 +13,7 @@ import {
   RINK_INK,
   RINK_INK_FAINT,
   RINK_RED,
-  RINK_NAVY,
+  RINK_BLUE_LINE,
   RINK_ICE,
 } from "@/app/lib/gravity-rink";
 
@@ -124,8 +124,8 @@ function Rink({ gravity }: { gravity: CardGravityInput }) {
         <rect x={rinkX} y={rinkY} width={rinkW} height={rinkH} rx={22} fill={RINK_ICE} stroke={RINK_INK} strokeWidth={1.5} opacity={0.95} />
 
         {/* Blue lines + center red line */}
-        <line x1={blue1} y1={rinkY + 2} x2={blue1} y2={rinkY + rinkH - 2} stroke={RINK_NAVY} strokeWidth={2.5} opacity={0.45} />
-        <line x1={blue2} y1={rinkY + 2} x2={blue2} y2={rinkY + rinkH - 2} stroke={RINK_NAVY} strokeWidth={2.5} opacity={0.45} />
+        <line x1={blue1} y1={rinkY + 2} x2={blue1} y2={rinkY + rinkH - 2} stroke={RINK_BLUE_LINE} strokeWidth={2.5} opacity={0.45} />
+        <line x1={blue2} y1={rinkY + 2} x2={blue2} y2={rinkY + rinkH - 2} stroke={RINK_BLUE_LINE} strokeWidth={2.5} opacity={0.45} />
         <line x1={centerX} y1={rinkY + 2} x2={centerX} y2={rinkY + rinkH - 2} stroke={RINK_RED} strokeWidth={1.5} opacity={0.4} strokeDasharray="4 3" />
 
         {/* Goal lines */}

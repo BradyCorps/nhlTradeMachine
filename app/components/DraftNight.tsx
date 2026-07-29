@@ -88,7 +88,7 @@ export default function DraftNight({
             </div>
             <div className="flex items-baseline justify-between gap-3 flex-wrap">
               <div>
-                <h2 className="font-black text-[1.25rem] leading-tight" style={{ color: "var(--ledger-navy)" }}>
+                <h2 className="font-black text-[1.25rem] leading-tight" style={{ color: "var(--ledger-ice)" }}>
                   ⏰ You&apos;re on the clock
                 </h2>
                 <div className="font-mono font-black text-[11px] mt-0.5" style={{ color: "var(--ledger-ink-faint)" }}>
@@ -148,7 +148,7 @@ export default function DraftNight({
             </p>
             <button onClick={() => setSeed((s) => s + 1)}
               className="text-[9px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
-              style={{ background: "transparent", color: "var(--ledger-navy)", border: "1px solid var(--ledger-navy)", borderRadius: "2px" }}>
+              style={{ background: "transparent", color: "var(--ledger-ice)", border: "1px solid var(--ledger-ice)", borderRadius: "2px" }}>
               ↻ Re-roll board
             </button>
           </div>
@@ -178,7 +178,7 @@ export default function DraftNight({
             </div>
             <button onClick={() => setSeed((s) => s + 1)}
               className="text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
-              style={{ background: "transparent", color: "var(--ledger-navy)", border: "1px solid var(--ledger-navy)", borderRadius: "2px" }}>
+              style={{ background: "transparent", color: "var(--ledger-ice)", border: "1px solid var(--ledger-ice)", borderRadius: "2px" }}>
               ↻ Re-roll
             </button>
           </div>
@@ -201,7 +201,7 @@ export default function DraftNight({
                 <div key={slot.overall} className="flex items-center gap-3 px-3 py-1.5"
                   style={{
                     background: isCurrent ? "rgba(40,70,110,0.16)" : mine ? "rgba(40,70,110,0.10)" : "var(--paper)",
-                    border: `1px solid ${isCurrent || mine ? "var(--ledger-navy)" : "var(--ledger-rule-light)"}`,
+                    border: `1px solid ${isCurrent || mine ? "var(--ledger-ice)" : "var(--ledger-rule-light)"}`,
                     borderRadius: "2px",
                     opacity: !r && !isCurrent ? 0.55 : 1,
                   }}>
@@ -210,7 +210,7 @@ export default function DraftNight({
                     {slot.overall}
                   </span>
                   <span className="font-mono font-black text-[11px] shrink-0"
-                    style={{ width: 64, color: mine ? "var(--ledger-navy)" : "var(--ledger-ink)" }}>
+                    style={{ width: 64, color: mine ? "var(--ledger-ice)" : "var(--ledger-ink)" }}>
                     {slot.team}
                     <span className="font-normal" style={{ color: "var(--ledger-ink-faint)" }}>{via}</span>
                   </span>

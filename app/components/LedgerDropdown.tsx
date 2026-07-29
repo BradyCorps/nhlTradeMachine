@@ -94,7 +94,7 @@ export default function LedgerDropdown({ teams, selectedId, onSelect }: {
                         fontFamily: "'Courier Prime', monospace",
                         color:
                           t.phase === 'Contender'  ? 'var(--green)'  :
-                          t.phase === 'Bubble'     ? 'var(--navy)'   :
+                          t.phase === 'Bubble'     ? 'var(--ledger-ice)'   :
                           t.phase === 'Retooling'  ? 'var(--amber)'  :
                           t.phase === 'Rebuilding' ? 'var(--red)'    :
                           'var(--brown)',

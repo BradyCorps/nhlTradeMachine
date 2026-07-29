@@ -87,7 +87,7 @@ export default function AssetCard({
     removeAssetFromStore(asset.id, idx, asset.teamId);
   };
 
-  const navColor = xnav.total > 80 ? 'var(--ledger-green)' : xnav.total > 20 ? 'var(--ledger-navy)' : xnav.total > -20 ? 'var(--ledger-brown)' : 'var(--ledger-red)';
+  const navColor = xnav.total > 80 ? 'var(--ledger-green)' : xnav.total > 20 ? 'var(--ledger-ice)' : xnav.total > -20 ? 'var(--ledger-brown)' : 'var(--ledger-red)';
 
   return (
     <div className="p-3 transition-all">
@@ -187,7 +187,7 @@ export default function AssetCard({
           <span className="font-black" style={{
             fontSize: '1.1rem',
             fontStyle: 'italic',
-            color: xnav.total > 80 ? 'var(--ledger-green)' : xnav.total > 20 ? 'var(--ledger-navy)' : xnav.total > -20 ? 'var(--ledger-brown)' : 'var(--ledger-red)',
+            color: xnav.total > 80 ? 'var(--ledger-green)' : xnav.total > 20 ? 'var(--ledger-ice)' : xnav.total > -20 ? 'var(--ledger-brown)' : 'var(--ledger-red)',
           }} title="X-NAV — Extended Net Asset Value, the player’s tradeable value">
             {fmt(xnav.total, 0)}
           </span>
@@ -238,7 +238,7 @@ export default function AssetCard({
                
                   <svg width="14" height="10" viewBox="0 0 14 10" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
                     <path d="M0,2 C2,2 2,8 4,8 C6,8 6,2 8,2 C10,2 10,8 12,8 C14,8 14,2 14,2"
-                      fill="none" stroke={view === "STRAND" ? "var(--ledger-navy)" : "var(--ledger-ink-faint)"} strokeWidth="1.5" strokeLinecap="round"/>
+                      fill="none" stroke={view === "STRAND" ? "var(--ledger-ice)" : "var(--ledger-ink-faint)"} strokeWidth="1.5" strokeLinecap="round"/>
                     <path d="M0,8 C2,8 2,2 4,2 C6,2 6,8 8,8 C10,8 10,2 12,2 C14,2 14,8 14,8"
                       fill="none" stroke={view === "STRAND" ? "var(--ledger-red)" : "var(--ledger-rule-mid)"} strokeWidth="1.5" strokeLinecap="round"/>
                     {[2, 5, 8, 11].map(x => (
@@ -322,7 +322,7 @@ export default function AssetCard({
               const isStarter = gp >= 40;
               return (
                 <span className="text-2xs px-1 py-0.5 font-black" style={{
-                  color: isStarter ? 'var(--ledger-navy)' : isBackup ? 'var(--ledger-amber-dark)' : 'var(--ledger-brown)',
+                  color: isStarter ? 'var(--ledger-ice)' : isBackup ? 'var(--ledger-amber-dark)' : 'var(--ledger-brown)',
                   border: `1px solid ${isStarter ? 'rgba(26,46,92,0.4)' : isBackup ? 'rgba(154,107,0,0.4)' : 'rgba(107,80,48,0.4)'}`,
                 }} title={isBackup ? "Backup goalie — NAV capped at 55. Per-game rates on <25 starts are unreliable predictors of full-season value." : isStarter ? "Starter — played 35+ games, full valuation applied" : "Tandem — shared starter role"}>
                   {isBackup ? "BACKUP" : isStarter ? "STARTER" : "TANDEM"}
@@ -330,7 +330,7 @@ export default function AssetCard({
               );
             })()}
             {pedigree?.careerGsax && (
-              <span className="text-2xs font-black text-ledger-navy font-mono">
+              <span className="text-2xs font-black text-ledger-ice font-mono">
                 +{pedigree.careerGsax} career · Peak {pedigree.peakGsax}
               </span>
             )}
@@ -347,7 +347,7 @@ export default function AssetCard({
               {asset.ops != null && (
                 <div className="flex items-center gap-1 px-1.5 py-0.5" style={{ background: 'rgba(26,46,92,0.08)', border: '1px solid rgba(26,46,92,0.2)', borderRadius: '2px' }}>
                   <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">OPS</span>
-                  <span className="text-2xs font-black text-ledger-navy font-mono">{asset.ops.toFixed(1)}</span>
+                  <span className="text-2xs font-black text-ledger-ice font-mono">{asset.ops.toFixed(1)}</span>
                 </div>
               )}
               {asset.dps != null && (
@@ -413,7 +413,7 @@ export default function AssetCard({
             return (
               <div className="mt-1.5 px-1 py-1 flex justify-between items-center" style={{ borderTop: '1px solid #c8b890' }}>
                 <span className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">Career Peak</span>
-                <span className="text-2xs font-black text-ledger-navy font-mono">
+                <span className="text-2xs font-black text-ledger-ice font-mono">
                   {peak} pts/82
                 </span>
               </div>
@@ -477,7 +477,7 @@ export default function AssetCard({
             ].map(s => (
               <div key={s.label} className="text-center p-1" title={s.tooltip} style={{ background: 'var(--ledger-warm)', border: '1px solid #b8a070' }}>
                 <div className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">{s.label}</div>
-                <div className="text-2xs font-black text-ledger-navy font-mono">{s.val}</div>
+                <div className="text-2xs font-black text-ledger-ice font-mono">{s.val}</div>
               </div>
             ))}
           </div>
@@ -571,7 +571,7 @@ export default function AssetCard({
 function StatItem({ val, pct, label, good, invert, note }: { val: string; pct: number; label: string; good?: boolean; invert?: boolean; note?: string }) {
   // same color logic...
   const color = good === undefined
-    ? 'var(--ledger-navy)'
+    ? 'var(--ledger-ice)'
     : good ? (invert ? 'var(--ledger-amber)' : 'var(--ledger-green)') : (invert ? 'var(--ledger-green)' : 'var(--ledger-red)');
   
   return (

@@ -138,7 +138,7 @@ export function ExpandedStats({ p, nav }: { p: Asset; nav: XNAVResult }) {
 
 const tierColor = (tier: OffseasonPending["contract"]["tier"]): string =>
   tier === "STAR" ? "var(--ledger-red)"
-  : tier === "TOP" ? "var(--ledger-navy)"
+  : tier === "TOP" ? "var(--ledger-ice)"
   : tier === "MIDDLE" ? "var(--ledger-amber)"
   : "var(--ledger-ink-faint)";
 

@@ -100,7 +100,7 @@ export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
   const span = Math.max(maxNav - Math.min(minNav, 0), 1);
 
   const GOOD = "#146a24", BAD = "#9c2b1f", INK = "#1c140a", BODY = "#4a3820";
-  const toneColor = (t: string) => t === "good" ? GOOD : t === "bad" ? BAD : "#1a2e5c";
+  const toneColor = (t: string) => t === "good" ? GOOD : t === "bad" ? BAD : "#1a4b5b";
 
   const avgNav = Math.round(years.reduce((s, y) => s + y.nav, 0) / years.length);
   const trajSentence = avgNav < 0
@@ -115,7 +115,7 @@ export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
     <div className="ptl">
       <style>{`
         .ptl { font-family: 'Courier Prime', ui-monospace, monospace; color: #1c140a; }
-        .ptl *:focus-visible { outline: 2px solid #1a2e5c; outline-offset: 2px; }
+        .ptl *:focus-visible { outline: 2px solid #1a4b5b; outline-offset: 2px; }
         .ptl-h { font-size: 11px; font-weight: 900; color: #4a3820; text-transform: uppercase;
           letter-spacing: 0.15em; margin-bottom: 8px; }
         .ptl-deal { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;

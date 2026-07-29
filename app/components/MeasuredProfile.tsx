@@ -10,7 +10,7 @@ import { computeMeasuredProfile, type ProfileTone } from "@/app/lib/measured-pro
 
 const TONE_COLOR: Record<ProfileTone, string> = {
   good: "var(--ledger-green)",
-  neutral: "var(--ledger-navy)",
+  neutral: "var(--ledger-ice)",
   warn: "var(--ledger-red)",
   none: "var(--ledger-ink-faint)",
 };
@@ -40,7 +40,7 @@ export default function MeasuredProfile({ asset }: { asset: Asset }) {
                 <span className="text-[11px] font-black uppercase tracking-tight font-mono" style={{ color: "var(--ledger-ink)" }}>
                   {d.label}
                   {d.edge && (
-                    <span className="ml-1 text-[9px] font-black" style={{ color: "var(--ledger-navy)" }} title="Sourced from an NHL EDGE snapshot">EDGE</span>
+                    <span className="ml-1 text-[9px] font-black" style={{ color: "var(--ledger-ice)" }} title="Sourced from an NHL EDGE snapshot">EDGE</span>
                   )}
                 </span>
                 <span className="text-[10px] font-mono tabular-nums" style={{ color: d.hasSample ? "var(--ledger-ink-body, var(--ledger-ink))" : "var(--ledger-ink-faint)" }}>

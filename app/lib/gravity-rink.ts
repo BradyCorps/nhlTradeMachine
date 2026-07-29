@@ -148,9 +148,11 @@ export function zoneQualifier(zone: keyof ZoneMasses, m: number): string {
 export const RINK_INK = "#1c140a";
 export const RINK_INK_FAINT = "#6e5a3d";
 export const RINK_RED = "#b83020";
-export const RINK_NAVY = "#1a2e5c";
+/** The blue line painted on the ice — not the ice itself. */
+export const RINK_BLUE_LINE = "#1a4b5b";
 export const RINK_GREEN = "#1a5c2e";
 export const RINK_AMBER = "#d4a017";
+/** The ice surface. */
 export const RINK_ICE = "#ece0be";
 
 // Tier color as concrete hex (gravityTierColor() resolved).

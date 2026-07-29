@@ -131,3 +131,57 @@ describe("derived cream wordmark", () => {
     expect(cream).toContain('fill="#b83020"');
   });
 });
+
+// ── Ice blue ramp ────────────────────────────────────────────────
+// The kit's ice blue is a FILL. Using it as text would be 2.04:1 on paper,
+// well under WCAG AA's 4.5:1, which is why the deep step exists and why the
+// kit says the colour is "reserved for the crease and related data accents".
+const luminance = (hex: string): number => {
+  const h = hex.replace("#", "");
+  const ch = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+  const lin = ch.map(c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+};
+const contrast = (a: string, b: string): number => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+describe("ice blue ramp", () => {
+  const PAPER = "#f2ecd7";
+  const CARD = "#e4d8b8";
+  const KIT_ICE = "#79afc1";
+  const DEEP_ICE = "#1a4b5b";
+
+  it("keeps the deep step readable on both paper surfaces", () => {
+    expect(contrast(DEEP_ICE, PAPER)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(DEEP_ICE, CARD)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // The whole reason the ramp has two steps.
+  it("confirms the kit value cannot carry text", () => {
+    expect(contrast(KIT_ICE, PAPER)).toBeLessThan(4.5);
+  });
+
+  it("puts the deep step on the kit's hue, not the old navy's", () => {
+    // Blue-channel dominance alone is not enough — the old navy was #1a2e5c.
+    // Green must sit close to blue for the cyan-leaning ice hue.
+    const g = parseInt(DEEP_ICE.slice(3, 5), 16);
+    const b = parseInt(DEEP_ICE.slice(5, 7), 16);
+    expect(b - g).toBeLessThan(24);
+    expect(b).toBeGreaterThan(g);
+  });
+
+  it("wires the ramp into the token file and the Tailwind palette", () => {
+    expect(read("app/globals.css")).toContain("--ledger-ice:          #1a4b5b");
+    expect(read("tailwind.config.ts")).toContain("ice:          '#1a4b5b'");
+  });
+
+  it("leaves no reference to the retired navy token", () => {
+    for (const f of ["app/globals.css", "tailwind.config.ts"]) {
+      const src = read(f).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+      expect(src, f).not.toContain("ledger-navy");
+      expect(src, f).not.toContain("#1a2e5c");
+    }
+  });
+});

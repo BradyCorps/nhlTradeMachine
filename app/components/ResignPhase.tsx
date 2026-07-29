@@ -268,7 +268,7 @@ export default function ResignPhase({
                       <button onClick={() => onExtend(player, terms)}
                         aria-label={`Extend ${player.name} at ${money(terms.aav)} for ${terms.term} years`}
                         className="tap-target text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
-                        style={{ background: "var(--ledger-navy)", color: "#fff", borderRadius: "2px" }}>
+                        style={{ background: "var(--ledger-ice)", color: "#fff", borderRadius: "2px" }}>
                         Extend
                       </button>
                     </div>
@@ -443,7 +443,7 @@ export default function ResignPhase({
                         title={affordable ? (isRfa ? `Sign via offer sheet (${offerPicks.length ? offerPicks.join(" + ") + " compensation" : "no pick comp"})` : "Sign to your roster") : "Not enough cap space"}
                         className="tap-target text-[10px] font-black uppercase tracking-wider px-3 py-1.5 font-mono"
                         style={{
-                          background: affordable ? "var(--ledger-navy)" : "transparent",
+                          background: affordable ? "var(--ledger-ice)" : "transparent",
                           color: affordable ? "#fff" : "var(--ledger-ink-faint)",
                           border: affordable ? "none" : "1px solid var(--ledger-rule)",
                           borderRadius: "2px",

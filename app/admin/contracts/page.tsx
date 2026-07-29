@@ -47,12 +47,12 @@ function SourceBadge({ source }: { source: string }) {
   // Light-theme badges: a soft accent tint with the saturated accent text.
   const cfg: Record<string, { bg: string; color: string }> = {
     // DB provenance (the single source of truth).
-    editor:   { bg: "#e3e7f1", color: "#1a2e5c" },
+    editor:   { bg: "#e3e7f1", color: "#1a4b5b" },
     sync:     { bg: "#e0eee0", color: "#1a5c2e" },
     seed:     { bg: "#e4d8b8", color: "#6b5030" },
     missing:  { bg: "#f4e0db", color: "#b83020" },
     // Legacy scrape-preview labels (only when ?scrape=1 delta view is active).
-    admin:    { bg: "#e3e7f1", color: "#1a2e5c" },
+    admin:    { bg: "#e3e7f1", color: "#1a4b5b" },
     override: { bg: "#f1e7d0", color: "#8a5c00" },
     scraper:  { bg: "#e0eee0", color: "#1a5c2e" },
     bundled:  { bg: "#e4d8b8", color: "#6b5030" },
@@ -244,13 +244,13 @@ function EditModal({ row, onSave, onClear, onClose }: {
         {/* Extension — signed next contract that kicks in after current deal */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20,
           background: hasExt ? "rgba(26,46,92,0.06)" : "var(--paper-inset)",
-          border: `1px solid ${hasExt ? "var(--ledger-navy)" : "var(--ledger-rule-light)"}`, padding: "10px 12px" }}>
+          border: `1px solid ${hasExt ? "var(--ledger-ice)" : "var(--ledger-rule-light)"}`, padding: "10px 12px" }}>
           <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 10, fontWeight: 900, color: hasExt ? "var(--ledger-navy)" : "var(--ledger-ink-faint)",
+            <span style={{ fontSize: 10, fontWeight: 900, color: hasExt ? "var(--ledger-ice)" : "var(--ledger-ink-faint)",
               textTransform: "uppercase", letterSpacing: "0.1em" }}>
               {hasExt ? "EXTENSION ACTIVE" : "EXTENSION"}
             </span>
-            {hasExt && <span style={{ fontSize: 9, color: "var(--ledger-navy)", opacity: 0.6 }}>
+            {hasExt && <span style={{ fontSize: 9, color: "var(--ledger-ice)", opacity: 0.6 }}>
               Current deal → then ${extCap}M × {extYrs || "?"}yr
             </span>}
           </div>
@@ -374,16 +374,16 @@ function AddPlayerForm({ onAdded }: { onAdded: () => void }) {
   if (!open) return (
     <button onClick={() => setOpen(true)}
       style={{ fontSize: 11, fontWeight: 900, padding: "5px 14px",
-        background: "rgba(26,46,92,0.10)", border: "1px solid var(--ledger-navy)",
-        color: "var(--ledger-navy)", cursor: "pointer", letterSpacing: "0.1em" }}>
+        background: "rgba(26,46,92,0.10)", border: "1px solid var(--ledger-ice)",
+        color: "var(--ledger-ice)", cursor: "pointer", letterSpacing: "0.1em" }}>
       + ADD PLAYER
     </button>
   );
 
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap",
-      background: "var(--ledger-card-light)", border: "1px solid var(--ledger-navy)", padding: "10px 14px" }}>
-      <span style={{ fontSize: 10, color: "var(--ledger-navy)", fontWeight: 900, letterSpacing: "0.1em", whiteSpace: "nowrap" }}>
+      background: "var(--ledger-card-light)", border: "1px solid var(--ledger-ice)", padding: "10px 14px" }}>
+      <span style={{ fontSize: 10, color: "var(--ledger-ice)", fontWeight: 900, letterSpacing: "0.1em", whiteSpace: "nowrap" }}>
         NEW PLAYER
       </span>
       <input placeholder="Full name (exact)" value={name} onChange={e => setName(e.target.value)}
@@ -453,7 +453,7 @@ function BulkFaForm({ onDone }: { onDone: (msg: string) => void }) {
   if (!open) return (
     <button onClick={() => setOpen(true)}
       style={{ fontSize: 11, fontWeight: 900, padding: "5px 14px",
-        background: "rgba(26,46,92,0.10)", border: "1px solid var(--ledger-navy)", color: "var(--ledger-navy)",
+        background: "rgba(26,46,92,0.10)", border: "1px solid var(--ledger-ice)", color: "var(--ledger-ice)",
         cursor: "pointer", letterSpacing: "0.1em" }}>
       ⇪ BULK FREE AGENTS
     </button>
@@ -461,8 +461,8 @@ function BulkFaForm({ onDone }: { onDone: (msg: string) => void }) {
 
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap",
-      background: "var(--ledger-card-light)", border: "1px solid var(--ledger-navy)", padding: "10px 14px" }}>
-      <span style={{ fontSize: 10, color: "var(--ledger-navy)", fontWeight: 900, letterSpacing: "0.1em", whiteSpace: "nowrap", paddingTop: 6 }}>
+      background: "var(--ledger-card-light)", border: "1px solid var(--ledger-ice)", padding: "10px 14px" }}>
+      <span style={{ fontSize: 10, color: "var(--ledger-ice)", fontWeight: 900, letterSpacing: "0.1em", whiteSpace: "nowrap", paddingTop: 6 }}>
         BULK FA
       </span>
       <textarea placeholder="One player per line (or comma-separated)…" value={text}
@@ -474,7 +474,7 @@ function BulkFaForm({ onDone }: { onDone: (msg: string) => void }) {
       </select>
       <button onClick={submit} disabled={saving || count === 0}
         style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
-          background: count === 0 ? "transparent" : "var(--ledger-navy)", border: "1px solid var(--ledger-navy)",
+          background: count === 0 ? "transparent" : "var(--ledger-ice)", border: "1px solid var(--ledger-ice)",
           color: count === 0 ? "var(--ledger-ink-faint)" : "#fff", cursor: count === 0 ? "default" : "pointer", letterSpacing: "0.1em" }}>
         {saving ? "..." : `APPLY (${count})`}
       </button>
@@ -668,7 +668,7 @@ export default function AdminContractsPage() {
         <button onClick={handleSeed}
           title="Load the committed contract/FA baseline into the DB (idempotent; keeps editor rows)"
           style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
-            background: "rgba(26,46,92,0.10)", border: "1px solid var(--ledger-navy)", color: "var(--ledger-navy)",
+            background: "rgba(26,46,92,0.10)", border: "1px solid var(--ledger-ice)", color: "var(--ledger-ice)",
             cursor: "pointer", letterSpacing: "0.1em" }}>
           LOAD BASELINE
         </button>
@@ -697,8 +697,8 @@ export default function AdminContractsPage() {
         </button>
         <button onClick={() => load(true)} disabled={loading}
           style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
-            background: "rgba(26,46,92,0.08)", border: "1px solid var(--ledger-navy)",
-            color: loading ? "var(--ledger-ink-faint)" : "var(--ledger-navy)",
+            background: "rgba(26,46,92,0.08)", border: "1px solid var(--ledger-ice)",
+            color: loading ? "var(--ledger-ink-faint)" : "var(--ledger-ice)",
             cursor: loading ? "default" : "pointer", letterSpacing: "0.1em" }}>
           + LIVE DELTA
         </button>
@@ -791,7 +791,7 @@ export default function AdminContractsPage() {
               {row.hasNMC && <span style={{ fontSize: 9, color: "#b83020", border: "1px solid #b8302050",
                 padding: "0 3px", marginLeft: 5 }}>NMC</span>}
               <FaBadge status={row.expiryStatus} year={row.expiryYear} />
-              {row.extensionCapHit != null && row.extensionCapHit > 0 && <span style={{ fontSize: 9, color: "#1a2e5c", border: "1px solid #1a2e5c50",
+              {row.extensionCapHit != null && row.extensionCapHit > 0 && <span style={{ fontSize: 9, color: "#1a4b5b", border: "1px solid #1a4b5b50",
                 padding: "0 3px", marginLeft: 5, background: "rgba(26,46,92,0.08)" }}>EXT</span>}
               {row.excludeFromRoster && <span style={{ fontSize: 9, color: "#b83020", border: "1px solid #b8302050",
                 padding: "0 3px", marginLeft: 5 }}>EXCL</span>}
@@ -803,7 +803,7 @@ export default function AdminContractsPage() {
             </div>
 
             <div style={{ textAlign: "right", fontWeight: 900,
-              color: hasAdmin ? "var(--ledger-navy)" : "var(--ledger-ink)" }}>
+              color: hasAdmin ? "var(--ledger-ice)" : "var(--ledger-ink)" }}>
               {row.finalYears}yr
             </div>
             <div style={{ textAlign: "right", color: "var(--ledger-ink-body)" }}>

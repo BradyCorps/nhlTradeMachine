@@ -228,10 +228,10 @@ export default function WelcomePage() {
               href="/players"
               lead
               kicker="Feature Two — Player Intelligence"
-              kickerColor="var(--ledger-navy)"
+              kickerColor="var(--ledger-ice)"
               edition="The Ledger"
               title="Player Analytics"
-              ctaColor="var(--ledger-navy)"
+              ctaColor="var(--ledger-ice)"
               cta="Open Player Analytics"
               body="Search the full NHL roster. Season totals, advanced analytics, STRAND DNA, Gravity fields, contract valuations, and X-NAV components — the deepest single-player view in hockey."
               lines={[

@@ -28,10 +28,10 @@ type Tile = {
   title: string;
 };
 
-// A muted-to-strong tone so a glance reads good (green) / neutral (navy)
+// A muted-to-strong tone so a glance reads good (green) / neutral (ice)
 // / caution (red) without relying on the number alone.
 const GOOD = "var(--ledger-green)";
-const NEUTRAL = "var(--ledger-navy)";
+const NEUTRAL = "var(--ledger-ice)";
 const WARN = "var(--ledger-red)";
 const FAINT = "var(--ledger-ink-faint)";
 

@@ -2266,7 +2266,7 @@ describe("Canary — fantasy page AA, pagination, and selection accent", () => {
     expect(page).toContain('aria-label="Draft board pagination"');
     // Selection uses a distinct accent, not the ink color.
     expect(page).toContain("accentInk");
-    expect(page).toContain("var(--ledger-navy");
+    expect(page).toContain("var(--ledger-ice");
     // Keyboard focus is visible on the interactive controls.
     expect(page).toContain("focus-visible:outline");
   });

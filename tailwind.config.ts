@@ -35,7 +35,7 @@ const config: Config = {
           'red-deep':   '#c0392b',
           'red-dark':   '#d43820',
           green:        '#1a5c2e',
-          navy:         '#1a2e5c',
+          ice:          '#1a4b5b',   // was navy #1a2e5c — rotated onto the brand ice hue
           brown:        '#6b5030',
           amber:        '#8a5c00',
           'amber-dark': '#9a6b00',

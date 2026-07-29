@@ -196,7 +196,7 @@ function PlayerIconBadges({ player }: { player: Player }) {
     isMegalodon ? { key: "megalodon", icon: "♛", color: "var(--ledger-amber)", title: `Megalodon tier — NAV ${xnav.total} ≥ ${FRANCHISE.megalodon}.` } : null,
     isFranchise ? { key: "franchise", icon: "◆", color: "var(--ledger-ink)", title: `Franchise tier — NAV ${xnav.total} ≥ ${FRANCHISE.threshold}.` } : null,
     isSurplus ? { key: "surplus", icon: "★", color: "var(--ledger-green)", title: "Surplus contract — on-ice value significantly exceeds cap hit." } : null,
-    prospectTier ? { key: "prospect", icon: prospectTier.tier === 1 ? "★" : prospectTier.tier === 2 ? "◆" : "◇", color: prospectTier.tier === 1 ? "var(--ledger-navy)" : prospectTier.tier === 2 ? "var(--ledger-green)" : "var(--ledger-brown)", title: prospectTier.tier === 1 ? "Franchise prospect pedigree." : prospectTier.tier === 2 ? "Top prospect pedigree." : "Prospect pedigree." } : null,
+    prospectTier ? { key: "prospect", icon: prospectTier.tier === 1 ? "★" : prospectTier.tier === 2 ? "◆" : "◇", color: prospectTier.tier === 1 ? "var(--ledger-ice)" : prospectTier.tier === 2 ? "var(--ledger-green)" : "var(--ledger-brown)", title: prospectTier.tier === 1 ? "Franchise prospect pedigree." : prospectTier.tier === 2 ? "Top prospect pedigree." : "Prospect pedigree." } : null,
     hasAwards ? { key: "awards", icon: "A", color: "var(--ledger-amber)", title: `Award pedigree — ${Array.from(new Set(pedigree!.awards)).join(" · ")}.` } : null,
     injuryRisk ? { key: "injury", icon: "!", color: "var(--ledger-red)", title: injuryRisk.note } : null,
     shutdownPedigree ? { key: "shutdown", icon: "■", color: "var(--ledger-amber)", title: shutdownPedigree.note } : null,

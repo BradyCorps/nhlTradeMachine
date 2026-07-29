@@ -290,8 +290,8 @@ function FieldDiagram({
       />
 
       {/* Blue lines + center red line */}
-      <line x1={blue1} y1={rinkY + 2} x2={blue1} y2={rinkY + rinkH - 2} stroke="var(--ledger-navy, #1a2e5c)" strokeWidth={2.5} opacity={0.45} />
-      <line x1={blue2} y1={rinkY + 2} x2={blue2} y2={rinkY + rinkH - 2} stroke="var(--ledger-navy, #1a2e5c)" strokeWidth={2.5} opacity={0.45} />
+      <line x1={blue1} y1={rinkY + 2} x2={blue1} y2={rinkY + rinkH - 2} stroke="var(--ledger-ice, #1a4b5b)" strokeWidth={2.5} opacity={0.45} />
+      <line x1={blue2} y1={rinkY + 2} x2={blue2} y2={rinkY + rinkH - 2} stroke="var(--ledger-ice, #1a4b5b)" strokeWidth={2.5} opacity={0.45} />
       <line x1={centerX} y1={rinkY + 2} x2={centerX} y2={rinkY + rinkH - 2} stroke="var(--ledger-red)" strokeWidth={1.5} opacity={0.4} strokeDasharray="4 3" />
 
       {/* Goal lines */}

@@ -328,8 +328,8 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
           --ledger-rule: #b8a070; --ledger-rule-light: #d6c8a5;
           --paper-bg: #ede4cc; --paper-card: #ede4cc; --paper-inset: #e4d8b8;
           --ledger-green: #146a24; --ledger-red: #9c2b1f;
-          --ledger-navy: #1a2e5c; --ledger-amber: #d4a017; --ledger-brown: #6e5a3d; }
-        .pcard *:focus-visible { outline: 2px solid #1a2e5c; outline-offset: 2px; border-radius: 2px; }
+          --ledger-ice: #1a4b5b; --ledger-amber: #d4a017; --ledger-brown: #6e5a3d; }
+        .pcard *:focus-visible { outline: 2px solid #1a4b5b; outline-offset: 2px; border-radius: 2px; }
         .pcard-head { background: #e4d8b8; color: #1c140a; padding: 12px 16px;
           border-bottom: 2px solid #1c140a;
           display: flex; align-items: center; gap: 12px; }

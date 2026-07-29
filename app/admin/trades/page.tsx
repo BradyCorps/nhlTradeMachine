@@ -108,10 +108,10 @@ function CsvIngestPanel({ onIngested }: { onIngested: () => void }) {
   };
 
   const statusColor = (s: string) =>
-    s === "created" ? "var(--ledger-green)" : s === "would-create" ? "var(--ledger-navy)" : "var(--ledger-red)";
+    s === "created" ? "var(--ledger-green)" : s === "would-create" ? "var(--ledger-ice)" : "var(--ledger-red)";
 
   return (
-    <div style={{ border: "1px solid var(--ledger-navy)", marginBottom: 20 }}>
+    <div style={{ border: "1px solid var(--ledger-ice)", marginBottom: 20 }}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
@@ -119,7 +119,7 @@ function CsvIngestPanel({ onIngested }: { onIngested: () => void }) {
         style={{
           width: "100%", textAlign: "left", padding: "10px 12px", cursor: "pointer",
           background: "rgba(26,46,92,0.08)", border: "none",
-          fontSize: 10, fontWeight: 900, letterSpacing: "0.18em", color: "var(--ledger-navy)",
+          fontSize: 10, fontWeight: 900, letterSpacing: "0.18em", color: "var(--ledger-ice)",
           fontFamily: "'Courier Prime', monospace",
         }}
       >

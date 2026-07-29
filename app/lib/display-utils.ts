@@ -1,6 +1,6 @@
 export function navColor(nav: number): string {
   if (nav >= 160) return "var(--ledger-green)";
-  if (nav >= 100) return "var(--ledger-navy)";
+  if (nav >= 100) return "var(--ledger-ice)";
   if (nav >= 50)  return "var(--ledger-amber)";
   if (nav >= 0)   return "var(--ledger-ink-faint)";
   return "var(--ledger-red)";

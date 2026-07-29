@@ -22,7 +22,7 @@ function tone(score: number, invert = false): string {
   const high = invert ? score <= 35 : score >= 65;
   const mid = invert ? score <= 55 : score >= 45;
   if (high) return "var(--ledger-green)";
-  if (mid) return "var(--ledger-navy)";
+  if (mid) return "var(--ledger-ice)";
   return "var(--ledger-red)";
 }
 
@@ -140,7 +140,7 @@ export function DevelopmentProfilePanel({ asset }: { asset: Asset }) {
     <div className="py-1">
       {/* Always-visible scale so the wall of numbers reads without opening the key */}
       <div className="text-2xs font-mono mb-1.5" style={{ color: "var(--ledger-ink-body)", lineHeight: 1.45 }}>
-        Scores are <b style={{ color: "var(--ledger-navy)" }}>0–100</b> (90+ elite · 45–55 average · under 35 weak/risk).
+        Scores are <b style={{ color: "var(--ledger-ice)" }}>0–100</b> (90+ elite · 45–55 average · under 35 weak/risk).
         Peak Left is in years; Projection is pts/82.
       </div>
       <OutlookKey />
@@ -205,7 +205,7 @@ export function DevelopmentProfilePanel({ asset }: { asset: Asset }) {
       <div className="p-2 mb-1.5" style={{ background: "var(--ledger-warm)", border: "1px solid #b8a070" }}>
         <div className="flex items-center justify-between mb-1">
           <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">Projection</span>
-          <span className="text-2xs font-black text-ledger-navy font-mono">
+          <span className="text-2xs font-black text-ledger-ice font-mono">
             {band.floorPts82}-{band.ceilingPts82} pts/82 · median {band.medianPts82}
           </span>
         </div>

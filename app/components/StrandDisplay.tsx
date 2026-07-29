@@ -122,7 +122,7 @@ export default function StrandDisplay({
   const cy       = H / 2;
   const freq     = (2 * Math.PI) / W;
   const amp      = Math.min(amplitude, cy - RAIL_ZONE - 4);
-  const offColor = "var(--ledger-navy)";
+  const offColor = "var(--ledger-ice)";
   const defColor = "var(--ledger-red)";
 
   const nodeIndex = (t: StrandTrait) =>
@@ -154,7 +154,7 @@ export default function StrandDisplay({
               <text x={8} y={13.5} fontSize="7.5" fontFamily="Courier Prime, monospace" fontWeight="bold"
                 fill={
                   strandType === "ELITE TWO-WAY" || strandType === "COMPLETE PLAYER" ? "var(--ledger-green)" :
-                  strandType.includes("OFFENSIVE") ? "var(--ledger-navy)" :
+                  strandType.includes("OFFENSIVE") ? "var(--ledger-ice)" :
                   strandType.includes("DEFENSIVE") ? "var(--ledger-red)" : "var(--ledger-brown)"
                 }>{strandType}</text>
             </>
@@ -275,9 +275,9 @@ export default function StrandDisplay({
         fontSize: "10px", lineHeight: 1.45, color: "var(--ledger-ink-body)",
         fontFamily: "Courier Prime, monospace",
       }}>
-        <span style={{ color: "var(--ledger-navy)", fontWeight: 900 }}>Big number</span> = 0–100 rating vs the NHL field (100 = elite; 50 = league median).{" "}
+        <span style={{ color: "var(--ledger-ice)", fontWeight: 900 }}>Big number</span> = 0–100 rating vs the NHL field (100 = elite; 50 = league median).{" "}
         <span style={{ color: "var(--ledger-ink-body)", fontWeight: 900 }}>Small number</span> = the actual stat.{" "}
-        <span style={{ color: "var(--ledger-navy)", fontWeight: 700 }}>Blue = offensive traits</span>,{" "}
+        <span style={{ color: "var(--ledger-ice)", fontWeight: 700 }}>Blue = offensive traits</span>,{" "}
         <span style={{ color: "var(--ledger-red)", fontWeight: 700 }}>red = defensive traits</span>{" "}
         — wave color marks the trait family, never good vs bad.
       </div>

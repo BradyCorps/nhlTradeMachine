@@ -1011,7 +1011,7 @@ export default function ArmchairGmPage() {
                 disabled={matchLoading}
                 aria-label="Find teams interested in this trade package"
                 className="tap-target w-full py-3 font-black uppercase tracking-widest text-[11px] transition-all duration-200 disabled:opacity-50 active:scale-[0.97]"
-                style={{ background: 'var(--ledger-navy)', color: 'white', border: '2px solid var(--ledger-navy)' }}
+                style={{ background: 'var(--ledger-ice)', color: 'white', border: '2px solid var(--ledger-ice)' }}
                 onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
                 onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
                 {matchLoading ? "Finding matches…" : "◈ Who Wants This Package?"}

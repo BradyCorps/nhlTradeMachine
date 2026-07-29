@@ -1,7 +1,7 @@
 "use client";
 // ── TeamStrand — Franchise DNA visualization ─────────────────────────────────
 // Double helix encoding team-aggregate analytics.
-//   OFF strand (navy, above centre): OPS/SCR · xG · NOIV · TOI+
+//   OFF strand (ice, above centre): OPS/SCR · xG · NOIV · TOI+
 //   DEF strand (red,  below centre): DPS/DEF · SUPP · Usage · OZ
 //
 // Amplitude fix: each trait owns exactly W/4 of the width. Amplitude is
@@ -62,7 +62,7 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
   const cy  = H / 2;
   const AMP = 46;
 
-  const NAVY = "#1a2e5c";
+  const ICE = "#1a4b5b";
   const RED  = "#b83020";
   const GOLD = "#9a7d58";
   const GRAY = "#888888";
@@ -128,7 +128,7 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
   const defDelta = compareDefVals ? (avg(defVals) - avg(compareDefVals)) * 100 : 0;
   const traitDeltas = compareOffVals && compareDefVals
     ? [
-        ...OFF_LABELS.map((label, i) => ({ label, delta: (offVals[i] - compareOffVals[i]) * 100, color: NAVY })),
+        ...OFF_LABELS.map((label, i) => ({ label, delta: (offVals[i] - compareOffVals[i]) * 100, color: ICE })),
         ...DEF_LABELS.map((label, i) => ({ label, delta: (defVals[i] - compareDefVals[i]) * 100, color: RED })),
       ].filter(({ delta }) => Math.abs(delta) >= 0.5)
        .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
@@ -152,7 +152,7 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
           )}
         </span>
         <span style={{ fontSize: 9, fontWeight: 900, flexShrink: 0 }}>
-          <span style={{ color: NAVY }}>OFF {offScore}</span>
+          <span style={{ color: ICE }}>OFF {offScore}</span>
           {compare && Math.abs(offDelta) >= 0.5 && (
             <span style={{ color: offDelta >= 0 ? "#2a7a44" : "var(--ledger-red)", marginLeft: 3 }}>
               {signedDelta(offDelta)}
@@ -212,7 +212,7 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
         {/* Compare overlay */}
         {compare && (<>
           <path d={buildPath(toOff(compare), false)} fill="none"
-                stroke={NAVY} strokeWidth="1.5" opacity="0.28" strokeDasharray="5,3"/>
+                stroke={ICE} strokeWidth="1.5" opacity="0.28" strokeDasharray="5,3"/>
           <path d={buildPath(toDef(compare), true)} fill="none"
                 stroke={RED} strokeWidth="1.5" opacity="0.28" strokeDasharray="5,3"/>
         </>)}
@@ -248,12 +248,12 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
             {/* Layer 1: back strand sections */}
             {sections.map(({ xS, xE, offFront }, k) => (
               <path key={`bk-${k}`} d={sectionPath(offFront ? defVals : offVals, offFront, xS, xE)}
-                    fill="none" stroke={offFront ? RED : NAVY} strokeWidth="2.5" opacity="0.90"/>
+                    fill="none" stroke={offFront ? RED : ICE} strokeWidth="2.5" opacity="0.90"/>
             ))}
             {/* Layer 3: front strand sections */}
             {sections.map(({ xS, xE, offFront }, k) => (
               <path key={`fg-${k}`} d={sectionPath(offFront ? offVals : defVals, !offFront, xS, xE)}
-                    fill="none" stroke={offFront ? NAVY : RED} strokeWidth="2.5" opacity="0.90"/>
+                    fill="none" stroke={offFront ? ICE : RED} strokeWidth="2.5" opacity="0.90"/>
             ))}
           </>);
         })()}
@@ -262,7 +262,7 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
         {OFF_LABELS.map((lbl, i) => (
           <g key={`off-${i}`}>
             <text x={labelX(i)} y={labelY(offVals[i], i, false)}
-                  textAnchor="middle" fontSize="7.5" fill={NAVY}
+                  textAnchor="middle" fontSize="7.5" fill={ICE}
                   fontWeight="900" fontFamily={MONO}>
               {lbl}
             </text>
@@ -285,7 +285,7 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
       <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px",
                     marginTop: 5, padding: "0 2px" }}>
         {([
-          { stroke: NAVY,      dash: "",    label: "OFF",        w: 2.5 },
+          { stroke: ICE,      dash: "",    label: "OFF",        w: 2.5 },
           { stroke: RED,       dash: "",    label: "DEF",        w: 2.5 },
           { stroke: GOLD,      dash: "5,3", label: "Champ",      w: 1.5 },
           { stroke: "#2a7a44", dash: "3,4", label: "Playoff",    w: 1.2 },

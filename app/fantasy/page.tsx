@@ -46,14 +46,14 @@ const ink = "var(--ledger-ink)";
 const body = "var(--ledger-ink-body, var(--ledger-ink))";
 const faint = "var(--ledger-ink-faint)";
 const rule = "var(--ledger-rule)";
-// Selected/active states use a distinct accent — a navy that reads as
+// Selected/active states use a distinct accent — an ice blue that reads as
 // "selected" — rather than the near-black ink, which was too heavy.
-const accent = "var(--ledger-navy, #1a2e5c)";
+const accent = "var(--ledger-ice, #1a4b5b)";
 const accentInk = "#f2ecd7";
 const PAGE_SIZE = 50;
 
 const TIER_COLORS = [
-  "var(--ledger-red)", "var(--ledger-navy, #1a2e5c)", "var(--ledger-green)",
+  "var(--ledger-red)", "var(--ledger-ice, #1a4b5b)", "var(--ledger-green)",
   "var(--ledger-brown, #6e5a3d)", "var(--ledger-ink)",
 ];
 const tierColor = (t: number) => TIER_COLORS[(t - 1) % TIER_COLORS.length];

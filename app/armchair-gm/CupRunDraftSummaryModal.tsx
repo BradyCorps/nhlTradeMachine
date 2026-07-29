@@ -50,10 +50,10 @@ export function CupRunDraftSummaryModal({
         <div className="overflow-y-auto px-4 sm:px-5 py-4" style={{ flex: 1, minHeight: 0 }}>
           {summary.userPick && (
             <div className="mb-4 px-3 py-3"
-              style={{ background: "var(--paper)", border: "2px solid var(--ledger-navy)", borderRadius: "2px" }}>
+              style={{ background: "var(--paper)", border: "2px solid var(--ledger-ice)", borderRadius: "2px" }}>
               <div className="flex items-baseline justify-between gap-3 flex-wrap mb-2">
                 <div>
-                  <div className="text-[9px] uppercase tracking-[0.28em] font-mono font-black" style={{ color: "var(--ledger-navy)" }}>
+                  <div className="text-[9px] uppercase tracking-[0.28em] font-mono font-black" style={{ color: "var(--ledger-ice)" }}>
                     Pick #{summary.userPick.overall} · You are on the clock
                   </div>
                   <div className="text-[10px] font-mono mt-0.5" style={{ color: "var(--ledger-ink-faint)" }}>

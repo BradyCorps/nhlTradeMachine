@@ -95,7 +95,7 @@ function EditPickModal({
 
         <div className="admin-dialog-actions" style={{ display: "flex", gap: 8 }}>
           <button onClick={() => handle(false)} disabled={saving}
-            style={{ flex: 1, background: "var(--ledger-navy)", color: "#fff", border: "none", padding: "8px 0", fontWeight: 900, fontSize: 11, letterSpacing: "0.1em", cursor: "pointer" }}>
+            style={{ flex: 1, background: "var(--ledger-ice)", color: "#fff", border: "none", padding: "8px 0", fontWeight: 900, fontSize: 11, letterSpacing: "0.1em", cursor: "pointer" }}>
             {saving ? "Saving…" : "SAVE"}
           </button>
           {pick.hasOverride && (
@@ -242,9 +242,9 @@ export default function DraftPicksPage() {
                     <td style={{ padding: "6px 10px", color: "var(--ledger-ink)" }}>{p.year}</td>
                     <td style={{ padding: "6px 10px", fontWeight: 900 }}>{ROUND_LABEL(p.round)}</td>
                     <td style={{ padding: "6px 10px", color: moved ? "var(--ledger-ink-faint)" : "var(--ledger-ink)" }}>{p.originalOwnerId}</td>
-                    <td style={{ padding: "6px 10px", fontWeight: moved ? 900 : 400, color: moved ? "var(--ledger-navy)" : "var(--ledger-ink)" }}>
+                    <td style={{ padding: "6px 10px", fontWeight: moved ? 900 : 400, color: moved ? "var(--ledger-ice)" : "var(--ledger-ink)" }}>
                       {p.currentOwnerId}
-                      {moved && <span style={{ fontSize: 9, marginLeft: 6, color: "#fff", background: "var(--ledger-navy)", padding: "1px 4px" }}>MOVED</span>}
+                      {moved && <span style={{ fontSize: 9, marginLeft: 6, color: "#fff", background: "var(--ledger-ice)", padding: "1px 4px" }}>MOVED</span>}
                     </td>
                     <td style={{ padding: "6px 10px", color: "var(--ledger-ink-faint)" }}>{p.teamStanding}</td>
                     <td style={{ padding: "6px 10px" }}>
@@ -255,7 +255,7 @@ export default function DraftPicksPage() {
                     </td>
                     <td style={{ padding: "6px 10px" }}>
                       <button onClick={() => setEditing(p)}
-                        style={{ background: "transparent", color: "var(--ledger-navy)", border: "1px solid var(--ledger-navy)", padding: "3px 10px", fontSize: 10, fontWeight: 900, letterSpacing: "0.1em", cursor: "pointer" }}>
+                        style={{ background: "transparent", color: "var(--ledger-ice)", border: "1px solid var(--ledger-ice)", padding: "3px 10px", fontSize: 10, fontWeight: 900, letterSpacing: "0.1em", cursor: "pointer" }}>
                         EDIT
                       </button>
                     </td>

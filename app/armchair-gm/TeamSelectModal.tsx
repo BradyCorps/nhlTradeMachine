@@ -92,7 +92,7 @@ export function TeamSelectModal({
                 const phase = teamWindow(t);
                 const phaseColor =
                   phase === "Contender"  ? 'var(--ledger-green)' :
-                  phase === "Bubble"     ? 'var(--ledger-navy)' :
+                  phase === "Bubble"     ? 'var(--ledger-ice)' :
                   phase === "Retooling"  ? 'var(--ledger-amber)' :
                   phase === "Rebuilding" ? 'var(--ledger-red)' :
                   'var(--ledger-brown)';

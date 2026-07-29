@@ -74,7 +74,7 @@ export default function WelcomeModal() {
 
           <p style={{ color: "var(--ledger-ink-faint)" }}>
             Hover or tap any dotted-underlined metric for a quick definition.
-            Full methodology available in the footer or at <a href="/methodology" className="underline" style={{ color: "var(--ledger-navy)" }}>/methodology</a>.
+            Full methodology available in the footer or at <a href="/methodology" className="underline" style={{ color: "var(--ledger-ice)" }}>/methodology</a>.
           </p>
         </div>
 

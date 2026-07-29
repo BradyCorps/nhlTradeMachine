@@ -417,7 +417,7 @@ export default function AdminHealth() {
         </div>
 
         {/* Re-seed */}
-        <div style={{ ...sectionStyle, borderTop: "3px solid var(--ledger-navy)" }}>
+        <div style={{ ...sectionStyle, borderTop: "3px solid var(--ledger-ice)" }}>
           <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.2em", marginBottom: 4 }}>
             RE-SEED BASELINE
           </div>

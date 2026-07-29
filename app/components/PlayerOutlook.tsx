@@ -13,7 +13,7 @@ const toneColor = (t: OutlookTone): string =>
   t === "good" ? "var(--ledger-green)"
     : t === "warn" ? "var(--ledger-amber, #b8860b)"
       : t === "bad" ? "var(--ledger-red)"
-        : "var(--ledger-navy)";
+        : "var(--ledger-ice)";
 
 const DIRECTION_META: Record<TrajectoryDirection, { arrow: string; label: string; tone: OutlookTone }> = {
   RISING:  { arrow: "▲", label: "Rising",  tone: "good" },
@@ -80,12 +80,12 @@ export function PlayerOutlook({ asset }: { asset: Asset }) {
       <div className="p-2.5" style={{ background: "var(--ledger-warm)", border: "1px solid #b8a070" }}>
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-2xs font-black uppercase tracking-wider" style={{ color: faint }}>Next-Season Projection</span>
-          <span className="text-2xs font-black" style={{ color: "var(--ledger-navy)" }}>
+          <span className="text-2xs font-black" style={{ color: "var(--ledger-ice)" }}>
             {floor}–{ceiling} pts/82 · median {median}
           </span>
         </div>
         <div className="relative h-2 overflow-hidden" style={{ background: "var(--ledger-rule-light)", border: "1px solid #c8b890" }}>
-          <div className="absolute top-0 h-full" style={{ left: 0, width: `${medianPct}%`, background: "var(--ledger-navy)", opacity: 0.8 }} />
+          <div className="absolute top-0 h-full" style={{ left: 0, width: `${medianPct}%`, background: "var(--ledger-ice)", opacity: 0.8 }} />
           <div className="absolute top-[-2px] h-[calc(100%+4px)] w-[2px]" style={{ left: `${medianPct}%`, background: "var(--ledger-ink)" }} title={`Median ${median} pts/82`} />
         </div>
         <div className="flex justify-between text-2xs mt-0.5" style={{ color: faint }}>

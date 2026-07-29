@@ -24,7 +24,16 @@
   --ledger-red-deep:     #c0392b;
   --ledger-red-dark:     #d43820;
   --ledger-green:        #1a5c2e;
-  --ledger-navy:         #1a2e5c;
+  /* ── Ice blue ramp ───────────────────────────────────────────
+     Was --ledger-navy #1a2e5c, hue 222° — a cold navy unrelated to the
+     brand. Rotated onto the kit's ice-blue hue (195°) at the SAME
+     lightness, so the blue now belongs to Cap & Crease while keeping the
+     contrast the old navy had: 8.07:1 on paper, 6.73:1 on card (the
+     navy was 11.17:1, so this is a small, deliberate reduction).
+     The kit value itself (--cc-ice-blue #79afc1) is 2.04:1 on paper and
+     must never be used for text — it is a fill, which is what the kit
+     means by "reserved for the crease and related data accents". */
+  --ledger-ice:          #1a4b5b;
   --ledger-brown:        #6b5030;
   --ledger-amber:        #8a5c00;
   --ledger-amber-dark:   #9a6b00;
@@ -109,7 +118,7 @@ button, a, select {
 }
 
 :where(button, a, input, select, textarea, [role="button"]):focus-visible {
-  outline: 3px solid var(--ledger-navy);
+  outline: 3px solid var(--ledger-ice);
   outline-offset: 3px;
 }
 

@@ -64,7 +64,7 @@ export function MatchResultsPanel({
               minWidth: 74,
               background: active ? 'var(--ledger-card-light)' : 'var(--ledger-cream)',
               color: active ? 'var(--ledger-ink)' : 'var(--ledger-ink-faint)',
-              border: active ? '2px solid var(--ledger-navy)' : '1px solid var(--ledger-rule)',
+              border: active ? '2px solid var(--ledger-ice)' : '1px solid var(--ledger-rule)',
               borderBottom: active ? '0' : '1px solid var(--ledger-rule)',
               borderRadius: '6px 6px 0 0',
               transform: active ? 'translateY(1px)' : 'none',
@@ -83,13 +83,13 @@ export function MatchResultsPanel({
     <div className="p-3"
       style={{
         background: 'var(--ledger-card-light)',
-        border: '2px solid var(--ledger-navy)',
+        border: '2px solid var(--ledger-ice)',
         boxShadow: 'inset 0 0 0 1px var(--ledger-rule-light)',
       }}>
       <div className="flex items-start justify-between gap-2 mb-2">
         <div>
           <div className="text-2xs font-black uppercase tracking-[0.35em] font-mono"
-            style={{ color: 'var(--ledger-navy)' }}>
+            style={{ color: 'var(--ledger-ice)' }}>
             Partner Dossier
           </div>
           <div className="text-2xs font-mono mt-1" style={{ color: 'var(--ledger-ink-faint)' }}>
@@ -131,7 +131,7 @@ export function MatchResultsPanel({
           <div key={m.teamId} className="p-2.5"
           style={{
             background: i === 0 ? 'rgba(26,46,92,0.08)' : 'var(--ledger-card)',
-            border: i === 0 ? '1px solid var(--ledger-navy)' : '1px solid var(--ledger-rule)',
+            border: i === 0 ? '1px solid var(--ledger-ice)' : '1px solid var(--ledger-rule)',
             borderRadius: 3,
           }}>
           <div className="flex items-center justify-between mb-1">
@@ -156,7 +156,7 @@ export function MatchResultsPanel({
               <div className="flex items-center gap-1">
                 <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--ledger-rule-light)' }}>
                   <div className="h-full rounded-full"
-                    style={{ width: `${m.score}%`, background: m.score >= 65 ? 'var(--ledger-navy)' : m.score >= 45 ? 'var(--ledger-amber)' : 'var(--ledger-red)' }} />
+                    style={{ width: `${m.score}%`, background: m.score >= 65 ? 'var(--ledger-ice)' : m.score >= 45 ? 'var(--ledger-amber)' : 'var(--ledger-red)' }} />
                 </div>
                 <span className="text-2xs font-black font-mono" style={{ color: 'var(--ledger-ink)', minWidth: 24 }}>
                   {m.score}

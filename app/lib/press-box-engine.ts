@@ -296,7 +296,7 @@ export function starRating(score: number, optimal: number): { stars: number; lab
   const pct = score / optimal;
   if (pct >= 1)    return { stars: 5, label: "PERFECT HAND", color: "var(--ledger-green)" };
   if (pct >= 0.85) return { stars: 4, label: "FRONT PAGE", color: "var(--ledger-green)" };
-  if (pct >= 0.65) return { stars: 3, label: "ABOVE THE FOLD", color: "var(--ledger-navy)" };
+  if (pct >= 0.65) return { stars: 3, label: "ABOVE THE FOLD", color: "var(--ledger-ice)" };
   if (pct >= 0.40) return { stars: 2, label: "PAGE THREE", color: "var(--ledger-brown)" };
   if (pct > 0)     return { stars: 1, label: "CLASSIFIED", color: "var(--ledger-amber)" };
   return { stars: 0, label: "PRESS RELEASE", color: "var(--ledger-red)" };

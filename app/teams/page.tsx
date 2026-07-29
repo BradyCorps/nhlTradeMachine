@@ -482,7 +482,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
               className="w-full rounded-sm"
               style={{
                 height: `${Math.max(2, contention.future * 3)}px`,
-                background: "var(--ledger-navy, #334155)",
+                background: "var(--ledger-ice, #334155)",
                 opacity: 0.8,
               }}
             />

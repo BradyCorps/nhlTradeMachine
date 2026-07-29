@@ -388,7 +388,7 @@ function TeamDNA({
       {expanded && (
         <div className="strands-body">
           <p className="strands-context" style={{ wordBreak: "break-word", overflowWrap: "break-word" }}>
-            Each helix shows a team's aggregate offensive (navy) and defensive (red) profile across their top-9 forwards and top-4 D by ice time. The dashed gold line is the championship template. The dotted green line is the playoff threshold. Gaps below either line are roster needs.{hasActiveTrade ? " Updated to reflect the current trade." : ""}
+            Each helix shows a team's aggregate offensive (ice blue) and defensive (red) profile across their top-9 forwards and top-4 D by ice time. The dashed gold line is the championship template. The dotted green line is the playoff threshold. Gaps below either line are roster needs.{hasActiveTrade ? " Updated to reflect the current trade." : ""}
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 mb-4" style={{ overflowX: 'auto' }}>

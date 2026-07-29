@@ -61,7 +61,7 @@ const PHASE_META: Record<TeamPhase, { stance: string; blurb: string; tone: "good
 function TeamWindowBadge({ phase, postPhase }: { phase: TeamPhase | null; postPhase: TeamPhase | null }) {
   if (!phase) return null;
   const meta = PHASE_META[phase];
-  const color = meta.tone === "good" ? "var(--ledger-green)" : meta.tone === "bad" ? "var(--ledger-amber)" : "var(--ledger-navy)";
+  const color = meta.tone === "good" ? "var(--ledger-green)" : meta.tone === "bad" ? "var(--ledger-amber)" : "var(--ledger-ice)";
   const shifted = postPhase && postPhase !== phase;
   const climbed = shifted && PHASE_ORDER.indexOf(postPhase!) > PHASE_ORDER.indexOf(phase);
   return (
@@ -621,7 +621,7 @@ function VerdictSummary({ verdict }: { verdict: VerdictDisplay }) {
               ? "var(--ledger-green)"
               : side.outcome === "LOSS"
                 ? "var(--ledger-red)"
-                : "var(--ledger-navy)";
+                : "var(--ledger-ice)";
             return (
               <div key={`${side.side}-${side.teamId}`} className="border px-3 py-2"
                 style={{ borderColor: "var(--ledger-rule-light)", background: "var(--ledger-card)" }}>

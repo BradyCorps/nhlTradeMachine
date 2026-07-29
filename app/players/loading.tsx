@@ -10,7 +10,7 @@ export default function PlayersLoading() {
       {/* Spinner */}
       <div className="relative w-12 h-12">
         <div className="absolute inset-0 rounded-full border-2 border-ledger-rule" />
-        <div className="absolute inset-0 rounded-full border-2 border-t-ledger-navy animate-spin" />
+        <div className="absolute inset-0 rounded-full border-2 border-t-ledger-ice animate-spin" />
       </div>
 
       {/* Label */}

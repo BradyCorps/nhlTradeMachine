@@ -50,7 +50,7 @@ function getGoalieRoleTag(asset: Asset, xnav: XNAVResult): { label: string; colo
   if (starts >= 45 || (starts >= 38 && xnav.total >= 70)) {
     return {
       label: "STARTER",
-      color: "var(--ledger-navy)",
+      color: "var(--ledger-ice)",
       title: "Starter — primary netminder workload with clear No. 1 usage.",
     };
   }
@@ -98,7 +98,7 @@ function getRoleTag(asset: Asset, xnav: XNAVResult): { label: string; color: str
     if (ppPace >= 18 && pts >= 40) {
       return {
         label: "POWERPLAY D",
-        color: "var(--ledger-navy)",
+        color: "var(--ledger-ice)",
         title: "Powerplay defenceman — meaningful production driven by special-teams offense.",
       };
     }
@@ -151,7 +151,7 @@ function getRoleTag(asset: Asset, xnav: XNAVResult): { label: string; color: str
   if (ppPace >= 22 && pts >= 45 && pkShare < 0.08) {
     return {
       label: "POWERPLAY SPECIALIST",
-      color: "var(--ledger-navy)",
+      color: "var(--ledger-ice)",
       title: "Powerplay specialist — a major share of value comes from man-advantage production.",
     };
   }
@@ -167,7 +167,7 @@ function getRoleTag(asset: Asset, xnav: XNAVResult): { label: string; color: str
   if (tier === "1ST_LINE_HIGH_2C") {
     return {
       label: asset.position === "C" ? "HIGH-END 2C" : "1ST LINE WINGER",
-      color: "var(--ledger-navy)",
+      color: "var(--ledger-ice)",
       title: "High-end top-six player — first-line winger profile or strong second-line centre profile.",
     };
   }
@@ -175,7 +175,7 @@ function getRoleTag(asset: Asset, xnav: XNAVResult): { label: string; color: str
   if (tier === "FRINGE_1ST_LINE_2C") {
     return {
       label: "FRINGE 1ST LINE",
-      color: "var(--ledger-navy)",
+      color: "var(--ledger-ice)",
       title: "Fringe first-line player — strong top-six production below clear first-line thresholds.",
     };
   }
@@ -335,7 +335,7 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
       {/* Prospect tier badge (name-list) — skip when the NAV tier already says franchise */}
       {hasProspectTier && (
         <span className="text-2xs px-1 py-0.5 font-black" style={{
-          color: prospectTier!.tier === 1 ? 'var(--ledger-navy)' : prospectTier!.tier === 2 ? 'var(--ledger-green)' : 'var(--ledger-brown)',
+          color: prospectTier!.tier === 1 ? 'var(--ledger-ice)' : prospectTier!.tier === 2 ? 'var(--ledger-green)' : 'var(--ledger-brown)',
           border: `1px solid ${prospectTier!.tier === 1 ? 'rgba(26,46,92,0.4)' : prospectTier!.tier === 2 ? 'rgba(26,92,46,0.4)' : 'rgba(107,80,48,0.4)'}`,
         }}>
           {prospectTier!.tier === 1 ? "★ FRANCHISE" : prospectTier!.tier === 2 ? "◆ TOP PROSPECT" : "◇ PROSPECT"}

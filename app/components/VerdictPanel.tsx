@@ -14,7 +14,7 @@ export const SEVERITY_STYLES: Record<FlagSeverity, { dot: string; bg: string; bo
 export const STATUS_CONFIG: Record<TradeStatus, { border: string; headerText: string; icon: string; bg: string; cssColor: string; outcome: string }> = {
   IDLE:     { border: "border-zinc-800",       headerText: "text-zinc-500",    icon: "—", bg: "bg-zinc-900/40",    cssColor: "var(--ledger-rule)",      outcome: "Awaiting audit" },
   PENDING:  { border: "border-zinc-700",       headerText: "text-zinc-300",    icon: "…", bg: "bg-zinc-900/40",    cssColor: "var(--ledger-ink-faint)", outcome: "Auditing" },
-  FAIR:     { border: "border-sky-600/50",     headerText: "text-sky-300",     icon: "⚖", bg: "bg-sky-950/15",    cssColor: "var(--ledger-navy)",      outcome: "Even" },
+  FAIR:     { border: "border-sky-600/50",     headerText: "text-sky-300",     icon: "⚖", bg: "bg-sky-950/15",    cssColor: "var(--ledger-ice)",      outcome: "Even" },
   WIN:      { border: "border-emerald-600/50", headerText: "text-emerald-400", icon: "↑", bg: "bg-emerald-950/15", cssColor: "var(--ledger-green)",     outcome: "Favors you" },
   LOSS:     { border: "border-amber-600/50",   headerText: "text-amber-400",   icon: "↓", bg: "bg-amber-950/15",  cssColor: "var(--ledger-amber)",     outcome: "Favors them" },
   BLOCKED:  { border: "border-red-600/50",     headerText: "text-rose-400",    icon: "✕", bg: "bg-red-950/20",    cssColor: "var(--ledger-red)",       outcome: "Won't happen" },

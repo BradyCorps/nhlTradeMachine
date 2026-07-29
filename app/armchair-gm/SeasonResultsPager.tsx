@@ -14,7 +14,7 @@ const CONFERENCES: { conf: string; divs: string[] }[] = [
 
 function playoffMark(t: any): { label: string; title: string; color: string } {
   if ((t.divisionRank ?? 99) <= 3) return { label: "x", title: "Clinched a top-3 division playoff spot", color: 'var(--ledger-green)' };
-  if (t.madePlayoffs) return { label: "WC", title: "In via wildcard", color: 'var(--ledger-navy)' };
+  if (t.madePlayoffs) return { label: "WC", title: "In via wildcard", color: 'var(--ledger-ice)' };
   return { label: "—", title: "Out of the playoffs", color: 'var(--ledger-ink-faint)' };
 }
 
@@ -100,7 +100,7 @@ function LeagueNumbers({ simData }: { simData: any }) {
             </div>
             <div className="text-[9px] font-mono" style={{ color: 'var(--ledger-ink-faint)' }}>
               <span style={{ color: 'var(--ledger-green)', fontWeight: 900 }}>x</span> clinched ·{' '}
-              <span style={{ color: 'var(--ledger-navy)', fontWeight: 900 }}>WC</span> wildcard
+              <span style={{ color: 'var(--ledger-ice)', fontWeight: 900 }}>WC</span> wildcard
             </div>
           </div>
           <div className="grid gap-2.5">
@@ -261,7 +261,7 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                       <td className="text-[11px] py-1.5 px-1.5 text-left">
                         <span className="font-black" style={{ color: 'var(--ledger-ink)' }}>{p.name}</span>
                         {p.calderEligible && (
-                          <span className="ml-1 px-1 text-[10px] font-black" style={{ color: '#fff', background: 'var(--ledger-navy, #2c3e6b)', borderRadius: 1 }}>R</span>
+                          <span className="ml-1 px-1 text-[10px] font-black" style={{ color: '#fff', background: 'var(--ledger-ice, #2c3e6b)', borderRadius: 1 }}>R</span>
                         )}
                         <div className="text-[10px] uppercase tracking-wider mt-0.5" style={{ color: 'var(--ledger-ink-faint)' }}>
                           {displayPosition(p.position, p.secondaryPosition)} · {p.age ?? '—'}{archetype ? ` · ${archetype}` : ''}
