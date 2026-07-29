@@ -1,6 +1,7 @@
 "use client";
 // GM analysis tab deck: lineups, Team DNA, comparison, trade breakdown, sim.
-import React, { useState, useMemo, Suspense, lazy } from "react";
+import React, { useState, useMemo, useEffect, useRef, Suspense, lazy } from "react";
+import { GM_TAB_FALLBACK, nextTab, visibleTab, type GmTab, type GmTabSpec } from "@/app/lib/gm-tabs";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
 import TeamStrand, { CHAMP_TEMPLATE, type TeamStrandData } from "@/app/components/TeamStrand";
@@ -41,8 +42,6 @@ const classifyTeam = (team: Team, _roster: Asset[]): TeamMode => {
 
 import { fmtSigned as fmt } from "@/app/lib/display-utils";
 import { teamWindow } from "@/app/lib/team-window";
-
-type GmTab = "roster" | "lineups" | "dna" | "comparison" | "breakdown" | "sim";
 
 function GmTabButton({ label, active, onClick, disabled, badge }: {
   label: string; active: boolean; onClick: () => void; disabled?: boolean; badge?: number;
@@ -113,7 +112,7 @@ function GmTabButton({ label, active, onClick, disabled, badge }: {
 export function GmAnalysisTabs({
   teams, allHomeRoster, allPartnerRoster, blocks, navMap, db,
   lineupOrders, handleGoalieStarterChange, handleLineupChange, executedTrades,
-  simYear, simLoading, simData, simResult,
+  showSimPanel, simYear, simLoading, simData, simResult,
 }: {
   teams: [Team, Team];
   allHomeRoster: Asset[];
@@ -131,10 +130,12 @@ export function GmAnalysisTabs({
   simData: any;
   simResult: string | null;
 }) {
-  const [activeTab, setActiveTab] = useState<GmTab>("roster");
+  // What the user picked. Held even while it is unusable, so putting assets
+  // back on the block returns them to the tab they were reading.
+  const [selectedTab, setSelectedTab] = useState<GmTab>(GM_TAB_FALLBACK);
   const hasAssets = blocks[0].length > 0 || blocks[1].length > 0;
 
-  const tabs: { key: GmTab; label: string; disabled?: boolean; badge?: number }[] = [
+  const tabs: (GmTabSpec & { label: string; badge?: number })[] = [
     { key: "roster", label: "Roster" },
     { key: "lineups", label: "Lineups" },
     { key: "dna", label: "Team DNA" },
@@ -144,6 +145,22 @@ export function GmAnalysisTabs({
     // league with zero trades. The badge only appears once trades exist.
     { key: "sim", label: "Sim", badge: executedTrades.length > 0 ? executedTrades.length : undefined },
   ];
+
+  // Executing a trade clears the blocks, which disables whichever of Compare or
+  // Breakdown the user was reading. Derived rather than stored, so the empty
+  // panel is never painted and the selection survives to be restored.
+  const activeTab = visibleTab(tabs, selectedTab);
+
+  // A trade's point is its consequences, and those are in the Sim tab. This is
+  // what `showSimPanel` was raised for; it was passed in and never read, so
+  // executing from Compare or Breakdown dropped the user on a dead panel with
+  // nothing saying the trade had gone through. Only the false→true edge moves
+  // them, so a remount does not yank them off a tab they chose since.
+  const simPanelWas = useRef(showSimPanel);
+  useEffect(() => {
+    if (showSimPanel && !simPanelWas.current) setSelectedTab("sim");
+    simPanelWas.current = showSimPanel;
+  }, [showSimPanel]);
 
   return (
     <div style={{ marginTop: "8px", marginBottom: "16px" }}>
@@ -155,10 +172,8 @@ export function GmAnalysisTabs({
           const dir = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
           if (!dir) return;
           e.preventDefault();
-          const usable = tabs.filter(t => !t.disabled);
-          const at = usable.findIndex(t => t.key === activeTab);
-          const next = usable[(at + dir + usable.length) % usable.length];
-          if (next) setActiveTab(next.key);
+          const next = nextTab(tabs, activeTab, dir);
+          if (next) setSelectedTab(next);
         }}
         style={{
         display: "flex",
@@ -173,7 +188,7 @@ export function GmAnalysisTabs({
             key={t.key}
             label={t.label}
             active={activeTab === t.key}
-            onClick={() => !t.disabled && setActiveTab(t.key)}
+            onClick={() => !t.disabled && setSelectedTab(t.key)}
             disabled={t.disabled}
             badge={t.badge}
           />

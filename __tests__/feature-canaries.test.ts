@@ -3039,7 +3039,10 @@ describe("Canary — RL2 roster tab", () => {
     const lineups = src.indexOf('{ key: "lineups"');
     expect(roster).toBeGreaterThan(-1);
     expect(roster).toBeLessThan(lineups);
-    expect(src).toContain('useState<GmTab>("roster")');
+    // The deck opens on Roster. Pinned through the named default rather than
+    // the literal, which CXH1 moved into app/lib/gm-tabs.ts.
+    expect(src).toContain("useState<GmTab>(GM_TAB_FALLBACK)");
+    expect(read("app/lib/gm-tabs.ts")).toContain('GM_TAB_FALLBACK: GmTab = "roster"');
   });
 
   it("keeps the ordering and sim-merge rules in a tested module", () => {
@@ -3399,5 +3402,39 @@ describe("Canary — an admin-recorded extension reaches Armchair GM", () => {
   it("an extended player is not injected into the free-agent pool", () => {
     const pool = assembly.slice(assembly.indexOf("Free-agent pool: teamless FA entries"));
     expect(pool).toContain("d.extensionCapHit != null && d.extensionCapHit > 0");
+  });
+});
+
+describe("Canary — CXH1 the analysis deck never shows an empty panel", () => {
+  const deck = read("app/armchair-gm/GmAnalysisTabs.tsx");
+
+  it("the shown tab is derived, not stored", () => {
+    // Storing it needs an effect to repair, which paints the empty panel for a
+    // frame and throws away the user's choice permanently.
+    expect(deck).toContain("visibleTab(tabs, selectedTab)");
+    expect(deck).not.toMatch(/useState<GmTab>\(\s*"(comparison|breakdown)"/);
+  });
+
+  it("a disabled tab cannot be the visible one", () => {
+    const rule = read("app/lib/gm-tabs.ts");
+    expect(rule).toContain("if (match && !match.disabled) return selected");
+    expect(rule).toContain("GM_TAB_FALLBACK");
+  });
+
+  it("executing a trade lands the user on the Sim tab", () => {
+    // showSimPanel was passed into the deck and never read, which is why
+    // executing from Compare or Breakdown dropped the user on a dead panel.
+    expect(deck).toContain("showSimPanel, simYear");
+    expect(deck).toContain("if (showSimPanel && !simPanelWas.current) setSelectedTab(\"sim\")");
+  });
+
+  it("keeps the selection so it can come back", () => {
+    // The tab returns when assets go back on the block; nothing overwrites it.
+    expect(deck).not.toMatch(/setSelectedTab\(GM_TAB_FALLBACK\)/);
+  });
+
+  it("arrow keys skip disabled tabs", () => {
+    expect(deck).toContain("nextTab(tabs, activeTab, dir)");
+    expect(read("app/lib/gm-tabs.ts")).toContain("tabs.filter(t => !t.disabled)");
   });
 });

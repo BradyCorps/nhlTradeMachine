@@ -68,7 +68,7 @@ _CX1–CX4 done (commit pending): CX1 `urlHydratedRef` gate; CX2 `resolveTradeSh
 
 ### High / moderate
 
-- [ ] **CXH1 Analysis tab blanks:** `showSimPanel` prop is never used; executing from Compare/Breakdown clears blocks and leaves the active tab disabled with no content. `GmAnalysisTabs.tsx:105/209`
+- [x] **CXH1 Analysis tab blanks:** `showSimPanel` prop is never used; executing from Compare/Breakdown clears blocks and leaves the active tab disabled with no content. `GmAnalysisTabs.tsx:105/209`
 - [x] **CXH2 Lineup state leaks + impurity:** reused `TeamLineup` keeps prior order across `teamId` change (no team key); swaps call setState inside another updater; `Cell` declared in render remounts each render; `resetTrades` clears goalies but not `lineupOrders`. `LineupEditor.tsx:148/215/238`, `useTradeBench.ts:200`
 - [x] **CXH3 Unsigned FA NAV disappears:** offseason resolution removes walked players from `db.players` while the NAV effect rebuilds `navMap` from current DB only — those market players show/sort as NAV 0. `useOffseasonFlow.ts:73`, `page.tsx:259`, `ResignPhase.tsx:182` — `applyOffseasonToRoster` relocates walked players to `FA_POOL` instead of deleting them, so they stay in `db.players` and keep a NAV. Regression in `__tests__/free-agency.test.ts`.
 - [ ] **CXH4 Proposal generation cost/nondeterminism:** up to 36 full audits at concurrency 6; same-team alternatives share a fit score so the kept package depends on network order; failures vs "no viable partner" look identical. (capCeiling now passed — partial, from #7.) `TradeProposal.tsx:45/224/245`
