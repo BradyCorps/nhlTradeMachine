@@ -3499,3 +3499,45 @@ describe("Canary — Press Box deals a constructed puzzle", () => {
     expect(page).toContain("saved.version === STATE_VERSION");
   });
 });
+
+describe("Canary — Press Box rules describe the game being scored", () => {
+  const page = read("app/press-box/page.tsx");
+
+  it("states that the call-up joins the hand", () => {
+    // scoreHand builds a FIVE-card hand, so a breakdown reads "2x OTT = 2"
+    // when only one of your picks is a Senator. The rules never said so.
+    expect(page).toContain("The call-up is the fifth card in your hand");
+  });
+
+  it("prices Pipeline per year, which is what the engine pays", () => {
+    // Four cards spanning 2019/2019/2020/2021 score 3, not 4.
+    expect(page).toContain("1 pt per year in a run");
+    expect(page).not.toContain("1 pt per card in a run");
+  });
+
+  it("admits the flat categories are flat", () => {
+    expect(page).toMatch(/Country Club<\/strong> — 3 pts if 3 or more share a country \(flat/);
+  });
+
+  it("keeps one copy of the rules", () => {
+    // Two verbatim copies is how the text drifted from the engine.
+    expect(page).toContain("function HowToScore()");
+    expect((page.match(/2 pts per pair on the same NHL team/g) ?? []).length).toBe(1);
+  });
+
+  it("shows the answer when the attempts run out", () => {
+    // A daily puzzle that never reveals its answer teaches nothing.
+    expect(page).toContain("gameOver && !foundOptimal && perfectHand");
+    expect(page).toContain("The Perfect Hand");
+  });
+
+  it("keeps every guess on screen", () => {
+    expect(page).toContain("belonged");
+    expect(page).toContain("{names.join(\" · \")}");
+  });
+
+  it("takes the optimum the curator already computed", () => {
+    // Recomputing is a second answer that can disagree with the accepted one.
+    expect(page).toContain("const optimalResult = hand?.optimal ?? null");
+  });
+});

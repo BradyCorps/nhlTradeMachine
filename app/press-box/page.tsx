@@ -9,12 +9,12 @@ import {
   dayNumberFromDate,
   dealDailyHand,
   scoreHand,
-  findOptimalCombos,
   overlapWithOptimal,
   starRating,
   buildShareText,
   PEG_BOARD_LENGTH,
   MAX_ATTEMPTS,
+  CARDS_DEALT,
   type PressBoxPlayer,
   type ScoringBreakdown,
 } from "@/app/lib/press-box-engine";
@@ -104,6 +104,51 @@ function updateStreak(dayNum: number, isPerfect: boolean) {
   const updated: StreakData = { current: newCurrent, best: newBest, lastDay: dayNum, perfectHands };
   localStorage.setItem("press-box-streak", JSON.stringify(updated));
   return updated;
+}
+
+// The seven categories, in the order the breakdown prints them. Listed once so
+// the player's breakdown and the revealed answer cannot show different rows.
+const SCORING_ROWS = [
+  { key: "teammates",     icon: "🏒", label: "Teammates" },
+  { key: "draftClass",    icon: "📋", label: "Draft Class" },
+  { key: "pipeline",      icon: "📈", label: "Pipeline" },
+  { key: "divisionFlush", icon: "🗺", label: "Division Flush" },
+  { key: "countryClub",   icon: "🌍", label: "Country Club" },
+  { key: "positionGroup", icon: "🎯", label: "Position Group" },
+  { key: "callUpBonus",   icon: "⭐", label: "Call-Up Bonus" },
+] as const satisfies readonly { key: keyof Omit<ScoringBreakdown, "total">; icon: string; label: string }[];
+
+// ── How to Score ──────────────────────────────────────────────
+//
+// One copy. This text existed verbatim in two places, which is how it drifted
+// out of step with the engine in the first place.
+//
+// It also described a different game from the one being scored. The call-up is
+// not a bonus card sitting beside your four — `scoreHand` builds a FIVE-card
+// hand and most categories count all five, which is why a breakdown can read
+// "2x OTT = 2" when only one of your picks is an Ottawa Senator. And Pipeline
+// paid per distinct YEAR in the run, never per card. Both are stated plainly
+// now, and each rule says how many cards it counts.
+function HowToScore() {
+  return (
+    <div className="px-4 pb-3 space-y-1 text-[11px] font-mono" style={{ color: "var(--ledger-ink-body)" }}>
+      <p><strong>You have {MAX_ATTEMPTS} attempts</strong> to find the perfect hand.</p>
+      <p>The call-up is hidden on your first attempt, then revealed.</p>
+      <p>The peg board shows how close your best hand is to the target hole.</p>
+      <p className="mt-2" style={{ color: "var(--ink)" }}>
+        <strong>The call-up is the fifth card in your hand.</strong> Every rule below
+        counts all five unless it says otherwise — so a pair can be one of your
+        picks and the call-up.
+      </p>
+      <p className="mt-2"><strong>Teammates</strong> — 2 pts per pair on the same NHL team</p>
+      <p><strong>Draft Class</strong> — 2 pts per pair drafted in the same year</p>
+      <p><strong>Pipeline</strong> — 1 pt per year in a run of 3+ consecutive draft years</p>
+      <p><strong>Division Flush</strong> — 4 pts if <em>your 4 picks</em> share a division (5 if the call-up matches too)</p>
+      <p><strong>Country Club</strong> — 3 pts if 3 or more share a country (flat — 4 or 5 scores the same)</p>
+      <p><strong>Position Group</strong> — 3 pts if 3 or more share a position type, F/D/G (flat)</p>
+      <p><strong>Call-Up Bonus</strong> — 1 pt per pick on the call-up&apos;s team, <em>on top of</em> the Teammates pair it already made</p>
+    </div>
+  );
 }
 
 // ── Rubber stamp overlay ──────────────────────────────────────
@@ -441,7 +486,10 @@ function PressBoxGame() {
       .then((data) => {
         if (!alive) return;
         const players = Array.isArray(data?.players) ? (data.players as PressBoxPlayer[]) : [];
-        setPool(players.length >= 7 ? players : PRESS_BOX_POOL);
+        // Eight on the table plus the call-up. This guard still said 7 after
+        // the deal grew, so a thin API pool would have been accepted and then
+        // dealt from with nothing left to be the call-up.
+        setPool(players.length > CARDS_DEALT ? players : PRESS_BOX_POOL);
       })
       .catch(() => {
         if (alive) setPool(PRESS_BOX_POOL);
@@ -450,11 +498,23 @@ function PressBoxGame() {
   }, []);
 
   const hand = useMemo(() => (pool ? dealDailyHand(pool, dayNum) : null), [pool, dayNum]);
-  const optimalResult = useMemo(
-    () => (hand ? findOptimalCombos(hand.dealt, hand.callUp) : null),
-    [hand]
-  );
+  // The deal already solved itself while curating; recomputing would be a
+  // second answer that could disagree with the one the curator accepted.
+  const optimalResult = hand?.optimal ?? null;
   const optimal = optimalResult?.score ?? 0;
+
+  // The answer, for the reveal when a player runs out of attempts.
+  const perfectHand = useMemo(() => {
+    if (!hand || !optimalResult || optimalResult.combos.length === 0) return null;
+    const byId = new Map(hand.dealt.map(p => [p.id, p]));
+    const cards = optimalResult.combos[0].map(id => byId.get(id)).filter((p): p is PressBoxPlayer => !!p);
+    return cards.length === optimalResult.combos[0].length ? cards : null;
+  }, [hand, optimalResult]);
+
+  const perfectBreakdown = useMemo(
+    () => (hand && perfectHand ? scoreHand(perfectHand, hand.callUp) : null),
+    [hand, perfectHand],
+  );
 
   const [picks, setPicks] = useState<string[]>([]);
   const [phase, setPhase] = useState<GamePhase>("DRAFTING");
@@ -1033,12 +1093,25 @@ function PressBoxGame() {
                 {attempts.map((attempt, i) => {
                   const isBest = attempt.score === bestScore;
                   const isPerfect = attempt.score === optimal;
+                  // Which four, and how many of them belonged. Without the
+                  // names a player has to remember five sets of four across
+                  // five attempts, which is memory load rather than deduction —
+                  // every guessing game worth playing keeps its guesses on
+                  // screen. The overlap is already shown for the latest
+                  // attempt; showing it for all of them is the same
+                  // information, not a new hint.
+                  const names = attempt.picks
+                    .map(id => hand.dealt.find(p => p.id === id)?.name ?? "—");
+                  const overlap = optimalResult
+                    ? overlapWithOptimal(attempt.picks, optimalResult.combos)
+                    : null;
                   return (
                     <div
                       key={i}
-                      className="flex items-center justify-between py-1.5 border-b"
+                      className="py-1.5 border-b"
                       style={{ borderColor: "var(--rule-light)" }}
                     >
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span
                           className="w-2 h-2"
@@ -1050,6 +1123,11 @@ function PressBoxGame() {
                         <span className="text-[11px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
                           Attempt {i + 1}
                         </span>
+                        {overlap !== null && !isPerfect && (
+                          <span className="text-[10px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+                            · {overlap}/4 belonged
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <span
@@ -1076,8 +1154,67 @@ function PressBoxGame() {
                         )}
                       </div>
                     </div>
+                    <div
+                      className="text-[10px] font-mono mt-1 pl-4"
+                      style={{ color: "var(--ledger-ink-faint)", overflowWrap: "anywhere" }}
+                    >
+                      {names.join(" · ")}
+                    </div>
+                    </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* The answer, once the game is over and it was not found.
+                A daily puzzle that never tells you the answer teaches nothing:
+                five attempts end and the player leaves without knowing what
+                they missed, so tomorrow they are no better at it. */}
+            {gameOver && !foundOptimal && perfectHand && (
+              <div
+                className="border p-4"
+                style={{ borderColor: "var(--ledger-green)", background: "var(--paper-inset)", borderRadius: 2 }}
+              >
+                <div
+                  className="text-[10px] font-black uppercase tracking-[0.3em] font-mono pb-2 border-b mb-3"
+                  style={{ color: "var(--ledger-green)", borderColor: "var(--rule)" }}
+                >
+                  The Perfect Hand — {optimal} pts
+                  {optimalResult && optimalResult.combos.length > 1 && (
+                    <span style={{ color: "var(--ledger-ink-faint)" }}>
+                      {" "}(one of {optimalResult.combos.length})
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {perfectHand.map((player) => (
+                    <PlayerCard
+                      key={player.id}
+                      player={player}
+                      selected
+                      disabled
+                      isCallUp={false}
+                    />
+                  ))}
+                </div>
+                {perfectBreakdown && (
+                  <div className="mt-3 space-y-1">
+                    {SCORING_ROWS.map(({ key, icon, label }) => {
+                      const row = perfectBreakdown[key];
+                      if (row.points === 0) return null;
+                      return (
+                        <div key={key} className="flex items-center justify-between text-[11px] font-mono">
+                          <span style={{ color: "var(--ledger-ink-body)" }}>
+                            {icon} {label} — {row.detail}
+                          </span>
+                          <span className="font-black" style={{ color: "var(--ledger-green)" }}>
+                            +{row.points}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1138,18 +1275,7 @@ function PressBoxGame() {
               >
                 ? How to Score
               </summary>
-              <div className="px-4 pb-3 space-y-1 text-[11px] font-mono" style={{ color: "var(--ledger-ink-body)" }}>
-                <p><strong>You have {MAX_ATTEMPTS} attempts</strong> to find the perfect hand.</p>
-                <p>The call-up is hidden on your first attempt, then revealed.</p>
-                <p>The peg board shows how close your best hand is to the target hole.</p>
-                <p className="mt-2"><strong>Teammates</strong> — 2 pts per pair of players on the same NHL team</p>
-                <p><strong>Draft Class</strong> — 2 pts per pair drafted in the same year</p>
-                <p><strong>Pipeline</strong> — 1 pt per card in a run of 3+ consecutive draft years</p>
-                <p><strong>Division Flush</strong> — 4 pts if all 4 picks share a division (5 if call-up matches)</p>
-                <p><strong>Country Club</strong> — 3 pts for 3+ players from the same country</p>
-                <p><strong>Position Group</strong> — 3 pts for 3+ players at the same position type (F/D/G)</p>
-                <p><strong>Call-Up Bonus</strong> — 1 pt for each of your picks who share a team with the call-up</p>
-              </div>
+              <HowToScore />
             </details>
 
             {/* Navigation to other hands */}
@@ -1197,18 +1323,7 @@ function PressBoxGame() {
             >
               ? How to Score
             </summary>
-            <div className="px-4 pb-3 space-y-1 text-[11px] font-mono" style={{ color: "var(--ledger-ink-body)" }}>
-              <p><strong>You have {MAX_ATTEMPTS} attempts</strong> to find the perfect hand.</p>
-              <p>The call-up is hidden on your first attempt, then revealed.</p>
-              <p>The peg board shows how close your best hand is to the target hole.</p>
-              <p className="mt-2"><strong>Teammates</strong> — 2 pts per pair of players on the same NHL team</p>
-              <p><strong>Draft Class</strong> — 2 pts per pair drafted in the same year</p>
-              <p><strong>Pipeline</strong> — 1 pt per card in a run of 3+ consecutive draft years</p>
-              <p><strong>Division Flush</strong> — 4 pts if all 4 picks share a division (5 if call-up matches)</p>
-              <p><strong>Country Club</strong> — 3 pts for 3+ players from the same country</p>
-              <p><strong>Position Group</strong> — 3 pts for 3+ players at the same position type (F/D/G)</p>
-              <p><strong>Call-Up Bonus</strong> — 1 pt for each of your picks who share a team with the call-up</p>
-            </div>
+            <HowToScore />
           </details>
         )}
         {/* ── Back Issues calendar ───────────────────────────── */}
