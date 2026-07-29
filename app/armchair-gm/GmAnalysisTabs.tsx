@@ -11,6 +11,7 @@ import ContentionQuadrant from "@/app/components/ContentionQuadrant";
 import { computeContention, GM_PLUM, GM_PLUM_FAINT, GM_PLUM_LIGHT } from "./contention";
 import { tradeAssetKey } from "@/app/store/tradeStore";
 import { SeasonResultsPager } from "./SeasonResultsPager";
+import { RosterTab } from "./RosterTab";
 import { computeTeamEdgeProfile } from "@/app/lib/team-edge-profile";
 import TeamEdgeTiles from "./TeamEdgeTiles";
 
@@ -41,7 +42,7 @@ const classifyTeam = (team: Team, _roster: Asset[]): TeamMode => {
 import { fmtSigned as fmt } from "@/app/lib/display-utils";
 import { teamWindow } from "@/app/lib/team-window";
 
-type GmTab = "lineups" | "dna" | "comparison" | "breakdown" | "sim";
+type GmTab = "roster" | "lineups" | "dna" | "comparison" | "breakdown" | "sim";
 
 function GmTabButton({ label, active, onClick, disabled, badge }: {
   label: string; active: boolean; onClick: () => void; disabled?: boolean; badge?: number;
@@ -125,10 +126,11 @@ export function GmAnalysisTabs({
   simData: any;
   simResult: string | null;
 }) {
-  const [activeTab, setActiveTab] = useState<GmTab>("lineups");
+  const [activeTab, setActiveTab] = useState<GmTab>("roster");
   const hasAssets = blocks[0].length > 0 || blocks[1].length > 0;
 
   const tabs: { key: GmTab; label: string; disabled?: boolean; badge?: number }[] = [
+    { key: "roster", label: "Roster" },
     { key: "lineups", label: "Lineups" },
     { key: "dna", label: "Team DNA" },
     { key: "comparison", label: "Compare", disabled: !hasAssets },
@@ -167,6 +169,17 @@ export function GmAnalysisTabs({
         background: "var(--ledger-card-light, #f0e8d0)",
         padding: "0",
       }}>
+        {/* ── Roster tab (RL2) ───────────────────── */}
+        {activeTab === "roster" && (
+          <RosterTab
+            teams={teams}
+            homeRoster={allHomeRoster}
+            partnerRoster={allPartnerRoster}
+            navMap={navMap}
+            simData={simData}
+          />
+        )}
+
         {/* ── Lineups tab ────────────────────────── */}
         {activeTab === "lineups" && (
           <div style={{ padding: "12px 0" }}>

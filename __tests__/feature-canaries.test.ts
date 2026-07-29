@@ -3004,3 +3004,45 @@ describe("Canary — the front page wears the brand kit", () => {
     expect(page).not.toContain('alt="Cap & Crease"');
   });
 });
+
+describe("Canary — RL2 roster tab", () => {
+  it("puts Roster ahead of Lineups and opens on it", () => {
+    const src = read("app/armchair-gm/GmAnalysisTabs.tsx");
+    const roster = src.indexOf('{ key: "roster"');
+    const lineups = src.indexOf('{ key: "lineups"');
+    expect(roster).toBeGreaterThan(-1);
+    expect(roster).toBeLessThan(lineups);
+    expect(src).toContain('useState<GmTab>("roster")');
+  });
+
+  it("keeps the ordering and sim-merge rules in a tested module", () => {
+    const lib = read("app/lib/roster-view.ts");
+    for (const fn of ["buildRosterRows", "projectedSeasonIndex", "simTeamFor"]) {
+      expect(lib).toContain(`export function ${fn}`);
+    }
+    expect(read("app/armchair-gm/RosterTab.tsx")).toContain("buildRosterRows");
+  });
+
+  it("reuses the shared analytics panel rather than a second copy", () => {
+    // A hand-rolled expander here would drift from the offseason screens,
+    // which is exactly what OFF4 extracted ExpandedStats to prevent.
+    const tab = read("app/armchair-gm/RosterTab.tsx");
+    expect(tab).toContain("ExpandedStats");
+    expect(tab).toContain("PlayerOutlook");
+    expect(tab).toContain("AssetBadges");
+  });
+
+  it("shows whether the numbers are simulated or baseline", () => {
+    // Reporting last season's points after a sim would misstate the one thing
+    // the tab exists for.
+    const tab = read("app/armchair-gm/RosterTab.tsx");
+    expect(tab).toContain("Simulated season");
+    expect(tab).toContain("Pre-season baseline");
+  });
+
+  it("no longer opens the Season Results roster table by default", () => {
+    const pager = read("app/armchair-gm/SeasonResultsPager.tsx");
+    expect(pager).not.toContain('<details className="mt-2.5" open>');
+    expect(pager).toContain("Season Review — Performance vs Expectation");
+  });
+});

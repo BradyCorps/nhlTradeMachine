@@ -1,5 +1,7 @@
 "use client";
-// Season Results pager: Team Numbers (Ledger Line), League Numbers, Bracket.
+// Season Results pager: Team Numbers, League Numbers, Bracket. The roster
+// listing moved to the Roster tab in RL2; the Ledger Line here is the
+// post-season review (ΔXP, NOIV), which only means anything after a sim.
 import React, { useState } from "react";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
@@ -211,13 +213,19 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
           <StatCell label="Seed" val={simData?.seed ?? '—'} />
         </div>
 
-        {/* The Ledger Line — season box score joined against the valuation engine */}
-        <details className="mt-2.5" open>
+        {/* The Ledger Line — season box score joined against the valuation
+            engine. RL2 moved the ROSTER listing to its own tab ahead of
+            Lineups; what stays here is the retrospective, because ΔXP (did he
+            beat his preseason expectation) and NOIV only exist once a season
+            has actually been played. Collapsed by default now — the roster
+            question is answered a tab away, so this opens when you want the
+            review rather than every time you glance at the results. */}
+        <details className="mt-2.5">
           <summary
             className="cursor-pointer select-none text-[10px] font-black font-mono uppercase tracking-[0.2em] pb-1"
             style={{ color: 'var(--ledger-ink-faint)' }}
           >
-            Season Stats — The Ledger Line
+            Season Review — Performance vs Expectation
           </summary>
           <div className="overflow-x-auto">
             <table className="w-full font-mono" style={{ borderCollapse: 'collapse', minWidth: 480 }}>
