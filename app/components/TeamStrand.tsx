@@ -83,14 +83,17 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
       return `${step === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
     }).join(" ");
 
-  // Uniform-amplitude path for reference lines
-  const buildRef = (uniformVal: number, flip: boolean): string =>
-    Array.from({ length: 81 }, (_, i) => {
-      const x   = (i / 80) * W;
-      const amp = AMP * (0.28 + uniformVal * 0.72);
-      const y   = cy + (flip ? 1 : -1) * amp * Math.sin(freq * x * sm);
-      return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
-    }).join(" ");
+  // CXH7 — reference lines follow the SAME per-trait sections the team's own
+  // strand does.
+  //
+  // They used to be drawn at one uniform amplitude, the mean of the reference
+  // profile's traits. That made the comparison invalid exactly where it was
+  // most likely to be read: a club above the flat "playoff" line could still be
+  // under the playoff threshold on a specific trait, and the picture said it
+  // was clear. A reference contour has to vary the way the thing it is being
+  // compared against varies, or it is not a threshold — it is an average
+  // wearing a threshold's colour.
+  const buildRef = (vals: number[], flip: boolean): string => buildPath(vals, flip);
 
   // ── Node geometry ──────────────────────────────────────────────────────────
   // Peak of i-th half-cycle: x = (2i+1)/(2N)·W
@@ -192,21 +195,21 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
            style={{ width: "100%", display: "block", overflow: "visible" }}>
 
         {/* League average (gray, faint) */}
-        <path d={buildRef(avg(toOff(LEAGUE_AVERAGE)), false)} fill="none"
+        <path d={buildRef(toOff(LEAGUE_AVERAGE), false)} fill="none"
               stroke={GRAY} strokeWidth="1" strokeDasharray="2,5" opacity="0.40"/>
-        <path d={buildRef(avg(toDef(LEAGUE_AVERAGE)), true)} fill="none"
+        <path d={buildRef(toDef(LEAGUE_AVERAGE), true)} fill="none"
               stroke={GRAY} strokeWidth="1" strokeDasharray="2,5" opacity="0.40"/>
 
         {/* Playoff threshold */}
-        <path d={buildRef(avg(toOff(PLAYOFF)), false)} fill="none"
+        <path d={buildRef(toOff(PLAYOFF), false)} fill="none"
               stroke="#2a7a44" strokeWidth="1.2" strokeDasharray="3,4" opacity="0.55"/>
-        <path d={buildRef(avg(toDef(PLAYOFF)), true)} fill="none"
+        <path d={buildRef(toDef(PLAYOFF), true)} fill="none"
               stroke="#2a7a44" strokeWidth="1.2" strokeDasharray="3,4" opacity="0.55"/>
 
         {/* Championship template */}
-        <path d={buildRef(avg(toOff(CHAMP_TEMPLATE)), false)} fill="none"
+        <path d={buildRef(toOff(CHAMP_TEMPLATE), false)} fill="none"
               stroke={GOLD} strokeWidth="1.5" strokeDasharray="6,4" opacity="0.70"/>
-        <path d={buildRef(avg(toDef(CHAMP_TEMPLATE)), true)} fill="none"
+        <path d={buildRef(toDef(CHAMP_TEMPLATE), true)} fill="none"
               stroke={GOLD} strokeWidth="1.5" strokeDasharray="6,4" opacity="0.70"/>
 
         {/* Compare overlay */}

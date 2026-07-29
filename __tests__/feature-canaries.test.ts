@@ -3135,3 +3135,54 @@ describe("Canary — CX8 one canonical trade-value model", () => {
     expect(bench).not.toMatch(/if \(cupRun\?\.status === "ACTIVE"\) \{\s*const retainedOutgoing/);
   });
 });
+
+describe("Canary — CXH7 visuals agree with the models they display", () => {
+  it("the quadrant chart reads the model's thresholds, not its own crosshair", () => {
+    const chart = read("app/components/ContentionQuadrant.tsx");
+    expect(chart).toContain("CONTENTION_THRESHOLDS");
+    expect(chart).toContain("classifyContention");
+    // The invented 5.0/5.0 crosshair.
+    expect(chart).not.toContain("ratingToX(5.0)");
+    expect(chart).not.toContain("ratingToY(5.0)");
+  });
+
+  it("labels and shading come from the same regions", () => {
+    // A cell tinted one verdict and captioned another is the defect.
+    const chart = read("app/components/ContentionQuadrant.tsx");
+    const uses = chart.match(/REGIONS\.map/g) ?? [];
+    expect(uses.length).toBe(2);
+  });
+
+  it("future strength counts picks and unproven youth", () => {
+    const src = read("app/armchair-gm/contention.ts");
+    expect(src).toContain("pickBonus");
+    expect(src).toContain("unprovenBonus");
+    expect(src).toContain("PICK_FUTURE_WEIGHT");
+  });
+
+  it("STRAND reference lines follow per-trait thresholds", () => {
+    // A flat mean wearing a threshold's colour is not a threshold.
+    const src = read("app/components/TeamStrand.tsx");
+    expect(src).toContain("buildRef = (vals: number[]");
+    expect(src).not.toContain("buildRef(avg(");
+  });
+
+  it("a league-average EDGE value is neutral, not red", () => {
+    const src = read("app/armchair-gm/TeamEdgeTiles.tsx");
+    expect(src).toContain("EDGE_NEUTRAL_BAND");
+  });
+
+  it("PlayerComparison quotes the compressed package, like the verdict beside it", () => {
+    const src = read("app/components/PlayerComparison.tsx");
+    expect(src).toContain("compressPackage");
+  });
+
+  it("keeps goalies out of the skater rate block", () => {
+    // A goalie's ptsPace is structurally near zero and his TOI is a different
+    // quantity, so including him made any trade with a goalie read as a
+    // downgrade.
+    const src = read("app/components/PlayerComparison.tsx");
+    const guards = src.match(/a\.position !== "Pick" && a\.position !== "G"/g) ?? [];
+    expect(guards.length).toBeGreaterThanOrEqual(2);
+  });
+});

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { CONTENTION_THRESHOLDS, classifyContention } from "@/app/armchair-gm/contention";
 
 export interface ContentionData {
   present:      number;
@@ -24,8 +25,39 @@ const PAD    = 20;
 function ratingToX(v: number) { return PAD + (v / 10) * (PLOT_W - PAD * 2); }
 function ratingToY(v: number) { return PAD + ((10 - v) / 10) * (PLOT_H - PAD * 2); }
 
-const X_MID = ratingToX(5.0);
-const Y_MID = ratingToY(5.0);
+// CXH7 — the chart reads the model's own thresholds instead of a 5.0/5.0
+// crosshair it invented. Present has three bands and future two, so there are
+// six regions, not four; each is labelled by asking `classifyContention` at
+// its own centroid, which makes it impossible for the picture to contradict
+// the verdict printed beneath it.
+const T = CONTENTION_THRESHOLDS;
+const X_PLAYOFF   = ratingToX(T.presentPlayoff);
+const X_CONTENDER = ratingToX(T.presentContender);
+const Y_OPEN      = ratingToY(T.futureOpen);
+const Y_OPENING   = ratingToY(T.futureOpening);
+
+const PRESENT_BANDS: [number, number][] = [
+  [0, T.presentPlayoff],
+  [T.presentPlayoff, T.presentContender],
+  [T.presentContender, 10],
+];
+const FUTURE_BANDS: [number, number][] = [
+  [0, T.futureOpen],
+  [T.futureOpen, 10],
+];
+
+const REGIONS = PRESENT_BANDS.flatMap(([p0, p1]) =>
+  FUTURE_BANDS.map(([f0, f1]) => {
+    const present = (p0 + p1) / 2;
+    const future = (f0 + f1) / 2;
+    return {
+      key: classifyContention(present, future),
+      x: ratingToX(p0),
+      y: ratingToY(f1),
+      w: ratingToX(p1) - ratingToX(p0),
+      h: ratingToY(f0) - ratingToY(f1),
+    };
+  }));
 
 const TEAM_COLORS = ["var(--blue)", "var(--red)"];
 
@@ -61,24 +93,36 @@ export default function ContentionQuadrant({
           style={{ overflow: "visible", display: "block" }}
         >
           {/* Quadrant fills */}
-          <rect x={PAD}   y={PAD}   width={X_MID - PAD}          height={Y_MID - PAD}          fill="rgba(26,95,168,0.06)" />
-          <rect x={X_MID} y={PAD}   width={PLOT_W - PAD - X_MID} height={Y_MID - PAD}          fill="rgba(42,122,60,0.06)" />
-          <rect x={PAD}   y={Y_MID} width={X_MID - PAD}          height={PLOT_H - PAD - Y_MID} fill="rgba(120,120,120,0.06)" />
-          <rect x={X_MID} y={Y_MID} width={PLOT_W - PAD - X_MID} height={PLOT_H - PAD - Y_MID} fill="rgba(200,145,58,0.06)" />
+          {/* Shading comes from the same regions as the labels — a cell can
+              never be tinted one verdict and captioned another. */}
+          {REGIONS.map((r, i) => (
+            <rect key={i} x={r.x} y={r.y} width={r.w} height={r.h} fill={QUADRANT_META[r.key].bg} />
+          ))}
 
           {/* Axes */}
           <line x1={PAD} y1={PAD} x2={PAD} y2={PLOT_H - PAD} stroke="#c8b890" strokeWidth={0.5} />
           <line x1={PAD} y1={PLOT_H - PAD} x2={PLOT_W - PAD} y2={PLOT_H - PAD} stroke="#c8b890" strokeWidth={0.5} />
-          <line x1={X_MID} y1={PAD} x2={X_MID} y2={PLOT_H - PAD} stroke="#c8b890" strokeWidth={0.8} strokeDasharray="3 3" />
-          <line x1={PAD} y1={Y_MID} x2={PLOT_W - PAD} y2={Y_MID} stroke="#c8b890" strokeWidth={0.8} strokeDasharray="3 3" />
+          <line x1={X_PLAYOFF} y1={PAD} x2={X_PLAYOFF} y2={PLOT_H - PAD} stroke="#c8b890" strokeWidth={0.8} strokeDasharray="3 3" />
+          <line x1={X_CONTENDER} y1={PAD} x2={X_CONTENDER} y2={PLOT_H - PAD} stroke="#c8b890" strokeWidth={0.8} strokeDasharray="3 3" />
+          <line x1={PAD} y1={Y_OPEN} x2={PLOT_W - PAD} y2={Y_OPEN} stroke="#c8b890" strokeWidth={0.8} strokeDasharray="3 3" />
+          <line x1={PAD} y1={Y_OPENING} x2={PLOT_W - PAD} y2={Y_OPENING} stroke="#c8b890" strokeWidth={0.4} strokeDasharray="1 4" opacity={0.7} />
 
-          {/* Quadrant labels */}
-          <text x={PAD + 3} y={PAD + 8}  fontSize={6} fill="#1a5fa8" fontFamily="'Courier Prime', monospace" fontWeight={700}>WINDOW</text>
-          <text x={PAD + 3} y={PAD + 15} fontSize={6} fill="#1a5fa8" fontFamily="'Courier Prime', monospace" fontWeight={700}>OPENING</text>
-          <text x={X_MID + 3} y={PAD + 8}  fontSize={6} fill="#2a7a3c" fontFamily="'Courier Prime', monospace" fontWeight={700}>WINDOW</text>
-          <text x={X_MID + 3} y={PAD + 15} fontSize={6} fill="#2a7a3c" fontFamily="'Courier Prime', monospace" fontWeight={700}>OPEN</text>
-          <text x={PAD + 3}   y={Y_MID + 10} fontSize={6} fill="#7a7a7a" fontFamily="'Courier Prime', monospace" fontWeight={700}>REBUILDING</text>
-          <text x={X_MID + 3} y={Y_MID + 10} fontSize={6} fill="#c8913a" fontFamily="'Courier Prime', monospace" fontWeight={700}>WIN NOW</text>
+          {/* Region labels, derived from the classifier so they cannot drift */}
+          {REGIONS.map((r, i) => {
+            const meta = QUADRANT_META[r.key];
+            return (
+              <text
+                key={i}
+                x={r.x + 3}
+                y={r.y + 8}
+                fontSize={5.5}
+                fill={meta.color}
+                fontFamily="'Courier Prime', monospace"
+                fontWeight={700}>
+                {meta.label.toUpperCase()}
+              </text>
+            );
+          })}
 
           {/* Axis labels */}
           <text x={(PAD + PLOT_W - PAD) / 2} y={PLOT_H - 4} fontSize={6.5} fill="#8a7a5a" textAnchor="middle" fontFamily="'Courier Prime', monospace">

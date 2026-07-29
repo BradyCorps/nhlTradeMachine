@@ -1,5 +1,6 @@
 "use client";
 
+import { compressPackage } from "@/app/lib/xnav-engine";
 import { formatPickRound } from "@/app/lib/trade-format";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { displayPosition } from "@/app/lib/display-position";
@@ -152,17 +153,32 @@ export default function PlayerComparison({ outgoing, incoming, navMap }: Props) 
 
   // Aggregate stats for comparison (sum of all outgoing vs all incoming)
   const sum = (assets: Asset[], key: keyof Asset) =>
-    assets.filter(a => a.position !== "Pick")
+    assets.filter(a => a.position !== "Pick" && a.position !== "G")
       .reduce((s, a) => s + (typeof a[key] === "number" ? (a[key] as number) : 0), 0);
 
+  // CXH7 — the comparison quoted a LINEAR package sum while the verdict, the
+  // TugBar and the audit all quote the compressed value. Two players at 100
+  // are not worth 200 to a club with one roster slot, and this panel sits
+  // directly beside the number that says so.
   const navSum = (assets: Asset[]) =>
-    assets.reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);
+    compressPackage(assets.map(a => ({
+      nav: navMap[a.id]?.total ?? 0,
+      isPick: a.position === "Pick",
+      age: a.age ?? 27,
+    })));
 
   // Per-skater average for deployment/profile stats (TOI, age). Returns null
   // for a side with no skaters so an empty package reads as "—", not a 0 that
   // would falsely win the youngest/most-rested comparison.
   const avg = (assets: Asset[], key: keyof Asset): number | null => {
-    const skaters = assets.filter(a => a.position !== "Pick");
+    // Goalies excluded from skater rates: a goaltender's ptsPace and xGPace are
+    // structurally near zero and his TOI is a different quantity entirely, so
+    // including him drags a package's per-skater averages toward nothing and
+    // makes any trade involving a goalie read as a downgrade. Age is the one
+    // exception a reader might expect — but splitting the rule per metric is
+    // how a panel starts disagreeing with itself, so goalies are out of the
+    // skater block and their own metrics are shown separately.
+    const skaters = assets.filter(a => a.position !== "Pick" && a.position !== "G");
     if (skaters.length === 0) return null;
     const total = skaters.reduce((s, a) => s + (typeof a[key] === "number" ? (a[key] as number) : 0), 0);
     return total / skaters.length;

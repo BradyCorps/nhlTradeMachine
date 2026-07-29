@@ -9,8 +9,22 @@ const pctText = (value: number | null, digits = 1): string =>
 const numberText = (value: number | null, digits = 1): string =>
   value == null ? "-" : value.toFixed(digits);
 
+// CXH7 — a league-average club was painted red.
+//
+// The old rule was a binary split on the threshold, so anything not strictly
+// above league average read as a deficiency. Half the league is below average
+// by construction; colouring all of it red says "problem" about a team that
+// does not have one, and it makes the genuinely bad cases indistinguishable
+// from the ordinary ones.
+//
+// A band around the threshold is neutral now, and only a real departure
+// earns a colour.
+export const EDGE_NEUTRAL_BAND = 0.04;
+
 const edgeTone = (value: number | null, threshold: number): string => {
   if (value == null) return "var(--ledger-ink)";
+  const margin = Math.abs(threshold) * EDGE_NEUTRAL_BAND;
+  if (Math.abs(value - threshold) <= margin) return "var(--ledger-ink)";
   return value > threshold ? "var(--ledger-green)" : "var(--ledger-red)";
 };
 
