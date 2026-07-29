@@ -1,0 +1,16 @@
+{
+  "name": "Cap & Crease",
+  "domain": "https://capandcrease.com",
+  "colors": {
+    "ink": "#1c140a",
+    "paper": "#f2ecd7",
+    "brickRed": "#b83020",
+    "mutedBrass": "#b8a070",
+    "mutedIceBlue": "#79afc1"
+  },
+  "opticalSizing": {
+    "primaryMarkMinimumPx": 40,
+    "smallMarkMaximumPx": 32,
+    "puckVisibleMinimumPx": 40
+  }
+}
