@@ -11,6 +11,7 @@
 
 import React from "react";
 import { createPortal } from "react-dom";
+import { useDialog } from "@/app/lib/use-dialog";
 import type { Team } from "@/app/lib/trade-types";
 import { GAME_MODES, type GameMode } from "@/app/lib/game-mode";
 
@@ -20,15 +21,17 @@ export function ModeSelectModal({
   team: Team;
   onChoose: (mode: GameMode) => void;
 }) {
+  // Deliberately no `onClose`: a mode must be chosen before the offseason can
+  // run, so Escape has nothing safe to fall back to.
+  const dialog = useDialog({ open: true, labelledBy: "mode-select-title" });
+
   if (typeof document === "undefined") return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[130] flex items-center justify-center p-4"
       style={{ background: "rgba(28,20,10,0.88)", backdropFilter: "blur(4px)" }}>
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="mode-select-title"
+        {...dialog}
         className="w-full max-w-lg"
         style={{ background: "var(--ledger-card-light)", borderRadius: "2px", boxShadow: "0 24px 70px rgba(0,0,0,0.6)" }}>
 

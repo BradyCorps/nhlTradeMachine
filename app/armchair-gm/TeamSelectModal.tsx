@@ -5,6 +5,7 @@
 import React from "react";
 import { TeamMark } from "@/app/components/TeamMark";
 import { createPortal } from "react-dom";
+import { useDialog } from "@/app/lib/use-dialog";
 import type { Team } from "@/app/lib/trade-types";
 import { teamWindow } from "@/app/lib/team-window";
 
@@ -23,6 +24,8 @@ export function TeamSelectModal({
   onSelectTeam: (team: Team) => void;
   onClose: () => void;
 }) {
+  const dialog = useDialog({ open: true, onClose, label: "Select your franchise" });
+
   const [selectingTeamId, setSelectingTeamId] = React.useState<string | null>(null);
 
   if (typeof document === "undefined") return null;
@@ -30,7 +33,7 @@ export function TeamSelectModal({
     (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4"
       style={{ background: 'rgba(28,20,10,0.88)', backdropFilter: 'blur(4px)' }}>
-      <div className="relative w-full max-w-lg"
+      <div {...dialog} className="relative w-full max-w-lg"
         style={{ background: 'var(--ledger-card-light)', borderRadius: '2px', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}>
 
         {/* Header rule */}

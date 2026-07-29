@@ -1,6 +1,7 @@
 "use client";
 // ── Front Office Memo Modal — the Claude trade evaluation report ──
 import React from "react";
+import { useDialog } from "@/app/lib/use-dialog";
 import type { TradeVerdict } from "@/app/lib/trade-types";
 
 export function MemoModal({
@@ -16,11 +17,13 @@ export function MemoModal({
   onClose: () => void;
   onRegenerate: () => void;
 }) {
+  const dialog = useDialog({ open: true, onClose, label: "Trade memorandum" });
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6"
       style={{ background: 'rgba(28,20,10,0.75)', backdropFilter: 'blur(3px)' }}
       onClick={onClose}>
-      <div className="relative max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+      <div {...dialog} className="relative max-w-2xl w-full max-h-[90vh] overflow-y-auto"
         style={{ background: 'var(--ledger-card-light)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', borderRadius: '2px' }}
         onClick={e => e.stopPropagation()}>
 

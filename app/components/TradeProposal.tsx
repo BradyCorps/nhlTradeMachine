@@ -20,6 +20,7 @@ import {
 } from "@/app/lib/trade-logic";
 import { formatPickRound } from "@/app/lib/trade-format";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
+import { useDialog } from "@/app/lib/use-dialog";
 
 interface Props {
   outgoingBlock: Asset[];
@@ -47,6 +48,7 @@ const MAX_AUDIT_CANDIDATES = 36;
 export default function TradeProposalEngine({
   outgoingBlock, homeTeam, allTeams, allPlayers, navMap, capCeiling, onClose, onLoadTrade
 }: Props) {
+  const dialog = useDialog({ open: true, onClose, label: "Trade partner proposals" });
   const [proposals,  setProposals]  = useState<TradeProposal[]>([]);
   const [generating, setGenerating] = useState(false);
   const [done,       setDone]       = useState(false);
@@ -325,7 +327,7 @@ export default function TradeProposalEngine({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(28,20,10,0.80)', backdropFilter: 'blur(3px)' }}>
-      <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto"
+      <div {...dialog} className="w-full max-w-5xl max-h-[90vh] overflow-y-auto"
         style={{ background: '#f0e6cc', border: '2px solid #b8a070', borderRadius: '3px' }}>
 
         {/* Header */}

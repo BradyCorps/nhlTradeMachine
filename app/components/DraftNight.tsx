@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { offseasonCta } from "@/app/lib/offseason-phases";
 import { createPortal } from "react-dom";
+import { useDialog } from "@/app/lib/use-dialog";
 import {
   DRAFT_2026_ORDER,
   DRAFT_2026_PROSPECTS,
@@ -30,6 +31,7 @@ export default function DraftNight({
   homeTeamId?: string | null;
   onDone: (results: DraftResult[]) => void;
 }) {
+  const dialog = useDialog({ open: true, label: "Draft Night" });
   const [seed, setSeed]       = useState(Math.floor(initialSeed) || 1);
   const [results, setResults] = useState<DraftResult[]>([]);
   const [board, setBoard]     = useState<DraftProspect[]>([]);
@@ -78,7 +80,7 @@ export default function DraftNight({
     return createPortal(
       <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-6"
         style={{ background: "rgba(28,20,10,0.92)", backdropFilter: "blur(4px)" }}>
-        <div className="relative w-full max-w-2xl flex flex-col"
+        <div {...dialog} className="relative w-full max-w-2xl flex flex-col"
           style={{ background: "var(--ledger-card-light)", borderRadius: "2px", maxHeight: "92vh", boxShadow: "0 24px 70px rgba(0,0,0,0.6)" }}>
 
           {/* Pick header */}
@@ -162,7 +164,7 @@ export default function DraftNight({
   return createPortal(
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-6"
       style={{ background: "rgba(28,20,10,0.88)", backdropFilter: "blur(4px)" }}>
-      <div className="relative w-full max-w-3xl flex flex-col"
+      <div {...dialog} className="relative w-full max-w-3xl flex flex-col"
         style={{ background: "var(--ledger-card-light)", borderRadius: "2px", maxHeight: "92vh", boxShadow: "0 24px 70px rgba(0,0,0,0.6)" }}>
 
         {/* Header */}

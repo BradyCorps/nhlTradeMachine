@@ -278,7 +278,22 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                     >
                       <td className="text-[10px] py-1.5 px-1.5 text-left align-top" style={{ color: 'var(--ledger-ink-faint)' }}>{isOpen ? '▾' : i + 1}</td>
                       <td className="text-[11px] py-1.5 px-1.5 text-left">
-                        <span className="font-black" style={{ color: 'var(--ledger-ink)' }}>{p.name}</span>
+                        {/* CXH8 — the row carried a click handler and nothing
+                            else, so the breakdown was unreachable by keyboard.
+                            The name is the control now: one focus stop, a real
+                            button, and the row click still works for a mouse. */}
+                        {nav ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setOpenPlayer(isOpen ? null : rowKey); }}
+                            aria-expanded={isOpen}
+                            aria-label={`${isOpen ? 'Collapse' : 'Expand'} valuation breakdown for ${p.name}`}
+                            className="tap-target font-black text-left hover:underline"
+                            style={{ color: 'var(--ledger-ink)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit' }}>
+                            {p.name}
+                          </button>
+                        ) : (
+                          <span className="font-black" style={{ color: 'var(--ledger-ink)' }}>{p.name}</span>
+                        )}
                         {p.calderEligible && (
                           <span className="ml-1 px-1 text-[10px] font-black" style={{ color: '#fff', background: 'var(--ledger-ice, #2c3e6b)', borderRadius: 1 }}>R</span>
                         )}

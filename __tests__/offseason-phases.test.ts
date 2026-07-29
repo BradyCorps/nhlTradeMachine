@@ -145,7 +145,12 @@ describe("run length is chosen before the offseason, not after", () => {
   });
 
   it("locks body scroll behind the modal like every other overlay", () => {
-    expect(page()).toMatch(/useBodyScrollLock\([^)]*modeSelectOpen/);
+    // CXH8 moved the lock into `useDialog`, so the modal locks scroll itself
+    // rather than being named in a page-level list. Same guarantee, and one
+    // that a new modal gets for free instead of having to be remembered.
+    const modal = read("app/armchair-gm/ModeSelectModal.tsx");
+    expect(modal).toContain("useDialog");
+    expect(read("app/lib/use-dialog.ts")).toContain("useBodyScrollLock(open)");
   });
 
   it("describes both modes from one definition", () => {

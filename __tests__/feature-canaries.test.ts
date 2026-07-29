@@ -1238,7 +1238,13 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(globals).toContain(".armchair-trade-flow");
     expect(tradePage).toContain("armchair-trade-flow");
     expect(tradePage).toContain("aria-label=\"Run GM audit for the current trade\"");
-    expect(tabs).toContain("aria-pressed={active}");
+    // CXH8 replaced toggle semantics with real tab semantics: a pressed button
+    // is a toggle, a tab selects a panel, and only the latter is announced as
+    // "N of M" with arrow-key navigation between them.
+    expect(tabs).toContain('role="tab"');
+    expect(tabs).toContain("aria-selected={active}");
+    expect(tabs).toContain('role="tablist"');
+    expect(tabs).not.toContain("aria-pressed={active}");
     expect(tabs).toContain("aria-label={`Open ${label} tab`}");
     expect(tabs).toContain("aria-label=\"Simulate one season\"");
     expect(verdictSheet).toContain("aria-expanded={verdictOpen}");
@@ -1797,15 +1803,27 @@ describe("Canary — UX and UI polish", () => {
     expect(hook).toContain("if (lockCount !== 1) return");
     expect(hook).toContain("if (lockCount !== 0) return");
     expect(hook).toContain('document.body.style.overflow = "hidden"');
-    // Pins that every overlay is in the lock, not one frozen argument list —
-    // a new modal still has to be added here, but adding one must not fail this.
+    // The guarantee is that every overlay locks scroll — not that it does so
+    // through one page-level argument list. CXH8 moved the lock into
+    // `useDialog`, and the list was precisely why the memo modal and the Cup
+    // resume prompt had been left out of it. So each overlay must satisfy one
+    // of the two mechanisms, and it is a failure only if it satisfies neither.
     const lockCall = armchair.slice(armchair.indexOf("useBodyScrollLock("));
     const lockArgs = lockCall.slice(0, lockCall.indexOf(");"));
-    for (const flag of [
-      "showTeamSelect", "modeSelectOpen", "tradeBlockOpen", "tradeRequest",
-      "draftOpen", "resignOpen", "offerSheetOpen", "cupDraftSummary",
-    ]) {
-      expect(lockArgs, `${flag} must lock body scroll`).toContain(flag);
+    const OVERLAYS: [string, string][] = [
+      ["showTeamSelect", "app/armchair-gm/TeamSelectModal.tsx"],
+      ["modeSelectOpen", "app/armchair-gm/ModeSelectModal.tsx"],
+      ["draftOpen", "app/components/DraftNight.tsx"],
+      ["tradeBlockOpen", ""],
+      ["tradeRequest", ""],
+      ["resignOpen", ""],
+      ["offerSheetOpen", ""],
+      ["cupDraftSummary", ""],
+    ];
+    for (const [flag, component] of OVERLAYS) {
+      const viaList = lockArgs.includes(flag);
+      const viaDialog = component !== "" && read(component).includes("useDialog");
+      expect(viaList || viaDialog, `${flag} must lock body scroll`).toBe(true);
     }
     expect(armchair).not.toContain("useBodyScrollLock(verdictOpen");
     expect(armchair).not.toContain("useBodyScrollLock(verdictOpen ||");
@@ -3184,5 +3202,51 @@ describe("Canary — CXH7 visuals agree with the models they display", () => {
     const src = read("app/components/PlayerComparison.tsx");
     const guards = src.match(/a\.position !== "Pick" && a\.position !== "G"/g) ?? [];
     expect(guards.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("Canary — CXH8 overlays are usable by keyboard", () => {
+  const OVERLAYS = [
+    "app/armchair-gm/TeamSelectModal.tsx",
+    "app/armchair-gm/ModeSelectModal.tsx",
+    "app/armchair-gm/MemoModal.tsx",
+    "app/armchair-gm/CupRunResumePrompt.tsx",
+    "app/components/TradeProposal.tsx",
+    "app/components/DraftNight.tsx",
+  ];
+
+  it("every overlay uses the shared dialog hook", () => {
+    // Six overlays each half-accessible in a different way is how this got
+    // filed. One hook means one place to be right.
+    for (const f of OVERLAYS) expect(read(f), f).toContain("useDialog");
+  });
+
+  it("no overlay hand-rolls dialog semantics any more", () => {
+    for (const f of OVERLAYS) {
+      expect(read(f), f).not.toContain('role="dialog"');
+      expect(read(f), f).not.toContain('aria-modal="true"');
+    }
+  });
+
+  it("the hook supplies trap, escape, restore and scroll lock", () => {
+    const hook = read("app/lib/use-dialog.ts");
+    expect(hook).toContain("useBodyScrollLock(open)");
+    expect(hook).toContain('event.key === "Escape"');
+    expect(hook).toContain('event.key !== "Tab"');
+    expect(hook).toContain("restoreRef");
+    expect(hook).toContain("nextFocusIndex");
+  });
+
+  it("keeps the cycling rule pure and tested", () => {
+    const lib = read("app/lib/focus-trap.ts");
+    expect(lib).toContain("export function nextFocusIndex");
+    expect(lib).toContain("export function initialFocusIndex");
+  });
+
+  it("gives season rows a keyboard path to the breakdown", () => {
+    // The row carried a click handler and nothing else.
+    const src = read("app/armchair-gm/SeasonResultsPager.tsx");
+    expect(src).toContain("aria-expanded={isOpen}");
+    expect(src).toContain("valuation breakdown for");
   });
 });

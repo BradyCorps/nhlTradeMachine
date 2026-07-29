@@ -4,6 +4,7 @@
 // reloaded session can only safely resume Year 1 pre-rollover.
 import React from "react";
 import type { CupRunState } from "@/app/lib/cup-run";
+import { useDialog } from "@/app/lib/use-dialog";
 
 export function CupRunResumePrompt({
   prompt,
@@ -13,9 +14,11 @@ export function CupRunResumePrompt({
   onDismiss: (resume: boolean) => void;
 }) {
   const resumable = prompt.currentYear === 1 && prompt.seasons.length === 0;
+  const dialog = useDialog({ open: true, label: "Cup Run in progress" });
+
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4" style={{ background: 'rgba(20,16,8,0.55)' }}>
-      <div className="max-w-md w-full border p-5" style={{ background: 'var(--paper, var(--ledger-cream))', borderColor: 'var(--ledger-ink)', borderRadius: 2 }}>
+      <div {...dialog} className="max-w-md w-full border p-5" style={{ background: 'var(--paper, var(--ledger-cream))', borderColor: 'var(--ledger-ink)', borderRadius: 2 }}>
         <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono mb-2" style={{ color: 'var(--ledger-red)' }}>
           Cup Run In Progress
         </div>

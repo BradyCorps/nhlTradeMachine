@@ -51,7 +51,12 @@ function GmTabButton({ label, active, onClick, disabled, badge }: {
     <button
       onClick={onClick}
       disabled={disabled}
-      aria-pressed={active}
+      role="tab"
+      aria-selected={active}
+      aria-controls={`gm-panel-${label.toLowerCase().replace(/\s+/g, "-")}`}
+      // Only the active tab is in the tab order; arrow keys move between them,
+      // which is what a tablist is supposed to do.
+      tabIndex={active ? 0 : -1}
       aria-label={`Open ${label} tab`}
       className="tap-target"
       style={{
@@ -143,7 +148,19 @@ export function GmAnalysisTabs({
   return (
     <div style={{ marginTop: "8px", marginBottom: "16px" }}>
       {/* Tab bar */}
-      <div style={{
+      <div
+        role="tablist"
+        aria-label="Analysis views"
+        onKeyDown={(e) => {
+          const dir = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+          if (!dir) return;
+          e.preventDefault();
+          const usable = tabs.filter(t => !t.disabled);
+          const at = usable.findIndex(t => t.key === activeTab);
+          const next = usable[(at + dir + usable.length) % usable.length];
+          if (next) setActiveTab(next.key);
+        }}
+        style={{
         display: "flex",
         gap: 0,
         background: "#e4d8b8",
@@ -164,7 +181,10 @@ export function GmAnalysisTabs({
       </div>
 
       {/* Tab content */}
-      <div style={{
+      <div
+        role="tabpanel"
+        id={`gm-panel-${(tabs.find(t => t.key === activeTab)?.label ?? "").toLowerCase().replace(/\s+/g, "-")}`}
+        style={{
         borderTop: `3px solid ${GM_PLUM}`,
         background: "var(--ledger-card-light, #f0e8d0)",
         padding: "0",

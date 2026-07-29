@@ -208,7 +208,12 @@ export default function ArmchairGmPage() {
   });
 
   const modeSelectOpen = !showTeamSelect && Boolean(homeTeam) && gameMode == null;
-  useBodyScrollLock(showTeamSelect || modeSelectOpen || tradeBlockOpen || Boolean(tradeRequest?.length) || draftOpen || resignOpen || offerSheetOpen || Boolean(cupDraftSummary));
+  // CXH8 — the memo modal and the Cup resume prompt were missing from this
+  // list, which is the predictable failure of a hand-maintained roll-call of
+  // every overlay in the app. `useDialog` locks scroll itself, so overlays
+  // converted to it no longer need naming here; what remains are the screens
+  // that are not yet dialogs.
+  useBodyScrollLock(tradeBlockOpen || Boolean(tradeRequest?.length) || resignOpen || offerSheetOpen || Boolean(cupDraftSummary));
 
   // ── Abort controllers — cancel stale Claude requests ─────────
   const memoAbortRef = useRef<AbortController | null>(null);
