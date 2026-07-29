@@ -3287,12 +3287,24 @@ describe("Canary — CXH9 public endpoints validate before they work", () => {
   });
 
   it("evaluate bounds its arrays, strings and numbers", () => {
-    const src = read("app/api/evaluate/route.ts");
+    // The schema moved into app/lib so it can be imported and proved; a route
+    // file cannot export anything but its handlers.
+    const src = read("app/lib/evaluate-request-schema.ts");
     expect(src).toContain("PUBLIC_LIMITS.MAX_PACKAGE");
     expect(src).toContain("PUBLIC_LIMITS.MAX_ROSTER");
     expect(src).toContain("z.number().finite()");
     // Unbounded `z.string()` for an id was the reported gap.
     expect(src).toContain("id: idString");
+    expect(read("app/api/evaluate/route.ts")).toContain("EvaluateRequestSchema.safeParse");
+  });
+
+  it("does not put a trade-package ceiling on a bulk-NAV field", () => {
+    // `assets` is the NAV batch — Armchair GM posts a whole league to price
+    // every player at once. Capping it at MAX_PACKAGE 400'd a normal 3 MB
+    // page load and left the app with no NAV for anything.
+    const src = read("app/lib/evaluate-request-schema.ts");
+    expect(src).toContain("assets: z.array(AssetSchema).max(PUBLIC_LIMITS.MAX_PLAYERS)");
+    expect(src).not.toContain("assets: z.array(AssetSchema).max(PUBLIC_LIMITS.MAX_PACKAGE)");
   });
 
   it("claude validates before charging the rate limit", () => {
