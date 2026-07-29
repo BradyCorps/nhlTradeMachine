@@ -246,9 +246,12 @@ describe("Canary — league route features (source-level)", () => {
       });
 
       it("does not present expired UFA/RFA contracts as fake one-year ELC deals", () => {
-        expect(src).toContain("const { contractStatus, expiresThisOffseason } = deriveContractStatus({");
-        expect(src).toContain("const rawCapHit     = expiresThisOffseason ? 0");
-        expect(src).toContain("expiresThisOffseason ? 0 : (nameCollision ? 1 : preliminaryYears)");
+        // Pinned as intent: an expiring deal carries no cap hit and no years,
+        // whatever else the branch has since grown. (It used to assert the two
+        // ternaries verbatim, which the extension work rewrote.)
+        expect(src).toContain("deriveContractStatus({");
+        expect(src).toMatch(/rawCapHit\s+=[\s\S]{0,120}expiresThisOffseason \? 0/);
+        expect(src).toMatch(/finalYears\s+= override\?\.yearsRemaining[\s\S]{0,200}expiresThisOffseason \? 0/);
       });
 
       it("derives free-agency status from stored expiry facts via a pure helper", () => {
@@ -3363,5 +3366,38 @@ describe("Canary — CXH2 lineup state does not leak or churn", () => {
     const reset = src.slice(src.indexOf("const resetTrades"));
     expect(reset).toContain("setLineupStartingGoalies({})");
     expect(reset).toContain("setLineupOrders({})");
+  });
+});
+
+describe("Canary — an admin-recorded extension reaches Armchair GM", () => {
+  const assembly = read("app/lib/roster-assembly.ts");
+
+  it("contract status asks about the extension", () => {
+    // The reported bug: Carlsson and Celebrini signed long-term deals entered
+    // in the admin panel and still derived as RFAs. The extension reached the
+    // valuation engine and nothing else.
+    expect(assembly).toContain("extensionCapHit: fin?.extensionCapHit");
+    expect(assembly).toContain("extensionYears: fin?.extensionYears");
+    expect(assembly).toContain("resolveRecordedExtension");
+    expect(assembly).toContain("expiresThisOffseason = currentDealExpires && extension.state === \"NONE\"");
+  });
+
+  it("an active extension becomes the contract rather than a $0 expiry", () => {
+    expect(assembly).toContain("extensionActive = extension.state === \"ACTIVE\"");
+    expect(assembly).toMatch(/rawCapHit\s+= extensionActive \? extension\.aav/);
+    expect(assembly).toMatch(/extensionActive \? extension\.term/);
+  });
+
+  it("a pending extension is recorded where the offseason flow reads it", () => {
+    // pendingExtension is what the cap horizon, the extension-eligibility gate
+    // and the rollover all read. Without it the signing was a number only the
+    // valuation engine could see.
+    expect(assembly).toContain("pendingExtension: extension.state === \"PENDING\"");
+    expect(assembly).toContain("wouldHaveBeen: normExpiry ?? \"UFA\"");
+  });
+
+  it("an extended player is not injected into the free-agent pool", () => {
+    const pool = assembly.slice(assembly.indexOf("Free-agent pool: teamless FA entries"));
+    expect(pool).toContain("d.extensionCapHit != null && d.extensionCapHit > 0");
   });
 });

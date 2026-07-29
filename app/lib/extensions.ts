@@ -30,6 +30,47 @@ export interface ExtensionOffer {
   extension: PendingExtension;
 }
 
+// ── Recorded (admin-entered) extensions ──────────────────────────
+//
+// Two different things were both called an extension. `pendingExtension` is
+// signed inside a session by the offseason flow. `extensionCapHit` /
+// `extensionYears` are real-world facts entered in the admin contracts panel —
+// Carlsson and Celebrini signing long-term deals a year before their ELCs ran
+// out. Only the first reached the roster's contract logic, so a player with a
+// recorded extension still derived as a pending RFA: the app listed a man under
+// contract for five more years as a free agent about to hit the market.
+//
+// An extension is a signed contract that starts when the current one ends, so
+// which of those two things it is depends entirely on whether the current one
+// has ended yet. That is the whole decision, and it lives here so it is decided
+// once rather than at each of the places that ask.
+
+/** The least a bare `extensionCapHit` with no term can mean. */
+export const DEFAULT_EXTENSION_TERM = 1;
+
+export type RecordedExtension =
+  /** Nothing on record. */
+  | { state: "NONE" }
+  /** Signed, but the current deal still has time to run. */
+  | { state: "PENDING"; aav: number; term: number }
+  /** The old deal has run out — this IS the contract now. */
+  | { state: "ACTIVE"; aav: number; term: number };
+
+export function resolveRecordedExtension(opts: {
+  extensionCapHit?: number | null;
+  extensionYears?: number | null;
+  /** Whether the deal the extension follows has already run out. */
+  currentDealExpired: boolean;
+}): RecordedExtension {
+  const aav = opts.extensionCapHit;
+  if (aav == null || !Number.isFinite(aav) || aav <= 0) return { state: "NONE" };
+  const years = opts.extensionYears;
+  const term = years != null && Number.isFinite(years) && years > 0
+    ? years
+    : DEFAULT_EXTENSION_TERM;
+  return { state: opts.currentDealExpired ? "ACTIVE" : "PENDING", aav, term };
+}
+
 /**
  * A player may be extended in the final year of his deal, and only once.
  *

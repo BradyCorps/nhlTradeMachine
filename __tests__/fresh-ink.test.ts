@@ -1,6 +1,6 @@
 // ── PA8 — dated Hot Off the Press feed ───────────────────────────
 import { describe, it, expect } from "vitest";
-import { orderFreshInk, signedRecency } from "@/app/lib/fresh-ink";
+import { orderFreshInk, signedAav, signedRecency, signedTerm } from "@/app/lib/fresh-ink";
 
 const ext = (name: string, cap: number, signedAt?: string | null) => ({
   name, hasExtension: true, extensionCapHit: cap, extensionSignedAt: signedAt ?? null,
@@ -56,5 +56,42 @@ describe("signedRecency", () => {
   });
   it("returns empty for garbage input", () => {
     expect(signedRecency("not-a-date", now)).toBe("");
+  });
+});
+
+// Once an extension takes effect the roster folds it into capHit/yearsRemaining
+// and clears the extension fields, so the valuation engine does not read the
+// live AAV as a raise still to come. The feed must not lose the signing at that
+// moment — a deal beginning is not a deal being un-signed.
+describe("a signing that has taken effect", () => {
+  const live = {
+    id: "carlsson", name: "Leo Carlsson", hasExtension: false,
+    extensionCapHit: null, extensionYears: null,
+    extensionSignedAt: "2026-07-01", capHit: 18.8, yearsRemaining: 5,
+  };
+
+  it("still appears in the feed", () => {
+    const out = orderFreshInk([live]);
+    expect(out).toHaveLength(1);
+  });
+
+  it("reports the live contract's terms", () => {
+    expect(signedAav(live)).toBe(18.8);
+    expect(signedTerm(live)).toBe(5);
+  });
+
+  it("prefers the extension's own terms while it is still future money", () => {
+    const pending = { ...live, hasExtension: true, extensionCapHit: 9.5, extensionYears: 6, capHit: 0.925, yearsRemaining: 1 };
+    expect(signedAav(pending)).toBe(9.5);
+    expect(signedTerm(pending)).toBe(6);
+  });
+
+  it("does not sweep in an ordinary signed player with no signing on record", () => {
+    // The gate is a signing date or an extension flag, not merely a cap hit.
+    expect(orderFreshInk([{ id: "x", name: "Nobody", capHit: 7.5, yearsRemaining: 4 }])).toHaveLength(0);
+  });
+
+  it("omits a term it does not have rather than printing a zero", () => {
+    expect(signedTerm({ ...live, yearsRemaining: 0 })).toBeNull();
   });
 });

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   isExtensionEligible, projectExtension, applyExtensions,
   activateMaturedExtension, resolveAiExtensions,
+  resolveRecordedExtension, DEFAULT_EXTENSION_TERM,
 } from "@/app/lib/extensions";
 import { buildCapHorizon } from "@/app/lib/cap-horizon";
 import type { Asset } from "@/app/lib/trade-types";
@@ -186,5 +187,86 @@ describe("OFF5 wiring — human and AI both get the lever", () => {
     // An extension that does not appear in the forward view is invisible
     // everywhere, since it costs nothing today.
     expect(read("app/lib/cap-horizon.ts")).toContain("pendingExtension");
+  });
+});
+
+// ── Recorded (admin-entered) extensions ──────────────────────────
+//
+// The app had two things called an extension and only one of them reached the
+// contract logic. `pendingExtension` is signed inside a session; the admin
+// panel's `extensionCapHit`/`extensionYears` are real signings, and they were
+// visible to the valuation engine and to nothing else — so a player under
+// contract for five more years still derived as a pending RFA.
+describe("resolveRecordedExtension", () => {
+  it("reports nothing when no extension is on record", () => {
+    expect(resolveRecordedExtension({ currentDealExpired: false }).state).toBe("NONE");
+    expect(resolveRecordedExtension({ extensionCapHit: null, currentDealExpired: true }).state).toBe("NONE");
+  });
+
+  it("treats a zero or negative AAV as no extension", () => {
+    // A cleared extension writes null, but a 0 in the field is the same claim.
+    expect(resolveRecordedExtension({ extensionCapHit: 0, currentDealExpired: true }).state).toBe("NONE");
+    expect(resolveRecordedExtension({ extensionCapHit: -4, currentDealExpired: true }).state).toBe("NONE");
+  });
+
+  it("rejects a non-finite AAV rather than carrying it into the cap math", () => {
+    expect(resolveRecordedExtension({ extensionCapHit: Number.NaN, currentDealExpired: true }).state).toBe("NONE");
+  });
+
+  // The whole decision: an extension starts when the current deal ends, so
+  // which of the two it is depends only on whether that deal has ended.
+  it("is PENDING while the current deal still runs", () => {
+    expect(resolveRecordedExtension({
+      extensionCapHit: 9.5, extensionYears: 6, currentDealExpired: false,
+    })).toEqual({ state: "PENDING", aav: 9.5, term: 6 });
+  });
+
+  it("is ACTIVE once the current deal has run out", () => {
+    expect(resolveRecordedExtension({
+      extensionCapHit: 18.8, extensionYears: 5, currentDealExpired: true,
+    })).toEqual({ state: "ACTIVE", aav: 18.8, term: 5 });
+  });
+
+  it("falls back to the shortest real term when only an AAV was entered", () => {
+    // Half-recorded, but the AAV alone still means he signed. A zero term would
+    // expire him again immediately, which is the bug this exists to prevent.
+    const r = resolveRecordedExtension({ extensionCapHit: 6, currentDealExpired: false });
+    expect(r).toEqual({ state: "PENDING", aav: 6, term: DEFAULT_EXTENSION_TERM });
+    expect(DEFAULT_EXTENSION_TERM).toBeGreaterThan(0);
+  });
+
+  it("ignores a zero or non-finite term the same way", () => {
+    for (const extensionYears of [0, -2, Number.NaN]) {
+      expect(resolveRecordedExtension({ extensionCapHit: 6, extensionYears, currentDealExpired: false }))
+        .toEqual({ state: "PENDING", aav: 6, term: DEFAULT_EXTENSION_TERM });
+    }
+  });
+});
+
+describe("a recorded extension behaves like a signed one", () => {
+  const base: Asset = {
+    id: "carlsson", teamId: "ANA", name: "Leo Carlsson", position: "C", age: 21,
+    capHit: 18.8, yearsRemaining: 5, retainedPct: 0,
+  } as unknown as Asset;
+
+  it("blocks a second extension", () => {
+    // Once the admin record is mapped onto pendingExtension, the offseason flow
+    // cannot offer him a deal he has already signed.
+    const withPending = { ...base, yearsRemaining: 1,
+      pendingExtension: { aav: 18.8, term: 5, wouldHaveBeen: "RFA" as const } };
+    expect(isExtensionEligible(withPending)).toBe(false);
+    expect(isExtensionEligible({ ...base, yearsRemaining: 1, pendingExtension: undefined })).toBe(true);
+  });
+
+  it("matures into the live contract at rollover", () => {
+    const expired = { ...base, capHit: 0.925, yearsRemaining: 0,
+      expiresThisOffseason: true, contractStatus: "RFA" as const,
+      pendingExtension: { aav: 18.8, term: 5, wouldHaveBeen: "RFA" as const } };
+    const after = activateMaturedExtension(expired);
+    expect(after.capHit).toBe(18.8);
+    expect(after.yearsRemaining).toBe(5);
+    expect(after.contractStatus).toBe("SIGNED");
+    expect(after.expiresThisOffseason).toBe(false);
+    expect(after.pendingExtension).toBeUndefined();
   });
 });

@@ -19,7 +19,7 @@ import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import PercentileCard from "@/app/components/PercentileCard";
 import { displayPosition } from "@/app/lib/display-position";
-import { orderFreshInk, signedRecency } from "@/app/lib/fresh-ink";
+import { orderFreshInk, signedAav, signedRecency, signedTerm } from "@/app/lib/fresh-ink";
 
 // ── Types ─────────────────────────────────────────────────────
 interface Player {
@@ -1121,8 +1121,10 @@ export default function PlayersPage() {
           </div>
           <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6 }}>
             {freshInk.map(p => {
-              const ext = (p as any).extensionCapHit as number;
-              const extYears = (p as any).extensionYears as number | undefined;
+              // Reads the extension's own numbers while it is still future
+              // money, and the live contract once it has taken effect.
+              const ext = signedAav(p as any);
+              const extYears = signedTerm(p as any);
               const signedAt = (p as any).extensionSignedAt as string | null | undefined;
               const inner = (
                 <>

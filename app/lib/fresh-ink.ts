@@ -6,12 +6,35 @@
 export interface FreshInkPlayer {
   hasExtension?: boolean;
   extensionCapHit?: number | null;
+  extensionYears?: number | null;
   extensionSignedAt?: string | null; // ISO YYYY-MM-DD
+  /** The live deal, for a signing that has since taken effect. */
+  capHit?: number | null;
+  yearsRemaining?: number | null;
+}
+
+// A signing does not stop being news the day it begins. An extension is future
+// money only until the contract it followed runs out; after that it IS the
+// contract, and the roster carries it as capHit/yearsRemaining with the
+// extension fields cleared so the valuation engine does not read the live AAV
+// as a raise still to come. The feed reports the deal either way, so it reads
+// whichever pair currently holds it.
+export function signedAav(p: FreshInkPlayer): number {
+  const ext = p.extensionCapHit ?? 0;
+  return ext > 0 ? ext : (p.capHit ?? 0);
+}
+
+export function signedTerm(p: FreshInkPlayer): number | null {
+  const ext = p.extensionCapHit ?? 0;
+  const term = ext > 0 ? p.extensionYears : p.yearsRemaining;
+  return term != null && term > 0 ? term : null;
 }
 
 export function orderFreshInk<T extends FreshInkPlayer>(players: T[], limit = 5): T[] {
   return players
-    .filter(p => p.hasExtension && (p.extensionCapHit ?? 0) > 0)
+    // A signing date is itself the claim that a deal was signed, and it is the
+    // only marker left once the extension has begun.
+    .filter(p => (p.hasExtension || p.extensionSignedAt) && signedAav(p) > 0)
     .slice() // don't mutate caller's array
     .sort((a, b) => {
       const da = a.extensionSignedAt;
@@ -19,7 +42,7 @@ export function orderFreshInk<T extends FreshInkPlayer>(players: T[], limit = 5)
       if (da && db && da !== db) return db.localeCompare(da); // newer date first
       if (da && !db) return -1;   // dated signings lead undated ones
       if (!da && db) return 1;
-      return (b.extensionCapHit ?? 0) - (a.extensionCapHit ?? 0); // AAV fallback
+      return signedAav(b) - signedAav(a); // AAV fallback
     })
     .slice(0, limit);
 }

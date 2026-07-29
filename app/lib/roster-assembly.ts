@@ -28,6 +28,7 @@ import { applyTeamCapDeltas, type CapDeltaAsset, type CapDeltaMoves, type TeamCa
 import { baselineForNhlPlayerId, type PlayerBaselineMap } from "@/app/lib/player-baselines";
 import { secondaryPositionFor } from "@/app/data/secondary-positions";
 import { teamWindow } from "@/app/lib/team-window";
+import { resolveRecordedExtension, type RecordedExtension } from "@/app/lib/extensions";
 
 const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
 const CONTRACTS_CACHE_KEY = "cache:contracts:v2";
@@ -60,7 +61,15 @@ export function deriveContractStatus(opts: {
   draftOverall?: number | null;
   isELC?: boolean;
   offseasonYear?: number;
-}): { contractStatus: "UFA" | "RFA" | "SIGNED"; expiresThisOffseason: boolean; normExpiry: "UFA" | "RFA" | null } {
+  /** Admin-recorded extension. A signed extension is not a trip to the market. */
+  extensionCapHit?: number | null;
+  extensionYears?: number | null;
+}): {
+  contractStatus: "UFA" | "RFA" | "SIGNED";
+  expiresThisOffseason: boolean;
+  normExpiry: "UFA" | "RFA" | null;
+  extension: RecordedExtension;
+} {
   const offseasonYear = opts.offseasonYear ?? Number(SEASON.label.slice(0, 4));
   const raw = typeof opts.expiryStatus === "string" ? opts.expiryStatus : null;
   const normExpiry: "UFA" | "RFA" | null = raw
@@ -71,12 +80,27 @@ export function deriveContractStatus(opts: {
   // draftOverall suppresses FA detection only for young ELC-age players (≤23).
   // Veterans with draftOverall from prospect enrichment should still expire.
   const isDraftSuppressed = opts.draftOverall != null && opts.isELC;
-  const expiresThisOffseason =
+  const currentDealExpires =
     normExpiry != null && !isDraftSuppressed &&
     (rawExpiryYear != null ? rawExpiryYear <= offseasonYear : prelim <= 1);
+
+  // A recorded extension is a signed contract, so it settles the question the
+  // expiry flags were being used to answer. Whether it has STARTED depends on
+  // the deal it follows: if that one has run out, the extension is the current
+  // contract; if not, it is money owed in a later season and the current deal
+  // stands. Either way the player is signed and does not reach the market —
+  // which is the bug this fixes. `expiryStatus` is left untouched as the record
+  // of what he would have been.
+  const extension = resolveRecordedExtension({
+    extensionCapHit: opts.extensionCapHit,
+    extensionYears: opts.extensionYears,
+    currentDealExpired: currentDealExpires,
+  });
+
+  const expiresThisOffseason = currentDealExpires && extension.state === "NONE";
   const contractStatus: "UFA" | "RFA" | "SIGNED" =
     expiresThisOffseason && normExpiry ? normExpiry : "SIGNED";
-  return { contractStatus, expiresThisOffseason, normExpiry };
+  return { contractStatus, expiresThisOffseason, normExpiry, extension };
 }
 
 const NHL_HEADERS = {
@@ -1182,12 +1206,14 @@ export async function assembleCanonicalRoster(options: {
       const rawExpiryStatus = typeof fin?.expiryStatus === "string" ? fin.expiryStatus : null;
       const rawExpiryYear = typeof fin?.expiryYear === "number" ? fin.expiryYear : null;
       const preliminaryYears = isLikelyELC ? 1 : (fin?.yearsRemaining ?? 1);
-      const { contractStatus, expiresThisOffseason } = deriveContractStatus({
+      const { contractStatus, expiresThisOffseason, normExpiry, extension } = deriveContractStatus({
         expiryStatus: rawExpiryStatus,
         expiryYear: rawExpiryYear,
         yearsRemaining: preliminaryYears,
         draftOverall,
         isELC: isLikelyELC,
+        extensionCapHit: fin?.extensionCapHit,
+        extensionYears: fin?.extensionYears,
       });
       if (/ufa/i.test(String(rawExpiryStatus))) {
         _dbg.ufaMatch++;
@@ -1203,7 +1229,14 @@ export async function assembleCanonicalRoster(options: {
       // "needs data" view; does not change pricing.
       const contractMissing = !fin && !isLikelyELC && draftOverall == null;
 
-      const rawCapHit     = expiresThisOffseason ? 0 : (isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925));
+      // An ACTIVE extension is the contract now — the deal it followed has run
+      // out, so its AAV and term are the live ones. Carlsson's ELC expiring in
+      // 2026 with an extension on record is not a $0 cap hit and 0 years left;
+      // he is signed at the extension's number.
+      const extensionActive = extension.state === "ACTIVE";
+      const rawCapHit     = extensionActive ? extension.aav
+                          : expiresThisOffseason ? 0
+                          : (isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925));
       // lastCapHit mirrors rawCapHit but is NEVER zeroed for pending FAs. It is the
       // real expiring/last contract value, used for the off-season "was $X" display
       // and — critically — as the cap CREDIT when a pending FA re-signs or walks.
@@ -1219,7 +1252,10 @@ export async function assembleCanonicalRoster(options: {
         && contractPos !== rosterPos;
 
       const finalCapHit  = override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
-      const finalYears   = override?.yearsRemaining ?? (expiresThisOffseason ? 0 : (nameCollision ? 1 : preliminaryYears));
+      const finalYears   = override?.yearsRemaining
+        ?? (extensionActive ? extension.term
+          : expiresThisOffseason ? 0
+          : (nameCollision ? 1 : preliminaryYears));
       const finalNMC     = override?.hasNMC  ?? (nameCollision ? false : (fin?.hasNMC  ?? false));
       const finalNTC     = override?.hasNTC  ?? (nameCollision ? false : (fin?.hasNTC  ?? false));
       const finalRetain  = override?.canRetain ?? (nameCollision ? true : (fin?.canRetain ?? true));
@@ -1333,10 +1369,21 @@ export async function assembleCanonicalRoster(options: {
         capHit:         finalCapHit,
         lastCapHit:     nameCollision ? elcCapHit : lastCapHitRaw,
         yearsRemaining: finalYears,
-        hasExtension: fin?.extensionCapHit != null && fin.extensionCapHit > 0,
-        extensionCapHit: fin?.extensionCapHit ?? undefined,
-        extensionYears: fin?.extensionYears ?? undefined,
+        // Only a PENDING extension is future money. Once it is ACTIVE it has
+        // been folded into capHit/yearsRemaining above, and leaving these set
+        // would have the valuation engine read the live AAV as a step-up still
+        // to come and the card badge a current contract as an extension.
+        hasExtension: extension.state === "PENDING",
+        extensionCapHit: extension.state === "PENDING" ? extension.aav : undefined,
+        extensionYears:  extension.state === "PENDING" ? extension.term : undefined,
         extensionSignedAt: fin?.extensionSignedAt ?? null,
+        // The same record the in-session offseason flow writes, so a signed
+        // extension reaches the cap horizon, blocks a second extension, and
+        // matures into a contract at rollover — instead of being a number only
+        // the valuation engine could see.
+        pendingExtension: extension.state === "PENDING"
+          ? { aav: extension.aav, term: extension.term, wouldHaveBeen: normExpiry ?? "UFA" }
+          : undefined,
         hasNMC:    finalNMC,
         hasNTC:    finalNTC,
         canRetain: finalRetain,
@@ -1386,7 +1433,7 @@ export async function assembleCanonicalRoster(options: {
       age: playersTable.age, expiryStatus: playersTable.expiryStatus,
       expiryYear: playersTable.expiryYear, capHit: playersTable.capHit,
       retired: playersTable.retired, excludeFromRoster: playersTable.excludeFromRoster,
-      teamId: playersTable.teamId,
+      teamId: playersTable.teamId, extensionCapHit: playersTable.extensionCapHit,
     }).from(playersTable);
     const existingSlugs = new Set(players.map((p: any) => slugify(p.name)));
     let poolCount = 0;
@@ -1398,6 +1445,10 @@ export async function assembleCanonicalRoster(options: {
       // their bare seed row never had an expiry flag written.
       const effectiveExpiry = d.expiryStatus ?? seedFreeAgentStatus(d.name);
       if (!effectiveExpiry) continue;
+      // A recorded extension means he signed. The expiry flag on the row is the
+      // status he would have carried into a market he is not going to reach, so
+      // injecting him here would put a man under contract into free agency.
+      if (d.extensionCapHit != null && d.extensionCapHit > 0) continue;
       const dSlug = slugify(d.name);
       if (existingSlugs.has(dSlug)) continue;
       const fin = CONTRACTS[d.name] ?? null;
