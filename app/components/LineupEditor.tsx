@@ -277,25 +277,28 @@ function TeamLineup({
     setSelected(null);
   }, [effective, navMap, seatLocks]);
 
+  // CXH2 — this used to perform the swap INSIDE a `setSelected` updater.
+  // A state updater must be pure: React StrictMode double-invokes it in
+  // development, so the swap, the lock move and the edited flag all fired
+  // twice, and a double swap is a no-op — the bug hid itself.
   const clickSlot = useCallback((group: Group, idx: number) => {
-    setSelected(prev => {
-      if (!prev) return { group, idx };
-      if (prev.group === group && prev.idx === idx) return null;   // deselect
-      if (prev.group !== group) return { group, idx };             // switch selection
-      // Swap within group (swapping with an empty slot just moves the player)
-      setOrders(o => {
-        const arr = [...o[group]];
-        if (arr[prev.idx] === undefined && arr[idx] === undefined) return o;
-        [arr[prev.idx], arr[idx]] = [arr[idx], arr[prev.idx]];
-        return { ...o, [group]: arr };
-      });
-      // The lock follows the player, not the slot — otherwise a manual move
-      // is silently undone the next time the sheet re-hydrates.
-      setLocks(l => ({ ...l, [group]: swapLocks(l[group], prev.idx, idx) }));
-      setEdited(true);
-      return null;
+    if (!selected) { setSelected({ group, idx }); return; }
+    if (selected.group === group && selected.idx === idx) { setSelected(null); return; }
+    if (selected.group !== group) { setSelected({ group, idx }); return; }
+
+    const from = selected.idx;
+    setOrders(o => {
+      const arr = [...o[group]];
+      if (arr[from] === undefined && arr[idx] === undefined) return o;
+      [arr[from], arr[idx]] = [arr[idx], arr[from]];
+      return { ...o, [group]: arr };
     });
-  }, []);
+    // The lock follows the player, not the slot — otherwise a manual move
+    // is silently undone the next time the sheet re-hydrates.
+    setLocks(l => ({ ...l, [group]: swapLocks(l[group], from, idx) }));
+    setEdited(true);
+    setSelected(null);
+  }, [selected]);
 
   // Reads `orders` directly rather than calling setLocks inside a setOrders
   // updater — a state update nested in another updater is a side effect in a
@@ -315,7 +318,16 @@ function TeamLineup({
     clickSlot(group, idx);
   }, [clickSlot]);
 
-  const Cell = ({ group, idx, pos }: { group: Group; idx: number; pos: string }) => {
+  // CXH2 — a render HELPER, not a component declared in render.
+  //
+  // As `const Cell = (...) => ...` this was a brand-new component type on every
+  // render, so React could not match the old tree to the new one and unmounted
+  // and remounted all 18 cells for any state change — including the `selected`
+  // change a click makes. That threw away focus mid-interaction, which is
+  // exactly what the CXH8 keyboard work was for. Called as a function, React
+  // sees the returned <td> elements as children of this component and reconciles
+  // them normally.
+  const renderCell = (group: Group, idx: number, pos: string) => {
     const id = orders[group][idx];
     const p  = id ? byId.get(id) : undefined;
     const isSel = selected?.group === group && selected.idx === idx;
@@ -437,25 +449,24 @@ function TeamLineup({
   // A player already on the sheet is moved rather than duplicated — a unit
   // cannot dress the same man twice.
   const clickUnitSlot = useCallback((sheet: "PP" | "PK", idx: number) => {
-    setStSelected(prev => {
-      if (!prev) return { sheet, idx };
-      if (prev.sheet === sheet && prev.idx === idx) return null;
-      if (prev.sheet !== sheet) return { sheet, idx };
+    if (!stSelected) { setStSelected({ sheet, idx }); return; }
+    if (stSelected.sheet === sheet && stSelected.idx === idx) { setStSelected(null); return; }
+    if (stSelected.sheet !== sheet) { setStSelected({ sheet, idx }); return; }
 
-      setSpecialTeams(st => {
-        const key = sheet === "PP" ? "powerPlay" : "penaltyKill";
-        const slots = sheet === "PP" ? PP_SLOTS : PK_SLOTS;
-        const arr = [...st[key]];
-        while (arr.length < slots) arr.push("");
-        [arr[prev.idx], arr[idx]] = [arr[idx], arr[prev.idx]];
-        return { ...st, [key]: arr };
-      });
-      setEdited(true);
-      return null;
+    const from = stSelected.idx;
+    setSpecialTeams(st => {
+      const key = sheet === "PP" ? "powerPlay" : "penaltyKill";
+      const slots = sheet === "PP" ? PP_SLOTS : PK_SLOTS;
+      const arr = [...st[key]];
+      while (arr.length < slots) arr.push("");
+      [arr[from], arr[idx]] = [arr[idx], arr[from]];
+      return { ...st, [key]: arr };
     });
-  }, []);
+    setEdited(true);
+    setStSelected(null);
+  }, [stSelected]);
 
-  const UnitCell = ({ sheet, idx }: { sheet: "PP" | "PK"; idx: number }) => {
+  const renderUnitCell = (sheet: "PP" | "PK", idx: number, key: React.Key) => {
     const ids = sheet === "PP" ? specialTeams.powerPlay : specialTeams.penaltyKill;
     const id = ids[idx];
     const p = id ? byId.get(id) : undefined;
@@ -464,6 +475,7 @@ function TeamLineup({
 
     return (
       <td
+        key={key}
         onClick={() => clickUnitSlot(sheet, idx)}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); clickUnitSlot(sheet, idx); } }}
         role="button"
@@ -496,7 +508,7 @@ function TeamLineup({
     );
   };
 
-  const UnitSheet = ({ sheet }: { sheet: "PP" | "PK" }) => {
+  const renderUnitSheet = (sheet: "PP" | "PK") => {
     const unitSize = sheet === "PP" ? PP_UNIT_SIZE : PK_UNIT_SIZE;
     const label = sheet === "PP" ? "Power Play" : "Penalty Kill";
     return (
@@ -504,11 +516,10 @@ function TeamLineup({
         <tbody>
           {[0, 1].map(unit => (
             <React.Fragment key={unit}>
-              <SectionHead>{`${label} — Unit ${unit + 1}`}</SectionHead>
+              {renderSectionHead(`${label} — Unit ${unit + 1}`)}
               <tr style={{ background: unit % 2 === 0 ? "transparent" : "var(--ledger-cream)" }}>
-                {Array.from({ length: unitSize }, (_, i) => (
-                  <UnitCell key={i} sheet={sheet} idx={unit * unitSize + i} />
-                ))}
+                {Array.from({ length: unitSize }, (_, i) =>
+                  renderUnitCell(sheet, unit * unitSize + i, i))}
               </tr>
             </React.Fragment>
           ))}
@@ -517,7 +528,7 @@ function TeamLineup({
     );
   };
 
-  const SectionHead = ({ children }: { children: React.ReactNode }) => (
+  const renderSectionHead = (children: React.ReactNode) => (
     <tr>
       <td colSpan={4} style={{
         fontFamily: MONO, fontSize: 11, fontWeight: 900, color: "var(--ledger-ink-faint)",
@@ -529,7 +540,7 @@ function TeamLineup({
     </tr>
   );
 
-  const RowLabel = ({ text }: { text: string }) => (
+  const renderRowLabel = (text: string) => (
     <td style={{ fontFamily: MONO, fontSize: 11, fontWeight: 900,
                  color: "var(--ledger-ink-faint)", paddingRight: 4, whiteSpace: "nowrap", width: 36 }}>
       {text}
@@ -613,41 +624,41 @@ function TeamLineup({
         })}
       </div>
 
-      {situation === "PP" && <UnitSheet sheet="PP" />}
-      {situation === "PK" && <UnitSheet sheet="PK" />}
+      {situation === "PP" && renderUnitSheet("PP")}
+      {situation === "PK" && renderUnitSheet("PK")}
 
       {situation === "EV" && (
       <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
         <tbody>
-          <SectionHead>Forwards</SectionHead>
+          {renderSectionHead("Forwards")}
           {[0, 1, 2, 3].map(i => (
             <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : "var(--ledger-cream)" }}>
-              <RowLabel text={ordinals[i]} />
-              <Cell group="F" idx={i * 3}     pos="LW" />
-              <Cell group="F" idx={i * 3 + 1} pos="C " />
-              <Cell group="F" idx={i * 3 + 2} pos="RW" />
+              {renderRowLabel(ordinals[i])}
+              {renderCell("F", i * 3,     "LW")}
+              {renderCell("F", i * 3 + 1, "C ")}
+              {renderCell("F", i * 3 + 2, "RW")}
             </tr>
           ))}
 
-          <SectionHead>Defense</SectionHead>
+          {renderSectionHead("Defense")}
           {[0, 1, 2].map(i => (
             <tr key={i} style={{ background: i % 2 === 0 ? "transparent" : "var(--ledger-cream)" }}>
-              <RowLabel text={ordinals[i]} />
-              <Cell group="D" idx={i * 2}     pos="LD" />
-              <Cell group="D" idx={i * 2 + 1} pos="RD" />
+              {renderRowLabel(ordinals[i])}
+              {renderCell("D", i * 2,     "LD")}
+              {renderCell("D", i * 2 + 1, "RD")}
               <td />
             </tr>
           ))}
 
-          <SectionHead>Goaltending</SectionHead>
+          {renderSectionHead("Goaltending")}
           <tr>
-            <RowLabel text="STR" />
-            <Cell group="G" idx={0} pos="G " />
+            {renderRowLabel("STR")}
+            {renderCell("G", 0, "G ")}
             <td colSpan={2} />
           </tr>
           <tr>
-            <RowLabel text="BAK" />
-            <Cell group="G" idx={1} pos="G " />
+            {renderRowLabel("BAK")}
+            {renderCell("G", 1, "G ")}
             <td colSpan={2} />
           </tr>
         </tbody>
@@ -740,6 +751,7 @@ export default function LineupEditor({
             {home && (
               <div style={{ background: "var(--ledger-cream)", border: "1px solid #c8b890", padding: "10px 12px" }}>
                 <TeamLineup
+                  key={home.teamId}
                   {...home}
                   navMap={navMap}
                   savedOrder={savedLineupOrders?.[home.teamId]}
@@ -751,6 +763,7 @@ export default function LineupEditor({
             {partner && (
               <div style={{ background: "var(--ledger-cream)", border: "1px solid #c8b890", padding: "10px 12px" }}>
                 <TeamLineup
+                  key={partner.teamId}
                   {...partner}
                   navMap={navMap}
                   savedOrder={savedLineupOrders?.[partner.teamId]}

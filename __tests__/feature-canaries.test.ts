@@ -1223,9 +1223,12 @@ describe("Canary — trade UX loading and mobile focus", () => {
   it("lineup editor keeps extra goalies on the swappable bench", () => {
     expect(lineupEditor).toContain("const gBench = orders.G.slice(2)");
     expect(lineupEditor).toContain('group: "G" as Group, idx: 2 + i');
-    expect(lineupEditor).toContain('if (prev.group !== group) return { group, idx };');
-    expect(lineupEditor).toContain('<Cell group="G" idx={0} pos="G " />');
-    expect(lineupEditor).toContain('<Cell group="G" idx={1} pos="G " />');
+    // Clicking across groups reselects rather than swapping — a goalie cannot
+    // be dropped into a forward slot. (Pinned as intent: this used to assert
+    // the exact `setSelected` updater line that CXH2 removed.)
+    expect(lineupEditor).toMatch(/selected\.group !== group\)\s*\{?\s*setSelected\(\{ group, idx \}\)/);
+    expect(lineupEditor).toContain('renderCell("G", 0, "G ")');
+    expect(lineupEditor).toContain('renderCell("G", 1, "G ")');
   });
 
   it("Armchair GM Phase 5 keeps mobile controls touch-sized and keyboard-visible", () => {
@@ -2929,7 +2932,10 @@ describe("Canary — RL5 line locks", () => {
 
   it("carries a lock with its player on a manual swap", () => {
     const src = read("app/components/LineupEditor.tsx");
-    expect(src).toContain("swapLocks(l[group], prev.idx, idx)");
+    // The lock follows the player, not the slot. Pinned as intent — the call
+    // used to read `prev.idx` from inside a setSelected updater, which CXH2
+    // removed in favour of reading the selection directly.
+    expect(src).toMatch(/setLocks\(l => \(\{ \.\.\.l, \[group\]: swapLocks\(l\[group\], \w+, idx\) \}\)\)/);
   });
 
   it("prunes locks when the roster changes", () => {
@@ -3302,5 +3308,60 @@ describe("Canary — CXH9 public endpoints validate before they work", () => {
     expect(src).toContain("signal: upstream.signal");
     // The upstream message can carry request detail.
     expect(src).not.toContain("{ error: e.message }");
+  });
+});
+
+describe("Canary — CXH2 lineup state does not leak or churn", () => {
+  it("a lineup sheet is keyed to its club", () => {
+    // `TeamLineup` is rendered twice with the same shape. Without a key React
+    // reuses the instance across a franchise change, so the previous club's
+    // order stayed on screen under the new club's name.
+    const src = read("app/components/LineupEditor.tsx");
+    expect(src).toContain("key={home.teamId}");
+    expect(src).toContain("key={partner.teamId}");
+  });
+
+  it("no state setter is called inside another setter's updater", () => {
+    // A state updater must be pure. StrictMode double-invokes it, and a swap
+    // performed twice is a swap not performed at all — the bug hid itself.
+    //
+    // Scanned by balancing parens rather than by a fixed window, so the check
+    // covers the whole updater body however long it grows.
+    const src = read("app/components/LineupEditor.tsx");
+    const setter = /\bset[A-Z]\w*\(/g;
+    for (let m = setter.exec(src); m; m = setter.exec(src)) {
+      let depth = 1;
+      let i = m.index + m[0].length;
+      for (; i < src.length && depth > 0; i++) {
+        if (src[i] === "(") depth++;
+        else if (src[i] === ")") depth--;
+      }
+      const body = src.slice(m.index + m[0].length, i - 1);
+      // Only an updater form can be double-invoked; `setX(value)` is fine.
+      if (!/^\s*(\(?\w+\)?|\([^)]*\))\s*=>/.test(body)) continue;
+      expect(body, `${m[0]} at index ${m.index}`).not.toMatch(/\bset[A-Z]\w*\(/);
+    }
+  });
+
+  it("lineup cells are render helpers, not components declared in render", () => {
+    // Declared in the body, each was a new component type every render, so
+    // React remounted all 18 cells on any state change and threw away focus
+    // mid-interaction — undoing the CXH8 keyboard work.
+    const src = read("app/components/LineupEditor.tsx");
+    for (const name of ["Cell", "UnitCell", "UnitSheet", "SectionHead", "RowLabel"]) {
+      expect(src, name).not.toMatch(new RegExp(`\\n  const ${name} = \\(`));
+      expect(src, name).not.toContain(`<${name} `);
+    }
+    expect(src).toContain("renderCell(");
+    expect(src).toContain("renderUnitSheet(");
+  });
+
+  it("reset clears the lineup orders, not only the goalies", () => {
+    // Reset restores the original database. An order left behind was re-applied
+    // to a roster that no longer held those players.
+    const src = read("app/armchair-gm/useTradeBench.ts");
+    const reset = src.slice(src.indexOf("const resetTrades"));
+    expect(reset).toContain("setLineupStartingGoalies({})");
+    expect(reset).toContain("setLineupOrders({})");
   });
 });

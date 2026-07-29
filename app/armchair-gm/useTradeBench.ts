@@ -231,7 +231,12 @@ export function useTradeBench({
       setExecutedTrades([]);
       setSessionRetention([]);
       simControlsRef.current?.resetSimulation();
+      // CXH2 — both halves of the lineup, not just the crease. Reset restores
+      // the original database, so a hand-built forward group left behind here
+      // was re-applied to a roster that no longer contained those players: the
+      // sheet came back holding men the club had never traded for.
       setLineupStartingGoalies({});
+      setLineupOrders({});
       setShowSimPanel(false);
       setBlocks([[], []]);
       setVerdict(null);
