@@ -3531,9 +3531,25 @@ describe("Canary — Press Box rules describe the game being scored", () => {
     expect(page).toContain("The Perfect Hand");
   });
 
-  it("keeps every guess on screen", () => {
+  it("keeps every guess on screen WHILE the next one is being made", () => {
+    // The history lived inside the SCORED panel, so it vanished the moment the
+    // player pressed Try Again — gone exactly when it was needed.
+    expect(page).toContain("function AttemptHistory(");
+    expect((page.match(/<AttemptHistory/g) ?? []).length).toBe(2);
+    const drafting = page.slice(page.indexOf("Hands You Have Tried") - 400,
+                                page.indexOf("Hands You Have Tried") + 100);
+    expect(drafting).toContain('phase === "DRAFTING"');
     expect(page).toContain("belonged");
-    expect(page).toContain("{names.join(\" · \")}");
+  });
+
+  it("does not tell the player to waive two cards out of eight", () => {
+    // "Waive the other 2" was left over from the six-card deal.
+    expect(page).not.toContain("Waive the other 2.");
+    expect(page).toContain("Waive the other {CARDS_DEALT - 4}");
+  });
+
+  it("does not point at a scoring breakdown that is off screen", () => {
+    expect(page).not.toContain("Use the scoring breakdown to improve your hand");
   });
 
   it("takes the optimum the curator already computed", () => {

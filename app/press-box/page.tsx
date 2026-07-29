@@ -151,6 +151,108 @@ function HowToScore() {
   );
 }
 
+// ── Attempt history ───────────────────────────────────────────
+//
+// Which four, and how many of them belonged. This lived inside the SCORED
+// panel, so it vanished the moment the player pressed Try Again — gone exactly
+// when it was needed, while the drafting instructions told them to "use the
+// scoring breakdown" that had gone with it. It renders in both phases now.
+//
+// Not a new hint: the overlap was already printed for the latest attempt. What
+// it removes is having to remember five sets of four, which is bookkeeping
+// rather than deduction. Every guessing game worth playing keeps its guesses
+// on screen.
+function AttemptHistory({
+  attempts, dealt, optimal, optimalCombos, minAttempts = 1, title = "Attempt History",
+}: {
+  attempts: AttemptRecord[];
+  dealt: PressBoxPlayer[];
+  optimal: number;
+  optimalCombos: string[][];
+  minAttempts?: number;
+  title?: string;
+}) {
+  if (attempts.length < minAttempts || attempts.length === 0) return null;
+  const bestScore = Math.max(...attempts.map(a => a.score));
+
+  return (
+    <div
+      className="border p-4"
+      style={{ borderColor: "var(--rule)", background: "var(--paper-inset)", borderRadius: 2 }}
+    >
+      <div
+        className="text-[10px] font-black uppercase tracking-[0.3em] font-mono pb-2 border-b mb-2"
+        style={{ color: "var(--ink)", borderColor: "var(--rule)" }}
+      >
+        {title}
+      </div>
+      {attempts.map((attempt, i) => {
+        const isBest = attempt.score === bestScore;
+        const isPerfect = attempt.score === optimal;
+        const names = attempt.picks.map(id => dealt.find(p => p.id === id)?.name ?? "—");
+        const overlap = optimalCombos.length > 0
+          ? overlapWithOptimal(attempt.picks, optimalCombos)
+          : null;
+        return (
+          <div key={i} className="py-1.5 border-b" style={{ borderColor: "var(--rule-light)" }}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-2 h-2"
+                  style={{
+                    background: isPerfect
+                      ? "var(--ledger-green)"
+                      : attempt.score >= optimal * 0.7 ? "var(--ledger-amber)" : "var(--ledger-red)",
+                    borderRadius: "50%",
+                  }}
+                />
+                <span className="text-[11px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+                  Attempt {i + 1}
+                </span>
+                {overlap !== null && !isPerfect && (
+                  <span className="text-[10px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+                    · {overlap}/4 belonged
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className="text-[13px] font-black font-mono tabular-nums"
+                  style={{ color: isPerfect ? "var(--ledger-green)" : "var(--ink)" }}
+                >
+                  {attempt.score}/{optimal}
+                </span>
+                {isBest && !isPerfect && (
+                  <span
+                    className="text-[10px] font-black font-mono uppercase px-1 py-px"
+                    style={{ background: "var(--ledger-amber)", color: "#fff", borderRadius: 1 }}
+                  >
+                    Best
+                  </span>
+                )}
+                {isPerfect && (
+                  <span
+                    className="text-[10px] font-black font-mono uppercase px-1 py-px"
+                    style={{ background: "var(--ledger-green)", color: "#fff", borderRadius: 1 }}
+                  >
+                    Perfect
+                  </span>
+                )}
+              </div>
+            </div>
+            <div
+              className="text-[10px] font-mono mt-1 pl-4"
+              style={{ color: "var(--ledger-ink-faint)", overflowWrap: "anywhere" }}
+            >
+              {names.join(" · ")}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Rubber stamp overlay ──────────────────────────────────────
 function CardStamp({ text, color }: { text: string; color: string }) {
   return (
@@ -850,11 +952,12 @@ function PressBoxGame() {
                 <>
                   <strong>Pick 4 cards</strong> to move your peg to the target hole.
                   <br />
-                  Use the scoring breakdown to improve your hand.
+                  Your earlier hands are below — work out what was carrying them.
                 </>
               ) : (
                 <>
-                  <strong>Draft 4 players</strong> into your lineup. Waive the other 2.
+                  {/* Was "Waive the other 2" — left over from the six-card deal. */}
+                  <strong>Draft 4 players</strong> into your lineup. Waive the other {CARDS_DEALT - 4}.
                   <br />
                   A mystery <strong>call-up</strong> will be revealed — score your hand.
                   <br />
@@ -870,6 +973,20 @@ function PressBoxGame() {
             >
               {picks.length}/4 selected
             </p>
+          </div>
+        )}
+
+        {/* What has been tried, sitting directly above the table it refers to,
+            so the player reads their own history and then looks at the cards. */}
+        {phase === "DRAFTING" && (
+          <div className="mb-5">
+            <AttemptHistory
+              attempts={attempts}
+              dealt={hand.dealt}
+              optimal={optimal}
+              optimalCombos={optimalResult?.combos ?? []}
+              title="Hands You Have Tried"
+            />
           </div>
         )}
 
@@ -1078,93 +1195,13 @@ function PressBoxGame() {
               </div>
             </div>
 
-            {/* Attempt history */}
-            {attempts.length > 1 && (
-              <div
-                className="border p-4"
-                style={{ borderColor: "var(--rule)", background: "var(--paper-inset)", borderRadius: 2 }}
-              >
-                <div
-                  className="text-[10px] font-black uppercase tracking-[0.3em] font-mono pb-2 border-b mb-2"
-                  style={{ color: "var(--ink)", borderColor: "var(--rule)" }}
-                >
-                  Attempt History
-                </div>
-                {attempts.map((attempt, i) => {
-                  const isBest = attempt.score === bestScore;
-                  const isPerfect = attempt.score === optimal;
-                  // Which four, and how many of them belonged. Without the
-                  // names a player has to remember five sets of four across
-                  // five attempts, which is memory load rather than deduction —
-                  // every guessing game worth playing keeps its guesses on
-                  // screen. The overlap is already shown for the latest
-                  // attempt; showing it for all of them is the same
-                  // information, not a new hint.
-                  const names = attempt.picks
-                    .map(id => hand.dealt.find(p => p.id === id)?.name ?? "—");
-                  const overlap = optimalResult
-                    ? overlapWithOptimal(attempt.picks, optimalResult.combos)
-                    : null;
-                  return (
-                    <div
-                      key={i}
-                      className="py-1.5 border-b"
-                      style={{ borderColor: "var(--rule-light)" }}
-                    >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-2 h-2"
-                          style={{
-                            background: isPerfect ? "var(--ledger-green)" : attempt.score >= optimal * 0.7 ? "var(--ledger-amber)" : "var(--ledger-red)",
-                            borderRadius: "50%",
-                          }}
-                        />
-                        <span className="text-[11px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
-                          Attempt {i + 1}
-                        </span>
-                        {overlap !== null && !isPerfect && (
-                          <span className="text-[10px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
-                            · {overlap}/4 belonged
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="text-[13px] font-black font-mono tabular-nums"
-                          style={{ color: isPerfect ? "var(--ledger-green)" : "var(--ink)" }}
-                        >
-                          {attempt.score}/{optimal}
-                        </span>
-                        {isBest && !isPerfect && (
-                          <span
-                            className="text-[10px] font-black font-mono uppercase px-1 py-px"
-                            style={{ background: "var(--ledger-amber)", color: "#fff", borderRadius: 1 }}
-                          >
-                            Best
-                          </span>
-                        )}
-                        {isPerfect && (
-                          <span
-                            className="text-[10px] font-black font-mono uppercase px-1 py-px"
-                            style={{ background: "var(--ledger-green)", color: "#fff", borderRadius: 1 }}
-                          >
-                            Perfect
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div
-                      className="text-[10px] font-mono mt-1 pl-4"
-                      style={{ color: "var(--ledger-ink-faint)", overflowWrap: "anywhere" }}
-                    >
-                      {names.join(" · ")}
-                    </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <AttemptHistory
+              attempts={attempts}
+              dealt={hand.dealt}
+              optimal={optimal}
+              optimalCombos={optimalResult?.combos ?? []}
+              minAttempts={2}
+            />
 
             {/* The answer, once the game is over and it was not found.
                 A daily puzzle that never tells you the answer teaches nothing:
