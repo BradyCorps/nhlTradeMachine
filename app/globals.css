@@ -37,9 +37,7 @@
   --ledger-brown:        #6b5030;
   --ledger-amber:        #8a5c00;
   --ledger-amber-dark:   #9a6b00;
-  --ledger-gold:         #946914;
   --ledger-orange:       #d97706;
-  --ledger-violet:       #5b4a9b;
   --fig-bright: #a05871;
   /* ── Brand kit tokens (docs/cap-and-crease-brand-kit) ────────
      Four of the kit's five already existed under ledger names and are
@@ -77,12 +75,15 @@
   --green:        #245e39;
   --green-dim:    rgba(36, 94, 57, 0.06);
 
-  --amber:        #946914;
+  --amber:        #8a5c00;
   --amber-dark: #362608;
-  --amber-dim:    rgba(148, 105, 20, 0.06);
+  --amber-dim:    rgba(138, 92, 0, 0.06);
 
-  --blue:         #2b3f66;
-  --blue-dim:     rgba(43, 63, 102, 0.06);
+  /* Rotated onto the brand ice hue alongside --ledger-ice. Was #2b3f66 at
+     hue 220°, a second navy that escaped the first pass by living under a
+     different token name. Same lightness, so 6.68:1 on paper holds. */
+  --blue:         #2b5766;
+  --blue-dim:     rgba(43, 87, 102, 0.06);
 }
 
 * { box-sizing: border-box; padding: 0; margin: 0; }
@@ -215,7 +216,7 @@ body::before {
 /* ── Cyan → blue ink ─────────────────────────────────────────── */
 .text-cyan-400, .text-cyan-500, .text-cyan-600, .text-cyan-700 { color: var(--blue) !important; }
 .bg-cyan-950, .bg-cyan-900  { background-color: var(--blue-dim) !important; }
-.border-cyan-800, .border-cyan-700 { border-color: rgba(43,63,102,0.3) !important; }
+.border-cyan-800, .border-cyan-700 { border-color: rgba(43,87,102,0.3) !important; }
 .border-cyan-600            { border-color: var(--blue) !important; }
 .hover\:bg-cyan-900:hover   { background-color: var(--blue-dim) !important; }
 .hover\:border-cyan-600:hover { border-color: var(--blue) !important; }
@@ -240,7 +241,7 @@ body::before {
 .text-sky-400, .text-sky-500 { color: var(--blue) !important; }
 .text-sky-300               { color: var(--ink) !important; }
 .bg-sky-950                 { background-color: var(--blue-dim) !important; }
-.border-sky-900             { border-color: rgba(43,63,102,0.2) !important; }
+.border-sky-900             { border-color: rgba(43,87,102,0.2) !important; }
 
 /* ── Orange → amber ──────────────────────────────────────────── */
 .text-orange-300            { color: var(--amber-dark) !important; }
@@ -250,7 +251,7 @@ body::before {
 /* ── Purple → blue ───────────────────────────────────────────── */
 .text-purple-400, .text-purple-500, .text-purple-600 { color: var(--blue) !important; }
 .bg-purple-950              { background-color: var(--blue-dim) !important; }
-.border-purple-800, .border-purple-500 { border-color: rgba(43,63,102,0.25) !important; }
+.border-purple-800, .border-purple-500 { border-color: rgba(43,87,102,0.25) !important; }
 .hover\:bg-purple-900:hover { background-color: var(--blue-dim) !important; }
 
 /* ── White CTA → red stamp ───────────────────────────────────── */

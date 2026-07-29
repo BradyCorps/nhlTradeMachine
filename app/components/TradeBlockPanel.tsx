@@ -15,7 +15,7 @@ interface Props {
 const STATUS_CONFIG = {
   requested:   { color: "var(--red)",   bg: "var(--red-dim)",   border: "rgba(166,53,36,0.35)",  label: "REQUESTED"   },
   available:   { color: "var(--amber)",  bg: "var(--amber-dim)", border: "rgba(148,105,20,0.35)", label: "AVAILABLE"   },
-  untouchable: { color: "var(--blue)",   bg: "var(--blue-dim)",  border: "rgba(43,63,102,0.35)",  label: "UNTOUCHABLE" },
+  untouchable: { color: "var(--blue)",   bg: "var(--blue-dim)",  border: "rgba(43,87,102,0.35)",  label: "UNTOUCHABLE" },
   auto:        { color: "var(--ledger-ink-faint)", bg: "transparent", border: "var(--rule)",      label: "AUTO"        },
 };
 

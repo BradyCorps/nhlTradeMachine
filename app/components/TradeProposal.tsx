@@ -591,9 +591,9 @@ export default function TradeProposalEngine({
 
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <div className="text-[9px] font-black uppercase tracking-wider px-2 py-1" style={{
-                      background: p.isDump ? 'rgba(184,48,32,0.08)' : 'rgba(43,63,102,0.08)',
-                      border: `1px solid ${p.isDump ? 'rgba(184,48,32,0.3)' : 'rgba(43,63,102,0.3)'}`,
-                      color: p.isDump ? '#b83020' : '#2b3f66',
+                      background: p.isDump ? 'rgba(184,48,32,0.08)' : 'rgba(43,87,102,0.08)',
+                      border: `1px solid ${p.isDump ? 'rgba(184,48,32,0.3)' : 'rgba(43,87,102,0.3)'}`,
+                      color: p.isDump ? '#b83020' : '#2b5766',
                       fontFamily: "'Courier Prime', monospace",
                     }}>
                       {p.isDump

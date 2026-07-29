@@ -185,3 +185,81 @@ describe("ice blue ramp", () => {
     }
   });
 });
+
+// Every colour in the palette should have a job. Gold and violet had one call
+// site each, no semantic role, and no relationship to the identity — gold was
+// a near-duplicate of amber (#946914 vs #8a5c00), violet was a lone accent on
+// a bar whose positive/negative pairing is green/amber everywhere else.
+describe("palette has no orphan accents", () => {
+  it("retired gold and violet from the tokens and the Tailwind palette", () => {
+    for (const f of ["app/globals.css", "tailwind.config.ts"]) {
+      const src = read(f);
+      expect(src, f).not.toContain("ledger-gold");
+      expect(src, f).not.toContain("ledger-violet");
+      expect(src, f).not.toContain("#5b4a9b");
+    }
+  });
+
+  it("leaves no component referencing a retired token", () => {
+    const walk = (dir: string): string[] => {
+      const out: string[] = [];
+      for (const e of fs.readdirSync(path.join(process.cwd(), dir), { withFileTypes: true })) {
+        const rel = `${dir}/${e.name}`;
+        if (e.isDirectory()) out.push(...walk(rel));
+        else if (/\.tsx?$/.test(e.name)) out.push(rel);
+      }
+      return out;
+    };
+    const offenders = walk("app").filter(f => /ledger-(gold|violet)/.test(read(f)));
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps every MicroBar key mapped to a real colour", () => {
+    const src = read("app/components/MicroBar.tsx");
+    const keys = [...src.matchAll(/^\s+(\w+):\s+"var\(--([\w-]+)\)"/gm)].map(m => m[2]);
+    expect(keys.length).toBeGreaterThan(0);
+    const css = read("app/globals.css");
+    for (const token of keys) expect(css, token).toContain(`--${token}:`);
+  });
+});
+
+// The ice rotation was done by token name, so a second navy under a different
+// name (--blue, 31 usages) survived the first pass. Both are on the brand hue
+// now; this is the guard that a third one cannot appear unnoticed.
+describe("no cold navy survives anywhere in the palette", () => {
+  it("keeps every blue token on the ice hue", () => {
+    const css = read("app/globals.css");
+    const blues = [...css.matchAll(/--(?:ledger-ice|blue):\s+(#[0-9a-f]{6})/g)].map(m => m[1]);
+    expect(blues.length).toBe(2);
+    for (const hex of blues) {
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      // Cyan-leaning: green close under blue. A 220° navy fails this.
+      expect(b - g, hex).toBeLessThan(24);
+      expect(b, hex).toBeGreaterThan(g);
+    }
+  });
+
+  it("retires the old navy hexes entirely", () => {
+    const walk = (dir: string): string[] => {
+      const out: string[] = [];
+      for (const e of fs.readdirSync(path.join(process.cwd(), dir), { withFileTypes: true })) {
+        const rel = `${dir}/${e.name}`;
+        if (e.isDirectory()) out.push(...walk(rel));
+        else if (/\.(tsx?|css)$/.test(e.name)) out.push(rel);
+      }
+      return out;
+    };
+    const offenders = walk("app").filter(f => {
+      const src = read(f).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+      return /#1a2e5c|#2b3f66/.test(src);
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it("gives the two token families one amber, not two", () => {
+    const css = read("app/globals.css");
+    expect(css).toContain("--ledger-amber:        #8a5c00");
+    expect(css).toContain("--amber:        #8a5c00");
+  });
+});

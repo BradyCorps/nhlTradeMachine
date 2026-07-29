@@ -355,8 +355,8 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
       {/* Change of scenery badge — negative NAV players that might thrive elsewhere */}
       {hasChangeOfScenery && (
         <span className="text-2xs px-1 py-0.5 font-black" style={{
-          color: 'var(--ledger-gold)',
-          border: '1px solid rgba(148,105,20,0.45)',
+          color: 'var(--ledger-amber)',
+          border: '1px solid rgba(138,92,0,0.45)',
         }} title="Negative NAV on current team — may suit a different system or situation. Teams with cap space and the right roster need sometimes absorb these contracts for picks.">
           ⟳ CHANGE OF SCENERY
         </span>

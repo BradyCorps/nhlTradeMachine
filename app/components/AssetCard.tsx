@@ -101,7 +101,7 @@ export default function AssetCard({
               {asset.tradeBlockStatus === 'untouchable' && (
                 <span className="text-2xs font-black shrink-0 inline-flex items-center justify-center rounded-sm"
                   title="Untouchable — excluded from partner matching"
-                  style={{ color: 'var(--blue)', border: '1px solid rgba(43,63,102,0.5)', background: 'var(--blue-dim)', width: 18, height: 18 }}>
+                  style={{ color: 'var(--blue)', border: '1px solid rgba(43,87,102,0.5)', background: 'var(--blue-dim)', width: 18, height: 18 }}>
                   ◈
                 </span>
               )}
@@ -393,7 +393,7 @@ export default function AssetCard({
     } 
 />
             <MicroBar label={xnav.age > 0 ? "YNG" : "AGE"} val={xnav.age} max={80}
-              color={xnav.age > 0 ? "violet" : "amber"}
+              color={xnav.age > 0 ? "emerald" : "amber"}
               tooltip={xnav.age > 0
                 ? "Youth premium — proven production on a cheap contract creates surplus value"
                 : "Age penalty — decline curve discount for veterans past peak age"} />

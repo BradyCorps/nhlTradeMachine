@@ -11,10 +11,12 @@ function MicroBar({ label, val, max, color, invert = false, tooltip }: {
   // FIX: Let the text display the true value, don't clamp it!
   const displayVal = val; 
   
+  // Five keys, four colours, one of which (violet) had a single caller and no
+  // relationship to the identity. Positive/negative now reads as the same
+  // green/amber pairing used everywhere else.
   const colorMap: Record<string, string> = {
     cyan:    "var(--ledger-ice)",
     emerald: "var(--ledger-green)",
-    violet:  "var(--ledger-violet)",
     amber:   "var(--ledger-amber-dark)",
     rose:    "var(--ledger-red-deep)",
   };

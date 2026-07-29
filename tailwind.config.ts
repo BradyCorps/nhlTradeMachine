@@ -39,7 +39,6 @@ const config: Config = {
           brown:        '#6b5030',
           amber:        '#8a5c00',
           'amber-dark': '#9a6b00',
-          gold:         '#946914',
           orange:       '#d97706',
         },
       },
