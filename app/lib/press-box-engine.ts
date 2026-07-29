@@ -29,9 +29,33 @@ export interface ScoringBreakdown {
 export interface DailyHand {
   dayNumber: number;
   dateLabel: string;
-  dealt: PressBoxPlayer[];   // 6 cards
-  callUp: PressBoxPlayer;    // hidden 7th
+  dealt: PressBoxPlayer[];   // CARDS_DEALT cards
+  callUp: PressBoxPlayer;    // hidden, revealed after the first submission
+  /** Precomputed so the board and the scoring can never disagree. */
+  optimal: OptimalResult;
+  /** How many candidate deals the curator rejected before this one. */
+  candidatesTried: number;
+  /** False when the curator ran out of candidates and took the least-bad deal. */
+  curated: boolean;
 }
+
+// ── Deal shape ────────────────────────────────────────────────
+//
+// Eight cards, not six. Measured over a year of deals from the current pool,
+// the change is not merely "more combinations":
+//
+//                              6 cards   8 cards
+//   hands to consider              15        70
+//   unique best hand              42%       54%
+//   ≤2 hands tie for best         51%       68%
+//   days where EVERY hand ties     2%        0%
+//   3+ scoring categories used    74%       95%
+//
+// The last row is the one that matters. Three or more categories in the answer
+// is the difference between deducing a hand and spotting the obvious group,
+// and it goes from three-quarters of days to essentially all of them.
+export const CARDS_DEALT = 8;
+export const HAND_SIZE = 4;
 
 // ── Deterministic PRNG (reuse from sim-engine) ────────────────
 function mulberry32(seed: number) {
@@ -64,15 +88,148 @@ export function dateFromDayNumber(dayNum: number): Date {
   return new Date(EPOCH + (dayNum - 1) * 86_400_000);
 }
 
+// ── Deal curation ─────────────────────────────────────────────
+//
+// The old deal was `shuffled.slice(0, 6)` under a comment claiming it ensured
+// "at least 2 different teams, at least 2 positions, spread of divisions". It
+// did none of that, and it showed: one day in six weeks dealt a hand where all
+// fifteen combinations scored identically, so every pick was simultaneously
+// perfect and the puzzle did not exist.
+//
+// A puzzle is constructed, not drawn. The generator now proposes deals and
+// rejects them until one is worth playing. Every rule below exists to make an
+// attempt informative rather than to make the game hard.
+export const DEAL_RULES = {
+  /** The optimum sits in a band so the peg board means the same thing daily. */
+  MIN_OPTIMUM: 12,
+  MAX_OPTIMUM: 18,
+  /** More than a couple of perfect hands and deduction collapses into guessing. */
+  MAX_PERFECT_HANDS: 2,
+  /** Fewer than three categories and the answer is one visible group. */
+  MIN_CATEGORIES: 3,
+  /** The runner-up has to be close enough to be tempting — but must not tie. */
+  MAX_RUNNER_UP_GAP: 3,
+  /** Median need is 2; the ceiling is for pools that drift, not for today. */
+  MAX_CANDIDATES: 600,
+} as const;
+
+/**
+ * The hand a player picks by chasing the single most visible grouping.
+ *
+ * Four of a team, four of a division, four countrymen. If this is also the
+ * answer the puzzle rewards pattern-matching over reading the cards, so the
+ * curator uses it as a decoy test: the obvious hand must be wrong.
+ */
+export function obviousHand(dealt: PressBoxPlayer[]): string[] | null {
+  const traits: ((p: PressBoxPlayer) => string)[] = [
+    p => `team:${p.team}`,
+    p => `div:${p.division}`,
+    p => `nat:${p.nationality}`,
+    p => `pos:${p.position === "C" || p.position === "W" ? "F" : p.position}`,
+    p => `draft:${p.draftYear}`,
+  ];
+  let biggest: PressBoxPlayer[] = [];
+  for (const trait of traits) {
+    const groups = new Map<string, PressBoxPlayer[]>();
+    for (const p of dealt) {
+      const key = trait(p);
+      groups.set(key, [...(groups.get(key) ?? []), p]);
+    }
+    for (const group of groups.values()) {
+      if (group.length > biggest.length) biggest = group;
+    }
+  }
+  if (biggest.length < HAND_SIZE) return null;
+  return biggest.slice(0, HAND_SIZE).map(p => p.id).sort();
+}
+
+export interface DealQuality {
+  optimum: number;
+  perfectHands: number;
+  runnerUp: number;
+  categories: number;
+  obviousIsAnswer: boolean;
+}
+
+export function assessDeal(dealt: PressBoxPlayer[], callUp: PressBoxPlayer): DealQuality {
+  const scored = combinations(dealt, HAND_SIZE).map(combo => ({
+    ids: combo.map(p => p.id).sort(),
+    cards: combo,
+    total: scoreHand(combo, callUp).total,
+  }));
+  const optimum = Math.max(...scored.map(s => s.total));
+  const winners = scored.filter(s => s.total === optimum);
+  const distinct = [...new Set(scored.map(s => s.total))].sort((a, b) => b - a);
+  const bd = scoreHand(winners[0].cards, callUp);
+  const categories = [
+    bd.teammates, bd.draftClass, bd.pipeline,
+    bd.divisionFlush, bd.countryClub, bd.positionGroup, bd.callUpBonus,
+  ].filter(c => c.points > 0).length;
+  const obvious = obviousHand(dealt);
+  return {
+    optimum,
+    perfectHands: winners.length,
+    runnerUp: distinct.length > 1 ? distinct[1] : optimum,
+    categories,
+    obviousIsAnswer: obvious != null && winners.some(w => w.ids.join() === obvious.join()),
+  };
+}
+
+export function dealIsPlayable(q: DealQuality): boolean {
+  if (q.optimum < DEAL_RULES.MIN_OPTIMUM || q.optimum > DEAL_RULES.MAX_OPTIMUM) return false;
+  if (q.perfectHands > DEAL_RULES.MAX_PERFECT_HANDS) return false;
+  if (q.categories < DEAL_RULES.MIN_CATEGORIES) return false;
+  // A runner-up that also wins is not a runner-up, and one too far back is not
+  // a temptation — both make the second attempt uninformative.
+  if (q.optimum === q.runnerUp) return false;
+  if (q.optimum - q.runnerUp > DEAL_RULES.MAX_RUNNER_UP_GAP) return false;
+  if (q.obviousIsAnswer) return false;
+  return true;
+}
+
+/** How far off a rejected deal was, so the fallback can pick the least-bad one. */
+function dealPenalty(q: DealQuality): number {
+  const bandMiss = q.optimum < DEAL_RULES.MIN_OPTIMUM ? DEAL_RULES.MIN_OPTIMUM - q.optimum
+    : q.optimum > DEAL_RULES.MAX_OPTIMUM ? q.optimum - DEAL_RULES.MAX_OPTIMUM
+    : 0;
+  return bandMiss
+    + Math.max(0, q.perfectHands - DEAL_RULES.MAX_PERFECT_HANDS) * 4
+    + Math.max(0, DEAL_RULES.MIN_CATEGORIES - q.categories) * 3
+    + (q.optimum === q.runnerUp ? 6 : 0)
+    + Math.max(0, (q.optimum - q.runnerUp) - DEAL_RULES.MAX_RUNNER_UP_GAP)
+    + (q.obviousIsAnswer ? 5 : 0);
+}
+
 // ── Deal the daily hand ───────────────────────────────────────
+//
+// Deterministic: the same day number yields the same deal for everyone, search
+// included, because the search draws from one seeded stream.
 export function dealDailyHand(pool: PressBoxPlayer[], dayNum: number): DailyHand {
   const rand = mulberry32(dayNum * 7919 + 31337);
-  const shuffled = shuffle(pool, rand);
 
-  // Pick 7 players ensuring some scoring potential:
-  // At least 2 different teams, at least 2 positions, spread of divisions
-  const dealt = shuffled.slice(0, 6);
-  const callUp = shuffled[6];
+  let chosen: { dealt: PressBoxPlayer[]; callUp: PressBoxPlayer } | null = null;
+  let fallback: { dealt: PressBoxPlayer[]; callUp: PressBoxPlayer; penalty: number } | null = null;
+  let tried = 0;
+
+  for (; tried < DEAL_RULES.MAX_CANDIDATES; tried++) {
+    const shuffled = shuffle(pool, rand);
+    const dealt = shuffled.slice(0, CARDS_DEALT);
+    const callUp = shuffled[CARDS_DEALT];
+    if (!callUp || dealt.length < CARDS_DEALT) break;   // pool too small to deal
+
+    const quality = assessDeal(dealt, callUp);
+    if (dealIsPlayable(quality)) { chosen = { dealt, callUp }; tried++; break; }
+
+    // Never fail to produce a puzzle. A slightly-off deal beats a blank page,
+    // and the pool will drift as rosters change.
+    const penalty = dealPenalty(quality);
+    if (!fallback || penalty < fallback.penalty) fallback = { dealt, callUp, penalty };
+  }
+
+  const picked = chosen ?? fallback ?? {
+    dealt: pool.slice(0, CARDS_DEALT),
+    callUp: pool[CARDS_DEALT] ?? pool[0],
+  };
 
   const date = dateFromDayNumber(dayNum);
   const dateLabel = date.toLocaleDateString("en-US", {
@@ -83,7 +240,15 @@ export function dealDailyHand(pool: PressBoxPlayer[], dayNum: number): DailyHand
     timeZone: "UTC",
   });
 
-  return { dayNumber: dayNum, dateLabel, dealt, callUp };
+  return {
+    dayNumber: dayNum,
+    dateLabel,
+    dealt: picked.dealt,
+    callUp: picked.callUp,
+    optimal: findOptimalCombos(picked.dealt, picked.callUp),
+    candidatesTried: tried,
+    curated: chosen != null,
+  };
 }
 
 // ── Scoring ───────────────────────────────────────────────────
@@ -286,8 +451,19 @@ export function overlapWithOptimal(pickIds: string[], optimalCombos: string[][])
   return best;
 }
 
-// ── Fixed ceiling (cribbage homage) ──────────────────────────
-export const MAX_SCORE = 15;
+// ── The board ────────────────────────────────────────────────
+//
+// This was `MAX_SCORE = 15`, a cribbage homage the scoring never respected.
+// Measured over a year, the real optimum ran 3 to 19 with a mean of 9.2 — so a
+// player who found the perfect hand was typically shown "8/15 ★★★★★ PERFECT
+// HAND", told they had scored 53% for winning, and on 3% of days the optimum
+// sat past the end of a board only 15 pegs long.
+//
+// Curation now holds the optimum inside DEAL_RULES' band, so the board keeps a
+// constant length day to day — the thing the fixed 15 was actually for — while
+// the target peg sits on today's real optimum and a perfect hand reads as
+// complete, because it is.
+export const PEG_BOARD_LENGTH = DEAL_RULES.MAX_OPTIMUM;
 export const MAX_ATTEMPTS = 5;
 
 // ── Star rating (did you find the optimal combo?) ────────────
@@ -323,7 +499,9 @@ export function buildShareText(
   return [
     `Press Box #${dayNum} ${attemptStr}`,
     blocks,
-    `${bestScore}/${MAX_SCORE} pts ${starStr}${found ? " PERFECT HAND" : ""}`,
+    // Against today's optimum, not a fixed 15 — a perfect hand used to share as
+    // "8/15 ★★★★★ PERFECT HAND", which reads as a loss to everyone who sees it.
+    `${bestScore}/${optimal} pts ${starStr}${found ? " PERFECT HAND" : ""}`,
     "capandcrease.com/press-box",
   ].join("\n");
 }

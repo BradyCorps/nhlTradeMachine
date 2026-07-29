@@ -3465,3 +3465,37 @@ describe("Canary — CXH1 the analysis deck never shows an empty panel", () => {
     expect(read("app/lib/gm-tabs.ts")).toContain("tabs.filter(t => !t.disabled)");
   });
 });
+
+describe("Canary — Press Box deals a constructed puzzle", () => {
+  const engine = read("app/lib/press-box-engine.ts");
+
+  it("the deal is curated, not a slice off a shuffle", () => {
+    // `shuffled.slice(0, 6)` sat under a comment claiming it ensured scoring
+    // potential. It ensured nothing, and one day in six weeks had no puzzle.
+    expect(engine).toContain("dealIsPlayable");
+    expect(engine).toContain("DEAL_RULES");
+    expect(engine).not.toMatch(/const dealt = shuffled\.slice\(0, 6\)/);
+  });
+
+  it("keeps a fallback so a drifting pool can never blank the page", () => {
+    expect(engine).toContain("dealPenalty");
+    expect(engine).toContain("chosen ?? fallback");
+  });
+
+  it("no fixed score ceiling survives", () => {
+    // MAX_SCORE = 15 while the real optimum ran 3-19, so a perfect hand
+    // displayed as "8/15 PERFECT HAND".
+    for (const file of ["app/lib/press-box-engine.ts", "app/press-box/page.tsx"]) {
+      const src = read(file).replace(/\/\/.*$/gm, "");
+      expect(src, file).not.toContain("MAX_SCORE");
+    }
+    expect(engine).toContain("PEG_BOARD_LENGTH = DEAL_RULES.MAX_OPTIMUM");
+  });
+
+  it("discards saved games from the six-card deal", () => {
+    // A v2 save holds picks naming cards no longer on the table.
+    const page = read("app/press-box/page.tsx");
+    expect(page).toContain("const STATE_VERSION = 3");
+    expect(page).toContain("saved.version === STATE_VERSION");
+  });
+});

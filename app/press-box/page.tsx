@@ -13,7 +13,7 @@ import {
   overlapWithOptimal,
   starRating,
   buildShareText,
-  MAX_SCORE,
+  PEG_BOARD_LENGTH,
   MAX_ATTEMPTS,
   type PressBoxPlayer,
   type ScoringBreakdown,
@@ -42,10 +42,17 @@ function storageKey(dayNum: number) {
   return `press-box-state-${dayNum}`;
 }
 
+// v3 — the deal went from six cards to eight and is now curated, so a v2 save
+// holds picks referring to cards that are no longer on the table. Bumping the
+// version discards those cleanly instead of restoring a board that cannot be
+// rendered; the alternative is an in-progress game silently showing the wrong
+// four players. Streaks live under a separate key and are unaffected.
+const STATE_VERSION = 3;
+
 interface SavedState {
   dayNumber: number;
   version?: number;
-  // v2 multi-attempt format
+  // v2+ multi-attempt format
   attempts?: AttemptRecord[];
   currentPicks?: string[];
   gameOver?: boolean;
@@ -70,7 +77,7 @@ function saveState(dayNum: number, attempts: AttemptRecord[], currentPicks: stri
   if (typeof window === "undefined") return;
   localStorage.setItem(
     storageKey(dayNum),
-    JSON.stringify({ dayNumber: dayNum, version: 2, attempts, currentPicks, gameOver })
+    JSON.stringify({ dayNumber: dayNum, version: STATE_VERSION, attempts, currentPicks, gameOver })
   );
 }
 
@@ -285,7 +292,7 @@ function PegBoard({ attempts, optimal }: { attempts: AttemptRecord[]; optimal: n
         Peg Board
       </div>
       <div className="flex items-end justify-center">
-        {Array.from({ length: MAX_SCORE + 1 }, (_, i) => {
+        {Array.from({ length: PEG_BOARD_LENGTH + 1 }, (_, i) => {
           const isTarget = i === optimal;
           const isBest = best !== null && i === best;
           const isLatest = latest !== null && i === latest && !isBest;
@@ -297,13 +304,16 @@ function PegBoard({ attempts, optimal }: { attempts: AttemptRecord[]; optimal: n
               key={i}
               className="flex flex-col items-center"
               // crib boards group holes in fives — breathe after 5 and 10
-              style={{ marginLeft: i === 0 ? 0 : i % 5 === 1 ? 8 : 3 }}
+              style={{ marginLeft: i === 0 ? 0 : i % 5 === 1 ? 7 : 2 }}
             >
               <div
                 className="rounded-full transition-all duration-300"
                 style={{
-                  width: 11,
-                  height: 11,
+                  // Trimmed from 11px/3px: the board runs to the curated
+                  // ceiling now, and 19 pegs at the old sizing overflowed a
+                  // 320px screen.
+                  width: 10,
+                  height: 10,
                   background: fill,
                   border: isTarget
                     ? "2px solid var(--ledger-red)"
@@ -473,7 +483,7 @@ function PressBoxGame() {
     if (!hand) return;
     const saved = loadSavedState(dayNum);
     if (saved) {
-      if (saved.version === 2 && saved.attempts) {
+      if (saved.version === STATE_VERSION && saved.attempts) {
         setAttempts(saved.attempts);
         setGameOver(saved.gameOver ?? false);
         if (saved.gameOver) {
@@ -812,7 +822,7 @@ function PressBoxGame() {
             >
               {isToday ? "Today's" : `Hand #${dayNum}`} Cards
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
               {hand.dealt.map((player) => (
                 <PlayerCard
                   key={player.id}
@@ -899,7 +909,7 @@ function PressBoxGame() {
                 {rating.label}
               </div>
               <div className="font-black font-serif" style={{ fontSize: "clamp(2rem, 8vw, 3.5rem)", lineHeight: 1 }}>
-                {breakdown.total}<span className="text-[0.5em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>/{MAX_SCORE}</span>
+                {breakdown.total}<span className="text-[0.5em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>/{optimal}</span>
               </div>
               <div
                 className="text-[11px] font-mono uppercase tracking-wider mt-1"
@@ -1003,7 +1013,7 @@ function PressBoxGame() {
                   Total
                 </span>
                 <span className="text-[18px] font-black font-mono tabular-nums" style={{ color: "var(--ledger-green)" }}>
-                  {breakdown.total}<span className="text-[12px]" style={{ color: "var(--ledger-ink-faint)" }}>/{MAX_SCORE}</span>
+                  {breakdown.total}<span className="text-[12px]" style={{ color: "var(--ledger-ink-faint)" }}>/{optimal}</span>
                 </span>
               </div>
             </div>
@@ -1046,7 +1056,7 @@ function PressBoxGame() {
                           className="text-[13px] font-black font-mono tabular-nums"
                           style={{ color: isPerfect ? "var(--ledger-green)" : "var(--ink)" }}
                         >
-                          {attempt.score}/{MAX_SCORE}
+                          {attempt.score}/{optimal}
                         </span>
                         {isBest && !isPerfect && (
                           <span
@@ -1112,7 +1122,7 @@ function PressBoxGame() {
                   Final Result
                 </div>
                 <div className="text-[11px] font-mono" style={{ color: "var(--ledger-ink-body)" }}>
-                  Best Score: <strong style={{ color: "var(--ledger-green)" }}>{bestScore}/{MAX_SCORE}</strong>
+                  Best Score: <strong style={{ color: "var(--ledger-green)" }}>{bestScore}/{optimal}</strong>
                   {" in "}
                   <strong>{attempts.length}</strong> attempt{attempts.length !== 1 ? "s" : ""}
                   {foundOptimal && " — Perfect!"}
