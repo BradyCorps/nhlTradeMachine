@@ -3250,3 +3250,57 @@ describe("Canary — CXH8 overlays are usable by keyboard", () => {
     expect(src).toContain("valuation breakdown for");
   });
 });
+
+describe("Canary — CXH9 public endpoints validate before they work", () => {
+  it("no public route casts req.json() to its request type", () => {
+    // The defect: `await req.json() as MatchRequest`. These endpoints do not
+    // authenticate, so "the client only sends thirty players" is an assumption
+    // about a program that is not the one making the request.
+    for (const route of [
+      "app/api/match/route.ts",
+      "app/api/simulate/route.ts",
+      "app/api/evaluate/route.ts",
+      "app/api/claude/route.ts",
+    ]) {
+      const src = read(route).replace(/\/\/.*$/gm, "");
+      expect(src, route).not.toMatch(/await req\.json\(\)\s+as\s+\w/);
+    }
+  });
+
+  it("match validates through a bounded schema", () => {
+    const src = read("app/api/match/route.ts");
+    expect(src).toContain("matchRequestSchema");
+    expect(src).toContain("safeParse");
+    expect(src).toContain("PUBLIC_LIMITS");
+  });
+
+  it("evaluate bounds its arrays, strings and numbers", () => {
+    const src = read("app/api/evaluate/route.ts");
+    expect(src).toContain("PUBLIC_LIMITS.MAX_PACKAGE");
+    expect(src).toContain("PUBLIC_LIMITS.MAX_ROSTER");
+    expect(src).toContain("z.number().finite()");
+    // Unbounded `z.string()` for an id was the reported gap.
+    expect(src).toContain("id: idString");
+  });
+
+  it("claude validates before charging the rate limit", () => {
+    // Limits protect the upstream bill; a malformed request never reaches
+    // upstream, so counting it against a global daily budget lets garbage deny
+    // the feature to real users at no cost to the attacker.
+    const src = read("app/api/claude/route.ts");
+    const parse = src.indexOf("ClaudeRequestSchema.safeParse");
+    const limit = src.indexOf("await checkRateLimit");
+    expect(parse).toBeGreaterThan(-1);
+    expect(limit).toBeGreaterThan(-1);
+    expect(parse).toBeLessThan(limit);
+  });
+
+  it("claude times out its upstream call and does not leak the reason", () => {
+    const src = read("app/api/claude/route.ts");
+    expect(src).toContain("UPSTREAM_TIMEOUT_MS");
+    expect(src).toContain("upstream.abort()");
+    expect(src).toContain("signal: upstream.signal");
+    // The upstream message can carry request detail.
+    expect(src).not.toContain("{ error: e.message }");
+  });
+});

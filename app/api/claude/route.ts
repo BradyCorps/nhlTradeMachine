@@ -7,6 +7,9 @@ import { redis } from "@/app/lib/redis";
 // The client sends locked, pre-calculated facts; this route builds the prompt.
 // Do not accept raw `messages` here, or the LLM boundary becomes unenforceable.
 
+/** Upstream generation is slow but not unbounded. */
+const UPSTREAM_TIMEOUT_MS = 60_000;
+
 const ALLOWED_MODELS = new Set([
   "claude-haiku-4-5",
   "claude-sonnet-4-5",
@@ -221,14 +224,14 @@ const SeasonRecapPayloadSchema = z.object({
 const ClaudeRequestSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("trade_memo"),
-    model: z.string().optional(),
-    max_tokens: z.number().optional(),
+    model: z.string().max(120).optional(),
+    max_tokens: z.number().int().finite().optional(),
     payload: TradeMemoPayloadSchema,
   }),
   z.object({
     kind: z.literal("season_recap"),
-    model: z.string().optional(),
-    max_tokens: z.number().optional(),
+    model: z.string().max(120).optional(),
+    max_tokens: z.number().int().finite().optional(),
     payload: SeasonRecapPayloadSchema,
   }),
 ]);
@@ -382,12 +385,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
   }
 
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  const rate = await checkRateLimit(ip);
-  if (!rate.ok) {
-    return NextResponse.json({ error: rate.reason }, { status: 429 });
-  }
-
+  // CXH9 — validate BEFORE charging the rate limit.
+  //
+  // The limits here exist to protect the upstream bill, and a malformed
+  // request never reaches upstream. Counting it against the GLOBAL 2000/day
+  // budget let a stream of garbage bodies deny the feature to real users
+  // without ever costing an API call. Parsing is bounded and cheap by
+  // comparison, and the schema caps every array and string it accepts.
   let rawBody: unknown;
   try {
     rawBody = await req.json();
@@ -403,6 +407,12 @@ export async function POST(req: Request) {
     );
   }
 
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rate = await checkRateLimit(ip);
+  if (!rate.ok) {
+    return NextResponse.json({ error: rate.reason }, { status: 429 });
+  }
+
   const body = parsed.data;
   const safeModel = body.model && ALLOWED_MODELS.has(body.model)
     ? body.model
@@ -413,9 +423,16 @@ export async function POST(req: Request) {
     ? buildTradeMemoPrompt(body.payload)
     : buildSeasonRecapPrompt(body.payload);
 
+  // An upstream call with no timeout holds the invocation open until the
+  // platform kills it — the slowest and most expensive way to fail, and it
+  // ties up capacity that other requests need.
+  const upstream = new AbortController();
+  const timeout = setTimeout(() => upstream.abort(), UPSTREAM_TIMEOUT_MS);
+
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
+      signal: upstream.signal,
       headers: {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
@@ -431,6 +448,17 @@ export async function POST(req: Request) {
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    if (e?.name === "AbortError") {
+      return NextResponse.json(
+        { error: "Narrative generation timed out — please try again." },
+        { status: 504 },
+      );
+    }
+    // The upstream message can carry request detail; it is not returned to a
+    // public caller.
+    console.error("[claude] upstream failed:", e instanceof Error ? e.message : e);
+    return NextResponse.json({ error: "Narrative generation failed." }, { status: 502 });
+  } finally {
+    clearTimeout(timeout);
   }
 }

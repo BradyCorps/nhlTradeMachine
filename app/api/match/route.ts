@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Asset, Team } from "@/app/lib/trade-types";
 import { teamWindow } from "@/app/lib/team-window";
+import { z } from "zod";
+import {
+  PUBLIC_LIMITS, idString, invalidRequest,
+  publicAssetSchema, publicNavMapSchema, publicTeamSchema,
+} from "@/app/lib/public-request-bounds";
 
 // ── Trade Partner Finder — "Who wants this package?" ─────────
 // A player's NAV is team-contextual. A $7M 35yr albatross for Tampa
@@ -34,12 +39,32 @@ export interface TeamMatch {
   returnProfile: string;
 }
 
-export async function POST(req: NextRequest) {
-  const { assets, homeTeamId, allTeams, allPlayers, navMap } = await req.json() as MatchRequest;
+// CXH9 — this endpoint is public and unauthenticated. It used to cast
+// `req.json()` straight to `MatchRequest`, so a caller could hand it arrays of
+// any length, ids of any size, and NaN where a number belonged. The route then
+// iterated all of it against every team in the league.
+const matchRequestSchema = z.object({
+  assets: z.array(publicAssetSchema).min(1).max(PUBLIC_LIMITS.MAX_PACKAGE),
+  homeTeamId: idString,
+  allTeams: z.array(publicTeamSchema).min(1).max(PUBLIC_LIMITS.MAX_TEAMS),
+  allPlayers: z.array(publicAssetSchema).max(PUBLIC_LIMITS.MAX_PLAYERS),
+  navMap: publicNavMapSchema,
+}).passthrough();
 
-  if (!assets?.length || !allTeams?.length) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+export async function POST(req: NextRequest) {
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid match request" }, { status: 400 });
   }
+
+  const parsed = matchRequestSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(invalidRequest("match", parsed.error), { status: 400 });
+  }
+  const { assets, homeTeamId, allTeams, allPlayers, navMap } =
+    parsed.data as unknown as MatchRequest;
 
   const packageNAV    = assets.reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);
   const packageCap    = assets.reduce((s, a) => s + a.capHit * (1 - (a.retainedPct || 0)), 0);
