@@ -2,7 +2,8 @@
 
 import TradePanel from "@/app/components/TradePanel";
 import TugBar from "@/app/components/TugBar";
-import { SEASON, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
+import { SEASON } from "@/app/lib/season-config";
+import { compressPackage } from "@/app/lib/xnav-engine";
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense, lazy } from "react";
 import { useTradeStore } from "@/app/store/tradeStore";
 import Header from "@/app/components/Header";
@@ -107,8 +108,8 @@ export default function ArmchairGmPage() {
     const query = buildTradeQueryString({
       homeTeamId: teams[0]?.id ?? null,
       partnerTeamId: teams[1]?.id ?? null,
-      outgoing: blocks[0].map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0 })),
-      incoming: blocks[1].map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0 })),
+      outgoing: blocks[0].map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0, ...(a.isProtected ? { isProtected: true as const } : {}) })),
+      incoming: blocks[1].map(a => ({ id: a.id, retainedPct: a.retainedPct ?? 0, ...(a.isProtected ? { isProtected: true as const } : {}) })),
     });
     const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
     window.history.replaceState({}, '', newUrl);
@@ -613,27 +614,25 @@ export default function ArmchairGmPage() {
     }
   }, [blocks, teams, db.teams, db.capCeiling, allHomeRoster, allPartnerRoster]);
 
-  // Client-side package compression — mirrors evaluate/route.ts compressPackage
-  // Shows users the roster-slot-aware value as they build, so the audit result
-  // isn't a surprise. Only visible when compression materially changes things.
-  // Package compression — age tier constants from season-config (single source of truth).
-  // Formula mirrors compressPackage in xnav-engine; rates change by editing season-config only.
-  const compressBlock = (block: Asset[]): number => {
-    if (block.length === 0) return 0;
-    const picks   = block.filter(a => a.position === "Pick");
-    const players = block.filter(a => a.position !== "Pick");
-    const pickValue = picks.reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);
-    if (players.length === 0) return pickValue;
-    const sorted = [...players]
-      .map(a => ({ nav: navMap[a.id]?.total ?? 0, age: a.age ?? 27 }))
-      .sort((a, b) => b.nav - a.nav);
-    let decaySum = 0, penaltySum = 0;
-    sorted.forEach((a, i) => {
-      decaySum += a.nav * Math.pow(ageDecayRate(a.age), i);
-      if (i > 0) penaltySum += ageSlotPenalty(a.age);
-    });
-    return pickValue + Math.max(0, decaySum - penaltySum);
-  };
+  // CX8 — one canonical trade-value model.
+  //
+  // This used to be a hand-copied reimplementation of `compressPackage`, and
+  // the copy had drifted: the engine clamps EACH marginal asset at zero
+  // (`Math.max(0, marginalValue)` per player), while the copy summed decay and
+  // slot penalties separately and clamped the difference ONCE. Those agree
+  // only while every secondary asset carries positive marginal value. Add a
+  // low-value 35-year-old to a package and the engine drops him to zero while
+  // the copy let his slot penalty eat into the rest — so the TugBar and the
+  // verdict quoted different numbers for the same trade.
+  //
+  // There is nothing to mirror now. The engine function is pure and has no
+  // server-only dependencies, so the bench calls it directly.
+  const compressBlock = (block: Asset[]): number =>
+    compressPackage(block.map(a => ({
+      nav: navMap[a.id]?.total ?? 0,
+      isPick: a.position === "Pick",
+      age: a.age ?? 27,
+    })));
 
   const navA = blocks[0].reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);
   const navB = blocks[1].reduce((s, a) => s + (navMap[a.id]?.total ?? 0), 0);

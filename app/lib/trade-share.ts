@@ -9,6 +9,13 @@ const RetainedPctSchema = z.number().min(0).max(0.5);
 export const TradeShareAssetRefSchema = z.object({
   id: z.string().min(1),
   retainedPct: RetainedPctSchema.default(0),
+  /**
+   * CX8 — pick protection is a term of the deal and now changes the pick's
+   * value, so a shared link that dropped it described a different trade than
+   * the one the sender built. Defaulted, so links made before this still
+   * parse.
+   */
+  isProtected: z.boolean().optional(),
 });
 
 export const TradeShareVerdictSchema = z.object({
@@ -83,9 +90,12 @@ export type TradeQueryState = {
   incoming: TradeShareAssetRef[];
 };
 
+// The flag is omitted rather than written false: absent means unprotected, so
+// an unprotected package serialises exactly as it did before CX8.
 const assetToRef = (asset: Asset): TradeShareAssetRef => ({
   id: asset.id,
   retainedPct: normalizeRetainedPct(asset.retainedPct ?? 0),
+  ...(asset.isProtected ? { isProtected: true } : {}),
 });
 
 export function normalizeRetainedPct(value: number): number {
@@ -183,12 +193,12 @@ export function resolveTradeShareAssets(
       // Ownership-guarded execution path: drop anything missing or not owned by
       // the expected team — never fabricate a movable phantom.
       if (asset && asset.teamId === expectedTeamId) {
-        resolved.push({ ...asset, retainedPct: ref.retainedPct });
+        resolved.push({ ...asset, retainedPct: ref.retainedPct, isProtected: Boolean(ref.isProtected) });
       }
       continue;
     }
     if (asset) {
-      resolved.push({ ...asset, retainedPct: ref.retainedPct });
+      resolved.push({ ...asset, retainedPct: ref.retainedPct, isProtected: Boolean(ref.isProtected) });
     } else {
       resolved.push({
         id: ref.id,
@@ -206,6 +216,7 @@ export function resolveTradeShareAssets(
         hasNTC: false,
         canRetain: false,
         retainedPct: ref.retainedPct,
+        isProtected: Boolean(ref.isProtected),
         multiplier: 1,
       });
     }
@@ -237,11 +248,15 @@ export function summarizeTradeSharePayload(payload: TradeSharePayload): TradeSha
   };
 }
 
+// `id` | `id:50` | `id:0:P` | `id:50:P`. The retention slot keeps its position
+// so links written before protection was encoded still parse unchanged.
 function encodeAssetRefs(refs: TradeShareAssetRef[]): string {
   return refs
     .map(ref => {
       const retainedPct = normalizeRetainedPct(ref.retainedPct);
-      return retainedPct > 0 ? `${ref.id}:${Math.round(retainedPct * 100)}` : ref.id;
+      const pct = Math.round(retainedPct * 100);
+      if (ref.isProtected) return `${ref.id}:${pct}:P`;
+      return pct > 0 ? `${ref.id}:${pct}` : ref.id;
     })
     .join(",");
 }
@@ -249,11 +264,12 @@ function encodeAssetRefs(refs: TradeShareAssetRef[]): string {
 function parseAssetRefs(value: string | null): TradeShareAssetRef[] {
   if (!value) return [];
   return value.split(",").flatMap(token => {
-    const [id, retainedPct] = token.split(":");
+    const [id, retainedPct, protectionFlag] = token.split(":");
     if (!id) return [];
     return [{
       id,
       retainedPct: retainedPct ? normalizeRetainedPct(Number.parseInt(retainedPct, 10) / 100) : 0,
+      ...(protectionFlag === "P" ? { isProtected: true } : {}),
     }];
   });
 }

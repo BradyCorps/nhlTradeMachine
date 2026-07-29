@@ -5,7 +5,7 @@
 // roster mutations (executeTrade, resetTrades). Sim controls arrive
 // through a ref because useSimDispatch runs after this hook — the ref
 // is only read inside event handlers, after render has assigned it.
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import type { Asset, Team, TradeVerdict } from "@/app/lib/trade-types";
 import type { LineupOrderPayload } from "@/app/components/LineupEditor";
 import { SEASON } from "@/app/lib/season-config";
@@ -14,7 +14,7 @@ import { teamWindow } from "@/app/lib/team-window";
 import { applyCapDelta } from "@/app/lib/cap-delta";
 import { clearNavCache } from "@/app/lib/evaluate-client";
 import { tradeAssetKey } from "@/app/store/tradeStore";
-import { retentionCheck, addRetention, type CupRunState } from "@/app/lib/cup-run";
+import { retentionCheck, addRetention, type CupRunState, type RetentionEntry } from "@/app/lib/cup-run";
 import { toast } from "@/app/lib/ledger-toast";
 import { buildTradeCapMoves } from "./CupRunDraftSummaryModal";
 
@@ -95,25 +95,31 @@ export function useTradeBench({
     // Cup Run: retention is a scarce cross-season resource. Slots stay
     // occupied for the retained contract's full term, so the ledger is
     // checked and charged here at execution time.
-    if (cupRun?.status === "ACTIVE") {
-      const retainedOutgoing = outgoingBlock
-        .filter(a => a.position !== "Pick" && (a.retainedPct ?? 0) > 0)
-        .map(a => ({
-          playerId: a.id,
-          playerName: a.name,
-          pct: a.retainedPct ?? 0,
-          capHit: a.capHit,
-          yearsRemaining: a.yearsRemaining,
-        }));
-      if (retainedOutgoing.length > 0) {
-        const check = retentionCheck(cupRun.retentionLedger, retainedOutgoing, db.capCeiling ?? SEASON.capCeiling);
-        if (!check.ok) {
-          toast(check.reason ?? "Retention limit reached for this run.", "error");
-          return;
-        }
+    const retainedOutgoing = outgoingBlock
+      .filter(a => a.position !== "Pick" && (a.retainedPct ?? 0) > 0)
+      .map(a => ({
+        playerId: a.id,
+        playerName: a.name,
+        pct: a.retainedPct ?? 0,
+        capHit: a.capHit,
+        yearsRemaining: a.yearsRemaining,
+      }));
+    if (retainedOutgoing.length > 0) {
+      const inCupRun = cupRun?.status === "ACTIVE";
+      // One check, two ledgers: a run's ledger carries across seasons, a
+      // session's does not, but the limits themselves are identical.
+      const ledger = inCupRun ? cupRun!.retentionLedger : sessionRetentionRef.current;
+      const check = retentionCheck(ledger, retainedOutgoing, db.capCeiling ?? SEASON.capCeiling);
+      if (!check.ok) {
+        toast(check.reason ?? "Retention limit reached.", "error");
+        return;
+      }
+      if (inCupRun) {
         setCupRun(prev => prev && prev.status === "ACTIVE"
           ? { ...prev, retentionLedger: addRetention(prev.retentionLedger, retainedOutgoing) }
           : prev);
+      } else {
+        setSessionRetention(prev => addRetention(prev, retainedOutgoing));
       }
     }
 
@@ -205,11 +211,25 @@ export function useTradeBench({
   }, [homeTeam, partnerTeam, outgoingBlock, incomingBlock, setBlocks, setVerdict, setDb, cupRun, setCupRun, db.capCeiling, simControlsRef]);
 
   // ── Reset to original rosters ─────────────────────────────────
+  // CX8 — retention slots are a LEAGUE rule (three slots, 50% a contract, a
+  // share of the ceiling), not a Cup Run rule. The check was gated on an
+  // active run, so in single-season play a user could retain 50% on any number
+  // of players with nothing to stop them. The Cup Run ledger persists across
+  // seasons; this one covers a single session, and both feed the same check.
+  const [sessionRetention, setSessionRetention] = useState<RetentionEntry[]>([]);
+  // Read through a ref so `executeTrade` always sees the current ledger without
+  // taking it as a dependency — otherwise the callback is rebuilt after every
+  // retained trade, and a stale closure would check against an old ledger and
+  // let a fourth retention through.
+  const sessionRetentionRef = useRef(sessionRetention);
+  useEffect(() => { sessionRetentionRef.current = sessionRetention; }, [sessionRetention]);
+
   const resetTrades = useCallback(() => {
     if (originalDb) {
       clearNavCache();
       setDb(originalDb);
       setExecutedTrades([]);
+      setSessionRetention([]);
       simControlsRef.current?.resetSimulation();
       setLineupStartingGoalies({});
       setShowSimPanel(false);

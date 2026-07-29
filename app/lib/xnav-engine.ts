@@ -337,6 +337,18 @@ export function resolveRosterTier(asset: AssetInput): RosterTier | undefined {
 }
 
 // ── Pick NAV ──────────────────────────────────────────────────────────────────
+/**
+ * What protection costs the club acquiring the pick, by how likely it is to
+ * bite. A lottery first is mostly the lottery; protecting it removes most of
+ * the value. A late first rarely lands in the protected range at all.
+ */
+export const PROTECTION_DISCOUNT = {
+  lottery: 0.55,
+  midFirst: 0.72,
+  lateFirst: 0.88,
+  laterRound: 0.85,
+} as const;
+
 export function calcPickNAV(asset: AssetInput): XNAVResult {
   const round    = asset.round    ?? 1;
   const baseYear = SEASON.draftYear;
@@ -363,7 +375,26 @@ export function calcPickNAV(asset: AssetInput): XNAVResult {
     baseValue = 2;
   }
 
-  const pickTotal = Math.max(round === 1 ? 5 : 1, baseValue * yearDecay);
+  // CX8 — protection is a real term, so it has to move a number.
+  //
+  // A protected pick is one the sender keeps if it lands in the protected
+  // range, rolling the obligation to a later year. To the receiver that is
+  // strictly worse than the same pick unprotected: he loses exactly the
+  // outcomes he most wanted. The discount is steepest where protection is
+  // most likely to bite — a bottom-five club's first is largely a lottery
+  // ticket, and protecting it removes most of what he was buying — and mild
+  // for a contender's late first, which will rarely land in the range.
+  //
+  // Before this the toggle changed nothing anywhere: not the valuation, not
+  // the shared URL, not execution. It read as a term of the deal and was
+  // decoration.
+  const protectionDiscount = asset.isProtected
+    ? (round === 1
+        ? (standing >= 27 ? PROTECTION_DISCOUNT.lottery : standing >= 20 ? PROTECTION_DISCOUNT.midFirst : PROTECTION_DISCOUNT.lateFirst)
+        : PROTECTION_DISCOUNT.laterRound)
+    : 1;
+
+  const pickTotal = Math.max(round === 1 ? 5 : 1, baseValue * yearDecay * protectionDiscount);
   const upsideFraction = standing >= 27 ? 0.55 : standing >= 20 ? 0.45 : 0.30;
   return {
     total:  Math.round(pickTotal),

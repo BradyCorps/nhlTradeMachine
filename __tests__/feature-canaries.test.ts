@@ -3104,3 +3104,34 @@ describe("Canary — RL6 special teams", () => {
     expect(read("app/components/LineupEditor.tsx")).toContain("hydrateSpecialTeams(effective, prev)");
   });
 });
+
+describe("Canary — CX8 one canonical trade-value model", () => {
+  it("the bench calls the engine instead of reimplementing compression", () => {
+    const page = read("app/armchair-gm/page.tsx");
+    expect(page).toContain("compressPackage");
+    // The copy summed penalties separately and clamped once; the engine clamps
+    // each marginal asset. Two implementations is the defect.
+    expect(page).not.toContain("penaltySum");
+    expect(page).not.toContain("decaySum");
+  });
+
+  it("pick protection moves a number rather than only a colour", () => {
+    const engine = read("app/lib/xnav-engine.ts");
+    expect(engine).toContain("PROTECTION_DISCOUNT");
+    expect(engine).toContain("asset.isProtected");
+  });
+
+  it("protection survives serialisation", () => {
+    const share = read("app/lib/trade-share.ts");
+    expect(share).toContain("isProtected");
+    expect(read("app/armchair-gm/page.tsx")).toContain("isProtected: true as const");
+  });
+
+  it("retention limits are not gated on a Cup Run", () => {
+    // Three slots, 50% a contract, a share of the ceiling — league rules, not
+    // run rules. The check used to sit inside `if (cupRun?.status === ACTIVE)`.
+    const bench = read("app/armchair-gm/useTradeBench.ts");
+    expect(bench).toContain("sessionRetention");
+    expect(bench).not.toMatch(/if \(cupRun\?\.status === "ACTIVE"\) \{\s*const retainedOutgoing/);
+  });
+});
