@@ -3067,3 +3067,40 @@ describe("Canary — Roster and Season Review state which is which", () => {
     expect(tab).toContain("SEASON.replaySeason");
   });
 });
+
+describe("Canary — RL6 special teams", () => {
+  it("keeps the unit rules in a tested module", () => {
+    const lib = read("app/lib/special-teams.ts");
+    for (const fn of ["defaultPowerPlay", "defaultPenaltyKill", "hydrateSpecialTeams",
+                      "specialTeamsPointMultiplier", "specialTeamsGamesBonus"]) {
+      // Some are `export const` arrows, some `export function` — assert the
+      // export exists, not which form it happens to take.
+      expect(lib, fn).toMatch(new RegExp(`export (const|function) ${fn}\\b`));
+    }
+  });
+
+  it("offers all three situations in the editor", () => {
+    const src = read("app/components/LineupEditor.tsx");
+    expect(src).toContain('"5-on-5"');
+    expect(src).toContain('"Power Play"');
+    expect(src).toContain('"Penalty Kill"');
+    expect(src).toContain('role="tablist"');
+  });
+
+  it("carries the sheets through the lineup payload", () => {
+    expect(read("app/lib/lineup-order.ts")).toContain("powerPlay?: string[]");
+    expect(read("app/components/LineupEditor.tsx")).toContain("powerPlay: specialTeams.powerPlay");
+  });
+
+  it("makes the sim actually respect the units", () => {
+    // "sim deployment must respect them" is the half of RL6 that matters.
+    const route = read("app/api/simulate/route.ts");
+    expect(route).toContain("specialTeamsPointMultiplier");
+    expect(route).toContain("specialTeamsGamesBonus");
+    expect(route).toContain("specialTeamsMultiplier");
+  });
+
+  it("rehydrates units across a roster change rather than playing short", () => {
+    expect(read("app/components/LineupEditor.tsx")).toContain("hydrateSpecialTeams(effective, prev)");
+  });
+});

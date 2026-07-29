@@ -15,6 +15,11 @@ import {
 } from "@/app/lib/lineup-locks";
 import { lineupContributionScore } from "@/app/lib/lineup-ranking";
 import {
+  defaultSpecialTeams, emptySpecialTeams, hydrateSpecialTeams,
+  PK_SLOTS, PK_UNIT_SIZE, PP_SLOTS, PP_UNIT_SIZE,
+  type SpecialTeamsOrder, type SpecialTeamsSituation,
+} from "@/app/lib/special-teams";
+import {
   defaultLineupOrdersForRoster,
   hydrateLineupOrdersForRoster,
   sameLineupGroupOrders,
@@ -152,6 +157,13 @@ function TeamLineup({
     setLocks(prev => pruneAllLocks(prev, effective.map(p => p.id)));
   }, [effective]);
 
+  // Units survive a trade the same way the 5-on-5 sheet does: departed players
+  // drop out, the gap closes, and the defaults fill what is left — a unit with
+  // a hole in it would silently play short.
+  useEffect(() => {
+    setSpecialTeams(prev => hydrateSpecialTeams(effective, prev));
+  }, [effective]);
+
   // Roster fingerprint — re-init orders when the trade or roster changes
   const rosterKey = useMemo(
     () => effective.map(p => p.id).sort().join("|"),
@@ -168,6 +180,11 @@ function TeamLineup({
   // re-order that follows every trade/signing/rollover cannot reflow the one
   // placement the user deliberately made.
   const [locks, setLocks] = useState<LineupLocks>(emptyLineupLocks);
+  // RL6 — which situation the sheet is showing. Even strength is the existing
+  // grid; PP and PK are unit sheets over the same roster.
+  const [situation, setSituation] = useState<SpecialTeamsSituation>("EV");
+  const [specialTeams, setSpecialTeams] = useState<SpecialTeamsOrder>(emptySpecialTeams);
+  const [stSelected, setStSelected] = useState<{ sheet: "PP" | "PK"; idx: number } | null>(null);
   const editedRef = useRef(false);
   useEffect(() => { editedRef.current = edited; }, [edited]);
 
@@ -222,8 +239,10 @@ function TeamLineup({
         ...orders.D.slice(6),
         ...orders.G.slice(2),
       ],
+      powerPlay: specialTeams.powerPlay,
+      penaltyKill: specialTeams.penaltyKill,
     });
-  }, [teamId, orders, onLineupChange]);
+  }, [teamId, orders, specialTeams, onLineupChange]);
 
   const reset = useCallback(() => {
     setOrders(defaultLineupOrdersForRoster(effective));
@@ -232,6 +251,8 @@ function TeamLineup({
     // Reset means "back to the default sheet". Keeping locks would leave the
     // sheet neither default nor the user's, which is the worst of both.
     setLocks(emptyLineupLocks());
+    setSpecialTeams(defaultSpecialTeams(effective));
+    setStSelected(null);
   }, [effective]);
 
   // Best Lines: order every unit by lineup contribution. X-NAV is contract-
@@ -411,6 +432,91 @@ function TeamLineup({
     );
   };
 
+  // ── Special-teams sheets (RL6) ──────────────────────────────
+  // The same click-to-swap idiom as the 5-on-5 grid, over a flat id list.
+  // A player already on the sheet is moved rather than duplicated — a unit
+  // cannot dress the same man twice.
+  const clickUnitSlot = useCallback((sheet: "PP" | "PK", idx: number) => {
+    setStSelected(prev => {
+      if (!prev) return { sheet, idx };
+      if (prev.sheet === sheet && prev.idx === idx) return null;
+      if (prev.sheet !== sheet) return { sheet, idx };
+
+      setSpecialTeams(st => {
+        const key = sheet === "PP" ? "powerPlay" : "penaltyKill";
+        const slots = sheet === "PP" ? PP_SLOTS : PK_SLOTS;
+        const arr = [...st[key]];
+        while (arr.length < slots) arr.push("");
+        [arr[prev.idx], arr[idx]] = [arr[idx], arr[prev.idx]];
+        return { ...st, [key]: arr };
+      });
+      setEdited(true);
+      return null;
+    });
+  }, []);
+
+  const UnitCell = ({ sheet, idx }: { sheet: "PP" | "PK"; idx: number }) => {
+    const ids = sheet === "PP" ? specialTeams.powerPlay : specialTeams.penaltyKill;
+    const id = ids[idx];
+    const p = id ? byId.get(id) : undefined;
+    const isSel = stSelected?.sheet === sheet && stSelected.idx === idx;
+    const nav = navOf(p, navMap);
+
+    return (
+      <td
+        onClick={() => clickUnitSlot(sheet, idx)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); clickUnitSlot(sheet, idx); } }}
+        role="button"
+        tabIndex={0}
+        aria-label={p ? `Select ${p.name} on ${sheet} unit` : `Select empty ${sheet} slot`}
+        style={{ padding: 3, fontFamily: MONO, cursor: "pointer", userSelect: "none", verticalAlign: "top" }}
+      >
+        <div style={{
+          minHeight: 38,
+          border: isSel ? "1px solid #a08020" : "1px solid rgba(184,160,112,0.7)",
+          background: isSel ? "rgba(180,140,40,0.20)" : p ? "rgba(255,255,255,0.20)" : "rgba(184,160,112,0.12)",
+          padding: "5px 6px",
+          display: "grid",
+          gap: 2,
+          overflow: "hidden",
+        }}>
+          <div style={{ fontSize: 10.5, fontWeight: p ? 800 : 500, lineHeight: 1.15, overflowWrap: "anywhere" }}>
+            {p ? p.name : "Empty"}
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 4 }}>
+            <span style={{ fontSize: 9, fontWeight: 900, color: "var(--ledger-ink-faint)" }}>
+              {p?.position ?? "--"}
+            </span>
+            {p && (
+              <span style={{ fontSize: 9, fontWeight: 900, color: navColor(nav) }}>NAV {nav}</span>
+            )}
+          </div>
+        </div>
+      </td>
+    );
+  };
+
+  const UnitSheet = ({ sheet }: { sheet: "PP" | "PK" }) => {
+    const unitSize = sheet === "PP" ? PP_UNIT_SIZE : PK_UNIT_SIZE;
+    const label = sheet === "PP" ? "Power Play" : "Penalty Kill";
+    return (
+      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+        <tbody>
+          {[0, 1].map(unit => (
+            <React.Fragment key={unit}>
+              <SectionHead>{`${label} — Unit ${unit + 1}`}</SectionHead>
+              <tr style={{ background: unit % 2 === 0 ? "transparent" : "var(--ledger-cream)" }}>
+                {Array.from({ length: unitSize }, (_, i) => (
+                  <UnitCell key={i} sheet={sheet} idx={unit * unitSize + i} />
+                ))}
+              </tr>
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+    );
+  };
+
   const SectionHead = ({ children }: { children: React.ReactNode }) => (
     <tr>
       <td colSpan={4} style={{
@@ -476,6 +582,41 @@ function TeamLineup({
         </div>
       </div>
 
+      {/* RL6 — situation switch. Every club spends about a fifth of the game
+          on special teams, and the gap between a first and second power-play
+          unit is most of the difference between a 60-point winger and an
+          80-point one, so the sheet has to be able to say which. */}
+      <div role="tablist" aria-label="Lineup situation" style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+        {([
+          ["EV", "5-on-5"],
+          ["PP", "Power Play"],
+          ["PK", "Penalty Kill"],
+        ] as [SpecialTeamsSituation, string][]).map(([key, label]) => {
+          const active = situation === key;
+          return (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={active}
+              onClick={() => { setSituation(key); setSelected(null); setStSelected(null); }}
+              className="tap-target"
+              style={{
+                fontFamily: MONO, fontSize: 10, fontWeight: 900, letterSpacing: "0.08em",
+                textTransform: "uppercase", padding: "3px 10px", cursor: "pointer",
+                color: active ? "var(--paper)" : "var(--ledger-ice)",
+                background: active ? "var(--ledger-ice)" : "transparent",
+                border: `1px solid var(--ledger-ice)`,
+              }}>
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {situation === "PP" && <UnitSheet sheet="PP" />}
+      {situation === "PK" && <UnitSheet sheet="PK" />}
+
+      {situation === "EV" && (
       <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
         <tbody>
           <SectionHead>Forwards</SectionHead>
@@ -511,9 +652,10 @@ function TeamLineup({
           </tr>
         </tbody>
       </table>
+      )}
 
       {/* Bench — extra players; click one, then click a matching lineup slot to insert */}
-      {benchIds.length > 0 && (
+      {situation === "EV" && benchIds.length > 0 && (
         <div style={{ marginTop: 6 }}>
           <div style={{ fontSize: 9, fontWeight: 900, color: "var(--ledger-ink-faint)",
                         textTransform: "uppercase", letterSpacing: 0, marginBottom: 3 }}>

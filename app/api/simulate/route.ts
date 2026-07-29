@@ -19,6 +19,9 @@ import { simRequestSchema } from "@/app/lib/sim-request-schema";
 import { teamWindow } from "@/app/lib/team-window";
 import { splitGoalieStarts } from "@/app/lib/goalie-workload";
 import {
+  specialTeamsPointMultiplier, specialTeamsGamesBonus, type SpecialTeamsOrder,
+} from "@/app/lib/special-teams";
+import {
   DIVISIONS,
   EASTERN,
   simulateSeries,
@@ -156,6 +159,9 @@ interface TeamLineupOrder {
   defense?: string[];
   goalies?: string[];
   scratches?: string[];
+  /** RL6 — flat sheets, PP1 = 0-4 / PP2 = 5-9, PK1 = 0-3 / PK2 = 4-7. */
+  powerPlay?: string[];
+  penaltyKill?: string[];
 }
 
 interface SkaterDeployment {
@@ -164,6 +170,9 @@ interface SkaterDeployment {
   group: "F" | "D";
   multiplier: number;
   gamesFloor: number;
+  /** RL6 — special-teams multiplier and games bonus, 1.0/0 when neither. */
+  specialTeamsMultiplier: number;
+  specialTeamsGames: number;
 }
 
 const safeIds = (ids: string[] | undefined): string[] =>
@@ -217,6 +226,10 @@ const onIceValue = (p: SimPlayer): number => {
   const driverBonus = p.position === "D" && p.pairDriverScore != null
     ? Math.max(-5, Math.min(10, p.pairDriverScore * 0.5))
     : 0;
+  // NOTE (RL6): this estimates kill usage from last season's ice time and
+  // feeds TEAM STRENGTH. The explicit special-teams sheet feeds the individual
+  // skater projection instead — different channels, so they do not
+  // double-count, and this stays a pure per-player memo.
   const pkBonus = p.pkTimeShare != null && p.pkTimeShare >= 0.10
     ? Math.min(5, p.pkTimeShare * 30)
     : 0;
@@ -256,6 +269,14 @@ function orderedLineupPlayers(
 
 function buildDeploymentMap(order?: TeamLineupOrder): Map<string, SkaterDeployment> {
   const deployments = new Map<string, SkaterDeployment>();
+  // RL6 — special teams ride along on the deployment record, so the projection
+  // reads one object rather than being handed a second parallel lookup.
+  const specialTeams: SpecialTeamsOrder = {
+    powerPlay: safeIds(order?.powerPlay),
+    penaltyKill: safeIds(order?.penaltyKill),
+  };
+  const stMult = (id: string) => specialTeamsPointMultiplier(id, specialTeams);
+  const stGames = (id: string) => specialTeamsGamesBonus(id, specialTeams);
   safeIds(order?.forwards).slice(0, 12).forEach((id, slot) => {
     const line = Math.floor(slot / 3);
     const multipliers = [1.10, 1.04, 0.98, 0.90];
@@ -266,6 +287,8 @@ function buildDeploymentMap(order?: TeamLineupOrder): Map<string, SkaterDeployme
       group: "F",
       multiplier: multipliers[line] ?? 0.90,
       gamesFloor: floors[line] ?? 48,
+      specialTeamsMultiplier: stMult(id),
+      specialTeamsGames: stGames(id),
     });
   });
   safeIds(order?.defense).slice(0, 6).forEach((id, slot) => {
@@ -278,6 +301,8 @@ function buildDeploymentMap(order?: TeamLineupOrder): Map<string, SkaterDeployme
       group: "D",
       multiplier: multipliers[pair] ?? 0.93,
       gamesFloor: floors[pair] ?? 56,
+      specialTeamsMultiplier: stMult(id),
+      specialTeamsGames: stGames(id),
     });
   });
   return deployments;
@@ -566,7 +591,10 @@ function projectSkaterOutcome(
   let gamesPlayed = Math.round(70 + rand() * 12);
   if (isProspectProfile) gamesPlayed = Math.round(55 + rand() * 27);
   if (deployment?.active) {
-    gamesPlayed = Math.max(gamesPlayed, Math.round(deployment.gamesFloor + rand() * 8));
+    // The kill pays in trust, not points — a coach who uses you shorthanded
+    // dresses you more often.
+    const floor = deployment.gamesFloor + (deployment.specialTeamsGames ?? 0);
+    gamesPlayed = Math.max(gamesPlayed, Math.round(floor + rand() * 8));
   } else if (benched) {
     // Not in the set lineup: press-box/AHL depth — call-up minutes only.
     gamesPlayed = Math.min(gamesPlayed, Math.round(18 + rand() * 24));
@@ -591,7 +619,13 @@ function projectSkaterOutcome(
   const burst = burstProfile(p);
   const paceVariance = (isAgingWell ? 0.98 + rand() * 0.14 : 0.91 + rand() * 0.18) + rand() * burst.varianceKick;
   const deploymentMultiplier = deployment?.active ? deployment.multiplier : benched ? 0.85 : 1;
-  const rawProjectedPts = (effectivePace / 82) * gamesPlayed * development * paceVariance * deploymentMultiplier * burst.rushLift;
+  // RL6 — first-unit power play is most of the gap between a 60-point winger
+  // and an 80-point one. Deliberately a smaller lever than the line
+  // multiplier, so the sheet matters without swamping it. Capped alongside
+  // everything else by ptsCeiling below.
+  const specialTeamsMultiplier = deployment?.active ? (deployment.specialTeamsMultiplier ?? 1) : 1;
+  const rawProjectedPts = (effectivePace / 82) * gamesPlayed * development * paceVariance
+    * deploymentMultiplier * specialTeamsMultiplier * burst.rushLift;
   // Believable-season ceiling: the breakout/variance/deployment/burst multipliers
   // can stack to ~1.7x, which let a 33-yo post 156 off a ~95 pace. A season can be
   // great but not physics-defying — cap it at a role-appropriate multiple of the

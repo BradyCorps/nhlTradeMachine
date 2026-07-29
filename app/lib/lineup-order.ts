@@ -19,6 +19,12 @@ export interface LineupOrderPayload {
   defense: string[];
   goalies: string[];
   scratches: string[];
+  /**
+   * RL6 — special-teams sheets, flat and sliced into units. Optional so a
+   * lineup saved before RL6 still hydrates; see app/lib/special-teams.ts.
+   */
+  powerPlay?: string[];
+  penaltyKill?: string[];
 }
 
 export type LineupGroup = "F" | "D" | "G";
