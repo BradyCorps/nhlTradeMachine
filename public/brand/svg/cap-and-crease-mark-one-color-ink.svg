@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Cap &amp; Crease one-colour ink mark</title>
+  <desc id="desc">One-colour top-down hockey goal, puck in the net, and right-facing outlined crease framed by brackets.</desc>
+  <path fill="#1c140a" d="M28 20h48v26H52v164h24v26H28l-16-16V36L28 20Z"/>
+    <path fill="#1c140a" d="M228 20h-48v26h24v164h-24v26h48l16-16V36l-16-16Z"/>
+    <path d="M140 70a58 58 0 0 1 0 116V70Z" fill="none" stroke="#1c140a" stroke-width="9" stroke-linejoin="round"/>
+    <path d="M128 82H84v92h44" fill="none" stroke="#1c140a" stroke-width="10" stroke-linecap="square" stroke-linejoin="round"/>
+    <path fill="#1c140a" d="M130 62h10v134h-10z"/>
+    <circle cx="106" cy="146" r="9" fill="#1c140a"/>
+</svg>

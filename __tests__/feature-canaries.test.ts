@@ -2930,3 +2930,45 @@ describe("Canary — RL5 line locks", () => {
     expect(src).toContain("locked");
   });
 });
+
+describe("Canary — brand kit implementation", () => {
+  it("does not type the ampersand as text in the masthead", () => {
+    // The kit: "The red ampersand is a custom vector. Do not recreate it with
+    // a typed &." The old masthead did exactly that, in whatever serif the
+    // browser happened to have.
+    const header = read("app/components/Header.tsx");
+    expect(header).toContain("cap-and-crease-lockup-horizontal.svg");
+    expect(header).not.toContain("Cap & Crease\n");
+  });
+
+  it("keeps a real heading for search and screen readers", () => {
+    // Swapping an <h1> for an image must not cost the page its heading.
+    const header = read("app/components/Header.tsx");
+    expect(header).toContain('<h1 className="sr-only">{BRAND.name}</h1>');
+    expect(header).toContain('alt=""');
+  });
+
+  it("serves icons and manifest from the kit rather than ad-hoc files", () => {
+    const layout = read("app/layout.tsx");
+    expect(layout).toContain('manifest: "/brand/favicon/site.webmanifest"');
+    expect(layout).toContain("/brand/favicon/favicon.svg");
+    expect(layout).toContain("/brand/png/cap-and-crease-og-1200x630.png");
+  });
+
+  it("keeps the name in BRAND, not re-hardcoded alongside the kit", () => {
+    const layout = read("app/layout.tsx");
+    expect(layout).toContain("applicationName: BRAND.name");
+    expect(layout).toContain("metadataBase: new URL(BRAND.url)");
+  });
+
+  it("renders the mark inline rather than through next/image", () => {
+    // next/image refuses to optimise SVG without dangerouslyAllowSVG, which
+    // would have to be enabled globally for every image, for a logo.
+    // Comments stripped — the component's own note explains why it avoids it.
+    const mark = read("app/components/BrandMark.tsx")
+      .replace(/\/\/.*$/gm, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(mark).not.toContain("next/image");
+    expect(mark).toContain("export function BrandMark");
+  });
+});

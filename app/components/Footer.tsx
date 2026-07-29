@@ -2,6 +2,7 @@
 // Shared across Armchair GM, Trade Machine, and Player Analytics pages.
 import Link from "next/link";
 import { BRAND } from "@/app/lib/brand";
+import { BrandMark } from "@/app/components/BrandMark";
 import { TierIcon } from "./GravityField";
 import type { GravityTier } from "@/app/lib/gravity";
 import { ROLE_DEFS } from "@/app/lib/player-roles";
@@ -260,6 +261,13 @@ export default function Footer() {
               </dl>
             </details>
           ))}
+        </div>
+
+        {/* The mark signs off the page. The wordmark is already in the
+            masthead, so this instance is decorative — no `title`, and it is
+            hidden from screen readers rather than announcing the site twice. */}
+        <div className="mt-5 flex justify-center">
+          <BrandMark size={44} />
         </div>
 
         <p className="mt-4 text-center text-[10px] leading-relaxed font-mono text-ledger-rule">

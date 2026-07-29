@@ -32,6 +32,20 @@
   --ledger-orange:       #d97706;
   --ledger-violet:       #5b4a9b;
   --fig-bright: #a05871;
+  /* ── Brand kit tokens (docs/cap-and-crease-brand-kit) ────────
+     Four of the kit's five already existed under ledger names and are
+     aliased rather than duplicated, so a future kit revision changes one
+     value in one place instead of two that can silently disagree:
+       --cc-ink #1c140a = --ledger-ink   |  --cc-paper #f2ecd7 = --paper
+       --cc-red #b83020 = --ledger-red   |  --cc-brass #b8a070 = --ledger-rule
+     Ice blue is genuinely new. Per the kit: reserved for the crease and
+     related data accents — never a general page background. */
+  --cc-ink:       var(--ledger-ink);
+  --cc-paper:     var(--paper);
+  --cc-red:       var(--ledger-red);
+  --cc-brass:     var(--ledger-rule);
+  --cc-ice-blue:  #79afc1;
+
   --paper:        #f2ecd7;
   --paper-card:   #e4d8b8;
   --paper-inset:  #d6c8a5;

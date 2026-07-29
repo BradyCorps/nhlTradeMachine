@@ -3,6 +3,7 @@
 // Shared across product mode and analytics pages.
 
 import { usePathname } from "next/navigation";
+import { BRAND } from "@/app/lib/brand";
 
 type NavTab = "trade" | "armchair-gm" | "players" | "teams" | "docket" | "press-box" | "fantasy";
 
@@ -33,13 +34,24 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
         {/* Masthead */}
         <div className="border-y-[3px] border-double border-ledger-ink py-2 mb-1">
           <div className="text-center">
-            <a href="/" className="no-underline">
-              <h1
-                className="font-black leading-none transition-opacity hover:opacity-70 text-ledger-ink font-serif cursor-pointer"
-                style={{ fontSize: 'clamp(1.8rem, 5vw, 3rem)', letterSpacing: '-0.02em', lineHeight: 1 }}
-              >
-                Cap & Crease
-              </h1>
+            {/* The masthead is the kit's horizontal lockup, not typed text.
+                The brand kit is explicit that the red ampersand is a custom
+                vector — "do not recreate it with a typed &" — and the old
+                markup did exactly that in whatever serif the browser had.
+                The <h1> survives as visually-hidden text so the page still
+                has a real heading for search and screen readers; the image
+                is decorative because that text already names the site. */}
+            <a href="/" className="no-underline block">
+              <h1 className="sr-only">{BRAND.name}</h1>
+              <img
+                src="/brand/svg/cap-and-crease-lockup-horizontal.svg"
+                alt=""
+                aria-hidden="true"
+                width={1560}
+                height={320}
+                className="mx-auto h-auto w-full transition-opacity hover:opacity-70 cursor-pointer"
+                style={{ maxWidth: 'clamp(260px, 62vw, 520px)' }}
+              />
             </a>
             <p className="flex items-center justify-center gap-2 text-2xs uppercase tracking-[0.3em] mt-1.5 font-mono text-ledger-ink-faint">
               <span>Est. 2026 &nbsp;—&nbsp; Vol. I &nbsp;—&nbsp;</span>
