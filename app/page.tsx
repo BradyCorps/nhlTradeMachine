@@ -6,6 +6,8 @@ import ScrollReveal from "./components/ScrollReveal";
 import ScrollNameplate from "./components/ScrollNameplate";
 import ScrollSnap from "./components/ScrollSnap";
 import LedgerScrollSetdown from "./components/LedgerScrollSetdown";
+import { BRAND } from "@/app/lib/brand";
+import { BrandMark } from "@/app/components/BrandMark";
 import TrendingPlayers from "./components/TrendingPlayers";
 
 function Cell({
@@ -116,9 +118,23 @@ export default function WelcomePage() {
               First Edition<br />Vol. I — No. 1
             </div>
             <div className="text-center">
-              <h1 className="fp-nameplate" style={{ fontSize: "clamp(2.4rem, 8vw, 4.6rem)" }}>
-                Cap & Crease
-              </h1>
+              {/* The mark as a crest above the nameplate — the traditional
+                  broadsheet position for a device. Decorative; the wordmark
+                  beneath it already names the paper. */}
+              <BrandMark size={44} className="mx-auto mb-3 block" />
+              {/* Kit wordmark. The <h1> stays as visually-hidden text so the
+                  front page keeps a real heading for search and screen
+                  readers; the image itself is decorative. */}
+              <h1 className="sr-only">{BRAND.name}</h1>
+              <img
+                src="/brand/svg/cap-and-crease-wordmark.svg"
+                alt=""
+                aria-hidden="true"
+                width={1280}
+                height={240}
+                className="mx-auto h-auto"
+                style={{ width: "min(86vw, 620px)" }}
+              />
               <p className="fp-slogan mt-3 text-[12px]">
                 "Everything a hockey fan could ask for"
               </p>
@@ -170,7 +186,7 @@ export default function WelcomePage() {
               Build your trade in the Trade Machine and test it against the X-NAV
               engine and the GM Audit or take the chair in Armchair GM and live
               with every consequence that follows. Explore advanced and enhanced
-              stats on the Player Analytics page, featuring Cap & Crease
+              stats on the Player Analytics page, featuring {BRAND.name}
               exclusive Player Gravity system, STRAND DNA Identity profiles and a
               new all-in-one X-NAV model. Read the published Docket to see how the
               calls have aged. Visit the Press Box and play the daily hockey crib.

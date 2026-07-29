@@ -2972,3 +2972,35 @@ describe("Canary — brand kit implementation", () => {
     expect(mark).toContain("export function BrandMark");
   });
 });
+
+describe("Canary — the front page wears the brand kit", () => {
+  it("types the name nowhere on the home page", () => {
+    // Both nameplates — the dark hero and the sheet below it — used Libre
+    // Baskerville with a typed ampersand, which the kit forbids.
+    for (const file of ["app/page.tsx", "app/components/ScrollNameplate.tsx"]) {
+      const src = read(file).replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+      expect(src, file).not.toContain("Cap & Crease");
+    }
+  });
+
+  it("uses the kit wordmark on both nameplates, cream cut on the dark desk", () => {
+    expect(read("app/page.tsx")).toContain("/brand/svg/cap-and-crease-wordmark.svg");
+    expect(read("app/components/ScrollNameplate.tsx"))
+      .toContain("/brand/svg/cap-and-crease-wordmark-cream.svg");
+  });
+
+  it("keeps a real heading on the front page", () => {
+    expect(read("app/page.tsx")).toContain('<h1 className="sr-only">{BRAND.name}</h1>');
+  });
+
+  it("shows the mark as a crest above the nameplate", () => {
+    expect(read("app/page.tsx")).toContain("<BrandMark size={44}");
+  });
+
+  it("does not announce the brand twice to a screen reader", () => {
+    // Wordmark images sit beside real headings, so they are decorative.
+    const page = read("app/page.tsx");
+    expect(page).toContain('alt=""');
+    expect(page).not.toContain('alt="Cap & Crease"');
+  });
+});

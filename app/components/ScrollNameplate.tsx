@@ -95,19 +95,23 @@ function MotionNameplate() {
 function NameplateContent() {
   return (
     <>
-      <div style={{
-        fontFamily: "'Libre Baskerville', Georgia, 'Times New Roman', serif",
-        fontWeight: 700,
-        fontSize: "clamp(2.2rem, 7.5vw, 4.8rem)",
-        color: "var(--paper)",
-        letterSpacing: "-0.02em",
-        lineHeight: 0.92,
-        textAlign: "center",
-        textShadow: "0 2px 36px rgba(0,0,0,0.5), 0 1px 0 rgba(0,0,0,0.15)",
-        userSelect: "none",
-      }}>
-        Cap & Crease
-      </div>
+      {/* The kit wordmark, cream cut, rather than Libre Baskerville with a
+          typed ampersand. The red ampersand is a custom vector and the kit
+          forbids recreating it as text. Decorative: the sheet below carries
+          the real <h1>, so announcing the name here would repeat it. */}
+      <img
+        src="/brand/svg/cap-and-crease-wordmark-cream.svg"
+        alt=""
+        aria-hidden="true"
+        width={1280}
+        height={240}
+        style={{
+          width: "min(88vw, 720px)",
+          height: "auto",
+          userSelect: "none",
+          filter: "drop-shadow(0 2px 36px rgba(0,0,0,0.5))",
+        }}
+      />
 
       <div style={{
         marginTop: 26,

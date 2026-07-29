@@ -107,3 +107,27 @@ describe("brand tokens", () => {
     expect(read("app/globals.css")).toContain("--cc-ice-blue:  #79afc1");
   });
 });
+
+// The kit ships no cream wordmark, and the hero nameplate sits on the dark
+// desk. The cream cut is derived from the kit file by swapping the two group
+// fills — so it must stay path-identical, or a kit revision would leave the
+// hero on a superseded wordmark while the sheet below it updated.
+describe("derived cream wordmark", () => {
+  const kit = read(`${PUBLIC}/svg/cap-and-crease-wordmark.svg`);
+  const cream = read(`${PUBLIC}/svg/cap-and-crease-wordmark-cream.svg`);
+
+  it("has identical geometry to the kit wordmark", () => {
+    expect(pathData(cream)).toEqual(pathData(kit));
+  });
+
+  it("differs from it only in the ink fill and its title", () => {
+    const normalise = (svg: string) =>
+      svg.replace(/fill:#f2ecd7/g, "fill:#1c140a")
+         .replace("Cap &amp; Crease wordmark, cream", "Cap &amp; Crease wordmark");
+    expect(normalise(cream)).toBe(normalise(kit));
+  });
+
+  it("keeps the ampersand red rather than washing it out", () => {
+    expect(cream).toContain('fill="#b83020"');
+  });
+});
