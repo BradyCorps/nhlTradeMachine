@@ -25,6 +25,7 @@ import {
 } from "@/app/lib/roster-view";
 import { teamLeadership, letterFor } from "@/app/lib/team-leadership";
 import { lineupContributionScore } from "@/app/lib/lineup-ranking";
+import { SEASON } from "@/app/lib/season-config";
 
 const MONO = "var(--font-mono, 'Courier Prime', monospace)";
 
@@ -58,18 +59,30 @@ function RosterTable({
   return (
     <section className="overflow-x-auto" style={{ fontFamily: MONO }}>
       <header
-        className="flex items-baseline justify-between gap-3 flex-wrap py-1.5 px-2"
+        className="py-1.5 px-2"
         style={{ background: "var(--ledger-cream)", border: "1px solid var(--ledger-rule)" }}>
-        <h3 className="text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: "var(--ledger-ink)" }}>
-          {team.name}
-        </h3>
-        <p className="text-[10px]" style={{ color: "var(--ledger-ink-faint)" }}>
-          {totals.players} skaters · {totals.goals}G · {totals.assists}A · {totals.points} PTS ·{" "}
-          ${totals.capHit.toFixed(1)}M
-          {" · "}
-          <span style={{ color: simulated ? "var(--ledger-green)" : "var(--ledger-ink-faint)" }}>
-            {simulated ? "Simulated season" : "Pre-season baseline"}
+        <div className="flex items-baseline justify-between gap-3 flex-wrap">
+          <h3 className="text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: "var(--ledger-ink)" }}>
+            {team.name}
+          </h3>
+          <p className="text-[10px]" style={{ color: "var(--ledger-ink-faint)" }}>
+            {totals.players} skaters · {totals.goals}G · {totals.assists}A · {totals.points} PTS ·{" "}
+            ${totals.capHit.toFixed(1)}M
+          </p>
+        </div>
+        {/* Which numbers these are, stated rather than implied. The Roster tab
+            and the Season Review both show points, and a reader who cannot
+            tell them apart will believe one of them is wrong. */}
+        <p className="text-[10px] mt-0.5" style={{ color: "var(--ledger-ink-faint)" }}>
+          <span
+            className="font-black uppercase tracking-[0.1em]"
+            style={{ color: simulated ? "var(--ledger-green)" : "var(--ledger-ice)" }}>
+            {simulated ? `${SEASON.label} results` : `${SEASON.replaySeason} baseline`}
           </span>
+          {" — "}
+          {simulated
+            ? "what these players did in the season you simulated, carried forward as their current form."
+            : "last completed season, scaled to games played. Simulate a year and this becomes those results."}
         </p>
       </header>
 
@@ -198,6 +211,18 @@ export function RosterTab({
 
   return (
     <div className="grid gap-4 px-2 py-3">
+      {/* The Roster tab and Season Results answer different questions, and
+          both of them show points. Naming the job here — and pointing at the
+          other — stops the overlap reading as a contradiction. */}
+      <p className="text-[10px] leading-relaxed" style={{ color: "var(--ledger-ink-faint)" }}>
+        <span className="font-black uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink)" }}>
+          Who you hold.
+        </span>{" "}
+        Current roster and form, ordered by production. For how a simulated season
+        compared with expectation — ΔXP, NOIV, who beat their contract — see
+        <span className="font-black"> Sim → Season Review</span>.
+      </p>
+
       <RosterTable team={teams[0]} rows={home.rows} navMap={navMap} simulated={home.simulated} />
       {teams[1] && (
         <RosterTable team={teams[1]} rows={partner.rows} navMap={navMap} simulated={partner.simulated} />

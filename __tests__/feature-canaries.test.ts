@@ -3034,15 +3034,36 @@ describe("Canary — RL2 roster tab", () => {
 
   it("shows whether the numbers are simulated or baseline", () => {
     // Reporting last season's points after a sim would misstate the one thing
-    // the tab exists for.
+    // the tab exists for. Pinned to the guarantee — the view distinguishes the
+    // two and names the season — rather than to the wording, which changed
+    // once already when the label gained the season name.
     const tab = read("app/armchair-gm/RosterTab.tsx");
-    expect(tab).toContain("Simulated season");
-    expect(tab).toContain("Pre-season baseline");
+    expect(tab).toContain("simulated");
+    expect(tab).toContain("baseline");
+    expect(tab).toMatch(/simulated\s*\?/);
   });
 
   it("no longer opens the Season Results roster table by default", () => {
     const pager = read("app/armchair-gm/SeasonResultsPager.tsx");
     expect(pager).not.toContain('<details className="mt-2.5" open>');
     expect(pager).toContain("Season Review — Performance vs Expectation");
+  });
+});
+
+describe("Canary — Roster and Season Review state which is which", () => {
+  it("names each view's job, since both show points", () => {
+    expect(read("app/armchair-gm/RosterTab.tsx")).toContain("Who you hold.");
+    expect(read("app/armchair-gm/SeasonResultsPager.tsx")).toContain("How it went.");
+  });
+
+  it("cross-references so neither reads as a contradiction", () => {
+    expect(read("app/armchair-gm/RosterTab.tsx")).toContain("Season Review");
+    expect(read("app/armchair-gm/SeasonResultsPager.tsx")).toContain("Roster</span>");
+  });
+
+  it("labels the roster's numbers with the season they came from", () => {
+    const tab = read("app/armchair-gm/RosterTab.tsx");
+    expect(tab).toContain("SEASON.label");
+    expect(tab).toContain("SEASON.replaySeason");
   });
 });

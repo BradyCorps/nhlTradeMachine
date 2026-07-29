@@ -227,6 +227,17 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
           >
             Season Review — Performance vs Expectation
           </summary>
+          {/* The other half of the pair. Roster answers "who do I hold and
+              what is their form"; this answers "how did that season go against
+              what we expected". Both show points, so each says which it is. */}
+          <p className="text-[10px] leading-relaxed pb-1.5" style={{ color: 'var(--ledger-ink-faint)' }}>
+            <span className="font-black uppercase tracking-[0.14em]" style={{ color: 'var(--ledger-ink)' }}>
+              How it went.
+            </span>{' '}
+            One season judged against its preseason expectation — ΔXP is points above
+            or below what the model projected. For the current roster and form, see
+            <span className="font-black"> Roster</span>.
+          </p>
           <div className="overflow-x-auto">
             <table className="w-full font-mono" style={{ borderCollapse: 'collapse', minWidth: 480 }}>
               <thead>
