@@ -578,8 +578,13 @@ describe("Canary — trade proposal audit verification", () => {
     const src = read("app/components/TradeProposal.tsx");
     expect(src).toContain("fetchTradeVerdict");
     expect(src).toContain("tradePassesFullAudit");
-    expect(src).toContain("AUDIT_CONCURRENCY");
-    expect(src).toContain("MAX_AUDIT_CANDIDATES");
+    // The audit stays bounded and batched. CXH4 moved the two constants into
+    // app/lib/proposal-plan.ts, so this pins the bound rather than the names.
+    const plan = read("app/lib/proposal-plan.ts");
+    expect(plan).toMatch(/AUDIT_BUDGET = \d+/);
+    expect(plan).toMatch(/AUDIT_WAVE = \d+/);
+    expect(src).toContain("AUDIT_WAVE");
+    expect(src).toContain("planAuditOrder(");
     expect(src).toContain("generateRunRef");
     expect(src).toContain("generateAbortRef");
     expect(src).toContain("auditProgress");
@@ -3555,5 +3560,45 @@ describe("Canary — Press Box rules describe the game being scored", () => {
   it("takes the optimum the curator already computed", () => {
     // Recomputing is a second answer that can disagree with the accepted one.
     expect(page).toContain("const optimalResult = hand?.optimal ?? null");
+  });
+});
+
+describe("Canary — CXH4 proposal generation is deterministic and honest", () => {
+  const panel = read("app/components/TradeProposal.tsx");
+
+  it("does not let arrival order pick the surviving package", () => {
+    // Every package from one club shares a fitScore, so `>` never fired
+    // between them and the first audit to RESOLVE won.
+    expect(panel).not.toMatch(/if \(candidate\.fitScore > existing\.fitScore\)/);
+    expect(panel).toContain("bestPerTeam(viable)");
+  });
+
+  it("carries the tiebreak keys on every candidate", () => {
+    expect(panel).toContain("packageIndex");
+    // Built through one helper so a new candidate branch cannot omit them.
+    expect((panel.match(/\.\.\.planKeys\(team, /g) ?? []).length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("audits breadth-first, so one club cannot eat the budget", () => {
+    expect(panel).toContain("planAuditOrder(screened)");
+    expect(read("app/lib/proposal-plan.ts")).toContain("byRound");
+  });
+
+  it("checks the early exit only at a settled wave boundary", () => {
+    // Checking mid-flight would hand the cutoff back to the network.
+    expect(panel).toContain("stopAfterWave(");
+    expect(panel).not.toContain("while (cursor < preScreened.length)");
+  });
+
+  it("keeps a failed audit distinct from a declined trade", () => {
+    // Errors were swallowed as "not viable", so a dead network reported
+    // "No realistic trade partners found."
+    expect(panel).toContain("summariseAudit(");
+    expect(panel).toContain('outcome?.kind === "INCOMPLETE"');
+    expect(panel).toContain("The audit could not be completed.");
+  });
+
+  it("does not count a user abort as a failure", () => {
+    expect(panel).toContain("if (ctrl.signal.aborted) return { failed: true }");
   });
 });

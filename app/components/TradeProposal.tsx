@@ -20,6 +20,10 @@ import {
 } from "@/app/lib/trade-logic";
 import { formatPickRound } from "@/app/lib/trade-format";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
+import {
+  AUDIT_WAVE, bestPerTeam, planAuditOrder, stopAfterWave, summariseAudit,
+  type AuditOutcome,
+} from "@/app/lib/proposal-plan";
 import { useDialog } from "@/app/lib/use-dialog";
 
 interface Props {
@@ -40,10 +44,25 @@ type Candidate = {
   partnerSends: Asset[];
   isDump: boolean;
   dumpSweetener: Asset[];
+  // CXH4 — the planner's total order needs these. Every package from one club
+  // shares a fitScore, so without packageIndex there is nothing to separate
+  // them and the survivor was decided by whichever fetch returned first.
+  teamId: string;
+  teamName: string;
+  standing: number;
+  packageIndex: number;
 };
 
-const AUDIT_CONCURRENCY = 6;
-const MAX_AUDIT_CANDIDATES = 36;
+/** Packages generated per club. Only one per club is ever displayed. */
+const PACKAGES_PER_TEAM = 4;
+
+/** The planner's tiebreak keys, so no candidate is built without them. */
+const planKeys = (team: Team, packageIndex: number) => ({
+  teamId: team.id,
+  teamName: team.name,
+  standing: team.standing ?? 99,
+  packageIndex,
+});
 
 export default function TradeProposalEngine({
   outgoingBlock, homeTeam, allTeams, allPlayers, navMap, capCeiling, onClose, onLoadTrade
@@ -56,6 +75,8 @@ export default function TradeProposalEngine({
   const [slideDirection, setSlideDirection] = useState<"next" | "prev">("next");
   const [marketStats, setMarketStats] = useState({ reviewed: 0, viable: 0 });
   const [auditProgress, setAuditProgress] = useState<{ checked: number; total: number } | null>(null);
+  // What the run established, so the empty state can tell the truth about it.
+  const [outcome, setOutcome] = useState<AuditOutcome | null>(null);
   const generateAbortRef = useRef<AbortController | null>(null);
   const generateRunRef = useRef(0);
   useBodyScrollLock(true);
@@ -69,6 +90,7 @@ export default function TradeProposalEngine({
     setActiveIndex(0);
     setGenerating(false);
     setAuditProgress(null);
+    setOutcome(null);
   }, [homeTeam?.id, outgoingBlock, navMap]);
 
   // Trade-block badge — shows why this player is realistically available
@@ -139,6 +161,7 @@ export default function TradeProposalEngine({
           partnerSends: cheapReturn ? [cheapReturn] : [],
           isDump: true,
           dumpSweetener: sweetener,
+          ...planKeys(team, 0),
         });
       } else if (hasNegPlayer) {
         // Neg-for-neg swap: both teams trading contracts they want to move
@@ -154,9 +177,9 @@ export default function TradeProposalEngine({
           if (fit < 15) continue;
           const pkgs = buildReturnPackages(blockNav, roster, picks, navMap);
           if (pkgs.length === 0) continue;
-          for (const pkg of pkgs.slice(0, 4)) {
-            candidates.push({ team, fitScore: fit, homeSends: outgoingBlock, partnerSends: pkg, isDump: false, dumpSweetener: [] });
-          }
+          pkgs.slice(0, PACKAGES_PER_TEAM).forEach((pkg, i) => {
+            candidates.push({ team, fitScore: fit, homeSends: outgoingBlock, partnerSends: pkg, isDump: false, dumpSweetener: [], ...planKeys(team, i) });
+          });
           continue;
         }
 
@@ -187,6 +210,7 @@ export default function TradeProposalEngine({
           partnerSends: [match],
           isDump: false,
           dumpSweetener: [],
+          ...planKeys(team, 0),
         });
       } else {
         // Standard trade — generate multiple return packages per team
@@ -198,31 +222,40 @@ export default function TradeProposalEngine({
 
         // Add each valid package as a separate candidate
         // Cap at 4 packages per team to avoid one team dominating the pool
-        for (const pkg of pkgs.slice(0, 4)) {
+        pkgs.slice(0, PACKAGES_PER_TEAM).forEach((pkg, i) => {
           candidates.push({
             team, fitScore: fit,
             homeSends: outgoingBlock,
             partnerSends: pkg,
             isDump: false,
             dumpSweetener: [],
+            ...planKeys(team, i),
           });
-        }
+        });
       }
     }
-
-    candidates.sort((a,b) => b.fitScore - a.fitScore);
 
     // Pre-screen — filter out proposals that would obviously be declined
     // Catches cap violations, NMC blocks, and self-defeating logic
     // before surfacing to the user. Better to show fewer clean proposals
     // than more with declined verdicts.
-    const preScreened = candidates
-      .filter(c => preScreenProposal(c.homeSends, c.partnerSends, homeTeam!, c.team, navMap))
-      .slice(0, MAX_AUDIT_CANDIDATES);
+    const screened = candidates
+      .filter(c => preScreenProposal(c.homeSends, c.partnerSends, homeTeam!, c.team, navMap));
+
+    // CXH4 — breadth first, under a total order. Sorting by fit alone let four
+    // packages from one club consume four slots of the budget while clubs
+    // further down were never contacted; every club's preferred package is
+    // audited before any club's second now.
+    const preScreened = planAuditOrder(screened);
 
     setAuditProgress({ checked: 0, total: preScreened.length });
 
-    const verifyCandidate = async (candidate: Candidate): Promise<Candidate | null> => {
+    // A rejected trade and an audit that never answered are different facts.
+    // Folding them together is what let an unreachable API report "No realistic
+    // trade partners found" — an assertion about the league made from nothing.
+    type AuditResult = { candidate: Candidate; passed: boolean } | { failed: true };
+
+    const verifyCandidate = async (candidate: Candidate): Promise<AuditResult> => {
       const partnerRoster = allPlayers.filter(p => p.teamId === candidate.team.id);
       const homeRoster = allPlayers.filter(p => p.teamId === homeTeam.id);
 
@@ -237,67 +270,59 @@ export default function TradeProposalEngine({
           ctrl.signal,
           capCeiling,
         );
-        return tradePassesFullAudit(verdict?.status) ? candidate : null;
+        return { candidate, passed: tradePassesFullAudit(verdict?.status) };
       } catch (e) {
+        // An abort is the user moving on, not a failure to report.
+        if (ctrl.signal.aborted) return { failed: true };
         console.error("[TradeProposal] full audit verification failed", e);
-        return null;
+        return { failed: true };
       }
     };
 
     const viable: Candidate[] = [];
     const verifiedCounts = new Map<string, number>();
-    let cursor = 0;
     let checked = 0;
-    const workerCount = Math.min(AUDIT_CONCURRENCY, preScreened.length);
+    let failed = 0;
 
-    await Promise.all(Array.from({ length: workerCount }, async () => {
-      while (cursor < preScreened.length) {
-        if (ctrl.signal.aborted || runId !== generateRunRef.current) return;
-        const candidate = preScreened[cursor++];
-        const verified = await verifyCandidate(candidate);
-        if (ctrl.signal.aborted || runId !== generateRunRef.current) return;
+    // Waves, not a shared cursor. The early exit is evaluated only once a wave
+    // has fully settled, so the cutoff falls after the same number of audits
+    // every run — checking it mid-flight would hand the decision back to
+    // whichever requests happened to be outstanding.
+    for (let start = 0; start < preScreened.length; start += AUDIT_WAVE) {
+      if (ctrl.signal.aborted || runId !== generateRunRef.current) return;
+
+      const wave = preScreened.slice(start, start + AUDIT_WAVE);
+      const results = await Promise.all(wave.map(verifyCandidate));
+      if (ctrl.signal.aborted || runId !== generateRunRef.current) return;
+
+      for (const result of results) {
         checked += 1;
-        setAuditProgress({ checked, total: preScreened.length });
-        if (verified) {
-          viable.push(verified);
-          verifiedCounts.set(verified.team.id, (verifiedCounts.get(verified.team.id) ?? 0) + 1);
-        }
+        if ("failed" in result) { failed += 1; continue; }
+        if (!result.passed) continue;
+        viable.push(result.candidate);
+        verifiedCounts.set(result.candidate.teamId, (verifiedCounts.get(result.candidate.teamId) ?? 0) + 1);
       }
-    }));
+      setAuditProgress({ checked, total: preScreened.length });
+
+      if (stopAfterWave(new Set(viable.map(c => c.teamId)).size, checked, preScreened.length)) break;
+    }
 
     if (ctrl.signal.aborted || runId !== generateRunRef.current) return;
 
-    if (preScreened.length === 0) {
-      setAuditProgress({ checked: 0, total: 0 });
-    }
-
     setMarketStats({ reviewed: Math.max(0, allTeams.length - 1), viable: viable.length });
+    setOutcome(summariseAudit({
+      candidates: preScreened.length, audited: checked, viable: viable.length, failed,
+    }));
 
     if (!viable.length) { setGenerating(false); setAuditProgress(null); setDone(true); return; }
 
-    const byTeam = new Map<string, Candidate & { alternativeCount: number }>();
-    for (const candidate of viable) {
-      const existing = byTeam.get(candidate.team.id);
-      if (!existing) {
-        byTeam.set(candidate.team.id, {
-          ...candidate,
-          alternativeCount: verifiedCounts.get(candidate.team.id) ?? 1,
-        });
-      } else {
-        if (candidate.fitScore > existing.fitScore) {
-          byTeam.set(candidate.team.id, {
-            ...candidate,
-            alternativeCount: verifiedCounts.get(candidate.team.id) ?? existing.alternativeCount,
-          });
-        }
-      }
-    }
-
-    const ranked = [...byTeam.values()].sort((a, b) =>
-      b.fitScore - a.fitScore
-      || (a.team.standing ?? 99) - (b.team.standing ?? 99)
-      || a.team.name.localeCompare(b.team.name)
-    );
+    // One club, one file — chosen by the same total order that scheduled the
+    // audit, so the survivor is a property of the league rather than of which
+    // request came back first.
+    const ranked = bestPerTeam(viable).map(candidate => ({
+      ...candidate,
+      alternativeCount: verifiedCounts.get(candidate.teamId) ?? 1,
+    }));
 
     const initial: TradeProposal[] = ranked.map((c, index) => ({
       partner:       c.team,
@@ -381,12 +406,29 @@ export default function TradeProposalEngine({
 
         {done && !proposals.length && (
           <div className="p-4 sm:p-6 text-center">
-            <div className="text-sm font-bold" style={{ color: '#9a7d58' }}>No realistic trade partners found.</div>
-            <div className="text-[10px] mt-1" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
-              {isDump
-                ? "No teams have enough cap space. Try retaining salary first — use the retention slider to lower the effective cap hit."
-                : "Try adjusting the package — a player may have NMC, or the NAV gap is too large."}
-            </div>
+            {outcome?.kind === "INCOMPLETE" ? (
+              // Not the same claim. Some audits never came back, so whether a
+              // partner exists is unknown — saying "none found" would be the
+              // app reporting a fact about the league it never established.
+              <>
+                <div className="text-sm font-bold" style={{ color: '#b83020' }}>
+                  The audit could not be completed.
+                </div>
+                <div className="text-[10px] mt-1" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
+                  {outcome.failed} of {outcome.audited} checks did not return — this is a connection
+                  problem, not a verdict on the package. Try again.
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-sm font-bold" style={{ color: '#9a7d58' }}>No realistic trade partners found.</div>
+                <div className="text-[10px] mt-1" style={{ color: '#b8a070', fontFamily: "'Courier Prime', monospace" }}>
+                  {isDump
+                    ? "No teams have enough cap space. Try retaining salary first — use the retention slider to lower the effective cap hit."
+                    : "Try adjusting the package — a player may have NMC, or the NAV gap is too large."}
+                </div>
+              </>
+            )}
           </div>
         )}
 
