@@ -874,7 +874,7 @@ export default function ArmchairGmPage() {
 
         <Header activeTab="armchair-gm" />
 
-        <TradeHistoryBar />
+        <TradeHistoryBar pool={{ teams: db.teams, players: db.players }} />
 
         {/* ── Cup Run resume guard — never restore a mid-run flag silently ── */}
         {cupRunPrompt && (

@@ -3708,3 +3708,35 @@ describe("Canary — CXS2 Draft Night says what it actually does to picks", () =
       .toContain("dropSpentDraftPicks(prev.players, draftYearForCupYear(1))");
   });
 });
+
+describe("Canary — CXS6 filed reports can be reopened, and only real trades filed", () => {
+  const bar = readSource("app/components/TradeHistoryBar.tsx");
+
+  it("a selected club is not a saveable trade", () => {
+    // Armchair GM picks a home club at startup, so the old gate had Save live
+    // from page load, filing reports reading "nothing" against "nothing".
+    expect(bar).toContain("isSaveableTrade(blocks)");
+    expect(bar).not.toMatch(/disabled=\{!hasActiveTrade\}[\s\S]{0,200}\+ Save/);
+  });
+
+  it("a filed report can be loaded back onto the bench", () => {
+    expect(bar).toContain("restoreScenario(scenario, pool)");
+    expect(bar).toContain("Load");
+    expect(read("app/armchair-gm/page.tsx"))
+      .toContain("<TradeHistoryBar pool={{ teams: db.teams, players: db.players }} />");
+  });
+
+  it("restores by lookup, never by rebuilding the asset", () => {
+    // A SavedScenario keeps none of the paces the engine reads, so a rebuilt
+    // player would price at zero — the CXH3 failure again.
+    const rule = readSource("app/lib/scenario-restore.ts");
+    expect(rule).toContain("byId.get(stored.id)");
+    expect(rule).toContain("canonicalNameSlug");
+  });
+
+  it("says so when the saved trade no longer fully exists", () => {
+    // Loading a smaller trade than the one filed, silently, is the bad outcome.
+    expect(readSource("app/lib/scenario-restore.ts")).toContain("missingAssets");
+    expect(bar).toContain("no longer in the league");
+  });
+});

@@ -85,7 +85,7 @@ _CX1–CX4 done (commit pending): CX1 `urlHydratedRef` gate; CX2 `resolveTradeSh
 - [x] **CXS3** Offer Sheet completion says "Proceed to Free Agency" after FA/re-signing already happened. (Overlaps OFF1.) `OfferSheetPhase.tsx:369` — closed by OFF1: every phase CTA now reads from `OFFSEASON_FLOW`, which pairs each label with its real destination.
 - [x] **CXS4** Recap heading special-cases Edmonton, styling other teams differently. `SeasonResultsPager.tsx:136` — headings are now detected structurally (a fully-bold line, or `##`) instead of by an allowlist of prefixes, so every club's recap renders alike.
 - [x] **CXS5** Asset expiry uses the real calendar year, not the simulated Cup year. `AssetCard.tsx:132` — `app/lib/contract-expiry.ts` anchors to `SEASON.label` and takes the Cup year, threaded through `TradePanel`. The old form also drifted every January, not just in Cup Runs.
-- [ ] **CXS6** Saved scenarios are read-only summaries (no restore/load); default partner alone enables saving an empty report. `TradeHistoryBar.tsx:165`, `scenarioStore.ts:16`
+- [x] **CXS6** Saved scenarios are read-only summaries (no restore/load); default partner alone enables saving an empty report. `TradeHistoryBar.tsx:165`, `scenarioStore.ts:16`
 
 ### Recommended execution order (Codex)
 1. State integrity — CX1 URL guard, CX2 ownership, CX3 versioning, CX4 metadata-preserving setDb + sim invalidation.

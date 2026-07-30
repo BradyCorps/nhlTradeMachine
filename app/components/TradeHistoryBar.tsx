@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { useTradeStore } from "@/app/store/tradeStore";
 import { useScenarioStore, type SavedScenario, type ScenarioAsset } from "@/app/store/scenarioStore";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
+import { isSaveableTrade, restoreScenario } from "@/app/lib/scenario-restore";
+import type { Asset, Team } from "@/app/lib/trade-types";
 
 // ── SaveModal ─────────────────────────────────────────────────
 function SaveModal({ onSave, onClose }: {
@@ -83,10 +85,12 @@ function AssetLine({ a }: { a: ScenarioAsset }) {
 }
 
 // ── TradeCard — read-only summary of one saved scenario ───────
-function TradeCard({ s, onDelete, onRename }: {
+function TradeCard({ s, onDelete, onRename, onLoad }: {
   s:        SavedScenario;
   onDelete: () => void;
   onRename: (name: string) => void;
+  /** Absent when no live pool is available to resolve the saved ids against. */
+  onLoad?:  () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft,   setDraft]   = useState(s.name);
@@ -126,11 +130,22 @@ function TradeCard({ s, onDelete, onRename }: {
             {date}
           </div>
         </div>
-        <button onClick={onDelete} title="Delete"
-          className="text-[10px] px-1.5 py-0.5 border mt-0.5 transition-opacity hover:opacity-70 shrink-0"
-          style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink-faint)" }}>
-          ✕
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+          {/* CXS6 — the archive was rename-and-delete only, so reopening a
+              filed trade meant rebuilding it by hand. */}
+          {onLoad && (
+            <button onClick={onLoad} title="Load this trade back onto the bench"
+              className="tap-target text-[10px] font-black uppercase tracking-widest px-2 py-0.5 border transition-opacity hover:opacity-80"
+              style={{ borderColor: "var(--ledger-ink)", color: "var(--ledger-ink)" }}>
+              Load
+            </button>
+          )}
+          <button onClick={onDelete} title="Delete"
+            className="text-[10px] px-1.5 py-0.5 border transition-opacity hover:opacity-70"
+            style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink-faint)" }}>
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* Trade body */}
@@ -163,9 +178,12 @@ function TradeCard({ s, onDelete, onRename }: {
 }
 
 // ── TradeHistoryBar ───────────────────────────────────────────
-export default function TradeHistoryBar() {
+export default function TradeHistoryBar({ pool }: { pool?: { teams: Team[]; players: Asset[] } }) {
   const teams  = useTradeStore(s => s.teams);
   const blocks = useTradeStore(s => s.blocks);
+  const setTeams  = useTradeStore(s => s.setTeams);
+  const setBlocks = useTradeStore(s => s.setBlocks);
+  const [restoreNote, setRestoreNote] = useState<string | null>(null);
 
   const { savedScenarios, saveScenario, deleteScenario, renameScenario } = useScenarioStore();
 
@@ -174,6 +192,12 @@ export default function TradeHistoryBar() {
   const [linkCopied,    setLinkCopied]    = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // CXS6 — a selected club is not a trade. Armchair GM picks a home club at
+  // startup, so this enabled Save from the moment the page loaded and filed
+  // reports reading "nothing" against "nothing".
+  const canSave = isSaveableTrade(blocks);
+  // Sharing stays looser: the URL carries the partner selection, so a link is
+  // worth copying before any asset is on the block.
   const hasActiveTrade = (teams[0] || teams[1] || blocks[0].length || blocks[1].length);
 
   useEffect(() => {
@@ -208,6 +232,25 @@ export default function TradeHistoryBar() {
     setShowSaveModal(false);
   };
 
+  // Resolve the filed report against the LIVE pool rather than rebuilding
+  // assets from the stored summary — a reconstructed player carries none of the
+  // paces or baselines the valuation engine reads and would price at zero.
+  const handleLoad = (scenario: SavedScenario) => {
+    if (!pool) return;
+    const restored = restoreScenario(scenario, pool);
+    setTeams([restored.homeTeam, restored.partnerTeam]);
+    setBlocks([restored.outgoing, restored.incoming]);
+    setShowPanel(false);
+
+    // A scenario outlives the league it was filed against. Loading a smaller
+    // trade than the one saved, and saying nothing, would be the worst outcome.
+    const gone = [...restored.missingTeams, ...restored.missingAssets];
+    setRestoreNote(gone.length
+      ? `Loaded without ${gone.join(", ")} — no longer in the league.`
+      : `Loaded "${scenario.name}".`);
+    setTimeout(() => setRestoreNote(null), 6000);
+  };
+
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
       setLinkCopied(true);
@@ -229,14 +272,15 @@ export default function TradeHistoryBar() {
         {/* Save */}
         <button
           onClick={() => setShowSaveModal(true)}
-          disabled={!hasActiveTrade}
+          disabled={!canSave}
+          title={canSave ? "File this trade as a report" : "Put an asset on the block first"}
           className="text-[10px] font-black uppercase tracking-widest px-3 py-1 border"
           style={{
-            borderColor: hasActiveTrade ? "var(--ledger-ink)" : "var(--ledger-rule)",
-            color:       hasActiveTrade ? "var(--ledger-ink)" : "var(--ledger-ink-faint)",
+            borderColor: canSave ? "var(--ledger-ink)" : "var(--ledger-rule)",
+            color:       canSave ? "var(--ledger-ink)" : "var(--ledger-ink-faint)",
             background:  "transparent",
-            cursor:      hasActiveTrade ? "pointer" : "default",
-            opacity:     hasActiveTrade ? 1 : 0.4,
+            cursor:      canSave ? "pointer" : "default",
+            opacity:     canSave ? 1 : 0.4,
           }}>
           + Save
         </button>
@@ -305,12 +349,26 @@ export default function TradeHistoryBar() {
                   s={s}
                   onDelete={() => deleteScenario(s.id)}
                   onRename={name => renameScenario(s.id, name)}
+                  onLoad={pool ? () => handleLoad(s) : undefined}
                 />
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {restoreNote && (
+        <div role="status" aria-live="polite"
+          className="px-4 py-1.5 text-[10px] font-mono border-b"
+          style={{
+            borderColor: "var(--ledger-rule)",
+            background: "var(--ledger-card)",
+            color: restoreNote.startsWith("Loaded without")
+              ? "var(--ledger-amber)" : "var(--ledger-ink-faint)",
+          }}>
+          {restoreNote}
+        </div>
+      )}
 
       {showSaveModal && (
         <SaveModal onSave={handleSave} onClose={() => setShowSaveModal(false)} />
