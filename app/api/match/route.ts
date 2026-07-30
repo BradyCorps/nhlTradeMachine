@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Asset, Team } from "@/app/lib/trade-types";
 import { teamWindow } from "@/app/lib/team-window";
+import { classifyMatch, type MatchFitTier } from "@/app/lib/match-fit";
 import { z } from "zod";
 import {
   PUBLIC_LIMITS, idString, invalidRequest,
@@ -31,7 +32,7 @@ export interface TeamMatch {
   teamName:      string;
   phase:         string;
   score:         number;
-  fitTier:       "LEAD" | "CAP_CLEAR" | "LONG_SHOT" | "BLOCKED";
+  fitTier:       MatchFitTier;
   navDelta:      number;
   capFit:        "FITS" | "TIGHT" | "OVER";
   fitReasons:    string[];
@@ -254,12 +255,11 @@ export async function POST(req: NextRequest) {
                            "Minimal return or future considerations";
 
       const finalScore = Math.max(0, Math.min(100, Math.round(score)));
-      const fitTier: TeamMatch["fitTier"] =
-        capFit === "OVER"             ? "BLOCKED" :
-        finalScore >= 60              ? "LEAD" :
-        capFit === "FITS"             ? "CAP_CLEAR" :
-        finalScore >= 35              ? "LONG_SHOT" :
-                                        "BLOCKED";
+      // CXH5 — cap fit decides only whether the trade is possible; interest is
+      // read off the score alone. The old ladder tested `capFit === "FITS"`
+      // between the score bands, which filed a club scoring 0 as CAP_CLEAR for
+      // having room, and made LONG_SHOT reachable only on a TIGHT cap.
+      const fitTier = classifyMatch(finalScore, capFit);
 
       return {
         teamId:    team.id,

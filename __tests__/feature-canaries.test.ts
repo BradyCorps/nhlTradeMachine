@@ -3602,3 +3602,43 @@ describe("Canary — CXH4 proposal generation is deterministic and honest", () =
     expect(panel).toContain("if (ctrl.signal.aborted) return { failed: true }");
   });
 });
+
+describe("Canary — CXH5 Partner Finder folders mean one thing each", () => {
+  it("the route classifies through the shared rule", () => {
+    const route = read("app/api/match/route.ts");
+    expect(route).toContain("classifyMatch(finalScore, capFit)");
+    // The ladder that tested cap fit between the score bands.
+    expect(route).not.toMatch(/capFit === "FITS"\s+\? "CAP_CLEAR"/);
+  });
+
+  it("cap space no longer promotes a club into an interest folder", () => {
+    // Strip the header comment, which quotes the old ladder verbatim.
+    const rule = read("app/lib/match-fit.ts").replace(/\/\/.*$/gm, "");
+    // capFit is consulted once, for OVER, and never again.
+    expect(rule).toContain('if (capFit === "OVER") return "BLOCKED"');
+    expect(rule).not.toContain('capFit === "FITS"');
+  });
+
+  it("no folder is named after a cap condition", () => {
+    for (const file of ["app/api/match/route.ts", "app/armchair-gm/MatchResultsPanel.tsx"]) {
+      const src = read(file).replace(/\/\/.*$/gm, "");
+      expect(src, file).not.toContain("CAP_CLEAR");
+    }
+  });
+
+  it("says what the open folder claims", () => {
+    const panel = read("app/armchair-gm/MatchResultsPanel.tsx");
+    expect(panel).toContain("TIER_MEANING[activeFolder]");
+  });
+
+  it("lets a scanned club be loaded as the partner", () => {
+    // The scan named a partner and then made you find them in the picker.
+    const panel = read("app/armchair-gm/MatchResultsPanel.tsx");
+    expect(panel).toContain("onSelectPartner");
+    expect(panel).toContain("Open Trade");
+    const page = read("app/armchair-gm/page.tsx");
+    expect(page).toContain("onSelectPartner={(teamId)");
+    // The shopped package is the point of the scan — it must survive.
+    expect(page).toContain("setBlocks([blocks[0], []])");
+  });
+});

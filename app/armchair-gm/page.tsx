@@ -1047,6 +1047,17 @@ export default function ArmchairGmPage() {
                 setMatchFolder={setMatchFolder}
                 approvedOnly={approvedOnly}
                 setApprovedOnly={setApprovedOnly}
+                activePartnerId={teams[1]?.id ?? null}
+                onSelectPartner={(teamId) => {
+                  const nextPartner = db.teams.find(t => t.id === teamId) ?? null;
+                  if (!nextPartner) return;
+                  setTeams([teams[0], nextPartner]);
+                  // The package being shopped is the whole point of the scan,
+                  // so it stays on the block. Only the return clears, because
+                  // it belonged to whichever club was selected before.
+                  setBlocks([blocks[0], []]);
+                  setVerdict(null);
+                }}
               />
             )}
 

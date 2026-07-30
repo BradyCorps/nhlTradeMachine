@@ -56,8 +56,15 @@ describe("match route negative NAV packages", () => {
     });
 
     const ana = body.matches.find((m: any) => m.teamId === "ANA");
+    // The cap constraint is reported by capFit and the retention warning, NOT
+    // by the interest tier. This used to assert LONG_SHOT, which under the old
+    // ladder was reachable only on a TIGHT cap — the test was pinning the very
+    // conflation CXH5 removes. A club with moderate interest is POSSIBLE
+    // whether its cap is roomy or tight.
     expect(ana.capFit).toBe("TIGHT");
-    expect(ana.fitTier).toBe("LONG_SHOT");
+    expect(ana.score).toBeGreaterThanOrEqual(35);
+    expect(ana.score).toBeLessThan(60);
+    expect(ana.fitTier).toBe("POSSIBLE");
     expect(ana.returnProfile).toBe("Salary retained + conditional pick");
     expect(ana.warnReasons.join(" ")).toContain("Needs retention");
   });

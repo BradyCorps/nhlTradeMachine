@@ -3,14 +3,19 @@
 // Folder-tabbed dossier of the 32-team fit scan. Owns the folder
 // taxonomy (MATCH_FOLDERS); the fetch and its state live with the caller.
 import React from "react";
+import { TIER_MEANING, type MatchFitTier } from "@/app/lib/match-fit";
 
-export type MatchFolder = "LEAD" | "CAP_CLEAR" | "LONG_SHOT" | "BLOCKED";
+// CXH5 — "Cap Clear" is gone. It named a cap condition while being used as an
+// interest tier, so a club with a score of zero was filed under it for having
+// room. The folders are interest bands now; whether the money works is the
+// separate `capFit` column on every row.
+export type MatchFolder = MatchFitTier;
 
 export const MATCH_FOLDERS: Array<{ id: MatchFolder; label: string; stamp: string }> = [
   { id: "LEAD",      label: "Leads",      stamp: "A" },
-  { id: "CAP_CLEAR", label: "Cap Clear",  stamp: "B" },
+  { id: "POSSIBLE",  label: "Possible",   stamp: "B" },
   { id: "LONG_SHOT", label: "Long Shot",  stamp: "C" },
-  { id: "BLOCKED",   label: "Blocked",    stamp: "X" },
+  { id: "BLOCKED",   label: "Cap Blocked", stamp: "X" },
 ];
 
 export type TradeMatchResults = {
@@ -29,12 +34,17 @@ export function MatchResultsPanel({
   setMatchFolder,
   approvedOnly,
   setApprovedOnly,
+  onSelectPartner,
+  activePartnerId,
 }: {
   matchResults: TradeMatchResults;
   matchFolder: MatchFolder;
   setMatchFolder: (f: MatchFolder) => void;
   approvedOnly: boolean;
   setApprovedOnly: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Load this club into the bench as the trade partner. */
+  onSelectPartner?: (teamId: string) => void;
+  activePartnerId?: string | null;
 }) {
   const capScreened = approvedOnly
     ? matchResults.matches.filter(m => m.capFit !== "OVER")
@@ -42,7 +52,7 @@ export function MatchResultsPanel({
   const folderCounts = MATCH_FOLDERS.reduce<Record<MatchFolder, number>>((acc, folder) => {
     acc[folder.id] = capScreened.filter(m => m.fitTier === folder.id).length;
     return acc;
-  }, { LEAD: 0, CAP_CLEAR: 0, LONG_SHOT: 0, BLOCKED: 0 });
+  }, { LEAD: 0, POSSIBLE: 0, LONG_SHOT: 0, BLOCKED: 0 });
   const activeFolder = folderCounts[matchFolder] > 0
     ? matchFolder
     : (MATCH_FOLDERS.find(f => folderCounts[f.id] > 0)?.id ?? matchFolder);
@@ -117,6 +127,12 @@ export function MatchResultsPanel({
         · ${matchResults.packageCap.toFixed(1)}M cap
         {matchResults.avgAge > 0 ? ` · avg ${matchResults.avgAge.toFixed(0)} yrs old` : ""}
       </div>
+      {/* What the open folder actually claims. A club filed under "Long Shot"
+          is a club with little reason to engage — not a comment on whether the
+          cap works, which is the per-row column. */}
+      <div className="text-2xs font-mono mb-2 px-1" style={{ color: 'var(--ledger-ink-faint)' }}>
+        {TIER_MEANING[activeFolder]}
+      </div>
       {displayed.length === 0 && (
         <div className="text-center text-2xs font-mono py-4" style={{ color: 'var(--ledger-ink-faint)' }}>
           No clubs in this folder.
@@ -178,8 +194,31 @@ export function MatchResultsPanel({
               ))}
             </div>
           )}
-          <div className="text-2xs font-mono mt-1 pt-1" style={{ color: 'var(--ledger-ink-faint)', borderTop: '1px solid var(--ledger-rule-light)' }}>
-            Return profile: {m.returnProfile}
+          <div className="flex items-center justify-between gap-2 mt-1 pt-1"
+            style={{ borderTop: '1px solid var(--ledger-rule-light)' }}>
+            <span className="text-2xs font-mono" style={{ color: 'var(--ledger-ink-faint)' }}>
+              Return profile: {m.returnProfile}
+            </span>
+            {/* CXH5 — the scan was read-only: it named a partner and then made
+                you go find them in the team picker yourself. */}
+            {onSelectPartner && (
+              <button
+                onClick={() => onSelectPartner(m.teamId)}
+                disabled={m.teamId === activePartnerId}
+                className="tap-target shrink-0 text-2xs font-black font-mono uppercase px-2 py-1"
+                title={m.teamId === activePartnerId
+                  ? `${m.teamName} is already your trade partner`
+                  : `Open a trade with ${m.teamName} — your package stays on the block`}
+                style={{
+                  background: m.teamId === activePartnerId ? 'var(--ledger-rule-light)' : 'var(--ledger-ice)',
+                  color: m.teamId === activePartnerId ? 'var(--ledger-ink-faint)' : 'var(--paper)',
+                  border: '1px solid var(--ledger-ice)',
+                  borderRadius: 2,
+                  cursor: m.teamId === activePartnerId ? 'default' : 'pointer',
+                }}>
+                {m.teamId === activePartnerId ? 'Current Partner' : 'Open Trade'}
+              </button>
+            )}
           </div>
         </div>
       ))}
