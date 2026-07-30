@@ -7,12 +7,21 @@
 
 import { describe, it, expect } from "vitest";
 import fs from "fs";
+import { stripComments } from "./support/source";
 import path from "path";
 import { calcNAV, calcProspectNAV } from "../app/lib/xnav-engine";
 import { parseWikipediaDraftProspects } from "../app/lib/prospect-enrichment";
 import { calcDevelopmentProfile } from "../app/lib/development-profile";
 
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
+
+/**
+ * Read a file as the code it compiles to, with its commentary removed.
+ *
+ * Use this for any assertion of the form "this string must NOT appear". Use
+ * plain `read` when the assertion is about a comment itself.
+ */
+const readSource = (p: string) => stripComments(read(p));
 
 const readArmchairAll = () =>
   [
@@ -2723,9 +2732,8 @@ describe("Canary — the masthead is Cap & Crease, from one source", () => {
         // brand.ts explains the rename in a comment. The buymeacoffee handle
         // is an external account under the old name — the owner's to migrate,
         // and breaking the link would be worse than the stale slug.
-        const shipped = src
-          .replace(/buymeacoffee\.com\/hockeyledger/g, "")
-          .replace(/\/\/.*$/gm, "");
+        const shipped = stripComments(src)
+          .replace(/buymeacoffee\.com\/hockeyledger/g, "");
         if (/hockey.?ledger/i.test(shipped) && !full.endsWith("brand.ts")) offenders.push(full);
       }
     };
@@ -2819,8 +2827,7 @@ describe("Canary — Redis is found under either provisioning name", () => {
   it("never reaches for the read-only token or a TCP connection string", () => {
     // Both sit beside the real credentials in the Upstash panel. Either one
     // produces a client that fails silently behind the swallowed catch.
-    const resolver = read("app/lib/redis-credentials.ts")
-      .replace(/\/\/.*$/gm, "")
+    const resolver = readSource("app/lib/redis-credentials.ts")
       .replace(/\/\*[\s\S]*?\*\//g, "");
     expect(resolver).not.toContain("READ_ONLY");
     expect(resolver).not.toContain("env.KV_URL");
@@ -2843,8 +2850,7 @@ describe("Canary — CXS batch: shared state, recap headings, simulated clock", 
 
   it("CXS4 — recap headings are detected structurally, not by club name", () => {
     // Comments stripped: the fix's own note names the prefixes it removed.
-    const src = read("app/armchair-gm/SeasonResultsPager.tsx")
-      .replace(/\/\/.*$/gm, "")
+    const src = readSource("app/armchair-gm/SeasonResultsPager.tsx")
       .replace(/\/\*[\s\S]*?\*\//g, "");
     expect(src).not.toContain("EDMONTON");
     expect(src).not.toContain("**AROUND");
@@ -2997,8 +3003,7 @@ describe("Canary — brand kit implementation", () => {
     // next/image refuses to optimise SVG without dangerouslyAllowSVG, which
     // would have to be enabled globally for every image, for a logo.
     // Comments stripped — the component's own note explains why it avoids it.
-    const mark = read("app/components/BrandMark.tsx")
-      .replace(/\/\/.*$/gm, "")
+    const mark = readSource("app/components/BrandMark.tsx")
       .replace(/\/\*[\s\S]*?\*\//g, "");
     expect(mark).not.toContain("next/image");
     expect(mark).toContain("export function BrandMark");
@@ -3010,7 +3015,7 @@ describe("Canary — the front page wears the brand kit", () => {
     // Both nameplates — the dark hero and the sheet below it — used Libre
     // Baskerville with a typed ampersand, which the kit forbids.
     for (const file of ["app/page.tsx", "app/components/ScrollNameplate.tsx"]) {
-      const src = read(file).replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+      const src = readSource(file);
       expect(src, file).not.toContain("Cap & Crease");
     }
   });
@@ -3279,7 +3284,7 @@ describe("Canary — CXH9 public endpoints validate before they work", () => {
       "app/api/evaluate/route.ts",
       "app/api/claude/route.ts",
     ]) {
-      const src = read(route).replace(/\/\/.*$/gm, "");
+      const src = readSource(route);
       expect(src, route).not.toMatch(/await req\.json\(\)\s+as\s+\w/);
     }
   });
@@ -3455,7 +3460,7 @@ describe("Canary — CXH1 the analysis deck never shows an empty panel", () => {
       "app/armchair-gm/useTradeBench.ts",
       "app/armchair-gm/page.tsx",
     ]) {
-      const src = read(file).replace(/\/\/.*$/gm, "");
+      const src = readSource(file);
       expect(src, file).not.toContain("showSimPanel");
     }
   });
@@ -3491,7 +3496,7 @@ describe("Canary — Press Box deals a constructed puzzle", () => {
     // MAX_SCORE = 15 while the real optimum ran 3-19, so a perfect hand
     // displayed as "8/15 PERFECT HAND".
     for (const file of ["app/lib/press-box-engine.ts", "app/press-box/page.tsx"]) {
-      const src = read(file).replace(/\/\/.*$/gm, "");
+      const src = readSource(file);
       expect(src, file).not.toContain("MAX_SCORE");
     }
     expect(engine).toContain("PEG_BOARD_LENGTH = DEAL_RULES.MAX_OPTIMUM");
@@ -3613,7 +3618,7 @@ describe("Canary — CXH5 Partner Finder folders mean one thing each", () => {
 
   it("cap space no longer promotes a club into an interest folder", () => {
     // Strip the header comment, which quotes the old ladder verbatim.
-    const rule = read("app/lib/match-fit.ts").replace(/\/\/.*$/gm, "");
+    const rule = readSource("app/lib/match-fit.ts");
     // capFit is consulted once, for OVER, and never again.
     expect(rule).toContain('if (capFit === "OVER") return "BLOCKED"');
     expect(rule).not.toContain('capFit === "FITS"');
@@ -3621,7 +3626,7 @@ describe("Canary — CXH5 Partner Finder folders mean one thing each", () => {
 
   it("no folder is named after a cap condition", () => {
     for (const file of ["app/api/match/route.ts", "app/armchair-gm/MatchResultsPanel.tsx"]) {
-      const src = read(file).replace(/\/\/.*$/gm, "");
+      const src = readSource(file);
       expect(src, file).not.toContain("CAP_CLEAR");
     }
   });
@@ -3665,7 +3670,7 @@ describe("Canary — CXH6 the payroll range is checked the same way at both ends
   it("does not gate the floor on an arbitrary dollar threshold", () => {
     // `capDelta < -3` cleared a club just above the floor that shed $2M.
     expect(route).not.toContain("capDeltaHome < -3");
-    const rule = read("app/lib/cap-limits.ts").replace(/\/\/.*$/gm, "");
+    const rule = readSource("app/lib/cap-limits.ts");
     expect(rule).not.toMatch(/capDelta < -\d/);
     // What replaced it: only a trade that reduces payroll can breach the floor.
     expect(rule).toContain("s.capDelta < 0");
@@ -3678,8 +3683,7 @@ describe("Canary — CXH6 the payroll range is checked the same way at both ends
 
 describe("Canary — CXS2 Draft Night says what it actually does to picks", () => {
   const panel = read("app/components/DraftNight.tsx");
-  // The comment explaining the fix quotes the old copy verbatim.
-  const rendered = panel.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+  const rendered = readSource("app/components/DraftNight.tsx");
 
   it("makes no blanket promise about picks", () => {
     // "your picks stay tradeable assets" was true only by accident of which
