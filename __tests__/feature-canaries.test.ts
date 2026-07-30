@@ -2653,26 +2653,35 @@ describe("ST3 — alternate positions resolve through a normalised key", () => {
 // ── No third-party imagery anywhere ─────────────────────────────────────────
 // Club logos were hotlinked from assets.nhle.com and player photos were inlined
 // into the exported card. The card exists to travel, so that exposure was
-// structural. Both are now drawn from our own type and palette.
-// Policy (owner's call, 2026-07-28): the SITE may hotlink NHL headshots —
-// that displays the league's image from the league's own server, in context.
-// The downloadable PNG may not: baking a copy into a branded file built to be
-// shared is redistribution. These canaries pin that asymmetry. The earlier
-// version of this block claimed the app shipped NO league imagery, which was
-// never true of /players or /press-box — it grepped for hardcoded hostnames
-// and was structurally blind to a URL arriving as data at runtime.
+// structural.
+//
+// Policy (owner's call, 2026-07-28, extended 2026-07-30): the SITE may hotlink
+// NHL headshots AND club logos — that displays the league's image from the
+// league's own server, in context, with nothing copied or rehosted. The
+// downloadable PNG may not: baking a copy into a branded file built to be
+// shared is redistribution. These canaries pin that asymmetry.
+//
+// The earlier version of this block asserted the app shipped NO league imagery,
+// which was never true of /players or /press-box — it grepped for hardcoded
+// hostnames and was structurally blind to a URL arriving as data at runtime.
+// What is actually load-bearing is (a) that URL construction lives in ONE
+// module, so the policy has a single place to change, and (b) that the module
+// is unreachable from the export renderer.
 describe("Canary — league imagery is allowed on the site, never in the export", () => {
-  it("hardcodes no NHL asset host in source", () => {
+  const IMAGERY_LIB = "app/lib/league-imagery.ts";
+
+  it("names the NHL asset host in exactly one module", () => {
     const offenders: string[] = [];
     const walk = (dir: string) => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) { walk(full); continue; }
         if (!/\.(tsx?|jsx?)$/.test(entry.name)) continue;
-        const src = fs.readFileSync(full, "utf8");
-        // The TeamMark component names the host in a comment explaining why.
-        if (src.includes("assets.nhle.com") && !full.endsWith("TeamMark.tsx")) {
-          offenders.push(full);
+        const rel = path.relative(process.cwd(), full);
+        if (rel === IMAGERY_LIB) continue;
+        // Comments discuss the host by name; only real code counts.
+        if (stripComments(fs.readFileSync(full, "utf8")).includes("assets.nhle.com")) {
+          offenders.push(rel);
         }
       }
     };
@@ -2680,27 +2689,55 @@ describe("Canary — league imagery is allowed on the site, never in the export"
     expect(offenders).toEqual([]);
   });
 
+  it("refuses to render an image from anywhere but the league's own host", () => {
+    // A DB row must not be able to point the page at a third-party image.
+    const lib = readSource(IMAGERY_LIB);
+    expect(lib).toContain("isNhlAssetUrl");
+    expect(lib).toContain("isNhlAssetUrl(subject.headshot)");
+  });
+
   it("has no headshot proxy route left to fetch through", () => {
     expect(fs.existsSync(path.join(process.cwd(), "app/api/headshot"))).toBe(false);
   });
 
   it("draws the exported card's player mark instead of embedding one", () => {
-    const route = read("app/api/card-image/route.tsx");
+    const route = readSource("app/api/card-image/route.tsx");
     expect(route).toContain("initialsForCard");
     expect(route).not.toContain("headshotDataUrl");
   });
 
-  it("renders club identity as a text mark", () => {
-    for (const f of ["app/components/LedgerDropdown.tsx", "app/armchair-gm/TeamSelectModal.tsx"]) {
-      expect(read(f), f).toContain("<TeamMark");
+  it("keeps the imagery module unreachable from the export renderer", () => {
+    // The strongest form of the policy: the export cannot embed what it has no
+    // way to build a URL for.
+    for (const f of ["app/api/card-image/route.tsx", "app/lib/card-payload.ts"]) {
+      expect(readSource(f), f).not.toContain("league-imagery");
     }
+  });
+
+  it("keeps the drawn bust available for the export, photo-free", () => {
+    // `playerAvatarSvgMarkup` is what the export draws. It renders outside
+    // React, has no error handler, and must never learn about a photo.
+    const avatar = readSource("app/components/PlayerAvatar.tsx");
+    const markup = avatar.slice(avatar.indexOf("export function playerAvatarSvgMarkup"));
+    expect(markup.length).toBeGreaterThan(0);
+    expect(markup).not.toContain("headshot");
+    expect(markup).not.toContain("<img");
+  });
+
+  it("routes club identity through one component, so the type fallback is everywhere", () => {
+    for (const f of ["app/components/LedgerDropdown.tsx", "app/armchair-gm/TeamSelectModal.tsx"]) {
+      expect(readSource(f), f).toContain("<TeamMark");
+    }
+    // The abbreviation set in type is the answer when no crest resolves — a
+    // broken-image box is not.
+    expect(readSource("app/components/TeamMark.tsx")).toContain("{id}");
   });
 
   it("strips a headshot at the export boundary rather than trusting the renderer", () => {
     // The schema tolerates the key so a stale client bundle isn't rejected,
     // but the validator must discard it — otherwise the policy holds only
     // until someone writes `data.headshotDataUrl`.
-    const lib = read("app/lib/card-payload.ts");
+    const lib = readSource("app/lib/card-payload.ts");
     expect(lib).toContain("headshotDataUrl: _discarded");
   });
 });

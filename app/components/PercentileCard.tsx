@@ -413,9 +413,10 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
 
       {/* Header — paper plate, ink reserved for text (PA7) */}
       <div className="pcard-head">
-        {/* Drawn, not photographed — the exported card carries no league
-            imagery, so nothing in it is anyone else's to take back. */}
-        <PlayerAvatar name={player.name} position={player.position} size={56} />
+        {/* The site may show the league's photo; the exported card may not.
+            That split lives in PlayerAvatar, not here. */}
+        <PlayerAvatar name={player.name} position={player.position} size={56}
+          playerId={player.id} teamId={player.teamId} headshot={player.headshot} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="pcard-name">{player.name}</div>
           <div className="pcard-sub">{teamName ?? player.teamId} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}</div>

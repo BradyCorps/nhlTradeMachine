@@ -18,6 +18,7 @@ import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
 import { ExpandedStats, ZERO_XNAV } from "@/app/components/OffseasonPlayerAnalytics";
 import { PlayerOutlook } from "@/app/components/PlayerOutlook";
+import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { AssetBadges } from "@/app/components/AssetBadges";
 import {
   buildRosterRows, projectedSeasonIndex, rosterTotals, simTeamFor,
@@ -118,6 +119,10 @@ function RosterTable({
                     {i + 1}
                   </td>
                   <td className="py-1.5 px-1.5">
+                    <div className="flex items-start gap-2">
+                    <PlayerAvatar name={p.name} position={p.position} size={22}
+                      playerId={p.id} teamId={p.teamId} headshot={p.headshot} className="mt-0.5" />
+                    <div className="min-w-0">
                     <button
                       onClick={() => setOpenId(open ? null : p.id)}
                       aria-expanded={open}
@@ -141,6 +146,8 @@ function RosterTable({
                     </button>
                     <div className="mt-0.5">
                       <AssetBadges asset={p} xnav={nav} />
+                    </div>
+                    </div>
                     </div>
                   </td>
                   <td className="text-[10px] py-1.5 px-1.5" style={{ color: "var(--ledger-ink-faint)" }}>

@@ -93,7 +93,8 @@ export default function AssetCard({
     <div className="p-3 transition-all">
       <div className="flex justify-between items-start mb-2.5">
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
-          <PlayerAvatar name={asset.name} position={asset.position} size={32} />
+          <PlayerAvatar name={asset.name} position={asset.position} size={32}
+            playerId={asset.id} teamId={asset.teamId} headshot={asset.headshot} />
           <div className="min-w-0">
             <div className="font-black leading-tight flex flex-wrap items-center gap-1.5"
               style={{ fontSize: '13px', color: 'var(--ledger-ink)' }}>

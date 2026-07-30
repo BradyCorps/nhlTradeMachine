@@ -111,7 +111,8 @@ const PlayerCard = ({ asset, nav, side }: { asset: Asset; nav: NavBreakdown; sid
   return (
     <div className={`rounded-xl border p-3 ${bgColor} ${borderColor}`}>
       <div className="flex items-center gap-2 mb-2">
-        {!isPick && <PlayerAvatar name={asset.name} position={asset.position} size={28} />}
+        {!isPick && <PlayerAvatar name={asset.name} position={asset.position} size={28}
+          playerId={asset.id} teamId={asset.teamId} headshot={asset.headshot} />}
         <div className="min-w-0 flex-1">
           <div className="font-black text-white text-[12px] truncate">{asset.name}</div>
           <div className="text-[9px] text-zinc-600 font-bold">

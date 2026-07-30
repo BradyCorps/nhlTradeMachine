@@ -19,6 +19,7 @@ import {
   type ScoringBreakdown,
 } from "@/app/lib/press-box-engine";
 import { PRESS_BOX_POOL } from "@/app/data/press-box-pool";
+import { candidateAt, headshotCandidates } from "@/app/lib/league-imagery";
 
 type GamePhase = "DRAFTING" | "REVEAL" | "SCORED";
 
@@ -278,18 +279,32 @@ function CardStamp({ text, color }: { text: string; color: string }) {
 }
 
 // ── Mugshot — sepia newspaper headshot, flag fallback ─────────
-function Mug({ src, alt, flag }: { src?: string | null; alt: string; flag: string }) {
-  const [failed, setFailed] = useState(false);
-  if (!src || failed) {
+// The pool API overlays the roster feed's own photo URL where it can reach the
+// feed; when it can't, the mug is derived from the player's id and tricode, so
+// the cards keep their faces even on a cold pool. The nation flag is the last
+// resort, not the first — it is also the fallback the exported card uses, which
+// carries no league imagery at all.
+function Mug({ player, flag }: { player: PressBoxPlayer; flag: string }) {
+  const candidates = useMemo(
+    () => headshotCandidates({ id: player.id, teamId: player.team, headshot: player.headshot }),
+    [player.id, player.team, player.headshot],
+  );
+  const key = candidates.join("|");
+  const [failed, setFailed] = useState<{ key: string; count: number }>({ key, count: 0 });
+  const src = candidateAt(candidates, failed.key === key ? failed.count : 0);
+
+  if (!src) {
     return <div className="text-[17px] leading-none" aria-hidden>{flag}</div>;
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
-      alt={alt}
+      alt={player.name}
       loading="lazy"
-      onError={() => setFailed(true)}
+      onError={() => setFailed(prev => (
+        prev.key === key ? { key, count: prev.count + 1 } : { key, count: 1 }
+      ))}
       className="rounded-full shrink-0"
       style={{
         width: 44,
@@ -374,7 +389,7 @@ function PlayerCard({
 
       {/* card face */}
       <div className="absolute inset-0 flex flex-col items-center justify-center px-3 text-center">
-        <Mug src={player.headshot} alt={player.name} flag={flag} />
+        <Mug player={player} flag={flag} />
         <div
           className="font-black font-serif text-[13px] leading-tight mt-1.5"
           style={{ color: "var(--ink)" }}

@@ -62,7 +62,8 @@ const RosterSlot = ({ player, isNew, isLeaving }: {
     isLeaving ? "bg-rose-950/40 border border-rose-900/40 opacity-50" :
     "bg-zinc-900/40 border border-zinc-800/30"
   }`}>
-    <PlayerAvatar name={player.name} position={player.position} size={20} />
+    <PlayerAvatar name={player.name} position={player.position} size={20}
+      playerId={player.id} teamId={player.teamId} headshot={player.headshot} />
     <div className="flex-1 min-w-0">
       <div className={`text-[10px] font-black truncate ${isLeaving ? "line-through text-zinc-600" : isNew ? "text-emerald-300" : "text-zinc-300"}`}>
         {player.name}

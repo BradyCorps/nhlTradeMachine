@@ -18,6 +18,7 @@ import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "r
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import PercentileCard from "@/app/components/PercentileCard";
+import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { displayPosition } from "@/app/lib/display-position";
 import { orderFreshInk, signedAav, signedRecency, signedTerm } from "@/app/lib/fresh-ink";
 
@@ -718,14 +719,8 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
       >
         <div style={{ fontSize: "11px", color: "var(--rule)", textAlign: "right" }}>{rank}</div>
 
-        <div style={{ width: 32, height: 32, borderRadius: "50%", overflow: "hidden", background: "var(--paper-dark)", flexShrink: 0 }}>
-          {player.headshot
-            ? <img src={player.headshot} alt={player.name} width={32} height={32} style={{ objectFit: "cover" }}/>
-            : <div style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", color: "var(--rule)" }}>
-                {player.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-              </div>
-          }
-        </div>
+        <PlayerAvatar name={player.name} position={player.position} size={32} shape="round"
+          playerId={player.id} teamId={player.teamId} headshot={player.headshot} />
 
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", minWidth: 0 }}>
@@ -785,15 +780,8 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
       >
         {/* Line 1: headshot + name block + expand arrow */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-          {/* Headshot */}
-          <div style={{ width: 36, height: 36, borderRadius: "50%", overflow: "hidden", background: "var(--paper-dark)", flexShrink: 0 }}>
-            {player.headshot
-              ? <img src={player.headshot} alt={player.name} width={36} height={36} style={{ objectFit: "cover" }}/>
-              : <div style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "var(--rule)" }}>
-                  {player.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                </div>
-            }
-          </div>
+          <PlayerAvatar name={player.name} position={player.position} size={36} shape="round"
+            playerId={player.id} teamId={player.teamId} headshot={player.headshot} />
 
           {/* Name + meta */}
           <div style={{ flex: 1, minWidth: 0 }}>

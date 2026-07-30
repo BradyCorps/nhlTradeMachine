@@ -19,6 +19,7 @@ import GravityField from "@/app/components/GravityField";
 import GravityFieldV4 from "@/app/components/GravityFieldV4";
 import PlayerStrandPanel from "@/app/components/PlayerStrandPanel";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
+import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
@@ -148,15 +149,9 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
 
         {/* Identity header */}
         <div className="flex items-center gap-4 border p-4 mb-3" style={{ borderColor: ink, background: "var(--paper-card, var(--paper-inset))" }}>
-          {player.headshot && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={player.headshot}
-              alt=""
-              className="rounded-full object-cover shrink-0"
-              style={{ width: 64, height: 64, border: `2px solid ${ink}` }}
-            />
-          )}
+          <PlayerAvatar name={player.name} position={player.position} size={64} shape="round"
+            playerId={player.id} teamId={player.teamId} headshot={player.headshot}
+            className="shrink-0" />
           <div className="flex-1 min-w-0">
             <h1 className="text-[22px] font-black font-mono leading-tight truncate">{player.name}</h1>
             <div className="text-[11px] font-black font-mono uppercase tracking-[0.12em] mt-0.5" style={{ color: faint }}>

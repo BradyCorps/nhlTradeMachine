@@ -553,6 +553,39 @@ A read-only Codex review of the components + SIM. Correctness/robustness items d
 - Held by choice: #5 (trade-context double-count) — a calibration judgment that
   needs a historical backtest, not a blind code change.
 
+### League imagery restored to the site (complete)
+Owner's call, 2026-07-30: NHL mugshots and club crests are shipped on a public
+asset host, so displaying them from that host is not redistribution. They are
+back on the site; the downloadable PNG still carries none.
+
+- `app/lib/league-imagery.ts` is the only module that names `assets.nhle.com`.
+  It builds mug URLs (`/mugs/nhl/{season}/{TEAM}/{playerId}.png`) and crest URLs
+  (`/logos/nhl/svg/{TEAM}_light.svg`), and returns an ORDERED CANDIDATE LIST
+  rather than a single URL — a mug exists only for the season and club a player
+  actually dressed for, so consumers walk the list on `onError`.
+  - The roster feed's own URL leads where we have one. It stays correct after an
+    Armchair GM trade moves `teamId`, when no mug exists for the new club.
+  - Derived URLs follow: projected season first (`apiSeasonId`), last completed
+    season second. Deduped, since those constants are equal each September.
+  - Name-slug ids (DB-only prospects, bulk FAs) and non-league hosts are dropped
+    rather than requested — a DB row cannot point the page at a third-party
+    image, and a slug never becomes a guaranteed 404.
+- `PlayerAvatar` decides photo-vs-drawn once for the whole site, so AssetCard,
+  PercentileCard, PlayerComparison, CapProjection, TrendingPlayers and the
+  Armchair roster table all gained faces from a single change. The engraved bust
+  is the fallback, not a loading state. A `shape` prop keeps /players and the
+  dossier circular, as they already were.
+- `TeamMark` shows the crest with the three-letter type mark underneath as the
+  fallback, so a club the league has no file for still renders an answer.
+- Fallback index is derived from the candidate list, not held as a bare number,
+  so a virtualised row reused for another player restarts its walk.
+- Export boundary unchanged and now pinned harder: `card-payload.ts` has no
+  image field and discards `headshotDataUrl`; the canaries additionally assert
+  that neither the card-image route nor the payload imports `league-imagery`,
+  and that `playerAvatarSvgMarkup` mentions no photo. The export cannot embed
+  what it has no way to build a URL for.
+- Nothing is proxied or cached. `app/api/headshot` stays deleted.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps
