@@ -43,8 +43,12 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
                 is decorative because that text already names the site. */}
             <a href="/" className="no-underline block">
               <h1 className="sr-only">{BRAND.name}</h1>
+              {/* The untextured cut. The kit's textured lockup is 246 KB, 218 KB
+                  of it a base64 paper-grain JPEG that is invisible at header
+                  size — nearly three times the whole shared JS bundle, on every
+                  page. Same artwork, grain stripped (scripts/derive-brand-assets.mjs). */}
               <img
-                src="/brand/svg/cap-and-crease-lockup-horizontal.svg"
+                src="/brand/svg/cap-and-crease-lockup-horizontal-clean.svg"
                 alt=""
                 aria-hidden="true"
                 width={1560}

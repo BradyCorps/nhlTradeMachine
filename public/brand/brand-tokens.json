@@ -6,11 +6,12 @@
     "paper": "#f2ecd7",
     "brickRed": "#b83020",
     "mutedBrass": "#b8a070",
-    "mutedIceBlue": "#79afc1"
+    "iceBlue": "#79afc1"
   },
   "opticalSizing": {
     "primaryMarkMinimumPx": 40,
     "smallMarkMaximumPx": 32,
-    "puckVisibleMinimumPx": 40
+    "puckVisibleMinimumPx": 16,
+    "paperTextureMinimumPx": 40
   }
 }

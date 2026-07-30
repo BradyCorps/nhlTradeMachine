@@ -2974,8 +2974,12 @@ describe("Canary — brand kit implementation", () => {
     // The kit: "The red ampersand is a custom vector. Do not recreate it with
     // a typed &." The old masthead did exactly that, in whatever serif the
     // browser happened to have.
+    // Pinned as intent: the masthead renders the kit's lockup artwork, in
+    // whichever cut. V3 added an untextured variant for the header, so
+    // asserting one exact filename was asserting a delivery choice rather than
+    // the rule the kit actually states.
     const header = read("app/components/Header.tsx");
-    expect(header).toContain("cap-and-crease-lockup-horizontal.svg");
+    expect(header).toMatch(/cap-and-crease-lockup-horizontal(-clean)?\.svg/);
     expect(header).not.toContain("Cap & Crease\n");
   });
 

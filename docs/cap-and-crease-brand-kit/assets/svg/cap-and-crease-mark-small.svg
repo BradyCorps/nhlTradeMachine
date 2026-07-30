@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
-  <title id="title">Cap &amp; Crease compact icon</title>
-  <desc id="desc">Small-size hockey goal and right-facing blue crease framed by brackets.</desc>
-  <path fill="#1c140a" d="M7 4h13v7h-6v42h6v7H7l-4-4V8l4-4Z"/>
-  <path fill="#1c140a" d="M57 4H44v7h6v42h-6v7h13l4-4V8l-4-4Z"/>
-  <path fill="#79afc1" d="M35 18a14 14 0 0 1 0 28V18Z"/>
-  <path d="M32 21H22v22h10" fill="none" stroke="#b83020" stroke-width="3" stroke-linecap="square" stroke-linejoin="round"/>
-  <path fill="#b83020" d="M32 16h3v32h-3z"/>
-</svg>
