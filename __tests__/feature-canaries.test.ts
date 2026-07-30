@@ -1232,7 +1232,9 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(tradePage).toContain("navMap={navMap}");
     expect(lineupEditor).toContain("navMap?: Record<string, NavLike>");
     expect(lineupEditor).toContain("NAV {nav}");
-    expect(lineupEditor).toContain("p?.position ?? \"--\"");
+    // The tile shows a position — now the alternate too, so this pins that a
+    // position is rendered rather than the exact expression that renders it.
+    expect(lineupEditor).toContain('displayPosition(p.position, p.secondaryPosition) : "--"');
     expect(lineupEditor).toContain("minHeight: 50");
     expect(lineupEditor).not.toContain("Click a player, then click another slot");
   });
@@ -3826,5 +3828,37 @@ describe("Canary — OFF7 AI clubs must live under the cap too", () => {
   it("is deterministic — no RNG decides which trades happened", () => {
     expect(rule).not.toMatch(/Math\.random|mulberry32|rand\(\)/);
     expect(rule).toContain("localeCompare");
+  });
+});
+
+describe("Canary — special-teams sheets are actually editable", () => {
+  const editor = readSource("app/components/LineupEditor.tsx");
+
+  it("offers a bench in PP and PK, not only at even strength", () => {
+    // The bench was gated `situation === "EV"`, so on a unit sheet the only
+    // reachable players were the ones hydrateSpecialTeams happened to place.
+    expect(editor).toContain('situation !== "EV" && (');
+    expect(editor).toContain("stBenchPlayers");
+  });
+
+  it("can put a bench player into a unit slot", () => {
+    // A slot-to-slot swap cannot do this: a bench player has no slot index.
+    expect(editor).toContain("placeFromBench(");
+    expect(editor).toContain("stBenchPick");
+  });
+
+  it("never dresses the same man twice on one unit", () => {
+    expect(editor).toContain("const existing = arr.indexOf(playerId)");
+  });
+
+  it("keeps goalies off the special-teams bench", () => {
+    expect(editor).toContain("!isG(p) && !onSheet.has(p.id)");
+  });
+
+  it("shows the alternate position on the tile, not just in the tooltip", () => {
+    // displayPosition was used in the title attribute and on the EV bench, but
+    // the visible badge printed the primary position alone.
+    const badges = editor.match(/displayPosition\(p\.position, p\.secondaryPosition\)/g) ?? [];
+    expect(badges.length).toBeGreaterThanOrEqual(4);
   });
 });

@@ -185,6 +185,10 @@ function TeamLineup({
   const [situation, setSituation] = useState<SpecialTeamsSituation>("EV");
   const [specialTeams, setSpecialTeams] = useState<SpecialTeamsOrder>(emptySpecialTeams);
   const [stSelected, setStSelected] = useState<{ sheet: "PP" | "PK"; idx: number } | null>(null);
+  // A player picked off the special-teams bench, waiting for a slot to land in.
+  // Distinct from `stSelected`, which is a slot-to-slot swap: a bench player is
+  // not on the sheet at all, so there is no index to swap with.
+  const [stBenchPick, setStBenchPick] = useState<string | null>(null);
   const editedRef = useRef(false);
   useEffect(() => { editedRef.current = edited; }, [edited]);
 
@@ -433,7 +437,7 @@ function TeamLineup({
               fontSize: 9, fontWeight: 900, color: p ? "var(--ledger-ink)" : "var(--ledger-ink-faint)",
               border: "1px solid rgba(184,160,112,0.8)", padding: "0 4px", lineHeight: "13px",
               minWidth: 18, textAlign: "center", flexShrink: 0,
-            }}>{p?.position ?? "--"}</span>
+            }}>{p ? displayPosition(p.position, p.secondaryPosition) : "--"}</span>
             <span style={{
               fontSize: 9, color: "var(--ledger-ink-faint)", whiteSpace: "nowrap",
               overflow: "hidden", textOverflow: "ellipsis", minWidth: 0,
@@ -466,6 +470,27 @@ function TeamLineup({
     setStSelected(null);
   }, [stSelected]);
 
+  // Put the pending bench player into this slot. Whoever was there returns to
+  // the bench, which is what makes the sheet editable at all — before this the
+  // only reachable players were the ones hydrate happened to place.
+  const placeFromBench = useCallback((sheet: "PP" | "PK", idx: number, playerId: string) => {
+    setSpecialTeams(st => {
+      const key = sheet === "PP" ? "powerPlay" : "penaltyKill";
+      const slots = sheet === "PP" ? PP_SLOTS : PK_SLOTS;
+      const arr = [...st[key]];
+      while (arr.length < slots) arr.push("");
+      // A unit cannot dress the same man twice: if he is already on this sheet,
+      // vacate that slot as he moves.
+      const existing = arr.indexOf(playerId);
+      if (existing >= 0) arr[existing] = arr[idx];
+      arr[idx] = playerId;
+      return { ...st, [key]: arr };
+    });
+    setEdited(true);
+    setStBenchPick(null);
+    setStSelected(null);
+  }, []);
+
   const renderUnitCell = (sheet: "PP" | "PK", idx: number, key: React.Key) => {
     const ids = sheet === "PP" ? specialTeams.powerPlay : specialTeams.penaltyKill;
     const id = ids[idx];
@@ -476,8 +501,12 @@ function TeamLineup({
     return (
       <td
         key={key}
-        onClick={() => clickUnitSlot(sheet, idx)}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); clickUnitSlot(sheet, idx); } }}
+        onClick={() => (stBenchPick ? placeFromBench(sheet, idx, stBenchPick) : clickUnitSlot(sheet, idx))}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          if (stBenchPick) placeFromBench(sheet, idx, stBenchPick); else clickUnitSlot(sheet, idx);
+        }}
         role="button"
         tabIndex={0}
         aria-label={p ? `Select ${p.name} on ${sheet} unit` : `Select empty ${sheet} slot`}
@@ -497,7 +526,7 @@ function TeamLineup({
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 4 }}>
             <span style={{ fontSize: 9, fontWeight: 900, color: "var(--ledger-ink-faint)" }}>
-              {p?.position ?? "--"}
+              {p ? displayPosition(p.position, p.secondaryPosition) : "--"}
             </span>
             {p && (
               <span style={{ fontSize: 9, fontWeight: 900, color: navColor(nav) }}>NAV {nav}</span>
@@ -546,6 +575,18 @@ function TeamLineup({
       {text}
     </td>
   );
+
+  // Everyone eligible for this special-teams sheet who is not already on it.
+  // Skaters only — a goaltender does not take a power-play shift.
+  const stBenchPlayers = useMemo(() => {
+    if (situation === "EV") return [];
+    const onSheet = new Set(
+      (situation === "PP" ? specialTeams.powerPlay : specialTeams.penaltyKill).filter(Boolean));
+    return effective
+      .filter(p => !isG(p) && !onSheet.has(p.id))
+      .sort((a, b) => lineupContributionScore(b, navMap?.[b.id]?.total)
+        - lineupContributionScore(a, navMap?.[a.id]?.total));
+  }, [situation, specialTeams, effective, navMap]);
 
   const ordinals = ["1st", "2nd", "3rd", "4th"];
   const fBench = orders.F.slice(12);
@@ -626,6 +667,53 @@ function TeamLineup({
 
       {situation === "PP" && renderUnitSheet("PP")}
       {situation === "PK" && renderUnitSheet("PK")}
+
+      {/* Special-teams bench. Without this the sheet was only editable among
+          the players `hydrateSpecialTeams` happened to place — anyone it left
+          off could never be put on a unit at all. */}
+      {situation !== "EV" && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 9, fontWeight: 900, color: "var(--ledger-ink-faint)",
+                        textTransform: "uppercase", letterSpacing: 0, marginBottom: 3 }}>
+            Available — {stBenchPick ? "now pick a unit slot" : "tap a player, then a unit slot"}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {stBenchPlayers.map(p => {
+              const nav = navOf(p, navMap);
+              const isSel = stBenchPick === p.id;
+              return (
+                <span key={p.id}
+                  onClick={() => setStBenchPick(isSel ? null : p.id)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter" && e.key !== " ") return;
+                    e.preventDefault();
+                    setStBenchPick(isSel ? null : p.id);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSel}
+                  aria-label={`${isSel ? "Deselect" : "Select"} ${p.name} for the ${situation} unit`}
+                  title={`${p.name} · ${displayPosition(p.position, p.secondaryPosition)} · NAV ${nav}`}
+                  className="tap-target"
+                  style={{
+                    fontFamily: MONO, fontSize: 11, fontWeight: 800, cursor: "pointer",
+                    minHeight: 44, display: "inline-flex", alignItems: "center",
+                    padding: "4px 7px", border: "1px solid #c8b890", userSelect: "none",
+                    color: inIds.has(p.id) ? "#2a7a44" : "var(--ledger-ink)",
+                    background: isSel ? "rgba(180,140,40,0.25)" : "var(--ledger-cream)",
+                    outline: isSel ? "1px dashed #a08020" : "none",
+                  }}>
+                  {abbr(p.name)}
+                  <span style={{ fontSize: 11, opacity: 0.65, marginLeft: 5 }}>
+                    {displayPosition(p.position, p.secondaryPosition)}
+                  </span>
+                  <span style={{ fontSize: 11, color: navColor(nav), marginLeft: 5 }}>NAV {nav}</span>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {situation === "EV" && (
       <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
