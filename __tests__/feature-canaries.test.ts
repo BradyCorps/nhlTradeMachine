@@ -3778,3 +3778,49 @@ describe("Canary — CX7c a simulation reports the season it actually played", (
     expect(rule).toContain("safeYear === 1 ? SEASON.replaySeason");
   });
 });
+
+describe("Canary — OFF7 AI clubs must live under the cap too", () => {
+  const rule = readSource("app/lib/ai-trades.ts");
+
+  it("the offseason resolves AI cap-clearing trades", () => {
+    // Before this, an AI club could sit over the ceiling all season while the
+    // user was held to it.
+    const fa = readSource("app/lib/free-agency.ts");
+    expect(fa).toContain("resolveAiTrades(players");
+    expect(fa).toContain("aiTrades");
+    expect(fa).toContain("applyAiTrades(players, res.aiTrades");
+  });
+
+  it("only a club with a cap problem trades", () => {
+    expect(rule).toContain("(capSpace.get(t.id) ?? 0) < 0");
+  });
+
+  it("the buyer has to want the player", () => {
+    expect(rule).toContain("blockFitsTeam(");
+    expect(rule).toContain("AI_TRADE_RULES.MIN_FIT_SCORE");
+  });
+
+  it("a club does not dump its core", () => {
+    expect(rule).toContain("lineupContributionScore");
+    expect(rule).toContain("PROTECTED_CORE");
+  });
+
+  it("a body comes back, so rosters do not shrink over a Cup Run", () => {
+    expect(rule).toContain("MAX_RETURN_FRACTION");
+    expect(rule).toContain("inPlayerId");
+  });
+
+  it("holds AI trades to the same payroll range as the user's", () => {
+    expect(rule).toContain("findCapBreaches(");
+  });
+
+  it("leaves the user's club alone", () => {
+    expect(rule).toContain("t.id !== userTeamId");
+    expect(rule).toContain("t.id !== s.userTeamId");
+  });
+
+  it("is deterministic — no RNG decides which trades happened", () => {
+    expect(rule).not.toMatch(/Math\.random|mulberry32|rand\(\)/);
+    expect(rule).toContain("localeCompare");
+  });
+});

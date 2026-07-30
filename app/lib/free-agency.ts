@@ -15,6 +15,7 @@ import { mulberry32, hashString } from "@/app/lib/sim-engine";
 import { SEASON } from "@/app/lib/season-config";
 import { marketBudgetFor } from "@/app/lib/ai-cap";
 import { resolveAiExtensions, type ExtensionOffer } from "@/app/lib/extensions";
+import { applyAiTrades, resolveAiTrades, type AiTrade } from "@/app/lib/ai-trades";
 
 export type FaStatus = "UFA" | "RFA";
 export type FaTier = "STAR" | "TOP" | "MIDDLE" | "DEPTH" | "FRINGE";
@@ -393,12 +394,16 @@ export interface LeagueOffseasonResult {
   // Players AI clubs re-signed a year early. Costs nothing this season; the
   // rollover activates them when the current deal runs out (OFF5).
   aiExtensions: ExtensionOffer[];
+  // Cap-clearing trades between AI clubs that came out of free agency over the
+  // ceiling (OFF7).
+  aiTrades: AiTrade[];
 }
 
 export interface ResolveContext {
   seed?: number;
   userTeamId?: string | null;
   capCeiling?: number;
+  capFloor?: number;
   teams?: Pick<Team, "id" | "phase" | "standing" | "capSpace">[];
 }
 
@@ -570,7 +575,35 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
       })
     : [];
 
-  return { expiringCount: expiring.length, userPending, resignings, walkAways, marketSignings, market, rfaMarket, teamCapMoves, aiExtensions };
+  // OFF7 — clubs that came out of free agency over the ceiling shed salary.
+  // Runs last, on the post-signing cap picture, because that is when a club
+  // knows whether it has a problem. Until now nothing happened here at all: an
+  // AI club could sit over the cap all season while the user was held to it.
+  const aiTrades = ctx.teams && mutableCap
+    ? resolveAiTrades(players, {
+        teams: ctx.teams as Team[],
+        capSpace: mutableCap,
+        limits: {
+          ceiling: ctx.capCeiling ?? SEASON.capCeiling,
+          floor: ctx.capFloor ?? SEASON.capFloor,
+        },
+        userTeamId: ctx.userTeamId ?? undefined,
+      })
+    : [];
+
+  for (const t of aiTrades) {
+    const out = players.find(p => p.id === t.outPlayerId);
+    const back = players.find(p => p.id === t.inPlayerId);
+    if (!out || !back) continue;
+    const asCapAsset = (a: Asset): CapDeltaAsset =>
+      ({ capHit: a.capHit, retainedPct: a.retainedPct ?? 0 });
+    addMove(t.fromTeamId, "outgoing", asCapAsset(out));
+    addMove(t.fromTeamId, "incoming", asCapAsset(back));
+    addMove(t.toTeamId, "incoming", asCapAsset(out));
+    addMove(t.toTeamId, "outgoing", asCapAsset(back));
+  }
+
+  return { expiringCount: expiring.length, userPending, resignings, walkAways, marketSignings, market, rfaMarket, teamCapMoves, aiExtensions, aiTrades };
 }
 
 // Apply a resolved offseason to the league roster. Re-signings take their new
@@ -584,8 +617,12 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
 export function applyOffseasonToRoster(
   players: Asset[],
   res: Pick<LeagueOffseasonResult, "resignings" | "marketSignings" | "walkAways">
-    & Partial<Pick<LeagueOffseasonResult, "aiExtensions">>,
+    & Partial<Pick<LeagueOffseasonResult, "aiExtensions" | "aiTrades">>,
 ): Asset[] {
+  // OFF7 — cap-clearing trades move players between clubs BEFORE the signing
+  // logic below runs, so a re-signing or a market move applies to the roster
+  // the player actually ends up on.
+  players = applyAiTrades(players, res.aiTrades ?? []);
   const resignById = new Map(res.resignings.map((r) => [r.playerId, r.contract]));
   const marketSigningById = new Map(res.marketSignings.map((s) => [s.playerId, s]));
   const walkedIds = new Set(

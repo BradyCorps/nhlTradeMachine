@@ -63,6 +63,7 @@ export function useOffseasonFlow({
       seed,
       userTeamId: homeTeamId,
       capCeiling: db.capCeiling ?? SEASON.capCeiling,
+      capFloor: SEASON.capFloor,
       teams: db.teams,
     });
     setUserPending(res.userPending);
