@@ -223,7 +223,19 @@ function getRoleTag(asset: Asset, xnav: XNAVResult): { label: string; color: str
   };
 }
 
-export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult }) {
+export function AssetBadges({ asset, xnav, compact = false }: {
+  asset: Asset;
+  xnav: XNAVResult;
+  /**
+   * One line, tier and role only.
+   *
+   * The Ledger strip below — awards, injury risk, change of scenery — is worth
+   * a second line on a trade card, where you are reading one player. In a
+   * roster table it is what turned every row into three, so the compact form
+   * drops it and the full set moves into the expanded row.
+   */
+  compact?: boolean;
+}) {
   const isPick = asset.position === "Pick";
 
   // NAV-driven franchise tier — same thresholds the GM audit uses (season-config)
@@ -259,7 +271,7 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
     || hasShutdownPedigree;
 
   return (
-    <div className="asset-badges mt-1 flex flex-col gap-1">
+    <div className={compact ? "asset-badges hidden sm:inline-flex shrink-0 items-center gap-1 whitespace-nowrap" : "asset-badges mt-1 flex flex-col gap-1"}>
       <div className="flex flex-wrap items-center gap-1">
         {isMegalodon && (
           <span className="text-2xs font-black rounded-sm" style={iconBadgeStyle("var(--ledger-amber)", "rgba(138,92,0,0.10)")}
@@ -296,7 +308,7 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
         )}
       </div>
 
-      {hasLedger && (
+      {hasLedger && !compact && (
       <div className="flex flex-wrap items-center gap-1 pl-1 border-l" style={{ borderColor: "rgba(107,80,48,0.35)" }}>
       <span className="text-[10px] font-black uppercase text-ledger-ink-faint">Ledger</span>
 

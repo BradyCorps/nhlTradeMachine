@@ -12,6 +12,16 @@ import path from "path";
 import { calcNAV, calcProspectNAV } from "../app/lib/xnav-engine";
 import { parseWikipediaDraftProspects } from "../app/lib/prospect-enrichment";
 import { calcDevelopmentProfile } from "../app/lib/development-profile";
+import { columnsFor, groupRosterRows, sortRosterRows } from "../app/lib/roster-table";
+import type { RosterRow } from "../app/lib/roster-view";
+
+/** A minimal roster row, for the Roster-tab canaries below. */
+const rosterRowFor = (
+  position: string, name = "Player", points = 0, nav: number | null = 0,
+): RosterRow => ({
+  asset: { id: `${name}-${position}`, name, position, teamId: "WPG" } as any,
+  games: 82, goals: 0, assists: 0, points, toi: 15, nav, simulated: false,
+});
 
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
 
@@ -3148,6 +3158,68 @@ describe("Canary — Roster and Season Review state which is which", () => {
     const tab = read("app/armchair-gm/RosterTab.tsx");
     expect(tab).toContain("SEASON.label");
     expect(tab).toContain("SEASON.replaySeason");
+  });
+});
+
+// The tab's first form was one flat table with a two-line badge block under
+// every name: tall, thin, and missing the columns a GM opens a roster for.
+// These pin the shape of the redesign, not its markup.
+describe("Canary — the roster reads like a roster page", () => {
+  it("keeps grouping, columns and sort in a tested module", () => {
+    const lib = readSource("app/lib/roster-table.ts");
+    for (const fn of ["unitOf", "groupRosterRows", "sortRosterRows", "nextSort", "unitTotals"]) {
+      expect(lib, fn).toContain(`export function ${fn}`);
+    }
+    expect(readSource("app/armchair-gm/RosterTab.tsx")).toContain("groupRosterRows");
+  });
+
+  it("splits forwards, defence and goaltenders", () => {
+    expect(groupRosterRows([
+      rosterRowFor("C"), rosterRowFor("D"), rosterRowFor("G"),
+    ]).map(g => g.unit)).toEqual(["F", "D", "G"]);
+  });
+
+  it("gives goalies goalie columns instead of zeroes where the scoring goes", () => {
+    const goalie = columnsFor("G").map(c => c.key);
+    const skater = columnsFor("F").map(c => c.key);
+    for (const k of ["svPct", "gsax", "gs"]) expect(goalie, k).toContain(k);
+    for (const k of ["g", "a", "pts", "plusMinus"]) expect(goalie, k).not.toContain(k);
+    for (const k of ["g", "a", "pts"]) expect(skater, k).toContain(k);
+  });
+
+  it("carries the columns the old table was missing", () => {
+    const skater = columnsFor("F").map(c => c.key);
+    for (const k of ["age", "plusMinus", "term"]) expect(skater, k).toContain(k);
+  });
+
+  it("sorts on a total order, so the rows cannot jitter", () => {
+    const rows = [rosterRowFor("C", "Zeta", 40), rosterRowFor("C", "Alpha", 40)];
+    const sort = { key: "pts", direction: "desc" as const };
+    const a = sortRosterRows(rows, sort, columnsFor("F")).map(r => r.asset.name);
+    const b = sortRosterRows([...rows].reverse(), sort, columnsFor("F")).map(r => r.asset.name);
+    expect(a).toEqual(b);
+  });
+
+  it("keeps rows with no value at the bottom whichever way the sort runs", () => {
+    // Reversing must not promote a row of dashes to the top.
+    const rows = [rosterRowFor("C", "Has", 40, 50), rosterRowFor("C", "None", 40, null)];
+    for (const direction of ["asc", "desc"] as const) {
+      const out = sortRosterRows(rows, { key: "nav", direction }, columnsFor("F"));
+      expect(out[out.length - 1].asset.name, direction).toBe("None");
+    }
+  });
+
+  it("shows one line per player, with the full badge ledger in the expansion", () => {
+    // The compact badge strip is what keeps a row one line high; the Ledger
+    // strip (awards, injury, scenery) moved into the expanded panel.
+    const tab = readSource("app/armchair-gm/RosterTab.tsx");
+    expect(tab).toContain("compact");
+    const badges = readSource("app/components/AssetBadges.tsx");
+    expect(badges).toContain("hasLedger && !compact");
+  });
+
+  it("announces the sort rather than only drawing a caret", () => {
+    expect(readSource("app/armchair-gm/RosterTab.tsx")).toContain("aria-sort");
   });
 });
 

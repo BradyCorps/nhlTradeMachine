@@ -586,6 +586,35 @@ back on the site; the downloadable PNG still carries none.
   what it has no way to build a URL for.
 - Nothing is proxied or cached. `app/api/headshot` stays deleted.
 
+### Roster tab redesign (complete)
+Flagged 2026-07-30: "too big, shows too little" — ZenGM and PuckPedia read
+better. The old tab was one flat table with a two-line badge block under every
+name, so a screenful showed about eight players and told you their points.
+
+- `app/lib/roster-table.ts` holds the grouping, column sets and sort; the tab
+  draws them and owns nothing but state.
+- Three tables — Forwards / Defence / Goaltenders — each with a subtotal strip
+  (count, points, average age, cap). "The blue line is old and expensive" is now
+  visible without a mental tally. Goalies get GS / SV% / GSAx instead of three
+  zeroes where the scoring goes, and no Pos column, which read "G" every row.
+- New columns the old table had room for and wasn't using: Age, +/-, Term. Term
+  shows years left, or the status a pending FA expires as (never "0y"), or EXT
+  for a signed extension, with NMC/NTC beside it.
+- Sortable headings. Nulls sort last in BOTH directions — a row of dashes must
+  not be promoted by reversing — and the order is total (column, then name,
+  then id) so it cannot jitter. Each unit table sorts independently, since the
+  goalie columns are not the skater columns.
+- Row height 52px → 32px. The cause was `.tap-target` (min-height 44px, WCAG
+  2.5.5 AAA) on the name button setting the row height on its own. Replaced with
+  `.dense-tap` at 24px — the 2.5.8 AA figure — and the clickable row around it is
+  far wider than that.
+- `AssetBadges` gained a `compact` variant: tier and role only, one line. The
+  Ledger strip (awards, injury risk, change of scenery) moved into the expanded
+  row, where there is space for two lines.
+- Verified against fabricated data in a throwaway route, since the sandbox
+  cannot reach the NHL roster API: 20 players render in ~830px against ~1370px
+  before, and the sort caret tracks the active column.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps
