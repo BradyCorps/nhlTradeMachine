@@ -137,6 +137,9 @@ export function useSimDispatch({
           },
           seed,
           lineupContext,
+          // CX7c — which season of the run this is, so the response labels
+          // itself with the season actually being played.
+          ...(cupRunContext ? { cupRunYear: cupRunContext.year } : {}),
         }),
       });
       if (simRes.ok) {
@@ -209,6 +212,7 @@ export function useSimDispatch({
           max_tokens: 1800,
           payload: {
             simulationMode: sim.simulationMode ?? SEASON.simulationMode,
+            season: sim.season ?? SEASON.label,
             replaySeason: sim.replaySeason ?? SEASON.replaySeason,
             rosterMoveWindow: sim.rosterMoveWindow ?? SEASON.rosterMoveWindow,
             latestCompleted: sim.latestCompleted ?? SEASON.latestCompleted,

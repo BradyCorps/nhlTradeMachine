@@ -171,6 +171,9 @@ const ExecutedTradeSummarySchema = z.object({
 });
 
 const SeasonRecapPayloadSchema = z.object({
+  // CX7c — the season actually simulated. Optional so a client that predates
+  // the field still works, falling back to the configured season.
+  season: z.string().max(32).optional(),
   simulationMode: z.string(),
   replaySeason: z.string(),
   rosterMoveWindow: z.string(),
@@ -311,6 +314,24 @@ function buildSeasonRecapPrompt(payload: z.infer<typeof SeasonRecapPayloadSchema
     seed: payload.seed,
   };
 
+  // The season this recap is OF. A Cup Run plays three consecutive seasons, and
+  // hard-coding SEASON.label told Claude that Year 3's results belonged to Year
+  // 1's season — while the preamble below listed the prior years correctly, so
+  // the prompt contradicted itself.
+  const recapSeason = payload.season ?? SEASON.label;
+
+  // Past Year 1 of a run, the most recent COMPLETED season is the previous run
+  // year, not the real-world baseline — and its champion is already listed in
+  // the preamble. Asserting the 2025-26 facts here contradicted that, in the
+  // same prompt, in the section headed LOCKED FACTS.
+  const priorRunSeason = payload.cupRunStory?.priorSeasons?.length
+    ? payload.cupRunStory.priorSeasons[payload.cupRunStory.priorSeasons.length - 1]
+    : null;
+  const lastCompletedSeason = priorRunSeason?.seasonLabel
+    ?? payload.latestCompleted?.season ?? payload.replaySeason;
+  const lastCompletedChampion = priorRunSeason?.championTeamName
+    ?? payload.latestCompleted?.stanleyCupChampion.teamName ?? "Unknown";
+
   const cupRunPreamble = payload.cupRunStory
     ? `\nCUP RUN CHALLENGE (LOCKED ARC):
 This recap closes a ${payload.cupRunStory.finalYear}-season "win the Cup in 3 years" run as GM of ${payload.cupRunStory.teamName} (difficulty ${payload.cupRunStory.difficulty}). The run ${payload.cupRunStory.wonCup ? "ENDS IN A STANLEY CUP" : "ends WITHOUT a Cup — the GM is fired"}.
@@ -319,7 +340,7 @@ ${payload.cupRunStory.priorSeasons.map((s, i) => `  Year ${i + 1} (${s.seasonLab
 Tell the story of the ENTIRE run as one arc — the plan, the seasons that built or broke it, and this final season as the climax. Weave the locked single-season data below into that larger narrative. Open with a section titled **THE ${payload.cupRunStory.wonCup ? "DYNASTY DELIVERED" : "FINAL VERDICT"}** (3-4 sentences on the whole run) before the standard sections.\n`
     : "";
 
-  return `${cupRunPreamble}You are a senior NHL beat reporter writing an end-of-season recap of the PROJECTED ${SEASON.label} NHL season — a forward projection of the upcoming season, NOT a replay of a past one.
+  return `${cupRunPreamble}You are a senior NHL beat reporter writing an end-of-season recap of the PROJECTED ${recapSeason} NHL season — a forward projection of the upcoming season, NOT a replay of a past one.
 
 Use ONLY the locked pre-calculated JSON and summaries below. Do not estimate, calculate, infer missing values, invent injuries, invent off-ice stories, or change standings/playoff results. Treat executed deals as ${payload.rosterMoveWindow} roster moves, never as trade-deadline moves. If a fact is not in the locked data, omit it.
 
@@ -331,7 +352,7 @@ ${tradesSummary || "No executed trades supplied."}
 
 ${payload.homeTeamName} OPENING-NIGHT ROSTER AFTER MOVES (top 12):
 ${payload.homeRoster.join("\n") || "No roster summary supplied."}
-Phase entering ${SEASON.label}: ${payload.homePhase ?? "Unknown"}
+Phase entering ${recapSeason}: ${payload.homePhase ?? "Unknown"}
 Contention ratings (X-NAV derived): Present ${payload.homeContention.present.toFixed(1)}/10 · Future ${payload.homeContention.future.toFixed(1)}/10
 Season-start outlook: ${payload.seasonStartOutlook}
 
@@ -339,11 +360,11 @@ TRADED PLAYER OUTCOMES (LOCKED):
 ${tradedOutcomeLines.length > 0 ? tradedOutcomeLines.join("\n") : "No traded player stat outcomes available."}
 
 LOCKED FACTS:
-- Latest completed NHL season: ${payload.latestCompleted?.season ?? payload.replaySeason}.
-- This recap covers the PROJECTED ${SEASON.label} season (the upcoming season). The line above is the most recent COMPLETED season — do not conflate them.
-- Latest Stanley Cup champion: ${payload.latestCompleted?.stanleyCupChampion.teamName ?? "Unknown"}.
-- Latest Conn Smythe winner: ${payload.latestCompleted?.connSmythe.name ?? "Unknown"} (${payload.latestCompleted?.connSmythe.teamName ?? "Unknown"}).
-- Florida Panthers did NOT win the ${payload.latestCompleted?.season ?? payload.replaySeason} Cup.
+- Latest completed season: ${lastCompletedSeason}${priorRunSeason ? " (the previous season of this run)" : ""}.
+- This recap covers the PROJECTED ${recapSeason} season. The line above is the most recent COMPLETED season — do not conflate them.
+- Latest Stanley Cup champion: ${lastCompletedChampion}.
+${priorRunSeason ? "" : `- Latest Conn Smythe winner: ${payload.latestCompleted?.connSmythe.name ?? "Unknown"} (${payload.latestCompleted?.connSmythe.teamName ?? "Unknown"}).
+- Florida Panthers did NOT win the ${payload.latestCompleted?.season ?? payload.replaySeason} Cup.`}
 - Utah Hockey Club is now the Utah Mammoth (UTA). Arizona Coyotes do not exist.
 - These are ${payload.rosterMoveWindow} moves. Never describe them as deadline deals or say a team sat at any ranking at the deadline.
 - Conn Smythe must be from the Stanley Cup champion listed in LOCKED JSON.

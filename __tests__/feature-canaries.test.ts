@@ -3740,3 +3740,41 @@ describe("Canary — CXS6 filed reports can be reopened, and only real trades fi
     expect(bar).toContain("no longer in the league");
   });
 });
+
+describe("Canary — CX7c a simulation reports the season it actually played", () => {
+  it("the sim response stamps the simulated year, not the configured one", () => {
+    // Year 3 of a Cup Run came back labelled the same season as Year 1.
+    const route = readSource("app/api/simulate/route.ts");
+    expect(route).toContain("simSeasonIdentity(");
+    expect(route).toContain("season: simSeason.season");
+    expect(route).toContain("simulationMode: simSeason.simulationMode");
+    expect(route).not.toContain("season: SEASON.label");
+    expect(route).not.toContain("simulationMode: SEASON.simulationMode,\n      replaySeason: SEASON.replaySeason");
+  });
+
+  it("the client tells the route which run year it is", () => {
+    expect(readSource("app/armchair-gm/useSimDispatch.ts")).toContain("cupRunYear: cupRunContext.year");
+    expect(readSource("app/lib/sim-request-schema.ts")).toContain("cupRunYear");
+  });
+
+  it("the recap prompt names the simulated season", () => {
+    // The prompt asked for a recap of SEASON.label while its own Cup Run
+    // preamble listed the prior years under their correct labels.
+    const claude = readSource("app/api/claude/route.ts");
+    expect(claude).toContain("const recapSeason = payload.season ?? SEASON.label");
+    expect(claude).toContain("recap of the PROJECTED ${recapSeason} NHL season");
+    expect(claude).not.toContain("PROJECTED ${SEASON.label}");
+  });
+
+  it("does not assert a completed season its own preamble contradicts", () => {
+    // Past Year 1 the most recent completed season is the previous run year.
+    const claude = readSource("app/api/claude/route.ts");
+    expect(claude).toContain("priorRunSeason");
+    expect(claude).toContain("lastCompletedChampion");
+  });
+
+  it("Year 1 still reports exactly the configured season", () => {
+    const rule = readSource("app/lib/sim-season.ts");
+    expect(rule).toContain("safeYear === 1 ? SEASON.replaySeason");
+  });
+});

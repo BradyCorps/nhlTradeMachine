@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SEASON } from "@/app/lib/season-config";
+import { simSeasonIdentity } from "@/app/lib/sim-season";
 import {
   ageDecay,
   hashString,
@@ -1011,6 +1012,7 @@ export async function POST(req: NextRequest) {
     }
     const body = parsed.data as unknown as SimRequest;
     const { homeTeamId, partnerTeamId, teams, players, trades, lineup, lineupContext } = body;
+    const simSeason = simSeasonIdentity((body as { cupRunYear?: number }).cupRunYear);
 
     const seed = body.seed ?? scenarioSeed({
       mode: SEASON.simulationMode,
@@ -1132,10 +1134,15 @@ export async function POST(req: NextRequest) {
       playoffBracket,
       playoffTeams: standings.filter(t => t.madePlayoffs).map(t => t.teamId),
       tradedPlayerOutcomes,
-      season: SEASON.label,
-      simulationMode: SEASON.simulationMode,
-      replaySeason: SEASON.replaySeason,
-      rosterMoveWindow: SEASON.rosterMoveWindow,
+      // CX7c — the season actually being played, not the configured one.
+      // Year 3 of a Cup Run used to come back labelled the same season as
+      // Year 1, and the recap prompt then asked for a recap of that season
+      // over results from two years later.
+      season: simSeason.season,
+      simulationMode: simSeason.simulationMode,
+      replaySeason: simSeason.replaySeason,
+      rosterMoveWindow: simSeason.rosterMoveWindow,
+      simYear: simSeason.year,
       latestCompleted: SEASON.latestCompleted,
       generatedAt: new Date().toISOString(),
     });

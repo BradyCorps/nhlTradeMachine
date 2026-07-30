@@ -49,6 +49,9 @@ export const simRequestSchema = z.object({
   teams: z.array(simTeamSchema).min(SIM_LIMITS.MIN_TEAMS).max(SIM_LIMITS.MAX_TEAMS),
   players: z.array(simPlayerSchema).max(SIM_LIMITS.MAX_PLAYERS),
   trades: z.array(tradeSchema).max(SIM_LIMITS.MAX_TRADES),
+  // CX7c — which season of a Cup Run this is. Absent for ordinary
+  // single-season play, which is Year 1.
+  cupRunYear: z.number().int().min(1).max(10).optional(),
   lineup: z.object({
     startingGoalies: z.record(z.string().nullable().optional()).optional(),
     orders: z.record(z.any()).optional(),
