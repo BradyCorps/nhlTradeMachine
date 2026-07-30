@@ -3675,3 +3675,32 @@ describe("Canary — CXH6 the payroll range is checked the same way at both ends
     expect(read("app/lib/cap-limits.ts")).toContain("causedByTrade");
   });
 });
+
+describe("Canary — CXS2 Draft Night says what it actually does to picks", () => {
+  const panel = read("app/components/DraftNight.tsx");
+  // The comment explaining the fix quotes the old copy verbatim.
+  const rendered = panel.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("makes no blanket promise about picks", () => {
+    // "your picks stay tradeable assets" was true only by accident of which
+    // years the inventory happens to carry.
+    expect(rendered).not.toContain("your picks stay tradeable assets");
+  });
+
+  it("names the years it is talking about, from config", () => {
+    // A literal year in the copy drifts the moment the season rolls over.
+    expect(panel).toContain("SEASON.firstTradablePickYear");
+    expect(panel).toContain("This draft's picks were spent when it was held");
+  });
+
+  it("shows the draft year from config rather than a literal", () => {
+    expect(panel).toContain("{SEASON.draftYear} Draft Night");
+    expect(rendered).not.toContain("2026 Draft Night —");
+  });
+
+  it("still spends picks on completion", () => {
+    // The no-op for Year 1 is correct, but the rule must stay wired.
+    expect(read("app/armchair-gm/page.tsx"))
+      .toContain("dropSpentDraftPicks(prev.players, draftYearForCupYear(1))");
+  });
+});

@@ -81,7 +81,7 @@ _CX1–CX4 done (commit pending): CX1 `urlHydratedRef` gate; CX2 `resolveTradeSh
 ### Smaller UX / docs
 
 - [x] **CXS1** TeamSelectModal sorts its `teams` prop in place (mutates shared state). `TeamSelectModal.tsx:82` — copies with `[...teams]` first; opening a modal no longer reorders the league for every other consumer.
-- [ ] **CXS2** Draft Night says picks stay tradeable, but completion removes all current-year picks. `DraftNight.tsx:186`, `page.tsx:706`
+- [x] **CXS2** Draft Night says picks stay tradeable, but completion removes all current-year picks. — Reported symptom does not occur: completion removes ZERO picks, because Year 1's draft (2026) was held before the scenario begins and the inventory starts at 2027. The real defect was the copy making a blanket promise that held only by accident. `DraftNight.tsx:186`, `page.tsx:706`
 - [x] **CXS3** Offer Sheet completion says "Proceed to Free Agency" after FA/re-signing already happened. (Overlaps OFF1.) `OfferSheetPhase.tsx:369` — closed by OFF1: every phase CTA now reads from `OFFSEASON_FLOW`, which pairs each label with its real destination.
 - [x] **CXS4** Recap heading special-cases Edmonton, styling other teams differently. `SeasonResultsPager.tsx:136` — headings are now detected structurally (a fully-bold line, or `##`) instead of by an allowlist of prefixes, so every club's recap renders alike.
 - [x] **CXS5** Asset expiry uses the real calendar year, not the simulated Cup year. `AssetCard.tsx:132` — `app/lib/contract-expiry.ts` anchors to `SEASON.label` and takes the Cup year, threaded through `TradePanel`. The old form also drifted every January, not just in Cup Runs.

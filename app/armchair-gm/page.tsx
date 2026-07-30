@@ -787,11 +787,17 @@ export default function ArmchairGmPage() {
             setDraftOpen(false);
             setResignOpen(true);
             setDb(prev => {
-              // The off-season draft just happened: spend this year's picks (drop
-              // them from the tradeable pool) and sign every selection to a default
-              // 3-year ELC so the rookies join their drafting team's roster.
-              // Same rule the Cup Run rollover uses: the draft just held spends
-              // that year's picks. Year 1 enters through the base draft.
+              // Sign every selection to a default 3-year ELC so the rookies join
+              // their drafting team's roster, and spend the picks for the draft
+              // just held — the same rule the Cup Run rollover applies.
+              //
+              // CXS2 — for Year 1 that spend is a NO-OP, and correctly so. Year 1's
+              // draft is SEASON.draftYear, which was held before the scenario
+              // begins; that is exactly why the pick inventory starts at
+              // SEASON.firstTradablePickYear and holds no picks for it. The call
+              // stays because the rule is the same one Years 2 and 3 need, and
+              // because a pool that ever did carry a stale current-year pick
+              // should have it dropped here rather than left tradeable.
               const withoutPicks = dropSpentDraftPicks(prev.players, draftYearForCupYear(1));
               // Diacritic-safe reconcile (AG4/VAL1): a prospect already on a
               // roster (e.g. seeded "Viggo Bjorck" vs a drafted "Viggo Björck")

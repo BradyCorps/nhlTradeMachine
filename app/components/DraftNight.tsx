@@ -12,6 +12,7 @@ import {
   type DraftProspect,
   type DraftResult,
 } from "@/app/lib/draft-2026";
+import { SEASON } from "@/app/lib/season-config";
 
 // ── Off-Season Draft Night ────────────────────────────────────────────────
 // Two distinct modal modes — never both visible at once:
@@ -86,7 +87,7 @@ export default function DraftNight({
           {/* Pick header */}
           <div className="shrink-0" style={{ borderTop: "4px double #1c140a", borderBottom: "1px solid #b8a070", padding: "14px 20px 12px" }}>
             <div className="text-[9px] uppercase tracking-[0.4em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
-              Cap & Crease · 2026 Draft Night
+              Cap &amp; Crease · {SEASON.draftYear} Draft Night
             </div>
             <div className="flex items-baseline justify-between gap-3 flex-wrap">
               <div>
@@ -175,7 +176,7 @@ export default function DraftNight({
                 Cap & Crease · Off-Season
               </div>
               <h2 className="font-black" style={{ fontSize: "1.4rem", color: "var(--ledger-ink)", lineHeight: 1.1 }}>
-                2026 Draft Night — First Round
+                {SEASON.draftYear} Draft Night — First Round
               </h2>
             </div>
             <button onClick={() => setSeed((s) => s + 1)}
@@ -189,8 +190,15 @@ export default function DraftNight({
         {/* Draft log */}
         <div className="overflow-y-auto px-5 py-4" style={{ flex: 1, minHeight: 0 }}>
           <p className="text-[11px] font-mono mb-3" style={{ color: "var(--ledger-ink-faint)" }}>
+            {/* CXS2 — "your picks stay tradeable assets" was a blanket claim
+                that happened to be true only by accident. The picks for THIS
+                draft are not assets at all: the 2026 draft was held in June
+                2026, before the scenario begins, which is why the pool starts
+                at {SEASON.firstTradablePickYear}. Saying which years are and
+                are not affected cannot drift into a lie the way a general
+                promise about "your picks" can. */}
             {done
-              ? "First round complete — your picks stay tradeable assets."
+              ? `First round complete. This draft's picks were spent when it was held — your ${SEASON.firstTradablePickYear} and later picks are untouched and still tradeable.`
               : "CPU teams are picking… you'll be notified when it's your turn."}
           </p>
           <div className="flex flex-col gap-1">
