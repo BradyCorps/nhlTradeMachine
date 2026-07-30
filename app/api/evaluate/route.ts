@@ -24,7 +24,8 @@ import {
 import { EvaluateRequestSchema } from "@/app/lib/evaluate-request-schema";
 import { db } from "@/app/db/client";
 import { siteSettings } from "@/app/db/schema";
-import { isValidCapCeiling, maxCapCeiling, parseStoredCapCeiling } from "@/app/lib/cap-settings";
+import { isValidCapCeiling, maxCapCeiling, parseStoredCapCeiling, parseStoredCapFloor } from "@/app/lib/cap-settings";
+import { describeBreach, findCapBreaches } from "@/app/lib/cap-limits";
 
 type Team = import("@/app/lib/trade-types").Team;
 
@@ -44,6 +45,16 @@ const getLiveCapCeiling = async (requestCapCeiling?: number | null): Promise<num
   const rows = await db.select().from(siteSettings).catch(() => []);
   const row = rows.find((r) => r.key === "cap_ceiling");
   return parseStoredCapCeiling(row?.value, SEASON.capCeiling) ?? SEASON.capCeiling;
+};
+
+// CXH6 — the floor gets the same treatment as the ceiling. There is a
+// `cap_floor` override in the admin settings and this audit ignored it, so
+// raising the ceiling for a what-if left the floor on the season default and
+// the two ends of the payroll range described different leagues.
+const getLiveCapFloor = async (): Promise<number> => {
+  const rows = await db.select().from(siteSettings).catch(() => []);
+  const row = rows.find((r) => r.key === "cap_floor");
+  return parseStoredCapFloor(row?.value, SEASON.capFloor) ?? SEASON.capFloor;
 };
 
 // ── Adapter: Maps raw client Asset to strict engine AssetInput ──
@@ -217,7 +228,8 @@ const runGmLogic = (
   teamPartner: Team | null,
   allHomeRoster: Asset[],
   allPartnerRoster: Asset[],
-  capCeiling: number = SEASON.capCeiling
+  capCeiling: number = SEASON.capCeiling,
+  capFloor: number = SEASON.capFloor
 ): GmFlag[] => {
   const flags: GmFlag[] = [];
   if (!teamHome || !teamPartner) return flags;
@@ -453,31 +465,32 @@ const runGmLogic = (
     }
   }
 
-  const capDeltaHome = incoming.reduce((s,a) => s + a.capHit*(1-(a.retainedPct||0)),0) - outgoing.reduce((s,a) => s + a.capHit*(1-(a.retainedPct||0)),0);
-  const projCapHome = teamHome.capSpace - capDeltaHome;
-  if (projCapHome < 0) flags.push({
-    severity: "HARD", category: "CAP_VIOLATION",
-    headline: "Cap Ceiling Breach",
-    explanation: `This trade puts ${teamHome.name} $${Math.abs(projCapHome).toFixed(2)}M over the ceiling.`,
-    vetoesSide: 0,
-  });
+  // CXH6 — one payroll-range rule, applied to both clubs with the same live
+  // limits. The ceiling was checked for both sides but the floor only for home,
+  // against a hard-coded season constant, and only when the club shed more than
+  // $3M — so a partner dropped under the floor was cleared, and so was a home
+  // club sitting just above it that shed $2M.
+  const effectiveCap = (a: Asset) => a.capHit * (1 - (a.retainedPct || 0));
+  const capIn  = incoming.reduce((s, a) => s + effectiveCap(a), 0);
+  const capOut = outgoing.reduce((s, a) => s + effectiveCap(a), 0);
 
-  const capDeltaPartner = outgoing.reduce((s,a) => s + a.capHit*(1-(a.retainedPct||0)),0) - incoming.reduce((s,a) => s + a.capHit*(1-(a.retainedPct||0)),0);
-  const projCapPartner = teamPartner.capSpace - capDeltaPartner;
-  if (projCapPartner < 0) flags.push({
-    severity: "HARD", category: "CAP_VIOLATION",
-    headline: "Partner Cap Breach",
-    explanation: `This trade puts ${teamPartner.name} $${Math.abs(projCapPartner).toFixed(2)}M over the ceiling.`,
-    vetoesSide: 1,
-  });
-
-  const newCapUsedHome = capCeiling - projCapHome;
-  if (newCapUsedHome < SEASON.capFloor && capDeltaHome < -3) flags.push({
-    severity: "HARD", category: "FLOOR_VIOLATION",
-    headline: "Cap Floor Violation",
-    explanation: `${teamHome.name} would fall below the NHL's $${SEASON.capFloor.toFixed(1)}M cap floor.`,
-    vetoesSide: 0,
-  });
+  for (const breach of findCapBreaches(
+    [
+      { teamName: teamHome.name,    side: 0, capSpaceBefore: teamHome.capSpace,    capDelta: capIn - capOut },
+      { teamName: teamPartner.name, side: 1, capSpaceBefore: teamPartner.capSpace, capDelta: capOut - capIn },
+    ],
+    { ceiling: capCeiling, floor: capFloor },
+  )) {
+    flags.push({
+      severity: "HARD",
+      category: breach.kind === "CEILING" ? "CAP_VIOLATION" : "FLOOR_VIOLATION",
+      headline: breach.kind === "CEILING"
+        ? (breach.side === 0 ? "Cap Ceiling Breach" : "Partner Cap Breach")
+        : (breach.side === 0 ? "Cap Floor Violation" : "Partner Cap Floor Violation"),
+      explanation: describeBreach(breach),
+      vetoesSide: breach.side,
+    });
+  }
 
   const waiverProbability = (player: Asset, destination: Team | null): number => {
     if (!destination) return 0;
@@ -1118,7 +1131,8 @@ const evaluateTrade = (
   teamPartner: Team | null,
   allHomeRoster: Asset[],
   allPartnerRoster: Asset[],
-  capCeiling: number = SEASON.capCeiling
+  capCeiling: number = SEASON.capCeiling,
+  capFloor: number = SEASON.capFloor
 ): TradeVerdict => {
   if (!outgoing.length && !incoming.length) {
     return { status: "IDLE", message: "Add assets to evaluate", flags: [], metrics: nullMetrics() };
@@ -1206,7 +1220,7 @@ const evaluateTrade = (
   const ewaPartner = (-onIceDelta / 7) * partnerMarginFactor;
   const cwiPartner = (calcAssetWindowImpact(outgoing, 1) + calcAssetWindowImpact(incoming, -1)) / 3.0;
 
-  const flags = runGmLogic(outgoing, incoming, teamHome, teamPartner, allHomeRoster, allPartnerRoster, capCeiling);
+  const flags = runGmLogic(outgoing, incoming, teamHome, teamPartner, allHomeRoster, allPartnerRoster, capCeiling, capFloor);
   const hardFlags = flags.filter((f) => f.severity === "HARD");
   const softFlags = flags.filter((f) => f.severity === "SOFT");
 
@@ -1325,7 +1339,8 @@ export async function POST(req: Request) {
         body.partnerTeam,
         body.allHomeRoster ?? [],
         body.allPartnerRoster ?? [],
-        liveCapCeiling
+        liveCapCeiling,
+        await getLiveCapFloor(),
       );
     }
 

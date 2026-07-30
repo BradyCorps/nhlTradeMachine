@@ -3642,3 +3642,36 @@ describe("Canary — CXH5 Partner Finder folders mean one thing each", () => {
     expect(page).toContain("setBlocks([blocks[0], []])");
   });
 });
+
+describe("Canary — CXH6 the payroll range is checked the same way at both ends", () => {
+  const route = read("app/api/evaluate/route.ts");
+
+  it("both clubs go through one rule", () => {
+    // The ceiling was checked for both sides, the floor for home only.
+    expect(route).toContain("findCapBreaches(");
+    expect(route).toContain("side: 0");
+    expect(route).toContain("side: 1");
+    expect(route).not.toMatch(/newCapUsedHome < SEASON\.capFloor/);
+  });
+
+  it("uses a live floor, not the season constant", () => {
+    // There is a cap_floor override in admin settings and this route ignored
+    // it, so raising the ceiling left the two ends describing different leagues.
+    expect(route).toContain("getLiveCapFloor");
+    expect(route).toContain('r.key === "cap_floor"');
+    expect(route).toContain("await getLiveCapFloor()");
+  });
+
+  it("does not gate the floor on an arbitrary dollar threshold", () => {
+    // `capDelta < -3` cleared a club just above the floor that shed $2M.
+    expect(route).not.toContain("capDeltaHome < -3");
+    const rule = read("app/lib/cap-limits.ts").replace(/\/\/.*$/gm, "");
+    expect(rule).not.toMatch(/capDelta < -\d/);
+    // What replaced it: only a trade that reduces payroll can breach the floor.
+    expect(rule).toContain("s.capDelta < 0");
+  });
+
+  it("separates causing a breach from deepening one", () => {
+    expect(read("app/lib/cap-limits.ts")).toContain("causedByTrade");
+  });
+});
