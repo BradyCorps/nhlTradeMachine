@@ -679,6 +679,54 @@ Also found: `XNAVResult` is defined twice, in `trade-types.ts` and
 `xnav-engine.ts`, kept compatible only by hand. Mirrored the new field and
 flagged it; worth collapsing.
 
+### T0-2 — STRAND missing-data honesty (complete)
+Half the STRAND nodes greyed out honestly when their source was absent; the
+other half substituted a value that looked measured:
+
+| node | old behaviour | rendered as |
+|------|---------------|-------------|
+| NOIV | `norm(xgRelTM ?? 0, -12, 12)` | 50, no flag |
+| SUPP | `norm(-(xgaRelTM ?? 0), …)` | 50, no flag |
+| QoC  | `(qocIndex ?? 35) / 100` | 35, no flag |
+| DPS  | `dpsNorm ?? norm(nav.def, -60, 150)` | the NAV defensive component — a different quantity on a different scale, same label |
+| GA   | `(1 - svPct) * (spg ?? 30)` | a goals-against figure off an assumed shot rate, to two decimals |
+
+50 is the worst available lie: it reads as "average", which is a finding, rather
+than "we do not know". A player with three real inputs and one with ten rendered
+identically.
+
+- `app/lib/strand-traits.ts` owns node construction. `node()` takes the raw
+  input and decides whether there was one; callers must not pre-substitute
+  (`value: x ?? 0` reintroduces the defect). A real zero counts as data; only
+  null/undefined/NaN/Infinity are absence.
+- Every absent node carries a specific message ("On-ice xG relative to teammates
+  unavailable"), not a bare "unavailable" — a reader should know what to go find.
+- The 0.5 on an unavailable node is geometry, not a reading: `StrandDisplay`
+  greys it and prints "—", but the helix still needs a y-coordinate.
+- Coverage: `strandCoverage` counts measured nodes and the display prints
+  "3 of 8 measured", in red with "too little to characterise this profile" below
+  half. This matters more than the greyed nodes themselves — a thin profile and
+  a full one draw the SAME helix, because the placeholder mid-rail values shape
+  the wave. Verified against a rendered three-profile comparison.
+- `computeRosterStrand` averaged the manufactured values across a roster, so a
+  club with five real NOIV readings out of thirteen produced a number that was
+  mostly eight copies of "unknown" pulled toward the middle. Each trait is now
+  averaged over the players who have it, with `rosterStrandCoverage` reporting
+  how many; `navMap` is no longer read at all.
+- The goalie "GAA" node is relabelled **GA/GM** and requires both save % and
+  shot volume. It is goals per appearance; calling it GAA claimed a per-60
+  figure the data cannot support. The unit question itself is T0-3.
+- `StrandTrait` had two definitions; `StrandDisplay` re-exports the lib's now.
+
+Five canaries were pinning implementation, two of them pinning the bugs
+themselves — one quoted `norm(p.qocIndex ?? 35, 0, 100)` verbatim, locking in
+the default this task removed. All repointed at the guarantee.
+
+NOT fixed here, and still true: OPS/DPS remain SHARES of a player's Point
+Shares, not ability percentiles, so an elite two-way forward's large offence
+still makes his defensive node small. Tooltips now say "share" explicitly. One
+consistent scale across the rails is Tier 1.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

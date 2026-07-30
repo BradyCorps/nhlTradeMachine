@@ -389,9 +389,22 @@ describe("Canary — engine inputs", () => {
 
 describe("Canary — Team DNA Usage trait", () => {
   it("computeRosterStrand uses qocIndex, not the dead legacy qocRank", () => {
-    const src = read("app/lib/roster-strand.ts");
-    expect(src).not.toContain("qocRank ?? 400");
-    expect(src).toContain("totals.def.Usage += norm(p.qocIndex ?? 35, 0, 100)");
+    // Pinned to the field consumed, not to the expression. The old assertion
+    // quoted `norm(p.qocIndex ?? 35, 0, 100)` verbatim, which locked in the
+    // `?? 35` default that Tier 0 removed — a canary holding a bug in place.
+    const src = readSource("app/lib/roster-strand.ts");
+    expect(src).not.toContain("qocRank");
+    expect(src).toContain("acc.Usage.add(p.qocIndex, 0, 100)");
+  });
+
+  it("averages each trait over the players who have it, not the whole roster", () => {
+    // Thirteen players with five real readings between them used to produce a
+    // mean that was mostly eight copies of "we do not know", pulled to 0.5.
+    const src = readSource("app/lib/roster-strand.ts");
+    expect(src).not.toMatch(/\?\?\s*35\b/);
+    expect(src).not.toMatch(/xnav\?\.def/);
+    expect(src).toContain("measured(value)");
+    expect(src).toContain("export function rosterStrandCoverage");
   });
 });
 
@@ -772,9 +785,13 @@ describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 go
   const docket = read("app/docket/DocketClient.tsx");
 
   it("renderer puts labels on fixed rails with one 0–100 index + faint raw, and an EDGE footer slot", () => {
-    // Trait carries a 0–100 index + a raw sub-line
-    expect(display).toContain("idx?:");
-    expect(display).toContain("raw?:");
+    // Trait carries a 0–100 index + a raw sub-line. The shape lives in
+    // app/lib/strand-traits.ts now — one definition, re-exported here — so the
+    // assertion follows it rather than pinning where it used to sit.
+    const traitShape = read("app/lib/strand-traits.ts");
+    expect(traitShape).toContain("idx?:");
+    expect(traitShape).toContain("raw?:");
+    expect(display).toContain("export type { StrandTrait }");
     expect(display).toContain("Math.round(t.val * 100)");
     // Rails own the top/bottom bands and clamp the wave so peaks never hit the text
     expect(display).toContain("RAIL_ZONE");
@@ -791,14 +808,18 @@ describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 go
 
   it("goalies use a shared 3×3 model with HDSV actually populated (no hardcoded greyed dash)", () => {
     expect(view).toContain("export function buildGoalieStrandTraits");
-    for (const label of ["GSAX", "SV%", "HDSV", "WRKLD", "BUSY", "GAA"]) {
+    // Six nodes, three per rail. The goals-against node is "GA/GM" rather than
+    // "GAA": it is goals per appearance, and calling it GAA claimed a per-60
+    // figure the data cannot support. The count and the rails are the
+    // guarantee; the label is free to be corrected.
+    for (const label of ["GSAX", "SV%", "HDSV", "WRKLD", "BUSY"]) {
       expect(view).toContain(`label: "${label}"`);
     }
+    expect(view).toMatch(/label: "GA\/GM"/);
     // HDSV comes from the real EDGE field, greying out only when truly absent
     expect(view).toContain("baselineHdsvPct");
-    expect(view).toContain("unavailable: hdsvPct == null");
-    // GAA index is inverted so a stingy goalie reads high
-    expect(view).toContain("1 - norm(safe(gaa)");
+    // The goals-against index is inverted so a stingy goalie reads high
+    expect(view).toMatch(/label: "GA\/GM"[\s\S]{0,200}invert: true/);
     // The players page no longer hardcodes HDSV to unavailable
     expect(players).toContain("buildGoalieStrandTraits(player)");
     expect(players).not.toContain('val: 0.5, unavailable: true');
@@ -828,7 +849,7 @@ describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 go
     expect(players).toContain("maxWidth={460}");
     // Ice time reads as minutes, not metres; QoC replaces the vague "Usage";
     // suppression is shown positive (higher = stingier)
-    expect(view).toContain('`${safe(a.avgTOI).toFixed(1)} min`');
+    expect(view).toMatch(/label: "TOI"[\s\S]{0,300}min\/gm/);
     expect(view).toContain('label: "QoC"');
     expect(view).not.toContain('label: "Usage"');
     expect(view).not.toContain('label: "TOI+"');
@@ -2813,6 +2834,65 @@ describe("Canary — every value breakdown reconciles to its headline", () => {
 
   it("states the goalie role ceiling as a row rather than an invisible clamp", () => {
     expect(readSource("app/lib/xnav-engine.ts")).toContain('stage("roleCeiling"');
+  });
+});
+
+// ── Tier 0: missing data never renders as a measurement ─────────────────────
+// Half the STRAND nodes greyed out honestly; the other half substituted a value
+// that looked measured — NOIV and SUPP became 50, QoC became 35, and a missing
+// DPS fell back onto the NAV defensive component, a different quantity on a
+// different scale under the same label. 50 is the worst possible lie: it reads
+// as "average", a finding, rather than "we do not know".
+describe("Canary — a STRAND node never invents a reading", () => {
+  const view = readSource("app/components/StrandView.tsx");
+  const lib = readSource("app/lib/strand-traits.ts");
+
+  it("routes every node through the builder that can say 'unavailable'", () => {
+    expect(lib).toContain("export function node");
+    expect(lib).toContain("unavailable: true");
+    // Both trait builders, skater and goalie.
+    expect(view).toContain("export function buildAssetTraits");
+    expect(view).toContain("export function buildGoalieStrandTraits");
+    expect(view.match(/node\(\{/g)?.length ?? 0).toBeGreaterThanOrEqual(14);
+  });
+
+  it("carries none of the specific defaults that manufactured a reading", () => {
+    for (const pattern of [
+      /qocIndex\s*\?\?\s*35/,          // QoC → 35
+      /xgRelTM\s*\?\?\s*0/,            // NOIV → 50
+      /xgaRelTM\s*\?\?\s*0/,           // SUPP → 50
+      /shotsPerGame\s*\?\?\s*30/,      // a fabricated shot rate
+      /spg\s*\?\?\s*30/,
+      /norm\(nav\.def/,                 // DPS → the NAV defensive component
+    ]) {
+      expect(view, String(pattern)).not.toMatch(pattern);
+    }
+  });
+
+  it("treats a real zero as data and absence as absence", () => {
+    // The mirror mistake would be just as wrong: a player who genuinely rates
+    // 0 on a trait must not be greyed out as unmeasured.
+    expect(lib).toContain("v != null && isFinite(v)");
+  });
+
+  it("says which measurement is missing, not merely that one is", () => {
+    // Every node supplies an `absent` string; a bare "unavailable" tells a
+    // reader nothing about what to go and find.
+    const absents = view.match(/absent:\s*"[^"]+"/g) ?? [];
+    expect(absents.length).toBeGreaterThanOrEqual(14);
+    for (const a of absents) expect(a.length).toBeGreaterThan("absent: \"unavailable\"".length);
+  });
+
+  it("counts coverage so a thin profile is visibly thin", () => {
+    // A greyed node says one input is missing. Only a count says most of the
+    // shape is — which is what matters before comparing two players.
+    expect(lib).toContain("export function strandCoverage");
+    expect(readSource("app/components/StrandDisplay.tsx")).toContain("coverageLabel");
+  });
+
+  it("keeps one definition of the trait shape", () => {
+    // StrandDisplay re-exports rather than declaring a second copy.
+    expect(readSource("app/components/StrandDisplay.tsx")).not.toMatch(/export interface StrandTrait/);
   });
 });
 

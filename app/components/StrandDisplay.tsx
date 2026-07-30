@@ -11,16 +11,12 @@
 // sub-line), and any EDGE band is rendered beneath the shape via `footer`.
 import React from "react";
 
-export interface StrandTrait {
-  label:       string;
-  val:         number;        // 0–1 normalised — drives bar width and helix amplitude
-  title?:      string;        // tooltip
-  idx?:        number;        // 0–100 index shown on the node (defaults to round(val*100))
-  raw?:        string;        // faint raw value shown under the label (e.g. "13.7 OPS")
-  ps?:         string | null; // legacy: Point Share value — used as a raw fallback
-  display?:    number;        // legacy: raw override — used as a raw fallback
-  unavailable?: boolean;      // greyed out — data not available
-}
+// The trait shape lives with the builder that decides whether a node measured
+// anything — `app/lib/strand-traits.ts`. Re-exported here so the long-standing
+// `import { StrandTrait } from ".../StrandDisplay"` keeps working, but there is
+// one definition, not two drifting copies.
+export type { StrandTrait } from "@/app/lib/strand-traits";
+import { coverageIsThin, coverageLabel, strandCoverage, type StrandTrait } from "@/app/lib/strand-traits";
 
 interface Props {
   offTraits:    StrandTrait[];
@@ -133,6 +129,14 @@ export default function StrandDisplay({
 
   const guideLabels = Array.from(new Set([...offTraits, ...defTraits].map(t => t.label)))
     .filter(label => TRAIT_GUIDE[label]);
+
+  // How much of this profile is a measurement. A greyed node says "this one is
+  // missing"; only the count says "most of this shape is missing", which is a
+  // different and more important thing for a reader to know before comparing
+  // two players.
+  const coverage = strandCoverage(offTraits, defTraits);
+  const coverageNote = coverageLabel(coverage);
+  const thin = coverageIsThin(coverage);
 
   return (
     <div style={maxWidth ? { maxWidth, margin: "0 auto" } : undefined}>
@@ -281,6 +285,21 @@ export default function StrandDisplay({
         <span style={{ color: "var(--ledger-red)", fontWeight: 700 }}>red = defensive traits</span>{" "}
         — wave color marks the trait family, never good vs bad.
       </div>
+
+      {/* Coverage. Silent on a complete profile; a badge that always shows is
+          one nobody reads. */}
+      {coverageNote && (
+        <div className="mt-1" style={{
+          fontSize: "10px", lineHeight: 1.45, fontFamily: "Courier Prime, monospace",
+          color: thin ? "var(--ledger-red)" : "var(--ledger-ink-faint)",
+          fontWeight: thin ? 900 : 700,
+        }}>
+          <span title="Greyed nodes had no source data. They are drawn mid-rail so the shape stays continuous; they are not readings.">
+            ◌ {coverageNote}
+            {thin && " — too little to characterise this profile"}
+          </span>
+        </div>
+      )}
 
       {/* ── Trait definitions (expandable) ───────────────────── */}
       <details className="text-2xs mt-1" style={{ color: "var(--ledger-ink-body)", lineHeight: 1.6 }}>

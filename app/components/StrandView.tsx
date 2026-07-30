@@ -8,15 +8,18 @@
 //                StrandView/computePlayerTraits own data normalisation.
 import React from "react";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
-import StrandDisplay, { StrandTrait } from "@/app/components/StrandDisplay";
+import StrandDisplay from "@/app/components/StrandDisplay";
+import { node, type StrandTrait } from "@/app/lib/strand-traits";
 import EdgeStrip from "@/app/components/EdgeStrip";
 
-function safe(n: number) { return isNaN(n) || !isFinite(n) ? 0 : n; }
-const norm = (val: number, mn: number, mx: number) =>
-  Math.max(0, Math.min(1, (val - mn) / (mx - mn)));
+// ── Trait builders: Asset + XNAVResult → StrandTrait[] ────────
+//
+// Every node goes through `node()` from `app/lib/strand-traits.ts`, which
+// takes the raw input and decides whether there was one. Do NOT pre-substitute
+// a fallback (`value: x ?? 0`) — that is precisely the defect the helper
+// exists to prevent, and it is how NOIV, SUPP and QoC came to render a
+// confident 50 / 35 off no data at all.
 
-// ── Trait builder: Asset + XNAVResult → StrandTrait[] ────────
-// Called by StrandView (Armchair GM). 10 traits: 5 OFF + 5 DEF.
 export function buildAssetTraits(a: Asset, nav: XNAVResult): {
   off: StrandTrait[]; def: StrandTrait[]
 } {
@@ -26,43 +29,74 @@ export function buildAssetTraits(a: Asset, nav: XNAVResult): {
   const ops = a.ops ?? null;
   const dps = a.dps ?? null;
   const psTotal = ops !== null && dps !== null ? ops + dps : null;
-  const opsNorm = psTotal !== null && psTotal > 0 ? Math.max(0, Math.min(1, ops! / Math.max(psTotal, 1))) : null;
-  const dpsNorm = psTotal !== null && psTotal > 0 ? Math.max(0, Math.min(1, dps! / Math.max(psTotal, 1))) : null;
+  // NOTE: these are SHARES of a player's Point Shares, not ability percentiles.
+  // An elite two-way forward's huge offence makes his defensive share small.
+  // The labels say OPS/DPS and the tooltips say "share" for that reason; making
+  // the whole rail one consistent scale is Tier 1, not Tier 0.
+  const opsShare = psTotal !== null && psTotal > 0 ? ops! / psTotal : null;
+  const dpsShare = psTotal !== null && psTotal > 0 ? dps! / psTotal : null;
 
   return {
     off: [
-      { label: ops !== null ? "OPS" : "SCR",
-        val: opsNorm ?? norm(safe(a.ptsPace), 0, isD ? 80 : 100),
-        title: ops !== null ? `OPS ${ops.toFixed(1)} — Offensive Point Shares` : `Pts/82: ${a.ptsPace.toFixed(1)}`,
-        raw: ops !== null ? `${ops.toFixed(1)} OPS` : `${a.ptsPace.toFixed(0)} P/82` },
-      { label: "xG",   val: a.xGPace != null ? norm(safe(a.xGPace), 0, isD ? 25 : 50) : 0.5,
-        title: a.xGPace != null ? `xGoals: ${a.xGPace.toFixed(1)}/82` : "xG data unavailable",
-        raw: a.xGPace != null ? `${a.xGPace.toFixed(0)} xG/82` : undefined,
-        unavailable: a.xGPace == null },
-      { label: "NOIV", val: norm(safe(a.xgRelTM ?? 0), -12, 12),
-        title: `xG% vs teammates: ${(a.xgRelTM ?? 0).toFixed(1)}`,
-        raw: `${(a.xgRelTM ?? 0) >= 0 ? "+" : ""}${(a.xgRelTM ?? 0).toFixed(1)}%` },
-      { label: "TOI", val: norm(safe(a.avgTOI), 10, 27),
-        title: `Ice time: ${safe(a.avgTOI).toFixed(1)} min/gm`,
-        raw: `${safe(a.avgTOI).toFixed(1)} min` },
+      ops !== null
+        ? node({
+            label: "OPS", value: opsShare, min: 0, max: 1,
+            title: v => `OPS ${ops.toFixed(1)} — ${(v * 100).toFixed(0)}% of his Point Shares are offensive`,
+            raw: () => `${ops.toFixed(1)} OPS`,
+            absent: "Offensive Point Shares unavailable",
+          })
+        : node({
+            label: "SCR", value: a.ptsPace ?? null, min: 0, max: isD ? 80 : 100,
+            title: v => `Pts/82: ${v.toFixed(1)}`,
+            raw: v => `${v.toFixed(0)} P/82`,
+            absent: "Scoring pace unavailable",
+          }),
+      node({
+        label: "xG", value: a.xGPace ?? null, min: 0, max: isD ? 25 : 50,
+        title: v => `xGoals: ${v.toFixed(1)}/82`,
+        raw: v => `${v.toFixed(0)} xG/82`,
+        absent: "Expected goals unavailable",
+      }),
+      node({
+        label: "NOIV", value: a.xgRelTM ?? null, min: -12, max: 12,
+        title: v => `xG% vs teammates: ${v.toFixed(1)}`,
+        raw: v => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`,
+        absent: "On-ice xG relative to teammates unavailable",
+      }),
+      node({
+        label: "TOI", value: a.avgTOI ?? null, min: 10, max: 27,
+        title: v => `Ice time: ${v.toFixed(1)} min/gm`,
+        raw: v => `${v.toFixed(1)} min`,
+        absent: "Ice time unavailable",
+      }),
     ],
     def: [
-      { label: dps !== null ? "DPS" : "DEF",
-        val: dpsNorm ?? norm(nav.def, -60, 150),
-        title: dps !== null ? `DPS ${dps.toFixed(1)} — Defensive Point Shares` : "Defensive NAV component",
-        raw: dps !== null ? `${dps.toFixed(1)} DPS` : undefined },
-      { label: "SUPP", val: norm(-(a.xgaRelTM ?? 0), -1.5, 1.5),
-        title: `Chance suppression vs teammates: ${(-(a.xgaRelTM ?? 0)).toFixed(2)} (higher = stingier)`,
-        raw: `${(-(a.xgaRelTM ?? 0)) >= 0 ? "+" : ""}${(-(a.xgaRelTM ?? 0)).toFixed(2)} xGA` },
-      { label: "QoC",  val: (a.qocIndex ?? 35) / 100,
-        title: `Quality of competition ${a.qocIndex ?? "—"}/100 — how tough his matchups are`,
-        raw: undefined },
-      { label: "OZ",   val: a.dzPct != null ? 1 - norm(safe(a.dzPct), 0.3, 0.7) : 0.5,
-        title: a.dzPct != null
-          ? `OZ: ${((1-a.dzPct)*100).toFixed(0)}% offensive zone starts`
-          : "Zone deployment unavailable",
-        raw: a.dzPct != null ? `${Math.round((1 - a.dzPct) * 100)}% OZ` : undefined,
-        unavailable: a.dzPct == null },
+      // No fallback onto the NAV defensive component. That is a different
+      // quantity on a different scale, and putting it here under a label the
+      // reader cannot distinguish is worse than an honest gap.
+      node({
+        label: "DPS", value: dpsShare, min: 0, max: 1,
+        title: v => `DPS ${dps!.toFixed(1)} — ${(v * 100).toFixed(0)}% of his Point Shares are defensive`,
+        raw: () => `${dps!.toFixed(1)} DPS`,
+        absent: "Defensive Point Shares unavailable",
+      }),
+      node({
+        label: "SUPP", value: a.xgaRelTM != null ? -a.xgaRelTM : null, min: -1.5, max: 1.5,
+        title: v => `Chance suppression vs teammates: ${v.toFixed(2)} (higher = stingier)`,
+        raw: v => `${v >= 0 ? "+" : ""}${v.toFixed(2)} xGA`,
+        absent: "Chance suppression relative to teammates unavailable",
+      }),
+      node({
+        label: "QoC", value: a.qocIndex ?? null, min: 0, max: 100,
+        title: v => `Quality of competition ${Math.round(v)}/100 — how tough his matchups are`,
+        absent: "Quality of competition unavailable",
+      }),
+      node({
+        label: "OZ", value: a.dzPct ?? null, min: 0.3, max: 0.7, invert: true,
+        title: v => `OZ: ${((1 - v) * 100).toFixed(0)}% offensive zone starts`,
+        raw: v => `${Math.round((1 - v) * 100)}% OZ`,
+        absent: "Zone deployment unavailable",
+      }),
     ],
   };
 }
@@ -77,48 +111,57 @@ export function buildGoalieStrandTraits(g: {
   baselineHdsvPct?: number | null; gamesStarted?: number | null;
   games?: number | null; shotsPerGame?: number | null;
 }): { off: StrandTrait[]; def: StrandTrait[] } {
-  const gsax    = g.gsax ?? null;
-  const svPct   = g.savePct ?? null;
-  const hdsvPct = g.baselineHdsvPct ?? null;
-  const gs      = g.gamesStarted ?? g.games ?? null;
-  const spg     = g.shotsPerGame ?? null;
-  const gaa     = svPct !== null ? (1 - svPct) * (spg ?? 30) : null;
+  const svPct = g.savePct ?? null;
+  const spg   = g.shotsPerGame ?? null;
+  // Goals per APPEARANCE, and only when both inputs are real.
+  //
+  // This used to read `(1 - svPct) * (spg ?? 30)`, which invented a shot rate
+  // from thin air whenever volume was missing and printed the result to two
+  // decimals as though it were measured. It is also not GAA — that is per 60
+  // minutes, and needs goalie ice time we do not currently carry. The label
+  // says what it is.
+  const gpa = svPct !== null && spg !== null ? (1 - svPct) * spg : null;
 
   return {
     off: [
-      { label: "GSAX",
-        val: gsax !== null ? norm(safe(gsax), -15, 25) : 0.5,
-        title: gsax !== null ? `GSAX ${gsax.toFixed(1)} — Goals Saved Above Expected` : "GSAX unavailable",
-        raw: gsax !== null ? `${gsax > 0 ? "+" : ""}${gsax.toFixed(1)}` : undefined,
-        unavailable: gsax == null },
-      { label: "SV%",
-        val: svPct !== null ? norm(safe(svPct), 0.890, 0.935) : 0.5,
-        title: svPct !== null ? `Save %: ${(svPct * 100).toFixed(1)}%` : "Save % unavailable",
-        raw: svPct !== null ? `${(svPct * 100).toFixed(1)}` : undefined,
-        unavailable: svPct == null },
-      { label: "HDSV",
-        val: hdsvPct !== null ? norm(safe(hdsvPct), 0.780, 0.880) : 0.5,
-        title: hdsvPct !== null ? `High-Danger SV%: ${(hdsvPct * 100).toFixed(1)}%` : "HD SV% unavailable (no EDGE sample)",
-        raw: hdsvPct !== null ? `${(hdsvPct * 100).toFixed(1)}` : undefined,
-        unavailable: hdsvPct == null },
+      node({
+        label: "GSAX", value: g.gsax ?? null, min: -15, max: 25,
+        title: v => `GSAX ${v.toFixed(1)} — Goals Saved Above Expected`,
+        raw: v => `${v > 0 ? "+" : ""}${v.toFixed(1)}`,
+        absent: "Goals saved above expected unavailable",
+      }),
+      node({
+        label: "SV%", value: svPct, min: 0.890, max: 0.935,
+        title: v => `Save %: ${(v * 100).toFixed(1)}%`,
+        raw: v => `${(v * 100).toFixed(1)}`,
+        absent: "Save percentage unavailable",
+      }),
+      node({
+        label: "HDSV", value: g.baselineHdsvPct ?? null, min: 0.780, max: 0.880,
+        title: v => `High-Danger SV%: ${(v * 100).toFixed(1)}%`,
+        raw: v => `${(v * 100).toFixed(1)}`,
+        absent: "High-danger save % unavailable (no EDGE sample)",
+      }),
     ],
     def: [
-      { label: "WRKLD",
-        val: gs !== null ? norm(safe(gs), 10, 65) : 0.5,
-        title: gs !== null ? `Games started: ${gs}` : "Workload unavailable",
-        raw: gs !== null ? `${gs} GS` : undefined,
-        unavailable: gs == null },
-      { label: "BUSY",
-        val: spg !== null ? norm(safe(spg), 24, 34) : 0.5,
-        title: spg !== null ? `Shots faced: ${spg.toFixed(1)}/game` : "Shot volume unavailable",
-        raw: spg !== null ? `${spg.toFixed(1)}/gm` : undefined,
-        unavailable: spg == null },
-      { label: "GAA",
-        // Lower GAA is better, so invert the index — a high node = stingy.
-        val: gaa !== null ? 1 - norm(safe(gaa), 2.0, 3.6) : 0.5,
-        title: gaa !== null ? `Goals-against average: ${gaa.toFixed(2)}` : "GAA unavailable",
-        raw: gaa !== null ? `${gaa.toFixed(2)}` : undefined,
-        unavailable: gaa == null },
+      node({
+        label: "WRKLD", value: g.gamesStarted ?? g.games ?? null, min: 10, max: 65,
+        title: v => `Games started: ${Math.round(v)}`,
+        raw: v => `${Math.round(v)} GS`,
+        absent: "Workload unavailable",
+      }),
+      node({
+        label: "BUSY", value: spg, min: 24, max: 34,
+        title: v => `Shots faced: ${v.toFixed(1)}/game`,
+        raw: v => `${v.toFixed(1)}/gm`,
+        absent: "Shot volume unavailable",
+      }),
+      node({
+        label: "GA/GM", value: gpa, min: 2.0, max: 3.6, invert: true,
+        title: v => `Goals against per appearance: ${v.toFixed(2)}`,
+        raw: v => `${v.toFixed(2)}`,
+        absent: "Goals against unavailable — needs both save % and shot volume",
+      }),
     ],
   };
 }
