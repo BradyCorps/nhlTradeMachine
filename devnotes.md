@@ -615,6 +615,70 @@ name, so a screenful showed about eight players and told you their points.
   cannot reach the NHL roster API: 20 players render in ~830px against ~1370px
   before, and the sort caret tracks the active column.
 
+## Tier 0 — trust repairs (in progress)
+
+Prompted by an external audit (2026-07-30) of STRAND and X-NAV, verified against
+the code line by line. Tier 0 is the subset that is unambiguously wrong rather
+than merely unvalidated: accounting and semantic defects that cost days, not the
+statistical programme that costs months. No coefficient changes.
+
+### T0-1 — the X-NAV accounting identity (complete)
+The dossier and the player card printed a panel headed "Value Breakdown" — OFF,
+DEF, GRAV, AGE, CAP, UPS — under an X-NAV headline those rows could not produce.
+Verified gaps on the live snapshot were +122 (McDavid), +103 (Suzuki), +144
+(Makar). Four separate causes:
+
+- the total is built from `defTotal`; the panel printed `defDisplay`, a different
+  blend computed for the STRAND rails and the role tags;
+- `upside` was `max(0, ageTotal) + teamControlValue` — `ageTotal` is the AGE row,
+  so the panel counted it twice;
+- the positional premium (×1.15 C / ×1.20 top-pair D), development discount,
+  franchise floor and thin-sample credibility regression all move the headline
+  and appeared nowhere;
+- `applyTradeRequestDiscount` subtracted its penalty from `cap` under a comment
+  claiming it did so "so the off/def/age/cap sum invariant holds" — an invariant
+  the engine never had, and a claim that blamed a negotiating haircut on the
+  player's contract.
+
+Two surfaces had already noticed and bolted on a plug row (`total − sum`), which
+closes the arithmetic without naming the difference. An existing canary pinned
+that plug, and the trade-block test asserted "components still sum" while they
+did not — both were pinning the bug.
+
+Fix:
+- `XNAVResult.stages` — an ordered list of signed rows whose sum IS the total,
+  each multiplicative step recorded as the delta it applied. Emitted on every
+  path: skater, goalie, pick, prospect, the prospect→NHL blend, and the
+  post-engine trade-request discount.
+- `app/lib/nav-breakdown.ts` reconciles rounding by largest-remainder
+  apportionment, so displayed integers sum exactly to the displayed headline and
+  every row stays within 1 of its true value.
+- The split is deliberate: rounding is guaranteed at DISPLAY (a reader can never
+  see numbers that do not add up), engine correctness is guaranteed by a TEST
+  (`stageDrift`) — otherwise the reconciler would paper over the very bug class
+  it was written to expose.
+- `__tests__/nav-identity.test.ts` is the test the codebase was missing: 1,600
+  tests and none asserted that the components a reader sees produce the headline
+  beside them. It sweeps 500 random skaters plus every named branch, all goalie
+  roles, all pick rounds/horizons, and the post-engine adjustments. It found two
+  real defects immediately — an early return with no stages, and `blendStages`
+  walking only the established side, which dropped the fading prospect row and
+  left a 238-point hole.
+- Surfaces converted: dossier, PercentileCard (and therefore the PNG export
+  payload), PlayerTimeline, SeasonResultsPager. GmAnalysisTabs' plug column now
+  sums the real adjustment rows and names them in its tooltip.
+- `MetricTip` folds in the stage vocabulary rather than restating it, so one
+  definition of "DEV" or "CRED" serves every surface.
+
+Worth noting from the verified output: an elite starting goalie comes out
+STOP +256, CAP +189, CEIL −195 → 250. The role ceiling was discarding 195 points
+of computed value invisibly, which is why two elite starters tie exactly. Now
+visible as a line item — the fix itself is a Tier 2 modelling decision.
+
+Also found: `XNAVResult` is defined twice, in `trade-types.ts` and
+`xnav-engine.ts`, kept compatible only by hand. Mirrored the new field and
+flagged it; worth collapsing.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

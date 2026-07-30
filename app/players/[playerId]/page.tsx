@@ -20,6 +20,7 @@ import GravityFieldV4 from "@/app/components/GravityFieldV4";
 import PlayerStrandPanel from "@/app/components/PlayerStrandPanel";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
+import { navStageDesc, navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
@@ -122,14 +123,12 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
   const pts = player.ptsPace != null ? Math.round((player.ptsPace / 82) * games) : null;
   const pm = player.plusMinus;
 
-  const navComponents = [
-    { label: "OFF", val: xnav.off },
-    { label: "DEF", val: xnav.def },
-    { label: "GRAV", val: xnav.grav ?? 0 },
-    { label: "AGE", val: xnav.age },
-    { label: "CAP", val: xnav.cap },
-    { label: "UPS", val: xnav.upside },
-  ];
+  // The engine's own waterfall — these sum to the X-NAV printed above them.
+  // The previous list did not: DEF was a descriptive rating rather than the
+  // value in the total, UPS re-counted AGE, and four multiplicative steps that
+  // move the headline appeared nowhere.
+  const navComponents = navStagesForDisplay(xnav.stages, xnav.total)
+    .map(st => ({ label: navStageShort(st.key), val: st.value, desc: navStageDesc(st.key) }));
   const surplus = xnav.fmvAav != null ? xnav.fmvAav - player.capHit : null;
 
   return (

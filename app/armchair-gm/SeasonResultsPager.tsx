@@ -7,6 +7,7 @@ import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
 import { SEASON } from "@/app/lib/season-config";
+import { navStageDesc, navStagesForDisplay } from "@/app/lib/nav-breakdown";
 
 // ── League Numbers — award race + full standings by division ──
 const CONFERENCES: { conf: string; divs: string[] }[] = [
@@ -325,38 +326,35 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                     {isOpen && nav && (
                       <tr style={{ borderBottom: '1px solid #b8a070', background: 'var(--ledger-cream)' }}>
                         <td colSpan={10} className="py-2 px-3">
-                          {/* Valuation breakdown — reconciles to X-NAV. The raw value
-                              drivers (off/def/age/contract) are the pre-adjustment inputs;
-                              Model Adj. is everything the trade model layers on top
-                              (positional scarcity, youth development discount, team-control
-                              upside, and the franchise/prospect floor). The five sum to the
-                              header X-NAV exactly, so nothing is unexplained. */}
+                          {/* Valuation breakdown, straight from the engine's own
+                              waterfall. It used to be four hand-picked components
+                              plus a plug row computed as `total − sum`, which made
+                              the arithmetic close without saying what the difference
+                              was — and printed `nav.def`, a descriptive rating that
+                              is not the figure in the total. Every row is now named
+                              and the sum is exact by construction. */}
                           {(() => {
-                            const componentSum = nav.off + nav.def + nav.age + nav.cap;
-                            const modelAdj = nav.total - componentSum;
-                            const rows: [string, number, string | undefined][] = [
-                              ['Offense', nav.off, undefined],
-                              ['Defense', nav.def, undefined],
-                              ['Age Curve', nav.age, undefined],
-                              ['Contract', nav.cap, undefined],
-                              ['Model Adj.', modelAdj, 'Positional scarcity, youth development discount, team-control upside, and the franchise/prospect floor — everything the trade model applies on top of the raw value drivers.'],
-                            ];
-                            const scale = Math.max(1, ...rows.map(([, v]) => Math.abs(v)));
+                            const rows = navStagesForDisplay(nav.stages, nav.total);
+                            if (rows.length === 0) return null;
+                            const scale = Math.max(1, ...rows.map(r => Math.abs(r.value)));
                             return (
                               <>
                                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-2">
-                                  {rows.map(([label, val, tip]) => (
-                                    <div key={label} title={tip}>
+                                  {rows.map(row => (
+                                    <div key={row.key} title={navStageDesc(row.key)}>
                                       <div className="flex items-baseline justify-between">
-                                        <span className="text-[10px] font-black font-mono uppercase tracking-wider" style={{ color: 'var(--ledger-ink)' }}>{label}</span>
-                                        <span className="text-[11px] font-black font-mono tabular-nums" style={{ color: posNeg(val) }}>
-                                          {val > 0 ? `+${val}` : val}
+                                        <span className="text-[10px] font-black font-mono uppercase tracking-wider"
+                                          style={{ color: row.kind === "adjustment" ? 'var(--ledger-ink-faint)' : 'var(--ledger-ink)' }}>
+                                          {row.label}
+                                        </span>
+                                        <span className="text-[11px] font-black font-mono tabular-nums" style={{ color: posNeg(row.value) }}>
+                                          {row.value > 0 ? `+${row.value}` : row.value}
                                         </span>
                                       </div>
                                       <div className="mt-1 h-1.5 w-full" style={{ background: 'rgba(200,184,144,0.5)', borderRadius: 1 }}>
                                         <div className="h-1.5" style={{
-                                          width: `${Math.min(100, Math.abs(val) / scale * 100)}%`,
-                                          background: val >= 0 ? 'var(--ledger-green)' : 'var(--ledger-red)',
+                                          width: `${Math.min(100, Math.abs(row.value) / scale * 100)}%`,
+                                          background: row.value >= 0 ? 'var(--ledger-green)' : 'var(--ledger-red)',
                                           borderRadius: 1,
                                         }} />
                                       </div>
@@ -364,7 +362,7 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                                   ))}
                                 </div>
                                 <div className="mt-2 text-[10px] font-mono" style={{ color: 'var(--ledger-ink-body, var(--ledger-ink))' }}>
-                                  Off {nav.off >= 0 ? '+' : ''}{nav.off} · Def {nav.def >= 0 ? '+' : ''}{nav.def} · Age {nav.age >= 0 ? '+' : ''}{nav.age} · Contract {nav.cap >= 0 ? '+' : ''}{nav.cap} · Adj {modelAdj >= 0 ? '+' : ''}{modelAdj} = <strong>X-NAV {nav.total}</strong>
+                                  {rows.map(r => `${r.label} ${r.value >= 0 ? '+' : ''}${r.value}`).join(' · ')} = <strong>X-NAV {nav.total}</strong>
                                 </div>
                               </>
                             );

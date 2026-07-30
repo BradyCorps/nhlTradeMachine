@@ -5,6 +5,7 @@
 // EDGE tracking — alongside percentiles vs the positional field.
 import React, { useMemo, useRef, useCallback, useState } from "react";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
+import { navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
 import { calcNAV } from "@/app/lib/xnav-engine";
 import { computeGravity } from "@/app/lib/gravity";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
@@ -235,13 +236,14 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
   const GOOD = "#146a24", BAD = "#9c2b1f", INK = "#1c140a";
   const toneColor = (t: string) => t === "good" ? GOOD : t === "bad" ? BAD : INK;
 
-  const navCells = [
-    { label: "OFF", val: xnav.off, term: "OFF" },
-    { label: "DEF", val: xnav.def, term: "DEF" },
-    { label: "GRAV", val: xnav.grav ?? 0, term: "GRAV" },
-    { label: "AGE", val: xnav.age, term: "YNG" },
-    { label: "CAP", val: xnav.cap, term: "CAP" },
-  ];
+  // The engine's waterfall, which sums to the X-NAV headline. The old fixed
+  // list could not: it printed the descriptive DEF rating instead of the value
+  // in the total, and showed none of the multiplicative steps.
+  const navCells = navStagesForDisplay(xnav.stages, xnav.total).map(st => ({
+    label: navStageShort(st.key),
+    val: st.value,
+    term: navStageShort(st.key),
+  }));
 
   // EDGE tracking strip (PA7) — only rows with real data render
   const edgeCells = [

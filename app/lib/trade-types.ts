@@ -4,6 +4,7 @@
 // ============================================================
 
 import type { DevelopmentProfile } from "@/app/lib/development-profile";
+import type { NavStage } from "@/app/lib/nav-breakdown";
 
 export interface Asset {
   id: string;
@@ -130,12 +131,21 @@ export interface Team {
   prospectPool?: string;
 }
 
+/**
+ * NOTE: this is a structural MIRROR of the interface in `app/lib/xnav-engine.ts`.
+ * Two definitions of the same shape exist because components import from here
+ * and the engine exports its own; they are compatible only as long as someone
+ * keeps them that way. `__tests__/nav-identity.test.ts` pins the field the
+ * accounting identity depends on. Worth collapsing into one definition.
+ */
 export interface XNAVResult {
   total: number;
   off: number;
+  /** Descriptive defensive rating — NOT the defensive value inside `total`. See `stages`. */
   def: number;
   age: number;
   cap: number;
+  /** Descriptive upside signal, not an additive component. Not part of `stages`. */
   upside: number;
   grav?: number;
   fmvAav?: number;
@@ -144,6 +154,8 @@ export interface XNAVResult {
   rosterTier?: RosterTier;
   isRFA?: boolean;
   volatility?: number;
+  /** Signed rows that sum to `total`. See `app/lib/nav-breakdown.ts`. */
+  stages?: NavStage[];
 }
 
 // Modern forward role taxonomy — primary identity label, not an EA-style build.

@@ -1976,9 +1976,14 @@ describe("Canary — sim without a trade + AI best lines", () => {
     const pager = read("app/armchair-gm/SeasonResultsPager.tsx");
     const engine = read("app/lib/xnav-engine.ts");
     const sim = read("app/api/simulate/route.ts");
-    // Breakdown now reconciles: off+def+age+contract+ModelAdj = X-NAV
-    expect(pager).toContain("const modelAdj = nav.total - componentSum");
-    expect(pager).toContain("'Model Adj.'");
+    // The breakdown reconciles to X-NAV, and says WHAT each row is.
+    //
+    // This used to pin the plug implementation: `nav.total - componentSum`
+    // under a row labelled "Model Adj." — which closed the arithmetic without
+    // naming the difference, and pinned the very thing Tier 0 removed. The
+    // guarantee was always "these rows produce the headline"; that is what is
+    // asserted now, and the row-by-row identity lives in nav-identity.test.ts.
+    expect(pager).toContain("navStagesForDisplay(nav.stages, nav.total)");
     expect(pager).toContain("= <strong>X-NAV {nav.total}</strong>");
     // Prospects with no market AAV read ELC, not "$—M"
     expect(pager).toContain("'ELC / n/a'");
@@ -2749,6 +2754,65 @@ describe("Canary — league imagery is allowed on the site, never in the export"
     // until someone writes `data.headshotDataUrl`.
     const lib = readSource("app/lib/card-payload.ts");
     expect(lib).toContain("headshotDataUrl: _discarded");
+  });
+});
+
+// ── Tier 0: the accounting identity ─────────────────────────────────────────
+// The dossier and the card printed a "Value Breakdown" whose rows could not
+// produce the headline above them: DEF was a descriptive rating rather than the
+// figure in the total, UPS re-counted AGE, and four multiplicative steps were
+// invisible. `__tests__/nav-identity.test.ts` proves the ENGINE explains itself;
+// these pin the DISPLAY to that explanation, so no surface can go back to
+// hand-picking components.
+describe("Canary — every value breakdown reconciles to its headline", () => {
+  const BREAKDOWN_SURFACES = [
+    "app/players/[playerId]/page.tsx",
+    "app/components/PercentileCard.tsx",
+    "app/components/PlayerTimeline.tsx",
+    "app/armchair-gm/SeasonResultsPager.tsx",
+  ];
+
+  it("draws every breakdown from the engine's waterfall", () => {
+    for (const f of BREAKDOWN_SURFACES) {
+      expect(readSource(f), f).toContain("navStagesForDisplay");
+    }
+  });
+
+  it("does not hand-pick components beside a total", () => {
+    // The exact shape of the old bug: a literal list of nav fields presented as
+    // a decomposition. `xnav.def` and `xnav.upside` are descriptive and must
+    // never appear in one of these panels again.
+    for (const f of BREAKDOWN_SURFACES) {
+      const src = readSource(f);
+      expect(src, `${f} prints the descriptive DEF rating as a value row`).not.toMatch(/label:\s*"DEF"/);
+      expect(src, `${f} prints upside as a value row`).not.toMatch(/\bnav\.upside\b|\bxnav\.upside\b/);
+    }
+  });
+
+  it("leaves no plug row computed as total minus the parts", () => {
+    // Two surfaces had bolted one on. A plug makes the arithmetic close without
+    // saying what the difference is, which is worse than not adding up.
+    for (const f of BREAKDOWN_SURFACES.concat("app/armchair-gm/GmAnalysisTabs.tsx")) {
+      expect(readSource(f), f).not.toMatch(/total\s*-\s*\(?\s*\w+\.off/);
+    }
+  });
+
+  it("keeps the engine honest about which defensive figure it used", () => {
+    const engine = readSource("app/lib/xnav-engine.ts");
+    expect(engine).toContain('stage("def",');
+    // The total is built from defTotal; defDisplay is the STRAND rating.
+    expect(engine).toContain("trueMarketValue = offTotal + defTotal");
+    expect(engine).toMatch(/stage\("def",\s*"On-ice defence",\s*defTotal\)/);
+  });
+
+  it("charges a trade request to leverage, not to the contract", () => {
+    const engine = readSource("app/lib/xnav-engine.ts");
+    expect(engine).toContain('stage("leverage"');
+    expect(engine).not.toContain("cap: result.cap - penalty");
+  });
+
+  it("states the goalie role ceiling as a row rather than an invisible clamp", () => {
+    expect(readSource("app/lib/xnav-engine.ts")).toContain('stage("roleCeiling"');
   });
 });
 
