@@ -914,6 +914,58 @@ lets a caller find out. The mistake is why the guard exists.
 
 Not wired into `calcGoalieNAV` yet — the artifact and reader land first.
 
+### Skater FMV, fitted to real signings (complete)
+The counterpart to the goalie model, and the consequential one: X-NAV's contract
+stage prices every player in the app, not just goalies.
+
+- 5,455 skater signings in the workbook; **2,265 one-way standard**, of which
+  **2,231 join** to MoneyPuck performance (98.5%). 1,996 survive the prior-sample
+  requirement — 1,297 forwards, 699 defencemen.
+- `scripts/skater-fmv/build.ts` → `app/data/skater-fmv.json` (4.8 KB).
+- **Walk-forward**, same July 2024 boundary: forwards R² 0.643, defencemen
+  R² 0.553, both MAE 0.0136 of the cap = **$1.41M** at $104M.
+
+**Fitted separately by position**, and the reason is not the R²:
+
+| | points/60 | ice time | UFA |
+|---|---:|---:|---:|
+| Forwards | 0.0204 | 0.0897 | 0.0029 |
+| Defence | 0.0159 | 0.1046 | 0.0052 |
+
+A defenceman is paid more for minutes and less for points. Pooling with an
+`isD` intercept shifts the line but forces one slope on both, which is the wrong
+shape; on mean error the pooled and split fits are identical ($1.41M either
+way), so the split is justified by structure, not score. A canary pins
+`D.toi > F.toi` and `D.pts60 < F.pts60` — if that ever stops holding, the split
+has no reason to exist.
+
+**Term excluded, and the reason now REPLICATES.** The goalie fit dropped term
+for endogeneity, on the evidence that including it flipped the UFA coefficient
+negative. The identical pathology appears here on a completely separate
+population: term correlates 0.78 with cap hit, adding it lifts walk-forward R²
+from 0.610 to 0.782, and UFA goes +0.00364 → −0.00119. Two independent
+confirmations of the same artefact is no longer a judgement call.
+
+Sanity at a $104M cap, using in-range percentile profiles:
+
+| forwards | | defence | |
+|---|---|---|---|
+| Superstar (p99) | $10.24M | No.1 D (p99) | $9.58M |
+| Star (p90) | $7.12M | Top-pair (p90) | $6.48M |
+| Top-six (p75) | $5.34M | Top-4 (p75) | $4.95M |
+| Middle-six (p50) | $3.12M | No.4-5 (p50) | $3.20M |
+| Depth (p10) | −$0.21M → floored | Depth (p10) | $0.08M → floored |
+
+**Two mistakes worth recording.** First, I sanity-checked with guessed inputs
+again — 1.05 points/60 as "elite" when the forward median is 1.66 and the max
+4.68 — and briefly believed the model undershot badly. Reading the fitted
+distribution first would have avoided it, exactly as with the goalie GSAx scale.
+Second, `unitForPosition` used `startsWith("D")`, which prices a left
+defenceman (LD) as a forward; caught by its own test and aligned with
+`roster-table.ts`.
+
+Not wired into `calcSkaterNAV` yet.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

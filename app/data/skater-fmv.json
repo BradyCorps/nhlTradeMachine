@@ -1,0 +1,158 @@
+{
+  "schemaVersion": "skater-fmv-v1",
+  "generatedAt": "2026-07-31T16:57:18.948Z",
+  "generationCommand": "npx tsx scripts/skater-fmv/build.ts",
+  "target": {
+    "variable": "capPct",
+    "why": "Fitting the share of the cap removes the era, so a 2018 deal and a 2026 deal are comparable and the app multiplies by whatever ceiling it is pricing against."
+  },
+  "population": {
+    "filter": "skaters, 1-Way, STD — two-way deals are priced against the AHL and entry-level deals are capped by the CBA",
+    "eligibleSignings": 2265,
+    "fitted": 1996,
+    "droppedNoPriorSeason": 34,
+    "droppedThinSample": 235,
+    "signingDates": "2017-07-01 to 2026-07-29",
+    "minPriorIcetimeSeconds": 24000,
+    "lookbackSeasons": 3
+  },
+  "model": {
+    "form": "ordinary least squares per position group, capPct ~ 1 + pts60 + toi + age + ufa",
+    "splitByPosition": "Forwards and defencemen are fitted separately. Pooled scores the same on mean error, but a defenceman is paid more for minutes (toi 0.105 vs 0.090) and less for points (pts60 0.016 vs 0.020), and one shared slope cannot say that.",
+    "features": {
+      "pts60": "Points per sixty minutes of ice over the last 3 finished seasons.",
+      "toi": "Latest finished season's minutes per game against a 20-minute reference, capped at 1.6.",
+      "age": "Age at signing.",
+      "ufa": "1 when signed as an unrestricted free agent, 0 when restricted."
+    },
+    "byPosition": {
+      "F": {
+        "n": 1297,
+        "intercept": -0.029081,
+        "coefficients": {
+          "pts60": 0.018818,
+          "toi": 0.09368,
+          "age": -0.001431,
+          "ufa": 0.003564
+        },
+        "featureDomain": {
+          "pts60": {
+            "min": 0.218785,
+            "p5": 0.928912,
+            "p50": 1.659987,
+            "p95": 2.907569,
+            "max": 4.680835
+          },
+          "toi": {
+            "min": 0.24,
+            "p5": 0.47803,
+            "p50": 0.704879,
+            "p95": 0.965434,
+            "max": 1.236869
+          },
+          "age": {
+            "min": 20,
+            "p5": 22,
+            "p50": 27,
+            "p95": 36,
+            "max": 42
+          },
+          "ufa": {
+            "min": 0,
+            "p5": 0,
+            "p50": 1,
+            "p95": 1,
+            "max": 1
+          }
+        },
+        "validation": {
+          "walkForward": {
+            "trainN": 902,
+            "testN": 395,
+            "r2": 0.6431,
+            "maeCapPct": 0.01355,
+            "maeDollarsAt104MCap": 1.409
+          },
+          "inSample": {
+            "n": 1297,
+            "r2": 0.6659
+          }
+        }
+      },
+      "D": {
+        "n": 699,
+        "intercept": -0.043087,
+        "coefficients": {
+          "pts60": 0.013011,
+          "toi": 0.108239,
+          "age": -0.001295,
+          "ufa": 0.003813
+        },
+        "featureDomain": {
+          "pts60": {
+            "min": 0.155039,
+            "p5": 0.45184,
+            "p50": 0.82504,
+            "p95": 1.65695,
+            "max": 3.166709
+          },
+          "toi": {
+            "min": 0.350833,
+            "p5": 0.638845,
+            "p50": 0.903664,
+            "p95": 1.168705,
+            "max": 1.336972
+          },
+          "age": {
+            "min": 20,
+            "p5": 22,
+            "p50": 27,
+            "p95": 35,
+            "max": 44
+          },
+          "ufa": {
+            "min": 0,
+            "p5": 0,
+            "p50": 1,
+            "p95": 1,
+            "max": 1
+          }
+        },
+        "validation": {
+          "walkForward": {
+            "trainN": 474,
+            "testN": 225,
+            "r2": 0.5529,
+            "maeCapPct": 0.01355,
+            "maeDollarsAt104MCap": 1.409
+          },
+          "inSample": {
+            "n": 699,
+            "r2": 0.6188
+          }
+        }
+      }
+    }
+  },
+  "walkForwardSplit": "2024-07-01",
+  "excludedFeatures": {
+    "term": "Excluded, and the reason replicates the goalie fit exactly. Term correlates 0.78 with cap hit here and lifts walk-forward R² from 0.61 to 0.78 — but it is endogenous, negotiated jointly with AAV, and including it flips the UFA coefficient from +0.0036 to -0.0012, which would mean unrestricted free agents cost less than restricted ones. Two independent populations showing the same artefact is not a judgement call."
+  },
+  "sources": [
+    {
+      "path": "OtherData/HistoricalData/skaters_2008_to_2024.csv",
+      "sha256": "fbb8ab3744d2bf61346fc21547d0dfe0f25999f31b9de86ffbc198d543e8afdc",
+      "bytes": 56643229
+    },
+    {
+      "path": "OtherData/2025_26Data/2025_26_skaters.csv",
+      "sha256": "9a7e1f1a2f6bc8bc2bf10c5ba32947b47c4b26d5397287e4b30e9d662c4966e4",
+      "bytes": 3483132
+    },
+    {
+      "path": "OtherData/contracts/signings.csv",
+      "sha256": "eca9d8ccbd3ecf8641b3086920392e9282da23d02521c9ddfcf9c7ed50705bfb",
+      "bytes": 686180
+    }
+  ]
+}
