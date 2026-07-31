@@ -58,6 +58,12 @@ export const AssetSchema = z.object({
   gsax: z.number().finite().nullish(),
   savePct: z.number().finite().nullish(),
   gamesStarted: z.number().finite().nullish(),
+  // Whether `gamesStarted` is genuinely starts or only appearances, and the
+  // per-60 goals-against figure. Declared rather than left to `.passthrough()`
+  // so they are bounds-checked like everything else the valuation reads.
+  startsKnown: z.boolean().nullish(),
+  gamesPlayed: z.number().finite().nullish(),
+  gaa: z.number().finite().nullish(),
   teamXga60: z.number().finite().nullish(),
   teamHdca60: z.number().finite().nullish(),
   round: z.number().finite().nullish(),

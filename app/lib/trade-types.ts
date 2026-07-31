@@ -4,6 +4,7 @@
 // ============================================================
 
 import type { DevelopmentProfile } from "@/app/lib/development-profile";
+import type { NavStage } from "@/app/lib/nav-breakdown";
 
 export interface Asset {
   id: string;
@@ -52,7 +53,19 @@ export interface Asset {
   isProtected?: boolean;
   gsax?: number;
   savePct?: number;
+  /**
+   * Best available goalie workload — real starts where a source publishes them,
+   * appearances otherwise. `startsKnown` says which. It used to be fed the
+   * MoneyPuck games-played count unconditionally, so relief outings counted as
+   * starts and moved the role ceiling on G-NAV.
+   */
   gamesStarted?: number;
+  /** True when `gamesStarted` is genuinely starts rather than appearances. */
+  startsKnown?: boolean;
+  /** Appearances, including relief. */
+  gamesPlayed?: number | null;
+  /** Goals against per SIXTY MINUTES. Null when ice time was unavailable. */
+  gaa?: number | null;
   shotsPerGame?: number;
   /** NHL EDGE goalie leaderboard appearances (PA3) — board name + rank. */
   goalieEdgeBoards?: { board: string; rank: number }[] | null;
@@ -130,12 +143,21 @@ export interface Team {
   prospectPool?: string;
 }
 
+/**
+ * NOTE: this is a structural MIRROR of the interface in `app/lib/xnav-engine.ts`.
+ * Two definitions of the same shape exist because components import from here
+ * and the engine exports its own; they are compatible only as long as someone
+ * keeps them that way. `__tests__/nav-identity.test.ts` pins the field the
+ * accounting identity depends on. Worth collapsing into one definition.
+ */
 export interface XNAVResult {
   total: number;
   off: number;
+  /** Descriptive defensive rating — NOT the defensive value inside `total`. See `stages`. */
   def: number;
   age: number;
   cap: number;
+  /** Descriptive upside signal, not an additive component. Not part of `stages`. */
   upside: number;
   grav?: number;
   fmvAav?: number;
@@ -144,6 +166,8 @@ export interface XNAVResult {
   rosterTier?: RosterTier;
   isRFA?: boolean;
   volatility?: number;
+  /** Signed rows that sum to `total`. See `app/lib/nav-breakdown.ts`. */
+  stages?: NavStage[];
 }
 
 // Modern forward role taxonomy — primary identity label, not an EA-style build.

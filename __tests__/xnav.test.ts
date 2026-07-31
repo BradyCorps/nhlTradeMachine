@@ -10,6 +10,7 @@
 import { describe, it, expect } from "vitest";
 import { calcNAV, calcDeploymentMultiplier, calcGoalieNAV, calcPickNAV, calcProspectNAV, calcSkaterNAV, currentSeasonWeight, classifyForwardArchetype, classifyRosterTier } from "../app/lib/xnav-engine";
 import { getHistoricalFloor } from "../app/lib/player-data";
+import { stageDrift } from "../app/lib/nav-breakdown";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const inRange = (val: number, min: number, max: number, label: string) => {
@@ -857,8 +858,16 @@ describe("Trade block — leverage discount", () => {
     const penalty = neutral.total - requested.total;
     expect(penalty).toBeLessThanOrEqual(20);
     expect(penalty).toBeGreaterThan(0);
-    // Components still sum: the haircut comes out of the cap strand
-    expect(requested.cap).toBeLessThan(neutral.cap);
+    // The haircut is its own row, not a deduction from the contract.
+    //
+    // This assertion used to read `requested.cap < neutral.cap` under the
+    // comment "components still sum" — which was false twice over: the
+    // components did not sum, and charging a negotiating penalty to the cap
+    // strand said the contract got worse because the player asked out.
+    expect(requested.cap).toBe(neutral.cap);
+    const leverage = requested.stages?.find(st => st.key === "leverage");
+    expect(leverage?.value).toBe(-penalty);
+    expect(Math.abs(stageDrift(requested.stages!, requested.total))).toBeLessThan(1);
   });
 
   it("'available' (being shopped) carries no penalty", () => {

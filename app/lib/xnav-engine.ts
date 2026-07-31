@@ -11,6 +11,7 @@
 //   • Rental discount on age penalty (1yr = 75% reduction, 2yr = 40%)
 
 import { SEASON, LEAGUE, FRANCHISE, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
+import type { NavStage, NavStageKind } from "@/app/lib/nav-breakdown";
 import type { FArchetype } from "@/app/lib/trade-types";
 import { computeGravity } from "@/app/lib/gravity";
 
@@ -84,9 +85,24 @@ export interface AssetInput {
 export interface XNAVResult {
   total:       number;
   off:         number;
+  /**
+   * DESCRIPTIVE defensive rating — NOT the defensive value inside `total`.
+   *
+   * The total uses `defTotal`; this is `defDisplay`, a separate blend of
+   * xGA-relative, DPS and defensive NAV built for the STRAND rails and the
+   * role tags. The two differ, sometimes by a lot. Never put this in a value
+   * breakdown — use `stages`, which carries the figure the total was actually
+   * built from.
+   */
   def:         number;
   age:         number;
   cap:         number;
+  /**
+   * DESCRIPTIVE upside signal, not an additive component. It re-states team
+   * control that already sits inside `cap`. It used to add `ageTotal` on top,
+   * which the AGE row already carried, so a breakdown printing both counted
+   * the same value twice. Not part of `stages`.
+   */
   upside:      number;
   grav?:       number;
   fmvAav?:     number;
@@ -95,7 +111,20 @@ export interface XNAVResult {
   rosterTier?: RosterTier;
   isRFA?:      boolean;
   volatility?: number;
+  /**
+   * The accounting identity: signed rows that sum to `total`.
+   *
+   * Every multiplicative step the engine applies is recorded as the delta it
+   * produced, so the headline is fully explained rather than partly. See
+   * `app/lib/nav-breakdown.ts` for why this exists and how the display rounds
+   * it without breaking the sum.
+   */
+  stages?:     NavStage[];
 }
+
+/** Build a stage, dropping the ones that did not fire. */
+const stage = (key: string, label: string, value: number, kind: NavStageKind = "component"): NavStage =>
+  ({ key, label, value: safe(value), kind });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 export const safe  = (n: number): number => (isNaN(n) || !isFinite(n) ? 0 : n);
@@ -179,7 +208,37 @@ function blendNavResults(lowSample: XNAVResult, established: XNAVResult, establi
     rosterTier: established.rosterTier ?? lowSample.rosterTier,
     isRFA: established.isRFA ?? lowSample.isRFA,
     volatility: Math.max(lowSample.volatility ?? 0, established.volatility ?? 0),
+    stages: blendStages(lowSample, established, w),
   };
+}
+
+/**
+ * Blend two waterfalls into one that still explains the blended total.
+ *
+ * The union of both sides, not just the established one. A prospect crossing
+ * into an NHL sample is a blend of two DIFFERENT decompositions — a single
+ * "prospect value" row on one side, the full skater waterfall on the other —
+ * so a row that exists only on the fading side still carries its share of the
+ * blended total. Walking `established` alone silently dropped it, and the
+ * headline came out hundreds of points larger than its parts.
+ *
+ * Fading rows lead, which is also how the transition reads: what is left of
+ * the draft-pedigree valuation, then the NHL evidence replacing it. Values
+ * stay unrounded; the display reconciler turns them into integers that add up.
+ */
+function blendStages(lowSample: XNAVResult, established: XNAVResult, w: number): NavStage[] | undefined {
+  const low = lowSample.stages, high = established.stages;
+  if (!low || !high) return high ?? low;
+  const highByKey = new Map(high.map(st => [st.key, st]));
+  const lowByKey  = new Map(low.map(st => [st.key, st]));
+  const fading = low.filter(st => !highByKey.has(st.key));
+  return [
+    ...fading.map(st => ({ ...st, value: st.value * (1 - w) })),
+    ...high.map(st => ({
+      ...st,
+      value: (lowByKey.get(st.key)?.value ?? 0) * (1 - w) + st.value * w,
+    })),
+  ];
 }
 
 export type RosterTier =
@@ -400,6 +459,8 @@ export function calcPickNAV(asset: AssetInput): XNAVResult {
     total:  Math.round(pickTotal),
     off: 0, def: 0, age: 0, cap: 0,
     upside: Math.round(pickTotal * upsideFraction),
+    // A pick's value is one number by construction; there is nothing to split.
+    stages: [stage("pick", "Draft-pick value", pickTotal)],
   };
 }
 
@@ -553,7 +614,18 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
     : 0;
 
   const roleCap     = isBackup ? (isAscendingGoalie ? 50 : 35) : isTandem ? (isAscendingGoalie ? 95 : 60) : 250;
-  const cappedTotal = Math.min(Math.max(rawTotal, youngFloor), roleCap);
+  const flooredG    = Math.max(rawTotal, youngFloor);
+  const cappedTotal = Math.min(flooredG, roleCap);
+
+  // The role ceiling is the single most consequential thing the goalie model
+  // does — two starters above 250 come out tied — so the breakdown states it
+  // as a line item rather than leaving it implicit in the headline.
+  const goalieStages: NavStage[] = [
+    stage("impact", "Projected stopping value", fmvTmv),
+    stage("cap",    "Contract surplus",         capTotalG),
+    stage("youngFloor",  "Cost-controlled floor", flooredG - rawTotal,     "adjustment"),
+    stage("roleCeiling", "Role ceiling",          cappedTotal - flooredG,  "adjustment"),
+  ];
   const volatility = Math.round(clamp(
     (1 - confidenceAdj) * 60
       + (gamesG < 50 ? 18 : 8)
@@ -569,6 +641,7 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
     def:    Math.round(safe(goalieImpact * ageFactor)),
     age:    Math.round(-agePenalty),
     cap:    Math.round(capTotalG),
+    stages: goalieStages,
     upside: youngFloor > 0 ? youngFloor * 0.4 : 0,
     fmvAav: currentFmvAavG,
     noivImpact: 0,
@@ -613,6 +686,10 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
       fArchetype: "",
       rosterTier: "BOTTOM_SIX",
       isRFA: asset.age + asset.yearsRemaining <= 27,
+      // Not "no breakdown" — an explicit, empty one. There is no NHL sample and
+      // no draft pedigree here, so a zero is a statement about evidence rather
+      // than a valuation, and the panel should have nothing to draw.
+      stages: [],
     };
   }
 
@@ -950,7 +1027,11 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const isTopPairD       = isD && toi > 22;
   const positionalPremium = asset.position === "C" ? 1.15 : isTopPairD ? 1.20 : 1.0;
   const mult             = asset.multiplier ?? 1.0;
-  const rawTotal         = safe((trueMarketValue + capTotal) * mult * positionalPremium);
+  // Recorded in two steps so the breakdown can name them separately: a
+  // user-set multiplier and the model's own scarcity view are different claims.
+  const preMultiplier    = safe(trueMarketValue + capTotal);
+  const multiplied       = safe(preMultiplier * mult);
+  const rawTotal         = safe(multiplied * positionalPremium);
 
   // ── Development Risk Discount ─────────────────────────────────
   // Young players on ELCs have significant bust probability that the cap surplus
@@ -1077,14 +1158,33 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     ? REPLACEMENT_NAV + (flooredTotal - REPLACEMENT_NAV) * sampleCredibility
     : flooredTotal;
 
+  // ── The accounting identity ───────────────────────────────────
+  // Each row is the delta its step applied, so the sum is `total` by
+  // construction rather than by luck. Note DEF carries `defTotal` — the
+  // figure the total was built from — not the `defDisplay` rating returned
+  // below for the STRAND rails.
+  const stages: NavStage[] = [
+    stage("off",  "On-ice offence",      offTotal),
+    stage("def",  "On-ice defence",      defTotal),
+    stage("age",  "Age curve",           ageTotal),
+    stage("grav", "Gravity",             gravTotal),
+    stage("cap",  "Contract surplus",    capTotal),
+    stage("multiplier", "Asset multiplier",     multiplied - preMultiplier,     "adjustment"),
+    stage("positional", "Positional scarcity",  rawTotal - multiplied,          "adjustment"),
+    stage("development", "Development risk",    discountedTotal - rawTotal,     "adjustment"),
+    stage("franchiseFloor", "Franchise floor",  flooredTotal - discountedTotal, "adjustment"),
+    stage("credibility", "Sample credibility",  total - flooredTotal,           "adjustment"),
+  ];
+
   return {
     total:  Math.round(total),
     off:    Math.round(offTotal),
     def:    Math.round(defDisplay),
     age:    Math.round(ageTotal),
     cap:    Math.round(capTotal),
-    upside: Math.round(Math.max(0, ageTotal) + teamControlValue),
+    upside: Math.round(teamControlValue),
     grav:   Math.round(gravTotal),
+    stages,
     fmvAav: currentFmvAav,
     noivImpact,
     fArchetype,
@@ -1141,20 +1241,32 @@ export function calcProspectNAV(asset: AssetInput): XNAVResult {
     total,
     off: 0, def: 0, age: 0, cap: 0,
     upside: Math.round(total * 0.70),
+    stages: [stage("prospect", "Prospect value", total)],
   };
 }
 
 // ── Trade-request leverage discount ───────────────────────────────────────────
 // A formal, public trade request strips the team of negotiating leverage — the
 // whole league knows they have to move him, so offers come in light. Small
-// haircut on positive value (8%, capped at 20 NAV). Deducted from the cap
-// component so the off/def/age/cap sum invariant holds. Negative-value
-// contracts are unaffected: there is no leverage left to lose.
+// haircut on positive value (8%, capped at 20 NAV). Negative-value contracts
+// are unaffected: there is no leverage left to lose.
+//
+// This used to subtract the penalty from the `cap` component, under a comment
+// claiming it did so "so the off/def/age/cap sum invariant holds" — an
+// invariant the engine did not have, and a claim that quietly misattributed a
+// negotiating haircut to the player's contract. It is its own row now.
 export function applyTradeRequestDiscount(result: XNAVResult, asset: AssetInput): XNAVResult {
   if (asset.tradeBlockStatus !== "requested" || result.total <= 0) return result;
   const penalty = Math.round(Math.min(20, result.total * 0.08));
   if (penalty <= 0) return result;
-  return { ...result, total: result.total - penalty, cap: result.cap - penalty };
+  return {
+    ...result,
+    total: result.total - penalty,
+    stages: [
+      ...(result.stages ?? []),
+      stage("leverage", "Trade-request leverage", -penalty, "adjustment"),
+    ],
+  };
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────

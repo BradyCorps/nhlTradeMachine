@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
-  <title id="title">Cap &amp; Crease one-colour ink mark</title>
-  <desc id="desc">One-colour top-down hockey goal, puck in the net, and right-facing outlined crease framed by brackets.</desc>
-  <path fill="#1c140a" d="M28 20h48v26H52v164h24v26H28l-16-16V36L28 20Z"/>
-    <path fill="#1c140a" d="M228 20h-48v26h24v164h-24v26h48l16-16V36l-16-16Z"/>
-    <path d="M140 70a58 58 0 0 1 0 116V70Z" fill="none" stroke="#1c140a" stroke-width="9" stroke-linejoin="round"/>
-    <path d="M128 82H84v92h44" fill="none" stroke="#1c140a" stroke-width="10" stroke-linecap="square" stroke-linejoin="round"/>
-    <path fill="#1c140a" d="M130 62h10v134h-10z"/>
-    <circle cx="106" cy="146" r="9" fill="#1c140a"/>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 405.39 405.39" role="img" aria-labelledby="one-ink-title one-ink-desc">
+  <title id="one-ink-title">Cap &amp; Crease V3 one-colour ink mark</title>
+  <desc id="one-ink-desc">The V3 mark rendered entirely in warm ink for single-colour reproduction.</desc>
+  <polygon fill="#1c140a" points="107.71 139.52 107.71 116.78 54.66 116.78 34.45 136.99 34.45 273.41 54.66 293.62 112.77 293.62 112.77 270.88 76.14 270.88 67.29 262.04 67.29 148.36 76.14 139.52 107.71 139.52"/>
+<path fill="#1c140a" d="M196.38,149.6v10.22h-43.84c-1.1,0-2.2.19-3.2.64-1.5.68-3.19,2.06-3.26,4.84-.11,4.51-.02,75.27,0,90.73,0,3.93,3.07,7.22,6.99,7.37.06,0,.11,0,.17,0,5.78.13,43.12,0,43.12,0v10.13h-43.61s-17.01-.74-16.93-15.81c.09-15.07,0-92.18,0-92.18,0,0-.33-15.95,14.83-15.94,15.16,0,45.72,0,45.72,0Z"/>
+<rect fill="#1c140a" x="202.7" y="134.47" width="8.84" height="150.31"/>
+<path fill="#1c140a" d="M215.7,280.99c35.82,0,64.86-31.95,64.86-71.36s-29.04-71.36-64.86-71.36v142.73Z"/>
+<circle fill="#1c140a" cx="187.73" cy="245.61" r="9.06"/>
+<polygon fill="#1c140a" points="308.67 139.52 308.67 116.78 361.72 116.78 381.93 136.99 381.93 273.41 361.72 293.62 303.62 293.62 303.62 270.88 340.25 270.88 349.09 262.04 349.09 148.36 340.25 139.52 308.67 139.52"/>
 </svg>

@@ -5,6 +5,7 @@
 // EDGE tracking — alongside percentiles vs the positional field.
 import React, { useMemo, useRef, useCallback, useState } from "react";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
+import { navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
 import { calcNAV } from "@/app/lib/xnav-engine";
 import { computeGravity } from "@/app/lib/gravity";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
@@ -235,13 +236,14 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
   const GOOD = "#146a24", BAD = "#9c2b1f", INK = "#1c140a";
   const toneColor = (t: string) => t === "good" ? GOOD : t === "bad" ? BAD : INK;
 
-  const navCells = [
-    { label: "OFF", val: xnav.off, term: "OFF" },
-    { label: "DEF", val: xnav.def, term: "DEF" },
-    { label: "GRAV", val: xnav.grav ?? 0, term: "GRAV" },
-    { label: "AGE", val: xnav.age, term: "YNG" },
-    { label: "CAP", val: xnav.cap, term: "CAP" },
-  ];
+  // The engine's waterfall, which sums to the X-NAV headline. The old fixed
+  // list could not: it printed the descriptive DEF rating instead of the value
+  // in the total, and showed none of the multiplicative steps.
+  const navCells = navStagesForDisplay(xnav.stages, xnav.total).map(st => ({
+    label: navStageShort(st.key),
+    val: st.value,
+    term: navStageShort(st.key),
+  }));
 
   // EDGE tracking strip (PA7) — only rows with real data render
   const edgeCells = [
@@ -413,9 +415,10 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
 
       {/* Header — paper plate, ink reserved for text (PA7) */}
       <div className="pcard-head">
-        {/* Drawn, not photographed — the exported card carries no league
-            imagery, so nothing in it is anyone else's to take back. */}
-        <PlayerAvatar name={player.name} position={player.position} size={56} />
+        {/* The site may show the league's photo; the exported card may not.
+            That split lives in PlayerAvatar, not here. */}
+        <PlayerAvatar name={player.name} position={player.position} size={56}
+          playerId={player.id} teamId={player.teamId} headshot={player.headshot} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="pcard-name">{player.name}</div>
           <div className="pcard-sub">{teamName ?? player.teamId} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}</div>

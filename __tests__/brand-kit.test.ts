@@ -1,16 +1,21 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { stripComments } from "./support/source";
 
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
 const exists = (p: string) => fs.existsSync(path.join(process.cwd(), p));
 
-const KIT = "docs/cap-and-crease-brand-kit";
+const KIT = "docs/cap-and-crease-brand-kitV3";
 const PUBLIC = "public/brand";
 
 /** Every `d="..."` in an SVG, in document order. */
 const pathData = (svg: string): string[] =>
   [...svg.matchAll(/\sd="([^"]+)"/g)].map(m => m[1]);
+
+/** V3 draws the brackets as polygons, so geometry is not all in `d`. */
+const polygonPoints = (svg: string): string[] =>
+  [...svg.matchAll(/\spoints="([^"]+)"/g)].map(m => m[1]);
 
 describe("brand kit is published to public/", () => {
   it("ships the files the metadata and manifest point at", () => {
@@ -50,10 +55,20 @@ describe("brand kit is published to public/", () => {
 describe("BrandMark matches the kit geometry", () => {
   const component = read("app/components/BrandMark.tsx");
 
+  // Against the CLEAN cut: it is the geometry the component renders, and it is
+  // identical to the textured primary minus the grain overlay.
   it("inlines every path from the primary cut", () => {
-    for (const d of pathData(read(`${PUBLIC}/svg/cap-and-crease-mark-primary.svg`))) {
+    const clean = read(`${PUBLIC}/svg/cap-and-crease-mark-primary-clean.svg`);
+    for (const d of pathData(clean)) {
       expect(component, d.slice(0, 32)).toContain(d);
     }
+  });
+
+  it("inlines both bracket polygons", () => {
+    const clean = read(`${PUBLIC}/svg/cap-and-crease-mark-primary-clean.svg`);
+    const points = polygonPoints(clean);
+    expect(points).toHaveLength(2);
+    for (const p of points) expect(component, p.slice(0, 32)).toContain(p);
   });
 
   it("inlines every path from the small cut", () => {
@@ -62,25 +77,35 @@ describe("BrandMark matches the kit geometry", () => {
     }
   });
 
-  it("carries the kit's five colours and no invented ones", () => {
+  it("carries the kit's colours and no invented ones", () => {
     const hexes = new Set((component.match(/#[0-9a-fA-F]{6}/g) ?? []).map(h => h.toLowerCase()));
     expect(hexes).toEqual(new Set(["#1c140a", "#f2ecd7", "#b83020", "#79afc1"]));
   });
 
-  // "Do not rotate the mark; the red goal is left of the vertical line and the
-  // blue crease always projects right." The goal line sits at x=130 and the
-  // crease starts at x=140, so crease-right is structural, not styling.
+  // "The blue crease always points right." The goal line sits at x=202.7 and
+  // the crease starts at x=215.7, so crease-right is structural, not styling.
   it("keeps the approved orientation", () => {
-    const primary = read(`${PUBLIC}/svg/cap-and-crease-mark-primary.svg`);
-    expect(primary).toContain("M130 62h10v134h-10z");
-    expect(primary).toContain("M140 70a58 58 0 0 1 0 116V70Z");
+    expect(component).toContain('x: 202.7');
+    expect(component).toContain("M215.7,280.99");
     expect(component).not.toContain("rotate(");
   });
 
-  it("omits the puck from the small cut, as the kit specifies", () => {
+  // The gap between the red goal and the red goal line is deliberate: the goal
+  // path ends at x=196.38 and the line begins at 202.7.
+  it("keeps the goal separated from the goal line", () => {
+    expect(component).toContain("M196.38,149.6");
+    expect(component).toContain('x: 202.7');
+  });
+
+  // V3 INVERTED what the small cut drops. It keeps the puck and omits the
+  // brackets; V2 did the opposite. Asserting the old rule would now be
+  // asserting the wrong mark.
+  it("keeps the puck in the small cut and drops the brackets", () => {
     const small = read(`${PUBLIC}/svg/cap-and-crease-mark-small.svg`);
-    expect(small).not.toContain("<circle");
-    expect(read(`${PUBLIC}/svg/cap-and-crease-mark-primary.svg`)).toContain("<circle");
+    expect(small).toContain("<circle");
+    expect(polygonPoints(small)).toHaveLength(0);
+    const clean = read(`${PUBLIC}/svg/cap-and-crease-mark-primary-clean.svg`);
+    expect(polygonPoints(clean)).toHaveLength(2);
   });
 });
 
@@ -261,5 +286,62 @@ describe("no cold navy survives anywhere in the palette", () => {
     const css = read("app/globals.css");
     expect(css).toContain("--ledger-amber:        #8a5c00");
     expect(css).toContain("--amber:        #8a5c00");
+  });
+});
+
+// ── Texture stays off the critical path ──────────────────────────
+//
+// The V3 textured artwork embeds a 1024×1024 paper-grain JPEG as base64: the
+// primary mark is 221 KB and the header lockup 246 KB, against a shared JS
+// bundle of 87 KB. At the sizes the UI actually renders (44px marks, a header
+// lockup) that grain is downsampled past visibility, so the app uses the clean
+// cuts and the textured files stay for large display and exports.
+describe("brand assets on the critical path", () => {
+  const bytes = (p: string) => fs.statSync(path.join(process.cwd(), p)).size;
+
+  it("the header lockup carries no embedded raster", () => {
+    const clean = read(`${PUBLIC}/svg/cap-and-crease-lockup-horizontal-clean.svg`);
+    expect(clean).not.toContain("base64");
+    expect(clean).not.toContain("<image");
+  });
+
+  it("the clean lockup keeps every drawn element of the kit's", () => {
+    // It strips a texture layer, not artwork.
+    const kit = read(`${KIT}/assets/svg/cap-and-crease-lockup-horizontal.svg`);
+    const clean = read(`${PUBLIC}/svg/cap-and-crease-lockup-horizontal-clean.svg`);
+    expect(pathData(clean)).toEqual(pathData(kit));
+    expect(polygonPoints(clean)).toEqual(polygonPoints(kit));
+  });
+
+  it("the header lockup is a fraction of the textured one", () => {
+    const clean = bytes(`${PUBLIC}/svg/cap-and-crease-lockup-horizontal-clean.svg`);
+    const textured = bytes(`${PUBLIC}/svg/cap-and-crease-lockup-horizontal.svg`);
+    expect(clean).toBeLessThan(textured / 5);
+    expect(clean).toBeLessThan(60_000);
+  });
+
+  it("the header does not reference the textured lockup", () => {
+    const header = read("app/components/Header.tsx");
+    expect(header).toContain("cap-and-crease-lockup-horizontal-clean.svg");
+    expect(header).not.toMatch(/lockup-horizontal\.svg/);
+  });
+
+  it("the inlined component carries no base64 payload", () => {
+    // Comments stripped: the component's own note explains why it avoids the
+    // base64 texture, and naming the thing you avoid is not shipping it.
+    expect(stripComments(read("app/components/BrandMark.tsx"))).not.toContain("base64");
+  });
+
+  // The textured artwork is still shipped — this is a routing decision about
+  // the critical path, not a deletion of the user's grain.
+  it("still publishes the textured artwork for large use and export", () => {
+    for (const f of [
+      "svg/cap-and-crease-mark-primary.svg",
+      "svg/cap-and-crease-lockup-horizontal.svg",
+      "png/cap-and-crease-og-1200x630.png",
+    ]) {
+      expect(exists(`${PUBLIC}/${f}`), f).toBe(true);
+    }
+    expect(read(`${PUBLIC}/svg/cap-and-crease-mark-primary.svg`)).toContain("base64");
   });
 });

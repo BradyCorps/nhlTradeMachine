@@ -271,7 +271,8 @@ function PlayerCard({
           {rank}
         </div>
         {(
-          <PlayerAvatar name={p.name} position={p.position} size={36} />
+          <PlayerAvatar name={p.name} position={p.position} size={36}
+            playerId={p.id} teamId={p.teamId} headshot={p.headshot} />
         )}
         <div className="min-w-0">
           <div className="font-mono text-[11px] font-black leading-tight truncate" style={{ color: "var(--ledger-ink)" }}>
@@ -398,7 +399,8 @@ function ExpandedPanel({
       {/* Player identity bar */}
       <div className="flex items-center gap-3 mb-4 pb-3" style={{ borderBottom: "1px solid var(--ledger-rule)" }}>
         {(
-          <PlayerAvatar name={p.name} position={p.position} size={40} />
+          <PlayerAvatar name={p.name} position={p.position} size={40}
+            playerId={p.id} teamId={p.teamId} headshot={p.headshot} />
         )}
         <div className="min-w-0">
           <div className="font-mono text-[13px] font-black leading-tight truncate" style={{ color: "var(--ledger-ink)" }}>

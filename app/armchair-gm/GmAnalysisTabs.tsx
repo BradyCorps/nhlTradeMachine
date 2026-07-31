@@ -1,6 +1,7 @@
 "use client";
 // GM analysis tab deck: lineups, Team DNA, comparison, trade breakdown, sim.
 import React, { useState, useMemo, useEffect, useRef, Suspense, lazy } from "react";
+import { navStagesForDisplay } from "@/app/lib/nav-breakdown";
 import { GM_TAB_FALLBACK, nextTab, visibleTab, type GmTab, type GmTabSpec } from "@/app/lib/gm-tabs";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
@@ -621,7 +622,15 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
               const defRate = a.defRate ?? 0;
               const avgTOI = a.avgTOI ?? 0;
               const capHit = a.capHit ?? 0;
-              const floorAdj = Math.round(xnav.total) - Math.round(xnav.off + xnav.def + xnav.age + xnav.cap);
+              // The engine's own adjustments, summed. This was a plug —
+              // `total − (off + def + age + cap)` — labelled "Franchise/career
+              // floor applied", which was a guess at what the gap was. It is
+              // the actual adjustment rows now, and the tooltip names them.
+              const adjustments = navStagesForDisplay(xnav.stages, xnav.total).filter(st => st.kind === "adjustment");
+              const floorAdj = adjustments.reduce((sum, st) => sum + st.value, 0);
+              const adjTitle = adjustments.length > 0
+                ? adjustments.map(st => `${st.label} ${st.value >= 0 ? "+" : ""}${st.value}`).join(" · ")
+                : "No model adjustments applied";
               return (
                 <tr key={`${a.side}:${tradeAssetKey(a)}`} className={`border-b border-zinc-900 hover:bg-zinc-800/20 transition-colors ${isOut ? "bg-rose-950/5" : "bg-emerald-950/5"}`}>
                   <td className="px-3 py-2">
@@ -652,7 +661,7 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
                     {fmt(xnav.age, 0)}
                   </td>
                   <td className="px-3 py-2 text-rose-500">{xnav.cap.toFixed(0)}</td>
-                  <td className="px-3 py-2 text-amber-500" title="Franchise/career floor applied">
+                  <td className="px-3 py-2 text-amber-500" title={adjTitle}>
                     {Math.abs(floorAdj) >= 1 ? fmt(floorAdj, 0) : "—"}
                   </td>
                 </tr>

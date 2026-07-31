@@ -1,96 +1,83 @@
-// ── Cap & Crease mark ────────────────────────────────────────────
+// ── Cap & Crease mark (V3) ───────────────────────────────────────
 //
-// The kit ships `implementation/BrandMark.tsx`, which renders the SVGs through
-// `next/image`. That would not work here: `next/image` refuses to optimise SVG
-// unless `dangerouslyAllowSVG` is set in next.config, and turning that on for a
-// logo means turning it on for every image the optimiser touches. The marks are
-// ~700 bytes each, so they are inlined instead — no network request, no config
-// flag, and the mark can inherit `currentColor` for the one-colour variants.
+// The authored V3 symbol: editorial brackets, a red goal separated from its
+// goal line, an ice-blue crease projecting right, and the puck inside the net.
+// Geometry is taken verbatim from the kit's `mark-primary-clean.svg` and must
+// not be re-centred, re-spaced or redrawn — the composition is deliberate and
+// the gap between the goal and the goal line is not a mistake.
 //
-// Inlining does create a copy of the kit's path data. `__tests__/brand-kit.test.ts`
-// reads the real SVGs out of `public/brand/svg/` and asserts these paths still
-// match, so regenerating the kit fails loudly instead of leaving the app
-// rendering a superseded mark.
+// WHY THE CLEAN VARIANT AND NOT THE TEXTURED PRIMARY
 //
-// Geometry is fixed by the kit and must not be altered: red goal left of the
-// vertical goal line, blue crease projecting right, puck inside the net. The
-// mark is never rotated.
+// The kit's textured `mark-primary.svg` is 221 KB, of which 218 KB is a
+// base64-embedded 1024×1024 JPEG of paper grain, carrying four vector paths.
+// The app renders its marks at 44px, which downsamples that texture 23:1 — the
+// grain is not perceptible at the size it would be paid for. For scale, the
+// whole shared JS bundle is 87 KB, so the textured header lockup alone would be
+// nearly three times the app's critical-path JavaScript.
+//
+// So the UI uses the clean vector — identical geometry, ~1.3 KB — and the
+// textured files stay in `public/brand/` for the places grain actually reads:
+// large display, the Open Graph card, downloadable art. Nothing about the
+// drawing changes; only whether a grain overlay nobody can see at this size
+// rides on the critical path.
+//
+// The kit's own `implementation/BrandMark.tsx` renders through `next/image`,
+// which cannot work here: `next/image` refuses SVG unless `dangerouslyAllowSVG`
+// is set, and enabling that for a logo enables it for every image the optimiser
+// touches. Inlining also lets the one-colour variants sit on any surface.
+//
+// Inlining copies the kit's path data, so `__tests__/brand-kit.test.ts` reads
+// the real SVGs out of `public/brand/svg/` and asserts these paths still match.
+// Regenerating the kit fails loudly rather than leaving the app on a superseded
+// mark.
 
 import React from "react";
 
 const INK = "#1c140a";
-const PAPER = "#f2ecd7";
+const CREAM = "#f2ecd7";
 const RED = "#b83020";
 const ICE = "#79afc1";
 
 export type BrandMarkVariant = "primary" | "reversed" | "ink" | "cream";
 
 /**
- * Below this the kit's optically-corrected small cut is used instead. It
- * deliberately omits the puck — at 32px and under the puck closes up into the
- * net and reads as a blob.
+ * Below this the kit's optically-corrected small cut is used.
+ *
+ * V3 reversed what the small cut drops. It keeps the goal, goal line, crease
+ * AND puck, and omits the outer BRACKETS — at 32px the brackets thicken into
+ * the ink and the mark reads as a solid block. (V2's small cut dropped the puck
+ * and kept the brackets; that is no longer the rule.)
  */
 export const SMALL_CUT_BELOW = 40;
 
-const BRACKETS = {
-  left: "M28 20h48v26H52v164h24v26H28l-16-16V36L28 20Z",
-  right: "M228 20h-48v26h24v164h-24v26h48l16-16V36l-16-16Z",
-} as const;
+// ── V3 geometry, verbatim from cap-and-crease-mark-primary-clean.svg ─────────
+const FULL_VIEWBOX = "0 0 405.39 405.39";
+/** The goal/crease unit alone — the frame the kit's small mark ships with. */
+const SMALL_VIEWBOX = "126 126 166 166";
 
-const CREASE = "M140 70a58 58 0 0 1 0 116V70Z";
-const NET = "M128 82H84v92h44";
-const GOAL_LINE = "M130 62h10v134h-10z";
+const BRACKET_LEFT =
+  "107.71 139.52 107.71 116.78 54.66 116.78 34.45 136.99 34.45 273.41 54.66 293.62 112.77 293.62 112.77 270.88 76.14 270.88 67.29 262.04 67.29 148.36 76.14 139.52 107.71 139.52";
+const BRACKET_RIGHT =
+  "308.67 139.52 308.67 116.78 361.72 116.78 381.93 136.99 381.93 273.41 361.72 293.62 303.62 293.62 303.62 270.88 340.25 270.88 349.09 262.04 349.09 148.36 340.25 139.52 308.67 139.52";
+const GOAL =
+  "M196.38,149.6v10.22h-43.84c-1.1,0-2.2.19-3.2.64-1.5.68-3.19,2.06-3.26,4.84-.11,4.51-.02,75.27,0,90.73,0,3.93,3.07,7.22,6.99,7.37.06,0,.11,0,.17,0,5.78.13,43.12,0,43.12,0v10.13h-43.61s-17.01-.74-16.93-15.81c.09-15.07,0-92.18,0-92.18,0,0-.33-15.95,14.83-15.94,15.16,0,45.72,0,45.72,0Z";
+const CREASE =
+  "M215.7,280.99c35.82,0,64.86-31.95,64.86-71.36s-29.04-71.36-64.86-71.36v142.73Z";
+/** Separated from the goal on purpose. Do not close the gap. */
+const GOAL_LINE = { x: 202.7, y: 134.47, width: 8.84, height: 150.31 } as const;
+const PUCK = { cx: 187.73, cy: 245.61, r: 9.06 } as const;
 
-/** The 256-unit cut, 40px and up. */
-function PrimaryCut({ variant }: { variant: BrandMarkVariant }) {
-  const monochrome = variant === "ink" || variant === "cream";
-  const frame = variant === "reversed" || variant === "cream" ? PAPER : INK;
-  const puck = variant === "reversed" ? PAPER : monochrome ? frame : INK;
+interface Palette { bracket: string; goal: string; crease: string; puck: string }
 
-  return (
-    <>
-      <path fill={frame} d={BRACKETS.left} />
-      <path fill={frame} d={BRACKETS.right} />
-      {monochrome
-        ? <path d={CREASE} fill="none" stroke={frame} strokeWidth="9" strokeLinejoin="round" />
-        : <path d={CREASE} fill={ICE} />}
-      <path
-        d={NET}
-        fill="none"
-        stroke={monochrome ? frame : RED}
-        strokeWidth="10"
-        strokeLinecap="square"
-        strokeLinejoin="round"
-      />
-      <path fill={monochrome ? frame : RED} d={GOAL_LINE} />
-      <circle cx="106" cy="146" r="9" fill={puck} />
-    </>
-  );
-}
-
-/** The 64-unit cut, under 40px. No puck — see SMALL_CUT_BELOW. */
-function SmallCut({ variant }: { variant: BrandMarkVariant }) {
-  const monochrome = variant === "ink" || variant === "cream";
-  const frame = variant === "reversed" || variant === "cream" ? PAPER : INK;
-
-  return (
-    <>
-      <path fill={frame} d="M7 4h13v7h-6v42h6v7H7l-4-4V8l4-4Z" />
-      <path fill={frame} d="M57 4H44v7h6v42h-6v7h13l4-4V8l-4-4Z" />
-      {monochrome
-        ? <path d="M35 18a14 14 0 0 1 0 28V18Z" fill="none" stroke={frame} strokeWidth="3" strokeLinejoin="round" />
-        : <path d="M35 18a14 14 0 0 1 0 28V18Z" fill={ICE} />}
-      <path
-        d="M32 21H22v22h10"
-        fill="none"
-        stroke={monochrome ? frame : RED}
-        strokeWidth="3"
-        strokeLinecap="square"
-        strokeLinejoin="round"
-      />
-      <path fill={monochrome ? frame : RED} d="M32 16h3v32h-3z" />
-    </>
-  );
+function paletteFor(variant: BrandMarkVariant): Palette {
+  switch (variant) {
+    // Dark surfaces: the ink parts go cream, the red and the ice hold — this
+    // is what the kit's reversed SVG does, not a full recolour.
+    case "reversed": return { bracket: CREAM, goal: RED, crease: ICE, puck: CREAM };
+    case "ink":      return { bracket: INK, goal: INK, crease: INK, puck: INK };
+    case "cream":    return { bracket: CREAM, goal: CREAM, crease: CREAM, puck: CREAM };
+    default:         return { bracket: INK, goal: RED, crease: ICE, puck: INK };
+  }
 }
 
 export function BrandMark({
@@ -110,12 +97,13 @@ export function BrandMark({
   className?: string;
 }) {
   const small = size < SMALL_CUT_BELOW;
+  const c = paletteFor(variant);
 
   return (
     <svg
       width={size}
       height={size}
-      viewBox={small ? "0 0 64 64" : "0 0 256 256"}
+      viewBox={small ? SMALL_VIEWBOX : FULL_VIEWBOX}
       className={className}
       role={title ? "img" : undefined}
       aria-label={title}
@@ -123,7 +111,17 @@ export function BrandMark({
       focusable="false"
     >
       {title && <title>{title}</title>}
-      {small ? <SmallCut variant={variant} /> : <PrimaryCut variant={variant} />}
+      {/* Brackets drop out below SMALL_CUT_BELOW — see the note above. */}
+      {!small && (
+        <>
+          <polygon fill={c.bracket} points={BRACKET_LEFT} />
+          <polygon fill={c.bracket} points={BRACKET_RIGHT} />
+        </>
+      )}
+      <path fill={c.goal} d={GOAL} />
+      <rect fill={c.goal} {...GOAL_LINE} />
+      <path fill={c.crease} d={CREASE} />
+      <circle fill={c.puck} {...PUCK} />
     </svg>
   );
 }

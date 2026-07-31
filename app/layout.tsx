@@ -28,7 +28,7 @@ const courier = Courier_Prime({
 
 export const metadata: Metadata = {
   // Icons, manifest and OG image come from the brand kit
-  // (docs/cap-and-crease-brand-kit/implementation/metadata-snippet.ts), served
+  // (docs/cap-and-crease-brand-kitV3/implementation/metadata-snippet.ts), served
   // out of public/brand. Titles stay driven by BRAND so the name still lives in
   // exactly one place.
   metadataBase: new URL(BRAND.url),

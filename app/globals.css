@@ -128,6 +128,19 @@ button, a, select {
   min-width: 44px;
 }
 
+/* Dense-table controls.
+   `.tap-target`'s 44px is WCAG 2.5.5 (AAA). Applied to a name in a roster
+   table it set the row height on its own — 52px a player, which is most of
+   why the Roster tab read as "too big, shows too little". 2.5.8 (AA) asks
+   24×24, and the row around the control is far wider than that, so this is
+   the AA figure rather than no target at all. */
+.dense-tap {
+  min-height: 24px;
+  min-width: 24px;
+  display: inline-flex;
+  align-items: center;
+}
+
 .armchair-trade-flow {
   display: flex;
   flex-direction: column;

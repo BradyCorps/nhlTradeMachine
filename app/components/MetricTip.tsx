@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useRef, useCallback } from "react";
+import { NAV_STAGE_DESC, NAV_STAGE_SHORT } from "@/app/lib/nav-breakdown";
 
 const GLOSSARY: Record<string, string> = {
   "X-NAV": "Extended Net Asset Value — the Ledger's trade-value model: offense, defense, gravity, age, contract surplus, deployment, and role context.",
@@ -31,6 +32,14 @@ const GLOSSARY: Record<string, string> = {
   "GM Audit": "Checks clauses, cap legality, retention, roster slots, surplus gaps, and timeline fit.",
 };
 
+// The X-NAV waterfall's own vocabulary, folded in rather than restated here —
+// a second copy of "what DEV means" is how two surfaces end up disagreeing.
+// Entries above win, so the existing wording for OFF/DEF/CAP is untouched.
+const STAGE_GLOSSARY: Record<string, string> = Object.fromEntries(
+  Object.entries(NAV_STAGE_SHORT).map(([key, short]) => [short, NAV_STAGE_DESC[key] ?? ""]),
+);
+const lookup = (term: string): string | undefined => GLOSSARY[term] || STAGE_GLOSSARY[term] || undefined;
+
 interface Props {
   term: string;
   children?: React.ReactNode;
@@ -59,7 +68,7 @@ export default function MetricTip({ term, children, className }: Props) {
     timeout.current = setTimeout(() => setShow(false), 150);
   }, []);
 
-  const tip = GLOSSARY[term];
+  const tip = lookup(term);
   if (!tip) return <span className={className}>{children ?? term}</span>;
 
   // Keyboard + screen-reader accessible: the trigger is focusable, opens on

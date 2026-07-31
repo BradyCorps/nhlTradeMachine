@@ -553,6 +553,244 @@ A read-only Codex review of the components + SIM. Correctness/robustness items d
 - Held by choice: #5 (trade-context double-count) — a calibration judgment that
   needs a historical backtest, not a blind code change.
 
+### League imagery restored to the site (complete)
+Owner's call, 2026-07-30: NHL mugshots and club crests are shipped on a public
+asset host, so displaying them from that host is not redistribution. They are
+back on the site; the downloadable PNG still carries none.
+
+- `app/lib/league-imagery.ts` is the only module that names `assets.nhle.com`.
+  It builds mug URLs (`/mugs/nhl/{season}/{TEAM}/{playerId}.png`) and crest URLs
+  (`/logos/nhl/svg/{TEAM}_light.svg`), and returns an ORDERED CANDIDATE LIST
+  rather than a single URL — a mug exists only for the season and club a player
+  actually dressed for, so consumers walk the list on `onError`.
+  - The roster feed's own URL leads where we have one. It stays correct after an
+    Armchair GM trade moves `teamId`, when no mug exists for the new club.
+  - Derived URLs follow: projected season first (`apiSeasonId`), last completed
+    season second. Deduped, since those constants are equal each September.
+  - Name-slug ids (DB-only prospects, bulk FAs) and non-league hosts are dropped
+    rather than requested — a DB row cannot point the page at a third-party
+    image, and a slug never becomes a guaranteed 404.
+- `PlayerAvatar` decides photo-vs-drawn once for the whole site, so AssetCard,
+  PercentileCard, PlayerComparison, CapProjection, TrendingPlayers and the
+  Armchair roster table all gained faces from a single change. The engraved bust
+  is the fallback, not a loading state. A `shape` prop keeps /players and the
+  dossier circular, as they already were.
+- `TeamMark` shows the crest with the three-letter type mark underneath as the
+  fallback, so a club the league has no file for still renders an answer.
+- Fallback index is derived from the candidate list, not held as a bare number,
+  so a virtualised row reused for another player restarts its walk.
+- Export boundary unchanged and now pinned harder: `card-payload.ts` has no
+  image field and discards `headshotDataUrl`; the canaries additionally assert
+  that neither the card-image route nor the payload imports `league-imagery`,
+  and that `playerAvatarSvgMarkup` mentions no photo. The export cannot embed
+  what it has no way to build a URL for.
+- Nothing is proxied or cached. `app/api/headshot` stays deleted.
+
+### Roster tab redesign (complete)
+Flagged 2026-07-30: "too big, shows too little" — ZenGM and PuckPedia read
+better. The old tab was one flat table with a two-line badge block under every
+name, so a screenful showed about eight players and told you their points.
+
+- `app/lib/roster-table.ts` holds the grouping, column sets and sort; the tab
+  draws them and owns nothing but state.
+- Three tables — Forwards / Defence / Goaltenders — each with a subtotal strip
+  (count, points, average age, cap). "The blue line is old and expensive" is now
+  visible without a mental tally. Goalies get GS / SV% / GSAx instead of three
+  zeroes where the scoring goes, and no Pos column, which read "G" every row.
+- New columns the old table had room for and wasn't using: Age, +/-, Term. Term
+  shows years left, or the status a pending FA expires as (never "0y"), or EXT
+  for a signed extension, with NMC/NTC beside it.
+- Sortable headings. Nulls sort last in BOTH directions — a row of dashes must
+  not be promoted by reversing — and the order is total (column, then name,
+  then id) so it cannot jitter. Each unit table sorts independently, since the
+  goalie columns are not the skater columns.
+- Row height 52px → 32px. The cause was `.tap-target` (min-height 44px, WCAG
+  2.5.5 AAA) on the name button setting the row height on its own. Replaced with
+  `.dense-tap` at 24px — the 2.5.8 AA figure — and the clickable row around it is
+  far wider than that.
+- `AssetBadges` gained a `compact` variant: tier and role only, one line. The
+  Ledger strip (awards, injury risk, change of scenery) moved into the expanded
+  row, where there is space for two lines.
+- Verified against fabricated data in a throwaway route, since the sandbox
+  cannot reach the NHL roster API: 20 players render in ~830px against ~1370px
+  before, and the sort caret tracks the active column.
+
+## Tier 0 — trust repairs (in progress)
+
+Prompted by an external audit (2026-07-30) of STRAND and X-NAV, verified against
+the code line by line. Tier 0 is the subset that is unambiguously wrong rather
+than merely unvalidated: accounting and semantic defects that cost days, not the
+statistical programme that costs months. No coefficient changes.
+
+### T0-1 — the X-NAV accounting identity (complete)
+The dossier and the player card printed a panel headed "Value Breakdown" — OFF,
+DEF, GRAV, AGE, CAP, UPS — under an X-NAV headline those rows could not produce.
+Verified gaps on the live snapshot were +122 (McDavid), +103 (Suzuki), +144
+(Makar). Four separate causes:
+
+- the total is built from `defTotal`; the panel printed `defDisplay`, a different
+  blend computed for the STRAND rails and the role tags;
+- `upside` was `max(0, ageTotal) + teamControlValue` — `ageTotal` is the AGE row,
+  so the panel counted it twice;
+- the positional premium (×1.15 C / ×1.20 top-pair D), development discount,
+  franchise floor and thin-sample credibility regression all move the headline
+  and appeared nowhere;
+- `applyTradeRequestDiscount` subtracted its penalty from `cap` under a comment
+  claiming it did so "so the off/def/age/cap sum invariant holds" — an invariant
+  the engine never had, and a claim that blamed a negotiating haircut on the
+  player's contract.
+
+Two surfaces had already noticed and bolted on a plug row (`total − sum`), which
+closes the arithmetic without naming the difference. An existing canary pinned
+that plug, and the trade-block test asserted "components still sum" while they
+did not — both were pinning the bug.
+
+Fix:
+- `XNAVResult.stages` — an ordered list of signed rows whose sum IS the total,
+  each multiplicative step recorded as the delta it applied. Emitted on every
+  path: skater, goalie, pick, prospect, the prospect→NHL blend, and the
+  post-engine trade-request discount.
+- `app/lib/nav-breakdown.ts` reconciles rounding by largest-remainder
+  apportionment, so displayed integers sum exactly to the displayed headline and
+  every row stays within 1 of its true value.
+- The split is deliberate: rounding is guaranteed at DISPLAY (a reader can never
+  see numbers that do not add up), engine correctness is guaranteed by a TEST
+  (`stageDrift`) — otherwise the reconciler would paper over the very bug class
+  it was written to expose.
+- `__tests__/nav-identity.test.ts` is the test the codebase was missing: 1,600
+  tests and none asserted that the components a reader sees produce the headline
+  beside them. It sweeps 500 random skaters plus every named branch, all goalie
+  roles, all pick rounds/horizons, and the post-engine adjustments. It found two
+  real defects immediately — an early return with no stages, and `blendStages`
+  walking only the established side, which dropped the fading prospect row and
+  left a 238-point hole.
+- Surfaces converted: dossier, PercentileCard (and therefore the PNG export
+  payload), PlayerTimeline, SeasonResultsPager. GmAnalysisTabs' plug column now
+  sums the real adjustment rows and names them in its tooltip.
+- `MetricTip` folds in the stage vocabulary rather than restating it, so one
+  definition of "DEV" or "CRED" serves every surface.
+
+Worth noting from the verified output: an elite starting goalie comes out
+STOP +256, CAP +189, CEIL −195 → 250. The role ceiling was discarding 195 points
+of computed value invisibly, which is why two elite starters tie exactly. Now
+visible as a line item — the fix itself is a Tier 2 modelling decision.
+
+Also found: `XNAVResult` is defined twice, in `trade-types.ts` and
+`xnav-engine.ts`, kept compatible only by hand. Mirrored the new field and
+flagged it; worth collapsing.
+
+### T0-2 — STRAND missing-data honesty (complete)
+Half the STRAND nodes greyed out honestly when their source was absent; the
+other half substituted a value that looked measured:
+
+| node | old behaviour | rendered as |
+|------|---------------|-------------|
+| NOIV | `norm(xgRelTM ?? 0, -12, 12)` | 50, no flag |
+| SUPP | `norm(-(xgaRelTM ?? 0), …)` | 50, no flag |
+| QoC  | `(qocIndex ?? 35) / 100` | 35, no flag |
+| DPS  | `dpsNorm ?? norm(nav.def, -60, 150)` | the NAV defensive component — a different quantity on a different scale, same label |
+| GA   | `(1 - svPct) * (spg ?? 30)` | a goals-against figure off an assumed shot rate, to two decimals |
+
+50 is the worst available lie: it reads as "average", which is a finding, rather
+than "we do not know". A player with three real inputs and one with ten rendered
+identically.
+
+- `app/lib/strand-traits.ts` owns node construction. `node()` takes the raw
+  input and decides whether there was one; callers must not pre-substitute
+  (`value: x ?? 0` reintroduces the defect). A real zero counts as data; only
+  null/undefined/NaN/Infinity are absence.
+- Every absent node carries a specific message ("On-ice xG relative to teammates
+  unavailable"), not a bare "unavailable" — a reader should know what to go find.
+- The 0.5 on an unavailable node is geometry, not a reading: `StrandDisplay`
+  greys it and prints "—", but the helix still needs a y-coordinate.
+- Coverage: `strandCoverage` counts measured nodes and the display prints
+  "3 of 8 measured", in red with "too little to characterise this profile" below
+  half. This matters more than the greyed nodes themselves — a thin profile and
+  a full one draw the SAME helix, because the placeholder mid-rail values shape
+  the wave. Verified against a rendered three-profile comparison.
+- `computeRosterStrand` averaged the manufactured values across a roster, so a
+  club with five real NOIV readings out of thirteen produced a number that was
+  mostly eight copies of "unknown" pulled toward the middle. Each trait is now
+  averaged over the players who have it, with `rosterStrandCoverage` reporting
+  how many; `navMap` is no longer read at all.
+- The goalie "GAA" node is relabelled **GA/GM** and requires both save % and
+  shot volume. It is goals per appearance; calling it GAA claimed a per-60
+  figure the data cannot support. The unit question itself is T0-3.
+- `StrandTrait` had two definitions; `StrandDisplay` re-exports the lib's now.
+
+Five canaries were pinning implementation, two of them pinning the bugs
+themselves — one quoted `norm(p.qocIndex ?? 35, 0, 100)` verbatim, locking in
+the default this task removed. All repointed at the guarantee.
+
+NOT fixed here, and still true: OPS/DPS remain SHARES of a player's Point
+Shares, not ability percentiles, so an elite two-way forward's large offence
+still makes his defensive node small. Tooltips now say "share" explicitly. One
+consistent scale across the rails is Tier 1.
+
+### T0-3 — goalie units (complete)
+Two numbers carried the wrong unit.
+
+**Starts were appearances.** `gamesStarted` was fed MoneyPuck's `games_played`,
+so relief outings counted as starts — and that field gates the
+starter/tandem/backup classification, which sets the role ceiling on G-NAV. The
+sharpest form: the assembly fetches the NHL stats API alongside MoneyPuck, the
+NHL feed publishes a real `gamesStarted`, and the merge spread MoneyPuck last —
+so the correct number was retrieved and then overwritten. The NHL fallback
+compounded it with `?? games`.
+
+- MoneyPuck now writes `gamesPlayed` and does not touch `gamesStarted`; the NHL
+  feed's real starts survive the merge.
+- The NHL entry emits starts only when the feed actually supplies them.
+- `resolveWorkload` picks starts where known, appearances otherwise, and returns
+  `startsKnown` so nothing downstream has to guess. `gamesStarted` still carries
+  the best available figure, so no consumer breaks.
+- Labels follow: "52 GS" when they are starts, "55 GP" when they are not. The
+  goalie role tag appends "(N appearances — starts not published by this
+  source)" when it classified on relief-inclusive numbers.
+- This DOES move valuations for goalies whose starts differ from their
+  appearances. That is a data correction, not a tuning change — the field was
+  always meant to hold starts.
+
+**GAA was not GAA.** STRAND computed `(1 - savePct) * shotsPerGame` and labelled
+it goals-against average. That is goals per APPEARANCE; GAA is per sixty
+minutes, and the two diverge by however far an average outing falls short of a
+full game — pulled starts and relief work, exactly the population the number is
+used to judge. It also fell back to an assumed 30 shots per game, so it could be
+fabricated outright and still printed to two decimals.
+
+- The MoneyPuck goalie CSV carries `icetime` in seconds. The assembly already
+  parsed it for the team xGA denominator and then discarded it; it is the
+  denominator real GAA needs. `gaa` is computed at assembly, where the raw
+  goals and ice time are both in hand, and STRAND consumes it.
+- The NHL path prefers the feed's own `goalsAgainstAverage`, else computes from
+  `timeOnIce`.
+- Null when ice time is unavailable — the node greys out (T0-2's machinery).
+
+Worked example from the tests: 40 appearances averaging 40 minutes, 100 goals
+against. Old figure 2.50; real GAA 3.75.
+
+`app/lib/goalie-units.ts` is deliberately distinct from the pre-existing
+`goalie-workload.ts`, which splits a projected season between starter and backup
+inside the sim.
+
+Four canaries repointed, one of them pinning a label this same Tier introduced
+one commit earlier (GA/GM, now correctly GAA).
+
+## Tier 0 complete — what it did and did not do
+Closed: the X-NAV accounting identity, STRAND missing-data honesty, goalie
+units. No coefficient was tuned. Still open and correctly outside Tier 0:
+
+- OPS/DPS are SHARES of Point Shares, not ability percentiles, so an elite
+  two-way forward's defensive node still reads small. One consistent scale is
+  Tier 1.
+- The goalie role ceiling still clamps hard — an elite starter comes out
+  STOP +256, CAP +189, CEIL −195 → 250, so two elite starters tie. It is now a
+  visible line item rather than an invisible one; softening it is Tier 2.
+- No uncertainty anywhere: X-NAV is a point estimate printed as an integer.
+- No out-of-sample validation, no point-in-time training data, hand-picked
+  constants throughout.
+- `XNAVResult` is still defined twice (trade-types.ts and xnav-engine.ts).
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

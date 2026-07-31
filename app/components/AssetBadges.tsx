@@ -7,6 +7,7 @@ import {
   getShutdownDPedigree,
 } from "@/app/lib/player-data";
 import { FRANCHISE } from "@/app/lib/season-config";
+import { resolveWorkload } from "@/app/lib/goalie-units";
 
 const badgeStyle = (color: string, background = "transparent"): React.CSSProperties => ({
   color,
@@ -34,7 +35,12 @@ const isForward = (position: string) => ["C", "W", "L", "R", "F"].includes(posit
 const wingLabel = (position: string) => position === "C" ? "CENTRE" : "WINGER";
 
 function getGoalieRoleTag(asset: Asset, xnav: XNAVResult): { label: string; color: string; title: string } {
-  const starts = asset.gamesStarted ?? asset.games ?? 0;
+  const workload = resolveWorkload({ gamesStarted: asset.gamesStarted, gamesPlayed: asset.gamesPlayed ?? asset.games });
+  const starts = workload.games;
+  // The thresholds below are start counts. When the source publishes only
+  // appearances, the classification is running on relief-inclusive numbers and
+  // the tooltip says so rather than implying a precision we do not have.
+  const caveat = workload.startsKnown ? "" : ` (${workload.games} appearances — starts not published by this source)`;
   const gsax = asset.gsax ?? 0;
   const savePct = asset.savePct ?? 0;
   const eliteSignal = xnav.total >= 100 || gsax >= 10 || savePct >= 0.915;
@@ -43,7 +49,7 @@ function getGoalieRoleTag(asset: Asset, xnav: XNAVResult): { label: string; colo
     return {
       label: "ELITE STARTER",
       color: "var(--ledger-ink)",
-      title: "Elite starter — full starter workload with high-end xNAV, GSAX, or save-percentage signal.",
+      title: `Elite starter — full starter workload with high-end xNAV, GSAX, or save-percentage signal.${caveat}`,
     };
   }
 
@@ -51,7 +57,7 @@ function getGoalieRoleTag(asset: Asset, xnav: XNAVResult): { label: string; colo
     return {
       label: "STARTER",
       color: "var(--ledger-ice)",
-      title: "Starter — primary netminder workload with clear No. 1 usage.",
+      title: `Starter — primary netminder workload with clear No. 1 usage.${caveat}`,
     };
   }
 
@@ -59,7 +65,7 @@ function getGoalieRoleTag(asset: Asset, xnav: XNAVResult): { label: string; colo
     return {
       label: "FRINGE STARTER",
       color: "var(--ledger-green)",
-      title: "Fringe starter — between tandem and No. 1 usage, or valued close to starter territory.",
+      title: `Fringe starter — between tandem and No. 1 usage, or valued close to starter territory.${caveat}`,
     };
   }
 
@@ -67,14 +73,14 @@ function getGoalieRoleTag(asset: Asset, xnav: XNAVResult): { label: string; colo
     return {
       label: "TANDEM",
       color: "var(--ledger-brown)",
-      title: "Tandem goalie — meaningful split workload without clear full-starter usage.",
+      title: `Tandem goalie — meaningful split workload without clear full-starter usage.${caveat}`,
     };
   }
 
   return {
     label: "BACKUP",
     color: "var(--ledger-brown)",
-    title: "Backup goalie — limited workload or depth role.",
+    title: `Backup goalie — limited workload or depth role.${caveat}`,
   };
 }
 
@@ -223,7 +229,19 @@ function getRoleTag(asset: Asset, xnav: XNAVResult): { label: string; color: str
   };
 }
 
-export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult }) {
+export function AssetBadges({ asset, xnav, compact = false }: {
+  asset: Asset;
+  xnav: XNAVResult;
+  /**
+   * One line, tier and role only.
+   *
+   * The Ledger strip below — awards, injury risk, change of scenery — is worth
+   * a second line on a trade card, where you are reading one player. In a
+   * roster table it is what turned every row into three, so the compact form
+   * drops it and the full set moves into the expanded row.
+   */
+  compact?: boolean;
+}) {
   const isPick = asset.position === "Pick";
 
   // NAV-driven franchise tier — same thresholds the GM audit uses (season-config)
@@ -259,7 +277,7 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
     || hasShutdownPedigree;
 
   return (
-    <div className="asset-badges mt-1 flex flex-col gap-1">
+    <div className={compact ? "asset-badges hidden sm:inline-flex shrink-0 items-center gap-1 whitespace-nowrap" : "asset-badges mt-1 flex flex-col gap-1"}>
       <div className="flex flex-wrap items-center gap-1">
         {isMegalodon && (
           <span className="text-2xs font-black rounded-sm" style={iconBadgeStyle("var(--ledger-amber)", "rgba(138,92,0,0.10)")}
@@ -296,7 +314,7 @@ export function AssetBadges({ asset, xnav }: { asset: Asset; xnav: XNAVResult })
         )}
       </div>
 
-      {hasLedger && (
+      {hasLedger && !compact && (
       <div className="flex flex-wrap items-center gap-1 pl-1 border-l" style={{ borderColor: "rgba(107,80,48,0.35)" }}>
       <span className="text-[10px] font-black uppercase text-ledger-ink-faint">Ledger</span>
 

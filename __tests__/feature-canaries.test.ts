@@ -12,6 +12,16 @@ import path from "path";
 import { calcNAV, calcProspectNAV } from "../app/lib/xnav-engine";
 import { parseWikipediaDraftProspects } from "../app/lib/prospect-enrichment";
 import { calcDevelopmentProfile } from "../app/lib/development-profile";
+import { columnsFor, groupRosterRows, sortRosterRows } from "../app/lib/roster-table";
+import type { RosterRow } from "../app/lib/roster-view";
+
+/** A minimal roster row, for the Roster-tab canaries below. */
+const rosterRowFor = (
+  position: string, name = "Player", points = 0, nav: number | null = 0,
+): RosterRow => ({
+  asset: { id: `${name}-${position}`, name, position, teamId: "WPG" } as any,
+  games: 82, goals: 0, assists: 0, points, toi: 15, nav, simulated: false,
+});
 
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
 
@@ -199,7 +209,11 @@ describe("Canary — league route features (source-level)", () => {
         expect(src).toContain("injectedFromDb:   true");
         expect(src).toContain("const hasProspectSignal");
         expect(src).toContain("p.injectedFromDb && !stats && !goalieStats && !hasProspectSignal && !hasFaStatus && p.age >= 24");
-        expect(src).toContain("stats?.games ?? goalieStats?.gamesStarted ?? 0");
+        // A goalie's game count falls back to his goalie stats when the skater
+        // stats map has nothing. Pinned as intent — the expression used to read
+        // `goalieStats?.gamesStarted`, which was appearances wearing the wrong
+        // name; it names `gamesPlayed` now.
+        expect(src).toMatch(/stats\?\.games \?\? goalieStats\?\.gamesPlayed/);
       });
 
       it("enriches known synced prospects before NAV evaluation", () => {
@@ -251,7 +265,20 @@ describe("Canary — league route features (source-level)", () => {
       it("keeps MoneyPuck goalie GSAX ahead of NHL fallback stats", () => {
         expect(src).toContain("const nhlG = NHL_GOALIE_STATS.get(`id:${p.id}`) ?? NHL_GOALIE_STATS.get");
         expect(src).toContain("const mpG  = goalieMap.get");
-        expect(src).toContain("...(nhlG ?? {}), ...(mpG ?? {}), gsax: mpG?.gsax ?? nhlG?.gsax ?? 0");
+        // GSAX: MoneyPuck first. Pinned to that precedence rather than to the
+        // spread expression, which grew per-field rules when starts stopped
+        // being clobbered.
+        expect(src).toContain("gsax: mpG?.gsax ?? nhlG?.gsax ?? 0");
+      });
+
+      it("lets the NHL feed's real starts survive the MoneyPuck merge", () => {
+        // The sharpest form of the bug: the correct starts count was fetched
+        // and then overwritten with MoneyPuck's games-played, because the
+        // spread put MoneyPuck last and MoneyPuck wrote `gamesStarted`.
+        expect(src).toContain("gamesStarted: nhlG?.gamesStarted ?? mpG?.gamesStarted ?? null");
+        // MoneyPuck publishes appearances, and says so.
+        expect(src).toMatch(/gamesPlayed:\s+g,/);
+        expect(src).not.toMatch(/gamesStarted:\s+g,/);
       });
 
       it("does not present expired UFA/RFA contracts as fake one-year ELC deals", () => {
@@ -379,9 +406,22 @@ describe("Canary — engine inputs", () => {
 
 describe("Canary — Team DNA Usage trait", () => {
   it("computeRosterStrand uses qocIndex, not the dead legacy qocRank", () => {
-    const src = read("app/lib/roster-strand.ts");
-    expect(src).not.toContain("qocRank ?? 400");
-    expect(src).toContain("totals.def.Usage += norm(p.qocIndex ?? 35, 0, 100)");
+    // Pinned to the field consumed, not to the expression. The old assertion
+    // quoted `norm(p.qocIndex ?? 35, 0, 100)` verbatim, which locked in the
+    // `?? 35` default that Tier 0 removed — a canary holding a bug in place.
+    const src = readSource("app/lib/roster-strand.ts");
+    expect(src).not.toContain("qocRank");
+    expect(src).toContain("acc.Usage.add(p.qocIndex, 0, 100)");
+  });
+
+  it("averages each trait over the players who have it, not the whole roster", () => {
+    // Thirteen players with five real readings between them used to produce a
+    // mean that was mostly eight copies of "we do not know", pulled to 0.5.
+    const src = readSource("app/lib/roster-strand.ts");
+    expect(src).not.toMatch(/\?\?\s*35\b/);
+    expect(src).not.toMatch(/xnav\?\.def/);
+    expect(src).toContain("measured(value)");
+    expect(src).toContain("export function rosterStrandCoverage");
   });
 });
 
@@ -762,9 +802,13 @@ describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 go
   const docket = read("app/docket/DocketClient.tsx");
 
   it("renderer puts labels on fixed rails with one 0–100 index + faint raw, and an EDGE footer slot", () => {
-    // Trait carries a 0–100 index + a raw sub-line
-    expect(display).toContain("idx?:");
-    expect(display).toContain("raw?:");
+    // Trait carries a 0–100 index + a raw sub-line. The shape lives in
+    // app/lib/strand-traits.ts now — one definition, re-exported here — so the
+    // assertion follows it rather than pinning where it used to sit.
+    const traitShape = read("app/lib/strand-traits.ts");
+    expect(traitShape).toContain("idx?:");
+    expect(traitShape).toContain("raw?:");
+    expect(display).toContain("export type { StrandTrait }");
     expect(display).toContain("Math.round(t.val * 100)");
     // Rails own the top/bottom bands and clamp the wave so peaks never hit the text
     expect(display).toContain("RAIL_ZONE");
@@ -781,14 +825,18 @@ describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 go
 
   it("goalies use a shared 3×3 model with HDSV actually populated (no hardcoded greyed dash)", () => {
     expect(view).toContain("export function buildGoalieStrandTraits");
-    for (const label of ["GSAX", "SV%", "HDSV", "WRKLD", "BUSY", "GAA"]) {
+    // Six nodes, three per rail. The goals-against node is "GA/GM" rather than
+    // "GAA": it is goals per appearance, and calling it GAA claimed a per-60
+    // figure the data cannot support. The count and the rails are the
+    // guarantee; the label is free to be corrected.
+    for (const label of ["GSAX", "SV%", "HDSV", "WRKLD", "BUSY"]) {
       expect(view).toContain(`label: "${label}"`);
     }
+    expect(view).toMatch(/label: "GAA"/);
     // HDSV comes from the real EDGE field, greying out only when truly absent
     expect(view).toContain("baselineHdsvPct");
-    expect(view).toContain("unavailable: hdsvPct == null");
-    // GAA index is inverted so a stingy goalie reads high
-    expect(view).toContain("1 - norm(safe(gaa)");
+    // The goals-against index is inverted so a stingy goalie reads high
+    expect(view).toMatch(/label: "GAA"[\s\S]{0,200}invert: true/);
     // The players page no longer hardcodes HDSV to unavailable
     expect(players).toContain("buildGoalieStrandTraits(player)");
     expect(players).not.toContain('val: 0.5, unavailable: true');
@@ -818,7 +866,7 @@ describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 go
     expect(players).toContain("maxWidth={460}");
     // Ice time reads as minutes, not metres; QoC replaces the vague "Usage";
     // suppression is shown positive (higher = stingier)
-    expect(view).toContain('`${safe(a.avgTOI).toFixed(1)} min`');
+    expect(view).toMatch(/label: "TOI"[\s\S]{0,300}min\/gm/);
     expect(view).toContain('label: "QoC"');
     expect(view).not.toContain('label: "Usage"');
     expect(view).not.toContain('label: "TOI+"');
@@ -1232,7 +1280,9 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(tradePage).toContain("navMap={navMap}");
     expect(lineupEditor).toContain("navMap?: Record<string, NavLike>");
     expect(lineupEditor).toContain("NAV {nav}");
-    expect(lineupEditor).toContain("p?.position ?? \"--\"");
+    // The tile shows a position — now the alternate too, so this pins that a
+    // position is rendered rather than the exact expression that renders it.
+    expect(lineupEditor).toContain('displayPosition(p.position, p.secondaryPosition) : "--"');
     expect(lineupEditor).toContain("minHeight: 50");
     expect(lineupEditor).not.toContain("Click a player, then click another slot");
   });
@@ -1964,9 +2014,14 @@ describe("Canary — sim without a trade + AI best lines", () => {
     const pager = read("app/armchair-gm/SeasonResultsPager.tsx");
     const engine = read("app/lib/xnav-engine.ts");
     const sim = read("app/api/simulate/route.ts");
-    // Breakdown now reconciles: off+def+age+contract+ModelAdj = X-NAV
-    expect(pager).toContain("const modelAdj = nav.total - componentSum");
-    expect(pager).toContain("'Model Adj.'");
+    // The breakdown reconciles to X-NAV, and says WHAT each row is.
+    //
+    // This used to pin the plug implementation: `nav.total - componentSum`
+    // under a row labelled "Model Adj." — which closed the arithmetic without
+    // naming the difference, and pinned the very thing Tier 0 removed. The
+    // guarantee was always "these rows produce the headline"; that is what is
+    // asserted now, and the row-by-row identity lives in nav-identity.test.ts.
+    expect(pager).toContain("navStagesForDisplay(nav.stages, nav.total)");
     expect(pager).toContain("= <strong>X-NAV {nav.total}</strong>");
     // Prospects with no market AAV read ELC, not "$—M"
     expect(pager).toContain("'ELC / n/a'");
@@ -2651,26 +2706,35 @@ describe("ST3 — alternate positions resolve through a normalised key", () => {
 // ── No third-party imagery anywhere ─────────────────────────────────────────
 // Club logos were hotlinked from assets.nhle.com and player photos were inlined
 // into the exported card. The card exists to travel, so that exposure was
-// structural. Both are now drawn from our own type and palette.
-// Policy (owner's call, 2026-07-28): the SITE may hotlink NHL headshots —
-// that displays the league's image from the league's own server, in context.
-// The downloadable PNG may not: baking a copy into a branded file built to be
-// shared is redistribution. These canaries pin that asymmetry. The earlier
-// version of this block claimed the app shipped NO league imagery, which was
-// never true of /players or /press-box — it grepped for hardcoded hostnames
-// and was structurally blind to a URL arriving as data at runtime.
+// structural.
+//
+// Policy (owner's call, 2026-07-28, extended 2026-07-30): the SITE may hotlink
+// NHL headshots AND club logos — that displays the league's image from the
+// league's own server, in context, with nothing copied or rehosted. The
+// downloadable PNG may not: baking a copy into a branded file built to be
+// shared is redistribution. These canaries pin that asymmetry.
+//
+// The earlier version of this block asserted the app shipped NO league imagery,
+// which was never true of /players or /press-box — it grepped for hardcoded
+// hostnames and was structurally blind to a URL arriving as data at runtime.
+// What is actually load-bearing is (a) that URL construction lives in ONE
+// module, so the policy has a single place to change, and (b) that the module
+// is unreachable from the export renderer.
 describe("Canary — league imagery is allowed on the site, never in the export", () => {
-  it("hardcodes no NHL asset host in source", () => {
+  const IMAGERY_LIB = "app/lib/league-imagery.ts";
+
+  it("names the NHL asset host in exactly one module", () => {
     const offenders: string[] = [];
     const walk = (dir: string) => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) { walk(full); continue; }
         if (!/\.(tsx?|jsx?)$/.test(entry.name)) continue;
-        const src = fs.readFileSync(full, "utf8");
-        // The TeamMark component names the host in a comment explaining why.
-        if (src.includes("assets.nhle.com") && !full.endsWith("TeamMark.tsx")) {
-          offenders.push(full);
+        const rel = path.relative(process.cwd(), full);
+        if (rel === IMAGERY_LIB) continue;
+        // Comments discuss the host by name; only real code counts.
+        if (stripComments(fs.readFileSync(full, "utf8")).includes("assets.nhle.com")) {
+          offenders.push(rel);
         }
       }
     };
@@ -2678,28 +2742,226 @@ describe("Canary — league imagery is allowed on the site, never in the export"
     expect(offenders).toEqual([]);
   });
 
+  it("refuses to render an image from anywhere but the league's own host", () => {
+    // A DB row must not be able to point the page at a third-party image.
+    const lib = readSource(IMAGERY_LIB);
+    expect(lib).toContain("isNhlAssetUrl");
+    expect(lib).toContain("isNhlAssetUrl(subject.headshot)");
+  });
+
   it("has no headshot proxy route left to fetch through", () => {
     expect(fs.existsSync(path.join(process.cwd(), "app/api/headshot"))).toBe(false);
   });
 
   it("draws the exported card's player mark instead of embedding one", () => {
-    const route = read("app/api/card-image/route.tsx");
+    const route = readSource("app/api/card-image/route.tsx");
     expect(route).toContain("initialsForCard");
     expect(route).not.toContain("headshotDataUrl");
   });
 
-  it("renders club identity as a text mark", () => {
-    for (const f of ["app/components/LedgerDropdown.tsx", "app/armchair-gm/TeamSelectModal.tsx"]) {
-      expect(read(f), f).toContain("<TeamMark");
+  it("keeps the imagery module unreachable from the export renderer", () => {
+    // The strongest form of the policy: the export cannot embed what it has no
+    // way to build a URL for.
+    for (const f of ["app/api/card-image/route.tsx", "app/lib/card-payload.ts"]) {
+      expect(readSource(f), f).not.toContain("league-imagery");
     }
+  });
+
+  it("keeps the drawn bust available for the export, photo-free", () => {
+    // `playerAvatarSvgMarkup` is what the export draws. It renders outside
+    // React, has no error handler, and must never learn about a photo.
+    const avatar = readSource("app/components/PlayerAvatar.tsx");
+    const markup = avatar.slice(avatar.indexOf("export function playerAvatarSvgMarkup"));
+    expect(markup.length).toBeGreaterThan(0);
+    expect(markup).not.toContain("headshot");
+    expect(markup).not.toContain("<img");
+  });
+
+  it("routes club identity through one component, so the type fallback is everywhere", () => {
+    for (const f of ["app/components/LedgerDropdown.tsx", "app/armchair-gm/TeamSelectModal.tsx"]) {
+      expect(readSource(f), f).toContain("<TeamMark");
+    }
+    // The abbreviation set in type is the answer when no crest resolves — a
+    // broken-image box is not.
+    expect(readSource("app/components/TeamMark.tsx")).toContain("{id}");
   });
 
   it("strips a headshot at the export boundary rather than trusting the renderer", () => {
     // The schema tolerates the key so a stale client bundle isn't rejected,
     // but the validator must discard it — otherwise the policy holds only
     // until someone writes `data.headshotDataUrl`.
-    const lib = read("app/lib/card-payload.ts");
+    const lib = readSource("app/lib/card-payload.ts");
     expect(lib).toContain("headshotDataUrl: _discarded");
+  });
+});
+
+// ── Tier 0: the accounting identity ─────────────────────────────────────────
+// The dossier and the card printed a "Value Breakdown" whose rows could not
+// produce the headline above them: DEF was a descriptive rating rather than the
+// figure in the total, UPS re-counted AGE, and four multiplicative steps were
+// invisible. `__tests__/nav-identity.test.ts` proves the ENGINE explains itself;
+// these pin the DISPLAY to that explanation, so no surface can go back to
+// hand-picking components.
+describe("Canary — every value breakdown reconciles to its headline", () => {
+  const BREAKDOWN_SURFACES = [
+    "app/players/[playerId]/page.tsx",
+    "app/components/PercentileCard.tsx",
+    "app/components/PlayerTimeline.tsx",
+    "app/armchair-gm/SeasonResultsPager.tsx",
+  ];
+
+  it("draws every breakdown from the engine's waterfall", () => {
+    for (const f of BREAKDOWN_SURFACES) {
+      expect(readSource(f), f).toContain("navStagesForDisplay");
+    }
+  });
+
+  it("does not hand-pick components beside a total", () => {
+    // The exact shape of the old bug: a literal list of nav fields presented as
+    // a decomposition. `xnav.def` and `xnav.upside` are descriptive and must
+    // never appear in one of these panels again.
+    for (const f of BREAKDOWN_SURFACES) {
+      const src = readSource(f);
+      expect(src, `${f} prints the descriptive DEF rating as a value row`).not.toMatch(/label:\s*"DEF"/);
+      expect(src, `${f} prints upside as a value row`).not.toMatch(/\bnav\.upside\b|\bxnav\.upside\b/);
+    }
+  });
+
+  it("leaves no plug row computed as total minus the parts", () => {
+    // Two surfaces had bolted one on. A plug makes the arithmetic close without
+    // saying what the difference is, which is worse than not adding up.
+    for (const f of BREAKDOWN_SURFACES.concat("app/armchair-gm/GmAnalysisTabs.tsx")) {
+      expect(readSource(f), f).not.toMatch(/total\s*-\s*\(?\s*\w+\.off/);
+    }
+  });
+
+  it("keeps the engine honest about which defensive figure it used", () => {
+    const engine = readSource("app/lib/xnav-engine.ts");
+    expect(engine).toContain('stage("def",');
+    // The total is built from defTotal; defDisplay is the STRAND rating.
+    expect(engine).toContain("trueMarketValue = offTotal + defTotal");
+    expect(engine).toMatch(/stage\("def",\s*"On-ice defence",\s*defTotal\)/);
+  });
+
+  it("charges a trade request to leverage, not to the contract", () => {
+    const engine = readSource("app/lib/xnav-engine.ts");
+    expect(engine).toContain('stage("leverage"');
+    expect(engine).not.toContain("cap: result.cap - penalty");
+  });
+
+  it("states the goalie role ceiling as a row rather than an invisible clamp", () => {
+    expect(readSource("app/lib/xnav-engine.ts")).toContain('stage("roleCeiling"');
+  });
+});
+
+// ── Tier 0: missing data never renders as a measurement ─────────────────────
+// Half the STRAND nodes greyed out honestly; the other half substituted a value
+// that looked measured — NOIV and SUPP became 50, QoC became 35, and a missing
+// DPS fell back onto the NAV defensive component, a different quantity on a
+// different scale under the same label. 50 is the worst possible lie: it reads
+// as "average", a finding, rather than "we do not know".
+describe("Canary — a STRAND node never invents a reading", () => {
+  const view = readSource("app/components/StrandView.tsx");
+  const lib = readSource("app/lib/strand-traits.ts");
+
+  it("routes every node through the builder that can say 'unavailable'", () => {
+    expect(lib).toContain("export function node");
+    expect(lib).toContain("unavailable: true");
+    // Both trait builders, skater and goalie.
+    expect(view).toContain("export function buildAssetTraits");
+    expect(view).toContain("export function buildGoalieStrandTraits");
+    expect(view.match(/node\(\{/g)?.length ?? 0).toBeGreaterThanOrEqual(14);
+  });
+
+  it("carries none of the specific defaults that manufactured a reading", () => {
+    for (const pattern of [
+      /qocIndex\s*\?\?\s*35/,          // QoC → 35
+      /xgRelTM\s*\?\?\s*0/,            // NOIV → 50
+      /xgaRelTM\s*\?\?\s*0/,           // SUPP → 50
+      /shotsPerGame\s*\?\?\s*30/,      // a fabricated shot rate
+      /spg\s*\?\?\s*30/,
+      /norm\(nav\.def/,                 // DPS → the NAV defensive component
+    ]) {
+      expect(view, String(pattern)).not.toMatch(pattern);
+    }
+  });
+
+  it("treats a real zero as data and absence as absence", () => {
+    // The mirror mistake would be just as wrong: a player who genuinely rates
+    // 0 on a trait must not be greyed out as unmeasured.
+    expect(lib).toContain("v != null && isFinite(v)");
+  });
+
+  it("says which measurement is missing, not merely that one is", () => {
+    // Every node supplies an `absent` string; a bare "unavailable" tells a
+    // reader nothing about what to go and find.
+    const absents = view.match(/absent:\s*"[^"]+"/g) ?? [];
+    expect(absents.length).toBeGreaterThanOrEqual(14);
+    for (const a of absents) expect(a.length).toBeGreaterThan("absent: \"unavailable\"".length);
+  });
+
+  it("counts coverage so a thin profile is visibly thin", () => {
+    // A greyed node says one input is missing. Only a count says most of the
+    // shape is — which is what matters before comparing two players.
+    expect(lib).toContain("export function strandCoverage");
+    expect(readSource("app/components/StrandDisplay.tsx")).toContain("coverageLabel");
+  });
+
+  it("keeps one definition of the trait shape", () => {
+    // StrandDisplay re-exports rather than declaring a second copy.
+    expect(readSource("app/components/StrandDisplay.tsx")).not.toMatch(/export interface StrandTrait/);
+  });
+});
+
+// ── Tier 0: goalie units mean what they say ─────────────────────────────────
+// Two numbers carried the wrong unit. `gamesStarted` was fed MoneyPuck's
+// games-played, so relief outings counted as starts — and that field gates the
+// role ceiling on G-NAV, so it moved valuations. And STRAND's "GAA" was
+// `(1 - savePct) * shotsPerGame`: goals per APPEARANCE, off an assumed shot
+// rate when volume was missing.
+describe("Canary — a goalie stat is the unit it claims", () => {
+  const lib = readSource("app/lib/goalie-units.ts");
+  const assembly = readSource("app/lib/roster-assembly.ts");
+  const view = readSource("app/components/StrandView.tsx");
+
+  it("keeps the unit rules in a tested module", () => {
+    for (const fn of ["goalsAgainstAverage", "resolveWorkload", "workloadLabel"]) {
+      expect(lib, fn).toContain(`export function ${fn}`);
+    }
+  });
+
+  it("computes goals against per sixty minutes, not per appearance", () => {
+    expect(lib).toContain("SECONDS_PER_HOUR");
+    expect(view).not.toMatch(/1 - svPct\)\s*\*/);
+    expect(view).not.toMatch(/spg\s*\?\?\s*30/);
+    // The node reads a precomputed figure rather than deriving one from a rate
+    // it does not have the denominator for.
+    expect(view).toMatch(/label: "GAA"[\s\S]{0,200}per 60 minutes/);
+  });
+
+  it("uses the ice time the assembly already parsed and threw away", () => {
+    expect(assembly).toContain("goalsAgainstAverage(goals, ice)");
+  });
+
+  it("never relabels appearances as starts", () => {
+    // MoneyPuck has no starts column, so it must not write the field.
+    expect(assembly).not.toMatch(/gamesStarted:\s+g,/);
+    expect(assembly).not.toMatch(/g\.gamesStarted \?\? g\.starts \?\? games/);
+    expect(lib).toContain("startsKnown");
+  });
+
+  it("records whether a workload figure is genuinely starts", () => {
+    expect(assembly).toContain("startsKnown:    goalieWorkload.startsKnown");
+    // And the label follows it, rather than always saying GS.
+    expect(lib).toContain('${w.startsKnown ? "GS" : "GP"}');
+  });
+
+  it("says so when a role was classified on appearances", () => {
+    // The classification thresholds are start counts. Running them on
+    // relief-inclusive numbers is sometimes unavoidable; claiming otherwise
+    // is not.
+    expect(readSource("app/components/AssetBadges.tsx")).toContain("resolveWorkload");
+    expect(readSource("app/components/AssetBadges.tsx")).toContain("starts not published by this source");
   });
 });
 
@@ -2974,8 +3236,12 @@ describe("Canary — brand kit implementation", () => {
     // The kit: "The red ampersand is a custom vector. Do not recreate it with
     // a typed &." The old masthead did exactly that, in whatever serif the
     // browser happened to have.
+    // Pinned as intent: the masthead renders the kit's lockup artwork, in
+    // whichever cut. V3 added an untextured variant for the header, so
+    // asserting one exact filename was asserting a delivery choice rather than
+    // the rule the kit actually states.
     const header = read("app/components/Header.tsx");
-    expect(header).toContain("cap-and-crease-lockup-horizontal.svg");
+    expect(header).toMatch(/cap-and-crease-lockup-horizontal(-clean)?\.svg/);
     expect(header).not.toContain("Cap & Crease\n");
   });
 
@@ -3105,6 +3371,68 @@ describe("Canary — Roster and Season Review state which is which", () => {
     const tab = read("app/armchair-gm/RosterTab.tsx");
     expect(tab).toContain("SEASON.label");
     expect(tab).toContain("SEASON.replaySeason");
+  });
+});
+
+// The tab's first form was one flat table with a two-line badge block under
+// every name: tall, thin, and missing the columns a GM opens a roster for.
+// These pin the shape of the redesign, not its markup.
+describe("Canary — the roster reads like a roster page", () => {
+  it("keeps grouping, columns and sort in a tested module", () => {
+    const lib = readSource("app/lib/roster-table.ts");
+    for (const fn of ["unitOf", "groupRosterRows", "sortRosterRows", "nextSort", "unitTotals"]) {
+      expect(lib, fn).toContain(`export function ${fn}`);
+    }
+    expect(readSource("app/armchair-gm/RosterTab.tsx")).toContain("groupRosterRows");
+  });
+
+  it("splits forwards, defence and goaltenders", () => {
+    expect(groupRosterRows([
+      rosterRowFor("C"), rosterRowFor("D"), rosterRowFor("G"),
+    ]).map(g => g.unit)).toEqual(["F", "D", "G"]);
+  });
+
+  it("gives goalies goalie columns instead of zeroes where the scoring goes", () => {
+    const goalie = columnsFor("G").map(c => c.key);
+    const skater = columnsFor("F").map(c => c.key);
+    for (const k of ["svPct", "gsax", "gs"]) expect(goalie, k).toContain(k);
+    for (const k of ["g", "a", "pts", "plusMinus"]) expect(goalie, k).not.toContain(k);
+    for (const k of ["g", "a", "pts"]) expect(skater, k).toContain(k);
+  });
+
+  it("carries the columns the old table was missing", () => {
+    const skater = columnsFor("F").map(c => c.key);
+    for (const k of ["age", "plusMinus", "term"]) expect(skater, k).toContain(k);
+  });
+
+  it("sorts on a total order, so the rows cannot jitter", () => {
+    const rows = [rosterRowFor("C", "Zeta", 40), rosterRowFor("C", "Alpha", 40)];
+    const sort = { key: "pts", direction: "desc" as const };
+    const a = sortRosterRows(rows, sort, columnsFor("F")).map(r => r.asset.name);
+    const b = sortRosterRows([...rows].reverse(), sort, columnsFor("F")).map(r => r.asset.name);
+    expect(a).toEqual(b);
+  });
+
+  it("keeps rows with no value at the bottom whichever way the sort runs", () => {
+    // Reversing must not promote a row of dashes to the top.
+    const rows = [rosterRowFor("C", "Has", 40, 50), rosterRowFor("C", "None", 40, null)];
+    for (const direction of ["asc", "desc"] as const) {
+      const out = sortRosterRows(rows, { key: "nav", direction }, columnsFor("F"));
+      expect(out[out.length - 1].asset.name, direction).toBe("None");
+    }
+  });
+
+  it("shows one line per player, with the full badge ledger in the expansion", () => {
+    // The compact badge strip is what keeps a row one line high; the Ledger
+    // strip (awards, injury, scenery) moved into the expanded panel.
+    const tab = readSource("app/armchair-gm/RosterTab.tsx");
+    expect(tab).toContain("compact");
+    const badges = readSource("app/components/AssetBadges.tsx");
+    expect(badges).toContain("hasLedger && !compact");
+  });
+
+  it("announces the sort rather than only drawing a caret", () => {
+    expect(readSource("app/armchair-gm/RosterTab.tsx")).toContain("aria-sort");
   });
 });
 
@@ -3822,5 +4150,37 @@ describe("Canary — OFF7 AI clubs must live under the cap too", () => {
   it("is deterministic — no RNG decides which trades happened", () => {
     expect(rule).not.toMatch(/Math\.random|mulberry32|rand\(\)/);
     expect(rule).toContain("localeCompare");
+  });
+});
+
+describe("Canary — special-teams sheets are actually editable", () => {
+  const editor = readSource("app/components/LineupEditor.tsx");
+
+  it("offers a bench in PP and PK, not only at even strength", () => {
+    // The bench was gated `situation === "EV"`, so on a unit sheet the only
+    // reachable players were the ones hydrateSpecialTeams happened to place.
+    expect(editor).toContain('situation !== "EV" && (');
+    expect(editor).toContain("stBenchPlayers");
+  });
+
+  it("can put a bench player into a unit slot", () => {
+    // A slot-to-slot swap cannot do this: a bench player has no slot index.
+    expect(editor).toContain("placeFromBench(");
+    expect(editor).toContain("stBenchPick");
+  });
+
+  it("never dresses the same man twice on one unit", () => {
+    expect(editor).toContain("const existing = arr.indexOf(playerId)");
+  });
+
+  it("keeps goalies off the special-teams bench", () => {
+    expect(editor).toContain("!isG(p) && !onSheet.has(p.id)");
+  });
+
+  it("shows the alternate position on the tile, not just in the tooltip", () => {
+    // displayPosition was used in the title attribute and on the EV bench, but
+    // the visible badge printed the primary position alone.
+    const badges = editor.match(/displayPosition\(p\.position, p\.secondaryPosition\)/g) ?? [];
+    expect(badges.length).toBeGreaterThanOrEqual(4);
   });
 });

@@ -6,17 +6,17 @@ import { calcNAV, type AssetInput } from "@/app/lib/xnav-engine";
 import { SEASON, projectedCapCeiling } from "@/app/lib/season-config";
 
 import { navColor, fmtSigned } from "@/app/lib/display-utils";
+import type { XNAVResult } from "@/app/lib/trade-types";
+import { navStageDesc, navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
 
-function NavBreakdown({ nav }: { nav: { off: number; def: number; age: number; cap: number; upside: number; grav?: number; noivImpact?: number } }) {
-  const rows: { label: string; val: number; desc: string }[] = [
-    { label: "OFF", val: nav.off, desc: "Scoring, expected goals, point production" },
-    { label: "DEF", val: nav.def, desc: "Defensive impact, suppression, shutdown value" },
-    { label: nav.age >= 0 ? "YNG" : "AGE", val: nav.age, desc: nav.age >= 0 ? "Youth premium — cost-controlled upside" : "Age curve — decline-phase discount" },
-    { label: "CAP", val: nav.cap, desc: nav.cap >= 0 ? "Contract surplus — paid below market value" : "Contract drag — paid above market value" },
-  ];
-  if (nav.grav != null && Math.abs(nav.grav) >= 1) rows.push({ label: "GRAV", val: nav.grav, desc: nav.grav > 0 ? "Positive Gravity v3 transition-proxy handoff" : "Negative Gravity v3 transition-proxy handoff" });
-  if (nav.upside > 0) rows.push({ label: "UPS", val: nav.upside, desc: "Upside premium — team control and development" });
-  if (nav.noivImpact && Math.abs(nav.noivImpact) >= 2) rows.push({ label: "NOIV", val: nav.noivImpact, desc: nav.noivImpact > 0 ? "Elevates teammates beyond raw stats" : "On-ice context reduces value vs raw stats" });
+// Rows come from the engine's own waterfall and sum to the headline. The old
+// hand-built list did not: it printed `nav.def` (a descriptive rating, not the
+// figure in the total), added UPS on top of AGE which already contained it,
+// and showed none of the multiplicative steps.
+function NavBreakdown({ nav }: { nav: XNAVResult }) {
+  const rows = navStagesForDisplay(nav.stages, nav.total)
+    .map(st => ({ label: navStageShort(st.key), val: st.value, desc: navStageDesc(st.key) }));
+  if (rows.length === 0) return null;
 
   const maxAbs = Math.max(...rows.map(r => Math.abs(r.val)), 1);
 
