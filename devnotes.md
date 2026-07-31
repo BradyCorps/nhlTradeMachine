@@ -791,6 +791,71 @@ units. No coefficient was tuned. Still open and correctly outside Tier 0:
   constants throughout.
 - `XNAVResult` is still defined twice (trade-types.ts and xnav-engine.ts).
 
+### Deploy payload and the goalie population (complete)
+
+**`.vercelignore`.** Every deploy uploaded the whole repository. 254 MB of it
+was material the runtime never opens: 143 MB of source CSVs (inputs to offline
+builders in `scripts/`), 69 MB of tracked repomix dumps, 32 MB of brand kits and
+audit archives. Verified before excluding that no file under `app/` references
+`OtherData`. Deploy payload 284 MB → 29 MB. The repomix dumps were also
+untracked from git — generated, regenerable, stale on the next commit.
+
+**Goalie zero-floor bug.** Oettinger read 0 on the dossier; so did a genuine
+albatross, and so did a goalie with no data. `Math.max(rawTotal, youngFloor)`
+was applied unconditionally and `youngFloor` is 0 for anyone not young and
+cheap, so it was a hard floor at zero for every goalie in the league. Found by
+the T0-1 waterfall — `impact +32, cap -49, youngFloor +17` under a headline of
+0, and a floor row firing on a 27-year-old making $8.25M is not something the
+old five-component panel could have shown. Now -17.
+
+That exposed something the clamp was concealing: the case prices a 50-start
+starter with positive GSAX at an FMV of **$2.71M**, which is low. The contract
+model appears to under-price the position. Not touched — it wants fitting.
+
+**Goalie percentile + stability artifact.** `scripts/goalie-percentiles/build.ts`
+→ `app/data/goalie-percentiles.json` (8 KB, aggregate only, committable).
+Built from the new `OtherData/HistoricalData/goalies_2008_to_2024.csv` plus the
+current season — 1,031 qualifying goalie-seasons, 197 goalies, identical
+36-column schema so they concatenate.
+
+Two windows on purpose: **percentiles** from the last five seasons (goaltending
+drifts; ranking a 2026 goalie against 2008 flatters him for unrelated reasons),
+**stability** from the full 2008-2025 panel (a year-over-year correlation wants
+every consecutive pair it can get).
+
+Year-over-year stability, 769 season pairs:
+
+| metric | r |
+|---|---:|
+| Freeze rate | 0.72 |
+| Rebound control vs expected | 0.69 |
+| High-danger SV% | 0.40 |
+| GAA | 0.34 |
+| SV% | 0.30 |
+| **GSAx/60** | **0.13** |
+| Medium-danger SV% | 0.06 |
+
+**GSAx/60 — what G-NAV is built on — is the least repeatable of the lot**, and
+the two most repeatable things a goalie does (freezing pucks, controlling
+rebounds) are not in the valuation at all. Medium-danger save rate is
+indistinguishable from noise.
+
+`app/lib/goalie-percentiles.ts` consumes it: `goaliePercentile` (oriented so 100
+is always the good end, including for GAA and rebound rate, which run
+backwards), `reliability(key, iceTime)` using `n/(n+k)` with k calibrated so a
+full season reproduces the published r exactly, and `regressedValue` for the
+figure a valuation should actually use.
+
+Not wired into the rails or the engine yet — the artifact and the reader land
+first so the change can be judged on its own.
+
+**Blocked on missing data:** a proper FMV fit needs signings joined to the
+performance available at signing date. `app/data/contracts.bundled.json` is
+current-only — `{capHit, yearsRemaining, hasNMC, hasNTC, canRetain}` — with no
+signing date or original term, so an old $5M deal cannot be expressed as a share
+of the cap when it was signed. A cross-sectional anchor against today's contracts
+is possible but mixes cap eras.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps
