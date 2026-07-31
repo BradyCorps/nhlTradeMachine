@@ -4218,3 +4218,30 @@ describe("Canary — special-teams sheets are actually editable", () => {
     expect(badges.length).toBeGreaterThanOrEqual(4);
   });
 });
+
+describe("Canary — a rookie's baseline must not vouch for itself", () => {
+  // `skater-prior.ts` pools a season against the MoneyPuck multi-season
+  // baseline. How much authority that baseline gets depends on how many
+  // seasons are behind it — a rookie carries 0.50, and that half IS the
+  // current season. Without the weight sum the prior assumes a complete
+  // baseline and hands one year the standing of a career.
+  //
+  // The plumbing crosses three files and nothing type-checks it away: drop the
+  // roster-assembly line and every rookie is quietly over-credited, with no
+  // unit test able to see it.
+  it("the roster reads the weight sum off the baseline", () => {
+    expect(readSource("app/lib/roster-assembly.ts"))
+      .toContain("baselineSeasonsWeighted: baselines.totalSeasonsWeighted");
+  });
+
+  it("the asset carries it and the request schema accepts it", () => {
+    expect(readSource("app/lib/trade-types.ts")).toContain("baselineSeasonsWeighted");
+    expect(readSource("app/lib/evaluate-request-schema.ts")).toContain("baselineSeasonsWeighted");
+  });
+
+  it("the prior spends it rather than ignoring it", () => {
+    const prior = readSource("app/lib/skater-prior.ts");
+    expect(prior).toContain("baselineSeasonsWeighted");
+    expect(prior).toMatch(/baselineEvidence\(input\.baselineSeasonsWeighted\)/);
+  });
+});

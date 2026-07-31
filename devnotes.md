@@ -966,6 +966,82 @@ defenceman (LD) as a forward; caught by its own test and aligned with
 
 Not wired into `calcSkaterNAV` yet.
 
+## Multi-year production prior for skaters
+
+The FMV comparison against the live roster priced Auston Matthews at $8.30M,
+Elias Pettersson at $6.83M and Drew Doughty at $5.18M. All three had just played
+their least representative season. `skater-fmv.ts` reads one year and one year
+only, so a shortened or down season becomes the player.
+
+`app/data/skater-stability.json` (8 KB, `scripts/skater-stability/build.ts`)
+measures how much of a skater-season carries into the next, from 11,702
+skater-seasons over 2008-2025, split F/D because the pricing model is:
+
+| | forwards | defence |
+|---|---:|---:|
+| TOI/game | r = 0.84 | r = 0.80 |
+| Points/60 | r = 0.72 | r = 0.69 |
+| Game Score/60 | r = 0.73 | r = 0.67 |
+
+Set beside GSAx/60 at **r = 0.13**, that is the whole design brief. A skater's
+season is mostly signal where a goalie's is mostly noise, so `skater-prior.ts`
+is a light touch and a full healthy season passes through it unchanged.
+Reaching for the goalie treatment — a 1:2 current-to-career blend — would have
+flattened the league for no reason.
+
+**Why it shrinks toward one full season and not toward the truth.** The obvious
+move is to regress every input toward the population mean by its reliability.
+That is wrong here and quietly so: `skater-fmv.ts` was fitted on raw
+single-season features, so its slopes are already attenuated by exactly that
+noise. Cleaning the inputs and leaving the slopes alone shrinks twice and
+underprices stars. What it does instead is pool the available seasons, then
+shrink only insofar as the pooled sample falls SHORT of the one full season the
+fit was built on — `belief = min(1, reliability(pooled) / r)`. At a full season
+belief is 1 and nothing moves. Above one season it is capped, because the fit
+cannot use inputs cleaner than it was trained on.
+
+The full-season anchor is measured rather than assumed: 1,373 minutes, the
+median load of a skater-season with 70+ games. A skater's full season is not a
+fixed figure the way a starting goalie's 3,500 minutes is.
+
+Effect, at a $104M cap:
+
+| | raw season | pooled | FMV |
+|---|---:|---:|---|
+| Matthews, 67 games, real history | 1.96/60 | 2.43/60 | $7.01M → $7.93M |
+| McDavid, full and consistent | 4.08/60 | 4.03/60 | $11.50M → $11.39M |
+| Fourth liner, full season | 1.20/60 | 1.14/60 | $0.88M → $0.93M |
+| 12-game call-up at 3.01/60 | 3.01/60 | 2.30/60 | $7.22M → $5.95M |
+
+**The bug worth recording.** The first draft discounted the CURRENT season by
+the share of it already inside the MoneyPuck baseline. That reads fine until
+the degenerate case: a rookie whose baseline IS his own fifteen games had his
+current sample zeroed and the baseline credited with 1.35 full seasons — a
+fifteen-game player reported as fully sampled, belief 1.0. The discount belongs
+on the prior, not on the season: only the part of the baseline that is not this
+year counts as evidence. At an overlap share of 1 the prior now contributes
+nothing and the estimate is the current season, thin and labelled thin.
+
+That fix needs `totalSeasonsWeighted`, which the baselines artifact publishes
+but nothing plumbed onto `Asset`. Now threaded through roster-assembly, the
+Asset type and the request schema, with a canary — the wiring crosses three
+files and dropping it silently over-credits every rookie.
+
+**One approximation, stated.** There is no `baselineToiPerGame`, so converting
+`baselinePtsPace` to a per-sixty rate uses the current season's minutes. For a
+player whose role just changed that understates his historical rate. Adding a
+TOI baseline to the MoneyPuck builder is the real fix and is not done here.
+Deployment therefore gets no multi-season prior at all and is shrunk on its own
+sample only; at r = 0.84 a full season moves essentially not at all and a
+fifteen-game sample moves a lot, which is right in both cases.
+
+`scripts/fmv-comparison/run.ts` now prices through the prior, with `--raw` to
+restore single-season pricing and diff the two.
+
+Still not wired into `calcSkaterNAV` — that is the next step, and it needs the
+pre-domain cases (Schaefer at 18, Celebrini at 20 sit at or under the fitted age
+floor of 20) handled first.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

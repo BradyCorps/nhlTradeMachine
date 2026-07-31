@@ -3,6 +3,7 @@
 //   npx tsx scripts/fmv-comparison/run.ts
 //   npx tsx scripts/fmv-comparison/run.ts --limit 40      # shorter tables
 //   npx tsx scripts/fmv-comparison/run.ts --json out.json # machine-readable too
+//   npx tsx scripts/fmv-comparison/run.ts --raw           # skip the multi-year prior
 //
 // WHY THIS EXISTS
 //
@@ -40,6 +41,7 @@ import {
   skaterFmvAav, unitForPosition, isInDomain as skaterInDomain,
   SKATER_FMV_VALIDATION,
 } from "@/app/lib/skater-fmv";
+import { skaterSeasonPrior } from "@/app/lib/skater-prior";
 import {
   goalieFmvAav, isInDomain as goalieInDomain, FMV_VALIDATION as GOALIE_VALIDATION,
 } from "@/app/lib/goalie-fmv";
@@ -66,16 +68,41 @@ interface Row {
   delta: number | null;
   inDomain: boolean;
   nav: number;
+  /** How much of the pooled production estimate survived, 0-1. Skaters only. */
+  belief?: number;
+  /** True when even the pooled sample is short of a full season. */
+  thin?: boolean;
 }
 
-/** Points per sixty MINUTES, which is what the skater model was fitted on. */
-function skaterPts60(a: Asset): number | null {
+/**
+ * The features the skater model wants, pooled across seasons.
+ *
+ * The first run of this script fed the model a raw single season and produced
+ * Matthews at $8.30M off a 67-game year. `skater-prior.ts` pools that season
+ * against the player's multi-season baseline and shrinks a thin sample, which
+ * is what the goalie path already did. `--raw` restores the old behaviour so
+ * the two can be read side by side.
+ */
+const RAW = process.argv.includes("--raw");
+
+function skaterFeatures(a: Asset): { pts60: number | null; minutesPerGame: number | null; belief: number; thin: boolean } {
+  const unit = unitForPosition(a.position);
   const toiPerGame = a.avgTOI;
-  if (!toiPerGame || toiPerGame <= 0) return null;
-  const ptsPer82 = a.ptsPace;
-  if (ptsPer82 == null || !isFinite(ptsPer82)) return null;
-  // pts/82 games ÷ (minutes per game × 82 ÷ 60) = points per sixty minutes.
-  return ptsPer82 / ((toiPerGame * 82) / 60);
+  if (RAW) {
+    const pts60 = toiPerGame && toiPerGame > 0 && a.ptsPace != null && isFinite(a.ptsPace)
+      ? a.ptsPace / ((toiPerGame * 82) / 60)
+      : null;
+    return { pts60, minutesPerGame: toiPerGame ?? null, belief: 1, thin: false };
+  }
+  const p = skaterSeasonPrior({
+    unit,
+    ptsPace: a.ptsPace,
+    minutesPerGame: toiPerGame,
+    games: a.games,
+    baselinePtsPace: a.baselinePtsPace,
+    baselineSeasonsWeighted: (a as any).baselineSeasonsWeighted,
+  });
+  return { pts60: p.pts60, minutesPerGame: p.minutesPerGame, belief: p.belief, thin: p.thin };
 }
 
 async function main() {
@@ -151,10 +178,10 @@ async function main() {
       continue;
     }
 
-    const pts60 = skaterPts60(p);
+    const f = skaterFeatures(p);
     const input = {
-      pts60,
-      minutesPerGame: p.avgTOI,
+      pts60: f.pts60,
+      minutesPerGame: f.minutesPerGame,
       age: p.age,
       isUfa: p.age + (p.yearsRemaining ?? 0) > 27,
       unit: unitForPosition(p.position),
@@ -167,6 +194,7 @@ async function main() {
       delta: engineFmv != null && modelFmv != null ? modelFmv - engineFmv : null,
       inDomain: skaterInDomain(input),
       nav: nav.total,
+      belief: f.belief, thin: f.thin,
     });
   }
 
@@ -192,6 +220,7 @@ async function main() {
     for (const r of big.slice(0, LIMIT)) {
       const flags = [
         !r.inDomain ? "OUT-OF-DOMAIN" : "",
+        r.thin ? `THIN (belief ${r.belief!.toFixed(2)})` : "",
         r.modelFmv != null && r.modelFmv - r.capHit > 3 ? "model says bargain" : "",
         r.modelFmv != null && r.capHit - r.modelFmv > 3 ? "model says overpaid" : "",
       ].filter(Boolean).join(" · ");
@@ -200,8 +229,17 @@ async function main() {
     if (big.length > LIMIT) console.log(`  … ${big.length - LIMIT} more`);
   };
 
-  report("SKATERS — model is NOT wired in; this is what it would do", skaters,
+  report(`SKATERS — model is NOT wired in; this is what it would do${RAW ? " (--raw: no multi-year prior)" : ""}`, skaters,
     (SKATER_FMV_VALIDATION.F.maeCapPct + SKATER_FMV_VALIDATION.D.maeCapPct) / 2);
+
+  if (!RAW) {
+    const withPrior = skaters.filter(r => r.belief != null);
+    const thin = withPrior.filter(r => r.thin).length;
+    const shrunk = withPrior.filter(r => (r.belief ?? 1) < 0.95).length;
+    console.log(`\n  Multi-year prior: ${withPrior.length} skaters pooled, ${thin} still short of a full season,`);
+    console.log(`  ${shrunk} shrunk toward the population by more than 5%. Rerun with --raw to price off`);
+    console.log(`  the single season instead and diff the two.`);
+  }
   report("GOALIES — model IS wired in; engine FMV already reflects it", goalies,
     GOALIE_VALIDATION.maeCapPct);
 

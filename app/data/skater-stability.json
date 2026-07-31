@@ -1,0 +1,270 @@
+{
+  "schemaVersion": "skater-stability-v1",
+  "generatedAt": "2026-07-31T20:14:29.801Z",
+  "generationCommand": "npx tsx scripts/skater-stability/build.ts",
+  "eligibility": {
+    "situation": "all",
+    "minIcetimeSeconds": 18000,
+    "minIcetimeMinutes": 300,
+    "why": "Sweeping 200/300/400 minutes moves every correlation by under 0.03, so this threshold is not carrying the result."
+  },
+  "fullSeason": {
+    "seconds": 82363,
+    "minutes": 1372.7,
+    "basis": "median ice time of skater-seasons with 70+ games played",
+    "n": 5367,
+    "why": "reliability() must equal the published r at one full season. A skater's full season is not a fixed figure the way a starting goalie's is, so it is measured rather than assumed."
+  },
+  "percentileWindow": {
+    "seasons": "2021-2025",
+    "count": 5,
+    "why": "League scoring drifts. Ranking a 2025 forward against 2008 measures the era, not the player."
+  },
+  "stabilityPanel": {
+    "seasons": "2008-2025",
+    "skaterSeasons": 11702,
+    "why": "A year-over-year correlation wants every consecutive pair available; era drift moves the level far more than the repeatability."
+  },
+  "sources": [
+    {
+      "path": "OtherData/HistoricalData/skaters_2008_to_2024.csv",
+      "bytes": 56643229,
+      "sha256": "fbb8ab3744d2bf61346fc21547d0dfe0f25999f31b9de86ffbc198d543e8afdc",
+      "rowsAtSituationAll": 15331
+    },
+    {
+      "path": "OtherData/2025_26Data/2025_26_skaters.csv",
+      "bytes": 3483132,
+      "sha256": "9a7e1f1a2f6bc8bc2bf10c5ba32947b47c4b26d5397287e4b30e9d662c4966e4",
+      "rowsAtSituationAll": 940
+    }
+  ],
+  "byUnit": {
+    "F": {
+      "label": "Forwards",
+      "skaterSeasons": 7503,
+      "players": 1359,
+      "percentileSeasons": 2205,
+      "metrics": {
+        "pts60": {
+          "label": "Points/60",
+          "unit": "points per sixty minutes",
+          "note": "All situations. The production feature the FMV model is fitted on — per SIXTY MINUTES, not per game and not per 82.",
+          "n": 2205,
+          "mean": 1.92179,
+          "sd": 0.790929,
+          "quantiles": {
+            "1": 0.461746,
+            "5": 0.810743,
+            "10": 1.011341,
+            "15": 1.140056,
+            "20": 1.244498,
+            "25": 1.341115,
+            "30": 1.443088,
+            "35": 1.533521,
+            "40": 1.607741,
+            "45": 1.710348,
+            "50": 1.805553,
+            "55": 1.903822,
+            "60": 2.017049,
+            "65": 2.131142,
+            "70": 2.265795,
+            "75": 2.40064,
+            "80": 2.573631,
+            "85": 2.77784,
+            "90": 3.028179,
+            "95": 3.408271,
+            "99": 4.148354
+          },
+          "stability": {
+            "pairs": 5876,
+            "r": 0.7212
+          }
+        },
+        "toiPerGame": {
+          "label": "TOI/game",
+          "unit": "minutes per game",
+          "note": "All situations. The deployment feature — how much a coach trusts him, and the most repeatable thing on this list.",
+          "n": 2205,
+          "mean": 15.100286,
+          "sd": 3.190139,
+          "quantiles": {
+            "1": 8.757055,
+            "5": 10.09447,
+            "10": 10.913509,
+            "15": 11.541216,
+            "20": 12.020606,
+            "25": 12.502957,
+            "30": 12.989795,
+            "35": 13.548007,
+            "40": 14.028623,
+            "45": 14.538016,
+            "50": 15.091239,
+            "55": 15.641523,
+            "60": 16.135488,
+            "65": 16.650572,
+            "70": 17.060691,
+            "75": 17.611523,
+            "80": 18.174187,
+            "85": 18.722058,
+            "90": 19.350546,
+            "95": 20.238178,
+            "99": 21.496341
+          },
+          "stability": {
+            "pairs": 5876,
+            "r": 0.8449
+          }
+        },
+        "gameScore60": {
+          "label": "Game Score/60",
+          "unit": "game score per sixty minutes",
+          "note": "MoneyPuck's all-in-one rate. Not used in pricing — published so a future feature can be judged on repeatability before it is trusted.",
+          "n": 2205,
+          "mean": 1.913255,
+          "sd": 0.986435,
+          "quantiles": {
+            "1": -0.139236,
+            "5": 0.377773,
+            "10": 0.696767,
+            "15": 0.901398,
+            "20": 1.065774,
+            "25": 1.221716,
+            "30": 1.350558,
+            "35": 1.46979,
+            "40": 1.612108,
+            "45": 1.741606,
+            "50": 1.867658,
+            "55": 1.9698,
+            "60": 2.104401,
+            "65": 2.271118,
+            "70": 2.433204,
+            "75": 2.589862,
+            "80": 2.73461,
+            "85": 2.934181,
+            "90": 3.178886,
+            "95": 3.61624,
+            "99": 4.419758
+          },
+          "stability": {
+            "pairs": 5876,
+            "r": 0.7269
+          }
+        }
+      }
+    },
+    "D": {
+      "label": "Defence",
+      "skaterSeasons": 4199,
+      "players": 772,
+      "percentileSeasons": 1210,
+      "metrics": {
+        "pts60": {
+          "label": "Points/60",
+          "unit": "points per sixty minutes",
+          "note": "All situations. The production feature the FMV model is fitted on — per SIXTY MINUTES, not per game and not per 82.",
+          "n": 1210,
+          "mean": 0.991908,
+          "sd": 0.485924,
+          "quantiles": {
+            "1": 0.183735,
+            "5": 0.384584,
+            "10": 0.479975,
+            "15": 0.555282,
+            "20": 0.603864,
+            "25": 0.652841,
+            "30": 0.706016,
+            "35": 0.755859,
+            "40": 0.807903,
+            "45": 0.855872,
+            "50": 0.892841,
+            "55": 0.946552,
+            "60": 0.997706,
+            "65": 1.052646,
+            "70": 1.128326,
+            "75": 1.225024,
+            "80": 1.345353,
+            "85": 1.452462,
+            "90": 1.64331,
+            "95": 2.000756,
+            "99": 2.53453
+          },
+          "stability": {
+            "pairs": 3278,
+            "r": 0.692
+          }
+        },
+        "toiPerGame": {
+          "label": "TOI/game",
+          "unit": "minutes per game",
+          "note": "All situations. The deployment feature — how much a coach trusts him, and the most repeatable thing on this list.",
+          "n": 1210,
+          "mean": 18.928967,
+          "sd": 3.450649,
+          "quantiles": {
+            "1": 11.863992,
+            "5": 13.308599,
+            "10": 14.46863,
+            "15": 15.089434,
+            "20": 15.735228,
+            "25": 16.326146,
+            "30": 16.783671,
+            "35": 17.301006,
+            "40": 17.822265,
+            "45": 18.552897,
+            "50": 18.986036,
+            "55": 19.480466,
+            "60": 19.864088,
+            "65": 20.564323,
+            "70": 21.025526,
+            "75": 21.472758,
+            "80": 22.094854,
+            "85": 22.858814,
+            "90": 23.525901,
+            "95": 24.636838,
+            "99": 25.735292
+          },
+          "stability": {
+            "pairs": 3278,
+            "r": 0.8021
+          }
+        },
+        "gameScore60": {
+          "label": "Game Score/60",
+          "unit": "game score per sixty minutes",
+          "note": "MoneyPuck's all-in-one rate. Not used in pricing — published so a future feature can be judged on repeatability before it is trusted.",
+          "n": 1210,
+          "mean": 1.081387,
+          "sd": 0.712674,
+          "quantiles": {
+            "1": -0.365374,
+            "5": 0.014932,
+            "10": 0.221328,
+            "15": 0.379237,
+            "20": 0.482352,
+            "25": 0.570926,
+            "30": 0.663919,
+            "35": 0.763072,
+            "40": 0.848873,
+            "45": 0.936886,
+            "50": 1.025441,
+            "55": 1.111565,
+            "60": 1.181087,
+            "65": 1.27071,
+            "70": 1.39673,
+            "75": 1.535663,
+            "80": 1.670731,
+            "85": 1.843322,
+            "90": 2.043955,
+            "95": 2.35331,
+            "99": 2.991263
+          },
+          "stability": {
+            "pairs": 3278,
+            "r": 0.6673
+          }
+        }
+      }
+    }
+  }
+}

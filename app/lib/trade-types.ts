@@ -91,6 +91,15 @@ export interface Asset {
   baselinePtsPace?: number;
   baselineGameScore?: number;
   baselineDpsProxy?: number;
+  /**
+   * Sum of the season weights behind those baselines, 0-1.
+   *
+   * How much history the baseline actually rests on. A rookie carries 0.50 —
+   * and that half is the current season, so his baseline is not independent
+   * evidence about him. `skater-prior.ts` needs this to avoid letting one
+   * season vouch for itself.
+   */
+  baselineSeasonsWeighted?: number;
 
   // Multi-season situational baselines (MoneyPuck per-season + NST 2022-26)
   baselineXgRel?: number;
