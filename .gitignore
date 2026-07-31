@@ -51,8 +51,10 @@ local.db
 repomix-output.*
 
 # ── Large source datasets ────────────────────────────────────────
-# Removed from git history 2026-07-31; they were 129 MB of the pack and the
-# runtime never opens them. They are INPUTS to the offline builders in
+# Removed from git history 2026-07-31. 197 MB of raw blobs, though only about
+# 10 MB of the packfile — CSVs compress hard, so the clone saving is far smaller
+# than the file sizes suggest. The reason to remove them is that the runtime
+# never opens them and they grow with every revision, not the one-time size. They are INPUTS to the offline builders in
 # scripts/, and the artifacts those builders produce are committed instead
 # (app/data/*.json), each recording the sha256 of the source it was built from.
 #
