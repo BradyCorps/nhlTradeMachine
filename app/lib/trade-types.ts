@@ -66,6 +66,9 @@ export interface Asset {
   gamesPlayed?: number | null;
   /** Goals against per SIXTY MINUTES. Null when ice time was unavailable. */
   gaa?: number | null;
+  /** Goalie ice time in the season, seconds. The denominator behind gaa and the
+   *  sample size the fitted FMV model regresses against. */
+  iceTimeSeconds?: number | null;
   shotsPerGame?: number;
   /** NHL EDGE goalie leaderboard appearances (PA3) — board name + rank. */
   goalieEdgeBoards?: { board: string; rank: number }[] | null;

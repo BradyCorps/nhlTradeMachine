@@ -733,6 +733,7 @@ async function fetchNhlGoalieStatsFallback(): Promise<Map<string, any>> {
         gamesStarted: isFinite(rawStarts) && rawStarts > 0 ? rawStarts : null,
         // The feed publishes GAA directly; fall back to computing it from ice
         // time. Either way it is per sixty minutes.
+        iceTime: isFinite(nhlToi) && nhlToi > 0 ? nhlToi : null,
         gaa: Number.isFinite(Number(g.goalsAgainstAverage))
           ? Number(g.goalsAgainstAverage)
           : goalsAgainstAverage(goalsAgainst, isFinite(nhlToi) ? nhlToi : null),
@@ -1224,6 +1225,7 @@ export async function assembleCanonicalRoster(options: {
                 gamesStarted: nhlG?.gamesStarted ?? mpG?.gamesStarted ?? null,
                 gamesPlayed: mpG?.gamesPlayed ?? nhlG?.gamesPlayed ?? null,
                 gaa: mpG?.gaa ?? nhlG?.gaa ?? null,
+                iceTime: mpG?.iceTime ?? nhlG?.iceTime ?? null,
               }
             : null)
         : null;
@@ -1400,6 +1402,7 @@ export async function assembleCanonicalRoster(options: {
         startsKnown:    goalieWorkload.startsKnown,
         gamesPlayed:    goalieStats?.gamesPlayed ?? null,
         gaa:            goalieStats?.gaa ?? null,
+        iceTimeSeconds: goalieStats?.iceTime ?? null,
         shotsPerGame:   goalieStats?.shotsPerGame  ?? 0,
         goalieEdgeBoards: finalPosition === "G" ? (goalieBoards.get(String(p.id)) ?? null) : null,
         teamXga60,

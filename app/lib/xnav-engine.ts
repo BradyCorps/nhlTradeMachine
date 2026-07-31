@@ -12,6 +12,8 @@
 
 import { SEASON, LEAGUE, FRANCHISE, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
 import type { NavStage, NavStageKind } from "@/app/lib/nav-breakdown";
+import { goalieFmvCapPct, LEAGUE_MINIMUM_CAP_PCT as GOALIE_LEAGUE_MIN_CAP_PCT } from "@/app/lib/goalie-fmv";
+import { reliability } from "@/app/lib/goalie-percentiles";
 import type { FArchetype } from "@/app/lib/trade-types";
 import { computeGravity } from "@/app/lib/gravity";
 
@@ -75,6 +77,8 @@ export interface AssetInput {
   pairXgfPct?:       number;
   pairDriverScore?:  number;
   baselineHdsvPct?:  number;
+  /** Goalie ice time, seconds — the sample the fitted FMV model regresses against. */
+  iceTimeSeconds?:   number | null;
   teamHdca60?:       number;   // team HD chances against per 60 min (from team_baselines.json)
   // Admin trade-block status (stamped by league routes). "requested" = formal
   // public trade request → small leverage discount. "available" (quietly
@@ -125,6 +129,19 @@ export interface XNAVResult {
 /** Build a stage, dropping the ones that did not fire. */
 const stage = (key: string, label: string, value: number, kind: NavStageKind = "component"): NavStage =>
   ({ key, label, value: safe(value), kind });
+
+/**
+ * Whether this goalie's next deal would be signed with restricted rights.
+ *
+ * The fitted FMV model separates the two because they price differently — a
+ * restricted goalie has no other bidder — and the engine already computes the
+ * same idea further down as `isRFA`, but only after the FMV it depends on.
+ */
+/** Minutes a full starter's season runs to. Matches the FMV fit's anchor. */
+const GOALIE_SEASON_MINUTES = 3500;
+
+const isRFAWindow = (asset: AssetInput): boolean =>
+  asset.age + Math.max(0, asset.yearsRemaining ?? 0) <= 27;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 export const safe  = (n: number): number => (isNaN(n) || !isFinite(n) ? 0 : n);
@@ -558,14 +575,69 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
     : isTandem ? 30 : 0;
   const fmvTmv = Math.max(trueMarketValueG, starterTmvFloor);
   
-  const LEAGUE_MIN_PCT_G = 0.009; // 0.9%
-  const MAX_CAP_PCT_G    = 0.12;  // 12.0%
-  const MIDPOINT_G       = 100;   // The ON_ICE_NAV where a goalie deserves ~6% (elite starter)
-  const K_FACTOR_G       = 0.025; // Steepness of the S-curve
-  
-  // fmvTmv applies the starter/tandem market floor so the sigmoid doesn't
-  // undershoot the real market. trueMarketValueG is kept for total/def output.
-  const fmvCapPctG = LEAGUE_MIN_PCT_G + (MAX_CAP_PCT_G - LEAGUE_MIN_PCT_G) / (1 + Math.exp(-K_FACTOR_G * (fmvTmv - MIDPOINT_G)));
+  // ── Fair market value, from contracts people actually signed ────
+  //
+  // This was a hand-written logistic — midpoint 100, steepness 0.025, ceiling
+  // 12% — whose output nobody had ever compared with a real price. It put a
+  // 50-start starter with positive GSAx at $2.71M, roughly half the market, and
+  // that error flowed straight into the contract stage of every goalie
+  // valuation.
+  //
+  // `goalieFmvCapPct` is fitted to 260 one-way standard contracts and
+  // walk-forward validated at ±$1.44M. It wants the RELIABILITY-REGRESSED
+  // GSAx/60, which is a much harder shrink than the engine's own
+  // `confidenceAdj` blend — a full season of GSAx carries about 13% of itself
+  // forward — so the regression is applied here rather than reusing `expGSAx`.
+  // Passing the engine's lighter-regressed figure would land outside the
+  // fitted domain and price every goalie as though he were an outlier.
+  const goalieIce = asset.iceTimeSeconds != null && asset.iceTimeSeconds > 0
+    ? asset.iceTimeSeconds
+    // No recorded ice time: infer it from workload, since a start is about 58
+    // minutes. Cruder than the real figure and better than dropping the term.
+    : gamesG * 58 * 60;
+  // NOTE the unit trap: the engine's `gsaxPer60` above is per sixty GAMES —
+  // `(gsax / games) * 60` — so for a full-season starter it is roughly the
+  // season total, around 18 for an elite year. The fitted model wants goals per
+  // sixty MINUTES, which is about 0.3 for the same goalie: a factor of ~58.
+  // Feeding the engine's figure in clamped every positive goalie to the domain
+  // ceiling and priced a -1.8 GSAx season above an +18.5 one.
+  //
+  // Raw rather than team-corrected, because the fit was built on raw MoneyPuck
+  // GSAx. The engine's `defCorrection` still shapes the on-ice impact below;
+  // it just has no business inside a market price that never saw it.
+  const rawGsaxPer60Min = goalieIce > 0 ? (gsaxRaw * 3600) / goalieIce : 0;
+
+  // The fit's feature is a THREE-season ice-weighted average, which carries
+  // reliability ~0.32. Handing it a single season (0.134) shrinks more than
+  // twice as hard and compresses every goalie toward the league mean — the
+  // ordering stays right and the spread collapses.
+  //
+  // `baselineGsax` is the engine's career mean, on the same per-60-GAMES scale
+  // as `asset.gsax`, so it converts the same way. Where it exists, treat the
+  // sample as three seasons deep and weight the career mean two-thirds, which
+  // is the window the model was fitted against. Where it does not, one season
+  // is genuinely all we have and the harder shrink is the honest answer.
+  const careerPer60Min = asset.baselineGsax != null && asset.baselineGsax !== 0
+    ? (asset.baselineGsax * 3600) / (GOALIE_SEASON_MINUTES * 60)
+    : null;
+  const blendedGsax = careerPer60Min != null
+    ? (rawGsaxPer60Min + careerPer60Min * 2) / 3
+    : rawGsaxPer60Min;
+  const effectiveIce = careerPer60Min != null ? goalieIce * 3 : goalieIce;
+  const regressedGsax = blendedGsax * reliability("gsaxPer60", effectiveIce);
+  const fittedCapPct = goalieFmvCapPct({
+    gsax: regressedGsax,
+    iceTimeSeconds: goalieIce,
+    age: asset.age,
+    // An unsigned goalie is priced as what he would command; a signed one is
+    // priced against the market he last entered. RFA years cost less.
+    isUfa: !isRFAWindow(asset),
+  });
+
+  // Replacement level when the model cannot price him at all — a goalie with no
+  // age or no rate has no market read, and inventing a mid-range one would be
+  // the same mistake the sigmoid made.
+  const fmvCapPctG = fittedCapPct ?? GOALIE_LEAGUE_MIN_CAP_PCT;
 
   const BASE_CAP_CEILING = asset.capCeiling ?? SEASON.capCeiling;
   const CAP_GROWTH_RATE  = 1.04;

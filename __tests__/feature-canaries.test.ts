@@ -2965,6 +2965,40 @@ describe("Canary — a goalie stat is the unit it claims", () => {
   });
 });
 
+// ── The goalie valuation prices against a real market ───────────────────────
+describe("Canary — G-NAV uses the fitted FMV, in the right units", () => {
+  const engine = readSource("app/lib/xnav-engine.ts");
+
+  it("prices goalies from the fitted model, not a hand-written curve", () => {
+    expect(engine).toContain("goalieFmvCapPct");
+    // The retired sigmoid's constants. If any come back, so has the $2.71M.
+    expect(engine).not.toContain("MAX_CAP_PCT_G");
+    expect(engine).not.toContain("MIDPOINT_G");
+    expect(engine).not.toContain("K_FACTOR_G");
+  });
+
+  it("converts GSAx to the units the model was fitted on", () => {
+    // The engine's own `gsaxPer60` is per sixty GAMES — roughly a season total.
+    // The fit wants goals per sixty MINUTES, ~58x smaller. Feeding the wrong one
+    // clamped every positive goalie to the domain ceiling and priced a -1.8
+    // GSAx season above an +18.5 one.
+    expect(engine).toContain("rawGsaxPer60Min");
+    expect(engine).toMatch(/rawGsaxPer60Min\s*=[\s\S]{0,120}3600/);
+    expect(engine).toContain('reliability("gsaxPer60"');
+  });
+
+  it("regresses against the sample the fit used, not a single season", () => {
+    // The fitted feature is a three-season average. One season shrinks more
+    // than twice as hard and compresses every goalie toward the mean.
+    expect(engine).toContain("careerPer60Min");
+    expect(engine).toContain("effectiveIce");
+  });
+
+  it("falls back to replacement level rather than inventing a mid-range price", () => {
+    expect(engine).toContain("GOALIE_LEAGUE_MIN_CAP_PCT");
+  });
+});
+
 // ── Brand ───────────────────────────────────────────────────────────────────
 // "The Hockey Ledger" collided with two live hockey products (hockeyledger.com,
 // thehockeyledger.ca). The rename touched forty-odd inline strings, which is
