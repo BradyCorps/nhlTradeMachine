@@ -51,20 +51,19 @@ local.db
 repomix-output.*
 
 # ── Large source datasets ────────────────────────────────────────
-# Removed from git history 2026-07-31. 197 MB of raw blobs, though only about
-# 10 MB of the packfile — CSVs compress hard, so the clone saving is far smaller
-# than the file sizes suggest. The reason to remove them is that the runtime
-# never opens them and they grow with every revision, not the one-time size. They are INPUTS to the offline builders in
-# scripts/, and the artifacts those builders produce are committed instead
-# (app/data/*.json), each recording the sha256 of the source it was built from.
+# Untracked 2026-07-31. Offline builder inputs the runtime never opens; the
+# artifacts built from them are committed instead (app/data/*.json), each
+# recording the sha256 of its source so a rebuild can verify it has the right
+# file.
 #
-# To rebuild an artifact you need the source file back. Re-download from
-# MoneyPuck and verify against the sha256 in the artifact:
-#   skaters: https://moneypuck.com/moneypuck/playerData/careers/gameByGame/all_teams.csv
-#   or the season-summary endpoints already listed in the calibration manifest.
+# NOTE: this stops them growing, it does NOT purge them from history. That
+# needs `git filter-repo` run from a clone with FULL history — see
+# docs/HISTORY_REWRITE.md. Worth knowing before anyone assumes the clone got
+# smaller: 197 MB of raw blobs is only about 10 MB of packfile, because CSVs
+# compress hard.
 #
 # Kept in git deliberately: goalies_2008_to_2024.csv (1.5 MB) and
-# teams_2008_to_2024.csv (1.6 MB) are small and drive the goalie work; and
+# teams_2008_to_2024.csv (1.6 MB) are small and drive the goalie work, and
 # OtherData/contracts/ is hand-built and cannot be re-downloaded at all.
 OtherData/HistoricalData/lines_2008_to_2024.csv
 OtherData/HistoricalData/skaters_2008_to_2024.csv
