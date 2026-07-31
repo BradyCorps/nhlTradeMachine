@@ -53,7 +53,19 @@ export interface Asset {
   isProtected?: boolean;
   gsax?: number;
   savePct?: number;
+  /**
+   * Best available goalie workload — real starts where a source publishes them,
+   * appearances otherwise. `startsKnown` says which. It used to be fed the
+   * MoneyPuck games-played count unconditionally, so relief outings counted as
+   * starts and moved the role ceiling on G-NAV.
+   */
   gamesStarted?: number;
+  /** True when `gamesStarted` is genuinely starts rather than appearances. */
+  startsKnown?: boolean;
+  /** Appearances, including relief. */
+  gamesPlayed?: number | null;
+  /** Goals against per SIXTY MINUTES. Null when ice time was unavailable. */
+  gaa?: number | null;
   shotsPerGame?: number;
   /** NHL EDGE goalie leaderboard appearances (PA3) — board name + rank. */
   goalieEdgeBoards?: { board: string; rank: number }[] | null;

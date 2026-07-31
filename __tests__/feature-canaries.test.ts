@@ -209,7 +209,11 @@ describe("Canary — league route features (source-level)", () => {
         expect(src).toContain("injectedFromDb:   true");
         expect(src).toContain("const hasProspectSignal");
         expect(src).toContain("p.injectedFromDb && !stats && !goalieStats && !hasProspectSignal && !hasFaStatus && p.age >= 24");
-        expect(src).toContain("stats?.games ?? goalieStats?.gamesStarted ?? 0");
+        // A goalie's game count falls back to his goalie stats when the skater
+        // stats map has nothing. Pinned as intent — the expression used to read
+        // `goalieStats?.gamesStarted`, which was appearances wearing the wrong
+        // name; it names `gamesPlayed` now.
+        expect(src).toMatch(/stats\?\.games \?\? goalieStats\?\.gamesPlayed/);
       });
 
       it("enriches known synced prospects before NAV evaluation", () => {
@@ -261,7 +265,20 @@ describe("Canary — league route features (source-level)", () => {
       it("keeps MoneyPuck goalie GSAX ahead of NHL fallback stats", () => {
         expect(src).toContain("const nhlG = NHL_GOALIE_STATS.get(`id:${p.id}`) ?? NHL_GOALIE_STATS.get");
         expect(src).toContain("const mpG  = goalieMap.get");
-        expect(src).toContain("...(nhlG ?? {}), ...(mpG ?? {}), gsax: mpG?.gsax ?? nhlG?.gsax ?? 0");
+        // GSAX: MoneyPuck first. Pinned to that precedence rather than to the
+        // spread expression, which grew per-field rules when starts stopped
+        // being clobbered.
+        expect(src).toContain("gsax: mpG?.gsax ?? nhlG?.gsax ?? 0");
+      });
+
+      it("lets the NHL feed's real starts survive the MoneyPuck merge", () => {
+        // The sharpest form of the bug: the correct starts count was fetched
+        // and then overwritten with MoneyPuck's games-played, because the
+        // spread put MoneyPuck last and MoneyPuck wrote `gamesStarted`.
+        expect(src).toContain("gamesStarted: nhlG?.gamesStarted ?? mpG?.gamesStarted ?? null");
+        // MoneyPuck publishes appearances, and says so.
+        expect(src).toMatch(/gamesPlayed:\s+g,/);
+        expect(src).not.toMatch(/gamesStarted:\s+g,/);
       });
 
       it("does not present expired UFA/RFA contracts as fake one-year ELC deals", () => {
@@ -815,11 +832,11 @@ describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 go
     for (const label of ["GSAX", "SV%", "HDSV", "WRKLD", "BUSY"]) {
       expect(view).toContain(`label: "${label}"`);
     }
-    expect(view).toMatch(/label: "GA\/GM"/);
+    expect(view).toMatch(/label: "GAA"/);
     // HDSV comes from the real EDGE field, greying out only when truly absent
     expect(view).toContain("baselineHdsvPct");
     // The goals-against index is inverted so a stingy goalie reads high
-    expect(view).toMatch(/label: "GA\/GM"[\s\S]{0,200}invert: true/);
+    expect(view).toMatch(/label: "GAA"[\s\S]{0,200}invert: true/);
     // The players page no longer hardcodes HDSV to unavailable
     expect(players).toContain("buildGoalieStrandTraits(player)");
     expect(players).not.toContain('val: 0.5, unavailable: true');
@@ -2893,6 +2910,58 @@ describe("Canary — a STRAND node never invents a reading", () => {
   it("keeps one definition of the trait shape", () => {
     // StrandDisplay re-exports rather than declaring a second copy.
     expect(readSource("app/components/StrandDisplay.tsx")).not.toMatch(/export interface StrandTrait/);
+  });
+});
+
+// ── Tier 0: goalie units mean what they say ─────────────────────────────────
+// Two numbers carried the wrong unit. `gamesStarted` was fed MoneyPuck's
+// games-played, so relief outings counted as starts — and that field gates the
+// role ceiling on G-NAV, so it moved valuations. And STRAND's "GAA" was
+// `(1 - savePct) * shotsPerGame`: goals per APPEARANCE, off an assumed shot
+// rate when volume was missing.
+describe("Canary — a goalie stat is the unit it claims", () => {
+  const lib = readSource("app/lib/goalie-units.ts");
+  const assembly = readSource("app/lib/roster-assembly.ts");
+  const view = readSource("app/components/StrandView.tsx");
+
+  it("keeps the unit rules in a tested module", () => {
+    for (const fn of ["goalsAgainstAverage", "resolveWorkload", "workloadLabel"]) {
+      expect(lib, fn).toContain(`export function ${fn}`);
+    }
+  });
+
+  it("computes goals against per sixty minutes, not per appearance", () => {
+    expect(lib).toContain("SECONDS_PER_HOUR");
+    expect(view).not.toMatch(/1 - svPct\)\s*\*/);
+    expect(view).not.toMatch(/spg\s*\?\?\s*30/);
+    // The node reads a precomputed figure rather than deriving one from a rate
+    // it does not have the denominator for.
+    expect(view).toMatch(/label: "GAA"[\s\S]{0,200}per 60 minutes/);
+  });
+
+  it("uses the ice time the assembly already parsed and threw away", () => {
+    expect(assembly).toContain("goalsAgainstAverage(goals, ice)");
+  });
+
+  it("never relabels appearances as starts", () => {
+    // MoneyPuck has no starts column, so it must not write the field.
+    expect(assembly).not.toMatch(/gamesStarted:\s+g,/);
+    expect(assembly).not.toMatch(/g\.gamesStarted \?\? g\.starts \?\? games/);
+    expect(lib).toContain("startsKnown");
+  });
+
+  it("records whether a workload figure is genuinely starts", () => {
+    expect(assembly).toContain("startsKnown:    goalieWorkload.startsKnown");
+    // And the label follows it, rather than always saying GS.
+    expect(lib).toContain('${w.startsKnown ? "GS" : "GP"}');
+  });
+
+  it("says so when a role was classified on appearances", () => {
+    // The classification thresholds are start counts. Running them on
+    // relief-inclusive numbers is sometimes unavoidable; claiming otherwise
+    // is not.
+    expect(readSource("app/components/AssetBadges.tsx")).toContain("resolveWorkload");
+    expect(readSource("app/components/AssetBadges.tsx")).toContain("starts not published by this source");
   });
 });
 

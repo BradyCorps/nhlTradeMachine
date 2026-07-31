@@ -1,3 +1,4 @@
+import { goalsAgainstAverage, resolveWorkload } from "@/app/lib/goalie-units";
 import { SEASON, LEAGUE } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
@@ -718,11 +719,23 @@ async function fetchNhlGoalieStatsFallback(): Promise<Map<string, any>> {
       const savePct = savePctRaw > 1 ? savePctRaw / 100 : savePctRaw > 0
         ? savePctRaw
         : shotsAgainst > 0 ? (shotsAgainst - goalsAgainst) / shotsAgainst : 0.900;
+      // Real starts only. This used to end `?? games`, which turned every
+      // goalie whose starts the feed omitted into one whose appearances were
+      // silently relabelled as starts. Absent means absent; `resolveWorkload`
+      // decides what to fall back to, and records that it did.
+      const rawStarts = Number(g.gamesStarted ?? g.starts ?? NaN);
+      const nhlToi = Number(g.timeOnIce ?? g.toi ?? NaN);
       const entry = {
         gsax: 0,
         savePct: Math.round(savePct * 10000) / 10000,
         shotsPerGame: shotsAgainst > 0 ? shotsAgainst / games : 0,
-        gamesStarted: Number(g.gamesStarted ?? g.starts ?? games),
+        gamesPlayed: games,
+        gamesStarted: isFinite(rawStarts) && rawStarts > 0 ? rawStarts : null,
+        // The feed publishes GAA directly; fall back to computing it from ice
+        // time. Either way it is per sixty minutes.
+        gaa: Number.isFinite(Number(g.goalsAgainstAverage))
+          ? Number(g.goalsAgainstAverage)
+          : goalsAgainstAverage(goalsAgainst, isFinite(nhlToi) ? nhlToi : null),
         xGoalsAllowed: 0,
         hasLiveStats: true,
       };
@@ -925,7 +938,16 @@ export async function assembleCanonicalRoster(options: {
             gsax,
             savePct:      Math.round(savePct * 10000) / 10000,
             shotsPerGame: ongoal / g,
-            gamesStarted: g,
+            // `games_played` is APPEARANCES. It used to be written straight
+            // into `gamesStarted`, so relief outings inflated the workload that
+            // gates the starter/tandem/backup role ceiling on G-NAV. MoneyPuck
+            // publishes no starts column, so this source leaves that unset and
+            // the NHL feed's real figure survives the merge.
+            gamesPlayed:  g,
+            // `ice` was parsed for the team xGA denominator and then thrown
+            // away. It is the denominator a real GAA needs.
+            gaa:          goalsAgainstAverage(goals, ice),
+            iceTime:      ice,
             xGoalsAllowed: xGoals,
             hasLiveStats: true,
           });
@@ -1189,9 +1211,27 @@ export async function assembleCanonicalRoster(options: {
 
       const nhlG = NHL_GOALIE_STATS.get(`id:${p.id}`) ?? NHL_GOALIE_STATS.get(slugify(p.name));
       const mpG  = goalieMap.get(slugify(p.name));
+      // MoneyPuck wins on the fields it measures better, but it no longer
+      // carries `gamesStarted` at all, so the NHL feed's real starts survive
+      // instead of being overwritten with appearances. `gaa` prefers whichever
+      // source produced one.
       const goalieStats = isGoalie
-        ? (mpG || nhlG ? { ...(nhlG ?? {}), ...(mpG ?? {}), gsax: mpG?.gsax ?? nhlG?.gsax ?? 0 } : null)
+        ? (mpG || nhlG
+            ? {
+                ...(nhlG ?? {}),
+                ...(mpG ?? {}),
+                gsax: mpG?.gsax ?? nhlG?.gsax ?? 0,
+                gamesStarted: nhlG?.gamesStarted ?? mpG?.gamesStarted ?? null,
+                gamesPlayed: mpG?.gamesPlayed ?? nhlG?.gamesPlayed ?? null,
+                gaa: mpG?.gaa ?? nhlG?.gaa ?? null,
+              }
+            : null)
         : null;
+
+      const goalieWorkload = resolveWorkload({
+        gamesStarted: goalieStats?.gamesStarted,
+        gamesPlayed: goalieStats?.gamesPlayed,
+      });
 
       const hasProspectSignal = draftOverall != null || (prospectPtsPace != null && prospectPtsPace > 0);
       const hasFaStatus = fin?.expiryStatus != null;
@@ -1281,7 +1321,11 @@ export async function assembleCanonicalRoster(options: {
       const hasSkaterStats = Boolean(stats);
       const games = draftOverall != null
         ? (stats?.games ?? 0)
-        : (stats?.games ?? goalieStats?.gamesStarted ?? 0);
+        // A goalie's game count is his APPEARANCES. It used to read
+        // `goalieStats?.gamesStarted`, which was the same number wearing the
+        // wrong name; now that starts are a separate, possibly-absent field,
+        // this has to name what it wants.
+        : (stats?.games ?? goalieStats?.gamesPlayed ?? goalieStats?.gamesStarted ?? 0);
       const ptsPace = stats?.ptsPace ?? (hasSkaterStats ? defaultPts : 0);
       const avgTOI = stats?.avgTOI ?? (hasSkaterStats ? defaultTOI : 0);
       const teamContext = options.includeTeamContext ? developmentTeamContext(teamWindow(developmentTeam), developmentTeam?.standing) : undefined;
@@ -1348,7 +1392,14 @@ export async function assembleCanonicalRoster(options: {
         hasLiveStats:   stats?.hasLiveStats ?? goalieStats?.hasLiveStats ?? false,
         gsax:           goalieStats?.gsax         ?? 0,
         savePct:        goalieStats?.savePct       ?? 0.900,
-        gamesStarted:   goalieStats?.gamesStarted  ?? 0,
+        // Workload, resolved once so every consumer gets the same figure AND
+        // knows whether it is genuinely starts. `gamesStarted` keeps carrying
+        // the best available number, so nothing downstream breaks; what is new
+        // is that `startsKnown` says when that number is only appearances.
+        gamesStarted:   goalieWorkload.games,
+        startsKnown:    goalieWorkload.startsKnown,
+        gamesPlayed:    goalieStats?.gamesPlayed ?? null,
+        gaa:            goalieStats?.gaa ?? null,
         shotsPerGame:   goalieStats?.shotsPerGame  ?? 0,
         goalieEdgeBoards: finalPosition === "G" ? (goalieBoards.get(String(p.id)) ?? null) : null,
         teamXga60,

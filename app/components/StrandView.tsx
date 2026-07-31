@@ -10,6 +10,7 @@ import React from "react";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 import StrandDisplay from "@/app/components/StrandDisplay";
 import { node, type StrandTrait } from "@/app/lib/strand-traits";
+import { resolveWorkload, workloadLabel, workloadTitle } from "@/app/lib/goalie-units";
 import EdgeStrip from "@/app/components/EdgeStrip";
 
 // ── Trait builders: Asset + XNAVResult → StrandTrait[] ────────
@@ -109,18 +110,20 @@ export function buildAssetTraits(a: Asset, nav: XNAVResult): {
 export function buildGoalieStrandTraits(g: {
   gsax?: number | null; savePct?: number | null;
   baselineHdsvPct?: number | null; gamesStarted?: number | null;
-  games?: number | null; shotsPerGame?: number | null;
+  startsKnown?: boolean; gamesPlayed?: number | null;
+  games?: number | null; shotsPerGame?: number | null; gaa?: number | null;
 }): { off: StrandTrait[]; def: StrandTrait[] } {
   const svPct = g.savePct ?? null;
   const spg   = g.shotsPerGame ?? null;
-  // Goals per APPEARANCE, and only when both inputs are real.
+  // Real GAA — goals against per sixty minutes, computed at assembly from the
+  // ice time MoneyPuck publishes.
   //
-  // This used to read `(1 - svPct) * (spg ?? 30)`, which invented a shot rate
-  // from thin air whenever volume was missing and printed the result to two
-  // decimals as though it were measured. It is also not GAA — that is per 60
-  // minutes, and needs goalie ice time we do not currently carry. The label
-  // says what it is.
-  const gpa = svPct !== null && spg !== null ? (1 - svPct) * spg : null;
+  // It used to be `(1 - svPct) * (spg ?? 30)`: goals per APPEARANCE, off an
+  // invented shot rate when volume was missing, printed to two decimals under
+  // the label "goals-against average". Both halves of that are fixed —
+  // `goalie-units.ts` explains why the two figures diverge and for whom.
+  const gaa = g.gaa ?? null;
+  const workload = resolveWorkload({ gamesStarted: g.gamesStarted, gamesPlayed: g.gamesPlayed ?? g.games });
 
   return {
     off: [
@@ -145,9 +148,11 @@ export function buildGoalieStrandTraits(g: {
     ],
     def: [
       node({
-        label: "WRKLD", value: g.gamesStarted ?? g.games ?? null, min: 10, max: 65,
-        title: v => `Games started: ${Math.round(v)}`,
-        raw: v => `${Math.round(v)} GS`,
+        // "GS" only when they really are starts. MoneyPuck publishes no starts
+        // column, so for most goalies this is appearances and now says so.
+        label: "WRKLD", value: workload.games > 0 ? workload.games : null, min: 10, max: 65,
+        title: () => workloadTitle(workload),
+        raw: () => workloadLabel(workload),
         absent: "Workload unavailable",
       }),
       node({
@@ -157,10 +162,10 @@ export function buildGoalieStrandTraits(g: {
         absent: "Shot volume unavailable",
       }),
       node({
-        label: "GA/GM", value: gpa, min: 2.0, max: 3.6, invert: true,
-        title: v => `Goals against per appearance: ${v.toFixed(2)}`,
+        label: "GAA", value: gaa, min: 2.0, max: 3.6, invert: true,
+        title: v => `Goals-against average: ${v.toFixed(2)} per 60 minutes`,
         raw: v => `${v.toFixed(2)}`,
-        absent: "Goals against unavailable — needs both save % and shot volume",
+        absent: "Goals-against average unavailable — no goalie ice time on record",
       }),
     ],
   };

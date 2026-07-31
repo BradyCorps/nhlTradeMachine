@@ -727,6 +727,70 @@ Shares, not ability percentiles, so an elite two-way forward's large offence
 still makes his defensive node small. Tooltips now say "share" explicitly. One
 consistent scale across the rails is Tier 1.
 
+### T0-3 — goalie units (complete)
+Two numbers carried the wrong unit.
+
+**Starts were appearances.** `gamesStarted` was fed MoneyPuck's `games_played`,
+so relief outings counted as starts — and that field gates the
+starter/tandem/backup classification, which sets the role ceiling on G-NAV. The
+sharpest form: the assembly fetches the NHL stats API alongside MoneyPuck, the
+NHL feed publishes a real `gamesStarted`, and the merge spread MoneyPuck last —
+so the correct number was retrieved and then overwritten. The NHL fallback
+compounded it with `?? games`.
+
+- MoneyPuck now writes `gamesPlayed` and does not touch `gamesStarted`; the NHL
+  feed's real starts survive the merge.
+- The NHL entry emits starts only when the feed actually supplies them.
+- `resolveWorkload` picks starts where known, appearances otherwise, and returns
+  `startsKnown` so nothing downstream has to guess. `gamesStarted` still carries
+  the best available figure, so no consumer breaks.
+- Labels follow: "52 GS" when they are starts, "55 GP" when they are not. The
+  goalie role tag appends "(N appearances — starts not published by this
+  source)" when it classified on relief-inclusive numbers.
+- This DOES move valuations for goalies whose starts differ from their
+  appearances. That is a data correction, not a tuning change — the field was
+  always meant to hold starts.
+
+**GAA was not GAA.** STRAND computed `(1 - savePct) * shotsPerGame` and labelled
+it goals-against average. That is goals per APPEARANCE; GAA is per sixty
+minutes, and the two diverge by however far an average outing falls short of a
+full game — pulled starts and relief work, exactly the population the number is
+used to judge. It also fell back to an assumed 30 shots per game, so it could be
+fabricated outright and still printed to two decimals.
+
+- The MoneyPuck goalie CSV carries `icetime` in seconds. The assembly already
+  parsed it for the team xGA denominator and then discarded it; it is the
+  denominator real GAA needs. `gaa` is computed at assembly, where the raw
+  goals and ice time are both in hand, and STRAND consumes it.
+- The NHL path prefers the feed's own `goalsAgainstAverage`, else computes from
+  `timeOnIce`.
+- Null when ice time is unavailable — the node greys out (T0-2's machinery).
+
+Worked example from the tests: 40 appearances averaging 40 minutes, 100 goals
+against. Old figure 2.50; real GAA 3.75.
+
+`app/lib/goalie-units.ts` is deliberately distinct from the pre-existing
+`goalie-workload.ts`, which splits a projected season between starter and backup
+inside the sim.
+
+Four canaries repointed, one of them pinning a label this same Tier introduced
+one commit earlier (GA/GM, now correctly GAA).
+
+## Tier 0 complete — what it did and did not do
+Closed: the X-NAV accounting identity, STRAND missing-data honesty, goalie
+units. No coefficient was tuned. Still open and correctly outside Tier 0:
+
+- OPS/DPS are SHARES of Point Shares, not ability percentiles, so an elite
+  two-way forward's defensive node still reads small. One consistent scale is
+  Tier 1.
+- The goalie role ceiling still clamps hard — an elite starter comes out
+  STOP +256, CAP +189, CEIL −195 → 250, so two elite starters tie. It is now a
+  visible line item rather than an invisible one; softening it is Tier 2.
+- No uncertainty anywhere: X-NAV is a point estimate printed as an integer.
+- No out-of-sample validation, no point-in-time training data, hand-picked
+  constants throughout.
+- `XNAVResult` is still defined twice (trade-types.ts and xnav-engine.ts).
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps
