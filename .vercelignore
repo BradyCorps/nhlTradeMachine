@@ -1,0 +1,41 @@
+# ── What never needs to reach a deployment ───────────────────────
+#
+# The repository carries ~143 MB of source CSVs that the RUNTIME never opens.
+# They are inputs to offline builders in `scripts/` — the population build, the
+# baseline processors, the awards import — which run on a developer's machine
+# and commit small derived JSON into `app/data/`. Shipping the raw inputs to
+# Vercel uploaded 143 MB on every deploy to sit unread on the disk.
+#
+# The rule this encodes is the one the Gravity v4 spec already states: the
+# application consumes exported artefacts only, and never reads a source dataset
+# during a request. Anything the app genuinely needs lives under `app/data/` and
+# is imported, so it is covered by the build and not by this file.
+#
+# Verified before adding: no file under `app/` references `OtherData`. Every
+# reference is in `scripts/`.
+
+# Generated whole-repo dumps for feeding to an LLM. 69 MB, regenerable, and
+# stale the moment anything is committed. Also untracked from git in the same
+# commit that added this line — they were being versioned.
+repomix-output.*
+
+# Brand kits, audit archives and specs. 32 MB, all reference material. The
+# brand assets the app actually serves live in `public/brand/`; the reference to
+# `docs/cap-and-crease-brand-kitV3` in app/layout.tsx is a comment naming where
+# a snippet came from, not a read.
+docs/
+
+# Source datasets — offline builder inputs only.
+# HistoricalData alone is 133 MB (2008-2024 skaters, lines, teams, goalies).
+OtherData/
+
+# Calibration outputs and raw-response caches. The population and stint payloads
+# are already gitignored; these entries cover a working tree that has them.
+data/gravity-calibration/*/population.json
+data/gravity-calibration/*/source-crosswalk.json
+data/gravity-v4/
+.gravity-calibration-cache/
+.gravity-v4-cache/
+
+# Tests and their fixtures never execute in a deployment.
+__tests__/

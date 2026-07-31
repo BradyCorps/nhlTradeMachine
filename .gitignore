@@ -46,3 +46,6 @@ local.db
 /data/gravity-calibration/*/source-crosswalk.json
 /.gravity-v4-cache/
 /data/gravity-v4/
+
+# Repomix whole-repo dumps — generated, large, and stale on the next commit.
+repomix-output.*
