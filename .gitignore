@@ -49,3 +49,20 @@ local.db
 
 # Repomix whole-repo dumps — generated, large, and stale on the next commit.
 repomix-output.*
+
+# ── Large source datasets ────────────────────────────────────────
+# Removed from git history 2026-07-31; they were 129 MB of the pack and the
+# runtime never opens them. They are INPUTS to the offline builders in
+# scripts/, and the artifacts those builders produce are committed instead
+# (app/data/*.json), each recording the sha256 of the source it was built from.
+#
+# To rebuild an artifact you need the source file back. Re-download from
+# MoneyPuck and verify against the sha256 in the artifact:
+#   skaters: https://moneypuck.com/moneypuck/playerData/careers/gameByGame/all_teams.csv
+#   or the season-summary endpoints already listed in the calibration manifest.
+#
+# Kept in git deliberately: goalies_2008_to_2024.csv (1.5 MB) and
+# teams_2008_to_2024.csv (1.6 MB) are small and drive the goalie work; and
+# OtherData/contracts/ is hand-built and cannot be re-downloaded at all.
+OtherData/HistoricalData/lines_2008_to_2024.csv
+OtherData/HistoricalData/skaters_2008_to_2024.csv
