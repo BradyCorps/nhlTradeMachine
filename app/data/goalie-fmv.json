@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "goalie-fmv-v1",
+  "generatedAt": "2026-07-31T16:25:14.218Z",
+  "generationCommand": "npx tsx scripts/goalie-fmv/build.ts",
+  "target": {
+    "variable": "capPct",
+    "why": "A $5M deal in 2018 was a bigger commitment than $5M today. Fitting the share of the cap removes the era; the app multiplies by the ceiling of the year it is pricing."
+  },
+  "population": {
+    "filter": "position G, 1-Way, STD — two-way deals are priced against the AHL and entry-level deals are capped by the CBA",
+    "eligibleSignings": 300,
+    "fitted": 260,
+    "droppedNoPriorSeason": 1,
+    "droppedThinSample": 39,
+    "signingDates": "2017-07-02 to 2026-07-24",
+    "minPriorIcetimeSeconds": 36000,
+    "lookbackSeasons": 3
+  },
+  "model": {
+    "form": "ordinary least squares, capPct ~ 1 + gsax + workload + age + ufa",
+    "features": {
+      "gsax": "Ice-weighted GSAx/60 over the last 3 finished seasons, regressed by its reliability (r = 0.134 at a full season).",
+      "workload": "Most recent finished season's ice time as a share of a full starter's season, capped at 1.",
+      "age": "Age at signing.",
+      "ufa": "1 when signed as an unrestricted free agent, 0 when restricted."
+    },
+    "intercept": 0.042018,
+    "coefficients": {
+      "gsax": 0.193114,
+      "workload": 0.050609,
+      "age": -0.001239,
+      "ufa": 0.004173
+    },
+    "featureDomain": {
+      "gsax": {
+        "min": -0.115848,
+        "p5": -0.064249,
+        "p95": 0.06739,
+        "max": 0.137391
+      },
+      "workload": {
+        "min": 0.013176,
+        "p5": 0.038662,
+        "p95": 0.931071,
+        "max": 1
+      },
+      "age": {
+        "min": 21,
+        "p5": 24,
+        "p95": 38,
+        "max": 41
+      },
+      "ufa": {
+        "min": 0,
+        "p5": 0,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    "domainNote": "Observed range of each feature across the fitted signings. `gsax` is REGRESSED, not raw — its whole span is about a tenth of a raw GSAx/60, so a caller passing a raw figure lands far outside the fit."
+  },
+  "validation": {
+    "walkForward": {
+      "splitDate": "2024-07-01",
+      "trainN": 177,
+      "testN": 83,
+      "r2": 0.5533,
+      "maeCapPct": 0.01386,
+      "maeDollarsAt104MCap": 1.441,
+      "why": "Trained only on contracts signed before the split and scored on ones signed after, so no future information reaches the fit."
+    },
+    "inSample": {
+      "n": 260,
+      "r2": 0.5641
+    }
+  },
+  "excludedFeatures": {
+    "term": "Strongest single correlate of cap hit (r = 0.83) and out-predicts every performance feature combined on its own — but endogenous. Term and AAV are negotiated together and both reflect what the club thinks of the player, so predicting AAV from term is partly predicting the answer from the answer. Including it also flipped the UFA coefficient negative, implying unrestricted free agents cost less than restricted ones, which is false and was term absorbing the effect. Adding it takes walk-forward R² from 0.55 to 0.70 and is not worth the meaning it costs."
+  },
+  "sources": [
+    {
+      "path": "OtherData/HistoricalData/goalies_2008_to_2024.csv",
+      "sha256": "b94d4ceecded6c23edb3ef197d4030bb2dc7f10d9a10cb396ae3802e28d4d0d4",
+      "bytes": 1521038
+    },
+    {
+      "path": "OtherData/2025_26Data/2025_26_goalies.csv",
+      "sha256": "2fe2a2dbf25822cf1650e2ad00388c94ef303681fbfd8a8c7fdcb065212cd2fc",
+      "bytes": 93386
+    },
+    {
+      "path": "OtherData/contracts/signings.csv",
+      "sha256": "eca9d8ccbd3ecf8641b3086920392e9282da23d02521c9ddfcf9c7ed50705bfb",
+      "bytes": 686180
+    }
+  ]
+}

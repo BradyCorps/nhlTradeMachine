@@ -856,6 +856,64 @@ signing date or original term, so an old $5M deal cannot be expressed as a share
 of the cap when it was signed. A cross-sectional anchor against today's contracts
 is possible but mixes cap eras.
 
+### Goalie FMV, fitted to real signings (complete)
+Owner supplied a hand-built signings workbook — 32 team sheets, **6,229
+signings, 2017-07 to 2026-07**, carrying signing date, cap hit, term, **Cap % at
+signing**, position, age, RFA/UFA status, contract level and 1-way/2-way
+structure. Landed at `OtherData/contracts/` as both the xlsx and a flat
+`signings.csv`. Tracked in git (it is manual work that cannot be regenerated),
+excluded from the deploy by `.vercelignore`.
+
+`Cap %` is what makes this work. The worry was that a $5M deal signed in 2018
+could not be compared to $5M today without a signing-era cap; the sheet already
+carries the share, so the era drops out of the problem.
+
+- 774 goalie signings; **300 one-way standard**, of which **299 join** to
+  MoneyPuck performance by name slug (99.7%). 260 survive the requirement of a
+  real prior sample.
+- `scripts/goalie-fmv/build.ts` → `app/data/goalie-fmv.json` (3 KB, coefficients
+  and validation only).
+- **Strictly point-in-time**: a July 2024 signing sees 2023-24 and earlier and
+  never the season that followed. Getting this wrong is the standard way a
+  contract model scores well and predicts nothing.
+- Feature `gsax` is ice-weighted GSAx/60 over three finished seasons, regressed
+  by the reliability curve from the percentile artifact — the two pieces compose.
+- **Walk-forward validated**: trained on 177 deals signed before 2024-07, scored
+  on the 83 signed after. R² 0.553, MAE 0.0109 of the cap = **$1.44M** at $104M.
+
+**Term is deliberately excluded.** It is the strongest single correlate
+(r = 0.83) and out-predicts every performance feature combined on its own —
+adding it takes walk-forward R² from 0.55 to 0.70. But it is endogenous: term
+and AAV are negotiated together and both reflect what the club thinks. Including
+it also flipped the UFA coefficient NEGATIVE, implying unrestricted free agents
+cost less than restricted ones, which is false and was term absorbing the
+effect. With term out, every sign is right: gsax +0.193, workload +0.051,
+age −0.00124, ufa +0.00417.
+
+Sanity against the market, at a $104M cap:
+
+| profile | model | market |
+|---|---|---|
+| Elite (p95 rate, workhorse) | $7.95M | $8.0-9.5M |
+| Strong starter | $7.01M | $6.5-8M |
+| Solid starter | $6.08M | $4.5-6M |
+| League-average starter | $5.29M | $3.5-5M |
+| Below-average starter | $4.00M | $2.5-4M |
+| Tandem | $3.50M | $2-3M |
+| Backup | $0.93M | $0.8-1.5M |
+
+Mild upward bias mid-market; the published range covers it. Compare with the
+$2.71M the hand-written logistic produced for a mid starter.
+
+**Domain guard.** A first sanity pass fed RAW GSAx/60 into a feature that
+expects the REGRESSED value and got $11.83M for an elite starter. The fitted
+`gsax` span is only −0.116 to +0.137 — roughly a tenth of a raw figure — so the
+model was extrapolating to double its observed maximum. The artifact now
+publishes `featureDomain`, `goalieFmvCapPct` clamps to it, and `isInDomain`
+lets a caller find out. The mistake is why the guard exists.
+
+Not wired into `calcGoalieNAV` yet — the artifact and reader land first.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps
