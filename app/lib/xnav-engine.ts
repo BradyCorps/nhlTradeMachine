@@ -614,7 +614,18 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
     : 0;
 
   const roleCap     = isBackup ? (isAscendingGoalie ? 50 : 35) : isTandem ? (isAscendingGoalie ? 95 : 60) : 250;
-  const flooredG    = Math.max(rawTotal, youngFloor);
+  // The young-controlled floor only applies when it actually fires.
+  //
+  // This read `Math.max(rawTotal, youngFloor)` unconditionally, and `youngFloor`
+  // is 0 for anyone who is not young and cheap — so the expression was a hard
+  // floor at zero for EVERY goalie. A 27-year-old on $8.25M x 8 came out
+  // impact +32, cap -49 → -17, clamped to 0. So did a genuine albatross at -73,
+  // and so did a goalie with no data at all: three completely different
+  // situations, one indistinguishable number, and a bad goalie contract that
+  // cost nothing to trade away.
+  //
+  // Skater NAV has always been allowed to go negative for exactly this reason.
+  const flooredG    = youngFloor > 0 ? Math.max(rawTotal, youngFloor) : rawTotal;
   const cappedTotal = Math.min(flooredG, roleCap);
 
   // The role ceiling is the single most consequential thing the goalie model

@@ -50,9 +50,20 @@ describe("G-NAV — Elite Starters", () => {
       age: 26, capHit: 5.75, yearsRemaining: 4,
       gsax: 5.1, gamesStarted: 50, teamXga60: 2.82,
     });
-    // Starter floor is rate-gated now; a defensive-team starter with only decent
-    // rate output stays modest instead of floating on volume alone.
-    inRange(result.total, 0, 65, "Oettinger NAV");
+    // A mid-market starter lands near zero, either side of it.
+    //
+    // The lower bound used to be 0, which was only ever satisfiable because
+    // `Math.max(rawTotal, youngFloor)` clamped every negative goalie to exactly
+    // zero — `youngFloor` is 0 for anyone not young and cheap, so the
+    // expression was a universal floor. With the clamp gone this reads -3:
+    // impact +32 against cap -35, on an FMV of $2.71M versus a $5.75M hit.
+    //
+    // That FMV is the open question, not the sign. $2.71M is low for a 50-start
+    // starter with positive GSAX, which suggests the goalie contract model
+    // under-prices the position — a calibration issue the clamp was concealing,
+    // and one that wants fitting against historical signings rather than a
+    // wider assertion here.
+    inRange(result.total, -25, 65, "Oettinger NAV");
   });
 });
 
