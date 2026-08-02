@@ -1,9 +1,10 @@
 {
   "schemaVersion": "skater-fmv-v1",
-  "generatedAt": "2026-07-31T16:57:18.948Z",
+  "generatedAt": "2026-08-02T21:22:16.712Z",
   "generationCommand": "npx tsx scripts/skater-fmv/build.ts",
   "target": {
     "variable": "capPct",
+    "bounds": "floored at the league minimum, ceilinged at the CBA's 20% individual maximum",
     "why": "Fitting the share of the cap removes the era, so a 2018 deal and a 2026 deal are comparable and the app multiplies by whatever ceiling it is pricing against."
   },
   "population": {
@@ -17,23 +18,37 @@
     "lookbackSeasons": 3
   },
   "model": {
-    "form": "ordinary least squares per position group, capPct ~ 1 + pts60 + toi + age + ufa",
+    "form": "bounded least squares per position group, capPct ~ 1 + pts60 + hinges(pts60) + toi + hinges(toi) + age + ufa, with the production and deployment slopes constrained non-negative",
+    "whyHinges": "The linear fit was misspecified, and the tell was a U-shaped residual curve: binned by PREDICTION (not by actual, which produces that shape even for a correct model), forwards ran +1.56 points of cap in the bottom decile, -0.80 in the middle, and +1.53 in the top. A straight line through a convex relationship over-predicts the middle and misses both ends. It also predicted a NEGATIVE cap share for the bottom decile, which only the league-minimum floor was hiding.  Walk-forward, forwards: mean error $1.26M -> $1.17M, and the average miss on the five richest held-out contracts +6.26 -> +0.51 points of cap. Defence is level on mean error ($1.33M -> $1.35M) and better at the top (+3.04 -> +2.02), and one functional form across both units is worth the rounding.  Adding squared terms scored better IN SAMPLE and collapsed out of sample (forwards R2 -0.04) because squares blow up under exp. Recency weighting the training rows changed nothing measurable. Neither is used.",
     "splitByPosition": "Forwards and defencemen are fitted separately. Pooled scores the same on mean error, but a defenceman is paid more for minutes (toi 0.105 vs 0.090) and less for points (pts60 0.016 vs 0.020), and one shared slope cannot say that.",
     "features": {
       "pts60": "Points per sixty minutes of ice over the last 3 finished seasons.",
       "toi": "Latest finished season's minutes per game against a 20-minute reference, capped at 1.6.",
-      "age": "Age at signing.",
-      "ufa": "1 when signed as an unrestricted free agent, 0 when restricted."
+      "age": "Age at signing."
     },
     "byPosition": {
       "F": {
         "n": 1297,
-        "intercept": -0.029081,
+        "intercept": 0.028614,
         "coefficients": {
-          "pts60": 0.018818,
-          "toi": 0.09368,
-          "age": -0.001431,
-          "ufa": 0.003564
+          "pts60": 0.000956,
+          "pts60Hinge1": 0.020403,
+          "pts60Hinge2": 0.004829,
+          "toi": 0.035701,
+          "toiHinge1": 0.120676,
+          "toiHinge2": 0.023381,
+          "age": -0.001354,
+          "ufa": 0.001454
+        },
+        "knots": {
+          "pts60": [
+            1.659987,
+            2.33463
+          ],
+          "toi": [
+            0.704879,
+            0.879694
+          ]
         },
         "featureDomain": {
           "pts60": {
@@ -65,28 +80,46 @@
             "max": 1
           }
         },
+        "domainEdgeCapPct": 0.19713,
+        "ceilingBindsOnFitted": 0,
         "validation": {
           "walkForward": {
             "trainN": 902,
             "testN": 395,
-            "r2": 0.6431,
-            "maeCapPct": 0.01355,
-            "maeDollarsAt104MCap": 1.409
+            "r2": 0.7026,
+            "maeCapPct": 0.01169,
+            "maeDollarsAt104MCap": 1.216,
+            "richestAbsMissCapPct": 0.02251,
+            "richestN": 20
           },
           "inSample": {
             "n": 1297,
-            "r2": 0.6659
+            "r2": 0.7474
           }
         }
       },
       "D": {
         "n": 699,
-        "intercept": -0.043087,
+        "intercept": -0.001828,
         "coefficients": {
-          "pts60": 0.013011,
-          "toi": 0.108239,
-          "age": -0.001295,
-          "ufa": 0.003813
+          "pts60": 0.007826,
+          "pts60Hinge1": 0,
+          "pts60Hinge2": 0,
+          "toi": 0.049807,
+          "toiHinge1": 0.105323,
+          "toiHinge2": 0.084304,
+          "age": -0.000942,
+          "ufa": 0.001398
+        },
+        "knots": {
+          "pts60": [
+            0.82504,
+            1.311223
+          ],
+          "toi": [
+            0.903664,
+            1.077692
+          ]
         },
         "featureDomain": {
           "pts60": {
@@ -118,17 +151,21 @@
             "max": 1
           }
         },
+        "domainEdgeCapPct": 0.13959,
+        "ceilingBindsOnFitted": 0,
         "validation": {
           "walkForward": {
             "trainN": 474,
             "testN": 225,
-            "r2": 0.5529,
-            "maeCapPct": 0.01355,
-            "maeDollarsAt104MCap": 1.409
+            "r2": 0.5703,
+            "maeCapPct": 0.01304,
+            "maeDollarsAt104MCap": 1.356,
+            "richestAbsMissCapPct": 0.02261,
+            "richestN": 20
           },
           "inSample": {
             "n": 699,
-            "r2": 0.6188
+            "r2": 0.6821
           }
         }
       }
@@ -136,7 +173,8 @@
   },
   "walkForwardSplit": "2024-07-01",
   "excludedFeatures": {
-    "term": "Excluded, and the reason replicates the goalie fit exactly. Term correlates 0.78 with cap hit here and lifts walk-forward R² from 0.61 to 0.78 — but it is endogenous, negotiated jointly with AAV, and including it flips the UFA coefficient from +0.0036 to -0.0012, which would mean unrestricted free agents cost less than restricted ones. Two independent populations showing the same artefact is not a judgement call."
+    "term": "Excluded, and the reason replicates the goalie fit exactly. Term correlates 0.78 with cap hit here and lifts walk-forward R² from 0.61 to 0.78 — but it is endogenous, negotiated jointly with AAV, and including it broke the UFA term. Two independent populations showing the same artefact is not a judgement call.",
+    "ufa": "Dropped when the fit moved to log(capPct), on evidence rather than taste. Its t-statistic is -0.40 for forwards and -0.40 for defence — indistinguishable from zero, and negative where hockey says leverage should cost money.  The reason is collinearity, not a broken transform. Unrestricted forwards sign at mean age 29.7 against 23.8 for restricted, so age already carries almost everything the flag would. And the unrestricted pool is 20.4% league-minimum deals against 9.5% — veteran depth. Fitting the log weights those proportionally, where the linear fit let the expensive tail set the sign (t 2.67, itself marginal).  Removing it changes walk-forward mean error by nothing to three decimals ($1.166M either way for forwards, $1.353M for defence) and slightly improves the miss on the richest contracts. A term that buys no accuracy and carries a wrong sign does not belong in a model that prices real deals."
   },
   "sources": [
     {

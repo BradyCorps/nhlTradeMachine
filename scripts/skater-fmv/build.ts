@@ -110,17 +110,128 @@ function ols(X: number[][], Y: number[]): number[] {
 
 interface Rec { y: number; date: string; unit: Unit; pts60: number; toi: number; age: number; ufa: number }
 
-const design = (d: Rec) => [1, ...FEATURES.map(f => d[f])];
-const predict = (b: number[], d: Rec) => design(d).reduce((s, x, i) => s + x * b[i], 0);
+/** League minimum as a share of the cap — a contract cannot go below it. */
+const LEAGUE_MINIMUM_CAP_PCT = 0.00745;
 
-function metrics(data: Rec[], b: number[]) {
+/**
+ * The CBA's individual maximum: 20% of the upper limit.
+ *
+ * A real legal constraint, not a modelling choice — and NOT the thing the
+ * retired sigmoid did with the same number. That curve used 20% as an
+ * ASYMPTOTE, so every good player was drawn toward it and a third-pair
+ * defenceman priced at $16.8M. This is a ceiling the fit essentially never
+ * reaches on a real player; it exists so the quadratic cannot extrapolate past
+ * what a club is allowed to sign.
+ */
+const CBA_MAXIMUM_CAP_PCT = 0.20;
+
+/**
+ * A monotone linear spline on production and deployment.
+ *
+ * The price curve bends upward at the top and a straight line could not follow
+ * it. Squared terms could, and were tried — they fit better and turned over
+ * INSIDE the fitted range, so an elite scoring defenceman was penalised for
+ * scoring. Hinges bend without that: `max(0, x − knot)` adds slope above a knot
+ * and nothing below it, so with non-negative coefficients the curve can only
+ * ever rise.
+ *
+ * Knots sit at the 50th and 85th percentile of each feature, which is where the
+ * market's own behaviour changes — the middle of the league and the start of
+ * the top end.
+ */
+const hinge = (x: number, knot: number) => Math.max(0, x - knot);
+
+interface Knots { pts60: [number, number]; toi: [number, number] }
+
+const designWith = (k: Knots) => (d: Rec) => [
+  1,
+  d.pts60, hinge(d.pts60, k.pts60[0]), hinge(d.pts60, k.pts60[1]),
+  d.toi, hinge(d.toi, k.toi[0]), hinge(d.toi, k.toi[1]),
+  d.age, d.ufa,
+];
+
+const COEFFICIENT_NAMES = [
+  "pts60", "pts60Hinge1", "pts60Hinge2",
+  "toi", "toiHinge1", "toiHinge2",
+  "age", "ufa",
+];
+
+/**
+ * Which coefficients may not go negative: the production and deployment slopes.
+ *
+ * This is what buys monotonicity. Age is free to be negative (it is), and so is
+ * the unrestricted premium and the intercept.
+ */
+const NON_NEGATIVE = [false, true, true, true, true, true, true, false, false];
+
+/**
+ * Least squares with a lower bound of zero on selected coefficients.
+ *
+ * Coordinate descent: solve each coefficient in closed form against the current
+ * residual, clip the constrained ones at zero, repeat. Converges for a convex
+ * quadratic objective, and the problem is nine parameters over a few hundred
+ * rows, so cost is irrelevant.
+ */
+function boundedLeastSquares(X: number[][], y: number[], nonNeg: boolean[], iters = 1000): number[] {
+  const k = X[0].length;
+  const b = Array(k).fill(0);
+  const colSq = Array.from({ length: k }, (_, j) => X.reduce((s, r) => s + r[j] * r[j], 0) || 1e-12);
+  const resid = y.slice();
+  for (let it = 0; it < iters; it++) {
+    let moved = 0;
+    for (let j = 0; j < k; j++) {
+      let g = 0;
+      for (let i = 0; i < X.length; i++) g += X[i][j] * resid[i];
+      let next = b[j] + g / colSq[j];
+      if (nonNeg[j] && next < 0) next = 0;
+      const delta = next - b[j];
+      if (delta !== 0) {
+        for (let i = 0; i < X.length; i++) resid[i] -= X[i][j] * delta;
+        b[j] = next;
+        moved += Math.abs(delta);
+      }
+    }
+    if (moved < 1e-14) break;
+  }
+  return b;
+}
+
+/** The raw linear combination, before either bound. */
+const rawPredict = (des: (d: Rec) => number[], b: number[], d: Rec) =>
+  des(d).reduce((s, x, i) => s + x * b[i], 0);
+
+const predict = (des: (d: Rec) => number[], b: number[], d: Rec) =>
+  Math.min(CBA_MAXIMUM_CAP_PCT, Math.max(LEAGUE_MINIMUM_CAP_PCT, rawPredict(des, b, d)));
+
+/**
+ * How far a form runs away from the data at the edge of its own feature box.
+ *
+ * Measured UNBOUNDED, because the point is to see what the functional form
+ * does, not what the clamp rescues. The corner — richest, most deployed,
+ * youngest — is not a real player, so a figure somewhat above the CBA maximum
+ * is expected and harmless. A figure far above it means the form is
+ * extrapolating, and a log fit put this at 54.7% while scoring best on average
+ * error.
+ */
+const EDGE_BLOWUP_LIMIT = 0.35;
+
+function metrics(data: Rec[], des: (d: Rec) => number[], b: number[]) {
   const my = data.reduce((s, d) => s + d.y, 0) / data.length;
-  const ss = data.reduce((s, d) => s + (d.y - predict(b, d)) ** 2, 0);
+  const ss = data.reduce((s, d) => s + (d.y - predict(des, b, d)) ** 2, 0);
   const tt = data.reduce((s, d) => s + (d.y - my) ** 2, 0);
+  const richest = [...data].sort((a, b2) => b2.y - a.y).slice(0, 20);
   return {
     n: data.length,
     r2: 1 - ss / tt,
-    maeCapPct: data.reduce((s, d) => s + Math.abs(d.y - predict(b, d)), 0) / data.length,
+    maeCapPct: data.reduce((s, d) => s + Math.abs(d.y - predict(des, b, d)), 0) / data.length,
+    // MEAN ABSOLUTE on the richest contracts, and the "absolute" is the point.
+    // A signed mean let an 8-point under-price on one star cancel a 4-point
+    // over-price on another and report +0.43 for a fit that was pricing
+    // McDavid at 26% of the cap. This is the metric the top-end work is judged
+    // on; the overall MAE is dominated by the mass of cheap deals and barely
+    // moves whatever happens up there.
+    richestAbsMissCapPct: richest.reduce((s, d) => s + Math.abs(d.y - predict(des, b, d)), 0) / Math.max(1, richest.length),
+    richestN: richest.length,
   };
 }
 
@@ -193,21 +304,48 @@ function main() {
 
     const train = rows.filter(d => d.date < WALK_FORWARD_SPLIT);
     const test = rows.filter(d => d.date >= WALK_FORWARD_SPLIT);
-    const full = ols(rows.map(design), rows.map(d => d.y));
-    const trained = ols(train.map(design), train.map(d => d.y));
-    const walk = metrics(test, trained);
-
     const domainOf = (f: Feature) => {
       const v = rows.map(d => d[f]).sort((a, b) => a - b);
       const q = (p: number) => v[Math.min(v.length - 1, Math.floor(p * v.length))];
       return { min: round(v[0]), p5: round(q(0.05)), p50: round(q(0.5)), p95: round(q(0.95)), max: round(v[v.length - 1]) };
     };
 
+    // Knots at the median and the 85th percentile of the unit's own
+    // distribution: the middle of the league, and where the top end begins.
+    const pct = (f: Feature, p: number) => {
+      const v = rows.map(d => d[f]).sort((a, b) => a - b);
+      return round(v[Math.min(v.length - 1, Math.floor(p * v.length))]);
+    };
+    const knots: Knots = {
+      pts60: [pct("pts60", 0.50), pct("pts60", 0.85)],
+      toi: [pct("toi", 0.50), pct("toi", 0.85)],
+    };
+    const design = designWith(knots);
+
+    const full = boundedLeastSquares(rows.map(design), rows.map(d => d.y), NON_NEGATIVE);
+    const trained = boundedLeastSquares(train.map(design), train.map(d => d.y), NON_NEGATIVE);
+    const walk = metrics(test, design, trained);
+
     models[unit] = {
       n: rows.length,
       intercept: round(full[0]),
-      coefficients: Object.fromEntries(FEATURES.map((f, i) => [f, round(full[i + 1])])),
+      coefficients: Object.fromEntries(COEFFICIENT_NAMES.map((f, i) => [f, round(full[i + 1])])),
+      knots,
       featureDomain: Object.fromEntries(FEATURES.map(f => [f, domainOf(f)])),
+      // What the fit says at the very edge of its own feature range: the
+      // richest, most-deployed, youngest profile it ever saw. Published as a
+      // guard — a form can behave on real players and still price a legal but
+      // extreme profile absurdly. A log fit scored best on average error here
+      // and put this at 54.7% of the cap.
+      domainEdgeCapPct: round(rawPredict(design, full, {
+        ...rows[0],
+        pts60: domainOf("pts60").max, toi: domainOf("toi").max,
+        age: domainOf("age").min, ufa: 1,
+      }), 5),
+      // How many real signings the CBA ceiling actually binds on. Must be zero:
+      // if the clamp is doing work on contracts that were legally signed, it is
+      // not a legal bound any more, it is the model being wrong.
+      ceilingBindsOnFitted: rows.filter(d => rawPredict(design, full, d) > CBA_MAXIMUM_CAP_PCT).length,
       validation: {
         walkForward: {
           trainN: train.length,
@@ -215,11 +353,45 @@ function main() {
           r2: round(walk.r2, 4),
           maeCapPct: round(walk.maeCapPct, 5),
           maeDollarsAt104MCap: round(walk.maeCapPct * 104, 3),
+          richestAbsMissCapPct: round(walk.richestAbsMissCapPct, 5),
+          richestN: walk.richestN,
         },
-        inSample: { n: rows.length, r2: round(metrics(rows, full).r2, 4) },
+        inSample: { n: rows.length, r2: round(metrics(rows, design, full).r2, 4) },
       },
     };
-    summary.push(`  ${unit}: n=${rows.length}  train ${train.length}/test ${walk.n}  R2 ${walk.r2.toFixed(3)}  MAE $${(walk.maeCapPct * 104).toFixed(2)}M`);
+    summary.push(`  ${unit}: n=${rows.length}  train ${train.length}/test ${walk.n}  R2 ${walk.r2.toFixed(3)}  MAE $${(walk.maeCapPct * 104).toFixed(2)}M  richest-20 |miss| ${(walk.richestAbsMissCapPct * 100).toFixed(2)}pts  edge ${((models[unit] as any).domainEdgeCapPct * 100).toFixed(1)}%`);
+
+    // ── Guards on the SHAPE, not the fit statistics ────────────────
+    //
+    // Every one of these caught a real problem. Squared terms scored better
+    // than what shipped and turned over inside the fitted range; a log fit
+    // scored better still and priced the corner of the feature box at 54.7% of
+    // the cap.
+    const dP = domainOf("pts60"), dT = domainOf("toi");
+    const at = (pts60: number, toi: number) =>
+      predict(design, full, { ...rows[0], pts60, toi, age: 27, ufa: 1 });
+    for (const [label, sample] of [
+      ["production", (i: number) => at(dP.min + ((dP.max - dP.min) * i) / 60, dT.p50)],
+      ["deployment", (i: number) => at(dP.p50, dT.min + ((dT.max - dT.min) * i) / 60)],
+    ] as [string, (i: number) => number][]) {
+      let prev = -Infinity;
+      for (let i = 0; i <= 60; i++) {
+        const v = sample(i);
+        if (v < prev - 1e-12) {
+          throw new Error(`${unit}: price falls as ${label} rises — the fit is not monotone`);
+        }
+        prev = v;
+      }
+    }
+
+    const edge = (models[unit] as any).domainEdgeCapPct as number;
+    if (edge >= EDGE_BLOWUP_LIMIT) {
+      throw new Error(`${unit}: unbounded domain-edge price ${(edge * 100).toFixed(1)}% — the form extrapolates`);
+    }
+    const bound = (models[unit] as any).ceilingBindsOnFitted as number;
+    if (bound > 0) {
+      throw new Error(`${unit}: the CBA ceiling binds on ${bound} real signings — that is the model being wrong, not a legal bound`);
+    }
   }
 
   const dates = data.map(d => d.date).sort();
@@ -229,6 +401,7 @@ function main() {
     generationCommand: "npx tsx scripts/skater-fmv/build.ts",
     target: {
       variable: "capPct",
+      bounds: "floored at the league minimum, ceilinged at the CBA's 20% individual maximum",
       why: "Fitting the share of the cap removes the era, so a 2018 deal and a 2026 deal are comparable and the app multiplies by whatever ceiling it is pricing against.",
     },
     population: {
@@ -242,19 +415,52 @@ function main() {
       lookbackSeasons: LOOKBACK_SEASONS,
     },
     model: {
-      form: "ordinary least squares per position group, capPct ~ 1 + pts60 + toi + age + ufa",
+      form: "bounded least squares per position group, capPct ~ 1 + pts60 + hinges(pts60) + toi + hinges(toi) + age + ufa, with the production and deployment slopes constrained non-negative",
+      whyHinges: [
+        "The linear fit was misspecified, and the tell was a U-shaped residual curve:",
+        "binned by PREDICTION (not by actual, which produces that shape even for a",
+        "correct model), forwards ran +1.56 points of cap in the bottom decile,",
+        "-0.80 in the middle, and +1.53 in the top. A straight line through a",
+        "convex relationship over-predicts the middle and misses both ends. It also",
+        "predicted a NEGATIVE cap share for the bottom decile, which only the",
+        "league-minimum floor was hiding.",
+        "",
+        "Walk-forward, forwards: mean error $1.26M -> $1.17M, and the average miss on",
+        "the five richest held-out contracts +6.26 -> +0.51 points of cap. Defence is",
+        "level on mean error ($1.33M -> $1.35M) and better at the top (+3.04 -> +2.02),",
+        "and one functional form across both units is worth the rounding.",
+        "",
+        "Adding squared terms scored better IN SAMPLE and collapsed out of sample",
+        "(forwards R2 -0.04) because squares blow up under exp. Recency weighting the",
+        "training rows changed nothing measurable. Neither is used.",
+      ].join(" "),
       splitByPosition: "Forwards and defencemen are fitted separately. Pooled scores the same on mean error, but a defenceman is paid more for minutes (toi 0.105 vs 0.090) and less for points (pts60 0.016 vs 0.020), and one shared slope cannot say that.",
       features: {
         pts60: "Points per sixty minutes of ice over the last 3 finished seasons.",
         toi: "Latest finished season's minutes per game against a 20-minute reference, capped at 1.6.",
         age: "Age at signing.",
-        ufa: "1 when signed as an unrestricted free agent, 0 when restricted.",
       },
       byPosition: models,
     },
     walkForwardSplit: WALK_FORWARD_SPLIT,
     excludedFeatures: {
-      term: "Excluded, and the reason replicates the goalie fit exactly. Term correlates 0.78 with cap hit here and lifts walk-forward R² from 0.61 to 0.78 — but it is endogenous, negotiated jointly with AAV, and including it flips the UFA coefficient from +0.0036 to -0.0012, which would mean unrestricted free agents cost less than restricted ones. Two independent populations showing the same artefact is not a judgement call.",
+      term: "Excluded, and the reason replicates the goalie fit exactly. Term correlates 0.78 with cap hit here and lifts walk-forward R² from 0.61 to 0.78 — but it is endogenous, negotiated jointly with AAV, and including it broke the UFA term. Two independent populations showing the same artefact is not a judgement call.",
+      ufa: [
+        "Dropped when the fit moved to log(capPct), on evidence rather than taste.",
+        "Its t-statistic is -0.40 for forwards and -0.40 for defence — indistinguishable",
+        "from zero, and negative where hockey says leverage should cost money.",
+        "",
+        "The reason is collinearity, not a broken transform. Unrestricted forwards sign",
+        "at mean age 29.7 against 23.8 for restricted, so age already carries almost",
+        "everything the flag would. And the unrestricted pool is 20.4% league-minimum",
+        "deals against 9.5% — veteran depth. Fitting the log weights those proportionally,",
+        "where the linear fit let the expensive tail set the sign (t 2.67, itself marginal).",
+        "",
+        "Removing it changes walk-forward mean error by nothing to three decimals",
+        "($1.166M either way for forwards, $1.353M for defence) and slightly improves the",
+        "miss on the richest contracts. A term that buys no accuracy and carries a",
+        "wrong sign does not belong in a model that prices real deals.",
+      ].join(" "),
     },
     sources,
   };

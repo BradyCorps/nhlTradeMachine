@@ -1209,6 +1209,76 @@ the change, not a side effect.
 
 Found while checking a claim I had made and got wrong — see the next note.
 
+## The top-end fit: three forms tested, two of them wrong
+
+The fitted model under-priced the top of the market. Leo Carlsson signed at
+17.30% of the cap and priced as a 7.91% player; Kaprizov 16.30% against 9.53%.
+The only case that looked right was McDavid — because his $12.5M is a
+hometown discount, and anchoring the sanity check on it is what let the problem
+sit unexamined.
+
+**The diagnosis.** Residuals binned by PREDICTION (binning by actual produces a
+rising pattern even for a correct model, which nearly fooled me): forwards ran
++1.56 points of cap in the bottom decile, −0.80 through the middle, +1.53 in the
+top. A U-shape is what a straight line makes of a curve that bends. The linear
+fit also predicted a NEGATIVE cap share for the cheapest decile, which only the
+league-minimum floor was hiding.
+
+**Two forms fitted better and were wrong.**
+
+*Log-linear* scored best on average error — forwards $1.26M → $1.17M — and I
+nearly shipped it. It prices the corner of its own feature box at **54.7% of the
+cap**, and McDavid at $26.76M. What hid this was my validation metric: I used
+the MEAN miss on the richest contracts, so Carlsson at −8.1 cancelled Celebrini
+at +3.9 and reported a reassuring +0.43. **Mean absolute** is the metric; the
+signed version is now impossible to reintroduce because the artifact publishes
+`richestAbsMissCapPct`.
+
+*Squared terms* also fit better and turn over INSIDE the fitted range. Defence
+points peaked at 1.78 pts/60 with a concave curve, so an elite scoring
+defenceman was penalised for scoring — in exactly the region the work was meant
+to fix.
+
+**What shipped: a monotone linear spline.** Base slope plus `max(0, x − knot)`
+at the 50th and 85th percentile of each unit's own distribution, with the
+production and deployment slopes constrained non-negative by bounded least
+squares. The curve can only rise.
+
+| walk-forward | linear | squares | **hinges** |
+|---|---:|---:|---:|
+| F mean error | $1.26M | $1.21M | **$1.22M** |
+| F miss on richest 20 | 3.45 pts | 2.58 | **2.25** |
+| D miss on richest 20 | 2.35 pts | 2.18 | **2.26** |
+| domain-edge price (F) | 15.0% | 26.2% | **19.7%** |
+| monotone | yes | **no** | **yes** |
+
+Bounded at both ends: the league minimum below, the CBA's 20% individual
+maximum above. That ceiling is a legal fact and is NOT what the retired sigmoid
+did with the same number — that curve made 20% an asymptote everything was drawn
+toward. This one binds on zero contracts in the fitted population, and the build
+throws if it ever binds on one.
+
+**Three guards now run at build time**, each of which caught something real: the
+price may not fall as production or deployment rises; the unbounded price at the
+corner of the feature box must stay under 35%; and the CBA ceiling must bind on
+no real signing.
+
+**The UFA term was dropped and then restored.** Under the log fit its t-statistic
+was −0.40 in both units and I removed it with a written justification. Under the
+form that actually shipped it is +2.67 and +2.03 and correctly signed, so the
+conclusion belonged to the log fit alone. It is back.
+
+**What remains, and it is nameable rather than a specification error.** The
+misses left are young players signed on projection: Carlsson at 21 is still
+−8.5 points of cap, Bedard −3.2. A model of production and minutes cannot price
+what a club thinks a 21-year-old becomes. Celebrini improved from −5.4 to −2.8
+and Kaprizov from −6.8 to −4.0. The honest statement is that this model prices
+established players well and pays no attention to projection.
+
+Also corrected: the top of the market is **17.3% of the cap**, not McDavid's
+$12.5M. Cap-relative throughout, so it scales with the ceiling — 17.3% is
+$18.0M at $104M and $19.6M at $113.5M.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

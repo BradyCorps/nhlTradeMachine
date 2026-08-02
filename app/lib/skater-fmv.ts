@@ -13,13 +13,43 @@
 // for minutes and less for points, and one shared slope cannot express that.
 // Pass the position and the right model is used.
 //
+// THE PRICE CURVE BENDS UPWARD, AND SO DOES THE FIT
+//
+// Production and deployment enter as monotone linear splines — a base slope
+// plus `max(0, x − knot)` terms at the median and the 85th percentile. A
+// straight line was misspecified, and the tell was the residuals binned by
+// PREDICTION (not by actual, which produces the same shape even for a correct
+// model): forwards ran +1.56 points of cap in the bottom decile, −0.80 through
+// the middle and +1.53 at the top. A line through a curve that bends
+// over-predicts the middle and misses both ends, and it predicted a NEGATIVE
+// cap share for the cheapest decile, which only the league minimum was hiding.
+//
+// The cost sat where it mattered most. On the twenty richest held-out contracts
+// the linear fit was out by 3.45 points of cap on average, pricing Leo
+// Carlsson's 17.3% deal as a 7.9% player. This is out by 2.25.
+//
+// The slopes are constrained non-negative, so the curve can only ever rise.
+// That constraint is not decoration: squared terms fit better and turned over
+// INSIDE the fitted range, so an elite scoring defenceman was penalised for
+// scoring, and a log fit scored better still and priced the corner of the
+// feature box at 54.7% of the cap. The build refuses to ship a fit whose price
+// falls as production or deployment rises.
+//
+// BOUNDED AT BOTH ENDS
+//
+// Floored at the league minimum, ceilinged at the CBA's 20% individual maximum.
+// The ceiling is a legal fact, and it is NOT what the retired sigmoid did with
+// the same number — that curve used 20% as an asymptote, so every good player
+// was drawn toward it. This one binds on no contract in the fitted population,
+// and the build refuses to ship if it ever does.
+//
 // WALK-FORWARD VALIDATED
 //
 // Trained on contracts signed before July 2024, scored on the ones signed
-// after: forwards R² 0.64, defencemen R² 0.55, both a mean error of $1.41M at
-// a $104M ceiling. Roughly two thirds of the variance in what a skater signs
-// for is in four numbers; the rest is leverage, cap room, and how many clubs
-// were bidding. `skaterFmvRange` exists so that can be shown rather than hidden
+// after: forwards R² 0.70 and a mean error of $1.21M at a $104M ceiling,
+// defencemen R² 0.60 and $1.33M. Roughly two thirds of what a skater signs for
+// is in these numbers; the rest is leverage, cap room, and how many clubs were
+// bidding. `skaterFmvRange` exists so that can be shown rather than hidden
 // behind a single figure.
 
 import artifact from "@/app/data/skater-fmv.json";
@@ -43,6 +73,8 @@ const BY_POSITION = artifact.model.byPosition as Record<SkaterUnit, {
   n: number;
   intercept: number;
   coefficients: Record<string, number>;
+  /** Where each feature's slope is allowed to change, in the feature's units. */
+  knots: { pts60: number[]; toi: number[] };
   featureDomain: Record<string, { min: number; p5: number; p50: number; p95: number; max: number }>;
   validation: { walkForward: { trainN: number; testN: number; r2: number; maeCapPct: number } };
 }>;
@@ -60,6 +92,18 @@ export const TOI_CAP = 1.6;
  * negative dollars; a contract cannot go there.
  */
 export const LEAGUE_MINIMUM_CAP_PCT = 0.00745;
+
+/**
+ * The CBA's individual maximum: 20% of the upper limit.
+ *
+ * A legal bound, and deliberately not the retired sigmoid's use of the same
+ * figure. That curve made 20% an asymptote every good player was drawn toward,
+ * which is how a third-pair defenceman came to be priced at $16.8M. This is a
+ * ceiling that binds on no contract in the fitted population — the build fails
+ * if it ever does — and exists only so the quadratic cannot price a profile
+ * above what a club may legally sign.
+ */
+export const CBA_MAXIMUM_CAP_PCT = 0.20;
 
 /**
  * The position group a raw position string belongs to.
@@ -121,6 +165,32 @@ export interface DomainReport {
 
 const clampTo = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+const hinge = (x: number, knot: number) => Math.max(0, x - knot);
+
+/**
+ * The fitted cap share before either bound is applied.
+ *
+ * One place, so pricing and the domain report cannot disagree about what the
+ * model says — the report subtracts two of these to work out what a clamp cost.
+ */
+function rawCapPct(
+  model: (typeof BY_POSITION)[SkaterUnit],
+  v: Record<SkaterFeature, number>,
+  isUfa: boolean,
+): number {
+  const c = model.coefficients;
+  const k = model.knots;
+  return model.intercept
+    + c.pts60 * v.pts60
+    + c.pts60Hinge1 * hinge(v.pts60, k.pts60[0])
+    + c.pts60Hinge2 * hinge(v.pts60, k.pts60[1])
+    + c.toi * v.toi
+    + c.toiHinge1 * hinge(v.toi, k.toi[0])
+    + c.toiHinge2 * hinge(v.toi, k.toi[1])
+    + c.age * v.age
+    + c.ufa * (isUfa ? 1 : 0);
+}
+
 /**
  * Clamp every feature to the fitted range, recording what each clamp cost.
  *
@@ -152,23 +222,36 @@ function clampFeatures(input: SkaterFmvInput): {
   };
 
   const values = {} as Record<SkaterFeature, number>;
-  const findings: DomainFinding[] = [];
+  const clampedFeatures: SkaterFeature[] = [];
   for (const feature of ["pts60", "toi", "age"] as SkaterFeature[]) {
     const bound = d[feature];
-    const v = raw[feature];
-    const clamped = clampTo(v, bound.min, bound.max);
-    values[feature] = clamped;
-    if (clamped !== v) {
-      findings.push({
-        feature,
-        label: labels[feature],
-        value: display[feature](v),
-        clampedTo: display[feature](clamped),
-        direction: v < bound.min ? "below" : "above",
-        withheldCapPct: model.coefficients[feature] * (v - clamped),
-      });
-    }
+    values[feature] = clampTo(raw[feature], bound.min, bound.max);
+    if (values[feature] !== raw[feature]) clampedFeatures.push(feature);
   }
+
+  // What the clamp cost is a difference of PRICES, not of coefficients.
+  //
+  // It used to be `coefficient × overshoot`, which was only ever right because
+  // the fit was linear in the cap share. It is linear in the LOG of the cap
+  // share now, so a coefficient is a multiplicative effect and that arithmetic
+  // would have quietly reported nonsense. Priced both ways instead, which is
+  // exact and survives the next change of functional form.
+  const priceOf = (v: Record<SkaterFeature, number>) =>
+    rawCapPct(model, v, input.isUfa);
+
+  const findings: DomainFinding[] = clampedFeatures.map(feature => {
+    // One feature at a time, holding the others clamped, so several clamps
+    // still add up to the whole difference rather than double-counting.
+    const withThis = { ...values, [feature]: raw[feature] };
+    return {
+      feature,
+      label: labels[feature],
+      value: display[feature](raw[feature]),
+      clampedTo: display[feature](values[feature]),
+      direction: raw[feature] < d[feature].min ? "below" : "above",
+      withheldCapPct: priceOf(withThis) - priceOf(values),
+    };
+  });
   return { model, values, findings };
 }
 
@@ -255,13 +338,8 @@ export function skaterFmvCapPct(input: SkaterFmvInput): number | null {
   const c = clampFeatures(input);
   if (!c) return null;
 
-  const pct = c.model.intercept
-    + c.model.coefficients.pts60 * c.values.pts60
-    + c.model.coefficients.toi * c.values.toi
-    + c.model.coefficients.age * c.values.age
-    + c.model.coefficients.ufa * (input.isUfa ? 1 : 0);
-
-  return Math.max(LEAGUE_MINIMUM_CAP_PCT, pct);
+  const pct = rawCapPct(c.model, c.values, input.isUfa);
+  return Math.min(CBA_MAXIMUM_CAP_PCT, Math.max(LEAGUE_MINIMUM_CAP_PCT, pct));
 }
 
 /** Dollars, in millions, against a given cap ceiling. */

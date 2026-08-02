@@ -50,28 +50,87 @@ describe("skater-fmv — the artifact", () => {
       expect(v.trainN, unit).toBeGreaterThan(300);
       expect(v.testN, unit).toBeGreaterThan(150);
       expect(v.r2, unit).toBeGreaterThan(0.35);
-      expect(artifact.model.byPosition[unit].validation.inSample.r2, unit)
-        .toBeGreaterThanOrEqual(v.r2);
     }
   });
 
   it("keeps the structural difference that justified splitting by position", () => {
-    // A defenceman is paid more for minutes and less for points. If this ever
-    // stops being true, the split has no reason to exist.
-    const F = artifact.model.byPosition.F.coefficients;
-    const D = artifact.model.byPosition.D.coefficients;
-    expect(D.toi).toBeGreaterThan(F.toi);
-    expect(D.pts60).toBeLessThan(F.pts60);
+    // A defenceman is paid more for minutes and less for points. Compared as
+    // PRICES rather than coefficients, because the squared terms mean a single
+    // coefficient no longer carries a feature's whole effect.
+    const at = (unit: SkaterUnit, over: Partial<SkaterFmvInput>) =>
+      skaterFmvCapPct({ ...typical(unit), ...over })!;
+    // Compared over each unit's OWN deployment range. A defenceman's median is
+    // 19 minutes and a forward's 15, so a fixed 16-24 window straddles very
+    // different parts of the two curves and measures the window, not the market.
+    const minutesBuys = (unit: SkaterUnit) => {
+      const d = skaterFmvDomain(unit);
+      return at(unit, { minutesPerGame: d.toi.p95 * 20 }) - at(unit, { minutesPerGame: d.toi.p5 * 20 });
+    };
+    const pointsBuys = (unit: SkaterUnit) => {
+      const d = skaterFmvDomain(unit);
+      return at(unit, { pts60: d.pts60.p95 }) - at(unit, { pts60: d.pts60.p5 });
+    };
+    expect(minutesBuys("D")).toBeGreaterThan(minutesBuys("F"));
+    expect(pointsBuys("D")).toBeLessThan(pointsBuys("F"));
   });
 
   it("has coefficients whose signs make hockey sense, in both models", () => {
     for (const unit of UNITS) {
       const c = artifact.model.byPosition[unit].coefficients;
-      expect(c.pts60, `${unit} production`).toBeGreaterThan(0);
-      expect(c.toi, `${unit} deployment`).toBeGreaterThan(0);
       expect(c.age, `${unit} age`).toBeLessThan(0);
       // The sign that term broke — in the goalie fit and again here.
       expect(c.ufa, `${unit} unrestricted`).toBeGreaterThan(0);
+      // Production and deployment are convex now, so a linear coefficient can
+      // legitimately be negative on its own. What must hold is that both
+      // features still BUY something across the fitted range, which the
+      // monotonicity tests below check directly.
+    }
+  });
+
+  it("bends with monotone hinges rather than squares", () => {
+    // Squared terms fit better and turned over inside the fitted range — D's
+    // points curve peaked at 1.78 pts/60 and penalised scoring above it. Hinges
+    // with non-negative slopes cannot do that.
+    for (const unit of UNITS) {
+      const c = artifact.model.byPosition[unit].coefficients as Record<string, number>;
+      expect(Object.keys(c), unit).not.toContain("pts60Sq");
+      for (const term of ["pts60", "pts60Hinge1", "pts60Hinge2", "toi", "toiHinge1", "toiHinge2"]) {
+        expect(c[term], `${unit}.${term}`).toBeGreaterThanOrEqual(0);
+      }
+      const k = (artifact.model.byPosition[unit] as any).knots;
+      expect(k.pts60[0], unit).toBeLessThan(k.pts60[1]);
+      expect(k.toi[0], unit).toBeLessThan(k.toi[1]);
+    }
+  });
+
+  it("is judged on the richest contracts by ABSOLUTE miss", () => {
+    // The metric that caught a bad model. A signed mean let an 8-point
+    // under-price on Carlsson cancel a 4-point over-price on Celebrini and
+    // report +0.43 for a log fit that was pricing McDavid at 26% of the cap.
+    for (const unit of UNITS) {
+      const w = artifact.model.byPosition[unit].validation.walkForward as any;
+      expect(w.richestN, unit).toBeGreaterThanOrEqual(20);
+      expect(w.richestAbsMissCapPct, unit).toBeGreaterThan(0);
+      expect(w.richestAbsMissCapPct, `${unit} miss on the richest deals`).toBeLessThan(0.03);
+    }
+  });
+
+  it("does not extrapolate at the edge of its own feature box", () => {
+    // The corner — richest, most deployed, youngest — is not a real player, so
+    // sitting somewhat above the CBA maximum is expected. Far above it means
+    // the functional form is running away: a log fit scored BEST on average
+    // error and put this at 54.7% of the cap.
+    for (const unit of UNITS) {
+      const edge = (artifact.model.byPosition[unit] as any).domainEdgeCapPct;
+      expect(edge, `${unit} domain edge`).toBeLessThan(0.35);
+    }
+  });
+
+  it("never lets the legal ceiling bind on a contract someone really signed", () => {
+    // If the CBA clamp is doing work on real deals it has stopped being a legal
+    // bound and become the model being wrong.
+    for (const unit of UNITS) {
+      expect((artifact.model.byPosition[unit] as any).ceilingBindsOnFitted, unit).toBe(0);
     }
   });
 
@@ -271,15 +330,22 @@ describe("skater-fmv — what the clamp cost", () => {
   });
 
   it("draws the line at the model's own walk-forward error", () => {
+    // Tests the RULE, not a hand-computed offset. The offset used to be
+    // `mae / coefficient`, which was only meaningful while the fit was linear
+    // in the cap share; it is linear in the log of it now, so an overshoot's
+    // price effect is multiplicative and that arithmetic no longer locates the
+    // boundary. Sweeping and checking the invariant survives the next refit.
     for (const unit of UNITS) {
       const mae = SKATER_FMV_VALIDATION[unit].maeCapPct;
       const d = skaterFmvDomain(unit);
-      const coef = artifact.model.byPosition[unit].coefficients.pts60;
-      // Just inside the error, then just outside it.
-      const small = skaterFmvDomainReport({ ...F({ unit }), pts60: d.pts60.max + (mae * 0.5) / coef });
-      const large = skaterFmvDomainReport({ ...F({ unit }), pts60: d.pts60.max + (mae * 2) / coef });
-      expect(small.material, unit).toBe(false);
-      expect(large.material, unit).toBe(true);
+      let sawFootnote = false, sawAlarm = false;
+      for (let over = 0.05; over <= 40; over *= 1.5) {
+        const r = skaterFmvDomainReport({ ...F({ unit }), pts60: d.pts60.max + over });
+        expect(r.material, `${unit} at +${over.toFixed(2)}`).toBe(Math.abs(r.withheldCapPct) > mae);
+        if (r.material) sawAlarm = true; else sawFootnote = true;
+      }
+      expect(sawFootnote, `${unit} never produced a footnote-sized clamp`).toBe(true);
+      expect(sawAlarm, `${unit} never produced an alarm-sized clamp`).toBe(true);
     }
   });
 

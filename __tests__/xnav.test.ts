@@ -253,10 +253,12 @@ describe("X-NAV — Franchise Centers", () => {
       avgTOI: 22, qocRank: 80, xgRelTM: 12, xgaRelTM: -0.3,
       games: 78, ops: 12.5, dps: 2.1,
     });
-    // Was [550, 760]. The fitted model prices him at $13.0M against a $12.5M
-    // cap hit — fairly paid, which he is. The retired curve said $20.7M and
-    // handed him $8M a year of surplus that does not exist.
-    inRange(result.total, 420, 600, "McDavid NAV");
+    // Was [550, 760] under the retired sigmoid, which said $20.7M and handed
+    // him $8M a year of surplus that does not exist. The fitted model prices a
+    // 140-point season at 22 minutes at $16.8M — 16.1% of the cap, against a
+    // market whose top is Leo Carlsson at 17.3% — so there is real surplus
+    // against $12.5M, just a third of what the curve invented.
+    inRange(result.total, 500, 700, "McDavid NAV");
   });
 
   it("Barkov: two-way C, fair contract → 450-600 NAV", () => {
@@ -609,7 +611,14 @@ describe("X-NAV — Elite Defencemen", () => {
       games: 78, ops: 2.0, dps: 1.4, pairDriverScore: -4,
     });
 
-    expect(result.total).toBeLessThan(40);
+    // The claim this test is really making is about the CONTRACT: heavy
+    // deployment must not turn a fair deal into a bargain. It does not — the
+    // market pays a 22.8-minute defenceman about $6.8M and he costs $6.5M, so
+    // the contract stage is worth ~11 of his total and the rest is on-ice.
+    // Drop him to 17 minutes on identical rate stats and he goes to -15.
+    const contractStage = (result.stages ?? []).find(s => s.key === "cap")?.value ?? 0;
+    expect(contractStage).toBeLessThan(20);
+    expect(result.total).toBeLessThan(60);
     expect(result.def).toBeLessThan(10);
   });
 });
