@@ -1183,6 +1183,32 @@ $20.8M asymptote. The canary now pins that `MAX_CAP_PCT`, `K_FACTOR`,
 engine and model are the same thing. Those constants live in that script and
 nowhere else.
 
+## Future contract years now use the announced cap
+
+`calcSkaterNAV` and `calcGoalieNAV` both escalated the ceiling at a flat 4% a
+year. The announced ceilings are 104.0 → 113.5 → 123.0, which is **9.1% then
+8.4%**. Every future year of every contract was priced against a cap several
+points too low, and the error compounded over exactly the long deals where the
+figure carries most weight.
+
+`season-config.ts` already exported `projectedCapCeiling(seasonsAhead)` — the
+announced values through 2028-29 then a 5% escalator — and `cap-horizon.ts` and
+`extensions.ts` both used it. The valuation engine did not.
+
+It cannot call it directly: Armchair GM lets a user set their own ceiling, and
+a contract has to be priced against that world rather than the real one. So
+`capGrowthFactor(n)` gives the announced curve's SHAPE as a multiple of today,
+and each loop multiplies its own base by it. With the default base the result
+is exactly the announced ceilings; with a custom one the cap still grows the
+way the real cap will.
+
+One band moved: Dustin Wolf on $875k × 2 years went 120 → 123 NAV, because year
+two of a cheap deal is now measured against $113.5M rather than $108.2M. A
+cost-controlled contract being worth more as the ceiling climbs is the point of
+the change, not a side effect.
+
+Found while checking a claim I had made and got wrong — see the next note.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

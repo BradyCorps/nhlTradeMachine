@@ -98,7 +98,11 @@ describe("G-NAV — Young Controlled Goalies", () => {
       age: 25, capHit: 0.875, yearsRemaining: 2,
       gsax: -1.8, gamesStarted: 57, teamXga60: 3.22,
     });
-    inRange(result.total, 75, 120, "Wolf (no ext) NAV");
+    // Was [75, 120]. The engine escalated the cap at a flat 4% a year; it now
+    // uses the announced ceilings (104.0 → 113.5), so year two of an $875k deal
+    // is measured against a bigger cap and the surplus grows. A cheap contract
+    // being worth MORE as the ceiling climbs is the point, not a side effect.
+    inRange(result.total, 75, 135, "Wolf (no ext) NAV");
     expect(result.total).toBeGreaterThan(20);
   });
 

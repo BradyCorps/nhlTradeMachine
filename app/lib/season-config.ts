@@ -85,6 +85,23 @@ export const projectedCapCeiling = (seasonsAhead: number): number => {
   return Math.round(cap * 10) / 10;
 };
 
+/**
+ * How much bigger the cap is N seasons out, as a multiple of today's.
+ *
+ * The valuation engine cannot call `projectedCapCeiling` directly: Armchair GM
+ * lets a user set their own ceiling, and a contract has to be priced against
+ * THAT world, not the real one. This gives the announced curve's SHAPE, so a
+ * custom base still grows the way the cap actually will.
+ *
+ * It exists because both NAV loops escalated at a flat 4% a year while the
+ * announced ceilings go 104.0 → 113.5 → 123.0, which is 9.1% then 8.4%. Every
+ * future year of every contract was priced against a cap several points too
+ * low, and the error compounded over exactly the long deals where the number
+ * matters most.
+ */
+export const capGrowthFactor = (seasonsAhead: number): number =>
+  projectedCapCeiling(seasonsAhead) / projectedCapCeiling(0);
+
 export const ageDecayRate   = (age: number): number =>
   age <= 23 ? COMPRESSION.decayProspect
   : age <= 27 ? COMPRESSION.decayYoung

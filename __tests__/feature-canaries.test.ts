@@ -4293,3 +4293,26 @@ describe("Canary — skater FMV comes from the fitted model, not a logistic curv
       .toContain("baselineToiPerGame: baselines.baselineToiPerGame");
   });
 });
+
+describe("Canary — future contract years use the announced cap, not a guess", () => {
+  const engine = readSource("app/lib/xnav-engine.ts");
+
+  it("no flat escalator survives in either NAV loop", () => {
+    // 4% a year against announced ceilings of 104.0 → 113.5 → 123.0, which are
+    // 9.1% and 8.4%. Every future year of every contract was priced against a
+    // cap several points too low, compounding worst on the long deals.
+    expect(engine).not.toContain("CAP_GROWTH_RATE");
+    expect(engine).not.toMatch(/Math\.pow\(\s*1\.0[0-9]\s*,\s*i\s*\)/);
+  });
+
+  it("both the skater and goalie loops escalate off the announced curve", () => {
+    const uses = engine.match(/BASE_CAP_CEILING \* capGrowthFactor\(i\)/g) ?? [];
+    expect(uses.length).toBe(2);
+  });
+
+  it("scales off the asset's own ceiling so a custom cap still governs", () => {
+    // Armchair GM lets a user set the cap. Calling projectedCapCeiling directly
+    // would price contracts against the real league instead of theirs.
+    expect(engine).not.toMatch(/=\s*projectedCapCeiling\(i\)/);
+  });
+});

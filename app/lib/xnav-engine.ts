@@ -10,7 +10,7 @@
 //   • Exponential Retention Tax
 //   • Rental discount on age penalty (1yr = 75% reduction, 2yr = 40%)
 
-import { SEASON, LEAGUE, FRANCHISE, ageDecayRate, ageSlotPenalty } from "@/app/lib/season-config";
+import { SEASON, LEAGUE, FRANCHISE, ageDecayRate, ageSlotPenalty, capGrowthFactor } from "@/app/lib/season-config";
 import type { NavStage, NavStageKind } from "@/app/lib/nav-breakdown";
 import { goalieFmvCapPct, LEAGUE_MINIMUM_CAP_PCT as GOALIE_LEAGUE_MIN_CAP_PCT } from "@/app/lib/goalie-fmv";
 import { reliability } from "@/app/lib/goalie-percentiles";
@@ -666,7 +666,6 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const fmvCapPctG = fittedCapPct ?? GOALIE_LEAGUE_MIN_CAP_PCT;
 
   const BASE_CAP_CEILING = asset.capCeiling ?? SEASON.capCeiling;
-  const CAP_GROWTH_RATE  = 1.04;
   const currentFmvAavG = BASE_CAP_CEILING * fmvCapPctG;
 
   const isUnsignedG = !extCapHit && asset.yearsRemaining <= 0 && asset.capHit <= 0.5;
@@ -681,7 +680,7 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
 
   let capSumG = 0;
   for (let i = 0; i < contractYears; i++) {
-    const projectedCapCeiling = BASE_CAP_CEILING * Math.pow(CAP_GROWTH_RATE, i);
+    const projectedCapCeiling = BASE_CAP_CEILING * capGrowthFactor(i);
     const fmvDollars = projectedCapCeiling * fmvCapPctG;
     const annualSurplus = fmvDollars - navCapHit;
     const timeDiscount = Math.pow(0.92, i);
@@ -1046,7 +1045,6 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const fmvCapPct = fittedCapPct ?? SKATER_LEAGUE_MIN_CAP_PCT;
 
   const BASE_CAP_CEILING = asset.capCeiling ?? SEASON.capCeiling;
-  const CAP_GROWTH_RATE  = 1.04;
   const currentFmvAav = BASE_CAP_CEILING * fmvCapPct;
 
   // Use extension cap hit and years if available to align with Goalie NAV and fix extension distortions.
@@ -1079,7 +1077,12 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   let capSum = 0;
   let tmvDriftFactor = 1;
   for (let i = 0; i < contractYears; i++) {
-    const projectedCapCeiling = BASE_CAP_CEILING * Math.pow(CAP_GROWTH_RATE, i);
+    // The announced ceilings, not a flat escalator. 104.0 → 113.5 → 123.0 is
+    // 9.1% then 8.4%; the 4% this used to compound left every future year of
+    // every contract priced against a cap several points too low, worst on the
+    // long deals where the figure carries most weight. Scaled off the asset's
+    // own base so a user-set ceiling in Armchair GM still governs.
+    const projectedCapCeiling = BASE_CAP_CEILING * capGrowthFactor(i);
     const ageAtYear = asset.age + i;
 
     if (i > 0) {
