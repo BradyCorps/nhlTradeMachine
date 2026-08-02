@@ -1,6 +1,6 @@
 {
   "schemaVersion": "skater-stability-v1",
-  "generatedAt": "2026-07-31T20:14:29.801Z",
+  "generatedAt": "2026-08-02T20:44:55.869Z",
   "generationCommand": "npx tsx scripts/skater-stability/build.ts",
   "eligibility": {
     "situation": "all",
@@ -79,6 +79,76 @@
           "stability": {
             "pairs": 5876,
             "r": 0.7212
+          },
+          "sampleCurve": {
+            "basis": "year-over-year correlation using only predictor seasons of that length; the predicted season always has 40+ games, so the only thing varying is how much of year one was seen",
+            "monotoneEnforced": true,
+            "fullSeasonR": 0.7557,
+            "buckets": [
+              {
+                "minGames": 1,
+                "maxGames": 10,
+                "meanGames": 5.3,
+                "pairs": 288,
+                "r": 0.1441,
+                "rMonotone": 0.1441,
+                "belief": 0.1907
+              },
+              {
+                "minGames": 11,
+                "maxGames": 20,
+                "meanGames": 15.6,
+                "pairs": 180,
+                "r": 0.4077,
+                "rMonotone": 0.4077,
+                "belief": 0.5395
+              },
+              {
+                "minGames": 21,
+                "maxGames": 30,
+                "meanGames": 25.8,
+                "pairs": 225,
+                "r": 0.3853,
+                "rMonotone": 0.4077,
+                "belief": 0.5395
+              },
+              {
+                "minGames": 31,
+                "maxGames": 40,
+                "meanGames": 35.8,
+                "pairs": 273,
+                "r": 0.5321,
+                "rMonotone": 0.5321,
+                "belief": 0.7041
+              },
+              {
+                "minGames": 41,
+                "maxGames": 55,
+                "meanGames": 48.3,
+                "pairs": 907,
+                "r": 0.6733,
+                "rMonotone": 0.6733,
+                "belief": 0.891
+              },
+              {
+                "minGames": 56,
+                "maxGames": 70,
+                "meanGames": 63.8,
+                "pairs": 1250,
+                "r": 0.7514,
+                "rMonotone": 0.7514,
+                "belief": 0.9943
+              },
+              {
+                "minGames": 71,
+                "maxGames": 82,
+                "meanGames": 78.5,
+                "pairs": 2919,
+                "r": 0.7557,
+                "rMonotone": 0.7557,
+                "belief": 1
+              }
+            ]
           }
         },
         "toiPerGame": {
@@ -114,6 +184,76 @@
           "stability": {
             "pairs": 5876,
             "r": 0.8449
+          },
+          "sampleCurve": {
+            "basis": "year-over-year correlation using only predictor seasons of that length; the predicted season always has 40+ games, so the only thing varying is how much of year one was seen",
+            "monotoneEnforced": true,
+            "fullSeasonR": 0.8594,
+            "buckets": [
+              {
+                "minGames": 1,
+                "maxGames": 10,
+                "meanGames": 5.3,
+                "pairs": 288,
+                "r": 0.5682,
+                "rMonotone": 0.5682,
+                "belief": 0.6612
+              },
+              {
+                "minGames": 11,
+                "maxGames": 20,
+                "meanGames": 15.6,
+                "pairs": 180,
+                "r": 0.7066,
+                "rMonotone": 0.7066,
+                "belief": 0.8222
+              },
+              {
+                "minGames": 21,
+                "maxGames": 30,
+                "meanGames": 25.8,
+                "pairs": 225,
+                "r": 0.7433,
+                "rMonotone": 0.7433,
+                "belief": 0.8649
+              },
+              {
+                "minGames": 31,
+                "maxGames": 40,
+                "meanGames": 35.8,
+                "pairs": 273,
+                "r": 0.8021,
+                "rMonotone": 0.8021,
+                "belief": 0.9333
+              },
+              {
+                "minGames": 41,
+                "maxGames": 55,
+                "meanGames": 48.3,
+                "pairs": 907,
+                "r": 0.8537,
+                "rMonotone": 0.8537,
+                "belief": 0.9934
+              },
+              {
+                "minGames": 56,
+                "maxGames": 70,
+                "meanGames": 63.8,
+                "pairs": 1250,
+                "r": 0.8594,
+                "rMonotone": 0.8594,
+                "belief": 1
+              },
+              {
+                "minGames": 71,
+                "maxGames": 82,
+                "meanGames": 78.5,
+                "pairs": 2919,
+                "r": 0.8477,
+                "rMonotone": 0.8594,
+                "belief": 1
+              }
+            ]
           }
         },
         "gameScore60": {
@@ -149,6 +289,76 @@
           "stability": {
             "pairs": 5876,
             "r": 0.7269
+          },
+          "sampleCurve": {
+            "basis": "year-over-year correlation using only predictor seasons of that length; the predicted season always has 40+ games, so the only thing varying is how much of year one was seen",
+            "monotoneEnforced": true,
+            "fullSeasonR": 0.7566,
+            "buckets": [
+              {
+                "minGames": 1,
+                "maxGames": 10,
+                "meanGames": 5.3,
+                "pairs": 288,
+                "r": 0.1604,
+                "rMonotone": 0.1604,
+                "belief": 0.212
+              },
+              {
+                "minGames": 11,
+                "maxGames": 20,
+                "meanGames": 15.6,
+                "pairs": 180,
+                "r": 0.5036,
+                "rMonotone": 0.5036,
+                "belief": 0.6656
+              },
+              {
+                "minGames": 21,
+                "maxGames": 30,
+                "meanGames": 25.8,
+                "pairs": 225,
+                "r": 0.4465,
+                "rMonotone": 0.5036,
+                "belief": 0.6656
+              },
+              {
+                "minGames": 31,
+                "maxGames": 40,
+                "meanGames": 35.8,
+                "pairs": 273,
+                "r": 0.6146,
+                "rMonotone": 0.6146,
+                "belief": 0.8123
+              },
+              {
+                "minGames": 41,
+                "maxGames": 55,
+                "meanGames": 48.3,
+                "pairs": 907,
+                "r": 0.7009,
+                "rMonotone": 0.7009,
+                "belief": 0.9264
+              },
+              {
+                "minGames": 56,
+                "maxGames": 70,
+                "meanGames": 63.8,
+                "pairs": 1250,
+                "r": 0.753,
+                "rMonotone": 0.753,
+                "belief": 0.9952
+              },
+              {
+                "minGames": 71,
+                "maxGames": 82,
+                "meanGames": 78.5,
+                "pairs": 2919,
+                "r": 0.7566,
+                "rMonotone": 0.7566,
+                "belief": 1
+              }
+            ]
           }
         }
       }
@@ -192,6 +402,76 @@
           "stability": {
             "pairs": 3278,
             "r": 0.692
+          },
+          "sampleCurve": {
+            "basis": "year-over-year correlation using only predictor seasons of that length; the predicted season always has 40+ games, so the only thing varying is how much of year one was seen",
+            "monotoneEnforced": true,
+            "fullSeasonR": 0.754,
+            "buckets": [
+              {
+                "minGames": 1,
+                "maxGames": 10,
+                "meanGames": 5,
+                "pairs": 129,
+                "r": 0.3281,
+                "rMonotone": 0.3281,
+                "belief": 0.4351
+              },
+              {
+                "minGames": 11,
+                "maxGames": 20,
+                "meanGames": 15.4,
+                "pairs": 106,
+                "r": 0.4512,
+                "rMonotone": 0.4512,
+                "belief": 0.5984
+              },
+              {
+                "minGames": 21,
+                "maxGames": 30,
+                "meanGames": 25.9,
+                "pairs": 127,
+                "r": 0.4276,
+                "rMonotone": 0.4512,
+                "belief": 0.5984
+              },
+              {
+                "minGames": 31,
+                "maxGames": 40,
+                "meanGames": 36,
+                "pairs": 169,
+                "r": 0.5144,
+                "rMonotone": 0.5144,
+                "belief": 0.6822
+              },
+              {
+                "minGames": 41,
+                "maxGames": 55,
+                "meanGames": 48.3,
+                "pairs": 488,
+                "r": 0.675,
+                "rMonotone": 0.675,
+                "belief": 0.8952
+              },
+              {
+                "minGames": 56,
+                "maxGames": 70,
+                "meanGames": 63.8,
+                "pairs": 716,
+                "r": 0.6945,
+                "rMonotone": 0.6945,
+                "belief": 0.9211
+              },
+              {
+                "minGames": 71,
+                "maxGames": 82,
+                "meanGames": 78.2,
+                "pairs": 1323,
+                "r": 0.754,
+                "rMonotone": 0.754,
+                "belief": 1
+              }
+            ]
           }
         },
         "toiPerGame": {
@@ -227,6 +507,76 @@
           "stability": {
             "pairs": 3278,
             "r": 0.8021
+          },
+          "sampleCurve": {
+            "basis": "year-over-year correlation using only predictor seasons of that length; the predicted season always has 40+ games, so the only thing varying is how much of year one was seen",
+            "monotoneEnforced": true,
+            "fullSeasonR": 0.7972,
+            "buckets": [
+              {
+                "minGames": 1,
+                "maxGames": 10,
+                "meanGames": 5,
+                "pairs": 129,
+                "r": 0.373,
+                "rMonotone": 0.373,
+                "belief": 0.4679
+              },
+              {
+                "minGames": 11,
+                "maxGames": 20,
+                "meanGames": 15.4,
+                "pairs": 106,
+                "r": 0.6006,
+                "rMonotone": 0.6006,
+                "belief": 0.7534
+              },
+              {
+                "minGames": 21,
+                "maxGames": 30,
+                "meanGames": 25.9,
+                "pairs": 127,
+                "r": 0.7149,
+                "rMonotone": 0.7149,
+                "belief": 0.8968
+              },
+              {
+                "minGames": 31,
+                "maxGames": 40,
+                "meanGames": 36,
+                "pairs": 169,
+                "r": 0.7278,
+                "rMonotone": 0.7278,
+                "belief": 0.9129
+              },
+              {
+                "minGames": 41,
+                "maxGames": 55,
+                "meanGames": 48.3,
+                "pairs": 488,
+                "r": 0.7665,
+                "rMonotone": 0.7665,
+                "belief": 0.9615
+              },
+              {
+                "minGames": 56,
+                "maxGames": 70,
+                "meanGames": 63.8,
+                "pairs": 716,
+                "r": 0.773,
+                "rMonotone": 0.773,
+                "belief": 0.9696
+              },
+              {
+                "minGames": 71,
+                "maxGames": 82,
+                "meanGames": 78.2,
+                "pairs": 1323,
+                "r": 0.7972,
+                "rMonotone": 0.7972,
+                "belief": 1
+              }
+            ]
           }
         },
         "gameScore60": {
@@ -262,6 +612,76 @@
           "stability": {
             "pairs": 3278,
             "r": 0.6673
+          },
+          "sampleCurve": {
+            "basis": "year-over-year correlation using only predictor seasons of that length; the predicted season always has 40+ games, so the only thing varying is how much of year one was seen",
+            "monotoneEnforced": true,
+            "fullSeasonR": 0.7276,
+            "buckets": [
+              {
+                "minGames": 1,
+                "maxGames": 10,
+                "meanGames": 5,
+                "pairs": 129,
+                "r": 0.2412,
+                "rMonotone": 0.2412,
+                "belief": 0.3315
+              },
+              {
+                "minGames": 11,
+                "maxGames": 20,
+                "meanGames": 15.4,
+                "pairs": 106,
+                "r": 0.6109,
+                "rMonotone": 0.6109,
+                "belief": 0.8396
+              },
+              {
+                "minGames": 21,
+                "maxGames": 30,
+                "meanGames": 25.9,
+                "pairs": 127,
+                "r": 0.553,
+                "rMonotone": 0.6109,
+                "belief": 0.8396
+              },
+              {
+                "minGames": 31,
+                "maxGames": 40,
+                "meanGames": 36,
+                "pairs": 169,
+                "r": 0.4882,
+                "rMonotone": 0.6109,
+                "belief": 0.8396
+              },
+              {
+                "minGames": 41,
+                "maxGames": 55,
+                "meanGames": 48.3,
+                "pairs": 488,
+                "r": 0.6444,
+                "rMonotone": 0.6444,
+                "belief": 0.8857
+              },
+              {
+                "minGames": 56,
+                "maxGames": 70,
+                "meanGames": 63.8,
+                "pairs": 716,
+                "r": 0.6352,
+                "rMonotone": 0.6444,
+                "belief": 0.8857
+              },
+              {
+                "minGames": 71,
+                "maxGames": 82,
+                "meanGames": 78.2,
+                "pairs": 1323,
+                "r": 0.7276,
+                "rMonotone": 0.7276,
+                "belief": 1
+              }
+            ]
           }
         }
       }

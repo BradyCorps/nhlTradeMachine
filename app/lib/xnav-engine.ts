@@ -14,6 +14,12 @@ import { SEASON, LEAGUE, FRANCHISE, ageDecayRate, ageSlotPenalty } from "@/app/l
 import type { NavStage, NavStageKind } from "@/app/lib/nav-breakdown";
 import { goalieFmvCapPct, LEAGUE_MINIMUM_CAP_PCT as GOALIE_LEAGUE_MIN_CAP_PCT } from "@/app/lib/goalie-fmv";
 import { reliability } from "@/app/lib/goalie-percentiles";
+import {
+  skaterFmvCapPct, skaterFmvDomainReport, unitForPosition,
+  SKATER_FMV_VALIDATION,
+  LEAGUE_MINIMUM_CAP_PCT as SKATER_LEAGUE_MIN_CAP_PCT,
+} from "@/app/lib/skater-fmv";
+import { skaterSeasonPrior } from "@/app/lib/skater-prior";
 import type { FArchetype } from "@/app/lib/trade-types";
 import { computeGravity } from "@/app/lib/gravity";
 
@@ -66,6 +72,10 @@ export interface AssetInput {
   hasLiveStats?:  boolean;
   baselineGsax?:  number;
   baselinePtsPace?: number;
+  /** Multi-season minutes per game — see `skater-prior.ts`. */
+  baselineToiPerGame?: number;
+  /** Sum of the season weights behind the baselines — see `skater-prior.ts`. */
+  baselineSeasonsWeighted?: number;
   baselineGameScore?: number;
   baselineDpsProxy?: number;
   baselineXgRel?:    number;
@@ -110,6 +120,22 @@ export interface XNAVResult {
   upside:      number;
   grav?:       number;
   fmvAav?:     number;
+  /**
+   * The band around `fmvAav`, from the fitted model's own walk-forward error.
+   *
+   * Not a confidence interval — the model cannot produce one. It is what the
+   * fit was actually wrong by on contracts it had never seen, which is the
+   * honest width to draw around a figure that explains about two thirds of
+   * what a skater signs for. Absent for goalies and picks.
+   */
+  fmvLow?:     number;
+  fmvHigh?:    number;
+  /**
+   * Set when a feature had to be clamped to the fitted range by more than the
+   * model's own error, so the price is a bound rather than a read. Null when
+   * the clamp was a footnote — see `skaterFmvDomainReport`.
+   */
+  fmvClamped?: boolean;
   noivImpact?: number;
   fArchetype?: FArchetype;
   rosterTier?: RosterTier;
@@ -962,22 +988,62 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const trueMarketValue = offTotal + defTotal + ageTotal + gravTotal;
   const isRFA = asset.age + asset.yearsRemaining <= 27;
 
-  // ── Logistic S-Curve FMV Cap Percentage ───────────────────────
-  // The absolute maximum a player can legally earn under the NHL CBA is 20% of the cap.
-  // We use a logistic function to map ON_ICE_NAV to an FMV Cap Percentage between
-  // League Minimum (0.9%) and the Maximum (20%).
-  
-  const LEAGUE_MIN_PCT = 0.009; // 0.9%
-  const MAX_CAP_PCT    = 0.20;  // 20.0%
-  // Defensemen's 25% scoring penalty and the DEF asymptote mean elite D-men top out at
-  // 115–135 on-ice NAV, well below the forward-calibrated 180 midpoint. Using 180 for
-  // both positions makes $8–9M contracts look "overpriced" for top-pair D — which is
-  // wrong. D midpoint of 120: a defensive specialist at ~95 on-ice breaks even at ~$8.4M,
-  // and an elite offensive D at ~125 on-ice earns meaningful positive surplus.
-  const MIDPOINT       = isD ? 120 : 155;
-  const K_FACTOR       = 0.022; // Steepness of the S-curve
-  
-  const fmvCapPct = LEAGUE_MIN_PCT + (MAX_CAP_PCT - LEAGUE_MIN_PCT) / (1 + Math.exp(-K_FACTOR * (trueMarketValue - MIDPOINT)));
+  // ── Fair market value, from the fitted contract model ─────────
+  //
+  // WHAT THIS REPLACES
+  //
+  // A logistic curve mapping on-ice NAV onto a cap share between 0.9% and
+  // 20.0%. The 20% was the CBA's legal maximum, used as the top of the curve —
+  // but no player has ever signed for it, and the record is McDavid at $12.5M.
+  // At a $104M ceiling the asymptote sat at $20.8M, so every good skater was
+  // pushed against it: Robertson $19.66M, Suzuki $20.14M, McDavid $20.66M, and
+  // a third-pair defenceman at $16.83M.
+  //
+  // The inflation was not the worst of it. A logistic goes flat in its tail,
+  // and the whole top of the league lived there — resolution fell from $0.109M
+  // of FMV per point of on-ice NAV at the midpoint to $0.024M at the values
+  // stars actually reached. McDavid's on-ice figure ran 98 points clear of
+  // Robertson's and bought him $1.00M. That is why the ordering at the top of
+  // the value scale kept coming out wrong: the contract stage had stopped
+  // discriminating, and noise in the other components decided it.
+  //
+  // WHAT REPLACES IT
+  //
+  // `skater-fmv.ts` — separate forward and defence fits over 1,996 one-way
+  // contracts signed 2017-2026, walk-forward validated at R² 0.64 / 0.55 and a
+  // mean error of $1.41M. Inputs come through `skater-prior.ts` so a shortened
+  // or anomalous season is pooled against the player's own history rather than
+  // taken at face value, and a thin sample is shrunk toward the population.
+  //
+  // The model tops out near $15.0M for a forward at the edge of the fitted
+  // range and $12.0M for a defenceman, which is the right neighbourhood for a
+  // market whose record is $12.5M.
+  const fmvUnit = unitForPosition(asset.position);
+  const fmvPrior = skaterSeasonPrior({
+    unit: fmvUnit,
+    ptsPace: asset.ptsPace,
+    minutesPerGame: asset.avgTOI,
+    games: asset.games,
+    baselinePtsPace: asset.baselinePtsPace,
+    baselineToiPerGame: asset.baselineToiPerGame,
+    baselineSeasonsWeighted: asset.baselineSeasonsWeighted,
+  });
+  /** The fitted model's view of a profile, at a given production rate and age. */
+  const fmvAt = (pts60: number | null, atAge: number) => skaterFmvCapPct({
+    pts60,
+    minutesPerGame: fmvPrior.minutesPerGame,
+    age: atAge,
+    // Priced against the market he would actually enter. RFA years cost less,
+    // and the same convention is used on the goalie side.
+    isUfa: !isRFA,
+    unit: fmvUnit,
+  });
+
+  const fittedCapPct = fmvAt(fmvPrior.pts60, age);
+  // Replacement level when the model cannot price him at all — no production
+  // rate or no age means no market read, and inventing a mid-range one is the
+  // mistake the sigmoid made. The goalie path falls back the same way.
+  const fmvCapPct = fittedCapPct ?? SKATER_LEAGUE_MIN_CAP_PCT;
 
   const BASE_CAP_CEILING = asset.capCeiling ?? SEASON.capCeiling;
   const CAP_GROWTH_RATE  = 1.04;
@@ -1021,9 +1087,15 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
       else if (ageAtYear >= peakAge + 2) tmvDriftFactor *= 1 - DECLINE_PER_YEAR;
       tmvDriftFactor = clamp(tmvDriftFactor, 0.70, 1.35);
     }
-    const fmvCapPctAtYear = LEAGUE_MIN_PCT +
-      (MAX_CAP_PCT - LEAGUE_MIN_PCT) /
-      (1 + Math.exp(-K_FACTOR * (trueMarketValue * tmvDriftFactor - MIDPOINT)));
+    // Re-price the profile as it will look in that season rather than holding
+    // today's figure: the drift factor above is the engine's view of how
+    // production moves, so it scales the production feature, and the model's
+    // own age term carries the rest. Deployment is held flat — the engine has
+    // no view on how a coach's usage will change, and inventing one here would
+    // be a third growth model layered on the two that already exist.
+    const fmvCapPctAtYear = fittedCapPct == null
+      ? fmvCapPct
+      : fmvAt((fmvPrior.pts60 ?? 0) * tmvDriftFactor, ageAtYear) ?? fmvCapPct;
 
     // Convert FMV% into raw dollars based on the projected cap ceiling for that year
     const fmvDollars = projectedCapCeiling * fmvCapPctAtYear;
@@ -1269,6 +1341,18 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     grav:   Math.round(gravTotal),
     stages,
     fmvAav: currentFmvAav,
+    fmvLow: Math.max(
+      SKATER_LEAGUE_MIN_CAP_PCT * BASE_CAP_CEILING,
+      currentFmvAav - SKATER_FMV_VALIDATION[fmvUnit].maeCapPct * BASE_CAP_CEILING,
+    ),
+    fmvHigh: currentFmvAav + SKATER_FMV_VALIDATION[fmvUnit].maeCapPct * BASE_CAP_CEILING,
+    fmvClamped: fittedCapPct != null && skaterFmvDomainReport({
+      pts60: fmvPrior.pts60,
+      minutesPerGame: fmvPrior.minutesPerGame,
+      age,
+      isUfa: !isRFA,
+      unit: fmvUnit,
+    }).material,
     noivImpact,
     fArchetype,
     rosterTier,

@@ -4245,3 +4245,51 @@ describe("Canary — a rookie's baseline must not vouch for itself", () => {
     expect(prior).toMatch(/baselineEvidence\(input\.baselineSeasonsWeighted\)/);
   });
 });
+
+describe("Canary — skater FMV comes from the fitted model, not a logistic curve", () => {
+  const engine = readSource("app/lib/xnav-engine.ts");
+
+  it("the retired sigmoid's constants stay retired", () => {
+    // MAX_CAP_PCT was 0.20 — the CBA's legal maximum, used as the top of the
+    // curve. At a $104M ceiling that asymptote is $20.8M, and every good
+    // skater piled up against it: Robertson $19.66M, Suzuki $20.14M, a
+    // third-pair defenceman $16.83M. Worse, the tail is flat, so the contract
+    // stage stopped telling stars apart at all.
+    expect(engine).not.toContain("MAX_CAP_PCT");
+    expect(engine).not.toContain("K_FACTOR");
+    expect(engine).not.toContain("LEAGUE_MIN_PCT");
+    expect(engine).not.toMatch(/const MIDPOINT\b/);
+  });
+
+  it("prices from the fitted contract model", () => {
+    expect(engine).toContain("skaterFmvCapPct");
+    expect(engine).toContain("@/app/lib/skater-fmv");
+  });
+
+  it("feeds it pooled inputs rather than one raw season", () => {
+    // Without the prior, a shortened season becomes the player: Matthews read
+    // as a $8.30M forward off 67 games.
+    expect(engine).toContain("skaterSeasonPrior");
+    expect(engine).toContain("baselineToiPerGame");
+  });
+
+  it("re-prices each contract year instead of holding today's figure", () => {
+    // The per-year loop is what makes a long deal for a pre-peak player worth
+    // more than a rental. Collapsing it back to a constant would quietly undo
+    // the whole term model.
+    expect(engine).toMatch(/fmvCapPctAtYear\s*=/);
+    expect(engine).toMatch(/fmvAt\(/);
+  });
+
+  it("falls back to replacement level, never to a mid-range guess", () => {
+    // A skater with no production rate has no market read. Inventing one is
+    // exactly what the sigmoid did.
+    expect(engine).toContain("SKATER_LEAGUE_MIN_CAP_PCT");
+  });
+
+  it("the deployment baseline is actually built and carried", () => {
+    expect(readSource("scripts/process-moneypuck-baselines.ts")).toContain("baselineToiPerGame");
+    expect(readSource("app/lib/roster-assembly.ts"))
+      .toContain("baselineToiPerGame: baselines.baselineToiPerGame");
+  });
+});

@@ -249,7 +249,10 @@ describe("X-NAV — Franchise Centers", () => {
       avgTOI: 22, qocRank: 80, xgRelTM: 12, xgaRelTM: -0.3,
       games: 78, ops: 12.5, dps: 2.1,
     });
-    inRange(result.total, 550, 760, "McDavid NAV");
+    // Was [550, 760]. The fitted model prices him at $13.0M against a $12.5M
+    // cap hit — fairly paid, which he is. The retired curve said $20.7M and
+    // handed him $8M a year of surplus that does not exist.
+    inRange(result.total, 420, 600, "McDavid NAV");
   });
 
   it("Barkov: two-way C, fair contract → 450-600 NAV", () => {
@@ -260,7 +263,12 @@ describe("X-NAV — Franchise Centers", () => {
       avgTOI: 21, qocRank: 95, xgRelTM: 8, xgaRelTM: -0.4,
       games: 70, ops: 6.5, dps: 3.5,
     });
-    inRange(result.total, 450, 600, "Barkov NAV");
+    // Was [450, 600]. $9.4M fair against $10M paid, so the contract stage is
+    // now slightly negative over six years. Worth knowing that the fit prices
+    // points and minutes only — it cannot see the defence Barkov is paid for,
+    // so a defensive centre's surplus is understated here. His defensive value
+    // still reaches the total through the on-ice core, just not the contract.
+    inRange(result.total, 250, 420, "Barkov NAV");
   });
 
   it("Barkov historical pedigree prevents stale current inputs from collapsing NAV", () => {
@@ -337,7 +345,9 @@ describe("X-NAV — Elite Defencemen", () => {
       avgTOI: 25, qocRank: 90, xgRelTM: 10, xgaRelTM: -0.2,
       games: 75, ops: 9.0, dps: 4.5,
     });
-    inRange(result.total, 500, 680, "Makar NAV");
+    // Was [500, 680]. $10.0M fair against $9M paid — a real but ordinary
+    // surplus, where the retired curve claimed $11M a year of it.
+    inRange(result.total, 300, 470, "Makar NAV");
   });
 
   it("Morrissey: two-way D with NOIV data — DEF bar positive, not an artifact", () => {
@@ -776,19 +786,23 @@ describe("X-NAV — Low-sample cap surplus dampening", () => {
       id: "injured-star", name: "Injured Star", position: "C",
       age: 29, capHit: 9, yearsRemaining: 4,
       ptsPace: 90, xGPace: 32, defRate: 0.08,
-      avgTOI: 20, games: 5, baselinePtsPace: 95,
+      avgTOI: 20, games: 5, baselinePtsPace: 95, baselineToiPerGame: 20,
       ops: 7, dps: 3, hasLiveStats: true,
     });
     const fullSample = calcNAV({
       id: "full-star", name: "Full Star", position: "C",
       age: 29, capHit: 9, yearsRemaining: 4,
       ptsPace: 90, xGPace: 32, defRate: 0.08,
-      avgTOI: 20, games: 70, baselinePtsPace: 95,
+      avgTOI: 20, games: 70, baselinePtsPace: 95, baselineToiPerGame: 20,
       ops: 7, dps: 3, hasLiveStats: true,
     });
 
+    // Deployment needs its own multi-season anchor for this to hold. With only
+    // `baselinePtsPace`, production was pooled but minutes were read off five
+    // games, and a 20-minute star was priced as a 16.7-minute one — $1.58M of
+    // fair value, 17 NAV. `baselineToiPerGame` is why the gap is now ~4.
     expect(Math.abs(injured.cap - fullSample.cap)).toBeLessThanOrEqual(5);
-    expect(injured.total).toBeGreaterThan(300);
+    expect(injured.total).toBeGreaterThan(200);
   });
 });
 
@@ -814,10 +828,16 @@ describe("X-NAV — Fair-market AAV output", () => {
       gsax: 12, gamesStarted: 55, teamXga60: 2.9,
     });
 
-    expect(eliteForward.fmvAav).toBeGreaterThanOrEqual(11);
-    expect(eliteForward.fmvAav).toBeLessThanOrEqual(14);
-    expect(depthForward.fmvAav).toBeGreaterThanOrEqual(1);
-    expect(depthForward.fmvAav).toBeLessThanOrEqual(2.5);
+    // Anchored to what clubs actually pay, not to what the retired sigmoid
+    // produced. A 90-point centre is Eichel money — he signed $10M — and the
+    // fitted model's own error is ±$1.41M. The old band started at $11M
+    // because the curve asymptoted at $20.8M and everything good piled up
+    // against it.
+    expect(eliteForward.fmvAav).toBeGreaterThanOrEqual(8);
+    expect(eliteForward.fmvAav).toBeLessThanOrEqual(12);
+    // An 8-point fourth liner signs at or near the league minimum.
+    expect(depthForward.fmvAav).toBeGreaterThanOrEqual(0.7);
+    expect(depthForward.fmvAav).toBeLessThanOrEqual(1.5);
     expect(starterGoalie.fmvAav).toBeGreaterThanOrEqual(6);
     expect(starterGoalie.fmvAav).toBeLessThanOrEqual(10);
   });
@@ -999,7 +1019,10 @@ describe("FMV — breakout credibility on the baseline blend", () => {
     // A player whose big season matches his multi-year baseline is not a spike;
     // the dynamic weight returns the default, so FMV stays elite.
     const star = calcNAV({ ...base, id: "star", name: "Star", ptsPace: 130, baselinePtsPace: 128, age: 28 });
-    expect(star.fmvAav ?? 0).toBeGreaterThan(15); // still near the top of the market
+    // Near the top of the market — which is about $12.5M, McDavid's deal, not
+    // the $20.8M the retired curve asymptoted to.
+    expect(star.fmvAav ?? 0).toBeGreaterThan(10);
+    expect(star.fmvAav ?? 0).toBeLessThan(14);
   });
 
   it("anchors an uncorroborated veteran contract-year spike toward the baseline", () => {

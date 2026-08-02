@@ -13,8 +13,11 @@
 // to the numbers on screen when we swap the curve out?" — which is the one that
 // decides whether the change is safe to keep.
 //
-// The goalie model is already wired into `calcGoalieNAV`. The skater model is
-// NOT wired in, so this reports what it WOULD do. Nothing here writes anything.
+// BOTH models are now wired in, so "engine vs model" is a tautology and this
+// asks a different question: what did replacing the curves actually do? The
+// comparison column is the RETIRED logistic curve, recomputed here from the
+// engine's own on-ice figure, so the shift is visible on real players.
+// Nothing here writes anything.
 //
 // WHAT TO LOOK FOR IN THE OUTPUT
 //
@@ -51,6 +54,25 @@ import type { Asset } from "@/app/lib/trade-types";
 const CAP = SEASON.capCeiling;
 const GOALIE_SEASON_MINUTES = 3500;
 
+/**
+ * The retired skater curve, kept here and nowhere else.
+ *
+ * `LEAGUE_MIN 0.9%` to `MAX 20%` of the cap, logistic in the on-ice NAV total,
+ * midpoint 155 for forwards and 120 for defence. A canary keeps these
+ * constants out of the engine; this script is the one place they still live,
+ * because "what changed" needs something to change from.
+ */
+const retiredSkaterFmv = (onIceNav: number, isD: boolean): number => {
+  const MIN = 0.009, MAX = 0.20, K = 0.022, MIDPOINT = isD ? 120 : 155;
+  return CAP * (MIN + (MAX - MIN) / (1 + Math.exp(-K * (onIceNav - MIDPOINT))));
+};
+
+/** The on-ice core the retired curve was a function of: OFF + DEF + AGE + GRAV. */
+const onIceCore = (stages: { key: string; value: number }[] | undefined): number =>
+  (stages ?? [])
+    .filter(s => ["off", "def", "age", "grav"].includes(s.key))
+    .reduce((sum, s) => sum + s.value, 0);
+
 const arg = (flag: string): string | null => {
   const i = process.argv.indexOf(flag);
   return i >= 0 ? process.argv[i + 1] ?? null : null;
@@ -63,8 +85,8 @@ const signed = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}`;
 interface Row {
   name: string; team: string; pos: string; age: number;
   capHit: number; years: number;
-  engineFmv: number | null;      // what the app currently shows
-  modelFmv: number | null;       // what the fitted model says
+  engineFmv: number | null;      // the retired curve, for comparison
+  modelFmv: number | null;       // what the app now shows
   delta: number | null;
   inDomain: boolean;
   nav: number;
@@ -106,7 +128,8 @@ function skaterFeatures(a: Asset): { pts60: number | null; minutesPerGame: numbe
     minutesPerGame: toiPerGame,
     games: a.games,
     baselinePtsPace: a.baselinePtsPace,
-    baselineSeasonsWeighted: (a as any).baselineSeasonsWeighted,
+    baselineToiPerGame: a.baselineToiPerGame,
+    baselineSeasonsWeighted: a.baselineSeasonsWeighted,
   });
   return { pts60: p.pts60, minutesPerGame: p.minutesPerGame, belief: p.belief, thin: p.thin };
 }
@@ -192,13 +215,18 @@ async function main() {
       isUfa: p.age + (p.yearsRemaining ?? 0) > 27,
       unit: unitForPosition(p.position),
     };
-    const modelFmv = skaterFmvAav(input, CAP);
+    // What the app shows now IS the fitted model, so read it off the engine
+    // rather than recomputing it — that way a wiring mistake shows up here.
+    const modelFmv = RAW ? skaterFmvAav(input, CAP) : (nav.fmvAav ?? null);
     const domain = skaterFmvDomainReport(input);
     skaters.push({
       name: p.name, team: p.teamId, pos: p.position, age: p.age,
       capHit: p.capHit, years: p.yearsRemaining,
-      engineFmv, modelFmv,
-      delta: engineFmv != null && modelFmv != null ? modelFmv - engineFmv : null,
+      engineFmv: retiredSkaterFmv(onIceCore(nav.stages), unitForPosition(p.position) === "D"),
+      modelFmv,
+      delta: modelFmv != null
+        ? modelFmv - retiredSkaterFmv(onIceCore(nav.stages), unitForPosition(p.position) === "D")
+        : null,
       inDomain: domain.inDomain,
       nav: nav.total,
       belief: f.belief, thin: f.thin,
@@ -236,7 +264,7 @@ async function main() {
     const big = priced.filter(r => Math.abs(r.delta!) > mae * CAP * 2)
       .sort((a, b) => Math.abs(b.delta!) - Math.abs(a.delta!));
     console.log(`\n  Biggest movers — beyond twice the model's own error (${big.length} of ${priced.length}):`);
-    console.log(`  ${"player".padEnd(24)}${"tm".padEnd(5)}${"pos".padEnd(5)}${"age".padEnd(5)}${"paid".padStart(8)}${"engine".padStart(9)}${"model".padStart(9)}${"move".padStart(9)}  flags`);
+    console.log(`  ${"player".padEnd(24)}${"tm".padEnd(5)}${"pos".padEnd(5)}${"age".padEnd(5)}${"paid".padStart(8)}${"retired".padStart(9)}${"now".padStart(9)}${"move".padStart(9)}  flags`);
     for (const r of big.slice(0, LIMIT)) {
       const flags = [
         !r.inDomain ? "OUT-OF-DOMAIN" : "",
@@ -249,7 +277,7 @@ async function main() {
     if (big.length > LIMIT) console.log(`  … ${big.length - LIMIT} more`);
   };
 
-  report(`SKATERS — model is NOT wired in; this is what it would do${RAW ? " (--raw: no multi-year prior)" : ""}`, skaters,
+  report(`SKATERS — fitted model vs the retired logistic curve${RAW ? " (--raw: no multi-year prior)" : ""}`, skaters,
     (SKATER_FMV_VALIDATION.F.maeCapPct + SKATER_FMV_VALIDATION.D.maeCapPct) / 2);
 
   if (!RAW) {
@@ -260,7 +288,7 @@ async function main() {
     console.log(`  ${shrunk} shrunk toward the population by more than 5%. Rerun with --raw to price off`);
     console.log(`  the single season instead and diff the two.`);
   }
-  report("GOALIES — model IS wired in; engine FMV already reflects it", goalies,
+  report("GOALIES — no comparison available; the retired curve is gone from source", goalies,
     GOALIE_VALIDATION.maeCapPct);
 
   // Sanity anchor: the highest-paid players should read as roughly fairly paid.

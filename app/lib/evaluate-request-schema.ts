@@ -74,6 +74,7 @@ export const AssetSchema = z.object({
   hasLiveStats: z.boolean().nullish(),
   baselineGsax: z.number().finite().nullish(),
   baselinePtsPace: z.number().finite().nullish(),
+  baselineToiPerGame: z.number().finite().nullish(),
   baselineSeasonsWeighted: z.number().finite().nullish(),
   baselineGameScore: z.number().finite().nullish(),
   baselineDpsProxy: z.number().finite().nullish(),

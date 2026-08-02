@@ -1093,6 +1093,96 @@ Growth across the contract term is already handled separately by the engine's
 
 Nothing now blocks wiring the fitted model into `calcSkaterNAV`.
 
+## Wiring the fitted skater FMV into calcSkaterNAV
+
+The logistic S-curve is gone. `calcSkaterNAV` now prices from `skater-fmv.ts`,
+fed through `skater-prior.ts`, in both the headline figure and the per-year
+`capSum` loop.
+
+What the retired curve did, on the seven archetypes in the test suite:
+
+| | paid | retired curve | fitted | NAV now |
+|---|---:|---:|---:|---:|
+| McDavid-tier C | $12.5M | $20.74M | $13.01M | 499 |
+| Barkov-tier C | $10.0M | $19.71M | $9.39M | 321 |
+| Makar-tier D | $9.0M | $19.97M | $9.99M | 368 |
+| Shutdown D | $5.0M | $9.71M | $6.03M | 146 |
+| Top-six W | $6.0M | $5.28M | $6.66M | 104 |
+| Fourth liner | $1.2M | $1.93M | $0.77M | 16 |
+| Overpaid vet | $9.0M | $1.61M | $3.08M | −62 |
+
+The correction is concentrated at the top, and the middle actually moves UP —
+the sigmoid was under-pricing top-six players while inflating stars. McDavid
+now reads as fairly paid, which he is; the curve had been handing him $8M a
+year of surplus that does not exist.
+
+Per-year pricing is preserved: the loop re-prices the profile at each contract
+year, with `tmvDriftFactor` scaling the production feature and the model's own
+age term carrying the rest. Deployment is held flat across the term — the
+engine has no view on how usage will change, and inventing one would be a third
+growth model on top of the two that exist.
+
+**The measurement that changed the design.** Wiring it in broke a test that was
+right: an established star with a five-game season lost 17 NAV against his
+full-sample twin. The cause was the belief curve. Both this module and the
+goalie one derived how much to trust a partial season from `n / (n + k)` with
+`k` calibrated so a full season reproduces the published year-over-year `r`.
+That form assumes everything `r` falls short of 1 is sampling noise. For
+deployment it is not — most of what stops last year's TOI predicting this
+year's is that the coach changed his mind, which no sample fixes.
+
+Measured on the panel, bucketing the correlation by how many games the
+predictor season had:
+
+| games in year 1 | r(TOI/game) | r(pts/60) |
+|---|---:|---:|
+| 5-15 | 0.738 | 0.343 |
+| 71-82 | 0.895 | 0.833 |
+
+A ten-game TOI sample retains **82%** of a full season's predictive power. The
+derived form gave it **34%**, dragging a 20-minute star to 16.7 minutes and
+$1.58M. So `skater-stability.json` now publishes the curve bucketed by games
+and `beliefWeight` interpolates it — measured, not derived. Monotonicity is
+enforced with a running maximum, since raw buckets are noisy enough to dip and
+a 75-game season must never be worth less than a 60-game one.
+
+A build bug worth recording: the curve was first computed over the rows that
+pass the 300-minute eligibility floor, and a ten-game season is never 300
+minutes. The two thinnest buckets fell below the minimum-pairs bar and vanished
+silently, leaving a curve that started at 21 games and said nothing about the
+case it exists for. It is built from unfiltered rows now, with a test pinning
+that the first bucket starts at one game.
+
+**`baselineToiPerGame`.** The remaining half of the fix, and the gap this
+module shipped with. Added to the MoneyPuck baseline builder — the diff against
+the previous artifact is purely additive, 1,206 players, zero existing values
+changed. Deployment now has a multi-season anchor, so a star who played five
+games keeps his minutes, and the baseline points pace is converted to a
+per-sixty rate against the BASELINE's minutes rather than the current season's.
+That removes the approximation documented in the prior's header: a player whose
+role just changed is no longer read at the wrong rate.
+
+**Pooling moved from seconds to games.** Belief is measured in games and
+pooling was in ice time; carrying both was two units for one idea. Games is
+also the unit the curve is bucketed in.
+
+**A limitation the wiring exposes.** The fit prices points and minutes. It
+cannot see defence, so a defensive centre's fair price is understated and his
+contract surplus with it — Barkov reads as very slightly overpaid at $10M. His
+defensive value still reaches the total through the on-ice core, but not
+through the contract stage. A defensive feature in the fit is the fix, and is
+not done.
+
+Test bands re-pinned to market anchors rather than to whatever the code emits:
+a 90-point centre is Eichel money at $10M, an 8-point fourth liner signs at the
+league minimum, and the top of the market is McDavid's $12.5M rather than the
+$20.8M asymptote. The canary now pins that `MAX_CAP_PCT`, `K_FACTOR`,
+`LEAGUE_MIN_PCT` and `MIDPOINT` stay out of the engine.
+
+`scripts/fmv-comparison/run.ts` compares against the retired curve now, since
+engine and model are the same thing. Those constants live in that script and
+nowhere else.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

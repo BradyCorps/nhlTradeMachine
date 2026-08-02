@@ -89,6 +89,8 @@ export interface Asset {
   
   // MoneyPuck 3-Year Baselines
   baselinePtsPace?: number;
+  /** Multi-season minutes per game — the deployment feature's anchor. */
+  baselineToiPerGame?: number;
   baselineGameScore?: number;
   baselineDpsProxy?: number;
   /**

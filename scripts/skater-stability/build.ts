@@ -70,6 +70,35 @@ const FULL_SEASON_MIN_GAMES = 70;
 /** Seasons the percentile scale is drawn from, counting back from the newest. */
 const PERCENTILE_WINDOW_SEASONS = 5;
 
+/**
+ * Games-played buckets for the sample curve.
+ *
+ * WHY A MEASURED CURVE AND NOT `n / (n + k)`
+ *
+ * The first version of this derived how much to believe a partial season from
+ * the single year-over-year `r`, via the standard `n / (n + k)` shrinkage with
+ * `k` set so a full season reproduced `r`. That form assumes everything `r`
+ * falls short of 1 is sampling noise — and for deployment it plainly is not.
+ * Most of what stops last year's TOI predicting this year's is that the coach
+ * changed his mind, which no amount of extra sample fixes.
+ *
+ * The consequence was a large, wrong shrink: the derived form gave a ten-game
+ * TOI sample 34% credibility. Measured against the panel, such a season
+ * predicts the next one at r = 0.74 against a full season's 0.90 — about 82%.
+ *
+ * So measure it. Each bucket is the year-over-year correlation using only
+ * predictor seasons of that length. The PREDICTED season always has 40+ games,
+ * so the only thing varying across buckets is how much was seen of year one.
+ */
+const SAMPLE_BUCKETS: [number, number][] =
+  [[1, 10], [11, 20], [21, 30], [31, 40], [41, 55], [56, 70], [71, 82]];
+
+/** Games the predicted season must have, so the target is not itself noisy. */
+const SAMPLE_CURVE_MIN_NEXT_GAMES = 40;
+
+/** Pairs a bucket needs before its correlation is published. */
+const SAMPLE_CURVE_MIN_PAIRS = 60;
+
 const QUANTILES = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50,
                    55, 60, 65, 70, 75, 80, 85, 90, 95, 99];
 
@@ -230,6 +259,21 @@ function main() {
       byPlayer.set(r.playerId, m);
     }
 
+    // The sample curve needs the seasons the eligibility floor throws away —
+    // the whole question is what a ten-game season is worth, and a ten-game
+    // season is never 300 minutes. Built from the unfiltered rows instead.
+    // (This bit me: with the floor applied, the two thinnest buckets fell
+    // below the minimum-pairs bar and vanished, leaving a curve that started
+    // at 21 games and said nothing about the case it exists for.)
+    const byPlayerAll = new Map<string, Map<number, Row>>();
+    for (const r of all) {
+      if (unitOf(r) !== unit) continue;
+      if (!((num(r, "games_played") ?? 0) > 0) || !((num(r, "icetime") ?? 0) > 0)) continue;
+      const m = byPlayerAll.get(r.playerId) ?? new Map<number, Row>();
+      m.set(Number(r.season), r);
+      byPlayerAll.set(r.playerId, m);
+    }
+
     const metrics: Record<string, unknown> = {};
     for (const spec of METRICS) {
       const values = windowRows.map(spec.of).filter((v): v is number => v != null).sort((a, b) => a - b);
@@ -245,6 +289,46 @@ function main() {
       }
 
       const r = round(pearson(x, y), 4);
+
+      // ── The sample curve ────────────────────────────────────────
+      const raw: { minGames: number; maxGames: number; meanGames: number; pairs: number; r: number }[] = [];
+      for (const [lo, hi] of SAMPLE_BUCKETS) {
+        const bx: number[] = [], by: number[] = [], games: number[] = [];
+        for (const seasonMap of byPlayerAll.values()) {
+          for (const [season, row] of seasonMap) {
+            const next = seasonMap.get(season + 1);
+            if (!next) continue;
+            const gp = Number(row.games_played);
+            if (!(gp >= lo && gp <= hi)) continue;
+            if (Number(next.games_played) < SAMPLE_CURVE_MIN_NEXT_GAMES) continue;
+            const a = spec.of(row), b = spec.of(next);
+            if (a != null && b != null) { bx.push(a); by.push(b); games.push(gp); }
+          }
+        }
+        if (bx.length < SAMPLE_CURVE_MIN_PAIRS) continue;
+        raw.push({
+          minGames: lo, maxGames: hi,
+          meanGames: round(mean(games), 1),
+          pairs: bx.length,
+          r: round(pearson(bx, by), 4),
+        });
+      }
+
+      // Enforce monotonicity with a running maximum. More games cannot make a
+      // season less predictive; where the raw buckets say otherwise it is
+      // sampling noise in the bucket, and a curve that dips would hand a
+      // 75-game season less credibility than a 60-game one.
+      let running = -Infinity;
+      const curve = raw.map(b => {
+        running = Math.max(running, b.r);
+        return { ...b, rMonotone: round(running, 4) };
+      });
+      const full = curve.length ? curve[curve.length - 1].rMonotone : r;
+      const buckets = curve.map(b => ({
+        ...b,
+        belief: full > 0 ? round(Math.min(1, b.rMonotone / full), 4) : 0,
+      }));
+
       metrics[spec.key] = {
         label: spec.label,
         unit: spec.unit,
@@ -254,6 +338,12 @@ function main() {
         sd: round(sd(values)),
         quantiles: Object.fromEntries(QUANTILES.map(p => [p, round(quantile(values, p))])),
         stability: { pairs: x.length, r },
+        sampleCurve: {
+          basis: `year-over-year correlation using only predictor seasons of that length; the predicted season always has ${SAMPLE_CURVE_MIN_NEXT_GAMES}+ games, so the only thing varying is how much of year one was seen`,
+          monotoneEnforced: true,
+          fullSeasonR: full,
+          buckets,
+        },
       };
       summary.push(`  ${unit} ${spec.label.padEnd(15)} n=${String(values.length).padStart(5)}  pairs=${String(x.length).padStart(5)}  r=${String(r).padStart(6)}`);
     }

@@ -2,6 +2,7 @@ export interface PlayerBaseline {
   playerId: number;
   name: string;
   baselinePtsPace?: number;
+  baselineToiPerGame?: number;
   baselineGameScore?: number;
   baselineDpsProxy?: number;
   baselineGsax?: number;

@@ -14,6 +14,7 @@ import sourceManifestJson from './moneypuck-baseline-sources.json';
 //   baselineDpsProxy     — weighted defensive proxy (5on5 on-ice xG% based)
 //   baselineGsax         — weighted season GSAX (goalies)
 //   baselineXgRel        — weighted 5on5 on-ice minus off-ice xG% (relative impact)
+//   baselineToiPerGame   — weighted all-situations minutes per game (deployment)
 //   ppPtsPace82          — weighted powerplay (5on4) pts/82 — specialist signal
 //   pkTimeShare          — weighted PK (4on5) icetime share of total — two-way signal
 //   totalSeasonsWeighted — sum of season weights actually accumulated
@@ -49,6 +50,8 @@ const MIN_GAMES_GOALIE = 8;
 interface SkaterSeason {
   gamesPlayed: number;
   points: number;
+  /** All-situations minutes per game. The deployment feature's multi-year anchor. */
+  toiPerGame: number;
   gameScore: number;
   xgRel: number;        // 5on5 onIce_xGoalsPercentage - offIce_xGoalsPercentage
   dpsProxy: number;
@@ -633,6 +636,7 @@ async function processMoneypuckData() {
       player.skaterSeasons[seasonKey] = {
         gamesPlayed: games,
         points: num(all[idxPts]),
+        toiPerGame: games > 0 ? totalIce / 60 / games : 0,
         gameScore: num(all[idxGameScore]),
         xgRel,
         dpsProxy,
@@ -690,7 +694,7 @@ async function processMoneypuckData() {
   for (const [playerId, player] of Object.entries(db)
     .sort(([a], [b]) => Number(a) - Number(b))) {
     let totalWeight = 0;
-    let aggPtsPace = 0, aggGameScore = 0, aggDpsProxy = 0;
+    let aggPtsPace = 0, aggGameScore = 0, aggDpsProxy = 0, aggToiPerGame = 0;
     let aggXgRel = 0, aggPpPace = 0, aggPkShare = 0;
     let aggGsax = 0;
 
@@ -710,6 +714,7 @@ async function processMoneypuckData() {
         aggXgRel     += s.xgRel * weight;
         aggPpPace    += (s.ppPoints * paceMult) * weight;
         aggPkShare   += s.pkIceShare * weight;
+        aggToiPerGame += s.toiPerGame * weight;
         totalWeight  += weight;
       }
     }
@@ -728,6 +733,7 @@ async function processMoneypuckData() {
       baselineXgRel:     round3(aggXgRel / totalWeight),
       ppPtsPace82:       round2(aggPpPace / totalWeight),
       pkTimeShare:       round3(aggPkShare / totalWeight),
+      baselineToiPerGame: round2(aggToiPerGame / totalWeight),
       totalSeasonsWeighted: round2(totalWeight),
       ...(preserved.byPlayerId.get(playerId) ?? {}),
     };

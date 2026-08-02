@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import artifact from "@/app/data/skater-stability.json";
 import {
+  FULL_SEASON_GAMES,
   FULL_SEASON_SECONDS,
   MONEYPUCK_BASELINE,
   SKATER_METRIC_KEYS,
@@ -9,7 +10,6 @@ import {
   pooledRate,
   skaterMetric,
   skaterPercentile,
-  skaterReliability,
   skaterSeasonPrior,
   skaterStabilityLabel,
   type SeasonPriorInput,
@@ -19,8 +19,7 @@ import { skaterFmvAav, type SkaterUnit } from "@/app/lib/skater-fmv";
 const UNITS: SkaterUnit[] = ["F", "D"];
 const CAP = 104;
 
-/** Ice time, in seconds, for a player of this shape. */
-const ice = (minutesPerGame: number, games: number) => minutesPerGame * games * 60;
+
 
 describe("skater-stability — the artifact", () => {
   it("carries no player rows and names its sources", () => {
@@ -81,48 +80,79 @@ describe("skater-stability — the artifact", () => {
   });
 });
 
-describe("skater-prior — reliability and belief", () => {
-  it("reproduces the published correlation at exactly one full season", () => {
+describe("skater-prior — the measured belief curve", () => {
+  it("publishes a curve that reaches the thin seasons it exists for", () => {
+    // The eligibility floor for the percentile population is 300 minutes, and
+    // a ten-game season is never 300 minutes. Building the curve from the
+    // filtered rows silently dropped the two thinnest buckets, leaving a curve
+    // that started at 21 games and said nothing about the case it is for.
     for (const unit of UNITS) {
-      for (const key of SKATER_METRIC_KEYS) {
-        expect(skaterReliability(unit, key, FULL_SEASON_SECONDS), `${unit}.${key}`)
-          .toBeCloseTo(skaterMetric(unit, key)!.stability.r, 6);
+      for (const key of ["pts60", "toiPerGame"] as const) {
+        const buckets = skaterMetric(unit, key)!.sampleCurve.buckets;
+        expect(buckets[0].minGames, `${unit}.${key}`).toBe(1);
+        expect(buckets[0].pairs, `${unit}.${key}`).toBeGreaterThan(60);
+        expect(buckets[buckets.length - 1].maxGames, `${unit}.${key}`).toBe(82);
       }
     }
   });
 
-  it("rises with sample and never leaves 0-1", () => {
-    let prev = -1;
-    for (const seconds of [1, 600, 6_000, 60_000, FULL_SEASON_SECONDS, FULL_SEASON_SECONDS * 10]) {
-      const r = skaterReliability("F", "pts60", seconds);
-      expect(r).toBeGreaterThan(prev);
-      expect(r).toBeGreaterThanOrEqual(0);
-      expect(r).toBeLessThanOrEqual(1);
-      prev = r;
-    }
-  });
-
-  it("treats no sample as no signal rather than a little", () => {
-    for (const bad of [0, -1, null, undefined, NaN]) {
-      expect(skaterReliability("F", "pts60", bad as number)).toBe(0);
+  it("never lets more games count for less", () => {
+    // Raw buckets are noisy enough to dip; the build enforces a running max so
+    // a 75-game season is never worth less than a 60-game one.
+    for (const unit of UNITS) {
+      for (const key of SKATER_METRIC_KEYS) {
+        let prev = -1;
+        for (const b of skaterMetric(unit, key)!.sampleCurve.buckets) {
+          expect(b.belief, `${unit}.${key} @${b.minGames}`).toBeGreaterThanOrEqual(prev);
+          prev = b.belief;
+        }
+      }
     }
   });
 
   it("believes a full season completely and never more than completely", () => {
-    // The cap is the point: the pricing model was fitted on single-season
-    // inputs, so handing it something cleaner buys nothing and pretending
-    // otherwise would double-count the pooling.
     for (const unit of UNITS) {
-      expect(beliefWeight(unit, "pts60", FULL_SEASON_SECONDS)).toBeCloseTo(1, 6);
-      expect(beliefWeight(unit, "pts60", FULL_SEASON_SECONDS * 5)).toBe(1);
+      expect(beliefWeight(unit, "pts60", FULL_SEASON_GAMES)).toBe(1);
+      expect(beliefWeight(unit, "pts60", FULL_SEASON_GAMES * 5)).toBe(1);
     }
   });
 
-  it("believes a thin season only partly", () => {
-    const fifteenGames = ice(18, 15);
-    const belief = beliefWeight("F", "pts60", fifteenGames);
-    expect(belief).toBeGreaterThan(0.2);
-    expect(belief).toBeLessThan(0.7);
+  it("rises with games and stays inside 0-1", () => {
+    let prev = -1;
+    for (const games of [1, 5, 15, 30, 50, 70, 82, 200]) {
+      const b = beliefWeight("F", "pts60", games);
+      expect(b, `${games} games`).toBeGreaterThanOrEqual(prev);
+      expect(b).toBeGreaterThanOrEqual(0);
+      expect(b).toBeLessThanOrEqual(1);
+      prev = b;
+    }
+  });
+
+  it("treats no games as no signal rather than a little", () => {
+    for (const bad of [0, -1, null, undefined, NaN]) {
+      expect(beliefWeight("F", "pts60", bad as number)).toBe(0);
+    }
+  });
+
+  it("credits a short deployment sample far more than a short scoring one", () => {
+    // The finding that replaced the derived shrinkage. A coach's usage is
+    // readable from ten games; a scoring rate is not. Deriving both from one
+    // year-over-year r gave deployment 34% at ten games where the panel says
+    // about 82%, and that cost an injured star $1.58M of fair value.
+    for (const unit of UNITS) {
+      const toi = beliefWeight(unit, "toiPerGame", 10);
+      const pts = beliefWeight(unit, "pts60", 10);
+      expect(toi, unit).toBeGreaterThan(pts);
+    }
+    expect(beliefWeight("F", "toiPerGame", 10)).toBeGreaterThan(0.55);
+  });
+
+  it("still shrinks a genuinely thin scoring sample hard", () => {
+    expect(beliefWeight("F", "pts60", 8)).toBeLessThan(0.4);
+  });
+
+  it("returns nothing for a metric it does not carry", () => {
+    expect(beliefWeight("F", "nonsense", 82)).toBe(0);
   });
 });
 
@@ -156,15 +186,15 @@ describe("skater-prior — pooling", () => {
   const base = { unit: "F" as SkaterUnit, key: "pts60" as const };
 
   it("says nothing when it knows nothing", () => {
-    expect(pooledRate({ ...base, current: null, currentSeconds: null })).toBeNull();
-    expect(pooledRate({ ...base, current: 2, currentSeconds: 0 })).toBeNull();
-    expect(pooledRate({ ...base, current: NaN, currentSeconds: 100_000 })).toBeNull();
+    expect(pooledRate({ ...base, current: null, currentGames: null })).toBeNull();
+    expect(pooledRate({ ...base, current: 2, currentGames: 0 })).toBeNull();
+    expect(pooledRate({ ...base, current: NaN, currentGames: 70 })).toBeNull();
   });
 
   it("lands between the season and the prior, never outside them", () => {
     const p = pooledRate({
-      ...base, current: 1.2, currentSeconds: FULL_SEASON_SECONDS,
-      prior: 2.8, priorSeconds: FULL_SEASON_SECONDS * 2, overlapShare: 0,
+      ...base, current: 1.2, currentGames: FULL_SEASON_GAMES,
+      prior: 2.8, priorGames: FULL_SEASON_GAMES * 2, overlapShare: 0,
     })!;
     expect(p.value).toBeGreaterThan(1.2);
     expect(p.value).toBeLessThan(2.8);
@@ -172,26 +202,26 @@ describe("skater-prior — pooling", () => {
   });
 
   it("weights by sample, so more history pulls harder", () => {
-    const light = pooledRate({ ...base, current: 1.2, currentSeconds: FULL_SEASON_SECONDS, prior: 2.8, priorSeconds: FULL_SEASON_SECONDS * 0.5, overlapShare: 0 })!;
-    const heavy = pooledRate({ ...base, current: 1.2, currentSeconds: FULL_SEASON_SECONDS, prior: 2.8, priorSeconds: FULL_SEASON_SECONDS * 4, overlapShare: 0 })!;
+    const light = pooledRate({ ...base, current: 1.2, currentGames: FULL_SEASON_GAMES, prior: 2.8, priorGames: FULL_SEASON_GAMES * 0.5, overlapShare: 0 })!;
+    const heavy = pooledRate({ ...base, current: 1.2, currentGames: FULL_SEASON_GAMES, prior: 2.8, priorGames: FULL_SEASON_GAMES * 4, overlapShare: 0 })!;
     expect(heavy.value).toBeGreaterThan(light.value);
   });
 
   it("ignores a prior that is entirely the season it is being pooled against", () => {
     // The boundary an earlier draft got backwards: discounting the CURRENT
     // sample here left a fifteen-game player reported as fully sampled.
-    const thin = ice(16, 15);
-    const p = pooledRate({ ...base, current: 3.2, currentSeconds: thin, prior: 3.2, priorSeconds: FULL_SEASON_SECONDS * 1.35, overlapShare: 1 })!;
+    const thin = 15;
+    const p = pooledRate({ ...base, current: 3.2, currentGames: thin, prior: 3.2, priorGames: FULL_SEASON_GAMES * 1.35, overlapShare: 1 })!;
     expect(p.usedPrior).toBe(false);
-    expect(p.effectiveSeconds).toBe(thin);
+    expect(p.effectiveGames).toBe(thin);
     expect(p.thin).toBe(true);
     expect(p.belief).toBeLessThan(0.6);
   });
 
   it("shrinks a thin sample toward the population and a full one not at all", () => {
     const mean = skaterMetric("F", "pts60")!.mean;
-    const thin = pooledRate({ ...base, current: 3.5, currentSeconds: ice(14, 12) })!;
-    const full = pooledRate({ ...base, current: 3.5, currentSeconds: FULL_SEASON_SECONDS })!;
+    const thin = pooledRate({ ...base, current: 3.5, currentGames: 12 })!;
+    const full = pooledRate({ ...base, current: 3.5, currentGames: FULL_SEASON_GAMES })!;
     expect(thin.value).toBeLessThan(3.5);
     expect(thin.value).toBeGreaterThan(mean);
     expect(full.value).toBeCloseTo(3.5, 6);
@@ -200,7 +230,7 @@ describe("skater-prior — pooling", () => {
   it("shrinks a thin sample upward when it is below the population", () => {
     // Symmetry matters — a cold twelve games is as unreliable as a hot one.
     const mean = skaterMetric("F", "pts60")!.mean;
-    const cold = pooledRate({ ...base, current: 0.4, currentSeconds: ice(14, 12) })!;
+    const cold = pooledRate({ ...base, current: 0.4, currentGames: 12 })!;
     expect(cold.value).toBeGreaterThan(0.4);
     expect(cold.value).toBeLessThan(mean);
   });
