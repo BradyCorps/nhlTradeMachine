@@ -38,8 +38,8 @@ import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
 import { calcNAV } from "@/app/lib/xnav-engine";
 import { SEASON } from "@/app/lib/season-config";
 import {
-  skaterFmvAav, unitForPosition, isInDomain as skaterInDomain,
-  SKATER_FMV_VALIDATION,
+  skaterFmvAav, unitForPosition,
+  skaterFmvDomainReport, SKATER_FMV_VALIDATION,
 } from "@/app/lib/skater-fmv";
 import { skaterSeasonPrior } from "@/app/lib/skater-prior";
 import {
@@ -72,6 +72,12 @@ interface Row {
   belief?: number;
   /** True when even the pooled sample is short of a full season. */
   thin?: boolean;
+  /** Dollars the domain clamp withheld. Skaters only. */
+  clampCostM?: number;
+  /** True when that clamp moved the price by more than the model's own error. */
+  material?: boolean;
+  /** Which features were clamped, if any. */
+  clampedOn?: string | null;
 }
 
 /**
@@ -187,14 +193,18 @@ async function main() {
       unit: unitForPosition(p.position),
     };
     const modelFmv = skaterFmvAav(input, CAP);
+    const domain = skaterFmvDomainReport(input);
     skaters.push({
       name: p.name, team: p.teamId, pos: p.position, age: p.age,
       capHit: p.capHit, years: p.yearsRemaining,
       engineFmv, modelFmv,
       delta: engineFmv != null && modelFmv != null ? modelFmv - engineFmv : null,
-      inDomain: skaterInDomain(input),
+      inDomain: domain.inDomain,
       nav: nav.total,
       belief: f.belief, thin: f.thin,
+      clampCostM: domain.withheldCapPct * CAP,
+      material: domain.material,
+      clampedOn: domain.findings.map(x => x.feature).join("+") || null,
     });
   }
 
@@ -211,6 +221,16 @@ async function main() {
     console.log(`  model minus engine:  mean ${signed(mean)}M   median ${signed(median)}M`);
     console.log(`  spread:              p10 ${signed(deltas[Math.floor(deltas.length * 0.1)] ?? 0)}M   p90 ${signed(deltas[Math.floor(deltas.length * 0.9)] ?? 0)}M`);
     console.log(`  outside fitted domain: ${outside} of ${rows.length}  ${outside > rows.length * 0.15 ? "← HIGH, the app's data may not look like the contracts" : ""}`);
+    // A clamp is only worth reading about when it moved the price. Age 18 is
+    // out of domain and costs $0.30M; a mis-scaled input is out of domain and
+    // costs ten million. Counting them together taught nothing.
+    const material = rows.filter(r => r.material);
+    if (rows.some(r => r.material != null)) {
+      console.log(`    of those, ${material.length} clamped by more than the model's own error${material.length ? ":" : " — the rest are footnotes"}`);
+      for (const r of material.slice(0, 8)) {
+        console.log(`      ${r.name.slice(0, 23).padEnd(24)} clamped on ${String(r.clampedOn).padEnd(10)} withheld $${r.clampCostM!.toFixed(2)}M`);
+      }
+    }
     console.log(`  model's own walk-forward error: ±$${(mae * CAP).toFixed(2)}M`);
 
     const big = priced.filter(r => Math.abs(r.delta!) > mae * CAP * 2)

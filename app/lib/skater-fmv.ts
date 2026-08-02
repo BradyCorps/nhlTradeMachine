@@ -84,6 +84,127 @@ export const skaterFmvDomain = (unit: SkaterUnit) => BY_POSITION[unit].featureDo
 const toiFeature = (minutesPerGame: number) =>
   Math.min(TOI_CAP, Math.max(0, minutesPerGame) / TOI_REFERENCE_MINUTES);
 
+export type SkaterFeature = "pts60" | "toi" | "age";
+
+/** One feature that had to be clamped to keep the price inside the fit. */
+export interface DomainFinding {
+  feature: SkaterFeature;
+  label: string;
+  /** The value handed in, in the feature's own units. */
+  value: number;
+  /** The bound it was pulled to. */
+  clampedTo: number;
+  direction: "below" | "above";
+  /**
+   * Cap percentage the clamp withheld — what the model would have added had it
+   * been willing to extrapolate. Signed: positive means the player was priced
+   * lower than a straight-line reading would have him.
+   */
+  withheldCapPct: number;
+}
+
+export interface DomainReport {
+  /** True when nothing needed clamping. */
+  inDomain: boolean;
+  /** True when a required input was missing, so there is no price at all. */
+  priceable: boolean;
+  findings: DomainFinding[];
+  /** Net cap percentage withheld across every clamp. */
+  withheldCapPct: number;
+  /**
+   * True when the clamping moved the price by more than the model's own
+   * walk-forward error — the line between "clamped, and it hardly matters" and
+   * "this player is not what the fit was built on".
+   */
+  material: boolean;
+}
+
+const clampTo = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/**
+ * Clamp every feature to the fitted range, recording what each clamp cost.
+ *
+ * Pricing and reporting both go through here so they cannot drift apart. A
+ * report that says "in domain" while the price was quietly clamped would be
+ * worse than no report.
+ */
+function clampFeatures(input: SkaterFmvInput): {
+  model: (typeof BY_POSITION)[SkaterUnit];
+  values: Record<SkaterFeature, number>;
+  findings: DomainFinding[];
+} | null {
+  const model = BY_POSITION[input.unit];
+  if (!model) return null;
+  const { pts60, age } = input;
+  if (pts60 == null || !isFinite(pts60)) return null;
+  if (age == null || !isFinite(age)) return null;
+
+  const d = model.featureDomain;
+  const minutes = input.minutesPerGame != null && isFinite(input.minutesPerGame) ? input.minutesPerGame : 0;
+
+  const raw: Record<SkaterFeature, number> = { pts60, toi: toiFeature(minutes), age };
+  const labels: Record<SkaterFeature, string> = {
+    pts60: "production", toi: "deployment", age: "age",
+  };
+  // The `toi` feature is a ratio; report it in the minutes a reader thinks in.
+  const display: Record<SkaterFeature, (v: number) => number> = {
+    pts60: v => v, age: v => v, toi: v => v * TOI_REFERENCE_MINUTES,
+  };
+
+  const values = {} as Record<SkaterFeature, number>;
+  const findings: DomainFinding[] = [];
+  for (const feature of ["pts60", "toi", "age"] as SkaterFeature[]) {
+    const bound = d[feature];
+    const v = raw[feature];
+    const clamped = clampTo(v, bound.min, bound.max);
+    values[feature] = clamped;
+    if (clamped !== v) {
+      findings.push({
+        feature,
+        label: labels[feature],
+        value: display[feature](v),
+        clampedTo: display[feature](clamped),
+        direction: v < bound.min ? "below" : "above",
+        withheldCapPct: model.coefficients[feature] * (v - clamped),
+      });
+    }
+  }
+  return { model, values, findings };
+}
+
+/**
+ * What the fit had to clamp, and what that clamping cost.
+ *
+ * WHY A REPORT AND NOT A FLAG
+ *
+ * `isInDomain` answered yes or no, which turned out to be the wrong question.
+ * Measured against the 2025-26 skaters, an eighteen-year-old is flagged
+ * out-of-domain on age alone — and clamping age 18 up to the fitted floor of
+ * 20 withholds $0.30M at a $104M ceiling, a fifth of the model's own error.
+ * Meanwhile a genuine per-82 pace fed in where a per-sixty rate belongs would
+ * carry the same flag and be wrong by ten million.
+ *
+ * So the number that matters is not whether a clamp happened but what it took
+ * off the price. `material` draws that line at the model's own walk-forward
+ * error: below it, the clamp is a footnote; above it, the player does not look
+ * like anything the fit was built on and the price is a floor or a ceiling
+ * rather than a read.
+ */
+export function skaterFmvDomainReport(input: SkaterFmvInput): DomainReport {
+  const c = clampFeatures(input);
+  if (!c) {
+    return { inDomain: false, priceable: false, findings: [], withheldCapPct: 0, material: false };
+  }
+  const withheldCapPct = c.findings.reduce((s, f) => s + f.withheldCapPct, 0);
+  return {
+    inDomain: c.findings.length === 0,
+    priceable: true,
+    findings: c.findings,
+    withheldCapPct,
+    material: Math.abs(withheldCapPct) > SKATER_FMV_VALIDATION[input.unit].maeCapPct,
+  };
+}
+
 /**
  * Whether an input sits inside the range its model was fitted over.
  *
@@ -91,18 +212,34 @@ const toiFeature = (minutesPerGame: number) =>
  * median is 1.66 and the fitted maximum is 4.68. Handing over a per-82 pace
  * lands an order of magnitude outside the fit, which is the mistake this
  * catches. (The goalie model earned the same guard the hard way.)
+ *
+ * Kept for callers that only need the boolean. Anything that has to EXPLAIN
+ * itself to a reader wants `skaterFmvDomainReport` — a clamp on age costs
+ * $0.30M and a clamp on a mis-scaled production input costs ten times that,
+ * and this cannot tell them apart.
  */
 export function isInDomain(input: SkaterFmvInput): boolean {
-  const d = BY_POSITION[input.unit]?.featureDomain;
-  if (!d) return false;
-  if (input.pts60 == null || !isFinite(input.pts60)) return false;
-  if (input.age == null || !isFinite(input.age)) return false;
-  const toi = toiFeature(input.minutesPerGame ?? 0);
-  return (
-    input.pts60 >= d.pts60.min && input.pts60 <= d.pts60.max &&
-    input.age >= d.age.min && input.age <= d.age.max &&
-    toi >= d.toi.min && toi <= d.toi.max
-  );
+  return skaterFmvDomainReport(input).inDomain;
+}
+
+/**
+ * A caption for a price that had to be clamped, or null when nothing was.
+ *
+ * Written to be shown as-is. It names the feature and the dollars rather than
+ * saying "out of domain", which means nothing to anyone reading a player page.
+ */
+export function domainNote(input: SkaterFmvInput, capCeilingM: number): string | null {
+  const report = skaterFmvDomainReport(input);
+  if (!report.priceable) return "Not enough recorded play to price this contract.";
+  if (report.inDomain) return null;
+
+  const dollars = Math.abs(report.withheldCapPct) * capCeilingM;
+  const parts = report.findings.map(f =>
+    `${f.label} ${f.direction === "above" ? "above" : "below"} anything in the sample`);
+  const what = parts.join(" and ");
+  return report.material
+    ? `Priced at the edge of the fit — ${what}. No contract signed since 2017 looks like this, so the figure is a bound rather than a read (about $${dollars.toFixed(1)}M held back).`
+    : `${what.charAt(0).toUpperCase()}${what.slice(1)}, so the price is held at the edge of the fitted range. Worth about $${dollars.toFixed(2)}M, inside the model's own margin.`;
 }
 
 /**
@@ -111,24 +248,18 @@ export function isInDomain(input: SkaterFmvInput): boolean {
  *
  * Clamped to the fitted range: a linear model extrapolates without complaint,
  * so an out-of-range input returns a number that looks like the others and is
- * not one. `isInDomain` is how a caller finds out it happened.
+ * not one. `skaterFmvDomainReport` is how a caller finds out it happened, and
+ * what it cost.
  */
 export function skaterFmvCapPct(input: SkaterFmvInput): number | null {
-  const model = BY_POSITION[input.unit];
-  if (!model) return null;
-  const { pts60, age } = input;
-  if (pts60 == null || !isFinite(pts60)) return null;
-  if (age == null || !isFinite(age)) return null;
+  const c = clampFeatures(input);
+  if (!c) return null;
 
-  const d = model.featureDomain;
-  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-  const minutes = input.minutesPerGame != null && isFinite(input.minutesPerGame) ? input.minutesPerGame : 0;
-
-  const pct = model.intercept
-    + model.coefficients.pts60 * clamp(pts60, d.pts60.min, d.pts60.max)
-    + model.coefficients.toi * clamp(toiFeature(minutes), d.toi.min, d.toi.max)
-    + model.coefficients.age * clamp(age, d.age.min, d.age.max)
-    + model.coefficients.ufa * (input.isUfa ? 1 : 0);
+  const pct = c.model.intercept
+    + c.model.coefficients.pts60 * c.values.pts60
+    + c.model.coefficients.toi * c.values.toi
+    + c.model.coefficients.age * c.values.age
+    + c.model.coefficients.ufa * (input.isUfa ? 1 : 0);
 
   return Math.max(LEAGUE_MINIMUM_CAP_PCT, pct);
 }

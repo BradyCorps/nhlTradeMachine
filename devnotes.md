@@ -1042,6 +1042,57 @@ Still not wired into `calcSkaterNAV` — that is the next step, and it needs the
 pre-domain cases (Schaefer at 18, Celebrini at 20 sit at or under the fitted age
 floor of 20) handled first.
 
+## Pre-domain handling: what the clamp cost
+
+I called the pre-domain cases a blocker for wiring `skater-fmv.ts` in. Measured
+against the 940 skaters in the 2025-26 file, that was wrong, and the multi-year
+prior had already done the work:
+
+| | out of fitted domain |
+|---|---:|
+| raw single season | 110 of 940 (11.7%) |
+| with the multi-year prior | **2 of 940 (0.2%)** |
+
+The 108 that resolved were overwhelmingly one-to-six-game players sitting at
+0.00 points/60, below the fitted floor. Pooling them against their baseline and
+shrinking the thin sample lifts them back inside. Nothing was unpriceable.
+
+The two survivors are Kucherov (4.96 points/60 against a fitted max of 4.68)
+and Quinn Hughes (27.7 minutes a night against 26.7). Both clamped, both
+costing well under the model's own error.
+
+**So the flag was asking the wrong question.** `isInDomain` returned a boolean,
+and a boolean cannot tell these apart:
+
+| clamp | price withheld at a $104M cap |
+|---|---:|
+| age 18 → fitted floor of 20 | $0.27M |
+| Hughes's deployment → max | $0.54M |
+| Kucherov's production → max | $0.55M |
+| a per-82 pace fed where a per-sixty rate belongs | **$157M** |
+
+All four are "out of domain". Three are footnotes and the fourth is the unit
+trap that clamped every goalie to the ceiling before it was caught.
+
+`skaterFmvDomainReport` replaces the flag: per-feature findings with the value,
+the bound, the direction, and the cap percentage the clamp withheld.
+`material` draws the line at the model's own walk-forward error — below it a
+clamp is a footnote, above it the price is a bound rather than a read.
+`domainNote` writes that as a caption that names the feature and the dollars
+instead of saying "out of domain", which means nothing on a player page.
+
+Pricing and reporting now share one `clampFeatures`, so a caption cannot vouch
+for a number computed some other way. Deployment is reported in minutes rather
+than the ratio the model uses internally.
+
+**On the age floor specifically.** No projection work was needed. An 18-year-old
+is priced on today's profile, which is correct for a surplus calculation — the
+whole value of an entry-level deal is production now against a CBA-capped hit.
+Growth across the contract term is already handled separately by the engine's
+`tmvDriftFactor` loop, and that division of labour survives the wiring.
+
+Nothing now blocks wiring the fitted model into `calcSkaterNAV`.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

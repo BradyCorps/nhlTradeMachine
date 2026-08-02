@@ -8,7 +8,9 @@ import {
   skaterFmvAav,
   skaterFmvCapPct,
   skaterFmvDomain,
+  skaterFmvDomainReport,
   skaterFmvRange,
+  domainNote,
   unitForPosition,
   type SkaterFmvInput,
   type SkaterUnit,
@@ -218,5 +220,105 @@ describe("skater-fmv — the range", () => {
 
   it("returns null when the price does", () => {
     expect(skaterFmvRange(typical("F", { pts60: null }), CAP)).toBeNull();
+  });
+});
+
+describe("skater-fmv — what the clamp cost", () => {
+  const F = (over: Partial<SkaterFmvInput> = {}): SkaterFmvInput =>
+    ({ pts60: 2.2, minutesPerGame: 18, age: 27, isUfa: true, unit: "F", ...over });
+
+  it("says nothing when nothing needed clamping", () => {
+    const r = skaterFmvDomainReport(F());
+    expect(r.inDomain).toBe(true);
+    expect(r.priceable).toBe(true);
+    expect(r.findings).toHaveLength(0);
+    expect(r.withheldCapPct).toBe(0);
+    expect(domainNote(F(), CAP)).toBeNull();
+  });
+
+  it("names the feature that was clamped, and which way", () => {
+    const r = skaterFmvDomainReport(F({ age: 18 }));
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0].feature).toBe("age");
+    expect(r.findings[0].direction).toBe("below");
+    expect(r.findings[0].value).toBe(18);
+    expect(r.findings[0].clampedTo).toBe(skaterFmvDomain("F").age.min);
+  });
+
+  it("reports deployment in minutes, not in the ratio the model uses", () => {
+    // The `toi` feature is minutes ÷ 20. A reader shown 1.39 learns nothing.
+    const r = skaterFmvDomainReport(F({ minutesPerGame: 40 }));
+    const toi = r.findings.find(f => f.feature === "toi")!;
+    expect(toi.value).toBeGreaterThan(20);
+    expect(toi.clampedTo).toBeCloseTo(skaterFmvDomain("F").toi.max * 20, 6);
+  });
+
+  it("treats an eighteen-year-old as a footnote rather than an alarm", () => {
+    // The case that was called a blocker. Clamping age 18 to the fitted floor
+    // of 20 withholds about $0.3M — a fifth of the model's own error.
+    const r = skaterFmvDomainReport(F({ age: 18, unit: "D" }));
+    expect(r.inDomain).toBe(false);
+    expect(r.material).toBe(false);
+    expect(Math.abs(r.withheldCapPct) * CAP).toBeLessThan(0.5);
+  });
+
+  it("treats a mis-scaled production input as an alarm", () => {
+    // A per-82 pace where a per-sixty rate belongs — the unit trap that clamped
+    // every goalie to the domain ceiling before it was caught.
+    const r = skaterFmvDomainReport(F({ pts60: 85 }));
+    expect(r.material).toBe(true);
+    expect(Math.abs(r.withheldCapPct) * CAP).toBeGreaterThan(50);
+  });
+
+  it("draws the line at the model's own walk-forward error", () => {
+    for (const unit of UNITS) {
+      const mae = SKATER_FMV_VALIDATION[unit].maeCapPct;
+      const d = skaterFmvDomain(unit);
+      const coef = artifact.model.byPosition[unit].coefficients.pts60;
+      // Just inside the error, then just outside it.
+      const small = skaterFmvDomainReport({ ...F({ unit }), pts60: d.pts60.max + (mae * 0.5) / coef });
+      const large = skaterFmvDomainReport({ ...F({ unit }), pts60: d.pts60.max + (mae * 2) / coef });
+      expect(small.material, unit).toBe(false);
+      expect(large.material, unit).toBe(true);
+    }
+  });
+
+  it("adds up several clamps rather than reporting only the first", () => {
+    const r = skaterFmvDomainReport(F({ pts60: 85, age: 18, minutesPerGame: 40 }));
+    expect(r.findings.map(f => f.feature).sort()).toEqual(["age", "pts60", "toi"]);
+    expect(r.withheldCapPct).toBeCloseTo(r.findings.reduce((s, f) => s + f.withheldCapPct, 0), 12);
+  });
+
+  it("agrees with the price it is describing", () => {
+    // Report and pricing share one clamp. If they ever diverge, a caption would
+    // vouch for a number that was computed some other way.
+    const clamped = F({ pts60: 85 });
+    const atMax = F({ pts60: skaterFmvDomain("F").pts60.max });
+    expect(skaterFmvAav(clamped, CAP)).toBe(skaterFmvAav(atMax, CAP));
+    expect(skaterFmvDomainReport(atMax).inDomain).toBe(true);
+  });
+
+  it("distinguishes 'clamped' from 'cannot price at all'", () => {
+    const missing = skaterFmvDomainReport(F({ pts60: null }));
+    expect(missing.priceable).toBe(false);
+    expect(missing.inDomain).toBe(false);
+    expect(skaterFmvCapPct(F({ pts60: null }))).toBeNull();
+    expect(domainNote(F({ pts60: null }), CAP)).toMatch(/[Nn]ot enough/);
+  });
+
+  it("writes a caption a reader can act on, in both registers", () => {
+    const footnote = domainNote(F({ age: 18 }), CAP)!;
+    expect(footnote).toMatch(/age/i);
+    expect(footnote).toMatch(/\$0\.\d\dM/);
+    expect(footnote).not.toMatch(/domain/i);
+
+    const alarm = domainNote(F({ pts60: 85 }), CAP)!;
+    expect(alarm).toMatch(/bound rather than a read/);
+  });
+
+  it("keeps the boolean honest for callers that only want one", () => {
+    expect(isInDomain(F())).toBe(true);
+    expect(isInDomain(F({ age: 18 }))).toBe(false);
+    expect(isInDomain(F({ pts60: null }))).toBe(false);
   });
 });
