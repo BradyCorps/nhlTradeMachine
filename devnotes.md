@@ -1311,6 +1311,73 @@ published error rather than a literal, and nothing may print "Fair Market
 Value". Three existing canaries had pinned the old implementation, including the
 `$1M` rule itself, and were repointed to intent.
 
+## Outcomes-model gate: build a narrow version, not the arbiter
+
+Before writing an outcomes model, one question: can a per-player value metric
+reconstruct team results? `scripts/outcomes-gate/run.mjs` answers it, and the
+gate was built to be hostile to the idea.
+
+**Two circularities it had to dodge.** Point Shares are *constructed* so a
+team's shares sum to its points — testing them would pass regardless. And
+on-ice metrics credit five skaters per event, so summing them reproduces team
+totals by accounting identity: the same-season test scores **r = 0.98** and
+means nothing at all. The real gate is predictive — last season's player values
+against this season's result, judged against the naive baseline of *the team
+was good last year*.
+
+| predictor of next season's goal differential | R² | partial vs baseline |
+|---|---:|---:|
+| baseline — team's own prior differential | **0.288** | — |
+| player value, 1 season, everyone | 0.209 | +0.140 |
+| player value, 3 seasons weighted | 0.237 | +0.206 |
+| player value, 3 seasons, skaters only | 0.265 | **+0.247** |
+| goalie value alone | 0.020 | −0.002 |
+| **baseline and player value together** | **0.318** | — |
+
+**Summed player value never beats knowing the team was good last year.** That
+is a humbling result for any player-valuation scheme and it should be stated
+plainly. What it does do is add real information on top: partial r +0.247, and
+combined R² 0.318 against 0.288.
+
+**Goalie value contributes nothing** — partial r of −0.002 on one season and
++0.010 on three. Consistent with GSAx repeating at r = 0.13. Any outcomes model
+must exclude goalies rather than pretend.
+
+**The number that changed the recommendation.** Converting the value metric's
+noise into dollars, via a replacement baseline and league payroll:
+
+| | per-player error |
+|---|---:|
+| one season of measured value | ±$1.28M |
+| three seasons pooled | **±$0.74M** |
+| the price model, walk-forward | ±$1.22M |
+
+Three seasons of measured production is a *tighter* estimate than the price
+model's, which is the opposite of what the weak team-level result suggested. The
+two are not measuring the same thing — one predicts what a club paid, the other
+estimates value in goals — but for deciding whether a contract is good, the
+second is the number you want to compare a cap hit against.
+
+**Caveats that matter.** The $0.35M-per-goal conversion does a lot of the work
+and is rough (32 clubs × $80M of real payroll ÷ 7,328 goals above replacement);
+at $0.50M a goal the errors become ±$1.06M and ±$0.61M. The value metric itself
+is crude — on-ice xG differential over five, plus individual finishing, with no
+adjustment for teammates, competition or zone starts. And it repeats at
+**r = 0.540** year over year, which is *worse* than plain points per sixty at
+0.72: the on-ice component carries real signal and a lot of team noise with it.
+
+**The recommendation.** Build it, narrowly, and drop the framing that started
+it. It should not replace the price model and it cannot adjudicate who was
+right — the gate says a player-value sum is a weaker predictor of team results
+than the crudest possible baseline. What it can be is a **second, independent
+read**: the market prices him here, three seasons of measured production value
+him there, and two numbers that disagree is information the price model
+structurally cannot produce, because it is fitted on prices.
+
+Scope, if it goes ahead: skaters only, three-season pooled, presented beside the
+market price and never as a verdict, with the dollars-per-goal calibration done
+properly rather than with the rough constant used here.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps
