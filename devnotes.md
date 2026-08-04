@@ -1378,6 +1378,35 @@ Scope, if it goes ahead: skaters only, three-season pooled, presented beside the
 market price and never as a verdict, with the dollars-per-goal calibration done
 properly rather than with the rough constant used here.
 
+## Two readings of one number
+
+X-NAV blends what a player does on the ice with what his contract costs and
+prints one figure. That is the right number for a trade — no general manager is
+indifferent between an $18.8M Celebrini and a $1M one — but a rich deal can
+swallow a good player and a reader cannot see which half is which. Dropping the
+contract, which was the other option on the table, would say those two
+Celebrinis are worth the same, which describes nobody.
+
+`navSplit` lives beside `reconcileStages` because it has the same obligation:
+the two figures are integers and they sum **exactly** to the rounded headline.
+The contract half is taken as the remainder so rounding cannot open a gap.
+
+**Apportioning the adjustments.** Scarcity, development risk, the franchise
+floor and sample credibility all act on the on-ice value and the contract
+together, so neither owns them. Each is split in proportion to the *absolute*
+size of the two bases — signed weights would let a large negative contract flip
+the apportionment inside out, which the test pins.
+
+**A bug the tests caught.** `youngFloor` — the goalie cost-controlled floor — is
+emitted with `kind: "adjustment"` because of how the engine applies it, but it
+is a statement about cheap years on a deal, not about the goalie. Testing `kind`
+before the key sent it into the apportioned pool and credited most of it to the
+player. Key is checked first now.
+
+The dossier leads with the three figures — on the ice, his contract, trade value
+— above the existing stage rows, so the breakdown reads as an explanation of the
+split rather than a separate accounting.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

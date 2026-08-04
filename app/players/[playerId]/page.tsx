@@ -20,7 +20,7 @@ import GravityFieldV4 from "@/app/components/GravityFieldV4";
 import PlayerStrandPanel from "@/app/components/PlayerStrandPanel";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
-import { navStageDesc, navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
+import { navSplit, navSplitNote, navStageDesc, navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
@@ -130,6 +130,10 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
   // move the headline appeared nowhere.
   const navComponents = navStagesForDisplay(xnav.stages, xnav.total)
     .map(st => ({ label: navStageShort(st.key), val: st.value, desc: navStageDesc(st.key) }));
+  // Two readings of one headline. The blended total is the right number for a
+  // trade, but it lets a rich deal swallow a good player — so say which half is
+  // which. The two sum to the headline by construction.
+  const split = navSplit(xnav.stages, xnav.total);
   // Tone comes from the verdict, so a gap inside the model's error reads
   // neutral rather than being painted green or red by its sign alone.
   const verdict = contractVerdict({ fmvAav: xnav.fmvAav, capHit: player.capHit, position: player.position });
@@ -202,6 +206,26 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
           />
           <StatCell label="TOI" value={player.avgTOI != null ? player.avgTOI.toFixed(1) : "—"} />
         </div>
+
+        {/* The player, and what his contract does to him */}
+        {split.known && (
+          <div className="border mb-3 grid grid-cols-3" style={{ borderColor: rule, background: "var(--paper-inset)" }} title={navSplitNote(split)}>
+            <div className="px-3 py-2 border-r" style={{ borderColor: rule }}>
+              <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>On the ice</div>
+              <div className="text-[17px] font-black font-mono" style={{ color: ink }}>{split.production}</div>
+            </div>
+            <div className="px-3 py-2 border-r" style={{ borderColor: rule }}>
+              <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>His contract</div>
+              <div className="text-[17px] font-black font-mono" style={{
+                color: split.contract > 0 ? "var(--ledger-green)" : split.contract < 0 ? "var(--ledger-red)" : ink,
+              }}>{split.contract > 0 ? "+" : ""}{split.contract}</div>
+            </div>
+            <div className="px-3 py-2">
+              <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>Trade value</div>
+              <div className="text-[17px] font-black font-mono" style={{ color: ink }}>{Math.round(xnav.total)}</div>
+            </div>
+          </div>
+        )}
 
         {/* NAV components */}
         <div className="border mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>

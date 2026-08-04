@@ -4364,3 +4364,30 @@ describe("Canary — one place decides whether a contract is a bargain", () => {
     }
   });
 });
+
+describe("Canary — the dossier shows the player apart from his contract", () => {
+  const dossier = readSource("app/players/[playerId]/page.tsx");
+
+  it("splits the headline into on-ice value and what the deal does to it", () => {
+    // The blended total is the right number for a trade — no GM is indifferent
+    // between an $18.8M Celebrini and a $1M one — but it lets a rich contract
+    // swallow a good player. Both readings, or neither.
+    expect(dossier).toContain("navSplit");
+    expect(dossier).toContain("On the ice");
+    expect(dossier).toContain("His contract");
+  });
+
+  it("keeps the split summing to the headline", () => {
+    // navSplit takes the contract half as the remainder for exactly this
+    // reason; a surface that recomputed it independently could drift.
+    const lib = readSource("app/lib/nav-breakdown.ts");
+    expect(lib).toContain("contract: target - production");
+  });
+
+  it("counts the goalie cost-controlled floor as contract, not as the goalie", () => {
+    // It is an `adjustment` by kind, so a kind-first test sent it into the
+    // apportioned pool and credited most of it to the player.
+    const lib = readSource("app/lib/nav-breakdown.ts");
+    expect(lib).toMatch(/CONTRACT_STAGE_KEYS[\s\S]{0,80}youngFloor/);
+  });
+});

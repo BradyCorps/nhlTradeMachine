@@ -151,3 +151,91 @@ export const NAV_STAGE_DESC: Record<string, string> = {
 
 export const navStageShort = (key: string): string => NAV_STAGE_SHORT[key] ?? key.toUpperCase();
 export const navStageDesc = (key: string): string => NAV_STAGE_DESC[key] ?? "";
+
+// ── Two readings of one number ───────────────────────────────────
+//
+// WHY THIS EXISTS
+//
+// X-NAV blends what a player does on the ice with what his contract costs, and
+// prints one figure. That is the right number for a trade — a general manager
+// is never indifferent between an $18.8M Celebrini and a $1M one — but it means
+// a rich deal can swallow a good player, and a reader cannot see which half is
+// which.
+//
+// The obvious alternative, dropping the contract, is worse: it would say those
+// two Celebrinis are worth the same, which describes nobody. So the fix is to
+// show both readings rather than pick one.
+//
+// APPORTIONING THE ADJUSTMENTS
+//
+// The multiplicative steps — scarcity, development risk, the franchise floor,
+// sample credibility — apply to the on-ice value and the contract TOGETHER, so
+// neither owns them outright. Each is split in proportion to the absolute size
+// of the two bases it acted on, which is the same reasoning as the largest
+// remainder above: attribute in proportion to contribution, and never let the
+// parts stop summing to the whole.
+
+/** Stages that describe the contract rather than the player. */
+const CONTRACT_STAGE_KEYS = new Set(["cap", "youngFloor"]);
+
+export interface NavSplit {
+  /** What the player is, in NAV: on-ice value plus its share of the adjustments. */
+  production: number;
+  /** What the contract does to that, in NAV. Negative means the deal costs value. */
+  contract: number;
+  /** `production + contract`, equal to the rounded headline by construction. */
+  total: number;
+  /** False when the engine gave no breakdown, so neither figure means anything. */
+  known: boolean;
+}
+
+/**
+ * Split a valuation into what the player is and what his contract does.
+ *
+ * Both figures are integers and they sum EXACTLY to the rounded headline, for
+ * the same reason the stage rows do: a reader must never be shown two numbers
+ * that do not add up to the third.
+ */
+export function navSplit(stages: NavStage[] | undefined, total: number): NavSplit {
+  const target = Math.round(total);
+  const rows = stages ?? [];
+  if (rows.length === 0) {
+    return { production: target, contract: 0, total: target, known: false };
+  }
+
+  let baseProduction = 0, baseContract = 0, adjustment = 0;
+  for (const s of rows) {
+    // Key before kind, deliberately. The goalie cost-controlled floor is an
+    // `adjustment` by kind because of how the engine applies it, but it is a
+    // statement about cheap years on a deal — testing `kind` first sent it into
+    // the apportioned pool and credited most of it to the goalie.
+    if (CONTRACT_STAGE_KEYS.has(s.key)) baseContract += s.value;
+    else if (s.kind === "adjustment") adjustment += s.value;
+    else baseProduction += s.value;
+  }
+
+  // Weight by absolute size: a negative contract still shaped the adjustments
+  // that acted on it, and signed weights would let a large negative flip the
+  // apportionment inside out.
+  const weight = Math.abs(baseProduction) + Math.abs(baseContract);
+  const productionShare = weight > 0 ? Math.abs(baseProduction) / weight : 1;
+
+  const production = Math.round(baseProduction + adjustment * productionShare);
+  // Taken as the remainder so the two always sum to the headline, whatever
+  // rounding did to the first.
+  return { production, contract: target - production, total: target, known: true };
+}
+
+/**
+ * Plain-language reading of the two figures together.
+ *
+ * Written so the contract never reads as a verdict on the player: a deal that
+ * costs value is a fact about the deal.
+ */
+export function navSplitNote(split: NavSplit): string {
+  if (!split.known) return "No breakdown available for this valuation.";
+  if (split.contract === 0) return "His contract neither adds to nor subtracts from his trade value.";
+  return split.contract > 0
+    ? `He is worth ${split.production} on the ice, and his contract adds ${split.contract} on top of that.`
+    : `He is worth ${split.production} on the ice; his contract gives back ${Math.abs(split.contract)} of it.`;
+}
