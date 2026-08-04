@@ -1529,6 +1529,44 @@ expiring deal.
 and name-keyed. Refreshing it before launch fixes Robertson and Celebrini. Doing
 it by player id would fix the whole class.
 
+## The needs-data panel: making the pipeline self-monitoring
+
+`roster-assembly.ts:1272` has computed `contractMissing` all along, under a
+comment reading *"Surfaced for the admin's 'needs data' view"*. There was no
+such view. The flag was computed and dropped, which is exactly why a pending
+free agent advertised as a $9.6M bargain had to be found by reading a player
+page rather than by looking at a list.
+
+**It is not the same as the filter that already existed.** The contracts page
+has a `needsData` filter over DB contract ROWS. That view structurally cannot
+show a player who has no row — and a player dressed for a team tonight with no
+contract anywhere is precisely the case that hurts. The new panel reads the
+assembled ROSTER instead, so the two are complementary rather than duplicated.
+
+**Three buckets, deliberately not merged into one "bad data" count:**
+
+| bucket | what it means | what to do |
+| --- | --- | --- |
+| No contract found | nothing resolved from any source, and not a drafted or ELC player where a placeholder is fair | enter by hand |
+| Pending free agent | deal expired, cap hit zeroed **on purpose** | scan for anyone you know has re-signed — that is what a stale source looks like |
+| League-minimum default | carrying $0.925M unflagged, 20+ games | usually fine; a star here is a source failure in disguise |
+
+Merging them would bury the one that matters. The pending-FA bucket in
+particular is *correct behaviour* being surfaced, not an error list — its value
+is that a recent signing the source has not caught up with is indistinguishable
+from a genuine free agent, and only a human scanning names can tell.
+
+Sorted by games played throughout: a missing contract on a first-liner is a
+launch problem, the same gap on a call-up is housekeeping. Clicking a row
+searches the contract table below for that player, so finding and fixing are one
+motion.
+
+**It refuses to report zero problems when it does not know.** If the roster
+will not assemble the endpoint returns 500 and the panel says so, because a
+silent empty panel reads as "all clear" — the one claim it must never make
+without evidence. Canaried, along with the admin gate and the three buckets
+staying separate.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

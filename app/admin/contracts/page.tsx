@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { adminErrorMessage, readAdminResponse } from "../admin-response";
 import { toast } from "@/app/lib/ledger-toast";
 import { TEAMS_DB } from "@/app/lib/db";
+import NeedsDataPanel from "@/app/admin/contracts/NeedsDataPanel";
 
 // The 32 clubs, alphabetical by name, for the admin team pickers.
 const TEAM_OPTIONS = [...TEAMS_DB].sort((a, b) => a.name.localeCompare(b.name));
@@ -717,6 +718,11 @@ export default function AdminContractsPage() {
         <AddPlayerForm onAdded={() => { load(); toast("Player added to the DB (editor-curated)", "success"); }} />
         <BulkFaForm onDone={(msg) => { load(); toast(msg, "success"); }} />
       </div>
+
+      {/* Roster gaps — players the pipeline could not price. Distinct from the
+          "needs" filter below, which looks at contract ROWS and therefore
+          cannot show a player who has no row at all. */}
+      <NeedsDataPanel onPick={name => { setSearch(name); setFilter("all"); }} />
 
       {/* Filter bar */}
       <div style={{ padding: "12px 24px", borderBottom: "1px solid var(--ledger-rule-light)",

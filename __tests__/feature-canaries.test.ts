@@ -4421,3 +4421,44 @@ describe("Canary — a pending free agent is never sold as a bargain", () => {
     expect(readSource("app/players/[playerId]/page.tsx")).toContain("Expiring deal");
   });
 });
+
+describe("Canary — the roster's contract gaps are actually visible", () => {
+  // roster-assembly has computed `contractMissing` all along, under a comment
+  // saying it was "surfaced for the admin's needs-data view". No such view
+  // existed, so the flag was computed and dropped — which is why a pending free
+  // agent advertised as a $9.6M bargain had to be found by reading a player
+  // page instead of a list.
+  const route = readSource("app/api/admin/needs-data/route.ts");
+  const panel = readSource("app/admin/contracts/NeedsDataPanel.tsx");
+  const page = readSource("app/admin/contracts/page.tsx");
+
+  it("the flag the pipeline computes reaches an endpoint", () => {
+    expect(route).toContain("contractMissing");
+    expect(route).toContain("assembleCanonicalRoster");
+  });
+
+  it("the endpoint is behind the admin gate like every other one", () => {
+    expect(route).toContain("requireAdmin");
+  });
+
+  it("keeps the three problems apart instead of one 'bad data' count", () => {
+    // A missing contract needs hand entry, a pending FA is correct behaviour
+    // worth eyeballing, and a league-minimum placeholder is usually fine.
+    // Merging them would bury the one that matters.
+    for (const bucket of ["missing", "pendingFa", "placeholder"]) {
+      expect(route, bucket).toContain(bucket);
+      expect(panel, bucket).toContain(bucket);
+    }
+  });
+
+  it("the panel is mounted, not merely written", () => {
+    expect(page).toContain("<NeedsDataPanel");
+  });
+
+  it("reports a failure rather than an empty list it cannot vouch for", () => {
+    // A silent empty panel reads as "no problems", which is the one thing it
+    // must never claim when the roster would not assemble.
+    expect(route).toMatch(/status:\s*500/);
+    expect(panel).toContain("setError");
+  });
+});
