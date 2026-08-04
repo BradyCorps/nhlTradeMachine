@@ -115,3 +115,49 @@ describe("contract-verdict — what it claims", () => {
     expect(MODEL_PRICE_LABEL).not.toMatch(/fair/i);
   });
 });
+
+describe("contract-verdict — a free agent has no contract to judge", () => {
+  const fa = (over: Record<string, unknown> = {}) => contractVerdict({
+    fmvAav: 9.61, capHit: 0, position: "W",
+    expiresThisOffseason: true, lastCapHit: 7.75, capCeilingM: CAP, ...over,
+  });
+
+  it("refuses to call an unsigned player a bargain", () => {
+    // The launch blocker. roster-assembly zeroes capHit for pending free agents
+    // so trade pricing treats them as a nought-year rental; four of six
+    // surfaces read that zero as a contract and printed "+$9.6M vs market ·
+    // PAID BELOW MARKET" in green for a player nobody had signed.
+    const v = fa();
+    expect(v.kind).toBe("noContract");
+    expect(v.tone).toBe("neutral");
+    expect(v.surplus).toBeNull();
+    expect(surplusText(v)).not.toMatch(/\+/);
+  });
+
+  it("catches it from the zeroed cap hit even without the flag", () => {
+    // Belt and braces: a $0 hit beside a real expiring deal is a free agent
+    // whether or not the caller remembered to pass the flag.
+    expect(fa({ expiresThisOffseason: undefined }).kind).toBe("noContract");
+  });
+
+  it("still says what he is worth, and what he used to earn", () => {
+    // Refusing a verdict is not refusing to be useful.
+    expect(fa().note).toMatch(/\$9\.6M/);
+    expect(fa().note).toMatch(/\$7\.8M/);
+    expect(fa().note).toMatch(/not under contract/i);
+  });
+
+  it("does not mistake a genuinely cheap contract for a free agent", () => {
+    // Celebrini on an entry-level deal IS a bargain and must keep reading as
+    // one. The distinction is a contract existing, not a contract being small.
+    const elc = contractVerdict({ fmvAav: 14.4, capHit: 0.95, position: "C", capCeilingM: CAP });
+    expect(elc.kind).toBe("bargain");
+    const minimum = contractVerdict({ fmvAav: 3.0, capHit: 0.775, position: "W", capCeilingM: CAP });
+    expect(minimum.kind).toBe("bargain");
+  });
+
+  it("does not fire on a player who simply has no priced market", () => {
+    expect(contractVerdict({ fmvAav: null, capHit: 0, position: "W", capCeilingM: CAP }).kind)
+      .toBe("unpriced");
+  });
+});

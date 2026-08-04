@@ -20,6 +20,14 @@ import {
 } from "@/app/lib/card-payload";
 
 interface PlayerData {
+  /**
+   * Set when the deal has run out. `roster-assembly` zeroes `capHit` for these
+   * players deliberately; without the flag a $0 hit reads as a huge bargain.
+   */
+  expiresThisOffseason?: boolean;
+  /** The expiring deal's real AAV — never zeroed, unlike `capHit`. */
+  lastCapHit?: number | null;
+
   id: string;
   name: string;
   teamId: string;
@@ -234,7 +242,10 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
   // Decided by the model's own walk-forward error, not a round $1M. See
   // `contract-verdict.ts` — the old threshold was smaller than the model is
   // wrong by, so a gap inside the noise printed as an OVERPAY.
-  const verdict = contractVerdict({ fmvAav: xnav.fmvAav, capHit: player.capHit, position: player.position });
+  const verdict = contractVerdict({
+    fmvAav: xnav.fmvAav, capHit: player.capHit, position: player.position,
+    expiresThisOffseason: player.expiresThisOffseason, lastCapHit: player.lastCapHit,
+  });
   const surplus = verdict.surplus ?? 0;
   const surplusTone = verdict.tone;
   const surplusWord = verdict.label;

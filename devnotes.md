@@ -1465,6 +1465,70 @@ A build guard now refuses to ship a rate that prices a median full-season skater
 above 5% of the cap or the best season on record past the CBA maximum. That
 guard is what caught the budget route.
 
+## Contracts pipeline audit — the backend was right, four surfaces were not
+
+Traced end to end before launch. The pipeline itself is sound; the gap is
+between what it computes and what the front end knows about.
+
+**The source order** is DB `players` table → `app/data/contracts.bundled.json`
+→ ELC guess → a `$0.925M` placeholder. Two things about that bundle are worth
+knowing: it is keyed by **player name**, not id, and it was last written on
+**24 July** — five days before Celebrini's extension. There is name-collision
+handling (`nameCollision`, which catches a 23-year-old suddenly carrying a $3M+
+deal at the wrong position), so the risk is understood, but the staleness is
+real and it is why recent signings are missing.
+
+**The zeroing is deliberate and correct.** `roster-assembly.ts:1279`:
+
+```js
+const rawCapHit = extensionActive ? extension.aav
+                : expiresThisOffseason ? 0
+                : (isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925));
+```
+
+A pending free agent gets a `$0` cap hit so trade pricing treats him as a
+nought-year rental, and `lastCapHit` preserves the real expiring figure. Both
+are right.
+
+**Six surfaces render contracts and two knew that.** `OffseasonPlayerAnalytics`
+reads `lastCapHit`; `RosterTab` colours by `expiresThisOffseason`. The dossier,
+the player card, the timeline and the trending cards all read `capHit` directly,
+so a pending free agent rendered as:
+
+```
+Contract      $0.0M × 0yr
+Market price  $9.61M
+Surplus       +$9.6M vs market · PAID BELOW MARKET   (green)
+```
+
+A fabricated $9.6M bargain on a player who is not under contract. That is the
+worst failure mode a valuation has — confidently wrong about something any
+reader can check — and it was going to be Jason Robertson on launch day.
+
+**The fix.** `contractVerdict` gains a `noContract` kind that fires on the flag
+*or* on a zero cap hit sitting beside a real `lastCapHit`, so a caller that
+forgets the flag is still caught. It refuses a verdict, keeps the tone neutral,
+and still says what he is worth and what he used to earn — declining to judge is
+not declining to be useful. The dossier prints "Expiring deal $7.8M · now a free
+agent" instead of the zero.
+
+A genuine bargain still reads as one: Celebrini on an entry-level deal and a
+veteran on the league minimum both keep their `bargain` verdict. The distinction
+is a contract *existing*, not a contract being small.
+
+**The type system was hiding it.** `PlayerData` and `AssetInput` never declared
+`expiresThisOffseason` or `lastCapHit`, so every consumer was structurally
+unable to ask. Adding the fields turned the bug into four compile errors, which
+is where it should have been all along.
+
+Canaried: every contract surface must pass both fields, the verdict must know
+that no contract is not a cheap contract, and the dossier must print the
+expiring deal.
+
+**Still open, and it is data ops rather than code:** the bundle is 11 days stale
+and name-keyed. Refreshing it before launch fixes Robertson and Celebrini. Doing
+it by player id would fix the whole class.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

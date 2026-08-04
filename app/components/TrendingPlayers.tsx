@@ -13,6 +13,14 @@ import type { XNAVResult } from "@/app/lib/trade-types";
 import { contractVerdict, verdictColor, MODEL_PRICE_SHORT } from "@/app/lib/contract-verdict";
 
 interface PlayerData {
+  /**
+   * Set when the deal has run out. `roster-assembly` zeroes `capHit` for these
+   * players deliberately; without the flag a $0 hit reads as a huge bargain.
+   */
+  expiresThisOffseason?: boolean;
+  /** The expiring deal's real AAV — never zeroed, unlike `capHit`. */
+  lastCapHit?: number | null;
+
   id: string;
   name: string;
   teamId: string;
@@ -541,8 +549,8 @@ function ExpandedPanel({
               <div>
                 <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>Surplus </span>
                 <span className="font-mono text-[11px] font-black"
-                  title={contractVerdict({ fmvAav: xnav.fmvAav, capHit: p.capHit, position: p.position }).note}
-                  style={{ color: verdictColor(contractVerdict({ fmvAav: xnav.fmvAav, capHit: p.capHit, position: p.position }).tone) }}>
+                  title={contractVerdict({ fmvAav: xnav.fmvAav, capHit: p.capHit, position: p.position, expiresThisOffseason: p.expiresThisOffseason, lastCapHit: p.lastCapHit }).note}
+                  style={{ color: verdictColor(contractVerdict({ fmvAav: xnav.fmvAav, capHit: p.capHit, position: p.position, expiresThisOffseason: p.expiresThisOffseason, lastCapHit: p.lastCapHit }).tone) }}>
                   {(xnav.fmvAav - p.capHit) > 0 ? "+" : ""}${(xnav.fmvAav - p.capHit).toFixed(1)}M
                 </span>
               </div>

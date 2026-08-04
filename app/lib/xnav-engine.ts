@@ -39,6 +39,13 @@ export interface AssetInput {
   position:       "C" | "W" | "D" | "G" | "Pick";
   age:            number;
   capHit:         number;
+  /**
+   * The expiring deal's real AAV. `capHit` is zeroed for a pending free agent
+   * so trade pricing treats him as a nought-year rental; this is not.
+   */
+  lastCapHit?:    number | null;
+  /** True when the deal has run out and he is a pending free agent. */
+  expiresThisOffseason?: boolean;
   yearsRemaining: number;
   capCeiling?:     number;
   retainedPct?:   number;

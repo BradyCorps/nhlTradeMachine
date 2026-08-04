@@ -23,12 +23,21 @@
 // So the language here is deliberately weaker than it was. A gap inside the
 // margin is "priced about right". A gap outside it says the deal is unusual for
 // the profile, not that somebody blundered.
+//
+// AND SOMETIMES THERE IS NO DEAL AT ALL
+//
+// `roster-assembly` zeroes `capHit` for pending free agents deliberately, so
+// trade pricing treats them as a nought-year rental, and keeps the real figure
+// in `lastCapHit`. Six surfaces render contracts and only two knew that. The
+// other four showed "$0.0M x 0yr" beside a $9.6M market price and called it a
+// bargain in green — the single most damaging thing a valuation can do, because
+// it is confidently wrong about a player anyone can look up.
 
 import { SEASON } from "@/app/lib/season-config";
 import { SKATER_FMV_VALIDATION, unitForPosition } from "@/app/lib/skater-fmv";
 import { FMV_VALIDATION as GOALIE_FMV_VALIDATION } from "@/app/lib/goalie-fmv";
 
-export type VerdictKind = "bargain" | "fair" | "overpay" | "unpriced";
+export type VerdictKind = "bargain" | "fair" | "overpay" | "unpriced" | "noContract";
 export type VerdictTone = "good" | "bad" | "neutral";
 
 export interface ContractVerdict {
@@ -72,6 +81,18 @@ export interface ContractVerdictInput {
   capHit: number;
   position: string | null | undefined;
   capCeilingM?: number;
+  /**
+   * True when the deal has run out and he is a pending free agent.
+   *
+   * `roster-assembly` zeroes `capHit` for these players on purpose, so trade
+   * pricing treats them as a nought-year rental. Without this flag a $0 cap hit
+   * against a $9.6M market price reads as a $9.6M bargain, which is how Jason
+   * Robertson came to be advertised as the steal of the summer while not being
+   * under contract at all.
+   */
+  expiresThisOffseason?: boolean;
+  /** The expiring deal's real AAV — `lastCapHit`, which is never zeroed. */
+  lastCapHit?: number | null;
 }
 
 const money = (n: number) => `$${Math.abs(n).toFixed(1)}M`;
@@ -85,6 +106,19 @@ export function contractVerdict(input: ContractVerdictInput): ContractVerdict {
       kind: "unpriced", surplus: null, margin,
       label: "NOT PRICED", tone: "neutral",
       note: "There is not enough recorded play to put a market price on this contract.",
+    };
+  }
+
+  // No contract is not a cheap contract. There is nothing to judge, and the
+  // arithmetic that would judge it produces its most flattering possible answer
+  // — which is exactly the wrong failure direction on a player page.
+  if (input.expiresThisOffseason || (input.capHit <= 0 && (input.lastCapHit ?? 0) > 0)) {
+    const was = input.lastCapHit && input.lastCapHit > 0
+      ? ` His expiring deal paid ${money(input.lastCapHit)}.` : "";
+    return {
+      kind: "noContract", surplus: null, margin,
+      label: "PENDING FREE AGENT", tone: "neutral",
+      note: `He is not under contract, so there is no deal to price against. The model puts his market at ${money(input.fmvAav)}.${was}`,
     };
   }
 
@@ -108,8 +142,9 @@ export function contractVerdict(input: ContractVerdictInput): ContractVerdict {
         note: `He costs more than the model says his profile usually signs for. ${shared}` };
 }
 
-/** `+$1.7M vs market` / `−$0.4M vs market`, or a dash when unpriced. */
+/** `+$1.7M vs market` / `−$0.4M vs market`, or a dash when there is nothing to compare. */
 export function surplusText(v: ContractVerdict): string {
+  if (v.kind === "noContract") return "no deal to price";
   if (v.surplus == null) return "—";
   const sign = v.surplus > 0 ? "+" : v.surplus < 0 ? "−" : "";
   return `${sign}${money(v.surplus)} vs market`;

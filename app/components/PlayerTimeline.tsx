@@ -86,7 +86,10 @@ export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
 
   // How the CURRENT deal compares to the model's price. The threshold is the
   // model's own error, so a gap it cannot resolve does not get a verdict.
-  const verdict = contractVerdict({ fmvAav: currentNav.fmvAav, capHit: asset.capHit, position: asset.position });
+  const verdict = contractVerdict({
+    fmvAav: currentNav.fmvAav, capHit: asset.capHit, position: asset.position,
+    expiresThisOffseason: asset.expiresThisOffseason, lastCapHit: asset.lastCapHit,
+  });
   const surplus = verdict.surplus ?? 0;
   const surplusTone = verdict.tone;
   const surplusWord = verdict.label;

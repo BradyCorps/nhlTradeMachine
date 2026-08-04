@@ -4391,3 +4391,33 @@ describe("Canary — the dossier shows the player apart from his contract", () =
     expect(lib).toMatch(/CONTRACT_STAGE_KEYS[\s\S]{0,80}youngFloor/);
   });
 });
+
+describe("Canary — a pending free agent is never sold as a bargain", () => {
+  // roster-assembly zeroes capHit for pending FAs on purpose and keeps the real
+  // figure in lastCapHit. Six surfaces render contracts; only two knew. The
+  // other four printed "$0.0M x 0yr" beside a $9.6M market price and coloured
+  // the difference green.
+  const surfaces = [
+    "app/components/PercentileCard.tsx",
+    "app/components/PlayerTimeline.tsx",
+    "app/players/[playerId]/page.tsx",
+    "app/components/TrendingPlayers.tsx",
+  ];
+
+  it("every surface tells the verdict whether he is actually signed", () => {
+    for (const f of surfaces) {
+      expect(readSource(f), f).toContain("expiresThisOffseason");
+      expect(readSource(f), f).toContain("lastCapHit");
+    }
+  });
+
+  it("the verdict knows that no contract is not a cheap contract", () => {
+    const v = readSource("app/lib/contract-verdict.ts");
+    expect(v).toContain("noContract");
+    expect(v).toMatch(/expiresThisOffseason\s*\|\|/);
+  });
+
+  it("the dossier prints the expiring deal, not the zero", () => {
+    expect(readSource("app/players/[playerId]/page.tsx")).toContain("Expiring deal");
+  });
+});

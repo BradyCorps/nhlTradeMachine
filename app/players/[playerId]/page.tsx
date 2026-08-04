@@ -136,7 +136,10 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
   const split = navSplit(xnav.stages, xnav.total);
   // Tone comes from the verdict, so a gap inside the model's error reads
   // neutral rather than being painted green or red by its sign alone.
-  const verdict = contractVerdict({ fmvAav: xnav.fmvAav, capHit: player.capHit, position: player.position });
+  const verdict = contractVerdict({
+    fmvAav: xnav.fmvAav, capHit: player.capHit, position: player.position,
+    expiresThisOffseason: player.expiresThisOffseason, lastCapHit: player.lastCapHit,
+  });
   const surplus = verdict.surplus;
 
   return (
@@ -247,9 +250,15 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
         {/* Contract + market */}
         <div className="flex flex-wrap items-center justify-between gap-3 border px-4 py-3 mb-4" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
           <div>
-            <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>Contract</div>
+            <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>
+              {verdict.kind === "noContract" ? "Expiring deal" : "Contract"}
+            </div>
             <div className="text-[13px] font-black font-mono">
-              ${player.capHit.toFixed(1)}M × {player.yearsRemaining}yr
+              {/* A pending FA has capHit zeroed on purpose. Printing that zero
+                  as his contract is how a free agent became a $9.6M bargain. */}
+              {verdict.kind === "noContract"
+                ? <>${(player.lastCapHit ?? 0).toFixed(1)}M · <span style={{ color: "var(--ledger-amber)" }}>now a free agent</span></>
+                : <>${player.capHit.toFixed(1)}M × {player.yearsRemaining}yr</>}
             </div>
           </div>
           {xnav.fmvAav != null && (
