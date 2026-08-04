@@ -8,6 +8,7 @@ import { SEASON, projectedCapCeiling } from "@/app/lib/season-config";
 import { navColor, fmtSigned } from "@/app/lib/display-utils";
 import type { XNAVResult } from "@/app/lib/trade-types";
 import { navStageDesc, navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
+import { contractVerdict, surplusText } from "@/app/lib/contract-verdict";
 
 // Rows come from the engine's own waterfall and sum to the headline. The old
 // hand-built list did not: it printed `nav.def` (a descriptive rating, not the
@@ -83,10 +84,12 @@ export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
   const nextStatus = currentNav.isRFA ? "RFA" : "UFA";
   const signingAge = asset.age + Math.max(0, asset.yearsRemaining ?? 0);
 
-  // Is the CURRENT deal a bargain? Market AAV (FMV) vs what he's actually paid.
-  const surplus = fmvToday - asset.capHit;
-  const surplusTone = surplus >= 1 ? "good" : surplus <= -1 ? "bad" : "neutral";
-  const surplusWord = surplus >= 1 ? "BARGAIN" : surplus <= -1 ? "OVERPAY" : "FAIR";
+  // How the CURRENT deal compares to the model's price. The threshold is the
+  // model's own error, so a gap it cannot resolve does not get a verdict.
+  const verdict = contractVerdict({ fmvAav: currentNav.fmvAav, capHit: asset.capHit, position: asset.position });
+  const surplus = verdict.surplus ?? 0;
+  const surplusTone = verdict.tone;
+  const surplusWord = verdict.label;
 
   // Trajectory across the deal (first → last projected value).
   const first = years[0].nav;
@@ -161,9 +164,8 @@ export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
             <span style={{ fontSize: 11, fontWeight: 700, color: BODY }}> · ends age {signingAge}</span>
           </div>
         </div>
-        <div className="ptl-chip" title="Estimated open-market AAV (FMV) vs the player's actual cap hit."
-          style={{ color: toneColor(surplusTone) }}>
-          {surplus > 0 ? "+" : surplus < 0 ? "−" : ""}${Math.abs(surplus).toFixed(1)}M vs market · {surplusWord}
+        <div className="ptl-chip" title={verdict.note} style={{ color: toneColor(surplusTone) }}>
+          {surplusText(verdict)} · {surplusWord}
         </div>
       </div>
 

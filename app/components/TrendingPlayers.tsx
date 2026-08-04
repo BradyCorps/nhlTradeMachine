@@ -10,6 +10,7 @@ import { displayPosition } from "@/app/lib/display-position";
 import { seasonTotal } from "@/app/lib/display-utils";
 import { buildAssetTraits, computeStrandType } from "@/app/components/StrandView";
 import type { XNAVResult } from "@/app/lib/trade-types";
+import { contractVerdict, verdictColor, MODEL_PRICE_SHORT } from "@/app/lib/contract-verdict";
 
 interface PlayerData {
   id: string;
@@ -532,16 +533,16 @@ function ExpandedPanel({
           {xnav.fmvAav != null && (
             <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: "var(--ledger-rule-light)" }}>
               <div>
-                <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>Market AAV </span>
+                <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>{MODEL_PRICE_SHORT} </span>
                 <span className="font-mono text-[11px] font-black" style={{ color: "var(--ledger-ink)" }}>
                   ${xnav.fmvAav.toFixed(1)}M
                 </span>
               </div>
               <div>
                 <span className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>Surplus </span>
-                <span className="font-mono text-[11px] font-black" style={{
-                  color: (xnav.fmvAav - p.capHit) > 0 ? "var(--ledger-green)" : "var(--ledger-red)",
-                }}>
+                <span className="font-mono text-[11px] font-black"
+                  title={contractVerdict({ fmvAav: xnav.fmvAav, capHit: p.capHit, position: p.position }).note}
+                  style={{ color: verdictColor(contractVerdict({ fmvAav: xnav.fmvAav, capHit: p.capHit, position: p.position }).tone) }}>
                   {(xnav.fmvAav - p.capHit) > 0 ? "+" : ""}${(xnav.fmvAav - p.capHit).toFixed(1)}M
                 </span>
               </div>

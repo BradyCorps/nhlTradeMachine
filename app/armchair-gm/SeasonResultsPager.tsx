@@ -8,6 +8,7 @@ import { displayPosition } from "@/app/lib/display-position";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
 import { SEASON } from "@/app/lib/season-config";
 import { navStageDesc, navStagesForDisplay } from "@/app/lib/nav-breakdown";
+import { MODEL_PRICE_SHORT } from "@/app/lib/contract-verdict";
 
 // ── League Numbers — award race + full standings by division ──
 const CONFERENCES: { conf: string; divs: string[] }[] = [
@@ -368,7 +369,7 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                             );
                           })()}
                           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[9px] font-mono" style={{ color: 'var(--ledger-ink-body, var(--ledger-ink))' }}>
-                            <span>FMV <strong>{nav.fmvAav != null ? `$${nav.fmvAav.toFixed(1)}M` : 'ELC / n/a'}</strong></span>
+                            <span>{MODEL_PRICE_SHORT} <strong>{nav.fmvAav != null ? `$${nav.fmvAav.toFixed(1)}M` : 'ELC / n/a'}</strong></span>
                             {roster && <span>Cap Hit <strong>${roster.capHit.toFixed(1)}M × {roster.yearsRemaining}yr</strong></span>}
                             {nav.rosterTier && <span>Tier <strong>{nav.rosterTier.replace(/_/g, ' ')}</strong></span>}
                             {expected !== null && <span>Expected <strong>{expected} pts</strong> → Actual <strong>{p.projectedPts}</strong></span>}

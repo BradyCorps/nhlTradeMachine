@@ -1279,6 +1279,38 @@ Also corrected: the top of the market is **17.3% of the cap**, not McDavid's
 $12.5M. Cap-relative throughout, so it scales with the ceiling — 17.3% is
 $18.0M at $104M and $19.6M at $113.5M.
 
+## The contract verdict now respects the model's own error
+
+Three surfaces each carried their own copy of `surplus >= 1 ? "BARGAIN" :
+surplus <= -1 ? "OVERPAY" : "FAIR"`. That $1M was hand-picked and it is
+**smaller than the model is wrong by** — the fitted skater model's walk-forward
+error is $1.22M for forwards and $1.35M for defence, the goalie model's $1.44M.
+So Jack Eichel's $13.5M against a $12.4M model price printed as an OVERPAY on a
+gap the model cannot resolve.
+
+`contract-verdict.ts` decides it in one place, from each fit's published
+`maeCapPct`, so a refit moves the threshold automatically and cannot leave it
+stale. Eichel now reads *priced about right*; Huberdeau at $10.5M against
+$4.5M still reads *paid above market*.
+
+**The language is deliberately weaker than it was.** Measured across 1,995
+contracts, when the model flags an overpay the gap is still there three seasons
+later only 57% of the time. BARGAIN and OVERPAY are verdicts; the model is
+entitled to say a deal is unusual for the profile and no more. So the chips read
+*paid below / above market*, the tooltip carries the 57%, and a within-margin
+gap is coloured neutral rather than painted green or red by its sign alone.
+
+**"Fair Market Value" is gone from every surface.** The name asserts what a
+player is WORTH, which the model cannot support: it predicts what clubs pay and
+is fitted on their mistakes as well as their successes. It is a *market price*
+now, and the tooltip says it predicts the market rather than judging it.
+
+A canary pins all of it — no surface may reintroduce its own threshold, every
+surface must route through the shared verdict, the margin must come from the
+published error rather than a literal, and nothing may print "Fair Market
+Value". Three existing canaries had pinned the old implementation, including the
+`$1M` rule itself, and were repointed to intent.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

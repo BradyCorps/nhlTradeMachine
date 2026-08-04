@@ -24,6 +24,7 @@ import { navStageDesc, navStageShort, navStagesForDisplay } from "@/app/lib/nav-
 import { derivePlayerRoles } from "@/app/lib/player-roles";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
+import { contractVerdict, verdictColor } from "@/app/lib/contract-verdict";
 
 export const dynamic = "force-dynamic";
 
@@ -129,7 +130,10 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
   // move the headline appeared nowhere.
   const navComponents = navStagesForDisplay(xnav.stages, xnav.total)
     .map(st => ({ label: navStageShort(st.key), val: st.value, desc: navStageDesc(st.key) }));
-  const surplus = xnav.fmvAav != null ? xnav.fmvAav - player.capHit : null;
+  // Tone comes from the verdict, so a gap inside the model's error reads
+  // neutral rather than being painted green or red by its sign alone.
+  const verdict = contractVerdict({ fmvAav: xnav.fmvAav, capHit: player.capHit, position: player.position });
+  const surplus = verdict.surplus;
 
   return (
     <main className="min-h-screen px-4 py-6" style={{ background: "var(--paper-bg)", color: ink }}>
@@ -233,7 +237,7 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
           {surplus != null && (
             <div className="text-right">
               <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>Surplus</div>
-              <div className="text-[13px] font-black font-mono" style={{ color: surplus > 0 ? "var(--ledger-green)" : "var(--ledger-red)" }}>
+              <div className="text-[13px] font-black font-mono" title={verdict.note} style={{ color: verdictColor(verdict.tone) }}>
                 {surplus > 0 ? "+" : ""}${surplus.toFixed(1)}M
               </div>
             </div>

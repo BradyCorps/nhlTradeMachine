@@ -911,18 +911,25 @@ describe("Canary — Player Card AA redesign + FMV surplus read", () => {
     expect(card).not.toContain("/api/headshot");
     expect(card).toContain("<PlayerAvatar");
     expect(card).toContain("CAP & CREASE");
-    expect(card).toContain("Fair Market Value");
+    expect(card).toContain("MODEL_PRICE_LABEL");
     expect(card).toContain("Extended Net Asset Value");
     // Missing stats read as "No data", never a fabricated 50th percentile
     expect(card).toContain("No data");
   });
 
-  it("reframes FMV as market AAV with an explicit surplus/overpay read", () => {
-    expect(card).toContain("const surplus = fmv - player.capHit");
-    expect(card).toContain('"BARGAIN"');
-    expect(card).toContain('"OVERPAY"');
-    // PA7: renamed Market AAV → Fair Market Value on the card
-    expect(card).toContain("Fair Market Value");
+  it("reads the contract against the model price, through the shared verdict", () => {
+    // The card used to decide this inline: `surplus >= 1 ? "BARGAIN" : ...`.
+    // That $1M is smaller than the model's own error, so a gap it cannot
+    // resolve was printed as a verdict — Eichel's $1.1M being the case that
+    // exposed it. The threshold now comes from the fit's published error, and
+    // it must come from ONE place so three surfaces cannot drift apart.
+    expect(card).toContain("contractVerdict");
+    expect(card).not.toMatch(/surplus\s*>=\s*1\s*\?/);
+    expect(card).not.toContain('"BARGAIN"');
+    expect(card).not.toContain('"OVERPAY"');
+    // Never "Fair Market Value" — the model predicts what clubs pay, it does
+    // not adjudicate what a player is worth, and the label must not claim it.
+    expect(card).not.toContain("Fair Market Value");
     expect(card).not.toContain("Market AAV");
     // NAV breakdown values are rounded (goalie def path is not pre-rounded)
     expect(card).toContain("Math.round(c.val)");
@@ -1844,7 +1851,8 @@ describe("Canary — R0/R1/R2 audit refinements", () => {
     expect(timeline).toContain("<table");
     expect(timeline).toContain('scope="row"');
     expect(timeline).toContain("Trade value (NAV) by contract year");
-    expect(timeline).toContain("vs market · ");
+    expect(timeline).toContain("surplusText");
+    expect(timeline).toContain("contractVerdict");
     expect(timeline).toContain("Current deal");
   });
 
@@ -4314,5 +4322,45 @@ describe("Canary — future contract years use the announced cap, not a guess", 
     // Armchair GM lets a user set the cap. Calling projectedCapCeiling directly
     // would price contracts against the real league instead of theirs.
     expect(engine).not.toMatch(/=\s*projectedCapCeiling\(i\)/);
+  });
+});
+
+describe("Canary — one place decides whether a contract is a bargain", () => {
+  // Three surfaces each carried `surplus >= 1 ? "BARGAIN" : surplus <= -1 ?
+  // "OVERPAY" : "FAIR"`. The $1M was hand-picked and smaller than the model is
+  // wrong by, so a gap inside the noise was printed as a verdict. Worse, three
+  // copies meant fixing one fixed one.
+  const surfaces = [
+    "app/components/PercentileCard.tsx",
+    "app/components/PlayerTimeline.tsx",
+    "app/players/[playerId]/page.tsx",
+    "app/components/TrendingPlayers.tsx",
+  ];
+
+  it("no surface decides the verdict with its own threshold", () => {
+    for (const f of surfaces) {
+      expect(readSource(f), f).not.toMatch(/surplus\s*[><]=?\s*-?1\s*\?/);
+      expect(readSource(f), f).not.toContain('"BARGAIN"');
+    }
+  });
+
+  it("every surface goes through the shared verdict", () => {
+    for (const f of surfaces) expect(readSource(f), f).toContain("contractVerdict");
+  });
+
+  it("the threshold is the fit's published error, not a constant", () => {
+    const v = readSource("app/lib/contract-verdict.ts");
+    expect(v).toContain("SKATER_FMV_VALIDATION");
+    expect(v).toContain("maeCapPct");
+    // A literal margin would go stale the moment either model is refitted.
+    expect(v).not.toMatch(/margin\s*=\s*1(\.\d+)?[;,]/);
+  });
+
+  it("nothing on screen still calls it Fair Market Value", () => {
+    // The name asserts what a player is WORTH. The model predicts what clubs
+    // pay, fitted on their mistakes as well as their successes.
+    for (const f of [...surfaces, "app/components/MetricTip.tsx", "app/armchair-gm/SeasonResultsPager.tsx"]) {
+      expect(readSource(f), f).not.toMatch(/Fair Market Value/i);
+    }
   });
 });

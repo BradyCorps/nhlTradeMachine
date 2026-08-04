@@ -13,6 +13,7 @@ import { FieldDiagram } from "@/app/components/GravityField";
 import { SEASON } from "@/app/lib/season-config";
 import MetricTip from "@/app/components/MetricTip";
 import { displayPosition } from "@/app/lib/display-position";
+import { contractVerdict, surplusText, MODEL_PRICE_LABEL } from "@/app/lib/contract-verdict";
 import {
   cardGravityFromV3,
   type CardImagePayload,
@@ -230,9 +231,13 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
   const peerLabel = posGroup === "F" ? "all forwards" : posGroup === "D" ? "all defensemen" : "all goalies";
 
   const fmv = xnav.fmvAav ?? 0;
-  const surplus = fmv - player.capHit;
-  const surplusTone = surplus >= 1 ? "good" : surplus <= -1 ? "bad" : "neutral";
-  const surplusWord = surplus >= 1 ? "BARGAIN" : surplus <= -1 ? "OVERPAY" : "FAIR DEAL";
+  // Decided by the model's own walk-forward error, not a round $1M. See
+  // `contract-verdict.ts` — the old threshold was smaller than the model is
+  // wrong by, so a gap inside the noise printed as an OVERPAY.
+  const verdict = contractVerdict({ fmvAav: xnav.fmvAav, capHit: player.capHit, position: player.position });
+  const surplus = verdict.surplus ?? 0;
+  const surplusTone = verdict.tone;
+  const surplusWord = verdict.label;
   const GOOD = "#146a24", BAD = "#9c2b1f", INK = "#1c140a";
   const toneColor = (t: string) => t === "good" ? GOOD : t === "bad" ? BAD : INK;
 
@@ -276,7 +281,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         capHitLabel: `$${player.capHit.toFixed(1)}M`,
         yearsLabel: `${player.yearsRemaining} yr`,
         fmvLabel: `$${fmv.toFixed(1)}M`,
-        surplusLabel: `${surplus > 0 ? "+" : surplus < 0 ? "−" : ""}$${Math.abs(surplus).toFixed(1)}M · ${surplusWord}`,
+        surplusLabel: `${surplusText(verdict)} · ${surplusWord}`,
         surplusColor: toneColor(surplusTone),
         gravity: publicGravity,
         edgeCells,
@@ -437,9 +442,9 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       {/* Contract line — one compact plate (PA7) */}
       <div className="pcard-contract">
         <span><span className="lbl">Cap Hit</span><span className="num" style={{ color: INK }}>${player.capHit.toFixed(1)}M × {player.yearsRemaining}yr</span></span>
-        <span><span className="lbl"><MetricTip term="FMV">Fair Market Value</MetricTip></span><span className="num" style={{ color: INK }}>${fmv.toFixed(1)}M</span></span>
-        <span><span className="lbl">Surplus</span><span className="num" style={{ color: toneColor(surplusTone) }}>
-          {surplus > 0 ? "+" : surplus < 0 ? "−" : ""}${Math.abs(surplus).toFixed(1)}M · {surplusWord}
+        <span><span className="lbl"><MetricTip term="FMV">{MODEL_PRICE_LABEL}</MetricTip></span><span className="num" style={{ color: INK }}>${fmv.toFixed(1)}M</span></span>
+        <span><span className="lbl">Surplus</span><span className="num" style={{ color: toneColor(surplusTone) }} title={verdict.note}>
+          {surplusText(verdict)} · {surplusWord}
         </span></span>
       </div>
 
