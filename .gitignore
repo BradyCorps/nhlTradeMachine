@@ -67,3 +67,8 @@ repomix-output.*
 # OtherData/contracts/ is hand-built and cannot be re-downloaded at all.
 OtherData/HistoricalData/lines_2008_to_2024.csv
 OtherData/HistoricalData/skaters_2008_to_2024.csv
+
+# The NHL raw-JSON archive. Grows without bound and is re-fetchable from the
+# league's own API — the manifest is what makes it reproducible, not the blobs.
+# See scripts/nhl-archive/crawl.py and docs/DATA_PERSISTENCE.md.
+OtherData/nhl-archive/raw/
