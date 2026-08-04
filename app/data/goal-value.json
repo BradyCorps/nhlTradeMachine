@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "goal-value-v1",
+  "generatedAt": "2026-08-04T15:02:24.298Z",
+  "generationCommand": "npx tsx scripts/goal-value/build.ts",
+  "replacementLevel": {
+    "per60": -0.129263,
+    "basis": "measured from 656 skaters on league-minimum standard contracts — at or under 1.1% of the cap, signed at age 25 or older",
+    "contracts": 1630,
+    "playersMatched": 656,
+    "seasonSeconds": 59789924,
+    "why": "Replacement is what a club can sign for the minimum, not a percentile of a distribution. Entry-level deals are excluded — a cheap contract only measures replacement when the player was free to sign anywhere and nobody bid more."
+  },
+  "marketRate": {
+    "capPctPerGoal": 0.002608,
+    "capPctPerGoalLadderEnds": 0.002858,
+    "n": 1996,
+    "r": 0.5038,
+    "why": "What clubs pay for a goal above replacement, from regressing cap share on production across every one-way standard signing. Corroborated by walking the pay ladder end to end, which needs no linear assumption and lands within 10%.",
+    "sanityCheck": {
+      "medianFullSeasonGar": 4.1,
+      "medianFullSeasonCapPct": 0.0217,
+      "bestSeasonEverGar": 39.9,
+      "bestSeasonEverCapPct": 0.1151
+    }
+  },
+  "marginalByBand": [
+    {
+      "band": "p20-40",
+      "capPctPerGoal": 0.001546
+    },
+    {
+      "band": "p40-60",
+      "capPctPerGoal": 0.001243
+    },
+    {
+      "band": "p60-80",
+      "capPctPerGoal": 0.002544
+    },
+    {
+      "band": "p80-95",
+      "capPctPerGoal": 0.004039
+    },
+    {
+      "band": "p95-100",
+      "capPctPerGoal": 0.003656
+    }
+  ],
+  "budgetConstraintRejected": {
+    "capPctPerGoal": 0.016266,
+    "goalsAboveReplacementPerSeason": 1577.7,
+    "discretionaryShareOfCap": 0.802,
+    "timesHigherThanMarket": 6.24,
+    "whyRejected": "It assumes a club's whole discretionary payroll buys the production this metric measures. It does not — goaltending, defence beyond on-ice expected goals, special teams and inefficiency all consume cap — so dividing all of the money by some of the value inflates the rate about sixfold. At this rate a median full-season skater would cost $6.9M and the best season on record $67.5M against a $20.8M legal maximum."
+  },
+  "agreement": {
+    "relativeGap": 0.8396,
+    "verdict": "the two routes disagree by design; the budget route is rejected above"
+  },
+  "sources": [
+    {
+      "path": "OtherData/HistoricalData/skaters_2008_to_2024.csv",
+      "sha256": "fbb8ab3744d2bf61346fc21547d0dfe0f25999f31b9de86ffbc198d543e8afdc",
+      "bytes": 56643229
+    },
+    {
+      "path": "OtherData/2025_26Data/2025_26_skaters.csv",
+      "sha256": "9a7e1f1a2f6bc8bc2bf10c5ba32947b47c4b26d5397287e4b30e9d662c4966e4",
+      "bytes": 3483132
+    },
+    {
+      "path": "OtherData/contracts/signings.csv",
+      "sha256": "eca9d8ccbd3ecf8641b3086920392e9282da23d02521c9ddfcf9c7ed50705bfb",
+      "bytes": 686180
+    }
+  ]
+}

@@ -1407,6 +1407,64 @@ The dossier leads with the three figures — on the ice, his contract, trade val
 — above the existing stage rows, so the breakdown reads as an explanation of the
 split rather than a separate accounting.
 
+## What a goal is worth: $0.27M, and it is not a constant
+
+The rough figure was `32 clubs × $80M ÷ 7,328 GAR` = $0.35M a goal. Every term
+was a guess, and the worst was replacement level — set at the 10th percentile of
+a rate distribution because it sounded about right. Replacement is the
+denominator, so guessing it sets the answer.
+
+**Replacement level is measured now.** A replacement player is not a percentile;
+he is the man a club can sign for the minimum, and 1,630 such contracts are on
+file. Taking standard deals at or under 1.1% of the cap, signed at 25 or older,
+and looking at what those 656 players actually produced gives **−0.129 goals per
+60** against the league average. Entry-level deals are excluded and it matters —
+Celebrini is on one. A cheap contract only measures replacement when the player
+was free to sign anywhere and nobody bid more.
+
+**Two routes were tried. One of them fails, instructively.**
+
+| | rate | a median full season | best season on file |
+|---|---:|---:|---:|
+| market slope (published) | 0.26% of cap/goal | $2.26M | $11.97M |
+| budget constraint (rejected) | 1.63% of cap/goal | $6.9M | $67.5M |
+
+The market rate regresses cap share on production across 1,996 signings, and is
+corroborated at 0.29% by walking the pay ladder end to end, which assumes no
+functional form.
+
+The budget route — total discretionary payroll divided by total production above
+replacement — comes out **6.2× higher and is wrong**. It assumes a club's whole
+discretionary spend buys the production this one metric measures. It does not:
+goaltending, defence beyond on-ice expected goals, special teams, durability and
+plain inefficiency all consume cap. Dividing all of the money by some of the
+value inflates the rate. It is published as `budgetConstraintRejected` rather
+than deleted, because the obvious second derivation deserves a recorded reason
+for being thrown out — and a test pins that the two are never averaged into a
+compromise with no derivation behind it.
+
+I had flagged this route in advance as the one that would make aggregate surplus
+zero by construction. That turned out to be the least of its problems.
+
+**The rate is not constant.** Marginal price per goal along the pay ladder:
+
+| band | % of cap per goal |
+|---|---:|
+| p20-40 | 0.155% |
+| p40-60 | 0.124% |
+| p60-80 | 0.254% |
+| p80-95 | **0.404%** |
+| p95-100 | 0.366% |
+
+Roughly triple from the middle to the top — the same convexity that put
+`skater-fmv.ts` on a monotone spline. A single figure is a fair average and a
+bad extrapolation, so the bands are published beside it and any consumer that
+treats the headline as linear at the top will understate stars.
+
+A build guard now refuses to ship a rate that prices a median full-season skater
+above 5% of the cap or the best season on record past the CBA maximum. That
+guard is what caught the budget route.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps
