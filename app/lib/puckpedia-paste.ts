@@ -41,6 +41,8 @@
 //
 // Nothing here writes. It returns rows and complaints; the caller decides.
 
+import { SEASON_START_YEAR } from "@/app/lib/contract-expiry";
+
 /** Cap ceilings by the season a deal begins, for reading the percentage back. */
 const CEILINGS: { seasonId: string; label: string; ceiling: number }[] = [
   { seasonId: "20242025", label: "2024-25", ceiling: 88.0 },
@@ -228,6 +230,45 @@ export function parsePuckPediaPaste(text: string): PasteResult {
   };
 }
 
+/** The calendar year a signing's money starts flowing. */
+export function startYearOf(s: Pick<ParsedSigning, "impliedSeason">, seasonStartYear: number): number {
+  const implied = s.impliedSeason ? parseInt(s.impliedSeason.slice(0, 4), 10) : NaN;
+  return Number.isFinite(implied) ? implied : seasonStartYear;
+}
+
+/** A deal whose money has not started yet is an extension, not a contract. */
+export function isFutureDated(s: Pick<ParsedSigning, "impliedSeason">, seasonStartYear: number): boolean {
+  return startYearOf(s, seasonStartYear) > seasonStartYear;
+}
+
+const MONTHS: Record<string, string> = {
+  JAN: "01", FEB: "02", MAR: "03", APR: "04", MAY: "05", JUN: "06",
+  JUL: "07", AUG: "08", SEP: "09", OCT: "10", NOV: "11", DEC: "12",
+};
+
+/** "JUL 31, 2026" → "2026-07-31", so a signing keeps its real date. */
+export function isoSignDate(header: string | null): string | undefined {
+  if (!header) return undefined;
+  const m = header.trim().toUpperCase().match(/^([A-Z]{3})\s+(\d{1,2}),\s*(\d{4})$/);
+  const month = m && MONTHS[m[1]];
+  return m && month ? `${m[3]}-${month}-${m[2].padStart(2, "0")}` : undefined;
+}
+
+export interface IngestRow {
+  capHit?: number;
+  yearsRemaining?: number;
+  /** The year the player reaches the market — the anchor the term derives from. */
+  expiryYear?: number;
+  position?: string;
+  teamSlug?: string;
+  age?: number | null;
+  /** Set instead of capHit/yearsRemaining when the money starts in a later season. */
+  extensionCapHit?: number;
+  extensionYears?: number;
+  extensionSignedAt?: string;
+  extensionStartsIn?: string;
+}
+
 /**
  * The shape `PUT /api/admin/contracts` ingests.
  *
@@ -236,30 +277,53 @@ export function parsePuckPediaPaste(text: string): PasteResult {
  * sending the paste's spelling for a player who is already in the DB does not
  * fail — it inserts a second copy of him with a real cap hit. Resolving the
  * key here is what stops that, and `name-match.ts` is what fills the map.
+ *
+ * TWO THINGS THIS DOES BESIDES COPYING FIELDS
+ *
+ * It sends `expiryYear`. A term is only true of the season it was captured in
+ * and the row does not record which one; the year the player reaches the
+ * market does not drift, so it is what a rollover can be derived from later.
+ *
+ * And it refuses to write a future-dated deal as a current contract.
+ * Celebrini's 16.56% of $18.8M implies the 2027-28 ceiling — the money starts
+ * after his entry-level deal. Writing it as his cap hit would put $18.8M on
+ * San Jose's books a season early and overwrite the contract he is actually
+ * playing under. It goes in as an extension instead, which is the field that
+ * already means "signed, owed later".
  */
 export function toIngestPayload(
   signings: ParsedSigning[],
   resolvedNames?: Record<string, string> | Map<string, string>,
-): Record<string, {
-  capHit: number; yearsRemaining: number; position?: string; teamSlug?: string; age?: number | null;
-}> {
+  seasonStartYear: number = SEASON_START_YEAR,
+): Record<string, IngestRow> {
   const resolve = (name: string): string => {
     if (!resolvedNames) return name;
     const hit = resolvedNames instanceof Map ? resolvedNames.get(name) : resolvedNames[name];
     return hit && hit.trim() ? hit : name;
   };
-  const out: Record<string, {
-    capHit: number; yearsRemaining: number; position?: string; teamSlug?: string; age?: number | null;
-  }> = {};
+  const out: Record<string, IngestRow> = {};
   for (const s of signings) {
-    out[resolve(s.name)] = {
-      // The DB carries millions, the paste carries dollars.
-      capHit: Math.round((s.capHit / 1_000_000) * 1000) / 1000,
-      yearsRemaining: s.years,
+    // The DB carries millions, the paste carries dollars.
+    const capHit = Math.round((s.capHit / 1_000_000) * 1000) / 1000;
+    const shared = {
       ...(s.position ? { position: s.position } : {}),
       teamSlug: s.team,
       age: s.age,
     };
+    out[resolve(s.name)] = isFutureDated(s, seasonStartYear)
+      ? {
+          ...shared,
+          extensionCapHit: capHit,
+          extensionYears: s.years,
+          extensionStartsIn: s.impliedSeason ?? undefined,
+          ...(isoSignDate(s.signDate) ? { extensionSignedAt: isoSignDate(s.signDate) } : {}),
+        }
+      : {
+          ...shared,
+          capHit,
+          yearsRemaining: s.years,
+          expiryYear: seasonStartYear + s.years,
+        };
   }
   return out;
 }

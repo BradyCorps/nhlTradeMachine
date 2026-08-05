@@ -219,10 +219,34 @@ describe("puckpedia-paste — the self-checks", () => {
 describe("puckpedia-paste — handing it to the ingest endpoint", () => {
   it("converts dollars to the millions the database stores", () => {
     const { signings } = parsePuckPediaPaste(MANY);
-    const payload = toIngestPayload(signings);
-    expect(payload["Macklin Celebrini"].capHit).toBe(18.8);
+    const payload = toIngestPayload(signings, undefined, 2026);
     expect(payload["Maksymilian Szuber"].capHit).toBe(0.85);
     expect(payload["Collin Graf"].yearsRemaining).toBe(3);
+  });
+
+  it("anchors each deal to the year the player reaches the market", () => {
+    // A term is only true of the season it was captured in and the row does
+    // not record which one. The year he becomes a free agent does not drift,
+    // so a rollover can be derived from it rather than decremented.
+    const payload = toIngestPayload(parsePuckPediaPaste(MANY).signings, undefined, 2026);
+    expect(payload["Collin Graf"].expiryYear).toBe(2029);      // 3 years from 2026-27
+    expect(payload["Colin White"].expiryYear).toBe(2027);      // 1 year
+  });
+
+  it("files a deal that starts later as an extension, not a cap hit", () => {
+    // Celebrini's 16.56% is taken against the 2027-28 ceiling: the money
+    // begins after his entry-level deal. Writing it as `capHit` would put
+    // $18.8M on San Jose's books a season early and overwrite the contract he
+    // is actually playing under.
+    const payload = toIngestPayload(parsePuckPediaPaste(MANY).signings, undefined, 2026);
+    const celebrini = payload["Macklin Celebrini"];
+    expect(celebrini.capHit).toBeUndefined();
+    expect(celebrini.yearsRemaining).toBeUndefined();
+    expect(celebrini).toMatchObject({
+      extensionCapHit: 18.8, extensionYears: 5, extensionStartsIn: "2027-28",
+    });
+    // And it keeps the date it was signed, so the feed can order by recency.
+    expect(celebrini.extensionSignedAt).toBe("2026-07-29");
   });
 
   it("sends a position only when it knows one", () => {
@@ -236,8 +260,8 @@ describe("puckpedia-paste — handing it to the ingest endpoint", () => {
     // the paste's spelling for a player the DB holds differently does not
     // fail — it duplicates him.
     const { signings } = parsePuckPediaPaste(MANY);
-    const payload = toIngestPayload(signings, { "Macklin Celebrini": "Mack Celebrini" });
-    expect(payload["Mack Celebrini"].capHit).toBe(18.8);
+    const payload = toIngestPayload(signings, { "Macklin Celebrini": "Mack Celebrini" }, 2026);
+    expect(payload["Mack Celebrini"].extensionCapHit).toBe(18.8);
     expect(payload["Macklin Celebrini"]).toBeUndefined();
     // Unmapped rows are untouched.
     expect(payload["Collin Graf"].capHit).toBe(4.25);

@@ -6,6 +6,7 @@ import { toast } from "@/app/lib/ledger-toast";
 import { TEAMS_DB } from "@/app/lib/db";
 import NeedsDataPanel from "@/app/admin/contracts/NeedsDataPanel";
 import PastePanel from "@/app/admin/contracts/PastePanel";
+import TermAuditPanel from "@/app/admin/contracts/TermAuditPanel";
 
 // The 32 clubs, alphabetical by name, for the admin team pickers.
 const TEAM_OPTIONS = [...TEAMS_DB].sort((a, b) => a.name.localeCompare(b.name));
@@ -738,6 +739,11 @@ export default function AdminContractsPage() {
           name-reconciliation candidates — the source spells players differently
           from the system, and an unmatched name inserts a duplicate. */}
       <PastePanel onSaved={() => load()} known={knownNames} />
+
+      {/* Whether anything stands behind each term. A stored `yearsRemaining`
+          is only true of the season it was captured in, and nothing here
+          advances it; the anchor is what makes a rollover safe to run. */}
+      <TermAuditPanel onWrote={() => load()} />
 
       {/* Filter bar */}
       <div style={{ padding: "12px 24px", borderBottom: "1px solid var(--ledger-rule-light)",

@@ -1799,6 +1799,79 @@ the id is what tells the two situations apart:
 The paste panel appends a team/position hint to tied option labels, because two
 identical entries in a picker is not a choice.
 
+### The Season a Term Belongs To
+
+Hanifin is year 3 of 8, and PuckPedia and the app agree: six seasons left, UFA
+2032. The operator's question was the right one — **is there a year switchover,
+or does it happen automatically?**
+
+Neither. The only rollover in the codebase is `advanceSeason`, which is Cup
+Run's in-memory simulation; it is called from `cup-run.ts` and tests and its
+output never reaches the players table. Real terms move when a human writes
+them, and never otherwise.
+
+**So `yearsRemaining` is not a fact about a contract.** It is a fact about a
+contract AND a season, and the row does not record which season. Hanifin's 6 is
+right for 2026-27 and wrong for 2027-28 without anything about the contract
+changing.
+
+That is why a "decrement everything" button would be wrong rather than merely
+crude. Contracts are hand-maintained from PuckPedia now, and a pasted row is
+already current — decrementing it makes it wrong. The rows that need moving and
+the rows that do not are indistinguishable.
+
+**The anchor.** `expiryYear` was already a column and does not drift: it is the
+calendar year the player reaches the market. Hanifin's is 2032 whichever season
+you read it in.
+
+```
+expiryYear     = seasonStartYear + yearsRemaining
+yearsRemaining = expiryYear − seasonStartYear
+```
+
+Derive the term instead of decrementing it and the rollover becomes
+**idempotent** — run it twice, or over a row pasted five minutes ago, and
+nothing moves twice. That property is the whole reason it is safe to put a
+button on it.
+
+**One refusal that is not arithmetic.** `deriveContractStatus` falls back to
+`yearsRemaining <= 1` when a row has no anchor, and terms are floored to 1
+across the pipeline — so that fallback is what currently makes a hand-set
+pending free agent read as pending. Anchoring one at `seasonStartYear + 1`
+would push him a year out and quietly sign him again: the phantom-bargain bug
+arriving from the opposite direction. Rows carrying a UFA/RFA class with no
+anchor are reported and left alone.
+
+The backfill also refuses a term sitting at the CBA maximum. Eight years
+remaining can only be true of a deal signed this offseason, and the seed has
+**18** of them — far more likely the term *at signing* was stored than the term
+remaining. Anchoring one would make that error permanent.
+
+**What the audit says about the committed seed** (the live table will differ,
+having been sync'd):
+
+| | |
+| --- | --- |
+| anchored and agreeing | 1 |
+| anchor disagrees with the term | 56 |
+| sitting at the CBA maximum | 18 |
+| unanchored, safe to anchor | 1,468 |
+
+The 56 are the curated 2026 free-agent class, stamped `expiryYear: 2026` while
+keeping whatever term the bundle held. Most are the harmless floor-to-1, but
+**Jason Robertson carries 6 years against a 2026 expiry** — he is being priced
+as a six-year asset when the curated class says he reaches the market this
+summer. A reconcile takes the anchor's word and zeroes him.
+
+**And the paste box stopped writing future money as present money.** A signing
+whose percentage-of-cap resolves to a later ceiling has not started: Celebrini's
+$18.8M is 2027-28 money. It was being written as his current cap hit, which put
+it on San Jose's books a season early *and* overwrote the entry-level deal he is
+actually playing under. It now goes into `extensionCapHit` / `extensionYears`,
+the fields that already mean "signed, owed later", carrying the real signing
+date. A future deal for a player the table has never heard of is reported, not
+invented — there is no contract for the extension to follow.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

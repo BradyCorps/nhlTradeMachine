@@ -22,7 +22,8 @@
 
 import { useMemo, useState } from "react";
 import { adminErrorMessage, readAdminResponse } from "@/app/admin/admin-response";
-import { parsePuckPediaPaste, toIngestPayload, type ParsedSigning } from "@/app/lib/puckpedia-paste";
+import { parsePuckPediaPaste, toIngestPayload, isFutureDated, type ParsedSigning } from "@/app/lib/puckpedia-paste";
+import { SEASON_START_YEAR } from "@/app/lib/contract-expiry";
 import { resolvePastedNames, type NameCandidate, type NameResolution } from "@/app/lib/name-match";
 
 const MONO = "'Courier Prime', 'Courier New', monospace";
@@ -103,6 +104,7 @@ export default function PastePanel({ onSaved, known = [] }: {
       const data = await readAdminResponse<{
         added?: number; updated?: number;
         reconciledEntries?: string[]; ambiguousEntries?: string[];
+        extensionsRecorded?: string[]; extensionNeedsPlayer?: string[];
       }>(res, "Save failed");
       // The endpoint reconciles spellings of its own accord too. Say so — a
       // silent reconciliation reads exactly like a duplicate from out here.
@@ -110,8 +112,14 @@ export default function PastePanel({ onSaved, known = [] }: {
         (data.reconciledEntries?.length ?? 0) > 0
           ? `${data.reconciledEntries!.length} matched to an existing spelling`
           : null,
+        (data.extensionsRecorded?.length ?? 0) > 0
+          ? `${data.extensionsRecorded!.length} filed as extensions (money starts later)`
+          : null,
         (data.ambiguousEntries?.length ?? 0) > 0
           ? `${data.ambiguousEntries!.length} skipped as ambiguous: ${data.ambiguousEntries!.join("; ")}`
+          : null,
+        (data.extensionNeedsPlayer?.length ?? 0) > 0
+          ? `${data.extensionNeedsPlayer!.length} future deal(s) skipped — add the player first: ${data.extensionNeedsPlayer!.join("; ")}`
           : null,
       ].filter(Boolean);
       setResult([`${data.added ?? 0} added · ${data.updated ?? 0} updated`, ...extra].join(" · "));
@@ -222,6 +230,7 @@ export default function PastePanel({ onSaved, known = [] }: {
                     const off = dropped.has(s.name);
                     const warn = s.warnings.length > 0;
                     const r = resolved.get(s.name);
+                    const future = isFutureDated(s, SEASON_START_YEAR);
                     const target = targetFor(s);
                     const undecidedRow = !off && !target;
                     // Only the options that are actually on the table: whatever
@@ -290,7 +299,15 @@ export default function PastePanel({ onSaved, known = [] }: {
                         </td>
                         <td style={{ ...cell, textAlign: "right" }}>{s.years}</td>
                         <td style={cell}>{s.type || "—"}</td>
-                        <td style={{ ...cell, color: "var(--ledger-ink-faint)" }}>{s.impliedSeason ?? "—"}</td>
+                        <td style={{
+                          ...cell,
+                          // A later start means this is an extension, not the
+                          // deal he is playing under. Worth seeing at a glance.
+                          color: future ? "var(--ledger-ice)" : "var(--ledger-ink-faint)",
+                          fontWeight: future ? 900 : 400,
+                        }}>
+                          {s.impliedSeason ?? "—"}{future ? " ext" : ""}
+                        </td>
                         <td style={{ ...cell, color: "var(--ledger-ink-faint)" }}>{s.signDate ?? "—"}</td>
                       </tr>
                     );
@@ -303,7 +320,8 @@ export default function PastePanel({ onSaved, known = [] }: {
           <div style={{ padding: "6px 14px", fontSize: 9, color: "var(--ledger-ink-faint)", borderTop: "1px solid var(--rule)", lineHeight: 1.6 }}>
             A forward reads as <b>F</b> and is left blank — the roster already knows whether he is a centre or a winger, and
             overwriting that with a guess would be worse than leaving it. <b>Starts</b> is inferred from the percentage of cap:
-            a figure taken against a later ceiling means the money begins in a later season. <b>Written as</b> is the name the
+            a figure taken against a later ceiling means the money begins in a later season, and a row marked <b>ext</b> is
+            filed as an extension rather than written over the contract the player is currently on. <b>Written as</b> is the name the
             row lands on: the source spells players differently from the system (Egor/Yegor, Nick/Nicholas), and writing a
             pasted spelling that the system does not hold creates a second copy of a player rather than updating him. Known
             spelling variants are matched for you; anything less certain is left red until you choose.

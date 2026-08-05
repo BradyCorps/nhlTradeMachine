@@ -559,6 +559,7 @@ export async function PUT(req: Request) {
     retired:        playersTable.retired,
     source:         playersTable.source,
     expiryStatus:   playersTable.expiryStatus,
+    expiryYear:     playersTable.expiryYear,
   }).from(playersTable);
   const existingById = new Map(existing.map(r => [r.id, r]));
   const existingByName = new Map(existing.map(r => [makeId(r.name), r]));
@@ -584,6 +585,8 @@ export async function PUT(req: Request) {
   const updatedEntries: string[] = [];
   const reconciledEntries: string[] = [];
   const ambiguousEntries: string[] = [];
+  const extensionsRecorded: string[] = [];
+  const extensionNeedsPlayer: string[] = [];
   const metadataMisses: string[] = [];
   const watchNames = new Set(["aatu raty", "brad lambert"]);
   const watch: Record<string, any> = {};
@@ -591,6 +594,38 @@ export async function PUT(req: Request) {
   for (const [key, cw] of Object.entries(source)) {
     if (key.includes("__")) continue;
     const id = makeId(key);
+
+    // ── A deal whose money starts in a later season ──────────────
+    // Celebrini's 16.56% of $18.8M is taken against the 2027-28 ceiling: the
+    // money begins after his entry-level deal. Writing it as `capHit` would
+    // put $18.8M on San Jose's books a season early AND overwrite the contract
+    // he is actually playing under. The extension fields already mean exactly
+    // this — signed, owed later — so it goes there, and the current deal is
+    // left alone. A player the table has never heard of gets no extension:
+    // there is no contract for it to follow, and inventing one would be worse
+    // than reporting the gap.
+    const extCapHit = Number(cw.extensionCapHit);
+    if (Number.isFinite(extCapHit) && extCapHit >= 0.5 && extCapHit <= 20.8) {
+      const target = existingById.get(id) ?? existingByName.get(id);
+      if (!target) {
+        extensionNeedsPlayer.push(`${key} — no current contract for the extension to follow`);
+        continue;
+      }
+      if (target.retired) continue;
+      const extYears = Number.isFinite(Number(cw.extensionYears)) && Number(cw.extensionYears) > 0
+        ? Math.round(Number(cw.extensionYears)) : 1;
+      await db.update(playersTable).set({
+        extensionCapHit: extCapHit,
+        extensionYears: extYears,
+        extensionSignedAt: typeof cw.extensionSignedAt === "string"
+          && /^\d{4}-\d{2}-\d{2}$/.test(cw.extensionSignedAt)
+          ? cw.extensionSignedAt
+          : new Date().toISOString().slice(0, 10),
+      }).where(eq(playersTable.id, target.id));
+      extensionsRecorded.push(`${key} — $${extCapHit}M × ${extYears}${cw.extensionStartsIn ? ` from ${cw.extensionStartsIn}` : ""}`);
+      continue;
+    }
+
     // Match scraper's CAP_MAX (CBA max = 20% of $104M ceiling); old 16 silently
     // dropped Kaprizov-tier contracts from bulk imports
     if (!cw.capHit || cw.capHit < 0.5 || cw.capHit > 20.8) continue;
@@ -655,6 +690,14 @@ export async function PUT(req: Request) {
       }
       if (teamId && current.teamId !== teamId) updates.teamId = teamId;
       if (values.age && current.age !== values.age) updates.age = values.age;
+      // The anchor is a contract fact, not a curation, so it is written onto
+      // editor rows too — the operator pasting the deal IS the editor. It also
+      // makes a stale `expiryStatus` inert rather than dangerous: a re-signed
+      // player keeps the UFA mark he was carrying, but `deriveContractStatus`
+      // reads the anchor first and sees a deal that runs for years.
+      if (expiryYear != null && current.expiryYear !== expiryYear) {
+        updates.expiryYear = expiryYear;
+      }
       // Only stamp expiry on non-editor rows that don't already carry a curated
       // FA class, so the seed's known UFA/RFA marks survive a live refresh.
       if (!isEditor && expiryStatus && current.expiryStatus == null) {
@@ -724,6 +767,10 @@ export async function PUT(req: Request) {
       // unreported reconciliation is indistinguishable from a duplicate.
       reconciledEntries,
       ambiguousEntries,
+      // Deals whose money starts in a later season, filed as extensions rather
+      // than written over the contract the player is currently on.
+      extensionsRecorded,
+      extensionNeedsPlayer,
       metadataMisses: metadataMisses.slice(0, 25),
       metadataMissCount: metadataMisses.length,
       watch,
