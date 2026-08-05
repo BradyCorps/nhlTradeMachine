@@ -159,6 +159,7 @@ function teamIdFromSlug(slug: string | null | undefined): string | null {
 
 // Shared player-ID function \u2014 single source of truth in player-identity.ts
 import { makePlayerId as makeId } from "@/app/lib/player-identity";
+import { buildNameIndex, resolveAgainstIndex } from "@/app/lib/name-match";
 
 function findScrapedByName(scraped: Record<string, any>, name: string): any | null {
   const direct = scraped[name];
@@ -561,11 +562,20 @@ export async function PUT(req: Request) {
   }).from(playersTable);
   const existingById = new Map(existing.map(r => [r.id, r]));
   const existingByName = new Map(existing.map(r => [makeId(r.name), r]));
+  // Spelling variants. The paste panel resolves these with a human looking at
+  // them; this is the net behind it, because a name that does not match an
+  // existing row is not rejected here — it is INSERTED. An unreconciled "Egor
+  // Chinakhov" therefore becomes a second Yegor Chinakhov carrying a real cap
+  // hit, which nothing downstream reports. Only the tiers that need no human
+  // are applied; a variant key matching two held names is refused outright.
+  const nameIndex = buildNameIndex(existing.map(r => r.name));
 
   let added = 0;
   let updated = 0;
   const newEntries: string[] = [];
   const updatedEntries: string[] = [];
+  const reconciledEntries: string[] = [];
+  const ambiguousEntries: string[] = [];
   const metadataMisses: string[] = [];
   const watchNames = new Set(["aatu raty", "brad lambert"]);
   const watch: Record<string, any> = {};
@@ -578,7 +588,20 @@ export async function PUT(req: Request) {
     if (!cw.capHit || cw.capHit < 0.5 || cw.capHit > 20.8) continue;
 
     const rosterFallback = rosterTeamMap.get(id);
-    const current = existingById.get(id) ?? existingByName.get(id);
+    let current = existingById.get(id) ?? existingByName.get(id);
+    if (!current) {
+      const hit = resolveAgainstIndex(key, nameIndex);
+      if (hit.ambiguous.length > 1) {
+        // Two held players fit equally well. Writing to either is a coin toss,
+        // and inserting a third is worse, so this row waits for a human.
+        ambiguousEntries.push(`${key} → ${hit.ambiguous.join(" | ")}`);
+        continue;
+      }
+      if (hit.name && hit.tier === "variant") {
+        current = existingByName.get(makeId(hit.name));
+        if (current) reconciledEntries.push(`${key} → ${hit.name}`);
+      }
+    }
     const position = normalisePosition(cw.position) ?? rosterFallback?.position ?? "Unknown";
     const currentTeamId = isValidTeamId(current?.teamId) ? current.teamId : null;
     const teamId = teamIdFromSlug(cw.teamSlug) ?? rosterFallback?.teamId ?? currentTeamId ?? null;
@@ -688,6 +711,11 @@ export async function PUT(req: Request) {
       total: total.length,
       newEntries,
       updatedEntries,
+      // Names written onto a differently-spelled existing player, and names
+      // that fit two of them. Both are reported rather than logged: an
+      // unreported reconciliation is indistinguishable from a duplicate.
+      reconciledEntries,
+      ambiguousEntries,
       metadataMisses: metadataMisses.slice(0, 25),
       metadataMissCount: metadataMisses.length,
       watch,

@@ -79,6 +79,12 @@ export function removePlayerFromOtherRosters(
 // Deliberately conservative and only ever applied WITHIN one team, where
 // two distinct players sharing a last name and a nickname-equivalent first
 // name effectively never occurs.
+//
+// The second half of the table is a different problem with the same shape:
+// a Cyrillic first name has no single correct spelling in the Latin
+// alphabet, so sources pick different ones and neither is wrong. Егор is
+// "Egor" on one page and "Yegor" on another. Those variants do not even
+// share a first letter, so nothing short of an explicit table finds them.
 const FIRST_NAME_NICKNAMES: Record<string, string> = {
   matt: "matthew", matty: "matthew", matthias: "matthew",
   mike: "michael", mikey: "michael",
@@ -110,7 +116,42 @@ const FIRST_NAME_NICKNAMES: Record<string, string> = {
   ed: "edward", eddie: "edward",
   greg: "gregory",
   tim: "timothy", timmy: "timothy",
+  mitch: "mitchell",
+  jon: "jonathan", jonny: "jonathan", johnny: "john",
+  kris: "kristopher",
+  cal: "calvin",
+
+  // ── Transliterations ───────────────────────────────────────────
+  // Same name, different romanisation. The root chosen here is arbitrary;
+  // all that matters is that every spelling of one name lands on it.
+  egor: "yegor",
+  alexei: "aleksei", alexey: "aleksei", aleksey: "aleksei", alexi: "aleksei",
+  dmitry: "dmitri", dmitriy: "dmitri", dmitrij: "dmitri",
+  sergey: "sergei", serguei: "sergei",
+  andrey: "andrei", andrej: "andrei",
+  evgeny: "evgeni", evgenii: "evgeni", yevgeni: "evgeni", yevgeny: "evgeni",
+  ilia: "ilya", iliya: "ilya",
+  matvey: "matvei",
+  nikolay: "nikolai", nicolai: "nikolai",
+  valery: "valeri", valerii: "valeri",
+  vitaly: "vitali", vitalii: "vitali",
+  vasily: "vasili", vasiliy: "vasili",
+  yury: "yuri",
+  maksim: "maxim",
+  danil: "daniil",
+  artemi: "artem", artyom: "artem", artiom: "artem",
+  grigory: "grigori", grigorii: "grigori",
+  arseny: "arseni", arsenii: "arseni",
+  mihail: "mikhail", michail: "mikhail",
+  kiril: "kirill",
+  fyodor: "fedor",
+  semen: "semyon",
+  timofey: "timofei",
 };
+
+/** The spelling every variant of a first name collapses to. */
+export const firstNameRoot = (first: string): string =>
+  FIRST_NAME_NICKNAMES[first] ?? first;
 
 // A team-scoped key that collapses first-name variants ("matt-savoie" and
 // "matthew-savoie" → "matthew-savoie") while keeping the last name intact.

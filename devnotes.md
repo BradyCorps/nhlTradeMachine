@@ -1673,6 +1673,77 @@ exact failure the "nothing skipped" assertion exists to catch. It was the
 fixture: I had listed Topias Vilen in the expected names and left him out of the
 sample text. The assertion was right to fire either way.
 
+### Name Reconciliation — The Paste Box's Real Failure Mode
+
+The paste box worked, and the first real use of it found the thing I had not
+built: **the source and the system do not agree about names.**
+
+| the paste says | the system holds |
+| --- | --- |
+| Egor Chinakhov | Yegor Chinakhov |
+| Nick Paul | Nicholas Paul |
+| Samuel Montembeault | Sam Montembeault |
+
+Each pair is one player. `makePlayerId` sees six.
+
+**Why this is worse than it looks.** The ingest keys on the name, and a name it
+cannot find is not rejected — it is INSERTED. So an unreconciled row does not
+fail loudly, it quietly grows a second Chinakhov carrying a real cap hit, on a
+roster, in the trade machine, priced by the model. Nothing downstream reports a
+duplicate. A missing contract is a gap you can see; this is a gap wearing a
+player's face.
+
+**Two kinds of disagreement, one shape.** Nick/Nicholas is common-vs-formal.
+Egor/Yegor is a transliteration: Егор has no single correct spelling in the
+Latin alphabet, so sources pick different ones and neither is wrong. The second
+kind is nastier because the variants **do not share a first letter** — no amount
+of prefix or initial matching finds it. Only a table does. Both now live in
+`FIRST_NAME_NICKNAMES`, which already existed for same-team roster dedup.
+
+**`app/lib/name-match.ts` — five tiers, and only two of them act alone.**
+
+| tier | rule | what happens |
+| --- | --- | --- |
+| exact | same id | applied |
+| variant | same surname, first names are known spellings of one another | applied |
+| sameTeamNear | same team + surname, first names 1-2 letters apart | pre-filled, amber, changeable |
+| sameTeamSurname | same team + surname, unrelated first names | **blocked until picked** |
+| nearSurname | same team, surname a near-miss | **blocked until picked** |
+
+The line between rows three and four is the whole design. Two Newhooks on one
+team could be brothers, and writing a contract onto the wrong one is silent, so
+the loose tiers come back marked and the panel refuses to write them until a
+human chooses. A tie at the top tier is reported as ambiguous no matter how
+confident the tier is — an arbitrary pick would be indistinguishable from a
+correct one at the call site.
+
+The loose tiers also require a shared team, deliberately. Without one, "Ryan
+Smith" and "Bryan Smith" are one edit apart and are two people. The two tiers
+that act alone do **not** require a matching team, because a signings list is
+full of players changing clubs — that is what the paste box is for.
+
+**A net behind the panel.** `buildNameIndex` / `resolveAgainstIndex` give the
+PUT endpoint the same two safe tiers in constant time, so a caller that skips
+the panel — a script, a re-post, a future importer — still cannot duplicate
+silently. It answers only what needs no human, since it has none to ask, and
+reports both what it reconciled and what it refused. An unreported
+reconciliation reads exactly like a duplicate from outside.
+
+**Checked against the real 1,545-name bundle.** All three reported cases resolve
+at `auto`, plus two I had not been told about (Artyom→Artem Zub,
+Maksim→Maxim Tsyplakov). Exactly one variant bucket in 1,542 holds more than one
+player — and it is a **genuine duplicate already in the data**: `Matt Savoie`
+($1.1M × 2) and `Matthew Savoie` ($0.887M × 3) are two rows for one player, with
+different contracts. Worth fixing by hand; the matcher found it by refusing to
+guess.
+
+**A bug the real data caught.** My first index counted names, not players. The
+bundle carries `Alexis Lafreniere` beside `Alexis Lafrenière` and `J.T. Miller`
+beside `JT Miller` — the id already strips accents and dots, so those are one
+player twice. Counting them as two would have made every near-miss on those
+surnames report as an ambiguous conflict and refuse to write, over a fight that
+does not exist. The index now dedupes by id before bucketing.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

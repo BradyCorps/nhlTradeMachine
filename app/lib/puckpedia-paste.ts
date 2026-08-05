@@ -228,15 +228,31 @@ export function parsePuckPediaPaste(text: string): PasteResult {
   };
 }
 
-/** The shape `PUT /api/admin/contracts` ingests. */
-export function toIngestPayload(signings: ParsedSigning[]): Record<string, {
+/**
+ * The shape `PUT /api/admin/contracts` ingests.
+ *
+ * `resolvedNames` maps a pasted name to the spelling the system already holds
+ * ("Egor Chinakhov" → "Yegor Chinakhov"). The ingest keys on the name, so
+ * sending the paste's spelling for a player who is already in the DB does not
+ * fail — it inserts a second copy of him with a real cap hit. Resolving the
+ * key here is what stops that, and `name-match.ts` is what fills the map.
+ */
+export function toIngestPayload(
+  signings: ParsedSigning[],
+  resolvedNames?: Record<string, string> | Map<string, string>,
+): Record<string, {
   capHit: number; yearsRemaining: number; position?: string; teamSlug?: string; age?: number | null;
 }> {
+  const resolve = (name: string): string => {
+    if (!resolvedNames) return name;
+    const hit = resolvedNames instanceof Map ? resolvedNames.get(name) : resolvedNames[name];
+    return hit && hit.trim() ? hit : name;
+  };
   const out: Record<string, {
     capHit: number; yearsRemaining: number; position?: string; teamSlug?: string; age?: number | null;
   }> = {};
   for (const s of signings) {
-    out[s.name] = {
+    out[resolve(s.name)] = {
       // The DB carries millions, the paste carries dollars.
       capHit: Math.round((s.capHit / 1_000_000) * 1000) / 1000,
       yearsRemaining: s.years,

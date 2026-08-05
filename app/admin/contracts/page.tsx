@@ -646,6 +646,14 @@ export default function AdminContractsPage() {
     return list;
   }, [contracts, search, filter]);
 
+  // Every name the system already holds, for the paste box to reconcile
+  // against. Memoised on `contracts` so the resolution below it is not redone
+  // on every keystroke in the search box.
+  const knownNames = useMemo(
+    () => contracts.map(r => ({ name: r.name, team: r.team })),
+    [contracts],
+  );
+
   const flaggedCount = contracts.filter(r => (r.delta ?? 0) >= 1).length;
   const editorCount  = contracts.filter(r => r.dbSource === "editor").length;
   const needsCount   = contracts.filter(r => r.needsData).length;
@@ -720,8 +728,10 @@ export default function AdminContractsPage() {
 
       {/* Paste a signings list. The replacement for the scrape: a human copies
           a transactions page, the parser checks itself, nothing is written
-          until it has been looked at. */}
-      <PastePanel onSaved={() => load()} />
+          until it has been looked at. The contract rows are handed over as the
+          name-reconciliation candidates — the source spells players differently
+          from the system, and an unmatched name inserts a duplicate. */}
+      <PastePanel onSaved={() => load()} known={knownNames} />
 
       {/* Filter bar */}
       <div style={{ padding: "12px 24px", borderBottom: "1px solid var(--ledger-rule-light)",

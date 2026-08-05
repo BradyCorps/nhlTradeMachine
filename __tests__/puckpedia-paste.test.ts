@@ -231,6 +231,24 @@ describe("puckpedia-paste — handing it to the ingest endpoint", () => {
     expect(payload["Collin Graf"].position).toBeUndefined();
   });
 
+  it("writes under the system's spelling when one was resolved", () => {
+    // The ingest keys on the name and inserts what it cannot find, so posting
+    // the paste's spelling for a player the DB holds differently does not
+    // fail — it duplicates him.
+    const { signings } = parsePuckPediaPaste(MANY);
+    const payload = toIngestPayload(signings, { "Macklin Celebrini": "Mack Celebrini" });
+    expect(payload["Mack Celebrini"].capHit).toBe(18.8);
+    expect(payload["Macklin Celebrini"]).toBeUndefined();
+    // Unmapped rows are untouched.
+    expect(payload["Collin Graf"].capHit).toBe(4.25);
+  });
+
+  it("ignores a blank resolution rather than writing an empty key", () => {
+    const { signings } = parsePuckPediaPaste(ONE);
+    const payload = toIngestPayload(signings, { "Maksymilian Szuber": "  " });
+    expect(payload["Maksymilian Szuber"].capHit).toBe(0.85);
+  });
+
   it("survives an empty or junk paste without throwing", () => {
     expect(parsePuckPediaPaste("").signings).toEqual([]);
     const junk = parsePuckPediaPaste("hello\nworld\n123");
