@@ -226,10 +226,18 @@ export default function PastePanel({ onSaved, known = [] }: {
                     const undecidedRow = !off && !target;
                     // Only the options that are actually on the table: whatever
                     // matched, its runners-up, and "write it as pasted".
-                    const options = [
-                      ...(r?.match ? [r.match] : []),
-                      ...(r?.alternatives ?? []),
-                    ].map(m => ({ value: m.name, label: m.name, why: m.why }));
+                    const hits = [...(r?.match ? [r.match] : []), ...(r?.alternatives ?? [])];
+                    // Two candidates can carry the SAME name and be two people
+                    // — there are two Elias Petterssons. Identical options in a
+                    // picker are not a choice, so a tied label gets its hint.
+                    const dupLabel = new Set(
+                      hits.map(m => m.name).filter((n, i, a) => a.indexOf(n) !== i),
+                    );
+                    const options = hits.map(m => ({
+                      value: m.name,
+                      label: dupLabel.has(m.name) && m.hint ? `${m.name} — ${m.hint}` : m.name,
+                      why: m.why,
+                    }));
                     if (!options.some(o => o.value === s.name)) {
                       options.push({ value: s.name, label: `${s.name} — new player`, why: "adds a new row under the pasted spelling" });
                     }

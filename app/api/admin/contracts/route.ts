@@ -567,8 +567,16 @@ export async function PUT(req: Request) {
   // existing row is not rejected here — it is INSERTED. An unreconciled "Egor
   // Chinakhov" therefore becomes a second Yegor Chinakhov carrying a real cap
   // hit, which nothing downstream reports. Only the tiers that need no human
-  // are applied; a variant key matching two held names is refused outright.
-  const nameIndex = buildNameIndex(existing.map(r => r.name));
+  // are applied; a key matching two held players is refused outright.
+  //
+  // The row ids go in alongside the names because two rows can share a name
+  // and be two people — Vancouver carries two Elias Petterssons, a centre and
+  // a defenceman. Without the ids the index would fold them into one and then
+  // resolve a near-miss to whichever it happened to see first. (A paste naming
+  // him exactly still lands on the row whose id matches exactly, above; that
+  // is a key hit rather than a guess, and the second Pettersson is reachable
+  // only by his suffixed id, as everywhere else in the app.)
+  const nameIndex = buildNameIndex(existing.map(r => ({ id: r.id, name: r.name })));
 
   let added = 0;
   let updated = 0;

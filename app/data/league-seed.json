@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-07-06T13:34:10.720Z",
+  "generatedAt": "2026-08-05T15:55:40.054Z",
   "season": "2026-27",
   "offseasonYear": 2026,
-  "count": 1544,
+  "count": 1543,
   "players": [
     {
       "id": "ajgreer",
@@ -765,10 +765,10 @@
     },
     {
       "id": "alexislafreniere",
-      "name": "Alexis Lafreniere",
+      "name": "Alexis Lafrenière",
       "position": "Unknown",
-      "capHit": 6.5,
-      "yearsRemaining": 6,
+      "capHit": 7.45,
+      "yearsRemaining": 7,
       "hasNmc": false,
       "hasNtc": false,
       "expiryStatus": null,
@@ -10730,17 +10730,6 @@
       "expiryYear": null
     },
     {
-      "id": "mattsavoie",
-      "name": "Matt Savoie",
-      "position": "Unknown",
-      "capHit": 1.1,
-      "yearsRemaining": 2,
-      "hasNmc": false,
-      "hasNtc": false,
-      "expiryStatus": null,
-      "expiryYear": null
-    },
-    {
       "id": "mattstienburg",
       "name": "Matt Stienburg",
       "position": "Unknown",
@@ -10855,7 +10844,7 @@
       "name": "Matthew Savoie",
       "position": "Unknown",
       "capHit": 0.887,
-      "yearsRemaining": 3,
+      "yearsRemaining": 1,
       "hasNmc": false,
       "hasNtc": false,
       "expiryStatus": null,

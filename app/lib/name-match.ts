@@ -69,6 +69,14 @@ const TIER_WHY: Record<MatchTier, string> = {
 export interface NameCandidate {
   name: string;
   team?: string | null;
+  /**
+   * The row's own id, where the caller has one. Two rows can share a name and
+   * be two people — Vancouver really does carry two Elias Petterssons, a
+   * centre and a defenceman — and only the id tells them apart.
+   */
+  id?: string | null;
+  /** Something to tell two identically-named players apart in a picker. */
+  hint?: string | null;
 }
 
 export interface NameMatch {
@@ -77,6 +85,8 @@ export interface NameMatch {
   tier: MatchTier;
   action: MatchAction;
   why: string;
+  /** The candidate's hint, carried through so a picker can show it. */
+  hint?: string | null;
 }
 
 export interface NameResolution {
@@ -169,7 +179,10 @@ export function resolvePastedName(
   for (const candidate of candidates) {
     const tier = tierFor(pasted, candidate);
     if (!tier) continue;
-    hits.push({ name: candidate.name, tier, action: TIER_ACTION[tier], why: TIER_WHY[tier] });
+    hits.push({
+      name: candidate.name, tier, action: TIER_ACTION[tier], why: TIER_WHY[tier],
+      hint: candidate.hint ?? candidate.team ?? null,
+    });
   }
 
   if (hits.length === 0) return { match: null, action: "none", alternatives: [] };
@@ -218,31 +231,48 @@ export function resolvePastedNames(
 // so it gets the tiers that need no asking and nothing else.
 
 export interface NameIndex {
-  byId: Map<string, string>;
+  /** Derived id → the names of every DISTINCT player deriving it. */
+  byId: Map<string, string[]>;
   byVariant: Map<string, string[]>;
 }
 
 /**
- * A bucket holds one entry per PLAYER, not per string.
+ * Index the names a table holds, one entry per PLAYER rather than per string.
  *
- * The live table really does carry "Alexis Lafreniere" and "Alexis Lafrenière",
- * and "J.T. Miller" beside "JT Miller". Those are one player twice: the id
- * strips accents and punctuation, so both spellings already resolve to him.
- * Counting them as two would make every near-miss on that surname report as
- * ambiguous and refuse to write — a made-up conflict blocking a real update.
+ * Both halves of that sentence are load-bearing, and they pull opposite ways:
+ *
+ * ONE ENTRY PER PLAYER. The live table carries "Alexis Lafreniere" beside
+ * "Alexis Lafrenière", and "J.T. Miller" beside "JT Miller". The id strips
+ * accents and dots, so those are one player written twice. Counting them as
+ * two would make every near-miss on that surname report as a conflict and
+ * refuse to write, over a fight that does not exist.
+ *
+ * PER PLAYER, NOT PER NAME. Vancouver carries two Elias Petterssons — a centre
+ * and a defenceman, different people, one spelling. Collapsing them would let
+ * a paste write the defenceman's deal onto the centre without a word. Pass the
+ * rows' own ids and they stay two, and any lookup landing on them is refused.
+ *
+ * So: rows are the same player when their given ids match, and when no ids are
+ * given, when their derived ids match. Callers that have ids should pass them.
  */
-export function buildNameIndex(names: Iterable<string>): NameIndex {
-  const byId = new Map<string, string>();
+export function buildNameIndex(rows: Iterable<string | NameCandidate>): NameIndex {
+  const byId = new Map<string, string[]>();
   const byVariant = new Map<string, string[]>();
-  for (const name of names) {
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const name = typeof row === "string" ? row : row.name;
     if (!name) continue;
-    const id = makePlayerId(name);
-    if (byId.has(id)) continue;   // same player, another spelling
-    byId.set(id, name);
-    const key = nicknameMergeKey(name);
-    const bucket = byVariant.get(key);
-    if (bucket) bucket.push(name);
-    else byVariant.set(key, [name]);
+    const derived = makePlayerId(name);
+    const player = (typeof row === "string" ? null : row.id) || derived;
+    if (seen.has(player)) continue;   // the same player again
+    seen.add(player);
+    const push = (map: Map<string, string[]>, key: string) => {
+      const bucket = map.get(key);
+      if (bucket) bucket.push(name);
+      else map.set(key, [name]);
+    };
+    push(byId, derived);
+    push(byVariant, nicknameMergeKey(name));
   }
   return { byId, byVariant };
 }
@@ -258,12 +288,14 @@ export interface IndexHit {
 /**
  * Look one name up against the index.
  *
- * A variant key matching two held names returns neither. Picking one would be
- * a coin toss written into a contract row, and the caller can at least say so.
+ * A key matching two held players returns neither — including an EXACT one,
+ * which is the two-Petterssons case. Picking one would be a coin toss written
+ * into a contract row, and the caller can at least say so.
  */
 export function resolveAgainstIndex(name: string, index: NameIndex): IndexHit {
-  const exact = index.byId.get(makePlayerId(name));
-  if (exact) return { name: exact, tier: "exact", ambiguous: [] };
+  const exact = index.byId.get(makePlayerId(name)) ?? [];
+  if (exact.length === 1) return { name: exact[0], tier: "exact", ambiguous: [] };
+  if (exact.length > 1) return { name: null, tier: null, ambiguous: [...exact] };
 
   const bucket = index.byVariant.get(nicknameMergeKey(name)) ?? [];
   if (bucket.length === 1) return { name: bucket[0], tier: "variant", ambiguous: [] };

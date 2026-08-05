@@ -650,7 +650,13 @@ export default function AdminContractsPage() {
   // against. Memoised on `contracts` so the resolution below it is not redone
   // on every keystroke in the search box.
   const knownNames = useMemo(
-    () => contracts.map(r => ({ name: r.name, team: r.team })),
+    () => contracts.map(r => ({
+      name: r.name,
+      team: r.team,
+      // Two candidates can share a name and be two people; the hint is what
+      // makes them tellable apart in the picker.
+      hint: [r.team, r.position].filter(Boolean).join(" ") || null,
+    })),
     [contracts],
   );
 

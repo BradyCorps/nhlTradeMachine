@@ -482,13 +482,6 @@
     "hasNTC": false,
     "canRetain": true
   },
-  "Alexis Lafreniere": {
-    "capHit": 6.5,
-    "yearsRemaining": 6,
-    "hasNMC": false,
-    "hasNTC": false,
-    "canRetain": true
-  },
   "Alexis Lafrenière": {
     "capHit": 7.45,
     "yearsRemaining": 7,
@@ -5445,13 +5438,6 @@
     "hasNTC": false,
     "canRetain": true
   },
-  "JT Miller": {
-    "capHit": 8,
-    "yearsRemaining": 3,
-    "hasNMC": false,
-    "hasNTC": true,
-    "canRetain": true
-  },
   "Juha Jaaska": {
     "capHit": 0.813,
     "yearsRemaining": 1,
@@ -6831,13 +6817,6 @@
     "hasNTC": false,
     "canRetain": true
   },
-  "Matt Savoie": {
-    "capHit": 1.1,
-    "yearsRemaining": 2,
-    "hasNMC": false,
-    "hasNTC": false,
-    "canRetain": true
-  },
   "Matt Stienburg": {
     "capHit": 0.775,
     "yearsRemaining": 1,
@@ -6910,7 +6889,7 @@
   },
   "Matthew Savoie": {
     "capHit": 0.887,
-    "yearsRemaining": 3,
+    "yearsRemaining": 1,
     "hasNMC": false,
     "hasNTC": false,
     "canRetain": true

@@ -85,6 +85,16 @@ describe("name-match — what it refuses to decide", () => {
     expect(r.action).toBe("confirm");
   });
 
+  it("carries a hint so a picker can tell two same-named players apart", () => {
+    const both = [
+      { name: "Elias Pettersson", team: "VAN", hint: "VAN C" },
+      { name: "Elias Pettersson", team: "VAN", hint: "VAN D" },
+    ];
+    const r = resolvePastedName({ name: "Elias Pettersson", team: "VAN" }, both);
+    expect(r.action).toBe("ambiguous");
+    expect([r.match?.hint, r.alternatives[0].hint]).toEqual(["VAN C", "VAN D"]);
+  });
+
   it("calls a tie ambiguous rather than taking the first one", () => {
     // Two candidates reaching the same tier means the tier is not the problem:
     // whichever it picked would look exactly as confident as a right answer.
@@ -137,7 +147,7 @@ describe("name-match — the index behind the endpoint", () => {
   });
 
   it("counts one player spelled two ways as one player", () => {
-    // Both of these are really in the table. The id strips accents and dots,
+    // Both of these were really in the bundle. The id strips accents and dots,
     // so they are already the same person; treating them as a conflict would
     // block every near-miss on that surname over a fight that does not exist.
     const doubled = buildNameIndex([
@@ -146,6 +156,32 @@ describe("name-match — the index behind the endpoint", () => {
     expect(resolveAgainstIndex("Alexis Lafreniere", doubled).tier).toBe("exact");
     expect(doubled.byVariant.get("alexis-lafreniere")).toHaveLength(1);
     expect(doubled.byVariant.get("jt-miller")).toHaveLength(1);
+  });
+
+  it("counts two players sharing a name as two players, given their ids", () => {
+    // Vancouver carries two Elias Petterssons, a centre and a defenceman. One
+    // spelling, two people. Folding them together would let a paste write the
+    // defenceman's deal onto the centre without a word, so an exact hit on a
+    // shared name is refused like any other tie.
+    const vancouver = buildNameIndex([
+      { id: "eliaspettersson", name: "Elias Pettersson" },
+      { id: "eliaspettersson-d", name: "Elias Pettersson" },
+      { id: "quinnhughes", name: "Quinn Hughes" },
+    ]);
+    expect(resolveAgainstIndex("Elias Pettersson", vancouver)).toMatchObject({
+      name: null, tier: null, ambiguous: ["Elias Pettersson", "Elias Pettersson"],
+    });
+    expect(resolveAgainstIndex("Quinn Hughes", vancouver).tier).toBe("exact");
+  });
+
+  it("still folds one player whose id is given twice", () => {
+    // The id is what says "same player", so a row listed twice under one id is
+    // one player however it is spelled.
+    const idx = buildNameIndex([
+      { id: "alexisLafreniere", name: "Alexis Lafreniere" },
+      { id: "alexisLafreniere", name: "Alexis Lafrenière" },
+    ]);
+    expect(resolveAgainstIndex("Alexis Lafreniere", idx).tier).toBe("exact");
   });
 
   it("has no opinion about a name it does not hold", () => {

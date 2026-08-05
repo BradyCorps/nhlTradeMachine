@@ -1744,6 +1744,61 @@ player twice. Counting them as two would have made every near-miss on those
 surnames report as an ambiguous conflict and refuse to write, over a fight that
 does not exist. The index now dedupes by id before bucketing.
 
+### One Player, One Row — What the Matcher Found by Refusing to Guess
+
+The name matcher's one job is to not guess. The first thing it did was report a
+conflict it could not resolve — `Matt Savoie` beside `Matthew Savoie` — and
+pulling that thread found three duplicate pairs in the committed baseline, each
+holding **different money**:
+
+| stale key (21 May) | live key (8 June) |
+| --- | --- |
+| `Alexis Lafreniere` $6.5M × 6 | `Alexis Lafrenière` $7.45M × 7 |
+| `JT Miller` $8M × 3, NTC | `J.T. Miller` $8M × 4 |
+| `Matt Savoie` $1.1M × 2 | `Matthew Savoie` $0.887M × 3 |
+
+Git dated the pairs: every stale entry came from one commit, every live one from
+a later commit that added the correct row without removing the old one. The
+operator's PuckPedia figure for Savoie ($886,666, year 3 of 3) confirmed the
+rule on the one case we could check independently, so the same rule settled the
+other two rather than my guessing at contracts.
+
+**It was not harmless.** `league-seed.json` — what "Load baseline" writes into
+the players table — is generated from the bundle by de-duplicating on the
+derived id, first key wins. `Alexis Lafreniere` sorts ahead of
+`Alexis Lafrenière`, so the generator kept the **stale** $6.5M × 6 and dropped
+the real $7.45M × 7 without a word. The committed seed had been shipping the
+wrong contract for a top-six winger.
+
+**And `yearsRemaining` counts the current season.** `extensions.ts` treats 1 as
+expiring and `SEASON.label` is 2026-27, so PuckPedia's "Year 3 of 3" is
+`yearsRemaining: 1`, not 3. Savoie is 0.887 × 1.
+
+`__tests__/contracts-bundle-identity.test.ts` now fails the build on two keys
+that resolve to one player id, on two keys that are spelling variants, and on
+two seed rows sharing a name *and* an id. Nobody found these by reading the
+file; a test run finds the next one.
+
+**Two Elias Petterssons, and a hole in what I had just shipped.** Vancouver
+carries a centre and a defenceman of that name — one spelling, two people — and
+the seed already handles it with a position-salted id, matching a house rule
+the codebase states in three other places: same-name players are *reported,
+never guessed*. My index broke it. `buildNameIndex` keyed on the name and kept
+the first, so a lookup would have resolved to the centre silently and a paste
+could have written the defenceman's deal onto him.
+
+The index now takes each row's own id and treats two ids as two players, so an
+exact hit on a shared name is refused like any other tie. That pulls against
+the Lafrenière case, which needs the opposite — two spellings, one player — and
+the id is what tells the two situations apart:
+
+* same given id → one player, however spelled
+* different given ids → two players, however alike
+* no ids → fall back to the derived id, which is all a bare name list affords
+
+The paste panel appends a team/position hint to tied option labels, because two
+identical entries in a picker is not a choice.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps
