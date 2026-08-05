@@ -20,9 +20,6 @@ vi.mock("@/app/lib/redis", () => ({ redis: null }));
 
 // Contracts come from the DB players table now, not the scrape — keep the mock
 // so any residual import resolves, but the read path never calls it.
-vi.mock("@/app/services/scraper", () => ({
-  scrapeCapWages: vi.fn(async () => ({})),
-}));
 
 // Auto-seed must be a no-op in tests (the players table is supplied directly).
 vi.mock("@/app/lib/league-seed", () => ({

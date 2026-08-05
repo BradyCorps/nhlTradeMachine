@@ -499,9 +499,9 @@ export default function AdminContractsPage() {
   const [dbError, setDbError]       = useState<string | null>(null);
   const [resettingSource, setResettingSource] = useState(false);
 
-  const load = (withScrape = false) => {
+  const load = () => {
     setLoading(true);
-    const url = withScrape ? "/api/admin/contracts?scrape=1" : "/api/admin/contracts";
+    const url = "/api/admin/contracts";
     fetch(url)
       .then(r => r.json())
       .then(d => {
@@ -674,7 +674,7 @@ export default function AdminContractsPage() {
           LOAD BASELINE
         </button>
         <button onClick={handleSync} disabled={syncing || !scrapedRaw}
-          title={!scrapedRaw ? "Click + LIVE DELTA first to load CapWages data" : ""}
+          title="Push the contracts you have entered into the DB"
           style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
             background: scrapedRaw && !syncing ? "var(--ledger-green)" : "transparent",
             border: `1px solid ${scrapedRaw && !syncing ? "var(--ledger-green)" : "var(--rule)"}`,
@@ -691,17 +691,10 @@ export default function AdminContractsPage() {
             cursor: editorCount > 0 && !resettingSource ? "pointer" : "default", letterSpacing: "0.1em" }}>
           {resettingSource ? "RESETTING..." : "EDITOR → SYNC"}
         </button>
-        <button onClick={() => load(false)} style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
+        <button onClick={() => load()} style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
           background: "transparent", border: "1px solid var(--rule)", color: "var(--ledger-ink-body)",
           cursor: "pointer", letterSpacing: "0.1em" }}>
           REFRESH
-        </button>
-        <button onClick={() => load(true)} disabled={loading}
-          style={{ fontSize: 11, fontWeight: 900, padding: "5px 12px",
-            background: "rgba(26,46,92,0.08)", border: "1px solid var(--ledger-ice)",
-            color: loading ? "var(--ledger-ink-faint)" : "var(--ledger-ice)",
-            cursor: loading ? "default" : "pointer", letterSpacing: "0.1em" }}>
-          + LIVE DELTA
         </button>
       </div>
 

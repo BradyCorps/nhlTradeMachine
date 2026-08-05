@@ -171,7 +171,7 @@ export default function AdminSettings() {
         <div style={{ border: "1px solid #6a2a2a", borderTop: "3px solid #6a2a2a", padding: "20px 22px" }}>
           <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.2em", marginBottom: 4, color: "#8a2f2f" }}>ADMIN DATA RESET</div>
           <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)", letterSpacing: "0.08em", marginBottom: 14, lineHeight: 1.6 }}>
-            Removes mutable admin data so the next roster load falls back to CapWages contracts and NHL roster scrapes.
+            Removes mutable admin data so the next roster load falls back to the committed contract baseline and NHL rosters.
             Clears contract DB rows, team overrides, trade-block rows, FA overrides, draft-pick overrides, cap settings, and live caches.
           </div>
           <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 10, color: "var(--ledger-ink-faint)", lineHeight: 1.5, marginBottom: 12 }}>
@@ -193,7 +193,7 @@ export default function AdminSettings() {
 
         <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)", lineHeight: 1.7, letterSpacing: "0.05em" }}>
           Cap space values come from TEAMS_DB (app/lib/db.ts) and use the active season cap setting.<br />
-          CapWages scraping for cap space has been disabled as it returns post-season offseason projections.
+          Cap space comes from curated figures corrected against the live ceiling. The CapWages scrape that used to supply it has been removed.
         </div>
       </div>
 

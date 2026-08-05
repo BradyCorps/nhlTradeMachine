@@ -57,7 +57,7 @@ export default async function AdminDashboard() {
     {
       href:  "/admin/health",
       label: "DATA HEALTH",
-      desc:  "Check all external data sources (NHL API, MoneyPuck, CapWages), prune stale DB rows, and re-seed the baseline.",
+      desc:  "Check all external data sources (NHL API, MoneyPuck) and the contract baseline, prune stale DB rows, and re-seed.",
       stat:  "Health check · Prune · Seed",
     },
     {

@@ -23,7 +23,7 @@ export const CURATED_CAPSPACE_CEILING = 95.5;
 /**
  * Cap space for one club under the live ceiling.
  *
- * `liveCapSpace` is a scraped figure (CapWages) already measured against the
+ * `liveCapSpace` is an externally supplied figure already measured against the
  * current ceiling, so it is used as-is. Only the curated fallback needs
  * rebasing — rebasing a live value would double-count the delta.
  */

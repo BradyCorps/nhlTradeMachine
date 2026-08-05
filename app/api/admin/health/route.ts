@@ -101,31 +101,18 @@ export async function GET(req: Request) {
       }
     }),
 
-    checkSource("CapWages", async () => {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 8000);
-      try {
-        const res = await fetch("https://capwages.com/players/active", {
-          signal: ctrl.signal,
-          cache: "no-store",
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          },
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const html = await res.text();
-        const match = html.match(
-          /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/,
-        );
-        if (!match) throw new Error("__NEXT_DATA__ not found — page structure changed");
-        const data = JSON.parse(match[1]);
-        const players = data?.props?.pageProps?.playersArray;
-        if (!Array.isArray(players)) throw new Error("playersArray missing from page data");
-        return `${players.length} active players`;
-      } finally {
-        clearTimeout(t);
-      }
+    // The contract baseline replaced a CapWages probe. It is a committed file
+    // rather than someone else's website, so this checks that it loaded and
+    // holds a plausible number of players — a truncated baseline is the failure
+    // that would matter, and unlike a scrape it cannot be a 403.
+    checkSource("Contract baseline", async () => {
+      const fs = require("fs");
+      const path = require("path");
+      const file = path.join(process.cwd(), "app/data/contracts.bundled.json");
+      const players = JSON.parse(fs.readFileSync(file, "utf-8"));
+      const n = Object.keys(players).filter(k => !k.includes("__")).length;
+      if (n < 200) throw new Error(`only ${n} players in the baseline`);
+      return `${n} players`;
     }),
 
     checkSource("Static baselines", async () => {

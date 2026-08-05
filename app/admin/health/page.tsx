@@ -284,7 +284,7 @@ export default function AdminHealth() {
             SOURCE HEALTH CHECK
           </div>
           <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)", letterSpacing: "0.08em", marginBottom: 16, lineHeight: 1.6 }}>
-            Probes all five external data sources (Database, NHL API, MoneyPuck, CapWages) plus static baseline files. Shows status and latency for each.
+            Probes the external data sources (Database, NHL API, MoneyPuck) plus the committed contract baseline. Shows status and latency for each.
           </div>
 
           <button onClick={runHealthCheck} disabled={healthLoading} style={btnStyle}>
@@ -341,7 +341,7 @@ export default function AdminHealth() {
             PRUNE STALE PLAYERS
           </div>
           <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)", letterSpacing: "0.08em", marginBottom: 16, lineHeight: 1.6 }}>
-            Scans all DB players against live CapWages contracts and NHL API rosters. Players missing from both sources
+            Scans all DB players against the committed contract baseline and NHL API rosters. Players missing from both sources
             (and not protected as draftees or extension holders) are flagged stale. Dry-run first, then confirm to delete.
           </div>
 
@@ -372,7 +372,7 @@ export default function AdminHealth() {
               </div>
 
               <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)", marginBottom: 8 }}>
-                CapWages: {pruneResult.sources.capwagesActive} active contracts · NHL: {pruneResult.sources.nhlRostersFetched}/32 rosters fetched
+                Baseline: {pruneResult.sources.capwagesActive} contracts · NHL: {pruneResult.sources.nhlRostersFetched}/32 rosters fetched
               </div>
 
               {pruneResult.staleCount > 0 && (
@@ -401,7 +401,7 @@ export default function AdminHealth() {
                     </button>
                   ) : (
                     <div style={{ fontSize: 9, color: "var(--ledger-red)", fontWeight: 900, letterSpacing: "0.08em" }}>
-                      SOURCES UNHEALTHY — prune blocked. Need &gt;200 CapWages contracts and &ge;28 NHL rosters.
+                      SOURCES UNHEALTHY — prune blocked. Need &gt;200 contracts in the baseline and &ge;28 NHL rosters.
                     </div>
                   )}
                 </>
@@ -432,7 +432,7 @@ export default function AdminHealth() {
         </div>
 
         <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)", lineHeight: 1.7, letterSpacing: "0.05em" }}>
-          Health checks probe external APIs with 8-second timeouts. Prune requires both CapWages (&gt;200 contracts) and
+          Health checks probe external APIs with 8-second timeouts. Prune requires both the contract baseline (&gt;200 contracts) and
           NHL API (&ge;28 rosters) to be healthy before any deletion is allowed. A &gt;60% catastrophic-delete guard also applies.
         </div>
       </div>

@@ -1443,158 +1443,38 @@ describe("Canary — development profile trade audit", () => {
   });
 });
 
-describe("Canary — admin contract sync", () => {
+describe("Canary — contracts are hand-maintained, not scraped", () => {
   const route = read("app/api/admin/contracts/route.ts");
-  const page = read("app/admin/contracts/page.tsx");
-  const scraper = read("app/services/scraper.ts");
+  const prune = read("app/api/admin/prune-stale/route.ts");
 
-  it("live delta keeps scraper team and position metadata for sync", () => {
-    expect(route).toContain("position: cw.position");
-    expect(route).toContain("teamSlug: cw.teamSlug");
+  it("nothing in the contract path fetches a third party's site", () => {
+    // CapWages sell an API and began 403ing the scraper, which is their right.
+    // Coding around a bot check to avoid paying for the product somebody sells
+    // is not a thing this project does, so the scraper was deleted rather than
+    // disguised.
+    expect(route).not.toContain("scrapeCapWages");
+    expect(route).not.toContain("capwages");
+    expect(prune).not.toContain("scrapeCapWages");
   });
 
-  it("sync treats dash position placeholders as missing metadata", () => {
+  it("the ingest endpoint refuses to invent its own data", () => {
+    // It used to scrape when handed an empty body, which is also how a failed
+    // scrape could quietly write a half-league of nulls.
+    expect(route).toMatch(/No players supplied/);
+    expect(route).toMatch(/status:\s*400/);
+  });
+
+  it("pruning is gated on the committed baseline, which cannot be blocked", () => {
+    // The gate exists because a source that fails flags the whole league as
+    // stale. A committed file cannot 403 or rate-limit, and a bad one shows up
+    // in a diff rather than at deletion time.
+    expect(prune).toContain("contracts.bundled.json");
+    expect(prune).toContain("sourcesHealthy");
+  });
+
+  it("sync still treats dash position placeholders as missing metadata", () => {
     expect(route).toContain("pos === \"-\"");
     expect(route).toContain("first === \"-\"");
-  });
-
-  it("scraper carries age and uses contract expiry year for remaining years", () => {
-    expect(scraper).toContain("yearsRemainingFromExpiry");
-    expect(scraper).toContain("SEASON.label.slice(0, 4)");
-    expect(scraper).toContain("age: ageNow");
-  });
-
-  it("sync updates existing rows instead of only inserting missing players", () => {
-    expect(route).toContain("existingById");
-    expect(route).toContain("existingByName");
-    expect(route).toContain("existingById.get(id) ?? existingByName.get(id)");
-    expect(route).toContain(".normalize(\"NFD\")");
-    expect(route).toContain("await db.update(playersTable).set(updates)");
-    expect(route).toContain("updatedEntries");
-  });
-
-  it("sync backfills scraper metadata when the client payload is stale", () => {
-    expect(route).toContain("needsMetadata");
-    expect(route).toContain("teamSlug: cw.teamSlug ?? live.teamSlug");
-  });
-
-  it("sync falls back to NHL rosters when CapWages has no team", () => {
-    expect(route).toContain("fetchNhlRosterTeamMap");
-    expect(route).toContain("teamIdFromSlug(cw.teamSlug) ?? rosterFallback?.teamId");
-  });
-
-  it("sync resolves AHL affiliate slugs to NHL parent teams", () => {
-    expect(route).toContain("manitoba_moose: \"WPG\"");
-    expect(route).toContain("abbotsford_canucks: \"VAN\"");
-  });
-
-  it("sync resolves lowercase NHL team abbreviations from CapWages", () => {
-    expect(route).toContain("const direct = slug.trim().toUpperCase()");
-    expect(route).toContain("if (isValidTeamId(direct)) return direct");
-  });
-
-  it("sync preserves an existing valid DB team when live sources do not resolve", () => {
-    expect(route).toContain("const currentTeamId = isValidTeamId(current?.teamId) ? current.teamId : null");
-    expect(route).toContain("?? currentTeamId ?? null");
-  });
-
-  it("sync writes scraped age into DB rows", () => {
-    expect(route).toContain("age:            playersTable.age");
-    expect(route).toContain("if (values.age && current.age !== values.age) updates.age = values.age");
-    expect(route).toContain("age:            values.age");
-  });
-
-  it("manual contract inserts require and send an explicit position", () => {
-    expect(route).toContain("position is required when adding a new DB player");
-    expect(route).toContain("position,");
-    expect(page).toContain("const POSITION_OPTIONS = [\"C\", \"W\", \"D\", \"G\"]");
-    expect(page).toContain("body: JSON.stringify({ name: name.trim(), yearsRemaining: y, capHit: c, position, hasNMC, teamId: teamId || null })");
-    // The editor save now sends the full ContractEdit object (incl. FA facts).
-    expect(page).toContain("body: JSON.stringify(edit)");
-    expect(page).toContain("expiryStatus");
-  });
-
-  it("admin contracts can place a player on a team (edit + add)", () => {
-    // Team assignment reaches the route, which already validates teamId.
-    expect(page).toContain("import { TEAMS_DB }");
-    expect(page).toContain("teamId: teamId || null");   // edit modal onSave
-    expect(page).toContain("TEAM_OPTIONS.map");          // dropdown of the 32 clubs
-    expect(route).toContain("body.teamId");
-    expect(route).toContain("updates.teamId = teamId");
-  });
-
-  it("contract admin can recover from an empty reset DB by creating the players table", () => {
-    const ensureSchema = read("app/db/ensure-schema.ts");
-    expect(ensureSchema).toContain("CREATE TABLE IF NOT EXISTS players");
-    expect(ensureSchema).toContain("CREATE TABLE IF NOT EXISTS teams");
-    expect(ensureSchema).toContain("export function ensurePlayerTable");
-    expect(ensureSchema).toContain("export function ensureTeamTable");
-    expect(route).toContain("ensurePlayerTable");
-    expect(route).toContain("await ensurePlayerTable()");
-    expect(route).toContain("ensureCanonicalTeamRows");
-    expect(route).toContain("await ensureCanonicalTeamRows()");
-  });
-
-  it("sync reports updated counts in the admin toast", () => {
-    expect(page).toContain("${data.added} added, ${data.updated ?? 0} updated");
-    expect(page).toContain("resolvedTeamId");
-    expect(page).toContain("info.resolvedTeamId ?? info.currentTeamId ?? \"no-team\"");
-  });
-
-  it("sync invalidates league caches after DB metadata updates", () => {
-    expect(route).toContain("SYNC_CACHE_KEYS");
-    expect(route).toContain("clearTeamCaches(redis, db)");
-    expect(route).toContain("clearedCacheKeys");
-    expect(route).toContain("cache:nhl_skater_summary_stats");
-  });
-
-  it("contract admin can reset editor-curated rows back to sync provenance", () => {
-    expect(route).toContain('action === "reset-source"');
-    expect(route).toContain('source: "sync"');
-    expect(route).toContain('eq(playersTable.source, "editor")');
-    expect(page).toContain("handleResetEditorsToSync");
-    expect(page).toContain("EDITOR → SYNC");
-  });
-
-  it("contract admin can persist prospect NHLe signal for synced prospects", () => {
-    expect(route).toContain("NHLE_FACTORS");
-    expect(route).toContain("prospectPtsPace");
-    expect(route).toContain("calculatedProspectPtsPace");
-    expect(route).toContain("updates.draftOverall");
-    expect(route).toContain("updates.prospectPtsPace");
-  });
-
-  it("league roster injection ignores placeholder team ids", () => {
-    const rosterAssembly = read("app/lib/roster-assembly.ts");
-    expect(rosterAssembly).toContain("const isValidTeamId");
-    expect(rosterAssembly).toContain("if (!isValidTeamId(d.teamId)) continue;");
-  });
-
-  it("league routes fall back to NHL summary stats when MoneyPuck misses a real skater", () => {
-    const rosterAssembly = read("app/lib/roster-assembly.ts");
-    expect(rosterAssembly).toContain("fetchNhlSkaterStatsFallback");
-    expect(rosterAssembly).toContain("statsMap.set(`id:${s.playerId}`, entry)");
-    expect(rosterAssembly).toContain("NHL_SKATER_STATS.get(`id:${p.id}`) ?? NHL_SKATER_STATS.get(posSlug) ?? NHL_SKATER_STATS.get(slug)");
-  });
-
-  it("league routes fall back to NHL goalie summary stats when MoneyPuck misses a goalie", () => {
-    const rosterAssembly = read("app/lib/roster-assembly.ts");
-    expect(rosterAssembly).toContain("fetchNhlGoalieStatsFallback");
-    expect(rosterAssembly).toContain("cache:nhl_goalie_summary_stats");
-    expect(rosterAssembly).toContain("NHL_GOALIE_STATS.get(`id:${p.id}`)");
-    expect(rosterAssembly).toContain("hasLiveStats: true");
-  });
-
-  it("league roster routes read extensions from DB columns, not file overlays", () => {
-    for (const source of ROSTER_ASSEMBLY_SOURCES) {
-      const src = read(source);
-      expect(src).not.toContain("contracts.extensions.json");
-      expect(src).not.toContain("loadExtensions");
-      expect(src).not.toContain("EXTENSIONS");
-      expect(src).toContain("hasExtension");
-      expect(src).toContain("extensionCapHit");
-      expect(src).toContain("extensionYears");
-    }
   });
 });
 
@@ -4460,5 +4340,45 @@ describe("Canary — the roster's contract gaps are actually visible", () => {
     // must never claim when the roster would not assemble.
     expect(route).toMatch(/status:\s*500/);
     expect(panel).toContain("setError");
+  });
+});
+
+describe("Canary — nothing in the app fetches CapWages", () => {
+  // They sell an API and began returning 403. Coding around a bot check to
+  // avoid paying for the product somebody sells is not a thing this project
+  // does, so the dependency was removed rather than disguised.
+  //
+  // The public league route was the one that mattered: it scraped 32 team
+  // pages on every load, in batches of eight with an eight-second timeout
+  // each, wrapped in a try/catch that made the failure invisible. After the
+  // 403 that was up to half a minute of requests that could only fail.
+  const files = [
+    "app/api/league/route.ts",
+    "app/api/admin/contracts/route.ts",
+    "app/api/admin/prune-stale/route.ts",
+    "app/api/admin/health/route.ts",
+  ];
+
+  it("no code path requests capwages.com", () => {
+    for (const f of files) {
+      expect(readSource(f), f).not.toMatch(/capwages\.com/i);
+    }
+  });
+
+  it("the scraper module is gone, not merely unused", () => {
+    expect(() => readSource("app/services/scraper.ts")).toThrow();
+  });
+
+  it("cap space falls back without it", () => {
+    // resolveTeamCapSpace already treated the live figure as optional, which is
+    // why removing the scrape needed no downstream change.
+    expect(readSource("app/lib/team-cap-space.ts")).toContain("liveCapSpace");
+    expect(readSource("app/api/league/route.ts")).toContain("resolveTeamCapSpace");
+  });
+
+  it("still credits them for the baseline the project was built on", () => {
+    // Independence is not the same as pretending the debt never existed.
+    expect(readSource("app/components/Footer.tsx")).toMatch(/CapWages/);
+    expect(readSource("app/methodology/page.tsx")).toMatch(/CapWages/);
   });
 });

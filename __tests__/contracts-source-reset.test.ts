@@ -18,9 +18,6 @@ vi.mock("@/app/db/ensure-schema", () => ({
   ensureTeamTable: vi.fn(async () => undefined),
 }));
 
-vi.mock("@/app/services/scraper", () => ({
-  scrapeCapWages: vi.fn(async () => ({})),
-}));
 
 vi.mock("@/app/lib/redis", () => ({
   redis: {

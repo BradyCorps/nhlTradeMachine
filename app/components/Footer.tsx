@@ -127,7 +127,7 @@ export const methodologySections: MethodologySection[] = [
     items: [
       { term: "NHL API", definition: "Rosters, positions, ages, game logs, current-season summary data, and NHL EDGE tracking (zone time, speed, shot location).", href: "https://www.nhl.com" },
       { term: "MoneyPuck", definition: "Skater and goalie analytics including xG, deployment, on/off impact, and GSAx inputs. An indispensable public resource.", href: "https://moneypuck.com" },
-      { term: "CapWages", definition: "Contract, cap hit, term, clause, extension, and roster metadata source.", href: "https://capwages.com" },
+      { term: "CapWages", definition: "Contract data this project was originally built on. No longer queried — contracts are maintained by hand here — but the historical baseline came from their work and the credit stands.", href: "https://capwages.com" },
       { term: "Hockey-Reference", definition: "Point Shares and historical context for career baselines.", href: "https://www.hockey-reference.com" },
       { term: "NHLe", definition: "Non-NHL production translated to NHL point pace for prospects. It must come from stored or imported production data." },
       { term: "AI Notes", definition: "AI is used for narrative explanation only; X-NAV and Gravity calculations stay in deterministic app code." },

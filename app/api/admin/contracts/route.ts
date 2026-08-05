@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { scrapeCapWages } from "@/app/services/scraper";
 import { db } from "@/app/db/client";
 import { players as playersTable, teams as teamsTable } from "@/app/db/schema";
 import { eq } from "drizzle-orm";
@@ -221,9 +220,6 @@ export async function GET(req: Request) {
   if (unauthorized) return unauthorized;
   await ensureRetirementColumns();
 
-  const url    = new URL(req.url);
-  const doScrape = url.searchParams.get("scrape") === "1";
-
   // Explicit column list — a full select() breaks with "no such column" whenever
   // schema.ts declares a column the live Turso table doesn't have yet.
   let dbError: string | null = null;
@@ -249,7 +245,10 @@ export async function GET(req: Request) {
       console.error("[Admin Contracts] DB read failed:", dbError);
       return [] as any[];
     }),
-    doScrape ? scrapeCapWages() : Promise.resolve({} as Record<string, any>),
+    // The live-delta comparison used to scrape CapWages here. Removed — they
+    // sell an API and started 403ing the scraper, which is their call. Nothing
+    // to diff against, so the GET is now purely the DB view.
+    Promise.resolve({} as Record<string, any>),
   ]);
 
   const dbMap = new Map<string, typeof dbRows[number]>();
@@ -260,11 +259,10 @@ export async function GET(req: Request) {
     if (!existing || (rowHasMetadata && !existingHasMetadata)) dbMap.set(row.name, row);
   }
 
-  const allNames = new Set<string>();
-  dbRows.forEach(r => allNames.add(r.name));
-  if (doScrape) {
-    Object.keys(scraped).filter(n => !n.includes("__")).forEach(n => allNames.add(n));
-  }
+  // DB rows only. There is no second source to union in any more, so a name
+  // that is not in the DB is not in this view — the roster-gaps panel is what
+  // finds players the DB has never heard of.
+  const allNames = new Set<string>(dbRows.map(r => r.name));
 
   const scrapedRaw: Record<string, { capHit: number; yearsRemaining: number; position?: string; teamSlug?: string; age?: number | null }> = {};
 
@@ -333,7 +331,7 @@ export async function GET(req: Request) {
     generatedAt: new Date().toISOString(),
     total: rows.length,
     contracts: rows,
-    scrapedRaw: doScrape ? scrapedRaw : {},
+    scrapedRaw: {},
     dbError,
   });
 }
@@ -517,8 +515,15 @@ export async function POST(req: Request) {
   }
 }
 
-// PUT /api/admin/contracts — sync scraped players into DB
+// PUT /api/admin/contracts — ingest contracts into the DB
+//
 // body: { players: Record<string, { capHit, yearsRemaining }> }
+//
+// This used to fall back to scraping CapWages when handed an empty body. It no
+// longer fetches anything: contracts are maintained by hand now, so the caller
+// supplies the data or there is nothing to do. An endpoint that silently went
+// and got its own data was also the reason a failed scrape could quietly write
+// a half-league of nulls.
 export async function PUT(req: Request) {
   const unauthorized = await requireAdmin(req);
   if (unauthorized) return unauthorized;
@@ -529,26 +534,15 @@ export async function PUT(req: Request) {
     let body: { players?: Record<string, any> } = {};
     try { body = await req.json(); } catch { /* no body */ }
 
-    let source: Record<string, any> = body.players ?? {};
+    const source: Record<string, any> = body.players ?? {};
     if (Object.keys(source).length === 0) {
-      source = await scrapeCapWages();
+      return NextResponse.json(
+        { error: "No players supplied. Contracts are hand-maintained — post them in the body." },
+        { status: 400 },
+      );
     }
-    const needsMetadata = Object.entries(source)
-      .some(([key, cw]) => !key.includes("__") && (!cw.position || !cw.teamSlug));
-
-    if (needsMetadata) {
-      const scraped = await scrapeCapWages();
-      source = Object.fromEntries(Object.entries(source).map(([key, cw]) => {
-        if (key.includes("__")) return [key, cw];
-        const live = findScrapedByName(scraped, key) ?? {};
-        return [key, {
-          ...live,
-          ...cw,
-          position: cw.position ?? live.position,
-          teamSlug: cw.teamSlug ?? live.teamSlug,
-        }];
-      }));
-    }
+    // Missing team or position is filled from the NHL rosters below, which is
+    // first-party and free. CapWages used to backfill it; it no longer can.
     const needsRosterFallback = Object.entries(source)
       .some(([key, cw]) => !key.includes("__") && !teamIdFromSlug(cw.teamSlug));
     const rosterTeamMap = needsRosterFallback ? await fetchNhlRosterTeamMap() : new Map<string, { teamId: string; position: string | null }>();

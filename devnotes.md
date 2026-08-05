@@ -1567,6 +1567,52 @@ silent empty panel reads as "all clear" — the one claim it must never make
 without evidence. Canaried, along with the admin gate and the three buckets
 staying separate.
 
+## Removing CapWages
+
+They sell an API and started returning 403 to the scraper. That is their right,
+and coding around a bot check to avoid paying for the product somebody sells is
+not a thing this project does. So the dependency is gone rather than disguised,
+and contracts are hand-maintained from here.
+
+**The 403 was not an outage.** An instant 403 is bot protection refusing a
+client; the site is up and fine in a browser. Worth naming because "down"
+implies waiting for it to come back, and this was never coming back.
+
+**I got the blast radius wrong at first.** Grepping for `scrapeCapWages` said
+admin-only. It was not: `/api/league` did an INLINE scrape of 32 team pages on
+every load, batched eight at a time with an eight-second timeout each, inside a
+try/catch that made failure invisible. After the 403 that was up to half a
+minute of requests per league load that could only fail — a real performance
+problem under launch traffic and rude to a site that had already said no.
+`resolveTeamCapSpace` already treated the live figure as optional, so removing
+it needed no downstream change.
+
+What went:
+
+| | |
+| --- | --- |
+| `app/services/scraper.ts` | deleted — both exports were CapWages |
+| `/api/league` team scrape | deleted; curated cap space corrected against the live ceiling |
+| Admin "LIVE DELTA" | deleted; nothing left to diff against |
+| Health probe | now checks the committed baseline loaded and holds 200+ players |
+| PUT ingest self-fetch | deleted; posts data or 400s |
+
+**The prune gate got better, not merely equivalent.** It used to be "not in
+CapWages AND not on an NHL roster", with a healthy-sources check because a
+failed scrape flags the entire league as stale. The first half is now the
+committed contract baseline: a file cannot 403, cannot rate-limit, and is
+versioned, so a bad baseline shows up in a diff rather than at deletion time.
+
+**The ingest endpoint no longer fetches its own data.** It used to scrape when
+handed an empty body, which is also how a failed scrape could quietly write a
+half-league of nulls. It now returns 400 and says contracts are hand-maintained.
+
+**The credit stays.** The historical baseline this project was built on came
+from CapWages, and independence is not the same as pretending the debt never
+existed. The footer and methodology page keep the acknowledgement with the tense
+corrected — no longer queried, still owed. A canary pins that too, alongside the
+one asserting nothing requests `capwages.com`.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

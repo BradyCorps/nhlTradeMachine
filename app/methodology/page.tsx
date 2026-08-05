@@ -58,8 +58,8 @@ const SECTIONS: { id: string; title: string; paras: string[] }[] = [
     id: "data",
     title: "Data pipeline & acknowledgements",
     paras: [
-      "Nightly snapshots combine NHL API rosters and NHL EDGE tracking with MoneyPuck's public analytics and CapWages contract data, layered over multi-season baselines so single-season noise never masquerades as signal. In fixed-weight composites such as Gravity v3, missing evidence contributes no term, which shrinks the estimate toward neutral and lowers the reported reliability.",
-      "The Ledger stands on the shoulders of the public hockey-data community. Sincere thanks to the NHL, MoneyPuck, CapWages, and Hockey-Reference — their work makes independent analysis like this possible. Full source credits with links are in the Glossary's Data & Sources section.",
+      "Nightly snapshots combine NHL API rosters and NHL EDGE tracking with MoneyPuck's public analytics, layered over multi-season baselines so single-season noise never masquerades as signal. In fixed-weight composites such as Gravity v3, missing evidence contributes no term, which shrinks the estimate toward neutral and lowers the reported reliability.",
+      "The Ledger stands on the shoulders of the public hockey-data community. Sincere thanks to the NHL, MoneyPuck, CapWages, and Hockey-Reference — their work makes independent analysis like this possible. Contract data is now entered by hand here rather than queried from CapWages, but the baseline this was built on came from them and the debt is worth naming. Full source credits with links are in the Glossary's Data & Sources section.",
     ],
   },
 ];

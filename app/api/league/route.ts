@@ -279,49 +279,25 @@ async function loadTeams(): Promise<any[]> {
     console.error("[league] Standings web-API enrichment failed:", err instanceof Error ? err.message : err);
   }
 
-  // ── Fetch cap space from CapWages (batch 8 at a time) ────────
-  interface CapInfo {
-    capSpace: number;
-    ltirUsed: number;
-    deadCap: number;
-    totalCapHit: number;
-    bonuses: number;
-  }
-  const capMap = new Map<string, CapInfo>();
-  const teamIds = Object.keys(CW_SLUGS);
-
-  for (let i = 0; i < teamIds.length; i += 8) {
-    const batch = teamIds.slice(i, i + 8);
-    await Promise.allSettled(batch.map(async (id) => {
-      try {
-        const slug = CW_SLUGS[id];
-        const res  = await fetchWithTimeout(
-          `https://capwages.com/teams/${slug}`,
-          8000,
-          { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
-        );
-        if (!res.ok) return;
-        const html  = await res.text();
-        const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-        if (!match) return;
-        const nextData = JSON.parse(match[1]);
-        const summary  = nextData?.props?.pageProps?.teamSummary;
-        if (summary?.capSpace !== undefined) {
-          const toM = (v: number | undefined) => v != null ? Math.round((v / 1_000_000) * 10) / 10 : 0;
-          capMap.set(id, {
-            capSpace:    toM(summary.capSpace),
-            ltirUsed:    toM(summary.ltirPool ?? summary.ltirUsed ?? summary.ltir),
-            deadCap:     toM(summary.deadCapHit ?? summary.deadCap ?? summary.deadCapSpace),
-            totalCapHit: toM(summary.currentCapHit ?? summary.activeCapHit ?? summary.totalCapHit),
-            bonuses:     toM(summary.performanceBonuses ?? summary.bonuses),
-          });
-        }
-      } catch (err) {
-        console.error(`[league] CapWages scrape failed for ${id}:`, err instanceof Error ? err.message : err);
-      }
-    }));
-    if (i + 8 < teamIds.length) await new Promise(r => setTimeout(r, 300));
-  }
+  // ── Team cap space ─────────────────────────────────────────────
+  //
+  // This used to scrape 32 CapWages team pages on every league load, in
+  // batches of eight with an eight-second timeout each. CapWages sell an API
+  // and now return 403, so that loop had become up to half a minute of
+  // requests that could only fail — swallowed by the try/catch, invisible, and
+  // rude to a site that had already said no.
+  //
+  // Removed entirely. `resolveTeamCapSpace` already treats the live figure as
+  // optional and falls back to the curated ceiling, so nothing downstream had
+  // to change. Cap space is now first-party: curated values, corrected against
+  // the real ceiling.
+  // Kept as an empty map rather than deleted, so every downstream `capInfo?.x`
+  // keeps its shape and its fallback. These figures were only ever available
+  // from the scrape; the curated ceiling covers cap space, and the rest read as
+  // absent instead of as zero.
+  const capMap = new Map<string, {
+    capSpace: number; ltirUsed: number; deadCap: number; totalCapHit: number; bonuses: number;
+  }>();
 
   // ── Query Database for manual overrides ────────
   let dbTeams: any[] = [];
@@ -434,7 +410,7 @@ export async function GET() {
     capCeiling: CAP_CEILING,
     capFloor:   CAP_FLOOR,
     generatedAt: roster.generatedAt,
-    source: "NHL API + CapWages + Bundled Contracts",
+    source: "NHL API + hand-maintained contracts",
     liveStats: roster.liveStats,
     debug: roster.debug,
   });

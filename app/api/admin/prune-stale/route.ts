@@ -2,19 +2,31 @@ import { NextResponse } from "next/server";
 import { db } from "@/app/db/client";
 import { players as playersTable } from "@/app/db/schema";
 import { eq, inArray } from "drizzle-orm";
-import { scrapeCapWages } from "@/app/services/scraper";
 import { TEAMS_DB } from "@/app/lib/db";
 import { requireAdmin } from "@/app/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
 // ── Stale player pruning ──────────────────────────────────────
-// A DB row is stale when the player is gone from BOTH live sources:
-//   1. CapWages active contracts (retired, bought out, overseas)
-//   2. NHL API current rosters   (catches UFAs like Carlson who have
-//      no contract but are still rostered in the sim)
+// A DB row is stale when the player is gone from BOTH sources:
+//   1. The committed contract baseline (app/data/contracts.bundled.json) —
+//      hand-maintained, so a player with a known deal is never a candidate
+//   2. NHL API current rosters — catches unsigned players who are still
+//      rostered, like a UFA the club has not moved on from
 // Always protected: draftees (draft_overall set) and rows carrying an
 // admin-entered extension.
+//
+// THE FIRST SOURCE USED TO BE A CAPWAGES SCRAPE.
+//
+// It was removed: CapWages sell an API and started returning 403 to the
+// scraper, which is their right, and coding around a bot check to avoid paying
+// for the product somebody sells is not a thing this project does.
+//
+// The swap makes the gate BETTER, not merely equivalent. A scrape that fails —
+// or gets blocked, or silently returns a short list — flags the whole league as
+// stale, and the healthy-sources check existed to catch exactly that. A
+// committed file cannot 403, cannot rate-limit, and is versioned, so a bad
+// baseline shows up in a diff rather than at deletion time.
 //
 // GET    → dry run: returns the full candidate list, deletes nothing
 // DELETE → prunes, but only if both sources came back healthy
@@ -31,10 +43,24 @@ const NHL_HEADERS = {
 const norm = (n: string) =>
   n.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
 
+/** The hand-maintained contract baseline. A player here has a known deal. */
+function loadContractBaseline(): Record<string, unknown> {
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    return JSON.parse(fs.readFileSync(path.join(process.cwd(), "app/data/contracts.bundled.json"), "utf-8"));
+  } catch (e: any) {
+    // Returning {} here would make every player look stale, so say so loudly
+    // and let the healthy-sources gate below refuse the deletion.
+    console.error("[Prune] contract baseline FAILED to load:", e?.message);
+    return {};
+  }
+}
+
 async function findStale() {
-  const scraped = await scrapeCapWages();
+  const baseline = loadContractBaseline();
   const activeNames = new Set(
-    Object.keys(scraped).filter(n => !n.includes("__")).map(norm)
+    Object.keys(baseline).filter(n => !n.includes("__")).map(norm)
   );
 
   const rosterNames = new Set<string>();
@@ -73,8 +99,8 @@ async function findStale() {
     !rosterNames.has(norm(r.name))
   );
 
-  // Both sources must be healthy before any deletion is trusted —
-  // a failed scrape or blocked NHL API would flag everyone as stale.
+  // Both sources must be healthy before any deletion is trusted — a baseline
+  // that failed to load, or a blocked NHL API, would flag everyone as stale.
   const sourcesHealthy = activeNames.size > 200 && rostersFetched >= 28;
 
   return { rows, stale, activeCount: activeNames.size, rostersFetched, sourcesHealthy };
@@ -108,7 +134,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({
       error: "Refusing to prune — upstream sources unhealthy",
       sources: { capwagesActive: activeCount, nhlRostersFetched: rostersFetched },
-      hint: "Need >200 CapWages contracts and ≥28 NHL rosters to trust the stale list.",
+      hint: "Need >200 contracts in the committed baseline and ≥28 NHL rosters to trust the stale list.",
     }, { status: 503 });
   }
   if (stale.length === 0) {
