@@ -5,6 +5,7 @@ import { adminErrorMessage, readAdminResponse } from "../admin-response";
 import { toast } from "@/app/lib/ledger-toast";
 import { TEAMS_DB } from "@/app/lib/db";
 import NeedsDataPanel from "@/app/admin/contracts/NeedsDataPanel";
+import PastePanel from "@/app/admin/contracts/PastePanel";
 
 // The 32 clubs, alphabetical by name, for the admin team pickers.
 const TEAM_OPTIONS = [...TEAMS_DB].sort((a, b) => a.name.localeCompare(b.name));
@@ -716,6 +717,11 @@ export default function AdminContractsPage() {
           "needs" filter below, which looks at contract ROWS and therefore
           cannot show a player who has no row at all. */}
       <NeedsDataPanel onPick={name => { setSearch(name); setFilter("all"); }} />
+
+      {/* Paste a signings list. The replacement for the scrape: a human copies
+          a transactions page, the parser checks itself, nothing is written
+          until it has been looked at. */}
+      <PastePanel onSaved={() => load()} />
 
       {/* Filter bar */}
       <div style={{ padding: "12px 24px", borderBottom: "1px solid var(--ledger-rule-light)",

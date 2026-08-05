@@ -1613,6 +1613,66 @@ existed. The footer and methodology page keep the acknowledgement with the tense
 corrected — no longer queried, still owed. A canary pins that too, alongside the
 one asserting nothing requests `capwages.com`.
 
+## The paste box: hand-maintained without hand-typing
+
+With the scrape gone, contracts are maintained by hand. That does not have to
+mean typed one field at a time — a person can select a transactions page, copy
+it, and paste it. Nobody's server is touched and the operator is doing what any
+reader may do with a page they are looking at.
+
+`puckpedia-paste.ts` parses the format Sportsnet's transactions page copies out
+(their contract data comes from PuckPedia):
+
+```
+JUL 31, 2026          <- a date header; applies to everything BELOW it
+SJSSJS                <- team, doubled by the copy
+Collin Graf
+F
+Collin Graf           <- the name again
+AGE23
+CAP HIT$4,250,000
+LENGTH3 yrs
+TOTAL$12,750,000
+% OF CAP4.09%
+TYPERFA
+CLAUSE
+```
+
+**The format is internally redundant, so the parser checks itself.** Three free
+cross-checks, each catching a different mis-parse:
+
+| check | what it catches |
+| --- | --- |
+| the name appears twice | the field order slipped a line |
+| cap hit × term = total | a misread figure |
+| cap hit ÷ percent-of-cap = a real ceiling | the numbers disagree |
+
+That third one does more than validate. It **recovers which season the money
+starts in**: Celebrini's 16.56% of $18.8M implies a $113.5M ceiling, which is
+2027-28, not the 2026-27 the list is dated. His deal begins after the
+entry-level contract, and that falls straight out of the arithmetic rather than
+needing to be known.
+
+Verified against the real paste: 7 signings, 0 lines skipped, 0 warnings, and
+the single-player form works identically.
+
+**A forward is left blank on purpose.** PuckPedia writes "F", which cannot be
+told from a centre or a winger. The roster already knows, and overwriting a
+correct position with a guess is worse than leaving the field alone. Only D and
+G — which are unambiguous — are sent.
+
+**Nothing is written until it has been looked at.** The panel shows every row it
+read, highlights the ones with warnings, lists any line it did not understand,
+and lets rows be unticked individually so one bad record does not cost the other
+twenty. A version that posted straight through would be a scraper with extra
+steps and no review.
+
+**A test bug worth recording.** The first run reported 6 of 7 records with
+nothing skipped, which looked like the parser silently swallowing one — the
+exact failure the "nothing skipped" assertion exists to catch. It was the
+fixture: I had listed Topias Vilen in the expected names and left him out of the
+sample text. The assertion was right to fire either way.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

@@ -4382,3 +4382,43 @@ describe("Canary — nothing in the app fetches CapWages", () => {
     expect(readSource("app/methodology/page.tsx")).toMatch(/CapWages/);
   });
 });
+
+describe("Canary — the paste box is how contracts get in now", () => {
+  const panel = readSource("app/admin/contracts/PastePanel.tsx");
+  const page = readSource("app/admin/contracts/page.tsx");
+  const parser = readSource("app/lib/puckpedia-paste.ts");
+
+  it("is mounted, not merely written", () => {
+    expect(page).toContain("<PastePanel");
+  });
+
+  it("shows the operator what it read before writing anything", () => {
+    // The whole point of a paste box over a scrape is that a human looks at it.
+    // A version that posted straight through would be a scraper with extra
+    // steps and no review.
+    expect(panel).toContain("WRITE ");
+    expect(panel).toMatch(/checkbox/);
+    expect(panel).toContain("not understood");
+  });
+
+  it("checks itself three ways rather than trusting the regexes", () => {
+    // The format is internally redundant, so the parser can verify its own
+    // work: the name appears twice, cap hit times term should equal the total,
+    // and cap hit over percent-of-cap must land on a real ceiling.
+    expect(parser).toContain("did not appear twice");
+    expect(parser).toMatch(/total says/);
+    expect(parser).toContain("do not agree with any season");
+  });
+
+  it("refuses to guess a forward's real position", () => {
+    // PuckPedia's "F" cannot be told from a centre or a winger, and the roster
+    // already knows. Overwriting a correct value with a guess is worse than
+    // leaving the field alone.
+    expect(parser).toMatch(/rawPosition === "D" \|\| rawPosition === "G"/);
+  });
+
+  it("never silently drops a line it did not understand", () => {
+    expect(parser).toContain("skipped");
+    expect(parser).toContain("no cap hit found");
+  });
+});
