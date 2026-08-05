@@ -45,9 +45,13 @@ interface WriteResult {
   refused: { name: string; why: string }[];
 }
 
-type Issue = "overMaxTerm" | "atMaxTerm" | "anchorDisagrees" | "pendingFaNoAnchor" | "zeroTermNoStatus" | "noAnchor";
+type Issue = "badAnchor" | "overMaxTerm" | "atMaxTerm" | "anchorDisagrees" | "pendingFaNoAnchor" | "zeroTermNoStatus" | "noAnchor";
 
 const BUCKETS: { key: Issue; label: string; tone: string; blurb: string }[] = [
+  {
+    key: "badAnchor", label: "Expiry year of 0", tone: "var(--ledger-red)",
+    blurb: "Carrying an expiry year that cannot be one — almost always a stored 0. The editor posts expiryYear: null whenever the status is SIGNED, and the endpoint ran that through Number(), where null becomes 0. Every hand-edited signed contract was stamped with it. That is worse than an empty anchor: the read path tests \"expiry year ≤ this season\", and 0 passes, so any such row that also carries a UFA/RFA class reads as a free agent forever. The coercion is fixed; these are the rows it already wrote, and the backfill overwrites the ones whose term is trustworthy.",
+  },
   {
     key: "anchorDisagrees", label: "Anchor disagrees", tone: "var(--ledger-red)",
     blurb: "The expiry year and the term contradict each other. Which one is right is not knowable from the row, so nothing is changed automatically — but a reconcile would take the anchor's word for it.",
@@ -150,7 +154,7 @@ export default function TermAuditPanel({ onWrote }: { onWrote?: () => void }) {
 
       {!error && report && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)" }}>
             {BUCKETS.map(b => {
               const n = report.counts[b.key] ?? 0;
               const active = open === b.key;

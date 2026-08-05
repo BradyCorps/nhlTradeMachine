@@ -1872,6 +1872,51 @@ the fields that already mean "signed, owed later", carrying the real signing
 date. A future deal for a player the table has never heard of is reported, not
 invented — there is no contract for the extension to follow.
 
+### The Expiry Year of Nought
+
+The term audit's first run found the operator's hand-edited rows reading
+"anchored to 0, which is 0 years from 2026-27, but the row says 8". Alex Tuch
+at 8 years, Trevor Zegras at 4 — both edited by hand that day.
+
+The operator's read was that editor rows were somehow not being picked up. The
+right rows, the wrong mechanism:
+
+```ts
+const expiryYear = Number.isFinite(Number(body.expiryYear)) ? Number(body.expiryYear) : …;
+```
+
+`Number(null)` is **0**, and 0 is finite. The editor posts
+`expiryYear: null` whenever the status is SIGNED — which is most saves — so
+every hand-edited signed contract was stamped with an expiry year of zero.
+
+**Zero is worse than empty.** `deriveContractStatus` decides a pending free
+agent with `rawExpiryYear <= offseasonYear`, and `0 <= 2026` is true. A row
+carrying both a stored 0 and a UFA/RFA class reads as a free agent forever, and
+nothing about it looks wrong. Tuch and Zegras were spared only because the
+editor also clears `expiryStatus` when the status is SIGNED, so the branch that
+would have used the 0 never ran. The landmine was armed and pointed away.
+
+Three changes:
+
+* **The coercion.** A year now has to be a positive finite number to count as
+  one; `null` and `""` mean "no anchor", which is what they were always trying
+  to say.
+* **The audit** treats an implausible expiry year as no anchor rather than as
+  an anchor of nought, and reports those rows in their own bucket so the reach
+  of the bug is visible. It overwrites the ones whose term is trustworthy and
+  refuses the rest — Zegras's 4 years anchors cleanly to 2030, Tuch's 8 is at
+  the CBA maximum and therefore suspect, and a bad anchor is not a reason to
+  write another one.
+* **A hand-edit now anchors itself.** The operator types 4 years for Zegras and
+  the row gets 2030 on the way in, so it never enters the backfill queue at
+  all. Not when a free-agency class is being set — same refusal as the
+  backfill, same reason.
+
+The three-source provenance (`seed` / `sync` / `editor`) stays as it is. The
+live sync no longer has a source behind it, but the label still records how a
+row got its numbers, which is worth more now that the answer is usually "by
+hand".
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

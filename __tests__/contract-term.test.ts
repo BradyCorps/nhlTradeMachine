@@ -88,6 +88,53 @@ describe("contract-term — what it refuses to anchor", () => {
   });
 });
 
+describe("contract-term — the expiry year of nought", () => {
+  // The admin editor posts `expiryYear: null` whenever the status is SIGNED,
+  // and the endpoint tested `Number.isFinite(Number(value))`. `Number(null)`
+  // is 0 and 0 is finite, so every hand-edited signed contract was stamped
+  // with an expiry year of zero. Alex Tuch and Trevor Zegras both had one.
+
+  it("does not read a stored 0 as a year", () => {
+    const v = auditTerm(row({ name: "Trevor Zegras", capHit: 9.125, yearsRemaining: 4, expiryYear: 0 }), SEASON);
+    expect(v.issue).toBe("badAnchor");
+    // 0 − 2026 clamps to 0, so the naive reading is "this deal is already
+    // over" for a player who just signed for four years.
+    expect(v.reconciledYears).toBeNull();
+  });
+
+  it("overwrites it when the term behind it is trustworthy", () => {
+    const v = auditTerm(row({ name: "Trevor Zegras", yearsRemaining: 4, expiryYear: 0 }), SEASON);
+    expect(v.backfillable).toBe(true);
+    expect(v.suggestedExpiryYear).toBe(2030);
+  });
+
+  it("does not overwrite it when the term behind it is not", () => {
+    // Tuch carries eight years, which is the maximum and therefore suspect.
+    // A bad anchor is not a reason to write a bad anchor.
+    const v = auditTerm(row({ name: "Alex Tuch", capHit: 10.5, yearsRemaining: 8, expiryYear: 0 }), SEASON);
+    expect(v.issue).toBe("badAnchor");
+    expect(v.backfillable).toBe(false);
+    expect(v.why).toMatch(/maximum/);
+  });
+
+  it("says why a 0 on a pending free agent is dangerous rather than wrong", () => {
+    // `deriveContractStatus` tests `expiryYear <= offseasonYear`, and 0 passes
+    // — so the row behaves correctly, by accident, for as long as the class
+    // stays. It is still not a year.
+    const v = auditTerm(row({ yearsRemaining: 1, expiryYear: 0, expiryStatus: "UFA" }), SEASON);
+    expect(v.issue).toBe("badAnchor");
+    expect(v.backfillable).toBe(false);
+    expect(v.why).toMatch(/already expired/);
+  });
+
+  it("rejects anything outside the range a real anchor could fall in", () => {
+    expect(auditTerm(row({ yearsRemaining: 3, expiryYear: 1970 }), SEASON).issue).toBe("badAnchor");
+    expect(auditTerm(row({ yearsRemaining: 3, expiryYear: 20260 }), SEASON).issue).toBe("badAnchor");
+    // But a deal that ended recently is a real anchor, not a broken one.
+    expect(auditTerm(row({ yearsRemaining: 1, expiryYear: 2025 }), SEASON).issue).toBe("anchorDisagrees");
+  });
+});
+
 describe("contract-term — the audit over a table", () => {
   const table = [
     row({ id: "a", name: "Anchored", yearsRemaining: 6, expiryYear: 2032 }),

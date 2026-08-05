@@ -36,6 +36,8 @@ import { SEASON_START_YEAR } from "@/app/lib/contract-expiry";
 export const MAX_CBA_TERM = 8;
 
 export type TermIssue =
+  /** Carries an expiry year that cannot mean anything — usually a stored 0. */
+  | "badAnchor"
   /** Longer than any contract may legally be. */
   | "overMaxTerm"
   /** Exactly at the maximum, which only a deal signed THIS offseason can be. */
@@ -73,6 +75,30 @@ export interface TermVerdict {
 const clampTerm = (n: number): number => Math.max(0, Math.round(n));
 
 /**
+ * The anchor as a usable year, or null when the stored value cannot be one.
+ *
+ * A stored **0** is the case this exists for. The admin editor sends
+ * `expiryYear: null` whenever the status is SIGNED, and the endpoint ran that
+ * through `Number.isFinite(Number(value))` — and `Number(null)` is 0, which is
+ * finite. So every hand-edited signed contract was stamped with an expiry year
+ * of 0. It is worse than a missing anchor: `deriveContractStatus` compares
+ * `expiryYear <= offseasonYear`, and 0 satisfies that, so any such row that
+ * also carries a UFA/RFA class reads as a free agent forever.
+ *
+ * Anything before the last decade or beyond the longest contract that could be
+ * signed today is treated the same way — present, but not an anchor.
+ */
+export function plausibleAnchor(
+  expiryYear: number | null | undefined,
+  seasonStartYear: number,
+): number | null {
+  if (expiryYear == null || !Number.isFinite(expiryYear)) return null;
+  if (expiryYear < seasonStartYear - 10) return null;
+  if (expiryYear > seasonStartYear + MAX_CBA_TERM + 1) return null;
+  return Math.round(expiryYear);
+}
+
+/**
  * Classify one row.
  *
  * The one rule here that is not arithmetic: a row carrying a UFA/RFA class
@@ -99,51 +125,65 @@ export function auditTerm(row: TermRow, seasonStartYear = SEASON_START_YEAR): Te
     };
   }
 
-  if (row.expiryYear != null) {
-    const reconciledYears = clampTerm(row.expiryYear - seasonStartYear);
+  const anchor = plausibleAnchor(row.expiryYear, seasonStartYear);
+  const broken = row.expiryYear != null && anchor === null;
+
+  if (anchor != null) {
+    const reconciledYears = clampTerm(anchor - seasonStartYear);
     if (reconciledYears !== row.yearsRemaining) {
       return {
         issue: "anchorDisagrees",
         suggestedExpiryYear: null,
         backfillable: false,
         reconciledYears,
-        why: `anchored to ${row.expiryYear}, which is ${reconciledYears} year${reconciledYears === 1 ? "" : "s"} from ${seasonStartYear}-${String((seasonStartYear + 1) % 100).padStart(2, "0")}, but the row says ${row.yearsRemaining}`,
+        why: `anchored to ${anchor}, which is ${reconciledYears} year${reconciledYears === 1 ? "" : "s"} from ${seasonStartYear}-${String((seasonStartYear + 1) % 100).padStart(2, "0")}, but the row says ${row.yearsRemaining}`,
       };
     }
     return {
-      issue: null, suggestedExpiryYear: row.expiryYear, backfillable: false, reconciledYears,
+      issue: null, suggestedExpiryYear: anchor, backfillable: false, reconciledYears,
       why: "anchored and consistent",
     };
   }
 
-  // ── No anchor from here down ─────────────────────────────────
+  // ── No usable anchor from here down ──────────────────────────
+  //
+  // The order matters: the reasons NOT to write one are checked before the
+  // reason to write one, so a row only reaches the last branch when nothing
+  // about it makes an anchor unsafe.
+
   if (row.expiryStatus) {
     return {
-      ...none, issue: "pendingFaNoAnchor",
-      why: `classed ${row.expiryStatus} with no expiry year — the read path is falling back to "term <= 1" to call him pending, so anchoring him would silently sign him again`,
+      ...none,
+      issue: broken ? "badAnchor" : "pendingFaNoAnchor",
+      why: broken
+        ? `classed ${row.expiryStatus} and carrying an expiry year of ${row.expiryYear}, which cannot be one — the read path reads it as "already expired", which happens to be what the class says, so the row behaves correctly by accident`
+        : `classed ${row.expiryStatus} with no expiry year — the read path is falling back to "term <= 1" to call him pending, so anchoring him would silently sign him again`,
     };
   }
 
   if (row.yearsRemaining >= MAX_CBA_TERM) {
     return {
-      ...none, issue: "atMaxTerm",
-      why: `${row.yearsRemaining} years is the CBA maximum, which is only true of a deal signed this offseason — more likely the term at signing was stored instead of the term remaining`,
+      ...none, issue: broken ? "badAnchor" : "atMaxTerm",
+      why: `${row.yearsRemaining} years is the CBA maximum, which is only true of a deal signed this offseason — more likely the term at signing was stored instead of the term remaining${broken ? `, and the expiry year of ${row.expiryYear} is not a year` : ""}`,
     };
   }
 
   if (row.yearsRemaining <= 0) {
     return {
-      ...none, issue: "zeroTermNoStatus",
+      ...none, issue: broken ? "badAnchor" : "zeroTermNoStatus",
       why: "no term and no free-agency class — nothing here says when the deal ends",
     };
   }
 
+  const suggestedExpiryYear = seasonStartYear + row.yearsRemaining;
   return {
-    issue: "noAnchor",
-    suggestedExpiryYear: seasonStartYear + row.yearsRemaining,
+    issue: broken ? "badAnchor" : "noAnchor",
+    suggestedExpiryYear,
     backfillable: true,
     reconciledYears: null,
-    why: `reaches the market in ${seasonStartYear + row.yearsRemaining}`,
+    why: broken
+      ? `expiry year of ${row.expiryYear} is not a year — the ${row.yearsRemaining}-year term puts him on the market in ${suggestedExpiryYear}`
+      : `reaches the market in ${suggestedExpiryYear}`,
   };
 }
 
@@ -159,14 +199,14 @@ export interface TermAudit {
 }
 
 const EMPTY_COUNTS = (): Record<TermIssue | "ok", number> => ({
-  ok: 0, overMaxTerm: 0, atMaxTerm: 0, anchorDisagrees: 0,
+  ok: 0, badAnchor: 0, overMaxTerm: 0, atMaxTerm: 0, anchorDisagrees: 0,
   pendingFaNoAnchor: 0, zeroTermNoStatus: 0, noAnchor: 0,
 });
 
 export function auditTerms(rows: TermRow[], seasonStartYear = SEASON_START_YEAR): TermAudit {
   const counts = EMPTY_COUNTS();
   const byIssue = {
-    overMaxTerm: [], atMaxTerm: [], anchorDisagrees: [],
+    badAnchor: [], overMaxTerm: [], atMaxTerm: [], anchorDisagrees: [],
     pendingFaNoAnchor: [], zeroTermNoStatus: [], noAnchor: [],
   } as TermAudit["byIssue"];
   let backfillable = 0;

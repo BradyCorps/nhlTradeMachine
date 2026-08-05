@@ -7,6 +7,7 @@ import { redis } from "@/app/lib/redis";
 import { requireAdmin } from "@/app/lib/admin-auth";
 import { ensurePlayerColumns, ensurePlayerTable, ensureTeamTable } from "@/app/db/ensure-schema";
 import { clearTeamCaches } from "@/app/lib/team-cache";
+import { SEASON_START_YEAR } from "@/app/lib/contract-expiry";
 
 const CONTRACT_OVERRIDES: Record<string, { yearsRemaining?: number; position?: string }> = {
   "Quinton Byfield": { position: "C" },
@@ -389,7 +390,17 @@ export async function POST(req: Request) {
   // table at read time). `expiryStatus: null` is an explicit "force SIGNED".
   const hasExpiryStatus = "expiryStatus" in body;
   const expiryStatus = hasExpiryStatus ? normaliseExpiryStatus(body.expiryStatus) : undefined;
-  const expiryYear = Number.isFinite(Number(body.expiryYear)) ? Number(body.expiryYear) : (hasExpiryStatus ? null : undefined);
+  // `Number(null)` is 0, and 0 is finite. This read `Number.isFinite(Number(v))`,
+  // so every hand-edit with status SIGNED — which posts `expiryYear: null` —
+  // stamped the row with an expiry year of ZERO. That is worse than leaving it
+  // empty: `deriveContractStatus` tests `expiryYear <= offseasonYear`, and 0
+  // passes, so any such row carrying a UFA/RFA class reads as a free agent for
+  // good. A year has to be a positive number to count as one.
+  const rawExpiryYear = Number(body.expiryYear);
+  const expiryYear = body.expiryYear != null && body.expiryYear !== ""
+      && Number.isFinite(rawExpiryYear) && rawExpiryYear > 0
+    ? rawExpiryYear
+    : (hasExpiryStatus || "expiryYear" in body ? null : undefined);
   const excludeFromRoster = typeof body.excludeFromRoster === "boolean" ? body.excludeFromRoster : undefined;
   const teamId = typeof body.teamId === "string" ? teamIdFromSlug(body.teamId) : null;
   const position = normalisePosition(body.position);
@@ -430,6 +441,21 @@ export async function POST(req: Request) {
   ) {
     return NextResponse.json({ error: `yearsRemaining must be an integer between ${MIN_CONTRACT_YEARS} and ${MAX_CONTRACT_YEARS}` }, { status: 400 });
   }
+
+  // ── Anchor a hand-edit as it is made ─────────────────────────
+  // Zegras signs 4 × $9.125M, the operator types 4, and without this the row
+  // carries a term that is only true of 2026-27 with nothing recording that.
+  // The term the operator just typed IS the answer, so the anchor falls out of
+  // it and the row is never in the backfill queue to begin with.
+  //
+  // Not when a free-agency class is being set: the same refusal as the
+  // backfill, for the same reason. Anchoring a pending FA at
+  // `SEASON_START_YEAR + term` pushes him a year out and signs him again.
+  const derivedExpiryYear =
+    expiryYear == null && !expiryStatus
+      && yearsRemaining != null && yearsRemaining > 0 && yearsRemaining < 8
+      ? SEASON_START_YEAR + yearsRemaining
+      : null;
 
   const id = makeId(name);
 
@@ -479,6 +505,7 @@ export async function POST(req: Request) {
     }
     if (expiryStatus !== undefined) updates.expiryStatus = expiryStatus;
     if (expiryYear   !== undefined) updates.expiryYear   = expiryYear;
+    if (derivedExpiryYear != null)  updates.expiryYear   = derivedExpiryYear;
     if (excludeFromRoster !== undefined) updates.excludeFromRoster = excludeFromRoster;
     await db.update(playersTable).set(updates).where(eq(playersTable.id, id));
     await clearRosterCaches();
@@ -504,7 +531,7 @@ export async function POST(req: Request) {
       draftOverall:   draftOverall   ?? undefined,
       prospectPtsPace: prospectPtsPace ?? undefined,
       expiryStatus:   expiryStatus ?? undefined,
-      expiryYear:     expiryYear ?? undefined,
+      expiryYear:     expiryYear ?? derivedExpiryYear ?? undefined,
       excludeFromRoster: excludeFromRoster ?? undefined,
       extensionCapHit: extensionCapHit ?? undefined,
       extensionYears:  extensionYears ?? undefined,
