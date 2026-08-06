@@ -42,6 +42,7 @@
 // Nothing here writes. It returns rows and complaints; the caller decides.
 
 import { SEASON_START_YEAR } from "@/app/lib/contract-expiry";
+import { anchorFromTerm } from "@/app/lib/contract-term";
 
 /** Cap ceilings by the season a deal begins, for reading the percentage back. */
 const CEILINGS: { seasonId: string; label: string; ceiling: number }[] = [
@@ -322,7 +323,11 @@ export function toIngestPayload(
           ...shared,
           capHit,
           yearsRemaining: s.years,
-          expiryYear: seasonStartYear + s.years,
+          // Omitted rather than guessed when the term cannot imply a year — a
+          // paste with a nonsense LENGTH should not mint a nonsense anchor.
+          ...(anchorFromTerm(s.years, seasonStartYear) != null
+            ? { expiryYear: anchorFromTerm(s.years, seasonStartYear)! }
+            : {}),
         };
   }
   return out;

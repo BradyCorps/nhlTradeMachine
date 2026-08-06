@@ -8,6 +8,7 @@ import { requireAdmin } from "@/app/lib/admin-auth";
 import { ensurePlayerColumns, ensurePlayerTable, ensureTeamTable } from "@/app/db/ensure-schema";
 import { clearTeamCaches } from "@/app/lib/team-cache";
 import { SEASON_START_YEAR } from "@/app/lib/contract-expiry";
+import { anchorFromTerm } from "@/app/lib/contract-term";
 
 const CONTRACT_OVERRIDES: Record<string, { yearsRemaining?: number; position?: string }> = {
   "Quinton Byfield": { position: "C" },
@@ -451,11 +452,13 @@ export async function POST(req: Request) {
   // Not when a free-agency class is being set: the same refusal as the
   // backfill, for the same reason. Anchoring a pending FA at
   // `SEASON_START_YEAR + term` pushes him a year out and signs him again.
+  //
+  // A term of 8 IS derived here, unlike in the bulk audit. There, eight years
+  // is a smell — it is what a term at signing looks like after a season goes
+  // by. Here a person typed it, having looked at the source, and the dialog
+  // showed them the year it produces before they pressed save.
   const derivedExpiryYear =
-    expiryYear == null && !expiryStatus
-      && yearsRemaining != null && yearsRemaining > 0 && yearsRemaining < 8
-      ? SEASON_START_YEAR + yearsRemaining
-      : null;
+    expiryYear == null && !expiryStatus ? anchorFromTerm(yearsRemaining) : null;
 
   const id = makeId(name);
 

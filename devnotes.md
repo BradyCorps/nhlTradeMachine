@@ -1917,6 +1917,43 @@ live sync no longer has a source behind it, but the label still records how a
 row got its numbers, which is worth more now that the answer is usually "by
 hand".
 
+### The Expiry Field Was Only For Free Agents
+
+Working through the admin page, the operator hit Zegras: a four-year contract
+showing an expiry year of **0**, in a box that could not be typed in. Their read
+— "years remaining on a new contract should persist to the expiry year" — was
+right, and the server had already been doing it since the previous commit. The
+dialog just never showed it, which is its own defect. A write nobody can see
+before it happens is the thing this whole pipeline has been built to avoid.
+
+Two separate faults in one small box:
+
+**It was disabled unless the player was a free agent.** `expiryYear` was
+conceived as an FA-only field — the year the curated class hits the market — and
+the form gated it on the status, sending `expiryYear: null` for anything SIGNED.
+Under the anchor model that is backwards: the year a player reaches the market
+is a fact about every contract, and gating it on the FA status is precisely why
+the audit found a league of unanchored terms.
+
+**And it showed the 0 back.** `String(row.expiryYear ?? "")` renders a stored
+zero as "0", presenting the coercion bug to the operator as though it were data.
+
+Now: the field is always editable, never displays a non-year, and **follows the
+term as you type it** — 4 years shows 2030 in muted ink before you press save,
+solid once you overtype it. Overtyping matters for the Tuch case, where the
+expiry is the thing you are sure of and the term is the thing that is wrong:
+fill in the year, let a reconcile correct the term from it.
+
+`anchorFromTerm` now states the rule once. Three callers had grown their own
+copy — the dialog, the endpoint, the paste box — and three copies of a rule
+about a season boundary is three chances to disagree about it.
+
+**One deliberate difference between the two paths.** The bulk audit refuses to
+anchor a term of 8, because eight years is what a term at signing looks like a
+season later. The editor derives one, because a person typed it after looking at
+the source and the dialog showed them the year it produces first. Same rule, and
+the difference is whether anyone was looking.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

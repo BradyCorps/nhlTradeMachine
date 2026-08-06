@@ -7,6 +7,8 @@ import { TEAMS_DB } from "@/app/lib/db";
 import NeedsDataPanel from "@/app/admin/contracts/NeedsDataPanel";
 import PastePanel from "@/app/admin/contracts/PastePanel";
 import TermAuditPanel from "@/app/admin/contracts/TermAuditPanel";
+import { SEASON_START_YEAR } from "@/app/lib/contract-expiry";
+import { anchorFromTerm } from "@/app/lib/contract-term";
 
 // The 32 clubs, alphabetical by name, for the admin team pickers.
 const TEAM_OPTIONS = [...TEAMS_DB].sort((a, b) => a.name.localeCompare(b.name));
@@ -114,12 +116,34 @@ function EditModal({ row, onSave, onClear, onClose }: {
   const [teamId, setTeamId] = useState(initTeam);
   const initFa = (row.expiryStatus ?? "").toUpperCase();
   const [fa, setFa] = useState<string>(initFa === "UFA" || initFa === "RFA" ? initFa : "SIGNED");
-  const [faYear, setFaYear] = useState(String(row.expiryYear ?? ""));
+  // A stored 0 is not a year — it is what the endpoint used to write whenever
+  // the status was SIGNED, because `Number(null)` is 0. Showing it back would
+  // present the bug as data.
+  const [faYear, setFaYear] = useState(
+    row.expiryYear && row.expiryYear > 2000 ? String(row.expiryYear) : "",
+  );
+  const [faYearTouched, setFaYearTouched] = useState(false);
   const [extCap, setExtCap] = useState(row.extensionCapHit ? String(row.extensionCapHit) : "");
   const [extYrs, setExtYrs] = useState(row.extensionYears ? String(row.extensionYears) : "");
   const [exclude, setExclude] = useState(Boolean(row.excludeFromRoster));
   const [saving, setSaving] = useState(false);
   const hasExt = extCap !== "" && parseFloat(extCap) > 0;
+
+  // ── The expiry year follows the term you type ────────────────
+  // A term is only true of one season and the row does not record which; the
+  // year the player reaches the market does not drift, so it is what the
+  // rollover derives from. Typing 4 years for Zegras means 2030, and there is
+  // no reason to make anyone work that out. It is shown rather than merely
+  // written so SAVE does what the dialog says it will.
+  //
+  // Overtypeable: sometimes the expiry is the thing you are sure of and the
+  // term is the thing that is wrong — Tuch, carrying a term at signing. Fill
+  // in the year you know and let a reconcile correct the term from it.
+  const typedYears = parseFloat(years);
+  const derivedExpiryYear = anchorFromTerm(typedYears);
+  const shownExpiryYear = faYearTouched || faYear !== ""
+    ? faYear
+    : (derivedExpiryYear != null ? String(derivedExpiryYear) : "");
 
   const handle = async (clear = false) => {
     setSaving(true);
@@ -129,7 +153,7 @@ function EditModal({ row, onSave, onClear, onClose }: {
       } else {
         const y = parseFloat(years);
         const c = parseFloat(cap);
-        const fy = parseInt(faYear);
+        const fy = parseInt(shownExpiryYear);
         const ec = parseFloat(extCap);
         const ey = parseInt(extYrs);
         const expiryStatus = fa === "UFA" || fa === "RFA" ? fa : null;
@@ -141,7 +165,11 @@ function EditModal({ row, onSave, onClear, onClose }: {
           position: position || null,
           teamId: teamId || null,
           expiryStatus,
-          expiryYear: expiryStatus ? (isNaN(fy) ? null : fy) : null,
+          // Sent whatever the status is. The anchor is a fact about the
+          // contract, not a property of being a free agent — it was gated on
+          // `expiryStatus` here, which is why every signed row went in without
+          // one and the audit found a league of unanchored terms.
+          expiryYear: isNaN(fy) ? null : fy,
           extensionCapHit: hasExt ? (isNaN(ec) ? null : ec) : null,
           extensionYears: hasExt ? (isNaN(ey) ? null : ey) : null,
           clearExtension: hadExtension && !hasExt,
@@ -298,17 +326,23 @@ function EditModal({ row, onSave, onClear, onClose }: {
           <div>
             <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
               letterSpacing: "0.1em", marginBottom: 5 }}>Expiry Yr</label>
-            <input type="number" min={2024} max={2035} step={1} value={faYear}
-              disabled={fa === "SIGNED"}
-              onChange={e => setFaYear(e.target.value)}
+            <input type="number" min={2024} max={2035} step={1} value={shownExpiryYear}
+              onChange={e => { setFaYearTouched(true); setFaYear(e.target.value); }}
+              title="The year he reaches the market. Follows the term above unless you type one."
               style={{ ...field, width: "100%", padding: "6px 10px", fontSize: 13,
-                background: fa === "SIGNED" ? "var(--ledger-rule-light)" : "var(--paper)",
-                color: fa === "SIGNED" ? "var(--ledger-ink-faint)" : "var(--ledger-ink)" }} />
+                // Muted while it is merely following the term, solid once it is
+                // a number someone stood behind.
+                color: faYearTouched || faYear !== "" ? "var(--ledger-ink)" : "var(--ledger-ink-faint)" }} />
           </div>
           <label style={{ display: "flex", alignItems: "flex-end", gap: 6, fontSize: 11, color: "var(--ledger-red)", cursor: "pointer", paddingBottom: 7 }}>
             <input type="checkbox" checked={exclude} onChange={e => setExclude(e.target.checked)} />
             Exclude from roster
           </label>
+          <div style={{ gridColumn: "1 / -1", fontSize: 10, color: "var(--ledger-ink-faint)", lineHeight: 1.5 }}>
+            {fa === "SIGNED"
+              ? <>Expiry year follows the term — {typedYears > 0 ? `${Math.round(typedYears)} years from ${SEASON_START_YEAR}-${String((SEASON_START_YEAR + 1) % 100).padStart(2, "0")} is ${derivedExpiryYear}` : "type a term above"}. It is the anchor a season rollover derives from, so it is worth being right. Overtype it when the expiry is what you are sure of and the term is not.</>
+              : <>Set the year he reaches the market. Leave it blank only if you do not know it — without it the read path falls back to “one year left”, which cannot tell a {SEASON_START_YEAR} free agent from a {SEASON_START_YEAR + 1} one.</>}
+          </div>
         </div>
 
         <div className="admin-dialog-actions" style={{ display: "flex", gap: 8 }}>

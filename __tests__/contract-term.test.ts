@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { auditTerm, auditTerms, MAX_CBA_TERM, type TermRow } from "@/app/lib/contract-term";
+import { auditTerm, auditTerms, anchorFromTerm, MAX_CBA_TERM, type TermRow } from "@/app/lib/contract-term";
 
 const SEASON = 2026;
 
@@ -85,6 +85,34 @@ describe("contract-term — what it refuses to anchor", () => {
     const v = auditTerm(row({ yearsRemaining: 8, retired: true }), SEASON);
     expect(v.issue).toBeNull();
     expect(v.backfillable).toBe(false);
+  });
+});
+
+describe("contract-term — a term implies its anchor", () => {
+  // One statement of the rule, because three callers want it: the editor
+  // dialog showing what SAVE will write, the endpoint writing it, and the
+  // paste box anchoring a fresh signing.
+
+  it("turns the term the operator typed into a year", () => {
+    // Zegras signs 4 × $9.125M. Typing 4 should not leave anyone working out
+    // 2030 for themselves, or leaving it blank.
+    expect(anchorFromTerm(4, SEASON)).toBe(2030);
+    expect(anchorFromTerm(1, SEASON)).toBe(2027);
+    expect(anchorFromTerm(MAX_CBA_TERM, SEASON)).toBe(2034);
+  });
+
+  it("declines when the term cannot imply one", () => {
+    expect(anchorFromTerm(0, SEASON)).toBeNull();
+    expect(anchorFromTerm(-2, SEASON)).toBeNull();
+    expect(anchorFromTerm(9, SEASON)).toBeNull();
+    expect(anchorFromTerm(null, SEASON)).toBeNull();
+    expect(anchorFromTerm(NaN, SEASON)).toBeNull();
+  });
+
+  it("round-trips against the audit", () => {
+    // What the dialog shows is what the audit will later call consistent.
+    const anchored = { yearsRemaining: 4, expiryYear: anchorFromTerm(4, SEASON) };
+    expect(auditTerm(row(anchored), SEASON).issue).toBeNull();
   });
 });
 

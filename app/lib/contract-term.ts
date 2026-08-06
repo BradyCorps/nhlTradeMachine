@@ -51,6 +51,25 @@ export type TermIssue =
   /** Fine, just not anchored yet. The backfill queue. */
   | "noAnchor";
 
+/**
+ * The anchor a term implies, or null when the term cannot imply one.
+ *
+ * The single statement of `expiryYear = seasonStartYear + yearsRemaining`.
+ * Three callers want it — the editor dialog computing what SAVE will write,
+ * the endpoint writing it, and the paste box putting it on a fresh signing —
+ * and three copies of a rule about a season boundary is three chances to
+ * disagree about it.
+ */
+export function anchorFromTerm(
+  yearsRemaining: number | null | undefined,
+  seasonStartYear = SEASON_START_YEAR,
+): number | null {
+  if (yearsRemaining == null || !Number.isFinite(yearsRemaining)) return null;
+  const years = Math.round(yearsRemaining);
+  if (years <= 0 || years > MAX_CBA_TERM) return null;
+  return seasonStartYear + years;
+}
+
 export interface TermRow {
   id: string;
   name: string;
