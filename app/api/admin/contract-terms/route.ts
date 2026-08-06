@@ -46,18 +46,68 @@ interface Report {
 
 const PER_BUCKET = 60;
 
+const TERM_COLUMNS = {
+  id: playersTable.id,
+  name: playersTable.name,
+  teamId: playersTable.teamId,
+  capHit: playersTable.capHit,
+  yearsRemaining: playersTable.yearsRemaining,
+  expiryYear: playersTable.expiryYear,
+  expiryStatus: playersTable.expiryStatus,
+  retired: playersTable.retired,
+  source: playersTable.source,
+};
+
 async function loadRows() {
-  return db.select({
-    id: playersTable.id,
-    name: playersTable.name,
-    teamId: playersTable.teamId,
-    capHit: playersTable.capHit,
-    yearsRemaining: playersTable.yearsRemaining,
-    expiryYear: playersTable.expiryYear,
-    expiryStatus: playersTable.expiryStatus,
-    retired: playersTable.retired,
-    source: playersTable.source,
-  }).from(playersTable);
+  return db.select(TERM_COLUMNS).from(playersTable);
+}
+
+type WriteAction = "backfill" | "reconcile";
+type LoadedRow = Awaited<ReturnType<typeof loadRows>>[number];
+type ReportedChange = { id: string; name: string; from: string; to: string };
+type PlannedChange = ReportedChange & {
+  values: { expiryYear: number } | { yearsRemaining: number };
+};
+
+function planChanges(rows: LoadedRow[], action: WriteAction) {
+  const planned: PlannedChange[] = [];
+  const refused: { name: string; why: string }[] = [];
+
+  for (const row of rows) {
+    const verdict = auditTerm(row as TermRow);
+
+    if (action === "backfill") {
+      if (verdict.backfillable && verdict.suggestedExpiryYear != null) {
+        planned.push({
+          id: row.id, name: row.name,
+          from: "no anchor", to: String(verdict.suggestedExpiryYear),
+          values: { expiryYear: verdict.suggestedExpiryYear },
+        });
+      } else if (verdict.issue && verdict.issue !== "noAnchor" && row.expiryYear == null) {
+        refused.push({ name: row.name, why: verdict.why });
+      }
+      continue;
+    }
+
+    if (verdict.reconciledYears != null && verdict.reconciledYears !== row.yearsRemaining) {
+      planned.push({
+        id: row.id, name: row.name,
+        from: `${row.yearsRemaining}yr`, to: `${verdict.reconciledYears}yr`,
+        values: { yearsRemaining: verdict.reconciledYears },
+      });
+    } else if (row.expiryYear == null && !row.retired) {
+      // No anchor means this row cannot be rolled over at all. Saying so is
+      // the point: a reconcile that silently skipped half the league would
+      // look exactly like one that worked.
+      refused.push({ name: row.name, why: "no anchor to reconcile from" });
+    }
+  }
+
+  return { planned, refused };
+}
+
+function reportChange({ values: _values, ...change }: PlannedChange): ReportedChange {
+  return change;
 }
 
 export async function GET(req: Request) {
@@ -120,50 +170,42 @@ export async function POST(req: Request) {
   const dryRun = body.dryRun === true;
 
   try {
-    const rows = await loadRows();
-    const changed: { id: string; name: string; from: string; to: string }[] = [];
-    const refused: { name: string; why: string }[] = [];
+    let outcome: {
+      changed: ReportedChange[];
+      refused: { name: string; why: string }[];
+    };
 
-    for (const row of rows) {
-      const verdict = auditTerm(row as TermRow);
+    if (dryRun) {
+      const plan = planChanges(await loadRows(), action);
+      outcome = {
+        changed: plan.planned.map(reportChange),
+        refused: plan.refused,
+      };
+    } else {
+      outcome = await db.transaction(async (tx) => {
+        const plan = planChanges(
+          await tx.select(TERM_COLUMNS).from(playersTable),
+          action,
+        );
+        const changed: ReportedChange[] = [];
 
-      if (action === "backfill") {
-        if (verdict.backfillable && verdict.suggestedExpiryYear != null) {
-          changed.push({
-            id: row.id, name: row.name,
-            from: "no anchor", to: String(verdict.suggestedExpiryYear),
-          });
-          if (!dryRun) {
-            await db.update(playersTable)
-              .set({ expiryYear: verdict.suggestedExpiryYear })
-              .where(eq(playersTable.id, row.id))
-              .catch(() => {});
+        for (const change of plan.planned) {
+          const updated = await tx.update(playersTable)
+            .set(change.values)
+            .where(eq(playersTable.id, change.id))
+            .returning({ id: playersTable.id });
+
+          if (updated.length !== 1) {
+            throw new Error(`expected to update one player for ${change.id}; updated ${updated.length}`);
           }
-        } else if (verdict.issue && verdict.issue !== "noAnchor" && row.expiryYear == null) {
-          refused.push({ name: row.name, why: verdict.why });
+          changed.push(reportChange(change));
         }
-        continue;
-      }
 
-      // reconcile
-      if (verdict.reconciledYears != null && verdict.reconciledYears !== row.yearsRemaining) {
-        changed.push({
-          id: row.id, name: row.name,
-          from: `${row.yearsRemaining}yr`, to: `${verdict.reconciledYears}yr`,
-        });
-        if (!dryRun) {
-          await db.update(playersTable)
-            .set({ yearsRemaining: verdict.reconciledYears })
-            .where(eq(playersTable.id, row.id))
-            .catch(() => {});
-        }
-      } else if (row.expiryYear == null && !row.retired) {
-        // No anchor means this row cannot be rolled over at all. Saying so is
-        // the point: a reconcile that silently skipped half the league would
-        // look exactly like one that worked.
-        refused.push({ name: row.name, why: "no anchor to reconcile from" });
-      }
+        return { changed, refused: plan.refused };
+      });
     }
+
+    const { changed, refused } = outcome;
 
     let clearedCacheKeys: string[] = [];
     if (!dryRun && changed.length > 0) {
