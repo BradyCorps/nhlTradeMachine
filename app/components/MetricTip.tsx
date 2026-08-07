@@ -52,7 +52,7 @@ export default function MetricTip({ term, children, className }: Props) {
   // the viewport. Measure the trigger on open and pin left/right instead.
   const [align, setAlign] = useState<"center" | "left" | "right">("center");
   const anchorRef = useRef<HTMLSpanElement>(null);
-  const timeout = useRef<ReturnType<typeof setTimeout>>();
+  const timeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const enter = useCallback(() => {
     clearTimeout(timeout.current);
     const rect = anchorRef.current?.getBoundingClientRect();

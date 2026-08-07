@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 
 const NAV_LINKS = [
   { href: "/admin",               label: "DASHBOARD"   },
@@ -59,7 +60,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           ))}
         </div>
         <div className="admin-nav-spacer" style={{ flex: 1 }} />
-        <a
+        <Link
           href="/"
           className="admin-nav-home"
           style={{
@@ -72,7 +73,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           }}
         >
           ← HOME
-        </a>
+        </Link>
       </nav>
       <div style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)" }}>{children}</div>
     </>

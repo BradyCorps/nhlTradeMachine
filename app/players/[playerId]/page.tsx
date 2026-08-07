@@ -58,9 +58,10 @@ function buildComparePeers(allPlayers: any[], player: any) {
 }
 
 export async function generateMetadata(
-  { params }: { params: { playerId: string } },
+  { params }: { params: Promise<{ playerId: string }> },
 ): Promise<Metadata> {
-  const player = await loadPlayer(params.playerId);
+  const { playerId } = await params;
+  const player = await loadPlayer(playerId);
   if (!player) return { title: "Player not found — Cap & Crease" };
   return {
     title: `${player.name} — Cap & Crease`,
@@ -85,9 +86,10 @@ function StatCell({ label, value, color }: { label: string; value: string; color
   );
 }
 
-export default async function PlayerPage({ params }: { params: { playerId: string } }) {
+export default async function PlayerPage({ params }: { params: Promise<{ playerId: string }> }) {
+  const { playerId } = await params;
   const roster = await assembleCanonicalRoster();
-  const player = (roster.players as any[]).find(p => String(p.id) === params.playerId) ?? null;
+  const player = (roster.players as any[]).find(p => String(p.id) === playerId) ?? null;
   if (!player || player.position === "Pick") notFound();
 
   const teamName = TEAMS_DB.find(t => t.id === player.teamId)?.name ?? player.teamId;
@@ -287,12 +289,12 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
         </div>
 
         {/* NHL EDGE shot map — skaters with NHL ids only */}
-        {player.position !== "G" && /^\d+$/.test(params.playerId) && (
+        {player.position !== "G" && /^\d+$/.test(playerId) && (
           <div className="border p-4 mb-4" style={{ borderColor: rule, background: "var(--paper-card, var(--paper-inset))" }}>
             <div className="text-[9px] font-black font-mono uppercase tracking-[0.18em] mb-3" style={{ color: faint }}>
               NHL EDGE — Shot Locations &amp; Tracking
             </div>
-            <EdgeShotMap nhlPlayerId={params.playerId} />
+            <EdgeShotMap nhlPlayerId={playerId} />
           </div>
         )}
 

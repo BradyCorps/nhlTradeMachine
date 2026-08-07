@@ -11,9 +11,10 @@ export const dynamic = "force-dynamic";
 // display data captured by the nightly feed; no snapshot yet → 404.
 export async function GET(
   _req: Request,
-  { params }: { params: { playerId: string } },
+  { params }: { params: Promise<{ playerId: string }> },
 ) {
-  const playerId = Number(params.playerId);
+  const { playerId: rawPlayerId } = await params;
+  const playerId = Number(rawPlayerId);
   if (!Number.isFinite(playerId) || playerId <= 0) {
     return NextResponse.json({ error: "Invalid player id" }, { status: 400 });
   }

@@ -1,12 +1,12 @@
 import { ImageResponse } from "next/og";
 import { decodeTradeSharePayload, summarizeTradeSharePayload } from "@/app/lib/trade-share";
 
-export const runtime = "edge";
 export const alt = "Cap & Crease shared trade card";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-export default function Image({ params }: { params: { code: string } }) {
+export default async function Image({ params }: { params: Promise<{ code: string }> }) {
+  const { code } = await params;
   let preview = {
     title: "Shared Trade",
     description: "Open a shared NHL trade receipt from Cap & Crease.",
@@ -17,7 +17,7 @@ export default function Image({ params }: { params: { code: string } }) {
   };
 
   try {
-    preview = summarizeTradeSharePayload(decodeTradeSharePayload(params.code));
+    preview = summarizeTradeSharePayload(decodeTradeSharePayload(code));
   } catch {}
 
   return new ImageResponse(

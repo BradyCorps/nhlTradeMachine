@@ -30,7 +30,7 @@ export interface DialogOptions {
 }
 
 export interface DialogProps {
-  ref: React.RefObject<HTMLDivElement>;
+  ref: React.RefObject<HTMLDivElement | null>;
   role: "dialog";
   "aria-modal": true;
   "aria-label"?: string;
