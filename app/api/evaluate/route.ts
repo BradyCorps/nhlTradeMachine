@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getHistoricalFloor, getInjuryRisk, getProspectTier } from "@/app/lib/player-data";
+import { getInjuryRisk, getProspectTier } from "@/app/lib/player-data";
 import type {
   Asset,
   EvaluateRequest,
@@ -10,7 +10,9 @@ import type {
 } from "@/app/lib/trade-types";
 import { SEASON, LEAGUE, FRANCHISE } from "@/app/lib/season-config";
 import { assessFranchiseReturn, assessCreaseContext } from "@/app/lib/gm-audit-context";
-import { calcNAV, compressPackage as coreCompress, AssetInput, XNAVResult } from "@/app/lib/xnav-engine";
+import { compressPackage as coreCompress, type XNAVResult } from "@/app/lib/xnav-engine";
+import { calculateAssetNAV } from "@/app/lib/asset-nav";
+import { getLiveCapCeiling, getLiveCapFloor } from "@/app/lib/live-cap-settings";
 import {
   DIVISION_BY_TEAM,
   hasVeteranTerm,
@@ -22,9 +24,7 @@ import {
   normalizePosition,
 } from "@/app/lib/trade-classification";
 import { EvaluateRequestSchema } from "@/app/lib/evaluate-request-schema";
-import { db } from "@/app/db/client";
-import { siteSettings } from "@/app/db/schema";
-import { isValidCapCeiling, maxCapCeiling, parseStoredCapCeiling, parseStoredCapFloor } from "@/app/lib/cap-settings";
+import { maxCapCeiling } from "@/app/lib/cap-settings";
 import { describeBreach, findCapBreaches } from "@/app/lib/cap-limits";
 
 type Team = import("@/app/lib/trade-types").Team;
@@ -40,110 +40,11 @@ const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(mi
 const fmt   = (n: number, d = 1) => (n > 0 ? `+${n.toFixed(d)}` : n.toFixed(d));
 const MAX_CAP_CEILING = maxCapCeiling();
 
-const getLiveCapCeiling = async (requestCapCeiling?: number | null): Promise<number> => {
-  if (requestCapCeiling != null && isValidCapCeiling(requestCapCeiling)) return requestCapCeiling;
-  const rows = await db.select().from(siteSettings).catch(() => []);
-  const row = rows.find((r) => r.key === "cap_ceiling");
-  return parseStoredCapCeiling(row?.value, SEASON.capCeiling) ?? SEASON.capCeiling;
-};
-
-// CXH6 — the floor gets the same treatment as the ceiling. There is a
-// `cap_floor` override in the admin settings and this audit ignored it, so
-// raising the ceiling for a what-if left the floor on the season default and
-// the two ends of the payroll range described different leagues.
-const getLiveCapFloor = async (): Promise<number> => {
-  const rows = await db.select().from(siteSettings).catch(() => []);
-  const row = rows.find((r) => r.key === "cap_floor");
-  return parseStoredCapFloor(row?.value, SEASON.capFloor) ?? SEASON.capFloor;
-};
-
-// ── Adapter: Maps raw client Asset to strict engine AssetInput ──
-const getAssetNAV = (asset: Asset, capCeiling: number = SEASON.capCeiling): XNAVResult => {
-  const input: AssetInput = {
-    id: asset.id,
-    name: asset.name,
-    position: asset.position as "C" | "W" | "D" | "G" | "Pick",
-    age: asset.age ?? 27,
-    capHit: asset.capHit ?? 0,
-    yearsRemaining: asset.yearsRemaining ?? 1,
-    capCeiling: asset.capCeiling ?? capCeiling,
-    retainedPct: asset.retainedPct,
-    extensionCapHit: asset.extensionCapHit,
-    extensionYears: asset.extensionYears,
-    ptsPace: asset.ptsPace,
-    goalsPace: asset.goalsPace,
-    assistsPace: asset.assistsPace,
-    xGPace: asset.xGPace,
-    hdFinishingDelta: asset.hdFinishingDelta,
-    edgeSpeedMaxMph: asset.edgeSpeedMaxMph,
-    edgeBurstsOver20: asset.edgeBurstsOver20,
-    edgeOzPct: asset.edgeOzPct,
-    defRate: asset.defRate,
-    avgTOI: asset.avgTOI,
-    qocRank: asset.qocRank,
-    qocIndex: asset.qocIndex,
-    draftOverall: asset.draftOverall ?? undefined,
-    prospectPtsPace: asset.prospectPtsPace ?? undefined,
-    xgRelTM: asset.xgRelTM,
-    xgaRelTM: asset.xgaRelTM,
-    dzPct: asset.dzPct,
-    ops: asset.ops,
-    dps: asset.dps,
-    games: asset.games,
-    gsax: asset.gsax,
-    savePct: asset.savePct,
-    gamesStarted: asset.gamesStarted,
-    teamXga60: asset.teamXga60,
-    teamHdca60: asset.teamHdca60,
-    round: asset.round,
-    year: asset.year,
-    teamStanding: asset.teamStanding,
-    isProtected: asset.isProtected,
-    multiplier: asset.multiplier,
-    hasLiveStats: asset.hasLiveStats,
-    baselineGsax: asset.baselineGsax,
-    baselinePtsPace: asset.baselinePtsPace,
-    baselineGameScore: asset.baselineGameScore,
-    baselineDpsProxy: asset.baselineDpsProxy,
-    baselineXgRel: asset.baselineXgRel,
-    ppPtsPace82: asset.ppPtsPace82,
-    pkTimeShare: asset.pkTimeShare,
-    baselineIxg82: asset.baselineIxg82,
-    baselineHits82: asset.baselineHits82,
-    baselineBlocks82: asset.baselineBlocks82,
-    pairXgfPct: asset.pairXgfPct,
-    pairDriverScore: asset.pairDriverScore,
-    baselineHdsvPct: asset.baselineHdsvPct,
-    tradeBlockStatus: asset.tradeBlockStatus,
-  };
-  const result = calcNAV(input);
-  if (asset.position === "Pick") return result;
-
-  // Historical (pedigree) floor guards a star's DOWN YEAR — but it must floor
-  // TALENT (on-ice + age), not the bottom-line total. Flooring the total let a
-  // pedigree lift cancel a toxic contract and, worse, the lift was dumped into
-  // the cap component, so an overpaid vet (Huberdeau: $10.5M, $2M FMV) read as
-  // cap-POSITIVE. Floor the talent, then re-apply the real contract drag; book
-  // any lift to `upside` so off/def/age/cap stay honest.
-  const contractDrag = result.cap;
-  const talent = result.total - contractDrag;
-  const talentFloor = getHistoricalFloor(asset.name, talent, asset);
-  if (talentFloor <= talent) return result;
-
-  const liftedTotal = Math.round(talentFloor + contractDrag);
-  if (liftedTotal <= result.total) return result;
-  return {
-    ...result,
-    total: liftedTotal,
-    upside: (result.upside ?? 0) + (liftedTotal - result.total),
-  };
-};
-
 // ── Package compression (Delegated to xnav-engine.ts) ──
 const compressPackage = (assets: Asset[], capCeiling: number = SEASON.capCeiling): number => {
   if (assets.length === 0) return 0;
   const mappedAssets = assets.map(a => ({
-    nav: getAssetNAV(a, capCeiling).total,
+    nav: calculateAssetNAV(a, capCeiling).total,
     isPick: a.position === "Pick",
     age: a.age
   }));
@@ -233,7 +134,7 @@ const runGmLogic = (
 ): GmFlag[] => {
   const flags: GmFlag[] = [];
   if (!teamHome || !teamPartner) return flags;
-  const navOf = (asset: Asset): number => getAssetNAV(asset, capCeiling).total;
+  const navOf = (asset: Asset): number => calculateAssetNAV(asset, capCeiling).total;
   const isEstablishedTopPairD = (asset: Asset): boolean => {
     if (normalizePosition(asset.position) !== "D") return false;
     const hasNhlSample = (asset.games ?? 0) >= 20 && asset.hasLiveStats !== false;
@@ -392,7 +293,7 @@ const runGmLogic = (
   const inPicks    = incoming.filter((a) => a.position === "Pick");
 
   for (const goalie of [...outPlayers, ...inPlayers].filter((a) => a.position === "G")) {
-    const volatility = getAssetNAV(goalie, capCeiling).volatility ?? 0;
+    const volatility = calculateAssetNAV(goalie, capCeiling).volatility ?? 0;
     if (volatility >= 40) {
       flags.push({
         severity: "WARN",
@@ -1138,8 +1039,8 @@ const evaluateTrade = (
     return { status: "IDLE", message: "Add assets to evaluate", flags: [], metrics: nullMetrics() };
   }
 
-  const navOut = outgoing.reduce((s, a) => s + getAssetNAV(a, capCeiling).total, 0);
-  const navIn  = incoming.reduce((s, a) => s + getAssetNAV(a, capCeiling).total, 0);
+  const navOut = outgoing.reduce((s, a) => s + calculateAssetNAV(a, capCeiling).total, 0);
+  const navIn  = incoming.reduce((s, a) => s + calculateAssetNAV(a, capCeiling).total, 0);
 
   const cNavOut = compressPackage(outgoing, capCeiling);
   const cNavIn  = compressPackage(incoming, capCeiling);
@@ -1196,7 +1097,7 @@ const evaluateTrade = (
         const pickValue = a.round === 1 ? 2.5 : a.round === 2 ? 1.0 : 0.3;
         return sum + direction * pickValue;
       }
-      const nav = getAssetNAV(a, capCeiling).total;
+      const nav = calculateAssetNAV(a, capCeiling).total;
       if (nav <= 0) return sum;
 
       const peakAge = a.position === "G" ? 30 : 28;
@@ -1321,7 +1222,7 @@ export async function POST(req: Request) {
     if (Array.isArray(body.assets)) {
       for (const asset of body.assets) {
         if (asset?.id) {
-          navMap[asset.id] = getAssetNAV(asset, liveCapCeiling);
+          navMap[asset.id] = calculateAssetNAV(asset, liveCapCeiling);
         }
       }
     }

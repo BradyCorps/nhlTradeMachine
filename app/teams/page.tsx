@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
-import { calcNAV } from "@/app/lib/xnav-engine";
+import { calculateAssetNAV } from "@/app/lib/asset-nav";
 import { computeContention } from "@/app/armchair-gm/contention";
 import { computeTeamEdgeProfile, type TeamEdgeProfile } from "@/app/lib/team-edge-profile";
 import { computeRosterStrand } from "@/app/lib/roster-strand";
@@ -798,13 +798,13 @@ export default function TeamsPage() {
     for (const p of players) {
       if (p.position === "Pick") continue;
       try {
-        map[p.id] = calcNAV(p as Parameters<typeof calcNAV>[0]) as unknown as XNAVResult;
+        map[p.id] = calculateAssetNAV(p, capCeiling) as unknown as XNAVResult;
       } catch {
         // skip players that fail NAV calc
       }
     }
     return map;
-  }, [players]);
+  }, [players, capCeiling]);
 
   const teamProfiles = useMemo((): TeamProfile[] => {
     return teams.map((team) => {

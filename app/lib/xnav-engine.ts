@@ -11,7 +11,7 @@
 //   • Rental discount on age penalty (1yr = 75% reduction, 2yr = 40%)
 
 import { SEASON, LEAGUE, FRANCHISE, ageDecayRate, ageSlotPenalty, capGrowthFactor } from "@/app/lib/season-config";
-import type { NavStage, NavStageKind } from "@/app/lib/nav-breakdown";
+import { navSplit, type NavStage, type NavStageKind } from "@/app/lib/nav-breakdown";
 import { goalieFmvCapPct, LEAGUE_MINIMUM_CAP_PCT as GOALIE_LEAGUE_MIN_CAP_PCT } from "@/app/lib/goalie-fmv";
 import { reliability } from "@/app/lib/goalie-percentiles";
 import {
@@ -22,6 +22,7 @@ import {
 import { skaterSeasonPrior } from "@/app/lib/skater-prior";
 import type { FArchetype } from "@/app/lib/trade-types";
 import { computeGravity } from "@/app/lib/gravity";
+import { getHistoricalFloor } from "@/app/lib/player-data";
 
 export const DPS_NAV_MULTIPLIER = 15; // dps * 15 = defPS for NAV (not 120 — the *8 bug is removed)
 
@@ -1446,6 +1447,38 @@ export function applyTradeRequestDiscount(result: XNAVResult, asset: AssetInput)
   };
 }
 
+// ── Historical-pedigree floor ────────────────────────────────────────────────
+// The floor belongs inside the engine boundary. Applying it in one API route
+// made identical assets disagree across public surfaces and changed `total`
+// without a stage that explained the lift. `navSplit` isolates the player's
+// production value after shared adjustments, so the floor cannot erase a bad
+// contract. The contract portion and descriptive `upside` remain untouched.
+export function applyHistoricalPedigreeFloor(
+  result: XNAVResult,
+  asset: AssetInput,
+): XNAVResult {
+  if (asset.position === "Pick") return result;
+
+  const split = navSplit(result.stages, result.total);
+  const productionFloor = getHistoricalFloor(asset.name, split.production, {
+    age: asset.age,
+    games: asset.games ?? 0,
+    ptsPace: asset.ptsPace ?? 0,
+    position: asset.position,
+  });
+  const lift = Math.max(0, Math.round(productionFloor) - split.production);
+  if (lift === 0) return result;
+
+  return {
+    ...result,
+    total: result.total + lift,
+    stages: [
+      ...(result.stages ?? []),
+      stage("historicalFloor", "Historical pedigree floor", lift, "adjustment"),
+    ],
+  };
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 export function calcNAV(asset: AssetInput): XNAVResult {
   if (asset.position === "Pick") return calcPickNAV(asset);
@@ -1453,15 +1486,18 @@ export function calcNAV(asset: AssetInput): XNAVResult {
   const hasProspectValuation =
     (asset.draftOverall != null && asset.age <= 22) ||
     (asset.prospectPtsPace != null && asset.prospectPtsPace > 0);
+  let result: XNAVResult;
   if (asset.position !== "G" && hasProspectValuation && !asset.hasLiveStats && games < 14) {
-    return applyTradeRequestDiscount(calcProspectNAV(asset), asset);
-  }
-  if (asset.position === "G")    return applyTradeRequestDiscount(calcGoalieNAV(asset), asset);
-  if (hasProspectValuation && games >= 14 && games < 60) {
+    result = calcProspectNAV(asset);
+  } else if (asset.position === "G") {
+    result = calcGoalieNAV(asset);
+  } else if (hasProspectValuation && games >= 14 && games < 60) {
     const transitionWeight = clamp((games - 14) / 46, 0, 1);
-    return applyTradeRequestDiscount(blendNavResults(calcProspectNAV(asset), calcSkaterNAV(asset), transitionWeight), asset);
+    result = blendNavResults(calcProspectNAV(asset), calcSkaterNAV(asset), transitionWeight);
+  } else {
+    result = calcSkaterNAV(asset);
   }
-  return applyTradeRequestDiscount(calcSkaterNAV(asset), asset);
+  return applyTradeRequestDiscount(applyHistoricalPedigreeFloor(result, asset), asset);
 }
 
 // ── Package compression ───────────────────────────────────────────────────────

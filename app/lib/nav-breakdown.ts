@@ -123,7 +123,7 @@ export function stagesReconcile(displayed: NavStage[], total: number): boolean {
 export const NAV_STAGE_SHORT: Record<string, string> = {
   off: "OFF", def: "DEF", age: "AGE", grav: "GRAV", cap: "CAP",
   multiplier: "MULT", positional: "POS", development: "DEV",
-  franchiseFloor: "FLOOR", credibility: "CRED", leverage: "LEV",
+  franchiseFloor: "FLOOR", historicalFloor: "HIST", credibility: "CRED", leverage: "LEV",
   impact: "STOP", youngFloor: "CTRL", roleCeiling: "CEIL",
   pick: "PICK", prospect: "PRSP", total: "VALUE",
 };
@@ -139,6 +139,7 @@ export const NAV_STAGE_DESC: Record<string, string> = {
   positional: "Positional scarcity — a centre or a genuine top-pair defenceman is harder to replace.",
   development: "Development risk — a young player's value discounted for bust probability, relieved by NHL track record.",
   franchiseFloor: "Franchise floor — a proven cornerstone held above what the surplus model alone would pay.",
+  historicalFloor: "Historical pedigree floor — a sourced peak-performance adjustment that protects an established player through a qualified down year without erasing contract value.",
   credibility: "Sample credibility — a thin NHL sample regressed toward a replacement anchor.",
   leverage: "Trade-request leverage — a public request costs the club negotiating position.",
   impact: "Projected stopping value above expected, at the workload the model expects.",
@@ -173,10 +174,13 @@ export const navStageDesc = (key: string): string => NAV_STAGE_DESC[key] ?? "";
 // neither owns them outright. Each is split in proportion to the absolute size
 // of the two bases it acted on, which is the same reasoning as the largest
 // remainder above: attribute in proportion to contribution, and never let the
-// parts stop summing to the whole.
+// parts stop summing to the whole. A policy that explicitly floors production
+// is kept out of that shared pool so it cannot rewrite the contract reading.
 
 /** Stages that describe the contract rather than the player. */
 const CONTRACT_STAGE_KEYS = new Set(["cap", "youngFloor"]);
+/** Adjustments whose policy explicitly targets production, not the contract. */
+const PRODUCTION_STAGE_KEYS = new Set(["historicalFloor"]);
 
 export interface NavSplit {
   /** What the player is, in NAV: on-ice value plus its share of the adjustments. */
@@ -203,13 +207,14 @@ export function navSplit(stages: NavStage[] | undefined, total: number): NavSpli
     return { production: target, contract: 0, total: target, known: false };
   }
 
-  let baseProduction = 0, baseContract = 0, adjustment = 0;
+  let baseProduction = 0, baseContract = 0, adjustment = 0, productionAdjustment = 0;
   for (const s of rows) {
     // Key before kind, deliberately. The goalie cost-controlled floor is an
     // `adjustment` by kind because of how the engine applies it, but it is a
     // statement about cheap years on a deal — testing `kind` first sent it into
     // the apportioned pool and credited most of it to the goalie.
     if (CONTRACT_STAGE_KEYS.has(s.key)) baseContract += s.value;
+    else if (PRODUCTION_STAGE_KEYS.has(s.key)) productionAdjustment += s.value;
     else if (s.kind === "adjustment") adjustment += s.value;
     else baseProduction += s.value;
   }
@@ -220,7 +225,7 @@ export function navSplit(stages: NavStage[] | undefined, total: number): NavSpli
   const weight = Math.abs(baseProduction) + Math.abs(baseContract);
   const productionShare = weight > 0 ? Math.abs(baseProduction) / weight : 1;
 
-  const production = Math.round(baseProduction + adjustment * productionShare);
+  const production = Math.round(baseProduction + adjustment * productionShare + productionAdjustment);
   // Taken as the remainder so the two always sum to the headline, whatever
   // rounding did to the first.
   return { production, contract: target - production, total: target, known: true };

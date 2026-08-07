@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { POST as evaluatePOST } from "../app/api/evaluate/route";
 import type { Asset, Team } from "../app/lib/trade-types";
+import { calculateAssetNAV } from "../app/lib/asset-nav";
+import { stageDrift } from "../app/lib/nav-breakdown";
 
 const team = (overrides: Partial<Team> = {}): Team => ({
   id: "WPG",
@@ -47,6 +49,67 @@ const postEvaluate = async (body: unknown) => {
 };
 
 describe("evaluate route integration", () => {
+  it("returns the canonical direct NAV for skaters, goalies, prospects, and picks", async () => {
+    const assets = [
+      asset({
+        id: "parity-skater",
+        name: "Parity Skater",
+        position: "RW",
+        games: 18,
+        baselinePtsPace: 74,
+        baselineToiPerGame: 21,
+        baselineSeasonsWeighted: 2.4,
+        edgeOzPct: 0.44,
+        edgeSpeedMaxMph: 23.4,
+        edgeBurstsOver20: 77,
+      }),
+      asset({
+        id: "parity-goalie",
+        name: "Parity Goalie",
+        position: "G",
+        ptsPace: 0,
+        games: 48,
+        gamesStarted: 44,
+        gsax: 9,
+        savePct: 0.914,
+        iceTimeSeconds: 153_000,
+        baselineGsax: 7.5,
+        baselineHdsvPct: 0.822,
+      }),
+      asset({
+        id: "parity-prospect",
+        name: "Parity Prospect",
+        position: "C",
+        age: 19,
+        games: 2,
+        hasLiveStats: false,
+        draftOverall: 4,
+        prospectPtsPace: 52,
+        capHit: 0.95,
+      }),
+      asset({
+        id: "parity-pick",
+        name: "2028 1st",
+        position: "Pick",
+        round: 1,
+        year: 2028,
+        teamStanding: 16,
+        games: 0,
+        ptsPace: 0,
+        capHit: 0,
+      }),
+    ];
+
+    const { response, body } = await postEvaluate({ assets, capCeiling: 110 });
+
+    expect(response.status).toBe(200);
+    for (const candidate of assets) {
+      const direct = JSON.parse(JSON.stringify(calculateAssetNAV(candidate, 110)));
+      expect(body.navMap[candidate.id], candidate.id).toEqual(direct);
+      expect(Math.abs(stageDrift(body.navMap[candidate.id].stages ?? [], body.navMap[candidate.id].total))).toBeLessThan(1);
+    }
+  });
+
   it("normalizes raw wing position labels instead of rejecting the request", async () => {
     const { response, body } = await postEvaluate({
       assets: [asset({ id: "raw-wing", name: "Raw Wing", position: "RW" as any })],

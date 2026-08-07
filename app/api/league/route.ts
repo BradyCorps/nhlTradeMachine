@@ -7,13 +7,11 @@ import { db } from "@/app/db/client";
 import { teams as teamsTable } from "@/app/db/schema";
 import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
 import { buildDraftPickInventory } from "@/app/lib/draft-pick-inventory";
-import { LEAGUE_TEAMS_CACHE_KEY } from "@/app/lib/team-cache";
+import { leagueTeamCacheKey } from "@/app/lib/team-cache";
 import { regulationWinsFrom } from "@/app/lib/nhl-standings-fields";
+import { getLiveCapCeiling, getLiveCapFloor } from "@/app/lib/live-cap-settings";
 
 export const dynamic = "force-dynamic";
-
-const CAP_CEILING = SEASON.capCeiling;
-const CAP_FLOOR   = SEASON.capFloor;
 
 const TEAMS_CACHE_TTL     = 6  * 60 * 60; // 6 hours (in seconds for Redis)
 
@@ -86,9 +84,10 @@ const fetchWithTimeout = (url: string, ms = 8000, extraHeaders: Record<string,st
   }).finally(() => clearTimeout(t));
 };
 
-async function loadTeams(): Promise<any[]> {
+async function loadTeams(capCeiling: number): Promise<any[]> {
+  const cacheKey = leagueTeamCacheKey(capCeiling);
   if (redis) {
-    const cached = await redis.get<any[]>(LEAGUE_TEAMS_CACHE_KEY);
+    const cached = await redis.get<any[]>(cacheKey);
     if (cached && Array.isArray(cached) && cached.length > 0) return cached;
   }
 
@@ -322,7 +321,7 @@ async function loadTeams(): Promise<any[]> {
     // every club — the difference between the curated ceiling and the live one.
     const capSpace = resolveTeamCapSpace({
       curatedCapSpace: t.capSpace,
-      capCeiling: CAP_CEILING,
+      capCeiling,
       liveCapSpace: capInfo?.capSpace,
     });
     
@@ -379,7 +378,7 @@ async function loadTeams(): Promise<any[]> {
 
   // ── Cache result ──────────────────────────────────────────────
   if (redis && teams.length > 0) {
-    await redis.setex(LEAGUE_TEAMS_CACHE_KEY, TEAMS_CACHE_TTL, teams);
+    await redis.setex(cacheKey, TEAMS_CACHE_TTL, teams);
   }
 
 
@@ -387,7 +386,11 @@ async function loadTeams(): Promise<any[]> {
 }
 
 export async function GET() {
-  const LIVE_TEAMS = await loadTeams();
+  const [capCeiling, capFloor] = await Promise.all([
+    getLiveCapCeiling(),
+    getLiveCapFloor(),
+  ]);
+  const LIVE_TEAMS = await loadTeams(capCeiling);
   const roster = await assembleCanonicalRoster({ teams: LIVE_TEAMS, includeTeamContext: true });
   const picks = await buildDraftPickInventory(LIVE_TEAMS);
 
@@ -407,8 +410,8 @@ export async function GET() {
   return NextResponse.json({
     teams,
     players: [...roster.players, ...picks],
-    capCeiling: CAP_CEILING,
-    capFloor:   CAP_FLOOR,
+    capCeiling,
+    capFloor,
     generatedAt: roster.generatedAt,
     source: "NHL API + hand-maintained contracts",
     liveStats: roster.liveStats,

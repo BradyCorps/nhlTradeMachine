@@ -4,13 +4,13 @@ import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
-import { siteSettings, teams as teamsTable } from "@/app/db/schema";
-import { parseStoredCapCeiling } from "@/app/lib/cap-settings";
+import { teams as teamsTable } from "@/app/db/schema";
 import { buildDraftPickInventory } from "@/app/lib/draft-pick-inventory";
 import { teamCacheKey, LEAGUE_TEAMS_PAYLOAD_CACHE_KEY } from "@/app/lib/team-cache";
 import { swrCache } from "@/app/lib/swr-cache";
 import { swrStore } from "@/app/lib/swr-store";
 import { regulationWinsFrom } from "@/app/lib/nhl-standings-fields";
+import { getLiveCapCeiling } from "@/app/lib/live-cap-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -46,12 +46,6 @@ const derivePhase = (confRank: number, divRank: number, pointPct: number): strin
   if (confRank <= 14) return "Retooling";
   if (pointPct < 0.38) return "Tanking";
   return "Rebuilding";
-};
-
-const getLiveCapCeiling = async (): Promise<number> => {
-  const rows = await db.select().from(siteSettings).catch(() => []);
-  const row = rows.find((r) => r.key === "cap_ceiling");
-  return parseStoredCapCeiling(row?.value, SEASON.capCeiling) ?? SEASON.capCeiling;
 };
 
 async function loadTeams(capCeiling: number): Promise<any[]> {

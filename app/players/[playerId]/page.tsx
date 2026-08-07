@@ -9,7 +9,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
-import { calcNAV } from "@/app/lib/xnav-engine";
+import { calculateAssetNAV } from "@/app/lib/asset-nav";
 import { computeGravity } from "@/app/lib/gravity";
 import { loadGravityProfileV4 } from "@/app/lib/gravity-v4/load-profile";
 import { GRAVITY_V4_RUNTIME_ARTIFACT } from "@/app/lib/gravity-v4/runtime-artifact";
@@ -25,6 +25,7 @@ import { derivePlayerRoles } from "@/app/lib/player-roles";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import { contractVerdict, verdictColor } from "@/app/lib/contract-verdict";
+import { getLiveCapCeiling } from "@/app/lib/live-cap-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -92,15 +93,13 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
   const teamName = TEAMS_DB.find(t => t.id === player.teamId)?.name ?? player.teamId;
   const position = player.position === "D" || player.position === "G" || player.position === "C"
     ? player.position : "W";
+  const capCeiling = await getLiveCapCeiling();
 
   // Server-side valuation — numbers only from here down.
-  const xnav = calcNAV({
+  const xnav = calculateAssetNAV({
     ...player,
     position,
-    capCeiling: SEASON.capCeiling,
-    defRate: player.defRate ?? 0.08,
-    games: player.games ?? 40,
-  });
+  }, capCeiling);
   // Display-only v4 lookup. calcNAV above has already completed and imports no
   // v4 code, so even a future validated display profile cannot affect X-NAV.
   const gravityV4Lookup = loadGravityProfileV4({

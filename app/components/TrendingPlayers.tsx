@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import Link from "next/link";
-import { calcNAV } from "@/app/lib/xnav-engine";
+import { calculateAssetNAV } from "@/app/lib/asset-nav";
 import { computeGravity, gravityTierColor } from "@/app/lib/gravity";
 import type { GravityProfile, GravityTier } from "@/app/lib/gravity";
 import { TierIcon, FieldDiagram } from "@/app/components/GravityField";
@@ -75,7 +75,7 @@ interface PlayerData {
   rosterTier?: string;
   baselineGameScore?: number | null;
   baselineDpsProxy?: number | null;
-  tradeBlockStatus?: string | null;
+  tradeBlockStatus?: "requested" | "available" | "blocked" | "untouchable" | null;
 }
 
 interface TeamData {
@@ -125,7 +125,7 @@ export default function TrendingPlayers() {
         );
 
         const results: RankedPlayer[] = players.map(p => {
-          const xnav = calcNAV(p as any);
+          const xnav = calculateAssetNAV(p, td.capCeiling);
           const grav = computeGravity(p as any);
           return {
             player: p,
