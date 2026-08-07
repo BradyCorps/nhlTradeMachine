@@ -2,13 +2,14 @@ import React from "react";
 
 export const dynamic = "force-dynamic";
 
-export default function AdminLoginPage({
+export default async function AdminLoginPage({
   searchParams,
 }: {
-  searchParams?: { error?: string; next?: string };
+  searchParams?: Promise<{ error?: string; next?: string }>;
 }) {
-  const hasError = searchParams?.error === "1";
-  const next = searchParams?.next?.startsWith("/admin") ? searchParams.next : "/admin";
+  const query = await searchParams;
+  const hasError = query?.error === "1";
+  const next = query?.next?.startsWith("/admin") ? query.next : "/admin";
 
   return (
     <div style={{

@@ -3,6 +3,7 @@
 // Shared across product mode and analytics pages.
 
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { BRAND } from "@/app/lib/brand";
 
 type NavTab = "trade" | "armchair-gm" | "players" | "teams" | "docket" | "press-box" | "fantasy";
@@ -41,7 +42,7 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
                 The <h1> survives as visually-hidden text so the page still
                 has a real heading for search and screen readers; the image
                 is decorative because that text already names the site. */}
-            <a href="/" className="no-underline block">
+            <Link href="/" className="no-underline block">
               <h1 className="sr-only">{BRAND.name}</h1>
               {/* The untextured cut. The kit's textured lockup is 246 KB, 218 KB
                   of it a base64 paper-grain JPEG that is invisible at header
@@ -56,7 +57,7 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
                 className="mx-auto h-auto w-full transition-opacity hover:opacity-70 cursor-pointer"
                 style={{ maxWidth: 'clamp(260px, 62vw, 520px)' }}
               />
-            </a>
+            </Link>
             <p className="flex items-center justify-center gap-2 text-2xs uppercase tracking-[0.3em] mt-1.5 font-mono text-ledger-ink-faint">
               <span>Est. 2026 &nbsp;—&nbsp; Vol. I &nbsp;—&nbsp;</span>
               {showLiveFeed && (
@@ -72,12 +73,12 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
 
             {/* Nav tabs */}
             <nav className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 px-2">
-              <a
+              <Link
                 href="/players"
                 className={navClass("players")}
               >
                 {resolvedActiveTab === "players" ? "◆" : "◇"} Players
-              </a>
+              </Link>
               <span className="nav-divider text-ledger-rule-light">|</span>
               <a
                 href="/teams"
