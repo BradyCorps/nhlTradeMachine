@@ -12,7 +12,7 @@ import {
   getShutdownDPedigree,
 } from "@/app/lib/player-data";
 import { FRANCHISE, SEASON } from "@/app/lib/season-config";
-import { calcNAV } from "@/app/lib/xnav-engine";
+import { calculateAssetNAV } from "@/app/lib/asset-nav";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
 import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import Header from "@/app/components/Header";
@@ -66,6 +66,7 @@ interface Player {
   assistsPace?: number | null;
   plusMinus?: number | null;
   capHit: number;
+  capCeiling?: number;
   yearsRemaining: number;
   hasNMC?: boolean;
   hasNTC?: boolean;
@@ -168,14 +169,7 @@ function ArchetypeBadge({ player }: { player: Player }) {
 }
 
 function PlayerIconBadges({ player }: { player: Player }) {
-  const position = player.position === "D" || player.position === "G" || player.position === "C" ? player.position : "W";
-  const xnav = useMemo(() => calcNAV({
-    ...(player as any),
-    position,
-    capCeiling: SEASON.capCeiling,
-    defRate: player.defRate ?? 0.08,
-    games: player.games ?? 40,
-  }), [player, position]);
+  const xnav = useMemo(() => calculateAssetNAV(player), [player]);
 
   const prospectTier = getProspectTier(player.name);
   const pedigree = getPlayerPedigree(player.name);
@@ -523,6 +517,7 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
               avgTOI:         player.avgTOI,
               qocIndex:       player.qocIndex,
               baselinePtsPace: player.baselinePtsPace ?? undefined,
+              capCeiling: player.capCeiling,
               pkTimeShare:    player.pkTimeShare ?? undefined,
               hdFinishingDelta: player.hdFinishingDelta ?? undefined,
               ops:            player.ops ?? undefined,
@@ -968,7 +963,9 @@ export default function PlayersPage() {
       }),
     ])
       .then(([td, pd]) => {
-        const nextPlayers = (pd.players ?? []).filter((p: Player) => p.position !== "Pick");
+        const nextPlayers = (pd.players ?? [])
+          .filter((p: Player) => p.position !== "Pick")
+          .map((p: Player) => ({ ...p, capCeiling: td.capCeiling }));
         const nextTeams = td.teams ?? [];
         if (!Array.isArray(nextPlayers) || !Array.isArray(nextTeams)) throw new Error("API returned invalid league payload");
         setPlayers(nextPlayers);

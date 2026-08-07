@@ -23,14 +23,21 @@ export function teamCacheKey(capCeiling: number): string {
   return `${TRADE_TEAMS_CACHE_KEY}:cap:${capCeiling.toFixed(1)}`;
 }
 
+export function leagueTeamCacheKey(capCeiling: number): string {
+  return `${LEAGUE_TEAMS_CACHE_KEY}:cap:${capCeiling.toFixed(1)}`;
+}
+
 export function teamCacheKeys(...capCeilings: number[]): string[] {
   return Array.from(new Set([
     LEAGUE_TEAMS_CACHE_KEY,
     TRADE_TEAMS_CACHE_KEY,
     LEAGUE_PLAYERS_CACHE_KEY,
     LEAGUE_TEAMS_PAYLOAD_CACHE_KEY,
+    leagueTeamCacheKey(SEASON.capCeiling),
+    leagueTeamCacheKey(LEGACY_CURATED_CAP_CEILING),
     teamCacheKey(SEASON.capCeiling),
     teamCacheKey(LEGACY_CURATED_CAP_CEILING),
+    ...capCeilings.map(leagueTeamCacheKey),
     ...capCeilings.map(teamCacheKey),
   ]));
 }

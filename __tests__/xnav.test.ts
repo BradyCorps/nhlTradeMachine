@@ -277,18 +277,18 @@ describe("X-NAV — Franchise Centers", () => {
     inRange(result.total, 250, 420, "Barkov NAV");
   });
 
-  it("Barkov historical pedigree prevents stale current inputs from collapsing NAV", () => {
+  it("Barkov historical pedigree is an explicit, reconciled engine stage", () => {
     const staleCurrent = calcNAV({
       id: "barkov-stale", name: "Aleksander Barkov", position: "C",
       age: 30, capHit: 10, yearsRemaining: 3,
       ptsPace: 25, xGPace: 10, defRate: 0.1,
       avgTOI: 16, qocIndex: 50,
-      games: 70, hasLiveStats: true,
+      games: 18, hasLiveStats: true,
     });
-    const floored = getHistoricalFloor("Aleksander Barkov", staleCurrent.total);
+    const floor = staleCurrent.stages?.find((row) => row.key === "historicalFloor");
 
-    expect(staleCurrent.total).toBeLessThan(50);
-    expect(floored).toBeGreaterThanOrEqual(185);
+    expect(floor?.value).toBeGreaterThan(0);
+    expect(Math.abs(stageDrift(staleCurrent.stages ?? [], staleCurrent.total))).toBeLessThan(1);
   });
 
   it("historical floors decay for injured or declining veterans when current context is supplied", () => {

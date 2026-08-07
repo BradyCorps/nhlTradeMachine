@@ -114,6 +114,7 @@ describe("Canary — NHL EDGE usage and presentation", () => {
     const players = read("app/players/page.tsx");
     const armchair = readArmchairAll();
     const card = read("app/components/PercentileCard.tsx");
+    const assetNav = read("app/lib/asset-nav.ts");
 
     expect(capture).toContain("hdFinishingDelta: edge.facts.hdFinishingDelta");
     expect(capture).toContain("export async function latestEdgeSignalMap");
@@ -134,9 +135,10 @@ describe("Canary — NHL EDGE usage and presentation", () => {
     expect(players).toContain('{ label: "EDGE HD"');
     expect(players).toContain("NHL EDGE high-danger finishing vs league average");
     expect(players).toContain("hdFinishingDelta: player.hdFinishingDelta ?? undefined");
-    // The card spreads the full player into calcNAV (EDGE fields included)
-    // and renders the EDGE HD finishing read on the plate.
-    expect(card).toContain("...(player as any)");
+    // The shared adapter preserves the full player payload (EDGE fields
+    // included), and the card renders the EDGE HD finishing read on the plate.
+    expect(card).toContain("calculateAssetNAV(player)");
+    expect(assetNav).toContain("...asset");
     expect(card).toContain("hdFinishingDelta");
     expect(armchair).toContain("NHL EDGE HD");
     expect(armchair).toContain("computeTeamEdgeProfile");
@@ -303,8 +305,9 @@ describe("Canary — league cache keys", () => {
     const league = read("app/api/league/route.ts");
     const teams = read("app/api/league/teams/route.ts");
     const teamCache = read("app/lib/team-cache.ts");
-    expect(league).toContain("LEAGUE_TEAMS_CACHE_KEY");
+    expect(league).toContain("leagueTeamCacheKey(capCeiling)");
     expect(teams).toContain("teamCacheKey(capCeiling)");
+    expect(teamCache).toContain("export function leagueTeamCacheKey");
     expect(teamCache).toContain('"cache:league:teams:v1"');
     expect(teamCache).toContain('"cache:trade:teams:v1"');
     expect(league).not.toContain('"cache:teams"');
@@ -435,7 +438,9 @@ describe("Canary — trade block mechanics", () => {
 
   it("evaluate route passes tradeBlockStatus through to the engine", () => {
     const src = read("app/api/evaluate/route.ts");
-    expect(src).toContain("tradeBlockStatus: asset.tradeBlockStatus");
+    const adapter = read("app/lib/asset-nav.ts");
+    expect(src).toContain("calculateAssetNAV(asset, capCeiling)");
+    expect(adapter).toContain("...asset");
   });
 
   it("evaluate route does not protect elite assets that are being shopped", () => {
@@ -1173,15 +1178,17 @@ describe("Canary — Batch 5 UI state robustness", () => {
 
 describe("Canary — evaluate route historical NAV floors", () => {
   const evaluateRoute = read("app/api/evaluate/route.ts");
+  const adapter = read("app/lib/asset-nav.ts");
+  const engine = read("app/lib/xnav-engine.ts");
 
-  it("applies the pedigree floor to talent, preserving contract drag and booking the lift to upside", () => {
-    expect(evaluateRoute).toContain("getHistoricalFloor");
-    // Floor talent (total − cap), not the bottom line, so a pedigree lift can't
-    // cancel a toxic contract; the cap component stays honest.
-    expect(evaluateRoute).toContain("const talent = result.total - contractDrag");
-    expect(evaluateRoute).toContain("getHistoricalFloor(asset.name, talent, asset)");
-    expect(evaluateRoute).toContain("total: liftedTotal");
-    expect(evaluateRoute).toContain("upside: (result.upside ?? 0) + (liftedTotal - result.total)");
+  it("uses one raw-asset adapter and books the pedigree floor inside the engine", () => {
+    expect(evaluateRoute).toContain("calculateAssetNAV");
+    expect(evaluateRoute).not.toContain("getHistoricalFloor");
+    expect(adapter).toContain("...asset");
+    expect(adapter).toContain("return calcNAV(toAssetInput(asset, capCeiling))");
+    expect(engine).toContain("const split = navSplit(result.stages, result.total)");
+    expect(engine).toContain('stage("historicalFloor", "Historical pedigree floor", lift, "adjustment")');
+    expect(engine).toContain("applyTradeRequestDiscount(applyHistoricalPedigreeFloor(result, asset), asset)");
   });
 });
 
@@ -1498,6 +1505,7 @@ describe("Canary — Batch 6 audit fixes", () => {
     const teams = read("app/api/league/teams/route.ts");
     const page = read("app/admin/settings/page.tsx");
     const capSettings = read("app/lib/cap-settings.ts");
+    const liveCapSettings = read("app/lib/live-cap-settings.ts");
     expect(src).toContain("validateCapValue");
     expect(src).toContain("isValidCapFloor(value)");
     expect(src).toContain("value > MAX_CAP_CEILING");
@@ -1512,12 +1520,12 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(teamCache).toContain("teamCacheKey(SEASON.capCeiling)");
     expect(teamCache).toContain("teamCacheKey(LEGACY_CURATED_CAP_CEILING)");
     expect(evaluate).toContain("const MAX_CAP_CEILING = maxCapCeiling()");
-    expect(evaluate).toContain("isValidCapCeiling(requestCapCeiling)");
-    expect(evaluate).toContain("parseStoredCapCeiling(row?.value, SEASON.capCeiling) ?? SEASON.capCeiling");
-    expect(teams).toContain("siteSettings");
-    expect(teams).toContain("const getLiveCapCeiling = async ()");
-    expect(teams).toContain('r.key === "cap_ceiling"');
-    expect(teams).toContain("parseStoredCapCeiling(row?.value, SEASON.capCeiling) ?? SEASON.capCeiling");
+    expect(evaluate).toContain("getLiveCapCeiling(body.capCeiling)");
+    expect(teams).toContain("getLiveCapCeiling");
+    expect(liveCapSettings).toContain("isValidCapCeiling(requested)");
+    expect(liveCapSettings).toContain('readSetting("cap_ceiling")');
+    expect(liveCapSettings).toContain("parseStoredCapCeiling(");
+    expect(liveCapSettings).toContain("SEASON.capCeiling");
     // Cap space = curated static room shifted by the ceiling delta (Decision A),
     // NOT a naive sum of all contract rows (which overstated used cap → false negatives).
     // Decision A is unchanged; it moved into a shared module because the other
@@ -1979,12 +1987,14 @@ describe("Canary — ship-readiness infrastructure", () => {
 
 describe("Canary — G4 model propagation", () => {
   it("evaluate route cannot silently drop the gravity NZ-well input again", () => {
-    // AssetInput declares edgeOzPct, and the evaluate route's field-by-field
-    // adapter maps it — the drift class behind the Fox home-vs-analytics bug.
+    // AssetInput declares edgeOzPct, and the canonical raw-asset adapter
+    // preserves it — the drift class behind the Fox home-vs-analytics bug.
     const engine = read("app/lib/xnav-engine.ts");
     const evaluate = read("app/api/evaluate/route.ts");
+    const adapter = read("app/lib/asset-nav.ts");
     expect(engine).toContain("edgeOzPct?: number | null;");
-    expect(evaluate).toContain("edgeOzPct: asset.edgeOzPct");
+    expect(evaluate).toContain("calculateAssetNAV");
+    expect(adapter).toContain("...asset");
   });
 
   it("season simulator feels gravity and speaks modern roles", () => {
@@ -3913,7 +3923,7 @@ describe("Canary — CXH6 the payroll range is checked the same way at both ends
     // There is a cap_floor override in admin settings and this route ignored
     // it, so raising the ceiling left the two ends describing different leagues.
     expect(route).toContain("getLiveCapFloor");
-    expect(route).toContain('r.key === "cap_floor"');
+    expect(read("app/lib/live-cap-settings.ts")).toContain('readSetting("cap_floor")');
     expect(route).toContain("await getLiveCapFloor()");
   });
 

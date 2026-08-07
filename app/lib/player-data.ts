@@ -1,7 +1,8 @@
 // app/lib/player-data.ts
 // ── Single source of truth for all player pedigree data ────────────────────
-// Both evaluate/route.ts and trade/page.tsx import from here.
-// Merged from both files — 87 canonical PLAYER_PEDIGREE entries.
+// The canonical X-NAV engine imports the historical-floor policy from here;
+// public routes and components must not apply a second local floor.
+// Merged from earlier route/UI copies — 87 canonical PLAYER_PEDIGREE entries.
 //
 // UPDATE SCHEDULE:
 //   PLAYER_PEDIGREE:    add new stars as they emerge

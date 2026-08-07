@@ -6,7 +6,7 @@
 import React, { useMemo, useRef, useCallback, useState } from "react";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
-import { calcNAV } from "@/app/lib/xnav-engine";
+import { calculateAssetNAV } from "@/app/lib/asset-nav";
 import { computeGravity } from "@/app/lib/gravity";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
 import { FieldDiagram } from "@/app/components/GravityField";
@@ -56,6 +56,7 @@ interface PlayerData {
   goalsPace?: number | null;
   assistsPace?: number | null;
   capHit: number;
+  capCeiling?: number;
   yearsRemaining: number;
   hasLiveStats?: boolean;
   baselinePtsPace?: number | null;
@@ -191,15 +192,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       });
     }
 
-    const position = player.position === "D" || player.position === "G" || player.position === "C"
-      ? player.position : "W";
-    const nav = calcNAV({
-      ...(player as any),
-      position,
-      capCeiling: SEASON.capCeiling,
-      defRate: player.defRate ?? 0.08,
-      games: player.games ?? 40,
-    });
+    const nav = calculateAssetNAV(player);
 
     return { percentiles: pcts, xnav: nav };
   }, [player, allPlayers, posGroup, statDefs]);
