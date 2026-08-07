@@ -42,7 +42,7 @@ thin. Make reliability coverage-constrained so zero evidence cannot produce a
 medium score. Recalibrate tiers from an authorized qualified population and
 remove unsupported cross-position percentile claims.
 
-### [ ] PL-4 — Upgrade to a supported Next.js release
+### [x] PL-4 — Upgrade to a supported Next.js release
 
 Migrate Next.js 14 to an Active or Maintenance LTS release in a dedicated PR.
 Clear all critical/high production advisories and rerun the complete test,
