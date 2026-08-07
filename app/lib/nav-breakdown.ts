@@ -133,7 +133,7 @@ export const NAV_STAGE_DESC: Record<string, string> = {
   off: "On-ice offence — scoring, expected goals, production.",
   def: "On-ice defence as the valuation used it. The DEF rating shown on the STRAND rails is a different, descriptive blend.",
   age: "Age curve — a youth premium or a decline discount on projected value.",
-  grav: "Gravity — the territorial residual left after the ordinary impact terms.",
+  grav: "Gravity — the separately gated territorial residual left after the ordinary impact terms.",
   cap: "Contract surplus — the gap between market value and what the club pays, including team-control rights.",
   multiplier: "A manually applied asset multiplier.",
   positional: "Positional scarcity — a centre or a genuine top-pair defenceman is harder to replace.",

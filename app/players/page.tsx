@@ -3,7 +3,7 @@ import PlayerTimeline from "@/app/components/PlayerTimeline";
 import { PlayerOutlook } from "@/app/components/PlayerOutlook";
 import { TierIcon } from "@/app/components/GravityField";
 import { gravityTierColor } from "@/app/lib/gravity";
-import { computeGravity } from "@/app/lib/gravity";
+import { gravityForDisplay } from "@/app/lib/gravity-channels";
 import type { DevelopmentProfile } from "@/app/lib/development-profile";
 import {
   getInjuryRisk,
@@ -177,7 +177,7 @@ function PlayerIconBadges({ player }: { player: Player }) {
   const shutdownPedigree = getShutdownDPedigree(player.name);
   const gravProfile = useMemo(() => {
     if (player.position === "G" || (player.games ?? 0) < 10) return null;
-    return computeGravity(player as any);
+    return gravityForDisplay(player as any);
   }, [player]);
   const gravTier = gravProfile?.tier;
   const showGravBadge = gravTier === "SUPERMASSIVE" || gravTier === "STAR";

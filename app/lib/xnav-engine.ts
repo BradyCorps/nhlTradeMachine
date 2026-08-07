@@ -21,7 +21,7 @@ import {
 } from "@/app/lib/skater-fmv";
 import { skaterSeasonPrior } from "@/app/lib/skater-prior";
 import type { FArchetype } from "@/app/lib/trade-types";
-import { computeGravity } from "@/app/lib/gravity";
+import { gravityForXnav } from "@/app/lib/gravity-channels";
 import { getHistoricalFloor } from "@/app/lib/player-data";
 
 export const DPS_NAV_MULTIPLIER = 15; // dps * 15 = defPS for NAV (not 120 — the *8 bug is removed)
@@ -986,7 +986,7 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   // existing X-NAV components. Gravity v4 is intentionally not imported
   // here and cannot affect X-NAV before its separate validation gates pass.
   let gravTotal = 0;
-  const gravProfile = computeGravity(asset as any);
+  const gravProfile = gravityForXnav(asset as any);
   if (gravProfile && games >= 20) {
     gravTotal = clamp(gravProfile.navResidual * 45, -20, 20);
   }

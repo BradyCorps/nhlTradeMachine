@@ -156,7 +156,9 @@ export default function GlossaryPage() {
               current-versus-baseline on-off agreement, with a legacy defenseman pair-driver
               adjustment; it is not a fitted portability model. The public situation label is
               MIXED SITUATIONS because v3 combines all-situations, 5v5, 5-on-4, 4-on-5, and
-              regular-season EDGE aggregate inputs.
+              regular-season EDGE aggregate inputs. Public display, X-NAV contribution, and
+              simulation contribution are independent release channels and are off in the
+              public-launch baseline.
             </p>
           </section>
 

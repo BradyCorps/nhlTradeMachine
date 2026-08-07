@@ -14,8 +14,6 @@ import type { OffseasonPending } from "@/app/lib/free-agency";
 import { getOfferSheetCompensation } from "@/app/lib/free-agency";
 import StrandView from "@/app/components/StrandView";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
-import { computeGravity } from "@/app/lib/gravity";
-import { CompactGravity } from "@/app/components/GravityField";
 import { formatCapHit as money } from "@/app/lib/display-utils";
 import {
   ZERO_XNAV, StatLine, ExpandedStats, Terms, PlayerMeta, AnalyticsDisclosure,

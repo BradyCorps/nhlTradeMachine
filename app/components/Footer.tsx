@@ -54,11 +54,11 @@ export const methodologySections: MethodologySection[] = [
     title: "Player Valuation",
     intro: "How the app turns a player, contract, and role into tradeable asset value.",
     items: [
-      { term: "X-NAV", definition: "Extended Net Asset Value: the Ledger's skater trade-value model. Offense, defense, gravity, age curve, contract surplus, deployment, Point Shares, and role context priced into one number." },
+      { term: "X-NAV", definition: "Extended Net Asset Value: the Ledger's skater trade-value model. Offense, defense, age curve, contract surplus, deployment, Point Shares, and role context priced into one number; Gravity is a separately gated experimental term." },
       { term: "G-NAV", definition: "X-NAV for goalies. Built around GSAx, workload, save profile, team defensive context, age, and contract surplus." },
       { term: "Prospect NAV", definition: "Pre-NHL value comes from draft pedigree and stored NHLe production. No-signal ELC players do not receive automatic cap or age value." },
       { term: "OFF / DEF", definition: "On-ice components: offensive production and creation on one side, suppression and defensive value on the other, each judged against position." },
-      { term: "GRAV", definition: "The X-NAV handoff from Gravity v3. It contains only the bounded neutral-zone transition proxy; direct offense and defensive suppression are valued elsewhere." },
+      { term: "GRAV", definition: "The separately gated X-NAV handoff from Gravity v3. When enabled, it contains only the bounded neutral-zone transition proxy; it is off in the public-launch baseline." },
       { term: "Modelled Field", definition: "The warped rink is a visualization generated from three model components. It is not an observed tracking heatmap or a map of puck trajectories." },
       { term: "Signal Stability", definition: "A v3 heuristic based mainly on current-versus-baseline on-off agreement, with a legacy defenseman pair-driver adjustment. It does not estimate portability." },
       { term: "Reliability", definition: "A 0–100 v3 sample, stability, and data-coverage index. It is not a calibrated probability." },

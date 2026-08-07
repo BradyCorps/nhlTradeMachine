@@ -10,7 +10,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
-import { computeGravity } from "@/app/lib/gravity";
+import { gravityForDisplay } from "@/app/lib/gravity-channels";
 import { loadGravityProfileV4 } from "@/app/lib/gravity-v4/load-profile";
 import { GRAVITY_V4_RUNTIME_ARTIFACT } from "@/app/lib/gravity-v4/runtime-artifact";
 import { SEASON } from "@/app/lib/season-config";
@@ -112,7 +112,7 @@ export default async function PlayerPage({ params }: { params: { playerId: strin
     ? gravityV4Lookup.profile
     : null;
   const gravityV3 = player.position !== "G" && !gravityV4
-    ? computeGravity(player)
+    ? gravityForDisplay(player)
     : null;
   const roles = derivePlayerRoles(player);
   const comparePeers = buildComparePeers(roster.players as any[], player);

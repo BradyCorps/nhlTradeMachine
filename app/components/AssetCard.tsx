@@ -3,7 +3,8 @@
 import React from "react";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
-import { computeGravity, gravityTierColor } from "@/app/lib/gravity";
+import { gravityTierColor } from "@/app/lib/gravity";
+import { gravityForDisplay } from "@/app/lib/gravity-channels";
 import GravityField, { CompactGravity, TierIcon } from "@/app/components/GravityField";
 import { PlayerOutlook } from "@/app/components/PlayerOutlook";
 import { getPlayerPedigree } from "@/app/lib/player-data";
@@ -66,7 +67,7 @@ export default function AssetCard({
   // from. A tab that opens onto nothing is worse than no tab.
   const gravProfile = React.useMemo(() => {
     if (isPick || asset.position === "G" || (asset.games ?? 0) < 10) return null;
-    return computeGravity(asset as any);
+    return gravityForDisplay(asset as any);
   }, [asset, isPick]);
   const gravTier = gravProfile?.tier;
   const showGravBadge = gravTier === "SUPERMASSIVE" || gravTier === "STAR";

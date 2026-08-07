@@ -10,7 +10,9 @@ import { computeRosterStrand } from "@/app/lib/roster-strand";
 import TeamStrand, { type TeamStrandData } from "@/app/components/TeamStrand";
 import { lineupContributionScore } from "@/app/lib/lineup-ranking";
 import { displayPosition } from "@/app/lib/display-position";
-import { computeGravity, type GravityProfile } from "@/app/lib/gravity";
+import type { GravityProfile } from "@/app/lib/gravity";
+import { gravityForDisplay } from "@/app/lib/gravity-channels";
+import { isGravityV3DisplayEnabled } from "@/app/lib/gravity-feature-flags";
 import GravityField from "@/app/components/GravityField";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 
@@ -55,6 +57,7 @@ interface TeamData {
 }
 
 type SortKey = "division" | "standing" | "present" | "future" | "rosterNAV" | "capSpace" | "goalDiff" | "gravity" | "speed" | "name";
+const GRAVITY_DISPLAY_ENABLED = isGravityV3DisplayEnabled();
 
 const CONFERENCE_ORDER = ["Eastern", "Western"] as const;
 const DIVISION_ORDER: Record<string, string[]> = {
@@ -832,7 +835,7 @@ export default function TeamsPage() {
 
       const gravityLeaders = roster
         .map((p) => {
-          const g = computeGravity(p);
+          const g = gravityForDisplay(p);
           return g ? { name: p.name, profile: g } : null;
         })
         .filter((g): g is GravityLeader => g !== null)
@@ -974,7 +977,7 @@ export default function TeamsPage() {
             ["rosterNAV", "NAV"],
             ["capSpace", "Cap Space"],
             ["goalDiff", "Goal Diff"],
-            ["gravity", "Gravity"],
+            ...(GRAVITY_DISPLAY_ENABLED ? [["gravity", "Gravity"] as [SortKey, string]] : []),
             ["speed", "Speed"],
             ["name", "Name"],
           ] as [SortKey, string][]).map(([key, label]) => (

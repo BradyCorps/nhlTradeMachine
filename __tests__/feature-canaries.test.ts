@@ -1986,6 +1986,37 @@ describe("Canary — ship-readiness infrastructure", () => {
 });
 
 describe("Canary — G4 model propagation", () => {
+  it("routes every public v3 field through the display-only channel", () => {
+    const displaySources = [
+      "app/players/page.tsx",
+      "app/players/[playerId]/page.tsx",
+      "app/teams/page.tsx",
+      "app/components/AssetCard.tsx",
+      "app/components/OffseasonPlayerAnalytics.tsx",
+      "app/components/PercentileCard.tsx",
+      "app/components/TrendingPlayers.tsx",
+    ];
+    for (const source of displaySources) {
+      const src = read(source);
+      expect(src, source).toContain("gravityForDisplay");
+      expect(src, source).not.toContain("computeGravity(");
+    }
+    expect(read("app/api/card-image/route.tsx")).toContain("isGravityV3DisplayEnabled");
+  });
+
+  it("keeps X-NAV and simulation on different fail-closed channels", () => {
+    const engine = read("app/lib/xnav-engine.ts");
+    const sim = read("app/api/simulate/route.ts");
+    const flags = read("app/lib/gravity-feature-flags.ts");
+    expect(engine).toContain("gravityForXnav");
+    expect(engine).not.toContain("gravityForSimulation");
+    expect(sim).toContain("gravityForSimulation");
+    expect(sim).not.toContain("gravityForXnav");
+    expect(flags).toContain("NEXT_PUBLIC_GRAVITY_V3_DISPLAY_ENABLED");
+    expect(flags).toContain("NEXT_PUBLIC_GRAVITY_V3_XNAV_ENABLED");
+    expect(flags).toContain("GRAVITY_V3_SIMULATION_ENABLED");
+  });
+
   it("evaluate route cannot silently drop the gravity NZ-well input again", () => {
     // AssetInput declares edgeOzPct, and the canonical raw-asset adapter
     // preserves it — the drift class behind the Fox home-vs-analytics bug.
@@ -1997,12 +2028,13 @@ describe("Canary — G4 model propagation", () => {
     expect(adapter).toContain("...asset");
   });
 
-  it("season simulator feels gravity and speaks modern roles", () => {
+  it("keeps simulated Gravity behind its own channel and speaks modern roles", () => {
     const sim = read("app/api/simulate/route.ts");
-    // Team strength includes the zone-mass on-ice term…
-    expect(sim).toContain("simOnIceDelta");
-    expect(sim).toContain("computeGravity");
+    const channels = read("app/lib/gravity-channels.ts");
+    // Team strength reaches the zone-mass term only through the simulation gate.
+    expect(sim).toContain("gravityForSimulation");
     expect(sim).toContain("gravityDelta(p)");
+    expect(channels).toContain("isGravityV3SimulationEnabled");
     // …and traded-player outcomes carry evidence-derived role labels.
     expect(sim).toContain("derivePlayerRoles");
     // The sim-side term lives in the gravity engine, one formula, one place.
@@ -3117,7 +3149,7 @@ describe("Canary — RL3 trade-card tabs", () => {
 
   it("computes gravity once rather than per render site", () => {
     const card = read("app/components/AssetCard.tsx");
-    const calls = card.match(/computeGravity\(/g) ?? [];
+    const calls = card.match(/gravityForDisplay\(/g) ?? [];
     expect(calls.length).toBe(1);
   });
 });

@@ -7,7 +7,7 @@
 // without constant test updates. They're floor/ceiling guards,
 // not precision assertions.
 
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { calcNAV, calcDeploymentMultiplier, calcGoalieNAV, calcPickNAV, calcProspectNAV, calcSkaterNAV, currentSeasonWeight, classifyForwardArchetype, classifyRosterTier } from "../app/lib/xnav-engine";
 import { getHistoricalFloor } from "../app/lib/player-data";
 import { stageDrift } from "../app/lib/nav-breakdown";
@@ -1152,6 +1152,14 @@ describe("forward archetype", () => {
 });
 
 describe("X-NAV — Gravity Release A boundary", () => {
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_GRAVITY_V3_XNAV_ENABLED", "true");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   const base = {
     id: "gravity-boundary",
     name: "Gravity Boundary",

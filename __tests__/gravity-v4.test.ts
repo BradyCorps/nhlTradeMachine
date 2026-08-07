@@ -148,10 +148,10 @@ describe("Gravity v4 display and validation", () => {
 });
 
 describe("Gravity v4 runtime loader and feature flag", () => {
-  it("is off by default and enables only for the explicit true value", () => {
+  it("is release-locked off even when the environment requests it", () => {
     expect(isGravityV4Enabled({})).toBe(false);
     expect(isGravityV4Enabled({ GRAVITY_V4_ENABLED: "false" })).toBe(false);
-    expect(isGravityV4Enabled({ GRAVITY_V4_ENABLED: "true" })).toBe(true);
+    expect(isGravityV4Enabled({ GRAVITY_V4_ENABLED: "true" })).toBe(false);
   });
 
   it("loads a fitted profile by stable ID and exact season", () => {

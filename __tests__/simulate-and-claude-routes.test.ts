@@ -690,6 +690,14 @@ describe("claude narrative route contract", () => {
 // input identical except the on-ice fields, with a fixed seed, so any
 // difference in output IS the propagation.
 describe("simulate route — G4 gravity and role propagation", () => {
+  beforeEach(() => {
+    vi.stubEnv("GRAVITY_V3_SIMULATION_ENABLED", "true");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   // The on-ice block of a heavy shutdown profile: big suppression, PK
   // trust, tough zone starts. Gravity-positive; barely moves pts pace.
   const shutdownFields = {
