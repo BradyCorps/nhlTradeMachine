@@ -105,6 +105,7 @@ export default function PastePanel({ onSaved, known = [] }: {
         added?: number; updated?: number;
         reconciledEntries?: string[]; ambiguousEntries?: string[];
         extensionsRecorded?: string[]; extensionNeedsPlayer?: string[];
+        writeConflicts?: string[];
       }>(res, "Save failed");
       // The endpoint reconciles spellings of its own accord too. Say so — a
       // silent reconciliation reads exactly like a duplicate from out here.
@@ -120,6 +121,9 @@ export default function PastePanel({ onSaved, known = [] }: {
           : null,
         (data.extensionNeedsPlayer?.length ?? 0) > 0
           ? `${data.extensionNeedsPlayer!.length} future deal(s) skipped — add the player first: ${data.extensionNeedsPlayer!.join("; ")}`
+          : null,
+        (data.writeConflicts?.length ?? 0) > 0
+          ? `${data.writeConflicts!.length} not written: ${data.writeConflicts!.join("; ")}`
           : null,
       ].filter(Boolean);
       setResult([`${data.added ?? 0} added · ${data.updated ?? 0} updated`, ...extra].join(" · "));

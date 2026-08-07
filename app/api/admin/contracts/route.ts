@@ -617,6 +617,7 @@ export async function PUT(req: Request) {
   const ambiguousEntries: string[] = [];
   const extensionsRecorded: string[] = [];
   const extensionNeedsPlayer: string[] = [];
+  const writeConflicts: string[] = [];
   const metadataMisses: string[] = [];
   const watchNames = new Set(["aatu raty", "brad lambert"]);
   const watch: Record<string, any> = {};
@@ -644,14 +645,19 @@ export async function PUT(req: Request) {
       if (target.retired) continue;
       const extYears = Number.isFinite(Number(cw.extensionYears)) && Number(cw.extensionYears) > 0
         ? Math.round(Number(cw.extensionYears)) : 1;
-      await db.update(playersTable).set({
+      const written = await db.update(playersTable).set({
         extensionCapHit: extCapHit,
         extensionYears: extYears,
         extensionSignedAt: typeof cw.extensionSignedAt === "string"
           && /^\d{4}-\d{2}-\d{2}$/.test(cw.extensionSignedAt)
           ? cw.extensionSignedAt
           : new Date().toISOString().slice(0, 10),
-      }).where(eq(playersTable.id, target.id));
+      }).where(eq(playersTable.id, target.id))
+        .returning({ id: playersTable.id });
+      if (written.length !== 1) {
+        writeConflicts.push(`${key} — current player changed before the extension could be written`);
+        continue;
+      }
       extensionsRecorded.push(`${key} — $${extCapHit}M × ${extYears}${cw.extensionStartsIn ? ` from ${cw.extensionStartsIn}` : ""}`);
       continue;
     }
@@ -735,13 +741,19 @@ export async function PUT(req: Request) {
         updates.expiryYear = expiryYear;
       }
 
-      await db.update(playersTable).set(updates).where(eq(playersTable.id, current.id));
+      const written = await db.update(playersTable).set(updates)
+        .where(eq(playersTable.id, current.id))
+        .returning({ id: playersTable.id });
+      if (written.length !== 1) {
+        writeConflicts.push(`${key} — existing player changed before the contract could be written`);
+        continue;
+      }
       updatedEntries.push(key);
       updated++;
       continue;
     }
 
-    await db.insert(playersTable).values({
+    const inserted = await db.insert(playersTable).values({
       id,
       name:           key,
       position:       values.position,
@@ -754,7 +766,13 @@ export async function PUT(req: Request) {
       expiryStatus:   values.expiryStatus,
       expiryYear:     values.expiryYear,
       source:         "sync",
-    }).onConflictDoNothing();
+    }).onConflictDoNothing()
+      .returning({ id: playersTable.id });
+
+    if (inserted.length !== 1) {
+      writeConflicts.push(`${key} — player id ${id} already exists`);
+      continue;
+    }
 
     newEntries.push(key);
     added++;
@@ -776,8 +794,11 @@ export async function PUT(req: Request) {
       if (!hit?.position) continue;
       const upd: Record<string, any> = { position: hit.position };
       if (hit.teamId && !isValidTeamId(r.teamId)) upd.teamId = hit.teamId;
-      await db.update(playersTable).set(upd).where(eq(playersTable.id, r.id)).catch(() => {});
-      positionsBackfilled++;
+      const written = await db.update(playersTable).set(upd)
+        .where(eq(playersTable.id, r.id))
+        .returning({ id: playersTable.id })
+        .catch(() => []);
+      positionsBackfilled += written.length;
     }
   }
 
@@ -801,6 +822,7 @@ export async function PUT(req: Request) {
       // than written over the contract the player is currently on.
       extensionsRecorded,
       extensionNeedsPlayer,
+      writeConflicts,
       metadataMisses: metadataMisses.slice(0, 25),
       metadataMissCount: metadataMisses.length,
       watch,
