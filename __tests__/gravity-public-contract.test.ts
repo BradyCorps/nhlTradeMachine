@@ -12,14 +12,14 @@ import {
   gravityV3PublicPresentation,
 } from "@/app/lib/gravity";
 
-function profile() {
+function profile(games = 72) {
   return computeGravity({
     id: "8478402",
     name: "Contract Test",
     teamId: "TST",
     position: "C",
     age: 26,
-    games: 72,
+    games,
     ptsPace: 80,
     goalsPace: 30,
     assistsPace: 50,
@@ -117,6 +117,39 @@ describe("Gravity Release A public contract", () => {
       expect(result.data).toEqual(payload);
       expect(result.data.gravity?.modelVersion).toBe("3.0");
     }
+  });
+
+  it("forces tier and percentile to null when v3 evidence is insufficient", () => {
+    const gravity = cardGravityFromV3(profile(19), {
+      season: "2025-26",
+      gravityPercentile: 88,
+    });
+    const result = validatePublicCardImagePayload({
+      ...validCardPayload(),
+      gravity,
+    });
+
+    expect(gravity.evidenceStatus).toBe("INSUFFICIENT");
+    expect(gravity.tier).toBeNull();
+    expect(gravity.gravityPercentile).toBeNull();
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a forged tier or percentile on insufficient v3 evidence", () => {
+    const gravity = cardGravityFromV3(profile(19), {
+      season: "2025-26",
+      gravityPercentile: 88,
+    });
+    const result = validatePublicCardImagePayload({
+      ...validCardPayload(),
+      gravity: {
+        ...gravity,
+        tier: "STAR",
+        gravityPercentile: 88,
+      },
+    });
+
+    expect(result).toMatchObject({ success: false, code: "INVALID_PAYLOAD" });
   });
 
   it("rejects caller-supplied v4 Gravity values", () => {

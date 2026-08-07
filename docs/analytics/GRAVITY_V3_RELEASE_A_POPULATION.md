@@ -2,7 +2,8 @@
 
 Generated from the frozen raw cache at `2026-07-24T21:45:10.482Z`. This report
 documents aggregate inputs only. It does not calculate tier cutoffs or activate
-Gravity v4.
+Gravity v4. The later aggregate cutoff calculation is documented in
+`docs/analytics/GRAVITY_V3_TIER_CALIBRATION.md`.
 
 ## Population
 
@@ -16,7 +17,7 @@ Gravity v4.
 - Duplicate NHL IDs: **0**
 
 Eligibility is deliberately split: fewer than 10 GP is Gravity-ineligible,
-10–19 GP permits a provisional calculation but no league percentile/public
+10–19 GP permits a provisional calculation but no position percentile/public
 tier, and 20+ GP enters the calibration population.
 
 ## Source coverage

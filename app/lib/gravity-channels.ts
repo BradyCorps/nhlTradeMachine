@@ -28,7 +28,9 @@ export function gravityForXnav(
   asset: Asset,
   env?: GravityFeatureEnvironment,
 ): GravityProfile | null {
-  return isGravityV3XnavEnabled(env) ? computeGravity(asset) : null;
+  if (!isGravityV3XnavEnabled(env)) return null;
+  const profile = computeGravity(asset);
+  return profile?.evidenceStatus === "QUALIFIED" ? profile : null;
 }
 
 export function gravityForSimulation(

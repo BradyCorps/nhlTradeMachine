@@ -100,6 +100,34 @@ describe("Gravity release feature flags", () => {
     expect(gravityForSimulation(subject, simulationOnly)).not.toBe(0);
   });
 
+  it("keeps insufficient evidence out of X-NAV and simulation when enabled", () => {
+    const sparse = {
+      ...subject,
+      games: 60,
+      xgRelTM: undefined,
+      baselineXgRel: undefined,
+      baselineIxg82: undefined,
+      goalsPace: undefined,
+      assistsPace: undefined,
+      ppPtsPace82: undefined,
+      edgeOzPct: undefined,
+      edgeSpeedMaxMph: undefined,
+      edgeBurstsOver20: undefined,
+      xgaRelTM: undefined,
+      dps: undefined,
+      pkTimeShare: undefined,
+    };
+    const enabled = {
+      [GRAVITY_V3_DISPLAY_FEATURE_FLAG]: "true",
+      [GRAVITY_V3_XNAV_FEATURE_FLAG]: "true",
+      [GRAVITY_V3_SIMULATION_FEATURE_FLAG]: "true",
+    };
+
+    expect(gravityForDisplay(sparse, enabled)?.evidenceStatus).toBe("INSUFFICIENT");
+    expect(gravityForXnav(sparse, enabled)).toBeNull();
+    expect(gravityForSimulation(sparse, enabled)).toBe(0);
+  });
+
   it("keeps the public X-NAV baseline free of Gravity until its own flag is enabled", () => {
     vi.stubEnv(GRAVITY_V3_DISPLAY_FEATURE_FLAG, "true");
     vi.stubEnv(GRAVITY_V3_XNAV_FEATURE_FLAG, "false");

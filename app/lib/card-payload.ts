@@ -30,7 +30,8 @@ interface CardGravityBase {
 }
 
 export interface CardGravityV3Input extends CardGravityBase {
-  tier: GravityTier;
+  evidenceStatus: GravityProfile["evidenceStatus"];
+  tier: GravityTier | null;
   modelVersion: "3.0";
   modelLabel: "V3 FALLBACK";
   reliabilityLabel: string;
@@ -58,6 +59,7 @@ export function cardGravityFromV3(
   return {
     masses: profile.masses,
     tier: profile.tier,
+    evidenceStatus: profile.evidenceStatus,
     force: profile.force,
     isDefenseman: profile.isDefenseman,
     modelVersion: "3.0",
@@ -68,7 +70,9 @@ export function cardGravityFromV3(
     fieldDisclaimer: presentation.fieldDisclaimer,
     reliabilityLabel: `${presentation.reliability.index} INDEX`,
     coverageLabel: `${profile.dataQuality.toUpperCase()} · ${presentation.coverage.percent}% WEIGHT`,
-    gravityPercentile: context.gravityPercentile,
+    gravityPercentile: profile.evidenceStatus === "QUALIFIED"
+      ? context.gravityPercentile
+      : null,
   };
 }
 
@@ -167,7 +171,8 @@ const publicGravityV3Schema = z.object({
     nz: finiteBoundedMass,
     dz: finiteBoundedMass,
   }).strict(),
-  tier: gravityTierSchema,
+  evidenceStatus: z.enum(["QUALIFIED", "INSUFFICIENT"]),
+  tier: gravityTierSchema.nullable(),
   force: finiteBoundedMass,
   isDefenseman: z.boolean(),
   modelVersion: z.literal("3.0"),
@@ -179,7 +184,30 @@ const publicGravityV3Schema = z.object({
   gravityPercentile: percentileSchema,
   fieldLabel: z.literal(GRAVITY_V3_FIELD_LABEL),
   fieldDisclaimer: z.literal(GRAVITY_V3_FIELD_DISCLAIMER),
-}).strict();
+}).strict().superRefine((gravity, context) => {
+  if (gravity.evidenceStatus === "INSUFFICIENT") {
+    if (gravity.tier !== null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["tier"],
+        message: "Insufficient Gravity evidence cannot carry a tier.",
+      });
+    }
+    if (gravity.gravityPercentile !== null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["gravityPercentile"],
+        message: "Insufficient Gravity evidence cannot carry a percentile.",
+      });
+    }
+  } else if (gravity.tier === null) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["tier"],
+      message: "Qualified Gravity evidence requires a tier.",
+    });
+  }
+});
 
 const publicCardImagePayloadSchema = z.object({
   name: z.string().min(1),

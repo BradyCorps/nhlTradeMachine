@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import Link from "next/link";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
-import { gravityTierColor } from "@/app/lib/gravity";
+import { gravityPositionPercentile, gravityTierColor } from "@/app/lib/gravity";
 import type { GravityProfile, GravityTier } from "@/app/lib/gravity";
 import { gravityForDisplay } from "@/app/lib/gravity-channels";
 import { isGravityV3DisplayEnabled } from "@/app/lib/gravity-feature-flags";
@@ -99,6 +99,7 @@ interface RankedPlayer {
   nav: number;
   xnav: XNAVResult;
   gravity: GravityProfile | null;
+  gravityPercentile: number | null;
   teamName: string;
 }
 
@@ -127,7 +128,7 @@ export default function TrendingPlayers() {
           (p: PlayerData) => p.position !== "Pick" && p.position !== "G" && (p.games ?? 0) >= 20
         );
 
-        const results: RankedPlayer[] = players.map(p => {
+        const computed = players.map(p => {
           const xnav = calculateAssetNAV(p, td.capCeiling);
           const grav = gravityForDisplay(p as any);
           return {
@@ -138,6 +139,15 @@ export default function TrendingPlayers() {
             teamName: teamMap.get(p.teamId) ?? p.teamId,
           };
         });
+        const gravityPopulation = computed
+          .map(result => result.gravity)
+          .filter((profile): profile is GravityProfile => profile !== null);
+        const results: RankedPlayer[] = computed.map(result => ({
+          ...result,
+          gravityPercentile: result.gravity
+            ? gravityPositionPercentile(result.gravity, gravityPopulation)
+            : null,
+        }));
 
         setAllPlayers(results);
       } catch {
@@ -164,7 +174,10 @@ export default function TrendingPlayers() {
   const ranked = [...allPlayers]
     .sort(sort === "nav"
       ? (a, b) => b.nav - a.nav
-      : (a, b) => (b.gravity?.force ?? -999) - (a.gravity?.force ?? -999)
+      : (a, b) => (
+          (b.gravityPercentile ?? -1) - (a.gravityPercentile ?? -1)
+          || (b.gravity?.force ?? -1) - (a.gravity?.force ?? -1)
+        )
     )
     .slice(0, 10);
 
@@ -247,7 +260,7 @@ function PlayerCard({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
-  const { player: p, nav, xnav, gravity, teamName } = data;
+  const { player: p, nav, xnav, gravity, gravityPercentile, teamName } = data;
   const gp = p.games ?? 0;
   const goals = p.goalsPace != null ? seasonTotal(p.goalsPace, gp) : null;
   const assists = p.assistsPace != null ? seasonTotal(p.assistsPace, gp) : null;
@@ -297,13 +310,13 @@ function PlayerCard({
           </div>
         </div>
         <div className="ml-auto shrink-0 text-right">
-          {sortMode === "gravity" && gravity ? (
+          {sortMode === "gravity" ? (
             <>
               <div className="font-mono text-[18px] font-black leading-none" style={{ color: tierColor ?? "var(--ledger-ink)" }}>
-                {gravity.force.toFixed(2)}
+                {gravityPercentile ?? "—"}
               </div>
               <div className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
-                Force
+                {gravityPercentile != null ? "Position pct" : gravity ? "Insufficient" : "Unavailable"}
               </div>
             </>
           ) : (
@@ -393,7 +406,7 @@ function ExpandedPanel({
 }) {
   const traits = buildAssetTraits(p as any, xnav);
   const strandType = computeStrandType(traits.off, traits.def, p.ops ?? null, p.dps ?? null);
-  const tierColor = gravity ? gravityTierColor(gravity.tier) : undefined;
+  const tierColor = gravity?.tier ? gravityTierColor(gravity.tier) : undefined;
   const pos = displayPosition(p.position, p.secondaryPosition);
 
   const advancedStats = [
@@ -445,9 +458,9 @@ function ExpandedPanel({
                 Gravity Field
               </div>
               <div className="flex items-center gap-1.5">
-                <TierIcon tier={gravity.tier} size={14} />
+                {gravity.tier ? <TierIcon tier={gravity.tier} size={14} /> : null}
                 <span className="font-mono text-[9px] font-black uppercase" style={{ color: tierColor }}>
-                  {TIER_LABEL[gravity.tier]}
+                  {gravity.tier ? TIER_LABEL[gravity.tier] : "Insufficient evidence"}
                 </span>
               </div>
             </div>

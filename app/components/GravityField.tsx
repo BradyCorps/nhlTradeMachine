@@ -1,7 +1,7 @@
 "use client";
 // ── GravityField v3 — zone-mass rink diagram, tier icons, glossary ──
 // Renders the Spacetime engine's output: three zone masses (OZ well,
-// NZ well, DZ dome) on a rink strip, with force as the single currency.
+// NZ well, DZ dome) on a rink strip, with position-relative force.
 
 import React from "react";
 import {
@@ -171,12 +171,15 @@ function zoneContext(zone: keyof ZoneMasses, m: number, isD: boolean): ZoneConte
 // ── CompactGravity — inline force + tier badge ────────────────────────────
 
 function CompactGravity({ profile }: { profile: GravityProfile }) {
-  const color = gravityTierColor(profile.tier);
+  const tier = profile.tier;
+  const color = tier
+    ? gravityTierColor(tier)
+    : "var(--ledger-ink-faint)";
   return (
     <span
       className="inline-flex items-center gap-1.5 font-mono text-[10px]"
       role="text"
-      aria-label={`Gravity v3 modelled field: ${profile.force > 0 ? "+" : ""}${profile.force.toFixed(2)}, tier ${TIER_LABEL[profile.tier]}`}
+      aria-label={`Gravity v3 modelled field: ${profile.force > 0 ? "+" : ""}${profile.force.toFixed(2)}, ${tier ? `tier ${TIER_LABEL[tier]}` : "insufficient evidence for a public tier"}`}
     >
       <span className="font-black" style={{ color, fontVariantNumeric: "tabular-nums" }}>
         {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
@@ -185,8 +188,8 @@ function CompactGravity({ profile }: { profile: GravityProfile }) {
         className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.1em] px-1 py-px border"
         style={{ color, borderColor: color }}
       >
-        <TierIcon tier={profile.tier} size={12} />
-        {TIER_LABEL[profile.tier]}
+        {tier ? <TierIcon tier={tier} size={12} /> : null}
+        {tier ? TIER_LABEL[tier] : "Insufficient"}
       </span>
     </span>
   );
@@ -203,7 +206,7 @@ const clampViz = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo
 export interface GravityFieldDiagramProfile {
   force: number;
   masses: ZoneMasses;
-  tier: GravityTier;
+  tier: GravityTier | null;
   isDefenseman: boolean;
   reliability: number;
 }
@@ -219,9 +222,12 @@ function FieldDiagram({
   reliabilityLabel?: string;
   forceLabel?: string;
 }) {
-  const color = gravityTierColor(profile.tier);
+  const color = profile.tier
+    ? gravityTierColor(profile.tier)
+    : "var(--ledger-ink-faint)";
   const { oz, nz, dz } = profile.masses;
-  const displayedTier = tierLabel ?? TIER_LABEL[profile.tier];
+  const displayedTier = tierLabel
+    ?? (profile.tier ? TIER_LABEL[profile.tier] : "Insufficient evidence");
   const displayedReliability = reliabilityLabel
     ?? `${Math.round(profile.reliability * 100)} out of 100 reliability index`;
 
@@ -408,7 +414,9 @@ function FieldDiagram({
 // ── Zone component panel with qualifiers ──────────────────────────────────
 
 function ComponentPanel({ profile }: { profile: GravityProfile }) {
-  const color = gravityTierColor(profile.tier);
+  const color = profile.tier
+    ? gravityTierColor(profile.tier)
+    : "var(--ledger-ink-faint)";
   const items: { zone: keyof ZoneMasses; m: number }[] = [
     { zone: "oz", m: profile.masses.oz },
     { zone: "nz", m: profile.masses.nz },
@@ -469,7 +477,9 @@ function ComponentPanel({ profile }: { profile: GravityProfile }) {
 // ── Signal panel — reliability, stability, and data coverage ─────────────
 
 function SignalPanel({ profile }: { profile: GravityProfile }) {
-  const color = gravityTierColor(profile.tier);
+  const color = profile.tier
+    ? gravityTierColor(profile.tier)
+    : "var(--ledger-ink-faint)";
   const presentation = gravityV3PublicPresentation(profile);
   const reliabilityIndex = presentation.reliability.index;
   const reliabilityColor = reliabilityIndex >= 75 ? "var(--ledger-green)" : reliabilityIndex >= 50 ? "var(--ledger-amber, #d4a017)" : "var(--ledger-red)";
@@ -568,20 +578,13 @@ function SignalPanel({ profile }: { profile: GravityProfile }) {
         className="text-[11px] font-mono leading-relaxed mt-3 pt-2.5"
         style={{ color: "var(--ledger-ink-faint)", borderTop: "1px solid var(--ledger-rule-light)" }}
       >
-        {profile.description}. Net force{" "}
+        {profile.description}. Diagnostic net force{" "}
         <span className="font-black" style={{ color }}>
           {profile.force > 0 ? "+" : ""}{profile.force.toFixed(2)}
         </span>
-        {" "}— {profile.force >= 0.40
-          ? "a dominant positive position-relative modelled field"
-          : profile.force >= 0.22
-          ? "a meaningful positive position-relative modelled field"
-          : profile.force >= 0.08
-          ? "a modest positive position-relative modelled field"
-          : profile.force >= -0.22
-          ? "a position-relative field near neutral"
-          : "a negative position-relative modelled field"
-        }.{" "}
+        {profile.evidenceStatus === "INSUFFICIENT"
+          ? " — no public tier or percentile is assigned."
+          : <> {" "}— interpreted through the verified {profile.isDefenseman ? "defense" : "forward"} position calibration.</>}{" "}
         <a href="/glossary#icon-key" className="underline hover:text-ledger-red transition-colors" style={{ color: "var(--ledger-ink-faint)" }}>
           Every tier and term is defined in the Glossary →
         </a>

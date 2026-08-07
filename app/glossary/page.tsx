@@ -151,8 +151,11 @@ export default function GlossaryPage() {
               Gravity v3 reports three bounded, position-relative zone masses — an offensive-zone
               well, a neutral-zone transition-proxy well, and a defensive-zone dome. The field is
               a model visualization of those components, not an observed player-tracking heatmap.
-              Reliability is a coverage/stability index rather than a probability, and missing
-              evidence shrinks the estimate toward neutral. Signal Stability is based mainly on
+              Reliability is a coverage/stability index rather than a probability, and coverage
+              is a hard ceiling on it. Profiles below 20 games or two-thirds weighted coverage
+              are INSUFFICIENT and receive no tier or percentile. Tiers and percentiles use
+              qualified same-position populations; no combined v3 league percentile is
+              published. Signal Stability is based mainly on
               current-versus-baseline on-off agreement, with a legacy defenseman pair-driver
               adjustment; it is not a fitted portability model. The public situation label is
               MIXED SITUATIONS because v3 combines all-situations, 5v5, 5-on-4, 4-on-5, and

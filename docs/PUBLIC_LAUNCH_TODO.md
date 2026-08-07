@@ -35,7 +35,7 @@ Keep Gravity v4 off. Give v3 display, X-NAV contribution, and simulation
 contribution independent feature flags. Default unvalidated value propagation
 to off for public launch unless held-out evidence clears the documented gates.
 
-### [ ] PL-3 — Gate insufficient Gravity evidence
+### [x] PL-3 — Gate insufficient Gravity evidence
 
 Return `INSUFFICIENT` with no tier or percentile when sample or coverage is too
 thin. Make reliability coverage-constrained so zero evidence cannot produce a

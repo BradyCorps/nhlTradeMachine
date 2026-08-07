@@ -1,11 +1,17 @@
 // ── Gravity Engine v3 "Spacetime" — zone-mass model tests ────────
 // Archetype fixtures verify the field SHAPE (which zone carries the
 // mass) as well as the magnitude (force, tier). The engine is
-// position-normalized: defensemen are z-scored against D calibration,
-// forwards against F, then force is one agnostic currency.
+// position-normalized: defensemen are z-scored and tiered against D,
+// forwards against F. V3 does not claim a common cross-position impact unit.
 
 import { describe, it, expect } from "vitest";
-import { computeGravity, classifyTier, simOnIceDelta } from "@/app/lib/gravity";
+import {
+  GRAVITY_V3_PUBLIC_MINIMUM_COVERAGE,
+  classifyTier,
+  computeGravity,
+  gravityPositionPercentile,
+  simOnIceDelta,
+} from "@/app/lib/gravity";
 
 // Minimal asset factory — only fields gravity reads
 function asset(overrides: Record<string, unknown>) {
@@ -23,6 +29,20 @@ describe("computeGravity v3 — eligibility", () => {
     expect(computeGravity(asset({ position: "G", games: 50 }))).toBeNull();
     expect(computeGravity(asset({ position: "Pick", games: 50 }))).toBeNull();
     expect(computeGravity(asset({ position: "C", games: 5 }))).toBeNull();
+  });
+
+  it("returns INSUFFICIENT with no tier for a 10–19 GP provisional sample", () => {
+    const provisional = computeGravity(asset({
+      position: "C", games: 19,
+      assistsPace: 30, goalsPace: 20, baselineIxg82: 12,
+      xgRelTM: 3, baselineXgRel: 0.02, xgaRelTM: -0.1,
+      ppPtsPace82: 6, dps: 1, pkTimeShare: 0.04,
+      edgeOzPct: 0.45, edgeSpeedMaxMph: 21.7, edgeBurstsOver20: 8,
+    }))!;
+
+    expect(provisional.evidenceStatus).toBe("INSUFFICIENT");
+    expect(provisional.evidenceReasons).toContain("BELOW_PUBLIC_MINIMUM_GAMES");
+    expect(provisional.tier).toBeNull();
   });
 });
 
@@ -159,7 +179,7 @@ describe("computeGravity v3 — archetype shapes", () => {
     expect(g.force).toBeLessThan(0.55);
   });
 
-  it("elite F and elite transition D land in comparable tiers — one currency", () => {
+  it("elite F and elite transition D each land in an elite position-relative tier", () => {
     const eliteF = computeGravity(asset({
       position: "C", games: 78, avgTOI: 21.5,
       ptsPace: 130, goalsPace: 40, assistsPace: 90,
@@ -262,18 +282,75 @@ describe("computeGravity v3 — signal quality", () => {
     expect(sparse.coverage.oz.missingInputs).toContain("assistsPace");
     expect(sparse.masses).toEqual({ oz: 0, nz: 0, dz: 0 });
     expect(sparse.dataQuality).toBe("partial");
+    expect(sparse.reliability).toBe(0);
+    expect(sparse.evidenceStatus).toBe("INSUFFICIENT");
+    expect(sparse.evidenceReasons).toContain("BELOW_PUBLIC_MINIMUM_COVERAGE");
+    expect(sparse.tier).toBeNull();
+  });
+
+  it("includes the verified two-thirds coverage boundary in the qualified population", () => {
+    const boundary = computeGravity(asset({
+      position: "W", games: 60,
+      xgRelTM: 2, baselineXgRel: 0.02,
+      assistsPace: 26, baselineIxg82: 12, ppPtsPace82: 8,
+      xgaRelTM: 0, dps: 1, pkTimeShare: 0.04,
+    }))!;
+
+    expect(boundary.coverage.nz.ratio).toBe(0);
+    expect(GRAVITY_V3_PUBLIC_MINIMUM_COVERAGE).toBeCloseTo(2 / 3);
+    expect(boundary.evidenceStatus).toBe("QUALIFIED");
+    expect(boundary.tier).not.toBeNull();
   });
 });
 
 describe("classifyTier", () => {
-  it("maps the bounded force scale to tiers", () => {
-    expect(classifyTier(0.60)).toBe("SUPERMASSIVE");
-    expect(classifyTier(0.45)).toBe("STAR");
-    expect(classifyTier(0.30)).toBe("MAIN_SEQUENCE");
-    expect(classifyTier(0.10)).toBe("SATELLITE");
-    expect(classifyTier(0.0)).toBe("ASTEROID");
-    expect(classifyTier(-0.15)).toBe("ASTEROID");
-    expect(classifyTier(-0.30)).toBe("BLACK_HOLE");
+  it("maps force through the frozen forward calibration", () => {
+    expect(classifyTier(0.46, "F")).toBe("SUPERMASSIVE");
+    expect(classifyTier(0.35, "F")).toBe("STAR");
+    expect(classifyTier(0.26, "F")).toBe("MAIN_SEQUENCE");
+    expect(classifyTier(0.16, "F")).toBe("SATELLITE");
+    expect(classifyTier(-0.15, "F")).toBe("ASTEROID");
+    expect(classifyTier(-0.16, "F")).toBe("BLACK_HOLE");
+  });
+
+  it("maps force through the separate frozen defense calibration", () => {
+    expect(classifyTier(0.52, "D")).toBe("SUPERMASSIVE");
+    expect(classifyTier(0.36, "D")).toBe("STAR");
+    expect(classifyTier(0.22, "D")).toBe("MAIN_SEQUENCE");
+    expect(classifyTier(0.09, "D")).toBe("SATELLITE");
+    expect(classifyTier(-0.28, "D")).toBe("ASTEROID");
+    expect(classifyTier(-0.29, "D")).toBe("BLACK_HOLE");
+  });
+});
+
+describe("gravityPositionPercentile", () => {
+  const qualified = () => computeGravity(asset({
+    position: "C", games: 60,
+    assistsPace: 30, goalsPace: 20, baselineIxg82: 12,
+    xgRelTM: 3, baselineXgRel: 0.02, xgaRelTM: -0.1,
+    ppPtsPace82: 6, dps: 1, pkTimeShare: 0.04,
+    edgeOzPct: 0.45, edgeSpeedMaxMph: 21.7, edgeBurstsOver20: 25,
+  }))!;
+
+  it("uses qualified same-position peers only", () => {
+    const subject = { ...qualified(), force: 0.5 } as any;
+    const forwards = Array.from({ length: 20 }, (_, index) => ({
+      ...qualified(), force: index / 100,
+    })) as any[];
+    const defensemen = Array.from({ length: 20 }, () => ({
+      ...qualified(), force: 0.9, isDefenseman: true,
+    })) as any[];
+
+    expect(gravityPositionPercentile(subject, [...forwards, ...defensemen])).toBe(100);
+  });
+
+  it("returns null for an insufficient subject or undersized peer population", () => {
+    const subject = qualified();
+    const tooFew = Array.from({ length: 19 }, () => qualified());
+    const insufficient = computeGravity(asset({ position: "C", games: 60 }))!;
+
+    expect(gravityPositionPercentile(subject, tooFew)).toBeNull();
+    expect(gravityPositionPercentile(insufficient, [...tooFew, subject])).toBeNull();
   });
 });
 
@@ -326,6 +403,7 @@ describe("simOnIceDelta (G4 sim propagation)", () => {
         dz: { presentWeight: 1, possibleWeight: 1, ratio: 1, missingInputs: [] },
       },
       isDefenseman: false, tier: "SUPERMASSIVE", description: "",
+      evidenceStatus: "QUALIFIED", evidenceReasons: [],
     } as any);
     expect(Math.abs(max)).toBeLessThanOrEqual(8);
   });
@@ -346,5 +424,11 @@ describe("simOnIceDelta (G4 sim propagation)", () => {
     const thin = simOnIceDelta(computeGravity(asset(fields(20))));
     const full = simOnIceDelta(computeGravity(asset(fields(75))));
     expect(Math.abs(thin)).toBeLessThan(Math.abs(full));
+  });
+
+  it("does not propagate an insufficient profile into simulation", () => {
+    const insufficient = computeGravity(asset({ position: "D", games: 60 }))!;
+    expect(insufficient.evidenceStatus).toBe("INSUFFICIENT");
+    expect(simOnIceDelta(insufficient)).toBe(0);
   });
 });

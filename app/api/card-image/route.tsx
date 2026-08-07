@@ -112,9 +112,10 @@ function Label({
 function Rink({ gravity }: { gravity: CardGravityInput }) {
   const geo = computeRinkGeometry({ masses: gravity.masses });
   const { W, H, rinkX, rinkY, rinkW, rinkH, midY, centerX, blue1, blue2, rowLines, colLines, zones } = geo;
-  const renderTier = gravity.tier ?? "ASTEROID";
-  const tierLabel = gravity.tier ? gravity.tier.replace(/_/g, " ") : "UNTIERED";
-  const color = rinkTierColor(renderTier);
+  const tierLabel = gravity.tier
+    ? gravity.tier.replace(/_/g, " ")
+    : "INSUFFICIENT EVIDENCE";
+  const color = gravity.tier ? rinkTierColor(gravity.tier) : RINK_INK_FAINT;
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
   const S = RINK_SCALE;
 
@@ -348,7 +349,11 @@ export async function POST(req: Request) {
             <div style={{ display: "flex" }}>{data.gravity.modelLabel}</div>
             <div style={{ display: "flex" }}>RELIABILITY {data.gravity.reliabilityLabel}</div>
             <div style={{ display: "flex" }}>DATA {data.gravity.coverageLabel}</div>
-            <div style={{ display: "flex" }}>GRAVITY {ordinal(data.gravity.gravityPercentile)}</div>
+            <div style={{ display: "flex" }}>
+              GRAVITY {data.gravity.modelVersion === "3.0" && data.gravity.evidenceStatus === "INSUFFICIENT"
+                ? "INSUFFICIENT"
+                : `POSITION ${ordinal(data.gravity.gravityPercentile)}`}
+            </div>
             {data.gravity.modelVersion === "4.0" && data.gravity.netXg82 !== null ? (
               <div style={{ display: "flex" }}>
                 NET {data.gravity.netXg82 > 0 ? "+" : ""}{data.gravity.netXg82.toFixed(1)} xG/82 · FIELD {data.gravity.force > 0 ? "+" : ""}{data.gravity.force.toFixed(2)}

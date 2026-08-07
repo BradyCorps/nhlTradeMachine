@@ -1,5 +1,11 @@
 # Gravity — position calibration study (2026-07-27)
 
+> **2026-08-07 release note:** The study's recommendation against a positional
+> force offset still stands. Its recommendation to retain one shared set of v3
+> tier cutoffs is superseded by the qualified-evidence release calibration:
+> public tiers and percentiles now use separate forward and defense
+> distributions. See `GRAVITY_V3_TIER_CALIBRATION.md`.
+
 **Question.** Gravity v3 z-scores every input against the player's own position.
 Does a defenseman at force *x* and a forward at force *x* deliver the same
 impact? If not, the scale measures *rarity within position*, not comparable
@@ -153,8 +159,9 @@ position bias.
 1. **Do not apply a positional offset to Gravity v3.** The supported effect size
    after deployment control is small, rests on one crude covariate, and the
    uncontrolled version actively degrades the leaderboard.
-2. **Keep the current tier cutoffs.** The live distribution is well-shaped; the
-   route's `suggestedTiers` would loosen SUPERMASSIVE from 1.1% to ~2%.
+2. **Do not use a shared cutoff as a cross-position percentile claim.** The
+   later release calibration keeps the raw force unchanged but derives tiers
+   separately inside the qualified forward and defense populations.
 3. **If a correction is ever wanted**, the deployment-controlled figure is
    ~**0.05** force units, not ~0.15. That leaves Makar comfortably STAR and moves
    Hutson from 1st to ~2nd. It is a display tweak, not a finding.

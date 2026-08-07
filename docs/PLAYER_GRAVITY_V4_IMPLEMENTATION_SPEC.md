@@ -1119,9 +1119,12 @@ docs/analytics/GRAVITY_V4_VALIDATION.md
 - [x] Runtime baseline inputs are keyed by stable NHL player IDs without a name fallback.
 - [x] Existing tests are updated and the full relevant suite passes.
 
-Implementation note: the qualified-population tier recalibration required by
-section 4.4 remains data-blocked. The legacy thresholds are retained without a
-percentile-calibration claim until a current authorized population is available.
+Implementation note (updated 2026-08-07): the qualified-population v3 tier
+recalibration required by section 4.4 is complete against the integrity-verified
+2025-26 frozen population. V3 cutoffs and percentiles are persisted separately
+for forwards and defensemen; see
+`docs/analytics/GRAVITY_V3_TIER_CALIBRATION.md`. This does not validate or
+activate Gravity v4.
 
 ### Release B infrastructure acceptance criteria
 
