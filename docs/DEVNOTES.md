@@ -1,5 +1,7 @@
 # Development Notes
 
+- 2026-08-06: **Made Bulk Free Agents atomic, identity-safe, and truthfully reported.** Existing/new player writes now run in one transaction, require one returned row each, roll back together on failure, and clear caches only after commit; names that collapse to one player ID are written once and reported as skipped in the admin result. Added five integration tests. Touched `app/api/admin/fa-bulk/route.ts`, `app/admin/contracts/page.tsx`, `__tests__/fa-bulk-route.test.ts`, `docs/DEVNOTES.md`.
+
 - 2026-08-06: **Made bulk contract-ingestion counts reflect rows actually written.** Insert, update, extension, and best-effort position-backfill reports now derive from database `RETURNING` rows; zero-row conflicts are listed in the Paste Signings result instead of being called successes, with five integration tests covering each write path. Touched `app/api/admin/contracts/route.ts`, `app/admin/contracts/PastePanel.tsx`, `__tests__/contracts-ingestion-counts.test.ts`, `docs/DEVNOTES.md`.
 
 - 2026-08-06: **Made admin contract-term backfills and reconciliations atomic and truthfully reported.** The route now plans and writes inside one transaction, verifies every affected row before counting it, rolls the batch back on any failure, and clears roster caches only after commit; added five in-memory database tests covering both actions, rollback, zero-row writes, and dry runs. Touched `app/api/admin/contract-terms/route.ts`, `__tests__/contract-term-route.test.ts`, `docs/DEVNOTES.md`.

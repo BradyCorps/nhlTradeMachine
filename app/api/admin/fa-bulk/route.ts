@@ -37,13 +37,29 @@ export async function POST(req: Request) {
     const rawList: string[] = Array.isArray(body.names)
       ? body.names.map((n: unknown) => String(n))
       : String(body.names ?? "").split(/[\n,]+/);
-    const names = Array.from(new Set(rawList.map((n) => n.trim()).filter(Boolean)));
+    const names = rawList.map((n) => n.trim()).filter(Boolean);
     if (names.length === 0) {
       return NextResponse.json({ error: "Provide at least one player name" }, { status: 400 });
     }
 
-    const existing = await db.select({ id: playersTable.id, name: playersTable.name }).from(playersTable).catch(() => [] as { id: string; name: string }[]);
-    const existingById = new Map(existing.map((r) => [r.id, r]));
+    const namesById = new Map<string, string>();
+    const skipped: string[] = [];
+    for (const name of names) {
+      const id = makeId(name);
+      if (!id) {
+        skipped.push(`${name} — no usable player id`);
+        continue;
+      }
+      const retained = namesById.get(id);
+      if (retained) {
+        skipped.push(`${name} — same player as ${retained}`);
+        continue;
+      }
+      namesById.set(id, name);
+    }
+    if (namesById.size === 0) {
+      return NextResponse.json({ error: "Provide at least one valid player name" }, { status: 400 });
+    }
 
     // Field changes implied by the chosen status.
     const patch: Record<string, any> = { source: "editor" };
@@ -59,16 +75,25 @@ export async function POST(req: Request) {
       patch.excludeFromRoster = true;
     }
 
-    let updated = 0;
-    let created = 0;
-    for (const name of names) {
-      const id = makeId(name);
-      if (!id) continue;
-      if (existingById.has(id)) {
-        await db.update(playersTable).set(patch).where(eq(playersTable.id, id)).catch(() => {});
-        updated++;
-      } else {
-        await db.insert(playersTable).values({
+    const { updated, created } = await db.transaction(async (tx) => {
+      const existing = await tx.select({ id: playersTable.id }).from(playersTable);
+      const existingIds = new Set(existing.map((row) => row.id));
+      let updated = 0;
+      let created = 0;
+
+      for (const [id, name] of namesById) {
+        if (existingIds.has(id)) {
+          const written = await tx.update(playersTable).set(patch)
+            .where(eq(playersTable.id, id))
+            .returning({ id: playersTable.id });
+          if (written.length !== 1) {
+            throw new Error(`expected to update one player for ${id}; updated ${written.length}`);
+          }
+          updated += written.length;
+          continue;
+        }
+
+        const inserted = await tx.insert(playersTable).values({
           id,
           name,
           position: "Unknown",
@@ -78,14 +103,28 @@ export async function POST(req: Request) {
           expiryYear: patch.expiryYear ?? null,
           excludeFromRoster: patch.excludeFromRoster ?? false,
           source: "editor",
-        }).onConflictDoUpdate({ target: playersTable.id, set: patch }).catch(() => {});
-        created++;
+        }).onConflictDoNothing()
+          .returning({ id: playersTable.id });
+        if (inserted.length !== 1) {
+          throw new Error(`expected to create one player for ${id}; created ${inserted.length}`);
+        }
+        created += inserted.length;
       }
-    }
+
+      return { updated, created };
+    });
 
     await clearTeamCaches(redis, db);
     if (redis) for (const k of CACHE_KEYS) await redis.del(k).catch(() => {});
-    return NextResponse.json({ ok: true, status, updated, created, total: names.length });
+    return NextResponse.json({
+      ok: true,
+      status,
+      updated,
+      created,
+      total: namesById.size,
+      submitted: names.length,
+      skipped,
+    });
   } catch (e: any) {
     console.error("[admin/fa-bulk]", e);
     return NextResponse.json({ error: e?.message ?? "Bulk FA update failed" }, { status: 500 });

@@ -477,8 +477,11 @@ function BulkFaForm({ onDone }: { onDone: (msg: string) => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ names: text, status }),
       });
-      const data = await readAdminResponse<{ updated: number; created: number }>(res, "Bulk FA failed");
-      onDone(`Bulk ${status} — ${data.updated} updated, ${data.created} created`);
+      const data = await readAdminResponse<{ updated: number; created: number; skipped?: string[] }>(res, "Bulk FA failed");
+      const skipped = data.skipped?.length
+        ? `, ${data.skipped.length} skipped: ${data.skipped.join("; ")}`
+        : "";
+      onDone(`Bulk ${status} — ${data.updated} updated, ${data.created} created${skipped}`);
       setText(""); setOpen(false);
     } catch (e) {
       onDone(adminErrorMessage(e, "Bulk FA failed"));
