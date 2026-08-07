@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/app/lib/admin-auth";
 import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
-import { computeGravity, gravityCoverageRatio } from "@/app/lib/gravity";
+import {
+  GRAVITY_V3_TIER_CALIBRATION,
+  computeGravity,
+  gravityCoverageRatio,
+} from "@/app/lib/gravity";
 
 export const dynamic = "force-dynamic";
 
 // ── Gravity calibration report ───────────────────────────────────
 // Computes the REAL per-position distribution (mean/σ/percentiles) of
 // every gravity input from the live league population, plus force
-// percentiles under the current constants. The `suggestedCal` block is
-// shaped to paste directly over the CAL table in app/lib/gravity.ts,
-// and `suggestedTiers` derives cutoffs from actual force percentiles
-// instead of hand estimates. Run once a season (or after a data-source
-// change), eyeball `top25` for sanity, then apply.
+// percentiles under the current constants. Force percentiles and tier
+// suggestions are emitted separately for forwards and defensemen because v3
+// is position-relative and does not support a combined impact leaderboard.
 
 type Num = number | null | undefined;
 
@@ -70,35 +72,65 @@ export async function GET(req: Request) {
   }
 
   // Force distribution under CURRENT constants
-  const forces = skaters
-    .map(p => ({ name: p.name, position: p.position, teamId: p.teamId, g: computeGravity(p) }))
-    .filter(x => x.g !== null)
-    .map(x => ({
-      name: x.name,
-      position: x.position,
-      teamId: x.teamId,
-      force: x.g!.force,
-      masses: x.g!.masses,
-      tier: x.g!.tier,
-      reliability: x.g!.reliability,
-      coverage: gravityCoverageRatio(x.g!.coverage),
-    }))
-    .sort((a, b) => b.force - a.force);
+  const forces = skaters.flatMap(p => {
+    const gravity = computeGravity(p);
+    if (!gravity || gravity.evidenceStatus !== "QUALIFIED") return [];
+    return [{
+      name: p.name,
+      position: p.position,
+      teamId: p.teamId,
+      force: gravity.force,
+      masses: gravity.masses,
+      tier: gravity.tier,
+      reliability: gravity.reliability,
+      coverage: gravityCoverageRatio(gravity.coverage),
+    }];
+  });
 
-  const forceVals = forces.map(f => f.force);
-  const fstats = stats(forceVals)!;
-  const sortedF = [...forceVals].sort((a, b) => a - b);
-  const pct = (p: number) => sortedF[Math.min(sortedF.length - 1, Math.round((p / 100) * (sortedF.length - 1)))];
   const r2 = (v: number) => Math.round(v * 100) / 100;
 
-  const tierCounts: Record<string, number> = {};
-  for (const f of forces) tierCounts[f.tier] = (tierCounts[f.tier] ?? 0) + 1;
+  const forceReport = (pool: typeof forces) => {
+    const ranked = [...pool].sort((a, b) => b.force - a.force);
+    const forceVals = ranked.map(f => f.force);
+    if (forceVals.length === 0) return null;
+    const sorted = [...forceVals].sort((a, b) => a - b);
+    const pct = (p: number) => sorted[
+      Math.min(sorted.length - 1, Math.round((p / 100) * (sorted.length - 1)))
+    ];
+    const tierCounts: Record<string, number> = {};
+    for (const force of ranked) {
+      tierCounts[force.tier] = (tierCounts[force.tier] ?? 0) + 1;
+    }
+    return {
+      forceDistribution: {
+        ...stats(forceVals),
+        p10: r2(pct(10)), p25: r2(pct(25)), p60: r2(pct(60)),
+        p80: r2(pct(80)), p92: r2(pct(92)), p98: r2(pct(98)),
+      },
+      coverageDistribution: stats(ranked.map(f => f.coverage)),
+      suggestedTiers: {
+        SUPERMASSIVE: r2(pct(98)),
+        STAR: r2(pct(92)),
+        MAIN_SEQUENCE: r2(pct(80)),
+        SATELLITE: r2(pct(60)),
+        BLACK_HOLE_BELOW: r2(pct(3)),
+      },
+      currentTierCounts: tierCounts,
+      top25: ranked.slice(0, 25),
+      bottom10: ranked.slice(-10),
+    };
+  };
 
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
     modelVersion: "3-release-a",
+    activeTierCalibration: GRAVITY_V3_TIER_CALIBRATION,
     perRateScale: { qocMultiplier: false, toiMultiplier: false },
-    population: { qualifiedSkaters: skaters.length, withGravity: forces.length },
+    population: {
+      sampleEligibleSkaters: skaters.length,
+      evidenceQualified: forces.length,
+      insufficientEvidence: skaters.length - forces.length,
+    },
     // Paste-ready: mean/sd per input per position for the CAL table
     suggestedCal: {
       F: Object.fromEntries(Object.entries(byPos.F).map(([k, s]: [string, any]) =>
@@ -107,23 +139,9 @@ export async function GET(req: Request) {
         [k, s ? { mean: s.mean, sd: s.sd } : null])),
     },
     inputDistributions: byPos,
-    forceDistribution: {
-      ...fstats,
-      p10: r2(pct(10)), p25: r2(pct(25)), p60: r2(pct(60)),
-      p80: r2(pct(80)), p92: r2(pct(92)), p98: r2(pct(98)),
+    forceByPosition: {
+      F: forceReport(forces.filter(force => force.position !== "D")),
+      D: forceReport(forces.filter(force => force.position === "D")),
     },
-    coverageDistribution: stats(forces.map(f => f.coverage)),
-    // Percentile-anchored cutoffs: SUPERMASSIVE = top 2%, STAR = top 8%,
-    // MAIN_SEQUENCE = top 20%, SATELLITE = top 40%, BLACK_HOLE = bottom 3%
-    suggestedTiers: {
-      SUPERMASSIVE: r2(pct(98)),
-      STAR: r2(pct(92)),
-      MAIN_SEQUENCE: r2(pct(80)),
-      SATELLITE: r2(pct(60)),
-      BLACK_HOLE_BELOW: r2(pct(3)),
-    },
-    currentTierCounts: tierCounts,
-    top25: forces.slice(0, 25),
-    bottom10: forces.slice(-10),
   });
 }

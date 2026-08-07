@@ -10,7 +10,10 @@ import { computeRosterStrand } from "@/app/lib/roster-strand";
 import TeamStrand, { type TeamStrandData } from "@/app/components/TeamStrand";
 import { lineupContributionScore } from "@/app/lib/lineup-ranking";
 import { displayPosition } from "@/app/lib/display-position";
-import type { GravityProfile } from "@/app/lib/gravity";
+import {
+  gravityPositionPercentile,
+  type GravityProfile,
+} from "@/app/lib/gravity";
 import { gravityForDisplay } from "@/app/lib/gravity-channels";
 import { isGravityV3DisplayEnabled } from "@/app/lib/gravity-feature-flags";
 import GravityField from "@/app/components/GravityField";
@@ -103,6 +106,7 @@ interface TeamLines {
 interface GravityLeader {
   name: string;
   profile: GravityProfile;
+  positionPercentile: number;
 }
 
 interface TeamProfile {
@@ -674,7 +678,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
           {gravityLeaders.length > 0 && (
             <div className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
               <div className="text-[9px] font-black uppercase tracking-[0.15em] mb-2" style={{ color: "var(--ledger-ink-faint)" }}>
-                Gravity Leaders
+                Position-relative Gravity Leaders
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Top gravity player — full field diagram */}
@@ -704,19 +708,22 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
                       </div>
                       <div className="text-[9px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
                         {(() => {
-                          const avgForce = gravityLeaders.reduce((s, g) => s + g.profile.force, 0) / gravityLeaders.length;
-                          const topForce = gravityLeaders[0].profile.force;
+                          const avgPercentile = gravityLeaders.reduce(
+                            (sum, leader) => sum + leader.positionPercentile,
+                            0,
+                          ) / gravityLeaders.length;
+                          const topPercentile = gravityLeaders[0].positionPercentile;
                           return (
                             <>
-                              Avg top-{gravityLeaders.length} force:{" "}
+                              Avg top-{gravityLeaders.length} position percentile:{" "}
                               <span className="font-black" style={{
-                                color: avgForce >= 0.15 ? "var(--ledger-green)" : avgForce >= 0 ? "var(--ledger-ink)" : "var(--ledger-red)",
+                                color: avgPercentile >= 80 ? "var(--ledger-green)" : "var(--ledger-ink)",
                                 fontVariantNumeric: "tabular-nums",
                               }}>
-                                {avgForce > 0 ? "+" : ""}{avgForce.toFixed(2)}
+                                {avgPercentile.toFixed(0)}
                               </span>
-                              {topForce >= 0.40 && (
-                                <span> — franchise-grade gravitational presence</span>
+                              {topPercentile >= 92 && (
+                                <span> — elite within-position field presence</span>
                               )}
                             </>
                           );
@@ -810,6 +817,19 @@ export default function TeamsPage() {
   }, [players, capCeiling]);
 
   const teamProfiles = useMemo((): TeamProfile[] => {
+    const computedGravity = players.flatMap((player) => {
+      const profile = gravityForDisplay(player);
+      return profile ? [{ player, profile }] : [];
+    });
+    const gravityPopulation = computedGravity.map(result => result.profile);
+    const gravityByPlayerId = new Map(computedGravity.map(({ player, profile }) => [
+      player.id,
+      {
+        profile,
+        positionPercentile: gravityPositionPercentile(profile, gravityPopulation),
+      },
+    ]));
+
     return teams.map((team) => {
       const roster = players.filter((p) => p.teamId === team.id && p.position !== "Pick");
       const contention = computeContention(roster, navMap);
@@ -834,12 +854,21 @@ export default function TeamsPage() {
         .slice(0, 10);
 
       const gravityLeaders = roster
-        .map((p) => {
-          const g = gravityForDisplay(p);
-          return g ? { name: p.name, profile: g } : null;
+        .flatMap((p) => {
+          const gravity = gravityByPlayerId.get(p.id);
+          return gravity?.profile.evidenceStatus === "QUALIFIED"
+            && gravity.positionPercentile != null
+            ? [{
+                name: p.name,
+                profile: gravity.profile,
+                positionPercentile: gravity.positionPercentile,
+              }]
+            : [];
         })
-        .filter((g): g is GravityLeader => g !== null)
-        .sort((a, b) => b.profile.force - a.profile.force)
+        .sort((a, b) => (
+          b.positionPercentile - a.positionPercentile
+          || b.profile.force - a.profile.force
+        ))
         .slice(0, 3);
 
       return {
@@ -865,7 +894,8 @@ export default function TeamsPage() {
           const bDiff = (b.team.record?.goalsFor ?? 0) - (b.team.record?.goalsAgainst ?? 0);
           return bDiff - aDiff;
         }
-        case "gravity": return (b.gravityLeaders[0]?.profile.force ?? -1) - (a.gravityLeaders[0]?.profile.force ?? -1);
+        case "gravity": return (b.gravityLeaders[0]?.positionPercentile ?? -1)
+          - (a.gravityLeaders[0]?.positionPercentile ?? -1);
         case "speed": return (b.edge?.avgSpeedMaxMph ?? 0) - (a.edge?.avgSpeedMaxMph ?? 0);
         case "name": return a.team.name.localeCompare(b.team.name);
         default: return 0;

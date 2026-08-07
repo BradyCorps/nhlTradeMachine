@@ -8,6 +8,7 @@ import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
 import { gravityForDisplay } from "@/app/lib/gravity-channels";
+import { gravityPositionPercentile } from "@/app/lib/gravity";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
 import { FieldDiagram } from "@/app/components/GravityField";
 import { SEASON } from "@/app/lib/season-config";
@@ -201,16 +202,13 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
     if (posGroup === "G") return { gravity: null, gravityPercentile: null };
     const profile = gravityForDisplay(player as any);
     if (!profile) return { gravity: null, gravityPercentile: null };
-    const peerForces = allPlayers
+    const peerProfiles = allPlayers
       .filter(peer => getPositionGroup(peer.position) === posGroup && (peer.games ?? 0) >= 20)
-      .map(peer => gravityForDisplay(peer as any)?.force)
-      .filter((force): force is number => force != null)
-      .sort((a, b) => a - b);
+      .map(peer => gravityForDisplay(peer as any))
+      .filter((peer): peer is NonNullable<typeof peer> => peer !== null);
     return {
       gravity: profile,
-      gravityPercentile: peerForces.length >= 10
-        ? computePercentile(profile.force, peerForces)
-        : null,
+      gravityPercentile: gravityPositionPercentile(profile, peerProfiles),
     };
   }, [player, allPlayers, posGroup]);
   const publicGravity = useMemo(
@@ -462,7 +460,9 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
             </span>
           </div>
           <div style={{ fontSize: 9, fontWeight: 900, letterSpacing: "0.05em", color: "#6e5a3d", textTransform: "uppercase", marginTop: 3 }}>
-            {publicGravity?.modelLabel} · Reliability {publicGravity?.reliabilityLabel} · Data {publicGravity?.coverageLabel} · Gravity {gravityPercentile != null ? `${gravityPercentile}th pct` : "pct unavailable"}
+            {publicGravity?.modelLabel} · Reliability {publicGravity?.reliabilityLabel} · Data {publicGravity?.coverageLabel} · Gravity {gravity.evidenceStatus === "INSUFFICIENT"
+              ? "insufficient"
+              : gravityPercentile != null ? `${gravityPercentile}th position pct` : "position pct unavailable"}
           </div>
           <FieldDiagram profile={gravity} />
           <div style={{ fontSize: 9, color: "#6e5a3d", lineHeight: 1.35, padding: "0 4px 4px" }}>

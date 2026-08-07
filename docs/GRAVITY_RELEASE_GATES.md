@@ -9,7 +9,7 @@ must never share an activation switch.
 
 | Channel | Flag | Default | Current decision |
 | --- | --- | --- | --- |
-| Gravity v3 public display | `NEXT_PUBLIC_GRAVITY_V3_DISPLAY_ENABLED` | Off | Off pending the display gate below and PL-3 |
+| Gravity v3 public display | `NEXT_PUBLIC_GRAVITY_V3_DISPLAY_ENABLED` | Off | PL-3 complete; off pending the remaining display gates below |
 | Gravity v3 X-NAV contribution | `NEXT_PUBLIC_GRAVITY_V3_XNAV_ENABLED` | Off | Off pending held-out incremental validation |
 | Gravity v3 simulation contribution | `GRAVITY_V3_SIMULATION_ENABLED` | Off | Off pending held-out simulation backtesting |
 | Gravity v4 runtime | `GRAVITY_V4_ENABLED` plus a source release lock | Locked off | PL-13 and PL-14 are incomplete |
@@ -35,11 +35,11 @@ The v4 environment flag cannot override its source release lock.
 
 ### V3 display
 
-All of the following are required:
+PL-3 now satisfies items 1 and 2. All remaining items are still required:
 
-1. PL-3 returns `INSUFFICIENT` rather than a tier or percentile when sample or
+1. **Complete:** PL-3 returns `INSUFFICIENT` rather than a tier or percentile when sample or
    coverage is inadequate.
-2. Tiers and any percentiles are recalibrated on an authorized, documented,
+2. **Complete:** Tiers and any percentiles are recalibrated on an authorized, documented,
    position-qualified population for the published season.
 3. Source permissions and required attribution are cleared under PL-5.
 4. The model card documents situation scope, input coverage, reliability,

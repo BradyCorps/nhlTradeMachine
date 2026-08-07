@@ -12,11 +12,11 @@
 //
 // Every raw input is standardized WITHIN POSITION (z-score against
 // positional calibration constants) before being squashed to a bounded
-// mass via tanh. That makes a defenseman's masses measured against
-// defensemen, a forward's against forwards — then the weighted force is
-// one agnostic currency and tiers mean "top X% of the league" regardless
-// of role. Assembly is additive, so no compounding multiplier blowups:
-// force is bounded in (−1, +1) by construction.
+// mass via tanh. A defenseman's masses are measured against defensemen and
+// a forward's against forwards. Force and tiers therefore describe rarity
+// within position; v3 does not support cross-position impact claims.
+// Assembly is additive, so no compounding multiplier blowups: force is
+// bounded in (−1, +1) by construction.
 //
 //   force = 0.45·m_OZ + 0.30·m_NZ + 0.25·m_DZ
 //
@@ -30,6 +30,7 @@
 // records the absent evidence and lowers the reliability index.
 
 import type { Asset } from "./trade-types";
+import tierCalibration from "@/data/gravity-calibration/2025-26/tier-calibration.json";
 
 // ── Public types ─────────────────────────────────────────────────
 
@@ -80,8 +81,8 @@ export const GRAVITY_V3_FIELD_LABEL = "MODELLED FIELD · POSITION-RELATIVE";
 export const GRAVITY_V3_FIELD_DISCLAIMER =
   "Model visualization of Gravity v3 components; not observed player-tracking data.";
 
-export interface GravityProfile {
-  /** Weighted zone-mass total, bounded (−1, +1). One currency across positions. */
+interface GravityProfileBase {
+  /** Weighted zone-mass total, bounded (−1, +1). Position-relative in v3. */
   force: number;
   /** The shape of the field — where on the rink the warping happens. */
   masses: ZoneMasses;
@@ -100,9 +101,27 @@ export interface GravityProfile {
   /** Per-zone evidence coverage for the fixed-weight v3 composites. */
   coverage: GravityCoverage;
   isDefenseman: boolean;
-  tier: GravityTier;
   description: string;
 }
+
+export type GravityEvidenceStatus = "QUALIFIED" | "INSUFFICIENT";
+
+export type GravityEvidenceReason =
+  | "BELOW_PUBLIC_MINIMUM_GAMES"
+  | "BELOW_PUBLIC_MINIMUM_COVERAGE";
+
+export type GravityProfile = GravityProfileBase & (
+  | {
+      evidenceStatus: "QUALIFIED";
+      evidenceReasons: [];
+      tier: GravityTier;
+    }
+  | {
+      evidenceStatus: "INSUFFICIENT";
+      evidenceReasons: GravityEvidenceReason[];
+      tier: null;
+    }
+);
 
 export type GravityTier =
   | "SUPERMASSIVE"    // warps the entire game
@@ -121,16 +140,34 @@ const TIER_DESC: Record<GravityTier, string> = {
   BLACK_HOLE:    "Strong negative position-relative modelled field",
 };
 
-// Legacy v3 tier cutoffs on the bounded force scale. The calibration route
-// derives season-specific suggestions from the qualified population; these
-// fixed cutoffs must not be described as checked percentiles until that report
-// is rerun against an available current-season population.
-export function classifyTier(force: number): GravityTier {
-  if (force >= 0.55) return "SUPERMASSIVE";
-  if (force >= 0.40) return "STAR";
-  if (force >= 0.22) return "MAIN_SEQUENCE";
-  if (force >= 0.08) return "SATELLITE";
-  if (force >= -0.22) return "ASTEROID";
+export type GravityPositionGroup = "F" | "D";
+
+export const GRAVITY_V3_CALCULATION_MINIMUM_GAMES =
+  tierCalibration.evidencePolicy.calculationMinimumGames;
+export const GRAVITY_V3_PUBLIC_MINIMUM_GAMES =
+  tierCalibration.evidencePolicy.publicMinimumGames;
+export const GRAVITY_V3_PUBLIC_MINIMUM_COVERAGE =
+  tierCalibration.evidencePolicy.publicMinimumCoverage;
+export const GRAVITY_V3_MINIMUM_PERCENTILE_POPULATION =
+  tierCalibration.evidencePolicy.minimumPositionPercentilePopulation;
+
+export const GRAVITY_V3_TIER_CALIBRATION = tierCalibration;
+
+/**
+ * Season-specific v3 cutoffs from the integrity-verified 2025-26 qualified
+ * population. They are deliberately position-specific: v3 force is a
+ * position-relative index, not a common cross-position impact currency.
+ */
+export function classifyTier(
+  force: number,
+  positionGroup: GravityPositionGroup,
+): GravityTier {
+  const thresholds = tierCalibration.positions[positionGroup].thresholds;
+  if (force >= thresholds.supermassiveAtOrAbove) return "SUPERMASSIVE";
+  if (force >= thresholds.starAtOrAbove) return "STAR";
+  if (force >= thresholds.mainSequenceAtOrAbove) return "MAIN_SEQUENCE";
+  if (force >= thresholds.satelliteAtOrAbove) return "SATELLITE";
+  if (force >= thresholds.blackHoleBelow) return "ASTEROID";
   return "BLACK_HOLE";
 }
 
@@ -143,7 +180,7 @@ export function classifyTier(force: number): GravityTier {
 // threading a league context everywhere.
 
 interface Dist { mean: number; sd: number }
-type PosGroup = "F" | "D";
+type PosGroup = GravityPositionGroup;
 
 const CAL: Record<PosGroup, Record<string, Dist>> = {
   F: {
@@ -223,6 +260,34 @@ export function gravityCoverageRatio(coverage: GravityCoverage): number {
   return possible > 0 ? clamp(present / possible, 0, 1) : 0;
 }
 
+/**
+ * Position-only percentile for public v3 display. Returns null unless the
+ * subject has sufficient evidence and the qualified same-position comparison
+ * population is large enough. This measures positional rarity, not equivalent
+ * cross-position hockey value.
+ */
+export function gravityPositionPercentile(
+  profile: GravityProfile,
+  population: readonly GravityProfile[],
+): number | null {
+  if (profile.evidenceStatus !== "QUALIFIED") return null;
+
+  const peerForces = population
+    .filter(peer => (
+      peer.evidenceStatus === "QUALIFIED"
+      && peer.isDefenseman === profile.isDefenseman
+    ))
+    .map(peer => peer.force);
+  if (peerForces.length < GRAVITY_V3_MINIMUM_PERCENTILE_POPULATION) return null;
+
+  let below = 0;
+  for (const force of peerForces) {
+    if (force < profile.force) below += 1;
+    else if (force === profile.force) below += 0.5;
+  }
+  return Math.round((below / peerForces.length) * 100);
+}
+
 export interface GravityV3PublicPresentation {
   fieldLabel: typeof GRAVITY_V3_FIELD_LABEL;
   fieldDisclaimer: typeof GRAVITY_V3_FIELD_DISCLAIMER;
@@ -273,7 +338,7 @@ export function gravityV3PublicPresentation(
 export function computeGravity(asset: Asset): GravityProfile | null {
   if (asset.position === "G" || asset.position === "Pick") return null;
   const games = asset.games ?? 0;
-  if (games < 10) return null;
+  if (games < GRAVITY_V3_CALCULATION_MINIMUM_GAMES) return null;
 
   const isD = asset.position === "D";
   const cal = CAL[isD ? "D" : "F"];
@@ -383,14 +448,24 @@ export function computeGravity(asset: Asset): GravityProfile | null {
   const sampleConf = Math.min(games / 60, 1);
   const stabilityConf = baselineLift !== null ? signalStability : 0.5;
   const coverageConf = gravityCoverageRatio(coverage);
-  const reliability = r2(clamp(
+  const rawReliability = clamp(
     0.40 * sampleConf + 0.40 * stabilityConf + 0.20 * coverageConf,
     0, 1,
-  ));
+  );
+  // Coverage is a hard ceiling, not merely one additive input. With no
+  // observed model evidence reliability must be zero, regardless of games or
+  // the unknown-stability prior.
+  const reliability = r2(Math.min(rawReliability, coverageConf));
 
-  const tier = classifyTier(force);
+  const evidenceReasons: GravityEvidenceReason[] = [];
+  if (games < GRAVITY_V3_PUBLIC_MINIMUM_GAMES) {
+    evidenceReasons.push("BELOW_PUBLIC_MINIMUM_GAMES");
+  }
+  if (coverageConf < GRAVITY_V3_PUBLIC_MINIMUM_COVERAGE) {
+    evidenceReasons.push("BELOW_PUBLIC_MINIMUM_COVERAGE");
+  }
 
-  return {
+  const base: GravityProfileBase = {
     force,
     masses: { oz: r2(mOz), nz: r2(mNz), dz: r2(mDz) },
     navResidual,
@@ -401,6 +476,25 @@ export function computeGravity(asset: Asset): GravityProfile | null {
     dataQuality: coverageConf === 1 ? "full" : "partial",
     coverage,
     isDefenseman: isD,
+    description: evidenceReasons.length > 0
+      ? "Insufficient sample or weighted input coverage for a public tier or percentile"
+      : "",
+  };
+
+  if (evidenceReasons.length > 0) {
+    return {
+      ...base,
+      evidenceStatus: "INSUFFICIENT",
+      evidenceReasons,
+      tier: null,
+    };
+  }
+
+  const tier = classifyTier(force, isD ? "D" : "F");
+  return {
+    ...base,
+    evidenceStatus: "QUALIFIED",
+    evidenceReasons: [],
     tier,
     description: TIER_DESC[tier],
   };
@@ -417,7 +511,7 @@ export function computeGravity(asset: Asset): GravityProfile | null {
 // so thin data can't swing a simulated season, and bounded to ±8 pace
 // points so gravity nudges a roster rather than replacing the scoresheet.
 export function simOnIceDelta(profile: GravityProfile | null): number {
-  if (!profile) return 0;
+  if (!profile || profile.evidenceStatus !== "QUALIFIED") return 0;
   const { oz, nz, dz } = profile.masses;
   const raw = (0.55 * dz + 0.35 * nz + 0.10 * oz) * 12 * profile.reliability;
   return r2(clamp(raw, -8, 8));

@@ -67,6 +67,17 @@ An absent term contributes nothing to its fixed-weight sum. Therefore:
 
 `Reliability` is a 0–100 sample, stability, and data-coverage index. It is not a probability.
 
+Coverage is also a hard ceiling on reliability. Zero weighted input coverage
+therefore returns zero reliability; games played and the unknown-stability
+prior cannot manufacture a medium score from absent evidence.
+
+A calculable profile is not automatically public-tier eligible:
+
+- fewer than 10 GP: no v3 profile;
+- 10–19 GP: `INSUFFICIENT`, with no tier or percentile;
+- 20+ GP but less than 66.67% weighted coverage: `INSUFFICIENT`, with no tier or percentile;
+- 20+ GP and at least 66.67% coverage: qualified for a tier and, when enough qualified same-position peers exist, a position percentile.
+
 `Signal Stability` is based mainly on agreement between current and baseline on-off values, with a legacy defenseman pair-driver adjustment. It is not a fitted portability model. The old `partnerIndependence` field remains only as a deprecated API alias during migration.
 
 ### X-NAV handoff
@@ -82,18 +93,26 @@ Assists, individual xG/goals, power-play production, OZ lift, and the DZ dome ca
 
 ### V3 tiers
 
-The existing fixed force cutoffs remain legacy v3 cutoffs until the calibration endpoint is rerun against an available qualified league population:
+The 2025-26 cutoffs are persisted from the verified 715-player qualified
+population. Because v3 is standardized within position, the calibration and
+all public percentiles are also within position:
 
 ```text
-SUPERMASSIVE ≥ 0.55
-STAR          ≥ 0.40
-MAIN_SEQUENCE ≥ 0.22
-SATELLITE     ≥ 0.08
-ASTEROID      ≥ -0.22
-BLACK_HOLE    < -0.22
+                 FORWARD     DEFENSE
+SUPERMASSIVE    ≥  0.46      ≥  0.52
+STAR             ≥  0.35      ≥  0.36
+MAIN_SEQUENCE    ≥  0.26      ≥  0.22
+SATELLITE        ≥  0.16      ≥  0.09
+ASTEROID         ≥ -0.15      ≥ -0.28
+BLACK_HOLE       < -0.15      < -0.28
 ```
 
-Do not describe those fixed numbers as verified season percentiles until that calibration report has been generated and reviewed.
+The nominal anchors are the 98th, 92nd, 80th, 60th, and 3rd percentiles.
+Production force is rounded to two decimals and tied values stay together, so
+observed tier shares do not exactly equal those anchors. A v3 position
+percentile describes rarity among qualified forwards or defensemen; it does not
+establish equivalent hockey value across positions. Full provenance and
+reconciliation are in `docs/analytics/GRAVITY_V3_TIER_CALIBRATION.md`.
 
 ## Gravity v4 infrastructure
 

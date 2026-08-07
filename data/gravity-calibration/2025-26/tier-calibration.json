@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "gravity-v3-tier-calibration-v1",
+  "modelRelease": "gravity-v3-release-a",
+  "season": "2025-26",
+  "source": {
+    "generatedAt": "2026-07-24T21:45:10.482Z",
+    "populationSha256": "6b76883a33802f1fbfc93475ca5240819ad8294bfc5aa5a8f35fd3fe895654f9",
+    "manifestPayloadSha256": "e59c9b8ea35d54b1d7ab8f7d9c94b9f46b8535ee6ffdd3a63d30ebba425e8a04"
+  },
+  "evidencePolicy": {
+    "calculationMinimumGames": 10,
+    "publicMinimumGames": 20,
+    "publicMinimumCoverage": 0.6666666666666666,
+    "minimumPositionPercentilePopulation": 20
+  },
+  "percentileScope": "WITHIN_POSITION",
+  "tierAnchors": {
+    "supermassiveAtOrAbovePercentile": 98,
+    "starAtOrAbovePercentile": 92,
+    "mainSequenceAtOrAbovePercentile": 80,
+    "satelliteAtOrAbovePercentile": 60,
+    "blackHoleBelowPercentile": 3
+  },
+  "positions": {
+    "F": {
+      "qualifiedPlayers": 476,
+      "thresholds": {
+        "supermassiveAtOrAbove": 0.46,
+        "starAtOrAbove": 0.35,
+        "mainSequenceAtOrAbove": 0.26,
+        "satelliteAtOrAbove": 0.16,
+        "blackHoleBelow": -0.15
+      },
+      "observedTierCounts": {
+        "SUPERMASSIVE": 12,
+        "STAR": 29,
+        "MAIN_SEQUENCE": 58,
+        "SATELLITE": 93,
+        "ASTEROID": 271,
+        "BLACK_HOLE": 13
+      }
+    },
+    "D": {
+      "qualifiedPlayers": 239,
+      "thresholds": {
+        "supermassiveAtOrAbove": 0.52,
+        "starAtOrAbove": 0.36,
+        "mainSequenceAtOrAbove": 0.22,
+        "satelliteAtOrAbove": 0.09,
+        "blackHoleBelow": -0.28
+      },
+      "observedTierCounts": {
+        "SUPERMASSIVE": 6,
+        "STAR": 15,
+        "MAIN_SEQUENCE": 28,
+        "SATELLITE": 52,
+        "ASTEROID": 131,
+        "BLACK_HOLE": 7
+      }
+    }
+  }
+}
