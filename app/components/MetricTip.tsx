@@ -3,7 +3,7 @@ import React, { useState, useRef, useCallback } from "react";
 import { NAV_STAGE_DESC, NAV_STAGE_SHORT } from "@/app/lib/nav-breakdown";
 
 const GLOSSARY: Record<string, string> = {
-  "X-NAV": "Extended Net Asset Value — the Ledger's trade-value model: offense, defense, gravity, age, contract surplus, deployment, and role context.",
+  "X-NAV": "Extended Net Asset Value — the Ledger's trade-value model: offense, defense, age, contract surplus, deployment, and role context. Gravity is separately gated and off in the public-launch baseline.",
   "G-NAV": "X-NAV for goalies — GSAx, workload, save profile, team defense, age, and contract surplus.",
   "NAV": "Shorthand for X-NAV — Extended Net Asset Value, the Ledger's overall trade-value model.",
   "OPS": "Offensive Point Shares — a player's offensive contribution measured in standings points.",
@@ -23,7 +23,7 @@ const GLOSSARY: Record<string, string> = {
   "CAP": "Contract surplus component — how the cap hit compares to the model's market price. Positive means he costs less than his profile usually signs for.",
   "YNG": "Youth/upside component for young NHL players with real signal. Not a blanket ELC bonus.",
   "DEF": "Defensive NAV component — composite of defensive contributions.",
-  "GRAV": "Gravity v3 transition handoff — only the bounded neutral-zone transition proxy; direct offense and defensive suppression are valued elsewhere.",
+  "GRAV": "Separately gated Gravity v3 transition handoff — only the bounded neutral-zone transition proxy. It is off in the public-launch baseline.",
   "OFF": "Offensive NAV component — production and creation priced against position.",
   "GSAX": "Goals Saved Above Expected — how many goals a goalie prevents vs league-average.",
   "SV%": "Save percentage — shots saved divided by total shots faced.",

@@ -29,7 +29,7 @@ baseline-season weight, goalie ice time, EDGE, contract, and cap-ceiling inputs
 survive the adapter; every returned stage list reconciles to the headline; and
 `npm test` plus the production build pass.
 
-### [ ] PL-2 — Put Gravity display, X-NAV, and simulation behind separate gates
+### [x] PL-2 — Put Gravity display, X-NAV, and simulation behind separate gates
 
 Keep Gravity v4 off. Give v3 display, X-NAV contribution, and simulation
 contribution independent feature flags. Default unvalidated value propagation

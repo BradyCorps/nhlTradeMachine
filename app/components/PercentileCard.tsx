@@ -7,7 +7,7 @@ import React, { useMemo, useRef, useCallback, useState } from "react";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
-import { computeGravity } from "@/app/lib/gravity";
+import { gravityForDisplay } from "@/app/lib/gravity-channels";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
 import { FieldDiagram } from "@/app/components/GravityField";
 import { SEASON } from "@/app/lib/season-config";
@@ -199,11 +199,11 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
 
   const { gravity, gravityPercentile } = useMemo(() => {
     if (posGroup === "G") return { gravity: null, gravityPercentile: null };
-    const profile = computeGravity(player as any);
+    const profile = gravityForDisplay(player as any);
     if (!profile) return { gravity: null, gravityPercentile: null };
     const peerForces = allPlayers
       .filter(peer => getPositionGroup(peer.position) === posGroup && (peer.games ?? 0) >= 20)
-      .map(peer => computeGravity(peer as any)?.force)
+      .map(peer => gravityForDisplay(peer as any)?.force)
       .filter((force): force is number => force != null)
       .sort((a, b) => a - b);
     return {

@@ -14,7 +14,7 @@ import type { OffseasonPending } from "@/app/lib/free-agency";
 import { displayPosition } from "@/app/lib/display-position";
 import StrandView from "@/app/components/StrandView";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
-import { computeGravity } from "@/app/lib/gravity";
+import { gravityForDisplay } from "@/app/lib/gravity-channels";
 import { CompactGravity } from "@/app/components/GravityField";
 import { formatCapHit as money } from "@/app/lib/display-utils";
 
@@ -54,7 +54,7 @@ export function StatLine({ p }: { p: Asset }) {
 
 export function ExpandedStats({ p, nav }: { p: Asset; nav: XNAVResult }) {
   const isG = p.position === "G";
-  const gravity = !isG ? computeGravity(p) : null;
+  const gravity = !isG ? gravityForDisplay(p) : null;
   const fmtPct = (v: number | null | undefined) => v != null ? `${(v * 100).toFixed(1)}%` : "—";
   const fmtDec = (v: number | null | undefined, sign = false) =>
     v != null ? `${sign && v > 0 ? "+" : ""}${v.toFixed(1)}` : "—";

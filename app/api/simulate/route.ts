@@ -13,7 +13,7 @@ import { leadershipBonus } from "@/app/data/leadership";
 import { opportunityPace } from "@/app/lib/young-opportunity";
 import { computeBreakout } from "@/app/lib/breakout-model";
 import { burstProfile } from "@/app/lib/burst-channel";
-import { computeGravity, simOnIceDelta } from "@/app/lib/gravity";
+import { gravityForSimulation } from "@/app/lib/gravity-channels";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
 import { effectiveCapHit } from "@/app/lib/cap-delta";
 import { simRequestSchema } from "@/app/lib/sim-request-schema";
@@ -63,11 +63,9 @@ interface SimPlayer {
   goalsPace?: number;               // luck fallback (xG vs goals)
   edgeBurstsOver20?: number | null; // NHL EDGE explosiveness → breakout burst signal
   edgeSpeedMaxMph?: number | null;
-  // G4 — gravity propagation. The client sends full Asset objects, so these
-  // on-ice fields already arrive in the payload; declaring them lets the sim
-  // compute each skater's gravity field instead of valuing rosters on
-  // points pace alone. All optional — absent data degrades gracefully
-  // inside computeGravity.
+  // Gated Gravity v3 simulation inputs. The client already sends full Asset
+  // objects, but these fields affect team strength only when the independent
+  // server-side simulation channel is enabled. All are optional.
   xgRelTM?: number | null;          // on-off xG lift (NOIV family)
   xgaRelTM?: number | null;         // on-off suppression (DZ dome)
   baselineXgRel?: number;           // multi-season on-off baseline
@@ -200,17 +198,15 @@ const stableGsax = (p: SimPlayer): number => {
     : cur;
 };
 
-// G4 — the sim feels gravity. Points pace prices scoring; the zone-mass
-// field adds what it misses (suppression, transition drive), so a shutdown
-// defenseman or transition engine finally moves simulated standings, default
-// lineup slots, and playoff odds. Memoized per player object: onIceValue
-// runs inside sort comparators, and the payload objects are fresh each
-// request, so a WeakMap can never serve stale cross-request values.
+// The separately gated v3 simulation channel adds what points pace misses
+// (suppression and transition drive). It defaults off until held-out evidence
+// clears the release gate. Memoized per request object because onIceValue runs
+// inside sort comparators.
 const gravityOnIce = new WeakMap<SimPlayer, number>();
 const gravityDelta = (p: SimPlayer): number => {
   let delta = gravityOnIce.get(p);
   if (delta === undefined) {
-    delta = simOnIceDelta(computeGravity(p as any));
+    delta = gravityForSimulation(p as any);
     gravityOnIce.set(p, delta);
   }
   return delta;

@@ -3,8 +3,10 @@ import React, { useEffect, useState } from "react";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import Link from "next/link";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
-import { computeGravity, gravityTierColor } from "@/app/lib/gravity";
+import { gravityTierColor } from "@/app/lib/gravity";
 import type { GravityProfile, GravityTier } from "@/app/lib/gravity";
+import { gravityForDisplay } from "@/app/lib/gravity-channels";
+import { isGravityV3DisplayEnabled } from "@/app/lib/gravity-feature-flags";
 import { TierIcon, FieldDiagram } from "@/app/components/GravityField";
 import { displayPosition } from "@/app/lib/display-position";
 import { seasonTotal } from "@/app/lib/display-utils";
@@ -101,6 +103,7 @@ interface RankedPlayer {
 }
 
 type SortMode = "nav" | "gravity";
+const GRAVITY_DISPLAY_ENABLED = isGravityV3DisplayEnabled();
 
 export default function TrendingPlayers() {
   const [allPlayers, setAllPlayers] = useState<RankedPlayer[]>([]);
@@ -126,7 +129,7 @@ export default function TrendingPlayers() {
 
         const results: RankedPlayer[] = players.map(p => {
           const xnav = calculateAssetNAV(p, td.capCeiling);
-          const grav = computeGravity(p as any);
+          const grav = gravityForDisplay(p as any);
           return {
             player: p,
             nav: xnav.total,
@@ -206,7 +209,9 @@ export default function TrendingPlayers() {
       <div className="flex items-center gap-1 mb-4" role="tablist" aria-label="Sort trending players">
         {([
           { mode: "nav" as SortMode, label: "By X-NAV" },
-          { mode: "gravity" as SortMode, label: "By Gravity" },
+          ...(GRAVITY_DISPLAY_ENABLED
+            ? [{ mode: "gravity" as SortMode, label: "By Gravity" }]
+            : []),
         ]).map(tab => (
           <button
             key={tab.mode}

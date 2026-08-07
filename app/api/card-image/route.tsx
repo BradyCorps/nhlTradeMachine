@@ -16,6 +16,7 @@ import {
   RINK_BLUE_LINE,
   RINK_ICE,
 } from "@/app/lib/gravity-rink";
+import { isGravityV3DisplayEnabled } from "@/app/lib/gravity-feature-flags";
 
 /** Two letters from a name — the drawn stand-in for a player photo. */
 function initialsForCard(name: string): string {
@@ -256,7 +257,13 @@ export async function POST(req: Request) {
   if (!validation.success) {
     return new Response(validation.message, { status: 400 });
   }
-  const data: CardImagePayload = validation.data;
+  // A stale client may still submit a previously computed v3 field. Enforce
+  // the display gate again at the renderer boundary so disabling the public
+  // channel removes Gravity from exported images as well as live components.
+  const data: CardImagePayload = {
+    ...validation.data,
+    gravity: isGravityV3DisplayEnabled() ? validation.data.gravity : null,
+  };
 
   const [regular, bold] = await Promise.all([fontRegular, fontBold]);
 
