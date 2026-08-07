@@ -1,5 +1,7 @@
 # Development Notes
 
+- 2026-08-06: **Made bulk contract-ingestion counts reflect rows actually written.** Insert, update, extension, and best-effort position-backfill reports now derive from database `RETURNING` rows; zero-row conflicts are listed in the Paste Signings result instead of being called successes, with five integration tests covering each write path. Touched `app/api/admin/contracts/route.ts`, `app/admin/contracts/PastePanel.tsx`, `__tests__/contracts-ingestion-counts.test.ts`, `docs/DEVNOTES.md`.
+
 - 2026-08-06: **Made admin contract-term backfills and reconciliations atomic and truthfully reported.** The route now plans and writes inside one transaction, verifies every affected row before counting it, rolls the batch back on any failure, and clears roster caches only after commit; added five in-memory database tests covering both actions, rollback, zero-row writes, and dry runs. Touched `app/api/admin/contract-terms/route.ts`, `__tests__/contract-term-route.test.ts`, `docs/DEVNOTES.md`.
 
 - 2026-08-06: **Reduced the production dependency audit from 38 advisories (including one critical) to the two high-severity findings blocked on a separate Next 14→16 migration.** Moved build/test tooling to `devDependencies`, removed the unused vulnerable Vercel CLI, upgraded direct PostCSS and Node types, and applied compatible transitive security fixes. Touched `package.json`, `package-lock.json`, `docs/DEVNOTES.md`.
