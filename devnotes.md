@@ -2091,6 +2091,21 @@ it; it did not create it.
 - calcGoalieNAV missing team-control option value, cornerstone floor
 - `careerGsax` on Asset is dead code
 
+### Security headers (PL-6, complete)
+`next.config.js` was empty. Added all six standard production headers:
+- **CSP**: `default-src 'self'`; scripts from `'self'` + `'unsafe-inline'`
+  (Next.js hydration) + `va.vercel-scripts.com` (Speed Insights); styles
+  `'unsafe-inline'` (3,900+ inline style props) + `fonts.googleapis.com`;
+  fonts from `fonts.gstatic.com`; images from `assets.nhle.com` + `data:`;
+  connect to `va.vercel-scripts.com` for SI beacon; no frames, no objects,
+  `base-uri 'self'`, `form-action 'self'`.
+- **HSTS**: 2-year max-age, includeSubDomains, preload.
+- **X-Frame-Options**: DENY (belt-and-suspenders with frame-ancestors).
+- **X-Content-Type-Options**: nosniff.
+- **Referrer-Policy**: strict-origin-when-cross-origin.
+- **Permissions-Policy**: camera, microphone, geolocation, interest-cohort
+  all denied.
+
 ### Remaining AA Items
 - Modal focus trapping (LedgerDropdown, AssetDropdown, WelcomeModal)
 - Admin trade-block keyboard access
