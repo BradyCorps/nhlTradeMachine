@@ -19,7 +19,6 @@
     "@libsql/client": "^0.17.3",
     "@upstash/redis": "^1.38.0",
     "@vercel/speed-insights": "^2.0.0",
-    "cheerio": "^1.0.0-rc.12",
     "drizzle-orm": "^0.45.2",
     "framer-motion": "^12.41.0",
     "next": "16.3.0",
@@ -29,7 +28,6 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "@types/jest": "^30.0.0",
     "@types/node": "^20.19.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
@@ -42,7 +40,6 @@
     "playwright-core": "^1.61.1",
     "postcss": "8.5.26",
     "tailwindcss": "3.4.4",
-    "ts-jest": "^29.4.11",
     "tsx": "^4.22.4",
     "typescript": "5.5.4",
     "vitest": "^4.1.7"
