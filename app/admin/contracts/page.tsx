@@ -573,8 +573,14 @@ export default function AdminContractsPage() {
   const handleSeed = async () => {
     try {
       const res = await fetch("/api/admin/seed", { method: "POST" });
-      const data = await readAdminResponse<{ inserted: number; filled: number; skipped: number }>(res, "Load baseline failed");
+      const data = await readAdminResponse<{ inserted: number; filled: number; skipped: number; staleFaClass?: string[] }>(res, "Load baseline failed");
       toast(`Baseline loaded — ${data.inserted} added, ${data.filled} FA-filled, ${data.skipped} kept`, "success");
+      // Players the curated class still lists who have since re-signed. Not
+      // stamped, but worth saying out loud: the list wants pruning, and until
+      // it is, every baseline load has to catch them again.
+      if (data.staleFaClass && data.staleFaClass.length > 0) {
+        toast(`${data.staleFaClass.length} on the FA list are under contract and were left alone — prune free-agent-seed.ts`, "success");
+      }
       load();
     } catch (e) {
       toast(adminErrorMessage(e, "Load baseline failed"), "error");

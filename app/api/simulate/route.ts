@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkPublicRateLimit, rateLimitResponse, SIMULATE_LIMITS } from "@/app/lib/public-rate-limit";
 import { SEASON } from "@/app/lib/season-config";
 import { simSeasonIdentity } from "@/app/lib/sim-season";
 import {
@@ -994,6 +995,10 @@ function buildTradedPlayerOutcomes(
 // ── Main handler ──────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
+    // Heavier than an evaluation, and just as public.
+    const limit = await checkPublicRateLimit(req, SIMULATE_LIMITS);
+    if (!limit.ok) return rateLimitResponse(limit);
+
     const rawBody = await req.json();
 
     // Validate structure and bounds before any work runs (audit #4). Fields on

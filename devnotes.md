@@ -1954,6 +1954,74 @@ season later. The editor derives one, because a person typed it after looking at
 the source and the dialog showed them the year it produces first. Same rule, and
 the difference is whether anyone was looking.
 
+### Launch Prep — The Saturday List
+
+Three things that could not break the product, done before the launch weekend.
+
+**The dependency tree was lying about its own risk.** `npm audit` reported 39
+vulnerabilities including a critical, and almost none were in code that runs:
+the Vercel CLI, ESLint, TypeScript, the type packages and the PostCSS/Tailwind
+toolchain were all listed as production dependencies. The critical was `tar`,
+reachable only through the Vercel CLI. Moving them where they belong took the
+**production surface from 39 to 3, with no critical**.
+
+The three that remain are Next and the `nanoid`/`postcss` it bundles. Their
+advisory range spans every published version *including the 16 previews*, so
+none of them clear by upgrading, and the surfaces they describe — image
+optimizer, rewrites, custom server, i18n middleware — are all unconfigured
+here. 14.2.35 is the last release on the 14.2 line. That is a defensible
+position to launch from, and it is worth having written down rather than
+rediscovered under pressure.
+
+Also dropped `cheerio` (unused since the scraper was removed) and
+`ts-jest`/`@types/jest` (unused since the suite moved to vitest).
+
+**The cold path could not be measured from here** — outbound to the NHL API and
+MoneyPuck is blocked in this environment, so the 1.24s I recorded is the
+fallback path, not the real one. That still bought something worth knowing:
+with no Redis, no database and no live stats feed, `/api/league` returned
+**200 with 32 teams and 857 players**, flagging `liveStats: false`. It degrades
+rather than failing, which is the launch-day question that actually mattered.
+
+`maxDuration = 60` on the three league routes is the insurance the measurement
+could not replace. A ceiling, not a delay: the platform default would cut off a
+genuinely cold assembly partway and hand a 504 to the one reader whose request
+was about to fill the cache for everyone behind them.
+
+**And the two most expensive public endpoints were unmetered.** `/api/claude`
+has had a limiter since it was written, because it spends money and the cost of
+not having one is a bill. `/api/evaluate` and `/api/simulate` never did — they
+are free to run, so the failure mode is quieter: they are the heaviest things
+the app computes, they authenticate nobody, and a loop pointed at either burns
+the serverless budget and starves every real reader. Survivable while nobody
+knows the site exists. Not survivable on the day of a launch post.
+
+60/min per address for evaluations, 30 for simulations, with global windows
+behind them because the per-IP one is bypassable by rotating
+`X-Forwarded-For`. Verified against a running server: 60 requests through, the
+61st a `429` carrying `Retry-After: 60`, a second address unaffected. It fails
+OPEN — if Redis throws, the request is allowed, because a limiter that closes
+the door when its own datastore hiccups has become the outage it was meant to
+prevent.
+
+**One real bug found on the way.** The cold-path run showed Alex Tuch and
+Alexander Ovechkin sitting in the free-agent pool. That was the no-database
+fallback doing its job, but it pointed at something live:
+`FREE_AGENT_SEED_LIST_2026` is a snapshot, and players on it keep signing —
+Tuch is under contract in Washington, Collin Graf re-signed in San Jose. Both
+are still on the list.
+
+"Load baseline" skips editor rows, but a `seed` or `sync` row with a null
+expiry gets stamped `UFA 2026`, which zeroes the cap hit and prices the player
+as a nought-year rental. That is the phantom-bargain bug arriving through a
+button rather than a scrape — and the button was about to be pressed during the
+launch data pass.
+
+The anchor settles it without needing the list to be right: a row whose expiry
+year runs past the offseason being seeded is signed, whatever the class list
+remembers. Those rows are now left alone and **reported**, because the actual
+fix is to prune the list rather than to keep catching them.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

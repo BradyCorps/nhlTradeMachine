@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkPublicRateLimit, rateLimitResponse, EVALUATE_LIMITS } from "@/app/lib/public-rate-limit";
 import { getInjuryRisk, getProspectTier } from "@/app/lib/player-data";
 import type {
   Asset,
@@ -1207,6 +1208,11 @@ interface TradeVerdict {
 // ============================================================
 export async function POST(req: Request) {
   try {
+    // Before the body is even read: this is the most expensive computation the
+    // app performs and it authenticates nobody.
+    const limit = await checkPublicRateLimit(req, EVALUATE_LIMITS);
+    if (!limit.ok) return rateLimitResponse(limit);
+
     const rawBody = await req.json();
     
     // Validate incoming payload with Zod

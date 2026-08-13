@@ -7,6 +7,16 @@ import { swrStore } from "@/app/lib/swr-store";
 
 export const dynamic = "force-dynamic";
 
+// The roster assembly behind this route makes several external calls and
+// parses a season of MoneyPuck. With Redis warm it answers in milliseconds;
+// with every cache cold — a fresh deploy, an evicted key, the first request
+// after a quiet night — it does the whole job inline. The platform default
+// would cut that off partway and hand the reader a 504 on the one request
+// that was about to fill the cache for everybody behind them.
+//
+// A ceiling, not a delay: a fast response is unaffected.
+export const maxDuration = 60;
+
 // The full roster assembly (~40s cold: 32 live NHL roster fetches, timeline
 // pulls, MoneyPuck CSV parse, per-player valuation for ~900 players) ran on
 // every request. Cache the finished payload so only one request per window
