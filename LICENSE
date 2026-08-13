@@ -1,0 +1,64 @@
+Copyright (c) 2026 Brady Corps. All rights reserved.
+
+Cap & Crease — https://capandcrease.com
+
+
+WHAT THIS COVERS
+
+This notice applies to the original source code, model design, written
+documentation, and site design in this repository ("the Work").
+
+The Work is source-available, not open source. It can be read here. No licence
+to use it is granted by its being published.
+
+
+WHAT YOU MAY NOT DO WITHOUT WRITTEN PERMISSION
+
+  * copy, publish, or redistribute the Work or any substantial part of it;
+  * modify it or create derivative works from it;
+  * run it, in whole or in part, as a hosted or public service;
+  * use it commercially.
+
+Permission may well be given. Ask.
+
+
+WHAT YOU MAY DO
+
+  * read the Work, and link to it;
+  * quote short excerpts with attribution, for commentary, teaching, review,
+    reporting, or research;
+  * open an issue or a pull request, on the understanding that a contribution
+    offered here may be used in the project.
+
+Nothing above is intended to restrict anything you are permitted to do under
+applicable copyright law regardless of this notice.
+
+
+WHAT THIS DOES NOT COVER, AND IS NOT CLAIMED
+
+This repository contains and refers to material that is not the author's, and
+no ownership of it is asserted here:
+
+  * National Hockey League and member club names, logos, and trademarks, which
+    belong to their respective owners;
+  * player names, biographical details, statistics, and imagery originating
+    from the NHL and its public APIs;
+  * data derived from MoneyPuck and other third-party sources;
+  * third-party software dependencies, each under its own licence.
+
+Cap & Crease is independent and unaffiliated with the National Hockey League.
+Those marks are named to say what the analysis is about, never to imply
+endorsement or association.
+
+Nothing in this notice grants any right in third-party material. Anyone
+seeking to use that material must look to its owner, not to this file.
+
+
+NO WARRANTY
+
+The Work is provided "as is", without warranty of any kind, express or
+implied, including but not limited to the warranties of merchantability,
+fitness for a particular purpose, and non-infringement. In no event shall the
+author be liable for any claim, damages, or other liability, whether in an
+action of contract, tort, or otherwise, arising from, out of, or in connection
+with the Work or its use.

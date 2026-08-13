@@ -2022,6 +2022,65 @@ year runs past the offseason being seeded is signed, whatever the class list
 remembers. Those rows are now left alone and **reported**, because the actual
 fix is to prune the list rather than to keep catching them.
 
+### The Legal Basics, Written From the Code
+
+A site that asks for donations while showing club marks needs four documents,
+and the requirement was that each be accurate and not readable any other way
+than intended. That second half is the harder one, and it is what shaped the
+work: the privacy section names the specific browser-storage keys and the
+specific third parties, so a reader can VERIFY it rather than trust it.
+
+**One page, not three.** `/legal` covers independence, what the numbers are and
+are not, using the site, privacy, and donations. Linked from the footer, which
+already renders on every public page.
+
+**What the audit of the code actually found**, all of which is now stated:
+
+* No accounts, and **no cookies are set for visitors at all** — the only cookie
+  is the author's own signed admin session.
+* Six things live in the browser and never leave it: the welcome dismissal, an
+  in-progress Cup Run, saved trade scenarios, two fantasy-board keys, and Press
+  Box puzzle progress. All named individually.
+* Rate limiting writes the caller's IP into a counter key for 60 seconds (24
+  hours for the narrative ceiling) and nothing else. Disclosed, because it is
+  an IP address and pretending otherwise would be the sort of omission this
+  page exists to avoid.
+* The narrative feature sends the built trade to **Anthropic**. That is the one
+  place a visitor's input leaves the site, and it says so.
+* Shared trades are base64 in the URL. There is no database of them, so the
+  page says there is no database of them.
+
+**The donation paragraph is the one most likely to be misread**, so it is the
+bluntest: not a purchase, not a subscription, buys no feature or influence, not
+refundable, not tax-deductible, and everything stays free for everyone either
+way. It also declines to promise a roadmap — "one person's nights and
+weekends" is the true description and a safer one than an implied commitment.
+
+**The licence does not claim what it cannot.** All rights reserved over the
+original code and model design, with an explicit carve-out saying that NHL and
+club marks, player data, and MoneyPuck-derived material are not the author's
+and that nothing in the file grants any right in them. A licence that read as
+covering the data would be asserting ownership of somebody else's.
+
+**`SECURITY.md` promises only what a solo project can deliver**: private
+reporting through GitHub, an acknowledgement in about a week, and no bounty —
+stated plainly, because promising money the project does not have is worse than
+saying there is none.
+
+**Ten canaries keep it true.** A privacy statement is the one document that is
+worse than useless when it drifts, because it keeps making a promise with
+authority after the code stopped keeping it. So the tests pin the claims to the
+source: every browser-storage key the app declares must be named on the page;
+no file outside the admin area may set a cookie; no analytics dependency may
+appear that is not disclosed; the share path must contain no database write.
+Verified by adding an undocumented key and watching it fail.
+
+**A correction to my own audit.** I reported that the words "not affiliated"
+appeared nowhere in the codebase. They did not — the existing wording is
+"unaffiliated", in `BRAND.disclaimer`, rendered in the footer on every public
+page. The disclaimer already existed and my grep missed it. `/legal` expands
+it; it did not create it.
+
 ## Known Issues / Future Work
 
 ### Goalie Gaps

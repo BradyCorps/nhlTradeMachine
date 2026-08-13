@@ -141,7 +141,7 @@ export default function Footer() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-5 text-center">
           <p className="text-2xs uppercase tracking-[0.16em] sm:tracking-[0.36em] leading-relaxed font-mono text-ledger-ink-faint">
-            <Link href="/methodology" className="underline hover:text-ledger-ink transition-colors">Methodology</Link> · <Link href="/glossary" className="underline hover:text-ledger-ink transition-colors">Glossary</Link> · <Link href="/glossary#icon-key" className="underline hover:text-ledger-ink transition-colors">Icon Key</Link>
+            <Link href="/methodology" className="underline hover:text-ledger-ink transition-colors">Methodology</Link> · <Link href="/glossary" className="underline hover:text-ledger-ink transition-colors">Glossary</Link> · <Link href="/glossary#icon-key" className="underline hover:text-ledger-ink transition-colors">Icon Key</Link> · <Link href="/legal" className="underline hover:text-ledger-ink transition-colors">Terms &amp; Privacy</Link>
           </p>
           <p className="mt-1 text-[10px] uppercase tracking-[0.14em] sm:tracking-[0.24em] font-mono text-ledger-rule">
             X-NAV · G-NAV · NOIV · STRAND · GM Audit
