@@ -11,6 +11,9 @@
 # next.js
 /.next/
 /out/
+# Debug output of scripts/fmv-comparison/run.ts --json out.json. Player-level
+# model output, regenerable, and 230 KB of it was committed by accident.
+out.json
 
 # production
 /build
