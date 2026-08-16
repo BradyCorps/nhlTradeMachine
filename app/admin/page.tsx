@@ -1,6 +1,7 @@
 import React from "react";
 import { db } from "@/app/db/client";
 import { draftPickOverrides, players, teams, tradeBlock, siteSettings } from "@/app/db/schema";
+import { SEASON } from "@/app/lib/season-config";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,12 @@ export default async function AdminDashboard() {
       label: "DATA HEALTH",
       desc:  "Check all external data sources (NHL API, MoneyPuck) and the contract baseline, prune stale DB rows, and re-seed.",
       stat:  "Health check · Prune · Seed",
+    },
+    {
+      href:  "/admin/season-setup",
+      label: "SEASON SETUP",
+      desc:  "Configure the next season, manage the FA class, and run the rollover checklist. One place for everything that changes each September.",
+      stat:  `Current: ${SEASON.label}`,
     },
     {
       href:  "/admin/settings",
