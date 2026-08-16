@@ -2106,6 +2106,40 @@ it; it did not create it.
 - **Permissions-Policy**: camera, microphone, geolocation, interest-cohort
   all denied.
 
+### Season Setup admin tab (complete)
+New admin page at `/admin/season-setup` and API route at
+`/api/admin/season-setup`. One place for everything that changes each
+September.
+
+**What it does:**
+- **Current season overview** — displays every `SEASON` field in a 3-column
+  read-only grid so the operator can see what's live without opening code.
+- **Rollover checklist** — 10 steps (config, contracts, FA class, seed
+  built, seed loaded, caches, leadership, draft class, baselines, press
+  box) persisted to `siteSettings` as JSON. Check items off as the work
+  gets done; progress survives page reloads.
+- **Season config form** — text inputs for label, cap ceiling/floor, and
+  champion fields. Typing a label like "2027-28" auto-fills
+  `replaySeason`, `apiSeasonId`, `nhleSeasonId`, `mpSeason`, `draftYear`,
+  and `firstTradablePickYear` via `deriveFields()`.
+- **FA class editor** — two textareas (UFA / RFA), one name per line,
+  saved to `siteSettings` as JSON.
+- **Action buttons** — Load Seed (calls `seedPlayersTable()` + cache
+  bust) and Clear All Caches (Redis team/contract/stats keys).
+- **Rollover guidance** — numbered steps printed on the page so the
+  operator doesn't have to remember the order.
+
+**Design decision — why season-config.ts stays as code.** Making `SEASON`
+database-driven would require every consumer (`getTeamData`,
+`fetchMoneypuck`, `fetchNhlStats`, `capEngine`, etc.) to become async and
+await the DB read. That's dozens of call sites, many of them in shared
+utilities already deep in the call graph. The tab instead serves as a
+staging area and reference: the operator fills in the new values, checks
+off the list, then updates the one-line constants in `season-config.ts`
+and redeploys. The actual rollover is a code change + deploy, which is
+the right forcing function for a solo-operator project — you can't
+accidentally roll over by clicking a button.
+
 ### Remaining AA Items
 - Modal focus trapping (LedgerDropdown, AssetDropdown, WelcomeModal)
 - Admin trade-block keyboard access
