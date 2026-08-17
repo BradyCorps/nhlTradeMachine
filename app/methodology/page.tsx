@@ -41,6 +41,16 @@ const SECTIONS: { id: string; title: string; paras: string[] }[] = [
     ],
   },
   {
+    id: "goalie-evaluation",
+    title: "Goalie Evaluation — a separate model, not a forced fit",
+    paras: [
+      "Goalies are not scored on points, so they cannot share a skater's valuation pipeline. X-NAV prices goalies through GSAx (goals saved above expected), save percentage, workload, and a fitted fair-market-value model trained on 260 goalie contracts. The result feeds the same trade-value currency as skaters, but the inputs and the aging assumptions are entirely different.",
+      "Not all goalie stats are equal. A stability backtest across 769 consecutive-season pairs (2008–2025, minimum 1,000 minutes) measured which metrics actually persist year to year: freeze rate (r = 0.72) and rebound control (r = 0.69) are genuine repeatable skills. High-danger save percentage (r = 0.40), overall save percentage (r = 0.30), and GAA (r = 0.34) carry moderate signal. GSAx per 60 (r = 0.13) and medium-danger save percentage (r = 0.06) are nearly random from one season to the next — a single year tells you almost nothing about the next. The app weights accordingly: the percentile profile emphasizes the stable metrics, and all eight are regressed toward population means using their measured stability coefficients before any evaluation.",
+      "Goalies peak later than skaters. The backtest aging curve (131 goalies, signings-derived birth years) shows near-plateau through age 30, a 3% annual decline at 31–33, 4.5% at 34–36, and steeper decline after 37 — with survivorship bias flattening the oldest group, since only elite goalies still play at that age. The valuation engine uses a goalie peak age of 30 (versus 27–28 for forwards), so a 29-year-old goalie in his prime is not penalized the way a 29-year-old skater past his peak would be.",
+      "Hot goalie regression is real and strong: 78% of goalies with a save percentage at or above .915 declined the next season, with an average drop of 0.93 percentage points. The model captures this — a .925 season regresses toward .913 in the next projection, not .925.",
+    ],
+  },
+  {
     id: "gm-audit",
     title: "The GM Audit — plausibility, not just math",
     paras: [
@@ -53,6 +63,7 @@ const SECTIONS: { id: string; title: string; paras: string[] }[] = [
     title: "The Simulation Engine — consequences on the record",
     paras: [
       "Armchair GM's three-year Cup Run exists because trades are hypotheses and seasons are experiments. The engine rolls the whole league forward — aging, retirements, breakouts, drafts, cap growth, AI cap compliance — so a deadline rental or a rebuild pivot is tested against consequences, not vibes.",
+      "Goalies evolve across offseasons rather than carrying a frozen stat line. Each rollover regresses GSAx and save percentage toward population means using the backtest stability coefficients, applies the goalie age curve, and adds stochastic noise — so a team riding a hot backup into Year 2 will honestly face the regression that history says is coming.",
       "Seeded randomness keeps runs replayable: the same decisions in the same season produce the same league, so outcomes are attributable to choices.",
     ],
   },
