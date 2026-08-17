@@ -382,57 +382,39 @@ console.log(`\n${"═".repeat(70)}`);
 console.log("  AGING — SV% change by age group");
 console.log(`${"═".repeat(70)}`);
 
-// We need age. Use playerId to track individuals, but we don't have birth dates
-// in the goalie data. We'll estimate from career length: if a goalie's first
-// season in the data is year X, assume they were ~23 then (league average debut).
-// This is rough but sufficient to show the aging curve shape.
-
-// Better approach: check if we can load bios
-const BIOS_FILE = "OtherData/2025;26_player_bios.csv";
+const SIGNINGS_FILE = "OtherData/contracts/signings.csv";
 const goalieBirthYear = new Map<string, number>();
-
-function readBiosCsv(rel: string): Row[] {
-  const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
-  const lines = text.split(/\r?\n/).filter(Boolean);
-  const rawHead = lines[0];
-  const head = rawHead.replace(/^﻿/, "").split(",").map(h => h.replace(/^"|"$/g, ""));
-  return lines.slice(1).map(line => {
-    const cells = line.split(",").map(c => c.replace(/^"|"$/g, ""));
-    const row: Row = {};
-    head.forEach((h, i) => { row[h] = cells[i] ?? ""; });
-    return row;
-  });
-}
 
 const slug = (n: string): string =>
   n.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z ]/g, "").trim();
 
-// Build name→playerId map from goalie data
 const nameToPlayerId = new Map<string, string>();
 for (const r of allRows) {
   nameToPlayerId.set(slug(r.name), r.playerId);
 }
 
 try {
-  const biosRows = readBiosCsv(BIOS_FILE);
-  for (const r of biosRows) {
-    const name = r["Player"] ?? "";
-    const pos = r["Position"] ?? "";
-    const dob = r["Date of Birth"] ?? "";
-    if (!name || !dob) continue;
-    if (pos !== "G") continue;
-    const key = slug(name);
-    const pid = nameToPlayerId.get(key);
-    if (!pid) continue;
-    const year = new Date(dob).getFullYear();
-    if (isFinite(year) && year > 1960) goalieBirthYear.set(pid, year);
+  const sigText = fs.readFileSync(path.join(ROOT, SIGNINGS_FILE), "utf8");
+  const sigLines = sigText.split(/\r?\n/).filter(Boolean);
+  const sigHead = sigLines[0].replace(/^﻿/, "").split(",");
+  for (const line of sigLines.slice(1)) {
+    const cells = line.split(",");
+    const obj: Record<string, string> = {};
+    sigHead.forEach((h, i) => { obj[h] = cells[i] ?? ""; });
+    if (obj.pos?.trim() !== "G") continue;
+    const name = slug(obj.player ?? "");
+    const signAge = Number(obj.signAge);
+    const signDate = obj.signDate;
+    if (!isFinite(signAge) || !signDate) continue;
+    const signYear = new Date(signDate).getFullYear();
+    const pid = nameToPlayerId.get(name);
+    if (pid && !goalieBirthYear.has(pid)) {
+      goalieBirthYear.set(pid, signYear - signAge);
+    }
   }
-  console.log(`\n  Goalie birth years loaded: ${goalieBirthYear.size}`);
-  if (goalieBirthYear.size === 0) {
-    console.log("  (bios file contains skaters only — no goalie DOBs available)");
-  }
+  console.log(`\n  Goalie birth years loaded: ${goalieBirthYear.size} (from signings.csv)`);
 } catch {
-  console.log("\n  Warning: could not load bios file for age data");
+  console.log("\n  Warning: could not load signings file for age data");
 }
 
 if (goalieBirthYear.size >= 20) {
