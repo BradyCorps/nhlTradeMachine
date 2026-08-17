@@ -12,12 +12,12 @@ export interface TimelineYear {
 }
 
 function skaterYearlyFactor(age: number): number {
-  if (age < 22) return 1.04;
-  if (age < 25) return 1.02;
+  if (age < 22) return 1.07;
+  if (age < 25) return 1.03;
   if (age < 28) return 1.00;
-  if (age < 31) return 0.965;
-  if (age < 34) return 0.93;
-  return 0.88;
+  if (age < 31) return 0.975;
+  if (age < 34) return 0.96;
+  return 0.91;
 }
 
 // Goalie curve from stability backtest (769 pairs, 2008-2025):

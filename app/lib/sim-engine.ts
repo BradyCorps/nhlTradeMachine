@@ -60,8 +60,8 @@ const projectedPtsPace = (p: SimEnginePlayer): number => {
 
 export const ageDecay = (age: number, position: string): number => {
   const peak = position === "D" ? 27 : position === "G" ? 29 : 26;
-  if (age <= peak) return 1.0 + Math.max(0, (peak - age) * 0.005);
-  const baseRate = position === "D" ? 0.018 : 0.022;
+  if (age <= peak) return 1.0 + Math.max(0, (peak - age) * 0.012);
+  const baseRate = position === "D" ? 0.016 : 0.020;
   const earlyYears = Math.min(age, 33) - peak;
   const lateYears = Math.max(0, age - 33);
   const decline = earlyYears * baseRate + lateYears * baseRate * 2.5;

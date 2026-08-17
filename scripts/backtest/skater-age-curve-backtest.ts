@@ -219,8 +219,8 @@ console.log(`  Defense:   ${defPairs.length}`);
 // sim-engine ageDecay()
 function ageDecay(age: number, position: string): number {
   const peak = position === "D" ? 27 : 26;
-  if (age <= peak) return 1.0 + Math.max(0, (peak - age) * 0.005);
-  const baseRate = position === "D" ? 0.018 : 0.022;
+  if (age <= peak) return 1.0 + Math.max(0, (peak - age) * 0.012);
+  const baseRate = position === "D" ? 0.016 : 0.020;
   const earlyYears = Math.min(age, 33) - peak;
   const lateYears = Math.max(0, age - 33);
   const decline = earlyYears * baseRate + lateYears * baseRate * 2.5;
@@ -229,12 +229,12 @@ function ageDecay(age: number, position: string): number {
 
 // player-timeline skaterYearlyFactor()
 function timelineYearlyFactor(age: number): number {
-  if (age < 22) return 1.04;
-  if (age < 25) return 1.02;
+  if (age < 22) return 1.07;
+  if (age < 25) return 1.03;
   if (age < 28) return 1.00;
-  if (age < 31) return 0.965;
-  if (age < 34) return 0.93;
-  return 0.88;
+  if (age < 31) return 0.975;
+  if (age < 34) return 0.96;
+  return 0.91;
 }
 
 // ══════════════════════════════════════════════════════════════
