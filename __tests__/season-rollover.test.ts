@@ -154,18 +154,49 @@ describe("advanceSeason", () => {
     for (const p of res.players) expect(p.ptsPace).toBeGreaterThanOrEqual(0);
   });
 
-  it("leaves goalies and paceless prospects untouched by pace regen", () => {
+  it("leaves paceless prospects untouched by pace regen", () => {
     const res = advanceSeason(
-      [
-        player("g", { position: "G", age: 28, ptsPace: 0 }),
-        player("prospect", { age: 19, ptsPace: 0, prospectPtsPace: 55 }),
-      ],
+      [player("prospect", { age: 19, ptsPace: 0, prospectPtsPace: 55 })],
       ctx,
     );
-    expect(res.players.find((p) => p.id === "g")!.ptsPace).toBe(0);
     const prospect = res.players.find((p) => p.id === "prospect")!;
     expect(prospect.ptsPace).toBe(0);
     expect(prospect.prospectPtsPace).toBe(55);
+  });
+
+  it("regresses goalie gsax and savePct toward population means each offseason", () => {
+    const hotGoalie = player("g", {
+      position: "G", age: 28, ptsPace: 0,
+      gsax: 15, savePct: 0.925, baselineGsax: 10,
+    } as Partial<RolloverPlayer>);
+    const res = advanceSeason([hotGoalie], ctx);
+    const g = res.players.find((p) => p.id === "g")!;
+    // GSAx regresses heavily (r=0.13) — should be much closer to 0 than 15
+    expect(g.gsax).toBeDefined();
+    expect(Math.abs(g.gsax!)).toBeLessThan(10);
+    // SV% regresses toward .908 — should drop from .925
+    expect(g.savePct).toBeDefined();
+    expect(g.savePct!).toBeLessThan(0.925);
+    // ptsPace stays zero for goalies
+    expect(g.ptsPace).toBe(0);
+  });
+
+  it("applies steeper goalie decline after 33", () => {
+    const youngGoalie = player("young", {
+      position: "G", age: 28, ptsPace: 0, gsax: 5, savePct: 0.912,
+    } as Partial<RolloverPlayer>);
+    const oldGoalie = player("old", {
+      position: "G", age: 35, ptsPace: 0, gsax: 5, savePct: 0.912,
+    } as Partial<RolloverPlayer>);
+    // Run many seeds and average to wash out noise
+    let youngSum = 0, oldSum = 0;
+    for (let s = 0; s < 200; s++) {
+      const yr = advanceSeason([youngGoalie], { seed: s, year: 2027 });
+      const or = advanceSeason([oldGoalie], { seed: s, year: 2027 });
+      youngSum += yr.players[0]?.gsax ?? 0;
+      oldSum += or.players[0]?.gsax ?? 0;
+    }
+    expect(youngSum / 200).toBeGreaterThan(oldSum / 200);
   });
 
   it("change-of-scenery players break out more often than stay-put twins", () => {

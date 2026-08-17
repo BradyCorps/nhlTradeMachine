@@ -8,9 +8,9 @@
 // (players, seed, year) always produces the same league. Any roster
 // change upstream changes the scenario seed and honestly re-rolls.
 //
-// Phase 1 limitation: goalie value flows through gsax/savePct at sim
-// time, which rollover does not model — goalies here only age, retire
-// (with a later clock), and decrement contracts.
+// Goalie stat regen: gsax and savePct are regressed toward population
+// means using stability coefficients from the backtest (769 pairs,
+// 2008-2025), then the goalie age curve is applied.
 
 import { ageDecay, hashString, mulberry32, stablePts } from "./sim-engine";
 import { computeBreakout, type BreakoutResult, type BreakoutSignals } from "./breakout-model";
@@ -35,6 +35,10 @@ export interface RolloverPlayer {
   draftOverall?: number | null; // pedigree
   edgeBurstsOver20?: number | null; // EDGE explosiveness
   edgeSpeedMaxMph?: number | null;
+  // Goalie stats — rollover regresses these toward league mean each offseason.
+  gsax?: number;
+  savePct?: number;
+  baselineGsax?: number;
 }
 
 export type RolloverEvent =
@@ -60,6 +64,21 @@ export interface RolloverContext {
 
 const posType = (position: string): "F" | "D" | "G" =>
   position === "G" ? "G" : position === "D" ? "D" : "F";
+
+// ── Goalie regression constants (from stability backtest, 769 pairs) ──
+// predicted(N+1) = popMean + r * (observed(N) - popMean)
+const GOALIE_GSAX_R      = 0.1342;
+const GOALIE_GSAX_MEAN   = 0;       // GSAx is goals above expected — population mean ≈ 0
+const GOALIE_SVPCT_R     = 0.2985;
+const GOALIE_SVPCT_MEAN  = 0.9084;  // population SV% from backtest (all-situations, ≥1000 min)
+// Goalie age decay from backtest: peak 28-30, steepest decline 34-36.
+function goalieAgeFactor(age: number): number {
+  if (age < 28) return 1.0;
+  if (age < 31) return 1.0;
+  if (age < 34) return 0.97;
+  if (age < 37) return 0.955;
+  return 0.92;
+}
 
 // ── Retirement ────────────────────────────────────────────────
 // Near-zero under 35, ramping after, sharp after 38. Goalies age on a
@@ -150,13 +169,36 @@ export function advanceSeason<P extends RolloverPlayer>(
       baselinePtsPace = Math.round((priorBaseline * (1 - newWeight) + ptsPace * newWeight) * 10) / 10;
     }
 
+    // ── Goalie stat regeneration ──
+    let gsax = p.gsax;
+    let savePct = p.savePct;
+    let baselineGsax = p.baselineGsax;
+    if (posType(p.position) === "G" && gsax != null) {
+      const ageFactor = goalieAgeFactor(age);
+      // Regress toward population mean, then apply age decay
+      const regressedGsax = GOALIE_GSAX_MEAN + GOALIE_GSAX_R * ((gsax ?? 0) - GOALIE_GSAX_MEAN);
+      // Stochastic noise: ±0.15 GSAx (≈ half a population SD of 0.34)
+      const noise = (rand() - 0.5) * 0.30;
+      gsax = Math.round(((regressedGsax + noise) * ageFactor) * 1000) / 1000;
+
+      if (savePct != null) {
+        const regressedSv = GOALIE_SVPCT_MEAN + GOALIE_SVPCT_R * (savePct - GOALIE_SVPCT_MEAN);
+        const svNoise = (rand() - 0.5) * 0.010;
+        savePct = Math.round(Math.max(0.860, Math.min(0.940, (regressedSv + svNoise) * ageFactor)) * 10000) / 10000;
+      }
+
+      // Anchor baseline toward the regressed value (same 40% weight as skaters)
+      const priorBaseline = baselineGsax ?? gsax;
+      baselineGsax = Math.round((priorBaseline * 0.6 + gsax * 0.4) * 1000) / 1000;
+    }
+
     // ── Contract decrement ──
     const yearsRemaining = Math.max(0, p.yearsRemaining - 1);
     const justExpired = p.yearsRemaining > 0 && yearsRemaining === 0;
     // Simplified UFA rule: 27+ walks, younger stays restricted.
     const expiryStatus = justExpired ? (age >= 27 ? "UFA" as const : "RFA" as const) : p.expiryStatus ?? null;
 
-    const next = { ...p, age, ptsPace, baselinePtsPace, yearsRemaining, expiryStatus };
+    const next = { ...p, age, ptsPace, baselinePtsPace, yearsRemaining, expiryStatus, gsax, savePct, baselineGsax };
     survivors.push(next);
     if (justExpired) expiring.push(next);
   }
