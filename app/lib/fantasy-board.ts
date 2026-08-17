@@ -270,9 +270,10 @@ export interface BreakoutWatchEntry {
   hasEdgeSignal: boolean;
 }
 
-// League base rate for a meaningful scoring jump — shown beside the odds
-// so "38%" reads as ~4× the field, not a naked number.
-export const BREAKOUT_BASE_RATE_PCT = 10;
+// Base rates from the backtest (5,741 player-seasons, 2008–2023).
+// Shown beside the odds so "30%" reads as ~2× the field, not a naked number.
+export const BREAKOUT_BASE_RATE_PCT = 16;
+export const REGRESSION_BASE_RATE_PCT = 14;
 
 const bursts82Of = (p: FantasyPlayerInput): number | null =>
   p.edgeBurstsOver20 != null && (p.games ?? 0) > 0
@@ -372,6 +373,105 @@ export function buildBreakoutWatch(
     })
     .filter(e => e.breakoutPct >= 20)
     .sort((a, b) => b.breakoutPct - a.breakoutPct || (b.hasEdgeSignal ? 1 : 0) - (a.hasEdgeSignal ? 1 : 0))
+    .slice(0, limit);
+}
+
+// ── Regression Watch ────────────────────────────────────────────
+// The sell-high list: productive players whose underlying signals say the
+// production is about to step down — age-driven decline, unsustainably hot
+// finishing, or career-year pace the model doesn't believe in. The backtest
+// shows regression prediction lifts 1.58× over the base rate (the model's
+// strongest signal), so this is the most data-backed section on the page.
+
+export type RegressionDriver =
+  | "HOT_FINISHING" | "AGE_DECLINE" | "UNSUSTAINABLE_PACE" | "GENERAL";
+
+export interface RegressionWatchEntry {
+  p: FantasyPlayerInput;
+  posGroup: "C" | "W" | "D";
+  regressionPct: number; // 0–100
+  driver: RegressionDriver;
+  reason: string;
+  evidence: string[];
+}
+
+function inferRegressionDriver(p: FantasyPlayerInput): RegressionDriver {
+  const hotOverall = p.xGPace != null && p.goalsPace != null
+    && (p.goalsPace as number) > (p.xGPace as number) * 1.25;
+  const hotHD = p.hdFinishingDelta != null && p.hdFinishingDelta >= 0.03;
+  if (hotOverall || hotHD) return "HOT_FINISHING";
+  if (p.age >= 30) return "AGE_DECLINE";
+  if ((p.ptsPace ?? 0) >= 85) return "UNSUSTAINABLE_PACE";
+  return "GENERAL";
+}
+
+function regressionStory(p: FantasyPlayerInput, posGroup: "C" | "W" | "D"): { reason: string; evidence: string[] } {
+  const evidence: string[] = [];
+  const hotOverall = p.xGPace != null && p.goalsPace != null
+    && (p.goalsPace as number) > (p.xGPace as number) * 1.25;
+  const hotHD = p.hdFinishingDelta != null && p.hdFinishingDelta >= 0.03;
+
+  if (p.xGPace != null && p.goalsPace != null)
+    evidence.push(`${Math.round(p.goalsPace as number)} G on ${Math.round(p.xGPace as number)} xG`);
+  if (hotHD && p.hdFinishingDelta != null)
+    evidence.push(`+${(p.hdFinishingDelta * 100).toFixed(1)}% HD finish`);
+  if (p.age >= 30) evidence.push(`Age ${p.age}`);
+  if ((p.ptsPace ?? 0) >= 70 && evidence.length < 3)
+    evidence.push(`${Math.round(p.ptsPace!)} pts pace`);
+  if ((p.avgTOI ?? 0) > 0 && evidence.length < 3)
+    evidence.push(`${(p.avgTOI as number).toFixed(1)} TOI`);
+
+  if (hotOverall) return { reason: "Shooting well above expected — the goals are borrowed, not earned", evidence };
+  if (hotHD) {
+    return posGroup === "D"
+      ? { reason: "Converting high-danger looks above the league rate from the blue line — that peak passes", evidence }
+      : { reason: "Converting high-danger looks above the league rate — that peak usually passes", evidence };
+  }
+  if (p.age >= 32) return { reason: "Production typically steps down at this age — the clock is real", evidence };
+  if (p.age >= 30) return { reason: "Entering the decline window — expect a step back from this pace", evidence };
+  if ((p.ptsPace ?? 0) >= 85) return { reason: "Career-year territory — pace this high rarely sustains", evidence };
+  return { reason: "Underlying signals point toward a production pullback", evidence };
+}
+
+export function buildRegressionWatch(
+  players: FantasyPlayerInput[],
+  limit = 8,
+  minGames = 15,
+  minPtsPace = 40,
+): RegressionWatchEntry[] {
+  return players
+    .filter(p => p.position !== "G" && p.position !== "Pick"
+      && (p.games ?? 0) >= minGames
+      && (p.ptsPace ?? 0) >= minPtsPace)
+    .map(p => {
+      const result = computeBreakout({
+        age: p.age,
+        position: p.position,
+        ptsPace: p.ptsPace,
+        stablePace: p.baselinePtsPace ?? p.ptsPace,
+        priorGames: p.games,
+        avgTOI: p.avgTOI,
+        xGPace: p.xGPace,
+        goalsPace: p.goalsPace,
+        hdFinishingDelta: p.hdFinishingDelta,
+        prospectPtsPace: p.prospectPtsPace,
+        draftOverall: p.draftOverall,
+        edgeBurstsOver20: p.edgeBurstsOver20,
+        edgeSpeedMaxMph: p.edgeSpeedMaxMph,
+      });
+      const posGroup = posGroupOf(p.position);
+      const story = regressionStory(p, posGroup);
+      return {
+        p,
+        posGroup,
+        regressionPct: Math.round(result.regression * 100),
+        driver: inferRegressionDriver(p),
+        reason: story.reason,
+        evidence: story.evidence.slice(0, 3),
+      };
+    })
+    .filter(e => e.regressionPct >= 13)
+    .sort((a, b) => b.regressionPct - a.regressionPct)
     .slice(0, limit);
 }
 

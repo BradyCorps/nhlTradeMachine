@@ -13,12 +13,14 @@ import Footer from "@/app/components/Footer";
 import {
   buildFantasyBoard,
   buildBreakoutWatch,
+  buildRegressionWatch,
   buildGoalieBoard,
   keeperRank,
   sanitizeSettings,
   sortRows,
   replacementRanks,
   BREAKOUT_BASE_RATE_PCT,
+  REGRESSION_BASE_RATE_PCT,
   DEFAULT_FANTASY_SETTINGS,
   FANTASY_SETTINGS_KEY,
   FANTASY_TAKEN_KEY,
@@ -197,6 +199,9 @@ export default function FantasyPage() {
 
   // EDGE Breakout Watch — same engine the season simulator trusts.
   const breakouts = useMemo(() => buildBreakoutWatch(players as any[]), [players]);
+
+  // Regression Watch — sell-high list, the model's strongest backtested signal.
+  const regressions = useMemo(() => buildRegressionWatch(players as any[]), [players]);
 
   // Modern role per board player (evidence-gated; null → no badge).
   const roleMap = useMemo(() => {
@@ -393,7 +398,9 @@ export default function FantasyPage() {
                 </div>
                 <div className="text-[10px] font-mono mb-3" style={{ color: body }}>
                   The number is <b>breakout odds</b>: the Ledger model&apos;s probability of a meaningful scoring
-                  jump next season. League base rate is ~{BREAKOUT_BASE_RATE_PCT}%, so 30%+ is three times the field.
+                  jump next season. League base rate is ~{BREAKOUT_BASE_RATE_PCT}%, so 30%+ is roughly twice the field.
+                  <span style={{ color: faint }}>{" "}Backtested across 5,741 player-seasons (2008–2023): players at
+                  this threshold broke out at 1.3× the league rate. EDGE signals push the live model higher.</span>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {breakouts.map(e => (
@@ -429,6 +436,60 @@ export default function FantasyPage() {
                         </span>
                         <span className="block text-[10px] font-black font-mono uppercase tracking-[0.1em]" style={{ color: faint }}>
                           breakout odds
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Regression Watch */}
+            {regressions.length > 0 && (
+              <section className="pt-6" aria-label="Regression watch">
+                <div className="text-[10px] font-black font-mono uppercase tracking-[0.25em] mb-1" style={{ color: faint }}>
+                  Regression Watch — sell high, the decline is coming
+                </div>
+                <div className="text-[10px] font-mono mb-3" style={{ color: body }}>
+                  Productive players whose underlying signals say the production is about to step down.
+                  League regression base rate is ~{REGRESSION_BASE_RATE_PCT}%.
+                  <span style={{ color: faint }}>{" "}Backtested across 5,741 player-seasons: flagged players declined
+                  at 1.6× the league rate — the model&apos;s strongest signal.</span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {regressions.map(e => (
+                    <div key={e.p.id} className="border px-3 py-2 flex items-start justify-between gap-3"
+                      style={{ borderColor: rule, background: "var(--paper-inset)" }}>
+                      <span className="min-w-0">
+                        <span className="text-[12px] font-black font-mono">
+                          {/^\d+$/.test(String(e.p.id))
+                            ? <a href={`/players/${e.p.id}`} className="no-underline hover:underline" style={{ color: ink }}>{e.p.name}</a>
+                            : e.p.name}
+                          <span className="text-[10px] font-bold ml-1.5" style={{ color: body }}>
+                            {teamName(e.p.teamId)} · {e.posGroup} · {e.p.age}y
+                          </span>
+                        </span>
+                        <span className="block text-[10px] font-mono mt-0.5" style={{ color: body }}>
+                          {e.reason}
+                        </span>
+                        {e.evidence.length > 0 && (
+                          <span className="flex flex-wrap gap-1 mt-1">
+                            {e.evidence.map(ev => (
+                              <span key={ev} className="text-[10px] font-black font-mono px-1 border"
+                                style={{ color: faint, borderColor: rule, background: "var(--paper-bg)" }}>
+                                {ev}
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-right shrink-0"
+                        title={`Modeled probability of a meaningful production decline next season. League base rate ≈ ${REGRESSION_BASE_RATE_PCT}%.`}>
+                        <span className="block text-[15px] font-black font-mono" style={{ color: "var(--ledger-red)" }}>
+                          {e.regressionPct}%
+                        </span>
+                        <span className="block text-[10px] font-black font-mono uppercase tracking-[0.1em]" style={{ color: faint }}>
+                          regression odds
                         </span>
                       </span>
                     </div>
