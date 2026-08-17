@@ -11,22 +11,31 @@ export interface TimelineYear {
   capHit:       number;  // actual cap hit that year
 }
 
-// Age-based production change per year (compounding)
-// Development phase gains offset by decline after peak
-function yearlyProductionFactor(age: number): number {
-  if (age < 22) return 1.04;   // rapid development
-  if (age < 25) return 1.02;   // late development
-  if (age < 28) return 1.00;   // peak plateau
-  if (age < 31) return 0.965;  // early decline
-  if (age < 34) return 0.93;   // accelerating decline
-  return 0.88;                  // late career
+function skaterYearlyFactor(age: number): number {
+  if (age < 22) return 1.04;
+  if (age < 25) return 1.02;
+  if (age < 28) return 1.00;
+  if (age < 31) return 0.965;
+  if (age < 34) return 0.93;
+  return 0.88;
 }
 
-// Compound production multiplier from baseAge to targetAge
-function productionMultiplier(baseAge: number, targetAge: number): number {
+// Goalie curve from stability backtest (769 pairs, 2008-2025):
+// peak ~28-30, gentler early decline, steepest drop at 34-36.
+function goalieYearlyFactor(age: number): number {
+  if (age < 24) return 1.02;
+  if (age < 28) return 1.005;
+  if (age < 31) return 1.00;
+  if (age < 34) return 0.97;
+  if (age < 37) return 0.955;
+  return 0.92;
+}
+
+function productionMultiplier(baseAge: number, targetAge: number, isGoalie: boolean): number {
+  const factor = isGoalie ? goalieYearlyFactor : skaterYearlyFactor;
   let m = 1.0;
   for (let a = baseAge; a < targetAge; a++) {
-    m *= yearlyProductionFactor(a);
+    m *= factor(a);
   }
   return m;
 }
@@ -38,11 +47,12 @@ export function calcPlayerTimeline(asset: AssetInput): TimelineYear[] {
 
   // Total years to project = current contract + extension (capped at 8 total)
   const totalYears = Math.min(contractYears + (extCapHit ? extYears : 0), 8);
+  const isGoalie = asset.position === "G";
   const result: TimelineYear[] = [];
 
   for (let i = 0; i < totalYears; i++) {
     const age    = asset.age + i;
-    const decay  = productionMultiplier(asset.age, age);
+    const decay  = productionMultiplier(asset.age, age, isGoalie);
     const inExt  = i >= contractYears && extCapHit != null;
     const capHit = inExt ? extCapHit : asset.capHit;
 
