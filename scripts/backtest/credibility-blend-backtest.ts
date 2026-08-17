@@ -141,7 +141,7 @@ function computeCredibility(
   age: number | null,
 ): { cred: number; weight: number } {
   const LO = 0.20, HI = 0.58;
-  const curr = (spike.pts / spike.ice) * (82 * 60);
+  const curr = (spike.pts / spike.gp) * 82;
   if (baseline <= 0 || curr <= baseline * SPIKE_THRESHOLD) return { cred: 0.5, weight: 0.4 };
 
   let cred = 0.5;
@@ -215,13 +215,13 @@ for (const [pid, seasonMap] of byPlayer) {
     const totalW = weights.reduce((a, b) => a + b, 0);
     const baseline = weights.reduce((sum, w, idx) => {
       const p = priors[idx];
-      return sum + w * ((p.pts / p.ice) * (82 * 60));
+      return sum + w * ((p.pts / p.gp) * 82);
     }, 0) / totalW;
 
-    const spikePace = (s.pts / s.ice) * (82 * 60);
+    const spikePace = (s.pts / s.gp) * 82;
     if (spikePace <= baseline * SPIKE_THRESHOLD) continue;
 
-    const nextPace = (next.pts / next.ice) * (82 * 60);
+    const nextPace = (next.pts / next.gp) * 82;
     const nameSlug = slug(s.name);
     const by = playerBirthYear.get(nameSlug);
     const age = by ? seasonN - by : null;
