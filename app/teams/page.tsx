@@ -466,7 +466,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
                 {team.record.streakCode}{team.record.streakCount}
               </span>
             )}
-            <span>NAV {Math.round(rosterNAV)}</span>
+            <span>NAV {Math.round(rosterNAV).toLocaleString()}</span>
             <span>Cap ${team.capSpace > 0 ? "+" : ""}{team.capSpace.toFixed(1)}M</span>
           </div>
         </div>
@@ -526,7 +526,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
             <StatCell
               label="Roster NAV"
               value={Math.round(rosterNAV).toLocaleString()}
-              sub={`top 10 skaters + starter`}
+              sub={`${rosterSize} players`}
             />
           </div>
 
