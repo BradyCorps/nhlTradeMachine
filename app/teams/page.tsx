@@ -17,6 +17,7 @@ import {
 import { gravityForDisplay } from "@/app/lib/gravity-channels";
 import { isGravityV3DisplayEnabled } from "@/app/lib/gravity-feature-flags";
 import GravityField from "@/app/components/GravityField";
+import TeamNavChart from "@/app/components/TeamNavChart";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 
 interface TeamRecord {
@@ -993,6 +994,17 @@ export default function TeamsPage() {
             </button>
           ))}
         </div>
+
+        {/* NAV chart */}
+        <TeamNavChart
+          data={teamProfiles.map((tp) => ({
+            name: tp.team.name,
+            abbrev: tp.team.id,
+            nav: tp.rosterNAV,
+            goalDiff: (tp.team.record?.goalsFor ?? 0) - (tp.team.record?.goalsAgainst ?? 0),
+            phase: tp.team.phase,
+          }))}
+        />
 
         {/* Sort controls */}
         <div className="flex flex-wrap items-center gap-2 mb-4">
