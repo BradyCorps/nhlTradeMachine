@@ -857,11 +857,8 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     : 0;
   const offPS     = ops !== null ? ops * 17 : null;
 
-  // Power-law curve: elite players separate more than linear pts * 1.6
-  // Use the power curve as the primary engine to properly value generational talent.
-  // We use offPS (Point Shares) to slightly modulate it, but we never let a linear 
-  // Point Shares stat overwrite the exponential power curve!
-  const baseOffCurve = Math.pow(ptsVal / 45, 1.6) * 55;
+  const offExp = isD ? 1.1 : 1.6;
+  const baseOffCurve = Math.pow(ptsVal / 45, offExp) * 55;
   const offRaw = (offPS !== null
     ? baseOffCurve + (offPS - (ptsVal / 45) * 55) * 0.4 + (noivBonus * 0.25)
     : baseOffCurve + (xg * 0.5) + noivBonus) + edgeLuckAdj;
