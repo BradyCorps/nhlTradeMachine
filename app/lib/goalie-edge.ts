@@ -14,6 +14,9 @@
 import { db } from "@/app/db/client";
 import { nhlSnapshots } from "@/app/db/schema";
 import { ensureNhlSnapshotTable } from "@/app/db/ensure-schema";
+import { fetchGoalieEdgeDetail, parseGoalieEdge, mapWithConcurrency } from "@/app/lib/nhl-player-feed";
+import type { GoalieEdgeFacts } from "@/app/lib/nhl-player-feed";
+import { activeGoalieIds } from "@/app/lib/nhl-active-players";
 
 const NHL_HEADERS = { "User-Agent": "Mozilla/5.0", "Accept": "application/json" };
 const EDGE_BASE = "https://api-web.nhle.com/v1/edge";
@@ -78,6 +81,101 @@ export async function captureGoalieEdgeBoards(seasonId: string): Promise<GoalieB
     } catch { /* table unavailable — capture is best-effort */ }
   }
   return { boardsFetched, stored, day };
+}
+
+// ── Per-goalie EDGE detail ───────────────────────────────────────
+//
+// The boards above rank the top ten at each location; this is the same
+// data for EVERY goalie, one request each. About 110 goalies at five in
+// flight is well inside a single invocation, and the snapshot table's
+// one-row-per-day id keeps a re-run from duplicating.
+//
+// The RAW payload is what gets stored. `latestGoalieEdgeDetailMap` parses
+// on read, so tightening the parser later re-reads every row already
+// captured instead of stranding a season of history behind a bad guess.
+
+export interface GoalieDetailCapture {
+  requested: number;
+  stored: number;
+  parsed: number;
+  failures: string[];
+  day: string;
+}
+
+/**
+ * Capture `/edge/goalie-detail` for a set of goalies.
+ *
+ * `playerIds` defaults to every goalie in the bundled active-player
+ * snapshot. That file has no rookies, so a caller that knows the live
+ * roster — assembly does — should pass its own ids instead.
+ */
+export async function captureGoalieEdgeDetail(
+  seasonId: string,
+  playerIds?: Array<string | number>,
+): Promise<GoalieDetailCapture> {
+  const ids = (playerIds ?? activeGoalieIds()).map(String);
+  const season = Number(seasonId);
+  const day = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const failures: string[] = [];
+  let stored = 0;
+  let parsed = 0;
+
+  await ensureNhlSnapshotTable().catch(() => {});
+
+  await mapWithConcurrency(ids, 5, async (playerId) => {
+    const { facts, raw } = await fetchGoalieEdgeDetail(playerId, season);
+    if (raw == null) { failures.push(playerId); return; }
+    if (facts) parsed++;
+    try {
+      await db.insert(nhlSnapshots).values({
+        id: `${playerId}-${season}-goalie-detail-${day}`,
+        playerId: Number(playerId),
+        name: null,
+        season,
+        source: "goalie-detail",
+        capturedAt: Date.now(),
+        gamesPlayed: facts?.gamesPlayed ?? null,
+        payload: JSON.stringify(raw),
+      }).onConflictDoNothing();
+      stored++;
+    } catch {
+      failures.push(playerId);
+    }
+  });
+
+  return { requested: ids.length, stored, parsed, failures, day };
+}
+
+/** Latest per-goalie EDGE detail, keyed by NHL player id (string). */
+export async function latestGoalieEdgeDetailMap(seasonId: string): Promise<Map<string, GoalieEdgeFacts>> {
+  const map = new Map<string, GoalieEdgeFacts>();
+  try {
+    await ensureNhlSnapshotTable();
+    const rows = await db.select({
+      playerId: nhlSnapshots.playerId,
+      capturedAt: nhlSnapshots.capturedAt,
+      source: nhlSnapshots.source,
+      season: nhlSnapshots.season,
+      payload: nhlSnapshots.payload,
+    }).from(nhlSnapshots);
+
+    const season = Number(seasonId);
+    const latest = new Map<number, { at: number; payload: string }>();
+    for (const r of rows) {
+      if (r.source !== "goalie-detail" || r.season !== season) continue;
+      const prev = latest.get(r.playerId);
+      if (prev && r.capturedAt <= prev.at) continue;
+      latest.set(r.playerId, { at: r.capturedAt, payload: r.payload });
+    }
+
+    for (const [id, v] of latest) {
+      try {
+        const facts = parseGoalieEdge(JSON.parse(v.payload), season);
+        if (facts) map.set(String(id), facts);
+      } catch { /* one unparseable row must not sink the rest */ }
+    }
+  } catch { /* feed table unavailable — detail simply absent */ }
+  return map;
 }
 
 // ── Tolerant board parsing ───────────────────────────────────────

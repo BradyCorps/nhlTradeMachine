@@ -16,7 +16,7 @@ import {
   safeNhlRosterPlayer,
 } from "@/app/lib/player-identity";
 import { latestEdgeSignalMap } from "@/app/lib/nhl-feed-capture";
-import { latestGoalieBoardsMap } from "@/app/lib/goalie-edge";
+import { latestGoalieBoardsMap, latestGoalieEdgeDetailMap } from "@/app/lib/goalie-edge";
 import { FA_KNOWN_FACTS, seedFreeAgentStatus } from "@/app/lib/free-agent-seed";
 import { listPublishedTrades, type TradeRecord } from "@/app/lib/trades";
 import {
@@ -1110,6 +1110,7 @@ export async function assembleCanonicalRoster(options: {
   // ── EDGE signals (latest nhl_snapshots per player) ────────────
   const edgeSignals = await latestEdgeSignalMap(Number(SEASON.nhleSeasonId)).catch(() => new Map());
   const goalieBoards = await latestGoalieBoardsMap(SEASON.nhleSeasonId).catch(() => new Map());
+  const goalieEdgeDetail = await latestGoalieEdgeDetailMap(SEASON.nhleSeasonId).catch(() => new Map());
 
   // Position-suffixed keys win so same-name players (two Elias
   // Petterssons) never share a block status; plain-name keys remain for
@@ -1414,6 +1415,12 @@ export async function assembleCanonicalRoster(options: {
         iceTimeSeconds: goalieStats?.iceTime ?? null,
         shotsPerGame:   goalieStats?.shotsPerGame  ?? 0,
         goalieEdgeBoards: finalPosition === "G" ? (goalieBoards.get(String(p.id)) ?? null) : null,
+        // Per-location EDGE shot data. Display-only for now: it is shown on
+        // the goalie dossier but deliberately not fed into calcGoalieNAV,
+        // because nothing has yet backtested whether it improves the
+        // valuation, and an unvalidated input is how a model gets worse
+        // while looking richer.
+        goalieEdgeDetail: finalPosition === "G" ? (goalieEdgeDetail.get(String(p.id)) ?? null) : null,
         teamXga60,
         teamHdca60:     TEAM_BASELINES[teamId]?.hdca60 ?? null,
         baselineGsax:      baselines.baselineGsax      ?? currentYearGsax,

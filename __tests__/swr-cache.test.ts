@@ -164,12 +164,22 @@ import fs from "fs";
 import path from "path";
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
 
+// The players route delegates its SWR policy to `cached-roster.ts` so the
+// server-component player pages can read through the very same cache
+// instead of calling assembleCanonicalRoster() themselves. The guarantees
+// below are about the players ENTRY POINT, so they follow that delegation
+// rather than insisting the policy sit literally in the route file.
+const playersPolicy = () =>
+  read("app/api/league/players/route.ts") + "\n" + read("app/lib/cached-roster.ts");
+
 describe("both league routes read through the same policy", () => {
   it("uses one shared store, so lock semantics cannot drift", () => {
-    for (const route of ["app/api/league/players/route.ts", "app/api/league/teams/route.ts"]) {
-      const src = read(route);
-      expect(src, route).toContain("swrCache");
-      expect(src, route).toContain("store: swrStore");
+    for (const [label, src] of [
+      ["app/api/league/players/route.ts", playersPolicy()],
+      ["app/api/league/teams/route.ts", read("app/api/league/teams/route.ts")],
+    ] as const) {
+      expect(src, label).toContain("swrCache");
+      expect(src, label).toContain("store: swrStore");
     }
     // The lock is what stops a quiet site starting N rebuilds at once.
     expect(read("app/lib/swr-store.ts")).toContain("nx: true");
@@ -192,6 +202,6 @@ describe("both league routes read through the same policy", () => {
 
   it("refuses to cache an empty league", () => {
     expect(read("app/api/league/teams/route.ts")).toMatch(/isCacheable[\s\S]{0,200}teams\.length > 0/);
-    expect(read("app/api/league/players/route.ts")).toContain("isHealthyRoster");
+    expect(playersPolicy()).toContain("isHealthyRoster");
   });
 });

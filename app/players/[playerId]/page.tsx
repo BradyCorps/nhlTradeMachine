@@ -20,6 +20,7 @@ import GravityFieldV4 from "@/app/components/GravityFieldV4";
 import GravityHeatMap from "@/app/components/GravityHeatMap";
 import NavTrajectoryChart from "@/app/components/NavTrajectoryChart";
 import NavLeagueScatter from "@/app/components/NavLeagueScatter";
+import GoalieEdgePanel from "@/app/components/GoalieEdgePanel";
 import PlayerStrandPanel from "@/app/components/PlayerStrandPanel";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
@@ -260,6 +261,13 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
             />
             <StatCell label="TOI" value={player.avgTOI != null ? player.avgTOI.toFixed(1) : "—"} />
           </div>
+        )}
+
+        {/* NHL EDGE shot-location detail — goalies only, and only once the
+            nightly capture has reached this one. Absent data renders nothing
+            rather than an empty panel. */}
+        {isGoalie && player.goalieEdgeDetail && (
+          <GoalieEdgePanel detail={player.goalieEdgeDetail} playerName={player.name} />
         )}
 
         {/* The player, and what his contract does to him */}

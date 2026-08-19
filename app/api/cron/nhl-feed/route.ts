@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import { capturePlayerSnapshots, rosterPlayerIds } from "@/app/lib/nhl-feed-capture";
-import { captureGoalieEdgeBoards } from "@/app/lib/goalie-edge";
+import { captureGoalieEdgeBoards, captureGoalieEdgeDetail } from "@/app/lib/goalie-edge";
+import { activeGoalieIdsForTeams } from "@/app/lib/nhl-active-players";
 import { isAuthorized } from "@/app/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -33,5 +34,13 @@ export async function GET(req: Request) {
   // League-wide goalie EDGE boards — one cheap capture per night (PA3)
   const goalieBoards = await captureGoalieEdgeBoards(SEASON.nhleSeasonId);
 
-  return NextResponse.json({ ok: true, cycleDay, teams: group, season, goalieBoards, ...result });
+  // Per-goalie EDGE detail, on the same 8-day team rotation as the skater
+  // snapshots above — roughly twenty requests a night rather than all ~110
+  // at once, so it cannot be the thing that busts the invocation.
+  const goalieDetail = await captureGoalieEdgeDetail(
+    SEASON.nhleSeasonId,
+    activeGoalieIdsForTeams(group),
+  ).catch((e: any) => ({ error: String(e?.message ?? e) }));
+
+  return NextResponse.json({ ok: true, cycleDay, teams: group, season, goalieBoards, goalieDetail, ...result });
 }

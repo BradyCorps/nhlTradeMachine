@@ -2129,20 +2129,24 @@ describe("Canary — /api/league/players performance + OPS/DPS resilience", () =
     // Pins the intent, not one implementation of it. The route moved from
     // cache-or-block (redis.get / redis.setex inline) to swrCache, which serves
     // stale instantly and refreshes behind the request — the guarantee this
-    // canary exists for is stronger now, not weaker.
+    // canary exists for is stronger now, not weaker. It then moved again, into
+    // the shared cached-roster module, so the server-component player pages
+    // read the same cache instead of assembling a roster of their own; the
+    // policy is followed through that delegation rather than pinned to a file.
     const route = read("app/api/league/players/route.ts");
-    expect(route).toContain("LEAGUE_PLAYERS_CACHE_KEY");
-    expect(route).toContain("swrCache");
-    expect(route).toContain("isHealthyRoster");        // don't cache a blank-OPS/DPS payload
-    expect(route).toContain("stale-while-revalidate"); // CDN cache header
+    const policy = route + "\n" + read("app/lib/cached-roster.ts");
+    expect(policy).toContain("LEAGUE_PLAYERS_CACHE_KEY");
+    expect(policy).toContain("swrCache");
+    expect(policy).toContain("isHealthyRoster");       // don't cache a blank-OPS/DPS payload
+    expect(route).toContain("stale-while-revalidate"); // CDN cache header, on the route itself
   });
 
   it("never makes a visitor wait for the rebuild when something is servable", () => {
     // The measured 20-25s cold load: a 15-minute TTL over a ~40s assembly meant
     // whoever arrived first after it lapsed paid the whole cost.
-    const route = read("app/api/league/players/route.ts");
-    expect(route).toContain("freshSeconds");
-    expect(route).toContain("staleSeconds");
+    const policy = read("app/api/league/players/route.ts") + "\n" + read("app/lib/cached-roster.ts");
+    expect(policy).toContain("freshSeconds");
+    expect(policy).toContain("staleSeconds");
     const swr = read("app/lib/swr-cache.ts");
     expect(swr).toContain("export function cacheDecision");
     // Stale must return without awaiting the rebuild.
