@@ -6,7 +6,7 @@
 // Uses d3-contour for density estimation and d3-interpolate for
 // color gradients. The output is pure SVG rendered through React.
 
-import React, { useMemo } from "react";
+import React, { useId, useMemo } from "react";
 import { contours as d3Contours } from "d3-contour";
 import { interpolateRgbBasis } from "d3-interpolate";
 import { scaleLinear, scaleSequential } from "d3-scale";
@@ -56,6 +56,7 @@ function generateField(masses: ZoneMasses): number[] {
 }
 
 export default function GravityHeatMap({ masses, tier, force, isDefenseman, playerName }: Props) {
+  const clipId = useId();
   const tierColor = tier ? gravityTierColor(tier) : "var(--ledger-ink-faint)";
 
   const { paths, colorScale, thresholds } = useMemo(() => {
@@ -136,12 +137,12 @@ export default function GravityHeatMap({ masses, tier, force, isDefenseman, play
 
         {/* Clip to rink shape */}
         <defs>
-          <clipPath id="rink-clip">
+          <clipPath id={clipId}>
             <rect x={RINK_X + 1} y={RINK_Y + 1} width={RINK_W - 2} height={RINK_H - 2} rx={RINK_H / 2.2 - 1} />
           </clipPath>
         </defs>
 
-        <g clipPath="url(#rink-clip)">
+        <g clipPath={`url(#${clipId})`}>
           {/* Heat map contours */}
           {hasSignal && paths.map((p, i) => (
             <path

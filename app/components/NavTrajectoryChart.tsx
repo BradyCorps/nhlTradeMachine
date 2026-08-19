@@ -177,28 +177,29 @@ export default function NavTrajectoryChart({ stages, total, playerName }: Props)
 
                 {/* Hover tooltip */}
                 {isHovered && (
-                  <g>
-                    <rect
-                      x={x - 20}
-                      y={barY - 26}
-                      width={barWidth + 40}
-                      height={16}
-                      fill="var(--paper-card, var(--paper-bg))"
-                      stroke="var(--ledger-ink)"
-                      strokeWidth={0.5}
-                      rx={2}
-                    />
-                    <text
-                      x={x + barWidth / 2}
-                      y={barY - 15}
-                      textAnchor="middle"
-                      fill="var(--ledger-ink)"
-                      fontSize={7}
-                      fontFamily="'Courier Prime', monospace"
-                    >
+                  <foreignObject
+                    x={x + barWidth / 2 - 60}
+                    y={barY - 30}
+                    width={120}
+                    height={24}
+                    style={{ overflow: "visible" }}
+                  >
+                    <div style={{
+                      background: "var(--paper-card, var(--paper-bg))",
+                      border: "0.5px solid var(--ledger-ink)",
+                      borderRadius: 2,
+                      padding: "2px 4px",
+                      fontFamily: "'Courier Prime', monospace",
+                      fontSize: 7,
+                      color: "var(--ledger-ink)",
+                      whiteSpace: "nowrap",
+                      width: "fit-content",
+                      transform: "translateX(-50%)",
+                      marginLeft: "50%",
+                    }}>
                       {d.desc}
-                    </text>
-                  </g>
+                    </div>
+                  </foreignObject>
                 )}
               </g>
             );

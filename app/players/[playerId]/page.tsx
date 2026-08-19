@@ -8,7 +8,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
+import { getCachedRoster } from "@/app/lib/cached-roster";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
 import { gravityForDisplay } from "@/app/lib/gravity-channels";
 import { loadGravityProfileV4 } from "@/app/lib/gravity-v4/load-profile";
@@ -32,8 +32,8 @@ import { getLiveCapCeiling } from "@/app/lib/live-cap-settings";
 export const dynamic = "force-dynamic";
 
 async function loadPlayer(playerId: string) {
-  const roster = await assembleCanonicalRoster();
-  const player = (roster.players as any[]).find(p => String(p.id) === playerId);
+  const { value } = await getCachedRoster();
+  const player = (value.players as any[]).find(p => String(p.id) === playerId);
   return player ?? null;
 }
 
@@ -90,7 +90,7 @@ function StatCell({ label, value, color }: { label: string; value: string; color
 
 export default async function PlayerPage({ params }: { params: Promise<{ playerId: string }> }) {
   const { playerId } = await params;
-  const roster = await assembleCanonicalRoster();
+  const { value: roster } = await getCachedRoster();
   const player = (roster.players as any[]).find(p => String(p.id) === playerId) ?? null;
   if (!player || player.position === "Pick") notFound();
 
