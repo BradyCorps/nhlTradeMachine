@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
+import { rosterNavByPosition } from "@/app/lib/team-nav-split";
 import { computeContention } from "@/app/armchair-gm/contention";
 import { computeTeamEdgeProfile, type TeamEdgeProfile } from "@/app/lib/team-edge-profile";
 import { computeRosterStrand } from "@/app/lib/roster-strand";
@@ -118,6 +119,10 @@ interface TeamProfile {
   edge: TeamEdgeProfile | null;
   strand: TeamStrandData | null;
   rosterNAV: number;
+  /** rosterNAV decomposed by position, using the same Σ max(0, nav) as
+   *  rosterNAV so that f + d + g === rosterNAV exactly — the identity the
+   *  "combined X-NAV" framing on the chart depends on. */
+  navByPos: { f: number; d: number; g: number };
   topPlayers: { name: string; nav: number; position: string }[];
   capCommitted: number;
   lines: TeamLines;
@@ -836,7 +841,14 @@ export default function TeamsPage() {
       const contention = computeContention(roster, navMap);
       const edge = computeTeamEdgeProfile(roster);
       const strand = computeRosterStrand(roster, navMap);
-      const rosterNAV = roster.reduce((s, p) => s + Math.max(0, navMap[p.id]?.total ?? 0), 0);
+      // rosterNAV and its F/D/G split come from one place so they cannot drift:
+      // xnav is defined as f + d + g, the combined-total identity the chart toggle
+      // depends on.
+      const navSplit = rosterNavByPosition(
+        roster.map((p) => ({ position: p.position, nav: navMap[p.id]?.total })),
+      );
+      const rosterNAV = navSplit.xnav;
+      const navByPos = { f: navSplit.f, d: navSplit.d, g: navSplit.g };
       const capCommitted = roster.reduce((s, p) => s + (p.capHit ?? 0), 0);
       const lines = buildTeamLines(roster, navMap);
 
@@ -873,7 +885,7 @@ export default function TeamsPage() {
         .slice(0, 3);
 
       return {
-        team, roster, navMap, contention, edge, strand, rosterNAV,
+        team, roster, navMap, contention, edge, strand, rosterNAV, navByPos,
         topPlayers: sorted, capCommitted, lines,
         avgAge, rosterSize: roster.length, ufaCount, rfaCount,
         gravityLeaders,
@@ -1000,7 +1012,10 @@ export default function TeamsPage() {
           data={teamProfiles.map((tp) => ({
             name: tp.team.name,
             abbrev: tp.team.id,
-            nav: tp.rosterNAV,
+            xnav: tp.rosterNAV,
+            fNav: tp.navByPos.f,
+            dNav: tp.navByPos.d,
+            gNav: tp.navByPos.g,
             goalDiff: (tp.team.record?.goalsFor ?? 0) - (tp.team.record?.goalsAgainst ?? 0),
             phase: tp.team.phase,
           }))}
