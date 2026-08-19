@@ -34,6 +34,7 @@ import { resolveRecordedExtension, type RecordedExtension } from "@/app/lib/exte
 const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
 const CONTRACTS_CACHE_KEY = "cache:contracts:v2";
 const MONEYPUCK_CACHE_TTL =  4 * 60 * 60; // 4 hours
+const MP_STALE_TTL        =  7 * 24 * 60 * 60; // 7 days — last-good fallback
 const PS_CACHE_TTL        = 12 * 60 * 60; // 12 hours
 const PS_STALE_TTL        =  7 * 24 * 60 * 60; // 7 days — last-good fallback
 const POINT_SHARES_CACHE_KEY = "cache:pointshares:v2";
@@ -787,6 +788,8 @@ export async function assembleCanonicalRoster(options: {
   if (redis) {
     skaterCsv = await redis.get<string>("cache:mp_skaters");
     goalieCsv = await redis.get<string>("cache:mp_goalies");
+    if (!skaterCsv) skaterCsv = await redis.get<string>("cache:mp_skaters:stale").catch(() => null);
+    if (!goalieCsv) goalieCsv = await redis.get<string>("cache:mp_goalies:stale").catch(() => null);
   }
 
   const skaterCsvFresh = !!skaterCsv;
@@ -812,7 +815,10 @@ export async function assembleCanonicalRoster(options: {
 
     if (mpRes.status === "fulfilled" && mpRes.value.ok) {
       const csv  = await mpRes.value.text();
-      if (!skaterCsvFresh && redis) await redis.setex("cache:mp_skaters", MONEYPUCK_CACHE_TTL, csv);
+      if (!skaterCsvFresh && redis) {
+        await redis.setex("cache:mp_skaters", MONEYPUCK_CACHE_TTL, csv);
+        await redis.setex("cache:mp_skaters:stale", MP_STALE_TTL, csv).catch(() => {});
+      }
       const rows = csv.split("\n").filter(Boolean);
       const hdr  = parseCSVRow(rows[0]);
       const h    = (k: string) => hdr.indexOf(k);
@@ -900,7 +906,10 @@ export async function assembleCanonicalRoster(options: {
 
     if (gpRes.status === "fulfilled" && gpRes.value.ok) {
       const csv  = await gpRes.value.text();
-      if (!goalieCsvFresh && redis) await redis.setex("cache:mp_goalies", MONEYPUCK_CACHE_TTL, csv);
+      if (!goalieCsvFresh && redis) {
+        await redis.setex("cache:mp_goalies", MONEYPUCK_CACHE_TTL, csv);
+        await redis.setex("cache:mp_goalies:stale", MP_STALE_TTL, csv).catch(() => {});
+      }
       const rows = csv.split("\n").filter(Boolean);
       const hdr  = parseCSVRow(rows[0]);
       const h    = (k: string) => hdr.indexOf(k);
