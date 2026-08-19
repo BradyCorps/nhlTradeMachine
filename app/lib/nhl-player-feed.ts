@@ -199,35 +199,33 @@ export function parseEdge(raw: unknown, seasonId: number): EdgeFacts | null {
 // long-range — each carrying the goalie's figure, the league average and
 // a percentile.
 //
-// WHY THIS PARSER IS DEFENSIVE
+// VERIFIED AGAINST A LIVE RESPONSE
 //
-// The skater sibling above pins exact paths because its shape was read
-// off a live response. This one was written from the rendered page and
-// the location taxonomy the goalie board URLs already use (`…/all/…`,
-// `…/high/…`), so the field SPELLINGS are inferred rather than observed.
-// Two consequences, both deliberate:
+// The shapes below were read off `goalie-detail/8478009/20252026/2` via
+// `scripts/verify-goalie-edge.ts`, not inferred. Three things that a
+// reasonable guess got wrong, kept here because they are the parts most
+// likely to be "corrected" back into bugs:
 //
-//   • the location array is found by shape — the first array whose
-//     entries carry a `locationCode` — rather than by key name, so it
-//     survives being called `sogAgainstSummary` or `savePctSummary`;
-//   • every metric is read through an alias list, and anything that does
-//     not resolve stays null rather than defaulting to a number that
-//     would silently enter a valuation.
+//   • the season line is `goalsAgainstAvg`, not `goalsAgainstAverage`;
+//   • there is NO shots-against field anywhere in the payload. It is
+//     `saves + goalsAgainst`, derived below — Sorokin's 1386 + 144 gives
+//     the 1530 the NHL's own page prints;
+//   • every percentile is a 0–1 FRACTION (0.7458 is the 75th), so it is
+//     scaled here. Reading it as 0–100 renders every goalie under the
+//     50th and looks plausible enough to ship.
 //
-// The capture stores the RAW payload, and the read path re-parses it, so
-// correcting a wrong guess here fixes every row already on disk without
-// re-fetching. `scripts/verify-goalie-edge.ts` prints the real keys
-// against a live response; run it somewhere the NHL API is reachable and
-// tighten the aliases below to what it reports.
+// The capture stores the RAW payload and the read path re-parses it, so
+// tightening this parser re-reads every row already on disk rather than
+// stranding history behind an old mistake.
 
 export type GoalieZoneKey = "all" | "high" | "mid" | "long";
 
-/** Which upstream location codes map onto each zone we display. */
+/** Location codes as the feed emits them: all, high, mid, long. */
 const ZONE_ALIASES: Record<GoalieZoneKey, string[]> = {
-  all:  ["all", "alllocations", "total"],
-  high: ["high", "highdanger", "hd"],
-  mid:  ["medium", "mid", "midrange", "md"],
-  long: ["low", "long", "longrange", "ld"],
+  all:  ["all"],
+  high: ["high"],
+  mid:  ["mid", "medium"],
+  long: ["long", "low"],
 };
 
 export const GOALIE_ZONE_LABEL: Record<GoalieZoneKey, string> = {
@@ -239,11 +237,26 @@ export interface GoalieZoneSplit {
   /** Save percentage as a 0–1 fraction, matching the rest of the codebase. */
   savePct: number | null;
   savePctLeagueAvg: number | null;
-  /** 0–100 rank against the league at this location. */
+  /** 0–100 rank against the league at this location, rescaled from the
+   *  feed's 0–1 fraction. */
   percentile: number | null;
+  /** Derived: the feed publishes saves and goals against, never the sum. */
   shotsAgainst: number | null;
   saves: number | null;
+  savesLeagueAvg: number | null;
+  savesPercentile: number | null;
   goalsAgainst: number | null;
+  goalsAgainstLeagueAvg: number | null;
+  goalsAgainstPercentile: number | null;
+}
+
+/** One cell of the rink map — `shotLocationDetails`, ~17 named areas. */
+export interface GoalieAreaDetail {
+  area: string;
+  saves: number | null;
+  savesPercentile: number | null;
+  savePct: number | null;
+  savePctPercentile: number | null;
 }
 
 export interface GoalieEdgeFacts {
@@ -254,6 +267,8 @@ export interface GoalieEdgeFacts {
   losses: number | null;
   otLosses: number | null;
   gaa: number | null;
+  gaaPercentile: number | null;
+  gaaLeagueAvg: number | null;
   savePct: number | null;
   shotsAgainst: number | null;
   saves: number | null;
@@ -262,11 +277,15 @@ export interface GoalieEdgeFacts {
    *  dots — the most repeatable goalie skill signal the feed carries. */
   highDangerSavePct: number | null;
   highDangerGoalsAgainst: number | null;
-  /** Share of starts finishing above a .900 save percentage — consistency
-   *  rather than peak, and the one figure here the feed may not publish
-   *  directly (the NHL derives it from game logs). */
+  /** Share of starts finishing above a .900 save percentage, as a
+   *  percentage (44.4, not 0.444) — consistency rather than peak. Lives at
+   *  `stats.gamesAbove900`, not on the season line. */
   startsAbove900Pct: number | null;
+  startsAbove900Percentile: number | null;
+  startsAbove900LeagueAvg: number | null;
   zones: GoalieZoneSplit[];
+  /** The rink map: per-area save data, feed order preserved. */
+  areas: GoalieAreaDetail[];
 }
 
 /** Finite number, or null. Strings like "99th" and ".906" are accepted —
@@ -294,28 +313,28 @@ const pick = (obj: any, keys: string[]): number | null => {
   return null;
 };
 
-/**
- * First alias found across several candidate objects, in order.
- *
- * The season line is not reliably in one place: the skater sibling keeps
- * games played under `player` while rate stats sit at the root. Searching
- * a single object meant whichever one was checked first hid the other —
- * `goalsAgainstAverage` at the root went missing the moment `player`
- * existed.
- */
-const pickAny = (objs: any[], keys: string[]): number | null => {
-  for (const obj of objs) {
-    const v = pick(obj, keys);
-    if (v !== null) return v;
-  }
-  return null;
-};
-
 /** Save percentages arrive as either .906 or 90.6 depending on endpoint —
  *  normalise to the 0–1 fraction the valuation and STRAND rails expect.
  *  Mirrors the same guard roster assembly applies to the NHL stats feed. */
 const asFraction = (v: number | null): number | null =>
   v == null ? null : v > 1 ? v / 100 : v;
+
+/** The feed states percentiles as 0–1 (0.7458 = 75th). Rescale to 0–100,
+ *  tolerating a feed that some day switches to whole numbers. */
+const asPercentile = (v: number | null): number | null =>
+  v == null ? null : v <= 1 ? v * 100 : v;
+
+/** `stats.{key}` carries a `{ value, percentile, leagueAvg }` triple. */
+const statTriple = (stats: any, key: string): {
+  value: number | null; percentile: number | null; leagueAvg: number | null;
+} => {
+  const node = stats?.[key];
+  return {
+    value: pick(node, ["value"]),
+    percentile: asPercentile(pick(node, ["percentile"])),
+    leagueAvg: pick(node, ["leagueAvg"]),
+  };
+};
 
 /** Recursively find the first array whose entries carry a location code. */
 function findLocationArray(node: unknown, depth = 0): any[] | null {
@@ -360,14 +379,22 @@ export function parseGoalieEdge(raw: unknown, seasonId: number): GoalieEdgeFacts
     const zone = zoneOf(e?.locationCode);
     if (zone == null || seen.has(zone)) continue;
     seen.add(zone);
+    const saves = pick(e, ["saves"]);
+    const goalsAgainst = pick(e, ["goalsAgainst"]);
     zones.push({
       zone,
-      savePct:          asFraction(pick(e, ["savePctg", "savePct", "savePctage", "saveP"])),
-      savePctLeagueAvg: asFraction(pick(e, ["savePctgLeagueAvg", "savePctLeagueAvg", "leagueAvg", "savePctgLeague"])),
-      percentile:       pick(e, ["percentile", "savePctgPercentile", "savePctPercentile", "rank"]),
-      shotsAgainst:     pick(e, ["shotsAgainst", "shots", "sog", "sogAgainst"]),
-      saves:            pick(e, ["saves", "savesMade"]),
-      goalsAgainst:     pick(e, ["goalsAgainst", "goals", "ga"]),
+      savePct:          asFraction(pick(e, ["savePctg"])),
+      savePctLeagueAvg: asFraction(pick(e, ["savePctgLeagueAvg"])),
+      percentile:       asPercentile(pick(e, ["savePctgPercentile"])),
+      // Not published anywhere in the payload: a shot against is a save or
+      // a goal, and nothing else, so the sum is the figure the NHL prints.
+      shotsAgainst:     saves != null && goalsAgainst != null ? saves + goalsAgainst : null,
+      saves,
+      savesLeagueAvg:   pick(e, ["savesLeagueAvg"]),
+      savesPercentile:  asPercentile(pick(e, ["savesPercentile"])),
+      goalsAgainst,
+      goalsAgainstLeagueAvg:  pick(e, ["goalsAgainstLeagueAvg"]),
+      goalsAgainstPercentile: asPercentile(pick(e, ["goalsAgainstPercentile"])),
     });
   }
 
@@ -375,28 +402,46 @@ export function parseGoalieEdge(raw: unknown, seasonId: number): GoalieEdgeFacts
   const all = byZone("all");
   const high = byZone("high");
 
-  // The season line is split across the root and a nested `player` object
-  // on the skater sibling, so search both rather than picking one.
-  const line = [r.player, r.seasonTotals, r].filter(o => o != null && typeof o === "object");
+  // The rink map. Areas keep whatever name the feed gives them ("Behind the
+  // Net", …) rather than being mapped onto a fixed vocabulary, so a renamed
+  // or added zone shows up instead of silently vanishing.
+  const areas: GoalieAreaDetail[] = (Array.isArray(r.shotLocationDetails) ? r.shotLocationDetails : [])
+    .map((a: any): GoalieAreaDetail => ({
+      area: String(a?.area ?? "").trim(),
+      saves:             pick(a, ["saves"]),
+      savesPercentile:   asPercentile(pick(a, ["savesPercentile"])),
+      savePct:           asFraction(pick(a, ["savePctg"])),
+      savePctPercentile: asPercentile(pick(a, ["savePctgPercentile"])),
+    }))
+    .filter((a: GoalieAreaDetail) => a.area.length > 0);
+
+  const line = r.player ?? r;
+  const stats = r.stats ?? {};
+  const gaaStat = statTriple(stats, "goalsAgainstAvg");
+  const above900 = statTriple(stats, "gamesAbove900");
 
   return {
     playerId,
     season: seasonId,
-    gamesPlayed: pickAny(line, ["gamesPlayed", "gp", "games"]),
-    wins:        pickAny(line, ["wins", "w"]),
-    losses:      pickAny(line, ["losses", "l"]),
-    otLosses:    pickAny(line, ["otLosses", "ot", "overtimeLosses"]),
-    gaa:         pickAny(line, ["goalsAgainstAverage", "gaa"]),
-    savePct:     asFraction(pickAny(line, ["savePctg", "savePct"])) ?? all?.savePct ?? null,
-    shotsAgainst: all?.shotsAgainst ?? pickAny(line, ["shotsAgainst"]),
-    saves:        all?.saves ?? pickAny(line, ["saves"]),
-    goalsAgainst: all?.goalsAgainst ?? pickAny(line, ["goalsAgainst"]),
+    gamesPlayed: pick(line, ["gamesPlayed"]),
+    wins:        pick(line, ["wins"]),
+    losses:      pick(line, ["losses"]),
+    otLosses:    pick(line, ["overtimeLosses", "otLosses"]),
+    gaa:           pick(line, ["goalsAgainstAvg"]) ?? gaaStat.value,
+    gaaPercentile: gaaStat.percentile,
+    gaaLeagueAvg:  gaaStat.leagueAvg,
+    savePct:      asFraction(pick(line, ["savePctg"])) ?? all?.savePct ?? null,
+    shotsAgainst: all?.shotsAgainst ?? null,
+    saves:        all?.saves ?? null,
+    goalsAgainst: all?.goalsAgainst ?? null,
     highDangerSavePct:      high?.savePct ?? null,
     highDangerGoalsAgainst: high?.goalsAgainst ?? null,
-    startsAbove900Pct: pick(r, [
-      "startsAbove900Pctg", "pctStartsAbove900", "startsOver900Pctg", "qualityStartsPctg",
-    ]),
+    // Stated as a fraction upstream (0.4444); the panel prints a percentage.
+    startsAbove900Pct:        above900.value == null ? null : above900.value * 100,
+    startsAbove900Percentile: above900.percentile,
+    startsAbove900LeagueAvg:  above900.leagueAvg == null ? null : above900.leagueAvg * 100,
     zones,
+    areas,
   };
 }
 

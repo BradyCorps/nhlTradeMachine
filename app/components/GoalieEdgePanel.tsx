@@ -25,10 +25,18 @@ export interface GoalieZoneSplitView {
   zone: GoalieZoneKey;
   savePct: number | null;
   savePctLeagueAvg: number | null;
+  /** 0–100. The feed states 0–1; the parser rescales. */
   percentile: number | null;
   shotsAgainst: number | null;
   saves: number | null;
   goalsAgainst: number | null;
+}
+
+export interface GoalieAreaView {
+  area: string;
+  saves: number | null;
+  savePct: number | null;
+  savePctPercentile: number | null;
 }
 
 export interface GoalieEdgeView {
@@ -37,6 +45,8 @@ export interface GoalieEdgeView {
   losses: number | null;
   otLosses: number | null;
   gaa: number | null;
+  gaaPercentile: number | null;
+  gaaLeagueAvg: number | null;
   savePct: number | null;
   shotsAgainst: number | null;
   saves: number | null;
@@ -44,7 +54,10 @@ export interface GoalieEdgeView {
   highDangerSavePct: number | null;
   highDangerGoalsAgainst: number | null;
   startsAbove900Pct: number | null;
+  startsAbove900Percentile: number | null;
+  startsAbove900LeagueAvg: number | null;
   zones: GoalieZoneSplitView[];
+  areas?: GoalieAreaView[];
 }
 
 interface Props {
@@ -93,6 +106,10 @@ function PercentileChip({ value }: { value: number | null }) {
     if (t === 3 && h !== 13) return "rd";
     return "th";
   };
+  // The feed tops out at a literal 1.0, which would print as "100th". The
+  // NHL's own pages cap the label at 99th, so match that rather than
+  // claiming a percentile that cannot mean what it says.
+  const shown = Math.min(99, Math.round(value));
   return (
     <span
       className="font-mono text-[9px] font-black px-1.5 py-0.5 border"
@@ -104,7 +121,7 @@ function PercentileChip({ value }: { value: number | null }) {
         whiteSpace: "nowrap",
       }}
     >
-      {value < 50 ? "<50th" : `${Math.round(value)}${suffix(Math.round(value))}`}
+      {value < 50 ? "<50th" : `${shown}${suffix(shown)}`}
     </span>
   );
 }
@@ -158,7 +175,9 @@ export default function GoalieEdgePanel({ detail, playerName }: Props) {
           NHL Edge · Shot Locations
         </span>
         <span className="font-mono text-[8px] sm:text-[9px] uppercase tracking-[0.12em]" style={{ color: faint }}>
-          {record ? `${record} · ` : ""}{detail.gamesPlayed != null ? `${detail.gamesPlayed} GP` : ""}
+          {record ? `${record} · ` : ""}
+          {detail.gamesPlayed != null ? `${detail.gamesPlayed} GP` : ""}
+          {detail.gaa != null ? ` · ${detail.gaa.toFixed(2)} GAA` : ""}
         </span>
       </div>
 
@@ -179,8 +198,10 @@ export default function GoalieEdgePanel({ detail, playerName }: Props) {
         <HeroStat
           label="Starts > .900"
           value={detail.startsAbove900Pct != null ? `${detail.startsAbove900Pct.toFixed(1)}%` : "—"}
-          percentile={null}
-          hint="Share of starts finishing above a .900 save percentage — a game-by-game consistency read rather than a peak."
+          percentile={detail.startsAbove900Percentile}
+          hint={`Share of starts finishing above a .900 save percentage — a game-by-game consistency read rather than a peak.${
+            detail.startsAbove900LeagueAvg != null
+              ? ` League average ${detail.startsAbove900LeagueAvg.toFixed(1)}%.` : ""}`}
         />
       </div>
 
@@ -274,6 +295,51 @@ export default function GoalieEdgePanel({ detail, playerName }: Props) {
             </tbody>
           </table>
         </div>
+
+        {/* Per-area strengths and soft spots.
+            The feed names ~17 rink areas but publishes no geometry, so this
+            ranks them rather than drawing them — a placed map would be
+            invented coordinates. Areas under 20 saves are dropped: a .818
+            over nine shots is noise wearing a percentile. */}
+        {(() => {
+          const ranked = (detail.areas ?? [])
+            .filter(a => a.savePctPercentile != null && a.savePct != null && (a.saves ?? 0) >= 20)
+            .sort((a, b) => (b.savePctPercentile ?? 0) - (a.savePctPercentile ?? 0));
+          if (ranked.length < 4) return null;
+          const best = ranked.slice(0, 3);
+          const worst = ranked.slice(-3).reverse();
+
+          const Column = ({ title, rows }: { title: string; rows: GoalieAreaView[] }) => (
+            <div>
+              <div className="font-mono text-[8px] font-black uppercase tracking-[0.12em] mb-1" style={{ color: faint }}>
+                {title}
+              </div>
+              {rows.map(a => (
+                <div key={a.area} className="flex items-center justify-between gap-2 py-0.5">
+                  <span className="font-mono text-[10px] truncate" style={{ color: ink }} title={a.area}>
+                    {a.area}
+                  </span>
+                  <span className="flex items-center gap-1.5 shrink-0">
+                    <span className="font-mono text-[10px] font-black" style={{ color: ink, fontVariantNumeric: "tabular-nums" }}>
+                      {pct3(a.savePct)}
+                    </span>
+                    <span className="font-mono text-[8px]" style={{ color: faint }}>
+                      {int(a.saves)} sv
+                    </span>
+                    <PercentileChip value={a.savePctPercentile} />
+                  </span>
+                </div>
+              ))}
+            </div>
+          );
+
+          return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-3 pt-2 border-t" style={{ borderColor: rule }}>
+              <Column title="Strongest areas" rows={best} />
+              <Column title="Softest areas" rows={worst} />
+            </div>
+          );
+        })()}
 
         {/* Legend — identity is never carried by colour alone */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 pt-2 border-t" style={{ borderColor: rule }}>
