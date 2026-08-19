@@ -14,6 +14,7 @@ import {
   EDGE_URL,
 } from "@/app/lib/nhl-player-feed";
 import { capturePlayerSnapshots, rosterPlayerIds } from "@/app/lib/nhl-feed-capture";
+import { captureGoalieEdgeDetail, goalieEdgeCoverage } from "@/app/lib/goalie-edge";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -45,6 +46,12 @@ export async function GET(req: Request) {
     snapshotCount = rows.length;
   } catch { /* table unavailable */ }
 
+  // Goalie EDGE detail is captured on an 8-day rotation and read by the
+  // dossier panel, which renders nothing when a goalie has no row. That
+  // failure mode is silent on the player page, so the standing coverage
+  // is reported here instead — "0 of 144" is the whole diagnosis.
+  const goalieEdge = await goalieEdgeCoverage(SEASON.nhleSeasonId);
+
   return NextResponse.json({
     checkedAt: new Date().toISOString(),
     season: seasonId(),
@@ -63,21 +70,60 @@ export async function GET(req: Request) {
       ok: edge.facts != null && edgeMissing.length === 0,
     },
     snapshotCount,
+    goalieEdge,
   });
 }
 
+// How many goalies one invocation attempts. `maxDuration` is 60s and a
+// single EDGE request can take the full 8s timeout, so 40 ids at six in
+// flight leaves headroom even in the worst case. The response carries
+// `nextOffset`, and the admin page loops on it — from the operator's
+// side one button press still covers the league.
+const GOALIE_BATCH = 40;
+const GOALIE_CONCURRENCY = 6;
+
 // POST /api/admin/nhl-feed — capture snapshots into the historical feed.
-// Body: { team?: "EDM" } to sync one team's current roster, or
-//       { ids?: number[] } for explicit NHL player ids.
+// Body: { team?: "EDM" }   sync one team's current roster (landing + EDGE)
+//       { ids?: number[] } explicit NHL player ids
+//       { goalies: true }  goalie EDGE detail backfill — the whole league,
+//                          one batch per call; pass back `nextOffset` to
+//                          resume, `teams` to scope, `discover` to include
+//                          goalies the bundled snapshot predates.
 export async function POST(req: Request) {
   const unauthorized = await requireAdmin(req);
   if (unauthorized) return unauthorized;
 
-  const body = await req.json().catch(() => ({})) as { team?: string; ids?: number[] };
-  let ids: number[] = Array.isArray(body.ids) ? body.ids.filter((n) => Number.isFinite(n)) : [];
+  const body = await req.json().catch(() => ({})) as {
+    team?: string;
+    ids?: number[];
+    goalies?: boolean;
+    teams?: string[];
+    offset?: number;
+    limit?: number;
+    discover?: boolean;
+  };
+
+  const explicitIds: number[] = Array.isArray(body.ids) ? body.ids.filter((n) => Number.isFinite(n)) : [];
+
+  if (body.goalies) {
+    const teams = Array.isArray(body.teams) && body.teams.length > 0
+      ? body.teams
+      : body.team ? [body.team] : undefined;
+    const result = await captureGoalieEdgeDetail(SEASON.nhleSeasonId, {
+      playerIds: explicitIds.length > 0 ? explicitIds : undefined,
+      teams,
+      discover: body.discover === true,
+      offset: Number.isFinite(body.offset) ? Number(body.offset) : 0,
+      limit: Math.min(Number.isFinite(body.limit) ? Number(body.limit) : GOALIE_BATCH, GOALIE_BATCH),
+      concurrency: GOALIE_CONCURRENCY,
+    });
+    return NextResponse.json({ ok: true, season: seasonId(), mode: "goalie-detail", ...result });
+  }
+
+  let ids: number[] = explicitIds;
   if (ids.length === 0 && body.team) ids = await rosterPlayerIds(body.team);
   if (ids.length === 0) {
-    return NextResponse.json({ error: "Provide { team } or { ids } — no players resolved." }, { status: 400 });
+    return NextResponse.json({ error: "Provide { team }, { ids } or { goalies: true } — no players resolved." }, { status: 400 });
   }
 
   const result = await capturePlayerSnapshots(ids.slice(0, 40), seasonId());

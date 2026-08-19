@@ -39,7 +39,7 @@ export async function GET(req: Request) {
   // at once, so it cannot be the thing that busts the invocation.
   const goalieDetail = await captureGoalieEdgeDetail(
     SEASON.nhleSeasonId,
-    activeGoalieIdsForTeams(group),
+    { playerIds: activeGoalieIdsForTeams(group) },
   ).catch((e: any) => ({ error: String(e?.message ?? e) }));
 
   return NextResponse.json({ ok: true, cycleDay, teams: group, season, goalieBoards, goalieDetail, ...result });

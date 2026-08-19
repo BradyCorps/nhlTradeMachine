@@ -13,7 +13,8 @@
     "gravity:calibration:check": "tsx scripts/gravity-calibration/calibrate-tiers.ts --check",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
-    "build:seed": "tsx scripts/build-league-seed.ts"
+    "build:seed": "tsx scripts/build-league-seed.ts",
+    "feed:goalie-backfill": "tsx scripts/backfill-goalie-edge.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

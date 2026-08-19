@@ -178,6 +178,51 @@ export default function AdminHealth() {
     }
   };
 
+  // Goalie EDGE backfill. The route caps each call at 40 goalies so it
+  // fits inside one 60s invocation, so the button walks `nextOffset`
+  // until the league is covered — one press, one complete backfill.
+  const [goalieBackfill, setGoalieBackfill] = useState<
+    { running: boolean; done: number; eligible: number; stored: number; skipped: number; failures: any[]; unparsed: string[] } | null
+  >(null);
+
+  const runGoalieBackfill = async () => {
+    let offset = 0;
+    let stored = 0;
+    let skipped = 0;
+    const failures: any[] = [];
+    const unparsed: string[] = [];
+    setGoalieBackfill({ running: true, done: 0, eligible: 0, stored: 0, skipped: 0, failures, unparsed });
+    try {
+      // Bounded rather than while(true): 32 batches of 40 is far more
+      // than the league, so a route that stopped advancing cannot spin.
+      for (let batch = 0; batch < 32; batch++) {
+        const res = await fetch("/api/admin/nhl-feed", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ goalies: true, offset }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+        stored += data.stored ?? 0;
+        skipped += data.skipped ?? 0;
+        failures.push(...(data.failures ?? []));
+        unparsed.push(...(data.unparsed ?? []));
+        const done = (data.nextOffset ?? data.eligible ?? 0) as number;
+        setGoalieBackfill({ running: data.nextOffset != null, done, eligible: data.eligible ?? 0, stored, skipped, failures, unparsed });
+        if (data.nextOffset == null) break;
+        offset = data.nextOffset;
+      }
+      toast(`Goalie EDGE: ${stored} stored · ${skipped} already captured · ${failures.length} failures`,
+        failures.length > 0 ? "error" : "success");
+      if (failures.length > 0) console.log("[goalie-backfill] failures:", failures);
+      if (unparsed.length > 0) console.log("[goalie-backfill] stored but unparseable:", unparsed);
+      runFeedCheck();
+    } catch (e: any) {
+      toast(e?.message ?? "Goalie backfill failed", "error");
+    } finally {
+      setGoalieBackfill(prev => prev ? { ...prev, running: false } : prev);
+    }
+  };
+
   const [backfilling, setBackfilling] = useState(false);
   const runFaBackfill = async () => {
     setBackfilling(true);
@@ -248,11 +293,35 @@ export default function AdminHealth() {
             <button onClick={runFeedSync} disabled={feedSyncing} style={btnStyle}>
               {feedSyncing ? "CAPTURING…" : "CAPTURE TEAM SNAPSHOTS"}
             </button>
+            <button onClick={runGoalieBackfill} disabled={goalieBackfill?.running} style={btnStyle}
+              title="Capture /edge/goalie-detail for every goalie in the active-player snapshot, 40 per request until the league is covered">
+              {goalieBackfill?.running
+                ? `BACKFILLING ${goalieBackfill.done}/${goalieBackfill.eligible}…`
+                : "BACKFILL GOALIE EDGE"}
+            </button>
             <button onClick={runFaBackfill} disabled={backfilling} style={btnStyle}
               title="Resolve FA-class rows with age 0 / Unknown position against the NHL search API and write real identities into the players table">
               {backfilling ? "RESOLVING…" : "BACKFILL FA AGES"}
             </button>
           </div>
+          {goalieBackfill && !goalieBackfill.running && (goalieBackfill.stored + goalieBackfill.skipped + goalieBackfill.failures.length) > 0 && (
+            <div style={{ marginTop: 14, fontSize: 10, lineHeight: 1.9, color: "var(--ledger-ink-faint)" }}>
+              Goalie EDGE backfill: <strong style={{ color: "var(--ledger-ink)" }}>{goalieBackfill.stored}</strong> stored ·{" "}
+              {goalieBackfill.skipped} already captured today ·{" "}
+              <span style={{ color: goalieBackfill.failures.length > 0 ? "var(--ledger-red)" : "inherit" }}>
+                {goalieBackfill.failures.length} failures
+              </span>
+              {goalieBackfill.unparsed.length > 0 && ` · ${goalieBackfill.unparsed.length} stored but unparseable`}
+              {goalieBackfill.failures.slice(0, 8).map((f: any) => (
+                <div key={f.playerId} style={{ paddingLeft: 12 }}>
+                  {f.reason} — {f.name ?? f.playerId}{f.detail ? ` (${f.detail})` : ""}
+                </div>
+              ))}
+              {goalieBackfill.failures.length > 8 && (
+                <div style={{ paddingLeft: 12 }}>…{goalieBackfill.failures.length - 8} more (console)</div>
+              )}
+            </div>
+          )}
           {feedHealth && (
             <div style={{ marginTop: 14, fontSize: 10, lineHeight: 1.9 }}>
               {(["landing", "edge"] as const).map((k) => {
@@ -274,6 +343,25 @@ export default function AdminHealth() {
               <div style={{ color: "var(--ledger-ink-faint)" }}>
                 Snapshots stored: <strong style={{ color: "var(--ledger-ink)" }}>{feedHealth.snapshotCount ?? "—"}</strong> · Season {feedHealth.season}
               </div>
+              {feedHealth.goalieEdge && (
+                <div>
+                  <span style={{
+                    fontWeight: 900,
+                    color: feedHealth.goalieEdge.goaliesCaptured === 0 ? "var(--ledger-red)"
+                      : feedHealth.goalieEdge.goaliesCaptured < feedHealth.goalieEdge.goaliesKnown ? "var(--ledger-amber)"
+                      : "var(--ledger-green)",
+                  }}>
+                    ● GOALIE EDGE
+                  </span>{" "}
+                  <span style={{ color: "var(--ledger-ink-faint)" }}>
+                    {feedHealth.goalieEdge.goaliesCaptured}/{feedHealth.goalieEdge.goaliesKnown} goalies ·{" "}
+                    {feedHealth.goalieEdge.rows} rows · last{" "}
+                    {feedHealth.goalieEdge.lastCapturedAt
+                      ? new Date(feedHealth.goalieEdge.lastCapturedAt).toLocaleString()
+                      : "never — the dossier panel is blank for every goalie"}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>

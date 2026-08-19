@@ -16,7 +16,9 @@ import { nhlSnapshots } from "@/app/db/schema";
 import { ensureNhlSnapshotTable } from "@/app/db/ensure-schema";
 import { fetchGoalieEdgeDetail, parseGoalieEdge, mapWithConcurrency } from "@/app/lib/nhl-player-feed";
 import type { GoalieEdgeFacts } from "@/app/lib/nhl-player-feed";
-import { activeGoalieIds } from "@/app/lib/nhl-active-players";
+import { activeGoalieIds, activeGoalieIdsForTeams, activePlayerById } from "@/app/lib/nhl-active-players";
+import { rosterGoalieIds } from "@/app/lib/nhl-feed-capture";
+import { TEAMS_DB } from "@/app/lib/db";
 
 const NHL_HEADERS = { "User-Agent": "Mozilla/5.0", "Accept": "application/json" };
 const EDGE_BASE = "https://api-web.nhle.com/v1/edge";
@@ -86,64 +88,217 @@ export async function captureGoalieEdgeBoards(seasonId: string): Promise<GoalieB
 // ── Per-goalie EDGE detail ───────────────────────────────────────
 //
 // The boards above rank the top ten at each location; this is the same
-// data for EVERY goalie, one request each. About 110 goalies at five in
-// flight is well inside a single invocation, and the snapshot table's
-// one-row-per-day id keeps a re-run from duplicating.
+// data for EVERY goalie, one request each.
+//
+// TWO CALLERS, TWO SHAPES. The nightly cron takes one night's teams off
+// an 8-day rotation, so it never asks for more than ~20 goalies and the
+// whole league takes eight nights to land. The backfill (admin route and
+// `scripts/backfill-goalie-edge.ts`) wants all 144 in one sitting, which
+// is more than a 60s serverless invocation can promise — so the run is
+// sliced by `offset`/`limit` and reports `nextOffset`, and a caller that
+// has no clock (the script) just passes no limit and takes the lot.
 //
 // The RAW payload is what gets stored. `latestGoalieEdgeDetailMap` parses
 // on read, so tightening the parser later re-reads every row already
 // captured instead of stranding a season of history behind a bad guess.
+//
+// FAILURES ARE THE POINT. This pipeline had captured zero rows for weeks
+// without anything saying so, because the cron's only report was a count
+// nobody read. Every id that does not end in a stored row comes back
+// named and with a reason, and `goalieEdgeCoverage` states the standing
+// total against the 144 goalies we know about.
+
+export interface GoalieCaptureFailure {
+  playerId: string;
+  /** From the bundled snapshot when known — a bare id is useless in a log. */
+  name: string | null;
+  /** `unreachable`: the NHL returned nothing. `write`: the insert threw. */
+  reason: "unreachable" | "write";
+  detail?: string;
+}
 
 export interface GoalieDetailCapture {
+  /** Ids resolved before slicing — what a full backfill would cover. */
+  eligible: number;
+  /** Ids actually attempted in this run (`eligible` minus the slice). */
   requested: number;
+  /** Rows newly written. */
   stored: number;
+  /** Already captured today: the daily id collided, so nothing was written. */
+  skipped: number;
+  /** Stored payloads the parser read facts from. */
   parsed: number;
-  failures: string[];
+  /** Stored, but `parseGoalieEdge` returned null — a feed-shape warning. */
+  unparsed: string[];
+  failures: GoalieCaptureFailure[];
+  /** Where a sliced caller resumes, or null when the run finished the list. */
+  nextOffset: number | null;
+  elapsedMs: number;
   day: string;
+}
+
+export interface GoalieCaptureOptions {
+  /** Explicit ids. Skips both `teams` and the bundled snapshot. */
+  playerIds?: Array<string | number>;
+  /** Club abbreviations — the snapshot's goalies for those teams. */
+  teams?: string[];
+  /**
+   * Union the resolved ids with the goalies on the live NHL rosters.
+   * The bundled snapshot has no rookies, and a rookie goalie is exactly
+   * the player whose dossier shows nothing, so a backfill that means to
+   * be complete should ask. Costs 32 roster requests; degrades to the
+   * snapshot alone if they fail.
+   */
+  discover?: boolean;
+  /** Skip this many resolved ids — for resuming a sliced run. */
+  offset?: number;
+  /** Attempt at most this many ids. Omit to take the whole list. */
+  limit?: number;
+  /** Requests in flight. Five is friendly to the NHL and fits an invocation. */
+  concurrency?: number;
+}
+
+/** Ids to attempt, in a stable order, after teams/explicit/slice resolution. */
+export function resolveGoalieIds(
+  options: Pick<GoalieCaptureOptions, "playerIds" | "teams" | "offset" | "limit">,
+  discovered: Array<string | number> = [],
+): { ids: string[]; eligible: number; nextOffset: number | null } {
+  const seed = options.playerIds ?? (options.teams ? activeGoalieIdsForTeams(options.teams) : activeGoalieIds());
+  // Sorted so a sliced run resumes against the same list it started on:
+  // `offset` means nothing if the order can shift between invocations.
+  const all = [...new Set([...seed, ...discovered].map(String))].sort();
+
+  const offset = Math.max(0, Math.trunc(options.offset ?? 0));
+  const limit = options.limit == null ? all.length : Math.max(0, Math.trunc(options.limit));
+  const ids = all.slice(offset, offset + limit);
+  const consumed = offset + ids.length;
+  return { ids, eligible: all.length, nextOffset: consumed < all.length ? consumed : null };
+}
+
+/** Goalie ids on the live NHL roster feeds — the rookies the snapshot misses. */
+export async function discoverGoalieIds(teams?: string[]): Promise<string[]> {
+  const clubs = (teams?.length ? teams : TEAMS_DB.map(t => t.id)).map(t => t.toUpperCase());
+  const lists = await Promise.all(clubs.map(rosterGoalieIds));
+  return [...new Set(lists.flat().map(String))];
 }
 
 /**
  * Capture `/edge/goalie-detail` for a set of goalies.
  *
- * `playerIds` defaults to every goalie in the bundled active-player
- * snapshot. That file has no rookies, so a caller that knows the live
- * roster — assembly does — should pass its own ids instead.
+ * Defaults to every goalie in the bundled active-player snapshot, which
+ * has no rookies — pass `discover: true` (or explicit `playerIds`) when
+ * the run is meant to be complete rather than nightly.
  */
 export async function captureGoalieEdgeDetail(
   seasonId: string,
-  playerIds?: Array<string | number>,
+  options: GoalieCaptureOptions = {},
 ): Promise<GoalieDetailCapture> {
-  const ids = (playerIds ?? activeGoalieIds()).map(String);
+  const startedAt = Date.now();
   const season = Number(seasonId);
   const day = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const failures: string[] = [];
+
+  const discovered = options.discover
+    ? await discoverGoalieIds(options.teams).catch(() => [])
+    : [];
+  const { ids, eligible, nextOffset } = resolveGoalieIds(options, discovered);
+
+  const failures: GoalieCaptureFailure[] = [];
+  const unparsed: string[] = [];
   let stored = 0;
+  let skipped = 0;
   let parsed = 0;
+
+  const fail = (playerId: string, reason: GoalieCaptureFailure["reason"], detail?: string) => {
+    failures.push({ playerId, name: activePlayerById(playerId)?.name ?? null, reason, ...(detail ? { detail } : {}) });
+  };
 
   await ensureNhlSnapshotTable().catch(() => {});
 
-  await mapWithConcurrency(ids, 5, async (playerId) => {
+  await mapWithConcurrency(ids, Math.max(1, options.concurrency ?? 5), async (playerId) => {
     const { facts, raw } = await fetchGoalieEdgeDetail(playerId, season);
-    if (raw == null) { failures.push(playerId); return; }
-    if (facts) parsed++;
+    if (raw == null) { fail(playerId, "unreachable"); return; }
+    if (facts) parsed++; else unparsed.push(playerId);
     try {
-      await db.insert(nhlSnapshots).values({
+      // `returning` is what separates a real write from a same-day re-run:
+      // the conflict clause makes both resolve, and only one wrote a row.
+      const written = await db.insert(nhlSnapshots).values({
         id: `${playerId}-${season}-goalie-detail-${day}`,
         playerId: Number(playerId),
-        name: null,
+        name: activePlayerById(playerId)?.name ?? null,
         season,
         source: "goalie-detail",
         capturedAt: Date.now(),
         gamesPlayed: facts?.gamesPlayed ?? null,
         payload: JSON.stringify(raw),
-      }).onConflictDoNothing();
-      stored++;
-    } catch {
-      failures.push(playerId);
+      }).onConflictDoNothing().returning({ id: nhlSnapshots.id });
+      if (written.length > 0) stored++; else skipped++;
+    } catch (e: any) {
+      fail(playerId, "write", String(e?.message ?? e));
     }
   });
 
-  return { requested: ids.length, stored, parsed, failures, day };
+  return {
+    eligible,
+    requested: ids.length,
+    stored,
+    skipped,
+    parsed,
+    unparsed,
+    failures,
+    nextOffset,
+    elapsedMs: Date.now() - startedAt,
+    day,
+  };
+}
+
+export interface GoalieEdgeCoverage {
+  season: number;
+  /** Distinct goalies with at least one detail row this season. */
+  goaliesCaptured: number;
+  /** Goalies in the bundled snapshot — the denominator a backfill targets. */
+  goaliesKnown: number;
+  rows: number;
+  /** Most recent capture, ISO, or null when the pipeline has never run. */
+  lastCapturedAt: string | null;
+}
+
+/**
+ * Standing state of the goalie-detail pipeline.
+ *
+ * Exists so "capture has never run" is visible in the admin panel rather
+ * than being inferred from empty dossier panels — which is how it went
+ * unnoticed the first time.
+ */
+export async function goalieEdgeCoverage(seasonId: string): Promise<GoalieEdgeCoverage> {
+  const season = Number(seasonId);
+  const coverage: GoalieEdgeCoverage = {
+    season,
+    goaliesCaptured: 0,
+    goaliesKnown: activeGoalieIds().length,
+    rows: 0,
+    lastCapturedAt: null,
+  };
+  try {
+    await ensureNhlSnapshotTable();
+    const rows = await db.select({
+      playerId: nhlSnapshots.playerId,
+      capturedAt: nhlSnapshots.capturedAt,
+      source: nhlSnapshots.source,
+      season: nhlSnapshots.season,
+    }).from(nhlSnapshots);
+
+    const seen = new Set<number>();
+    let latest = 0;
+    for (const r of rows) {
+      if (r.source !== "goalie-detail" || r.season !== season) continue;
+      coverage.rows++;
+      seen.add(r.playerId);
+      if (r.capturedAt > latest) latest = r.capturedAt;
+    }
+    coverage.goaliesCaptured = seen.size;
+    coverage.lastCapturedAt = latest > 0 ? new Date(latest).toISOString() : null;
+  } catch { /* feed table unavailable — reported as never captured */ }
+  return coverage;
 }
 
 /** Latest per-goalie EDGE detail, keyed by NHL player id (string). */

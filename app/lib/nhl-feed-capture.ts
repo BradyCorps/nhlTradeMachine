@@ -6,20 +6,34 @@ import { fetchPlayerLanding, fetchEdgeDetail, mapWithConcurrency } from "./nhl-p
 
 const NHL_HEADERS = { "User-Agent": "Mozilla/5.0", "Accept": "application/json" };
 
-export async function rosterPlayerIds(team: string): Promise<number[]> {
+const ROSTER_URL = (team: string) => `https://api-web.nhle.com/v1/roster/${team.toUpperCase()}/current`;
+
+/** A club's current roster, or null when the feed is unreachable. */
+async function fetchRoster(team: string): Promise<any | null> {
   try {
-    const res = await fetch(`https://api-web.nhle.com/v1/roster/${team.toUpperCase()}/current`, {
-      cache: "no-store",
-      headers: NHL_HEADERS,
-    });
-    if (!res.ok) return [];
-    const roster = await res.json();
-    return [...(roster.forwards ?? []), ...(roster.defensemen ?? []), ...(roster.goalies ?? [])]
-      .map((p: { id?: number }) => p.id)
-      .filter((n: unknown): n is number => Number.isFinite(n));
+    const res = await fetch(ROSTER_URL(team), { cache: "no-store", headers: NHL_HEADERS });
+    return res.ok ? await res.json() : null;
   } catch {
-    return [];
+    return null;
   }
+}
+
+const rosterIds = (group: unknown): number[] =>
+  ((group as Array<{ id?: number }> | undefined) ?? [])
+    .map(p => p.id)
+    .filter((n): n is number => Number.isFinite(n));
+
+export async function rosterPlayerIds(team: string): Promise<number[]> {
+  const roster = await fetchRoster(team);
+  if (!roster) return [];
+  return [...rosterIds(roster.forwards), ...rosterIds(roster.defensemen), ...rosterIds(roster.goalies)];
+}
+
+/** Goalie ids on a club's current roster — the seed the bundled CSV
+ *  snapshot cannot give, because it predates this season's call-ups. */
+export async function rosterGoalieIds(team: string): Promise<number[]> {
+  const roster = await fetchRoster(team);
+  return roster ? rosterIds(roster.goalies) : [];
 }
 
 export interface CaptureResult {
