@@ -17,6 +17,8 @@ import { SEASON } from "@/app/lib/season-config";
 import { TEAMS_DB } from "@/app/lib/db";
 import GravityField from "@/app/components/GravityField";
 import GravityFieldV4 from "@/app/components/GravityFieldV4";
+import GravityHeatMap from "@/app/components/GravityHeatMap";
+import NavTrajectoryChart from "@/app/components/NavTrajectoryChart";
 import PlayerStrandPanel from "@/app/components/PlayerStrandPanel";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
@@ -246,6 +248,13 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
               />
             ))}
           </div>
+          <div className="px-3 pb-3">
+            <NavTrajectoryChart
+              stages={navComponents.map(c => ({ label: c.label, value: c.val, desc: c.desc }))}
+              total={xnav.total}
+              playerName={player.name}
+            />
+          </div>
         </div>
 
         {/* Contract + market */}
@@ -307,6 +316,15 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
         {gravityV3 && (
           <div className="border p-4" style={{ borderColor: rule, background: "var(--paper-card, var(--paper-inset))" }}>
             <GravityField profile={gravityV3} playerName={player.name} mode="full" />
+            <div className="mt-4 pt-3 border-t" style={{ borderColor: rule }}>
+              <GravityHeatMap
+                masses={gravityV3.masses}
+                tier={gravityV3.tier}
+                force={gravityV3.force}
+                isDefenseman={player.position === "D"}
+                playerName={player.name}
+              />
+            </div>
           </div>
         )}
 
