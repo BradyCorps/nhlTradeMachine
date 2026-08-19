@@ -19,6 +19,7 @@ import GravityField from "@/app/components/GravityField";
 import GravityFieldV4 from "@/app/components/GravityFieldV4";
 import GravityHeatMap from "@/app/components/GravityHeatMap";
 import NavTrajectoryChart from "@/app/components/NavTrajectoryChart";
+import NavLeagueScatter from "@/app/components/NavLeagueScatter";
 import PlayerStrandPanel from "@/app/components/PlayerStrandPanel";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
@@ -120,6 +121,33 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
     : null;
   const roles = derivePlayerRoles(player);
   const comparePeers = buildComparePeers(roster.players as any[], player);
+
+  // Scatter plot: compute NAV for same-position peers (lightweight — pure sync math)
+  const posGroup = posGroupOf(player.position);
+  const scatterPeers = (roster.players as any[])
+    .filter(p => String(p.id) !== String(player.id) && p.position !== "Pick"
+      && posGroupOf(p.position) === posGroup && (p.games ?? 0) >= 20)
+    .map(p => {
+      try {
+        const pos = p.position === "D" || p.position === "G" || p.position === "C" ? p.position : "W";
+        const pNav = calculateAssetNAV({ ...p, position: pos }, capCeiling);
+        const offStage = pNav.stages?.find((s: any) => s.key === "off");
+        const defStage = pNav.stages?.find((s: any) => s.key === "def");
+        return {
+          id: String(p.id), name: p.name, teamId: p.teamId ?? "",
+          off: offStage?.value ?? 0, def: defStage?.value ?? 0,
+          nav: pNav.total, age: p.age ?? 0,
+        };
+      } catch { return null; }
+    })
+    .filter((p): p is NonNullable<typeof p> => p !== null);
+
+  const currentScatter = {
+    id: String(player.id), name: player.name, teamId: player.teamId ?? "",
+    off: xnav.stages?.find((s: any) => s.key === "off")?.value ?? 0,
+    def: xnav.stages?.find((s: any) => s.key === "def")?.value ?? 0,
+    nav: xnav.total, age: player.age ?? 0,
+  };
 
   const games = player.games ?? 0;
   const goals = player.goalsPace != null ? Math.round((player.goalsPace / 82) * games) : null;
@@ -233,28 +261,13 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
           </div>
         )}
 
-        {/* NAV components */}
-        <div className="border mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
-          <div className="px-3 pt-2 text-[9px] font-black font-mono uppercase tracking-[0.18em]" style={{ color: faint }}>
-            Value Breakdown
-          </div>
-          <div className="grid grid-cols-6">
-            {navComponents.map(c => (
-              <StatCell
-                key={c.label}
-                label={c.label}
-                value={`${c.val > 0 ? "+" : ""}${c.val}`}
-                color={c.val > 0 ? "var(--ledger-green)" : c.val < 0 ? "var(--ledger-red)" : undefined}
-              />
-            ))}
-          </div>
-          <div className="px-3 pb-3">
-            <NavTrajectoryChart
-              stages={navComponents.map(c => ({ label: c.label, value: c.val, desc: c.desc }))}
-              total={xnav.total}
-              playerName={player.name}
-            />
-          </div>
+        {/* NAV components — horizontal diverging bar chart */}
+        <div className="border mb-3 px-3 py-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
+          <NavTrajectoryChart
+            stages={navComponents.map(c => ({ label: c.label, value: c.val, desc: c.desc }))}
+            total={xnav.total}
+            playerName={player.name}
+          />
         </div>
 
         {/* Contract + market */}
@@ -296,6 +309,15 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
             <PlayerStrandPanel player={player} peers={comparePeers} />
           </div>
         </div>
+
+        {/* League context scatter — OFF vs DEF for same-position peers */}
+        {player.position !== "G" && scatterPeers.length >= 5 && (
+          <NavLeagueScatter
+            peers={scatterPeers}
+            currentPlayer={currentScatter}
+            playerName={player.name}
+          />
+        )}
 
         {/* NHL EDGE shot map — skaters with NHL ids only */}
         {player.position !== "G" && /^\d+$/.test(playerId) && (
