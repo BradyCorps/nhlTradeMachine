@@ -55,9 +55,35 @@ const concurrency = num("concurrency") ?? 5;
 
 const label = (id: string) => `${id} ${activePlayerById(id)?.name ?? "(not in snapshot)"}`;
 
+/**
+ * Where the db client will actually write, resolved exactly as it does.
+ *
+ * This is the line that was missing when 86 rows silently landed in a
+ * codespace's local.db instead of Turso: a plain `tsx` script does not
+ * load `.env.local`, so `DATABASE_URL` has to be exported into the shell.
+ * Print the target every run, and shout when it is the dev default — a
+ * backfill meant for production against `file:local.db` is a no-op on the
+ * live site, and nothing downstream will say so.
+ */
+function reportTargetDatabase(): void {
+  const url = process.env.DATABASE_URL || "file:local.db";
+  const masked = url
+    .replace(/\/\/[^@]*@/, "//***@")             // //user:pass@host
+    .replace(/([?&](?:authToken|auth_token|token)=)[^&]*/gi, "$1***");  // ?authToken=…
+  const isLocalDefault = !process.env.DATABASE_URL;
+  console.log(`  database: ${masked}`);
+  if (isLocalDefault) {
+    console.log(`  ⚠ DATABASE_URL is not set — this writes to the dev file:local.db, NOT`);
+    console.log(`    production. The live site reads Turso; to target it, either export`);
+    console.log(`    DATABASE_URL / DATABASE_AUTH_TOKEN here, or run the backfill from the`);
+    console.log(`    admin panel (BACKFILL GOALIE EDGE), which runs server-side against Turso.`);
+  }
+}
+
 async function main() {
   const season = SEASON.nhleSeasonId;
   console.log(`\nGoalie EDGE backfill — season ${season}`);
+  reportTargetDatabase();
 
   const line = (c: Awaited<ReturnType<typeof goalieEdgeCoverage>>) =>
     `${c.goaliesCaptured} captured · ${c.goaliesWithoutSeasonData} no season data · `
