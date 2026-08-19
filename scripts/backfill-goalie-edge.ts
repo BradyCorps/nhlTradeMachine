@@ -59,9 +59,12 @@ async function main() {
   const season = SEASON.nhleSeasonId;
   console.log(`\nGoalie EDGE backfill — season ${season}`);
 
+  const line = (c: Awaited<ReturnType<typeof goalieEdgeCoverage>>) =>
+    `${c.goaliesCaptured} captured · ${c.goaliesWithoutSeasonData} no season data · `
+    + `${c.goaliesUnaccounted} unaccounted of ${c.goaliesKnown} known · ${c.rows} rows`;
+
   const before = await goalieEdgeCoverage(season);
-  console.log(`  before: ${before.goaliesCaptured}/${before.goaliesKnown} goalies captured, `
-    + `${before.rows} rows, last ${before.lastCapturedAt ?? "never"}`);
+  console.log(`  before: ${line(before)}, last ${before.lastCapturedAt ?? "never"}`);
 
   const discovered = discover ? await discoverGoalieIds(teams) : [];
   if (discover) {
@@ -91,6 +94,17 @@ async function main() {
     + `skipped ${result.skipped} (already captured ${result.day}) · parsed ${result.parsed} · `
     + `${(result.elapsedMs / 1000).toFixed(1)}s`);
 
+  // Expected, not broken: the bundled snapshot is a 32-club depth chart,
+  // so most of it is juniors and AHL goalies the NHL has no EDGE rows
+  // for. Summarised rather than listed — this is the majority of a
+  // full-league run and it drowns out anything that actually went wrong.
+  if (result.noSeasonData.length > 0) {
+    const names = result.noSeasonData.slice(0, 5).map(label);
+    console.log(`\n  · ${result.noSeasonData.length} goalies have no EDGE data for ${season} `
+      + `(404 — no NHL games): ${names.join(", ")}${result.noSeasonData.length > 5 ? ", …" : ""}`);
+    console.log(`    Recorded as such, so coverage counts them instead of waiting for them.`);
+  }
+
   // A payload that stored but would not parse is the dangerous case: the
   // row exists, so coverage looks healthy, and the dossier panel still
   // renders nothing. Name those loudly.
@@ -100,16 +114,24 @@ async function main() {
     console.log(`      Run: npx tsx scripts/verify-goalie-edge.ts ${result.unparsed[0]} ${season}`);
   }
 
+  // Everything left is a real problem: a timeout, a 5xx, a rate limit, a
+  // write that threw. Worth re-running for.
   if (result.failures.length > 0) {
     console.log(`\n  ✗ failures (${result.failures.length}):`);
-    for (const f of result.failures) console.log(`      ${f.reason.padEnd(11)} ${label(f.playerId)}${f.detail ? ` — ${f.detail}` : ""}`);
+    for (const f of result.failures) {
+      console.log(`      ${f.reason.padEnd(11)} ${label(f.playerId)}`
+        + `${f.status ? ` — HTTP ${f.status}` : ""}${f.detail ? ` — ${f.detail}` : ""}`);
+    }
   }
 
   const after = await goalieEdgeCoverage(season);
-  console.log(`\n  after: ${after.goaliesCaptured}/${after.goaliesKnown} goalies captured, ${after.rows} rows`);
+  console.log(`\n  after: ${line(after)}`);
+  if (after.goaliesUnaccounted > 0) {
+    console.log(`  ${after.goaliesUnaccounted} still unaccounted — re-run to pick them up.`);
+  }
 
-  if (result.requested > 0 && result.stored === 0 && result.skipped === 0) {
-    console.error(`\n  Nothing was captured. Every request failed — check egress to api-web.nhle.com.`);
+  if (result.requested > 0 && result.stored === 0 && result.skipped === 0 && result.noSeasonData.length === 0) {
+    console.error(`\n  Nothing was captured and nothing 404'd. Every request failed — check egress to api-web.nhle.com.`);
     process.exit(1);
   }
 }

@@ -22,8 +22,8 @@ import * as schema from "@/app/db/schema";
 
 const state = vi.hoisted(() => ({
   db: null as any,
-  /** playerId → payload | null (null = the NHL returned nothing). */
-  feed: new Map<string, unknown | null>(),
+  /** playerId → payload, or a bare status for a response with no body. */
+  feed: new Map<string, unknown | { status: number }>(),
   rosterGoalies: new Map<string, number[]>(),
 }));
 
@@ -51,17 +51,25 @@ vi.mock("@/app/lib/nhl-player-feed", async (importOriginal) => {
   return {
     ...actual,
     fetchGoalieEdgeDetail: vi.fn(async (playerId: string | number, seasonId: number) => {
-      const raw = state.feed.has(String(playerId)) ? state.feed.get(String(playerId)) : null;
-      return { facts: raw ? actual.parseGoalieEdge(raw, seasonId) : null, raw: raw ?? null };
+      const entry = state.feed.get(String(playerId));
+      // A goalie nobody stubbed is one the NHL has no rows for: 404, the
+      // ordinary case for most of a depth chart.
+      if (entry == null) return { facts: null, raw: null, status: 404 };
+      if (typeof entry === "object" && entry !== null && "status" in entry && Object.keys(entry).length === 1) {
+        return { facts: null, raw: null, status: (entry as { status: number }).status };
+      }
+      return { facts: actual.parseGoalieEdge(entry, seasonId), raw: entry, status: 200 };
     }),
   };
 });
 
 const {
+  NO_SEASON_DATA_SOURCE,
   captureGoalieEdgeDetail,
   resolveGoalieIds,
   goalieEdgeCoverage,
   discoverGoalieIds,
+  latestGoalieEdgeDetailMap,
 } = await import("@/app/lib/goalie-edge");
 const { activeGoalieIds, activeGoalieIdsForTeams } = await import("@/app/lib/nhl-active-players");
 
@@ -201,15 +209,59 @@ describe("captureGoalieEdgeDetail", () => {
 
   it("names an unreachable goalie instead of returning a bare id", async () => {
     state.feed.set("8478009", payloadFor(8478009));
-    state.feed.set("8480313", null);
+    state.feed.set("8480313", { status: 503 });
 
     const result = await captureGoalieEdgeDetail(SEASON, { playerIds: ["8478009", "8480313"] });
 
     expect(result.stored).toBe(1);
     expect(result.failures).toEqual([
-      { playerId: "8480313", name: "Logan Thompson", reason: "unreachable" },
+      { playerId: "8480313", name: "Logan Thompson", reason: "unreachable", status: 503 },
     ]);
+    expect(result.noSeasonData).toEqual([]);
     expect(await countRows()).toBe(1);
+  });
+
+  // The first real backfill reported 58 "failures", every one of them a
+  // depth goalie the NHL simply has no EDGE rows for. A 404 is an answer,
+  // not a fault, and burying the four real problems under it defeats the
+  // point of reporting failures at all.
+  it("records a 404 as no-season-data rather than as a failure", async () => {
+    state.feed.set("8478009", payloadFor(8478009));       // dressed this season
+    state.feed.set("8480313", { status: 404 });           // has not
+
+    const result = await captureGoalieEdgeDetail(SEASON, { playerIds: ["8478009", "8480313"] });
+
+    expect(result.failures).toEqual([]);
+    expect(result.noSeasonData).toEqual(["8480313"]);
+    expect(result.stored).toBe(1);
+
+    const tombstone = (await client.execute(
+      `SELECT * FROM nhl_snapshots WHERE source = '${NO_SEASON_DATA_SOURCE}'`)).rows;
+    expect(tombstone).toHaveLength(1);
+    expect(tombstone[0].player_id).toBe(8480313);
+    expect(tombstone[0].name).toBe("Logan Thompson");
+  });
+
+  // A nightly cron across a season would otherwise write ten thousand
+  // rows saying nothing happened.
+  it("keeps one no-season-data row per goalie per season, refreshing its timestamp", async () => {
+    state.feed.set("8480313", { status: 404 });
+    await captureGoalieEdgeDetail(SEASON, { playerIds: ["8480313"] });
+    const first = (await client.execute("SELECT captured_at FROM nhl_snapshots")).rows[0].captured_at;
+
+    await new Promise(r => setTimeout(r, 5));
+    await captureGoalieEdgeDetail(SEASON, { playerIds: ["8480313"] });
+
+    const rows = (await client.execute("SELECT captured_at FROM nhl_snapshots")).rows;
+    expect(rows).toHaveLength(1);
+    expect(Number(rows[0].captured_at)).toBeGreaterThan(Number(first));
+  });
+
+  // The tombstone must never reach the dossier panel as if it were data.
+  it("keeps no-season-data rows out of the detail read path", async () => {
+    state.feed.set("8480313", { status: 404 });
+    await captureGoalieEdgeDetail(SEASON, { playerIds: ["8480313"] });
+    expect((await latestGoalieEdgeDetailMap(SEASON)).size).toBe(0);
   });
 
   // The row exists, so coverage counts it and the dossier panel still
@@ -264,6 +316,37 @@ describe("goalieEdgeCoverage", () => {
     expect(coverage.rows).toBe(0);
     expect(coverage.lastCapturedAt).toBeNull();
     expect(coverage.goaliesKnown).toBe(activeGoalieIds().length);
+    // Nothing has been asked yet, so every known goalie is outstanding.
+    expect(coverage.goaliesUnaccounted).toBe(activeGoalieIds().length);
+  });
+
+  // Captured can never reach 144: most of the snapshot is juniors and
+  // AHL goalies with no NHL games. A full backfill is done when nothing
+  // is unaccounted for, not when captured hits the roster size.
+  it("counts a 404 goalie as accounted for, not as a gap", async () => {
+    const known = activeGoalieIds();
+    state.feed.set(known[0], payloadFor(Number(known[0])));
+    state.feed.set(known[1], { status: 404 });
+
+    await captureGoalieEdgeDetail(SEASON, { playerIds: [known[0], known[1]] });
+
+    const coverage = await goalieEdgeCoverage(SEASON);
+    expect(coverage.goaliesCaptured).toBe(1);
+    expect(coverage.goaliesWithoutSeasonData).toBe(1);
+    expect(coverage.goaliesUnaccounted).toBe(known.length - 2);
+  });
+
+  it("lets a real row supersede an earlier no-season-data row", async () => {
+    const id = activeGoalieIds()[0];
+    state.feed.set(id, { status: 404 });                  // has not dressed yet
+    await captureGoalieEdgeDetail(SEASON, { playerIds: [id] });
+
+    state.feed.set(id, payloadFor(Number(id)));           // debuts
+    await captureGoalieEdgeDetail(SEASON, { playerIds: [id] });
+
+    const coverage = await goalieEdgeCoverage(SEASON);
+    expect(coverage.goaliesCaptured).toBe(1);
+    expect(coverage.goaliesWithoutSeasonData).toBe(0);    // not counted twice
   });
 
   it("counts distinct goalies, not rows, and ignores other sources", async () => {

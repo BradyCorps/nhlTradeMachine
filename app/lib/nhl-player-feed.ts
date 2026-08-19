@@ -23,18 +23,33 @@ export const EDGE_URL = (playerId: number | string, seasonId: number | string) =
 export const GOALIE_EDGE_URL = (playerId: number | string, seasonId: number | string) =>
   `https://api-web.nhle.com/v1/edge/goalie-detail/${playerId}/${seasonId}/2`;
 
-const fetchJson = async (url: string, timeoutMs = 8000): Promise<unknown | null> => {
+/**
+ * A fetch that keeps the status.
+ *
+ * The NHL answers 404 for a player it simply has no rows for — a goalie
+ * who has not dressed this season, which is most of the league's depth
+ * chart. Collapsing that into the same `null` as a timeout made a
+ * healthy backfill report 58 "failures", so callers that care about the
+ * difference read `status` (0 means the request never got an answer).
+ */
+export const fetchJsonWithStatus = async (
+  url: string,
+  timeoutMs = 8000,
+): Promise<{ data: unknown | null; status: number }> => {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(url, { signal: ctrl.signal, cache: "no-store", headers: NHL_HEADERS });
-    return res.ok ? await res.json() : null;
+    return { data: res.ok ? await res.json() : null, status: res.status };
   } catch {
-    return null;
+    return { data: null, status: 0 };
   } finally {
     clearTimeout(t);
   }
 };
+
+const fetchJson = async (url: string, timeoutMs = 8000): Promise<unknown | null> =>
+  (await fetchJsonWithStatus(url, timeoutMs)).data;
 
 // ── Shape canaries — the fields the app depends on ────────────
 // If any of these paths vanish, the NHL changed the contract.
@@ -456,9 +471,12 @@ export async function fetchEdgeDetail(playerId: number | string, seasonId: numbe
   return { facts: raw ? parseEdge(raw, seasonId) : null, raw };
 }
 
-export async function fetchGoalieEdgeDetail(playerId: number | string, seasonId: number): Promise<{ facts: GoalieEdgeFacts | null; raw: unknown | null }> {
-  const raw = await fetchJson(GOALIE_EDGE_URL(playerId, seasonId));
-  return { facts: raw ? parseGoalieEdge(raw, seasonId) : null, raw };
+export async function fetchGoalieEdgeDetail(
+  playerId: number | string,
+  seasonId: number,
+): Promise<{ facts: GoalieEdgeFacts | null; raw: unknown | null; status: number }> {
+  const { data: raw, status } = await fetchJsonWithStatus(GOALIE_EDGE_URL(playerId, seasonId));
+  return { facts: raw ? parseGoalieEdge(raw, seasonId) : null, raw, status };
 }
 
 /** Bounded-concurrency map so a team-sized sync stays inside one

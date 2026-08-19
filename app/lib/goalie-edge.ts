@@ -107,13 +107,31 @@ export async function captureGoalieEdgeBoards(seasonId: string): Promise<GoalieB
 // nobody read. Every id that does not end in a stored row comes back
 // named and with a reason, and `goalieEdgeCoverage` states the standing
 // total against the 144 goalies we know about.
+//
+// AND MOST OF THE LEAGUE HAS NO ROWS TO CAPTURE. The bundled snapshot
+// carries every goalie on a 32-club depth chart — juniors, AHL, the
+// third stringer who has never dressed — and the NHL answers 404 for a
+// goalie with no NHL games in the season asked for. That is not a
+// failure, and the first real backfill reported it as 58 of them. So a
+// 404 is recorded as its own outcome: a `goalie-detail-none` tombstone,
+// one row per goalie per season, which is what lets coverage separate
+// "we have not asked" from "we asked and the NHL has nothing". Only a
+// goalie in neither bucket is genuinely unaccounted for.
+
+/** Snapshot source for a goalie the NHL has no season rows for. Distinct
+ *  from "goalie-detail" so the read path never sees a tombstone. */
+export const NO_SEASON_DATA_SOURCE = "goalie-detail-none";
 
 export interface GoalieCaptureFailure {
   playerId: string;
   /** From the bundled snapshot when known — a bare id is useless in a log. */
   name: string | null;
-  /** `unreachable`: the NHL returned nothing. `write`: the insert threw. */
+  /** `unreachable`: no answer, or one that was not 404 or OK (timeout, 5xx,
+   *  rate limit). `write`: the row could not be inserted. A 404 is NOT a
+   *  failure — it lands in `noSeasonData` instead. */
   reason: "unreachable" | "write";
+  /** HTTP status, or 0 when the request never got an answer. */
+  status?: number;
   detail?: string;
 }
 
@@ -130,6 +148,9 @@ export interface GoalieDetailCapture {
   parsed: number;
   /** Stored, but `parseGoalieEdge` returned null — a feed-shape warning. */
   unparsed: string[];
+  /** 404 — the NHL has no EDGE rows for this goalie this season. Expected
+   *  for anyone who has not dressed; recorded, not counted as a failure. */
+  noSeasonData: string[];
   failures: GoalieCaptureFailure[];
   /** Where a sliced caller resumes, or null when the run finished the list. */
   nextOffset: number | null;
@@ -204,19 +225,35 @@ export async function captureGoalieEdgeDetail(
 
   const failures: GoalieCaptureFailure[] = [];
   const unparsed: string[] = [];
+  const noSeasonData: string[] = [];
   let stored = 0;
   let skipped = 0;
   let parsed = 0;
 
-  const fail = (playerId: string, reason: GoalieCaptureFailure["reason"], detail?: string) => {
-    failures.push({ playerId, name: activePlayerById(playerId)?.name ?? null, reason, ...(detail ? { detail } : {}) });
+  const named = (playerId: string) => activePlayerById(playerId)?.name ?? null;
+  const fail = (playerId: string, reason: GoalieCaptureFailure["reason"], status?: number, detail?: string) => {
+    failures.push({
+      playerId, name: named(playerId), reason,
+      ...(status != null ? { status } : {}),
+      ...(detail ? { detail } : {}),
+    });
   };
 
   await ensureNhlSnapshotTable().catch(() => {});
 
   await mapWithConcurrency(ids, Math.max(1, options.concurrency ?? 5), async (playerId) => {
-    const { facts, raw } = await fetchGoalieEdgeDetail(playerId, season);
-    if (raw == null) { fail(playerId, "unreachable"); return; }
+    const { facts, raw, status } = await fetchGoalieEdgeDetail(playerId, season);
+
+    if (raw == null) {
+      if (status === 404) {
+        noSeasonData.push(playerId);
+        await markNoSeasonData(playerId, season, named(playerId)).catch(() => {});
+      } else {
+        fail(playerId, "unreachable", status);
+      }
+      return;
+    }
+
     if (facts) parsed++; else unparsed.push(playerId);
     try {
       // `returning` is what separates a real write from a same-day re-run:
@@ -224,7 +261,7 @@ export async function captureGoalieEdgeDetail(
       const written = await db.insert(nhlSnapshots).values({
         id: `${playerId}-${season}-goalie-detail-${day}`,
         playerId: Number(playerId),
-        name: activePlayerById(playerId)?.name ?? null,
+        name: named(playerId),
         season,
         source: "goalie-detail",
         capturedAt: Date.now(),
@@ -233,7 +270,7 @@ export async function captureGoalieEdgeDetail(
       }).onConflictDoNothing().returning({ id: nhlSnapshots.id });
       if (written.length > 0) stored++; else skipped++;
     } catch (e: any) {
-      fail(playerId, "write", String(e?.message ?? e));
+      fail(playerId, "write", undefined, String(e?.message ?? e));
     }
   });
 
@@ -244,6 +281,7 @@ export async function captureGoalieEdgeDetail(
     skipped,
     parsed,
     unparsed,
+    noSeasonData,
     failures,
     nextOffset,
     elapsedMs: Date.now() - startedAt,
@@ -251,12 +289,42 @@ export async function captureGoalieEdgeDetail(
   };
 }
 
+/**
+ * Record that the NHL has no EDGE rows for this goalie this season.
+ *
+ * One row per goalie per season rather than per day — the interesting
+ * fact is "as of the last ask there was nothing", and 58 depth goalies
+ * times a nightly cron would otherwise be ten thousand rows of nothing.
+ * The distinct source keeps it out of `latestGoalieEdgeDetailMap`, and
+ * the real row wins once the goalie finally dresses.
+ */
+async function markNoSeasonData(playerId: string, season: number, name: string | null): Promise<void> {
+  await db.insert(nhlSnapshots).values({
+    id: `${playerId}-${season}-goalie-detail-none`,
+    playerId: Number(playerId),
+    name,
+    season,
+    source: NO_SEASON_DATA_SOURCE,
+    capturedAt: Date.now(),
+    payload: "{}",
+  }).onConflictDoUpdate({
+    target: nhlSnapshots.id,
+    set: { capturedAt: Date.now() },
+  });
+}
+
 export interface GoalieEdgeCoverage {
   season: number;
   /** Distinct goalies with at least one detail row this season. */
   goaliesCaptured: number;
+  /** Asked, and the NHL had nothing — a goalie who has not dressed. */
+  goaliesWithoutSeasonData: number;
   /** Goalies in the bundled snapshot — the denominator a backfill targets. */
   goaliesKnown: number;
+  /** Known goalies in neither bucket: never asked, or the ask failed. This
+   *  is the number a backfill is trying to drive to zero — not `captured`,
+   *  which can never reach 144 while most of the league sits in the AHL. */
+  goaliesUnaccounted: number;
   rows: number;
   /** Most recent capture, ISO, or null when the pipeline has never run. */
   lastCapturedAt: string | null;
@@ -271,10 +339,13 @@ export interface GoalieEdgeCoverage {
  */
 export async function goalieEdgeCoverage(seasonId: string): Promise<GoalieEdgeCoverage> {
   const season = Number(seasonId);
+  const known = activeGoalieIds();
   const coverage: GoalieEdgeCoverage = {
     season,
     goaliesCaptured: 0,
-    goaliesKnown: activeGoalieIds().length,
+    goaliesWithoutSeasonData: 0,
+    goaliesKnown: known.length,
+    goaliesUnaccounted: known.length,
     rows: 0,
     lastCapturedAt: null,
   };
@@ -287,15 +358,26 @@ export async function goalieEdgeCoverage(seasonId: string): Promise<GoalieEdgeCo
       season: nhlSnapshots.season,
     }).from(nhlSnapshots);
 
-    const seen = new Set<number>();
+    const captured = new Set<number>();
+    const empty = new Set<number>();
     let latest = 0;
     for (const r of rows) {
-      if (r.source !== "goalie-detail" || r.season !== season) continue;
-      coverage.rows++;
-      seen.add(r.playerId);
-      if (r.capturedAt > latest) latest = r.capturedAt;
+      if (r.season !== season) continue;
+      if (r.source === "goalie-detail") {
+        coverage.rows++;
+        captured.add(r.playerId);
+        if (r.capturedAt > latest) latest = r.capturedAt;
+      } else if (r.source === NO_SEASON_DATA_SOURCE) {
+        empty.add(r.playerId);
+      }
     }
-    coverage.goaliesCaptured = seen.size;
+    // A goalie who has since dressed has both a tombstone and a real row;
+    // the real row wins, so coverage never double-counts.
+    for (const id of captured) empty.delete(id);
+
+    coverage.goaliesCaptured = captured.size;
+    coverage.goaliesWithoutSeasonData = empty.size;
+    coverage.goaliesUnaccounted = known.filter(id => !captured.has(Number(id)) && !empty.has(Number(id))).length;
     coverage.lastCapturedAt = latest > 0 ? new Date(latest).toISOString() : null;
   } catch { /* feed table unavailable — reported as never captured */ }
   return coverage;

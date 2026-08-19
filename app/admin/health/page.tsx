@@ -182,16 +182,17 @@ export default function AdminHealth() {
   // fits inside one 60s invocation, so the button walks `nextOffset`
   // until the league is covered — one press, one complete backfill.
   const [goalieBackfill, setGoalieBackfill] = useState<
-    { running: boolean; done: number; eligible: number; stored: number; skipped: number; failures: any[]; unparsed: string[] } | null
+    { running: boolean; done: number; eligible: number; stored: number; skipped: number; noSeasonData: number; failures: any[]; unparsed: string[] } | null
   >(null);
 
   const runGoalieBackfill = async () => {
     let offset = 0;
     let stored = 0;
     let skipped = 0;
+    let noSeasonData = 0;
     const failures: any[] = [];
     const unparsed: string[] = [];
-    setGoalieBackfill({ running: true, done: 0, eligible: 0, stored: 0, skipped: 0, failures, unparsed });
+    setGoalieBackfill({ running: true, done: 0, eligible: 0, stored: 0, skipped: 0, noSeasonData, failures, unparsed });
     try {
       // Bounded rather than while(true): 32 batches of 40 is far more
       // than the league, so a route that stopped advancing cannot spin.
@@ -204,14 +205,15 @@ export default function AdminHealth() {
         if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
         stored += data.stored ?? 0;
         skipped += data.skipped ?? 0;
+        noSeasonData += (data.noSeasonData ?? []).length;
         failures.push(...(data.failures ?? []));
         unparsed.push(...(data.unparsed ?? []));
         const done = (data.nextOffset ?? data.eligible ?? 0) as number;
-        setGoalieBackfill({ running: data.nextOffset != null, done, eligible: data.eligible ?? 0, stored, skipped, failures, unparsed });
+        setGoalieBackfill({ running: data.nextOffset != null, done, eligible: data.eligible ?? 0, stored, skipped, noSeasonData, failures, unparsed });
         if (data.nextOffset == null) break;
         offset = data.nextOffset;
       }
-      toast(`Goalie EDGE: ${stored} stored · ${skipped} already captured · ${failures.length} failures`,
+      toast(`Goalie EDGE: ${stored} stored · ${skipped} already captured · ${noSeasonData} no season data · ${failures.length} failures`,
         failures.length > 0 ? "error" : "success");
       if (failures.length > 0) console.log("[goalie-backfill] failures:", failures);
       if (unparsed.length > 0) console.log("[goalie-backfill] stored but unparseable:", unparsed);
@@ -304,17 +306,18 @@ export default function AdminHealth() {
               {backfilling ? "RESOLVING…" : "BACKFILL FA AGES"}
             </button>
           </div>
-          {goalieBackfill && !goalieBackfill.running && (goalieBackfill.stored + goalieBackfill.skipped + goalieBackfill.failures.length) > 0 && (
+          {goalieBackfill && !goalieBackfill.running && (goalieBackfill.stored + goalieBackfill.skipped + goalieBackfill.noSeasonData + goalieBackfill.failures.length) > 0 && (
             <div style={{ marginTop: 14, fontSize: 10, lineHeight: 1.9, color: "var(--ledger-ink-faint)" }}>
               Goalie EDGE backfill: <strong style={{ color: "var(--ledger-ink)" }}>{goalieBackfill.stored}</strong> stored ·{" "}
               {goalieBackfill.skipped} already captured today ·{" "}
+              {goalieBackfill.noSeasonData} with no EDGE data this season (no NHL games) ·{" "}
               <span style={{ color: goalieBackfill.failures.length > 0 ? "var(--ledger-red)" : "inherit" }}>
                 {goalieBackfill.failures.length} failures
               </span>
               {goalieBackfill.unparsed.length > 0 && ` · ${goalieBackfill.unparsed.length} stored but unparseable`}
               {goalieBackfill.failures.slice(0, 8).map((f: any) => (
                 <div key={f.playerId} style={{ paddingLeft: 12 }}>
-                  {f.reason} — {f.name ?? f.playerId}{f.detail ? ` (${f.detail})` : ""}
+                  {f.reason} — {f.name ?? f.playerId}{f.status ? ` (HTTP ${f.status})` : ""}{f.detail ? ` (${f.detail})` : ""}
                 </div>
               ))}
               {goalieBackfill.failures.length > 8 && (
@@ -348,14 +351,21 @@ export default function AdminHealth() {
                   <span style={{
                     fontWeight: 900,
                     color: feedHealth.goalieEdge.goaliesCaptured === 0 ? "var(--ledger-red)"
-                      : feedHealth.goalieEdge.goaliesCaptured < feedHealth.goalieEdge.goaliesKnown ? "var(--ledger-amber)"
+                      : feedHealth.goalieEdge.goaliesUnaccounted > 0 ? "var(--ledger-amber)"
                       : "var(--ledger-green)",
                   }}>
                     ● GOALIE EDGE
                   </span>{" "}
                   <span style={{ color: "var(--ledger-ink-faint)" }}>
-                    {feedHealth.goalieEdge.goaliesCaptured}/{feedHealth.goalieEdge.goaliesKnown} goalies ·{" "}
-                    {feedHealth.goalieEdge.rows} rows · last{" "}
+                    {/* Captured can never reach 144 — most of a 32-club depth
+                        chart has no NHL games. Unaccounted is the number a
+                        backfill is actually driving to zero. */}
+                    {feedHealth.goalieEdge.goaliesCaptured} captured ·{" "}
+                    {feedHealth.goalieEdge.goaliesWithoutSeasonData} no season data ·{" "}
+                    <strong style={{ color: feedHealth.goalieEdge.goaliesUnaccounted > 0 ? "var(--ledger-amber)" : "inherit" }}>
+                      {feedHealth.goalieEdge.goaliesUnaccounted} unaccounted
+                    </strong>{" "}
+                    of {feedHealth.goalieEdge.goaliesKnown} · {feedHealth.goalieEdge.rows} rows · last{" "}
                     {feedHealth.goalieEdge.lastCapturedAt
                       ? new Date(feedHealth.goalieEdge.lastCapturedAt).toLocaleString()
                       : "never — the dossier panel is blank for every goalie"}
