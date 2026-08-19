@@ -150,6 +150,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
   };
 
   const games = player.games ?? 0;
+  const isGoalie = player.position === "G";
   const goals = player.goalsPace != null ? Math.round((player.goalsPace / 82) * games) : null;
   const assists = player.assistsPace != null ? Math.round((player.assistsPace / 82) * games) : null;
   const pts = player.ptsPace != null ? Math.round((player.ptsPace / 82) * games) : null;
@@ -227,19 +228,39 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
           </div>
         )}
 
-        {/* Season stats */}
-        <div className="grid grid-cols-6 border mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
-          <StatCell label="GP" value={String(games)} />
-          <StatCell label="G" value={goals != null ? String(goals) : "—"} />
-          <StatCell label="A" value={assists != null ? String(assists) : "—"} />
-          <StatCell label="PTS" value={pts != null ? String(pts) : "—"} />
-          <StatCell
-            label="+/−"
-            value={pm != null ? `${pm > 0 ? "+" : ""}${pm}` : "—"}
-            color={pm != null ? (pm > 0 ? "var(--ledger-green)" : pm < 0 ? "var(--ledger-red)" : undefined) : undefined}
-          />
-          <StatCell label="TOI" value={player.avgTOI != null ? player.avgTOI.toFixed(1) : "—"} />
-        </div>
+        {/* Season stats — position-aware */}
+        {isGoalie ? (
+          <div className="grid grid-cols-5 border mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
+            <StatCell label="GP" value={String(games)} />
+            <StatCell
+              label="GSAX"
+              value={player.gsax != null ? (player.gsax > 0 ? "+" : "") + player.gsax.toFixed(1) : "—"}
+              color={player.gsax != null ? (player.gsax > 0 ? "var(--ledger-green)" : player.gsax < 0 ? "var(--ledger-red)" : undefined) : undefined}
+            />
+            <StatCell
+              label="SV%"
+              value={player.savePct != null ? (player.savePct * 100).toFixed(1) : "—"}
+            />
+            <StatCell
+              label="GAA"
+              value={player.gaa != null ? player.gaa.toFixed(2) : "—"}
+            />
+            <StatCell label="GS" value={player.gamesStarted != null ? String(player.gamesStarted) : "—"} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-6 border mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
+            <StatCell label="GP" value={String(games)} />
+            <StatCell label="G" value={goals != null ? String(goals) : "—"} />
+            <StatCell label="A" value={assists != null ? String(assists) : "—"} />
+            <StatCell label="PTS" value={pts != null ? String(pts) : "—"} />
+            <StatCell
+              label="+/−"
+              value={pm != null ? `${pm > 0 ? "+" : ""}${pm}` : "—"}
+              color={pm != null ? (pm > 0 ? "var(--ledger-green)" : pm < 0 ? "var(--ledger-red)" : undefined) : undefined}
+            />
+            <StatCell label="TOI" value={player.avgTOI != null ? player.avgTOI.toFixed(1) : "—"} />
+          </div>
+        )}
 
         {/* The player, and what his contract does to him */}
         {split.known && (

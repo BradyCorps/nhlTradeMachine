@@ -143,35 +143,41 @@ export default function NavTrajectoryChart({ stages, total, playerName }: Props)
               >
                 {s.value > 0 ? "+" : ""}{s.value}
               </text>
-
-              {/* Tooltip on hover */}
-              {isHovered && (
-                <foreignObject
-                  x={labelW}
-                  y={y + barH}
-                  width={barAreaW + valueW}
-                  height={24}
-                  style={{ overflow: "visible", pointerEvents: "none" }}
-                >
-                  <div style={{
-                    background: "var(--paper-card, var(--paper-bg))",
-                    border: "1px solid var(--ledger-rule, #ccc)",
-                    borderRadius: 3,
-                    padding: "3px 8px",
-                    fontFamily: "'Courier Prime', monospace",
-                    fontSize: 10,
-                    color: "var(--ledger-ink)",
-                    whiteSpace: "nowrap",
-                    width: "fit-content",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                  }}>
-                    {s.desc}
-                  </div>
-                </foreignObject>
-              )}
             </g>
           );
         })}
+
+        {/* Tooltip overlay — rendered after all bars so it paints on top */}
+        {hoveredIdx !== null && stages[hoveredIdx] && (() => {
+          const s = stages[hoveredIdx];
+          const y = margin.top + hoveredIdx * (barH + gap);
+          return (
+            <foreignObject
+              x={labelW}
+              y={y + barH}
+              width={barAreaW + valueW}
+              height={24}
+              style={{ overflow: "visible", pointerEvents: "none" }}
+            >
+              <div style={{
+                background: "var(--paper-card, var(--paper-bg))",
+                border: "1px solid var(--ledger-rule, #ccc)",
+                borderRadius: 3,
+                padding: "3px 8px",
+                fontFamily: "'Courier Prime', monospace",
+                fontSize: 10,
+                color: "var(--ledger-ink)",
+                whiteSpace: "nowrap",
+                width: "fit-content",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                position: "relative",
+                zIndex: 10,
+              }}>
+                {s.desc}
+              </div>
+            </foreignObject>
+          );
+        })()}
       </svg>
     </div>
   );

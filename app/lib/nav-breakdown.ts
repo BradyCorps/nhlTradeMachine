@@ -144,7 +144,7 @@ export const NAV_STAGE_DESC: Record<string, string> = {
   leverage: "Trade-request leverage — a public request costs the club negotiating position.",
   impact: "Projected stopping value above expected, at the workload the model expects.",
   youngFloor: "Cost-controlled floor — cheap years on a capable goalie carry value the surplus model understates.",
-  roleCeiling: "Role ceiling — a hard cap applied by starter/tandem/backup classification. Two goalies above it come out tied.",
+  roleCeiling: "Role ceiling — goalies are capped by their starter/tandem/backup role. A negative value means the goalie's raw value exceeded the cap for his role and was pulled down to it.",
   pick: "Draft-pick value at this selection range, discounted for how far out it is.",
   prospect: "Prospect value from draft pedigree and junior production, before an NHL sample exists.",
   total: "Unexplained — the model produced this headline without a breakdown.",
