@@ -185,3 +185,25 @@ MoneyPuck (public analytics, on/off), and Natural Stat Trick (baseline on/off,
 pair-driver, individual xG). MoneyPuck data is credited to MoneyPuck.com. Formal
 source-permission and attribution clearance (release gate PL-5) is tracked
 separately and is **not** asserted complete by this card.
+
+## 9. Accessibility audit (display gate 5)
+
+Audited every surface that renders when the v3 display flag is on — the
+player-page field (`GravityField`) and its heat map (`GravityHeatMap`), and the
+teams-page **Team Territorial Gravity** contour and gravity leaders — against
+WCAG 2.1 AA.
+
+| Criterion | Status |
+| --- | --- |
+| 1.1.1 Non-text content | **Pass.** Every data SVG has `role="img"` and an `aria-label` stating the force, the three zone masses as numbers, tier/reliability, and (heat map) that warm = attack / cool = suppression. Decorative grids/icons are `aria-hidden`. |
+| 1.4.1 Use of colour | **Pass.** Colour never carries meaning alone — zone masses, reliability, stability and coverage are all printed as numbers and labelled text (list/group roles), and the heat map ships a text legend plus the numeric field. |
+| 2.1.1 Keyboard / 2.1.2 no trap | **Pass.** The gravity panels are non-interactive; the only control (the X-NAV chart's dimension toggle) is a native `<button>` group. Hover `title` tooltips duplicate information already in `aria-label`, so nothing is hover-only. |
+| 2.3.1 / 2.3.3 Motion | **Pass.** The gravity fields have no animation. The one animated gravity-adjacent surface (the X-NAV column chart) honours `prefers-reduced-motion`. |
+| 1.3.1 Info & relationships | **Pass.** Zone masses use `role="list"`/`listitem`; the reliability trio uses `role="group"`; the panel is a labelled `role="region"`. |
+| 4.1.2 Name/role/value | **Pass** after this pass: the team contour's `aria-label` now names the panel title, states it is a modelled field rather than tracking data, and describes the colour encoding (previously it read as a generic "gravity heat map for <team>"). |
+
+**Known cosmetic limitation (not a WCAG failure):** the ledger aesthetic uses 7–8px
+monospace for legends and zone tags across the whole app; it is small but every
+such label is duplicated in an `aria-label`, so no information depends on reading
+it. Left as-is to match the site-wide design system rather than special-casing
+gravity.

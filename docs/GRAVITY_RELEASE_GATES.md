@@ -9,7 +9,7 @@ must never share an activation switch.
 
 | Channel | Flag | Default | Current decision |
 | --- | --- | --- | --- |
-| Gravity v3 public display | `NEXT_PUBLIC_GRAVITY_V3_DISPLAY_ENABLED` | Off | PL-3 complete; off pending the remaining display gates below |
+| Gravity v3 public display | `NEXT_PUBLIC_GRAVITY_V3_DISPLAY_ENABLED` | Off | Enabled in production as a labelled beta; display gates 1/2/4/5 met, PL-5 source attribution (item 3) outstanding |
 | Gravity v3 X-NAV contribution | `NEXT_PUBLIC_GRAVITY_V3_XNAV_ENABLED` | Off | Off pending held-out incremental validation |
 | Gravity v3 simulation contribution | `GRAVITY_V3_SIMULATION_ENABLED` | Off | Off pending held-out simulation backtesting |
 | Gravity v4 runtime | `GRAVITY_V4_ENABLED` plus a source release lock | Locked off | PL-13 and PL-14 are incomplete |
@@ -35,8 +35,8 @@ The v4 environment flag cannot override its source release lock.
 
 ### V3 display
 
-Items 1, 2, and 4 are satisfied. Items 3 (source permissions / attribution) and
-5 (accessibility) remain required before activation:
+Items 1, 2, 4, and 5 are satisfied. Item 3 (source permissions / attribution
+under PL-5) is the only display gate that remains, and is a permissions decision:
 
 1. **Complete:** PL-3 returns `INSUFFICIENT` rather than a tier or percentile when sample or
    coverage is inadequate.
@@ -49,7 +49,10 @@ Items 1, 2, and 4 are satisfied. Items 3 (source permissions / attribution) and
    carry-forward baseline; NZ well unvalidated), the limitations, and the
    difference between a model field and observed tracking. Its headline finding is
    surfaced to users in the methodology page's Gravity section.
-5. Browser and accessibility checks cover every enabled display surface.
+5. **Complete:** A WCAG 2.1 AA audit of every enabled v3 display surface (player
+   field + heat map, team contour, gravity leaders) is recorded in
+   `docs/GRAVITY_MODEL_CARD.md` §9; the one gap found (a generic team-contour
+   aria-label) was fixed.
 
 ### V3 X-NAV contribution
 

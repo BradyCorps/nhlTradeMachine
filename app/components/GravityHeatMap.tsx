@@ -132,7 +132,7 @@ export default function GravityHeatMap({ masses, tier, force, isDefenseman, play
         className="w-full"
         style={{ maxWidth: W, background: "var(--paper-card, var(--paper-bg))" }}
         role="img"
-        aria-label={`Gravity heat map${playerName ? ` for ${playerName}` : ""}: OZ ${masses.oz > 0 ? "+" : ""}${masses.oz.toFixed(2)}, NZ ${masses.nz > 0 ? "+" : ""}${masses.nz.toFixed(2)}, DZ ${masses.dz > 0 ? "+" : ""}${masses.dz.toFixed(2)}`}
+        aria-label={`${title}${playerName ? ` for ${playerName}` : ""} — a modelled field, not observed tracking data. Offensive-zone well ${masses.oz > 0 ? "+" : ""}${masses.oz.toFixed(2)}, neutral-zone well ${masses.nz > 0 ? "+" : ""}${masses.nz.toFixed(2)}, defensive-zone dome ${masses.dz > 0 ? "+" : ""}${masses.dz.toFixed(2)}. Warm colour is attacking pull, cool colour is defensive suppression.`}
       >
         {/* Rink outline */}
         <rect
