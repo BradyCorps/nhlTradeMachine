@@ -21,9 +21,8 @@ interface Props {
 
 type Dim = "xnav" | "fNav" | "dNav" | "gNav";
 
-// The four views the chart switches between. `full` names the combined
-// total; the three splits decompose it by position. Order matters — it is
-// the order of the toggle.
+// The four views the chart switches between. `xnav` is the combined total;
+// the three splits decompose it by position. Order is the toggle order.
 const DIMS: { key: Dim; label: string; blurb: string }[] = [
   { key: "xnav", label: "X-NAV", blurb: "Combined roster value" },
   { key: "fNav", label: "F-NAV", blurb: "Forwards only" },
@@ -60,7 +59,7 @@ export default function TeamNavChart({ data }: Props) {
 
   const active = DIMS.find(d => d.key === dim) ?? DIMS[0];
 
-  // Rank order for the active dimension. Rows stay keyed by abbrev across
+  // Rank order for the active dimension. Columns stay keyed by abbrev across
   // dimension switches, so React reuses each DOM node and the CSS transition
   // slides it to its new rank instead of the list snapping.
   const ranked = useMemo(() => {
@@ -71,32 +70,35 @@ export default function TeamNavChart({ data }: Props) {
 
   if (ranked.length === 0) return null;
 
-  const barH = 24;
-  const gap = 3;
-  const labelW = 48;
-  const valueW = 56;
-  const margin = { top: 20, right: 8, bottom: 8, left: 0 };
-  const chartW = 520;
-  const barAreaW = chartW - labelW - valueW - margin.left - margin.right;
-  const chartH = margin.top + margin.bottom + ranked.length * (barH + gap) - gap;
+  const n = ranked.length;
+  const margin = { top: 24, right: 12, bottom: 30, left: 12 };
+  // Wide enough that 32 three-letter labels stay legible; scrolls on mobile.
+  const chartW = Math.max(720, n * 28);
+  const chartH = 360;
+  const plotW = chartW - margin.left - margin.right;
+  const plotH = chartH - margin.top - margin.bottom;
+  const baseline = margin.top + plotH;
 
-  // Domain re-scales per dimension so each view uses the full bar width — a
+  const bandW = plotW / n;
+  const barPad = Math.min(6, bandW * 0.18);
+  const barW = bandW - barPad * 2;
+
+  // Domain re-scales per dimension so each view uses the full height — a
   // team's G-NAV of 200 should not read as a stub beside an X-NAV of 3,000.
   const maxValue = Math.max(1, ...ranked.map(d => d.value));
-  const xScale = scaleLinear().domain([0, maxValue * 1.08]).range([0, barAreaW]);
+  const yScale = scaleLinear().domain([0, maxValue * 1.08]).range([0, plotH]);
 
-  // Median of the active dimension, in rank space (values are already sorted).
-  const median = ranked[Math.floor(ranked.length / 2)]?.value ?? 0;
-  const medianX = labelW + xScale(median);
+  // Median of the active dimension (values are already sorted).
+  const median = ranked[Math.floor(n / 2)]?.value ?? 0;
+  const medianY = baseline - yScale(median);
 
   // A 2px floor so a zero-value bar is still a visible tick, expressed as the
-  // scaleX factor the bar rect (full barAreaW wide) is squeezed to.
-  const minK = 2 / barAreaW;
-  const scaleXFor = (value: number) => Math.max(minK, xScale(value) / barAreaW);
+  // scaleY factor the bar rect (full plotH tall) is squeezed to.
+  const minK = 2 / plotH;
+  const scaleYFor = (value: number) => Math.max(minK, yScale(value) / plotH);
+  const xFor = (rank: number) => margin.left + rank * bandW;
 
-  const rowTransition = reduceMotion ? undefined : "transform 620ms cubic-bezier(0.4, 0, 0.2, 1)";
-  const barTransition = reduceMotion ? undefined : "transform 620ms cubic-bezier(0.4, 0, 0.2, 1)";
-
+  const trans = reduceMotion ? undefined : "transform 620ms cubic-bezier(0.4, 0, 0.2, 1)";
   const rankByAbbrev = new Map(ranked.map((d, i) => [d.abbrev, i]));
 
   return (
@@ -136,122 +138,105 @@ export default function TeamNavChart({ data }: Props) {
 
       <div className="px-3 pt-2 font-mono text-[8px] sm:text-[9px] uppercase tracking-[0.12em]"
         style={{ color: "var(--ledger-ink-faint)" }}>
-        {active.blurb} · {ranked.length} teams
+        {active.blurb} · {n} teams
       </div>
 
       <div className="overflow-x-auto">
         <svg
           viewBox={`0 0 ${chartW} ${chartH}`}
           className="w-full"
-          style={{ maxWidth: chartW, minWidth: 340 }}
+          style={{ maxWidth: chartW, minWidth: Math.min(chartW, 620) }}
           role="img"
-          aria-label={`Bar chart ranking ${ranked.length} NHL teams by ${active.label} (${active.blurb}). Top: ${ranked[0]?.name} at ${Math.round(ranked[0]?.value ?? 0)}`}
+          aria-label={`Column chart ranking ${n} NHL teams by ${active.label} (${active.blurb}). Top: ${ranked[0]?.name} at ${Math.round(ranked[0]?.value ?? 0)}`}
         >
-          {/* Median reference line — slides as the dimension changes */}
-          <g style={{ transform: `translateX(${medianX}px)`, transition: barTransition }}>
-            <line
-              x1={0} y1={margin.top - 4}
-              x2={0} y2={chartH - margin.bottom}
-              stroke="var(--ledger-ink-faint)"
-              strokeWidth={1}
-              strokeDasharray="3,3"
-              opacity={0.35}
-            />
-            <text
-              x={0} y={margin.top - 8}
-              textAnchor="middle"
-              fill="var(--ledger-ink-faint)"
-              fontSize={7}
-              fontFamily="'Courier Prime', 'Courier New', monospace"
-              fontWeight={700}
-            >
+          {/* Baseline */}
+          <line x1={margin.left} y1={baseline} x2={chartW - margin.right} y2={baseline}
+            stroke="var(--ledger-rule)" strokeWidth={1} />
+
+          {/* Median reference line — rises/falls as the dimension changes */}
+          <g style={{ transform: `translateY(${medianY}px)`, transition: trans }}>
+            <line x1={margin.left} y1={0} x2={chartW - margin.right} y2={0}
+              stroke="var(--ledger-ink-faint)" strokeWidth={1} strokeDasharray="3,3" opacity={0.35} />
+            <text x={chartW - margin.right} y={-3} textAnchor="end"
+              fill="var(--ledger-ink-faint)" fontSize={7} fontWeight={700}
+              fontFamily="'Courier Prime', 'Courier New', monospace">
               MEDIAN
             </text>
           </g>
 
           {ranked.map((d) => {
             const rank = rankByAbbrev.get(d.abbrev) ?? 0;
-            const y = margin.top + rank * (barH + gap);
             const fill = PHASE_COLORS[d.phase] || "var(--ledger-ink)";
             const isHovered = hoveredAbbrev === d.abbrev;
+            const k = scaleYFor(d.value);
+            const topY = baseline - plotH * k;
 
             return (
               <g key={d.abbrev}
-                style={{ transform: `translateY(${y}px)`, transition: rowTransition, cursor: "default" }}
+                style={{ transform: `translateX(${xFor(rank)}px)`, transition: trans, cursor: "default" }}
                 onMouseEnter={() => setHoveredAbbrev(d.abbrev)}
                 onMouseLeave={() => setHoveredAbbrev(null)}
               >
-                {/* Full-row hit target */}
-                <rect x={0} y={0} width={chartW} height={barH} fill="transparent" />
+                {/* Full-band hit target (bars + label strip) */}
+                <rect x={0} y={margin.top} width={bandW} height={plotH + margin.bottom} fill="transparent" />
 
-                {/* Row highlight on hover */}
+                {/* Column highlight on hover */}
                 {isHovered && (
-                  <rect x={0} y={0} width={chartW} height={barH}
-                    fill="var(--ledger-ink)" opacity={0.04} rx={2} />
+                  <rect x={0} y={margin.top} width={bandW} height={plotH}
+                    fill="var(--ledger-ink)" opacity={0.05} />
                 )}
 
-                {/* Team abbreviation */}
-                <text
-                  x={labelW - 6}
-                  y={barH / 2 + 1}
-                  textAnchor="end"
-                  dominantBaseline="middle"
-                  fill="var(--ledger-ink)"
-                  fontSize={10}
-                  fontFamily="'Courier Prime', 'Courier New', monospace"
-                  fontWeight={isHovered ? 900 : 700}
-                >
-                  {d.abbrev}
-                </text>
-
-                {/* Bar — full-width rect squeezed by scaleX so the growth
-                    animates from the left edge on every dimension change */}
+                {/* Bar — full-height rect squeezed by scaleY so the growth
+                    animates up from the baseline on every dimension change */}
                 <rect
-                  x={labelW}
-                  y={3}
-                  width={barAreaW}
-                  height={barH - 6}
+                  x={barPad}
+                  y={margin.top}
+                  width={barW}
+                  height={plotH}
                   fill={fill}
-                  opacity={isHovered ? 1 : 0.8}
+                  opacity={isHovered ? 1 : 0.82}
                   rx={2}
                   style={{
                     transformBox: "fill-box",
-                    transformOrigin: "left",
-                    transform: `scaleX(${scaleXFor(d.value)})`,
-                    transition: barTransition,
+                    transformOrigin: "bottom",
+                    transform: `scaleY(${k})`,
+                    transition: trans,
                   }}
                 />
 
-                {/* Value for the active dimension */}
-                <text
-                  x={chartW - margin.right}
-                  y={barH / 2 + 1}
-                  textAnchor="end"
-                  dominantBaseline="middle"
-                  fill={fill}
-                  fontSize={10}
-                  fontFamily="'Courier Prime', 'Courier New', monospace"
-                  fontWeight={700}
-                >
-                  {Math.round(d.value).toLocaleString()}
+                {/* Value above the bar, on hover */}
+                {isHovered && (
+                  <text x={bandW / 2} y={topY - 4} textAnchor="middle"
+                    fill={fill} fontSize={9} fontWeight={700}
+                    fontFamily="'Courier Prime', 'Courier New', monospace">
+                    {Math.round(d.value).toLocaleString()}
+                  </text>
+                )}
+
+                {/* Team abbreviation under the column */}
+                <text x={bandW / 2} y={baseline + 12} textAnchor="middle"
+                  fill="var(--ledger-ink)" fontSize={8}
+                  fontWeight={isHovered ? 900 : 600}
+                  fontFamily="'Courier Prime', 'Courier New', monospace">
+                  {d.abbrev}
                 </text>
               </g>
             );
           })}
 
-          {/* Hovered team tooltip — name + phase + the active value */}
+          {/* Hovered team tooltip — name + phase + active value + GD */}
           {hoveredAbbrev !== null && (() => {
             const d = ranked.find(r => r.abbrev === hoveredAbbrev);
             if (!d) return null;
             const rank = rankByAbbrev.get(d.abbrev) ?? 0;
-            const y = margin.top + rank * (barH + gap);
-            const barW = xScale(d.value);
+            const cx = xFor(rank) + bandW / 2;
+            const anchorLeft = cx > chartW / 2;
             return (
               <foreignObject
-                x={labelW + Math.min(barW + 6, barAreaW * 0.4)}
-                y={y - 2}
-                width={220}
-                height={barH + 4}
+                x={anchorLeft ? cx - 210 : cx + 4}
+                y={margin.top - 2}
+                width={206}
+                height={26}
                 style={{ overflow: "visible", pointerEvents: "none" }}
               >
                 <div style={{
@@ -264,6 +249,7 @@ export default function TeamNavChart({ data }: Props) {
                   color: "var(--ledger-ink)",
                   whiteSpace: "nowrap",
                   width: "fit-content",
+                  marginLeft: anchorLeft ? "auto" : 0,
                   boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
                 }}>
                   {d.name} · {d.phase} · {active.label} {Math.round(d.value).toLocaleString()} · GD {d.goalDiff > 0 ? "+" : ""}{d.goalDiff}
