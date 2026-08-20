@@ -246,16 +246,20 @@ function forcesForSeason(rows: SeasonRow[]): ForceRow[] {
     return asset ? [{ r, asset, xga60 }] : [];
   });
 
-  for (const pos of ["F", "D"] as const) {
-    const grp = staged.filter(s => s.asset.position === pos && s.xga60 != null);
-    if (grp.length === 0) continue;
+  // Center within (position, season): league xGA/60 drifts year to year, so a
+  // single pooled mean would bleed a season effect into the cross-year
+  // correlations. Positive xgaRelTM = allows more than the average peer that
+  // season (worse); the engine rewards the negative of this.
+  const groups = new Map<string, typeof staged>();
+  for (const s of staged) {
+    if (s.xga60 == null) continue;
+    const key = `${s.asset.position}:${s.r.season}`;
+    const g = groups.get(key);
+    if (g) g.push(s); else groups.set(key, [s]);
+  }
+  for (const grp of groups.values()) {
     const mean = grp.reduce((a, s) => a + (s.xga60 as number), 0) / grp.length;
-    for (const s of grp) {
-      // Positive xgaRelTM = allows more than the average peer (worse); the
-      // engine rewards the negative of this. On-ice/60 is more dispersed than
-      // on-off, so scale to the engine's expected sd (~0.35) via the group sd.
-      (s.asset as Asset).xgaRelTM = (s.xga60 as number) - mean;
-    }
+    for (const s of grp) (s.asset as Asset).xgaRelTM = (s.xga60 as number) - mean;
   }
 
   return staged.flatMap(({ r, asset }) => {
@@ -275,23 +279,53 @@ function forcesForSeason(rows: SeasonRow[]): ForceRow[] {
 }
 
 // ── Report ───────────────────────────────────────────────────────
-function main() {
-  const arg = process.argv[2];
-  const rel = arg ?? (fs.existsSync(path.join(ROOT, DEFAULT_PANEL)) ? DEFAULT_PANEL : SMOKE_FALLBACK);
-  const abs = path.isAbsolute(rel) ? rel : path.join(ROOT, rel);
-
-  if (!fs.existsSync(abs)) {
-    console.error(`\n✗ No data file at ${rel}.`);
-    console.error(`  The full panel (${DEFAULT_PANEL}) is gitignored — run this in the codespace,`);
-    console.error(`  or pass a MoneyPuck skaters CSV path as the first argument.\n`);
-    process.exit(1);
+/** Resolve CLI args into a list of CSV files: each arg may be a file or a
+ *  directory (all *.csv inside). No args falls back to the historical panel,
+ *  then the single-season smoke file. */
+function resolveInputs(args: string[]): string[] {
+  const raw = args.length > 0
+    ? args
+    : [fs.existsSync(path.join(ROOT, DEFAULT_PANEL)) ? DEFAULT_PANEL : SMOKE_FALLBACK];
+  const files: string[] = [];
+  for (const a of raw) {
+    const abs = path.isAbsolute(a) ? a : path.join(ROOT, a);
+    if (!fs.existsSync(abs)) {
+      console.error(`\n✗ No file or directory at ${a}.`);
+      console.error(`  The full panel (${DEFAULT_PANEL}) is gitignored. Pass MoneyPuck skaters`);
+      console.error(`  CSVs (a file, several files, or a directory of season files) as arguments.\n`);
+      process.exit(1);
+    }
+    if (fs.statSync(abs).isDirectory()) {
+      files.push(...fs.readdirSync(abs).filter(f => f.toLowerCase().endsWith(".csv")).map(f => path.join(abs, f)));
+    } else {
+      files.push(abs);
+    }
   }
+  return files;
+}
+
+function main() {
+  const files = resolveInputs(process.argv.slice(2));
 
   console.log(`\nGravity v3 Stability & Predictive Backtest`);
-  console.log(`  source: ${rel}`);
+  console.log(`  source: ${files.length === 1 ? path.relative(ROOT, files[0]) : `${files.length} files`}`);
+
+  // Each file is parsed with its own header (MoneyPuck column order is stable
+  // but this is robust to it), then the per-player-season rows are pooled; the
+  // season column keeps them apart. A directory of MoneyPuck downloads holds
+  // goalies/lines/teams files too — skip anything without the skater signature
+  // column so those cannot leak junk rows into the panel.
+  const rows = files.flatMap(f => {
+    const table = readCsv(f);
+    if (!table.index.has("I_F_xGoals")) {
+      console.log(`  (skipped ${path.basename(f)} — not a MoneyPuck skaters file)`);
+      return [];
+    }
+    return pivot(table);
+  });
 
   const seasons = new Map<number, ForceRow[]>();
-  for (const fr of forcesForSeason(pivot(readCsv(abs)))) {
+  for (const fr of forcesForSeason(rows)) {
     const list = seasons.get(fr.season) ?? [];
     list.push(fr);
     seasons.set(fr.season, list);
