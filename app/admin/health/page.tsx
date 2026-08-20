@@ -225,6 +225,48 @@ export default function AdminHealth() {
     }
   };
 
+  // Skater EDGE backfill — the gravity model's inputs. ~1,200 skaters at 40 a
+  // call, so the button walks nextOffset until the league is covered.
+  const [skaterBackfill, setSkaterBackfill] = useState<
+    { running: boolean; done: number; eligible: number; edgeStored: number; edgeSkipped: number; noEdgeData: number; failures: any[] } | null
+  >(null);
+
+  const runSkaterBackfill = async () => {
+    let offset = 0;
+    let edgeStored = 0;
+    let edgeSkipped = 0;
+    let noEdgeData = 0;
+    const failures: any[] = [];
+    setSkaterBackfill({ running: true, done: 0, eligible: 0, edgeStored: 0, edgeSkipped: 0, noEdgeData, failures });
+    try {
+      // ~1,200 skaters / 40 per call = 30 batches; 40 is generous headroom.
+      for (let batch = 0; batch < 40; batch++) {
+        const res = await fetch("/api/admin/nhl-feed", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skaters: true, offset }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+        edgeStored += data.edgeStored ?? 0;
+        edgeSkipped += data.edgeSkipped ?? 0;
+        noEdgeData += (data.noEdgeData ?? []).length;
+        failures.push(...(data.failures ?? []));
+        const done = (data.nextOffset ?? data.eligible ?? 0) as number;
+        setSkaterBackfill({ running: data.nextOffset != null, done, eligible: data.eligible ?? 0, edgeStored, edgeSkipped, noEdgeData, failures });
+        if (data.nextOffset == null) break;
+        offset = data.nextOffset;
+      }
+      toast(`Skater EDGE: ${edgeStored} edge stored · ${edgeSkipped} already today · ${noEdgeData} no edge data · ${failures.length} failures`,
+        failures.length > 0 ? "error" : "success");
+      if (failures.length > 0) console.log("[skater-backfill] failures:", failures);
+      runFeedCheck();
+    } catch (e: any) {
+      toast(e?.message ?? "Skater backfill failed", "error");
+    } finally {
+      setSkaterBackfill(prev => prev ? { ...prev, running: false } : prev);
+    }
+  };
+
   const [backfilling, setBackfilling] = useState(false);
   const runFaBackfill = async () => {
     setBackfilling(true);
@@ -301,6 +343,12 @@ export default function AdminHealth() {
                 ? `BACKFILLING ${goalieBackfill.done}/${goalieBackfill.eligible}…`
                 : "BACKFILL GOALIE EDGE"}
             </button>
+            <button onClick={runSkaterBackfill} disabled={skaterBackfill?.running} style={btnStyle}
+              title="Capture landing + /edge/skater-detail for every skater, 40 per request until the league is covered — the inputs the gravity model reads">
+              {skaterBackfill?.running
+                ? `BACKFILLING ${skaterBackfill.done}/${skaterBackfill.eligible}…`
+                : "BACKFILL SKATER EDGE"}
+            </button>
             <button onClick={runFaBackfill} disabled={backfilling} style={btnStyle}
               title="Resolve FA-class rows with age 0 / Unknown position against the NHL search API and write real identities into the players table">
               {backfilling ? "RESOLVING…" : "BACKFILL FA AGES"}
@@ -322,6 +370,24 @@ export default function AdminHealth() {
               ))}
               {goalieBackfill.failures.length > 8 && (
                 <div style={{ paddingLeft: 12 }}>…{goalieBackfill.failures.length - 8} more (console)</div>
+              )}
+            </div>
+          )}
+          {skaterBackfill && !skaterBackfill.running && (skaterBackfill.edgeStored + skaterBackfill.edgeSkipped + skaterBackfill.noEdgeData + skaterBackfill.failures.length) > 0 && (
+            <div style={{ marginTop: 14, fontSize: 10, lineHeight: 1.9, color: "var(--ledger-ink-faint)" }}>
+              Skater EDGE backfill: <strong style={{ color: "var(--ledger-ink)" }}>{skaterBackfill.edgeStored}</strong> edge stored ·{" "}
+              {skaterBackfill.edgeSkipped} already captured today ·{" "}
+              {skaterBackfill.noEdgeData} with no EDGE data this season ·{" "}
+              <span style={{ color: skaterBackfill.failures.length > 0 ? "var(--ledger-red)" : "inherit" }}>
+                {skaterBackfill.failures.length} failures
+              </span>
+              {skaterBackfill.failures.slice(0, 8).map((f: any) => (
+                <div key={f.playerId} style={{ paddingLeft: 12 }}>
+                  {f.reason} — {f.name ?? f.playerId}{f.status ? ` (HTTP ${f.status})` : ""}
+                </div>
+              ))}
+              {skaterBackfill.failures.length > 8 && (
+                <div style={{ paddingLeft: 12 }}>…{skaterBackfill.failures.length - 8} more (console)</div>
               )}
             </div>
           )}
@@ -369,6 +435,31 @@ export default function AdminHealth() {
                     {feedHealth.goalieEdge.lastCapturedAt
                       ? new Date(feedHealth.goalieEdge.lastCapturedAt).toLocaleString()
                       : "never — the dossier panel is blank for every goalie"}
+                  </span>
+                </div>
+              )}
+              {feedHealth.skaterEdge && (
+                <div>
+                  <span style={{
+                    fontWeight: 900,
+                    color: feedHealth.skaterEdge.skatersCaptured === 0 ? "var(--ledger-red)"
+                      : feedHealth.skaterEdge.skatersUnaccounted > 0 ? "var(--ledger-amber)"
+                      : "var(--ledger-green)",
+                  }}>
+                    ● SKATER EDGE
+                  </span>{" "}
+                  <span style={{ color: "var(--ledger-ink-faint)" }}>
+                    {/* Skater EDGE is the gravity model's input coverage — this
+                        number is why a gravity flip would render sparsely. */}
+                    {feedHealth.skaterEdge.skatersCaptured} captured ·{" "}
+                    {feedHealth.skaterEdge.skatersWithoutEdgeData} no edge data ·{" "}
+                    <strong style={{ color: feedHealth.skaterEdge.skatersUnaccounted > 0 ? "var(--ledger-amber)" : "inherit" }}>
+                      {feedHealth.skaterEdge.skatersUnaccounted} unaccounted
+                    </strong>{" "}
+                    of {feedHealth.skaterEdge.skatersKnown} · {feedHealth.skaterEdge.edgeRows} rows · gravity input · last{" "}
+                    {feedHealth.skaterEdge.lastCapturedAt
+                      ? new Date(feedHealth.skaterEdge.lastCapturedAt).toLocaleString()
+                      : "never — gravity renders INSUFFICIENT for every skater"}
                   </span>
                 </div>
               )}

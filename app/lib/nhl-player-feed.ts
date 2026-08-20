@@ -466,9 +466,9 @@ export async function fetchPlayerLanding(playerId: number | string): Promise<{ f
   return { facts: raw ? parseLanding(raw) : null, raw };
 }
 
-export async function fetchEdgeDetail(playerId: number | string, seasonId: number): Promise<{ facts: EdgeFacts | null; raw: unknown | null }> {
-  const raw = await fetchJson(EDGE_URL(playerId, seasonId));
-  return { facts: raw ? parseEdge(raw, seasonId) : null, raw };
+export async function fetchEdgeDetail(playerId: number | string, seasonId: number): Promise<{ facts: EdgeFacts | null; raw: unknown | null; status: number }> {
+  const { data: raw, status } = await fetchJsonWithStatus(EDGE_URL(playerId, seasonId));
+  return { facts: raw ? parseEdge(raw, seasonId) : null, raw, status };
 }
 
 export async function fetchGoalieEdgeDetail(

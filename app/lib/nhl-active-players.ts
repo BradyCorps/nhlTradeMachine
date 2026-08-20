@@ -101,6 +101,18 @@ export function activeGoalieIdsForTeams(teams: Array<string>): string[] {
   return load().filter(r => r.position === "G" && wanted.has(r.team)).map(r => r.id);
 }
 
+/** Ids of every skater (non-goalie) in the snapshot — the seed for an Edge
+ *  skater backfill (the inputs the gravity model reads). */
+export function activeSkaterIds(): string[] {
+  return load().filter(r => r.position !== "G").map(r => r.id);
+}
+
+/** Skater ids for a set of club abbreviations. */
+export function activeSkaterIdsForTeams(teams: Array<string>): string[] {
+  const wanted = new Set(teams.map(t => t.trim().toUpperCase()));
+  return load().filter(r => r.position !== "G" && wanted.has(r.team)).map(r => r.id);
+}
+
 /** Ids of every player in the snapshot. */
 export function activePlayerIds(): string[] {
   return load().map(r => r.id);

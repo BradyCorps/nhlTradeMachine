@@ -13,7 +13,7 @@ import {
   LANDING_URL,
   EDGE_URL,
 } from "@/app/lib/nhl-player-feed";
-import { capturePlayerSnapshots, rosterPlayerIds } from "@/app/lib/nhl-feed-capture";
+import { capturePlayerSnapshots, rosterPlayerIds, backfillSkaterEdge, skaterEdgeCoverage } from "@/app/lib/nhl-feed-capture";
 import { captureGoalieEdgeDetail, goalieEdgeCoverage } from "@/app/lib/goalie-edge";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +51,10 @@ export async function GET(req: Request) {
   // failure mode is silent on the player page, so the standing coverage
   // is reported here instead — "0 of 144" is the whole diagnosis.
   const goalieEdge = await goalieEdgeCoverage(SEASON.nhleSeasonId);
+  // Skater EDGE feeds the gravity model's inputs; its coverage is the reason a
+  // gravity flip would render sparsely, so it is surfaced alongside the goalie
+  // number rather than inferred from empty player pages.
+  const skaterEdge = await skaterEdgeCoverage(SEASON.nhleSeasonId);
 
   return NextResponse.json({
     checkedAt: new Date().toISOString(),
@@ -71,6 +75,7 @@ export async function GET(req: Request) {
     },
     snapshotCount,
     goalieEdge,
+    skaterEdge,
   });
 }
 
@@ -81,6 +86,11 @@ export async function GET(req: Request) {
 // side one button press still covers the league.
 const GOALIE_BATCH = 40;
 const GOALIE_CONCURRENCY = 6;
+// Skaters fetch TWO endpoints each (landing + edge), so a smaller batch keeps
+// one invocation inside maxDuration; the response carries nextOffset and the
+// admin page walks it, so one button press still covers all ~1,200 skaters.
+const SKATER_BATCH = 40;
+const SKATER_CONCURRENCY = 6;
 
 // POST /api/admin/nhl-feed — capture snapshots into the historical feed.
 // Body: { team?: "EDM" }   sync one team's current roster (landing + EDGE)
@@ -89,6 +99,8 @@ const GOALIE_CONCURRENCY = 6;
 //                          one batch per call; pass back `nextOffset` to
 //                          resume, `teams` to scope, `discover` to include
 //                          goalies the bundled snapshot predates.
+//       { skaters: true }  skater EDGE (+ landing) backfill — same shape as
+//                          the goalie one; the inputs the gravity model reads.
 export async function POST(req: Request) {
   const unauthorized = await requireAdmin(req);
   if (unauthorized) return unauthorized;
@@ -97,6 +109,7 @@ export async function POST(req: Request) {
     team?: string;
     ids?: number[];
     goalies?: boolean;
+    skaters?: boolean;
     teams?: string[];
     offset?: number;
     limit?: number;
@@ -104,14 +117,26 @@ export async function POST(req: Request) {
   };
 
   const explicitIds: number[] = Array.isArray(body.ids) ? body.ids.filter((n) => Number.isFinite(n)) : [];
+  const scopedTeams = Array.isArray(body.teams) && body.teams.length > 0
+    ? body.teams
+    : body.team ? [body.team] : undefined;
+
+  if (body.skaters) {
+    const result = await backfillSkaterEdge(SEASON.nhleSeasonId, {
+      playerIds: explicitIds.length > 0 ? explicitIds : undefined,
+      teams: scopedTeams,
+      discover: body.discover === true,
+      offset: Number.isFinite(body.offset) ? Number(body.offset) : 0,
+      limit: Math.min(Number.isFinite(body.limit) ? Number(body.limit) : SKATER_BATCH, SKATER_BATCH),
+      concurrency: SKATER_CONCURRENCY,
+    });
+    return NextResponse.json({ ok: true, season: seasonId(), mode: "skater-edge", ...result });
+  }
 
   if (body.goalies) {
-    const teams = Array.isArray(body.teams) && body.teams.length > 0
-      ? body.teams
-      : body.team ? [body.team] : undefined;
     const result = await captureGoalieEdgeDetail(SEASON.nhleSeasonId, {
       playerIds: explicitIds.length > 0 ? explicitIds : undefined,
-      teams,
+      teams: scopedTeams,
       discover: body.discover === true,
       offset: Number.isFinite(body.offset) ? Number(body.offset) : 0,
       limit: Math.min(Number.isFinite(body.limit) ? Number(body.limit) : GOALIE_BATCH, GOALIE_BATCH),
