@@ -19,6 +19,9 @@ interface Props {
   force: number;
   isDefenseman: boolean;
   playerName?: string;
+  /** Header label — defaults to the per-player title; the team aggregate
+   *  view passes its own ("Team Territorial Gravity"). */
+  title?: string;
 }
 
 const W = 320;
@@ -55,7 +58,7 @@ function generateField(masses: ZoneMasses): number[] {
   return values;
 }
 
-export default function GravityHeatMap({ masses, tier, force, isDefenseman, playerName }: Props) {
+export default function GravityHeatMap({ masses, tier, force, isDefenseman, playerName, title = "Territorial Heat Map" }: Props) {
   const clipId = useId();
   const tierColor = tier ? gravityTierColor(tier) : "var(--ledger-ink-faint)";
 
@@ -112,7 +115,7 @@ export default function GravityHeatMap({ masses, tier, force, isDefenseman, play
       <div className="flex items-baseline justify-between mb-2">
         <span className="font-mono text-[9px] font-black uppercase tracking-[0.18em]"
           style={{ color: "var(--ledger-ink-faint)" }}>
-          Territorial Heat Map
+          {title}
         </span>
         <span className="font-mono text-[11px] font-black" style={{ color: tierColor }}>
           {force > 0 ? "+" : ""}{force.toFixed(2)}

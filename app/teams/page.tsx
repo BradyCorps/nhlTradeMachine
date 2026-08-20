@@ -5,6 +5,8 @@ import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
 import { rosterNavByPosition } from "@/app/lib/team-nav-split";
+import { aggregateTeamGravity, type TeamGravityAggregate } from "@/app/lib/team-gravity";
+import GravityHeatMap from "@/app/components/GravityHeatMap";
 import { computeContention } from "@/app/armchair-gm/contention";
 import { computeTeamEdgeProfile, type TeamEdgeProfile } from "@/app/lib/team-edge-profile";
 import { computeRosterStrand } from "@/app/lib/roster-strand";
@@ -131,6 +133,9 @@ interface TeamProfile {
   ufaCount: number;
   rfaCount: number;
   gravityLeaders: GravityLeader[];
+  /** Mean gravity field across the roster's qualified skaters, or null when
+   *  none qualify (also the case when the display channel is gated off). */
+  teamGravity: TeamGravityAggregate | null;
 }
 
 function PhaseChip({ phase }: { phase: string }) {
@@ -440,7 +445,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
   onToggle: () => void;
   capCeiling: number;
 }) {
-  const { team, contention, edge, strand, rosterNAV, topPlayers, capCommitted, lines, avgAge, rosterSize, ufaCount, rfaCount, gravityLeaders } = profile;
+  const { team, contention, edge, strand, rosterNAV, topPlayers, capCommitted, lines, avgAge, rosterSize, ufaCount, rfaCount, gravityLeaders, teamGravity } = profile;
 
   return (
     <div
@@ -680,6 +685,26 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
             <EdgeMini profile={edge} />
           </div>
 
+          {/* Team territorial gravity — the roster's mean field as a contour
+              surface, above the individual leaders that generate it. */}
+          {teamGravity && (
+            <div className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
+              <div className="max-w-[340px]">
+                <GravityHeatMap
+                  masses={teamGravity.masses}
+                  tier={null}
+                  force={teamGravity.force}
+                  isDefenseman={false}
+                  playerName={team.name}
+                  title="Team Territorial Gravity"
+                />
+                <div className="mt-1 text-[8px] font-mono uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>
+                  Mean field · {teamGravity.count} qualified skater{teamGravity.count === 1 ? "" : "s"}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Gravity Leaders */}
           {gravityLeaders.length > 0 && (
             <div className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
@@ -884,11 +909,25 @@ export default function TeamsPage() {
         ))
         .slice(0, 3);
 
+      // Mean field across every rostered skater with a gravity profile — the
+      // whole roster, not just the top three, so the surface is the team's and
+      // not its stars'. Empty (null) whenever the display channel is gated off.
+      const teamGravity = aggregateTeamGravity(
+        roster.flatMap((p) => {
+          const g = gravityByPlayerId.get(p.id);
+          return g ? [{
+            masses: g.profile.masses,
+            force: g.profile.force,
+            qualified: g.profile.evidenceStatus === "QUALIFIED",
+          }] : [];
+        }),
+      );
+
       return {
         team, roster, navMap, contention, edge, strand, rosterNAV, navByPos,
         topPlayers: sorted, capCommitted, lines,
         avgAge, rosterSize: roster.length, ufaCount, rfaCount,
-        gravityLeaders,
+        gravityLeaders, teamGravity,
       };
     });
   }, [teams, players, navMap]);
