@@ -35,15 +35,20 @@ The v4 environment flag cannot override its source release lock.
 
 ### V3 display
 
-PL-3 now satisfies items 1 and 2. All remaining items are still required:
+Items 1, 2, and 4 are satisfied. Items 3 (source permissions / attribution) and
+5 (accessibility) remain required before activation:
 
 1. **Complete:** PL-3 returns `INSUFFICIENT` rather than a tier or percentile when sample or
    coverage is inadequate.
 2. **Complete:** Tiers and any percentiles are recalibrated on an authorized, documented,
    position-qualified population for the published season.
 3. Source permissions and required attribution are cleared under PL-5.
-4. The model card documents situation scope, input coverage, reliability,
-   limitations, and the difference between a model field and observed tracking.
+4. **Complete:** The model card (`docs/GRAVITY_MODEL_CARD.md`) documents situation
+   scope, input coverage, the evidence policy, the reliability index, the
+   stability/prediction backtest (persistence r=0.68; predicts on-ice xGF% below
+   carry-forward baseline; NZ well unvalidated), the limitations, and the
+   difference between a model field and observed tracking. Its headline finding is
+   surfaced to users in the methodology page's Gravity section.
 5. Browser and accessibility checks cover every enabled display surface.
 
 ### V3 X-NAV contribution
