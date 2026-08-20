@@ -11,7 +11,7 @@ import { contours as d3Contours } from "d3-contour";
 import { interpolateRgbBasis } from "d3-interpolate";
 import { scaleLinear, scaleSequential } from "d3-scale";
 import type { ZoneMasses, GravityTier } from "@/app/lib/gravity";
-import { gravityTierColor } from "@/app/lib/gravity";
+import { gravityTierColor, GRAVITY_V3_FIELD_DISCLAIMER } from "@/app/lib/gravity";
 
 interface Props {
   masses: ZoneMasses;
@@ -22,6 +22,11 @@ interface Props {
   /** Header label — defaults to the per-player title; the team aggregate
    *  view passes its own ("Team Territorial Gravity"). */
   title?: string;
+  /** Print the "model visualization, not tracking data" disclaimer inside
+   *  this component. Off by default because on the player page GravityField
+   *  already carries it; the standalone team contour must set it true so the
+   *  caveat is never missing. */
+  showDisclaimer?: boolean;
 }
 
 const W = 320;
@@ -58,7 +63,7 @@ function generateField(masses: ZoneMasses): number[] {
   return values;
 }
 
-export default function GravityHeatMap({ masses, tier, force, isDefenseman, playerName, title = "Territorial Heat Map" }: Props) {
+export default function GravityHeatMap({ masses, tier, force, isDefenseman, playerName, title = "Territorial Heat Map", showDisclaimer = false }: Props) {
   const clipId = useId();
   const tierColor = tier ? gravityTierColor(tier) : "var(--ledger-ink-faint)";
 
@@ -218,6 +223,13 @@ export default function GravityHeatMap({ masses, tier, force, isDefenseman, play
           Attack
         </span>
       </div>
+
+      {showDisclaimer && (
+        <div className="mt-1.5 font-mono text-[7px] leading-snug"
+          style={{ color: "var(--ledger-ink-faint)" }}>
+          {GRAVITY_V3_FIELD_DISCLAIMER}
+        </div>
+      )}
     </div>
   );
 }

@@ -697,6 +697,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
                   isDefenseman={false}
                   playerName={team.name}
                   title="Team Territorial Gravity"
+                  showDisclaimer
                 />
                 <div className="mt-1 text-[8px] font-mono uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>
                   Mean field · {teamGravity.count} qualified skater{teamGravity.count === 1 ? "" : "s"}
