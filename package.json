@@ -15,7 +15,8 @@
     "db:generate": "drizzle-kit generate",
     "build:seed": "tsx scripts/build-league-seed.ts",
     "feed:goalie-backfill": "tsx scripts/backfill-goalie-edge.ts",
-    "feed:skater-backfill": "tsx scripts/backfill-skater-edge.ts"
+    "feed:skater-backfill": "tsx scripts/backfill-skater-edge.ts",
+    "backtest:gravity-teammate": "tsx scripts/backtest/gravity-teammate-impact.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
