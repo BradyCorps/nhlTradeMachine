@@ -9,8 +9,10 @@ components; not observed player-tracking data.*
 This card documents what Gravity v3 is, what it is built from, how well it holds
 up against evidence, and — as importantly — what it does **not** do. It exists
 because a number a reader can interrogate is an instrument; a number they cannot
-is a gimmick. Gravity v3's own backtest says it is a stable descriptive trait
-that is **not** a predictor, so this card leads with that.
+is a gimmick. Gravity v3's own backtests say it is a stable trait that does not
+forecast a player's own results but **does** predict, out of sample, his effect on
+teammates — a measure of playmaking/territorial impact on others, not a scoring
+projection. This card leads with that evidence (§4, §4b).
 
 ---
 
@@ -89,26 +91,61 @@ league-centered on-ice xGA/60 proxy, and **NZ is absent (no EDGE history), so
 | **Baseline** `r(xGF%_N, xGF%_{N+1})` | **0.43** | Carrying a player's own prior on-ice xGF% forward predicts next season **better** than force does. |
 | **Concurrent** `r(force_N, xGF%_N)` | **0.66** | A real composite, not xGF% relabeled — but substantially built from the on-ice result it is scored against. |
 
-**Verdict:** force is a stable, position-relative *descriptor* that does **not**
-beat a naive carry-forward as a *predictor* of on-ice results, and is partly
-circular with the production it is built from. This is why the display channel is
-defensible as a labelled visualization but the X-NAV (valuation) channel is
-correctly held off pending independent, held-out incremental validation.
+This asked the wrong question — whether force forecasts a player's *own* future
+on-ice result, which is sticky and redundant with the box score. The right
+question is measured next.
+
+## 4b. Teammate impact — the effect-on-others test
+
+`scripts/backtest/gravity-teammate-impact.ts`, same 11-season panel. Physical
+gravity is a mass's effect on *other* bodies, so the test target is **teammate xG
+uplift, focal-excluded**: `(OnIce_F_xG − his own I_F_xG)/on-TOI − OffIce_F_xG/off-TOI`
+at 5v5, per 60. `forceNoLift` rebuilds force **without** the on-off lift term that
+shares the on/off split with the target, isolating the player's own-skill
+contribution — the clean signal.
+
+| Predictive: `forceNoLift_N → uplift_{N+1}` | r | full force | uplift's own persistence |
+| --- | --- | --- | --- |
+| Forwards | **0.42** | 0.42 | 0.47 |
+| Defense | **0.25** | 0.25 | 0.35 |
+| All | 0.28 | 0.27 | 0.69 |
+
+Three things make this a real result: it **holds out of sample** against next
+season's partly-different linemates; the circularity **vanishes predictively**
+(cross-sectionally full force 0.55 beat forceNoLift 0.45 for forwards — that gap
+was the shared on-off math; predictively they are equal, so the persistent signal
+is entirely own-skill, not mechanism); and for forwards force predicts next-year
+teammate uplift **nearly as well as the uplift's own autocorrelation** (0.42 vs
+0.47), i.e. it captures most of the predictable part.
+
+**Verdict (both tests together).** Gravity is a *weak* predictor of a player's own
+future results (§4, redundant with the box score) but a *real, out-of-sample*
+predictor of his **effect on teammates** (§4b) — strong for forwards, moderate for
+defense. It is not a scoring projection; it is a measure of territorial /
+playmaking effect on others, and the evidence supports it as that. This makes the
+display channel well-founded, not merely defensible; the X-NAV channel still needs
+its own held-out incremental test on valuation, which predicting teammate uplift
+does not by itself satisfy. Residual confound: players who stay on strong teams
+keep good linemates across seasons; a replacement-adjusted, focal-excluded WOWY
+(v4) is the clean removal.
 
 ## 5. Limitations
 
-- **Not a predictor.** Predicts next-season on-ice xGF% worse than carry-forward
-  (0.36 < 0.43). Do not read force as a forecast.
+- **Not a predictor of the player's OWN results.** Predicts next-season on-ice
+  xGF% worse than carry-forward (0.36 < 0.43). Do not read force as a scoring
+  forecast — its predictive value is for effect-on-teammates (§4b), not self.
 - **Partially circular.** Force correlates 0.66 with the same-season on-ice result
   it is partly assembled from; it re-packages production/suppression you already
   see elsewhere as much as it adds to them.
 - **The novel 30% is unvalidated.** The NZ transition well has no historical EDGE
   data and was untested by the backtest. Until an EDGE-era validation exists, UI
   copy must not present transition gravity as a *measured* signal.
-- **Measures the player, not his effect on others.** True "gravity" is a player's
-  effect on teammates (pulling defenders, opening space). v3 conflates that with
-  his own production. A focal-player-excluded (WOWY) validation is the decisive
-  open experiment.
+- **Effect-on-others is now evidenced — with a confound.** The teammate-impact
+  test (§4b) shows force predicts a player's out-of-sample effect on teammates
+  (F r=0.42, D r=0.25), so v3 is measuring more than the player's own production.
+  What remains is the team/linemate-quality confound: players who stay put keep
+  good linemates, so some of the signal is roster continuity, not the player.
+  Only a replacement-adjusted, focal-excluded WOWY (v4) removes it cleanly.
 - **Position-relative only.** No cross-position comparison; no combined league
   percentile.
 - **Mixed situations.** EDGE aggregates carry no strength-state tag, so the field
