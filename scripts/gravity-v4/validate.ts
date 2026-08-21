@@ -109,6 +109,32 @@ export function teammateXgRate(obs: PossessionObservation[]): Map<number, Teamma
   return acc;
 }
 
+/**
+ * Raw on-ice OPPONENT xG per player: while a player is on the ice, the expected
+ * goals the OTHER team generates, with the seconds of exposure. Per-60 = xg / sec
+ * × 3600. This is the observable the DZ well (the `defense` coefficient) claims to
+ * MOVE — a good suppressor keeps it LOW, so his negative defense coefficient
+ * should track a low opponent rate here. Held-out target, never a fit input. No
+ * focal-exclusion: the focal defends against the whole opposing side, none of
+ * whose shots are his own. (Reuses the TeammateXg shape — {xg, sec}.)
+ */
+export function opponentXgRate(obs: PossessionObservation[]): Map<number, TeammateXg> {
+  const acc = new Map<number, TeammateXg>();
+  const bump = (id: number, xg: number, sec: number) => {
+    const a = acc.get(id);
+    if (a) { a.xg += xg; a.sec += sec; } else acc.set(id, { xg, sec });
+  };
+  for (const o of obs) {
+    if (o.durationSec <= 0) continue;
+    let homeTot = 0, awayTot = 0;
+    for (const s of o.shots) { if (s.team === "H") homeTot += s.xg; else awayTot += s.xg; }
+    // A home skater's opponents are the away team → they face awayTot, and v.v.
+    for (const id of o.homeSkaters) bump(id, awayTot, o.durationSec);
+    for (const id of o.awaySkaters) bump(id, homeTot, o.durationSec);
+  }
+  return acc;
+}
+
 /** A tiny deterministic PRNG (mulberry32) so a null control is reproducible. */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;

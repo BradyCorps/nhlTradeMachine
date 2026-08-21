@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  assignFold, splitByGame, pearson, spearman, teammateXgRate, shuffleShots, mulberry32,
+  assignFold, splitByGame, pearson, spearman, teammateXgRate, opponentXgRate, shuffleShots, mulberry32,
 } from "@/scripts/gravity-v4/validate";
 import type { PossessionObservation } from "@/scripts/gravity-v4/possession-states";
 
@@ -85,6 +85,21 @@ describe("teammateXgRate", () => {
     ]);
     expect(r.get(1)!.sec).toBe(3600);
     expect(r.get(1)!.xg).toBeCloseTo(1.0, 6);   // 0.5 + 0.5, both from teammate 2
+  });
+});
+
+describe("opponentXgRate", () => {
+  it("charges each player the OTHER team's xG, whole (no focal-exclusion)", () => {
+    const r = opponentXgRate([obs({
+      shots: [{ team: "H", shooterId: 3, xg: 0.6 }, { team: "A", shooterId: 6, xg: 0.2 }],
+    })]);
+    const per60 = (id: number) => { const t = r.get(id)!; return (t.xg / t.sec) * 3600; };
+    // Home skaters defend against the away team → they face awayTot = 0.2.
+    expect(per60(1)).toBeCloseTo(0.2, 6);
+    // Even the home shooter is charged the full opposing total, not his own side.
+    expect(per60(3)).toBeCloseTo(0.2, 6);
+    // Away skaters face the home team → homeTot = 0.6.
+    expect(per60(6)).toBeCloseTo(0.6, 6);
   });
 });
 
