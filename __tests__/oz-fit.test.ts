@@ -6,7 +6,7 @@
 // — and so the penalty only ever touches the player blocks, never context.
 
 import { describe, it, expect } from "vitest";
-import { fitOzWell } from "@/scripts/gravity-v4/oz-fit";
+import { fitOzWell, OZ_RIDGE_LAMBDA } from "@/scripts/gravity-v4/oz-fit";
 import { buildOzDesign } from "@/scripts/gravity-v4/oz-design";
 import { solveRidgeCG } from "@/scripts/gravity-v4/rapm";
 import type { PossessionObservation } from "@/scripts/gravity-v4/possession-states";
@@ -25,6 +25,10 @@ const sample: PossessionObservation[] = [
 ];
 
 describe("fitOzWell", () => {
+  it("pins the held-out-selected production penalty", () => {
+    expect(OZ_RIDGE_LAMBDA).toBe(100_000);
+  });
+
   it("reproduces the manual buildOzDesign → solveRidgeCG fit exactly", () => {
     const lambda = 100;
     const { design, beta, byPlayer, context } = fitOzWell(sample, isForward, { lambda });

@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  resampleWithReplacement, quantile, summarize, resolvedFromZero, intervalsOverlap,
+  resampleWithReplacement, quantile, populationSd, summarize, resolvedFromZero, intervalsOverlap,
 } from "@/scripts/gravity-v4/bootstrap";
 import { mulberry32 } from "@/scripts/gravity-v4/validate";
 
@@ -53,6 +53,13 @@ describe("summarize", () => {
     const s = summarize([]);
     expect(s.n).toBe(0);
     expect(Number.isNaN(s.mean)).toBe(true);
+  });
+});
+
+describe("populationSd", () => {
+  it("reports the fitted point spread without a stale calibration constant", () => {
+    expect(populationSd([1, 2, 3, 4, 5])).toBeCloseTo(Math.sqrt(2), 9);
+    expect(Number.isNaN(populationSd([]))).toBe(true);
   });
 });
 

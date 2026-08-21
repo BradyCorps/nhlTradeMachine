@@ -28,9 +28,9 @@ import path from "path";
 import zlib from "zlib";
 import { SEASON } from "../../app/lib/season-config";
 import { activePlayerById } from "../../app/lib/nhl-active-players";
-import { fitOzWell } from "./oz-fit";
+import { fitOzWell, OZ_RIDGE_LAMBDA } from "./oz-fit";
 import { mulberry32 } from "./validate";
-import { resampleWithReplacement, summarize, resolvedFromZero, intervalsOverlap, type Summary } from "./bootstrap";
+import { resampleWithReplacement, summarize, resolvedFromZero, intervalsOverlap, populationSd, type Summary } from "./bootstrap";
 import type { PossessionObservation } from "./possession-states";
 
 const isForward = (id: number): boolean => activePlayerById(id)?.position !== "D";
@@ -44,7 +44,7 @@ const flag = (n: string): string | null => {
   return i >= 0 && args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : null;
 };
 const season = flag("season") ?? SEASON.nhleSeasonId;
-const lambda = Number(flag("lambda") ?? 25000);
+const lambda = Number(flag("lambda") ?? OZ_RIDGE_LAMBDA);
 const nBoot = Number(flag("boot") ?? 40);
 const MIN_TOI_MIN = 300;
 
@@ -141,7 +141,8 @@ function main() {
     console.log(`  #1 ${top.name} vs #${k + 1} ${other.name}: intervals ${ov ? "OVERLAP — not separable" : "disjoint — #1 clearly ahead"}`);
   }
   const medianSe = [...est].map(e => e.se).sort((a, b) => a - b)[Math.floor(est.length / 2)];
-  console.log(`  median SE across qualified: ±${medianSe.toFixed(3)} xG/60  (point spread sd was ~0.047)`);
+  const pointSd = populationSd(est.map(e => e.point));
+  console.log(`  median SE across qualified: ±${medianSe.toFixed(3)} xG/60  (point spread sd ${pointSd.toFixed(3)})`);
 
   fs.writeFileSync(path.join(OUT_DIR, `oz-bootstrap-${season}.json`), JSON.stringify({
     schemaVersion: 1, season, lambda, nBoot, minToiMin: MIN_TOI_MIN,

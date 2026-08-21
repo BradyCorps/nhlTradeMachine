@@ -31,6 +31,13 @@ export function quantile(sortedAsc: number[], q: number): number {
   return sortedAsc[lo] * (hi - pos) + sortedAsc[hi] * (pos - lo);
 }
 
+/** Population standard deviation, used to compare fitted point spread with SE. */
+export function populationSd(values: number[]): number {
+  if (values.length === 0) return NaN;
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  return Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length);
+}
+
 export interface Summary {
   /** Bootstrap mean of the replicates. */
   mean: number;

@@ -20,7 +20,7 @@
 //      between "measures effect on others" and "restates own production".
 //
 //   npx tsx scripts/gravity-v4/validate-model.ts
-//   npx tsx scripts/gravity-v4/validate-model.ts --lambda 25000 --minToi 150
+//   npx tsx scripts/gravity-v4/validate-model.ts --lambda 50000 --minToi 150
 //
 // Input  (gitignored): data/gravity-v4/possessions-<season>.ndjson.gz
 // Output (gitignored): data/gravity-v4/oz-validation-<season>.json (aggregate r's)
@@ -30,7 +30,7 @@ import path from "path";
 import zlib from "zlib";
 import { SEASON } from "../../app/lib/season-config";
 import { activePlayerById } from "../../app/lib/nhl-active-players";
-import { fitOzWell } from "./oz-fit";
+import { fitOzWell, OZ_RIDGE_LAMBDA } from "./oz-fit";
 import { splitByGame, pearson, spearman, teammateXgRate, shuffleShots, mulberry32 } from "./validate";
 import type { PossessionObservation } from "./possession-states";
 
@@ -44,7 +44,7 @@ const flag = (n: string): string | null => {
   return i >= 0 && args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : null;
 };
 const season = flag("season") ?? SEASON.nhleSeasonId;
-const lambda = Number(flag("lambda") ?? 25000);
+const lambda = Number(flag("lambda") ?? OZ_RIDGE_LAMBDA);
 const MIN_TOI_MIN = Number(flag("minToi") ?? 150);   // per half, so ~half the fit-oz threshold
 
 const grade = (r: number): string =>

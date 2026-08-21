@@ -15,6 +15,10 @@ import { buildOzDesign, type OzDesign } from "./oz-design";
 import { solveRidgeCG } from "./rapm";
 import type { PossessionObservation } from "./possession-states";
 
+/** Selected on 2025-26 by the predeclared reliability/null/teammate grid.
+ *  Override only for sensitivity work, never to make a leaderboard look right. */
+export const OZ_RIDGE_LAMBDA = 100_000;
+
 export interface PlayerFit {
   /** The OZ well — effect on teammates' xG/60, focal-excluded. */
   gravity: number;

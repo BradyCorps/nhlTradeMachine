@@ -7,21 +7,21 @@
 // teammate-impact WOWY that showed a real pulse (forwards r=0.42).
 //
 //   npx tsx scripts/gravity-v4/fit-oz-model.ts
-//   npx tsx scripts/gravity-v4/fit-oz-model.ts --lambda 25000
+//   npx tsx scripts/gravity-v4/fit-oz-model.ts --lambda 50000 # sensitivity only
 //
 // Input  (gitignored): data/gravity-v4/possessions-<season>.ndjson.gz
 // Output (gitignored, player-level): data/gravity-v4/oz-model-<season>.json
 //
-// SANITY: the gravity leaderboard should be topped by recognised play-drivers.
-// λ is the tuning knob — everyone ~0 means lower it; low-minute names spiking
-// means raise it.
+// SANITY: the gravity leaderboard should remain position-fair and separate
+// teammate influence from own finishing. The default λ was selected from
+// held-out reliability/null/teammate evidence, never leaderboard appearance.
 
 import fs from "fs";
 import path from "path";
 import zlib from "zlib";
 import { SEASON } from "../../app/lib/season-config";
 import { activePlayerById } from "../../app/lib/nhl-active-players";
-import { fitOzWell } from "./oz-fit";
+import { fitOzWell, OZ_RIDGE_LAMBDA } from "./oz-fit";
 import type { PossessionObservation } from "./possession-states";
 
 // Position from the bundled roster snapshot; unknown ids (rookies) default to
@@ -39,7 +39,7 @@ const flag = (n: string): string | null => {
   return i >= 0 && args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : null;
 };
 const season = flag("season") ?? SEASON.nhleSeasonId;
-const lambda = Number(flag("lambda") ?? 25000);
+const lambda = Number(flag("lambda") ?? OZ_RIDGE_LAMBDA);
 const MIN_TOI_MIN = 300;
 
 const name = (id: number) => activePlayerById(id)?.name ?? `#${id}`;
