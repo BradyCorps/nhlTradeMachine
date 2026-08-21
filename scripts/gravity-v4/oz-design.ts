@@ -38,9 +38,18 @@ export interface OzDesign {
   toiSec: Float64Array;
 }
 
-const CONTEXT = ["intercept", "homeIce", "scoreState", "zoneOZ", "zoneDZ"];
+// `focalFwd` is the key control: a forward's own xG baseline is ~5× a
+// defenseman's, and a D's on-ice teammates are mostly forwards, so without it
+// "is a defenseman" leaks into gravity. Absorbing the focal's positional
+// baseline makes gravity a player's effect ABOVE what the focal already scores
+// for his position — the spec §3.4 "position affects priors, not value" rule.
+const CONTEXT = ["intercept", "homeIce", "scoreState", "zoneOZ", "zoneDZ", "focalFwd"];
 
-export function buildOzDesign(obs: PossessionObservation[]): OzDesign {
+/** @param isForward maps a player id to true for C/L/R, false for D. */
+export function buildOzDesign(
+  obs: PossessionObservation[],
+  isForward: (playerId: number) => boolean,
+): OzDesign {
   const index = new Map<number, number>();
   const players: number[] = [];
   const idxOf = (id: number): number => {
@@ -57,6 +66,7 @@ export function buildOzDesign(obs: PossessionObservation[]): OzDesign {
   const contextOffset = 3 * nPlayers;
   const nFeatures = contextOffset + CONTEXT.length;
   const toiSec = new Float64Array(nPlayers);
+  const fwdByIdx = players.map(isForward);   // focal-position lookup, by index
 
   const rows: SparseObs[] = [];
 
@@ -81,10 +91,10 @@ export function buildOzDesign(obs: PossessionObservation[]): OzDesign {
       bucket.set(pi, (bucket.get(pi) ?? 0) + s.xg);
     }
 
-    emitSide(rows, home, away, ownHome, o.durationSec, perHr,
+    emitSide(rows, home, away, ownHome, o.durationSec, perHr, fwdByIdx,
       { homeIce: 1, scoreState: o.scoreStateHome, zoneOZ: oz, zoneDZ: dz },
       { finishOffset, defenseOffset, contextOffset });
-    emitSide(rows, away, home, ownAway, o.durationSec, perHr,
+    emitSide(rows, away, home, ownAway, o.durationSec, perHr, fwdByIdx,
       { homeIce: 0, scoreState: -o.scoreStateHome, zoneOZ: dz, zoneDZ: oz },
       { finishOffset, defenseOffset, contextOffset });
   }
@@ -107,6 +117,7 @@ function emitSide(
   ownXg: Map<number, number>,
   durationSec: number,
   perHr: number,
+  fwdByIdx: boolean[],
   ctx: Ctx,
   off: Offsets,
 ): void {
@@ -121,6 +132,7 @@ function emitSide(
     idx.push(off.contextOffset + 2); val.push(ctx.scoreState);
     idx.push(off.contextOffset + 3); val.push(ctx.zoneOZ);
     idx.push(off.contextOffset + 4); val.push(ctx.zoneDZ);
+    idx.push(off.contextOffset + 5); val.push(fwdByIdx[focal] ? 1 : 0);       // focal position baseline
     rows.push({ idx, val, y: (ownXg.get(focal) ?? 0) / perHr, w: durationSec });
   }
 }

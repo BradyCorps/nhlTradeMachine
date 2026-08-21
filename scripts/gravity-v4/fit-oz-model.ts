@@ -25,6 +25,14 @@ import { solveRidgeCG } from "./rapm";
 import { buildOzDesign } from "./oz-design";
 import type { PossessionObservation } from "./possession-states";
 
+// Position from the bundled roster snapshot; unknown ids (rookies) default to
+// forward, the majority class. Goalies never reach a 5v5 skater lineup.
+const isForward = (id: number): boolean => {
+  const pos = activePlayerById(id)?.position;
+  return pos !== "D";
+};
+const posTag = (id: number): string => (activePlayerById(id)?.position === "D" ? "D" : "F");
+
 const OUT_DIR = path.join(process.cwd(), "data", "gravity-v4");
 const args = process.argv.slice(2);
 const flag = (n: string): string | null => {
@@ -49,7 +57,7 @@ function main() {
     .split("\n").filter(Boolean).map(l => JSON.parse(l) as PossessionObservation);
   console.log(`  observations: ${obs.length}`);
 
-  const design = buildOzDesign(obs);
+  const design = buildOzDesign(obs, isForward);
   console.log(`  players: ${design.nPlayers} · features: ${design.nFeatures} · rows: ${design.rows.length}`);
 
   const penalty = new Float64Array(design.nFeatures);
@@ -70,14 +78,22 @@ function main() {
   const qualified = rows.filter(r => r.toiMin >= MIN_TOI_MIN);
   const byGravity = [...qualified].sort((a, b) => b.gravity - a.gravity);
   const col = (r: typeof rows[number]) =>
-    `${r.name.padEnd(22)} gravity ${r.gravity >= 0 ? "+" : ""}${r.gravity.toFixed(3)}  finish ${r.finish >= 0 ? "+" : ""}${r.finish.toFixed(3)}  ${Math.round(r.toiMin)}m`;
+    `${posTag(r.id)} ${r.name.padEnd(22)} gravity ${r.gravity >= 0 ? "+" : ""}${r.gravity.toFixed(3)}  finish ${r.finish >= 0 ? "+" : ""}${r.finish.toFixed(3)}  ${Math.round(r.toiMin)}m`;
 
   console.log(`\n── TOP 15 OZ WELL (gravity: effect on teammates' xG/60, ≥${MIN_TOI_MIN} min) `.padEnd(64, "─"));
   for (const r of byGravity.slice(0, 15)) console.log(`  ${col(r)}`);
   console.log(`\n── BOTTOM 5 `.padEnd(64, "─"));
   for (const r of byGravity.slice(-5)) console.log(`  ${col(r)}`);
 
-  // Where do the big shooters land on FINISH (should be high) vs gravity?
+  // Top forwards and defensemen separately — the position mix is the tell that
+  // focalFwd de-confounded gravity from position.
+  const topF = byGravity.filter(r => posTag(r.id) === "F").slice(0, 8);
+  const topD = byGravity.filter(r => posTag(r.id) === "D").slice(0, 8);
+  console.log(`\n── TOP 8 FORWARDS by gravity `.padEnd(64, "─"));
+  for (const r of topF) console.log(`  ${col(r)}`);
+  console.log(`\n── TOP 8 DEFENSEMEN by gravity `.padEnd(64, "─"));
+  for (const r of topD) console.log(`  ${col(r)}`);
+
   const byFinish = [...qualified].sort((a, b) => b.finish - a.finish).slice(0, 5);
   console.log(`\n── TOP 5 FINISH (own shooting, sanity) `.padEnd(64, "─"));
   for (const r of byFinish) console.log(`  ${col(r)}`);

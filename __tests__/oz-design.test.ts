@@ -17,17 +17,20 @@ const obs = (o: Partial<PossessionObservation>): PossessionObservation => ({
   scoreStateHome: 0, startZoneHome: "N", homeXg: 0, awayXg: 0, shots: [], ...o,
 });
 
+// Players 5 and 11 are defensemen; the rest forwards.
+const isForward = (id: number): boolean => id !== 5 && id !== 11;
+
 describe("buildOzDesign", () => {
   it("emits ten rows per stint — one per attacker on each side", () => {
-    const d = buildOzDesign([obs({})]);
+    const d = buildOzDesign([obs({})], isForward);
     expect(d.rows).toHaveLength(10);
     expect(d.nPlayers).toBe(10);
-    expect(d.nFeatures).toBe(3 * 10 + 5);
+    expect(d.nFeatures).toBe(3 * 10 + 6);   // 3 player blocks + 6 context (incl. focalFwd)
   });
 
   it("regresses a focal's own xG on teammates' gravity, not his own", () => {
     // Player 3 (home) takes a 0.6 xG shot; duration 3600s → rate 0.6.
-    const d = buildOzDesign([obs({ homeXg: 0.6, shots: [{ team: "H", shooterId: 3, xg: 0.6 }] })]);
+    const d = buildOzDesign([obs({ homeXg: 0.6, shots: [{ team: "H", shooterId: 3, xg: 0.6 }] })], isForward);
     const p = (id: number) => d.players.indexOf(id);
     const focalRow = d.rows.find(r => r.idx.includes(d.finishOffset + p(3)))!;
 
@@ -45,7 +48,7 @@ describe("buildOzDesign", () => {
   });
 
   it("flips home-ice, score and zone context for the away attackers", () => {
-    const d = buildOzDesign([obs({ startZoneHome: "O", scoreStateHome: 2 })]);
+    const d = buildOzDesign([obs({ startZoneHome: "O", scoreStateHome: 2 })], isForward);
     const p = (id: number) => d.players.indexOf(id);
     const homeRow = d.rows.find(r => r.idx.includes(d.finishOffset + p(1)))!;   // a home attacker
     const awayRow = d.rows.find(r => r.idx.includes(d.finishOffset + p(6)))!;   // an away attacker
@@ -57,10 +60,15 @@ describe("buildOzDesign", () => {
     expect(ctx(homeRow, "zoneOZ")).toBe(1);      // home started in its OZ
     expect(ctx(awayRow, "zoneOZ")).toBe(0);      // = away DZ
     expect(ctx(awayRow, "zoneDZ")).toBe(1);
+    // focalFwd marks the focal's position: player 1 (home) is a forward,
+    // player 11 (away) is a defenseman.
+    const p11Row = d.rows.find(r => r.idx.includes(d.finishOffset + p(11)))!;
+    expect(ctx(homeRow, "focalFwd")).toBe(1);
+    expect(ctx(p11Row, "focalFwd")).toBe(0);
   });
 
   it("accumulates ice time for every on-ice skater", () => {
-    const d = buildOzDesign([obs({ durationSec: 120 })]);
+    const d = buildOzDesign([obs({ durationSec: 120 })], isForward);
     for (let i = 0; i < d.nPlayers; i++) expect(d.toiSec[i]).toBe(120);
   });
 });
