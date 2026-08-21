@@ -1,59 +1,66 @@
 // ── oz-design.test.ts ────────────────────────────────────────────
 //
-// The OZ RAPM design is where a subtle sign or indexing slip would quietly
-// bias every coefficient, so these pin the layout: two rows per stint, home
-// offense vs away defense (and the mirror), the context controls flipped for
-// the away row, rate responses with duration weights, and the direct-rate
-// accounting the gravity decomposition subtracts.
+// The OZ design estimates gravity directly: each on-ice attacker's OWN xG
+// regressed on his finish + his teammates' gravity + opponents' defense. These
+// pin the layout a sign or indexing slip would corrupt — ten rows per stint,
+// a focal's own gravity absent from his own row, his shots as the response,
+// teammates in the gravity block, opponents in the defense block, and the
+// context controls flipped for the away side.
 
 import { describe, it, expect } from "vitest";
-import { buildOzDesign, computeDirectRates } from "@/scripts/gravity-v4/oz-design";
+import { buildOzDesign } from "@/scripts/gravity-v4/oz-design";
 import type { PossessionObservation } from "@/scripts/gravity-v4/possession-states";
 
 const obs = (o: Partial<PossessionObservation>): PossessionObservation => ({
-  gameId: 1, stintIdx: 0, durationSec: 60, homeTeamId: 10, awayTeamId: 20,
+  gameId: 1, stintIdx: 0, durationSec: 3600, homeTeamId: 10, awayTeamId: 20,
   homeSkaters: [1, 2, 3, 4, 5], awaySkaters: [6, 7, 8, 9, 11],
   scoreStateHome: 0, startZoneHome: "N", homeXg: 0, awayXg: 0, shots: [], ...o,
 });
 
 describe("buildOzDesign", () => {
-  it("emits two rows per stint with off/def blocks and flipped context", () => {
-    const d = buildOzDesign([obs({ durationSec: 3600, homeXg: 2, awayXg: 1, startZoneHome: "O", scoreStateHome: 1 })]);
-    expect(d.rows).toHaveLength(2);
+  it("emits ten rows per stint — one per attacker on each side", () => {
+    const d = buildOzDesign([obs({})]);
+    expect(d.rows).toHaveLength(10);
     expect(d.nPlayers).toBe(10);
+    expect(d.nFeatures).toBe(3 * 10 + 5);
+  });
 
-    const [homeRow, awayRow] = d.rows;
-    // Home xGF row: rate = homeXg / (duration/3600) = 2 / 1 = 2; weight = 3600s.
-    expect(homeRow.y).toBeCloseTo(2, 6);
-    expect(homeRow.w).toBe(3600);
-    // Home skaters occupy the OFFENSE block (index < nPlayers)...
-    const homeOff = d.players.slice(0, 5).map(id => d.players.indexOf(id));
-    for (const p of homeOff) expect(homeRow.idx).toContain(p);
-    // ...and away skaters occupy the DEFENSE block (index >= nPlayers).
-    const awayDefIdx = [6, 7, 8, 9, 11].map(id => d.nPlayers + d.players.indexOf(id));
-    for (const j of awayDefIdx) expect(homeRow.idx).toContain(j);
+  it("regresses a focal's own xG on teammates' gravity, not his own", () => {
+    // Player 3 (home) takes a 0.6 xG shot; duration 3600s → rate 0.6.
+    const d = buildOzDesign([obs({ homeXg: 0.6, shots: [{ team: "H", shooterId: 3, xg: 0.6 }] })]);
+    const p = (id: number) => d.players.indexOf(id);
+    const focalRow = d.rows.find(r => r.idx.includes(d.finishOffset + p(3)))!;
 
-    // Context: home-ice = 1 on the home row, 0 on the away row; score/zone flip.
-    const ctx = (r: typeof homeRow, name: string) => r.val[r.idx.indexOf(d.contextOffset + d.contextNames.indexOf(name))];
+    expect(focalRow.y).toBeCloseTo(0.6, 6);           // his own xG rate is the response
+    expect(focalRow.w).toBe(3600);
+    // His own gravity index must NOT be in his own row (no self-credit).
+    expect(focalRow.idx).not.toContain(d.gravityOffset + p(3));
+    // His four home teammates' gravity IS in his row.
+    for (const id of [1, 2, 4, 5]) expect(focalRow.idx).toContain(d.gravityOffset + p(id));
+    // The five away players sit in the defense block.
+    for (const id of [6, 7, 8, 9, 11]) expect(focalRow.idx).toContain(d.defenseOffset + p(id));
+    // A non-shooting teammate's own row has response 0.
+    const teammateRow = d.rows.find(r => r.idx.includes(d.finishOffset + p(1)))!;
+    expect(teammateRow.y).toBe(0);
+  });
+
+  it("flips home-ice, score and zone context for the away attackers", () => {
+    const d = buildOzDesign([obs({ startZoneHome: "O", scoreStateHome: 2 })]);
+    const p = (id: number) => d.players.indexOf(id);
+    const homeRow = d.rows.find(r => r.idx.includes(d.finishOffset + p(1)))!;   // a home attacker
+    const awayRow = d.rows.find(r => r.idx.includes(d.finishOffset + p(6)))!;   // an away attacker
+    const ctx = (r: typeof homeRow, nm: string) => r.val[r.idx.indexOf(d.contextOffset + d.contextNames.indexOf(nm))];
     expect(ctx(homeRow, "homeIce")).toBe(1);
     expect(ctx(awayRow, "homeIce")).toBe(0);
-    expect(ctx(homeRow, "scoreState")).toBe(1);
-    expect(ctx(awayRow, "scoreState")).toBe(-1);     // away's lead is the negative
-    expect(ctx(homeRow, "zoneOZ")).toBe(1);          // home started in its OZ
-    expect(ctx(awayRow, "zoneOZ")).toBe(0);          // which is the away DZ
+    expect(ctx(homeRow, "scoreState")).toBe(2);
+    expect(ctx(awayRow, "scoreState")).toBe(-2);
+    expect(ctx(homeRow, "zoneOZ")).toBe(1);      // home started in its OZ
+    expect(ctx(awayRow, "zoneOZ")).toBe(0);      // = away DZ
     expect(ctx(awayRow, "zoneDZ")).toBe(1);
   });
 
-  it("credits direct xG to the shooter and ice time to everyone on", () => {
-    const { directRate, toiSec } = computeDirectRates([
-      obs({ durationSec: 3600, homeXg: 0.5, shots: [{ team: "H", shooterId: 3, xg: 0.5 }] }),
-    ], [1, 2, 3, 4, 5, 6, 7, 8, 9, 11]);
-    // Player 3 shot 0.5 xG over 3600s on ice → 0.5 xG/60.
-    expect(directRate[2]).toBeCloseTo(0.5, 6);
-    // A non-shooting on-ice skater has ice time but no direct xG.
-    expect(directRate[0]).toBe(0);
-    expect(toiSec[0]).toBe(3600);
-    // An away skater accrued ice time too.
-    expect(toiSec[5]).toBe(3600);
+  it("accumulates ice time for every on-ice skater", () => {
+    const d = buildOzDesign([obs({ durationSec: 120 })]);
+    for (let i = 0; i < d.nPlayers; i++) expect(d.toiSec[i]).toBe(120);
   });
 });

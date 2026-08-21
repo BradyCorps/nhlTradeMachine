@@ -1,20 +1,20 @@
 // ── Gravity v4 — stage: fit-oz-model (the OZ well) ───────────────
 //
-// Fits the offensive-zone RAPM ridge over the valued possession observations
-// and decomposes each player's offensive impact into the DIRECT part (his own
-// xG rate) and the INDIRECT part — his effect on teammates' offense, which IS
-// the OZ gravity well (spec §3.1, §5.2). It is the rigorous version of the
-// teammate-impact WOWY that already showed a real pulse (forwards r=0.42).
+// Fits the offensive-zone RAPM ridge and reads each player's GRAVITY
+// coefficient directly — how much his teammates' own expected goals rise with
+// him on the ice, controlling for linemates, opponents, score and zone start
+// (spec §3.1, §5.2). This is the rigorous, per-player-controlled version of the
+// teammate-impact WOWY that showed a real pulse (forwards r=0.42).
 //
 //   npx tsx scripts/gravity-v4/fit-oz-model.ts
-//   npx tsx scripts/gravity-v4/fit-oz-model.ts --lambda 25000     # ridge strength
+//   npx tsx scripts/gravity-v4/fit-oz-model.ts --lambda 25000
 //
 // Input  (gitignored): data/gravity-v4/possessions-<season>.ndjson.gz
 // Output (gitignored, player-level): data/gravity-v4/oz-model-<season>.json
 //
-// λ is the tuning knob — too high flattens everyone to zero, too low lets
-// low-minute players spike. The sanity signal is the leaderboard: the OZ well
-// should be topped by recognised play-drivers, not fourth-liners.
+// SANITY: the gravity leaderboard should be topped by recognised play-drivers.
+// λ is the tuning knob — everyone ~0 means lower it; low-minute names spiking
+// means raise it.
 
 import fs from "fs";
 import path from "path";
@@ -22,7 +22,7 @@ import zlib from "zlib";
 import { SEASON } from "../../app/lib/season-config";
 import { activePlayerById } from "../../app/lib/nhl-active-players";
 import { solveRidgeCG } from "./rapm";
-import { buildOzDesign, computeDirectRates } from "./oz-design";
+import { buildOzDesign } from "./oz-design";
 import type { PossessionObservation } from "./possession-states";
 
 const OUT_DIR = path.join(process.cwd(), "data", "gravity-v4");
@@ -33,7 +33,7 @@ const flag = (n: string): string | null => {
 };
 const season = flag("season") ?? SEASON.nhleSeasonId;
 const lambda = Number(flag("lambda") ?? 25000);
-const MIN_TOI_MIN = 300;   // display threshold (spec §6.5 medium reliability)
+const MIN_TOI_MIN = 300;
 
 const name = (id: number) => activePlayerById(id)?.name ?? `#${id}`;
 
@@ -52,7 +52,6 @@ function main() {
   const design = buildOzDesign(obs);
   console.log(`  players: ${design.nPlayers} · features: ${design.nFeatures} · rows: ${design.rows.length}`);
 
-  // Penalize player off/def coefficients; leave the context block free.
   const penalty = new Float64Array(design.nFeatures);
   for (let j = 0; j < design.contextOffset; j++) penalty[j] = lambda;
 
@@ -60,43 +59,42 @@ function main() {
   const beta = solveRidgeCG(design.rows, design.nFeatures, penalty, { maxIter: 800 });
   console.log(`  solved in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
-  const { directRate, toiSec } = computeDirectRates(obs, design.players);
-  // Center the direct rate by TOI-weighted mean so offense (relative to average)
-  // and the direct part are on the same footing before subtracting.
-  let wSum = 0, dSum = 0;
-  for (let i = 0; i < design.nPlayers; i++) { wSum += toiSec[i]; dSum += directRate[i] * toiSec[i]; }
-  const meanDirect = wSum > 0 ? dSum / wSum : 0;
-
-  const rows = design.players.map((id, i) => {
-    const off = beta[design.offOffset + i];
-    const def = beta[design.defOffset + i];
-    const direct = directRate[i];
-    const ozWell = off - (direct - meanDirect);   // indirect = total offense − own shooting
-    return { id, name: name(id), off, def, direct, ozWell, toiMin: toiSec[i] / 60 };
-  });
+  const rows = design.players.map((id, i) => ({
+    id, name: name(id),
+    gravity: beta[design.gravityOffset + i],   // the OZ well
+    finish: beta[design.finishOffset + i],
+    defense: beta[design.defenseOffset + i],
+    toiMin: design.toiSec[i] / 60,
+  }));
 
   const qualified = rows.filter(r => r.toiMin >= MIN_TOI_MIN);
-  const byOz = [...qualified].sort((a, b) => b.ozWell - a.ozWell);
+  const byGravity = [...qualified].sort((a, b) => b.gravity - a.gravity);
   const col = (r: typeof rows[number]) =>
-    `${r.name.padEnd(22)} OZ ${r.ozWell >= 0 ? "+" : ""}${r.ozWell.toFixed(3)}  off ${r.off >= 0 ? "+" : ""}${r.off.toFixed(3)}  direct ${r.direct.toFixed(3)}  ${Math.round(r.toiMin)}m`;
+    `${r.name.padEnd(22)} gravity ${r.gravity >= 0 ? "+" : ""}${r.gravity.toFixed(3)}  finish ${r.finish >= 0 ? "+" : ""}${r.finish.toFixed(3)}  ${Math.round(r.toiMin)}m`;
 
-  console.log(`\n── TOP 15 OZ WELL (indirect teammate offense, xG/60, ≥${MIN_TOI_MIN} min) `.padEnd(64, "─"));
-  for (const r of byOz.slice(0, 15)) console.log(`  ${col(r)}`);
+  console.log(`\n── TOP 15 OZ WELL (gravity: effect on teammates' xG/60, ≥${MIN_TOI_MIN} min) `.padEnd(64, "─"));
+  for (const r of byGravity.slice(0, 15)) console.log(`  ${col(r)}`);
   console.log(`\n── BOTTOM 5 `.padEnd(64, "─"));
-  for (const r of byOz.slice(-5)) console.log(`  ${col(r)}`);
+  for (const r of byGravity.slice(-5)) console.log(`  ${col(r)}`);
 
-  const ozVals = qualified.map(r => r.ozWell);
-  const sd = Math.sqrt(ozVals.reduce((a, v) => a + v * v, 0) / ozVals.length - (ozVals.reduce((a, v) => a + v, 0) / ozVals.length) ** 2);
+  // Where do the big shooters land on FINISH (should be high) vs gravity?
+  const byFinish = [...qualified].sort((a, b) => b.finish - a.finish).slice(0, 5);
+  console.log(`\n── TOP 5 FINISH (own shooting, sanity) `.padEnd(64, "─"));
+  for (const r of byFinish) console.log(`  ${col(r)}`);
+
+  const g = qualified.map(r => r.gravity);
+  const mean = g.reduce((a, v) => a + v, 0) / g.length;
+  const sd = Math.sqrt(g.reduce((a, v) => a + (v - mean) ** 2, 0) / g.length);
   console.log(`\n  context: ${design.contextNames.map((n, k) => `${n} ${beta[design.contextOffset + k].toFixed(3)}`).join(" · ")}`);
-  console.log(`  OZ well spread (qualified): sd ${sd.toFixed(3)} xG/60 · ${qualified.length} qualified of ${design.nPlayers}`);
+  console.log(`  gravity spread (qualified): sd ${sd.toFixed(3)} xG/60 · ${qualified.length} qualified of ${design.nPlayers}`);
 
   fs.writeFileSync(path.join(OUT_DIR, `oz-model-${season}.json`), JSON.stringify({
-    schemaVersion: 1, season, lambda, meanDirect,
+    schemaVersion: 2, season, lambda,
     context: Object.fromEntries(design.contextNames.map((n, k) => [n, beta[design.contextOffset + k]])),
-    players: rows.map(r => ({ id: r.id, name: r.name, offPer60: r.off, defPer60: r.def, directPer60: r.direct, ozWellPer60: r.ozWell, toiMin: r.toiMin })),
+    players: rows.map(r => ({ id: r.id, name: r.name, ozWellPer60: r.gravity, finishPer60: r.finish, defensePer60: r.defense, toiMin: r.toiMin })),
   }, null, 2));
   console.log(`\n  wrote data/gravity-v4/oz-model-${season}.json`);
-  console.log(`  SANITY: are the top names recognised play-drivers? If everyone is ~0, lower λ; if fourth-liners spike, raise λ.`);
+  console.log(`  SANITY: top gravity = play-drivers, top finish = snipers. Overlap is fine; a total flip is not.`);
 }
 
 main();
