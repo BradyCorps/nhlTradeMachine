@@ -185,25 +185,25 @@ export default function GravityHeatMap({ masses, tier, force, isDefenseman, play
 
         {/* Zone labels */}
         <text x={RINK_X + RINK_W * 0.16} y={RINK_Y + RINK_H - 6}
-          textAnchor="middle" fill="var(--ledger-ink)" opacity={0.4}
-          fontSize={8} fontFamily="'Courier Prime', monospace" fontWeight={700}>
+          textAnchor="middle" fill="var(--ledger-ink)" opacity={0.5}
+          fontSize={9} fontFamily="'Courier Prime', monospace" fontWeight={700}>
           DZ
         </text>
         <text x={RINK_X + RINK_W * 0.50} y={RINK_Y + RINK_H - 6}
-          textAnchor="middle" fill="var(--ledger-ink)" opacity={0.4}
-          fontSize={8} fontFamily="'Courier Prime', monospace" fontWeight={700}>
+          textAnchor="middle" fill="var(--ledger-ink)" opacity={0.5}
+          fontSize={9} fontFamily="'Courier Prime', monospace" fontWeight={700}>
           NZ
         </text>
         <text x={RINK_X + RINK_W * 0.84} y={RINK_Y + RINK_H - 6}
-          textAnchor="middle" fill="var(--ledger-ink)" opacity={0.4}
-          fontSize={8} fontFamily="'Courier Prime', monospace" fontWeight={700}>
+          textAnchor="middle" fill="var(--ledger-ink)" opacity={0.5}
+          fontSize={9} fontFamily="'Courier Prime', monospace" fontWeight={700}>
           OZ
         </text>
 
         {/* Direction arrow */}
         <text x={W - 14} y={RINK_Y - 2}
           textAnchor="end" fill="var(--ledger-ink-faint)"
-          fontSize={6} fontFamily="'Courier Prime', monospace" fontWeight={700}
+          fontSize={8} fontFamily="'Courier Prime', monospace" fontWeight={700}
           letterSpacing="0.12em" opacity={0.6}>
           ATTACKING →
         </text>
@@ -211,21 +211,21 @@ export default function GravityHeatMap({ masses, tier, force, isDefenseman, play
 
       {/* Color legend */}
       <div className="flex items-center justify-between mt-1.5">
-        <span className="font-mono text-[7px] font-bold uppercase tracking-[0.1em]"
+        <span className="font-mono text-[8px] font-bold uppercase tracking-[0.1em]"
           style={{ color: "var(--ledger-ice, #2d7d9a)" }}>
           Suppression
         </span>
         <div className="flex-1 mx-2 h-1.5 rounded-sm" style={{
           background: "linear-gradient(to right, #2d7d9a, #5fb5c8, var(--paper-bg, #f5f0e8), #c44020, #e8a040)",
         }} />
-        <span className="font-mono text-[7px] font-bold uppercase tracking-[0.1em]"
+        <span className="font-mono text-[8px] font-bold uppercase tracking-[0.1em]"
           style={{ color: "var(--ledger-red, #c44020)" }}>
           Attack
         </span>
       </div>
 
       {showDisclaimer && (
-        <div className="mt-1.5 font-mono text-[7px] leading-snug"
+        <div className="mt-1.5 font-mono text-[8px] leading-snug"
           style={{ color: "var(--ledger-ink-faint)" }}>
           {GRAVITY_V3_FIELD_DISCLAIMER}
         </div>

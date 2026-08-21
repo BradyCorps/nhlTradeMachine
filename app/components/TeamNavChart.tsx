@@ -30,12 +30,16 @@ const DIMS: { key: Dim; label: string; blurb: string }[] = [
   { key: "gNav", label: "G-NAV", blurb: "Goaltending only" },
 ];
 
+// Ordinal competitive stance, best → worst. Each phase gets a DISTINCT fill:
+// Rebuilding and Tanking are both "down" states but must not read as one bar
+// colour — Tanking takes a deeper red so the legend's two entries are actually
+// separable on the chart.
 const PHASE_COLORS: Record<string, string> = {
   Contender: "var(--ledger-green, #2a7a3f)",
   Bubble: "var(--ledger-amber, #d4a017)",
   Retooling: "var(--ledger-ink-faint, #888)",
   Rebuilding: "var(--ledger-red, #b83020)",
-  Tanking: "var(--ledger-red, #b83020)",
+  Tanking: "#6f1109",
 };
 
 /** Respect the OS "reduce motion" setting — the re-sort animation is the
@@ -158,7 +162,7 @@ export default function TeamNavChart({ data }: Props) {
             <line x1={margin.left} y1={0} x2={chartW - margin.right} y2={0}
               stroke="var(--ledger-ink-faint)" strokeWidth={1} strokeDasharray="3,3" opacity={0.35} />
             <text x={chartW - margin.right} y={-3} textAnchor="end"
-              fill="var(--ledger-ink-faint)" fontSize={7} fontWeight={700}
+              fill="var(--ledger-ink-faint)" fontSize={9} fontWeight={700}
               fontFamily="'Courier Prime', 'Courier New', monospace">
               MEDIAN
             </text>
@@ -173,9 +177,10 @@ export default function TeamNavChart({ data }: Props) {
 
             return (
               <g key={d.abbrev}
-                style={{ transform: `translateX(${xFor(rank)}px)`, transition: trans, cursor: "default" }}
+                style={{ transform: `translateX(${xFor(rank)}px)`, transition: trans, cursor: "pointer" }}
                 onMouseEnter={() => setHoveredAbbrev(d.abbrev)}
                 onMouseLeave={() => setHoveredAbbrev(null)}
+                onClick={() => setHoveredAbbrev(prev => (prev === d.abbrev ? null : d.abbrev))}
               >
                 {/* Full-band hit target (bars + label strip) */}
                 <rect x={0} y={margin.top} width={bandW} height={plotH + margin.bottom} fill="transparent" />

@@ -31,6 +31,12 @@ interface Props {
 const CURRENT_COLOR = "var(--ledger-red, #b83020)";
 const PEER_COLOR = "var(--ledger-ink, #1a1a18)";
 
+// Fixed layout — module-level so the coordinate callbacks have a stable
+// reference (no changing hook dependency).
+const margin = { top: 24, right: 16, bottom: 36, left: 44 };
+const W = 400;
+const H = 280;
+
 interface BrushRect {
   x0: number; y0: number;
   x1: number; y1: number;
@@ -50,11 +56,6 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName }: P
 
   const all = useMemo(() => [currentPlayer, ...peers], [currentPlayer, peers]);
 
-  if (all.length < 5) return null;
-
-  const margin = { top: 24, right: 16, bottom: 36, left: 44 };
-  const W = 400;
-  const H = 280;
   const innerW = W - margin.left - margin.right;
   const innerH = H - margin.top - margin.bottom;
 
@@ -75,6 +76,12 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName }: P
   const sortedDef = [...defVals].sort((a, b) => a - b);
   const medOff = sortedOff[Math.floor(sortedOff.length / 2)];
   const medDef = sortedDef[Math.floor(sortedDef.length / 2)];
+
+  // Which quadrant the current player falls in — spoken in the aria label so a
+  // screen-reader user learns WHERE he sits, not just that a scatter exists.
+  const playerQuadrant = currentPlayer.off >= medOff
+    ? (currentPlayer.def >= medDef ? "elite two-way" : "offensive")
+    : (currentPlayer.def >= medDef ? "defensive" : "depth");
 
   const hoveredPeer = hoveredId ? all.find(p => p.id === hoveredId) : null;
 
@@ -145,6 +152,10 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName }: P
     }).sort((a, b) => b.nav - a.nav);
   }, [activeBrush, all, xScale, yScale]);
 
+  // Too few peers to place a meaningful league cloud. Guarded AFTER every hook
+  // so hook order stays constant across renders (rules-of-hooks).
+  if (all.length < 5) return null;
+
   // Current brush rect (while dragging or active)
   const displayBrush = brush || activeBrush;
 
@@ -188,7 +199,7 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName }: P
         className="w-full"
         style={{ maxWidth: W, cursor: brushing ? "crosshair" : "default" }}
         role="img"
-        aria-label={`Scatter plot of offensive vs defensive value for ${playerName} and ${peers.length} position peers`}
+        aria-label={`Scatter plot of offensive value (horizontal) vs defensive value (vertical) for ${playerName} and ${peers.length} same-position peers, split into four quadrants at the league median. ${playerName} sits in the ${playerQuadrant} quadrant.`}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
@@ -222,22 +233,22 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName }: P
 
           {/* Quadrant labels */}
           <text x={innerW - 4} y={8} textAnchor="end"
-            fill="var(--ledger-ink-faint)" fontSize={7} opacity={0.4}
+            fill="var(--ledger-ink-faint)" fontSize={9} opacity={0.55}
             fontFamily="'Courier Prime', monospace" fontWeight={700}>
             ELITE TWO-WAY
           </text>
           <text x={4} y={8} textAnchor="start"
-            fill="var(--ledger-ink-faint)" fontSize={7} opacity={0.4}
+            fill="var(--ledger-ink-faint)" fontSize={9} opacity={0.55}
             fontFamily="'Courier Prime', monospace" fontWeight={700}>
             DEFENSIVE
           </text>
           <text x={innerW - 4} y={innerH - 4} textAnchor="end"
-            fill="var(--ledger-ink-faint)" fontSize={7} opacity={0.4}
+            fill="var(--ledger-ink-faint)" fontSize={9} opacity={0.55}
             fontFamily="'Courier Prime', monospace" fontWeight={700}>
             OFFENSIVE
           </text>
           <text x={4} y={innerH - 4} textAnchor="start"
-            fill="var(--ledger-ink-faint)" fontSize={7} opacity={0.4}
+            fill="var(--ledger-ink-faint)" fontSize={9} opacity={0.55}
             fontFamily="'Courier Prime', monospace" fontWeight={700}>
             DEPTH
           </text>
@@ -273,12 +284,13 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName }: P
                 cx={cx} cy={cy}
                 r={isHov ? 5 : isBrushed ? 4.5 : 3.5}
                 fill={isBrushed ? "var(--ledger-green, #2a7a3f)" : PEER_COLOR}
-                opacity={isHov ? 0.7 : isBrushed ? 0.6 : 0.18}
+                opacity={isHov ? 0.85 : isBrushed ? 0.6 : 0.28}
                 stroke={isHov ? PEER_COLOR : isBrushed ? "var(--ledger-green, #2a7a3f)" : "none"}
                 strokeWidth={isHov || isBrushed ? 1 : 0}
                 onMouseEnter={() => { if (!brushing) setHoveredId(p.id); }}
                 onMouseLeave={() => { if (!brushing) setHoveredId(null); }}
-                style={{ cursor: "default", transition: "opacity 0.15s, r 0.15s" }}
+                onClick={() => setHoveredId(prev => (prev === p.id ? null : p.id))}
+                style={{ cursor: "pointer", transition: "opacity 0.15s, r 0.15s" }}
               />
             );
           })}
