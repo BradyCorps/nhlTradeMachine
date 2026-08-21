@@ -48,6 +48,32 @@ const lambda = Number(flag("lambda") ?? 25000);
 const nBoot = Number(flag("boot") ?? 40);
 const MIN_TOI_MIN = 300;
 
+// Each fit materializes a ~2.7M-row design (~850 MB). The bootstrap runs one
+// after another, so only ONE may be live at a time — these helpers pull out the
+// handful of numbers we keep and return, letting the giant design fall out of
+// scope and be collected before the next fit allocates its own. (Holding the
+// reference fit's design across the loop is what OOM'd the first version: two
+// live designs blew past Node's ~2 GB heap.)
+
+interface RefExtract { nPlayers: number; point: Map<number, number>; toiMin: Map<number, number>; }
+
+function referenceFit(all: PossessionObservation[], lambda: number): RefExtract {
+  const fit = fitOzWell(all, isForward, { lambda });
+  const point = new Map<number, number>();
+  const toiMin = new Map<number, number>();
+  for (const [id, f] of fit.byPlayer) { point.set(id, f.gravity); toiMin.set(id, f.toiSec / 60); }
+  return { nPlayers: fit.design.nPlayers, point, toiMin };
+}
+
+function replicateGravity(games: PossessionObservation[][], pick: number[], qualified: number[], lambda: number): Map<number, number> {
+  const rObs: PossessionObservation[] = [];
+  for (const gi of pick) for (const o of games[gi]) rObs.push(o);
+  const fit = fitOzWell(rObs, isForward, { lambda });
+  const out = new Map<number, number>();
+  for (const id of qualified) { const f = fit.byPlayer.get(id); if (f) out.set(id, f.gravity); }
+  return out;   // rObs and the design go out of scope here → collectable before the next replicate
+}
+
 function main() {
   const file = path.join(OUT_DIR, `possessions-${season}.ndjson.gz`);
   if (!fs.existsSync(file)) {
@@ -65,10 +91,11 @@ function main() {
   const games = [...byGame.values()];
   console.log(`  observations: ${obs.length} · games: ${games.length}`);
 
-  // Reference fit on the full data — the point estimates and the qualified set.
-  const ref = fitOzWell(obs, isForward, { lambda });
-  const qualified = ref.design.players.filter(id => (ref.byPlayer.get(id)!.toiSec / 60) >= MIN_TOI_MIN);
-  console.log(`  qualified (≥${MIN_TOI_MIN} min): ${qualified.length} of ${ref.design.nPlayers}`);
+  // Reference fit — keep only the point estimates and ice time; the design it
+  // built is dropped here so it is not competing for heap during the loop.
+  const { nPlayers, point, toiMin } = referenceFit(obs, lambda);
+  const qualified = [...point.keys()].filter(id => (toiMin.get(id) ?? 0) >= MIN_TOI_MIN);
+  console.log(`  qualified (≥${MIN_TOI_MIN} min): ${qualified.length} of ${nPlayers}`);
 
   // Bootstrap: resample games with replacement, refit, collect gravity per player.
   const samples = new Map<number, number[]>();
@@ -76,21 +103,15 @@ function main() {
   const rng = mulberry32(0xC0FFEE);
   const t0 = Date.now();
   for (let b = 0; b < nBoot; b++) {
-    const pick = resampleWithReplacement(games.length, rng);
-    const rObs: PossessionObservation[] = [];
-    for (const gi of pick) for (const o of games[gi]) rObs.push(o);
-    const fit = fitOzWell(rObs, isForward, { lambda });
-    for (const id of qualified) {
-      const f = fit.byPlayer.get(id);
-      if (f) samples.get(id)!.push(f.gravity);
-    }
+    const g = replicateGravity(games, resampleWithReplacement(games.length, rng), qualified, lambda);
+    for (const id of qualified) { const v = g.get(id); if (v !== undefined) samples.get(id)!.push(v); }
     process.stdout.write(`\r  replicate ${b + 1}/${nBoot} (${((Date.now() - t0) / 1000).toFixed(0)}s)   `);
   }
   console.log();
 
   const est = qualified.map(id => {
     const s = summarize(samples.get(id)!);
-    return { id, name: name(id), pos: posTag(id), point: ref.byPlayer.get(id)!.gravity, ...s, resolved: resolvedFromZero(s) };
+    return { id, name: name(id), pos: posTag(id), point: point.get(id)!, ...s, resolved: resolvedFromZero(s) };
   });
   const byPoint = [...est].sort((a, b) => b.point - a.point);
 
