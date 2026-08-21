@@ -21,8 +21,7 @@ import path from "path";
 import zlib from "zlib";
 import { SEASON } from "../../app/lib/season-config";
 import { activePlayerById } from "../../app/lib/nhl-active-players";
-import { solveRidgeCG } from "./rapm";
-import { buildOzDesign } from "./oz-design";
+import { fitOzWell } from "./oz-fit";
 import type { PossessionObservation } from "./possession-states";
 
 // Position from the bundled roster snapshot; unknown ids (rookies) default to
@@ -57,23 +56,15 @@ function main() {
     .split("\n").filter(Boolean).map(l => JSON.parse(l) as PossessionObservation);
   console.log(`  observations: ${obs.length}`);
 
-  const design = buildOzDesign(obs, isForward);
-  console.log(`  players: ${design.nPlayers} · features: ${design.nFeatures} · rows: ${design.rows.length}`);
-
-  const penalty = new Float64Array(design.nFeatures);
-  for (let j = 0; j < design.contextOffset; j++) penalty[j] = lambda;
-
   const t0 = Date.now();
-  const beta = solveRidgeCG(design.rows, design.nFeatures, penalty, { maxIter: 800 });
+  const { design, byPlayer, context } = fitOzWell(obs, isForward, { lambda });
+  console.log(`  players: ${design.nPlayers} · features: ${design.nFeatures} · rows: ${design.rows.length}`);
   console.log(`  solved in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
-  const rows = design.players.map((id, i) => ({
-    id, name: name(id),
-    gravity: beta[design.gravityOffset + i],   // the OZ well
-    finish: beta[design.finishOffset + i],
-    defense: beta[design.defenseOffset + i],
-    toiMin: design.toiSec[i] / 60,
-  }));
+  const rows = design.players.map((id) => {
+    const f = byPlayer.get(id)!;
+    return { id, name: name(id), gravity: f.gravity, finish: f.finish, defense: f.defense, toiMin: f.toiSec / 60 };
+  });
 
   const qualified = rows.filter(r => r.toiMin >= MIN_TOI_MIN);
   const byGravity = [...qualified].sort((a, b) => b.gravity - a.gravity);
@@ -101,12 +92,12 @@ function main() {
   const g = qualified.map(r => r.gravity);
   const mean = g.reduce((a, v) => a + v, 0) / g.length;
   const sd = Math.sqrt(g.reduce((a, v) => a + (v - mean) ** 2, 0) / g.length);
-  console.log(`\n  context: ${design.contextNames.map((n, k) => `${n} ${beta[design.contextOffset + k].toFixed(3)}`).join(" · ")}`);
+  console.log(`\n  context: ${design.contextNames.map(n => `${n} ${context[n].toFixed(3)}`).join(" · ")}`);
   console.log(`  gravity spread (qualified): sd ${sd.toFixed(3)} xG/60 · ${qualified.length} qualified of ${design.nPlayers}`);
 
   fs.writeFileSync(path.join(OUT_DIR, `oz-model-${season}.json`), JSON.stringify({
     schemaVersion: 2, season, lambda,
-    context: Object.fromEntries(design.contextNames.map((n, k) => [n, beta[design.contextOffset + k]])),
+    context,
     players: rows.map(r => ({ id: r.id, name: r.name, ozWellPer60: r.gravity, finishPer60: r.finish, defensePer60: r.defense, toiMin: r.toiMin })),
   }, null, 2));
   console.log(`\n  wrote data/gravity-v4/oz-model-${season}.json`);
