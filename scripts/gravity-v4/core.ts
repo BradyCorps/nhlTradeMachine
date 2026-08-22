@@ -486,29 +486,24 @@ export interface EmitReport {
 
 const FACEOFF_LIKE = new Set(["faceoff", "period-start", "game-start"]);
 
-/** Seconds within which a shot preceded by a puck-gain in the shooting team's own
- *  or neutral zone counts as a transition (rush) chance. */
-export const RUSH_WINDOW_SEC = 4;
+/** Seconds within which a shot after the shooting team was last in its OWN
+ *  defensive zone counts as a transition (rush) chance — the up-ice window. */
+export const RUSH_WINDOW_SEC = 10;
 
 /**
  * Was this shot a transition (rush) chance? The public play-by-play has no
- * controlled-entry tracking, so this is a PROXY: `prevZoneHome` is the
- * home-relative zone of the immediately preceding PBP event and `gapSec` the time
- * since it. A shot counts as rush when that prior event sat in the shooting
- * team's own half or the neutral zone within the window — the puck came up-ice
- * fast. In home terms the shooting team's own+neutral zones are D/N for the home
- * team and O/N for the away team (away defends the home-O end). It is deliberately
- * conservative: an intervening offensive-zone event resets the chain, so a
- * sustained-cycle shot is never mislabelled a rush.
+ * controlled-entry tracking, so this is a PROXY for "off the rush": the shot came
+ * within `window` seconds of the shooting team being in its OWN defensive zone —
+ * an end-to-end break rather than sustained offensive-zone pressure.
+ * `ownDzArmSec` is the game-elapsed second the shooting team was last seen in its
+ * own end (tracked by the caller: home's own end is the home-relative D zone, the
+ * away team's own end is the home-relative O zone). The caller "consumes" the arm
+ * after the first qualifying shot, so a sustained cycle after the entry is not
+ * repeatedly counted. Non-finite arm (no recent defensive-zone possession) is
+ * never a rush.
  */
-export function isRushShot(
-  shootingTeamId: number, homeTeamId: number,
-  prevZoneHome: ZoneCode | null, gapSec: number,
-): boolean {
-  if (prevZoneHome == null || gapSec < 0 || gapSec > RUSH_WINDOW_SEC) return false;
-  return shootingTeamId === homeTeamId
-    ? prevZoneHome === "D" || prevZoneHome === "N"
-    : prevZoneHome === "O" || prevZoneHome === "N";
+export function isRushShot(ownDzArmSec: number, shotGameSec: number, window = RUSH_WINDOW_SEC): boolean {
+  return Number.isFinite(ownDzArmSec) && shotGameSec - ownDzArmSec <= window;
 }
 const SHOT_KIND: Record<string, StintShot["kind"]> = {
   goal: "goal",
@@ -637,18 +632,22 @@ export function buildStintRows(args: {
     strengthChecked: 0, strengthAgreedTrailing: 0, strengthAgreedLeading: 0,
   };
 
-  // Rolling "previous PBP event" zone + time, for the rush proxy. Snapshotted
-  // per iteration BEFORE updating, so the running pointer advances even on the
-  // `continue` paths and every event (not just shots) can be a predecessor.
-  let prevZoneHome: ZoneCode | null = null;
-  let prevGameSec = -Infinity;
+  // Rush proxy: the game-elapsed second each team was last seen in its OWN
+  // defensive zone. Home's own end is the home-relative D zone; the away team's
+  // own end is the home-relative O zone. A shot within RUSH_WINDOW_SEC of that is
+  // a transition chance. Snapshotted BEFORE this event's own zone updates the
+  // arm, and consumed on the first qualifying shot so a sustained cycle after the
+  // break is not repeatedly flagged.
+  let armHomeSec = -Infinity;
+  let armAwaySec = -Infinity;
 
   for (const ev of events) {
     const evGameSec = gameElapsedSec(ev.period, ev.sec);
-    const beforeZone = prevZoneHome;
-    const beforeSec = prevGameSec;
-    prevZoneHome = zoneFromEventHomePerspective(ev, homeTeamId);
-    prevGameSec = evGameSec;
+    const evZoneHome = zoneFromEventHomePerspective(ev, homeTeamId);
+    const armHomeBefore = armHomeSec;
+    const armAwayBefore = armAwaySec;
+    if (evZoneHome === "D") armHomeSec = evGameSec;   // play in home's own end
+    if (evZoneHome === "O") armAwaySec = evGameSec;   // home's O end = away's own end
 
     const mode = eventAttributionMode(ev.typeDescKey);
     const stint = attributeEvent(ordered, ev.period, ev.sec, mode);
@@ -683,12 +682,17 @@ export function buildStintRows(args: {
     const shootingTeamId = kind === "blocked-shot"
       ? (ev.eventOwnerTeamId === homeTeamId ? awayTeamId : homeTeamId)
       : ev.eventOwnerTeamId;
+    const armSec = shootingTeamId === homeTeamId ? armHomeBefore : armAwayBefore;
+    const rush = isRushShot(armSec, evGameSec);
+    if (rush) {   // consume, so only the first shot of the break counts
+      if (shootingTeamId === homeTeamId) armHomeSec = -Infinity; else armAwaySec = -Infinity;
+    }
     row.shots.push({
       teamId: shootingTeamId,
       shooterId: ev.shooterId ?? null,
       kind, sec: ev.sec,
       xCoord: ev.xCoord ?? null, yCoord: ev.yCoord ?? null,
-      rush: isRushShot(shootingTeamId, homeTeamId, beforeZone, evGameSec - beforeSec),
+      rush,
     });
     report.shotsAttributed++;
     if (ev.shooterId == null) report.shotsWithoutShooter++;
