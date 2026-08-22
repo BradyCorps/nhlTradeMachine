@@ -111,7 +111,7 @@ export default function TeamNavChart({ data }: Props) {
         style={{ borderColor: "var(--ledger-rule)" }}>
         <span className="font-mono text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em]"
           style={{ color: "var(--ledger-ink)" }}>
-          League X-NAV Rankings
+          League {active.label} Rankings
         </span>
 
         {/* Dimension toggle — X-NAV / F / D / G */}
@@ -164,7 +164,7 @@ export default function TeamNavChart({ data }: Props) {
             <text x={chartW - margin.right} y={-3} textAnchor="end"
               fill="var(--ledger-ink-faint)" fontSize={9} fontWeight={700}
               fontFamily="'Courier Prime', 'Courier New', monospace">
-              MEDIAN
+              MEDIAN {Math.round(median).toLocaleString()}
             </text>
           </g>
 

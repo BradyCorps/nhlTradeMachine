@@ -7,6 +7,7 @@
 // splits. Data comes from /api/player-edge/{nhlId} (nightly snapshots).
 
 import React, { useEffect, useState } from "react";
+import { ordinal, pluralize } from "@/app/lib/ordinal";
 
 interface SogDetail { area: string; shots: number; shotsPercentile: number }
 interface SogSummary {
@@ -130,7 +131,7 @@ export default function EdgeShotMap({ nhlPlayerId }: { nhlPlayerId: string | num
                 <g key={area}>
                   <rect x={t.x} y={t.y} width={t.w} height={t.h} rx={4}
                     fill={pctColor(pct)} stroke="var(--rule-light, #ddd2b8)" strokeWidth="0.75">
-                    <title>{`${area}: ${shots} shots — ${Math.round(pct * 100)}th percentile`}</title>
+                    <title>{`${area}: ${pluralize(shots, "shot")} — ${ordinal(Math.round(pct * 100))} percentile`}</title>
                   </rect>
                   <text x={t.x + t.w / 2} y={t.y + t.h / 2 + 1} textAnchor="middle"
                     fontSize="12" fontFamily="monospace" fontWeight="900"
@@ -151,7 +152,7 @@ export default function EdgeShotMap({ nhlPlayerId }: { nhlPlayerId: string | num
             {[0.2, 0.5, 0.7, 0.9].map((p) => (
               <span key={p} className="flex items-center gap-1">
                 <span className="inline-block w-3 h-3" style={{ background: pctColor(p + 0.01), borderRadius: 2 }} />
-                {Math.round(p * 100)}th+
+                {ordinal(Math.round(p * 100))}+
               </span>
             ))}
           </div>
@@ -168,7 +169,7 @@ export default function EdgeShotMap({ nhlPlayerId }: { nhlPlayerId: string | num
                     <span className="px-1.5 py-0.5 text-[10px] font-black font-mono tabular-nums" style={{
                       background: pctColor(s.shotsPercentile), color: s.shotsPercentile >= 0.5 ? "#fff" : "var(--ink)", borderRadius: 2,
                     }}>
-                      {Math.round(s.shotsPercentile * 100)}th
+                      {ordinal(Math.round(s.shotsPercentile * 100))}
                     </span>
                     <span className="text-[11px] font-black font-mono uppercase tracking-wider" style={{ color: "var(--ink)" }}>
                       {SUMMARY_LABEL[s.locationCode] ?? s.locationCode}

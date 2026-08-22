@@ -14,6 +14,7 @@ import { FieldDiagram } from "@/app/components/GravityField";
 import { SEASON } from "@/app/lib/season-config";
 import MetricTip from "@/app/components/MetricTip";
 import { displayPosition } from "@/app/lib/display-position";
+import { ordinal } from "@/app/lib/ordinal";
 import { contractVerdict, surplusText, MODEL_PRICE_LABEL } from "@/app/lib/contract-verdict";
 import {
   cardGravityFromV3,
@@ -462,7 +463,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
           <div style={{ fontSize: 9, fontWeight: 900, letterSpacing: "0.05em", color: "#6e5a3d", textTransform: "uppercase", marginTop: 3 }}>
             {publicGravity?.modelLabel} · Reliability {publicGravity?.reliabilityLabel} · Data {publicGravity?.coverageLabel} · Gravity {gravity.evidenceStatus === "INSUFFICIENT"
               ? "insufficient"
-              : gravityPercentile != null ? `${gravityPercentile}th position pct` : "position pct unavailable"}
+              : gravityPercentile != null ? `${ordinal(gravityPercentile)} position pct` : "position pct unavailable"}
           </div>
           <FieldDiagram profile={gravity} />
           <div style={{ fontSize: 9, color: "#6e5a3d", lineHeight: 1.35, padding: "0 4px 4px" }}>
@@ -506,7 +507,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
                     {stat.pct !== null ? (
                       <div className="pcard-barrow">
                         <div className="pcard-bar" role="img"
-                          aria-label={`${stat.pct}th percentile — ${percentileLabel(stat.pct).toLowerCase()}`}>
+                          aria-label={`${ordinal(stat.pct)} percentile — ${percentileLabel(stat.pct).toLowerCase()}`}>
                           <div className="pcard-fill" style={{ width: `${stat.pct}%`, background: percentileColor(stat.pct) }} />
                           <div className="pcard-median" />
                         </div>
@@ -543,7 +544,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         <span style={{ fontWeight: 900, color: INK }}>CAP & CREASE</span>
         <span>
           {avgPercentile !== null
-            ? `${percentileLabel(avgPercentile)} · avg ${avgPercentile}th pct vs ${peerLabel}`
+            ? `${percentileLabel(avgPercentile)} · avg ${ordinal(avgPercentile)} pct vs ${peerLabel}`
             : `vs ${peerLabel}`}
         </span>
       </div>

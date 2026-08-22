@@ -895,7 +895,7 @@ describe("Canary — Player Card AA redesign + FMV surplus read", () => {
     expect(card).toContain('scope="row"');
     // Bars are labelled for assistive tech, not color-only
     expect(card).toContain('role="img"');
-    expect(card).toContain("th percentile —");
+    expect(card).toContain(" percentile —");   // ordinal(stat.pct) + " percentile — <label>"
     // Value breakdown uses a description list, not a bare grid of divs
     expect(card).toContain("<dl");
     expect(card).toContain("<dt>");
