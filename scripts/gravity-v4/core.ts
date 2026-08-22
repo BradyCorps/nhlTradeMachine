@@ -426,6 +426,11 @@ export interface StintShot {
   sec: number;
   xCoord: number | null;
   yCoord: number | null;
+  /** True when the shot followed a quick puck-gain in the shooting team's own or
+   *  neutral zone — a TRANSITION (rush) chance. A proxy: public PBP carries no
+   *  zone-entry tracking, so this is inferred from the preceding event's zone and
+   *  timing (see isRushShot), deliberately conservative. */
+  rush: boolean;
 }
 
 export interface StintRow {
@@ -480,6 +485,31 @@ export interface EmitReport {
 }
 
 const FACEOFF_LIKE = new Set(["faceoff", "period-start", "game-start"]);
+
+/** Seconds within which a shot preceded by a puck-gain in the shooting team's own
+ *  or neutral zone counts as a transition (rush) chance. */
+export const RUSH_WINDOW_SEC = 4;
+
+/**
+ * Was this shot a transition (rush) chance? The public play-by-play has no
+ * controlled-entry tracking, so this is a PROXY: `prevZoneHome` is the
+ * home-relative zone of the immediately preceding PBP event and `gapSec` the time
+ * since it. A shot counts as rush when that prior event sat in the shooting
+ * team's own half or the neutral zone within the window — the puck came up-ice
+ * fast. In home terms the shooting team's own+neutral zones are D/N for the home
+ * team and O/N for the away team (away defends the home-O end). It is deliberately
+ * conservative: an intervening offensive-zone event resets the chain, so a
+ * sustained-cycle shot is never mislabelled a rush.
+ */
+export function isRushShot(
+  shootingTeamId: number, homeTeamId: number,
+  prevZoneHome: ZoneCode | null, gapSec: number,
+): boolean {
+  if (prevZoneHome == null || gapSec < 0 || gapSec > RUSH_WINDOW_SEC) return false;
+  return shootingTeamId === homeTeamId
+    ? prevZoneHome === "D" || prevZoneHome === "N"
+    : prevZoneHome === "O" || prevZoneHome === "N";
+}
 const SHOT_KIND: Record<string, StintShot["kind"]> = {
   goal: "goal",
   "shot-on-goal": "shot-on-goal",
@@ -607,7 +637,19 @@ export function buildStintRows(args: {
     strengthChecked: 0, strengthAgreedTrailing: 0, strengthAgreedLeading: 0,
   };
 
+  // Rolling "previous PBP event" zone + time, for the rush proxy. Snapshotted
+  // per iteration BEFORE updating, so the running pointer advances even on the
+  // `continue` paths and every event (not just shots) can be a predecessor.
+  let prevZoneHome: ZoneCode | null = null;
+  let prevGameSec = -Infinity;
+
   for (const ev of events) {
+    const evGameSec = gameElapsedSec(ev.period, ev.sec);
+    const beforeZone = prevZoneHome;
+    const beforeSec = prevGameSec;
+    prevZoneHome = zoneFromEventHomePerspective(ev, homeTeamId);
+    prevGameSec = evGameSec;
+
     const mode = eventAttributionMode(ev.typeDescKey);
     const stint = attributeEvent(ordered, ev.period, ev.sec, mode);
     if (!stint) { report.unattributedEvents++; continue; }
@@ -646,6 +688,7 @@ export function buildStintRows(args: {
       shooterId: ev.shooterId ?? null,
       kind, sec: ev.sec,
       xCoord: ev.xCoord ?? null, yCoord: ev.yCoord ?? null,
+      rush: isRushShot(shootingTeamId, homeTeamId, beforeZone, evGameSec - beforeSec),
     });
     report.shotsAttributed++;
     if (ev.shooterId == null) report.shotsWithoutShooter++;

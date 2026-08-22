@@ -23,6 +23,11 @@ export interface ValuedShot {
   shooterId: number | null;
   /** Expected goals for this attempt, from the location model. */
   xg: number;
+  /** True for a transition (rush) chance — see StintShot.rush. Lets the NZ well
+   *  fit on rush xG while the OZ well fits on sustained xG (no double-count).
+   *  Optional so hand-built fixtures may omit it (absent = sustained); the real
+   *  pipeline always sets it via valueStint. */
+  rush?: boolean;
 }
 
 export interface PossessionObservation {
@@ -57,7 +62,7 @@ export function valueStint(row: StintRow, model: XgModel): PossessionObservation
     const xg = predictXg(model, s);      // null for blocked / coordinate-less shots
     if (xg == null) continue;
     const team: "H" | "A" = s.teamId === row.homeTeamId ? "H" : "A";
-    shots.push({ team, shooterId: s.shooterId, xg });
+    shots.push({ team, shooterId: s.shooterId, xg, rush: s.rush });
     if (team === "H") homeXg += xg; else awayXg += xg;
   }
   return {

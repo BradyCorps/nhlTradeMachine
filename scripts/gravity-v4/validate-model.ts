@@ -38,6 +38,7 @@ import { SEASON } from "../../app/lib/season-config";
 import { activePlayerById } from "../../app/lib/nhl-active-players";
 import { fitOzWell, OZ_RIDGE_LAMBDA } from "./oz-fit";
 import { splitByGame, pearson, spearman, teammateXgRate, opponentXgRate, shuffleShots, mulberry32 } from "./validate";
+import { rushOnly } from "./transition";
 import type { PossessionObservation } from "./possession-states";
 
 const isForward = (id: number): boolean => activePlayerById(id)?.position !== "D";
@@ -60,7 +61,12 @@ const coef = (flag("coef") ?? "gravity") as "gravity" | "defense";
 if (coef !== "gravity" && coef !== "defense") {
   console.error(`\n✗ --coef must be "gravity" or "defense" (got "${coef}").\n`); process.exit(1);
 }
-const well = coef === "defense" ? "DZ" : "OZ";
+// --rush validates the NZ TRANSITION well: the same gravity coefficient, but fit
+// on the rush-only view of the possessions (transition.ts). Its held-out target
+// is teammate RUSH xG, so the whole gate (reliability, null, identity vs finish)
+// applies unchanged — only the data is filtered to transition chances.
+const rush = args.includes("--rush");
+const well = rush ? "NZ" : coef === "defense" ? "DZ" : "OZ";
 // The contrast coefficient that should NOT predict this well's outcome — the
 // discriminant that the coefficient measures its own thing, not "good player".
 const contrast: "gravity" | "finish" = coef === "defense" ? "gravity" : "finish";
@@ -74,10 +80,14 @@ function main() {
     console.error(`\n✗ Missing ${path.relative(process.cwd(), file)}. Run build-possession-states first.\n`);
     process.exit(1);
   }
-  console.log(`\nGravity v4 — validate-model · ${well} well (${coef}) · season ${season} · λ=${lambda} · minTOI ${MIN_TOI_MIN}m/half`);
+  console.log(`\nGravity v4 — validate-model · ${well} well (${coef}${rush ? ", rush" : ""}) · season ${season} · λ=${lambda} · minTOI ${MIN_TOI_MIN}m/half`);
 
-  const obs = zlib.gunzipSync(fs.readFileSync(file)).toString("utf8")
+  const raw = zlib.gunzipSync(fs.readFileSync(file)).toString("utf8")
     .split("\n").filter(Boolean).map(l => JSON.parse(l) as PossessionObservation);
+  const obs = rush ? rushOnly(raw) : raw;   // NZ validates on the transition view
+  if (rush && obs.every(o => o.shots.length === 0)) {
+    console.error(`\n✗ No rush shots — rebuild the possessions file with the rush tag.\n`); process.exit(1);
+  }
   const [foldA, foldB] = splitByGame(obs, 2);
   console.log(`  observations: ${obs.length} → fold A ${foldA.length} / fold B ${foldB.length}`);
 
@@ -149,9 +159,9 @@ function main() {
   console.log(`  reliability: ${grade(relAll.r)} (r=${relAll.r.toFixed(3)}), null ${nullPass ? "clean" : "LEAKS"} → ${reliable ? "a stable, real coefficient" : "NOT yet a trustworthy coefficient"}`);
   console.log(`  identity:    ${measuresOutcome ? claim.yes : claim.no}`);
 
-  const outFile = `${coef === "defense" ? "dz" : "oz"}-validation-${season}.json`;
+  const outFile = `${rush ? "nz" : coef === "defense" ? "dz" : "oz"}-validation-${season}.json`;
   fs.writeFileSync(path.join(OUT_DIR, outFile), JSON.stringify({
-    schemaVersion: 2, season, coef, lambda, minToiMinPerHalf: MIN_TOI_MIN,
+    schemaVersion: 2, season, coef, rush, lambda, minToiMinPerHalf: MIN_TOI_MIN,
     foldSizes: { a: foldA.length, b: foldB.length },
     reliability: { overall: relAll, forwards: relF, defensemen: relD },
     nullControl: { r: nullR, pass: nullPass },

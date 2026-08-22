@@ -25,7 +25,7 @@ const model = (() => {
 })();
 
 const shot = (teamId: number, kind: StintShot["kind"], x: number | null, y: number | null, shooterId = 1): StintShot =>
-  ({ teamId, shooterId, kind, sec: 0, xCoord: x, yCoord: y });
+  ({ teamId, shooterId, kind, sec: 0, xCoord: x, yCoord: y, rush: false });
 
 const baseRow = (shots: StintShot[], over: Partial<StintRow> = {}): StintRow => ({
   season: "20252026", gameId: 1, stintIdx: 0, period: 1, startSec: 0, endSec: 40, durationSec: 40,

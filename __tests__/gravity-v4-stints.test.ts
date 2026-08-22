@@ -17,6 +17,8 @@ import {
   buildScoreTimeline,
   scoreAt,
   buildStintRows,
+  isRushShot,
+  RUSH_WINDOW_SEC,
   type RawShiftRow,
   type RosterSpot,
   type PbpEvent,
@@ -610,5 +612,55 @@ describe("foreign rows stay out of this game's denominators", () => {
     // The roster-join rate is computed over shiftRows, so a contaminated chart
     // can neither inflate nor deflate it.
     expect(report.shiftRows - report.unknownPlayerRows).toBe(12);
+  });
+});
+
+describe("isRushShot (transition proxy)", () => {
+  it("flags a quick shot after a puck-gain in the shooting team's own/neutral zone", () => {
+    // Home shooter: own half + neutral in home terms is D / N.
+    expect(isRushShot(HOME, HOME, "D", 2)).toBe(true);
+    expect(isRushShot(HOME, HOME, "N", RUSH_WINDOW_SEC)).toBe(true);
+    // Away shooter: away defends the home-O end, so its own+neutral is O / N.
+    expect(isRushShot(AWAY, HOME, "O", 1)).toBe(true);
+    expect(isRushShot(AWAY, HOME, "N", 3)).toBe(true);
+  });
+
+  it("does not flag sustained-zone origin, a stale gap, or a missing prior zone", () => {
+    expect(isRushShot(HOME, HOME, "O", 1)).toBe(false);          // prior event already attacking
+    expect(isRushShot(HOME, HOME, "D", RUSH_WINDOW_SEC + 1)).toBe(false); // too slow
+    expect(isRushShot(HOME, HOME, null, 1)).toBe(false);         // no prior zone
+  });
+});
+
+describe("buildStintRows — rush tagging", () => {
+  const { shifts } = parseShifts([
+    ...[1, 2, 3, 4, 5].map(id => row(id, HOME, "00:00", "02:00")),
+    ...[11, 12, 13, 14, 15].map(id => row(id, AWAY, "00:00", "02:00")),
+  ]);
+  const stints = buildStints(shifts, roster, HOME);
+
+  // One home shot after a D-zone takeaway (rush), one after an O-zone hit
+  // (sustained), one a stale 10s after a D-zone giveaway (not a rush).
+  const events: PbpEvent[] = [
+    { period: 1, sec: 0, typeDescKey: "faceoff", eventOwnerTeamId: HOME, zoneCode: "N" },
+    { period: 1, sec: 18, typeDescKey: "takeaway", eventOwnerTeamId: HOME, zoneCode: "D" },
+    { period: 1, sec: 20, typeDescKey: "shot-on-goal", eventOwnerTeamId: HOME, shooterId: 1 },
+    { period: 1, sec: 39, typeDescKey: "hit", eventOwnerTeamId: HOME, zoneCode: "O" },
+    { period: 1, sec: 40, typeDescKey: "shot-on-goal", eventOwnerTeamId: HOME, shooterId: 2 },
+    { period: 1, sec: 50, typeDescKey: "giveaway", eventOwnerTeamId: HOME, zoneCode: "D" },
+    { period: 1, sec: 60, typeDescKey: "shot-on-goal", eventOwnerTeamId: HOME, shooterId: 3 },
+  ];
+
+  it("tags only the shot that followed a fast own/neutral-zone gain", () => {
+    const { rows } = buildStintRows({
+      season: "20252026", gameId: 2025020002,
+      homeTeamId: HOME, awayTeamId: AWAY, stints, events,
+    });
+    const shotRush = rows.flatMap(r => r.shots).map(s => ({ id: s.shooterId, rush: s.rush }));
+    expect(shotRush).toEqual([
+      { id: 1, rush: true },   // 2s after a D-zone takeaway
+      { id: 2, rush: false },  // right after an O-zone hit — sustained
+      { id: 3, rush: false },  // 10s after the D-zone giveaway — too slow
+    ]);
   });
 });
