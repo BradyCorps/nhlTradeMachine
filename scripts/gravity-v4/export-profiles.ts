@@ -182,11 +182,14 @@ function main() {
   console.log(`\n  top OZ:  ${show(topOz)}`);
   console.log(`  top DZ:  ${show(topDz)}`);
 
-  const outFile = path.join(OUT_DIR, `gravity-v4-artifact-${seasonId}.json`);
-  fs.writeFileSync(outFile, JSON.stringify(envelope, null, 2));
-  console.log(`\n  wrote data/gravity-v4/gravity-v4-artifact-${seasonId}.json (${profiles.length} profiles, gitignored)`);
-  console.log(`  NOTE: NOT wired live. Every profile is fitted-but-UNTIERED (NZ missing ⇒ insufficient ⇒ no tier),`);
-  console.log(`        diagnostic-only, X-NAV-free. Publishing (runtime-artifact.ts + the flag) is the PL-13/PL-14 product call.`);
+  // The COMMITTED artifact the app bundles (runtime-artifact.ts imports it). This
+  // is the file to git-commit to publish; the display stays dark until the Vercel
+  // env flag GRAVITY_V4_ENABLED=true is also set.
+  const committed = path.join(process.cwd(), "app", "lib", "gravity-v4", "fitted-artifact.json");
+  fs.writeFileSync(committed, JSON.stringify(envelope, null, 2) + "\n");
+  console.log(`\n  wrote app/lib/gravity-v4/fitted-artifact.json (${profiles.length} profiles)`);
+  console.log(`  Every profile is fitted-but-UNTIERED (NZ excluded ⇒ insufficient ⇒ no tier), diagnostic-only, X-NAV-free.`);
+  console.log(`  TO PUBLISH: git add + commit this file, then set GRAVITY_V4_ENABLED=true in Vercel.`);
 }
 
 main();

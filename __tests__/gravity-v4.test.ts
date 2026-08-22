@@ -148,10 +148,10 @@ describe("Gravity v4 display and validation", () => {
 });
 
 describe("Gravity v4 runtime loader and feature flag", () => {
-  it("is release-locked off even when the environment requests it", () => {
+  it("is env-gated now that the release lock is open (OZ+DZ untiered)", () => {
     expect(isGravityV4Enabled({})).toBe(false);
     expect(isGravityV4Enabled({ GRAVITY_V4_ENABLED: "false" })).toBe(false);
-    expect(isGravityV4Enabled({ GRAVITY_V4_ENABLED: "true" })).toBe(false);
+    expect(isGravityV4Enabled({ GRAVITY_V4_ENABLED: "true" })).toBe(true);
   });
 
   it("loads a fitted profile by stable ID and exact season", () => {

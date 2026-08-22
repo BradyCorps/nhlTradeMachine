@@ -140,8 +140,9 @@ describe("Gravity release feature flags", () => {
     expect(enabled.grav).not.toBe(0);
   });
 
-  it("keeps v4 source-locked even when its environment flag is true", () => {
-    expect(GRAVITY_V4_RELEASE_READY).toBe(false);
-    expect(isGravityV4Enabled({ [GRAVITY_V4_FEATURE_FLAG]: "true" })).toBe(false);
+  it("opens v4 to its environment flag now the release lock is lifted", () => {
+    expect(GRAVITY_V4_RELEASE_READY).toBe(true);
+    expect(isGravityV4Enabled({ [GRAVITY_V4_FEATURE_FLAG]: "true" })).toBe(true);
+    expect(isGravityV4Enabled({})).toBe(false);   // still dark without the flag
   });
 });
