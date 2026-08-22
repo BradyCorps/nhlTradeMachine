@@ -44,6 +44,18 @@ const MIN_TOI_MIN = 300;
 
 const sgn = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(3)}`;
 
+// Fit a well and keep only the per-player gravity + ice time — the ~850 MB design
+// is dropped when this returns, so the rush and sustained fits never hold two
+// designs live at once (the OOM the naive two-fit version hit on the full slate).
+interface GravityFit { gravity: Map<number, number>; toiSec: Map<number, number>; players: number[]; nPlayers: number }
+function fitGravityMap(obs: PossessionObservation[], lambda: number): GravityFit {
+  const fit = fitOzWell(obs, isForward, { lambda });
+  const gravity = new Map<number, number>();
+  const toiSec = new Map<number, number>();
+  for (const [id, f] of fit.byPlayer) { gravity.set(id, f.gravity); toiSec.set(id, f.toiSec); }
+  return { gravity, toiSec, players: fit.design.players, nPlayers: fit.design.nPlayers };
+}
+
 function main() {
   const file = path.join(OUT_DIR, `possessions-${season}.ndjson.gz`);
   if (!fs.existsSync(file)) {
@@ -62,15 +74,15 @@ function main() {
   }
 
   const t0 = Date.now();
-  const nz = fitOzWell(rushOnly(obs), isForward, { lambda });        // transition well
-  const ozSust = fitOzWell(sustainedOnly(obs), isForward, { lambda }); // sustained, for distinctness
+  const nz = fitGravityMap(rushOnly(obs), lambda);          // transition well
+  const ozSust = fitGravityMap(sustainedOnly(obs), lambda); // sustained, for distinctness
   console.log(`  fit rush + sustained in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
-  const rows = nz.design.players.map((id) => ({
+  const rows = nz.players.map((id) => ({
     id, name: name(id),
-    nz: nz.byPlayer.get(id)!.gravity,
-    ozSust: ozSust.byPlayer.get(id)?.gravity ?? 0,
-    toiMin: nz.byPlayer.get(id)!.toiSec / 60,
+    nz: nz.gravity.get(id)!,
+    ozSust: ozSust.gravity.get(id) ?? 0,
+    toiMin: nz.toiSec.get(id)! / 60,
   }));
   const qualified = rows.filter(r => r.toiMin >= MIN_TOI_MIN);
   const byNz = [...qualified].sort((a, b) => b.nz - a.nz);
@@ -95,7 +107,7 @@ function main() {
   const mean = g.reduce((a, v) => a + v, 0) / g.length;
   const sd = Math.sqrt(g.reduce((a, v) => a + (v - mean) ** 2, 0) / g.length);
   console.log(`\n  distinctness: corr(transition, sustained) = ${distinct.toFixed(3)} (want well below 1.0 — a separate skill)`);
-  console.log(`  transition spread (qualified): sd ${sd.toFixed(3)} xG/60 · ${qualified.length} qualified of ${nz.design.nPlayers}`);
+  console.log(`  transition spread (qualified): sd ${sd.toFixed(3)} xG/60 · ${qualified.length} qualified of ${nz.nPlayers}`);
 
   fs.writeFileSync(path.join(OUT_DIR, `nz-model-${season}.json`), JSON.stringify({
     schemaVersion: 1, season, lambda, rushXgShare: share,
