@@ -15,6 +15,7 @@ import { SEASON } from "@/app/lib/season-config";
 import MetricTip from "@/app/components/MetricTip";
 import { displayPosition } from "@/app/lib/display-position";
 import { ordinal } from "@/app/lib/ordinal";
+import { metricPercentile } from "@/app/lib/strand-metrics";
 import { contractVerdict, surplusText, MODEL_PRICE_LABEL } from "@/app/lib/contract-verdict";
 import {
   cardGravityFromV3,
@@ -115,16 +116,6 @@ function getPositionGroup(pos: string): "F" | "D" | "G" {
   return "F";
 }
 
-function computePercentile(value: number, sorted: number[]): number {
-  if (sorted.length === 0) return 50;
-  let count = 0;
-  for (const v of sorted) {
-    if (v < value) count++;
-    else if (v === value) count += 0.5;
-  }
-  return Math.round((count / sorted.length) * 100);
-}
-
 // Bar-fill tones — darkened so white/dark text and the newsprint ground both
 // clear WCAG AA. These are decorative (the number carries the real value), but
 // kept legible for low-vision users who read the fill.
@@ -180,9 +171,8 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
     for (const stat of statDefs) {
       const raw = stat.extract(player);
       const sorted = sortedMaps.get(stat.key) ?? [];
-      const pct = raw !== null && sorted.length >= 10
-        ? computePercentile(stat.invert ? -raw : raw, stat.invert ? sorted.map(v => -v).sort((a, b) => a - b) : sorted)
-        : null;
+      // Shared derivation — identical to the STRAND rails, so card and dossier agree.
+      const pct = metricPercentile(raw, sorted, stat.invert ?? false);
       const medianVal = sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)] : null;
       pcts.push({
         key: stat.key,

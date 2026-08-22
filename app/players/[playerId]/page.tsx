@@ -61,6 +61,26 @@ function buildComparePeers(allPlayers: any[], player: any) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// The percentile cohort for the STRAND rails — same position group, ≥20 GP,
+// INCLUDING this player, exactly the filter the percentile card uses, so the two
+// surfaces rank against the identical field and can never disagree. Slim to the
+// metric fields the rails read.
+function buildStrandCohort(allPlayers: any[], player: any) {
+  const group = posGroupOf(player.position);
+  return allPlayers
+    .filter(p => p.position !== "Pick" && posGroupOf(p.position) === group && (p.games ?? 0) >= 20)
+    .map(p => ({
+      ops: p.ops ?? null, dps: p.dps ?? null, ptsPace: p.ptsPace ?? null,
+      xGPace: p.xGPace ?? null, xgRelTM: p.xgRelTM ?? null, avgTOI: p.avgTOI ?? null,
+      xgaRelTM: p.xgaRelTM ?? null, qocIndex: p.qocIndex ?? null, dzPct: p.dzPct ?? null,
+      gsax: p.gsax ?? null, savePct: p.savePct ?? null, baselineHdsvPct: p.baselineHdsvPct ?? null,
+      gamesStarted: p.gamesStarted ?? null, gamesPlayed: p.gamesPlayed ?? null, games: p.games ?? null,
+      shotsPerGame: p.shotsPerGame ?? null, gaa: p.gaa ?? null,
+    }));
+}
+
+const STRAND_COHORT_NOUN = { F: "forwards", D: "defensemen", G: "goalies" } as const;
+
 export async function generateMetadata(
   { params }: { params: Promise<{ playerId: string }> },
 ): Promise<Metadata> {
@@ -122,6 +142,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
     : null;
   const roles = derivePlayerRoles(player);
   const comparePeers = buildComparePeers(roster.players as any[], player);
+  const strandCohort = buildStrandCohort(roster.players as any[], player);
+  const strandCohortLabel = `${STRAND_COHORT_NOUN[posGroupOf(player.position)]}, ≥20 GP, ${SEASON.replaySeason}`;
 
   // Scatter plot: compute NAV for same-position peers (lightweight — pure sync math)
   const posGroup = posGroupOf(player.position);
@@ -335,7 +357,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
             STRAND DNA
           </div>
           <div className="flex justify-center">
-            <PlayerStrandPanel player={player} peers={comparePeers} />
+            <PlayerStrandPanel player={player} peers={comparePeers} cohort={strandCohort} cohortLabel={strandCohortLabel} />
           </div>
         </div>
 

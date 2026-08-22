@@ -842,8 +842,11 @@ describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 go
     expect(view).toContain("baselineHdsvPct");
     // The goals-against index is inverted so a stingy goalie reads high
     expect(view).toMatch(/label: "GAA"[\s\S]{0,200}invert: true/);
-    // The players page no longer hardcodes HDSV to unavailable
-    expect(players).toContain("buildGoalieStrandTraits(player)");
+    // The players page builds STRAND through the shared percentile model, which
+    // carries the 3×3 goalie rails (HDSV populated from the real EDGE field), and
+    // never hardcodes a greyed dash.
+    expect(players).toContain("buildStrandPercentiles(player");
+    expect(read("app/lib/strand-metrics.ts")).toContain("baselineHdsvPct");
     expect(players).not.toContain('val: 0.5, unavailable: true');
   });
 

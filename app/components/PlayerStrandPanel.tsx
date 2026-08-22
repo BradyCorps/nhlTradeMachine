@@ -9,10 +9,8 @@
 import { useMemo, useState } from "react";
 import StrandDisplay from "@/app/components/StrandDisplay";
 import EdgeStrip from "@/app/components/EdgeStrip";
-import { buildAssetTraits, buildGoalieStrandTraits, computeStrandType } from "@/app/components/StrandView";
-import type { Asset } from "@/app/lib/trade-types";
-
-const STRAND_NAV_SHIM = { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0, fmvAav: 0, fArchetype: undefined, rosterTier: undefined } as const;
+import { computeStrandType } from "@/app/components/StrandView";
+import { buildStrandPercentiles, type PlayerLike } from "@/app/lib/strand-metrics";
 
 // Slim peer shape — only the fields the strand trait builds read, shipped
 // from the server dossier so the client can overlay a comparison without
@@ -44,9 +42,16 @@ const rule = "var(--ledger-rule)";
 export default function PlayerStrandPanel({
   player,
   peers = [],
+  cohort = [],
+  cohortLabel,
 }: {
   player: any;
   peers?: StrandComparePeer[];
+  /** Same-position, ≥20 GP field (incl. this player) — the cohort every rail's
+   *  percentile is ranked against. The SAME cohort the percentile card uses, so
+   *  the two surfaces always agree. */
+  cohort?: PlayerLike[];
+  cohortLabel?: string;
 }) {
   const [compareId, setCompareId] = useState<string>("");
   const isGoalie = player.position === "G";
@@ -58,15 +63,14 @@ export default function PlayerStrandPanel({
 
   const compare = useMemo(() => {
     if (!comparePeer) return null;
-    const traits = isGoalie
-      ? buildGoalieStrandTraits(comparePeer)
-      : buildAssetTraits(comparePeer as unknown as Asset, STRAND_NAV_SHIM);
+    const traits = buildStrandPercentiles(comparePeer as unknown as PlayerLike, cohort, isGoalie);
     return { ...traits, label: comparePeer.name.split(" ").pop() };
-  }, [comparePeer, isGoalie]);
+  }, [comparePeer, cohort, isGoalie]);
 
-  const primary = isGoalie
-    ? buildGoalieStrandTraits(player)
-    : buildAssetTraits(player as unknown as Asset, STRAND_NAV_SHIM);
+  const primary = useMemo(
+    () => buildStrandPercentiles(player as PlayerLike, cohort, isGoalie),
+    [player, cohort, isGoalie],
+  );
   const ops = isGoalie ? null : (player.ops ?? null);
   const dps = isGoalie ? null : (player.dps ?? null);
   const strandType = isGoalie
@@ -118,6 +122,11 @@ export default function PlayerStrandPanel({
         footer={<EdgeStrip asset={player} heading={false} />}
         W={300} H={200} amplitude={42} maxWidth={460}
       />
+      {cohortLabel && (
+        <div className="mt-1 text-[8px] font-mono uppercase tracking-[0.12em]" style={{ color: faint }}>
+          Percentile rank vs {cohortLabel}
+        </div>
+      )}
     </div>
   );
 }
