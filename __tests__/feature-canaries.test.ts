@@ -1213,11 +1213,18 @@ describe("Canary — footer glossary", () => {
     expect(footer).toContain("NHLe");
   });
 
-  it("keeps the icon key visible instead of hiding it in a dropdown", () => {
+  it("keeps the icon key in the footer, collapsed into a native disclosure", () => {
+    // Mobile audit X2: the always-open key added ~1,000px to every page. It is
+    // now collapsed behind a native <details>/<summary> (works without JS) but
+    // still lives in the footer with its full entries — not deleted, not moved
+    // off to a JS-only dropdown, and its definitions still generate from data.
     expect(footer).toContain("const iconKey");
-    expect(footer).toContain('aria-label="Icon key"');
     expect(footer).toContain("Megalodon");
     expect(footer).toContain("Salary Dump");
+    // The icon-key section is now a collapsible native disclosure: its summary
+    // carries the "Icon key" label the old always-open <section> used to.
+    expect(footer).toMatch(/<summary[^>]*aria-label="Icon key"/);
+    expect(footer).toContain("<details");
     expect(footer).not.toMatch(/title:\s*"Icon Key"/);
   });
 

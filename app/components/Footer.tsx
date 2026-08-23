@@ -148,14 +148,21 @@ export default function Footer() {
           </p>
         </div>
 
-        <section className="mb-4 border border-ledger-rule"
-          style={{ background: "var(--paper-card)" }}
-          aria-label="Icon key">
-          <div className="border-b px-4 py-2 font-mono text-[10px] font-black uppercase tracking-[0.22em] text-ledger-ink"
+        {/* Collapsed by default (mobile audit X2): the full icon key added
+            ~1,000px of always-on grids to every page that renders the footer.
+            It opens on demand here and still lives in full at
+            /glossary#icon-key. Kept as a native <details> so it works without JS. */}
+        <details className="group mb-4 border border-ledger-rule"
+          style={{ background: "var(--paper-card)" }}>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3"
+            aria-label="Icon key">
+            <div className="font-mono text-[10px] font-black uppercase tracking-[0.22em] text-ledger-ink">
+              Icon Key
+            </div>
+            <span className="font-mono text-[13px] text-ledger-ink-faint group-open:rotate-180" aria-hidden="true">⌄</span>
+          </summary>
+          <div className="border-t px-4 pt-3 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint"
             style={{ borderColor: "var(--ledger-rule)" }}>
-            Icon Key
-          </div>
-          <div className="px-4 pt-3 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint">
             Asset Flags
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 p-4">
@@ -220,7 +227,7 @@ export default function Footer() {
               </div>
             ))}
           </div>
-        </section>
+        </details>
 
         <div className="space-y-2">
           {methodologySections.map(section => (
