@@ -576,6 +576,60 @@ describe("simulate route", () => {
   it("uses order-insensitive object keys for scenario seeds", () => {
     expect(scenarioSeed({ b: 2, a: 1 })).toBe(scenarioSeed({ a: 1, b: 2 }));
   });
+
+  it("conserves a full roster's skater-games to 1476 and goals to the team goals-for (SIM-CONS)", async () => {
+    // A believable 20-skater WPG roster (12F + 6D + 2 extra F) plus a goalie —
+    // enough bodies to ice 18 a night, so conservation engages.
+    const wpg = [
+      ...Array.from({ length: 14 }, (_, i) => player(`wpg-f${i}`, `WPG Forward ${i}`, "WPG", 70 - i * 3, i % 2 ? "W" : "C")),
+      ...Array.from({ length: 6 }, (_, i) => player(`wpg-d${i}`, `WPG Defender ${i}`, "WPG", 34 - i * 3, "D")),
+      { ...player("wpg-g1", "WPG Goalie", "WPG", 0, "G"), gsax: 2, gamesStarted: 55, savePct: 0.912 },
+    ];
+    const depth = teamIds.flatMap((teamId) => teamId === "WPG" ? [] : [
+      player(`${teamId}-f1`, `${teamId} Forward`, teamId, 42, "C"),
+      player(`${teamId}-d1`, `${teamId} Defender`, teamId, 25, "D"),
+      { ...player(`${teamId}-g1`, `${teamId} Goalie`, teamId, 0, "G"), gsax: 0, gamesStarted: 45, savePct: 0.905 },
+    ]);
+
+    const res = await simulatePOST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      body: JSON.stringify({ homeTeamId: "WPG", partnerTeamId: "CGY", teams, players: [...depth, ...wpg], seed: 42, trades: [] }),
+    }) as any);
+    const body = await res.json();
+
+    const wpgDiag = body.conservation.teams.find((t: any) => t.teamId === "WPG");
+    expect(wpgDiag.skaterCount).toBe(20);
+    expect(wpgDiag.skaterGames).toBe(1476);             // 18 skaters × 82, conserved
+    expect(wpgDiag.summedSkaterGoals).toBe(wpgDiag.teamGoalsFor); // Σ player goals = team GF
+
+    // And the season stays internally consistent: pts = G + A for every skater.
+    const wpgTeam = body.standings.find((t: any) => t.teamId === "WPG");
+    for (const s of wpgTeam.projectedSkaters) {
+      expect(s.projectedGoals + s.projectedAssists).toBe(s.projectedPts);
+    }
+    // League standings total sits near the realistic ~2,924, not inflated.
+    expect(Math.abs(body.conservation.totalStandingsPoints - 2924)).toBeLessThan(60);
+  });
+
+  it("does not floor a no-xG young forward at a 20/80 goal split (SIM-CONS P0-4)", async () => {
+    // Small WPG roster (conservation off) so the raw per-player goal share shows.
+    // A prospect with a scoring pace but no xG sample used to be pinned at the
+    // 0.22 goal floor → ~78% assists. He should now get a real prior share.
+    const prospect = { ...player("prospect", "No-xG Prospect", "WPG", 55, "C"), age: 22, xGPace: 0, baselinePtsPace: 55, games: 60 };
+    const depth = teamIds.flatMap((teamId) => [
+      player(`${teamId}-f1`, `${teamId} Forward`, teamId, 42, "C"),
+      player(`${teamId}-d1`, `${teamId} Defender`, teamId, 25, "D"),
+      { ...player(`${teamId}-g1`, `${teamId} Goalie`, teamId, 0, "G"), gsax: 0, gamesStarted: 45, savePct: 0.905 },
+    ]);
+    const res = await simulatePOST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      body: JSON.stringify({ homeTeamId: "WPG", partnerTeamId: "CGY", teams, players: [...depth, prospect], seed: 71, trades: [] }),
+    }) as any);
+    const body = await res.json();
+    const p = body.homeTeam.projectedSkaters.find((s: any) => s.playerId === "prospect");
+    expect(p.projectedPts).toBeGreaterThan(0);
+    expect(p.projectedGoals / p.projectedPts).toBeGreaterThan(0.27); // was ~0.22 floor
+  });
 });
 
 describe("claude narrative route contract", () => {

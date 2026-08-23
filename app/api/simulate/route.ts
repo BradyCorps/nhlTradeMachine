@@ -21,6 +21,13 @@ import { simRequestSchema } from "@/app/lib/sim-request-schema";
 import { teamWindow } from "@/app/lib/team-window";
 import { splitGoalieStarts } from "@/app/lib/goalie-workload";
 import {
+  conserveTeamSeason,
+  conserveLeaguePoints,
+  teamGoalsFor,
+  TEAM_SKATER_GAMES,
+  MIN_CONSERVE_SKATERS,
+} from "@/app/lib/sim-conservation";
+import {
   specialTeamsPointMultiplier, specialTeamsGamesBonus, type SpecialTeamsOrder,
 } from "@/app/lib/special-teams";
 import {
@@ -109,6 +116,8 @@ interface ProjectedSkaterSeason {
   gamesPlayed: number;
   projectedTOI: number;
   breakoutTag?: "BREAKOUT" | "REGRESSION" | "VETERAN_HOLD" | "CAREER_YEAR";
+  /** Healthy scratch / depth: a tighter games cap under season conservation. */
+  benched?: boolean;
 }
 
 interface TradeRecord {
@@ -633,9 +642,17 @@ function projectSkaterOutcome(
   const ceilingMult = p.age <= 23 ? 1.9 : p.age <= 26 ? 1.6 : p.age <= 29 ? 1.42 : p.age <= 32 ? 1.3 : 1.22;
   const ptsCeiling = (demonstratedLevel / 82) * gamesPlayed * ceilingMult;
   const projectedPts = Math.max(0, Math.round(Math.min(rawProjectedPts, ptsCeiling)));
-  const xgGoalShare = stablePace > 0
+  // Goal share: derive from the finishing signal (xG per point) when the player
+  // HAS one; otherwise fall back to a position/age prior. Rookies and prospects
+  // arrive with a scoring pace but no xG sample — flooring their share at the
+  // xG-minimum (0.22) is exactly what made simulated rookies ~80% assists
+  // (sim-engine audit P0-4). A young forward is a fraction under a veteran's
+  // goal share, not pinned to the floor.
+  const hasFinishingSignal = (p.xGPace ?? 0) > 0;
+  const forwardGoalPrior = p.age <= 23 ? 0.34 : 0.37;
+  const xgGoalShare = hasFinishingSignal && stablePace > 0
     ? clamp((p.xGPace ?? 0) / Math.max(stablePace, 1), 0.22, p.position === "D" ? 0.36 : 0.55)
-    : p.position === "D" ? 0.24 : 0.38;
+    : p.position === "D" ? 0.24 : forwardGoalPrior;
   const roleGoalShare = p.position === "D" ? 0.24 : xgGoalShare;
   const projectedGoals = Math.max(0, Math.min(projectedPts, Math.round(projectedPts * roleGoalShare * (0.88 + rand() * 0.24))));
 
@@ -665,7 +682,8 @@ function simulateLeague(
   lineup?: SimRequest["lineup"],
   lineupContext?: boolean,
 ): SimTeamResult[] {
-  return teams.map(team => {
+  // Pass 1 — every team's raw projected points (per-team RNG streams unchanged).
+  const prepared = teams.map(team => {
     const roster     = playersByTeam.get(team.id) ?? [];
     const navDelta   = tradeNavDeltas.get(team.id) ?? 0;
     const capDelta   = capDeltas.get(team.id) ?? 0;
@@ -677,7 +695,7 @@ function simulateLeague(
     const lineupOrder = lineup?.orders?.[team.id] ?? defaultLineupOrder(roster);
     const startingGoalieId = lineup?.startingGoalies?.[team.id] ?? lineupOrder?.goalies?.[0] ?? null;
     const deploymentByPlayer = buildDeploymentMap(lineupOrder);
-    const projectedPoints = projectTeamPoints(
+    const rawPoints = projectTeamPoints(
       team,
       roster,
       navDelta,
@@ -687,20 +705,50 @@ function simulateLeague(
       lineupOrder,
       lineupContext,
     );
+    return { team, roster, teamSeed, startingGoalieId, deploymentByPlayer, rawPoints };
+  });
+
+  // SIM-CONS — conserve the league point total, so standings sum to a realistic
+  // ~2,924 (≈91/team) instead of the free-floating total that independent
+  // per-team rolls produced. Pure proportional, so ordering (and the champion)
+  // is unchanged and the result is independent of input team order.
+  const conservedPoints = conserveLeaguePoints(prepared.map(p => p.rawPoints));
+
+  // Pass 2 — rosters and goalies on the conserved points, then conserve each
+  // full team's skater season (games → 1,476, goals → team goals-for).
+  return prepared.map((prep, ti) => {
+    const { team, roster, teamSeed, startingGoalieId, deploymentByPlayer } = prep;
+    const projectedPoints = conservedPoints[ti];
+
     // Every skater on the team projects a season — lineup players are
     // starters (deployment floors/multipliers), everyone else is depth.
     const hasSetLineup = deploymentByPlayer.size > 0;
-    const projectedSkaters = roster
+    let projectedSkaters = roster
       .filter(p => p.position !== "Pick" && p.position !== "G")
-      .map(p => projectSkaterOutcome(
-        p, team.id, seed, deploymentByPlayer.get(p.id),
-        hasSetLineup && !deploymentByPlayer.has(p.id),
-      ))
-      .sort((a, b) =>
-        b.projectedPts !== a.projectedPts
-          ? b.projectedPts - a.projectedPts
-          : a.name.localeCompare(b.name)
-      );
+      .map(p => {
+        const benched = hasSetLineup && !deploymentByPlayer.has(p.id);
+        const season = projectSkaterOutcome(p, team.id, seed, deploymentByPlayer.get(p.id), benched);
+        season.benched = benched;
+        return season;
+      });
+
+    // SIM-CONS — only for full rosters. Production always sends a ~23-man club
+    // that ices 18 skaters a night (1,476 skater-games); thin synthetic rosters
+    // (and genuinely short/illegal ones) keep the per-player projection so their
+    // season is legitimately short rather than inflated to a budget they can't
+    // fill. teamGoalsFor couples scoring to team strength.
+    if (projectedSkaters.length >= MIN_CONSERVE_SKATERS) {
+      conserveTeamSeason(projectedSkaters, {
+        gamesBudget: TEAM_SKATER_GAMES,
+        teamGoals: teamGoalsFor(projectedPoints),
+      });
+    }
+
+    projectedSkaters = projectedSkaters.sort((a, b) =>
+      b.projectedPts !== a.projectedPts
+        ? b.projectedPts - a.projectedPts
+        : a.name.localeCompare(b.name)
+    );
     const topScorer  = projectedSkaters[0] ?? null;
     const winPct     = projectedPoints / 164;
     const { starter: goalie, backup: backupGoalie } =
@@ -1120,6 +1168,23 @@ export async function POST(req: NextRequest) {
       : null;
     const tradedPlayerOutcomes = buildTradedPlayerOutcomes(trades, teams, standings, seed);
 
+    // SIM-CONS diagnostics — the exact quantities the sim-engine audit asked to
+    // be observable, so a regression in the conservation invariants is visible
+    // rather than silent: skater-games per team (should be 1,476 for a full
+    // roster), team goals-for vs the summed skater goals (should match), and the
+    // total standings points (should sit near the realistic ~2,924).
+    const conservation = {
+      totalStandingsPoints: standings.reduce((s, t) => s + t.projectedPoints, 0),
+      leaguePointTarget: 2924,
+      teams: standings.map(t => ({
+        teamId: t.teamId,
+        skaterGames: t.projectedSkaters.reduce((s, p) => s + p.gamesPlayed, 0),
+        skaterCount: t.projectedSkaters.length,
+        teamGoalsFor: teamGoalsFor(t.projectedPoints),
+        summedSkaterGoals: t.projectedSkaters.reduce((s, p) => s + p.projectedGoals, 0),
+      })),
+    };
+
     return NextResponse.json({
       seed,
       homeTeam:    homeResult,
@@ -1135,6 +1200,7 @@ export async function POST(req: NextRequest) {
       playoffBracket,
       playoffTeams: standings.filter(t => t.madePlayoffs).map(t => t.teamId),
       tradedPlayerOutcomes,
+      conservation,
       // CX7c — the season actually being played, not the configured one.
       // Year 3 of a Cup Run used to come back labelled the same season as
       // Year 1, and the recap prompt then asked for a recap of that season
