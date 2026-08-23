@@ -101,35 +101,44 @@ const edgeLuckColor = (delta: number | null | undefined): string =>
 
 const EDGE_LUCK_TITLE = "NHL EDGE high-danger finishing vs league average. Negative means unlucky finishing; positive means hot finishing.";
 
-// ── Mini helix SVG ────────────────────────────────────────────
-// The directory's mini-STRAND. `offV`/`defV` are the mean of the off / def rail
-// percentiles (0–1) — the SAME percentiles the dossier draws, against the same
-// same-position ≥20 GP cohort — so a player's mini-shape here and his full STRAND
-// on the dossier read off one derivation. Null while the cohort is still thin
-// (early season) or a player is unrated; the wave then rests flat.
+// ── Mini STRAND — paired OFF/DEF dots on a shared 0–100 track ──
+// Replaces the old twin-sine "wave", which mapped a percentile to a wobble
+// amplitude nobody could read a value off. `offV`/`defV` are the mean of the
+// off / def rail percentiles (0–1) — the SAME percentiles the dossier draws,
+// against the same same-position ≥20 GP cohort — so the row and the dossier read
+// off one derivation. Two stacked tracks share the 0–100 x-scale, so OFF (blue)
+// and DEF (red) are directly comparable and never collide. A dot is drawn only
+// when its value is measured; a missing rail leaves the track empty (no faked
+// midpoint).
 function MiniHelix({ offV, defV }: {
   offV: number | null; defV: number | null;
 }) {
-  const W = 80; const H = 28; const cy = H / 2;
-  const off = offV ?? 0.5;
-  const def = defV ?? 0.5;
-  const amp  = 9;
-  const freq = (2 * Math.PI) / W;
-
-  const buildPath = (v: number, flip: boolean) => {
-    const pts = [];
-    for (let i = 0; i <= 40; i++) {
-      const x = (i / 40) * W;
-      const y = cy + (flip ? 1 : -1) * (amp * (0.3 + v * 0.7)) * Math.sin(freq * x * 2);
-      pts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`);
-    }
-    return pts.join(" ");
-  };
+  const W = 80, H = 28;
+  const x0 = 8, x1 = 72, trackW = x1 - x0;
+  const yOff = 9, yDef = 19;
+  const xAt = (v: number) => x0 + Math.max(0, Math.min(1, v)) * trackW;
+  const track = "var(--rule-light, #ddd2b8)";
+  const ring = "var(--paper-bg, #f7f1e1)";
+  const o = offV == null ? null : Math.round(offV * 100);
+  const d = defV == null ? null : Math.round(defV * 100);
+  const label = `STRAND percentile — offense ${o ?? "n/a"}, defense ${d ?? "n/a"}`;
 
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
-      <path d={buildPath(def, true)}  fill="none" stroke="var(--red)"  strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>
-      <path d={buildPath(off, false)} fill="none" stroke="var(--blue)" strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block", margin: "0 auto" }}
+      role="img" aria-label={label}>
+      <title>{`OFF ${o ?? "—"} · DEF ${d ?? "—"} (percentile vs same-position peers)`}</title>
+      {/* midpoint (50) reference */}
+      <line x1={x0 + trackW / 2} y1={4} x2={x0 + trackW / 2} y2={H - 4}
+        stroke={track} strokeWidth={1} opacity={0.7} />
+      {/* two shared-scale tracks */}
+      <line x1={x0} y1={yOff} x2={x1} y2={yOff} stroke={track} strokeWidth={1.5} strokeLinecap="round" />
+      <line x1={x0} y1={yDef} x2={x1} y2={yDef} stroke={track} strokeWidth={1.5} strokeLinecap="round" />
+      {offV != null && (
+        <circle cx={xAt(offV)} cy={yOff} r={3.6} fill="var(--blue)" stroke={ring} strokeWidth={1.6} />
+      )}
+      {defV != null && (
+        <circle cx={xAt(defV)} cy={yDef} r={3.6} fill="var(--red)" stroke={ring} strokeWidth={1.6} />
+      )}
     </svg>
   );
 }
@@ -886,6 +895,17 @@ function SectionColumnHeader({ section, sortKey, sortDir, onSort }: {
       <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Player</div>
       <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "center" }}>
         {section === "G" ? "Role" : "Strand"}
+        {section !== "G" && (
+          <div style={{ display: "flex", gap: "7px", justifyContent: "center", marginTop: "2px", fontSize: "8px", fontWeight: 700 }}
+            title="Offensive and defensive percentile vs same-position peers (0–100)">
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--blue)", display: "inline-block" }} />OFF
+            </span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--red)", display: "inline-block" }} />DEF
+            </span>
+          </div>
+        )}
       </div>
       {PLAYER_COLUMNS[section].map(({ key, label }) => (
         <SortHeader

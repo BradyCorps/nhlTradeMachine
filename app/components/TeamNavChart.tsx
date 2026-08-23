@@ -72,10 +72,29 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
+/** Narrow viewport → default to a top-10 view that fits without a 620px
+ *  horizontal scroll. Starts false so the server and first client render agree
+ *  (no hydration mismatch); flips after mount if the screen is small. */
+function useIsMobile(): boolean {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const update = () => setMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return mobile;
+}
+
 export default function TeamNavChart({ data }: Props) {
   const [dim, setDim] = useState<Dim>("xnav");
   const [hoveredAbbrev, setHoveredAbbrev] = useState<string | null>(null);
+  // null = auto (all on desktop, top-10 on mobile); a boolean is the reader's
+  // explicit override of that default.
+  const [showAllOverride, setShowAllOverride] = useState<boolean | null>(null);
   const reduceMotion = usePrefersReducedMotion();
+  const isMobile = useIsMobile();
 
   const active = DIMS.find(d => d.key === dim) ?? DIMS[0];
 
@@ -90,10 +109,18 @@ export default function TeamNavChart({ data }: Props) {
 
   if (ranked.length === 0) return null;
 
-  const n = ranked.length;
+  const TOP_N = 10;
+  const canCollapse = ranked.length > TOP_N;
+  const showAll = showAllOverride ?? !isMobile;
+  // The plotted subset. Full-league facts (median, the screen-reader table)
+  // always come from `ranked`, so a collapsed view never misreports the league.
+  const visible = showAll || !canCollapse ? ranked : ranked.slice(0, TOP_N);
+
+  const n = visible.length;
   const margin = { top: 24, right: 12, bottom: 30, left: 12 };
-  // Wide enough that 32 three-letter labels stay legible; scrolls on mobile.
-  const chartW = Math.max(720, n * 28);
+  // All 32 need width (three-letter labels legible; scrolls on mobile); the
+  // top-10 view is sized to fit a phone with no scroll.
+  const chartW = showAll ? Math.max(720, n * 28) : Math.max(320, n * 34);
   const chartH = 360;
   const plotW = chartW - margin.left - margin.right;
   const plotH = chartH - margin.top - margin.bottom;
@@ -108,8 +135,9 @@ export default function TeamNavChart({ data }: Props) {
   const maxValue = Math.max(1, ...ranked.map(d => d.value));
   const yScale = scaleLinear().domain([0, maxValue * 1.08]).range([0, plotH]);
 
-  // Median of the active dimension (values are already sorted).
-  const median = ranked[Math.floor(n / 2)]?.value ?? 0;
+  // Median of the active dimension across the WHOLE league (values sorted), so
+  // the reference line means the same thing in the top-10 and full views.
+  const median = ranked[Math.floor(ranked.length / 2)]?.value ?? 0;
   const medianY = baseline - yScale(median);
 
   // A 2px floor so a zero-value bar is still a visible tick, expressed as the
@@ -119,7 +147,7 @@ export default function TeamNavChart({ data }: Props) {
   const xFor = (rank: number) => margin.left + rank * bandW;
 
   const trans = reduceMotion ? undefined : "transform 620ms cubic-bezier(0.4, 0, 0.2, 1)";
-  const rankByAbbrev = new Map(ranked.map((d, i) => [d.abbrev, i]));
+  const rankByAbbrev = new Map(visible.map((d, i) => [d.abbrev, i]));
 
   return (
     <div className="border mb-5" style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-card)" }}>
@@ -156,9 +184,19 @@ export default function TeamNavChart({ data }: Props) {
         </div>
       </div>
 
-      <div className="px-3 pt-2 font-mono text-[8px] sm:text-[9px] uppercase tracking-[0.12em]"
+      <div className="px-3 pt-2 flex items-center justify-between gap-2 font-mono text-[8px] sm:text-[9px] uppercase tracking-[0.12em]"
         style={{ color: "var(--ledger-ink-faint)" }}>
-        {active.blurb} · {n} teams
+        <span>{active.blurb} · {showAll ? `${ranked.length} teams` : `top ${TOP_N} of ${ranked.length}`}</span>
+        {canCollapse && (
+          <button
+            onClick={() => setShowAllOverride(!showAll)}
+            aria-expanded={showAll}
+            className="font-mono text-[8px] sm:text-[9px] font-black uppercase tracking-[0.12em] underline cursor-pointer"
+            style={{ color: "var(--ledger-ink-faint)", background: "none", border: "none" }}
+          >
+            {showAll ? `Show top ${TOP_N}` : `Show all ${ranked.length}`}
+          </button>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -167,7 +205,7 @@ export default function TeamNavChart({ data }: Props) {
           className="w-full"
           style={{ maxWidth: chartW, minWidth: Math.min(chartW, 620) }}
           role="img"
-          aria-label={`Column chart ranking ${n} NHL teams by ${active.label} (${active.blurb}). Top: ${ranked[0]?.name} at ${Math.round(ranked[0]?.value ?? 0)}`}
+          aria-label={`Column chart ranking ${showAll ? `all ${ranked.length}` : `the top ${n} of ${ranked.length}`} NHL teams by ${active.label} (${active.blurb}). Top: ${ranked[0]?.name} at ${Math.round(ranked[0]?.value ?? 0)}. Full ranking follows in a table.`}
         >
           {/* Baseline */}
           <line x1={margin.left} y1={baseline} x2={chartW - margin.right} y2={baseline}
@@ -184,7 +222,7 @@ export default function TeamNavChart({ data }: Props) {
             </text>
           </g>
 
-          {ranked.map((d) => {
+          {visible.map((d) => {
             const rank = rankByAbbrev.get(d.abbrev) ?? 0;
             const fill = PHASE_COLORS[d.phase] || "var(--ledger-ink)";
             const isHovered = hoveredAbbrev === d.abbrev;
@@ -247,7 +285,7 @@ export default function TeamNavChart({ data }: Props) {
 
           {/* Hovered team tooltip — name + phase + active value + GD */}
           {hoveredAbbrev !== null && (() => {
-            const d = ranked.find(r => r.abbrev === hoveredAbbrev);
+            const d = visible.find(r => r.abbrev === hoveredAbbrev);
             if (!d) return null;
             const rank = rankByAbbrev.get(d.abbrev) ?? 0;
             const cx = xFor(rank) + bandW / 2;
@@ -285,7 +323,7 @@ export default function TeamNavChart({ data }: Props) {
           leader in its label, so a non-visual reader gets the full ordered
           table here (kept off-screen, updates with the active dimension). */}
       <table style={SR_ONLY}>
-        <caption>{`League ${active.label} rankings — ${active.blurb}, ${n} teams`}</caption>
+        <caption>{`League ${active.label} rankings — ${active.blurb}, ${ranked.length} teams`}</caption>
         <thead>
           <tr>
             <th scope="col">Rank</th>

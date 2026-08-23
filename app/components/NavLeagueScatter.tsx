@@ -40,6 +40,48 @@ const margin = { top: 24, right: 16, bottom: 36, left: 44 };
 const W = 400;
 const H = 280;
 
+// ── Hexbin density (self-contained; no d3-hexbin dependency) ────
+// With ~250 peers the cloud overplots near the median and a reader can't tell a
+// crowded region from a sparse one. A faint single-hue hex wash UNDER the dots
+// carries that density (sequential: darker = more players in the cell) without
+// competing with the categorical dots on top. Standard pointy-top hex binning,
+// ported from d3-hexbin's core so the tessellation is exact.
+const HEX_R = 16;
+const HEX_PATH = (() => {
+  const a = Math.PI / 3;
+  return Array.from({ length: 6 }, (_, i) => {
+    const ang = i * a;
+    return `${i === 0 ? "M" : "L"}${(Math.sin(ang) * HEX_R).toFixed(2)},${(-Math.cos(ang) * HEX_R).toFixed(2)}`;
+  }).join("") + "Z";
+})();
+
+interface HexCell { x: number; y: number; count: number }
+function hexbinCells(pts: { x: number; y: number }[], radius: number): HexCell[] {
+  const dx = radius * 2 * Math.sin(Math.PI / 3);
+  const dy = radius * 1.5;
+  const map = new Map<string, HexCell>();
+  for (const { x, y } of pts) {
+    const py = y / dy;
+    let pj = Math.round(py);
+    let pi = Math.round(x / dx - (pj & 1 ? 0.5 : 0));
+    const py1 = py - pj;
+    if (Math.abs(py1) * 3 > 1) {
+      const px = x / dx - (pj & 1 ? 0.5 : 0);
+      const px1 = px - pi;
+      const pi2 = pi + (px < pi ? -1 : 1) / 2;
+      const pj2 = pj + (py < pj ? -1 : 1);
+      const px2 = px - pi2;
+      const py2 = py - pj2;
+      if (px1 * px1 + py1 * py1 > px2 * px2 + py2 * py2) { pi = pi2 + (pj & 1 ? 1 : -1) / 2; pj = pj2; }
+    }
+    const key = `${pi}-${pj}`;
+    const cell = map.get(key);
+    if (cell) cell.count += 1;
+    else map.set(key, { x: (pi + (pj & 1 ? 0.5 : 0)) * dx, y: pj * dy, count: 1 });
+  }
+  return [...map.values()];
+}
+
 interface BrushRect {
   x0: number; y0: number;
   x1: number; y1: number;
@@ -155,6 +197,15 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName, coh
     }).sort((a, b) => b.nav - a.nav);
   }, [activeBrush, all, xScale, yScale]);
 
+  // Density hexbins for the whole cloud, in plot-pixel space. Cells with a
+  // single player are dropped so the wash marks genuine crowding, not scatter.
+  const hexBins = useMemo(() => {
+    const cells = hexbinCells(all.map(p => ({ x: xScale(p.off), y: yScale(p.def) })), HEX_R)
+      .filter(c => c.count >= 2);
+    const maxCount = cells.reduce((m, c) => Math.max(m, c.count), 1);
+    return { cells, maxCount };
+  }, [all, xScale, yScale]);
+
   // Too few peers to place a meaningful league cloud. Guarded AFTER every hook
   // so hook order stays constant across renders (rules-of-hooks).
   if (all.length < 5) return null;
@@ -206,7 +257,7 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName, coh
         className="w-full"
         style={{ maxWidth: W, cursor: brushing ? "crosshair" : "default" }}
         role="img"
-        aria-label={`Scatter plot of offensive value (horizontal) vs defensive value (vertical) for ${playerName} and ${peers.length} same-position peers, split into four quadrants at the league median. ${playerName} sits in the ${playerQuadrant} quadrant.`}
+        aria-label={`Scatter plot of offensive value (horizontal) vs defensive value (vertical) for ${playerName} and ${peers.length} same-position peers, split into four quadrants at the league median, with denser regions of the league shaded. ${playerName} sits in the ${playerQuadrant} quadrant.`}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
@@ -219,7 +270,26 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName, coh
           setHoveredId(null);
         }}
       >
+        <defs>
+          <clipPath id="scatter-plot-clip">
+            <rect x={0} y={0} width={innerW} height={innerH} />
+          </clipPath>
+        </defs>
         <g transform={`translate(${margin.left},${margin.top})`}>
+          {/* Density wash — darker where more of the league sits (under the dots) */}
+          <g clipPath="url(#scatter-plot-clip)">
+            {hexBins.cells.map((c, i) => (
+              <path
+                key={`hex-${i}`}
+                d={HEX_PATH}
+                transform={`translate(${c.x.toFixed(2)},${c.y.toFixed(2)})`}
+                fill="var(--ledger-ink)"
+                opacity={0.04 + ((c.count - 1) / Math.max(1, hexBins.maxCount - 1)) * 0.14}
+                stroke="none"
+              />
+            ))}
+          </g>
+
           {/* Quadrant lines at median */}
           <line
             x1={xScale(medOff)} y1={0}
