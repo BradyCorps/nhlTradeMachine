@@ -769,7 +769,9 @@ describe("Canary — trade UI negative NAV", () => {
     // Expandable per-player row with scouting detail
     expect(quick).toContain("function AssetRow");
     expect(quick).toContain("<MeasuredProfile asset={asset} />");
-    expect(quick).toContain("buildAssetTraits(asset, nav)");
+    // STRAND now ranks against the live league cohort (one derivation with the
+    // dossier), not the old min-max index off the asset alone.
+    expect(quick).toContain("buildAssetTraits(asset, cohortFor(asset))");
     expect(quick).toContain("<StrandDisplay");
     // Scannable collapsed stat chip (skater pts pace / goalie SV% + GSAx)
     expect(quick).toContain("pts/82");
@@ -805,6 +807,9 @@ describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 go
   const players = read("app/components/PlayerStrandPanel.tsx");
   const quick = read("app/components/QuickTradeMachine.tsx");
   const docket = read("app/docket/DocketClient.tsx");
+  // The single derivation every STRAND surface now reads: labels, units,
+  // direction and the "unavailable, never a faked 50th" rule live here.
+  const metrics = read("app/lib/strand-metrics.ts");
 
   it("renderer puts labels on fixed rails with one 0–100 index + faint raw, and an EDGE footer slot", () => {
     // Trait carries a 0–100 index + a raw sub-line. The shape lives in
@@ -829,24 +834,22 @@ describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 go
   });
 
   it("goalies use a shared 3×3 model with HDSV actually populated (no hardcoded greyed dash)", () => {
-    expect(view).toContain("export function buildGoalieStrandTraits");
-    // Six nodes, three per rail. The goals-against node is "GA/GM" rather than
-    // "GAA": it is goals per appearance, and calling it GAA claimed a per-60
-    // figure the data cannot support. The count and the rails are the
-    // guarantee; the label is free to be corrected.
+    // The 3×3 goalie rails now live in the one shared derivation, not a
+    // trade-machine-only builder.
+    expect(metrics).toContain('GOALIE_RAILS = { off: ["gsax", "svpct", "hdsv"], def: ["wrkld", "busy", "gaa"] }');
     for (const label of ["GSAX", "SV%", "HDSV", "WRKLD", "BUSY"]) {
-      expect(view).toContain(`label: "${label}"`);
+      expect(metrics).toContain(`label: "${label}"`);
     }
-    expect(view).toMatch(/label: "GAA"/);
+    expect(metrics).toMatch(/label: "GAA"/);
     // HDSV comes from the real EDGE field, greying out only when truly absent
-    expect(view).toContain("baselineHdsvPct");
-    // The goals-against index is inverted so a stingy goalie reads high
-    expect(view).toMatch(/label: "GAA"[\s\S]{0,200}invert: true/);
-    // The players page builds STRAND through the shared percentile model, which
-    // carries the 3×3 goalie rails (HDSV populated from the real EDGE field), and
-    // never hardcodes a greyed dash.
+    expect(metrics).toContain("baselineHdsvPct");
+    // The goals-against rail is inverted so a stingy goalie reads high
+    expect(metrics).toMatch(/label: "GAA"[\s\S]{0,200}invert: true/);
+    // Both the players page and the trade machine build STRAND through the shared
+    // percentile model, which carries the 3×3 goalie rails, and never hardcodes a
+    // greyed dash.
     expect(players).toContain("buildStrandPercentiles(player");
-    expect(read("app/lib/strand-metrics.ts")).toContain("baselineHdsvPct");
+    expect(view).toContain("buildStrandPercentiles(");
     expect(players).not.toContain('val: 0.5, unavailable: true');
   });
 
@@ -873,12 +876,13 @@ describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 go
     expect(display).toContain("maxWidth");
     expect(players).toContain("maxWidth={460}");
     // Ice time reads as minutes, not metres; QoC replaces the vague "Usage";
-    // suppression is shown positive (higher = stingier)
-    expect(view).toMatch(/label: "TOI"[\s\S]{0,300}min\/gm/);
-    expect(view).toContain('label: "QoC"');
-    expect(view).not.toContain('label: "Usage"');
-    expect(view).not.toContain('label: "TOI+"');
-    expect(view).toContain("(higher = stingier)");
+    // suppression is shown positive (higher = stingier). Units and labels live
+    // in the shared derivation now.
+    expect(metrics).toMatch(/label: "TOI"[\s\S]{0,300}min\/gm/);
+    expect(metrics).toContain('label: "QoC"');
+    expect(metrics).not.toContain('label: "Usage"');
+    expect(metrics).not.toContain('label: "TOI+"');
+    expect(metrics).toContain("(higher = stingier)");
   });
 
   it("EDGE OZ-time percentile is normalized from the feed's 0–1 fraction", () => {
@@ -2798,16 +2802,23 @@ describe("Canary — every value breakdown reconciles to its headline", () => {
 // different scale under the same label. 50 is the worst possible lie: it reads
 // as "average", a finding, rather than "we do not know".
 describe("Canary — a STRAND node never invents a reading", () => {
-  const view = readSource("app/components/StrandView.tsx");
+  // The one derivation every STRAND surface reads. The "unavailable, never a
+  // faked 50th" guarantee moved here from the old per-surface min-max builders.
+  const metrics = readSource("app/lib/strand-metrics.ts");
   const lib = readSource("app/lib/strand-traits.ts");
 
-  it("routes every node through the builder that can say 'unavailable'", () => {
+  it("routes every rail through the builder that can say 'unavailable'", () => {
+    // The absence-aware helpers still exist for the roster-average path.
     expect(lib).toContain("export function node");
     expect(lib).toContain("unavailable: true");
-    // Both trait builders, skater and goalie.
-    expect(view).toContain("export function buildAssetTraits");
-    expect(view).toContain("export function buildGoalieStrandTraits");
-    expect(view.match(/node\(\{/g)?.length ?? 0).toBeGreaterThanOrEqual(14);
+    // A missing input yields a null percentile → an unavailable rail, never a
+    // number. metricPercentile returns null; buildRail turns that into the rail.
+    expect(metrics).toContain("export function metricPercentile");
+    expect(metrics).toContain("return null");
+    expect(metrics).toContain("unavailable: true");
+    // Every registry entry is a real metric with its own absent string; 15 of
+    // them across the skater and goalie rails.
+    expect((metrics.match(/absent:\s*"[^"]+"/g) ?? []).length).toBeGreaterThanOrEqual(14);
   });
 
   it("carries none of the specific defaults that manufactured a reading", () => {
@@ -2819,20 +2830,22 @@ describe("Canary — a STRAND node never invents a reading", () => {
       /spg\s*\?\?\s*30/,
       /norm\(nav\.def/,                 // DPS → the NAV defensive component
     ]) {
-      expect(view, String(pattern)).not.toMatch(pattern);
+      expect(metrics, String(pattern)).not.toMatch(pattern);
     }
   });
 
   it("treats a real zero as data and absence as absence", () => {
-    // The mirror mistake would be just as wrong: a player who genuinely rates
-    // 0 on a trait must not be greyed out as unmeasured.
+    // A player who genuinely rates 0 on a trait must not be greyed out as
+    // unmeasured — both the derivation and the roster-average path guard on
+    // isFinite rather than truthiness.
+    expect(metrics).toContain("isFinite");
     expect(lib).toContain("v != null && isFinite(v)");
   });
 
   it("says which measurement is missing, not merely that one is", () => {
-    // Every node supplies an `absent` string; a bare "unavailable" tells a
-    // reader nothing about what to go and find.
-    const absents = view.match(/absent:\s*"[^"]+"/g) ?? [];
+    // Every registry entry supplies an `absent` string; a bare "unavailable"
+    // tells a reader nothing about what to go and find.
+    const absents = metrics.match(/absent:\s*"[^"]+"/g) ?? [];
     expect(absents.length).toBeGreaterThanOrEqual(14);
     for (const a of absents) expect(a.length).toBeGreaterThan("absent: \"unavailable\"".length);
   });
@@ -2859,7 +2872,8 @@ describe("Canary — a STRAND node never invents a reading", () => {
 describe("Canary — a goalie stat is the unit it claims", () => {
   const lib = readSource("app/lib/goalie-units.ts");
   const assembly = readSource("app/lib/roster-assembly.ts");
-  const view = readSource("app/components/StrandView.tsx");
+  // The GAA rail lives in the shared derivation now, not a trade-machine builder.
+  const metrics = readSource("app/lib/strand-metrics.ts");
 
   it("keeps the unit rules in a tested module", () => {
     for (const fn of ["goalsAgainstAverage", "resolveWorkload", "workloadLabel"]) {
@@ -2869,11 +2883,12 @@ describe("Canary — a goalie stat is the unit it claims", () => {
 
   it("computes goals against per sixty minutes, not per appearance", () => {
     expect(lib).toContain("SECONDS_PER_HOUR");
-    expect(view).not.toMatch(/1 - svPct\)\s*\*/);
-    expect(view).not.toMatch(/spg\s*\?\?\s*30/);
-    // The node reads a precomputed figure rather than deriving one from a rate
-    // it does not have the denominator for.
-    expect(view).toMatch(/label: "GAA"[\s\S]{0,200}per 60 minutes/);
+    expect(metrics).not.toMatch(/1 - svPct\)\s*\*/);
+    expect(metrics).not.toMatch(/spg\s*\?\?\s*30/);
+    // The rail reads a precomputed figure (p.gaa) rather than deriving one from a
+    // rate it does not have the denominator for, and labels it as per-60.
+    expect(metrics).toContain("extract: p => num(p.gaa)");
+    expect(metrics).toMatch(/label: "GAA"[\s\S]{0,200}per 60 minutes/);
   });
 
   it("uses the ice time the assembly already parsed and threw away", () => {

@@ -99,7 +99,7 @@ export const STRAND_METRIC: Record<string, StrandMetricDef> = {
   busy:  { key: "busy",  label: "BUSY",   extract: p => num(p.shotsPerGame), format: v => `${v.toFixed(1)}/gm`,
            title: (v, pct) => `Shots faced ${v.toFixed(1)}/game · ${pctText(pct)}`, absent: "Shot volume unavailable" },
   gaa:   { key: "gaa",   label: "GAA",    extract: p => num(p.gaa), invert: true, format: v => v.toFixed(2),
-           title: (v, pct) => `Goals-against average ${v.toFixed(2)} (lower = better) · ${pctText(pct)}`, absent: "Goals-against average unavailable" },
+           title: (v, pct) => `Goals-against average ${v.toFixed(2)} per 60 minutes (lower = better) · ${pctText(pct)}`, absent: "Goals-against average unavailable" },
 };
 
 const pctText = (pct: number | null): string => (pct == null ? "no cohort" : `${ordinal(pct)} pct`);

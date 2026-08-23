@@ -3,12 +3,13 @@
 import { useMemo, useState } from "react";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
 import StrandDisplay from "@/app/components/StrandDisplay";
-import { buildAssetTraits, computeStrandType } from "@/app/components/StrandView";
+import { buildAssetTraits, computeStrandType, StrandLoading } from "@/app/components/StrandView";
+import { useStrandCohort } from "@/app/lib/use-strand-cohort";
 import EdgeStrip from "@/app/components/EdgeStrip";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import type { DocketEntry, DocketReturn, DocketSortKey } from "@/app/lib/docket-view";
 import { docketReturns, filterAndSortDocketEntries } from "@/app/lib/docket-view";
-import type { Asset, XNAVResult } from "@/app/lib/trade-types";
+import type { Asset } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
 
 const fmtNav = (value: number): string => `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
@@ -23,15 +24,6 @@ const assetList = (assets: DocketReturn["assets"]): string =>
 
 const directionLabel = (direction: DocketReturn["direction"]): string =>
   direction === "received" ? "RECEIVED" : "SENT";
-
-const navFromAsset = (navAtTrade: number | null): XNAVResult => ({
-  total: navAtTrade ?? 0,
-  off: 0,
-  def: 0,
-  age: 0,
-  cap: 0,
-  upside: 0,
-});
 
 type AssetTab = "STATS" | "STRAND" | "OUTLOOK";
 
@@ -77,11 +69,11 @@ function AssetStats({ asset, detailAsset, isPick }: {
 
 function AssetDetail({ asset }: { asset: DocketEntry["packages"][number]["assets"][number] }) {
   const detailAsset = asset.currentAsset ?? asset.asset;
-  const nav = navFromAsset(asset.navToday ?? asset.navAtTrade);
   const isPick = asset.kind === "pick" || detailAsset.position === "Pick";
   const isGoalie = detailAsset.position === "G";
-  const traits = buildAssetTraits(detailAsset, nav);
-  const strandType = isGoalie
+  const { ready: strandReady, cohortFor } = useStrandCohort();
+  const traits = !isPick && strandReady ? buildAssetTraits(detailAsset, cohortFor(detailAsset)) : null;
+  const strandType = !traits ? "" : isGoalie
     ? "GOALTENDER"
     : computeStrandType(traits.off, traits.def, detailAsset.ops ?? null, detailAsset.dps ?? null);
   const hasOutlook = !isPick && !isGoalie && Boolean(detailAsset.developmentProfile);
@@ -142,17 +134,21 @@ function AssetDetail({ asset }: { asset: DocketEntry["packages"][number]["assets
       {activeTab === "STATS" && <AssetStats asset={asset} detailAsset={detailAsset} isPick={isPick} />}
 
       {activeTab === "STRAND" && !isPick && (
-        <StrandDisplay
-          offTraits={traits.off}
-          defTraits={traits.def}
-          ops={detailAsset.ops ?? null}
-          dps={detailAsset.dps ?? null}
-          strandType={strandType}
-          footer={<EdgeStrip asset={detailAsset} heading={false} />}
-          W={280}
-          H={200}
-          amplitude={42}
-        />
+        traits ? (
+          <StrandDisplay
+            offTraits={traits.off}
+            defTraits={traits.def}
+            ops={detailAsset.ops ?? null}
+            dps={detailAsset.dps ?? null}
+            strandType={strandType}
+            footer={<EdgeStrip asset={detailAsset} heading={false} />}
+            W={280}
+            H={200}
+            amplitude={42}
+          />
+        ) : (
+          <StrandLoading />
+        )
       )}
 
       {activeTab === "OUTLOOK" && hasOutlook && (

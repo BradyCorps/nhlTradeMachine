@@ -10,7 +10,8 @@ import { isGravityV3DisplayEnabled } from "@/app/lib/gravity-feature-flags";
 import { TierIcon, FieldDiagram } from "@/app/components/GravityField";
 import { displayPosition } from "@/app/lib/display-position";
 import { seasonTotal } from "@/app/lib/display-utils";
-import { buildAssetTraits, computeStrandType } from "@/app/components/StrandView";
+import { buildAssetTraits, computeStrandType, StrandLoading } from "@/app/components/StrandView";
+import { useStrandCohort } from "@/app/lib/use-strand-cohort";
 import type { XNAVResult } from "@/app/lib/trade-types";
 import { contractVerdict, verdictColor, MODEL_PRICE_SHORT } from "@/app/lib/contract-verdict";
 
@@ -404,8 +405,9 @@ function ExpandedPanel({
   gravity: GravityProfile | null;
   teamName: string;
 }) {
-  const traits = buildAssetTraits(p as any, xnav);
-  const strandType = computeStrandType(traits.off, traits.def, p.ops ?? null, p.dps ?? null);
+  const { ready: strandReady, cohortFor } = useStrandCohort();
+  const traits = strandReady ? buildAssetTraits(p as any, cohortFor(p)) : null;
+  const strandType = traits ? computeStrandType(traits.off, traits.def, p.ops ?? null, p.dps ?? null) : "";
   const tierColor = gravity?.tier ? gravityTierColor(gravity.tier) : undefined;
   const pos = displayPosition(p.position, p.secondaryPosition);
 
@@ -504,6 +506,7 @@ function ExpandedPanel({
                 {strandType}
               </div>
             </div>
+            {!traits ? <StrandLoading height={80} /> : (
             <div className="grid grid-cols-2 gap-x-3 gap-y-1">
               {[...traits.off, ...traits.def].map(t => (
                 <div key={t.label} className="flex items-center gap-2">
@@ -520,11 +523,12 @@ function ExpandedPanel({
                     />
                   </div>
                   <div className="font-mono text-[9px] font-black w-[22px] text-right" style={{ color: "var(--ledger-ink)" }}>
-                    {t.idx ?? Math.round(t.val * 100)}
+                    {t.display ?? Math.round(t.val * 100)}
                   </div>
                 </div>
               ))}
             </div>
+            )}
           </div>
 
           {/* NAV breakdown */}

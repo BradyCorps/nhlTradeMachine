@@ -23,7 +23,8 @@ import { ageDecayRate, ageSlotPenalty, SEASON } from "@/app/lib/season-config";
 import MeasuredProfile from "@/app/components/MeasuredProfile";
 import StrandDisplay from "@/app/components/StrandDisplay";
 import EdgeStrip from "@/app/components/EdgeStrip";
-import { buildAssetTraits, computeStrandType } from "@/app/components/StrandView";
+import { buildAssetTraits, computeStrandType, StrandLoading } from "@/app/components/StrandView";
+import { useStrandCohort } from "@/app/lib/use-strand-cohort";
 import { formatCapHit as fmtCap, fmtSigned } from "@/app/lib/display-utils";
 
 const ZERO_NAV: XNAVResult = { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
@@ -291,7 +292,8 @@ function AssetRow({
   const isPick = asset.position === "Pick";
   const nav = navMap[asset.id] ?? ZERO_NAV;
   const isGoalie = asset.position === "G";
-  const traits = !isPick ? buildAssetTraits(asset, nav) : null;
+  const { ready: strandReady, cohortFor } = useStrandCohort();
+  const traits = !isPick && strandReady ? buildAssetTraits(asset, cohortFor(asset)) : null;
   const strandType = !traits ? "" : isGoalie
     ? "GOALTENDER"
     : computeStrandType(traits.off, traits.def, asset.ops ?? null, asset.dps ?? null);
@@ -362,11 +364,11 @@ function AssetRow({
       {open && !isPick && (
         <div className="px-4 pb-4 grid gap-3 sm:grid-cols-2" style={{ background: "var(--paper-inset)" }}>
           <MeasuredProfile asset={asset} />
-          {traits && (
-            <div className="min-w-0">
-              <div className="text-[10px] font-black uppercase tracking-[0.16em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
-                STRAND · {strandType}
-              </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-black uppercase tracking-[0.16em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
+              STRAND{traits ? ` · ${strandType}` : ""}
+            </div>
+            {traits ? (
               <StrandDisplay
                 offTraits={traits.off}
                 defTraits={traits.def}
@@ -378,8 +380,10 @@ function AssetRow({
                 H={200}
                 amplitude={42}
               />
-            </div>
-          )}
+            ) : (
+              <StrandLoading />
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -21,6 +21,8 @@ import PercentileCard from "@/app/components/PercentileCard";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { displayPosition } from "@/app/lib/display-position";
 import { orderFreshInk, signedAav, signedRecency, signedTerm } from "@/app/lib/fresh-ink";
+import { buildStrandCohort } from "@/app/lib/strand-cohort";
+import { buildStrandPercentiles, type PlayerLike } from "@/app/lib/strand-metrics";
 
 // ── Types ─────────────────────────────────────────────────────
 interface Player {
@@ -100,15 +102,17 @@ const edgeLuckColor = (delta: number | null | undefined): string =>
 const EDGE_LUCK_TITLE = "NHL EDGE high-danger finishing vs league average. Negative means unlucky finishing; positive means hot finishing.";
 
 // ── Mini helix SVG ────────────────────────────────────────────
-function MiniHelix({ ops, dps, ptsPace, avgTOI }: {
-  ops?: number | null; dps?: number | null;
-  ptsPace: number; avgTOI: number;
+// The directory's mini-STRAND. `offV`/`defV` are the mean of the off / def rail
+// percentiles (0–1) — the SAME percentiles the dossier draws, against the same
+// same-position ≥20 GP cohort — so a player's mini-shape here and his full STRAND
+// on the dossier read off one derivation. Null while the cohort is still thin
+// (early season) or a player is unrated; the wave then rests flat.
+function MiniHelix({ offV, defV }: {
+  offV: number | null; defV: number | null;
 }) {
   const W = 80; const H = 28; const cy = H / 2;
-  const offV = ops != null && dps != null && (ops + dps) > 0
-    ? ops / (ops + dps)
-    : Math.min(1, ptsPace / 100);
-  const defV = 1 - offV;
+  const off = offV ?? 0.5;
+  const def = defV ?? 0.5;
   const amp  = 9;
   const freq = (2 * Math.PI) / W;
 
@@ -124,8 +128,8 @@ function MiniHelix({ ops, dps, ptsPace, avgTOI }: {
 
   return (
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
-      <path d={buildPath(defV, true)}  fill="none" stroke="var(--red)"  strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>
-      <path d={buildPath(offV, false)} fill="none" stroke="var(--blue)" strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>
+      <path d={buildPath(def, true)}  fill="none" stroke="var(--red)"  strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>
+      <path d={buildPath(off, false)} fill="none" stroke="var(--blue)" strokeWidth="1.5" strokeLinecap="round" opacity="0.8"/>
     </svg>
   );
 }
@@ -685,6 +689,18 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
   const secondary = columns[1] ?? columns[0];
   const tertiary = columns[2];
 
+  // Mini-STRAND strengths — the mean of the off / def rail percentiles against
+  // the same same-position ≥20 GP cohort the dossier ranks against, so the row
+  // shape and the dossier STRAND read one derivation. Skaters only.
+  const strandVals = useMemo(() => {
+    if (isG) return null;
+    const cohort = buildStrandCohort(allPlayers as unknown as Record<string, unknown>[], player);
+    if (cohort.length < 10) return null;
+    const s = buildStrandPercentiles(player as unknown as PlayerLike, cohort, false);
+    const mean = (rs: { val: number }[]) => rs.length ? rs.reduce((a, r) => a + r.val, 0) / rs.length : 0.5;
+    return { offV: mean(s.off), defV: mean(s.def) };
+  }, [player, allPlayers, isG]);
+
   // Abbreviated team name for mobile (use teamId which is already short)
   const teamAbbr = player.teamId;
 
@@ -733,7 +749,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
 
         <div className="players-hide-mobile">
           {!isG
-            ? <MiniHelix ops={player.ops} dps={player.dps} ptsPace={player.ptsPace} avgTOI={player.avgTOI}/>
+            ? <MiniHelix offV={strandVals?.offV ?? null} defV={strandVals?.defV ?? null}/>
             : <div style={{ fontSize: "11px", color: "var(--ink-faint)", textAlign: "center" }}>
                 {goalieTeir(player.gamesStarted ?? 0)}
               </div>

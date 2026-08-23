@@ -14,6 +14,7 @@ import { gravityForDisplay } from "@/app/lib/gravity-channels";
 import { loadGravityProfileV4 } from "@/app/lib/gravity-v4/load-profile";
 import { GRAVITY_V4_RUNTIME_ARTIFACT } from "@/app/lib/gravity-v4/runtime-artifact";
 import { SEASON } from "@/app/lib/season-config";
+import { buildStrandCohort, posGroupOf, STRAND_COHORT_NOUN } from "@/app/lib/strand-cohort";
 import { TEAMS_DB } from "@/app/lib/db";
 import GravityField from "@/app/components/GravityField";
 import GravityFieldV4 from "@/app/components/GravityFieldV4";
@@ -42,9 +43,9 @@ async function loadPlayer(playerId: string) {
 // PA5 — same-position peers for the STRAND compare dropdown. Only the fields
 // the trait build reads are shipped, so the client can overlay a comparison
 // without a second request. Built from the roster PlayerPage already loaded.
-function posGroupOf(pos: string): "F" | "D" | "G" {
-  return pos === "G" ? "G" : pos === "D" ? "D" : "F";
-}
+// posGroupOf / buildStrandCohort / STRAND_COHORT_NOUN come from the shared
+// strand-cohort module so the dossier and the trade machine rank against the
+// identical field.
 function buildComparePeers(allPlayers: any[], player: any) {
   const group = posGroupOf(player.position);
   return allPlayers
@@ -60,26 +61,6 @@ function buildComparePeers(allPlayers: any[], player: any) {
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
-
-// The percentile cohort for the STRAND rails — same position group, ≥20 GP,
-// INCLUDING this player, exactly the filter the percentile card uses, so the two
-// surfaces rank against the identical field and can never disagree. Slim to the
-// metric fields the rails read.
-function buildStrandCohort(allPlayers: any[], player: any) {
-  const group = posGroupOf(player.position);
-  return allPlayers
-    .filter(p => p.position !== "Pick" && posGroupOf(p.position) === group && (p.games ?? 0) >= 20)
-    .map(p => ({
-      ops: p.ops ?? null, dps: p.dps ?? null, ptsPace: p.ptsPace ?? null,
-      xGPace: p.xGPace ?? null, xgRelTM: p.xgRelTM ?? null, avgTOI: p.avgTOI ?? null,
-      xgaRelTM: p.xgaRelTM ?? null, qocIndex: p.qocIndex ?? null, dzPct: p.dzPct ?? null,
-      gsax: p.gsax ?? null, savePct: p.savePct ?? null, baselineHdsvPct: p.baselineHdsvPct ?? null,
-      gamesStarted: p.gamesStarted ?? null, gamesPlayed: p.gamesPlayed ?? null, games: p.games ?? null,
-      shotsPerGame: p.shotsPerGame ?? null, gaa: p.gaa ?? null,
-    }));
-}
-
-const STRAND_COHORT_NOUN = { F: "forwards", D: "defensemen", G: "goalies" } as const;
 
 export async function generateMetadata(
   { params }: { params: Promise<{ playerId: string }> },
