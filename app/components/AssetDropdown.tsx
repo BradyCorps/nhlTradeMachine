@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import type { Asset, Team } from "@/app/lib/trade-types";
 import { useTradeStore } from "@/app/store/tradeStore";
-import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
+import { useDialog } from "@/app/lib/use-dialog";
 import { displayPosition } from "@/app/lib/display-position";
 import { navColor } from "@/app/lib/display-utils";
 
@@ -84,16 +84,12 @@ function AssetDropdown({
   const [open,   setOpen]   = useState(false);
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
-  useBodyScrollLock(open);
+  // One shared overlay contract (role=dialog, aria-modal, focus trap + restore,
+  // Escape, body-scroll lock) instead of the hand-rolled Escape/scroll-lock this
+  // component used to carry — the only app overlay that wasn't on useDialog.
+  const dialog = useDialog({ open, onClose: () => setOpen(false), label: "Select trade asset" });
 
   const label = idx === 0 ? "+ Add Outgoing Asset" : "+ Request Incoming Asset";
-
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("keydown", h);
-    return () => document.removeEventListener("keydown", h);
-  }, [open]);
 
   useEffect(() => {
     if (!open) setSearch("");
@@ -154,6 +150,7 @@ function AssetDropdown({
           onClick={() => setOpen(false)}
         >
           <div
+            {...dialog}
             className="relative flex flex-col font-mono"
             style={{
               background:  "var(--ledger-warm)",

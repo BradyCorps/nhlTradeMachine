@@ -1800,6 +1800,9 @@ describe("Canary — UX and UI polish", () => {
     }
     expect(armchair).not.toContain("useBodyScrollLock(verdictOpen");
     expect(armchair).not.toContain("useBodyScrollLock(verdictOpen ||");
+    // Same guarantee as the OVERLAYS loop above: lock body scroll via the raw
+    // hook OR via useDialog (which owns the lock since CXH8). AssetDropdown was
+    // migrated to useDialog, so it locks scroll through the shared contract now.
     for (const path of [
       "app/components/TradeProposal.tsx",
       "app/components/LedgerDropdown.tsx",
@@ -1808,7 +1811,9 @@ describe("Canary — UX and UI polish", () => {
       "app/components/TradeHistoryBar.tsx",
       "app/armchair-gm/page.tsx",
     ]) {
-      expect(read(path)).toContain("useBodyScrollLock");
+      const src = read(path);
+      expect(src.includes("useBodyScrollLock") || src.includes("useDialog"),
+        `${path} must lock body scroll`).toBe(true);
     }
   });
 

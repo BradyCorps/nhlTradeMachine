@@ -80,7 +80,8 @@ export function TeamSelectModal({
             <div className="text-[11px] font-black uppercase tracking-[0.3em] text-ledger-ink-faint font-mono">
               Select Your Franchise
             </div>
-            <button onClick={onClose} className="text-[10px] uppercase font-bold text-ledger-ink-faint hover:text-ledger-ink transition-colors">
+            <button onClick={onClose} aria-label="Close franchise picker"
+              className="text-[10px] uppercase font-bold text-ledger-ink-faint hover:text-ledger-ink transition-colors inline-flex items-center px-3 py-2 min-h-[44px] -mr-2">
               Close ✕
             </button>
           </div>
@@ -114,6 +115,11 @@ export function TeamSelectModal({
                     }}
                     className="p-2 text-left transition-all disabled:cursor-wait"
                     aria-pressed={isSelected}
+                    // The crest is aria-hidden and the only other text was the
+                    // stage ("Bubble"), so assistive tech heard 32 buttons named
+                    // only by stage. Name each one by its club, and show the
+                    // abbreviation so sighted users aren't guessing 32 logos.
+                    aria-label={`Select ${t.name} — ${phase}`}
                     style={{
                       background: 'var(--ledger-card)',
                       border: isSelected ? '2px solid var(--ledger-red)' : '1px solid var(--ledger-rule-mid)',
@@ -121,8 +127,12 @@ export function TeamSelectModal({
                       opacity: selectingTeamId && !isSelecting ? 0.45 : 1,
                     }}
                   >
-                    <div className="flex flex-col items-center justify-center gap-1.5 py-1">
+                    <div className="flex flex-col items-center justify-center gap-1 py-1">
                       <TeamMark id={t.id} size={32} />
+                      <div className="text-[10px] font-black uppercase tracking-wider text-center leading-none"
+                        style={{ color: 'var(--ledger-ink)' }}>
+                        {t.id}
+                      </div>
                       <div className="text-[9px] font-black uppercase tracking-widest text-center leading-tight" style={{
                         color: phaseColor,
                         lineHeight: 1.1
