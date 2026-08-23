@@ -43,6 +43,9 @@ export default function ResignPhase({
   const [marketSort, setMarketSort] = useState<"ask" | "nav" | "age">("ask");
   const [marketPage, setMarketPage] = useState(1);
   const [expandedFaId, setExpandedFaId] = useState<string | null>(null);
+  // Advancing with unresolved free agents used to walk them silently (audit
+  // P0-3). Gate the advance behind an explicit confirmation + summary instead.
+  const [confirmWalk, setConfirmWalk] = useState(false);
 
   const sortedMarket = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -507,7 +510,7 @@ export default function ResignPhase({
           <p className="text-[10px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
             Other teams have resolved their own free agents.
           </p>
-          <button onClick={onDone}
+          <button onClick={() => (pending.length > 0 ? setConfirmWalk(true) : onDone())}
             className="tap-target text-[11px] font-black uppercase tracking-[0.18em] px-5 py-2 font-mono shrink-0"
             style={{ background: "var(--ledger-ink)", color: "var(--ledger-card-light)", borderRadius: "2px" }}>
             {offseasonCta("RESIGN")}
@@ -515,6 +518,63 @@ export default function ResignPhase({
         </div>
       </div>
     </div>
+
+    {/* Unresolved-FA confirmation (audit P0-3) — advancing walks them, so name
+        who leaves and what it means before it happens, rather than silently. */}
+    {confirmWalk && (
+      <div className="fixed inset-0 z-[140] flex items-center justify-center p-3 sm:p-6"
+        style={{ background: "rgba(28,20,10,0.92)", backdropFilter: "blur(5px)" }}
+        onClick={() => setConfirmWalk(false)}>
+        <div className="relative w-full max-w-md flex flex-col"
+          role="dialog" aria-modal="true" aria-labelledby="confirm-walk-title"
+          style={{ background: "var(--ledger-card-light)", borderRadius: "2px", maxHeight: "88vh", boxShadow: "0 24px 70px rgba(0,0,0,0.6)" }}
+          onClick={(e) => e.stopPropagation()}>
+          <div className="shrink-0" style={{ borderTop: "4px double #1c140a", borderBottom: "1px solid #b8a070", padding: "16px 20px 12px" }}>
+            <div className="text-[10px] uppercase tracking-[0.4em] font-mono mb-1" style={{ color: "var(--ledger-red)" }}>
+              Unresolved Free Agents
+            </div>
+            <h2 id="confirm-walk-title" className="font-black text-[1.15rem] leading-tight" style={{ color: "var(--ledger-ink)" }}>
+              Let {pending.length} player{pending.length === 1 ? "" : "s"} walk?
+            </h2>
+            <p className="mt-2 text-[11px] font-mono leading-relaxed" style={{ color: "var(--ledger-ink-body, var(--ledger-ink))" }}>
+              These free agents are still unresolved. Advancing sends them to the open market — you won&rsquo;t re-sign them
+              {rfaCount > 0 ? `, and ${rfaCount} restricted free agent${rfaCount === 1 ? "" : "s"} surrender${rfaCount === 1 ? "s" : ""} their rights` : ""}.
+            </p>
+          </div>
+          <div className="overflow-y-auto px-4 py-3" style={{ flex: 1, minHeight: 0 }}>
+            <ul className="flex flex-col" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {orderedPending.map((fa) => (
+                <li key={fa.player.id} className="flex items-center justify-between gap-3 px-1 py-1.5"
+                  style={{ borderBottom: "1px solid var(--ledger-rule-light, #d8c9a4)" }}>
+                  <span className="min-w-0 text-[12px] font-mono truncate" style={{ color: "var(--ledger-ink)" }}>
+                    <span className="font-black">{fa.player.name}</span>
+                    <span className="ml-2 text-[10px]" style={{ color: "var(--ledger-ink-faint)" }}>
+                      {displayPosition(fa.player.position, fa.player.secondaryPosition)} · age {fa.player.age}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-[10px] font-black uppercase tracking-wider font-mono"
+                    style={{ color: fa.contract.status === "RFA" ? "var(--ledger-red)" : "var(--ledger-ink-faint)" }}>
+                    {fa.contract.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="shrink-0 px-4 py-3 flex items-center justify-end gap-2" style={{ borderTop: "1px solid #b8a070" }}>
+            <button onClick={() => setConfirmWalk(false)}
+              className="tap-target text-[11px] font-black uppercase tracking-[0.15em] px-4 py-2 font-mono"
+              style={{ background: "transparent", border: "1px solid var(--ledger-rule)", color: "var(--ledger-ink)", borderRadius: "2px" }}>
+              Go back
+            </button>
+            <button onClick={() => { setConfirmWalk(false); onDone(); }}
+              className="tap-target text-[11px] font-black uppercase tracking-[0.15em] px-4 py-2 font-mono"
+              style={{ background: "var(--ledger-red)", color: "#fff", borderRadius: "2px" }}>
+              Let them walk
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Player detail — STRAND + development + last-season stats */}
     {detail && (
