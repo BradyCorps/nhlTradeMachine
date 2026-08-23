@@ -85,7 +85,7 @@ export const STRAND_METRIC: Record<string, StrandMetricDef> = {
            title: (v, pct) => `Chance suppression vs teammates ${sign(v)}${v.toFixed(2)} (higher = stingier) · ${pctText(pct)}`, absent: "Chance suppression relative to teammates unavailable" },
   qoc:   { key: "qoc",   label: "QoC",    extract: p => num(p.qocIndex), format: v => v.toFixed(0),
            title: (v, pct) => `Quality of competition ${Math.round(v)}/100 · ${pctText(pct)}`, absent: "Quality of competition unavailable" },
-  oz:    { key: "oz",    label: "OZ%",    extract: p => { const d = num(p.dzPct); return d == null ? null : (1 - d) * 100; }, format: v => `${v.toFixed(0)}% OZ`,
+  oz:    { key: "oz",    label: "OZ Starts", extract: p => { const d = num(p.dzPct); return d == null ? null : (1 - d) * 100; }, format: v => `${v.toFixed(0)}% OZ`,
            title: (v, pct) => `Offensive-zone starts ${v.toFixed(0)}% · ${pctText(pct)}`, absent: "Zone deployment unavailable" },
   // Goalies (3×3).
   gsax:  { key: "gsax",  label: "GSAX",   extract: p => num(p.gsax),     format: v => `${sign(v)}${v.toFixed(1)}`,

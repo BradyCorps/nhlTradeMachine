@@ -14,7 +14,7 @@ const GLOSSARY: Record<string, string> = {
   "TOI+": "Ice-time trust and role load — heavy minutes imply broader usage and higher coaching trust.",
   "SUPP": "xGA suppression relative to teammates — positive means fewer chances allowed with this player on ice.",
   "Usage": "QoC deployment difficulty (0-100) — matchup and usage context at even strength.",
-  "OZ": "Offensive zone start share — high means more offensive deployment.",
+  "OZ Starts": "Offensive-zone START share — how often his shifts begin in the offensive zone (deployment), distinct from OZ Time, the share of ice time spent there.",
   "DZ%": "Defensive-zone start share — high indicates trusted defensive deployment.",
   "STRAND": "Stylistic Trait & Rating Analysis for NHL Development — a player/team identity view.",
   "EWA": "Estimated Wins Added — translates asset value into standings impact.",

@@ -101,7 +101,7 @@ const DEF_STATS: StatDef[] = [
   { key: "xgrel", label: "xG%+",    extract: p => p.xgRelTM ?? null,                               format: v => `${v > 0 ? "+" : ""}${v.toFixed(1)}` },
   { key: "supp",  label: "SUPP",    extract: p => p.xgaRelTM != null ? -(p.xgaRelTM as number) : null, format: v => v.toFixed(2) },
   { key: "qoc",   label: "QoC",     extract: p => p.qocIndex ?? null,                              format: v => v.toFixed(0) },
-  { key: "oz",    label: "OZ%",     extract: p => p.dzPct != null ? (1 - (p.dzPct as number)) * 100 : null, format: v => `${v.toFixed(0)}%` },
+  { key: "oz",    label: "OZ Starts", extract: p => p.dzPct != null ? (1 - (p.dzPct as number)) * 100 : null, format: v => `${v.toFixed(0)}%` },
 ];
 
 const GOALIE_STATS: StatDef[] = [

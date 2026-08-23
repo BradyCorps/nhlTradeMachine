@@ -42,6 +42,22 @@ const PHASE_COLORS: Record<string, string> = {
   Tanking: "#6f1109",
 };
 
+// Standard visually-hidden style: off-screen for sighted readers, still in the
+// accessibility tree for screen readers. Inline so it doesn't depend on a
+// Tailwind `sr-only` class being present in the build.
+const SR_ONLY: React.CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  clipPath: "inset(50%)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
+
 /** Respect the OS "reduce motion" setting — the re-sort animation is the
  *  whole point of this chart, but it is decoration, not information. */
 function usePrefersReducedMotion(): boolean {
@@ -264,6 +280,33 @@ export default function TeamNavChart({ data }: Props) {
           })()}
         </svg>
       </div>
+
+      {/* Screen-reader ranking — the column chart is role="img" with only the
+          leader in its label, so a non-visual reader gets the full ordered
+          table here (kept off-screen, updates with the active dimension). */}
+      <table style={SR_ONLY}>
+        <caption>{`League ${active.label} rankings — ${active.blurb}, ${n} teams`}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Rank</th>
+            <th scope="col">Team</th>
+            <th scope="col">Competitive phase</th>
+            <th scope="col">{active.label}</th>
+            <th scope="col">Goal differential</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ranked.map((d, i) => (
+            <tr key={d.abbrev}>
+              <th scope="row">{i + 1}</th>
+              <td>{d.name}</td>
+              <td>{d.phase}</td>
+              <td>{Math.round(d.value).toLocaleString()}</td>
+              <td>{d.goalDiff > 0 ? "+" : ""}{d.goalDiff}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 border-t"

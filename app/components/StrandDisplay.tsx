@@ -97,7 +97,7 @@ const TRAIT_GUIDE: Record<string, string> = {
   DEF:  "Defensive value component",
   SUPP: "Suppression — fewer scoring chances allowed than his teammates",
   QoC:  "Quality of competition — how tough his matchups are (0–100)",
-  OZ:   "Share of his shifts that start in the offensive zone",
+  "OZ Starts": "Share of his shifts that start in the offensive zone (not time spent there)",
   GSAX: "Goals Saved Above Expected vs an average goalie",
   "SV%": "Even-strength save percentage",
   HDSV: "High-danger save % — stopping the chances that matter most",
@@ -309,7 +309,7 @@ export default function StrandDisplay({
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "2px 12px", marginTop: "4px" }}>
           {guideLabels.map(label => (
             <div key={label} style={{ display: "flex", gap: "6px" }}>
-              <span style={{ fontWeight: 900, width: "42px", flexShrink: 0, color: "var(--ledger-ink)" }}>{label}</span>
+              <span style={{ fontWeight: 900, width: "58px", flexShrink: 0, color: "var(--ledger-ink)" }}>{label}</span>
               <span style={{ color: "var(--ledger-ink-body)" }}>{TRAIT_GUIDE[label]}</span>
             </div>
           ))}

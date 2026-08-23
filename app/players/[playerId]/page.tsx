@@ -348,6 +348,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
             peers={scatterPeers}
             currentPlayer={currentScatter}
             playerName={player.name}
+            cohortLabel={`${STRAND_COHORT_NOUN[posGroupOf(player.position)]} · ≥20 GP · ${SEASON.replaySeason}`}
           />
         )}
 

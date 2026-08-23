@@ -56,9 +56,12 @@ const SUMMARY_LABEL: Record<string, string> = {
 };
 const SUMMARY_ORDER = ["all", "high", "mid", "long"];
 
+// Low-volume tiles were nearly invisible (0.07 / 0.20 over cream), so a zone
+// with a few real shots read as empty. Floor lifted and the low band widened so
+// every non-zero tile is legibly filled while the high end still dominates.
 const pctColor = (p: number) =>
-  p >= 0.9 ? "rgba(44,62,107,0.92)" : p >= 0.7 ? "rgba(44,62,107,0.66)" :
-  p >= 0.5 ? "rgba(44,62,107,0.42)" : p > 0 ? "rgba(44,62,107,0.20)" : "rgba(44,62,107,0.07)";
+  p >= 0.9 ? "rgba(44,62,107,0.94)" : p >= 0.7 ? "rgba(44,62,107,0.70)" :
+  p >= 0.5 ? "rgba(44,62,107,0.48)" : p > 0 ? "rgba(44,62,107,0.30)" : "rgba(44,62,107,0.12)";
 
 export default function EdgeShotMap({ nhlPlayerId }: { nhlPlayerId: string | number }) {
   const [data, setData] = useState<EdgePayload | null>(null);
@@ -148,13 +151,16 @@ export default function EdgeShotMap({ nhlPlayerId }: { nhlPlayerId: string | num
             })}
           </svg>
           <div className="flex items-center justify-center gap-3 mt-1.5 text-[9px] font-mono uppercase tracking-wider" style={{ color: "var(--ledger-ink-faint)" }}>
-            <span>Shot volume:</span>
+            <span>Shot volume %ile:</span>
             {[0.2, 0.5, 0.7, 0.9].map((p) => (
               <span key={p} className="flex items-center gap-1">
                 <span className="inline-block w-3 h-3" style={{ background: pctColor(p + 0.01), borderRadius: 2 }} />
                 {ordinal(Math.round(p * 100))}+
               </span>
             ))}
+          </div>
+          <div className="text-center mt-0.5 text-[8px] font-mono uppercase tracking-wider" style={{ color: "var(--ledger-ink-faint)" }}>
+            percentile vs all NHL skaters
           </div>
         </div>
 
@@ -176,7 +182,7 @@ export default function EdgeShotMap({ nhlPlayerId }: { nhlPlayerId: string | num
                     </span>
                   </div>
                   <span className="text-[11px] font-mono tabular-nums font-black" style={{ color: "var(--ink)" }}>
-                    {s.shots} <span className="font-normal text-[10px]" style={{ color: "var(--ledger-ink-faint)" }}>shots · lg {Math.round(s.shotsLeagueAvg)}</span>
+                    {s.shots} <span className="font-normal text-[10px]" style={{ color: "var(--ledger-ink-faint)" }}>shots · league avg {Math.round(s.shotsLeagueAvg)}</span>
                   </span>
                 </div>
                 <div className="text-[10px] font-mono mt-0.5" style={{ color: "var(--ledger-ink-body, var(--ink))" }}>
@@ -224,7 +230,7 @@ export default function EdgeShotMap({ nhlPlayerId }: { nhlPlayerId: string | num
       </div>
 
       <div className="mt-3 pt-2 border-t text-[9px] font-mono uppercase tracking-wider leading-relaxed" style={{ borderColor: "var(--rule-light)", color: "var(--ledger-ink-faint)" }}>
-        Source: NHL EDGE via nightly snapshot · captured {new Date(data.capturedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · tile fill = shot-volume percentile · ± = finishing vs league
+        Source: NHL EDGE via nightly snapshot · captured {new Date(data.capturedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · tile fill = shot-volume percentile vs all NHL skaters · ± = finishing vs league
       </div>
     </div>
   );

@@ -26,6 +26,9 @@ interface Props {
   peers: ScatterPeer[];
   currentPlayer: ScatterPeer;
   playerName: string;
+  /** Names the exact cohort the cloud is drawn from (e.g. "forwards · ≥20 GP ·
+   *  2025-26"), so the reader knows who these dots are, not just "peers". */
+  cohortLabel?: string;
 }
 
 const CURRENT_COLOR = "var(--ledger-red, #b83020)";
@@ -42,7 +45,7 @@ interface BrushRect {
   x1: number; y1: number;
 }
 
-export default function NavLeagueScatter({ peers, currentPlayer, playerName }: Props) {
+export default function NavLeagueScatter({ peers, currentPlayer, playerName, cohortLabel }: Props) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -181,16 +184,20 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName }: P
 
   return (
     <div ref={containerRef} className="border p-4 mb-4" style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-card, var(--paper-inset))", position: "relative" }}>
-      <div className="flex items-baseline justify-between mb-2">
+      <div className="flex items-baseline justify-between mb-0.5">
         <span className="font-mono text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em]"
           style={{ color: "var(--ledger-ink-faint)" }}>
           League Context
         </span>
         <span className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.12em]"
           style={{ color: "var(--ledger-ink-faint)" }}>
-          {all.length} same-position peers
+          {all.length} plotted
           {activeBrush ? ` · ${brushedPlayers.length} selected` : " · drag to select"}
         </span>
+      </div>
+      <div className="mb-2 font-mono text-[8px] sm:text-[9px] uppercase tracking-[0.12em]"
+        style={{ color: "var(--ledger-ink-faint)" }}>
+        Ranked among {cohortLabel ?? "same-position peers"}
       </div>
 
       <svg
@@ -230,6 +237,31 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName }: P
             strokeDasharray="3,3"
             opacity={0.3}
           />
+
+          {/* Axis ticks — numeric scale so a reader can read a dot's OFF/DEF
+              value off the plot, not just its quadrant. */}
+          {xScale.ticks(4).map(v => (
+            <g key={`xt-${v}`}>
+              <line x1={xScale(v)} y1={innerH} x2={xScale(v)} y2={innerH + 3}
+                stroke="var(--ledger-ink-faint)" strokeWidth={0.6} opacity={0.5} />
+              <text x={xScale(v)} y={innerH + 11} textAnchor="middle"
+                fill="var(--ledger-ink-faint)" fontSize={7} opacity={0.7}
+                fontFamily="'Courier Prime', monospace">
+                {Math.round(v)}
+              </text>
+            </g>
+          ))}
+          {yScale.ticks(4).map(v => (
+            <g key={`yt-${v}`}>
+              <line x1={-3} y1={yScale(v)} x2={0} y2={yScale(v)}
+                stroke="var(--ledger-ink-faint)" strokeWidth={0.6} opacity={0.5} />
+              <text x={-5} y={yScale(v) + 2.5} textAnchor="end"
+                fill="var(--ledger-ink-faint)" fontSize={7} opacity={0.7}
+                fontFamily="'Courier Prime', monospace">
+                {Math.round(v)}
+              </text>
+            </g>
+          ))}
 
           {/* Quadrant labels */}
           <text x={innerW - 4} y={8} textAnchor="end"
@@ -350,15 +382,18 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName }: P
             background: "var(--paper-card, var(--paper-bg))",
             border: "1px solid var(--ledger-rule, #ccc)",
             borderRadius: 3,
-            padding: "2px 6px",
+            padding: "3px 7px",
             fontFamily: "'Courier Prime', monospace",
             fontSize: 10,
-            fontWeight: 700,
             color: "var(--ledger-ink)",
             whiteSpace: "nowrap",
             boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+            textAlign: "center",
           }}>
-            {hoveredPeer.name} ({hoveredPeer.nav})
+            <div style={{ fontWeight: 700 }}>{hoveredPeer.name}</div>
+            <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)" }}>
+              OFF {Math.round(hoveredPeer.off)} · DEF {Math.round(hoveredPeer.def)} · NAV {hoveredPeer.nav > 0 ? "+" : ""}{hoveredPeer.nav}
+            </div>
           </div>
         </div>
       )}
@@ -382,7 +417,7 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName }: P
           <div className="grid gap-0" style={{ maxHeight: 160, overflowY: "auto" }}>
             {brushedPlayers.slice(0, 20).map(p => (
               <div key={p.id}
-                className="flex items-center justify-between py-0.5 px-1"
+                className="flex items-center justify-between gap-2 py-0.5 px-1"
                 style={{
                   fontFamily: "'Courier Prime', monospace",
                   fontSize: 11,
@@ -392,9 +427,14 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName }: P
                   opacity: 0.9,
                 }}
               >
-                <span>{p.name}</span>
-                <span style={{ fontWeight: 700 }}>
-                  {p.nav > 0 ? "+" : ""}{p.nav}
+                <span className="truncate">{p.name}</span>
+                <span className="flex items-baseline gap-2 shrink-0 tabular-nums">
+                  <span style={{ fontSize: 9, color: "var(--ledger-ink-faint)" }}>
+                    OFF {Math.round(p.off)} · DEF {Math.round(p.def)}
+                  </span>
+                  <span style={{ fontWeight: 700, minWidth: 34, textAlign: "right" }}>
+                    {p.nav > 0 ? "+" : ""}{p.nav}
+                  </span>
                 </span>
               </div>
             ))}
