@@ -23,7 +23,9 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
     : pathname?.startsWith("/fantasy") ? "fantasy"
     : activeTab;
   const navClass = (tab: NavTab) => [
-    "text-[11px] uppercase tracking-[0.1em] sm:tracking-[0.14em] font-mono no-underline transition-colors border-b-2 pb-0.5",
+    // 44px tap targets (audit §1), and no-shrink so the row scrolls sideways on
+    // a phone instead of wrapping the seven links into a small-target thicket.
+    "inline-flex items-center shrink-0 min-h-[44px] px-2 whitespace-nowrap text-[11px] uppercase tracking-[0.1em] sm:tracking-[0.14em] font-mono no-underline transition-colors border-b-2",
     resolvedActiveTab === tab
       ? "text-ledger-red font-black border-ledger-red"
       : "text-ledger-ink-faint font-black border-transparent hover:text-ledger-ink hover:border-ledger-rule",
@@ -71,8 +73,15 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
               </span>
             </p>
 
-            {/* Nav tabs */}
-            <nav className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 px-2">
+            {/* Nav tabs. On a phone the seven links no longer wrap into a
+                many-row thicket of ~21px targets: they sit in one 44px-tall row
+                that scrolls sideways (the scrollbar is the "more this way" cue),
+                primary tools first. From sm up it recentres and wraps as before,
+                with the `|` dividers (hidden below 640px via .nav-divider). */}
+            <nav
+              aria-label="Primary"
+              className="mt-2 flex flex-nowrap sm:flex-wrap items-stretch sm:items-center justify-start sm:justify-center gap-x-1 sm:gap-x-3 gap-y-1 px-2 overflow-x-auto sm:overflow-visible"
+            >
               <Link
                 href="/players"
                 className={navClass("players")}
@@ -88,13 +97,6 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
               </a>
               <span className="nav-divider text-ledger-rule-light">|</span>
               <a
-                href="/docket"
-                className={navClass("docket")}
-              >
-                {resolvedActiveTab === "docket" ? "◆" : "◇"} The Docket
-              </a>
-              <span className="nav-divider text-ledger-rule-light">|</span>
-              <a
                 href="/trade-machine"
                 className={navClass("trade")}
               >
@@ -106,6 +108,13 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
                 className={navClass("armchair-gm")}
               >
                 {resolvedActiveTab === "armchair-gm" ? "◆" : "◇"} Armchair GM
+              </a>
+              <span className="nav-divider text-ledger-rule-light">|</span>
+              <a
+                href="/docket"
+                className={navClass("docket")}
+              >
+                {resolvedActiveTab === "docket" ? "◆" : "◇"} The Docket
               </a>
               <span className="nav-divider text-ledger-rule-light">|</span>
               <a
