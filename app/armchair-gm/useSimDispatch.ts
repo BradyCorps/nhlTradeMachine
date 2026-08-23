@@ -7,6 +7,8 @@ import { scenarioSeed } from "@/app/lib/sim-engine";
 import type { LineupOrderPayload } from "@/app/components/LineupEditor";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import { teamWindow } from "@/app/lib/team-window";
+import { rosterLegality, rosterLegalityMessage } from "@/app/lib/roster-legality";
+import { toast } from "@/app/lib/ledger-toast";
 
 type LeagueState = {
   teams: Team[];
@@ -82,6 +84,22 @@ export function useSimDispatch({
     // A season can be simulated with zero trades — the baseline league is a
     // valid scenario. Only a chosen home team is required.
     if (!homeTeam) return;
+
+    // Roster-legality gate (audit P0-2): a team that cannot dress a legal
+    // lineup (12F / 6D / 2G) must not simulate a season. Without this a user
+    // could let free agents walk down to 10F/3D/1G and still be handed a full
+    // 82-game result for a team that cannot ice a legal roster. Blocking here
+    // also keeps the Cup Run from advancing on an illegal roster: the advance
+    // handler needs a champion from simData, which is never produced.
+    const legality = rosterLegality(db.players, homeTeam.id);
+    if (!legality.legal) {
+      const message = rosterLegalityMessage(homeTeam.name, legality);
+      setSimData(null);
+      setSimResult(message);
+      toast(message, "error");
+      return;
+    }
+
     setSimLoading(true);
     setSimResult(null);
     setSimData(null);

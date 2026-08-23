@@ -25,6 +25,7 @@ import {
   type CupRunSkaterSeason,
 } from "@/app/lib/cup-run";
 import { toast } from "@/app/lib/ledger-toast";
+import { rosterLegality, rosterLegalityMessage } from "@/app/lib/roster-legality";
 import type { CupDraftSummary } from "./CupRunDraftSummaryModal";
 import { futureDraftPromptForUserPick } from "@/app/lib/future-draft-choice";
 
@@ -112,6 +113,20 @@ export function useCupRunLifecycle({
 
   const handleCupRunAdvance = useCallback(() => {
     if (!cupRun || cupRun.status !== "ACTIVE") return;
+
+    // Roster-legality gate (audit P0-2), second line of defence: the sim result
+    // that enabled this button could be stale — simmed while legal, then a
+    // player traded away — so re-check the live roster before recording the
+    // season and rolling the league forward. The dispatch gate blocks the
+    // common path; this blocks the stale-simData path.
+    if (homeTeam) {
+      const legality = rosterLegality(db.players, homeTeam.id);
+      if (!legality.legal) {
+        toast(rosterLegalityMessage(homeTeam.name, legality), "error");
+        return;
+      }
+    }
+
     const simData = simDataRef.current;
     const champion = simData?.playoffBracket?.champion;
     if (!champion) return;
@@ -196,7 +211,7 @@ export function useCupRunLifecycle({
     } finally {
       setCupAdvancing(false);
     }
-  }, [cupRun, db, originalDb, setDb, setOriginalDb, simDataRef, onSeasonRolledRef]);
+  }, [cupRun, homeTeam, db, originalDb, setDb, setOriginalDb, simDataRef, onSeasonRolledRef]);
 
   return {
     cupRun,

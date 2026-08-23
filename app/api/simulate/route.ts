@@ -27,6 +27,7 @@ import {
   TEAM_SKATER_GAMES,
   MIN_CONSERVE_SKATERS,
 } from "@/app/lib/sim-conservation";
+import { rosterLegality } from "@/app/lib/roster-legality";
 import {
   specialTeamsPointMultiplier, specialTeamsGamesBonus, type SpecialTeamsOrder,
 } from "@/app/lib/special-teams";
@@ -1176,13 +1177,24 @@ export async function POST(req: NextRequest) {
     const conservation = {
       totalStandingsPoints: standings.reduce((s, t) => s + t.projectedPoints, 0),
       leaguePointTarget: 2924,
-      teams: standings.map(t => ({
-        teamId: t.teamId,
-        skaterGames: t.projectedSkaters.reduce((s, p) => s + p.gamesPlayed, 0),
-        skaterCount: t.projectedSkaters.length,
-        teamGoalsFor: teamGoalsFor(t.projectedPoints),
-        summedSkaterGoals: t.projectedSkaters.reduce((s, p) => s + p.projectedGoals, 0),
-      })),
+      teams: standings.map(t => {
+        // Legality reads the post-trade roster (with goalies), which the
+        // projected-skater list excludes; it is diagnostic only here — the
+        // hard block lives in the Armchair GM dispatch where the user's own
+        // roster is validated before a season is ever requested (audit P0-2).
+        const legality = rosterLegality(playersByTeam.get(t.teamId) ?? []);
+        return {
+          teamId: t.teamId,
+          skaterGames: t.projectedSkaters.reduce((s, p) => s + p.gamesPlayed, 0),
+          skaterCount: t.projectedSkaters.length,
+          teamGoalsFor: teamGoalsFor(t.projectedPoints),
+          summedSkaterGoals: t.projectedSkaters.reduce((s, p) => s + p.projectedGoals, 0),
+          rosterLegal: legality.legal,
+          forwards: legality.forwards,
+          defense: legality.defense,
+          goalies: legality.goalies,
+        };
+      }),
     };
 
     return NextResponse.json({

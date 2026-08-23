@@ -584,6 +584,7 @@ describe("simulate route", () => {
       ...Array.from({ length: 14 }, (_, i) => player(`wpg-f${i}`, `WPG Forward ${i}`, "WPG", 70 - i * 3, i % 2 ? "W" : "C")),
       ...Array.from({ length: 6 }, (_, i) => player(`wpg-d${i}`, `WPG Defender ${i}`, "WPG", 34 - i * 3, "D")),
       { ...player("wpg-g1", "WPG Goalie", "WPG", 0, "G"), gsax: 2, gamesStarted: 55, savePct: 0.912 },
+      { ...player("wpg-g2", "WPG Backup", "WPG", 0, "G"), gsax: 0, gamesStarted: 22, savePct: 0.905 },
     ];
     const depth = teamIds.flatMap((teamId) => teamId === "WPG" ? [] : [
       player(`${teamId}-f1`, `${teamId} Forward`, teamId, 42, "C"),
@@ -601,6 +602,8 @@ describe("simulate route", () => {
     expect(wpgDiag.skaterCount).toBe(20);
     expect(wpgDiag.skaterGames).toBe(1476);             // 18 skaters × 82, conserved
     expect(wpgDiag.summedSkaterGoals).toBe(wpgDiag.teamGoalsFor); // Σ player goals = team GF
+    // Legality diagnostic (audit P0-2): a legal 14F / 6D / 2G roster.
+    expect(wpgDiag).toMatchObject({ forwards: 14, defense: 6, goalies: 2, rosterLegal: true });
 
     // And the season stays internally consistent: pts = G + A for every skater.
     const wpgTeam = body.standings.find((t: any) => t.teamId === "WPG");
