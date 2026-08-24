@@ -50,9 +50,10 @@ Root: draft table `minWidth:780`, goalie `640`, tiny controls (mobile audit §10
 Fix: below 768px, the skater board renders cards with a 44px Taken target, rank/name/team/age/role, position, tier, FP/82, VOR, and a 44px Ledger-outlook disclosure; a mobile sort selector/direction control preserves every desktop sort. The goalie board likewise becomes cards for workload, starts, SV%, GSAx, and win environment. Both original tables and their dense controls remain unchanged behind `hidden md:block` at ≥768px.
 Acceptance: no 780px horizontal table on phones; fantasy tests green. ✅ 2026-08-24.
 
-### [ ] M-TradeSummary — Trade Machine sticky package summary + A/B toggle (M)
+### [x] M-TradeSummary — Trade Machine sticky package summary + A/B toggle (M)
 Root: two stacked panels, no sticky summary (mobile audit §8).
 Fix: sticky bottom summary (both teams, asset counts, NAV balance, Run Audit) + Team A/B toggle.
+Acceptance: below 1024px, one labelled team panel is shown at a time behind an accessible A/B toggle; a safe-area-aware bottom ledger keeps both team IDs, outbound asset counts, Team A net NAV, and the existing GM Audit action visible. Desktop keeps both panels. ✅ 2026-08-24.
 
 ### [ ] M-TeamPages — `/teams/{team}` detail routes (L)
 Root: `app/teams/` is index-only; the expanded card does index+detail and links no players (mobile audit §7).

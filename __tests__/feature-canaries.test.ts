@@ -2612,6 +2612,25 @@ describe("Canary — trade UI state bugs (audit #6/#7)", () => {
   });
 });
 
+describe("Canary — mobile trade package summary", () => {
+  it("toggles one team panel and keeps both packages plus the audit action in reach", () => {
+    const src = read("app/components/QuickTradeMachine.tsx");
+
+    expect(src).toContain('useState<"A" | "B">("A")');
+    expect(src).toContain('aria-label="Choose trade team"');
+    expect(src).toContain('aria-pressed={mobileSide === "A"}');
+    expect(src).toContain('aria-pressed={mobileSide === "B"}');
+    expect(src).toContain('id="trade-team-a"');
+    expect(src).toContain('id="trade-team-b"');
+    expect(src).toContain('fixed inset-x-0 bottom-0');
+    expect(src).toContain('aria-label="Mobile trade package summary"');
+    expect(src).toContain('outgoing.length');
+    expect(src).toContain('incoming.length');
+    expect(src).toContain('incomingSummary.nav - outgoingSummary.nav');
+    expect(src).toContain('onClick={runVerdict}');
+  });
+});
+
 describe("Canary — SIM RNG determinism (audit #2/#3)", () => {
   it("uses independent named streams for awards, calder, and playoffs", () => {
     const route = read("app/api/simulate/route.ts");
