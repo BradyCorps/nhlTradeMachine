@@ -105,6 +105,7 @@ export default function StrandView({ asset, compareAsset }: {
   return (
     <div className="mt-1 mb-2">
       <StrandDisplay
+        ariaDescription={`${asset.name} roster STRAND`}
         offTraits={primary.off}
         defTraits={primary.def}
         ops={asset.ops ?? null}

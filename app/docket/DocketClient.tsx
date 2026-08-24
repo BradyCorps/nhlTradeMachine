@@ -136,6 +136,7 @@ function AssetDetail({ asset }: { asset: DocketEntry["packages"][number]["assets
       {activeTab === "STRAND" && !isPick && (
         traits ? (
           <StrandDisplay
+            ariaDescription={`${detailAsset.name} Docket STRAND`}
             offTraits={traits.off}
             defTraits={traits.def}
             ops={detailAsset.ops ?? null}

@@ -111,6 +111,7 @@ export default function PlayerStrandPanel({
       )}
 
       <StrandDisplay
+        ariaDescription={`${player.name} player profile STRAND`}
         offTraits={primary.off}
         defTraits={primary.def}
         ops={ops}

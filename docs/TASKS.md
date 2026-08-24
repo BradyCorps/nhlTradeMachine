@@ -25,9 +25,10 @@ Root: the profile skater season line was `grid-cols-6` at every width (`app/play
 Fix: `grid-cols-3 sm:grid-cols-6` — two rows of three on narrow, one row ≥640.
 Acceptance: 2×3 on phones, suite + tsc + build green. ✅ 2026-08-24.
 
-### [ ] M-STRAND — Player STRAND SVG has no accessible name
+### [x] M-STRAND — Player STRAND SVG has no accessible name
 Root: `PlayerStrandPanel`→`StrandDisplay` renders an SVG with no `role="img"`/description (mobile audit §6). `StrandDisplay` is SHARED — verify every call site before adding a static label; thread a per-context aria description prop.
-Acceptance: STRAND exposes role=img + a value-bearing aria-label; no canary/other-surface regressions.
+Fix: `StrandDisplay` now requires a per-context `ariaDescription`; all four direct callers provide one, and the SVG exposes `role="img"` plus an aria-label containing its type, indexed/raw trait values, unavailable readings, and comparison values.
+Acceptance: STRAND exposes role=img + a value-bearing aria-label; no canary/other-surface regressions. ✅ 2026-08-24.
 
 ### [ ] M-PlayersSeam — Players index 540 vs Tailwind 640 breakpoint seam
 Root: the players page uses a pervasive custom 539/540 mobile breakpoint (`globals.css`, ~10 rules) while Tailwind `sm:` (640) utilities live on the same page, leaving a 540–639 mixed-layout band (mobile audit §5). NOT a one-liner — reconciling two breakpoint systems.
