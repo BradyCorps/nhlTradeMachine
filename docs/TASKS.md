@@ -30,10 +30,10 @@ Root: `PlayerStrandPanel`→`StrandDisplay` renders an SVG with no `role="img"`/
 Fix: `StrandDisplay` now requires a per-context `ariaDescription`; all four direct callers provide one, and the SVG exposes `role="img"` plus an aria-label containing its type, indexed/raw trait values, unavailable readings, and comparison values.
 Acceptance: STRAND exposes role=img + a value-bearing aria-label; no canary/other-surface regressions. ✅ 2026-08-24.
 
-### [ ] M-PlayersSeam — Players index 540 vs Tailwind 640 breakpoint seam
-Root: the players page uses a pervasive custom 539/540 mobile breakpoint (`globals.css`, ~10 rules) while Tailwind `sm:` (640) utilities live on the same page, leaving a 540–639 mixed-layout band (mobile audit §5). NOT a one-liner — reconciling two breakpoint systems.
-Fix: pick one breakpoint for the players mobile layout and align the custom media queries with any `sm:` usage; verify the card/row swap at 500/560/620/700px.
-Acceptance: no mixed-layout band; players tests green.
+### [x] M-PlayersSeam — Players index 540 vs Tailwind 640 breakpoint seam
+Root: the players page used a pervasive custom 539/540 mobile breakpoint (`globals.css`, ~10 rules) while the shared small-screen boundary is 640, leaving a 540–639 mixed-layout band (mobile audit §5). The originally cited page-level `sm:` utilities no longer remain, but the CSS seam did.
+Fix: all Players analytics rules now use `max-width:639px` / `min-width:640px`; the regression pins mobile cards at 500/560/620px and the desktop row at 700px, while preserving the intentional 480px and 720px sub-layouts.
+Acceptance: no mixed-layout band; players tests green. ✅ 2026-08-24.
 
 ### [ ] M-PlayerFlags — Player status icons are non-focusable spans
 Root: status icons are `<span title aria-label>`, not buttons; tapping hits the row (mobile audit §5).

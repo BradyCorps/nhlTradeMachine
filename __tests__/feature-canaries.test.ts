@@ -1725,6 +1725,29 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(src).toContain('{ label: "PTS",    val: seasonPoints.toString() }');
     expect(src).not.toContain(">Season Points<");
   });
+
+  it("keeps Players mobile layouts through the shared 640px breakpoint", () => {
+    const css = read("app/globals.css");
+    const start = css.indexOf("/* ── Players analytics page");
+    const end = css.indexOf("/* Trade proposal sends", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+
+    const playersCss = css.slice(start, end);
+    const rowMax = playersCss.match(
+      /@media \(max-width:\s*(\d+)px\)\s*\{\s*\.player-row-desktop/,
+    );
+    expect(rowMax?.[1]).toBe("639");
+    expect(playersCss).not.toMatch(/(?:min|max)-width:\s*(?:539|540)px/);
+    const mediaWidths = [...playersCss.matchAll(/(?:min|max)-width:\s*(\d+)px/g)]
+      .map(match => Number(match[1]));
+    expect([...new Set(mediaWidths)].sort((a, b) => a - b))
+      .toEqual([480, 639, 640, 720]);
+
+    const maxMobileWidth = Number(rowMax?.[1]);
+    expect([500, 560, 620, 700].map(width => width <= maxMobileWidth))
+      .toEqual([true, true, true, false]);
+  });
 });
 
 describe("Canary — R0/R1/R2 audit refinements", () => {

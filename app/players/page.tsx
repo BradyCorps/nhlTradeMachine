@@ -715,7 +715,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
 
   return (
     <>
-      {/* ── Desktop row (≥540px) — original 6-column grid ── */}
+      {/* ── Desktop row (≥640px) — original 6-column grid ── */}
       <div
         onClick={() => setExpanded(e => !e)}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(x => !x); } }}
@@ -781,7 +781,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
         <span style={{ fontSize: "11px", color: "var(--rule)", textAlign: "right" }}>{expanded ? "▲" : "▼"}</span>
       </div>
 
-      {/* ── Mobile card (≤539px) — 2-line layout with labelled stats ── */}
+      {/* ── Mobile card (≤639px) — 2-line layout with labelled stats ── */}
       <div
         onClick={() => setExpanded(e => !e)}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(x => !x); } }}
