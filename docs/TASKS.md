@@ -40,10 +40,10 @@ Root: status icons are `<span title aria-label>`, not buttons; tapping hits the 
 Fix: role/status/NMC chips now sit inside one real Player Flags disclosure button per row; it exposes the player-specific meanings in a labelled region, supports Escape/light-dismiss, stops flag taps from expanding the row, and grows to 44px on mobile. The row remains pointer-clickable, with separate keyboard-accessible expand buttons to avoid nested controls.
 Acceptance: icons are focusable/tappable controls; row tap still works. ✅ 2026-08-24.
 
-### [ ] M-Nav2 — Global nav: "More" overflow menu + sticky compact header
+### [x] M-Nav2 — Global nav: "More" overflow menu + sticky compact header
 Root: §1 shipped 44px + horizontal scroll; the audit also wants 4 primary + "More" and a sticky compact bar after scroll (`app/components/Header.tsx`). JS/state.
-Fix: keep the active-nav canary (border-b-2 / text-ledger-red / ◆) satisfied.
-Acceptance: More menu reachable, compact header sticks on scroll, canaries green.
+Fix: Players, Teams, Trade Machine, and Armchair GM remain visible while The Docket, Fantasy, and Press Box move into a 44px More disclosure with expanded/controls semantics, Escape/focus/outside dismissal, and active-secondary styling. The shared header is sticky and, after 96px of scroll, collapses the feed into a compact bar with a reduced home wordmark and 44px controls; abbreviated mobile labels keep it inside narrow page insets without horizontal scroll. The border-b-2 / text-ledger-red / ◆ active treatment remains intact.
+Acceptance: More menu reachable, compact header sticks on scroll, canaries green. ✅ 2026-08-24.
 
 ### [ ] M-Fantasy — Fantasy draft board → mobile card row (L)
 Root: draft table `minWidth:780`, goalie `640`, tiny controls (mobile audit §10).
