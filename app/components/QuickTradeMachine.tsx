@@ -905,6 +905,7 @@ export default function QuickTradeMachine() {
   const [error, setError] = useState<string | null>(null);
   const [homeTeamId, setHomeTeamId] = useState("");
   const [partnerTeamId, setPartnerTeamId] = useState("");
+  const [mobileSide, setMobileSide] = useState<"A" | "B">("A");
   const [outgoing, setOutgoing] = useState<Asset[]>([]);
   const [incoming, setIncoming] = useState<Asset[]>([]);
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
@@ -1161,7 +1162,7 @@ export default function QuickTradeMachine() {
 
   return (
     <main className="min-h-screen font-serif antialiased" style={{ background: "var(--paper)", color: "var(--ink)" }}>
-      <div className="relative w-full max-w-6xl mx-auto px-4 lg:px-6 py-6 lg:py-8 flex flex-col gap-5">
+      <div className="relative w-full max-w-6xl mx-auto px-4 lg:px-6 pt-6 pb-36 lg:py-8 flex flex-col gap-5">
         <Header activeTab="trade" />
 
         <section className="border p-5 sm:p-6" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card)" }}>
@@ -1225,8 +1226,53 @@ export default function QuickTradeMachine() {
           </div>
         ) : (
           <>
+            <div
+              className="grid grid-cols-2 border lg:hidden"
+              role="group"
+              aria-label="Choose trade team"
+              style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card)" }}
+            >
+              <button
+                id="trade-team-a-tab"
+                type="button"
+                aria-controls="trade-team-a"
+                aria-pressed={mobileSide === "A"}
+                onClick={() => setMobileSide("A")}
+                className="min-h-11 border-r px-3 py-2.5 text-left font-mono"
+                style={{
+                  borderColor: "var(--ledger-rule)",
+                  background: mobileSide === "A" ? "var(--ledger-warm)" : "transparent",
+                  color: mobileSide === "A" ? "var(--ledger-red)" : "var(--ledger-ink-body)",
+                }}
+              >
+                <span className="block text-[9px] font-black uppercase tracking-[0.2em]">Team A</span>
+                <span className="mt-0.5 block truncate text-[11px] font-black">{homeTeam?.name ?? "Choose team"}</span>
+              </button>
+              <button
+                id="trade-team-b-tab"
+                type="button"
+                aria-controls="trade-team-b"
+                aria-pressed={mobileSide === "B"}
+                onClick={() => setMobileSide("B")}
+                className="min-h-11 px-3 py-2.5 text-left font-mono"
+                style={{
+                  background: mobileSide === "B" ? "var(--ledger-warm)" : "transparent",
+                  color: mobileSide === "B" ? "var(--ledger-red)" : "var(--ledger-ink-body)",
+                }}
+              >
+                <span className="block text-[9px] font-black uppercase tracking-[0.2em]">Team B</span>
+                <span className="mt-0.5 block truncate text-[11px] font-black">{partnerTeam?.name ?? "Choose team"}</span>
+              </button>
+            </div>
+
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="border p-4 flex flex-col gap-4" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card-light)" }}>
+              <div
+                id="trade-team-a"
+                role="region"
+                aria-labelledby="trade-team-a-tab"
+                className={`${mobileSide === "A" ? "flex" : "hidden"} border p-4 flex-col gap-4 lg:flex`}
+                style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card-light)" }}
+              >
                 <TeamSelect label="Team sending assets" teams={data.teams} value={homeTeamId} excludeId={partnerTeamId} onChange={setHomeTeamId} />
                 <RosterGridPicker label="Tap a player to add" team={homeTeam} assets={data.players} selected={outgoing} navMap={rosterNavMap} onAdd={asset => setOutgoing(prev => [...prev, asset])} />
                 <AssetList
@@ -1244,7 +1290,13 @@ export default function QuickTradeMachine() {
                   navLoading={navLoading}
                 />
               </div>
-              <div className="border p-4 flex flex-col gap-4" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card-light)" }}>
+              <div
+                id="trade-team-b"
+                role="region"
+                aria-labelledby="trade-team-b-tab"
+                className={`${mobileSide === "B" ? "flex" : "hidden"} border p-4 flex-col gap-4 lg:flex`}
+                style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card-light)" }}
+              >
                 <TeamSelect label="Team sending return" teams={data.teams} value={partnerTeamId} excludeId={homeTeamId} onChange={setPartnerTeamId} />
                 <RosterGridPicker label="Tap a player to add" team={partnerTeam} assets={data.players} selected={incoming} navMap={rosterNavMap} onAdd={asset => setIncoming(prev => [...prev, asset])} />
                 <AssetList
@@ -1363,6 +1415,50 @@ export default function QuickTradeMachine() {
                 </div>
               </section>
             )}
+
+            <section
+              className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pointer-events-none lg:hidden"
+              aria-label="Mobile trade package summary"
+            >
+              <div
+                className="pointer-events-auto mx-auto max-w-6xl border px-3 py-2.5 shadow-[0_-8px_24px_rgba(28,22,18,0.16)]"
+                style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card)" }}
+              >
+                <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-3 font-mono">
+                  <div className="min-w-0">
+                    <div className="truncate text-[9px] font-black uppercase tracking-[0.16em] text-ledger-ink-faint">
+                      A · {homeTeam?.id ?? "Team A"}
+                    </div>
+                    <div className="mt-0.5 text-[12px] font-black" style={{ color: "var(--ledger-ink)" }}>
+                      {outgoing.length} {outgoing.length === 1 ? "asset" : "assets"} out
+                    </div>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-[9px] font-black uppercase tracking-[0.16em] text-ledger-ink-faint">
+                      B · {partnerTeam?.id ?? "Team B"}
+                    </div>
+                    <div className="mt-0.5 text-[12px] font-black" style={{ color: "var(--ledger-ink)" }}>
+                      {incoming.length} {incoming.length === 1 ? "asset" : "assets"} out
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[9px] font-black uppercase tracking-[0.16em] text-ledger-ink-faint">A net NAV</div>
+                    <div className="mt-0.5 text-[12px] font-black tabular-nums" style={{ color: "var(--ledger-ink)" }}>
+                      {navLoading ? "Loading" : fmtSigned(incomingSummary.nav - outgoingSummary.nav, 1)}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={!canEvaluate || evaluating}
+                  onClick={runVerdict}
+                  className="mt-2 min-h-11 w-full px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.22em] font-mono disabled:opacity-40"
+                  style={{ background: "var(--ledger-red)", color: "white" }}
+                >
+                  {evaluating ? "Auditing" : "Run Audit"}
+                </button>
+              </div>
+            </section>
           </>
         )}
 
