@@ -76,7 +76,15 @@ are to the code on `claude/cap-crease-mobile-audit-8ug1ft`.
   rather than defaulting to the 0.22 floor. **M.** *(Per CLAUDE.md, validate any new
   allocator against real NHL G/A splits before it ships.)*
 
-### P0-5 · Prospects play substantial games with zero possible offense 🔴 CONFIRMED
+### P0-5 · Prospects play substantial games with zero possible offense ✅ RESOLVED
+- **Resolution (2026-08-24):** after lineup opportunity is calculated, a prospect
+  profile whose effective scoring pace is still zero is limited to the explicit
+  NHL-games sample he has actually established. This couples appearances to an
+  existing evidence input instead of inventing an unvalidated replacement-level
+  scoring floor. A dressed prospect whose lineup role unlocks a positive
+  opportunity pace is unchanged. The full-roster regression reproduced **40 GP /
+  0 P** before the fix and now produces **0 GP / 0 P** while the team still
+  conserves exactly **1,476 skater-games**.
 - **Evidence:** 8 Year-1 rookies = 226 GP / 0 P; Barlow 34GP/0P then 31GP/0P; same
   repeated-zero for Julien/He/Walton/Björck.
 - **Root cause:** `projectSkaterOutcome` assigns `gamesPlayed` **unconditionally**
@@ -85,8 +93,8 @@ are to the code on `claude/cap-crease-mobile-audit-8ug1ft`.
   **and** `prospectPtsPace≈0` → `skaterPace=0` → `effectivePace=0` →
   `projectedPts=0`, while still dressing for tens of games. Points and appearances
   are decoupled.
-- **Fix:** couple GP to a non-zero pace (a no-pace prospect shouldn't dress 30+
-  NHL games), or give every dressed skater a replacement-level pace floor. **S–M.**
+- **Fix shipped:** couple GP to the prospect's non-zero effective pace or prior
+  NHL sample; do not create a new scoring input. **S.**
 
 ---
 
