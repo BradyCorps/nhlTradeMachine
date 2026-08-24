@@ -10,6 +10,68 @@ Legend: `[ ]` to-do · `[~]` partial / verify-then-close
 
 ---
 
+## [~] Mobile Audit (mobile-first UI)
+Full detail + verification per item: `docs/mobile-audit-triage.md`. Items already
+✅ there (global nav §1, footer icon-key X2, franchise-selector a11y §9,
+AssetDropdown→useDialog) are done; below is what remains, plus the two closed this pass.
+
+### [x] M-Docket — Docket filter controls too small; search should span the row
+Root: `.docket-filters` inputs/selects were ~34–38px and the search field shared a 2-col mobile row with Team (`app/docket/DocketClient.tsx` + `.docket-filters` in `globals.css`).
+Fix: all four controls `minHeight:44` (fontSize 13, 10/12 padding); search carries a `.docket-search` class spanning both columns under 640px.
+Acceptance: 44px targets, full-width mobile search, `npm test` + tsc + build green. ✅ 2026-08-24.
+
+### [x] M-SeasonStats — Six season stats crammed in one row on phones
+Root: the profile skater season line was `grid-cols-6` at every width (`app/players/[playerId]/page.tsx`).
+Fix: `grid-cols-3 sm:grid-cols-6` — two rows of three on narrow, one row ≥640.
+Acceptance: 2×3 on phones, suite + tsc + build green. ✅ 2026-08-24.
+
+### [ ] M-STRAND — Player STRAND SVG has no accessible name
+Root: `PlayerStrandPanel`→`StrandDisplay` renders an SVG with no `role="img"`/description (mobile audit §6). `StrandDisplay` is SHARED — verify every call site before adding a static label; thread a per-context aria description prop.
+Acceptance: STRAND exposes role=img + a value-bearing aria-label; no canary/other-surface regressions.
+
+### [ ] M-PlayersSeam — Players index 540 vs Tailwind 640 breakpoint seam
+Root: the players page uses a pervasive custom 539/540 mobile breakpoint (`globals.css`, ~10 rules) while Tailwind `sm:` (640) utilities live on the same page, leaving a 540–639 mixed-layout band (mobile audit §5). NOT a one-liner — reconciling two breakpoint systems.
+Fix: pick one breakpoint for the players mobile layout and align the custom media queries with any `sm:` usage; verify the card/row swap at 500/560/620/700px.
+Acceptance: no mixed-layout band; players tests green.
+
+### [ ] M-PlayerFlags — Player status icons are non-focusable spans
+Root: status icons are `<span title aria-label>`, not buttons; tapping hits the row (mobile audit §5).
+Fix: make each a real button, or open one consolidated "player flags" sheet from the row.
+Acceptance: icons are focusable/tappable controls; row tap still works.
+
+### [ ] M-Nav2 — Global nav: "More" overflow menu + sticky compact header
+Root: §1 shipped 44px + horizontal scroll; the audit also wants 4 primary + "More" and a sticky compact bar after scroll (`app/components/Header.tsx`). JS/state.
+Fix: keep the active-nav canary (border-b-2 / text-ledger-red / ◆) satisfied.
+Acceptance: More menu reachable, compact header sticks on scroll, canaries green.
+
+### [ ] M-Fantasy — Fantasy draft board → mobile card row (L)
+Root: draft table `minWidth:780`, goalie `640`, tiny controls (mobile audit §10).
+Fix: a mobile player-card row (taken · name · pos · tier · FP82 · VOR + expand); keep the desktop table ≥768.
+Acceptance: no 780px horizontal table on phones; fantasy tests green.
+
+### [ ] M-TradeSummary — Trade Machine sticky package summary + A/B toggle (M)
+Root: two stacked panels, no sticky summary (mobile audit §8).
+Fix: sticky bottom summary (both teams, asset counts, NAV balance, Run Audit) + Team A/B toggle.
+
+### [ ] M-TeamPages — `/teams/{team}` detail routes (L)
+Root: `app/teams/` is index-only; the expanded card does index+detail and links no players (mobile audit §7).
+Fix: add dynamic team routes; link projected-line players to their profiles.
+
+### [ ] M-Perf — Teams/Docket/Armchair loading precompute (P0 — blocked in Claude-web)
+Root: cold roster build ~40s + client full-league navMap (mobile audit §2/X4). Not testable without NHL egress.
+Fix: precompute/cache league aggregates; render shell + skeletons first. Needs a codespace with egress.
+
+## [ ] Sim Engine — remaining audit items
+Full detail + status: `docs/sim-engine-audit-triage.md` (P0-1…P0-5, P1-7, P1-8 are ✅ RESOLVED).
+
+### [ ] SIM-P1-6 — Roles/line/PP don't affect goal-vs-assist type
+Root: goal share is the xG/pace ratio + a D special-case; the modern role labels are display-only (`app/api/simulate/route.ts`).
+Fix: feed role/line/PP/TOI into the goal-share model. Backtest against real NHL G/A splits before it moves a number (CLAUDE.md hard rule).
+
+### [ ] SIM-P1-9 — No transaction ledger / player-state invariant
+Root: offseason walk-aways move internally but are never reconciled or surfaced (`free-agency.ts`, `useOffseasonFlow.ts`).
+Fix: add a transaction ledger + the invariant `roster + retained rights + RFA + UFA + signed-elsewhere + retired = previous + drafted`, checked each offseason and exposed as a diagnostic.
+
 ## [~] New Sim Engine/Off season
 
 ### [x] S5 - Cup Run AI cap discipline and offseason market signings

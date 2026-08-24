@@ -221,13 +221,13 @@ export default function DocketClient({ entries }: DocketClientProps) {
   return (
     <section style={{ display: "grid", gap: 18 }}>
       <div className="docket-filters">
-        <label style={{ display: "grid", gap: 5, fontSize: 10, fontWeight: 900, letterSpacing: "0.16em" }}>
+        <label className="docket-search" style={{ display: "grid", gap: 5, fontSize: 10, fontWeight: 900, letterSpacing: "0.16em" }}>
           SEARCH
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Player, team, verdict..."
-            style={{ border: "1px solid var(--rule)", padding: "9px 10px", fontSize: 12, background: "var(--ledger-card)", color: "var(--ledger-ink)" }}
+            style={{ border: "1px solid var(--rule)", padding: "10px 12px", fontSize: 13, minHeight: 44, background: "var(--ledger-card)", color: "var(--ledger-ink)" }}
           />
         </label>
         <label style={{ display: "grid", gap: 5, fontSize: 10, fontWeight: 900, letterSpacing: "0.16em" }}>
@@ -235,7 +235,7 @@ export default function DocketClient({ entries }: DocketClientProps) {
           <select
             value={teamId}
             onChange={e => setTeamId(e.target.value)}
-            style={{ border: "1px solid var(--rule)", padding: "9px 10px", fontSize: 12, background: "var(--ledger-card)", color: "var(--ledger-ink)" }}
+            style={{ border: "1px solid var(--rule)", padding: "10px 12px", fontSize: 13, minHeight: 44, background: "var(--ledger-card)", color: "var(--ledger-ink)" }}
           >
             <option value="">ALL</option>
             {teamOptions.map(team => <option key={team} value={team}>{team}</option>)}
@@ -246,7 +246,7 @@ export default function DocketClient({ entries }: DocketClientProps) {
           <select
             value={winner}
             onChange={e => setWinner(e.target.value)}
-            style={{ border: "1px solid var(--rule)", padding: "9px 10px", fontSize: 12, background: "var(--ledger-card)", color: "var(--ledger-ink)" }}
+            style={{ border: "1px solid var(--rule)", padding: "10px 12px", fontSize: 13, minHeight: 44, background: "var(--ledger-card)", color: "var(--ledger-ink)" }}
           >
             <option value="">ALL</option>
             {winnerOptions.map(option => <option key={option} value={option}>{option}</option>)}
@@ -257,7 +257,7 @@ export default function DocketClient({ entries }: DocketClientProps) {
           <select
             value={sort}
             onChange={e => setSort(e.target.value as DocketSortKey)}
-            style={{ border: "1px solid var(--rule)", padding: "9px 10px", fontSize: 12, background: "var(--ledger-card)", color: "var(--ledger-ink)" }}
+            style={{ border: "1px solid var(--rule)", padding: "10px 12px", fontSize: 13, minHeight: 44, background: "var(--ledger-card)", color: "var(--ledger-ink)" }}
           >
             <option value="date-desc">Newest</option>
             <option value="date-asc">Oldest</option>

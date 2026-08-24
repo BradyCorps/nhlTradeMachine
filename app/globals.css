@@ -177,6 +177,10 @@ button, a, select {
   .docket-filters {
     grid-template-columns: 1fr 1fr;
   }
+  /* Search spans both columns on phones (mobile audit §11). */
+  .docket-search {
+    grid-column: 1 / -1;
+  }
 }
 
 /* ── Aged paper grain ────────────────────────────────────────── */

@@ -252,7 +252,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
             <StatCell label="GS" value={player.gamesStarted != null ? String(player.gamesStarted) : "—"} />
           </div>
         ) : (
-          <div className="grid grid-cols-6 border mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
+          <div className="grid grid-cols-3 sm:grid-cols-6 border mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
             <StatCell label="GP" value={String(games)} />
             <StatCell label="G" value={goals != null ? String(goals) : "—"} />
             <StatCell label="A" value={assists != null ? String(assists) : "—"} />
