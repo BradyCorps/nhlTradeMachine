@@ -2631,6 +2631,23 @@ describe("Canary — mobile trade package summary", () => {
   });
 });
 
+describe("Canary — team detail routes", () => {
+  it("validates team routes and links every projected-line player profile", () => {
+    const page = read("app/teams/page.tsx");
+    const route = read("app/teams/[team]/page.tsx");
+
+    expect(route).toContain('from "@/app/lib/db"');
+    expect(route).toContain("notFound()");
+    expect(route).toContain("generateMetadata");
+    expect(route).toContain("<TeamsPage />");
+    expect(page).toContain("usePathname");
+    expect(page).toContain('href={`/teams/${team.id.toLowerCase()}`}');
+    expect(page).toContain("function LinePlayerLink");
+    expect(page).toContain('href={`/players/${encodeURIComponent(player.id)}`}');
+    expect(page.match(/<LinePlayerLink/g)).toHaveLength(3);
+  });
+});
+
 describe("Canary — SIM RNG determinism (audit #2/#3)", () => {
   it("uses independent named streams for awards, calder, and playoffs", () => {
     const route = read("app/api/simulate/route.ts");
