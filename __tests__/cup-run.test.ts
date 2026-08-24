@@ -291,11 +291,12 @@ describe("rollLeagueForward", () => {
 
     const bjork = res.players.find((p) => p.id === "bjork")!;
     expect(bjork.games).toBe(70);
-    expect(bjork.goalsPace).toBeCloseTo(7, 1);
-    expect(bjork.assistsPace).toBeCloseTo(29.3, 1);
     expect(bjork.avgTOI).toBe(15.8);
-    expect(bjork.ptsPace).toBeGreaterThan(25);
-    expect(bjork.baselinePtsPace).toBeGreaterThan(15);
+    expect(bjork.ptsPace).toBeGreaterThan(30);
+    expect(bjork.ptsPace).toBeLessThan(36.4); // regressed below the raw 31-in-70 pace
+    expect(bjork.baselinePtsPace).toBeGreaterThan(30); // first NHL season establishes an anchor
+    expect(bjork.baselinePtsPace).toBeLessThan(36.4);
+    expect((bjork.goalsPace ?? 0) + (bjork.assistsPace ?? 0)).toBeCloseTo(bjork.ptsPace, 5);
     expect(bjork.hasLiveStats).toBe(true);
   });
 

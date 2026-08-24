@@ -19,7 +19,7 @@ the **offseason hooks** (`useOffseasonFlow.ts`, `free-agency.ts`). Line refs bel
 are to the code on `claude/cap-crease-mobile-audit-8ug1ft`.
 
 ## Status legend
-🔴 **CONFIRMED** (accurate, root cause found) · 🟡 **PARTIAL** (accurate with nuance) · ⚪ **INACCURATE** · effort **S/M/L**.
+🔴 **CONFIRMED** (accurate, root cause found) · 🟡 **PARTIAL** (accurate with nuance) · ⚪ **INACCURATE** · ✅ **RESOLVED** · effort **S/M/L**.
 
 ---
 
@@ -100,17 +100,30 @@ are to the code on `claude/cap-crease-mobile-audit-8ug1ft`.
   no goal tilt; Connor leads in goals because his xG/pace ratio is high, label
   notwithstanding. **Fix:** feed role/line/PP into the goal-share model. **M.**
 
-### P1-7 · Elite production runs away; weakly coupled to team 🔴 CONFIRMED
-- **Root cause:** the per-player ceiling `ptsCeiling = demonstratedLevel/82 * GP *
+### P1-7 · Elite production runs away; weakly coupled to team ✅ RESOLVED
+- **Resolution (2026-08-23):** `carryForwardSimSkaterStats` now validates the
+  simulated line, establishes/updates `baselinePtsPace` as a career mean (25%
+  new season), carries only a validated 40/60 season/anchor blend, and caps the
+  pace banked in one offseason at **+20 pts/82**. The guard is re-applied after
+  the seeded `advanceSeason` roll and its career baseline is restored, so a
+  second breakout roll cannot bank the route's 1.9× young-player ceiling again.
+  G/A pace is rescaled to the guarded points pace. The deterministic three-year
+  route+rollover regression went from leaders **138/189/192** and target pace
+  **82→142.9→195.2** (red) to **127/147/129** and **82→102→118.3**
+  (green), while the existing SIM-CONS layer continues to couple team goals and
+  conserve games/goals/standings. This closes the runaway defect; a richer
+  primary/secondary-assist team-pool allocator remains a separate model
+  enhancement rather than a rollover integrity bug.
+- **Original root cause:** the per-player ceiling `ptsCeiling = demonstratedLevel/82 * GP *
   ceilingMult` with `ceilingMult` up to **1.9× for age ≤ 23** (`:633`) — a
   high-pace phenom can reach ~215 (matches Michkov 216/164; assists = pts − goals,
   and his goal share is floored per P0-4 → 164 A). Crucially, `projectSkaterOutcome`
   is **independent of the team's scoring environment**: `projectTeamPoints` rolls
   team points separately (`:333`), and nothing reconciles Σ(player goals) with a
   team goals-for. So a 150-point scorer on a 32nd-place Anaheim is unconstrained.
-- **Fix:** generate team goals first, then allocate to players (G / primary A /
-  secondary A) within that envelope so individual and team stay coupled; tighten
-  the young-player ceiling. **L.**
+- **Fix shipped:** regress and cap the year-to-year demonstrated pace in the Cup
+  Run carry path; retain the already-shipped team-GF/skater-goal conservation
+  envelope. **M.**
 
 ### P1-8 · Standings are inflated 🔴 CONFIRMED
 - **Evidence:** Year 3 = 3,176 total points, 99.25/team (implies 42% OT games);

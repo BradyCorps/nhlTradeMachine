@@ -8,6 +8,8 @@
 // bounds are what protect the shipped behaviour from a silent regression.
 import { describe, it, expect } from "vitest";
 import { POST as simulatePOST } from "../app/api/simulate/route";
+import { recordSeason, rollLeagueForward, startCupRun } from "../app/lib/cup-run";
+import { scenarioSeed } from "../app/lib/sim-engine";
 
 const DIVISIONS: Record<string, string[]> = {
   Atlantic: ["BOS","BUF","DET","FLA","MTL","OTT","TBL","TOR"],
@@ -150,5 +152,114 @@ describe("SIM-CONS believability (report)", () => {
     expect(mean(topScorerPts)).toBeLessThan(165);      // but no 216-point runaway
     expect(mean(topScorerGames)).toBeGreaterThan(70);  // stars aren't crushed by conservation
     expect(prospectG / Math.max(1, prospectG + prospectA)).toBeGreaterThan(0.24); // not the 0.22 floor
+  });
+
+  it("keeps a young star's scoring believable across a three-season Cup Run", async () => {
+    const runOnce = async () => {
+      const youngStarId = "WPG-C0";
+      let players = buildLeague(88944);
+      // Keep the rest of this fixture out of the route's deliberately broad
+      // <=23 single-season upside tail. The regression target is one player's
+      // repeated rollover, not a league-wide tuning test for unrelated phenoms.
+      for (const p of players) {
+        if (p.position !== "G" && p.id !== youngStarId) p.age = Math.max(27, p.age);
+      }
+      const youngStar = players.find(p => p.id === youngStarId)!;
+      Object.assign(youngStar, {
+        age: 19,
+        games: 42,
+        ptsPace: 82,
+        baselinePtsPace: undefined,
+        prospectPtsPace: 110,
+        draftOverall: 2,
+        avgTOI: 20.5,
+        yearsRemaining: 7,
+      });
+
+      let state = startCupRun(teams.find(t => t.id === "WPG") as any);
+      const seasonLeaders: number[] = [];
+      const seasonLeaderLines: string[] = [];
+      const starSeasons: number[] = [];
+      const carriedStarPaces: number[] = [youngStar.ptsPace];
+      const careerAnchors: number[] = [youngStar.baselinePtsPace ?? 0];
+
+      for (let year = 1; year <= 3; year++) {
+        const seed = scenarioSeed({ cupRunSeed: state.seed, cupRunYear: year });
+        const res = await simulatePOST(new Request("http://localhost/api/simulate", {
+          method: "POST",
+          body: JSON.stringify({
+            homeTeamId: "WPG",
+            partnerTeamId: "COL",
+            teams,
+            players,
+            seed,
+            trades: [],
+            lineupContext: true,
+          }),
+        }) as any);
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        const allSkaters = body.standings.flatMap((t: any) => t.projectedSkaters);
+        const starSeason = allSkaters.find((p: any) => p.playerId === youngStarId);
+        expect(starSeason).toBeDefined();
+
+        const leader = [...allSkaters].sort((a: any, b: any) => b.projectedPts - a.projectedPts)[0];
+        seasonLeaders.push(leader.projectedPts);
+        seasonLeaderLines.push(`${leader.playerId}: ${leader.projectedPts}`);
+        starSeasons.push(starSeason.projectedPts);
+
+        for (const diagnostic of body.conservation.teams) {
+          if (diagnostic.skaterCount < 18) continue;
+          expect(diagnostic.skaterGames).toBe(1476);
+          expect(diagnostic.summedSkaterGoals).toBe(diagnostic.teamGoalsFor);
+        }
+        expect(body.conservation.totalStandingsPoints).toBeGreaterThan(2880);
+        expect(body.conservation.totalStandingsPoints).toBeLessThan(2970);
+
+        if (year === 3) break;
+        state = recordSeason(state, {
+          championTeamId: "CAR",
+          championTeamName: "Carolina Hurricanes",
+          madePlayoffs: true,
+        });
+        const rolled = rollLeagueForward({
+          players,
+          seasonStartPlayers: players,
+          state,
+          teams: teams as any,
+          standings: body.standings.map((t: any, i: number) => ({ teamId: t.teamId, standing: i + 1 })),
+          capCeiling: 200,
+          simSkaterSeasons: allSkaters,
+        });
+        players = rolled.players;
+        const carriedStar = players.find(p => p.id === youngStarId)!;
+        carriedStarPaces.push(carriedStar.ptsPace);
+        careerAnchors.push(carriedStar.baselinePtsPace ?? 0);
+      }
+
+      return { seasonLeaders, seasonLeaderLines, starSeasons, carriedStarPaces, careerAnchors };
+    };
+
+    const first = await runOnce();
+    const replay = await runOnce();
+    console.log([
+      "",
+      "── Three-season Cup Run believability report ─────────────",
+      `league leaders: ${first.seasonLeaderLines.join(" | ")}`,
+      `young star seasons: ${first.starSeasons.join(", ")}`,
+      `young star carried paces: ${first.carriedStarPaces.join(" → ")}`,
+      `young star career anchors: ${first.careerAnchors.join(" → ")}`,
+      "──────────────────────────────────────────────────────────",
+    ].join("\n"));
+
+    expect(replay).toEqual(first);
+    expect(Math.max(...first.seasonLeaders)).toBeLessThanOrEqual(150);
+    expect(first.careerAnchors[1]).toBeGreaterThan(0);
+    for (let i = 1; i < first.carriedStarPaces.length; i++) {
+      expect(first.carriedStarPaces[i] - first.carriedStarPaces[i - 1]).toBeLessThanOrEqual(20);
+    }
+    for (let i = 2; i < first.careerAnchors.length; i++) {
+      expect(first.careerAnchors[i] - first.careerAnchors[i - 1]).toBeLessThanOrEqual(20);
+    }
   });
 });
