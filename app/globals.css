@@ -863,17 +863,17 @@ select.ledger-select {
 /* ── Players analytics page ──────────────────────────────────── */
 .player-row:hover { background: var(--paper-card) !important; }
 
-/* Desktop row: show on ≥540px, hide on mobile */
+/* Desktop row: show on ≥640px, hide on mobile */
 .player-row-desktop { display: grid; }
 .player-row-mobile  { display: none; }
 
-@media (max-width: 539px) {
+@media (max-width: 639px) {
   .player-row-desktop { display: none !important; }
   .player-row-mobile  { display: block !important; }
 }
 
 .players-hide-mobile { display: block; }
-@media (max-width: 540px) { .players-hide-mobile { display: none; } }
+@media (max-width: 639px) { .players-hide-mobile { display: none; } }
 
 /* ── Filter bar ── */
 .players-filter-bar {
@@ -888,7 +888,7 @@ select.ledger-select {
   gap: 10px;
   margin-bottom: 8px;
 }
-@media (max-width: 539px) {
+@media (max-width: 639px) {
   .players-filter-row1 {
     flex-direction: column;
     align-items: flex-start;
@@ -908,7 +908,7 @@ select.ledger-select {
   gap: 8px;
   flex-wrap: wrap;
 }
-@media (max-width: 539px) {
+@media (max-width: 639px) {
   .players-filter-row2 {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -927,7 +927,7 @@ select.ledger-select {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
 }
-@media (max-width: 539px) {
+@media (max-width: 639px) {
   .players-column-header {
     margin: 0 -12px;
     padding-left: 12px !important;
@@ -983,7 +983,7 @@ select.ledger-select {
   border-bottom: 1px solid var(--rule-light);
   cursor: pointer;
 }
-@media (min-width: 540px) {
+@media (min-width: 640px) {
   .player-row-grid {
     grid-template-columns: 32px 36px 1fr 80px 72px 64px;
     gap: 8px;
@@ -998,7 +998,7 @@ select.ledger-select {
   flex-wrap: wrap;
   align-items: center;
 }
-@media (max-width: 540px) {
+@media (max-width: 639px) {
   .filter-row {
     overflow-x: auto;
     flex-wrap: nowrap;
@@ -1046,7 +1046,7 @@ select.ledger-select {
 }
 .player-mobile-stat-row::-webkit-scrollbar { display: none; }
 
-@media (max-width: 539px) {
+@media (max-width: 639px) {
   .player-expanded-panel {
     padding: 10px 12px !important;
   }
