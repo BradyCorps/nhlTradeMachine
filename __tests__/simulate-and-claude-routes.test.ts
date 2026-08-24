@@ -633,6 +633,53 @@ describe("simulate route", () => {
     expect(p.projectedPts).toBeGreaterThan(0);
     expect(p.projectedGoals / p.projectedPts).toBeGreaterThan(0.27); // was ~0.22 floor
   });
+
+  it("does not dress a no-signal prospect for NHL games with zero possible offense (SIM-CONS P0-5)", async () => {
+    const noSignalProspect = {
+      ...player("zero-signal-prospect", "Zero-signal Prospect", "WPG", 0, "C"),
+      age: 20,
+      games: 0,
+      baselinePtsPace: 0,
+      xGPace: 0,
+      avgTOI: 0,
+      prospectPtsPace: 0,
+    };
+    const wpg = [
+      ...Array.from({ length: 13 }, (_, i) =>
+        player(`wpg-signal-f${i}`, `WPG Signal Forward ${i}`, "WPG", 62 - i * 2, i % 2 ? "W" : "C")
+      ),
+      noSignalProspect,
+      ...Array.from({ length: 6 }, (_, i) =>
+        player(`wpg-signal-d${i}`, `WPG Signal Defender ${i}`, "WPG", 36 - i * 3, "D")
+      ),
+      { ...player("wpg-zero-g1", "WPG Goalie", "WPG", 0, "G"), gsax: 2, gamesStarted: 55, savePct: 0.912 },
+      { ...player("wpg-zero-g2", "WPG Backup", "WPG", 0, "G"), gsax: 0, gamesStarted: 22, savePct: 0.905 },
+    ];
+    const depth = teamIds.flatMap((teamId) => teamId === "WPG" ? [] : [
+      player(`${teamId}-zero-f1`, `${teamId} Forward`, teamId, 42, "C"),
+      player(`${teamId}-zero-d1`, `${teamId} Defender`, teamId, 25, "D"),
+      { ...player(`${teamId}-zero-g1`, `${teamId} Goalie`, teamId, 0, "G"), gsax: 0, gamesStarted: 45, savePct: 0.905 },
+    ]);
+
+    const res = await simulatePOST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      body: JSON.stringify({
+        homeTeamId: "WPG",
+        partnerTeamId: "CGY",
+        teams,
+        players: [...depth, ...wpg],
+        seed: 42,
+        trades: [],
+      }),
+    }) as any);
+    const body = await res.json();
+    const wpgTeam = body.standings.find((t: any) => t.teamId === "WPG");
+    const prospect = wpgTeam.projectedSkaters.find((s: any) => s.playerId === noSignalProspect.id);
+
+    expect(body.conservation.teams.find((t: any) => t.teamId === "WPG").skaterGames).toBe(1476);
+    expect(prospect.projectedPts).toBe(0);
+    expect(prospect.gamesPlayed).toBe(0);
+  });
 });
 
 describe("claude narrative route contract", () => {

@@ -26,6 +26,7 @@ import {
   teamGoalsFor,
   TEAM_SKATER_GAMES,
   MIN_CONSERVE_SKATERS,
+  SEASON_GAMES,
 } from "@/app/lib/sim-conservation";
 import { rosterLegality } from "@/app/lib/roster-legality";
 import {
@@ -621,6 +622,17 @@ function projectSkaterOutcome(
     deploymentGroup: deployment?.group,
     deploymentSlot: deployment?.slot,
   });
+
+  // A depth prospect with no NHL/NHLe scoring signal has no path to a point in
+  // this model. Do not independently hand him a 55–82 game season anyway:
+  // limit him to the NHL sample he has actually established. A dressed young
+  // player whose lineup role unlocks a positive opportunity pace is unaffected.
+  if (isProspectProfile && effectivePace <= 0) {
+    const evidencedGames = Number.isFinite(p.games)
+      ? clamp(Math.round(p.games ?? 0), 0, SEASON_GAMES)
+      : 0;
+    gamesPlayed = Math.min(gamesPlayed, evidencedGames);
+  }
 
   // Burst channel: explosive skaters carry a fatter upside tail (variance kick
   // adds only to the ceiling) and a small steady rush-offence lift on scoring.
