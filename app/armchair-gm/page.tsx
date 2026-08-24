@@ -188,8 +188,10 @@ export default function ArmchairGmPage() {
   const {
     mode, setMode, draftOpen, setDraftOpen, resignOpen, setResignOpen,
     offerSheetOpen, setOfferSheetOpen, userPending, market, rfaMarket,
+    offseasonTransactions, offseasonDiagnostic,
     offseasonResolvedRef, resignPlayer, extendPlayer, walkPlayer, dropPlayer,
-    signMarketPlayer, proceedToOfferSheets, signOfferSheet, finishOffseason,
+    signMarketPlayer, proceedToOfferSheets, signOfferSheet, recordDraftedPlayers,
+    reconcileDraftSelections, finishOffseason,
   } = useOffseasonFlow({
     db, setDb, setOriginalDb, homeTeamId, showTeamSelect, initialNavReady,
     modeChosen: gameMode != null,
@@ -673,6 +675,7 @@ export default function ArmchairGmPage() {
     const current = applyTo(db);
     setDb(current.next);
     setOriginalDb(prev => prev ? applyTo(prev).next : prev);
+    reconcileDraftSelections(current.changedPicks);
     setCupDraftSummary(prev => {
       if (!prev?.userPick) return prev;
       const changedByOverall = new Map(current.changedPicks.map(p => [p.draftOverall ?? null, p]));
@@ -685,6 +688,17 @@ export default function ArmchairGmPage() {
       return {
         ...prev,
         topPicks,
+        transactions: [
+          ...prev.transactions,
+          ...current.changedPicks.map((player) => ({
+            playerId: player.id,
+            playerName: player.name,
+            kind: "DRAFTED" as const,
+            state: "ROSTER" as const,
+            toTeamId: player.teamId,
+            detail: `Draft board selection finalized by ${player.teamId}${player.draftOverall ? ` at #${player.draftOverall}` : ""}`,
+          })),
+        ],
         userPick: {
           ...prev.userPick,
           pickId: current.changedPicks[0]?.id ?? prev.userPick.pickId,
@@ -797,6 +811,8 @@ export default function ArmchairGmPage() {
           onDone={(results) => {
             setDraftOpen(false);
             setResignOpen(true);
+            const rookies = draftedRookieAssets(results.filter(r => r.prospect != null));
+            recordDraftedPlayers(rookies);
             setDb(prev => {
               // Sign every selection to a default 3-year ELC so the rookies join
               // their drafting team's roster, and spend the picks for the draft
@@ -816,7 +832,6 @@ export default function ArmchairGmPage() {
               // rookie discarded its draft context (draftOverall + NHLe pace),
               // leaving the seeded copy to value at 0. Backfill that context
               // onto the existing entry instead of dropping the rookie.
-              const rookies = draftedRookieAssets(results.filter(r => r.prospect != null));
               return { ...prev, players: reconcileDraftedRookies(withoutPicks, rookies) };
             });
             clearNavCache();
@@ -845,6 +860,8 @@ export default function ArmchairGmPage() {
           market={market}
           roster={db.players.filter(p => p.teamId === homeTeamId)}
           navMap={navMap}
+          transactions={offseasonTransactions}
+          stateDiagnostic={offseasonDiagnostic}
           onResign={resignPlayer}
           onExtend={extendPlayer}
           onWalk={walkPlayer}
@@ -863,6 +880,8 @@ export default function ArmchairGmPage() {
           navMap={navMap}
           teams={db.teams}
           picks={db.players.filter(p => p.position === "Pick")}
+          transactions={offseasonTransactions}
+          stateDiagnostic={offseasonDiagnostic}
           onSign={signOfferSheet}
           onDone={finishOffseason}
         />

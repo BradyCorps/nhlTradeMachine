@@ -5,15 +5,28 @@
 // and every roster/cap mutation those phases perform. The league-wide
 // resolution runs exactly once per season (offseasonResolvedRef), and
 // Cup Run rollovers reset that ref so year 2-3 re-resolve.
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { Asset, Team } from "@/app/lib/trade-types";
 import { SEASON } from "@/app/lib/season-config";
 import { scenarioSeed } from "@/app/lib/sim-engine";
-import { resolveLeagueOffseason, applyOffseasonToRoster, resolveOfferSheetCompensation, type OffseasonPending } from "@/app/lib/free-agency";
+import {
+  resolveLeagueOffseason,
+  applyOffseasonToRoster,
+  movePendingToUfaMarket,
+  projectFreeAgentContract,
+  resolveOfferSheetCompensation,
+  type OffseasonPending,
+} from "@/app/lib/free-agency";
 import { applyCapDelta, applyTeamCapDeltas } from "@/app/lib/cap-delta";
 import { applyExtensions } from "@/app/lib/extensions";
 import { clearNavCache } from "@/app/lib/evaluate-client";
 import { cupRunOffseasonEntry, type CupRunState } from "@/app/lib/cup-run";
+import {
+  auditOffseasonPlayerStates,
+  latestOffseasonStates,
+  type OffseasonTransaction,
+} from "@/app/lib/offseason-ledger";
+import { normalizeName } from "@/app/lib/name-normalize";
 import type { CupDraftSummary } from "./CupRunDraftSummaryModal";
 
 type LeagueDb = { teams: Team[]; players: Asset[]; capCeiling?: number | null };
@@ -48,7 +61,34 @@ export function useOffseasonFlow({
   const [userPending, setUserPending] = useState<OffseasonPending[]>([]);
   const [market, setMarket] = useState<OffseasonPending[]>([]);
   const [rfaMarket, setRfaMarket] = useState<OffseasonPending[]>([]);
+  const [offseasonBaseline, setOffseasonBaseline] = useState<Asset[]>([]);
+  const [draftedPlayers, setDraftedPlayers] = useState<Asset[]>([]);
+  const [offseasonTransactions, setOffseasonTransactions] = useState<OffseasonTransaction[]>([]);
   const offseasonResolvedRef = useRef(false);
+
+  const appendTransactions = useCallback((entries: OffseasonTransaction[]) => {
+    if (entries.length > 0) setOffseasonTransactions((previous) => [...previous, ...entries]);
+  }, []);
+
+  const offseasonDiagnostic = useMemo(() => {
+    const latestStates = latestOffseasonStates(offseasonTransactions);
+    return auditOffseasonPlayerStates({
+      previous: offseasonBaseline,
+      current: db.players,
+      drafted: draftedPlayers,
+      retainedRightsIds: userPending
+        .filter((pending) => pending.contract.status === "RFA")
+        .map((pending) => pending.player.id),
+      rfaIds: rfaMarket.map((pending) => pending.player.id),
+      ufaIds: [
+        ...userPending.filter((pending) => pending.contract.status === "UFA"),
+        ...market,
+      ].map((pending) => pending.player.id),
+      signedElsewhereIds: [...latestStates]
+        .filter(([, state]) => state === "SIGNED_ELSEWHERE")
+        .map(([playerId]) => playerId),
+    });
+  }, [db.players, draftedPlayers, market, offseasonBaseline, offseasonTransactions, rfaMarket, userPending]);
 
   // ── Off-Season: resolve the league's pending free agents (once) ──
   // Auto-handles the other 31 teams (re-signs / walks) and sets the user's own
@@ -66,6 +106,9 @@ export function useOffseasonFlow({
       capFloor: SEASON.capFloor,
       teams: db.teams,
     });
+    setOffseasonBaseline(db.players);
+    setDraftedPlayers([]);
+    setOffseasonTransactions(res.transactions);
     setUserPending(res.userPending);
     setMarket(res.market);
     setRfaMarket(res.rfaMarket);
@@ -124,8 +167,17 @@ export function useOffseasonFlow({
           : t),
     }));
     setUserPending(prev => prev.filter(p => p.player.id !== fa.player.id));
+    appendTransactions([{
+      playerId: fa.player.id,
+      playerName: fa.player.name,
+      kind: "RE_SIGNED",
+      state: "ROSTER",
+      fromTeamId: fa.player.teamId,
+      toTeamId: fa.player.teamId,
+      detail: `Re-signed with ${fa.player.teamId} for ${fa.contract.term} year${fa.contract.term === 1 ? "" : "s"} at $${fa.contract.aav.toFixed(2)}M`,
+    }]);
     clearNavCache();
-  }, [setDb]);
+  }, [appendTransactions, setDb]);
 
   // Extend a player who still has a year left. No cap effect now — the deal
   // starts when the current one ends, so only the horizon changes (OFF5).
@@ -139,34 +191,80 @@ export function useOffseasonFlow({
         { playerId: player.id, teamId: player.teamId, extension },
       ]),
     }));
+    appendTransactions([{
+      playerId: player.id,
+      playerName: player.name,
+      kind: "EXTENDED",
+      state: "ROSTER",
+      fromTeamId: player.teamId,
+      toTeamId: player.teamId,
+      detail: `Extended by ${player.teamId} for ${extension.term} year${extension.term === 1 ? "" : "s"} at $${extension.aav.toFixed(2)}M`,
+    }]);
     clearNavCache();
-  }, [setDb]);
+  }, [appendTransactions, setDb]);
 
   // Let a pending free agent walk — opens a roster hole and drops him into
   // the open market. Cap already freed at phase start.
   const walkPlayer = useCallback((fa: OffseasonPending) => {
+    const marketFa = movePendingToUfaMarket(fa);
     setDb(prev => ({
       ...prev,
-      players: prev.players.filter(p => p.id !== fa.player.id),
+      players: prev.players.map((player) => player.id === fa.player.id ? marketFa.player : player),
     }));
     setUserPending(prev => prev.filter(p => p.player.id !== fa.player.id));
-    setMarket(prev => [{ player: fa.player, contract: fa.contract }, ...prev]);
+    setMarket(prev => [marketFa, ...prev.filter((pending) => pending.player.id !== fa.player.id)]);
+    appendTransactions([{
+      playerId: fa.player.id,
+      playerName: fa.player.name,
+      kind: "ENTERED_MARKET",
+      state: "UFA",
+      fromTeamId: fa.player.teamId,
+      toTeamId: "FA_POOL",
+      detail: `Rights surrendered by ${fa.player.teamId}; entered the unrestricted market`,
+    }]);
     clearNavCache();
-  }, [setDb]);
+  }, [appendTransactions, setDb]);
 
-  // Release a signed player — clean release frees his full cap hit and removes
-  // him from the roster (no dead-cap retention).
+  // Release a signed player — clean release frees his full cap hit and moves
+  // him to the UFA pool (no dead-cap retention, no deletion from the league).
   const dropPlayer = useCallback((player: Asset) => {
+    const releasedPlayer: Asset = {
+      ...player,
+      teamId: "FA_POOL",
+      retainedPct: 0,
+      yearsRemaining: 0,
+      expiresThisOffseason: true,
+      contractStatus: "UFA",
+      expiryStatus: "UFA",
+    };
+    const projected = projectFreeAgentContract(releasedPlayer, {
+      seed: scenarioSeed({ release: player.id, season: SEASON.label }),
+      capCeiling: db.capCeiling ?? SEASON.capCeiling,
+    });
+    const releasedFa: OffseasonPending = {
+      player: releasedPlayer,
+      contract: { ...projected, status: "UFA", term: Math.min(projected.term, 7) },
+    };
     setDb(prev => ({
       ...prev,
-      players: prev.players.filter(p => p.id !== player.id),
+      players: prev.players.map((candidate) => candidate.id === player.id ? releasedPlayer : candidate),
       teams: prev.teams.map(t =>
         t.id === player.teamId
           ? { ...t, capSpace: Math.round(applyCapDelta(t.capSpace, { outgoing: [{ capHit: player.capHit }] }) * 10) / 10 }
           : t),
     }));
+    setMarket((previous) => [releasedFa, ...previous.filter((pending) => pending.player.id !== player.id)]);
+    appendTransactions([{
+      playerId: player.id,
+      playerName: player.name,
+      kind: "RELEASED",
+      state: "UFA",
+      fromTeamId: player.teamId,
+      toTeamId: "FA_POOL",
+      detail: `Released by ${player.teamId}; entered the unrestricted market`,
+    }]);
     clearNavCache();
-  }, [setDb]);
+  }, [appendTransactions, db.capCeiling, setDb]);
 
   // Sign a free agent off the open market onto your roster.
   const signMarketPlayer = useCallback((fa: OffseasonPending) => {
@@ -186,27 +284,49 @@ export function useOffseasonFlow({
       };
     });
     setMarket(prev => prev.filter(p => p.player.id !== fa.player.id));
+    const previousTeamId = offseasonBaseline.find((player) => player.id === fa.player.id)?.teamId
+      ?? fa.player.teamId;
+    appendTransactions([{
+      playerId: fa.player.id,
+      playerName: fa.player.name,
+      kind: "SIGNED",
+      state: previousTeamId === homeTeamId ? "ROSTER" : "SIGNED_ELSEWHERE",
+      fromTeamId: previousTeamId,
+      toTeamId: homeTeamId,
+      detail: `Signed with ${homeTeamId} for ${fa.contract.term} year${fa.contract.term === 1 ? "" : "s"} at $${fa.contract.aav.toFixed(2)}M`,
+    }]);
     clearNavCache();
-  }, [homeTeamId, setDb]);
+  }, [appendTransactions, homeTeamId, offseasonBaseline, setDb]);
 
   // Re-sign phase done — auto-walk any remaining pending FAs (cap already
   // freed at phase start), then open offer sheet phase for other teams' RFAs.
   const proceedToOfferSheets = useCallback(() => {
-    setUserPending(prev => {
-      if (prev.length > 0) {
-        const walkIds = new Set(prev.map(fa => fa.player.id));
-        setDb(dbPrev => ({
-          ...dbPrev,
-          players: dbPrev.players.filter(p => !walkIds.has(p.id)),
-        }));
-        setMarket(m => [...prev.map(fa => ({ player: fa.player, contract: fa.contract })), ...m]);
-        clearNavCache();
-      }
-      return [];
-    });
+    if (userPending.length > 0) {
+      const walked = userPending.map(movePendingToUfaMarket);
+      const byId = new Map(walked.map((pending) => [pending.player.id, pending.player]));
+      setDb(dbPrev => ({
+        ...dbPrev,
+        players: dbPrev.players.map((player) => byId.get(player.id) ?? player),
+      }));
+      setMarket((previous) => [
+        ...walked,
+        ...previous.filter((pending) => !byId.has(pending.player.id)),
+      ]);
+      appendTransactions(userPending.map((fa) => ({
+        playerId: fa.player.id,
+        playerName: fa.player.name,
+        kind: "ENTERED_MARKET",
+        state: "UFA",
+        fromTeamId: fa.player.teamId,
+        toTeamId: "FA_POOL",
+        detail: `Rights surrendered by ${fa.player.teamId}; entered the unrestricted market`,
+      })));
+      clearNavCache();
+    }
+    setUserPending([]);
     setResignOpen(false);
     setOfferSheetOpen(true);
-  }, [setDb]);
+  }, [appendTransactions, setDb, userPending]);
 
   // Sign an RFA via offer sheet: move player to the user's roster; the
   // compensation picks CONVEY to the original club (not deleted), and the
@@ -239,8 +359,66 @@ export function useOffseasonFlow({
       };
     });
     setRfaMarket(prev => prev.filter(p => p.player.id !== fa.player.id));
+    appendTransactions([{
+      playerId: fa.player.id,
+      playerName: fa.player.name,
+      kind: "SIGNED",
+      state: "SIGNED_ELSEWHERE",
+      fromTeamId: originalTeamId,
+      toTeamId: homeTeamId,
+      detail: `Offer sheet accepted: ${originalTeamId} to ${homeTeamId} at $${fa.contract.aav.toFixed(2)}M`,
+    }]);
     clearNavCache();
-  }, [homeTeamId, db.players, setDb]);
+  }, [appendTransactions, homeTeamId, db.players, setDb]);
+
+  // Draft Night runs inside this same offseason. Only genuinely new identities
+  // join the right side of the equation; a diacritic-normalized roster prospect
+  // is enriched in place by reconcileDraftedRookies and is not counted twice.
+  const recordDraftedPlayers = useCallback((rookies: Asset[]) => {
+    const knownIds = new Set([...offseasonBaseline, ...draftedPlayers].map((player) => player.id));
+    const knownNames = new Set([...offseasonBaseline, ...draftedPlayers].map((player) => normalizeName(player.name)));
+    const additions: Asset[] = [];
+    for (const rookie of rookies) {
+      const name = normalizeName(rookie.name);
+      if (knownIds.has(rookie.id) || knownNames.has(name)) continue;
+      knownIds.add(rookie.id);
+      knownNames.add(name);
+      additions.push(rookie);
+    }
+    if (additions.length === 0) return;
+    setDraftedPlayers((previous) => [...previous, ...additions]);
+    appendTransactions(additions.map((rookie) => ({
+      playerId: rookie.id,
+      playerName: rookie.name,
+      kind: "DRAFTED",
+      state: "ROSTER",
+      toTeamId: rookie.teamId,
+      detail: `Drafted by ${rookie.teamId}${rookie.draftOverall ? ` at #${rookie.draftOverall}` : ""}`,
+    })));
+  }, [appendTransactions, draftedPlayers, offseasonBaseline]);
+
+  // A future-draft board choice swaps synthetic player ids while keeping the
+  // same draft slots. Replace those identities in the captured baseline so the
+  // live free-agency audit does not mistake a user selection for a disappearance.
+  const reconcileDraftSelections = useCallback((selections: Asset[]) => {
+    const draftedSelections = selections.filter((player) =>
+      player.draftYear != null && player.draftOverall != null);
+    if (draftedSelections.length === 0) return;
+    const bySlot = new Map(draftedSelections.map((player) => [
+      `${player.draftYear}:${player.draftOverall}`,
+      player,
+    ]));
+    setOffseasonBaseline((previous) => previous.map((player) =>
+      bySlot.get(`${player.draftYear ?? ""}:${player.draftOverall ?? ""}`) ?? player));
+    appendTransactions(draftedSelections.map((player) => ({
+      playerId: player.id,
+      playerName: player.name,
+      kind: "DRAFTED",
+      state: "ROSTER",
+      toTeamId: player.teamId,
+      detail: `Draft board selection finalized by ${player.teamId}${player.draftOverall ? ` at #${player.draftOverall}` : ""}`,
+    })));
+  }, [appendTransactions]);
 
   // Commit the off-season as the new baseline and open the trade flow.
   const finishOffseason = useCallback(() => {
@@ -267,6 +445,8 @@ export function useOffseasonFlow({
     userPending,
     market,
     rfaMarket,
+    offseasonTransactions,
+    offseasonDiagnostic,
     offseasonResolvedRef,
     resignPlayer,
     extendPlayer,
@@ -275,6 +455,8 @@ export function useOffseasonFlow({
     signMarketPlayer,
     proceedToOfferSheets,
     signOfferSheet,
+    recordDraftedPlayers,
+    reconcileDraftSelections,
     finishOffseason,
   };
 }

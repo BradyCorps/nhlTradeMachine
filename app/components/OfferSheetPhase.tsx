@@ -18,6 +18,8 @@ import {
 import { SEASON } from "@/app/lib/season-config";
 import { scenarioSeed } from "@/app/lib/sim-engine";
 import { formatCapHit as money } from "@/app/lib/display-utils";
+import { OffseasonDiagnostic } from "@/app/components/OffseasonDiagnostic";
+import type { OffseasonStateDiagnostic, OffseasonTransaction } from "@/app/lib/offseason-ledger";
 const RFA_PAGE_SIZE = 30;
 
 const roundLabel = (r: string) =>
@@ -37,6 +39,8 @@ export default function OfferSheetPhase({
   teams,
   picks,
   navMap,
+  transactions,
+  stateDiagnostic,
   onSign,
   onDone,
 }: {
@@ -46,6 +50,8 @@ export default function OfferSheetPhase({
   teams: Team[];
   picks: Asset[];
   navMap?: Record<string, XNAVResult>;
+  transactions: OffseasonTransaction[];
+  stateDiagnostic: OffseasonStateDiagnostic;
   onSign: (fa: OffseasonPending, compensation: string[]) => void;
   onDone: () => void;
 }) {
@@ -160,6 +166,7 @@ export default function OfferSheetPhase({
         </div>
 
         <div className="overflow-y-auto px-5 py-4" style={{ flex: 1, minHeight: 0 }}>
+          <OffseasonDiagnostic diagnostic={stateDiagnostic} transactions={transactions} />
           {/* Offer results */}
           {results.length > 0 && (
             <div className="mb-5">

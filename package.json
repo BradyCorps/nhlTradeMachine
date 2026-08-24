@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
+    "backtest:sim-goal-share": "tsx scripts/backtest/sim-goal-share-backtest.ts",
     "gravity:calibration:check": "tsx scripts/gravity-calibration/calibrate-tiers.ts --check",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",

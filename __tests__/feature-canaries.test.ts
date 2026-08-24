@@ -2546,6 +2546,13 @@ describe("Canary — AI offseason RFA retention + no vanishing FAs (AI1–3/CXH3
     const hook = read("app/armchair-gm/useOffseasonFlow.ts");
     expect(hook).toContain("applyOffseasonToRoster(prev.players, res)");
     expect(hook).not.toContain("filter(p => !walkedIds.has(p.id))");
+    expect(hook).toContain("movePendingToUfaMarket");
+    expect(hook).not.toContain("players: prev.players.filter(p => p.id !== fa.player.id)");
+    expect(hook).not.toContain("players: dbPrev.players.filter(p => !walkIds.has(p.id))");
+    expect(hook).toContain("auditOffseasonPlayerStates");
+    expect(read("app/components/ResignPhase.tsx")).toContain("<OffseasonDiagnostic");
+    expect(read("app/components/OfferSheetPhase.tsx")).toContain("<OffseasonDiagnostic");
+    expect(read("app/armchair-gm/CupRunDraftSummaryModal.tsx")).toContain("<OffseasonDiagnostic");
   });
 });
 

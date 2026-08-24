@@ -175,6 +175,8 @@ export function useCupRunLifecycle({
         depthAddedCount: rolled.depthAddedCount,
         breakoutCount: rolled.events.filter(e => e.type === "breakout").length,
         regressionCount: rolled.events.filter(e => e.type === "regression").length,
+        transactions: rolled.transactions,
+        stateDiagnostic: rolled.stateDiagnostic,
         topPicks: drafted.slice(0, 10).map(p => ({
           id: p.id,
           name: p.name,

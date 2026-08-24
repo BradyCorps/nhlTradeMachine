@@ -16,6 +16,7 @@ import { computeBreakout } from "@/app/lib/breakout-model";
 import { burstProfile } from "@/app/lib/burst-channel";
 import { gravityForSimulation } from "@/app/lib/gravity-channels";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
+import { simGoalShare } from "@/app/lib/sim-goal-share";
 import { effectiveCapHit } from "@/app/lib/cap-delta";
 import { simRequestSchema } from "@/app/lib/sim-request-schema";
 import { teamWindow } from "@/app/lib/team-window";
@@ -30,7 +31,10 @@ import {
 } from "@/app/lib/sim-conservation";
 import { rosterLegality } from "@/app/lib/roster-legality";
 import {
-  specialTeamsPointMultiplier, specialTeamsGamesBonus, type SpecialTeamsOrder,
+  powerPlayUnit,
+  specialTeamsPointMultiplier,
+  specialTeamsGamesBonus,
+  type SpecialTeamsOrder,
 } from "@/app/lib/special-teams";
 import {
   DIVISIONS,
@@ -184,6 +188,7 @@ interface SkaterDeployment {
   /** RL6 — special-teams multiplier and games bonus, 1.0/0 when neither. */
   specialTeamsMultiplier: number;
   specialTeamsGames: number;
+  powerPlayUnit: 1 | 2 | null;
 }
 
 const safeIds = (ids: string[] | undefined): string[] =>
@@ -298,6 +303,7 @@ function buildDeploymentMap(order?: TeamLineupOrder): Map<string, SkaterDeployme
       gamesFloor: floors[line] ?? 48,
       specialTeamsMultiplier: stMult(id),
       specialTeamsGames: stGames(id),
+      powerPlayUnit: powerPlayUnit(id, specialTeams),
     });
   });
   safeIds(order?.defense).slice(0, 6).forEach((id, slot) => {
@@ -312,6 +318,7 @@ function buildDeploymentMap(order?: TeamLineupOrder): Map<string, SkaterDeployme
       gamesFloor: floors[pair] ?? 56,
       specialTeamsMultiplier: stMult(id),
       specialTeamsGames: stGames(id),
+      powerPlayUnit: powerPlayUnit(id, specialTeams),
     });
   });
   return deployments;
@@ -666,8 +673,22 @@ function projectSkaterOutcome(
   const xgGoalShare = hasFinishingSignal && stablePace > 0
     ? clamp((p.xGPace ?? 0) / Math.max(stablePace, 1), 0.22, p.position === "D" ? 0.36 : 0.55)
     : p.position === "D" ? 0.24 : forwardGoalPrior;
-  const roleGoalShare = p.position === "D" ? 0.24 : xgGoalShare;
-  const projectedGoals = Math.max(0, Math.min(projectedPts, Math.round(projectedPts * roleGoalShare * (0.88 + rand() * 0.24))));
+  // SIM-P1-6 — the holdout-cleared layer shrinks that noisy anchor, then lets
+  // evidence-backed scoring role and deployment determine goal-vs-assist type.
+  const baseGoalShare = p.position === "D" ? 0.24 : xgGoalShare;
+  const role = derivePlayerRoles(p as any)?.primary.key ?? null;
+  const deploymentLine = deployment?.active
+    ? Math.floor(deployment.slot / (deployment.group === "D" ? 2 : 3)) + 1
+    : null;
+  const calibratedGoalShare = simGoalShare({
+    position: p.position,
+    anchorGoalShare: baseGoalShare,
+    role,
+    line: deploymentLine,
+    powerPlayUnit: deployment?.powerPlayUnit,
+    avgTOI: p.avgTOI,
+  });
+  const projectedGoals = Math.max(0, Math.min(projectedPts, Math.round(projectedPts * calibratedGoalShare * (0.88 + rand() * 0.24))));
 
   return {
     playerId: p.id,

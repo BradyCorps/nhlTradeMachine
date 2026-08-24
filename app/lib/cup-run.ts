@@ -14,6 +14,11 @@ import { SEASON } from "./season-config";
 import { planCapCompliance } from "./ai-cap";
 import { activateMaturedExtension } from "./extensions";
 import { teamWindow } from "@/app/lib/team-window";
+import {
+  auditOffseasonPlayerStates,
+  type OffseasonStateDiagnostic,
+  type OffseasonTransaction,
+} from "@/app/lib/offseason-ledger";
 
 // ── Types ─────────────────────────────────────────────────────
 export interface CupRunSeasonRecord {
@@ -160,6 +165,8 @@ export interface RollForwardResult {
   rookieCount: number;
   draftedRookies: Asset[];
   depthAddedCount: number;
+  transactions: OffseasonTransaction[];
+  stateDiagnostic: OffseasonStateDiagnostic;
 }
 
 export interface CupRunSkaterSeason {
@@ -441,6 +448,24 @@ export function rollLeagueForward(opts: {
     const owner = firstRoundOwner.get(r.teamId);
     return owner && owner !== r.teamId ? { ...r, teamId: owner } : r;
   });
+  const transactions: OffseasonTransaction[] = [
+    ...rolled.retired.map((player): OffseasonTransaction => ({
+      playerId: player.id,
+      playerName: player.name,
+      kind: "RETIRED",
+      state: "RETIRED",
+      fromTeamId: player.teamId,
+      detail: `Retired at age ${player.age}`,
+    })),
+    ...rookies.map((player): OffseasonTransaction => ({
+      playerId: player.id,
+      playerName: player.name,
+      kind: "DRAFTED",
+      state: "ROSTER",
+      toTeamId: player.teamId,
+      detail: `Drafted by ${player.teamId}${player.draftOverall ? ` at #${player.draftOverall}` : ""}`,
+    })),
+  ];
 
   // Flag every contract that has run out so resolveLeagueOffseason picks
   // it up on re-entry — including rows that were already at 0 years
@@ -473,6 +498,7 @@ export function rollLeagueForward(opts: {
   // Clubs that could not reach the ceiling by cutting — surfaced rather than
   // silently left over the cap.
   const capNonCompliant: string[] = [];
+  const capCutIds = new Set<string>();
 
   const enforceAiCap = () => {
     capNonCompliant.length = 0;
@@ -488,6 +514,19 @@ export function rollLeagueForward(opts: {
       if (plan.cuts.length === 0 && !plan.compliant) capNonCompliant.push(team.id);
       if (plan.cuts.length === 0) continue;
       const cutIds = new Set(plan.cuts.map((c: { id: string }) => c.id));
+      for (const cut of plan.cuts) {
+        if (capCutIds.has(cut.id)) continue;
+        capCutIds.add(cut.id);
+        transactions.push({
+          playerId: cut.id,
+          playerName: cut.name,
+          kind: "RELEASED",
+          state: "UFA",
+          fromTeamId: team.id,
+          toTeamId: "FA_POOL",
+          detail: `Released by ${team.id} for cap compliance`,
+        });
+      }
       nextPlayers = nextPlayers.map((p) =>
         cutIds.has(p.id)
           ? { ...p, teamId: "FA_POOL", expiryStatus: "UFA" as const, expiresThisOffseason: true }
@@ -504,6 +543,7 @@ export function rollLeagueForward(opts: {
 
   // 5. Roster repair (after cuts) — every team must dress a lineup
   let depthAdded = 0;
+  const generatedDepth: Asset[] = [];
   for (const team of teams) {
     const roster = nextPlayers.filter((p) => p.teamId === team.id && isSkaterOrGoalie(p));
     const need: Array<["C" | "W" | "D" | "G", number]> = [
@@ -513,7 +553,17 @@ export function rollLeagueForward(opts: {
     ];
     for (const [pos, missing] of need) {
       for (let i = 0; i < missing; i++) {
-        nextPlayers.push(depthPlayer(team.id, pos, draftYear, i + 1));
+        const player = depthPlayer(team.id, pos, draftYear, i + 1);
+        nextPlayers.push(player);
+        generatedDepth.push(player);
+        transactions.push({
+          playerId: player.id,
+          playerName: player.name,
+          kind: "DEPTH_ADDED",
+          state: "ROSTER",
+          toTeamId: team.id,
+          detail: `Generated replacement-depth signing by ${team.id}`,
+        });
         depthAdded++;
       }
     }
@@ -523,6 +573,16 @@ export function rollLeagueForward(opts: {
   // pass so AI clubs do not carry illegal rosters into the next simulated year.
   enforceAiCap();
 
+  const generatedDepthIds = new Set(generatedDepth.map((player) => player.id));
+  const stateDiagnostic = auditOffseasonPlayerStates({
+    previous: skatersBeforeCarry,
+    current: nextPlayers,
+    drafted: rookies,
+    retired: rolled.retired,
+    ufaIds: [...capCutIds].filter((playerId) => !generatedDepthIds.has(playerId)),
+    excludedSyntheticDepthIds: [...generatedDepthIds],
+  });
+
   return {
     players: [...nextPlayers, ...picks],
     events: rolled.events,
@@ -530,6 +590,8 @@ export function rollLeagueForward(opts: {
     rookieCount: rookies.length,
     draftedRookies: rookies,
     depthAddedCount: depthAdded,
+    transactions,
+    stateDiagnostic,
   };
 }
 

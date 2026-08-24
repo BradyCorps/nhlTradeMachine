@@ -214,6 +214,10 @@ describe("rollLeagueForward", () => {
     expect(res.rookieCount).toBe(32);
     expect(res.draftedRookies).toHaveLength(32);
     expect(res.players.some((p) => p.id === "pick-1")).toBe(true);
+    expect(res.stateDiagnostic.ok).toBe(true);
+    expect(res.stateDiagnostic.draftedCount).toBe(32);
+    expect(res.transactions.filter((transaction) => transaction.kind === "DRAFTED")).toHaveLength(32);
+    expect(res.transactions.some((transaction) => transaction.kind === "RETIRED" && transaction.playerId === "van-old")).toBe(true);
 
     for (const t of teams) {
       const roster = res.players.filter((p) => p.teamId === t.id && p.position !== "Pick");

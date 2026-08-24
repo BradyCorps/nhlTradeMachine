@@ -16,6 +16,12 @@ import { SEASON } from "@/app/lib/season-config";
 import { marketBudgetFor } from "@/app/lib/ai-cap";
 import { resolveAiExtensions, type ExtensionOffer } from "@/app/lib/extensions";
 import { applyAiTrades, resolveAiTrades, type AiTrade } from "@/app/lib/ai-trades";
+import {
+  auditOffseasonPlayerStates,
+  latestOffseasonStates,
+  type OffseasonStateDiagnostic,
+  type OffseasonTransaction,
+} from "@/app/lib/offseason-ledger";
 
 export type FaStatus = "UFA" | "RFA";
 export type FaTier = "STAR" | "TOP" | "MIDDLE" | "DEPTH" | "FRINGE";
@@ -364,6 +370,22 @@ export interface OffseasonPending {
   contract: ProjectedContract;
 }
 
+/** Surrendered rights become a canonical UFA-pool row, not a UI-only player. */
+export function movePendingToUfaMarket(fa: OffseasonPending): OffseasonPending {
+  return {
+    player: {
+      ...fa.player,
+      teamId: "FA_POOL",
+      retainedPct: 0,
+      expiresThisOffseason: true,
+      contractStatus: "UFA",
+      expiryStatus: "UFA",
+      yearsRemaining: 0,
+    },
+    contract: { ...fa.contract, status: "UFA" },
+  };
+}
+
 /**
  * Order pending free agents the way the NHL offseason actually runs: restricted
  * business first, then unrestricted.
@@ -397,6 +419,10 @@ export interface LeagueOffseasonResult {
   // Cap-clearing trades between AI clubs that came out of free agency over the
   // ceiling (OFF7).
   aiTrades: AiTrade[];
+  // Chronological player movement plus the conservation check over its terminal
+  // roster/rights/market states (SIM-P1-9).
+  transactions: OffseasonTransaction[];
+  stateDiagnostic: OffseasonStateDiagnostic;
 }
 
 export interface ResolveContext {
@@ -423,6 +449,7 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
   const marketSignings: LeagueOffseasonResult["marketSignings"] = [];
   const market: OffseasonPending[] = [];
   const rfaMarket: OffseasonPending[] = [];
+  const transactions: OffseasonTransaction[] = [];
   const teamCapMoves: Record<string, CapDeltaMoves> = {};
   const mutableCap = ctx.teams
     ? new Map(ctx.teams.map((t) => [t.id, t.capSpace ?? 0]))
@@ -453,6 +480,16 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
 
     if (ctx.userTeamId && player.teamId === ctx.userTeamId) {
       userPending.push({ player, contract });
+      transactions.push({
+        playerId: player.id,
+        playerName: player.name,
+        kind: contract.status === "RFA" ? "RIGHTS_RETAINED" : "ENTERED_MARKET",
+        state: contract.status === "RFA" ? "RETAINED_RIGHTS" : "UFA",
+        fromTeamId: player.teamId,
+        detail: contract.status === "RFA"
+          ? `${player.teamId} retained negotiation rights`
+          : `${player.teamId} contract expired; UFA decision pending`,
+      });
       continue;
     }
 
@@ -466,8 +503,24 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
       const marketContract = { ...contract, term: Math.min(contract.term, MARKET_TERM_CAP) };
       if (contract.status === "RFA") {
         rfaMarket.push({ player, contract: marketContract });
+        transactions.push({
+          playerId: player.id,
+          playerName: player.name,
+          kind: "OFFER_SHEET_ELIGIBLE",
+          state: "RFA",
+          fromTeamId: player.teamId,
+          detail: "Restricted free agent remains offer-sheet eligible",
+        });
       } else {
         addMarketCandidate({ player, contract: marketContract });
+        transactions.push({
+          playerId: player.id,
+          playerName: player.name,
+          kind: "ENTERED_MARKET",
+          state: "UFA",
+          fromTeamId: player.teamId,
+          detail: "Entered the unrestricted free-agent market",
+        });
       }
       continue;
     }
@@ -484,18 +537,52 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
       addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
       addMove(player.teamId, "incoming", { capHit: contract.aav });
       resignings.push({ playerId: player.id, teamId: player.teamId, contract });
+      transactions.push({
+        playerId: player.id,
+        playerName: player.name,
+        kind: "RE_SIGNED",
+        state: "ROSTER",
+        fromTeamId: player.teamId,
+        toTeamId: player.teamId,
+        detail: `Re-signed with ${player.teamId} for ${contract.term} year${contract.term === 1 ? "" : "s"} at $${contract.aav.toFixed(2)}M`,
+      });
       rfaMarket.push({ player, contract });
+      transactions.push({
+        playerId: player.id,
+        playerName: player.name,
+        kind: "OFFER_SHEET_ELIGIBLE",
+        state: "RFA",
+        fromTeamId: player.teamId,
+        detail: `${player.teamId} retained rights; offer-sheet eligible`,
+      });
     } else {
       const resign = rand() < contract.resignProbability;
       if (resign && wouldFit(player.teamId, contract.aav - expiringCapHit)) {
         addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
         addMove(player.teamId, "incoming", { capHit: contract.aav });
         resignings.push({ playerId: player.id, teamId: player.teamId, contract });
+        transactions.push({
+          playerId: player.id,
+          playerName: player.name,
+          kind: "RE_SIGNED",
+          state: "ROSTER",
+          fromTeamId: player.teamId,
+          toTeamId: player.teamId,
+          detail: `Re-signed with ${player.teamId} for ${contract.term} year${contract.term === 1 ? "" : "s"} at $${contract.aav.toFixed(2)}M`,
+        });
       } else {
         addMove(player.teamId, "outgoing", { capHit: expiringCapHit });
         const marketContract = { ...contract, term: Math.min(contract.term, MARKET_TERM_CAP) };
         walkAways.push({ playerId: player.id, fromTeamId: player.teamId, contract: marketContract });
         addMarketCandidate({ player, contract: marketContract });
+        transactions.push({
+          playerId: player.id,
+          playerName: player.name,
+          kind: "ENTERED_MARKET",
+          state: "UFA",
+          fromTeamId: player.teamId,
+          detail: `Left ${player.teamId} for the unrestricted free-agent market`,
+        });
       }
     }
   }
@@ -557,6 +644,15 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
         teamId: winner.id,
         contract: pending.contract,
       });
+      transactions.push({
+        playerId: pending.player.id,
+        playerName: pending.player.name,
+        kind: "SIGNED",
+        state: "SIGNED_ELSEWHERE",
+        fromTeamId: pending.player.teamId,
+        toTeamId: winner.id,
+        detail: `Signed with ${winner.id} for ${pending.contract.term} year${pending.contract.term === 1 ? "" : "s"} at $${pending.contract.aav.toFixed(2)}M`,
+      });
       signedMarketIds.add(pending.player.id);
     }
 
@@ -574,6 +670,20 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
         userTeamId: ctx.userTeamId ?? undefined,
       })
     : [];
+
+  for (const extension of aiExtensions) {
+    const player = players.find((candidate) => candidate.id === extension.playerId);
+    if (!player) continue;
+    transactions.push({
+      playerId: player.id,
+      playerName: player.name,
+      kind: "EXTENDED",
+      state: "ROSTER",
+      fromTeamId: extension.teamId,
+      toTeamId: extension.teamId,
+      detail: `Extended by ${extension.teamId} for ${extension.extension.term} year${extension.extension.term === 1 ? "" : "s"} at $${extension.extension.aav.toFixed(2)}M`,
+    });
+  }
 
   // OFF7 — clubs that came out of free agency over the ceiling shed salary.
   // Runs last, on the post-signing cap picture, because that is when a club
@@ -601,9 +711,66 @@ export function resolveLeagueOffseason(players: Asset[], ctx: ResolveContext = {
     addMove(t.fromTeamId, "incoming", asCapAsset(back));
     addMove(t.toTeamId, "incoming", asCapAsset(out));
     addMove(t.toTeamId, "outgoing", asCapAsset(back));
+    transactions.push(
+      {
+        playerId: out.id,
+        playerName: out.name,
+        kind: "TRADED",
+        state: "ROSTER",
+        fromTeamId: t.fromTeamId,
+        toTeamId: t.toTeamId,
+        detail: `Traded from ${t.fromTeamId} to ${t.toTeamId}`,
+      },
+      {
+        playerId: back.id,
+        playerName: back.name,
+        kind: "TRADED",
+        state: "ROSTER",
+        fromTeamId: t.toTeamId,
+        toTeamId: t.fromTeamId,
+        detail: `Traded from ${t.toTeamId} to ${t.fromTeamId}`,
+      },
+    );
   }
 
-  return { expiringCount: expiring.length, userPending, resignings, walkAways, marketSignings, market, rfaMarket, teamCapMoves, aiExtensions, aiTrades };
+  const appliedPlayers = applyOffseasonToRoster(players, {
+    resignings,
+    walkAways,
+    marketSignings,
+    aiExtensions,
+    aiTrades,
+  });
+  const latestStates = latestOffseasonStates(transactions);
+  const stateDiagnostic = auditOffseasonPlayerStates({
+    previous: players,
+    current: appliedPlayers,
+    retainedRightsIds: userPending
+      .filter((pending) => pending.contract.status === "RFA")
+      .map((pending) => pending.player.id),
+    rfaIds: rfaMarket.map((pending) => pending.player.id),
+    ufaIds: [
+      ...userPending.filter((pending) => pending.contract.status === "UFA"),
+      ...market,
+    ].map((pending) => pending.player.id),
+    signedElsewhereIds: [...latestStates]
+      .filter(([, state]) => state === "SIGNED_ELSEWHERE")
+      .map(([playerId]) => playerId),
+  });
+
+  return {
+    expiringCount: expiring.length,
+    userPending,
+    resignings,
+    walkAways,
+    marketSignings,
+    market,
+    rfaMarket,
+    teamCapMoves,
+    aiExtensions,
+    aiTrades,
+    transactions,
+    stateDiagnostic,
+  };
 }
 
 // Apply a resolved offseason to the league roster. Re-signings take their new

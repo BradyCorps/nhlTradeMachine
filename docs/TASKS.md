@@ -65,15 +65,17 @@ Fix: an authenticated daily job precomputes the canonical roster, server NAV map
 Acceptance: NHL egress verified; measured production requests reduced player bootstrap from 25.97s cold to 65.6ms warm, Teams payload from 1.09s cold to 6.5ms warm, reused Team Analytics from 0.99s cold to 49.7ms warm, and Docket from an unbounded >15s request to 1.40s cold / 48.8ms warm with its shell starting in 345ms. Server and client NAV results are regression-tested as identical; full suite, tsc, lint, and production build are green. ✅ 2026-08-24.
 
 ## [ ] Sim Engine — remaining audit items
-Full detail + status: `docs/sim-engine-audit-triage.md` (P0-1…P0-5, P1-7, P1-8 are ✅ RESOLVED).
+Full detail + status: `docs/sim-engine-audit-triage.md` (P0-1…P0-5, P1-6…P1-8 are ✅ RESOLVED).
 
-### [ ] SIM-P1-6 — Roles/line/PP don't affect goal-vs-assist type
+### [x] SIM-P1-6 — Roles/line/PP don't affect goal-vs-assist type
 Root: goal share is the xG/pace ratio + a D special-case; the modern role labels are display-only (`app/api/simulate/route.ts`).
 Fix: feed role/line/PP/TOI into the goal-share model. Backtest against real NHL G/A splits before it moves a number (CLAUDE.md hard rule).
+Acceptance: a frozen prior-season model fit on 960 player-season pairs feeds evidence-backed role, line/pair, PP unit, and TOI into the split; on an untouched 475-player 2025-26 holdout it improved weighted MAE from 0.08308 to 0.06973 (16.1%), predicted the league mean within 0.1 percentage point, and every signal passed its ablation gate. Full suite and tsc are green. ✅ 2026-08-24.
 
-### [ ] SIM-P1-9 — No transaction ledger / player-state invariant
+### [x] SIM-P1-9 — No transaction ledger / player-state invariant
 Root: offseason walk-aways move internally but are never reconciled or surfaced (`free-agency.ts`, `useOffseasonFlow.ts`).
 Fix: add a transaction ledger + the invariant `roster + retained rights + RFA + UFA + signed-elsewhere + retired = previous + drafted`, checked each offseason and exposed as a diagnostic.
+Acceptance: every free-agency and Cup Run rollover transition is recorded in a user-visible ledger; walks/releases preserve the canonical player row and surrender RFA rights into UFA state; the unique-player partition fails on missing, unexpected, duplicated, or conflicting identities while transparently excluding only newly generated depth placeholders. Focused tests 489/489, full suite 2,170/2,170, and tsc are green. ✅ 2026-08-24.
 
 ## [~] New Sim Engine/Off season
 

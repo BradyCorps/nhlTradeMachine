@@ -120,6 +120,63 @@ describe("simulate route", () => {
     expect(benched.gamesPlayed).toBeLessThanOrEqual(48); // press-box depth minutes, not a full slate
   });
 
+  it("feeds line and PP deployment into a skater's goal-vs-assist split (SIM-P1-6)", async () => {
+    const subject = { ...player("wpg-split", "Split Subject", "WPG", 82, "W"), xGPace: 30 };
+    const forwards = Array.from({ length: 11 }, (_, i) =>
+      player(`wpg-split-f${i}`, `Split Forward ${i}`, "WPG", 48 - i, i % 2 ? "W" : "C")
+    );
+    const defender = player("wpg-split-d", "Split Defender", "WPG", 28, "D");
+    const goalie = {
+      ...player("wpg-split-g", "Split Goalie", "WPG", 0, "G"),
+      gsax: 0,
+      gamesStarted: 45,
+      savePct: 0.905,
+    };
+    const depth = teamIds.flatMap((teamId) => teamId === "WPG" ? [] : [
+      player(`${teamId}-split-f`, `${teamId} Forward`, teamId, 42, "C"),
+      player(`${teamId}-split-d`, `${teamId} Defender`, teamId, 25, "D"),
+      { ...player(`${teamId}-split-g`, `${teamId} Goalie`, teamId, 0, "G"), gsax: 0, gamesStarted: 45, savePct: 0.905 },
+    ]);
+    const run = async (forwardOrder: string[], powerPlay: string[]) => {
+      const res = await simulatePOST(new Request("http://localhost/api/simulate", {
+        method: "POST",
+        body: JSON.stringify({
+          homeTeamId: "WPG",
+          partnerTeamId: "CGY",
+          teams,
+          players: [...depth, subject, ...forwards, defender, goalie],
+          trades: [],
+          seed: 73,
+          lineup: {
+            orders: {
+              WPG: {
+                forwards: forwardOrder,
+                defense: [defender.id],
+                goalies: [goalie.id],
+                powerPlay,
+              },
+            },
+          },
+        }),
+      }) as any);
+      const body = await res.json();
+      return body.homeTeam.projectedSkaters.find((skater: any) => skater.playerId === subject.id);
+    };
+
+    const forwardIds = forwards.map((forward) => forward.id);
+    const featured = await run(
+      [subject.id, ...forwardIds],
+      [subject.id, ...forwardIds.slice(0, 3), defender.id],
+    );
+    const depthRole = await run(
+      [...forwardIds.slice(0, 9), subject.id, ...forwardIds.slice(9)],
+      [...forwardIds.slice(0, 4), defender.id],
+    );
+
+    expect(featured.projectedGoals / featured.projectedPts)
+      .toBeGreaterThan(depthRole.projectedGoals / depthRole.projectedPts);
+  });
+
   it("gives an explosive skater (EDGE burst) a rush-offense lift in the projection", async () => {
     // Same player id + same seed => identical RNG stream, so the ONLY difference
     // between the two runs is the burst channel. Explosiveness must not lower it

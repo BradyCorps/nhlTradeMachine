@@ -4,6 +4,7 @@ import {
   projectFreeAgentContract,
   resolveLeagueOffseason,
   applyOffseasonToRoster,
+  movePendingToUfaMarket,
   resolveOfferSheetCompensation,
   FA,
 } from "../app/lib/free-agency";
@@ -103,6 +104,36 @@ describe("resolveLeagueOffseason", () => {
     expect(res.teamCapMoves["WPG"]).toBeUndefined();
     expect(res.resignings.some((r) => r.playerId === "wpg-ufa")).toBe(false);
     expect(res.walkAways.some((w) => w.playerId === "wpg-ufa")).toBe(false);
+  });
+
+  it("emits a reconciled player-state diagnostic and transaction ledger", () => {
+    const res = resolveLeagueOffseason(players, { seed: 42, userTeamId: "WPG" });
+
+    expect(res.stateDiagnostic.ok).toBe(true);
+    expect(res.stateDiagnostic.actualCount).toBe(4);
+    expect(res.stateDiagnostic.expectedCount).toBe(4);
+    expect(res.transactions.some((transaction) => transaction.playerId === "wpg-ufa")).toBe(true);
+    expect(res.transactions.some((transaction) => transaction.playerId === "stl-rfa" && transaction.state === "RFA")).toBe(true);
+  });
+
+  it("keeps a surrendered RFA in the canonical UFA pool", () => {
+    const rfa = mkAsset({
+      id: "walked-rfa",
+      teamId: "WPG",
+      position: "D",
+      age: 23,
+      contractStatus: "RFA",
+    });
+    const pending = {
+      player: rfa,
+      contract: projectFreeAgentContract(rfa, { seed: 2 }),
+    };
+
+    const moved = movePendingToUfaMarket(pending);
+    expect(moved.player.id).toBe(rfa.id);
+    expect(moved.player.teamId).toBe("FA_POOL");
+    expect(moved.player.contractStatus).toBe("UFA");
+    expect(moved.contract.status).toBe("UFA");
   });
 
   it("always re-signs RFAs and books the cap swing (old off, new on)", () => {

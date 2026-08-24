@@ -6,6 +6,8 @@ import { createPortal } from "react-dom";
 import type { Asset } from "@/app/lib/trade-types";
 import type { CapDeltaMoves } from "@/app/lib/cap-delta";
 import type { FutureDraftChoice, FutureDraftPrompt } from "@/app/lib/future-draft-choice";
+import { OffseasonDiagnostic } from "@/app/components/OffseasonDiagnostic";
+import type { OffseasonStateDiagnostic, OffseasonTransaction } from "@/app/lib/offseason-ledger";
 
 export type CupDraftSummary = {
   seasonLabel: string;
@@ -15,6 +17,8 @@ export type CupDraftSummary = {
   depthAddedCount: number;
   breakoutCount: number;
   regressionCount: number;
+  transactions: OffseasonTransaction[];
+  stateDiagnostic: OffseasonStateDiagnostic;
   topPicks: Array<{ id: string; name: string; teamId: string; position: string; overall: number | null }>;
   userPick?: FutureDraftPrompt | null;
 };
@@ -48,6 +52,11 @@ export function CupRunDraftSummaryModal({
         </div>
 
         <div className="overflow-y-auto px-4 sm:px-5 py-4" style={{ flex: 1, minHeight: 0 }}>
+          <OffseasonDiagnostic
+            diagnostic={summary.stateDiagnostic}
+            transactions={summary.transactions}
+            title="Rollover Player-State Audit"
+          />
           {summary.userPick && (
             <div className="mb-4 px-3 py-3"
               style={{ background: "var(--paper)", border: "2px solid var(--ledger-ice)", borderRadius: "2px" }}>

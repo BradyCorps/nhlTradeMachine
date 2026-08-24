@@ -6,11 +6,13 @@ import { sortPendingByRights } from "@/app/lib/free-agency";
 import { buildCapHorizon, withProjectedSigning } from "@/app/lib/cap-horizon";
 import { isExtensionEligible, projectExtension } from "@/app/lib/extensions";
 import { CapHorizon } from "@/app/components/CapHorizon";
+import { OffseasonDiagnostic } from "@/app/components/OffseasonDiagnostic";
 import { SEASON } from "@/app/lib/season-config";
 import { createPortal } from "react-dom";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
 import type { OffseasonPending } from "@/app/lib/free-agency";
+import type { OffseasonStateDiagnostic, OffseasonTransaction } from "@/app/lib/offseason-ledger";
 import { getOfferSheetCompensation } from "@/app/lib/free-agency";
 import StrandView from "@/app/components/StrandView";
 import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePanel";
@@ -21,7 +23,8 @@ import {
 const MARKET_PAGE_SIZE = 30;
 
 export default function ResignPhase({
-  homeTeam, capSpace, pending, market, roster, navMap, onResign, onWalk, onSign, onDrop, onExtend, onDone,
+  homeTeam, capSpace, pending, market, roster, navMap, transactions, stateDiagnostic,
+  onResign, onWalk, onSign, onDrop, onExtend, onDone,
 }: {
   homeTeam: Team;
   capSpace: number;
@@ -29,6 +32,8 @@ export default function ResignPhase({
   market: OffseasonPending[];
   roster: Asset[];
   navMap?: Record<string, XNAVResult>;
+  transactions: OffseasonTransaction[];
+  stateDiagnostic: OffseasonStateDiagnostic;
   onResign: (p: OffseasonPending) => void;
   onWalk: (p: OffseasonPending) => void;
   onSign: (p: OffseasonPending) => void;
@@ -145,6 +150,7 @@ export default function ResignPhase({
         </div>
 
         <div className="overflow-y-auto px-3 sm:px-5 py-4" style={{ flex: 1, minHeight: 0 }}>
+          <OffseasonDiagnostic diagnostic={stateDiagnostic} transactions={transactions} />
           {/* Pending free agents — restricted first, then unrestricted */}
           <h3 className="text-[11px] font-black uppercase tracking-[0.3em] font-mono mb-1" style={{ color: "var(--ledger-ink-faint)" }}>
             Your Pending Free Agents — {pending.length}
