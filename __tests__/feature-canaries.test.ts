@@ -2396,6 +2396,44 @@ describe("Canary — Outlook credibility (confidence cap, trend reconciliation, 
 });
 
 describe("Canary — fantasy page AA, pagination, and selection accent", () => {
+  it("uses mobile draft and goalie cards while keeping wide tables desktop-only", () => {
+    const page = read("app/fantasy/page.tsx");
+    const draftStart = page.indexOf("{/* Draft board */}");
+    const goalieStart = page.indexOf("{/* Goalie board */}", draftStart);
+    expect(draftStart).toBeGreaterThanOrEqual(0);
+    expect(goalieStart).toBeGreaterThan(draftStart);
+
+    const draft = page.slice(draftStart, goalieStart);
+    const mobileDraftStart = draft.indexOf('className="fantasy-draft-mobile md:hidden border"');
+    const desktopDraftStart = draft.indexOf('className="fantasy-draft-desktop hidden md:block border overflow-x-auto"');
+    expect(mobileDraftStart).toBeGreaterThanOrEqual(0);
+    expect(desktopDraftStart).toBeGreaterThan(mobileDraftStart);
+
+    const mobileDraft = draft.slice(mobileDraftStart, desktopDraftStart);
+    expect(mobileDraft).toContain("toggleTaken(r.p.id)");
+    expect(mobileDraft).toContain("r.p.name");
+    expect(mobileDraft).toContain("r.posGroup");
+    expect(mobileDraft).toContain("T{r.tier}");
+    expect(mobileDraft).toContain("FP/82");
+    expect(mobileDraft).toContain("VOR");
+    expect(mobileDraft).toContain("aria-expanded={isExpanded}");
+    expect(mobileDraft).toContain("fantasy-mobile-outlook-");
+    expect(mobileDraft).toContain("tap-target");
+    expect(draft).toContain('aria-label="Sort mobile draft board"');
+
+    const desktopDraft = draft.slice(desktopDraftStart);
+    expect(desktopDraft).toContain("<table");
+    expect(desktopDraft).toContain("minWidth: 780");
+
+    const goalie = page.slice(goalieStart);
+    const mobileGoalieStart = goalie.indexOf('className="fantasy-goalie-mobile md:hidden border"');
+    const desktopGoalieStart = goalie.indexOf('className="fantasy-goalie-desktop hidden md:block border overflow-x-auto"');
+    expect(mobileGoalieStart).toBeGreaterThanOrEqual(0);
+    expect(desktopGoalieStart).toBeGreaterThan(mobileGoalieStart);
+    expect(goalie.slice(mobileGoalieStart, desktopGoalieStart)).toContain("entry.startShare");
+    expect(goalie.slice(desktopGoalieStart)).toContain("minWidth: 640");
+  });
+
   it("keeps keyboard-visible focus, windowed pagination, and a non-ink selection color", () => {
     const page = read("app/fantasy/page.tsx");
     // Pagination replaced the "show 50 more" accumulator.

@@ -78,6 +78,11 @@ function fmt(v: number | null | undefined, d = 0): string {
   return v == null ? "—" : v.toFixed(d);
 }
 
+function fmtSavePct(v: number | null | undefined): string {
+  if (v == null) return "—";
+  return v > 1 ? v.toFixed(1) : (v * 100).toFixed(1);
+}
+
 function readStorage<T>(key: string, fallback: T): T {
   try {
     const raw = window.localStorage.getItem(key);
@@ -582,7 +587,151 @@ export default function FantasyPage() {
                 Sort by VOR to draft across positions; a big VOR is scarce value, not just a big raw total.
               </p>
 
-              <div className="border overflow-x-auto" style={{ borderColor: rule }}>
+              <div className="md:hidden mb-3 flex items-end gap-2" role="group" aria-label="Mobile draft board sorting">
+                <label className="min-w-0 flex-1 text-[10px] font-black font-mono uppercase tracking-[0.12em]" style={{ color: faint }}>
+                  Sort board
+                  <select
+                    value={sortKey}
+                    onChange={e => {
+                      setSortKey(e.target.value as SortKey);
+                      setSortDesc(true);
+                    }}
+                    aria-label="Sort mobile draft board"
+                    className="tap-target mt-1 w-full border px-2 text-[12px] font-black font-mono focus-visible:outline focus-visible:outline-2"
+                    style={{ borderColor: rule, background: "var(--paper-inset)", color: ink, outlineColor: accent }}
+                  >
+                    <option value="fp82">Fantasy points / 82</option>
+                    <option value="vbd">Value over replacement</option>
+                    <option value="g82">Goals</option>
+                    <option value="a82">Assists</option>
+                    <option value="ppp82">Power-play points</option>
+                    <option value="hit82">Hits</option>
+                    <option value="blk82">Blocks</option>
+                    <option value="age">Age</option>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setSortDesc(desc => !desc)}
+                  aria-label={`Sort ${sortDesc ? "low to high" : "high to low"}`}
+                  className="tap-target shrink-0 border px-2 text-[10px] font-black font-mono uppercase tracking-[0.08em] focus-visible:outline focus-visible:outline-2"
+                  style={{ borderColor: rule, background: "var(--paper-inset)", color: ink, cursor: "pointer", outlineColor: accent }}
+                >
+                  {sortDesc ? "High → Low" : "Low → High"}
+                </button>
+              </div>
+
+              <div className="fantasy-draft-mobile md:hidden border" style={{ borderColor: rule }}>
+                {pageRows.map((r, i) => {
+                  const rank = pageStart + i + 1;
+                  const isTaken = taken.has(r.p.id);
+                  const isExpanded = expandedId === r.p.id;
+                  const role = roleMap.get(r.p.id);
+                  const outlookId = `fantasy-mobile-outlook-${r.p.id}`;
+                  const nameId = `fantasy-mobile-name-${r.p.id}`;
+                  return (
+                    <article
+                      key={r.p.id}
+                      aria-labelledby={nameId}
+                      className="border-t first:border-t-0 font-mono"
+                      style={{
+                        borderColor: "var(--ledger-rule-light, var(--ledger-rule))",
+                        color: ink,
+                        opacity: isTaken ? 0.5 : 1,
+                      }}
+                    >
+                      <div className="grid grid-cols-[44px_minmax(0,1fr)_44px] items-stretch">
+                        <label
+                          className="tap-target flex flex-col items-center justify-center gap-1 border-r text-[10px] font-black uppercase tracking-[0.08em]"
+                          style={{ borderColor: rule, color: faint, cursor: "pointer" }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isTaken}
+                            onChange={() => toggleTaken(r.p.id)}
+                            aria-label={`Mark ${r.p.name} as ${isTaken ? "available" : "taken"}`}
+                            className="h-4 w-4"
+                            style={{ cursor: "pointer" }}
+                          />
+                          <span aria-hidden="true">Taken</span>
+                        </label>
+
+                        <div className="min-w-0 px-2 py-2">
+                          <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.08em]">
+                            <span style={{ color: faint }}>#{rank}</span>
+                            <span className="px-1 border" style={{ color: tierColor(r.tier), borderColor: tierColor(r.tier) }}>
+                              T{r.tier}
+                            </span>
+                            <span style={{ color: ink }}>{r.posGroup}</span>
+                          </div>
+                          <div
+                            id={nameId}
+                            className="mt-1 break-words text-[13px] font-black leading-tight"
+                            style={{ textDecoration: isTaken ? "line-through" : "none" }}
+                          >
+                            {/^[0-9]+$/.test(String(r.p.id))
+                              ? <a href={`/players/${r.p.id}`} className="no-underline hover:underline" style={{ color: ink }}>{r.p.name}</a>
+                              : r.p.name}
+                          </div>
+                          <div className="mt-1 text-[10px] font-bold leading-snug" style={{ color: body }}>
+                            {teamName(r.p.teamId)} · {r.p.age}y
+                            {role && (
+                              <span style={{ color: role.color }}> · {role.icon} {role.label}</span>
+                            )}
+                          </div>
+                          <dl className="mt-2 grid grid-cols-2 gap-2">
+                            <div className="border-l-2 pl-2" style={{ borderColor: rule }}>
+                              <dt className="text-[10px] font-black uppercase tracking-[0.08em]" style={{ color: faint }}>FP/82</dt>
+                              <dd className="text-[15px] font-black" style={{ fontVariantNumeric: "tabular-nums" }}>{r.fp82}</dd>
+                            </div>
+                            <div className="border-l-2 pl-2" style={{ borderColor: rule }}>
+                              <dt className="text-[10px] font-black uppercase tracking-[0.08em]" style={{ color: faint }}>VOR</dt>
+                              <dd className="text-[15px] font-black" style={{
+                                fontVariantNumeric: "tabular-nums",
+                                color: r.vbd > 0 ? "var(--ledger-green)" : r.vbd < 0 ? "var(--ledger-red)" : body,
+                              }}>
+                                {r.vbd > 0 ? "+" : ""}{r.vbd}
+                              </dd>
+                            </div>
+                          </dl>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setExpandedId(prev => prev === r.p.id ? null : r.p.id)}
+                          aria-expanded={isExpanded}
+                          aria-controls={outlookId}
+                          aria-label={`${isExpanded ? "Hide" : "Show"} ${r.p.name}'s Ledger outlook`}
+                          className="tap-target flex items-center justify-center border-l text-[14px] font-black focus-visible:outline focus-visible:outline-2"
+                          style={{
+                            color: isExpanded ? accentInk : ink,
+                            background: isExpanded ? accent : "var(--paper-inset)",
+                            borderColor: isExpanded ? accent : rule,
+                            cursor: "pointer",
+                            outlineColor: accent,
+                          }}
+                        >
+                          {isExpanded ? "▾" : "▸"}
+                        </button>
+                      </div>
+
+                      {isExpanded && (
+                        <div
+                          id={outlookId}
+                          role="region"
+                          aria-label={`${r.p.name} Ledger outlook`}
+                          className="border-t px-3 py-3"
+                          style={{ borderColor: rule, background: "var(--paper-inset)" }}
+                        >
+                          <PlayerOutlook asset={r.p as any} />
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+
+              <div className="fantasy-draft-desktop hidden md:block border overflow-x-auto" style={{ borderColor: rule }}>
                 <table className="w-full font-mono" style={{ borderCollapse: "collapse", minWidth: 780 }}>
                   <thead>
                     <tr className="text-[10px] font-black uppercase tracking-[0.12em]" style={{ background: "var(--paper-inset)", color: ink }}>
@@ -753,7 +902,66 @@ export default function FantasyPage() {
                 Workload first (starts are the scarcest resource in fantasy), save quality second,
                 and the team in front of him third — wins are a team stat.
               </div>
-              <div className="border overflow-x-auto" style={{ borderColor: rule }}>
+              <div className="fantasy-goalie-mobile md:hidden border" style={{ borderColor: rule }}>
+                {goalies.map((entry, i) => {
+                  const g = entry.p as any;
+                  const envColor = entry.winEnv === "STRONG" ? "var(--ledger-green)" : entry.winEnv === "WEAK" ? "var(--ledger-red)" : body;
+                  return (
+                    <article
+                      key={g.id}
+                      className="border-t first:border-t-0 px-3 py-2.5 font-mono"
+                      style={{ borderColor: "var(--ledger-rule-light, var(--ledger-rule))", color: ink }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-black leading-tight">
+                            <span className="mr-1.5 text-[10px]" style={{ color: faint }}>#{i + 1}</span>
+                            {g.name}
+                          </div>
+                          <div className="mt-1 text-[10px] font-bold" style={{ color: body }}>{teamName(g.teamId)}</div>
+                        </div>
+                        <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.08em]" style={{ color: envColor }}>
+                          {entry.winEnv} win env
+                        </span>
+                      </div>
+                      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
+                        <div className="border-l-2 pl-2" style={{ borderColor: rule }}>
+                          <dt className="text-[10px] font-black uppercase tracking-[0.08em]" style={{ color: faint }}>Start Share</dt>
+                          <dd className="text-[14px] font-black" style={{
+                            fontVariantNumeric: "tabular-nums",
+                            color: entry.startShare >= 60 ? "var(--ledger-green)" : entry.startShare >= 40 ? ink : body,
+                          }}>
+                            {entry.startShare}%
+                          </dd>
+                        </div>
+                        <div className="border-l-2 pl-2" style={{ borderColor: rule }}>
+                          <dt className="text-[10px] font-black uppercase tracking-[0.08em]" style={{ color: faint }}>Starts</dt>
+                          <dd className="text-[14px] font-black" style={{ fontVariantNumeric: "tabular-nums", color: body }}>
+                            {g.gamesStarted ?? "—"}
+                          </dd>
+                        </div>
+                        <div className="border-l-2 pl-2" style={{ borderColor: rule }}>
+                          <dt className="text-[10px] font-black uppercase tracking-[0.08em]" style={{ color: faint }}>SV%</dt>
+                          <dd className="text-[14px] font-black" style={{ fontVariantNumeric: "tabular-nums", color: body }}>
+                            {fmtSavePct(g.savePct)}
+                          </dd>
+                        </div>
+                        <div className="border-l-2 pl-2" style={{ borderColor: rule }}>
+                          <dt className="text-[10px] font-black uppercase tracking-[0.08em]" style={{ color: faint }}>GSAx</dt>
+                          <dd className="text-[14px] font-black" style={{
+                            fontVariantNumeric: "tabular-nums",
+                            color: (g.gsax ?? 0) > 0 ? "var(--ledger-green)" : "var(--ledger-red)",
+                          }}>
+                            {g.gsax != null ? `${g.gsax > 0 ? "+" : ""}${g.gsax.toFixed(1)}` : "—"}
+                          </dd>
+                        </div>
+                      </dl>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <div className="fantasy-goalie-desktop hidden md:block border overflow-x-auto" style={{ borderColor: rule }}>
                 <table className="w-full font-mono" style={{ borderCollapse: "collapse", minWidth: 640 }}>
                   <thead>
                     <tr className="text-[10px] font-black uppercase tracking-[0.12em]" style={{ background: "var(--paper-inset)", color: ink }}>
@@ -784,7 +992,7 @@ export default function FantasyPage() {
                             {entry.startShare}%
                           </td>
                           <td className="px-2 py-1.5 text-right" style={{ fontVariantNumeric: "tabular-nums", color: body }}>
-                            {g.savePct != null ? (g.savePct > 1 ? g.savePct.toFixed(1) : (g.savePct * 100).toFixed(1)) : "—"}
+                            {fmtSavePct(g.savePct)}
                           </td>
                           <td className="px-2 py-1.5 text-right font-black" style={{
                             fontVariantNumeric: "tabular-nums",

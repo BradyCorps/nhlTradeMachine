@@ -45,10 +45,10 @@ Root: §1 shipped 44px + horizontal scroll; the audit also wants 4 primary + "Mo
 Fix: Players, Teams, Trade Machine, and Armchair GM remain visible while The Docket, Fantasy, and Press Box move into a 44px More disclosure with expanded/controls semantics, Escape/focus/outside dismissal, and active-secondary styling. The shared header is sticky and, after 96px of scroll, collapses the feed into a compact bar with a reduced home wordmark and 44px controls; abbreviated mobile labels keep it inside narrow page insets without horizontal scroll. The border-b-2 / text-ledger-red / ◆ active treatment remains intact.
 Acceptance: More menu reachable, compact header sticks on scroll, canaries green. ✅ 2026-08-24.
 
-### [ ] M-Fantasy — Fantasy draft board → mobile card row (L)
+### [x] M-Fantasy — Fantasy draft board → mobile card row (L)
 Root: draft table `minWidth:780`, goalie `640`, tiny controls (mobile audit §10).
-Fix: a mobile player-card row (taken · name · pos · tier · FP82 · VOR + expand); keep the desktop table ≥768.
-Acceptance: no 780px horizontal table on phones; fantasy tests green.
+Fix: below 768px, the skater board renders cards with a 44px Taken target, rank/name/team/age/role, position, tier, FP/82, VOR, and a 44px Ledger-outlook disclosure; a mobile sort selector/direction control preserves every desktop sort. The goalie board likewise becomes cards for workload, starts, SV%, GSAx, and win environment. Both original tables and their dense controls remain unchanged behind `hidden md:block` at ≥768px.
+Acceptance: no 780px horizontal table on phones; fantasy tests green. ✅ 2026-08-24.
 
 ### [ ] M-TradeSummary — Trade Machine sticky package summary + A/B toggle (M)
 Root: two stacked panels, no sticky summary (mobile audit §8).
