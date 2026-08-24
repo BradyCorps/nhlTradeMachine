@@ -9,7 +9,7 @@ import type { Asset, Team } from "@/app/lib/trade-types";
 import { advanceSeason, type RolloverEvent } from "./season-rollover";
 import { generateSyntheticDraftClass } from "./synthetic-draft";
 import { computeChangeOfScenery } from "./lineup-context";
-import { hashString, mulberry32 } from "./sim-engine";
+import { hashString, mulberry32, stablePts } from "./sim-engine";
 import { SEASON } from "./season-config";
 import { planCapCompliance } from "./ai-cap";
 import { activateMaturedExtension } from "./extensions";
@@ -195,37 +195,122 @@ const round1 = (value: number): number => Math.round(value * 10) / 10;
 const seasonPace = (count: number, games: number): number =>
   round1((Math.max(0, count) / Math.max(1, games)) * 82);
 
+// Cup Run scoring carry is intentionally more conservative than one simulated
+// season's upside tail. The credibility backtest (3,371 spike seasons) supports
+// a 40/60 observed-season/career-anchor blend (9.5 pts/82 MAE; the dynamic form
+// is 9.4), while the MoneyPuck baseline represents about 2.7 effective seasons.
+// Giving one new season 25% of the updated career mean approximates adding it to
+// that history (1 / 3.7 ~= 27%) without letting one ceiling result become the
+// new career. A +20 pts/82 banked-offseason cap is roughly two validation MAEs:
+// room for a real leap, but not enough for the route's 1.9x young-player ceiling
+// to become next year's input and stack again.
+const CARRIED_SEASON_WEIGHT = 0.40;
+const CAREER_MEAN_SEASON_WEIGHT = 0.25;
+const MAX_OFFSEASON_PACE_GAIN = 20;
+
+interface CarriedSkaterGuard {
+  baselinePtsPace: number;
+  maxPtsPace: number;
+  goalShare: number;
+}
+
 const fallbackSeasonToi = (p: Asset, ptsPace: number): number => {
   if ((p.avgTOI ?? 0) > 0) return p.avgTOI;
   if (p.position === "D") return ptsPace >= 40 ? 21 : ptsPace >= 25 ? 18 : 16;
   return ptsPace >= 55 ? 18 : ptsPace >= 35 ? 15 : 12;
 };
 
-function carryForwardSimSkaterStats(players: Asset[], seasons: CupRunSkaterSeason[] = []): Asset[] {
-  if (seasons.length === 0) return players;
+function carryForwardSimSkaterStats(
+  players: Asset[],
+  seasons: CupRunSkaterSeason[] = [],
+): { players: Asset[]; guards: Map<string, CarriedSkaterGuard> } {
+  const guards = new Map<string, CarriedSkaterGuard>();
+  if (seasons.length === 0) return { players, guards };
   const byId = new Map(seasons.map((s) => [s.playerId, s]));
 
-  return players.map((p) => {
+  const carried = players.map((p) => {
     if (p.position === "Pick" || p.position === "G") return p;
     const season = byId.get(p.id);
-    if (!season || !Number.isFinite(season.gamesPlayed) || season.gamesPlayed <= 0) return p;
+    if (
+      !season
+      || !Number.isFinite(season.gamesPlayed)
+      || season.gamesPlayed <= 0
+      || season.gamesPlayed > 82
+      || !Number.isFinite(season.projectedPts)
+      || !Number.isFinite(season.projectedGoals)
+      || !Number.isFinite(season.projectedAssists)
+      || season.projectedPts < 0
+      || season.projectedGoals < 0
+      || season.projectedAssists < 0
+      || season.projectedGoals + season.projectedAssists !== season.projectedPts
+    ) return p;
 
     const games = Math.max(1, Math.round(season.gamesPlayed));
-    const ptsPace = seasonPace(season.projectedPts, games);
+    const observedPtsPace = seasonPace(season.projectedPts, games);
+    const currentPtsPace = Number.isFinite(p.ptsPace) ? Math.max(0, p.ptsPace) : 0;
+    const baselinePtsPace = Number.isFinite(p.baselinePtsPace) && (p.baselinePtsPace ?? 0) > 0
+      ? p.baselinePtsPace!
+      : 0;
+    const prospectPtsPace = Number.isFinite(p.prospectPtsPace) && (p.prospectPtsPace ?? 0) > 0
+      ? p.prospectPtsPace! * 0.72
+      : 0;
+
+    // Existing NHL pace is first regressed by the same stablePts blend used by
+    // the season route. A debutant instead starts from his NHLe translation;
+    // with neither signal, his first simulated season becomes the initial
+    // career anchor rather than leaving baselinePtsPace absent forever.
+    const stablePrior = currentPtsPace > 0 ? stablePts(p) : 0;
+    const priorLevel = Math.max(stablePrior, prospectPtsPace);
+    const careerAnchor = baselinePtsPace > 0
+      ? baselinePtsPace
+      : priorLevel > 0 ? priorLevel : observedPtsPace;
+    // The step limit is truly year over year: compare with the pace stored on
+    // last season's roster. A never-dressed prospect uses his NHLe translation
+    // until he has an NHL pace of his own.
+    const growthReference = currentPtsPace > 0
+      ? currentPtsPace
+      : prospectPtsPace > 0 ? prospectPtsPace : careerAnchor;
+    const maxPtsPace = round1(growthReference + MAX_OFFSEASON_PACE_GAIN);
+    const maxBaselinePtsPace = round1(careerAnchor + MAX_OFFSEASON_PACE_GAIN);
+    const updatedBaseline = round1(Math.min(
+      careerAnchor * (1 - CAREER_MEAN_SEASON_WEIGHT)
+        + observedPtsPace * CAREER_MEAN_SEASON_WEIGHT,
+      maxBaselinePtsPace,
+    ));
+    const ptsPace = round1(Math.min(
+      observedPtsPace * CARRIED_SEASON_WEIGHT
+        + updatedBaseline * (1 - CARRIED_SEASON_WEIGHT),
+      maxPtsPace,
+    ));
+
+    const observedGoalShare = season.projectedPts > 0
+      ? Math.max(0, Math.min(1, season.projectedGoals / season.projectedPts))
+      : 0;
+    const priorGoalShare = currentPtsPace > 0 && Number.isFinite(p.goalsPace)
+      ? Math.max(0, Math.min(1, (p.goalsPace ?? 0) / currentPtsPace))
+      : observedGoalShare;
+    const goalShare = priorGoalShare * (1 - CARRIED_SEASON_WEIGHT)
+      + observedGoalShare * CARRIED_SEASON_WEIGHT;
     const projectedTOI = Number.isFinite(season.projectedTOI) && (season.projectedTOI ?? 0) > 0
       ? season.projectedTOI!
       : fallbackSeasonToi(p, ptsPace);
+    const goalsPace = round1(ptsPace * goalShare);
+
+    guards.set(p.id, { baselinePtsPace: updatedBaseline, maxPtsPace, goalShare });
 
     return {
       ...p,
       games,
       ptsPace,
-      goalsPace: seasonPace(season.projectedGoals, games),
-      assistsPace: seasonPace(season.projectedAssists, games),
+      goalsPace,
+      assistsPace: round1(ptsPace - goalsPace),
+      baselinePtsPace: updatedBaseline,
       avgTOI: round1(projectedTOI),
       hasLiveStats: true,
     };
   });
+
+  return { players: carried, guards };
 }
 
 // Recompute every team's cap space against the season the league is entering:
@@ -312,13 +397,30 @@ export function rollLeagueForward(opts: {
     seasonStartPlayers.filter(isSkaterOrGoalie),
     skatersBeforeCarry,
   );
-  const skaters = carryForwardSimSkaterStats(skatersBeforeCarry, simSkaterSeasons);
+  const carried = carryForwardSimSkaterStats(skatersBeforeCarry, simSkaterSeasons);
 
   // 2. Age the league one offseason
-  const rolled = advanceSeason(skaters, {
+  const rolled = advanceSeason(carried.players, {
     seed: rolloverSeed,
     year: draftYear,
     changeOfScenery: scenery,
+  });
+  // advanceSeason still supplies the seeded age/breakout/regression roll, but a
+  // second upside roll in the same offseason may not punch through the carry
+  // cap or update the career mean again. Scale G/A to the final guarded pace so
+  // their identity remains goals + assists = points pace.
+  const rolledPlayers = rolled.players.map((p) => {
+    const guard = carried.guards.get(p.id);
+    if (!guard) return p;
+    const ptsPace = round1(Math.min(Math.max(0, p.ptsPace), guard.maxPtsPace));
+    const goalsPace = round1(ptsPace * guard.goalShare);
+    return {
+      ...p,
+      ptsPace,
+      goalsPace,
+      assistsPace: round1(ptsPace - goalsPace),
+      baselinePtsPace: guard.baselinePtsPace,
+    };
   });
 
   // 3. Synthetic draft class, worst teams first
@@ -343,7 +445,7 @@ export function rollLeagueForward(opts: {
   // Flag every contract that has run out so resolveLeagueOffseason picks
   // it up on re-entry — including rows that were already at 0 years
   // (stale data would otherwise sit on a roster forever at full cap hit).
-  const flagged = rolled.players.map((raw) => {
+  const flagged = rolledPlayers.map((raw) => {
     // An extension signed a year early matures exactly here. Activate it before
     // the expiry check, or the contract it was meant to replace flags him as a
     // pending free agent and he reaches the market anyway (OFF5).
