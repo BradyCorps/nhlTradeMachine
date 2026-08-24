@@ -1,23 +1,12 @@
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import DocketClient from "@/app/docket/DocketClient";
-import { attachTodayDocketGrades } from "@/app/lib/docket-today";
-import { buildDocketEntries } from "@/app/lib/docket-view";
-import { listPublishedTrades } from "@/app/lib/trades";
+import { getCachedDocketEntries } from "@/app/lib/cached-docket";
 
 export const dynamic = "force-dynamic";
 
-async function loadDocketEntries() {
-  try {
-    return attachTodayDocketGrades(buildDocketEntries(await listPublishedTrades()));
-  } catch (error) {
-    console.warn("[Docket] published trade load failed:", error instanceof Error ? error.message : error);
-    return [];
-  }
-}
-
 export default async function DocketPage() {
-  const entries = await loadDocketEntries();
+  const { value: entries } = await getCachedDocketEntries();
 
   return (
     <main style={{

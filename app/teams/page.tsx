@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
-import { calculateAssetNAV } from "@/app/lib/asset-nav";
 import { rosterNavByPosition } from "@/app/lib/team-nav-split";
 import { aggregateTeamGravity, type TeamGravityAggregate } from "@/app/lib/team-gravity";
 import GravityHeatMap from "@/app/components/GravityHeatMap";
@@ -24,6 +23,7 @@ import { isGravityV3DisplayEnabled } from "@/app/lib/gravity-feature-flags";
 import GravityField from "@/app/components/GravityField";
 import TeamNavChart from "@/app/components/TeamNavChart";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
+import TeamsLoading from "./loading";
 
 interface TeamRecord {
   wins: number;
@@ -839,6 +839,7 @@ export default function TeamsPage() {
     : null;
   const [teams, setTeams] = useState<TeamData[]>([]);
   const [players, setPlayers] = useState<Asset[]>([]);
+  const [navMap, setNavMap] = useState<Record<string, XNAVResult>>({});
   const [capCeiling, setCapCeiling] = useState(104);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("division");
@@ -857,24 +858,12 @@ export default function TeamsPage() {
           capBreakdown: t.capBreakdown ?? null,
         })));
         setPlayers(data.players ?? []);
+        setNavMap(data.navMap ?? {});
         if (data.capCeiling) setCapCeiling(data.capCeiling);
       })
       .catch((err) => console.error("Failed to load league data:", err))
       .finally(() => setLoading(false));
   }, []);
-
-  const navMap = useMemo(() => {
-    const map: Record<string, XNAVResult> = {};
-    for (const p of players) {
-      if (p.position === "Pick") continue;
-      try {
-        map[p.id] = calculateAssetNAV(p, capCeiling) as unknown as XNAVResult;
-      } catch {
-        // skip players that fail NAV calc
-      }
-    }
-    return map;
-  }, [players, capCeiling]);
 
   const teamProfiles = useMemo((): TeamProfile[] => {
     const computedGravity = players.flatMap((player) => {
@@ -1021,15 +1010,7 @@ export default function TeamsPage() {
     : null;
 
   if (loading) {
-    return (
-      <main className="min-h-screen font-mono" style={{ background: "var(--paper-bg)", color: "var(--ledger-ink)" }}>
-        <div className="mx-auto max-w-6xl px-4 py-12 text-center">
-          <div className="text-[11px] font-black uppercase tracking-[0.3em] animate-pulse">
-            Loading Team Analytics&hellip;
-          </div>
-        </div>
-      </main>
-    );
+    return <TeamsLoading />;
   }
 
   if (detailTeamId) {

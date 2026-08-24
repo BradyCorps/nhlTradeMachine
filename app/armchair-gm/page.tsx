@@ -13,7 +13,7 @@ import type {
   Asset, Team, TradeVerdict,
 } from "@/app/lib/trade-types";
 import {
-  fetchNavMap, fetchTradeVerdict, clearNavCache, getCachedNav,
+  fetchNavMap, fetchTradeVerdict, clearNavCache, getCachedNav, primeNavCache,
 } from "@/app/lib/evaluate-client";
 import {
   buildTradeQueryString,
@@ -455,6 +455,17 @@ export default function ArmchairGmPage() {
           setError("Couldn't load league data");
           setBooting(false);
           return;
+        }
+        const rosterNavMap = pd.capCeiling === td.capCeiling ? (pd.navMap ?? {}) : {};
+        const precomputedNavMap = { ...rosterNavMap, ...(td.navMap ?? {}) };
+        primeNavCache(data.players, precomputedNavMap, data.capCeiling);
+        setNavMap(precomputedNavMap);
+
+        const expectedIds = new Set(data.players.map((asset: Asset) => asset.id));
+        const readyCount = Object.keys(precomputedNavMap).filter((id) => expectedIds.has(id)).length;
+        if (readyCount >= expectedIds.size) {
+          initialNavReadyRef.current = true;
+          setInitialNavReady(true);
         }
         setDb(data);
         setOriginalDb(data);

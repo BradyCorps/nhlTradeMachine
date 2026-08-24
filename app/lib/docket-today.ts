@@ -1,7 +1,7 @@
 import { POST as evaluatePost } from "@/app/api/evaluate/route";
 import type { DocketEntry } from "@/app/lib/docket-view";
 import { canonicalNameSlug } from "@/app/lib/player-identity";
-import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
+import { getCachedRoster } from "@/app/lib/cached-roster";
 import type { Asset, EvaluateResponse, Team } from "@/app/lib/trade-types";
 
 const assetKey = (asset: Pick<Asset, "id" | "name">): string[] => [
@@ -109,7 +109,7 @@ async function evaluateTodayEntry(
 export async function attachTodayDocketGrades(entries: DocketEntry[]): Promise<DocketEntry[]> {
   if (entries.length === 0) return entries;
   try {
-    const roster = await assembleCanonicalRoster({ includeTeamContext: true });
+    const { value: roster } = await getCachedRoster();
     const currentAssets = buildCurrentAssetIndex(roster.players as Asset[]);
     const teams = roster.teams as Team[];
     return Promise.all(entries.map(entry =>

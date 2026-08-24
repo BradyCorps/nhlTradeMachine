@@ -34,6 +34,18 @@ function assetCacheKey(a: Asset, capCeiling?: number | null): string {
   });
 }
 
+/** Seed exact-input NAV results supplied by the cached league bootstrap. */
+export function primeNavCache(
+  assets: Asset[],
+  navMap: Record<string, XNAVResult>,
+  capCeiling?: number | null,
+): void {
+  for (const asset of assets) {
+    const result = navMap[asset.id];
+    if (result) _navCache.set(assetCacheKey(asset, capCeiling), result);
+  }
+}
+
 // Fetch NAV values for a list of assets
 // Uses cache for unchanged assets, only fetches stale/new ones
 export async function fetchNavMap(
