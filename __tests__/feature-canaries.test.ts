@@ -1899,6 +1899,43 @@ describe("Canary — UX and UI polish", () => {
     expect(src).toContain("◆");
   });
 
+  it("keeps four primary destinations visible and discloses the rest from a compact sticky header", () => {
+    const src = read("app/components/Header.tsx");
+    expect(src).toContain("data-compact={isCompact}");
+    expect(src).toContain("sticky top-0");
+    expect(src).toContain("window.scrollY > COMPACT_SCROLL_THRESHOLD");
+    expect(src).toContain('window.addEventListener("scroll", onScroll, { passive: true })');
+    expect(src).toContain('aria-label="More navigation"');
+    expect(src).toContain("aria-expanded={moreOpen}");
+    expect(src).toContain("aria-controls={moreMenuId}");
+    expect(src).toContain('role="group"');
+    expect(src).toContain('event.key === "Escape"');
+    expect(src).not.toContain("overflow-x-auto");
+    expect(src).toContain('<span className="sm:hidden">Trade</span>');
+    expect(src).toContain('<span className="sm:hidden">GM</span>');
+    expect(src).toContain('inline-flex min-h-[44px] w-11');
+
+    const navStart = src.indexOf('<nav');
+    const moreStart = src.indexOf('aria-label="More navigation"', navStart);
+    const navEnd = src.indexOf('</nav>', moreStart);
+    expect(navStart).toBeGreaterThanOrEqual(0);
+    expect(moreStart).toBeGreaterThan(navStart);
+    expect(navEnd).toBeGreaterThan(moreStart);
+
+    const primary = src.slice(navStart, moreStart);
+    expect(primary.match(/href="/g)).toHaveLength(4);
+    expect(primary).toContain('href="/players"');
+    expect(primary).toContain('href="/teams"');
+    expect(primary).toContain('href="/trade-machine"');
+    expect(primary).toContain('href="/armchair-gm"');
+
+    const overflow = src.slice(moreStart, navEnd);
+    expect(overflow.match(/href="/g)).toHaveLength(3);
+    expect(overflow).toContain('href="/docket"');
+    expect(overflow).toContain('href="/fantasy"');
+    expect(overflow).toContain('href="/press-box"');
+  });
+
   it("keeps lineups below the trade grid and removes the old roster projection panel", () => {
     const armchair = read("app/armchair-gm/page.tsx");
     const styles = read("app/globals.css");
