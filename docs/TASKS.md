@@ -35,10 +35,10 @@ Root: the players page used a pervasive custom 539/540 mobile breakpoint (`globa
 Fix: all Players analytics rules now use `max-width:639px` / `min-width:640px`; the regression pins mobile cards at 500/560/620px and the desktop row at 700px, while preserving the intentional 480px and 720px sub-layouts.
 Acceptance: no mixed-layout band; players tests green. ✅ 2026-08-24.
 
-### [ ] M-PlayerFlags — Player status icons are non-focusable spans
+### [x] M-PlayerFlags — Player status icons are non-focusable spans
 Root: status icons are `<span title aria-label>`, not buttons; tapping hits the row (mobile audit §5).
-Fix: make each a real button, or open one consolidated "player flags" sheet from the row.
-Acceptance: icons are focusable/tappable controls; row tap still works.
+Fix: role/status/NMC chips now sit inside one real Player Flags disclosure button per row; it exposes the player-specific meanings in a labelled region, supports Escape/light-dismiss, stops flag taps from expanding the row, and grows to 44px on mobile. The row remains pointer-clickable, with separate keyboard-accessible expand buttons to avoid nested controls.
+Acceptance: icons are focusable/tappable controls; row tap still works. ✅ 2026-08-24.
 
 ### [ ] M-Nav2 — Global nav: "More" overflow menu + sticky compact header
 Root: §1 shipped 44px + horizontal scroll; the audit also wants 4 primary + "More" and a sticky compact bar after scroll (`app/components/Header.tsx`). JS/state.

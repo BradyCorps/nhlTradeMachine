@@ -1739,7 +1739,7 @@ describe("Canary — Batch 6 audit fixes", () => {
     );
     expect(rowMax?.[1]).toBe("639");
     expect(playersCss).not.toMatch(/(?:min|max)-width:\s*(?:539|540)px/);
-    const mediaWidths = [...playersCss.matchAll(/(?:min|max)-width:\s*(\d+)px/g)]
+    const mediaWidths = [...playersCss.matchAll(/@media \((?:min|max)-width:\s*(\d+)px\)/g)]
       .map(match => Number(match[1]));
     expect([...new Set(mediaWidths)].sort((a, b) => a - b))
       .toEqual([480, 639, 640, 720]);
@@ -1747,6 +1747,38 @@ describe("Canary — Batch 6 audit fixes", () => {
     const maxMobileWidth = Number(rowMax?.[1]);
     expect([500, 560, 620, 700].map(width => width <= maxMobileWidth))
       .toEqual([true, true, true, false]);
+  });
+
+  it("gives Player flags their own disclosure without nesting controls in a row button", () => {
+    const src = read("app/players/page.tsx");
+    const flags = src.slice(
+      src.indexOf("function PlayerIconBadges"),
+      src.indexOf("const PLAYER_ICON_KEY"),
+    );
+    expect(flags).toContain('className="player-flags-trigger dense-tap"');
+    expect(flags).toContain('type="button"');
+    expect(flags).toContain("aria-expanded={open}");
+    expect(flags).toContain("aria-controls={panelId}");
+    expect(flags).toContain("aria-describedby={open ? panelId : undefined}");
+    expect(flags).toContain("event.stopPropagation()");
+    expect(flags).toContain('role="region"');
+    expect(flags).toContain("player.hasNMC");
+
+    const row = src.slice(
+      src.indexOf("function PlayerRow"),
+      src.indexOf("// ── Section header"),
+    );
+    expect(row).not.toContain('role="button"');
+    expect(row).not.toContain("tabIndex={0}");
+    expect(row.match(/onClick=\{toggleExpanded\}/g)).toHaveLength(2);
+    expect(row).toContain('className="player-row-expand dense-tap"');
+    expect(row).toContain('className="player-row-expand tap-target"');
+    expect(row).toContain("event.stopPropagation()");
+
+    const css = read("app/globals.css");
+    expect(css).toMatch(
+      /@media \(max-width: 639px\) \{\s*\.player-flags-trigger \{\s*min-height: 44px;/,
+    );
   });
 });
 
