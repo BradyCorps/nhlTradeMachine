@@ -14,7 +14,7 @@ import {
 import { FRANCHISE, SEASON } from "@/app/lib/season-config";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
-import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
+import React, { useState, useEffect, useMemo, useRef, useDeferredValue, useId } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import PercentileCard from "@/app/components/PercentileCard";
@@ -143,46 +143,40 @@ function MiniHelix({ offV, defV }: {
   );
 }
 
-// ── Modern role badge (PA2) — derived identity, not legacy labels ──
-function ArchetypeBadge({ player }: { player: Player }) {
-  let label = "";
-  let icon = "•";
-  let color = "var(--ink-faint)";
-  let blurb = "";
-
-  const roles = derivePlayerRoles(player);
-  if (roles) {
-    label = roles.primary.label;
-    icon = roles.primary.icon;
-    color = roles.primary.color;
-    blurb = roles.primary.blurb;
-  } else if (player.position === "G") {
-    // No role evidence yet — fall back to the workload tier chip
-    const tier = goalieTeir(player.gamesStarted ?? 0);
-    label = tier;
-    icon = tier === "STARTER" ? "G1" : tier === "TANDEM" ? "G2" : "G3";
-    color = tier === "STARTER" ? "var(--green)" : tier === "TANDEM" ? "var(--blue)" : "var(--ink-faint)";
-  } else {
-    return null;
-  }
-
-  if (!label) return null;
-  const displayLabel = blurb ? `${label} — ${blurb}` : label;
-
-  return (
-    <span title={displayLabel} aria-label={displayLabel} style={{
-      display: "inline-flex", alignItems: "center", justifyContent: "center",
-      minWidth: "18px", height: "18px",
-      fontSize: icon.length > 1 ? "8px" : "11px", fontWeight: 900,
-      color, border: `1px solid ${color}`,
-      padding: "0 3px", letterSpacing: 0,
-      opacity: 0.9, whiteSpace: "nowrap", flexShrink: 0,
-    }}>{icon}</span>
-  );
-}
+type PlayerFlag = {
+  key: string;
+  icon: string;
+  color: string;
+  title: string;
+  gravityTier?: "SUPERMASSIVE" | "STAR";
+};
 
 function PlayerIconBadges({ player }: { player: Player }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
   const xnav = useMemo(() => calculateAssetNAV(player), [player]);
+
+  const roles = derivePlayerRoles(player);
+  let roleFlag: PlayerFlag | null = null;
+  if (roles) {
+    const { label, icon, color, blurb } = roles.primary;
+    roleFlag = {
+      key: "role",
+      icon,
+      color,
+      title: blurb ? `${label} — ${blurb}` : label,
+    };
+  } else if (player.position === "G") {
+    // No role evidence yet — fall back to the workload tier chip.
+    const tier = goalieTeir(player.gamesStarted ?? 0);
+    roleFlag = {
+      key: "role",
+      icon: tier === "STARTER" ? "G1" : tier === "TANDEM" ? "G2" : "G3",
+      color: tier === "STARTER" ? "var(--green)" : tier === "TANDEM" ? "var(--blue)" : "var(--ink-faint)",
+      title: tier,
+    };
+  }
 
   const prospectTier = getProspectTier(player.name);
   const pedigree = getPlayerPedigree(player.name);
@@ -193,14 +187,13 @@ function PlayerIconBadges({ player }: { player: Player }) {
     return gravityForDisplay(player as any);
   }, [player]);
   const gravTier = gravProfile?.tier;
-  const showGravBadge = gravTier === "SUPERMASSIVE" || gravTier === "STAR";
 
   const isMegalodon = xnav.total >= FRANCHISE.megalodon;
   const isFranchise = !isMegalodon && xnav.total >= FRANCHISE.threshold;
   const isSurplus = xnav.cap > 0 && xnav.total > player.capHit * 18 && xnav.total > 50;
   const hasAwards = (pedigree?.awards?.length ?? 0) > 0;
 
-  const badges = [
+  const badgeFlags = [
     isMegalodon ? { key: "megalodon", icon: "♛", color: "var(--ledger-amber)", title: `Megalodon tier — NAV ${xnav.total} ≥ ${FRANCHISE.megalodon}.` } : null,
     isFranchise ? { key: "franchise", icon: "◆", color: "var(--ledger-ink)", title: `Franchise tier — NAV ${xnav.total} ≥ ${FRANCHISE.threshold}.` } : null,
     isSurplus ? { key: "surplus", icon: "★", color: "var(--ledger-green)", title: "Surplus contract — on-ice value significantly exceeds cap hit." } : null,
@@ -208,46 +201,123 @@ function PlayerIconBadges({ player }: { player: Player }) {
     hasAwards ? { key: "awards", icon: "A", color: "var(--ledger-amber)", title: `Award pedigree — ${Array.from(new Set(pedigree!.awards)).join(" · ")}.` } : null,
     injuryRisk ? { key: "injury", icon: "!", color: "var(--ledger-red)", title: injuryRisk.note } : null,
     shutdownPedigree ? { key: "shutdown", icon: "■", color: "var(--ledger-amber)", title: shutdownPedigree.note } : null,
-  ].filter(Boolean) as { key: string; icon: string; color: string; title: string }[];
+  ].filter(Boolean) as PlayerFlag[];
+  const gravityFlag: PlayerFlag | null = gravTier === "SUPERMASSIVE" || gravTier === "STAR"
+    ? {
+        key: "gravity",
+        icon: "✦",
+        color: gravityTierColor(gravTier),
+        title: `${gravTier === "SUPERMASSIVE" ? "Supermassive" : "Star"} gravity — force ${gravProfile!.force.toFixed(2)}.`,
+        gravityTier: gravTier,
+      }
+    : null;
+  const flags = [
+    roleFlag,
+    gravityFlag,
+    ...badgeFlags.slice(0, 4),
+    player.hasNMC
+      ? { key: "nmc", icon: "NMC", color: "var(--red)", title: "No-movement clause." }
+      : null,
+  ].filter((flag): flag is PlayerFlag => Boolean(flag));
 
-  if (badges.length === 0 && !showGravBadge) return null;
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [open]);
+
+  if (flags.length === 0) return null;
   return (
-    <>
-      {showGravBadge && gravTier && (
-        <span
-          title={`${gravTier === "SUPERMASSIVE" ? "Supermassive" : "Star"} gravity — force ${gravProfile!.force.toFixed(2)}`}
-          aria-label={`${gravTier === "SUPERMASSIVE" ? "Supermassive" : "Star"} gravity tier`}
+    <div
+      ref={rootRef}
+      style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}
+      onClick={event => event.stopPropagation()}
+      onBlur={event => {
+        if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) {
+          setOpen(false);
+        }
+      }}
+    >
+      <button
+        type="button"
+        className="player-flags-trigger dense-tap"
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-describedby={open ? panelId : undefined}
+        aria-label={`${open ? "Hide" : "View"} ${player.name} player flags`}
+        onClick={event => {
+          event.stopPropagation();
+          setOpen(current => !current);
+        }}
+        onKeyDown={event => {
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            setOpen(false);
+          }
+        }}
+        style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          gap: "2px", padding: "2px", cursor: "pointer", flexWrap: "wrap",
+          border: `1px solid ${open ? "var(--ledger-rule)" : "transparent"}`,
+          background: open ? "var(--paper-card)" : "transparent",
+        }}
+      >
+        {flags.map(flag => (
+          <span
+            key={flag.key}
+            title={flag.title}
+            aria-hidden="true"
+            style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              minWidth: "18px", height: "18px", padding: "0 3px", flexShrink: 0,
+              fontSize: flag.icon.length > 1 ? "8px" : "11px", fontWeight: 900,
+              color: flag.color, border: `1px solid ${flag.color}`,
+              background: "rgba(255,255,255,0.18)", lineHeight: 1,
+            }}
+          >
+            {flag.gravityTier
+              ? <TierIcon tier={flag.gravityTier} size={14} />
+              : flag.icon}
+          </span>
+        ))}
+      </button>
+
+      {open && (
+        <div
+          id={panelId}
+          role="region"
+          aria-label={`${player.name} player flags`}
           style={{
-            display: "inline-flex", alignItems: "center", justifyContent: "center",
-            minWidth: "18px", height: "18px",
-            border: `1px solid ${gravityTierColor(gravTier)}`,
-            background: "rgba(255,255,255,0.18)",
-            padding: "0 2px", flexShrink: 0,
+            position: "absolute", zIndex: 70, top: "calc(100% + 4px)", left: 0,
+            width: "min(280px, calc(100vw - 80px))", padding: "8px 10px",
+            border: "1px solid var(--ledger-rule)", background: "var(--paper-card)",
+            boxShadow: "0 4px 12px rgba(28,20,10,0.2)",
           }}
         >
-          <TierIcon tier={gravTier} size={14} />
-        </span>
+          <div style={{
+            marginBottom: "6px", fontSize: "9px", fontWeight: 900,
+            color: "var(--ledger-ink)", textTransform: "uppercase", letterSpacing: "0.1em",
+          }}>
+            Player Flags
+          </div>
+          {flags.map(flag => (
+            <div key={flag.key} style={{ display: "grid", gridTemplateColumns: "20px 1fr", gap: "6px", alignItems: "start", marginTop: "4px" }}>
+              <span aria-hidden="true" style={{ color: flag.color, fontSize: "10px", fontWeight: 900, textAlign: "center" }}>
+                {flag.gravityTier
+                  ? <TierIcon tier={flag.gravityTier} size={14} />
+                  : flag.icon}
+              </span>
+              <span style={{ fontSize: "10px", lineHeight: 1.35, color: "var(--ledger-ink-light)", fontWeight: 700 }}>
+                {flag.title}
+              </span>
+            </div>
+          ))}
+        </div>
       )}
-      {badges.slice(0, 4).map(badge => (
-        <span key={badge.key} title={badge.title} aria-label={badge.title} style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minWidth: "18px",
-          height: "18px",
-          fontSize: badge.icon.length > 1 ? "8px" : "11px",
-          fontWeight: 900,
-          color: badge.color,
-          border: `1px solid ${badge.color}`,
-          background: "rgba(255,255,255,0.18)",
-          padding: "0 3px",
-          lineHeight: 1,
-          flexShrink: 0,
-        }}>
-          {badge.icon}
-        </span>
-      ))}
-    </>
+    </div>
   );
 }
 
@@ -712,17 +782,17 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
 
   // Abbreviated team name for mobile (use teamId which is already short)
   const teamAbbr = player.teamId;
+  const toggleExpanded = () => setExpanded(current => !current);
+  const toggleFromControl = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    toggleExpanded();
+  };
 
   return (
     <>
       {/* ── Desktop row (≥640px) — original 6-column grid ── */}
       <div
-        onClick={() => setExpanded(e => !e)}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(x => !x); } }}
-        role="button"
-        tabIndex={0}
-        aria-expanded={expanded}
-        aria-label={`${player.name}, ${displayPosition(player.position, player.secondaryPosition)}, age ${player.age}`}
+        onClick={toggleExpanded}
         className="player-row player-row-desktop"
         style={{
           display: "grid",
@@ -747,9 +817,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
             <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--ink)", whiteSpace: "normal", overflowWrap: "anywhere", lineHeight: 1.15, display: "block" }}>
               {player.name}
             </span>
-            <ArchetypeBadge player={player} />
             <PlayerIconBadges player={player} />
-            {player.hasNMC && <span style={{ fontSize: "11px", color: "var(--red)", border: "1px solid var(--red)", padding: "0 3px" }}>NMC</span>}
           </div>
           <div style={{ fontSize: "11px", color: "var(--rule)", marginTop: "1px" }}>
             {team?.name ?? player.teamId} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}
@@ -778,17 +846,24 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
             {statDisplay(player, key, actualPPG)}
           </div>
         ))}
-        <span style={{ fontSize: "11px", color: "var(--rule)", textAlign: "right" }}>{expanded ? "▲" : "▼"}</span>
+        <button
+          type="button"
+          className="player-row-expand dense-tap"
+          onClick={toggleFromControl}
+          aria-expanded={expanded}
+          aria-label={`${expanded ? "Collapse" : "Expand"} ${player.name}`}
+          style={{
+            justifyContent: "center", padding: 0, border: 0, background: "transparent",
+            color: "var(--rule)", fontSize: "11px", cursor: "pointer",
+          }}
+        >
+          {expanded ? "▲" : "▼"}
+        </button>
       </div>
 
       {/* ── Mobile card (≤639px) — 2-line layout with labelled stats ── */}
       <div
-        onClick={() => setExpanded(e => !e)}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(x => !x); } }}
-        role="button"
-        tabIndex={0}
-        aria-expanded={expanded}
-        aria-label={`${player.name}, ${displayPosition(player.position, player.secondaryPosition)}, age ${player.age}`}
+        onClick={toggleExpanded}
         className="player-row player-row-mobile"
         style={{
           padding: "10px 12px",
@@ -809,9 +884,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
               <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--ink)", whiteSpace: "normal", overflowWrap: "anywhere", lineHeight: 1.15 }}>
                 {player.name}
               </span>
-              <ArchetypeBadge player={player} />
               <PlayerIconBadges player={player} />
-              {player.hasNMC && <span style={{ fontSize: "10px", color: "var(--red)", border: "1px solid var(--red)", padding: "0 3px", flexShrink: 0 }}>NMC</span>}
             </div>
             <div style={{ fontSize: "11px", color: "var(--rule)", marginTop: "2px" }}>
               {teamAbbr} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}
@@ -819,9 +892,20 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
           </div>
 
           {/* Expand toggle */}
-          <span style={{ fontSize: "12px", color: "var(--rule)", flexShrink: 0 }}>
+          <button
+            type="button"
+            className="player-row-expand tap-target"
+            onClick={toggleFromControl}
+            aria-expanded={expanded}
+            aria-label={`${expanded ? "Collapse" : "Expand"} ${player.name}`}
+            style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              padding: 0, border: 0, background: "transparent",
+              color: "var(--rule)", fontSize: "12px", cursor: "pointer", flexShrink: 0,
+            }}
+          >
             {expanded ? "▲" : "▼"}
-          </span>
+          </button>
         </div>
 
         {/* Line 2: rank pill + stats row */}

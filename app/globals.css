@@ -875,6 +875,13 @@ select.ledger-select {
 .players-hide-mobile { display: block; }
 @media (max-width: 639px) { .players-hide-mobile { display: none; } }
 
+@media (max-width: 639px) {
+  .player-flags-trigger {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
 /* ── Filter bar ── */
 .players-filter-bar {
   background: var(--paper);
