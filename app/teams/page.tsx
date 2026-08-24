@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
@@ -92,6 +94,7 @@ const QUADRANT_LABEL: Record<string, string> = {
 };
 
 interface LineEntry {
+  id: string;
   name: string;
   position: string;
   nav: number;
@@ -280,6 +283,7 @@ function EdgeMini({ profile }: { profile: TeamEdgeProfile | null }) {
 
 function buildTeamLines(roster: Asset[], navMap: Record<string, XNAVResult>): TeamLines {
   const toEntry = (p: Asset): LineEntry => ({
+    id: String(p.id),
     name: p.name,
     position: displayPosition(p.position, p.secondaryPosition),
     nav: navMap[p.id]?.total ?? 0,
@@ -364,6 +368,23 @@ function buildTeamLines(roster: Asset[], navMap: Record<string, XNAVResult>): Te
   };
 }
 
+function LinePlayerLink({ player, detail }: { player: LineEntry; detail?: string }) {
+  return (
+    <Link
+      href={`/players/${encodeURIComponent(player.id)}`}
+      className="inline-flex min-h-11 items-center px-1 -mx-1 text-[10px] font-mono underline-offset-2 hover:underline focus-visible:underline sm:min-h-0 sm:px-0 sm:mx-0"
+      style={{ color: "var(--ledger-ink)" }}
+    >
+      <span className="font-black">{player.name}</span>
+      {detail && (
+        <span className="text-[8px] ml-1" style={{ color: "var(--ledger-ink-faint)" }}>
+          {detail}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 function LineupSection({ lines }: { lines: TeamLines }) {
   const LINE_NAMES = ["1st Line", "2nd Line", "3rd Line", "4th Line"];
   const PAIR_NAMES = ["1st Pair", "2nd Pair", "3rd Pair"];
@@ -386,12 +407,7 @@ function LineupSection({ lines }: { lines: TeamLines }) {
               </div>
               <div className="flex flex-wrap gap-x-2">
                 {line.map((p) => (
-                  <span key={p.name} className="text-[10px] font-mono" style={{ color: "var(--ledger-ink)" }}>
-                    <span className="font-black">{p.name}</span>
-                    <span className="text-[8px] ml-0.5" style={{ color: "var(--ledger-ink-faint)" }}>
-                      {p.position}
-                    </span>
-                  </span>
+                  <LinePlayerLink key={p.id} player={p} detail={p.position} />
                 ))}
               </div>
             </div>
@@ -410,9 +426,7 @@ function LineupSection({ lines }: { lines: TeamLines }) {
               </div>
               <div className="flex flex-wrap gap-x-2">
                 {pair.map((p) => (
-                  <span key={p.name} className="text-[10px] font-mono" style={{ color: "var(--ledger-ink)" }}>
-                    <span className="font-black">{p.name}</span>
-                  </span>
+                  <LinePlayerLink key={p.id} player={p} />
                 ))}
               </div>
             </div>
@@ -424,12 +438,7 @@ function LineupSection({ lines }: { lines: TeamLines }) {
             </div>
             <div className="flex flex-wrap gap-x-3">
               {lines.goalies.map((g, i) => (
-                <span key={g.name} className="text-[10px] font-mono" style={{ color: "var(--ledger-ink)" }}>
-                  <span className="font-black">{g.name}</span>
-                  <span className="text-[8px] ml-1" style={{ color: "var(--ledger-ink-faint)" }}>
-                    {i === 0 ? "Starter" : "Backup"}
-                  </span>
-                </span>
+                <LinePlayerLink key={g.id} player={g} detail={i === 0 ? "Starter" : "Backup"} />
               ))}
             </div>
           </div>
@@ -439,11 +448,12 @@ function LineupSection({ lines }: { lines: TeamLines }) {
   );
 }
 
-function TeamCard({ profile, expanded, onToggle, capCeiling }: {
+function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = true }: {
   profile: TeamProfile;
   expanded: boolean;
   onToggle: () => void;
   capCeiling: number;
+  showDetailLink?: boolean;
 }) {
   const { team, contention, edge, strand, rosterNAV, topPlayers, capCommitted, lines, avgAge, rosterSize, ufaCount, rfaCount, gravityLeaders, teamGravity } = profile;
 
@@ -453,12 +463,13 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
       style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-card)" }}
     >
       {/* Header row */}
-      <button
-        onClick={onToggle}
-        className="w-full text-left px-4 py-3 flex items-center gap-3 cursor-pointer"
-        style={{ background: "transparent", border: "none", color: "inherit" }}
-        aria-expanded={expanded}
-      >
+      <div className="flex items-stretch">
+        <button
+          onClick={onToggle}
+          className="flex-1 min-w-0 text-left px-4 py-3 flex items-center gap-3 cursor-pointer"
+          style={{ background: "transparent", border: "none", color: "inherit" }}
+          aria-expanded={expanded}
+        >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[13px] font-black uppercase tracking-[0.08em]" style={{ color: "var(--ledger-ink)" }}>
@@ -508,10 +519,22 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
           </div>
         </div>
 
-        <span className="text-[10px] shrink-0" style={{ color: "var(--ledger-ink-faint)" }}>
-          {expanded ? "▲" : "▼"}
-        </span>
-      </button>
+          <span className="text-[10px] shrink-0" style={{ color: "var(--ledger-ink-faint)" }}>
+            {expanded ? "▲" : "▼"}
+          </span>
+        </button>
+        {showDetailLink && (
+          <Link
+            href={`/teams/${team.id.toLowerCase()}`}
+            aria-label={`Open ${team.name} team page`}
+            className="min-w-11 border-l px-2 flex flex-col items-center justify-center gap-0.5 text-[8px] font-black uppercase tracking-[0.1em]"
+            style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-red)" }}
+          >
+            <span aria-hidden="true" className="text-[13px] leading-none">↗</span>
+            <span>Page</span>
+          </Link>
+        )}
+      </div>
 
       {/* Expanded detail */}
       {expanded && (
@@ -810,12 +833,17 @@ function TeamCard({ profile, expanded, onToggle, capCeiling }: {
 }
 
 export default function TeamsPage() {
+  const pathname = usePathname();
+  const detailTeamId = pathname.startsWith("/teams/")
+    ? decodeURIComponent(pathname.slice("/teams/".length).split("/")[0]).toUpperCase()
+    : null;
   const [teams, setTeams] = useState<TeamData[]>([]);
   const [players, setPlayers] = useState<Asset[]>([]);
   const [capCeiling, setCapCeiling] = useState(104);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("division");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detailCollapsed, setDetailCollapsed] = useState(false);
   const [filterPhase, setFilterPhase] = useState<string>("ALL");
 
   useEffect(() => {
@@ -988,6 +1016,10 @@ export default function TeamsPage() {
     return counts;
   }, [teamProfiles]);
 
+  const detailProfile = detailTeamId
+    ? teamProfiles.find((profile) => profile.team.id.toUpperCase() === detailTeamId) ?? null
+    : null;
+
   if (loading) {
     return (
       <main className="min-h-screen font-mono" style={{ background: "var(--paper-bg)", color: "var(--ledger-ink)" }}>
@@ -995,6 +1027,52 @@ export default function TeamsPage() {
           <div className="text-[11px] font-black uppercase tracking-[0.3em] animate-pulse">
             Loading Team Analytics&hellip;
           </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (detailTeamId) {
+    return (
+      <main className="min-h-screen font-mono" style={{ background: "var(--paper-bg)", color: "var(--ledger-ink)" }}>
+        <div className="mx-auto max-w-6xl px-4 pt-5 pb-8">
+          <Header activeTab="teams" />
+
+          <div className="mt-6 mb-5 border-b pb-4" style={{ borderColor: "var(--ledger-rule)" }}>
+            <Link
+              href="/teams"
+              className="inline-flex min-h-11 items-center text-[10px] font-black uppercase tracking-[0.14em] underline-offset-2 hover:underline focus-visible:underline"
+              style={{ color: "var(--ledger-red)" }}
+            >
+              ← All teams
+            </Link>
+            <h1 className="text-[18px] font-black uppercase tracking-[0.08em]" style={{ color: "var(--ledger-ink)" }}>
+              {detailProfile?.team.name ?? detailTeamId}
+            </h1>
+            <p className="text-[11px] mt-1 leading-relaxed" style={{ color: "var(--ledger-ink-faint)" }}>
+              Team detail — contention window, roster NAV, cap situation, Team DNA, EDGE profile, and projected lines.
+            </p>
+          </div>
+
+          {detailProfile ? (
+            <TeamCard
+              profile={detailProfile}
+              expanded={!detailCollapsed}
+              onToggle={() => setDetailCollapsed((collapsed) => !collapsed)}
+              capCeiling={capCeiling}
+              showDetailLink={false}
+            />
+          ) : (
+            <div
+              className="border px-4 py-8 text-center text-[11px]"
+              role="status"
+              style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink-faint)", background: "var(--paper-card)" }}
+            >
+              Team analytics are temporarily unavailable.
+            </div>
+          )}
+
+          <Footer />
         </div>
       </main>
     );

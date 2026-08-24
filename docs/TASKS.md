@@ -55,9 +55,10 @@ Root: two stacked panels, no sticky summary (mobile audit §8).
 Fix: sticky bottom summary (both teams, asset counts, NAV balance, Run Audit) + Team A/B toggle.
 Acceptance: below 1024px, one labelled team panel is shown at a time behind an accessible A/B toggle; a safe-area-aware bottom ledger keeps both team IDs, outbound asset counts, Team A net NAV, and the existing GM Audit action visible. Desktop keeps both panels. ✅ 2026-08-24.
 
-### [ ] M-TeamPages — `/teams/{team}` detail routes (L)
+### [x] M-TeamPages — `/teams/{team}` detail routes (L)
 Root: `app/teams/` is index-only; the expanded card does index+detail and links no players (mobile audit §7).
 Fix: add dynamic team routes; link projected-line players to their profiles.
+Acceptance: every index card exposes a dedicated 44px team-page link; `/teams/{abbreviation}` validates against the 32-team source of truth, 404s unknown IDs, and opens the selected analytics card expanded. Every projected forward, defenseman, and goalie links to `/players/{id}` with a 44px mobile target. ✅ 2026-08-24.
 
 ### [ ] M-Perf — Teams/Docket/Armchair loading precompute (P0 — blocked in Claude-web)
 Root: cold roster build ~40s + client full-league navMap (mobile audit §2/X4). Not testable without NHL egress.
