@@ -5,11 +5,16 @@ import { TEAMS_DB } from "@/app/lib/db";
 import { redis } from "@/app/lib/redis";
 import { db } from "@/app/db/client";
 import { teams as teamsTable } from "@/app/db/schema";
-import { assembleCanonicalRoster } from "@/app/lib/roster-assembly";
 import { buildDraftPickInventory } from "@/app/lib/draft-pick-inventory";
-import { leagueTeamCacheKey } from "@/app/lib/team-cache";
+import { LEAGUE_ANALYTICS_CACHE_KEY, leagueTeamCacheKey } from "@/app/lib/team-cache";
 import { regulationWinsFrom } from "@/app/lib/nhl-standings-fields";
 import { getLiveCapCeiling, getLiveCapFloor } from "@/app/lib/live-cap-settings";
+import { buildLeagueNavMap } from "@/app/lib/league-nav";
+import { isHealthyRoster } from "@/app/lib/roster-health";
+import { swrCache } from "@/app/lib/swr-cache";
+import { swrStore } from "@/app/lib/swr-store";
+import { getCachedRoster } from "@/app/lib/cached-roster";
+import { applyTeamCapDeltas } from "@/app/lib/cap-delta";
 
 export const dynamic = "force-dynamic";
 
@@ -395,16 +400,23 @@ async function loadTeams(capCeiling: number): Promise<any[]> {
   return teams;
 }
 
-export async function GET() {
+const ANALYTICS_FRESH_TTL = 30 * 60;
+const ANALYTICS_STALE_TTL = 24 * 60 * 60;
+
+async function buildLeagueAnalyticsPayload() {
   const [capCeiling, capFloor] = await Promise.all([
     getLiveCapCeiling(),
     getLiveCapFloor(),
   ]);
-  const LIVE_TEAMS = await loadTeams(capCeiling);
-  const roster = await assembleCanonicalRoster({ teams: LIVE_TEAMS, includeTeamContext: true });
-  const picks = await buildDraftPickInventory(LIVE_TEAMS);
+  const [LIVE_TEAMS, cachedRoster] = await Promise.all([
+    loadTeams(capCeiling),
+    getCachedRoster(),
+  ]);
+  const roster = cachedRoster.value;
+  const contextualTeams = applyTeamCapDeltas(LIVE_TEAMS, roster.publishedTradeCapMoves);
+  const picks = await buildDraftPickInventory(contextualTeams);
 
-  const teams = roster.teams.map((t: any) => ({
+  const teams = contextualTeams.map((t: any) => ({
     id:       t.id,
     name:     t.name,
     capSpace: t.capSpace,
@@ -417,14 +429,39 @@ export async function GET() {
     capBreakdown: t.capBreakdown ?? null,
   }));
 
-  return NextResponse.json({
+  const players = [...roster.players, ...picks];
+  const rosterNavMap = roster.capCeiling === capCeiling
+    ? roster.navMap
+    : buildLeagueNavMap(roster.players, capCeiling);
+
+  return {
     teams,
-    players: [...roster.players, ...picks],
+    players,
+    navMap: { ...rosterNavMap, ...buildLeagueNavMap(picks, capCeiling) },
     capCeiling,
     capFloor,
     generatedAt: roster.generatedAt,
     source: "NHL API + hand-maintained contracts",
     liveStats: roster.liveStats,
     debug: roster.debug,
+  };
+}
+
+export async function GET() {
+  const { value, state, blocked } = await swrCache({
+    store: swrStore,
+    key: LEAGUE_ANALYTICS_CACHE_KEY,
+    freshSeconds: ANALYTICS_FRESH_TTL,
+    staleSeconds: ANALYTICS_STALE_TTL,
+    isCacheable: (payload) => isHealthyRoster(payload?.players ?? []),
+    build: buildLeagueAnalyticsPayload,
+  });
+
+  return NextResponse.json(value, {
+    headers: {
+      "Cache-Control": "public, s-maxage=300, stale-while-revalidate=900",
+      "x-ledger-cache": state,
+      "x-ledger-blocked": String(blocked),
+    },
   });
 }

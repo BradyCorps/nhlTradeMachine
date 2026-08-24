@@ -10,10 +10,9 @@ Legend: `[ ]` to-do · `[~]` partial / verify-then-close
 
 ---
 
-## [~] Mobile Audit (mobile-first UI)
-Full detail + verification per item: `docs/mobile-audit-triage.md`. Items already
-✅ there (global nav §1, footer icon-key X2, franchise-selector a11y §9,
-AssetDropdown→useDialog) are done; below is what remains, plus the two closed this pass.
+## [x] Mobile Audit (mobile-first UI)
+Full detail + verification per item: `docs/mobile-audit-triage.md`. The active audit
+queue and the items already marked ✅ there are complete as of 2026-08-24.
 
 ### [x] M-Docket — Docket filter controls too small; search should span the row
 Root: `.docket-filters` inputs/selects were ~34–38px and the search field shared a 2-col mobile row with Team (`app/docket/DocketClient.tsx` + `.docket-filters` in `globals.css`).
@@ -60,9 +59,10 @@ Root: `app/teams/` is index-only; the expanded card does index+detail and links 
 Fix: add dynamic team routes; link projected-line players to their profiles.
 Acceptance: every index card exposes a dedicated 44px team-page link; `/teams/{abbreviation}` validates against the 32-team source of truth, 404s unknown IDs, and opens the selected analytics card expanded. Every projected forward, defenseman, and goalie links to `/players/{id}` with a 44px mobile target. ✅ 2026-08-24.
 
-### [ ] M-Perf — Teams/Docket/Armchair loading precompute (P0 — blocked in Claude-web)
-Root: cold roster build ~40s + client full-league navMap (mobile audit §2/X4). Not testable without NHL egress.
-Fix: precompute/cache league aggregates; render shell + skeletons first. Needs a codespace with egress.
+### [x] M-Perf — Teams/Docket/Armchair loading precompute (P0)
+Root: cold roster build ~40s + client full-league navMap (mobile audit §2/X4).
+Fix: an authenticated daily job precomputes the canonical roster, server NAV map, and current Docket grades into shared SWR caches; Team Analytics reuses that roster aggregate, Armchair primes its exact-input NAV cache from the two league payloads, and all three routes render application-shell skeletons while data resolves. Redis remains the durable store, with a TTL memory fallback for warm Redis-less processes; an uncached Docket request reads only the published ledger while the expensive current-day regrade stays in precompute.
+Acceptance: NHL egress verified; measured production requests reduced player bootstrap from 25.97s cold to 65.6ms warm, Teams payload from 1.09s cold to 6.5ms warm, reused Team Analytics from 0.99s cold to 49.7ms warm, and Docket from an unbounded >15s request to 1.40s cold / 48.8ms warm with its shell starting in 345ms. Server and client NAV results are regression-tested as identical; full suite, tsc, lint, and production build are green. ✅ 2026-08-24.
 
 ## [ ] Sim Engine — remaining audit items
 Full detail + status: `docs/sim-engine-audit-triage.md` (P0-1…P0-5, P1-7, P1-8 are ✅ RESOLVED).

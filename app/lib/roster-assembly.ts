@@ -1587,15 +1587,14 @@ export async function assembleCanonicalRoster(options: {
     console.warn("[FA pool] injection skipped:", e.message);
   }
 
-  const finalTeams = applyTeamCapDeltas(
-    rosterTeams,
-    buildPublishedTradeCapMoves(publishedTrades, players),
-  );
+  const publishedTradeCapMoves = buildPublishedTradeCapMoves(publishedTrades, players);
+  const finalTeams = applyTeamCapDeltas(rosterTeams, publishedTradeCapMoves);
   players = applyPublishedTradeOverlay(players, publishedTrades);
 
   return {
     teams: finalTeams,
     players,
+    publishedTradeCapMoves,
     rosterMap,
     liveStats: analyticsMap.size > 0,
     generatedAt: new Date().toISOString(),

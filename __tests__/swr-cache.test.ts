@@ -185,6 +185,13 @@ describe("both league routes read through the same policy", () => {
     expect(read("app/lib/swr-store.ts")).toContain("nx: true");
   });
 
+  it("falls back to a TTL memory store instead of rebuilding on every Redis-less request", () => {
+    const store = read("app/lib/swr-store.ts");
+    expect(store).toContain("memorySwrStore");
+    expect(store).toContain(": memorySwrStore");
+    expect(store).toContain("expiresAt <= Date.now()");
+  });
+
   it("caches the whole teams response, not just the inner team list", () => {
     // The warm path still hit the DB twice and rebuilt ~800 pick objects.
     const src = read("app/api/league/teams/route.ts");

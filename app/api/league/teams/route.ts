@@ -11,6 +11,7 @@ import { swrCache } from "@/app/lib/swr-cache";
 import { swrStore } from "@/app/lib/swr-store";
 import { regulationWinsFrom } from "@/app/lib/nhl-standings-fields";
 import { getLiveCapCeiling } from "@/app/lib/live-cap-settings";
+import { buildLeagueNavMap } from "@/app/lib/league-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -245,6 +246,7 @@ async function buildTeamsPayload() {
   return {
     teams,
     picks,
+    navMap: buildLeagueNavMap(picks, liveCapCeiling),
     capCeiling:  liveCapCeiling,
     capFloor:    CAP_FLOOR,
     generatedAt: new Date().toISOString(),

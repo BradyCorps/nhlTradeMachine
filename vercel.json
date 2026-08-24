@@ -1,5 +1,6 @@
 {
   "crons": [
-    { "path": "/api/cron/nhl-feed", "schedule": "0 9 * * *" }
+    { "path": "/api/cron/nhl-feed", "schedule": "0 9 * * *" },
+    { "path": "/api/cron/league-precompute", "schedule": "30 9 * * *" }
   ]
 }

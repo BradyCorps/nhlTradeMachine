@@ -1,6 +1,7 @@
 "use client";
 // Boot / error full-page states for the Armchair GM.
 import React from "react";
+import Header from "@/app/components/Header";
 
 export function LoadingScreen({
   teamsReady = false,
@@ -24,26 +25,50 @@ export function LoadingScreen({
   );
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
-      <div className="relative">
-        <div className="w-12 h-12 border-2 border-zinc-800 rounded-full" />
-        <div className="w-12 h-12 border-2 border-t-cyan-500 rounded-full animate-spin absolute inset-0" />
+    <main
+      className="min-h-screen bg-paper px-4 pt-5 pb-8 font-serif text-ink"
+      aria-busy="true"
+      aria-label="Loading Armchair GM"
+    >
+      <div className="mx-auto max-w-7xl">
+        <Header activeTab="armchair-gm" />
+
+        <div className="mt-6 border-b border-ledger-rule pb-4">
+          <div className="text-[10px] font-black uppercase tracking-[0.28em] font-mono text-ledger-ink-faint">
+            Armchair GM
+          </div>
+          <div className="mt-2 h-5 w-64 animate-pulse bg-ledger-rule-light" />
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-2" aria-hidden="true">
+          {[0, 1].map((side) => (
+            <section key={side} className="border border-ledger-rule bg-ledger-card-light p-4">
+              <div className="h-11 animate-pulse bg-paper-inset" />
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {Array.from({ length: 6 }, (_, index) => (
+                  <div key={index} className="h-16 animate-pulse bg-paper-inset" />
+                ))}
+              </div>
+              <div className="mt-4 h-24 animate-pulse bg-paper-inset" />
+            </section>
+          ))}
+        </div>
+
+        <div className="mt-4 border border-zinc-300 bg-white/35 p-4 font-mono" role="status" aria-live="polite">
+          <div className="mb-3 text-[10px] font-black uppercase tracking-[0.3em] text-zinc-700 animate-pulse">
+            Confirming Full Player Load
+          </div>
+          <div className="space-y-2">
+            <Check ready={teamsReady} label="Teams" />
+            <Check ready={playersReady} label="Player Assets" detail={playerCount ? `${playerCount}` : undefined} />
+            <Check ready={navReady} label="Player Values" detail={playerCount ? `${Math.min(navCount, playerCount)}/${playerCount}` : undefined} />
+          </div>
+          <div className="mt-3 text-[10px] text-zinc-600 font-black uppercase tracking-widest">
+            Cached league values unlock the desk as soon as the roster arrives.
+          </div>
+        </div>
       </div>
-      <div className="text-2xs font-black uppercase tracking-[0.5em] text-zinc-600 animate-pulse">
-        Confirming Full Player Load
-      </div>
-      <div className="text-2xs text-zinc-800 font-black uppercase tracking-widest">
-        MoneyPuck · NHL API · X-NAV 2.0
-      </div>
-      <div className="mt-2 w-full max-w-md space-y-2 border border-zinc-300 bg-white/35 p-4">
-        <Check ready={teamsReady} label="Teams" />
-        <Check ready={playersReady} label="Player Assets" detail={playerCount ? `${playerCount}` : undefined} />
-        <Check ready={navReady} label="Player Values" detail={playerCount ? `${Math.min(navCount, playerCount)}/${playerCount}` : undefined} />
-      </div>
-      <div className="text-[10px] text-zinc-600 font-black uppercase tracking-widest text-center">
-        Armchair GM unlocks after every roster value is ready.
-      </div>
-    </div>
+    </main>
   );
 }
 

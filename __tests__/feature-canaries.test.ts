@@ -551,6 +551,7 @@ describe("Canary — admin trade ingestion", () => {
 
 describe("Canary — public Docket page", () => {
   const page = read("app/docket/page.tsx");
+  const cachedDocket = read("app/lib/cached-docket.ts");
   const client = read("app/docket/DocketClient.tsx");
   const today = read("app/lib/docket-today.ts");
   const view = read("app/lib/docket-view.ts");
@@ -558,9 +559,10 @@ describe("Canary — public Docket page", () => {
   const home = read("app/page.tsx");
 
   it("loads published trades through the Docket view model", () => {
-    expect(page).toContain("listPublishedTrades");
-    expect(page).toContain("buildDocketEntries");
-    expect(page).toContain("attachTodayDocketGrades");
+    expect(cachedDocket).toContain("listPublishedTrades");
+    expect(cachedDocket).toContain("buildDocketEntries");
+    expect(cachedDocket).toContain("attachTodayDocketGrades");
+    expect(page).toContain("getCachedDocketEntries");
     expect(page).toContain("<DocketClient entries={entries} />");
     expect(view).toContain("if (!trade.published || !trade.gradeAtTrade) return null");
   });
@@ -594,7 +596,8 @@ describe("Canary — public Docket page", () => {
   });
 
   it("computes today's Docket grade from current canonical data without mutating at-trade snapshots", () => {
-    expect(today).toContain("assembleCanonicalRoster");
+    expect(today).toContain("getCachedRoster");
+    expect(today).not.toContain("assembleCanonicalRoster");
     expect(today).toContain("evaluatePost");
     expect(today).toContain("runTrade: true");
     expect(today).toContain("todayLockedVerdict: evaluation.verdict ?? null");
@@ -962,7 +965,7 @@ describe("Canary — draft pick inventory", () => {
     const league = read("app/api/league/route.ts");
     const teams = read("app/api/league/teams/route.ts");
     const helper = read("app/lib/draft-pick-inventory.ts");
-    expect(league).toContain("buildDraftPickInventory(LIVE_TEAMS)");
+    expect(league).toContain("buildDraftPickInventory(contextualTeams)");
     expect(teams).toContain("buildDraftPickInventory(LIVE_TEAMS)");
     expect(helper).toContain("[firstYear, firstYear + 1, firstYear + 2, firstYear + 3, firstYear + 4]");
     expect(helper).toContain("SEASON.firstTradablePickYear");
@@ -1237,7 +1240,7 @@ describe("Canary — footer glossary", () => {
 
 describe("Canary — trade UX loading and mobile focus", () => {
   const tradePage = readArmchairAll();
-  const tradeLoading = read("app/armchair-gm/loading.tsx");
+  const tradeLoading = read("app/armchair-gm/loading.tsx") + read("app/armchair-gm/Screens.tsx");
   const assetDropdown = read("app/components/AssetDropdown.tsx");
   const lineupEditor = read("app/components/LineupEditor.tsx");
   const header = read("app/components/Header.tsx");
@@ -1287,15 +1290,16 @@ describe("Canary — trade UX loading and mobile focus", () => {
     expect(tradePage).toContain("unique values ready");
     expect(tradePage).toContain("if (booting || !dataReady || !initialNavReady)");
     expect(tradePage).toContain("Confirming Full Player Load");
-    expect(tradePage).toContain("Armchair GM unlocks after every roster value is ready.");
+    expect(tradePage).toContain("Cached league values unlock the desk as soon as the roster arrives.");
   });
 
-  it("uses one consistent trade preloader without skeleton bars", () => {
+  it("uses one consistent trade shell with progress and content skeletons", () => {
     expect(tradeLoading).toContain("Confirming Full Player Load");
     expect(tradeLoading).toContain("Player Values");
-    expect(tradeLoading).toContain("Armchair GM unlocks after every roster value is ready.");
-    expect(tradeLoading).not.toContain("Content skeleton bars");
-    expect(tradeLoading).not.toContain("bg-ledger-card");
+    expect(tradeLoading).toContain("Cached league values unlock the desk as soon as the roster arrives.");
+    expect(tradeLoading).toContain('aria-busy="true"');
+    expect(tradeLoading).toContain("animate-pulse");
+    expect(tradeLoading).toContain('<Header activeTab="armchair-gm" />');
   });
 
   it("shows contract years remaining before adding an asset", () => {
@@ -2645,6 +2649,58 @@ describe("Canary — team detail routes", () => {
     expect(page).toContain("function LinePlayerLink");
     expect(page).toContain('href={`/players/${encodeURIComponent(player.id)}`}');
     expect(page.match(/<LinePlayerLink/g)).toHaveLength(3);
+  });
+});
+
+describe("Canary — mobile league loading precompute", () => {
+  it("serves cached server NAV to Teams and Armchair instead of recomputing the league in-browser", () => {
+    const cachedRoster = read("app/lib/cached-roster.ts");
+    const teamRoute = read("app/api/league/teams/route.ts");
+    const leagueRoute = read("app/api/league/route.ts");
+    const armchair = read("app/armchair-gm/page.tsx");
+    const teams = readSource("app/teams/page.tsx");
+
+    expect(cachedRoster).toContain("buildLeagueNavMap");
+    expect(cachedRoster).toContain("navMap:");
+    expect(teamRoute).toContain("buildLeagueNavMap(picks");
+    expect(leagueRoute).toContain("LEAGUE_ANALYTICS_CACHE_KEY");
+    expect(leagueRoute).toContain("swrCache");
+    expect(leagueRoute).toContain("buildLeagueNavMap");
+    expect(leagueRoute).toContain("getCachedRoster");
+    expect(readSource("app/api/league/route.ts")).not.toContain("assembleCanonicalRoster");
+    expect(armchair).toContain("primeNavCache");
+    expect(armchair).toContain("pd.navMap");
+    expect(armchair).toContain("td.navMap");
+    expect(teams).toContain("setNavMap(data.navMap");
+    expect(teams).not.toContain("calculateAssetNAV");
+
+    const cron = read("app/api/cron/league-precompute/route.ts");
+    expect(cachedRoster).toContain("precomputeRosterCache");
+    expect(cron).toContain("precomputeRosterCache");
+    expect(cron).toContain("precomputeDocketCache");
+    expect(read("vercel.json")).toContain("/api/cron/league-precompute");
+  });
+
+  it("caches Docket grades on the shared roster and renders route shells while data resolves", () => {
+    const docketPage = read("app/docket/page.tsx");
+    const cachedDocket = read("app/lib/cached-docket.ts");
+    const docketToday = readSource("app/lib/docket-today.ts");
+
+    expect(docketPage).toContain("getCachedDocketEntries");
+    expect(cachedDocket).toContain("DOCKET_ENTRIES_CACHE_KEY");
+    expect(cachedDocket).toContain("swrCache");
+    expect(cachedDocket).toContain("DOCKET_DB_TIMEOUT_MS");
+    expect(docketToday).toContain("getCachedRoster");
+    expect(docketToday).not.toContain("assembleCanonicalRoster");
+    for (const loading of [
+      "app/teams/loading.tsx",
+      "app/docket/loading.tsx",
+      "app/armchair-gm/loading.tsx",
+    ]) {
+      const src = read(loading) + (loading.includes("armchair-gm") ? read("app/armchair-gm/Screens.tsx") : "");
+      expect(src, loading).toContain("aria-busy");
+      expect(src, loading).toMatch(/animate-pulse|animate-spin/);
+    }
   });
 });
 
