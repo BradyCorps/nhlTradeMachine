@@ -370,6 +370,7 @@ function AssetRow({
             </div>
             {traits ? (
               <StrandDisplay
+                ariaDescription={`${asset.name} Trade Machine STRAND`}
                 offTraits={traits.off}
                 defTraits={traits.def}
                 ops={asset.ops ?? null}

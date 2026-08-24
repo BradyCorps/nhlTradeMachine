@@ -19,6 +19,7 @@ export type { StrandTrait } from "@/app/lib/strand-traits";
 import { coverageIsThin, coverageLabel, strandCoverage, type StrandTrait } from "@/app/lib/strand-traits";
 
 interface Props {
+  ariaDescription: string;
   offTraits:    StrandTrait[];
   defTraits:    StrandTrait[];
   ops?:         number | null;
@@ -111,7 +112,7 @@ const TRAIT_GUIDE: Record<string, string> = {
 const RAIL_ZONE = 46;
 
 export default function StrandDisplay({
-  offTraits, defTraits, ops, dps, strandType,
+  ariaDescription, offTraits, defTraits, ops, dps, strandType,
   compareOff, compareDef, compareLabel, footer,
   W = 340, H = 210, amplitude = 44, maxWidth,
 }: Props) {
@@ -126,6 +127,29 @@ export default function StrandDisplay({
   const rawLabel = (t: StrandTrait) =>
     t.unavailable ? null
     : t.raw ?? t.ps ?? (t.display !== undefined ? String(t.display) : null);
+  const describeTrait = (t: StrandTrait): string => {
+    if (t.unavailable) return `${t.label} unavailable`;
+    const raw = rawLabel(t);
+    return `${t.label} ${nodeIndex(t)} out of 100${raw ? `, actual ${raw}` : ""}`;
+  };
+  const describeRail = (label: string, traits: StrandTrait[]): string =>
+    `${label}: ${traits.length > 0 ? traits.map(describeTrait).join("; ") : "none"}`;
+  const primaryAria = [
+    ariaDescription,
+    strandType ? `Type: ${strandType}` : null,
+    describeRail("Offensive traits", offTraits),
+    describeRail("Defensive traits", defTraits),
+  ].filter((part): part is string => Boolean(part));
+  const comparisonAria = compareLabel && compareOff && compareDef
+    ? [
+        `Comparison with ${compareLabel}`,
+        describeRail("offensive traits", compareOff),
+        describeRail("defensive traits", compareDef),
+      ].join(". ")
+    : null;
+  const accessibleLabel = [...primaryAria, comparisonAria]
+    .filter((part): part is string => Boolean(part))
+    .join(". ");
 
   const guideLabels = Array.from(new Set([...offTraits, ...defTraits].map(t => t.label)))
     .filter(label => TRAIT_GUIDE[label]);
@@ -142,7 +166,13 @@ export default function StrandDisplay({
     <div style={maxWidth ? { maxWidth, margin: "0 auto" } : undefined}>
       {/* ── SVG Helix ─────────────────────────────────────────── */}
       <div style={{ background: "var(--ledger-cream)", border: "1px solid #c8b890", borderRadius: "2px" }}>
-        <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+        <svg
+          width="100%"
+          viewBox={`0 0 ${W} ${H}`}
+          style={{ display: "block" }}
+          role="img"
+          aria-label={accessibleLabel}
+        >
           {/* Per-trait column dividers + centre line */}
           {offTraits.length > 0 && Array.from({ length: offTraits.length - 1 }, (_, i) => {
             const x = ((i + 1) / offTraits.length) * W;
