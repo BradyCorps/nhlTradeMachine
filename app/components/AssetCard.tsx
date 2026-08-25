@@ -20,6 +20,11 @@ import { contractExpiryYear } from "@/app/lib/contract-expiry";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
 import MeasuredProfile from "@/app/components/MeasuredProfile";
 import { displayPosition } from "@/app/lib/display-position";
+import {
+  PLAYER_STATS_CONTEXT,
+  navLabelForPosition,
+  navLongLabelForPosition,
+} from "@/app/lib/player-terminology";
 
 import { fmtSigned as fmt } from "@/app/lib/display-utils";
 // RL3 — DEV is gone from the trade card. The dynasty/boom-bust read it showed
@@ -89,6 +94,7 @@ export default function AssetCard({
   };
 
   const navColor = xnav.total > 80 ? 'var(--ledger-green)' : xnav.total > 20 ? 'var(--ledger-ice)' : xnav.total > -20 ? 'var(--ledger-brown)' : 'var(--ledger-red)';
+  const navLabel = navLabelForPosition(asset.position);
 
   return (
     <div className="p-3 transition-all">
@@ -190,7 +196,7 @@ export default function AssetCard({
             fontSize: '1.1rem',
             fontStyle: 'italic',
             color: xnav.total > 80 ? 'var(--ledger-green)' : xnav.total > 20 ? 'var(--ledger-ice)' : xnav.total > -20 ? 'var(--ledger-brown)' : 'var(--ledger-red)',
-          }} title="X-NAV — Extended Net Asset Value, the player’s tradeable value">
+          }} title={`${navLabel} — ${navLongLabelForPosition(asset.position)}, the player’s tradeable value`}>
             {fmt(xnav.total, 0)}
           </span>
           {xnav.noivImpact !== undefined && Math.abs(xnav.noivImpact) >= 2 && (
@@ -304,12 +310,17 @@ export default function AssetCard({
       )}
       {/* Standard STATS view */}
       {(view === "STATS" || isPick) && (<>
+      {!isPick && (
+        <div className="mb-2 text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">
+          {PLAYER_STATS_CONTEXT}
+        </div>
+      )}
       {asset.position === "G" && !isPick && (
         <div className="grid grid-cols-3 gap-1.5 mb-2.5 sm:grid-cols-3">
           {[
-            { label: 'GSAx', val: (asset.gsax??0).toFixed(1), good: (asset.gsax??0) >= 0 },
-            { label: 'SV%',  val: ((asset.savePct??0.9)*100).toFixed(1), good: (asset.savePct??0) >= 0.910 },
-            { label: 'GP',   val: String(asset.gamesStarted ?? 0), good: true },
+            { label: 'Goals saved above expected', val: (asset.gsax??0).toFixed(1), good: (asset.gsax??0) >= 0 },
+            { label: 'Save percentage', val: ((asset.savePct??0.9)*100).toFixed(1), good: (asset.savePct??0) >= 0.910 },
+            { label: 'Games started', val: String(asset.gamesStarted ?? 0), good: true },
           ].map(s => (
             <div key={s.label} className="p-2 text-center">
               <div className="text-2xs font-black uppercase tracking-tight mb-0.5">{s.label}</div>
@@ -348,19 +359,19 @@ export default function AssetCard({
             <div className="flex gap-1.5 mb-1.5">
               {asset.ops != null && (
                 <div className="flex items-center gap-1 px-1.5 py-0.5" style={{ background: 'rgba(26,46,92,0.08)', border: '1px solid rgba(26,46,92,0.2)', borderRadius: '2px' }}>
-                  <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">OPS</span>
+                  <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">Offensive Point Shares</span>
                   <span className="text-2xs font-black text-ledger-ice font-mono">{asset.ops.toFixed(1)}</span>
                 </div>
               )}
               {asset.dps != null && (
                 <div className="flex items-center gap-1 px-1.5 py-0.5" style={{ background: 'rgba(184,48,32,0.08)', border: '1px solid rgba(184,48,32,0.2)', borderRadius: '2px' }}>
-                  <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">DPS</span>
+                  <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">Defensive Point Shares</span>
                   <span className="text-2xs font-black" style={{ color: 'var(--ledger-red)' }}>{asset.dps.toFixed(1)}</span>
                 </div>
               )}
               {asset.ops != null && asset.dps != null && (asset.ops + asset.dps) > 0 && (
                 <div className="flex items-center gap-1 px-1.5 py-0.5" style={{ background: 'rgba(107,80,48,0.08)', border: '1px solid rgba(107,80,48,0.2)', borderRadius: '2px' }}>
-                  <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">PS</span>
+                  <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">Point Shares</span>
                   <span className="text-2xs font-black" style={{ color: 'var(--ledger-brown)' }}>{(asset.ops + asset.dps).toFixed(1)}</span>
                 </div>
               )}
@@ -377,14 +388,14 @@ export default function AssetCard({
           </div>
           <div className="stat-grid-4">
             <MicroBar 
-    label="OFF" 
+    label="Offence"
     val={xnav.off} 
     max={HISTORICAL_MAX_OFF} // Updated to Lemieux's 300 scale
     color="cyan"
     tooltip="Offensive impact — scoring production (pts/82, xG rate)" 
 />
             <MicroBar
-    label="DEF"
+    label="Defence"
     val={displayedDef}
     // Now that the scales are mathematically synced, the max is 148 either way
     max={HISTORICAL_MAX_DEF}
@@ -394,15 +405,15 @@ export default function AssetCard({
     : "Defensive value — xG suppression weighted by ice time quality"
     } 
 />
-            <MicroBar label={xnav.age > 0 ? "YNG" : "AGE"} val={xnav.age} max={80}
+            <MicroBar label={xnav.age > 0 ? "Youth" : "Age"} val={xnav.age} max={80}
               color={xnav.age > 0 ? "emerald" : "amber"}
               tooltip={xnav.age > 0
                 ? "Youth premium — proven production on a cheap contract creates surplus value"
                 : "Age penalty — decline curve discount for veterans past peak age"} />
-            <MicroBar label="CAP" val={xnav.cap} max={100} color="rose" invert
+            <MicroBar label="Contract" val={xnav.cap} max={100} color="rose" invert
               tooltip="Contract cost — overpaid contracts drag total NAV. Negative = cap hit exceeds on-ice value" />
             {Math.abs(floorAdj) >= 1 && (
-              <MicroBar label="FLOOR" val={floorAdj} max={100} color="amber"
+              <MicroBar label="Career floor" val={floorAdj} max={100} color="amber"
                 tooltip="Franchise/career floor applied" />
             )}
           </div>
@@ -443,7 +454,7 @@ export default function AssetCard({
           <div className="grid grid-cols-2 gap-1">
             <MicroBar label="G-NAV" val={xnav.def} max={300} color="emerald"
               tooltip="Goalie NAV — based on GSAx (goals saved above expected) from MoneyPuck" />
-            <MicroBar label="CAP" val={xnav.cap} max={100} color="rose" invert
+            <MicroBar label="Contract" val={xnav.cap} max={100} color="rose" invert
               tooltip="Contract cost — overpaid contracts drag total NAV" />
           </div>
         </div>
@@ -457,10 +468,10 @@ export default function AssetCard({
             {(() => {
               const box = boxScoreFromPace(asset);
               return [
-                { label: 'GP',  val: String(box.gp) },
-                { label: 'G',   val: String(box.g) },
-                { label: 'A',   val: String(box.a) },
-                { label: 'PTS', val: String(box.pts) },
+                { label: 'Games', val: String(box.gp) },
+                { label: 'Goals', val: String(box.g) },
+                { label: 'Assists', val: String(box.a) },
+                { label: 'Points', val: String(box.pts) },
               ];
             })().map(s => (
               <div key={s.label} className="text-center p-1" style={{ background: 'var(--ledger-cream)', border: '1px solid #b8a070' }}>
@@ -472,10 +483,10 @@ export default function AssetCard({
           {/* Advanced row */}
           <div className="stat-grid-4">
             {[
-              { label: 'TOI',   val: asset.avgTOI?.toFixed(1) ?? '—',   tooltip: 'Average time on ice per game (minutes)' },
-              { label: 'xG/82', val: asset.xGPace?.toFixed(1)  ?? '—',  tooltip: 'Expected goals generated per 82 games' },
-              { label: 'xG%+', val: asset.xgRelTM != null ? `${(asset.xgRelTM as number) > 0 ? '+' : ''}${(asset.xgRelTM as number).toFixed(1)}` : '—', tooltip: 'xG% relative to teammates — positive means team controls more shots when this player is on ice vs off' },
-              { label: 'QoC',   val: asset.qocIndex != null ? asset.qocIndex.toString() : '—',  tooltip: 'Deployment difficulty 0-100: per-game ice-time rank + PK share + d-zone starts. 75+ shutdown/top-pair, ~40 middle six, <20 sheltered' },
+              { label: 'Average ice time', val: asset.avgTOI?.toFixed(1) ?? '—', tooltip: 'Average time on ice per game (minutes)' },
+              { label: 'Expected goals/82', val: asset.xGPace?.toFixed(1) ?? '—', tooltip: 'Expected goals generated per 82 games' },
+              { label: 'Expected-goal share relative', val: asset.xgRelTM != null ? `${(asset.xgRelTM as number) > 0 ? '+' : ''}${(asset.xgRelTM as number).toFixed(1)}` : '—', tooltip: 'Expected-goal share relative to teammates — positive means the team controls more shots with this player on the ice' },
+              { label: 'Competition', val: asset.qocIndex != null ? asset.qocIndex.toString() : '—', tooltip: 'Deployment difficulty 0-100: per-game ice-time rank + PK share + defensive-zone starts' },
             ].map(s => (
               <div key={s.label} className="text-center p-1" title={s.tooltip} style={{ background: 'var(--ledger-warm)', border: '1px solid #b8a070' }}>
                 <div className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">{s.label}</div>

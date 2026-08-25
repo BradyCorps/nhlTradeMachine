@@ -132,7 +132,7 @@ describe("Canary — NHL EDGE usage and presentation", () => {
     expect(breakoutModel).toContain("if (s.hdFinishingDelta != null)");
     expect(breakoutModel).toContain("edgeBurstsOver20");
     expect(rollover).toContain("computeBreakout");
-    expect(players).toContain('{ label: "EDGE HD"');
+    expect(players).toContain('{ label: "High-danger finish"');
     expect(players).toContain("NHL EDGE high-danger finishing vs league average");
     expect(players).toContain("hdFinishingDelta: player.hdFinishingDelta ?? undefined");
     // The shared adapter preserves the full player payload (EDGE fields
@@ -927,7 +927,7 @@ describe("Canary — Player Card AA redesign + FMV surplus read", () => {
     expect(card).toContain("<PlayerAvatar");
     expect(card).toContain("CAP & CREASE");
     expect(card).toContain("MODEL_PRICE_LABEL");
-    expect(card).toContain("Extended Net Asset Value");
+    expect(card).toContain("navLongLabelForPosition");
     // Missing stats read as "No data", never a fabricated 50th percentile
     expect(card).toContain("No data");
   });
@@ -1146,15 +1146,15 @@ describe("Canary — Batch 5 UI state robustness", () => {
     expect(src).toContain("const compare = (av: number | null | undefined, bv: number | null | undefined)");
     expect(src).toContain("type PlayerSortKey =");
     expect(src).toContain('| "supp" | "gsax" | "svPct" | "gaa" | "gp";');
-    expect(src).toContain('{ key: "seasonPts", label: "PTS" }');
-    expect(src).toContain('{ key: "term",      label: "Term" }');
+    expect(src).toContain('{ key: "seasonPts", label: "Points" }');
+    expect(src).toContain('{ key: "term",      label: PLAYER_TERMINOLOGY.yearsLeft }');
     expect(src).toContain('case "seasonPts": return compare(seasonPointsOf(a), seasonPointsOf(b));');
     expect(src).toContain('case "term": return compare(a.yearsRemaining, b.yearsRemaining);');
     expect(src).toContain("const visibleGoalies");
     expect(src).toContain('SectionColumnHeader section="D"');
     expect(src).toContain('SectionColumnHeader section="G"');
-    expect(src).toContain('{ key: "supp",      label: "Supp" }');
-    expect(src).toContain('{ key: "gaa",   label: "GAA" }');
+    expect(src).toContain('{ key: "supp",      label: "Chance suppression" }');
+    expect(src).toContain('{ key: "gaa",   label: "Goals against" }');
     expect(src).toContain("function PlayerIconBadges");
     expect(src).toContain("FRANCHISE.megalodon");
     expect(src).toContain("getProspectTier(player.name)");
@@ -1303,9 +1303,9 @@ describe("Canary — trade UX loading and mobile focus", () => {
   });
 
   it("shows contract years remaining before adding an asset", () => {
-    expect(assetDropdown).toContain("termLabel");
-    expect(assetDropdown).toContain("p.yearsRemaining");
-    expect(assetDropdown).toContain("{termLabel}");
+    expect(assetDropdown).toContain("contractTermLabel");
+    expect(assetDropdown).toContain("contractTermLabel(p)");
+    expect(assetDropdown).toContain("{term}");
   });
 
   it("lineup editor shows position and NAV on larger mobile-friendly player tiles", () => {
@@ -1726,7 +1726,7 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(src).toContain("players-column-header");
     expect(src).not.toContain("players-mobile-sort-strip");
     expect(src).toContain("const seasonPoints = Math.round");
-    expect(src).toContain('{ label: "PTS",    val: seasonPoints.toString() }');
+    expect(src).toContain('{ label: "Points", val: seasonPoints.toString() }');
     expect(src).not.toContain(">Season Points<");
   });
 
@@ -1820,11 +1820,11 @@ describe("Canary — R0/R1/R2 audit refinements", () => {
   it("keeps expanded player cards and STRAND displays de-duplicated", () => {
     const players = read("app/players/page.tsx");
     const strand = read("app/components/StrandDisplay.tsx");
-    expect(players).toContain('{ label: "PTS",    val: seasonPoints.toString() }');
+    expect(players).toContain('{ label: "Points", val: seasonPoints.toString() }');
     expect(players).not.toContain("Season Points");
     expect(players).not.toContain(">OPS</span>");
     expect(players).not.toContain(">DPS</span>");
-    expect(players).toContain(">PS</span>");
+    expect(players).toContain(">Point Shares</span>");
     expect(strand).not.toContain("Trait bars with league average baseline");
     expect(strand).toContain("What does each trait mean?");
     expect(strand).toContain("<details");
@@ -1888,11 +1888,11 @@ describe("Canary — UX and UI polish", () => {
     const panel = read("app/components/TradePanel.tsx");
     const armchair = readArmchairAll();
     expect(card).toContain("const floorAdj =");
-    expect(card).toContain('label="FLOOR"');
+    expect(card).toContain('label="Career floor"');
     expect(card).toContain("Franchise/career floor applied");
-    expect(card).toContain("Net Asset Value");
+    expect(card).toContain("navLongLabelForPosition");
     expect(panel).toContain("Net Asset Value");
-    expect(armchair).toContain("Franchise/career floor applied");
+    expect(armchair).toContain("Model adjustments applied");
   });
 
   it("makes active header navigation visually distinct", () => {

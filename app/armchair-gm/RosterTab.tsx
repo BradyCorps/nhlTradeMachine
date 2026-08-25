@@ -41,6 +41,7 @@ import {
 import { teamLeadership, letterFor } from "@/app/lib/team-leadership";
 import { lineupContributionScore } from "@/app/lib/lineup-ranking";
 import { SEASON } from "@/app/lib/season-config";
+import { playerCountLabel } from "@/app/lib/player-terminology";
 
 const MONO = "var(--font-mono, 'Courier Prime', monospace)";
 
@@ -333,7 +334,7 @@ function RosterTable({
               style={{ color: simulated ? "var(--ledger-green)" : "var(--ledger-ice)" }}>
               {simulated ? `${SEASON.label} results` : `${SEASON.replaySeason} baseline`}
             </span>
-            {" · "}{totals.players} players · {totals.points} PTS · ${totals.capHit.toFixed(1)}M
+            {" · "}{playerCountLabel(totals.players)} · {totals.points} PTS · ${totals.capHit.toFixed(1)}M
           </p>
         </div>
       </header>

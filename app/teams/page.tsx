@@ -24,6 +24,7 @@ import GravityField from "@/app/components/GravityField";
 import TeamNavChart from "@/app/components/TeamNavChart";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 import TeamsLoading from "./loading";
+import { playerCountLabel } from "@/app/lib/player-terminology";
 
 interface TeamRecord {
   wins: number;
@@ -560,7 +561,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
             <StatCell
               label="Roster NAV"
               value={Math.round(rosterNAV).toLocaleString()}
-              sub={`${rosterSize} players`}
+              sub={playerCountLabel(rosterSize)}
             />
           </div>
 
@@ -625,7 +626,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
           {/* Roster overview strip */}
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
             <StatCell label="Avg Age" value={avgAge.toFixed(1)} />
-            <StatCell label="Roster" value={`${rosterSize}`} sub="players" />
+            <StatCell label="Roster" value={`${rosterSize}`} sub={rosterSize === 1 ? "player" : "players"} />
             <StatCell label="Pending UFA" value={`${ufaCount}`} tone={ufaCount > 5 ? "var(--ledger-red)" : undefined} />
             <StatCell label="Pending RFA" value={`${rfaCount}`} />
           </div>
@@ -701,7 +702,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
               </span>
               {edge && (
                 <span className="text-[8px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
-                  {edge.sampleSize} players sampled
+                  {playerCountLabel(edge.sampleSize)} sampled
                 </span>
               )}
             </div>

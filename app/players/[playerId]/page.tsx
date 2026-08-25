@@ -31,6 +31,12 @@ import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import { contractVerdict, verdictColor } from "@/app/lib/contract-verdict";
 import { getLiveCapCeiling } from "@/app/lib/live-cap-settings";
+import { displayPosition } from "@/app/lib/display-position";
+import {
+  PLAYER_STATS_CONTEXT,
+  navLabelForPosition,
+  navLongLabelForPosition,
+} from "@/app/lib/player-terminology";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +76,7 @@ export async function generateMetadata(
   if (!player) return { title: "Player not found — Cap & Crease" };
   return {
     title: `${player.name} — Cap & Crease`,
-    description: `${player.name}: X-NAV valuation, gravity field analysis, contract and market value.`,
+    description: `${player.name}: ${navLabelForPosition(player.position)} valuation, gravity field analysis, contract and market value.`,
   };
 }
 
@@ -159,6 +165,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
   const assists = player.assistsPace != null ? Math.round((player.assistsPace / 82) * games) : null;
   const pts = player.ptsPace != null ? Math.round((player.ptsPace / 82) * games) : null;
   const pm = player.plusMinus;
+  const navLabel = navLabelForPosition(player.position);
 
   // The engine's own waterfall — these sum to the X-NAV printed above them.
   // The previous list did not: DEF was a descriptive rating rather than the
@@ -201,12 +208,12 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
           <div className="flex-1 min-w-0">
             <h1 className="text-[22px] font-black font-mono leading-tight truncate">{player.name}</h1>
             <div className="text-[11px] font-black font-mono uppercase tracking-[0.12em] mt-0.5" style={{ color: faint }}>
-              {teamName} · {player.position} · Age {player.age}
+              {teamName} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}
             </div>
           </div>
           <div className="text-right shrink-0">
             <div className="text-[32px] font-black font-mono leading-none">{xnav.total}</div>
-            <div className="text-[9px] font-black font-mono uppercase tracking-[0.18em]" style={{ color: faint }}>X-NAV</div>
+            <div className="text-[9px] font-black font-mono uppercase tracking-[0.18em]" style={{ color: faint }} title={navLongLabelForPosition(player.position)}>{navLabel}</div>
           </div>
         </div>
 
@@ -218,11 +225,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
                 Role
               </span>
               <span className="text-[13px] font-black font-mono" style={{ color: roles.primary.color }}>
-                {roles.primary.icon} {roles.primary.label}
+                ROLE: {roles.primary.label}
               </span>
               {roles.secondary && (
                 <span className="text-[11px] font-black font-mono" style={{ color: faint }}>
-                  · {roles.secondary.icon} {roles.secondary.label}
+                  · SECONDARY ROLE: {roles.secondary.label}
                 </span>
               )}
             </div>
@@ -233,36 +240,39 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
         )}
 
         {/* Season stats — position-aware */}
+        <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em] mb-1" style={{ color: faint }}>
+          {PLAYER_STATS_CONTEXT}
+        </div>
         {isGoalie ? (
           <div className="grid grid-cols-5 border mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
-            <StatCell label="GP" value={String(games)} />
+            <StatCell label="Games" value={String(games)} />
             <StatCell
-              label="GSAX"
+              label="Goals saved above expected"
               value={player.gsax != null ? (player.gsax > 0 ? "+" : "") + player.gsax.toFixed(1) : "—"}
               color={player.gsax != null ? (player.gsax > 0 ? "var(--ledger-green)" : player.gsax < 0 ? "var(--ledger-red)" : undefined) : undefined}
             />
             <StatCell
-              label="SV%"
+              label="Save percentage"
               value={player.savePct != null ? (player.savePct * 100).toFixed(1) : "—"}
             />
             <StatCell
-              label="GAA"
+              label="Goals against average"
               value={player.gaa != null ? player.gaa.toFixed(2) : "—"}
             />
-            <StatCell label="GS" value={player.gamesStarted != null ? String(player.gamesStarted) : "—"} />
+            <StatCell label="Games started" value={player.gamesStarted != null ? String(player.gamesStarted) : "—"} />
           </div>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-6 border mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
-            <StatCell label="GP" value={String(games)} />
-            <StatCell label="G" value={goals != null ? String(goals) : "—"} />
-            <StatCell label="A" value={assists != null ? String(assists) : "—"} />
-            <StatCell label="PTS" value={pts != null ? String(pts) : "—"} />
+            <StatCell label="Games" value={String(games)} />
+            <StatCell label="Goals" value={goals != null ? String(goals) : "—"} />
+            <StatCell label="Assists" value={assists != null ? String(assists) : "—"} />
+            <StatCell label="Points" value={pts != null ? String(pts) : "—"} />
             <StatCell
-              label="+/−"
+                label="Plus/minus"
               value={pm != null ? `${pm > 0 ? "+" : ""}${pm}` : "—"}
               color={pm != null ? (pm > 0 ? "var(--ledger-green)" : pm < 0 ? "var(--ledger-red)" : undefined) : undefined}
             />
-            <StatCell label="TOI" value={player.avgTOI != null ? player.avgTOI.toFixed(1) : "—"} />
+            <StatCell label="Avg ice time" value={player.avgTOI != null ? player.avgTOI.toFixed(1) : "—"} />
           </div>
         )}
 

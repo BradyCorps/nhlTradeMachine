@@ -17,6 +17,10 @@ import { DevelopmentProfilePanel } from "@/app/components/DevelopmentProfilePane
 import { gravityForDisplay } from "@/app/lib/gravity-channels";
 import { CompactGravity } from "@/app/components/GravityField";
 import { formatCapHit as money } from "@/app/lib/display-utils";
+import {
+  PLAYER_STATS_CONTEXT,
+  navLabelForPosition,
+} from "@/app/lib/player-terminology";
 
 // FAs come through without a computed NAV; StrandView derives its axes from the
 // asset's own Point Shares / pace / usage, so a neutral NAV is fine here.
@@ -28,26 +32,26 @@ export function StatLine({ p }: { p: Asset }) {
   const isG = p.position === "G";
   const bits: string[] = [];
   if (isG) {
-    if (p.gamesStarted) bits.push(`${p.gamesStarted} GS`);
-    if (p.savePct != null) bits.push(`${(p.savePct * 100).toFixed(1)}% SV`);
-    if (p.gsax != null) bits.push(`${p.gsax > 0 ? "+" : ""}${p.gsax.toFixed(1)} GSAx`);
+    if (p.gamesStarted) bits.push(`${p.gamesStarted} starts`);
+    if (p.savePct != null) bits.push(`${(p.savePct * 100).toFixed(1)}% save`);
+    if (p.gsax != null) bits.push(`${p.gsax > 0 ? "+" : ""}${p.gsax.toFixed(1)} goals saved above expected`);
   } else {
     const gp = p.games ?? 0;
-    if (gp) bits.push(`${gp} GP`);
+    if (gp) bits.push(`${gp} games`);
     if (p.goalsPace != null && p.assistsPace != null && gp > 0) {
       const gf = gp / 82;
       const g = Math.round(p.goalsPace * gf);
       const a = Math.round(p.assistsPace * gf);
-      bits.push(`${g}G-${a}A-${g + a}P`);
+      bits.push(`${g} goals · ${a} assists · ${g + a} points`);
     } else if (p.ptsPace && gp > 0) {
-      bits.push(`${Math.round(p.ptsPace * gp / 82)}P`);
+      bits.push(`${Math.round(p.ptsPace * gp / 82)} points`);
     }
-    if (p.avgTOI) bits.push(`${p.avgTOI.toFixed(1)} TOI`);
+    if (p.avgTOI) bits.push(`${p.avgTOI.toFixed(1)} avg ice time`);
   }
   if (bits.length === 0) return null;
   return (
     <span className="text-[10px] font-mono tracking-wide" style={{ color: "var(--ledger-brown)" }}>
-      &rsquo;26 · {bits.join(" · ")}
+      {PLAYER_STATS_CONTEXT} · {bits.join(" · ")}
     </span>
   );
 }
@@ -71,14 +75,18 @@ export function ExpandedStats({ p, nav }: { p: Asset; nav: XNAVResult }) {
       role="region"
       aria-label={`Advanced stats for ${p.name}`}
     >
-      {/* X-NAV breakdown */}
+      <div className="text-[10px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)", gridColumn: "1 / -1" }}>
+        {PLAYER_STATS_CONTEXT}
+      </div>
+
+      {/* Position-aware NAV breakdown */}
       <div>
-        <div className="text-[10px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>X-NAV</div>
+        <div className="text-[10px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>{navLabelForPosition(p.position)}</div>
         <div className="text-[12px] font-black font-mono" style={{ color: nav.total >= 0 ? "var(--ledger-green)" : "var(--ledger-red)" }}>
           {nav.total > 0 ? "+" : ""}{nav.total.toFixed(0)}
         </div>
         <div className="text-[10px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
-          Off {fmtDec(nav.off, true)} · Def {fmtDec(nav.def, true)} · Age {fmtDec(nav.age, true)} · Cap {fmtDec(nav.cap, true)}
+          Offense {fmtDec(nav.off, true)} · Defense {fmtDec(nav.def, true)} · Age {fmtDec(nav.age, true)} · Contract {fmtDec(nav.cap, true)}
         </div>
       </div>
 
@@ -87,9 +95,9 @@ export function ExpandedStats({ p, nav }: { p: Asset; nav: XNAVResult }) {
         <div>
           <div className="text-[10px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>Production</div>
           <div className="text-[10px] font-mono" style={{ color: "var(--ledger-brown)" }}>
-            P/82: {fmtDec(p.ptsPace)} · xG/82: {fmtDec(p.xGPace)}
+            Points/82: {fmtDec(p.ptsPace)} · Expected goals/82: {fmtDec(p.xGPace)}
           </div>
-          {p.ops != null && <div className="text-[10px] font-mono" style={{ color: "var(--ledger-brown)" }}>OPS: {fmtDec(p.ops)} · DPS: {fmtDec(p.dps)}</div>}
+          {p.ops != null && <div className="text-[10px] font-mono" style={{ color: "var(--ledger-brown)" }}>Offensive Point Shares: {fmtDec(p.ops)} · Defensive Point Shares: {fmtDec(p.dps)}</div>}
         </div>
       )}
 
@@ -98,9 +106,9 @@ export function ExpandedStats({ p, nav }: { p: Asset; nav: XNAVResult }) {
         <div>
           <div className="text-[10px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>Impact</div>
           <div className="text-[10px] font-mono" style={{ color: "var(--ledger-brown)" }}>
-            NOIV: {fmtDec(p.xgRelTM, true)} · xGA Rel: {fmtDec(p.xgaRelTM, true)}
+            On-ice impact: {fmtDec(p.xgRelTM, true)} · Expected goals against relative: {fmtDec(p.xgaRelTM, true)}
           </div>
-          {p.dzPct != null && <div className="text-[10px] font-mono" style={{ color: "var(--ledger-brown)" }}>DZ%: {fmtPct(p.dzPct)}</div>}
+          {p.dzPct != null && <div className="text-[10px] font-mono" style={{ color: "var(--ledger-brown)" }}>Defensive-zone starts (5v5): {fmtPct(p.dzPct)}</div>}
         </div>
       )}
 
@@ -109,7 +117,7 @@ export function ExpandedStats({ p, nav }: { p: Asset; nav: XNAVResult }) {
         <div>
           <div className="text-[10px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>Goaltending</div>
           <div className="text-[10px] font-mono" style={{ color: "var(--ledger-brown)" }}>
-            SV%: {fmtPct(p.savePct)} · GSAx: {fmtDec(p.gsax, true)}
+            Save percentage: {fmtPct(p.savePct)} · Goals saved above expected: {fmtDec(p.gsax, true)}
           </div>
         </div>
       )}
@@ -120,7 +128,7 @@ export function ExpandedStats({ p, nav }: { p: Asset; nav: XNAVResult }) {
           <div className="text-[10px] font-black uppercase tracking-[0.12em] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>EDGE</div>
           <div className="text-[10px] font-mono" style={{ color: "var(--ledger-brown)" }}>
             {p.edgeSpeedMaxMph != null ? `Speed: ${p.edgeSpeedMaxMph.toFixed(1)} mph` : ""}
-            {p.hdFinishingDelta != null ? ` · HD: ${(p.hdFinishingDelta * 100) > 0 ? "+" : ""}${(p.hdFinishingDelta * 100).toFixed(1)}%` : ""}
+            {p.hdFinishingDelta != null ? ` · High-danger finish: ${(p.hdFinishingDelta * 100) > 0 ? "+" : ""}${(p.hdFinishingDelta * 100).toFixed(1)}%` : ""}
           </div>
         </div>
       )}

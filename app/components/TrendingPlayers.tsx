@@ -14,6 +14,7 @@ import { buildAssetTraits, computeStrandType, StrandLoading } from "@/app/compon
 import { useStrandCohort } from "@/app/lib/use-strand-cohort";
 import type { XNAVResult } from "@/app/lib/trade-types";
 import { contractVerdict, verdictColor, MODEL_PRICE_SHORT } from "@/app/lib/contract-verdict";
+import { PLAYER_STATS_CONTEXT, navLabelForPosition } from "@/app/lib/player-terminology";
 
 interface PlayerData {
   /**
@@ -222,7 +223,7 @@ export default function TrendingPlayers() {
       {/* Sort toggle */}
       <div className="flex items-center gap-1 mb-4" role="tablist" aria-label="Sort trending players">
         {([
-          { mode: "nav" as SortMode, label: "By X-NAV" },
+          { mode: "nav" as SortMode, label: "By NAV" },
           ...(GRAVITY_DISPLAY_ENABLED
             ? [{ mode: "gravity" as SortMode, label: "By Gravity" }]
             : []),
@@ -326,7 +327,7 @@ function PlayerCard({
                 {nav}
               </div>
               <div className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
-                X-NAV
+                {navLabelForPosition(p.position)}
               </div>
             </>
           )}
@@ -342,7 +343,7 @@ function PlayerCard({
           { label: "G", val: goals?.toString() ?? "—" },
           { label: "A", val: assists?.toString() ?? "—" },
           { label: "PTS", val: pts.toString() },
-          { label: "+/−", val: pm != null ? `${pm > 0 ? "+" : ""}${pm}` : "—",
+            { label: "Plus/minus", val: pm != null ? `${pm > 0 ? "+" : ""}${pm}` : "—",
             color: pm != null ? (pm > 0 ? "var(--ledger-green)" : pm < 0 ? "var(--ledger-red)" : undefined) : undefined },
         ].map(s => (
           <div key={s.label} className="text-center">
@@ -444,9 +445,13 @@ function ExpandedPanel({
             {xnav.total}
           </div>
           <div className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: "var(--ledger-ink-faint)" }}>
-            X-NAV
+            {navLabelForPosition(p.position)}
           </div>
         </div>
+      </div>
+
+      <div className="font-mono text-[9px] font-black uppercase tracking-[0.12em] mb-2" style={{ color: "var(--ledger-ink-faint)" }}>
+        {PLAYER_STATS_CONTEXT}
       </div>
 
       {/* Two-column layout: Gravity diagram left, stats right */}

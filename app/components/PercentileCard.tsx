@@ -14,6 +14,7 @@ import { FieldDiagram } from "@/app/components/GravityField";
 import { SEASON } from "@/app/lib/season-config";
 import MetricTip from "@/app/components/MetricTip";
 import { displayPosition } from "@/app/lib/display-position";
+import { navLabelForPosition, navLongLabelForPosition } from "@/app/lib/player-terminology";
 import { ordinal } from "@/app/lib/ordinal";
 import { metricPercentile } from "@/app/lib/strand-metrics";
 import { contractVerdict, surplusText, MODEL_PRICE_LABEL } from "@/app/lib/contract-verdict";
@@ -231,6 +232,8 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
   const surplus = verdict.surplus ?? 0;
   const surplusTone = verdict.tone;
   const surplusWord = verdict.label;
+  const navLabel = navLabelForPosition(player.position);
+  const navLongLabel = navLongLabelForPosition(player.position);
   const GOOD = "#146a24", BAD = "#9c2b1f", INK = "#1c140a";
   const toneColor = (t: string) => t === "good" ? GOOD : t === "bad" ? BAD : INK;
 
@@ -271,6 +274,8 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         roleLabel: roles?.primary.label,
         roleColor: roles?.primary.color,
         xnavTotal: xnav.total,
+        navLabel,
+        navLongLabel,
         capHitLabel: `$${player.capHit.toFixed(1)}M`,
         yearsLabel: `${player.yearsRemaining} yr`,
         fmvLabel: `$${fmv.toFixed(1)}M`,
@@ -309,7 +314,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       setExporting(false);
     }
   }, [
-    player, teamName, roles, xnav, fmv, surplus, surplusWord, surplusTone,
+    player, teamName, roles, xnav, fmv, verdict, surplusWord, surplusTone, navLabel, navLongLabel,
     publicGravity, edgeCells, percentiles, navCells, peerLabel, avgPercentile, exporting,
   ]);
 
@@ -317,7 +322,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
     <div style={{ width: "100%", maxWidth: 620, margin: "0 auto" }}>
       <div ref={cardRef} className="pcard" role="group"
         style={{ background: "#ede4cc" }}
-        aria-label={`${player.name} value card — X-NAV ${xnav.total}${avgPercentile !== null ? `, ${percentileLabel(avgPercentile)} vs ${peerLabel}` : ""}`}>
+        aria-label={`${player.name} value card — ${navLabel} ${xnav.total}${avgPercentile !== null ? `, ${percentileLabel(avgPercentile)} vs ${peerLabel}` : ""}`}>
       <style>{`
         .pcard { width: 100%;
           background: #ede4cc; border: 2px solid #1c140a; border-radius: 3px;
@@ -422,13 +427,13 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
           <div className="pcard-sub">{teamName ?? player.teamId} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}</div>
           {roles && (
             <div className="pcard-role" style={{ color: roles.primary.color }}>
-              {roles.primary.icon} {roles.primary.label}
+              ROLE: {roles.primary.label}
             </div>
           )}
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div className="pcard-nav-total">{xnav.total}</div>
-          <div className="pcard-nav-label">X-NAV · Extended Net Asset Value</div>
+          <div className="pcard-nav-label">{navLabel} · {navLongLabel}</div>
         </div>
       </div>
 

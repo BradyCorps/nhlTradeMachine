@@ -4,8 +4,8 @@ import { NAV_STAGE_DESC, NAV_STAGE_SHORT } from "@/app/lib/nav-breakdown";
 
 const GLOSSARY: Record<string, string> = {
   "X-NAV": "Extended Net Asset Value — the Ledger's trade-value model: offense, defense, age, contract surplus, deployment, and role context. Gravity is separately gated and off in the public-launch baseline.",
-  "G-NAV": "X-NAV for goalies — GSAx, workload, save profile, team defense, age, and contract surplus.",
-  "NAV": "Shorthand for X-NAV — Extended Net Asset Value, the Ledger's overall trade-value model.",
+  "G-NAV": "Goalie Net Asset Value — goals saved above expected, workload, save profile, team defense, age, and contract surplus.",
+  "NAV": "Net Asset Value — X-NAV for skaters and G-NAV for goalies.",
   "OPS": "Offensive Point Shares — a player's offensive contribution measured in standings points.",
   "DPS": "Defensive Point Shares — a player's defensive contribution measured in standings points.",
   "SCR": "Scoring pace — points per 82 games, normalized by position.",

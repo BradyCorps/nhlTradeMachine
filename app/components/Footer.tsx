@@ -7,19 +7,17 @@ import { TierIcon } from "./GravityField";
 import type { GravityTier } from "@/app/lib/gravity";
 import { ROLE_DEFS } from "@/app/lib/player-roles";
 
-// G3: one icon system — every icon rendered anywhere in the product is
-// documented here. Role icons come straight from ROLE_DEFS so the key
-// can never drift from what the badges actually render.
+// G3: one flag system — explicit role chips come straight from ROLE_DEFS so
+// the key cannot drift from what the badges actually render.
 export const roleIconEntries = Object.values(ROLE_DEFS).map(def =>
-  [def.icon, def.label, def.blurb] as [string, string, string]);
+  [`ROLE: ${def.label}`, def.label, def.blurb] as [string, string, string]);
 
 export const iconKey = [
-  ["♛", "Megalodon", "Extreme franchise-value tier above the top NAV threshold."],
-  ["◆", "Franchise / Core", "Franchise marker on asset cards; core-player section marker in selectors."],
-  ["★", "Surplus / Pedigree", "Surplus contract, award signal, prospect marker, or elite shutdown pedigree when paired with text."],
-  ["◇", "Prospect / Depth", "Prospect marker or depth-player section marker."],
-  ["↑", "Prospects & ELC", "Prospects and entry-level contract grouping in asset selectors."],
-  ["⬡", "Draft Picks", "Draft-pick grouping in asset selectors."],
+  ["NAV: MEGALODON", "Megalodon", "Extreme franchise-value tier above the top NAV threshold."],
+  ["NAV: FRANCHISE", "Franchise", "Franchise-value player."],
+  ["SURPLUS", "Surplus", "On-ice value significantly exceeds contract cost."],
+  ["PROSPECT: TOP", "Prospect", "Tracked top-prospect pedigree."],
+  ["RFA / UFA", "Rights", "Contract rights expire this offseason."],
   ["⚕", "Injury Risk", "Ledger note for elevated injury risk."],
   ["⟳", "Change of Scenery", "Negative but recoverable NAV profile that may fit another roster better."],
   ["⚠", "Salary Dump", "Deeply negative or high-risk contract warning."],
@@ -55,7 +53,7 @@ export const methodologySections: MethodologySection[] = [
     intro: "How the app turns a player, contract, and role into tradeable asset value.",
     items: [
       { term: "X-NAV", definition: "Extended Net Asset Value: the Ledger's skater trade-value model. Offense, defense, age curve, contract surplus, deployment, Point Shares, and role context priced into one number; Gravity is a separately gated experimental term." },
-      { term: "G-NAV", definition: "X-NAV for goalies. Built around GSAx, workload, save profile, team defensive context, age, and contract surplus." },
+      { term: "G-NAV", definition: "Goalie Net Asset Value. Built around goals saved above expected, workload, save profile, team defensive context, age, and contract surplus." },
       { term: "Prospect NAV", definition: "Pre-NHL value comes from draft pedigree and stored NHLe production. No-signal ELC players do not receive automatic cap or age value." },
       { term: "OFF / DEF", definition: "On-ice components: offensive production and creation on one side, suppression and defensive value on the other, each judged against position." },
       { term: "GRAV", definition: "The separately gated X-NAV handoff from Gravity v3. When enabled, it contains only the bounded neutral-zone transition proxy; it is off in the public-launch baseline." },
@@ -168,7 +166,7 @@ export default function Footer() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 p-4">
             {iconKey.map(([icon, label, definition]) => (
               <div key={`${icon}-${label}`} className="flex items-start gap-2.5">
-                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center border font-mono text-[12px] font-black"
+                <span className="inline-flex min-h-6 min-w-6 shrink-0 items-center justify-center border px-1 font-mono text-[10px] font-black"
                   style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}>
                   {icon}
                 </span>
@@ -185,12 +183,12 @@ export default function Footer() {
           </div>
           <div className="px-4 pt-1 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint border-t"
             style={{ borderColor: "var(--ledger-rule-light, var(--ledger-rule))" }}>
-            <span className="inline-block pt-2">Modern Role Icons</span>
+            <span className="inline-block pt-2">Modern Role Chips</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 p-4">
             {roleIconEntries.map(([icon, label, definition]) => (
               <div key={`role-${label}`} className="flex items-start gap-2.5">
-                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center border font-mono text-[12px] font-black"
+                <span className="inline-flex min-h-6 min-w-6 shrink-0 items-center justify-center border px-1 font-mono text-[9px] font-black"
                   style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}>
                   {icon}
                 </span>

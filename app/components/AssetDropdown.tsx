@@ -7,6 +7,8 @@ import { useTradeStore } from "@/app/store/tradeStore";
 import { useDialog } from "@/app/lib/use-dialog";
 import { displayPosition } from "@/app/lib/display-position";
 import { navColor } from "@/app/lib/display-utils";
+import { navLabelForPosition, pickCountLabel, playerCountLabel } from "@/app/lib/player-terminology";
+import { termLabel as contractTermLabel } from "@/app/lib/roster-table";
 
 const CORE_COUNT = 8;
 
@@ -16,7 +18,7 @@ function isProspect(p: Asset): boolean {
 }
 
 function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number; onClick: () => void }) {
-  const termLabel = p.position === "Pick" ? `${p.year ?? ""}` : `${p.yearsRemaining ?? 0}yr`;
+  const term = p.position === "Pick" ? `${p.year ?? ""}` : contractTermLabel(p);
 
   return (
     <button
@@ -27,13 +29,14 @@ function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number; onClick: () => 
       onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
     >
       <div className="flex items-center gap-2 min-w-0">
-        <span className="text-2xs font-black w-5 shrink-0 font-mono"
-          style={{ color: "var(--ledger-ink-faint)" }}>
-          {p.position === "Pick" ? "" : displayPosition(p.position, p.secondaryPosition)}
-        </span>
         <span className="text-[11px] font-bold truncate"
           style={{ color: "var(--ledger-ink)" }}>
           {p.name}
+        </span>
+        {p.position !== "Pick" && <span aria-hidden="true" style={{ color: "var(--ledger-ink-faint)" }}>·</span>}
+        <span className="text-2xs font-black shrink-0 font-mono"
+          style={{ color: "var(--ledger-ink-faint)" }}>
+          {p.position === "Pick" ? "" : displayPosition(p.position, p.secondaryPosition)}
         </span>
         <span className="text-2xs shrink-0 font-mono"
           style={{ color: "var(--ledger-ink-faint)" }}>
@@ -41,13 +44,13 @@ function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number; onClick: () => 
         </span>
       </div>
       <div className="flex items-center gap-3 shrink-0 ml-2 font-mono">
-        <span className="text-2xs" style={{ color: "var(--ledger-ink-faint)" }}>
+        <span className="text-2xs" title="Contract cap hit" style={{ color: "var(--ledger-ink-faint)" }}>
           ${p.capHit.toFixed(2)}M
         </span>
         <span className="text-2xs w-8 text-right" style={{ color: "var(--ledger-ink-faint)" }}>
-          {termLabel}
+          {term}
         </span>
-        <span className="text-2xs font-black w-10 text-right" style={{ color: navColor(nav) }}>
+        <span className="text-2xs font-black w-10 text-right" title={navLabelForPosition(p.position)} style={{ color: navColor(nav) }}>
           {nav > 0 ? "+" : ""}{nav.toFixed(0)}
         </span>
       </div>
@@ -55,13 +58,13 @@ function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number; onClick: () => 
   );
 }
 
-function SectionHead({ label, count, icon }: { label: string; count: number; icon: string }) {
+function SectionHead({ label, count }: { label: string; count: number }) {
   return (
     <div className="px-3 py-1.5 flex items-center justify-between sticky top-0"
       style={{ background: "var(--ledger-card)", borderBottom: "1px solid var(--ledger-rule)", borderTop: "1px solid var(--ledger-rule)" }}>
       <span className="text-2xs font-black uppercase tracking-[0.25em] font-mono"
         style={{ color: "var(--ledger-ink-faint)" }}>
-        {icon} {label}
+        {label}
       </span>
       <span className="text-2xs font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
         {count}
@@ -206,7 +209,7 @@ function AssetDropdown({
 
               {core.length > 0 && (
                 <>
-                  <SectionHead label="Core Players" count={core.length} icon="◆" />
+                  <SectionHead label="Core Players" count={core.length} />
                   {core.map(p => (
                     <PlayerRow key={p.id} p={p} nav={navMap[p.id]?.total ?? 0} onClick={() => handleAdd(p)} />
                   ))}
@@ -215,7 +218,7 @@ function AssetDropdown({
 
               {depth.length > 0 && (
                 <>
-                  <SectionHead label="Depth Players" count={depth.length} icon="◇" />
+                  <SectionHead label="Depth Players" count={depth.length} />
                   {depth.map(p => (
                     <PlayerRow key={p.id} p={p} nav={navMap[p.id]?.total ?? 0} onClick={() => handleAdd(p)} />
                   ))}
@@ -224,7 +227,7 @@ function AssetDropdown({
 
               {prospects.length > 0 && (
                 <>
-                  <SectionHead label="Prospects & ELC" count={prospects.length} icon="↑" />
+                  <SectionHead label="Prospects & ELC" count={prospects.length} />
                   {prospects.map(p => (
                     <PlayerRow key={p.id} p={p} nav={navMap[p.id]?.total ?? 0} onClick={() => handleAdd(p)} />
                   ))}
@@ -233,7 +236,7 @@ function AssetDropdown({
 
               {picks.length > 0 && (
                 <>
-                  <SectionHead label="Draft Picks" count={picks.length} icon="⬡" />
+                  <SectionHead label="Draft Picks" count={picks.length} />
                   {picks.map(p => (
                     <PlayerRow key={p.id} p={p} nav={navMap[p.id]?.total ?? 0} onClick={() => handleAdd(p)} />
                   ))}
@@ -251,7 +254,7 @@ function AssetDropdown({
             {/* Footer */}
             <div className="px-4 py-1.5 text-2xs font-mono text-center shrink-0"
               style={{ borderTop: "1px solid var(--ledger-rule)", color: "var(--ledger-ink-faint)" }}>
-              {total} players · {picks.length} picks — click to add
+              {playerCountLabel(total)} · {pickCountLabel(picks.length)} — click to add
             </div>
           </div>
         </div>,

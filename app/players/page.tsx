@@ -1,7 +1,6 @@
 "use client";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
 import { PlayerOutlook } from "@/app/components/PlayerOutlook";
-import { TierIcon } from "@/app/components/GravityField";
 import { gravityTierColor } from "@/app/lib/gravity";
 import { gravityForDisplay } from "@/app/lib/gravity-channels";
 import type { DevelopmentProfile } from "@/app/lib/development-profile";
@@ -20,6 +19,13 @@ import Footer from "@/app/components/Footer";
 import PercentileCard from "@/app/components/PercentileCard";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { displayPosition } from "@/app/lib/display-position";
+import {
+  PLAYER_STATS_CONTEXT,
+  PLAYER_TERMINOLOGY,
+  expiringRightsLabel,
+  playerCountLabel,
+  prospectTierLabel,
+} from "@/app/lib/player-terminology";
 import { orderFreshInk, signedAav, signedRecency, signedTerm } from "@/app/lib/fresh-ink";
 import { buildStrandCohort } from "@/app/lib/strand-cohort";
 import { buildStrandPercentiles, type PlayerLike } from "@/app/lib/strand-metrics";
@@ -74,6 +80,8 @@ interface Player {
   hasNTC?: boolean;
   hasLiveStats?: boolean;
   developmentProfile?: DevelopmentProfile | null;
+  contractStatus?: "UFA" | "RFA" | "SIGNED";
+  expiresThisOffseason?: boolean;
 }
 
 interface Team {
@@ -145,10 +153,9 @@ function MiniHelix({ offV, defV }: {
 
 type PlayerFlag = {
   key: string;
-  icon: string;
+  label: string;
   color: string;
   title: string;
-  gravityTier?: "SUPERMASSIVE" | "STAR";
 };
 
 function PlayerIconBadges({ player }: { player: Player }) {
@@ -160,10 +167,10 @@ function PlayerIconBadges({ player }: { player: Player }) {
   const roles = derivePlayerRoles(player);
   let roleFlag: PlayerFlag | null = null;
   if (roles) {
-    const { label, icon, color, blurb } = roles.primary;
+    const { label, color, blurb } = roles.primary;
     roleFlag = {
       key: "role",
-      icon,
+      label: `ROLE: ${label}`,
       color,
       title: blurb ? `${label} — ${blurb}` : label,
     };
@@ -172,7 +179,7 @@ function PlayerIconBadges({ player }: { player: Player }) {
     const tier = goalieTeir(player.gamesStarted ?? 0);
     roleFlag = {
       key: "role",
-      icon: tier === "STARTER" ? "G1" : tier === "TANDEM" ? "G2" : "G3",
+      label: `ROLE: ${tier}`,
       color: tier === "STARTER" ? "var(--green)" : tier === "TANDEM" ? "var(--blue)" : "var(--ink-faint)",
       title: tier,
     };
@@ -192,31 +199,34 @@ function PlayerIconBadges({ player }: { player: Player }) {
   const isFranchise = !isMegalodon && xnav.total >= FRANCHISE.threshold;
   const isSurplus = xnav.cap > 0 && xnav.total > player.capHit * 18 && xnav.total > 50;
   const hasAwards = (pedigree?.awards?.length ?? 0) > 0;
+  const freeAgentStatus = expiringRightsLabel(player);
 
   const badgeFlags = [
-    isMegalodon ? { key: "megalodon", icon: "♛", color: "var(--ledger-amber)", title: `Megalodon tier — NAV ${xnav.total} ≥ ${FRANCHISE.megalodon}.` } : null,
-    isFranchise ? { key: "franchise", icon: "◆", color: "var(--ledger-ink)", title: `Franchise tier — NAV ${xnav.total} ≥ ${FRANCHISE.threshold}.` } : null,
-    isSurplus ? { key: "surplus", icon: "★", color: "var(--ledger-green)", title: "Surplus contract — on-ice value significantly exceeds cap hit." } : null,
-    prospectTier ? { key: "prospect", icon: prospectTier.tier === 1 ? "★" : prospectTier.tier === 2 ? "◆" : "◇", color: prospectTier.tier === 1 ? "var(--ledger-ice)" : prospectTier.tier === 2 ? "var(--ledger-green)" : "var(--ledger-brown)", title: prospectTier.tier === 1 ? "Franchise prospect pedigree." : prospectTier.tier === 2 ? "Top prospect pedigree." : "Prospect pedigree." } : null,
-    hasAwards ? { key: "awards", icon: "A", color: "var(--ledger-amber)", title: `Award pedigree — ${Array.from(new Set(pedigree!.awards)).join(" · ")}.` } : null,
-    injuryRisk ? { key: "injury", icon: "!", color: "var(--ledger-red)", title: injuryRisk.note } : null,
-    shutdownPedigree ? { key: "shutdown", icon: "■", color: "var(--ledger-amber)", title: shutdownPedigree.note } : null,
+    isMegalodon ? { key: "megalodon", label: "NAV: MEGALODON", color: "var(--ledger-amber)", title: `Megalodon tier — NAV ${xnav.total} ≥ ${FRANCHISE.megalodon}.` } : null,
+    isFranchise ? { key: "franchise", label: "NAV: FRANCHISE", color: "var(--ledger-ink)", title: `Franchise tier — NAV ${xnav.total} ≥ ${FRANCHISE.threshold}.` } : null,
+    isSurplus ? { key: "surplus", label: "SURPLUS", color: "var(--ledger-green)", title: "Surplus contract — on-ice value significantly exceeds cap hit." } : null,
+    prospectTier ? { key: "prospect", label: prospectTierLabel(prospectTier.tier)!, color: prospectTier.tier === 1 ? "var(--ledger-ice)" : prospectTier.tier === 2 ? "var(--ledger-green)" : "var(--ledger-brown)", title: prospectTier.tier === 1 ? "Franchise prospect pedigree." : prospectTier.tier === 2 ? "Top prospect pedigree." : "Prospect pedigree." } : null,
+    hasAwards ? { key: "awards", label: "AWARDS", color: "var(--ledger-amber)", title: `Award pedigree — ${Array.from(new Set(pedigree!.awards)).join(" · ")}.` } : null,
+    injuryRisk ? { key: "injury", label: "INJURY RISK", color: "var(--ledger-red)", title: injuryRisk.note } : null,
+    shutdownPedigree ? { key: "shutdown", label: "ROLE: SHUTDOWN", color: "var(--ledger-amber)", title: shutdownPedigree.note } : null,
   ].filter(Boolean) as PlayerFlag[];
   const gravityFlag: PlayerFlag | null = gravTier === "SUPERMASSIVE" || gravTier === "STAR"
     ? {
         key: "gravity",
-        icon: "✦",
+        label: `GRAVITY: ${gravTier}`,
         color: gravityTierColor(gravTier),
         title: `${gravTier === "SUPERMASSIVE" ? "Supermassive" : "Star"} gravity — force ${gravProfile!.force.toFixed(2)}.`,
-        gravityTier: gravTier,
       }
     : null;
   const flags = [
     roleFlag,
+    freeAgentStatus
+      ? { key: "free-agent", label: freeAgentStatus, color: "var(--ledger-red)", title: `${freeAgentStatus} rights expire this offseason.` }
+      : null,
     gravityFlag,
     ...badgeFlags.slice(0, 4),
     player.hasNMC
-      ? { key: "nmc", icon: "NMC", color: "var(--red)", title: "No-movement clause." }
+      ? { key: "nmc", label: "NMC", color: "var(--red)", title: "No-movement clause." }
       : null,
   ].filter((flag): flag is PlayerFlag => Boolean(flag));
 
@@ -247,7 +257,7 @@ function PlayerIconBadges({ player }: { player: Player }) {
         aria-expanded={open}
         aria-controls={panelId}
         aria-describedby={open ? panelId : undefined}
-        aria-label={`${open ? "Hide" : "View"} ${player.name} player flags`}
+        aria-label={`${player.name}: ${flags.map(flag => flag.label).join(", ")}. ${open ? "Hide" : "View"} definitions`}
         onClick={event => {
           event.stopPropagation();
           setOpen(current => !current);
@@ -272,15 +282,13 @@ function PlayerIconBadges({ player }: { player: Player }) {
             aria-hidden="true"
             style={{
               display: "inline-flex", alignItems: "center", justifyContent: "center",
-              minWidth: "18px", height: "18px", padding: "0 3px", flexShrink: 0,
-              fontSize: flag.icon.length > 1 ? "8px" : "11px", fontWeight: 900,
+              minHeight: "18px", padding: "2px 4px", flexShrink: 0,
+              fontSize: "8px", fontWeight: 900,
               color: flag.color, border: `1px solid ${flag.color}`,
               background: "rgba(255,255,255,0.18)", lineHeight: 1,
             }}
           >
-            {flag.gravityTier
-              ? <TierIcon tier={flag.gravityTier} size={14} />
-              : flag.icon}
+            {flag.label}
           </span>
         ))}
       </button>
@@ -304,11 +312,9 @@ function PlayerIconBadges({ player }: { player: Player }) {
             Player Flags
           </div>
           {flags.map(flag => (
-            <div key={flag.key} style={{ display: "grid", gridTemplateColumns: "20px 1fr", gap: "6px", alignItems: "start", marginTop: "4px" }}>
-              <span aria-hidden="true" style={{ color: flag.color, fontSize: "10px", fontWeight: 900, textAlign: "center" }}>
-                {flag.gravityTier
-                  ? <TierIcon tier={flag.gravityTier} size={14} />
-                  : flag.icon}
+            <div key={flag.key} style={{ display: "grid", gridTemplateColumns: "minmax(90px, auto) 1fr", gap: "6px", alignItems: "start", marginTop: "4px" }}>
+              <span style={{ color: flag.color, fontSize: "9px", fontWeight: 900 }}>
+                {flag.label}
               </span>
               <span style={{ fontSize: "10px", lineHeight: 1.35, color: "var(--ledger-ink-light)", fontWeight: 700 }}>
                 {flag.title}
@@ -322,14 +328,14 @@ function PlayerIconBadges({ player }: { player: Player }) {
 }
 
 const PLAYER_ICON_KEY = [
-  ["✦", "Gravity", "Supermassive or Star gravity tier — elite gravitational pull."],
-  ["♛", "Megalodon", "Extreme franchise-value tier."],
-  ["◆", "Franchise", "Franchise-value player or top prospect marker."],
-  ["★", "Surplus", "Strong surplus contract, prospect pedigree, or elite pedigree signal."],
-  ["◇", "Prospect", "Tracked prospect or depth prospect marker."],
-  ["A", "Awards", "Award pedigree on the player record."],
-  ["!", "Risk", "Elevated injury or availability risk."],
-  ["■", "Shutdown", "Elite shutdown or defensive pedigree signal."],
+  ["NAV: MEGALODON", "Megalodon", "Extreme franchise-value tier."],
+  ["NAV: FRANCHISE", "Franchise", "Franchise-value player."],
+  ["SURPLUS", "Surplus", "On-ice value significantly exceeds contract cost."],
+  ["PROSPECT: TOP", "Prospect", "Tracked top prospect pedigree."],
+  ["ROLE: …", "Role", "Derived deployment or playing-style role."],
+  ["GRAVITY: STAR", "Gravity", "Supermassive or Star gravity tier."],
+  ["RFA / UFA", "Rights", "Contract rights expire this offseason."],
+  ["NMC", "Clause", "No-movement clause."],
 ] as const;
 
 function PlayersIconKey() {
@@ -356,7 +362,7 @@ function PlayersIconKey() {
         }}
       >
         <span style={{ fontSize: "11px", fontWeight: 900 }}>?</span>
-        Icon Key
+        Flag Key
         <span style={{ fontSize: "8px", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>▼</span>
       </button>
       {open && (
@@ -368,17 +374,17 @@ function PlayersIconKey() {
         }}>
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
             gap: "6px 12px",
           }}>
             {PLAYER_ICON_KEY.map(([icon, label, definition]) => (
-              <div key={`${icon}-${label}`} title={definition} style={{ display: "grid", gridTemplateColumns: "20px 1fr", gap: "6px", alignItems: "center" }}>
+              <div key={`${icon}-${label}`} title={definition} style={{ display: "grid", gridTemplateColumns: "minmax(90px, auto) 1fr", gap: "6px", alignItems: "center" }}>
                 <span style={{
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: "18px",
-                  height: "18px",
+                  minHeight: "18px",
+                  padding: "2px 4px",
                   border: "1px solid var(--ledger-rule)",
                   color: "var(--ledger-ink)",
                   fontSize: "10px",
@@ -489,19 +495,19 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
   const seasonPoints = Math.round((player.ptsPace / 82) * gp);
   const pm = player.plusMinus;
   const statItems: Array<{ label: string; val: string; title?: string; color?: string }> = isG ? [
-    { label: "GP",    val: player.gamesStarted?.toString() ?? "—" },
-    { label: "GSAx",  val: (player.gsax ?? 0).toFixed(1) },
-    { label: "SV%",   val: player.savePct?.toFixed(3) ?? "—" },
-    { label: "Tier",  val: goalieTeir(player.gamesStarted ?? 0) },
+    { label: "Games started", val: player.gamesStarted?.toString() ?? "—" },
+    { label: "Goals saved above expected", val: (player.gsax ?? 0).toFixed(1) },
+    { label: "Save percentage", val: player.savePct?.toFixed(3) ?? "—" },
+    { label: "Role", val: goalieTeir(player.gamesStarted ?? 0) },
   ] : [
-    { label: "GP",     val: gp.toString() },
-    { label: "G",      val: seasonGoals?.toString() ?? "—" },
-    { label: "A",      val: seasonAssists?.toString() ?? "—" },
-    { label: "PTS",    val: seasonPoints.toString() },
-    { label: "+/−",    val: pm != null ? `${pm > 0 ? "+" : ""}${pm}` : "—", color: pm != null ? (pm > 0 ? "var(--ledger-green)" : pm < 0 ? "var(--ledger-red)" : undefined) : undefined },
-    { label: "TOI",    val: player.avgTOI.toFixed(1) },
-    { label: "xG%+",   val: player.xgRelTM != null ? `${(player.xgRelTM as number) > 0 ? "+" : ""}${(player.xgRelTM as number).toFixed(1)}` : "—" },
-    { label: "EDGE HD", val: formatEdgeLuck(player.hdFinishingDelta), title: EDGE_LUCK_TITLE, color: edgeLuckColor(player.hdFinishingDelta) },
+    { label: "Games", val: gp.toString() },
+    { label: "Goals", val: seasonGoals?.toString() ?? "—" },
+    { label: "Assists", val: seasonAssists?.toString() ?? "—" },
+    { label: "Points", val: seasonPoints.toString() },
+    { label: "Plus/minus", val: pm != null ? `${pm > 0 ? "+" : ""}${pm}` : "—", color: pm != null ? (pm > 0 ? "var(--ledger-green)" : pm < 0 ? "var(--ledger-red)" : undefined) : undefined },
+    { label: "Average ice time", val: player.avgTOI.toFixed(1) },
+    { label: "Expected-goal share relative", val: player.xgRelTM != null ? `${(player.xgRelTM as number) > 0 ? "+" : ""}${(player.xgRelTM as number).toFixed(1)}` : "—" },
+    { label: "High-danger finish", val: formatEdgeLuck(player.hdFinishingDelta), title: EDGE_LUCK_TITLE, color: edgeLuckColor(player.hdFinishingDelta) },
   ];
 
   return (
@@ -562,6 +568,9 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
         {/* ── Stats tab ──────────────────────────── */}
         {activeTab === "stats" && (
           <div>
+            <div style={{ marginBottom: "8px", fontSize: "10px", fontWeight: 900, color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+              {PLAYER_STATS_CONTEXT}
+            </div>
             <div className="stat-grid-4" style={{ marginBottom: "10px" }}>
               {statItems.map(s => (
                 <div key={s.label} title={s.title} style={{
@@ -576,7 +585,7 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
             {!isG && player.ops != null && player.dps != null && (
               <div style={{ display: "flex", gap: "6px" }}>
                 <div style={{ padding: "3px 8px", background: "var(--paper-card)", border: "1px solid var(--rule-light)", fontSize: "11px", fontWeight: 900 }}>
-                  <span style={{ color: "var(--rule)", marginRight: "4px" }}>PS</span>
+                  <span style={{ color: "var(--rule)", marginRight: "4px" }}>Point Shares</span>
                   <span style={{ color: "var(--ink)" }}>{(player.ops + player.dps).toFixed(1)}</span>
                 </div>
               </div>
@@ -659,33 +668,33 @@ type PlayerColumn = { key: PlayerSortKey; label: string };
 
 const PLAYER_COLUMNS: Record<PlayerSection, PlayerColumn[]> = {
   F: [
-    { key: "seasonPts", label: "PTS" },
-    { key: "ppg",       label: "PPG" },
-    { key: "pts",       label: "P/82" },
-    { key: "ops",       label: "OPS" },
-    { key: "dps",       label: "DPS" },
-    { key: "toi",       label: "TOI" },
+    { key: "seasonPts", label: "Points" },
+    { key: "ppg",       label: "Points/game" },
+    { key: "pts",       label: "Points/82" },
+    { key: "ops",       label: "Offense shares" },
+    { key: "dps",       label: "Defense shares" },
+    { key: "toi",       label: "Avg ice" },
     { key: "age",       label: "Age" },
-    { key: "cap",       label: "Cap" },
-    { key: "term",      label: "Term" },
+    { key: "cap",       label: PLAYER_TERMINOLOGY.contract },
+    { key: "term",      label: PLAYER_TERMINOLOGY.yearsLeft },
   ],
   D: [
-    { key: "seasonPts", label: "PTS" },
-    { key: "ops",       label: "OPS" },
-    { key: "dps",       label: "DPS" },
-    { key: "toi",       label: "TOI" },
+    { key: "seasonPts", label: "Points" },
+    { key: "ops",       label: "Offense shares" },
+    { key: "dps",       label: "Defense shares" },
+    { key: "toi",       label: "Avg ice" },
     { key: "age",       label: "Age" },
-    { key: "cap",       label: "Contract" },
-    { key: "term",      label: "Yrs left" },
-    { key: "supp",      label: "Supp" },
+    { key: "cap",       label: PLAYER_TERMINOLOGY.contract },
+    { key: "term",      label: PLAYER_TERMINOLOGY.yearsLeft },
+    { key: "supp",      label: "Chance suppression" },
   ],
   G: [
-    { key: "gsax",  label: "GSAx" },
-    { key: "svPct", label: "SV%" },
-    { key: "gaa",   label: "GAA" },
-    { key: "cap",   label: "Contract" },
-    { key: "term",  label: "Yrs left" },
-    { key: "gp",    label: "GP" },
+    { key: "gsax",  label: "Goals saved" },
+    { key: "svPct", label: "Save %" },
+    { key: "gaa",   label: "Goals against" },
+    { key: "cap",   label: PLAYER_TERMINOLOGY.contract },
+    { key: "term",  label: PLAYER_TERMINOLOGY.yearsLeft },
+    { key: "gp",    label: "Games" },
   ],
 };
 
@@ -952,7 +961,7 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
         {label}
       </span>
       <span style={{ fontSize: "11px", color: "var(--ledger-ink-faint)" }}>
-        · {count} players
+        · {playerCountLabel(count)}
       </span>
     </div>
   );
@@ -1263,7 +1272,7 @@ export default function PlayersPage() {
           {/* Row 1: count + search */}
           <div className="players-filter-row1">
             <span style={{ fontSize: "11px", color: "var(--rule)", whiteSpace: "nowrap", letterSpacing: "0.05em" }}>
-              {players.length > 0 ? `${skaters.length + goalies.length} players · Live data` : "Loading..."}
+              {players.length > 0 ? `${playerCountLabel(skaters.length + goalies.length)} · Live data` : "Loading..."}
             </span>
             <input
               value={search}

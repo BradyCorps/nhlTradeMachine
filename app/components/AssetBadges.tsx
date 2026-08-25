@@ -8,6 +8,7 @@ import {
 } from "@/app/lib/player-data";
 import { FRANCHISE } from "@/app/lib/season-config";
 import { resolveWorkload } from "@/app/lib/goalie-units";
+import { expiringRightsLabel, prospectTierLabel } from "@/app/lib/player-terminology";
 
 const badgeStyle = (color: string, background = "transparent"): React.CSSProperties => ({
   color,
@@ -267,6 +268,7 @@ export function AssetBadges({ asset, xnav, compact = false }: {
   const hasChangeOfScenery = !isPick && xnav.total < -5 && xnav.total > -40 && asset.age <= 32;
   const hasSalaryDump = !isPick && xnav.total <= -40;
   const hasShutdownPedigree = Boolean(shutdownPedigree);
+  const freeAgentStatus = expiringRightsLabel(asset);
   const hasLedger = asset.tradeBlockStatus === "requested"
     || asset.tradeBlockStatus === "available"
     || awardEntries.length > 0
@@ -280,16 +282,16 @@ export function AssetBadges({ asset, xnav, compact = false }: {
     <div className={compact ? "asset-badges hidden sm:inline-flex shrink-0 items-center gap-1 whitespace-nowrap" : "asset-badges mt-1 flex flex-col gap-1"}>
       <div className="flex flex-wrap items-center gap-1">
         {isMegalodon && (
-          <span className="text-2xs font-black rounded-sm" style={iconBadgeStyle("var(--ledger-amber)", "rgba(138,92,0,0.10)")}
+          <span className="text-2xs px-1 py-0.5 font-black rounded-sm" style={iconBadgeStyle("var(--ledger-amber)", "rgba(138,92,0,0.10)")}
             title={`Megalodon tier — NAV ${xnav.total} ≥ ${FRANCHISE.megalodon}.`}>
-            ♛
+            NAV: MEGALODON
           </span>
         )}
 
         {!isMegalodon && isFranchise && (
-          <span className="text-2xs font-black rounded-sm" style={iconBadgeStyle("var(--ledger-ink)")}
+          <span className="text-2xs px-1 py-0.5 font-black rounded-sm" style={iconBadgeStyle("var(--ledger-ink)")}
             title={`Franchise tier — NAV ${xnav.total} ≥ ${FRANCHISE.threshold}.`}>
-            ◆
+            NAV: FRANCHISE
           </span>
         )}
 
@@ -298,18 +300,26 @@ export function AssetBadges({ asset, xnav, compact = false }: {
           const isSurplus = xnav.cap > 0 && xnav.total > effectiveCap * 18 && xnav.total > 50;
           if (!isSurplus) return null;
           return (
-            <span className="text-2xs font-black rounded-sm" style={iconBadgeStyle("var(--ledger-green)", "rgba(26,92,46,0.10)")}
+            <span className="text-2xs px-1 py-0.5 font-black rounded-sm" style={iconBadgeStyle("var(--ledger-green)", "rgba(26,92,46,0.10)")}
               title="Surplus contract — on-ice value significantly exceeds cap hit.">
-              ★
+              SURPLUS
             </span>
           );
         })()}
+
+        {freeAgentStatus && (
+          <span className="text-2xs px-1.5 py-0.5 font-black uppercase rounded-sm"
+            style={badgeStyle("var(--ledger-red)")}
+            title={`${freeAgentStatus} rights expire this offseason.`}>
+            {freeAgentStatus}
+          </span>
+        )}
 
         {roleTag && (
           <span className="text-2xs px-1.5 py-0.5 font-black uppercase rounded-sm"
             style={badgeStyle(roleTag.color)}
             title={roleTag.title}>
-            {roleTag.label}
+            ROLE: {roleTag.label}
           </span>
         )}
       </div>
@@ -356,7 +366,7 @@ export function AssetBadges({ asset, xnav, compact = false }: {
           color: prospectTier!.tier === 1 ? 'var(--ledger-ice)' : prospectTier!.tier === 2 ? 'var(--ledger-green)' : 'var(--ledger-brown)',
           border: `1px solid ${prospectTier!.tier === 1 ? 'rgba(26,46,92,0.4)' : prospectTier!.tier === 2 ? 'rgba(26,92,46,0.4)' : 'rgba(107,80,48,0.4)'}`,
         }}>
-          {prospectTier!.tier === 1 ? "★ FRANCHISE" : prospectTier!.tier === 2 ? "◆ TOP PROSPECT" : "◇ PROSPECT"}
+          {prospectTierLabel(prospectTier!.tier)}
         </span>
       )}
       
@@ -396,7 +406,7 @@ export function AssetBadges({ asset, xnav, compact = false }: {
           color: 'var(--ledger-amber)',
           border: '1px solid rgba(138,92,0,0.5)'
         }} title={shutdownPedigree!.note}>
-          ★ ELITE SHUTDOWN
+          ROLE: ELITE SHUTDOWN
         </span>
       )}
       </div>

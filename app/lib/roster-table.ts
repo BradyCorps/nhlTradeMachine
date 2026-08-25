@@ -23,6 +23,8 @@
 
 import type { Asset } from "@/app/lib/trade-types";
 import type { RosterRow } from "@/app/lib/roster-view";
+import { displayPosition } from "@/app/lib/display-position";
+import { PLAYER_TERMINOLOGY } from "@/app/lib/player-terminology";
 
 export type RosterUnit = "F" | "D" | "G";
 export type SortDirection = "asc" | "desc";
@@ -132,10 +134,10 @@ const nameColumn: RosterColumn = {
 
 const posColumn: RosterColumn = {
   key: "pos",
-  label: "Pos",
+  label: PLAYER_TERMINOLOGY.position,
   align: "left",
-  value: r => r.asset.position,
-  format: r => r.asset.position,
+  value: r => displayPosition(r.asset.position, r.asset.secondaryPosition),
+  format: r => displayPosition(r.asset.position, r.asset.secondaryPosition),
   initial: "asc",
 };
 
@@ -168,9 +170,15 @@ const navColumn: RosterColumn = {
   initial: "desc",
 };
 
+const goalieNavColumn: RosterColumn = {
+  ...navColumn,
+  label: "G-NAV",
+  title: "Goalie Net Asset Value",
+};
+
 const capColumn: RosterColumn = {
   key: "cap",
-  label: "Cap",
+  label: PLAYER_TERMINOLOGY.contract,
   align: "right",
   title: "Cap hit carried, after retention",
   value: r => effectiveCap(r.asset),
@@ -180,7 +188,7 @@ const capColumn: RosterColumn = {
 
 const termColumn: RosterColumn = {
   key: "term",
-  label: "Term",
+  label: PLAYER_TERMINOLOGY.yearsLeft,
   align: "right",
   title: "Years left on the deal, or the status it expires as",
   value: r => termValue(r.asset),
@@ -237,7 +245,7 @@ export const GOALIE_COLUMNS: readonly RosterColumn[] = [
     format: r => (r.asset.gsax == null ? "—" : r.asset.gsax.toFixed(1)),
     initial: "desc",
   },
-  navColumn,
+  goalieNavColumn,
   capColumn,
   termColumn,
 ];

@@ -458,7 +458,7 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                 <table className="w-full font-mono" style={{ borderCollapse: 'collapse', minWidth: 480 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid #b8a070' }}>
-                      {["Goaltender", "GS", "GAA", "SV%", "GSAX", "X-NAV", "CAP±"].map((h, i) => (
+                      {["Goaltender", "GS", "GAA", "SV%", "GSAX", "G-NAV", "CAP±"].map((h, i) => (
                         <th key={i} className="text-[9px] uppercase tracking-wider py-1 px-1.5"
                           style={{ color: 'var(--ledger-ink-faint)', textAlign: i === 0 ? 'left' : 'right', fontWeight: 900 }}>
                           {h}
@@ -476,7 +476,7 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
           })()}
 
           <div className="mt-2 text-[10px] font-mono uppercase tracking-wider leading-relaxed" style={{ color: 'var(--ledger-ink-faint)' }}>
-            ΔXP — points vs preseason pace over games played · X-NAV — net asset (trade) value · NOIV — net on-ice value impact · CAP± — fair market AAV minus cap hit
+            ΔXP — points vs preseason pace over games played · X-NAV — skater net asset value · G-NAV — goalie net asset value · NOIV — net on-ice value impact · CAP± — fair market AAV minus cap hit
           </div>
           <div className="mt-1 text-[10px] font-mono leading-relaxed" style={{ color: 'var(--ledger-ink-faint)' }}>
             Note: X-NAV is a player&rsquo;s trade value, not their season line. For a young prospect it is weighted toward Upside/pedigree, so the Offense/Defense components can read 0 even after a productive simulated season — that is the trade model, not the sim.
@@ -573,4 +573,3 @@ export function MiniStat({ label, val }: { label: string; val: string }) {
     </div>
   );
 }
-

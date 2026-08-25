@@ -607,9 +607,9 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
         <table className="w-full text-[11px] font-mono">
           <thead>
             <tr className="border-b border-zinc-800/30">
-              {["Side", "Player", "Pos", "Age", "Pts/82", "xG/82", "DefRate", "Avg TOI", "Cap", "Term", "X-NAV", "Off", "Def", "Age/YNG", "Cap Cost", "Floor"].map((h) => (
+              {["Side", "Player", "Position", "Age", "Points/82", "Expected goals/82", "Defense rate", "Avg ice time", "Contract", "Years left", "NAV", "Offense", "Defense", "Age/Youth", "Contract cost", "Adjustments"].map((h) => (
                 <th key={h} className="px-3 py-2.5 text-left text-2xs font-black uppercase tracking-wider text-zinc-600"
-                  title={h === "X-NAV" ? "X-NAV — Extended Net Asset Value, the player’s tradeable value" : h === "Floor" ? "Franchise/career floor applied" : undefined}>{h}</th>
+                  title={h === "NAV" ? "X-NAV for skaters; G-NAV for goalies" : h === "Adjustments" ? "Model adjustments applied" : undefined}>{h}</th>
               ))}
             </tr>
           </thead>
