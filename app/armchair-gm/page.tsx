@@ -49,6 +49,9 @@ import { CupRunResumePrompt } from "./CupRunResumePrompt";
 import { VerdictSheet } from "./VerdictSheet";
 import { MatchResultsPanel, MATCH_FOLDERS, type MatchFolder, type TradeMatchResults } from "./MatchResultsPanel";
 import { applyFutureDraftChoice, type FutureDraftChoice } from "@/app/lib/future-draft-choice";
+import { DataContextRail } from "@/app/components/DataContextRail";
+import MetricTip from "@/app/components/MetricTip";
+import type { LeagueProvenance } from "@/app/lib/data-context";
 
 const TradeProposalEngine = lazy(() => import("@/app/components/TradeProposal"));
 const PlayerComparison    = lazy(() => import("@/app/components/PlayerComparison"));
@@ -57,6 +60,7 @@ export default function ArmchairGmPage() {
   const [booting, setBooting] = useState(true);
   const [initialNavReady, setInitialNavReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [provenance, setProvenance] = useState<LeagueProvenance | null>(null);
   const [db, setDb] = useState<{ teams: Team[]; players: Asset[]; capCeiling?: number | null }>({ teams: [], players: [] });
   const [originalDb, setOriginalDb] = useState<{ teams: Team[]; players: Asset[]; capCeiling?: number | null } | null>(null);
   const teams = useTradeStore(s => s.teams);
@@ -419,6 +423,7 @@ export default function ArmchairGmPage() {
   const loadLeagueData = useCallback(() => {
     setBooting(true);
     setError(null);
+    setProvenance(null);
     setDb({ teams: [], players: [] });
     setOriginalDb({ teams: [], players: [] });
     setNavMap({});
@@ -471,6 +476,7 @@ export default function ArmchairGmPage() {
         }
         setDb(data);
         setOriginalDb(data);
+        setProvenance(pd.provenance ?? td.provenance ?? null);
         // The immutable entry baseline. originalDb is overwritten by each Cup
         // Run rollover, so it cannot serve as the league to restart from (ST1).
         entryBaselineRef.current = cloneLeague(data);
@@ -904,6 +910,17 @@ export default function ArmchairGmPage() {
 
         <Header activeTab="armchair-gm" />
 
+        <header className="border-b border-ledger-rule pb-4">
+          <h1 className="text-[18px] font-black uppercase tracking-[0.12em] font-mono text-ledger-ink">
+            Armchair GM
+          </h1>
+          <p className="mt-2 max-w-3xl text-[11px] font-mono leading-relaxed text-ledger-ink-body">
+            Run an NHL front office through trades, roster construction, free agency, the draft, season simulation, and a three-year Cup Run.
+          </p>
+        </header>
+
+        <DataContextRail route="armchair" provenance={provenance} capCeiling={db.capCeiling} />
+
         <TradeHistoryBar pool={{ teams: db.teams, players: db.players }} />
 
         {/* ── Cup Run resume guard — never restore a mid-run flag silently ── */}
@@ -1026,9 +1043,7 @@ export default function ArmchairGmPage() {
                             border: `1px solid ${linkCopied ? 'var(--ledger-green)' : 'var(--ledger-rule)'}`,
                             color: linkCopied ? 'var(--ledger-green)' : 'var(--ledger-ink-faint)',
                             borderRadius: '2px',
-                          }}
-                          title="Copy Trade Link"
-                        >
+                          }}>
                           {linkCopied ? '✓' : '🔗'}
                         </button>
                       )}
@@ -1130,9 +1145,7 @@ export default function ArmchairGmPage() {
                     }}>
                       {verdict.metrics.homeNetGain > 0 ? "+" : ""}
                       {verdict.metrics.homeNetGain.toFixed(0)}
-                      <span style={{ fontSize: 9, fontWeight: 400, marginLeft: 3,
-                                     color: "var(--ledger-ink-faint)" }}
-                                  title="X-NAV — Extended Net Asset Value, the player’s tradeable value">NAV</span>
+                      <MetricTip term="NAV" className="ml-1 text-[9px] font-normal" />
                     </div>
                   </div>
                 )}

@@ -2,14 +2,15 @@
 // The "why/how" narrative: why each system exists and how it thinks.
 // Definitions, keys, and the icon key live at /glossary.
 import React from "react";
-import type { Metadata } from "next";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { publicRouteMetadata } from "@/app/lib/public-seo";
 
-export const metadata: Metadata = {
+export const metadata = publicRouteMetadata({
+  path: "/methodology",
   title: "Methodology — Cap & Crease",
   description: "Why the Ledger's systems exist and how they think: X-NAV, Fair Market Value, Player Gravity, STRAND DNA, the GM Audit, and the simulation engine.",
-};
+});
 
 const SECTIONS: { id: string; title: string; paras: string[] }[] = [
   {

@@ -1,19 +1,23 @@
 import type { Metadata } from "next";
 import { SharedTradeView } from "@/app/components/QuickTradeMachine";
 import { decodeTradeSharePayload, summarizeTradeSharePayload } from "@/app/lib/trade-share";
+import { BRAND } from "@/app/lib/brand";
 
 export async function generateMetadata({ params }: { params: Promise<{ code: string }> }): Promise<Metadata> {
   const { code } = await params;
   try {
     const preview = summarizeTradeSharePayload(decodeTradeSharePayload(code));
+    const canonical = `${BRAND.url}/t/${encodeURIComponent(code)}`;
     return {
       title: `${preview.title} | Cap & Crease`,
       description: preview.description,
+      alternates: { canonical },
       openGraph: {
         title: preview.title,
         description: preview.description,
         type: "article",
         siteName: "Cap & Crease",
+        url: canonical,
         images: [{
           url: `/t/${code}/opengraph-image`,
           width: 1200,

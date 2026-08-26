@@ -1,5 +1,7 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import React, { useCallback, useEffect, useState } from "react";
+import { useDialog } from "@/app/lib/use-dialog";
 
 // Bumped with the rename: a returning visitor should be told the paper changed
 // its name once, rather than silently finding a different masthead.
@@ -9,17 +11,30 @@ export default function WelcomeModal() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && !localStorage.getItem(STORAGE_KEY)) {
+    try {
+      if (!localStorage.getItem(STORAGE_KEY)) setVisible(true);
+    } catch {
       setVisible(true);
     }
   }, []);
 
-  if (!visible) return null;
-
-  const dismiss = () => {
-    localStorage.setItem(STORAGE_KEY, "1");
+  const dismiss = useCallback(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, "1");
+    } catch {
+      // Storage can be unavailable in private browsing; dismissal still works
+      // for the current page even when it cannot be persisted.
+    }
     setVisible(false);
-  };
+  }, []);
+
+  const dialog = useDialog({
+    open: visible,
+    onClose: dismiss,
+    labelledBy: "welcome-title",
+  });
+
+  if (!visible) return null;
 
   return (
     <div
@@ -28,6 +43,7 @@ export default function WelcomeModal() {
       onClick={dismiss}
     >
       <div
+        {...dialog}
         className="relative w-full max-w-lg font-mono"
         style={{
           background: "var(--ledger-cream, #f5efe0)",
@@ -48,6 +64,7 @@ export default function WelcomeModal() {
             Est. 2026 — Vol. I — Trade Edition
           </div>
           <h2
+            id="welcome-title"
             className="mt-1 text-lg font-black uppercase tracking-[0.1em]"
             style={{ color: "var(--ledger-ink, #2c2416)" }}
           >
@@ -62,27 +79,61 @@ export default function WelcomeModal() {
         <div className="px-5 py-4 space-y-3 text-[11px] leading-relaxed" style={{ color: "var(--ledger-ink-body, #3d3428)" }}>
           <p>
             <strong>Cap & Crease</strong> is an NHL analytics platform that values every player, contract,
-            and trade using proprietary models. Here are the key concepts:
+            and trade. Pick a desk to begin, or read about the models when you want the detail.
           </p>
 
-          <div className="grid grid-cols-[72px_1fr] gap-x-3 gap-y-2">
-            <Term t="X-NAV" d="Extended Net Asset Value — a player's total trade value combining on-ice impact, age, contract, and role; experimental Gravity value is separately gated." />
-            <Term t="STRAND" d="DNA-style visualization showing offensive and defensive trait profiles at a glance." />
-            <Term t="GM Audit" d="Automated trade analysis checking cap legality, roster fit, timeline alignment, and fair value." />
-            <Term t="FMV" d="Fair Market Value — what a player would earn as a free agent based on their production profile." />
-          </div>
+          <nav aria-label="Choose a product" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <Link
+              href="/players"
+              onClick={dismiss}
+              className="min-h-11 flex items-center justify-center border-2 px-3 py-2 text-center text-[9px] font-black uppercase tracking-[0.12em] no-underline"
+              style={{ borderColor: "var(--ledger-ice)", color: "var(--ledger-ice)" }}
+            >
+              Search Players
+            </Link>
+            <Link
+              href="/trade-machine"
+              onClick={dismiss}
+              className="min-h-11 flex items-center justify-center border-2 px-3 py-2 text-center text-[9px] font-black uppercase tracking-[0.12em] no-underline"
+              style={{ borderColor: "var(--ledger-red)", color: "var(--ledger-red)" }}
+            >
+              Build a Trade
+            </Link>
+            <Link
+              href="/teams"
+              onClick={dismiss}
+              className="min-h-11 flex items-center justify-center border-2 px-3 py-2 text-center text-[9px] font-black uppercase tracking-[0.12em] no-underline"
+              style={{ borderColor: "var(--ledger-green)", color: "var(--ledger-green)" }}
+            >
+              Explore Teams
+            </Link>
+          </nav>
 
-          <p style={{ color: "var(--ledger-ink-faint)" }}>
-            Hover or tap any dotted-underlined metric for a quick definition.
-            Full methodology available in the footer or at <a href="/methodology" className="underline" style={{ color: "var(--ledger-ice)" }}>/methodology</a>.
-          </p>
+          <details className="border-t pt-2" style={{ borderColor: "var(--ledger-rule-mid, #c8b890)" }}>
+            <summary className="min-h-11 flex cursor-pointer items-center font-black uppercase tracking-[0.14em]"
+              style={{ color: "var(--ledger-brown)" }}>
+              How the models work
+            </summary>
+            <div className="grid grid-cols-[72px_1fr] gap-x-3 gap-y-2 pb-2">
+              <Term t="X-NAV" d="Extended Net Asset Value — a player's total trade value combining on-ice impact, age, contract, and role; experimental Gravity value is separately gated." />
+              <Term t="STRAND" d="DNA-style visualization showing offensive and defensive trait profiles at a glance." />
+              <Term t="GM Audit" d="Automated trade analysis checking cap legality, roster fit, timeline alignment, and fair value." />
+              <Term t="FMV" d="Fair Market Value — what a player would earn as a free agent based on their production profile." />
+            </div>
+            <p className="pb-2" style={{ color: "var(--ledger-ink-faint)" }}>
+              Metric help is available beside each value. Read the full explanation in the{" "}
+              <Link href="/methodology" onClick={dismiss} className="underline" style={{ color: "var(--ledger-ice)" }}>
+                methodology
+              </Link>.
+            </p>
+          </details>
         </div>
 
         {/* Footer */}
         <div className="px-5 py-3 text-center" style={{ borderTop: "1px solid var(--ledger-rule-mid, #c8b890)" }}>
           <button
             onClick={dismiss}
-            className="font-mono text-[10px] font-black uppercase tracking-[0.2em] px-6 py-2"
+            className="min-h-11 font-mono text-[10px] font-black uppercase tracking-[0.2em] px-6 py-2"
             style={{
               background: "var(--ledger-ink, #2c2416)",
               color: "var(--ledger-cream, #f5efe0)",

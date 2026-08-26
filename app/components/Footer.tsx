@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { BRAND } from "@/app/lib/brand";
 import { BrandMark } from "@/app/components/BrandMark";
-import { TierIcon } from "./GravityField";
 import type { GravityTier } from "@/app/lib/gravity";
 import { ROLE_DEFS } from "@/app/lib/player-roles";
 
@@ -135,143 +134,27 @@ export const methodologySections: MethodologySection[] = [
 
 export default function Footer() {
   return (
-    <footer className="mt-8 border-t border-ledger-rule px-4 py-6">
+    <footer className="mt-8 border-t border-ledger-rule px-4 py-5">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-5 text-center">
-          <p className="text-2xs uppercase tracking-[0.16em] sm:tracking-[0.36em] leading-relaxed font-mono text-ledger-ink-faint">
-            <Link href="/methodology" className="underline hover:text-ledger-ink transition-colors">Methodology</Link> · <Link href="/glossary" className="underline hover:text-ledger-ink transition-colors">Glossary</Link> · <Link href="/glossary#icon-key" className="underline hover:text-ledger-ink transition-colors">Icon Key</Link> · <Link href="/legal" className="underline hover:text-ledger-ink transition-colors">Terms &amp; Privacy</Link>
-          </p>
+        <div className="text-center">
+          <nav aria-label="Footer" className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-2xs uppercase tracking-[0.16em] sm:tracking-[0.28em] leading-relaxed font-mono text-ledger-ink-faint">
+            <Link href="/methodology" className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-ledger-ink transition-colors md:min-h-0">Methodology</Link>
+            <span aria-hidden="true">·</span>
+            <Link href="/glossary" className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-ledger-ink transition-colors md:min-h-0">Glossary</Link>
+            <span aria-hidden="true">·</span>
+            <Link href="/glossary#data-sources" className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-ledger-ink transition-colors md:min-h-0">Sources</Link>
+            <span aria-hidden="true">·</span>
+            <Link href="/legal" className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-ledger-ink transition-colors md:min-h-0">Legal</Link>
+          </nav>
           <p className="mt-1 text-[10px] uppercase tracking-[0.14em] sm:tracking-[0.24em] font-mono text-ledger-rule">
             X-NAV · G-NAV · NOIV · STRAND · GM Audit
           </p>
         </div>
 
-        {/* Collapsed by default (mobile audit X2): the full icon key added
-            ~1,000px of always-on grids to every page that renders the footer.
-            It opens on demand here and still lives in full at
-            /glossary#icon-key. Kept as a native <details> so it works without JS. */}
-        <details className="group mb-4 border border-ledger-rule"
-          style={{ background: "var(--paper-card)" }}>
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3"
-            aria-label="Icon key">
-            <div className="font-mono text-[10px] font-black uppercase tracking-[0.22em] text-ledger-ink">
-              Icon Key
-            </div>
-            <span className="font-mono text-[13px] text-ledger-ink-faint group-open:rotate-180" aria-hidden="true">⌄</span>
-          </summary>
-          <div className="border-t px-4 pt-3 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint"
-            style={{ borderColor: "var(--ledger-rule)" }}>
-            Asset Flags
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 p-4">
-            {iconKey.map(([icon, label, definition]) => (
-              <div key={`${icon}-${label}`} className="flex items-start gap-2.5">
-                <span className="inline-flex min-h-6 min-w-6 shrink-0 items-center justify-center border px-1 font-mono text-[10px] font-black"
-                  style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}>
-                  {icon}
-                </span>
-                <div className="min-w-0">
-                  <span className="font-mono text-[10px] font-black uppercase leading-snug text-ledger-ink">
-                    {label}
-                  </span>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-ledger-ink-body">
-                    {definition}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="px-4 pt-1 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint border-t"
-            style={{ borderColor: "var(--ledger-rule-light, var(--ledger-rule))" }}>
-            <span className="inline-block pt-2">Modern Role Chips</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 p-4">
-            {roleIconEntries.map(([icon, label, definition]) => (
-              <div key={`role-${label}`} className="flex items-start gap-2.5">
-                <span className="inline-flex min-h-6 min-w-6 shrink-0 items-center justify-center border px-1 font-mono text-[9px] font-black"
-                  style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}>
-                  {icon}
-                </span>
-                <div className="min-w-0">
-                  <span className="font-mono text-[10px] font-black uppercase leading-snug text-ledger-ink">
-                    {label}
-                  </span>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-ledger-ink-body">
-                    {definition}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="px-4 pt-1 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint border-t"
-            style={{ borderColor: "var(--ledger-rule-light, var(--ledger-rule))" }}>
-            <span className="inline-block pt-2">Gravity Tiers</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 p-4">
-            {gravityTierEntries.map(([tier, label, definition]) => (
-              <div key={`grav-${tier}`} className="flex items-start gap-2.5">
-                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center border"
-                  style={{ borderColor: "var(--ledger-rule)" }}>
-                  <TierIcon tier={tier} size={14} />
-                </span>
-                <div className="min-w-0">
-                  <span className="font-mono text-[10px] font-black uppercase leading-snug text-ledger-ink">
-                    {label}
-                  </span>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-ledger-ink-body">
-                    {definition}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </details>
-
-        <div className="space-y-2">
-          {methodologySections.map(section => (
-            <details
-              key={section.title}
-              className="group border border-ledger-rule"
-              style={{ background: "var(--paper-card)" }}
-            >
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3">
-                <div>
-                  <div className="font-mono text-[10px] font-black uppercase tracking-[0.22em] text-ledger-ink">
-                    {section.title}
-                  </div>
-                  <div className="mt-1 text-[11px] leading-relaxed text-ledger-ink-body">
-                    {section.intro}
-                  </div>
-                </div>
-                <span className="font-mono text-[13px] text-ledger-ink-faint group-open:rotate-180"
-                  aria-hidden="true">⌄</span>
-              </summary>
-              <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 border-t px-4 py-4"
-                style={{ borderColor: "var(--ledger-rule)" }}>
-                {section.items.map(({ term, definition, href }) => (
-                  <div key={`${section.title}-${term}`} className="grid grid-cols-[96px_1fr] gap-4">
-                    <dt className="font-mono text-[10px] font-black uppercase leading-snug text-ledger-ink">
-                      {href ? (
-                        <a href={href} target="_blank" rel="noopener noreferrer"
-                          className="underline hover:text-ledger-red transition-colors text-ledger-ink">
-                          {term}
-                        </a>
-                      ) : term}
-                    </dt>
-                    <dd className="text-[11px] leading-relaxed text-ledger-ink-body">
-                      {definition}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </details>
-          ))}
-        </div>
-
         {/* The mark signs off the page. The wordmark is already in the
             masthead, so this instance is decorative — no `title`, and it is
             hidden from screen readers rather than announcing the site twice. */}
-        <div className="mt-5 flex justify-center">
+        <div className="mt-4 flex justify-center">
           <BrandMark size={44} />
         </div>
 

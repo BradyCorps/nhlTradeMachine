@@ -9,6 +9,9 @@ import PlayoffBracket from "@/app/components/PlayoffBracket";
 import { SEASON } from "@/app/lib/season-config";
 import { navStageDesc, navStagesForDisplay } from "@/app/lib/nav-breakdown";
 import { MODEL_PRICE_SHORT } from "@/app/lib/contract-verdict";
+import { HelpPopover } from "@/app/components/HelpPopover";
+import MetricTip from "@/app/components/MetricTip";
+import { HorizontalScrollCue } from "@/app/components/HorizontalScrollCue";
 
 // ── League Numbers — award race + full standings by division ──
 const CONFERENCES: { conf: string; divs: string[] }[] = [
@@ -21,6 +24,13 @@ function playoffMark(t: any): { label: string; title: string; color: string } {
   if (t.madePlayoffs) return { label: "WC", title: "In via wildcard", color: 'var(--ledger-ice)' };
   return { label: "—", title: "Out of the playoffs", color: 'var(--ledger-ink-faint)' };
 }
+
+const BREAKOUT_HELP: Record<string, { label: string; symbol: string; definition: string }> = {
+  BREAKOUT: { label: "Breakout season", symbol: "▲", definition: "A young player made a meaningful performance leap." },
+  CAREER_YEAR: { label: "Career year", symbol: "▲", definition: "A veteran performed above their established pace." },
+  VETERAN_HOLD: { label: "Veteran hold", symbol: "▲", definition: "A veteran held off the expected age-related decline." },
+  REGRESSION: { label: "Regression", symbol: "▼", definition: "The player finished below their expected performance." },
+};
 
 function DivisionStandings({ division, teams, userIds }: { division: string; teams: any[]; userIds: Set<string> }) {
   return (
@@ -44,7 +54,9 @@ function DivisionStandings({ division, teams, userIds }: { division: string; tea
                   {t.teamName ?? t.teamId}
                 </td>
                 <td className="text-[11px] py-1 px-2 text-right tabular-nums font-black" style={{ color: 'var(--ledger-ink)' }}>{t.projectedPoints}</td>
-                <td className="text-[10px] py-1 px-2 text-right tabular-nums font-black" title={mark.title} style={{ color: mark.color, width: 30 }}>{mark.label}</td>
+                <td className="text-[10px] py-1 px-2 text-right tabular-nums font-black" style={{ color: mark.color, width: 30 }}>
+                  <HelpPopover label="Playoff status" definition={mark.title}>{mark.label}</HelpPopover>
+                </td>
               </tr>
             );
           })}
@@ -247,7 +259,10 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                   {["#", "Player", "GP", "G", "A", "PTS", "ΔXP", "X-NAV", "NOIV", "CAP±"].map((h, i) => (
                     <th key={i} className="text-[9px] uppercase tracking-wider py-1 px-1.5"
                       style={{ color: 'var(--ledger-ink-faint)', textAlign: i < 2 ? 'left' : 'right', fontWeight: 900 }}>
-                      {h}
+                      {h === "X-NAV" || h === "NOIV" ? <MetricTip term={h} />
+                        : h === "ΔXP" ? <HelpPopover label="Points versus expectation" definition="Points above or below the player's preseason pace over the games played.">ΔXP</HelpPopover>
+                        : h === "CAP±" ? <HelpPopover label="Cap surplus" definition="Model fair-market annual value minus the player's effective cap hit.">CAP±</HelpPopover>
+                        : h}
                     </th>
                   ))}
                 </tr>
@@ -276,7 +291,6 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                     <tr
                       style={{ borderBottom: '1px solid rgba(200,184,144,0.45)', cursor: nav ? 'pointer' : 'default', background: isOpen ? 'var(--ledger-cream)' : 'transparent' }}
                       onClick={() => nav && setOpenPlayer(isOpen ? null : rowKey)}
-                      title={nav ? 'Tap for the valuation breakdown' : undefined}
                     >
                       <td className="text-[10px] py-1.5 px-1.5 text-left align-top" style={{ color: 'var(--ledger-ink-faint)' }}>{isOpen ? '▾' : i + 1}</td>
                       <td className="text-[11px] py-1.5 px-1.5 text-left">
@@ -309,10 +323,15 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                       <td className="text-[11px] py-1.5 px-1.5 text-right tabular-nums font-black align-top" style={{ color: 'var(--ledger-ink)' }}>{p.projectedPts}</td>
                       <td className="text-[10px] py-1.5 px-1.5 text-right tabular-nums font-black align-top" style={{ color: dxp === null ? 'var(--ledger-ink-faint)' : posNeg(dxp) }}>
                         {dxp === null ? '—' : dxp > 0 ? `+${dxp}` : dxp}
-                        {p.breakoutTag === 'BREAKOUT' && <span title="Breakout season (young player leap)"> ▲</span>}
-                        {p.breakoutTag === 'CAREER_YEAR' && <span title="Career year (veteran over-pace)"> ▲</span>}
-                        {p.breakoutTag === 'VETERAN_HOLD' && <span title="Held off decline"> ▲</span>}
-                        {p.breakoutTag === 'REGRESSION' && <span title="Down year"> ▼</span>}
+                        {p.breakoutTag && BREAKOUT_HELP[p.breakoutTag] && (
+                          <HelpPopover
+                            label={BREAKOUT_HELP[p.breakoutTag].label}
+                            definition={BREAKOUT_HELP[p.breakoutTag].definition}
+                            className="ml-1"
+                          >
+                            {BREAKOUT_HELP[p.breakoutTag].symbol}
+                          </HelpPopover>
+                        )}
                       </td>
                       <td className="text-[11px] py-1.5 px-1.5 text-right tabular-nums font-black align-top" style={{ color: 'var(--ledger-ink)' }}>
                         {nav ? nav.total : '—'}
@@ -342,11 +361,11 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                               <>
                                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-2">
                                   {rows.map(row => (
-                                    <div key={row.key} title={navStageDesc(row.key)}>
+                                    <div key={row.key}>
                                       <div className="flex items-baseline justify-between">
                                         <span className="text-[10px] font-black font-mono uppercase tracking-wider"
                                           style={{ color: row.kind === "adjustment" ? 'var(--ledger-ink-faint)' : 'var(--ledger-ink)' }}>
-                                          {row.label}
+                                          <HelpPopover label={row.label} definition={navStageDesc(row.key)}>{row.label}</HelpPopover>
                                         </span>
                                         <span className="text-[11px] font-black font-mono tabular-nums" style={{ color: posNeg(row.value) }}>
                                           {row.value > 0 ? `+${row.value}` : row.value}
@@ -374,8 +393,13 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                             {nav.rosterTier && <span>Tier <strong>{nav.rosterTier.replace(/_/g, ' ')}</strong></span>}
                             {expected !== null && <span>Expected <strong>{expected} pts</strong> → Actual <strong>{p.projectedPts}</strong></span>}
                             {roster?.hdFinishingDelta != null && (
-                              <span title="NHL EDGE: high-danger finishing vs league average — negative means unlucky on quality chances (breakout fuel)">
-                                NHL EDGE HD{' '}
+                              <span>
+                                <HelpPopover
+                                  label="NHL EDGE high-danger finishing"
+                                  definition="High-danger finishing versus league average. A negative value can indicate poor finishing luck and possible breakout fuel."
+                                >
+                                  NHL EDGE HD
+                                </HelpPopover>{' '}
                                 <strong style={{ color: roster.hdFinishingDelta <= -0.02 ? 'var(--ledger-green)' : roster.hdFinishingDelta >= 0.03 ? 'var(--ledger-red)' : 'inherit' }}>
                                   {roster.hdFinishingDelta > 0 ? '+' : ''}{(roster.hdFinishingDelta * 100).toFixed(1)}%
                                 </strong>{' '}vs league
@@ -461,7 +485,11 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                       {["Goaltender", "GS", "GAA", "SV%", "GSAX", "G-NAV", "CAP±"].map((h, i) => (
                         <th key={i} className="text-[9px] uppercase tracking-wider py-1 px-1.5"
                           style={{ color: 'var(--ledger-ink-faint)', textAlign: i === 0 ? 'left' : 'right', fontWeight: 900 }}>
-                          {h}
+                          {h === "SV%" || h === "GSAX" || h === "G-NAV" ? <MetricTip term={h} />
+                            : h === "GS" ? <HelpPopover label="Games started" definition="The number of games the goalie started.">GS</HelpPopover>
+                            : h === "GAA" ? <HelpPopover label="Goals-against average" definition="Goals allowed per 60 minutes played.">GAA</HelpPopover>
+                            : h === "CAP±" ? <HelpPopover label="Cap surplus" definition="Model fair-market annual value minus the goalie's effective cap hit.">CAP±</HelpPopover>
+                            : h}
                         </th>
                       ))}
                     </tr>
@@ -544,13 +572,16 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
       </div>
 
       {pages.length > 1 && (
-        <div className="trade-file-tabs" aria-label="Season result sections">
-          {pages.map((page, i) => (
-            <button key={page.label} onClick={() => goToPage(i)} className={i === activeIndex ? "active" : ""}>
-              {page.label}
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="trade-file-tabs" role="group" aria-label="Season result sections" tabIndex={0}>
+            {pages.map((page, i) => (
+              <button key={page.label} onClick={() => goToPage(i)} className={i === activeIndex ? "active" : ""}>
+                {page.label}
+              </button>
+            ))}
+          </div>
+          <HorizontalScrollCue label="Swipe or scroll for all season files" />
+        </>
       )}
 
       <div key={`${activePage.label}-${slideDirection}`} className={`trade-file-card slide-${slideDirection}`} style={{ background: '#e8dab8', border: '1px solid #b8a070', padding: '12px' }}>

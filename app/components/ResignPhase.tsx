@@ -20,6 +20,7 @@ import { formatCapHit as money } from "@/app/lib/display-utils";
 import {
   ZERO_XNAV, StatLine, ExpandedStats, Terms, PlayerMeta, AnalyticsDisclosure,
 } from "@/app/components/OffseasonPlayerAnalytics";
+import { matchesPlayerSearch } from "@/app/lib/player-search";
 const MARKET_PAGE_SIZE = 30;
 
 export default function ResignPhase({
@@ -53,9 +54,8 @@ export default function ResignPhase({
   const [confirmWalk, setConfirmWalk] = useState(false);
 
   const sortedMarket = useMemo(() => {
-    const q = query.trim().toLowerCase();
     return [...market]
-      .filter((m) => (q ? m.player.name.toLowerCase().includes(q) : true))
+      .filter((m) => matchesPlayerSearch(m.player, query))
       .sort((a, b) => {
         if (marketSort === "nav") return (navMap?.[b.player.id]?.total ?? 0) - (navMap?.[a.player.id]?.total ?? 0);
         if (marketSort === "age") return a.player.age - b.player.age;
@@ -104,12 +104,11 @@ export default function ResignPhase({
 
   const pendingIds = useMemo(() => new Set(pending.map((p) => p.player.id)), [pending]);
   const droppable = useMemo(() => {
-    const q = dropQuery.trim().toLowerCase();
     return roster
       .filter((p) => p.position !== "Pick" && !pendingIds.has(p.id))
-      .filter((p) => (q ? p.name.toLowerCase().includes(q) : true))
+      .filter((p) => matchesPlayerSearch(p, dropQuery, homeTeam))
       .sort((a, b) => (b.capHit ?? 0) - (a.capHit ?? 0));
-  }, [roster, pendingIds, dropQuery]);
+  }, [roster, pendingIds, dropQuery, homeTeam]);
 
   if (typeof document === "undefined") return null;
 

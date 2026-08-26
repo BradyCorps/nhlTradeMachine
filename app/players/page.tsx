@@ -13,9 +13,12 @@ import {
 import { FRANCHISE, SEASON } from "@/app/lib/season-config";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
-import React, { useState, useEffect, useMemo, useRef, useDeferredValue, useId } from "react";
+import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
+import { DataContextRail } from "@/app/components/DataContextRail";
+import { HelpPopover } from "@/app/components/HelpPopover";
+import { HorizontalScrollCue } from "@/app/components/HorizontalScrollCue";
 import PercentileCard from "@/app/components/PercentileCard";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { displayPosition } from "@/app/lib/display-position";
@@ -29,6 +32,8 @@ import {
 import { orderFreshInk, signedAav, signedRecency, signedTerm } from "@/app/lib/fresh-ink";
 import { buildStrandCohort } from "@/app/lib/strand-cohort";
 import { buildStrandPercentiles, type PlayerLike } from "@/app/lib/strand-metrics";
+import { matchesPlayerSearch } from "@/app/lib/player-search";
+import type { LeagueProvenance } from "@/app/lib/data-context";
 
 // ── Types ─────────────────────────────────────────────────────
 interface Player {
@@ -132,22 +137,26 @@ function MiniHelix({ offV, defV }: {
   const label = `STRAND percentile — offense ${o ?? "n/a"}, defense ${d ?? "n/a"}`;
 
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block", margin: "0 auto" }}
-      role="img" aria-label={label}>
-      <title>{`OFF ${o ?? "—"} · DEF ${d ?? "—"} (percentile vs same-position peers)`}</title>
-      {/* midpoint (50) reference */}
-      <line x1={x0 + trackW / 2} y1={4} x2={x0 + trackW / 2} y2={H - 4}
-        stroke={track} strokeWidth={1} opacity={0.7} />
-      {/* two shared-scale tracks */}
-      <line x1={x0} y1={yOff} x2={x1} y2={yOff} stroke={track} strokeWidth={1.5} strokeLinecap="round" />
-      <line x1={x0} y1={yDef} x2={x1} y2={yDef} stroke={track} strokeWidth={1.5} strokeLinecap="round" />
-      {offV != null && (
-        <circle cx={xAt(offV)} cy={yOff} r={3.6} fill="var(--blue)" stroke={ring} strokeWidth={1.6} />
-      )}
-      {defV != null && (
-        <circle cx={xAt(defV)} cy={yDef} r={3.6} fill="var(--red)" stroke={ring} strokeWidth={1.6} />
-      )}
-    </svg>
+    <HelpPopover
+      label="STRAND offense and defense percentiles"
+      definition={`OFF ${o ?? "not available"}; DEF ${d ?? "not available"}. Percentiles compare this player with same-position peers.`}
+    >
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block", margin: "0 auto" }}
+        role="img" aria-label={label}>
+        {/* midpoint (50) reference */}
+        <line x1={x0 + trackW / 2} y1={4} x2={x0 + trackW / 2} y2={H - 4}
+          stroke={track} strokeWidth={1} opacity={0.7} />
+        {/* two shared-scale tracks */}
+        <line x1={x0} y1={yOff} x2={x1} y2={yOff} stroke={track} strokeWidth={1.5} strokeLinecap="round" />
+        <line x1={x0} y1={yDef} x2={x1} y2={yDef} stroke={track} strokeWidth={1.5} strokeLinecap="round" />
+        {offV != null && (
+          <circle cx={xAt(offV)} cy={yOff} r={3.6} fill="var(--blue)" stroke={ring} strokeWidth={1.6} />
+        )}
+        {defV != null && (
+          <circle cx={xAt(defV)} cy={yDef} r={3.6} fill="var(--red)" stroke={ring} strokeWidth={1.6} />
+        )}
+      </svg>
+    </HelpPopover>
   );
 }
 
@@ -159,9 +168,6 @@ type PlayerFlag = {
 };
 
 function PlayerIconBadges({ player }: { player: Player }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const panelId = useId();
   const xnav = useMemo(() => calculateAssetNAV(player), [player]);
 
   const roles = derivePlayerRoles(player);
@@ -230,55 +236,29 @@ function PlayerIconBadges({ player }: { player: Player }) {
       : null,
   ].filter((flag): flag is PlayerFlag => Boolean(flag));
 
-  useEffect(() => {
-    if (!open) return;
-    const closeOnOutsidePointer = (event: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", closeOnOutsidePointer);
-    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
-  }, [open]);
-
   if (flags.length === 0) return null;
   return (
     <div
-      ref={rootRef}
-      style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}
+      className="player-icon-badges"
       onClick={event => event.stopPropagation()}
-      onBlur={event => {
-        if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) {
-          setOpen(false);
-        }
-      }}
     >
-      <button
-        type="button"
-        className="player-flags-trigger dense-tap"
-        aria-expanded={open}
-        aria-controls={panelId}
-        aria-describedby={open ? panelId : undefined}
-        aria-label={`${player.name}: ${flags.map(flag => flag.label).join(", ")}. ${open ? "Hide" : "View"} definitions`}
-        onClick={event => {
-          event.stopPropagation();
-          setOpen(current => !current);
-        }}
-        onKeyDown={event => {
-          if (event.key === "Escape") {
-            event.stopPropagation();
-            setOpen(false);
-          }
-        }}
-        style={{
-          display: "inline-flex", alignItems: "center", justifyContent: "center",
-          gap: "2px", padding: "2px", cursor: "pointer", flexWrap: "wrap",
-          border: `1px solid ${open ? "var(--ledger-rule)" : "transparent"}`,
-          background: open ? "var(--paper-card)" : "transparent",
-        }}
+      <HelpPopover
+        label={`${player.name} player flags`}
+        definition={(
+          <div>
+            {flags.map(flag => (
+              <div key={flag.key} style={{ display: "grid", gridTemplateColumns: "minmax(90px, auto) 1fr", gap: "6px", alignItems: "start", marginTop: "4px" }}>
+                <span style={{ color: flag.color, fontSize: "9px", fontWeight: 900 }}>{flag.label}</span>
+                <span style={{ fontSize: "10px", lineHeight: 1.35, color: "var(--ledger-ink-light)", fontWeight: 700 }}>{flag.title}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        className="player-flags-trigger dense-tap flex-wrap gap-0.5 border-b-0 p-0.5"
       >
         {flags.map(flag => (
           <span
             key={flag.key}
-            title={flag.title}
             aria-hidden="true"
             style={{
               display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -291,38 +271,7 @@ function PlayerIconBadges({ player }: { player: Player }) {
             {flag.label}
           </span>
         ))}
-      </button>
-
-      {open && (
-        <div
-          id={panelId}
-          role="region"
-          aria-label={`${player.name} player flags`}
-          style={{
-            position: "absolute", zIndex: 70, top: "calc(100% + 4px)", left: 0,
-            width: "min(280px, calc(100vw - 80px))", padding: "8px 10px",
-            border: "1px solid var(--ledger-rule)", background: "var(--paper-card)",
-            boxShadow: "0 4px 12px rgba(28,20,10,0.2)",
-          }}
-        >
-          <div style={{
-            marginBottom: "6px", fontSize: "9px", fontWeight: 900,
-            color: "var(--ledger-ink)", textTransform: "uppercase", letterSpacing: "0.1em",
-          }}>
-            Player Flags
-          </div>
-          {flags.map(flag => (
-            <div key={flag.key} style={{ display: "grid", gridTemplateColumns: "minmax(90px, auto) 1fr", gap: "6px", alignItems: "start", marginTop: "4px" }}>
-              <span style={{ color: flag.color, fontSize: "9px", fontWeight: 900 }}>
-                {flag.label}
-              </span>
-              <span style={{ fontSize: "10px", lineHeight: 1.35, color: "var(--ledger-ink-light)", fontWeight: 700 }}>
-                {flag.title}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+      </HelpPopover>
     </div>
   );
 }
@@ -339,84 +288,36 @@ const PLAYER_ICON_KEY = [
 ] as const;
 
 function PlayersIconKey() {
-  const [open, setOpen] = useState(false);
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 16px" }}>
-      <button
-        onClick={() => setOpen(!open)}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "5px",
-          padding: "3px 10px",
-          border: "1px solid var(--ledger-rule)",
-          background: open ? "var(--paper-card)" : "transparent",
-          color: "var(--ledger-ink-faint)",
-          fontSize: "9px",
-          fontWeight: 900,
-          fontFamily: "'Courier Prime', monospace",
-          textTransform: "uppercase",
-          letterSpacing: "0.12em",
-          cursor: "pointer",
-          lineHeight: 1,
-        }}
-      >
-        <span style={{ fontSize: "11px", fontWeight: 900 }}>?</span>
-        Flag Key
-        <span style={{ fontSize: "8px", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>▼</span>
-      </button>
-      {open && (
-        <div style={{
-          border: "1px solid var(--ledger-rule)",
-          borderTop: "none",
-          background: "var(--paper-card)",
-          padding: "8px 10px",
-        }}>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "6px 12px",
-          }}>
+      <HelpPopover
+        label="Player flag key"
+        definition={(
+          <div style={{ display: "grid", gap: "8px" }}>
             {PLAYER_ICON_KEY.map(([icon, label, definition]) => (
-              <div key={`${icon}-${label}`} title={definition} style={{ display: "grid", gridTemplateColumns: "minmax(90px, auto) 1fr", gap: "6px", alignItems: "center" }}>
+              <div key={`${icon}-${label}`} style={{ display: "grid", gridTemplateColumns: "minmax(90px, auto) 1fr", gap: "6px", alignItems: "center" }}>
                 <span style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minHeight: "18px",
-                  padding: "2px 4px",
-                  border: "1px solid var(--ledger-rule)",
-                  color: "var(--ledger-ink)",
-                  fontSize: "10px",
-                  fontWeight: 900,
-                  lineHeight: 1,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  minHeight: "18px", padding: "2px 4px", border: "1px solid var(--ledger-rule)",
+                  color: "var(--ledger-ink)", fontSize: "10px", fontWeight: 900, lineHeight: 1,
                 }}>
                   {icon}
                 </span>
                 <span>
-                  <span style={{
-                    fontSize: "9px",
-                    fontWeight: 900,
-                    color: "var(--ledger-ink-light)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.04em",
-                  }}>
+                  <strong style={{ fontSize: "9px", color: "var(--ledger-ink-light)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                     {label}
-                  </span>
-                  {" "}
-                  <span style={{
-                    fontSize: "9px",
-                    fontWeight: 700,
-                    color: "var(--ledger-ink-faint)",
-                  }}>
-                    {definition}
-                  </span>
+                  </strong>{" "}
+                  <span style={{ fontSize: "9px", fontWeight: 700, color: "var(--ledger-ink-faint)" }}>{definition}</span>
                 </span>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+        className="gap-1 border px-2 font-mono text-[9px] font-black uppercase tracking-[0.12em]"
+      >
+        <span style={{ fontSize: "11px", fontWeight: 900 }}>?</span>
+        Flag Key
+      </HelpPopover>
     </div>
   );
 }
@@ -573,11 +474,15 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
             </div>
             <div className="stat-grid-4" style={{ marginBottom: "10px" }}>
               {statItems.map(s => (
-                <div key={s.label} title={s.title} style={{
+                <div key={s.label} style={{
                   background: "#e4d8b8", border: "1px solid #b8a070",
                   padding: "6px 8px", textAlign: "center",
                 }}>
-                  <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{s.label}</div>
+                  <div style={{ fontSize: "11px", color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    {s.title
+                      ? <HelpPopover label={s.label} definition={s.title}>{s.label}</HelpPopover>
+                      : s.label}
+                  </div>
                   <div style={{ fontSize: "11px", fontWeight: 900, color: s.color ?? "var(--ledger-ink)", marginTop: "2px" }}>{s.val}</div>
                 </div>
               ))}
@@ -654,7 +559,8 @@ function StatPill({ value, label, accent }: { value: string; label: string; acce
       <span style={{
         fontSize: "9px", color: "var(--rule)",
         textTransform: "uppercase", letterSpacing: "0.08em",
-        marginTop: "2px", whiteSpace: "nowrap",
+        marginTop: "2px", whiteSpace: "normal", textAlign: "center",
+        lineHeight: 1.1, overflowWrap: "anywhere",
       }}>{label}</span>
     </div>
   );
@@ -773,9 +679,14 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
   const [expanded, setExpanded] = useState(false);
   const isG = player.position === "G";
   const columns = PLAYER_COLUMNS[section];
-  const primary = columns[0];
-  const secondary = columns[1] ?? columns[0];
-  const tertiary = columns[2];
+  // Compact cards lead with the value that actually controls the ordering.
+  // A sort from another section falls back to this section's default, matching
+  // the section-specific comparator below.
+  const activeColumn = columns.find(column => column.key === sortKey) ?? columns[0];
+  const compactColumns = [
+    activeColumn,
+    ...columns.filter(column => column.key !== activeColumn.key),
+  ].slice(0, 3);
 
   // Mini-STRAND strengths — the mean of the off / def rail percentiles against
   // the same same-position ≥20 GP cohort the dossier ranks against, so the row
@@ -930,15 +841,14 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
 
           {/* Stats */}
           <div className="player-mobile-stat-row">
-            <StatPill value={statDisplay(player, primary.key, actualPPG)} label={primary.label} accent />
-            <StatPill value={statDisplay(player, secondary.key, actualPPG)} label={secondary.label} />
-            {tertiary && (
-              <StatPill value={statDisplay(player, tertiary.key, actualPPG)} label={tertiary.label} />
-            )}
-            {/* Contract shorthand */}
-            {!columns.some(c => c.key === "cap") && (
-              <StatPill value={`$${player.capHit}M`} label={`${player.yearsRemaining}yr`} />
-            )}
+            {compactColumns.map((column, index) => (
+              <StatPill
+                key={column.key}
+                value={statDisplay(player, column.key, actualPPG)}
+                label={index === 0 ? `Sort: ${column.label}` : column.label}
+                accent={index === 0}
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -967,51 +877,85 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
   );
 }
 
-function SectionColumnHeader({ section, sortKey, sortDir, onSort }: {
+function SectionColumnHeader({ section, sortKey, sortDir, onSort, onToggleDirection }: {
   section: PlayerSection;
   sortKey: PlayerSortKey;
   sortDir: "desc" | "asc";
   onSort: (k: PlayerSortKey) => void;
+  onToggleDirection: () => void;
 }) {
+  const columns = PLAYER_COLUMNS[section];
+  const activeColumn = columns.find(column => column.key === sortKey) ?? columns[0];
+  const sectionLabel = section === "F" ? "Forwards" : section === "D" ? "Defence" : "Goalies";
+
   return (
-    <div className="players-column-header" style={{
-      display: "grid",
-      gridTemplateColumns: playerGridTemplate(section),
-      minWidth: playerGridMinWidth(section),
-      gap: "8px",
-      padding: "6px 12px",
-      borderBottom: "1px solid #1c140a",
-      background: "#f2ecd7",
-    }}>
-      <div style={{ fontSize: "10px", color: "var(--rule)", textAlign: "right", textTransform: "uppercase", fontWeight: 900 }}>Rank</div>
-      <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Photo</div>
-      <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Player</div>
-      <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "center" }}>
-        {section === "G" ? "Role" : "Strand"}
-        {section !== "G" && (
-          <div style={{ display: "flex", gap: "7px", justifyContent: "center", marginTop: "2px", fontSize: "8px", fontWeight: 700 }}
-            title="Offensive and defensive percentile vs same-position peers (0–100)">
-            <span style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--blue)", display: "inline-block" }} />OFF
-            </span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--red)", display: "inline-block" }} />DEF
-            </span>
-          </div>
-        )}
+    <>
+      <div className="players-compact-sort">
+        <label>
+          <span>Sort {sectionLabel}</span>
+          <select
+            aria-label={`${sectionLabel} sort metric`}
+            value={activeColumn.key}
+            onChange={event => onSort(event.target.value as PlayerSortKey)}
+          >
+            {columns.map(column => (
+              <option key={column.key} value={column.key}>{column.label}</option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          className="tap-target players-compact-sort-direction"
+          onClick={onToggleDirection}
+          aria-label={`Reverse ${sectionLabel} sort; currently ${sortDir === "desc" ? "descending" : "ascending"}`}
+        >
+          {sortDir === "desc" ? "Descending ▼" : "Ascending ▲"}
+        </button>
       </div>
-      {PLAYER_COLUMNS[section].map(({ key, label }) => (
-        <SortHeader
-          key={key}
-          k={key}
-          label={label}
-          active={sortKey === key}
-          dir={sortDir}
-          onClick={onSort}
-        />
-      ))}
-      <div />
-    </div>
+
+      <div className="players-column-header" style={{
+        display: "grid",
+        gridTemplateColumns: playerGridTemplate(section),
+        minWidth: playerGridMinWidth(section),
+        gap: "8px",
+        padding: "6px 12px",
+        borderBottom: "1px solid #1c140a",
+        background: "#f2ecd7",
+      }}>
+        <div style={{ fontSize: "10px", color: "var(--rule)", textAlign: "right", textTransform: "uppercase", fontWeight: 900 }}>Rank</div>
+        <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Photo</div>
+        <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900 }}>Player</div>
+        <div style={{ fontSize: "10px", color: "var(--rule)", textTransform: "uppercase", fontWeight: 900, textAlign: "center" }}>
+          {section === "G" ? "Role" : "Strand"}
+          {section !== "G" && (
+            <HelpPopover
+              label="STRAND percentile key"
+              definition="Offensive and defensive percentiles versus same-position peers on a 0–100 scale."
+            >
+              <span style={{ display: "flex", gap: "7px", justifyContent: "center", fontSize: "8px", fontWeight: 700 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--blue)", display: "inline-block" }} />OFF
+                </span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--red)", display: "inline-block" }} />DEF
+                </span>
+              </span>
+            </HelpPopover>
+          )}
+        </div>
+        {columns.map(({ key, label }) => (
+          <SortHeader
+            key={key}
+            k={key}
+            label={label}
+            active={sortKey === key}
+            dir={sortDir}
+            onClick={onSort}
+          />
+        ))}
+        <div />
+      </div>
+    </>
   );
 }
 
@@ -1046,6 +990,7 @@ export default function PlayersPage() {
   const [teams, setTeams]       = useState<Team[]>([]);
   const [loading, setLoading]   = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [provenance, setProvenance] = useState<LeagueProvenance | null>(null);
   const [search, setSearch]     = useState("");
   const deferredSearch = useDeferredValue(search);
   const [posFilter, setPosFilter] = useState<"ALL" | "F" | "D" | "G">("ALL");
@@ -1099,10 +1044,12 @@ export default function PlayersPage() {
         if (!Array.isArray(nextPlayers) || !Array.isArray(nextTeams)) throw new Error("API returned invalid league payload");
         setPlayers(nextPlayers);
         setTeams(nextTeams);
+        setProvenance(pd.provenance ?? null);
         setLoadError(null);
         setLoading(false);
       })
       .catch((e: any) => {
+        setProvenance(null);
         setLoadError(e?.message ?? "Failed to load players");
         setLoading(false);
       });
@@ -1118,11 +1065,7 @@ export default function PlayersPage() {
     let list = players;
 
     if (deferredSearch.trim()) {
-      const q = deferredSearch.toLowerCase();
-      list = list.filter(p =>
-        p.name.toLowerCase().includes(q) ||
-        p.teamId.toLowerCase().includes(q)
-      );
+      list = list.filter(p => matchesPlayerSearch(p, deferredSearch, teamMap.get(p.teamId)));
     }
 
     if (posFilter !== "ALL") {
@@ -1135,7 +1078,7 @@ export default function PlayersPage() {
     }
 
     return list;
-  }, [players, deferredSearch, posFilter, teamFilter]);
+  }, [players, deferredSearch, posFilter, teamFilter, teamMap]);
 
   useEffect(() => {
     setForwardPage(1);
@@ -1169,7 +1112,7 @@ export default function PlayersPage() {
         case "cap": return compare(a.capHit, b.capHit);
         case "term": return compare(a.yearsRemaining, b.yearsRemaining);
         case "supp": return compare(suppressionSortValue(a), suppressionSortValue(b));
-        default:    return compare(actualPPG(a), actualPPG(b));
+        default:    return compare(seasonPointsOf(a), seasonPointsOf(b));
       }
     };
     const goalieSort = (a: Player, b: Player): number => {
@@ -1226,6 +1169,19 @@ export default function PlayersPage() {
 
       <Header activeTab="players" />
 
+      <header style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px 16px", borderBottom: "1px solid var(--rule)" }}>
+        <h1 className="text-[18px] sm:text-[22px] font-black font-mono uppercase tracking-[0.12em]" style={{ color: "var(--ledger-ink)" }}>
+          NHL Player Analytics
+        </h1>
+        <p className="mt-2 max-w-3xl text-[11px] sm:text-[12px] font-mono leading-relaxed" style={{ color: "var(--ledger-ink-body)" }}>
+          Search NHL player dossiers for season production, contracts, roles, STRAND identity, development outlook, and position-aware X-NAV or G-NAV trade value.
+        </p>
+      </header>
+
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "12px 16px 0" }}>
+        <DataContextRail route="players" provenance={provenance} />
+      </div>
+
       {/* ── Hot off the Press — freshest signed extensions (PA8) ── */}
       {freshInk.length > 0 && (
         <section aria-label="Hot off the press — latest contract extensions"
@@ -1233,7 +1189,12 @@ export default function PlayersPage() {
           <div className="text-[9px] font-black font-mono uppercase tracking-[0.25em] mb-2" style={{ color: "var(--ledger-red)" }}>
             ● Hot Off the Press — Fresh Ink
           </div>
-          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6 }}>
+          <div
+            className="fresh-ink-row"
+            role="region"
+            aria-label="Recent contract extensions"
+            tabIndex={0}
+          >
             {freshInk.map(p => {
               // Reads the extension's own numbers while it is still future
               // money, and the live contract once it has taken effect.
@@ -1262,6 +1223,7 @@ export default function PlayersPage() {
                 : <div key={p.id} style={style}>{inner}</div>;
             })}
           </div>
+          <HorizontalScrollCue label="Swipe or scroll for recent extensions" />
         </section>
       )}
 
@@ -1272,7 +1234,7 @@ export default function PlayersPage() {
           {/* Row 1: count + search */}
           <div className="players-filter-row1">
             <span style={{ fontSize: "11px", color: "var(--rule)", whiteSpace: "nowrap", letterSpacing: "0.05em" }}>
-              {players.length > 0 ? `${playerCountLabel(skaters.length + goalies.length)} · Live data` : "Loading..."}
+              {players.length > 0 ? playerCountLabel(skaters.length + goalies.length) : "Loading..."}
             </span>
             <input
               value={search}
@@ -1293,7 +1255,7 @@ export default function PlayersPage() {
           </div>
 
           {/* Row 2: pos filters + team dropdown */}
-          <div className="players-filter-row2">
+          <div className="players-filter-row2" role="group" aria-label="Position and team filters" tabIndex={0}>
             <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
               {(["ALL","F","D","G"] as const).map(p => (
                 <button key={p} className={`filter-btn${posFilter === p ? " active" : ""}`}
@@ -1322,6 +1284,7 @@ export default function PlayersPage() {
               ))}
             </select>
           </div>
+          <HorizontalScrollCue label="Swipe or scroll for all filters" />
 
         </div>
       </div>
@@ -1344,7 +1307,7 @@ export default function PlayersPage() {
             {showForwards && (
               <div className="section-shell" style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
                 <SectionHeader label="Forwards" count={forwards.length} />
-                <SectionColumnHeader section="F" sortKey={sortKey} sortDir={sortDir} onSort={handleSortKey} />
+                <SectionColumnHeader section="F" sortKey={sortKey} sortDir={sortDir} onSort={handleSortKey} onToggleDirection={() => setSortDir(direction => direction === "desc" ? "asc" : "desc")} />
                 {visibleForwards.map((p, i) => (
                   <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(forwardPage - 1) * FORWARD_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="F" allPlayers={players} />
                 ))}
@@ -1356,7 +1319,7 @@ export default function PlayersPage() {
             {showDefence && (
               <div className="section-shell" style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
                 <SectionHeader label="Defence" count={defence.length} />
-                <SectionColumnHeader section="D" sortKey={sortKey} sortDir={sortDir} onSort={handleSortKey} />
+                <SectionColumnHeader section="D" sortKey={sortKey} sortDir={sortDir} onSort={handleSortKey} onToggleDirection={() => setSortDir(direction => direction === "desc" ? "asc" : "desc")} />
                 {visibleDefence.map((p, i) => (
                   <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(defencePage - 1) * DEFENCE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="D" allPlayers={players} />
                 ))}
@@ -1368,7 +1331,7 @@ export default function PlayersPage() {
             {showGoalies && (
               <div className="section-shell" style={{ border: "1px solid #b8a070", borderTop: "2px solid #1c140a", marginTop: "16px" }}>
                 <SectionHeader label="Goalies" count={goalies.length} />
-                <SectionColumnHeader section="G" sortKey={sortKey} sortDir={sortDir} onSort={handleSortKey} />
+                <SectionColumnHeader section="G" sortKey={sortKey} sortDir={sortDir} onSort={handleSortKey} onToggleDirection={() => setSortDir(direction => direction === "desc" ? "asc" : "desc")} />
                 {visibleGoalies.map((p, i) => (
                   <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(goaliePage - 1) * GOALIE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="G" allPlayers={players} />
                 ))}

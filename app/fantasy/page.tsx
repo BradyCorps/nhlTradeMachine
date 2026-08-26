@@ -10,6 +10,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
+import { DataContextRail } from "@/app/components/DataContextRail";
+import { HelpPopover } from "@/app/components/HelpPopover";
 import {
   buildFantasyBoard,
   buildBreakoutWatch,
@@ -30,6 +32,8 @@ import {
 } from "@/app/lib/fantasy-board";
 import { PlayerOutlook } from "@/app/components/PlayerOutlook";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
+import { matchesPlayerSearch } from "@/app/lib/player-search";
+import type { LeagueProvenance } from "@/app/lib/data-context";
 
 interface ApiPlayer {
   id: string; name: string; teamId: string; position: string;
@@ -101,7 +105,7 @@ function Num({ label, aria, value, onChange, step = 1, width = 56 }: {
   label: string; aria: string; value: number; onChange: (v: number) => void; step?: number; width?: number;
 }) {
   return (
-    <label className="flex items-center gap-1.5 text-[11px] font-black font-mono uppercase tracking-[0.06em]" style={{ color: body }} title={aria}>
+    <label className="flex items-center gap-1.5 text-[11px] font-black font-mono uppercase tracking-[0.06em]" style={{ color: body }}>
       {label}
       <input
         type="number" value={value} step={step}
@@ -120,6 +124,7 @@ export default function FantasyPage() {
   const [standings, setStandings] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [provenance, setProvenance] = useState<LeagueProvenance | null>(null);
   const [posFilter, setPosFilter] = useState<"ALL" | "C" | "W" | "D">("ALL");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -150,10 +155,14 @@ export default function FantasyPage() {
         ]);
         if (cancelled) return;
         setPlayers(pd.players ?? []);
+        setProvenance(pd.provenance ?? td.provenance ?? null);
         setTeamMap(new Map((td.teams ?? []).map((t: any) => [t.id, t.name])));
         setStandings(new Map((td.teams ?? []).map((t: any) => [t.id, t.standing])));
       } catch {
-        if (!cancelled) setError("League data failed to load — refresh to retry.");
+        if (!cancelled) {
+          setProvenance(null);
+          setError("League data failed to load — refresh to retry.");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -172,11 +181,10 @@ export default function FantasyPage() {
   );
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
     const rows = board.filter(r =>
       (posFilter === "ALL" || r.posGroup === posFilter) &&
       (!hideTaken || !taken.has(r.p.id)) &&
-      (!q || r.p.name.toLowerCase().includes(q) || teamName(r.p.teamId).toLowerCase().includes(q)),
+      matchesPlayerSearch(r.p, search, { id: r.p.teamId, name: teamName(r.p.teamId) }),
     );
     // sortRows lives in the tested engine — the page once shipped an
     // inverted comparator (least FP first on load); never again.
@@ -241,16 +249,18 @@ export default function FantasyPage() {
 
   const Th = ({ k, label, title, align = "right" }: { k: SortKey; label: string; title?: string; align?: "right" | "center" }) => (
     <th scope="col" className={`text-${align} px-2 py-2`} aria-sort={sortKey === k ? (sortDesc ? "descending" : "ascending") : undefined}>
-      <button
-        type="button"
-        onClick={() => sortBy(k)}
-        title={title}
-        className="font-black uppercase tracking-[0.12em] text-[10px] focus-visible:outline focus-visible:outline-2"
-        style={{ color: sortKey === k ? accent : ink, background: "transparent", cursor: "pointer", outlineColor: accent }}
-        aria-label={`Sort by ${label}`}
-      >
-        {label}{sortKey === k ? (sortDesc ? " ▾" : " ▴") : ""}
-      </button>
+      <span className="inline-flex items-center justify-end gap-1">
+        <button
+          type="button"
+          onClick={() => sortBy(k)}
+          className="font-black uppercase tracking-[0.12em] text-[10px] focus-visible:outline focus-visible:outline-2"
+          style={{ color: sortKey === k ? accent : ink, background: "transparent", cursor: "pointer", outlineColor: accent }}
+          aria-label={`Sort by ${label}`}
+        >
+          {label}{sortKey === k ? (sortDesc ? " ▾" : " ▴") : ""}
+        </button>
+        {title && <HelpPopover label={label} definition={title}>?</HelpPopover>}
+      </span>
     </th>
   );
 
@@ -264,18 +274,22 @@ export default function FantasyPage() {
 
         {/* Page lede */}
         <section className="pt-6 pb-4 border-b" style={{ borderColor: rule }}>
-          <h2 className="text-[10px] font-black font-mono uppercase tracking-[0.3em]" style={{ color: "var(--ledger-red)" }}>
+          <div className="text-[10px] font-black font-mono uppercase tracking-[0.3em]" style={{ color: "var(--ledger-red)" }}>
             The Fantasy Desk
-          </h2>
-          <p className="text-[20px] font-black font-serif mt-1" style={{ color: ink }}>
+          </div>
+          <h1 className="text-[20px] font-black font-serif mt-1" style={{ color: ink }}>
             Fantasy Hockey Tools
-          </p>
+          </h1>
           <p className="text-[12px] font-mono leading-relaxed mt-2 max-w-3xl" style={{ color: body }}>
             Fantasy research the box score can&apos;t give you: projections scored to <b>your league</b>,
             tier breaks where the talent actually drops, NHL EDGE breakout signals, and a full
             Ledger outlook — role, trajectory, and leading indicators — one tap deep on every player.
           </p>
         </section>
+
+        <div className="pt-3">
+          <DataContextRail route="fantasy" provenance={provenance} />
+        </div>
 
         {/* League settings */}
         <section className="pt-4" aria-label="League settings">
@@ -434,15 +448,18 @@ export default function FantasyPage() {
                           </span>
                         )}
                       </span>
-                      <span className="text-right shrink-0"
-                        title={`Modeled probability of a meaningful scoring jump next season. League base rate ≈ ${BREAKOUT_BASE_RATE_PCT}%.`}>
+                      <HelpPopover
+                        label="Breakout odds"
+                        definition={`Modeled probability of a meaningful scoring jump next season. League base rate is approximately ${BREAKOUT_BASE_RATE_PCT}%.`}
+                        className="text-right shrink-0 flex-col items-end border-b-0"
+                      >
                         <span className="block text-[15px] font-black font-mono" style={{ color: "var(--ledger-green)" }}>
                           {e.breakoutPct}%
                         </span>
                         <span className="block text-[10px] font-black font-mono uppercase tracking-[0.1em]" style={{ color: faint }}>
                           breakout odds
                         </span>
-                      </span>
+                      </HelpPopover>
                     </div>
                   ))}
                 </div>
@@ -488,15 +505,18 @@ export default function FantasyPage() {
                           </span>
                         )}
                       </span>
-                      <span className="text-right shrink-0"
-                        title={`Modeled probability of a meaningful production decline next season. League base rate ≈ ${REGRESSION_BASE_RATE_PCT}%.`}>
+                      <HelpPopover
+                        label="Regression odds"
+                        definition={`Modeled probability of a meaningful production decline next season. League base rate is approximately ${REGRESSION_BASE_RATE_PCT}%.`}
+                        className="text-right shrink-0 flex-col items-end border-b-0"
+                      >
                         <span className="block text-[15px] font-black font-mono" style={{ color: "var(--ledger-red)" }}>
                           {e.regressionPct}%
                         </span>
                         <span className="block text-[10px] font-black font-mono uppercase tracking-[0.1em]" style={{ color: faint }}>
                           regression odds
                         </span>
-                      </span>
+                      </HelpPopover>
                     </div>
                   ))}
                 </div>
@@ -735,11 +755,13 @@ export default function FantasyPage() {
                 <table className="w-full font-mono" style={{ borderCollapse: "collapse", minWidth: 780 }}>
                   <thead>
                     <tr className="text-[10px] font-black uppercase tracking-[0.12em]" style={{ background: "var(--paper-inset)", color: ink }}>
-                      <th scope="col" className="text-center px-2 py-2" title="Mark taken on draft night">✓</th>
+                      <th scope="col" className="text-center px-2 py-2">
+                        <HelpPopover label="Taken status" definition="Mark a player as taken during your draft.">✓</HelpPopover>
+                      </th>
                       <th scope="col" className="text-left px-2 py-2">Rk</th>
-                      <th scope="col" className="text-center px-2 py-2" title="Tier — a group of interchangeable players; a new tier starts at a real projection drop-off, and no tier runs longer than a draftable cluster">Tier</th>
+                      <th scope="col" className="text-center px-2 py-2"><HelpPopover label="Tier" definition="A group of interchangeable players. A new tier starts at a real projection drop-off, and no tier runs longer than a draftable cluster.">Tier</HelpPopover></th>
                       <th scope="col" className="text-left px-2 py-2">Player</th>
-                      <th scope="col" className="text-left px-2 py-2" title="Ledger modern role — evidence-derived play style">Role</th>
+                      <th scope="col" className="text-left px-2 py-2"><HelpPopover label="Role" definition="Ledger modern role — an evidence-derived playing style.">Role</HelpPopover></th>
                       <th scope="col" className="text-left px-2 py-2">Team</th>
                       <th scope="col" className="text-center px-2 py-2">Pos</th>
                       <Th k="age" label="Age" align="center" />
@@ -766,8 +788,7 @@ export default function FantasyPage() {
                           opacity: isTaken ? 0.45 : 1,
                           cursor: "pointer",
                         }}
-                          onClick={() => setExpandedId(prev => prev === r.p.id ? null : r.p.id)}
-                          title={`${isExpanded ? "Hide" : "Show"} the Ledger outlook`}>
+                          onClick={() => setExpandedId(prev => prev === r.p.id ? null : r.p.id)}>
                           <td className="px-2 py-1.5 text-center" onClick={e => e.stopPropagation()}>
                             <input
                               type="checkbox"
@@ -804,7 +825,7 @@ export default function FantasyPage() {
                               ? <a href={`/players/${r.p.id}`} onClick={e => e.stopPropagation()} className="no-underline hover:underline" style={{ color: ink }}>{r.p.name}</a>
                               : r.p.name}
                           </td>
-                          <td className="px-2 py-1.5" title={role ? `Ledger role: ${role.label}` : undefined}>
+                          <td className="px-2 py-1.5">
                             {role ? (
                               <span className="text-[10px] font-black uppercase tracking-[0.05em] whitespace-nowrap" style={{ color: role.color }}>
                                 {role.icon} {role.label}
@@ -968,11 +989,11 @@ export default function FantasyPage() {
                       <th scope="col" className="text-left px-2 py-2">Rk</th>
                       <th scope="col" className="text-left px-2 py-2">Goalie</th>
                       <th scope="col" className="text-left px-2 py-2">Team</th>
-                      <th scope="col" className="text-right px-2 py-2" title="Games started">GS</th>
-                      <th scope="col" className="text-right px-2 py-2" title="Share of his team's 82 games started — the workload signal">Start&nbsp;Share</th>
+                      <th scope="col" className="text-right px-2 py-2"><HelpPopover label="Games started" definition="Games started by the goalie.">GS</HelpPopover></th>
+                      <th scope="col" className="text-right px-2 py-2"><HelpPopover label="Start share" definition="Share of the team’s 82 games started — the workload signal.">Start&nbsp;Share</HelpPopover></th>
                       <th scope="col" className="text-right px-2 py-2">SV%</th>
-                      <th scope="col" className="text-right px-2 py-2" title="Goals saved above expected — save quality independent of the defense in front">GSAx</th>
-                      <th scope="col" className="text-center px-2 py-2" title="Win environment from team standing — wins are a team stat">Win&nbsp;Env</th>
+                      <th scope="col" className="text-right px-2 py-2"><HelpPopover label="GSAx" definition="Goals saved above expected — save quality independent of the defence in front.">GSAx</HelpPopover></th>
+                      <th scope="col" className="text-center px-2 py-2"><HelpPopover label="Win environment" definition="Win environment from team standing; wins are a team stat.">Win&nbsp;Env</HelpPopover></th>
                     </tr>
                   </thead>
                   <tbody>

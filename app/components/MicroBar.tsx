@@ -1,6 +1,7 @@
 "use client";
 // ── MicroBar — compact NAV component bar ─────────────────────
 import React from "react";
+import { HelpPopover } from "@/app/components/HelpPopover";
 function clamp(n: number, mn: number, mx: number) { return Math.min(mx, Math.max(mn, n)); }
 
 function MicroBar({ label, val, max, color, invert = false, tooltip }: {
@@ -26,8 +27,10 @@ function MicroBar({ label, val, max, color, invert = false, tooltip }: {
     : (val < 0 ? 'var(--ledger-red-deep)' : 'var(--ledger-green)');
 
   return (
-    <div className="rounded p-2 text-center" title={tooltip}>
-      <div className="text-2xs font-black uppercase tracking-wider mb-1.5">{label}</div>
+    <div className="rounded p-2 text-center">
+      <div className="text-2xs font-black uppercase tracking-wider mb-1.5">
+        {tooltip ? <HelpPopover label={label} definition={tooltip}>{label}</HelpPopover> : label}
+      </div>
       <div className="h-1.5 rounded-full mb-1.5 overflow-hidden" style={{ background: 'var(--ledger-rule-light)' }}>
         <div className="h-full rounded-full transition-all duration-500"
           style={{ width: `${norm * 100}%`, background: barColor, opacity: 0.85 }} />
@@ -47,8 +50,10 @@ function DeltaRow({ label, val, unit, invert = false, tooltip }: {
   const isGood    = invert ? val <= 0 : val >= 0;
   const isNeutral = Math.abs(val) < 0.5;
   return (
-    <div className="flex justify-between items-center" title={tooltip}>
-      <span className="text-zinc-700 text-2xs uppercase tracking-tight font-black">{label}</span>
+    <div className="flex justify-between items-center">
+      <span className="text-zinc-700 text-2xs uppercase tracking-tight font-black">
+        {tooltip ? <HelpPopover label={label} definition={tooltip}>{label}</HelpPopover> : label}
+      </span>
       <span className={`font-black text-2xs ${isNeutral ? "text-zinc-600" : isGood ? "text-emerald-400" : "text-rose-400"}`}>
         {val > 0 ? "+" : ""}{val.toFixed(1)}{unit}
       </span>

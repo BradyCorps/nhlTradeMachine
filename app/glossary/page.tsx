@@ -2,15 +2,16 @@
 // The "what" reference: every definition, key, and system explanation.
 // The "why/how" narrative lives at /methodology.
 import React from "react";
-import type { Metadata } from "next";
 import Header from "../components/Header";
 import Footer, { iconKey, gravityTierEntries, roleIconEntries, methodologySections } from "../components/Footer";
 import { TierIcon } from "../components/GravityField";
+import { publicRouteMetadata } from "@/app/lib/public-seo";
 
-export const metadata: Metadata = {
+export const metadata = publicRouteMetadata({
+  path: "/glossary",
   title: "Glossary — Cap & Crease",
   description: "Every definition in the Ledger: X-NAV components, STRAND traits, gravity tiers, trade logic, icon key, and data sources.",
-};
+});
 
 function slugify(title: string) {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -83,7 +84,7 @@ export default function GlossaryPage() {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3 p-4">
               {iconKey.map(([icon, label, definition]) => (
-                <div key={`${icon}-${label}`} className="grid grid-cols-[28px_110px_1fr] items-start gap-3">
+                <div key={`${icon}-${label}`} id={slugify(`icon-${label}`)} className="scroll-mt-4 grid grid-cols-[28px_110px_1fr] items-start gap-3">
                   <span
                     className="inline-flex h-6 w-6 items-center justify-center border font-mono text-[12px] font-black"
                     style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}
@@ -107,7 +108,7 @@ export default function GlossaryPage() {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3 p-4">
               {roleIconEntries.map(([icon, label, definition]) => (
-                <div key={`role-${label}`} className="grid grid-cols-[28px_110px_1fr] items-start gap-3">
+                <div key={`role-${label}`} id={slugify(`role-${label}`)} className="scroll-mt-4 grid grid-cols-[28px_110px_1fr] items-start gap-3">
                   <span
                     className="inline-flex h-6 w-6 items-center justify-center border font-mono text-[12px] font-black"
                     style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}
@@ -131,7 +132,7 @@ export default function GlossaryPage() {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3 p-4">
               {gravityTierEntries.map(([tier, label, definition]) => (
-                <div key={`grav-${tier}`} className="grid grid-cols-[28px_110px_1fr] items-start gap-3">
+                <div key={`grav-${tier}`} id={slugify(`gravity-${label}`)} className="scroll-mt-4 grid grid-cols-[28px_110px_1fr] items-start gap-3">
                   <span
                     className="inline-flex h-6 w-6 items-center justify-center border"
                     style={{ borderColor: "var(--ledger-rule)" }}
@@ -186,7 +187,7 @@ export default function GlossaryPage() {
               </div>
               <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 px-4 py-4">
                 {section.items.map(({ term, definition, href }) => (
-                  <div key={`${section.title}-${term}`} className="grid grid-cols-[96px_1fr] gap-4">
+                  <div key={`${section.title}-${term}`} id={slugify(`${section.title}-${term}`)} className="scroll-mt-4 grid grid-cols-[96px_1fr] gap-4">
                     <dt className="font-mono text-[10px] font-black uppercase leading-snug text-ledger-ink">
                       {href ? (
                         <a href={href} target="_blank" rel="noopener noreferrer"

@@ -170,6 +170,12 @@ button, a, select {
   gap: 10px;
   align-items: end;
 }
+.docket-ruling-summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 8px 4px;
+}
 @media (max-width: 639px) {
   .docket-pkg-grid {
     grid-template-columns: 1fr;
@@ -863,22 +869,46 @@ select.ledger-select {
 /* ── Players analytics page ──────────────────────────────────── */
 .player-row:hover { background: var(--paper-card) !important; }
 
-/* Desktop row: show on ≥640px, hide on mobile */
-.player-row-desktop { display: grid; }
-.player-row-mobile  { display: none; }
-
-@media (max-width: 639px) {
-  .player-row-desktop { display: none !important; }
-  .player-row-mobile  { display: block !important; }
+/* Row mode is selected from the ledger section's available width. The full
+   forward grid needs just over 1,037px including its gaps and action column. */
+.section-shell {
+  container-name: player-ledger;
+  container-type: inline-size;
 }
+.player-row-desktop { display: none !important; }
+.player-row-mobile  { display: block !important; }
 
 .players-hide-mobile { display: block; }
-@media (max-width: 639px) { .players-hide-mobile { display: none; } }
+.player-icon-badges {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.player-row-mobile .player-icon-badges {
+  flex: 1 1 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.player-row-mobile .player-flags-trigger {
+  width: 100%;
+  max-width: 100%;
+  justify-content: flex-start;
+  min-height: 44px;
+  min-width: 44px;
+}
 
-@media (max-width: 639px) {
-  .player-flags-trigger {
-    min-height: 44px;
-    min-width: 44px;
+/* Extension cards scroll locally on phones with an adjacent cue, then wrap
+   once there is room instead of widening the page. */
+.fresh-ink-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+@media (min-width: 768px) {
+  .fresh-ink-row {
+    flex-wrap: wrap;
+    overflow-x: visible;
   }
 }
 
@@ -927,18 +957,59 @@ select.ledger-select {
   .players-filter-row2::-webkit-scrollbar { display: none; }
 }
 
-/* ── Player table header — one sortable header, scrollable on narrow screens ── */
+/* Compact sorting stays available whenever the wide column header cannot fit. */
 .players-column-header {
-  display: grid;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+  display: none !important;
 }
-@media (max-width: 639px) {
-  .players-column-header {
-    margin: 0 -12px;
-    padding-left: 12px !important;
-    padding-right: 12px !important;
+.players-compact-sort {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ledger-rule);
+  background: #f2ecd7;
+  font-family: 'Courier Prime', monospace;
+}
+.players-compact-sort label {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 3px;
+  color: var(--ledger-ink-faint);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.players-compact-sort select,
+.players-compact-sort-direction {
+  min-height: 44px;
+  border: 1px solid var(--ledger-rule);
+  background: var(--paper-card);
+  color: var(--ledger-ink);
+  font-family: 'Courier Prime', monospace;
+  font-size: 11px;
+  font-weight: 900;
+}
+.players-compact-sort select {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+}
+.players-compact-sort-direction {
+  flex: 0 0 auto;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+@container player-ledger (min-width: 1040px) {
+  .player-row-desktop { display: grid !important; }
+  .player-row-mobile { display: none !important; }
+  .players-column-header { display: grid !important; }
+  .players-compact-sort { display: none !important; }
+  .player-flags-trigger {
+    min-height: 24px;
+    min-width: 24px;
   }
 }
 
@@ -974,7 +1045,10 @@ select.ledger-select {
   color: var(--rule); cursor: pointer;
   padding: 6px 6px; border: none; background: none;
   transition: color 0.1s;
-  white-space: nowrap;
+  min-width: 0;
+  line-height: 1.1;
+  white-space: normal;
+  overflow-wrap: anywhere;
   flex-shrink: 0;
 }
 .col-header.active { color: var(--ink); }
@@ -1042,16 +1116,14 @@ select.ledger-select {
 .strand-svg-wrap svg { width: 100%; height: auto; display: block; }
 
 .player-mobile-stat-row {
-  display: flex;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
   align-items: center;
   flex: 1;
+  width: 100%;
   min-width: 0;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
 }
-.player-mobile-stat-row::-webkit-scrollbar { display: none; }
 
 @media (max-width: 639px) {
   .player-expanded-panel {

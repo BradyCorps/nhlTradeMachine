@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { scaleLinear } from "d3-scale";
+import { HorizontalScrollCue } from "@/app/components/HorizontalScrollCue";
 
 interface TeamNavDatum {
   name: string;
@@ -168,7 +169,6 @@ export default function TeamNavChart({ data }: Props) {
                 key={d.key}
                 role="tab"
                 aria-selected={on}
-                title={d.blurb}
                 onClick={() => setDim(d.key)}
                 className="font-mono text-[8px] sm:text-[9px] font-black uppercase tracking-[0.12em] px-2 py-1 cursor-pointer"
                 style={{
@@ -199,7 +199,7 @@ export default function TeamNavChart({ data }: Props) {
         )}
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" role="region" aria-label="League NAV rankings chart" tabIndex={0}>
         <svg
           viewBox={`0 0 ${chartW} ${chartH}`}
           className="w-full"
@@ -231,10 +231,24 @@ export default function TeamNavChart({ data }: Props) {
 
             return (
               <g key={d.abbrev}
+                role="button"
+                tabIndex={0}
+                aria-pressed={isHovered}
+                aria-label={`${d.name}, ${d.phase}, ${active.label} ${Math.round(d.value).toLocaleString()}, goal differential ${d.goalDiff > 0 ? "+" : ""}${d.goalDiff}`}
                 style={{ transform: `translateX(${xFor(rank)}px)`, transition: trans, cursor: "pointer" }}
                 onMouseEnter={() => setHoveredAbbrev(d.abbrev)}
                 onMouseLeave={() => setHoveredAbbrev(null)}
+                onFocus={() => setHoveredAbbrev(d.abbrev)}
+                onBlur={() => setHoveredAbbrev(null)}
                 onClick={() => setHoveredAbbrev(prev => (prev === d.abbrev ? null : d.abbrev))}
+                onKeyDown={event => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setHoveredAbbrev(prev => (prev === d.abbrev ? null : d.abbrev));
+                  } else if (event.key === "Escape") {
+                    setHoveredAbbrev(null);
+                  }
+                }}
               >
                 {/* Full-band hit target (bars + label strip) */}
                 <rect x={0} y={margin.top} width={bandW} height={plotH + margin.bottom} fill="transparent" />
@@ -318,6 +332,7 @@ export default function TeamNavChart({ data }: Props) {
           })()}
         </svg>
       </div>
+      <HorizontalScrollCue label="Swipe or scroll for the full league chart" className="px-3" />
 
       {/* Screen-reader ranking — the column chart is role="img" with only the
           leader in its label, so a non-visual reader gets the full ordered

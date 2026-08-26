@@ -131,11 +131,9 @@ export default function EdgeShotMap({ nhlPlayerId }: { nhlPlayerId: string | num
               const pct = d?.shotsPercentile ?? 0;
               const onDark = pct >= 0.5;
               return (
-                <g key={area}>
+                <g key={area} role="img" aria-label={`${area}: ${pluralize(shots, "shot")}; ${ordinal(Math.round(pct * 100))} percentile`}>
                   <rect x={t.x} y={t.y} width={t.w} height={t.h} rx={4}
-                    fill={pctColor(pct)} stroke="var(--rule-light, #ddd2b8)" strokeWidth="0.75">
-                    <title>{`${area}: ${pluralize(shots, "shot")} — ${ordinal(Math.round(pct * 100))} percentile`}</title>
-                  </rect>
+                    fill={pctColor(pct)} stroke="var(--rule-light, #ddd2b8)" strokeWidth="0.75" />
                   <text x={t.x + t.w / 2} y={t.y + t.h / 2 + 1} textAnchor="middle"
                     fontSize="12" fontFamily="monospace" fontWeight="900"
                     fill={onDark ? "#fff" : "var(--ink, #2a2318)"}>

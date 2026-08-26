@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCachedRoster } from "@/app/lib/cached-roster";
+import { buildLeagueProvenance } from "@/app/lib/data-context";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,18 @@ const CACHE_HEADERS = {
 
 export async function GET() {
   const { value, state, blocked } = await getCachedRoster();
+  const provenance = buildLeagueProvenance({
+    kind: "players",
+    generatedAt: value.generatedAt,
+    cacheState: state,
+    blocked,
+    liveStats: value.liveStats,
+    playerCount: value.debug?.playerCount ?? value.players?.length,
+    analyticsCount: value.debug?.analyticsCount,
+    contractsLoaded: value.debug?.contractsLoaded,
+  });
 
-  return NextResponse.json(value, {
+  return NextResponse.json({ ...value, provenance }, {
     headers: { ...CACHE_HEADERS, "x-ledger-cache": state, "x-ledger-blocked": String(blocked) },
   });
 }

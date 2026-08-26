@@ -25,6 +25,8 @@ import GoalieEdgePanel from "@/app/components/GoalieEdgePanel";
 import PlayerStrandPanel from "@/app/components/PlayerStrandPanel";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
+import { HelpPopover } from "@/app/components/HelpPopover";
+import MetricTip from "@/app/components/MetricTip";
 import { navSplit, navSplitNote, navStageDesc, navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
 import Header from "@/app/components/Header";
@@ -35,8 +37,10 @@ import { displayPosition } from "@/app/lib/display-position";
 import {
   PLAYER_STATS_CONTEXT,
   navLabelForPosition,
-  navLongLabelForPosition,
 } from "@/app/lib/player-terminology";
+import { BRAND } from "@/app/lib/brand";
+import StructuredData from "@/app/components/StructuredData";
+import { publicRouteMetadata } from "@/app/lib/public-seo";
 
 export const dynamic = "force-dynamic";
 
@@ -74,10 +78,11 @@ export async function generateMetadata(
   const { playerId } = await params;
   const player = await loadPlayer(playerId);
   if (!player) return { title: "Player not found — Cap & Crease" };
-  return {
+  return publicRouteMetadata({
+    path: `/players/${encodeURIComponent(playerId)}`,
     title: `${player.name} — Cap & Crease`,
     description: `${player.name}: ${navLabelForPosition(player.position)} valuation, gravity field analysis, contract and market value.`,
-  };
+  });
 }
 
 const ink = "var(--ledger-ink)";
@@ -187,6 +192,18 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
 
   return (
     <main className="min-h-screen px-4 py-6" style={{ background: "var(--paper-bg)", color: ink }}>
+      <StructuredData id={`player-${playerId}-schema`} data={{
+        "@context": "https://schema.org",
+        "@type": "Person",
+        name: player.name,
+        url: `${BRAND.url}/players/${encodeURIComponent(playerId)}`,
+        jobTitle: displayPosition(player.position, player.secondaryPosition),
+        affiliation: {
+          "@type": "SportsTeam",
+          name: teamName,
+          url: player.teamId ? `${BRAND.url}/teams/${String(player.teamId).toLowerCase()}` : undefined,
+        },
+      }} />
       <div className="mx-auto" style={{ maxWidth: 760 }}>
         <Header activeTab="players" />
 
@@ -213,7 +230,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
           </div>
           <div className="text-right shrink-0">
             <div className="text-[32px] font-black font-mono leading-none">{xnav.total}</div>
-            <div className="text-[9px] font-black font-mono uppercase tracking-[0.18em]" style={{ color: faint }} title={navLongLabelForPosition(player.position)}>{navLabel}</div>
+            <MetricTip term={navLabel} className="text-[9px] font-black font-mono uppercase tracking-[0.18em]" />
           </div>
         </div>
 
@@ -285,7 +302,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
 
         {/* The player, and what his contract does to him */}
         {split.known && (
-          <div className="border mb-3 grid grid-cols-3" style={{ borderColor: rule, background: "var(--paper-inset)" }} title={navSplitNote(split)}>
+          <div className="border mb-3 grid grid-cols-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
             <div className="px-3 py-2 border-r" style={{ borderColor: rule }}>
               <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>On the ice</div>
               <div className="text-[17px] font-black font-mono" style={{ color: ink }}>{split.production}</div>
@@ -297,7 +314,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
               }}>{split.contract > 0 ? "+" : ""}{split.contract}</div>
             </div>
             <div className="px-3 py-2">
-              <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>Trade value</div>
+              <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>
+                <HelpPopover label="Trade-value split" definition={navSplitNote(split)}>Trade value</HelpPopover>
+              </div>
               <div className="text-[17px] font-black font-mono" style={{ color: ink }}>{Math.round(xnav.total)}</div>
             </div>
           </div>
@@ -334,8 +353,10 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
           )}
           {surplus != null && (
             <div className="text-right">
-              <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>Surplus</div>
-              <div className="text-[13px] font-black font-mono" title={verdict.note} style={{ color: verdictColor(verdict.tone) }}>
+              <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>
+                <HelpPopover label="Contract surplus" definition={verdict.note}>Surplus</HelpPopover>
+              </div>
+              <div className="text-[13px] font-black font-mono" style={{ color: verdictColor(verdict.tone) }}>
                 {surplus > 0 ? "+" : ""}${surplus.toFixed(1)}M
               </div>
             </div>

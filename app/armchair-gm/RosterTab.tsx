@@ -42,6 +42,7 @@ import { teamLeadership, letterFor } from "@/app/lib/team-leadership";
 import { lineupContributionScore } from "@/app/lib/lineup-ranking";
 import { SEASON } from "@/app/lib/season-config";
 import { playerCountLabel } from "@/app/lib/player-terminology";
+import { HelpPopover } from "@/app/components/HelpPopover";
 
 const MONO = "var(--font-mono, 'Courier Prime', monospace)";
 
@@ -175,21 +176,24 @@ function SortableHeading({ column, sort, onPick }: {
       aria-sort={ariaSortFor(sort, column)}
       className={`text-[9px] uppercase tracking-wider ${cellPad}`}
       style={{ textAlign: column.align, fontWeight: 900 }}>
-      <button
-        type="button"
-        onClick={onPick}
-        title={column.title ? `${column.title} — click to sort` : "Click to sort"}
-        className="dense-tap hover:underline"
-        style={{
-          color: active ? "var(--ledger-ink)" : "var(--ledger-ink-faint)",
-          background: "none", border: "none", padding: 0, cursor: "pointer",
-          font: "inherit", letterSpacing: "inherit", textTransform: "inherit",
-        }}>
-        {column.label}
-        {/* The caret only appears on the sorted column, so the heading row
-            stays quiet instead of showing twelve arrows. */}
-        {active && <span aria-hidden="true">{sort!.direction === "asc" ? " ▲" : " ▼"}</span>}
-      </button>
+      <span className="inline-flex items-center gap-1">
+        <button
+          type="button"
+          onClick={onPick}
+          aria-label={`Sort by ${column.title ?? column.label}`}
+          className="dense-tap hover:underline"
+          style={{
+            color: active ? "var(--ledger-ink)" : "var(--ledger-ink-faint)",
+            background: "none", border: "none", padding: 0, cursor: "pointer",
+            font: "inherit", letterSpacing: "inherit", textTransform: "inherit",
+          }}>
+          {column.label}
+          {/* The caret only appears on the sorted column, so the heading row
+              stays quiet instead of showing twelve arrows. */}
+          {active && <span aria-hidden="true">{sort!.direction === "asc" ? " ▲" : " ▼"}</span>}
+        </button>
+        {column.title && <HelpPopover label={column.label} definition={column.title}>?</HelpPopover>}
+      </span>
     </th>
   );
 }
@@ -228,11 +232,14 @@ function Cell({ column, row, nav, letter, open, onToggle }: {
             {p.name}
           </button>
           {letter && (
-            <span
-              title={letter === "C" ? "Captain" : "Alternate captain"}
-              className="text-[8px] font-black shrink-0"
+            <span className="text-[8px] font-black shrink-0"
               style={{ border: "1px solid var(--ledger-ink-faint)", padding: "0 2px" }}>
-              {letter}
+              <HelpPopover
+                label={letter === "C" ? "Captain" : "Alternate captain"}
+                definition={letter === "C" ? "The team's designated captain." : "One of the team's designated alternate captains."}
+              >
+                {letter}
+              </HelpPopover>
             </span>
           )}
           {row.breakoutTag && (
@@ -268,9 +275,14 @@ function Cell({ column, row, nav, letter, open, onToggle }: {
       <td className={`text-[10px] ${cellPad} text-right tabular-nums`} style={{ color: termColor(p) }}>
         {column.format(row)}
         {clause && (
-          <span className="ml-1 text-[8px] font-black" title={clause === "NMC" ? "No-movement clause" : "No-trade clause"}
+          <span className="ml-1 text-[8px] font-black"
             style={{ color: "var(--ledger-red)" }}>
-            {clause}
+            <HelpPopover
+              label={clause === "NMC" ? "No-movement clause" : "No-trade clause"}
+              definition={clause === "NMC" ? "The player cannot be traded, assigned, or waived without consenting." : "The contract limits trades according to the player's negotiated consent or team list."}
+            >
+              {clause}
+            </HelpPopover>
           </span>
         )}
       </td>
@@ -328,11 +340,15 @@ function RosterTable({
                 cannot tell them apart will believe one of them is wrong. */}
             <span
               className="font-black uppercase tracking-[0.1em]"
-              title={simulated
-                ? "What these players did in the season you simulated, carried forward as their current form."
-                : "Last completed season, scaled to games played. Simulate a year and this becomes those results."}
               style={{ color: simulated ? "var(--ledger-green)" : "var(--ledger-ice)" }}>
-              {simulated ? `${SEASON.label} results` : `${SEASON.replaySeason} baseline`}
+              <HelpPopover
+                label={simulated ? `${SEASON.label} results` : `${SEASON.replaySeason} baseline`}
+                definition={simulated
+                  ? "What these players did in the season you simulated, carried forward as their current form."
+                  : "Last completed season, scaled to games played. Simulate a year and this becomes those results."}
+              >
+                {simulated ? `${SEASON.label} results` : `${SEASON.replaySeason} baseline`}
+              </HelpPopover>
             </span>
             {" · "}{playerCountLabel(totals.players)} · {totals.points} PTS · ${totals.capHit.toFixed(1)}M
           </p>

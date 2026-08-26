@@ -49,6 +49,7 @@ export const metadata: Metadata = {
   manifest: "/brand/favicon/site.webmanifest",
   title: `${BRAND.name} — ${BRAND.descriptor}`,
   description: 'X-NAV Analytics · Trade Machine · Armchair GM. Evaluate NHL trades and front-office decisions with advanced analytics.',
+  alternates: { canonical: BRAND.url },
   keywords: ['NHL', 'trade machine', 'armchair GM', 'hockey analytics', 'X-NAV', 'xG', 'cap hit'],
   openGraph: {
     title: `${BRAND.name} — ${BRAND.descriptor}`,

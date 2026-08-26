@@ -2,8 +2,13 @@ import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import DocketClient from "@/app/docket/DocketClient";
 import { getCachedDocketEntries } from "@/app/lib/cached-docket";
+import StructuredData from "@/app/components/StructuredData";
+import { BRAND } from "@/app/lib/brand";
+import { PUBLIC_ROUTE_SEO, canonicalUrl, publicRouteMetadata } from "@/app/lib/public-seo";
 
 export const dynamic = "force-dynamic";
+const route = PUBLIC_ROUTE_SEO.docket;
+export const metadata = publicRouteMetadata(route);
 
 export default async function DocketPage() {
   const { value: entries } = await getCachedDocketEntries();
@@ -15,6 +20,14 @@ export default async function DocketPage() {
       color: "var(--ledger-ink)",
       fontFamily: "'Courier Prime', monospace",
     }}>
+      <StructuredData id="docket-collection-schema" data={{
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        name: route.title,
+        description: route.description,
+        url: canonicalUrl(route.path),
+        isPartOf: { "@type": "WebSite", name: BRAND.name, url: BRAND.url },
+      }} />
       <div style={{ maxWidth: 1180, margin: "0 auto", padding: "24px 18px 36px" }}>
         <Header activeTab="docket" />
 

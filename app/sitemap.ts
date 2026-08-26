@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
 import { BRAND } from "@/app/lib/brand";
+import { TEAMS_DB } from "@/app/lib/db";
+import { activePlayers } from "@/app/lib/nhl-active-players";
 
 // ── Sitemap ──────────────────────────────────────────────────────
 //
@@ -22,6 +24,20 @@ const GLOSSARY_REVISED = new Date("2026-07-29");
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = BRAND.url;
+  const teamRoutes: MetadataRoute.Sitemap = TEAMS_DB.map((team) => ({
+    url: `${base}/teams/${team.id.toLowerCase()}`,
+    lastModified: BUILD_DATE,
+    changeFrequency: "daily",
+    priority: 0.7,
+  }));
+  const playerRoutes: MetadataRoute.Sitemap = activePlayers()
+    .filter((player, index, all) => all.findIndex((candidate) => candidate.id === player.id) === index)
+    .map((player) => ({
+      url: `${base}/players/${encodeURIComponent(player.id)}`,
+      lastModified: BUILD_DATE,
+      changeFrequency: "daily",
+      priority: 0.6,
+    }));
 
   return [
     { url: base, lastModified: BUILD_DATE, changeFrequency: "weekly", priority: 1.0 },
@@ -34,5 +50,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/press-box`, lastModified: BUILD_DATE, changeFrequency: "daily", priority: 0.7 },
     { url: `${base}/methodology`, lastModified: METHODOLOGY_REVISED, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/glossary`, lastModified: GLOSSARY_REVISED, changeFrequency: "monthly", priority: 0.5 },
+    ...teamRoutes,
+    ...playerRoutes,
   ];
 }

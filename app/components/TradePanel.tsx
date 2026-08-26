@@ -5,6 +5,7 @@ import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import AssetCard from "@/app/components/AssetCard";
 import AssetDropdown from "@/app/components/AssetDropdown";
 import LedgerDropdown from "@/app/components/LedgerDropdown";
+import MetricTip from "@/app/components/MetricTip";
 
 import { useTradeStore } from "@/app/store/tradeStore";
 
@@ -80,8 +81,7 @@ function TradePanel({
             <div className="font-black leading-none" style={{ fontSize: '1.4rem', color: 'var(--ledger-ink)', fontStyle: 'italic' }}>
               {nav.toFixed(1)}
             </div>
-            <div className="text-2xs font-black uppercase tracking-widest"
-              title="X-NAV — Extended Net Asset Value, the player’s tradeable value">NAV</div>
+            <MetricTip term="NAV" className="text-2xs font-black uppercase tracking-widest" />
             <div className="text-2xs font-black px-1.5 py-0.5 mt-0.5" style={{
               color: capSpace < 0 ? 'var(--ledger-red)' : 'var(--ledger-green)',
               background: capSpace < 0 ? 'rgba(184,48,32,0.08)' : 'rgba(26,92,46,0.08)',

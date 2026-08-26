@@ -25,6 +25,13 @@ import TeamNavChart from "@/app/components/TeamNavChart";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 import TeamsLoading from "./loading";
 import { playerCountLabel } from "@/app/lib/player-terminology";
+import { DataContextRail } from "@/app/components/DataContextRail";
+import type { LeagueProvenance } from "@/app/lib/data-context";
+import { HelpPopover } from "@/app/components/HelpPopover";
+import {
+  teamSortSummary,
+  type TeamSortKey as SortKey,
+} from "@/app/lib/team-sort-summary";
 
 interface TeamRecord {
   wins: number;
@@ -66,7 +73,6 @@ interface TeamData {
   capBreakdown: CapBreakdown | null;
 }
 
-type SortKey = "division" | "standing" | "present" | "future" | "rosterNAV" | "capSpace" | "goalDiff" | "gravity" | "speed" | "name";
 const GRAVITY_DISPLAY_ENABLED = isGravityV3DisplayEnabled();
 
 const CONFERENCE_ORDER = ["Eastern", "Western"] as const;
@@ -212,11 +218,12 @@ function PlayoffChip({ position, clinch }: { position: string; clinch: string })
   );
 }
 
-function StatCell({ label, value, sub, tone }: {
+function StatCell({ label, value, sub, tone, definition }: {
   label: string;
   value: string;
   sub?: string;
   tone?: string;
+  definition?: string;
 }) {
   return (
     <div className="min-w-0">
@@ -224,7 +231,9 @@ function StatCell({ label, value, sub, tone }: {
         className="text-[8px] font-black uppercase tracking-[0.15em] font-mono"
         style={{ color: "var(--ledger-ink-faint)" }}
       >
-        {label}
+        {definition
+          ? <HelpPopover label={label} definition={definition}>{label}</HelpPopover>
+          : label}
       </div>
       <div
         className="text-[18px] font-black font-mono leading-tight"
@@ -449,12 +458,13 @@ function LineupSection({ lines }: { lines: TeamLines }) {
   );
 }
 
-function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = true }: {
+function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = true, sortSummary }: {
   profile: TeamProfile;
   expanded: boolean;
   onToggle: () => void;
   capCeiling: number;
   showDetailLink?: boolean;
+  sortSummary?: string | null;
 }) {
   const { team, contention, edge, strand, rosterNAV, topPlayers, capCommitted, lines, avgAge, rosterSize, ufaCount, rfaCount, gravityLeaders, teamGravity } = profile;
 
@@ -491,6 +501,15 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
             )}
             <span>NAV {Math.round(rosterNAV).toLocaleString()}</span>
             <span>Cap ${team.capSpace > 0 ? "+" : ""}{team.capSpace.toFixed(1)}M</span>
+            {sortSummary && (
+              <span
+                aria-label={`Sorted by ${sortSummary}`}
+                className="border-l pl-3 font-black"
+                style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-red)" }}
+              >
+                {sortSummary}
+              </span>
+            )}
           </div>
         </div>
 
@@ -547,21 +566,25 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
               value={contention.present.toFixed(1)}
               sub={contention.presentLabel}
               tone={contention.present >= 6.5 ? "var(--ledger-green)" : contention.present >= 4 ? "var(--ledger-amber)" : "var(--ledger-red)"}
+              definition="Current roster strength from the top six forwards, top three defence, and top goalie by NAV, scaled from 0–10."
             />
             <StatCell
               label="Future"
               value={contention.future.toFixed(1)}
               sub={contention.futureLabel}
               tone={contention.future >= 6 ? "var(--ledger-green)" : contention.future >= 4 ? "var(--ledger-amber)" : "var(--ledger-red)"}
+              definition="Estimated 2028-29 strength after three-year age curves, prospect upside, unproven youth, and discounted draft capital."
             />
             <StatCell
               label="Window"
               value={QUADRANT_LABEL[contention.quadrant] ?? contention.quadrant}
+              definition="Competitive-window classification derived from the Present and Future thresholds."
             />
             <StatCell
               label="Roster NAV"
               value={Math.round(rosterNAV).toLocaleString()}
               sub={playerCountLabel(rosterSize)}
+              definition="Combined positive X-NAV for the current roster, split into forward, defence, and goalie value."
             />
           </div>
 
@@ -842,6 +865,7 @@ export default function TeamsPage() {
   const [players, setPlayers] = useState<Asset[]>([]);
   const [navMap, setNavMap] = useState<Record<string, XNAVResult>>({});
   const [capCeiling, setCapCeiling] = useState(104);
+  const [provenance, setProvenance] = useState<LeagueProvenance | null>(null);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("division");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -860,9 +884,13 @@ export default function TeamsPage() {
         })));
         setPlayers(data.players ?? []);
         setNavMap(data.navMap ?? {});
+        setProvenance(data.provenance ?? null);
         if (data.capCeiling) setCapCeiling(data.capCeiling);
       })
-      .catch((err) => console.error("Failed to load league data:", err))
+      .catch((err) => {
+        setProvenance(null);
+        console.error("Failed to load league data:", err);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -983,6 +1011,11 @@ export default function TeamsPage() {
     return applySort(list, sortKey);
   }, [teamProfiles, sortKey, filterPhase]);
 
+  const sortRankByTeamId = useMemo(() => new Map(
+    applySort([...teamProfiles], sortKey)
+      .map((profile, index) => [profile.team.id, index + 1]),
+  ), [teamProfiles, sortKey]);
+
   const divisionGroups = useMemo(() => {
     if (sortKey !== "division") return null;
     const groups: { conference: string; division: string; teams: TeamProfile[] }[] = [];
@@ -1019,6 +1052,10 @@ export default function TeamsPage() {
       <main className="min-h-screen font-mono" style={{ background: "var(--paper-bg)", color: "var(--ledger-ink)" }}>
         <div className="mx-auto max-w-6xl px-4 pt-5 pb-8">
           <Header activeTab="teams" />
+
+          <div className="mt-3">
+            <DataContextRail route="teams" provenance={provenance} capCeiling={capCeiling} />
+          </div>
 
           <div className="mt-6 mb-5 border-b pb-4" style={{ borderColor: "var(--ledger-rule)" }}>
             <Link
@@ -1065,14 +1102,18 @@ export default function TeamsPage() {
       <div className="mx-auto max-w-6xl px-4 pt-5 pb-8">
         <Header activeTab="teams" />
 
+        <div className="mt-3">
+          <DataContextRail route="teams" provenance={provenance} capCeiling={capCeiling} />
+        </div>
+
         {/* Page header */}
         <div className="mt-6 mb-5 border-b pb-4" style={{ borderColor: "var(--ledger-rule)" }}>
-          <h2
+          <h1
             className="text-[11px] font-black uppercase tracking-[0.28em] font-mono"
             style={{ color: "var(--ledger-ink)" }}
           >
-            Team Analytics
-          </h2>
+            NHL Team Analytics
+          </h1>
           <p className="text-[11px] mt-1 leading-relaxed" style={{ color: "var(--ledger-ink-faint)" }}>
             All 32 franchises — contention window, team DNA, EDGE profile, projected lines, and cap situation.
           </p>
@@ -1141,6 +1182,7 @@ export default function TeamsPage() {
             <button
               key={key}
               onClick={() => setSortKey(key)}
+              aria-pressed={sortKey === key}
               className="text-[10px] font-black uppercase tracking-[0.1em] px-2 py-1 cursor-pointer font-mono"
               style={{
                 background: sortKey === key ? "var(--ledger-red, #b83020)" : "transparent",
@@ -1207,6 +1249,20 @@ export default function TeamsPage() {
                 expanded={expandedId === tp.team.id}
                 onToggle={() => setExpandedId(expandedId === tp.team.id ? null : tp.team.id)}
                 capCeiling={capCeiling}
+                sortSummary={teamSortSummary(
+                  sortKey,
+                  {
+                    standing: tp.team.standing,
+                    present: tp.contention.present,
+                    future: tp.contention.future,
+                    rosterNAV: tp.rosterNAV,
+                    capSpace: tp.team.capSpace,
+                    goalDiff: (tp.team.record?.goalsFor ?? 0) - (tp.team.record?.goalsAgainst ?? 0),
+                    gravityPercentile: tp.gravityLeaders[0]?.positionPercentile ?? null,
+                    speedMph: tp.edge?.avgSpeedMaxMph ?? null,
+                  },
+                  sortRankByTeamId.get(tp.team.id) ?? 0,
+                )}
               />
             ))}
           </div>

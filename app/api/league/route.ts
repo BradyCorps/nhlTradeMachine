@@ -15,6 +15,7 @@ import { swrCache } from "@/app/lib/swr-cache";
 import { swrStore } from "@/app/lib/swr-store";
 import { getCachedRoster } from "@/app/lib/cached-roster";
 import { applyTeamCapDeltas } from "@/app/lib/cap-delta";
+import { buildLeagueProvenance } from "@/app/lib/data-context";
 
 export const dynamic = "force-dynamic";
 
@@ -457,7 +458,19 @@ export async function GET() {
     build: buildLeagueAnalyticsPayload,
   });
 
-  return NextResponse.json(value, {
+  const provenance = buildLeagueProvenance({
+    kind: "league",
+    generatedAt: value.generatedAt,
+    cacheState: state,
+    blocked,
+    liveStats: value.liveStats,
+    playerCount: value.debug?.playerCount ?? value.players?.length,
+    analyticsCount: value.debug?.analyticsCount,
+    contractsLoaded: value.debug?.contractsLoaded,
+    teamCount: value.teams?.length,
+  });
+
+  return NextResponse.json({ ...value, provenance }, {
     headers: {
       "Cache-Control": "public, s-maxage=300, stale-while-revalidate=900",
       "x-ledger-cache": state,

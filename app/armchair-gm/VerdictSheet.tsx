@@ -42,8 +42,9 @@ export function VerdictSheet({
     <div
       className="fixed bottom-0 left-0 right-0 z-40 transition-all duration-300 ease-out"
       style={{
-        transform: verdictOpen ? 'translateY(0)' : 'translateY(calc(100% - 52px))',
-        maxHeight: verdictOpen ? '70vh' : '52px',
+        transform: verdictOpen ? 'translateY(0)' : 'translateY(calc(100% - 52px - env(safe-area-inset-bottom)))',
+        maxHeight: verdictOpen ? '70vh' : 'calc(52px + env(safe-area-inset-bottom))',
+        paddingBottom: 'env(safe-area-inset-bottom)',
         boxShadow: '0 -4px 32px rgba(28,20,10,0.35)',
         background: 'var(--ledger-card-light)',
         borderTop: `3px solid ${sc.cssColor}`,
@@ -107,7 +108,7 @@ export function VerdictSheet({
       {/* ── Expanded content — scrollable ────────────────────── */}
       {verdictOpen && (
         <div className="overflow-y-auto px-4 sm:px-6 pb-6 pt-1"
-          style={{ maxHeight: 'calc(70vh - 52px)', scrollbarWidth: 'thin', scrollbarColor: 'var(--ledger-rule) transparent' }}>
+          style={{ maxHeight: 'calc(70vh - 52px - env(safe-area-inset-bottom))', scrollbarWidth: 'thin', scrollbarColor: 'var(--ledger-rule) transparent' }}>
           <div className="lg:hidden grid grid-cols-2 gap-2 mb-3">
             <button
               onClick={onRunEval}
@@ -177,8 +178,7 @@ export function VerdictSheet({
                       background: 'transparent',
                       border: '2px solid #b83020',
                       color: 'var(--ledger-red)',
-                    }}
-                    title="You're giving up value — but it's your team, your call. This trade will be locked in.">
+                    }}>
                     ⚠ My Team, My Call — Override & Execute
                   </button>
                 );

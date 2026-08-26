@@ -168,7 +168,7 @@ The F/D/G controls are online, but they are client-side positional sums of posit
 
 **Completed August 25, 2026.** Added shared player terminology/count/NAV-label helpers and a six-row inline snapshot covering forward, defence, goalie, prospect, RFA, and UFA states; normalized duplicate positions, contract/years-left headings, expanded-stat context, plain-language metrics, and explicit status/role/NAV chips across shared player surfaces. The focused QW-01 suite passes **4/4**, the full suite passes **2,178/2,178**, TypeScript and the production build pass (**30/30** static pages), and repository lint remains blocked only by the pre-existing `Header.tsx:159` internal-anchor error plus four unrelated warnings.
 
-## [ ] QW-02 — Make search copy truthful, then normalize the search index (`S`)
+## [x] QW-02 — Make search copy truthful, then normalize the search index (`S`)
 
 The Players input promises name-or-team search but previously returned no result for `Edmonton`, `Oilers`, `EDM`, `Montreal`, `Montréal`, `Canadiens`, `MTL`, or unaccented `Stutzle`.
 
@@ -180,7 +180,9 @@ The Players input promises name-or-team search but previously returned no result
 
 **Acceptance:** fixtures cover the queries above, plus duplicate-name and formal/common-name cases; all routes return the same NHL ID for the same person.
 
-## [ ] QW-03 — Replace vague “Live data” claims with a precise time rail (`S`)
+**Completed August 25, 2026.** Added one shared accent-, punctuation-, hyphen-, common-name-, city-, franchise-nickname-, and abbreviation-aware player/team matcher and adopted it in Players, Trade Machine, Fantasy, and both Armchair offseason searches without collapsing duplicate names or rewriting NHL IDs. Focused fixtures pass **11/11** for Edmonton/Oilers/EDM, Montreal/Montréal/Canadiens/MTL, unaccented Stutzle, punctuation, formal/common names, and the two Elias Petterssons; the full suite passes **2,189/2,189**, TypeScript and the production build pass (**30/30** static pages), and lint retains only the pre-existing `Header.tsx:159` error plus four unrelated warnings.
+
+## [x] QW-03 — Replace vague “Live data” claims with a precise time rail (`S`)
 
 **Change:** show the exact context used by each route, for example:
 
@@ -190,7 +192,9 @@ Teams must distinguish completed results, current roster/cap, and future forecas
 
 **Acceptance:** every headline number has `season`, `situation` where relevant, `asOf`, `source/coverage`, and `modelVersion`; stale or failed sources produce an explicit warning instead of `Live`.
 
-## [ ] QW-04 — Convert remaining help and glossary triggers into real controls (`S`)
+**Completed August 25, 2026.** Added API-level provenance and one shared data-context rail across Players, Teams, Fantasy, Trade Machine/shared trades, and Armchair GM. The rails identify completed/current/future seasons, stats situations, cap/CBA horizons, Central-time snapshot timestamps, source coverage, X-NAV model version, and reconciliation state; stale, incomplete, timestamp-less, or analytics-free payloads show explicit warnings, and the former Players `Live data` claim is removed. Focused route/API tests pass **10/10**, the full suite passes **2,193/2,193**, TypeScript and the production build pass (**30/30** static pages), and lint retains only the pre-existing `Header.tsx:159` error plus four unrelated warnings.
+
+## [x] QW-04 — Convert remaining help and glossary triggers into real controls (`S`)
 
 **Change:** replace non-interactive `?`, icon, and hover-only spans with labelled buttons. Use a small popover on desktop and a bottom sheet on mobile. Expose `aria-expanded`, `aria-controls`, focus return, Escape dismissal, outside dismissal, and a minimum 44×44px mobile target.
 
@@ -198,7 +202,9 @@ Teams must distinguish completed results, current roster/cap, and future forecas
 
 **Acceptance:** all definitions are available by keyboard and touch; no essential meaning depends on hover or `title` alone.
 
-## [ ] QW-05 — Finish the accessible Armchair team/season selector (`XS`)
+**Completed August 25, 2026.** Added one shared labelled help control with focus trapping/return, `aria-expanded`/`aria-controls`, Escape and outside dismissal, a desktop popover, a mobile bottom sheet, and 44×44px mobile targets. Players, charts, Teams, Trade, Fantasy, and Armchair now expose definitions through keyboard/touch controls; title-only status, contract, NAV/NOIV, role, outlook, and advanced-stat explanations were removed or given an explicit accessible equivalent. Focused accessibility and UI-canary checks pass **453/453**, the full suite passes **2,196/2,196**, TypeScript and the production build pass (**30/30** static pages), and lint retains only the pre-existing `Header.tsx:159` error plus four unrelated warnings.
+
+## [x] QW-05 — Finish the accessible Armchair team/season selector (`XS`)
 
 The selector already uses the shared accessible dialog/focus-management system. This residual ticket is limited to option naming, visible franchise identity, target sizing, and selected-state treatment.
 
@@ -206,7 +212,9 @@ The selector already uses the shared accessible dialog/focus-management system. 
 
 **Acceptance:** VoiceOver/NVDA announces franchise, season, and phase; keyboard and touch can select, close, and restart without ambiguity.
 
-## [ ] QW-06 — Finish the compact global footer (`S`)
+**Completed August 25, 2026.** Armchair franchise options now show both the club abbreviation and full name, and their accessible names include franchise, the 2026-27 Off-Season/In-Season mode, and competitive phase. Options, mode choices, and close/reset actions retain native keyboard behavior and at least 44×44px targets; selected clubs use a warm surface, red rule, marker, and `aria-pressed` instead of ink-black fill. Focused selector/focus tests pass **19/19**, the full suite passes **2,200/2,200**, TypeScript and the production build pass (**30/30** static pages), and lint retains only the pre-existing `Header.tsx:159` error plus four unrelated warnings.
+
+## [x] QW-06 — Finish the compact global footer (`S`)
 
 The completed `M-FooterKey` increment collapsed the three icon-key grids behind a native disclosure on August 23. This residual ticket covers the remaining long methodology/glossary content repeated in route footers.
 
@@ -214,7 +222,9 @@ The completed `M-FooterKey` increment collapsed the three icon-key grids behind 
 
 **Acceptance:** primary page content ends before the glossary begins; definitions remain one action away and deep-linkable; footer controls pass keyboard and touch tests.
 
-## [ ] QW-07 — Make the homepage action-first (`S`)
+**Completed August 25, 2026.** Removed the repeated icon-key and methodology disclosure stacks from the shared route footer. It now provides four native, 44px mobile links to Methodology, Glossary, Sources, and Legal, followed only by the compact brand/disclaimer sign-off. Full definitions and icon keys remain one action away on dedicated pages, with section and individual-entry anchors for deep links. Focused footer/UI-canary checks pass **438/438**, the full suite passes **2,203/2,203**, TypeScript and the production build pass (**30/30** static pages), and lint retains only the pre-existing `Header.tsx:159` error plus four unrelated warnings.
+
+## [x] QW-07 — Make the homepage action-first (`S`)
 
 The welcome modal followed by a full-screen `scroll to read` cover creates two barriers before the product.
 
@@ -222,11 +232,15 @@ The welcome modal followed by a full-screen `scroll to read` cover creates two b
 
 **Acceptance:** a first-time user reaches a primary product in one action; a returning user is not forced through both barriers; dismissal persists locally without requiring authentication.
 
-## [ ] QW-08 — Surface the active Teams sort value (`XS`)
+**Completed August 25, 2026.** The homepage now opens directly on the retained newspaper masthead instead of requiring a full-viewport scroll-to-read setdown, with touch-sized `Search Players`, `Build a Trade`, and `Explore Teams` links ahead of the editorial. The locally persisted first-visit dialog offers those same one-action destinations before an optional native model disclosure and now uses the shared focus-managed dialog behavior. Focused homepage/dialog checks pass **454/454**, the full suite passes **2,207/2,207**, TypeScript and the production build pass (**30/30** static pages), changed-file lint is clean, and repository lint retains only the pre-existing `Header.tsx:159` error plus four unrelated warnings.
+
+## [x] QW-08 — Surface the active Teams sort value (`XS`)
 
 When Present, Future, Speed, or another metric controls order, show the exact value and league rank in each collapsed row, for example `Future 6.8 · 3rd`.
 
 **Acceptance:** the visible row explains its current ordering without opening the dossier; the active metric has an accessible selected state.
+
+**Completed August 25, 2026.** Every collapsed Teams row now names the active non-division sort, shows its exact value, and reports its rank against the full 32-team league rather than the current phase filter; unavailable Speed or Gravity samples render as `—` instead of a false zero. Standing and alphabetical modes remain explicit, and every sort button exposes its selected state with `aria-pressed`. Focused Teams/UI-canary checks pass **439/439**, the full suite passes **2,211/2,211**, TypeScript, changed-file lint, and the production build pass (**30/30** static pages), while repository lint retains only the pre-existing `Header.tsx:159` error plus four unrelated warnings.
 
 ## [ ] QW-09 — Persist public research state in URLs (`M`)
 
@@ -236,7 +250,7 @@ When Present, Future, Speed, or another metric controls order, show the exact va
 
 **Acceptance:** reload, back/forward, copy/paste, and canonicalization work; invalid parameters recover safely; low-value filter combinations are not indexed.
 
-## [ ] QW-10 — Add route-specific headings and metadata (`S`)
+## [x] QW-10 — Add route-specific headings and metadata (`S`)
 
 `M-TeamPages` already delivered validated team detail routes and their initial metadata. This residual ticket covers the missing H1, canonical, social, structured-data, and server-content requirements across the full route set.
 
@@ -244,7 +258,9 @@ When Present, Future, Speed, or another metric controls order, show the exact va
 
 **Acceptance:** server HTML contains the route topic and useful first-screen content rather than only `Loading…`; metadata tests cover `/players`, `/teams`, every team route, Fantasy, Trade Machine, and Armchair GM.
 
-## [ ] QW-11 — Finish small mobile spacing/cue defects (`XS`)
+**Completed August 26, 2026.** Added shared route metadata contracts with distinct H1s, titles, descriptions, canonical URLs, Open Graph/Twitter cards, and appropriate `CollectionPage`, `ItemList`, `WebApplication`, `SportsTeam`, and `Person` structured data across the public route set. Server-first shells now contain the route topic and useful explanatory content; the Teams shell exposes all 32 canonical dossier links, while structured data and the sitemap expose **1,331** numeric NHL player dossiers and **32** team dossiers. Focused metadata/UI-canary checks pass **440/440**, the full suite passes **2,216/2,216**, TypeScript and the production build pass (**30/30** static pages), and live production HTML verifies the required topics, canonicals, schema, and sitemap counts. Repository lint retains only the pre-existing `Header.tsx:159` error plus four unrelated warnings.
+
+## [x] QW-11 — Finish small mobile spacing/cue defects (`XS`)
 
 **Scope:**
 
@@ -254,6 +270,8 @@ When Present, Future, Speed, or another metric controls order, show the exact va
 - Ensure sticky elements respect `env(safe-area-inset-bottom)`.
 
 **Acceptance:** no discoverability relies on a hidden scrollbar; pinned chart data can be dismissed and compared by keyboard/touch.
+
+**Completed August 26, 2026.** The Docket ruling disclosure is now a padded 44px control inside the existing page/card gutters; intentional horizontal control sets carry a visible compact-layout swipe/scroll cue; league scatter peers have persistent touch/keyboard pin state, Escape and button dismissal, current-player deltas, and a complete accessible comparison table; and the Armchair verdict sheet now includes the bottom safe-area inset (matching the existing Trade Machine ledger). Focused checks pass **4/4**, the full suite passes **2,220/2,220**, TypeScript and the production build pass (**30/30** static pages), and a live **320×844** browser check confirms zero page overflow, a **250×44px** Docket disclosure inset **35px** from both viewport edges, a visible filter cue, touch/keyboard pin dismissal, and the table fallback. Repository lint retains only the pre-existing `Header.tsx:159` error plus four unrelated warnings.
 
 ---
 
@@ -1197,11 +1215,13 @@ Use full-screen dossier routes/sheets with sticky section navigation for Player,
 
 **Acceptance:** focus is trapped/restored correctly; browser Back closes the sheet before leaving the parent workflow; no nested horizontal-plus-vertical scroll trap.
 
-## [ ] MOB-03 — Close all remaining responsive overflow gaps (`S`)
+## [x] MOB-03 — Close all remaining responsive overflow gaps (`S`)
 
 **Promoted August 25, 2026 after `V-02` failed.** At 667, 700, 768, and 844px, Players renders the desktop grid while clipping a 1,037px body layout; the expand action begins at x=1,013 and cannot be reached. Choose layout from available container width rather than device labels. Remove incompatible desktop headers when compact cards render.
 
 **Acceptance:** no page-level horizontal overflow at the full viewport matrix; intentional local scrollers are labelled/cued and do not hide primary actions.
+
+**Completed August 26, 2026.** Players now selects compact cards or the full ledger grid from the section container's available width, pairs compact cards with an explicit metric/direction sort control and the value actually governing each section, and hides the incompatible desktop header with the desktop rows. Compact stats and player badges wrap within the card; phone-only extension cards remain a labelled, keyboard-focusable local scroller with a visible cue and wrap from 768px; wide sort headings wrap inside their columns instead of projecting beyond the page. A production-browser matrix at **320, 360, 375, 390, 412, 430, 540, 667, 700, 768, 844, 1024, 1039, 1040, 1041, 1042, 1050, 1100, 1120, 1160, 1280, and 1440px**, plus expanded-row checks at eight compact/desktop widths, reports exact viewport/body widths, no section or stat-row overflow, and reachable expand actions throughout. Focused responsive/UI checks pass **443/443**, the full suite passes **2,224/2,224**, TypeScript, changed-file lint (**0 errors; two existing Press Box warnings**), and the production build pass (**30/30** static pages); repository lint retains only the pre-existing `Header.tsx:159` error plus four unrelated warnings.
 
 ## [ ] MOB-04 — Mobile charts must support tap, pin, compare, and table fallback (`M`)
 

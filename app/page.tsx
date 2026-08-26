@@ -3,9 +3,6 @@ import React from "react";
 import Link from "next/link";
 import Footer from "./components/Footer";
 import ScrollReveal from "./components/ScrollReveal";
-import ScrollNameplate from "./components/ScrollNameplate";
-import ScrollSnap from "./components/ScrollSnap";
-import LedgerScrollSetdown from "./components/LedgerScrollSetdown";
 import { BRAND } from "@/app/lib/brand";
 import { BrandMark } from "@/app/components/BrandMark";
 import TrendingPlayers from "./components/TrendingPlayers";
@@ -93,11 +90,7 @@ export default function WelcomePage() {
   return (
     <main className="fp-desk fp-desk-deep min-h-screen font-serif antialiased" style={{ color: "var(--ink)" }}>
       <ScrollReveal />
-      <ScrollNameplate />
-      <ScrollSnap />
-      {/* Desk spacer — gives the nameplate a full viewport of desk to sit on */}
-      <div className="fp-desk-spacer" aria-hidden="true" />
-      <LedgerScrollSetdown className="fp-stack">
+      <div className="fp-stack">
         <div className="fp-stack-extra" aria-hidden="true" />
         <div className="fp-sheet">
 
@@ -167,6 +160,41 @@ export default function WelcomePage() {
             </div>
           </div>
         </header>
+
+        {/* ── Immediate actions ──────────────────────────────── */}
+        <nav
+          aria-label="Start here"
+          className="fp-reveal border-b px-5 py-5 sm:px-8"
+          style={{ borderColor: "var(--ink)", background: "var(--paper-inset)" }}
+        >
+          <div className="mb-3 text-center text-2xs font-black uppercase tracking-[0.3em] font-mono"
+            style={{ color: "var(--ledger-ink-faint)" }}>
+            Start Here
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <Link
+              href="/players"
+              className="min-h-11 flex items-center justify-center border-2 px-4 py-2 text-center text-[11px] font-black uppercase tracking-[0.16em] font-mono no-underline transition-colors"
+              style={{ borderColor: "var(--ledger-ice)", color: "var(--ledger-ice)" }}
+            >
+              Search Players
+            </Link>
+            <Link
+              href="/trade-machine"
+              className="min-h-11 flex items-center justify-center border-2 px-4 py-2 text-center text-[11px] font-black uppercase tracking-[0.16em] font-mono no-underline transition-colors"
+              style={{ borderColor: "var(--ledger-red)", color: "var(--ledger-red)" }}
+            >
+              Build a Trade
+            </Link>
+            <Link
+              href="/teams"
+              className="min-h-11 flex items-center justify-center border-2 px-4 py-2 text-center text-[11px] font-black uppercase tracking-[0.16em] font-mono no-underline transition-colors"
+              style={{ borderColor: "var(--ledger-green)", color: "var(--ledger-green)" }}
+            >
+              Explore Teams
+            </Link>
+          </div>
+        </nav>
 
         {/* ── Lead editorial ─────────────────────────────────── */}
         <section className="fp-reveal px-5 sm:px-8 pt-8 pb-7 border-b" style={{ borderColor: "var(--ink)", transitionDelay: "0.08s" }}>
@@ -377,7 +405,7 @@ export default function WelcomePage() {
 
         <Footer />
         </div>
-      </LedgerScrollSetdown>
+      </div>
     </main>
   );
 }

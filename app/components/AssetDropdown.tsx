@@ -9,6 +9,7 @@ import { displayPosition } from "@/app/lib/display-position";
 import { navColor } from "@/app/lib/display-utils";
 import { navLabelForPosition, pickCountLabel, playerCountLabel } from "@/app/lib/player-terminology";
 import { termLabel as contractTermLabel } from "@/app/lib/roster-table";
+import { matchesPlayerSearch } from "@/app/lib/player-search";
 
 const CORE_COUNT = 8;
 
@@ -22,7 +23,9 @@ function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number; onClick: () => 
 
   return (
     <button
+      type="button"
       onClick={onClick}
+      aria-label={`Add ${p.name}; cap hit $${p.capHit.toFixed(2)} million; ${term}; ${navLabelForPosition(p.position)} ${nav.toFixed(0)}`}
       className="w-full flex items-center justify-between px-3 py-2 text-left transition-colors"
       style={{ borderBottom: "1px solid var(--ledger-rule-light)" }}
       onMouseEnter={e => (e.currentTarget.style.background = "var(--ledger-cream)")}
@@ -44,14 +47,14 @@ function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number; onClick: () => 
         </span>
       </div>
       <div className="flex items-center gap-3 shrink-0 ml-2 font-mono">
-        <span className="text-2xs" title="Contract cap hit" style={{ color: "var(--ledger-ink-faint)" }}>
+        <span className="text-2xs" style={{ color: "var(--ledger-ink-faint)" }}>
           ${p.capHit.toFixed(2)}M
         </span>
         <span className="text-2xs w-8 text-right" style={{ color: "var(--ledger-ink-faint)" }}>
           {term}
         </span>
-        <span className="text-2xs font-black w-10 text-right" title={navLabelForPosition(p.position)} style={{ color: navColor(nav) }}>
-          {nav > 0 ? "+" : ""}{nav.toFixed(0)}
+        <span className="text-2xs font-black w-16 text-right" style={{ color: navColor(nav) }}>
+          {nav > 0 ? "+" : ""}{nav.toFixed(0)} <span className="text-[8px]">{navLabelForPosition(p.position)}</span>
         </span>
       </div>
     </button>
@@ -107,8 +110,9 @@ function AssetDropdown({
   );
 
   const { core, depth, prospects, picks } = useMemo(() => {
-    const q        = search.toLowerCase();
-    const filtered = q ? eligible.filter(p => p.name.toLowerCase().includes(q)) : eligible;
+    const filtered = search.trim()
+      ? eligible.filter(p => matchesPlayerSearch(p, search, team))
+      : eligible;
     const byNav    = (a: Asset, b: Asset) => (navMap[b.id]?.total ?? 0) - (navMap[a.id]?.total ?? 0);
 
     const skaters     = filtered.filter(p => p.position !== "Pick");
@@ -120,7 +124,7 @@ function AssetDropdown({
       prospects: skaters.filter(isProspect).sort(byNav),
       picks:     filtered.filter(p => p.position === "Pick"),
     };
-  }, [eligible, navMap, search]);
+  }, [eligible, navMap, search, team]);
 
   const handleAdd = (p: Asset) => {
     addAsset({ ...p, retainedPct: 0 }, idx);
@@ -192,8 +196,8 @@ function AssetDropdown({
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 onFocus={() => searchRef.current?.scrollIntoView({ block: "nearest" })}
-                placeholder="Search by name…"
-                aria-label="Search players by name"
+              placeholder="Search player or team…"
+              aria-label="Search players by name or team"
                 className="w-full text-[11px] font-mono outline-none"
                 style={{
                   background:   "transparent",

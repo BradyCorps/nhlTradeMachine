@@ -328,7 +328,7 @@ export default function DocketClient({ entries }: DocketClientProps) {
             </div>
 
             <details>
-              <summary style={{ cursor: "pointer", fontSize: 10, fontWeight: 900, letterSpacing: "0.16em", color: "var(--ledger-red)" }}>
+              <summary className="docket-ruling-summary" style={{ cursor: "pointer", fontSize: 10, fontWeight: 900, letterSpacing: "0.16em", color: "var(--ledger-red)" }}>
                 FULL RULING + PLAYER DETAIL
               </summary>
               <div style={{ marginTop: 12 }}>

@@ -26,10 +26,19 @@ import EdgeStrip from "@/app/components/EdgeStrip";
 import { buildAssetTraits, computeStrandType, StrandLoading } from "@/app/components/StrandView";
 import { useStrandCohort } from "@/app/lib/use-strand-cohort";
 import { formatCapHit as fmtCap, fmtSigned } from "@/app/lib/display-utils";
+import { DataContextRail } from "@/app/components/DataContextRail";
+import type { LeagueProvenance } from "@/app/lib/data-context";
+import MetricTip from "@/app/components/MetricTip";
+import { HelpPopover } from "@/app/components/HelpPopover";
 
 const ZERO_NAV: XNAVResult = { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
 
-type LeagueData = { teams: Team[]; players: Asset[]; capCeiling?: number | null };
+type LeagueData = {
+  teams: Team[];
+  players: Asset[];
+  capCeiling?: number | null;
+  provenance?: LeagueProvenance | null;
+};
 type VerdictDisplay = Pick<TradeVerdict, "status" | "message" | "metrics" | "sideOutcomes"> & {
   flags: Array<Pick<TradeVerdict["flags"][number], "severity" | "headline" | "explanation">>;
 };
@@ -178,7 +187,6 @@ function RosterCard({ asset, nav, onAdd }: { asset: Asset; nav: XNAVResult; onAd
       type="button"
       onClick={() => onAdd({ ...asset, retainedPct: 0 })}
       aria-label={`Add ${isPick ? assetLabel(asset) : asset.name} to the package`}
-      title={`Add ${isPick ? assetLabel(asset) : asset.name}`}
       className="group text-left border px-2.5 py-2 flex flex-col gap-1 transition-colors hover:bg-[var(--paper-inset)] focus:outline-none focus-visible:ring-2"
       style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-bg)" }}
     >
@@ -332,10 +340,11 @@ function AssetRow({
         </button>
         <div className="flex items-center gap-2 shrink-0">
           {!isPick && (
-            <span className="text-[11px] font-black font-mono tabular-nums" title="Net Asset Value"
-              style={{ color: nav.total > 0 ? "var(--ledger-green)" : nav.total < 0 ? "var(--ledger-red)" : "var(--ledger-ink-faint)" }}>
-              {nav.total > 0 ? "+" : ""}{Math.round(nav.total)} NAV
-            </span>
+            <MetricTip term="NAV" className="text-[11px] font-black font-mono tabular-nums">
+              <span style={{ color: nav.total > 0 ? "var(--ledger-green)" : nav.total < 0 ? "var(--ledger-red)" : "var(--ledger-ink-faint)" }}>
+                {nav.total > 0 ? "+" : ""}{Math.round(nav.total)} NAV
+              </span>
+            </MetricTip>
           )}
           {!isPick && onRetain && (
             <select
@@ -736,10 +745,9 @@ function TeamStrandPreview({
     return (
       <div className="mt-2 flex items-center justify-between border-t pt-2"
         style={{ borderColor: "var(--ledger-rule-light)" }}>
-        <span className="text-[9px] font-black uppercase tracking-[0.18em] font-mono text-ledger-ink-faint"
-          title="Team goaltending — stable goals saved above expected, summed across the roster's goalies">
+        <HelpPopover label="Crease GSAx" definition="Team goaltending — stable goals saved above expected, summed across the roster’s goalies.">
           Crease GSAx
-        </span>
+        </HelpPopover>
         <span className="text-[11px] font-black font-mono" style={{ fontVariantNumeric: "tabular-nums", color: "var(--ledger-ink)" }}>
           {hasActiveTrade ? (
             <>
@@ -824,6 +832,7 @@ export function SharedTradeView({ code }: { code: string }) {
           teams: teamData.teams ?? [],
           players: [...(playerData.players ?? []), ...(teamData.picks ?? [])],
           capCeiling: teamData.capCeiling ?? null,
+          provenance: playerData.provenance ?? teamData.provenance ?? null,
         });
       })
       .catch(event => {
@@ -864,6 +873,7 @@ export function SharedTradeView({ code }: { code: string }) {
     <main className="min-h-screen font-serif antialiased" style={{ background: "var(--paper)", color: "var(--ink)" }}>
       <div className="relative w-full max-w-5xl mx-auto px-4 lg:px-6 py-6 lg:py-8 flex flex-col gap-5">
         <Header activeTab="trade" />
+        <DataContextRail route="trade" provenance={data.provenance} capCeiling={data.capCeiling} />
         <section className="border p-5 sm:p-6" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card)" }}>
           <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono text-ledger-ink-faint">
             Shared Trade
@@ -941,6 +951,7 @@ export default function QuickTradeMachine() {
           teams: teamData.teams ?? [],
           players: [...(playerData.players ?? []), ...(teamData.picks ?? [])],
           capCeiling: teamData.capCeiling ?? null,
+          provenance: playerData.provenance ?? teamData.provenance ?? null,
         };
         if (!Array.isArray(nextData.teams) || !Array.isArray(nextData.players) || nextData.teams.length === 0 || nextData.players.length === 0) {
           throw new Error("league API returned invalid data");
@@ -1165,15 +1176,17 @@ export default function QuickTradeMachine() {
       <div className="relative w-full max-w-6xl mx-auto px-4 lg:px-6 pt-6 pb-36 lg:py-8 flex flex-col gap-5">
         <Header activeTab="trade" />
 
+        <DataContextRail route="trade" provenance={data.provenance} capCeiling={data.capCeiling} />
+
         <section className="border p-5 sm:p-6" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card)" }}>
           <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono text-ledger-ink-faint">
             The Trade Desk
           </div>
           <h1 className="mt-2 text-3xl sm:text-4xl font-black leading-none" style={{ color: "var(--ledger-ink)" }}>
-            Put a deal on the record.
+            NHL Trade Machine
           </h1>
           <p className="mt-3 max-w-2xl text-[13px] leading-relaxed" style={{ color: "var(--ledger-ink-body)" }}>
-            One trade, argued with numbers. The X-NAV engine prices both packages, the GM Audit
+            <strong>Put a deal on the record.</strong> The X-NAV engine prices both packages, the GM Audit
             rules on whether the deal survives a real front office, and the locked verdict
             becomes a share link built for the group-chat debate.
           </p>

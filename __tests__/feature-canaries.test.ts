@@ -897,6 +897,7 @@ describe("Canary — STRAND redesign (rails · one index · EDGE band · 3×3 go
 describe("Canary — Player Card AA redesign + FMV surplus read", () => {
   const card = read("app/components/PercentileCard.tsx");
   const tip = read("app/components/MetricTip.tsx");
+  const help = read("app/components/HelpPopover.tsx");
 
   it("renders percentiles as a semantic table with scoped headers and accessible bars", () => {
     expect(card).toContain("<table");
@@ -951,12 +952,14 @@ describe("Canary — Player Card AA redesign + FMV surplus read", () => {
   });
 
   it("MetricTip is keyboard + screen-reader accessible", () => {
-    expect(tip).toContain("tabIndex={0}");
-    expect(tip).toContain("onFocus={enter}");
-    expect(tip).toContain("onBlur={leave}");
-    expect(tip).toContain('aria-label={`${term}: ${tip}`}');
-    expect(tip).toContain('role="tooltip"');
-    expect(tip).toContain('e.key === "Escape"');
+    expect(tip).toContain("HelpPopover");
+    expect(help).toContain("<button");
+    expect(help).toContain("aria-expanded={open}");
+    expect(help).toContain("aria-controls={panelId}");
+    expect(help).toContain('aria-haspopup="dialog"');
+    expect(help).toContain("useDialog");
+    expect(help).toContain("onPointerDown");
+    expect(help).toContain("createPortal");
   });
 });
 
@@ -1204,31 +1207,26 @@ describe("Canary — evaluate route historical NAV floors", () => {
 
 describe("Canary — footer glossary", () => {
   const footer = read("app/components/Footer.tsx");
+  const glossary = read("app/glossary/page.tsx");
   const tradePage = read("app/armchair-gm/page.tsx");
 
-  it("combines methodology and glossary into wide footer disclosure sections", () => {
-    expect(footer).toContain("methodologySections");
-    expect(footer).toContain("<details");
-    expect(footer).toContain("Player Valuation");
-    expect(footer).toContain("STRAND Glossary");
-    expect(footer).toContain("grid grid-cols-1 md:grid-cols-2");
-    expect(footer).toContain("Prospect NAV");
-    expect(footer).toContain("NHLe");
+  it("keeps the shared route footer compact and links to dedicated references", () => {
+    expect(footer).toContain('aria-label="Footer"');
+    expect(footer).toContain('href="/methodology"');
+    expect(footer).toContain('href="/glossary"');
+    expect(footer).toContain('href="/glossary#data-sources"');
+    expect(footer).toContain('href="/legal"');
+    expect(footer).not.toContain("<details");
+    expect(footer).not.toContain("methodologySections.map");
   });
 
-  it("keeps the icon key in the footer, collapsed into a native disclosure", () => {
-    // Mobile audit X2: the always-open key added ~1,000px to every page. It is
-    // now collapsed behind a native <details>/<summary> (works without JS) but
-    // still lives in the footer with its full entries — not deleted, not moved
-    // off to a JS-only dropdown, and its definitions still generate from data.
+  it("keeps the full glossary and icon key on the deep-linkable glossary page", () => {
     expect(footer).toContain("const iconKey");
     expect(footer).toContain("Megalodon");
     expect(footer).toContain("Salary Dump");
-    // The icon-key section is now a collapsible native disclosure: its summary
-    // carries the "Icon key" label the old always-open <section> used to.
-    expect(footer).toMatch(/<summary[^>]*aria-label="Icon key"/);
-    expect(footer).toContain("<details");
-    expect(footer).not.toMatch(/title:\s*"Icon Key"/);
+    expect(glossary).toContain("methodologySections.map");
+    expect(glossary).toContain('id="icon-key"');
+    expect(glossary).toContain('id={slugify(`${section.title}-${term}`)}');
   });
 
   it("does not keep a second trade-page methodology block", () => {
@@ -1730,7 +1728,7 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(src).not.toContain(">Season Points<");
   });
 
-  it("keeps Players mobile layouts through the shared 640px breakpoint", () => {
+  it("chooses the Players row mode from the section's available width", () => {
     const css = read("app/globals.css");
     const start = css.indexOf("/* ── Players analytics page");
     const end = css.indexOf("/* Trade proposal sends", start);
@@ -1738,34 +1736,31 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(end).toBeGreaterThan(start);
 
     const playersCss = css.slice(start, end);
-    const rowMax = playersCss.match(
-      /@media \(max-width:\s*(\d+)px\)\s*\{\s*\.player-row-desktop/,
-    );
-    expect(rowMax?.[1]).toBe("639");
+    expect(playersCss).toContain("container-name: player-ledger");
+    expect(playersCss).toContain("container-type: inline-size");
+    expect(playersCss).toMatch(/@container player-ledger \(min-width:\s*1040px\)/);
+    expect(playersCss).toMatch(/\.player-row-desktop\s*\{\s*display:\s*none\s*!important/);
+    expect(playersCss).toMatch(/\.player-row-mobile\s*\{\s*display:\s*block\s*!important/);
+    expect(playersCss).toMatch(/@container player-ledger[\s\S]*?\.player-row-desktop\s*\{\s*display:\s*grid\s*!important/);
     expect(playersCss).not.toMatch(/(?:min|max)-width:\s*(?:539|540)px/);
-    const mediaWidths = [...playersCss.matchAll(/@media \((?:min|max)-width:\s*(\d+)px\)/g)]
-      .map(match => Number(match[1]));
-    expect([...new Set(mediaWidths)].sort((a, b) => a - b))
-      .toEqual([480, 639, 640, 720]);
-
-    const maxMobileWidth = Number(rowMax?.[1]);
-    expect([500, 560, 620, 700].map(width => width <= maxMobileWidth))
-      .toEqual([true, true, true, false]);
+    expect(playersCss).not.toMatch(/@media \(max-width:\s*639px\)\s*\{\s*\.player-row-desktop/);
   });
 
   it("gives Player flags their own disclosure without nesting controls in a row button", () => {
     const src = read("app/players/page.tsx");
+    const help = read("app/components/HelpPopover.tsx");
     const flags = src.slice(
       src.indexOf("function PlayerIconBadges"),
       src.indexOf("const PLAYER_ICON_KEY"),
     );
-    expect(flags).toContain('className="player-flags-trigger dense-tap"');
-    expect(flags).toContain('type="button"');
-    expect(flags).toContain("aria-expanded={open}");
-    expect(flags).toContain("aria-controls={panelId}");
-    expect(flags).toContain("aria-describedby={open ? panelId : undefined}");
+    expect(flags).toContain("<HelpPopover");
+    expect(flags).toContain('className="player-flags-trigger dense-tap');
+    expect(help).toContain('type="button"');
+    expect(help).toContain("aria-expanded={open}");
+    expect(help).toContain("aria-controls={panelId}");
+    expect(help).toContain('aria-haspopup="dialog"');
     expect(flags).toContain("event.stopPropagation()");
-    expect(flags).toContain('role="region"');
+    expect(help).toContain("useDialog");
     expect(flags).toContain("player.hasNMC");
 
     const row = src.slice(
@@ -1781,7 +1776,7 @@ describe("Canary — Batch 6 audit fixes", () => {
 
     const css = read("app/globals.css");
     expect(css).toMatch(
-      /@media \(max-width: 639px\) \{\s*\.player-flags-trigger \{\s*min-height: 44px;/,
+      /\.player-row-mobile \.player-flags-trigger \{[\s\S]*?min-height: 44px;/,
     );
   });
 });
@@ -1890,8 +1885,8 @@ describe("Canary — UX and UI polish", () => {
     expect(card).toContain("const floorAdj =");
     expect(card).toContain('label="Career floor"');
     expect(card).toContain("Franchise/career floor applied");
-    expect(card).toContain("navLongLabelForPosition");
-    expect(panel).toContain("Net Asset Value");
+    expect(card).toContain("<MetricTip term={navLabel}");
+    expect(panel).toContain('<MetricTip term="NAV"');
     expect(armchair).toContain("Model adjustments applied");
   });
 

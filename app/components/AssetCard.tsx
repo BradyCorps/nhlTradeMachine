@@ -19,11 +19,12 @@ import { formatPickRound } from "@/app/lib/trade-format";
 import { contractExpiryYear } from "@/app/lib/contract-expiry";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
 import MeasuredProfile from "@/app/components/MeasuredProfile";
+import { HelpPopover } from "@/app/components/HelpPopover";
+import MetricTip from "@/app/components/MetricTip";
 import { displayPosition } from "@/app/lib/display-position";
 import {
   PLAYER_STATS_CONTEXT,
   navLabelForPosition,
-  navLongLabelForPosition,
 } from "@/app/lib/player-terminology";
 
 import { fmtSigned as fmt } from "@/app/lib/display-utils";
@@ -107,39 +108,41 @@ export default function AssetCard({
               style={{ fontSize: '13px', color: 'var(--ledger-ink)' }}>
               <span className="truncate max-w-full">{asset.name}</span>
               {asset.tradeBlockStatus === 'untouchable' && (
-                <span className="text-2xs font-black shrink-0 inline-flex items-center justify-center rounded-sm"
-                  title="Untouchable — excluded from partner matching"
-                  style={{ color: 'var(--blue)', border: '1px solid rgba(43,87,102,0.5)', background: 'var(--blue-dim)', width: 18, height: 18 }}>
-                  ◈
+                <span className="text-2xs font-black shrink-0 inline-flex items-center justify-center rounded-sm md:w-[18px] md:h-[18px]"
+                  style={{ color: 'var(--blue)', border: '1px solid rgba(43,87,102,0.5)', background: 'var(--blue-dim)' }}>
+                  <HelpPopover label="Untouchable asset" definition="Excluded from partner matching.">◈</HelpPopover>
                 </span>
               )}
               {asset.tradeBlockStatus === 'requested' && (
-                <span className="text-2xs px-1 font-black shrink-0" title={asset.tradeBlockNote ?? "Formal trade request"}
+                <span className="text-2xs px-1 font-black shrink-0"
                   style={{ color: 'var(--red)', border: '1px solid rgba(166,53,36,0.5)', background: 'var(--red-dim)' }}>
-                  ◉ REQUESTED
+                  <HelpPopover label="Requested asset" definition={asset.tradeBlockNote ?? "A formal trade request has been submitted."}>◉ REQUESTED</HelpPopover>
                 </span>
               )}
               {asset.tradeBlockStatus === 'available' && (
-                <span className="text-2xs px-1 font-black shrink-0" title={asset.tradeBlockNote ?? "Being shopped"}
+                <span className="text-2xs px-1 font-black shrink-0"
                   style={{ color: 'var(--amber)', border: '1px solid rgba(148,105,20,0.5)', background: 'var(--amber-dim)' }}>
-                  ◉ SHOPPED
+                  <HelpPopover label="Shopped asset" definition={asset.tradeBlockNote ?? "The team is actively shopping this asset."}>◉ SHOPPED</HelpPopover>
                 </span>
               )}
-              {asset.hasNMC && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-red)', border: '1px solid #b83020' }}>NMC</span>}
-              {asset.hasNTC && !asset.hasNMC && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-amber)', border: '1px solid #8a5c00' }}>NTC</span>}
-              {!asset.hasLiveStats && !isPick && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-ink-faint)', border: '1px solid #b8a070' }}>EST</span>}
+              {asset.hasNMC && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-red)', border: '1px solid #b83020' }}><HelpPopover label="No-movement clause" definition="The player cannot be traded, assigned, or waived without consenting.">NMC</HelpPopover></span>}
+              {asset.hasNTC && !asset.hasNMC && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-amber)', border: '1px solid #8a5c00' }}><HelpPopover label="No-trade clause" definition="The contract limits trades according to the player's negotiated consent or team list.">NTC</HelpPopover></span>}
+              {!asset.hasLiveStats && !isPick && <span className="text-2xs px-1 font-black shrink-0" style={{ color: 'var(--ledger-ink-faint)', border: '1px solid #b8a070' }}><HelpPopover label="Estimated data" definition="This player does not have a complete live-stat feed, so the displayed valuation uses available estimates.">EST</HelpPopover></span>}
               {asset.hasExtension && (
                 <span className="text-2xs px-1 font-black shrink-0 shadow-sm rounded-sm"
-                  style={{ background: 'var(--ledger-orange)', color: 'white', border: '1px solid #b45309' }}
-                  title="Future contract extension applied to valuation">
-                  EXTENSION
+                  style={{ background: 'var(--ledger-orange)', color: 'white', border: '1px solid #b45309' }}>
+                  <HelpPopover label="Contract extension" definition="The future contract extension is included in this valuation.">EXTENSION</HelpPopover>
                 </span>
               )}
               {showGravBadge && gravTier && (
-                <span className="shrink-0 inline-flex items-center justify-center"
-                  title={`${gravTier === "SUPERMASSIVE" ? "Supermassive" : "Star"} gravity — force ${gravProfile!.force.toFixed(2)}`}
-                  style={{ minWidth: 18, height: 18, border: `1px solid ${gravityTierColor(gravTier)}`, background: "rgba(255,255,255,0.18)", padding: "0 2px" }}>
-                  <TierIcon tier={gravTier} size={14} />
+                <span className="shrink-0 inline-flex items-center justify-center md:min-w-[18px] md:h-[18px]"
+                  style={{ border: `1px solid ${gravityTierColor(gravTier)}`, background: "rgba(255,255,255,0.18)", padding: "0 2px" }}>
+                  <HelpPopover
+                    label={`${gravTier === "SUPERMASSIVE" ? "Supermassive" : "Star"} gravity`}
+                    definition={`Transition gravity force ${gravProfile!.force.toFixed(2)}.`}
+                  >
+                    <TierIcon tier={gravTier} size={14} />
+                  </HelpPopover>
                 </span>
               )}
             </div>
@@ -196,25 +199,27 @@ export default function AssetCard({
             fontSize: '1.1rem',
             fontStyle: 'italic',
             color: xnav.total > 80 ? 'var(--ledger-green)' : xnav.total > 20 ? 'var(--ledger-ice)' : xnav.total > -20 ? 'var(--ledger-brown)' : 'var(--ledger-red)',
-          }} title={`${navLabel} — ${navLongLabelForPosition(asset.position)}, the player’s tradeable value`}>
+          }}>
             {fmt(xnav.total, 0)}
           </span>
+          <MetricTip term={navLabel} className="text-2xs font-black uppercase tracking-widest" />
           {xnav.noivImpact !== undefined && Math.abs(xnav.noivImpact) >= 2 && (
             <span className="text-2xs font-black" style={{
               color: xnav.noivImpact > 0 ? 'var(--ledger-green)' : 'var(--ledger-red)',
               letterSpacing: '0.05em',
-            }} title={`NOIV Impact: ${xnav.noivImpact > 0 ? '+' : ''}${xnav.noivImpact.toFixed(0)}. ${xnav.noivImpact > 0 ? 'Elevates teammates beyond raw stats.' : 'On-ice context reduces value vs raw stats.'}`}>
-              {xnav.noivImpact > 0 ? '↑' : '↓'} {Math.abs(xnav.noivImpact).toFixed(0)} NOIV
+            }}>
+              {xnav.noivImpact > 0 ? '↑' : '↓'} {Math.abs(xnav.noivImpact).toFixed(0)} <MetricTip term="NOIV" />
             </span>
           )}
           </div>
           {!isPick && idx === 0 && (
-            <button onClick={() => onRequestTrade?.(asset)} title="Generate trade proposals"
-              className="font-bold leading-none transition-colors text-ink-faint text-[11px]">
+            <button type="button" onClick={() => onRequestTrade?.(asset)} aria-label={`Generate trade proposals for ${asset.name}`}
+              className="tap-target font-bold leading-none transition-colors text-ink-faint text-[11px]">
               ⚡
             </button>
           )}
-          <button onClick={removeAsset} className="font-bold leading-none transition-colors text-ink-faint text-[13px]">
+          <button type="button" onClick={removeAsset} aria-label={`Remove ${asset.name} from trade`}
+            className="tap-target font-bold leading-none transition-colors text-ink-faint text-[13px]">
             ✕
           </button>
         </div>
@@ -337,8 +342,13 @@ export default function AssetCard({
                 <span className="text-2xs px-1 py-0.5 font-black" style={{
                   color: isStarter ? 'var(--ledger-ice)' : isBackup ? 'var(--ledger-amber-dark)' : 'var(--ledger-brown)',
                   border: `1px solid ${isStarter ? 'rgba(26,46,92,0.4)' : isBackup ? 'rgba(154,107,0,0.4)' : 'rgba(107,80,48,0.4)'}`,
-                }} title={isBackup ? "Backup goalie — NAV capped at 55. Per-game rates on <25 starts are unreliable predictors of full-season value." : isStarter ? "Starter — played 35+ games, full valuation applied" : "Tandem — shared starter role"}>
-                  {isBackup ? "BACKUP" : isStarter ? "STARTER" : "TANDEM"}
+                }}>
+                  <HelpPopover
+                    label={`${isBackup ? "Backup" : isStarter ? "Starter" : "Tandem"} goalie role`}
+                    definition={isBackup ? "NAV is capped at 55. Per-game rates on fewer than 25 starts are unreliable predictors of full-season value." : isStarter ? "Played at least 40 games; full valuation is applied." : "Shares the starter role."}
+                  >
+                    {isBackup ? "BACKUP" : isStarter ? "STARTER" : "TANDEM"}
+                  </HelpPopover>
                 </span>
               );
             })()}
@@ -378,13 +388,12 @@ export default function AssetCard({
             </div>
           )}
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono"
-              title="X-NAV — Extended Net Asset Value, the player’s tradeable value">NAV Breakdown</span>
-            <span
-              className="text-2xs font-black rounded-full w-4 h-4 flex items-center justify-center cursor-help shrink-0"
-              style={{ color: 'var(--ledger-ink-faint)', border: '1px solid #c8b890' }}
-              title="OFF: Offensive production value (pts/82 pace, xG). DEF: Defensive suppression (xG against, TOI quality). YNG: Option value from proven youth on cheap deal. CAP: Contract cost penalty — overpaid contracts drag total NAV."
-            >i</span>
+            <MetricTip term="X-NAV" className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">NAV Breakdown</MetricTip>
+            <HelpPopover
+              label="NAV components"
+              definition="OFF: offensive production value (points-per-82 pace and expected goals). DEF: defensive suppression. YNG: option value from proven youth on a cheap deal. CAP: contract cost; overpaid contracts reduce NAV."
+              className="text-2xs font-black rounded-full shrink-0"
+            >i</HelpPopover>
           </div>
           <div className="stat-grid-4">
             <MicroBar 
@@ -445,11 +454,12 @@ export default function AssetCard({
       {!isPick && asset.position === "G" && (
         <div className="mb-2.5">
           <div className="flex items-center justify-between mb-1.5">
-            <span>G-NAV Breakdown</span>
-            <span
-              className="text-2xs font-black rounded-full w-4 h-4 flex items-center justify-center cursor-help shrink-0 badge-rule"
-              title="G-NAV: Goals Saved Above Expected (GSAx) — how many goals this goalie prevented vs an average starter. CAP: Contract cost penalty."
-            >i</span>
+            <MetricTip term="G-NAV">G-NAV Breakdown</MetricTip>
+            <HelpPopover
+              label="G-NAV components"
+              definition="G-NAV uses goals saved above expected to estimate how many goals this goalie prevented versus league average. CAP is the contract-cost adjustment."
+              className="text-2xs font-black rounded-full shrink-0 badge-rule"
+            >i</HelpPopover>
           </div>
           <div className="grid grid-cols-2 gap-1">
             <MicroBar label="G-NAV" val={xnav.def} max={300} color="emerald"
@@ -488,8 +498,10 @@ export default function AssetCard({
               { label: 'Expected-goal share relative', val: asset.xgRelTM != null ? `${(asset.xgRelTM as number) > 0 ? '+' : ''}${(asset.xgRelTM as number).toFixed(1)}` : '—', tooltip: 'Expected-goal share relative to teammates — positive means the team controls more shots with this player on the ice' },
               { label: 'Competition', val: asset.qocIndex != null ? asset.qocIndex.toString() : '—', tooltip: 'Deployment difficulty 0-100: per-game ice-time rank + PK share + defensive-zone starts' },
             ].map(s => (
-              <div key={s.label} className="text-center p-1" title={s.tooltip} style={{ background: 'var(--ledger-warm)', border: '1px solid #b8a070' }}>
-                <div className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">{s.label}</div>
+              <div key={s.label} className="text-center p-1" style={{ background: 'var(--ledger-warm)', border: '1px solid #b8a070' }}>
+                <div className="text-2xs font-black uppercase tracking-tight text-ledger-ink-faint font-mono">
+                  <HelpPopover label={s.label} definition={s.tooltip}>{s.label}</HelpPopover>
+                </div>
                 <div className="text-2xs font-black text-ledger-ice font-mono">{s.val}</div>
               </div>
             ))}
@@ -588,20 +600,16 @@ function StatItem({ val, pct, label, good, invert, note }: { val: string; pct: n
     : good ? (invert ? 'var(--ledger-amber)' : 'var(--ledger-green)') : (invert ? 'var(--ledger-green)' : 'var(--ledger-red)');
   
   return (
-    <div className="flex justify-between items-center group relative cursor-help">
-      <span className="text-2xs font-black uppercase tracking-widest text-ledger-ink-faint">{label}</span>
+    <div className="flex justify-between items-center group relative">
+      <span className="text-2xs font-black uppercase tracking-widest text-ledger-ink-faint">
+        {note ? <HelpPopover label={label} definition={note}>{label}</HelpPopover> : label}
+      </span>
       <div className="flex items-center gap-2">
         <span className="text-[11px] font-bold" style={{ color }}>{val}</span>
         <div className="w-12 h-1 rounded-full overflow-hidden shrink-0" style={{ background: 'var(--ledger-rule-light)' }}>
           <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
         </div>
       </div>
-      {note && (
-        <div className="absolute right-0 bottom-full mb-1 w-48 p-2 bg-ledger-cream border border-ledger-rule shadow-sm 
-                        text-2xs text-ledger-ink-faint font-medium rounded opacity-0 group-hover:opacity-100 pointer-events-none z-10 transition-opacity">
-          {note}
-        </div>
-      )}
     </div>
   );
 }

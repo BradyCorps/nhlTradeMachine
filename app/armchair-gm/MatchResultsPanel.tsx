@@ -4,6 +4,7 @@
 // taxonomy (MATCH_FOLDERS); the fetch and its state live with the caller.
 import React from "react";
 import { TIER_MEANING, type MatchFitTier } from "@/app/lib/match-fit";
+import { HorizontalScrollCue } from "@/app/components/HorizontalScrollCue";
 
 // CXH5 — "Cap Clear" is gone. It named a cap condition while being used as an
 // interest tier, so a club with a score of zero was filed under it for having
@@ -90,6 +91,7 @@ export function MatchResultsPanel({
         );
       })}
     </div>
+    <HorizontalScrollCue label="Swipe or scroll for all match folders" />
     <div className="p-3"
       style={{
         background: 'var(--ledger-card-light)',
@@ -205,10 +207,10 @@ export function MatchResultsPanel({
               <button
                 onClick={() => onSelectPartner(m.teamId)}
                 disabled={m.teamId === activePartnerId}
-                className="tap-target shrink-0 text-2xs font-black font-mono uppercase px-2 py-1"
-                title={m.teamId === activePartnerId
+                aria-label={m.teamId === activePartnerId
                   ? `${m.teamName} is already your trade partner`
-                  : `Open a trade with ${m.teamName} — your package stays on the block`}
+                  : `Open a trade with ${m.teamName}; your package stays on the block`}
+                className="tap-target shrink-0 text-2xs font-black font-mono uppercase px-2 py-1"
                 style={{
                   background: m.teamId === activePartnerId ? 'var(--ledger-rule-light)' : 'var(--ledger-ice)',
                   color: m.teamId === activePartnerId ? 'var(--ledger-ink-faint)' : 'var(--paper)',

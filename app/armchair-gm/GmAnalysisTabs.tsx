@@ -16,6 +16,8 @@ import { SeasonResultsPager } from "./SeasonResultsPager";
 import { RosterTab } from "./RosterTab";
 import { computeTeamEdgeProfile } from "@/app/lib/team-edge-profile";
 import TeamEdgeTiles from "./TeamEdgeTiles";
+import { HelpPopover } from "@/app/components/HelpPopover";
+import { HorizontalScrollCue } from "@/app/components/HorizontalScrollCue";
 
 const PlayerComparison = lazy(() => import("@/app/components/PlayerComparison"));
 
@@ -198,6 +200,7 @@ export function GmAnalysisTabs({
           />
         ))}
       </div>
+      <HorizontalScrollCue label="Swipe or scroll for all analysis views" />
 
       {/* Tab content */}
       <div
@@ -525,8 +528,14 @@ function TeamDNA({
                     const valClass = g.gap < -0.10 ? 'deficit' : g.gap > 0.05 ? 'surplus' : 'neutral';
                     const explain = GAP_EXPLAIN[g.label];
                     return (
-                      <div key={g.label} className="strands-gap-row" title={explain ? `${explain.full}: ${explain.need}` : g.label}>
-                        <span className="strands-gap-label" style={{ cursor: 'help' }} title={explain?.full}>{g.label}</span>
+                      <div key={g.label} className="strands-gap-row">
+                        {explain ? (
+                          <HelpPopover label={explain.full} definition={explain.need} className="strands-gap-label">
+                            {g.label}
+                          </HelpPopover>
+                        ) : (
+                          <span className="strands-gap-label">{g.label}</span>
+                        )}
                         <div className="strands-gap-track">
                           <div className="strands-gap-left">
                             {g.gap < 0 && (
@@ -607,10 +616,18 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
         <table className="w-full text-[11px] font-mono">
           <thead>
             <tr className="border-b border-zinc-800/30">
-              {["Side", "Player", "Position", "Age", "Points/82", "Expected goals/82", "Defense rate", "Avg ice time", "Contract", "Years left", "NAV", "Offense", "Defense", "Age/Youth", "Contract cost", "Adjustments"].map((h) => (
-                <th key={h} className="px-3 py-2.5 text-left text-2xs font-black uppercase tracking-wider text-zinc-600"
-                  title={h === "NAV" ? "X-NAV for skaters; G-NAV for goalies" : h === "Adjustments" ? "Model adjustments applied" : undefined}>{h}</th>
-              ))}
+              {["Side", "Player", "Position", "Age", "Points/82", "Expected goals/82", "Defense rate", "Avg ice time", "Contract", "Years left", "NAV", "Offense", "Defense", "Age/Youth", "Contract cost", "Adjustments"].map((h) => {
+                const definition = h === "NAV"
+                  ? "X-NAV for skaters; G-NAV for goalies."
+                  : h === "Adjustments"
+                    ? "Model adjustments applied after the component values."
+                    : null;
+                return (
+                  <th key={h} className="px-3 py-2.5 text-left text-2xs font-black uppercase tracking-wider text-zinc-600">
+                    {definition ? <HelpPopover label={h} definition={definition}>{h}</HelpPopover> : h}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -648,8 +665,11 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
                   </td>
                   <td className="px-3 py-2 text-zinc-400">{a.position === "Pick" ? "—" : avgTOI.toFixed(1)}</td>
                   {/* ── NEW: Extension styling on the Cap Hit column ── */}
-                  <td className={`px-3 py-2 ${a.hasExtension ? "text-amber-500 font-bold" : "text-amber-400"}`} title={a.hasExtension ? "Valuation based on future extension AAV" : undefined}>
-                    {a.position === "Pick" ? "—" : `$${capHit.toFixed(2)}M${a.hasExtension ? '*' : ''}`}
+                  <td className={`px-3 py-2 ${a.hasExtension ? "text-amber-500 font-bold" : "text-amber-400"}`}>
+                    {a.position === "Pick" ? "—" : `$${capHit.toFixed(2)}M`}
+                    {a.position !== "Pick" && a.hasExtension && (
+                      <HelpPopover label="Extension-adjusted cap hit" definition="Valuation is based on the future extension's average annual value." className="ml-1">*</HelpPopover>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-zinc-500">{a.position === "Pick" ? "—" : `${a.yearsRemaining}yr`}</td>
                   <td className={`px-3 py-2 font-black text-[12px] ${xnav.total > 0 ? "text-emerald-400" : "text-rose-400"}`}>
@@ -661,8 +681,9 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
                     {fmt(xnav.age, 0)}
                   </td>
                   <td className="px-3 py-2 text-rose-500">{xnav.cap.toFixed(0)}</td>
-                  <td className="px-3 py-2 text-amber-500" title={adjTitle}>
-                    {Math.abs(floorAdj) >= 1 ? fmt(floorAdj, 0) : "—"}
+                  <td className="px-3 py-2 text-amber-500">
+                    {Math.abs(floorAdj) >= 1 ? fmt(floorAdj, 0) : "—"}{" "}
+                    <HelpPopover label={`${a.name} model adjustments`} definition={adjTitle}>?</HelpPopover>
                   </td>
                 </tr>
               );

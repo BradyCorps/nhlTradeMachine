@@ -25,6 +25,7 @@ import {
   type AuditOutcome,
 } from "@/app/lib/proposal-plan";
 import { useDialog } from "@/app/lib/use-dialog";
+import { HorizontalScrollCue } from "@/app/components/HorizontalScrollCue";
 
 interface Props {
   outgoingBlock: Asset[];
@@ -468,17 +469,20 @@ export default function TradeProposalEngine({
             </div>
 
             {proposals.length > 1 && (
-              <div className="trade-file-tabs" aria-label="Trade partner files">
-                {proposals.map((p, i) => (
-                  <button
-                    key={p.partner.id}
-                    onClick={() => goToFile(i)}
-                    className={i === activeIndex ? "active" : ""}
-                    aria-label={`Open file ${i + 1}: ${p.partner.name}`}>
-                    {String(i + 1).padStart(2, "0")}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="trade-file-tabs" role="group" aria-label="Trade partner files" tabIndex={0}>
+                  {proposals.map((p, i) => (
+                    <button
+                      key={p.partner.id}
+                      onClick={() => goToFile(i)}
+                      className={i === activeIndex ? "active" : ""}
+                      aria-label={`Open file ${i + 1}: ${p.partner.name}`}>
+                      {String(i + 1).padStart(2, "0")}
+                    </button>
+                  ))}
+                </div>
+                <HorizontalScrollCue label="Swipe or scroll for all trade files" />
+              </>
             )}
 
             {activeProposal && (() => {

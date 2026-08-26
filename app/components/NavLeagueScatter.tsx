@@ -11,6 +11,7 @@
 
 import React, { useState, useMemo, useRef, useCallback } from "react";
 import { scaleLinear } from "d3-scale";
+import { HorizontalScrollCue } from "@/app/components/HorizontalScrollCue";
 
 export interface ScatterPeer {
   id: string;
@@ -33,6 +34,7 @@ interface Props {
 
 const CURRENT_COLOR = "var(--ledger-red, #b83020)";
 const PEER_COLOR = "var(--ledger-ink, #1a1a18)";
+const signedDelta = (value: number): string => `${value > 0 ? "+" : ""}${Math.round(value)}`;
 
 // Fixed layout — module-level so the coordinate callbacks have a stable
 // reference (no changing hook dependency).
@@ -89,7 +91,7 @@ interface BrushRect {
 
 export default function NavLeagueScatter({ peers, currentPlayer, playerName, cohortLabel }: Props) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
+  const [pinnedId, setPinnedId] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -129,6 +131,12 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName, coh
     : (currentPlayer.def >= medDef ? "defensive" : "depth");
 
   const hoveredPeer = hoveredId ? all.find(p => p.id === hoveredId) : null;
+  const pinnedPeer = pinnedId ? all.find(p => p.id === pinnedId) : null;
+  const activePeer = hoveredPeer ?? pinnedPeer;
+  const tablePlayers = useMemo(
+    () => [...all].sort((a, b) => b.nav - a.nav || a.name.localeCompare(b.name)),
+    [all],
+  );
 
   // Convert mouse event to SVG-space coordinates
   const toSvgCoords = useCallback((e: React.MouseEvent) => {
@@ -215,12 +223,12 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName, coh
 
   // Hover tooltip position in container-relative pixels
   const getTooltipStyle = (): React.CSSProperties | null => {
-    if (!hoveredPeer || hoveredPeer.id === currentPlayer.id || !svgRef.current || !containerRef.current) return null;
+    if (!activePeer || activePeer.id === currentPlayer.id || !svgRef.current || !containerRef.current) return null;
     const svgRect = svgRef.current.getBoundingClientRect();
     const containerRect = containerRef.current.getBoundingClientRect();
     const scaleRatio = svgRect.width / W;
-    const dotX = (margin.left + xScale(hoveredPeer.off)) * scaleRatio + svgRect.left - containerRect.left;
-    const dotY = (margin.top + yScale(hoveredPeer.def)) * scaleRatio + svgRect.top - containerRect.top;
+    const dotX = (margin.left + xScale(activePeer.off)) * scaleRatio + svgRect.left - containerRect.left;
+    const dotY = (margin.top + yScale(activePeer.def)) * scaleRatio + svgRect.top - containerRect.top;
     return {
       position: "absolute" as const,
       left: dotX,
@@ -243,13 +251,17 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName, coh
         <span className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.12em]"
           style={{ color: "var(--ledger-ink-faint)" }}>
           {all.length} plotted
-          {activeBrush ? ` · ${brushedPlayers.length} selected` : " · drag to select"}
+          {activeBrush ? ` · ${brushedPlayers.length} selected` : ""}
         </span>
       </div>
       <div className="mb-2 font-mono text-[8px] sm:text-[9px] uppercase tracking-[0.12em]"
         style={{ color: "var(--ledger-ink-faint)" }}>
         Ranked among {cohortLabel ?? "same-position peers"}
       </div>
+      <p className="mb-1 font-mono text-[9px] leading-relaxed" style={{ color: "var(--ledger-ink-faint)" }}>
+        <span className="sm:hidden">Tap a point to pin it. Open the table below to compare every player.</span>
+        <span className="hidden sm:inline">Click a point to pin it, or drag the plot to select a group.</span>
+      </p>
 
       <svg
         ref={svgRef}
@@ -376,22 +388,39 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName, coh
           {peers.map(p => {
             const cx = xScale(p.off);
             const cy = yScale(p.def);
-            const isHov = hoveredId === p.id;
+            const isHovered = hoveredId === p.id;
+            const isPinned = pinnedId === p.id;
+            const isActive = isHovered || isPinned;
             const isBrushed = activeBrush
               && cx >= activeBrush.x0 && cx <= activeBrush.x1
               && cy >= activeBrush.y0 && cy <= activeBrush.y1;
             return (
               <circle
                 key={p.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={isPinned}
+                aria-label={`${p.name}: offense ${Math.round(p.off)}, defense ${Math.round(p.def)}, NAV ${p.nav > 0 ? "+" : ""}${p.nav}. ${isPinned ? "Pinned; activate to dismiss" : "Activate to pin for comparison"}.`}
                 cx={cx} cy={cy}
-                r={isHov ? 5 : isBrushed ? 4.5 : 3.5}
+                r={isPinned ? 6 : isHovered ? 5 : isBrushed ? 4.5 : 3.5}
                 fill={isBrushed ? "var(--ledger-green, #2a7a3f)" : PEER_COLOR}
-                opacity={isHov ? 0.85 : isBrushed ? 0.6 : 0.28}
-                stroke={isHov ? PEER_COLOR : isBrushed ? "var(--ledger-green, #2a7a3f)" : "none"}
-                strokeWidth={isHov || isBrushed ? 1 : 0}
+                opacity={isActive ? 0.9 : isBrushed ? 0.6 : 0.28}
+                stroke={isActive ? PEER_COLOR : isBrushed ? "var(--ledger-green, #2a7a3f)" : "none"}
+                strokeWidth={isPinned ? 2 : isHovered || isBrushed ? 1 : 0}
                 onMouseEnter={() => { if (!brushing) setHoveredId(p.id); }}
                 onMouseLeave={() => { if (!brushing) setHoveredId(null); }}
-                onClick={() => setHoveredId(prev => (prev === p.id ? null : p.id))}
+                onFocus={() => setHoveredId(p.id)}
+                onBlur={() => setHoveredId(null)}
+                onClick={() => setPinnedId(prev => (prev === p.id ? null : p.id))}
+                onKeyDown={event => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setPinnedId(prev => (prev === p.id ? null : p.id));
+                  } else if (event.key === "Escape") {
+                    setPinnedId(null);
+                    setHoveredId(null);
+                  }
+                }}
                 style={{ cursor: "pointer", transition: "opacity 0.15s, r 0.15s" }}
               />
             );
@@ -446,7 +475,7 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName, coh
       </svg>
 
       {/* HTML hover tooltip — outside SVG so it never clips */}
-      {tooltipStyle && hoveredPeer && hoveredPeer.id !== currentPlayer.id && (
+      {tooltipStyle && activePeer && activePeer.id !== currentPlayer.id && (
         <div style={tooltipStyle}>
           <div style={{
             background: "var(--paper-card, var(--paper-bg))",
@@ -460,11 +489,36 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName, coh
             boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
             textAlign: "center",
           }}>
-            <div style={{ fontWeight: 700 }}>{hoveredPeer.name}</div>
+            <div style={{ fontWeight: 700 }}>{activePeer.name}{activePeer.id === pinnedId ? " · PINNED" : ""}</div>
             <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)" }}>
-              OFF {Math.round(hoveredPeer.off)} · DEF {Math.round(hoveredPeer.def)} · NAV {hoveredPeer.nav > 0 ? "+" : ""}{hoveredPeer.nav}
+              OFF {Math.round(activePeer.off)} · DEF {Math.round(activePeer.def)} · NAV {activePeer.nav > 0 ? "+" : ""}{activePeer.nav}
             </div>
           </div>
+        </div>
+      )}
+
+      {pinnedPeer && pinnedPeer.id !== currentPlayer.id && (
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border px-3 py-2"
+          aria-live="polite"
+          style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
+          <div className="font-mono text-[10px] leading-relaxed" style={{ color: "var(--ledger-ink)" }}>
+            <div className="font-black uppercase tracking-[0.12em]">Pinned · {pinnedPeer.name} ({pinnedPeer.teamId})</div>
+            <div style={{ color: "var(--ledger-ink-faint)" }}>
+              OFF {Math.round(pinnedPeer.off)} · DEF {Math.round(pinnedPeer.def)} · NAV {pinnedPeer.nav > 0 ? "+" : ""}{pinnedPeer.nav}
+            </div>
+            <div style={{ color: "var(--ledger-ink-faint)" }}>
+              Compared with {playerName}: OFF {signedDelta(pinnedPeer.off - currentPlayer.off)} · DEF {signedDelta(pinnedPeer.def - currentPlayer.def)} · NAV {signedDelta(pinnedPeer.nav - currentPlayer.nav)}
+            </div>
+          </div>
+          <button
+            type="button"
+            aria-label="Dismiss pinned player"
+            onClick={() => setPinnedId(null)}
+            className="min-h-11 px-3 font-mono text-[9px] font-black uppercase tracking-[0.12em] underline"
+            style={{ color: "var(--ledger-ink-faint)", background: "transparent", border: 0 }}
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
@@ -516,6 +570,78 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName, coh
           </div>
         </div>
       )}
+
+      <details className="mt-3 border-t pt-1" style={{ borderColor: "var(--ledger-rule)" }}>
+        <summary className="flex min-h-11 cursor-pointer items-center font-mono text-[9px] font-black uppercase tracking-[0.12em]"
+          style={{ color: "var(--ledger-ink-faint)" }}>
+          Compare all plotted players in a table
+        </summary>
+        <HorizontalScrollCue label="Swipe or scroll for all comparison columns" />
+        <div
+          className="overflow-x-auto"
+          role="region"
+          aria-label="League context player comparison table"
+          tabIndex={0}
+        >
+          <table className="w-full font-mono" style={{ borderCollapse: "collapse", minWidth: 560 }}>
+            <caption className="sr-only">
+              Offensive value, defensive value, and NAV for {playerName} and {peers.length} same-position peers
+            </caption>
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--ledger-rule)" }}>
+                {[
+                  ["Player", "left"],
+                  ["Team", "left"],
+                  ["OFF", "right"],
+                  ["DEF", "right"],
+                  ["NAV", "right"],
+                  ["Compare", "right"],
+                ].map(([label, align]) => (
+                  <th key={label} scope="col" className="px-2 py-2 text-[9px] font-black uppercase tracking-[0.1em]"
+                    style={{ color: "var(--ledger-ink-faint)", textAlign: align as "left" | "right" }}>
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tablePlayers.map(player => {
+                const isCurrent = player.id === currentPlayer.id;
+                const isPinned = player.id === pinnedId;
+                return (
+                  <tr key={player.id} style={{ borderBottom: "1px solid var(--ledger-rule)", background: isPinned ? "var(--paper-inset)" : "transparent" }}>
+                    <th scope="row" className="px-2 py-1 text-left text-[10px] font-bold" style={{ color: isCurrent ? CURRENT_COLOR : "var(--ledger-ink)" }}>
+                      {player.name}{isCurrent ? " · CURRENT" : ""}
+                    </th>
+                    <td className="px-2 py-1 text-left text-[10px]" style={{ color: "var(--ledger-ink-faint)" }}>{player.teamId}</td>
+                    <td className="px-2 py-1 text-right text-[10px] tabular-nums">{Math.round(player.off)}</td>
+                    <td className="px-2 py-1 text-right text-[10px] tabular-nums">{Math.round(player.def)}</td>
+                    <td className="px-2 py-1 text-right text-[10px] font-bold tabular-nums">{player.nav > 0 ? "+" : ""}{player.nav}</td>
+                    <td className="px-1 py-0.5 text-right">
+                      {isCurrent ? (
+                        <span className="px-2 text-[9px] font-bold uppercase" style={{ color: "var(--ledger-ink-faint)" }}>Baseline</span>
+                      ) : (
+                        <button
+                          type="button"
+                          aria-pressed={isPinned}
+                          onClick={() => setPinnedId(prev => (prev === player.id ? null : player.id))}
+                          onKeyDown={event => {
+                            if (event.key === "Escape") setPinnedId(null);
+                          }}
+                          className="min-h-11 px-2 text-[9px] font-black uppercase underline"
+                          style={{ color: "var(--ledger-ink-faint)", background: "transparent", border: 0 }}
+                        >
+                          {isPinned ? "Dismiss" : "Pin"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
   );
 }

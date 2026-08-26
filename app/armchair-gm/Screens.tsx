@@ -34,10 +34,12 @@ export function LoadingScreen({
         <Header activeTab="armchair-gm" />
 
         <div className="mt-6 border-b border-ledger-rule pb-4">
-          <div className="text-[10px] font-black uppercase tracking-[0.28em] font-mono text-ledger-ink-faint">
+          <h1 className="text-[18px] font-black uppercase tracking-[0.12em] font-mono text-ledger-ink">
             Armchair GM
-          </div>
-          <div className="mt-2 h-5 w-64 animate-pulse bg-ledger-rule-light" />
+          </h1>
+          <p className="mt-2 max-w-3xl text-[11px] font-mono leading-relaxed text-ledger-ink-body">
+            Run an NHL front office through roster moves, free agency, the draft, season simulation, and a three-year Cup Run.
+          </p>
         </div>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-2" aria-hidden="true">

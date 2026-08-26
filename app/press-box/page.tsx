@@ -846,12 +846,12 @@ function PressBoxGame() {
           >
             {isArchive ? "Archive" : "Daily Game"}
           </div>
-          <h2
+          <h1
             className="font-black font-serif leading-none"
             style={{ fontSize: "clamp(1.6rem, 5vw, 2.4rem)", letterSpacing: "-0.02em" }}
           >
             Press Box
-          </h2>
+          </h1>
           <p
             className="text-[11px] font-mono mt-1 uppercase tracking-[0.15em] cursor-pointer select-none"
             style={{ color: "var(--ledger-ink-faint)" }}

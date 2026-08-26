@@ -12,6 +12,7 @@ import { swrStore } from "@/app/lib/swr-store";
 import { regulationWinsFrom } from "@/app/lib/nhl-standings-fields";
 import { getLiveCapCeiling } from "@/app/lib/live-cap-settings";
 import { buildLeagueNavMap } from "@/app/lib/league-nav";
+import { buildLeagueProvenance } from "@/app/lib/data-context";
 
 export const dynamic = "force-dynamic";
 
@@ -265,7 +266,15 @@ export async function GET() {
     build: buildTeamsPayload,
   });
 
-  return NextResponse.json(value, {
+  const provenance = buildLeagueProvenance({
+    kind: "teams",
+    generatedAt: value.generatedAt,
+    cacheState: state,
+    blocked,
+    teamCount: value.teams?.length,
+  });
+
+  return NextResponse.json({ ...value, provenance }, {
     headers: {
       "Cache-Control": "public, s-maxage=300, stale-while-revalidate=900",
       "x-ledger-cache": state,

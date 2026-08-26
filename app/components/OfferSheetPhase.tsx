@@ -20,6 +20,7 @@ import { scenarioSeed } from "@/app/lib/sim-engine";
 import { formatCapHit as money } from "@/app/lib/display-utils";
 import { OffseasonDiagnostic } from "@/app/components/OffseasonDiagnostic";
 import type { OffseasonStateDiagnostic, OffseasonTransaction } from "@/app/lib/offseason-ledger";
+import { matchesPlayerSearch } from "@/app/lib/player-search";
 const RFA_PAGE_SIZE = 30;
 
 const roundLabel = (r: string) =>
@@ -85,11 +86,10 @@ export default function OfferSheetPhase({
   };
 
   const sorted = useMemo(() => {
-    const q = query.trim().toLowerCase();
     return [...rfaMarket]
-      .filter(m => (q ? m.player.name.toLowerCase().includes(q) || m.player.teamId.toLowerCase().includes(q) : true))
+      .filter(m => matchesPlayerSearch(m.player, query, teamMap.get(m.player.teamId)))
       .sort((a, b) => b.contract.aav - a.contract.aav);
-  }, [rfaMarket, query]);
+  }, [rfaMarket, query, teamMap]);
   const rfaPageCount = Math.max(1, Math.ceil(sorted.length / RFA_PAGE_SIZE));
   const visibleRfas = useMemo(() => {
     const start = (rfaPage - 1) * RFA_PAGE_SIZE;

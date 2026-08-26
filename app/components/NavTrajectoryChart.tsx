@@ -5,8 +5,9 @@
 // (negative) or right (positive) from a centre zero line. Much
 // more readable than the old vertical waterfall on mobile.
 
-import React, { useState } from "react";
+import React from "react";
 import { scaleLinear } from "d3-scale";
+import { HelpPopover } from "@/app/components/HelpPopover";
 
 export interface NavStage {
   label: string;
@@ -24,8 +25,6 @@ const POSITIVE_COLOR = "var(--ledger-green, #2a7a3f)";
 const NEGATIVE_COLOR = "var(--ledger-red, #b83020)";
 
 export default function NavTrajectoryChart({ stages, total, playerName }: Props) {
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-
   if (stages.length === 0) return null;
 
   const barH = 22;
@@ -79,31 +78,14 @@ export default function NavTrajectoryChart({ stages, total, playerName }: Props)
           const fill = isPositive ? POSITIVE_COLOR : NEGATIVE_COLOR;
           const barStart = isPositive ? zeroX : labelW + xScale(s.value);
           const barW = Math.max(2, Math.abs(xScale(s.value) - xScale(0)));
-          const isHovered = hoveredIdx === i;
 
           return (
-            <g key={i}
-              onMouseEnter={() => setHoveredIdx(i)}
-              onMouseLeave={() => setHoveredIdx(null)}
-              onTouchStart={() => setHoveredIdx(i)}
-              onTouchEnd={() => setHoveredIdx(null)}
-              style={{ cursor: "default" }}
-            >
+            <g key={i}>
               {/* Hit target — full row */}
               <rect
                 x={0} y={y} width={chartW} height={barH}
                 fill="transparent"
               />
-
-              {/* Row background on hover */}
-              {isHovered && (
-                <rect
-                  x={0} y={y} width={chartW} height={barH}
-                  fill="var(--ledger-ink)"
-                  opacity={0.04}
-                  rx={2}
-                />
-              )}
 
               {/* Label */}
               <text
@@ -126,7 +108,7 @@ export default function NavTrajectoryChart({ stages, total, playerName }: Props)
                 width={barW}
                 height={barH - 6}
                 fill={fill}
-                opacity={isHovered ? 1 : 0.8}
+                opacity={0.8}
                 rx={2}
               />
 
@@ -147,38 +129,12 @@ export default function NavTrajectoryChart({ stages, total, playerName }: Props)
           );
         })}
 
-        {/* Tooltip overlay — rendered after all bars so it paints on top */}
-        {hoveredIdx !== null && stages[hoveredIdx] && (() => {
-          const s = stages[hoveredIdx];
-          const y = margin.top + hoveredIdx * (barH + gap);
-          return (
-            <foreignObject
-              x={labelW}
-              y={y + barH}
-              width={barAreaW + valueW}
-              height={24}
-              style={{ overflow: "visible", pointerEvents: "none" }}
-            >
-              <div style={{
-                background: "var(--paper-card, var(--paper-bg))",
-                border: "1px solid var(--ledger-rule, #ccc)",
-                borderRadius: 3,
-                padding: "3px 8px",
-                fontFamily: "'Courier Prime', monospace",
-                fontSize: 10,
-                color: "var(--ledger-ink)",
-                whiteSpace: "nowrap",
-                width: "fit-content",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                position: "relative",
-                zIndex: 10,
-              }}>
-                {s.desc}
-              </div>
-            </foreignObject>
-          );
-        })()}
       </svg>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[9px] font-black uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>
+        {stages.map(stage => (
+          <HelpPopover key={stage.label} label={stage.label} definition={stage.desc}>{stage.label}</HelpPopover>
+        ))}
+      </div>
     </div>
   );
 }

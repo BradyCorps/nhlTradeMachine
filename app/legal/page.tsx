@@ -16,16 +16,17 @@
 // plainly rather than buried.
 
 import React from "react";
-import type { Metadata } from "next";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { BRAND } from "@/app/lib/brand";
+import { publicRouteMetadata } from "@/app/lib/public-seo";
 
-export const metadata: Metadata = {
+export const metadata = publicRouteMetadata({
+  path: "/legal",
   title: "Terms, Privacy & Independence — Cap & Crease",
   description:
     "What Cap & Crease is, what it does with your data, and what a donation supports. Independent and unaffiliated with the National Hockey League.",
-};
+});
 
 /** Where a reader can reach a person. Change this in one place. */
 const CONTACT_URL = "https://github.com/BradyCorps/nhlTradeMachine/issues";
