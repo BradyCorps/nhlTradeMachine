@@ -1913,6 +1913,8 @@ describe("Canary — UX and UI polish", () => {
     expect(src).toContain('<span className="sm:hidden">Trade</span>');
     expect(src).toContain('<span className="sm:hidden">GM</span>');
     expect(src).toContain('inline-flex min-h-[44px] w-11');
+    expect(src).toMatch(/<Link\s+href="\/teams"/);
+    expect(src).not.toMatch(/<a\s+href="\/teams"/);
 
     const navStart = src.indexOf('<nav');
     const moreStart = src.indexOf('aria-label="More navigation"', navStart);

@@ -156,7 +156,7 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
                 Players
               </Link>
               <span className="nav-divider text-ledger-rule-light">|</span>
-              <a
+              <Link
                 href="/teams"
                 aria-current={resolvedActiveTab === "teams" ? "page" : undefined}
                 className={navClass(resolvedActiveTab === "teams")}
@@ -165,7 +165,7 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
                   {resolvedActiveTab === "teams" ? "◆" : "◇"}&nbsp;
                 </span>
                 Teams
-              </a>
+              </Link>
               <span className="nav-divider text-ledger-rule-light">|</span>
               <a
                 href="/trade-machine"
