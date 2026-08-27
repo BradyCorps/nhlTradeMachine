@@ -1198,7 +1198,7 @@ describe("Canary — evaluate route historical NAV floors", () => {
     expect(evaluateRoute).toContain("calculateAssetNAV");
     expect(evaluateRoute).not.toContain("getHistoricalFloor");
     expect(adapter).toContain("...asset");
-    expect(adapter).toContain("return calcNAV(toAssetInput(asset, capCeiling))");
+    expect(adapter).toContain("const result = calcNAV(input)");
     expect(engine).toContain("const split = navSplit(result.stages, result.total)");
     expect(engine).toContain('stage("historicalFloor", "Historical pedigree floor", lift, "adjustment")');
     expect(engine).toContain("applyTradeRequestDiscount(applyHistoricalPedigreeFloor(result, asset), asset)");

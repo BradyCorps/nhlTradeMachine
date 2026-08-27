@@ -7,6 +7,7 @@
 
 import { SEASON } from "@/app/lib/season-config";
 import { calcNAV, type AssetInput, type XNAVResult } from "@/app/lib/xnav-engine";
+import { buildValuationSnapshot, snapshotDate } from "@/app/lib/valuation-snapshot";
 
 type NullableAssetInput = {
   [K in keyof AssetInput]?: AssetInput[K] | null;
@@ -53,6 +54,12 @@ export function toAssetInput(
 export function calculateAssetNAV(
   asset: AssetNavSource,
   capCeiling = asset.capCeiling ?? SEASON.capCeiling,
+  asOfDate: string = snapshotDate(),
 ): XNAVResult {
-  return calcNAV(toAssetInput(asset, capCeiling));
+  const input = toAssetInput(asset, capCeiling);
+  const result = calcNAV(input);
+  // Every caller of this boundary gets the same immutable envelope (DATA-02)
+  // for the same inputs on the same day — see valuation-snapshot.ts.
+  result.snapshot = buildValuationSnapshot(input, result, asOfDate);
+  return result;
 }

@@ -158,6 +158,13 @@ export interface XNAVResult {
    * it without breaking the sum.
    */
   stages?:     NavStage[];
+  /**
+   * The immutable, content-addressed valuation record (DATA-02). Attached at
+   * the `asset-nav.ts` boundary, not here — `calcNAV` and its position-specific
+   * callers stay pure engine functions with no provenance concerns. See
+   * `app/lib/valuation-snapshot.ts`.
+   */
+  snapshot?:   import("@/app/lib/valuation-snapshot").ValuationSnapshot;
 }
 
 /** Build a stage, dropping the ones that did not fire. */
