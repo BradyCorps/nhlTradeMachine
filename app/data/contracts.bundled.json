@@ -3238,7 +3238,9 @@
     "yearsRemaining": 3,
     "hasNMC": false,
     "hasNTC": false,
-    "canRetain": true
+    "canRetain": true,
+    "expiryStatus": "RFA",
+    "expiryYear": 2026
   },
   "Ethan Edwards": {
     "capHit": 0.934,
@@ -5786,7 +5788,9 @@
     "yearsRemaining": 3,
     "hasNMC": false,
     "hasNTC": false,
-    "canRetain": true
+    "canRetain": true,
+    "expiryStatus": "RFA",
+    "expiryYear": 2026
   },
   "Kevin Lankinen": {
     "capHit": 2.75,

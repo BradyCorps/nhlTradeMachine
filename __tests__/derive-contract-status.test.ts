@@ -44,6 +44,20 @@ describe("deriveContractStatus", () => {
     expect(r.expiresThisOffseason).toBe(true);
   });
 
+  it("DATA-01: an expired-ELC row (Korchinski-shaped) reaches the market as RFA, not SIGNED", () => {
+    // Real shape from the corrected league seed: a stale bundled contract
+    // (capHit/yearsRemaining captured at signing, never rolled forward) with
+    // an FA-class expiryStatus/expiryYear now layered on top. isELC is false
+    // here because a bundled/DB contract match exists — the read path only
+    // treats a player as a live ELC guess when no stored contract was found.
+    const r = deriveContractStatus({
+      expiryStatus: "RFA", expiryYear: 2026, yearsRemaining: 3,
+      isELC: false, offseasonYear: OFFSEASON,
+    });
+    expect(r.contractStatus).toBe("RFA");
+    expect(r.expiresThisOffseason).toBe(true);
+  });
+
   it("falls back to the final-year heuristic when no expiry year is known", () => {
     expect(deriveContractStatus({ expiryStatus: "UFA", expiryYear: null, yearsRemaining: 1, offseasonYear: OFFSEASON }).expiresThisOffseason).toBe(true);
     expect(deriveContractStatus({ expiryStatus: "UFA", expiryYear: null, yearsRemaining: 3, offseasonYear: OFFSEASON }).expiresThisOffseason).toBe(false);

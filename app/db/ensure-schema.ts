@@ -28,6 +28,7 @@ const PLAYER_COLUMN_STATEMENTS = [
   "ALTER TABLE players ADD COLUMN exclude_from_roster INTEGER DEFAULT 0",
   "ALTER TABLE players ADD COLUMN source TEXT DEFAULT 'seed'",
   "ALTER TABLE players ADD COLUMN extension_signed_at TEXT",
+  "ALTER TABLE players ADD COLUMN birth_date TEXT",
 ];
 
 const PLAYER_TABLE_STATEMENTS = [
@@ -38,6 +39,7 @@ const PLAYER_TABLE_STATEMENTS = [
     secondary_position TEXT,
     team_id TEXT,
     age INTEGER,
+    birth_date TEXT,
     cap_hit REAL NOT NULL,
     years_remaining INTEGER NOT NULL,
     has_nmc INTEGER DEFAULT 0,

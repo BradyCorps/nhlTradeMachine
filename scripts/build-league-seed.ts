@@ -32,14 +32,26 @@ interface SeedRow {
   hasNtc: boolean;
   expiryStatus: "UFA" | "RFA" | null;
   expiryYear: number | null;
+  /** ISO birthdate, when known — the canonical age source (app/lib/player-age.ts). */
+  birthDate?: string | null;
 }
 
 // Known contract-fact corrections where the bundled snapshot is wrong (e.g. the
-// old CapWages age-math floored a back-loaded extension to 1 year). Baked into
-// the seed so the fix lives as data, not as a read-time code override.
+// old CapWages age-math floored a back-loaded extension to 1 year), or where a
+// verified birthdate closes the DATA-01 "static age" gap for a player whose
+// stale bundled row would otherwise read through unchanged. Baked into the
+// seed so the fix lives as data, not as a read-time code override.
 const SEED_CORRECTIONS: Record<string, Partial<SeedRow>> = {
   "Mark Scheifele": { yearsRemaining: 5 },         // 8yr/2023→2031; age math gave 1
   "Elias Pettersson": { position: "C" },           // disambiguates from the VAN D-man below
+  // DATA-01 canaries: both ELCs ran through 2025-26 and expired. The
+  // Blackhawks issued qualifying offers in June 2026 that lapsed July 15,
+  // 2026 unverified; both remain unsigned Group 2 RFAs as of August 2026
+  // (thehockeynews.com, bleachernation.com). Birthdates from Wikipedia/
+  // Hockey-Reference. expiryStatus/expiryYear are also set by the FA-class
+  // merge below; birthDate is not, so it is corrected here.
+  "Kevin Korchinski":  { birthDate: "2004-06-21" },
+  "Ethan Del Mastro":  { birthDate: "2003-01-15" },
 };
 
 // Same-name players collapse to a single makeId, and the bundled snapshot

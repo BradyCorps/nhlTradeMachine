@@ -25,7 +25,12 @@ describe("2026 free-agent seed", () => {
   });
 
   it("covers the full curated class without duplicate collisions", () => {
-    // 31 UFA + 25 RFA names, all distinct after normalization.
-    expect(FREE_AGENT_SEED_2026.size).toBe(56);
+    // 31 UFA + 27 RFA names, all distinct after normalization.
+    expect(FREE_AGENT_SEED_2026.size).toBe(58);
+  });
+
+  it("marks the DATA-01 canaries (expired ELCs, unsigned Group 2 RFAs) as RFA", () => {
+    expect(seedFreeAgentStatus("Kevin Korchinski")).toBe("RFA");
+    expect(seedFreeAgentStatus("Ethan Del Mastro")).toBe("RFA");
   });
 });

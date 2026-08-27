@@ -32,6 +32,8 @@ export interface LeagueSeedRow {
   hasNtc: boolean;
   expiryStatus: "UFA" | "RFA" | null;
   expiryYear: number | null;
+  /** ISO birthdate, when known — the canonical age source (app/lib/player-age.ts). */
+  birthDate?: string | null;
 }
 
 interface LeagueSeedFile {
@@ -85,9 +87,10 @@ export async function seedPlayersTable(database: Database = defaultDb): Promise<
       expiryYear: playersTable.expiryYear,
       hasNmc: playersTable.hasNmc,
       hasNtc: playersTable.hasNtc,
+      birthDate: playersTable.birthDate,
     })
     .from(playersTable)
-    .catch(() => [] as { id: string; source: string | null; expiryStatus: string | null; expiryYear: number | null; hasNmc: boolean | null; hasNtc: boolean | null }[]);
+    .catch(() => [] as { id: string; source: string | null; expiryStatus: string | null; expiryYear: number | null; hasNmc: boolean | null; hasNtc: boolean | null; birthDate: string | null }[]);
   const existingById = new Map(existing.map((r) => [r.id, r]));
 
   let inserted = 0;
@@ -134,6 +137,9 @@ export async function seedPlayersTable(database: Database = defaultDb): Promise<
     }
     if (row.hasNmc && !ex.hasNmc) set.hasNmc = true;
     if (row.hasNtc && !ex.hasNtc) set.hasNtc = true;
+    // Fill a missing birthdate the same way as expiry: a real fact the sync
+    // can't supply, never overwriting one already on the row.
+    if (ex.birthDate == null && row.birthDate != null) set.birthDate = row.birthDate;
 
     if (Object.keys(set).length > 0) {
       await database
@@ -160,6 +166,7 @@ export async function seedPlayersTable(database: Database = defaultDb): Promise<
       hasNtc: row.hasNtc,
       expiryStatus: row.expiryStatus,
       expiryYear: row.expiryYear,
+      birthDate: row.birthDate ?? null,
       source: "seed",
     }));
     await database.insert(playersTable).values(chunk).onConflictDoNothing().catch(async () => {

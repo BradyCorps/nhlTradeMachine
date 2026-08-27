@@ -30,6 +30,8 @@ import { baselineForNhlPlayerId, type PlayerBaselineMap } from "@/app/lib/player
 import { secondaryPositionFor } from "@/app/data/secondary-positions";
 import { teamWindow } from "@/app/lib/team-window";
 import { resolveRecordedExtension, type RecordedExtension } from "@/app/lib/extensions";
+import { deriveAge, resolvePlayerAge } from "@/app/lib/player-age";
+import { SEASON_START_YEAR } from "@/app/lib/contract-expiry";
 
 const CONTRACTS_CACHE_TTL = 23 * 60 * 60; // 23 hours
 const CONTRACTS_CACHE_KEY = "cache:contracts:v2";
@@ -155,15 +157,10 @@ const developmentTeamContext = (phase: string | undefined, standing: number | un
   return "AVERAGE";
 };
 
-const calcAge = (birthDate: string): number => {
-  const b = new Date(birthDate);
-  if (!Number.isFinite(b.getTime())) return 27;
-  const n = new Date();
-  let age = n.getFullYear() - b.getFullYear();
-  const m = n.getMonth() - b.getMonth();
-  if (m < 0 || (m === 0 && n.getDate() < b.getDate())) age--;
-  return age;
-};
+// League-average age used only when a live NHL birthdate is malformed —
+// vanishingly rare, and a fixed non-alarming fallback beats a null here since
+// this path always has a real birthdate string to parse.
+const calcAge = (birthDate: string): number => deriveAge(birthDate) ?? 27;
 
 const developmentLinemateContext = (
   position: string,
@@ -1028,6 +1025,7 @@ export async function assembleCanonicalRoster(options: {
       position:        playersTable.position,
       teamId:          playersTable.teamId,
       age:             playersTable.age,
+      birthDate:       playersTable.birthDate,
       draftYear:       playersTable.draftYear,
       draftOverall:    playersTable.draftOverall,
       prospectPtsPace: playersTable.prospectPtsPace,
@@ -1059,7 +1057,10 @@ export async function assembleCanonicalRoster(options: {
           id:              d.id,
           name:            d.name,
           position:        normalisePos(d.position),
-          age:             d.age ?? 18,
+          age:             resolvePlayerAge({
+                             birthDate: d.birthDate, storedAge: d.age, draftYear: d.draftYear,
+                             seasonStartYear: SEASON_START_YEAR,
+                           }) ?? 18,
           headshot:        null,
           draftYear:       d.draftYear,
           draftOverall:    d.draftOverall,
@@ -1092,7 +1093,10 @@ export async function assembleCanonicalRoster(options: {
         id:              d.id,
         name:            d.name,
         position:        normalisePos(d.position),
-        age:             d.age ?? 25,
+        age:             resolvePlayerAge({
+                           birthDate: d.birthDate, storedAge: d.age, draftYear: d.draftYear,
+                           seasonStartYear: SEASON_START_YEAR,
+                         }) ?? 25,
         headshot:        null,
         draftYear:       d.draftYear,
         draftOverall:    d.draftOverall,

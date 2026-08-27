@@ -39,6 +39,10 @@ const RFA: string[] = [
   // Defence
   "Brandt Clarke", "Alexander Nikishin", "Jamie Drysdale", "Jordan Spence", "Simon Nemec",
   "Simon Edvinsson", "Pavel Mintyukov", "Olen Zellweger", "Braden Schneider", "Emil Andrae",
+  // Kevin Korchinski and Ethan Del Mastro (CHI): both ELCs expired after
+  // 2025-26; both received June 2026 qualifying offers and remain unsigned
+  // Group 2 RFAs as of August 2026 (DATA-01 canaries — see V-04).
+  "Kevin Korchinski", "Ethan Del Mastro",
   // Goalies
   "Jet Greaves", "Akira Schmid", "Arturs Silovs", "Samuel Ersson", "Leevi Merilainen",
 ];

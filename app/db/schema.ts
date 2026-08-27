@@ -14,6 +14,7 @@ export const players = sqliteTable("players", {
   secondaryPosition: text("secondary_position"),
   teamId:            text("team_id").references(() => teams.id),
   age:             integer("age"),
+  birthDate:       text("birth_date"),   // ISO date; canonical age source — see app/lib/player-age.ts
   capHit:          real("cap_hit").notNull(),
   yearsRemaining:  integer("years_remaining").notNull(),
   hasNmc:          integer("has_nmc", { mode: "boolean" }).default(false),

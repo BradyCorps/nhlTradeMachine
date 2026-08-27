@@ -88,6 +88,7 @@ describe("admin bulk free-agent writes", () => {
       secondary_position TEXT,
       team_id TEXT,
       age INTEGER,
+      birth_date TEXT,
       cap_hit REAL NOT NULL,
       years_remaining INTEGER NOT NULL,
       has_nmc INTEGER DEFAULT 0,

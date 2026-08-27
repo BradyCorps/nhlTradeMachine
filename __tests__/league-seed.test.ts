@@ -36,6 +36,14 @@ describe("league seed", () => {
     expect(nyquist).toMatchObject({ expiryStatus: "UFA", expiryYear: 2026 });
   });
 
+  it("DATA-01: Korchinski and Del Mastro carry a birthdate and current Group 2 RFA status", () => {
+    const seed = loadLeagueSeed();
+    const korchinski = seed.players.find((p) => p.id === "kevinkorchinski");
+    const delMastro = seed.players.find((p) => p.id === "ethandelmastro");
+    expect(korchinski).toMatchObject({ expiryStatus: "RFA", expiryYear: 2026, birthDate: "2004-06-21" });
+    expect(delMastro).toMatchObject({ expiryStatus: "RFA", expiryYear: 2026, birthDate: "2003-01-15" });
+  });
+
   it("inserts the full baseline into an empty table", async () => {
     const seed = loadLeagueSeed();
     const fake = makeFakeDb([]);
@@ -60,5 +68,17 @@ describe("league seed", () => {
     expect(result.filled).toBe(1);
     expect(fake._inserted.some((r: any) => r.id === "gustavnyquist")).toBe(false);
     expect(fake._updated[0]).toMatchObject({ expiryStatus: "UFA", expiryYear: 2026 });
+  });
+
+  it("fills a missing birthdate onto an existing row without overwriting one already set", async () => {
+    const fake = makeFakeDb([
+      { id: "kevinkorchinski", source: "sync", expiryStatus: "RFA", expiryYear: 2026, birthDate: null },
+      { id: "ethandelmastro", source: "editor", expiryStatus: "RFA", expiryYear: 2026, birthDate: "1999-01-01" },
+    ]);
+    const result = await seedPlayersTable(fake);
+    expect(result.filled).toBeGreaterThanOrEqual(1);
+    expect(fake._updated.some((u: any) => u.birthDate === "2004-06-21")).toBe(true);
+    // Editor row is never touched, so its (deliberately wrong here) birthdate stands.
+    expect(fake._updated.some((u: any) => u.birthDate === "2003-01-15")).toBe(false);
   });
 });

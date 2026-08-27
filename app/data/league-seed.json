@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-05T15:55:40.054Z",
+  "generatedAt": "2026-08-27T16:48:28.422Z",
   "season": "2026-27",
   "offseasonYear": 2026,
   "count": 1543,
@@ -5105,8 +5105,9 @@
       "yearsRemaining": 3,
       "hasNmc": false,
       "hasNtc": false,
-      "expiryStatus": null,
-      "expiryYear": null
+      "expiryStatus": "RFA",
+      "expiryYear": 2026,
+      "birthDate": "2003-01-15"
     },
     {
       "id": "ethanedwards",
@@ -9109,8 +9110,9 @@
       "yearsRemaining": 3,
       "hasNmc": false,
       "hasNtc": false,
-      "expiryStatus": null,
-      "expiryYear": null
+      "expiryStatus": "RFA",
+      "expiryYear": 2026,
+      "birthDate": "2004-06-21"
     },
     {
       "id": "kevinlankinen",
