@@ -3,6 +3,9 @@ import { siteSettings } from "@/app/db/schema";
 import { redis as defaultRedis } from "@/app/lib/redis";
 import { parseStoredCapCeiling } from "@/app/lib/cap-settings";
 import { SEASON } from "@/app/lib/season-config";
+import { XNAV_MODEL_VERSION } from "@/app/lib/data-context";
+import { manifestCacheKey } from "@/app/lib/release-manifest";
+import { snapshotDate } from "@/app/lib/valuation-snapshot";
 
 type Database = typeof defaultDb;
 type RedisClient = typeof defaultRedis;
@@ -23,12 +26,18 @@ export const LEAGUE_ANALYTICS_CACHE_KEY = "cache:league:analytics:v1";
 export const DOCKET_ENTRIES_CACHE_KEY = "cache:docket:entries:v1";
 export const LEGACY_CURATED_CAP_CEILING = 95.5;
 
+// DATA-06: "all downstream caches invalidate by snapshotDate + modelVersion."
+// A deployed model-version bump used to leave a stale-shaped cached payload
+// serving under its old key for up to TEAMS_CACHE_TTL (6h) with nothing to
+// force a miss; wrapping the existing cap-parameterized key through
+// manifestCacheKey makes that automatic — the key itself changes, so the old
+// entry is never looked up again rather than needing an explicit bust.
 export function teamCacheKey(capCeiling: number): string {
-  return `${TRADE_TEAMS_CACHE_KEY}:cap:${capCeiling.toFixed(1)}`;
+  return manifestCacheKey(`${TRADE_TEAMS_CACHE_KEY}:cap:${capCeiling.toFixed(1)}`, snapshotDate(), XNAV_MODEL_VERSION);
 }
 
 export function leagueTeamCacheKey(capCeiling: number): string {
-  return `${LEAGUE_TEAMS_CACHE_KEY}:cap:${capCeiling.toFixed(1)}`;
+  return manifestCacheKey(`${LEAGUE_TEAMS_CACHE_KEY}:cap:${capCeiling.toFixed(1)}`, snapshotDate(), XNAV_MODEL_VERSION);
 }
 
 export function teamCacheKeys(...capCeilings: number[]): string[] {

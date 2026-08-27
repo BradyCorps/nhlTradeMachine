@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getTableName } from "drizzle-orm";
+import { teamCacheKey } from "../app/lib/team-cache";
 
 const state = vi.hoisted(() => ({
   deletedKeys: [] as string[],
@@ -92,7 +93,9 @@ describe("admin contract source reset", () => {
     expect(body.clearedCacheKeys).toEqual(expect.arrayContaining([
       "cache:league:teams:v1",
       "cache:trade:teams:v1",
-      "cache:trade:teams:v1:cap:102.3",
+      // DATA-06: wrapped through manifestCacheKey now (snapshot date + model
+      // version) — build the expectation from the real function.
+      teamCacheKey(102.3),
       "cache:contracts:v2",
     ]));
   });

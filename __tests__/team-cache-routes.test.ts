@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getTableName } from "drizzle-orm";
 import { SEASON } from "../app/lib/season-config";
+import { teamCacheKey } from "../app/lib/team-cache";
 
 const state = vi.hoisted(() => ({
   deletedKeys: [] as string[],
@@ -71,9 +72,12 @@ describe("admin team cache invalidation", () => {
     expect(state.deletedKeys).toEqual(expect.arrayContaining([
       "cache:league:teams:v1",
       "cache:trade:teams:v1",
-      `cache:trade:teams:v1:cap:${SEASON.capCeiling.toFixed(1)}`,
-      "cache:trade:teams:v1:cap:95.5",
-      "cache:trade:teams:v1:cap:102.3",
+      // DATA-06: this key is now wrapped through manifestCacheKey (snapshot
+      // date + model version), so build the expectation from the real
+      // function rather than pinning its internal string shape here.
+      teamCacheKey(SEASON.capCeiling),
+      teamCacheKey(95.5),
+      teamCacheKey(102.3),
     ]));
   });
 
@@ -86,9 +90,12 @@ describe("admin team cache invalidation", () => {
     expect(body.cleared).toEqual(expect.arrayContaining([
       "cache:league:teams:v1",
       "cache:trade:teams:v1",
-      `cache:trade:teams:v1:cap:${SEASON.capCeiling.toFixed(1)}`,
-      "cache:trade:teams:v1:cap:95.5",
-      "cache:trade:teams:v1:cap:102.3",
+      // DATA-06: this key is now wrapped through manifestCacheKey (snapshot
+      // date + model version), so build the expectation from the real
+      // function rather than pinning its internal string shape here.
+      teamCacheKey(SEASON.capCeiling),
+      teamCacheKey(95.5),
+      teamCacheKey(102.3),
     ]));
   });
 });
