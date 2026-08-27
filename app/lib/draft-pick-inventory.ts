@@ -5,6 +5,7 @@ import { TEAMS_DB } from "@/app/lib/db";
 import { pickEffectiveStanding } from "@/app/lib/pick-value";
 import { SEASON } from "@/app/lib/season-config";
 import { teamWindow } from "@/app/lib/team-window";
+import { ALL_DRAFT_ROUNDS } from "@/app/lib/draft-picks";
 
 type TeamPickContext = {
   id: string;
@@ -49,7 +50,7 @@ export async function buildDraftPickInventory(teams: TeamPickContext[]) {
 
   TEAMS_DB.forEach((origTeam) => {
     [firstYear, firstYear + 1, firstYear + 2, firstYear + 3, firstYear + 4].flatMap(year =>
-      [1, 2, 3, 4, 5].map(round => ({ round, year }))
+      ALL_DRAFT_ROUNDS.map(round => ({ round, year }))
     ).forEach(({ round, year }) => {
       const id = `pick-${origTeam.id}-${year}-${round}`;
       const override = pickOverrideMap.get(id);

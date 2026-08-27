@@ -14,6 +14,16 @@ import { SEASON } from "./season-config";
 import type { Asset } from "./trade-types";
 
 /**
+ * Every round the NHL draft actually has (DATA-04). Trade Machine, the
+ * league pick inventory, and the admin pick editor each generated their own
+ * `[1, 2, 3, 4, 5]` — three copies of the same wrong number, silently
+ * dropping every club's 6th- and 7th-round picks from every surface that
+ * lets a user own, trade, or protect one. One constant now, so a round can
+ * only ever be added or removed in one place.
+ */
+export const ALL_DRAFT_ROUNDS = [1, 2, 3, 4, 5, 6, 7] as const;
+
+/**
  * The draft held when the league enters Cup Run year `cupYear`.
  *
  * Year 1 is entered through the base draft (`SEASON.draftYear`); each later year

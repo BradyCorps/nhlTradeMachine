@@ -239,6 +239,40 @@ describe("Pick NAV — First Round Curve", () => {
     const second = calcPickNAV({ id:"s",name:"2nd",position:"Pick",age:0,capHit:0,yearsRemaining:0,round:2,year:2026,teamStanding:25 });
     expect(second.total).toBeLessThan(first.total);
   });
+
+  // DATA-04: rounds 4-7 used to share ONE flat value (2) regardless of round
+  // or standing — a lottery team's 4th priced identically to a contender's
+  // 7th, and a newly-tradable 6th/7th (ALL_DRAFT_ROUNDS) would have been
+  // indistinguishable from a 4th. This is a mechanical extension of the
+  // existing hand-tuned table, not a calibrated distribution — see the
+  // comment in calcPickNAV.
+  it("rounds 3 through 7 strictly decrease for the same team and year", () => {
+    const at = (round: number) => calcPickNAV({
+      id: `r${round}`, name: `r${round}`, position: "Pick",
+      age: 0, capHit: 0, yearsRemaining: 0, round, year: 2026, teamStanding: 16,
+    }).total;
+    const values = [3, 4, 5, 6, 7].map(at);
+    for (let i = 1; i < values.length; i++) {
+      expect(values[i]).toBeLessThanOrEqual(values[i - 1]);
+    }
+  });
+
+  it("a lottery team's late-round pick is never cheaper than a contender's same-round pick", () => {
+    for (const round of [4, 5, 6, 7]) {
+      const lottery = calcPickNAV({ id: "lot", name: "lot", position: "Pick", age: 0, capHit: 0, yearsRemaining: 0, round, year: 2026, teamStanding: 30 }).total;
+      const contender = calcPickNAV({ id: "con", name: "con", position: "Pick", age: 0, capHit: 0, yearsRemaining: 0, round, year: 2026, teamStanding: 5 }).total;
+      expect(lottery).toBeGreaterThanOrEqual(contender);
+    }
+  });
+
+  it("no round-4-through-7 pick is worth more than a 3rd, or less than the pick floor", () => {
+    const third = calcPickNAV({ id: "r3", name: "r3", position: "Pick", age: 0, capHit: 0, yearsRemaining: 0, round: 3, year: 2026, teamStanding: 30 }).total;
+    for (const round of [4, 5, 6, 7]) {
+      const total = calcPickNAV({ id: `r${round}`, name: `r${round}`, position: "Pick", age: 0, capHit: 0, yearsRemaining: 0, round, year: 2026, teamStanding: 30 }).total;
+      expect(total).toBeLessThanOrEqual(third);
+      expect(total).toBeGreaterThanOrEqual(1);
+    }
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

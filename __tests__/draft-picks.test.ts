@@ -4,9 +4,18 @@
 // must vanish. The old boundary kept them, leaving a traded 2027 first
 // tradeable after it had already conveyed.
 import { describe, expect, it } from "vitest";
-import { dropSpentDraftPicks, draftYearForCupYear } from "@/app/lib/draft-picks";
+import { ALL_DRAFT_ROUNDS, dropSpentDraftPicks, draftYearForCupYear } from "@/app/lib/draft-picks";
 import { SEASON } from "@/app/lib/season-config";
 import type { Asset } from "@/app/lib/trade-types";
+
+// DATA-04: the trade-machine inventory, the admin pick editor, and the admin
+// API each hand-copied `[1, 2, 3, 4, 5]` — silently dropping every 6th and
+// 7th round pick from three surfaces at once. One canonical list now.
+describe("ALL_DRAFT_ROUNDS", () => {
+  it("covers the real NHL draft's seven rounds", () => {
+    expect(ALL_DRAFT_ROUNDS).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  });
+});
 
 const pick = (origTeam: string, year: number, round: number, owner = origTeam): Asset =>
   ({

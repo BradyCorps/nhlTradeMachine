@@ -964,7 +964,10 @@ describe("Canary — Player Card AA redesign + FMV surplus read", () => {
 });
 
 describe("Canary — draft pick inventory", () => {
-  it("league routes create rounds 1-5 for five draft years", () => {
+  // DATA-04: this canary used to pin the bug it should have caught — every
+  // club's 6th and 7th round picks were silently absent because the
+  // inventory only ever generated rounds 1-5.
+  it("league routes create all seven rounds for five draft years", () => {
     const league = read("app/api/league/route.ts");
     const teams = read("app/api/league/teams/route.ts");
     const helper = read("app/lib/draft-pick-inventory.ts");
@@ -972,7 +975,7 @@ describe("Canary — draft pick inventory", () => {
     expect(teams).toContain("buildDraftPickInventory(LIVE_TEAMS)");
     expect(helper).toContain("[firstYear, firstYear + 1, firstYear + 2, firstYear + 3, firstYear + 4]");
     expect(helper).toContain("SEASON.firstTradablePickYear");
-    expect(helper).toContain("[1, 2, 3, 4, 5].map(round => ({ round, year }))");
+    expect(helper).toContain("ALL_DRAFT_ROUNDS.map(round => ({ round, year }))");
     expect(helper).toContain("draftPickOverrides");
     expect(helper).toContain("currentOwnerId");
     expect(helper).toContain("via ${origTeam.id}");

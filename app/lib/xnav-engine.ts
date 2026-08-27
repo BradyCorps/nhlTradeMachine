@@ -489,7 +489,21 @@ export function calcPickNAV(asset: AssetInput): XNAVResult {
   } else if (round === 3) {
     baseValue = standing >= 25 ? 5 : 3;
   } else {
-    baseValue = 2;
+    // Rounds 4-7 (DATA-04): every pick this deep used to share ONE flat
+    // value regardless of round or standing — a lottery team's 4th priced
+    // identically to a contender's 7th, and a newly-tradable 6th/7th (see
+    // ALL_DRAFT_ROUNDS) would have been indistinguishable from a 4th. This
+    // keeps round 3's two-tier standing shape and steps it down per round so
+    // the ordering at least holds. It is a mechanical extension of the
+    // existing hand-tuned table, NOT a calibrated distribution — no
+    // draft-slot-to-outcome or trade-market evidence backs these numbers,
+    // and per the project's model-validation rule a real pick-value curve
+    // needs its own backtest before this is more than a placeholder shape.
+    const LATE_ROUND_BASE: Record<number, readonly [number, number]> = {
+      4: [3, 2], 5: [2.2, 1.5], 6: [1.6, 1.1], 7: [1.2, 1],
+    };
+    const [highStanding, lowStanding] = LATE_ROUND_BASE[round] ?? LATE_ROUND_BASE[7];
+    baseValue = standing >= 25 ? highStanding : lowStanding;
   }
 
   // CX8 — protection is a real term, so it has to move a number.

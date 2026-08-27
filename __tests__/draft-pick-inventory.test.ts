@@ -47,4 +47,21 @@ describe("draft pick inventory", () => {
       conditions: "top-10 protected",
     });
   });
+
+  // DATA-04: rounds 6-7 were silently omitted — only [1,2,3,4,5] were ever
+  // generated, so a real trade involving a 6th or 7th had no tradable asset
+  // to represent it.
+  it("generates all seven rounds, not just the first five", async () => {
+    const { buildDraftPickInventory } = await import("../app/lib/draft-pick-inventory");
+    const picks = await buildDraftPickInventory([{ id: "CGY", phase: "Tanking", standing: 32 }]);
+
+    const cgyFirstYearRounds = picks
+      .filter((p: any) => p.id.startsWith(`pick-CGY-${SEASON.firstTradablePickYear}-`))
+      .map((p: any) => p.round)
+      .sort((a: number, b: number) => a - b);
+    expect(cgyFirstYearRounds).toEqual([1, 2, 3, 4, 5, 6, 7]);
+
+    const seventh = picks.find((p: any) => p.id === `pick-CGY-${SEASON.firstTradablePickYear}-7`);
+    expect(seventh).toMatchObject({ round: 7, name: expect.stringContaining("7th Round Pick") });
+  });
 });

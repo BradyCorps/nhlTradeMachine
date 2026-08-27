@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { adminErrorMessage, readAdminResponse } from "../admin-response";
 import { toast } from "@/app/lib/ledger-toast";
+import { ALL_DRAFT_ROUNDS } from "@/app/lib/draft-picks";
 
 interface PickRow {
   id: string;
@@ -210,7 +211,7 @@ export default function DraftPicksPage() {
             className="admin-filter-control"
             style={{ ...inputStyle, width: "auto", fontSize: 12 }}>
             <option value="ALL">All Rounds</option>
-            {[1,2,3,4,5].map((r) => <option key={r} value={String(r)}>{ROUND_LABEL(r)}</option>)}
+            {ALL_DRAFT_ROUNDS.map((r) => <option key={r} value={String(r)}>{ROUND_LABEL(r)}</option>)}
           </select>
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--ledger-ink-faint)", cursor: "pointer" }}>
             <input type="checkbox" checked={showMovedOnly} onChange={(e) => setShowMovedOnly(e.target.checked)} />
