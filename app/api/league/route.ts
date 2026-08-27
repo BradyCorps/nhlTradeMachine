@@ -16,6 +16,7 @@ import { swrStore } from "@/app/lib/swr-store";
 import { getCachedRoster } from "@/app/lib/cached-roster";
 import { applyTeamCapDeltas } from "@/app/lib/cap-delta";
 import { buildLeagueProvenance } from "@/app/lib/data-context";
+import { rosterLegality } from "@/app/lib/roster-legality";
 
 export const dynamic = "force-dynamic";
 
@@ -428,6 +429,10 @@ async function buildLeagueAnalyticsPayload() {
     needs:    t.needs ?? [],
     record:   t.record ?? null,
     capBreakdown: t.capBreakdown ?? null,
+    // DATA-03: machine-readable 12F/6D/2G accounting against the active
+    // roster this club actually carries, not a description of it — same
+    // pure counter the Armchair GM simulation gate already trusts.
+    lineupAccounting: rosterLegality(roster.players, t.id),
   }));
 
   const players = [...roster.players, ...picks];

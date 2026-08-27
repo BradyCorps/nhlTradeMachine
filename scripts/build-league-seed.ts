@@ -52,6 +52,12 @@ const SEED_CORRECTIONS: Record<string, Partial<SeedRow>> = {
   // merge below; birthDate is not, so it is corrected here.
   "Kevin Korchinski":  { birthDate: "2004-06-21" },
   "Ethan Del Mastro":  { birthDate: "2003-01-15" },
+  // DATA-03 canary: signed with Chicago July 1, 2026 (1yr/$4.0M, not the
+  // stale $2.8M carried over from a prior club) — a real pending 2027 UFA,
+  // not part of the 2026 FA-class list below (he is not expiring THIS
+  // offseason). Set directly rather than through the FA-class merge, which
+  // is hardcoded to OFFSEASON_YEAR (nhl.com/blackhawks release, puckpedia).
+  "Ian Cole": { capHit: 4.0, expiryStatus: "UFA", expiryYear: 2027 },
 };
 
 // Same-name players collapse to a single makeId, and the bundled snapshot

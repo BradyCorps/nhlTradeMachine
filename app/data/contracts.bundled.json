@@ -3852,11 +3852,13 @@
     "canRetain": true
   },
   "Ian Cole": {
-    "capHit": 2.8,
+    "capHit": 4.0,
     "yearsRemaining": 1,
     "hasNMC": false,
     "hasNTC": false,
-    "canRetain": true
+    "canRetain": true,
+    "expiryStatus": "UFA",
+    "expiryYear": 2027
   },
   "Ian Mitchell": {
     "capHit": 0.775,

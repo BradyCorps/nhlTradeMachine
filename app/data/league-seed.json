@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-27T16:48:28.422Z",
+  "generatedAt": "2026-08-27T17:13:54.432Z",
   "season": "2026-27",
   "offseasonYear": 2026,
   "count": 1543,
@@ -6070,12 +6070,12 @@
       "id": "iancole",
       "name": "Ian Cole",
       "position": "Unknown",
-      "capHit": 2.8,
+      "capHit": 4,
       "yearsRemaining": 1,
       "hasNmc": false,
       "hasNtc": false,
-      "expiryStatus": null,
-      "expiryYear": null
+      "expiryStatus": "UFA",
+      "expiryYear": 2027
     },
     {
       "id": "ianmitchell",
