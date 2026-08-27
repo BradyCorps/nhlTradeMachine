@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { withProjectedTrade } from "@/app/lib/cap-horizon";
+import { effectiveCapHit } from "@/app/lib/cap-delta";
 import { CapHorizon } from "@/app/components/CapHorizon";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
@@ -455,7 +456,11 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function summarizePackage(assets: Asset[], navMap: Record<string, XNAVResult>): PackageSummary {
   const players = assets.filter(asset => asset.position !== "Pick");
-  const cap = players.reduce((sum, asset) => sum + asset.capHit * (1 - (asset.retainedPct || 0)), 0);
+  // DATA-05: was a fourth independent copy of this formula (xnav-engine,
+  // cap-delta.ts, and the unused CapProjection.tsx each had their own) — the
+  // exact drift risk the ledger tickets exist to close, even where every
+  // copy still agrees today.
+  const cap = players.reduce((sum, asset) => sum + effectiveCapHit(asset), 0);
   const production = players.reduce((sum, asset) => sum + (asset.ptsPace ?? 0), 0);
   const goals = players.reduce((sum, asset) => sum + (asset.goalsPace ?? 0), 0);
   const xg = players.reduce((sum, asset) => sum + (asset.xGPace ?? 0), 0);

@@ -2,6 +2,7 @@
 
 import { SEASON } from "@/app/lib/season-config";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
+import { applyCapDelta, effectiveCapHit as sharedEffectiveCapHit } from "@/app/lib/cap-delta";
 
 // ============================================================
 // CAP PROJECTION PANEL
@@ -50,7 +51,10 @@ const posLabel: Record<string, string> = {
 };
 
 const assetKey = (a: Asset) => `${a.id}::${a.teamId ?? ""}`;
-const effectiveCapHit = (a: Asset) => (a.capHit || 0) * (1 - (a.retainedPct || 0));
+// DATA-05: the single source of truth for retention math — same helper the
+// simulation and free-agency resolver use, so a trade's cap delta can't
+// drift from what this panel showed.
+const effectiveCapHit = sharedEffectiveCapHit;
 
 const RosterSlot = ({ player, isNew, isLeaving }: {
   player: Asset;
@@ -101,11 +105,18 @@ const TeamProjection = ({ team, currentRoster, outgoing, incoming, label }: {
     return true;
   });
 
-  const currentCapUsed = currentRoster.reduce((s, a) => s + effectiveCapHit(a), 0);
-  const outCap  = outgoing.reduce((s, a) => s + effectiveCapHit(a), 0);
-  const inCap   = incoming.filter(a => a.position !== "Pick").reduce((s, a) => s + effectiveCapHit(a), 0);
-  const postCapUsed = currentCapUsed - outCap + inCap;
-  const postCapSpace = CAP_CEILING - postCapUsed;
+  // DATA-05: this used to sum the roster's cap hits from scratch — the exact
+  // "naive sum of contract rows" team-cap-space.ts warns overstates used cap,
+  // because it can't see LTIR relief, buried contracts, or bonus overages.
+  // The team's own curated capSpace (the same figure Teams and the trade
+  // summary read) is the baseline; the trade only ever applies as a delta on
+  // top of it, via the one shared delta function every cap consumer uses.
+  const currentCapSpace = team.capSpace;
+  const postCapSpace = applyCapDelta(currentCapSpace, {
+    outgoing,
+    incoming: incoming.filter(a => a.position !== "Pick"),
+  });
+  const postCapUsed = CAP_CEILING - postCapSpace;
 
   // Group by normalised position
   const groupByPos = (roster: Asset[]) => {
@@ -128,8 +139,16 @@ const TeamProjection = ({ team, currentRoster, outgoing, incoming, label }: {
         <div className="text-[9px] text-zinc-600 font-black uppercase tracking-wider">{label}</div>
       </div>
 
-      {/* Cap bar */}
+      {/* Cap bar — before AND after, from the same curated baseline plus one
+          delta, so the two totals reconcile rather than each being computed
+          a different way (DATA-05). */}
       <div className="mb-4">
+        <div className="flex justify-between text-[11px] text-zinc-700 font-mono mb-1">
+          <span className="uppercase tracking-wider font-black text-zinc-800">Cap Before Trade</span>
+          <span className="font-black">
+            {currentCapSpace >= 0 ? `+$${currentCapSpace.toFixed(1)}M` : `-$${Math.abs(currentCapSpace).toFixed(1)}M over`}
+          </span>
+        </div>
         <div className="flex justify-between items-center mb-1">
           <span className="text-[11px] font-black uppercase tracking-wider text-zinc-700">Cap After Trade</span>
           <span className={`text-[10px] font-black font-mono ${postCapSpace >= 0 ? "text-emerald-400" : "text-rose-400"}`}>

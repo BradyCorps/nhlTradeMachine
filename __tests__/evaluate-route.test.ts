@@ -150,6 +150,61 @@ describe("evaluate route integration", () => {
     ]));
   });
 
+  // DATA-05: the CBA caps a club at three active retention slots. A single
+  // trade retaining on four contracts at once used to have nothing to stop
+  // it — only Armchair GM's Cup Run simulation enforced this rule.
+  it("hard-vetoes a four-retained-contract stress test (CBA limit is three)", async () => {
+    const home = team({ id: "WPG", name: "Winnipeg Jets", capSpace: 20, phase: "Contender", standing: 4 });
+    const partner = team({ id: "SJS", name: "San Jose Sharks", capSpace: 20, phase: "Rebuilding", standing: 29 });
+    const outgoing = [1, 2, 3, 4].map((n) => asset({
+      id: `retained-${n}`, name: `Retained ${n}`, teamId: "WPG", capHit: 3, retainedPct: 0.3, ptsPace: 20,
+    }));
+    const incoming = [asset({ id: "return", name: "Return Piece", teamId: "SJS", capHit: 5, ptsPace: 40 })];
+
+    const { response, body } = await postEvaluate({
+      assets: [...outgoing, ...incoming],
+      tradeOutgoing: outgoing,
+      tradeIncoming: incoming,
+      homeTeam: home,
+      partnerTeam: partner,
+      allHomeRoster: outgoing,
+      allPartnerRoster: incoming,
+      runTrade: true,
+      capCeiling: 104,
+    });
+
+    expect(response.status).toBe(200);
+    expect(body.verdict.status).toBe("BLOCKED");
+    expect(body.verdict.flags).toEqual(expect.arrayContaining([
+      expect.objectContaining({ severity: "HARD", category: "RETAIN_ABUSE" }),
+    ]));
+  });
+
+  it("allows a trade retaining on exactly three contracts", async () => {
+    const home = team({ id: "WPG", name: "Winnipeg Jets", capSpace: 20, phase: "Contender", standing: 4 });
+    const partner = team({ id: "SJS", name: "San Jose Sharks", capSpace: 20, phase: "Rebuilding", standing: 29 });
+    const outgoing = [1, 2, 3].map((n) => asset({
+      id: `retained-${n}`, name: `Retained ${n}`, teamId: "WPG", capHit: 3, retainedPct: 0.3, ptsPace: 20,
+    }));
+    const incoming = [asset({ id: "return", name: "Return Piece", teamId: "SJS", capHit: 5, ptsPace: 40 })];
+
+    const { body } = await postEvaluate({
+      assets: [...outgoing, ...incoming],
+      tradeOutgoing: outgoing,
+      tradeIncoming: incoming,
+      homeTeam: home,
+      partnerTeam: partner,
+      allHomeRoster: outgoing,
+      allPartnerRoster: incoming,
+      runTrade: true,
+      capCeiling: 104,
+    });
+
+    expect(body.verdict.flags).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: "RETAIN_ABUSE", headline: expect.stringContaining("Slots Full") }),
+    ]));
+  });
+
   it("hard-vetoes an untouchable partner asset", async () => {
     const home = team({ id: "EDM", name: "Edmonton Oilers", capSpace: 20, phase: "Contender", standing: 3 });
     const partner = team({ id: "SJS", name: "San Jose Sharks", capSpace: 20, phase: "Rebuilding", standing: 29 });

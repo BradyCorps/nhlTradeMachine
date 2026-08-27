@@ -13,6 +13,7 @@ import { SEASON, LEAGUE, FRANCHISE } from "@/app/lib/season-config";
 import { assessFranchiseReturn, assessCreaseContext } from "@/app/lib/gm-audit-context";
 import { compressPackage as coreCompress, type XNAVResult } from "@/app/lib/xnav-engine";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
+import { MAX_RETENTION_SLOTS, retainedSlotsInTrade } from "@/app/lib/retention-ledger";
 import { getLiveCapCeiling, getLiveCapFloor } from "@/app/lib/live-cap-settings";
 import {
   DIVISION_BY_TEAM,
@@ -448,6 +449,25 @@ const runGmLogic = (
     severity: "HARD", category: "RETAIN_ABUSE",
     headline: "Retention Exceeds 50% Cap",
     explanation: `The NHL CBA prohibits retaining more than 50% of any player's cap hit.`,
+  });
+
+  // DATA-05: the 50% check above says nothing about HOW MANY contracts a
+  // club can retain on at once — the CBA caps that at three. This used to
+  // be enforced only inside Armchair GM's Cup Run simulation; a single
+  // Trade Machine proposal could retain on four different players with
+  // nothing to stop it. Checked per side: each club is independently bound
+  // by its own three-slot limit.
+  const homeRetainedSlots    = retainedSlotsInTrade(outgoing);
+  const partnerRetainedSlots = retainedSlotsInTrade(incoming);
+  if (homeRetainedSlots > MAX_RETENTION_SLOTS) flags.push({
+    severity: "HARD", category: "RETAIN_ABUSE",
+    headline: `Retention Slots Full — ${teamHome?.name ?? "This club"}`,
+    explanation: `${teamHome?.name ?? "This club"} would retain on ${homeRetainedSlots} contracts in one trade. The NHL CBA caps a club at ${MAX_RETENTION_SLOTS} active retention slots.`,
+  });
+  if (partnerRetainedSlots > MAX_RETENTION_SLOTS) flags.push({
+    severity: "HARD", category: "RETAIN_ABUSE",
+    headline: `Retention Slots Full — ${teamPartner?.name ?? "The other club"}`,
+    explanation: `${teamPartner?.name ?? "The other club"} would retain on ${partnerRetainedSlots} contracts in one trade. The NHL CBA caps a club at ${MAX_RETENTION_SLOTS} active retention slots.`,
   });
 
   const partnerElites = incoming.filter((a) => navOf(a) > 260 && !isShoppedAsset(a));

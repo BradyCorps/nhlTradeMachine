@@ -1675,13 +1675,27 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(src).toContain("unauthenticated calls return `401`");
   });
 
-  it("cap projection uses retained effective cap and only strikes through players from the current roster", () => {
+  it("cap projection uses the shared retention-aware delta from a curated baseline, and only strikes through players from the current roster", () => {
     const src = read("app/components/CapProjection.tsx");
-    expect(src).toContain("const effectiveCapHit =");
-    expect(src).toContain("currentRoster.reduce((s, a) => s + effectiveCapHit(a), 0)");
+    // DATA-05: this used to sum the roster's contract rows from scratch —
+    // the naive-sum method team-cap-space.ts documents as overstating used
+    // cap, because it can't see LTIR relief, buried contracts, or bonus
+    // overages. The curated `team.capSpace` (same figure Teams and the
+    // trade summary read) is now the baseline, and the trade applies as one
+    // delta via the same shared function every cap consumer uses.
+    expect(src).toContain('import { applyCapDelta, effectiveCapHit as sharedEffectiveCapHit } from "@/app/lib/cap-delta"');
+    expect(src).toContain("const currentCapSpace = team.capSpace");
+    expect(src).toContain("applyCapDelta(currentCapSpace,");
     expect(src).toContain("currentKeys.has(assetKey(a))");
     expect(src).toContain("players.length + departing.length");
     expect(src).toContain("outKeys.has(assetKey(a))");
+  });
+
+  it("DATA-05: the live Trade Machine summary also uses the one shared effective-cap formula", () => {
+    const src = read("app/components/QuickTradeMachine.tsx");
+    expect(src).toContain('import { effectiveCapHit } from "@/app/lib/cap-delta"');
+    expect(src).not.toContain("asset.capHit * (1 - (asset.retainedPct || 0))");
+    expect(src).toContain("players.reduce((sum, asset) => sum + effectiveCapHit(asset), 0)");
   });
 
   it("league routes preserve young-player contracts when only position metadata disagrees", () => {
