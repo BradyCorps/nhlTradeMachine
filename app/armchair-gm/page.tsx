@@ -28,6 +28,7 @@ import DraftNight from "@/app/components/DraftNight";
 import { draftedRookieAssets } from "@/app/lib/draft-rookies";
 import { reconcileDraftedRookies } from "@/app/lib/draft-reconcile";
 import TradeBlockPanel from "@/app/components/TradeBlockPanel";
+import FreeAgentBoard from "@/app/components/FreeAgentBoard";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 import { useSimDispatch } from "./useSimDispatch";
 import CupRunPanel from "@/app/components/CupRunPanel";
@@ -146,6 +147,7 @@ export default function ArmchairGmPage() {
   const [verdictOpen, setVerdictOpen] = useState(false);   // bottom sheet expanded
   const [showTeamSelect, setShowTeamSelect] = useState(false); // Team select modal open
   const [tradeBlockOpen, setTradeBlockOpen] = useState(false);
+  const [freeAgentBoardOpen, setFreeAgentBoardOpen] = useState(false);
   const [tradeRequest,   setTradeRequest]   = useState<Asset[] | null>(null);
 
   const tradeInputKey = useMemo(() => JSON.stringify({
@@ -774,6 +776,14 @@ export default function ArmchairGmPage() {
           onClose={() => setTradeBlockOpen(false)}
         />
       )}
+      {/* ── Free Agent Board ────────────────────────────────────── */}
+      {freeAgentBoardOpen && db.players.length > 0 && (
+        <FreeAgentBoard
+          players={db.players}
+          navMap={navMap}
+          onClose={() => setFreeAgentBoardOpen(false)}
+        />
+      )}
 
       {/* ── Team Selection Modal ─────────────────────────────────── */}
       {showTeamSelect && db.teams.length > 0 && (
@@ -1087,6 +1097,24 @@ export default function ArmchairGmPage() {
                 onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
                 onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
                 ◉ Trade Block
+              </button>
+            )}
+
+            {/* ── Free Agents ── */}
+            {db.players.length > 0 && (
+              <button
+                onClick={() => setFreeAgentBoardOpen(true)}
+                aria-label="Browse restricted and unrestricted free agents"
+                className="tap-target w-full py-2.5 font-black uppercase tracking-widest text-[11px] transition-all duration-200 active:scale-[0.97]"
+                style={{
+                  background: 'var(--amber-dim, rgba(148,105,20,0.12))',
+                  color: 'var(--amber, #946914)',
+                  border: '1px solid rgba(148,105,20,0.4)',
+                  fontFamily: 'monospace',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
+                ⚑ Free Agents
               </button>
             )}
 

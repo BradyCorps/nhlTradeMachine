@@ -4,6 +4,10 @@ import React, { useMemo, useState } from "react";
 import type { Asset, Team } from "@/app/lib/trade-types";
 import { useBodyScrollLock } from "@/app/lib/use-body-scroll-lock";
 import { displayPosition } from "@/app/lib/display-position";
+import {
+  filterTradeBlockPlayers, tradeBlockCounts,
+  type TradeBlockPosFilter, type TradeBlockStatusFilter,
+} from "@/app/lib/trade-block";
 
 interface Props {
   players: Asset[];
@@ -19,56 +23,25 @@ const STATUS_CONFIG = {
   auto:        { color: "var(--ledger-ink-faint)", bg: "transparent", border: "var(--rule)",      label: "AUTO"        },
 };
 
-// Computer-determined sell candidates — the "what teams could give up" half of
-// the trade block. Classic availability profile: veteran on an expiring-ish deal,
-// on a team selling (Rebuilding/Tanking/Retooling), real cap hit, not admin-flagged.
-function isAutoAvailable(p: Asset, phase: string | undefined): boolean {
-  if (p.tradeBlockStatus) return false;
-  if (p.position === "Pick") return false;
-  const selling = phase === "Rebuilding" || phase === "Tanking" || phase === "Retooling";
-  return selling
-    && (p.age ?? 0) >= 29
-    && (p.yearsRemaining ?? 99) <= 2
-    && (p.capHit ?? 0) >= 3;
-}
-
 const POSITION_TABS = ["ALL", "C", "W", "D", "G"] as const;
-type PosFilter = typeof POSITION_TABS[number];
 
 export default function TradeBlockPanel({ players, teams, onSelectTeam, onClose }: Props) {
-  const [posFilter,  setPosFilter]  = useState<PosFilter>("ALL");
-  const [showStatus, setShowStatus] = useState<"available_requested" | "all">("available_requested");
+  const [posFilter,  setPosFilter]  = useState<TradeBlockPosFilter>("ALL");
+  const [showStatus, setShowStatus] = useState<TradeBlockStatusFilter>("available_requested");
   const [search,     setSearch]     = useState("");
   useBodyScrollLock(true);
 
   const teamMap = useMemo(() =>
     new Map(teams.map(t => [t.id, t])), [teams]);
+  const teamPhaseById = useMemo(() =>
+    new Map(teams.map(t => [t.id, t.phase])), [teams]);
 
-  const filtered = useMemo(() => {
-    const statusSet = showStatus === "available_requested"
-      ? new Set(["requested", "available"])
-      : new Set(["requested", "available", "untouchable"]);
+  const filtered = useMemo(
+    () => filterTradeBlockPlayers(players, teamPhaseById, { posFilter, showStatus, search }),
+    [players, posFilter, showStatus, search, teamPhaseById],
+  );
 
-    return players
-      .filter(p => p.position !== "Pick")
-      .filter(p => statusSet.has(p.tradeBlockStatus ?? "")
-        || isAutoAvailable(p, teamMap.get(p.teamId)?.phase))
-      .filter(p => posFilter === "ALL" || p.position === posFilter)
-      .filter(p => !search.trim() || p.name.toLowerCase().includes(search.toLowerCase())
-        || p.teamId.toLowerCase().includes(search.toLowerCase()))
-      .sort((a, b) => {
-        const rank = (s: string | null | undefined) =>
-          s === "requested" ? 0 : s === "available" ? 1 : s === "untouchable" ? 2 : 3;
-        const r = rank(a.tradeBlockStatus) - rank(b.tradeBlockStatus);
-        if (r !== 0) return r;
-        return (b.capHit ?? 0) - (a.capHit ?? 0);
-      });
-  }, [players, posFilter, showStatus, search, teamMap]);
-
-  const counts = useMemo(() => ({
-    requested: players.filter(p => p.tradeBlockStatus === "requested").length,
-    available: players.filter(p => p.tradeBlockStatus === "available").length,
-  }), [players]);
+  const counts = useMemo(() => tradeBlockCounts(players), [players]);
 
   const requested   = filtered.filter(p => p.tradeBlockStatus === "requested");
   const available   = filtered.filter(p => p.tradeBlockStatus === "available");
