@@ -41,6 +41,14 @@ export const players = sqliteTable("players", {
   // Provenance: 'seed' = canonical baseline, 'sync' = live CapWages ingest,
   // 'editor' = hand-curated. Ingestion never clobbers 'editor' rows.
   source:            text("source").default("seed"),
+  // ISO timestamp a human last confirmed capHit/yearsRemaining/expiryStatus/
+  // expiryYear against a real source (editor save, paste-box ingest). NOT the
+  // same as "internally consistent" — see app/lib/contract-verification.ts.
+  // A row's expiryYear = seasonStartYear + yearsRemaining can hold forever
+  // even when yearsRemaining hasn't been touched in years; this is the one
+  // signal that actually distinguishes "recently confirmed" from "never
+  // revisited since the initial sync."
+  termVerifiedAt:    text("term_verified_at"),
 });
 
 // Global key-value config — cap_ceiling, cap_floor, etc.

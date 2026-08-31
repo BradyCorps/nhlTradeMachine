@@ -29,6 +29,11 @@ interface Row {
   suggestedExpiryYear: number | null; reconciledYears: number | null; why: string;
 }
 
+interface VerificationRow {
+  id: string; name: string; teamId: string | null; capHit: number;
+  daysSinceVerified: number | null; state: "unverified" | "stale";
+}
+
 interface Report {
   seasonStartYear: number;
   checkedAt: string;
@@ -37,6 +42,11 @@ interface Report {
   backfillable: number;
   reconcilable: number;
   rows: Record<string, Row[]>;
+  verification: {
+    asOf: string; staleDays: number; total: number;
+    unverified: number; stale: number; fresh: number;
+    worklist: VerificationRow[];
+  };
 }
 
 interface WriteResult {
@@ -95,6 +105,7 @@ export default function TermAuditPanel({ onWrote }: { onWrote?: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<Issue | null>(null);
+  const [showVerification, setShowVerification] = useState(false);
   const [preview, setPreview] = useState<WriteResult | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -154,13 +165,13 @@ export default function TermAuditPanel({ onWrote }: { onWrote?: () => void }) {
 
       {!error && report && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)" }}>
             {BUCKETS.map(b => {
               const n = report.counts[b.key] ?? 0;
               const active = open === b.key;
               return (
                 <button key={b.key}
-                  onClick={() => setOpen(active ? null : b.key)}
+                  onClick={() => { setOpen(active ? null : b.key); setShowVerification(false); }}
                   disabled={n === 0}
                   title={b.blurb}
                   style={{
@@ -184,6 +195,28 @@ export default function TermAuditPanel({ onWrote }: { onWrote?: () => void }) {
               <div style={{ fontSize: 19, fontWeight: 900, color: "var(--ledger-green)" }}>{report.counts.ok ?? 0}</div>
               <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)" }}>of {report.total}</div>
             </div>
+            {(() => {
+              const n = report.verification.unverified + report.verification.stale;
+              return (
+                <button
+                  onClick={() => { setShowVerification(!showVerification); setOpen(null); }}
+                  disabled={n === 0}
+                  title="Anchored and consistent is not the same as recently confirmed — a term can hold together with itself for years without anyone having looked at a real source since the initial sync."
+                  style={{
+                    textAlign: "left", padding: "10px 12px", cursor: n === 0 ? "default" : "pointer",
+                    background: showVerification ? "var(--paper-inset)" : "transparent",
+                    border: 0, borderLeft: "1px solid var(--rule)",
+                    borderBottom: showVerification ? "2px solid var(--ledger-ink)" : "2px solid transparent",
+                    fontFamily: MONO, color: "var(--ledger-ink)",
+                  }}>
+                  <div style={{ fontSize: 9, letterSpacing: "0.1em", color: "var(--ledger-ink-faint)", lineHeight: 1.3, minHeight: 24 }}>
+                    NOT RECENTLY CONFIRMED
+                  </div>
+                  <div style={{ fontSize: 19, fontWeight: 900, color: n > 0 ? "var(--ledger-amber)" : "var(--ledger-ink-faint)" }}>{n}</div>
+                  <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)" }}>of {report.verification.total}</div>
+                </button>
+              );
+            })()}
           </div>
 
           {/* ── The two actions ──────────────────────────────── */}
@@ -269,6 +302,46 @@ export default function TermAuditPanel({ onWrote }: { onWrote?: () => void }) {
                         </td>
                         <td style={cell}>{r.expiryStatus ?? "—"}</td>
                         <td style={{ ...cell, whiteSpace: "normal", fontSize: 10, color: "var(--ledger-ink-faint)" }}>{r.why}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {showVerification && (
+            <div style={{ borderTop: "1px solid var(--rule)" }}>
+              <div style={{ padding: "8px 14px", fontSize: 10, color: "var(--ledger-ink-faint)", lineHeight: 1.5 }}>
+                A term can be internally consistent — the buckets above all read this roster as anchored and agreeing — and
+                still never have been checked against a real source since it first landed in the table. This lists every row
+                with no confirmation on record, or none in the last {report.verification.staleDays} days, worst (never
+                confirmed, highest cap hit) first. Confirming one is just re-saving it — through the editor or a fresh paste —
+                once you have checked it.
+              </div>
+              <div style={{ maxHeight: 280, overflowY: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={head}>Player</th>
+                      <th style={head}>Tm</th>
+                      <th style={{ ...head, textAlign: "right" }}>Cap hit</th>
+                      <th style={head}>Status</th>
+                      <th style={{ ...head, textAlign: "right" }}>Last confirmed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.verification.worklist.map(r => (
+                      <tr key={r.id} style={{ borderBottom: "1px solid var(--rule-light)" }}>
+                        <td style={{ ...cell, fontWeight: 700 }}>{r.name}</td>
+                        <td style={cell}>{r.teamId ?? "—"}</td>
+                        <td style={{ ...cell, textAlign: "right" }}>${r.capHit.toFixed(3)}M</td>
+                        <td style={{ ...cell, color: r.state === "unverified" ? "var(--ledger-red)" : "var(--ledger-amber)" }}>
+                          {r.state === "unverified" ? "Never" : "Stale"}
+                        </td>
+                        <td style={{ ...cell, textAlign: "right" }}>
+                          {r.daysSinceVerified == null ? "—" : `${r.daysSinceVerified}d ago`}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -116,7 +116,8 @@ describe("admin contract ingestion counts", () => {
       exclude_from_roster INTEGER DEFAULT 0,
       extension_cap_hit REAL,
       extension_years INTEGER,
-      extension_signed_at TEXT
+      extension_signed_at TEXT,
+      term_verified_at TEXT
     )`);
   });
 

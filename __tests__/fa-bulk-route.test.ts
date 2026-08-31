@@ -109,7 +109,8 @@ describe("admin bulk free-agent writes", () => {
       expiry_status TEXT,
       expiry_year INTEGER,
       exclude_from_roster INTEGER DEFAULT 0,
-      source TEXT DEFAULT 'seed'
+      source TEXT DEFAULT 'seed',
+      term_verified_at TEXT
     )`);
   });
 

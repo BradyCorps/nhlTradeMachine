@@ -8,6 +8,7 @@ import { redis } from "@/app/lib/redis";
 import { clearTeamCaches } from "@/app/lib/team-cache";
 import { auditTerm, auditTerms, type TermRow } from "@/app/lib/contract-term";
 import { SEASON_START_YEAR } from "@/app/lib/contract-expiry";
+import { auditVerification, type VerificationAudit } from "@/app/lib/contract-verification";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,17 @@ interface Report {
     yearsRemaining: number; expiryYear: number | null; expiryStatus: string | null;
     suggestedExpiryYear: number | null; reconciledYears: number | null; why: string;
   }[]>;
+  /**
+   * Orthogonal to `counts`/`rows` above: a row can be "anchored and
+   * consistent" (no term issue) and still never independently confirmed —
+   * see app/lib/contract-verification.ts for why that gap is real and how
+   * it was found.
+   */
+  verification: {
+    asOf: string; staleDays: number; total: number;
+    unverified: number; stale: number; fresh: number;
+    worklist: (VerificationAudit["worklist"][number] & { teamId: string | null })[];
+  };
 }
 
 const PER_BUCKET = 60;
@@ -56,6 +68,7 @@ const TERM_COLUMNS = {
   expiryStatus: playersTable.expiryStatus,
   retired: playersTable.retired,
   source: playersTable.source,
+  termVerifiedAt: playersTable.termVerifiedAt,
 };
 
 async function loadRows() {
@@ -134,6 +147,9 @@ export async function GET(req: Request) {
       }));
     }
 
+    const verificationAudit = auditVerification(rows);
+    const teamIdByRowId = new Map(rows.map(r => [r.id, (r as { teamId?: string | null }).teamId ?? null]));
+
     const report: Report = {
       seasonStartYear: audit.seasonStartYear,
       checkedAt: new Date().toISOString(),
@@ -142,6 +158,17 @@ export async function GET(req: Request) {
       backfillable: audit.backfillable,
       reconcilable: audit.reconcilable,
       rows: out,
+      verification: {
+        asOf: verificationAudit.asOf,
+        staleDays: verificationAudit.staleDays,
+        total: verificationAudit.total,
+        unverified: verificationAudit.unverified,
+        stale: verificationAudit.stale,
+        fresh: verificationAudit.fresh,
+        worklist: verificationAudit.worklist.slice(0, PER_BUCKET).map(r => ({
+          ...r, teamId: teamIdByRowId.get(r.id) ?? null,
+        })),
+      },
     };
     return NextResponse.json(report);
   } catch (e) {

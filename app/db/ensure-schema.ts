@@ -29,6 +29,7 @@ const PLAYER_COLUMN_STATEMENTS = [
   "ALTER TABLE players ADD COLUMN source TEXT DEFAULT 'seed'",
   "ALTER TABLE players ADD COLUMN extension_signed_at TEXT",
   "ALTER TABLE players ADD COLUMN birth_date TEXT",
+  "ALTER TABLE players ADD COLUMN term_verified_at TEXT",
 ];
 
 const PLAYER_TABLE_STATEMENTS = [
@@ -40,6 +41,7 @@ const PLAYER_TABLE_STATEMENTS = [
     team_id TEXT,
     age INTEGER,
     birth_date TEXT,
+    term_verified_at TEXT,
     cap_hit REAL NOT NULL,
     years_remaining INTEGER NOT NULL,
     has_nmc INTEGER DEFAULT 0,

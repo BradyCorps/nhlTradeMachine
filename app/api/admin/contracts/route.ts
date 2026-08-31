@@ -510,6 +510,12 @@ export async function POST(req: Request) {
     if (expiryYear   !== undefined) updates.expiryYear   = expiryYear;
     if (derivedExpiryYear != null)  updates.expiryYear   = derivedExpiryYear;
     if (excludeFromRoster !== undefined) updates.excludeFromRoster = excludeFromRoster;
+    // An operator typing a term/expiry fact here has just looked at a real
+    // source — see app/lib/contract-verification.ts for why this is the one
+    // signal `contract-term.ts`'s own consistency check cannot provide.
+    if (yearsRemaining != null || capHit != null || expiryStatus !== undefined || expiryYear !== undefined) {
+      updates.termVerifiedAt = new Date().toISOString();
+    }
     await db.update(playersTable).set(updates).where(eq(playersTable.id, id));
     await clearRosterCaches();
     return NextResponse.json({ ok: true, destination: "db-update", name });
@@ -539,6 +545,10 @@ export async function POST(req: Request) {
       extensionCapHit: extensionCapHit ?? undefined,
       extensionYears:  extensionYears ?? undefined,
       extensionSignedAt: extensionSignedAt ?? undefined,
+      // Real term facts were provided (or the row wouldn't exist), and an
+      // operator typed them having looked at a source — same as the update
+      // branch above.
+      termVerifiedAt: (yearsRemaining != null || capHit != null) ? new Date().toISOString() : undefined,
       source:         "editor",
     });
     await clearRosterCaches();
@@ -720,6 +730,9 @@ export async function PUT(req: Request) {
         capHit: values.capHit,
         yearsRemaining: values.yearsRemaining,
         source: isEditor ? "editor" : "sync",
+        // The operator pasting a fresh source snapshot just confirmed
+        // capHit/yearsRemaining for real — see contract-verification.ts.
+        termVerifiedAt: new Date().toISOString(),
       };
       if (position !== "Unknown" && (current.position === "Unknown" || current.position !== position)) {
         updates.position = position;
@@ -765,6 +778,7 @@ export async function PUT(req: Request) {
       hasNtc:         false,
       expiryStatus:   values.expiryStatus,
       expiryYear:     values.expiryYear,
+      termVerifiedAt: new Date().toISOString(),
       source:         "sync",
     }).onConflictDoNothing()
       .returning({ id: playersTable.id });

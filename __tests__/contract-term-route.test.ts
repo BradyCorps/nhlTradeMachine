@@ -100,7 +100,8 @@ describe("admin contract-term writes", () => {
       expiry_year INTEGER,
       expiry_status TEXT,
       retired INTEGER DEFAULT 0,
-      source TEXT DEFAULT 'seed'
+      source TEXT DEFAULT 'seed',
+      term_verified_at TEXT
     )`);
   });
 
