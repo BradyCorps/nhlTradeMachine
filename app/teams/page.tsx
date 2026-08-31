@@ -32,7 +32,7 @@ import {
   teamSortSummary,
   type TeamSortKey as SortKey,
 } from "@/app/lib/team-sort-summary";
-import { buildTeamsUrlQuery, readTeamsUrlState, type TeamPhaseFilter } from "@/app/lib/teams-url-state";
+import { buildTeamsUrlQuery, readTeamsUrlState, type TeamPhaseFilter, type TeamNavDim } from "@/app/lib/teams-url-state";
 
 interface TeamRecord {
   wins: number;
@@ -876,6 +876,7 @@ export default function TeamsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(initialUrlState.expandedId);
   const [detailCollapsed, setDetailCollapsed] = useState(initialUrlState.detailCollapsed);
   const [filterPhase, setFilterPhase] = useState<TeamPhaseFilter>(initialUrlState.filterPhase);
+  const [navDim, setNavDim] = useState<TeamNavDim>(initialUrlState.navDim);
 
   useEffect(() => {
     fetch("/api/league")
@@ -903,10 +904,10 @@ export default function TeamsPage() {
   // trade bench's own live-state URL sync (armchair-gm/page.tsx). Which team
   // is being viewed is the path, not touched here.
   useEffect(() => {
-    const query = buildTeamsUrlQuery({ sortKey, filterPhase, expandedId, detailCollapsed });
+    const query = buildTeamsUrlQuery({ sortKey, filterPhase, expandedId, detailCollapsed, navDim });
     const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
     window.history.replaceState({}, "", newUrl);
-  }, [sortKey, filterPhase, expandedId, detailCollapsed]);
+  }, [sortKey, filterPhase, expandedId, detailCollapsed, navDim]);
 
   // A stale/hand-edited expanded-team id must recover safely rather than
   // leaving the index view expanding nothing.
@@ -1181,6 +1182,8 @@ export default function TeamsPage() {
             goalDiff: (tp.team.record?.goalsFor ?? 0) - (tp.team.record?.goalsAgainst ?? 0),
             phase: tp.team.phase,
           }))}
+          dim={navDim}
+          onDimChange={setNavDim}
         />
 
         {/* Sort controls */}

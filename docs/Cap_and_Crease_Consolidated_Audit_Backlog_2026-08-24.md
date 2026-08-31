@@ -136,11 +136,13 @@ P = Players card, PD = player dossier, T = Teams, TM = Trade Machine, F = Fantas
 
 Verification: live record/NAV route comparisons **6/6**, dossier render checks **6/6**, focused route/identity/surplus tests **36/36**, and the full suite **2,174/2,174** passed. TypeScript and the production build passed. Repository-wide lint remains blocked by the pre-existing internal-link error in `app/components/Header.tsx:159` plus five unrelated warnings; no V-04 file produced a lint finding.
 
-## [~] V-05 — Verify team route completion did not leave league-state fragmentation (`XS`)
+## [x] V-05 — Verify team route completion did not leave league-state fragmentation (`XS`)
 
 Dedicated team routes now exist, but the Teams audit also requires filters, metric tabs, sort, and compare state to be shareable and consistent across the league visualization and team list.
 
 **Acceptance:** reload/back/forward/share preserve selected metric, filter, sort, team, and compare state. Any missing state moves to `QW-09`.
+
+**Verified August 31, 2026 — closed by QW-09's Teams increment, plus one gap it missed.** Which team is being viewed already round-tripped through the path before this ticket (`/teams/[team]` reuses the index page component). QW-09's Teams work (same date) added sort/phase-filter/expanded-card/detail-collapsed URL state. That left one item from this ticket's own acceptance line uncovered: the NAV chart's F/D/G/X-NAV "selected metric" toggle (`TeamNavChart.tsx`'s `dim`) was still fully local component state, invisible to the URL. Lifted it into a controlled `dim`/`onDimChange` prop pair and added it to `teams-url-state.ts` (`navDim`, `?metric=`). There is no team-compare feature on this route to verify — the acceptance line's "compare state" has nothing to point at yet (would land under a future `TEAM-0X` ticket if built). Verified live: clicking F-NAV updates the URL to `?metric=fNav`; reloading that URL renders F-NAV active (dark background) and X-NAV inactive, matching pre-click state exactly. Full suite **2,366/2,366**, TypeScript and changed-file lint clean, production build passes (**30/30** static pages).
 
 ## [x] V-06 — Identify if F-NAV, G-NAV and D-NAV are online
 

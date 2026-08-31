@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { scaleLinear } from "d3-scale";
 import { HorizontalScrollCue } from "@/app/components/HorizontalScrollCue";
+import type { TeamNavDim } from "@/app/lib/teams-url-state";
 
 interface TeamNavDatum {
   name: string;
@@ -16,11 +17,14 @@ interface TeamNavDatum {
   phase: string;
 }
 
+type Dim = TeamNavDim;
+
 interface Props {
   data: TeamNavDatum[];
+  /** Controlled dim — omit to let the chart own its own toggle state. */
+  dim?: Dim;
+  onDimChange?: (dim: Dim) => void;
 }
-
-type Dim = "xnav" | "fNav" | "dNav" | "gNav";
 
 // The four views the chart switches between. `xnav` is the combined total;
 // the three splits decompose it by position. Order is the toggle order.
@@ -88,8 +92,10 @@ function useIsMobile(): boolean {
   return mobile;
 }
 
-export default function TeamNavChart({ data }: Props) {
-  const [dim, setDim] = useState<Dim>("xnav");
+export default function TeamNavChart({ data, dim: controlledDim, onDimChange }: Props) {
+  const [internalDim, setInternalDim] = useState<Dim>("xnav");
+  const dim = controlledDim ?? internalDim;
+  const setDim = onDimChange ?? setInternalDim;
   const [hoveredAbbrev, setHoveredAbbrev] = useState<string | null>(null);
   // null = auto (all on desktop, top-10 on mobile); a boolean is the reader's
   // explicit override of that default.

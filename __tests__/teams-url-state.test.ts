@@ -1,6 +1,6 @@
-// QW-09 — Teams index URL state. Which team is being VIEWED already
+// QW-09 / V-05 — Teams index URL state. Which team is being VIEWED already
 // round-trips through the path (`/teams/[team]` reuses this page
-// component), so this only covers sort/filter/expand/collapse.
+// component), so this only covers sort/filter/expand/collapse/nav-metric.
 import { describe, expect, it } from "vitest";
 import {
   TEAMS_URL_DEFAULTS, buildTeamsUrlQuery, parseTeamsUrlState, readTeamsUrlState,
@@ -12,16 +12,17 @@ describe("parseTeamsUrlState", () => {
   });
 
   it("reads every recognized field", () => {
-    const params = new URLSearchParams("sort=capSpace&phase=Contender&expand=EDM&collapsed=1");
+    const params = new URLSearchParams("sort=capSpace&phase=Contender&expand=EDM&collapsed=1&metric=fNav");
     expect(parseTeamsUrlState(params)).toEqual({
-      sortKey: "capSpace", filterPhase: "Contender", expandedId: "EDM", detailCollapsed: true,
+      sortKey: "capSpace", filterPhase: "Contender", expandedId: "EDM", detailCollapsed: true, navDim: "fNav",
     });
   });
 
-  it("falls back to defaults for an unrecognized sort key or phase", () => {
-    const parsed = parseTeamsUrlState(new URLSearchParams("sort=not-a-real-key&phase=Playoffs"));
+  it("falls back to defaults for an unrecognized sort key, phase, or nav metric", () => {
+    const parsed = parseTeamsUrlState(new URLSearchParams("sort=not-a-real-key&phase=Playoffs&metric=hNav"));
     expect(parsed.sortKey).toBe("division");
     expect(parsed.filterPhase).toBe("ALL");
+    expect(parsed.navDim).toBe("xnav");
   });
 
   it("treats an empty expand id as no selection rather than an empty-string id", () => {
@@ -46,12 +47,13 @@ describe("buildTeamsUrlQuery", () => {
     expect(params.has("phase")).toBe(false);
     expect(params.has("expand")).toBe(false);
     expect(params.has("collapsed")).toBe(false);
+    expect(params.has("metric")).toBe(false);
   });
 
   it("round-trips a fully customized state through build then parse", () => {
     const state = {
       sortKey: "speed" as const, filterPhase: "Rebuilding" as const,
-      expandedId: "CHI", detailCollapsed: true,
+      expandedId: "CHI", detailCollapsed: true, navDim: "gNav" as const,
     };
     expect(parseTeamsUrlState(new URLSearchParams(buildTeamsUrlQuery(state)))).toEqual(state);
   });
