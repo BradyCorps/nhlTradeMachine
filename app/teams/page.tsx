@@ -8,7 +8,8 @@ import Footer from "@/app/components/Footer";
 import { rosterNavByPosition } from "@/app/lib/team-nav-split";
 import { aggregateTeamGravity, type TeamGravityAggregate } from "@/app/lib/team-gravity";
 import GravityHeatMap from "@/app/components/GravityHeatMap";
-import { computeContention } from "@/app/armchair-gm/contention";
+import { computeContention, deriveTeamPhase } from "@/app/armchair-gm/contention";
+import { buildTeamContentionSnapshot, type TeamContentionSnapshot } from "@/app/lib/team-contention-snapshot";
 import { computeTeamEdgeProfile, type TeamEdgeProfile } from "@/app/lib/team-edge-profile";
 import { computeRosterStrand } from "@/app/lib/roster-strand";
 import TeamStrand, { type TeamStrandData } from "@/app/components/TeamStrand";
@@ -147,6 +148,8 @@ interface TeamProfile {
   /** Mean gravity field across the roster's qualified skaters, or null when
    *  none qualify (also the case when the display channel is gated off). */
   teamGravity: TeamGravityAggregate | null;
+  /** DATA-03 — phase/window/contention/cap carried as one provenance-stamped record. */
+  contentionSnapshot: TeamContentionSnapshot;
 }
 
 function PhaseChip({ phase }: { phase: string }) {
@@ -467,7 +470,11 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
   showDetailLink?: boolean;
   sortSummary?: string | null;
 }) {
-  const { team, contention, edge, strand, rosterNAV, topPlayers, capCommitted, lines, avgAge, rosterSize, ufaCount, rfaCount, gravityLeaders, teamGravity } = profile;
+  const { team, contention, edge, strand, rosterNAV, topPlayers, capCommitted, lines, avgAge, rosterSize, ufaCount, rfaCount, gravityLeaders, teamGravity, contentionSnapshot } = profile;
+  // DATA-03 — one reconciled label, not two that can silently disagree. When a
+  // live roster read outvotes the standings tier, say so rather than leaving
+  // the standings phase to look like an unexplained second opinion elsewhere.
+  const windowDivergesFromPhase = contentionSnapshot.window !== contentionSnapshot.phase;
 
   return (
     <div
@@ -487,7 +494,17 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
             <span className="text-[13px] font-black uppercase tracking-[0.08em]" style={{ color: "var(--ledger-ink)" }}>
               {team.name}
             </span>
-            <PhaseChip phase={team.phase} />
+            <PhaseChip phase={contentionSnapshot.window} />
+            {windowDivergesFromPhase && (
+              <HelpPopover
+                label="Standings vs. live window"
+                definition={`Standings tier: ${contentionSnapshot.phase}. This club's live roster read (${contentionSnapshot.window}) currently reads differently — the roster shown here isn't the one that earned the standings tier.`}
+              >
+                <span className="text-[9px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+                  vs. {contentionSnapshot.phase} standing
+                </span>
+              </HelpPopover>
+            )}
             <DivisionChip division={team.division} conference={team.conference} />
             <PlayoffChip position={team.record?.playoffPosition ?? ""} clinch={team.record?.clinchIndicator ?? ""} />
           </div>
@@ -933,6 +950,18 @@ export default function TeamsPage() {
     return teams.map((team) => {
       const roster = players.filter((p) => p.teamId === team.id && p.position !== "Pick");
       const contention = computeContention(roster, navMap);
+      // Same live-roster read Armchair GM uses to set `rosterWindow` — null on
+      // a data-thin roster rather than a fabricated window (deriveTeamPhase's
+      // own qualified-player floor).
+      const rosterWindow = deriveTeamPhase(roster, navMap);
+      const contentionSnapshot = buildTeamContentionSnapshot({
+        teamId: team.id,
+        phase: team.phase,
+        rosterWindow,
+        contention,
+        capSpace: team.capSpace,
+        capBreakdown: team.capBreakdown,
+      });
       const edge = computeTeamEdgeProfile(roster);
       const strand = computeRosterStrand(roster, navMap);
       // rosterNAV and its F/D/G split come from one place so they cannot drift:
@@ -996,7 +1025,7 @@ export default function TeamsPage() {
         team, roster, navMap, contention, edge, strand, rosterNAV, navByPos,
         topPlayers: sorted, capCommitted, lines,
         avgAge, rosterSize: roster.length, ufaCount, rfaCount,
-        gravityLeaders, teamGravity,
+        gravityLeaders, teamGravity, contentionSnapshot,
       };
     });
   }, [teams, players, navMap]);

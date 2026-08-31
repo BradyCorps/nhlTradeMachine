@@ -73,8 +73,13 @@ export interface ValuationSnapshot {
   contract: ValuationContractSnapshot;
 }
 
-/** Recursively sort object keys so the same inputs always hash the same way. */
-function stableStringify(value: unknown): string {
+/**
+ * Recursively sort object keys so the same inputs always hash the same way.
+ * Exported — `team-contention-snapshot.ts` (DATA-03) reuses this rather than
+ * a second copy, so both snapshot families hash identically-shaped inputs
+ * the same way.
+ */
+export function stableStringify(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
   const keys = Object.keys(value as Record<string, unknown>).sort();
