@@ -14,7 +14,7 @@ export function buildLeagueNavMap(
 
   for (const asset of assets) {
     try {
-      navMap[asset.id] = calculateAssetNAV(asset, capCeiling ?? undefined) as XNAVResult;
+      navMap[asset.id] = calculateAssetNAV(asset, capCeiling ?? undefined);
     } catch (error) {
       console.warn(
         "[league NAV] valuation skipped:",

@@ -34,6 +34,8 @@ import { PlayerOutlook } from "@/app/components/PlayerOutlook";
 import { derivePlayerRoles } from "@/app/lib/player-roles";
 import { matchesPlayerSearch } from "@/app/lib/player-search";
 import type { LeagueProvenance } from "@/app/lib/data-context";
+import type { XNAVResult } from "@/app/lib/xnav-engine";
+import { navColor, fmtSigned } from "@/app/lib/display-utils";
 
 interface ApiPlayer {
   id: string; name: string; teamId: string; position: string;
@@ -118,6 +120,53 @@ function Num({ label, aria, value, onChange, step = 1, width = 56 }: {
   );
 }
 
+const COVERAGE_LABEL: Record<string, string> = {
+  full: "Full coverage",
+  partial: "Partial coverage",
+  "contract-only": "Contract only",
+};
+
+// DATA-02 — the same content-addressed snapshot every other surface (Players,
+// dossier, Teams, Trade Machine, Armchair GM) reads through `calculateAssetNAV`.
+// This is display-only cross-reference: VOR/FP82 above still drive the fantasy
+// rank. X-NAV is a real-money trade/roster model (cap hit, contract term,
+// defensive value) — a wholly different question from category production
+// under this league's scoring, so it is never used to rank or filter here.
+function XNavStrip({ nav }: { nav: XNAVResult | undefined }) {
+  if (!nav) return null;
+  const snap = nav.snapshot;
+  return (
+    <div className="mt-2 pt-2 border-t text-[10px] font-mono" style={{ borderColor: rule }}>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <HelpPopover
+          label="Ledger X-NAV"
+          definition="Cap & Crease's cross-product trade/roster value for this player — cap surplus, contract term, defensive value. A different question from fantasy points; shown for reference only and never used to rank this board."
+        >
+          <span className="font-black uppercase tracking-[0.08em]" style={{ color: faint }}>Ledger X-NAV</span>
+        </HelpPopover>
+        <span className="font-black" style={{ color: navColor(nav.total), fontVariantNumeric: "tabular-nums" }}>
+          {fmtSigned(nav.total, 0)}
+        </span>
+        {snap && (
+          <>
+            <span style={{ color: faint }}>· {COVERAGE_LABEL[snap.coverage] ?? snap.coverage}</span>
+            {snap.uncertainty && (
+              <span style={{ color: faint }}>
+                · range {fmtSigned(snap.uncertainty.low, 0)} to {fmtSigned(snap.uncertainty.high, 0)}
+              </span>
+            )}
+          </>
+        )}
+      </div>
+      {snap && (
+        <div className="mt-0.5" style={{ color: faint }}>
+          model {snap.modelVersion} · as of {snap.asOf} · snapshot {snap.snapshotId.slice(0, 12)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FantasyPage() {
   const [players, setPlayers] = useState<ApiPlayer[]>([]);
   const [teamMap, setTeamMap] = useState<Map<string, string>>(new Map());
@@ -135,6 +184,9 @@ export default function FantasyPage() {
   const [hideTaken, setHideTaken] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // DATA-02 — the same league-wide snapshot map Teams/Docket/Armchair already
+  // read from this exact cached response; Fantasy just hadn't looked at it.
+  const [navMap, setNavMap] = useState<Record<string, XNAVResult>>({});
 
   // Hydrate league settings + draft state once on the client.
   useEffect(() => {
@@ -158,6 +210,7 @@ export default function FantasyPage() {
         setProvenance(pd.provenance ?? td.provenance ?? null);
         setTeamMap(new Map((td.teams ?? []).map((t: any) => [t.id, t.name])));
         setStandings(new Map((td.teams ?? []).map((t: any) => [t.id, t.standing])));
+        setNavMap(pd.navMap ?? {});
       } catch {
         if (!cancelled) {
           setProvenance(null);
@@ -744,6 +797,7 @@ export default function FantasyPage() {
                           style={{ borderColor: rule, background: "var(--paper-inset)" }}
                         >
                           <PlayerOutlook asset={r.p as any} />
+                          <XNavStrip nav={navMap[r.p.id]} />
                         </div>
                       )}
                     </article>
@@ -855,6 +909,7 @@ export default function FantasyPage() {
                             <td colSpan={15} className="px-3 py-3" style={{ background: "var(--paper-inset)" }}>
                               {/* The full Ledger read — same component as the player dossier */}
                               <PlayerOutlook asset={r.p as any} />
+                              <XNavStrip nav={navMap[r.p.id]} />
                             </td>
                           </tr>
                         )}

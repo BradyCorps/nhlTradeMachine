@@ -59,6 +59,19 @@ describe("league NAV precompute", () => {
     expect(navMap[pick.id]).toEqual(calculateAssetNAV(pick, capCeiling));
   });
 
+  // DATA-02 — trade-types.ts's XNAVResult used to be a hand-mirrored copy of
+  // xnav-engine.ts's, missing `.snapshot`. Every consumer importing the type
+  // from trade-types.ts (most of the app) could not see the envelope without
+  // an unsafe cast. Regression: the field the type fix exists to expose must
+  // actually be present on what buildLeagueNavMap hands back.
+  it("carries the DATA-02 valuation snapshot on every entry, typed with no cast needed", () => {
+    const navMap = buildLeagueNavMap([skater], 104);
+
+    expect(navMap[skater.id].snapshot).toBeDefined();
+    expect(navMap[skater.id].snapshot?.playerId).toBe(skater.id);
+    expect(navMap[skater.id].snapshot?.coverage).toMatch(/^(full|partial|contract-only)$/);
+  });
+
   it("primes the exact-input client cache so bootstrap does not POST the full league again", async () => {
     const capCeiling = 104;
     const navMap = buildLeagueNavMap([skater], capCeiling);

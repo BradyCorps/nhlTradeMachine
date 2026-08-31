@@ -5,6 +5,7 @@
 
 import type { DevelopmentProfile } from "@/app/lib/development-profile";
 import type { NavStage } from "@/app/lib/nav-breakdown";
+import type { ValuationSnapshot } from "@/app/lib/valuation-snapshot";
 
 export interface Asset {
   id: string;
@@ -182,6 +183,13 @@ export interface XNAVResult {
   volatility?: number;
   /** Signed rows that sum to `total`. See `app/lib/nav-breakdown.ts`. */
   stages?: NavStage[];
+  /**
+   * DATA-02's content-addressed envelope — same one every surface gets from
+   * `calculateAssetNAV`. Was missing from this mirror, so UI components that
+   * import `XNAVResult` from here (most of them) could not read `.snapshot`
+   * without an unsafe cast (see `app/lib/league-nav.ts`'s former `as XNAVResult`).
+   */
+  snapshot?: ValuationSnapshot;
 }
 
 // Modern forward role taxonomy — primary identity label, not an EA-style build.
