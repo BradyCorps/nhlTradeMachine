@@ -963,6 +963,32 @@ describe("Canary — Player Card AA redesign + FMV surplus read", () => {
   });
 });
 
+describe("Canary — a hard veto's flag card cannot be truncated behind INFO noise", () => {
+  // Live-tested Aug 31 2026: a 4-player, 10%-retained Stars→Oilers package
+  // correctly computed status BLOCKED and the top-line message "Retention
+  // Slots Full — Dallas Stars" (DATA-05's hard veto worked), but the flags
+  // LIST below it showed only a SOFT compression note and three INFO
+  // franchise-comparison flags — the HARD flag itself never rendered,
+  // because `verdict.flags.slice(0, 4)` kept whatever four flags were
+  // pushed first, in insertion order, with no severity priority. The
+  // share-link builder already sorted by severity before slicing; the live
+  // on-screen panel did not.
+  const src = read("app/components/QuickTradeMachine.tsx");
+
+  it("defines one shared severity sort used by both the live panel and the share link", () => {
+    expect(src).toContain("function sortFlagsBySeverity");
+    expect(src).toContain("HARD: 0, SOFT: 1, WARN: 2, INFO: 3");
+  });
+
+  it("sorts before slicing in the on-screen verdict panel", () => {
+    expect(src).toContain("sortFlagsBySeverity(verdict.flags).slice(0, 4)");
+  });
+
+  it("the share-link builder reuses the same function rather than its own copy", () => {
+    expect(src).toContain("flags: sortFlagsBySeverity(verdict.flags ?? [])");
+  });
+});
+
 describe("Canary — draft pick inventory", () => {
   // DATA-04: this canary used to pin the bug it should have caught — every
   // club's 6th and 7th round picks were silently absent because the

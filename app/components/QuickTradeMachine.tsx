@@ -34,6 +34,19 @@ import { HelpPopover } from "@/app/components/HelpPopover";
 
 const ZERO_NAV: XNAVResult = { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
 
+// A BLOCKED/DECLINED verdict's whole point is explaining why — a HARD flag
+// (a CBA veto, a clause block) must never be the one truncated out of view
+// behind a pile of merely-informational franchise-comparison notes. The
+// share-link builder below already sorted by severity before slicing; the
+// live on-screen verdict panel did not, so a real hard veto (DATA-05's
+// retention-slot check, live-tested Aug 31 2026) could compute correctly,
+// win the top-line BLOCKED message, and still never show its explanation
+// card if four lower-priority flags happened to be pushed first.
+const GM_FLAG_SEVERITY_RANK: Record<string, number> = { HARD: 0, SOFT: 1, WARN: 2, INFO: 3 };
+export function sortFlagsBySeverity<T extends { severity: string }>(flags: T[]): T[] {
+  return [...flags].sort((a, b) => (GM_FLAG_SEVERITY_RANK[a.severity] ?? 9) - (GM_FLAG_SEVERITY_RANK[b.severity] ?? 9));
+}
+
 type LeagueData = {
   teams: Team[];
   players: Asset[];
@@ -674,7 +687,7 @@ function VerdictSummary({ verdict }: { verdict: VerdictDisplay }) {
       )}
       {verdict.flags.length > 0 && (
         <div className="mt-4 space-y-2">
-          {verdict.flags.slice(0, 4).map((flag, index) => (
+          {sortFlagsBySeverity(verdict.flags).slice(0, 4).map((flag, index) => (
             <div key={`${flag.headline}-${index}`} className="border px-3 py-2"
               style={{ borderColor: "var(--ledger-rule-light)", background: "var(--ledger-card)" }}>
               <div className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: "var(--ledger-ink)" }}>
@@ -1138,12 +1151,10 @@ export default function QuickTradeMachine() {
       // Slim the verdict for the URL: keep the ruling and the flags that
       // decide it, trim long-form prose so the link survives Discord,
       // Reddit, and proxy URL limits.
-      const severityRank: Record<string, number> = { HARD: 0, SOFT: 1, WARN: 2, INFO: 3 };
       const slimVerdict = {
         ...verdict,
         message: (verdict.message ?? "").slice(0, 500),
-        flags: [...(verdict.flags ?? [])]
-          .sort((a: any, b: any) => (severityRank[a.severity] ?? 9) - (severityRank[b.severity] ?? 9))
+        flags: sortFlagsBySeverity(verdict.flags ?? [])
           .slice(0, 8)
           .map((f: any) => ({ ...f, explanation: (f.explanation ?? "").slice(0, 300) })),
       };
