@@ -250,6 +250,18 @@ When Present, Future, Speed, or another metric controls order, show the exact va
 
 **Acceptance:** reload, back/forward, copy/paste, and canonicalization work; invalid parameters recover safely; low-value filter combinations are not indexed.
 
+**Progress — August 31, 2026 (increment 1 of `M`; ticket remains `[ ]`).** Shipped the two routes the ticket names first; Fantasy, Trade Machine, and Armchair scenario entry points are untouched:
+
+- Added `app/lib/players-url-state.ts` and `app/lib/teams-url-state.ts` — pure parse/build pairs, unit tested for defaults, round-tripping, and recovering from an unrecognized/out-of-range/garbage value rather than breaking the view (36 focused tests).
+- Players (`app/players/page.tsx`): search, position filter, team filter, sort key/direction, all three section page numbers, and the expanded/selected player now round-trip through the URL. The expanded player was previously local-only state inside each `PlayerRow`; lifted it to the page so it could be addressed at all.
+- Teams (`app/teams/page.tsx`): sort key, phase filter, the index view's inline-expanded team card, and the detail view's collapsed toggle now round-trip. Which team is being *viewed* already round-tripped through the path (`/teams/[team]` reuses this same page component) — not duplicated into the query string.
+- Both follow the trade bench's own existing pattern (`window.history.replaceState`, not the App Router's `useRouter`) rather than introducing a second URL-sync mechanism; state is hydrated synchronously from `window.location.search` before first paint (no read/write race to gate, unlike the trade bench's async data-dependent parse).
+- Verified live in a browser end to end: typing a search term updates the URL; reloading a URL with `?q=...&player=...` restores both the search box and the expanded player card; clicking a Teams phase filter and a sort key updates the URL and both restore correctly on reload; a URL with `pos=NOTREAL&sort=garbage&fpage=-3&player=doesnotexist` (Players) and `sort=garbage&phase=NotReal&collapsed=maybe` (Teams) both normalize to the bare route with no crash.
+- "Low-value filter combinations are not indexed" is already satisfied without new work — `QW-10`'s canonical tag is derived from the static route path, not the query string, so every filter permutation already canonicalizes to the bare `/players` or `/teams`.
+- While touching `app/players/page.tsx`, fixed one CXS1-shaped bug found in passing: the team-filter dropdown called `teams.sort(...)` directly on shared state during every render instead of copying first (same class of bug `TeamSelectModal.tsx` already documents and guards against).
+- Not yet built: Fantasy board, Trade Machine, and Armchair scenario entry-point URL state; back/forward as distinct history *entries* per filter change (the trade bench's own precedent — and this increment — treat `back/forward` as "leaving and returning restores state," not per-keystroke undo, which would be poor UX for a search box).
+- Full suite **2,366/2,366**, TypeScript and changed-file lint clean, production build passes (**30/30** static pages).
+
 ## [x] QW-10 — Add route-specific headings and metadata (`S`)
 
 `M-TeamPages` already delivered validated team detail routes and their initial metadata. This residual ticket covers the missing H1, canonical, social, structured-data, and server-content requirements across the full route set.

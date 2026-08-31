@@ -32,6 +32,7 @@ import {
   teamSortSummary,
   type TeamSortKey as SortKey,
 } from "@/app/lib/team-sort-summary";
+import { buildTeamsUrlQuery, readTeamsUrlState, type TeamPhaseFilter } from "@/app/lib/teams-url-state";
 
 interface TeamRecord {
   wins: number;
@@ -867,10 +868,14 @@ export default function TeamsPage() {
   const [capCeiling, setCapCeiling] = useState(104);
   const [provenance, setProvenance] = useState<LeagueProvenance | null>(null);
   const [loading, setLoading] = useState(true);
-  const [sortKey, setSortKey] = useState<SortKey>("division");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [detailCollapsed, setDetailCollapsed] = useState(false);
-  const [filterPhase, setFilterPhase] = useState<string>("ALL");
+  // Hydrated once, synchronously, from the URL (QW-09) — which team is being
+  // VIEWED already round-trips through the path, so only sort/filter/expand
+  // state needs the query string.
+  const [initialUrlState] = useState(() => readTeamsUrlState());
+  const [sortKey, setSortKey] = useState<SortKey>(initialUrlState.sortKey);
+  const [expandedId, setExpandedId] = useState<string | null>(initialUrlState.expandedId);
+  const [detailCollapsed, setDetailCollapsed] = useState(initialUrlState.detailCollapsed);
+  const [filterPhase, setFilterPhase] = useState<TeamPhaseFilter>(initialUrlState.filterPhase);
 
   useEffect(() => {
     fetch("/api/league")
@@ -893,6 +898,22 @@ export default function TeamsPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // State → URL (QW-09). `replaceState` rather than the router — matches the
+  // trade bench's own live-state URL sync (armchair-gm/page.tsx). Which team
+  // is being viewed is the path, not touched here.
+  useEffect(() => {
+    const query = buildTeamsUrlQuery({ sortKey, filterPhase, expandedId, detailCollapsed });
+    const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+    window.history.replaceState({}, "", newUrl);
+  }, [sortKey, filterPhase, expandedId, detailCollapsed]);
+
+  // A stale/hand-edited expanded-team id must recover safely rather than
+  // leaving the index view expanding nothing.
+  useEffect(() => {
+    if (loading) return;
+    if (expandedId && !teams.some(t => t.id === expandedId)) setExpandedId(null);
+  }, [loading, teams, expandedId]);
 
   const teamProfiles = useMemo((): TeamProfile[] => {
     const computedGravity = players.flatMap((player) => {
@@ -1124,7 +1145,7 @@ export default function TeamsPage() {
           className="grid grid-cols-5 gap-2 mb-5 p-3 border"
           style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
         >
-          {["Contender", "Bubble", "Retooling", "Rebuilding", "Tanking"].map((phase) => (
+          {(["Contender", "Bubble", "Retooling", "Rebuilding", "Tanking"] as const).map((phase) => (
             <button
               key={phase}
               onClick={() => setFilterPhase(filterPhase === phase ? "ALL" : phase)}

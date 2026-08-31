@@ -1812,7 +1812,7 @@ describe("Canary — Batch 6 audit fixes", () => {
     );
     expect(row).not.toContain('role="button"');
     expect(row).not.toContain("tabIndex={0}");
-    expect(row.match(/onClick=\{toggleExpanded\}/g)).toHaveLength(2);
+    expect(row.match(/onClick=\{onToggle\}/g)).toHaveLength(2);
     expect(row).toContain('className="player-row-expand dense-tap"');
     expect(row).toContain('className="player-row-expand tap-target"');
     expect(row).toContain("event.stopPropagation()");

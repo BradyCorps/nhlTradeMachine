@@ -34,6 +34,7 @@ import { buildStrandCohort } from "@/app/lib/strand-cohort";
 import { buildStrandPercentiles, type PlayerLike } from "@/app/lib/strand-metrics";
 import { matchesPlayerSearch } from "@/app/lib/player-search";
 import type { LeagueProvenance } from "@/app/lib/data-context";
+import { buildPlayersUrlQuery, readPlayersUrlState } from "@/app/lib/players-url-state";
 
 // ── Types ─────────────────────────────────────────────────────
 interface Player {
@@ -669,14 +670,15 @@ function SortHeader({ k, label, active, dir, onClick }: {
 }
 
 // ── Player row ────────────────────────────────────────────────
-function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers }: {
+function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers, expanded, onToggle }: {
   player: Player; team?: Team; rank: number;
   sortKey: PlayerSortKey;
   actualPPG: (p: Player) => number;
   section: PlayerSection;
   allPlayers: Player[];
+  expanded: boolean;
+  onToggle: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const isG = player.position === "G";
   const columns = PLAYER_COLUMNS[section];
   // Compact cards lead with the value that actually controls the ordering.
@@ -702,17 +704,16 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
 
   // Abbreviated team name for mobile (use teamId which is already short)
   const teamAbbr = player.teamId;
-  const toggleExpanded = () => setExpanded(current => !current);
   const toggleFromControl = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    toggleExpanded();
+    onToggle();
   };
 
   return (
     <>
       {/* ── Desktop row (≥640px) — original 6-column grid ── */}
       <div
-        onClick={toggleExpanded}
+        onClick={onToggle}
         className="player-row player-row-desktop"
         style={{
           display: "grid",
@@ -783,7 +784,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
 
       {/* ── Mobile card (≤639px) — 2-line layout with labelled stats ── */}
       <div
-        onClick={toggleExpanded}
+        onClick={onToggle}
         className="player-row player-row-mobile"
         style={{
           padding: "10px 12px",
@@ -991,15 +992,20 @@ export default function PlayersPage() {
   const [loading, setLoading]   = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [provenance, setProvenance] = useState<LeagueProvenance | null>(null);
-  const [search, setSearch]     = useState("");
+  // Hydrated once, synchronously, from the URL (QW-09) — self-contained (no
+  // fetched data needed to interpret it), so there is no read/write race to
+  // gate like the trade bench's shared-link parse has.
+  const [initialUrlState] = useState(() => readPlayersUrlState());
+  const [search, setSearch]     = useState(initialUrlState.search);
   const deferredSearch = useDeferredValue(search);
-  const [posFilter, setPosFilter] = useState<"ALL" | "F" | "D" | "G">("ALL");
-  const [teamFilter, setTeamFilter] = useState<string>("ALL");
-  const [sortKey, setSortKey] = useState<PlayerSortKey>("seasonPts");
-  const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
-  const [forwardPage, setForwardPage] = useState(1);
-  const [defencePage, setDefencePage] = useState(1);
-  const [goaliePage, setGoaliePage] = useState(1);
+  const [posFilter, setPosFilter] = useState<"ALL" | "F" | "D" | "G">(initialUrlState.posFilter);
+  const [teamFilter, setTeamFilter] = useState<string>(initialUrlState.teamFilter);
+  const [sortKey, setSortKey] = useState<PlayerSortKey>(initialUrlState.sortKey);
+  const [sortDir, setSortDir] = useState<"desc" | "asc">(initialUrlState.sortDir);
+  const [forwardPage, setForwardPage] = useState(initialUrlState.forwardPage);
+  const [defencePage, setDefencePage] = useState(initialUrlState.defencePage);
+  const [goaliePage, setGoaliePage] = useState(initialUrlState.goaliePage);
+  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(initialUrlState.playerId);
 
   const handleSortKey = (k: typeof sortKey) => {
     if (k === sortKey) {
@@ -1085,6 +1091,27 @@ export default function PlayersPage() {
     setDefencePage(1);
     setGoaliePage(1);
   }, [search, posFilter, teamFilter, sortKey, sortDir]);
+
+  // State → URL (QW-09). `replaceState` rather than the router — no extra
+  // history entry per keystroke/filter change, matching the trade bench's
+  // own live-state URL sync (armchair-gm/page.tsx).
+  useEffect(() => {
+    const query = buildPlayersUrlQuery({
+      search: deferredSearch, posFilter, teamFilter, sortKey, sortDir,
+      forwardPage, defencePage, goaliePage, playerId: expandedPlayerId,
+    });
+    const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+    window.history.replaceState({}, "", newUrl);
+  }, [deferredSearch, posFilter, teamFilter, sortKey, sortDir, forwardPage, defencePage, goaliePage, expandedPlayerId]);
+
+  // A stale/hand-edited team or player id in the URL must recover safely
+  // rather than silently filtering to nothing or expanding a phantom row —
+  // clear it once real data is in to check against.
+  useEffect(() => {
+    if (loading) return;
+    if (teamFilter !== "ALL" && !teams.some(t => t.id === teamFilter)) setTeamFilter("ALL");
+    if (expandedPlayerId && !players.some(p => p.id === expandedPlayerId)) setExpandedPlayerId(null);
+  }, [loading, teams, players, teamFilter, expandedPlayerId]);
 
   // Sort and split into sections
   const { forwards, defence, skaters, goalies } = useMemo(() => {
@@ -1279,7 +1306,9 @@ export default function PlayersPage() {
               }}
             >
               <option value="ALL">All Teams</option>
-              {teams.sort((a,b) => a.name.localeCompare(b.name)).map(t => (
+              {/* Copy first — `.sort()` mutates, and this runs on every render
+                  of shared `teams` state (CXS1-shaped; see TeamSelectModal.tsx). */}
+              {[...teams].sort((a,b) => a.name.localeCompare(b.name)).map(t => (
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </select>
@@ -1309,7 +1338,9 @@ export default function PlayersPage() {
                 <SectionHeader label="Forwards" count={forwards.length} />
                 <SectionColumnHeader section="F" sortKey={sortKey} sortDir={sortDir} onSort={handleSortKey} onToggleDirection={() => setSortDir(direction => direction === "desc" ? "asc" : "desc")} />
                 {visibleForwards.map((p, i) => (
-                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(forwardPage - 1) * FORWARD_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="F" allPlayers={players} />
+                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(forwardPage - 1) * FORWARD_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="F" allPlayers={players}
+                    expanded={expandedPlayerId === p.id}
+                    onToggle={() => setExpandedPlayerId(id => id === p.id ? null : p.id)} />
                 ))}
                 <SectionPager total={forwards.length} pageSize={FORWARD_CAP} page={forwardPage} onPage={setForwardPage} />
               </div>
@@ -1321,7 +1352,9 @@ export default function PlayersPage() {
                 <SectionHeader label="Defence" count={defence.length} />
                 <SectionColumnHeader section="D" sortKey={sortKey} sortDir={sortDir} onSort={handleSortKey} onToggleDirection={() => setSortDir(direction => direction === "desc" ? "asc" : "desc")} />
                 {visibleDefence.map((p, i) => (
-                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(defencePage - 1) * DEFENCE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="D" allPlayers={players} />
+                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(defencePage - 1) * DEFENCE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="D" allPlayers={players}
+                    expanded={expandedPlayerId === p.id}
+                    onToggle={() => setExpandedPlayerId(id => id === p.id ? null : p.id)} />
                 ))}
                 <SectionPager total={defence.length} pageSize={DEFENCE_CAP} page={defencePage} onPage={setDefencePage} />
               </div>
@@ -1333,7 +1366,9 @@ export default function PlayersPage() {
                 <SectionHeader label="Goalies" count={goalies.length} />
                 <SectionColumnHeader section="G" sortKey={sortKey} sortDir={sortDir} onSort={handleSortKey} onToggleDirection={() => setSortDir(direction => direction === "desc" ? "asc" : "desc")} />
                 {visibleGoalies.map((p, i) => (
-                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(goaliePage - 1) * GOALIE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="G" allPlayers={players} />
+                  <PlayerRow key={`${p.id}::${p.teamId}`} player={p} team={teamMap.get(p.teamId)} rank={(goaliePage - 1) * GOALIE_CAP + i + 1} sortKey={sortKey} actualPPG={actualPPG} section="G" allPlayers={players}
+                    expanded={expandedPlayerId === p.id}
+                    onToggle={() => setExpandedPlayerId(id => id === p.id ? null : p.id)} />
                 ))}
                 <SectionPager total={goalies.length} pageSize={GOALIE_CAP} page={goaliePage} onPage={setGoaliePage} />
               </div>
