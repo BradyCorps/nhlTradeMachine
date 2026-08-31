@@ -4,6 +4,7 @@ import {
   contractStatusAgeInvariant,
   crossSurfaceValueReconciliation,
   exactNameAliasInvariance,
+  freeAgentPoolConsistencyInvariant,
   missingDataUncertaintyInvariant,
   noFutureInformationLeakage,
   retentionSlotGate,
@@ -201,5 +202,30 @@ describe("noFutureInformationLeakage", () => {
   it("fails cleanly on an unparseable as_of rather than silently passing", () => {
     const result = noFutureInformationLeakage("not-a-date", [{ label: "x", timestamp: null }]);
     expect(result.passed).toBe(false);
+  });
+});
+
+describe("freeAgentPoolConsistencyInvariant", () => {
+  it("passes a signed roster player and a genuinely unsigned FA_POOL player", () => {
+    const result = freeAgentPoolConsistencyInvariant([
+      { id: "rostered", teamId: "WPG", contractStatus: "SIGNED" },
+      { id: "unsigned", teamId: "FA_POOL", contractStatus: "UFA" },
+    ]);
+    expect(result.passed).toBe(true);
+  });
+
+  it("does not flag a pending RFA/UFA still on his current roster — that is the normal mid-season state", () => {
+    const result = freeAgentPoolConsistencyInvariant([
+      { id: "pendingUfa", teamId: "WPG", contractStatus: "UFA" },
+    ]);
+    expect(result.passed).toBe(true);
+  });
+
+  it("fails a player who is in FA_POOL but still reads as SIGNED", () => {
+    const result = freeAgentPoolConsistencyInvariant([
+      { id: "staleWrite", teamId: "FA_POOL", contractStatus: "SIGNED" },
+    ]);
+    expect(result.passed).toBe(false);
+    expect(result.detail).toContain("staleWrite");
   });
 });

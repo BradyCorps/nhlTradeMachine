@@ -14,6 +14,7 @@ import { canonicalNameSlug, makePlayerId } from "@/app/lib/player-identity";
 import { rosterLegality, type RosterLegality } from "@/app/lib/roster-legality";
 import { retentionCheck, type RetentionEntry } from "@/app/lib/retention-ledger";
 import { applyCapDelta, type CapDeltaMoves } from "@/app/lib/cap-delta";
+import { FA_POOL_TEAM_ID } from "@/app/lib/fa-pool";
 
 export interface GateResult {
   gate: string;
@@ -225,5 +226,37 @@ export function noFutureInformationLeakage(
     detail: leaks.length === 0
       ? `${inputs.length} input(s) checked against as_of ${asOf}; none postdate it.`
       : `${leaks.length} input(s) postdate as_of ${asOf}: ${leaks.slice(0, 3).map((l) => l.label).join(", ")}.`,
+  };
+}
+
+// ── Free-agent pool / contract-status agreement (DATA-01) ─────────────────
+// Two independent signals both claim to answer "is this player unsigned":
+// `contractStatus` (deriveContractStatus's read of the contract facts —
+// roster-assembly.ts) and roster location (`teamId === FA_POOL`, the
+// player-level fact fa-pool.ts owns). Nothing at either write site checks
+// the other agrees — a stale write during the offseason state machine
+// (free-agency.ts moves a player to FA_POOL without also clearing
+// `contractStatus`, or the reverse) would silently produce a player who
+// reads as both "on the open market" and "signed," and nothing today would
+// notice. Only one direction is actually invalid: a player mid-season with
+// a pending RFA/UFA class who is STILL on his current roster is normal and
+// expected (his rights haven't reached the market yet) — that is not a
+// contradiction and must not be flagged, the same lesson
+// contractStatusAgeInvariant's own history above already states.
+export function freeAgentPoolConsistencyInvariant(
+  players: { id: string; teamId: string; contractStatus?: string | null }[],
+): GateResult {
+  const violations: string[] = [];
+  for (const p of players) {
+    if (p.teamId === FA_POOL_TEAM_ID && p.contractStatus === "SIGNED") {
+      violations.push(`${p.id}: in FA_POOL but contractStatus reads SIGNED`);
+    }
+  }
+  return {
+    gate: "free-agent-pool-consistency-invariant",
+    passed: violations.length === 0,
+    detail: violations.length === 0
+      ? `${players.length} player(s) checked; no FA_POOL player reads as SIGNED.`
+      : `${violations.length} violation(s): ${violations.slice(0, 3).join("; ")}.`,
   };
 }
