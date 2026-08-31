@@ -19,6 +19,7 @@ import { players as playersTable } from "@/app/db/schema";
 import { eq } from "drizzle-orm";
 import { ensurePlayerColumns, ensurePlayerTable } from "@/app/db/ensure-schema";
 import { plausibleAnchor } from "@/app/lib/contract-term";
+import { canonicalNameSlug } from "@/app/lib/player-identity";
 
 type Database = typeof defaultDb;
 
@@ -34,6 +35,22 @@ export interface LeagueSeedRow {
   expiryYear: number | null;
   /** ISO birthdate, when known — the canonical age source (app/lib/player-age.ts). */
   birthDate?: string | null;
+  /**
+   * Set only on an individually fact-checked `SEED_CORRECTIONS` row (never
+   * the bulk `FREE_AGENT_SEED_LIST_2026` merge). Bypasses the "don't send a
+   * signed player back to the market" guard below, which otherwise trusts
+   * whatever `expiryYear` a row already has to decide the contract "runs
+   * on." That guard is right in general — but it was written to be fooled
+   * by exactly the DATA-01/03 bug it was protecting against: Kevin
+   * Korchinski's real players-table row (a live NHL numeric id, not this
+   * seed's id — see the name-fallback match above) carried a *plausible but
+   * wrong* `expiryYear` of 2029, re-derived at some past ingest from his
+   * stale, never-decremented `yearsRemaining`. The guard read that as "a
+   * real contract running to 2029" and refused every correction. A row
+   * verified by hand against a live source is trusted over the anchor the
+   * guard is trying to protect.
+   */
+  forceExpiry?: boolean;
 }
 
 interface LeagueSeedFile {
@@ -82,6 +99,7 @@ export async function seedPlayersTable(database: Database = defaultDb): Promise<
   const existing = await database
     .select({
       id: playersTable.id,
+      name: playersTable.name,
       source: playersTable.source,
       expiryStatus: playersTable.expiryStatus,
       expiryYear: playersTable.expiryYear,
@@ -90,8 +108,23 @@ export async function seedPlayersTable(database: Database = defaultDb): Promise<
       birthDate: playersTable.birthDate,
     })
     .from(playersTable)
-    .catch(() => [] as { id: string; source: string | null; expiryStatus: string | null; expiryYear: number | null; hasNmc: boolean | null; hasNtc: boolean | null; birthDate: string | null }[]);
+    .catch(() => [] as { id: string; name: string; source: string | null; expiryStatus: string | null; expiryYear: number | null; hasNmc: boolean | null; hasNtc: boolean | null; birthDate: string | null }[]);
   const existingById = new Map(existing.map((r) => [r.id, r]));
+  // A seed row's id is a name-derived slug (`makePlayerId`); a real DB row for
+  // the same person can carry a live NHL numeric id from a contract sync
+  // instead — Kevin Korchinski's row is "8483466", not "kevinkorchinski". An
+  // id-only lookup silently misses every such player: the fix sits in the
+  // committed seed forever, correctly reasoned about, and never reaches the
+  // row the app actually reads. Match by canonical name as a fallback — the
+  // same trust level draft-reconcile.ts already uses for exactly this kind
+  // of live-identity collision — so a correction lands on whichever row is
+  // real, not only on a row whose id happens to match the seed's guess.
+  const existingByNameSlug = new Map<string, (typeof existing)[number]>();
+  for (const r of existing) {
+    if (!r.name) continue;
+    const slug = canonicalNameSlug(r.name);
+    if (slug && !existingByNameSlug.has(slug)) existingByNameSlug.set(slug, r);
+  }
 
   let inserted = 0;
   let filled = 0;
@@ -101,7 +134,7 @@ export async function seedPlayersTable(database: Database = defaultDb): Promise<
   const toInsert: LeagueSeedRow[] = [];
 
   for (const row of seed.players) {
-    const ex = existingById.get(row.id);
+    const ex = existingById.get(row.id) ?? existingByNameSlug.get(canonicalNameSlug(row.name));
     if (!ex) {
       toInsert.push(row);
       continue;
@@ -128,7 +161,7 @@ export async function seedPlayersTable(database: Database = defaultDb): Promise<
     // offseason being seeded is signed, whatever the class list remembers.
     // Editor rows never reach here at all.
     const anchor = plausibleAnchor(ex.expiryYear, seed.offseasonYear);
-    const contractRunsOn = anchor != null && anchor > seed.offseasonYear;
+    const contractRunsOn = !row.forceExpiry && anchor != null && anchor > seed.offseasonYear;
     if (ex.expiryStatus == null && row.expiryStatus != null && !contractRunsOn) {
       set.expiryStatus = row.expiryStatus;
       set.expiryYear = row.expiryYear;
@@ -142,10 +175,13 @@ export async function seedPlayersTable(database: Database = defaultDb): Promise<
     if (ex.birthDate == null && row.birthDate != null) set.birthDate = row.birthDate;
 
     if (Object.keys(set).length > 0) {
+      // Write to the REAL row's id — `ex.id`, not the seed's guessed
+      // `row.id` — so a name-fallback match updates the row that exists
+      // rather than silently no-op'ing on an id nothing has.
       await database
         .update(playersTable)
         .set(set)
-        .where(eq(playersTable.id, row.id))
+        .where(eq(playersTable.id, ex.id))
         .catch(() => {});
       filled++;
     } else {

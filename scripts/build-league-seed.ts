@@ -34,6 +34,8 @@ interface SeedRow {
   expiryYear: number | null;
   /** ISO birthdate, when known — the canonical age source (app/lib/player-age.ts). */
   birthDate?: string | null;
+  /** See the field doc on `LeagueSeedRow` in app/lib/league-seed.ts. */
+  forceExpiry?: boolean;
 }
 
 // Known contract-fact corrections where the bundled snapshot is wrong (e.g. the
@@ -50,14 +52,25 @@ const SEED_CORRECTIONS: Record<string, Partial<SeedRow>> = {
   // (thehockeynews.com, bleachernation.com). Birthdates from Wikipedia/
   // Hockey-Reference. expiryStatus/expiryYear are also set by the FA-class
   // merge below; birthDate is not, so it is corrected here.
-  "Kevin Korchinski":  { birthDate: "2004-06-21" },
-  "Ethan Del Mastro":  { birthDate: "2003-01-15" },
+  //
+  // forceExpiry: production's real players-table row for each of these
+  // three (found via live testing, Aug 31 2026 — see DEVNOTES) carries a
+  // live NHL numeric id, not this seed's name-derived id, AND a stale but
+  // plausible-looking expiryYear (Korchinski/Del Mastro read 2029 — his
+  // ELC's yearsRemaining re-anchored against the current season, never
+  // decremented). seedPlayersTable()'s "don't send a signed player back to
+  // the market" guard reads that stale anchor as a genuine future contract
+  // and refuses every correction. These three rows are individually
+  // fact-checked against a live source, not the bulk FA-class guess that
+  // guard exists to protect against — see the field doc on `LeagueSeedRow`.
+  "Kevin Korchinski":  { birthDate: "2004-06-21", forceExpiry: true },
+  "Ethan Del Mastro":  { birthDate: "2003-01-15", forceExpiry: true },
   // DATA-03 canary: signed with Chicago July 1, 2026 (1yr/$4.0M, not the
   // stale $2.8M carried over from a prior club) — a real pending 2027 UFA,
   // not part of the 2026 FA-class list below (he is not expiring THIS
   // offseason). Set directly rather than through the FA-class merge, which
   // is hardcoded to OFFSEASON_YEAR (nhl.com/blackhawks release, puckpedia).
-  "Ian Cole": { capHit: 4.0, expiryStatus: "UFA", expiryYear: 2027 },
+  "Ian Cole": { capHit: 4.0, expiryStatus: "UFA", expiryYear: 2027, forceExpiry: true },
 };
 
 // Same-name players collapse to a single makeId, and the bundled snapshot
