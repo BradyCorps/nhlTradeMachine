@@ -25,8 +25,19 @@ export interface GateResult {
 // Two different NHL IDs must never collapse to the same canonical identity —
 // that is the accidental-duplicate-record failure mode DATA-04's Björck/
 // Bjorck reconciliation exists to prevent, stated as a general invariant.
+//
+// Run against a real production export (1,640 players, Aug 31 2026), this
+// correctly caught "elias-pettersson" — but that collision is real and
+// deliberate: two different NHL players share the name (a center and a
+// defenseman), and `build-league-seed.ts`'s `SAME_NAME_ADDITIONS` exists
+// specifically to keep both as distinct, position-salted rows rather than
+// collapsing them. `knownCollisions` lets a caller name that one slug as
+// reviewed and accepted, so the gate keeps catching every OTHER accidental
+// duplicate without asserting a fact about the real world (two humans can
+// share a name) that isn't actually broken.
 export function exactNameAliasInvariance(
   records: { nhlId: string | number; name: string }[],
+  knownCollisions: ReadonlySet<string> = new Set(),
 ): GateResult {
   const slugToIds = new Map<string, Set<string>>();
   for (const r of records) {
@@ -36,12 +47,13 @@ export function exactNameAliasInvariance(
     if (!slugToIds.has(slug)) slugToIds.set(slug, new Set());
     slugToIds.get(slug)!.add(id);
   }
-  const collisions = [...slugToIds.entries()].filter(([, ids]) => ids.size > 1);
+  const collisions = [...slugToIds.entries()]
+    .filter(([slug, ids]) => ids.size > 1 && !knownCollisions.has(slug));
   return {
     gate: "exact-name-alias-invariance",
     passed: collisions.length === 0,
     detail: collisions.length === 0
-      ? `${records.length} records, ${slugToIds.size} distinct identities; no name resolves to more than one NHL ID.`
+      ? `${records.length} records, ${slugToIds.size} distinct identities; no unreviewed name resolves to more than one NHL ID.`
       : `${collisions.length} name(s) resolve to more than one NHL ID: ${collisions.slice(0, 3).map(([slug]) => slug).join(", ")}.`,
   };
 }
@@ -76,8 +88,23 @@ export function crossSurfaceValueReconciliation(
 }
 
 // ── Contract/status/age invariants ─────────────────────────────────────────
-// DATA-01's hard rule, restated as a checkable gate: never RFA/UFA plus a
-// contract that has not actually run out, and never a negative age.
+// DATA-01's rule, restated as a checkable gate: never a negative age, and
+// never an asserted RFA/UFA class with no year behind it.
+//
+// A first version of this gate also flagged `expiryStatus` set alongside an
+// `expiryYear` later than the current offseason — reasoning that a class
+// that "hasn't happened yet" must be fabricated. Running it against a real
+// production export (1,640 players, Aug 31 2026) proved that wrong: Ian
+// Cole (DATA-03's own verified fix — signed through 2026-27, UFA in 2027)
+// and the seeded Elias Pettersson defenseman both failed it, because a
+// player can be genuinely signed now with a real, known future free-agent
+// class — that is the entire point of the expiry-by-year ledger (DATA-03),
+// not a contradiction. The gate was checking the wrong direction: DATA-01's
+// actual bug (Korchinski) paired a MISSING status with a stale-looking term,
+// not a present status with a future year. Missing the year while claiming
+// the status is the one direction that is unambiguously an incomplete fact
+// (found live: Zack Bolduc — `RFA`, no `expiryYear`) — the only conditions
+// this gate is now allowed to assert as a real invariant of the data.
 export function contractStatusAgeInvariant(
   players: { id: string; age?: number | null; expiryStatus?: string | null; expiryYear?: number | null; offseasonYear: number }[],
 ): GateResult {
@@ -85,15 +112,15 @@ export function contractStatusAgeInvariant(
   for (const p of players) {
     if (p.age != null && p.age < 0) violations.push(`${p.id}: negative age`);
     const pending = p.expiryStatus === "RFA" || p.expiryStatus === "UFA";
-    if (pending && p.expiryYear != null && p.expiryYear > p.offseasonYear) {
-      violations.push(`${p.id}: ${p.expiryStatus} but contract runs through ${p.expiryYear}`);
+    if (pending && p.expiryYear == null) {
+      violations.push(`${p.id}: ${p.expiryStatus} with no expiryYear — an incomplete free-agent fact`);
     }
   }
   return {
     gate: "contract-status-age-invariant",
     passed: violations.length === 0,
     detail: violations.length === 0
-      ? `${players.length} player(s) checked; no fabricated free-agent status and no negative age.`
+      ? `${players.length} player(s) checked; no incomplete free-agent status and no negative age.`
       : `${violations.length} violation(s): ${violations.slice(0, 3).join("; ")}.`,
   };
 }

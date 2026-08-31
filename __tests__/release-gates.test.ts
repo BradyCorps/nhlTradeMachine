@@ -29,6 +29,19 @@ describe("exactNameAliasInvariance", () => {
     expect(result.detail).toContain("more than one NHL ID");
   });
 
+  it("a known, reviewed real-world collision (two different Elias Perssons) does not fail the gate", () => {
+    // Live production export, Aug 31 2026: caught exactly this, which is
+    // real and deliberate — build-league-seed.ts's SAME_NAME_ADDITIONS keeps
+    // the VAN center and VAN defenseman as distinct, position-salted rows on
+    // purpose rather than collapsing them.
+    const records = [
+      { nhlId: "eliaspettersson", name: "Elias Pettersson" },
+      { nhlId: "eliaspettersson-d", name: "Elias Pettersson" },
+    ];
+    expect(exactNameAliasInvariance(records).passed).toBe(false);
+    expect(exactNameAliasInvariance(records, new Set(["elias-pettersson"])).passed).toBe(true);
+  });
+
   it("passes when the same NHL ID reappears under the same spelling", () => {
     const result = exactNameAliasInvariance([
       { nhlId: 1, name: "Connor McDavid" },
@@ -67,12 +80,25 @@ describe("contractStatusAgeInvariant", () => {
     expect(result.passed).toBe(true);
   });
 
-  it("fails a fabricated RFA/UFA status alongside a contract that has not run out (DATA-01's rule)", () => {
+  it("passes a real signed-with-a-known-future-class player (Ian Cole's own verified DATA-03 shape)", () => {
+    // A live production export (1,640 players, Aug 31 2026) proved the
+    // original version of this gate wrong: it flagged exactly this shape —
+    // signed now, a real known future UFA/RFA year — as a violation. That
+    // is what the expiry-by-year ledger (DATA-03) exists to represent, not
+    // a contradiction.
     const result = contractStatusAgeInvariant([
-      { id: "korchinski", age: 22, expiryStatus: "RFA", expiryYear: 2029, offseasonYear },
+      { id: "iancole", age: 37, expiryStatus: "UFA", expiryYear: 2027, offseasonYear },
+      { id: "eliaspettersson-d", age: 25, expiryStatus: "RFA", expiryYear: 2027, offseasonYear },
+    ]);
+    expect(result.passed).toBe(true);
+  });
+
+  it("fails an asserted RFA/UFA status with no expiryYear behind it (the live Zack Bolduc case)", () => {
+    const result = contractStatusAgeInvariant([
+      { id: "zackbolduc", age: 22, expiryStatus: "RFA", expiryYear: null, offseasonYear },
     ]);
     expect(result.passed).toBe(false);
-    expect(result.detail).toContain("korchinski");
+    expect(result.detail).toContain("zackbolduc");
   });
 
   it("fails a negative age", () => {
