@@ -804,6 +804,62 @@ these before assuming the fix is "different weights":
   after — this increment was scoped to the diagnosis only, per direct
   instruction.
 
+**Increment 2 progress (this session) — Phase 2, feature audit complete:**
+
+- Built `scripts/backtest/defense-feature-audit.ts`: 9 candidate defensive
+  signals (xGA-relative persistence, defensive-zone start share, average
+  TOI, QoC index, blocks-by-player, takeaway/giveaway differential, on-ice
+  Corsi-against-relative, high-danger-against rate, PK time share), each
+  tested individually against Phase 1's same walk-forward target, gated on
+  sign consistency across all three transitions (2023, 2024, 2025) rather
+  than a single holdout number. Naive result: 8 of 9 passed.
+- **That result needed a second look before trusting it.** A quick pairwise
+  correlation check on the "passing" signals found qocIndex correlates 0.80
+  with avgTOI, 0.65 with blocks-per-82, 0.57 with defensive-zone start share
+  — these are not 8 independent signals, they are mostly one latent "how
+  much and how hard does this player play" factor. A player thrown at tough
+  matchups for heavy minutes shows worse raw on-ice numbers next season too
+  — not because he defends worse, but because his role mechanically is
+  harder. Feeding these into a model naively would very likely just
+  reproduce the current formula's own failure mode (Phase 1): rewarding
+  tough deployment as if it were defensive skill.
+- Built `scripts/backtest/defense-deployment-adjusted-audit.ts` to test the
+  real question: after controlling for role difficulty, does anything ELSE
+  still predict a defenseman's future results? Fit a weighted multiple
+  regression (next-season xGA-relative ~ QoC index + avg TOI + zone-start
+  share) frozen on train, confirming the confound is real and substantial
+  (deployment alone: holdout r=0.473, nearly matching Phase 1's persistence
+  baseline's r=0.472) — then tested each other signal against the
+  RESIDUAL (what deployment does not explain).
+- **Real, decisive, and this time genuinely positive result: all 6 tested
+  signals** (xGA-relative persistence, blocks-per-82, takeaway/giveaway
+  differential, Corsi-against-relative, high-danger-against rate, PK time
+  share) **hold a consistent sign against the deployment-adjusted residual
+  across every transition.** There is real individual defensive signal in
+  this data — it just is not visible in a naive raw-target test, because
+  deployment difficulty swamps it. xGA-relative and Corsi-against-relative
+  carry the strongest incremental signal (residual r=0.25-0.42); blocks,
+  takeaway differential, and high-danger rate are real but modest (r=0.04-
+  0.21); PK time share is comparably strong (r=0.25-0.40) but its
+  interpretation is genuinely ambiguous — it may be a fourth deployment axis
+  (how much a coach trusts this player, generally) rather than a skill
+  signal, and Phase 3 needs to reckon with that rather than assume either.
+- **What this means for Phase 3's architecture:** the fix is not "better
+  weights for deployment terms" — that's what the current formula already
+  does, and Phase 1 showed it fails. The fix is structural: predict the
+  raw defensive result EXPECTED given a player's role difficulty first
+  (the deployment model above), then value him on how much he beats or
+  falls short of that expectation using the validated residual signals.
+  That is a materially different model shape than `calcDefenseNAV`'s
+  current one, which sums deployment-difficulty bonuses directly into
+  value with no expectation baseline to compare against.
+- Evidence: real runs against `MoneyPuckData/` (408 train / 199 holdout
+  defenseman-season transitions across both scripts), TypeScript and lint
+  clean, full suite unaffected (**2,397/2,397** — no production code
+  touched this increment either).
+- **Not attempted:** Phase 3 (fitting and freezing the actual two-stage
+  model this diagnosis points to) and everything after.
+
 **Explicitly out of scope for this ticket** (same reasoning as NAV-01's own
 phase boundaries — this is real iterative modeling work that should not be
 compressed into one sitting):
