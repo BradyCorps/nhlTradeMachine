@@ -775,6 +775,35 @@ these before assuming the fix is "different weights":
    confirm the new `calcDefenseNAV` doesn't regress the whole-roster result
    NAV-01 increment 1 already validated.
 
+**Increment 1 progress (this session) — Phase 1, diagnosis complete:**
+
+- Built `scripts/backtest/defense-signal-diagnostic.ts`: does a defenseman's
+  real `defTotal` (read off `calcDefenseNAV`'s accounting-identity `stages`,
+  not the separate `defDisplay` blend) predict that SAME player's own
+  next-season on-ice xG-against-relative better than simply extrapolating
+  his current result forward (a persistence baseline)? Walk-forward on
+  MoneyPuck 2022-25 (403 train / 197 holdout defenseman-season transitions).
+- **Decisive result: no.** The persistence baseline is a real, positive
+  signal (holdout r=0.472 — a defenseman's own current defensive results do
+  meaningfully predict his next season's). `calcDefenseNAV`'s `defTotal`
+  does not just fail to add value on top of that — it is *negatively*
+  correlated with next-season results (holdout r=-0.102, MAE 12.7% worse
+  than doing nothing but persistence).
+- **This resolves Phase 1's diagnostic question decisively toward hypothesis
+  (a):** the formula's inputs/weights are actively counterproductive at the
+  individual level, not merely diluted by team-level aggregation (b) or
+  measured against the wrong target (c) — those would still permit
+  `defTotal` to at least track a player's own future results. It does not.
+  Phase 2's feature audit is the confirmed next step: start from individual
+  signals (xGA-relative, zone starts, block/takeaway rates, etc.) tested one
+  at a time, not from patching the current formula's weights.
+- Evidence: real run against `MoneyPuckData/`, TypeScript and lint clean,
+  full suite unaffected (**2,397/2,397** — diagnostic script only, no
+  production code touched this increment).
+- **Not attempted:** Phase 2 (the per-signal feature audit) and everything
+  after — this increment was scoped to the diagnosis only, per direct
+  instruction.
+
 **Explicitly out of scope for this ticket** (same reasoning as NAV-01's own
 phase boundaries — this is real iterative modeling work that should not be
 compressed into one sitting):
