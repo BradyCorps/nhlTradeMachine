@@ -694,6 +694,110 @@ The signed and positive-only totals must never share the same label.
   the next real increment here is fitting a defense model that actually
   predicts defensive outcomes, not proceeding past a known-broken step.
 
+## [ ] NAV-02 — Fit and validate an independent Defense-NAV model (`L`)
+
+**Current state:** `calcDefenseNAV` (NAV-01 Phase 3) is a real, separately
+named entry point, but it purely delegates to `calcSkaterNAV`'s existing
+`isD` branch — the same defensive-value formula (`defRawBase`: blended `dps`
+or `def`/`qocVal`/`toiD`/`dzVal`/`xgaRel`, plus `driverAdj`/`shutdownDAdj`/
+`toiDefFloor`) that was never independently fit or validated. NAV-01
+increment 3's `scripts/backtest/position-nav-backtest.ts` tested the only
+honest claim available — does `ΣD-NAV` (this formula, summed per team)
+track team goals-against/game — and it failed: wrong-signed (more D-NAV
+associated with MORE goals allowed) in 2022, 2023, and 2024, only turning
+the expected negative direction on the untouched 2025-26 holdout, and even
+then weakly (r=-0.13). `ΣF-NAV`, tested the same way over the same window,
+passed cleanly (positive and holding every season). This ticket is that gap:
+build a defensive-value model that actually validates, rather than
+continuing to ship the failing one under a `calcDefenseNAV` label that
+implies it does.
+
+**Objective:** determine whether a defenseman's individual defensive value
+can be measured from data this app already has access to, and if so, fit
+and validate a real `calcDefenseNAV` body to replace today's delegation. If
+not — a real, allowed outcome, not a failure to avoid finding — document why
+and what data source would be required, rather than shipping something that
+LOOKS validated but isn't.
+
+**Why the team-level test may have failed for a reason other than "the
+formula is wrong":** individual defensive value is one of the hardest
+things to measure in hockey analytics precisely because it is heavily
+confounded — by linemates, by the goalie behind the player, by opponent
+quality, and by team defensive scheme. Sixty seconds of research before
+writing new coefficients (this is Phase A below) should distinguish between
+these before assuming the fix is "different weights":
+- The current formula's inputs might be genuinely uninformative.
+- The inputs might carry real individual signal that a **team-level sum**
+  washes out — 6-7 defensemen with wildly different roles (shutdown
+  pair vs. offensive-minded second pair vs. third-pair depth) collapsed
+  into one number is a much noisier aggregate than each player's own
+  predictive validity.
+- Team goals-against/game is itself a blunt, goalie-confounded target — a
+  strong defense in front of a league-worst goaltender still allows more
+  goals than a mediocre defense in front of an elite one. An xG-against
+  target (already computed in MoneyPuck, strips finishing/goaltending
+  variance) may be the more honest ground truth than raw goals-against.
+
+**Required phases:**
+
+1. **Diagnose before refitting.** Test the CURRENT formula's individual-level
+   predictive validity (not the team sum) against on-ice defensive outcomes
+   — e.g. does a defenseman's `defRaw` (or its components individually)
+   predict his own on-ice xGA-relative or GA-relative next season, walk-
+   forward, the same way `deployment-multiplier-backtest.ts` tested
+   `normalizedPts` against next-season points pace. This separates "the
+   formula is wrong" from "the formula might be fine but team-level
+   aggregation and/or the GA target buried it," and should decide whether
+   Phase 2-3 refits the formula, changes the target, or both.
+2. **Feature audit.** Enumerate every defensive signal already flowing into
+   the pipeline or available in `MoneyPuckData/` per player-season (xGA-
+   relative on/off ice, defensive-zone start share, shot-block/takeaway/
+   giveaway rates, PK deployment, pairing on-ice xGF%, faceoff win% as a
+   zone-time proxy) and backtest each **individually** against the chosen
+   target — same convention as `sim-goal-share-backtest.ts` and this
+   session's two new backtests: walk-forward split, named simple baseline,
+   sign-consistency required across every available season, not just a
+   holdout average. A signal that fails this bar does not go into the model,
+   full stop — this is exactly the discipline that would have caught the
+   M_dep/ASI/SLF composite before it shipped.
+3. **Fit a real, minimal model** from only the signals that individually
+   validated in Phase 2 — start with the simplest form that clears the bar
+   (a small weighted linear combination is preferable to anything more
+   opaque at this sample size: 4 MoneyPuck seasons is not a lot of data to
+   fit against without overfitting). Freeze it; do not re-tune against the
+   holdout.
+4. **Replace `calcDefenseNAV`'s delegation** with the fitted model, gated on
+   the same walk-forward, sign-consistent, holdout-validated bar
+   `position-nav-backtest.ts` already applies — the ticket is not done until
+   that script's `ΣD-NAV` gate passes for real, not until a model merely
+   exists.
+5. **Re-run `position-nav-backtest.ts` and `team-nav-backtest.ts`** to
+   confirm the new `calcDefenseNAV` doesn't regress the whole-roster result
+   NAV-01 increment 1 already validated.
+
+**Explicitly out of scope for this ticket** (same reasoning as NAV-01's own
+phase boundaries — this is real iterative modeling work that should not be
+compressed into one sitting):
+- Cross-position calibration onto a shared X-NAV scale (NAV-01 Phase 5).
+- Uncertainty/coverage metadata, shadow mode, canaries, feature-flag
+  activation, or migrating any of the 5 product surfaces (NAV-01 Phases
+  6-12) — none of that should move until `ΣD-NAV` itself validates.
+- Sourcing new data this environment cannot reach (live NHL egress is
+  blocked here per this file's environment notes) — if Phase 1's diagnosis
+  concludes the fix genuinely needs data this app doesn't have (e.g. a
+  proper WOWY/RAPM regression needs far more line-combination data than 4
+  MoneyPuck seasons provide), that conclusion is itself an acceptable,
+  honestly-reported outcome of this ticket.
+
+**Acceptance:** `calcDefenseNAV` produces a defensive value that is no
+longer pure delegation, and `scripts/backtest/position-nav-backtest.ts`'s
+`ΣD-NAV` gate passes — sign-consistent across every available season,
+correlating with a clearly defined, justified defensive outcome on an
+untouched holdout — with the same honesty this session's other backtests
+held to: a real negative result (data doesn't support any defensive model
+better than today's) is an acceptable, documented close, not a blocker to
+force past.
+
 - After # 2A. [X]-NAV model evolution [ ] NAV-01 — Build, cross-calibrate and activate F/D/G-NAV (`XL`) is marked as complete. Replace goalie `X-NAV` labels with `G-NAV` and goalie-specific component language.
 2B. Gravity v4 controlled release
 
