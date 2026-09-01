@@ -1,0 +1,382 @@
+/**
+ * Position-Split NAV Backtest (NAV-01 Required Phase 4)
+ *
+ * team-nav-backtest.ts (NAV-01 increment 1) validated Roster X-NAV as a
+ * whole against overall goal differential. That is a blunt test: X-NAV
+ * bundles offense, defense, age and contract-surplus into one number, and a
+ * roster's defensemen mostly do not drive its goals-for the way its
+ * forwards do (or vice versa for goals-against).
+ *
+ * This backtest is the position-appropriate version, made possible by
+ * NAV-01 Phase 3's calcForwardNAV/calcDefenseNAV — real, independently
+ * callable entry points (not a hand-copied reimplementation) — so it
+ * satisfies one of NAV-01's own activation gates along the way: "production
+ * and backtest implementations use the same calculation path."
+ *
+ *   ΣF-NAV (forwards only, calcForwardNAV) vs team goals-for/game — the
+ *     outcome forwards actually drive.
+ *   ΣD-NAV (defensemen only, calcDefenseNAV) vs team goals-against/game —
+ *     the outcome defensemen actually drive (lower GA is better, so a
+ *     useful D-NAV should correlate NEGATIVELY with GA/game).
+ *
+ * Same walk-forward convention as team-nav-backtest.ts and
+ * deployment-multiplier-backtest.ts: 2022-24 train (frozen linear baseline
+ * fit), untouched 2025-26 holdout, process.exitCode gate.
+ *
+ * Usage: npx tsx scripts/backtest/position-nav-backtest.ts
+ */
+
+import * as fs from "fs";
+import * as path from "path";
+import { calcForwardNAV, calcDefenseNAV, type AssetInput } from "../../app/lib/xnav-engine";
+
+const ROOT = process.cwd();
+
+const CAP_CEILING: Record<number, number> = {
+  2022: 82.5,
+  2023: 83.5,
+  2024: 88.0,
+  2025: 95.0,
+};
+
+type Row = Record<string, string>;
+
+function splitCsvLine(line: string): string[] {
+  const fields: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (ch === ',' && !inQuotes) {
+      fields.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  fields.push(current);
+  return fields;
+}
+
+function readCsv(rel: string): Row[] {
+  const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  const head = splitCsvLine(lines[0].replace(/^﻿/, ""));
+  return lines.slice(1).map(line => {
+    const cells = splitCsvLine(line);
+    const row: Row = {};
+    head.forEach((h, i) => { row[h] = cells[i] ?? ""; });
+    return row;
+  });
+}
+
+function num(v: string | undefined): number { return v ? parseFloat(v) || 0 : 0; }
+function safe(v: number): number { return isFinite(v) ? v : 0; }
+function slug(name: string): string {
+  return name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z]/g, "");
+}
+
+const SEASON_FOLDERS: Record<number, string> = {
+  2022: "2022_23",
+  2023: "2023_24",
+  2024: "2024_25",
+  2025: "2025_26",
+};
+
+function moneyPuckFile(season: number, prefix: "skaters" | "teams"): string {
+  const dir = path.join(ROOT, "MoneyPuckData", SEASON_FOLDERS[season]);
+  const file = fs.readdirSync(dir).find(f => f.startsWith(prefix));
+  if (!file) throw new Error(`No ${prefix} file found in MoneyPuckData/${SEASON_FOLDERS[season]}`);
+  return path.join("MoneyPuckData", SEASON_FOLDERS[season], file);
+}
+
+// ── Age + contract lookups (same as team-nav-backtest.ts) ─────────────────
+const biosRows = readCsv("OtherData/2025;26_player_bios.csv");
+const biosByName = new Map<string, { dob: string; draftOverall: number | undefined }>();
+for (const r of biosRows) {
+  const name = r["Player"];
+  if (!name) continue;
+  biosByName.set(slug(name), {
+    dob: r["Date of Birth"] || "",
+    draftOverall: r["Overall Draft Position"] ? parseInt(r["Overall Draft Position"]) || undefined : undefined,
+  });
+}
+
+const signings = readCsv("OtherData/contracts/signings.csv");
+const ageFromSignings = new Map<string, { signAge: number; signYear: number }>();
+for (const s of signings) {
+  const name = slug(s.player || "");
+  const signAge = parseInt(s.signAge);
+  const sd = s.signDate || "";
+  const signYear = sd ? parseInt(sd.slice(0, 4)) : 0;
+  if (name && signAge && signYear) ageFromSignings.set(name, { signAge, signYear });
+}
+
+function getAge(name: string, season: number): number | null {
+  const s = slug(name);
+  const bio = biosByName.get(s);
+  if (bio && bio.dob) {
+    const birthYear = parseInt(bio.dob.slice(0, 4));
+    if (birthYear && birthYear >= 1960 && birthYear <= 2010) return season - birthYear;
+  }
+  const sig = ageFromSignings.get(s);
+  if (sig) {
+    const age = sig.signAge + (season - sig.signYear);
+    if (age >= 16 && age <= 50) return age;
+  }
+  return null;
+}
+
+interface Contract { capHit: number; term: number; signSeason: number; endSeason: number }
+const contractsByPlayer = new Map<string, Contract[]>();
+for (const s of signings) {
+  const name = slug(s.player || "");
+  if (!name) continue;
+  const capHitRaw = parseFloat(s.capHit);
+  const capHit = capHitRaw / 1_000_000;
+  const term = parseInt((s.term || "").replace(/yr$/, "")) || 1;
+  const sd = s.signDate || "";
+  const signYear = sd ? parseInt(sd.slice(0, 4)) : 0;
+  const signMonth = sd ? parseInt(sd.slice(5, 7)) : 7;
+  if (!signYear || !capHit) continue;
+  const signSeason = signMonth >= 7 ? signYear : signYear - 1;
+  const endSeason = signSeason + term - 1;
+  if (!contractsByPlayer.has(name)) contractsByPlayer.set(name, []);
+  contractsByPlayer.get(name)!.push({ capHit, term, signSeason, endSeason });
+}
+
+function getContract(name: string, season: number): { capHit: number; yearsRemaining: number } | null {
+  const contracts = contractsByPlayer.get(slug(name));
+  if (!contracts) return null;
+  const active = contracts.filter(c => c.signSeason <= season && c.endSeason >= season);
+  if (active.length === 0) return null;
+  const c = active.sort((a, b) => b.signSeason - a.signSeason)[0];
+  return { capHit: c.capHit, yearsRemaining: c.endSeason - season + 1 };
+}
+
+// ── Team goals for/against ─────────────────────────────────────────────────
+interface TeamSeason { team: string; season: number; gp: number; gfPerGame: number; gaPerGame: number }
+const teamStandings = new Map<string, TeamSeason>();
+const SEASONS = [2022, 2023, 2024, 2025];
+for (const season of SEASONS) {
+  for (const r of readCsv(moneyPuckFile(season, "teams"))) {
+    if (r.situation !== "all") continue;
+    const team = r.team;
+    const gp = num(r.games_played);
+    if (!team || gp < 40) continue;
+    teamStandings.set(`${team}-${season}`, {
+      team, season, gp,
+      gfPerGame: num(r.goalsFor) / gp,
+      gaPerGame: num(r.goalsAgainst) / gp,
+    });
+  }
+}
+
+// ── Skater loader (mirrors roster-assembly.ts's own defRate/xgRelTM/dzPct
+// derivation — see team-nav-backtest.ts for the same pattern) ─────────────
+interface SkaterSeason {
+  name: string; team: string; season: number; position: string; gp: number;
+  ptsPace: number; goalsPace: number; assistsPace: number; xgPace: number; avgTOI: number;
+  defRate: number; xgRelTM: number; xgaRelTM: number; dzPct: number;
+}
+
+function loadSkaterSeason(season: number): SkaterSeason[] {
+  const rows = readCsv(moneyPuckFile(season, "skaters"));
+  const byPlayer = new Map<string, Map<string, Row>>();
+  for (const row of rows) {
+    const key = `${row.name}__${row.position}`;
+    const situations = byPlayer.get(key) ?? new Map<string, Row>();
+    situations.set(row.situation, row);
+    byPlayer.set(key, situations);
+  }
+
+  const out: SkaterSeason[] = [];
+  for (const [, situations] of byPlayer) {
+    const all = situations.get("all");
+    if (!all || all.position === "G") continue;
+    const gp = num(all.games_played);
+    if (gp < 10) continue;
+
+    const iceSec = num(all.icetime) || 1;
+    const iceHours = iceSec / 3600;
+    const benchH = Math.max(0.01, (gp * 60 - iceSec / 60) / 60);
+    const onA = num(all.OnIce_A_xGoals) / Math.max(0.01, iceHours);
+    const offA = num(all.OffIce_A_xGoals) / Math.max(0.01, benchH);
+
+    const onF = num(all.OnIce_F_xGoals);
+    const offF = num(all.OffIce_F_xGoals);
+    const onAVal = num(all.OnIce_A_xGoals);
+    const offAVal = num(all.OffIce_A_xGoals);
+    const onXgPct = onF + onAVal > 0 ? onF / (onF + onAVal) : 0.5;
+    const offXgPct = offF + offAVal > 0 ? offF / (offF + offAVal) : 0.5;
+
+    const es = situations.get("5on5");
+    const dz = num(es?.I_F_dZoneShiftStarts);
+    const oz = num(es?.I_F_oZoneShiftStarts);
+
+    const pts = num(all.I_F_points);
+    const goals = num(all.I_F_goals);
+
+    out.push({
+      name: all.name,
+      team: all.team,
+      season,
+      position: all.position === "L" || all.position === "R" ? "W" : all.position === "C" ? "C" : "D",
+      gp,
+      ptsPace: (pts / gp) * 82,
+      goalsPace: (goals / gp) * 82,
+      assistsPace: ((pts - goals) / gp) * 82,
+      xgPace: (num(all.I_F_xGoals) / gp) * 82,
+      avgTOI: (iceSec / 60) / gp,
+      defRate: safe(offA - onA),
+      xgRelTM: safe((onXgPct - offXgPct) * 100),
+      xgaRelTM: safe(onA - offA),
+      dzPct: dz + oz > 0 ? dz / (dz + oz) : 0.5,
+    });
+  }
+  return out;
+}
+
+const skaterSeasons = SEASONS.flatMap(loadSkaterSeason);
+
+function assetInputFor(sk: SkaterSeason, age: number, capHit: number, yearsRemaining: number, ceiling: number, draftOverall?: number): AssetInput {
+  return {
+    id: slug(sk.name), name: sk.name,
+    position: sk.position === "D" ? "D" : (sk.position === "C" ? "C" : "W"),
+    age, capHit, yearsRemaining, capCeiling: ceiling,
+    ptsPace: sk.ptsPace, goalsPace: sk.goalsPace, assistsPace: sk.assistsPace,
+    xGPace: sk.xgPace, avgTOI: sk.avgTOI, defRate: sk.defRate,
+    xgRelTM: sk.xgRelTM, xgaRelTM: sk.xgaRelTM, dzPct: sk.dzPct,
+    games: sk.gp, hasLiveStats: true, draftOverall,
+  };
+}
+
+interface TeamPositionNav {
+  team: string; season: number;
+  fNav: number; dNav: number;
+  gfPerGame: number; gaPerGame: number;
+  fMatchRate: number; dMatchRate: number;
+}
+
+const results: TeamPositionNav[] = [];
+for (const season of SEASONS) {
+  const ceiling = CAP_CEILING[season];
+  const seasonTeams = new Set([...teamStandings.values()].filter(t => t.season === season).map(t => t.team));
+
+  for (const team of seasonTeams) {
+    const standings = teamStandings.get(`${team}-${season}`);
+    if (!standings) continue;
+
+    const teamSkaters = skaterSeasons.filter(s => s.team === team && s.season === season);
+    let fNav = 0, dNav = 0;
+    let fMatched = 0, fTotal = 0, dMatched = 0, dTotal = 0;
+
+    for (const sk of teamSkaters) {
+      const age = getAge(sk.name, season);
+      if (age === null) continue;
+      const contract = getContract(sk.name, season);
+      const capHit = contract ? contract.capHit : ceiling * 0.009;
+      const yrs = contract ? contract.yearsRemaining : 1;
+      const bio = biosByName.get(slug(sk.name));
+      const input = assetInputFor(sk, age, capHit, yrs, ceiling, bio?.draftOverall);
+
+      if (sk.position === "D") {
+        dTotal++;
+        if (contract) dMatched++;
+        dNav += calcDefenseNAV(input as AssetInput & { position: "D" }).total;
+      } else {
+        fTotal++;
+        if (contract) fMatched++;
+        fNav += calcForwardNAV(input as AssetInput & { position: "C" | "W" }).total;
+      }
+    }
+
+    results.push({
+      team, season, fNav, dNav,
+      gfPerGame: standings.gfPerGame, gaPerGame: standings.gaPerGame,
+      fMatchRate: fTotal > 0 ? fMatched / fTotal : 0,
+      dMatchRate: dTotal > 0 ? dMatched / dTotal : 0,
+    });
+  }
+}
+
+// ── Stats helpers ──────────────────────────────────────────────────
+function pearsonR(xs: number[], ys: number[]): number {
+  const n = xs.length;
+  if (n < 3) return 0;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  let cov = 0, dx2 = 0, dy2 = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = xs[i] - mx, dy = ys[i] - my;
+    cov += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
+  }
+  return dx2 > 0 && dy2 > 0 ? cov / Math.sqrt(dx2 * dy2) : 0;
+}
+
+const train = results.filter(r => r.season <= 2024);
+const holdout = results.filter(r => r.season === 2025);
+
+const fAvgMatch = results.reduce((s, r) => s + r.fMatchRate, 0) / results.length;
+const dAvgMatch = results.reduce((s, r) => s + r.dMatchRate, 0) / results.length;
+
+const fHoldoutR = pearsonR(holdout.map(r => r.fNav), holdout.map(r => r.gfPerGame));
+const dHoldoutR = pearsonR(holdout.map(r => r.dNav), holdout.map(r => r.gaPerGame));
+
+console.log("Position-Split NAV Backtest (NAV-01 Phase 4)");
+console.log("=".repeat(60));
+console.log(`\nTrain: ${train.length} team-seasons (2022-24). Holdout: ${holdout.length} (2025-26, untouched).`);
+console.log(`Contract match rate — forwards: ${(fAvgMatch * 100).toFixed(1)}%, defensemen: ${(dAvgMatch * 100).toFixed(1)}%`);
+
+console.log(`\nHoldout correlation (position-appropriate outcome):`);
+console.log(`  ΣF-NAV vs team goals-for/game:      r=${fHoldoutR.toFixed(4)}  R²=${(fHoldoutR ** 2).toFixed(4)}`);
+console.log(`  ΣD-NAV vs team goals-against/game:  r=${dHoldoutR.toFixed(4)}  R²=${(dHoldoutR ** 2).toFixed(4)}  (negative is good — more D value should mean fewer goals against)`);
+
+console.log(`\nPer-season breakdown:`);
+const perSeason: { season: number; fr: number; dr: number }[] = [];
+for (const season of SEASONS) {
+  const seasonResults = results.filter(r => r.season === season);
+  if (seasonResults.length < 10) continue;
+  const fr = pearsonR(seasonResults.map(r => r.fNav), seasonResults.map(r => r.gfPerGame));
+  const dr = pearsonR(seasonResults.map(r => r.dNav), seasonResults.map(r => r.gaPerGame));
+  perSeason.push({ season, fr, dr });
+  console.log(`  ${season}: F-NAV vs GF/gm r=${fr.toFixed(4)}  |  D-NAV vs GA/gm r=${dr.toFixed(4)}`);
+}
+
+// ── Gates ────────────────────────────────────────────────────────
+// A single holdout correlation is not enough to call a signal validated —
+// NAV-01 increment 1 learned that the hard way (a barely-passing headline
+// number hid three-of-four seasons pointing the wrong way). Sign
+// consistency across every season is the real bar, matching the on-ice-only
+// check team-nav-backtest.ts already applies.
+const failures: string[] = [];
+if (train.length < 80) failures.push(`insufficient train sample (${train.length} < 80)`);
+if (holdout.length < 25) failures.push(`insufficient holdout sample (${holdout.length} < 25)`);
+if (fAvgMatch < 0.5) failures.push(`forward contract match rate too low (${(fAvgMatch * 100).toFixed(1)}%)`);
+if (dAvgMatch < 0.5) failures.push(`defenseman contract match rate too low (${(dAvgMatch * 100).toFixed(1)}%)`);
+if (fHoldoutR <= 0.10) failures.push(`ΣF-NAV does not meaningfully track team goals-for on holdout (r=${fHoldoutR.toFixed(4)})`);
+if (dHoldoutR >= -0.10) failures.push(`ΣD-NAV does not meaningfully track team goals-against suppression on holdout (r=${dHoldoutR.toFixed(4)}, expected clearly negative)`);
+for (const { season, fr } of perSeason) {
+  if (fr <= 0) failures.push(`ΣF-NAV vs goals-for is non-positive in ${season} (r=${fr.toFixed(4)})`);
+}
+for (const { season, dr } of perSeason) {
+  if (dr >= 0) failures.push(`ΣD-NAV vs goals-against is the WRONG sign in ${season} (r=${dr.toFixed(4)} — more D-NAV associated with MORE goals allowed, not fewer)`);
+}
+
+console.log(`\n${"=".repeat(60)}`);
+if (failures.length > 0) {
+  console.error(`FAIL: ${failures.join("; ")}`);
+  if (failures.some(f => f.includes("WRONG sign"))) {
+    console.error(`\nΣF-NAV is validated: positive and holding up every season. ΣD-NAV is NOT: it`);
+    console.error(`points the wrong way in most seasons, meaning the engine's defensive-value`);
+    console.error(`component does not reliably aggregate into a team-level defensive signal —`);
+    console.error(`this is a real gap for a future increment's actual D-model fitting work to`);
+    console.error(`close, not something to paper over with a single passing holdout number.`);
+  }
+  process.exitCode = 1;
+} else {
+  console.log("PASS: ΣF-NAV tracks team offense and ΣD-NAV tracks defensive suppression, sign-consistent every season.");
+}

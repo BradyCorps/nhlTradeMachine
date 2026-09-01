@@ -8,7 +8,7 @@
 // not precision assertions.
 
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import { calcNAV, calcDeploymentMultiplier, calcGoalieNAV, calcPickNAV, calcProspectNAV, calcSkaterNAV, currentSeasonWeight, classifyForwardArchetype, classifyRosterTier } from "../app/lib/xnav-engine";
+import { calcNAV, calcDeploymentMultiplier, calcGoalieNAV, calcPickNAV, calcProspectNAV, calcSkaterNAV, calcForwardNAV, calcDefenseNAV, currentSeasonWeight, classifyForwardArchetype, classifyRosterTier } from "../app/lib/xnav-engine";
 import { getHistoricalFloor } from "../app/lib/player-data";
 import { stageDrift } from "../app/lib/nav-breakdown";
 
@@ -1261,5 +1261,38 @@ describe("X-NAV — Gravity Release A boundary", () => {
     expect(transitionChanged.grav).not.toBe(original.grav);
     expect(transitionChanged.grav).toBeLessThanOrEqual(20);
     expect(transitionCollapsed.grav).toBeGreaterThanOrEqual(-20);
+  });
+});
+
+// NAV-01 Phase 3 — calcForwardNAV/calcDefenseNAV are new, independently
+// named entry points (see xnav-engine.ts's comment above them for why they
+// currently delegate rather than reimplement). This locks in that they are
+// pure delegation today: byte-identical to calling calcSkaterNAV directly
+// for a matching position, so wiring calcNAV through them changed nothing.
+describe("calcForwardNAV / calcDefenseNAV — Phase 3 delegation", () => {
+  const forward = {
+    id: "fwd", name: "Test Forward", position: "C" as const,
+    age: 27, capHit: 6.5, yearsRemaining: 4,
+    ptsPace: 72, xGPace: 18, defRate: 0.1, avgTOI: 18.5,
+    qocIndex: 55, dzPct: 0.48, games: 78,
+  };
+  const defense = {
+    id: "def", name: "Test Defenseman", position: "D" as const,
+    age: 26, capHit: 7.2, yearsRemaining: 5,
+    ptsPace: 45, xGPace: 9, defRate: 0.15, avgTOI: 22.5,
+    qocIndex: 62, dzPct: 0.55, games: 78,
+  };
+
+  it("calcForwardNAV matches calcSkaterNAV exactly for a forward", () => {
+    expect(calcForwardNAV(forward)).toEqual(calcSkaterNAV(forward));
+  });
+
+  it("calcDefenseNAV matches calcSkaterNAV exactly for a defenseman", () => {
+    expect(calcDefenseNAV(defense)).toEqual(calcSkaterNAV(defense));
+  });
+
+  it("calcNAV routes a forward and a defenseman through their own entry point with no value change", () => {
+    expect(calcNAV(forward)).toEqual(calcForwardNAV(forward));
+    expect(calcNAV(defense)).toEqual(calcDefenseNAV(defense));
   });
 });

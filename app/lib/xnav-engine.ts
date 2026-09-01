@@ -1412,6 +1412,38 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   };
 }
 
+// ── NAV-01 Phase 3: separate forward / defence feature contracts ──────────────
+//
+// calcSkaterNAV branches internally on `isD` at ~12 points (offense-curve
+// exponent, age-curve peak, defensive driver/shutdown/TOI-floor terms, cap
+// establishment divisor, franchise-floor thresholds, positional premium) —
+// real position-specific math, but hidden inside one function's implicit
+// branch rather than exposed as two independent, independently-callable,
+// independently-backtestable pipelines. That's the literal complaint NAV-01
+// opens with: "not independent player-level models."
+//
+// These two entry points are the structural fix: F and D are now genuinely
+// separate named functions a caller (or a backtest) can reach directly. Each
+// currently delegates to calcSkaterNAV — same math, byte-identical output,
+// zero valuation change — because a REAL independently-fitted forward or
+// defence model is Phase 4's larger, still-open task, and after this
+// session's deployment-multiplier finding, no new coefficient ships without
+// its own validated backtest. What Phase 3 buys now: a genuinely separate
+// forward model can replace calcForwardNAV's body without touching
+// calcDefenseNAV or any of its callers, and position-specific validation
+// (scripts/backtest/position-nav-backtest.ts) can call each independently
+// rather than reimplementing the engine's isD branch by hand.
+export type ForwardFeatureContract = Omit<AssetInput, "position"> & { position: "C" | "W" };
+export type DefenseFeatureContract = Omit<AssetInput, "position"> & { position: "D" };
+
+export function calcForwardNAV(asset: ForwardFeatureContract): XNAVResult {
+  return calcSkaterNAV(asset);
+}
+
+export function calcDefenseNAV(asset: DefenseFeatureContract): XNAVResult {
+  return calcSkaterNAV(asset);
+}
+
 // ── Prospect NAV (pedigree-based) ─────────────────────────────────────────────
 // A drafted prospect with no meaningful NHL sample is valued from the pick that
 // selected him, discounted for burned development time unless NHLe production
@@ -1520,6 +1552,16 @@ export function applyHistoricalPedigreeFloor(
   };
 }
 
+// Position is already narrowed to C/W/D by the two calcNAV call sites below
+// (Pick and G are handled by their own branches first) — the cast makes that
+// existing guarantee explicit at the one boundary that needs it, rather than
+// exposing a wider position union on calcForwardNAV/calcDefenseNAV themselves.
+function skaterNAVByPosition(asset: AssetInput): XNAVResult {
+  return asset.position === "D"
+    ? calcDefenseNAV(asset as DefenseFeatureContract)
+    : calcForwardNAV(asset as ForwardFeatureContract);
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 export function calcNAV(asset: AssetInput): XNAVResult {
   if (asset.position === "Pick") return calcPickNAV(asset);
@@ -1534,9 +1576,9 @@ export function calcNAV(asset: AssetInput): XNAVResult {
     result = calcGoalieNAV(asset);
   } else if (hasProspectValuation && games >= 14 && games < 60) {
     const transitionWeight = clamp((games - 14) / 46, 0, 1);
-    result = blendNavResults(calcProspectNAV(asset), calcSkaterNAV(asset), transitionWeight);
+    result = blendNavResults(calcProspectNAV(asset), skaterNAVByPosition(asset), transitionWeight);
   } else {
-    result = calcSkaterNAV(asset);
+    result = skaterNAVByPosition(asset);
   }
   return applyTradeRequestDiscount(applyHistoricalPedigreeFloor(result, asset), asset);
 }

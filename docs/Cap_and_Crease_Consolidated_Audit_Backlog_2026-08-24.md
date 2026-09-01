@@ -639,15 +639,60 @@ The signed and positive-only totals must never share the same label.
   same documented limitation as prior entries), so the live check confirmed
   correct rendering/labeling, not a non-zero signed-vs-positive-only
   divergence with real data.
-- **Not attempted this increment:** Required Phase 3 (separate forward/
-  defence feature contracts — `calcSkaterNAV` still branches F vs D
-  internally via one `isD` boolean rather than being two independently
-  named/typed pipelines; goalies already have this via `calcGoalieNAV`) and
-  Phase 4 (fit/validate F-NAV and D-NAV against position-appropriate
-  outcomes). The live-multiplier finding took priority — CLAUDE.md's rule
-  applies to what is already shipping, not only to new work — and is a more
-  urgent "more truthish" fix than adding new positional splits on top of an
-  engine that had this in it.
+- **Not attempted in increment 2:** Required Phase 3 (separate forward/
+  defence feature contracts) and Phase 4 (fit/validate F-NAV and D-NAV
+  against position-appropriate outcomes) — the live-multiplier finding took
+  priority. Both were picked up in increment 3, below.
+
+**Increment 3 progress (this session) — Required Phases 3 and 4:**
+
+- **Phase 3, shipped safely:** `calcSkaterNAV` still computes F and D through
+  one function with an internal `isD` branch (offense-curve exponent,
+  age-curve peak, defensive driver/shutdown terms, franchise-floor
+  thresholds, positional premium — ~12 branch points), which is real
+  position-specific math but was never exposed as independent, callable
+  pipelines — the literal "not independent player-level models" complaint
+  this ticket opens with. Added `calcForwardNAV`/`calcDefenseNAV` (with
+  `ForwardFeatureContract`/`DefenseFeatureContract` types pinning position at
+  the type level) as genuinely separate, independently-named entry points,
+  and wired `calcNAV`'s dispatcher through them. Currently pure delegation to
+  `calcSkaterNAV` — byte-identical output, zero valuation change, tested via
+  `.toEqual()` regression — because after increment 2's finding, no new
+  coefficient ships without its own validated backtest, and a real
+  independently-fitted forward or defence model is a larger, separate task.
+  What this buys now: a real model can replace `calcForwardNAV`'s body
+  without touching `calcDefenseNAV` or any caller, and Phase 4 can validate
+  each position through its own real entry point rather than a hand-copied
+  reimplementation of the engine's branch.
+- **Phase 4, run for real, reported honestly:** built
+  `scripts/backtest/position-nav-backtest.ts` — ΣF-NAV (via
+  `calcForwardNAV`) against team goals-for/game, ΣD-NAV (via
+  `calcDefenseNAV`) against team goals-against/game, walk-forward on
+  MoneyPuck 2022-25 (96 train / 32 holdout team-seasons), gated on sign
+  consistency across every season, not just a single holdout number — the
+  same lesson increment 2 taught about the M_dep composite. Real result:
+  **ΣF-NAV validates** — positive every season (r=0.65, 0.68, 0.71, 0.49),
+  holding up on the untouched 2025-26 holdout. **ΣD-NAV does not** — it
+  points the WRONG way (more D-NAV associated with MORE goals allowed, not
+  fewer) in 3 of 4 seasons (2022 r=+0.07, 2023 r=+0.30, 2024 r=+0.22), only
+  turning the expected negative direction on the 2025-26 holdout and even
+  then weakly (r=-0.13). This is a real, useful, honestly-surfaced gap: the
+  engine's defensive-value component does not currently aggregate into a
+  reliable team-level defensive signal, which is exactly what a real,
+  independently-fitted defence model (the remainder of Phase 4, genuinely
+  unstarted) needs to fix — not something a passing gate should paper over.
+- Evidence: full suite **2,397/2,397** (3 new delegation-regression tests),
+  TypeScript and changed-file lint clean, production build passes (**30/30**
+  static pages). Both backtests are real runs against `MoneyPuckData/`, not
+  fabricated numbers.
+- **Not attempted:** actually re-fitting independent F/D models (the real
+  content of Phase 4 beyond validating what already exists), Phase 5
+  (cross-position calibration), and everything from Phase 6 on (uncertainty/
+  coverage metadata, shadow mode, canaries, feature-flag activation, surface
+  migration, retiring client-side bucketing). Given ΣD-NAV just failed its
+  own validation, activating anything downstream of it would be premature —
+  the next real increment here is fitting a defense model that actually
+  predicts defensive outcomes, not proceeding past a known-broken step.
 
 - After # 2A. [X]-NAV model evolution [ ] NAV-01 — Build, cross-calibrate and activate F/D/G-NAV (`XL`) is marked as complete. Replace goalie `X-NAV` labels with `G-NAV` and goalie-specific component language.
 2B. Gravity v4 controlled release
