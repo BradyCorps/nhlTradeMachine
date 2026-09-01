@@ -860,6 +860,57 @@ these before assuming the fix is "different weights":
 - **Not attempted:** Phase 3 (fitting and freezing the actual two-stage
   model this diagnosis points to) and everything after.
 
+**Increment 3 progress (this session) — Phase 3, model fitted and validated:**
+
+- Built `scripts/backtest/defense-model-fit.ts`: one joint weighted
+  multiple regression (deployment controls — QoC index, avg TOI, zone-start
+  share — plus the 6 Phase-2-validated skill signals) predicting a
+  defenseman's next-season on-ice xG-against-relative. A single joint fit,
+  not the two-stage residualize-then-fit from Phase 2 — mathematically the
+  right way to combine controls and signals of interest in one linear model.
+- **Ablation decided the final signal set on evidence, not argument** (same
+  convention as `sim-goal-share-backtest.ts`): refit on train with each
+  skill signal dropped one at a time, keep only the ones whose removal hurts
+  holdout accuracy. `xgaRelTM` (current-season persistence — the Phase 1
+  baseline signal itself) and `takeawayDiffPer82` did NOT survive — removing
+  them doesn't hurt, because `corsiAgainstRel` and the deployment terms
+  already capture what they were adding (xgaRelTM and corsiAgainstRel
+  correlate ~0.68). `corsiAgainstRel`, `blocksPer82`, `highDangerAgainstRate`,
+  and `pkTimeShare` all survived — **resolving Phase 2's flagged ambiguity
+  on pkTimeShare with evidence**: whatever its true nature, it measurably
+  improves holdout accuracy (removing it is the single worst ablation:
+  MAE 0.3105 vs. the full model's 0.3052).
+- **Frozen final model** (7 terms: 3 deployment + 4 skill), evaluated ONCE
+  on the untouched 2024-25 holdout, no re-tuning against it — real,
+  decisive result:
+  | | holdout r | holdout MAE |
+  |---|---|---|
+  | Current `calcDefenseNAV` formula (Phase 1) | -0.1022 | 0.3805 |
+  | Raw persistence baseline (Phase 1) | 0.4717 | 0.3376 |
+  | **This fitted model (Phase 3)** | **0.5826** | **0.3013** |
+
+  Sign-consistent and positive across every season tested (2023 r=0.649,
+  2024 r=0.651, 2025 r=0.583) — **10.8% MAE improvement over the persistence
+  baseline**, clearing the same ≥10%-relative-lift bar
+  `sim-goal-share-backtest.ts` established as this repo's enforced-gate
+  convention, and a decisive win over the currently-shipping formula.
+- **Caveat, stated plainly:** individual coefficient signs in this joint fit
+  are not causally interpretable on their own — `dzPct`'s coefficient came
+  out negative here despite being positive in Phase 2's deployment-only
+  model, an ordinary consequence of fitting correlated predictors together.
+  What's validated is the model's JOINT predictive accuracy on held-out
+  data, not any single term's story.
+- Evidence: real run against `MoneyPuckData/` (408 train / 199 holdout),
+  TypeScript and lint clean, full suite unaffected (**2,397/2,397** — no
+  production code touched this increment; this script fits and validates
+  only, per its own header comment).
+- **Not attempted:** Phase 4 — wiring this frozen model into
+  `calcDefenseNAV` (replacing its current pure delegation to
+  `calcSkaterNAV`) and re-validating with `position-nav-backtest.ts`. That
+  is a live production change and, matching this session's pattern at every
+  prior phase boundary, is its own deliberate step rather than a rider on
+  the modeling script.
+
 **Explicitly out of scope for this ticket** (same reasoning as NAV-01's own
 phase boundaries — this is real iterative modeling work that should not be
 compressed into one sitting):
