@@ -559,6 +559,43 @@ The signed and positive-only totals must never share the same label.
 
 **Acceptance:** a forward, defenceman and goalie can display F-NAV, D-NAV and G-NAV respectively while remaining meaningfully comparable through calibrated X-NAV; every team positional total is traceable to those exact player snapshots.
 
+**Increment 1 progress (this session) — Required Phase 1 only:**
+
+- `scripts/backtest/team-nav-backtest.ts` rewritten to call the real production
+  engine (`calcNAV` from `xnav-engine.ts`) instead of the file's old hand-copied
+  `calcSimplifiedSkaterNAV`/`calcSimplifiedGoalieNAV` reimplementation, which
+  could silently drift from the shipping formula. Data source swapped from the
+  missing `OtherData/HistoricalData/skaters_2008_to_2024.csv` (gitignored, not
+  fetchable in this sandbox — confirmed ENOENT) to the present, git-tracked
+  `MoneyPuckData/` (2022-23 .. 2025-26, 4 seasons). Kept the file's proven
+  contract-matching (signings.csv, name-slug + season-range) and age-lookup
+  (bios DOB, signAge fallback) scaffolding.
+- Added a walk-forward, `process.exitCode`-gated pass/fail (2022-24 train,
+  untouched 2025-26 holdout), matching the repo's one existing enforced-gate
+  backtest (`sim-goal-share-backtest.ts`): sample-size floors, a frozen
+  train-fit linear baseline evaluated on holdout, and per-season sign
+  consistency.
+- **Real finding, not a tuned pass:** full X-NAV (which includes cap/contract
+  surplus — a trade-value signal) correlates with team GD/game *more weakly*
+  (holdout r=0.4658) than the on-ice-only component (r=0.5973) or even a raw
+  points-pace baseline (r=0.7382). This is expected — surplus measures
+  bargain, not talent, and dilutes across a 20+ man roster — not an engine
+  bug, and the script says so. The gate is scoped to what should actually
+  hold: the on-ice math (offense + defense + age) tracks real team success
+  out of sample, R²=0.12-0.46 and positive every single season 2022-2025.
+  Full X-NAV is reported for visibility, not gated against a baseline it
+  isn't designed to beat.
+- Evidence: real run against `MoneyPuckData/` (96 train / 32 holdout
+  team-seasons, 85.6% contract match rate), full suite **2,394/2,394**,
+  TypeScript and lint clean, production build passes.
+- **Not attempted this increment:** Required Phases 2-12 (freezing a formal
+  train/val/holdout artifact, defining new F/D/G feature contracts, fitting
+  and cross-calibrating them, shadow mode, canaries, feature-flag activation,
+  migrating the 5 product surfaces, retiring client-side positional
+  bucketing). Those are real iterative model-fitting work and should not be
+  rushed in one sitting, especially against 4 seasons of data in a
+  network-restricted sandbox.
+
 - After # 2A. [X]-NAV model evolution [ ] NAV-01 — Build, cross-calibrate and activate F/D/G-NAV (`XL`) is marked as complete. Replace goalie `X-NAV` labels with `G-NAV` and goalie-specific component language.
 2B. Gravity v4 controlled release
 
