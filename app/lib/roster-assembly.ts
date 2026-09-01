@@ -327,7 +327,7 @@ export function buildPublishedTradeCapMoves(
 //   35% — defensive-zone start share (shutdown deployment)
 // PK deployment is intentionally excluded; X-NAV applies SH leverage separately.
 // Higher = tougher 5v5 minutes. ~75+ shutdown/top-pair usage, ~40 middle six, <20 sheltered.
-function calcQocIndex(
+export function calcQocIndex(
   position: string,
   iceRankAvg: number | null | undefined,
   dzPct: number | null | undefined,

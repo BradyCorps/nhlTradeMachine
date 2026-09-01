@@ -8,7 +8,10 @@ import type { TeamNavDim } from "@/app/lib/teams-url-state";
 interface TeamNavDatum {
   name: string;
   abbrev: string;
-  /** rosterNAV — the combined total. Equals fNav + dNav + gNav. */
+  /** Positive-assets-only combined total ("X-NAV+") — Σ max(0, nav) per
+   *  player. Equals fNav + dNav + gNav. NOT the team's real signed NAV total
+   *  (shown elsewhere on the page); bars here can't render a negative value,
+   *  so this dimension is deliberately the floored one — see team-nav-split.ts. */
   xnav: number;
   fNav: number;
   dNav: number;
@@ -29,10 +32,13 @@ interface Props {
 // The four views the chart switches between. `xnav` is the combined total;
 // the three splits decompose it by position. Order is the toggle order.
 const DIMS: { key: Dim; label: string; blurb: string }[] = [
-  { key: "xnav", label: "X-NAV", blurb: "Combined roster value" },
-  { key: "fNav", label: "F-NAV", blurb: "Forwards only" },
-  { key: "dNav", label: "D-NAV", blurb: "Defense only" },
-  { key: "gNav", label: "G-NAV", blurb: "Goaltending only" },
+  // "+" is deliberate and load-bearing: this is the positive-assets-only
+  // total (Σ max(0, nav)), not the team's real signed NAV shown elsewhere on
+  // the page — this chart's bars have no way to render a negative value.
+  { key: "xnav", label: "X-NAV+", blurb: "Combined roster value (positive assets only)" },
+  { key: "fNav", label: "F-NAV", blurb: "Forwards only, positive assets" },
+  { key: "dNav", label: "D-NAV", blurb: "Defense only, positive assets" },
+  { key: "gNav", label: "G-NAV", blurb: "Goaltending only, positive assets" },
 ];
 
 // Ordinal competitive stance, best → worst. Each phase gets a DISTINCT fill:

@@ -23,12 +23,18 @@ describe("rosterNavByPosition", () => {
     expect(split.g).toBe(200);
     expect(split.xnav).toBe(600);
     expect(split.f + split.d + split.g).toBe(split.xnav);
+    // No negatives in this fixture, so the signed total agrees with X-NAV+.
+    expect(split.signed).toEqual({ f: 240, d: 160, g: 200, total: 600 });
   });
 
-  // A below-replacement player subtracts nothing, matching the rosterNAV
-  // convention the chart replaced. Without the clamp, F+D+G would undershoot
-  // a total that itself clamped — the two numbers would disagree on screen.
-  it("clamps negative NAV to zero", () => {
+  // A below-replacement player subtracts nothing from X-NAV+, matching the
+  // chart's convention. Without the clamp, F+D+G would undershoot a total
+  // that itself clamped — the two numbers would disagree on screen. `signed`
+  // is the counterpart that does NOT clamp — the real total a below-
+  // replacement contract actually drags down, for surfaces that aren't a bar
+  // chart (NAV-01's "signed and positive-only totals must never share the
+  // same label").
+  it("clamps X-NAV+ to zero but keeps the real signed total negative", () => {
     const split = rosterNavByPosition([
       { position: "C", nav: 50 },
       { position: "C", nav: -30 },
@@ -37,6 +43,7 @@ describe("rosterNavByPosition", () => {
     expect(split.f).toBe(50);
     expect(split.d).toBe(0);
     expect(split.xnav).toBe(50);
+    expect(split.signed).toEqual({ f: 20, d: -10, g: 0, total: 10 });
   });
 
   // Wingers spelled "W", and any unexpected code, fold into forwards so no
@@ -51,6 +58,7 @@ describe("rosterNavByPosition", () => {
     expect(split.d).toBe(0);
     expect(split.g).toBe(0);
     expect(split.xnav).toBe(35);
+    expect(split.signed).toEqual({ f: 35, d: 0, g: 0, total: 35 });
   });
 
   it("treats null, undefined and NaN NAV as zero", () => {
@@ -60,15 +68,21 @@ describe("rosterNavByPosition", () => {
       { position: "G", nav: Number.NaN },
       { position: "C", nav: 12 },
     ]);
-    expect(split).toEqual({ xnav: 12, f: 12, d: 0, g: 0 });
+    expect(split).toEqual({
+      xnav: 12, f: 12, d: 0, g: 0,
+      signed: { f: 12, d: 0, g: 0, total: 12 },
+    });
   });
 
   it("is all zeros for an empty roster", () => {
-    expect(rosterNavByPosition([])).toEqual({ xnav: 0, f: 0, d: 0, g: 0 });
+    expect(rosterNavByPosition([])).toEqual({
+      xnav: 0, f: 0, d: 0, g: 0,
+      signed: { f: 0, d: 0, g: 0, total: 0 },
+    });
   });
 
   // The property that has to hold for any roster the page throws at it.
-  it("keeps the identity across a randomized roster", () => {
+  it("keeps both identities across a randomized roster with real negatives", () => {
     const positions = ["C", "L", "R", "W", "D", "G", "F", "?"];
     const roster = Array.from({ length: 200 }, () => ({
       position: positions[Math.floor(Math.random() * positions.length)],
@@ -79,5 +93,10 @@ describe("rosterNavByPosition", () => {
     expect(split.f).toBeGreaterThanOrEqual(0);
     expect(split.d).toBeGreaterThanOrEqual(0);
     expect(split.g).toBeGreaterThanOrEqual(0);
+    // Signed total is its own independent sum — never clamped, and can (with
+    // a (Math.random() - 0.4) skew toward negative NAV) legitimately go below
+    // the always-nonnegative X-NAV+ total.
+    expect(split.signed.f + split.signed.d + split.signed.g).toBe(split.signed.total);
+    expect(split.signed.total).toBeLessThanOrEqual(split.xnav);
   });
 });

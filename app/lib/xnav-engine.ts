@@ -417,7 +417,25 @@ export function calcSkaterDeploymentContext(asset: AssetInput): {
   evMdep: number;
   asi: number;
   slf: number;
+  /**
+   * Deployment-adjusted points pace: `unadjustedPts * clamp(M_dep*ASI*SLF,
+   * 0.80, 1.25)`. Display/role-classification input ONLY — feeds
+   * `classifyRosterTier`'s tier label, nowhere else.
+   *
+   * `scripts/backtest/deployment-multiplier-backtest.ts` backtested this
+   * composite as a next-season points-pace predictor (1,206 train / 596
+   * holdout transitions, MoneyPuck 2022-25): it underperforms raw points
+   * pace on holdout (r=0.852 vs 0.867, MAE 6.2% worse), and every
+   * sub-component individually underperforms too. It must never be used to
+   * move a valuation — see CLAUDE.md's model-input rule — which is why
+   * `calcSkaterNAV`'s offense calculation reads `unadjustedPts` below, not
+   * this field.
+   */
   normalizedPts: number;
+  /** Current-season pts blended with a multi-season baseline (see
+   *  `currentSeasonWeight`) — no deployment multiplier applied. This is the
+   *  real offense-value input. */
+  unadjustedPts: number;
   evQoc: number;
   evToi: number;
   shToi: number;
@@ -443,7 +461,7 @@ export function calcSkaterDeploymentContext(asset: AssetInput): {
   const slf = calcShortHandedLeverageFactor(evToi, shToi);
   const normalizedPts = blendedPts * clamp(evMdep * asi * slf, 0.80, 1.25);
 
-  return { evMdep, asi, slf, normalizedPts, evQoc, evToi, shToi };
+  return { evMdep, asi, slf, normalizedPts, unadjustedPts: blendedPts, evQoc, evToi, shToi };
 }
 
 export function resolveRosterTier(asset: AssetInput): RosterTier | undefined {
@@ -854,10 +872,15 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     ? (pts * currentWeight + baselinePtsPace * baselineWeight)
     : pts;
 
-  const { evMdep, normalizedPts, evToi, shToi } = calcSkaterDeploymentContext(asset);
+  // normalizedPts (M_dep × ASI × SLF) is deliberately NOT used here — a
+  // backtest found it degrades next-season prediction vs. raw points pace on
+  // every component. unadjustedPts is the real offense-value input;
+  // normalizedPts still exists for classifyRosterTier's display tier below.
+  // See calcSkaterDeploymentContext's docs.
+  const { evMdep, normalizedPts, unadjustedPts, evToi, shToi } = calcSkaterDeploymentContext(asset);
 
   const ptsScale  = isD ? 0.75 : 1.0;
-  const ptsVal    = normalizedPts * ptsScale;
+  const ptsVal    = unadjustedPts * ptsScale;
 
   const baselineDpsProxy = asset.baselineDpsProxy;
   const blendedDps = baselineDpsProxy !== undefined && baselineDpsProxy > 0

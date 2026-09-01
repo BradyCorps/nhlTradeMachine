@@ -531,6 +531,8 @@ describe("X-NAV — Elite Defencemen", () => {
     expect(result.rosterTier).toBe("FRINGE_1ST_LINE_2C");
   });
 
+  // Passes for a stronger reason than the name implies now: SLF never moves
+  // `total` for anyone, PK specialist or not — see the test below.
   it("SLF does not inflate low-EV pure PK specialists", () => {
     const base = {
       id: "pk-specialist", name: "PK Specialist", position: "C" as const,
@@ -545,7 +547,13 @@ describe("X-NAV — Elite Defencemen", () => {
     expect(heavyPk.rosterTier).toBe("PK_SPECIALIST");
   });
 
-  it("SLF applies only after regular EV rotation minutes", () => {
+  // scripts/backtest/deployment-multiplier-backtest.ts found the M_dep × ASI
+  // × SLF composite underperforms raw points pace as a next-season predictor
+  // (every component individually, and the full composite worst of all;
+  // 1,206 train / 596 holdout MoneyPuck transitions), so it no longer moves
+  // `total` — see calcSkaterDeploymentContext's docs. SLF (and M_dep, ASI)
+  // still exist purely to feed classifyRosterTier's display label.
+  it("SLF no longer moves the valuation total, even for a regular-rotation PK forward", () => {
     const base = {
       id: "regular-pk", name: "Regular PK Forward", position: "C" as const,
       age: 28, capHit: 2.0, yearsRemaining: 2,
@@ -555,7 +563,7 @@ describe("X-NAV — Elite Defencemen", () => {
     };
     const noPk = calcSkaterNAV({ ...base, pkTimeShare: 0 });
     const heavyPk = calcSkaterNAV({ ...base, pkTimeShare: 0.15 });
-    expect(heavyPk.total).toBeGreaterThan(noPk.total);
+    expect(heavyPk.total).toBe(noPk.total);
   });
 
   it("Elite shutdown tier requires high EV QoC", () => {

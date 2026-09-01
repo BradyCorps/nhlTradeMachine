@@ -132,10 +132,18 @@ interface TeamProfile {
   contention: ReturnType<typeof computeContention>;
   edge: TeamEdgeProfile | null;
   strand: TeamStrandData | null;
+  /** True signed roster total — every player's real NAV, no floor. "Roster
+   *  X-NAV" per NAV-01's acceptance line. Used for the card headline and NAV
+   *  sort; NOT what feeds the chart (see rosterNAVPositiveOnly). */
   rosterNAV: number;
-  /** rosterNAV decomposed by position, using the same Σ max(0, nav) as
-   *  rosterNAV so that f + d + g === rosterNAV exactly — the identity the
-   *  "combined X-NAV" framing on the chart depends on. */
+  /** Σ max(0, nav) — "Roster X-NAV+". Exists only because the chart's bars
+   *  cannot render a negative value; equals navByPos.f + navByPos.g + navByPos.d
+   *  exactly. Must never be shown under the same "NAV" label as rosterNAV —
+   *  the two disagree whenever a roster carries real negative-value contracts. */
+  rosterNAVPositiveOnly: number;
+  /** rosterNAVPositiveOnly decomposed by position — Σ max(0, nav) per bucket,
+   *  so f + d + g === rosterNAVPositiveOnly exactly, the identity the chart's
+   *  toggle depends on. */
   navByPos: { f: number; d: number; g: number };
   topPlayers: { name: string; nav: number; position: string }[];
   capCommitted: number;
@@ -602,7 +610,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
               label="Roster NAV"
               value={Math.round(rosterNAV).toLocaleString()}
               sub={playerCountLabel(rosterSize)}
-              definition="Combined positive X-NAV for the current roster, split into forward, defence, and goalie value."
+              definition="Combined signed X-NAV for the current roster — every player's real value, including any below-replacement contract. The League NAV chart below shows a separate positive-assets-only view (X-NAV+), since its bars cannot render a negative value."
             />
           </div>
 
@@ -964,13 +972,16 @@ export default function TeamsPage() {
       });
       const edge = computeTeamEdgeProfile(roster);
       const strand = computeRosterStrand(roster, navMap);
-      // rosterNAV and its F/D/G split come from one place so they cannot drift:
-      // xnav is defined as f + d + g, the combined-total identity the chart toggle
-      // depends on.
+      // rosterNAVPositiveOnly and its F/D/G split come from one place so they
+      // cannot drift: rosterNAVPositiveOnly is defined as f + d + g, the
+      // combined-total identity the chart toggle depends on. rosterNAV (the
+      // real signed total) is a DIFFERENT number — see the TeamProfile
+      // interface for why both exist and must stay separately labeled.
       const navSplit = rosterNavByPosition(
         roster.map((p) => ({ position: p.position, nav: navMap[p.id]?.total })),
       );
-      const rosterNAV = navSplit.xnav;
+      const rosterNAV = navSplit.signed.total;
+      const rosterNAVPositiveOnly = navSplit.xnav;
       const navByPos = { f: navSplit.f, d: navSplit.d, g: navSplit.g };
       const capCommitted = roster.reduce((s, p) => s + (p.capHit ?? 0), 0);
       const lines = buildTeamLines(roster, navMap);
@@ -1022,7 +1033,7 @@ export default function TeamsPage() {
       );
 
       return {
-        team, roster, navMap, contention, edge, strand, rosterNAV, navByPos,
+        team, roster, navMap, contention, edge, strand, rosterNAV, rosterNAVPositiveOnly, navByPos,
         topPlayers: sorted, capCommitted, lines,
         avgAge, rosterSize: roster.length, ufaCount, rfaCount,
         gravityLeaders, teamGravity, contentionSnapshot,
@@ -1204,7 +1215,7 @@ export default function TeamsPage() {
           data={teamProfiles.map((tp) => ({
             name: tp.team.name,
             abbrev: tp.team.id,
-            xnav: tp.rosterNAV,
+            xnav: tp.rosterNAVPositiveOnly,
             fNav: tp.navByPos.f,
             dNav: tp.navByPos.d,
             gNav: tp.navByPos.g,

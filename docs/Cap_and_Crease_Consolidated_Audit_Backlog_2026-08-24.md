@@ -596,6 +596,59 @@ The signed and positive-only totals must never share the same label.
   rushed in one sitting, especially against 4 seasons of data in a
   network-restricted sandbox.
 
+**Increment 2 progress (this session):**
+
+- **Found and backed out a live, unvalidated valuation input.** While tracing
+  `calcSkaterNAV`'s F/D branching (prep for Phase 3), found that
+  `app/lib/XNAV_CONTEXT.md` — a file flagged to the user as a likely
+  prompt-injection artifact — has its exact formulas ($M_{dep}$, $ASI$, $SLF$)
+  already implemented and wired live into production: `normalizedPts =
+  blendedPts * clamp(evMdep*asi*slf, 0.80, 1.25)` fed directly into every
+  skater's offense value. The only prior coverage was a unit test confirming
+  the formula computes what the formula says — never validated against a real
+  outcome, exactly what CLAUDE.md's model-input rule exists to catch. Built
+  `scripts/backtest/deployment-multiplier-backtest.ts` (1,206 train / 596
+  holdout MoneyPuck 2022-25 transitions) to test the only principled claim
+  such an adjustment can make — that it predicts a player's own next-season
+  points pace better than raw pace once corrected for deployment difficulty.
+  It does not: full composite r=0.852 vs raw r=0.867, MAE 6.2% *worse*, and
+  every sub-component individually underperforms raw pace too. Backed the
+  multiplier out of the valuation path (`calcSkaterNAV` now reads
+  `unadjustedPts`, a new field `calcSkaterDeploymentContext` returns
+  alongside the now-display-only `normalizedPts`, which still feeds
+  `classifyRosterTier`'s tier label — unaffected, unchanged, out of today's
+  proven-harm scope). One test locked in the old (now-reverted) behavior and
+  was rewritten to assert the correct one.
+- **Fixed the "signed and positive-only totals must never share the same
+  label" acceptance line** — currently violated. Every Teams page NAV figure
+  (card headline, sort key, the chart's bars) was `Σ max(0, playerNav)`,
+  silently mislabeled as if it were the real total; a roster carrying real
+  below-replacement contracts had that negative value erased with no
+  disclosure. `team-nav-split.ts`'s `rosterNavByPosition` now returns both
+  the existing positive-only split (`f`/`d`/`g`/`xnav`, unchanged — the
+  chart's bars structurally cannot render a negative value) and a new
+  `signed` sub-object (the real, unclamped total). Teams' card headline and
+  NAV sort now use the signed total (`rosterNAV`); the chart keeps the
+  positive-only feed (`rosterNAVPositiveOnly`) but is honestly relabeled
+  "X-NAV+" instead of bare "X-NAV". Verified live: chart header now reads
+  "LEAGUE X-NAV+ RANKINGS" with a "positive assets only" blurb.
+- Evidence: full suite **2,394/2,394** (one test rewritten for the reverted
+  multiplier, rest unaffected), TypeScript and changed-file lint clean,
+  production build passes (**30/30** static pages). This sandbox's roster
+  analytics source is unavailable (`0/60 player records with analytics` —
+  same documented limitation as prior entries), so the live check confirmed
+  correct rendering/labeling, not a non-zero signed-vs-positive-only
+  divergence with real data.
+- **Not attempted this increment:** Required Phase 3 (separate forward/
+  defence feature contracts — `calcSkaterNAV` still branches F vs D
+  internally via one `isD` boolean rather than being two independently
+  named/typed pipelines; goalies already have this via `calcGoalieNAV`) and
+  Phase 4 (fit/validate F-NAV and D-NAV against position-appropriate
+  outcomes). The live-multiplier finding took priority — CLAUDE.md's rule
+  applies to what is already shipping, not only to new work — and is a more
+  urgent "more truthish" fix than adding new positional splits on top of an
+  engine that had this in it.
+
 - After # 2A. [X]-NAV model evolution [ ] NAV-01 — Build, cross-calibrate and activate F/D/G-NAV (`XL`) is marked as complete. Replace goalie `X-NAV` labels with `G-NAV` and goalie-specific component language.
 2B. Gravity v4 controlled release
 
