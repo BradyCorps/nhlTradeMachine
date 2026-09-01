@@ -19,6 +19,20 @@
  *     the outcome defensemen actually drive (lower GA is better, so a
  *     useful D-NAV should correlate NEGATIVELY with GA/game).
  *
+ * NAV-02 increment 4: also evaluates, standalone (see DEFENSE_MODEL_
+ * COEFFICIENTS below), what ΣD-NAV would look like using NAV-02's fitted
+ * defensive model (scripts/backtest/defense-model-fit.ts) instead of the
+ * legacy formula this same script found actively counterproductive in
+ * NAV-01 increment 3. That model validates well at the INDIVIDUAL level
+ * (Phase 3) but — the finding this evaluation exists to record — does NOT
+ * clear this script's own team-level acceptance bar either, even isolated
+ * from offense/age/cap and even tested against a goalie-stripped xGA
+ * target. It was therefore NOT wired into calcDefenseNAV; dNav below still
+ * reflects exactly what ships. dNavFittedEvaluation is a parallel,
+ * self-contained computation (duplicating the frozen coefficients, not
+ * importing from xnav-engine.ts, which was never changed) kept only so
+ * this negative result stays reproducible.
+ *
  * Same walk-forward convention as team-nav-backtest.ts and
  * deployment-multiplier-backtest.ts: 2022-24 train (frozen linear baseline
  * fit), untouched 2025-26 holdout, process.exitCode gate.
@@ -29,6 +43,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { calcForwardNAV, calcDefenseNAV, type AssetInput } from "../../app/lib/xnav-engine";
+import { calcQocIndex } from "../../app/lib/roster-assembly";
 
 const ROOT = process.cwd();
 
@@ -158,7 +173,12 @@ function getContract(name: string, season: number): { capHit: number; yearsRemai
 }
 
 // ── Team goals for/against ─────────────────────────────────────────────────
-interface TeamSeason { team: string; season: number; gp: number; gfPerGame: number; gaPerGame: number }
+// xgaPerGame is a diagnostic target alongside gaPerGame — raw goals-against
+// is goalie-confounded (a strong defense in front of a bad goalie still
+// allows more goals than a mediocre defense in front of an elite one),
+// which NAV-02's own scope flagged as a candidate explanation worth ruling
+// out before concluding the defensive model itself is the problem.
+interface TeamSeason { team: string; season: number; gp: number; gfPerGame: number; gaPerGame: number; xgaPerGame: number }
 const teamStandings = new Map<string, TeamSeason>();
 const SEASONS = [2022, 2023, 2024, 2025];
 for (const season of SEASONS) {
@@ -171,6 +191,7 @@ for (const season of SEASONS) {
       team, season, gp,
       gfPerGame: num(r.goalsFor) / gp,
       gaPerGame: num(r.goalsAgainst) / gp,
+      xgaPerGame: num(r.xGoalsAgainst) / gp,
     });
   }
 }
@@ -181,6 +202,10 @@ interface SkaterSeason {
   name: string; team: string; season: number; position: string; gp: number;
   ptsPace: number; goalsPace: number; assistsPace: number; xgPace: number; avgTOI: number;
   defRate: number; xgRelTM: number; xgaRelTM: number; dzPct: number;
+  // NAV-02 fitted defensive model inputs (defensemen only downstream, but
+  // computed for every skater here to keep this loader position-agnostic).
+  qocIndex: number | null; corsiAgainstRel: number; blocksPer82: number;
+  highDangerAgainstRate: number; pkTimeShare: number;
 }
 
 function loadSkaterSeason(season: number): SkaterSeason[] {
@@ -205,6 +230,8 @@ function loadSkaterSeason(season: number): SkaterSeason[] {
     const benchH = Math.max(0.01, (gp * 60 - iceSec / 60) / 60);
     const onA = num(all.OnIce_A_xGoals) / Math.max(0.01, iceHours);
     const offA = num(all.OffIce_A_xGoals) / Math.max(0.01, benchH);
+    const onCA = num(all.OnIce_A_shotAttempts) / Math.max(0.01, iceHours);
+    const offCA = num(all.OffIce_A_shotAttempts) / Math.max(0.01, benchH);
 
     const onF = num(all.OnIce_F_xGoals);
     const offF = num(all.OffIce_F_xGoals);
@@ -216,6 +243,12 @@ function loadSkaterSeason(season: number): SkaterSeason[] {
     const es = situations.get("5on5");
     const dz = num(es?.I_F_dZoneShiftStarts);
     const oz = num(es?.I_F_oZoneShiftStarts);
+    const dzPct = dz + oz > 0 ? dz / (dz + oz) : 0.5;
+
+    const iceRankAvg = gp >= 5 ? num(all.iceTimeRank) / gp : null;
+    const position = all.position === "L" || all.position === "R" ? "W" : all.position === "C" ? "C" : "D";
+    const qocIndex = calcQocIndex(position === "D" ? "D" : "F", iceRankAvg, dzPct);
+    const pkIce = num(situations.get("4on5")?.icetime);
 
     const pts = num(all.I_F_points);
     const goals = num(all.I_F_goals);
@@ -224,17 +257,22 @@ function loadSkaterSeason(season: number): SkaterSeason[] {
       name: all.name,
       team: all.team,
       season,
-      position: all.position === "L" || all.position === "R" ? "W" : all.position === "C" ? "C" : "D",
+      position,
       gp,
       ptsPace: (pts / gp) * 82,
       goalsPace: (goals / gp) * 82,
       assistsPace: ((pts - goals) / gp) * 82,
       xgPace: (num(all.I_F_xGoals) / gp) * 82,
+      qocIndex,
+      corsiAgainstRel: safe(onCA - offCA),
+      blocksPer82: (num(all.shotsBlockedByPlayer) / gp) * 82,
+      highDangerAgainstRate: safe(num(all.OnIce_A_highDangerxGoals) / Math.max(0.01, iceHours)),
+      pkTimeShare: iceSec > 0 ? pkIce / iceSec : 0,
       avgTOI: (iceSec / 60) / gp,
       defRate: safe(offA - onA),
       xgRelTM: safe((onXgPct - offXgPct) * 100),
       xgaRelTM: safe(onA - offA),
-      dzPct: dz + oz > 0 ? dz / (dz + oz) : 0.5,
+      dzPct,
     });
   }
   return out;
@@ -242,6 +280,10 @@ function loadSkaterSeason(season: number): SkaterSeason[] {
 
 const skaterSeasons = SEASONS.flatMap(loadSkaterSeason);
 
+// Unchanged from NAV-01 increment 3: calcDefenseNAV is pure delegation to
+// the legacy formula (NAV-02's fitted model was evaluated but NOT wired
+// into production — see the standalone evaluation below), so this
+// continues to exercise exactly what actually ships, same as before.
 function assetInputFor(sk: SkaterSeason, age: number, capHit: number, yearsRemaining: number, ceiling: number, draftOverall?: number): AssetInput {
   return {
     id: slug(sk.name), name: sk.name,
@@ -254,10 +296,41 @@ function assetInputFor(sk: SkaterSeason, age: number, capHit: number, yearsRemai
   };
 }
 
+// ── NAV-02 Phase 4 evaluation (NOT wired into production) ─────────────────
+// scripts/backtest/defense-model-fit.ts's frozen coefficients, duplicated
+// here rather than imported from xnav-engine.ts — deliberately, because
+// that model was evaluated at team level and found NOT to clear NAV-02's
+// own acceptance bar (see the report below), so it was never added to
+// xnav-engine.ts. This computes what ΣD-NAV WOULD look like if it had been
+// wired in, entirely standalone, so that finding is preserved without
+// implying any part of it is live.
+const DEFENSE_MODEL_COEFFICIENTS = {
+  intercept: -1.0701, qocIndex: 0.00375, avgTOI: 0.04382, dzPct: -0.48441,
+  corsiAgainstRel: 0.01881, blocksPer82: -0.00039, highDangerAgainstRate: -0.02635,
+  pkTimeShare: 3.75395,
+};
+const DEFENSE_MODEL_MEAN = -0.0129;
+const DEFENSE_MODEL_SCALE = 100;
+
+function fittedDefenseValue(sk: SkaterSeason): number | null {
+  if (sk.qocIndex == null) return null;
+  const c = DEFENSE_MODEL_COEFFICIENTS;
+  const predicted = c.intercept
+    + c.qocIndex * sk.qocIndex + c.avgTOI * sk.avgTOI + c.dzPct * sk.dzPct
+    + c.corsiAgainstRel * sk.corsiAgainstRel + c.blocksPer82 * sk.blocksPer82
+    + c.highDangerAgainstRate * sk.highDangerAgainstRate + c.pkTimeShare * sk.pkTimeShare;
+  return Math.max(-100, Math.min(120, (DEFENSE_MODEL_MEAN - predicted) * DEFENSE_MODEL_SCALE));
+}
+
 interface TeamPositionNav {
   team: string; season: number;
   fNav: number; dNav: number;
-  gfPerGame: number; gaPerGame: number;
+  // Standalone NAV-02 Phase 4 evaluation (see fittedDefenseValue above) —
+  // NOT part of what calcDefenseNAV actually returns. Isolated (not summed
+  // into a .total with offense/age/cap) so it's an apples-to-apples test
+  // against a purely defensive outcome, unlike dNav above.
+  dNavFittedEvaluation: number;
+  gfPerGame: number; gaPerGame: number; xgaPerGame: number;
   fMatchRate: number; dMatchRate: number;
 }
 
@@ -271,7 +344,7 @@ for (const season of SEASONS) {
     if (!standings) continue;
 
     const teamSkaters = skaterSeasons.filter(s => s.team === team && s.season === season);
-    let fNav = 0, dNav = 0;
+    let fNav = 0, dNav = 0, dNavFittedEvaluation = 0;
     let fMatched = 0, fTotal = 0, dMatched = 0, dTotal = 0;
 
     for (const sk of teamSkaters) {
@@ -287,6 +360,7 @@ for (const season of SEASONS) {
         dTotal++;
         if (contract) dMatched++;
         dNav += calcDefenseNAV(input as AssetInput & { position: "D" }).total;
+        dNavFittedEvaluation += fittedDefenseValue(sk) ?? 0;
       } else {
         fTotal++;
         if (contract) fMatched++;
@@ -295,8 +369,8 @@ for (const season of SEASONS) {
     }
 
     results.push({
-      team, season, fNav, dNav,
-      gfPerGame: standings.gfPerGame, gaPerGame: standings.gaPerGame,
+      team, season, fNav, dNav, dNavFittedEvaluation,
+      gfPerGame: standings.gfPerGame, gaPerGame: standings.gaPerGame, xgaPerGame: standings.xgaPerGame,
       fMatchRate: fTotal > 0 ? fMatched / fTotal : 0,
       dMatchRate: dTotal > 0 ? dMatched / dTotal : 0,
     });
@@ -325,26 +399,41 @@ const dAvgMatch = results.reduce((s, r) => s + r.dMatchRate, 0) / results.length
 
 const fHoldoutR = pearsonR(holdout.map(r => r.fNav), holdout.map(r => r.gfPerGame));
 const dHoldoutR = pearsonR(holdout.map(r => r.dNav), holdout.map(r => r.gaPerGame));
+const fittedHoldoutR = pearsonR(holdout.map(r => r.dNavFittedEvaluation), holdout.map(r => r.gaPerGame));
+const fittedVsXgaHoldoutR = pearsonR(holdout.map(r => r.dNavFittedEvaluation), holdout.map(r => r.xgaPerGame));
 
 console.log("Position-Split NAV Backtest (NAV-01 Phase 4)");
 console.log("=".repeat(60));
 console.log(`\nTrain: ${train.length} team-seasons (2022-24). Holdout: ${holdout.length} (2025-26, untouched).`);
 console.log(`Contract match rate — forwards: ${(fAvgMatch * 100).toFixed(1)}%, defensemen: ${(dAvgMatch * 100).toFixed(1)}%`);
 
-console.log(`\nHoldout correlation (position-appropriate outcome):`);
+console.log(`\nHoldout correlation (position-appropriate outcome) — what SHIPS:`);
 console.log(`  ΣF-NAV vs team goals-for/game:      r=${fHoldoutR.toFixed(4)}  R²=${(fHoldoutR ** 2).toFixed(4)}`);
 console.log(`  ΣD-NAV vs team goals-against/game:  r=${dHoldoutR.toFixed(4)}  R²=${(dHoldoutR ** 2).toFixed(4)}  (negative is good — more D value should mean fewer goals against)`);
+console.log(`\nNAV-02 Phase 4 EVALUATION (standalone, NOT wired into calcDefenseNAV — see note below):`);
+console.log(`  Fitted model, isolated, vs team goals-against/game: r=${fittedHoldoutR.toFixed(4)}  R²=${(fittedHoldoutR ** 2).toFixed(4)}`);
+console.log(`  Fitted model, isolated, vs team xGA/game (goalie-stripped): r=${fittedVsXgaHoldoutR.toFixed(4)}`);
 
 console.log(`\nPer-season breakdown:`);
-const perSeason: { season: number; fr: number; dr: number }[] = [];
+const perSeason: { season: number; fr: number; dr: number; dDefOnlyR: number }[] = [];
 for (const season of SEASONS) {
   const seasonResults = results.filter(r => r.season === season);
   if (seasonResults.length < 10) continue;
   const fr = pearsonR(seasonResults.map(r => r.fNav), seasonResults.map(r => r.gfPerGame));
   const dr = pearsonR(seasonResults.map(r => r.dNav), seasonResults.map(r => r.gaPerGame));
-  perSeason.push({ season, fr, dr });
-  console.log(`  ${season}: F-NAV vs GF/gm r=${fr.toFixed(4)}  |  D-NAV vs GA/gm r=${dr.toFixed(4)}`);
+  const dDefOnlyR = pearsonR(seasonResults.map(r => r.dNavFittedEvaluation), seasonResults.map(r => r.gaPerGame));
+  perSeason.push({ season, fr, dr, dDefOnlyR });
+  console.log(`  ${season}: F-NAV (ships) vs GF/gm r=${fr.toFixed(4)}  |  D-NAV (ships) vs GA/gm r=${dr.toFixed(4)}  |  fitted-model evaluation vs GA/gm r=${dDefOnlyR.toFixed(4)}`);
 }
+
+console.log(`\nNOTE: ΣD-NAV (dNav, what ships) sums calcDefenseNAV's .total — offense +`);
+console.log(`defense + age + cap surplus for every defenseman, per NAV-01's own "signed`);
+console.log(`defence total" definition. The fitted-model evaluation column is a DIFFERENT,`);
+console.log(`standalone computation (isolated, not summed with offense/age/cap) testing`);
+console.log(`whether NAV-02's model — which validates well at the individual level —`);
+console.log(`clears this script's team-level bar if it HAD been wired in. It does not,`);
+console.log(`even isolated and even against a goalie-stripped target, which is why it`);
+console.log(`was not wired in — see NAV-02's backlog entry for the full decision.`);
 
 // ── Gates ────────────────────────────────────────────────────────
 // A single holdout correlation is not enough to call a signal validated —

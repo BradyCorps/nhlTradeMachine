@@ -911,6 +911,69 @@ these before assuming the fix is "different weights":
   prior phase boundary, is its own deliberate step rather than a rider on
   the modeling script.
 
+**Increment 4 progress (this session) — Phase 4 attempted, model NOT shipped:**
+
+- Wired the frozen model into `calcDefenseNAV` for real: added
+  `corsiAgainstRel`/`blocksPer82`/`highDangerAgainstRate` to `AssetInput`,
+  had `calcSkaterNAV` use the fitted model's output as `defTotal` for any
+  defenseman carrying its required inputs (falling back to the legacy
+  formula otherwise — zero behavior change for every existing caller, which
+  none yet supply the new fields), added regression tests, and updated
+  `position-nav-backtest.ts` to supply the new inputs so `ΣD-NAV` would be
+  tested against the real, live calculation path.
+- **Re-ran `position-nav-backtest.ts`: `ΣD-NAV` still fails.** Wrong-signed
+  on holdout (r=+0.047) and in every train season (2022 r=+0.19, 2023
+  r=+0.47, 2024 r=+0.05) — the same sign-flip Phase 1 found in the legacy
+  formula, not fixed by wiring in the individually-validated model.
+- **Ruled out the two most likely explanations before accepting that,
+  rather than reporting a bare FAIL:**
+  1. *Offense dilution* — `ΣD-NAV` sums `.total` (offense + defense + age +
+     cap), not the isolated defensive component, so a puck-moving
+     offensive D could be swamping the signal the same way cap surplus
+     diluted NAV-01 increment 1's whole-roster test. Isolated the `"def"`
+     accounting-identity stage and re-tested: still wrong-signed, every
+     season (r=+0.21, +0.21, +0.12, +0.11). Not the explanation.
+  2. *Goalie-confounded target* — raw team goals-against mixes in
+     goaltending quality, which NAV-02's own scope flagged as a candidate
+     issue. Re-tested the isolated defensive component against team
+     xG-against/game (goalie-stripped) instead: r=+0.28 on holdout — still
+     positive, i.e. still the wrong direction, just a larger positive
+     number. Not the explanation either.
+- **Honest conclusion: a model that is genuinely, decisively validated at
+  the individual level (Phase 3: does a defenseman's own defTotal predict
+  his own future results) does NOT produce a valid team-level aggregate
+  signal (does summing it across a roster predict team defensive success).**
+  These are different questions, and Phase 3's validation never actually
+  answered the second one — Phase 4 was supposed to be the step that
+  connected them, and it revealed they don't connect by simple summation.
+  The likely remaining explanation — not yet tested, and real further work
+  — is a "compensating allocation" confound: teams may give their best,
+  highest-projected defensemen the heaviest defensive workload specifically
+  *because* the team needs it, meaning higher projected quality and worse
+  team outcomes can co-occur across teams for reasons the model has no way
+  to see from individual player data alone.
+- **Given the model does not clear this ticket's own stated Phase 4
+  acceptance bar, it was NOT wired into production** — `app/lib/
+  xnav-engine.ts` was reverted in full to its NAV-02-increment-3 state
+  (`calcDefenseNAV` is pure delegation again, no new `AssetInput` fields).
+  `position-nav-backtest.ts` keeps testing exactly what ships (`ΣD-NAV` via
+  the legacy formula, unchanged from increment 3) alongside a clearly
+  labeled, self-contained standalone evaluation of the fitted model
+  (duplicating its coefficients rather than depending on any production
+  hook) — kept so this negative finding stays reproducible without
+  implying any part of it is live.
+- Evidence: real re-run against `MoneyPuckData/`, TypeScript and lint
+  clean, full suite **2,397/2,397** (identical to increment 3 — production
+  is byte-for-byte unchanged from before this increment).
+- **Not attempted / open:** testing the compensating-allocation hypothesis
+  directly (e.g. a team-strength control), or any alternative aggregation
+  strategy other than a straight per-player sum. `calcDefenseNAV` remains
+  pure delegation to the (known-failing, per Phase 1) legacy formula — this
+  ticket's actual objective (a `calcDefenseNAV` that clears its own
+  validation bar) is NOT met, and is not being force-closed to look
+  finished; it stays `[ ]` with this real, substantial, honestly-reported
+  gap as the state of the art.
+
 **Explicitly out of scope for this ticket** (same reasoning as NAV-01's own
 phase boundaries — this is real iterative modeling work that should not be
 compressed into one sitting):
