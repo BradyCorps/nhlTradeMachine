@@ -163,11 +163,19 @@ genuinely live for any real defenseman with >= 20 games played this season
 (`roster-assembly.ts` computes its three inputs from live MoneyPuck data;
 verified byte-identical to the validated fit script against the real,
 checked-in 2025-26 CSV). Below 20 games, or for any input the CSV is
-missing, it falls back to the legacy formula, unchanged. **G-NAV**: still
-the original, unvalidated goalie formula — Edge goalie data is captured and
-displayed on player pages but deliberately not fed into `calcGoalieNAV`,
-which needs its own backtest gate the same way D-NAV just got one. The
-Teams-page F/D/G toggle described above still exists and is unrelated
+missing, it falls back to the legacy formula, unchanged. **G-NAV**: the
+original on-ice impact formula, now diagnosed (NAV-03) rather than merely
+assumed adequate — real backtests found it sign-consistent and genuinely
+informative at the concurrent team level (r=0.53-0.78, holdout 0.71), and
+two concrete candidate improvements (a validated reliability-weight swap,
+MoneyPuck HD SV% as an added feature) were tested against real data and
+both failed to beat it, so it ships unchanged rather than being replaced
+by something untested. Its separate contract/market-price half
+(`goalie-fmv.ts`) was already independently validated against 260 real
+signed contracts before this session. NHL Edge's own high-danger signal
+remains unfed — not because it's unwanted, but because no offline
+multi-season Edge capture exists in this sandbox to validate it against.
+The Teams-page F/D/G toggle described above still exists and is unrelated
 display machinery (a sum of whichever of these per-player numbers is
 currently live), not this engine split.
  
@@ -1201,7 +1209,7 @@ force past.
 
 ---
 
-## [ ] NAV-03 — Diagnose and, if warranted, validate the goalie (G-NAV) on-ice impact model (`M`)
+## [x] NAV-03 — Diagnose and, if warranted, validate the goalie (G-NAV) on-ice impact model (`M`)
 
 **Current state:** `calcGoalieNAV` is a real, separately named entry point
 (NAV-01 Phase 3), and unlike D-NAV's pre-NAV-02 state it is NOT pure
@@ -1306,12 +1314,70 @@ available season, no re-tuning against the holdout):
   check found `moneypuck.com` is too; any live-fetch verification needs a
   codespace, same as every other NHL feed increment this session.
 
-**Acceptance:** either (a) a validated replacement for `goalieImpact` ships,
-fallback-safe, with the same sign-consistent walk-forward evidence NAV-02
-required, or (b) Phase 1 finds the current formula already clears a
-reasonable bar and this ticket closes with that finding honestly documented
-— a negative or "already fine" result is an acceptable close, not a
-blocker to force past.
+**Phase 1 progress (this session) — real diagnosis run, two candidate fixes tested, both failed, ticket closes on acceptance option (b):**
+
+- Built `scripts/backtest/goalie-model-diagnostic.ts`, calling the REAL
+  `calcGoalieNAV` (not a reimplementation) against real, multi-season
+  MoneyPuck goalie/team data (2022-25, the same window every NAV-02
+  backtest used).
+- **Part A (concurrent team-level — the question that actually matters
+  under NAV-02's own concurrent-valuation framing):** Σ(real engine impact
+  stage) vs. actual team season GSAx (xGoalsAgainst − goalsAgainst) is
+  sign-consistent positive every season (r=0.53-0.78, holdout 0.71) —
+  genuinely informative and, critically, NOT wrong-signed the way `defRaw`
+  was pre-NAV-02. Raw, untransformed GSAx tracks the same target almost
+  tautologically (r=0.93-0.97), as expected since summed individual GSAx is
+  nearly definitionally the team total.
+- **Part A2 (decomposition):** the gap between raw and engine output is
+  almost entirely the deliberate career-baseline blend, not the
+  power-curve shape — the curve step alone is roughly neutral (+/-0.05
+  either direction, no consistent sign across seasons).
+- **Part A3 (the most promising lead, tested rather than assumed):**
+  swapped the engine's hand-tuned `confidenceAdj` blend for
+  `goalie-percentiles.ts`'s already-validated `reliability("gsaxPer60",
+  ice)` weight — fit against 1,031 real goalie-seasons (2008-2025), far
+  more data than this diagnostic's own window. Result: concurrent tracking
+  got WORSE, not better (down to r=0.03-0.27 in later seasons). That
+  weight is calibrated for a PREDICTIVE question (does this season predict
+  the same goalie's own next season) and shrinks far too hard for a
+  CONCURRENT one — the exact category error NAV-02 corrected for D-NAV,
+  caught here before shipping instead of after.
+- **Part B (individual persistence):** weak for both raw and engine GSAx
+  (r≈0.15 pooled, both), matching `goalie-percentiles.ts`'s own published
+  r=0.13 for GSAx/60 stability — a real property of goaltending variance,
+  not a flaw specific to this engine, and not G-NAV's primary job under the
+  concurrent framing anyway.
+- **Part C (feature audit):** MoneyPuck's own HD SV% — the one candidate
+  signal actually testable from this sandbox, since NHL Edge's own
+  `highDangerSavePct` has no offline multi-season history to backtest
+  against — shows no real incremental predictive lift (r=0.05 vs. raw
+  GSAx/60's r=0.15).
+- **Conclusion: two concrete candidate improvements were tested against
+  real data and both failed to beat the status quo.** `calcGoalieNAV` is
+  untouched — no code change, because none cleared the bar. This is
+  acceptance option (b), exercised honestly rather than assumed: the
+  current formula already clears a reasonable bar (sign-consistent,
+  genuinely informative, not obviously improvable by either lever tried).
+- Evidence: `npx tsc --noEmit` and `eslint` clean on the new script; full
+  suite unaffected, **2,403/2,403** (no engine code touched).
+- **Not attempted:** testing NHL Edge's own `highDangerSavePct`/
+  `startsAbove900Pct` against real historical data — no offline multi-season
+  capture exists in this sandbox (Edge lives only in the live Turso DB);
+  this remains a real, open gap if a codespace with live egress or a
+  historical Edge export becomes available later. Team-level testing of
+  the `hdRateCorr` term specifically — `teamHdca60` is NST-sourced in
+  production and only a current-season (not per-historical-season) NST
+  team-rates file exists offline, so that specific correction term was
+  left at its neutral default throughout and was not exercised by this
+  diagnosis.
+
+**Acceptance, closed under option (b):** Phase 1 found the current formula
+already clears a reasonable bar — sign-consistent, genuinely informative
+at the concurrent team level, and not improvable by either of the two
+concrete candidate fixes actually tested against real data. `calcGoalieNAV`
+ships unchanged. Reopen if NHL Edge's own historical data becomes
+available to test, or if a future session identifies a different,
+untested lever.
 
 ---
 
