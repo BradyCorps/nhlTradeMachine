@@ -162,12 +162,18 @@ const gamesColumn: RosterColumn = {
 
 const navColumn: RosterColumn = {
   key: "nav",
-  label: "X-NAV",
+  label: "F-NAV",
   align: "right",
-  title: "Net asset value",
+  title: "Forward Net Asset Value",
   value: r => r.nav,
   format: r => (r.nav == null ? "—" : String(r.nav)),
   initial: "desc",
+};
+
+const defenseNavColumn: RosterColumn = {
+  ...navColumn,
+  label: "D-NAV",
+  title: "Defense Net Asset Value",
 };
 
 const goalieNavColumn: RosterColumn = {
@@ -196,7 +202,7 @@ const termColumn: RosterColumn = {
   initial: "desc",
 };
 
-export const SKATER_COLUMNS: readonly RosterColumn[] = [
+const buildSkaterColumns = (nav: RosterColumn): readonly RosterColumn[] => [
   nameColumn,
   posColumn,
   ageColumn,
@@ -216,10 +222,15 @@ export const SKATER_COLUMNS: readonly RosterColumn[] = [
     format: r => r.toi.toFixed(1),
     initial: "desc",
   },
-  navColumn,
+  nav,
   capColumn,
   termColumn,
 ];
+
+/** Forwards read F-NAV; kept as `SKATER_COLUMNS` since it was the original
+ *  shared name — `columnsFor` is what actually picks per-unit now. */
+export const SKATER_COLUMNS: readonly RosterColumn[] = buildSkaterColumns(navColumn);
+export const DEFENSE_COLUMNS: readonly RosterColumn[] = buildSkaterColumns(defenseNavColumn);
 
 export const GOALIE_COLUMNS: readonly RosterColumn[] = [
   nameColumn,
@@ -252,7 +263,7 @@ export const GOALIE_COLUMNS: readonly RosterColumn[] = [
 
 /** The column set a unit is read in. */
 export const columnsFor = (unit: RosterUnit): readonly RosterColumn[] =>
-  unit === "G" ? GOALIE_COLUMNS : SKATER_COLUMNS;
+  unit === "G" ? GOALIE_COLUMNS : unit === "D" ? DEFENSE_COLUMNS : SKATER_COLUMNS;
 
 // ── Sorting ──────────────────────────────────────────────────────
 

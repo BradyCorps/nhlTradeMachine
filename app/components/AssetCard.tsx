@@ -388,7 +388,7 @@ export default function AssetCard({
             </div>
           )}
           <div className="flex items-center justify-between mb-1.5">
-            <MetricTip term="X-NAV" className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">NAV Breakdown</MetricTip>
+            <MetricTip term={navLabel} className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">NAV Breakdown</MetricTip>
             <HelpPopover
               label="NAV components"
               definition="OFF: offensive production value (points-per-82 pace and expected goals). DEF: defensive suppression. YNG: option value from proven youth on a cheap deal. CAP: contract cost; overpaid contracts reduce NAV."

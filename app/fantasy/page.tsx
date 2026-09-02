@@ -36,6 +36,7 @@ import { matchesPlayerSearch } from "@/app/lib/player-search";
 import type { LeagueProvenance } from "@/app/lib/data-context";
 import type { XNAVResult } from "@/app/lib/xnav-engine";
 import { navColor, fmtSigned } from "@/app/lib/display-utils";
+import { navLabelForPosition } from "@/app/lib/player-terminology";
 
 interface ApiPlayer {
   id: string; name: string; teamId: string; position: string;
@@ -132,17 +133,18 @@ const COVERAGE_LABEL: Record<string, string> = {
 // rank. X-NAV is a real-money trade/roster model (cap hit, contract term,
 // defensive value) — a wholly different question from category production
 // under this league's scoring, so it is never used to rank or filter here.
-function XNavStrip({ nav }: { nav: XNAVResult | undefined }) {
+function XNavStrip({ nav, position }: { nav: XNAVResult | undefined; position?: string | null }) {
   if (!nav) return null;
   const snap = nav.snapshot;
+  const navLabel = navLabelForPosition(position);
   return (
     <div className="mt-2 pt-2 border-t text-[10px] font-mono" style={{ borderColor: rule }}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <HelpPopover
-          label="Ledger X-NAV"
+          label={`Ledger ${navLabel}`}
           definition="Cap & Crease's cross-product trade/roster value for this player — cap surplus, contract term, defensive value. A different question from fantasy points; shown for reference only and never used to rank this board."
         >
-          <span className="font-black uppercase tracking-[0.08em]" style={{ color: faint }}>Ledger X-NAV</span>
+          <span className="font-black uppercase tracking-[0.08em]" style={{ color: faint }}>Ledger {navLabel}</span>
         </HelpPopover>
         <span className="font-black" style={{ color: navColor(nav.total), fontVariantNumeric: "tabular-nums" }}>
           {fmtSigned(nav.total, 0)}
@@ -797,7 +799,7 @@ export default function FantasyPage() {
                           style={{ borderColor: rule, background: "var(--paper-inset)" }}
                         >
                           <PlayerOutlook asset={r.p as any} />
-                          <XNavStrip nav={navMap[r.p.id]} />
+                          <XNavStrip nav={navMap[r.p.id]} position={r.p.position} />
                         </div>
                       )}
                     </article>
@@ -909,7 +911,7 @@ export default function FantasyPage() {
                             <td colSpan={15} className="px-3 py-3" style={{ background: "var(--paper-inset)" }}>
                               {/* The full Ledger read — same component as the player dossier */}
                               <PlayerOutlook asset={r.p as any} />
-                              <XNavStrip nav={navMap[r.p.id]} />
+                              <XNavStrip nav={navMap[r.p.id]} position={r.p.position} />
                             </td>
                           </tr>
                         )}

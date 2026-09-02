@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { Asset } from "@/app/lib/trade-types";
 import type { RosterRow } from "@/app/lib/roster-view";
 import {
+  DEFENSE_COLUMNS,
   GOALIE_COLUMNS,
   SKATER_COLUMNS,
   UNIT_ORDER,
@@ -87,7 +88,13 @@ describe("roster-table — units", () => {
     for (const unit of UNIT_ORDER) expect(columnsFor(unit).length).toBeGreaterThan(0);
     expect(columnsFor("G")).toBe(GOALIE_COLUMNS);
     expect(columnsFor("F")).toBe(SKATER_COLUMNS);
-    expect(columnsFor("D")).toBe(SKATER_COLUMNS);
+    expect(columnsFor("D")).toBe(DEFENSE_COLUMNS);
+  });
+
+  it("labels the nav column by unit — F-NAV, D-NAV, G-NAV, never a shared X-NAV", () => {
+    expect(SKATER_COLUMNS.find(c => c.key === "nav")?.label).toBe("F-NAV");
+    expect(DEFENSE_COLUMNS.find(c => c.key === "nav")?.label).toBe("D-NAV");
+    expect(GOALIE_COLUMNS.find(c => c.key === "nav")?.label).toBe("G-NAV");
   });
 });
 

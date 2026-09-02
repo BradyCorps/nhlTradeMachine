@@ -618,7 +618,7 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
             <tr className="border-b border-zinc-800/30">
               {["Side", "Player", "Position", "Age", "Points/82", "Expected goals/82", "Defense rate", "Avg ice time", "Contract", "Years left", "NAV", "Offense", "Defense", "Age/Youth", "Contract cost", "Adjustments"].map((h) => {
                 const definition = h === "NAV"
-                  ? "X-NAV for skaters; G-NAV for goalies."
+                  ? "F-NAV for forwards, D-NAV for defensemen, G-NAV for goalies."
                   : h === "Adjustments"
                     ? "Model adjustments applied after the component values."
                     : null;

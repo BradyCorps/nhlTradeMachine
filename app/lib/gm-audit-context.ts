@@ -14,7 +14,7 @@ export interface CalibreAsset {
   gsax?: number;
 }
 
-// G-NAV runs structurally lower than skater X-NAV (shorter primes,
+// G-NAV runs structurally lower than F-NAV/D-NAV (shorter primes,
 // higher variance, no positional premium), so a single skater bar
 // misjudges goalie calibre. A franchise goalie clears ~72% of the
 // skater threshold.
@@ -62,7 +62,7 @@ export function assessFranchiseReturn(
 
   if (isFranchiseCalibre(headliner, franchiseThreshold)) {
     const posNote = headliner.position === "G"
-      ? " (judged on the goalie value scale — G-NAV runs lower than skater X-NAV)"
+      ? " (judged on the goalie value scale — G-NAV runs lower than F-NAV/D-NAV)"
       : "";
     return {
       qualifies: true, headliner, secondPiece,

@@ -51,7 +51,9 @@ export const methodologySections: MethodologySection[] = [
     title: "Player Valuation",
     intro: "How the app turns a player, contract, and role into tradeable asset value.",
     items: [
-      { term: "X-NAV", definition: "Extended Net Asset Value: the Ledger's skater trade-value model. Offense, defense, age curve, contract surplus, deployment, Point Shares, and role context priced into one number; Gravity is a separately gated experimental term." },
+      { term: "X-NAV", definition: "Extended Net Asset Value: the Ledger's trade-value model spanning every position. Offense, defense, age curve, contract surplus, deployment, Point Shares, and role context priced into one number; Gravity is a separately gated experimental term. Shown as F-NAV, D-NAV, or G-NAV on an individual player." },
+      { term: "F-NAV", definition: "Forward Net Asset Value — X-NAV scored for a forward." },
+      { term: "D-NAV", definition: "Defense Net Asset Value — X-NAV scored for a defenseman, using a fitted defensive model where enough games exist this season." },
       { term: "G-NAV", definition: "Goalie Net Asset Value. Built around goals saved above expected, workload, save profile, team defensive context, age, and contract surplus." },
       { term: "Prospect NAV", definition: "Pre-NHL value comes from draft pedigree and stored NHLe production. No-signal ELC players do not receive automatic cap or age value." },
       { term: "OFF / DEF", definition: "On-ice components: offensive production and creation on one side, suppression and defensive value on the other, each judged against position." },

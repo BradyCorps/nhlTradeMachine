@@ -8,6 +8,7 @@ import { displayPosition } from "@/app/lib/display-position";
 import PlayoffBracket from "@/app/components/PlayoffBracket";
 import { SEASON } from "@/app/lib/season-config";
 import { navStageDesc, navStagesForDisplay } from "@/app/lib/nav-breakdown";
+import { navLabelForPosition } from "@/app/lib/player-terminology";
 import { MODEL_PRICE_SHORT } from "@/app/lib/contract-verdict";
 import { HelpPopover } from "@/app/components/HelpPopover";
 import MetricTip from "@/app/components/MetricTip";
@@ -382,7 +383,7 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
                                   ))}
                                 </div>
                                 <div className="mt-2 text-[10px] font-mono" style={{ color: 'var(--ledger-ink-body, var(--ledger-ink))' }}>
-                                  {rows.map(r => `${r.label} ${r.value >= 0 ? '+' : ''}${r.value}`).join(' · ')} = <strong>X-NAV {nav.total}</strong>
+                                  {rows.map(r => `${r.label} ${r.value >= 0 ? '+' : ''}${r.value}`).join(' · ')} = <strong>{navLabelForPosition(p.position)} {nav.total}</strong>
                                 </div>
                               </>
                             );

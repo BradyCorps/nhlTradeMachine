@@ -1201,7 +1201,7 @@ export default function PlayersPage() {
           NHL Player Analytics
         </h1>
         <p className="mt-2 max-w-3xl text-[11px] sm:text-[12px] font-mono leading-relaxed" style={{ color: "var(--ledger-ink-body)" }}>
-          Search NHL player dossiers for season production, contracts, roles, STRAND identity, development outlook, and position-aware X-NAV or G-NAV trade value.
+          Search NHL player dossiers for season production, contracts, roles, STRAND identity, development outlook, and position-specific trade value — F-NAV, D-NAV, or G-NAV.
         </p>
       </header>
 

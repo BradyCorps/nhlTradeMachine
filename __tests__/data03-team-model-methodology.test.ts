@@ -28,9 +28,10 @@ describe("DATA-03: Team Model methodology section", () => {
     expect(methodology).toContain("12 forwards, 6 defensemen, 2 goaltenders");
   });
 
-  it("states the F/D/G-NAV population and that it is a sum, not yet an independent model", () => {
+  it("states the F/D/G-NAV population, and that the per-player values summed are genuinely position-specific models post NAV-02/NAV-03", () => {
     expect(methodology).toContain("client-side positional SUM");
     expect(methodology).toContain("signed active roster only");
+    expect(methodology).toContain("genuinely position-specific");
   });
 
   it("describes the expiry ledger naming the league year rather than a single expiring bucket", () => {

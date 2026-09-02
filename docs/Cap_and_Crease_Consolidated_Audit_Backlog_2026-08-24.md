@@ -1381,7 +1381,7 @@ untested lever.
 
 ---
 
-- After # 2A. [X]-NAV model evolution [ ] NAV-01 — Build, cross-calibrate and activate F/D/G-NAV (`XL`) is marked as complete. Replace goalie `X-NAV` labels with `G-NAV` and goalie-specific component language.
+- [x] DONE (2026-09-02, ahead of NAV-01's own remaining phases): replace goalie `X-NAV` labels with `G-NAV` — and, once real, independently-validated F-NAV/D-NAV models existed (NAV-02/NAV-03), replace THEIR generic `X-NAV` labels too, not just the goalie one this note originally scoped. `navLabelForPosition` (`player-terminology.ts`) now returns F-NAV/D-NAV/G-NAV/X-NAV correctly across every player-facing surface; see DEVNOTES.
 2B. Gravity v4 controlled release
 
 [ ] GRAV-01 — Contain, validate, shadow-test and deliberately reactivate Gravity v4 (XL)

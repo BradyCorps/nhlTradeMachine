@@ -115,7 +115,7 @@ export default function WelcomeModal() {
               How the models work
             </summary>
             <div className="grid grid-cols-[72px_1fr] gap-x-3 gap-y-2 pb-2">
-              <Term t="X-NAV" d="Extended Net Asset Value — a player's total trade value combining on-ice impact, age, contract, and role; experimental Gravity value is separately gated." />
+              <Term t="X-NAV" d="Extended Net Asset Value — a player's total trade value combining on-ice impact, age, contract, and role; experimental Gravity value is separately gated. Shown as F-NAV, D-NAV, or G-NAV on the player himself." />
               <Term t="STRAND" d="DNA-style visualization showing offensive and defensive trait profiles at a glance." />
               <Term t="GM Audit" d="Automated trade analysis checking cap legality, roster fit, timeline alignment, and fair value." />
               <Term t="FMV" d="Fair Market Value — what a player would earn as a free agent based on their production profile." />

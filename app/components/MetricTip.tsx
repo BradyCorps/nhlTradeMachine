@@ -4,9 +4,11 @@ import { NAV_STAGE_DESC, NAV_STAGE_SHORT } from "@/app/lib/nav-breakdown";
 import { HelpPopover } from "@/app/components/HelpPopover";
 
 const GLOSSARY: Record<string, string> = {
-  "X-NAV": "Extended Net Asset Value — the Ledger's trade-value model: offense, defense, age, contract surplus, deployment, and role context. Gravity is separately gated and off in the public-launch baseline.",
+  "X-NAV": "Extended Net Asset Value — the Ledger's trade-value model spanning every position: offense, defense, age, contract surplus, deployment, and role context. Shown as F-NAV, D-NAV, or G-NAV on an individual player, and as X-NAV for a combined roster total or a pick. Gravity is separately gated and off in the public-launch baseline.",
+  "F-NAV": "Forward Net Asset Value — X-NAV scored for a forward: offense, defense, age, contract surplus, deployment, and role context.",
+  "D-NAV": "Defense Net Asset Value — X-NAV scored for a defenseman, using a fitted defensive model where enough games exist this season: offense, defense, age, contract surplus, deployment, and role context.",
   "G-NAV": "Goalie Net Asset Value — goals saved above expected, workload, save profile, team defense, age, and contract surplus.",
-  "NAV": "Net Asset Value — X-NAV for skaters and G-NAV for goalies.",
+  "NAV": "Net Asset Value — F-NAV for forwards, D-NAV for defensemen, G-NAV for goalies.",
   "OPS": "Offensive Point Shares — a player's offensive contribution measured in standings points.",
   "DPS": "Defensive Point Shares — a player's defensive contribution measured in standings points.",
   "SCR": "Scoring pace — points per 82 games, normalized by position.",

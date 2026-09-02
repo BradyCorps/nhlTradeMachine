@@ -2073,7 +2073,7 @@ describe("Canary — sim without a trade + AI best lines", () => {
     // guarantee was always "these rows produce the headline"; that is what is
     // asserted now, and the row-by-row identity lives in nav-identity.test.ts.
     expect(pager).toContain("navStagesForDisplay(nav.stages, nav.total)");
-    expect(pager).toContain("= <strong>X-NAV {nav.total}</strong>");
+    expect(pager).toContain("= <strong>{navLabelForPosition(p.position)} {nav.total}</strong>");
     // Prospects with no market AAV read ELC, not "$—M"
     expect(pager).toContain("'ELC / n/a'");
     // Defensemen get pairing labels, not forward line labels

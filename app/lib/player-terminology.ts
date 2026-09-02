@@ -15,13 +15,28 @@ export const playerCountLabel = (count: number): string =>
 export const pickCountLabel = (count: number): string =>
   `${count} ${count === 1 ? "pick" : "picks"}`;
 
-export const navLabelForPosition = (position: string | null | undefined): "G-NAV" | "X-NAV" =>
-  String(position ?? "").trim().toUpperCase() === "G" ? "G-NAV" : "X-NAV";
+// F-NAV/D-NAV/G-NAV are real, independently-scored position splits (NAV-01
+// Phase 3's calcForwardNAV/calcDefenseNAV/calcGoalieNAV, validated by
+// NAV-02/NAV-03) — not a relabeling of one shared number. "X-NAV" stays the
+// umbrella term for a non-skater, non-goalie asset (a Pick) or an unknown
+// position, and for cross-position contexts (a team's combined roster
+// total, the product/brand name) that aren't a single player's own value.
+export const navLabelForPosition = (position: string | null | undefined): "F-NAV" | "D-NAV" | "G-NAV" | "X-NAV" => {
+  const pos = String(position ?? "").trim().toUpperCase();
+  if (pos === "G") return "G-NAV";
+  if (pos === "D" || pos === "LD" || pos === "RD") return "D-NAV";
+  if (pos === "C" || pos === "W" || pos === "L" || pos === "R" || pos === "LW" || pos === "RW" || pos === "F") return "F-NAV";
+  return "X-NAV";
+};
 
-export const navLongLabelForPosition = (position: string | null | undefined): string =>
-  navLabelForPosition(position) === "G-NAV"
-    ? "Goalie Net Asset Value"
-    : "Extended Net Asset Value";
+export const navLongLabelForPosition = (position: string | null | undefined): string => {
+  switch (navLabelForPosition(position)) {
+    case "G-NAV": return "Goalie Net Asset Value";
+    case "D-NAV": return "Defense Net Asset Value";
+    case "F-NAV": return "Forward Net Asset Value";
+    default:      return "Extended Net Asset Value";
+  }
+};
 
 export const expiringRightsLabel = (player: {
   expiresThisOffseason?: boolean;
