@@ -270,7 +270,13 @@ describe("league players route roster assembly", () => {
     expect(player.highDangerAgainstRate).toBeCloseTo(1.2, 5);
   });
 
-  it("leaves NAV-02's fitted-model inputs null for a defenseman under the 20-game validated minimum", async () => {
+  it("still computes NAV-02's fitted-model inputs on a thin sample — the engine shrinks, it does not gate", async () => {
+    // There used to be a >= 20 GP gate here, which meant the engine
+    // switched formulas at exactly 20 games and swung a defenseman's total
+    // by up to 100 points on one extra game. The model now shrinks by
+    // sample size internally, so the inputs are supplied at any game count
+    // and a thin sample simply lands nearer league average.
+    // 8 GP, 9600s icetime. onCA=500/2.6667h=187.5, offCA=300/(8*60-160)/60h
     state.rosters.WPG.defensemen = [rosterPlayer("401", "Small", "Sample", "D")];
     state.skaterCsvRows = [
       "Small Sample,all,5,1,8,9600,50,30,20,60,40,100,80,1,D,500,300,50,10",
@@ -282,8 +288,8 @@ describe("league players route roster assembly", () => {
 
     const player = body.players.find((p: any) => p.name === "Small Sample");
     expect(player).toBeDefined();
-    expect(player.corsiAgainstRel).toBeNull();
-    expect(player.blocksPer82).toBeNull();
-    expect(player.highDangerAgainstRate).toBeNull();
+    expect(player.corsiAgainstRel).not.toBeNull();
+    expect(Number.isFinite(player.corsiAgainstRel)).toBe(true);
+    expect(player.blocksPer82).toBeCloseTo((50 / 8) * 82, 5);
   });
 });

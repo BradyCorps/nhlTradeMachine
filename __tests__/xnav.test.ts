@@ -1299,53 +1299,85 @@ describe("calcForwardNAV / calcDefenseNAV — Phase 3 delegation", () => {
   });
 });
 
-// NAV-02 — a defenseman carrying the fitted model's required inputs
-// (corsiAgainstRel/blocksPer82/highDangerAgainstRate, alongside the
-// already-existing dzPct) gets his defTotal from
-// scripts/backtest/defense-model-team-fit.ts's frozen, holdout-validated
-// model — fit directly against CONCURRENT team defense, not a defenseman's
-// own future — instead of the legacy defRaw computation Phase 1 found
-// actively counterproductive. See DEFENSE_MODEL_COEFFICIENTS in
-// xnav-engine.ts.
-describe("calcDefenseNAV — NAV-02 fitted defensive model (concurrent fit)", () => {
+// NAV-02 — a defenseman carrying teammate-relative defensive evidence
+// (xgaRelTM + corsiAgainstRel) gets his defTotal from
+// scripts/backtest/defense-model-individual-fit.ts's frozen,
+// holdout-validated model instead of the legacy defRaw computation Phase 1
+// found actively counterproductive. See DEFENSE_MODEL in xnav-engine.ts.
+//
+// Increment 6-8 shipped a TEAM-level fit applied per player, which ranked
+// defensemen close to backwards (value vs. QoC r=-0.72, vs. TOI r=-0.57,
+// depth D rated 53 points above first-pair D) and switched formulas at
+// exactly 20 GP, swinging totals by up to 100 points on one extra game.
+// The deployment and continuity tests below exist specifically so that
+// class of defect cannot ship again unnoticed.
+describe("calcDefenseNAV — NAV-02 fitted defensive model (individual fit)", () => {
   const base = {
     id: "def-fitted", name: "Test Defenseman", position: "D" as const,
     age: 26, capHit: 7.2, yearsRemaining: 5,
     ptsPace: 45, xGPace: 9, defRate: 0.15, avgTOI: 22.5,
-    qocIndex: 62, games: 78,
+    qocIndex: 62, dzPct: 0.55, games: 78,
   };
+  const withEvidence = (over: Record<string, unknown> = {}) =>
+    calcDefenseNAV({ ...base, xgaRelTM: 0, corsiAgainstRel: 0, ...over } as typeof base);
 
   it("uses the fitted model instead of the legacy formula when its inputs are present", () => {
-    const withModel = calcDefenseNAV({
-      ...base, dzPct: 0.55, corsiAgainstRel: 0, blocksPer82: 100, highDangerAgainstRate: 2,
-    });
-    const legacy = calcSkaterNAV({ ...base, dzPct: 0.55 }); // same profile, no fitted-model inputs
-    expect(withModel.total).not.toBe(legacy.total);
+    // Compared against the same profile carrying the same xgaRelTM, so the
+    // only difference is whether the fitted branch fired — xgaRelTM also
+    // feeds the display-only DEF field, which would otherwise muddy this.
+    const legacy = calcSkaterNAV({ ...base, xgaRelTM: 0 });
+    expect(withEvidence().total).not.toBe(legacy.total);
   });
 
-  it("falls back to the legacy formula when even one fitted-model input is missing", () => {
-    const missingOnlyHighDanger = calcDefenseNAV({
-      ...base, dzPct: 0.55, corsiAgainstRel: 0, blocksPer82: 100, highDangerAgainstRate: null,
-    });
-    expect(missingOnlyHighDanger).toEqual(calcSkaterNAV({ ...base, dzPct: 0.55 }));
+  it("falls back to the legacy formula when teammate-relative evidence is missing", () => {
+    expect(calcDefenseNAV({ ...base, xgaRelTM: 0, corsiAgainstRel: null }))
+      .toEqual(calcSkaterNAV({ ...base, xgaRelTM: 0 }));
+    expect(calcDefenseNAV({ ...base, xgaRelTM: null, corsiAgainstRel: 0 }))
+      .toEqual(calcSkaterNAV({ ...base, xgaRelTM: null }));
   });
 
-  // dzPct carries the largest, cleanly-signed coefficient in the frozen
-  // fit (positive — more defensive-zone-start share predicts a worse
-  // concurrent team result). Other inputs (corsiAgainstRel especially)
-  // carry sign flips from joint-fit collinearity with dzPct and the other
-  // team-level signals — real, validated by the model's overall holdout
-  // accuracy, but not individually intuitive — so this test isolates the
-  // one signal whose direction is unambiguous in the coefficients, rather
-  // than asserting a combination the fit doesn't actually agree with.
-  it("values a lower defensive-zone-start share above a higher one, all else equal", () => {
-    const lowDzPct = calcDefenseNAV({
-      ...base, dzPct: 0.40, corsiAgainstRel: 0, blocksPer82: 100, highDangerAgainstRate: 2,
-    });
-    const highDzPct = calcDefenseNAV({
-      ...base, dzPct: 0.65, corsiAgainstRel: 0, blocksPer82: 100, highDangerAgainstRate: 2,
-    });
-    expect(lowDzPct.total).toBeGreaterThan(highDzPct.total);
+  it("ignores the captured-but-unvalued role stats entirely", () => {
+    // blocksPer82 and highDangerAgainstRate are role/absolute-rate stats.
+    // Feeding them to a defensive valuation is what inverted the previous
+    // model, so they must not move the number at all.
+    expect(withEvidence({ blocksPer82: 220, highDangerAgainstRate: 3.1 }).total)
+      .toBe(withEvidence({ blocksPer82: 10, highDangerAgainstRate: 0.2 }).total);
+  });
+
+  it("values suppressing chances relative to teammates above conceding them", () => {
+    expect(withEvidence({ xgaRelTM: -0.5 }).total)
+      .toBeGreaterThan(withEvidence({ xgaRelTM: 0.5 }).total);
+  });
+
+  it("values a lower shot-attempts-against rate above a higher one — the sign the shipped model had inverted", () => {
+    expect(withEvidence({ corsiAgainstRel: -8 }).total)
+      .toBeGreaterThan(withEvidence({ corsiAgainstRel: 8 }).total);
+  });
+
+  it("credits tougher deployment and never penalises it", () => {
+    // The defect that made the previous model unusable: it scored value
+    // DOWN as quality of competition went up (r=-0.72 across the real
+    // league), so depth defensemen outranked first-pair ones.
+    const sheltered = withEvidence({ qocIndex: 30 });
+    const heavy = withEvidence({ qocIndex: 90 });
+    expect(heavy.total).toBeGreaterThan(sheltered.total);
+  });
+
+  it("has no cliff at the old 20-game threshold", () => {
+    // Increment 7-8 switched formulas at exactly 20 GP. The replacement
+    // shrinks by sample size instead, so neighbouring game counts must
+    // produce neighbouring values.
+    const at19 = withEvidence({ games: 19 }).total;
+    const at20 = withEvidence({ games: 20 }).total;
+    expect(Math.abs(at20 - at19)).toBeLessThan(3);
+  });
+
+  it("shrinks a thin sample toward league average rather than trusting it", () => {
+    // A strong rate over 12 games should read as less extreme than the
+    // same rate over a full season.
+    const thin = withEvidence({ games: 12, xgaRelTM: -1.0, corsiAgainstRel: -15 });
+    const full = withEvidence({ games: 82, xgaRelTM: -1.0, corsiAgainstRel: -15 });
+    expect(full.total).toBeGreaterThan(thin.total);
   });
 
   it("never lets the fitted model affect a forward, even if fed its inputs", () => {

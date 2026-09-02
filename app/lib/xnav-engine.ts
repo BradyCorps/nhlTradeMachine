@@ -820,83 +820,107 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   };
 }
 
-// ── NAV-02: fitted, validated defenseman defensive-value model ────────────────
+// ── NAV-02: fitted defenseman defensive-value model ───────────────────────────
+//
+// WHAT CAME BEFORE, AND WHY IT WAS REPLACED (increment 9)
 //
 // The legacy defRaw computation below (defRawBase + driverAdj + shutdownDAdj +
-// toiDefFloor) was never validated. Two rounds of NAV-02 backtesting found:
-//   Phase 1 (scripts/backtest/defense-signal-diagnostic.ts): the legacy
-//     formula is actively counterproductive at predicting a defenseman's own
-//     future on-ice defense (holdout r=-0.102, worse than doing nothing).
-//   First refit attempt (scripts/backtest/defense-model-fit.ts): fitting a
-//     replacement against that SAME predictive target (does this season
-//     predict the player's own next season) produced a model that validated
-//     well individually but never aggregated to a team-level signal, even
-//     isolated from offense/age/cap and even against a goalie-stripped
-//     target (scripts/backtest/position-nav-backtest.ts). Root cause,
-//     confirmed by direct test: X-NAV/D-NAV is a CONCURRENT relative
-//     valuation — how good is this player right now, vs. position peers,
-//     given the season's evidence so far — not a forecast. A model fit
-//     toward "predicts next season" was answering a different question than
-//     the one D-NAV needs answered.
-// The model below (scripts/backtest/defense-model-team-fit.ts) is fit
-// DIRECTLY against the concurrent target: team-level defense signals
-// (ice-time-weighted per-team averages) explaining THIS SEASON's team
-// xG-against/game. Frozen on 2022-24 team-seasons, evaluated once on an
-// untouched 2025-26 holdout: r=0.82 against team xGA/game, sign-consistent
-// every season (2023 r=0.90, 2024 r=0.86, 2025 r=0.82) — and, checked
-// separately, still discriminates between teammates rather than degenerating
-// into a team-strength relabel (77.3% of variance is within-team, not
-// between-team). scripts/backtest/position-nav-backtest.ts's GATE 2 confirms
-// this against the same ΣD-NAV-shaped test that failed every earlier
-// attempt. DO NOT hand-edit these coefficients; a changed model needs its
-// own re-run of defense-model-team-fit.ts and its own re-validated holdout
-// numbers, not a tweak.
-const DEFENSE_MODEL_COEFFICIENTS = {
-  intercept: 0.063573,
-  dzPct: 2.693710,
-  corsiAgainstRel: -0.028817,
-  blocksPer82: -0.000454,
-  highDangerAgainstRate: 1.491240,
+// toiDefFloor) was never validated: scripts/backtest/defense-signal-diagnostic.ts
+// found it actively counterproductive at predicting a defenseman's own future
+// on-ice defense (holdout r=-0.102, worse than doing nothing).
+//
+// Increment 6 replaced it with a model fit at TEAM level — ice-time-weighted
+// per-team AVERAGES of player signals explaining team xGA — and shipped it in
+// increments 7-8. That was an ecological fallacy: team-level coefficients
+// applied to an individual player. An audit against real 2025-26 defensemen
+// found it ranked them close to backwards —
+//     value vs. QoC index      r = -0.72
+//     value vs. avg TOI/game   r = -0.57   (the legacy formula was +0.62)
+//     depth defensemen scored 53 points ABOVE first-pair defensemen
+// — because the team-level truth it learned ("rosters whose D corps starts in
+// its own zone and faces high-danger chances concede more xGA") is mostly a
+// team-strength effect, and per player it just penalised hard deployment. Its
+// dzPct coefficient was +2.69 on pure deployment, and collinearity had flipped
+// corsiAgainstRel's sign — noted at the time as "counterintuitive" rather than
+// treated as the red flag it was. The team-level gate in
+// position-nav-backtest.ts could not catch any of this: summing per-player
+// values back to team level reconstructs the very aggregate the coefficients
+// were fit on, so it passed by construction.
+//
+// THE MODEL BELOW (scripts/backtest/defense-model-individual-fit.ts)
+//
+// Fit at the INDIVIDUAL level, on teammate-relative signals only. xgaRelTM and
+// corsiAgainstRel are on-ice-minus-off-ice differences, so team strength
+// cancels inside each player — structurally immune to the confound above.
+// Absolute on-ice rates and pure deployment (dzPct, blocksPer82,
+// highDangerAgainstRate) are deliberately NOT value signals here: they are
+// role, not skill, and they are exactly what inverted the previous model.
+//
+// The weights are fit against the DEPLOYMENT-ADJUSTED residual — the part of a
+// defenseman's own next-season on-ice result that role difficulty
+// (qocIndex + avgTOI + dzPct) does not already explain, the control
+// defense-deployment-adjusted-audit.ts established. Frozen on 2022-24
+// transitions, evaluated once on the untouched 2024->25 holdout: r=-0.328,
+// sign-consistent every transition (-0.44, -0.43, -0.33).
+//
+// DO NOT hand-edit these constants. A changed model needs its own re-run of
+// defense-model-individual-fit.ts and its own re-validated holdout numbers.
+const DEFENSE_MODEL = {
+  // Standardisation means/sds are the TRAIN-fold values, and xgaRelTM's are
+  // measured on the sample-damped figure roster-assembly.ts actually feeds
+  // (`* Math.min(1, games/30)`) — fitting the undamped value and scoring the
+  // damped one is a unit mismatch this ticket has already been bitten by.
+  xgaRelTM:        { mean: -0.031156, sd: 0.507722, weight: 0.079926 },
+  corsiAgainstRel: { mean:  1.433308, sd: 8.468249, weight: 0.141080 },
+  /** Reliability shrink, n/(n+k), the same form goalie-percentiles.ts uses.
+   *  k comes from the skill index's MEASURED year-over-year stability
+   *  (r=0.663 over 607 pairs): k = 82*(1-r)/r. This is what removes the hard
+   *  20-game cliff increments 7-8 shipped (Seider 198 -> 98 on one extra
+   *  game): a thin sample sits nearer league average instead of switching
+   *  formulas at a threshold. */
+  reliabilityK: 41.762667,
+  /** SD of the shrunk skill index over the current season, so the composite
+   *  enters in standard-deviation units. */
+  skillSd: 0.111858,
+  /** Usage is part of VALUE, not just skill: equal teammate-relative
+   *  suppression across 24 hard minutes is worth more than across 14
+   *  sheltered ones. Applied as a credit, never as a penalty — the previous
+   *  model's core defect. Weighted so skill still drives more of the spread
+   *  than deployment does. */
+  deployCreditWeight: 0.35,
+  qocMean: 56.924686, qocSd: 17.426312,
+  /** Final affine map onto the legacy defTotal's own centre and spread, so
+   *  defensemen are not silently deflated against forwards league-wide the
+   *  way increments 7-8 deflated them by ~28 points. */
+  compMean: 0.024417, scale: 21.823485, centre: 35.9,
 };
 
 /**
- * Predicted concurrent team xG-against/game contribution — lower is
- * better defensively. Null when any required input is absent, so the
- * caller can fall back to the legacy formula rather than compute on
- * missing evidence (see `calcSkaterNAV`'s defRaw branch below).
+ * Fitted defTotal for a defenseman — higher is better defensively.
+ *
+ * Null when the teammate-relative evidence is absent, so `calcSkaterNAV`
+ * falls back to the legacy formula rather than compute on missing evidence.
  */
-function predictDefensiveResult(asset: AssetInput): number | null {
-  if (
-    asset.dzPct == null || asset.corsiAgainstRel == null ||
-    asset.blocksPer82 == null || asset.highDangerAgainstRate == null
-  ) return null;
-  const c = DEFENSE_MODEL_COEFFICIENTS;
-  return c.intercept
-    + c.dzPct * asset.dzPct
-    + c.corsiAgainstRel * asset.corsiAgainstRel
-    + c.blocksPer82 * asset.blocksPer82
-    + c.highDangerAgainstRate * asset.highDangerAgainstRate;
-}
-
-// Predicted-value distribution over the fit's own training population
-// (defense-model-team-fit.ts, 969 defenseman-seasons, MoneyPuck 2022-25):
-// mean=3.0623, stddev=0.4638. DEFENSE_MODEL_MEAN anchors a league-average
-// projection at defTotal=0; DEFENSE_MODEL_SCALE (~70 NAV points per 2
-// stddev) puts a top-decile projection in the same rough neighborhood the
-// legacy formula's typical range occupied, without reusing its asymptote —
-// that curve was shaped for the OLD formula's unbounded compounding
-// bonuses, not this model's already realistically-bounded output.
-const DEFENSE_MODEL_MEAN = 3.0623;
-const DEFENSE_MODEL_SCALE = 75;
-
-/** Fitted defTotal for a defenseman — see DEFENSE_MODEL_COEFFICIENTS. Null
- *  when `predictDefensiveResult` has insufficient inputs. */
 function fittedDefenseValue(asset: AssetInput): number | null {
-  const predicted = predictDefensiveResult(asset);
-  if (predicted == null) return null;
-  // Sanity clamp only — a numerical-hygiene guard against a live input
-  // wildly outside anything the fit ever saw, not a rescaling of the model.
-  return clamp((DEFENSE_MODEL_MEAN - predicted) * DEFENSE_MODEL_SCALE, -100, 120);
+  const games = asset.games ?? 0;
+  if (asset.xgaRelTM == null || asset.corsiAgainstRel == null || games <= 0) return null;
+  const m = DEFENSE_MODEL;
+
+  const zXga   = (asset.xgaRelTM        - m.xgaRelTM.mean)        / m.xgaRelTM.sd;
+  const zCorsi = (asset.corsiAgainstRel - m.corsiAgainstRel.mean) / m.corsiAgainstRel.sd;
+  // Both fitted weights are POSITIVE — allowing more chances relative to
+  // teammates predicts a worse own next-season result — so defensive VALUE is
+  // the negation. (The replaced model had corsiAgainstRel the other way up.)
+  const skillRaw = -(m.xgaRelTM.weight * zXga + m.corsiAgainstRel.weight * zCorsi);
+
+  const shrunk = skillRaw * (games / (games + m.reliabilityK));
+  const qoc = asset.qocIndex ?? m.qocMean;
+  const deployCredit = m.deployCreditWeight * ((qoc - m.qocMean) / m.qocSd);
+  const composite = shrunk / m.skillSd + deployCredit;
+
+  // Sanity clamp only — numerical hygiene against a live input far outside
+  // anything the fit saw, not a rescaling of the model.
+  return clamp(m.centre + m.scale * (composite - m.compMean), -40, 140);
 }
 
 // ── Skater NAV ────────────────────────────────────────────────────────────────
@@ -1043,12 +1067,15 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     : 0;
   const defRaw = defRawBase + driverAdj + shutdownDAdj + toiDefFloor;
 
-  // NAV-02: a defenseman with the fitted model's required inputs gets his
-  // real, validated defTotal from it instead of the legacy computation
-  // above — see DEFENSE_MODEL_COEFFICIENTS. Forwards are untouched (NAV-01
-  // Phase 4 already validated ΣF-NAV against team offense using the legacy
-  // defense math unchanged); a defenseman missing the new inputs falls back
-  // to the legacy path rather than compute on absent evidence.
+  // NAV-02: a defenseman with the fitted model's teammate-relative evidence
+  // (xgaRelTM + corsiAgainstRel) gets his defTotal from it instead of the
+  // legacy computation above — see DEFENSE_MODEL. Forwards are untouched
+  // (NAV-01 Phase 4 validated ΣF-NAV against team offense on the legacy
+  // defense math); a defenseman missing that evidence falls back to the
+  // legacy path rather than compute on absent inputs. There is no games
+  // threshold on the branch itself: the model shrinks by sample size
+  // internally, so a thin sample lands near league average instead of
+  // jumping formulas at a cutoff.
   const fittedDef = isD ? fittedDefenseValue(asset) : null;
 
   let defTotal: number;
@@ -1058,9 +1085,8 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     defTotal = safe(defRaw);
     // ── Larry Robinson Defensive Asymptote ──────────────────────────
     // Max 150 UI ceiling. Legacy-path only — the fitted model above is
-    // already realistically bounded by DEFENSE_MODEL_SCALE's own clamp,
-    // not this curve, which was shaped for the legacy formula's unbounded
-    // compounding bonuses.
+    // already bounded by its own clamp, and this curve was shaped for the
+    // legacy formula's unbounded compounding bonuses.
     if (defTotal > 80) {
       const L = 70; // Remaining headroom to 150
       const excess = defTotal - 80;

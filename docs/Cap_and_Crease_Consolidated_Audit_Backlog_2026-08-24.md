@@ -157,13 +157,18 @@ are not implemented.
 player by position to `calcForwardNAV` / `calcDefenseNAV` / `calcGoalieNAV`
 — not a display-only sum, a real engine-level split. **F-NAV**: same
 formula as always, already validated against team offense (NAV-01). **D-NAV**:
-now a real, independently fit and validated model (concurrent target, team
-xGA holdout r=0.82), wired into `calcDefenseNAV`, and — as of increment 8 —
-genuinely live for any real defenseman with >= 20 games played this season
-(`roster-assembly.ts` computes its three inputs from live MoneyPuck data;
-verified byte-identical to the validated fit script against the real,
-checked-in 2025-26 CSV). Below 20 games, or for any input the CSV is
-missing, it falls back to the legacy formula, unchanged. **G-NAV**: the
+a real, independently fit model, live in `calcDefenseNAV` for any
+defenseman carrying teammate-relative evidence. Note the history: the
+version shipped in increments 6-8 was fit at TEAM level and applied per
+player, which ranked defensemen close to backwards (value vs. QoC r=-0.72)
+until an audit caught it. Increment 9 replaced it with an individual-level
+fit on teammate-relative signals — untouched-holdout r=-0.328 against the
+deployment-adjusted residual, sign-consistent across all three transitions,
+stability r=0.663, and deployment now credited rather than penalised. It
+shrinks by sample size instead of gating at a games threshold, so there is
+no cliff; a defenseman with no teammate-relative evidence at all falls back
+to the legacy formula. Its known limit is that it ranks well WITHIN a
+roster and carries little between-team absolute signal. **G-NAV**: the
 original on-ice impact formula, now diagnosed (NAV-03) rather than merely
 assumed adequate — real backtests found it sign-consistent and genuinely
 informative at the concurrent team level (r=0.53-0.78, holdout 0.71), and
@@ -1179,10 +1184,66 @@ these before assuming the fix is "different weights":
 - **Not attempted:** confirming against a genuinely live MoneyPuck fetch
   (blocked here); NAV-01's remaining phases.
 
-**NAV-02's D-NAV model is now live end-to-end**, not just in code: a real
-defenseman with >= 20 games played gets the validated fitted value in
-production; everyone else (forwards, goalies, sub-20-game defensemen, or a
-CSV missing the new columns) keeps the exact prior behavior.
+**SUPERSEDED BY INCREMENT 9 — the model increments 6-8 shipped was broken.**
+The paragraph that stood here declared D-NAV live and validated. An audit
+(below) found it ranked defensemen close to backwards. Read increment 9
+before trusting anything in increments 6-8.
+
+**Increment 9 progress (this session) — the shipped model was ranking defensemen backwards; replaced with an individual-level fit:**
+
+- **The audit.** User asked for the previous session's work to be verified
+  as workable. Running the real, live `calcDefenseNAV` over 239 real
+  2025-26 defensemen: value correlated **-0.72 with quality of
+  competition** and **-0.57 with ice time** (legacy: +0.62), and rated
+  **depth defensemen 53 points ABOVE first-pair defensemen** — Ben Hutton,
+  Hamonic, Mancini, Reilly at the top; Seth Jones, Skjei, LaCombe,
+  Sergachev, Bouchard at the bottom, Quinn Hughes at -33. Also a **20-game
+  cliff** (Seider 198 -> 98, Hronek 139 -> 24 on one extra game) and a
+  **scale break** (~28 points off every qualifying defenseman's total while
+  F-NAV was unchanged, silently deflating D against F in trade evaluation).
+- **Root cause: an ecological fallacy.** Increment 6 fit at TEAM level
+  (ice-time-weighted per-team averages -> team xGA); increments 7-8 applied
+  those coefficients per player. The team-level truth it learned is largely
+  a team-strength effect, so per player it penalised hard deployment —
+  `dzPct` entered at +2.69 on pure deployment and collinearity inverted
+  `corsiAgainstRel`'s sign, documented at the time as "counterintuitive"
+  instead of treated as a red flag. `defense-deployment-adjusted-audit.ts`
+  had already established qocIndex/avgTOI/dzPct as one latent "how hard is
+  this role" factor; increment 6 reintroduced it as a feature.
+- **Why the gate missed it.** `position-nav-backtest.ts` summed per-player
+  values back to team level, reconstructing the aggregate the coefficients
+  were fit on — so it passed by construction while the per-player ordering
+  was inverted.
+- **The replacement** (`scripts/backtest/defense-model-individual-fit.ts`):
+  fit at the INDIVIDUAL level on teammate-relative signals only
+  (`xgaRelTM`, `corsiAgainstRel` — on-ice-minus-off-ice, so team strength
+  cancels inside each player), against the deployment-adjusted residual,
+  frozen on 2022-24, evaluated once on the untouched 2024->25 holdout:
+  **r=-0.328, sign-consistent across all three transitions**
+  (-0.44/-0.43/-0.33), stability **r=0.663**. Role/absolute-rate stats
+  (`blocksPer82`, `highDangerAgainstRate`, `dzPct`) are captured but
+  deliberately NOT valued. Sample shrink uses the codebase's own `n/(n+k)`
+  form from `goalie-percentiles.ts` (k=41.8 games from measured
+  stability), removing the cliff without a formula switch — the >=20 GP
+  gate in `roster-assembly.ts` is gone. A deployment CREDIT (never a
+  penalty) prices usage; output is affine-mapped onto legacy's own centre
+  and spread.
+- **Verified against the same audit that caught the bug:** QoC
+  **-0.72 -> +0.07**, TOI **-0.57 -> +0.23**, xgaRelTM **-0.68** (legacy
+  -0.30), first-pair now **+11.8 above** depth, total shift vs legacy
+  **mean 0.2 / median 0.0** (was -27.7), no cliff. League top now reads
+  Lane Hutson, Quinn Hughes, Moritz Seider, Adam Fox, Rasmus Dahlin.
+- **Honest limitation, recorded not papered over:** the corrected model is
+  still weak/wrong-signed aggregated to team level — but so is the LEGACY
+  formula at nearly identical magnitudes (2023 xGA: legacy +0.49 vs
+  corrected +0.58; 2024: +0.29 vs +0.42), because teammate-relative signals
+  are near zero-sum inside a roster. The only model that ever passed that
+  team gate was the broken one, circularly. The team check is therefore
+  demoted from gate to labelled diagnostic; a properly team-separated model
+  needs the RAPM/WOWY line-combination data this ticket flagged as out of
+  reach from the start.
+- Evidence: 8 new engine regression tests pinning the specific failure
+  modes; full suite **2,409/2,409**; `tsc`, `eslint`, `next build` clean.
 
 **Explicitly out of scope for this ticket** (same reasoning as NAV-01's own
 phase boundaries — this is real iterative modeling work that should not be

@@ -829,21 +829,26 @@ export async function assembleCanonicalRoster(options: {
         h("I_F_dZoneShiftStarts"), h("I_F_oZoneShiftStarts"),
         h("I_F_goals"),
         h("position"),
-        // NAV-02: inputs to calcDefenseNAV's fitted defensive model
-        // (scripts/backtest/defense-model-team-fit.ts). Same "all"-situation
-        // row as onA/offA above — kept as separate indices because the
-        // model was fit on shot attempts (Corsi), not xGoals.
+        // NAV-02: corsiAgainstRel is the fitted defensive model's second
+        // signal (the first, xgaRelTM, is already derived above). Same
+        // "all"-situation row as onA/offA — separate indices because the
+        // model uses shot attempts (Corsi), not xGoals.
         h("OnIce_A_shotAttempts"), h("OffIce_A_shotAttempts"),
+        // Captured but NOT valued: blocks and on-ice high-danger-against are
+        // role/absolute-rate stats, and feeding them to a defensive
+        // valuation is what inverted the increment-6 model (it rated depth
+        // defensemen 53 points above first-pair ones). They stay available
+        // for display and future work; they do not move a number.
         h("shotsBlockedByPlayer"), h("OnIce_A_highDangerxGoals"),
       ];
       const zoneMap = new Map<string, number>();
-      // NAV-02: the fitted defensive model (defense-model-team-fit.ts) was
-      // only ever fit and validated on defensemen with >= 20 games played
-      // that season — feeding it a smaller sample extrapolates outside what
-      // was actually tested. Below that, or if the source CSV is ever
-      // missing one of these columns, leave the three fields null so
-      // calcSkaterNAV's fallback-safe branch uses the legacy formula
-      // instead of a fabricated signal.
+      // If the source CSV ever stops carrying these columns, leave the
+      // fields null so calcSkaterNAV's fallback-safe branch uses the legacy
+      // formula rather than a fabricated signal. There is deliberately NO
+      // games threshold: the model shrinks by sample size internally
+      // (n/(n+k)), so a thin sample sits nearer league average instead of
+      // producing the hard cliff increments 7-8 shipped, where one extra
+      // game swung a defenseman's total by up to 100 points.
       const hasDefenseModelCols = onCAI >= 0 && offCAI >= 0 && blocksI >= 0 && hdAI >= 0;
 
       rows.slice(1).forEach((row) => {
@@ -885,15 +890,14 @@ export async function assembleCanonicalRoster(options: {
         const posForZone = pos ? `${slugify(name)}__${pos}` : slugify(name);
         const dzPct = zoneMap.get(posForZone) ?? zoneMap.get(slugify(name)) ?? null;
 
-        // NAV-02: same three inputs, same construction, as
-        // defense-model-team-fit.ts's loadDSeason — do not change this
-        // formula without re-running that fit; the coefficients in
-        // xnav-engine.ts's DEFENSE_MODEL_COEFFICIENTS were validated
+        // NAV-02: same construction as defense-model-individual-fit.ts's
+        // loadSeason — do not change this formula without re-running that
+        // fit; xnav-engine.ts's DEFENSE_MODEL constants were standardised
         // against exactly this derivation, not a lookalike.
         let corsiAgainstRel:       number | null = null;
         let blocksPer82:           number | null = null;
         let highDangerAgainstRate: number | null = null;
-        if (hasDefenseModelCols && g >= 20) {
+        if (hasDefenseModelCols) {
           const onCA  = (parseFloat(c[onCAI])  || 0) / Math.max(0.01, iceHours);
           const offCA = (parseFloat(c[offCAI]) || 0) / Math.max(0.01, benchH);
           const rel = onCA - offCA;
@@ -1523,9 +1527,10 @@ export async function assembleCanonicalRoster(options: {
         goalsPace:   stats?.goalsPace,
         assistsPace: stats?.assistsPace,
         plusMinus:   stats?.plusMinus ?? null,
-        // NAV-02: calcDefenseNAV's fitted defensive model. Null (rather than
-        // a computed value) for forwards, small samples, and goalies alike —
-        // see the `hasDefenseModelCols && g >= 20` gate above.
+        // NAV-02: corsiAgainstRel feeds calcDefenseNAV's fitted defensive
+        // model (blocksPer82/highDangerAgainstRate are captured but not
+        // valued — see the column comment above). Null when the source CSV
+        // lacks the columns, which sends the engine down its legacy path.
         corsiAgainstRel:       stats?.corsiAgainstRel       ?? null,
         blocksPer82:           stats?.blocksPer82           ?? null,
         highDangerAgainstRate: stats?.highDangerAgainstRate ?? null,
