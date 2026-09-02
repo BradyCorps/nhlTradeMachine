@@ -1199,6 +1199,122 @@ held to: a real negative result (data doesn't support any defensive model
 better than today's) is an acceptable, documented close, not a blocker to
 force past.
 
+---
+
+## [ ] NAV-03 — Diagnose and, if warranted, validate the goalie (G-NAV) on-ice impact model (`M`)
+
+**Current state:** `calcGoalieNAV` is a real, separately named entry point
+(NAV-01 Phase 3), and unlike D-NAV's pre-NAV-02 state it is NOT pure
+delegation to a shared skater formula — it is genuinely goalie-specific.
+But it is two very differently-validated pieces stitched together:
+- **The contract/market-price side is already real, rigorous, validated
+  work** (`app/lib/goalie-fmv.ts`, `goalieFmvCapPct`): fitted against 260
+  real one-way contracts signed 2017-2026, walk-forward tested (trained on
+  deals before July 2024, scored on the 83 after), R²=0.55, mean error
+  $1.44M at a $104M ceiling. This determines `navCapHit`/`fmvDollars`/cap
+  surplus. **Nothing about this ticket should touch it** — it already
+  cleared a real bar and re-litigating it would be waste.
+- **The on-ice "impact" side has never been checked against a real
+  outcome.** `goalieImpact` (`xnav-engine.ts` ~line 609) is a hand-written
+  power curve — `expGSAx >= 0 ? Math.pow(expGSAx/gsaxSd, 1.5)*80 :
+  (expGSAx/gsaxSd)*40` — applied to a blend of season and career GSAx. This
+  becomes the `def` stage in the breakdown and feeds `trueMarketValueG`/
+  `fmvTmv`, which is HALF of `rawTotal` (`fmvTmv + capTotalG`) — so an
+  unvalidated transform sits directly in the number every user sees,
+  exactly the situation NAV-02 found and fixed for defensemen. The team
+  correction terms inside it (`defCorrection` from `teamXga60`/
+  `teamHdca60`, hand-tuned 0.40/0.18 coefficients) and the HD SV% adjustment
+  (`hdsvAdj`, from MoneyPuck-derived `baselineHdsvPct`, a 600x-scaled linear
+  term) are similarly hand-tuned and unvalidated.
+- **A real, un-fed candidate signal already exists.** NHL Edge goalie data
+  (`app/lib/goalie-edge.ts`, `nhl-player-feed.ts`'s `GoalieEdgeFacts`) is
+  captured and displayed on `GoalieEdgePanel` (per-shot-location save data,
+  `highDangerSavePct`, `startsAbove900Pct` — a consistency signal distinct
+  from peak GSAx) but deliberately never fed into `calcGoalieNAV`. This is
+  the open question DEVNOTES has carried since before this session: does
+  Edge HD SV% (or start consistency) predict next-season goaltending better
+  than the GSAx already in the model, once GSAx is properly regressed?
+- **No isolated aggregate check exists.** `scripts/backtest/team-nav-backtest.ts`
+  computes `goalieNav` per team and sums it into whole-roster `rosterNav`,
+  but never isolates it the way `position-nav-backtest.ts` isolates ΣF-NAV/
+  ΣD-NAV against a goalie-specific team outcome (team save% or
+  goals-against beyond what team xGA already explains). A whole-roster
+  pass, if the roster backtest even makes that specific claim, would not
+  tell us whether G-NAV itself is pulling its weight or riding on skaters.
+
+**Why this may be a smaller ticket than NAV-02, and why that must be
+verified rather than assumed:** unlike `defRaw` (which NAV-02 Phase 1 found
+was actively counterproductive), GSAx is not a home-grown formula — it is
+MoneyPuck's own shot-quality-adjusted save metric, already a credible,
+externally-computed input. It is plausible Phase 1 finds `expGSAx` itself
+already tracks real outcomes reasonably well, and the actual gap is
+narrower than NAV-02's: just the hand-tuned curve shape, or just the
+question of whether Edge signals add anything beyond what GSAx already
+carries. Sizing this `M` (not NAV-02's `L`) reflects that expectation, but
+Phase 1 is still required before assuming it — the same "diagnose before
+refitting" discipline NAV-02 opened with, since a plausible prior is not a
+substitute for a real backtest.
+
+**Objective:** determine whether `calcGoalieNAV`'s on-ice impact stage
+(`goalieImpact`, its team corrections, and its HD SV% adjustment) tracks a
+real goaltending outcome — and separately, whether the un-fed NHL Edge
+signals (`highDangerSavePct`, `startsAbove900Pct`) improve on what the
+model already has. Fit and validate a replacement only where Phase 1/2
+show a real, uncovered gap; leave `goalie-fmv.ts`'s contract-pricing side
+untouched either way.
+
+**Required phases** (same walk-forward discipline as NAV-02 throughout:
+frozen train window, untouched holdout, sign consistency across every
+available season, no re-tuning against the holdout):
+
+1. **Diagnose before refitting.** Test the CURRENT `goalieImpact` formula
+   (not `goalieFmvCapPct`, which is already validated) at both levels NAV-02
+   tested for defensemen: individual-level (does a goalie's own `expGSAx`/
+   `goalieImpact` predict his own next-season GSAx or save%, walk-forward)
+   and team-level (does ΣG-NAV, or the `def`/impact stage isolated from cap
+   surplus, track team save% or goals-against beyond what team xGA already
+   explains — extend `team-nav-backtest.ts` or add a goalie-specific gate to
+   `position-nav-backtest.ts`, following its own GATE 1/GATE 2 pattern).
+   This decides whether there is a real problem to fix at all before writing
+   a single new coefficient.
+2. **Feature audit on the Edge signals specifically.** Individually backtest
+   `highDangerSavePct` and `startsAbove900Pct` against the chosen outcome
+   from Phase 1, walk-forward, same sign-consistency bar as every other
+   backtest this session — this directly answers the open DEVNOTES question
+   ("does HD SV% predict next season better than the GSAx already in the
+   model?"). A signal that fails this bar does not go into the model, full
+   stop.
+3. **Fit a real, minimal model** only from what individually validates in
+   Phases 1-2 — if `expGSAx` alone already clears the bar, the honest
+   outcome may be "keep the input, replace only the hand-tuned curve
+   shape," not a full rebuild.
+4. **Wire in with the same fallback-safe pattern NAV-02 used**: new inputs
+   as optional `AssetInput` fields, `calcGoalieNAV` computes the validated
+   value only when they are present, falls back to the exact current
+   formula otherwise — zero behavior change for every caller not yet
+   supplying the new fields. If Edge signals are added, `roster-assembly.ts`
+   needs its own wiring increment (NAV-02 increment 8's shape) to compute
+   them from a real capture, not left dormant.
+
+**Explicitly out of scope for this ticket:**
+- `goalie-fmv.ts`/`goalieFmvCapPct` — already validated against real
+  contracts; not this ticket's concern.
+- NAV-01's remaining phases (cross-position calibration, shadow mode,
+  surface migration).
+- Sourcing NHL Edge data live from this sandbox — `api-web.nhle.com` is
+  blocked here per this file's environment notes, and increment 8's `curl`
+  check found `moneypuck.com` is too; any live-fetch verification needs a
+  codespace, same as every other NHL feed increment this session.
+
+**Acceptance:** either (a) a validated replacement for `goalieImpact` ships,
+fallback-safe, with the same sign-consistent walk-forward evidence NAV-02
+required, or (b) Phase 1 finds the current formula already clears a
+reasonable bar and this ticket closes with that finding honestly documented
+— a negative or "already fine" result is an acceptable close, not a
+blocker to force past.
+
+---
+
 - After # 2A. [X]-NAV model evolution [ ] NAV-01 — Build, cross-calibrate and activate F/D/G-NAV (`XL`) is marked as complete. Replace goalie `X-NAV` labels with `G-NAV` and goalie-specific component language.
 2B. Gravity v4 controlled release
 
