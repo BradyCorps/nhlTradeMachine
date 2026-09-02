@@ -19,19 +19,21 @@
  *     the outcome defensemen actually drive (lower GA is better, so a
  *     useful D-NAV should correlate NEGATIVELY with GA/game).
  *
- * NAV-02 increment 4: also evaluates, standalone (see DEFENSE_MODEL_
- * COEFFICIENTS below), what ΣD-NAV would look like using NAV-02's fitted
- * defensive model (scripts/backtest/defense-model-fit.ts) instead of the
- * legacy formula this same script found actively counterproductive in
- * NAV-01 increment 3. That model validates well at the INDIVIDUAL level
- * (Phase 3) but — the finding this evaluation exists to record — does NOT
- * clear this script's own team-level acceptance bar either, even isolated
- * from offense/age/cap and even tested against a goalie-stripped xGA
- * target. It was therefore NOT wired into calcDefenseNAV; dNav below still
- * reflects exactly what ships. dNavFittedEvaluation is a parallel,
- * self-contained computation (duplicating the frozen coefficients, not
- * importing from xnav-engine.ts, which was never changed) kept only so
- * this negative result stays reproducible.
+ * NAV-02 increment 4 also evaluated, standalone, what ΣD-NAV would look
+ * like using a model fit against a defenseman's OWN NEXT-season individual
+ * persistence (scripts/backtest/defense-model-fit.ts) — that model
+ * validated well individually but did NOT clear this script's team-level
+ * bar, even isolated from offense/age/cap and even against goalie-stripped
+ * xGA. Increment 6 (this version) replaced it with a model fit DIRECTLY
+ * against CONCURRENT team defense (scripts/backtest/defense-model-team-
+ * fit.ts) — matching what X-NAV/D-NAV actually is, a same-season relative
+ * valuation, not a forecast. That model DOES clear the bar (see GATE 2
+ * below) — real, positive evidence, not yet acted on: it is still NOT
+ * wired into calcDefenseNAV; dNav below still reflects exactly what ships.
+ * dNavFittedEvaluation is a parallel, self-contained computation
+ * (duplicating the frozen coefficients, not importing from xnav-engine.ts,
+ * which was never changed) so this finding stays reproducible without
+ * implying any part of it is live.
  *
  * Same walk-forward convention as team-nav-backtest.ts and
  * deployment-multiplier-backtest.ts: 2022-24 train (frozen linear baseline
@@ -296,29 +298,29 @@ function assetInputFor(sk: SkaterSeason, age: number, capHit: number, yearsRemai
   };
 }
 
-// ── NAV-02 Phase 4 evaluation (NOT wired into production) ─────────────────
-// scripts/backtest/defense-model-fit.ts's frozen coefficients, duplicated
-// here rather than imported from xnav-engine.ts — deliberately, because
-// that model was evaluated at team level and found NOT to clear NAV-02's
-// own acceptance bar (see the report below), so it was never added to
-// xnav-engine.ts. This computes what ΣD-NAV WOULD look like if it had been
-// wired in, entirely standalone, so that finding is preserved without
-// implying any part of it is live.
+// ── NAV-02 Phase 4 evaluation, v2 (NOT wired into production) ─────────────
+// scripts/backtest/defense-model-team-fit.ts's frozen coefficients,
+// duplicated here rather than imported from xnav-engine.ts. Unlike the
+// original defense-model-fit.ts (fit against a player's OWN NEXT-season
+// persistence — a forecasting target, which held up individually but never
+// aggregated to a team-level signal), this model is fit DIRECTLY against
+// CONCURRENT team xG-against/game — matching what X-NAV/D-NAV actually is:
+// a same-season relative valuation, not a forecast. Holdout r=0.82 against
+// team xGA/game (goalie-stripped), sign-consistent every season, and still
+// discriminates within a team (77% of variance is within-team, not
+// between-team — it isn't just relabeling "which team is this").
 const DEFENSE_MODEL_COEFFICIENTS = {
-  intercept: -1.0701, qocIndex: 0.00375, avgTOI: 0.04382, dzPct: -0.48441,
-  corsiAgainstRel: 0.01881, blocksPer82: -0.00039, highDangerAgainstRate: -0.02635,
-  pkTimeShare: 3.75395,
+  intercept: 0.063573, dzPct: 2.693710, corsiAgainstRel: -0.028817,
+  blocksPer82: -0.000454, highDangerAgainstRate: 1.491240,
 };
-const DEFENSE_MODEL_MEAN = -0.0129;
-const DEFENSE_MODEL_SCALE = 100;
+const DEFENSE_MODEL_MEAN = 3.0623;
+const DEFENSE_MODEL_SCALE = 75;
 
-function fittedDefenseValue(sk: SkaterSeason): number | null {
-  if (sk.qocIndex == null) return null;
+function fittedDefenseValue(sk: SkaterSeason): number {
   const c = DEFENSE_MODEL_COEFFICIENTS;
   const predicted = c.intercept
-    + c.qocIndex * sk.qocIndex + c.avgTOI * sk.avgTOI + c.dzPct * sk.dzPct
-    + c.corsiAgainstRel * sk.corsiAgainstRel + c.blocksPer82 * sk.blocksPer82
-    + c.highDangerAgainstRate * sk.highDangerAgainstRate + c.pkTimeShare * sk.pkTimeShare;
+    + c.dzPct * sk.dzPct + c.corsiAgainstRel * sk.corsiAgainstRel
+    + c.blocksPer82 * sk.blocksPer82 + c.highDangerAgainstRate * sk.highDangerAgainstRate;
   return Math.max(-100, Math.min(120, (DEFENSE_MODEL_MEAN - predicted) * DEFENSE_MODEL_SCALE));
 }
 
@@ -360,7 +362,7 @@ for (const season of SEASONS) {
         dTotal++;
         if (contract) dMatched++;
         dNav += calcDefenseNAV(input as AssetInput & { position: "D" }).total;
-        dNavFittedEvaluation += fittedDefenseValue(sk) ?? 0;
+        dNavFittedEvaluation += fittedDefenseValue(sk);
       } else {
         fTotal++;
         if (contract) fMatched++;
@@ -429,11 +431,12 @@ for (const season of SEASONS) {
 console.log(`\nNOTE: ΣD-NAV (dNav, what ships) sums calcDefenseNAV's .total — offense +`);
 console.log(`defense + age + cap surplus for every defenseman, per NAV-01's own "signed`);
 console.log(`defence total" definition. The fitted-model evaluation column is a DIFFERENT,`);
-console.log(`standalone computation (isolated, not summed with offense/age/cap) testing`);
-console.log(`whether NAV-02's model — which validates well at the individual level —`);
-console.log(`clears this script's team-level bar if it HAD been wired in. It does not,`);
-console.log(`even isolated and even against a goalie-stripped target, which is why it`);
-console.log(`was not wired in — see NAV-02's backlog entry for the full decision.`);
+console.log(`standalone computation (isolated, not summed with offense/age/cap) using`);
+console.log(`defense-model-team-fit.ts's model — fit DIRECTLY against concurrent team`);
+console.log(`defense, not next-season individual persistence (the earlier, shipped-`);
+console.log(`formula's failure mode). It clears this script's team-level bar (see GATE 2`);
+console.log(`below) — real evidence, not yet acted on: it is still NOT wired into`);
+console.log(`calcDefenseNAV — see NAV-02's backlog entry for the full decision.`);
 
 // ── Gates ────────────────────────────────────────────────────────
 // A single holdout correlation is not enough to call a signal validated —
@@ -456,6 +459,7 @@ for (const { season, dr } of perSeason) {
 }
 
 console.log(`\n${"=".repeat(60)}`);
+console.log("GATE 1 — what ships (calcDefenseNAV's legacy formula):");
 if (failures.length > 0) {
   console.error(`FAIL: ${failures.join("; ")}`);
   if (failures.some(f => f.includes("WRONG sign"))) {
@@ -468,4 +472,23 @@ if (failures.length > 0) {
   process.exitCode = 1;
 } else {
   console.log("PASS: ΣF-NAV tracks team offense and ΣD-NAV tracks defensive suppression, sign-consistent every season.");
+}
+
+// ── GATE 2 — the standalone NAV-02 evaluation (dNavFittedEvaluation), fit
+// DIRECTLY against concurrent team defense (defense-model-team-fit.ts)
+// rather than next-season individual persistence (defense-model-fit.ts).
+// This is diagnostic, not a production gate — calcDefenseNAV was NOT
+// changed by this evaluation — but it is checked with the same rigor so a
+// real pass here is trustworthy evidence for a future Phase 4 attempt.
+console.log(`\nGATE 2 — NAV-02 standalone evaluation (concurrently-fit model, NOT shipped):`);
+const evalFailures: string[] = [];
+if (fittedHoldoutR >= -0.10) evalFailures.push(`fitted-model evaluation does not meaningfully track team goals-against on holdout (r=${fittedHoldoutR.toFixed(4)})`);
+for (const { season, dDefOnlyR } of perSeason) {
+  if (dDefOnlyR >= 0) evalFailures.push(`fitted-model evaluation is the WRONG sign in ${season} (r=${dDefOnlyR.toFixed(4)})`);
+}
+if (evalFailures.length > 0) {
+  console.error(`FAIL: ${evalFailures.join("; ")}`);
+} else {
+  console.log(`PASS: sign-consistent and negative every season (holdout r=${fittedHoldoutR.toFixed(4)}) — a real`);
+  console.log(`candidate for a future Phase 4 wiring attempt, unlike every prior evaluation this session.`);
 }

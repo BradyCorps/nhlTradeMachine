@@ -1009,6 +1009,60 @@ these before assuming the fix is "different weights":
   accepting the negative result as final. `calcDefenseNAV` remains pure
   delegation; this ticket stays `[ ]`.
 
+**Increment 6 progress (this session) — real breakthrough: refit against the correct target:**
+
+- User pushed back on the framing behind every prior increment: X-NAV/F-NAV/
+  D-NAV/G-NAV is a CONCURRENT relative valuation — how good is this player
+  *right now*, versus position peers, given the season's evidence so far
+  (already blended against career history by `calcSkaterNAV`'s existing
+  sample-weighted baseline machinery, untouched by any of this). It is not
+  a forecast. Every prior NAV-02 increment fit and validated the defense
+  model against a PREDICTIVE target — does this season predict the
+  player's OWN NEXT season. That's a real, useful, but different question,
+  and it's why increments 3-5 kept finding individual validity that
+  wouldn't aggregate: the model was fit toward one relationship and tested
+  against a different one.
+- Built `scripts/backtest/defense-model-team-fit.ts`: refit the model
+  DIRECTLY against the concurrent target — team-level defense signals
+  (ice-time-weighted PER-TEAM AVERAGES, not summed, to avoid confusing
+  roster depth with quality) explaining THIS SEASON's team GA/game and
+  xGA/game. Same walk-forward discipline as every other backtest this
+  session (2022-24 train, frozen; untouched 2025-26 holdout) plus a
+  per-signal ablation to keep the model minimal.
+- **Real, decisive, and — for the first time — genuinely positive result.**
+  Against team xG-against/game (goalie-stripped, the cleaner target): full
+  7-feature model holdout r=0.86; ablation-reduced 4-feature final model
+  (`dzPct`, `corsiAgainstRel`, `blocksPer82`, `highDangerAgainstRate`)
+  holdout r=0.82, sign-consistent and strong every season (2023 r=0.90,
+  2024 r=0.86, 2025 r=0.82). Against raw goals-against/game: weaker but
+  still correctly signed and real (holdout r=0.53).
+- **Ran a sanity check the earlier approach never needed**: a model fit
+  directly on a team-level aggregate risks degenerating into a pure
+  team-strength detector that reads the same for every player on a
+  team — useless for X-NAV's actual job of ranking players against each
+  other, including teammates. Applied the fitted model per PLAYER (not
+  team-averaged) and checked variance: **77.3% of variance is WITHIN
+  teams, not between them** — the model genuinely discriminates between
+  teammates, not just relabeling "which team is this."
+- **Confirmed against the real acceptance gate.** Updated
+  `position-nav-backtest.ts`'s standalone NAV-02 evaluation (`GATE 2`,
+  distinct from `GATE 1`, which still correctly tests and fails what
+  actually ships) to this new model. It passes for the first time this
+  session: holdout r=-0.3847 (correct sign — more D value, fewer goals
+  against), sign-consistent negative in every season (2022 r=-0.73, 2023
+  r=-0.71, 2024 r=-0.63, 2025 r=-0.38).
+- Evidence: real runs against `MoneyPuckData/`, TypeScript and lint clean,
+  full suite unaffected (**2,397/2,397** — both scripts standalone, no
+  production code touched yet — deliberately not wired into
+  `calcDefenseNAV` in this increment; that is its own decision given how
+  many prior "validated" results in this ticket didn't hold up).
+- **Not attempted:** wiring this model into `calcDefenseNAV` (Phase 4,
+  attempted twice already this session with weaker models — this is the
+  first with a real shot, but deserves its own confirmed step, not a
+  rider on the modeling work); feeding it from live production data
+  (`roster-assembly.ts`, unverifiable in this sandbox); NAV-01's remaining
+  phases.
+
 **Explicitly out of scope for this ticket** (same reasoning as NAV-01's own
 phase boundaries — this is real iterative modeling work that should not be
 compressed into one sitting):
