@@ -974,6 +974,41 @@ these before assuming the fix is "different weights":
   finished; it stays `[ ]` with this real, substantial, honestly-reported
   gap as the state of the art.
 
+**Increment 5 progress (this session) — compensating-allocation hypothesis tested, partially supported, not resolving:**
+
+- Built `scripts/backtest/defense-team-strength-control.ts`: a weighted
+  multiple regression, `team GA/game ~ β0 + β1·ΣD-NAV(fitted) +
+  β2·priorSeasonGoalDiff/game` — does controlling for overall team quality
+  (prior-season goal differential, chosen specifically to avoid circularity
+  with the current season's own outcome) correct `ΣD-NAV`'s wrong sign, the
+  way it would if teams hand their best defensemen the heaviest workload
+  *because* the team is otherwise weak? 95 of 128 team-seasons carried a
+  prior season to control on (2022 dropped — no prior year in this
+  dataset).
+- **Real, partial, honest result: the control meaningfully shrinks the
+  wrong-signed effect but does not correct it.** Against goals-against/game,
+  the coefficient roughly halved (+0.001726 → +0.000863) once team strength
+  was controlled; against xG-against/game (goalie-stripped), it also roughly
+  halved (+0.001061 → +0.000412). In both cases it stayed positive — the
+  wrong direction — and the per-season partial correlations after
+  controlling stayed positive in 5 of 6 season/target combinations tested
+  (2023/2024/2025 × GA/xGA).
+- **Conclusion: the hypothesis is partially supported, not confirmed.**
+  Team strength explains a real share of the wrong-signed relationship —
+  meaning the compensating-allocation effect is likely real and part of the
+  story — but something else, still unidentified, accounts for the
+  remainder. This is not a fourth reframing chasing a pass; it's the
+  concrete, most-promising test from increment 4's list, run once, reported
+  as it came out.
+- Evidence: real run against `MoneyPuckData/` (95 team-seasons), TypeScript
+  and lint clean, full suite unaffected (**2,397/2,397** — standalone
+  script only, no production code touched).
+- **Not attempted:** a richer team-strength control (e.g. payroll, or a
+  multi-season rolling average rather than a single prior year), an
+  alternative aggregation strategy (ice-time-weighted, top-4-only), or
+  accepting the negative result as final. `calcDefenseNAV` remains pure
+  delegation; this ticket stays `[ ]`.
+
 **Explicitly out of scope for this ticket** (same reasoning as NAV-01's own
 phase boundaries — this is real iterative modeling work that should not be
 compressed into one sitting):
