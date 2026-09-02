@@ -819,7 +819,8 @@ export async function assembleCanonicalRoster(options: {
       const rows = csv.split("\n").filter(Boolean);
       const hdr  = parseCSVRow(rows[0]);
       const h    = (k: string) => hdr.indexOf(k);
-      const [nI, sI, pI, xgI, gI, iceI, onAI, offAI, rkI, onFI, offFI, dzI, ozI, goalsI, posI] = [
+      const [nI, sI, pI, xgI, gI, iceI, onAI, offAI, rkI, onFI, offFI, dzI, ozI, goalsI, posI,
+             onCAI, offCAI, blocksI, hdAI] = [
         h("name"), h("situation"), h("I_F_points"), h("I_F_xGoals"),
         h("games_played"), h("icetime"),
         h("OnIce_A_xGoals"), h("OffIce_A_xGoals"),
@@ -828,8 +829,22 @@ export async function assembleCanonicalRoster(options: {
         h("I_F_dZoneShiftStarts"), h("I_F_oZoneShiftStarts"),
         h("I_F_goals"),
         h("position"),
+        // NAV-02: inputs to calcDefenseNAV's fitted defensive model
+        // (scripts/backtest/defense-model-team-fit.ts). Same "all"-situation
+        // row as onA/offA above — kept as separate indices because the
+        // model was fit on shot attempts (Corsi), not xGoals.
+        h("OnIce_A_shotAttempts"), h("OffIce_A_shotAttempts"),
+        h("shotsBlockedByPlayer"), h("OnIce_A_highDangerxGoals"),
       ];
       const zoneMap = new Map<string, number>();
+      // NAV-02: the fitted defensive model (defense-model-team-fit.ts) was
+      // only ever fit and validated on defensemen with >= 20 games played
+      // that season — feeding it a smaller sample extrapolates outside what
+      // was actually tested. Below that, or if the source CSV is ever
+      // missing one of these columns, leave the three fields null so
+      // calcSkaterNAV's fallback-safe branch uses the legacy formula
+      // instead of a fabricated signal.
+      const hasDefenseModelCols = onCAI >= 0 && offCAI >= 0 && blocksI >= 0 && hdAI >= 0;
 
       rows.slice(1).forEach((row) => {
         const c = parseCSVRow(row);
@@ -870,6 +885,24 @@ export async function assembleCanonicalRoster(options: {
         const posForZone = pos ? `${slugify(name)}__${pos}` : slugify(name);
         const dzPct = zoneMap.get(posForZone) ?? zoneMap.get(slugify(name)) ?? null;
 
+        // NAV-02: same three inputs, same construction, as
+        // defense-model-team-fit.ts's loadDSeason — do not change this
+        // formula without re-running that fit; the coefficients in
+        // xnav-engine.ts's DEFENSE_MODEL_COEFFICIENTS were validated
+        // against exactly this derivation, not a lookalike.
+        let corsiAgainstRel:       number | null = null;
+        let blocksPer82:           number | null = null;
+        let highDangerAgainstRate: number | null = null;
+        if (hasDefenseModelCols && g >= 20) {
+          const onCA  = (parseFloat(c[onCAI])  || 0) / Math.max(0.01, iceHours);
+          const offCA = (parseFloat(c[offCAI]) || 0) / Math.max(0.01, benchH);
+          const rel = onCA - offCA;
+          corsiAgainstRel       = isFinite(rel) ? rel : 0;
+          blocksPer82           = (parseFloat(c[blocksI]) || 0) / g * 82;
+          const hd = (parseFloat(c[hdAI]) || 0) / Math.max(0.01, iceHours);
+          highDangerAgainstRate = isFinite(hd) ? hd : 0;
+        }
+
         const mapKey     = pos ? `${slugify(name)}__${pos}` : slugify(name);
         const rawPtsPace = (parseFloat(c[pI]) / g) * 82;
         const posDefault = pos.startsWith("D") ? 26 : pos === "C" ? 52 : 44;
@@ -895,6 +928,7 @@ export async function assembleCanonicalRoster(options: {
           games: g, hasLiveStats: true, dzPct,
           goalsPace:   goalsI >= 0 ? (parseFloat(c[goalsI])   / g) * 82 : undefined,
           assistsPace: goalsI >= 0 ? ((parseFloat(c[pI]) - parseFloat(c[goalsI])) / g) * 82 : undefined,
+          corsiAgainstRel, blocksPer82, highDangerAgainstRate,
         };
         analyticsMap.set(mapKey, entry);
         if (pos) analyticsMap.set(slugify(name), entry);
@@ -1489,6 +1523,12 @@ export async function assembleCanonicalRoster(options: {
         goalsPace:   stats?.goalsPace,
         assistsPace: stats?.assistsPace,
         plusMinus:   stats?.plusMinus ?? null,
+        // NAV-02: calcDefenseNAV's fitted defensive model. Null (rather than
+        // a computed value) for forwards, small samples, and goalies alike —
+        // see the `hasDefenseModelCols && g >= 20` gate above.
+        corsiAgainstRel:       stats?.corsiAgainstRel       ?? null,
+        blocksPer82:           stats?.blocksPer82           ?? null,
+        highDangerAgainstRate: stats?.highDangerAgainstRate ?? null,
       });
     });
   });
@@ -1582,6 +1622,7 @@ export async function assembleCanonicalRoster(options: {
         ops: null, dps: null, xgRelTM: null, xgaRelTM: null,
         dzPct: null, goalsPace: stats?.goalsPace, assistsPace: stats?.assistsPace,
         plusMinus: stats?.plusMinus ?? null,
+        corsiAgainstRel: null, blocksPer82: null, highDangerAgainstRate: null,
       });
       existingSlugs.add(dSlug);
       poolCount++;

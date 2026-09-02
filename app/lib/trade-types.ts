@@ -45,6 +45,13 @@ export interface Asset {
   edgeBurstsOver20?: number | null;  // EDGE 20+ mph bursts from latest snapshot
   xgaRelTM?: number | null;
   dzPct?: number | null;
+  // NAV-02: inputs to calcDefenseNAV's fitted defensive model — see
+  // DEFENSE_MODEL_COEFFICIENTS in xnav-engine.ts. Populated for defensemen
+  // with >= 20 games played; null otherwise, which is calcSkaterNAV's
+  // signal to fall back to the legacy defensive formula.
+  corsiAgainstRel?: number | null;
+  blocksPer82?: number | null;
+  highDangerAgainstRate?: number | null;
   goalsPace?: number;
   assistsPace?: number;
   plusMinus?: number | null;

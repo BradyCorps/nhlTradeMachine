@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({
   rosters: {} as Record<string, any>,
   skaterSummaryRows: [] as any[],
   goalieSummaryRows: [] as any[],
+  skaterCsvRows: [] as string[],
 }));
 
 vi.mock("@/app/lib/db", () => ({
@@ -104,6 +105,7 @@ describe("league players route roster assembly", () => {
     state.skaterSummaryRows = [];
     state.goalieSummaryRows = [];
     state.dbPlayers = [];
+    state.skaterCsvRows = [];
     state.rosters = {
       WPG: { forwards: fillerRoster("WPG"), defensemen: [], goalies: [] },
       CGY: { forwards: fillerRoster("CGY"), defensemen: [], goalies: [] },
@@ -122,7 +124,8 @@ describe("league players route roster assembly", () => {
         return jsonResponse({ data: state.goalieSummaryRows });
       }
       if (href.includes("/regular/skaters.csv")) {
-        return new Response("name,situation,I_F_points,I_F_xGoals,games_played,icetime,OnIce_A_xGoals,OffIce_A_xGoals,iceTimeRank,OnIce_F_xGoals,OffIce_F_xGoals,I_F_dZoneShiftStarts,I_F_oZoneShiftStarts,I_F_goals,position\n");
+        const header = "name,situation,I_F_points,I_F_xGoals,games_played,icetime,OnIce_A_xGoals,OffIce_A_xGoals,iceTimeRank,OnIce_F_xGoals,OffIce_F_xGoals,I_F_dZoneShiftStarts,I_F_oZoneShiftStarts,I_F_goals,position,OnIce_A_shotAttempts,OffIce_A_shotAttempts,shotsBlockedByPlayer,OnIce_A_highDangerxGoals";
+        return new Response([header, ...state.skaterCsvRows].join("\n") + "\n");
       }
       if (href.includes("/regular/goalies.csv")) {
         return new Response("name,situation,games_played,xGoals,goals,ongoal,team,icetime\n");
@@ -246,5 +249,41 @@ describe("league players route roster assembly", () => {
     const body = await response.json();
 
     expect(body.players.find((p: any) => p.name === "Alex Tuch")).toBeUndefined();
+  });
+
+  it("computes NAV-02's fitted-model inputs for a defenseman with >= 20 games from the MoneyPuck CSV", async () => {
+    state.rosters.WPG.defensemen = [rosterPlayer("400", "Test", "Defenseman", "D")];
+    // 25 GP, 30000s icetime (20 min/gm). onCA=500/8.3333h=60, offCA=300/16.6667h=18
+    // -> corsiAgainstRel=42. blocksPer82=(50/25)*82=164. highDangerAgainstRate=10/8.3333h=1.2.
+    state.skaterCsvRows = [
+      "Test Defenseman,all,20,5,25,30000,50,30,100,60,40,300,200,5,D,500,300,50,10",
+    ];
+
+    const { GET } = await import("../app/api/league/players/route");
+    const response = await GET();
+    const body = await response.json();
+
+    const player = body.players.find((p: any) => p.name === "Test Defenseman");
+    expect(player).toBeDefined();
+    expect(player.corsiAgainstRel).toBeCloseTo(42, 5);
+    expect(player.blocksPer82).toBeCloseTo(164, 5);
+    expect(player.highDangerAgainstRate).toBeCloseTo(1.2, 5);
+  });
+
+  it("leaves NAV-02's fitted-model inputs null for a defenseman under the 20-game validated minimum", async () => {
+    state.rosters.WPG.defensemen = [rosterPlayer("401", "Small", "Sample", "D")];
+    state.skaterCsvRows = [
+      "Small Sample,all,5,1,8,9600,50,30,20,60,40,100,80,1,D,500,300,50,10",
+    ];
+
+    const { GET } = await import("../app/api/league/players/route");
+    const response = await GET();
+    const body = await response.json();
+
+    const player = body.players.find((p: any) => p.name === "Small Sample");
+    expect(player).toBeDefined();
+    expect(player.corsiAgainstRel).toBeNull();
+    expect(player.blocksPer82).toBeNull();
+    expect(player.highDangerAgainstRate).toBeNull();
   });
 });

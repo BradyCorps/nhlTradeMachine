@@ -146,7 +146,30 @@ Dedicated team routes now exist, but the Teams audit also requires filters, metr
 
 ## [x] V-06 — Identify if F-NAV, G-NAV and D-NAV are online
 
-The F/D/G controls are online, but they are client-side positional sums of positive per-player X-NAV, not separate positional models. They exist only on Teams. The planned F-NAV/D-NAV/G-NAV pipelines and cross-position goalie calibration are not implemented.
+**Updated by NAV-02 increments 1-8 (2026-09-01/02) — see below; this
+paragraph is the original, now-superseded finding.** The F/D/G controls are
+online, but they are client-side positional sums of positive per-player
+X-NAV, not separate positional models. They exist only on Teams. The
+planned F-NAV/D-NAV/G-NAV pipelines and cross-position goalie calibration
+are not implemented.
+
+**Current state (post NAV-02):** `calcNAV` genuinely dispatches every real
+player by position to `calcForwardNAV` / `calcDefenseNAV` / `calcGoalieNAV`
+— not a display-only sum, a real engine-level split. **F-NAV**: same
+formula as always, already validated against team offense (NAV-01). **D-NAV**:
+now a real, independently fit and validated model (concurrent target, team
+xGA holdout r=0.82), wired into `calcDefenseNAV`, and — as of increment 8 —
+genuinely live for any real defenseman with >= 20 games played this season
+(`roster-assembly.ts` computes its three inputs from live MoneyPuck data;
+verified byte-identical to the validated fit script against the real,
+checked-in 2025-26 CSV). Below 20 games, or for any input the CSV is
+missing, it falls back to the legacy formula, unchanged. **G-NAV**: still
+the original, unvalidated goalie formula — Edge goalie data is captured and
+displayed on player pages but deliberately not fed into `calcGoalieNAV`,
+which needs its own backtest gate the same way D-NAV just got one. The
+Teams-page F/D/G toggle described above still exists and is unrelated
+display machinery (a sum of whichever of these per-player numbers is
+currently live), not this engine split.
  
 ---
 
@@ -694,7 +717,7 @@ The signed and positive-only totals must never share the same label.
   the next real increment here is fitting a defense model that actually
   predicts defensive outcomes, not proceeding past a known-broken step.
 
-## [ ] NAV-02 — Fit and validate an independent Defense-NAV model (`L`)
+## [x] NAV-02 — Fit and validate an independent Defense-NAV model (`L`)
 
 **Current state:** `calcDefenseNAV` (NAV-01 Phase 3) is a real, separately
 named entry point, but it purely delegates to `calcSkaterNAV`'s existing
@@ -1100,13 +1123,58 @@ these before assuming the fix is "different weights":
   files, full suite **2,401/2,401**, `npx next build` clean, and
   `npx tsx scripts/backtest/position-nav-backtest.ts` re-run against the
   real wired model for the numbers above.
-- **Not attempted:** feeding the new fields from live production data —
-  `roster-assembly.ts`'s MoneyPuck fetch does not yet compute
-  `corsiAgainstRel`/`blocksPer82`/`highDangerAgainstRate`, so every real
-  production call still falls back to the legacy formula until that
-  pipeline wiring is done separately (unverifiable in this sandbox per this
-  file's environment notes — `api-web.nhle.com` egress is blocked here);
-  NAV-01's remaining phases.
+- **Not attempted (at the time):** feeding the new fields from live
+  production data — `roster-assembly.ts`'s MoneyPuck fetch did not yet
+  compute `corsiAgainstRel`/`blocksPer82`/`highDangerAgainstRate`; NAV-01's
+  remaining phases.
+
+**Increment 8 progress (this session) — `roster-assembly.ts` now computes the fitted model's real inputs, closing the loop end-to-end:**
+
+- User asked to scope this now. Added four new MoneyPuck column lookups
+  (`OnIce_A_shotAttempts`, `OffIce_A_shotAttempts`, `shotsBlockedByPlayer`,
+  `OnIce_A_highDangerxGoals`) to the existing "situation === all" skater-CSV
+  loop in `roster-assembly.ts`, and computed `corsiAgainstRel`,
+  `blocksPer82`, `highDangerAgainstRate` using the EXACT construction
+  `defense-model-team-fit.ts` was fit and validated on — same `iceHours`/
+  `benchH` already in scope, same formulas, a deliberately faithful copy
+  rather than a lookalike.
+- **Two fail-closed validity gates**, both falling back to `null` (which
+  triggers `calcSkaterNAV`'s existing legacy-formula fallback rather than a
+  fabricated signal): all four CSV columns must be present, and the player
+  must have **>= 20 games** — `loadDSeason` only ever fit and validated the
+  model on defensemen at or above that sample size; below it is
+  extrapolation outside anything tested.
+- **Verified two independent ways before trusting it.** First, wrote a
+  standalone script re-implementing `defense-model-team-fit.ts`'s
+  `loadDSeason` independently and diffed it against the new
+  `roster-assembly.ts` logic on the real, checked-in
+  `MoneyPuckData/2025_26/skaters.csv`: **byte-identical across all 239 real
+  defensemen with >= 20 GP this season, zero mismatches.** Second, ran a
+  real player's real derived values (K'Andre Miller) through
+  `calcDefenseNAV` directly: the fitted path produces a materially
+  different, non-trivial output from the legacy fallback (def stage 13.8 vs.
+  42.9, `.total` 74 vs. 103) — not merely a value that type-checks.
+- Added 2 regression tests to `__tests__/league-players-route.test.ts`,
+  exercising the real `/api/league/players` route end-to-end with a
+  synthetic MoneyPuck CSV row: one confirms the exact computed values for a
+  >= 20-game defenseman, the other confirms all three fields stay `null`
+  under the 20-game floor.
+- **`moneypuck.com` itself (not just `api-web.nhle.com`) is also blocked
+  from this sandbox** — confirmed via a direct `curl`, HTTP 403 through the
+  proxy. The live fetch path itself could not be exercised here;
+  verification instead leaned on the real, current-season CSV already
+  checked into the repo for the baseline-identity tests (same format and
+  season MoneyPuck's live endpoint serves). This is new information worth
+  keeping in mind alongside this file's existing `api-web.nhle.com` note.
+- Evidence: `npx tsc --noEmit` clean, `npx eslint` clean on all touched
+  files, full suite **2,403/2,403** (2 new), `npx next build` clean.
+- **Not attempted:** confirming against a genuinely live MoneyPuck fetch
+  (blocked here); NAV-01's remaining phases.
+
+**NAV-02's D-NAV model is now live end-to-end**, not just in code: a real
+defenseman with >= 20 games played gets the validated fitted value in
+production; everyone else (forwards, goalies, sub-20-game defensemen, or a
+CSV missing the new columns) keeps the exact prior behavior.
 
 **Explicitly out of scope for this ticket** (same reasoning as NAV-01's own
 phase boundaries — this is real iterative modeling work that should not be
