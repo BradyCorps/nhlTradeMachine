@@ -102,6 +102,20 @@ export interface AssetInput {
   // public trade request → small leverage discount. "available" (quietly
   // shopped) carries no penalty — the team controls that narrative.
   tradeBlockStatus?: "requested" | "available" | "blocked" | "untouchable" | null;
+  // ── NAV-02: inputs to calcDefenseNAV's fitted defensive model — see
+  // DEFENSE_MODEL_COEFFICIENTS below for what validated them and why. Not
+  // consumed anywhere else; absent for forwards and for any defenseman
+  // this hasn't been backfilled for yet, in which case calcSkaterNAV falls
+  // back to the legacy defRaw computation rather than guess.
+  /** On-ice shot-attempts-against rate relative to off-ice (same
+   *  construction as `xgaRelTM`, raw Corsi instead of expected goals). */
+  corsiAgainstRel?:       number | null;
+  /** Shots blocked BY this player, pace-adjusted to /82 games. NOT
+   *  `I_F_blockedShotAttempts` (a player's own shots that got blocked — an
+   *  offensive-side stat) — this is MoneyPuck's `shotsBlockedByPlayer`. */
+  blocksPer82?:           number | null;
+  /** On-ice high-danger expected goals against, per 60 minutes. */
+  highDangerAgainstRate?: number | null;
 }
 
 export interface XNAVResult {
@@ -806,6 +820,85 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   };
 }
 
+// ── NAV-02: fitted, validated defenseman defensive-value model ────────────────
+//
+// The legacy defRaw computation below (defRawBase + driverAdj + shutdownDAdj +
+// toiDefFloor) was never validated. Two rounds of NAV-02 backtesting found:
+//   Phase 1 (scripts/backtest/defense-signal-diagnostic.ts): the legacy
+//     formula is actively counterproductive at predicting a defenseman's own
+//     future on-ice defense (holdout r=-0.102, worse than doing nothing).
+//   First refit attempt (scripts/backtest/defense-model-fit.ts): fitting a
+//     replacement against that SAME predictive target (does this season
+//     predict the player's own next season) produced a model that validated
+//     well individually but never aggregated to a team-level signal, even
+//     isolated from offense/age/cap and even against a goalie-stripped
+//     target (scripts/backtest/position-nav-backtest.ts). Root cause,
+//     confirmed by direct test: X-NAV/D-NAV is a CONCURRENT relative
+//     valuation — how good is this player right now, vs. position peers,
+//     given the season's evidence so far — not a forecast. A model fit
+//     toward "predicts next season" was answering a different question than
+//     the one D-NAV needs answered.
+// The model below (scripts/backtest/defense-model-team-fit.ts) is fit
+// DIRECTLY against the concurrent target: team-level defense signals
+// (ice-time-weighted per-team averages) explaining THIS SEASON's team
+// xG-against/game. Frozen on 2022-24 team-seasons, evaluated once on an
+// untouched 2025-26 holdout: r=0.82 against team xGA/game, sign-consistent
+// every season (2023 r=0.90, 2024 r=0.86, 2025 r=0.82) — and, checked
+// separately, still discriminates between teammates rather than degenerating
+// into a team-strength relabel (77.3% of variance is within-team, not
+// between-team). scripts/backtest/position-nav-backtest.ts's GATE 2 confirms
+// this against the same ΣD-NAV-shaped test that failed every earlier
+// attempt. DO NOT hand-edit these coefficients; a changed model needs its
+// own re-run of defense-model-team-fit.ts and its own re-validated holdout
+// numbers, not a tweak.
+const DEFENSE_MODEL_COEFFICIENTS = {
+  intercept: 0.063573,
+  dzPct: 2.693710,
+  corsiAgainstRel: -0.028817,
+  blocksPer82: -0.000454,
+  highDangerAgainstRate: 1.491240,
+};
+
+/**
+ * Predicted concurrent team xG-against/game contribution — lower is
+ * better defensively. Null when any required input is absent, so the
+ * caller can fall back to the legacy formula rather than compute on
+ * missing evidence (see `calcSkaterNAV`'s defRaw branch below).
+ */
+function predictDefensiveResult(asset: AssetInput): number | null {
+  if (
+    asset.dzPct == null || asset.corsiAgainstRel == null ||
+    asset.blocksPer82 == null || asset.highDangerAgainstRate == null
+  ) return null;
+  const c = DEFENSE_MODEL_COEFFICIENTS;
+  return c.intercept
+    + c.dzPct * asset.dzPct
+    + c.corsiAgainstRel * asset.corsiAgainstRel
+    + c.blocksPer82 * asset.blocksPer82
+    + c.highDangerAgainstRate * asset.highDangerAgainstRate;
+}
+
+// Predicted-value distribution over the fit's own training population
+// (defense-model-team-fit.ts, 969 defenseman-seasons, MoneyPuck 2022-25):
+// mean=3.0623, stddev=0.4638. DEFENSE_MODEL_MEAN anchors a league-average
+// projection at defTotal=0; DEFENSE_MODEL_SCALE (~70 NAV points per 2
+// stddev) puts a top-decile projection in the same rough neighborhood the
+// legacy formula's typical range occupied, without reusing its asymptote —
+// that curve was shaped for the OLD formula's unbounded compounding
+// bonuses, not this model's already realistically-bounded output.
+const DEFENSE_MODEL_MEAN = 3.0623;
+const DEFENSE_MODEL_SCALE = 75;
+
+/** Fitted defTotal for a defenseman — see DEFENSE_MODEL_COEFFICIENTS. Null
+ *  when `predictDefensiveResult` has insufficient inputs. */
+function fittedDefenseValue(asset: AssetInput): number | null {
+  const predicted = predictDefensiveResult(asset);
+  if (predicted == null) return null;
+  // Sanity clamp only — a numerical-hygiene guard against a live input
+  // wildly outside anything the fit ever saw, not a rescaling of the model.
+  return clamp((DEFENSE_MODEL_MEAN - predicted) * DEFENSE_MODEL_SCALE, -100, 120);
+}
+
 // ── Skater NAV ────────────────────────────────────────────────────────────────
 export function calcSkaterNAV(asset: AssetInput): XNAVResult {
   const pts    = safe(asset.ptsPace ?? 0);
@@ -950,13 +1043,29 @@ export function calcSkaterNAV(asset: AssetInput): XNAVResult {
     : 0;
   const defRaw = defRawBase + driverAdj + shutdownDAdj + toiDefFloor;
 
-  let defTotal = safe(defRaw);
-  // ── Larry Robinson Defensive Asymptote ──────────────────────────
-  // Max 150 UI ceiling.
-  if (defTotal > 80) {
-    const L = 70; // Remaining headroom to 150
-    const excess = defTotal - 80;
-    defTotal = 80 + L * (1 - Math.exp(-excess / L));
+  // NAV-02: a defenseman with the fitted model's required inputs gets his
+  // real, validated defTotal from it instead of the legacy computation
+  // above — see DEFENSE_MODEL_COEFFICIENTS. Forwards are untouched (NAV-01
+  // Phase 4 already validated ΣF-NAV against team offense using the legacy
+  // defense math unchanged); a defenseman missing the new inputs falls back
+  // to the legacy path rather than compute on absent evidence.
+  const fittedDef = isD ? fittedDefenseValue(asset) : null;
+
+  let defTotal: number;
+  if (fittedDef != null) {
+    defTotal = fittedDef;
+  } else {
+    defTotal = safe(defRaw);
+    // ── Larry Robinson Defensive Asymptote ──────────────────────────
+    // Max 150 UI ceiling. Legacy-path only — the fitted model above is
+    // already realistically bounded by DEFENSE_MODEL_SCALE's own clamp,
+    // not this curve, which was shaped for the legacy formula's unbounded
+    // compounding bonuses.
+    if (defTotal > 80) {
+      const L = 70; // Remaining headroom to 150
+      const excess = defTotal - 80;
+      defTotal = 80 + L * (1 - Math.exp(-excess / L));
+    }
   }
 
   // DEF display (position-aware, not used in total)

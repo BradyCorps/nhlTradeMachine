@@ -1264,11 +1264,13 @@ describe("X-NAV — Gravity Release A boundary", () => {
   });
 });
 
-// NAV-01 Phase 3 — calcForwardNAV/calcDefenseNAV are new, independently
-// named entry points (see xnav-engine.ts's comment above them for why they
-// currently delegate rather than reimplement). This locks in that they are
-// pure delegation today: byte-identical to calling calcSkaterNAV directly
-// for a matching position, so wiring calcNAV through them changed nothing.
+// NAV-01 Phase 3 — calcForwardNAV/calcDefenseNAV are independently named
+// entry points. calcForwardNAV always delegates to calcSkaterNAV unchanged.
+// calcDefenseNAV also delegates when its NAV-02 fitted-model inputs
+// (corsiAgainstRel/blocksPer82/highDangerAgainstRate, alongside the
+// already-existing dzPct) are absent, as they are for this fixture — see
+// the "NAV-02 fitted defensive model" describe block below for the case
+// where they're present.
 describe("calcForwardNAV / calcDefenseNAV — Phase 3 delegation", () => {
   const forward = {
     id: "fwd", name: "Test Forward", position: "C" as const,
@@ -1294,5 +1296,67 @@ describe("calcForwardNAV / calcDefenseNAV — Phase 3 delegation", () => {
   it("calcNAV routes a forward and a defenseman through their own entry point with no value change", () => {
     expect(calcNAV(forward)).toEqual(calcForwardNAV(forward));
     expect(calcNAV(defense)).toEqual(calcDefenseNAV(defense));
+  });
+});
+
+// NAV-02 — a defenseman carrying the fitted model's required inputs
+// (corsiAgainstRel/blocksPer82/highDangerAgainstRate, alongside the
+// already-existing dzPct) gets his defTotal from
+// scripts/backtest/defense-model-team-fit.ts's frozen, holdout-validated
+// model — fit directly against CONCURRENT team defense, not a defenseman's
+// own future — instead of the legacy defRaw computation Phase 1 found
+// actively counterproductive. See DEFENSE_MODEL_COEFFICIENTS in
+// xnav-engine.ts.
+describe("calcDefenseNAV — NAV-02 fitted defensive model (concurrent fit)", () => {
+  const base = {
+    id: "def-fitted", name: "Test Defenseman", position: "D" as const,
+    age: 26, capHit: 7.2, yearsRemaining: 5,
+    ptsPace: 45, xGPace: 9, defRate: 0.15, avgTOI: 22.5,
+    qocIndex: 62, games: 78,
+  };
+
+  it("uses the fitted model instead of the legacy formula when its inputs are present", () => {
+    const withModel = calcDefenseNAV({
+      ...base, dzPct: 0.55, corsiAgainstRel: 0, blocksPer82: 100, highDangerAgainstRate: 2,
+    });
+    const legacy = calcSkaterNAV({ ...base, dzPct: 0.55 }); // same profile, no fitted-model inputs
+    expect(withModel.total).not.toBe(legacy.total);
+  });
+
+  it("falls back to the legacy formula when even one fitted-model input is missing", () => {
+    const missingOnlyHighDanger = calcDefenseNAV({
+      ...base, dzPct: 0.55, corsiAgainstRel: 0, blocksPer82: 100, highDangerAgainstRate: null,
+    });
+    expect(missingOnlyHighDanger).toEqual(calcSkaterNAV({ ...base, dzPct: 0.55 }));
+  });
+
+  // dzPct carries the largest, cleanly-signed coefficient in the frozen
+  // fit (positive — more defensive-zone-start share predicts a worse
+  // concurrent team result). Other inputs (corsiAgainstRel especially)
+  // carry sign flips from joint-fit collinearity with dzPct and the other
+  // team-level signals — real, validated by the model's overall holdout
+  // accuracy, but not individually intuitive — so this test isolates the
+  // one signal whose direction is unambiguous in the coefficients, rather
+  // than asserting a combination the fit doesn't actually agree with.
+  it("values a lower defensive-zone-start share above a higher one, all else equal", () => {
+    const lowDzPct = calcDefenseNAV({
+      ...base, dzPct: 0.40, corsiAgainstRel: 0, blocksPer82: 100, highDangerAgainstRate: 2,
+    });
+    const highDzPct = calcDefenseNAV({
+      ...base, dzPct: 0.65, corsiAgainstRel: 0, blocksPer82: 100, highDangerAgainstRate: 2,
+    });
+    expect(lowDzPct.total).toBeGreaterThan(highDzPct.total);
+  });
+
+  it("never lets the fitted model affect a forward, even if fed its inputs", () => {
+    const forwardWithDefenseFields = {
+      id: "fwd-fields", name: "Test Forward", position: "C" as const,
+      age: 27, capHit: 6.5, yearsRemaining: 4,
+      ptsPace: 72, xGPace: 18, defRate: 0.1, avgTOI: 18.5,
+      qocIndex: 55, dzPct: 0.48, games: 78,
+      corsiAgainstRel: -0.6, blocksPer82: 160, highDangerAgainstRate: 1.0,
+    };
+    const { corsiAgainstRel, blocksPer82, highDangerAgainstRate, ...withoutDefenseFields } = forwardWithDefenseFields;
+    expect(calcForwardNAV(forwardWithDefenseFields)).toEqual(calcForwardNAV(withoutDefenseFields));
   });
 });

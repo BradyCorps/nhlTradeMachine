@@ -1056,12 +1056,57 @@ these before assuming the fix is "different weights":
   production code touched yet — deliberately not wired into
   `calcDefenseNAV` in this increment; that is its own decision given how
   many prior "validated" results in this ticket didn't hold up).
-- **Not attempted:** wiring this model into `calcDefenseNAV` (Phase 4,
-  attempted twice already this session with weaker models — this is the
-  first with a real shot, but deserves its own confirmed step, not a
-  rider on the modeling work); feeding it from live production data
-  (`roster-assembly.ts`, unverifiable in this sandbox); NAV-01's remaining
-  phases.
+- **Not attempted (at the time):** wiring this model into `calcDefenseNAV`;
+  feeding it from live production data (`roster-assembly.ts`, unverifiable
+  in this sandbox); NAV-01's remaining phases.
+
+**Increment 7 progress (this session) — wired into `calcDefenseNAV` for real, and it validates end-to-end:**
+
+- User explicitly approved shipping increment 6's model: "Yes, wire it into
+  calcDefenseNAV." Added `corsiAgainstRel`, `blocksPer82`, and
+  `highDangerAgainstRate` as optional `AssetInput` fields, and a
+  fallback-safe `fittedDefenseValue()` in `xnav-engine.ts` using increment
+  6's frozen coefficients (intercept 0.063573; `dzPct` 2.693710;
+  `corsiAgainstRel` -0.028817; `blocksPer82` -0.000454;
+  `highDangerAgainstRate` 1.491240), mean-centered (3.0623) and scaled by
+  75, clamped to `[-100, 120]`.
+- `calcSkaterNAV`'s defense branch now uses the fitted value only when all
+  four inputs are present for a `D`; otherwise it falls back to the exact
+  legacy formula, asymptote clamp included. This is a zero-behavior-change
+  guarantee for every existing caller — confirmed by a full, undrifted
+  **2,401/2,401** test run before adding any new tests, since nothing yet
+  supplies the new fields in production.
+- Added 4 regression tests in `__tests__/xnav.test.ts`: the fitted model
+  overrides the legacy formula when its inputs are present; it falls back
+  to legacy when even one input is missing; it values a lower
+  defensive-zone-start share above a higher one, all else equal; and it
+  never affects a forward, even when fed the new fields by mistake.
+- Updated `position-nav-backtest.ts` so `dNavIsolated` is computed from the
+  real `calcDefenseNAV()` call — no more standalone duplicate of the
+  coefficients — and rewrote both gates to reflect that this is now a live
+  production path, not a hypothetical future one.
+- **Confirmed against the real acceptance gate, for real this time.**
+  **GATE 1** (`.total` — offense + defense + age + cap surplus bundled
+  together, exactly what NAV-01's own "signed defence total" definition
+  sums) now **PASSES**: holdout r=-0.3758, sign-consistent negative every
+  season (2022 r=-0.52, 2023 r=-0.50, 2024 r=-0.33, 2025 r=-0.38) — this is
+  the first increment where `.total` itself, not just an isolated stage,
+  clears the bar. **GATE 2** (the isolated `def` stage, now genuinely the
+  live `calcDefenseNAV` output) also **PASSES**: holdout r=-0.3847 against
+  goalie-included GA/game, r=-0.7529 against goalie-stripped xGA/game,
+  sign-consistent negative in every season (2022 r=-0.73, 2023 r=-0.71,
+  2024 r=-0.63, 2025 r=-0.38).
+- Evidence: `npx tsc --noEmit` clean, `npx eslint` clean on all touched
+  files, full suite **2,401/2,401**, `npx next build` clean, and
+  `npx tsx scripts/backtest/position-nav-backtest.ts` re-run against the
+  real wired model for the numbers above.
+- **Not attempted:** feeding the new fields from live production data —
+  `roster-assembly.ts`'s MoneyPuck fetch does not yet compute
+  `corsiAgainstRel`/`blocksPer82`/`highDangerAgainstRate`, so every real
+  production call still falls back to the legacy formula until that
+  pipeline wiring is done separately (unverifiable in this sandbox per this
+  file's environment notes — `api-web.nhle.com` egress is blocked here);
+  NAV-01's remaining phases.
 
 **Explicitly out of scope for this ticket** (same reasoning as NAV-01's own
 phase boundaries — this is real iterative modeling work that should not be
