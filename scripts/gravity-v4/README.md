@@ -1,40 +1,32 @@
-# Gravity v4 Offline Pipeline Boundary
+# Gravity v4 Offline Pipeline
 
-No fitting pipeline or fitted player artifact is included in the current execution scope.
+**State (2026-09-03):** the pipeline below is implemented and has been run once
+in a codespace against NHL shift charts and play-by-play. Its output is the
+committed `app/lib/gravity-v4/fitted-artifact.json` (560 profiles, 2025-26,
+5v5, OZ + DZ, untiered; SHA-256 pinned in `app/lib/gravity-v4/artifact-manifest.ts`).
+NZ was fitted as a rush proxy, failed split-half reliability (r=0.099) and is
+excluded. Evidence and verdict: `docs/analytics/GRAVITY_V4_RELEASE_EVIDENCE.md`.
 
-Gravity v4 training requires an authorized shift-, event-, stint-, or possession-level source that can support:
-
-- stable numeric NHL player IDs;
-- explicit season, game, strength-state, and source identifiers;
-- teammate-only OZ expected-goal targets that exclude the focal player's shots, individual xG, goals, and direct box-score production;
-- event-valued transition states, or an explicitly labelled proxy/missing NZ result;
-- opponent expected goals prevented for positive DZ output;
-- context controls for teammates, opponents, team, game state, deployment, goaltender, and season;
-- block bootstrap by game, player-cluster bootstrap, or a posterior interval;
-- immutable/versioned inputs, deterministic exports, persisted settings, and rejected-row coverage reports.
-
-The application runtime must consume exported JSON only; it must never fit a league model during a request.
-
-When an authorized source becomes available, the offline implementation should follow the stages named in `docs/PLAYER_GRAVITY_V4_IMPLEMENTATION_SPEC.md`:
+Stages, in order:
 
 ```text
-build-stints
-build-possession-states
-fit-oz-model
-fit-nz-model
-fit-dz-model
-bootstrap-estimates
-validate-model
-export-profiles
+build-stints → build-possession-states → fit-shot-xg → fit-oz-model → fit-dz-model
+→ fit-nz-model (excluded) → bootstrap-estimates → validate-model → export-profiles
 ```
 
-Until those stages exist and the validation gates pass:
+Inputs live in `data/gravity-v4/` and `.gravity-v4-cache/` (gitignored). The
+application runtime consumes the exported JSON only and never fits during a
+request. Any re-export that changes a byte of the artifact fails the manifest
+checksum until the manifest is updated with new evidence.
 
-- `GRAVITY_V4_ENABLED` remains false by default;
-- `app/lib/gravity-v4/runtime-artifact.ts` remains `null`;
+Rules that still hold:
+
+- `GRAVITY_V4_ENABLED` is unset in production; the display is dark until a human sets it;
 - the zero-value fixture is restricted to `/api/admin/gravity-v4`;
-- Gravity v3 remains the clearly labelled fallback;
-- X-NAV and the season simulator do not import Gravity v4.
+- Gravity v3 remains the labelled fallback;
+- X-NAV, F-NAV, D-NAV, G-NAV, team totals, rankings, Trade Machine, Armchair GM, Fantasy and the season simulator do not import Gravity v4.
+
+The original source requirements (stable numeric ids; explicit season/game/strength/source ids; teammate-only OZ targets excluding the focal player's own production; event-valued or explicitly proxy/missing NZ; opponent xG prevented for DZ; teammate/opponent/team/game-state/deployment/goalie/season controls; block bootstrap; deterministic exports and rejected-row reports) are met by the stages documented below.
 
 ---
 

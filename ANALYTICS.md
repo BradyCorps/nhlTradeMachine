@@ -65,9 +65,9 @@ GRAV = clamp(navResidual · 45, -20, +20)
 
 Changes to assists, individual xG/goals, power-play production, OZ lift, or the DZ dome do not change the GRAV handoff.
 
-Gravity v4 is a separate 5v5 Territorial Gravity contract expressed in expected goals added or prevented. The application has versioned types, validation, a loader, an off-by-default `GRAVITY_V4_ENABLED` flag, and an explicitly unfitted zero-value admin fixture. The player dossier and share-card contract can render a validated v4 profile without changing X-NAV.
+Gravity v4 is a separate 5v5 Territorial Gravity contract expressed in expected goals added or prevented. The application has versioned types, validation, a checksum-pinned loader, an `GRAVITY_V4_ENABLED` flag that is unset in production, and an explicitly unfitted zero-value admin fixture. The player dossier and share-card contract render a validated v4 profile without changing X-NAV.
 
-No fitted v4 profile is currently authorized or bundled. Production fitting is blocked pending a legally usable shift/event or possession dataset. Held-out results, correlated-observation uncertainty intervals, league-derived visual scales/tier cutoffs, portability, and incremental X-NAV evidence remain unavailable and must not be inferred from aggregate NHL EDGE speed or zone-time fields.
+A fitted artifact IS bundled (`app/lib/gravity-v4/fitted-artifact.json`, 560 profiles, 2025-26, OZ + DZ only, untiered; SHA-256 `6de0271e…74e29f`). OZ and DZ cleared same-season split-half, shuffle-null and identity gates with whole-game block-bootstrap intervals; NZ did not (r=0.099) and is presented as *not available*, never as zero. Year-over-year stability, portability, calibration by decile and incremental X-NAV evidence remain unavailable. The v3 `GRAV` handoff above is gated by `GRAVITY_V3_XNAV_ENABLED` and is off in production, so no Gravity value of either version currently enters any NAV. Canonical status: `docs/analytics/ANALYTICS_STATE_2026.md`.
 
 ---
 

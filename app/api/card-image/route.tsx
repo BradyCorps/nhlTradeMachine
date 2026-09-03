@@ -186,19 +186,24 @@ function Rink({ gravity }: { gravity: CardGravityInput }) {
         const analyticalValue = gravity.modelVersion === "4.0"
           ? gravity.zoneXg82?.[zone.key] ?? null
           : null;
+        // A v4 zone with no fitted estimate (NZ) prints "N/A", never "+0.0".
+        const zoneUnavailable = gravity.modelVersion === "4.0" && analyticalValue === null;
         return (
           <React.Fragment key={`label-${zone.key}`}>
             <Label x={zone.cx} y={rinkY + rinkH + 18} size={9} color={INK_FAINT} anchor="middle" ls={0.9} vbW={W}>
               {ZONE_TITLE[zone.key].toUpperCase()}
             </Label>
-            <Label x={zone.cx} y={rinkY + rinkH + 34} size={14} color={valColor} anchor="middle" vbW={W}>
-              {(analyticalValue ?? zone.m) > 0 ? "+" : ""}
-              {(analyticalValue ?? zone.m).toFixed(analyticalValue === null ? 2 : 1)}
+            <Label x={zone.cx} y={rinkY + rinkH + 34} size={14} color={zoneUnavailable ? INK_FAINT : valColor} anchor="middle" vbW={W}>
+              {zoneUnavailable
+                ? "N/A"
+                : `${(analyticalValue ?? zone.m) > 0 ? "+" : ""}${(analyticalValue ?? zone.m).toFixed(analyticalValue === null ? 2 : 1)}`}
             </Label>
             <Label x={zone.cx} y={rinkY + rinkH + 45} size={7} color={INK_FAINT} anchor="middle" ls={0.4} opacity={0.8} vbW={W}>
-              {analyticalValue === null
-                ? (zoneQualifier(zone.key, zone.m) ?? "").toUpperCase()
-                : "XG / 82"}
+              {zoneUnavailable
+                ? "NOT AVAILABLE"
+                : analyticalValue === null
+                  ? (zoneQualifier(zone.key, zone.m) ?? "").toUpperCase()
+                  : "XG / 82"}
             </Label>
           </React.Fragment>
         );
@@ -358,7 +363,7 @@ export async function POST(req: Request) {
             </div>
             {data.gravity.modelVersion === "4.0" && data.gravity.netXg82 !== null ? (
               <div style={{ display: "flex" }}>
-                NET {data.gravity.netXg82 > 0 ? "+" : ""}{data.gravity.netXg82.toFixed(1)} xG/82 · FIELD {data.gravity.force > 0 ? "+" : ""}{data.gravity.force.toFixed(2)}
+                NET {data.gravity.netXg82 > 0 ? "+" : ""}{data.gravity.netXg82.toFixed(1)} xG/82 ({data.gravity.netScopeLabel}) · FIELD {data.gravity.force > 0 ? "+" : ""}{data.gravity.force.toFixed(2)}
               </div>
             ) : null}
           </div>

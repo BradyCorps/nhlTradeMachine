@@ -1,5 +1,5 @@
 import type { GravityTier, ZoneMasses } from "@/app/lib/gravity";
-import type { GravityProfileV4, GravityReliabilityBand } from "./types";
+import type { GravityProfileV4, GravityReliabilityBand, GravityZoneEstimate } from "./types";
 
 export function gravityDisplayValue(value: number, scale: number): number {
   if (!Number.isFinite(value)) {
@@ -54,4 +54,30 @@ export function toGravityRinkDisplayProfile(profile: GravityProfileV4): GravityR
     isDefenseman: profile.position === "D",
     reliability: RELIABILITY_INDEX[profile.reliability],
   };
+}
+
+/**
+ * Whether a zone carries a fitted estimate. The shipped artifact stores an
+ * unavailable zone (NZ, excluded at split-half r=0.099) as `xg60: 0, xg82: 0,
+ * dataQuality: "insufficient", sampleMinutes: 0` because the schema's
+ * `net = OZ + NZ + DZ` identity needs a number. That zero is a placeholder,
+ * not an estimate, and must never be shown as "+0.0" — every display surface
+ * routes through here and prints "not available" instead.
+ */
+export function gravityZoneAvailable(zone: GravityZoneEstimate): boolean {
+  return zone.dataQuality !== "insufficient";
+}
+
+/** The zone's xG/82 when fitted, null when the zone is unavailable. */
+export function gravityZoneXg82OrNull(zone: GravityZoneEstimate): number | null {
+  return gravityZoneAvailable(zone) ? zone.xg82 : null;
+}
+
+/** "OZ + DZ" when NZ is unavailable, "OZ + NZ + DZ" when all three are fitted. */
+export function gravityNetScopeLabel(profile: GravityProfileV4): string {
+  const parts: string[] = [];
+  if (gravityZoneAvailable(profile.zones.oz)) parts.push("OZ");
+  if (gravityZoneAvailable(profile.zones.nz)) parts.push("NZ");
+  if (gravityZoneAvailable(profile.zones.dz)) parts.push("DZ");
+  return parts.join(" + ");
 }

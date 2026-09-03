@@ -1,0 +1,46 @@
+{
+  "updated": "2026-09-03",
+  "branch": "claude/analytics-integrity-season-snapshot-zfn41r",
+  "season": { "projected": "2026-27", "statsBaseline": "2025-26", "projectedGamesObserved": 0, "contractLedger": "2026-27", "capCeiling": 104.0 },
+  "modelVersion": "X-NAV 4.2",
+  "surfaces": {
+    "gravityV4": {
+      "status": "PASS",
+      "scope": "dossier-only diagnostic display, env-gated (GRAVITY_V4_ENABLED not set in production), untiered, X-NAV-free",
+      "artifact": {
+        "path": "app/lib/gravity-v4/fitted-artifact.json",
+        "sha256": "6de0271ef80f0969185e4217604efa332f1a94e7a1144d586a18ede05e74e29f",
+        "schemaVersion": "gravity-v4-profile-set/1",
+        "artifactKind": "fitted",
+        "profileCount": 560,
+        "population": { "C": 181, "W": 181, "D": 198 },
+        "generatedAt": "2026-08-22T16:39:29.669Z",
+        "trainedAt": "2026-08-22T16:39:29.616Z",
+        "sourceVersion": "capandcrease/oz-dz@20252026",
+        "season": "2025-26",
+        "strengthState": "5v5",
+        "zonesFitted": ["oz", "dz"],
+        "zonesUnavailable": ["nz"],
+        "tiered": false,
+        "reliability": { "LOW": 535, "MEDIUM": 25 }
+      },
+      "validation": {
+        "kind": "same-season split-half on game-level halves, shuffle null, identity, whole-game block bootstrap",
+        "oz": { "splitHalfR": 0.409, "intervalsExcludingZero": "118/594" },
+        "dz": { "splitHalfR": 0.328, "identityR": 0.372, "intervalsExcludingZero": "126/594" },
+        "nz": { "splitHalfR": 0.099, "decision": "excluded" },
+        "outOfTime": false,
+        "regeneratedThisSprint": false,
+        "regenerationBlocker": "data/gravity-v4 and .gravity-v4-cache absent; api-web.nhle.com blocked"
+      },
+      "verdict": "APPROVED FOR LIMITED DOSSIER-ONLY DIAGNOSTIC LAUNCH",
+      "recommendedFlagState": "GRAVITY_V4_ENABLED unset until a human sets it; RELEASE_READY stays true"
+    },
+    "fNav": { "status": "PASS", "path": "calcForwardNAV", "validation": "same-season audit r=0.95 vs pts/82; walk-forward FMV band", "outOfTime": false, "fixedThisSprint": ["prospect 14-game cliff when hasLiveStats"], "openFindings": ["franchise floor threshold step (product rule)"] },
+    "dNav": { "status": "PASS", "path": "calcDefenseNAV", "validation": "frozen 2022-24 fit, 2024->25 holdout r=-0.328, YoY r=0.663", "outOfTime": true, "openFindings": ["shutdown top-pair floor masks fitted signal at heavy usage"] },
+    "gNav": { "status": "PASS", "path": "calcGoalieNAV", "validation": "same-season audit; continuous workload tier; GSAX stability backtest", "outOfTime": false, "openFindings": ["missing gsax priced as 0", "no uncertainty band"] },
+    "teamAggregation": { "status": "PASS", "path": "rosterNavByPosition", "identity": "signed.total = f+d+g; xnav = f+ + d+ + g+", "isModel": false },
+    "seasonSnapshots": { "status": "PASS", "scope": "foundation", "tables": ["player_season_snapshots", "team_season_snapshots"], "migration": "drizzle/0006_add_season_snapshots.sql", "productionMigrationExecuted": false, "backfillRoute": "POST /api/admin/season-snapshots", "idScheme": "{season}:{asOf}:{modelVersion}:{playerId|teamId}" }
+  },
+  "verification": { "vitest": "2454/2454 (181 files)", "tsc": "clean", "eslint": "0 errors, 4 pre-existing warnings", "nextBuild": "clean" }
+}

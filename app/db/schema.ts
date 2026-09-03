@@ -130,3 +130,63 @@ export const faOverrides = sqliteTable("fa_overrides", {
   notes:       text("notes"),
   updatedAt:   integer("updated_at"),
 });
+
+// ── Season analytical snapshots (DATA-06 foundation) ─────────────────────────
+// Immutable, additive history of what the valuation engine said about every
+// player and team for a season on a given day. One row per
+// (season, as_of, model_version, player|team) — `id` encodes all four — and the
+// writer only ever INSERTs with ON CONFLICT DO NOTHING, so a row can never be
+// rewritten or relabelled to a different season. 2025-26 keeps its own rows;
+// 2026-27 starts its own. See docs/analytics/SEASON_SNAPSHOT_CONTRACT.md.
+export const playerSeasonSnapshots = sqliteTable("player_season_snapshots", {
+  id:                  text("id").primaryKey(),          // "{season}:{asOf}:{modelVersion}:{playerId}"
+  playerId:            text("player_id").notNull(),
+  teamId:              text("team_id"),
+  season:              text("season").notNull(),         // the season this row describes, e.g. "2025-26"
+  asOf:                text("as_of").notNull(),          // calendar day (YYYY-MM-DD) the valuation was struck
+  source:              text("source").notNull(),
+  coverage:            text("coverage").notNull(),       // "completed-season" | "preseason-baseline" | "in-season"
+  statsSeason:         text("stats_season").notNull(),   // season whose completed stats fed the engine
+  seasonGamesObserved: integer("season_games_observed").notNull(), // games of THIS season in the inputs (0 at preseason)
+  contractSeason:      text("contract_season").notNull(),// season of the contract ledger the cap context came from
+  modelVersion:        text("model_version").notNull(),
+  valuationSnapshotId: text("valuation_snapshot_id").notNull(), // content-addressed id from valuation-snapshot.ts
+  position:            text("position").notNull(),
+  navLabel:            text("nav_label").notNull(),      // F-NAV | D-NAV | G-NAV | X-NAV
+  total:               real("total").notNull(),
+  components:          text("components").notNull(),     // JSON NavStage[] — sums to total
+  marketValue:         real("market_value"),
+  surplus:             real("surplus"),
+  uncertaintyLow:      real("uncertainty_low"),
+  uncertaintyHigh:     real("uncertainty_high"),
+  contract:            text("contract").notNull(),       // JSON ValuationContractSnapshot
+  population:          text("population").notNull(),
+  createdAt:           integer("created_at").notNull(),
+});
+
+export const teamSeasonSnapshots = sqliteTable("team_season_snapshots", {
+  id:                  text("id").primaryKey(),          // "{season}:{asOf}:{modelVersion}:{teamId}"
+  teamId:              text("team_id").notNull(),
+  season:              text("season").notNull(),
+  asOf:                text("as_of").notNull(),
+  source:              text("source").notNull(),
+  coverage:            text("coverage").notNull(),
+  statsSeason:         text("stats_season").notNull(),
+  contractSeason:      text("contract_season").notNull(),
+  modelVersion:        text("model_version").notNull(),
+  rosterCount:         integer("roster_count").notNull(),
+  // Signed positional aggregates — Σ NAV with no floor ("Roster X-NAV").
+  fNav:                real("f_nav").notNull(),
+  dNav:                real("d_nav").notNull(),
+  gNav:                real("g_nav").notNull(),
+  xnavSigned:          real("xnav_signed").notNull(),    // = f + d + g
+  // Positive-assets-only aggregates — Σ max(0, NAV) ("Roster X-NAV+", the chart total).
+  fNavPositive:        real("f_nav_positive").notNull(),
+  dNavPositive:        real("d_nav_positive").notNull(),
+  gNavPositive:        real("g_nav_positive").notNull(),
+  xnavPositive:        real("xnav_positive").notNull(),  // = f+ + d+ + g+
+  capCeiling:          real("cap_ceiling").notNull(),
+  capCommitted:        real("cap_committed").notNull(),
+  population:          text("population").notNull(),
+  createdAt:           integer("created_at").notNull(),
+});

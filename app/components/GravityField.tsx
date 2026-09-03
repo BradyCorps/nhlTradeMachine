@@ -507,7 +507,7 @@ function SignalPanel({ profile }: { profile: GravityProfile }) {
         Signal Quality
       </div>
 
-      <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
+      <div className="grid gap-2 grid-cols-1 sm:grid-cols-3">
         <div
           className="border p-2.5"
           style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
@@ -628,7 +628,7 @@ export default function GravityField({ profile, playerName, mode = "full" }: Pro
       </div>
 
       {/* Top: rink diagram left, zone components right */}
-      <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}>
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 items-start">
         <div
           className="border p-2"
           style={{

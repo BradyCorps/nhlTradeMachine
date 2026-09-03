@@ -16,6 +16,7 @@ import {
   type GravityTier,
 } from "./gravity";
 import type { GravityProfileV4 } from "./gravity-v4/types";
+import { gravityNetScopeLabel, gravityZoneXg82OrNull } from "./gravity-v4/display";
 import { z } from "zod";
 
 interface CardGravityBase {
@@ -45,8 +46,11 @@ export interface CardGravityV4Input extends CardGravityBase {
   reliabilityLabel: string;
   coverageLabel: string;
   netXg82: number | null;
+  /** Which zones `netXg82` sums — "OZ + DZ" while NZ is unavailable. */
+  netScopeLabel: string;
   netIntervalLabel: string | null;
-  zoneXg82: { oz: number; nz: number; dz: number } | null;
+  /** Null per zone means no fitted estimate (never a zero placeholder). */
+  zoneXg82: { oz: number | null; nz: number | null; dz: number | null } | null;
 }
 
 export type CardGravityInput = CardGravityV3Input | CardGravityV4Input;
@@ -96,13 +100,14 @@ export function cardGravityFromV4(profile: GravityProfileV4): CardGravityV4Input
     coverageLabel: `${profile.dataQuality.toUpperCase()} · NZ ${profile.transitionDataQuality.toUpperCase()}`,
     gravityPercentile: profile.positionPercentile,
     netXg82: profile.netXg82,
+    netScopeLabel: gravityNetScopeLabel(profile),
     netIntervalLabel: profile.netInterval
       ? `${signed(profile.netInterval.low)} TO ${signed(profile.netInterval.high)}`
       : null,
     zoneXg82: {
-      oz: profile.zones.oz.xg82,
-      nz: profile.zones.nz.xg82,
-      dz: profile.zones.dz.xg82,
+      oz: gravityZoneXg82OrNull(profile.zones.oz),
+      nz: gravityZoneXg82OrNull(profile.zones.nz),
+      dz: gravityZoneXg82OrNull(profile.zones.dz),
     },
   };
 }

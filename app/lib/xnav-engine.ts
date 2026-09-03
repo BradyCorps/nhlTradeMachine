@@ -1817,7 +1817,14 @@ export function calcNAV(asset: AssetInput): XNAVResult {
     (asset.draftOverall != null && asset.age <= 22) ||
     (asset.prospectPtsPace != null && asset.prospectPtsPace > 0);
   let result: XNAVResult;
-  if (asset.position !== "G" && hasProspectValuation && !asset.hasLiveStats && games < 14) {
+  // Below 14 games a drafted prospect is valued from pedigree alone. The blend
+  // branch below starts at weight 0 (100% pedigree) at exactly 14 games, so
+  // this branch must not depend on `hasLiveStats`: it used to, which sent a
+  // rookie with a MoneyPuck row through the full skater path on a 13-game
+  // sample (a 3rd-overall pick at 13 GP read 36) and then to pure pedigree
+  // at 14 GP (240) — a ~200-point cliff on one appearance. See
+  // docs/analytics/MODEL_CARD_NAV.md, "Prospect transition".
+  if (asset.position !== "G" && hasProspectValuation && games < 14) {
     result = calcProspectNAV(asset);
   } else if (asset.position === "G") {
     result = calcGoalieNAV(asset);

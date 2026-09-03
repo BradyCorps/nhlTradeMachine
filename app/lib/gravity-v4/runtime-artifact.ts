@@ -1,4 +1,5 @@
 import fittedArtifact from "./fitted-artifact.json";
+import { GRAVITY_V4_ARTIFACT_MANIFEST } from "./artifact-manifest";
 
 /**
  * The fitted Gravity v4 artifact the app serves — the OZ + DZ wells, UNTIERED
@@ -7,8 +8,9 @@ import fittedArtifact from "./fitted-artifact.json";
  * `scripts/gravity-v4/export-profiles.ts`, which validates every profile against
  * the shipped schema before writing this file, and committed here so it bundles.
  *
- * The committed default is an EMPTY profile set: until the real artifact is
- * generated and committed, every lookup returns `profile_missing` and nothing
- * renders — the display fails closed even with the environment flag on.
+ * `GRAVITY_V4_RUNTIME_MANIFEST` pins its SHA-256 and profile count. Pass both
+ * to `loadGravityProfileV4` — a regenerated artifact that does not match the
+ * manifest is refused (`artifact_invalid`), never served.
  */
 export const GRAVITY_V4_RUNTIME_ARTIFACT: unknown = fittedArtifact;
+export const GRAVITY_V4_RUNTIME_MANIFEST = GRAVITY_V4_ARTIFACT_MANIFEST;

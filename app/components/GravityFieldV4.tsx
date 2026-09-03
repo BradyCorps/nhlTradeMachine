@@ -3,7 +3,11 @@
 import React from "react";
 import { FieldDiagram, TierIcon } from "@/app/components/GravityField";
 import { gravityTierColor } from "@/app/lib/gravity";
-import { toGravityRinkDisplayProfile } from "@/app/lib/gravity-v4/display";
+import {
+  gravityNetScopeLabel,
+  gravityZoneAvailable,
+  toGravityRinkDisplayProfile,
+} from "@/app/lib/gravity-v4/display";
 import type {
   GravityProfileV4,
   GravityZoneEstimate,
@@ -36,6 +40,7 @@ export default function GravityFieldV4({ profile, playerName }: Props) {
     ? gravityTierColor(profile.tier)
     : "var(--ledger-ink-faint)";
   const diagnostic = profile.metadata.artifactKind === "diagnostic_fixture";
+  const netScope = gravityNetScopeLabel(profile);
   const zones: Array<{
     key: "oz" | "nz" | "dz";
     title: string;
@@ -110,10 +115,10 @@ export default function GravityFieldV4({ profile, playerName }: Props) {
       >
         {diagnostic
           ? "Zero-value schema fixture only. It was not fitted, is not a player rating, and is not used by X-NAV."
-          : "Diagnostic-only model output. Gravity v4 remains excluded from X-NAV until the held-out validation gates pass."}
+          : `Diagnostic-only model output, untiered. OZ and DZ are fitted from ${profile.season} 5v5 play; the NZ transition well is not available and is excluded from the net. Gravity v4 does not enter X-NAV, F-NAV, D-NAV, G-NAV, team totals, rankings or simulation.`}
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr", alignItems: "start" }}>
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 items-start">
         <div
           className="border p-2"
           style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
@@ -127,33 +132,41 @@ export default function GravityFieldV4({ profile, playerName }: Props) {
         </div>
 
         <div className="flex flex-col gap-1.5" role="list" aria-label="Territorial Gravity zone estimates">
-          {zones.map(zone => (
-            <div
-              key={zone.key}
-              className="border px-2.5 py-2"
-              style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-bg)" }}
-              role="listitem"
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <div className="text-[10px] font-black uppercase tracking-[0.12em]" style={{ color: "var(--ledger-ink-faint)" }}>
-                  {zone.title}
+          {zones.map(zone => {
+            const available = gravityZoneAvailable(zone.value);
+            return (
+              <div
+                key={zone.key}
+                className="border px-2.5 py-2"
+                style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-bg)" }}
+                role="listitem"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                  <div className="text-[10px] font-black uppercase tracking-[0.12em]" style={{ color: "var(--ledger-ink-faint)" }}>
+                    {zone.title}
+                  </div>
+                  <div
+                    className="text-[15px] font-black"
+                    style={{ color: available ? color : "var(--ledger-ink-faint)", fontVariantNumeric: "tabular-nums" }}
+                  >
+                    {available ? `${fmt(zone.value.xg82, 1)} xG/82` : "Not available"}
+                  </div>
                 </div>
-                <div className="text-[15px] font-black" style={{ color, fontVariantNumeric: "tabular-nums" }}>
-                  {fmt(zone.value.xg82, 1)} xG/82
+                <div className="text-[9px] mt-1 leading-snug" style={{ color: "var(--ledger-ink-faint)" }}>
+                  {available
+                    ? zone.meaning
+                    : `${zone.meaning} No fitted estimate for this zone — it is excluded from the net, not counted as zero.`}
+                </div>
+                <div className="text-[9px] mt-1 break-words" style={{ color: "var(--ledger-ink-faint)" }}>
+                  90% interval: {available ? intervalText(zone.value.interval) : "Not available"} · Data: {zone.value.dataQuality}
+                  {zone.key === "nz" ? ` (${profile.transitionDataQuality})` : ""}
+                </div>
+                <div className="text-[9px] break-words" style={{ color: "var(--ledger-ink-faint)" }}>
+                  Position pct: {zone.value.positionPercentile ?? "—"} · League pct: {zone.value.leaguePercentile ?? "—"} · Sample: {available ? `${zone.value.sampleMinutes.toFixed(0)} min` : "—"}
                 </div>
               </div>
-              <div className="text-[9px] mt-1 leading-snug" style={{ color: "var(--ledger-ink-faint)" }}>
-                {zone.meaning}
-              </div>
-              <div className="text-[9px] mt-1" style={{ color: "var(--ledger-ink-faint)" }}>
-                90% interval: {intervalText(zone.value.interval)} · Data: {zone.value.dataQuality}
-                {zone.key === "nz" ? ` (${profile.transitionDataQuality})` : ""}
-              </div>
-              <div className="text-[9px]" style={{ color: "var(--ledger-ink-faint)" }}>
-                Position pct: {zone.value.positionPercentile ?? "—"} · League pct: {zone.value.leaguePercentile ?? "—"} · Sample: {zone.value.sampleMinutes.toFixed(0)} min
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -161,9 +174,9 @@ export default function GravityFieldV4({ profile, playerName }: Props) {
         className="mt-3 border p-3"
         style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-bg)" }}
       >
-        <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+        <div className="grid gap-2 grid-cols-2 sm:grid-cols-4">
           {[
-            ["NET xG / 82", fmt(profile.netXg82, 1)],
+            [`NET xG / 82 · ${netScope}`, fmt(profile.netXg82, 1)],
             ["FIELD FORCE", fmt(profile.displayForce)],
             ["RELIABILITY", profile.reliability],
             ["DATA QUALITY", profile.dataQuality],
@@ -172,8 +185,8 @@ export default function GravityFieldV4({ profile, playerName }: Props) {
             ["LEAGUE PCT", profile.leaguePercentile ?? "—"],
             ["PORTABILITY", profile.portabilityLabel],
           ].map(([label, value]) => (
-            <div key={label} className="border p-2" style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
-              <div className="text-[8px] font-black uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>
+            <div key={label} className="border p-2 min-w-0" style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
+              <div className="text-[8px] font-black uppercase tracking-[0.1em] break-words" style={{ color: "var(--ledger-ink-faint)" }}>
                 {label}
               </div>
               <div className="text-[11px] font-black mt-0.5" style={{ color }}>

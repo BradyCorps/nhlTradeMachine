@@ -455,7 +455,7 @@ function ExpandedPanel({
       </div>
 
       {/* Two-column layout: Gravity diagram left, stats right */}
-      <div className="grid gap-5" style={{ gridTemplateColumns: gravity ? "minmax(200px, 280px) 1fr" : "1fr" }}>
+      <div className={`grid gap-5 grid-cols-1 ${gravity ? "md:grid-cols-[minmax(200px,280px)_1fr]" : ""}`}>
 
         {/* Left: Gravity field diagram */}
         {gravity && (

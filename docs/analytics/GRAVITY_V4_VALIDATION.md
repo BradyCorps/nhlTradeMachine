@@ -1,38 +1,26 @@
 # Gravity v4 Validation Status
 
-**Status:** Blocked — no authorized event/shift dataset or fitted artifact is available.
-**Updated:** 2026-07-24
+**Status:** Fitted (OZ + DZ, untiered) · NZ excluded · display env-gated and dark in production.
+**Updated:** 2026-09-03. Full evidence and verdict: `GRAVITY_V4_RELEASE_EVIDENCE.md`.
+Canonical state: `ANALYTICS_STATE_2026.md` §1.
 
-This is a status summary, not a validation result. No RMSE, rank correlation, calibration, stability, portability, uncertainty, or X-NAV improvement numbers have been generated.
+## What exists
 
-## Infrastructure available
+- `app/lib/gravity-v4/fitted-artifact.json`: 560 profiles, 2025-26, 5v5, SHA-256
+  `6de0271e…74e29f`, pinned by `artifact-manifest.ts` and refused by the loader
+  if changed.
+- OZ well: split-half r=0.409, null collapses, teammate identity holds, 20% of
+  players resolve sign at 95%.
+- DZ well: split-half r=0.328, null −0.036, identity 0.372 vs −0.032, 21% resolve.
+- NZ rush-proxy well: split-half r=0.099 — excluded; stored as an explicit
+  placeholder and presented as "not available", never as zero.
+- Every profile untiered, no net interval, no net percentile, no portability.
 
-- Versioned Gravity v4 profile and artifact types
-- Runtime schema and semantic validation
-- Exact player-ID, season, model-version, and artifact-kind guards
-- Bounded display transforms derived from unbounded xG values
-- Off-by-default `GRAVITY_V4_ENABLED` flag
-- Player-dossier and share-card rendering contracts
-- Admin-only zero-value diagnostic fixture
-- Explicit v3 fallback and no Gravity v4 X-NAV import
+## What does not exist
 
-## Blocked evidence
+- Year-over-year / out-of-time stability, portability, calibration by decile,
+  external benchmarks, incremental X-NAV evidence.
+- A refit reproducible in the web environment (inputs gitignored; NHL egress
+  blocked).
 
-The Release A v3 qualified-population tier recalibration after removal of the
-usage scalars is blocked because a current authorized qualified league
-population is unavailable in this execution environment.
-
-The following require an authorized shift-, event-, stint-, or possession-level dataset and therefore remain unavailable:
-
-- teammate-only OZ model fitting;
-- event-valued NZ transition fitting;
-- context-adjusted DZ expected goals prevented;
-- game-block/bootstrap or posterior 90% intervals;
-- qualified league visual scales and tier cutoffs;
-- held-out prediction and calibration by decile;
-- year-over-year stability and portability;
-- correlations with direct offense and external isolated-impact benchmarks;
-- sensitivity tests;
-- base X-NAV versus base-plus-Gravity comparisons in two non-overlapping periods.
-
-The diagnostic fixture contains zero analytical values, no intervals, no tier, no training seasons, and a null training date. It verifies loading and rendering only and must not be interpreted as a fitted player profile.
+The diagnostic fixture contains zero analytical values and remains admin-only.

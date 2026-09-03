@@ -12,12 +12,13 @@ import { getCachedRoster } from "@/app/lib/cached-roster";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
 import { gravityForDisplay } from "@/app/lib/gravity-channels";
 import { loadGravityProfileV4 } from "@/app/lib/gravity-v4/load-profile";
-import { GRAVITY_V4_RUNTIME_ARTIFACT } from "@/app/lib/gravity-v4/runtime-artifact";
+import { GRAVITY_V4_RUNTIME_ARTIFACT, GRAVITY_V4_RUNTIME_MANIFEST } from "@/app/lib/gravity-v4/runtime-artifact";
 import { SEASON } from "@/app/lib/season-config";
 import { buildStrandCohort, posGroupOf, STRAND_COHORT_NOUN } from "@/app/lib/strand-cohort";
 import { TEAMS_DB } from "@/app/lib/db";
 import GravityField from "@/app/components/GravityField";
 import GravityFieldV4 from "@/app/components/GravityFieldV4";
+import { SeasonReferenceBlock } from "@/app/components/SeasonReferenceBlock";
 import GravityHeatMap from "@/app/components/GravityHeatMap";
 import NavTrajectoryChart from "@/app/components/NavTrajectoryChart";
 import NavLeagueScatter from "@/app/components/NavLeagueScatter";
@@ -125,6 +126,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
     season: SEASON.replaySeason,
     position: player.position,
     artifact: GRAVITY_V4_RUNTIME_ARTIFACT,
+    manifest: GRAVITY_V4_RUNTIME_MANIFEST,
   });
   const gravityV4 = gravityV4Lookup.status === "ready"
     ? gravityV4Lookup.profile
@@ -382,6 +384,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
             cohortLabel={`${STRAND_COHORT_NOUN[posGroupOf(player.position)]} · ≥20 GP · ${SEASON.replaySeason}`}
           />
         )}
+
+        <SeasonReferenceBlock valuationSnapshotId={xnav.snapshot?.snapshotId ?? null} />
 
         {/* NHL EDGE shot map — skaters with NHL ids only */}
         {player.position !== "G" && /^\d+$/.test(playerId) && (

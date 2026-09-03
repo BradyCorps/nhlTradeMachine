@@ -1,4 +1,5 @@
 import { isGravityV4Enabled } from "./feature-flag";
+import { verifyGravityV4Artifact, type GravityV4ArtifactManifest } from "./artifact-manifest";
 import {
   validateGravityProfileV4,
   validateGravityV4ArtifactEnvelope,
@@ -37,6 +38,12 @@ export interface LoadGravityProfileV4Options {
   enabled?: boolean;
   env?: Record<string, string | undefined>;
   allowDiagnosticFixture?: boolean;
+  /**
+   * When supplied, the artifact must hash to this manifest before any profile
+   * is read. The runtime caller always passes `GRAVITY_V4_RUNTIME_MANIFEST`;
+   * diagnostic and test callers may omit it.
+   */
+  manifest?: GravityV4ArtifactManifest | null;
 }
 
 export function loadGravityProfileV4(
@@ -51,6 +58,18 @@ export function loadGravityProfileV4(
   }
   if (options.artifact == null) {
     return { status: "artifact_missing", profile: null, artifactKind: null, issues: [] };
+  }
+
+  if (options.manifest) {
+    const integrity = verifyGravityV4Artifact(options.artifact, options.manifest);
+    if (!integrity.ok) {
+      return {
+        status: "artifact_invalid",
+        profile: null,
+        artifactKind: null,
+        issues: integrity.issues,
+      };
+    }
   }
 
   const envelope = validateGravityV4ArtifactEnvelope(

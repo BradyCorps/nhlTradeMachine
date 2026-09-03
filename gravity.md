@@ -127,14 +127,15 @@ netXg82 = ozXg82 + nzXg82 + dzXg82
 
 Analytical values remain unbounded. The existing rink identity is preserved by deriving display-only masses and force with documented `tanh` scales stored in model metadata.
 
-The repository currently contains only:
+The repository currently contains:
 
 - v4 types and runtime validation guards;
-- an off-by-default `GRAVITY_V4_ENABLED` server flag;
-- a loader that rejects player, season, model, and diagnostic-artifact mismatches;
+- an off-by-default `GRAVITY_V4_ENABLED` server flag (release lock `GRAVITY_V4_RELEASE_READY` is open);
+- a loader that rejects player, season, model, diagnostic-artifact and **checksum** mismatches (`artifact-manifest.ts`);
+- a committed fitted artifact: 560 profiles, 2025-26, 5v5, OZ + DZ only, untiered (`fitted-artifact.json`);
 - a zero-value, explicitly unfitted fixture for the admin diagnostic path;
 - a v4 player-panel and share-card payload adapter that remain diagnostic-only.
 
-There are no fitted v4 player values in production. No v4 value enters X-NAV or the season simulator.
+NZ has no fitted estimate (split-half r=0.099, excluded). It is stored as an explicit placeholder and rendered as "not available" — `netXg82` is OZ + DZ and is labelled so. No v4 value enters X-NAV, F-NAV, D-NAV, G-NAV, team totals, rankings, the Trade Machine, Armchair GM, Fantasy or the season simulator. Production remains dark until `GRAVITY_V4_ENABLED=true` is set. Evidence: `docs/analytics/GRAVITY_V4_RELEASE_EVIDENCE.md`.
 
-The missing work requires an authorized shift/event or possession dataset: offline fitting, block-bootstrap or posterior intervals, league distribution scales and tier cutoffs, held-out validation, portability analysis, and X-NAV incremental-value tests. Those results must not be fabricated from aggregate NHL EDGE speed or zone-time fields.
+Still missing: out-of-time (year-over-year) stability, portability, calibration by decile, league tier cutoffs, and any X-NAV incremental-value test. Those results must not be fabricated from aggregate NHL EDGE speed or zone-time fields.

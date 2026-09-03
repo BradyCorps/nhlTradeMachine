@@ -1,4 +1,5 @@
 import { SEASON } from "@/app/lib/season-config";
+import { buildSeasonReference, type SeasonReference } from "@/app/lib/season-snapshot";
 
 export const XNAV_MODEL_VERSION = "X-NAV 4.2";
 
@@ -14,6 +15,12 @@ export interface LeagueProvenance {
   modelVersion: string;
   reconciliation: "passed" | "warning";
   warning: string | null;
+  /**
+   * Season identity of the payload — projected season, completed stats
+   * season, contract ledger season, model, valuation day and the id schemes.
+   * Attached by `buildLeagueProvenance`; see season-snapshot.ts.
+   */
+  seasonReference: SeasonReference;
 }
 
 export interface ContextItem {
@@ -83,7 +90,14 @@ export function buildLeagueProvenance(input: {
     modelVersion: XNAV_MODEL_VERSION,
     reconciliation: reconciliation ? "passed" : "warning",
     warning: warnings.length > 0 ? warnings.join(" ") : null,
+    seasonReference: buildSeasonReference(),
   };
+}
+
+/** One-line season reference for a data rail — the same facts as `SeasonReference`. */
+export function seasonReferenceLine(ref: SeasonReference | null | undefined = undefined): string {
+  const r = ref ?? buildSeasonReference();
+  return `${r.projectedSeason} projected (${r.projectedSeasonGamesObserved} GP observed) · stats ${r.statsSeason} · contracts ${r.contractSeason} · ${r.modelVersion} · struck ${r.valuationAsOf}`;
 }
 
 export function formatDataTimestamp(value: string | null | undefined): string {
@@ -140,6 +154,7 @@ export function routeDataContext(
     modelVersion: XNAV_MODEL_VERSION,
     reconciliation: "warning" as const,
     warning: "Data context is unavailable.",
+    seasonReference: buildSeasonReference(),
   };
 
   return {
@@ -149,6 +164,7 @@ export function routeDataContext(
       { label: "Source / coverage", value: `${resolved.source} · ${resolved.coverage}` },
       { label: "Model", value: resolved.modelVersion },
       { label: "Reconciliation", value: resolved.reconciliation === "passed" ? "Passed" : "Warning" },
+      { label: "Season reference", value: seasonReferenceLine(resolved.seasonReference) },
     ],
     warning: resolved.warning,
   };
