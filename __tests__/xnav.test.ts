@@ -130,8 +130,15 @@ describe("G-NAV — Backup/Tandem Edge Cases", () => {
       gsax: 23.1, gamesStarted: 45, teamXga60: 2.72,
       extensionCapHit: 2.5, extensionYears: 1,
     });
-    expect(result.total).toBeLessThanOrEqual(60);
-    inRange(result.total, 30, 60, "Wedgewood NAV");
+    // NAV-03 increment 2 widened this band deliberately. The role ceiling used
+    // to be a flat clamp, which pinned Wedgewood at exactly 60 despite 23.1
+    // GSAx and a .921 save percentage while a 50-game starter with 8.3 GSAx
+    // scored 115 — a workload threshold outranking clearly better goaltending.
+    // The ceiling is still 60; it now carries 25 points of headroom so an
+    // elite tandem lands in the 60-90 band instead of tying with every other
+    // goalie above the line. He must still not price like a starter.
+    expect(result.total).toBeLessThanOrEqual(90);
+    inRange(result.total, 30, 90, "Wedgewood NAV");
   });
 
   it("Elite backup with small sample: regressed by confidence", () => {
@@ -140,13 +147,12 @@ describe("G-NAV — Backup/Tandem Edge Cases", () => {
       age: 27, capHit: 1.5, yearsRemaining: 1,
       gsax: 8.0, gamesStarted: 20, teamXga60: 2.92,
     });
-    // A hot 20-game sample must not inflate him past backup value. It does not
-    // — but with the fitted FMV the binding constraint is now the backup ROLE
-    // CEILING (35) rather than confidence regression, so he sits exactly on it
-    // instead of under it. The guarantee is the same; what enforces it changed,
-    // and the `roleCeiling` stage in the breakdown now says so out loud.
-    expect(result.total).toBeLessThanOrEqual(35);
-    inRange(result.total, 0, 35, "Elite backup (20gp) NAV");
+    // A hot 20-game sample must not inflate him past backup value. The backup
+    // role ceiling is still 35, but NAV-03 increment 2 gave it a few points of
+    // headroom rather than a flat clamp, so a hot backup sits just above it
+    // instead of tying with every other backup at exactly 35.
+    expect(result.total).toBeLessThanOrEqual(50);
+    inRange(result.total, 0, 50, "Elite backup (20gp) NAV");
   });
 
   it("Backup on a good team: per-game cap prevents inflation", () => {
@@ -155,7 +161,7 @@ describe("G-NAV — Backup/Tandem Edge Cases", () => {
       age: 30, capHit: 2.0, yearsRemaining: 1,
       gsax: 15.0, gamesStarted: 30, teamXga60: 2.67,
     });
-    expect(result.total).toBeLessThanOrEqual(35);
+    expect(result.total).toBeLessThanOrEqual(50);
   });
 
   it("Ascending 1B can exceed the old tandem cap when rate and control support it", () => {
@@ -165,7 +171,8 @@ describe("G-NAV — Backup/Tandem Edge Cases", () => {
       gsax: 50.0, gamesStarted: 45, teamXga60: 2.92,
     });
     expect(result.total).toBeGreaterThan(60);
-    expect(result.total).toBeLessThanOrEqual(95);
+    // Ascending ceiling is still 95, plus the tandem band's headroom.
+    expect(result.total).toBeLessThanOrEqual(125);
   });
 });
 
@@ -902,22 +909,24 @@ describe("X-NAV — Fair-market AAV output", () => {
 // SANITY / REGRESSION GUARDS
 // ─────────────────────────────────────────────────────────────────────────────
 describe("Sanity Guards — Values that should never happen", () => {
-  it("Veteran tandem goalie should not exceed 60 NAV", () => {
+  it("Veteran tandem goalie should not price like a starter", () => {
     const result = calcGoalieNAV({
       id: "tandem-max", name: "Tandem G", position: "G",
       age: 31, capHit: 1.0, yearsRemaining: 2,
       gsax: 50.0, gamesStarted: 45, teamXga60: 2.92,
     });
-    expect(result.total).toBeLessThanOrEqual(60);
+    // 60 ceiling + the tandem band's 25 points of headroom (NAV-03 inc. 2).
+    expect(result.total).toBeLessThanOrEqual(90);
   });
 
-  it("No backup should exceed 35 NAV", () => {
+  it("No backup should reach tandem value", () => {
     const result = calcGoalieNAV({
       id: "backup-max", name: "Backup G", position: "G",
       age: 24, capHit: 0.9, yearsRemaining: 1,
       gsax: 30.0, gamesStarted: 25, teamXga60: 2.92,
     });
-    expect(result.total).toBeLessThanOrEqual(35);
+    // 35 ceiling + the backup band's 12 points of headroom (NAV-03 inc. 2).
+    expect(result.total).toBeLessThanOrEqual(50);
   });
 
   it("Last place 1st round pick should always beat contender 1st", () => {
@@ -1390,5 +1399,72 @@ describe("calcDefenseNAV — NAV-02 fitted defensive model (individual fit)", ()
     };
     const { corsiAgainstRel, blocksPer82, highDangerAgainstRate, ...withoutDefenseFields } = forwardWithDefenseFields;
     expect(calcForwardNAV(forwardWithDefenseFields)).toEqual(calcForwardNAV(withoutDefenseFields));
+  });
+});
+
+// NAV-03 increment 2 — calcGoalieNAV's role thresholds, made continuous.
+//
+// The model used to branch on hard workload tiers (backup < 38 GP, tandem
+// 38-49, starter >= 50) in five places, the role ceiling among them. An audit
+// over real 2025-26 goalies found the consequences: on identical per-game
+// performance a goalie was worth 60 at 49 GP and 250 at 50 GP, and 20 of 77
+// goalies sat pinned to exactly a cap, so the league's best goalie (Logan
+// Thompson, 29.3 GSAx) and its sixth-best (Jet Greaves, 16.5) were both a flat
+// 250. These tests pin both failures shut.
+describe("calcGoalieNAV — continuous workload tier (no role-cap cliffs)", () => {
+  const g = (over: Record<string, unknown> = {}) => calcGoalieNAV({
+    id: "g", name: "Test Goalie", position: "G" as const,
+    age: 28, capHit: 4.0, yearsRemaining: 3, capCeiling: 95.5,
+    gsax: 20, savePct: 0.912, games: 55, gamesStarted: 55,
+    hasLiveStats: true, ...over,
+  });
+  // Same per-game rate at every workload, so only the tier moves.
+  const atGames = (games: number, perGame = 0.45) =>
+    g({ games, gamesStarted: games, gsax: perGame * games }).total;
+
+  it("has no cliff at the old 50-game starter threshold", () => {
+    // Was 190 points on a single appearance (60 -> 250). The measured step is
+    // now ~25: a real role transition, spread over the 49-60 game ramp rather
+    // than concentrated on one game.
+    expect(Math.abs(atGames(50) - atGames(49))).toBeLessThan(30);
+  });
+
+  it("has no cliff at the old 38-game tandem threshold", () => {
+    expect(Math.abs(atGames(38) - atGames(37))).toBeLessThan(25);
+  });
+
+  it("rises monotonically with workload rather than in steps", () => {
+    const series = [34, 38, 42, 46, 50, 54].map(n => atGames(n));
+    for (let i = 1; i < series.length; i++) expect(series[i]).toBeGreaterThanOrEqual(series[i - 1]);
+  });
+
+  it("keeps two strong goalies distinguishable above the role ceiling", () => {
+    // The old hard Math.min tied everyone above the line at one value.
+    const better = g({ gsax: 30 }).total;
+    const good = g({ gsax: 20 }).total;
+    expect(better).toBeGreaterThan(good);
+  });
+
+  it("still values stopping more pucks above stopping fewer", () => {
+    expect(g({ gsax: 25 }).total).toBeGreaterThan(g({ gsax: 5 }).total);
+  });
+
+  it("keeps tandem goalies ranked among themselves instead of pinned to the ceiling", () => {
+    // The flat clamp made every tandem above the line identical. Ordering
+    // inside the band is what the headroom buys back.
+    const elite = g({ games: 45, gamesStarted: 45, gsax: 23 }).total;
+    const decent = g({ games: 45, gamesStarted: 45, gsax: 12 }).total;
+    expect(elite).toBeGreaterThan(decent);
+  });
+
+  it("narrows, without fully closing, the workload gap over a better tandem goalie", () => {
+    // An honest record of the trade-off chosen here. A 45-game goalie at an
+    // elite rate used to sit at a flat 60 while a 50-game goalie at a mediocre
+    // rate scored 115 — a 55-point inversion on workload alone. Keeping the
+    // tandem guardrail meaningful means that gap narrows rather than
+    // disappears: workload is still part of a goalie's asset value.
+    const eliteLighterLoad = g({ games: 45, gamesStarted: 45, gsax: 23 }).total;
+    const mediocreFullLoad = g({ games: 50, gamesStarted: 50, gsax: 8 }).total;
+    expect(mediocreFullLoad - eliteLighterLoad).toBeLessThan(25);
   });
 });

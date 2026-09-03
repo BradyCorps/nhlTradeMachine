@@ -569,16 +569,108 @@ export function calcPickNAV(asset: AssetInput): XNAVResult {
 }
 
 // ── Goalie NAV ────────────────────────────────────────────────────────────────
+// ── Goalie workload tier — the role axis, made continuous ─────────────────────
+//
+// calcGoalieNAV used to branch on hard thresholds: backup < 38 GP, tandem
+// 38-49, starter >= 50. FIVE separate terms keyed off them — the per-game GSAx
+// cap, the confidence ceiling, the workload bonus, the FMV floor, and the role
+// ceiling — so one extra game could move a goalie's total by 190 points. On
+// identical per-game performance, Swayman and Sorokin were both worth 60 at 49
+// GP and 250 at 50 GP. The audit also found 20 of 77 goalies pinned to exactly
+// a cap, which made the top of the league unrankable: Logan Thompson (29.3
+// GSAx) and Jet Greaves (16.5) were both flat 250. Same defect class as
+// NAV-02's 20-game defensive cliff, roughly twice as severe.
+//
+// This is that role axis as a continuous 0..1 quantity. The anchors are chosen
+// so the interpolated constants REPRODUCE the old values exactly at <= 30 GP,
+// 44 GP and >= 50 GP — the steps go away without silently repricing goalies who
+// were never near a threshold.
+// A single even ramp rather than two segments: most of the value range sits
+// in the tandem->starter half (the role ceiling moves 60 -> 250 there against
+// 35 -> 60 below), so an uneven ramp concentrated that range into a handful of
+// games and left ~31 points riding on one appearance. Spread evenly across
+// 30..52 GP it is ~17, with the tandem anchor landing at 41 GP.
+function goalieWorkloadTier(games: number): number {
+  if (games <= 30) return 0;   // a pure backup load
+  if (games >= 52) return 1;   // a starter's load
+  return (games - 30) / 22;
+}
+
+/** Interpolate the old backup/tandem/starter constants along that tier. */
+function tierLerp(tier: number, backup: number, tandem: number, starter: number): number {
+  return tier <= 0.5
+    ? backup + (tandem - backup) * (tier * 2)
+    : tandem + (starter - tandem) * ((tier - 0.5) * 2);
+}
+
+/**
+ * Compress above a ceiling instead of clamping flat, so ordering survives.
+ * A hard `Math.min` ties everyone above the line together; this keeps the
+ * better goalie ahead of the worse one while still bending the top down. Same
+ * asymptotic idiom as the Robinson and Luongo curves elsewhere in this file.
+ * `softness` of 0 reproduces the old hard clamp exactly.
+ */
+function softCeiling(value: number, ceiling: number, softness: number): number {
+  if (value <= ceiling || softness <= 0) return Math.min(value, ceiling);
+  // Logarithmic, not asymptotic. An exponential approach to `ceiling +
+  // softness` saturates: two goalies far above the line both land on that
+  // limit and tie again, which is the exact failure this replaced. A log grows
+  // without bound, so the better goalie always stays ahead, while still
+  // compressing hard — 10x the excess buys about 2.3x the headroom.
+  return ceiling + softness * Math.log1p((value - ceiling) / softness);
+}
+
+/**
+ * The role ceiling as a function of workload.
+ *
+ * Deliberately NOT a straight ramp. The backup (<= 37 GP) and tandem (44-49
+ * GP) ceilings are real product guardrails — a 45-game tandem goalie is not
+ * supposed to price like a starter — so those bands hold their exact previous
+ * values. What changes is the transitions: the old +25 step at 38 GP and the
+ * +190 step at 50 GP become ramps, so no single appearance moves a goalie by
+ * more than about 21 points.
+ *
+ * The cost, chosen deliberately: a goalie just over the old 50-game line no
+ * longer jumps straight to the full starter ceiling. He climbs to it by a
+ * workhorse load (58 GP). Ranking a 51-game starter below a 58-game one is a
+ * defensible reading of workload, and it is what keeps the tandem guardrail
+ * intact without reintroducing a cliff.
+ */
+function goalieRoleCeiling(games: number, backup: number, tandem: number, starter: number): number {
+  if (games <= 37) return backup;                                         // backup band, level
+  if (games <= 44) return backup + (tandem - backup) * ((games - 37) / 7); // was a step at 38
+  if (games <= 49) return tandem;                                         // tandem band, level
+  if (games >= 60) return starter;
+  return tandem + (starter - tandem) * ((games - 49) / 11);               // was a step at 50
+}
+
+/**
+ * How much a goalie may exceed his role ceiling before it binds hard.
+ *
+ * Small in the backup and tandem bands and large for starters. The headroom
+ * is what stops the ceiling from tying goalies together: with a flat clamp the
+ * league's best goalie (29.3 GSAx) and its sixth-best (16.5) both read exactly
+ * 250, and an elite tandem (Wedgewood, 23.1 GSAx and .921) sat at 60 while a
+ * mediocre 50-game starter (Skinner, 8.3 GSAx) scored 115.
+ *
+ * These values are the deliberate middle setting: enough headroom that a
+ * genuinely elite tandem lands in the 60-90 range rather than pinned at 60,
+ * not so much that he prices like a starter.
+ */
+function goalieCeilingSoftness(games: number): number {
+  if (games <= 37) return 4;
+  if (games <= 49) return 7;
+  return 7 + 30 * Math.min(1, (games - 49) / 11);
+}
+
 export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const gamesG      = Math.max(1, asset.gamesStarted ?? asset.games ?? 1);
   const confidenceG = Math.min(1.0, Math.pow(gamesG / 60, 1.4));
-  const isStarter   = gamesG >= 50;
-  const isBackup    = gamesG < 38;
-  const isTandem    = !isStarter && !isBackup;
+  const workTier    = goalieWorkloadTier(gamesG);
 
   const gsaxRaw          = safe(asset.gsax ?? 0);
   const gsaxPerGame      = gsaxRaw / gamesG;
-  const perGameCap       = isStarter ? 0.48 : isTandem ? 0.35 : 0.22;
+  const perGameCap       = tierLerp(workTier, 0.22, 0.35, 0.48);
   const gsaxPerGameCapped = gsaxPerGame > 0 ? Math.min(gsaxPerGame, perGameCap) : gsaxPerGame;
 
   // Team HD rate correction: goalies behind high-HD-volume teams face a harder job.
@@ -601,9 +693,12 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const starterCap = !hasGoalieBaseline
     ? (asset.age <= 26 ? 0.75 : 0.80)   // no career baseline to lean on → unchanged
     : (asset.age <= 26 ? 0.62 : 0.68);  // real career baseline → regress a down year harder
-  const confidenceAdj = isStarter
-    ? Math.min(confidenceG, starterCap)
-    : confidenceG;
+  // The regression ceiling used to apply only once a goalie crossed 50 GP,
+  // which dropped confidence discontinuously at that line. It now phases in
+  // along the workload tier: no ceiling at a backup load (as before), the full
+  // starterCap at a starter's load (as before), continuous in between.
+  const confidenceCeiling = tierLerp(workTier, 1.0, (1.0 + starterCap) / 2, starterCap);
+  const confidenceAdj = Math.min(confidenceG, confidenceCeiling);
   const expGSAx       = gsaxPer60 * confidenceAdj + careerMean * (1 - confidenceAdj);
 
   let goalieImpact = expGSAx >= 0
@@ -618,9 +713,12 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
     goalieImpact = 150 + L * (1 - Math.exp(-excess / L));
   }
 
-  const workloadBonus = isStarter ? Math.min(20, (gamesG / 60) * 15)
-    : isTandem ? Math.min(10, (gamesG / 60) * 10)
-    : Math.min(5, (gamesG / 60) * 5);
+  // Same three tiers as before (5 / 10 / 20 ceilings on a games-scaled bonus),
+  // interpolated along the workload tier rather than switched at 38 and 50.
+  const workloadBonus = Math.min(
+    tierLerp(workTier, 5, 10, 20),
+    (gamesG / 60) * tierLerp(workTier, 5, 10, 15),
+  );
 
   const peakAge    = 30;
   const agePenalty = asset.age > peakAge ? Math.pow(asset.age - peakAge, 1.55) * 0.95 : 0;
@@ -657,9 +755,10 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   // The floor degrades with age (ageFactor) so a 38-year-old bad goalie on an
   // overpaid deal can still produce negative-value outcomes.
   const starterFloorSignal = clamp((expGSAx + 6) / 18, 0, 1.0);
-  const starterTmvFloor = isStarter && gamesG >= 50
-    ? Math.max(0, 65 * Math.min(ageFactor, 1.0) * starterFloorSignal)
-    : isTandem ? 30 : 0;
+  const fullStarterFloor = Math.max(0, 65 * Math.min(ageFactor, 1.0) * starterFloorSignal);
+  // Phased in along the workload tier (0 at a backup load, 30 at mid-tandem,
+  // the full starter floor at a starter's load) instead of stepping at 38/50.
+  const starterTmvFloor = tierLerp(workTier, 0, 30, fullStarterFloor);
   const fmvTmv = Math.max(trueMarketValueG, starterTmvFloor);
   
   // ── Fair market value, from contracts people actually signed ────
@@ -766,12 +865,21 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   const isAscendingGoalie = asset.age <= 27 && gamesG >= 34 && rateSignal >= 0.12 && effectiveCap <= 4.0 && !extCapHit;
 
   const isYoungControlled = asset.age <= 26 && effectiveCap <= 3.5 && !extCapHit;
-  const youngFloor = isYoungControlled && (isStarter || isTandem)
-    ? Math.max(0, (27 - asset.age) * 10 - effectiveCap * 3
-        + Math.min(15, (gamesG / 82) * 20) + (isTandem ? -8 : 0))
+  // Scaled by the workload tier rather than gated on "tandem or starter", and
+  // the old flat -8 tandem deduction becomes the same taper.
+  const youngFloor = isYoungControlled
+    ? Math.max(0, ((27 - asset.age) * 10 - effectiveCap * 3
+        + Math.min(15, (gamesG / 82) * 20) - 8 + 8 * workTier) * workTier)
     : 0;
 
-  const roleCap     = isBackup ? (isAscendingGoalie ? 50 : 35) : isTandem ? (isAscendingGoalie ? 95 : 60) : 250;
+  // The role ceiling, ramped across the old 38 and 50 game steps while the
+  // backup and tandem bands keep their exact previous values.
+  const roleCeiling = goalieRoleCeiling(
+    gamesG,
+    isAscendingGoalie ? 50 : 35,
+    isAscendingGoalie ? 95 : 60,
+    250,
+  );
   // The young-controlled floor only applies when it actually fires.
   //
   // This read `Math.max(rawTotal, youngFloor)` unconditionally, and `youngFloor`
@@ -784,11 +892,15 @@ export function calcGoalieNAV(asset: AssetInput): XNAVResult {
   //
   // Skater NAV has always been allowed to go negative for exactly this reason.
   const flooredG    = youngFloor > 0 ? Math.max(rawTotal, youngFloor) : rawTotal;
-  const cappedTotal = Math.min(flooredG, roleCap);
+  // Soft, not flat. `Math.min` tied every goalie above the line together — the
+  // audit found six pinned at exactly 250, so the model could not tell the
+  // league's best goalie from its sixth-best. Compressing instead of clamping
+  // keeps the better goalie ahead while still bending the top of the range down.
+  const cappedTotal = softCeiling(flooredG, roleCeiling, goalieCeilingSoftness(gamesG));
 
   // The role ceiling is the single most consequential thing the goalie model
-  // does — two starters above 250 come out tied — so the breakdown states it
-  // as a line item rather than leaving it implicit in the headline.
+  // does, so the breakdown states it as a line item rather than leaving it
+  // implicit in the headline.
   const goalieStages: NavStage[] = [
     stage("impact", "Projected stopping value", fmvTmv),
     stage("cap",    "Contract surplus",         capTotalG),
