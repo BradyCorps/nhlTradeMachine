@@ -2183,7 +2183,7 @@ Blend age curve, role stability, prospect NHLe, contract/control context, produc
 
 # 8. Cross-route mobile finish
 
-## [ ] MOB-01 — Preserve Cap & Crease intelligence in compact cards (`M`)
+## [x] MOB-01 — Preserve Cap & Crease intelligence in compact cards (`M`)
 
 Players and Teams compact layouts must prioritize proprietary decision signals over generic box scores.
 
@@ -2194,6 +2194,8 @@ Players and Teams compact layouts must prioritize proprietary decision signals o
 Use a sticky `Filter` button, applied-filter chips, result count, and a separate `Sort` control instead of an undiscoverable hidden-scroll filter row.
 
 **Acceptance:** no critical meaning is encoded only as a tiny glyph; compact cards remain readable at 320px and landscape modes.
+
+**Completed September 7, 2026.** Finished the existing compact-card draft on `feat/mob01-compact-cards`: Players exposes role, position-specific NAV, the existing franchise/megalodon bands, contract and annual surplus, one selected sort metric, and a dossier action; Teams exposes its present/future thesis, signed-roster NAV, cap flexibility, contract exposure, lineup vacancies, and existing dossier link. Filters have a sticky, opaque disclosure, removable selections, and result counts, with sorting separate. Roster-role tiers are not NAV value bands; unsupported NAV bands, trends, and ranges remain explicitly unavailable. Unsigned players retain UFA/RFA labels when known and never show a surplus against a fictitious $0 deal. No valuation inputs or coefficients changed. The focused `scripts/mob-compact-cards.mjs` exercises both routes at 320, 360, 390, 412, 540, 667, 768, 844, and 1024px and retains screenshots/results in `artifacts/mob/compact-cards/`. Verification against the production build: **18/18** route/viewport cases pass, with loaded Player/Team cards, working filter/removal/count controls, 44px filter targets, no card/page overflow, no header/filter collision, and an opaque sticky background. Screenshots at 320px were also reviewed. Full tests **2,454/2,454** (181 files; 0 failed), TypeScript, changed-file lint, and the **30/30**-page production build pass. The development server stayed on loading shells, so it was not used as completion evidence. MOB-02/04/05 remain separate unfinished work; this is not the full cross-route accessibility gate.
 
 ## [ ] MOB-02 — Replace crowded inline expansions with mobile sheets/routes (`M`)
 

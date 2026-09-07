@@ -918,6 +918,23 @@ select.ledger-select {
   border-bottom: 2px solid var(--ledger-ink);
 }
 
+/* MOB-01: readable decision summaries and an explicit filter disclosure. */
+.compact-filters { position: sticky; top: var(--sticky-header-height, 56px); z-index: 25; background: var(--paper); padding: 8px; }
+.compact-filter-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+.compact-filter-options { padding-top: 8px; }
+.compact-filter-options input, .compact-filter-options select, .compact-filter-options button { min-height: 44px; max-width: 100%; }
+.compact-player-intelligence, .compact-team-intelligence { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.compact-player-intelligence { margin-bottom: 8px; }
+.compact-team-intelligence { padding: 0 16px 12px; }
+.compact-player-intelligence a { display: inline-flex; align-items: center; text-decoration: underline; }
+.mob-filter-bar { position: sticky; top: var(--sticky-header-height, 56px); z-index: 25; }
+.mob-filter-bar > .compact-filters { position: static; }
+.compact-filter-options .players-filter-row2 { flex-wrap: wrap; overflow: visible; }
+.compact-filter-options .players-filter-row2 > div { flex-wrap: wrap; flex-shrink: 1 !important; }
+@media (min-width: 1040px) {
+  .compact-team-intelligence { display: none; }
+}
+
 /* Row 1: count label + search — side by side on desktop, stacked on mobile */
 .players-filter-row1 {
   display: flex;

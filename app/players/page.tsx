@@ -1,5 +1,8 @@
 "use client";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
+import Link from "next/link";
+import { CompactFilters } from "@/app/components/CompactFilters";
+import { contractVerdict } from "@/app/lib/contract-verdict";
 import { PlayerOutlook } from "@/app/components/PlayerOutlook";
 import { gravityTierColor } from "@/app/lib/gravity";
 import { gravityForDisplay } from "@/app/lib/gravity-channels";
@@ -681,6 +684,11 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
 }) {
   const isG = player.position === "G";
   const columns = PLAYER_COLUMNS[section];
+  const nav = useMemo(() => calculateAssetNAV(player), [player]);
+  const contract = contractVerdict({ ...player, fmvAav: nav.fmvAav });
+  const role = derivePlayerRoles(player)?.primary.label ?? (isG ? goalieTeir(player.gamesStarted ?? 0) : player.rosterTier?.replace(/_/g, " ") ?? "Role unavailable");
+  const band = nav.total >= FRANCHISE.megalodon ? "Megalodon" : nav.total >= FRANCHISE.threshold ? "Franchise" : "Value band unavailable";
+  const unsigned = player.expiresThisOffseason || player.capHit <= 0;
   // Compact cards lead with the value that actually controls the ordering.
   // A sort from another section falls back to this section's default, matching
   // the section-specific comparator below.
@@ -688,7 +696,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
   const compactColumns = [
     activeColumn,
     ...columns.filter(column => column.key !== activeColumn.key),
-  ].slice(0, 3);
+  ].slice(0, 1);
 
   // Mini-STRAND strengths — the mean of the off / def rail percentiles against
   // the same same-position ≥20 GP cohort the dossier ranks against, so the row
@@ -829,7 +837,16 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
           </button>
         </div>
 
-        {/* Line 2: rank pill + stats row */}
+        <div className="compact-player-intelligence">
+          <p>Role: {role}</p>
+          <p><strong>{isG ? "G-NAV" : player.position === "D" ? "D-NAV" : "F-NAV"} {nav.total} · {band}</strong></p>
+          <p>NAV trend: unavailable · NAV range: unavailable</p>
+          <p>Contract: {unsigned ? (expiringRightsLabel(player) ? `Unsigned ${expiringRightsLabel(player)}` : "No signed contract recorded") : `$${player.capHit.toFixed(2)}M · ${player.yearsRemaining} ${player.yearsRemaining === 1 ? "year" : "years"} left`}</p>
+          <p>Annual surplus: {unsigned ? "no signed deal to price" : contract.surplus != null ? `${contract.surplus >= 0 ? "+" : "−"}$${Math.abs(contract.surplus).toFixed(2)}M` : "unavailable"}</p>
+          <Link className="tap-target" href={`/players/${player.id}`} onClick={event => event.stopPropagation()}>Open player dossier</Link>
+        </div>
+
+        {/* Rank and the selected secondary metric */}
         <div style={{ display: "flex", alignItems: "center", gap: "0", paddingLeft: "46px", minWidth: 0 }}>
           {/* Rank */}
           <span style={{
@@ -1255,7 +1272,12 @@ export default function PlayersPage() {
       )}
 
       {/* ── Filter bar ── */}
-      <div className="players-filter-bar">
+      <div className="players-filter-bar mob-filter-bar">
+        <CompactFilters count={loading ? "Loading players" : playerCountLabel(filtered.length)} chips={[
+          ...(search ? [{ label: search, clear: () => setSearch("") }] : []),
+          ...(posFilter !== "ALL" ? [{ label: posFilter, clear: () => setPosFilter("ALL") }] : []),
+          ...(teamFilter !== "ALL" ? [{ label: teamFilter, clear: () => setTeamFilter("ALL") }] : []),
+        ]}>
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "12px 16px 10px" }}>
 
           {/* Row 1: count + search */}
@@ -1282,10 +1304,11 @@ export default function PlayersPage() {
           </div>
 
           {/* Row 2: pos filters + team dropdown */}
-          <div className="players-filter-row2" role="group" aria-label="Position and team filters" tabIndex={0}>
+          <div className="players-filter-row2" role="group" aria-label="Position and team filters">
             <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
               {(["ALL","F","D","G"] as const).map(p => (
                 <button key={p} className={`filter-btn${posFilter === p ? " active" : ""}`}
+                  aria-pressed={posFilter === p}
                   style={{ fontSize: "11px", letterSpacing: "0.04em" }}
                   onClick={() => setPosFilter(p)}>
                   {p === "ALL" ? "All" : p === "F" ? "Forwards" : p === "D" ? "Defence" : "Goalies"}
@@ -1293,6 +1316,7 @@ export default function PlayersPage() {
               ))}
             </div>
             <select
+              aria-label="Filter by team"
               value={teamFilter}
               onChange={e => setTeamFilter(e.target.value)}
               style={{
@@ -1313,9 +1337,9 @@ export default function PlayersPage() {
               ))}
             </select>
           </div>
-          <HorizontalScrollCue label="Swipe or scroll for all filters" />
 
         </div>
+        </CompactFilters>
       </div>
 
       <PlayersIconKey />

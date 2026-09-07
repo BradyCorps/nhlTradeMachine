@@ -22,6 +22,7 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
   const moreRef = useRef<HTMLDivElement>(null);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const moreMenuId = useId();
+  const headerRef = useRef<HTMLElement>(null);
   const pathname = usePathname();
   const resolvedActiveTab =
     pathname?.startsWith("/armchair-gm") ? "armchair-gm"
@@ -30,6 +31,16 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
     : pathname?.startsWith("/press-box") ? "press-box"
     : pathname?.startsWith("/fantasy") ? "fantasy"
     : activeTab;
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const update = () => document.documentElement.style.setProperty("--sticky-header-height", `${header.getBoundingClientRect().height}px`);
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    update();
+    return () => { observer.disconnect(); document.documentElement.style.removeProperty("--sticky-header-height"); };
+  }, []);
 
   useEffect(() => {
     let compact = false;
@@ -82,6 +93,7 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
 
   return (
     <header
+      ref={headerRef}
       data-compact={isCompact}
       className={[
         "sticky top-0 z-40 flex flex-col border-b border-ledger-rule bg-ledger-paper transition-[padding,box-shadow] duration-200",

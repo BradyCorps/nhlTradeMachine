@@ -1,5 +1,7 @@
 # Development Notes
 
+- 2026-09-07: **MOB-01 compact decision cards completed** (`app/players/page.tsx`, `app/teams/page.tsx`, `app/components/{CompactFilters,Header}.tsx`, `app/globals.css`, `scripts/mob-compact-cards.mjs`, consolidated audit backlog, `docs/DEVNOTES.md`): finished the existing Player/Team summaries and sticky filter workflow, corrected unsigned-contract surplus and NAV-band labels, and fixed the transparent sticky background found in screenshot review; production browser checks **18/18**, tests **2,454/2,454** (0 failed), TypeScript/lint/build green, screenshots and report retained in `artifacts/mob/compact-cards/`; MOB-02/04/05 remain open.
+
 ## Open threads (as of 2026-08-19)
 
 1. ✓ **RESOLVED — Goalie Edge is live on production.** `GoalieEdgePanel` renders on capandcrease.com (Sorokin: high-danger .864 vs .811 league, 99th pctile, 1,530 SA), matching the known-good fixture, so capture → parser → join → panel is verified with real data. Operational lesson worth keeping: the backfill must run where the Turso creds and NHL egress already are — the **BACKFILL GOALIE EDGE** button on `/admin/health` (or `POST /api/admin/nhl-feed { goalies: true }`), NOT `scripts/backfill-goalie-edge.ts` from a codespace, which silently defaulted to `file:local.db` (plain `tsx` does not load `.env.local`) and wrote 86 rows to the wrong database. The script still has its place when `DATABASE_URL`/`DATABASE_AUTH_TOKEN` are explicitly exported to Turso. `--discover` currently finds zero goalies outside the bundled snapshot, so the CSV is current.
