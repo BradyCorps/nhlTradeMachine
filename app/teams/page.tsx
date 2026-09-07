@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { CompactFilters } from "@/app/components/CompactFilters";
 import { usePathname } from "next/navigation";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
@@ -580,6 +581,13 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
             <span>Page</span>
           </Link>
         )}
+      </div>
+
+      <div className="compact-team-intelligence">
+        <p><strong>{QUADRANT_LABEL[contention.quadrant]}:</strong> {contention.presentLabel} now; {contention.futureLabel} outlook.</p>
+        <p>Present {contention.present.toFixed(1)}/10 · Future {contention.future.toFixed(1)}/10 · Signed roster assets {Math.round(rosterNAV).toLocaleString()} NAV</p>
+        <p>Cap flexibility: ${Math.abs(team.capSpace).toFixed(1)}M {team.capSpace < 0 ? "over the ceiling" : "available"}.</p>
+        <p>{team.capSpace < 0 ? "Primary constraint: over the cap." : `Contract exposure: ${ufaCount} unsigned UFAs and ${rfaCount} unsigned RFAs.`} Lineup vacancies: {Math.max(0, 12 - lines.forwards.flat().length)} forwards, {Math.max(0, 6 - lines.defense.flat().length)} defense, {Math.max(0, 2 - lines.goalies.length)} goalies.</p>
       </div>
 
       {/* Expanded detail */}
@@ -1182,13 +1190,15 @@ export default function TeamsPage() {
         </div>
 
         {/* League overview strip */}
+        <CompactFilters count={`${filtered.length} teams`} chips={filterPhase === "ALL" ? [] : [{ label: filterPhase, clear: () => setFilterPhase("ALL") }]}>
         <div
-          className="grid grid-cols-5 gap-2 mb-5 p-3 border"
+          className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-5 p-3 border"
           style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
         >
           {(["Contender", "Bubble", "Retooling", "Rebuilding", "Tanking"] as const).map((phase) => (
             <button
               key={phase}
+              aria-pressed={filterPhase === phase}
               onClick={() => setFilterPhase(filterPhase === phase ? "ALL" : phase)}
               className="text-center cursor-pointer p-1"
               style={{
@@ -1209,6 +1219,7 @@ export default function TeamsPage() {
             </button>
           ))}
         </div>
+        </CompactFilters>
 
         {/* NAV chart */}
         <TeamNavChart
