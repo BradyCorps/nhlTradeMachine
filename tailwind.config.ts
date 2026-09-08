@@ -24,14 +24,14 @@ const config: Config = {
           'ink-mid':    '#3d2e18',
           'ink-body':   '#4a3820',
           'ink-light':  '#5e4f3a',
-          'ink-faint':  '#6e5a3d',
+          'ink-faint':  '#534129',
           // Rule tones
           rule:         '#b8a070',
           'rule-mid':   '#c8b890',
           'rule-light': '#c8b078',
           'rule-faint': '#d6c8a5',
           // Accent
-          red:          '#b83020',
+          red:          '#982719',
           'red-deep':   '#c0392b',
           'red-dark':   '#d43820',
           green:        '#1a5c2e',

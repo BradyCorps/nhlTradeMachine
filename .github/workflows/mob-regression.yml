@@ -1,0 +1,43 @@
+name: Mobile regression
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npm run build
+      - run: npx playwright-core install --with-deps chromium
+      - name: Fetch pinned accessibility test tool
+        run: |
+          curl --fail --location https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.10.3/axe.min.js --output /tmp/mob-axe-4.10.3.min.js
+          echo '880970c081707360e64f34cea25ff91892f5bc95675b0776925b9709dd8a68bb  /tmp/mob-axe-4.10.3.min.js' | sha256sum --check
+      - name: Start production server
+        run: |
+          npm run start &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Device and axe matrix
+        run: node scripts/mob-regression.mjs
+      - name: Keyboard and workflow regression
+        if: always()
+        run: node scripts/mob-workflows.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobile-screenshots-and-accessibility
+          path: artifacts/mob/
+          retention-days: 14

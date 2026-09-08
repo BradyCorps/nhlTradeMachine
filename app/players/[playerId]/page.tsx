@@ -33,6 +33,7 @@ import { derivePlayerRoles } from "@/app/lib/player-roles";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import { contractVerdict, verdictColor } from "@/app/lib/contract-verdict";
+import { DossierNav } from "@/app/components/DossierNav";
 import { getLiveCapCeiling } from "@/app/lib/live-cap-settings";
 import { displayPosition } from "@/app/lib/display-position";
 import {
@@ -208,6 +209,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
       }} />
       <div className="mx-auto" style={{ maxWidth: 760 }}>
         <Header activeTab="players" />
+        <DossierNav sections={[{ id: "player-identity", label: "Player" }, { id: "player-value", label: "Value" }, { id: "player-contract", label: "Contract" }, { id: "player-strand", label: "STRAND" }]} />
 
         {/* Dossier strip */}
         <div className="flex items-center justify-between border-b-2 pb-2 mb-4 mt-4" style={{ borderColor: ink }}>
@@ -220,7 +222,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
         </div>
 
         {/* Identity header */}
-        <div className="flex items-center gap-4 border p-4 mb-3" style={{ borderColor: ink, background: "var(--paper-card, var(--paper-inset))" }}>
+        <div id="player-identity" className="flex flex-wrap items-center gap-4 border p-4 mb-3" style={{ borderColor: ink, background: "var(--paper-card, var(--paper-inset))" }}>
           <PlayerAvatar name={player.name} position={player.position} size={64} shape="round"
             playerId={player.id} teamId={player.teamId} headshot={player.headshot}
             className="shrink-0" />
@@ -325,7 +327,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
         )}
 
         {/* NAV components — horizontal diverging bar chart */}
-        <div className="border mb-3 px-3 py-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
+        <div id="player-value" className="border mb-3 px-3 py-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
           <NavTrajectoryChart
             stages={navComponents.map(c => ({ label: c.label, value: c.val, desc: c.desc }))}
             total={xnav.total}
@@ -334,7 +336,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
         </div>
 
         {/* Contract + market */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border px-4 py-3 mb-4" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
+        <div id="player-contract" className="flex flex-wrap items-center justify-between gap-3 border px-4 py-3 mb-4" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
           <div>
             <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>
               {verdict.kind === "noContract" ? "Expiring deal" : "Contract"}
@@ -366,7 +368,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
         </div>
 
         {/* STRAND DNA — stylistic identity profile */}
-        <div className="border p-4 mb-4" style={{ borderColor: rule, background: "var(--paper-card, var(--paper-inset))" }}>
+        <div id="player-strand" className="border p-4 mb-4" style={{ borderColor: rule, background: "var(--paper-card, var(--paper-inset))" }}>
           <div className="text-[9px] font-black font-mono uppercase tracking-[0.18em] mb-3" style={{ color: faint }}>
             STRAND DNA
           </div>

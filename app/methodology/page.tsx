@@ -121,7 +121,7 @@ export default function MethodologyPage() {
           </h1>
           <p className="mt-2 text-[10px] uppercase tracking-[0.18em] text-ledger-ink-body leading-relaxed">
             Why these systems exist and how they think. For definitions and keys, read the{" "}
-            <a href="/glossary" className="underline hover:text-ledger-red transition-colors">Glossary</a>.
+            <a href="/glossary" className="inline-flex items-center min-h-11 underline hover:text-ledger-red transition-colors">Glossary</a>.
           </p>
         </header>
 
@@ -154,7 +154,7 @@ export default function MethodologyPage() {
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block px-5 py-2.5 font-mono text-[11px] font-black uppercase tracking-[0.15em] border-2 no-underline transition-colors hover:opacity-80"
-              style={{ borderColor: "var(--ledger-ink)", background: "var(--ledger-amber, #d4a017)", color: "var(--ledger-ink)" }}
+              style={{ borderColor: "var(--ledger-ink)", background: "var(--ledger-amber, #d4a017)", color: "var(--paper)" }}
             >
               ☕ Buy Me a Coffee
             </a>

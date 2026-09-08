@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { ChartData } from "@/app/components/ChartData";
 import { calcPlayerTimeline } from "@/app/lib/player-timeline";
 import { calcNAV, type AssetInput } from "@/app/lib/xnav-engine";
 import { SEASON, projectedCapCeiling } from "@/app/lib/season-config";
@@ -24,6 +25,7 @@ function NavBreakdown({ nav }: { nav: XNAVResult }) {
   return (
     <div style={{ marginBottom: 10 }}>
       <div className="ptl-sech"><span>What drives the valuation</span></div>
+      <ChartData title="Valuation components" columns={["NAV", "Meaning"]} rows={rows.map(row => ({ id: row.label, label: row.label, values: [String(row.val), row.desc] }))} />
       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
         {rows.map(r => {
           const pct = (Math.abs(r.val) / maxAbs) * 100;
@@ -176,6 +178,7 @@ export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
       <NavBreakdown nav={currentNav} />
 
       {/* Value across the deal */}
+      <ChartData title="Projected contract years" columns={["Age", "NAV", "Cap hit ($M)"]} rows={years.map(year => ({ id: String(year.year), label: `Year ${year.year}`, values: [String(year.age), String(year.nav), String(year.capHit)] }))} />
       <div className="ptl-sech">
         <span>Trade value (NAV) by contract year</span>
         <span style={{ color: toneColor(trajTone), fontWeight: 900 }}>{trajectory}</span>

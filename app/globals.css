@@ -12,7 +12,7 @@
   --ledger-ink-deep:     #261e12;
   --ledger-ink-mid:      #3d2e18;
   --ledger-ink-body:     #4a3820;
-  --ledger-ink-faint:    #6e5a3d;  /* darkened from #9a7d58 — agate must be readable */
+  --ledger-ink-faint:    #534129;  /* MOB-05: AA contrast on the darker inset paper. */
   --ledger-card:         #e4d8b8;
   --ledger-card-light:   #ede4cc;
   --ledger-warm:         #e8dab8;
@@ -20,7 +20,7 @@
   --ledger-rule:         #b8a070;
   --ledger-rule-mid:     #c8b890;
   --ledger-rule-light:   #d6c8a5;
-  --ledger-red:          #b83020;
+  --ledger-red:          #982719;
   --ledger-red-deep:     #c0392b;
   --ledger-red-dark:     #d43820;
   --ledger-green:        #1a5c2e;
@@ -34,8 +34,8 @@
      must never be used for text — it is a fill, which is what the kit
      means by "reserved for the crease and related data accents". */
   --ledger-ice:          #1a4b5b;
-  --ledger-brown:        #6b5030;
-  --ledger-amber:        #8a5c00;
+  --ledger-brown:        #60472b;
+  --ledger-amber:        #704900;
   --ledger-amber-dark:   #9a6b00;
   --ledger-orange:       #d97706;
   --fig-bright: #a05871;
@@ -65,7 +65,7 @@
   --ink-ghost:    #5c503d;
   --ink-dark-mode: #ebe9e5;
 
-  --rule:         #a89569;
+  --rule:         #635340;
   --rule-light:   #d6c8a5;
 
   --red:          #a63524;
@@ -75,7 +75,7 @@
   --green:        #245e39;
   --green-dim:    rgba(36, 94, 57, 0.06);
 
-  --amber:        #8a5c00;
+  --amber:        #704900;
   --amber-dark: #362608;
   --amber-dim:    rgba(138, 92, 0, 0.06);
 
@@ -94,7 +94,7 @@ html, body {
   font-family: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
   -webkit-font-smoothing: subpixel-antialiased;
   font-feature-settings: "kern" 1, "onum" 1;
-  text-shadow: 0 0 0.1px rgba(0,0,0,0.1);
+  text-shadow: none;
 }
 
 html {
@@ -916,6 +916,46 @@ select.ledger-select {
 .players-filter-bar {
   background: var(--paper);
   border-bottom: 2px solid var(--ledger-ink);
+}
+
+/* MOB-01: readable decision summaries and an explicit filter disclosure. */
+.compact-filters { position: sticky; top: var(--sticky-header-height, 56px); z-index: 25; background: var(--paper); padding: 8px; }
+.compact-filter-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+.compact-filter-options { padding-top: 8px; }
+.compact-filter-options input, .compact-filter-options select, .compact-filter-options button { min-height: 44px; max-width: 100%; }
+.compact-player-intelligence, .compact-team-intelligence { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.compact-player-intelligence { margin-bottom: 8px; }
+.compact-team-intelligence { padding: 0 16px 12px; }
+.compact-player-intelligence a { display: inline-flex; align-items: center; text-decoration: underline; }
+.mob-filter-bar { position: sticky; top: var(--sticky-header-height, 56px); z-index: 25; }
+.mob-filter-bar > .compact-filters { position: static; }
+.compact-filter-options .players-filter-row2 { flex-wrap: wrap; overflow: visible; }
+.compact-filter-options .players-filter-row2 > div { flex-wrap: wrap; flex-shrink: 1 !important; }
+.mobile-detail-sheet { position: fixed; inset: 0; z-index: 200; background: var(--paper-bg); color: var(--ledger-ink); overflow-y: auto; overscroll-behavior: contain; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.mobile-detail-heading { position: sticky; top: 0; z-index: 2; background: var(--paper-bg); border-bottom: 1px solid var(--ledger-rule); padding: 8px 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.mobile-detail-heading h2 { font-size: 16px; font-weight: 700; }
+.mobile-detail-heading nav { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; }
+.mobile-detail-content { padding: 12px; min-width: 0; overflow-wrap: anywhere; }
+.mobile-detail-content [role="tablist"] { position: sticky; top: 0; flex-wrap: wrap; overflow: visible !important; }
+.mobile-detail-content :is(button, a, select, summary) { min-height: 44px; }
+.mobile-detail-content :is(h2, h3, [role="tablist"]) { scroll-margin-top: 130px; }
+.mobile-detail-content .player-expanded-panel [role="tablist"] { flex-wrap: wrap; }
+.chart-data { padding: 8px; font-size: 12px; line-height: 1.5; }
+.chart-data summary { cursor: pointer; text-decoration: underline; }
+.chart-data table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.chart-data th, .chart-data td { text-align: left; vertical-align: top; padding: 6px 3px; overflow-wrap: anywhere; border-bottom: 1px solid var(--ledger-rule); }
+.chart-data th:last-child { width: 55px; }
+.text-ledger-rule { color: var(--ledger-ink-faint); }
+.dossier-section-nav { position: sticky; top: var(--sticky-header-height, 56px); z-index: 30; display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 0; background: var(--paper-bg, var(--paper)); }
+[id^="player-"], [id^="team-"] { scroll-margin-top: calc(var(--sticky-header-height, 56px) + 110px); }
+@media (max-width: 1039px) {
+  button, input:not([type="checkbox"]):not([type="radio"]), select, summary { min-height: 44px; min-width: 44px; }
+  a { min-height: 44px; min-width: 44px; }
+  a:not(p a) { display: inline-flex; align-items: center; }
+  .chart-data button { min-width: 44px; }
+}
+@media (min-width: 1040px) {
+  .compact-team-intelligence { display: none; }
 }
 
 /* Row 1: count label + search — side by side on desktop, stacked on mobile */

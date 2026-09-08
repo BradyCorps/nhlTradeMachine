@@ -1,4 +1,5 @@
 "use client";
+import { MobileDetail } from "@/app/components/MobileDetail";
 // ── Fantasy Hockey Tools — /fantasy ──────────────────────────────
 // F0 release priority: the fantasy research desk, workshopped into a
 // draft-day tool. League-configurable scoring + roster build (drives FP
@@ -791,6 +792,7 @@ export default function FantasyPage() {
                       </div>
 
                       {isExpanded && (
+                        <MobileDetail title={`${r.p.name} Ledger outlook`} onClose={() => setExpandedId(null)}>
                         <div
                           id={outlookId}
                           role="region"
@@ -801,6 +803,7 @@ export default function FantasyPage() {
                           <PlayerOutlook asset={r.p as any} />
                           <XNavStrip nav={navMap[r.p.id]} position={r.p.position} />
                         </div>
+                        </MobileDetail>
                       )}
                     </article>
                   );

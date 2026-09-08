@@ -7,6 +7,7 @@
 // color gradients. The output is pure SVG rendered through React.
 
 import React, { useId, useMemo } from "react";
+import { ChartData } from "@/app/components/ChartData";
 import { contours as d3Contours } from "d3-contour";
 import { interpolateRgbBasis } from "d3-interpolate";
 import { scaleLinear, scaleSequential } from "d3-scale";
@@ -208,6 +209,7 @@ export default function GravityHeatMap({ masses, tier, force, isDefenseman, play
           ATTACKING →
         </text>
       </svg>
+      <ChartData title={`${playerName ?? "Team"} territorial model`} columns={["Model mass"]} rows={Object.entries(masses).map(([zone, value]) => ({ id: zone, label: zone, values: [String(value)] }))} />
 
       {/* Color legend */}
       <div className="flex items-center justify-between mt-1.5">

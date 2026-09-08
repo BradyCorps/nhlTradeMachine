@@ -1,4 +1,5 @@
 "use client";
+import { ChartData } from "@/app/components/ChartData";
 // ── StrandDisplay — shared STRAND renderer ───────────────────
 // Used by Armchair GM (StrandView.tsx), the Trade Machine (asset rows),
 // and player analytics (players/page.tsx). Takes pre-computed traits —
@@ -299,6 +300,10 @@ export default function StrandDisplay({
             </g>
           )}
         </svg>
+        <ChartData title={ariaDescription} columns={["Rating / 100", "Actual", compareLabel ?? "Comparison"]} rows={[
+          ...offTraits.map((trait, index) => ({ id: `off-${index}`, label: `Offense: ${trait.label}`, values: [nodeIndex(trait), String(rawLabel(trait) ?? "Unavailable"), compareOff?.[index] ? describeTrait(compareOff[index]) : "Unavailable"] })),
+          ...defTraits.map((trait, index) => ({ id: `def-${index}`, label: `Defense: ${trait.label}`, values: [nodeIndex(trait), String(rawLabel(trait) ?? "Unavailable"), compareDef?.[index] ? describeTrait(compareDef[index]) : "Unavailable"] })),
+        ]} />
       </div>
 
       {/* ── EDGE band / footer ───────────────────────────────── */}

@@ -268,7 +268,7 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName, coh
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
         style={{ maxWidth: W, cursor: brushing ? "crosshair" : "default" }}
-        role="img"
+        role="group"
         aria-label={`Scatter plot of offensive value (horizontal) vs defensive value (vertical) for ${playerName} and ${peers.length} same-position peers, split into four quadrants at the league median, with denser regions of the league shaded. ${playerName} sits in the ${playerQuadrant} quadrant.`}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}

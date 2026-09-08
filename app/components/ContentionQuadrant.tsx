@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { ChartData } from "@/app/components/ChartData";
 import { CONTENTION_THRESHOLDS, classifyContention } from "@/app/armchair-gm/contention";
 
 export interface ContentionData {
@@ -76,6 +77,7 @@ export default function ContentionQuadrant({
 
   return (
     <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <ChartData title="Contention comparison" columns={["Present / 10", "Future / 10", "Window"]} rows={teams.map((team, index) => ({ id: String(index), label: team.name, values: [String(team.data.present), String(team.data.future), QUADRANT_META[team.data.quadrant].label] }))} />
 
       {/* ── Scatter plot ── */}
       <div style={{ flexShrink: 0 }}>

@@ -4,6 +4,7 @@
 // proprietary read — X-NAV breakdown, gravity field, modern role, and
 // EDGE tracking — alongside percentiles vs the positional field.
 import React, { useMemo, useRef, useCallback, useState } from "react";
+import { ChartData } from "@/app/components/ChartData";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
@@ -546,6 +547,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       </div>
 
       {/* Export control — outside the captured plate (PA6) */}
+      <ChartData title={`${player.name} percentile card`} columns={["Actual", "Percentile", "Peer median"]} rows={percentiles.map(stat => ({ id: stat.key, label: stat.label, values: [stat.formatted, stat.pct == null ? "Unavailable" : String(stat.pct), stat.median] }))} />
       <div style={{ marginTop: 10, display: "flex", justifyContent: "center" }}>
         <button
           type="button"
