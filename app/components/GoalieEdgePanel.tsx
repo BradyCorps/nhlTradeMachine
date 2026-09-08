@@ -1,4 +1,5 @@
 "use client";
+import { ChartData } from "@/app/components/ChartData";
 
 // ── GoalieEdgePanel — NHL EDGE shot-location detail ──────────────
 //
@@ -216,7 +217,8 @@ export default function GoalieEdgePanel({ detail, playerName }: Props) {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        <ChartData title={`${playerName} save locations`} columns={["Save percentage", "League average", "Shots against", "Saves", "Goals against", "Meaning"]} rows={zones.map(zone => ({ id: zone.zone, label: ZONE_LABEL[zone.zone], values: [pct3(zone.savePct), pct3(zone.savePctLeagueAvg), int(zone.shotsAgainst), int(zone.saves), int(zone.goalsAgainst), ZONE_DESC[zone.zone]] }))} />
+        <div className="overflow-x-auto" role="region" aria-label="Goalie shot-location table; scroll horizontally for all columns" tabIndex={0}>
           <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 420 }}>
             <thead>
               <tr>

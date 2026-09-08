@@ -284,8 +284,9 @@ describe("no cold navy survives anywhere in the palette", () => {
 
   it("gives the two token families one amber, not two", () => {
     const css = read("app/globals.css");
-    expect(css).toContain("--ledger-amber:        #8a5c00");
-    expect(css).toContain("--amber:        #8a5c00");
+    // MOB-05: the inset-paper contrast regression requires the darker ink.
+    expect(css).toContain("--ledger-amber:        #704900");
+    expect(css).toContain("--amber:        #704900");
   });
 });
 

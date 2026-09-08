@@ -32,7 +32,7 @@ export default function GlossaryPage() {
           </h1>
           <p className="mt-2 text-[10px] uppercase tracking-[0.18em] text-ledger-ink-body leading-relaxed">
             What every number, badge, and term means. For the how and why, read the{" "}
-            <a href="/methodology" className="underline hover:text-ledger-red transition-colors">Methodology</a>.
+            <a href="/methodology" className="inline-flex items-center min-h-11 underline hover:text-ledger-red transition-colors">Methodology</a>.
           </p>
         </header>
 

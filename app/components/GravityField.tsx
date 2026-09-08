@@ -1,4 +1,5 @@
 "use client";
+import { ChartData } from "@/app/components/ChartData";
 // ── GravityField v3 — zone-mass rink diagram, tier icons, glossary ──
 // Renders the Spacetime engine's output: three zone masses (OZ well,
 // NZ well, DZ dome) on a rink strip, with position-relative force.
@@ -637,6 +638,7 @@ export default function GravityField({ profile, playerName, mode = "full" }: Pro
           }}
         >
           <FieldDiagram profile={profile} />
+          <ChartData title={`${playerName} modelled field`} columns={["Model mass"]} rows={Object.entries(profile.masses).map(([zone, value]) => ({ id: zone, label: zone, values: [String(value)] }))} />
           <p
             className="px-2 pb-2 text-[9px] font-mono leading-snug"
             style={{ color: "var(--ledger-ink-faint)" }}

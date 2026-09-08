@@ -1,4 +1,5 @@
 "use client";
+import { MobileDetail } from "@/app/components/MobileDetail";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { withProjectedTrade } from "@/app/lib/cap-horizon";
@@ -385,6 +386,7 @@ function AssetRow({
         </div>
       </div>
       {open && !isPick && (
+        <MobileDetail title={`${asset.name} scouting`} onClose={() => setOpen(false)}>
         <div className="px-4 pb-4 grid gap-3 sm:grid-cols-2" style={{ background: "var(--paper-inset)" }}>
           <MeasuredProfile asset={asset} />
           <div className="min-w-0">
@@ -409,6 +411,7 @@ function AssetRow({
             )}
           </div>
         </div>
+        </MobileDetail>
       )}
     </div>
   );

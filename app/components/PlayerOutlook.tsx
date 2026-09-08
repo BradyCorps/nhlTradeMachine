@@ -6,6 +6,7 @@
 // for the fantasy and docket surfaces — this is the analytics-desk read.
 
 import { useMemo } from "react";
+import { ChartData } from "@/app/components/ChartData";
 import type { Asset } from "@/app/lib/trade-types";
 import { deriveOutlook, type OutlookTone, type TrajectoryDirection } from "@/app/lib/player-outlook";
 
@@ -77,6 +78,12 @@ export function PlayerOutlook({ asset }: { asset: Asset }) {
       </div>
 
       {/* Next-season projection band */}
+      <ChartData title="Scoring outlook" columns={["Points / 82"]} rows={[
+        ...outlook.trajectory.seasons.map(season => ({ id: season.season, label: season.season, values: [String(season.pace)] })),
+        { id: "floor", label: "Next season floor", values: [String(floor)] },
+        { id: "median", label: "Next season median", values: [String(median)] },
+        { id: "ceiling", label: "Next season ceiling", values: [String(ceiling)] },
+      ]} />
       <div className="p-2.5" style={{ background: "var(--ledger-warm)", border: "1px solid #b8a070" }}>
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-2xs font-black uppercase tracking-wider" style={{ color: faint }}>Next-Season Projection</span>

@@ -6,6 +6,7 @@
 // more readable than the old vertical waterfall on mobile.
 
 import React from "react";
+import { ChartData } from "@/app/components/ChartData";
 import { scaleLinear } from "d3-scale";
 import { HelpPopover } from "@/app/components/HelpPopover";
 
@@ -130,6 +131,7 @@ export default function NavTrajectoryChart({ stages, total, playerName }: Props)
         })}
 
       </svg>
+      <ChartData title={`NAV breakdown${playerName ? ` for ${playerName}` : ""}`} columns={["NAV", "Meaning"]} rows={[...stages.map(stage => ({ id: stage.label, label: stage.label, values: [String(stage.value), stage.desc] })), { id: "total", label: "Total", values: [String(total), "Combined value"] }]} />
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[9px] font-black uppercase tracking-[0.1em]" style={{ color: "var(--ledger-ink-faint)" }}>
         {stages.map(stage => (
           <HelpPopover key={stage.label} label={stage.label} definition={stage.desc}>{stage.label}</HelpPopover>

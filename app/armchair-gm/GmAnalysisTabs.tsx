@@ -1,4 +1,5 @@
 "use client";
+import { MobileDetail } from "@/app/components/MobileDetail";
 // GM analysis tab deck: lineups, Team DNA, comparison, trade breakdown, sim.
 import React, { useState, useMemo, useEffect, useRef, Suspense, lazy } from "react";
 import { navStagesForDisplay } from "@/app/lib/nav-breakdown";
@@ -135,6 +136,7 @@ export function GmAnalysisTabs({
   // What the user picked. Held even while it is unusable, so putting assets
   // back on the block returns them to the tab they were reading.
   const [selectedTab, setSelectedTab] = useState<GmTab>(GM_TAB_FALLBACK);
+  const [detailOpen, setDetailOpen] = useState(false);
   const hasAssets = blocks[0].length > 0 || blocks[1].length > 0;
 
   const tabs: (GmTabSpec & { label: string; badge?: number })[] = [
@@ -170,6 +172,8 @@ export function GmAnalysisTabs({
 
   return (
     <div style={{ marginTop: "8px", marginBottom: "16px" }}>
+      <button type="button" className="tap-target filter-btn lg:hidden" aria-expanded={detailOpen} onClick={() => setDetailOpen(true)}>Open advanced views</button>
+      <MobileDetail title="Armchair advanced views" onClose={() => setDetailOpen(false)} enabled={detailOpen}>
       {/* Tab bar */}
       <div
         role="tablist"
@@ -351,6 +355,7 @@ export function GmAnalysisTabs({
           </div>
         )}
       </div>
+      </MobileDetail>
     </div>
   );
 }

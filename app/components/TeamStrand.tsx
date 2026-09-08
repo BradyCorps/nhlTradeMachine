@@ -10,6 +10,7 @@
 // exactly on the path by construction — no blending artefacts.
 
 import React from "react";
+import { ChartData } from "@/app/components/ChartData";
 
 export interface TeamStrandData {
   off: { OPS: number; xG: number; NOIV: number; TOI: number };
@@ -63,9 +64,9 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
   const AMP = 46;
 
   const ICE = "#1a4b5b";
-  const RED  = "#b83020";
-  const GOLD = "#9a7d58";
-  const GRAY = "#888888";
+  const RED  = "var(--ledger-red)";
+  const GOLD = "var(--ledger-brown)";
+  const GRAY = "var(--ledger-ink-faint)";
   const MONO = "'Courier Prime', monospace";
 
   const freq = (2 * Math.PI) / W;
@@ -157,14 +158,14 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
         <span style={{ fontSize: 9, fontWeight: 900, flexShrink: 0 }}>
           <span style={{ color: ICE }}>OFF {offScore}</span>
           {compare && Math.abs(offDelta) >= 0.5 && (
-            <span style={{ color: offDelta >= 0 ? "#2a7a44" : "var(--ledger-red)", marginLeft: 3 }}>
+            <span style={{ color: offDelta >= 0 ? "var(--ledger-green)" : "var(--ledger-red)", marginLeft: 3 }}>
               {signedDelta(offDelta)}
             </span>
           )}
           <span style={{ color: "var(--ledger-ink-faint)", margin: "0 3px" }}>·</span>
           <span style={{ color: RED }}>DEF {defScore}</span>
           {compare && Math.abs(defDelta) >= 0.5 && (
-            <span style={{ color: defDelta >= 0 ? "#2a7a44" : "var(--ledger-red)", marginLeft: 3 }}>
+            <span style={{ color: defDelta >= 0 ? "var(--ledger-green)" : "var(--ledger-red)", marginLeft: 3 }}>
               {signedDelta(defDelta)}
             </span>
           )}
@@ -182,7 +183,7 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
                            padding: "2px 6px", fontSize: 11, fontWeight: 900,
                            color }}>
               <span>{deltaLabel}</span>
-              <span style={{ color: delta >= 0 ? "#2a7a44" : "var(--ledger-red)" }}>
+              <span style={{ color: delta >= 0 ? "var(--ledger-green)" : "var(--ledger-red)" }}>
                 {signedDelta(delta)}
               </span>
             </span>
@@ -283,6 +284,10 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
           </g>
         ))}
       </svg>
+      <ChartData title={`${teamName} franchise DNA`} columns={["Rating / 100", "League reference / 100", "Championship reference / 100", "Comparison / 100"]} rows={[
+        ...toOff(strand).map((value, index) => ({ id: `off-${index}`, label: `Offense: ${OFF_LABELS[index]}`, values: [String(Math.round(value * 100)), String(Math.round(toOff(LEAGUE_AVERAGE)[index] * 100)), String(Math.round(toOff(CHAMP_TEMPLATE)[index] * 100)), compare ? String(Math.round(toOff(compare)[index] * 100)) : "Unavailable"] })),
+        ...toDef(strand).map((value, index) => ({ id: `def-${index}`, label: `Defense: ${DEF_LABELS[index]}`, values: [String(Math.round(value * 100)), String(Math.round(toDef(LEAGUE_AVERAGE)[index] * 100)), String(Math.round(toDef(CHAMP_TEMPLATE)[index] * 100)), compare ? String(Math.round(toDef(compare)[index] * 100)) : "Unavailable"] })),
+      ]} />
 
       {/* Legend — below the SVG, no overlap with helix */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px",
@@ -291,7 +296,7 @@ export default function TeamStrand({ strand, teamName, label, compare }: Props) 
           { stroke: ICE,      dash: "",    label: "OFF",        w: 2.5 },
           { stroke: RED,       dash: "",    label: "DEF",        w: 2.5 },
           { stroke: GOLD,      dash: "5,3", label: "Champ",      w: 1.5 },
-          { stroke: "#2a7a44", dash: "3,4", label: "Playoff",    w: 1.2 },
+          { stroke: "var(--ledger-green)", dash: "3,4", label: "Playoff",    w: 1.2 },
           { stroke: GRAY,      dash: "2,5", label: "League avg", w: 1.0 },
         ] as const).map(({ stroke, dash, label: l, w }) => (
           <span key={l} style={{ display: "inline-flex", alignItems: "center",

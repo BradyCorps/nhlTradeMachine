@@ -37,7 +37,7 @@ describe("MOB-03 Players responsive layout", () => {
     const css = read("app/globals.css");
     const statRow = css.slice(
       css.indexOf(".player-mobile-stat-row"),
-      css.indexOf(".player-expanded-panel"),
+      css.indexOf(".player-expanded-panel", css.indexOf(".player-mobile-stat-row")),
     );
 
     expect(statRow).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");

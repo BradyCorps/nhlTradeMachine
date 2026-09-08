@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { ChartData } from "@/app/components/ChartData";
 import { scaleLinear } from "d3-scale";
 import { HorizontalScrollCue } from "@/app/components/HorizontalScrollCue";
 import type { TeamNavDim } from "@/app/lib/teams-url-state";
@@ -56,18 +57,6 @@ const PHASE_COLORS: Record<string, string> = {
 // Standard visually-hidden style: off-screen for sighted readers, still in the
 // accessibility tree for screen readers. Inline so it doesn't depend on a
 // Tailwind `sr-only` class being present in the build.
-const SR_ONLY: React.CSSProperties = {
-  position: "absolute",
-  width: 1,
-  height: 1,
-  padding: 0,
-  margin: -1,
-  overflow: "hidden",
-  clip: "rect(0 0 0 0)",
-  clipPath: "inset(50%)",
-  whiteSpace: "nowrap",
-  border: 0,
-};
 
 /** Respect the OS "reduce motion" setting — the re-sort animation is the
  *  whole point of this chart, but it is decoration, not information. */
@@ -103,6 +92,8 @@ export default function TeamNavChart({ data, dim: controlledDim, onDimChange }: 
   const dim = controlledDim ?? internalDim;
   const setDim = onDimChange ?? setInternalDim;
   const [hoveredAbbrev, setHoveredAbbrev] = useState<string | null>(null);
+  const [pinnedAbbrev, setPinnedAbbrev] = useState<string | null>(null);
+  const activeAbbrev = pinnedAbbrev ?? hoveredAbbrev;
   // null = auto (all on desktop, top-10 on mobile); a boolean is the reader's
   // explicit override of that default.
   const [showAllOverride, setShowAllOverride] = useState<boolean | null>(null);
@@ -215,8 +206,8 @@ export default function TeamNavChart({ data, dim: controlledDim, onDimChange }: 
         <svg
           viewBox={`0 0 ${chartW} ${chartH}`}
           className="w-full"
-          style={{ maxWidth: chartW, minWidth: Math.min(chartW, 620) }}
-          role="img"
+          style={{ maxWidth: chartW, minWidth: showAll ? Math.min(chartW, 620) : 0 }}
+          role="group"
           aria-label={`Column chart ranking ${showAll ? `all ${ranked.length}` : `the top ${n} of ${ranked.length}`} NHL teams by ${active.label} (${active.blurb}). Top: ${ranked[0]?.name} at ${Math.round(ranked[0]?.value ?? 0)}. Full ranking follows in a table.`}
         >
           {/* Baseline */}
@@ -237,7 +228,7 @@ export default function TeamNavChart({ data, dim: controlledDim, onDimChange }: 
           {visible.map((d) => {
             const rank = rankByAbbrev.get(d.abbrev) ?? 0;
             const fill = PHASE_COLORS[d.phase] || "var(--ledger-ink)";
-            const isHovered = hoveredAbbrev === d.abbrev;
+            const isHovered = activeAbbrev === d.abbrev;
             const k = scaleYFor(d.value);
             const topY = baseline - plotH * k;
 
@@ -245,19 +236,20 @@ export default function TeamNavChart({ data, dim: controlledDim, onDimChange }: 
               <g key={d.abbrev}
                 role="button"
                 tabIndex={0}
-                aria-pressed={isHovered}
+                aria-pressed={pinnedAbbrev === d.abbrev}
                 aria-label={`${d.name}, ${d.phase}, ${active.label} ${Math.round(d.value).toLocaleString()}, goal differential ${d.goalDiff > 0 ? "+" : ""}${d.goalDiff}`}
                 style={{ transform: `translateX(${xFor(rank)}px)`, transition: trans, cursor: "pointer" }}
                 onMouseEnter={() => setHoveredAbbrev(d.abbrev)}
                 onMouseLeave={() => setHoveredAbbrev(null)}
                 onFocus={() => setHoveredAbbrev(d.abbrev)}
                 onBlur={() => setHoveredAbbrev(null)}
-                onClick={() => setHoveredAbbrev(prev => (prev === d.abbrev ? null : d.abbrev))}
+                onClick={() => setPinnedAbbrev(prev => (prev === d.abbrev ? null : d.abbrev))}
                 onKeyDown={event => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    setHoveredAbbrev(prev => (prev === d.abbrev ? null : d.abbrev));
+                    setPinnedAbbrev(prev => (prev === d.abbrev ? null : d.abbrev));
                   } else if (event.key === "Escape") {
+                    setPinnedAbbrev(null);
                     setHoveredAbbrev(null);
                   }
                 }}
@@ -310,8 +302,8 @@ export default function TeamNavChart({ data, dim: controlledDim, onDimChange }: 
           })}
 
           {/* Hovered team tooltip — name + phase + active value + GD */}
-          {hoveredAbbrev !== null && (() => {
-            const d = visible.find(r => r.abbrev === hoveredAbbrev);
+          {activeAbbrev !== null && (() => {
+            const d = visible.find(r => r.abbrev === activeAbbrev);
             if (!d) return null;
             const rank = rankByAbbrev.get(d.abbrev) ?? 0;
             const cx = xFor(rank) + bandW / 2;
@@ -345,11 +337,13 @@ export default function TeamNavChart({ data, dim: controlledDim, onDimChange }: 
         </svg>
       </div>
       <HorizontalScrollCue label="Swipe or scroll for the full league chart" className="px-3" />
+      {pinnedAbbrev && <p className="p-3 text-xs" role="status">Pinned: {ranked.find(d => d.abbrev === pinnedAbbrev)?.name} · {active.label} {Math.round(ranked.find(d => d.abbrev === pinnedAbbrev)?.value ?? 0)} <button type="button" className="tap-target filter-btn" onClick={() => setPinnedAbbrev(null)}>Clear pin</button></p>}
+      <ChartData title="League NAV comparison" columns={["X-NAV+", "F-NAV", "D-NAV", "G-NAV", "Phase", "Goal differential"]} rows={ranked.map(d => ({ id: d.abbrev, label: d.name, values: [String(d.xnav), String(d.fNav), String(d.dNav), String(d.gNav), d.phase, String(d.goalDiff)] }))} />
 
       {/* Screen-reader ranking — the column chart is role="img" with only the
           leader in its label, so a non-visual reader gets the full ordered
           table here (kept off-screen, updates with the active dimension). */}
-      <table style={SR_ONLY}>
+      <details className="chart-data"><summary className="tap-target">Ranked table for {active.label}</summary><table>
         <caption>{`League ${active.label} rankings — ${active.blurb}, ${ranked.length} teams`}</caption>
         <thead>
           <tr>
@@ -372,6 +366,7 @@ export default function TeamNavChart({ data, dim: controlledDim, onDimChange }: 
           ))}
         </tbody>
       </table>
+      </details>
 
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 border-t"

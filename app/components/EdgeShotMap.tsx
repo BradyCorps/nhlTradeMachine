@@ -7,6 +7,7 @@
 // splits. Data comes from /api/player-edge/{nhlId} (nightly snapshots).
 
 import React, { useEffect, useState } from "react";
+import { ChartData } from "@/app/components/ChartData";
 import { ordinal, pluralize } from "@/app/lib/ordinal";
 
 interface SogDetail { area: string; shots: number; shotsPercentile: number }
@@ -148,6 +149,7 @@ export default function EdgeShotMap({ nhlPlayerId }: { nhlPlayerId: string | num
               );
             })}
           </svg>
+          <ChartData title="Shots by zone" columns={["Shots", "Percentile"]} rows={data.sogDetails.map(zone => ({ id: zone.area, label: zone.area, values: [String(zone.shots), String(Math.round(zone.shotsPercentile * 100))] }))} />
           <div className="flex items-center justify-center gap-3 mt-1.5 text-[9px] font-mono uppercase tracking-wider" style={{ color: "var(--ledger-ink-faint)" }}>
             <span>Shot volume %ile:</span>
             {[0.2, 0.5, 0.7, 0.9].map((p) => (

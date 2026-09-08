@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { MobileDetail } from "@/app/components/MobileDetail";
+import { CompactFilters } from "@/app/components/CompactFilters";
+import { DossierNav } from "@/app/components/DossierNav";
 import { usePathname } from "next/navigation";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
@@ -504,14 +507,11 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
             </span>
             <PhaseChip phase={contentionSnapshot.window} />
             {windowDivergesFromPhase && (
-              <HelpPopover
-                label="Standings vs. live window"
-                definition={`Standings tier: ${contentionSnapshot.phase}. This club's live roster read (${contentionSnapshot.window}) currently reads differently — the roster shown here isn't the one that earned the standings tier.`}
-              >
+              <span title={`Standings tier: ${contentionSnapshot.phase}. Live roster window: ${contentionSnapshot.window}.`}>
                 <span className="text-[9px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
                   vs. {contentionSnapshot.phase} standing
                 </span>
-              </HelpPopover>
+              </span>
             )}
             <DivisionChip division={team.division} conference={team.conference} />
             <PlayoffChip position={team.record?.playoffPosition ?? ""} clinch={team.record?.clinchIndicator ?? ""} />
@@ -582,11 +582,19 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
         )}
       </div>
 
+      <div className="compact-team-intelligence">
+        <p><strong>{QUADRANT_LABEL[contention.quadrant]}:</strong> {contention.presentLabel} now; {contention.futureLabel} outlook.</p>
+        <p>Present {contention.present.toFixed(1)}/10 · Future {contention.future.toFixed(1)}/10 · Signed roster assets {Math.round(rosterNAV).toLocaleString()} NAV</p>
+        <p>Cap flexibility: ${Math.abs(team.capSpace).toFixed(1)}M {team.capSpace < 0 ? "over the ceiling" : "available"}.</p>
+        <p>{team.capSpace < 0 ? "Primary constraint: over the cap." : `Contract exposure: ${ufaCount} unsigned UFAs and ${rfaCount} unsigned RFAs.`} Lineup vacancies: {Math.max(0, 12 - lines.forwards.flat().length)} forwards, {Math.max(0, 6 - lines.defense.flat().length)} defense, {Math.max(0, 2 - lines.goalies.length)} goalies.</p>
+      </div>
+
       {/* Expanded detail */}
       {expanded && (
+        <MobileDetail title={`${team.name} team details`} onClose={onToggle} enabled={showDetailLink}>
         <div className="px-4 pb-4 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
           {/* Contention + Cap */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-3">
+          <div id={`team-${team.id}-window`} className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-3">
             <StatCell
               label="Present"
               value={contention.present.toFixed(1)}
@@ -842,7 +850,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
           )}
 
           {/* Projected Lines */}
-          <div className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
+          <div id={`team-${team.id}-roster`} className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
             <LineupSection lines={lines} />
           </div>
 
@@ -877,6 +885,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
             </div>
           </div>
         </div>
+        </MobileDetail>
       )}
     </div>
   );
@@ -931,7 +940,7 @@ export default function TeamsPage() {
   useEffect(() => {
     const query = buildTeamsUrlQuery({ sortKey, filterPhase, expandedId, detailCollapsed, navDim });
     const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
-    window.history.replaceState({}, "", newUrl);
+    window.history.replaceState(window.history.state, "", newUrl);
   }, [sortKey, filterPhase, expandedId, detailCollapsed, navDim]);
 
   // A stale/hand-edited expanded-team id must recover safely rather than
@@ -1135,6 +1144,7 @@ export default function TeamsPage() {
             </p>
           </div>
 
+          {detailProfile && <DossierNav sections={[{ id: `team-${detailProfile.team.id}-window`, label: "Window & cap" }, { id: `team-${detailProfile.team.id}-roster`, label: "Roster" }]} />}
           {detailProfile ? (
             <TeamCard
               profile={detailProfile}
@@ -1182,13 +1192,15 @@ export default function TeamsPage() {
         </div>
 
         {/* League overview strip */}
+        <CompactFilters count={`${filtered.length} teams`} chips={filterPhase === "ALL" ? [] : [{ label: filterPhase, clear: () => setFilterPhase("ALL") }]}>
         <div
-          className="grid grid-cols-5 gap-2 mb-5 p-3 border"
+          className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-5 p-3 border"
           style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}
         >
           {(["Contender", "Bubble", "Retooling", "Rebuilding", "Tanking"] as const).map((phase) => (
             <button
               key={phase}
+              aria-pressed={filterPhase === phase}
               onClick={() => setFilterPhase(filterPhase === phase ? "ALL" : phase)}
               className="text-center cursor-pointer p-1"
               style={{
@@ -1209,6 +1221,7 @@ export default function TeamsPage() {
             </button>
           ))}
         </div>
+        </CompactFilters>
 
         {/* NAV chart */}
         <TeamNavChart
