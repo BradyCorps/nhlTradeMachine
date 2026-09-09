@@ -537,7 +537,7 @@ When Present, Future, Speed, or another metric controls order, show the exact va
 
 ## [ ] NAV-01 — Build, cross-calibrate and activate F/D/G-NAV (`XL`)
 
-**Current state:** F-NAV, D-NAV and G-NAV on the Teams page are positional sums of existing per-player X-NAV. They are not independent player-level models. The split is calculated client-side, negative player values are floored to zero, and goalie NAV has not been proven commensurate with skater NAV.
+**Current state (reconciled September 8, 2026):** production dispatches to separate forward, defence and goalie entry points. NAV-02 replaced the defensive model with an individual-level fit; NAV-03 validated retaining the goalie formula after two tested alternatives failed to improve it. Position-aware labels already ship. Teams distinguishes signed roster NAV from positive-only X-NAV+, but still calculates positional aggregates client-side. These advances do not establish a common calibrated asset-value scale or goalie-to-skater equivalence. Earlier increment notes below are historical evidence, not the current release status.
 
 **Objective:** build position-specific player pipelines that produce F-NAV, D-NAV and G-NAV, then calibrate them into a shared X-NAV unit suitable for player comparison and team aggregation.
 
@@ -582,7 +582,7 @@ The signed and positive-only totals must never share the same label.
 
 **Activation gates:**
 
-- Each positional model beats its frozen current-engine baseline out of time under the existing model-improvement standard.
+- Each changed positional model must beat its frozen current-engine baseline out of time under a predeclared model-improvement standard. An unchanged model may be retained with a documented adequacy finding and failed candidate comparisons, as NAV-03 explicitly permits; retention is not evidence of improvement or cross-position equivalence. Any new calibration that changes values remains subject to its own out-of-time gate, including for a retained model.
 - F/D/G outputs are calibrated into demonstrably comparable X-NAV units.
 - Goalie-to-skater equivalence is tested rather than assumed.
 - Production and backtest implementations use the same calculation path.
@@ -590,10 +590,35 @@ The signed and positive-only totals must never share the same label.
 - Team totals reconcile exactly to their underlying player snapshots.
 - Negative-value handling is explicit and tested.
 - Missing data widens uncertainty and reduces reliability.
-- No public surface changes labels until all consuming routes are ready.
+- All consuming routes must be ready before calibrated values activate. Existing F/D/G labels identify the shipping positional paths; they do not certify that NAV-01's cross-position calibration has passed.
 - Full suite, TypeScript, lint and production build are green.
 
 **Acceptance:** a forward, defenceman and goalie can display F-NAV, D-NAV and G-NAV respectively while remaining meaningfully comparable through calibrated X-NAV; every team positional total is traceable to those exact player snapshots.
+
+**Closure sequence (reconciled September 8, 2026):**
+
+- [x] Reconcile acceptance with NAV-02/NAV-03 and define the evidence contract below. Documentation only; no model, calibration, or activation gate is declared passed by this step.
+- [x] Freeze the known development-source identities and execute the independent-data readiness audit (September 8, 2026); see `docs/analytics/NAV01_EVALUATION_READINESS.md`. Eight source checksums pass; all four seasons have prior exposure. This completes the availability audit, not the statistical protocol.
+- [x] Specify the target-design and evidence-route decision (September 8, 2026): `docs/analytics/NAV01_CALIBRATION_TARGETS.md` preserves composite NAV, selects common goal/cap-share measurement layers and metric families, and distinguishes historical development from prospective evaluation. The composite transaction target remains operationally unresolved; this decision is not calibration evidence.
+- [x] Execute the permitted-source diagnostic coverage pilot (September 8, 2026): `scripts/backtest/nav-target-pilot.ts` verifies source hashes and reports 3,735 skater/406 goalie rows, 2,351/246 consecutive-season ID pairs, and zero duplicate/invalid all-situations identities. See `docs/analytics/NAV01_TARGET_PILOT.md`; these are diagnostic ingredients, not independent GAR or asset-value targets.
+- [x] Complete the local historical-data, signing-ledger and NHL-ID coverage audit (September 9, 2026): `scripts/backtest/nav-historical-data-audit.ts` verifies 6,229 local contracts, the original workbook, ID-bearing 2008–24 goalie history and eight MoneyPuck player files. It resolves 4,311 records to one NHL ID (4,202 exact, 45 normalized, 64 controlled manual) and emits only the 1,918 unresolved rows. `OtherData/HistoricalData/skaters_2008_to_2024.csv` is confirmed absent but gitignored; see `docs/analytics/NAV01_CONTRACT_JOIN_AUDIT.md`. No match is treated as fit evidence until the dated join protocol is frozen.
+- [ ] Complete canonical-ID, as-of contract/performance joins for the 1,918 unresolved contracts, including provenance/timestamp and leakage audits. Then obtain the genuinely absent historical transaction export and independent trade-value label needed for the composite target: transaction ID/date, both sides and every asset/condition/retention, NHL player IDs and source timestamps; a non-circular outcome definition; and then freeze the executable evaluation protocol (eligibility, metrics, thresholds and independent holdout). Current NHL EDGE/NHL roster IDs corroborate current identities only and are not a dated historical contract archive; see `docs/analytics/NAV01_CONTRACT_JOIN_AUDIT.md`. The initial `docs/analytics/nav01-evaluation-manifest.json` explicitly leaves the statistical requirements unresolved and blocks calibration.
+- [ ] Fit and validate the common F/D/G scale under that manifest; publish a reproducible pass/fail report.
+- [ ] Complete calibrated player snapshots and shared server positional aggregates, with reconciliation and missing-data tests.
+- [ ] Run shadow comparisons across Players, Teams, Trade Machine, Armchair GM, Fantasy and simulation canaries; complete a deliberate flag-controlled rollout and retire client-side bucketing after parity.
+- [ ] Record release evidence and mark the parent NAV-01 complete only after all activation gates pass.
+
+**Evidence contract for the next scoped step:**
+
+1. **Freeze identities before fitting.** The inspected reference engine is commit `bf7febb637661a3c545e8a1a80d8c9c7ca8b69d4`. Record the actual baseline revision, source checksums, feature derivations, player/team/season membership, exclusions, missingness, target definitions, metrics, thresholds, and calibration version in a machine-readable manifest. Invoke the production entry points for both baseline and candidate. This paragraph defines requirements; it is not a completed data freeze.
+2. **Do not reuse an inspected holdout as new evidence.** The 2022–23 through 2025–26 results have already informed NAV-01/02/03 decisions. They remain development and historical audit evidence, not an untouched test of a newly selected calibration. Inventory exposure and provenance before selecting new evaluation data. A replay with locked settings is useful but does not restore independence. If no defensible independent evaluation set is available, record that blocker and keep activation closed.
+3. **Separate the claims.** Evaluate on-ice contribution against an appropriate hockey outcome, and contract/surplus value against an appropriate economic outcome; full asset NAV is not simply a predictor of team goal differential. Define the common unit, its reference level, time horizon, and conversion into asset value before fitting. Matching positional means, spreads, percentiles or attractive leaderboard ordering is not proof of equivalence.
+4. **Respect the individual/team distinction.** NAV-02 increment 9 validates an individual teammate-relative signal and explicitly records weak between-team signal. Its legacy-centre/spread mapping does not prove absolute F/D/G equivalence. A team-level fit applied to individual players, or a team sum that reconstructs its training target, cannot satisfy the individual comparison gate. If absolute contribution cannot be identified from available data, record the required additional evidence rather than inventing a scale.
+5. **Predeclare measurable gates.** Specify baseline comparisons, primary error metrics, minimum samples, uncertainty method, and numerical pass/fail thresholds before candidate fitting or new holdout inspection. Report results separately for F/D/G and relevant workload, sample-size and missing-data groups; a pooled gain cannot hide a positional regression. Document why the selected targets and tolerances establish goalie/skater equivalence. Threshold selection and the executable manifest remain the next task, not a claimed result of this reconciliation.
+6. **Test the delivered value.** Preserve `positionalNavRaw` separately from `xNavCalibrated`, with the ticket's complete output contract. The existing `valuation-snapshot.ts` envelope supplies identity, version, components and market-price error bands, but those bands are not calibrated NAV uncertainty; stage-presence coverage is not measured input reliability. Require explicit missing-data treatment, exact signed player-to-team reconciliation, distinct X-NAV+ totals, and snapshot provenance across consumers.
+7. **Keep release decisions separate from model adequacy.** NAV-03's retention decision remains valid within its stated scope. It does not waive independent calibration, shadow comparisons, consumer readiness or release verification. Record candidate/baseline deltas and failures, preserve a rollback path, and require green tests, TypeScript, lint and production build for the implementation that will activate.
+
+**Completion evidence for this increment:** reviewed NAV-01's historical increments, NAV-02 increment 9, NAV-03's option-(b) closure, `valuation-snapshot.ts`, and the Teams positional aggregation. Only this backlog and `docs/DEVNOTES.md` changed. No coefficients, runtime values, or public claims were changed. NAV-01 remains open; the next task is the evaluation manifest/data-availability gate, not activation.
 
 **Increment 1 progress (this session) — Required Phase 1 only:**
 
