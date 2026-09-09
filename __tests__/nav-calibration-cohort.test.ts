@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { CALIBRATION_SAMPLE_GATES, ageBand, auditCalibrationCohort, compareDistributions, freezePeriod, unitForPosition } from "../scripts/backtest/nav-calibration-cohort";
+import { CALIBRATION_SAMPLE_GATES, ageBand, auditCalibrationCohort, auditMarketCalibrationCohort, compareDistributions, freezePeriod, unitForPosition } from "../scripts/backtest/nav-calibration-cohort";
 
 const resolved = (contractRow: number, playerId: string, signDate: string, pos = "C") => ({
   contractRow, playerId, resolution: "exact" as const, priorSeason: Number(signDate.slice(0, 4)) - 1,
@@ -45,6 +45,24 @@ describe("NAV-01 calibration cohort audit", () => {
       validation: CALIBRATION_SAMPLE_GATES.validation,
       holdout: CALIBRATION_SAMPLE_GATES.holdout,
     });
-    expect(protocol.representativenessGate.minimumAdditionalElcResolutions).toBe(280);
+    expect(protocol.status).toBe("proceed_market_calibration");
+    expect(protocol.marketReferenceGate.referencePopulation).toBe("market_calibration_eligible");
+  });
+
+  it("keeps regulated ELCs and missing NHL histories out of market-price fitting", () => {
+    const standard = { ...resolved(2, "1", "2023-07-01"), signing: { ...resolved(2, "1", "2023-07-01").signing, level: "STD" } };
+    const elc = { ...resolved(3, "2", "2023-07-01"), signing: { ...resolved(3, "2", "2023-07-01").signing, level: "ELC" } };
+    const noHistory = { ...resolved(4, "3", "2023-07-01"), signing: { ...resolved(4, "3", "2023-07-01").signing, level: "STD" } };
+    const missingIdentity = { ...standard.signing, player: "missing", level: "STD" };
+    const report = auditMarketCalibrationCohort([standard.signing, elc.signing, noHistory.signing, missingIdentity], [standard, elc, noHistory], [
+      { season: 2022, row: { playerId: "1", situation: "all", games_played: "50", icetime: "1000" } },
+    ]);
+    expect(report.universe).toMatchObject({
+      market_calibration_eligible: { contractRows: 1 },
+      elc_policy_constrained: { contractRows: 1, resolvedIdentityRows: 1 },
+      no_pre_signing_nhl_sample: { contractRows: 1 },
+      identity_unresolved: { contractRows: 1 },
+    });
+    expect(report.proposedElcResolutionsWithCurrentlyProvablePreSigningFeatures).toBe(0);
   });
 });

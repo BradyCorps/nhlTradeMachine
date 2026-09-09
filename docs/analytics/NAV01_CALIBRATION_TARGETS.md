@@ -3,12 +3,13 @@
 Decision recorded September 8, 2026. This specifies the next research
 experiment; it does not introduce a production formula or claim validation.
 
-**Phase 5 update, September 9:** the resolved-contract protocol now freezes
-annual cap share at signing as the common **shadow** calibration target for
-F/D/G. Historical transactions remain a validation enhancement, not an
-automatic prerequisite for the Phase 5 fit or shadow output. The protocol's
-representativeness gate currently fails for ELC/age-18–21 coverage, so no fit
-or public promotion is authorized; see `NAV01_CONTRACT_CALIBRATION_PROTOCOL.md`.
+**Phase 5 update, September 9:** the resolved-contract protocol freezes annual
+cap share at signing as the common **shadow** calibration target for F/D/G.
+Historical transactions remain a validation enhancement, not an automatic
+prerequisite for the Phase 5 fit or shadow output. The market-only reference
+population passes representation/sample gates; ELCs are policy-constrained
+fallback coverage rather than open-market training labels. See
+`NAV01_CONTRACT_CALIBRATION_PROTOCOL.md`.
 
 ## Preserve the product's meaning
 

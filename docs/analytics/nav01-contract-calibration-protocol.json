@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "status": "blocked_representativeness",
+  "status": "proceed_market_calibration",
   "target": {
     "name": "shadowExpectedCapShare",
     "unit": "annual cap-share percentage points at signing",
@@ -24,11 +24,15 @@
     "maxSignedBiasCapSharePp": 0.25,
     "interval": "paired 95% bootstrap"
   },
-  "representativenessGate": {
+  "marketReferenceGate": {
     "categoryDifferencePp": 15,
     "teamTotalVariationPp": 20,
-    "currentFailure": "ELC and age 18-21",
-    "minimumAdditionalElcResolutions": 280,
-    "minimumOfThoseAge18To21": 59
+    "referencePopulation": "market_calibration_eligible",
+    "result": "pass"
+  },
+  "policyFallback": {
+    "class": "elc_policy_constrained",
+    "label": "ELC policy-constrained fallback; not an open-market cap-share prediction",
+    "uncertainty": "wider interval and coverage=policy_constrained"
   }
 }

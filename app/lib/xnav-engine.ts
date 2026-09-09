@@ -1691,6 +1691,46 @@ export function calcDefenseNAV(asset: DefenseFeatureContract): XNAVResult {
   return calcSkaterNAV(asset);
 }
 
+/**
+ * The pre-contract positional signal used by NAV-01 market calibration.
+ *
+ * This deliberately consumes a neutral three-year horizon and a zeroed
+ * contract.  Only the stage values whose inputs are player performance,
+ * age, and gravity are retained.  It therefore cannot encode the signed
+ * contract's cap hit, term, extension, retention, or surplus.
+ */
+export function calcContractIndependentPositionalNavRaw(asset: AssetInput): {
+  unit: "F" | "D" | "G";
+  raw: number;
+  neutralYearsRemaining: number;
+} {
+  const neutral: AssetInput = {
+    ...asset,
+    capHit: 0,
+    lastCapHit: undefined,
+    expiresThisOffseason: false,
+    yearsRemaining: 3,
+    retainedPct: 0,
+    extensionCapHit: undefined,
+    extensionYears: undefined,
+    multiplier: 1,
+  };
+  if (asset.position === "G") {
+    const goalieStages = calcGoalieNAV(neutral).stages;
+    const impact = goalieStages?.find(value => value.key === "impact")?.value;
+    if (impact == null) throw new Error("Goalie NAV did not expose a pre-contract impact stage");
+    return { unit: "G", raw: impact, neutralYearsRemaining: 3 };
+  }
+  const unit = asset.position === "D" ? "D" : "F";
+  const result = unit === "D"
+    ? calcDefenseNAV({ ...neutral, position: "D" })
+    : calcForwardNAV({ ...neutral, position: asset.position === "C" ? "C" : "W" });
+  const raw = (result.stages ?? [])
+    .filter(value => value.key === "off" || value.key === "def" || value.key === "age" || value.key === "grav")
+    .reduce((sum, value) => sum + value.value, 0);
+  return { unit, raw, neutralYearsRemaining: 3 };
+}
+
 // ── Prospect NAV (pedigree-based) ─────────────────────────────────────────────
 // A drafted prospect with no meaningful NHL sample is valued from the pick that
 // selected him, discounted for burned development time unless NHLe production

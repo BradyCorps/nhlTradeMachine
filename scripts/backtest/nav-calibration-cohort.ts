@@ -9,9 +9,10 @@ import {
 } from "./nav-historical-data-audit";
 import { parseCsv } from "./nav-target-pilot";
 
-type Unit = "F" | "D" | "G" | "unknown";
+export type Unit = "F" | "D" | "G" | "unknown";
 type FreezePeriod = "train" | "validation" | "holdout" | "outside";
 type Distribution = Array<{ value: string; resolved: number; unresolved: number; resolvedPct: number; unresolvedPct: number; differencePp: number }>;
+type MarketRecord = ResolvedContractRecord;
 
 const FREEZE_PERIODS: Array<{ name: Exclude<FreezePeriod, "outside">; start: string; end: string }> = [
   { name: "train", start: "2023-07-01", end: "2024-07-01" },
@@ -78,6 +79,13 @@ function sumUnits(rows: Array<{ signing: Row }>) {
 
 function validTarget(row: Row) {
   return Number(row.capPct) > 0 && Number.isFinite(Number(row.signAge)) && unitForPosition(row.pos) !== "unknown";
+}
+
+function isElc(row: Row) { return row.level?.trim() === "ELC"; }
+
+function statusBucket(row: Row): "UFA" | "RFA" | "UFA Group 6" | "missing" {
+  const status = row.signStatus?.trim() || "missing";
+  return status === "UFA" || status === "RFA" || status === "UFA Group 6" ? status : "missing";
 }
 
 function recordsForPeriod(records: ResolvedContractRecord[], period: FreezePeriod, preSigningIds: Set<number>) {
@@ -203,6 +211,131 @@ export function auditCalibrationCohort(
   };
 }
 
+function referenceDifference(candidate: MarketRecord[], reference: MarketRecord[], field: "position" | "age" | "status" | "team") {
+  const distribution = compareDistributions(candidate.map(row => row.signing), reference.map(row => row.signing), field);
+  return {
+    distribution,
+    pass: field === "team"
+      ? totalVariation(distribution) <= CALIBRATION_SAMPLE_GATES.representativeness.teamTotalVariation
+      : distribution.every(row => Math.abs(row.differencePp) <= CALIBRATION_SAMPLE_GATES.representativeness.categoryDifferencePp),
+  };
+}
+
+function median(values: number[]): number | null {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function baselineKey(record: MarketRecord, statusControlled: boolean) {
+  const base = `${unitForPosition(record.signing.pos)}|${ageBand(record.signing.signAge)}`;
+  return statusControlled ? `${base}|${statusBucket(record.signing)}` : base;
+}
+
+function fitMedianBaseline(train: MarketRecord[], validation: MarketRecord[], statusControlled: boolean) {
+  const byKey = new Map<string, number[]>(), byUnit = new Map<string, number[]>();
+  for (const row of train) {
+    const target = Number(row.signing.capPct);
+    const key = baselineKey(row, statusControlled), unit = unitForPosition(row.signing.pos);
+    byKey.set(key, [...(byKey.get(key) ?? []), target]);
+    byUnit.set(unit, [...(byUnit.get(unit) ?? []), target]);
+  }
+  const overall = median(train.map(row => Number(row.signing.capPct)));
+  const errors = validation.map(row => {
+    const key = baselineKey(row, statusControlled), unit = unitForPosition(row.signing.pos);
+    const prediction = median(byKey.get(key) ?? []) ?? median(byUnit.get(unit) ?? []) ?? overall;
+    return prediction == null ? null : Math.abs(prediction - Number(row.signing.capPct)) * 100;
+  }).filter((value): value is number => value != null);
+  return {
+    trainingRows: train.length,
+    validationRows: validation.length,
+    fittedCells: byKey.size,
+    validationMaeCapSharePp: errors.length ? errors.reduce((sum, value) => sum + value, 0) / errors.length : null,
+  };
+}
+
+function marketSampleGate(records: MarketRecord[], period: Exclude<FreezePeriod, "outside">) {
+  const units = sumUnits(records), gate = CALIBRATION_SAMPLE_GATES[period];
+  return {
+    contracts: records.length >= gate.contracts,
+    players: new Set(records.map(row => row.playerId)).size >= gate.players,
+    F: units.F >= gate.F,
+    D: units.D >= gate.D,
+    G: units.G >= gate.G,
+  };
+}
+
+export function classifyMarketCalibrationUniverse(signings: Row[], resolved: ResolvedContractRecord[], moneyPuckRows: Array<{ season: number; row: Row }>) {
+  const seasonsById = new Map<string, Set<number>>();
+  for (const { season, row } of moneyPuckRows) {
+    if (row.situation !== "all" || !/^\d+$/.test(row.playerId ?? "") || Number(row.games_played) <= 0 || Number(row.icetime) <= 0) continue;
+    const seasons = seasonsById.get(row.playerId) ?? new Set<number>();
+    seasons.add(season); seasonsById.set(row.playerId, seasons);
+  }
+  const resolvedByRow = new Map(resolved.map(row => [row.contractRow, row]));
+  const buckets = { marketCalibrationEligible: [] as MarketRecord[], elcPolicyConstrained: [] as Row[], noPreSigningNhlSample: [] as MarketRecord[], identityUnresolved: [] as Row[] };
+  let elcResolvedIdentityRows = 0;
+  for (const [index, signing] of signings.entries()) {
+    const contractRow = index + 2;
+    const record = resolvedByRow.get(contractRow);
+    if (isElc(signing)) {
+      buckets.elcPolicyConstrained.push(signing);
+      if (record) elcResolvedIdentityRows++;
+      continue;
+    }
+    if (!record) { buckets.identityUnresolved.push(signing); continue; }
+    const hasPreSigning = [...(seasonsById.get(record.playerId) ?? [])].some(season => season <= record.priorSeason);
+    if (!hasPreSigning) { buckets.noPreSigningNhlSample.push(record); continue; }
+    if (validTarget(signing)) buckets.marketCalibrationEligible.push(record);
+  }
+  return {
+    buckets,
+    elcResolvedIdentityRows,
+    market: buckets.marketCalibrationEligible,
+  };
+}
+
+export function auditMarketCalibrationCohort(signings: Row[], resolved: ResolvedContractRecord[], moneyPuckRows: Array<{ season: number; row: Row }>) {
+  const { buckets, elcResolvedIdentityRows, market } = classifyMarketCalibrationUniverse(signings, resolved, moneyPuckRows);
+  const byPeriod = Object.fromEntries(FREEZE_PERIODS.map(period => [period.name, market.filter(row => freezePeriod(row.signing.signDate) === period.name)]));
+  const train = byPeriod.train, validation = byPeriod.validation;
+  const trainReference = { rows: train.length, players: new Set(train.map(row => row.playerId)).size, units: sumUnits(train), sampleGate: marketSampleGate(train, "train"), position: referenceDifference(train, market, "position"), age: referenceDifference(train, market, "age"), status: referenceDifference(train, market, "status"), team: referenceDifference(train, market, "team") };
+  const validationReference = { rows: validation.length, players: new Set(validation.map(row => row.playerId)).size, units: sumUnits(validation), sampleGate: marketSampleGate(validation, "validation"), position: referenceDifference(validation, market, "position"), age: referenceDifference(validation, market, "age"), status: referenceDifference(validation, market, "status"), team: referenceDifference(validation, market, "team") };
+  const holdoutReference = { rows: byPeriod.holdout.length, players: new Set(byPeriod.holdout.map(row => row.playerId)).size, units: sumUnits(byPeriod.holdout), sampleGate: marketSampleGate(byPeriod.holdout, "holdout") };
+  const knownStatus = (records: MarketRecord[]) => records.filter(row => statusBucket(row.signing) !== "missing");
+  const allPass = [trainReference, validationReference].every(partition => Object.values(partition.sampleGate).every(Boolean)
+    && partition.position.pass && partition.age.pass && partition.status.pass && partition.team.pass)
+    && Object.values(holdoutReference.sampleGate).every(Boolean);
+  return {
+    universe: {
+      market_calibration_eligible: { contractRows: market.length, players: new Set(market.map(row => row.playerId)).size, units: sumUnits(market) },
+      elc_policy_constrained: { contractRows: buckets.elcPolicyConstrained.length, resolvedIdentityRows: elcResolvedIdentityRows },
+      no_pre_signing_nhl_sample: { contractRows: buckets.noPreSigningNhlSample.length, age18To21: buckets.noPreSigningNhlSample.filter(row => ageBand(row.signing.signAge) === "18-21").length },
+      identity_unresolved: { contractRows: buckets.identityUnresolved.length, age18To21: buckets.identityUnresolved.filter(row => ageBand(row.signAge) === "18-21").length },
+      unclassified: signings.length - market.length - buckets.elcPolicyConstrained.length - buckets.noPreSigningNhlSample.length - buckets.identityUnresolved.length,
+    },
+    proposedElcResolutionsWithCurrentlyProvablePreSigningFeatures: 0,
+    marketReference: {
+      referenceRows: market.length,
+      train: trainReference,
+      validation: validationReference,
+      holdout: holdoutReference,
+    },
+    baselines: {
+      allEligibleNegotiated: fitMedianBaseline(train, validation, false),
+      statusControlledUfaRfaAndMissing: fitMedianBaseline(train, validation, true),
+      sensitivityKnownStatusOnly: fitMedianBaseline(knownStatus(train), knownStatus(validation), true),
+    },
+    fallback: {
+      appliesTo: "elc_policy_constrained",
+      label: "ELC policy-constrained fallback; not an open-market cap-share prediction",
+      uncertainty: "wider interval and coverage=policy_constrained",
+    },
+    decision: allPass ? "PROCEED" : "BLOCKED",
+  };
+}
+
 export function runCalibrationCohortAudit() {
   const identities = runHistoricalDataAudit();
   const signings = parseCsv(readFileSync("OtherData/contracts/signings.csv", "utf8"));
@@ -212,7 +345,16 @@ export function runCalibrationCohortAudit() {
   return auditCalibrationCohort(identities.resolved, identities.unresolved.map(row => signings[row.contractRow - 2]), moneyPuckRows);
 }
 
+export function runMarketCalibrationCohortAudit() {
+  const identities = runHistoricalDataAudit();
+  const signings = parseCsv(readFileSync("OtherData/contracts/signings.csv", "utf8"));
+  const moneyPuckRows = loadLocalIdentitySources(readFileSync)
+    .filter(source => source.source !== "historicalGoalie")
+    .map(source => ({ season: source.season, row: source.row }));
+  return auditMarketCalibrationCohort(signings, identities.resolved, moneyPuckRows);
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve("scripts/backtest/nav-calibration-cohort.ts")) {
-  try { console.log(JSON.stringify(runCalibrationCohortAudit(), null, 2)); }
+  try { console.log(JSON.stringify(process.argv.includes("--market") ? runMarketCalibrationCohortAudit() : runCalibrationCohortAudit(), null, 2)); }
   catch (error) { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; }
 }

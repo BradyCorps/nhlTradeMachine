@@ -89,7 +89,8 @@ and non-circular target definition remain necessary for composite validation.
 ## Next step and closure status
 
 The **permitted-source diagnostic pilot** and local contract identity audit are
-complete. The contract/trade portion of target construction remains open:
-freeze dated joins, then obtain the historical transaction and independent
-trade-value evidence specified in `NAV01_CONTRACT_JOIN_AUDIT.md`. Do not fit
-calibration coefficients or mark NAV-01 complete from coverage results.
+complete. The market-calibration protocol now authorizes a deal-excluded
+shadow fit from the eligible negotiated cohort; see
+`NAV01_CONTRACT_CALIBRATION_PROTOCOL.md`. Historical transactions remain an
+external validation enhancement. Do not mark NAV-01 complete from coverage or
+shadow-calibration results.
