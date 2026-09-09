@@ -10,7 +10,7 @@ const WORKBOOK = "OtherData/contracts/NHL_Contract_signings.xlsx";
 const HISTORICAL_GOALIES = "OtherData/HistoricalData/goalies_2008_to_2024.csv";
 const HISTORICAL_SKATERS = "OtherData/HistoricalData/skaters_2008_to_2024.csv";
 
-const MONEYPUCK_FILES = [
+export const MONEYPUCK_FILES = [
   [2022, "skater", "MoneyPuckData/2022_23/skaters(3).csv"],
   [2022, "goalie", "MoneyPuckData/2022_23/goalies(3).csv"],
   [2023, "skater", "MoneyPuckData/2023_24/skaters(2).csv"],
@@ -21,9 +21,9 @@ const MONEYPUCK_FILES = [
   [2025, "goalie", "MoneyPuckData/2025_26/goalies.csv"],
 ] as const;
 
-type Row = Record<string, string>;
-type SourceRow = { season: number; source: "historicalGoalie" | "moneyPuckSkater" | "moneyPuckGoalie"; row: Row };
-type Resolution = "exact" | "normalized" | "manual" | "unmatched";
+export type Row = Record<string, string>;
+export type SourceRow = { season: number; source: "historicalGoalie" | "moneyPuckSkater" | "moneyPuckGoalie"; row: Row };
+export type Resolution = "exact" | "normalized" | "manual" | "unmatched";
 
 export interface UnresolvedContractRecord {
   contractRow: number;
@@ -32,6 +32,14 @@ export interface UnresolvedContractRecord {
   position: string;
   signDate: string;
   reason: "ambiguous identity" | "no ID-bearing name candidate" | "invalid signing date";
+}
+
+export interface ResolvedContractRecord {
+  contractRow: number;
+  playerId: string;
+  resolution: Exclude<Resolution, "unmatched">;
+  priorSeason: number;
+  signing: Row;
 }
 
 export interface HistoricalDataAudit {
@@ -57,7 +65,17 @@ export interface HistoricalDataAudit {
     matchedWithoutPreSigningPerformance: number;
     unresolvedByReason: Record<UnresolvedContractRecord["reason"], number>;
   };
+  resolved: ResolvedContractRecord[];
   unresolved: UnresolvedContractRecord[];
+}
+
+export function loadLocalIdentitySources(read = readFileSync): SourceRow[] {
+  return [
+    ...parseCsv(read(HISTORICAL_GOALIES, "utf8")).map(row => ({ season: Number(row.season), source: "historicalGoalie" as const, row })),
+    ...MONEYPUCK_FILES.flatMap(([season, kind, file]) => parseCsv(read(file, "utf8")).map(row => ({
+      season, source: kind === "skater" ? "moneyPuckSkater" as const : "moneyPuckGoalie" as const, row,
+    }))),
+  ];
 }
 
 function plainNameKey(name: string): string {
@@ -137,6 +155,7 @@ export function auditHistoricalData(signings: Row[], sourceRows: SourceRow[], pr
     seasonsById.set(row.playerId, seasons);
   }
 
+  const resolved: ResolvedContractRecord[] = [];
   const unresolved: UnresolvedContractRecord[] = [];
   const identityCoverage: HistoricalDataAudit["identityCoverage"] = {
     total: signings.length, exact: 0, normalized: 0, manual: 0, unmatched: 0,
@@ -176,7 +195,8 @@ export function auditHistoricalData(signings: Row[], sourceRows: SourceRow[], pr
       }
     }
     identityCoverage[resolution]++;
-    if (id) {
+    if (id && resolution !== "unmatched") {
+      resolved.push({ contractRow: index + 2, playerId: id, resolution, priorSeason: priorSeason!, signing });
       if ([...(seasonsById.get(id) ?? [])].some(season => season <= priorSeason!)) identityCoverage.matchedWithPreSigningPerformance++;
       else identityCoverage.matchedWithoutPreSigningPerformance++;
     }
@@ -190,18 +210,13 @@ export function auditHistoricalData(signings: Row[], sourceRows: SourceRow[], pr
       moneyPuckFilesPresent: presence.moneyPuckFilesPresent,
       idBearingRows, idBearingPlayers: seasonsById.size, historicalGoalieRows, moneyPuckSkaterRows, moneyPuckGoalieRows,
     },
-    identityCoverage, unresolved,
+    identityCoverage, resolved, unresolved,
   };
 }
 
 export function runHistoricalDataAudit(read = readFileSync, exists = existsSync): HistoricalDataAudit {
   const signings = parseCsv(read(SIGNINGS, "utf8"));
-  const sourceRows: SourceRow[] = [
-    ...parseCsv(read(HISTORICAL_GOALIES, "utf8")).map(row => ({ season: Number(row.season), source: "historicalGoalie" as const, row })),
-    ...MONEYPUCK_FILES.flatMap(([season, kind, file]) => parseCsv(read(file, "utf8")).map(row => ({
-      season, source: kind === "skater" ? "moneyPuckSkater" as const : "moneyPuckGoalie" as const, row,
-    }))),
-  ];
+  const sourceRows = loadLocalIdentitySources(read);
   return auditHistoricalData(signings, sourceRows, {
     signingWorkbookPresent: exists(WORKBOOK),
     historicalGoalieFilePresent: exists(HISTORICAL_GOALIES),
@@ -214,6 +229,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve("scripts/b
   try {
     const report = runHistoricalDataAudit();
     const onlyUnresolved = process.argv.includes("--unresolved");
-    console.log(JSON.stringify(onlyUnresolved ? report.unresolved : { ...report, unresolved: undefined }, null, 2));
+    console.log(JSON.stringify(onlyUnresolved ? report.unresolved : {
+      inventory: report.inventory,
+      identityCoverage: report.identityCoverage,
+    }, null, 2));
   } catch (error) { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; }
 }

@@ -3,6 +3,13 @@
 Decision recorded September 8, 2026. This specifies the next research
 experiment; it does not introduce a production formula or claim validation.
 
+**Phase 5 update, September 9:** the resolved-contract protocol now freezes
+annual cap share at signing as the common **shadow** calibration target for
+F/D/G. Historical transactions remain a validation enhancement, not an
+automatic prerequisite for the Phase 5 fit or shadow output. The protocol's
+representativeness gate currently fails for ELC/age-18–21 coverage, so no fit
+or public promotion is authorized; see `NAV01_CONTRACT_CALIBRATION_PROTOCOL.md`.
+
 ## Preserve the product's meaning
 
 X-NAV remains a signed composite asset index combining on-ice contribution,
@@ -31,7 +38,7 @@ or hardcoded dollar conversion can close that gap.
 | On-ice contribution | Net goals added/prevented above a position-appropriate replacement player over one NHL regular season, at the player's workload | An independently specified estimate of individual goal contribution, evaluated out of time; separately check team outcome consistency | Individual contribution is estimated, not directly observed. Goalies' GSAx alone uses an expected-shot baseline, not a replacement-player baseline. Raw skater points and on-ice xGA cannot be equated to individual net goals. |
 | Market price | Annual cap share (`AAV / signing-season cap ceiling`), with contract term and signing status recorded | Actual signed contract AAV/cap share predicted using only information available before signing | Price tests economic calibration, not hockey impact or trade value. Separate UFA, RFA and extension populations; price differences cannot be interpreted solely as ability. |
 | Contract advantage | Signed annual cap-share difference between estimated market price and the club's actual obligation; preserve the yearly vector across the controlled term | Validate the market-price model first; reconcile each year's obligation and surplus mechanically | Surplus itself has no independently observed counterfactual label. Missing contract facts remain missing; no fictitious $0 contracts. Multi-year discount/control rules need separate evidence. |
-| Composite X-NAV | Signed dimensionless NAV points with an explicit fitted mapping from the preceding layers | Independent asset-exchange evidence controlling for contract obligations, retention, picks, rights and transaction context, plus unchanged-engine comparisons | A trade is an exchange, not a labelled dollar sale. Pricing each side with the same candidate and finding balance would be circular. This target's operational definition is still unresolved. |
+| Composite X-NAV | Shadow bridge of deal-excluded positional signals into expected annual cap-share percentage points at signing | Frozen contract-cohort validation/holdout comparison; transaction evidence is a later enhancement | A price is not pure hockey impact or trade fairness. The shadow bridge does not replace the public dimensionless NAV headline without its own release evidence. |
 
 The on-ice target is a methodological choice for this experiment, not a claim
 that an independent GAR provider supplies ground truth. Evolving-Hockey's
