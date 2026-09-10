@@ -1,0 +1,1967 @@
+{
+  "schemaVersion": 1,
+  "certification": {
+    "spentHoldout": {
+      "rows": 651,
+      "status": "development_only_spent",
+      "rule": "Never use these rows for future certification or model selection after this remediation report."
+    }
+  },
+  "coverage": {
+    "train": 390,
+    "validation": 512,
+    "holdout": 651
+  },
+  "diagnostics": {
+    "F": {
+      "model": "F-raw-affine",
+      "spentDevelopmentMetric": {
+        "rows": 901,
+        "players": 556,
+        "maePp": 1.4593320282206423,
+        "signedBiasPp": -0.04501577081020123,
+        "slope": 1.1071690296184584,
+        "rankCorrelation": 0.6040252646724881
+      },
+      "residuals": {
+        "signingYear": {
+          "2023": {
+            "rows": 174,
+            "players": 171,
+            "maePp": 1.411560809332597,
+            "signedBiasPp": 0.20547503257845956,
+            "slope": 1.0233736657854704,
+            "rankCorrelation": 0.5738228506645873
+          },
+          "2024": {
+            "rows": 253,
+            "players": 244,
+            "maePp": 1.4238416401104632,
+            "signedBiasPp": 0.020987542185903176,
+            "slope": 1.1345147496263526,
+            "rankCorrelation": 0.6457498513208338
+          },
+          "2025": {
+            "rows": 272,
+            "players": 260,
+            "maePp": 1.4624542832679874,
+            "signedBiasPp": -0.02254947798167673,
+            "slope": 1.0494802708327433,
+            "rankCorrelation": 0.591195690549433
+          },
+          "2026": {
+            "rows": 202,
+            "players": 197,
+            "maePp": 1.540728102010328,
+            "signedBiasPp": -0.373704234310201,
+            "slope": 1.2563683578186986,
+            "rankCorrelation": 0.6393527604608351
+          }
+        },
+        "ageBand": {
+          "18-21": {
+            "rows": 19,
+            "players": 18,
+            "maePp": 3.834584950180318,
+            "signedBiasPp": -3.0427421490435784,
+            "slope": 2.274815242402664,
+            "rankCorrelation": 0.9143610894958187
+          },
+          "22-24": {
+            "rows": 228,
+            "players": 177,
+            "maePp": 1.1525419180119598,
+            "signedBiasPp": 0.5660007943172434,
+            "slope": 0.9513339075918323,
+            "rankCorrelation": 0.7068874592670888
+          },
+          "25-27": {
+            "rows": 273,
+            "players": 194,
+            "maePp": 1.4507070594433817,
+            "signedBiasPp": 0.3459463754453415,
+            "slope": 1.0321670059355814,
+            "rankCorrelation": 0.58190757095793
+          },
+          "28-30": {
+            "rows": 197,
+            "players": 146,
+            "maePp": 1.6916623989779993,
+            "signedBiasPp": -0.5024147798405494,
+            "slope": 1.072933037684783,
+            "rankCorrelation": 0.6864651721635426
+          },
+          "31+": {
+            "rows": 184,
+            "players": 131,
+            "maePp": 1.3582661208692175,
+            "signedBiasPp": -0.5829507534808954,
+            "slope": 1.056604272071116,
+            "rankCorrelation": 0.6034006803867594
+          }
+        },
+        "status": {
+          "RFA": {
+            "rows": 288,
+            "players": 220,
+            "maePp": 1.4828459388508264,
+            "signedBiasPp": 0.0293968402093112,
+            "slope": 1.354084385163236,
+            "rankCorrelation": 0.7313221989882986
+          },
+          "UFA": {
+            "rows": 613,
+            "players": 389,
+            "maePp": 1.4482847096863936,
+            "signedBiasPp": -0.07997634499228852,
+            "slope": 0.9964995795896734,
+            "rankCorrelation": 0.5420113768637782
+          }
+        },
+        "term": {
+          "1": {
+            "rows": 442,
+            "players": 280,
+            "maePp": 1.1298077449178996,
+            "signedBiasPp": 0.7478614836398395,
+            "slope": 0.36340594350085165,
+            "rankCorrelation": 0.3959860558293587
+          },
+          "2": {
+            "rows": 272,
+            "players": 238,
+            "maePp": 1.209737890242007,
+            "signedBiasPp": 0.2740290097432474,
+            "slope": 0.5027893508817161,
+            "rankCorrelation": 0.49591980387927814
+          },
+          "3": {
+            "rows": 62,
+            "players": 61,
+            "maePp": 1.1324179462541628,
+            "signedBiasPp": -0.5566154800892072,
+            "slope": 1.1057629207638366,
+            "rankCorrelation": 0.6521773508287998
+          },
+          "4": {
+            "rows": 35,
+            "players": 34,
+            "maePp": 2.4557916645955604,
+            "signedBiasPp": -2.348525245342988,
+            "slope": 0.49189421490994933,
+            "rankCorrelation": 0.5426770299183792
+          },
+          "5": {
+            "rows": 24,
+            "players": 23,
+            "maePp": 3.4441517232432624,
+            "signedBiasPp": -3.434941560522951,
+            "slope": 1.1331843031742053,
+            "rankCorrelation": 0.9277321757846786
+          },
+          "6": {
+            "rows": 20,
+            "players": 20,
+            "maePp": 2.1041295821530652,
+            "signedBiasPp": -2.048658050805969,
+            "slope": 2.0843017454021804,
+            "rankCorrelation": 0.7520742655374062
+          },
+          "7": {
+            "rows": 16,
+            "players": 15,
+            "maePp": 4.389990150240955,
+            "signedBiasPp": -4.389990150240955,
+            "slope": 0.33477486366247244,
+            "rankCorrelation": 0.4786450662739323
+          },
+          "8": {
+            "rows": 30,
+            "players": 30,
+            "maePp": 4.509657723130087,
+            "signedBiasPp": -4.509657723130087,
+            "slope": 2.611131849932601,
+            "rankCorrelation": 0.8682395696606882
+          }
+        },
+        "structure": {
+          "1-Way": {
+            "rows": 601,
+            "players": 400,
+            "maePp": 1.7116125305020373,
+            "signedBiasPp": -0.45555866421391,
+            "slope": 1.1228097054025372,
+            "rankCorrelation": 0.5796672316725326
+          },
+          "2-Way": {
+            "rows": 279,
+            "players": 188,
+            "maePp": 0.959697379852237,
+            "signedBiasPp": 0.7759910675123531,
+            "slope": 0.005047984583007545,
+            "rankCorrelation": 0.06223468408544935
+          },
+          "Mixed": {
+            "rows": 21,
+            "players": 21,
+            "maePp": 0.877307505538044,
+            "signedBiasPp": 0.796668564601062,
+            "slope": 0.027181786325598985,
+            "rankCorrelation": 0.5744562646538028
+          }
+        },
+        "team": {
+          "ANA": {
+            "rows": 22,
+            "players": 21,
+            "maePp": 2.207624219329609,
+            "signedBiasPp": -1.2584297210934265,
+            "slope": 1.8391571280206302,
+            "rankCorrelation": 0.653362643869003
+          },
+          "BOS": {
+            "rows": 38,
+            "players": 33,
+            "maePp": 1.2563247139889917,
+            "signedBiasPp": 0.5914750625598554,
+            "slope": -0.07925150186311726,
+            "rankCorrelation": 0.2824937195199847
+          },
+          "BUF": {
+            "rows": 26,
+            "players": 23,
+            "maePp": 1.82087962125367,
+            "signedBiasPp": -1.0854092058390221,
+            "slope": 0.4839318234403925,
+            "rankCorrelation": 0.5979487667319962
+          },
+          "CAR": {
+            "rows": 25,
+            "players": 22,
+            "maePp": 1.5768109663899665,
+            "signedBiasPp": -0.44410570194687365,
+            "slope": 2.282275880121484,
+            "rankCorrelation": 0.7897263159484211
+          },
+          "CBJ": {
+            "rows": 25,
+            "players": 22,
+            "maePp": 1.3243359285237926,
+            "signedBiasPp": -0.33583858614771456,
+            "slope": 0.3925299716394788,
+            "rankCorrelation": 0.6258614393714543
+          },
+          "CGY": {
+            "rows": 24,
+            "players": 18,
+            "maePp": 1.1925813328136123,
+            "signedBiasPp": 0.18570976266245554,
+            "slope": 1.1027216919731324,
+            "rankCorrelation": 0.36254223185758266
+          },
+          "CHI": {
+            "rows": 20,
+            "players": 19,
+            "maePp": 1.982365121022952,
+            "signedBiasPp": -1.0735952468773873,
+            "slope": 2.134735849361601,
+            "rankCorrelation": 0.6293892815339447
+          },
+          "COL": {
+            "rows": 32,
+            "players": 26,
+            "maePp": 1.3689393870867075,
+            "signedBiasPp": 0.18581256107123212,
+            "slope": 1.2186739276092113,
+            "rankCorrelation": 0.7020574851374248
+          },
+          "DAL": {
+            "rows": 25,
+            "players": 18,
+            "maePp": 1.4397330606136212,
+            "signedBiasPp": 0.07981029853627385,
+            "slope": 1.9075058316148894,
+            "rankCorrelation": 0.7646962350012179
+          },
+          "DET": {
+            "rows": 34,
+            "players": 26,
+            "maePp": 1.3629532157263782,
+            "signedBiasPp": 0.16718392829037573,
+            "slope": 1.1877006531203085,
+            "rankCorrelation": 0.8314127820029835
+          },
+          "EDM": {
+            "rows": 31,
+            "players": 28,
+            "maePp": 1.5217696967967587,
+            "signedBiasPp": -0.2332279930584929,
+            "slope": 0.8293842278582154,
+            "rankCorrelation": 0.573414271605472
+          },
+          "FLA": {
+            "rows": 35,
+            "players": 28,
+            "maePp": 1.5567053209129007,
+            "signedBiasPp": 0.4655210076744322,
+            "slope": 1.8163316896213362,
+            "rankCorrelation": 0.7005165458621534
+          },
+          "LAK": {
+            "rows": 31,
+            "players": 27,
+            "maePp": 1.6347247252458514,
+            "signedBiasPp": -0.11632682655349404,
+            "slope": 1.3915676397011523,
+            "rankCorrelation": 0.3982638988012754
+          },
+          "MIN": {
+            "rows": 29,
+            "players": 28,
+            "maePp": 1.3552731095650208,
+            "signedBiasPp": 0.0796994107870356,
+            "slope": 1.949064373394173,
+            "rankCorrelation": 0.582129077698959
+          },
+          "MTL": {
+            "rows": 20,
+            "players": 17,
+            "maePp": 1.8604403654997408,
+            "signedBiasPp": -0.013012953560642044,
+            "slope": 0.1904942343533137,
+            "rankCorrelation": 0.5486498082108626
+          },
+          "NJD": {
+            "rows": 26,
+            "players": 25,
+            "maePp": 0.9821123686281376,
+            "signedBiasPp": 0.22448982592987576,
+            "slope": 1.286669749535117,
+            "rankCorrelation": 0.7558376697779021
+          },
+          "NSH": {
+            "rows": 23,
+            "players": 22,
+            "maePp": 1.6670368777348175,
+            "signedBiasPp": 0.02201611500061109,
+            "slope": 0.8472740666104827,
+            "rankCorrelation": 0.496032687371731
+          },
+          "NYI": {
+            "rows": 26,
+            "players": 21,
+            "maePp": 1.164420304750203,
+            "signedBiasPp": 0.7036384470766704,
+            "slope": 0.9389450753941815,
+            "rankCorrelation": 0.718633400510094
+          },
+          "NYR": {
+            "rows": 21,
+            "players": 21,
+            "maePp": 1.3051331158229362,
+            "signedBiasPp": 0.1557388799899344,
+            "slope": 1.044424274803514,
+            "rankCorrelation": 0.6890395200784971
+          },
+          "OTT": {
+            "rows": 32,
+            "players": 24,
+            "maePp": 0.9924454602424388,
+            "signedBiasPp": 0.24575085828993792,
+            "slope": 0.9961983959970373,
+            "rankCorrelation": 0.5846589859685667
+          },
+          "PHI": {
+            "rows": 24,
+            "players": 19,
+            "maePp": 1.51651302536777,
+            "signedBiasPp": -0.43394457067582565,
+            "slope": 2.003368638971046,
+            "rankCorrelation": 0.7211621806391908
+          },
+          "PIT": {
+            "rows": 35,
+            "players": 30,
+            "maePp": 1.1377085419642095,
+            "signedBiasPp": 0.28699122134237626,
+            "slope": 1.194738183539314,
+            "rankCorrelation": 0.6617548611147736
+          },
+          "SEA": {
+            "rows": 24,
+            "players": 19,
+            "maePp": 1.3371273867670708,
+            "signedBiasPp": -0.1763026789384002,
+            "slope": 1.682370620025129,
+            "rankCorrelation": 0.7933236992358542
+          },
+          "SJS": {
+            "rows": 30,
+            "players": 27,
+            "maePp": 1.5810052804293226,
+            "signedBiasPp": -0.5282785348089221,
+            "slope": 1.6271372990379132,
+            "rankCorrelation": 0.6225744102848915
+          },
+          "STL": {
+            "rows": 26,
+            "players": 18,
+            "maePp": 1.1634208798349266,
+            "signedBiasPp": 0.18773821036589716,
+            "slope": 1.318831215386924,
+            "rankCorrelation": 0.8004396700384341
+          },
+          "TBL": {
+            "rows": 24,
+            "players": 22,
+            "maePp": 1.56895610278559,
+            "signedBiasPp": 0.10006877102436183,
+            "slope": 0.6141516507156194,
+            "rankCorrelation": 0.4034897369270121
+          },
+          "TOR": {
+            "rows": 33,
+            "players": 29,
+            "maePp": 1.941910341102346,
+            "signedBiasPp": -0.4045602232456216,
+            "slope": 1.925325226119367,
+            "rankCorrelation": 0.602664267974583
+          },
+          "UTA": {
+            "rows": 33,
+            "players": 26,
+            "maePp": 1.5745473633322187,
+            "signedBiasPp": -0.4904142557807817,
+            "slope": 0.7556836434886577,
+            "rankCorrelation": 0.546379057264175
+          },
+          "VAN": {
+            "rows": 29,
+            "players": 26,
+            "maePp": 1.3516575909987045,
+            "signedBiasPp": 0.22479011617493128,
+            "slope": 2.019789588383194,
+            "rankCorrelation": 0.7582751138007713
+          },
+          "VGK": {
+            "rows": 23,
+            "players": 16,
+            "maePp": 1.3493814974717642,
+            "signedBiasPp": 0.604639246523468,
+            "slope": 1.7022675792354516,
+            "rankCorrelation": 0.5001541127701726
+          },
+          "WAS": {
+            "rows": 21,
+            "players": 21,
+            "maePp": 1.459457987337253,
+            "signedBiasPp": -0.18984739525780933,
+            "slope": -0.053418788527258114,
+            "rankCorrelation": 0.13580994120861373
+          },
+          "WPG": {
+            "rows": 54,
+            "players": 47,
+            "maePp": 1.5099485271228876,
+            "signedBiasPp": -0.02332264467289771,
+            "slope": 1.1642826025858914,
+            "rankCorrelation": 0.4132703764703253
+          }
+        },
+        "role": {
+          "depth": {
+            "rows": 560,
+            "players": 365,
+            "maePp": 1.5018317126932474,
+            "signedBiasPp": 0.014762494019809416,
+            "slope": 0.7012479910709488,
+            "rankCorrelation": 0.5448342087449342
+          },
+          "regular": {
+            "rows": 192,
+            "players": 153,
+            "maePp": 1.9615000651838441,
+            "signedBiasPp": -0.4406989461713105,
+            "slope": 2.1744725294590386,
+            "rankCorrelation": 0.5772067809196836
+          },
+          "top_six": {
+            "rows": 149,
+            "players": 110,
+            "maePp": 0.6525126563978546,
+            "signedBiasPp": 0.24018786250877272,
+            "slope": 0.019981788676983706,
+            "rankCorrelation": 0.07852685516404663
+          }
+        }
+      }
+    },
+    "D": {
+      "model": "D-raw-affine",
+      "spentDevelopmentMetric": {
+        "rows": 486,
+        "players": 295,
+        "maePp": 1.9343945107567317,
+        "signedBiasPp": 0.10367488417930978,
+        "slope": 0.31265711619998804,
+        "rankCorrelation": 0.2671948474306817
+      },
+      "residuals": {
+        "signingYear": {
+          "2023": {
+            "rows": 82,
+            "players": 79,
+            "maePp": 1.7967354389456647,
+            "signedBiasPp": -0.027476750746578918,
+            "slope": 4.411662811033307,
+            "rankCorrelation": 0.32118700333372097
+          },
+          "2024": {
+            "rows": 155,
+            "players": 152,
+            "maePp": 1.8668769246454182,
+            "signedBiasPp": 0.13145344731795508,
+            "slope": -1.2017425280445693,
+            "rankCorrelation": 0.22910029754706748
+          },
+          "2025": {
+            "rows": 136,
+            "players": 128,
+            "maePp": 2.135066146428366,
+            "signedBiasPp": -0.06654586972334949,
+            "slope": -1.1512317647803918,
+            "rankCorrelation": 0.26957804500321536
+          },
+          "2026": {
+            "rows": 113,
+            "players": 109,
+            "maePp": 1.885385017698504,
+            "signedBiasPp": 0.36561098425182753,
+            "slope": -0.4184421193584555,
+            "rankCorrelation": 0.2616816295867657
+          }
+        },
+        "ageBand": {
+          "18-21": {
+            "rows": 5,
+            "players": 5,
+            "maePp": 5.2010938410617955,
+            "signedBiasPp": -5.2010938410617955,
+            "slope": 43.95853304374054,
+            "rankCorrelation": 0.1
+          },
+          "22-24": {
+            "rows": 121,
+            "players": 93,
+            "maePp": 1.9046751696546338,
+            "signedBiasPp": 0.3806161596393382,
+            "slope": 2.605431175070896,
+            "rankCorrelation": 0.5219443188688166
+          },
+          "25-27": {
+            "rows": 149,
+            "players": 109,
+            "maePp": 1.895052695728082,
+            "signedBiasPp": 0.37506689341518473,
+            "slope": 1.5617760987140148,
+            "rankCorrelation": 0.3384089548875505
+          },
+          "28-30": {
+            "rows": 104,
+            "players": 79,
+            "maePp": 2.1235859465703215,
+            "signedBiasPp": -0.22561914354426105,
+            "slope": 1.1359100971121376,
+            "rankCorrelation": 0.32109716842204505
+          },
+          "31+": {
+            "rows": 107,
+            "players": 74,
+            "maePp": 1.6862502559575292,
+            "signedBiasPp": -0.01947353822584868,
+            "slope": -2.359781676314503,
+            "rankCorrelation": 0.010646192842335173
+          }
+        },
+        "status": {
+          "RFA": {
+            "rows": 160,
+            "players": 116,
+            "maePp": 2.1127511861738606,
+            "signedBiasPp": -0.2105975878944196,
+            "slope": 3.8782281429440983,
+            "rankCorrelation": 0.5064712004989825
+          },
+          "UFA": {
+            "rows": 326,
+            "players": 210,
+            "maePp": 1.8468574921471006,
+            "signedBiasPp": 0.2579190422523057,
+            "slope": -1.330420934756453,
+            "rankCorrelation": 0.1165062735061945
+          }
+        },
+        "term": {
+          "1": {
+            "rows": 223,
+            "players": 151,
+            "maePp": 1.5399893423411957,
+            "signedBiasPp": 1.3206247950912346,
+            "slope": -1.4841997550542354,
+            "rankCorrelation": 0.03755515095697422
+          },
+          "2": {
+            "rows": 146,
+            "players": 128,
+            "maePp": 1.4714343568840542,
+            "signedBiasPp": 0.8268209942565683,
+            "slope": 1.1766898524352118,
+            "rankCorrelation": 0.441198737487677
+          },
+          "3": {
+            "rows": 33,
+            "players": 32,
+            "maePp": 1.3669864764473565,
+            "signedBiasPp": -0.9931773237000999,
+            "slope": 1.2693636345286083,
+            "rankCorrelation": 0.15803150477977498
+          },
+          "4": {
+            "rows": 22,
+            "players": 21,
+            "maePp": 2.9837776574477526,
+            "signedBiasPp": -2.8714055109113015,
+            "slope": 1.1713133203259276,
+            "rankCorrelation": 0.35653701640614627
+          },
+          "5": {
+            "rows": 14,
+            "players": 13,
+            "maePp": 2.654143617916421,
+            "signedBiasPp": -2.654143617916421,
+            "slope": 0.3327170739998194,
+            "rankCorrelation": 0.35942689982423187
+          },
+          "6": {
+            "rows": 15,
+            "players": 14,
+            "maePp": 3.5592316601698006,
+            "signedBiasPp": -3.4104581428036025,
+            "slope": 7.605351850142244,
+            "rankCorrelation": 0.42614162108574594
+          },
+          "7": {
+            "rows": 14,
+            "players": 13,
+            "maePp": 5.217572053377016,
+            "signedBiasPp": -5.217572053377016,
+            "slope": 0.8044834052311771,
+            "rankCorrelation": 0.019845657045509738
+          },
+          "8": {
+            "rows": 19,
+            "players": 18,
+            "maePp": 5.659080857544512,
+            "signedBiasPp": -5.659080857544512,
+            "slope": 11.680701936904473,
+            "rankCorrelation": 0.8312832734962805
+          }
+        },
+        "structure": {
+          "1-Way": {
+            "rows": 331,
+            "players": 223,
+            "maePp": 2.0712340637346354,
+            "signedBiasPp": -0.6167711885814607,
+            "slope": 0.4560308269757538,
+            "rankCorrelation": 0.23051817368139577
+          },
+          "2-Way": {
+            "rows": 140,
+            "players": 91,
+            "maePp": 1.6431295544779314,
+            "signedBiasPp": 1.6431295544779314,
+            "slope": -0.1906297728079736,
+            "rankCorrelation": -0.08728491492438173
+          },
+          "Mixed": {
+            "rows": 15,
+            "players": 15,
+            "maePp": 1.6332746336464967,
+            "signedBiasPp": 1.6332746336464967,
+            "slope": -0.023279733393943243,
+            "rankCorrelation": 0
+          }
+        },
+        "team": {
+          "ANA": {
+            "rows": 13,
+            "players": 12,
+            "maePp": 1.9584268947121553,
+            "signedBiasPp": -0.04711019724814246,
+            "slope": 43.955784534791675,
+            "rankCorrelation": 0.4502831153895114
+          },
+          "BOS": {
+            "rows": 19,
+            "players": 14,
+            "maePp": 1.5161777003097572,
+            "signedBiasPp": 1.0386805886976134,
+            "slope": 10.5803091231214,
+            "rankCorrelation": 0.4177172719654355
+          },
+          "BUF": {
+            "rows": 17,
+            "players": 13,
+            "maePp": 2.366625511774445,
+            "signedBiasPp": -0.598295836672037,
+            "slope": 7.501458063138798,
+            "rankCorrelation": 0.33269740681208204
+          },
+          "CAR": {
+            "rows": 15,
+            "players": 15,
+            "maePp": 1.9564931546436106,
+            "signedBiasPp": 0.053277808008474106,
+            "slope": 17.80454584865567,
+            "rankCorrelation": 0.511795073008353
+          },
+          "CBJ": {
+            "rows": 11,
+            "players": 10,
+            "maePp": 2.008312937468273,
+            "signedBiasPp": 0.4682288380347275,
+            "slope": -13.260025713388016,
+            "rankCorrelation": -0.2664598921524103
+          },
+          "CGY": {
+            "rows": 15,
+            "players": 14,
+            "maePp": 1.6732023690953328,
+            "signedBiasPp": 0.6789500616637968,
+            "slope": 16.698424157389876,
+            "rankCorrelation": 0.82348043160885
+          },
+          "CHI": {
+            "rows": 11,
+            "players": 10,
+            "maePp": 2.2616468213224694,
+            "signedBiasPp": -0.7363009698680281,
+            "slope": 11.996827389945121,
+            "rankCorrelation": 0.31171221048348774
+          },
+          "COL": {
+            "rows": 19,
+            "players": 17,
+            "maePp": 1.7927719035544227,
+            "signedBiasPp": 0.4501369394447882,
+            "slope": 5.674411352432141,
+            "rankCorrelation": 0.6610990116644884
+          },
+          "DAL": {
+            "rows": 15,
+            "players": 11,
+            "maePp": 2.059186788856134,
+            "signedBiasPp": -0.10138997529410317,
+            "slope": -2.587294790236689,
+            "rankCorrelation": 0.18936909921553968
+          },
+          "DET": {
+            "rows": 13,
+            "players": 11,
+            "maePp": 1.9726619184056058,
+            "signedBiasPp": -0.030491649159226267,
+            "slope": -10.74664735881758,
+            "rankCorrelation": -0.1855984162159652
+          },
+          "EDM": {
+            "rows": 16,
+            "players": 15,
+            "maePp": 1.9775771878256803,
+            "signedBiasPp": -0.36082062086237643,
+            "slope": 15.776547684014908,
+            "rankCorrelation": 0.6109788044825388
+          },
+          "FLA": {
+            "rows": 23,
+            "players": 19,
+            "maePp": 1.694929153675676,
+            "signedBiasPp": 0.7359304963151999,
+            "slope": -1.387454367286176,
+            "rankCorrelation": -0.13244471156254412
+          },
+          "LAK": {
+            "rows": 13,
+            "players": 13,
+            "maePp": 1.8991776829301577,
+            "signedBiasPp": 0.18174152593988874,
+            "slope": -4.072778452033248,
+            "rankCorrelation": -0.07202464772761691
+          },
+          "MIN": {
+            "rows": 11,
+            "players": 10,
+            "maePp": 2.0197386656126124,
+            "signedBiasPp": 0.47254908712590105,
+            "slope": 4.320152032734396,
+            "rankCorrelation": 0.3724383967960793
+          },
+          "MTL": {
+            "rows": 9,
+            "players": 9,
+            "maePp": 2.4104062324976807,
+            "signedBiasPp": -0.5138933572388874,
+            "slope": -5.500090735590321,
+            "rankCorrelation": 0.10127393670836667
+          },
+          "NJD": {
+            "rows": 12,
+            "players": 12,
+            "maePp": 2.2823833267211056,
+            "signedBiasPp": -0.09788254818468513,
+            "slope": 3.4307646500380438,
+            "rankCorrelation": -0.05378037058235392
+          },
+          "NSH": {
+            "rows": 14,
+            "players": 13,
+            "maePp": 1.7592323705878155,
+            "signedBiasPp": 0.05830699758241718,
+            "slope": 35.815960036463984,
+            "rankCorrelation": 0.5179203694177663
+          },
+          "NYI": {
+            "rows": 13,
+            "players": 10,
+            "maePp": 2.209926546933678,
+            "signedBiasPp": -0.10002381608231353,
+            "slope": -7.372671935838138,
+            "rankCorrelation": -0.09819304088496758
+          },
+          "NYR": {
+            "rows": 17,
+            "players": 14,
+            "maePp": 2.07004869531868,
+            "signedBiasPp": -0.2470777960919487,
+            "slope": -2.319644189447075,
+            "rankCorrelation": 0.1328658849691579
+          },
+          "OTT": {
+            "rows": 14,
+            "players": 14,
+            "maePp": 1.8036052911773115,
+            "signedBiasPp": 0.5547245271305807,
+            "slope": 17.526523492549412,
+            "rankCorrelation": 0.4674401493349389
+          },
+          "PHI": {
+            "rows": 12,
+            "players": 12,
+            "maePp": 1.51534733552545,
+            "signedBiasPp": 0.8202176919755765,
+            "slope": 10.894398944385504,
+            "rankCorrelation": 0.648966119911809
+          },
+          "PIT": {
+            "rows": 16,
+            "players": 15,
+            "maePp": 1.5828974598584222,
+            "signedBiasPp": 0.9995669041794766,
+            "slope": 16.700526176189886,
+            "rankCorrelation": 0.4687459003994848
+          },
+          "SEA": {
+            "rows": 15,
+            "players": 13,
+            "maePp": 2.1989927671940808,
+            "signedBiasPp": -0.404213723114683,
+            "slope": -3.74525674931464,
+            "rankCorrelation": 0.17690568232240647
+          },
+          "SJS": {
+            "rows": 12,
+            "players": 12,
+            "maePp": 2.1296352082048906,
+            "signedBiasPp": -0.08857677443457962,
+            "slope": -9.400990493987578,
+            "rankCorrelation": -0.10582422051290631
+          },
+          "STL": {
+            "rows": 11,
+            "players": 9,
+            "maePp": 2.1822681229941523,
+            "signedBiasPp": 0.15816579477456003,
+            "slope": 54.167178159460946,
+            "rankCorrelation": 0.8705196492275474
+          },
+          "TBL": {
+            "rows": 12,
+            "players": 10,
+            "maePp": 2.613529158699949,
+            "signedBiasPp": -0.46510877511585463,
+            "slope": 76.59331252862066,
+            "rankCorrelation": 0.721779076286529
+          },
+          "TOR": {
+            "rows": 17,
+            "players": 14,
+            "maePp": 1.5349376725327746,
+            "signedBiasPp": 0.42101164408794856,
+            "slope": 1.947344882389153,
+            "rankCorrelation": 0.5979769596796788
+          },
+          "UTA": {
+            "rows": 17,
+            "players": 15,
+            "maePp": 1.5799587608119703,
+            "signedBiasPp": -0.02505260402422868,
+            "slope": 5.938142574532232,
+            "rankCorrelation": 0.1723092910190634
+          },
+          "VAN": {
+            "rows": 20,
+            "players": 18,
+            "maePp": 1.639731309007858,
+            "signedBiasPp": 0.16272239720329024,
+            "slope": 1.862777383863126,
+            "rankCorrelation": 0.022131408594418422
+          },
+          "VGK": {
+            "rows": 17,
+            "players": 14,
+            "maePp": 2.207537042844923,
+            "signedBiasPp": -0.12450476704203105,
+            "slope": 33.18145322262461,
+            "rankCorrelation": 0.4699976237418909
+          },
+          "WAS": {
+            "rows": 16,
+            "players": 14,
+            "maePp": 1.9955479869102457,
+            "signedBiasPp": -0.45045764977910047,
+            "slope": 2.89738878802529,
+            "rankCorrelation": 0.3450760484974731
+          },
+          "WPG": {
+            "rows": 31,
+            "players": 26,
+            "maePp": 1.953874476979366,
+            "signedBiasPp": -0.1535971938750532,
+            "slope": -2.5240234935171393,
+            "rankCorrelation": 0.24118345391875465
+          }
+        },
+        "role": {
+          "depth": {
+            "rows": 226,
+            "players": 162,
+            "maePp": 1.8551207037570456,
+            "signedBiasPp": -0.5325429990464752,
+            "slope": -0.20773654314613846,
+            "rankCorrelation": 0.0998638834216681
+          },
+          "regular": {
+            "rows": 127,
+            "players": 101,
+            "maePp": 2.421741084163342,
+            "signedBiasPp": -0.2603690876425488,
+            "slope": 0.7526590209884517,
+            "rankCorrelation": 0.3123332694386364
+          },
+          "top_pair": {
+            "rows": 133,
+            "players": 93,
+            "maePp": 1.6037393645859876,
+            "signedBiasPp": 1.5323878618515157,
+            "slope": -0.4992965125288669,
+            "rankCorrelation": 0.2057502415600857
+          }
+        }
+      }
+    },
+    "G": {
+      "model": "G-raw-affine",
+      "spentDevelopmentMetric": {
+        "rows": 166,
+        "players": 108,
+        "maePp": 1.2099286894637913,
+        "signedBiasPp": 0.114210798415241,
+        "slope": 1.0134091318099012,
+        "rankCorrelation": 0.6707949917044596
+      },
+      "residuals": {
+        "signingYear": {
+          "2023": {
+            "rows": 35,
+            "players": 35,
+            "maePp": 1.0428600115757931,
+            "signedBiasPp": 0.56215889658187,
+            "slope": 0.8248892657495001,
+            "rankCorrelation": 0.6910297151936288
+          },
+          "2024": {
+            "rows": 48,
+            "players": 48,
+            "maePp": 1.4134489554077947,
+            "signedBiasPp": -0.21178332180894252,
+            "slope": 1.8206880074462937,
+            "rankCorrelation": 0.6345447305795564
+          },
+          "2025": {
+            "rows": 49,
+            "players": 47,
+            "maePp": 1.288047379020582,
+            "signedBiasPp": -0.2625116042112742,
+            "slope": 1.4004526294560244,
+            "rankCorrelation": 0.7237949006290543
+          },
+          "2026": {
+            "rows": 34,
+            "players": 33,
+            "maePp": 0.9820056063015862,
+            "signedBiasPp": 0.6562382120513593,
+            "slope": 0.7765531560409974,
+            "rankCorrelation": 0.5936537963072204
+          }
+        },
+        "ageBand": {
+          "18-21": {
+            "rows": 1,
+            "players": 1,
+            "maePp": 0.48981248111919795,
+            "signedBiasPp": -0.48981248111919795,
+            "slope": 0,
+            "rankCorrelation": 0
+          },
+          "22-24": {
+            "rows": 29,
+            "players": 25,
+            "maePp": 0.9312299864338043,
+            "signedBiasPp": 0.46848357370129323,
+            "slope": 1.9595047544983866,
+            "rankCorrelation": 0.4300662545814444
+          },
+          "25-27": {
+            "rows": 48,
+            "players": 41,
+            "maePp": 1.1865369127943945,
+            "signedBiasPp": 0.21150010136666972,
+            "slope": 0.9162768719773537,
+            "rankCorrelation": 0.7957950322468764
+          },
+          "28-30": {
+            "rows": 39,
+            "players": 31,
+            "maePp": 1.587708093321135,
+            "signedBiasPp": -0.4895415545723453,
+            "slope": 0.9681865261987105,
+            "rankCorrelation": 0.7064984506320585
+          },
+          "31+": {
+            "rows": 49,
+            "players": 33,
+            "maePp": 1.1118018961149927,
+            "signedBiasPp": 0.3020999417027147,
+            "slope": 1.2882957703586773,
+            "rankCorrelation": 0.5874399200433712
+          }
+        },
+        "status": {
+          "RFA": {
+            "rows": 46,
+            "players": 35,
+            "maePp": 1.1207398853725388,
+            "signedBiasPp": 0.24222274402783955,
+            "slope": 1.0766292454956707,
+            "rankCorrelation": 0.7607470859866358
+          },
+          "UFA": {
+            "rows": 120,
+            "players": 80,
+            "maePp": 1.2441177310321052,
+            "signedBiasPp": 0.0651395525970782,
+            "slope": 0.9911946338027129,
+            "rankCorrelation": 0.6242526546987793
+          }
+        },
+        "term": {
+          "1": {
+            "rows": 80,
+            "players": 55,
+            "maePp": 0.8798155340162565,
+            "signedBiasPp": 0.8434299046170747,
+            "slope": 0.8278010802099512,
+            "rankCorrelation": 0.4579101372797068
+          },
+          "2": {
+            "rows": 50,
+            "players": 41,
+            "maePp": 0.8326294871040172,
+            "signedBiasPp": 0.16176921719425316,
+            "slope": 1.7340386367214413,
+            "rankCorrelation": 0.5396951464014976
+          },
+          "3": {
+            "rows": 12,
+            "players": 11,
+            "maePp": 2.0942987286091204,
+            "signedBiasPp": -0.4774638331507157,
+            "slope": 0.022740783300748902,
+            "rankCorrelation": 0.151947257405004
+          },
+          "4": {
+            "rows": 3,
+            "players": 3,
+            "maePp": 1.487372764617248,
+            "signedBiasPp": -1.487372764617248,
+            "slope": 1.5776450407033773,
+            "rankCorrelation": 1
+          },
+          "5": {
+            "rows": 11,
+            "players": 11,
+            "maePp": 1.845133870605977,
+            "signedBiasPp": -1.432078374910951,
+            "slope": 0.2767777705929627,
+            "rankCorrelation": 0.33713071520787186
+          },
+          "6": {
+            "rows": 3,
+            "players": 2,
+            "maePp": 3.4828363196341794,
+            "signedBiasPp": -3.4828363196341794,
+            "slope": -2.590807321807682,
+            "rankCorrelation": -1
+          },
+          "7": {
+            "rows": 2,
+            "players": 2,
+            "maePp": 2.2763609882844302,
+            "signedBiasPp": -0.34645542511321414,
+            "slope": 0.35447306845579746,
+            "rankCorrelation": 1
+          },
+          "8": {
+            "rows": 5,
+            "players": 5,
+            "maePp": 4.7880077650379365,
+            "signedBiasPp": -3.9035788934677678,
+            "slope": 0.0766198308231156,
+            "rankCorrelation": 0.6668859288553503
+          }
+        },
+        "structure": {
+          "1-Way": {
+            "rows": 126,
+            "players": 84,
+            "maePp": 1.294271496234601,
+            "signedBiasPp": -0.1492933443531717,
+            "slope": 0.9307589550056589,
+            "rankCorrelation": 0.6825869342209626
+          },
+          "2-Way": {
+            "rows": 31,
+            "players": 25,
+            "maePp": 0.9507362222579369,
+            "signedBiasPp": 0.9507362222579369,
+            "slope": 1.6452112217109893,
+            "rankCorrelation": 0.47363327362338253
+          },
+          "Mixed": {
+            "rows": 9,
+            "players": 9,
+            "maePp": 0.9219034483815113,
+            "signedBiasPp": 0.9219034483815113,
+            "slope": -0.21946484763856858,
+            "rankCorrelation": -0.3535533905932738
+          }
+        },
+        "team": {
+          "ANA": {
+            "rows": 5,
+            "players": 4,
+            "maePp": 0.8063038305023135,
+            "signedBiasPp": 0.1259211921546489,
+            "slope": 1.4423070435357312,
+            "rankCorrelation": 0.7254762501100117
+          },
+          "BOS": {
+            "rows": 3,
+            "players": 2,
+            "maePp": 0.9914606029637918,
+            "signedBiasPp": -0.19179613033878243,
+            "slope": 1.4842948502553033,
+            "rankCorrelation": 1
+          },
+          "BUF": {
+            "rows": 8,
+            "players": 8,
+            "maePp": 0.9812651186995134,
+            "signedBiasPp": 0.514556904509335,
+            "slope": 2.56734131364509,
+            "rankCorrelation": 0.4159001959280291
+          },
+          "CAR": {
+            "rows": 6,
+            "players": 5,
+            "maePp": 0.9369604575549753,
+            "signedBiasPp": 0.017014785676701005,
+            "slope": 7.779511470730605,
+            "rankCorrelation": 0.7700513795421218
+          },
+          "CBJ": {
+            "rows": 3,
+            "players": 2,
+            "maePp": 1.2408940383867089,
+            "signedBiasPp": 1.2408940383867089,
+            "slope": 0.8482076262109953,
+            "rankCorrelation": 1
+          },
+          "CGY": {
+            "rows": 5,
+            "players": 3,
+            "maePp": 1.1396315240341874,
+            "signedBiasPp": 0.09050495867512956,
+            "slope": 2.228982384380094,
+            "rankCorrelation": 0.5735393346764044
+          },
+          "CHI": {
+            "rows": 6,
+            "players": 6,
+            "maePp": 1.4868794600290691,
+            "signedBiasPp": -0.8082367683921653,
+            "slope": 4.686934987184446,
+            "rankCorrelation": 0.9276336570439175
+          },
+          "COL": {
+            "rows": 5,
+            "players": 4,
+            "maePp": 1.1564255086813457,
+            "signedBiasPp": -0.0979792711647404,
+            "slope": 4.712941158087071,
+            "rankCorrelation": 0.7631578947368421
+          },
+          "DAL": {
+            "rows": 4,
+            "players": 4,
+            "maePp": 2.200522775585362,
+            "signedBiasPp": -0.9278512188819581,
+            "slope": 14.438540614295036,
+            "rankCorrelation": 0.6324555320336759
+          },
+          "DET": {
+            "rows": 6,
+            "players": 6,
+            "maePp": 0.814620767880479,
+            "signedBiasPp": 0.814620767880479,
+            "slope": 0.8813251820164593,
+            "rankCorrelation": 0.9411764705882353
+          },
+          "EDM": {
+            "rows": 3,
+            "players": 3,
+            "maePp": 1.0442030191379381,
+            "signedBiasPp": 1.0442030191379381,
+            "slope": 0.20703838989181195,
+            "rankCorrelation": 0.8660254037844387
+          },
+          "FLA": {
+            "rows": 5,
+            "players": 5,
+            "maePp": 0.6902354667314687,
+            "signedBiasPp": 0.6902354667314687,
+            "slope": 2.238392288609146,
+            "rankCorrelation": 0.4472135954999579
+          },
+          "LAK": {
+            "rows": 7,
+            "players": 5,
+            "maePp": 0.8690717781392935,
+            "signedBiasPp": 0.7223790029163772,
+            "slope": 0.3342961497760708,
+            "rankCorrelation": 0.626253683333941
+          },
+          "MIN": {
+            "rows": 7,
+            "players": 6,
+            "maePp": 0.637508117336444,
+            "signedBiasPp": 0.3260425638440914,
+            "slope": 1.1630602207132295,
+            "rankCorrelation": 0.8153742483272113
+          },
+          "MTL": {
+            "rows": 5,
+            "players": 3,
+            "maePp": 1.1954849767484357,
+            "signedBiasPp": 1.1954849767484357,
+            "slope": 0.7330324971653578,
+            "rankCorrelation": 0.7631578947368421
+          },
+          "NJD": {
+            "rows": 7,
+            "players": 6,
+            "maePp": 1.2350924151809124,
+            "signedBiasPp": 0.32089849320657493,
+            "slope": 2.9596851747682846,
+            "rankCorrelation": 0.8975491104081188
+          },
+          "NSH": {
+            "rows": 4,
+            "players": 4,
+            "maePp": 2.150924417614782,
+            "signedBiasPp": -0.9921358523461218,
+            "slope": -8.735886583077152,
+            "rankCorrelation": 0.2
+          },
+          "NYI": {
+            "rows": 4,
+            "players": 4,
+            "maePp": 1.3732786084015443,
+            "signedBiasPp": 0.7381165245736073,
+            "slope": 0.7950077626918164,
+            "rankCorrelation": 0.6324555320336759
+          },
+          "NYR": {
+            "rows": 5,
+            "players": 3,
+            "maePp": 2.483270728139541,
+            "signedBiasPp": -0.4812144788420394,
+            "slope": 4.107476339675967,
+            "rankCorrelation": 0.6668859288553503
+          },
+          "OTT": {
+            "rows": 9,
+            "players": 8,
+            "maePp": 1.005261671769914,
+            "signedBiasPp": 0.3211755306687299,
+            "slope": 1.6640268059239898,
+            "rankCorrelation": 0.6312669987536296
+          },
+          "PHI": {
+            "rows": 5,
+            "players": 4,
+            "maePp": 0.9938853038780191,
+            "signedBiasPp": 0.3179603114303397,
+            "slope": 0.7660201729051532,
+            "rankCorrelation": 0.5642880936468347
+          },
+          "PIT": {
+            "rows": 6,
+            "players": 5,
+            "maePp": 1.170331800023871,
+            "signedBiasPp": -0.5268109478097355,
+            "slope": 2.8661459352345875,
+            "rankCorrelation": 0.5408987230262506
+          },
+          "SEA": {
+            "rows": 3,
+            "players": 3,
+            "maePp": 1.4653760371024298,
+            "signedBiasPp": -0.24929282773488484,
+            "slope": 5.269103859136487,
+            "rankCorrelation": 0.5
+          },
+          "SJS": {
+            "rows": 5,
+            "players": 5,
+            "maePp": 0.6596459385205174,
+            "signedBiasPp": 0.02850407658412406,
+            "slope": 1.544665701533575,
+            "rankCorrelation": 0.6708203932499369
+          },
+          "STL": {
+            "rows": 1,
+            "players": 1,
+            "maePp": 0.9231254909869833,
+            "signedBiasPp": -0.9231254909869833,
+            "slope": 0,
+            "rankCorrelation": 0
+          },
+          "TBL": {
+            "rows": 4,
+            "players": 3,
+            "maePp": 0.8640757781680788,
+            "signedBiasPp": 0.8640757781680788,
+            "slope": -4.286408244739031,
+            "rankCorrelation": 0.2721655269759087
+          },
+          "TOR": {
+            "rows": 8,
+            "players": 7,
+            "maePp": 1.4757917795797146,
+            "signedBiasPp": -0.1926228200153594,
+            "slope": 0.3701857463657166,
+            "rankCorrelation": 0.3927045549390528
+          },
+          "UTA": {
+            "rows": 6,
+            "players": 5,
+            "maePp": 0.9213283136291843,
+            "signedBiasPp": 0.0890153590585705,
+            "slope": 4.830168493728011,
+            "rankCorrelation": 0.16395645894598823
+          },
+          "VAN": {
+            "rows": 6,
+            "players": 5,
+            "maePp": 2.115602073467767,
+            "signedBiasPp": -0.8595263323914463,
+            "slope": 1.3694227465997897,
+            "rankCorrelation": 0.6515327693178213
+          },
+          "VGK": {
+            "rows": 5,
+            "players": 5,
+            "maePp": 1.3320120713519363,
+            "signedBiasPp": -0.32488532343567417,
+            "slope": 2.8672977794942702,
+            "rankCorrelation": 0.20519567041703082
+          },
+          "WAS": {
+            "rows": 2,
+            "players": 2,
+            "maePp": 2.235259670027994,
+            "signedBiasPp": -1.062779306498361,
+            "slope": -2.0400955759519483,
+            "rankCorrelation": -1
+          },
+          "WPG": {
+            "rows": 8,
+            "players": 8,
+            "maePp": 1.2523974778605251,
+            "signedBiasPp": 0.32705222702797243,
+            "slope": 0.8151162932665057,
+            "rankCorrelation": 0.8795180722891566
+          }
+        },
+        "role": {
+          "backup": {
+            "rows": 119,
+            "players": 80,
+            "maePp": 0.881779106078522,
+            "signedBiasPp": 0.4861957682219938,
+            "slope": 1.9674767640698332,
+            "rankCorrelation": 0.387307071675266
+          },
+          "starter": {
+            "rows": 17,
+            "players": 16,
+            "maePp": 2.6029247102219455,
+            "signedBiasPp": -1.3906988194558803,
+            "slope": 0.31541422286578025,
+            "rankCorrelation": 0.1903008338921602
+          },
+          "tandem": {
+            "rows": 30,
+            "players": 26,
+            "maePp": 1.7222242917957395,
+            "signedBiasPp": -0.5085474650245748,
+            "slope": 0.7514955346359916,
+            "rankCorrelation": 0.4081791944472129
+          }
+        }
+      }
+    }
+  },
+  "rolling": {
+    "F": {
+      "results": [
+        {
+          "name": "2023-24 to 2024-25",
+          "training": [
+            "train"
+          ],
+          "evaluation": "validation",
+          "results": [
+            {
+              "name": "F-raw-affine",
+              "features": [
+                "positionalNavRaw"
+              ],
+              "metric": {
+                "rows": 282,
+                "players": 254,
+                "maePp": 1.4113860265731855,
+                "signedBiasPp": -0.26776995989183133,
+                "slope": 0.7941063134886173,
+                "rankCorrelation": 0.6451314188655514,
+                "playerClusteredBootstrap": {
+                  "replicates": 1000,
+                  "maePp95": [
+                    1.2363193542063922,
+                    1.6133496603744013
+                  ],
+                  "signedBiasPp95": [
+                    -0.5448164395835771,
+                    -0.010196213057472958
+                  ]
+                }
+              }
+            },
+            {
+              "name": "F-raw-affine-status-mean",
+              "features": [
+                "positionalNavRaw",
+                "signingStatus"
+              ],
+              "metric": {
+                "rows": 282,
+                "players": 254,
+                "maePp": 1.4065117135166192,
+                "signedBiasPp": -0.276484515158961,
+                "slope": 0.7984562226217443,
+                "rankCorrelation": 0.6492467375640643,
+                "playerClusteredBootstrap": {
+                  "replicates": 1000,
+                  "maePp95": [
+                    1.2317153587742915,
+                    1.6082561009045384
+                  ],
+                  "signedBiasPp95": [
+                    -0.5473955186828754,
+                    -0.018105634043443643
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "2023-25 to spent 2025-26",
+          "training": [
+            "train",
+            "validation"
+          ],
+          "evaluation": "holdout",
+          "results": [
+            {
+              "name": "F-raw-affine",
+              "features": [
+                "positionalNavRaw"
+              ],
+              "metric": {
+                "rows": 388,
+                "players": 330,
+                "maePp": 1.4975144676045715,
+                "signedBiasPp": -0.10453404510306608,
+                "slope": 1.2466218224194037,
+                "rankCorrelation": 0.6085585845595086,
+                "playerClusteredBootstrap": {
+                  "replicates": 1000,
+                  "maePp95": [
+                    1.3581185923310939,
+                    1.6514851155504084
+                  ],
+                  "signedBiasPp95": [
+                    -0.33189361709468757,
+                    0.10556272418759254
+                  ]
+                }
+              }
+            },
+            {
+              "name": "F-raw-affine-status-mean",
+              "features": [
+                "positionalNavRaw",
+                "signingStatus"
+              ],
+              "metric": {
+                "rows": 388,
+                "players": 330,
+                "maePp": 1.5007401667681124,
+                "signedBiasPp": -0.10663946948241171,
+                "slope": 1.262386531011983,
+                "rankCorrelation": 0.6214297787870178,
+                "playerClusteredBootstrap": {
+                  "replicates": 1000,
+                  "maePp95": [
+                    1.3627283956861442,
+                    1.6515057846811425
+                  ],
+                  "signedBiasPp95": [
+                    -0.3397171314689264,
+                    0.10090307069685148
+                  ]
+                }
+              }
+            },
+            {
+              "name": "F-raw-affine-rolling-intercept",
+              "features": [
+                "positionalNavRaw",
+                "prior-fold intercept"
+              ],
+              "metric": {
+                "rows": 388,
+                "players": 330,
+                "maePp": 1.574652542321873,
+                "signedBiasPp": 0.16323591478876548,
+                "slope": 1.2466218224194037,
+                "rankCorrelation": 0.6085585845595086,
+                "playerClusteredBootstrap": {
+                  "replicates": 1000,
+                  "maePp95": [
+                    1.4417866272084818,
+                    1.7171708704851816
+                  ],
+                  "signedBiasPp95": [
+                    -0.06412365720285586,
+                    0.3733326840794238
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "causes": {
+        "rawBias": [
+          -0.26776995989183133,
+          -0.10453404510306608
+        ],
+        "conditionalBias": [
+          -0.276484515158961,
+          -0.10663946948241171
+        ],
+        "finding": "The error is primarily an intercept/calibration problem; status conditioning does not reduce rolling bias consistently."
+      },
+      "readyForFrozenHoldout": false,
+      "candidateReadiness": {
+        "F-raw-affine": false,
+        "F-raw-affine-status-mean": false,
+        "F-raw-affine-rolling-intercept": false
+      }
+    },
+    "D": {
+      "results": [
+        {
+          "name": "2023-24 to 2024-25",
+          "training": [
+            "train"
+          ],
+          "evaluation": "validation",
+          "results": [
+            {
+              "name": "D-raw-affine",
+              "features": [
+                "positionalNavRaw"
+              ],
+              "metric": {
+                "rows": 173,
+                "players": 149,
+                "maePp": 2.0321616721984377,
+                "signedBiasPp": 0.1281546112901898,
+                "slope": -0.7823840815554859,
+                "rankCorrelation": 0.23300160322346666,
+                "playerClusteredBootstrap": {
+                  "replicates": 1000,
+                  "maePp95": [
+                    1.8267693326978265,
+                    2.272125398968866
+                  ],
+                  "signedBiasPp95": [
+                    -0.2861024022968827,
+                    0.4975700353181665
+                  ]
+                }
+              }
+            },
+            {
+              "name": "D-market-bridge-v1",
+              "features": [
+                "positionalNavRaw",
+                "pointsPace",
+                "defensiveImpact",
+                "deploymentRank",
+                "signingAge"
+              ],
+              "metric": {
+                "rows": 173,
+                "players": 149,
+                "maePp": 1.4560913243411713,
+                "signedBiasPp": 0.03025405360711315,
+                "slope": 1.0264924817562184,
+                "rankCorrelation": 0.6808929012179873,
+                "playerClusteredBootstrap": {
+                  "replicates": 1000,
+                  "maePp95": [
+                    1.2758288057928198,
+                    1.6449676788108325
+                  ],
+                  "signedBiasPp95": [
+                    -0.26856048432123536,
+                    0.32548396901329335
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "2023-25 to spent 2025-26",
+          "training": [
+            "train",
+            "validation"
+          ],
+          "evaluation": "holdout",
+          "results": [
+            {
+              "name": "D-raw-affine",
+              "features": [
+                "positionalNavRaw"
+              ],
+              "metric": {
+                "rows": 197,
+                "players": 167,
+                "maePp": 1.9709679083423086,
+                "signedBiasPp": 0.25576646553881077,
+                "slope": -0.8580304884459876,
+                "rankCorrelation": 0.24038013107112613,
+                "playerClusteredBootstrap": {
+                  "replicates": 1000,
+                  "maePp95": [
+                    1.7792837815600089,
+                    2.175240838035517
+                  ],
+                  "signedBiasPp95": [
+                    -0.12180517029108384,
+                    0.6221221318575931
+                  ]
+                }
+              }
+            },
+            {
+              "name": "D-market-bridge-v1",
+              "features": [
+                "positionalNavRaw",
+                "pointsPace",
+                "defensiveImpact",
+                "deploymentRank",
+                "signingAge"
+              ],
+              "metric": {
+                "rows": 197,
+                "players": 167,
+                "maePp": 1.2684004351875835,
+                "signedBiasPp": -0.1284920141314473,
+                "slope": 0.9818564795999091,
+                "rankCorrelation": 0.6403865534757476,
+                "playerClusteredBootstrap": {
+                  "replicates": 1000,
+                  "maePp95": [
+                    1.1071219268127181,
+                    1.4371900877094834
+                  ],
+                  "signedBiasPp95": [
+                    -0.3773987502196436,
+                    0.12642197785285877
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "causes": {
+        "rawDirection": [
+          0.23300160322346666,
+          0.24038013107112613
+        ],
+        "bridgeDirection": [
+          0.6808929012179873,
+          0.6403865534757476
+        ],
+        "finding": "The narrow D raw signal is insufficient for total market price; the broader pre-signing bridge adds usable market information."
+      },
+      "readyForFrozenHoldout": true,
+      "candidateReadiness": {
+        "D-raw-affine": false,
+        "D-market-bridge-v1": true
+      }
+    },
+    "G": {
+      "results": [
+        {
+          "name": "2023-24 to 2024-25",
+          "training": [
+            "train"
+          ],
+          "evaluation": "validation",
+          "results": [
+            {
+              "name": "G-raw-affine",
+              "features": [
+                "positionalNavRaw"
+              ],
+              "metric": {
+                "rows": 57,
+                "players": 52,
+                "maePp": 1.4631238775704083,
+                "signedBiasPp": -0.7968370788406809,
+                "slope": 2.0818953534616265,
+                "rankCorrelation": 0.7171898484100262,
+                "playerClusteredBootstrap": {
+                  "replicates": 1000,
+                  "maePp95": [
+                    1.032013889754012,
+                    1.9433951577997106
+                  ],
+                  "signedBiasPp95": [
+                    -1.3674961303591515,
+                    -0.2852655300200823
+                  ]
+                }
+              }
+            },
+            {
+              "name": "G-raw-affine-status-mean",
+              "features": [
+                "positionalNavRaw",
+                "signingStatus"
+              ],
+              "metric": {
+                "rows": 57,
+                "players": 52,
+                "maePp": 1.481567782446194,
+                "signedBiasPp": -0.8109411788936315,
+                "slope": 1.9951014875283777,
+                "rankCorrelation": 0.6348965942461032,
+                "playerClusteredBootstrap": {
+                  "replicates": 1000,
+                  "maePp95": [
+                    1.0447456177959096,
+                    1.9586331557918055
+                  ],
+                  "signedBiasPp95": [
+                    -1.378829018125765,
+                    -0.29914019884676074
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "2023-25 to spent 2025-26",
+          "training": [
+            "train",
+            "validation"
+          ],
+          "evaluation": "holdout",
+          "results": [
+            {
+              "name": "G-raw-affine",
+              "features": [
+                "positionalNavRaw"
+              ],
+              "metric": {
+                "rows": 66,
+                "players": 59,
+                "maePp": 1.0701200251244132,
+                "signedBiasPp": 0.2872574626807577,
+                "slope": 1.0279089738586444,
+                "rankCorrelation": 0.6235512175190541,
+                "playerClusteredBootstrap": {
+                  "replicates": 1000,
+                  "maePp95": [
+                    0.8597625888091398,
+                    1.34711583080923
+                  ],
+                  "signedBiasPp95": [
+                    -0.09314571438420473,
+                    0.5942304807411383
+                  ]
+                }
+              }
+            },
+            {
+              "name": "G-raw-affine-status-mean",
+              "features": [
+                "positionalNavRaw",
+                "signingStatus"
+              ],
+              "metric": {
+                "rows": 66,
+                "players": 59,
+                "maePp": 1.0679308709492759,
+                "signedBiasPp": 0.27740626889264164,
+                "slope": 1.0419324401619336,
+                "rankCorrelation": 0.6409168206066723,
+                "playerClusteredBootstrap": {
+                  "replicates": 1000,
+                  "maePp95": [
+                    0.8550173633433426,
+                    1.3415683539782826
+                  ],
+                  "signedBiasPp95": [
+                    -0.10571872660382149,
+                    0.5805373851114012
+                  ]
+                }
+              }
+            },
+            {
+              "name": "G-raw-affine-rolling-intercept",
+              "features": [
+                "positionalNavRaw",
+                "prior-fold intercept"
+              ],
+              "metric": {
+                "rows": 66,
+                "players": 59,
+                "maePp": 1.6050523402355008,
+                "signedBiasPp": 1.0840945415214385,
+                "slope": 1.0279089738586462,
+                "rankCorrelation": 0.6235512175190541,
+                "playerClusteredBootstrap": {
+                  "replicates": 1000,
+                  "maePp95": [
+                    1.3993760460598912,
+                    1.8232573882170853
+                  ],
+                  "signedBiasPp95": [
+                    0.7036913644564756,
+                    1.3910675595818192
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "causes": {
+        "rawBias": [
+          -0.7968370788406809,
+          0.2872574626807577
+        ],
+        "conditionalBias": [
+          -0.8109411788936315,
+          0.27740626889264164
+        ],
+        "finding": "The error is primarily an intercept/calibration problem; status conditioning does not reduce rolling bias consistently."
+      },
+      "readyForFrozenHoldout": false,
+      "candidateReadiness": {
+        "G-raw-affine": false,
+        "G-raw-affine-status-mean": false,
+        "G-raw-affine-rolling-intercept": false
+      }
+    }
+  },
+  "nextCertificationMinimum": {
+    "contracts": 120,
+    "players": 90,
+    "byPosition": {
+      "F": 50,
+      "D": 30,
+      "G": 15
+    },
+    "note": "New, never-developed rows only; the existing 651 spent holdout is excluded."
+  },
+  "historicalData": {
+    "localPre2022MoneyPuckSkaters": "absent",
+    "required": "ID-bearing skater-season rows with position, all-situations exposure and pre-signing market-bridge inputs for 2017-18 through 2021-22",
+    "forwardTimeConfirmation": "Retain the 2026-27 signing cohort as the strongest forward-time confirmation before unrestricted activation."
+  },
+  "checksum": "8f5fca31a54102709c02b27cf12710e659ca05a791cc2d8b9f47f5a385e90f85"
+}

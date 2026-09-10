@@ -7,6 +7,12 @@ That was the wrong reference population. No ELC contract will be trained as an
 open-market cap-price label, and no manual resolution of the proposed 280 ELC
 rows should occur for this purpose.
 
+**Remediation status, September 10:** that calibration subsequently failed its
+single frozen holdout and the 651 rows are now spent development-only evidence.
+The gates remain unchanged. See `NAV01_PHASE5_REMEDIATION.md`; no replacement
+candidate may open a new evaluation cohort until its feature set, transforms,
+model class, baselines and gates are committed and checksummed.
+
 Run the full local audit with:
 
 ```sh

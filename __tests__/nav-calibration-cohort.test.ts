@@ -47,6 +47,13 @@ describe("NAV-01 calibration cohort audit", () => {
     });
     expect(protocol.status).toBe("proceed_market_calibration");
     expect(protocol.marketReferenceGate.referencePopulation).toBe("market_calibration_eligible");
+    expect(protocol.performanceGates).toMatchObject({
+      aggregateMaeImprovementCapSharePp: 0.1,
+      maxPositionMaeRegressionCapSharePp: 0.05,
+      calibrationSlope: [0.7, 1.3],
+      maxSignedBiasCapSharePp: 0.25,
+      bootstrapImprovementLowerBoundCapSharePp: 0,
+    });
   });
 
   it("keeps regulated ELCs and missing NHL histories out of market-price fitting", () => {

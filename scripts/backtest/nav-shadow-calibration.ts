@@ -24,9 +24,20 @@ export type ShadowRow = {
   contractRow: number;
   playerId: string;
   unit: MarketUnit;
+  signingAge: number;
   ageBand: string;
   status: Status;
   partition: Partition;
+  signingYear: number;
+  termYears: number | null;
+  structure: string;
+  team: string;
+  role: string;
+  pointsPace: number;
+  expectedGoalsPace: number;
+  defensiveImpact: number;
+  deploymentToi: number;
+  deploymentRank: number;
   raw: number;
   targetCapSharePp: number;
   actualCapHit: number;
@@ -61,6 +72,15 @@ function number(value: string | undefined, fallback = 0) {
 }
 
 function signingYear(signDate: string) { return Number(signDate.slice(0, 4)); }
+function termYears(term: string | undefined) {
+  const match = term?.match(/(\d+(?:\.\d+)?)\s*yr/i);
+  return match ? number(match[1]) : null;
+}
+function roleFor(unit: MarketUnit, games: number, iceTimeRank: number) {
+  if (unit === "G") return games >= 50 ? "starter" : games >= 35 ? "tandem" : "backup";
+  if (unit === "D") return iceTimeRank <= 60 ? "top_pair" : iceTimeRank <= 180 ? "regular" : "depth";
+  return iceTimeRank <= 60 ? "top_six" : iceTimeRank <= 240 ? "regular" : "depth";
+}
 function statusFor(row: Row): Status {
   const status = row.signStatus?.trim();
   return status === "UFA" ? "UFA" : status === "RFA" || status === "UFA Group 6" ? "RFA" : "missing";
@@ -273,8 +293,16 @@ export function buildShadowRows(partitions: ReadonlySet<Partition> = new Set(["t
     const capCeiling = CAP_CEILING_BY_SIGNING_YEAR[signingYear(record.signing.signDate)];
     if (!playerSeason || partition === "outside" || !partitions.has(partition) || !capCeiling) continue;
     const raw = calcContractIndependentPositionalNavRaw(assetFrom(playerSeason, record.signing, unit)).raw;
+    const games = Math.max(1, number(playerSeason.games_played));
+    const toi = number(playerSeason.icetime) / games;
+    const pace = (field: string) => number(playerSeason[field]) / games * 82;
     rows.push({
-      contractRow: record.contractRow, playerId: record.playerId, unit, ageBand: ageBand(record.signing.signAge), status: statusFor(record.signing), partition,
+      contractRow: record.contractRow, playerId: record.playerId, unit, signingAge: number(record.signing.signAge), ageBand: ageBand(record.signing.signAge), status: statusFor(record.signing), partition,
+      signingYear: signingYear(record.signing.signDate), termYears: termYears(record.signing.term),
+      structure: record.signing.structure?.trim() || "missing", team: record.signing.team?.trim().toUpperCase() || "missing",
+      role: roleFor(unit, games, number(playerSeason.iceTimeRank, Infinity)), pointsPace: unit === "G" ? 0 : pace("I_F_points"), expectedGoalsPace: unit === "G" ? 0 : pace("I_F_xGoals"),
+      defensiveImpact: unit === "G" ? number(playerSeason.xGoals) - number(playerSeason.goals) : number(playerSeason.OnIce_A_xGoals) - number(playerSeason.OffIce_A_xGoals),
+      deploymentToi: toi, deploymentRank: number(playerSeason.iceTimeRank, 999),
       raw, targetCapSharePp: number(record.signing.capPct) * 100, actualCapHit: number(record.signing.capHit), capCeiling,
     });
   }

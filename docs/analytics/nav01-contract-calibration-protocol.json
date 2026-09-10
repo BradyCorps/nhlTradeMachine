@@ -12,6 +12,13 @@
     "validation": ["2024-07-01", "2025-07-01"],
     "holdout": ["2025-07-01", "2026-08-01"]
   },
+  "spentPartitions": {
+    "holdout": {
+      "rows": 651,
+      "status": "development_only_spent",
+      "rule": "The Phase 5 holdout was evaluated once under checksum ac9154272fe14031c3d3a3bbfda0f1fdac0e4889ad6940126e265d171c35d111 and is ineligible for future selection or certification."
+    }
+  },
   "sampleGates": {
     "train": { "contracts": 250, "players": 175, "F": 100, "D": 60, "G": 25 },
     "validation": { "contracts": 120, "players": 90, "F": 50, "D": 30, "G": 15 },
@@ -20,9 +27,11 @@
   "performanceGates": {
     "aggregateMaeImprovementCapSharePp": 0.1,
     "maxPositionMaeRegressionCapSharePp": 0.05,
-    "calibrationSlope": [0.85, 1.15],
+    "calibrationSlope": [0.7, 1.3],
     "maxSignedBiasCapSharePp": 0.25,
-    "interval": "paired 95% bootstrap"
+    "interval": "player-clustered 95% bootstrap",
+    "bootstrapImprovementLowerBoundCapSharePp": 0,
+    "authority": "docs/analytics/nav01-shadow-calibration-spec.json, checksum ac9154272fe14031c3d3a3bbfda0f1fdac0e4889ad6940126e265d171c35d111"
   },
   "marketReferenceGate": {
     "categoryDifferencePp": 15,
@@ -34,5 +43,10 @@
     "class": "elc_policy_constrained",
     "label": "ELC policy-constrained fallback; not an open-market cap-share prediction",
     "uncertainty": "wider interval and coverage=policy_constrained"
+  },
+  "remediation": {
+    "report": "docs/analytics/NAV01_PHASE5_REMEDIATION.md",
+    "frozenGatesChanged": false,
+    "newEvaluationRule": "Commit and checksum feature set, transformations, model class, baselines and unchanged gates before opening a new evaluation cohort."
   }
 }
