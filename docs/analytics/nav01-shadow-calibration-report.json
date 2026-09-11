@@ -1,0 +1,377 @@
+{
+  "schemaVersion": 1,
+  "frozenSpecChecksum": "ac9154272fe14031c3d3a3bbfda0f1fdac0e4889ad6940126e265d171c35d111",
+  "holdoutRun": "single post-freeze evaluation",
+  "decision": "FAIL",
+  "result": {
+    "candidate": {
+      "rows": 651,
+      "players": 556,
+      "maePp": 1.515102653555166,
+      "medianAbsoluteErrorPp": 1.104301674454458,
+      "rmsePp": 2.2459940409436765,
+      "calibrationSlope": 1.0219814793146162,
+      "calibrationInterceptPp": 0.5815211047346125,
+      "signedBiasPp": -0.6186650456767965,
+      "rankCorrelation": 0.44641629119449866,
+      "meanCalibratedMarketValue": 1688350.0544392501,
+      "meanSurplus": -671626.808848
+    },
+    "baseline": {
+      "rows": 651,
+      "players": 556,
+      "maePp": 1.5485407066052277,
+      "medianAbsoluteErrorPp": 0.7000000000000002,
+      "rmsePp": 2.7034341248841907,
+      "calibrationSlope": 0.33248961374003005,
+      "calibrationInterceptPp": 1.799601532766213,
+      "signedBiasPp": -0.7780337941628256,
+      "rankCorrelation": 0.23096632469982156,
+      "meanCalibratedMarketValue": 1533019.2012288787,
+      "meanSurplus": -826957.6620583717
+    },
+    "maeImprovementPp": 0.033438053050061756,
+    "maeImprovementRelativePct": 2.1593267072304467,
+    "byPosition": {
+      "F": {
+        "candidate": {
+          "rows": 388,
+          "players": 330,
+          "maePp": 1.488237286602137,
+          "medianAbsoluteErrorPp": 0.9598875456747462,
+          "rmsePp": 2.2739546724107225,
+          "calibrationSlope": 1.0727972958017415,
+          "calibrationInterceptPp": 0.696413727465717,
+          "signedBiasPp": -0.8105981469492824,
+          "rankCorrelation": 0.6045094933723176,
+          "meanCalibratedMarketValue": 1562064.2882550822,
+          "meanSurplus": -869974.8766933717
+        },
+        "baseline": {
+          "rows": 388,
+          "players": 330,
+          "maePp": 1.5432989690721668,
+          "medianAbsoluteErrorPp": 0.6000000000000001,
+          "rmsePp": 2.892578488006567,
+          "calibrationSlope": 0.7253188991788255,
+          "calibrationInterceptPp": 1.4019995139155292,
+          "signedBiasPp": -1.0319587628865974,
+          "rankCorrelation": 0.25354070157326475,
+          "meanCalibratedMarketValue": 1346918.8144329898,
+          "meanSurplus": -1085120.3505154639
+        },
+        "maeImprovementPp": 0.05506168247002985
+      },
+      "D": {
+        "candidate": {
+          "rows": 197,
+          "players": 167,
+          "maePp": 1.7975187439717906,
+          "medianAbsoluteErrorPp": 1.2501489799729553,
+          "rmsePp": 2.370186803476115,
+          "calibrationSlope": -0.11993417621301537,
+          "calibrationInterceptPp": 2.487791046377146,
+          "signedBiasPp": -0.22228986882534957,
+          "rankCorrelation": 0.22879838210884457,
+          "meanCalibratedMarketValue": 2031101.3486891813,
+          "meanSurplus": -265554.3213615812
+        },
+        "baseline": {
+          "rows": 197,
+          "players": 167,
+          "maePp": 1.5619289340101508,
+          "medianAbsoluteErrorPp": 0.5000000000000002,
+          "rmsePp": 2.4690058419768333,
+          "calibrationSlope": 0.34440408870823064,
+          "calibrationInterceptPp": 1.6738514914220837,
+          "signedBiasPp": -0.5862944162436547,
+          "rankCorrelation": 0.22488195934667213,
+          "meanCalibratedMarketValue": 1666860.4060913706,
+          "meanSurplus": -629795.2639593908
+        },
+        "maeImprovementPp": -0.2355898099616398
+      },
+      "G": {
+        "candidate": {
+          "rows": 66,
+          "players": 59,
+          "maePp": 0.8300692075809138,
+          "medianAbsoluteErrorPp": 0.20309557000561207,
+          "rmsePp": 1.6094477084558672,
+          "calibrationSlope": 1.230358714220532,
+          "calibrationInterceptPp": 0.3490212268054489,
+          "signedBiasPp": -0.6734509024345354,
+          "rankCorrelation": 0.5384479537654335,
+          "meanCalibratedMarketValue": 1407696.604624416,
+          "meanSurplus": -717645.440830129
+        },
+        "baseline": {
+          "rows": 66,
+          "players": 59,
+          "maePp": 1.5393939393939393,
+          "medianAbsoluteErrorPp": 1.1,
+          "rmsePp": 2.1692059711918885,
+          "calibrationSlope": 0.13417017577390455,
+          "calibrationInterceptPp": 1.7833911847937995,
+          "signedBiasPp": 0.14242424242424243,
+          "rankCorrelation": 0.08104699916825764,
+          "meanCalibratedMarketValue": 2227568.1818181816,
+          "meanSurplus": 102226.13636363643
+        },
+        "maeImprovementPp": 0.7093247318130255
+      }
+    },
+    "bootstrap": {
+      "method": "player-clustered bootstrap",
+      "replicates": 1000,
+      "seed": "0x4e415630",
+      "improvementPp95": [
+        -0.07008197864480947,
+        0.15456393537744306
+      ]
+    }
+  },
+  "sensitivity": [
+    {
+      "kind": "uncontrolled",
+      "eligible": true,
+      "metrics": {
+        "overall": {
+          "rows": 651,
+          "players": 556,
+          "maePp": 1.5901596495169195,
+          "medianAbsoluteErrorPp": 1.3207107045856528,
+          "rmsePp": 2.1614956373177603,
+          "calibrationSlope": 1.0262230327234962,
+          "calibrationInterceptPp": 0.01642152492387705,
+          "signedBiasPp": -0.07498959202182917,
+          "rankCorrelation": 0.4520667205281705,
+          "meanCalibratedMarketValue": 2232364.6854937617,
+          "meanSurplus": -127612.1777934904
+        },
+        "byPosition": {
+          "F": {
+            "rows": 388,
+            "players": 330,
+            "maePp": 1.4753132281665482,
+            "medianAbsoluteErrorPp": 1.0971763821636928,
+            "rmsePp": 2.140688894712184,
+            "calibrationSlope": 1.079069321857382,
+            "calibrationInterceptPp": 0.10048040164713123,
+            "signedBiasPp": -0.26744908253055577,
+            "rankCorrelation": 0.6085585845595085,
+            "meanCalibratedMarketValue": 2104868.677198593,
+            "meanSurplus": -327170.48774986045
+          },
+          "D": {
+            "rows": 197,
+            "players": 167,
+            "maePp": 2.0351841815144356,
+            "medianAbsoluteErrorPp": 1.734695431720758,
+            "rmsePp": 2.3860633562883655,
+            "calibrationSlope": -0.2398166550071105,
+            "calibrationInterceptPp": 2.860932216013585,
+            "signedBiasPp": 0.3224277877021624,
+            "rankCorrelation": 0.24038013107112619,
+            "meanCalibratedMarketValue": 2577879.11721201,
+            "meanSurplus": 281223.44716124877
+          },
+          "G": {
+            "rows": 66,
+            "players": 59,
+            "maePp": 0.9369865992204672,
+            "medianAbsoluteErrorPp": 0.6906449703183202,
+            "rmsePp": 1.4663110986495518,
+            "calibrationSlope": 1.2451434440738824,
+            "calibrationInterceptPp": -0.34873475012130273,
+            "signedBiasPp": -0.12979173578304934,
+            "rankCorrelation": 0.6235512175190541,
+            "meanCalibratedMarketValue": 1950578.4456457219,
+            "meanSurplus": -174763.59980882274
+          }
+        }
+      }
+    },
+    {
+      "kind": "statusControlled",
+      "eligible": true,
+      "metrics": {
+        "overall": {
+          "rows": 651,
+          "players": 556,
+          "maePp": 1.515102653555166,
+          "medianAbsoluteErrorPp": 1.104301674454458,
+          "rmsePp": 2.2459940409436765,
+          "calibrationSlope": 1.0219814793146162,
+          "calibrationInterceptPp": 0.5815211047346125,
+          "signedBiasPp": -0.6186650456767965,
+          "rankCorrelation": 0.44641629119449866,
+          "meanCalibratedMarketValue": 1688350.0544392501,
+          "meanSurplus": -671626.808848
+        },
+        "byPosition": {
+          "F": {
+            "rows": 388,
+            "players": 330,
+            "maePp": 1.488237286602137,
+            "medianAbsoluteErrorPp": 0.9598875456747462,
+            "rmsePp": 2.2739546724107225,
+            "calibrationSlope": 1.0727972958017415,
+            "calibrationInterceptPp": 0.696413727465717,
+            "signedBiasPp": -0.8105981469492824,
+            "rankCorrelation": 0.6045094933723176,
+            "meanCalibratedMarketValue": 1562064.2882550822,
+            "meanSurplus": -869974.8766933717
+          },
+          "D": {
+            "rows": 197,
+            "players": 167,
+            "maePp": 1.7975187439717906,
+            "medianAbsoluteErrorPp": 1.2501489799729553,
+            "rmsePp": 2.370186803476115,
+            "calibrationSlope": -0.11993417621301537,
+            "calibrationInterceptPp": 2.487791046377146,
+            "signedBiasPp": -0.22228986882534957,
+            "rankCorrelation": 0.22879838210884457,
+            "meanCalibratedMarketValue": 2031101.3486891813,
+            "meanSurplus": -265554.3213615812
+          },
+          "G": {
+            "rows": 66,
+            "players": 59,
+            "maePp": 0.8300692075809138,
+            "medianAbsoluteErrorPp": 0.20309557000561207,
+            "rmsePp": 1.6094477084558672,
+            "calibrationSlope": 1.230358714220532,
+            "calibrationInterceptPp": 0.3490212268054489,
+            "signedBiasPp": -0.6734509024345354,
+            "rankCorrelation": 0.5384479537654335,
+            "meanCalibratedMarketValue": 1407696.604624416,
+            "meanSurplus": -717645.440830129
+          }
+        }
+      }
+    },
+    {
+      "kind": "blankStatusExcluded",
+      "eligible": true,
+      "metrics": {
+        "overall": {
+          "rows": 651,
+          "players": 556,
+          "maePp": 1.5901596495169195,
+          "medianAbsoluteErrorPp": 1.3207107045856528,
+          "rmsePp": 2.1614956373177603,
+          "calibrationSlope": 1.0262230327234962,
+          "calibrationInterceptPp": 0.01642152492387705,
+          "signedBiasPp": -0.07498959202182917,
+          "rankCorrelation": 0.4520667205281705,
+          "meanCalibratedMarketValue": 2232364.6854937617,
+          "meanSurplus": -127612.1777934904
+        },
+        "byPosition": {
+          "F": {
+            "rows": 388,
+            "players": 330,
+            "maePp": 1.4753132281665482,
+            "medianAbsoluteErrorPp": 1.0971763821636928,
+            "rmsePp": 2.140688894712184,
+            "calibrationSlope": 1.079069321857382,
+            "calibrationInterceptPp": 0.10048040164713123,
+            "signedBiasPp": -0.26744908253055577,
+            "rankCorrelation": 0.6085585845595085,
+            "meanCalibratedMarketValue": 2104868.677198593,
+            "meanSurplus": -327170.48774986045
+          },
+          "D": {
+            "rows": 197,
+            "players": 167,
+            "maePp": 2.0351841815144356,
+            "medianAbsoluteErrorPp": 1.734695431720758,
+            "rmsePp": 2.3860633562883655,
+            "calibrationSlope": -0.2398166550071105,
+            "calibrationInterceptPp": 2.860932216013585,
+            "signedBiasPp": 0.3224277877021624,
+            "rankCorrelation": 0.24038013107112619,
+            "meanCalibratedMarketValue": 2577879.11721201,
+            "meanSurplus": 281223.44716124877
+          },
+          "G": {
+            "rows": 66,
+            "players": 59,
+            "maePp": 0.9369865992204672,
+            "medianAbsoluteErrorPp": 0.6906449703183202,
+            "rmsePp": 1.4663110986495518,
+            "calibrationSlope": 1.2451434440738824,
+            "calibrationInterceptPp": -0.34873475012130273,
+            "signedBiasPp": -0.12979173578304934,
+            "rankCorrelation": 0.6235512175190541,
+            "meanCalibratedMarketValue": 1950578.4456457219,
+            "meanSurplus": -174763.59980882274
+          }
+        }
+      }
+    },
+    {
+      "kind": "ufaOnly",
+      "eligible": true,
+      "metrics": {
+        "overall": {
+          "rows": 444,
+          "players": 377,
+          "maePp": 1.4936707290970845,
+          "medianAbsoluteErrorPp": 1.3062679507046375,
+          "rmsePp": 2.0282297601216692,
+          "calibrationSlope": 0.7947487536044808,
+          "calibrationInterceptPp": 0.46867012355735094,
+          "signedBiasPp": -0.04951619364180536,
+          "rankCorrelation": 0.36529674935533546,
+          "meanCalibratedMarketValue": 2041708.2997895544,
+          "meanSurplus": -95391.91867891324
+        },
+        "byPosition": {
+          "F": {
+            "rows": 262,
+            "players": 221,
+            "maePp": 1.4575561747861618,
+            "medianAbsoluteErrorPp": 1.1232801631864344,
+            "rmsePp": 2.068502199101581,
+            "calibrationSlope": 0.8029562722712651,
+            "calibrationInterceptPp": 0.5932119751430791,
+            "signedBiasPp": -0.2077140283826794,
+            "rankCorrelation": 0.5151236685358339,
+            "meanCalibratedMarketValue": 1951956.997057059,
+            "meanSurplus": -255094.51821011683
+          },
+          "D": {
+            "rows": 137,
+            "players": 117,
+            "maePp": 1.7332110211249612,
+            "medianAbsoluteErrorPp": 1.4607948463055622,
+            "rmsePp": 2.091399148787594,
+            "calibrationSlope": -2.4954930967864613,
+            "calibrationInterceptPp": 7.612657212019973,
+            "signedBiasPp": 0.2501399318900369,
+            "rankCorrelation": 0.02826543319794132,
+            "meanCalibratedMarketValue": 2258657.7539399355,
+            "meanSurplus": 206103.00941438906
+          },
+          "G": {
+            "rows": 45,
+            "players": 39,
+            "maePp": 0.9746705784669116,
+            "medianAbsoluteErrorPp": 0.7270331162252264,
+            "rmsePp": 1.5365106814382716,
+            "calibrationSlope": 1.2956279209365218,
+            "calibrationInterceptPp": -0.5240194656352031,
+            "signedBiasPp": -0.04073967132521387,
+            "rankCorrelation": 0.5104084984211865,
+            "meanCalibratedMarketValue": 1903769.768618707,
+            "meanSurplus": -83452.45360351534
+          }
+        }
+      }
+    }
+  ],
+  "publicModel": "retained; shadow artifacts only; no feature flag or consumer surface changed"
+}

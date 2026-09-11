@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "purpose": "NAV-01 Phase 5 market-only shadow calibration; no public values changed",
+  "cohort": {
+    "rows": 1554,
+    "partitions": {
+      "train": 390,
+      "validation": 513,
+      "holdout": 651
+    },
+    "fittedRows": 902,
+    "featureRowExclusions": [
+      {
+        "contractRow": 626,
+        "reason": "contract position is G but canonical NHL ID 8476473 has only pre-signing skater data; excluded rather than misclassifying a skater as a goalie"
+      }
+    ],
+    "neutralYearsRemaining": 3
+  },
+  "target": "signed cap share in percentage points; dollar conversion = calibratedCapSharePp / 100 * signing-date cap ceiling; surplus = calibratedMarketValue - actualCapHit after calibration",
+  "raw": "calcContractIndependentPositionalNavRaw: goalie impact; skater off + def + age + gravity; zero cap, neutral 3-year horizon, and no target-contract fields",
+  "selectedModel": {
+    "kind": "statusControlled",
+    "coefficients": {
+      "F": {
+        "intercept": -1.091042820197503,
+        "slope": 0.021680262581268015
+      },
+      "D": {
+        "intercept": 2.350757665010107,
+        "slope": 0.0025463543091932
+      },
+      "G": {
+        "intercept": 1.4906449703183202,
+        "slope": 0.029614495256243333
+      }
+    },
+    "statusOffsets": {
+      "UFA": -0.5683991249402969,
+      "RFA": -0.4906449703183202,
+      "missing": 0
+    },
+    "trainingRows": 390,
+    "trainingPlayers": 356
+  },
+  "validation": {
+    "baseline": "training-only position x age-band x status median",
+    "selected": {
+      "candidate": {
+        "rows": 512,
+        "players": 455,
+        "maePp": 1.554121822515622,
+        "medianAbsoluteErrorPp": 1.041942574071313,
+        "rmsePp": 2.354048648129629,
+        "calibrationSlope": 0.8000018482480654,
+        "calibrationInterceptPp": 1.0868733391242298,
+        "signedBiasPp": -0.7362324431387075,
+        "rankCorrelation": 0.47727379883776055,
+        "meanCalibratedMarketValue": 1580720.912790533,
+        "meanSurplus": -700523.165334465
+      },
+      "baseline": {
+        "rows": 512,
+        "players": 455,
+        "maePp": 1.5478515625000022,
+        "medianAbsoluteErrorPp": 0.7999999999999998,
+        "rmsePp": 2.5934374811724314,
+        "calibrationSlope": 0.6613545833285516,
+        "calibrationInterceptPp": 1.479724848070451,
+        "signedBiasPp": -0.9626953125000003,
+        "rankCorrelation": 0.24906821765328074,
+        "meanCalibratedMarketValue": 1381017.578125,
+        "meanSurplus": -900226.5
+      },
+      "maeImprovementPp": -0.0062702600156197,
+      "maeImprovementRelativePct": -0.40509440100912075,
+      "byPosition": {
+        "F": {
+          "candidate": {
+            "rows": 282,
+            "players": 254,
+            "maePp": 1.4155396188020437,
+            "medianAbsoluteErrorPp": 0.8278104053846798,
+            "rmsePp": 2.2280297967907807,
+            "calibrationSlope": 0.7911840681716709,
+            "calibrationInterceptPp": 1.152282504515518,
+            "signedBiasPp": -0.8105267572440297,
+            "rankCorrelation": 0.6430048637511425,
+            "meanCalibratedMarketValue": 1473288.147719237,
+            "meanSurplus": -761462.199798492
+          },
+          "baseline": {
+            "rows": 282,
+            "players": 254,
+            "maePp": 1.5152482269503549,
+            "medianAbsoluteErrorPp": 0.5999999999999999,
+            "rmsePp": 2.713722679299018,
+            "calibrationSlope": 0.4434332718448923,
+            "calibrationInterceptPp": 1.8823360594089136,
+            "signedBiasPp": -1.173404255319149,
+            "rankCorrelation": 0.22453816269024854,
+            "meanCalibratedMarketValue": 1152902.4822695036,
+            "meanSurplus": -1081847.865248227
+          },
+          "maeImprovementPp": 0.09970860814831117
+        },
+        "D": {
+          "candidate": {
+            "rows": 173,
+            "players": 149,
+            "maePp": 1.8278722921165007,
+            "medianAbsoluteErrorPp": 1.2218569911024244,
+            "rmsePp": 2.4928726915761232,
+            "calibrationSlope": -0.7902754376026128,
+            "calibrationInterceptPp": 4.087998982088819,
+            "signedBiasPp": -0.4146260927630972,
+            "rankCorrelation": 0.20407895356675929,
+            "meanCalibratedMarketValue": 1853220.999573971,
+            "meanSurplus": -405779.931061867
+          },
+          "baseline": {
+            "rows": 173,
+            "players": 149,
+            "maePp": 1.5410404624277438,
+            "medianAbsoluteErrorPp": 0.8000000000000003,
+            "rmsePp": 2.3882903164896327,
+            "calibrationSlope": 0.7249787965298387,
+            "calibrationInterceptPp": 1.1535499598104089,
+            "signedBiasPp": -0.6554913294797686,
+            "rankCorrelation": 0.25696492168336654,
+            "meanCalibratedMarketValue": 1639315.0289017342,
+            "meanSurplus": -619685.901734104
+          },
+          "maeImprovementPp": -0.28683182968875687
+        },
+        "G": {
+          "candidate": {
+            "rows": 57,
+            "players": 52,
+            "maePp": 1.408882352450305,
+            "medianAbsoluteErrorPp": 0.19999999999999996,
+            "rmsePp": 2.5211263923585534,
+            "calibrationSlope": 2.075276890700429,
+            "calibrationInterceptPp": -0.18603956394876908,
+            "signedBiasPp": -1.3447745841436154,
+            "rankCorrelation": 0.7259022603967731,
+            "meanCalibratedMarketValue": 1285168.7151865219,
+            "meanSurplus": -1293606.8813047062
+          },
+          "baseline": {
+            "rows": 57,
+            "players": 52,
+            "maePp": 1.7298245614035093,
+            "medianAbsoluteErrorPp": 1.2000000000000002,
+            "rmsePp": 2.5825324168750576,
+            "calibrationSlope": 1.0446001334477173,
+            "calibrationInterceptPp": 0.7671871127633207,
+            "signedBiasPp": -0.8526315789473684,
+            "rankCorrelation": 0.2520874204199389,
+            "meanCalibratedMarketValue": 1725631.5789473683,
+            "meanSurplus": -853144.0175438597
+          },
+          "maeImprovementPp": 0.32094220895320436
+        }
+      },
+      "bootstrap": {
+        "method": "player-clustered bootstrap",
+        "replicates": 1000,
+        "seed": "0x4e415630",
+        "improvementPp95": [
+          -0.1379988650032682,
+          0.11641383952775941
+        ]
+      }
+    },
+    "candidateKinds": [
+      "statusControlled",
+      "uncontrolled"
+    ],
+    "status": "FAIL"
+  },
+  "gates": {
+    "minimumRowsByPosition": {
+      "F": 50,
+      "D": 30,
+      "G": 15
+    },
+    "minimumUfaRowsByPosition": {
+      "F": 25,
+      "D": 15,
+      "G": 10
+    },
+    "targetImprovementPp": 0.1,
+    "maximumPositionMaeRegressionPp": 0.05,
+    "maximumAbsoluteSignedBiasPp": 0.25,
+    "calibrationSlope": {
+      "min": 0.7,
+      "max": 1.3
+    },
+    "bootstrapImprovementLowerBoundPp": 0,
+    "bootstrapReplicates": 1000
+  },
+  "fallback": [
+    "ELC policy-constrained: use labelled fallback with wider uncertainty; excluded from training",
+    "No pre-signing NHL sample: use labelled fallback with wider uncertainty; excluded from training"
+  ],
+  "checksum": "ac9154272fe14031c3d3a3bbfda0f1fdac0e4889ad6940126e265d171c35d111"
+}
