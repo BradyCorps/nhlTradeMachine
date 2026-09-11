@@ -108,6 +108,17 @@ describe("DATA-06: builder", () => {
     expect(teams.map(t => t.teamId)).toEqual(["BOS", "TOR"]);
   });
 
+  it("excludes FA_POOL from the completed NHL-roster snapshot population without changing free-agent source data", () => {
+    const players = [...roster(), {
+      ...roster()[0], id: "fa1", name: "Free Agent", teamId: "FA_POOL", position: "C",
+    }];
+    const nav = navMap(players as ReturnType<typeof roster>);
+    const rows = buildSeasonSnapshotRows(players, nav, seasonSnapshotContext("completed", { asOf: ASOF }));
+    expect(rows.excluded).toEqual(["fa1"]);
+    expect(rows.players.map(row => row.playerId)).not.toContain("fa1");
+    expect(rows.teams.map(row => row.teamId)).not.toContain("FA_POOL");
+  });
+
   it("team aggregates reconcile exactly to the player rows through the same split the Teams page uses", () => {
     const players = roster();
     const nav = navMap(players);

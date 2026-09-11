@@ -30,6 +30,7 @@
 import { createHash } from "node:crypto";
 import { eq, isNull, sql } from "drizzle-orm";
 import { playerSeasonSnapshots, seasonSnapshotBatches, teamSeasonSnapshots } from "@/app/db/schema";
+import { TEAMS_DB } from "@/app/lib/db";
 import { SEASON } from "@/app/lib/season-config";
 import { XNAV_MODEL_VERSION } from "@/app/lib/data-context";
 import { navLabelForPosition } from "@/app/lib/player-terminology";
@@ -63,9 +64,25 @@ export interface SeasonSnapshotContext {
 export const SEASON_SNAPSHOT_SOURCE =
   "roster-assembly · NHL rosters · MoneyPuck all-situations · contract ledger";
 export const PLAYER_SNAPSHOT_POPULATION =
-  "players on the 32 assembled NHL rosters at asOf with an engine valuation; draft picks excluded";
+  "players rostered to one of the 32 canonical NHL franchises at asOf with an engine valuation; draft picks and pseudo-team pools excluded";
 export const TEAM_SNAPSHOT_POPULATION =
-  "Σ over that team's player rows; positional buckets per team-nav-split.ts (G→g, D→d, else f)";
+  "one row for each of the 32 canonical NHL franchises; Σ over that franchise's eligible player rows using team-nav-split.ts (G→g, D→d, else f)";
+
+/** The single canonical franchise registry; snapshot code must not maintain its own list. */
+export const CANONICAL_NHL_TEAM_IDS = Object.freeze(TEAMS_DB.map(team => team.id));
+const CANONICAL_NHL_TEAM_ID_SET = new Set(CANONICAL_NHL_TEAM_IDS);
+
+function assertCanonicalNhlTeamRegistry(): void {
+  // Some isolated route tests substitute a deliberately small team fixture.
+  // Enforce the real 32-club rule only where a verified batch is created.
+  if (CANONICAL_NHL_TEAM_IDS.length !== 32 || CANONICAL_NHL_TEAM_ID_SET.size !== CANONICAL_NHL_TEAM_IDS.length) {
+    throw new Error("Canonical NHL team registry must contain exactly 32 unique franchises.");
+  }
+}
+
+export function isCanonicalNhlTeamId(teamId: string | null | undefined): teamId is string {
+  return Boolean(teamId && CANONICAL_NHL_TEAM_ID_SET.has(teamId));
+}
 
 /**
  * The context for one of the two seasons the app currently straddles.
@@ -153,6 +170,12 @@ export const playerSeasonSnapshotId = (ctx: SeasonSnapshotContext, playerId: str
 export const teamSeasonSnapshotId = (ctx: SeasonSnapshotContext, teamId: string): string =>
   `${ctx.season}:${ctx.asOf}:${ctx.modelVersion}:${teamId}`;
 
+/** Legacy DATA-06 rows keep the historical context-scoped identity above. */
+export const batchPlayerSeasonSnapshotId = (batchId: string, playerId: string): string =>
+  `${batchId}:player:${playerId}`;
+export const batchTeamSeasonSnapshotId = (batchId: string, teamId: string): string =>
+  `${batchId}:team:${teamId}`;
+
 export interface SnapshotPlayerInput {
   id: string;
   teamId?: string | null;
@@ -218,7 +241,7 @@ export function buildTeamSeasonSnapshotRows(
 ): TeamSeasonSnapshotRow[] {
   const byTeam = new Map<string, Array<SnapshotPlayerInput & { total: number }>>();
   for (const p of players) {
-    if (!p.teamId) continue;
+    if (!isCanonicalNhlTeamId(p.teamId)) continue;
     const list = byTeam.get(p.teamId) ?? [];
     list.push(p);
     byTeam.set(p.teamId, list);
@@ -263,19 +286,24 @@ export function buildSeasonSnapshotRows(
   navMap: Record<string, XNAVResult>,
   ctx: SeasonSnapshotContext,
   now: number = Date.now(),
-): { players: PlayerSeasonSnapshotRow[]; teams: TeamSeasonSnapshotRow[]; skipped: string[] } {
+): { players: PlayerSeasonSnapshotRow[]; teams: TeamSeasonSnapshotRow[]; skipped: string[]; excluded: string[] } {
   const rows: PlayerSeasonSnapshotRow[] = [];
   const skipped: string[] = [];
+  const excluded: string[] = [];
   const valued: Array<SnapshotPlayerInput & { total: number }> = [];
   for (const p of players) {
     if (p.position === "Pick") continue;
+    // Free agents and any other pseudo-team affiliations remain available to
+    // their owning product flows, but are outside this completed NHL-roster
+    // snapshot contract and must not form a player or team batch member.
+    if (!isCanonicalNhlTeamId(p.teamId)) { excluded.push(p.id); continue; }
     const result = navMap[p.id];
     if (!result?.snapshot) { skipped.push(p.id); continue; }
     const row = buildPlayerSeasonSnapshotRow(p, result, ctx, now);
     rows.push(row);
     valued.push({ ...p, total: row.total });
   }
-  return { players: rows, teams: buildTeamSeasonSnapshotRows(valued, ctx, now), skipped };
+  return { players: rows, teams: buildTeamSeasonSnapshotRows(valued, ctx, now), skipped, excluded };
 }
 
 // ── Persistence ───────────────────────────────────────────────────────────
@@ -415,7 +443,7 @@ const canonicalJson = (value: unknown): string => JSON.stringify(value);
 export function seasonSnapshotBatchIntegrityHash(
   ctx: SeasonSnapshotContext,
   snapshotKind: SnapshotSeasonKind,
-  rows: { players: PlayerSeasonSnapshotRow[]; teams: TeamSeasonSnapshotRow[]; skipped: string[] },
+  rows: { players: PlayerSeasonSnapshotRow[]; teams: TeamSeasonSnapshotRow[]; skipped: string[]; excluded: string[] },
 ): string {
   const payload = {
     context: {
@@ -431,11 +459,12 @@ export function seasonSnapshotBatchIntegrityHash(
     },
     players: [...rows.players]
       .sort((a, b) => a.playerId.localeCompare(b.playerId))
-      .map(({ id, playerId, teamId, valuationSnapshotId, total, components, contract }) => ({ id, playerId, teamId, valuationSnapshotId, total, components, contract })),
+      .map(({ playerId, teamId, valuationSnapshotId, total, components, contract }) => ({ playerId, teamId, valuationSnapshotId, total, components, contract })),
     teams: [...rows.teams]
       .sort((a, b) => a.teamId.localeCompare(b.teamId))
-      .map(({ id, teamId, rosterCount, fNav, dNav, gNav, xnavSigned, xnavPositive }) => ({ id, teamId, rosterCount, fNav, dNav, gNav, xnavSigned, xnavPositive })),
+      .map(({ teamId, rosterCount, fNav, dNav, gNav, xnavSigned, xnavPositive }) => ({ teamId, rosterCount, fNav, dNav, gNav, xnavSigned, xnavPositive })),
     skipped: [...rows.skipped].sort(),
+    excluded: [...rows.excluded].sort(),
   };
   return createHash("sha256").update(canonicalJson(payload)).digest("hex");
 }
@@ -443,10 +472,11 @@ export function seasonSnapshotBatchIntegrityHash(
 export const seasonSnapshotBatchId = (ctx: SeasonSnapshotContext, integrityHash: string): string =>
   `snapshot:${ctx.season}:${ctx.asOf}:${ctx.modelVersion}:${integrityHash.slice(0, 16)}`;
 
-function assertBatchRows(
+export function assertSeasonSnapshotBatchRows(
   ctx: SeasonSnapshotContext,
-  rows: { players: PlayerSeasonSnapshotRow[]; teams: TeamSeasonSnapshotRow[]; skipped: string[] },
+  rows: { players: PlayerSeasonSnapshotRow[]; teams: TeamSeasonSnapshotRow[]; skipped: string[]; excluded: string[] },
 ): void {
+  assertCanonicalNhlTeamRegistry();
   const unique = (values: string[], kind: string) => {
     if (new Set(values).size !== values.length) throw new Error(`Duplicate ${kind} in season snapshot batch.`);
   };
@@ -457,6 +487,16 @@ function assertBatchRows(
   unique(rows.teams.map(row => row.teamId), "team ID");
   unique(rows.players.map(row => row.id), "player row ID");
   unique(rows.teams.map(row => row.id), "team row ID");
+  if (rows.players.some(row => !isCanonicalNhlTeamId(row.teamId))) {
+    throw new Error("Player rows contain a non-canonical NHL team membership.");
+  }
+  if (rows.teams.some(row => !isCanonicalNhlTeamId(row.teamId))) {
+    throw new Error("Team rows contain a non-canonical NHL team membership.");
+  }
+  const teamIds = new Set(rows.teams.map(row => row.teamId));
+  if (teamIds.size !== CANONICAL_NHL_TEAM_IDS.length || CANONICAL_NHL_TEAM_IDS.some(teamId => !teamIds.has(teamId))) {
+    throw new Error("Snapshot batch is missing canonical NHL team membership.");
+  }
   if (rows.players.some(row => row.season !== ctx.season || row.asOf !== ctx.asOf || row.coverage !== ctx.coverage || row.modelVersion !== ctx.modelVersion)) {
     throw new Error("Player rows do not share the batch season context.");
   }
@@ -509,6 +549,7 @@ export async function captureSeasonSnapshotBatch(
   },
 ): Promise<SeasonSnapshotBatchCaptureResult> {
   if (typeof db.transaction !== "function") throw new Error("Season snapshot batches require transactional database support.");
+  assertCanonicalNhlTeamRegistry();
   const now = options.now ?? Date.now();
   const rows = buildSeasonSnapshotRows(options.players, options.navMap, options.context, now);
   const integrityHash = seasonSnapshotBatchIntegrityHash(options.context, options.snapshotKind, rows);
@@ -524,7 +565,9 @@ export async function captureSeasonSnapshotBatch(
     status: "CAPTURING",
     expectedPlayers: rows.players.length,
     capturedPlayers: 0,
-    expectedTeams: rows.teams.length,
+    // Team completeness is anchored to the authoritative franchise registry,
+    // never to whatever affiliations happened to appear in an input payload.
+    expectedTeams: CANONICAL_NHL_TEAM_IDS.length,
     capturedTeams: 0,
     skippedPlayers: rows.skipped.length,
     source: options.context.source,
@@ -538,7 +581,7 @@ export async function captureSeasonSnapshotBatch(
   };
 
   try {
-    assertBatchRows(options.context, rows);
+    assertSeasonSnapshotBatchRows(options.context, rows);
     return await db.transaction(async (tx) => {
       const existingRows = await tx.select().from(seasonSnapshotBatches).where(eq(seasonSnapshotBatches.id, batch.id));
       const existing = existingRows[0] ? asBatch(existingRows[0]) : null;
@@ -554,8 +597,8 @@ export async function captureSeasonSnapshotBatch(
       }
 
       const membership = {
-        players: rows.players.map(row => ({ ...row, batchId: batch.id })),
-        teams: rows.teams.map(row => ({ ...row, batchId: batch.id })),
+        players: rows.players.map(row => ({ ...row, id: batchPlayerSeasonSnapshotId(batch.id, row.playerId), batchId: batch.id })),
+        teams: rows.teams.map(row => ({ ...row, id: batchTeamSeasonSnapshotId(batch.id, row.teamId), batchId: batch.id })),
       };
       const written = await writeSeasonSnapshots(tx, membership);
       if (written.players.inserted !== batch.expectedPlayers || written.teams.inserted !== batch.expectedTeams) {
@@ -567,8 +610,11 @@ export async function captureSeasonSnapshotBatch(
       if (capturedPlayers.length !== batch.expectedPlayers || capturedTeams.length !== batch.expectedTeams) {
         throw new Error("Snapshot batch membership count does not match its expected population.");
       }
-      if (capturedPlayers.some((row: any) => row.season !== batch.season || row.batchId !== batch.id) || capturedTeams.some((row: any) => row.season !== batch.season || row.batchId !== batch.id)) {
-        throw new Error("Snapshot batch contains rows outside its declared season or membership.");
+      if (
+        capturedPlayers.some((row: any) => row.season !== batch.season || row.batchId !== batch.id || row.id !== batchPlayerSeasonSnapshotId(batch.id, row.playerId))
+        || capturedTeams.some((row: any) => row.season !== batch.season || row.batchId !== batch.id || row.id !== batchTeamSeasonSnapshotId(batch.id, row.teamId))
+      ) {
+        throw new Error("Snapshot batch contains rows outside its declared season or batch-scoped membership.");
       }
 
       const complete: SeasonSnapshotBatch = { ...batch, status: "COMPLETE", capturedPlayers: capturedPlayers.length, capturedTeams: capturedTeams.length, completedAt: now };

@@ -1,12 +1,15 @@
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
-import { eq, sql } from "drizzle-orm";
+import { eq, isNull, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import * as schema from "@/app/db/schema";
 import { SEASON_SNAPSHOT_TABLE_STATEMENTS } from "@/app/db/ensure-schema";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
 import {
   captureSeasonSnapshotBatch,
+  CANONICAL_NHL_TEAM_IDS,
+  assertSeasonSnapshotBatchRows,
+  batchPlayerSeasonSnapshotId,
   requireCompleteSeasonSnapshotBatch,
   seasonSnapshotBatchInventory,
   seasonSnapshotContext,
@@ -18,11 +21,12 @@ import type { XNAVResult } from "@/app/lib/xnav-engine";
 const ASOF = "2026-09-11";
 
 function roster() {
-  return [
-    { id: "batch-f", name: "Batch F", teamId: "TOR", position: "C", age: 27, capHit: 8, yearsRemaining: 3, ptsPace: 90, xGPace: 25, defRate: 0.05, avgTOI: 19, qocIndex: 60, games: 80, ops: 8, dps: 1, hasLiveStats: true },
-    { id: "batch-d", name: "Batch D", teamId: "TOR", position: "D", age: 26, capHit: 6, yearsRemaining: 5, ptsPace: 45, xGPace: 8, defRate: 0.08, avgTOI: 23, qocIndex: 70, games: 78, ops: 3, dps: 5, xgaRelTM: -0.3, corsiAgainstRel: -3, hasLiveStats: true },
-    { id: "batch-g", name: "Batch G", teamId: "BOS", position: "G", age: 29, capHit: 5, yearsRemaining: 2, gsax: 14, games: 55, gamesStarted: 55, savePct: 0.916, hasLiveStats: true },
-  ];
+  return CANONICAL_NHL_TEAM_IDS.map((teamId, index) => ({
+    id: `batch-${teamId}`, name: `Batch ${teamId}`, teamId, position: "C", age: 27,
+    capHit: 5, yearsRemaining: 3, ptsPace: 60 + (index % 5), xGPace: 18,
+    defRate: 0.04, avgTOI: 18, qocIndex: 55, games: 80, ops: 4, dps: 1,
+    hasLiveStats: true,
+  }));
 }
 
 function navMap(players: ReturnType<typeof roster>): Record<string, XNAVResult> {
@@ -59,8 +63,8 @@ describe("Phase 1A: verified season snapshot batches", () => {
     const result = await capture();
     expect(result.idempotent).toBe(false);
     expect(result.batch).toMatchObject({
-      status: "COMPLETE", expectedPlayers: 3, capturedPlayers: 3,
-      expectedTeams: 2, capturedTeams: 2, skippedPlayers: 0,
+      status: "COMPLETE", expectedPlayers: 32, capturedPlayers: 32,
+      expectedTeams: 32, capturedTeams: 32, skippedPlayers: 0,
       createdBy: "test-admin", createdAction: "test capture",
     });
     expect(result.batch.integrityHash).toMatch(/^[a-f0-9]{64}$/);
@@ -82,18 +86,24 @@ describe("Phase 1A: verified season snapshot batches", () => {
     const second = await capture();
     expect(second.idempotent).toBe(true);
     expect(second.batch.id).toBe(first.batch.id);
+    expect(second.batch.integrityHash).toBe(first.batch.integrityHash);
     const players = await db.select().from(schema.playerSeasonSnapshots).where(eq(schema.playerSeasonSnapshots.batchId, first.batch.id));
     expect(players).toHaveLength(first.batch.expectedPlayers);
   });
 
-  it("rejects incomplete capture when immutable legacy rows prevent full batch membership", async () => {
+  it("keeps legacy rows unverified while a verified batch uses separate batch-scoped row identities", async () => {
     const players = roster();
     const ctx = seasonSnapshotContext("completed", { asOf: ASOF });
-    await writeSeasonSnapshots(db, buildSeasonSnapshotRows(players, navMap(players), ctx));
-    await expect(capture()).rejects.toThrow(/Incomplete snapshot batch/);
-    const batches = await seasonSnapshotBatchInventory(db);
-    expect(batches).toHaveLength(1);
-    expect(batches[0]).toMatchObject({ status: "FAILED", capturedPlayers: 0, capturedTeams: 0 });
+    const legacy = buildSeasonSnapshotRows(players, navMap(players), ctx);
+    await writeSeasonSnapshots(db, legacy);
+
+    const verified = await capture();
+    const legacyPlayers = await db.select().from(schema.playerSeasonSnapshots).where(isNull(schema.playerSeasonSnapshots.batchId));
+    const verifiedPlayers = await db.select().from(schema.playerSeasonSnapshots).where(eq(schema.playerSeasonSnapshots.batchId, verified.batch.id));
+    expect(legacyPlayers).toHaveLength(32);
+    expect(verifiedPlayers).toHaveLength(32);
+    expect(verifiedPlayers.every(row => row.id === batchPlayerSeasonSnapshotId(verified.batch.id, row.playerId))).toBe(true);
+    expect(verifiedPlayers.some(row => legacyPlayers.some(legacyRow => legacyRow.id === row.id))).toBe(false);
   });
 
   it("rejects duplicate canonical player IDs before a batch can become complete", async () => {
@@ -108,6 +118,46 @@ describe("Phase 1A: verified season snapshot batches", () => {
       now: 1_789_000_000_000,
     })).rejects.toThrow(/Duplicate player ID/);
     expect((await seasonSnapshotBatchInventory(db))[0].status).toBe("FAILED");
+  });
+
+  it("rejects missing or duplicate canonical team membership before capture", async () => {
+    const players = roster();
+    await expect(captureSeasonSnapshotBatch(db as any, {
+      snapshotKind: "completed",
+      context: seasonSnapshotContext("completed", { asOf: ASOF }),
+      players: players.slice(1), navMap: navMap(players.slice(1)),
+      createdBy: "test-admin", createdAction: "missing team test", now: 1_789_000_000_000,
+    })).rejects.toThrow(/missing canonical NHL team membership/);
+
+    const rows = buildSeasonSnapshotRows(players, navMap(players), seasonSnapshotContext("completed", { asOf: ASOF }));
+    expect(() => assertSeasonSnapshotBatchRows(seasonSnapshotContext("completed", { asOf: ASOF }), {
+      ...rows, teams: [...rows.teams, rows.teams[0]],
+    })).toThrow(/Duplicate team ID/);
+  });
+
+  it("keeps pseudo-team players outside verified membership and cannot inflate the 32-team expectation", async () => {
+    const players = [...roster(), { ...roster()[0], id: "batch-fa", name: "Batch FA", teamId: "FA_POOL" }];
+    const rows = buildSeasonSnapshotRows(players, navMap(players), seasonSnapshotContext("completed", { asOf: ASOF }));
+    expect(rows.excluded).toEqual(["batch-fa"]);
+    expect(rows.players).toHaveLength(32);
+    expect(rows.teams.map(row => row.teamId)).not.toContain("FA_POOL");
+    expect(rows.teams).toHaveLength(CANONICAL_NHL_TEAM_IDS.length);
+  });
+
+  it("allows distinct immutable batches to coexist while an identical recapture reuses its batch", async () => {
+    const first = await capture();
+    const changed = roster().map(player => player.id === "batch-TOR" ? { ...player, ptsPace: player.ptsPace + 10 } : player);
+    const second = await captureSeasonSnapshotBatch(db as any, {
+      snapshotKind: "completed", context: seasonSnapshotContext("completed", { asOf: ASOF }),
+      players: changed, navMap: navMap(changed), createdBy: "test-admin", createdAction: "changed source capture", now: 1_789_000_000_000,
+    });
+    expect(second.batch.id).not.toBe(first.batch.id);
+    expect((await seasonSnapshotBatchInventory(db)).filter(batch => batch.status === "COMPLETE")).toHaveLength(2);
+    const secondRetry = await captureSeasonSnapshotBatch(db as any, {
+      snapshotKind: "completed", context: seasonSnapshotContext("completed", { asOf: ASOF }),
+      players: changed, navMap: navMap(changed), createdBy: "test-admin", createdAction: "changed source capture", now: 1_789_000_000_000,
+    });
+    expect(secondRetry).toMatchObject({ idempotent: true, batch: { id: second.batch.id } });
   });
 
   it("allows Labs provenance references only to COMPLETE batches", async () => {

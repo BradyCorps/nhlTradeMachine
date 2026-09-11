@@ -285,6 +285,8 @@ export const SEASON_SNAPSHOT_TABLE_STATEMENTS = [
     created_at INTEGER NOT NULL
   )`,
   "CREATE INDEX IF NOT EXISTS idx_team_season_snapshots_team ON team_season_snapshots (team_id, season, as_of)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_player_season_snapshots_batch_member ON player_season_snapshots (batch_id, player_id) WHERE batch_id IS NOT NULL",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_team_season_snapshots_batch_member ON team_season_snapshots (batch_id, team_id) WHERE batch_id IS NOT NULL",
 ];
 
 // Existing DATA-06 tables predate batch membership. These are intentionally
@@ -296,6 +298,8 @@ const SEASON_SNAPSHOT_BATCH_COMPATIBILITY_STATEMENTS = [
   "ALTER TABLE team_season_snapshots ADD COLUMN batch_id TEXT",
   "CREATE INDEX IF NOT EXISTS idx_player_season_snapshots_batch ON player_season_snapshots (batch_id, player_id)",
   "CREATE INDEX IF NOT EXISTS idx_team_season_snapshots_batch ON team_season_snapshots (batch_id, team_id)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_player_season_snapshots_batch_member ON player_season_snapshots (batch_id, player_id) WHERE batch_id IS NOT NULL",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_team_season_snapshots_batch_member ON team_season_snapshots (batch_id, team_id) WHERE batch_id IS NOT NULL",
 ];
 const seasonSnapshotTablesEnsured = new WeakMap<object, Promise<void>>();
 
