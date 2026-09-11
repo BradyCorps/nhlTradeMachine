@@ -4,10 +4,11 @@ import { ensureSeasonSnapshotTables } from "@/app/db/ensure-schema";
 import { requireAdmin } from "@/app/lib/admin-auth";
 import { getCachedRoster } from "@/app/lib/cached-roster";
 import {
-  buildSeasonSnapshotRows,
+  captureSeasonSnapshotBatch,
+  SeasonSnapshotBatchCaptureError,
+  seasonSnapshotBatchInventory,
   seasonSnapshotContext,
   seasonSnapshotInventory,
-  writeSeasonSnapshots,
   type SnapshotSeasonKind,
 } from "@/app/lib/season-snapshot";
 import { snapshotDate } from "@/app/lib/valuation-snapshot";
@@ -19,7 +20,10 @@ export async function GET(req: Request) {
   const unauthorized = await requireAdmin(req);
   if (unauthorized) return unauthorized;
   await ensureSeasonSnapshotTables();
-  return NextResponse.json({ inventory: await seasonSnapshotInventory(db) });
+  return NextResponse.json({
+    batches: await seasonSnapshotBatchInventory(db),
+    legacyInventory: await seasonSnapshotInventory(db, { unbatchedOnly: true }),
+  });
 }
 
 /**
@@ -42,21 +46,30 @@ export async function POST(req: Request) {
   await ensureSeasonSnapshotTables();
   const { value: roster } = await getCachedRoster();
   const asOf = snapshotDate();
-  const results: Record<string, unknown> = {};
-  for (const kind of kinds) {
-    const ctx = seasonSnapshotContext(kind, { asOf, capCeiling: roster.capCeiling });
-    const rows = buildSeasonSnapshotRows(roster.players as any[], roster.navMap, ctx);
-    const written = await writeSeasonSnapshots(db, rows);
-    results[ctx.season] = {
-      coverage: ctx.coverage,
-      statsSeason: ctx.statsSeason,
-      seasonGamesObserved: ctx.seasonGamesObserved,
-      contractSeason: ctx.contractSeason,
-      asOf: ctx.asOf,
-      modelVersion: ctx.modelVersion,
-      built: { players: rows.players.length, teams: rows.teams.length, skipped: rows.skipped.length },
-      written,
-    };
+  try {
+    const results: Record<string, unknown> = {};
+    for (const kind of kinds) {
+      const ctx = seasonSnapshotContext(kind, { asOf, capCeiling: roster.capCeiling });
+      const result = await captureSeasonSnapshotBatch(db as any, {
+        snapshotKind: kind,
+        context: ctx,
+        players: roster.players as any[],
+        navMap: roster.navMap,
+        createdBy: "admin-session",
+        createdAction: "POST /api/admin/season-snapshots",
+      });
+      results[ctx.season] = {
+        batch: result.batch,
+        built: result.rows,
+        idempotent: result.idempotent,
+      };
+    }
+    return NextResponse.json({ ok: true, rosterGeneratedAt: roster.generatedAt, results });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Season snapshot capture failed.";
+    return NextResponse.json({
+      error: message,
+      ...(error instanceof SeasonSnapshotBatchCaptureError ? { batchId: error.batchId } : {}),
+    }, { status: 409 });
   }
-  return NextResponse.json({ ok: true, rosterGeneratedAt: roster.generatedAt, results });
 }

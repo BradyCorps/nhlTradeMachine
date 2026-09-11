@@ -3,7 +3,13 @@
 Purpose: retain 2025-26 as its own analytical record and enter 2026-27
 without relabelling or overwriting history. Additive, idempotent, immutable.
 
-## Tables (`app/db/schema.ts`; `drizzle/0006_add_season_snapshots.sql`; `ensureSeasonSnapshotTables`)
+## Tables (`app/db/schema.ts`; `drizzle/0006_add_season_snapshots.sql`; `drizzle/0007_add_season_snapshot_batches.sql`; `ensureSeasonSnapshotTables`)
+
+`season_snapshot_batches` — one verified, immutable capture of both row
+families. Its status is `CAPTURING`, `COMPLETE`, or `FAILED`; expected and
+captured player/team counts, source/population metadata, action provenance,
+and an integrity hash determine whether it is complete. See
+`SNAPSHOT_PROVENANCE_CONTRACT.md`.
 
 `player_season_snapshots` — one row per `(season, asOf, modelVersion, playerId)`,
 `id = "{season}:{asOf}:{modelVersion}:{playerId}"`.
@@ -20,6 +26,7 @@ without relabelling or overwriting history. Additive, idempotent, immutable.
 | total, components | headline and JSON `NavStage[]` (Σ = total) |
 | market_value, surplus, uncertainty_low/high | FMV, FMV − cap hit, walk-forward band (null when absent) |
 | contract, population | JSON contract snapshot; population definition |
+| batch_id | verified capture batch; null means legacy/unverified and cannot be Labs provenance |
 
 `team_season_snapshots` — `id = "{season}:{asOf}:{modelVersion}:{teamId}"`:
 signed `f_nav, d_nav, g_nav, xnav_signed` and positive-only
@@ -45,9 +52,14 @@ signed `f_nav, d_nav, g_nav, xnav_signed` and positive-only
 `app/lib/season-snapshot.ts`: `seasonSnapshotContext(kind)`,
 `buildSeasonSnapshotRows(players, navMap, ctx)`, `writeSeasonSnapshots(db, rows)`,
 `seasonSnapshotInventory(db)`. `POST /api/admin/season-snapshots`
-(`{ season: "completed" | "projected" | "both" }`) runs it against the
-cached roster where the Turso credentials live; `GET` lists the inventory.
-No production migration or backfill was executed by this change.
+(`{ season: "completed" | "projected" | "both" }`) now calls
+`captureSeasonSnapshotBatch` against the cached roster where the Turso
+credentials live. It transactionally binds both row families to a batch before
+marking it `COMPLETE`; `GET` lists verified batches separately from unbatched
+legacy rows. No production migration or backfill was executed by this change.
+
+Labs must use `requireCompleteSeasonSnapshotBatch(batchId)`, never a season
+label or raw row inventory, as their dataset/provenance reference.
 
 ## API exposure
 

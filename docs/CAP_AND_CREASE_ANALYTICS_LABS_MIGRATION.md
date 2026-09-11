@@ -482,6 +482,16 @@ Do **not** create duplicate sources of truth.
 - existing fallbacks continue to work;
 - tests/typecheck/lint/build pass.
 
+### 6.4 Phase 1A snapshot provenance amendment — 2026-09-11
+
+Phase 1A adds `season_snapshot_batches` as an additive extension of DATA-06.
+It is not an Analytics Registry, experiment system, or promotion mechanism.
+Labs dataset references must use only a verified `COMPLETE` batch ID. Existing
+unbatched season rows remain legacy/unverified and must not be inferred into a
+batch. Before Phase 1B or Phase 4 relies on snapshot provenance, perform and
+inspect an authenticated capture against the production-compatible cached
+roster path; no automatic capture was authorized in this phase.
+
 ---
 
 # 7. Phase 2 — Refactor Admin into an operating layer

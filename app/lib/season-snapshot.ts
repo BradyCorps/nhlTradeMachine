@@ -27,8 +27,9 @@
 //
 // See docs/analytics/SEASON_SNAPSHOT_CONTRACT.md.
 
-import { sql } from "drizzle-orm";
-import { playerSeasonSnapshots, teamSeasonSnapshots } from "@/app/db/schema";
+import { createHash } from "node:crypto";
+import { eq, isNull, sql } from "drizzle-orm";
+import { playerSeasonSnapshots, seasonSnapshotBatches, teamSeasonSnapshots } from "@/app/db/schema";
 import { SEASON } from "@/app/lib/season-config";
 import { XNAV_MODEL_VERSION } from "@/app/lib/data-context";
 import { navLabelForPosition } from "@/app/lib/player-terminology";
@@ -115,6 +116,8 @@ export interface PlayerSeasonSnapshotRow {
   uncertaintyHigh: number | null;
   contract: string;
   population: string;
+  /** Null identifies a legacy DATA-06 row without verified batch provenance. */
+  batchId: string | null;
   createdAt: number;
 }
 
@@ -140,6 +143,8 @@ export interface TeamSeasonSnapshotRow {
   capCeiling: number;
   capCommitted: number;
   population: string;
+  /** Null identifies a legacy DATA-06 row without verified batch provenance. */
+  batchId: string | null;
   createdAt: number;
 }
 
@@ -195,6 +200,7 @@ export function buildPlayerSeasonSnapshotRow(
     uncertaintyHigh: snapshot.uncertainty?.high ?? null,
     contract: JSON.stringify(snapshot.contract),
     population: ctx.population,
+    batchId: null,
     createdAt: now,
   };
 }
@@ -241,6 +247,7 @@ export function buildTeamSeasonSnapshotRows(
       capCeiling: ctx.capCeiling,
       capCommitted: Math.round(roster.reduce((s, p) => s + (p.capHit ?? 0), 0) * 1000) / 1000,
       population: TEAM_SNAPSHOT_POPULATION,
+      batchId: null,
       createdAt: now,
     };
   });
@@ -314,26 +321,28 @@ export async function writeSeasonSnapshots(
 }
 
 /** Per-season row counts — what history the database actually holds. */
-export async function seasonSnapshotInventory(db: SnapshotDb): Promise<Array<{
+export async function seasonSnapshotInventory(db: SnapshotDb, options: { unbatchedOnly?: boolean } = {}): Promise<Array<{
   season: string; asOf: string; modelVersion: string; players: number; teams: number;
 }>> {
-  const players = await db
+  const playerQuery = db
     .select({
       season: playerSeasonSnapshots.season,
       asOf: playerSeasonSnapshots.asOf,
       modelVersion: playerSeasonSnapshots.modelVersion,
       n: sql<number>`count(*)`,
     })
-    .from(playerSeasonSnapshots)
-    .groupBy(playerSeasonSnapshots.season, playerSeasonSnapshots.asOf, playerSeasonSnapshots.modelVersion);
-  const teams = await db
+    .from(playerSeasonSnapshots);
+  const teamQuery = db
     .select({
       season: teamSeasonSnapshots.season,
       asOf: teamSeasonSnapshots.asOf,
       modelVersion: teamSeasonSnapshots.modelVersion,
       n: sql<number>`count(*)`,
     })
-    .from(teamSeasonSnapshots)
+    .from(teamSeasonSnapshots);
+  const players = await (options.unbatchedOnly ? playerQuery.where(isNull(playerSeasonSnapshots.batchId)) : playerQuery)
+    .groupBy(playerSeasonSnapshots.season, playerSeasonSnapshots.asOf, playerSeasonSnapshots.modelVersion);
+  const teams = await (options.unbatchedOnly ? teamQuery.where(isNull(teamSeasonSnapshots.batchId)) : teamQuery)
     .groupBy(teamSeasonSnapshots.season, teamSeasonSnapshots.asOf, teamSeasonSnapshots.modelVersion);
   const key = (r: { season: string; asOf: string; modelVersion: string }) => `${r.season}|${r.asOf}|${r.modelVersion}`;
   const out = new Map<string, { season: string; asOf: string; modelVersion: string; players: number; teams: number }>();
@@ -344,6 +353,253 @@ export async function seasonSnapshotInventory(db: SnapshotDb): Promise<Array<{
     out.set(key(r), cur);
   }
   return [...out.values()].sort((a, b) => a.season.localeCompare(b.season) || a.asOf.localeCompare(b.asOf));
+}
+
+// ── Verified capture batches (Labs provenance boundary) ─────────────────────
+
+export type SeasonSnapshotBatchStatus = "CAPTURING" | "COMPLETE" | "FAILED";
+
+export interface SeasonSnapshotBatch {
+  id: string;
+  season: string;
+  snapshotKind: SnapshotSeasonKind;
+  asOf: string;
+  coverage: SeasonSnapshotCoverage;
+  statsSeason: string;
+  contractSeason: string;
+  modelVersion: string;
+  status: SeasonSnapshotBatchStatus;
+  expectedPlayers: number;
+  capturedPlayers: number;
+  expectedTeams: number;
+  capturedTeams: number;
+  skippedPlayers: number;
+  source: string;
+  population: string;
+  integrityHash: string;
+  createdBy: string;
+  createdAction: string;
+  createdAt: number;
+  completedAt: number | null;
+  failureReason: string | null;
+}
+
+export interface SeasonSnapshotBatchCaptureResult {
+  batch: SeasonSnapshotBatch;
+  rows: { players: number; teams: number; skipped: number };
+  idempotent: boolean;
+}
+
+export class SeasonSnapshotBatchCaptureError extends Error {
+  constructor(
+    message: string,
+    readonly batchId: string,
+  ) {
+    super(message);
+    this.name = "SeasonSnapshotBatchCaptureError";
+  }
+}
+
+type BatchDb = SnapshotDb & {
+  transaction: <T>(callback: (tx: any) => Promise<T>) => Promise<T>;
+  update: (...args: any[]) => any;
+};
+
+const canonicalJson = (value: unknown): string => JSON.stringify(value);
+
+/**
+ * Hash exactly the immutable context and rows intended for one capture. It is
+ * not a model artifact hash: it proves that the batch metadata and its player
+ * and team membership have not been substituted after capture.
+ */
+export function seasonSnapshotBatchIntegrityHash(
+  ctx: SeasonSnapshotContext,
+  snapshotKind: SnapshotSeasonKind,
+  rows: { players: PlayerSeasonSnapshotRow[]; teams: TeamSeasonSnapshotRow[]; skipped: string[] },
+): string {
+  const payload = {
+    context: {
+      season: ctx.season,
+      snapshotKind,
+      asOf: ctx.asOf,
+      coverage: ctx.coverage,
+      statsSeason: ctx.statsSeason,
+      contractSeason: ctx.contractSeason,
+      modelVersion: ctx.modelVersion,
+      source: ctx.source,
+      population: ctx.population,
+    },
+    players: [...rows.players]
+      .sort((a, b) => a.playerId.localeCompare(b.playerId))
+      .map(({ id, playerId, teamId, valuationSnapshotId, total, components, contract }) => ({ id, playerId, teamId, valuationSnapshotId, total, components, contract })),
+    teams: [...rows.teams]
+      .sort((a, b) => a.teamId.localeCompare(b.teamId))
+      .map(({ id, teamId, rosterCount, fNav, dNav, gNav, xnavSigned, xnavPositive }) => ({ id, teamId, rosterCount, fNav, dNav, gNav, xnavSigned, xnavPositive })),
+    skipped: [...rows.skipped].sort(),
+  };
+  return createHash("sha256").update(canonicalJson(payload)).digest("hex");
+}
+
+export const seasonSnapshotBatchId = (ctx: SeasonSnapshotContext, integrityHash: string): string =>
+  `snapshot:${ctx.season}:${ctx.asOf}:${ctx.modelVersion}:${integrityHash.slice(0, 16)}`;
+
+function assertBatchRows(
+  ctx: SeasonSnapshotContext,
+  rows: { players: PlayerSeasonSnapshotRow[]; teams: TeamSeasonSnapshotRow[]; skipped: string[] },
+): void {
+  const unique = (values: string[], kind: string) => {
+    if (new Set(values).size !== values.length) throw new Error(`Duplicate ${kind} in season snapshot batch.`);
+  };
+  if (!ctx.season || !ctx.asOf || !ctx.coverage || !ctx.statsSeason || !ctx.contractSeason || !ctx.modelVersion || !ctx.source || !ctx.population) {
+    throw new Error("Season snapshot batch requires complete provenance metadata.");
+  }
+  unique(rows.players.map(row => row.playerId), "player ID");
+  unique(rows.teams.map(row => row.teamId), "team ID");
+  unique(rows.players.map(row => row.id), "player row ID");
+  unique(rows.teams.map(row => row.id), "team row ID");
+  if (rows.players.some(row => row.season !== ctx.season || row.asOf !== ctx.asOf || row.coverage !== ctx.coverage || row.modelVersion !== ctx.modelVersion)) {
+    throw new Error("Player rows do not share the batch season context.");
+  }
+  if (rows.teams.some(row => row.season !== ctx.season || row.asOf !== ctx.asOf || row.coverage !== ctx.coverage || row.modelVersion !== ctx.modelVersion)) {
+    throw new Error("Team rows do not share the batch season context.");
+  }
+}
+
+const asBatch = (row: any): SeasonSnapshotBatch => ({
+  ...row,
+  snapshotKind: row.snapshotKind as SnapshotSeasonKind,
+  coverage: row.coverage as SeasonSnapshotCoverage,
+  status: row.status as SeasonSnapshotBatchStatus,
+  completedAt: row.completedAt ?? null,
+  failureReason: row.failureReason ?? null,
+});
+
+async function recordBatchFailure(
+  db: BatchDb,
+  batch: SeasonSnapshotBatch,
+  reason: string,
+): Promise<void> {
+  const existing = await db.select().from(seasonSnapshotBatches).where(eq(seasonSnapshotBatches.id, batch.id));
+  if (existing[0]?.status === "COMPLETE") return;
+  if (existing[0]) {
+    await db.update(seasonSnapshotBatches)
+      .set({ status: "FAILED", failureReason: reason, capturedPlayers: 0, capturedTeams: 0, completedAt: null })
+      .where(eq(seasonSnapshotBatches.id, batch.id));
+    return;
+  }
+  await db.insert(seasonSnapshotBatches).values({ ...batch, status: "FAILED", failureReason: reason, capturedPlayers: 0, capturedTeams: 0, completedAt: null });
+}
+
+/**
+ * Atomically capture one coherent player/team dataset. A COMPLETE batch is
+ * immutable and an identical re-run returns that batch without rewriting rows.
+ * Rows that existed before batches retain null batchId and therefore cannot be
+ * silently adopted as Labs provenance.
+ */
+export async function captureSeasonSnapshotBatch(
+  db: BatchDb,
+  options: {
+    snapshotKind: SnapshotSeasonKind;
+    context: SeasonSnapshotContext;
+    players: Array<SnapshotPlayerInput & { name?: string }>;
+    navMap: Record<string, XNAVResult>;
+    createdBy: string;
+    createdAction: string;
+    now?: number;
+  },
+): Promise<SeasonSnapshotBatchCaptureResult> {
+  if (typeof db.transaction !== "function") throw new Error("Season snapshot batches require transactional database support.");
+  const now = options.now ?? Date.now();
+  const rows = buildSeasonSnapshotRows(options.players, options.navMap, options.context, now);
+  const integrityHash = seasonSnapshotBatchIntegrityHash(options.context, options.snapshotKind, rows);
+  const batch: SeasonSnapshotBatch = {
+    id: seasonSnapshotBatchId(options.context, integrityHash),
+    season: options.context.season,
+    snapshotKind: options.snapshotKind,
+    asOf: options.context.asOf,
+    coverage: options.context.coverage,
+    statsSeason: options.context.statsSeason,
+    contractSeason: options.context.contractSeason,
+    modelVersion: options.context.modelVersion,
+    status: "CAPTURING",
+    expectedPlayers: rows.players.length,
+    capturedPlayers: 0,
+    expectedTeams: rows.teams.length,
+    capturedTeams: 0,
+    skippedPlayers: rows.skipped.length,
+    source: options.context.source,
+    population: options.context.population,
+    integrityHash,
+    createdBy: options.createdBy,
+    createdAction: options.createdAction,
+    createdAt: now,
+    completedAt: null,
+    failureReason: null,
+  };
+
+  try {
+    assertBatchRows(options.context, rows);
+    return await db.transaction(async (tx) => {
+      const existingRows = await tx.select().from(seasonSnapshotBatches).where(eq(seasonSnapshotBatches.id, batch.id));
+      const existing = existingRows[0] ? asBatch(existingRows[0]) : null;
+      if (existing?.status === "COMPLETE") {
+        if (existing.integrityHash !== integrityHash) throw new Error("Completed snapshot batch integrity mismatch.");
+        return { batch: existing, rows: { players: existing.capturedPlayers, teams: existing.capturedTeams, skipped: existing.skippedPlayers }, idempotent: true };
+      }
+      if (existing?.status === "CAPTURING") throw new Error("Season snapshot batch is already capturing.");
+      if (existing) {
+        await tx.update(seasonSnapshotBatches).set({ ...batch, status: "CAPTURING", failureReason: null }).where(eq(seasonSnapshotBatches.id, batch.id));
+      } else {
+        await tx.insert(seasonSnapshotBatches).values(batch);
+      }
+
+      const membership = {
+        players: rows.players.map(row => ({ ...row, batchId: batch.id })),
+        teams: rows.teams.map(row => ({ ...row, batchId: batch.id })),
+      };
+      const written = await writeSeasonSnapshots(tx, membership);
+      if (written.players.inserted !== batch.expectedPlayers || written.teams.inserted !== batch.expectedTeams) {
+        throw new Error(`Incomplete snapshot batch: expected ${batch.expectedPlayers}/${batch.expectedTeams}, inserted ${written.players.inserted}/${written.teams.inserted}.`);
+      }
+
+      const capturedPlayers = await tx.select().from(playerSeasonSnapshots).where(eq(playerSeasonSnapshots.batchId, batch.id));
+      const capturedTeams = await tx.select().from(teamSeasonSnapshots).where(eq(teamSeasonSnapshots.batchId, batch.id));
+      if (capturedPlayers.length !== batch.expectedPlayers || capturedTeams.length !== batch.expectedTeams) {
+        throw new Error("Snapshot batch membership count does not match its expected population.");
+      }
+      if (capturedPlayers.some((row: any) => row.season !== batch.season || row.batchId !== batch.id) || capturedTeams.some((row: any) => row.season !== batch.season || row.batchId !== batch.id)) {
+        throw new Error("Snapshot batch contains rows outside its declared season or membership.");
+      }
+
+      const complete: SeasonSnapshotBatch = { ...batch, status: "COMPLETE", capturedPlayers: capturedPlayers.length, capturedTeams: capturedTeams.length, completedAt: now };
+      await tx.update(seasonSnapshotBatches)
+        .set({ status: complete.status, capturedPlayers: complete.capturedPlayers, capturedTeams: complete.capturedTeams, completedAt: complete.completedAt, failureReason: null })
+        .where(eq(seasonSnapshotBatches.id, batch.id));
+      return { batch: complete, rows: { players: rows.players.length, teams: rows.teams.length, skipped: rows.skipped.length }, idempotent: false };
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "Unknown snapshot batch capture failure.";
+    await recordBatchFailure(db, batch, reason);
+    throw new SeasonSnapshotBatchCaptureError(reason, batch.id);
+  }
+}
+
+/** Only COMPLETE batches are eligible as Analytics Labs dataset provenance. */
+export async function requireCompleteSeasonSnapshotBatch(db: SnapshotDb, batchId: string): Promise<SeasonSnapshotBatch> {
+  const rows = await db.select().from(seasonSnapshotBatches).where(eq(seasonSnapshotBatches.id, batchId));
+  const batch = rows[0] ? asBatch(rows[0]) : null;
+  if (!batch || batch.status !== "COMPLETE") throw new Error(`Season snapshot batch ${batchId} is not COMPLETE.`);
+  if (batch.capturedPlayers !== batch.expectedPlayers || batch.capturedTeams !== batch.expectedTeams) {
+    throw new Error(`Season snapshot batch ${batchId} is incomplete.`);
+  }
+  return batch;
+}
+
+/** Minimal operator inventory; legacy rows are intentionally reported separately. */
+export async function seasonSnapshotBatchInventory(db: SnapshotDb): Promise<SeasonSnapshotBatch[]> {
+  const rows = await db.select().from(seasonSnapshotBatches);
+  const batches: SeasonSnapshotBatch[] = rows.map(asBatch);
+  return batches.sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id));
 }
 
 // ── Public season reference (API contract) ───────────────────────────────

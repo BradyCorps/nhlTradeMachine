@@ -161,6 +161,9 @@ export const playerSeasonSnapshots = sqliteTable("player_season_snapshots", {
   uncertaintyHigh:     real("uncertainty_high"),
   contract:            text("contract").notNull(),       // JSON ValuationContractSnapshot
   population:          text("population").notNull(),
+  // Null means a legacy DATA-06 row that predates verified capture batches.
+  // Labs must never infer batch membership from season/as_of alone.
+  batchId:             text("batch_id").references(() => seasonSnapshotBatches.id),
   createdAt:           integer("created_at").notNull(),
 });
 
@@ -188,5 +191,35 @@ export const teamSeasonSnapshots = sqliteTable("team_season_snapshots", {
   capCeiling:          real("cap_ceiling").notNull(),
   capCommitted:        real("cap_committed").notNull(),
   population:          text("population").notNull(),
+  // Null means a legacy DATA-06 row that predates verified capture batches.
+  batchId:             text("batch_id").references(() => seasonSnapshotBatches.id),
   createdAt:           integer("created_at").notNull(),
+});
+
+// One coherent, verified capture of player and team analytical snapshots.
+// Rows only become Labs-eligible when their batch reaches COMPLETE; legacy
+// rows intentionally retain a null batch_id rather than fabricated provenance.
+export const seasonSnapshotBatches = sqliteTable("season_snapshot_batches", {
+  id:                   text("id").primaryKey(),
+  season:               text("season").notNull(),
+  snapshotKind:         text("snapshot_kind").notNull(), // completed | projected
+  asOf:                 text("as_of").notNull(),
+  coverage:             text("coverage").notNull(),
+  statsSeason:          text("stats_season").notNull(),
+  contractSeason:       text("contract_season").notNull(),
+  modelVersion:         text("model_version").notNull(),
+  status:               text("status").notNull(), // CAPTURING | COMPLETE | FAILED
+  expectedPlayers:      integer("expected_players").notNull(),
+  capturedPlayers:      integer("captured_players").notNull().default(0),
+  expectedTeams:        integer("expected_teams").notNull(),
+  capturedTeams:        integer("captured_teams").notNull().default(0),
+  skippedPlayers:       integer("skipped_players").notNull().default(0),
+  source:               text("source").notNull(),
+  population:           text("population").notNull(),
+  integrityHash:        text("integrity_hash").notNull(),
+  createdBy:            text("created_by").notNull(),
+  createdAction:        text("created_action").notNull(),
+  createdAt:            integer("created_at").notNull(),
+  completedAt:          integer("completed_at"),
+  failureReason:        text("failure_reason"),
 });
