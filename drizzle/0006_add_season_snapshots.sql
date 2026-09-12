@@ -27,8 +27,11 @@ CREATE TABLE IF NOT EXISTS player_season_snapshots (
   population TEXT NOT NULL,
   created_at INTEGER NOT NULL
 );
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_player_season_snapshots_player ON player_season_snapshots (player_id, season, as_of);
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_player_season_snapshots_season ON player_season_snapshots (season, as_of, model_version);
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS team_season_snapshots (
   id TEXT PRIMARY KEY,
   team_id TEXT NOT NULL,
@@ -53,4 +56,5 @@ CREATE TABLE IF NOT EXISTS team_season_snapshots (
   population TEXT NOT NULL,
   created_at INTEGER NOT NULL
 );
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_team_season_snapshots_team ON team_season_snapshots (team_id, season, as_of);

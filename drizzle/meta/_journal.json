@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "turso",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1788998400000,
+      "tag": "0006_add_season_snapshots",
+      "breakpoints": false
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788998460000,
+      "tag": "0007_add_season_snapshot_batches",
+      "breakpoints": false
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788998520000,
+      "tag": "0008_add_snapshot_batch_member_uniqueness",
+      "breakpoints": false
+    }
+  ]
+}

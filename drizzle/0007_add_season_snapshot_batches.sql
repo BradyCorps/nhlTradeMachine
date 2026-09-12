@@ -24,9 +24,14 @@ CREATE TABLE IF NOT EXISTS season_snapshot_batches (
   completed_at INTEGER,
   failure_reason TEXT
 );
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_snapshot_batches_inventory ON season_snapshot_batches (season, as_of, model_version, status);
 
+--> statement-breakpoint
 ALTER TABLE player_season_snapshots ADD COLUMN batch_id TEXT;
+--> statement-breakpoint
 ALTER TABLE team_season_snapshots ADD COLUMN batch_id TEXT;
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_player_season_snapshots_batch ON player_season_snapshots (batch_id, player_id);
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_team_season_snapshots_batch ON team_season_snapshots (batch_id, team_id);

@@ -4,6 +4,7 @@
 CREATE UNIQUE INDEX IF NOT EXISTS idx_player_season_snapshots_batch_member
   ON player_season_snapshots (batch_id, player_id)
   WHERE batch_id IS NOT NULL;
+--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS idx_team_season_snapshots_batch_member
   ON team_season_snapshots (batch_id, team_id)
   WHERE batch_id IS NOT NULL;
