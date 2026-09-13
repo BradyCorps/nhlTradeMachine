@@ -397,7 +397,7 @@ function LinePlayerLink({ player, detail }: { player: LineEntry; detail?: string
   return (
     <Link
       href={`/players/${encodeURIComponent(player.id)}`}
-      className="inline-flex min-h-11 items-center px-1 -mx-1 text-[10px] font-mono underline-offset-2 hover:underline focus-visible:underline sm:min-h-0 sm:px-0 sm:mx-0"
+      className="inline-flex min-h-11 items-center px-1 -mx-1 text-[10px] font-mono underline-offset-2 hover:underline focus-visible:underline"
       style={{ color: "var(--ledger-ink)" }}
     >
       <span className="font-black">{player.name}</span>
@@ -427,7 +427,7 @@ function LineupSection({ lines }: { lines: TeamLines }) {
           </div>
           {lines.forwards.map((line, i) => (
             <div key={i} className="mb-1.5">
-              <div className="text-[8px] font-black uppercase tracking-[0.1em] mb-0.5" style={{ color: "var(--ledger-ink-faint)", opacity: 0.6 }}>
+              <div className="text-[8px] font-black uppercase tracking-[0.1em] mb-0.5" style={{ color: "var(--ledger-ink-faint)" }}>
                 {LINE_NAMES[i]}
               </div>
               <div className="flex flex-wrap gap-x-2">
@@ -446,7 +446,7 @@ function LineupSection({ lines }: { lines: TeamLines }) {
           </div>
           {lines.defense.map((pair, i) => (
             <div key={i} className="mb-1.5">
-              <div className="text-[8px] font-black uppercase tracking-[0.1em] mb-0.5" style={{ color: "var(--ledger-ink-faint)", opacity: 0.6 }}>
+              <div className="text-[8px] font-black uppercase tracking-[0.1em] mb-0.5" style={{ color: "var(--ledger-ink-faint)" }}>
                 {PAIR_NAMES[i]}
               </div>
               <div className="flex flex-wrap gap-x-2">

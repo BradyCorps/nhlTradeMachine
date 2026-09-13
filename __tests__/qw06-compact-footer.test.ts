@@ -13,6 +13,7 @@ describe("QW-06 compact global footer", () => {
     expect(html).toContain('href="/glossary#data-sources"');
     expect(html).toContain('href="/legal"');
     expect(html).toContain("min-h-11");
+    expect(html).not.toContain("md:min-h-0");
   });
 
   it("ends the product page before long glossary content begins", () => {
