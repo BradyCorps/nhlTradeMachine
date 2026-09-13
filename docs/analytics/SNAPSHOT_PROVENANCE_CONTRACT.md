@@ -117,3 +117,13 @@ Automatic scheduling remains deferred.
 Before a broader production-registry contract references snapshot data, an
 operator must run and inspect a real authenticated capture. Only the returned
 `COMPLETE` batch ID—not a season label—may be stored as a dataset reference.
+
+### Phase 1B registry boundary — 2026-09-13
+
+The typed production-analytics catalog is metadata-only and carries no runtime
+snapshot batch reference. A later Labs candidate may reference only a verified
+`COMPLETE` batch ID through its own candidate/provenance record; it may not infer
+membership from a season label or adopt legacy unbatched rows. The catalog cannot
+select an implementation for public NAV and does not alter the canonical
+`calculateAssetNAV → calcNAV` execution path. See
+`PRODUCTION_ANALYTICS_REGISTRY.md`.

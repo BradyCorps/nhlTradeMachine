@@ -492,6 +492,26 @@ batch. Before Phase 1B or Phase 4 relies on snapshot provenance, perform and
 inspect an authenticated capture against the production-compatible cached
 roster path; no automatic capture was authorized in this phase.
 
+### 6.5 Phase 1B production-identity amendment — 2026-09-13
+
+The first registry increment is a typed, code-backed catalog at
+`app/lib/production-analytics.ts`, documented in
+`docs/analytics/PRODUCTION_ANALYTICS_REGISTRY.md`. It is the one source of
+truth for the *identity metadata* of existing production, diagnostic, and failed
+research analytics; it is not a database registry or production-dispatch
+framework.
+
+The public raw-asset boundary remains `calculateAssetNAV → calcNAV`. The catalog
+does not select a candidate, call a calculator, read a snapshot batch, or change
+feature-flag behavior. Unknown, diagnostic, and research records fail closed
+when asked for a production identity. Gravity v4 remains diagnostic and
+flag-controlled; NAV-01 failed calibration evidence remains research-only.
+
+Future Phase 2 work must introduce candidate, artifact, validation, promotion,
+and rollback records separately. A candidate may reference only a verified
+`COMPLETE` snapshot batch ID; registration alone cannot make it production or
+displace the canonical public execution path.
+
 ---
 
 # 7. Phase 2 — Refactor Admin into an operating layer
