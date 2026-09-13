@@ -17,6 +17,8 @@ describe("QW-04 accessible help controls", () => {
     expect(html).toContain('aria-haspopup="dialog"');
     expect(html).toContain("min-h-11");
     expect(html).toContain("min-w-11");
+    expect(html).not.toContain("md:min-h-0");
+    expect(html).not.toContain("md:min-w-0");
   });
 
   it("uses the shared focus-managed popover/sheet behavior", () => {

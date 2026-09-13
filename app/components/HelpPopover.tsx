@@ -123,7 +123,7 @@ export function HelpPopover({
         aria-haspopup="dialog"
         aria-label={`Explain ${label}`}
         onClick={() => open ? close() : openPanel()}
-        className={`inline-flex min-h-11 min-w-11 items-center justify-center border-b border-dotted px-1 text-inherit md:min-h-0 md:min-w-0 ${className}`}
+        className={`inline-flex min-h-11 min-w-11 items-center justify-center border-b border-dotted px-1 text-inherit ${className}`}
         style={{ borderColor: "var(--ledger-rule)", background: "transparent", cursor: "help", font: "inherit" }}
       >
         {children ?? label}
