@@ -206,6 +206,31 @@ export function ensureNewTables(database: Database = defaultDb): Promise<void> {
 // Additive only. Mirrors drizzle/0006_add_season_snapshots.sql so a database
 // that has not had the migration applied still gets the tables on first use.
 export const SEASON_SNAPSHOT_TABLE_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS season_snapshot_batches (
+    id TEXT PRIMARY KEY,
+    season TEXT NOT NULL,
+    snapshot_kind TEXT NOT NULL,
+    as_of TEXT NOT NULL,
+    coverage TEXT NOT NULL,
+    stats_season TEXT NOT NULL,
+    contract_season TEXT NOT NULL,
+    model_version TEXT NOT NULL,
+    status TEXT NOT NULL,
+    expected_players INTEGER NOT NULL,
+    captured_players INTEGER NOT NULL DEFAULT 0,
+    expected_teams INTEGER NOT NULL,
+    captured_teams INTEGER NOT NULL DEFAULT 0,
+    skipped_players INTEGER NOT NULL DEFAULT 0,
+    source TEXT NOT NULL,
+    population TEXT NOT NULL,
+    integrity_hash TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_action TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    completed_at INTEGER,
+    failure_reason TEXT
+  )`,
+  "CREATE INDEX IF NOT EXISTS idx_snapshot_batches_inventory ON season_snapshot_batches (season, as_of, model_version, status)",
   `CREATE TABLE IF NOT EXISTS player_season_snapshots (
     id TEXT PRIMARY KEY,
     player_id TEXT NOT NULL,
@@ -229,6 +254,7 @@ export const SEASON_SNAPSHOT_TABLE_STATEMENTS = [
     uncertainty_high REAL,
     contract TEXT NOT NULL,
     population TEXT NOT NULL,
+    batch_id TEXT,
     created_at INTEGER NOT NULL
   )`,
   "CREATE INDEX IF NOT EXISTS idx_player_season_snapshots_player ON player_season_snapshots (player_id, season, as_of)",
@@ -255,12 +281,31 @@ export const SEASON_SNAPSHOT_TABLE_STATEMENTS = [
     cap_ceiling REAL NOT NULL,
     cap_committed REAL NOT NULL,
     population TEXT NOT NULL,
+    batch_id TEXT,
     created_at INTEGER NOT NULL
   )`,
   "CREATE INDEX IF NOT EXISTS idx_team_season_snapshots_team ON team_season_snapshots (team_id, season, as_of)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_player_season_snapshots_batch_member ON player_season_snapshots (batch_id, player_id) WHERE batch_id IS NOT NULL",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_team_season_snapshots_batch_member ON team_season_snapshots (batch_id, team_id) WHERE batch_id IS NOT NULL",
+];
+
+// Existing DATA-06 tables predate batch membership. These are intentionally
+// separate from the create-table fixture above: direct test setup may create a
+// current table that already has the columns, while runtime `runStatements`
+// safely ignores duplicate-column failures for deployed legacy tables.
+const SEASON_SNAPSHOT_BATCH_COMPATIBILITY_STATEMENTS = [
+  "ALTER TABLE player_season_snapshots ADD COLUMN batch_id TEXT",
+  "ALTER TABLE team_season_snapshots ADD COLUMN batch_id TEXT",
+  "CREATE INDEX IF NOT EXISTS idx_player_season_snapshots_batch ON player_season_snapshots (batch_id, player_id)",
+  "CREATE INDEX IF NOT EXISTS idx_team_season_snapshots_batch ON team_season_snapshots (batch_id, team_id)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_player_season_snapshots_batch_member ON player_season_snapshots (batch_id, player_id) WHERE batch_id IS NOT NULL",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_team_season_snapshots_batch_member ON team_season_snapshots (batch_id, team_id) WHERE batch_id IS NOT NULL",
 ];
 const seasonSnapshotTablesEnsured = new WeakMap<object, Promise<void>>();
 
 export function ensureSeasonSnapshotTables(database: Database = defaultDb): Promise<void> {
-  return memoize(seasonSnapshotTablesEnsured, database, SEASON_SNAPSHOT_TABLE_STATEMENTS);
+  return memoize(seasonSnapshotTablesEnsured, database, [
+    ...SEASON_SNAPSHOT_TABLE_STATEMENTS,
+    ...SEASON_SNAPSHOT_BATCH_COMPATIBILITY_STATEMENTS,
+  ]);
 }

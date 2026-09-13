@@ -67,7 +67,10 @@ permissions policy.
 
 Create a complete baseline migration and journal, stop swallowing arbitrary DDL
 errors, validate required production environment variables at startup, and
-document/test backup, restore, rollback, and migration procedures.
+document/test backup, restore, rollback, and migration procedures. See
+`docs/PRODUCTION_DATABASE_OPERATIONS.md`. The procedure and isolated PITR test
+are complete; verify Vercel Preview-versus-Production database-secret isolation
+before marking this launch gate complete.
 
 ## P1 — required before open beta
 
