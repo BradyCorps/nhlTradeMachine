@@ -140,13 +140,13 @@ export default function Footer() {
       <div className="mx-auto max-w-6xl">
         <div className="text-center">
           <nav aria-label="Footer" className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-2xs uppercase tracking-[0.16em] sm:tracking-[0.28em] leading-relaxed font-mono text-ledger-ink-faint">
-            <Link href="/methodology" className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-ledger-ink transition-colors md:min-h-0">Methodology</Link>
+            <Link href="/methodology" className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-ledger-ink transition-colors">Methodology</Link>
             <span aria-hidden="true">·</span>
-            <Link href="/glossary" className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-ledger-ink transition-colors md:min-h-0">Glossary</Link>
+            <Link href="/glossary" className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-ledger-ink transition-colors">Glossary</Link>
             <span aria-hidden="true">·</span>
-            <Link href="/glossary#data-sources" className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-ledger-ink transition-colors md:min-h-0">Sources</Link>
+            <Link href="/glossary#data-sources" className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-ledger-ink transition-colors">Sources</Link>
             <span aria-hidden="true">·</span>
-            <Link href="/legal" className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-ledger-ink transition-colors md:min-h-0">Legal</Link>
+            <Link href="/legal" className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-ledger-ink transition-colors">Legal</Link>
           </nav>
           <p className="mt-1 text-[10px] uppercase tracking-[0.14em] sm:tracking-[0.24em] font-mono text-ledger-rule">
             X-NAV · G-NAV · NOIV · STRAND · GM Audit

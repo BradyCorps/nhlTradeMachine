@@ -2696,6 +2696,9 @@ describe("Canary — team detail routes", () => {
     expect(page).toContain("function LinePlayerLink");
     expect(page).toContain('href={`/players/${encodeURIComponent(player.id)}`}');
     expect(page.match(/<LinePlayerLink/g)).toHaveLength(3);
+    expect(page).toContain('className="inline-flex min-h-11 items-center px-1 -mx-1');
+    expect(page).not.toContain("sm:min-h-0");
+    expect(page).not.toContain('color: "var(--ledger-ink-faint)", opacity: 0.6');
   });
 });
 
