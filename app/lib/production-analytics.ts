@@ -32,6 +32,13 @@ export type AnalyticRecordKind =
   | "research-candidate";
 export type AnalyticVersionKind = "explicit" | "implicit";
 export type AnalyticDeterminism = "fixed-inputs" | "seeded";
+export type AnalyticCalculationRole =
+  | "asset-valuation"
+  | "position-valuation"
+  | "display-aggregation"
+  | "descriptive-model"
+  | "season-simulation"
+  | "research-evidence";
 
 export type AnalyticImplementationId =
   | "calculateAssetNAV"
@@ -56,14 +63,19 @@ export type AnalyticExecutionBoundary =
 export type AnalyticFeatureFlag =
   | typeof GRAVITY_V3_DISPLAY_FEATURE_FLAG
   | typeof GRAVITY_V3_XNAV_FEATURE_FLAG
-  | typeof GRAVITY_V3_SIMULATION_FEATURE_FLAG
-  | "GRAVITY_V4_ENABLED";
+  | typeof GRAVITY_V3_SIMULATION_FEATURE_FLAG;
+
+export interface AnalyticSourceReference {
+  module: string;
+  exportName?: string;
+  detail?: string;
+}
 
 export interface AnalyticVersionIdentity {
   /** Explicit means repository evidence names a version; implicit means it does not. */
   kind: AnalyticVersionKind;
   value: string;
-  evidence: string;
+  source: AnalyticSourceReference;
 }
 
 export interface AnalyticArtifactIdentity {
@@ -75,7 +87,9 @@ export interface AnalyticArtifactIdentity {
 }
 
 export interface AnalyticFeatureFlagMetadata {
-  key: AnalyticFeatureFlag;
+  /** Present only when importing the exported key does not widen a runtime boundary. */
+  key?: AnalyticFeatureFlag;
+  source: AnalyticSourceReference;
   /** Every current analytical flag must be explicitly true to enable its channel. */
   failsClosed: true;
   scope: "display" | "xnav" | "simulation" | "diagnostic";
@@ -91,6 +105,7 @@ export interface AnalyticDefinition {
   implementation: AnalyticImplementationId;
   implementationModule: string;
   executionBoundary: AnalyticExecutionBoundary;
+  calculationRole: AnalyticCalculationRole;
   version: AnalyticVersionIdentity;
   deterministicForFixedInputs: AnalyticDeterminism;
   immediateConsumers: readonly string[];
@@ -105,12 +120,16 @@ export type ProductionAnalyticDefinition = AnalyticDefinition & {
   recordKind: "production-analytic";
 };
 
+export type ProductionPlayerValuationAnalytic = ProductionAnalyticDefinition & {
+  calculationRole: "asset-valuation" | "position-valuation";
+};
+
 /**
  * The sole typed source of truth for known production, diagnostic, and failed
  * research identities. It describes selection that remains in committed code;
  * it must not be used to dispatch a candidate implementation at runtime.
  */
-export const ANALYTIC_CATALOG: readonly AnalyticDefinition[] = [
+const ANALYTIC_CATALOG_DEFINITIONS: readonly AnalyticDefinition[] = [
   {
     id: "nav.asset",
     name: "X-NAV asset valuation",
@@ -121,7 +140,8 @@ export const ANALYTIC_CATALOG: readonly AnalyticDefinition[] = [
     implementation: "calculateAssetNAV",
     implementationModule: "app/lib/asset-nav.ts",
     executionBoundary: "calculateAssetNAV -> calcNAV",
-    version: { kind: "explicit", value: XNAV_MODEL_VERSION, evidence: "app/lib/data-context.ts" },
+    calculationRole: "asset-valuation",
+    version: { kind: "explicit", value: XNAV_MODEL_VERSION, source: { module: "app/lib/data-context.ts", exportName: "XNAV_MODEL_VERSION" } },
     deterministicForFixedInputs: "fixed-inputs",
     immediateConsumers: ["Players", "Teams", "trade evaluation", "league NAV map"],
     datasetReferencePolicy: "none-at-runtime",
@@ -136,7 +156,8 @@ export const ANALYTIC_CATALOG: readonly AnalyticDefinition[] = [
     implementation: "calcNAV.forward-dispatch",
     implementationModule: "app/lib/xnav-engine.ts",
     executionBoundary: "calcNAV position dispatch",
-    version: { kind: "explicit", value: XNAV_MODEL_VERSION, evidence: "docs/analytics/MODEL_CARD_NAV.md" },
+    calculationRole: "position-valuation",
+    version: { kind: "explicit", value: XNAV_MODEL_VERSION, source: { module: "app/lib/data-context.ts", exportName: "XNAV_MODEL_VERSION" } },
     deterministicForFixedInputs: "fixed-inputs",
     immediateConsumers: ["calcNAV", "calculateAssetNAV"],
     datasetReferencePolicy: "none-at-runtime",
@@ -151,7 +172,8 @@ export const ANALYTIC_CATALOG: readonly AnalyticDefinition[] = [
     implementation: "calcNAV.defense-dispatch",
     implementationModule: "app/lib/xnav-engine.ts",
     executionBoundary: "calcNAV position dispatch",
-    version: { kind: "explicit", value: XNAV_MODEL_VERSION, evidence: "docs/analytics/MODEL_CARD_NAV.md" },
+    calculationRole: "position-valuation",
+    version: { kind: "explicit", value: XNAV_MODEL_VERSION, source: { module: "app/lib/data-context.ts", exportName: "XNAV_MODEL_VERSION" } },
     deterministicForFixedInputs: "fixed-inputs",
     immediateConsumers: ["calcNAV", "calculateAssetNAV"],
     datasetReferencePolicy: "none-at-runtime",
@@ -166,7 +188,8 @@ export const ANALYTIC_CATALOG: readonly AnalyticDefinition[] = [
     implementation: "calcNAV.goalie-dispatch",
     implementationModule: "app/lib/xnav-engine.ts",
     executionBoundary: "calcNAV position dispatch",
-    version: { kind: "explicit", value: XNAV_MODEL_VERSION, evidence: "docs/analytics/MODEL_CARD_NAV.md" },
+    calculationRole: "position-valuation",
+    version: { kind: "explicit", value: XNAV_MODEL_VERSION, source: { module: "app/lib/data-context.ts", exportName: "XNAV_MODEL_VERSION" } },
     deterministicForFixedInputs: "fixed-inputs",
     immediateConsumers: ["calcNAV", "calculateAssetNAV"],
     datasetReferencePolicy: "none-at-runtime",
@@ -181,7 +204,8 @@ export const ANALYTIC_CATALOG: readonly AnalyticDefinition[] = [
     implementation: "rosterNavByPosition",
     implementationModule: "app/lib/team-nav-split.ts",
     executionBoundary: "rosterNavByPosition display aggregation",
-    version: { kind: "implicit", value: "committed implementation", evidence: "No independent model version exists." },
+    calculationRole: "display-aggregation",
+    version: { kind: "implicit", value: "committed implementation", source: { module: "app/lib/team-nav-split.ts", detail: "No independent model version exists." } },
     deterministicForFixedInputs: "fixed-inputs",
     immediateConsumers: ["Teams roster X-NAV chart", "season snapshot rows"],
     datasetReferencePolicy: "none-at-runtime",
@@ -196,13 +220,14 @@ export const ANALYTIC_CATALOG: readonly AnalyticDefinition[] = [
     implementation: "computeGravity.v3",
     implementationModule: "app/lib/gravity.ts",
     executionBoundary: "gravity-channels",
-    version: { kind: "explicit", value: "Gravity v3", evidence: "docs/GRAVITY_MODEL_CARD.md" },
+    calculationRole: "descriptive-model",
+    version: { kind: "explicit", value: "Gravity v3", source: { module: "docs/GRAVITY_MODEL_CARD.md", detail: "Model-card title is the authoritative named version." } },
     deterministicForFixedInputs: "fixed-inputs",
     immediateConsumers: ["player dossier", "team Gravity display", "trending display"],
     featureFlags: [
-      { key: GRAVITY_V3_DISPLAY_FEATURE_FLAG, failsClosed: true, scope: "display" },
-      { key: GRAVITY_V3_XNAV_FEATURE_FLAG, failsClosed: true, scope: "xnav" },
-      { key: GRAVITY_V3_SIMULATION_FEATURE_FLAG, failsClosed: true, scope: "simulation" },
+      { key: GRAVITY_V3_DISPLAY_FEATURE_FLAG, source: { module: "app/lib/gravity-feature-flags.ts", exportName: "GRAVITY_V3_DISPLAY_FEATURE_FLAG" }, failsClosed: true, scope: "display" },
+      { key: GRAVITY_V3_XNAV_FEATURE_FLAG, source: { module: "app/lib/gravity-feature-flags.ts", exportName: "GRAVITY_V3_XNAV_FEATURE_FLAG" }, failsClosed: true, scope: "xnav" },
+      { key: GRAVITY_V3_SIMULATION_FEATURE_FLAG, source: { module: "app/lib/gravity-feature-flags.ts", exportName: "GRAVITY_V3_SIMULATION_FEATURE_FLAG" }, failsClosed: true, scope: "simulation" },
     ],
     datasetReferencePolicy: "none-at-runtime",
   },
@@ -216,7 +241,8 @@ export const ANALYTIC_CATALOG: readonly AnalyticDefinition[] = [
     implementation: "gravity-v4.runtime-artifact",
     implementationModule: "app/lib/gravity-v4/runtime-artifact.ts",
     executionBoundary: "gravity-v4 diagnostic loader",
-    version: { kind: "explicit", value: "Gravity v4.0", evidence: "app/lib/gravity-v4/artifact-manifest.ts" },
+    calculationRole: "descriptive-model",
+    version: { kind: "implicit", value: "artifact-backed diagnostic implementation", source: { module: "app/lib/gravity-v4/artifact-manifest.ts", exportName: "GRAVITY_V4_ARTIFACT_MANIFEST", detail: "No separate exported v4 semantic-version constant exists." } },
     deterministicForFixedInputs: "fixed-inputs",
     immediateConsumers: ["player dossier diagnostic panel", "admin Gravity v4 route"],
     artifact: {
@@ -225,7 +251,9 @@ export const ANALYTIC_CATALOG: readonly AnalyticDefinition[] = [
       manifestModule: "app/lib/gravity-v4/artifact-manifest.ts",
       manifestExport: "GRAVITY_V4_ARTIFACT_MANIFEST",
     },
-    featureFlags: [{ key: "GRAVITY_V4_ENABLED", failsClosed: true, scope: "diagnostic" }],
+    // Keep this a reference rather than importing the v4 feature module: the
+    // v4 isolation contract permits runtime imports only in diagnostic paths.
+    featureFlags: [{ source: { module: "app/lib/gravity-v4/feature-flag.ts", exportName: "GRAVITY_V4_FEATURE_FLAG" }, failsClosed: true, scope: "diagnostic" }],
     datasetReferencePolicy: "none-at-runtime",
   },
   {
@@ -238,10 +266,11 @@ export const ANALYTIC_CATALOG: readonly AnalyticDefinition[] = [
     implementation: "simulateLeague",
     implementationModule: "app/api/simulate/route.ts",
     executionBoundary: "POST /api/simulate",
-    version: { kind: "implicit", value: "committed implementation", evidence: "No independent simulation version exists." },
+    calculationRole: "season-simulation",
+    version: { kind: "implicit", value: "committed implementation", source: { module: "app/api/simulate/route.ts", detail: "No independent simulation version exists." } },
     deterministicForFixedInputs: "seeded",
     immediateConsumers: ["Armchair GM", "Cup Run"],
-    featureFlags: [{ key: GRAVITY_V3_SIMULATION_FEATURE_FLAG, failsClosed: true, scope: "simulation" }],
+    featureFlags: [{ key: GRAVITY_V3_SIMULATION_FEATURE_FLAG, source: { module: "app/lib/gravity-feature-flags.ts", exportName: "GRAVITY_V3_SIMULATION_FEATURE_FLAG" }, failsClosed: true, scope: "simulation" }],
     datasetReferencePolicy: "none-at-runtime",
   },
   {
@@ -254,12 +283,55 @@ export const ANALYTIC_CATALOG: readonly AnalyticDefinition[] = [
     implementation: "nav01.phase5-research-evidence",
     implementationModule: "docs/analytics/NAV01_PHASE5_REMEDIATION.md",
     executionBoundary: "research-only no runtime boundary",
-    version: { kind: "implicit", value: "failed Phase 5 research evidence", evidence: "docs/analytics/NAV01_PHASE5_REMEDIATION.md" },
+    calculationRole: "research-evidence",
+    version: { kind: "implicit", value: "failed Phase 5 research evidence", source: { module: "docs/analytics/NAV01_PHASE5_REMEDIATION.md", detail: "Development-only spent evidence; no implementation version is authoritative." } },
     deterministicForFixedInputs: "fixed-inputs",
     immediateConsumers: [],
     datasetReferencePolicy: "candidate-requires-complete-snapshot-batch",
   },
 ];
+
+function freezeAnalyticDefinition(analytic: AnalyticDefinition): AnalyticDefinition {
+  return Object.freeze({
+    ...analytic,
+    version: Object.freeze({ ...analytic.version, source: Object.freeze({ ...analytic.version.source }) }),
+    immediateConsumers: Object.freeze([...analytic.immediateConsumers]),
+    artifact: analytic.artifact === undefined ? undefined : Object.freeze({ ...analytic.artifact }),
+    featureFlags: analytic.featureFlags === undefined
+      ? undefined
+      : Object.freeze(analytic.featureFlags.map(flag => Object.freeze({
+        ...flag,
+        source: Object.freeze({ ...flag.source }),
+      }))),
+  });
+}
+
+/** Runtime immutability prevents a consumer from altering metadata after import. */
+export const ANALYTIC_CATALOG: readonly AnalyticDefinition[] = Object.freeze(
+  ANALYTIC_CATALOG_DEFINITIONS.map(freezeAnalyticDefinition),
+);
+
+export class ProductionAnalyticCatalogError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProductionAnalyticCatalogError";
+  }
+}
+
+/** Validate catalog structure without selecting or executing any implementation. */
+export function validateAnalyticCatalog(catalog: readonly AnalyticDefinition[]): void {
+  const ids = new Set<string>();
+  for (const analytic of catalog) {
+    if (ids.has(analytic.id)) throw new ProductionAnalyticCatalogError(`Duplicate analytic ID: ${analytic.id}`);
+    ids.add(analytic.id);
+    const isProduction = analytic.lifecycle === "PRODUCTION";
+    if (isProduction !== (analytic.recordKind === "production-analytic")) {
+      throw new ProductionAnalyticCatalogError(`Lifecycle and record kind disagree for ${analytic.id}`);
+    }
+  }
+}
+
+validateAnalyticCatalog(ANALYTIC_CATALOG);
 
 export class ProductionAnalyticResolutionError extends Error {
   constructor(id: string, reason: "unknown" | "not-production") {
@@ -293,4 +365,13 @@ export function listProductionAnalytics(): readonly ProductionAnalyticDefinition
   return ANALYTIC_CATALOG.filter((analytic): analytic is ProductionAnalyticDefinition =>
     analytic.lifecycle === "PRODUCTION" && analytic.recordKind === "production-analytic",
   );
+}
+
+/** Metadata-only guard for callers that require a player/asset valuation identity. */
+export function getProductionPlayerValuationAnalytic(id: string): ProductionPlayerValuationAnalytic {
+  const analytic = getProductionAnalytic(id);
+  if (analytic.calculationRole !== "asset-valuation" && analytic.calculationRole !== "position-valuation") {
+    throw new ProductionAnalyticResolutionError(id, "not-production");
+  }
+  return analytic as ProductionPlayerValuationAnalytic;
 }

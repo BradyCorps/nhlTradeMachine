@@ -31,21 +31,47 @@ unnecessary runtime failure mode without changing what code is selected.
 ## Contract
 
 Each catalog record has a constrained stable ID, family, lifecycle, exposure,
-implementation identity, implementation module, execution boundary, honest
-version identity, determinism classification, immediate consumers, optional
-artifact identity, and fail-closed feature-flag metadata. A bundled artifact is
-identified by its artifact path plus its authoritative manifest module/export;
-the catalog does not import or duplicate the checksum/schema data.
+implementation identity, implementation module, execution boundary, calculation
+role, honest version identity, determinism classification, immediate consumers,
+optional artifact identity, and fail-closed feature-flag metadata. A bundled
+artifact is identified by its artifact path plus its authoritative manifest
+module/export; the catalog does not import or duplicate the checksum/schema
+data. Where importing an authoritative constant would breach a runtime-isolation
+boundary, the catalog records that module/export reference instead of copying
+the value (Gravity v4 is the current example).
 
 `getProductionAnalytic(id)` is a metadata-only resolver. It throws for an
 unknown ID and for every diagnostic or research record. Registration therefore
 does not imply production eligibility or promotion.
+
+`getProductionPlayerValuationAnalytic(id)` is a narrower metadata-only guard:
+it permits only asset or position valuation records. It rejects
+`nav.team-aggregation`, which remains a display aggregation of existing player
+NAV rather than a player calculator. The catalog and all nested records are
+runtime-frozen; `validateAnalyticCatalog` rejects duplicate IDs and inconsistent
+lifecycle/record-kind pairs before a catalog can be used.
 
 The catalog uses a code-backed manifest because production selection is currently
 code-, artifact-, and narrowly scoped flag-backed. There is no existing
 authoritative persistent selector to extend, and a database registry would add a
 second source of truth prematurely. There are no ordinary public-NAV database
 reads from this registry.
+
+## Source-of-truth boundary
+
+Production code is authoritative for calculation execution: its direct imports,
+function calls, artifact validation, and environment checks choose what runs.
+The catalog is authoritative only for typed analytic identity and lifecycle
+metadata. `getProductionAnalytic` validates that metadata eligibility; it does
+not return a calculator, dynamically select an implementation, or alter a
+production call path.
+
+A later approved adapter can connect promotion metadata to the canonical
+`calculateAssetNAV → calcNAV` boundary only by resolving one already-approved
+identity to the same committed implementation contract, failing closed when that
+identity is absent/non-production, and preserving rollback history. It must not
+allow a request caller or Labs candidate to supply a calculator or bypass the
+canonical boundary.
 
 ## Current identities
 
@@ -64,6 +90,18 @@ reads from this registry.
 An “implicit” version is an honest declaration that repository evidence names a
 committed implementation but no independent semantic model version. It is not a
 new invented version number.
+
+### Authority map
+
+| Metadata | Authoritative source | Catalog treatment |
+| --- | --- | --- |
+| X-NAV asset/F-NAV/D-NAV/G-NAV version | `XNAV_MODEL_VERSION` from `app/lib/data-context.ts` | Imported constant; all four records use the same value. |
+| Team aggregation identity | `app/lib/team-nav-split.ts#rosterNavByPosition` | Explicitly implicit: no independent model version exists. |
+| Gravity v3 identity and lifecycle | `docs/GRAVITY_MODEL_CARD.md`, `ANALYTICS.md`, and `gravity-channels.ts` | Documented `Gravity v3`; public-display lifecycle does not imply either value handoff is enabled. |
+| Gravity v3 flags | Exports from `app/lib/gravity-feature-flags.ts` | Imported constants, with independent fail-closed channel metadata. |
+| Gravity v4 artifact/version/flag | `GRAVITY_V4_ARTIFACT_MANIFEST` and `GRAVITY_V4_FEATURE_FLAG` | Manifest/export references only; no eager v4 import and no invented semantic version. |
+| Simulation identity/version | `app/api/simulate/route.ts#simulateLeague` and `scenarioSeed` | Explicitly implicit committed implementation; fixed request/seed is deterministic. |
+| NAV-01 Phase 5 | `docs/analytics/NAV01_PHASE5_REMEDIATION.md` | Research evidence only; spent/development-only and unresolvable as production. |
 
 ## Runtime call paths and consumers
 

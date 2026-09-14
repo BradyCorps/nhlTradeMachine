@@ -512,6 +512,18 @@ and rollback records separately. A candidate may reference only a verified
 `COMPLETE` snapshot batch ID; registration alone cannot make it production or
 displace the canonical public execution path.
 
+### 6.6 Phase 1B.1 registry-contract audit — 2026-09-14
+
+The catalog is authoritative for typed identity/lifecycle metadata only;
+production code remains authoritative for execution. `getProductionAnalytic`
+validates production eligibility without returning or selecting a calculator.
+Its companion player-valuation guard rejects display-only aggregation. Version,
+artifact, and feature-flag metadata must use exported constants where their
+runtime import is safe; otherwise they must reference the authoritative
+module/export and be explicitly implicit/metadata-only rather than duplicate a
+value. The catalog is runtime-frozen and its validator rejects duplicate IDs and
+inconsistent lifecycle records.
+
 ---
 
 # 7. Phase 2 — Refactor Admin into an operating layer
