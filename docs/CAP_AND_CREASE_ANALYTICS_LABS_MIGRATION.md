@@ -482,6 +482,28 @@ Do **not** create duplicate sources of truth.
 - existing fallbacks continue to work;
 - tests/typecheck/lint/build pass.
 
+### 7.3 Phase 2 initial Labs overview — 2026-09-14
+
+The first Admin increment is deliberately one protected, server-rendered
+`/admin/labs` overview rather than the broader operating-layer redesign above.
+It belongs beside the existing Admin data-health and season operations links,
+and adds no empty subroutes. The existing `proxy.ts` signed-session boundary
+continues to protect the page; existing `requireAdmin` protection remains the
+boundary for Admin APIs.
+
+The overview reads the Phase 1B code-backed analytic catalog and the existing
+season-snapshot inventory directly on the server. It lists only batches accepted
+by `requireCompleteSeasonSnapshotBatch`, reports legacy inventory as aggregate
+unverified counts, and never browses raw snapshot membership. It exposes no
+mutation, candidate-selection, calculation, capture, promotion, flag, or
+artifact-upload control.
+
+Later phases may add candidate, artifact, experiment, validation, promotion,
+and rollback sections beneath this overview only when their respective records
+and authorization boundaries are separately approved. Those records must not
+turn the catalog into a calculator selector or let legacy inventory serve as
+Labs provenance.
+
 ### 6.4 Phase 1A snapshot provenance amendment — 2026-09-11
 
 Phase 1A adds `season_snapshot_batches` as an additive extension of DATA-06.

@@ -62,6 +62,12 @@ export default async function AdminDashboard() {
       stat:  "Health check · Prune · Seed",
     },
     {
+      href:  "/admin/labs",
+      label: "ANALYTICS LABS",
+      desc:  "Read the production analytics registry, verified dataset provenance, and explicitly unverified legacy inventory.",
+      stat:  "Read-only registry · datasets",
+    },
+    {
       href:  "/admin/season-setup",
       label: "SEASON SETUP",
       desc:  "Configure the next season, manage the FA class, and run the rollover checklist. One place for everything that changes each September.",

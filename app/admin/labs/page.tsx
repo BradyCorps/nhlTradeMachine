@@ -1,0 +1,64 @@
+import { db } from "@/app/db/client";
+import { ANALYTIC_CATALOG } from "@/app/lib/production-analytics";
+import {
+  requireCompleteSeasonSnapshotBatch,
+  seasonSnapshotBatchInventory,
+  seasonSnapshotInventory,
+  type SeasonSnapshotBatch,
+} from "@/app/lib/season-snapshot";
+import LabsOverview, { type LabsOverviewData } from "./LabsOverview";
+
+export const dynamic = "force-dynamic";
+
+async function readVerifiedBatches(batches: readonly SeasonSnapshotBatch[]): Promise<{
+  batches: SeasonSnapshotBatch[];
+  state: LabsOverviewData["snapshotState"];
+}> {
+  const complete = batches.filter(batch => batch.status === "COMPLETE");
+  const verified: SeasonSnapshotBatch[] = [];
+  let state: LabsOverviewData["snapshotState"] = "available";
+
+  for (const batch of complete) {
+    try {
+      verified.push(await requireCompleteSeasonSnapshotBatch(db, batch.id));
+    } catch {
+      // A row labelled COMPLETE is not enough for Labs eligibility. Preserve
+      // that distinction in the overview without exposing raw membership.
+      state = "attention";
+    }
+  }
+
+  return { batches: verified, state };
+}
+
+async function readLabsOverview(): Promise<LabsOverviewData> {
+  try {
+    const [batchInventory, legacyInventory] = await Promise.all([
+      seasonSnapshotBatchInventory(db),
+      seasonSnapshotInventory(db, { unbatchedOnly: true }),
+    ]);
+    const verified = await readVerifiedBatches(batchInventory);
+    const legacy = legacyInventory.reduce((total, inventory) => ({
+      players: total.players + inventory.players,
+      teams: total.teams + inventory.teams,
+    }), { players: 0, teams: 0 });
+
+    return {
+      analytics: ANALYTIC_CATALOG,
+      verifiedBatches: verified.batches,
+      legacyInventory: legacy,
+      snapshotState: verified.state,
+    };
+  } catch {
+    return {
+      analytics: ANALYTIC_CATALOG,
+      verifiedBatches: [],
+      legacyInventory: { players: 0, teams: 0 },
+      snapshotState: "unavailable",
+    };
+  }
+}
+
+export default async function AdminLabsPage() {
+  return <LabsOverview {...await readLabsOverview()} />;
+}

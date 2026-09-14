@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
+import { NextRequest } from "next/server";
+import { proxy } from "../proxy";
 import {
   ADMIN_SESSION_COOKIE,
   createAdminSessionValue,
@@ -78,5 +80,27 @@ describe("admin auth", () => {
       expect(src, route).toContain('import { requireAdmin } from "@/app/lib/admin-auth"');
       expect(src.match(/await requireAdmin\(req\)/g)?.length ?? 0, route).toBe(handlerCount);
     }
+  });
+
+  it("redirects an unauthenticated Analytics Labs page through the signed admin-session boundary", async () => {
+    process.env.ADMIN_KEY = "shared-admin-secret";
+    delete process.env.ADMIN_PASSWORD;
+    delete process.env.ADMIN_DISABLE_AUTH;
+
+    const response = await proxy(new NextRequest("https://example.com/admin/labs"));
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("https://example.com/admin/login?next=%2Fadmin%2Flabs");
+  });
+
+  it("allows Analytics Labs through the proxy only with a valid signed admin session", async () => {
+    process.env.ADMIN_KEY = "shared-admin-secret";
+    delete process.env.ADMIN_PASSWORD;
+    delete process.env.ADMIN_DISABLE_AUTH;
+
+    const session = await createAdminSessionValue(Date.now());
+    const response = await proxy(new NextRequest("https://example.com/admin/labs", {
+      headers: { cookie: `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(session)}` },
+    }));
+    expect(response.headers.get("x-middleware-next")).toBe("1");
   });
 });
