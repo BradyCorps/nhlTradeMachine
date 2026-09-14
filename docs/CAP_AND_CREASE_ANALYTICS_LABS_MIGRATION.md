@@ -492,6 +492,38 @@ batch. Before Phase 1B or Phase 4 relies on snapshot provenance, perform and
 inspect an authenticated capture against the production-compatible cached
 roster path; no automatic capture was authorized in this phase.
 
+### 6.5 Phase 1B production-identity amendment — 2026-09-13
+
+The first registry increment is a typed, code-backed catalog at
+`app/lib/production-analytics.ts`, documented in
+`docs/analytics/PRODUCTION_ANALYTICS_REGISTRY.md`. It is the one source of
+truth for the *identity metadata* of existing production, diagnostic, and failed
+research analytics; it is not a database registry or production-dispatch
+framework.
+
+The public raw-asset boundary remains `calculateAssetNAV → calcNAV`. The catalog
+does not select a candidate, call a calculator, read a snapshot batch, or change
+feature-flag behavior. Unknown, diagnostic, and research records fail closed
+when asked for a production identity. Gravity v4 remains diagnostic and
+flag-controlled; NAV-01 failed calibration evidence remains research-only.
+
+Future Phase 2 work must introduce candidate, artifact, validation, promotion,
+and rollback records separately. A candidate may reference only a verified
+`COMPLETE` snapshot batch ID; registration alone cannot make it production or
+displace the canonical public execution path.
+
+### 6.6 Phase 1B.1 registry-contract audit — 2026-09-14
+
+The catalog is authoritative for typed identity/lifecycle metadata only;
+production code remains authoritative for execution. `getProductionAnalytic`
+validates production eligibility without returning or selecting a calculator.
+Its companion player-valuation guard rejects display-only aggregation. Version,
+artifact, and feature-flag metadata must use exported constants where their
+runtime import is safe; otherwise they must reference the authoritative
+module/export and be explicitly implicit/metadata-only rather than duplicate a
+value. The catalog is runtime-frozen and its validator rejects duplicate IDs and
+inconsistent lifecycle records.
+
 ---
 
 # 7. Phase 2 — Refactor Admin into an operating layer

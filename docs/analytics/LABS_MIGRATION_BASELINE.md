@@ -82,6 +82,23 @@ baseline records code-level behavior, not an unverifiable deployment claim:
 
 ## Architecture discrepancies and amendments for later phases
 
+### Phase 1B production-identity amendment — 2026-09-13
+
+`app/lib/production-analytics.ts#ANALYTIC_CATALOG` is now the single typed,
+code-backed source of truth for the known production, diagnostic, and failed
+research analytic identities. Its contract is documented in
+`PRODUCTION_ANALYTICS_REGISTRY.md`. It describes the current committed-code
+selection; it does not calculate, dynamically dispatch, promote, or read an
+analytic implementation. In particular, public NAV remains
+`calculateAssetNAV → calcNAV`, and the catalog is intentionally not wired into
+that path. No database-backed registry is justified while code/flags/artifacts
+remain the existing authoritative production selectors.
+
+Only a future Labs candidate may carry a verified `COMPLETE` snapshot batch ID.
+No catalog record carries a runtime batch reference; the Phase 1A batch does not
+alter live valuation. Gravity v4 remains diagnostic/flag-controlled and NAV-01
+Phase 5 remains failed research evidence.
+
 1. **Start from the existing canonical boundary, not a new `lib/analytics/`
    tree.** Phase 1 should retain `calculateAssetNAV` as the public NAV choke
    point and put a production selector behind it only after a behavior-preserving
