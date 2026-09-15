@@ -404,10 +404,157 @@ input[type="range"] { accent-color: var(--red); }
   min-width: max-content;
 }
 
+/* ── Analytics Labs overview ───────────────────────────────── */
+.admin-labs-shell {
+  max-width: 1120px;
+}
+
+.admin-labs-status-grid,
+.admin-labs-analytics-grid,
+.admin-labs-dataset-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-labs-status-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-labs-analytics-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-labs-dataset-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-labs-card {
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--ledger-ink);
+  padding: 18px 20px;
+  min-width: 0;
+}
+
+.admin-labs-status-card {
+  background: var(--paper);
+}
+
+.admin-labs-status-value {
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+}
+
+.admin-labs-kicker,
+.admin-labs-meta dt {
+  color: var(--ledger-ink-faint);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.admin-labs-kicker {
+  margin-bottom: 6px;
+}
+
+.admin-labs-copy,
+.admin-labs-meta dd {
+  color: var(--ledger-ink-faint);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.admin-labs-copy {
+  margin: 8px 0 0;
+}
+
+.admin-labs-heading {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.admin-labs-id,
+.admin-labs-safe-text {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.admin-labs-id {
+  color: var(--ledger-ink-faint);
+  font-size: 10px;
+  line-height: 1.5;
+  margin: 6px 0 0;
+}
+
+.admin-labs-badge {
+  align-items: center;
+  border: 1px solid currentColor;
+  display: inline-flex;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1.25;
+  margin-top: 10px;
+  padding: 4px 6px;
+  text-transform: uppercase;
+}
+
+.admin-labs-badge-production { color: #1a5c2e; }
+.admin-labs-badge-diagnostic { color: #8a5a00; }
+.admin-labs-badge-research { color: #8b2e2e; }
+.admin-labs-badge-complete { color: #1a5c2e; }
+.admin-labs-badge-warning { color: #8b2e2e; }
+
+.admin-labs-meta {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+}
+
+.admin-labs-meta div {
+  border-top: 1px solid var(--rule);
+  padding-top: 8px;
+}
+
+.admin-labs-meta dt,
+.admin-labs-meta dd {
+  margin: 0;
+}
+
+.admin-labs-meta dd {
+  color: var(--ledger-ink);
+  margin-top: 3px;
+}
+
+.admin-labs-section {
+  border-top: 1px solid var(--rule);
+  margin-top: 30px;
+  padding-top: 24px;
+}
+
+.admin-labs-section-title {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  margin: 0;
+}
+
+.admin-labs-section-copy {
+  color: var(--ledger-ink-faint);
+  font-size: 11px;
+  line-height: 1.65;
+  margin: 7px 0 16px;
+}
+
 @media (max-width: 639px) {
   .admin-nav {
     height: auto !important;
-    min-height: 42px;
+    min-height: 44px;
     padding: 7px 12px !important;
     flex-wrap: wrap;
     align-items: stretch !important;
@@ -434,7 +581,7 @@ input[type="range"] { accent-color: var(--red); }
   }
 
   .admin-nav-link {
-    min-height: 30px;
+    min-height: 44px;
     flex: 0 0 auto;
     padding: 0 9px !important;
   }
@@ -442,7 +589,7 @@ input[type="range"] { accent-color: var(--red); }
   .admin-nav-home {
     order: 1;
     margin-left: auto;
-    min-height: 24px;
+    min-height: 44px;
     display: flex;
     align-items: center;
   }
@@ -477,6 +624,9 @@ input[type="range"] { accent-color: var(--red); }
 
   .admin-dashboard-stats,
   .admin-dashboard-cards,
+  .admin-labs-status-grid,
+  .admin-labs-analytics-grid,
+  .admin-labs-dataset-grid,
   .admin-settings-cap-grid,
   .admin-trades-meta-grid,
   .admin-trades-sides-grid,

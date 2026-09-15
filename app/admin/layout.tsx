@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { href: "/admin/trades",        label: "TRADES"      },
   { href: "/admin/draft-picks",   label: "PICKS"       },
   { href: "/admin/health",        label: "DATA HEALTH" },
+  { href: "/admin/labs",          label: "ANALYTICS LABS" },
   { href: "/admin/season-setup",  label: "SEASON"      },
   { href: "/admin/settings",      label: "SETTINGS"    },
 ];
@@ -21,7 +22,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         padding: "0 24px",
         display: "flex",
         alignItems: "center",
-        height: 42,
+        height: 44,
         position: "sticky",
         top: 0,
         zIndex: 50,
@@ -71,12 +72,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             textDecoration: "none",
             letterSpacing: "0.18em",
             whiteSpace: "nowrap",
+            minHeight: 44,
+            display: "flex",
+            alignItems: "center",
           }}
         >
           ← HOME
         </Link>
       </nav>
-      <div style={{ minHeight: "calc(100vh - 42px)", background: "var(--paper)" }}>{children}</div>
+      <div style={{ minHeight: "calc(100vh - 44px)", background: "var(--paper)" }}>{children}</div>
     </>
   );
 }
