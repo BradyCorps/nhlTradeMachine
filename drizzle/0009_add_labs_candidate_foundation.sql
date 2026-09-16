@@ -23,6 +23,8 @@ CREATE INDEX IF NOT EXISTS idx_labs_candidates_target ON labs_candidates (target
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_labs_candidates_dataset ON labs_candidates (dataset_batch_id);
 --> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_labs_candidates_created ON labs_candidates (created_at DESC, id);
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS labs_artifacts (
   id TEXT PRIMARY KEY NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('implementation', 'fitted-model', 'configuration', 'report')),

@@ -545,6 +545,15 @@ artifact and lifecycle-event update/delete triggers preserve immutability and
 append-only history. No Phase 3 UI or API writes candidates, artifacts, or
 events.
 
+Database enforcement is intentionally limited to durable relational facts:
+primary/unique candidate, artifact, association, and event identities; digest
+and enum checks; restrictive foreign keys; immutable artifact and lifecycle
+update/delete triggers; and stable candidate ID/revision triggers. The
+server-only read boundary—not a database trigger—validates catalog eligibility,
+COMPLETE-batch provenance, the full lifecycle transition chain, and derived
+current status. Phase 3 has no write service, so no documentation claims that
+those semantic transition rules are database-enforced.
+
 The protected `/admin/labs` overview gains a read-only Candidates section with
 an honest empty/unavailable state and provenance summaries. It contains no
 create, edit, run, validate, approve, promote, activate, rollback, delete, or

@@ -8,6 +8,7 @@ import * as schema from "@/app/db/schema";
 import { SEASON_SNAPSHOT_TABLE_STATEMENTS } from "@/app/db/ensure-schema";
 import {
   LabsCandidateIntegrityError,
+  MAX_LABS_CANDIDATE_OVERVIEW,
   getLabCandidate,
   isCandidateProductionResolvable,
   listLabCandidates,
@@ -176,6 +177,25 @@ describe("Phase 3 Analytics Labs candidate foundation", () => {
     expect(validateCandidateLifecycleHistory("candidate.lifecycle.v1", history)).toBe("REGISTERED");
     expect(() => validateCandidateLifecycleHistory("candidate.lifecycle.v1", [{ ...history[0], resultingStatus: "REGISTERED" }])).toThrow(/must begin/);
     expect(() => validateCandidateLifecycleHistory("candidate.lifecycle.v1", [{ ...history[0] }, { ...history[1], previousStatus: "REGISTERED" }])).toThrow(/incoherent/);
+    expect(validateCandidateLifecycleHistory("candidate.lifecycle.v1", [
+      history[0],
+      { ...history[1], id: "event.lifecycle.retired-from-draft", eventType: "RETIRED", previousStatus: "DRAFT", resultingStatus: "RETIRED" },
+    ])).toBe("RETIRED");
+    expect(validateCandidateLifecycleHistory("candidate.lifecycle.v1", [
+      ...history,
+      { ...history[1], id: "event.lifecycle.retired-from-registered", sequence: 3, eventType: "RETIRED", previousStatus: "REGISTERED", resultingStatus: "RETIRED" },
+    ])).toBe("RETIRED");
+    expect(() => validateCandidateLifecycleHistory("candidate.lifecycle.v1", [
+      ...history,
+      { ...history[1], id: "event.lifecycle.reactivate", sequence: 3, eventType: "REGISTERED", previousStatus: "RETIRED", resultingStatus: "REGISTERED" },
+    ])).toThrow(/incoherent/);
+    expect(() => validateCandidateLifecycleHistory("candidate.lifecycle.v1", [
+      ...history,
+      { ...history[0], id: "event.lifecycle.duplicate-initial", sequence: 3 },
+    ])).toThrow(/cannot repeat/);
+    expect(() => validateCandidateLifecycleHistory("candidate.lifecycle.v1", [
+      { ...history[0], resultingStatus: "PUBLIC" as never },
+    ])).toThrow(/unknown resulting status/);
   });
 
   it("rejects missing, legacy-shaped, and non-COMPLETE dataset references", async () => {
@@ -214,6 +234,35 @@ describe("Phase 3 Analytics Labs candidate foundation", () => {
     await expect(db.run(sql.raw("UPDATE labs_candidates SET revision = 'rewritten-v2' WHERE id = 'candidate.nav-defense.role-aware.v1'"))).rejects.toThrow();
     await expect(db.run(sql.raw("UPDATE labs_artifacts SET media_type = 'text/plain' WHERE id = 'artifact.role-aware-defense-nav.v1'"))).rejects.toThrow();
     await expect(db.run(sql.raw("DELETE FROM labs_candidate_lifecycle_events WHERE id = 'event.role-aware-defense-nav.draft'"))).rejects.toThrow();
+  });
+
+  it("fails closed for corrupt public exposure and a bounded candidate overview", async () => {
+    await db.run(sql.raw("PRAGMA ignore_check_constraints = ON"));
+    await seedCandidate(db, { candidate: { exposure: "public" as never }, artifact: false });
+    await db.run(sql.raw("PRAGMA ignore_check_constraints = OFF"));
+    await expect(listLabCandidates(db)).rejects.toThrow(/invalid exposure/);
+
+    db = await fixtureDb();
+    const candidates = Array.from({ length: MAX_LABS_CANDIDATE_OVERVIEW + 1 }, (_, index) => candidateRow({
+      id: `candidate.bulk-${index}`,
+      revision: `bulk-${index}`,
+    }));
+    await db.insert(schema.labsCandidates).values(candidates);
+    await db.insert(schema.labsCandidateLifecycleEvents).values(candidates.map((candidate, index) => ({
+      id: `event.bulk-${index}`,
+      candidateId: candidate.id,
+      sequence: 1,
+      eventType: "DRAFT_CREATED",
+      previousStatus: null,
+      resultingStatus: "DRAFT",
+      occurredAt: candidate.createdAt,
+      actor: "test-admin",
+      source: "isolated-test",
+      note: null,
+      evidenceReference: null,
+      metadataSchemaVersion: 1,
+    })));
+    await expect(listLabCandidates(db)).rejects.toThrow(/safety limit/);
   });
 
   it("keeps candidate reads out of production resolution and exposes no Labs mutation route", async () => {

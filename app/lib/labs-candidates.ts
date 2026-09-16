@@ -5,6 +5,12 @@
 // selects a calculator, evaluates a model, or changes production state.
 
 import {
+  asc,
+  desc,
+  eq,
+  inArray,
+} from "drizzle-orm";
+import {
   labsArtifacts,
   labsCandidateArtifacts,
   labsCandidateLifecycleEvents,
@@ -20,6 +26,9 @@ import {
 } from "@/app/lib/season-snapshot";
 
 export const LABS_METADATA_SCHEMA_VERSION = 1 as const;
+export const MAX_LABS_CANDIDATE_OVERVIEW = 100;
+const MAX_LABS_CANDIDATE_ARTIFACT_REFERENCES = 500;
+const MAX_LABS_CANDIDATE_LIFECYCLE_EVENTS = 1_000;
 
 export const CANDIDATE_LIFECYCLE_STATUSES = ["DRAFT", "REGISTERED", "RETIRED"] as const;
 export type CandidateLifecycleStatus = typeof CANDIDATE_LIFECYCLE_STATUSES[number];
@@ -275,13 +284,44 @@ function freezeCandidate(candidate: Omit<LabCandidate, "productionResolvable">):
  * Server-only read boundary. Any missing artifact, incoherent history, unknown
  * catalog identity, or non-COMPLETE dataset causes the record to fail closed.
  */
-export async function listLabCandidates(db: LabsReadDb): Promise<readonly LabCandidate[]> {
-  const [candidateRows, artifactRows, attachmentRows, eventRows] = await Promise.all([
-    db.select().from(labsCandidates),
-    db.select().from(labsArtifacts),
-    db.select().from(labsCandidateArtifacts),
-    db.select().from(labsCandidateLifecycleEvents),
+async function readLabCandidates(db: LabsReadDb, candidateId?: string): Promise<readonly LabCandidate[]> {
+  const candidateRows = candidateId
+    ? await db.select().from(labsCandidates).where(eq(labsCandidates.id, candidateId))
+    : await db.select()
+      .from(labsCandidates)
+      .orderBy(desc(labsCandidates.createdAt), asc(labsCandidates.id))
+      .limit(MAX_LABS_CANDIDATE_OVERVIEW + 1);
+  if (!candidateId && candidateRows.length > MAX_LABS_CANDIDATE_OVERVIEW) {
+    throw new LabsCandidateIntegrityError(`Candidate overview exceeds its ${MAX_LABS_CANDIDATE_OVERVIEW}-record safety limit.`);
+  }
+  if (candidateRows.length === 0) return Object.freeze([]);
+
+  const candidateIds = candidateRows.map((row: typeof labsCandidates.$inferSelect) => row.id);
+  const [attachmentRows, eventRows] = await Promise.all([
+    db.select()
+      .from(labsCandidateArtifacts)
+      .where(inArray(labsCandidateArtifacts.candidateId, candidateIds))
+      .orderBy(asc(labsCandidateArtifacts.candidateId), asc(labsCandidateArtifacts.artifactId))
+      .limit(MAX_LABS_CANDIDATE_ARTIFACT_REFERENCES + 1),
+    db.select()
+      .from(labsCandidateLifecycleEvents)
+      .where(inArray(labsCandidateLifecycleEvents.candidateId, candidateIds))
+      .orderBy(asc(labsCandidateLifecycleEvents.candidateId), asc(labsCandidateLifecycleEvents.sequence))
+      .limit(MAX_LABS_CANDIDATE_LIFECYCLE_EVENTS + 1),
   ]);
+  if (attachmentRows.length > MAX_LABS_CANDIDATE_ARTIFACT_REFERENCES) {
+    throw new LabsCandidateIntegrityError("Candidate artifact inventory exceeds the read safety limit.");
+  }
+  if (eventRows.length > MAX_LABS_CANDIDATE_LIFECYCLE_EVENTS) {
+    throw new LabsCandidateIntegrityError("Candidate lifecycle inventory exceeds the read safety limit.");
+  }
+  const artifactIds = [...new Set((attachmentRows as Array<typeof labsCandidateArtifacts.$inferSelect>).map(row => row.artifactId))];
+  const artifactRows = artifactIds.length === 0
+    ? []
+    : await db.select().from(labsArtifacts).where(inArray(labsArtifacts.id, artifactIds)).limit(MAX_LABS_CANDIDATE_ARTIFACT_REFERENCES + 1);
+  if (artifactRows.length > MAX_LABS_CANDIDATE_ARTIFACT_REFERENCES) {
+    throw new LabsCandidateIntegrityError("Candidate artifact metadata exceeds the read safety limit.");
+  }
   const artifactsById = new Map<string, LabArtifactDefinition>(
     (artifactRows as Array<typeof labsArtifacts.$inferSelect>).map(row => [row.id, asArtifact(row)]),
   );
@@ -339,9 +379,13 @@ export async function listLabCandidates(db: LabsReadDb): Promise<readonly LabCan
   return Object.freeze(candidates.sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id)));
 }
 
+export async function listLabCandidates(db: LabsReadDb): Promise<readonly LabCandidate[]> {
+  return readLabCandidates(db);
+}
+
 export async function getLabCandidate(db: LabsReadDb, candidateId: string): Promise<LabCandidate> {
   assertStableId("Candidate ID", candidateId);
-  const candidates = await listLabCandidates(db);
+  const candidates = await readLabCandidates(db, candidateId);
   const candidate = candidates.find(record => record.id === candidateId);
   if (!candidate) throw new LabsCandidateIntegrityError(`Unknown Labs candidate: ${candidateId}.`);
   return candidate;
