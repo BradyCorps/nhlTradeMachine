@@ -63,19 +63,21 @@ and deploy/redeploy the selected application revision. Do not overwrite the
 original production database. Retain it until the recovered deployment passes
 read-only health and data checks.
 
-## Journaled Phase 1A migrations
+## Journaled snapshot and Labs migrations
 
 `drizzle/meta/_journal.json` is the authoritative Drizzle journal for the
-Phase 1A migration baseline. It contains exactly:
+snapshot and Labs migration baseline. It contains, in order:
 
 1. `0006_add_season_snapshots`
 2. `0007_add_season_snapshot_batches`
 3. `0008_add_snapshot_batch_member_uniqueness`
+4. `0009_add_labs_candidate_foundation`
 
 Earlier repository SQL files predate the controlled journal and are not
 retroactively replayed. `0006` is idempotent against the pre-existing legacy
-snapshot tables; `0007` and `0008` are applied only when their journal hashes
-are absent. An unknown database journal hash is a hard stop rather than a
+snapshot tables; each later journaled migration, including `0007`, `0008`, and
+`0009`, is applied only when its journal hash is absent. An unknown database
+journal hash is a hard stop rather than a
 best-effort repair.
 
 `npm run db:push` is unsuitable for production: it reconciles a schema instead
@@ -141,6 +143,41 @@ the additive schema manually. If database recovery is required, use the new
 PITR database procedure above and point the approved production deployment at
 the verified recovery copy. If neither option is safe, stop and escalate rather
 than editing snapshot rows or issuing ad-hoc DDL.
+
+## Phase 3 candidate-foundation rollout
+
+Vercel's Git deployment builds the application (`next build`) but does not run
+Drizzle migrations. The Labs overview is dynamically rendered and reads the
+Labs tables only at authenticated request time. Old application revisions do
+not query those tables, so `0009` is backward-compatible. Deploying the Phase
+3 application before `0009` intentionally shows an unavailable candidate
+inventory rather than treating a missing table as an empty inventory; it is not
+the approved rollout order.
+
+Before the first Phase 3 production registration, use this order:
+
+1. Verify the reviewed PR head and read-only status: production must have only
+   `0009_add_labs_candidate_foundation` pending.
+2. Create a fresh, independently readable PITR recovery database immediately
+   before the maintenance window. Record its UTC restore timestamp, source
+   database identity, migration journal, aggregate legacy and verified snapshot
+   counts, and snapshot identity fingerprint. Verify that it includes the
+   current COMPLETE batch before proceeding.
+3. Apply the journaled migration once through the explicit production command;
+   never use `db:push` or ad-hoc SQL.
+4. Run `MIGRATION_TARGET=production npm run db:verify-labs-candidate-schema`.
+   It fails closed on a pending migration, missing Labs table/index/trigger, or
+   foreign-key violation and reports only aggregate snapshot counts plus an
+   identity fingerprint. Before any future write phase, all four Labs-table
+   counts must be zero.
+5. Compare the recorded snapshot counts and fingerprint to the recovery-point
+   evidence, merge the reviewed PR, and let Vercel deploy the resulting main
+   commit. Then verify the authenticated `/admin/labs` page and public health.
+
+The retained `hockey-ledger-db-phase1a4a-recovery-20260912t235530z` recovery
+database predates the verified 2025-26 capture and is therefore not a sufficient
+Phase 3 rollback point. Retain it, but create and verify a new recovery target
+under separately authorized production maintenance before applying `0009`.
 
 ## Vercel Git deployment procedure
 

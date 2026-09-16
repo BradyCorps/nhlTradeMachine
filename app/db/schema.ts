@@ -223,3 +223,67 @@ export const seasonSnapshotBatches = sqliteTable("season_snapshot_batches", {
   completedAt:          integer("completed_at"),
   failureReason:        text("failure_reason"),
 });
+
+// ── Analytics Labs candidate provenance (Phase 3) ──────────────────────────
+// These records describe proposed work only. They are deliberately separate
+// from the code-backed production analytics catalog and never select runtime
+// implementation, flags, or public calculation behaviour.
+export const labsCandidates = sqliteTable("labs_candidates", {
+  id:                       text("id").primaryKey(),
+  targetAnalyticId:         text("target_analytic_id").notNull(),
+  name:                     text("name").notNull(),
+  revision:                 text("revision").notNull(),
+  implementationIdentity:   text("implementation_identity").notNull(),
+  baseAnalyticVersion:      text("base_analytic_version").notNull(),
+  baseImplementationIdentity: text("base_implementation_identity").notNull(),
+  exposure:                 text("exposure").notNull(), // internal | research
+  datasetBatchId:           text("dataset_batch_id").notNull().references(() => seasonSnapshotBatches.id),
+  description:              text("description"),
+  hypothesis:               text("hypothesis"),
+  schemaVersion:            integer("schema_version").notNull(),
+  createdAt:                integer("created_at").notNull(),
+  createdBy:                text("created_by").notNull(),
+  createdSource:            text("created_source").notNull(),
+});
+
+export const labsArtifacts = sqliteTable("labs_artifacts", {
+  id:                     text("id").primaryKey(),
+  kind:                   text("kind").notNull(), // implementation | fitted-model | configuration | report
+  contentDigest:          text("content_digest").notNull(), // lowercase SHA-256
+  implementationIdentity: text("implementation_identity").notNull(),
+  mediaType:              text("media_type").notNull(),
+  artifactSchemaVersion:  text("artifact_schema_version").notNull(),
+  repositoryCommit:       text("repository_commit"),
+  repositoryPath:         text("repository_path"),
+  immutableReference:     text("immutable_reference"),
+  byteSize:               integer("byte_size"),
+  metadataSchemaVersion:  integer("metadata_schema_version").notNull(),
+  createdAt:              integer("created_at").notNull(),
+  createdBy:              text("created_by").notNull(),
+  createdSource:          text("created_source").notNull(),
+});
+
+export const labsCandidateArtifacts = sqliteTable("labs_candidate_artifacts", {
+  candidateId: text("candidate_id").notNull().references(() => labsCandidates.id),
+  artifactId:  text("artifact_id").notNull().references(() => labsArtifacts.id),
+  role:        text("role").notNull(),
+  attachedAt:  integer("attached_at").notNull(),
+  attachedBy:  text("attached_by").notNull(),
+});
+
+// The sequence, rather than a timestamp, defines historical ordering. Events
+// are append-only; the current candidate lifecycle is derived from this chain.
+export const labsCandidateLifecycleEvents = sqliteTable("labs_candidate_lifecycle_events", {
+  id:              text("id").primaryKey(),
+  candidateId:     text("candidate_id").notNull().references(() => labsCandidates.id),
+  sequence:        integer("sequence").notNull(),
+  eventType:       text("event_type").notNull(),
+  previousStatus:  text("previous_status"),
+  resultingStatus: text("resulting_status").notNull(),
+  occurredAt:      integer("occurred_at").notNull(),
+  actor:           text("actor").notNull(),
+  source:          text("source").notNull(),
+  note:            text("note"),
+  evidenceReference: text("evidence_reference"),
+  metadataSchemaVersion: integer("metadata_schema_version").notNull(),
+});

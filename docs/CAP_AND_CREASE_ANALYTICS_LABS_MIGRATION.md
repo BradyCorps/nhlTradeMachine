@@ -504,6 +504,63 @@ and authorization boundaries are separately approved. Those records must not
 turn the catalog into a calculator selector or let legacy inventory serve as
 Labs provenance.
 
+### 7.4 Phase 3 candidate, artifact, and lifecycle-history foundation — 2026-09-15
+
+Phase 3 adds a deliberately narrow, persistent provenance boundary for future
+Labs work. A production analytic remains an existing identity described by the
+code-backed Phase 1B catalog. A **candidate** is a non-public proposal that
+challenges one catalog identity; it is never a production implementation merely
+because it is registered. A **dataset reference** is always a verified
+`COMPLETE` snapshot batch ID. An **artifact** is immutable metadata identifying
+code, fitted output, configuration, or a report; this phase does not upload,
+download, import, or execute it. A **lifecycle event** is an append-only fact
+about a candidate. Validation results, experiment runs, promotion, and rollback
+remain deferred.
+
+The additive `0009_add_labs_candidate_foundation.sql` migration introduces four
+tables with restrictive foreign keys and no production-selection column:
+
+```text
+season_snapshot_batches (existing COMPLETE provenance)
+          │
+          └──< labs_candidates ──< labs_candidate_lifecycle_events
+                    │                       (append-only, sequence ordered)
+                    └──< labs_candidate_artifacts >── labs_artifacts
+                                                       (immutable SHA-256 metadata)
+```
+
+The database does not duplicate the production catalog: candidate target IDs
+are validated through the narrow server-side domain boundary. Candidate reads
+validate that the target is known and not display-only/research-only, that the
+dataset passes `requireCompleteSeasonSnapshotBatch`, that artifact metadata has
+an immutable digest/reference, and that the lifecycle chain is coherent. Gravity
+v4 may be a diagnostic research target, but every Phase 3 candidate has only
+`internal` or `research` exposure and is explicitly non-production-resolvable.
+
+Initial lifecycle states are `DRAFT`, `REGISTERED`, and `RETIRED`. The first
+event must be `DRAFT_CREATED` (`null → DRAFT`); only `DRAFT → REGISTERED` and
+`DRAFT|REGISTERED → RETIRED` transitions are valid. Sequence, not timestamps,
+defines ordering. The current status is derived from the latest valid event;
+artifact and lifecycle-event update/delete triggers preserve immutability and
+append-only history. No Phase 3 UI or API writes candidates, artifacts, or
+events.
+
+Database enforcement is intentionally limited to durable relational facts:
+primary/unique candidate, artifact, association, and event identities; digest
+and enum checks; restrictive foreign keys; immutable artifact and lifecycle
+update/delete triggers; and stable candidate ID/revision triggers. The
+server-only read boundary—not a database trigger—validates catalog eligibility,
+COMPLETE-batch provenance, the full lifecycle transition chain, and derived
+current status. Phase 3 has no write service, so no documentation claims that
+those semantic transition rules are database-enforced.
+
+The protected `/admin/labs` overview gains a read-only Candidates section with
+an honest empty/unavailable state and provenance summaries. It contains no
+create, edit, run, validate, approve, promote, activate, rollback, delete, or
+feature-flag controls. Phase 4 may add evaluation-run and validation-evidence
+records against these stable identities without changing candidate identity or
+the canonical `calculateAssetNAV → calcNAV` production boundary.
+
 ### 6.4 Phase 1A snapshot provenance amendment — 2026-09-11
 
 Phase 1A adds `season_snapshot_batches` as an additive extension of DATA-06.
