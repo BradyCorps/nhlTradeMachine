@@ -1,4 +1,5 @@
 import { db } from "@/app/db/client";
+import { listLabCandidates } from "@/app/lib/labs-candidates";
 import { ANALYTIC_CATALOG } from "@/app/lib/production-analytics";
 import {
   requireCompleteSeasonSnapshotBatch,
@@ -32,6 +33,7 @@ async function readVerifiedBatches(batches: readonly SeasonSnapshotBatch[]): Pro
 }
 
 async function readLabsOverview(): Promise<LabsOverviewData> {
+  const candidateInventory = await readCandidateInventory();
   try {
     const [batchInventory, legacyInventory] = await Promise.all([
       seasonSnapshotBatchInventory(db),
@@ -48,6 +50,7 @@ async function readLabsOverview(): Promise<LabsOverviewData> {
       verifiedBatches: verified.batches,
       legacyInventory: legacy,
       snapshotState: verified.state,
+      ...candidateInventory,
     };
   } catch {
     return {
@@ -55,7 +58,18 @@ async function readLabsOverview(): Promise<LabsOverviewData> {
       verifiedBatches: [],
       legacyInventory: { players: 0, teams: 0 },
       snapshotState: "unavailable",
+      ...candidateInventory,
     };
+  }
+}
+
+async function readCandidateInventory(): Promise<Pick<LabsOverviewData, "candidates" | "candidateState">> {
+  try {
+    return { candidates: await listLabCandidates(db), candidateState: "available" };
+  } catch {
+    // Missing, incoherent, or non-COMPLETE provenance must never become a
+    // selectable candidate. Preserve an explicit read-only unavailable state.
+    return { candidates: [], candidateState: "unavailable" };
   }
 }
 

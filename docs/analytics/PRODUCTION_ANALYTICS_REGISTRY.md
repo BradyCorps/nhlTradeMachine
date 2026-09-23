@@ -131,6 +131,21 @@ but it is not wired into public NAV, team aggregation, Gravity, or simulation.
 Legacy unbatched snapshot rows remain unverified and cannot become a dataset
 reference by catalog lookup or by matching a season/version label.
 
+### Phase 3 candidate relationship — 2026-09-15
+
+Phase 3 adds a separate persistent candidate-provenance boundary. A candidate
+references one existing catalog ID and may challenge a production analytic or,
+for research only, the diagnostic `gravity.v4` record. It cannot target the
+display-only team aggregation or a research-only catalog record. Every candidate
+has internal/research exposure only and is non-production-resolvable by design.
+
+Candidate base-version and implementation fields must match the current catalog
+metadata at registration; the catalog itself remains code-backed and is not
+copied into a database table. Candidate records carry a verified `COMPLETE`
+batch ID, immutable artifact metadata, and append-only lifecycle facts, but
+they do not create a runtime selector, calculator import, feature-flag control,
+or public dataset dependency.
+
 ## Later promotion and rollback boundary
 
 Phase 2 may add candidate, artifact, validation, and promotion records only

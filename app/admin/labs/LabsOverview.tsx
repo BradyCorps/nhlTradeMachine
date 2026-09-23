@@ -1,4 +1,5 @@
 import React from "react";
+import type { LabCandidate } from "@/app/lib/labs-candidates";
 import type { AnalyticDefinition } from "@/app/lib/production-analytics";
 import type { SeasonSnapshotBatch } from "@/app/lib/season-snapshot";
 
@@ -9,6 +10,8 @@ export interface LabsOverviewData {
   verifiedBatches: readonly SeasonSnapshotBatch[];
   legacyInventory: { players: number; teams: number };
   snapshotState: LabsSnapshotState;
+  candidates: readonly LabCandidate[];
+  candidateState: "available" | "unavailable";
 }
 
 const lifecycleClass = (lifecycle: AnalyticDefinition["lifecycle"]) => {
@@ -93,11 +96,51 @@ function DatasetCard({ batch }: { batch: SeasonSnapshotBatch }) {
   );
 }
 
+function CandidateCard({ candidate }: { candidate: LabCandidate }) {
+  const latestEvent = candidate.lifecycleHistory[candidate.lifecycleHistory.length - 1];
+  return (
+    <article className="admin-labs-card" aria-label={`Labs candidate ${candidate.name}, ${candidate.lifecycleStatus}`}>
+      <h3 className="admin-labs-heading">{candidate.name}</h3>
+      <p className="admin-labs-id"><code>{candidate.id}</code> · revision <code>{candidate.revision}</code></p>
+      <span className="admin-labs-badge admin-labs-badge-research">
+        {candidate.lifecycleStatus} · {candidate.exposure}
+      </span>
+      <dl className="admin-labs-meta">
+        <div>
+          <dt>Target analytic</dt>
+          <dd><code>{candidate.targetAnalytic.id}</code> · {candidate.targetAnalytic.name}</dd>
+        </div>
+        <div>
+          <dt>Verified dataset</dt>
+          <dd className="admin-labs-safe-text"><code>{candidate.dataset.id}</code></dd>
+        </div>
+        <div>
+          <dt>Artifacts</dt>
+          <dd>{candidate.artifacts.length === 0
+            ? "No immutable artifact metadata registered"
+            : candidate.artifacts.map(reference => <React.Fragment key={reference.artifact.id}><code>{reference.artifact.id}</code> · {shortHash(reference.artifact.contentDigest)}<br /></React.Fragment>)}</dd>
+        </div>
+        <div>
+          <dt>Lifecycle history</dt>
+          <dd>{candidate.lifecycleHistory.length} append-only event{candidate.lifecycleHistory.length === 1 ? "" : "s"} · latest {latestEvent.eventType}</dd>
+        </div>
+        <div>
+          <dt>Created</dt>
+          <dd>{displayTimestamp(candidate.createdAt)} · {candidate.createdSource}</dd>
+        </div>
+      </dl>
+      {candidate.hypothesis && <p className="admin-labs-copy">Hypothesis: {candidate.hypothesis}</p>}
+    </article>
+  );
+}
+
 export default function LabsOverview({
   analytics,
   verifiedBatches,
   legacyInventory,
   snapshotState,
+  candidates,
+  candidateState,
 }: LabsOverviewData) {
   const production = analytics.filter(analytic => analytic.lifecycle === "PRODUCTION");
   const diagnostic = analytics.filter(analytic => analytic.lifecycle === "DIAGNOSTIC");
@@ -180,6 +223,20 @@ export default function LabsOverview({
           <div className="admin-labs-analytics-grid">
             {[...diagnostic, ...research].map(analytic => <AnalyticCard key={analytic.id} analytic={analytic} />)}
           </div>
+        </section>
+
+        <section className="admin-labs-section" aria-labelledby="labs-candidates">
+          <h2 id="labs-candidates" className="admin-labs-section-title">CANDIDATES</h2>
+          <p className="admin-labs-section-copy">Candidate registration is internal provenance only. It is not validation, approval, promotion, runtime selection, or a calculation trigger.</p>
+          {candidateState === "unavailable" ? (
+            <div className="admin-labs-card" role="status">Candidate inventory unavailable. No candidate is treated as production-ready.</div>
+          ) : candidates.length === 0 ? (
+            <div className="admin-labs-card" role="status">No candidates are registered. Registration will not imply validation or promotion.</div>
+          ) : (
+            <div className="admin-labs-analytics-grid">
+              {candidates.map(candidate => <CandidateCard key={candidate.id} candidate={candidate} />)}
+            </div>
+          )}
         </section>
       </div>
     </main>

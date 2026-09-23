@@ -127,3 +127,17 @@ membership from a season label or adopt legacy unbatched rows. The catalog canno
 select an implementation for public NAV and does not alter the canonical
 `calculateAssetNAV → calcNAV` execution path. See
 `PRODUCTION_ANALYTICS_REGISTRY.md`.
+
+### Phase 3 candidate provenance boundary — 2026-09-15
+
+`labs_candidates.dataset_batch_id` is a foreign key to a batch ID, but the
+foreign key is not sufficient proof of Labs eligibility. The server-side
+candidate read boundary also calls `requireCompleteSeasonSnapshotBatch`; a
+missing, legacy-shaped, `CAPTURING`, `FAILED`, or count-incoherent batch fails
+closed. A season label, legacy snapshot row ID, or arbitrary string cannot be
+substituted for verified dataset provenance.
+
+Candidate registration is metadata only. It does not read raw player/team
+membership into the Admin overview, select an analytic implementation, or alter
+the batch. Legacy rows remain `batch_id = NULL` and are never candidate dataset
+references.
