@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import * as schema from "@/app/db/schema";
 import { SEASON_SNAPSHOT_TABLE_STATEMENTS } from "@/app/db/ensure-schema";
@@ -100,7 +100,7 @@ async function seedCompleteRun(db: Awaited<ReturnType<typeof fixtureDb>>) {
     id: "run.nav-market.fixture.v1", candidateId: candidate.id, candidateRevision: candidate.revision, candidateLifecycleStatus: "REGISTERED", protocolId: protocol.id,
     protocolFingerprint: protocol.fingerprint, datasetBatchId: BATCH_ID, baselineAnalyticId: "nav.defense", baselineVersion: "X-NAV 4.2",
     baselineImplementation: "calcNAV.defense-dispatch", implementationCommit: COMMIT, deterministicSeed: "42", environmentMetadata: "isolated fixture",
-    status: "COMPLETED", startedAt: 12, completedAt: 13, resultSetFingerprint: DIGEST, failureReason: null, invalidationReason: null,
+    status: "PLANNED", startedAt: null, completedAt: null, resultSetFingerprint: null, failureReason: null, invalidationReason: null,
     schemaVersion: 1, createdAt: 12, createdBy: "test", createdSource: "isolated-test",
   });
   await db.insert(schema.labsEvaluationRunArtifacts).values([
@@ -119,6 +119,7 @@ async function seedCompleteRun(db: Awaited<ReturnType<typeof fixtureDb>>) {
     { id: "outcome.defense", runId: "run.nav-market.fixture.v1", gateId: "gate.defense", observedValue: -0.2356, evidenceArtifactId: "artifact.evaluation.report.v1", result: "FAIL", reason: "Regression retained", evaluatorIdentity: "fixture-v1", metadataSchemaVersion: 1 },
     { id: "outcome.goalie", runId: "run.nav-market.fixture.v1", gateId: "gate.goalie", observedValue: 0.7093, evidenceArtifactId: "artifact.evaluation.report.v1", result: "PASS", reason: "Positive", evaluatorIdentity: "fixture-v1", metadataSchemaVersion: 1 },
   ]);
+  await db.update(schema.labsEvaluationRuns).set({ status: "COMPLETED", startedAt: 12, completedAt: 13, resultSetFingerprint: DIGEST }).where(eq(schema.labsEvaluationRuns.id, "run.nav-market.fixture.v1"));
   return { candidate, protocol };
 }
 
@@ -145,6 +146,11 @@ describe("Phase 4 Analytics Labs evaluation evidence", () => {
     expect(isEvaluationProductionResolvable(run)).toBe(false);
     expect(Object.isFrozen(run)).toBe(true);
     expect(Object.isFrozen(run.gateOutcomes)).toBe(true);
+    await expect(db.insert(schema.labsEvaluationMetricObservations).values({
+      id: "observation.after-complete", runId: run.id, metricId: "metric.mae-delta", cohortId: "overall", observedValue: 1,
+      unit: "cap-share-pp", sampleSize: 1, uncertaintyLower: null, uncertaintyUpper: null, calculationIdentity: "fixture-v1", evidenceArtifactId: null, metadataSchemaVersion: 1,
+    })).rejects.toThrow();
+    await expect(db.update(schema.labsEvaluationRuns).set({ status: "PLANNED" }).where(eq(schema.labsEvaluationRuns.id, run.id))).rejects.toThrow();
     await db.insert(schema.labsCandidateLifecycleEvents).values({ id: "event.evaluation.retired", candidateId: "candidate.nav-defense.evaluation.v1", sequence: 3, eventType: "RETIRED", previousStatus: "REGISTERED", resultingStatus: "RETIRED", occurredAt: 14, actor: "test", source: "isolated-test", note: "Fixture retirement", evidenceReference: null, metadataSchemaVersion: 1 });
     await expect(getEvaluationRun(db, "run.nav-market.fixture.v1")).resolves.toMatchObject({ status: "COMPLETED", candidate: { lifecycleStatus: "RETIRED" } });
   });
@@ -193,12 +199,14 @@ describe("Phase 4 Analytics Labs evaluation evidence", () => {
     await db.insert(schema.labsEvaluationRuns).values({ ...common, id: "run.planned.results.v1", implementationCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", status: "PLANNED", startedAt: null, completedAt: null, resultSetFingerprint: DIGEST, failureReason: null, invalidationReason: null });
     await db.insert(schema.labsEvaluationRunArtifacts).values({ runId: "run.planned.results.v1", artifactId: "artifact.evaluation.config.v1", contentDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", role: "candidate-input", attachedAt: 20, attachedBy: "test" });
     await expect(getEvaluationRun(db, "run.planned.results.v1")).rejects.toThrow(/claims completed evidence/);
-    await db.insert(schema.labsEvaluationRuns).values({ ...common, id: "run.failed.pass.v1", implementationCommit: "cccccccccccccccccccccccccccccccccccccccc", status: "FAILED", startedAt: 20, completedAt: 21, resultSetFingerprint: null, failureReason: "fixture failure", invalidationReason: null });
+    await db.insert(schema.labsEvaluationRuns).values({ ...common, id: "run.failed.pass.v1", implementationCommit: "cccccccccccccccccccccccccccccccccccccccc", status: "PLANNED", startedAt: null, completedAt: null, resultSetFingerprint: null, failureReason: null, invalidationReason: null });
     await db.insert(schema.labsEvaluationRunArtifacts).values({ runId: "run.failed.pass.v1", artifactId: "artifact.evaluation.config.v1", contentDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", role: "candidate-input", attachedAt: 20, attachedBy: "test" });
     await db.insert(schema.labsEvaluationGateResults).values({ id: "outcome.failed.pass", runId: "run.failed.pass.v1", gateId: "gate.overall-improvement", observedValue: 0.2, evidenceArtifactId: null, result: "PASS", reason: "bad fixture", evaluatorIdentity: "fixture", metadataSchemaVersion: 1 });
+    await db.update(schema.labsEvaluationRuns).set({ status: "FAILED", startedAt: 20, completedAt: 21, failureReason: "fixture failure" }).where(eq(schema.labsEvaluationRuns.id, "run.failed.pass.v1"));
     await expect(getEvaluationRun(db, "run.failed.pass.v1")).rejects.toThrow(/cannot present a successful validation/);
-    await db.insert(schema.labsEvaluationRuns).values({ ...common, id: "run.invalidated.v1", implementationCommit: "dddddddddddddddddddddddddddddddddddddddd", status: "INVALIDATED", startedAt: 20, completedAt: 21, resultSetFingerprint: DIGEST, failureReason: null, invalidationReason: "Fixture invalidation" });
+    await db.insert(schema.labsEvaluationRuns).values({ ...common, id: "run.invalidated.v1", implementationCommit: "dddddddddddddddddddddddddddddddddddddddd", status: "PLANNED", startedAt: null, completedAt: null, resultSetFingerprint: null, failureReason: null, invalidationReason: null });
     await db.insert(schema.labsEvaluationRunArtifacts).values({ runId: "run.invalidated.v1", artifactId: "artifact.evaluation.config.v1", contentDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", role: "candidate-input", attachedAt: 20, attachedBy: "test" });
+    await db.update(schema.labsEvaluationRuns).set({ status: "INVALIDATED", startedAt: 20, completedAt: 21, resultSetFingerprint: DIGEST, invalidationReason: "Fixture invalidation" }).where(eq(schema.labsEvaluationRuns.id, "run.invalidated.v1"));
     const invalidated = await getEvaluationRun(db, "run.invalidated.v1");
     expect(invalidated.status).toBe("INVALIDATED");
     expect(isEvaluationProductionResolvable(invalidated)).toBe(false);

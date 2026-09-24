@@ -161,9 +161,9 @@ CREATE TRIGGER IF NOT EXISTS prevent_labs_evaluation_run_identity_rewrite
 BEFORE UPDATE OF id, candidate_id, candidate_revision, candidate_lifecycle_status, protocol_id, protocol_fingerprint, dataset_batch_id, baseline_analytic_id, baseline_version, baseline_implementation, implementation_commit ON labs_evaluation_runs
 BEGIN SELECT RAISE(ABORT, 'Labs evaluation run identity is immutable'); END;
 --> statement-breakpoint
-CREATE TRIGGER IF NOT EXISTS prevent_labs_evaluation_completed_run_update
-BEFORE UPDATE ON labs_evaluation_runs WHEN OLD.status = 'COMPLETED'
-BEGIN SELECT RAISE(ABORT, 'Completed Labs evaluation runs are immutable'); END;
+CREATE TRIGGER IF NOT EXISTS prevent_labs_evaluation_terminal_run_update
+BEFORE UPDATE ON labs_evaluation_runs WHEN OLD.status IN ('COMPLETED', 'FAILED', 'INVALIDATED')
+BEGIN SELECT RAISE(ABORT, 'Terminal Labs evaluation runs are immutable'); END;
 --> statement-breakpoint
 CREATE TRIGGER IF NOT EXISTS prevent_labs_evaluation_result_delete
 BEFORE DELETE ON labs_evaluation_runs
@@ -177,6 +177,11 @@ CREATE TRIGGER IF NOT EXISTS prevent_labs_evaluation_run_artifact_delete
 BEFORE DELETE ON labs_evaluation_run_artifacts
 BEGIN SELECT RAISE(ABORT, 'Labs evaluation artifact references are immutable'); END;
 --> statement-breakpoint
+CREATE TRIGGER IF NOT EXISTS prevent_labs_evaluation_run_artifact_insert_after_terminal
+BEFORE INSERT ON labs_evaluation_run_artifacts
+WHEN EXISTS (SELECT 1 FROM labs_evaluation_runs WHERE id = NEW.run_id AND status IN ('COMPLETED', 'FAILED', 'INVALIDATED'))
+BEGIN SELECT RAISE(ABORT, 'Terminal Labs evaluation evidence is immutable'); END;
+--> statement-breakpoint
 CREATE TRIGGER IF NOT EXISTS prevent_labs_evaluation_observation_update
 BEFORE UPDATE ON labs_evaluation_metric_observations
 BEGIN SELECT RAISE(ABORT, 'Labs metric observations are immutable'); END;
@@ -185,6 +190,11 @@ CREATE TRIGGER IF NOT EXISTS prevent_labs_evaluation_observation_delete
 BEFORE DELETE ON labs_evaluation_metric_observations
 BEGIN SELECT RAISE(ABORT, 'Labs metric observations are immutable'); END;
 --> statement-breakpoint
+CREATE TRIGGER IF NOT EXISTS prevent_labs_evaluation_observation_insert_after_terminal
+BEFORE INSERT ON labs_evaluation_metric_observations
+WHEN EXISTS (SELECT 1 FROM labs_evaluation_runs WHERE id = NEW.run_id AND status IN ('COMPLETED', 'FAILED', 'INVALIDATED'))
+BEGIN SELECT RAISE(ABORT, 'Terminal Labs evaluation evidence is immutable'); END;
+--> statement-breakpoint
 CREATE TRIGGER IF NOT EXISTS prevent_labs_evaluation_gate_result_update
 BEFORE UPDATE ON labs_evaluation_gate_results
 BEGIN SELECT RAISE(ABORT, 'Labs gate results are immutable'); END;
@@ -192,3 +202,8 @@ BEGIN SELECT RAISE(ABORT, 'Labs gate results are immutable'); END;
 CREATE TRIGGER IF NOT EXISTS prevent_labs_evaluation_gate_result_delete
 BEFORE DELETE ON labs_evaluation_gate_results
 BEGIN SELECT RAISE(ABORT, 'Labs gate results are immutable'); END;
+--> statement-breakpoint
+CREATE TRIGGER IF NOT EXISTS prevent_labs_evaluation_gate_result_insert_after_terminal
+BEFORE INSERT ON labs_evaluation_gate_results
+WHEN EXISTS (SELECT 1 FROM labs_evaluation_runs WHERE id = NEW.run_id AND status IN ('COMPLETED', 'FAILED', 'INVALIDATED'))
+BEGIN SELECT RAISE(ABORT, 'Terminal Labs evaluation evidence is immutable'); END;

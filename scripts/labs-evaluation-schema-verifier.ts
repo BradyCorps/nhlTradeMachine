@@ -30,14 +30,17 @@ const TRIGGERS = [
   "prevent_labs_evaluation_protocol_gate_update",
   "prevent_labs_evaluation_protocol_gate_delete",
   "prevent_labs_evaluation_run_identity_rewrite",
-  "prevent_labs_evaluation_completed_run_update",
+  "prevent_labs_evaluation_terminal_run_update",
   "prevent_labs_evaluation_result_delete",
   "prevent_labs_evaluation_run_artifact_update",
   "prevent_labs_evaluation_run_artifact_delete",
+  "prevent_labs_evaluation_run_artifact_insert_after_terminal",
   "prevent_labs_evaluation_observation_update",
   "prevent_labs_evaluation_observation_delete",
+  "prevent_labs_evaluation_observation_insert_after_terminal",
   "prevent_labs_evaluation_gate_result_update",
   "prevent_labs_evaluation_gate_result_delete",
+  "prevent_labs_evaluation_gate_result_insert_after_terminal",
 ] as const;
 
 async function objects(client: Client, type: "table" | "index" | "trigger", expected: readonly string[]) {
