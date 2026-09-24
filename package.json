@@ -18,6 +18,7 @@
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:verify-season-snapshot-schema": "tsx scripts/db-verify-season-snapshot-schema.ts",
     "db:verify-labs-candidate-schema": "tsx scripts/db-verify-labs-candidate-schema.ts",
+    "db:verify-labs-evaluation-schema": "tsx scripts/db-verify-labs-evaluation-schema.ts",
     "build:seed": "tsx scripts/build-league-seed.ts",
     "feed:goalie-backfill": "tsx scripts/backfill-goalie-edge.ts",
     "feed:skater-backfill": "tsx scripts/backfill-skater-edge.ts",

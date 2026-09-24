@@ -287,3 +287,112 @@ export const labsCandidateLifecycleEvents = sqliteTable("labs_candidate_lifecycl
   evidenceReference: text("evidence_reference"),
   metadataSchemaVersion: integer("metadata_schema_version").notNull(),
 });
+
+// ── Analytics Labs evaluation evidence (Phase 4) ───────────────────────────
+// Protocols and results are immutable historical evidence. They reference the
+// candidate/snapshot foundations but never select a runtime implementation.
+export const labsEvaluationProtocols = sqliteTable("labs_evaluation_protocols", {
+  id:                  text("id").primaryKey(),
+  targetAnalyticId:    text("target_analytic_id").notNull(),
+  name:                text("name").notNull(),
+  version:             text("version").notNull(),
+  purpose:             text("purpose").notNull(),
+  populationDefinition: text("population_definition").notNull(),
+  exclusions:          text("exclusions").notNull(),
+  trainDefinition:     text("train_definition").notNull(),
+  validationDefinition: text("validation_definition").notNull(),
+  holdoutDefinition:   text("holdout_definition").notNull(),
+  randomSeedPolicy:    text("random_seed_policy").notNull(),
+  leakageControls:     text("leakage_controls").notNull(),
+  minimumCoverage:     text("minimum_coverage").notNull(),
+  fingerprint:         text("fingerprint").notNull(), // lowercase SHA-256
+  schemaVersion:       integer("schema_version").notNull(),
+  createdAt:           integer("created_at").notNull(),
+  createdBy:           text("created_by").notNull(),
+  createdSource:       text("created_source").notNull(),
+});
+
+export const labsEvaluationProtocolMetrics = sqliteTable("labs_evaluation_protocol_metrics", {
+  protocolId:     text("protocol_id").notNull().references(() => labsEvaluationProtocols.id),
+  metricId:       text("metric_id").notNull(),
+  name:           text("name").notNull(),
+  unit:           text("unit").notNull(),
+  requiredCohorts: text("required_cohorts").notNull(), // canonical JSON array
+  definition:     text("definition").notNull(),
+  metadataSchemaVersion: integer("metadata_schema_version").notNull(),
+});
+
+export const labsEvaluationProtocolGates = sqliteTable("labs_evaluation_protocol_gates", {
+  protocolId:     text("protocol_id").notNull().references(() => labsEvaluationProtocols.id),
+  gateId:         text("gate_id").notNull(),
+  metricId:       text("metric_id").notNull(),
+  cohortId:       text("cohort_id").notNull(),
+  operator:       text("operator").notNull(), // GT | GTE | LT | LTE | EQ
+  thresholdValue: real("threshold_value").notNull(),
+  unit:           text("unit").notNull(),
+  required:       integer("required").notNull(),
+  description:    text("description").notNull(),
+  metadataSchemaVersion: integer("metadata_schema_version").notNull(),
+});
+
+export const labsEvaluationRuns = sqliteTable("labs_evaluation_runs", {
+  id:                     text("id").primaryKey(),
+  candidateId:            text("candidate_id").notNull().references(() => labsCandidates.id),
+  candidateRevision:      text("candidate_revision").notNull(),
+  candidateLifecycleStatus: text("candidate_lifecycle_status").notNull(), // REGISTERED when frozen
+  protocolId:             text("protocol_id").notNull().references(() => labsEvaluationProtocols.id),
+  protocolFingerprint:    text("protocol_fingerprint").notNull(),
+  datasetBatchId:         text("dataset_batch_id").notNull().references(() => seasonSnapshotBatches.id),
+  baselineAnalyticId:     text("baseline_analytic_id").notNull(),
+  baselineVersion:        text("baseline_version").notNull(),
+  baselineImplementation: text("baseline_implementation").notNull(),
+  implementationCommit:   text("implementation_commit").notNull(),
+  deterministicSeed:      text("deterministic_seed"),
+  environmentMetadata:    text("environment_metadata").notNull(),
+  status:                 text("status").notNull(), // PLANNED | COMPLETED | FAILED | INVALIDATED
+  startedAt:              integer("started_at"),
+  completedAt:            integer("completed_at"),
+  resultSetFingerprint:   text("result_set_fingerprint"),
+  failureReason:          text("failure_reason"),
+  invalidationReason:     text("invalidation_reason"),
+  schemaVersion:          integer("schema_version").notNull(),
+  createdAt:              integer("created_at").notNull(),
+  createdBy:              text("created_by").notNull(),
+  createdSource:          text("created_source").notNull(),
+});
+
+export const labsEvaluationRunArtifacts = sqliteTable("labs_evaluation_run_artifacts", {
+  runId:             text("run_id").notNull().references(() => labsEvaluationRuns.id),
+  artifactId:        text("artifact_id").notNull().references(() => labsArtifacts.id),
+  contentDigest:     text("content_digest").notNull(), // frozen artifact digest
+  role:              text("role").notNull(), // candidate-input | evidence
+  attachedAt:        integer("attached_at").notNull(),
+  attachedBy:        text("attached_by").notNull(),
+});
+
+export const labsEvaluationMetricObservations = sqliteTable("labs_evaluation_metric_observations", {
+  id:                  text("id").primaryKey(),
+  runId:               text("run_id").notNull().references(() => labsEvaluationRuns.id),
+  metricId:             text("metric_id").notNull(),
+  cohortId:             text("cohort_id").notNull(),
+  observedValue:        real("observed_value").notNull(),
+  unit:                 text("unit").notNull(),
+  sampleSize:           integer("sample_size").notNull(),
+  uncertaintyLower:     real("uncertainty_lower"),
+  uncertaintyUpper:     real("uncertainty_upper"),
+  calculationIdentity:  text("calculation_identity").notNull(),
+  evidenceArtifactId:   text("evidence_artifact_id").references(() => labsArtifacts.id),
+  metadataSchemaVersion: integer("metadata_schema_version").notNull(),
+});
+
+export const labsEvaluationGateResults = sqliteTable("labs_evaluation_gate_results", {
+  id:                  text("id").primaryKey(),
+  runId:               text("run_id").notNull().references(() => labsEvaluationRuns.id),
+  gateId:              text("gate_id").notNull(),
+  observedValue:       real("observed_value"),
+  evidenceArtifactId:  text("evidence_artifact_id").references(() => labsArtifacts.id),
+  result:              text("result").notNull(), // PASS | FAIL | INCONCLUSIVE
+  reason:              text("reason").notNull(),
+  evaluatorIdentity:   text("evaluator_identity").notNull(),
+  metadataSchemaVersion: integer("metadata_schema_version").notNull(),
+});

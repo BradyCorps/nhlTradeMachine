@@ -1,5 +1,6 @@
 import React from "react";
 import type { LabCandidate } from "@/app/lib/labs-candidates";
+import type { EvaluationProtocol, LabEvaluationRun } from "@/app/lib/labs-evaluations";
 import type { AnalyticDefinition } from "@/app/lib/production-analytics";
 import type { SeasonSnapshotBatch } from "@/app/lib/season-snapshot";
 
@@ -12,6 +13,9 @@ export interface LabsOverviewData {
   snapshotState: LabsSnapshotState;
   candidates: readonly LabCandidate[];
   candidateState: "available" | "unavailable";
+  protocols: readonly EvaluationProtocol[];
+  runs: readonly LabEvaluationRun[];
+  evaluationState: "available" | "unavailable";
 }
 
 const lifecycleClass = (lifecycle: AnalyticDefinition["lifecycle"]) => {
@@ -134,6 +138,40 @@ function CandidateCard({ candidate }: { candidate: LabCandidate }) {
   );
 }
 
+function ProtocolCard({ protocol }: { protocol: EvaluationProtocol }) {
+  return (
+    <article className="admin-labs-card" aria-label={`Evaluation protocol ${protocol.name}`}>
+      <h3 className="admin-labs-heading">{protocol.name}</h3>
+      <p className="admin-labs-id"><code>{protocol.id}</code> · version <code>{protocol.version}</code></p>
+      <span className="admin-labs-badge admin-labs-badge-research">FROZEN · evidence protocol</span>
+      <dl className="admin-labs-meta">
+        <div><dt>Target analytic</dt><dd><code>{protocol.targetAnalyticId}</code></dd></div>
+        <div><dt>Definitions</dt><dd>{protocol.metrics.length} metrics · {protocol.gates.length} frozen gates</dd></div>
+        <div><dt>Fingerprint</dt><dd className="admin-labs-safe-text"><code aria-label={`Full SHA-256 protocol fingerprint ${protocol.fingerprint}`} title={protocol.fingerprint}>{shortHash(protocol.fingerprint)}</code></dd></div>
+      </dl>
+    </article>
+  );
+}
+
+function RunCard({ run }: { run: LabEvaluationRun }) {
+  const gateSummary = run.gateOutcomes.reduce<Record<string, number>>((summary, outcome) => {
+    summary[outcome.result] = (summary[outcome.result] ?? 0) + 1;
+    return summary;
+  }, {});
+  return (
+    <article className="admin-labs-card" aria-label={`Evaluation run ${run.id}, ${run.status}`}>
+      <h3 className="admin-labs-heading"><code>{run.id}</code></h3>
+      <span className="admin-labs-badge admin-labs-badge-research">{run.status} · evidence only</span>
+      <dl className="admin-labs-meta">
+        <div><dt>Candidate</dt><dd><code>{run.candidate.id}</code> · {run.candidate.revision}</dd></div>
+        <div><dt>Baseline</dt><dd><code>{run.baseline.id}</code> · {run.baseline.version.value}</dd></div>
+        <div><dt>Verified dataset</dt><dd className="admin-labs-safe-text"><code>{run.dataset.id}</code></dd></div>
+        <div><dt>Evidence</dt><dd>{run.observations.length} metrics · {run.gateOutcomes.length} gates ({gateSummary.PASS ?? 0} pass · {gateSummary.FAIL ?? 0} fail · {gateSummary.INCONCLUSIVE ?? 0} inconclusive)</dd></div>
+      </dl>
+    </article>
+  );
+}
+
 export default function LabsOverview({
   analytics,
   verifiedBatches,
@@ -141,6 +179,9 @@ export default function LabsOverview({
   snapshotState,
   candidates,
   candidateState,
+  protocols,
+  runs,
+  evaluationState,
 }: LabsOverviewData) {
   const production = analytics.filter(analytic => analytic.lifecycle === "PRODUCTION");
   const diagnostic = analytics.filter(analytic => analytic.lifecycle === "DIAGNOSTIC");
@@ -236,6 +277,28 @@ export default function LabsOverview({
             <div className="admin-labs-analytics-grid">
               {candidates.map(candidate => <CandidateCard key={candidate.id} candidate={candidate} />)}
             </div>
+          )}
+        </section>
+
+        <section className="admin-labs-section" aria-labelledby="labs-evaluation-protocols">
+          <h2 id="labs-evaluation-protocols" className="admin-labs-section-title">EVALUATION PROTOCOLS</h2>
+          <p className="admin-labs-section-copy">Frozen cohorts, metrics, leakage controls, and gates must be registered before results. Revising a protocol requires a new identity and fingerprint.</p>
+          {evaluationState === "unavailable" ? (
+            <div className="admin-labs-card" role="status">Evaluation evidence inventory unavailable. No missing record is treated as a pass.</div>
+          ) : protocols.length === 0 ? (
+            <div className="admin-labs-card" role="status">No evaluation protocols are registered. This page cannot create or revise one.</div>
+          ) : (
+            <div className="admin-labs-analytics-grid">{protocols.map(protocol => <ProtocolCard key={protocol.id} protocol={protocol} />)}</div>
+          )}
+        </section>
+
+        <section className="admin-labs-section" aria-labelledby="labs-evaluation-runs">
+          <h2 id="labs-evaluation-runs" className="admin-labs-section-title">EVALUATION RUNS</h2>
+          <p className="admin-labs-section-copy">Recorded evidence is read-only. Completion is not validation, approval, promotion, or runtime availability.</p>
+          {evaluationState === "unavailable" ? null : runs.length === 0 ? (
+            <div className="admin-labs-card" role="status">No evaluation runs are recorded. This page cannot run or rerun a candidate.</div>
+          ) : (
+            <div className="admin-labs-analytics-grid">{runs.map(run => <RunCard key={run.id} run={run} />)}</div>
           )}
         </section>
       </div>

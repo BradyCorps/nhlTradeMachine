@@ -1,5 +1,6 @@
 import { db } from "@/app/db/client";
 import { listLabCandidates } from "@/app/lib/labs-candidates";
+import { listEvaluationProtocols, listEvaluationRuns } from "@/app/lib/labs-evaluations";
 import { ANALYTIC_CATALOG } from "@/app/lib/production-analytics";
 import {
   requireCompleteSeasonSnapshotBatch,
@@ -33,7 +34,10 @@ async function readVerifiedBatches(batches: readonly SeasonSnapshotBatch[]): Pro
 }
 
 async function readLabsOverview(): Promise<LabsOverviewData> {
-  const candidateInventory = await readCandidateInventory();
+  const [candidateInventory, evaluationInventory] = await Promise.all([
+    readCandidateInventory(),
+    readEvaluationInventory(),
+  ]);
   try {
     const [batchInventory, legacyInventory] = await Promise.all([
       seasonSnapshotBatchInventory(db),
@@ -51,6 +55,7 @@ async function readLabsOverview(): Promise<LabsOverviewData> {
       legacyInventory: legacy,
       snapshotState: verified.state,
       ...candidateInventory,
+      ...evaluationInventory,
     };
   } catch {
     return {
@@ -59,7 +64,19 @@ async function readLabsOverview(): Promise<LabsOverviewData> {
       legacyInventory: { players: 0, teams: 0 },
       snapshotState: "unavailable",
       ...candidateInventory,
+      ...evaluationInventory,
     };
+  }
+}
+
+async function readEvaluationInventory(): Promise<Pick<LabsOverviewData, "protocols" | "runs" | "evaluationState">> {
+  try {
+    const [protocols, runs] = await Promise.all([listEvaluationProtocols(db), listEvaluationRuns(db)]);
+    return { protocols, runs, evaluationState: "available" };
+  } catch {
+    // A missing migration or corrupt evidence is operationally distinct from an
+    // honest empty inventory and must never be rendered as one.
+    return { protocols: [], runs: [], evaluationState: "unavailable" };
   }
 }
 
