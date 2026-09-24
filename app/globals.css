@@ -1071,6 +1071,9 @@ select.ledger-select {
 /* MOB-01: readable decision summaries and an explicit filter disclosure. */
 .compact-filters { position: sticky; top: var(--sticky-header-height, 56px); z-index: 25; background: var(--paper); padding: 8px; }
 .compact-filter-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+/* The entry point and its removable chips inherited `.filter-btn`'s 8px label —
+   unreadable as the primary control on a phone; match the 11px filter buttons. */
+.compact-filter-summary .filter-btn { font-size: 11px; }
 .compact-filter-options { padding-top: 8px; }
 .compact-filter-options input, .compact-filter-options select, .compact-filter-options button { min-height: 44px; max-width: 100%; }
 .compact-player-intelligence, .compact-team-intelligence { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
@@ -1079,6 +1082,10 @@ select.ledger-select {
 .compact-player-intelligence a { display: inline-flex; align-items: center; text-decoration: underline; }
 .mob-filter-bar { position: sticky; top: var(--sticky-header-height, 56px); z-index: 25; }
 .mob-filter-bar > .compact-filters { position: static; }
+/* The summary row shares the page's 1100px column and 16px gutter; it sat at
+   8px, out of line with the title and results, and far left on wide screens.
+   1084px = 1100px less the bar's own 8px padding on each side. */
+.players-filter-bar .compact-filter-summary { max-width: 1084px; margin: 0 auto; padding: 0 8px; }
 .compact-filter-options .players-filter-row2 { flex-wrap: wrap; overflow: visible; }
 .compact-filter-options .players-filter-row2 > div { flex-wrap: wrap; flex-shrink: 1 !important; }
 .mobile-detail-sheet { position: fixed; inset: 0; z-index: 200; background: var(--paper-bg); color: var(--ledger-ink); overflow-y: auto; overscroll-behavior: contain; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }

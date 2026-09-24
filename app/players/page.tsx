@@ -26,6 +26,7 @@ import { HorizontalScrollCue } from "@/app/components/HorizontalScrollCue";
 import PercentileCard from "@/app/components/PercentileCard";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { displayPosition } from "@/app/lib/display-position";
+import { teamLabelFor } from "@/app/lib/fa-pool";
 import {
   PLAYER_STATS_CONTEXT,
   PLAYER_TERMINOLOGY,
@@ -711,8 +712,9 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
     return { offV: mean(s.off), defV: mean(s.def) };
   }, [player, allPlayers, isG]);
 
-  // Abbreviated team name for mobile (use teamId which is already short)
-  const teamAbbr = player.teamId;
+  // Abbreviated team name for mobile (use teamId which is already short);
+  // the free-agent holding id reads as "Free Agent", never "FA_POOL".
+  const teamAbbr = teamLabelFor(player.teamId);
   const toggleFromControl = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     onToggle();
@@ -750,7 +752,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
             <PlayerIconBadges player={player} />
           </div>
           <div style={{ fontSize: "11px", color: "var(--rule)", marginTop: "1px" }}>
-            {team?.name ?? player.teamId} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}
+            {team?.name ?? teamLabelFor(player.teamId)} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}
           </div>
         </div>
 
@@ -803,21 +805,24 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
           transition: "background 0.15s",
         }}
       >
-        {/* Line 1: headshot + name block + expand arrow */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+        {/* Line 1: headshot + name block + expand arrow. Top-aligned so a
+            flag row cannot push the headshot down beside the badges. */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "8px" }}>
           <PlayerAvatar name={player.name} position={player.position} size={36} shape="round"
             playerId={player.id} teamId={player.teamId} headshot={player.headshot} />
 
           {/* Name + meta */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--ink)", whiteSpace: "normal", overflowWrap: "anywhere", lineHeight: 1.15 }}>
-                {player.name}
-              </span>
-              <PlayerIconBadges player={player} />
+            {/* Name, then team/position/age, then flags — the identity line
+                stays attached to the name rather than below a 44px flag row. */}
+            <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--ink)", whiteSpace: "normal", overflowWrap: "anywhere", lineHeight: 1.15 }}>
+              {player.name}
             </div>
             <div style={{ fontSize: "11px", color: "var(--rule)", marginTop: "2px" }}>
               {teamAbbr} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}
+            </div>
+            <div style={{ display: "flex", marginTop: "2px" }}>
+              <PlayerIconBadges player={player} />
             </div>
           </div>
 
@@ -844,7 +849,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
           <p>NAV trend: unavailable · NAV range: unavailable</p>
           <p>Contract: {unsigned ? (expiringRightsLabel(player) ? `Unsigned ${expiringRightsLabel(player)}` : "No signed contract recorded") : `$${player.capHit.toFixed(2)}M · ${player.yearsRemaining} ${player.yearsRemaining === 1 ? "year" : "years"} left`}</p>
           <p>Annual surplus: {unsigned ? "no signed deal to price" : contract.surplus != null ? `${contract.surplus >= 0 ? "+" : "−"}$${Math.abs(contract.surplus).toFixed(2)}M` : "unavailable"}</p>
-          <Link className="tap-target" href={`/players/${player.id}`} onClick={event => event.stopPropagation()}>Open player dossier</Link>
+          <Link className="tap-target" href={`/players/${player.id}`} onClick={event => { event.stopPropagation(); rememberListScroll(); }}>Open player dossier</Link>
         </div>
 
         {/* Rank and the selected secondary metric */}
@@ -1004,12 +1009,29 @@ function SectionPager({ total, pageSize, page, onPage }: {
 }
 
 // ── Main page ─────────────────────────────────────────────────
+// The last league payload this tab loaded. Returning from a dossier remounts
+// the page; without this it rendered the short loading state first, so the
+// browser's restored scroll position had nothing to land on and Back dropped
+// the reader near the top of the list. A full page load starts empty, so the
+// server-rendered loading state still matches on hydration.
+let lastLeague: { players: Player[]; teams: Team[]; provenance: LeagueProvenance | null } | null = null;
+
+// Where the reader was in the list when they opened a dossier. The route
+// change scrolls to the top before this page unmounts, and the browser's own
+// restoration runs before the list has re-rendered, so neither keeps it. It
+// is recorded at the click and consumed once, on return to the same list URL.
+// In memory rather than browser storage (which /legal would have to name), so
+// it covers the client-side dossier link; a full page load starts clean.
+let listScroll: { url: string; y: number } | null = null;
+const rememberListScroll = () => { listScroll = { url: location.pathname + location.search, y: window.scrollY }; };
+const takeListScroll = () => { const saved = listScroll; listScroll = null; return saved; };
+
 export default function PlayersPage() {
-  const [players, setPlayers]   = useState<Player[]>([]);
-  const [teams, setTeams]       = useState<Team[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [players, setPlayers]   = useState<Player[]>(() => lastLeague?.players ?? []);
+  const [teams, setTeams]       = useState<Team[]>(() => lastLeague?.teams ?? []);
+  const [loading, setLoading]   = useState(() => lastLeague == null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [provenance, setProvenance] = useState<LeagueProvenance | null>(null);
+  const [provenance, setProvenance] = useState<LeagueProvenance | null>(() => lastLeague?.provenance ?? null);
   // Hydrated once, synchronously, from the URL (QW-09) — self-contained (no
   // fetched data needed to interpret it), so there is no read/write race to
   // gate like the trade bench's shared-link parse has.
@@ -1024,6 +1046,18 @@ export default function PlayersPage() {
   const [defencePage, setDefencePage] = useState(initialUrlState.defencePage);
   const [goaliePage, setGoaliePage] = useState(initialUrlState.goaliePage);
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(initialUrlState.playerId);
+
+  const restoredScroll = useRef(false);
+  useEffect(() => {
+    if (loading || restoredScroll.current) return;
+    restoredScroll.current = true;
+    const saved = takeListScroll();
+    if (!saved || saved.url !== location.pathname + location.search) return;
+    // Reapplied on the next frame too, after any history restoration.
+    window.scrollTo({ top: saved.y, behavior: "auto" });
+    const frame = requestAnimationFrame(() => window.scrollTo({ top: saved.y, behavior: "auto" }));
+    return () => cancelAnimationFrame(frame);
+  }, [loading]);
 
   const handleSortKey = (k: typeof sortKey) => {
     if (k === sortKey) {
@@ -1066,6 +1100,7 @@ export default function PlayersPage() {
           .map((p: Player) => ({ ...p, capCeiling: td.capCeiling }));
         const nextTeams = td.teams ?? [];
         if (!Array.isArray(nextPlayers) || !Array.isArray(nextTeams)) throw new Error("API returned invalid league payload");
+        lastLeague = { players: nextPlayers, teams: nextTeams, provenance: pd.provenance ?? null };
         setPlayers(nextPlayers);
         setTeams(nextTeams);
         setProvenance(pd.provenance ?? null);
@@ -1109,6 +1144,26 @@ export default function PlayersPage() {
     setDefencePage(1);
     setGoaliePage(1);
   }, [search, posFilter, teamFilter, sortKey, sortDir]);
+
+  // A filter, search or sort change restarts every section at page 1. If the
+  // reader is scrolled past the start of the results, the new first rows (or
+  // the no-match message) sat hidden under the sticky header and filter bar,
+  // which on a phone with the filter panel open is most of the screen. Bring
+  // the start of the results back just below that sticky bar. Skipped on
+  // mount so a restored scroll position is left alone.
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const filterBarRef = useRef<HTMLDivElement>(null);
+  const resultsKey = JSON.stringify([deferredSearch, posFilter, teamFilter, sortKey, sortDir]);
+  const lastResultsKey = useRef(resultsKey);
+  useEffect(() => {
+    if (lastResultsKey.current === resultsKey) return;
+    lastResultsKey.current = resultsKey;
+    const results = resultsRef.current;
+    if (!results) return;
+    const stickyBottom = filterBarRef.current?.getBoundingClientRect().bottom ?? 0;
+    const top = results.getBoundingClientRect().top;
+    if (top < stickyBottom) window.scrollTo({ top: window.scrollY + top - stickyBottom, behavior: "auto" });
+  }, [resultsKey]);
 
   // State → URL (QW-09). `replaceState` rather than the router — no extra
   // history entry per keystroke/filter change, matching the trade bench's
@@ -1273,7 +1328,7 @@ export default function PlayersPage() {
       )}
 
       {/* ── Filter bar ── */}
-      <div className="players-filter-bar mob-filter-bar">
+      <div ref={filterBarRef} className="players-filter-bar mob-filter-bar">
         <CompactFilters count={loading ? "Loading players" : playerCountLabel(filtered.length)} chips={[
           ...(search ? [{ label: search, clear: () => setSearch("") }] : []),
           ...(posFilter !== "ALL" ? [{ label: posFilter, clear: () => setPosFilter("ALL") }] : []),
@@ -1346,7 +1401,7 @@ export default function PlayersPage() {
       <PlayersIconKey />
 
       {/* Table */}
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 0 40px" }}>
+      <div ref={resultsRef} style={{ maxWidth: 1100, margin: "0 auto", padding: "0 0 40px" }}>
         {loading ? (
           <div style={{ padding: "60px 20px", textAlign: "center", fontSize: "11px", color: "var(--rule)", letterSpacing: "0.2em" }}>
             LOADING ROSTER DATA...

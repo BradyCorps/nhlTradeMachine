@@ -134,7 +134,9 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
               />
             </Link>
             {!isCompact && (
-              <p className="flex items-center justify-center gap-2 text-2xs uppercase tracking-[0.3em] mt-1.5 font-mono text-ledger-ink-faint">
+              // Each phrase is kept whole and the line wraps between them; as
+              // shrinking flex items they broke mid-phrase ("Vol." / "I —") on phones.
+              <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 px-2 text-2xs uppercase tracking-[0.3em] mt-1.5 font-mono text-ledger-ink-faint [&>span]:whitespace-nowrap">
                 <span>Est. 2026 &nbsp;—&nbsp; Vol. I &nbsp;—&nbsp;</span>
                 {showLiveFeed && (
                   <span className="relative flex h-1.5 w-1.5" aria-hidden="true">

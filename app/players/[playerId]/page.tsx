@@ -36,6 +36,7 @@ import { contractVerdict, verdictColor } from "@/app/lib/contract-verdict";
 import { DossierNav } from "@/app/components/DossierNav";
 import { getLiveCapCeiling } from "@/app/lib/live-cap-settings";
 import { displayPosition } from "@/app/lib/display-position";
+import { teamLabelFor } from "@/app/lib/fa-pool";
 import {
   PLAYER_STATS_CONTEXT,
   navLabelForPosition,
@@ -226,13 +227,16 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
           <PlayerAvatar name={player.name} position={player.position} size={64} shape="round"
             playerId={player.id} teamId={player.teamId} headshot={player.headshot}
             className="shrink-0" />
-          <div className="flex-1 min-w-0">
-            <h1 className="text-[22px] font-black font-mono leading-tight truncate">{player.name}</h1>
+          {/* Below `sm` the name takes its own full-width line under the
+              avatar and NAV figure; squeezed between them it truncated to a
+              few letters ("Micha…"). */}
+          <div className="order-last basis-full min-w-0 sm:order-none sm:basis-0 sm:flex-1">
+            <h1 className="text-[22px] font-black font-mono leading-tight [overflow-wrap:anywhere] sm:truncate">{player.name}</h1>
             <div className="text-[11px] font-black font-mono uppercase tracking-[0.12em] mt-0.5" style={{ color: faint }}>
-              {teamName} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}
+              {teamLabelFor(teamName)} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}
             </div>
           </div>
-          <div className="text-right shrink-0">
+          <div className="text-right shrink-0 ml-auto sm:ml-0">
             <div className="text-[32px] font-black font-mono leading-none">{xnav.total}</div>
             <MetricTip term={navLabel} className="text-[9px] font-black font-mono uppercase tracking-[0.18em]" />
           </div>
@@ -265,7 +269,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
           {PLAYER_STATS_CONTEXT}
         </div>
         {isGoalie ? (
-          <div className="grid grid-cols-5 border mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
+          // Five fixed columns left ~57px per cell at 320px, and "Save
+          // percentage" ran into its neighbour; phones take three per row.
+          <div className="grid grid-cols-3 sm:grid-cols-5 border mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
             <StatCell label="Games" value={String(games)} />
             <StatCell
               label="Goals saved above expected"
