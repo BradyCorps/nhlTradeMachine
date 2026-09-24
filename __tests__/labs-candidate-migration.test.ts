@@ -100,7 +100,10 @@ describe("Phase 3 migration upgrade", () => {
       }
 
       const pendingBefore = await assertJournalIsCompatible(client, journal);
-      expect(pendingBefore.pending.map(entry => entry.tag)).toEqual(["0009_add_labs_candidate_foundation"]);
+      expect(pendingBefore.pending.map(entry => entry.tag)).toEqual([
+        "0009_add_labs_candidate_foundation",
+        "0010_add_labs_evaluation_evidence",
+      ]);
       await migrate(drizzle(client), { migrationsFolder: migrationFolder() });
       const after = await snapshotSummary(client);
       const pendingAfter = await assertJournalIsCompatible(client, journal);

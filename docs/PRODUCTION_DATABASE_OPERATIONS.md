@@ -72,6 +72,7 @@ snapshot and Labs migration baseline. It contains, in order:
 2. `0007_add_season_snapshot_batches`
 3. `0008_add_snapshot_batch_member_uniqueness`
 4. `0009_add_labs_candidate_foundation`
+5. `0010_add_labs_evaluation_evidence`
 
 Earlier repository SQL files predate the controlled journal and are not
 retroactively replayed. `0006` is idempotent against the pre-existing legacy
@@ -178,6 +179,24 @@ The retained `hockey-ledger-db-phase1a4a-recovery-20260912t235530z` recovery
 database predates the verified 2025-26 capture and is therefore not a sufficient
 Phase 3 rollback point. Retain it, but create and verify a new recovery target
 under separately authorized production maintenance before applying `0009`.
+
+## Phase 4 evaluation-evidence rollout
+
+Vercel does not run Drizzle migrations. The Phase 4 overview reads its new
+tables only at authenticated request time, so old application revisions are
+compatible with the additive empty schema. The approved future order is: verify
+the reviewed PR and journal state; create and independently verify a fresh PITR
+recovery database containing the current COMPLETE batch and legacy fingerprint;
+apply `0010_add_labs_evaluation_evidence` once using `db:migrate`; run
+`db:verify-labs-evaluation-schema`; verify all seven new tables are empty and
+snapshot fingerprints unchanged; then merge and deploy the reviewed commit.
+
+If the application fails after the additive migration, roll back the application
+only through the documented Git/Vercel workflow. Do not hand-edit or reverse
+the evidence schema, and do not create production evidence records as a
+verification fixture. The read-only verifier checks the journal, schema objects,
+foreign-key integrity, and aggregate Phase 4 table counts without printing
+credentials or raw records.
 
 ## Vercel Git deployment procedure
 

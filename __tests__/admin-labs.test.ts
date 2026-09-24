@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import LabsOverview from "@/app/admin/labs/LabsOverview";
 import type { LabCandidate } from "@/app/lib/labs-candidates";
+import type { EvaluationProtocol, LabEvaluationRun } from "@/app/lib/labs-evaluations";
 import { ANALYTIC_CATALOG } from "@/app/lib/production-analytics";
 import type { SeasonSnapshotBatch } from "@/app/lib/season-snapshot";
 
@@ -90,6 +91,55 @@ const candidateFixture: LabCandidate = {
   productionResolvable: false,
 };
 
+const protocolFixture: EvaluationProtocol = {
+  id: "protocol.nav-defense.fixture.v1",
+  targetAnalyticId: "nav.defense",
+  name: "Frozen D-NAV evidence protocol",
+  version: "v1",
+  purpose: "Fixture only",
+  populationDefinition: "Fixture population",
+  exclusions: "Fixture exclusions",
+  trainDefinition: "Fixture train",
+  validationDefinition: "Fixture validation",
+  holdoutDefinition: "Fixture holdout",
+  randomSeedPolicy: "Fixed fixture seed",
+  leakageControls: "No fixture leakage",
+  minimumCoverage: "Overall and position cohorts",
+  fingerprint: verifiedBatch.integrityHash,
+  schemaVersion: 1,
+  createdAt: verifiedBatch.createdAt,
+  createdBy: "fixture",
+  createdSource: "isolated-test",
+  metrics: [{ id: "metric.fixture", name: "Fixture metric", unit: "cap-share-pp", requiredCohorts: ["overall"], definition: "Fixture definition", metadataSchemaVersion: 1 }],
+  gates: [{ id: "gate.fixture", metricId: "metric.fixture", cohortId: "overall", operator: "GTE", thresholdValue: 0.1, unit: "cap-share-pp", required: true, description: "Fixture gate", metadataSchemaVersion: 1 }],
+};
+
+const runFixture: LabEvaluationRun = {
+  id: "run.nav-defense.fixture.v1",
+  candidate: { ...candidateFixture, lifecycleStatus: "REGISTERED" },
+  candidateLifecycleStatusAtRegistration: "REGISTERED",
+  protocol: protocolFixture,
+  dataset: verifiedBatch,
+  baseline: ANALYTIC_CATALOG.find(analytic => analytic.id === "nav.defense")! as LabEvaluationRun["baseline"],
+  implementationCommit: "e232d9684f43d8ed21e384ca3f812c7db2261618",
+  deterministicSeed: "42",
+  environmentMetadata: "fixture",
+  status: "COMPLETED",
+  startedAt: verifiedBatch.createdAt,
+  completedAt: verifiedBatch.createdAt,
+  resultSetFingerprint: verifiedBatch.integrityHash,
+  failureReason: null,
+  invalidationReason: null,
+  metadataSchemaVersion: 1,
+  createdAt: verifiedBatch.createdAt,
+  createdBy: "fixture",
+  createdSource: "isolated-test",
+  artifacts: [],
+  observations: [{ id: "observation.fixture", metricId: "metric.fixture", cohortId: "overall", observedValue: 0.0334, unit: "cap-share-pp", sampleSize: 10, uncertaintyLower: -0.0701, uncertaintyUpper: 0.1546, calculationIdentity: "fixture", evidenceArtifactId: null, metadataSchemaVersion: 1 }],
+  gateOutcomes: [{ id: "outcome.fixture", gateId: "gate.fixture", observedValue: 1, evidenceArtifactId: null, result: "FAIL", reason: "Fixture failure", evaluatorIdentity: "fixture", metadataSchemaVersion: 1 }],
+  productionResolvable: false,
+};
+
 describe("Phase 2 Analytics Labs Admin overview", () => {
   it("renders production metadata, verified provenance, and explicit legacy warning without mutation controls", () => {
     const html = renderToStaticMarkup(React.createElement(LabsOverview, {
@@ -99,6 +149,9 @@ describe("Phase 2 Analytics Labs Admin overview", () => {
       snapshotState: "available",
       candidates: [],
       candidateState: "available",
+      protocols: [],
+      runs: [],
+      evaluationState: "available",
     }));
 
     expect(html).toContain("ANALYTICS LABS");
@@ -112,6 +165,8 @@ describe("Phase 2 Analytics Labs Admin overview", () => {
     expect(html).toContain("5af40ed576d53014…");
     expect(html).toContain(`Full SHA-256 integrity fingerprint ${verifiedBatch.integrityHash}`);
     expect(html).toContain("No candidates are registered. Registration will not imply validation or promotion.");
+    expect(html).toContain("No evaluation protocols are registered. This page cannot create or revise one.");
+    expect(html).toContain("No evaluation runs are recorded. This page cannot run or rerun a candidate.");
     expect(html).not.toContain("<button");
     expect(html).not.toContain("player_season_snapshots");
   });
@@ -124,11 +179,15 @@ describe("Phase 2 Analytics Labs Admin overview", () => {
       snapshotState: "unavailable",
       candidates: [],
       candidateState: "unavailable",
+      protocols: [],
+      runs: [],
+      evaluationState: "unavailable",
     }));
 
     expect(html).toContain("No verified COMPLETE snapshot batch is currently available.");
     expect(html).toContain("Inventory unavailable");
     expect(html).toContain("Candidate inventory unavailable. No candidate is treated as production-ready.");
+    expect(html).toContain("Evaluation evidence inventory unavailable. No missing record is treated as a pass.");
     expect(read("app/globals.css")).toMatch(/\.admin-labs-safe-text\s*\{[\s\S]*?overflow-wrap:\s*anywhere/);
     expect(read("app/globals.css")).toMatch(/\.admin-labs-id\s*,[\s\S]*?word-break:\s*break-word/);
   });
@@ -141,6 +200,9 @@ describe("Phase 2 Analytics Labs Admin overview", () => {
       snapshotState: "available",
       candidates: [candidateFixture],
       candidateState: "available",
+      protocols: [],
+      runs: [],
+      evaluationState: "available",
     }));
 
     expect(html).toContain("Role-aware D-NAV research candidate");
@@ -150,6 +212,23 @@ describe("Phase 2 Analytics Labs Admin overview", () => {
     expect(html).toContain("artifact.role-aware-defense-nav.v1");
     expect(html).toContain("1 append-only event · latest DRAFT_CREATED");
     expect(html).not.toContain("Create Candidate");
+    expect(html).not.toContain("<button");
+  });
+
+  it("renders read-only frozen protocol and run evidence without mutation controls", () => {
+    const html = renderToStaticMarkup(React.createElement(LabsOverview, {
+      analytics: ANALYTIC_CATALOG, verifiedBatches: [verifiedBatch], legacyInventory: { players: 1428, teams: 33 }, snapshotState: "available",
+      candidates: [candidateFixture], candidateState: "available", protocols: [protocolFixture], runs: [runFixture], evaluationState: "available",
+    }));
+    expect(html).toContain("EVALUATION PROTOCOLS");
+    expect(html).toContain("Frozen D-NAV evidence protocol");
+    expect(html).toContain("run.nav-defense.fixture.v1");
+    expect(html).toContain("1 metrics · 1 gates (0 pass · 1 fail · 0 inconclusive)");
+    expect(html).toContain("metric.fixture");
+    expect(html).toContain("overall · 0.0334 cap-share-pp");
+    expect(html).toContain("gate.fixture");
+    expect(html).toContain("· FAIL");
+    expect(html).not.toMatch(/Create Candidate|Run Candidate|Promote Candidate|Approve Candidate|Delete Candidate/);
     expect(html).not.toContain("<button");
   });
 
