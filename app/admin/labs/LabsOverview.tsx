@@ -167,6 +167,18 @@ function RunCard({ run }: { run: LabEvaluationRun }) {
         <div><dt>Baseline</dt><dd><code>{run.baseline.id}</code> · {run.baseline.version.value}</dd></div>
         <div><dt>Verified dataset</dt><dd className="admin-labs-safe-text"><code>{run.dataset.id}</code></dd></div>
         <div><dt>Evidence</dt><dd>{run.observations.length} metrics · {run.gateOutcomes.length} gates ({gateSummary.PASS ?? 0} pass · {gateSummary.FAIL ?? 0} fail · {gateSummary.INCONCLUSIVE ?? 0} inconclusive)</dd></div>
+        {run.observations.length > 0 && (
+          <div>
+            <dt>Metric observations</dt>
+            <dd className="admin-labs-safe-text">{run.observations.map(observation => <React.Fragment key={observation.id}><code>{observation.metricId}</code> · {observation.cohortId} · {observation.observedValue} {observation.unit}<br /></React.Fragment>)}</dd>
+          </div>
+        )}
+        {run.gateOutcomes.length > 0 && (
+          <div>
+            <dt>Gate outcomes</dt>
+            <dd className="admin-labs-safe-text">{run.gateOutcomes.map(outcome => <React.Fragment key={outcome.id}><code>{outcome.gateId}</code> · {outcome.result}<br /></React.Fragment>)}</dd>
+          </div>
+        )}
       </dl>
     </article>
   );

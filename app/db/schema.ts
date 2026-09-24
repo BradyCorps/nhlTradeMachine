@@ -313,7 +313,7 @@ export const labsEvaluationProtocols = sqliteTable("labs_evaluation_protocols", 
 });
 
 export const labsEvaluationProtocolMetrics = sqliteTable("labs_evaluation_protocol_metrics", {
-  protocolId:     text("protocol_id").notNull().references(() => labsEvaluationProtocols.id),
+  protocolId:     text("protocol_id").notNull().references(() => labsEvaluationProtocols.id, { onDelete: "restrict" }),
   metricId:       text("metric_id").notNull(),
   name:           text("name").notNull(),
   unit:           text("unit").notNull(),
@@ -323,7 +323,7 @@ export const labsEvaluationProtocolMetrics = sqliteTable("labs_evaluation_protoc
 });
 
 export const labsEvaluationProtocolGates = sqliteTable("labs_evaluation_protocol_gates", {
-  protocolId:     text("protocol_id").notNull().references(() => labsEvaluationProtocols.id),
+  protocolId:     text("protocol_id").notNull().references(() => labsEvaluationProtocols.id, { onDelete: "restrict" }),
   gateId:         text("gate_id").notNull(),
   metricId:       text("metric_id").notNull(),
   cohortId:       text("cohort_id").notNull(),
@@ -337,12 +337,12 @@ export const labsEvaluationProtocolGates = sqliteTable("labs_evaluation_protocol
 
 export const labsEvaluationRuns = sqliteTable("labs_evaluation_runs", {
   id:                     text("id").primaryKey(),
-  candidateId:            text("candidate_id").notNull().references(() => labsCandidates.id),
+  candidateId:            text("candidate_id").notNull().references(() => labsCandidates.id, { onDelete: "restrict" }),
   candidateRevision:      text("candidate_revision").notNull(),
   candidateLifecycleStatus: text("candidate_lifecycle_status").notNull(), // REGISTERED when frozen
-  protocolId:             text("protocol_id").notNull().references(() => labsEvaluationProtocols.id),
+  protocolId:             text("protocol_id").notNull().references(() => labsEvaluationProtocols.id, { onDelete: "restrict" }),
   protocolFingerprint:    text("protocol_fingerprint").notNull(),
-  datasetBatchId:         text("dataset_batch_id").notNull().references(() => seasonSnapshotBatches.id),
+  datasetBatchId:         text("dataset_batch_id").notNull().references(() => seasonSnapshotBatches.id, { onDelete: "restrict" }),
   baselineAnalyticId:     text("baseline_analytic_id").notNull(),
   baselineVersion:        text("baseline_version").notNull(),
   baselineImplementation: text("baseline_implementation").notNull(),
@@ -362,8 +362,8 @@ export const labsEvaluationRuns = sqliteTable("labs_evaluation_runs", {
 });
 
 export const labsEvaluationRunArtifacts = sqliteTable("labs_evaluation_run_artifacts", {
-  runId:             text("run_id").notNull().references(() => labsEvaluationRuns.id),
-  artifactId:        text("artifact_id").notNull().references(() => labsArtifacts.id),
+  runId:             text("run_id").notNull().references(() => labsEvaluationRuns.id, { onDelete: "restrict" }),
+  artifactId:        text("artifact_id").notNull().references(() => labsArtifacts.id, { onDelete: "restrict" }),
   contentDigest:     text("content_digest").notNull(), // frozen artifact digest
   role:              text("role").notNull(), // candidate-input | evidence
   attachedAt:        integer("attached_at").notNull(),
@@ -372,7 +372,7 @@ export const labsEvaluationRunArtifacts = sqliteTable("labs_evaluation_run_artif
 
 export const labsEvaluationMetricObservations = sqliteTable("labs_evaluation_metric_observations", {
   id:                  text("id").primaryKey(),
-  runId:               text("run_id").notNull().references(() => labsEvaluationRuns.id),
+  runId:               text("run_id").notNull().references(() => labsEvaluationRuns.id, { onDelete: "restrict" }),
   metricId:             text("metric_id").notNull(),
   cohortId:             text("cohort_id").notNull(),
   observedValue:        real("observed_value").notNull(),
@@ -381,16 +381,16 @@ export const labsEvaluationMetricObservations = sqliteTable("labs_evaluation_met
   uncertaintyLower:     real("uncertainty_lower"),
   uncertaintyUpper:     real("uncertainty_upper"),
   calculationIdentity:  text("calculation_identity").notNull(),
-  evidenceArtifactId:   text("evidence_artifact_id").references(() => labsArtifacts.id),
+  evidenceArtifactId:   text("evidence_artifact_id").references(() => labsArtifacts.id, { onDelete: "restrict" }),
   metadataSchemaVersion: integer("metadata_schema_version").notNull(),
 });
 
 export const labsEvaluationGateResults = sqliteTable("labs_evaluation_gate_results", {
   id:                  text("id").primaryKey(),
-  runId:               text("run_id").notNull().references(() => labsEvaluationRuns.id),
+  runId:               text("run_id").notNull().references(() => labsEvaluationRuns.id, { onDelete: "restrict" }),
   gateId:              text("gate_id").notNull(),
   observedValue:       real("observed_value"),
-  evidenceArtifactId:  text("evidence_artifact_id").references(() => labsArtifacts.id),
+  evidenceArtifactId:  text("evidence_artifact_id").references(() => labsArtifacts.id, { onDelete: "restrict" }),
   result:              text("result").notNull(), // PASS | FAIL | INCONCLUSIVE
   reason:              text("reason").notNull(),
   evaluatorIdentity:   text("evaluator_identity").notNull(),

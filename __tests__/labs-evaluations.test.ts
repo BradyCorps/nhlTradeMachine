@@ -8,6 +8,7 @@ import * as schema from "@/app/db/schema";
 import { SEASON_SNAPSHOT_TABLE_STATEMENTS } from "@/app/db/ensure-schema";
 import {
   LabsEvaluationIntegrityError,
+  evaluateGateThreshold,
   fingerprintEvaluationProtocol,
   getEvaluationRun,
   isEvaluationProductionResolvable,
@@ -79,6 +80,12 @@ async function seedCompleteRun(db: Awaited<ReturnType<typeof fixtureDb>>) {
     mediaType: "application/json", artifactSchemaVersion: "report-v1", repositoryCommit: COMMIT, repositoryPath: "docs/analytics/fixture.json",
     immutableReference: null, byteSize: 1, metadataSchemaVersion: 1, createdAt: 10, createdBy: "test", createdSource: "isolated-test",
   });
+  await db.insert(schema.labsArtifacts).values({
+    id: "artifact.evaluation.config.v1", kind: "configuration", contentDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", implementationIdentity: candidate.implementationIdentity,
+    mediaType: "application/json", artifactSchemaVersion: "config-v1", repositoryCommit: COMMIT, repositoryPath: "docs/analytics/config.json",
+    immutableReference: null, byteSize: 1, metadataSchemaVersion: 1, createdAt: 10, createdBy: "test", createdSource: "isolated-test",
+  });
+  await db.insert(schema.labsCandidateArtifacts).values({ candidateId: candidate.id, artifactId: "artifact.evaluation.config.v1", role: "configuration", attachedAt: 10, attachedBy: "test" });
   const protocol = protocolFixture();
   await db.insert(schema.labsEvaluationProtocols).values({ ...protocol, fingerprint: protocol.fingerprint });
   await db.insert(schema.labsEvaluationProtocolMetrics).values(protocol.metrics.map(metric => ({
@@ -96,11 +103,14 @@ async function seedCompleteRun(db: Awaited<ReturnType<typeof fixtureDb>>) {
     status: "COMPLETED", startedAt: 12, completedAt: 13, resultSetFingerprint: DIGEST, failureReason: null, invalidationReason: null,
     schemaVersion: 1, createdAt: 12, createdBy: "test", createdSource: "isolated-test",
   });
-  await db.insert(schema.labsEvaluationRunArtifacts).values({ runId: "run.nav-market.fixture.v1", artifactId: "artifact.evaluation.report.v1", contentDigest: DIGEST, role: "evidence", attachedAt: 13, attachedBy: "test" });
-  const observations = [["overall", 0.0334], ["forward", 0.0551], ["defense", -0.2356], ["goalie", 0.7093]] as const;
-  await db.insert(schema.labsEvaluationMetricObservations).values(observations.map(([cohortId, observedValue]) => ({
+  await db.insert(schema.labsEvaluationRunArtifacts).values([
+    { runId: "run.nav-market.fixture.v1", artifactId: "artifact.evaluation.report.v1", contentDigest: DIGEST, role: "evidence", attachedAt: 13, attachedBy: "test" },
+    { runId: "run.nav-market.fixture.v1", artifactId: "artifact.evaluation.config.v1", contentDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", role: "candidate-input", attachedAt: 13, attachedBy: "test" },
+  ]);
+  const observations = [["overall", 0.0334, -0.0701, 0.1546], ["forward", 0.0551, -0.0449, 0.1551], ["defense", -0.2356, -0.3356, -0.1356], ["goalie", 0.7093, 0.6093, 0.8093]] as const;
+  await db.insert(schema.labsEvaluationMetricObservations).values(observations.map(([cohortId, observedValue, uncertaintyLower, uncertaintyUpper]) => ({
     id: `observation.${cohortId}`, runId: "run.nav-market.fixture.v1", metricId: "metric.mae-delta", cohortId, observedValue,
-    unit: "cap-share-pp", sampleSize: 10, uncertaintyLower: observedValue - 0.1, uncertaintyUpper: observedValue + 0.1,
+    unit: "cap-share-pp", sampleSize: 10, uncertaintyLower, uncertaintyUpper,
     calculationIdentity: "fixture-v1", evidenceArtifactId: "artifact.evaluation.report.v1", metadataSchemaVersion: 1,
   })));
   await db.insert(schema.labsEvaluationGateResults).values([
@@ -124,12 +134,19 @@ describe("Phase 4 Analytics Labs evaluation evidence", () => {
     expect(run.gateOutcomes.find(outcome => outcome.gateId === "gate.forward")?.result).toBe("PASS");
     expect(run.gateOutcomes.find(outcome => outcome.gateId === "gate.defense")?.result).toBe("FAIL");
     expect(run.gateOutcomes.find(outcome => outcome.gateId === "gate.goalie")?.result).toBe("PASS");
+    expect(run.observations.find(observation => observation.cohortId === "overall")).toMatchObject({ observedValue: 0.0334, uncertaintyLower: -0.0701, uncertaintyUpper: 0.1546 });
     expect(run.dataset.status).toBe("COMPLETE");
     expect(run.candidate.lifecycleStatus).toBe("REGISTERED");
     expect(run.baseline).toBe(getProductionAnalytic("nav.defense"));
+    expect(run.artifacts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: "candidate-input", contentDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }),
+      expect.objectContaining({ role: "evidence", contentDigest: DIGEST }),
+    ]));
     expect(isEvaluationProductionResolvable(run)).toBe(false);
     expect(Object.isFrozen(run)).toBe(true);
     expect(Object.isFrozen(run.gateOutcomes)).toBe(true);
+    await db.insert(schema.labsCandidateLifecycleEvents).values({ id: "event.evaluation.retired", candidateId: "candidate.nav-defense.evaluation.v1", sequence: 3, eventType: "RETIRED", previousStatus: "REGISTERED", resultingStatus: "RETIRED", occurredAt: 14, actor: "test", source: "isolated-test", note: "Fixture retirement", evidenceReference: null, metadataSchemaVersion: 1 });
+    await expect(getEvaluationRun(db, "run.nav-market.fixture.v1")).resolves.toMatchObject({ status: "COMPLETED", candidate: { lifecycleStatus: "RETIRED" } });
   });
 
   it("fails closed for rewritten protocol fingerprints, missing cohorts, threshold contradictions, and non-production evidence", async () => {
@@ -140,6 +157,51 @@ describe("Phase 4 Analytics Labs evaluation evidence", () => {
     await expect(db.run(sql.raw("UPDATE labs_evaluation_runs SET baseline_analytic_id = 'gravity.v4'"))).rejects.toThrow();
     expect(() => getProductionAnalytic("gravity.v4")).toThrow(/not a production analytic/);
     expect(() => fingerprintEvaluationProtocol({ ...protocol, gates: [...protocol.gates, { ...protocol.gates[0]!, id: "gate.changed", thresholdValue: 0.2 }] })).not.toBe(protocol.fingerprint);
+  });
+
+  it("canonicalizes protocol fingerprints and uses exact, documented gate boundaries", () => {
+    const protocol = protocolFixture();
+    const whitespaceAndOrderVariant = {
+      ...protocol,
+      name: "  Market   calibration\n evaluation ",
+      metrics: [...protocol.metrics].map(metric => ({ ...metric, requiredCohorts: [...metric.requiredCohorts].reverse() })),
+      gates: [...protocol.gates].reverse(),
+    };
+    expect(fingerprintEvaluationProtocol(whitespaceAndOrderVariant)).toBe(protocol.fingerprint);
+    expect(fingerprintEvaluationProtocol({ ...protocol, gates: protocol.gates.map(gate => gate.id === "gate.overall-improvement" ? { ...gate, thresholdValue: 0.1000001 } : gate) })).not.toBe(protocol.fingerprint);
+    expect(evaluateGateThreshold("GT", 0.1, 0.1)).toBe(false);
+    expect(evaluateGateThreshold("GTE", 0.1, 0.1)).toBe(true);
+    expect(evaluateGateThreshold("LT", 0.1, 0.1)).toBe(false);
+    expect(evaluateGateThreshold("LTE", 0.1, 0.1)).toBe(true);
+    expect(evaluateGateThreshold("EQ", 0.1, 0.1)).toBe(true);
+    expect(() => evaluateGateThreshold("GTE", Number.NaN, 0)).toThrow(/finite/);
+    expect(() => evaluateGateThreshold("GTE", Number.POSITIVE_INFINITY, 0)).toThrow(/finite/);
+    expect(() => evaluateGateThreshold("GTE", 0, Number.NEGATIVE_INFINITY)).toThrow(/finite/);
+  });
+
+  it("rejects planned result claims and failed PASS outcomes while retaining completed evidence immutable", async () => {
+    const { candidate, protocol } = await seedCompleteRun(db);
+    const common = {
+      candidateId: candidate.id, candidateRevision: candidate.revision, candidateLifecycleStatus: "REGISTERED" as const,
+      protocolId: protocol.id, protocolFingerprint: protocol.fingerprint, datasetBatchId: BATCH_ID,
+      baselineAnalyticId: "nav.defense", baselineVersion: "X-NAV 4.2", baselineImplementation: "calcNAV.defense-dispatch",
+      deterministicSeed: null, environmentMetadata: "isolated fixture", schemaVersion: 1, createdAt: 20, createdBy: "test", createdSource: "isolated-test",
+    };
+    await db.insert(schema.labsEvaluationRuns).values({ ...common, id: "run.planned.clean.v1", implementationCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", status: "PLANNED", startedAt: null, completedAt: null, resultSetFingerprint: null, failureReason: null, invalidationReason: null });
+    await db.insert(schema.labsEvaluationRunArtifacts).values({ runId: "run.planned.clean.v1", artifactId: "artifact.evaluation.config.v1", contentDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", role: "candidate-input", attachedAt: 20, attachedBy: "test" });
+    await expect(getEvaluationRun(db, "run.planned.clean.v1")).resolves.toMatchObject({ status: "PLANNED" });
+    await db.insert(schema.labsEvaluationRuns).values({ ...common, id: "run.planned.results.v1", implementationCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", status: "PLANNED", startedAt: null, completedAt: null, resultSetFingerprint: DIGEST, failureReason: null, invalidationReason: null });
+    await db.insert(schema.labsEvaluationRunArtifacts).values({ runId: "run.planned.results.v1", artifactId: "artifact.evaluation.config.v1", contentDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", role: "candidate-input", attachedAt: 20, attachedBy: "test" });
+    await expect(getEvaluationRun(db, "run.planned.results.v1")).rejects.toThrow(/claims completed evidence/);
+    await db.insert(schema.labsEvaluationRuns).values({ ...common, id: "run.failed.pass.v1", implementationCommit: "cccccccccccccccccccccccccccccccccccccccc", status: "FAILED", startedAt: 20, completedAt: 21, resultSetFingerprint: null, failureReason: "fixture failure", invalidationReason: null });
+    await db.insert(schema.labsEvaluationRunArtifacts).values({ runId: "run.failed.pass.v1", artifactId: "artifact.evaluation.config.v1", contentDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", role: "candidate-input", attachedAt: 20, attachedBy: "test" });
+    await db.insert(schema.labsEvaluationGateResults).values({ id: "outcome.failed.pass", runId: "run.failed.pass.v1", gateId: "gate.overall-improvement", observedValue: 0.2, evidenceArtifactId: null, result: "PASS", reason: "bad fixture", evaluatorIdentity: "fixture", metadataSchemaVersion: 1 });
+    await expect(getEvaluationRun(db, "run.failed.pass.v1")).rejects.toThrow(/cannot present a successful validation/);
+    await db.insert(schema.labsEvaluationRuns).values({ ...common, id: "run.invalidated.v1", implementationCommit: "dddddddddddddddddddddddddddddddddddddddd", status: "INVALIDATED", startedAt: 20, completedAt: 21, resultSetFingerprint: DIGEST, failureReason: null, invalidationReason: "Fixture invalidation" });
+    await db.insert(schema.labsEvaluationRunArtifacts).values({ runId: "run.invalidated.v1", artifactId: "artifact.evaluation.config.v1", contentDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", role: "candidate-input", attachedAt: 20, attachedBy: "test" });
+    const invalidated = await getEvaluationRun(db, "run.invalidated.v1");
+    expect(invalidated.status).toBe("INVALIDATED");
+    expect(isEvaluationProductionResolvable(invalidated)).toBe(false);
   });
 
   it("keeps an honest empty protocol/run inventory distinct from malformed evidence", async () => {

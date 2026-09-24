@@ -18,6 +18,7 @@ import {
 import {
   LabsCandidateIntegrityError,
   getLabCandidate,
+  validateCandidateTarget,
   type LabArtifactDefinition,
   type LabCandidate,
 } from "@/app/lib/labs-candidates";
@@ -170,6 +171,21 @@ function assertSchemaVersion(value: number): void {
   }
 }
 
+/** Protocol fingerprints are locale-free and ignore presentation whitespace. */
+function canonicalText(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function canonicalNumber(value: number): number {
+  if (!Number.isFinite(value)) throw new LabsEvaluationIntegrityError("Protocol fingerprint contains a non-finite number.");
+  return Object.is(value, -0) ? 0 : value;
+}
+
+/** Stable byte-wise order; unlike localeCompare this cannot vary by host locale. */
+function compareStableIds(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function parseCohorts(value: string, metricId: string): readonly string[] {
   try {
     const parsed = JSON.parse(value) as unknown;
@@ -184,25 +200,38 @@ function parseCohorts(value: string, metricId: string): readonly string[] {
   }
 }
 
-/** Deterministic protocol identity over the frozen metadata and sorted definitions. */
+/**
+ * Deterministic protocol identity over frozen metadata. Object keys are
+ * constructed in one fixed order; definition rows and cohorts are sorted;
+ * insignificant whitespace and -0 are normalized; JSON numbers are locale
+ * independent. Gate comparisons deliberately use exact IEEE-754 semantics.
+ */
 export function fingerprintEvaluationProtocol(protocol: Omit<EvaluationProtocol, "fingerprint">): string {
   const canonical = JSON.stringify({
-    id: protocol.id,
-    targetAnalyticId: protocol.targetAnalyticId,
-    name: protocol.name,
-    version: protocol.version,
-    purpose: protocol.purpose,
-    populationDefinition: protocol.populationDefinition,
-    exclusions: protocol.exclusions,
-    trainDefinition: protocol.trainDefinition,
-    validationDefinition: protocol.validationDefinition,
-    holdoutDefinition: protocol.holdoutDefinition,
-    randomSeedPolicy: protocol.randomSeedPolicy,
-    leakageControls: protocol.leakageControls,
-    minimumCoverage: protocol.minimumCoverage,
+    id: canonicalText(protocol.id),
+    targetAnalyticId: canonicalText(protocol.targetAnalyticId),
+    name: canonicalText(protocol.name),
+    version: canonicalText(protocol.version),
+    purpose: canonicalText(protocol.purpose),
+    populationDefinition: canonicalText(protocol.populationDefinition),
+    exclusions: canonicalText(protocol.exclusions),
+    trainDefinition: canonicalText(protocol.trainDefinition),
+    validationDefinition: canonicalText(protocol.validationDefinition),
+    holdoutDefinition: canonicalText(protocol.holdoutDefinition),
+    randomSeedPolicy: canonicalText(protocol.randomSeedPolicy),
+    leakageControls: canonicalText(protocol.leakageControls),
+    minimumCoverage: canonicalText(protocol.minimumCoverage),
     schemaVersion: protocol.schemaVersion,
-    metrics: [...protocol.metrics].sort((a, b) => a.id.localeCompare(b.id)),
-    gates: [...protocol.gates].sort((a, b) => a.id.localeCompare(b.id)),
+    metrics: [...protocol.metrics].map(metric => ({
+      id: canonicalText(metric.id), name: canonicalText(metric.name), unit: canonicalText(metric.unit),
+      requiredCohorts: [...metric.requiredCohorts].map(canonicalText).sort(), definition: canonicalText(metric.definition),
+      metadataSchemaVersion: metric.metadataSchemaVersion,
+    })).sort((a, b) => compareStableIds(a.id, b.id)),
+    gates: [...protocol.gates].map(gate => ({
+      id: canonicalText(gate.id), metricId: canonicalText(gate.metricId), cohortId: canonicalText(gate.cohortId), operator: gate.operator,
+      thresholdValue: canonicalNumber(gate.thresholdValue), unit: canonicalText(gate.unit), required: gate.required,
+      description: canonicalText(gate.description), metadataSchemaVersion: gate.metadataSchemaVersion,
+    })).sort((a, b) => compareStableIds(a.id, b.id)),
   });
   return createHash("sha256").update(canonical).digest("hex");
 }
@@ -218,11 +247,15 @@ function freezeProtocol(protocol: EvaluationProtocol): EvaluationProtocol {
 function validateProtocol(protocol: EvaluationProtocol): void {
   assertStableId("Protocol ID", protocol.id);
   assertStableId("Protocol target analytic ID", protocol.targetAnalyticId);
+  validateCandidateTarget(protocol.targetAnalyticId);
   if (!protocol.name || !protocol.version || !protocol.purpose || !protocol.populationDefinition || !protocol.trainDefinition || !protocol.validationDefinition || !protocol.holdoutDefinition || !protocol.randomSeedPolicy || !protocol.leakageControls || !protocol.minimumCoverage) {
     throw new LabsEvaluationIntegrityError(`Protocol ${protocol.id} is missing frozen planning metadata.`);
   }
   if (!SHA_256.test(protocol.fingerprint)) throw new LabsEvaluationIntegrityError(`Protocol ${protocol.id} has an invalid SHA-256 fingerprint.`);
   assertSchemaVersion(protocol.schemaVersion);
+  if (protocol.metrics.length === 0 || protocol.gates.length === 0) {
+    throw new LabsEvaluationIntegrityError(`Protocol ${protocol.id} requires frozen metric and gate definitions.`);
+  }
   const metricIds = new Set<string>();
   for (const metric of protocol.metrics) {
     assertStableId("Protocol metric ID", metric.id);
@@ -234,7 +267,7 @@ function validateProtocol(protocol: EvaluationProtocol): void {
   const gateIds = new Set<string>();
   for (const gate of protocol.gates) {
     assertStableId("Protocol gate ID", gate.id);
-    if (gateIds.has(gate.id) || !metricIds.has(gate.metricId) || !includes(GATE_OPERATORS, gate.operator) || !Number.isFinite(gate.thresholdValue) || !gate.unit || !gate.description) {
+    if (gateIds.has(gate.id) || !metricIds.has(gate.metricId) || !includes(GATE_OPERATORS, gate.operator) || !Number.isFinite(gate.thresholdValue) || !gate.unit || !gate.description || typeof gate.required !== "boolean") {
       throw new LabsEvaluationIntegrityError(`Protocol ${protocol.id} has an invalid frozen gate.`);
     }
     gateIds.add(gate.id);
@@ -248,7 +281,11 @@ function validateProtocol(protocol: EvaluationProtocol): void {
   if (expected !== protocol.fingerprint) throw new LabsEvaluationIntegrityError(`Protocol ${protocol.id} fingerprint does not match frozen definitions.`);
 }
 
-function outcomeFor(operator: GateOperator, observed: number, threshold: number): boolean {
+/** Exact, tolerance-free threshold comparison for a frozen gate. */
+export function evaluateGateThreshold(operator: GateOperator, observed: number, threshold: number): boolean {
+  if (!includes(GATE_OPERATORS, operator)) throw new LabsEvaluationIntegrityError(`Unknown gate operator: ${operator}.`);
+  assertFinite("Gate observation", observed);
+  assertFinite("Gate threshold", threshold);
   if (operator === "GT") return observed > threshold;
   if (operator === "GTE") return observed >= threshold;
   if (operator === "LT") return observed < threshold;
@@ -297,7 +334,7 @@ async function readProtocols(db: LabsReadDb, protocolId?: string): Promise<reado
     });
     validateProtocol(protocol);
     return protocol;
-  }).sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id)));
+  }).sort((a, b) => b.createdAt - a.createdAt || compareStableIds(a.id, b.id)));
 }
 
 export async function listEvaluationProtocols(db: LabsReadDb): Promise<readonly EvaluationProtocol[]> {
@@ -313,11 +350,12 @@ export async function getEvaluationProtocol(db: LabsReadDb, protocolId: string):
 
 function validateRunStatus(row: typeof labsEvaluationRuns.$inferSelect): EvaluationRunStatus {
   if (!includes(EVALUATION_RUN_STATUSES, row.status)) throw new LabsEvaluationIntegrityError(`Run ${row.id} has an unknown status.`);
-  if (row.status === "COMPLETED" && (!row.startedAt || !row.completedAt || !row.resultSetFingerprint || !SHA_256.test(row.resultSetFingerprint))) {
+  if (row.status === "COMPLETED" && (row.startedAt === null || row.completedAt === null || row.completedAt < row.startedAt || !row.resultSetFingerprint || !SHA_256.test(row.resultSetFingerprint) || row.failureReason !== null || row.invalidationReason !== null)) {
     throw new LabsEvaluationIntegrityError(`Completed run ${row.id} is missing immutable result provenance.`);
   }
-  if (row.status === "FAILED" && !row.failureReason) throw new LabsEvaluationIntegrityError(`Failed run ${row.id} is missing its failure reason.`);
-  if (row.status === "INVALIDATED" && !row.invalidationReason) throw new LabsEvaluationIntegrityError(`Invalidated run ${row.id} is missing its invalidation reason.`);
+  if (row.status === "PLANNED" && (row.startedAt !== null || row.completedAt !== null || row.resultSetFingerprint !== null || row.failureReason !== null || row.invalidationReason !== null)) throw new LabsEvaluationIntegrityError(`Planned run ${row.id} claims completed evidence.`);
+  if (row.status === "FAILED" && (!row.failureReason || row.startedAt === null || row.completedAt === null || row.completedAt < row.startedAt || row.invalidationReason !== null)) throw new LabsEvaluationIntegrityError(`Failed run ${row.id} has incoherent failure provenance.`);
+  if (row.status === "INVALIDATED" && (!row.invalidationReason || row.failureReason !== null)) throw new LabsEvaluationIntegrityError(`Invalidated run ${row.id} has incoherent invalidation provenance.`);
   return row.status;
 }
 
@@ -354,7 +392,7 @@ async function readRuns(db: LabsReadDb, runId?: string): Promise<readonly LabEva
     if (!GIT_COMMIT.test(row.implementationCommit) || !SHA_256.test(row.protocolFingerprint)) throw new LabsEvaluationIntegrityError(`Run ${row.id} has invalid frozen implementation provenance.`);
     const candidate = candidates.get(row.candidateId)!;
     const protocol = protocols.get(row.protocolId)!;
-    if (row.candidateLifecycleStatus !== "REGISTERED" || (candidate.lifecycleStatus !== "REGISTERED" && candidate.lifecycleStatus !== "RETIRED") || candidate.revision !== row.candidateRevision || candidate.targetAnalytic.id !== protocol.targetAnalyticId) throw new LabsEvaluationIntegrityError(`Run ${row.id} does not reference a registered coherent candidate.`);
+    if (row.candidateLifecycleStatus !== "REGISTERED" || (candidate.lifecycleStatus !== "REGISTERED" && candidate.lifecycleStatus !== "RETIRED") || (row.status === "PLANNED" && candidate.lifecycleStatus !== "REGISTERED") || candidate.revision !== row.candidateRevision || candidate.targetAnalytic.id !== protocol.targetAnalyticId) throw new LabsEvaluationIntegrityError(`Run ${row.id} does not reference a registered coherent candidate.`);
     if (protocol.fingerprint !== row.protocolFingerprint || candidate.dataset.id !== row.datasetBatchId) throw new LabsEvaluationIntegrityError(`Run ${row.id} does not preserve candidate/protocol provenance.`);
     const dataset = await requireCompleteSeasonSnapshotBatch(db as any, row.datasetBatchId);
     const baseline = getProductionAnalytic(row.baselineAnalyticId);
@@ -388,10 +426,16 @@ async function readRuns(db: LabsReadDb, runId?: string): Promise<readonly LabEva
       if (!gate || (outcome.evidenceArtifactId && !permittedEvidence.has(outcome.evidenceArtifactId))) throw new LabsEvaluationIntegrityError(`Gate outcome ${outcome.id} does not match the frozen protocol.`);
       if (outcome.observedValue !== null) assertFinite(`Gate outcome ${outcome.id}`, outcome.observedValue);
       if (outcome.result === "PASS" && outcome.observedValue === null) throw new LabsEvaluationIntegrityError(`Gate outcome ${outcome.id} cannot establish PASS from prose alone.`);
-      if (outcome.observedValue !== null && (outcome.result === "PASS") !== outcomeFor(gate.operator, outcome.observedValue, gate.thresholdValue)) throw new LabsEvaluationIntegrityError(`Gate outcome ${outcome.id} contradicts its frozen threshold.`);
+      if (outcome.observedValue !== null && (outcome.result === "PASS") !== evaluateGateThreshold(gate.operator, outcome.observedValue, gate.thresholdValue)) throw new LabsEvaluationIntegrityError(`Gate outcome ${outcome.id} contradicts its frozen threshold.`);
       assertSchemaVersion(outcome.metadataSchemaVersion);
       return Object.freeze({ id: outcome.id, gateId: outcome.gateId, observedValue: outcome.observedValue, evidenceArtifactId: outcome.evidenceArtifactId, result: outcome.result, reason: outcome.reason, evaluatorIdentity: outcome.evaluatorIdentity, metadataSchemaVersion: outcome.metadataSchemaVersion });
     });
+    if (status === "PLANNED" && (runObservations.length > 0 || runGateOutcomes.length > 0)) {
+      throw new LabsEvaluationIntegrityError(`Planned run ${row.id} cannot present observations or gate outcomes.`);
+    }
+    if (status === "FAILED" && runGateOutcomes.some(outcome => outcome.result === "PASS")) {
+      throw new LabsEvaluationIntegrityError(`Failed run ${row.id} cannot present a successful validation outcome.`);
+    }
     if (status === "COMPLETED") {
       for (const metric of protocol.metrics) for (const cohort of metric.requiredCohorts) {
         if (!runObservations.some(observation => observation.metricId === metric.id && observation.cohortId === cohort)) throw new LabsEvaluationIntegrityError(`Completed run ${row.id} is missing required ${metric.id}/${cohort} evidence.`);
@@ -408,7 +452,7 @@ async function readRuns(db: LabsReadDb, runId?: string): Promise<readonly LabEva
       artifacts: Object.freeze(runArtifacts), observations: Object.freeze(runObservations), gateOutcomes: Object.freeze(runGateOutcomes), productionResolvable: false as const,
     }));
   }
-  return Object.freeze(result.sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id)));
+  return Object.freeze(result.sort((a, b) => b.createdAt - a.createdAt || compareStableIds(a.id, b.id)));
 }
 
 export async function listEvaluationRuns(db: LabsReadDb): Promise<readonly LabEvaluationRun[]> { return readRuns(db); }

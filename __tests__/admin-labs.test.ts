@@ -110,8 +110,8 @@ const protocolFixture: EvaluationProtocol = {
   createdAt: verifiedBatch.createdAt,
   createdBy: "fixture",
   createdSource: "isolated-test",
-  metrics: [],
-  gates: [],
+  metrics: [{ id: "metric.fixture", name: "Fixture metric", unit: "cap-share-pp", requiredCohorts: ["overall"], definition: "Fixture definition", metadataSchemaVersion: 1 }],
+  gates: [{ id: "gate.fixture", metricId: "metric.fixture", cohortId: "overall", operator: "GTE", thresholdValue: 0.1, unit: "cap-share-pp", required: true, description: "Fixture gate", metadataSchemaVersion: 1 }],
 };
 
 const runFixture: LabEvaluationRun = {
@@ -135,7 +135,7 @@ const runFixture: LabEvaluationRun = {
   createdBy: "fixture",
   createdSource: "isolated-test",
   artifacts: [],
-  observations: [],
+  observations: [{ id: "observation.fixture", metricId: "metric.fixture", cohortId: "overall", observedValue: 0.0334, unit: "cap-share-pp", sampleSize: 10, uncertaintyLower: -0.0701, uncertaintyUpper: 0.1546, calculationIdentity: "fixture", evidenceArtifactId: null, metadataSchemaVersion: 1 }],
   gateOutcomes: [{ id: "outcome.fixture", gateId: "gate.fixture", observedValue: 1, evidenceArtifactId: null, result: "FAIL", reason: "Fixture failure", evaluatorIdentity: "fixture", metadataSchemaVersion: 1 }],
   productionResolvable: false,
 };
@@ -223,7 +223,11 @@ describe("Phase 2 Analytics Labs Admin overview", () => {
     expect(html).toContain("EVALUATION PROTOCOLS");
     expect(html).toContain("Frozen D-NAV evidence protocol");
     expect(html).toContain("run.nav-defense.fixture.v1");
-    expect(html).toContain("0 metrics · 1 gates (0 pass · 1 fail · 0 inconclusive)");
+    expect(html).toContain("1 metrics · 1 gates (0 pass · 1 fail · 0 inconclusive)");
+    expect(html).toContain("metric.fixture");
+    expect(html).toContain("overall · 0.0334 cap-share-pp");
+    expect(html).toContain("gate.fixture");
+    expect(html).toContain("· FAIL");
     expect(html).not.toMatch(/Create Candidate|Run Candidate|Promote Candidate|Approve Candidate|Delete Candidate/);
     expect(html).not.toContain("<button");
   });
