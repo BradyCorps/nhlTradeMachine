@@ -93,4 +93,33 @@ describe("Players mobile stabilization", () => {
     expect(dateline).toContain("flex-wrap");
     expect(dateline).toContain("[&>span]:whitespace-nowrap");
   });
+
+  it("paints the mobile detail sheet opaque", () => {
+    const css = read("app/globals.css");
+
+    // `--paper-bg` has no :root definition, so a bare var() was transparent.
+    expect(css).not.toMatch(/:root[^}]*--paper-bg\s*:/);
+    expect(css).toMatch(/\.mobile-detail-sheet \{[^}]*background: var\(--paper-bg, var\(--paper\)\)/);
+    expect(css).toMatch(/\.mobile-detail-heading \{[^}]*background: var\(--paper-bg, var\(--paper\)\)/);
+  });
+
+  it("keeps sheet tabs at their label width and wraps them instead of overprinting", () => {
+    const css = read("app/globals.css");
+
+    expect(css).toContain('.mobile-detail-content [role="tablist"] > [role="tab"] { flex: 1 0 auto !important; min-height: 44px; }');
+    expect(css).toContain('.mobile-detail-content [role="tablist"] > a { flex: 1 0 100%; margin-left: 0 !important;');
+  });
+
+  it("keeps the player value card readable inside the narrow sheet", () => {
+    const card = read("app/components/PercentileCard.tsx");
+
+    // Overrides the sheet's overflow-wrap: anywhere, which shrank columns to one character.
+    expect(card).toMatch(/\.pcard \{ width: 100%;[\s\S]*?overflow-wrap: break-word;/);
+    expect(card).toMatch(/\.pcard-val \{[^}]*white-space: nowrap; \}/);
+    expect(card).toMatch(/\.pcard-med \{[^}]*white-space: nowrap; \}/);
+    // The name wraps rather than truncating, and the header can wrap the NAV figure below it.
+    expect(card).not.toMatch(/\.pcard-name \{[^}]*text-overflow: ellipsis/);
+    expect(card).toMatch(/\.pcard-head \{[^}]*flex-wrap: wrap;/);
+    expect(card).toContain('<div style={{ flex: "1 1 120px", minWidth: 0 }}>');
+  });
 });

@@ -1088,12 +1088,19 @@ select.ledger-select {
 .players-filter-bar .compact-filter-summary { max-width: 1084px; margin: 0 auto; padding: 0 8px; }
 .compact-filter-options .players-filter-row2 { flex-wrap: wrap; overflow: visible; }
 .compact-filter-options .players-filter-row2 > div { flex-wrap: wrap; flex-shrink: 1 !important; }
-.mobile-detail-sheet { position: fixed; inset: 0; z-index: 200; background: var(--paper-bg); color: var(--ledger-ink); overflow-y: auto; overscroll-behavior: contain; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-.mobile-detail-heading { position: sticky; top: 0; z-index: 2; background: var(--paper-bg); border-bottom: 1px solid var(--ledger-rule); padding: 8px 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+/* `--paper-bg` is never defined at :root, so the sheet and its sticky heading
+   painted transparent and the page showed through; fall back to the page paper. */
+.mobile-detail-sheet { position: fixed; inset: 0; z-index: 200; background: var(--paper-bg, var(--paper)); color: var(--ledger-ink); overflow-y: auto; overscroll-behavior: contain; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.mobile-detail-heading { position: sticky; top: 0; z-index: 2; background: var(--paper-bg, var(--paper)); border-bottom: 1px solid var(--ledger-rule); padding: 8px 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .mobile-detail-heading h2 { font-size: 16px; font-weight: 700; }
 .mobile-detail-heading nav { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; }
 .mobile-detail-content { padding: 12px; min-width: 0; overflow-wrap: anywhere; }
 .mobile-detail-content [role="tablist"] { position: sticky; top: 0; flex-wrap: wrap; overflow: visible !important; }
+/* Tabs sized `flex: 1 1 0` with nowrap labels shrank below their text and the
+   labels overprinted each other; in a sheet they keep their width and wrap,
+   and a trailing link (e.g. the Players dossier link) takes its own row. */
+.mobile-detail-content [role="tablist"] > [role="tab"] { flex: 1 0 auto !important; min-height: 44px; }
+.mobile-detail-content [role="tablist"] > a { flex: 1 0 100%; margin-left: 0 !important; display: flex; align-items: center; min-height: 44px; }
 .mobile-detail-content :is(button, a, select, summary) { min-height: 44px; }
 .mobile-detail-content :is(h2, h3, [role="tablist"]) { scroll-margin-top: 130px; }
 .mobile-detail-content .player-expanded-panel [role="tablist"] { flex-wrap: wrap; }

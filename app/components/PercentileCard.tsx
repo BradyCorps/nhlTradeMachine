@@ -326,6 +326,10 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         aria-label={`${player.name} value card — ${navLabel} ${xnav.total}${avgPercentile !== null ? `, ${percentileLabel(avgPercentile)} vs ${peerLabel}` : ""}`}>
       <style>{`
         .pcard { width: 100%;
+          /* A host's overflow-wrap: anywhere (the mobile detail sheet) also
+             shrinks min-content to one character, stacking "0.0" and splitting
+             words mid-letter; break only words that cannot otherwise fit. */
+          overflow-wrap: break-word;
           background: #ede4cc; border: 2px solid #1c140a; border-radius: 3px;
           font-family: var(--font-mono, ui-monospace, monospace); color: #1c140a;
           /* Scope the ledger palette to fixed newspaper tones so the embedded
@@ -338,11 +342,10 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         .pcard *:focus-visible { outline: 2px solid #1a4b5b; outline-offset: 2px; border-radius: 2px; }
         .pcard-head { background: #e4d8b8; color: #1c140a; padding: 12px 16px;
           border-bottom: 2px solid #1c140a;
-          display: flex; align-items: center; gap: 12px; }
+          display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
         .pcard-head img { width: 52px; height: 52px; border-radius: 50%;
           border: 2px solid #1c140a; flex-shrink: 0; }
-        .pcard-name { font-size: 16px; font-weight: 900; line-height: 1.15; color: #1c140a;
-          overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pcard-name { font-size: 16px; font-weight: 900; line-height: 1.15; color: #1c140a; }
         .pcard-sub { font-size: 11px; color: #4a3820; margin-top: 3px;
           text-transform: uppercase; letter-spacing: 0.1em; }
         .pcard-role { font-size: 10px; font-weight: 900; margin-top: 3px;
@@ -397,9 +400,9 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         .pcard-nodata { font-size: 10px; font-weight: 700; color: #6e5a3d;
           text-transform: uppercase; letter-spacing: 0.08em; }
         .pcard-val { font-size: 12px; font-weight: 800; color: #1c140a;
-          text-align: right; font-variant-numeric: tabular-nums; }
+          text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .pcard-med { font-size: 11px; font-weight: 600; color: #6e5a3d;
-          text-align: right; font-variant-numeric: tabular-nums; }
+          text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .pcard-side { border-top: 1px solid #b8a070; padding: 10px 14px; }
         @media (min-width: 540px) { .pcard-side { border-top: none; border-left: 1px solid #b8a070; } }
         .pcard-side-h { font-size: 10px; font-weight: 700; color: #4a3820;
@@ -423,7 +426,9 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
             That split lives in PlayerAvatar, not here. */}
         <PlayerAvatar name={player.name} position={player.position} size={56}
           playerId={player.id} teamId={player.teamId} headshot={player.headshot} />
-        <div style={{ flex: 1, minWidth: 0 }}>
+        {/* A 120px basis lets the NAV figure drop to its own line on a narrow
+            card instead of squeezing the name to a letter per line. */}
+        <div style={{ flex: "1 1 120px", minWidth: 0 }}>
           <div className="pcard-name">{player.name}</div>
           <div className="pcard-sub">{teamName ?? player.teamId} · {displayPosition(player.position, player.secondaryPosition)} · Age {player.age}</div>
           {roles && (
@@ -432,7 +437,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
             </div>
           )}
         </div>
-        <div style={{ textAlign: "right", flexShrink: 0 }}>
+        <div style={{ textAlign: "right", flexShrink: 0, marginLeft: "auto" }}>
           <div className="pcard-nav-total">{xnav.total}</div>
           <div className="pcard-nav-label">{navLabel} · {navLongLabel}</div>
         </div>
