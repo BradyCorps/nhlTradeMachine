@@ -244,7 +244,11 @@ function freezeProtocol(protocol: EvaluationProtocol): EvaluationProtocol {
   });
 }
 
-function validateProtocol(protocol: EvaluationProtocol): void {
+/**
+ * Validate a complete frozen protocol before it is persisted or presented.
+ * This remains a metadata contract: it does not schedule or execute a run.
+ */
+export function validateEvaluationProtocol(protocol: EvaluationProtocol): void {
   assertStableId("Protocol ID", protocol.id);
   assertStableId("Protocol target analytic ID", protocol.targetAnalyticId);
   validateCandidateTarget(protocol.targetAnalyticId);
@@ -262,7 +266,13 @@ function validateProtocol(protocol: EvaluationProtocol): void {
     if (metricIds.has(metric.id) || !metric.name || !metric.unit || !metric.definition) throw new LabsEvaluationIntegrityError(`Protocol ${protocol.id} has an invalid metric definition.`);
     metricIds.add(metric.id);
     assertSchemaVersion(metric.metadataSchemaVersion);
-    if (metric.requiredCohorts.length === 0) throw new LabsEvaluationIntegrityError(`Metric ${metric.id} has no required cohort.`);
+    if (
+      metric.requiredCohorts.length === 0
+      || metric.requiredCohorts.some(cohort => !STABLE_ID.test(cohort))
+      || new Set(metric.requiredCohorts).size !== metric.requiredCohorts.length
+    ) {
+      throw new LabsEvaluationIntegrityError(`Metric ${metric.id} has invalid required cohorts.`);
+    }
   }
   const gateIds = new Set<string>();
   for (const gate of protocol.gates) {
@@ -332,7 +342,7 @@ async function readProtocols(db: LabsReadDb, protocolId?: string): Promise<reado
       leakageControls: row.leakageControls, minimumCoverage: row.minimumCoverage, fingerprint: row.fingerprint, schemaVersion: row.schemaVersion,
       createdAt: row.createdAt, createdBy: row.createdBy, createdSource: row.createdSource, metrics, gates,
     });
-    validateProtocol(protocol);
+    validateEvaluationProtocol(protocol);
     return protocol;
   }).sort((a, b) => b.createdAt - a.createdAt || compareStableIds(a.id, b.id)));
 }
