@@ -967,6 +967,9 @@ export default function QuickTradeMachine() {
   const [shareError, setShareError] = useState(false);
   const shareSectionRef = useRef<HTMLElement>(null);
   const shareInputRef = useRef<HTMLInputElement>(null);
+  // Set when a fresh link is built; the reveal waits for the commit that
+  // renders it (a next-frame callback could run before the section existed).
+  const revealWhenRendered = useRef(false);
   const [navMap, setNavMap] = useState<Record<string, XNAVResult>>({});
   const [navLoading, setNavLoading] = useState(false);
   const [rosterNavMap, setRosterNavMap] = useState<Record<string, XNAVResult>>({});
@@ -1182,6 +1185,12 @@ export default function QuickTradeMachine() {
     });
   };
 
+  useEffect(() => {
+    if (!shareUrl || !revealWhenRendered.current) return;
+    revealWhenRendered.current = false;
+    revealShareLink();
+  }, [shareUrl]);
+
   const createShare = () => {
     if (!homeTeam || !partnerTeam || !verdict || shareBuilding) return;
     // One link per locked verdict: a repeat tap shows the existing link
@@ -1218,8 +1227,8 @@ export default function QuickTradeMachine() {
       });
       const code = encodeTradeSharePayload(payload);
       const origin = typeof window !== "undefined" ? window.location.origin : "";
+      revealWhenRendered.current = true;
       setShareUrl(`${origin}/t/${code}`);
-      revealShareLink();
     } catch (event) {
       console.error("[quick trade share]", event);
       setShareUrl("");

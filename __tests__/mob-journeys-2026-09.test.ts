@@ -124,6 +124,9 @@ describe("Trade Machine share link feedback", () => {
     // second tap lands on the same (now idempotent) button.
     expect(qtm.indexOf('<section ref={shareSectionRef}')).toBeLessThan(qtm.indexOf("{verdict && <VerdictSummary verdict={verdict} />}"));
     expect(qtm).toContain("shareInputRef.current?.focus({ preventScroll: true });");
+    // A fresh link is revealed after the commit that renders it, not on a
+    // next-frame guess that can run before the section exists.
+    expect(qtm).toMatch(/useEffect\(\(\) => \{\s*if \(!shareUrl \|\| !revealWhenRendered\.current\) return;/);
   });
 
   it("offers an accessible error with retry that keeps the trade", () => {
