@@ -1109,6 +1109,30 @@ select.ledger-select {
 .chart-data table { width: 100%; table-layout: fixed; border-collapse: collapse; }
 .chart-data th, .chart-data td { text-align: left; vertical-align: top; padding: 6px 3px; overflow-wrap: anywhere; border-bottom: 1px solid var(--ledger-rule); }
 .chart-data th:last-child { width: 55px; }
+/* Values as a compact label/value grid (was one sentence per value per line). */
+.chart-data-values { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 4px 10px; margin: 0; }
+.chart-data-values dt { font-size: 9px; font-weight: 700; line-height: 1.25; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ledger-ink-faint); }
+.chart-data-values dd { margin: 0; font-weight: 900; font-variant-numeric: tabular-nums; }
+.chart-data-pinned { margin: 6px 0; }
+.chart-data-pinned .chart-data-values { margin-top: 2px; }
+/* Numeric readings as a matrix: labels once in the header, one row each,
+   the Pin control inside the reading's own cell. */
+.chart-data { container-type: inline-size; }
+.chart-data-scroll { max-width: 100%; overflow-x: auto; }
+.chart-data .chart-data-matrix { table-layout: auto; }
+.chart-data .chart-data-matrix th:last-child { width: auto; }
+.chart-data-matrix thead th { font-size: 9px; line-height: 1.25; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ledger-ink-faint); vertical-align: bottom; overflow-wrap: normal; }
+.chart-data-matrix thead th:not(:first-child) { text-align: right; }
+.chart-data-matrix tbody th { overflow-wrap: break-word; }
+@container (min-width: 401px) { .chart-data-matrix tbody th { width: 42%; } }
+.chart-data-rowhead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 8px; }
+.chart-data-matrix td { text-align: right; font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; overflow-wrap: normal; vertical-align: middle; }
+.chart-data-key, .chart-data-legend { display: none; }
+@container (max-width: 400px) {
+  .chart-data-matrix .chart-data-full { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .chart-data-matrix .chart-data-key { display: inline; font-size: 12px; }
+  .chart-data-legend { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 4px 0; font-size: 10px; color: var(--ledger-ink-faint); }
+}
 .text-ledger-rule { color: var(--ledger-ink-faint); }
 .dossier-section-nav { position: sticky; top: var(--sticky-header-height, 56px); z-index: 30; display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 0; background: var(--paper-bg, var(--paper)); }
 [id^="player-"], [id^="team-"] { scroll-margin-top: calc(var(--sticky-header-height, 56px) + 110px); }
@@ -1849,13 +1873,15 @@ select.ledger-select {
   opacity: 0;
   transform: perspective(1200px) translateY(42px) rotateX(8deg) scale(0.984);
   transform-origin: 50% 100%;
-  transition: opacity 0.8s var(--fp-ease), transform 0.95s var(--fp-ease);
+  /* Short enough that a fast flick never lands on a still-transparent sheet. */
+  transition: opacity 0.4s var(--fp-ease), transform 0.6s var(--fp-ease);
   will-change: opacity, transform;
 }
 .fp-armed.fp-in {
   opacity: 1;
   transform: perspective(1200px) translateY(0) rotateX(0deg) scale(1);
 }
+.fp-armed.fp-instant { transition: none; transform: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .fp-cell, .fp-stamp, .fp-cell:active .fp-stamp { transition: none; transform: none; }
@@ -1895,4 +1921,16 @@ button:active:not(:disabled) { transform: translateY(1px); }
   .btn-stamp, .btn-green-ink, .btn-ink, .btn-ghost, .filter-btn, .col-header, button { transition: none; }
   .btn-stamp:active, .btn-green-ink:active, .btn-ink:active, .btn-ghost:active,
   .filter-btn:active, .col-header:active, button:active:not(:disabled) { transform: none; }
+}
+
+/* Armchair GM analysis tabs. Sized `flex: 1 1 0` with nowrap labels, the six
+   tabs shrank below their text on phones and overprinted each other; the row's
+   overflow scroller never engaged because the tabs shrank first. Below lg they
+   keep their label width and wrap onto a second row; from lg they share one
+   row equally, as before. */
+.gm-tablist { display: flex; flex-wrap: wrap; gap: 0; }
+.gm-tab { flex: 1 0 auto; min-width: 44px; }
+@media (min-width: 1024px) {
+  .gm-tablist { flex-wrap: nowrap; }
+  .gm-tab { flex: 1 1 0; min-width: 0; }
 }

@@ -23,7 +23,8 @@ describe("QW-11 mobile spacing and interaction cues", () => {
     for (const path of [
       "app/players/page.tsx",
       "app/components/TeamNavChart.tsx",
-      "app/armchair-gm/GmAnalysisTabs.tsx",
+      // GmAnalysisTabs no longer scrolls: its tabs wrap below lg, so it has
+      // no scroller to cue (see mob-journeys-2026-09.test.ts).
       "app/armchair-gm/MatchResultsPanel.tsx",
       "app/armchair-gm/SeasonResultsPager.tsx",
       "app/components/TradeProposal.tsx",

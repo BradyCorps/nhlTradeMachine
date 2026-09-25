@@ -18,7 +18,6 @@ import { RosterTab } from "./RosterTab";
 import { computeTeamEdgeProfile } from "@/app/lib/team-edge-profile";
 import TeamEdgeTiles from "./TeamEdgeTiles";
 import { HelpPopover } from "@/app/components/HelpPopover";
-import { HorizontalScrollCue } from "@/app/components/HorizontalScrollCue";
 
 const PlayerComparison = lazy(() => import("@/app/components/PlayerComparison"));
 
@@ -61,9 +60,10 @@ function GmTabButton({ label, active, onClick, disabled, badge }: {
       // which is what a tablist is supposed to do.
       tabIndex={active ? 0 : -1}
       aria-label={`Open ${label} tab`}
-      className="tap-target"
+      // Sizing lives in `.gm-tab` (globals.css): tabs keep their label width
+      // and wrap below lg, and share the row equally from lg up.
+      className="tap-target gm-tab"
       style={{
-        flex: "1 1 0",
         padding: "10px 6px",
         fontSize: "11px",
         fontWeight: 900,
@@ -76,7 +76,6 @@ function GmTabButton({ label, active, onClick, disabled, badge }: {
         cursor: disabled ? "default" : "pointer",
         transition: "all 0.15s ease",
         whiteSpace: "nowrap",
-        minWidth: 0,
         opacity: disabled ? 0.4 : 1,
         position: "relative",
       }}
@@ -178,6 +177,7 @@ export function GmAnalysisTabs({
       <div
         role="tablist"
         aria-label="Analysis views"
+        className="gm-tablist"
         onKeyDown={(e) => {
           const dir = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
           if (!dir) return;
@@ -186,12 +186,8 @@ export function GmAnalysisTabs({
           if (next) setSelectedTab(next);
         }}
         style={{
-        display: "flex",
-        gap: 0,
         background: "#e4d8b8",
         borderBottom: `2px solid ${GM_PLUM}`,
-        overflowX: "auto",
-        scrollbarWidth: "none",
       }}>
         {tabs.map(t => (
           <GmTabButton
@@ -204,7 +200,6 @@ export function GmAnalysisTabs({
           />
         ))}
       </div>
-      <HorizontalScrollCue label="Swipe or scroll for all analysis views" />
 
       {/* Tab content */}
       <div

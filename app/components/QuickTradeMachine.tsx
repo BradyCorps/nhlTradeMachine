@@ -172,7 +172,7 @@ function TeamSelect({
       <select
         value={value}
         onChange={event => onChange(event.target.value)}
-        className="w-full border px-3 py-3 text-[13px] font-black uppercase tracking-[0.08em] bg-transparent outline-none"
+        className="w-full border px-3 py-3 text-[13px] font-black uppercase tracking-[0.08em] bg-transparent"
         style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}
       >
         <option value="">Select team</option>
@@ -363,9 +363,10 @@ function AssetRow({
           )}
           {!isPick && onRetain && (
             <select
+              aria-label={`Salary retained on ${asset.name}`}
               value={Math.round((asset.retainedPct ?? 0) * 100)}
               onChange={event => onRetain(asset.id, Number(event.target.value) / 100)}
-              className="border px-2 py-1 text-[10px] font-mono bg-transparent"
+              className="min-h-6 border px-2 py-1 text-[10px] font-mono bg-transparent"
               style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-ink)" }}
             >
               {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map(value => (
@@ -821,6 +822,7 @@ export function SharedTradeView({ code }: { code: string }) {
   const [payload, setPayload] = useState<TradeSharePayload | null>(null);
   const [data, setData] = useState<LeagueData>({ teams: [], players: [] });
   const [error, setError] = useState<string | null>(null);
+  const [leagueLoaded, setLeagueLoaded] = useState(false);
   const [navMap, setNavMap] = useState<Record<string, XNAVResult>>({});
   const navRunRef = useRef(0);
 
@@ -855,6 +857,7 @@ export function SharedTradeView({ code }: { code: string }) {
           capCeiling: teamData.capCeiling ?? null,
           provenance: playerData.provenance ?? teamData.provenance ?? null,
         });
+        setLeagueLoaded(true);
       })
       .catch(event => {
         console.error("[quick shared league load]", event);
@@ -894,7 +897,9 @@ export function SharedTradeView({ code }: { code: string }) {
     <main className="min-h-screen font-serif antialiased" style={{ background: "var(--paper)", color: "var(--ink)" }}>
       <div className="relative w-full max-w-5xl mx-auto px-4 lg:px-6 py-6 lg:py-8 flex flex-col gap-5">
         <Header activeTab="trade" />
-        <DataContextRail route="trade" provenance={data.provenance} capCeiling={data.capCeiling} />
+        {/* Before the league data arrives the rail can only say "unavailable"
+            in red — a false alarm during an ordinary wait. */}
+        {(leagueLoaded || error) && <DataContextRail route="trade" provenance={data.provenance} capCeiling={data.capCeiling} />}
         <section className="border p-5 sm:p-6" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card)" }}>
           <div className="text-[10px] font-black uppercase tracking-[0.3em] font-mono text-ledger-ink-faint">
             Shared Trade
@@ -915,10 +920,23 @@ export function SharedTradeView({ code }: { code: string }) {
 
         {payload && (
           <>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <AssetList title={`${homeTeam?.name ?? payload.teams.homeTeamId} sends`} assets={outgoing} navMap={navMap} />
-              <AssetList title={`${partnerTeam?.name ?? payload.teams.partnerTeamId} sends`} assets={incoming} navMap={navMap} />
-            </div>
+            {/* Assets resolve against league data; until it loads they would
+                render as placeholders ("? round pick"). The locked verdict
+                travels in the link itself, so it shows straight away. */}
+            {leagueLoaded ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <AssetList title={`${homeTeam?.name ?? payload.teams.homeTeamId} sends`} assets={outgoing} navMap={navMap} />
+                <AssetList title={`${partnerTeam?.name ?? payload.teams.partnerTeamId} sends`} assets={incoming} navMap={navMap} />
+              </div>
+            ) : !error && (
+              <div role="status" aria-live="polite" aria-busy="true" className="border p-4 font-mono text-[12px]"
+                style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card-light)", color: "var(--ledger-ink)" }}>
+                <div className="font-black uppercase tracking-[0.18em]">Loading the traded players…</div>
+                <div className="mt-1 text-[11px]" style={{ color: "var(--ledger-ink-faint)" }}>
+                  {payload.blocks.outgoing.length + payload.blocks.incoming.length} assets · {payload.teams.homeTeamId} ↔ {payload.teams.partnerTeamId}. The verdict below is locked from when this link was made.
+                </div>
+              </div>
+            )}
             {payload.lockedVerdict && <VerdictSummary verdict={payload.lockedVerdict} />}
           </>
         )}
@@ -942,6 +960,13 @@ export default function QuickTradeMachine() {
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
   const [evaluating, setEvaluating] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
+  // Building the link is quick but invisible: the result lands below the
+  // verdict, off-screen on a phone, so a tap looked like nothing happened and
+  // invited a second one. Track it explicitly and bring the result into view.
+  const [shareBuilding, setShareBuilding] = useState(false);
+  const [shareError, setShareError] = useState(false);
+  const shareSectionRef = useRef<HTMLElement>(null);
+  const shareInputRef = useRef<HTMLInputElement>(null);
   const [navMap, setNavMap] = useState<Record<string, XNAVResult>>({});
   const [navLoading, setNavLoading] = useState(false);
   const [rosterNavMap, setRosterNavMap] = useState<Record<string, XNAVResult>>({});
@@ -1124,6 +1149,7 @@ export default function QuickTradeMachine() {
     setEvaluating(true);
     setError(null);
     setShareUrl("");
+    setShareError(false);
     try {
       const nextVerdict = await fetchTradeVerdict(
         outgoingSnapshot,
@@ -1147,9 +1173,29 @@ export default function QuickTradeMachine() {
     }
   };
 
+  const revealShareLink = () => {
+    // After paint, so the section exists; focus selects the link for copying.
+    requestAnimationFrame(() => {
+      // Scroll only if the link is off-screen; it renders right below the button.
+      shareSectionRef.current?.scrollIntoView({ block: "nearest", behavior: "auto" });
+      shareInputRef.current?.focus({ preventScroll: true });
+    });
+  };
+
   const createShare = () => {
-    if (!homeTeam || !partnerTeam || !verdict) return;
+    if (!homeTeam || !partnerTeam || !verdict || shareBuilding) return;
+    // One link per locked verdict: a repeat tap shows the existing link
+    // (any package or team change clears both verdict and link).
+    if (shareUrl) { revealShareLink(); return; }
     setShareFeedback("");
+    setShareError(false);
+    setShareBuilding(true);
+    // Yield a frame so the busy state paints before the encode runs.
+    window.setTimeout(buildShare, 0);
+  };
+
+  const buildShare = () => {
+    if (!homeTeam || !partnerTeam || !verdict) { setShareBuilding(false); return; }
     try {
       // Slim the verdict for the URL: keep the ruling and the flags that
       // decide it, trim long-form prose so the link survives Discord,
@@ -1173,10 +1219,13 @@ export default function QuickTradeMachine() {
       const code = encodeTradeSharePayload(payload);
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       setShareUrl(`${origin}/t/${code}`);
+      revealShareLink();
     } catch (event) {
       console.error("[quick trade share]", event);
       setShareUrl("");
-      setError("Couldn't build the share link — re-run the GM Audit and try again.");
+      setShareError(true);
+    } finally {
+      setShareBuilding(false);
     }
   };
 
@@ -1405,25 +1454,43 @@ export default function QuickTradeMachine() {
                 </button>
                 <button
                   type="button"
-                  disabled={!verdict}
+                  disabled={!verdict || shareBuilding}
+                  aria-busy={shareBuilding}
                   onClick={createShare}
-                  className="border px-5 py-3 text-[10px] font-black uppercase tracking-[0.22em] font-mono disabled:opacity-40"
+                  className="min-h-11 border px-5 py-3 text-[10px] font-black uppercase tracking-[0.22em] font-mono disabled:opacity-40"
                   style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-brown)", background: "var(--ledger-warm)" }}
                 >
-                  Generate Share Link
+                  {shareBuilding ? "Building link…" : shareUrl ? "Show share link" : "Generate Share Link"}
                 </button>
               </div>
             </section>
 
-            {verdict && <VerdictSummary verdict={verdict} />}
+            {/* Announces progress where the tap happened; the link itself is
+                further down the page. */}
+            <p role="status" aria-live="polite" className="-mt-2 text-[11px] font-mono" style={{ color: "var(--ledger-ink-faint)" }}>
+              {shareBuilding ? "Building the share link…" : shareUrl ? "Share link ready — the verdict is locked into it." : ""}
+            </p>
+            {shareError && (
+              <div role="alert">
+                <ErrorNotice
+                  title="Couldn't build the share link"
+                  detail="Your trade and its verdict are unchanged. Try again, or re-run the GM Audit first."
+                  onRetry={createShare}
+                />
+              </div>
+            )}
 
+            {/* Directly under the controls: the result appears where the tap
+                happened, so a second tap lands on the same button, not on
+                whatever scrolled under the finger. */}
             {shareUrl && (
-              <section className="border p-4" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card)" }}>
+              <section ref={shareSectionRef} aria-label="Share link" className="border p-4" style={{ borderColor: "var(--ledger-rule)", background: "var(--ledger-card)" }}>
                 <div className="text-[10px] font-black uppercase tracking-[0.25em] font-mono text-ledger-ink-faint">
                   Share Link
                 </div>
                 <div className="mt-2 flex flex-col sm:flex-row gap-2">
                   <input
+                    ref={shareInputRef}
                     readOnly
                     value={shareUrl}
                     aria-label="Locked verdict share link"
@@ -1447,6 +1514,8 @@ export default function QuickTradeMachine() {
                 </div>
               </section>
             )}
+
+            {verdict && <VerdictSummary verdict={verdict} />}
 
             <section
               className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pointer-events-none lg:hidden"

@@ -232,15 +232,19 @@ function Cell({ column, row, nav, letter, open, onToggle }: {
             {p.name}
           </button>
           {letter && (
-            <span className="text-[8px] font-black shrink-0"
-              style={{ border: "1px solid var(--ledger-ink-faint)", padding: "0 2px" }}>
-              <HelpPopover
-                label={letter === "C" ? "Captain" : "Alternate captain"}
-                definition={letter === "C" ? "The team's designated captain." : "One of the team's designated alternate captains."}
-              >
+            // The popover trigger carries a 44px minimum; wrapped in the border
+            // it drew a 44px box over the row. The dense-table 24px target
+            // (as the name button uses) sits around a small bordered letter.
+            <HelpPopover
+              label={letter === "C" ? "Captain" : "Alternate captain"}
+              definition={letter === "C" ? "The team's designated captain." : "One of the team's designated alternate captains."}
+              className="shrink-0 !min-h-6 !min-w-6 !border-0 !px-0"
+            >
+              <span className="text-[8px] font-black leading-none"
+                style={{ border: "1px solid var(--ledger-ink-faint)", padding: "1px 2px" }}>
                 {letter}
-              </HelpPopover>
-            </span>
+              </span>
+            </HelpPopover>
           )}
           {row.breakoutTag && (
             <span className="text-[8px] font-black shrink-0" style={{ color: "var(--ledger-green)" }}>
