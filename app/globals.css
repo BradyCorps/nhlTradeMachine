@@ -1923,6 +1923,18 @@ button:active:not(:disabled) { transform: translateY(1px); }
   .filter-btn:active, .col-header:active, button:active:not(:disabled) { transform: none; }
 }
 
+/* STRAND DNA on the shareable player card (outside the exported plate). */
+.card-strand { margin-top: 12px; border: 2px solid var(--ledger-ink); background: #ede4cc; padding: 10px 12px; font-family: var(--font-mono, ui-monospace, monospace); }
+.card-strand-title { font-size: 11px; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; margin: 0 0 6px; }
+.card-strand-search label { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ledger-ink-faint); }
+.card-strand-search input { width: 100%; min-height: 44px; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--ledger-rule); background: #e4d8b8; color: var(--ledger-ink); font-size: 16px; }
+.card-strand-hint { margin: 4px 0 0; font-size: 10px; color: var(--ledger-ink-faint); }
+.card-strand-matches { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px; }
+.card-strand-matches button { width: 100%; text-align: left; padding: 8px 10px; border: 1px solid var(--ledger-rule); background: transparent; color: var(--ledger-ink); font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
+.card-strand-matches button span { font-weight: 400; color: var(--ledger-ink-faint); }
+.card-strand-comparing { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 12px; }
+.card-strand-comparing button { border: 1px solid var(--ledger-rule); background: transparent; color: var(--ledger-ink); font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; padding: 4px 10px; }
+
 /* Armchair GM analysis tabs. Sized `flex: 1 1 0` with nowrap labels, the six
    tabs shrank below their text on phones and overprinted each other; the row's
    overflow scroller never engaged because the tabs shrank first. Below lg they
