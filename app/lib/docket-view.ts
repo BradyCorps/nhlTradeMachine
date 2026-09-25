@@ -1,5 +1,6 @@
 import type { TradeRecord } from "@/app/lib/trades";
 import type { Asset, TradeVerdict } from "@/app/lib/trade-types";
+import draft2026 from "@/app/data/draft-2026.json";
 
 export type DocketSortKey = "date-desc" | "date-asc" | "nav-desc" | "nav-asc" | "winner";
 
@@ -285,4 +286,50 @@ export function filterAndSortDocketEntries(
     if (sort === "winner") return (a.winner ?? "EVEN").localeCompare(b.winner ?? "EVEN") || b.executedDate.localeCompare(a.executedDate);
     return b.executedDate.localeCompare(a.executedDate) || a.id.localeCompare(b.id);
   });
+}
+
+/**
+ * What the Docket can honestly say about a traded asset's NAV today.
+ *
+ * A pick is frozen as `pick-{TEAM}-{YEAR}-{ROUND}` — team, year and round,
+ * with no overall number and no ownership chain. Once its draft has been held
+ * it drops out of the live pick pool, so there is nothing to value today, and
+ * team/year/round alone cannot say which selection it became: draft-night
+ * trades move slots between clubs (the 2026 #26 passed through several before
+ * Montreal used it). Rather than print a bare "NA" or guess a player, a used
+ * pick says it was used and that its selection is not linked; an unused one
+ * says it is pending. The frozen at-trade NAV is never touched. Linking a pick
+ * to its selection needs pick identity and lineage in the trade record — a
+ * data-model change, proposed separately.
+ */
+export type DocketTodayState =
+  | { kind: "nav"; value: number }
+  | { kind: "pick-used"; label: string; detail: string }
+  | { kind: "pick-pending"; label: string; detail: string }
+  | { kind: "unavailable"; label: string };
+
+/** Draft years whose selections have been made, from the committed draft data. */
+const completedDraftYears = new Set<number>(draft2026.pickState === "complete" ? [draft2026.draftYear] : []);
+
+export function docketTodayState(
+  asset: Pick<Asset, "position" | "year"> & { kind?: string },
+  navToday: number | null,
+): DocketTodayState {
+  if (navToday != null) return { kind: "nav", value: navToday };
+  const isPick = asset.kind === "pick" || asset.position === "Pick";
+  if (!isPick) return { kind: "unavailable", label: "NA" };
+  const year = Number(asset.year);
+  const latestCompleted = completedDraftYears.size ? Math.max(...completedDraftYears) : -Infinity;
+  if (Number.isFinite(year) && year <= latestCompleted) {
+    return {
+      kind: "pick-used",
+      label: `Used at ${year} draft`,
+      detail: "Selection not linked — the trade record stores team, year and round, not the pick's number or ownership chain, so the Docket does not guess which player it became.",
+    };
+  }
+  return {
+    kind: "pick-pending",
+    label: "Pending",
+    detail: "Not yet used; valued on the pick curve until its draft.",
+  };
 }
