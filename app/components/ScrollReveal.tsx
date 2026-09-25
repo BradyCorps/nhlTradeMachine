@@ -18,12 +18,19 @@ export default function ScrollReveal() {
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
+            // Already on screen when detected (a fast fling or a jump): show it
+            // at once rather than fading in over content the reader is on.
+            if (entry.boundingClientRect.top < window.innerHeight * 0.9) entry.target.classList.add("fp-instant");
             entry.target.classList.add("fp-in");
             io.unobserve(entry.target);
           }
         }
       },
-      { threshold: 0.1, rootMargin: "0px 0px -10% 0px" },
+      // Fire while the block is still up to 40% of a viewport below the
+      // screen, on its first pixel. The old 10%-of-the-block threshold scaled
+      // with block height: a 2,500px section on a phone stayed invisible for
+      // a full screen of scrolling (and one over ~5,000px could never fire).
+      { threshold: 0, rootMargin: "0px 0px 40% 0px" },
     );
 
     const foldLine = window.innerHeight * 0.85;
