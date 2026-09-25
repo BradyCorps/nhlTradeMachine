@@ -8,7 +8,7 @@ import { useStrandCohort } from "@/app/lib/use-strand-cohort";
 import EdgeStrip from "@/app/components/EdgeStrip";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import type { DocketEntry, DocketReturn, DocketSortKey } from "@/app/lib/docket-view";
-import { docketReturns, filterAndSortDocketEntries } from "@/app/lib/docket-view";
+import { docketReturns, docketTodayState, filterAndSortDocketEntries } from "@/app/lib/docket-view";
 import type { Asset } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
 
@@ -33,8 +33,9 @@ function AssetStats({ asset, detailAsset, isPick }: {
   isPick: boolean;
 }) {
   const isGoalie = detailAsset.position === "G";
+  const today = docketTodayState({ ...detailAsset, kind: asset.kind }, asset.navToday);
   const tiles: [string, string, string][] = isPick
-    ? [["Today NAV", asset.navToday == null ? "NA" : fmtNav(asset.navToday), "NAV today"]]
+    ? [["Today NAV", today.kind === "nav" ? fmtNav(today.value) : today.label, "NAV today"]]
     : isGoalie
       ? [
         ["Today NAV", asset.navToday == null ? "NA" : fmtNav(asset.navToday), "NAV today"],
@@ -61,6 +62,7 @@ function AssetStats({ asset, detailAsset, isPick }: {
       {isPick
         ? <div style={{ fontSize: 11, color: "var(--ledger-ink-faint)", lineHeight: 1.5 }}>
             Pick value is the frozen pick-curve NAV captured at ingestion.
+            {(today.kind === "pick-used" || today.kind === "pick-pending") && <> {today.detail}</>}
           </div>
         : <EdgeStrip asset={detailAsset} />}
     </div>
@@ -97,7 +99,10 @@ function AssetDetail({ asset }: { asset: DocketEntry["packages"][number]["assets
         </div>
         <div style={{ fontSize: 12, fontWeight: 900, color: "var(--ledger-red)", whiteSpace: "nowrap", textAlign: "right" }}>
           <div>{fmtNav(asset.navAtTrade ?? 0)} AT TRADE</div>
-          <div style={{ color: "var(--ledger-green)", marginTop: 2 }}>{asset.navToday == null ? "TODAY NA" : `${fmtNav(asset.navToday)} TODAY`}</div>
+          <div style={{ color: "var(--ledger-green)", marginTop: 2 }}>{(() => {
+            const today = docketTodayState({ ...detailAsset, kind: asset.kind }, asset.navToday);
+            return today.kind === "nav" ? `${fmtNav(today.value)} TODAY` : `TODAY: ${today.label.toUpperCase()}`;
+          })()}</div>
         </div>
       </div>
 
