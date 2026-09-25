@@ -5,6 +5,7 @@
 // EDGE tracking — alongside percentiles vs the positional field.
 import React, { useMemo, useRef, useCallback, useState } from "react";
 import { ChartData } from "@/app/components/ChartData";
+import CardStrandCompare from "@/app/components/CardStrandCompare";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
 import { calculateAssetNAV } from "@/app/lib/asset-nav";
@@ -550,6 +551,10 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         </span>
       </div>
       </div>
+
+      {/* STRAND DNA with a searchable comparison — outside the captured
+          plate, so the exported PNG is unchanged. */}
+      <CardStrandCompare player={player} allPlayers={allPlayers} />
 
       {/* Export control — outside the captured plate (PA6) */}
       <ChartData title={`${player.name} percentile card`} columns={["Actual", "Percentile", "Peer median"]} rows={percentiles.map(stat => ({ id: stat.key, label: stat.label, values: [stat.formatted, stat.pct == null ? "Unavailable" : String(stat.pct), stat.median] }))} />
