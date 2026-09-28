@@ -19,9 +19,11 @@ import { displayPosition } from "@/app/lib/display-position";
 import { navLabelForPosition, navLongLabelForPosition } from "@/app/lib/player-terminology";
 import { ordinal } from "@/app/lib/ordinal";
 import { metricPercentile } from "@/app/lib/strand-metrics";
+import { buildStrandCohort } from "@/app/lib/strand-cohort";
 import { contractVerdict, surplusText, MODEL_PRICE_LABEL } from "@/app/lib/contract-verdict";
 import {
   cardGravityFromV3,
+  cardStrandProfile,
   type CardImagePayload,
 } from "@/app/lib/card-payload";
 
@@ -150,6 +152,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
   const statDefs = posGroup === "G" ? GOALIE_STATS : posGroup === "D" ? DEF_STATS : FWD_STATS;
   const cardRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
+  const [compareSelection, setCompareSelection] = useState<{ forPlayerId: string; player: PlayerData } | null>(null);
 
   const { percentiles, xnav } = useMemo(() => {
     const peers = allPlayers.filter(p => {
@@ -270,6 +273,9 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       // Here the browser ships an already-formatted payload and the route
       // renders a guaranteed-solid PNG — deterministic across every browser.
 
+      const cohort = buildStrandCohort(allPlayers as unknown as readonly Record<string, unknown>[], player);
+      const compare = compareSelection?.forPlayerId === player.id ? compareSelection.player : null;
+
       const payload: CardImagePayload = {
         name: player.name,
         sub: `${teamName ?? player.teamId} · ${displayPosition(player.position, player.secondaryPosition)} · Age ${player.age}`,
@@ -295,6 +301,11 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         navCells: navCells.map(c => ({ label: c.label, val: c.val })),
         peerLabel,
         avgPercentile,
+        strand: {
+          cohortLabel: `${peerLabel} · ≥20 GP · ${SEASON.replaySeason}`,
+          primary: cardStrandProfile(player, cohort),
+          compare: compare ? cardStrandProfile(compare, cohort) : null,
+        },
       };
 
       const res = await fetch("/api/card-image", {
@@ -318,6 +329,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
   }, [
     player, teamName, roles, xnav, fmv, verdict, surplusWord, surplusTone, navLabel, navLongLabel,
     publicGravity, edgeCells, percentiles, navCells, peerLabel, avgPercentile, exporting,
+    allPlayers, compareSelection,
   ]);
 
   return (
@@ -398,11 +410,11 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
           height: calc(100% + 2px); background: #1c140a; opacity: 0.45; }
         .pcard-pctnum { font-size: 12px; font-weight: 900; color: #1c140a;
           font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
-        .pcard-nodata { font-size: 10px; font-weight: 700; color: #6e5a3d;
+        .pcard-nodata { font-size: 10px; font-weight: 700; color: #4a3820;
           text-transform: uppercase; letter-spacing: 0.08em; }
         .pcard-val { font-size: 12px; font-weight: 800; color: #1c140a;
           text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .pcard-med { font-size: 11px; font-weight: 600; color: #6e5a3d;
+        .pcard-med { font-size: 11px; font-weight: 600; color: #4a3820;
           text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .pcard-side { border-top: 1px solid #b8a070; padding: 10px 14px; }
         @media (min-width: 540px) { .pcard-side { border-top: none; border-left: 1px solid #b8a070; } }
@@ -552,9 +564,9 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       </div>
       </div>
 
-      {/* STRAND DNA with a searchable comparison — outside the captured
-          plate, so the exported PNG is unchanged. */}
-      <CardStrandCompare player={player} allPlayers={allPlayers} />
+      {/* Interactive controls stay below the plate; the same comparison rails go into the PNG. */}
+      <CardStrandCompare key={player.id} player={player} allPlayers={allPlayers}
+        onCompareChange={selected => setCompareSelection(selected ? { forPlayerId: player.id, player: selected } : null)} />
 
       {/* Export control — outside the captured plate (PA6) */}
       <ChartData title={`${player.name} percentile card`} columns={["Actual", "Percentile", "Peer median"]} rows={percentiles.map(stat => ({ id: stat.key, label: stat.label, values: [stat.formatted, stat.pct == null ? "Unavailable" : String(stat.pct), stat.median] }))} />

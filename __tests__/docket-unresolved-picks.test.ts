@@ -35,4 +35,14 @@ describe("Docket today state for traded picks", () => {
     expect(client).toContain("{fmtNav(asset.navAtTrade ?? 0)} AT TRADE");
     expect(client).not.toContain('asset.navToday == null ? "TODAY NA"');
   });
+
+  it("uses a contrast-safe verdict surface without a nonfunctional memo action", () => {
+    const client = readFileSync("app/docket/DocketClient.tsx", "utf8");
+    const verdict = readFileSync("app/components/VerdictPanel.tsx", "utf8");
+    expect(client).toContain("paperSurface");
+    expect(client).toContain("showMemoAction={false}");
+    expect(verdict).toContain('background: "var(--ledger-card-light)"');
+    expect(verdict).toContain('color: "var(--ledger-ink-mid)"');
+    expect(verdict).toContain("{showMemoAction && <div");
+  });
 });
