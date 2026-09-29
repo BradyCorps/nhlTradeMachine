@@ -22,9 +22,10 @@ interface ComparablePlayer {
   position: string;
 }
 
-export default function CardStrandCompare<T extends ComparablePlayer>({ player, allPlayers }: {
+export default function CardStrandCompare<T extends ComparablePlayer>({ player, allPlayers, onCompareChange }: {
   player: T;
   allPlayers: readonly T[];
+  onCompareChange?: (player: T | null) => void;
 }) {
   const [query, setQuery] = useState("");
   const [compareId, setCompareId] = useState<string | null>(null);
@@ -72,7 +73,7 @@ export default function CardStrandCompare<T extends ComparablePlayer>({ player, 
                   type="button"
                   className="tap-target"
                   aria-pressed={compareId === match.id}
-                  onClick={() => { setCompareId(match.id); setQuery(""); }}
+                  onClick={() => { setCompareId(match.id); onCompareChange?.(match); setQuery(""); }}
                 >
                   {match.name} <span>· {match.teamId}</span>
                 </button>
@@ -83,7 +84,7 @@ export default function CardStrandCompare<T extends ComparablePlayer>({ player, 
         {compare && (
           <p className="card-strand-comparing">
             Comparing with <strong>{compare.name}</strong>
-            <button type="button" className="tap-target" onClick={() => setCompareId(null)} aria-label={`Stop comparing with ${compare.name}`}>
+            <button type="button" className="tap-target" onClick={() => { setCompareId(null); onCompareChange?.(null); }} aria-label={`Stop comparing with ${compare.name}`}>
               Clear
             </button>
           </p>

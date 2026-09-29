@@ -17,6 +17,7 @@ import {
 } from "./gravity";
 import type { GravityProfileV4 } from "./gravity-v4/types";
 import { gravityNetScopeLabel, gravityZoneXg82OrNull } from "./gravity-v4/display";
+import { buildStrandPercentiles, type PlayerLike } from "./strand-metrics";
 import { z } from "zod";
 
 interface CardGravityBase {
@@ -120,6 +121,25 @@ export interface CardStatRow {
   barColor: string | null;
 }
 
+export interface CardStrandProfile {
+  name: string;
+  off: { label: string; percentile: number | null }[];
+  def: { label: string; percentile: number | null }[];
+}
+
+/** The PNG uses the same cohort and rail derivation as the live STRAND view. */
+export function cardStrandProfile(
+  player: { name: string; position: string },
+  cohort: PlayerLike[],
+): CardStrandProfile {
+  const traits = buildStrandPercentiles(player as unknown as PlayerLike, cohort, player.position === "G");
+  return {
+    name: player.name,
+    off: traits.off.map(({ label, percentile }) => ({ label, percentile })),
+    def: traits.def.map(({ label, percentile }) => ({ label, percentile })),
+  };
+}
+
 export interface CardImagePayload {
   name: string;
   sub: string; // "Team · POS · Age NN"
@@ -146,6 +166,12 @@ export interface CardImagePayload {
 
   peerLabel: string; // "all forwards"
   avgPercentile: number | null;
+  /** Optional for pre-STRAND browser bundles; new exports include the comparison. */
+  strand?: {
+    cohortLabel: string;
+    primary: CardStrandProfile;
+    compare: CardStrandProfile | null;
+  };
 
   // NOTE: there is deliberately no headshot field here.
   //
@@ -172,6 +198,12 @@ const gravityTierSchema = z.enum([
 
 const finiteBoundedMass = z.number().finite().min(-1).max(1);
 const percentileSchema = z.number().finite().min(0).max(100).nullable();
+
+const cardStrandProfileSchema = z.object({
+  name: z.string().min(1).max(120),
+  off: z.array(z.object({ label: z.string().min(1).max(20), percentile: percentileSchema }).strict()).min(3).max(4),
+  def: z.array(z.object({ label: z.string().min(1).max(20), percentile: percentileSchema }).strict()).min(3).max(4),
+}).strict();
 
 const publicGravityV3Schema = z.object({
   masses: z.object({
@@ -249,6 +281,11 @@ const publicCardImagePayloadSchema = z.object({
   }).strict()),
   peerLabel: z.string(),
   avgPercentile: percentileSchema,
+  strand: z.object({
+    cohortLabel: z.string().min(1).max(120),
+    primary: cardStrandProfileSchema,
+    compare: cardStrandProfileSchema.nullable(),
+  }).strict().optional(),
   // Accepted and ignored — see the note on CardImagePayload. Kept only so a
   // stale client bundle still sending it isn't rejected by `.strict()`.
   headshotDataUrl: z.string().nullable().optional(),

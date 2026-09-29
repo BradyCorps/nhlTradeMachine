@@ -29,13 +29,15 @@ const SIDE_OUTCOME_STYLE = {
 
 const signed = (value: number, digits = 1) => `${value > 0 ? "+" : ""}${value.toFixed(digits)}`;
 
-export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestClaudeAnalysis, onOpenMemo }: {
+export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFlag, onRequestClaudeAnalysis, onOpenMemo, paperSurface = false, showMemoAction = true }: {
   verdict: TradeVerdict;
   sc: typeof STATUS_CONFIG[TradeStatus];
   expandedFlag: number | null;
   setExpandedFlag: (i: number | null) => void;
   onRequestClaudeAnalysis: () => void;
   onOpenMemo: () => void;
+  paperSurface?: boolean;
+  showMemoAction?: boolean;
 }) {
   const flags = verdict.flags;
   const flagEntries = flags.map((flag, index) => ({
@@ -48,7 +50,8 @@ export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFla
   const warnCount = flags.filter((f) => f.severity === "WARN").length;
 
   return (
-    <div className={`rounded-2xl border overflow-hidden transition-all duration-500 ${sc.bg} ${sc.border}`}>
+    <div className={`rounded-2xl border overflow-hidden transition-all duration-500 ${sc.bg} ${sc.border}`}
+      style={paperSurface ? { background: "var(--ledger-card-light)" } : undefined}>
       {/* Status header */}
       <div className="px-5 py-4 border-b border-zinc-800/30">
         <div className="flex items-center justify-between mb-1">
@@ -154,7 +157,8 @@ export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFla
                   {flag.headline}
                 </span>
                 {flag.affectedAsset && (
-                  <span className={`text-2xs font-black px-1.5 py-0.5 rounded border shrink-0 ${fs.label}`}>
+                  <span className={`text-2xs font-black px-1.5 py-0.5 rounded border shrink-0 ${fs.label}`}
+                    style={paperSurface ? { background: "var(--ledger-card-light)", color: "var(--ledger-ink-mid)", borderColor: "var(--ledger-rule)" } : undefined}>
                     {flag.affectedAsset.split(" ").pop()}
                   </span>
                 )}
@@ -225,7 +229,7 @@ export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFla
       </div>
 
       {/* ── Claude GM Analysis — triggers modal ───────────────── */}
-      <div className="px-4 py-3">
+      {showMemoAction && <div className="px-4 py-3">
         {!verdict.claudeAnalysis && !verdict.claudeLoading && (
           <button
             onClick={onRequestClaudeAnalysis}
@@ -252,7 +256,7 @@ export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFla
             ✦ Read Front Office Memo
           </button>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

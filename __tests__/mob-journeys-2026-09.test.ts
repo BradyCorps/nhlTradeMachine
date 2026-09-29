@@ -47,15 +47,25 @@ describe("Armchair GM analysis tabs", () => {
     expect(tabs).toContain('e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0');
     expect(tabs).toContain("tabIndex={active ? 0 : -1}");
   });
+
+  it("measures the roster only after Draft Night and off-season dialogs close", () => {
+    const journey = read("scripts/mob-journeys.mjs");
+    expect(journey).toContain('getByRole("button", { name: /Viggo Björck/i }).click()');
+    expect(journey).toContain("/Done.*Start Armchair GM/i");
+    expect(journey).toContain('throw new Error("Armchair off-season modal still masks the roster")');
+    expect(journey).toContain("captainPopover");
+  });
 });
 
 describe("Armchair GM captain / alternate badges", () => {
-  it("uses a 24px dense-table target around a small bordered letter", () => {
+  it("keeps the popover's 44px target around a visually compact letter", () => {
     const roster = read("app/armchair-gm/RosterTab.tsx");
     const badge = roster.slice(roster.indexOf("{letter && ("), roster.indexOf("{row.breakoutTag &&"));
 
-    expect(badge).toContain('className="shrink-0 !min-h-6 !min-w-6 !border-0 !px-0"');
-    // The border belongs to the letter, not to a wrapper around the 44px trigger.
+    expect(badge).toContain('className="shrink-0 !border-0 !px-0"');
+    expect(badge).not.toContain("!min-h-6");
+    expect(read("app/components/HelpPopover.tsx")).toContain("inline-flex min-h-11 min-w-11");
+    // The visible border belongs to the letter, not the full-size trigger.
     expect(badge.indexOf("<HelpPopover")).toBeLessThan(badge.indexOf('border: "1px solid var(--ledger-ink-faint)"'));
     expect(badge).toContain("{letter}");
   });

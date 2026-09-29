@@ -232,13 +232,12 @@ function Cell({ column, row, nav, letter, open, onToggle }: {
             {p.name}
           </button>
           {letter && (
-            // The popover trigger carries a 44px minimum; wrapped in the border
-            // it drew a 44px box over the row. The dense-table 24px target
-            // (as the name button uses) sits around a small bordered letter.
+            // Keep the letter visually compact, but preserve the popover's
+            // 44px touch target instead of shrinking the interactive button.
             <HelpPopover
               label={letter === "C" ? "Captain" : "Alternate captain"}
               definition={letter === "C" ? "The team's designated captain." : "One of the team's designated alternate captains."}
-              className="shrink-0 !min-h-6 !min-w-6 !border-0 !px-0"
+              className="shrink-0 !border-0 !px-0"
             >
               <span className="text-[8px] font-black leading-none"
                 style={{ border: "1px solid var(--ledger-ink-faint)", padding: "1px 2px" }}>

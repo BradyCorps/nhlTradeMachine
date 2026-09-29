@@ -4,6 +4,7 @@ import {
   validatePublicCardImagePayload,
   type CardImagePayload,
   type CardGravityInput,
+  type CardStrandProfile,
 } from "@/app/lib/card-payload";
 import {
   computeRinkGeometry,
@@ -252,6 +253,40 @@ function Stat({ row }: { row: CardImagePayload["stats"][number] }) {
   );
 }
 
+function StrandColumn({
+  title,
+  rails,
+  compare,
+  color,
+}: {
+  title: string;
+  rails: CardStrandProfile["off"];
+  compare: CardStrandProfile["off"] | null;
+  color: string;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", width: "50%", padding: "0 18px" }}>
+      <div style={{ display: "flex", fontSize: 12, fontWeight: 700, letterSpacing: 0.8, color: INK_BODY, marginBottom: 8 }}>{title}</div>
+      {rails.map((rail, index) => (
+        <div key={`${title}-${rail.label}`} style={{ display: "flex", alignItems: "center", height: 37, borderBottom: `1px solid ${INSET}` }}>
+          <div style={{ display: "flex", width: 76, fontSize: 12, fontWeight: 700, color: INK_BODY }}>{rail.label}</div>
+          <div style={{ display: "flex", width: 36, justifyContent: "flex-end", fontSize: 17, fontWeight: 700, color: INK }}>
+            {rail.percentile ?? "—"}
+          </div>
+          <div style={{ display: "flex", width: 128, height: 8, marginLeft: 10, marginRight: 10, background: INSET }}>
+            {rail.percentile !== null && <div style={{ display: "flex", height: 8, width: `${rail.percentile}%`, background: color }} />}
+          </div>
+          {compare && (
+            <div style={{ display: "flex", fontSize: 15, fontWeight: 700, color: INK_FAINT }}>
+              / {compare[index]?.percentile ?? "—"}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export async function POST(req: Request) {
   let raw: unknown;
   try {
@@ -281,11 +316,12 @@ export async function POST(req: Request) {
   const contractH = 60;
   const gravityH = data.gravity ? 96 + 240 * 1.95 + 8 : 0;
   const edgeH = data.edgeCells.length > 0 ? 74 : 0;
+  const strandH = data.strand ? 96 + Math.max(data.strand.primary.off.length, data.strand.primary.def.length) * 37 : 0;
   const statsBodyH = 46 + data.stats.length * 35 + 20;
   const sideBodyH = 46 + data.navCells.length * 40 + 16;
   const bodyH = Math.max(statsBodyH, sideBodyH);
   const footerH = 56;
-  const CARD_H = headerH + contractH + gravityH + edgeH + bodyH + footerH;
+  const CARD_H = headerH + contractH + gravityH + edgeH + strandH + bodyH + footerH;
 
   const img = (
     <div
@@ -396,6 +432,24 @@ export async function POST(req: Request) {
           ))}
         </div>
       ) : null}
+
+      {data.strand && (
+        <div style={{ display: "flex", flexDirection: "column", height: strandH, background: TAN, borderBottom: `1px solid ${RULE}`, padding: "12px 8px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "0 18px", marginBottom: 3 }}>
+            <div style={{ display: "flex", fontSize: 15, fontWeight: 700, color: INK, letterSpacing: 1 }}>STRAND DNA · POSITION PERCENTILES</div>
+            <div style={{ display: "flex", fontSize: 11, color: INK_BODY }}>{data.strand.cohortLabel}</div>
+          </div>
+          <div style={{ display: "flex", padding: "0 18px", marginBottom: 8, fontSize: 11, color: INK_BODY }}>
+            {data.strand.compare
+              ? `PRIMARY ${data.strand.primary.name} / COMPARE ${data.strand.compare.name}`
+              : data.strand.primary.name}
+          </div>
+          <div style={{ display: "flex" }}>
+            <StrandColumn title="OFFENSE / CREATION" rails={data.strand.primary.off} compare={data.strand.compare?.off ?? null} color={RINK_BLUE_LINE} />
+            <StrandColumn title="DEFENSE / CONTROL" rails={data.strand.primary.def} compare={data.strand.compare?.def ?? null} color={RINK_RED} />
+          </div>
+        </div>
+      )}
 
       {/* Body: percentile table + value breakdown */}
       <div style={{ display: "flex", flexGrow: 1, background: CREAM }}>

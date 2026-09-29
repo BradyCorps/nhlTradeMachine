@@ -86,16 +86,33 @@ try {
       await page.goto(`${base}/armchair-gm`, { waitUntil: "networkidle", timeout: 120000 });
       await page.getByRole("button", { name: /WPG.*Winnipeg/i }).click({ timeout: 90000 });
       await page.getByRole("button", { name: /Single Season/i }).click();
+      // The selected term opens Draft Night. Finish the actual off-season
+      // flow before measuring the roster; otherwise a modal masks the tabs.
+      await page.getByRole("dialog").getByRole("button", { name: /Viggo Björck/i }).click();
+      for (const name of [/Done.*Proceed to Re-Sign/i, /Done.*RFA Offer Sheets/i, /Done.*Start Armchair GM/i]) {
+        await page.getByRole("dialog").getByRole("button", { name }).click();
+      }
+      if (await page.getByRole("dialog").count()) throw new Error("Armchair off-season modal still masks the roster");
       await page.waitForTimeout(800);
       const list = page.locator('[role=tablist][aria-label="Analysis views"]').first();
+      await list.getByRole("tab", { name: "Team DNA" }).click();
+      const dnaSelected = await list.getByRole("tab", { name: "Team DNA" }).getAttribute("aria-selected");
+      await list.getByRole("tab", { name: "Roster" }).click();
+      const rosterSelected = await list.getByRole("tab", { name: "Roster" }).getAttribute("aria-selected");
       const tabs = await list.evaluate(el => [...el.querySelectorAll("[role=tab]")].map(t => {
         const r = t.getBoundingClientRect();
         return { text: t.textContent.trim(), clipped: t.scrollWidth > t.clientWidth + 1, small: r.width < 44 || r.height < 44 };
       }));
       const badges = await page.evaluate(() => [...document.querySelectorAll('button[aria-label="Explain Captain"], button[aria-label="Explain Alternate captain"]')]
         .filter(e => e.checkVisibility()).map(e => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }));
+      const captain = page.getByRole("button", { name: "Explain Captain" }).first();
+      await captain.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(200);
+      await captain.click();
+      const captainPopover = (await page.getByRole("dialog").innerText()).includes("The team's designated captain.");
+      await page.keyboard.press("Escape");
       await page.screenshot({ path: `${output}/${width}-armchair.png` });
-      return { clippedTabs: tabs.filter(t => t.clipped).map(t => t.text), smallTabs: tabs.filter(t => t.small).map(t => t.text), badges, overflow: await overflow(page) };
+      return { dnaSelected, rosterSelected, captainPopover, clippedTabs: tabs.filter(t => t.clipped).map(t => t.text), smallTabs: tabs.filter(t => t.small).map(t => t.text), badges, overflow: await overflow(page) };
     });
 
     // 4–5. Trade Machine: franchise DNA, then share (double tap) and the shared page.

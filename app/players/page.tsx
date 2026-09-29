@@ -422,21 +422,22 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
       background: "#d6c8a5", borderTop: `3px solid ${PLUM}`,
     }}>
       {/* Tab bar */}
-      <div role="tablist" style={{
+      <div style={{
         display: "flex",
-        gap: 0,
-        padding: "0",
+        flexWrap: "wrap",
         background: "#e4d8b8",
         borderBottom: `2px solid ${PLUM}`,
       }}>
-        {tabs.map(t => (
-          <PlayerTabButton
-            key={t.key}
-            label={t.label}
-            active={activeTab === t.key}
-            onClick={() => setActiveTab(t.key)}
-          />
-        ))}
+        <div role="tablist" style={{ display: "flex", flex: "1 1 auto", minWidth: 0 }}>
+          {tabs.map(t => (
+            <PlayerTabButton
+              key={t.key}
+              label={t.label}
+              active={activeTab === t.key}
+              onClick={() => setActiveTab(t.key)}
+            />
+          ))}
+        </div>
         {hasDossier && (
           <a
             href={`/players/${player.id}`}

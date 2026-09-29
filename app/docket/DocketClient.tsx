@@ -178,6 +178,8 @@ function ExpandedEntry({ entry }: { entry: DocketEntry }) {
           setExpandedFlag={setExpandedFlag}
           onRequestClaudeAnalysis={() => undefined}
           onOpenMemo={() => undefined}
+          paperSurface
+          showMemoAction={false}
         />
       )}
 
