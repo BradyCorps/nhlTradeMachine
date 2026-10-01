@@ -1,9 +1,9 @@
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import { eq, sql } from "drizzle-orm";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "@/app/db/schema";
 import { SEASON_SNAPSHOT_TABLE_STATEMENTS } from "@/app/db/ensure-schema";
 import { getProductionAnalytic } from "@/app/lib/production-analytics";
@@ -11,7 +11,9 @@ import {
   LabsRegistrationAuthorizationError,
   LabsRegistrationConflictError,
   registerCandidateAndProtocol,
+  transitionCandidateToRegistered,
   type CandidateProtocolRegistrationInput,
+  type CandidateRegisteredTransitionInput,
 } from "@/app/lib/labs-registration.server";
 
 const BATCH_ID = "snapshot:2025-26:2026-09-13:X-NAV-4.2:5af40ed576d53014";
@@ -24,9 +26,13 @@ const MIGRATIONS = ["0009_add_labs_candidate_foundation.sql", "0010_add_labs_eva
     .filter(Boolean),
 );
 
+const resources: Array<{ client: ReturnType<typeof createClient>; path: string }> = [];
 async function fixtureDb() {
-  const client = createClient({ url: `file:/tmp/labs-registration-${crypto.randomUUID()}.db` });
+  const path = `/tmp/labs-registration-${crypto.randomUUID()}.db`;
+  const client = createClient({ url: `file:${path}` });
+  resources.push({ client, path });
   const db = drizzle(client, { schema });
+  await db.run(sql.raw("PRAGMA journal_mode = WAL"));
   for (const statement of SEASON_SNAPSHOT_TABLE_STATEMENTS) await db.run(sql.raw(statement));
   for (const statement of MIGRATIONS) await db.run(sql.raw(statement));
   await db.insert(schema.seasonSnapshotBatches).values({
@@ -42,6 +48,14 @@ async function fixtureDb() {
 const TEST_ADMIN_KEY = "isolated-labs-registration-test-key";
 const previousAdminKey = process.env.ADMIN_KEY;
 const authorizedRequest = () => new Request("https://admin.example/labs", { headers: { "x-admin-key": TEST_ADMIN_KEY } });
+
+afterEach(() => {
+  for (const { client, path } of resources.splice(0)) {
+    client.close();
+    for (const suffix of ["", "-wal", "-shm"]) rmSync(`${path}${suffix}`, { force: true });
+  }
+  vi.unstubAllEnvs();
+});
 
 function registration(overrides: Partial<CandidateProtocolRegistrationInput> = {}): CandidateProtocolRegistrationInput {
   const target = getProductionAnalytic("nav.defense");
@@ -246,5 +260,187 @@ describe("Phase 5A.1 controlled Labs registration", () => {
     expect(existsSync(join(process.cwd(), "app/api/admin/labs"))).toBe(false);
     expect(source).toContain("requireAdmin(request)");
     expect(source).not.toMatch(/calculateAssetNAV|calcNAV|simulateLeague|import\(|require\(|INSERT\s+INTO|UPDATE\s+labs_|DELETE\s+FROM/);
+  });
+});
+
+describe("Phase 5A.2 isolated DRAFT to REGISTERED transition", () => {
+  let db: Awaited<ReturnType<typeof fixtureDb>>;
+  let input: CandidateRegisteredTransitionInput;
+  beforeEach(async () => {
+    vi.stubEnv("ADMIN_KEY", TEST_ADMIN_KEY);
+    vi.stubEnv("ADMIN_DISABLE_AUTH", "0");
+    db = await fixtureDb();
+    const draft = await registerCandidateAndProtocol(authorizedRequest(), db, registration());
+    input = {
+      candidateId: draft.candidate.id, protocolId: draft.protocol.id,
+      protocolFingerprint: draft.protocol.fingerprint, eventId: "event.registration.registered.v1",
+      occurredAt: registration().candidate.createdAt + 1, actor: "labs.reviewer",
+      source: "isolated-transition-test", note: "Planning metadata checked.",
+    };
+  });
+
+  it("rejects missing and incorrect authorization before any database access", async () => {
+    const transaction = vi.fn();
+    const select = vi.fn();
+    for (const request of [new Request("https://admin.example/labs"), new Request("https://admin.example/labs", { headers: { "x-admin-key": "incorrect" } })]) {
+      await expect(transitionCandidateToRegistered(request, { transaction, select, insert: vi.fn() }, input))
+        .rejects.toBeInstanceOf(LabsRegistrationAuthorizationError);
+    }
+    expect(transaction).not.toHaveBeenCalled();
+    expect(select).not.toHaveBeenCalled();
+    expect((await counts(db)).events).toBe(1);
+  });
+
+  it("appends one protocol-bound event and makes exact retries immutable no-ops", async () => {
+    const before = await counts(db);
+    const first = await transitionCandidateToRegistered(authorizedRequest(), db, input);
+    expect(first.created).toBe(true);
+    expect(first.candidate.lifecycleStatus).toBe("REGISTERED");
+    expect(first.candidate.lifecycleHistory[1]).toMatchObject({
+      id: input.eventId, sequence: 2, eventType: "REGISTERED", previousStatus: "DRAFT",
+      actor: input.actor, source: input.source,
+      evidenceReference: JSON.stringify({ protocolId: input.protocolId, fingerprint: input.protocolFingerprint }),
+    });
+    const second = await transitionCandidateToRegistered(authorizedRequest(), db, input);
+    expect(second).toEqual({ ...first, created: false });
+    expect(await counts(db)).toEqual({ ...before, events: 2 });
+  });
+
+  it.each([
+    { eventId: "event.other.registered.v1" }, { actor: "other.operator" },
+    { source: "different-source" }, { note: "Changed note" }, { occurredAt: 42 },
+    { protocolFingerprint: "c".repeat(64) },
+  ])("rejects a changed retry %j without another event", async change => {
+    await transitionCandidateToRegistered(authorizedRequest(), db, input);
+    await expect(transitionCandidateToRegistered(authorizedRequest(), db, { ...input, ...change }))
+      .rejects.toBeInstanceOf(LabsRegistrationConflictError);
+    expect((await counts(db)).events).toBe(2);
+  });
+
+  it("arbitrates exact concurrent retries across independent connections", async () => {
+    const path = resources[0]!.path;
+    const client = createClient({ url: `file:${path}` });
+    resources.push({ client, path });
+    const peer = drizzle(client, { schema });
+    const results = await Promise.all([
+      transitionCandidateToRegistered(authorizedRequest(), db, input),
+      transitionCandidateToRegistered(authorizedRequest(), peer, input),
+    ]);
+    expect(results.map(result => result.created).sort()).toEqual([false, true]);
+    expect(results[0]!.candidate).toEqual(results[1]!.candidate);
+    expect((await counts(db)).events).toBe(2);
+  });
+
+  it("allows only one of two competing transitions across independent connections", async () => {
+    const path = resources[0]!.path;
+    const client = createClient({ url: `file:${path}` });
+    resources.push({ client, path });
+    const peer = drizzle(client, { schema });
+    const results = await Promise.allSettled([
+      transitionCandidateToRegistered(authorizedRequest(), db, input),
+      transitionCandidateToRegistered(authorizedRequest(), peer, { ...input, eventId: "event.competing.registered.v1" }),
+    ]);
+    expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    const loser = results.find(result => result.status === "rejected") as PromiseRejectedResult;
+    expect(loser.reason).toBeInstanceOf(LabsRegistrationConflictError);
+    expect((await counts(db)).events).toBe(2);
+  });
+
+  it("rolls back an event when a database failure occurs after its insertion", async () => {
+    const before = await db.select().from(schema.labsCandidateLifecycleEvents);
+    const failingDb = {
+      select: db.select.bind(db),
+      insert: db.insert.bind(db),
+      transaction: async <T>(operation: (tx: any) => Promise<T>): Promise<T> => db.transaction(async tx => {
+        const result = await operation(tx);
+        // Fail only after the write, allowing the subsequent retry inspection.
+        if ((await tx.select().from(schema.labsCandidateLifecycleEvents)).length > before.length) {
+          throw new Error("Injected pre-commit failure");
+        }
+        return result;
+      }),
+    };
+    await expect(transitionCandidateToRegistered(authorizedRequest(), failingDb, input)).rejects.toThrow("Injected pre-commit failure");
+    expect(await db.select().from(schema.labsCandidateLifecycleEvents)).toEqual(before);
+    expect((await transitionCandidateToRegistered(authorizedRequest(), db, input)).created).toBe(true);
+  });
+
+  it.each(["FAILED", "CAPTURING", "count-mismatch", "legacy"])("rejects %s dataset provenance with no transition", async kind => {
+    if (kind === "legacy") {
+      // Deliberately corrupt only this disposable fixture to exercise the reader.
+      await db.run(sql.raw("PRAGMA foreign_keys = OFF"));
+      await db.update(schema.labsCandidates).set({ datasetBatchId: "2025-26" }).where(eq(schema.labsCandidates.id, input.candidateId));
+    } else {
+      await db.update(schema.seasonSnapshotBatches)
+        .set(kind === "count-mismatch" ? { capturedPlayers: 1 } : { status: kind })
+        .where(eq(schema.seasonSnapshotBatches.id, BATCH_ID));
+    }
+    await expect(transitionCandidateToRegistered(authorizedRequest(), db, input)).rejects.toThrow(/not COMPLETE|incomplete/);
+    expect((await counts(db)).events).toBe(1);
+  });
+
+  it("rejects mismatched implementation provenance and missing frozen protocols", async () => {
+    await db.update(schema.labsCandidates).set({ implementationIdentity: "different.implementation" }).where(eq(schema.labsCandidates.id, input.candidateId));
+    await expect(transitionCandidateToRegistered(authorizedRequest(), db, input)).rejects.toThrow(/implementation identity/);
+    await expect(transitionCandidateToRegistered(authorizedRequest(), db, { ...input, protocolId: "protocol.missing.v1" })).rejects.toThrow();
+    expect((await counts(db)).events).toBe(1);
+  });
+
+  it("rejects a valid frozen protocol for a different analytic", async () => {
+    const other = registration();
+    const target = getProductionAnalytic("nav.forward");
+    other.candidate = {
+      ...other.candidate, id: "candidate.other.registration.v1", targetAnalyticId: target.id,
+      baseAnalyticVersion: target.version.value, baseImplementationIdentity: target.implementation,
+    };
+    other.protocol = { ...other.protocol, id: "protocol.other.registration.v1", targetAnalyticId: target.id };
+    other.initialLifecycleEvent = { ...other.initialLifecycleEvent, id: "event.other.draft.v1" };
+    const registered = await registerCandidateAndProtocol(authorizedRequest(), db, other);
+    const before = await counts(db);
+    await expect(transitionCandidateToRegistered(authorizedRequest(), db, {
+      ...input, protocolId: registered.protocol.id, protocolFingerprint: registered.protocol.fingerprint,
+    })).rejects.toThrow(/same analytic/);
+    expect(await counts(db)).toEqual(before);
+  });
+
+  it("rejects retired candidates, even when the protocol and provenance remain valid", async () => {
+    await db.insert(schema.labsCandidateLifecycleEvents).values({
+      id: "event.registration.retired.v1", candidateId: input.candidateId, sequence: 2,
+      eventType: "RETIRED", previousStatus: "DRAFT", resultingStatus: "RETIRED",
+      occurredAt: input.occurredAt, actor: input.actor, source: input.source,
+      note: null, evidenceReference: null, metadataSchemaVersion: 1,
+    });
+    await expect(transitionCandidateToRegistered(authorizedRequest(), db, input))
+      .rejects.toBeInstanceOf(LabsRegistrationConflictError);
+    expect((await counts(db)).events).toBe(2);
+  });
+
+  it("fails closed when transactional database support is absent", async () => {
+    await expect(transitionCandidateToRegistered(authorizedRequest(), { ...db, transaction: undefined } as any, input))
+      .rejects.toThrow(/transactional database support/);
+    expect((await counts(db)).events).toBe(1);
+  });
+
+  it("leaves production resolution, frozen records and evaluation evidence untouched", async () => {
+    const target = getProductionAnalytic("nav.defense");
+    const frozen = await Promise.all([
+      db.select().from(schema.labsCandidates), db.select().from(schema.labsArtifacts),
+      db.select().from(schema.labsCandidateArtifacts), db.select().from(schema.labsEvaluationProtocols),
+      db.select().from(schema.labsEvaluationProtocolMetrics), db.select().from(schema.labsEvaluationProtocolGates),
+      db.select().from(schema.seasonSnapshotBatches),
+    ]);
+    const result = await transitionCandidateToRegistered(authorizedRequest(), db, input);
+    expect(result.candidate.productionResolvable).toBe(false);
+    expect(getProductionAnalytic("nav.defense")).toEqual(target);
+    expect(() => getProductionAnalytic(input.candidateId)).toThrow();
+    expect(await Promise.all([
+      db.select().from(schema.labsCandidates), db.select().from(schema.labsArtifacts),
+      db.select().from(schema.labsCandidateArtifacts), db.select().from(schema.labsEvaluationProtocols),
+      db.select().from(schema.labsEvaluationProtocolMetrics), db.select().from(schema.labsEvaluationProtocolGates),
+      db.select().from(schema.seasonSnapshotBatches),
+    ])).toEqual(frozen);
+    expect(await db.select().from(schema.labsEvaluationRuns)).toEqual([]);
+    expect(await db.select().from(schema.labsEvaluationMetricObservations)).toEqual([]);
+    expect(await db.select().from(schema.labsEvaluationGateResults)).toEqual([]);
   });
 });

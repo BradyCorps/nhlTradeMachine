@@ -438,3 +438,110 @@ export async function registerCandidateAndProtocol(
   if (!registered) throw new LabsRegistrationConflictError("Registration committed but could not be re-read as coherent immutable metadata.");
   return Object.freeze({ ...registered, created: true });
 }
+
+export interface CandidateRegisteredTransitionInput {
+  candidateId: string;
+  protocolId: string;
+  protocolFingerprint: string;
+  eventId: string;
+  occurredAt: number;
+  actor: string;
+  source: string;
+  note: string | null;
+}
+
+/** Metadata readiness only: no execution, analytical validation, or promotion. */
+export async function transitionCandidateToRegistered(
+  request: Request,
+  db: LabsWriteDb,
+  input: CandidateRegisteredTransitionInput,
+): Promise<CandidateProtocolRegistrationResult> {
+  const denied = await requireAdmin(request);
+  if (denied) throw new LabsRegistrationAuthorizationError();
+  if (typeof db.transaction !== "function") throw new LabsRegistrationConflictError("Labs registration requires transactional database support.");
+  assertStableId("Candidate ID", input.candidateId);
+  assertStableId("Protocol ID", input.protocolId);
+  assertStableId("Lifecycle event ID", input.eventId);
+  assertTimestamp("Lifecycle event timestamp", input.occurredAt);
+  assertNonEmpty("Transition actor", input.actor);
+  assertNonEmpty("Transition source", input.source);
+
+  const event: CandidateLifecycleEvent = {
+    id: input.eventId, candidateId: input.candidateId, sequence: 2,
+    eventType: "REGISTERED", previousStatus: "DRAFT", resultingStatus: "REGISTERED",
+    occurredAt: input.occurredAt, actor: input.actor, source: input.source, note: input.note,
+    evidenceReference: JSON.stringify({ protocolId: input.protocolId, fingerprint: input.protocolFingerprint }),
+    metadataSchemaVersion: LABS_METADATA_SCHEMA_VERSION,
+  };
+
+  async function readReady(tx: any): Promise<CandidateProtocolRegistrationResult> {
+    const candidate = await getLabCandidate(tx, input.candidateId);
+    const protocol = await getEvaluationProtocol(tx, input.protocolId);
+    if (protocol.fingerprint !== input.protocolFingerprint) {
+      throw new LabsRegistrationConflictError("The requested protocol fingerprint differs from its frozen definitions.");
+    }
+    // Recheck the complete Phase 5A.1 metadata contract inside the write
+    // transaction, including immutable artifacts and COMPLETE provenance.
+    const initial = candidate.lifecycleHistory[0]!;
+    const validated = await validateRegistrationInput(tx, {
+      actor: candidate.createdBy, source: candidate.createdSource,
+      candidate: {
+        ...candidate, targetAnalyticId: candidate.targetAnalytic.id,
+        datasetBatchId: candidate.dataset.id,
+      },
+      artifacts: candidate.artifacts,
+      initialLifecycleEvent: initial,
+      protocol,
+    });
+    if (!sameJson(initial, validated.lifecycleEvent)
+      || candidate.artifacts.some(reference => reference.attachedBy !== candidate.createdBy)
+      || protocol.createdBy !== candidate.createdBy || protocol.createdSource !== candidate.createdSource) {
+      throw new LabsCandidateIntegrityError("Candidate and protocol registration provenance must match.");
+    }
+    if (candidate.lifecycleStatus === "REGISTERED"
+      && candidate.lifecycleHistory.length === 2
+      && sameJson(candidate.lifecycleHistory[1], event)) {
+      return Object.freeze({ candidate, protocol, created: false });
+    }
+    if (candidate.lifecycleStatus !== "DRAFT" || candidate.lifecycleHistory.length !== 1) {
+      throw new LabsRegistrationConflictError("Only a DRAFT candidate may transition; an existing transition must be an exact retry.");
+    }
+    validateCandidateLifecycleHistory(candidate.id, [...candidate.lifecycleHistory, event]);
+    return { candidate, protocol, created: true };
+  }
+
+  function isBusy(error: unknown): boolean {
+    if (!error || typeof error !== "object") return false;
+    const databaseError = error as { code?: string; cause?: unknown };
+    return databaseError.code === "SQLITE_BUSY" || isBusy(databaseError.cause);
+  }
+
+  async function transact<T>(operation: (tx: any) => Promise<T>): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await db.transaction(operation);
+      } catch (error) {
+        if (!isBusy(error) || attempt >= 6) throw error;
+        await new Promise(resolve => setTimeout(resolve, 10 * 2 ** attempt));
+      }
+    }
+  }
+
+  try {
+    return await transact(async tx => {
+      const ready = await readReady(tx);
+      if (!ready.created) return ready;
+      // The unique (candidate_id, sequence) constraint arbitrates concurrent
+      // transitions. Re-read before commit so a failed integrity check rolls back.
+      await tx.insert(labsCandidateLifecycleEvents).values(event);
+      const candidate = await getLabCandidate(tx, input.candidateId);
+      return Object.freeze({ candidate, protocol: ready.protocol, created: true });
+    });
+  } catch (error) {
+    // A competing connection may have won the write. A fresh transaction
+    // accepts only its exact event and revalidates all readiness metadata.
+    const retry = await transact(readReady);
+    if (!retry.created) return retry;
+    throw error;
+  }
+}
