@@ -1,8 +1,8 @@
-# Controlled candidate and protocol registration — Phase 5A.1
+# Controlled candidate and protocol registration — Phases 5A.1 and 5A.2
 
 ## Scope
 
-`app/lib/labs-registration.server.ts` is the sole Phase 5A.1 write boundary.
+`app/lib/labs-registration.server.ts` is the sole registration write boundary.
 It is server-only by placement and use: there is no Server Action, no
 `/api/admin/labs` route, and no Admin Labs control that invokes it. A later,
 separately approved administrative entry point must pass a real `Request`; the
@@ -27,11 +27,9 @@ candidate ──< candidate-artifact references >── immutable artifacts
     └── frozen evaluation protocol ──< metrics and gates
 ```
 
-The initial state is deliberately `DRAFT`, not `REGISTERED`. Creating a record
-does not assert evaluation readiness. A later Phase 5A.2 authorization may add
-the separately audited `DRAFT → REGISTERED` lifecycle transition; only then can
-a future evaluation-run boundary consider the candidate eligible. No Phase
-5A.1 record is production-resolvable.
+The initial state is `DRAFT`. Creating a record does not assert evaluation
+readiness. Phase 5A.2 adds the internal `DRAFT → REGISTERED` transition below.
+Neither state is production-resolvable.
 
 Before opening the transaction, the service validates:
 
@@ -71,9 +69,69 @@ concurrent retry is accepted only after the same exact re-read; otherwise its
 database error remains a failure. This service does not repair or adopt legacy
 records.
 
-## Deferred to Phase 5A.2
+## Phase 5A.2 service contract
 
-Phase 5A.1 intentionally leaves out an operator route or form, lifecycle
-advancement to `REGISTERED`, evaluation-run creation, execution isolation,
-metrics, validation evidence, human approval, promotion, rollback, and flag
-controls. The protected `/admin/labs` surface remains read-only.
+- [x] Implement and verify the isolated, authenticated DRAFT → REGISTERED service.
+
+`transitionCandidateToRegistered(request, db, input)` requires an authorized
+admin Request and transactional database support. Its input names the existing
+candidate, frozen protocol ID and expected fingerprint, stable event ID,
+timestamp, actor, source, and nullable note. Actor/source are explicit operator
+provenance supplied by the authorized caller; they are not inferred from the
+shared admin key. The service never creates a candidate, artifact, protocol, or
+evaluation run.
+
+Within one transaction, it re-reads through the fail-closed candidate/protocol
+readers and rechecks the Phase 5A.1 metadata contract: current catalog base
+identity, internal/research exposure, diagnostic research restriction,
+count-consistent COMPLETE dataset provenance, immutable implementation
+artifacts with matching identity/role, attachment and initial-event provenance,
+and a target-matched frozen protocol with a recomputed fingerprint. The
+protocol must share the original candidate registration timestamp, creator,
+and source. No artifact bytes are fetched, hashed, or executed by this service;
+these checks qualify declared immutable references and stored metadata.
+
+A successful transition appends exactly one sequence-two `REGISTERED` event
+(`DRAFT → REGISTERED`). Its `evidenceReference` is canonical JSON containing
+`protocolId` and `fingerprint`, preserving the chosen protocol binding in
+append-only history. The candidate row and all frozen definitions remain
+unchanged. State is derived from the event sequence, not its timestamp.
+
+The returned `{ candidate, protocol, created }` has `created: true` when this
+call appends the event and `false` when an exact retry reuses it. An exact retry
+must match every event field, including protocol binding, event ID, actor,
+source, timestamp, and note, and must still pass readiness checks. A changed
+retry, retired candidate, mismatched fingerprint, or competing transition
+fails closed. Primary event identity and unique `(candidate_id, sequence)`
+constraints arbitrate concurrent writes; identical concurrent requests yield
+one append and one reuse, while competing requests yield one winner and one
+conflict. Lock contention is retried at most six times per transaction attempt
+with 10–320ms exponential delays; persistent contention remains a failure.
+Any pre-commit failure rolls back the append. A fresh transaction may accept
+a competing commit only after proving exact equivalence again.
+
+**REGISTERED guarantees that the service checked planning metadata and durably
+bound an immutable protocol to the candidate. It does not mean analytically
+validated or production-approved.** It supplies a prerequisite for a future
+isolated evaluation boundary, not authority to execute a run. It makes no
+claim about statistical performance, unspent holdouts, actual artifact byte
+integrity, evaluation results, gate passage, certification, or human approval.
+Candidates remain `productionResolvable: false`.
+
+Verification uses disposable, uniquely named local libSQL databases with WAL
+enabled and two independent connections for concurrency cases. It does not
+use application database configuration or create/transition Production
+records. Authorization, transition/retry/conflict, rollback, provenance,
+retirement, and production isolation tests run alongside the Phase 0 golden
+baseline. Earlier schema and frozen-protocol evidence is reused; no migration
+or deployed-endpoint operation is required for this service-only change.
+
+## Deferred
+
+An operator route/form, isolated evaluation-run creation and execution,
+metrics, validation evidence, human approval, promotion, and flag controls
+remain separate work. The protected `/admin/labs` surface remains read-only.
+The next smallest step is an internal, isolated evaluation-run planning
+boundary that requires REGISTERED history and its exact protocol binding,
+then persists a PLANNED run with immutable inputs and execution provenance
+without executing candidate code or writing to Production.
