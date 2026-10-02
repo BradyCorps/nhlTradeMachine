@@ -6,6 +6,7 @@ import { SEASON } from "@/app/lib/season-config";
 import { XNAV_MODEL_VERSION } from "@/app/lib/data-context";
 import { manifestCacheKey } from "@/app/lib/release-manifest";
 import { snapshotDate } from "@/app/lib/valuation-snapshot";
+import { clearMemorySwrKeys } from "@/app/lib/swr-store";
 
 type Database = typeof defaultDb;
 type RedisClient = typeof defaultRedis;
@@ -73,8 +74,9 @@ export async function clearTeamCaches(
   extraCapCeilings: Array<number | null | undefined> = [],
 ): Promise<string[]> {
   const cleared: string[] = [];
-  if (!cache) return cleared;
   const keys = await activeTeamCacheKeys(database, extraCapCeilings);
+  clearMemorySwrKeys(keys);
+  if (!cache) return keys;
   for (const key of keys) {
     await cache.del(key).then(() => cleared.push(key)).catch(() => {});
   }

@@ -26,7 +26,9 @@ join; it does not introduce current observations into NAV or fit a new model.
 The split `/api/league/teams` payload consumes the canonical cap moves once, as
 `/api/league` already does. Roster, analytics, team-payload, cap-parameterized team
 and Docket cache namespaces advance; existing mutation invalidators include them.
-No Production cache was cleared during this work.
+Mutation invalidation also evicts the in-process fallback payloads and refresh
+locks when Redis is unavailable, preserving unrelated historical-observation
+keys. No Production cache was cleared during this work.
 
 Roster injection preserves a uniquely matched live NHL identity and its source
 metadata while retaining the stored contract name for the contract join. Genuine
@@ -105,7 +107,7 @@ Focused tests cover TOR/CBJ ownership reuse, flags, ordering/ties, subsequent tr
 retention cap suffixes, already-updated assignments, idempotency, ambiguous names,
 same-name positions, stable NHL identity, large-population resolution, missing versus
 zero pricing, isolated Admin read/save/authorization and affected invalidation keys.
-Final code: **2,633/2,633 tests across 208 files**, Phase 0 **10/10**, TypeScript
+Final code: **2,634/2,634 tests across 209 files**, Phase 0 **10/10**, TypeScript
 passed, lint **0 errors / 4 pre-existing warnings**, and optimized build passed.
 Phase 0 analytical fixtures remain unchanged. Hosted head checks are recorded in
 the PR; unchanged preservation evidence was reused.

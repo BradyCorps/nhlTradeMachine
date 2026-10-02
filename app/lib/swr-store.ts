@@ -9,6 +9,14 @@ import type { SwrStore } from "@/app/lib/swr-cache";
 type MemoryEntry = { value: unknown; expiresAt: number };
 const memory = new Map<string, MemoryEntry>();
 
+/** Mutation invalidators must evict the Redis-less roster fallback too. */
+export function clearMemorySwrKeys(keys: string[]): void {
+  for (const key of keys) {
+    memory.delete(key);
+    memory.delete(`${key}:refreshing`);
+  }
+}
+
 const memorySwrStore: SwrStore = {
   get: async <T>(key: string) => {
     const entry = memory.get(key);
