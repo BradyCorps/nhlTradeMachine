@@ -132,7 +132,7 @@ describe("Canary — NHL EDGE usage and presentation", () => {
     expect(breakoutModel).toContain("if (s.hdFinishingDelta != null)");
     expect(breakoutModel).toContain("edgeBurstsOver20");
     expect(rollover).toContain("computeBreakout");
-    expect(players).toContain('{ label: "High-danger finish"');
+    expect(players).toContain('{ label: "High-danger finish (2025–26)"');
     expect(players).toContain("NHL EDGE high-danger finishing vs league average");
     expect(players).toContain("hdFinishingDelta: player.hdFinishingDelta ?? undefined");
     // The shared adapter preserves the full player payload (EDGE fields
@@ -1751,8 +1751,8 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(src).toContain("PlayerOutlook");
     expect(src).toContain("developmentProfile?: DevelopmentProfile | null");
     expect(src).toContain("Player Outlook");
-    expect(src).toContain('fetch("/api/league/teams")');
-    expect(src).toContain('fetch("/api/league/players")');
+    expect(src).toContain('fetch("/api/league/teams", { signal: controller.signal })');
+    expect(src).toContain('fetch(`/api/league/players?${selectionKey}`, { signal: controller.signal })');
     expect(src).toContain("const [forwardPage");
     expect(src).toContain("function SectionPager");
     expect(src).toContain("const FORWARD_CAP = 25");
@@ -1766,8 +1766,8 @@ describe("Canary — Batch 6 audit fixes", () => {
     expect(src).toContain("SortHeader");
     expect(src).toContain("players-column-header");
     expect(src).not.toContain("players-mobile-sort-strip");
-    expect(src).toContain("const seasonPoints = Math.round");
-    expect(src).toContain('{ label: "Points", val: seasonPoints.toString() }');
+    expect(src).toContain("const observed = player.observedStats");
+    expect(src).toContain('{ label: "Points", val: observed?.points?.toString() ?? "—" }');
     expect(src).not.toContain(">Season Points<");
   });
 
@@ -1858,7 +1858,7 @@ describe("Canary — R0/R1/R2 audit refinements", () => {
   it("keeps expanded player cards and STRAND displays de-duplicated", () => {
     const players = read("app/players/page.tsx");
     const strand = read("app/components/StrandDisplay.tsx");
-    expect(players).toContain('{ label: "Points", val: seasonPoints.toString() }');
+    expect(players).toContain('{ label: "Points", val: observed?.points?.toString() ?? "—" }');
     expect(players).not.toContain("Season Points");
     expect(players).not.toContain(">OPS</span>");
     expect(players).not.toContain(">DPS</span>");
@@ -2692,9 +2692,9 @@ describe("Canary — team detail routes", () => {
     expect(route).toContain("generateMetadata");
     expect(route).toContain("<TeamsPage />");
     expect(page).toContain("usePathname");
-    expect(page).toContain('href={`/teams/${team.id.toLowerCase()}`}');
+    expect(page).toContain('href={`/teams/${team.id.toLowerCase()}?${team.observedSelection');
     expect(page).toContain("function LinePlayerLink");
-    expect(page).toContain('href={`/players/${encodeURIComponent(player.id)}`}');
+    expect(page).toContain('href={`/players/${encodeURIComponent(player.id)}?${observedQuery(selection)}`}');
     expect(page.match(/<LinePlayerLink/g)).toHaveLength(3);
     expect(page).toContain('className="inline-flex min-h-11 items-center px-1 -mx-1');
     expect(page).not.toContain("sm:min-h-0");

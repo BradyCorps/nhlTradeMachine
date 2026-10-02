@@ -21,7 +21,7 @@ export const maxDuration = 60;
 
 // A stable, always-rostered probe player for the drift check.
 const CANARY_PLAYER_ID = 8478402; // Connor McDavid
-const seasonId = () => Number(SEASON.nhleSeasonId);
+const seasonId = () => Number(SEASON.apiSeasonId);
 
 // GET /api/admin/nhl-feed — source health check. Probes both endpoints
 // with a canary player and reports any required field that vanished, so
@@ -50,15 +50,15 @@ export async function GET(req: Request) {
   // dossier panel, which renders nothing when a goalie has no row. That
   // failure mode is silent on the player page, so the standing coverage
   // is reported here instead — "0 of 144" is the whole diagnosis.
-  const goalieEdge = await goalieEdgeCoverage(SEASON.nhleSeasonId);
+  const goalieEdge = await goalieEdgeCoverage(SEASON.apiSeasonId);
   // Skater EDGE feeds the gravity model's inputs; its coverage is the reason a
   // gravity flip would render sparsely, so it is surfaced alongside the goalie
   // number rather than inferred from empty player pages.
-  const skaterEdge = await skaterEdgeCoverage(SEASON.nhleSeasonId);
+  const skaterEdge = await skaterEdgeCoverage(SEASON.apiSeasonId);
 
   return NextResponse.json({
     checkedAt: new Date().toISOString(),
-    season: seasonId(),
+    season: seasonId(), gameType: 2,
     landing: {
       url: LANDING_URL(CANARY_PLAYER_ID),
       reachable: landing.raw != null,
@@ -106,6 +106,8 @@ export async function POST(req: Request) {
   if (unauthorized) return unauthorized;
 
   const body = await req.json().catch(() => ({})) as {
+    season?: string;
+    gameType?: number;
     team?: string;
     ids?: number[];
     goalies?: boolean;
@@ -116,13 +118,16 @@ export async function POST(req: Request) {
     discover?: boolean;
   };
 
+  if ((body.season != null && body.season !== SEASON.apiSeasonId) || (body.gameType != null && body.gameType !== 2)) {
+    return NextResponse.json({ error: "This feed captures only the current regular season; archive historical inputs separately." }, { status: 400 });
+  }
   const explicitIds: number[] = Array.isArray(body.ids) ? body.ids.filter((n) => Number.isFinite(n)) : [];
   const scopedTeams = Array.isArray(body.teams) && body.teams.length > 0
     ? body.teams
     : body.team ? [body.team] : undefined;
 
   if (body.skaters) {
-    const result = await backfillSkaterEdge(SEASON.nhleSeasonId, {
+    const result = await backfillSkaterEdge(SEASON.apiSeasonId, {
       playerIds: explicitIds.length > 0 ? explicitIds : undefined,
       teams: scopedTeams,
       discover: body.discover === true,
@@ -130,11 +135,11 @@ export async function POST(req: Request) {
       limit: Math.min(Number.isFinite(body.limit) ? Number(body.limit) : SKATER_BATCH, SKATER_BATCH),
       concurrency: SKATER_CONCURRENCY,
     });
-    return NextResponse.json({ ok: true, season: seasonId(), mode: "skater-edge", ...result });
+    return NextResponse.json({ ok: true, season: seasonId(), gameType: 2, mode: "skater-edge", ...result });
   }
 
   if (body.goalies) {
-    const result = await captureGoalieEdgeDetail(SEASON.nhleSeasonId, {
+    const result = await captureGoalieEdgeDetail(SEASON.apiSeasonId, {
       playerIds: explicitIds.length > 0 ? explicitIds : undefined,
       teams: scopedTeams,
       discover: body.discover === true,
@@ -142,7 +147,7 @@ export async function POST(req: Request) {
       limit: Math.min(Number.isFinite(body.limit) ? Number(body.limit) : GOALIE_BATCH, GOALIE_BATCH),
       concurrency: GOALIE_CONCURRENCY,
     });
-    return NextResponse.json({ ok: true, season: seasonId(), mode: "goalie-detail", ...result });
+    return NextResponse.json({ ok: true, season: seasonId(), gameType: 2, mode: "goalie-detail", ...result });
   }
 
   let ids: number[] = explicitIds;
@@ -152,5 +157,5 @@ export async function POST(req: Request) {
   }
 
   const result = await capturePlayerSnapshots(ids.slice(0, 40), seasonId());
-  return NextResponse.json({ ok: true, season: seasonId(), ...result });
+  return NextResponse.json({ ok: true, season: seasonId(), gameType: 2, ...result });
 }

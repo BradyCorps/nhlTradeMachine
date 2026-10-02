@@ -54,7 +54,7 @@ const {
 const { activeSkaterIds, activeSkaterIdsForTeams } = await import("@/app/lib/nhl-active-players");
 
 const SEASON = 20252026;
-const landingFacts = (name: string) => ({ name, gamesPlayed: 60, goals: 20, assists: 25, points: 45, shootingPctg: 0.12 });
+const landingFacts = (name: string) => ({ name, season: SEASON, gamesPlayed: 60, goals: 20, assists: 25, points: 45, shootingPctg: 0.12 });
 const edgeFor = (status = 200) => ({
   facts: { gamesPlayed: 60, ozPct: 0.55, hdShots: 40, hdShootingPct: 0.18, hdFinishingDelta: 0.02 },
   raw: { edge: true }, status,

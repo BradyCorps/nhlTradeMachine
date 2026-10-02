@@ -1020,7 +1020,7 @@ export async function assembleCanonicalRoster(options: {
         fetchWithTimeout(`https://api-web.nhle.com/v1/roster/${t.id}/current`, 5000, NHL_HEADERS)
           .then((r) => (r.ok ? r.json() : null))
           .catch(() =>
-            fetchWithTimeout(`https://api-web.nhle.com/v1/roster/${t.id}/${SEASON.nhleSeasonId}`, 5000, NHL_HEADERS)
+            fetchWithTimeout(`https://api-web.nhle.com/v1/roster/${t.id}/${SEASON.apiSeasonId}`, 5000, NHL_HEADERS)
               .then((r) => (r.ok ? r.json() : null))
               .catch(() => null)
           )

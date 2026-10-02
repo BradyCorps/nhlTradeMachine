@@ -88,7 +88,7 @@ async function markNoEdgeData(playerId: number, season: number, name: string | n
  *  insert vs a same-day re-run — via `returning()` on the conflict clause. */
 async function captureOneSkater(playerId: number, season: number, day: string): Promise<OneSkaterResult> {
   const [landing, edge] = await Promise.all([
-    fetchPlayerLanding(playerId),
+    fetchPlayerLanding(playerId, season),
     fetchEdgeDetail(playerId, season),
   ]);
   const r: OneSkaterResult = {
@@ -97,7 +97,7 @@ async function captureOneSkater(playerId: number, season: number, day: string): 
     edgeStatus: edge.status, noEdgeData: false, wrote_error: false,
   };
 
-  if (landing.facts && landing.raw) {
+  if (landing.facts?.season === season && landing.raw) {
     r.reached = true;
     try {
       const w = await db.insert(nhlSnapshots).values({

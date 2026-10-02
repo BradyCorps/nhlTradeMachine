@@ -1,3 +1,5 @@
+import { parseObservedSelection, type ObservedSelection } from "@/app/lib/observed-season";
+import { readObservedSummary, observedTeamRecord } from "@/app/lib/observed-stats.server";
 import { NextResponse } from "next/server";
 import { resolveTeamCapSpace } from "@/app/lib/team-cap-space";
 import { SEASON } from "@/app/lib/season-config";
@@ -239,7 +241,7 @@ async function loadTeams(capCeiling: number): Promise<any[]> {
       const data = await res.json();
       const entries: any[] = data.standings ?? [];
       entries.sort((a: any, b: any) => (b.points ?? 0) - (a.points ?? 0));
-      entries.forEach((t: any, i: number) => {
+      entries.filter((t: any) => Number(t.seasonId) === Number(SEASON.nhleSeasonId)).forEach((t: any, i: number) => {
         const tricode = t.teamAbbrev?.default;
         if (!tricode) return;
 
@@ -453,7 +455,12 @@ async function buildLeagueAnalyticsPayload() {
   };
 }
 
-export async function GET() {
+export async function GET(req?: Request) {
+  let selection: ObservedSelection | undefined;
+  try {
+    const params = new URL(req?.url ?? "http://localhost/api/league").searchParams;
+    if (params.has("season") || params.has("gameType")) selection = parseObservedSelection(params);
+  } catch { return NextResponse.json({ error: "Unsupported statistics season or competition" }, { status: 400 }); }
   const { value, state, blocked } = await swrCache({
     store: swrStore,
     key: LEAGUE_ANALYTICS_CACHE_KEY,
@@ -475,7 +482,17 @@ export async function GET() {
     teamCount: value.teams?.length,
   });
 
-  return NextResponse.json({ ...value, provenance }, {
+  const observations = selection ? await readObservedSummary(selection, "team") : null;
+  const teams = observations ? value.teams.map(team => {
+    const row = observations.rows.find(row => row.teamFullName === team.name
+      || row.teamFullName === TEAMS_DB.find(t => t.id === team.id)?.name);
+    const ranked = [...observations.rows].sort((a, b) => Number(b.points) - Number(a.points)
+      || regulationWinsFrom(b) - regulationWinsFrom(a));
+    return { ...team, standing: row ? ranked.indexOf(row) + 1 : null,
+      record: observedTeamRecord(row), observedSelection: selection,
+      observedCoverage: row ? Number(row.gamesPlayed) === 0 ? "zero-games" : "available" : observations.coverage === "unavailable" ? "unavailable" : "missing" };
+  }) : value.teams;
+  return NextResponse.json({ ...value, teams, provenance, observations }, {
     headers: {
       "Cache-Control": "public, s-maxage=300, stale-while-revalidate=900",
       "x-ledger-cache": state,

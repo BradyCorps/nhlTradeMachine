@@ -161,7 +161,7 @@ async function loadTeams(capCeiling: number): Promise<any[]> {
         const data = await res.json();
         const entries: any[] = data.standings ?? [];
         entries.sort((a: any, b: any) => (b.points ?? 0) - (a.points ?? 0));
-        entries.forEach((t: any, i: number) => {
+        entries.filter((t: any) => Number(t.seasonId) === Number(SEASON.nhleSeasonId)).forEach((t: any, i: number) => {
           const tricode = t.teamAbbrev?.default;
           if (!tricode || standingsMap.has(tricode)) return;
           standingsMap.set(tricode, {
