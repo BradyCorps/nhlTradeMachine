@@ -14,7 +14,7 @@ export const SEASON = {
   draftYear:      2026,          // Draft Night projection year for Armchair GM sim flows
   firstTradablePickYear: 2027,   // 2026 draft completed June 2026 — its picks no longer exist as assets
   mpSeason:       "2025",        // MoneyPuck URL path segment — last completed season is the stats baseline
-  nhleSeasonId:   "20252026",    // NHL API roster fallback — keep at last completed season until 2026-27 rosters exist
+  nhleSeasonId:   "20252026",    // frozen model inputs; observed statistics, roster fallback and feed jobs use apiSeasonId
   latestCompleted: {
     season: "2025-26",
     stanleyCupChampion: { teamId: "CAR", teamName: "Carolina Hurricanes" },

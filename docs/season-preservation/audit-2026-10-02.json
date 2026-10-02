@@ -1,0 +1,402 @@
+{
+  "auditedAt": "2026-10-02",
+  "baseCommit": "cf70af1eb993d71e696bbd9be884728dbf6e3091",
+  "preservedInputs": [
+    {
+      "path": "MoneyPuckData/2025_26/skaters.csv",
+      "bytes": 3483132,
+      "sha256": "9a7e1f1a2f6bc8bc2bf10c5ba32947b47c4b26d5397287e4b30e9d662c4966e4",
+      "tracked": true
+    },
+    {
+      "path": "MoneyPuckData/2025_26/goalies.csv",
+      "bytes": 93386,
+      "sha256": "2fe2a2dbf25822cf1650e2ad00388c94ef303681fbfd8a8c7fdcb065212cd2fc",
+      "tracked": true
+    },
+    {
+      "path": "OtherData/2025;26_skater_totals_all.csv",
+      "bytes": 186493,
+      "sha256": "ecbe0fd77dc64a9e90c4484776c85076432c230e2f58e2182d6f0769683acd1e",
+      "tracked": true
+    },
+    {
+      "path": "OtherData/2025;26_defensive_pairings_all.csv",
+      "bytes": 487651,
+      "sha256": "9802693052a8c11d4462529ebdced4c8d6ae77df7793d0a142e761e019756825",
+      "tracked": true
+    },
+    {
+      "path": "app/data/moneypuck_baselines.json",
+      "bytes": 551999,
+      "sha256": "e03b432adaabe450fe4e344232e95580fa78dc490e0ec33a5933bf58cf8aff7b",
+      "tracked": true
+    },
+    {
+      "path": "app/data/skater-fmv.json",
+      "bytes": 7749,
+      "sha256": "c096c852d8c497dccdb6be5fdde642105ea51de7ac9a0509e858d1a7836824ce",
+      "tracked": true,
+      "recordedSources": [
+        {
+          "path": "OtherData/HistoricalData/skaters_2008_to_2024.csv",
+          "sha256": "fbb8ab3744d2bf61346fc21547d0dfe0f25999f31b9de86ffbc198d543e8afdc",
+          "bytes": 56643229
+        },
+        {
+          "path": "OtherData/2025_26Data/2025_26_skaters.csv",
+          "sha256": "9a7e1f1a2f6bc8bc2bf10c5ba32947b47c4b26d5397287e4b30e9d662c4966e4",
+          "bytes": 3483132
+        },
+        {
+          "path": "OtherData/contracts/signings.csv",
+          "sha256": "eca9d8ccbd3ecf8641b3086920392e9282da23d02521c9ddfcf9c7ed50705bfb",
+          "bytes": 686180
+        }
+      ]
+    },
+    {
+      "path": "app/data/goalie-fmv.json",
+      "bytes": 3621,
+      "sha256": "b783f771a62070125561cd8c9f7fc40f21dcc9088b502b6a5a8fb9aab798594b",
+      "tracked": true,
+      "recordedSources": [
+        {
+          "path": "OtherData/HistoricalData/goalies_2008_to_2024.csv",
+          "sha256": "b94d4ceecded6c23edb3ef197d4030bb2dc7f10d9a10cb396ae3802e28d4d0d4",
+          "bytes": 1521038
+        },
+        {
+          "path": "OtherData/2025_26Data/2025_26_goalies.csv",
+          "sha256": "2fe2a2dbf25822cf1650e2ad00388c94ef303681fbfd8a8c7fdcb065212cd2fc",
+          "bytes": 93386
+        },
+        {
+          "path": "OtherData/contracts/signings.csv",
+          "sha256": "eca9d8ccbd3ecf8641b3086920392e9282da23d02521c9ddfcf9c7ed50705bfb",
+          "bytes": 686180
+        }
+      ]
+    },
+    {
+      "path": "app/data/skater-stability.json",
+      "bytes": 21196,
+      "sha256": "ebf556d4f72b0721fc175525394274f772188f6c0fe399e7de08a305a0923d3f",
+      "tracked": true,
+      "recordedSources": [
+        {
+          "path": "OtherData/HistoricalData/skaters_2008_to_2024.csv",
+          "bytes": 56643229,
+          "sha256": "fbb8ab3744d2bf61346fc21547d0dfe0f25999f31b9de86ffbc198d543e8afdc",
+          "rowsAtSituationAll": 15331
+        },
+        {
+          "path": "OtherData/2025_26Data/2025_26_skaters.csv",
+          "bytes": 3483132,
+          "sha256": "9a7e1f1a2f6bc8bc2bf10c5ba32947b47c4b26d5397287e4b30e9d662c4966e4",
+          "rowsAtSituationAll": 940
+        }
+      ]
+    },
+    {
+      "path": "app/data/goal-value.json",
+      "bytes": 2892,
+      "sha256": "1d7c3ef6e5bccb7e6fd8e2bc688b0e86dacfd90ab99f62d6bc2478eeb3e95e3a",
+      "tracked": true,
+      "recordedSources": [
+        {
+          "path": "OtherData/HistoricalData/skaters_2008_to_2024.csv",
+          "sha256": "fbb8ab3744d2bf61346fc21547d0dfe0f25999f31b9de86ffbc198d543e8afdc",
+          "bytes": 56643229
+        },
+        {
+          "path": "OtherData/2025_26Data/2025_26_skaters.csv",
+          "sha256": "9a7e1f1a2f6bc8bc2bf10c5ba32947b47c4b26d5397287e4b30e9d662c4966e4",
+          "bytes": 3483132
+        },
+        {
+          "path": "OtherData/contracts/signings.csv",
+          "sha256": "eca9d8ccbd3ecf8641b3086920392e9282da23d02521c9ddfcf9c7ed50705bfb",
+          "bytes": 686180
+        }
+      ]
+    },
+    {
+      "path": "app/lib/gravity-v4/fitted-artifact.json",
+      "bytes": 1232037,
+      "sha256": "6de0271ef80f0969185e4217604efa332f1a94e7a1144d586a18ede05e74e29f",
+      "tracked": true
+    }
+  ],
+  "verifiedProductionBatch": {
+    "verification": "authenticated read-only /admin/labs, existing COMPLETE guard",
+    "id": "snapshot:2025-26:2026-09-13:X-NAV 4.2:5af40ed576d53014",
+    "integrityHash": "5af40ed576d53014d16f1048a1977a84f865a5019631ea19615e5cf2b44e0b39",
+    "players": 1417,
+    "teams": 32,
+    "capturedAt": "2026-09-13T01:54:40.075Z",
+    "legacyPlayers": 1428,
+    "legacyTeams": 33,
+    "recoveryCopyVerifiedThisPass": false
+  },
+  "upstreamSummaries": [
+    {
+      "season": 20262027,
+      "gameType": 2,
+      "kind": "skater",
+      "status": 200,
+      "total": 455,
+      "rows": 455,
+      "seasons": [
+        20262027
+      ],
+      "gpRange": [
+        1,
+        2
+      ],
+      "sha256": "77aafacf45687f875a38cbb3e3c82cd362b97b69691a7710a8099fde7d9015ac",
+      "source": "https://api.nhle.com/stats/rest/en/skater/summary?cayenneExp=seasonId%3D20262027%20and%20gameTypeId%3D2&limit=-1",
+      "retrievedAt": "2026-10-02T17:13:47.266589+00:00"
+    },
+    {
+      "season": 20262027,
+      "gameType": 2,
+      "kind": "goalie",
+      "status": 200,
+      "total": 31,
+      "rows": 31,
+      "seasons": [
+        20262027
+      ],
+      "gpRange": [
+        1,
+        2
+      ],
+      "sha256": "af2bf4b1f1dd12e35c4cb1dfa0d406bca9bdade790d4b329b12f23e801c43d99",
+      "source": "https://api.nhle.com/stats/rest/en/goalie/summary?cayenneExp=seasonId%3D20262027%20and%20gameTypeId%3D2&limit=-1",
+      "retrievedAt": "2026-10-02T17:13:47.511785+00:00"
+    },
+    {
+      "season": 20262027,
+      "gameType": 2,
+      "kind": "team",
+      "status": 200,
+      "total": 25,
+      "rows": 25,
+      "seasons": [
+        20262027
+      ],
+      "gpRange": [
+        1,
+        2
+      ],
+      "sha256": "bf7d74abd82fec0f6fa57f9302b29102c5ce6ad84475e829b4dcbbf7157eb2a5",
+      "source": "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId%3D20262027%20and%20gameTypeId%3D2&limit=-1",
+      "retrievedAt": "2026-10-02T17:13:47.651733+00:00"
+    },
+    {
+      "season": 20252026,
+      "gameType": 2,
+      "kind": "skater",
+      "status": 200,
+      "total": 940,
+      "rows": 940,
+      "seasons": [
+        20252026
+      ],
+      "gpRange": [
+        1,
+        83
+      ],
+      "sha256": "6d2ec60062110f1c357e4517a2116d765fb5b58dbf694e1b71674c9442d0f6fa",
+      "source": "https://api.nhle.com/stats/rest/en/skater/summary?cayenneExp=seasonId%3D20252026%20and%20gameTypeId%3D2&limit=-1",
+      "retrievedAt": "2026-10-02T17:13:47.787786+00:00"
+    },
+    {
+      "season": 20252026,
+      "gameType": 2,
+      "kind": "goalie",
+      "status": 200,
+      "total": 98,
+      "rows": 98,
+      "seasons": [
+        20252026
+      ],
+      "gpRange": [
+        1,
+        64
+      ],
+      "sha256": "bf0f5312dde65799897ce8d28fe34cc1a0652ab2f060cd9929660377e08a131f",
+      "source": "https://api.nhle.com/stats/rest/en/goalie/summary?cayenneExp=seasonId%3D20252026%20and%20gameTypeId%3D2&limit=-1",
+      "retrievedAt": "2026-10-02T17:13:48.261156+00:00"
+    },
+    {
+      "season": 20252026,
+      "gameType": 2,
+      "kind": "team",
+      "status": 200,
+      "total": 32,
+      "rows": 32,
+      "seasons": [
+        20252026
+      ],
+      "gpRange": [
+        82,
+        82
+      ],
+      "sha256": "51560606ad41c4aa7de3345b607b1f7460de9829832ce41ce0721e2356695846",
+      "source": "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId%3D20252026%20and%20gameTypeId%3D2&limit=-1",
+      "retrievedAt": "2026-10-02T17:13:48.399323+00:00"
+    },
+    {
+      "season": 20262027,
+      "gameType": 3,
+      "kind": "skater",
+      "status": 200,
+      "total": 0,
+      "rows": 0,
+      "seasons": [],
+      "gpRange": [
+        null,
+        null
+      ],
+      "sha256": "93fd5b4feec7a9fd7bd879aabf27c59c8638cfeb001d4a78c2fc033d5b813868",
+      "source": "https://api.nhle.com/stats/rest/en/skater/summary?cayenneExp=seasonId%3D20262027%20and%20gameTypeId%3D3&limit=-1",
+      "retrievedAt": "2026-10-02T17:13:48.686861+00:00"
+    },
+    {
+      "season": 20262027,
+      "gameType": 3,
+      "kind": "goalie",
+      "status": 200,
+      "total": 0,
+      "rows": 0,
+      "seasons": [],
+      "gpRange": [
+        null,
+        null
+      ],
+      "sha256": "93fd5b4feec7a9fd7bd879aabf27c59c8638cfeb001d4a78c2fc033d5b813868",
+      "source": "https://api.nhle.com/stats/rest/en/goalie/summary?cayenneExp=seasonId%3D20262027%20and%20gameTypeId%3D3&limit=-1",
+      "retrievedAt": "2026-10-02T17:13:48.813430+00:00"
+    },
+    {
+      "season": 20262027,
+      "gameType": 3,
+      "kind": "team",
+      "status": 200,
+      "total": 0,
+      "rows": 0,
+      "seasons": [],
+      "gpRange": [
+        null,
+        null
+      ],
+      "sha256": "93fd5b4feec7a9fd7bd879aabf27c59c8638cfeb001d4a78c2fc033d5b813868",
+      "source": "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId%3D20262027%20and%20gameTypeId%3D3&limit=-1",
+      "retrievedAt": "2026-10-02T17:13:48.949727+00:00"
+    },
+    {
+      "season": 20252026,
+      "gameType": 3,
+      "kind": "skater",
+      "status": 200,
+      "total": 347,
+      "rows": 347,
+      "seasons": [
+        20252026
+      ],
+      "gpRange": [
+        1,
+        22
+      ],
+      "sha256": "8032ee76b5e4c2fe6412a5fb7ab4bbfc2f2cbd4b0da23cb2f328003f1be430da",
+      "source": "https://api.nhle.com/stats/rest/en/skater/summary?cayenneExp=seasonId%3D20252026%20and%20gameTypeId%3D3&limit=-1",
+      "retrievedAt": "2026-10-02T17:13:49.331435+00:00"
+    },
+    {
+      "season": 20252026,
+      "gameType": 3,
+      "kind": "goalie",
+      "status": 200,
+      "total": 25,
+      "rows": 25,
+      "seasons": [
+        20252026
+      ],
+      "gpRange": [
+        1,
+        22
+      ],
+      "sha256": "144d4c3926402f8f9ed4ad501342f8d4cca9c7bc35e103986979d5df1d4396f6",
+      "source": "https://api.nhle.com/stats/rest/en/goalie/summary?cayenneExp=seasonId%3D20252026%20and%20gameTypeId%3D3&limit=-1",
+      "retrievedAt": "2026-10-02T17:13:49.473404+00:00"
+    },
+    {
+      "season": 20252026,
+      "gameType": 3,
+      "kind": "team",
+      "status": 200,
+      "total": 16,
+      "rows": 16,
+      "seasons": [
+        20252026
+      ],
+      "gpRange": [
+        4,
+        22
+      ],
+      "sha256": "34a1e5c2c24ca932a94c41411a42ec3f770173a1635f73c251988e1a605b2de9",
+      "source": "https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=seasonId%3D20252026%20and%20gameTypeId%3D3&limit=-1",
+      "retrievedAt": "2026-10-02T17:13:49.625259+00:00"
+    }
+  ],
+  "rawProbeObjects": {
+    "location": "temporary workspace outside repository",
+    "durableOffWorkspaceArchiveVerified": false
+  },
+  "verification": {
+    "fullSuite": {
+      "passed": 2619,
+      "failed": 0,
+      "files": 206
+    },
+    "phase0": {
+      "passed": 10,
+      "failed": 0
+    },
+    "typeScript": "passed",
+    "lint": {
+      "errors": 0,
+      "preExistingWarnings": 4
+    },
+    "build": {
+      "staticPages": 30,
+      "status": "passed"
+    },
+    "selector": [
+      {
+        "surface": "players",
+        "width": 320,
+        "switching": "passed",
+        "url": "passed",
+        "overflow": false
+      },
+      {
+        "surface": "players",
+        "width": 412,
+        "switching": "passed",
+        "url": "passed",
+        "overflow": false
+      },
+      {
+        "surface": "players",
+        "keyboard": "passed"
+      },
+      {
+        "surface": "teams",
+        "switching": "passed"
+      }
+    ]
+  }
+}

@@ -126,7 +126,9 @@ class Client:
         for attempt in range(MAX_RETRIES):
             self._wait()
             req = urllib.request.Request(url, headers={
-                "User-Agent": USER_AGENT,
+                "User-Agent": "Mozilla/5.0 " + USER_AGENT,
+                "Origin": "https://www.nhl.com",
+                "Referer": "https://www.nhl.com/",
                 "Accept": "application/json",
             })
             try:
@@ -181,9 +183,12 @@ def store(client: Client, url: str, seen: set[str]) -> Fetch:
     rel = Path("raw") / slug / digest[:2] / f"{digest}.json.gz"
     dest = ARCHIVE / rel
 
-    if digest in seen or dest.exists():
+    if dest.exists():
         # Same bytes as a previous fetch. The manifest still records that we
         # looked, which is how "when did this last change" stays answerable.
+        with gzip.open(dest, "rb") as fh:
+            if hashlib.sha256(fh.read()).hexdigest() != digest:
+                raise ValueError(f"corrupt archive object: {dest}; refusing to overwrite")
         client.counts["cached"] += 1
     else:
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -317,10 +322,24 @@ def discover(args: argparse.Namespace) -> None:
         print("\n  Those are the report families worth harvesting; nothing else")
         print("  the NHL publishes is self-describing.")
 
-    print(f"\n  manifest: {MANIFEST.relative_to(ROOT)}")
+    print(f"\n  manifest: {MANIFEST}")
 
 
 # ── Harvest ──────────────────────────────────────────────────────
+
+def harvest_plan(seasons: list[str], game_types: list[int]) -> list[str]:
+    plan: list[str] = []
+    for season in seasons:
+        for game_type in game_types:
+            for report in ["skater/summary", "goalie/summary", "team/summary"]:
+                # -1 requests the entire summary; completeness is checked before player discovery.
+                plan.append(f"{STATS}/{report}?limit=-1&cayenneExp=seasonId={season}%20and%20gameTypeId={game_type}")
+            for team in TEAMS:
+                plan.append(f"{WEB}/club-stats/{team}/{season}/{game_type}")
+        for team in TEAMS:
+            plan.append(f"{WEB}/roster/{team}/{season}")
+    return plan
+
 
 def harvest(args: argparse.Namespace) -> None:
     seasons = [s.strip() for s in args.seasons.split(",") if s.strip()]
@@ -328,18 +347,13 @@ def harvest(args: argparse.Namespace) -> None:
         sys.exit("--seasons is required, e.g. --seasons 20232024,20242025")
 
     client = Client(args.rate, args.dry_run)
-    seen = known_digests()
-    reports = ["skater/summary", "goalie/summary", "team/summary"]
 
-    plan: list[str] = []
-    for season in seasons:
-        plan.append(f"{WEB}/standings/now")
-        for report in reports:
-            # The stats service pages; 100 a page is what it comfortably serves.
-            plan.append(f"{STATS}/{report}?limit=100&start=0&cayenneExp=seasonId={season}")
-        for team in TEAMS:
-            plan.append(f"{WEB}/roster/{team}/{season}")
-            plan.append(f"{WEB}/club-stats/{team}/{season}/2")
+    game_types = [int(g) for g in args.game_types.split(",")]
+    if not game_types or any(g not in (2, 3) for g in game_types):
+        sys.exit("--game-types must contain 2 (regular season) and/or 3 (playoffs)")
+    if any(not re.fullmatch(r"20\d{6}", season) or int(season[4:]) != int(season[:4]) + 1 for season in seasons):
+        sys.exit("invalid consecutive NHL season id")
+    plan = harvest_plan(seasons, game_types)
 
     est = len(plan) / max(args.rate, 0.1) / 60
     print(f"{len(plan)} requests across {len(seasons)} season(s) — roughly "
@@ -348,12 +362,34 @@ def harvest(args: argparse.Namespace) -> None:
         for u in plan[:20]:
             print(f"  would fetch  {u}")
         print(f"  … {max(0, len(plan) - 20)} more")
+        if args.include_player_details: print("  plus all players discovered from complete summaries: landing, game logs, EDGE")
         return
 
+    seen = known_digests()
     records: list[Fetch] = []
+    player_plan: set[str] = set()
     for i, url in enumerate(plan, 1):
         rec = store(client, url, seen)
         records.append(rec)
+        # Discover every player from the complete selected summary, including retired players.
+        if "/summary?" in url:
+            if rec.status != 200 or not rec.path:
+                append(records)
+                sys.exit("cannot preserve a complete inventory from an unavailable summary")
+            with gzip.open(ARCHIVE / rec.path, "rt") as fh:
+                summary = json.load(fh)
+            rows = summary.get("data", [])
+            season = re.search(r"seasonId=(\d+)", url).group(1)
+            game_type = int(re.search(r"gameTypeId=(\d+)", url).group(1))
+            if summary.get("total") != len(rows) or any(row.get("seasonId") != int(season) for row in rows):
+                append(records)
+                sys.exit("refusing a truncated or wrong-season summary")
+            kind = "goalie" if "/goalie/" in url else "skater"
+            for row in rows if args.include_player_details and "/team/" not in url else []:
+                player = row["playerId"]
+                player_plan.add(f"{WEB}/player/{player}/landing")
+                player_plan.add(f"{WEB}/player/{player}/game-log/{season}/{game_type}")
+                player_plan.add(f"{WEB}/edge/{kind}-detail/{player}/{season}/{game_type}")
         if i % 25 == 0 or i == len(plan):
             print(f"  {i}/{len(plan)}  new {client.counts['ok']}  "
                   f"unchanged {client.counts['cached']}  missing {client.counts['missing']}")
@@ -362,29 +398,77 @@ def harvest(args: argparse.Namespace) -> None:
             append(records)
             records = []
     append(records)
+    for i, url in enumerate(sorted(player_plan), 1):
+        rec = store(client, url, seen)
+        append([rec])
+        if i % 50 == 0: print(f"  player details {i}/{len(player_plan)}")
+    if client.counts["error"]:
+        sys.exit(f"archive incomplete: {client.counts['error']} failed requests; manifest retained for retry")
 
     total = sum(f.stat().st_size for f in (ARCHIVE / "raw").rglob("*.json.gz")) if (ARCHIVE / "raw").exists() else 0
     print(f"\n  archive now {total / 1e6:.1f} MB on disk")
-    print(f"  manifest: {MANIFEST.relative_to(ROOT)}")
+    print(f"  manifest: {MANIFEST}")
+
+
+def verify(args: argparse.Namespace) -> None:
+    records = {}
+    for line in MANIFEST.read_text().splitlines():
+        record = json.loads(line)
+        records[record["url"]] = record
+        if record["status"] == 200:
+            path = (ARCHIVE / record["path"]).resolve()
+            if not path.is_relative_to(ARCHIVE): sys.exit("archive object escaped archive directory")
+            with gzip.open(path, "rb") as fh: body = fh.read()
+            if hashlib.sha256(body).hexdigest() != record["sha256"] or len(body) != record["bytes"]:
+                sys.exit("archive object digest/size mismatch")
+    seasons = [season.strip() for season in args.seasons.split(",") if season.strip()]
+    if not seasons: sys.exit("--seasons is required for verification")
+    required = set(harvest_plan(seasons, [int(g) for g in args.game_types.split(",")]))
+    for url in list(required):
+        record = records.get(url)
+        if "/summary?" in url:
+            if not record or record["status"] != 200: sys.exit(f"missing summary: {url}")
+            with gzip.open(ARCHIVE / record["path"], "rt") as fh: summary = json.load(fh)
+            rows = summary.get("data", [])
+            season = re.search(r"seasonId=(\d+)", url).group(1)
+            game_type = int(re.search(r"gameTypeId=(\d+)", url).group(1))
+            if summary.get("total") != len(rows) or any(row.get("seasonId") != int(season) for row in rows):
+                sys.exit("incomplete or wrong-season summary")
+            if args.include_player_details and "/team/" not in url:
+                kind = "goalie" if "/goalie/" in url else "skater"
+                for row in rows:
+                    player = row["playerId"]
+                    required.update([f"{WEB}/player/{player}/landing", f"{WEB}/player/{player}/game-log/{season}/{game_type}",
+                                     f"{WEB}/edge/{kind}-detail/{player}/{season}/{game_type}"])
+    for url in required:
+        record = records.get(url)
+        if not record or record["status"] not in (200, 404): sys.exit(f"missing or failed archive request: {url}")
+    print(f"Verified {len(required)} requested URLs and all stored object digests. 404 means absent coverage, not zero games.")
 
 
 def main() -> None:
+    global ARCHIVE, MANIFEST
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("mode", choices=["discover", "harvest"])
+    p.add_argument("mode", choices=["discover", "harvest", "verify"])
     p.add_argument("--rate", type=float, default=DEFAULT_RATE,
                    help=f"requests per second (default {DEFAULT_RATE}); raising this is a bad idea")
     p.add_argument("--dry-run", action="store_true", help="print the plan, fetch nothing")
+    p.add_argument("--archive-dir", type=Path, default=ARCHIVE, help="content-addressed archive destination")
+    p.add_argument("--game-types", default="2,3", help="harvest: regular season 2, playoffs 3")
+    p.add_argument("--include-player-details", action="store_true", help="harvest: archive all summary player landings, game logs and EDGE")
     p.add_argument("--seasons", default="", help="harvest: comma-separated, e.g. 20232024,20242025")
     p.add_argument("--season", default="20242025", help="discover: a season id to probe with")
     p.add_argument("--team", default="TOR", help="discover: a team code to probe with")
     p.add_argument("--player", default="8478402", help="discover: a player id to probe with")
     p.add_argument("--game", default="2024020001", help="discover: a game id to probe with")
     args = p.parse_args()
+    ARCHIVE = args.archive_dir.resolve()
+    MANIFEST = ARCHIVE / "manifest.jsonl"
 
     if args.rate > 8:
         sys.exit("refusing: a rate above 8/s on a public API is abusive and will get you blocked")
 
-    (discover if args.mode == "discover" else harvest)(args)
+    {"discover": discover, "harvest": harvest, "verify": verify}[args.mode](args)
 
 
 if __name__ == "__main__":

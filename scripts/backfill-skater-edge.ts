@@ -70,7 +70,7 @@ function reportTargetDatabase(): void {
 }
 
 async function main() {
-  const season = SEASON.nhleSeasonId;
+  const season = SEASON.apiSeasonId;
   console.log(`\nSkater EDGE backfill — season ${season}`);
   reportTargetDatabase();
 

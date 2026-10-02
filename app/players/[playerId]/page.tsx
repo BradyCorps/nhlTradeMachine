@@ -5,6 +5,11 @@
 // bundle. The playerId segment is the NHL player id, matching the NHL
 // API, so external links can be constructed from any NHL data source.
 
+import { ObservedSeasonSelector } from "@/app/components/ObservedSeasonSelector";
+import { parseObservedSelection, observedLabel, observedQuery, missingObservedStats } from "@/app/lib/observed-season";
+import { readObservedPlayers } from "@/app/lib/observed-stats.server";
+import { readObservedEdge } from "@/app/lib/observed-edge.server";
+import { parseGoalieEdge } from "@/app/lib/nhl-player-feed";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -38,7 +43,6 @@ import { getLiveCapCeiling } from "@/app/lib/live-cap-settings";
 import { displayPosition } from "@/app/lib/display-position";
 import { teamLabelFor } from "@/app/lib/fa-pool";
 import {
-  PLAYER_STATS_CONTEXT,
   navLabelForPosition,
 } from "@/app/lib/player-terminology";
 import { BRAND } from "@/app/lib/brand";
@@ -105,7 +109,18 @@ function StatCell({ label, value, color }: { label: string; value: string; color
   );
 }
 
-export default async function PlayerPage({ params }: { params: Promise<{ playerId: string }> }) {
+export default async function PlayerPage({ params, searchParams }: {
+  params: Promise<{ playerId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const query = await searchParams;
+  const selectionParams = new URLSearchParams();
+  for (const key of ["season", "gameType"]) {
+    const value = query?.[key];
+    if (Array.isArray(value)) notFound();
+    if (value != null) selectionParams.set(key, value);
+  }
+  let selection;
+  try { selection = parseObservedSelection(selectionParams); } catch { notFound(); }
   const { playerId } = await params;
   const { value: roster } = await getCachedRoster();
   const player = (roster.players as any[]).find(p => String(p.id) === playerId) ?? null;
@@ -168,12 +183,17 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
     nav: xnav.total, age: player.age ?? 0,
   };
 
-  const games = player.games ?? 0;
+  const observations = await readObservedPlayers(selection);
+  const observed = observations.byId.get(String(player.id)) ?? missingObservedStats(selection,
+    (player.position === "G" ? observations.goalies : observations.skaters).coverage === "unavailable");
+  const selectedEdge = player.position === "G" ? await readObservedEdge(Number(player.id), selection, true) : null;
+  const goalieDetail = selectedEdge?.raw ? parseGoalieEdge(selectedEdge.raw, Number(selection.season)) : null;
+  const games = observed.games;
   const isGoalie = player.position === "G";
-  const goals = player.goalsPace != null ? Math.round((player.goalsPace / 82) * games) : null;
-  const assists = player.assistsPace != null ? Math.round((player.assistsPace / 82) * games) : null;
-  const pts = player.ptsPace != null ? Math.round((player.ptsPace / 82) * games) : null;
-  const pm = player.plusMinus;
+  const goals = observed.goals;
+  const assists = observed.assists;
+  const pts = observed.points;
+  const pm = observed.plusMinus;
   const navLabel = navLabelForPosition(player.position);
 
   // The engine's own waterfall — these sum to the X-NAV printed above them.
@@ -214,7 +234,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
 
         {/* Dossier strip */}
         <div className="flex items-center justify-between border-b-2 pb-2 mb-4 mt-4" style={{ borderColor: ink }}>
-          <Link href="/players" className="text-[10px] font-black font-mono uppercase tracking-[0.2em]" style={{ color: faint }}>
+          <Link href={`/players?${observedQuery(selection)}`} className="text-[10px] font-black font-mono uppercase tracking-[0.2em]" style={{ color: faint }}>
             ← All Players
           </Link>
           <span className="text-[9px] font-mono uppercase tracking-[0.2em]" style={{ color: faint }}>
@@ -242,6 +262,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
           </div>
         </div>
 
+        <ObservedSeasonSelector selection={selection} />
+        <p className="text-[11px] font-mono mb-3">Current contracts and NAV · model inputs, roles, STRAND and comparisons: 2025–26 regular season. Current NAV is not historical NAV.</p>
         {/* Modern role identity */}
         {roles && (
           <div className="border px-4 py-3 mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
@@ -266,31 +288,26 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
 
         {/* Season stats — position-aware */}
         <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em] mb-1" style={{ color: faint }}>
-          {PLAYER_STATS_CONTEXT}
+          {observedLabel(selection)} · observed statistics · {observed.coverage}
         </div>
         {isGoalie ? (
           // Five fixed columns left ~57px per cell at 320px, and "Save
           // percentage" ran into its neighbour; phones take three per row.
           <div className="grid grid-cols-3 sm:grid-cols-5 border mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
-            <StatCell label="Games" value={String(games)} />
-            <StatCell
-              label="Goals saved above expected"
-              value={player.gsax != null ? (player.gsax > 0 ? "+" : "") + player.gsax.toFixed(1) : "—"}
-              color={player.gsax != null ? (player.gsax > 0 ? "var(--ledger-green)" : player.gsax < 0 ? "var(--ledger-red)" : undefined) : undefined}
-            />
+            <StatCell label="Games" value={games != null ? String(games) : "—"} />
             <StatCell
               label="Save percentage"
-              value={player.savePct != null ? (player.savePct * 100).toFixed(1) : "—"}
+              value={observed.savePct != null ? (observed.savePct * 100).toFixed(1) : "—"}
             />
             <StatCell
               label="Goals against average"
-              value={player.gaa != null ? player.gaa.toFixed(2) : "—"}
+              value={observed.gaa != null ? observed.gaa.toFixed(2) : "—"}
             />
-            <StatCell label="Games started" value={player.gamesStarted != null ? String(player.gamesStarted) : "—"} />
+            <StatCell label="Games started" value={observed.gamesStarted != null ? String(observed.gamesStarted) : "—"} />
           </div>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-6 border mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
-            <StatCell label="Games" value={String(games)} />
+            <StatCell label="Games" value={games != null ? String(games) : "—"} />
             <StatCell label="Goals" value={goals != null ? String(goals) : "—"} />
             <StatCell label="Assists" value={assists != null ? String(assists) : "—"} />
             <StatCell label="Points" value={pts != null ? String(pts) : "—"} />
@@ -299,15 +316,17 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
               value={pm != null ? `${pm > 0 ? "+" : ""}${pm}` : "—"}
               color={pm != null ? (pm > 0 ? "var(--ledger-green)" : pm < 0 ? "var(--ledger-red)" : undefined) : undefined}
             />
-            <StatCell label="Avg ice time" value={player.avgTOI != null ? player.avgTOI.toFixed(1) : "—"} />
+            <StatCell label="Avg ice time" value={observed.toiMinutes != null ? observed.toiMinutes.toFixed(1) : "—"} />
           </div>
         )}
 
+        {isGoalie && !goalieDetail && <p className="text-[11px] font-mono mb-3">NHL EDGE · {observedLabel(selection)} · coverage missing or delayed. No other season substituted.</p>}
         {/* NHL EDGE shot-location detail — goalies only, and only once the
             nightly capture has reached this one. Absent data renders nothing
             rather than an empty panel. */}
-        {isGoalie && player.goalieEdgeDetail && (
-          <GoalieEdgePanel detail={player.goalieEdgeDetail} playerName={player.name} />
+        {isGoalie && goalieDetail && (
+          <div><p className="text-[11px] font-mono">NHL EDGE · {observedLabel(selection)} · {selectedEdge?.coverage}</p>
+          <GoalieEdgePanel detail={goalieDetail} playerName={player.name} /></div>
         )}
 
         {/* The player, and what his contract does to him */}
@@ -401,7 +420,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
             <div className="text-[9px] font-black font-mono uppercase tracking-[0.18em] mb-3" style={{ color: faint }}>
               NHL EDGE — Shot Locations &amp; Tracking
             </div>
-            <EdgeShotMap nhlPlayerId={playerId} />
+            <EdgeShotMap nhlPlayerId={playerId} selection={selection} />
           </div>
         )}
 
@@ -427,7 +446,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ playerI
         )}
 
         <div className="mt-4 pt-2 border-t text-center" style={{ borderColor: rule }}>
-          <Link href="/players" className="text-[10px] font-black font-mono uppercase tracking-[0.16em]" style={{ color: faint }}>
+          <Link href={`/players?${observedQuery(selection)}`} className="text-[10px] font-black font-mono uppercase tracking-[0.16em]" style={{ color: faint }}>
             Full League Analytics →
           </Link>
         </div>

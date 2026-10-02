@@ -1,4 +1,6 @@
 "use client";
+import { ObservedSeasonSelector } from "@/app/components/ObservedSeasonSelector";
+import { DEFAULT_OBSERVED_SELECTION, observedQuery, observedLabel, type ObservedSelection } from "@/app/lib/observed-season";
 
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -75,6 +77,8 @@ interface TeamData {
   division: string;
   conference: string;
   record: TeamRecord | null;
+  observedSelection?: ObservedSelection;
+  observedCoverage?: string;
   capBreakdown: CapBreakdown | null;
 }
 
@@ -393,10 +397,10 @@ function buildTeamLines(roster: Asset[], navMap: Record<string, XNAVResult>): Te
   };
 }
 
-function LinePlayerLink({ player, detail }: { player: LineEntry; detail?: string }) {
+function LinePlayerLink({ player, detail, selection = DEFAULT_OBSERVED_SELECTION }: { player: LineEntry; detail?: string; selection?: ObservedSelection }) {
   return (
     <Link
-      href={`/players/${encodeURIComponent(player.id)}`}
+      href={`/players/${encodeURIComponent(player.id)}?${observedQuery(selection)}`}
       className="inline-flex min-h-11 items-center px-1 -mx-1 text-[10px] font-mono underline-offset-2 hover:underline focus-visible:underline"
       style={{ color: "var(--ledger-ink)" }}
     >
@@ -410,7 +414,7 @@ function LinePlayerLink({ player, detail }: { player: LineEntry; detail?: string
   );
 }
 
-function LineupSection({ lines }: { lines: TeamLines }) {
+function LineupSection({ lines, selection }: { lines: TeamLines; selection?: ObservedSelection }) {
   const LINE_NAMES = ["1st Line", "2nd Line", "3rd Line", "4th Line"];
   const PAIR_NAMES = ["1st Pair", "2nd Pair", "3rd Pair"];
 
@@ -432,7 +436,7 @@ function LineupSection({ lines }: { lines: TeamLines }) {
               </div>
               <div className="flex flex-wrap gap-x-2">
                 {line.map((p) => (
-                  <LinePlayerLink key={p.id} player={p} detail={p.position} />
+                  <LinePlayerLink selection={selection} key={p.id} player={p} detail={p.position} />
                 ))}
               </div>
             </div>
@@ -451,7 +455,7 @@ function LineupSection({ lines }: { lines: TeamLines }) {
               </div>
               <div className="flex flex-wrap gap-x-2">
                 {pair.map((p) => (
-                  <LinePlayerLink key={p.id} player={p} />
+                  <LinePlayerLink selection={selection} key={p.id} player={p} />
                 ))}
               </div>
             </div>
@@ -463,7 +467,7 @@ function LineupSection({ lines }: { lines: TeamLines }) {
             </div>
             <div className="flex flex-wrap gap-x-3">
               {lines.goalies.map((g, i) => (
-                <LinePlayerLink key={g.id} player={g} detail={i === 0 ? "Starter" : "Backup"} />
+                <LinePlayerLink selection={selection} key={g.id} player={g} detail={i === 0 ? "Starter" : "Backup"} />
               ))}
             </div>
           </div>
@@ -518,7 +522,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
           </div>
           <div className="flex items-center gap-3 mt-1 text-[10px] flex-wrap" style={{ color: "var(--ledger-ink-faint)", fontVariantNumeric: "tabular-nums" }}>
             <span>#{team.standing}</span>
-            {team.record && <span>{team.record.wins}-{team.record.losses}-{team.record.otLosses}</span>}
+            {team.record ? <span>{team.record.wins ?? "—"}-{team.record.losses ?? "—"}{team.observedSelection?.gameType !== 3 && `-${team.record.otLosses ?? "—"}`}</span> : <span>Statistics {team.observedCoverage ?? "unavailable"}</span>}
             {team.record?.l10Record && <span>L10: {team.record.l10Record}</span>}
             {team.record?.streakCode && team.record.streakCount > 0 && (
               <span style={{ color: team.record.streakCode === "W" ? "var(--ledger-green)" : team.record.streakCode === "L" ? "var(--ledger-red)" : "var(--ledger-ink-faint)" }}>
@@ -571,7 +575,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
         </button>
         {showDetailLink && (
           <Link
-            href={`/teams/${team.id.toLowerCase()}`}
+            href={`/teams/${team.id.toLowerCase()}?${team.observedSelection ? observedQuery(team.observedSelection) : observedQuery(DEFAULT_OBSERVED_SELECTION)}`}
             aria-label={`Open ${team.name} team page`}
             className="min-w-11 border-l px-2 flex flex-col items-center justify-center gap-0.5 text-[8px] font-black uppercase tracking-[0.1em]"
             style={{ borderColor: "var(--ledger-rule)", color: "var(--ledger-red)" }}
@@ -647,8 +651,8 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                 <StatCell
                   label="Record"
-                  value={`${team.record.wins}-${team.record.losses}-${team.record.otLosses}`}
-                  sub={`${team.record.points} pts · ${team.record.regulationWins} RW`}
+                  value={team.observedSelection?.gameType === 3 ? `${team.record.wins ?? "—"}-${team.record.losses ?? "—"}` : `${team.record.wins ?? "—"}-${team.record.losses ?? "—"}-${team.record.otLosses ?? "—"}`}
+                  sub={`${team.record.points ?? "—"} pts · ${team.record.regulationWins} RW`}
                 />
                 <StatCell
                   label="Goal Diff"
@@ -658,22 +662,22 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
                 />
                 <StatCell
                   label="PP%"
-                  value={`${(team.record.powerPlayPct * 100).toFixed(1)}%`}
+                  value={team.record.powerPlayPct != null ? `${(team.record.powerPlayPct * 100).toFixed(1)}%` : "—"}
                   tone={team.record.powerPlayPct > 0.22 ? "var(--ledger-green)" : team.record.powerPlayPct < 0.18 ? "var(--ledger-red)" : undefined}
                 />
                 <StatCell
                   label="PK%"
-                  value={`${(team.record.penaltyKillPct * 100).toFixed(1)}%`}
+                  value={team.record.penaltyKillPct != null ? `${(team.record.penaltyKillPct * 100).toFixed(1)}%` : "—"}
                   tone={team.record.penaltyKillPct > 0.82 ? "var(--ledger-green)" : team.record.penaltyKillPct < 0.78 ? "var(--ledger-red)" : undefined}
                 />
                 <StatCell
                   label="SF/Game"
-                  value={team.record.shotsForPerGame.toFixed(1)}
-                  sub={`${team.record.shotsAgainstPerGame.toFixed(1)} SA`}
+                  value={team.record.shotsForPerGame?.toFixed(1) ?? "—"}
+                  sub={`${team.record.shotsAgainstPerGame?.toFixed(1) ?? "—"} SA`}
                 />
                 <StatCell
                   label="FO%"
-                  value={`${(team.record.faceoffWinPct * 100).toFixed(1)}%`}
+                  value={team.record.faceoffWinPct != null ? `${(team.record.faceoffWinPct * 100).toFixed(1)}%` : "—"}
                   tone={team.record.faceoffWinPct > 0.51 ? "var(--ledger-green)" : team.record.faceoffWinPct < 0.49 ? "var(--ledger-red)" : undefined}
                 />
               </div>
@@ -851,7 +855,7 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
 
           {/* Projected Lines */}
           <div id={`team-${team.id}-roster`} className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
-            <LineupSection lines={lines} />
+            <LineupSection lines={lines} selection={team.observedSelection} />
           </div>
 
           {/* Top Players */}
@@ -892,6 +896,14 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
 }
 
 export default function TeamsPage() {
+  const [selection, setSelection] = useState<ObservedSelection>(() => {
+    if (typeof window === "undefined") return DEFAULT_OBSERVED_SELECTION;
+    const params = new URLSearchParams(window.location.search);
+    return { season: (params.get("season") ?? "20262027") as ObservedSelection["season"],
+      gameType: Number(params.get("gameType") ?? 2) as 2 | 3 };
+  });
+  const selectionKey = observedQuery(selection);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const pathname = usePathname();
   const detailTeamId = pathname.startsWith("/teams/")
     ? decodeURIComponent(pathname.slice("/teams/".length).split("/")[0]).toUpperCase()
@@ -913,9 +925,15 @@ export default function TeamsPage() {
   const [navDim, setNavDim] = useState<TeamNavDim>(initialUrlState.navDim);
 
   useEffect(() => {
-    fetch("/api/league")
-      .then((r) => r.json())
+    let alive = true;
+    const controller = new AbortController();
+    setLoading(true);
+    setTeams([]);
+    setLoadError(null);
+    fetch(`/api/league?${selectionKey}`, { signal: controller.signal })
+      .then((r) => { if (!r.ok) throw new Error(`Statistics request returned ${r.status}`); return r.json(); })
       .then((data) => {
+        if (!alive) return;
         setTeams((data.teams ?? []).map((t: any) => ({
           ...t,
           division: t.division ?? "",
@@ -928,20 +946,26 @@ export default function TeamsPage() {
         if (data.capCeiling) setCapCeiling(data.capCeiling);
       })
       .catch((err) => {
+        if (!alive) return;
+        setLoadError(err.message);
         setProvenance(null);
         console.error("Failed to load league data:", err);
       })
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; controller.abort(); };
+  }, [selectionKey]);
 
   // State → URL (QW-09). `replaceState` rather than the router — matches the
   // trade bench's own live-state URL sync (armchair-gm/page.tsx). Which team
   // is being viewed is the path, not touched here.
   useEffect(() => {
     const query = buildTeamsUrlQuery({ sortKey, filterPhase, expandedId, detailCollapsed, navDim });
-    const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+    const params = new URLSearchParams(query);
+    params.set("season", selection.season);
+    params.set("gameType", String(selection.gameType));
+    const newUrl = `${window.location.pathname}?${params}`;
     window.history.replaceState(window.history.state, "", newUrl);
-  }, [sortKey, filterPhase, expandedId, detailCollapsed, navDim]);
+  }, [sortKey, filterPhase, expandedId, detailCollapsed, navDim, selection.season, selection.gameType]);
 
   // A stale/hand-edited expanded-team id must recover safely rather than
   // leaving the index view expanding nothing.
@@ -964,7 +988,7 @@ export default function TeamsPage() {
       },
     ]));
 
-    return teams.map((team) => {
+    return teams.filter(team => team.observedSelection?.season === selection.season && team.observedSelection?.gameType === selection.gameType).map((team) => {
       const roster = players.filter((p) => p.teamId === team.id && p.position !== "Pick");
       const contention = computeContention(roster, navMap);
       // Same live-roster read Armchair GM uses to set `rosterWindow` — null on
@@ -1048,19 +1072,20 @@ export default function TeamsPage() {
         gravityLeaders, teamGravity, contentionSnapshot,
       };
     });
-  }, [teams, players, navMap]);
+  }, [teams, players, navMap, selection.season, selection.gameType]);
 
   const applySort = (list: TeamProfile[], key: SortKey) => {
     list.sort((a, b) => {
       switch (key) {
         case "division":
-        case "standing": return a.team.standing - b.team.standing;
+        case "standing": return (a.team.standing ?? Infinity) - (b.team.standing ?? Infinity);
         case "present": return b.contention.present - a.contention.present;
         case "future": return b.contention.future - a.contention.future;
         case "rosterNAV": return b.rosterNAV - a.rosterNAV;
         case "capSpace": return b.team.capSpace - a.team.capSpace;
         case "goalDiff": {
-          const aDiff = (a.team.record?.goalsFor ?? 0) - (a.team.record?.goalsAgainst ?? 0);
+          if (!a.team.record || !b.team.record) return a.team.record ? -1 : b.team.record ? 1 : 0;
+          const aDiff = a.team.record.goalsFor - a.team.record.goalsAgainst;
           const bDiff = (b.team.record?.goalsFor ?? 0) - (b.team.record?.goalsAgainst ?? 0);
           return bDiff - aDiff;
         }
@@ -1125,12 +1150,16 @@ export default function TeamsPage() {
           <Header activeTab="teams" />
 
           <div className="mt-3">
+            <ObservedSeasonSelector selection={selection} onChange={setSelection} />
+            <p className="text-[11px] mb-2">Records: {observedLabel(selection)}. Missing or delayed coverage is unavailable, not zero games.</p>
+            <p className="text-[11px] mb-2">Current roster, contracts and NAV · model inputs, phases, Team DNA, EDGE profile and comparisons: 2025–26 regular season. These are not historical valuations.</p>
+            {loadError && <p role="alert">{loadError}</p>}
             <DataContextRail route="teams" provenance={provenance} capCeiling={capCeiling} />
           </div>
 
           <div className="mt-6 mb-5 border-b pb-4" style={{ borderColor: "var(--ledger-rule)" }}>
             <Link
-              href="/teams"
+              href={`/teams?${selectionKey}`}
               className="inline-flex min-h-11 items-center text-[10px] font-black uppercase tracking-[0.14em] underline-offset-2 hover:underline focus-visible:underline"
               style={{ color: "var(--ledger-red)" }}
             >
@@ -1175,7 +1204,11 @@ export default function TeamsPage() {
         <Header activeTab="teams" />
 
         <div className="mt-3">
-          <DataContextRail route="teams" provenance={provenance} capCeiling={capCeiling} />
+          <ObservedSeasonSelector selection={selection} onChange={setSelection} />
+            <p className="text-[11px] mb-2">Records: {observedLabel(selection)}. Missing or delayed coverage is unavailable, not zero games.</p>
+            <p className="text-[11px] mb-2">Current roster, contracts and NAV · model inputs, phases, Team DNA, EDGE profile and comparisons: 2025–26 regular season. These are not historical valuations.</p>
+            {loadError && <p role="alert">{loadError}</p>}
+            <DataContextRail route="teams" provenance={provenance} capCeiling={capCeiling} />
         </div>
 
         {/* Page header */}
@@ -1232,7 +1265,7 @@ export default function TeamsPage() {
             fNav: tp.navByPos.f,
             dNav: tp.navByPos.d,
             gNav: tp.navByPos.g,
-            goalDiff: (tp.team.record?.goalsFor ?? 0) - (tp.team.record?.goalsAgainst ?? 0),
+            goalDiff: tp.team.record ? tp.team.record.goalsFor - tp.team.record.goalsAgainst : NaN,
             phase: tp.team.phase,
           }))}
           dim={navDim}
@@ -1334,7 +1367,7 @@ export default function TeamsPage() {
                     future: tp.contention.future,
                     rosterNAV: tp.rosterNAV,
                     capSpace: tp.team.capSpace,
-                    goalDiff: (tp.team.record?.goalsFor ?? 0) - (tp.team.record?.goalsAgainst ?? 0),
+                    goalDiff: tp.team.record ? tp.team.record.goalsFor - tp.team.record.goalsAgainst : NaN,
                     gravityPercentile: tp.gravityLeaders[0]?.positionPercentile ?? null,
                     speedMph: tp.edge?.avgSpeedMaxMph ?? null,
                   },

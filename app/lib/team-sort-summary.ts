@@ -36,7 +36,7 @@ export function teamSortSummary(
     case "division":
       return null;
     case "standing":
-      return `Standing ${ordinal(facts.standing)}`;
+      return facts.standing == null || !Number.isFinite(facts.standing) ? "Standing unavailable" : `Standing ${ordinal(facts.standing)}`;
     case "present":
       return `Present ${facts.present.toFixed(1)} · ${rank}`;
     case "future":
@@ -48,7 +48,7 @@ export function teamSortSummary(
       return `Cap space ${sign}$${Math.abs(facts.capSpace).toFixed(1)}M · ${rank}`;
     }
     case "goalDiff":
-      return `Goal diff ${signed(facts.goalDiff)} · ${rank}`;
+      return Number.isFinite(facts.goalDiff) ? `Goal diff ${signed(facts.goalDiff)} · ${rank}` : "Goal diff unavailable";
     case "gravity":
       return `Gravity ${facts.gravityPercentile == null ? "—" : `${ordinal(Math.round(facts.gravityPercentile))} pct`} · ${rank}`;
     case "speed":

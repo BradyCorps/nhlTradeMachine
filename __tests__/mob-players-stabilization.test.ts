@@ -52,8 +52,11 @@ describe("Players mobile stabilization", () => {
     const players = read("app/players/page.tsx");
 
     expect(players).toMatch(/let lastLeague: \{[^}]*\} \| null = null;/);
-    expect(players).toContain("useState(() => lastLeague == null)");
-    expect(players).toContain("lastLeague = { players: nextPlayers, teams: nextTeams");
+    expect(players).toContain("useState(() => remembered == null)");
+    expect(players).toContain("lastLeague?.selectionKey === selectionKey ? lastLeague : null");
+    expect(players).toContain("setPlayers(saved?.players ?? [])");
+    expect(players).toContain("p.observedStats?.season === selection.season");
+    expect(players).toContain("lastLeague = { selectionKey, players: nextPlayers, teams: nextTeams");
   });
 
   it("records the list position when a dossier opens and restores it once on return", () => {

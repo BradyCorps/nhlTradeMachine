@@ -1,7 +1,6 @@
 # Keeping the data we fetch
 
-**Status: the crawler exists and has never been run. Everything below the first
-section is a proposal.**
+**2026-10-02 status:** the historical proposal below predates immutable season batches and tracked baseline inputs. See the [current preservation audit and bounded rollover procedure](season-preservation/ROLLOVER_2026_27.md). The crawler now supports complete, competition-scoped harvests and digest verification; a full durable off-workspace archive and independent Production restore remain unverified in this pass.
 
 ## The problem, stated concretely
 

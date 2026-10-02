@@ -18,10 +18,10 @@ const NHL_HEADERS = {
 
 export const LANDING_URL = (playerId: number | string) =>
   `https://api-web.nhle.com/v1/player/${playerId}/landing`;
-export const EDGE_URL = (playerId: number | string, seasonId: number | string) =>
-  `https://api-web.nhle.com/v1/edge/skater-detail/${playerId}/${seasonId}/2`;
-export const GOALIE_EDGE_URL = (playerId: number | string, seasonId: number | string) =>
-  `https://api-web.nhle.com/v1/edge/goalie-detail/${playerId}/${seasonId}/2`;
+export const EDGE_URL = (playerId: number | string, seasonId: number | string, gameType: 2 | 3 = 2) =>
+  `https://api-web.nhle.com/v1/edge/skater-detail/${playerId}/${seasonId}/${gameType}`;
+export const GOALIE_EDGE_URL = (playerId: number | string, seasonId: number | string, gameType: 2 | 3 = 2) =>
+  `https://api-web.nhle.com/v1/edge/goalie-detail/${playerId}/${seasonId}/${gameType}`;
 
 /**
  * A fetch that keeps the status.
@@ -140,10 +140,19 @@ const toiToMinutes = (toi: unknown): number | null => {
 // should still snapshot (with zeros) instead of counting as failures.
 const LANDING_CORE_PATHS = ["playerId", "position", "birthDate"] as const;
 
-export function parseLanding(raw: unknown): LandingFacts | null {
+export function parseLanding(raw: unknown, seasonId?: number, gameType: 2 | 3 = 2): LandingFacts | null {
   if (missingPaths(raw, LANDING_CORE_PATHS).length > 0) return null;
   const r = raw as any;
-  const sub = r.featuredStats?.regularSeason?.subSeason ?? {};
+  let sub = r.featuredStats?.regularSeason?.subSeason ?? {};
+  if (seasonId != null) {
+    const featured = r.featuredStats?.[gameType === 2 ? "regularSeason" : "playoffs"]?.subSeason;
+    const lines = (Array.isArray(r.seasonTotals) ? r.seasonTotals : []).filter((s: any) =>
+      s.leagueAbbrev === "NHL" && s.season === seasonId && s.gameTypeId === gameType);
+    // A multi-team season needs the aggregate NHL line; never choose one club silently.
+    const total = lines.find((s: any) => ["TOT", "NHL"].includes(s.teamAbbrev)) ?? (lines.length === 1 ? lines[0] : null);
+    sub = r.featuredStats?.season === seasonId && featured ? featured : total;
+    if (!sub || !Number.isFinite(sub.gamesPlayed)) return null; // absence is not zero games
+  }
   const career = r.careerTotals?.regularSeason ?? r.featuredStats?.regularSeason?.career ?? {};
   const nhlSeasons = new Set(
     (Array.isArray(r.seasonTotals) ? r.seasonTotals : [])
@@ -160,7 +169,7 @@ export function parseLanding(raw: unknown): LandingFacts | null {
     birthCountry: r.birthCountry ?? null,
     draftYear: r.draftDetails?.year ?? null,
     draftOverall: r.draftDetails?.overallPick ?? null,
-    season: Number(r.featuredStats?.season ?? 0),
+    season: seasonId ?? Number(r.featuredStats?.season ?? 0),
     gamesPlayed: Number(sub.gamesPlayed ?? 0),
     goals: Number(sub.goals ?? 0),
     assists: Number(sub.assists ?? 0),
@@ -461,9 +470,9 @@ export function parseGoalieEdge(raw: unknown, seasonId: number): GoalieEdgeFacts
 }
 
 // ── Fetchers ──────────────────────────────────────────────────
-export async function fetchPlayerLanding(playerId: number | string): Promise<{ facts: LandingFacts | null; raw: unknown | null }> {
+export async function fetchPlayerLanding(playerId: number | string, seasonId?: number): Promise<{ facts: LandingFacts | null; raw: unknown | null }> {
   const raw = await fetchJson(LANDING_URL(playerId));
-  return { facts: raw ? parseLanding(raw) : null, raw };
+  return { facts: raw ? parseLanding(raw, seasonId) : null, raw };
 }
 
 export async function fetchEdgeDetail(playerId: number | string, seasonId: number): Promise<{ facts: EdgeFacts | null; raw: unknown | null; status: number }> {

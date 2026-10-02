@@ -1,3 +1,5 @@
+import { parseObservedSelection, missingObservedStats } from "@/app/lib/observed-season";
+import { readObservedPlayers } from "@/app/lib/observed-stats.server";
 import { NextResponse } from "next/server";
 import { getCachedRoster } from "@/app/lib/cached-roster";
 import { buildLeagueProvenance } from "@/app/lib/data-context";
@@ -16,7 +18,15 @@ const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=300, stale-while-revalidate=900",
 };
 
-export async function GET() {
+export async function GET(req?: Request) {
+  // Explicit observations are a display overlay. Unqualified callers retain model inputs.
+  let selection;
+  try {
+    const params = new URL(req?.url ?? "http://localhost/api/league/players").searchParams;
+    if (params.has("season") || params.has("gameType")) selection = parseObservedSelection(params);
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Invalid selection" }, { status: 400 });
+  }
   const { value, state, blocked } = await getCachedRoster();
   const provenance = buildLeagueProvenance({
     kind: "players",
@@ -29,7 +39,17 @@ export async function GET() {
     contractsLoaded: value.debug?.contractsLoaded,
   });
 
-  return NextResponse.json({ ...value, provenance }, {
+  const observations = selection ? await readObservedPlayers(selection) : null;
+  const players = observations ? value.players.map(player => ({ ...player,
+    observedStats: observations.byId.get(String(player.id)) ?? missingObservedStats(observations.selection,
+      (player.position === "G" ? observations.goalies : observations.skaters).coverage === "unavailable"),
+  })) : value.players;
+  return NextResponse.json({ ...value, players, provenance,
+    observations: observations ? { selection,
+      skaters: { coverage: observations.skaters.coverage, source: observations.skaters.source, retrievedAt: observations.skaters.retrievedAt },
+      goalies: { coverage: observations.goalies.coverage, source: observations.goalies.source, retrievedAt: observations.goalies.retrievedAt },
+    } : undefined,
+  }, {
     headers: { ...CACHE_HEADERS, "x-ledger-cache": state, "x-ledger-blocked": String(blocked) },
   });
 }

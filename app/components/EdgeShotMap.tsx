@@ -6,6 +6,7 @@
 // shot-volume percentile, plus the location summary and zone-time
 // splits. Data comes from /api/player-edge/{nhlId} (nightly snapshots).
 
+import { DEFAULT_OBSERVED_SELECTION, observedQuery, observedLabel, type ObservedSelection } from "@/app/lib/observed-season";
 import React, { useEffect, useState } from "react";
 import { ChartData } from "@/app/components/ChartData";
 import { ordinal, pluralize } from "@/app/lib/ordinal";
@@ -18,6 +19,9 @@ interface SogSummary {
 }
 interface EdgePayload {
   capturedAt: number;
+  source: string;
+  season: string;
+  gameType: number;
   sogDetails: SogDetail[];
   sogSummary: SogSummary[];
   zoneTime: {
@@ -64,27 +68,29 @@ const pctColor = (p: number) =>
   p >= 0.9 ? "rgba(44,62,107,0.94)" : p >= 0.7 ? "rgba(44,62,107,0.70)" :
   p >= 0.5 ? "rgba(44,62,107,0.48)" : p > 0 ? "rgba(44,62,107,0.30)" : "rgba(44,62,107,0.12)";
 
-export default function EdgeShotMap({ nhlPlayerId }: { nhlPlayerId: string | number }) {
+export default function EdgeShotMap({ nhlPlayerId, selection = DEFAULT_OBSERVED_SELECTION }: { nhlPlayerId: string | number; selection?: ObservedSelection }) {
+  const { season, gameType } = selection;
   const [data, setData] = useState<EdgePayload | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "empty">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "empty" | "zero">("loading");
 
   useEffect(() => {
     let alive = true;
     setState("loading");
     setData(null);
     if (!/^\d+$/.test(String(nhlPlayerId))) { setState("empty"); return; }
-    fetch(`/api/player-edge/${nhlPlayerId}`)
+    fetch(`/api/player-edge/${nhlPlayerId}?${observedQuery({ season, gameType })}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!alive) return;
-        if (d?.sogDetails?.length) { setData(d); setState("ready"); }
+        if (d?.season === season && d?.gameType === gameType && d?.coverage === "zero-games") { setData(d); setState("zero"); }
+        else if (d?.season === season && d?.gameType === gameType && d?.sogDetails?.length) { setData(d); setState("ready"); }
         else setState("empty");
       })
       .catch(() => { if (alive) setState("empty"); });
     return () => { alive = false; };
-  }, [nhlPlayerId]);
+  }, [nhlPlayerId, season, gameType]);
 
-  if (state === "loading") {
+  if (state === "loading" || (data && (data.season !== season || data.gameType !== gameType))) {
     return (
       <div className="py-10 text-center" role="status" aria-live="polite">
         <div className="text-[11px] font-mono font-black uppercase tracking-[0.25em]" style={{ color: "var(--ledger-ink-body, var(--ledger-ink))" }}>
@@ -102,11 +108,12 @@ export default function EdgeShotMap({ nhlPlayerId }: { nhlPlayerId: string | num
       </div>
     );
   }
+  if (state === "zero") return <p className="py-10 text-center text-[11px] font-mono">NHL EDGE · {observedLabel(selection)} · confirmed zero games.</p>;
   if (state === "empty" || !data) {
     return (
       <div className="py-10 text-center text-[11px] font-mono uppercase tracking-wider leading-relaxed" style={{ color: "var(--ledger-ink-body, var(--ledger-ink))" }}>
-        No EDGE snapshot captured for this player yet.<br />
-        The nightly feed covers the league on an 8-day rotation.
+        EDGE coverage missing or delayed for {observedLabel(selection)}.<br />
+        No other season has been substituted.
       </div>
     );
   }
@@ -230,7 +237,7 @@ export default function EdgeShotMap({ nhlPlayerId }: { nhlPlayerId: string | num
       </div>
 
       <div className="mt-3 pt-2 border-t text-[9px] font-mono uppercase tracking-wider leading-relaxed" style={{ borderColor: "var(--rule-light)", color: "var(--ledger-ink-faint)" }}>
-        Source: NHL EDGE via nightly snapshot · captured {new Date(data.capturedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · tile fill = shot-volume percentile vs all NHL skaters · ± = finishing vs league
+        Source: NHL EDGE · {observedLabel(selection)} · {data.source === "snapshot" ? "captured" : "retrieved"} {new Date(data.capturedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · tile fill = shot-volume percentile vs all NHL skaters · ± = finishing vs league
       </div>
     </div>
   );

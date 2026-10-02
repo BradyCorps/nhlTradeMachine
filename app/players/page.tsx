@@ -1,4 +1,6 @@
 "use client";
+import { ObservedSeasonSelector } from "@/app/components/ObservedSeasonSelector";
+import { DEFAULT_OBSERVED_SELECTION, observedQuery, observedLabel, type ObservedSelection, type ObservedStats } from "@/app/lib/observed-season";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
 import Link from "next/link";
 import { MobileDetail } from "@/app/components/MobileDetail";
@@ -43,6 +45,7 @@ import { buildPlayersUrlQuery, readPlayersUrlState } from "@/app/lib/players-url
 
 // ── Types ─────────────────────────────────────────────────────
 interface Player {
+  observedStats?: ObservedStats;
   id: string;
   name: string;
   teamId: string;
@@ -396,25 +399,22 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
 
   const [activeTab, setActiveTab] = useState<PlayerTab>("card");
 
-  const gp = player.games ?? 82;
-  const seasonGoals = player.goalsPace != null ? Math.round((player.goalsPace / 82) * gp) : null;
-  const seasonAssists = player.assistsPace != null ? Math.round((player.assistsPace / 82) * gp) : null;
-  const seasonPoints = Math.round((player.ptsPace / 82) * gp);
-  const pm = player.plusMinus;
+  const observed = player.observedStats;
+  const gp = observed?.games;
+  const pm = observed?.plusMinus;
   const statItems: Array<{ label: string; val: string; title?: string; color?: string }> = isG ? [
-    { label: "Games started", val: player.gamesStarted?.toString() ?? "—" },
-    { label: "Goals saved above expected", val: (player.gsax ?? 0).toFixed(1) },
-    { label: "Save percentage", val: player.savePct?.toFixed(3) ?? "—" },
-    { label: "Role", val: goalieTeir(player.gamesStarted ?? 0) },
+    { label: "Games", val: gp?.toString() ?? "—" },
+    { label: "Games started", val: observed?.gamesStarted?.toString() ?? "—" },
+    { label: "Save percentage", val: observed?.savePct?.toFixed(3) ?? "—" },
+    { label: "Goals against average", val: observed?.gaa?.toFixed(2) ?? "—" },
   ] : [
-    { label: "Games", val: gp.toString() },
-    { label: "Goals", val: seasonGoals?.toString() ?? "—" },
-    { label: "Assists", val: seasonAssists?.toString() ?? "—" },
-    { label: "Points", val: seasonPoints.toString() },
-    { label: "Plus/minus", val: pm != null ? `${pm > 0 ? "+" : ""}${pm}` : "—", color: pm != null ? (pm > 0 ? "var(--ledger-green)" : pm < 0 ? "var(--ledger-red)" : undefined) : undefined },
-    { label: "Average ice time", val: player.avgTOI.toFixed(1) },
-    { label: "Expected-goal share relative", val: player.xgRelTM != null ? `${(player.xgRelTM as number) > 0 ? "+" : ""}${(player.xgRelTM as number).toFixed(1)}` : "—" },
-    { label: "High-danger finish", val: formatEdgeLuck(player.hdFinishingDelta), title: EDGE_LUCK_TITLE, color: edgeLuckColor(player.hdFinishingDelta) },
+    { label: "Games", val: gp?.toString() ?? "—" },
+    { label: "Goals", val: observed?.goals?.toString() ?? "—" },
+    { label: "Assists", val: observed?.assists?.toString() ?? "—" },
+    { label: "Points", val: observed?.points?.toString() ?? "—" },
+    { label: "Plus/minus", val: pm != null ? `${pm > 0 ? "+" : ""}${pm}` : "—" },
+    { label: "Average ice time", val: observed?.toiMinutes?.toFixed(1) ?? "—" },
+    { label: "High-danger finish (2025–26)", val: formatEdgeLuck(player.hdFinishingDelta), title: EDGE_LUCK_TITLE, color: edgeLuckColor(player.hdFinishingDelta) },
   ];
 
   return (
@@ -440,7 +440,7 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
         </div>
         {hasDossier && (
           <a
-            href={`/players/${player.id}`}
+            href={`/players/${player.id}${player.observedStats ? `?${observedQuery(player.observedStats)}` : ""}`}
             className="no-underline"
             style={{
               fontFamily: "'Courier Prime', monospace",
@@ -477,7 +477,7 @@ function ExpandedPlayer({ player, team, allPlayers }: { player: Player; team?: T
         {activeTab === "stats" && (
           <div>
             <div style={{ marginBottom: "8px", fontSize: "10px", fontWeight: 900, color: "var(--ledger-ink-faint)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-              {PLAYER_STATS_CONTEXT}
+              {player.observedStats ? `${observedLabel(player.observedStats)} · ${player.observedStats.coverage}` : PLAYER_STATS_CONTEXT}
             </div>
             <div className="stat-grid-4" style={{ marginBottom: "10px" }}>
               {statItems.map(s => (
@@ -583,7 +583,7 @@ const PLAYER_COLUMNS: Record<PlayerSection, PlayerColumn[]> = {
   F: [
     { key: "seasonPts", label: "Points" },
     { key: "ppg",       label: "Points/game" },
-    { key: "pts",       label: "Points/82" },
+    { key: "pts",       label: "2025–26 P/82" },
     { key: "ops",       label: "Offense shares" },
     { key: "dps",       label: "Defense shares" },
     { key: "toi",       label: "Avg ice" },
@@ -602,12 +602,12 @@ const PLAYER_COLUMNS: Record<PlayerSection, PlayerColumn[]> = {
     { key: "supp",      label: "Chance suppression" },
   ],
   G: [
-    { key: "gsax",  label: "Goals saved" },
+    { key: "gp", label: "Games" },
+    { key: "gsax",  label: "2025–26 GSAx" },
     { key: "svPct", label: "Save %" },
     { key: "gaa",   label: "Goals against" },
     { key: "cap",   label: PLAYER_TERMINOLOGY.contract },
     { key: "term",  label: PLAYER_TERMINOLOGY.yearsLeft },
-    { key: "gp",    label: "Games" },
   ],
 };
 
@@ -622,9 +622,10 @@ const playerGridMinWidth = (section: PlayerSection): string => {
   return "880px";
 };
 
-const seasonPointsOf = (p: Player): number => Math.round((p.ptsPace / 82) * (p.games ?? 82));
-const goalieGamesOf = (p: Player): number => p.games ?? p.gamesStarted ?? 0;
+const seasonPointsOf = (p: Player): number => p.observedStats ? p.observedStats.points ?? NaN : Math.round((p.ptsPace / 82) * (p.games ?? 82));
+const goalieGamesOf = (p: Player): number => p.observedStats ? p.observedStats.games ?? NaN : p.games ?? p.gamesStarted ?? 0;
 const goalieGaaOf = (p: Player): number | null => {
+  if (p.observedStats) return p.observedStats.gaa;
   if (p.position !== "G" || p.savePct == null) return null;
   const shotsPerGame = p.shotsPerGame && p.shotsPerGame > 0 ? p.shotsPerGame : 30;
   return (1 - p.savePct) * shotsPerGame;
@@ -636,23 +637,23 @@ const signedOneDecimal = (n: number): string => `${n > 0 ? "+" : ""}${n.toFixed(
 
 const statDisplay = (p: Player, key: PlayerSortKey, actualPPG: (p: Player) => number): string => {
   switch (key) {
-    case "seasonPts": return seasonPointsOf(p).toString();
-    case "ppg":       return actualPPG(p).toFixed(3);
+    case "seasonPts": return Number.isFinite(seasonPointsOf(p)) ? seasonPointsOf(p).toString() : "—";
+    case "ppg":       return Number.isFinite(actualPPG(p)) ? actualPPG(p).toFixed(3) : "—";
     case "pts":       return p.ptsPace.toFixed(1);
     case "ops":       return p.ops != null ? p.ops.toFixed(1) : "—";
     case "dps":       return p.dps != null ? p.dps.toFixed(1) : "—";
-    case "toi":       return p.avgTOI.toFixed(1);
+    case "toi":       return p.observedStats ? p.observedStats.toiMinutes?.toFixed(1) ?? "—" : p.avgTOI.toFixed(1);
     case "age":       return `${p.age}`;
     case "cap":       return `$${p.capHit}M`;
     case "term":      return `${p.yearsRemaining}yr`;
     case "supp":      return p.xgaRelTM != null ? signedOneDecimal(p.xgaRelTM) : "—";
-    case "gsax":      return (p.gsax ?? 0).toFixed(1);
-    case "svPct":     return p.savePct?.toFixed(3) ?? "—";
+    case "gsax":      return p.gsax?.toFixed(1) ?? "—";
+    case "svPct":     return (p.observedStats ? p.observedStats.savePct : p.savePct)?.toFixed(3) ?? "—";
     case "gaa": {
       const gaa = goalieGaaOf(p);
       return gaa != null ? gaa.toFixed(2) : "—";
     }
-    case "gp":        return `${goalieGamesOf(p)}`;
+    case "gp":        return Number.isFinite(goalieGamesOf(p)) ? `${goalieGamesOf(p)}` : "—";
     default:          return "—";
   }
 };
@@ -850,7 +851,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
           <p>NAV trend: unavailable · NAV range: unavailable</p>
           <p>Contract: {unsigned ? (expiringRightsLabel(player) ? `Unsigned ${expiringRightsLabel(player)}` : "No signed contract recorded") : `$${player.capHit.toFixed(2)}M · ${player.yearsRemaining} ${player.yearsRemaining === 1 ? "year" : "years"} left`}</p>
           <p>Annual surplus: {unsigned ? "no signed deal to price" : contract.surplus != null ? `${contract.surplus >= 0 ? "+" : "−"}$${Math.abs(contract.surplus).toFixed(2)}M` : "unavailable"}</p>
-          <Link className="tap-target" href={`/players/${player.id}`} onClick={event => { event.stopPropagation(); rememberListScroll(); }}>Open player dossier</Link>
+          <Link className="tap-target" href={`/players/${player.id}${player.observedStats ? `?${observedQuery(player.observedStats)}` : ""}`} onClick={event => { event.stopPropagation(); rememberListScroll(); }}>Open player dossier</Link>
         </div>
 
         {/* Rank and the selected secondary metric */}
@@ -1015,7 +1016,7 @@ function SectionPager({ total, pageSize, page, onPage }: {
 // browser's restored scroll position had nothing to land on and Back dropped
 // the reader near the top of the list. A full page load starts empty, so the
 // server-rendered loading state still matches on hydration.
-let lastLeague: { players: Player[]; teams: Team[]; provenance: LeagueProvenance | null } | null = null;
+let lastLeague: { selectionKey: string; players: Player[]; teams: Team[]; provenance: LeagueProvenance | null } | null = null;
 
 // Where the reader was in the list when they opened a dossier. The route
 // change scrolls to the top before this page unmounts, and the browser's own
@@ -1028,11 +1029,20 @@ const rememberListScroll = () => { listScroll = { url: location.pathname + locat
 const takeListScroll = () => { const saved = listScroll; listScroll = null; return saved; };
 
 export default function PlayersPage() {
-  const [players, setPlayers]   = useState<Player[]>(() => lastLeague?.players ?? []);
-  const [teams, setTeams]       = useState<Team[]>(() => lastLeague?.teams ?? []);
-  const [loading, setLoading]   = useState(() => lastLeague == null);
+  const [selection, setSelection] = useState<ObservedSelection>(() => {
+    if (typeof window === "undefined") return DEFAULT_OBSERVED_SELECTION;
+    const params = new URLSearchParams(window.location.search);
+    // Preserve invalid URL identities so the server rejects them instead of substituting a season.
+    return { season: (params.get("season") ?? "20262027") as ObservedSelection["season"],
+      gameType: Number(params.get("gameType") ?? 2) as 2 | 3 };
+  });
+  const selectionKey = observedQuery(selection);
+  const remembered = lastLeague?.selectionKey === selectionKey ? lastLeague : null;
+  const [players, setPlayers]   = useState<Player[]>(() => remembered?.players ?? []);
+  const [teams, setTeams]       = useState<Team[]>(() => remembered?.teams ?? []);
+  const [loading, setLoading]   = useState(() => remembered == null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [provenance, setProvenance] = useState<LeagueProvenance | null>(() => lastLeague?.provenance ?? null);
+  const [provenance, setProvenance] = useState<LeagueProvenance | null>(() => remembered?.provenance ?? null);
   // Hydrated once, synchronously, from the URL (QW-09) — self-contained (no
   // fetched data needed to interpret it), so there is no read/write race to
   // gate like the trade bench's shared-link parse has.
@@ -1078,6 +1088,10 @@ export default function PlayersPage() {
 
   // Simpler: derive actual points from ptsPace and games
   const actualPPG = (p: Player): number => {
+    if (p.observedStats) {
+      const { games, points } = p.observedStats;
+      return games != null && games > 0 && points != null ? points / games : NaN;
+    }
     const gp = p.games ?? 0;
     if (gp <= 0) return 0;
     const actualPts = (p.ptsPace / 82) * gp;
@@ -1085,23 +1099,30 @@ export default function PlayersPage() {
   };
 
   useEffect(() => {
+    let alive = true;
+    const controller = new AbortController();
+    const saved = lastLeague?.selectionKey === selectionKey ? lastLeague : null;
+    setLoading(saved == null);
+    setPlayers(saved?.players ?? []);
+    setLoadError(null);
     Promise.all([
-      fetch("/api/league/teams").then(r => {
+      fetch("/api/league/teams", { signal: controller.signal }).then(r => {
         if (!r.ok) throw new Error(`/api/league/teams returned ${r.status}`);
         return r.json();
       }),
-      fetch("/api/league/players").then(r => {
+      fetch(`/api/league/players?${selectionKey}`, { signal: controller.signal }).then(r => {
         if (!r.ok) throw new Error(`/api/league/players returned ${r.status}`);
         return r.json();
       }),
     ])
       .then(([td, pd]) => {
+        if (!alive) return;
         const nextPlayers = (pd.players ?? [])
           .filter((p: Player) => p.position !== "Pick")
           .map((p: Player) => ({ ...p, capCeiling: td.capCeiling }));
         const nextTeams = td.teams ?? [];
         if (!Array.isArray(nextPlayers) || !Array.isArray(nextTeams)) throw new Error("API returned invalid league payload");
-        lastLeague = { players: nextPlayers, teams: nextTeams, provenance: pd.provenance ?? null };
+        lastLeague = { selectionKey, players: nextPlayers, teams: nextTeams, provenance: pd.provenance ?? null };
         setPlayers(nextPlayers);
         setTeams(nextTeams);
         setProvenance(pd.provenance ?? null);
@@ -1109,11 +1130,13 @@ export default function PlayersPage() {
         setLoading(false);
       })
       .catch((e: any) => {
+        if (!alive) return;
         setProvenance(null);
         setLoadError(e?.message ?? "Failed to load players");
         setLoading(false);
       });
-  }, []);
+    return () => { alive = false; controller.abort(); };
+  }, [selectionKey]);
 
   const teamMap = useMemo(() => {
     const m = new Map<string, Team>();
@@ -1122,7 +1145,7 @@ export default function PlayersPage() {
   }, [teams]);
 
   const filtered = useMemo(() => {
-    let list = players;
+    let list = players.filter(p => p.observedStats?.season === selection.season && p.observedStats?.gameType === selection.gameType);
 
     if (deferredSearch.trim()) {
       list = list.filter(p => matchesPlayerSearch(p, deferredSearch, teamMap.get(p.teamId)));
@@ -1138,7 +1161,7 @@ export default function PlayersPage() {
     }
 
     return list;
-  }, [players, deferredSearch, posFilter, teamFilter, teamMap]);
+  }, [players, deferredSearch, posFilter, teamFilter, teamMap, selection.season, selection.gameType]);
 
   useEffect(() => {
     setForwardPage(1);
@@ -1174,9 +1197,13 @@ export default function PlayersPage() {
       search: deferredSearch, posFilter, teamFilter, sortKey, sortDir,
       forwardPage, defencePage, goaliePage, playerId: expandedPlayerId,
     });
-    const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+    const selectionParams = new URLSearchParams(query);
+    selectionParams.set("season", selection.season);
+    selectionParams.set("gameType", String(selection.gameType));
+    const selectedQuery = selectionParams.toString();
+    const newUrl = selectedQuery ? `${window.location.pathname}?${selectedQuery}` : window.location.pathname;
     window.history.replaceState(window.history.state, "", newUrl);
-  }, [deferredSearch, posFilter, teamFilter, sortKey, sortDir, forwardPage, defencePage, goaliePage, expandedPlayerId]);
+  }, [deferredSearch, posFilter, teamFilter, sortKey, sortDir, forwardPage, defencePage, goaliePage, expandedPlayerId, selection.season, selection.gameType]);
 
   // A stale/hand-edited team or player id in the URL must recover safely
   // rather than silently filtering to nothing or expanding a phantom row —
@@ -1206,7 +1233,7 @@ export default function PlayersPage() {
         case "seasonPts": return compare(seasonPointsOf(a), seasonPointsOf(b));
         case "ppg": return compare(actualPPG(a), actualPPG(b));
         case "pts": return compare(a.ptsPace, b.ptsPace);
-        case "toi": return compare(a.avgTOI, b.avgTOI);
+        case "toi": return compare(a.observedStats?.toiMinutes, b.observedStats?.toiMinutes);
         case "ops": return compare(a.ops, b.ops);
         case "dps": return compare(a.dps, b.dps);
         case "age": return compare(a.age, b.age);
@@ -1230,7 +1257,7 @@ export default function PlayersPage() {
       if (sortKey === "cap") return compare(a.capHit, b.capHit);
       if (sortKey === "term") return compare(a.yearsRemaining, b.yearsRemaining);
       if (sortKey === "gsax") return compare(a.gsax, b.gsax);
-      if (sortKey === "svPct") return compare(a.savePct, b.savePct);
+      if (sortKey === "svPct") return compare(a.observedStats?.savePct, b.observedStats?.savePct);
       if (sortKey === "gaa") {
         const aGaa = goalieGaaOf(a);
         const bGaa = goalieGaaOf(b);
@@ -1280,6 +1307,9 @@ export default function PlayersPage() {
       </header>
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "12px 16px 0" }}>
+        <ObservedSeasonSelector selection={selection} onChange={setSelection} />
+        <p className="text-[11px] font-mono mb-2" role="status">Observed: {observedLabel(selection)}. Missing or delayed coverage is shown as —; confirmed zero games as 0.</p>
+        <p className="text-[11px] font-mono mb-2">Current contracts and NAV · model inputs, STRAND, roles, GSAx, OPS/DPS and 82-game pace: 2025–26 regular season. These are not historical valuations.</p>
         <DataContextRail route="players" provenance={provenance} />
       </div>
 
@@ -1320,7 +1350,7 @@ export default function PlayersPage() {
                 padding: "7px 12px", whiteSpace: "nowrap", textDecoration: "none",
               };
               return /^\d+$/.test(String(p.id))
-                ? <a key={p.id} href={`/players/${p.id}`} style={style}>{inner}</a>
+                ? <a key={p.id} href={`/players/${p.id}?${selectionKey}`} style={style}>{inner}</a>
                 : <div key={p.id} style={style}>{inner}</div>;
             })}
           </div>

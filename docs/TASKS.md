@@ -550,3 +550,8 @@ Tests that a player on two teams' feeds dedups to one, DB-injection augments wit
 duplicating, and name/stat matching attaches the right stats. Mock the fetches; assert the
 emitted player list. Do NOT change route logic.
 Acceptance: tests cover the three cases above and pass; `npm test` + typecheck pass.
+
+
+### [x] Season preservation and observed-statistics rollover — implementation and PR preparation
+
+2026-10-02: audited tracked inputs and read-only Production provenance; implemented 2026–27/default and 2025–26/historical regular-season/playoff selection on Players and Teams with selected dossier EDGE, preserved model/NAV context, corrected capture identity, and prepared the archive/recovery rollout. See [audit and rollout](season-preservation/ROLLOVER_2026_27.md). Production archive copy, recovery verification, merge, deployment and current-season ingestion await separate authorization. Labs PR #33 remains unmerged at its verified head.

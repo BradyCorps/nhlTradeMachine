@@ -24,7 +24,7 @@ export async function GET(req: Request) {
   const cycleDay = Math.floor(Date.now() / 86_400_000) % 8;
   const group = teams.slice(cycleDay * 4, cycleDay * 4 + 4);
 
-  const season = Number(SEASON.nhleSeasonId);
+  const season = Number(SEASON.apiSeasonId);
   const idLists = await Promise.all(group.map(rosterPlayerIds));
   const ids = idLists.flat();
   const result = ids.length > 0
@@ -32,15 +32,15 @@ export async function GET(req: Request) {
     : { requested: 0, landingStored: 0, edgeStored: 0, failures: [], day: "" };
 
   // League-wide goalie EDGE boards — one cheap capture per night (PA3)
-  const goalieBoards = await captureGoalieEdgeBoards(SEASON.nhleSeasonId);
+  const goalieBoards = await captureGoalieEdgeBoards(SEASON.apiSeasonId);
 
   // Per-goalie EDGE detail, on the same 8-day team rotation as the skater
   // snapshots above — roughly twenty requests a night rather than all ~110
   // at once, so it cannot be the thing that busts the invocation.
   const goalieDetail = await captureGoalieEdgeDetail(
-    SEASON.nhleSeasonId,
+    SEASON.apiSeasonId,
     { playerIds: activeGoalieIdsForTeams(group) },
   ).catch((e: any) => ({ error: String(e?.message ?? e) }));
 
-  return NextResponse.json({ ok: true, cycleDay, teams: group, season, goalieBoards, goalieDetail, ...result });
+  return NextResponse.json({ ok: true, cycleDay, teams: group, season, gameType: 2, goalieBoards, goalieDetail, ...result });
 }
