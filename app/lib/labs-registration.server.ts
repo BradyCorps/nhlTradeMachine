@@ -439,6 +439,30 @@ export async function registerCandidateAndProtocol(
   return Object.freeze({ ...registered, created: true });
 }
 
+/** Shared planning readiness contract; callers must hold their write transaction. */
+export async function verifyCandidateRegistrationMetadata(
+  db: LabsWriteDb,
+  candidate: LabCandidate,
+  protocol: EvaluationProtocol,
+): Promise<void> {
+  const initial = candidate.lifecycleHistory[0]!;
+  const validated = await validateRegistrationInput(db, {
+    actor: candidate.createdBy, source: candidate.createdSource,
+    candidate: {
+      ...candidate, targetAnalyticId: candidate.targetAnalytic.id,
+      datasetBatchId: candidate.dataset.id,
+    },
+    artifacts: candidate.artifacts,
+    initialLifecycleEvent: initial,
+    protocol,
+  });
+  if (!sameJson(initial, validated.lifecycleEvent)
+    || candidate.artifacts.some(reference => reference.attachedBy !== candidate.createdBy)
+    || protocol.createdBy !== candidate.createdBy || protocol.createdSource !== candidate.createdSource) {
+    throw new LabsCandidateIntegrityError("Candidate and protocol registration provenance must match.");
+  }
+}
+
 export interface CandidateRegisteredTransitionInput {
   candidateId: string;
   protocolId: string;
@@ -482,22 +506,7 @@ export async function transitionCandidateToRegistered(
     }
     // Recheck the complete Phase 5A.1 metadata contract inside the write
     // transaction, including immutable artifacts and COMPLETE provenance.
-    const initial = candidate.lifecycleHistory[0]!;
-    const validated = await validateRegistrationInput(tx, {
-      actor: candidate.createdBy, source: candidate.createdSource,
-      candidate: {
-        ...candidate, targetAnalyticId: candidate.targetAnalytic.id,
-        datasetBatchId: candidate.dataset.id,
-      },
-      artifacts: candidate.artifacts,
-      initialLifecycleEvent: initial,
-      protocol,
-    });
-    if (!sameJson(initial, validated.lifecycleEvent)
-      || candidate.artifacts.some(reference => reference.attachedBy !== candidate.createdBy)
-      || protocol.createdBy !== candidate.createdBy || protocol.createdSource !== candidate.createdSource) {
-      throw new LabsCandidateIntegrityError("Candidate and protocol registration provenance must match.");
-    }
+    await verifyCandidateRegistrationMetadata(tx, candidate, protocol);
     if (candidate.lifecycleStatus === "REGISTERED"
       && candidate.lifecycleHistory.length === 2
       && sameJson(candidate.lifecycleHistory[1], event)) {

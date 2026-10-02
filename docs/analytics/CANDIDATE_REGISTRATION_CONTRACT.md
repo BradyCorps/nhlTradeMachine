@@ -128,10 +128,12 @@ or deployed-endpoint operation is required for this service-only change.
 
 ## Deferred
 
-An operator route/form, isolated evaluation-run creation and execution,
-metrics, validation evidence, human approval, promotion, and flag controls
-remain separate work. The protected `/admin/labs` surface remains read-only.
-The next smallest step is an internal, isolated evaluation-run planning
-boundary that requires REGISTERED history and its exact protocol binding,
-then persists a PLANNED run with immutable inputs and execution provenance
-without executing candidate code or writing to Production.
+Phase 5B.1 now provides internal authenticated PLANNED run creation in
+`labs-planning.server.ts`; see [the planning contract](EVALUATION_EVIDENCE_CONTRACT.md#phase-5b1-authenticated-planning-contract).
+Registration and planning share `verifyCandidateRegistrationMetadata` without
+changing the Phase 5A.2 transition contract. Planning freezes the exact
+REGISTERED event and its protocol binding without executing candidate code.
+
+An operator route/form, candidate execution, metrics, validation evidence,
+human approval, promotion, and flag controls remain separate work. The
+protected `/admin/labs` surface remains read-only.
