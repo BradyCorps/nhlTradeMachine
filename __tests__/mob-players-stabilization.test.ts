@@ -54,6 +54,7 @@ describe("Players mobile stabilization", () => {
     expect(players).toMatch(/let lastLeague: \{[^}]*\} \| null = null;/);
     expect(players).toContain("useState(() => remembered == null)");
     expect(players).toContain("lastLeague?.selectionKey === selectionKey ? lastLeague : null");
+    expect(players).toContain("if (!selectionReady) return;");
     expect(players).toContain("setPlayers(saved?.players ?? [])");
     expect(players).toContain("p.observedStats?.season === selection.season");
     expect(players).toContain("lastLeague = { selectionKey, players: nextPlayers, teams: nextTeams");

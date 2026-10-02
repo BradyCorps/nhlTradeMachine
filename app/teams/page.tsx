@@ -1,6 +1,6 @@
 "use client";
 import { ObservedSeasonSelector } from "@/app/components/ObservedSeasonSelector";
-import { DEFAULT_OBSERVED_SELECTION, observedQuery, observedLabel, type ObservedSelection } from "@/app/lib/observed-season";
+import { DEFAULT_OBSERVED_SELECTION, parseObservedSelection, observedQuery, observedLabel, type ObservedSelection } from "@/app/lib/observed-season";
 
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -896,12 +896,14 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
 }
 
 export default function TeamsPage() {
-  const [selection, setSelection] = useState<ObservedSelection>(() => {
-    if (typeof window === "undefined") return DEFAULT_OBSERVED_SELECTION;
-    const params = new URLSearchParams(window.location.search);
-    return { season: (params.get("season") ?? "20262027") as ObservedSelection["season"],
-      gameType: Number(params.get("gameType") ?? 2) as 2 | 3 };
-  });
+  // Match the static server render, then resolve URL identity before any statistics read or URL write.
+  const [selection, setSelection] = useState<ObservedSelection>(DEFAULT_OBSERVED_SELECTION);
+  const [selectionReady, setSelectionReady] = useState(false);
+  useEffect(() => {
+    try { setSelection(parseObservedSelection(new URLSearchParams(window.location.search))); }
+    catch { setSelection({ season: "unsupported" as ObservedSelection["season"], gameType: 2 }); }
+    setSelectionReady(true);
+  }, []);
   const selectionKey = observedQuery(selection);
   const [loadError, setLoadError] = useState<string | null>(null);
   const pathname = usePathname();
@@ -925,6 +927,7 @@ export default function TeamsPage() {
   const [navDim, setNavDim] = useState<TeamNavDim>(initialUrlState.navDim);
 
   useEffect(() => {
+    if (!selectionReady) return;
     let alive = true;
     const controller = new AbortController();
     setLoading(true);
@@ -953,19 +956,20 @@ export default function TeamsPage() {
       })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; controller.abort(); };
-  }, [selectionKey]);
+  }, [selectionKey, selectionReady]);
 
   // State → URL (QW-09). `replaceState` rather than the router — matches the
   // trade bench's own live-state URL sync (armchair-gm/page.tsx). Which team
   // is being viewed is the path, not touched here.
   useEffect(() => {
+    if (!selectionReady) return;
     const query = buildTeamsUrlQuery({ sortKey, filterPhase, expandedId, detailCollapsed, navDim });
     const params = new URLSearchParams(query);
     params.set("season", selection.season);
     params.set("gameType", String(selection.gameType));
     const newUrl = `${window.location.pathname}?${params}`;
     window.history.replaceState(window.history.state, "", newUrl);
-  }, [sortKey, filterPhase, expandedId, detailCollapsed, navDim, selection.season, selection.gameType]);
+  }, [sortKey, filterPhase, expandedId, detailCollapsed, navDim, selection.season, selection.gameType, selectionReady]);
 
   // A stale/hand-edited expanded-team id must recover safely rather than
   // leaving the index view expanding nothing.

@@ -1,6 +1,6 @@
 "use client";
 import { ObservedSeasonSelector } from "@/app/components/ObservedSeasonSelector";
-import { DEFAULT_OBSERVED_SELECTION, observedQuery, observedLabel, type ObservedSelection, type ObservedStats } from "@/app/lib/observed-season";
+import { DEFAULT_OBSERVED_SELECTION, parseObservedSelection, observedQuery, observedLabel, type ObservedSelection, type ObservedStats } from "@/app/lib/observed-season";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
 import Link from "next/link";
 import { MobileDetail } from "@/app/components/MobileDetail";
@@ -1029,15 +1029,16 @@ const rememberListScroll = () => { listScroll = { url: location.pathname + locat
 const takeListScroll = () => { const saved = listScroll; listScroll = null; return saved; };
 
 export default function PlayersPage() {
-  const [selection, setSelection] = useState<ObservedSelection>(() => {
-    if (typeof window === "undefined") return DEFAULT_OBSERVED_SELECTION;
-    const params = new URLSearchParams(window.location.search);
-    // Preserve invalid URL identities so the server rejects them instead of substituting a season.
-    return { season: (params.get("season") ?? "20262027") as ObservedSelection["season"],
-      gameType: Number(params.get("gameType") ?? 2) as 2 | 3 };
-  });
+  // Match the static server render, then resolve URL identity before any statistics read or URL write.
+  const [selection, setSelection] = useState<ObservedSelection>(DEFAULT_OBSERVED_SELECTION);
+  const [selectionReady, setSelectionReady] = useState(false);
+  useEffect(() => {
+    try { setSelection(parseObservedSelection(new URLSearchParams(window.location.search))); }
+    catch { setSelection({ season: "unsupported" as ObservedSelection["season"], gameType: 2 }); }
+    setSelectionReady(true);
+  }, []);
   const selectionKey = observedQuery(selection);
-  const remembered = lastLeague?.selectionKey === selectionKey ? lastLeague : null;
+  const remembered = selectionReady && lastLeague?.selectionKey === selectionKey ? lastLeague : null;
   const [players, setPlayers]   = useState<Player[]>(() => remembered?.players ?? []);
   const [teams, setTeams]       = useState<Team[]>(() => remembered?.teams ?? []);
   const [loading, setLoading]   = useState(() => remembered == null);
@@ -1099,6 +1100,7 @@ export default function PlayersPage() {
   };
 
   useEffect(() => {
+    if (!selectionReady) return;
     let alive = true;
     const controller = new AbortController();
     const saved = lastLeague?.selectionKey === selectionKey ? lastLeague : null;
@@ -1136,7 +1138,7 @@ export default function PlayersPage() {
         setLoading(false);
       });
     return () => { alive = false; controller.abort(); };
-  }, [selectionKey]);
+  }, [selectionKey, selectionReady]);
 
   const teamMap = useMemo(() => {
     const m = new Map<string, Team>();
@@ -1193,6 +1195,7 @@ export default function PlayersPage() {
   // history entry per keystroke/filter change, matching the trade bench's
   // own live-state URL sync (armchair-gm/page.tsx).
   useEffect(() => {
+    if (!selectionReady) return;
     const query = buildPlayersUrlQuery({
       search: deferredSearch, posFilter, teamFilter, sortKey, sortDir,
       forwardPage, defencePage, goaliePage, playerId: expandedPlayerId,
@@ -1203,7 +1206,7 @@ export default function PlayersPage() {
     const selectedQuery = selectionParams.toString();
     const newUrl = selectedQuery ? `${window.location.pathname}?${selectedQuery}` : window.location.pathname;
     window.history.replaceState(window.history.state, "", newUrl);
-  }, [deferredSearch, posFilter, teamFilter, sortKey, sortDir, forwardPage, defencePage, goaliePage, expandedPlayerId, selection.season, selection.gameType]);
+  }, [deferredSearch, posFilter, teamFilter, sortKey, sortDir, forwardPage, defencePage, goaliePage, expandedPlayerId, selection.season, selection.gameType, selectionReady]);
 
   // A stale/hand-edited team or player id in the URL must recover safely
   // rather than silently filtering to nothing or expanding a phantom row —

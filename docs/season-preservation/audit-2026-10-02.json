@@ -397,6 +397,12 @@
         "surface": "teams",
         "switching": "passed"
       }
-    ]
+    ],
+    "historicalReload": {
+      "status": "passed",
+      "wrongSeasonRequests": 0,
+      "browserRuntimeErrors": 0,
+      "runtime": "local production build, isolated database target, intercepted responses"
+    }
   }
 }

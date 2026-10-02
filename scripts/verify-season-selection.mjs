@@ -41,8 +41,11 @@ async function waitForPoints(page, value) {
 try {
   for (const width of [320, 412]) {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
     await installFixtures(page);
-    await page.goto(`${baseURL}/players`, { waitUntil: "networkidle" });
+    const response = await page.goto(`${baseURL}/players`, { waitUntil: "networkidle" });
+    assert.equal(response.status(), 200);
     await waitForPoints(page, "7");
     const select = page.getByRole("combobox", { name: "Statistics season", exact: true });
     assert.equal(await select.inputValue(), "20262027");
@@ -50,6 +53,11 @@ try {
     await select.selectOption("20252026");
     await waitForPoints(page, "138");
     assert.equal(new URL(page.url()).searchParams.get("season"), "20252026");
+    const beforeReload = requests.length;
+    await page.reload({ waitUntil: "networkidle" });
+    await waitForPoints(page, "138");
+    assert.equal(await select.inputValue(), "20252026");
+    assert.ok(requests.slice(beforeReload).filter(r => r.path === "/api/league/players").every(r => r.season === "20252026" && r.gameType === 2));
     assert.ok((await page.getByRole("link", { name: /Open player dossier/i }).first().getAttribute("href")).includes("season=20252026"));
     await page.getByRole("combobox", { name: "Statistics competition" }).selectOption("3");
     await waitForPoints(page, "6");
@@ -61,6 +69,7 @@ try {
     await waitForPoints(page, "7");
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await mkdir(output, { recursive: true });
+    assert.deepEqual(errors, [], "Selector reload must hydrate without runtime errors");
     await page.screenshot({ path: `${output}/players-${width}.png` });
     results.push({ surface: "players", width, switching: "passed", url: "passed", overflow: false });
     await page.close();

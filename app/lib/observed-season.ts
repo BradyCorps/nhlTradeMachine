@@ -21,6 +21,7 @@ export function observedQuery(selection: ObservedSelection): string {
   return new URLSearchParams({ season: selection.season, gameType: String(selection.gameType) }).toString();
 }
 export function observedLabel(selection: ObservedSelection): string {
+  if (!(OBSERVED_SEASONS as readonly string[]).includes(selection.season) || ![2, 3].includes(selection.gameType)) return "Unsupported statistics selection";
   return `${selection.season.slice(0, 4)}–${selection.season.slice(6)} ${selection.gameType === 2 ? "regular season" : "playoffs"}`;
 }
 export function observedCacheKey(selection: ObservedSelection, report: string): string {

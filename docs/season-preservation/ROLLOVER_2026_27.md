@@ -186,11 +186,13 @@ cache separation, wrong identities, missing/zero coverage, capture parsing,
 unchanged historical snapshots and canonical valuation payloads. Existing
 snapshot-batch/backfill and Phase 0 fixtures are reused unchanged.
 `scripts/verify-season-selection.mjs` checks only this selector with isolated
-response fixtures: Players at 320/412px, URL reload/link persistence, keyboard
+response fixtures: Players at 320/412px, URL reload/link persistence, historical reload hydration without runtime errors, keyboard
 selection/tab order and Teams switching. It is not a repeated public-site audit.
 Final local gates: 2,619/2,619 tests across 206 files; Phase 0 baseline 10/10;
 TypeScript clean; lint 0 errors and 4 pre-existing warnings; production build
 30/30 static pages. The full suite/build were repeated after the Back-navigation
-correction revealed by the initial full-suite failure. Focused development checks
+correction revealed by the initial full-suite failure, and again after fixing
+historical-URL hydration. The final selector check used a local production
+server with an isolated database target and intercepted response fixtures. Focused development checks
 passed 65 tests, then 24 affected checks after that correction. Hosted evidence
 is recorded in the PR against its final head.
