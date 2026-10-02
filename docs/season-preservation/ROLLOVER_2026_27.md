@@ -192,7 +192,7 @@ Final local gates: 2,619/2,619 tests across 206 files; Phase 0 baseline 10/10;
 TypeScript clean; lint 0 errors and 4 pre-existing warnings; production build
 30/30 static pages. The full suite/build were repeated after the Back-navigation
 correction revealed by the initial full-suite failure, and again after fixing
-historical-URL hydration. The final selector check used a local production
+historical-URL hydration, then after correcting an EDGE percentile badge contrast failure exposed by current-season data in hosted CI. A focused pinned axe check passed all nine percentile color boundaries; unchanged Fantasy small-target observations remain outside this scope. The final selector check used a local production
 server with an isolated database target and intercepted response fixtures. Focused development checks
 passed 65 tests, then 24 affected checks after that correction. Hosted evidence
 is recorded in the PR against its final head.

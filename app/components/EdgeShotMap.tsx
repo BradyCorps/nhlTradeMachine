@@ -180,7 +180,7 @@ export default function EdgeShotMap({ nhlPlayerId, selection = DEFAULT_OBSERVED_
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
                     <span className="px-1.5 py-0.5 text-[10px] font-black font-mono tabular-nums" style={{
-                      background: pctColor(s.shotsPercentile), color: s.shotsPercentile >= 0.5 ? "#fff" : "var(--ink)", borderRadius: 2,
+                      background: pctColor(s.shotsPercentile), color: s.shotsPercentile >= 0.7 ? "#fff" : "var(--ink)", borderRadius: 2,
                     }}>
                       {ordinal(Math.round(s.shotsPercentile * 100))}
                     </span>
