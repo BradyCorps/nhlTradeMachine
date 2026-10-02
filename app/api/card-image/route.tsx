@@ -359,7 +359,7 @@ export async function POST(req: Request) {
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-          <div style={{ display: "flex", fontSize: 46, fontWeight: 700, color: INK, lineHeight: 1 }}>{String(data.xnavTotal)}</div>
+          <div style={{ display: "flex", fontSize: data.navAvailable === false ? 22 : 46, fontWeight: 700, color: INK, lineHeight: 1 }}>{data.navAvailable === false ? "Not priced" : String(data.xnavTotal)}</div>
           <div style={{ display: "flex", fontSize: 11, letterSpacing: 1, color: INK_BODY, marginTop: 4 }}>
             {data.navLabel ?? "X-NAV"} · {data.navLongLabel ?? "EXTENDED NET ASSET VALUE"}
           </div>

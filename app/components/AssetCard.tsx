@@ -1,5 +1,6 @@
 "use client";
 // ── AssetCard — individual player/pick card in trade panels ───
+import { navValueForDisplay, navLabelForDisplay } from "@/app/lib/valuation-display";
 import React from "react";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
@@ -200,7 +201,7 @@ export default function AssetCard({
             fontStyle: 'italic',
             color: xnav.total > 80 ? 'var(--ledger-green)' : xnav.total > 20 ? 'var(--ledger-ice)' : xnav.total > -20 ? 'var(--ledger-brown)' : 'var(--ledger-red)',
           }}>
-            {fmt(xnav.total, 0)}
+            {navLabelForDisplay(navResult)}
           </span>
           <MetricTip term={navLabel} className="text-2xs font-black uppercase tracking-widest" />
           {xnav.noivImpact !== undefined && Math.abs(xnav.noivImpact) >= 2 && (
@@ -362,7 +363,7 @@ export default function AssetCard({
       )}
 
       {/* SKATER NAV breakdown bars */}
-      {!isPick && asset.position !== "G" && (
+      {!isPick && navValueForDisplay(navResult) !== null && asset.position !== "G" && (
         <div className="mb-2.5">
           {/* Point Shares — shown when available */}
           {(asset.ops != null || asset.dps != null) && (
@@ -451,7 +452,7 @@ export default function AssetCard({
       )}
 
       {/* Goalie G-NAV + CAP bars */}
-      {!isPick && asset.position === "G" && (
+      {!isPick && navValueForDisplay(navResult) !== null && asset.position === "G" && (
         <div className="mb-2.5">
           <div className="flex items-center justify-between mb-1.5">
             <MetricTip term="G-NAV">G-NAV Breakdown</MetricTip>

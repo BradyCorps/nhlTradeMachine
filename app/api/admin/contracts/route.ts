@@ -9,6 +9,8 @@ import { ensurePlayerColumns, ensurePlayerTable, ensureTeamTable } from "@/app/d
 import { clearTeamCaches } from "@/app/lib/team-cache";
 import { SEASON_START_YEAR } from "@/app/lib/contract-expiry";
 import { anchorFromTerm } from "@/app/lib/contract-term";
+import { listPublishedTrades } from "@/app/lib/trades";
+import { publishedOwnershipByPlayer } from "@/app/lib/published-roster-ownership";
 
 const CONTRACT_OVERRIDES: Record<string, { yearsRemaining?: number; position?: string }> = {
   "Quinton Byfield": { position: "C" },
@@ -226,8 +228,9 @@ export async function GET(req: Request) {
   // Explicit column list — a full select() breaks with "no such column" whenever
   // schema.ts declares a column the live Turso table doesn't have yet.
   let dbError: string | null = null;
-  const [dbRows, scraped] = await Promise.all([
+  const [dbRows, scraped, publishedTrades] = await Promise.all([
     db.select({
+      id:             playersTable.id,
       name:           playersTable.name,
       position:       playersTable.position,
       teamId:         playersTable.teamId,
@@ -252,25 +255,20 @@ export async function GET(req: Request) {
     // sell an API and started 403ing the scraper, which is their call. Nothing
     // to diff against, so the GET is now purely the DB view.
     Promise.resolve({} as Record<string, any>),
+    listPublishedTrades(),
   ]);
-
-  const dbMap = new Map<string, typeof dbRows[number]>();
-  for (const row of dbRows) {
-    const existing = dbMap.get(row.name);
-    const rowHasMetadata = row.teamId != null || normalisePosition(row.position) != null;
-    const existingHasMetadata = existing?.teamId != null || normalisePosition(existing?.position) != null;
-    if (!existing || (rowHasMetadata && !existingHasMetadata)) dbMap.set(row.name, row);
-  }
 
   // DB rows only. There is no second source to union in any more, so a name
   // that is not in the DB is not in this view — the roster-gaps panel is what
   // finds players the DB has never heard of.
-  const allNames = new Set<string>(dbRows.map(r => r.name));
 
   const scrapedRaw: Record<string, { capHit: number; yearsRemaining: number; position?: string; teamSlug?: string; age?: number | null }> = {};
 
-  const rows = Array.from(allNames).sort().map(name => {
-    const b  = dbMap.get(name);
+  const ownership = publishedOwnershipByPlayer(dbRows, publishedTrades);
+  const rows = dbRows.map(b => {
+    const name = b.name;
+    const move = !b.retired && !b.excludeFromRoster
+      ? ownership.get(b) : null;
     const cw = findScrapedByName(scraped, name);
     const ov = CONTRACT_OVERRIDES[name];
 
@@ -295,8 +293,11 @@ export async function GET(req: Request) {
     }
 
     return {
+      id: b.id,
       name,
-      team:          cw?.teamSlug ?? b?.teamId ?? null,
+      team:          move?.teamId ?? b.teamId ?? null,
+      storedTeam:    b.teamId ?? null,
+      ownershipTradeId: move?.tradeId ?? null,
       position:      ov?.position ?? normalisePosition(cw?.position) ?? normalisePosition(b?.position) ?? null,
       finalYears:    baseYears,
       finalCap:      baseCap,
@@ -328,7 +329,7 @@ export async function GET(req: Request) {
     };
   });
 
-  rows.sort((a, b) => (b.delta ?? -1) - (a.delta ?? -1) || a.name.localeCompare(b.name));
+  rows.sort((a, b) => (b.delta ?? -1) - (a.delta ?? -1) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
 
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
@@ -460,7 +461,7 @@ export async function POST(req: Request) {
   const derivedExpiryYear =
     expiryYear == null && !expiryStatus ? anchorFromTerm(yearsRemaining) : null;
 
-  const id = makeId(name);
+  const id = typeof body.id === "string" && body.id.trim() ? body.id : makeId(name);
 
   if (clear) {
     await db.delete(playersTable).where(eq(playersTable.id, id));
@@ -479,6 +480,9 @@ export async function POST(req: Request) {
   }
 
   const existing = await db.select().from(playersTable).where(eq(playersTable.id, id));
+  if (existing.length && existing[0].name !== name) {
+    return NextResponse.json({ error: "Player identity does not match the stored contract" }, { status: 400 });
+  }
 
   if (existing.length > 0) {
     const updates: Record<string, any> = { source: "editor" };

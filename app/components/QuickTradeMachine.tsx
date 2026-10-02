@@ -1,4 +1,5 @@
 "use client";
+import { navLabelForDisplay, navValueForDisplay } from "@/app/lib/valuation-display";
 import { MobileDetail } from "@/app/components/MobileDetail";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -33,7 +34,7 @@ import type { LeagueProvenance } from "@/app/lib/data-context";
 import MetricTip from "@/app/components/MetricTip";
 import { HelpPopover } from "@/app/components/HelpPopover";
 
-const ZERO_NAV: XNAVResult = { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
+const ZERO_NAV: XNAVResult = { stages: [], total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
 
 // A BLOCKED/DECLINED verdict's whole point is explaining why — a HARD flag
 // (a CBA veto, a clause block) must never be the one truncated out of view
@@ -211,7 +212,7 @@ function RosterCard({ asset, nav, onAdd }: { asset: Asset; nav: XNAVResult; onAd
         </span>
         {!isPick && (
           <span className="text-[10px] font-black font-mono tabular-nums shrink-0" style={{ color: navTone }}>
-            {nav.total > 0 ? "+" : ""}{Math.round(nav.total)}
+            {navValueForDisplay(nav) !== null && nav.total > 0 ? "+" : ""}{navLabelForDisplay(nav)}
           </span>
         )}
       </span>
@@ -357,7 +358,7 @@ function AssetRow({
           {!isPick && (
             <MetricTip term="NAV" className="text-[11px] font-black font-mono tabular-nums">
               <span style={{ color: nav.total > 0 ? "var(--ledger-green)" : nav.total < 0 ? "var(--ledger-red)" : "var(--ledger-ink-faint)" }}>
-                {nav.total > 0 ? "+" : ""}{Math.round(nav.total)} NAV
+                {navValueForDisplay(nav) !== null && nav.total > 0 ? "+" : ""}{navLabelForDisplay(nav)} NAV
               </span>
             </MetricTip>
           )}

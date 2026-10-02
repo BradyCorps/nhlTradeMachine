@@ -1,5 +1,7 @@
 "use client";
 
+import { navValueForDisplay } from "@/app/lib/valuation-display";
+
 import React from "react";
 import { ChartData } from "@/app/components/ChartData";
 import { calcPlayerTimeline } from "@/app/lib/player-timeline";
@@ -73,6 +75,7 @@ export default function PlayerTimeline({ asset }: { asset: AssetInput }) {
   if (years.length === 0) return null;
 
   const currentNav = calcNAV(asset);
+  if (navValueForDisplay(currentNav) === null) return <p>Not priced — historical model inputs unavailable. Contract value projections are unavailable.</p>;
   const fmvToday = currentNav.fmvAav ?? asset.capHit;
   // PA11: the next contract signs against the cap of the EXPIRY season, not
   // today's. FMV is a share of the current ceiling — the same share of the

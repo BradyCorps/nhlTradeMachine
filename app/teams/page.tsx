@@ -1,4 +1,5 @@
 "use client";
+import { navLabelForDisplay, navValueForDisplay } from "@/app/lib/valuation-display";
 import { ObservedSeasonSelector } from "@/app/components/ObservedSeasonSelector";
 import { DEFAULT_OBSERVED_SELECTION, parseObservedSelection, observedQuery, observedLabel, type ObservedSelection } from "@/app/lib/observed-season";
 
@@ -423,6 +424,7 @@ function LineupSection({ lines, selection }: { lines: TeamLines; selection?: Obs
       <div className="text-[9px] font-black uppercase tracking-[0.15em] mb-2" style={{ color: "var(--ledger-ink-faint)" }}>
         Projected Lines
       </div>
+      <p className="text-[11px] mb-2">Projection from available model inputs: up to 12 forwards, 6 defenders and 2 goalies. This is not the full roster or a confirmed lineup.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* Forwards */}
         <div>
@@ -858,6 +860,24 @@ function TeamCard({ profile, expanded, onToggle, capCeiling, showDetailLink = tr
             <LineupSection lines={lines} selection={team.observedSelection} />
           </div>
 
+          <details className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
+            <summary className="min-h-[44px] flex items-center cursor-pointer font-black text-[12px]">
+              Full assigned roster ({profile.roster.length})
+            </summary>
+            <p className="text-[11px] mb-2">Includes eligible depth players and prospects, regardless of pricing coverage. Current contract assignments with published roster trades applied; not a game-day active list. Team NAV totals cover priced assets; unavailable inputs are not calculated zeros.</p>
+            <ul className="space-y-1">
+              {profile.roster.map(player => (
+                <li key={player.id} className="flex items-center gap-2 text-[11px]">
+                  <Link className="min-h-[44px] flex items-center flex-1 min-w-0 underline" href={`/players/${player.id}?${observedQuery(team.observedSelection ?? DEFAULT_OBSERVED_SELECTION)}`}>
+                    {player.name}
+                  </Link>
+                  <span>{displayPosition(player.position, player.secondaryPosition)}</span>
+                  <span className="font-mono shrink-0">{navLabelForDisplay(profile.navMap[player.id])}{navValueForDisplay(profile.navMap[player.id]) !== null ? " NAV" : ""}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+
           {/* Top Players */}
           <div className="py-2 border-t" style={{ borderColor: "var(--ledger-rule)" }}>
             <div className="text-[9px] font-black uppercase tracking-[0.15em] mb-2" style={{ color: "var(--ledger-ink-faint)" }}>
@@ -1029,6 +1049,7 @@ export default function TeamsPage() {
       const rfaCount = roster.filter(p => p.contractStatus === "RFA").length;
 
       const sorted = roster
+        .filter(p => navValueForDisplay(navMap[p.id]) !== null)
         .map((p) => ({
           name: p.name,
           nav: navMap[p.id]?.total ?? 0,

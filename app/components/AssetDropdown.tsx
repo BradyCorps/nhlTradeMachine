@@ -6,6 +6,7 @@ import type { Asset, Team } from "@/app/lib/trade-types";
 import { useTradeStore } from "@/app/store/tradeStore";
 import { useDialog } from "@/app/lib/use-dialog";
 import { displayPosition } from "@/app/lib/display-position";
+import { navValueForDisplay } from "@/app/lib/valuation-display";
 import { navColor } from "@/app/lib/display-utils";
 import { navLabelForPosition, pickCountLabel, playerCountLabel } from "@/app/lib/player-terminology";
 import { termLabel as contractTermLabel } from "@/app/lib/roster-table";
@@ -18,14 +19,14 @@ function isProspect(p: Asset): boolean {
   return p.age <= 23 && ((p.games ?? 0) < 50 || p.capHit <= 0.925);
 }
 
-function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number; onClick: () => void }) {
+function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number | null; onClick: () => void }) {
   const term = p.position === "Pick" ? `${p.year ?? ""}` : contractTermLabel(p);
 
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={`Add ${p.name}; cap hit $${p.capHit.toFixed(2)} million; ${term}; ${navLabelForPosition(p.position)} ${nav.toFixed(0)}`}
+      aria-label={`Add ${p.name}; cap hit $${p.capHit.toFixed(2)} million; ${term}; ${navLabelForPosition(p.position)} ${nav == null ? "Not priced" : nav.toFixed(0)}`}
       className="w-full flex items-center justify-between px-3 py-2 text-left transition-colors"
       style={{ borderBottom: "1px solid var(--ledger-rule-light)" }}
       onMouseEnter={e => (e.currentTarget.style.background = "var(--ledger-cream)")}
@@ -53,8 +54,8 @@ function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number; onClick: () => 
         <span className="text-2xs w-8 text-right" style={{ color: "var(--ledger-ink-faint)" }}>
           {term}
         </span>
-        <span className="text-2xs font-black w-16 text-right" style={{ color: navColor(nav) }}>
-          {nav > 0 ? "+" : ""}{nav.toFixed(0)} <span className="text-[8px]">{navLabelForPosition(p.position)}</span>
+        <span className="text-2xs font-black w-16 text-right" style={{ color: nav == null ? "var(--ledger-ink-faint)" : navColor(nav) }}>
+          {nav == null ? "Not priced" : `${nav > 0 ? "+" : ""}${nav.toFixed(0)}`} <span className="text-[8px]">{navLabelForPosition(p.position)}</span>
         </span>
       </div>
     </button>
@@ -215,7 +216,7 @@ function AssetDropdown({
                 <>
                   <SectionHead label="Core Players" count={core.length} />
                   {core.map(p => (
-                    <PlayerRow key={p.id} p={p} nav={navMap[p.id]?.total ?? 0} onClick={() => handleAdd(p)} />
+                    <PlayerRow key={p.id} p={p} nav={navValueForDisplay(navMap[p.id])} onClick={() => handleAdd(p)} />
                   ))}
                 </>
               )}
@@ -224,7 +225,7 @@ function AssetDropdown({
                 <>
                   <SectionHead label="Depth Players" count={depth.length} />
                   {depth.map(p => (
-                    <PlayerRow key={p.id} p={p} nav={navMap[p.id]?.total ?? 0} onClick={() => handleAdd(p)} />
+                    <PlayerRow key={p.id} p={p} nav={navValueForDisplay(navMap[p.id])} onClick={() => handleAdd(p)} />
                   ))}
                 </>
               )}
@@ -233,7 +234,7 @@ function AssetDropdown({
                 <>
                   <SectionHead label="Prospects & ELC" count={prospects.length} />
                   {prospects.map(p => (
-                    <PlayerRow key={p.id} p={p} nav={navMap[p.id]?.total ?? 0} onClick={() => handleAdd(p)} />
+                    <PlayerRow key={p.id} p={p} nav={navValueForDisplay(navMap[p.id])} onClick={() => handleAdd(p)} />
                   ))}
                 </>
               )}
@@ -242,7 +243,7 @@ function AssetDropdown({
                 <>
                   <SectionHead label="Draft Picks" count={picks.length} />
                   {picks.map(p => (
-                    <PlayerRow key={p.id} p={p} nav={navMap[p.id]?.total ?? 0} onClick={() => handleAdd(p)} />
+                    <PlayerRow key={p.id} p={p} nav={navValueForDisplay(navMap[p.id])} onClick={() => handleAdd(p)} />
                   ))}
                 </>
               )}

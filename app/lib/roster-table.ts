@@ -166,7 +166,7 @@ const navColumn: RosterColumn = {
   align: "right",
   title: "Forward Net Asset Value",
   value: r => r.nav,
-  format: r => (r.nav == null ? "—" : String(r.nav)),
+  format: r => (r.nav == null ? "Not priced" : String(r.nav)),
   initial: "desc",
 };
 

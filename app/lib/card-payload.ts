@@ -146,6 +146,7 @@ export interface CardImagePayload {
   roleLabel?: string;
   roleColor?: string;
   xnavTotal: number;
+  navAvailable?: boolean;
   /** Optional only so a stale pre-QW-01 browser payload remains renderable. */
   navLabel?: "F-NAV" | "D-NAV" | "G-NAV" | "X-NAV";
   navLongLabel?: string;
@@ -255,6 +256,7 @@ const publicCardImagePayloadSchema = z.object({
   roleLabel: z.string().optional(),
   roleColor: z.string().optional(),
   xnavTotal: z.number().finite(),
+  navAvailable: z.boolean().optional(),
   navLabel: z.enum(["F-NAV", "D-NAV", "G-NAV", "X-NAV"]).optional(),
   navLongLabel: z.string().min(1).optional(),
   capHitLabel: z.string(),
