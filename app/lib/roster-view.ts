@@ -12,6 +12,7 @@
 // reported last year's points after you simulated a year would be lying about
 // the only thing the page is for.
 
+import { navValueForDisplay } from "@/app/lib/valuation-display";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 
 /** One skater's simulated season, as returned by /api/simulate. */
@@ -86,7 +87,7 @@ export function buildRosterRows(
   const rows = roster
     .filter(p => p.position !== "Pick")
     .map(asset => {
-      const nav = navMap?.[asset.id]?.total ?? null;
+      const nav = navValueForDisplay(navMap?.[asset.id]);
       const sim = projected?.get(asset.id);
       if (!sim) return baselineRow(asset, nav);
 

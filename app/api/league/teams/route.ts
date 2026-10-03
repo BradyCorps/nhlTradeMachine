@@ -13,6 +13,8 @@ import { regulationWinsFrom } from "@/app/lib/nhl-standings-fields";
 import { getLiveCapCeiling } from "@/app/lib/live-cap-settings";
 import { buildLeagueNavMap } from "@/app/lib/league-nav";
 import { buildLeagueProvenance } from "@/app/lib/data-context";
+import { getCachedRoster } from "@/app/lib/cached-roster";
+import { applyTeamCapDeltas } from "@/app/lib/cap-delta";
 
 export const dynamic = "force-dynamic";
 
@@ -232,7 +234,8 @@ const TEAMS_STALE_TTL = 24 * 60 * 60;       // serve stale + refresh in backgrou
 
 async function buildTeamsPayload() {
   const liveCapCeiling = await getLiveCapCeiling();
-  const LIVE_TEAMS = await loadTeams(liveCapCeiling);
+  const [baseTeams, roster] = await Promise.all([loadTeams(liveCapCeiling), getCachedRoster()]);
+  const LIVE_TEAMS = applyTeamCapDeltas(baseTeams, roster.value.publishedTradeCapMoves);
   const picks = await buildDraftPickInventory(LIVE_TEAMS);
 
   const teams = LIVE_TEAMS.map((t: any) => ({

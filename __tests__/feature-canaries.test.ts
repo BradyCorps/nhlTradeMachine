@@ -154,7 +154,8 @@ describe("Canary — league route features (source-level)", () => {
       it("injects team-assigned DB players missing from the live roster feed", () => {
         expect(src).toContain("Inject DB roster rows");
         expect(src).toContain("}).from(playersTable);");
-        expect(src).toContain("slugify(x.name) === dbSlug");
+        expect(src).toContain("findRosterIdentity(rosterMap, d)");
+        expect(src).toContain("samePlayerIdentity(x, liveIdentity ?? d)");
       });
 
       it("reads contracts only from the players table (no live scrape at read time)", () => {
@@ -235,7 +236,7 @@ describe("Canary — league route features (source-level)", () => {
       it("applies published trade overlays after canonical roster assembly", () => {
         expect(src).toContain("listPublishedTrades");
         expect(src).toContain("applyPublishedTradeOverlay");
-        expect(src).toContain("!trade.rosterMutating");
+        expect(src).toContain("@/app/lib/published-roster-ownership");
         expect(src).toContain("players = applyPublishedTradeOverlay(players, publishedTrades)");
       });
 
@@ -246,15 +247,10 @@ describe("Canary — league route features (source-level)", () => {
         expect(src).toContain("teams: finalTeams");
       });
 
-      it("skips overlay cap moves when the scrape already reconciled the player", () => {
-        expect(src).toContain("isAlreadyReconciled");
-        expect(src).toContain("player.teamId === destinationTeamId");
-        expect(src).toContain("if (isAlreadyReconciled(basePlayers, asset, pair.to.teamId)) continue");
-      });
-
-      it("skips roster and cap overlays for UI-only published trades", () => {
-        expect(src).toContain("!trade.rosterMutating");
-        expect(src).toContain("if (!trade.published || !trade.rosterMutating || trade.sides.length !== 2) continue");
+      it("delegates roster and cap eligibility to the shared ownership resolver", () => {
+        expect(src).toContain("@/app/lib/published-roster-ownership");
+        expect(src).toContain("buildPublishedTradeCapMoves(publishedTrades, players)");
+        expect(src).toContain("players = applyPublishedTradeOverlay(players, publishedTrades)");
       });
 
       it("does not use surname-only goalie stat fallbacks", () => {

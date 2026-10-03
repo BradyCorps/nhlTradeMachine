@@ -14,8 +14,11 @@ import { anchorFromTerm } from "@/app/lib/contract-term";
 const TEAM_OPTIONS = [...TEAMS_DB].sort((a, b) => a.name.localeCompare(b.name));
 
 interface ContractRow {
+  id?:           string;
   name:          string;
   team:          string | null;
+  storedTeam?:   string | null;
+  ownershipTradeId?: string | null;
   position:      string | null;
   finalYears:    number;
   finalCap:      number | null;
@@ -86,11 +89,12 @@ function FaBadge({ status, year }: { status: string | null; year: number | null 
 }
 
 interface ContractEdit {
+  id?: string;
   name: string;
   yearsRemaining: number | null;
   capHit: number | null;
   position: string | null;
-  teamId: string | null;
+  teamId?: string | null;
   expiryStatus: string | null;       // "UFA" | "RFA" | null (SIGNED)
   expiryYear: number | null;
   extensionCapHit: number | null;
@@ -104,16 +108,18 @@ const FA_OPTIONS = ["SIGNED", "UFA", "RFA"] as const;
 function EditModal({ row, onSave, onClear, onClose }: {
   row:     ContractRow;
   onSave:  (edit: ContractEdit) => Promise<void>;
-  onClear: (name: string) => Promise<void>;
+  onClear: (name: string, id?: string) => Promise<void>;
   onClose: () => void;
 }) {
   const [years, setYears] = useState(String(row.adminYears ?? row.finalYears ?? ""));
   const [cap,   setCap]   = useState(String(row.adminCap   ?? row.finalCap   ?? ""));
   const [position, setPosition] = useState(POSITION_OPTIONS.includes(row.position as any) ? String(row.position) : "");
-  // Team: default to the row's current club if it maps to a real team id
-  // (row.team may arrive as a slug/abbrev in mixed case).
-  const initTeam = row.team ? (TEAM_OPTIONS.find(t => t.id === row.team!.toUpperCase())?.id ?? "") : "";
+  // Edit stored contract ownership explicitly; an unrelated save must not
+  // copy the published-trade overlay back into the source row.
+  const storedTeam = row.storedTeam === undefined ? row.team : row.storedTeam;
+  const initTeam = storedTeam ? (TEAM_OPTIONS.find(t => t.id === storedTeam.toUpperCase())?.id ?? "") : "";
   const [teamId, setTeamId] = useState(initTeam);
+  const [teamTouched, setTeamTouched] = useState(false);
   const initFa = (row.expiryStatus ?? "").toUpperCase();
   const [fa, setFa] = useState<string>(initFa === "UFA" || initFa === "RFA" ? initFa : "SIGNED");
   // A stored 0 is not a year — it is what the endpoint used to write whenever
@@ -149,7 +155,7 @@ function EditModal({ row, onSave, onClear, onClose }: {
     setSaving(true);
     try {
       if (clear) {
-        await onClear(row.name);
+        await onClear(row.name, row.id);
       } else {
         const y = parseFloat(years);
         const c = parseFloat(cap);
@@ -159,11 +165,12 @@ function EditModal({ row, onSave, onClear, onClose }: {
         const expiryStatus = fa === "UFA" || fa === "RFA" ? fa : null;
         const hadExtension = row.extensionCapHit != null && row.extensionCapHit > 0;
         await onSave({
+          id: row.id,
           name: row.name,
           yearsRemaining: isNaN(y) ? null : y,
           capHit: isNaN(c) ? null : c,
           position: position || null,
-          teamId: teamId || null,
+          ...(teamTouched ? { teamId: teamId || null } : {}),
           expiryStatus,
           // Sent whatever the status is. The anchor is a fact about the
           // contract, not a property of being a free agent — it was gated on
@@ -260,16 +267,21 @@ function EditModal({ row, onSave, onClear, onClose }: {
         <div style={{ marginBottom: 20 }}>
           <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
             letterSpacing: "0.1em", marginBottom: 5 }}>
-            Team {!initTeam && <span style={{ color: "var(--ledger-red)" }}>· unassigned</span>}
+            Stored contract team {!initTeam && <span style={{ color: "var(--ledger-red)" }}>· unassigned</span>}
           </label>
           <select
             value={teamId}
-            onChange={e => setTeamId(e.target.value)}
+            aria-label="Stored contract team"
+            onChange={e => { setTeamId(e.target.value); setTeamTouched(true); }}
             style={{ ...field, width: "100%", padding: "6px 10px", fontSize: 13 }}
           >
             <option value="">{initTeam ? "Keep current team" : "No team (free agent / unassigned)"}</option>
             {TEAM_OPTIONS.map(t => <option key={t.id} value={t.id}>{t.name} ({t.id})</option>)}
           </select>
+          {row.ownershipTradeId && <p style={{ fontSize: 11, marginTop: 8 }}>
+            Effective current team: {row.team}. Published roster transaction {row.ownershipTradeId} controls ownership;
+            the stored assignment remains {row.storedTeam ?? "unassigned"}. No duplicate team edit is needed.
+          </p>}
         </div>
 
         {/* Extension — signed next contract that kicks in after current deal */}
@@ -587,12 +599,12 @@ export default function AdminContractsPage() {
     }
   };
 
-  const handleClear = async (name: string) => {
+  const handleClear = async (name: string, id?: string) => {
     try {
       const res = await fetch("/api/admin/contracts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, clear: true }),
+        body: JSON.stringify({ id, name, clear: true }),
       });
       await readAdminResponse(res, "Clear failed");
       toast(`Cleared admin override for ${name}`, "success");
@@ -609,7 +621,7 @@ export default function AdminContractsPage() {
       const res = await fetch("/api/admin/contracts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: row.name, retired }),
+        body: JSON.stringify({ id: row.id, name: row.name, retired }),
       });
       await readAdminResponse(res, retired ? "Retire failed" : "Un-retire failed");
       toast(retired ? `Retired ${row.name}` : `Restored ${row.name}`, "success");
@@ -681,7 +693,7 @@ export default function AdminContractsPage() {
     let list = contracts;
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter(r => r.name.toLowerCase().includes(q) || (r.team ?? "").includes(q));
+      list = list.filter(r => r.name.toLowerCase().includes(q) || (r.team ?? "").toLowerCase().includes(q));
     }
     if (filter === "flagged") list = list.filter(r => (r.delta ?? 0) >= 1);
     if (filter === "editor")  list = list.filter(r => r.dbSource === "editor");
@@ -848,7 +860,7 @@ export default function AdminContractsPage() {
         const rowBg      = hasAdmin ? "rgba(26,92,46,0.06)" : hasDelta ? "rgba(148,105,20,0.07)" : "transparent";
 
         return (
-          <div key={row.name}
+          <div key={row.id ?? row.name}
             style={{ display: "grid",
               gridTemplateColumns: "200px 60px 60px 70px 70px 70px 70px 70px 80px 128px",
               gap: 8, padding: "7px 24px", borderBottom: "1px solid var(--ledger-rule-light)",
@@ -870,6 +882,9 @@ export default function AdminContractsPage() {
             <div style={{ textAlign: "center", color: "var(--ledger-ink-faint)" }}>{row.position ?? "—"}</div>
             <div style={{ textAlign: "center", color: "var(--ledger-ink-faint)", fontSize: 10 }}>
               {row.team ? row.team.replace(/_/g, " ").slice(0, 6).toUpperCase() : "—"}
+              {row.storedTeam !== undefined && row.storedTeam !== row.team && <div style={{ fontSize: 10 }}>
+                Stored: {row.storedTeam ?? "unassigned"} · published trade
+              </div>}
             </div>
 
             <div style={{ textAlign: "right", fontWeight: 900,

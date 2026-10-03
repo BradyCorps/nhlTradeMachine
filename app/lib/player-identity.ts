@@ -29,6 +29,35 @@ export const canonicalPlayerKey = (player: { id?: unknown; name?: unknown }): st
   return name ? `name:${name}` : "";
 };
 
+const identityPosition = (position?: string): string => {
+  const value = position?.toUpperCase();
+  return value && ["C", "W", "L", "R", "LW", "RW"].includes(value) ? "F" : value ?? "";
+};
+
+/** NHL ids take precedence; legacy name ids require compatible positions. */
+export function samePlayerIdentity(
+  a: { id?: unknown; name?: unknown; position?: string },
+  b: { id?: unknown; name?: unknown; position?: string },
+): boolean {
+  const aid = String(a.id ?? ""), bid = String(b.id ?? "");
+  if (aid && aid === bid) return true;
+  if (/^\d+$/.test(aid) && /^\d+$/.test(bid)) return false;
+  const ap = identityPosition(a.position), bp = identityPosition(b.position);
+  if (ap && bp && ap !== bp && ap !== "UNKNOWN" && bp !== "UNKNOWN") return false;
+  return typeof a.name === "string" && typeof b.name === "string"
+    && canonicalNameSlug(a.name) !== "" && nicknameMergeKey(a.name) === nicknameMergeKey(b.name);
+}
+
+export function findRosterIdentity(
+  rosterMap: Map<string, any[]>, player: { id?: unknown; name?: unknown; position?: string },
+): any | undefined {
+  const all = [...rosterMap.values()].flat();
+  const exact = all.find(p => player.id != null && String(p.id) === String(player.id));
+  if (exact) return exact;
+  const matches = all.filter(p => samePlayerIdentity(p, player));
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
 export const safeNhlRosterPlayer = (raw: any): {
   id: string;
   name: string;
@@ -56,17 +85,11 @@ export const safeNhlRosterPlayer = (raw: any): {
 export function removePlayerFromOtherRosters(
   rosterMap: Map<string, any[]>,
   targetTeamId: string,
-  player: { id?: unknown; name?: unknown },
+  player: { id?: unknown; name?: unknown; position?: string },
 ): void {
-  const id = player.id == null ? "" : String(player.id);
-  const slug = typeof player.name === "string" ? canonicalNameSlug(player.name) : "";
   for (const [teamId, list] of rosterMap.entries()) {
     if (teamId === targetTeamId) continue;
-    rosterMap.set(teamId, list.filter(existing => {
-      const existingId = existing?.id == null ? "" : String(existing.id);
-      const existingSlug = typeof existing?.name === "string" ? canonicalNameSlug(existing.name) : "";
-      return !(id && existingId === id) && !(slug && existingSlug === slug);
-    }));
+    rosterMap.set(teamId, list.filter(existing => !samePlayerIdentity(existing, player)));
   }
 }
 
@@ -187,7 +210,7 @@ export function dedupeSameTeamNicknames<T extends { name?: unknown; teamId?: str
     const team = player.teamId ?? "";
     // Picks and teamless/nameless rows never merge.
     if (!name || !team || player.position === "Pick") { passthrough.push(player); continue; }
-    const key = `${team}::${nicknameMergeKey(name)}`;
+    const key = `${team}::${identityPosition(player.position)}::${nicknameMergeKey(name)}`;
     const current = best.get(key);
     if (!current || preferRecord(player, current)) best.set(key, player);
   }

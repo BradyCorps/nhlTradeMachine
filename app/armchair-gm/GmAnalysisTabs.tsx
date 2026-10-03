@@ -1,4 +1,5 @@
 "use client";
+import { navLabelForDisplay, navValueForDisplay } from "@/app/lib/valuation-display";
 import { MobileDetail } from "@/app/components/MobileDetail";
 // GM analysis tab deck: lineups, Team DNA, comparison, trade breakdown, sim.
 import React, { useState, useMemo, useEffect, useRef, Suspense, lazy } from "react";
@@ -633,6 +634,7 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
           <tbody>
             {allAssets.map((a) => {
               const xnav = navMap[a.id] ?? { total: 0, off: 0, def: 0, age: 0, cap: 0, upside: 0 };
+              const priced = navValueForDisplay(navMap[a.id]) !== null;
               const isOut = a.side === "OUT";
               const ptsPace = a.ptsPace ?? 0;
               const xgPace = a.xGPace ?? 0;
@@ -645,7 +647,7 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
               // the actual adjustment rows now, and the tooltip names them.
               const adjustments = navStagesForDisplay(xnav.stages, xnav.total).filter(st => st.kind === "adjustment");
               const floorAdj = adjustments.reduce((sum, st) => sum + st.value, 0);
-              const adjTitle = adjustments.length > 0
+              const adjTitle = !priced ? "Model inputs unavailable" : adjustments.length > 0
                 ? adjustments.map(st => `${st.label} ${st.value >= 0 ? "+" : ""}${st.value}`).join(" · ")
                 : "No model adjustments applied";
               return (
@@ -673,14 +675,14 @@ function BreakdownTable({ blocks, navMap }: { blocks: [Asset[], Asset[]]; navMap
                   </td>
                   <td className="px-3 py-2 text-zinc-500">{a.position === "Pick" ? "—" : `${a.yearsRemaining}yr`}</td>
                   <td className={`px-3 py-2 font-black text-[12px] ${xnav.total > 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                    {fmt(xnav.total, 1)}
+                    {priced ? fmt(xnav.total, 1) : navLabelForDisplay(navMap[a.id])}
                   </td>
-                  <td className="px-3 py-2 text-zinc-500">{xnav.off.toFixed(0)}</td>
-                  <td className="px-3 py-2 text-zinc-500">{xnav.def.toFixed(0)}</td>
+                  <td className="px-3 py-2 text-zinc-500">{priced ? xnav.off.toFixed(0) : "Unavailable"}</td>
+                  <td className="px-3 py-2 text-zinc-500">{priced ? xnav.def.toFixed(0) : "Unavailable"}</td>
                   <td className={`px-3 py-2 ${xnav.age > 0 ? "text-violet-400" : "text-amber-500"}`}>
-                    {fmt(xnav.age, 0)}
+                    {priced ? fmt(xnav.age, 0) : "Unavailable"}
                   </td>
-                  <td className="px-3 py-2 text-rose-500">{xnav.cap.toFixed(0)}</td>
+                  <td className="px-3 py-2 text-rose-500">{priced ? xnav.cap.toFixed(0) : "Unavailable"}</td>
                   <td className="px-3 py-2 text-amber-500">
                     {Math.abs(floorAdj) >= 1 ? fmt(floorAdj, 0) : "—"}{" "}
                     <HelpPopover label={`${a.name} model adjustments`} definition={adjTitle}>?</HelpPopover>

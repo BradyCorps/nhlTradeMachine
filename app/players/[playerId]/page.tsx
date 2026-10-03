@@ -5,6 +5,7 @@
 // bundle. The playerId segment is the NHL player id, matching the NHL
 // API, so external links can be constructed from any NHL data source.
 
+import { navValueForDisplay, navLabelForDisplay, marketValueLabel } from "@/app/lib/valuation-display";
 import { ObservedSeasonSelector } from "@/app/components/ObservedSeasonSelector";
 import { parseObservedSelection, observedLabel, observedQuery, missingObservedStats } from "@/app/lib/observed-season";
 import { readObservedPlayers } from "@/app/lib/observed-stats.server";
@@ -257,7 +258,7 @@ export default async function PlayerPage({ params, searchParams }: {
             </div>
           </div>
           <div className="text-right shrink-0 ml-auto sm:ml-0">
-            <div className="text-[32px] font-black font-mono leading-none">{xnav.total}</div>
+            <div className="text-[32px] font-black font-mono leading-none">{navLabelForDisplay(xnav)}</div>
             <MetricTip term={navLabel} className="text-[9px] font-black font-mono uppercase tracking-[0.18em]" />
           </div>
         </div>
@@ -330,7 +331,7 @@ export default async function PlayerPage({ params, searchParams }: {
         )}
 
         {/* The player, and what his contract does to him */}
-        {split.known && (
+        {split.known && navValueForDisplay(xnav) !== null && (
           <div className="border mb-3 grid grid-cols-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
             <div className="px-3 py-2 border-r" style={{ borderColor: rule }}>
               <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>On the ice</div>
@@ -346,18 +347,18 @@ export default async function PlayerPage({ params, searchParams }: {
               <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>
                 <HelpPopover label="Trade-value split" definition={navSplitNote(split)}>Trade value</HelpPopover>
               </div>
-              <div className="text-[17px] font-black font-mono" style={{ color: ink }}>{Math.round(xnav.total)}</div>
+              <div className="text-[17px] font-black font-mono" style={{ color: ink }}>{navLabelForDisplay(xnav)}</div>
             </div>
           </div>
         )}
 
         {/* NAV components — horizontal diverging bar chart */}
         <div id="player-value" className="border mb-3 px-3 py-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
-          <NavTrajectoryChart
+          {navValueForDisplay(xnav) === null ? <p>Not priced — historical model inputs unavailable.</p> : <NavTrajectoryChart
             stages={navComponents.map(c => ({ label: c.label, value: c.val, desc: c.desc }))}
             total={xnav.total}
             playerName={player.name}
-          />
+          />}
         </div>
 
         {/* Contract + market */}
@@ -374,12 +375,10 @@ export default async function PlayerPage({ params, searchParams }: {
                 : <>${player.capHit.toFixed(1)}M × {player.yearsRemaining}yr</>}
             </div>
           </div>
-          {xnav.fmvAav != null && (
-            <div>
+          <div>
               <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>Market AAV</div>
-              <div className="text-[13px] font-black font-mono">${xnav.fmvAav.toFixed(1)}M</div>
-            </div>
-          )}
+              <div className="text-[13px] font-black font-mono">{marketValueLabel(xnav.fmvAav)}</div>
+          </div>
           {surplus != null && (
             <div className="text-right">
               <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>

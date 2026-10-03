@@ -9,7 +9,7 @@ import { seedPlayersTable } from "@/app/lib/league-seed";
 import { resolveRosterTier } from "@/app/lib/xnav-engine";
 import { calcDevelopmentProfile } from "@/app/lib/development-profile";
 import {
-  canonicalNameSlug,
+  findRosterIdentity, samePlayerIdentity, canonicalNameSlug,
   dedupePlayersByAuthority,
   dedupeSameTeamNicknames,
   removePlayerFromOtherRosters,
@@ -18,6 +18,8 @@ import {
 import { latestEdgeSignalMap } from "@/app/lib/nhl-feed-capture";
 import { latestGoalieBoardsMap, latestGoalieEdgeDetailMap } from "@/app/lib/goalie-edge";
 import { FA_KNOWN_FACTS, seedFreeAgentStatus } from "@/app/lib/free-agent-seed";
+import { applyPublishedTradeOverlay, buildPublishedTradeCapMoves } from "@/app/lib/published-roster-ownership";
+export { applyPublishedTradeOverlay, buildPublishedTradeCapMoves } from "@/app/lib/published-roster-ownership";
 import { listPublishedTrades, type TradeRecord } from "@/app/lib/trades";
 import {
   buildDevelopmentInputFromNhlTimeline,
@@ -25,7 +27,7 @@ import {
   fetchCachedNhlSkaterTimelineRowsForPlayers,
 } from "@/app/lib/development-sources";
 import { fetchProspectEnrichmentMap } from "@/app/lib/prospect-enrichment";
-import { applyTeamCapDeltas, type CapDeltaAsset, type CapDeltaMoves, type TeamCapDeltaMap } from "@/app/lib/cap-delta";
+import { applyTeamCapDeltas, type TeamCapDeltaMap } from "@/app/lib/cap-delta";
 import { baselineForNhlPlayerId, type PlayerBaselineMap } from "@/app/lib/player-baselines";
 import { secondaryPositionFor } from "@/app/data/secondary-positions";
 import { teamWindow } from "@/app/lib/team-window";
@@ -181,145 +183,6 @@ const developmentInternationalScore = (prospectPtsPace: number | null | undefine
     ? Math.max(20, Math.min(100, prospectPtsPace * 1.4))
     : undefined;
 
-const assetSnapshotName = (snapshot: Record<string, unknown>): string =>
-  typeof snapshot.name === "string" ? snapshot.name : "";
-
-const movedPlayerKeys = (asset: TradeRecord["sides"][number]["assetsGiven"][number]): string[] => {
-  const keys = [
-    asset.ref.id ? `id:${asset.ref.id}` : "",
-    asset.ref.nameSlug ? `slug:${asset.ref.nameSlug}` : "",
-  ];
-  const snapshotSlug = canonicalNameSlug(assetSnapshotName(asset.inputSnapshot));
-  if (snapshotSlug) keys.push(`slug:${snapshotSlug}`);
-  return keys.filter(Boolean);
-};
-
-export function applyPublishedTradeOverlay<T extends {
-  id?: unknown;
-  name?: unknown;
-  teamId?: string;
-  position?: string;
-  retainedPct?: number;
-  tradeBlockStatus?: string | null;
-  tradeBlockNote?: string | null;
-}>(
-  players: T[],
-  publishedTrades: TradeRecord[],
-): T[] {
-  if (publishedTrades.length === 0) return players;
-
-  const destinations = new Map<string, { teamId: string; retainedPct: number }>();
-
-  for (const trade of publishedTrades) {
-    if (!trade.published || !trade.rosterMutating || trade.sides.length !== 2) continue;
-    const [sideA, sideB] = trade.sides;
-    const pairs = [
-      { from: sideA, toTeamId: sideB.teamId },
-      { from: sideB, toTeamId: sideA.teamId },
-    ];
-
-    for (const pair of pairs) {
-      for (const asset of pair.from.assetsGiven) {
-        if (asset.kind !== "player") continue;
-        for (const key of movedPlayerKeys(asset)) {
-          destinations.set(key, {
-            teamId: pair.toTeamId,
-            retainedPct: asset.retainedPct ?? 0,
-          });
-        }
-      }
-    }
-  }
-
-  if (destinations.size === 0) return players;
-
-  return players.map((player) => {
-    const idKey = player.id == null ? "" : `id:${String(player.id)}`;
-    const nameSlug = typeof player.name === "string" ? canonicalNameSlug(player.name) : "";
-    const move = (idKey ? destinations.get(idKey) : undefined)
-      ?? (nameSlug ? destinations.get(`slug:${nameSlug}`) : undefined);
-
-    if (!move || player.teamId === move.teamId) return player;
-
-    return {
-      ...player,
-      teamId: move.teamId,
-      retainedPct: player.position === "Pick" ? player.retainedPct : move.retainedPct,
-      tradeBlockStatus: null,
-      tradeBlockNote: null,
-    };
-  });
-}
-
-const playerMatchesTradeAsset = (
-  player: { id?: unknown; name?: unknown },
-  asset: TradeRecord["sides"][number]["assetsGiven"][number],
-): boolean => {
-  const keys = new Set(movedPlayerKeys(asset));
-  const idKey = player.id == null ? "" : `id:${String(player.id)}`;
-  const nameSlug = typeof player.name === "string" ? canonicalNameSlug(player.name) : "";
-  return Boolean((idKey && keys.has(idKey)) || (nameSlug && keys.has(`slug:${nameSlug}`)));
-};
-
-const isAlreadyReconciled = (
-  basePlayers: Array<{ id?: unknown; name?: unknown; teamId?: string }> | undefined,
-  asset: TradeRecord["sides"][number]["assetsGiven"][number],
-  destinationTeamId: string,
-): boolean =>
-  Boolean(basePlayers?.some((player) =>
-    player.teamId === destinationTeamId && playerMatchesTradeAsset(player, asset)
-  ));
-
-const assetSnapshotCapHit = (snapshot: Record<string, unknown>): number => {
-  const capHit = snapshot.capHit;
-  return typeof capHit === "number" && Number.isFinite(capHit) ? capHit : 0;
-};
-
-const addCapMove = (
-  moves: Record<string, CapDeltaMoves>,
-  teamId: string,
-  side: "incoming" | "outgoing",
-  asset: CapDeltaAsset,
-) => {
-  const current = moves[teamId] ?? {};
-  moves[teamId] = {
-    ...current,
-    [side]: [...(current[side] ?? []), asset],
-  };
-};
-
-export function buildPublishedTradeCapMoves(
-  publishedTrades: TradeRecord[],
-  basePlayers?: Array<{ id?: unknown; name?: unknown; teamId?: string }>,
-): Record<string, CapDeltaMoves> {
-  const moves: Record<string, CapDeltaMoves> = {};
-
-  for (const trade of publishedTrades) {
-    if (!trade.published || !trade.rosterMutating || trade.sides.length !== 2) continue;
-    const [sideA, sideB] = trade.sides;
-    const pairs = [
-      { from: sideA, to: sideB },
-      { from: sideB, to: sideA },
-    ];
-
-    for (const pair of pairs) {
-      for (const asset of pair.from.assetsGiven) {
-        if (asset.kind !== "player") continue;
-        if (isAlreadyReconciled(basePlayers, asset, pair.to.teamId)) continue;
-        const capAsset = {
-          capHit: assetSnapshotCapHit(asset.inputSnapshot),
-          retainedPct: asset.retainedPct ?? 0,
-        };
-        addCapMove(moves, pair.from.teamId, "outgoing", capAsset);
-        addCapMove(moves, pair.to.teamId, "incoming", capAsset);
-      }
-    }
-  }
-
-  return moves;
-}
-
-
 // ── EV QoC Index (0-100): quantified even-strength deployment difficulty ──
 // Replaces the old "qocRank", which was MoneyPuck's raw iceTimeRank SUM — a
 // number that scaled with games played and measured nothing. Components:
@@ -342,15 +205,9 @@ export function calcQocIndex(
   return Math.round(100 * (0.65 * rankScore + 0.35 * dzScore));
 }
 
-function removeRetiredPlayersFromRosters(rosterMap: Map<string, any[]>, retiredPlayers: { id?: unknown; name?: unknown }[]): void {
-  const retiredIds = new Set(retiredPlayers.map(p => p.id == null ? "" : String(p.id)).filter(Boolean));
-  const retiredSlugs = new Set(retiredPlayers.map(p => typeof p.name === "string" ? canonicalNameSlug(p.name) : "").filter(Boolean));
+function removeRetiredPlayersFromRosters(rosterMap: Map<string, any[]>, retiredPlayers: { id?: unknown; name?: unknown; position?: string }[]): void {
   for (const [teamId, list] of rosterMap.entries()) {
-    rosterMap.set(teamId, list.filter(p => {
-      const id = p?.id == null ? "" : String(p.id);
-      const slug = typeof p?.name === "string" ? canonicalNameSlug(p.name) : "";
-      return !(id && retiredIds.has(id)) && !(slug && retiredSlugs.has(slug));
-    }));
+    rosterMap.set(teamId, list.filter(p => !retiredPlayers.some(retired => samePlayerIdentity(p, retired))));
   }
 }
 
@@ -1083,27 +940,31 @@ export async function assembleCanonicalRoster(options: {
       if (!isValidTeamId(d.teamId)) continue;
       const dbSlug = canonicalNameSlug(d.name);
       dbTeamBySlug.set(dbSlug, d.teamId);
-      removePlayerFromOtherRosters(rosterMap, d.teamId, d);
+      const liveIdentity = findRosterIdentity(rosterMap, d);
+      removePlayerFromOtherRosters(rosterMap, d.teamId, liveIdentity ?? d);
       const list = rosterMap.get(d.teamId) ?? [];
-      const existing = list.find((x: any) => String(x.id) === String(d.id) || slugify(x.name) === dbSlug);
+      const existing = list.find((x: any) => samePlayerIdentity(x, liveIdentity ?? d));
       if (existing) {
+        existing.contractName = d.name;
         existing.draftYear = existing.draftYear ?? d.draftYear;
         existing.draftOverall = existing.draftOverall ?? d.draftOverall;
         existing.prospectPtsPace = existing.prospectPtsPace ?? d.prospectPtsPace;
       } else {
         list.push({
-          id:              d.id,
-          name:            d.name,
-          position:        normalisePos(d.position),
+          ...(liveIdentity ?? {}),
+          contractName:    d.name,
+          id:              liveIdentity?.id ?? d.id,
+          name:            liveIdentity?.name ?? d.name,
+          position:        liveIdentity?.position ?? normalisePos(d.position),
           age:             resolvePlayerAge({
                              birthDate: d.birthDate, storedAge: d.age, draftYear: d.draftYear,
                              seasonStartYear: SEASON_START_YEAR,
                            }) ?? 18,
-          headshot:        null,
+          headshot:        liveIdentity?.headshot ?? null,
           draftYear:       d.draftYear,
           draftOverall:    d.draftOverall,
           prospectPtsPace: d.prospectPtsPace,
-          injectedFromDb:   true,
+          injectedFromDb:   !liveIdentity,
         });
       }
       rosterMap.set(d.teamId, list);
@@ -1226,9 +1087,10 @@ export async function assembleCanonicalRoster(options: {
         if (nhlEntry?.plusMinus != null) stats = { ...stats, plusMinus: nhlEntry.plusMinus };
       }
 
-      const normalName  = p.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      const posKey      = `${p.name}__${p.position}`;
-      const teamKey     = `${p.name}__${teamId.toLowerCase()}`;
+      const contractName = p.contractName ?? p.name;
+      const normalName  = contractName.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const posKey      = `${contractName}__${p.position}`;
+      const teamKey     = `${contractName}__${teamId.toLowerCase()}`;
       const normPosKey  = `${normalName}__${p.position}`;
       const normTeamKey = `${normalName}__${teamId.toLowerCase()}`;
       const contractMatch =
@@ -1236,7 +1098,7 @@ export async function assembleCanonicalRoster(options: {
         CONTRACTS[teamKey]    ? { row: CONTRACTS[teamKey],    source: "team" } :
         CONTRACTS[normPosKey]  ? { row: CONTRACTS[normPosKey],  source: "position" } :
         CONTRACTS[normTeamKey] ? { row: CONTRACTS[normTeamKey], source: "team" } :
-        CONTRACTS[p.name]     ? { row: CONTRACTS[p.name],     source: "name" } :
+        CONTRACTS[contractName] ? { row: CONTRACTS[contractName],     source: "name" } :
         CONTRACTS[normalName] ? { row: CONTRACTS[normalName], source: "name" } :
         null;
       const fin = contractMatch?.row ?? null;
@@ -1510,8 +1372,8 @@ export async function assembleCanonicalRoster(options: {
         edgeOzPercentile: edgeSignal?.ozPercentile ?? null,
         edgeSpeedMaxMph: edgeSignal?.speedMaxMph ?? null,
         edgeBurstsOver20: edgeSignal?.burstsOver20 ?? null,
-        tradeBlockStatus: (blockMap.get(`${p.name}__${p.position}`) ?? blockMap.get(p.name))?.status ?? null,
-        tradeBlockNote:   (blockMap.get(`${p.name}__${p.position}`) ?? blockMap.get(p.name))?.note   ?? null,
+        tradeBlockStatus: (blockMap.get(`${contractName}__${p.position}`) ?? blockMap.get(p.name))?.status ?? null,
+        tradeBlockNote:   (blockMap.get(`${contractName}__${p.position}`) ?? blockMap.get(p.name))?.note   ?? null,
         expiryStatus:     rawExpiryStatus,
         expiryYear:       rawExpiryYear,
         contractStatus,

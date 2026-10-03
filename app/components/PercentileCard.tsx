@@ -3,6 +3,7 @@
 // PA6/PA7: newspaper plate, free PNG export, branded, and carrying the
 // proprietary read — X-NAV breakdown, gravity field, modern role, and
 // EDGE tracking — alongside percentiles vs the positional field.
+import { navValueForDisplay, navLabelForDisplay, marketValueLabel } from "@/app/lib/valuation-display";
 import React, { useMemo, useRef, useCallback, useState } from "react";
 import { ChartData } from "@/app/components/ChartData";
 import CardStrandCompare from "@/app/components/CardStrandCompare";
@@ -226,7 +227,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
 
   const peerLabel = posGroup === "F" ? "all forwards" : posGroup === "D" ? "all defensemen" : "all goalies";
 
-  const fmv = xnav.fmvAav ?? 0;
+  const fmv = xnav.fmvAav;
   // Decided by the model's own walk-forward error, not a round $1M. See
   // `contract-verdict.ts` — the old threshold was smaller than the model is
   // wrong by, so a gap inside the noise printed as an OVERPAY.
@@ -286,7 +287,8 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
         navLongLabel,
         capHitLabel: `$${player.capHit.toFixed(1)}M`,
         yearsLabel: `${player.yearsRemaining} yr`,
-        fmvLabel: `$${fmv.toFixed(1)}M`,
+        fmvLabel: marketValueLabel(fmv),
+        navAvailable: navValueForDisplay(xnav) !== null,
         surplusLabel: `${surplusText(verdict)} · ${surplusWord}`,
         surplusColor: toneColor(surplusTone),
         gravity: publicGravity,
@@ -298,7 +300,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
           median: s.median,
           barColor: s.pct !== null ? percentileColor(s.pct) : null,
         })),
-        navCells: navCells.map(c => ({ label: c.label, val: c.val })),
+        navCells: (navValueForDisplay(xnav) === null ? [] : navCells).map(c => ({ label: c.label, val: c.val })),
         peerLabel,
         avgPercentile,
         strand: {
@@ -336,7 +338,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
     <div style={{ width: "100%", maxWidth: 620, margin: "0 auto" }}>
       <div ref={cardRef} className="pcard" role="group"
         style={{ background: "#ede4cc" }}
-        aria-label={`${player.name} value card — ${navLabel} ${xnav.total}${avgPercentile !== null ? `, ${percentileLabel(avgPercentile)} vs ${peerLabel}` : ""}`}>
+        aria-label={`${player.name} value card — ${navLabel} ${navLabelForDisplay(xnav)}${avgPercentile !== null ? `, ${percentileLabel(avgPercentile)} vs ${peerLabel}` : ""}`}>
       <style>{`
         .pcard { width: 100%;
           /* A host's overflow-wrap: anywhere (the mobile detail sheet) also
@@ -451,7 +453,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
           )}
         </div>
         <div style={{ textAlign: "right", flexShrink: 0, marginLeft: "auto" }}>
-          <div className="pcard-nav-total">{xnav.total}</div>
+          <div className="pcard-nav-total">{navLabelForDisplay(xnav)}</div>
           <div className="pcard-nav-label">{navLabel} · {navLongLabel}</div>
         </div>
       </div>
@@ -459,7 +461,7 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
       {/* Contract line — one compact plate (PA7) */}
       <div className="pcard-contract">
         <span><span className="lbl">Cap Hit</span><span className="num" style={{ color: INK }}>${player.capHit.toFixed(1)}M × {player.yearsRemaining}yr</span></span>
-        <span><span className="lbl"><MetricTip term="FMV">{MODEL_PRICE_LABEL}</MetricTip></span><span className="num" style={{ color: INK }}>${fmv.toFixed(1)}M</span></span>
+        <span><span className="lbl"><MetricTip term="FMV">{MODEL_PRICE_LABEL}</MetricTip></span><span className="num" style={{ color: INK }}>{marketValueLabel(fmv)}</span></span>
         <span><span className="lbl">Surplus</span><span className="num" style={{ color: toneColor(surplusTone) }} title={verdict.note}>
           {surplusText(verdict)} · {surplusWord}
         </span></span>
@@ -541,8 +543,9 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
 
         <div className="pcard-side">
           <div className="pcard-side-h">Value Breakdown</div>
+          {navValueForDisplay(xnav) === null && <p>Not priced — model inputs unavailable.</p>}
           <dl style={{ margin: 0 }}>
-            {navCells.map(c => (
+            {(navValueForDisplay(xnav) === null ? [] : navCells).map(c => (
               <div key={c.label} className="pcard-navrow">
                 <dt><MetricTip term={c.term}>{c.label}</MetricTip></dt>
                 <dd style={{ color: Math.round(c.val) >= 0 ? INK : BAD }}>

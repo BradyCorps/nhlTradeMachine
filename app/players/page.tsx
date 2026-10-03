@@ -1,4 +1,5 @@
 "use client";
+import { navLabelForDisplay } from "@/app/lib/valuation-display";
 import { ObservedSeasonSelector } from "@/app/components/ObservedSeasonSelector";
 import { DEFAULT_OBSERVED_SELECTION, parseObservedSelection, observedQuery, observedLabel, type ObservedSelection, type ObservedStats } from "@/app/lib/observed-season";
 import PlayerTimeline from "@/app/components/PlayerTimeline";
@@ -847,7 +848,7 @@ function PlayerRow({ player, team, rank, sortKey, actualPPG, section, allPlayers
 
         <div className="compact-player-intelligence">
           <p>Role: {role}</p>
-          <p><strong>{isG ? "G-NAV" : player.position === "D" ? "D-NAV" : "F-NAV"} {nav.total} · {band}</strong></p>
+          <p><strong>{isG ? "G-NAV" : player.position === "D" ? "D-NAV" : "F-NAV"} {navLabelForDisplay(nav)} · {band}</strong></p>
           <p>NAV trend: unavailable · NAV range: unavailable</p>
           <p>Contract: {unsigned ? (expiringRightsLabel(player) ? `Unsigned ${expiringRightsLabel(player)}` : "No signed contract recorded") : `$${player.capHit.toFixed(2)}M · ${player.yearsRemaining} ${player.yearsRemaining === 1 ? "year" : "years"} left`}</p>
           <p>Annual surplus: {unsigned ? "no signed deal to price" : contract.surplus != null ? `${contract.surplus >= 0 ? "+" : "−"}$${Math.abs(contract.surplus).toFixed(2)}M` : "unavailable"}</p>
