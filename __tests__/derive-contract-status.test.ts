@@ -127,3 +127,70 @@ describe("deriveContractStatus — recorded extensions", () => {
     });
   });
 });
+
+// ── Extension lifecycle ───────────────────────────────────────────────────────
+// Start timing comes from the expiry anchor and the application's season, not
+// from the UFA/RFA class. A SIGNED row (no class) with a good expiry year used
+// to be unable to activate, and an active extension used to regain its full
+// term every season.
+describe("deriveContractStatus — extension lifecycle (SIGNED/null status)", () => {
+  // Current $3.85M deal, final season 2026-27 (expiryYear 2027), six years at $12.5M after.
+  const signed = {
+    expiryStatus: null, expiryYear: 2027, yearsRemaining: 1,
+    extensionCapHit: 12.5, extensionYears: 6,
+  };
+  const at = (offseasonYear: number, extra: object = {}) =>
+    deriveContractStatus({ ...signed, offseasonYear, ...extra });
+
+  it("is pending in 2026-27 and the current deal stands", () => {
+    const r = at(2026);
+    expect(r.extension).toEqual({ state: "PENDING", aav: 12.5, term: 6 });
+    expect(r.extensionTiming).toMatchObject({ startSeason: "2027-28", endSeason: "2032-33", flags: [] });
+    expect(r.contractStatus).toBe("SIGNED");
+    expect(r.expiresThisOffseason).toBe(false);
+  });
+
+  it("activates in 2027-28 even though there is no RFA/UFA class", () => {
+    const r = at(2027);
+    expect(r.extension).toEqual({ state: "ACTIVE", aav: 12.5, term: 6 });
+    expect(r.contractStatus).toBe("SIGNED");
+    expect(r.expiresThisOffseason).toBe(false);
+  });
+
+  it("counts the remaining term down in later seasons", () => {
+    expect(at(2028).extension).toEqual({ state: "ACTIVE", aav: 12.5, term: 5 });
+    expect(at(2031).extension).toEqual({ state: "ACTIVE", aav: 12.5, term: 2 });
+  });
+
+  it("is in its final season with one year left, then expires", () => {
+    expect(at(2032).extension).toEqual({ state: "ACTIVE", aav: 12.5, term: 1 });
+    expect(at(2033).extension.state).toBe("EXPIRED");
+  });
+
+  it("a finished extension on a classed player reads as a pending free agent again", () => {
+    const r = at(2033, { expiryStatus: "UFA" });
+    expect(r.extension.state).toBe("EXPIRED");
+    expect(r.contractStatus).toBe("UFA");
+    expect(r.expiresThisOffseason).toBe(true);
+  });
+
+  it("an Evangelista-style $3M deal with a five-year $7.25M AAV extension", () => {
+    const e = { expiryStatus: null, expiryYear: 2027, yearsRemaining: 1, extensionCapHit: 7.25, extensionYears: 5 };
+    expect(deriveContractStatus({ ...e, offseasonYear: 2026 }).extension).toEqual({ state: "PENDING", aav: 7.25, term: 5 });
+    expect(deriveContractStatus({ ...e, offseasonYear: 2027 }).extension).toEqual({ state: "ACTIVE", aav: 7.25, term: 5 });
+    expect(deriveContractStatus({ ...e, offseasonYear: 2031 }).extensionTiming).toMatchObject({ remaining: 1, endSeason: "2031-32" });
+  });
+
+  it("flags missing or contradictory dates instead of guessing", () => {
+    const none = deriveContractStatus({ ...signed, expiryYear: null, offseasonYear: 2026 });
+    expect(none.extension.state).toBe("PENDING");
+    expect(none.extensionTiming?.flags).toContain("NO_ANCHOR");
+    const zero = deriveContractStatus({ ...signed, expiryYear: 0, offseasonYear: 2026 });
+    expect(zero.extensionTiming?.flags).toContain("NO_ANCHOR");
+    const conflict = deriveContractStatus({ ...signed, yearsRemaining: 4, offseasonYear: 2026 });
+    expect(conflict.extensionTiming?.flags).toContain("TERM_ANCHOR_MISMATCH");
+    expect(conflict.extensionTiming?.startSeason).toBe("2027-28");
+    const late = deriveContractStatus({ ...signed, offseasonYear: 2026, extensionSignedAt: "2027-08-01" });
+    expect(late.extensionTiming?.flags).toContain("SIGNED_AFTER_START");
+  });
+});

@@ -31,7 +31,8 @@ import { applyTeamCapDeltas, type TeamCapDeltaMap } from "@/app/lib/cap-delta";
 import { baselineForNhlPlayerId, type PlayerBaselineMap } from "@/app/lib/player-baselines";
 import { secondaryPositionFor } from "@/app/data/secondary-positions";
 import { teamWindow } from "@/app/lib/team-window";
-import { resolveRecordedExtension, type RecordedExtension } from "@/app/lib/extensions";
+import { type RecordedExtension } from "@/app/lib/extensions";
+import { resolveExtensionTiming, type ExtensionTiming } from "@/app/lib/extension-terms";
 import { deriveAge, resolvePlayerAge } from "@/app/lib/player-age";
 import { SEASON_START_YEAR } from "@/app/lib/contract-expiry";
 
@@ -70,11 +71,14 @@ export function deriveContractStatus(opts: {
   /** Admin-recorded extension. A signed extension is not a trip to the market. */
   extensionCapHit?: number | null;
   extensionYears?: number | null;
+  extensionSignedAt?: string | null;
 }): {
   contractStatus: "UFA" | "RFA" | "SIGNED";
   expiresThisOffseason: boolean;
   normExpiry: "UFA" | "RFA" | null;
   extension: RecordedExtension;
+  /** Derived start/end season, remaining term and data-quality flags. Absent with no extension. */
+  extensionTiming?: ExtensionTiming;
 } {
   const offseasonYear = opts.offseasonYear ?? Number(SEASON.label.slice(0, 4));
   const raw = typeof opts.expiryStatus === "string" ? opts.expiryStatus : null;
@@ -91,22 +95,41 @@ export function deriveContractStatus(opts: {
     (rawExpiryYear != null ? rawExpiryYear <= offseasonYear : prelim <= 1);
 
   // A recorded extension is a signed contract, so it settles the question the
-  // expiry flags were being used to answer. Whether it has STARTED depends on
-  // the deal it follows: if that one has run out, the extension is the current
-  // contract; if not, it is money owed in a later season and the current deal
-  // stands. Either way the player is signed and does not reach the market —
-  // which is the bug this fixes. `expiryStatus` is left untouched as the record
-  // of what he would have been.
-  const extension = resolveRecordedExtension({
-    extensionCapHit: opts.extensionCapHit,
-    extensionYears: opts.extensionYears,
-    currentDealExpired: currentDealExpires,
-  });
+  // expiry flags were being used to answer. Whether it has STARTED is a
+  // question about dates, not about free-agency class: it begins in the season
+  // that starts in `expiryYear`, whatever the status says. The old gate on
+  // UFA/RFA meant a SIGNED/null row with a perfectly good expiry year never
+  // activated. Only when there is no usable expiry year does the status-based
+  // read above stand in, and the timing says so. `expiryStatus` is left
+  // untouched as the record of what he would have been.
+  //
+  // Seasons are counted from the application's season (`offseasonYear`), never
+  // from whichever year of statistics is being viewed.
+  const extAav = opts.extensionCapHit;
+  let extension: RecordedExtension = { state: "NONE" };
+  let extensionTiming: ExtensionTiming | undefined;
+  if (extAav != null && Number.isFinite(extAav) && extAav > 0) {
+    const timing = resolveExtensionTiming({
+      term: opts.extensionYears,
+      expiryYear: rawExpiryYear,
+      offseasonYear,
+      yearsRemaining: opts.yearsRemaining,
+      fallbackExpired: currentDealExpires,
+      signedAt: opts.extensionSignedAt,
+    });
+    extensionTiming = timing;
+    // `term` on an ACTIVE extension is the seasons LEFT, so a second-year
+    // extension no longer regains its full term every season.
+    extension = timing.state === "EXPIRED"
+      ? { state: "EXPIRED", aav: extAav, term: timing.term }
+      : { state: timing.state, aav: extAav, term: timing.remaining };
+  }
 
-  const expiresThisOffseason = currentDealExpires && extension.state === "NONE";
+  // A finished extension no longer protects him from the market.
+  const expiresThisOffseason = currentDealExpires && (extension.state === "NONE" || extension.state === "EXPIRED");
   const contractStatus: "UFA" | "RFA" | "SIGNED" =
     expiresThisOffseason && normExpiry ? normExpiry : "SIGNED";
-  return { contractStatus, expiresThisOffseason, normExpiry, extension };
+  return { contractStatus, expiresThisOffseason, normExpiry, extension, extensionTiming };
 }
 
 const NHL_HEADERS = {
@@ -1170,6 +1193,7 @@ export async function assembleCanonicalRoster(options: {
         isELC: isLikelyELC,
         extensionCapHit: fin?.extensionCapHit,
         extensionYears: fin?.extensionYears,
+        extensionSignedAt: fin?.extensionSignedAt,
       });
       if (/ufa/i.test(String(rawExpiryStatus))) {
         _dbg.ufaMatch++;

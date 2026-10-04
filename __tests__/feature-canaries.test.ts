@@ -3997,8 +3997,11 @@ describe("Canary — an admin-recorded extension reaches Armchair GM", () => {
     // valuation engine and nothing else.
     expect(assembly).toContain("extensionCapHit: fin?.extensionCapHit");
     expect(assembly).toContain("extensionYears: fin?.extensionYears");
-    expect(assembly).toContain("resolveRecordedExtension");
-    expect(assembly).toContain("expiresThisOffseason = currentDealExpires && extension.state === \"NONE\"");
+    // Start timing is derived from the expiry anchor (extension-terms.ts), not
+    // gated on the UFA/RFA class.
+    expect(assembly).toContain("resolveExtensionTiming");
+    expect(assembly).toContain("extensionSignedAt: fin?.extensionSignedAt");
+    expect(assembly).toContain("expiresThisOffseason = currentDealExpires && (extension.state === \"NONE\" || extension.state === \"EXPIRED\")");
   });
 
   it("an active extension becomes the contract rather than a $0 expiry", () => {

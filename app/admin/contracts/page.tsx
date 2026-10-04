@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { adminErrorMessage, readAdminResponse } from "../admin-response";
 import { toast } from "@/app/lib/ledger-toast";
 import { TEAMS_DB } from "@/app/lib/db";
 import NeedsDataPanel from "@/app/admin/contracts/NeedsDataPanel";
 import PastePanel from "@/app/admin/contracts/PastePanel";
 import TermAuditPanel from "@/app/admin/contracts/TermAuditPanel";
+import ExtensionEditor, { type ExtensionSavePayload } from "@/app/admin/contracts/ExtensionEditor";
 import { SEASON_START_YEAR } from "@/app/lib/contract-expiry";
 import { anchorFromTerm } from "@/app/lib/contract-term";
 
@@ -35,6 +36,7 @@ interface ContractRow {
   expiryYear:    number | null;
   extensionCapHit: number | null;
   extensionYears:  number | null;
+  extensionSignedAt?: string | null;
   excludeFromRoster: boolean;
   dbSource:      string | null;
   needsData:     boolean;
@@ -97,17 +99,15 @@ interface ContractEdit {
   teamId?: string | null;
   expiryStatus: string | null;       // "UFA" | "RFA" | null (SIGNED)
   expiryYear: number | null;
-  extensionCapHit: number | null;
-  extensionYears: number | null;
-  clearExtension?: boolean;
   excludeFromRoster: boolean;
 }
 
 const FA_OPTIONS = ["SIGNED", "UFA", "RFA"] as const;
 
-function EditModal({ row, onSave, onClear, onClose }: {
+function EditModal({ row, onSave, onSaveExtension, onClear, onClose }: {
   row:     ContractRow;
   onSave:  (edit: ContractEdit) => Promise<void>;
+  onSaveExtension: (payload: ExtensionSavePayload) => Promise<void>;
   onClear: (name: string, id?: string) => Promise<void>;
   onClose: () => void;
 }) {
@@ -129,11 +129,16 @@ function EditModal({ row, onSave, onClear, onClose }: {
     row.expiryYear && row.expiryYear > 2000 ? String(row.expiryYear) : "",
   );
   const [faYearTouched, setFaYearTouched] = useState(false);
-  const [extCap, setExtCap] = useState(row.extensionCapHit ? String(row.extensionCapHit) : "");
-  const [extYrs, setExtYrs] = useState(row.extensionYears ? String(row.extensionYears) : "");
   const [exclude, setExclude] = useState(Boolean(row.excludeFromRoster));
   const [saving, setSaving] = useState(false);
-  const hasExt = extCap !== "" && parseFloat(extCap) > 0;
+  // Keyboard users land inside the dialog, and Escape closes it from anywhere.
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { dialogRef.current?.focus(); }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   // ── The expiry year follows the term you type ────────────────
   // A term is only true of one season and the row does not record which; the
@@ -160,10 +165,7 @@ function EditModal({ row, onSave, onClear, onClose }: {
         const y = parseFloat(years);
         const c = parseFloat(cap);
         const fy = parseInt(shownExpiryYear);
-        const ec = parseFloat(extCap);
-        const ey = parseInt(extYrs);
         const expiryStatus = fa === "UFA" || fa === "RFA" ? fa : null;
-        const hadExtension = row.extensionCapHit != null && row.extensionCapHit > 0;
         await onSave({
           id: row.id,
           name: row.name,
@@ -177,9 +179,8 @@ function EditModal({ row, onSave, onClear, onClose }: {
           // `expiryStatus` here, which is why every signed row went in without
           // one and the audit found a league of unanchored terms.
           expiryYear: isNaN(fy) ? null : fy,
-          extensionCapHit: hasExt ? (isNaN(ec) ? null : ec) : null,
-          extensionYears: hasExt ? (isNaN(ey) ? null : ey) : null,
-          clearExtension: hadExtension && !hasExt,
+          // No extension fields: correcting the current contract must never
+          // touch a signed extension. That has its own section and request.
           excludeFromRoster: exclude,
         });
       }
@@ -196,17 +197,35 @@ function EditModal({ row, onSave, onClear, onClose }: {
       position: "fixed", inset: 0, background: "rgba(28,20,10,0.6)", backdropFilter: "blur(3px)",
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
     }} onClick={onClose}>
-      <div className="admin-modal-card" style={{
+      <div className="admin-modal-card" role="dialog" aria-modal="true" aria-labelledby="contract-edit-title"
+        ref={dialogRef} tabIndex={-1}
+        style={{
+        outline: "none",
         background: "var(--ledger-card-light)", border: "1px solid var(--rule)", borderTop: "3px solid var(--ledger-ink)",
-        padding: "24px", minWidth: 340, maxWidth: 420,
+        padding: "24px", width: "min(560px, calc(100vw - 24px))", maxHeight: "92vh", overflowY: "auto", boxSizing: "border-box",
       }} onClick={e => e.stopPropagation()}>
-        <div style={{ fontSize: 14, fontWeight: 900, color: "var(--ledger-ink)", marginBottom: 16,
-          fontFamily: MONO, letterSpacing: "0.05em" }}>
-          {row.name}
-          <span style={{ fontSize: 11, color: "var(--ledger-ink-faint)", marginLeft: 8 }}>
-            {row.position} {row.team && `· ${row.team.toUpperCase()}`}
-          </span>
+        {/* Identity — enough to tell namesakes apart before anything is typed. */}
+        <div style={{ marginBottom: 16, fontFamily: MONO }}>
+          <div id="contract-edit-title" style={{ fontSize: 14, fontWeight: 900, color: "var(--ledger-ink)", letterSpacing: "0.05em" }}>
+            {row.name}
+          </div>
+          <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 10px", margin: "6px 0 0", fontSize: 11, color: "var(--ledger-ink-body)" }}>
+            <dt style={{ color: "var(--ledger-ink-faint)" }}>Position</dt><dd style={{ margin: 0 }}>{row.position ?? "unknown"}</dd>
+            <dt style={{ color: "var(--ledger-ink-faint)" }}>Effective team</dt>
+            <dd style={{ margin: 0 }}>{row.team ? row.team.toUpperCase() : "unassigned"}
+              {row.storedTeam !== undefined && row.storedTeam !== row.team && ` (stored: ${row.storedTeam ?? "unassigned"})`}</dd>
+            <dt style={{ color: "var(--ledger-ink-faint)" }}>Record id</dt>
+            <dd style={{ margin: 0, overflowWrap: "anywhere" }}>{row.id ?? "none — cannot save an extension"}</dd>
+          </dl>
         </div>
+
+        <fieldset style={{ border: "1px solid var(--ledger-rule-light)", padding: "12px 14px", margin: "0 0 16px", minWidth: 0 }}>
+        <legend style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.1em", color: "var(--ledger-ink)", padding: "0 6px" }}>
+          1 · CORRECT CURRENT CONTRACT
+        </legend>
+        <p style={{ fontSize: 11, margin: "0 0 10px", color: "var(--ledger-ink-body)", lineHeight: 1.5 }}>
+          Fixes the deal the player is playing under now. A signed extension is recorded separately, below, and is not touched here.
+        </p>
 
         <div className="admin-modal-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
           {[
@@ -224,11 +243,11 @@ function EditModal({ row, onSave, onClear, onClose }: {
 
         <div className="admin-modal-grid-3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
+            <label htmlFor="cur-years" style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
               letterSpacing: "0.1em", marginBottom: 5 }}>
               Years Remaining
             </label>
-            <input
+            <input id="cur-years"
               type="number" min={0} max={12} step={1}
               value={years}
               onChange={e => setYears(e.target.value)}
@@ -236,11 +255,11 @@ function EditModal({ row, onSave, onClear, onClose }: {
             />
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
+            <label htmlFor="cur-cap" style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
               letterSpacing: "0.1em", marginBottom: 5 }}>
               Cap Hit ($M)
             </label>
-            <input
+            <input id="cur-cap"
               type="number" min={0} max={20} step={0.001}
               value={cap}
               onChange={e => setCap(e.target.value)}
@@ -248,11 +267,11 @@ function EditModal({ row, onSave, onClear, onClose }: {
             />
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
+            <label htmlFor="cur-pos" style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
               letterSpacing: "0.1em", marginBottom: 5 }}>
               Position
             </label>
-            <select
+            <select id="cur-pos"
               value={position}
               onChange={e => setPosition(e.target.value)}
               style={{ ...field, width: "100%", padding: "6px 10px", fontSize: 13 }}
@@ -284,61 +303,21 @@ function EditModal({ row, onSave, onClear, onClose }: {
           </p>}
         </div>
 
-        {/* Extension — signed next contract that kicks in after current deal */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20,
-          background: hasExt ? "rgba(26,46,92,0.06)" : "var(--paper-inset)",
-          border: `1px solid ${hasExt ? "var(--ledger-ice)" : "var(--ledger-rule-light)"}`, padding: "10px 12px" }}>
-          <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 10, fontWeight: 900, color: hasExt ? "var(--ledger-ice)" : "var(--ledger-ink-faint)",
-              textTransform: "uppercase", letterSpacing: "0.1em" }}>
-              {hasExt ? "EXTENSION ACTIVE" : "EXTENSION"}
-            </span>
-            {hasExt && <span style={{ fontSize: 9, color: "var(--ledger-ice)", opacity: 0.6 }}>
-              Current deal → then ${extCap}M × {extYrs || "?"}yr
-            </span>}
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
-              letterSpacing: "0.1em", marginBottom: 5 }}>Ext Cap ($M)</label>
-            <input type="number" min={0} max={25} step={0.001} value={extCap}
-              onChange={e => setExtCap(e.target.value)}
-              placeholder="—"
-              style={{ ...field, width: "100%", padding: "6px 10px", fontSize: 13 }} />
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
-              letterSpacing: "0.1em", marginBottom: 5 }}>Ext Years</label>
-            <input type="number" min={1} max={8} step={1} value={extYrs}
-              onChange={e => setExtYrs(e.target.value)}
-              placeholder="—"
-              style={{ ...field, width: "100%", padding: "6px 10px", fontSize: 13 }} />
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-end", paddingBottom: 7 }}>
-            {hasExt && <button type="button" onClick={() => { setExtCap(""); setExtYrs(""); }}
-              style={{ fontSize: 10, fontWeight: 900, padding: "4px 10px",
-                background: "transparent", border: "1px solid var(--ledger-red)",
-                color: "var(--ledger-red)", cursor: "pointer", letterSpacing: "0.08em",
-                fontFamily: MONO }}>
-              CLEAR EXT
-            </button>}
-          </div>
-        </div>
-
         {/* Free-agency status — first-class DB facts (single source of truth) */}
         <div className="admin-modal-grid-3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20,
           background: "var(--paper-inset)", border: "1px solid var(--ledger-rule-light)", padding: "10px 12px" }}>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
+            <label htmlFor="cur-status" style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
               letterSpacing: "0.1em", marginBottom: 5 }}>FA Status</label>
-            <select value={fa} onChange={e => setFa(e.target.value)}
+            <select id="cur-status" value={fa} onChange={e => setFa(e.target.value)}
               style={{ ...field, width: "100%", padding: "6px 10px", fontSize: 13 }}>
               {FA_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
+            <label htmlFor="cur-expiry" style={{ display: "block", fontSize: 10, color: "var(--ledger-ink-faint)", textTransform: "uppercase",
               letterSpacing: "0.1em", marginBottom: 5 }}>Expiry Yr</label>
-            <input type="number" min={2024} max={2035} step={1} value={shownExpiryYear}
+            <input id="cur-expiry" type="number" min={2024} max={2035} step={1} value={shownExpiryYear}
               onChange={e => { setFaYearTouched(true); setFaYear(e.target.value); }}
               title="The year he reaches the market. Follows the term above unless you type one."
               style={{ ...field, width: "100%", padding: "6px 10px", fontSize: 13,
@@ -362,7 +341,7 @@ function EditModal({ row, onSave, onClear, onClose }: {
             style={{ flex: 1, padding: "8px 0", background: "var(--ledger-green)", border: "1px solid var(--ledger-green)",
               color: "#fff", fontSize: 12, fontWeight: 900, cursor: "pointer",
               letterSpacing: "0.1em", fontFamily: MONO }}>
-            {saving ? "SAVING..." : "SAVE"}
+            {saving ? "SAVING..." : "SAVE CURRENT CONTRACT"}
           </button>
           {row.adminYears != null || row.adminCap != null ? (
             <button onClick={() => handle(true)} disabled={saving}
@@ -376,9 +355,24 @@ function EditModal({ row, onSave, onClear, onClose }: {
             style={{ padding: "8px 16px", background: "transparent", border: "1px solid var(--rule)",
               color: "var(--ledger-ink-faint)", fontSize: 12, fontWeight: 900, cursor: "pointer",
               letterSpacing: "0.1em", fontFamily: MONO }}>
-            CANCEL
+            CLOSE
           </button>
         </div>
+        </fieldset>
+
+        <ExtensionEditor
+          row={{
+            id: row.id, name: row.name,
+            capHit: row.adminCap ?? row.finalCap,
+            yearsRemaining: row.adminYears ?? row.finalYears,
+            expiryYear: row.expiryYear && row.expiryYear > 2000 ? row.expiryYear : null,
+            expiryStatus: row.expiryStatus,
+            extensionCapHit: row.extensionCapHit,
+            extensionYears: row.extensionYears,
+            extensionSignedAt: row.extensionSignedAt ?? null,
+          }}
+          onSave={onSaveExtension}
+        />
       </div>
     </div>
   );
@@ -578,6 +572,26 @@ export default function AdminContractsPage() {
       load();
     } catch (e) {
       toast(adminErrorMessage(e, "Save failed"), "error");
+      throw e;
+    }
+  };
+
+  // Extension saves send extension fields only — never current-contract fields —
+  // so recording a signed deal cannot change the contract being played under.
+  const handleSaveExtension = async (payload: ExtensionSavePayload) => {
+    try {
+      const res = await fetch("/api/admin/contracts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await readAdminResponse<{ warnings?: string[] }>(res, "Extension save failed");
+      toast(payload.clearExtension ? `Cleared extension for ${payload.name}` : `Saved extension for ${payload.name}`, "success");
+      for (const w of data.warnings ?? []) toast(w, "error");
+      setEditing(null);
+      load();
+    } catch (e) {
+      toast(adminErrorMessage(e, "Extension save failed"), "error");
       throw e;
     }
   };
@@ -944,6 +958,7 @@ export default function AdminContractsPage() {
         <EditModal
           row={editing}
           onSave={handleSave}
+          onSaveExtension={handleSaveExtension}
           onClear={handleClear}
           onClose={() => setEditing(null)}
         />
