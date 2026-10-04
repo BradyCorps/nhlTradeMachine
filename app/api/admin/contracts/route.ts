@@ -9,6 +9,12 @@ import { ensurePlayerColumns, ensurePlayerTable, ensureTeamTable } from "@/app/d
 import { clearTeamCaches } from "@/app/lib/team-cache";
 import { SEASON_START_YEAR } from "@/app/lib/contract-expiry";
 import { anchorFromTerm } from "@/app/lib/contract-term";
+import {
+  EXTENSION_FLAG_TEXT,
+  parseExtensionInput,
+  resolveExtensionTiming,
+  validateSigningDate,
+} from "@/app/lib/extension-terms";
 import { listPublishedTrades } from "@/app/lib/trades";
 import { publishedOwnershipByPlayer } from "@/app/lib/published-roster-ownership";
 
@@ -245,6 +251,7 @@ export async function GET(req: Request) {
       excludeFromRoster: playersTable.excludeFromRoster,
       extensionCapHit: playersTable.extensionCapHit,
       extensionYears:  playersTable.extensionYears,
+      extensionSignedAt: playersTable.extensionSignedAt,
       source:         playersTable.source,
     }).from(playersTable).catch((e: any) => {
       dbError = e?.message ?? String(e);
@@ -317,6 +324,18 @@ export async function GET(req: Request) {
       excludeFromRoster: (b as any)?.excludeFromRoster ?? false,
       extensionCapHit: b?.extensionCapHit ?? null,
       extensionYears:  b?.extensionYears ?? null,
+      extensionSignedAt: b?.extensionSignedAt ?? null,
+      // Start season, remaining term and data-quality flags, derived from the
+      // expiry anchor and the application's season. Read-only: nothing stores it.
+      extensionTiming: b?.extensionCapHit != null && b.extensionCapHit > 0
+        ? resolveExtensionTiming({
+            term: b.extensionYears,
+            expiryYear: (b as any)?.expiryYear ?? null,
+            offseasonYear: SEASON_START_YEAR,
+            yearsRemaining: b.yearsRemaining,
+            signedAt: b.extensionSignedAt ?? null,
+          })
+        : null,
       // Provenance straight from the DB: seed | sync | editor (or "missing" when
       // the rostered player has no DB contract row at all).
       dbSource:      (b as any)?.source ?? null,
@@ -410,17 +429,47 @@ export async function POST(req: Request) {
   const draftYear = Number.isFinite(Number(body.draftYear)) ? Number(body.draftYear) : null;
   const draftRound = Number.isFinite(Number(body.draftRound)) ? Number(body.draftRound) : null;
   const draftOverall = Number.isFinite(Number(body.draftOverall)) ? Number(body.draftOverall) : null;
-  const extensionCapHit = Number.isFinite(Number(body.extensionCapHit)) && Number(body.extensionCapHit) > 0 ? Number(body.extensionCapHit) : null;
-  const extensionYears = Number.isFinite(Number(body.extensionYears)) && Number(body.extensionYears) > 0 ? Math.round(Number(body.extensionYears)) : null;
-  const clearExtension = body.extensionCapHit === null || body.extensionCapHit === 0 || body.clearExtension === true;
-  // PA8 — stamp the signing date so the Hot Off the Press feed can order by
-  // true recency. Accepts an explicit YYYY-MM-DD (back-dating a real signing)
-  // or defaults to today when an extension is set without one.
-  const validDate = (v: unknown): string | null =>
-    typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
-  const extensionSignedAt = extensionCapHit != null
-    ? (validDate(body.extensionSignedAt) ?? new Date().toISOString().slice(0, 10))
-    : null;
+  // ── Signed extension ─────────────────────────────────────────
+  // Units: `extensionCapHit` is the ANNUAL value in $ millions (a 6-year $75M
+  // deal is 12.5, never 75). An extension is only written, changed or cleared
+  // by an explicit request:
+  //   • `extensionCapHit` (+ `extensionYears`) records or edits it;
+  //   • `clearExtension: true` removes it — a null or zero amount no longer
+  //     does, so a payload that merely omits or nulls the field cannot wipe a
+  //     signed deal;
+  //   • `extensionSignedAt` is the date the deal was SIGNED. Omitted, the
+  //     stored date is preserved and an unknown date stays unknown; an explicit
+  //     null clears it to unknown. It is never defaulted to today.
+  // Start season is derived from the current contract's expiry year and is not
+  // an input here, so there is nothing to silently discard.
+  const clearExtension = body.clearExtension === true;
+  const touchesExtension = body.extensionCapHit != null || body.extensionYears != null
+    || body.extensionTotalValue != null;
+  const hasExtensionDate = "extensionSignedAt" in body;
+  const extensionRequested = touchesExtension && !clearExtension;
+  if (clearExtension && touchesExtension) {
+    return NextResponse.json({ error: "clearExtension cannot be combined with extension values" }, { status: 400 });
+  }
+  if ((extensionRequested || clearExtension || hasExtensionDate) && !(typeof body.id === "string" && body.id.trim())) {
+    // Same-name players exist (two Elias Petterssons); an extension is only
+    // ever written against the stable record id, never a name-derived one.
+    return NextResponse.json({ error: "id is required to record, change or clear an extension" }, { status: 400 });
+  }
+  let extensionSignedAtUpdate: string | null | undefined = undefined;
+  if (hasExtensionDate && !clearExtension) {
+    if (body.extensionSignedAt === null || body.extensionSignedAt === "") {
+      extensionSignedAtUpdate = null;
+    } else {
+      const d = validateSigningDate(body.extensionSignedAt);
+      if (!d.ok) return NextResponse.json({ error: d.error }, { status: 400 });
+      extensionSignedAtUpdate = d.date;
+    }
+  }
+  // Final values are resolved against the stored row below; these are what the
+  // request itself supplied.
+  const requestedAav = body.extensionCapHit != null ? Number(body.extensionCapHit) : undefined;
+  const requestedYears = body.extensionYears != null ? Number(body.extensionYears) : undefined;
+  const requestedTotal = body.extensionTotalValue != null ? Number(body.extensionTotalValue) : undefined;
   const explicitProspectPtsPace = Number.isFinite(Number(body.prospectPtsPace)) ? Number(body.prospectPtsPace) : null;
   const league = typeof body.league === "string" ? body.league.toUpperCase() : null;
   const points = Number.isFinite(Number(body.points)) ? Number(body.points) : null;
@@ -472,7 +521,7 @@ export async function POST(req: Request) {
   if (
     yearsRemaining == null && capHit == null && hasNMC == null && hasNTC == null &&
     retired == null && expiryStatus === undefined && expiryYear === undefined &&
-    excludeFromRoster === undefined && extensionCapHit == null && !clearExtension &&
+    excludeFromRoster === undefined && !extensionRequested && !clearExtension && !hasExtensionDate &&
     !teamId && !position && age == null && draftYear == null && draftRound == null &&
     draftOverall == null && prospectPtsPace == null
   ) {
@@ -482,6 +531,57 @@ export async function POST(req: Request) {
   const existing = await db.select().from(playersTable).where(eq(playersTable.id, id));
   if (existing.length && existing[0].name !== name) {
     return NextResponse.json({ error: "Player identity does not match the stored contract" }, { status: 400 });
+  }
+
+  // ── Resolve the extension against the stored row ─────────────
+  // Server-side validation mirrors the form: whole-year term, plausible annual
+  // value, a total that agrees with annual × term, a real signing date. An
+  // extension follows an existing contract, so it is never created alongside a
+  // brand-new row.
+  const warnings: string[] = [];
+  let extensionWrite: { aav: number; years: number } | null = null;
+  const stored = existing[0] as (typeof existing)[number] | undefined;
+  if (extensionRequested || clearExtension || hasExtensionDate) {
+    if (!stored) {
+      return NextResponse.json({ error: "No stored contract for this id — an extension needs a current contract to follow" }, { status: 400 });
+    }
+  }
+  if (extensionRequested) {
+    const storedAav = stored!.extensionCapHit != null && stored!.extensionCapHit > 0 ? stored!.extensionCapHit : null;
+    const years = requestedYears ?? (storedAav != null ? stored!.extensionYears ?? undefined : undefined);
+    if (years === undefined || !Number.isFinite(years)) {
+      return NextResponse.json({ error: "extensionYears is required to record an extension" }, { status: 400 });
+    }
+    const mode = requestedAav !== undefined ? "aav" : requestedTotal !== undefined ? "total" : null;
+    const value = mode === "aav" ? requestedAav : mode === "total" ? requestedTotal : storedAav ?? undefined;
+    if (value === undefined) {
+      return NextResponse.json({ error: "extensionCapHit (annual, $M) or extensionTotalValue ($M) is required" }, { status: 400 });
+    }
+    const parsed = parseExtensionInput({ mode: mode ?? "aav", value, years });
+    if (!parsed.ok) return NextResponse.json({ error: parsed.errors.join(" ") }, { status: 400 });
+    if (requestedAav !== undefined && requestedTotal !== undefined
+        && Math.abs(parsed.total - requestedTotal) > 1e-6 * parsed.years) {
+      return NextResponse.json({
+        error: `extensionTotalValue ${requestedTotal} does not equal extensionCapHit ${requestedAav} × ${parsed.years} years`,
+      }, { status: 400 });
+    }
+    extensionWrite = { aav: parsed.aav, years: parsed.years };
+  }
+  if (extensionSignedAtUpdate !== undefined && !clearExtension) {
+    const willHave = extensionWrite != null || (stored!.extensionCapHit != null && stored!.extensionCapHit > 0);
+    if (!willHave) {
+      return NextResponse.json({ error: "No extension on record to date" }, { status: 400 });
+    }
+  }
+  if (extensionWrite) {
+    const timing = resolveExtensionTiming({
+      term: extensionWrite.years,
+      expiryYear: expiryYear ?? derivedExpiryYear ?? stored!.expiryYear ?? null,
+      offseasonYear: SEASON_START_YEAR,
+      yearsRemaining: yearsRemaining ?? stored!.yearsRemaining,
+      signedAt: extensionSignedAtUpdate === undefined ? stored!.extensionSignedAt ?? null : extensionSignedAtUpdate,
+    });
+    for (const f of timing.flags) warnings.push(EXTENSION_FLAG_TEXT[f]);
   }
 
   if (existing.length > 0) {
@@ -501,15 +601,16 @@ export async function POST(req: Request) {
     if (draftRound    != null)   updates.draftRound     = draftRound;
     if (draftOverall  != null)   updates.draftOverall   = draftOverall;
     if (prospectPtsPace != null) updates.prospectPtsPace = prospectPtsPace;
-    if (extensionCapHit != null) {
-      updates.extensionCapHit = extensionCapHit;
-      updates.extensionYears = extensionYears ?? 1;
-      updates.extensionSignedAt = extensionSignedAt;
+    if (extensionWrite) {
+      updates.extensionCapHit = extensionWrite.aav;
+      updates.extensionYears = extensionWrite.years;
     } else if (clearExtension) {
       updates.extensionCapHit = null;
       updates.extensionYears = null;
       updates.extensionSignedAt = null;
     }
+    // Only an explicit date (or an explicit null) touches the signing date.
+    if (!clearExtension && extensionSignedAtUpdate !== undefined) updates.extensionSignedAt = extensionSignedAtUpdate;
     if (expiryStatus !== undefined) updates.expiryStatus = expiryStatus;
     if (expiryYear   !== undefined) updates.expiryYear   = expiryYear;
     if (derivedExpiryYear != null)  updates.expiryYear   = derivedExpiryYear;
@@ -522,7 +623,11 @@ export async function POST(req: Request) {
     }
     await db.update(playersTable).set(updates).where(eq(playersTable.id, id));
     await clearRosterCaches();
-    return NextResponse.json({ ok: true, destination: "db-update", name });
+    return NextResponse.json({
+      ok: true, destination: "db-update", name,
+      ...(extensionWrite ? { extension: { aav: extensionWrite.aav, years: extensionWrite.years } } : {}),
+      ...(warnings.length ? { warnings } : {}),
+    });
   } else {
     if (!position) {
       return NextResponse.json({ error: "position is required when adding a new DB player" }, { status: 400 });
@@ -546,9 +651,6 @@ export async function POST(req: Request) {
       expiryStatus:   expiryStatus ?? undefined,
       expiryYear:     expiryYear ?? derivedExpiryYear ?? undefined,
       excludeFromRoster: excludeFromRoster ?? undefined,
-      extensionCapHit: extensionCapHit ?? undefined,
-      extensionYears:  extensionYears ?? undefined,
-      extensionSignedAt: extensionSignedAt ?? undefined,
       // Real term facts were provided (or the row wouldn't exist), and an
       // operator typed them having looked at a source — same as the update
       // branch above.
@@ -662,10 +764,9 @@ export async function PUT(req: Request) {
       const written = await db.update(playersTable).set({
         extensionCapHit: extCapHit,
         extensionYears: extYears,
-        extensionSignedAt: typeof cw.extensionSignedAt === "string"
-          && /^\d{4}-\d{2}-\d{2}$/.test(cw.extensionSignedAt)
-          ? cw.extensionSignedAt
-          : new Date().toISOString().slice(0, 10),
+        // A pasted signing date is recorded; a missing one leaves whatever is
+        // stored — known or unknown. It is never stamped with today's date.
+        ...(validateSigningDate(cw.extensionSignedAt).ok ? { extensionSignedAt: cw.extensionSignedAt } : {}),
       }).where(eq(playersTable.id, target.id))
         .returning({ id: playersTable.id });
       if (written.length !== 1) {

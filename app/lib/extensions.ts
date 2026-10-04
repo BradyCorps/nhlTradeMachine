@@ -53,8 +53,10 @@ export type RecordedExtension =
   | { state: "NONE" }
   /** Signed, but the current deal still has time to run. */
   | { state: "PENDING"; aav: number; term: number }
-  /** The old deal has run out — this IS the contract now. */
-  | { state: "ACTIVE"; aav: number; term: number };
+  /** The old deal has run out — this IS the contract now. `term` is seasons LEFT. */
+  | { state: "ACTIVE"; aav: number; term: number }
+  /** Every season of it has been played. */
+  | { state: "EXPIRED"; aav: number; term: number };
 
 export function resolveRecordedExtension(opts: {
   extensionCapHit?: number | null;
