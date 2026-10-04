@@ -164,7 +164,7 @@ export function routeDataContext(
       { label: "Source / coverage", value: `${resolved.source} · ${resolved.coverage}` },
       { label: "Model", value: resolved.modelVersion },
       { label: "Reconciliation", value: resolved.reconciliation === "passed" ? "Passed" : "Warning" },
-      { label: "Season reference", value: seasonReferenceLine(resolved.seasonReference) },
+      { label: "Season reference", value: provenance ? seasonReferenceLine(provenance.seasonReference) : "Unavailable" },
     ],
     warning: resolved.warning,
   };
