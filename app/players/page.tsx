@@ -42,7 +42,7 @@ import { buildStrandCohort } from "@/app/lib/strand-cohort";
 import { buildStrandPercentiles, type PlayerLike } from "@/app/lib/strand-metrics";
 import { matchesPlayerSearch } from "@/app/lib/player-search";
 import type { LeagueProvenance } from "@/app/lib/data-context";
-import { buildPlayersUrlQuery, readPlayersUrlState } from "@/app/lib/players-url-state";
+import { PLAYERS_URL_DEFAULTS, buildPlayersUrlQuery, readPlayersUrlState } from "@/app/lib/players-url-state";
 
 // ── Types ─────────────────────────────────────────────────────
 interface Player {
@@ -1033,11 +1033,6 @@ export default function PlayersPage() {
   // Match the static server render, then resolve URL identity before any statistics read or URL write.
   const [selection, setSelection] = useState<ObservedSelection>(DEFAULT_OBSERVED_SELECTION);
   const [selectionReady, setSelectionReady] = useState(false);
-  useEffect(() => {
-    try { setSelection(parseObservedSelection(new URLSearchParams(window.location.search))); }
-    catch { setSelection({ season: "unsupported" as ObservedSelection["season"], gameType: 2 }); }
-    setSelectionReady(true);
-  }, []);
   const selectionKey = observedQuery(selection);
   const remembered = selectionReady && lastLeague?.selectionKey === selectionKey ? lastLeague : null;
   const [players, setPlayers]   = useState<Player[]>(() => remembered?.players ?? []);
@@ -1045,10 +1040,9 @@ export default function PlayersPage() {
   const [loading, setLoading]   = useState(() => remembered == null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [provenance, setProvenance] = useState<LeagueProvenance | null>(() => remembered?.provenance ?? null);
-  // Hydrated once, synchronously, from the URL (QW-09) — self-contained (no
-  // fetched data needed to interpret it), so there is no read/write race to
-  // gate like the trade bench's shared-link parse has.
-  const [initialUrlState] = useState(() => readPlayersUrlState());
+  // The server and first client render must use identical defaults. Restore
+  // the URL after hydration, before allowing statistics reads or URL writes.
+  const initialUrlState = PLAYERS_URL_DEFAULTS;
   const [search, setSearch]     = useState(initialUrlState.search);
   const deferredSearch = useDeferredValue(search);
   const [posFilter, setPosFilter] = useState<"ALL" | "F" | "D" | "G">(initialUrlState.posFilter);
@@ -1059,6 +1053,27 @@ export default function PlayersPage() {
   const [defencePage, setDefencePage] = useState(initialUrlState.defencePage);
   const [goaliePage, setGoaliePage] = useState(initialUrlState.goaliePage);
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(initialUrlState.playerId);
+
+  useEffect(() => {
+    const restoreUrl = () => {
+      const state = readPlayersUrlState();
+      setSearch(state.search);
+      setPosFilter(state.posFilter);
+      setTeamFilter(state.teamFilter);
+      setSortKey(state.sortKey);
+      setSortDir(state.sortDir);
+      setForwardPage(state.forwardPage);
+      setDefencePage(state.defencePage);
+      setGoaliePage(state.goaliePage);
+      setExpandedPlayerId(state.playerId);
+      try { setSelection(parseObservedSelection(new URLSearchParams(window.location.search))); }
+      catch { setSelection({ season: "unsupported" as ObservedSelection["season"], gameType: 2 }); }
+      setSelectionReady(true);
+    };
+    restoreUrl();
+    window.addEventListener("popstate", restoreUrl);
+    return () => window.removeEventListener("popstate", restoreUrl);
+  }, []);
 
   const restoredScroll = useRef(false);
   useEffect(() => {
@@ -1198,7 +1213,7 @@ export default function PlayersPage() {
   useEffect(() => {
     if (!selectionReady) return;
     const query = buildPlayersUrlQuery({
-      search: deferredSearch, posFilter, teamFilter, sortKey, sortDir,
+      search, posFilter, teamFilter, sortKey, sortDir,
       forwardPage, defencePage, goaliePage, playerId: expandedPlayerId,
     });
     const selectionParams = new URLSearchParams(query);
@@ -1207,7 +1222,7 @@ export default function PlayersPage() {
     const selectedQuery = selectionParams.toString();
     const newUrl = selectedQuery ? `${window.location.pathname}?${selectedQuery}` : window.location.pathname;
     window.history.replaceState(window.history.state, "", newUrl);
-  }, [deferredSearch, posFilter, teamFilter, sortKey, sortDir, forwardPage, defencePage, goaliePage, expandedPlayerId, selection.season, selection.gameType, selectionReady]);
+  }, [search, posFilter, teamFilter, sortKey, sortDir, forwardPage, defencePage, goaliePage, expandedPlayerId, selection.season, selection.gameType, selectionReady]);
 
   // A stale/hand-edited team or player id in the URL must recover safely
   // rather than silently filtering to nothing or expanding a phantom row —

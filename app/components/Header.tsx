@@ -19,6 +19,7 @@ interface HeaderProps {
 export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) {
   const [isCompact, setIsCompact] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [feedDate, setFeedDate] = useState("");
   const moreRef = useRef<HTMLDivElement>(null);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const moreMenuId = useId();
@@ -31,6 +32,12 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
     : pathname?.startsWith("/press-box") ? "press-box"
     : pathname?.startsWith("/fantasy") ? "fantasy"
     : activeTab;
+
+  // Static pages may be served days after their server render. Hydrate the
+  // same undated label first, then show the browser's current date.
+  useEffect(() => {
+    setFeedDate(new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }));
+  }, []);
 
   useEffect(() => {
     const header = headerRef.current;
@@ -145,7 +152,7 @@ export default function Header({ activeTab, showLiveFeed = true }: HeaderProps) 
                   </span>
                 )}
                 <span>
-                  {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })} Data Feed Active
+                  {feedDate ? `${feedDate} ` : ""}Data Feed Active
                 </span>
               </p>
             )}
