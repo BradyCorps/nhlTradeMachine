@@ -16,6 +16,9 @@
 
 import { describe, it, expect } from "vitest";
 import { parseGoalieEdge } from "@/app/lib/nhl-player-feed";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import GoalieEdgePanel from "@/app/components/GoalieEdgePanel";
 
 const SOROKIN = {
   player: {
@@ -118,6 +121,18 @@ describe("parseGoalieEdge", () => {
   it("returns null without a player id rather than a hollow row", () => {
     expect(parseGoalieEdge({ stats: {} }, 20252026)).toBeNull();
     expect(parseGoalieEdge(null, 20252026)).toBeNull();
+  });
+
+  it("keeps low-percentile labels legible without fading their text", () => {
+    const detail = { ...facts, zones: facts.zones.map(z => ({ ...z, percentile: 33.9 })) };
+    const markup = renderToStaticMarkup(createElement(GoalieEdgePanel, { detail, playerName: "Fixture goalie" }));
+    const chips = markup.match(/<span[^>]*class="font-mono text-\[9px\] font-black px-1\.5 py-0\.5 border"[^>]*>[^<]*<\/span>/g) ?? [];
+    expect(chips).toHaveLength(2);
+    for (const chip of chips) {
+      expect(chip).toContain("&lt;50th");
+      expect(chip).toContain("color:var(--ledger-ink-faint)");
+      expect(chip).not.toContain("opacity:");
+    }
   });
 
   it("survives a payload with no locations at all", () => {

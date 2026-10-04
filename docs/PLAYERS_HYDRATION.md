@@ -52,3 +52,21 @@ The browser harness accepts `PLAYERS_HYDRATION_BASE_URL` and
 coverage. No API, roster, valuation, storage, cache or Labs behavior changes.
 Normal PR CI supplies broader tests/build checks. Do not merge or deploy before
 independent review.
+
+## Focused review and goalie contrast correction
+
+Review of head `457dc92dbf2565c68097c37d0dd3c807c33285a8` found no additional
+hydration defect. The browser harness now also preserves combined search,
+selected-player, historical-season and playoff parameters through reload and
+same-document Back/Forward (`popstate`), with no hydration warnings suppressed.
+All 53 focused tests across six files, TypeScript and targeted lint pass.
+The updated isolated journeys pass at 412px and 1280px with no browser errors.
+
+The reported goalie dossier `/players/8479973` reproduces the CI contrast
+failure on the public deployment at both widths. Low-percentile chips faded
+`--ledger-ink-faint` to 75% opacity against `--paper-inset`, giving 3.49:1
+contrast. Removing only that opacity retains the existing colors, labels,
+thresholds, percentile values and analytical behavior. The isolated local
+dossier returns 404 without the deployed roster; local component browser
+checks therefore use rendered fixture markup and the real application CSS,
+separately from the live reproduction and final hosted CI dossier checks.

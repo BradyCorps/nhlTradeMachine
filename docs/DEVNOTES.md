@@ -1,5 +1,7 @@
 # Development Notes
 
+- 2026-10-04: **PR #36 focused review** (`app/components/GoalieEdgePanel.tsx`, `__tests__/goalie-edge-detail.test.ts`, `scripts/verify-players-hydration.mjs`, `docs/PLAYERS_HYDRATION.md`): removed low-percentile badge opacity to restore text contrast without changing values, and verified URL restoration including competition and selected-player history.
+
 - 2026-10-04: **Players hydration** (`app/components/Header.tsx`, `app/players/page.tsx`, `app/lib/data-context.ts`, `__tests__/players-hydration.test.ts`, `scripts/verify-players-hydration.mjs`, `docs/PLAYERS_HYDRATION.md`): aligned initial date/filter markup, kept missing provenance unavailable, restored URL state after hydration and on browser history navigation, and kept immediate search state in URL writes; no roster, valuation, cache or Labs changes.
 
 - 2026-10-02: **Post-rollover roster consistency** (`app/lib/{published-roster-ownership,player-identity,roster-assembly,valuation-display,roster-view,roster-table,team-cache,swr-store,card-payload}`, Admin Contracts, split league teams route, player/team/trade cards, `app/armchair-gm/GmAnalysisTabs.tsx` and focused tests; `docs/POST_ROLLOVER_ROSTER_CONSISTENCY.md`): shared effective published-trade ownership without rewriting stored teams, retained NHL identities and same-name positions, exposed the full assigned roster alongside bounded projections, and labelled unavailable pricing without changing NAV mathematics; read-only Production diagnosis and isolated write/browser verification, no merge/deploy or Labs work.

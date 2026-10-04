@@ -7,7 +7,7 @@ const base = process.env.PLAYERS_HYDRATION_BASE_URL ?? "http://localhost:3004";
 const output = process.env.PLAYERS_HYDRATION_OUTPUT ?? "/tmp/players-hydration-verification";
 const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
 const results = [];
-const paths = ["/players", "/players?q=mcdavid&season=20262027&gameType=2", "/players?player=8478402&season=20252026&gameType=2"];
+const paths = ["/players", "/players?q=mcdavid&season=20262027&gameType=2", "/players?q=mcdavid&player=8478402&season=20252026&gameType=3"];
 const players = [
   { id: "8478402", name: "Connor McDavid", position: "C", teamId: "EDM", age: 29, ptsPace: 138, capHit: 12.5 },
   { id: "8479318", name: "Auston Matthews", position: "C", teamId: "TOR", age: 29, ptsPace: 90, capHit: 13.25 },
@@ -34,7 +34,7 @@ try {
       if (url.pathname === "/api/league/teams") return route.fulfill({ json: { teams, capCeiling: 104 } });
       const season = url.searchParams.get("season");
       const gameType = Number(url.searchParams.get("gameType"));
-      requests.push({ season, gameType });
+      if (url.pathname === "/api/league/players") requests.push({ season, gameType });
       const games = season === "20252026" ? 82 : 2;
       const points = season === "20252026" ? 138 : 7;
       return route.fulfill({ json: { teams, capCeiling: 104, navMap: {}, players: players.map(p => ({ ...p,
@@ -56,10 +56,15 @@ try {
       await waitForSearch(expectedSearch);
       assert.equal(new URL(page.url()).searchParams.get("q") ?? "", expectedSearch);
       assert.equal(await seasonSelect.inputValue(), query.get("season") ?? "20262027");
+      assert.equal(new URL(page.url()).searchParams.get("gameType"), query.get("gameType") ?? "2");
+      assert.equal(new URL(page.url()).searchParams.get("player"), query.get("player"));
       if (query.has("player")) await page.getByRole("tab", { name: "Player Card", exact: true }).waitFor();
       await page.reload({ waitUntil: "networkidle" });
       await waitForSearch(expectedSearch);
       assert.equal(new URL(page.url()).searchParams.get("q") ?? "", expectedSearch);
+      assert.equal(new URL(page.url()).searchParams.get("season"), query.get("season") ?? "20262027");
+      assert.equal(new URL(page.url()).searchParams.get("gameType"), query.get("gameType") ?? "2");
+      assert.equal(new URL(page.url()).searchParams.get("player"), query.get("player"));
       if (query.has("player")) await page.getByRole("tab", { name: "Player Card", exact: true }).waitFor();
       results.push({ width, path, directAndReload: "passed" });
       console.log(`${width}px direct/reload passed: ${path}`);
@@ -86,6 +91,27 @@ try {
     await page.goForward({ waitUntil: "networkidle" });
     await waitForSearch("Matthews");
     assert.equal(await seasonSelect.inputValue(), "20252026");
+
+    // Exercise popstate in the mounted page, independent of full-load/bfcache restoration.
+    await page.evaluate(path => {
+      history.pushState(history.state, "", path);
+      dispatchEvent(new PopStateEvent("popstate"));
+    }, paths[2]);
+    await waitForSearch("mcdavid");
+    await page.getByRole("tab", { name: "Player Card", exact: true }).waitFor();
+    assert.equal(new URL(page.url()).searchParams.get("gameType"), "3");
+    await page.waitForFunction(() => document.querySelector('select[aria-label="Statistics competition"]')?.value === "3");
+    assert.ok(requests.some(request => request.season === "20252026" && request.gameType === 3));
+    await page.goBack({ waitUntil: "networkidle" });
+    await waitForSearch("Matthews");
+    assert.equal(new URL(page.url()).searchParams.get("gameType"), "2");
+    assert.equal(new URL(page.url()).searchParams.get("player"), null);
+    await page.goForward({ waitUntil: "networkidle" });
+    await waitForSearch("mcdavid");
+    await page.getByRole("tab", { name: "Player Card", exact: true }).waitFor();
+    assert.equal(new URL(page.url()).searchParams.get("season"), "20252026");
+    assert.equal(new URL(page.url()).searchParams.get("gameType"), "3");
+    assert.equal(new URL(page.url()).searchParams.get("player"), "8478402");
     assert.deepEqual(errors, []);
     await page.screenshot({ path: `${output}/players-${width}.png` });
     results.push({ width, searchSeasonBackForward: "passed", errors, requests });
