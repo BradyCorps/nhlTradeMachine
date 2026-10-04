@@ -284,8 +284,12 @@ describe("Canary — league route features (source-level)", () => {
         // whatever else the branch has since grown. (It used to assert the two
         // ternaries verbatim, which the extension work rewrote.)
         expect(src).toContain("deriveContractStatus({");
-        expect(src).toMatch(/rawCapHit\s+=[\s\S]{0,120}expiresThisOffseason \? 0/);
-        expect(src).toMatch(/finalYears\s+= override\?\.yearsRemaining[\s\S]{0,200}expiresThisOffseason \? 0/);
+        // The rule lives in resolveLiveContractFields (tested behaviourally in
+        // derive-contract-status.test.ts); the roster row must read it.
+        expect(src).toMatch(/rawCapHit:[^\n]*o\.expiresThisOffseason \? 0/);
+        expect(src).toMatch(/years:[^\n]*o\.expiresThisOffseason \? 0/);
+        expect(src).toContain("resolveLiveContractFields({");
+        expect(src).toMatch(/finalYears\s+= override\?\.yearsRemaining[\s\S]{0,80}live\.years/);
       });
 
       it("derives free-agency status from stored expiry facts via a pure helper", () => {
@@ -4001,13 +4005,16 @@ describe("Canary — an admin-recorded extension reaches Armchair GM", () => {
     // gated on the UFA/RFA class.
     expect(assembly).toContain("resolveExtensionTiming");
     expect(assembly).toContain("extensionSignedAt: fin?.extensionSignedAt");
-    expect(assembly).toContain("expiresThisOffseason = currentDealExpires && (extension.state === \"NONE\" || extension.state === \"EXPIRED\")");
+    // A finished extension is a known contract end; it does not wait on a class.
+    expect(assembly).toContain("const extensionEnded = extension.state === \"EXPIRED\"");
+    expect(assembly).toContain("|| (currentDealExpires && extension.state === \"NONE\")");
   });
 
   it("an active extension becomes the contract rather than a $0 expiry", () => {
-    expect(assembly).toContain("extensionActive = extension.state === \"ACTIVE\"");
-    expect(assembly).toMatch(/rawCapHit\s+= extensionActive \? extension\.aav/);
-    expect(assembly).toMatch(/extensionActive \? extension\.term/);
+    expect(assembly).toMatch(/rawCapHit: ext\.state === "ACTIVE" \? ext\.aav/);
+    expect(assembly).toMatch(/years: ext\.state === "ACTIVE" \? ext\.term/);
+    // An ended extension's last contract is the extension, not the deal it followed.
+    expect(assembly).toMatch(/lastCapHitRaw: ext\.state === "EXPIRED" \? ext\.aav/);
   });
 
   it("a pending extension is recorded where the offseason flow reads it", () => {

@@ -73,7 +73,12 @@ export function deriveContractStatus(opts: {
   extensionYears?: number | null;
   extensionSignedAt?: string | null;
 }): {
-  contractStatus: "UFA" | "RFA" | "SIGNED";
+  /**
+   * `null` means the contract is known to have ended but its free-agency class
+   * was never recorded. That is not SIGNED (nothing is under contract) and not a
+   * guessed UFA/RFA; downstream treats the player as expiring with class unknown.
+   */
+  contractStatus: "UFA" | "RFA" | "SIGNED" | null;
   expiresThisOffseason: boolean;
   normExpiry: "UFA" | "RFA" | null;
   extension: RecordedExtension;
@@ -125,11 +130,43 @@ export function deriveContractStatus(opts: {
       : { state: timing.state, aav: extAav, term: timing.remaining };
   }
 
-  // A finished extension no longer protects him from the market.
-  const expiresThisOffseason = currentDealExpires && (extension.state === "NONE" || extension.state === "EXPIRED");
-  const contractStatus: "UFA" | "RFA" | "SIGNED" =
-    expiresThisOffseason && normExpiry ? normExpiry : "SIGNED";
+  // A finished extension no longer protects him from the market. Its end is
+  // known from the expiry anchor even when no UFA/RFA class was ever recorded,
+  // so it does not wait on `currentDealExpires` (which requires a class). The
+  // class itself is NOT guessed: with none on record the status is null.
+  const extensionEnded = extension.state === "EXPIRED";
+  const expiresThisOffseason = extensionEnded
+    || (currentDealExpires && extension.state === "NONE");
+  const contractStatus: "UFA" | "RFA" | "SIGNED" | null =
+    !expiresThisOffseason ? "SIGNED" : normExpiry ?? null;
   return { contractStatus, expiresThisOffseason, normExpiry, extension, extensionTiming };
+}
+
+/**
+ * The live contract fields a roster row carries, before manual overrides and
+ * the name-collision guard.
+ *
+ * ACTIVE extension: its AAV and the seasons left are the contract. EXPIRING
+ * (including an extension whose final season has passed): capHit 0 and 0 years,
+ * so trade pricing sees a rental. `lastCapHit` is the real last contract value
+ * and is never zeroed — for an ended extension that is the extension's AAV, not
+ * the pre-extension deal it followed. `years` is null when neither rule applies
+ * and the stored term stands.
+ */
+export function resolveLiveContractFields(o: {
+  extension: RecordedExtension;
+  expiresThisOffseason: boolean;
+  isLikelyELC: boolean;
+  elcCapHit: number;
+  storedCapHit: number | null | undefined;
+}): { rawCapHit: number; lastCapHitRaw: number; years: number | null } {
+  const ext = o.extension;
+  const stored = o.isLikelyELC ? o.elcCapHit : (o.storedCapHit ?? 0.925);
+  return {
+    rawCapHit: ext.state === "ACTIVE" ? ext.aav : o.expiresThisOffseason ? 0 : stored,
+    lastCapHitRaw: ext.state === "EXPIRED" ? ext.aav : stored,
+    years: ext.state === "ACTIVE" ? ext.term : o.expiresThisOffseason ? 0 : null,
+  };
 }
 
 const NHL_HEADERS = {
@@ -1213,15 +1250,15 @@ export async function assembleCanonicalRoster(options: {
       // out, so its AAV and term are the live ones. Carlsson's ELC expiring in
       // 2026 with an extension on record is not a $0 cap hit and 0 years left;
       // he is signed at the extension's number.
-      const extensionActive = extension.state === "ACTIVE";
-      const rawCapHit     = extensionActive ? extension.aav
-                          : expiresThisOffseason ? 0
-                          : (isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925));
+      const live = resolveLiveContractFields({
+        extension, expiresThisOffseason, isLikelyELC, elcCapHit, storedCapHit: fin?.capHit,
+      });
+      const rawCapHit = live.rawCapHit;
       // lastCapHit mirrors rawCapHit but is NEVER zeroed for pending FAs. It is the
       // real expiring/last contract value, used for the off-season "was $X" display
       // and — critically — as the cap CREDIT when a pending FA re-signs or walks.
       // (capHit goes to 0 so FA trade-pricing treats them as a 0-year rental.)
-      const lastCapHitRaw = isLikelyELC ? elcCapHit : (fin?.capHit ?? 0.925);
+      const lastCapHitRaw = live.lastCapHitRaw;
       const contractPos = normContractPos(fin?.position);
       const rosterPos = normContractPos(finalPosition);
       const nameCollision = p.age <= 23
@@ -1233,9 +1270,7 @@ export async function assembleCanonicalRoster(options: {
 
       const finalCapHit  = override?.capHit ?? (nameCollision ? elcCapHit : rawCapHit);
       const finalYears   = override?.yearsRemaining
-        ?? (extensionActive ? extension.term
-          : expiresThisOffseason ? 0
-          : (nameCollision ? 1 : preliminaryYears));
+        ?? (live.years ?? (nameCollision ? 1 : preliminaryYears));
       const finalNMC     = override?.hasNMC  ?? (nameCollision ? false : (fin?.hasNMC  ?? false));
       const finalNTC     = override?.hasNTC  ?? (nameCollision ? false : (fin?.hasNTC  ?? false));
       const finalRetain  = override?.canRetain ?? (nameCollision ? true : (fin?.canRetain ?? true));
@@ -1400,7 +1435,7 @@ export async function assembleCanonicalRoster(options: {
         tradeBlockNote:   (blockMap.get(`${contractName}__${p.position}`) ?? blockMap.get(p.name))?.note   ?? null,
         expiryStatus:     rawExpiryStatus,
         expiryYear:       rawExpiryYear,
-        contractStatus,
+        contractStatus: contractStatus ?? undefined,
         expiresThisOffseason,
         contractMissing,
         retainedPct: 0,

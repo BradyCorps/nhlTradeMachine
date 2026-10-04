@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveContractStatus } from "../app/lib/roster-assembly";
+import { deriveContractStatus, resolveLiveContractFields } from "../app/lib/roster-assembly";
 
 // The read path now resolves free-agency status from the DB's stored expiry
 // facts via this pure helper. These cases pin the orthogonal behavior.
@@ -192,5 +192,65 @@ describe("deriveContractStatus — extension lifecycle (SIGNED/null status)", ()
     expect(conflict.extensionTiming?.startSeason).toBe("2027-28");
     const late = deriveContractStatus({ ...signed, offseasonYear: 2026, extensionSignedAt: "2027-08-01" });
     expect(late.extensionTiming?.flags).toContain("SIGNED_AFTER_START");
+  });
+});
+
+// ── Integrated roster contract fields across the extension's whole life ───────
+// The original deal ($3.85M, one year, expiryYear 2027, no class on record) with
+// a six-year $12.5M extension, read in each application season. Asserts the
+// fields a roster row actually carries, not just the extension state.
+describe("roster contract fields across an extension lifecycle (SIGNED/null class)", () => {
+  const input = {
+    expiryStatus: null, expiryYear: 2027, yearsRemaining: 1,
+    extensionCapHit: 12.5, extensionYears: 6,
+  };
+  const fieldsAt = (offseasonYear: number, expiryStatus: string | null = null) => {
+    const d = deriveContractStatus({ ...input, expiryStatus, offseasonYear });
+    const live = resolveLiveContractFields({
+      extension: d.extension, expiresThisOffseason: d.expiresThisOffseason,
+      isLikelyELC: false, elcCapHit: 0.925, storedCapHit: 3.85,
+    });
+    return {
+      state: d.extension.state,
+      contractStatus: d.contractStatus,
+      expires: d.expiresThisOffseason,
+      capHit: live.rawCapHit,
+      lastCapHit: live.lastCapHitRaw,
+      // Stored term (1) stands when the helper has no verdict.
+      years: live.years ?? 1,
+    };
+  };
+
+  it("pending: the original deal stands, signed", () => {
+    expect(fieldsAt(2026)).toEqual({ state: "PENDING", contractStatus: "SIGNED", expires: false, capHit: 3.85, lastCapHit: 3.85, years: 1 });
+  });
+
+  it("active from its start season: extension salary and full term", () => {
+    expect(fieldsAt(2027)).toEqual({ state: "ACTIVE", contractStatus: "SIGNED", expires: false, capHit: 12.5, lastCapHit: 3.85, years: 6 });
+  });
+
+  it("final active season: extension salary, one year left, still signed", () => {
+    expect(fieldsAt(2032)).toEqual({ state: "ACTIVE", contractStatus: "SIGNED", expires: false, capHit: 12.5, lastCapHit: 3.85, years: 1 });
+  });
+
+  it("expired (2033-34): does not resurrect the $3.85M deal or read as signed, and does not invent a class", () => {
+    const f = fieldsAt(2033);
+    expect(f.state).toBe("EXPIRED");
+    expect(f.expires).toBe(true);           // known contract end
+    expect(f.contractStatus).toBeNull();    // class unknown — not SIGNED, not a guessed UFA/RFA
+    expect(f.capHit).toBe(0);               // nothing under contract
+    expect(f.years).toBe(0);
+    expect(f.lastCapHit).toBe(12.5);        // last real contract was the extension, not $3.85M
+    expect(fieldsAt(2036)).toEqual(f);      // stays coherent in later seasons
+  });
+
+  it("expired with a recorded class keeps that class", () => {
+    expect(fieldsAt(2033, "UFA")).toMatchObject({ contractStatus: "UFA", expires: true, capHit: 0, years: 0, lastCapHit: 12.5 });
+    expect(fieldsAt(2033, "RFA").contractStatus).toBe("RFA");
+  });
+
+  it("a plain SIGNED/null deal with no extension is unchanged", () => {
+    const d = deriveContractStatus({ expiryStatus: null, expiryYear: 2027, yearsRemaining: 1, offseasonYear: 2033 });
+    expect(d).toMatchObject({ contractStatus: "SIGNED", expiresThisOffseason: false });
   });
 });
