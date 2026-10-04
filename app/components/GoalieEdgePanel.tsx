@@ -118,7 +118,6 @@ function PercentileChip({ value }: { value: number | null }) {
         background: bg,
         color: fg,
         borderColor: band === "low" ? rule : "transparent",
-        opacity: band === "low" ? 0.75 : 1,
         whiteSpace: "nowrap",
       }}
     >
