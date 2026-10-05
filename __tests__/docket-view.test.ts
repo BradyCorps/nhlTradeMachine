@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDocketEntries,
+  docketAtTradeWinner,
+  docketLiveGrade,
   docketReturns,
   filterAndSortDocketEntries,
   type DocketEntry,
@@ -86,6 +88,33 @@ const trade = (
 });
 
 describe("Docket view model", () => {
+  it("distinguishes pending, unavailable, invalid, and genuine even live grades without changing frozen evidence", () => {
+    const entry = buildDocketEntries([trade("live", "2026-07-01", true, "WPG", 20)])[0];
+    const frozen = JSON.stringify(entry.lockedVerdict);
+    expect(docketLiveGrade(entry)).toEqual({ kind: "pending", label: "Not yet graded" });
+    expect(docketLiveGrade({ ...entry, todayVerdict: "Today grade unavailable" }))
+      .toEqual({ kind: "unavailable", label: "Grade unavailable" });
+    const graded = { ...entry, todayNavMargin: 0, todayLockedVerdict: { ...entry.lockedVerdict!,
+      status: "FAIR" as const, metrics: { ...entry.lockedVerdict!.metrics, homeNetGain: 0 } } };
+    expect(docketLiveGrade(graded)).toEqual({ kind: "graded", label: "EVEN", margin: 0 });
+    expect(docketLiveGrade({ ...graded, todayWinner: "CGY", todayNavMargin: 12 }))
+      .toEqual({ kind: "graded", label: "CGY", margin: 12 });
+    expect(docketLiveGrade({ ...graded, todayNavMargin: NaN }).kind).toBe("pending");
+    expect(docketLiveGrade({ ...graded, todayLockedVerdict: null }).kind).toBe("pending");
+    expect(JSON.stringify(entry.lockedVerdict)).toBe(frozen);
+  });
+
+  it("filters and sorts frozen winners without mistaking an absent grade for even", () => {
+    const [even, pending] = buildDocketEntries([trade("even", "2026-07-01", true, null, 0),
+      trade("pending", "2026-07-02", true, "WPG", 20)]);
+    const unavailable = { ...pending, id: "unavailable", winner: null, fairness: "PENDING" };
+    expect(docketAtTradeWinner(unavailable)).toBe("Unavailable");
+    expect(docketAtTradeWinner({ ...unavailable, navMargin: 0 })).toBe("Unavailable");
+    expect(filterAndSortDocketEntries([even, pending, unavailable], { winner: "EVEN" }).map(e => e.id)).toEqual(["even"]);
+    expect(filterAndSortDocketEntries([unavailable], { query: "even" })).toEqual([]);
+    expect(filterAndSortDocketEntries([pending, unavailable, even], { sort: "winner" }).map(e => e.id))
+      .toEqual(["even", "unavailable", "pending"]);
+  });
   it("builds entries only from published graded trades", () => {
     const draft = trade("draft", "2026-07-01", false, "WPG", 20);
     const ungraded: TradeRecord = { ...trade("ungraded", "2026-07-02", true, "CGY", 12), gradeAtTrade: null };

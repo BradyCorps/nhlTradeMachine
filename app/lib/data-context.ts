@@ -1,5 +1,6 @@
 import { SEASON } from "@/app/lib/season-config";
 import { buildSeasonReference, type SeasonReference } from "@/app/lib/season-snapshot";
+import { observedLabel, type ObservedSelection } from "@/app/lib/observed-season";
 
 export const XNAV_MODEL_VERSION = "X-NAV 4.2";
 
@@ -70,7 +71,9 @@ export function buildLeagueProvenance(input: {
   if (input.kind !== "teams" && !liveStats) warnings.push("Player analytics source is unavailable; roster and contract fallbacks are shown.");
   if (input.kind !== "players" && teamCount !== 32) warnings.push(`Team coverage is incomplete (${teamCount}/32).`);
 
-  const playerCoverage = `${analyticsCount}/${playerCount} player records with analytics · ${contractsLoaded} contract records`;
+  // These are separate populations, not a player-coverage numerator/denominator.
+  // Assembly maps include name/position/team aliases for the same source record.
+  const playerCoverage = `${playerCount} catalogue entries · ${analyticsCount} analytics lookup keys (includes aliases) · ${contractsLoaded} contract lookup keys (includes aliases)`;
   const teamCoverage = `${teamCount}/32 teams · cap ledger · draft-pick inventory`;
 
   return {
@@ -97,7 +100,7 @@ export function buildLeagueProvenance(input: {
 /** One-line season reference for a data rail — the same facts as `SeasonReference`. */
 export function seasonReferenceLine(ref: SeasonReference | null | undefined = undefined): string {
   const r = ref ?? buildSeasonReference();
-  return `${r.projectedSeason} projected (${r.projectedSeasonGamesObserved} GP observed) · stats ${r.statsSeason} · contracts ${r.contractSeason} · ${r.modelVersion} · struck ${r.valuationAsOf}`;
+  return `${r.projectedSeason} valuation · model inputs ${r.statsSeason} (${r.projectedSeasonGamesObserved} target-season GP in model, not observed-statistics coverage) · current contracts ${r.contractSeason} · ${r.modelVersion} · struck ${r.valuationAsOf}`;
 }
 
 export function formatDataTimestamp(value: string | null | undefined): string {
@@ -117,18 +120,18 @@ export function formatDataTimestamp(value: string | null | undefined): string {
 export function routeDataContext(
   route: ProductRoute,
   provenance: LeagueProvenance | null | undefined,
-  options: { capCeiling?: number | null } = {},
+  options: { capCeiling?: number | null; observedSelection?: ObservedSelection } = {},
 ): RouteDataContext {
   const ceiling = Number.isFinite(options.capCeiling)
     ? `$${Number(options.capCeiling).toFixed(1)}M ceiling`
     : "cap ceiling unavailable";
   const routeItems: Record<ProductRoute, ContextItem[]> = {
     players: [
-      { label: "Stats", value: `${SEASON.replaySeason} regular season · all situations` },
+      { label: "Model inputs", value: `${SEASON.replaySeason} regular season · all situations` },
       { label: "Roster / contracts", value: `${SEASON.label} · ${SEASON.rosterMoveWindow}` },
     ],
     teams: [
-      { label: "Completed results", value: `${SEASON.replaySeason} regular season` },
+      { label: "Model inputs", value: `${SEASON.replaySeason} regular season · all situations` },
       { label: "Current roster / cap", value: `${SEASON.label} · ${ceiling}` },
       { label: "Future rating", value: "2028-29 age curve, prospects, and draft capital" },
     ],
@@ -137,7 +140,7 @@ export function routeDataContext(
       { label: "Stats baseline", value: `${SEASON.replaySeason} regular season · all situations` },
     ],
     trade: [
-      { label: "Stats", value: `${SEASON.replaySeason} regular season · all situations` },
+      { label: "Model inputs", value: `${SEASON.replaySeason} regular season · all situations` },
       { label: "Roster / CBA", value: `${SEASON.label} · ${SEASON.rosterMoveWindow} · ${ceiling}` },
     ],
     armchair: [
@@ -159,11 +162,12 @@ export function routeDataContext(
 
   return {
     items: [
+      ...(options.observedSelection ? [{ label: "Observed statistics", value: observedLabel(options.observedSelection) }] : []),
       ...routeItems[route],
       { label: "As of", value: formatDataTimestamp(resolved.asOf) },
       { label: "Source / coverage", value: `${resolved.source} · ${resolved.coverage}` },
       { label: "Model", value: resolved.modelVersion },
-      { label: "Reconciliation", value: resolved.reconciliation === "passed" ? "Passed" : "Warning" },
+      { label: "Reconciliation", value: `${resolved.reconciliation === "passed" ? "Passed" : "Warning"} · assembly checks only; not complete player coverage` },
       { label: "Season reference", value: provenance ? seasonReferenceLine(provenance.seasonReference) : "Unavailable" },
     ],
     warning: resolved.warning,

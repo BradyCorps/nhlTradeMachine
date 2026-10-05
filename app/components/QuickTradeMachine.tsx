@@ -635,7 +635,7 @@ function VerdictSummary({ verdict }: { verdict: VerdictDisplay }) {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <div className="text-[10px] font-black uppercase tracking-[0.25em] font-mono text-ledger-ink-faint">
-            Locked Verdict
+            Locked audit · NAV balance / feasibility
           </div>
           <div className="text-3xl font-black uppercase italic" style={{ color: statusColor }}>
             {verdict.status}
@@ -652,43 +652,46 @@ function VerdictSummary({ verdict }: { verdict: VerdictDisplay }) {
         {verdict.message}
       </p>
       {verdict.sideOutcomes && verdict.sideOutcomes.length > 0 && (
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {verdict.sideOutcomes.map(side => {
-            const color = side.outcome === "WIN"
-              ? "var(--ledger-green)"
-              : side.outcome === "LOSS"
-                ? "var(--ledger-red)"
-                : "var(--ledger-ice)";
-            return (
-              <div key={`${side.side}-${side.teamId}`} className="border px-3 py-2"
-                style={{ borderColor: "var(--ledger-rule-light)", background: "var(--ledger-card)" }}>
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="text-[9px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint">
-                      {side.teamName}
+        <>
+          <p className="mt-4 text-[10px] font-mono text-ledger-ink-faint">Team fit assessment · combines NAV, estimated wins, window shift and roster needs. A fit WIN can still pay a NAV premium.</p>
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {verdict.sideOutcomes.map(side => {
+              const color = side.outcome === "WIN"
+                ? "var(--ledger-green)"
+                : side.outcome === "LOSS"
+                  ? "var(--ledger-red)"
+                  : "var(--ledger-ice)";
+              return (
+                <div key={`${side.side}-${side.teamId}`} className="border px-3 py-2"
+                  style={{ borderColor: "var(--ledger-rule-light)", background: "var(--ledger-card)" }}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="text-[9px] font-black uppercase tracking-[0.2em] text-ledger-ink-faint">
+                        {side.teamName}
+                      </div>
+                      <div className="text-[15px] font-black uppercase italic" style={{ color }}>
+                        {side.outcome === "EVEN" ? "Even" : side.outcome}
+                      </div>
                     </div>
-                    <div className="text-[15px] font-black uppercase italic" style={{ color }}>
-                      {side.outcome === "EVEN" ? "Even" : side.outcome}
+                    <div className="text-right text-[10px] font-mono text-ledger-ink-faint">
+                      <div>{fmtSigned(side.navNet, 0)} NAV</div>
+                      <div>{fmtSigned(side.winsAdded)} W</div>
+                      <div>{fmtSigned(side.windowYears)} yr</div>
                     </div>
                   </div>
-                  <div className="text-right text-[10px] font-mono text-ledger-ink-faint">
-                    <div>{fmtSigned(side.navNet, 0)} NAV</div>
-                    <div>{fmtSigned(side.winsAdded)} W</div>
-                    <div>{fmtSigned(side.windowYears)} yr</div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {side.drivers.map(driver => (
+                      <span key={driver} className="border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.12em]"
+                        style={{ borderColor: "var(--ledger-rule-light)", color: "var(--ledger-ink-faint)" }}>
+                        {driver}
+                      </span>
+                    ))}
                   </div>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {side.drivers.map(driver => (
-                    <span key={driver} className="border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.12em]"
-                      style={{ borderColor: "var(--ledger-rule-light)", color: "var(--ledger-ink-faint)" }}>
-                      {driver}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
       {verdict.flags.length > 0 && (
         <div className="mt-4 space-y-2">

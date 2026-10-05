@@ -1,0 +1,37 @@
+[
+  {
+    "width": 320,
+    "badges": "contained; no STRAND/stat overlap",
+    "interactions": "search, selection, flags, expansion, sorting, keyboard passed",
+    "docket": "pending/unavailable/zero and frozen filter passed",
+    "trade": "audit, share/reopen, locked NAV and status passed"
+  },
+  {
+    "width": 412,
+    "badges": "contained; no STRAND/stat overlap",
+    "interactions": "search, selection, flags, expansion, sorting, keyboard passed",
+    "docket": "pending/unavailable/zero and frozen filter passed",
+    "trade": "audit, share/reopen, locked NAV and status passed"
+  },
+  {
+    "width": 768,
+    "badges": "contained; no STRAND/stat overlap",
+    "interactions": "search, selection, flags, expansion, sorting, keyboard passed",
+    "docket": "pending/unavailable/zero and frozen filter passed",
+    "trade": "audit, share/reopen, locked NAV and status passed"
+  },
+  {
+    "width": 1024,
+    "badges": "contained; no STRAND/stat overlap",
+    "interactions": "search, selection, flags, expansion, sorting, keyboard passed",
+    "docket": "pending/unavailable/zero and frozen filter passed",
+    "trade": "audit, share/reopen, locked NAV and status passed"
+  },
+  {
+    "width": 1440,
+    "badges": "contained; no STRAND/stat overlap",
+    "interactions": "search, selection, flags, expansion, sorting, keyboard passed",
+    "docket": "pending/unavailable/zero and frozen filter passed",
+    "trade": "audit, share/reopen, locked NAV and status passed"
+  }
+]

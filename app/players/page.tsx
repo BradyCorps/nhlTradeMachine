@@ -1329,7 +1329,7 @@ export default function PlayersPage() {
         <ObservedSeasonSelector selection={selection} onChange={setSelection} />
         <p className="text-[11px] font-mono mb-2" role="status">Observed: {observedLabel(selection)}. Missing or delayed coverage is shown as —; confirmed zero games as 0.</p>
         <p className="text-[11px] font-mono mb-2">Current contracts and NAV · model inputs, STRAND, roles, GSAx, OPS/DPS and 82-game pace: 2025–26 regular season. These are not historical valuations.</p>
-        <DataContextRail route="players" provenance={provenance} />
+        <DataContextRail route="players" provenance={provenance} observedSelection={selection} />
       </div>
 
       {/* ── Hot off the Press — freshest signed extensions (PA8) ── */}
