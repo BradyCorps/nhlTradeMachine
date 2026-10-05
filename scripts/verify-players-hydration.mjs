@@ -22,7 +22,6 @@ try {
   await mkdir(output, { recursive: true });
   for (const width of [412, 1280]) {
     const page = await browser.newPage({ viewport: { width, height: 900 }, bypassCSP: base.includes("localhost") });
-    await page.addInitScript(() => localStorage.setItem("cap-and-crease-welcomed-v1", "1"));
     // Model a browser opening build-time HTML on a different calendar day.
     await page.clock.setFixedTime(new Date("2026-10-05T12:00:00Z"));
     const errors = [];

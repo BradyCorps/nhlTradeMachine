@@ -150,12 +150,13 @@ export default function WelcomePage() {
             </div>
             <div className="flex justify-center md:justify-end">
               <a
-                href="https://buymeacoffee.com/hockeyledger"
+                href="https://buymeacoffee.com/capandcrease"
+                aria-label="Buy me a stick tap — support Cap & Crease"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="fp-stamp-small no-underline"
               >
-                Buy Me a Coffee
+                Buy me a stick tap
               </a>
             </div>
           </div>
@@ -208,25 +209,22 @@ export default function WelcomePage() {
               On the Business of Building a Hockey Team
             </p>
           </div>
-          <div className="fp-lede text-[14px] leading-[1.9] max-w-3xl mx-auto"
-            style={{ color: "var(--ledger-ink-body)" }}>
+          <div className="fp-lede text-[14px] leading-[1.9] max-w-2xl mx-auto"
+            style={{ color: "var(--ledger-ink-body)", columnCount: 1, columnRule: "none" }}>
             <p>
-              Build your trade in the Trade Machine and test it against the X-NAV
-              engine and the GM Audit or take the chair in Armchair GM and live
-              with every consequence that follows. Explore advanced and enhanced
-              stats on the Player Analytics page, featuring the {BRAND.name}{" "}
-              exclusive Player Gravity system, STRAND DNA Identity profiles and a
-              new all-in-one X-NAV model. Read the published Docket to see how the
-              calls have aged. Visit the Press Box and play the daily hockey crib.
+              It started with a familiar hockey argument: ‘Who says no?’ Usually,
+              one side was getting Connor McDavid and the other was getting a bag
+              of chips and a haircut.
             </p>
+            <p className="mt-4">I figured, how hard could it be to build a trade machine that gave those conversations a little more substance?</p>
+            <p className="mt-4">What was supposed to be a simple side project grew into Cap &amp; Crease: a hockey analytics website with custom valuation models, player profiles, team-building tools, and more data feeds than I originally planned to manage.</p>
+            <p className="mt-4">Turns out, it’s very hard.</p>
+            <p className="mt-4">The goal is to give the debate a better starting point: what a player brings, what their contract costs, and whether a deal makes sense for both teams. The models are estimates, the site is still evolving, and there will always be room to argue with the verdict.</p>
+            <p className="mt-4">Try a trade, explore your team, and let me know what looks wrong. That’s how this gets better.</p>
           </div>
-          <p className="mt-5 text-2xs uppercase tracking-[0.3em] font-mono text-center max-w-3xl mx-auto"
+          <p className="mt-3 text-2xs uppercase tracking-[0.28em] font-mono text-right max-w-2xl mx-auto"
             style={{ color: "var(--ledger-ink-faint)" }}>
-            The press is open. Turn the page and start running the room.
-          </p>
-          <p className="mt-3 text-2xs uppercase tracking-[0.28em] font-mono text-right max-w-3xl mx-auto"
-            style={{ color: "var(--ledger-ink-faint)" }}>
-            — The Front Office
+            — Brady, creator of Cap &amp; Crease
           </p>
         </section>
 

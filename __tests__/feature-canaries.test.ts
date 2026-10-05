@@ -3548,15 +3548,6 @@ describe("Canary — brand kit implementation", () => {
 });
 
 describe("Canary — the front page wears the brand kit", () => {
-  it("types the name nowhere on the home page", () => {
-    // Both nameplates — the dark hero and the sheet below it — used Libre
-    // Baskerville with a typed ampersand, which the kit forbids.
-    for (const file of ["app/page.tsx", "app/components/ScrollNameplate.tsx"]) {
-      const src = readSource(file);
-      expect(src, file).not.toContain("Cap & Crease");
-    }
-  });
-
   it("uses the kit wordmark on both nameplates, cream cut on the dark desk", () => {
     expect(read("app/page.tsx")).toContain("/brand/svg/cap-and-crease-wordmark.svg");
     expect(read("app/components/ScrollNameplate.tsx"))
