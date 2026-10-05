@@ -10,6 +10,8 @@ Legend: `[ ]` to-do · `[~]` partial / verify-then-close
 
 ---
 
+- [x] Temporarily pause the automatic Claude season recap with an explanation; preserve simulation results and Season Review.
+
 ## [x] Post-rollover roster consistency — 2026-10-02
 Shared published-trade ownership with Admin Contracts, preserve live identities, expose the full assigned team roster, and distinguish unavailable pricing from calculated zero. Verification and remaining data-only corrections: `docs/POST_ROLLOVER_ROSTER_CONSISTENCY.md`. Delivery is PR-only; no Production writes, merge, deploy or Labs work.
 

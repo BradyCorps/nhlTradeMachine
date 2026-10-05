@@ -38,7 +38,7 @@ try {
   for (const width of [320, 412, 1024, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 1000 }, hasTouch: true, reducedMotion: "reduce" });
     const page = await context.newPage(); page.setDefaultTimeout(12000);
-    const errors = []; let simulations = 0;
+    const errors = []; let simulations = 0; let recapRequests = 0;
     page.on("pageerror", e => errors.push(e.message));
     page.on("response", r => { if (new URL(r.url()).pathname === "/api/simulate") simulations++; });
     await page.route("**/api/league**", route => {
@@ -49,7 +49,10 @@ try {
         observedStats: { season, gameType, coverage: "available", games: 3, goals: 1, assists: 2, points: 3 },
       })) } });
     });
-    await page.route("**/api/claude", route => route.fulfill({ json: { content: [{ text: "Isolated simulation recap." }] } }));
+    await page.route("**/api/claude", route => {
+      recapRequests++;
+      return route.fulfill({ status: 400, json: { error: "AI recap must not be requested while paused." } });
+    });
 
     // Each route starts in a fresh browser; no global acknowledgement gate.
     for (const path of ["/", "/players", "/trade-machine", "/armchair-gm"]) {
@@ -93,6 +96,7 @@ try {
     await review.locator("summary").click({ timeout: 25000 });
     const player = review.getByRole("button", { name: /Expand valuation breakdown/ }).first();
     await player.waitFor();
+    await page.getByText("AI season recap is temporarily unavailable. Simulated results and Season Review remain available.", { exact: true }).filter({ visible: true }).waitFor();
     const label = await player.getAttribute("aria-label");
     const name = label.replace("Expand valuation breakdown for ", "");
     const reviewNode = await review.elementHandle();
@@ -118,6 +122,7 @@ try {
     await player.click();
     await page.screenshot({ path: `${output}/after-review-expanded-${width}.png`, fullPage: true });
     assert.equal(simulations, 1, "Nested expansion restarted simulation");
+    assert.equal(recapRequests, 0, "Paused AI recap still contacted the service");
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0);
     const sheet = page.locator(".mobile-detail-sheet");
     if (await sheet.count()) {

@@ -13,6 +13,7 @@ import { MODEL_PRICE_SHORT } from "@/app/lib/contract-verdict";
 import { HelpPopover } from "@/app/components/HelpPopover";
 import MetricTip from "@/app/components/MetricTip";
 import { HorizontalScrollCue } from "@/app/components/HorizontalScrollCue";
+import { AI_SEASON_RECAP_ENABLED, AI_SEASON_RECAP_PAUSED_MESSAGE } from "@/app/lib/season-recap";
 
 // ── League Numbers — award race + full standings by division ──
 const CONFERENCES: { conf: string; divs: string[] }[] = [
@@ -573,6 +574,12 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
           </div>
         )}
       </div>
+
+      {simData && !AI_SEASON_RECAP_ENABLED && (
+        <p className="text-xs font-mono mb-3" style={{ color: 'var(--ledger-ink)' }}>
+          {AI_SEASON_RECAP_PAUSED_MESSAGE}
+        </p>
+      )}
 
       {pages.length > 1 && (
         <>
