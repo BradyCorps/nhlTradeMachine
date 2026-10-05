@@ -13,7 +13,6 @@ const results = [];
 try {
   for (const width of widths) {
     const context = await browser.newContext({ viewport: { width, height: width >= 667 && width <= 844 ? 390 : 844 }, reducedMotion: "reduce", hasTouch: true, bypassCSP: true });
-    await context.addInitScript(() => localStorage.setItem("cap-and-crease-welcomed-v1", "1"));
     const page = await context.newPage();
     for (const route of routes) {
       const name = `${width}-${route.replaceAll("/", "_") || "home"}`;

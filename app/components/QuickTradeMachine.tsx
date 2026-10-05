@@ -22,6 +22,7 @@ import {
 } from "@/app/lib/trade-share";
 import { formatPickRound } from "@/app/lib/trade-format";
 import { groupTeamRoster, rosterGroupCount, type RosterGroups } from "@/app/lib/roster-picker";
+import { canOfferPick, pickOffersSupported, pickOriginalTeam, pickUnavailableReason } from "@/app/lib/pick-ownership";
 import { ageDecayRate, ageSlotPenalty, SEASON } from "@/app/lib/season-config";
 import MeasuredProfile from "@/app/components/MeasuredProfile";
 import StrandDisplay from "@/app/components/StrandDisplay";
@@ -116,7 +117,9 @@ function TeamWindowBadge({ phase, postPhase }: { phase: TeamPhase | null; postPh
 function assetLabel(asset: Asset): string {
   if (asset.position === "Pick") {
     const round = formatPickRound(asset.round);
-    return `${asset.year ?? ""} ${round} round pick`;
+    const original = asset.originalOwnerId ?? pickOriginalTeam(asset);
+    const origin = original ? (asset.teamId && asset.teamId !== original ? ` via ${original}` : ` (${original})`) : "";
+    return `${asset.year ?? ""} ${round} round pick${origin}`;
   }
   return `${asset.name} · ${displayPosition(asset.position, asset.secondaryPosition)} · ${fmtCap(asset.capHit ?? 0)}`;
 }
@@ -201,13 +204,14 @@ function RosterCard({ asset, nav, onAdd }: { asset: Asset; nav: XNAVResult; onAd
   return (
     <button
       type="button"
+      disabled={!canOfferPick(asset)}
       onClick={() => onAdd({ ...asset, retainedPct: 0 })}
-      aria-label={`Add ${isPick ? assetLabel(asset) : asset.name} to the package`}
+      aria-label={`${canOfferPick(asset) ? "Add" : "Unavailable:"} ${isPick ? assetLabel(asset) : asset.name}${canOfferPick(asset) ? " to the package" : ` — ${pickUnavailableReason(asset)}`}`}
       className="group text-left border px-2.5 py-2 flex flex-col gap-1 transition-colors hover:bg-[var(--paper-inset)] focus:outline-none focus-visible:ring-2"
       style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-bg)" }}
     >
       <span className="flex items-baseline justify-between gap-2">
-        <span className="text-[12px] font-black truncate" style={{ color: "var(--ledger-ink)" }}>
+        <span className="text-[12px] font-black break-words" style={{ color: "var(--ledger-ink)" }}>
           {isPick ? assetLabel(asset) : asset.name}
         </span>
         {!isPick && (
@@ -218,10 +222,11 @@ function RosterCard({ asset, nav, onAdd }: { asset: Asset; nav: XNAVResult; onAd
       </span>
       <span className="flex items-center justify-between gap-2 text-[9px] font-mono uppercase tracking-[0.1em] text-ledger-ink-faint">
         <span className="truncate">
-          {isPick ? "Draft pick" : `${displayPosition(asset.position, asset.secondaryPosition)} · ${fmtCap(asset.capHit)}`}
+          {isPick ? (canOfferPick(asset) ? "Draft pick" : "Unavailable pick") : `${displayPosition(asset.position, asset.secondaryPosition)} · ${fmtCap(asset.capHit)}`}
         </span>
         <span className="shrink-0" style={{ color: "var(--ledger-ink-body)" }}>{stat}</span>
       </span>
+      {!canOfferPick(asset) && <span className="text-[10px] leading-relaxed text-ledger-ink-body">{pickUnavailableReason(asset)}</span>}
       <span aria-hidden="true" className="text-[8px] font-black uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity"
         style={{ color: "var(--ledger-red)" }}>
         + Add to block
@@ -1027,7 +1032,9 @@ export default function QuickTradeMachine() {
   const partnerTeam = data.teams.find(team => team.id === partnerTeamId) ?? null;
   const allHomeRoster = useMemo(() => data.players.filter(player => player.teamId === homeTeamId), [data.players, homeTeamId]);
   const allPartnerRoster = useMemo(() => data.players.filter(player => player.teamId === partnerTeamId), [data.players, partnerTeamId]);
-  const canEvaluate = Boolean(homeTeam && partnerTeam && (outgoing.length || incoming.length));
+  const picksAvailable = pickOffersSupported(outgoing, data.players, homeTeamId) &&
+    pickOffersSupported(incoming, data.players, partnerTeamId);
+  const canEvaluate = Boolean(homeTeam && partnerTeam && (outgoing.length || incoming.length) && picksAvailable);
   const selectedAssets = useMemo(() => [...outgoing, ...incoming], [outgoing, incoming]);
   const outgoingSummary = useMemo(() => summarizePackage(outgoing, navMap), [outgoing, navMap]);
   const incomingSummary = useMemo(() => summarizePackage(incoming, navMap), [incoming, navMap]);
@@ -1301,6 +1308,10 @@ export default function QuickTradeMachine() {
             onRetry={error === "Couldn't load league data" ? loadTradeMachineData : undefined}
           />
         )}
+
+        {!picksAvailable && <p role="status" className="border p-3 text-[12px] leading-relaxed text-ledger-ink-body">
+          A draft pick is unavailable or no longer owned by its offering team. Remove it to continue.
+        </p>}
 
         {booting ? (
           <div className="border p-8" role="status" aria-live="polite"

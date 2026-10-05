@@ -3,12 +3,13 @@ import { SEASON } from "../app/lib/season-config";
 
 const state = vi.hoisted(() => ({
   overrides: [] as any[],
+  failed: false,
 }));
 
 vi.mock("@/app/db/client", () => ({
   db: {
     select: vi.fn(() => ({
-      from: vi.fn(async () => state.overrides),
+      from: vi.fn(async () => { if (state.failed) throw new Error("isolated DB failure"); return state.overrides; }),
     })),
   },
 }));
@@ -16,10 +17,12 @@ vi.mock("@/app/db/client", () => ({
 vi.mock("@/app/db/ensure-schema", () => ({
   ensureNewTables: vi.fn(async () => undefined),
 }));
+vi.mock("@/app/lib/trades", () => ({ listPublishedTrades: vi.fn(async () => []) }));
 
 describe("draft pick inventory", () => {
   beforeEach(() => {
     state.overrides = [];
+    state.failed = false;
   });
 
   it("applies DB ownership overrides while preserving original-owner pick context", async () => {
@@ -31,6 +34,7 @@ describe("draft pick inventory", () => {
       year: SEASON.firstTradablePickYear,
       isProtected: true,
       conditions: "top-10 protected",
+      updatedAt: Date.parse("2026-10-06"),
     }];
 
     const { buildDraftPickInventory } = await import("../app/lib/draft-pick-inventory");
@@ -41,11 +45,20 @@ describe("draft pick inventory", () => {
 
     const moved = picks.find((pick: any) => pick.id === `pick-CGY-${SEASON.firstTradablePickYear}-1`);
     expect(moved).toMatchObject({
-      teamId: "WPG",
-      name: `${SEASON.firstTradablePickYear} 1st Round Pick via CGY`,
+      teamId: "",
+      currentOwnerId: "WPG",
+      pickOwnership: "conditional",
       isProtected: true,
       conditions: "top-10 protected",
     });
+  });
+
+  it("does not recreate original ownership if the ledger read fails", async () => {
+    state.failed = true;
+    const { buildDraftPickInventory } = await import("../app/lib/draft-pick-inventory");
+    const picks = await buildDraftPickInventory([]);
+    expect(picks).toHaveLength(32 * 5 * 7);
+    expect(picks.every(p => p.teamId === "" && p.pickOwnership === "unverified")).toBe(true);
   });
 
   // DATA-04: rounds 6-7 were silently omitted — only [1,2,3,4,5] were ever

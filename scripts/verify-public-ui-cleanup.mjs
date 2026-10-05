@@ -38,7 +38,6 @@ try {
   for (const width of [320, 412, 768, 1024, 1440]) {
     const page = await browser.newPage({ viewport: { width, height: 1000 }, bypassCSP: true });
     page.setDefaultTimeout(8000);
-    await page.addInitScript(() => localStorage.setItem("cap-and-crease-welcomed-v1", "1"));
     await page.route("**/*", route => route.request().headers()["next-router-prefetch"]
       ? route.abort() : route.continue());
     await page.route("**/api/league**", route => {

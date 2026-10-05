@@ -35,6 +35,8 @@ jobs:
       - name: Keyboard and workflow regression
         if: always()
         run: node scripts/mob-workflows.mjs
+      - name: Pick ownership and nested Season Review regression
+        run: node --import tsx scripts/verify-picks-welcome-review.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

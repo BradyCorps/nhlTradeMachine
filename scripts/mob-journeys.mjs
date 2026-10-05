@@ -51,7 +51,6 @@ async function buildTrade(page) {
 try {
   for (const width of widths) {
     const context = await browser.newContext({ viewport: { width, height: width >= 1024 ? 768 : 844 }, hasTouch: width < 1024, bypassCSP: true });
-    await context.addInitScript(() => localStorage.setItem("cap-and-crease-welcomed-v1", "1"));
     const page = await context.newPage();
     const entry = { width };
     const step = async (name, run) => {

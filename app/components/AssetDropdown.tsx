@@ -11,6 +11,7 @@ import { navColor } from "@/app/lib/display-utils";
 import { navLabelForPosition, pickCountLabel, playerCountLabel } from "@/app/lib/player-terminology";
 import { termLabel as contractTermLabel } from "@/app/lib/roster-table";
 import { matchesPlayerSearch } from "@/app/lib/player-search";
+import { canOfferPick, pickUnavailableReason, teamPickAssets } from "@/app/lib/pick-ownership";
 
 const CORE_COUNT = 8;
 
@@ -25,8 +26,9 @@ function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number | null; onClick:
   return (
     <button
       type="button"
+      disabled={!canOfferPick(p)}
       onClick={onClick}
-      aria-label={`Add ${p.name}; cap hit $${p.capHit.toFixed(2)} million; ${term}; ${navLabelForPosition(p.position)} ${nav == null ? "Not priced" : nav.toFixed(0)}`}
+      aria-label={`${canOfferPick(p) ? "Add" : "Unavailable:"} ${p.name}; ${pickUnavailableReason(p) ?? `cap hit $${p.capHit.toFixed(2)} million; ${term}; ${navLabelForPosition(p.position)} ${nav == null ? "Not priced" : nav.toFixed(0)}`}`}
       className="w-full flex items-center justify-between px-3 py-2 text-left transition-colors"
       style={{ borderBottom: "1px solid var(--ledger-rule-light)" }}
       onMouseEnter={e => (e.currentTarget.style.background = "var(--ledger-cream)")}
@@ -36,6 +38,7 @@ function PlayerRow({ p, nav, onClick }: { p: Asset; nav: number | null; onClick:
         <span className="text-[11px] font-bold truncate"
           style={{ color: "var(--ledger-ink)" }}>
           {p.name}
+          {!canOfferPick(p) && <span className="block whitespace-normal text-[10px] font-normal">{pickUnavailableReason(p)}</span>}
         </span>
         {p.position !== "Pick" && <span aria-hidden="true" style={{ color: "var(--ledger-ink-faint)" }}>·</span>}
         <span className="text-2xs font-black shrink-0 font-mono"
@@ -103,11 +106,10 @@ function AssetDropdown({
   }, [open]);
 
   const eligible = useMemo(() =>
-    db.players.filter(p =>
-      p.teamId === team?.id &&
-      !blocks[idx].some((a: Asset) => a.id === p.id)
-    ),
-    [db.players, team?.id, blocks, idx]
+    [...db.players.filter(p => p.position !== "Pick" && p.teamId === team?.id),
+      ...teamPickAssets(db.players, team?.id ?? "")]
+      .filter(p => !blocks.flat().some((a: Asset) => a.id === p.id)),
+    [db.players, team?.id, blocks]
   );
 
   const { core, depth, prospects, picks } = useMemo(() => {
@@ -128,6 +130,7 @@ function AssetDropdown({
   }, [eligible, navMap, search, team]);
 
   const handleAdd = (p: Asset) => {
+    if (!canOfferPick(p)) return;
     addAsset({ ...p, retainedPct: 0 }, idx);
     setOpen(false);
   };
