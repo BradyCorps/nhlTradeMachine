@@ -1,5 +1,7 @@
 # Development Notes
 
+- 2026-10-05: **Pause unavailable AI season recap** (`app/lib/season-recap.ts`, `app/armchair-gm/useSimDispatch.ts`, `SeasonResultsPager.tsx`, focused unit tests and Season Review browser harness): skip automatic Claude recap requests after successful simulation and explain the temporary pause while retaining deterministic results/review; trade-memo analysis and simulation calculations are unchanged. Re-enable only after recap service recovery is verified.
+
 - 2026-10-05: **PR #40 rollout refinement** (`app/page.tsx`, `scripts/verify-welcome-season-review.mjs`): keep the Staff Editorial in one continuous, narrower newspaper reading column with six paragraph breaks and aligned byline; browser regression checks computed single-column layout and top-to-bottom paragraph order. No pick, simulation calculation or Production record changes.
 
 - 2026-10-05: **Independent Welcome/home and Season Review split from held PR #39** (`app/{layout,page}.tsx`, methodology/legal, removed Welcome modal, `SeasonResultsPager.tsx`, homepage tests and acknowledgement-free browser harnesses): preserve direct first visits, supplied editorial/support links and stable nested disclosure state without any pick inventory/eligibility changes. Reused reproduction/screenshots and fresh split verification are in `docs/welcome-season-review-2026-10-05/README.md`; no Production, issue-reporting form, simulation calculation or Labs changes.

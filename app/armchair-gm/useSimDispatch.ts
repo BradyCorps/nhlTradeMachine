@@ -9,6 +9,7 @@ import type { Asset, Team, XNAVResult } from "@/app/lib/trade-types";
 import { teamWindow } from "@/app/lib/team-window";
 import { rosterLegality, rosterLegalityMessage } from "@/app/lib/roster-legality";
 import { toast } from "@/app/lib/ledger-toast";
+import { AI_SEASON_RECAP_ENABLED } from "@/app/lib/season-recap";
 
 type LeagueState = {
   teams: Team[];
@@ -168,6 +169,13 @@ export function useSimDispatch({
 
     if (!sim) {
       setSimResult("Simulation unavailable — deterministic projection engine did not return results.");
+      setSimLoading(false);
+      return;
+    }
+
+    // Do not request a narrative while the recap service is paused. The
+    // deterministic simulation above remains the source of season results.
+    if (!AI_SEASON_RECAP_ENABLED) {
       setSimLoading(false);
       return;
     }
