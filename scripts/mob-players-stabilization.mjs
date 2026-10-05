@@ -100,7 +100,6 @@ try {
     const tag = `${vp.width}x${vp.height}`;
     const isTouch = vp.width < 1024;
     const context = await browser.newContext({ viewport: vp, hasTouch: isTouch, reducedMotion: "reduce", bypassCSP: true });
-    await context.addInitScript(() => localStorage.setItem("cap-and-crease-welcomed-v1", "1"));
     const page = await context.newPage();
     const entry = { viewport: tag, steps: {} };
     const step = async (name, run) => {

@@ -150,13 +150,14 @@ export default function MethodologyPage() {
               analysis has earned a spot in your bookmarks, a coffee keeps the data flowing.
             </p>
             <a
-              href="https://buymeacoffee.com/hockeyledger"
+              href="https://buymeacoffee.com/capandcrease"
+              aria-label="Buy me a stick tap — support Cap & Crease"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block px-5 py-2.5 font-mono text-[11px] font-black uppercase tracking-[0.15em] border-2 no-underline transition-colors hover:opacity-80"
               style={{ borderColor: "var(--ledger-ink)", background: "var(--ledger-amber, #d4a017)", color: "var(--paper)" }}
             >
-              ☕ Buy Me a Coffee
+              Buy me a stick tap
             </a>
           </section>
         </div>

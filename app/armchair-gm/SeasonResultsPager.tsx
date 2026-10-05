@@ -180,7 +180,9 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
       <div style={{ fontSize: '11px', fontWeight: 900, color: 'var(--ledger-ink)', marginTop: '2px' }}>{val ?? '—'}</div>
     </div>
   );
-  const TeamNumbers = ({ t }: { t: any }) => {
+  // Render in this component: a nested component type is recreated when
+  // openPlayer changes, remounting the native Season Review disclosure.
+  const renderTeamNumbers = (t: any) => {
     const skaters = t.projectedSkaters ?? [];
     const goalsLeader = [...skaters].sort((a, b) => (b.projectedGoals ?? 0) - (a.projectedGoals ?? 0))[0];
     const assistsLeader = [...skaters].sort((a, b) => (b.projectedAssists ?? 0) - (a.projectedAssists ?? 0))[0];
@@ -194,7 +196,7 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
       : '—';
 
     return (
-      <div style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070', padding: '10px 12px' }}>
+      <div key={t.teamId} style={{ background: 'var(--ledger-card)', border: '1px solid #b8a070', padding: '10px 12px' }}>
         <div className="flex items-center justify-between mb-2 gap-2">
           <div>
             <div className="font-black text-[12px] text-ledger-ink font-serif">{t.teamName}</div>
@@ -519,7 +521,7 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
     label: "Team Numbers",
     node: (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {[simData.homeTeam, simData.partnerTeam].filter(Boolean).map((t: any) => <TeamNumbers key={t.teamId} t={t} />)}
+        {[simData.homeTeam, simData.partnerTeam].filter(Boolean).map(renderTeamNumbers)}
       </div>
     ),
   } : null;

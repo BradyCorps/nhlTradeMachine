@@ -3,7 +3,6 @@ import { BRAND } from "@/app/lib/brand";
 import { Libre_Baskerville, Courier_Prime } from 'next/font/google';
 import './globals.css';
 import LedgerToaster from './components/LedgerToaster';
-import WelcomeModal from './components/WelcomeModal';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
 // ── next/font: self-hosted, no layout shift, no external request ──
@@ -89,7 +88,6 @@ export default function RootLayout({
       </head>
       <body className="antialiased font-serif">
         {children}
-        <WelcomeModal />
         <LedgerToaster />
         <SpeedInsights />
       </body>
