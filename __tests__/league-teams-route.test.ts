@@ -13,6 +13,7 @@ vi.mock("@/app/lib/cached-roster", () => ({ getCachedRoster: async () => ({ valu
 
 vi.mock("@/app/lib/swr-store", () => ({ swrStore: null }));
 vi.mock("@/app/lib/redis", () => ({ redis: null }));
+vi.mock("@/app/lib/trades", () => ({ listPublishedTrades: vi.fn(async () => []) }));
 
 vi.mock("@/app/db/ensure-schema", () => ({
   ensureNewTables: vi.fn(async () => undefined),
@@ -70,6 +71,7 @@ describe("league teams route", () => {
       year: SEASON.firstTradablePickYear,
       isProtected: false,
       conditions: null,
+      updatedAt: Date.parse("2026-10-06"),
     }];
 
     const { GET } = await import("../app/api/league/teams/route");

@@ -5,6 +5,7 @@
 // grid component just maps over the result.
 
 import type { Asset } from "./trade-types";
+import { teamPickAssets } from "./pick-ownership";
 
 export interface RosterGroups {
   forwards: Asset[];
@@ -38,7 +39,7 @@ export function groupTeamRoster(
     defense:  mine.filter(p => p.position === "D").sort(byRank),
     goalies:  mine.filter(p => p.position === "G").sort(byRank),
     // Picks read chronologically (year then round), not by cap.
-    picks:    mine.filter(p => p.position === "Pick").sort((a, b) => a.name.localeCompare(b.name)),
+    picks:    teamPickAssets(players, teamId).filter(p => !selectedIds.has(p.id)).sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
 

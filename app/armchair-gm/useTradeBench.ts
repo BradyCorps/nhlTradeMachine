@@ -10,6 +10,7 @@ import type { Asset, Team, TradeVerdict } from "@/app/lib/trade-types";
 import type { LineupOrderPayload } from "@/app/components/LineupEditor";
 import { SEASON } from "@/app/lib/season-config";
 import { pickEffectiveStanding } from "@/app/lib/pick-value";
+import { pickOffersSupported } from "@/app/lib/pick-ownership";
 import { teamWindow } from "@/app/lib/team-window";
 import { applyCapDelta } from "@/app/lib/cap-delta";
 import { clearNavCache } from "@/app/lib/evaluate-client";
@@ -90,6 +91,11 @@ export function useTradeBench({
   // ── Execute Trade — moves players between teams in db state ──
   const executeTrade = useCallback(() => {
     if (!homeTeam || !partnerTeam || (!outgoingBlock.length && !incomingBlock.length)) return;
+    if (!pickOffersSupported(outgoingBlock, db.players, homeTeam.id) ||
+        !pickOffersSupported(incomingBlock, db.players, partnerTeam.id)) {
+      toast("A draft pick is unavailable or no longer owned by the offering team.", "error");
+      return;
+    }
 
     // Cup Run: retention is a scarce cross-season resource. Slots stay
     // occupied for the retained contract's full term, so the ledger is
@@ -138,6 +144,7 @@ export function useTradeBench({
           return clearSessionTradeBlock({
             ...p,
             teamId: partnerTeam.id,
+            ...(p.position === "Pick" ? { currentOwnerId: partnerTeam.id } : {}),
             retainedPct: outgoingAsset.retainedPct ?? p.retainedPct ?? 0,
           });
         }
@@ -146,6 +153,7 @@ export function useTradeBench({
           return clearSessionTradeBlock({
             ...p,
             teamId: homeTeam.id,
+            ...(p.position === "Pick" ? { currentOwnerId: homeTeam.id } : {}),
             retainedPct: incomingAsset.retainedPct ?? p.retainedPct ?? 0,
           });
         }
@@ -206,7 +214,7 @@ export function useTradeBench({
     setBlocks([[], []]);
     setVerdict(null);
     simControlsRef.current?.resetSimulation();
-  }, [homeTeam, partnerTeam, outgoingBlock, incomingBlock, setBlocks, setVerdict, setDb, cupRun, setCupRun, db.capCeiling, simControlsRef]);
+  }, [homeTeam, partnerTeam, outgoingBlock, incomingBlock, setBlocks, setVerdict, setDb, cupRun, setCupRun, db.capCeiling, db.players, simControlsRef]);
 
   // ── Reset to original rosters ─────────────────────────────────
   // CX8 — retention slots are a LEAGUE rule (three slots, 50% a contract, a

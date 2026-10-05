@@ -1,4 +1,7 @@
 import { readFileSync } from "node:fs";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import Home from "@/app/page";
 import { describe, expect, it } from "vitest";
 
 const read = (path: string) => readFileSync(path, "utf8");
@@ -33,27 +36,15 @@ describe("QW-07 action-first homepage", () => {
     expect(page).not.toContain("fp-desk-spacer");
   });
 
-  it("offers one-action destinations before optional model details", () => {
-    const modal = read("app/components/WelcomeModal.tsx");
-
-    expect(modal).toContain('href="/players"');
-    expect(modal).toContain("Search Players");
-    expect(modal).toContain('href="/trade-machine"');
-    expect(modal).toContain("Build a Trade");
-    expect(modal).toContain('href="/teams"');
-    expect(modal).toContain("Explore Teams");
-    expect(modal).toContain("<details");
-    expect(modal).toContain("How the models work");
-    expect(modal.indexOf("Search Players")).toBeLessThan(modal.indexOf("How the models work"));
-  });
-
-  it("persists dismissal locally and exposes dialog semantics", () => {
-    const modal = read("app/components/WelcomeModal.tsx");
-
-    expect(modal).toContain('const STORAGE_KEY = "cap-and-crease-welcomed-v1"');
-    expect(modal).toContain("localStorage.getItem(STORAGE_KEY)");
-    expect(modal).toContain('localStorage.setItem(STORAGE_KEY, "1")');
-    expect(modal).toContain("useDialog({");
-    expect(modal).toContain("{...dialog}");
+  it("renders direct navigation, creator editorial, and an explicitly labelled support link", () => {
+    const html = renderToStaticMarkup(React.createElement(Home));
+    expect(html).toContain('href="/players"');
+    expect(html).toContain('href="/trade-machine"');
+    expect(html).toContain('href="/teams"');
+    expect(html).toContain('href="https://buymeacoffee.com/capandcrease"');
+    expect(html).toContain('aria-label="Buy me a stick tap — support Cap &amp; Crease"');
+    expect(html).toContain("Turns out, it’s very hard.");
+    expect(html).toContain("— Brady, creator of Cap &amp; Crease");
+    expect(html).not.toContain('role="dialog"');
   });
 });

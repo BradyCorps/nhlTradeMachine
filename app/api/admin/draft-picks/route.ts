@@ -16,7 +16,7 @@ function pickId(origOwner: string, year: number, round: number) {
 
 // Build the full set of runtime-generated picks (same logic as /api/league).
 function buildDefaultPicks() {
-  const { draftYear } = SEASON;
+  const draftYear = SEASON.firstTradablePickYear;
   const picks: Record<string, { originalOwnerId: string; currentOwnerId: string; round: number; year: number; isProtected: boolean }> = {};
   for (const team of TEAMS_DB) {
     for (const year of [draftYear, draftYear + 1, draftYear + 2, draftYear + 3, draftYear + 4]) {

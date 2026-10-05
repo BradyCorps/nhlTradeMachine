@@ -10,7 +10,6 @@ const browser = await chromium.launch({ args: ["--no-sandbox"] });
 const results = [];
 try {
   const context = await browser.newContext({ hasTouch: true, reducedMotion: "reduce", bypassCSP: true });
-  await context.addInitScript(() => localStorage.setItem("cap-and-crease-welcomed-v1", "1"));
   const page = await context.newPage();
   page.on("pageerror", error => console.error(`Page error: ${error.message}`));
   for (const route of ["/players", "/teams"]) {

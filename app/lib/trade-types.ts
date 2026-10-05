@@ -59,6 +59,12 @@ export interface Asset {
   year?: number;
   teamStanding?: number;
   isProtected?: boolean;
+  originalOwnerId?: string;
+  currentOwnerId?: string | null;
+  pickOwnership?: "verified" | "conditional" | "unverified";
+  conditions?: string | null;
+  ownershipSources?: string[];
+  ownershipAsOf?: string | null;
   gsax?: number;
   savePct?: number;
   /**

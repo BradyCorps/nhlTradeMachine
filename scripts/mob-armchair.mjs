@@ -7,7 +7,6 @@ const output = process.env.MOB_OUTPUT ?? "artifacts/mob/armchair";
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ args: ["--no-sandbox"] });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, reducedMotion: "reduce", bypassCSP: true });
-await context.addInitScript(() => localStorage.setItem("cap-and-crease-welcomed-v1", "1"));
 const page = await context.newPage();
 const axeSource = await readFile(process.env.MOB_AXE_PATH ?? "/tmp/mob-axe-4.10.3.min.js", "utf8");
 const states = [];
