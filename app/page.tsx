@@ -6,6 +6,7 @@ import ScrollReveal from "./components/ScrollReveal";
 import { BRAND } from "@/app/lib/brand";
 import { BrandMark } from "@/app/components/BrandMark";
 import TrendingPlayers from "./components/TrendingPlayers";
+import { ReportIssueLink } from "./components/ReportIssueLink";
 
 function Cell({
   href, lead = false, kicker, kickerColor, edition, title, body, lines, cta, ctaColor,
@@ -220,7 +221,7 @@ export default function WelcomePage() {
             <p className="mt-4">What was supposed to be a simple side project grew into Cap &amp; Crease: a hockey analytics website with custom valuation models, player profiles, team-building tools, and more data feeds than I originally planned to manage.</p>
             <p className="mt-4">Turns out, it’s very hard.</p>
             <p className="mt-4">The goal is to give the debate a better starting point: what a player brings, what their contract costs, and whether a deal makes sense for both teams. The models are estimates, the site is still evolving, and there will always be room to argue with the verdict.</p>
-            <p className="mt-4">Try a trade, explore your team, and let me know what looks wrong. That’s how this gets better.</p>
+            <p className="mt-4">Try a trade, explore your team, and <ReportIssueLink className="underline focus-visible:outline focus-visible:outline-2">let me know what looks wrong</ReportIssueLink>. That’s how this gets better.</p>
           </div>
           <p className="mt-3 text-2xs uppercase tracking-[0.28em] font-mono text-right max-w-2xl mx-auto"
             style={{ color: "var(--ledger-ink-faint)" }}>

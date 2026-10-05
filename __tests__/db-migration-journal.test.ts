@@ -11,6 +11,7 @@ describe("PL-7 migration journal", () => {
       "0008_add_snapshot_batch_member_uniqueness",
       "0009_add_labs_candidate_foundation",
       "0010_add_labs_evaluation_evidence",
+      "0011_add_issue_reports",
     ]);
     expect(migrations.map(migration => migration.hash)).toEqual(
       expect.arrayContaining([

@@ -10,6 +10,8 @@ Legend: `[ ]` to-do · `[~]` partial / verify-then-close
 
 ---
 
+- [x] Add private text issue reporting and protected Admin review; disclose unavailable screenshots, prepare the additive journaled migration, and verify isolated submission/review journeys.
+
 - [x] Temporarily pause the automatic Claude season recap with an explanation; preserve simulation results and Season Review.
 
 ## [x] Post-rollover roster consistency — 2026-10-02

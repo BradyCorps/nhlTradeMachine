@@ -1,0 +1,35 @@
+[
+  {
+    "width": 320,
+    "submission": "validated; lost acknowledgement retry deduplicated",
+    "review": "signed-session read/update/delete; cancelled and failed deletion preserve record",
+    "focus": "visible keyboard focus",
+    "overflow": 0,
+    "errors": [],
+    "screenshots": "explicitly unavailable",
+    "publicAccessibility": "Pinned axe unavailable; keyboard/focus checks only",
+    "adminAccessibility": "Pinned axe unavailable; keyboard/focus checks only"
+  },
+  {
+    "width": 412,
+    "submission": "validated; lost acknowledgement retry deduplicated",
+    "review": "signed-session read/update/delete; cancelled and failed deletion preserve record",
+    "focus": "visible keyboard focus",
+    "overflow": 0,
+    "errors": [],
+    "screenshots": "explicitly unavailable",
+    "publicAccessibility": "Pinned axe unavailable; keyboard/focus checks only",
+    "adminAccessibility": "Pinned axe unavailable; keyboard/focus checks only"
+  },
+  {
+    "width": 1440,
+    "submission": "validated; lost acknowledgement retry deduplicated",
+    "review": "signed-session read/update/delete; cancelled and failed deletion preserve record",
+    "focus": "visible keyboard focus",
+    "overflow": 0,
+    "errors": [],
+    "screenshots": "explicitly unavailable",
+    "publicAccessibility": "Pinned axe unavailable; keyboard/focus checks only",
+    "adminAccessibility": "Pinned axe unavailable; keyboard/focus checks only"
+  }
+]
