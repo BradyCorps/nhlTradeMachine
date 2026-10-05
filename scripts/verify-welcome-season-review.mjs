@@ -62,6 +62,13 @@ try {
         assert.equal(await support.getAttribute("href"), "https://buymeacoffee.com/capandcrease");
         await support.focus(); assert.equal(await support.evaluate(e => e === document.activeElement), true);
         await page.getByText("Turns out, it’s very hard.", { exact: true }).waitFor();
+        const editorial = page.locator(".fp-lede");
+        assert.equal(await editorial.evaluate(e => getComputedStyle(e).columnCount), "1", "Editorial split into newspaper columns");
+        assert.equal(await editorial.locator("p").count(), 6);
+        const paragraphs = await editorial.locator("p").evaluateAll(ps => ps.map(p => {
+          const box = p.getBoundingClientRect(); return { x: box.x, top: box.top, bottom: box.bottom };
+        }));
+        assert.ok(paragraphs.every((p, i) => i === 0 || (Math.abs(p.x - paragraphs[0].x) < 2 && p.top >= paragraphs[i - 1].bottom)), "Editorial paragraphs do not read continuously top to bottom");
         await page.screenshot({ path: `${output}/after-home-${width}.png`, fullPage: true });
       }
       if (path === "/players") {
