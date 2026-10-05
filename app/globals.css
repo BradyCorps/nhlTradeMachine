@@ -1031,7 +1031,17 @@ select.ledger-select {
 .players-hide-mobile { display: block; }
 .player-icon-badges {
   display: inline-flex;
-  flex-shrink: 0;
+  flex: 1 1 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.player-flags-trigger {
+  max-width: 100%;
+  justify-content: flex-start;
+}
+.players-column-header .col-header {
+  overflow-wrap: normal;
+  padding-inline: 2px;
 }
 .player-row-mobile .player-icon-badges {
   flex: 1 1 100%;

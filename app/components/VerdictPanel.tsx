@@ -54,6 +54,7 @@ export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFla
       style={paperSurface ? { background: "var(--ledger-card-light)" } : undefined}>
       {/* Status header */}
       <div className="px-5 py-4 border-b border-zinc-800/30">
+        <div className="text-2xs font-black uppercase tracking-widest text-zinc-500 mb-2">Locked audit · NAV balance / feasibility</div>
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-baseline gap-2 min-w-0">
             <div className={`text-2xl font-black italic uppercase leading-none tracking-tight ${sc.headerText}`}>
@@ -76,7 +77,7 @@ export default function VerdictPanel({ verdict, sc, expandedFlag, setExpandedFla
       {verdict.sideOutcomes && verdict.sideOutcomes.length > 0 && (
         <div className="px-5 py-3 border-b border-zinc-800/30">
           <div className="text-2xs font-black text-zinc-700 uppercase tracking-widest mb-2">
-            Side Read
+            Team fit · NAV, estimated wins, window shift and roster needs
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {verdict.sideOutcomes.map((side) => {

@@ -37,7 +37,7 @@ describe("QW-03 route data context", () => {
   it("distinguishes completed, current, and three-year Teams horizons", () => {
     const context = routeDataContext("teams", fresh, { capCeiling: 104 });
     expect(context.items).toEqual(expect.arrayContaining([
-      { label: "Completed results", value: "2025-26 regular season" },
+      { label: "Model inputs", value: "2025-26 regular season · all situations" },
       { label: "Current roster / cap", value: "2026-27 · $104.0M ceiling" },
       { label: "Future rating", value: "2028-29 age curve, prospects, and draft capital" },
     ]));
@@ -57,7 +57,29 @@ describe("QW-03 route data context", () => {
     const context = routeDataContext("players", stale);
     expect(context.warning).toContain("stale cached snapshot");
     expect(context.warning).toContain("analytics source is unavailable");
-    expect(context.items).toContainEqual({ label: "Reconciliation", value: "Warning" });
+    expect(context.items.find(item => item.label === "Reconciliation")?.value).toMatch(/^Warning/);
+  });
+
+  it("labels observed selection independently of frozen model inputs and current contracts", () => {
+    for (const route of ["players", "teams"] as const) {
+      const current = routeDataContext(route, fresh, { observedSelection: { season: "20262027", gameType: 2 } });
+      const historical = routeDataContext(route, fresh, { observedSelection: { season: "20252026", gameType: 3 } });
+      expect(current.items).toContainEqual({ label: "Observed statistics", value: "2026–27 regular season" });
+      expect(historical.items).toContainEqual({ label: "Observed statistics", value: "2025–26 playoffs" });
+      expect(current.items.find(i => i.label === "Model inputs")).toEqual(historical.items.find(i => i.label === "Model inputs"));
+      const reference = current.items.find(i => i.label === "Season reference")!.value;
+      expect(reference).toContain("target-season GP in model, not observed-statistics coverage");
+      expect(reference).toContain("current contracts 2026-27");
+    }
+  });
+
+  it("reports separate lookup populations without inventing unique-player coverage", () => {
+    const provenance = buildLeagueProvenance({ kind: "players", playerCount: 7, analyticsCount: 19,
+      contractsLoaded: 22, liveStats: true });
+    expect(provenance.coverage).toBe("7 catalogue entries · 19 analytics lookup keys (includes aliases) · 22 contract lookup keys (includes aliases)");
+    expect(provenance.reconciliation).toBe("passed");
+    expect(routeDataContext("players", provenance).items.find(i => i.label === "Reconciliation")!.value)
+      .toContain("not complete player coverage");
   });
 
   it("renders the shared rail on all requested routes and publishes API provenance", () => {

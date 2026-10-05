@@ -1179,7 +1179,7 @@ export default function TeamsPage() {
             <p className="text-[11px] mb-2">Records: {observedLabel(selection)}. Missing or delayed coverage is unavailable, not zero games.</p>
             <p className="text-[11px] mb-2">Current roster, contracts and NAV · model inputs, phases, Team DNA, EDGE profile and comparisons: 2025–26 regular season. These are not historical valuations.</p>
             {loadError && <p role="alert">{loadError}</p>}
-            <DataContextRail route="teams" provenance={provenance} capCeiling={capCeiling} />
+            <DataContextRail route="teams" provenance={provenance} capCeiling={capCeiling} observedSelection={selection} />
           </div>
 
           <div className="mt-6 mb-5 border-b pb-4" style={{ borderColor: "var(--ledger-rule)" }}>
@@ -1233,7 +1233,7 @@ export default function TeamsPage() {
             <p className="text-[11px] mb-2">Records: {observedLabel(selection)}. Missing or delayed coverage is unavailable, not zero games.</p>
             <p className="text-[11px] mb-2">Current roster, contracts and NAV · model inputs, phases, Team DNA, EDGE profile and comparisons: 2025–26 regular season. These are not historical valuations.</p>
             {loadError && <p role="alert">{loadError}</p>}
-            <DataContextRail route="teams" provenance={provenance} capCeiling={capCeiling} />
+            <DataContextRail route="teams" provenance={provenance} capCeiling={capCeiling} observedSelection={selection} />
         </div>
 
         {/* Page header */}

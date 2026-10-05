@@ -602,7 +602,8 @@ describe("Canary — public Docket page", () => {
     expect(today).toContain("runTrade: true");
     expect(today).toContain("todayLockedVerdict: evaluation.verdict ?? null");
     expect(today).toContain("navToday");
-    expect(client).toContain("entry.todayWinner");
+    // Live winner availability is exercised behaviorally in docket-view.test.ts;
+    // the client now delegates to that shared state helper.
     expect(client).toContain("asset.navToday");
     expect(view).toContain('todayVerdict: "Pending live re-grade"');
   });

@@ -206,8 +206,9 @@ describe("DATA-06: season identity on the API contract", () => {
     expect(provenance.seasonReference.valuationAsOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     const rail = routeDataContext("teams", provenance, { capCeiling: 104 });
     const line = rail.items.find(i => i.label === "Season reference")!.value;
-    expect(line).toContain(`${SEASON.label} projected (0 GP observed)`);
-    expect(line).toContain(`stats ${SEASON.replaySeason}`);
+    expect(line).toContain(`${SEASON.label} valuation`);
+    expect(line).toContain("0 target-season GP in model, not observed-statistics coverage");
+    expect(line).toContain(`model inputs ${SEASON.replaySeason}`);
   });
 
   it("the reference the player dossier renders is the same object the API carries", () => {

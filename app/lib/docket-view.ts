@@ -248,6 +248,32 @@ export function buildDocketEntries(trades: TradeRecord[]): DocketEntry[] {
   });
 }
 
+/** A null winner is only even when the frozen grade establishes that fact. */
+export function docketAtTradeWinner(entry: DocketEntry): string {
+  if (["IDLE", "PENDING"].includes(entry.fairness) || !Number.isFinite(entry.navMargin)) return "Unavailable";
+  if (entry.winner) return entry.winner;
+  return entry.fairness === "FAIR" || entry.navMargin === 0 ? "EVEN" : "Unavailable";
+}
+
+export type DocketLiveGrade =
+  | { kind: "pending" | "unavailable"; label: string }
+  | { kind: "graded"; label: string; margin: number };
+
+export function docketLiveGrade(entry: DocketEntry): DocketLiveGrade {
+  const verdict = entry.todayLockedVerdict;
+  if (verdict && !["IDLE", "PENDING"].includes(verdict.status)
+    && typeof entry.todayNavMargin === "number" && Number.isFinite(entry.todayNavMargin)
+    && Number.isFinite(verdict.metrics.homeNetGain)) {
+    // Zero is a valid grade; absence of a winner alone is not one.
+    const label = entry.todayWinner ?? (verdict.status === "FAIR" || verdict.metrics.homeNetGain === 0
+      ? "EVEN" : verdict.status);
+    return { kind: "graded", label, margin: entry.todayNavMargin };
+  }
+  return entry.todayVerdict === "Pending live re-grade"
+    ? { kind: "pending", label: "Not yet graded" }
+    : { kind: "unavailable", label: "Grade unavailable" };
+}
+
 const matchesQuery = (entry: DocketEntry, query: string): boolean => {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return true;
@@ -255,7 +281,7 @@ const matchesQuery = (entry: DocketEntry, query: string): boolean => {
     entry.id,
     entry.executedDate,
     entry.fairness,
-    entry.winner ?? "even",
+    docketAtTradeWinner(entry),
     ...entry.teams,
     ...entry.packages.flatMap(pkg => pkg.assets.map(asset => asset.name)),
   ].join(" ").toLowerCase();
@@ -272,10 +298,7 @@ export function filterAndSortDocketEntries(
 
   const filtered = entries.filter((entry) => {
     if (teamId && !entry.teams.includes(teamId)) return false;
-    if (winner) {
-      if (winner === "EVEN" && entry.winner) return false;
-      if (winner !== "EVEN" && entry.winner !== winner) return false;
-    }
+    if (winner && docketAtTradeWinner(entry) !== winner) return false;
     return matchesQuery(entry, filters.query ?? "");
   });
 
@@ -283,7 +306,7 @@ export function filterAndSortDocketEntries(
     if (sort === "date-asc") return a.executedDate.localeCompare(b.executedDate) || a.id.localeCompare(b.id);
     if (sort === "nav-desc") return b.navMargin - a.navMargin || b.executedDate.localeCompare(a.executedDate);
     if (sort === "nav-asc") return a.navMargin - b.navMargin || b.executedDate.localeCompare(a.executedDate);
-    if (sort === "winner") return (a.winner ?? "EVEN").localeCompare(b.winner ?? "EVEN") || b.executedDate.localeCompare(a.executedDate);
+    if (sort === "winner") return docketAtTradeWinner(a).localeCompare(docketAtTradeWinner(b)) || b.executedDate.localeCompare(a.executedDate);
     return b.executedDate.localeCompare(a.executedDate) || a.id.localeCompare(b.id);
   });
 }

@@ -8,11 +8,16 @@ import { useStrandCohort } from "@/app/lib/use-strand-cohort";
 import EdgeStrip from "@/app/components/EdgeStrip";
 import VerdictPanel, { STATUS_CONFIG } from "@/app/components/VerdictPanel";
 import type { DocketEntry, DocketReturn, DocketSortKey } from "@/app/lib/docket-view";
-import { docketReturns, docketTodayState, filterAndSortDocketEntries } from "@/app/lib/docket-view";
+import { docketAtTradeWinner, docketLiveGrade, docketReturns, docketTodayState, filterAndSortDocketEntries } from "@/app/lib/docket-view";
 import type { Asset } from "@/app/lib/trade-types";
 import { displayPosition } from "@/app/lib/display-position";
 
 const fmtNav = (value: number): string => `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
+
+const todayGradeLabel = (entry: DocketEntry): string => {
+  const grade = docketLiveGrade(entry);
+  return grade.kind === "graded" ? `${grade.label} ${fmtNav(grade.margin)} NAV` : grade.label;
+};
 
 const assetList = (assets: DocketReturn["assets"]): string =>
   assets.length
@@ -218,7 +223,7 @@ export default function DocketClient({ entries }: DocketClientProps) {
     [entries],
   );
   const winnerOptions = useMemo(
-    () => [...new Set(entries.map(entry => entry.winner ?? "EVEN"))].sort(),
+    () => [...new Set(entries.map(docketAtTradeWinner))].sort(),
     [entries],
   );
   const visibleEntries = useMemo(
@@ -250,7 +255,7 @@ export default function DocketClient({ entries }: DocketClientProps) {
           </select>
         </label>
         <label style={{ display: "grid", gap: 5, fontSize: 10, fontWeight: 900, letterSpacing: "0.16em" }}>
-          WINNER
+          AT-TRADE WINNER
           <select
             value={winner}
             onChange={e => setWinner(e.target.value)}
@@ -295,7 +300,7 @@ export default function DocketClient({ entries }: DocketClientProps) {
                       app's own roster state — an admin concern, not provenance
                       a reader of the ledger can use. It stays in the admin
                       view, where "ROSTER OVERLAY" vs "UI ONLY" means something. */}
-                  AT TRADE: {entry.fairness} · TODAY: {entry.todayWinner ?? "EVEN"} {entry.todayNavMargin == null ? "NA" : fmtNav(entry.todayNavMargin)} NAV
+                  AT TRADE: {entry.fairness} · TODAY: {todayGradeLabel(entry)}
                 </div>
               </div>
               <div style={{
@@ -304,10 +309,10 @@ export default function DocketClient({ entries }: DocketClientProps) {
                 fontSize: 11,
                 fontWeight: 900,
                 letterSpacing: "0.12em",
-                whiteSpace: "nowrap",
+                maxWidth: "100%",
               }}>
-                <div>{entry.winner ?? "EVEN"} {fmtNav(entry.navMargin)} AT TRADE</div>
-                <div style={{ color: "var(--ledger-green)", marginTop: 3 }}>{entry.todayWinner ?? "EVEN"} {entry.todayNavMargin == null ? "NA" : fmtNav(entry.todayNavMargin)} TODAY</div>
+                <div>{docketAtTradeWinner(entry)} {fmtNav(entry.navMargin)} AT TRADE</div>
+                <div style={{ color: docketLiveGrade(entry).kind === "graded" ? "var(--ledger-green)" : "var(--ledger-ink-faint)", marginTop: 3 }}>TODAY: {todayGradeLabel(entry)}</div>
               </div>
             </div>
 
