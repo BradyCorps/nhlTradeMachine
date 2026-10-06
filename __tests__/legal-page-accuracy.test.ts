@@ -91,9 +91,16 @@ describe("legal page — the claims that are checkable in code", () => {
       if (deps.includes(dep)) expect(LEGAL, `${dep} is installed but /legal does not name it`).toMatch(wording);
     }
     expect(LEGAL).toMatch(/no advertising/i);
-    // What the page says Web Analytics does must be what the page also promises overall.
-    expect(LEGAL).toMatch(/sets no cookies/i);
-    expect(LEGAL).toMatch(/not used for advertising/i);
+    // What the page says Web Analytics does is limited to what Vercel documents:
+    // a request hash that resets daily instead of third-party cookies, no
+    // cross-site identification, city/country from IP address. Those claims, and
+    // this site's own no-advertising claim, must stay on the page.
+    expect(LEGAL).toMatch(/Vercel's documentation/);
+    expect(LEGAL).toMatch(/single day/);
+    expect(LEGAL).toMatch(/third-party cookies/);
+    expect(LEGAL).toMatch(/does not identify you across other sites/);
+    expect(LEGAL).toMatch(/Neither this site nor its author uses it for advertising/);
+    expect(LEGAL).not.toMatch(/sets no cookies/i); // Vercel documents "no third-party cookies", not "no cookies"
   });
 
   it("discloses the only third party a visitor's input is sent to", () => {
