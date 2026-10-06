@@ -87,9 +87,9 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&display=swap" rel="stylesheet" />
       </head>
-      <Analytics />
       <body className="antialiased font-serif">
         {children}
+        <Analytics />
         <LedgerToaster />
         <SpeedInsights />
       </body>
