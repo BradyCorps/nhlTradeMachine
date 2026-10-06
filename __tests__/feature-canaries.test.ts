@@ -134,7 +134,9 @@ describe("Canary — NHL EDGE usage and presentation", () => {
     expect(rollover).toContain("computeBreakout");
     expect(players).toContain('{ label: "High-danger finish (2025–26)"');
     expect(players).toContain("NHL EDGE high-danger finishing vs league average");
-    expect(players).toContain("hdFinishingDelta: player.hdFinishingDelta ?? undefined");
+    // The Contract tab no longer hand-picks fields; it crosses the same boundary (…asset spread).
+    expect(players).toContain("contractTabAsset(player)");
+    expect(fs.readFileSync("app/lib/contract-tab-asset.ts", "utf8")).toContain("toAssetInput(player)");
     // The shared adapter preserves the full player payload (EDGE fields
     // included), and the card renders the EDGE HD finishing read on the plate.
     expect(card).toContain("calculateAssetNAV(player)");

@@ -37,11 +37,14 @@ Meaning: a fit to 1,996 one-way standard contracts (2017–2026) on scoring per 
 unit. It estimates a **typical signing value**, not what a player's output is worth, and not a price for an
 exceptional player. Floor is league minimum; ceiling is the CBA 20%.
 
-Upper-end validation (walk-forward, held-out): forwards R² 0.7026, mean miss 1.169% of cap (~$1.2M at $104M).
-For the 20 richest held-out forwards the mean absolute miss is 2.25% of cap (~$2.3M) (defence: 2.26%, 20 deals).
-No signed top-end bias is reported. Twenty deals is thin evidence for a superstar, so McDavid's figure should be
-read as a range. **McDavid's estimate was not changed.** The dossier label now carries this explanation
-(`marketAavDefinition`, numbers read from the artifact).
+Validation (walk-forward, forwards): trained on contracts signed before 2024-07-01, tested on the 395 later
+contracts. Metric: mean **absolute** error in share-of-cap points, converted to dollars at the ceiling shown
+(1.169 pts ≈ $1.2M at $104M; R² 0.7026). "Richest" is the 20 largest *actual* held-out contracts; their mean
+absolute miss is 2.25 pts ≈ $2.3M (defence 2.26 pts, 20 deals). These are averages across contracts, not an
+interval for any player, and the model applies no adjustment for them. An earlier draft of the copy said "no
+consistent bias reported"; that was not supported (the build notes cite a signed +0.51-pt mean on the five
+richest forwards, and warn signed means cancel), so it was removed. **McDavid's estimate was not changed.**
+The dossier label's explanation (`marketAavDefinition`) now says exactly this.
 
 ## 3. Outlook certainty
 
@@ -60,7 +63,42 @@ read as a range. **McDavid's estimate was not changed.** The dossier label now c
 - That is a single as-of date, not a time series. Snapshot IDs are content hashes and do not prove a stored
   historical valuation. No history line should be drawn, and none was built from forecasts or invented checkpoints.
 
-## 5. Proposed, not implemented
+## 5. Contract tab input correction (follow-up commit)
 
-Make the `/players` Contract tab pass the full player through the `calculateAssetNAV` boundary. It changes
-displayed numbers on that tab, so it needs your go-ahead.
+The tab's inline literal is replaced by `contractTabAsset(player)` (`app/lib/contract-tab-asset.ts`, a thin call to
+`toAssetInput`). It restores baseline ice time, seasons weighted, retention, extension terms, contract status and
+every other engine input; it also drops the hard-coded `retainedPct: 0`, `multiplier: 1`, `defRate ?? 0.08`.
+Forecast logic in `calcPlayerTimeline` is untouched. Year 1 equals the card value when there is no extension;
+with an extension the timeline deliberately excludes it from per-year NAV (it clears extension fields in its
+loop and prices extension years from `extensionCapHit`), so Year 1 can differ from the headline. Unchanged.
+
+### Cap ceiling by surface
+| Surface | Ceiling | Why |
+|---|---|---|
+| `/players` row, card, Contract tab | `player.capCeiling`, stamped from `/api/league/teams` (live) on load; static `SEASON.capCeiling` only if absent | one value per payload, same for all three |
+| Dossier | `getLiveCapCeiling()` | server reads the same live setting |
+| `/api/league` navMap | live ceiling | same |
+Within `/players` the three surfaces therefore share one ceiling; a static/live gap there is not the cause.
+The panel's *next-contract* estimate still divides by static `SEASON.capCeiling` (`PlayerTimeline.tsx`); left as is
+and flagged, not changed here. A static fallback occurs only when the teams payload lacks a ceiling.
+
+### Before / after (fixtures, `npx tsx scripts/trace-nav-surfaces.ts`)
+| Fixture | Card NAV / AAV | Tab before | Tab after |
+|---|---|---|---|
+| Star C, current TOI below baseline | 446 / $15.27M | 430 / $14.65M | 446 / $15.27M |
+| Star C, current TOI above baseline | 467 / $15.63M | 478 / $16.06M | 467 / $15.63M |
+| Winger, 50% salary retained | 280 / $7.92M | 179 / $7.80M | 280 / $7.92M |
+| D, expiring | 94 / $6.57M | 88 / $6.05M | 94 / $6.57M |
+| Complete input, no baseline extras | 147 / $5.86M | 147 / $5.86M | 147 / $5.86M |
+
+Why: without baseline ice time and seasons weighted the tab pooled a different prior (lower when current TOI is
+below baseline, higher when above); ignoring retention charged the full cap hit (−101 NAV on the 50% case); the
+no-baseline fixture is unchanged, as expected. Existing engine/baseline tests are unchanged and pass.
+
+## 6. Live comparison
+Not possible: the sandbox cannot reach capandcrease.com or api-web.nhle.com. The historical McDavid 536 vs 538
+discrepancy remains **unresolved**; the fixture mechanisms are candidates, not findings.
+
+## 7. Proposed, not implemented
+
+Use the live cap ceiling for the panel's next-contract estimate (currently static). Would change displayed numbers.

@@ -37,11 +37,11 @@ export const ANNUAL_SURPLUS_LABEL = "Est. annual surplus";
  * Copy only: nothing here changes an estimate.
  */
 export function marketAavDefinition(
-  v: { maeCapPct: number; richestAbsMissCapPct: number; richestN: number },
+  v: { testN: number; maeCapPct: number; richestAbsMissCapPct: number; richestN: number },
   capCeilingM: number,
 ): string {
   const m = (pct: number) => `$${(pct * capCeilingM).toFixed(1)}M`;
-  return `What clubs have typically paid skaters with similar scoring, ice time, age and free-agent status, fitted to one-way contracts signed 2017–2026. It is a typical signing value, not a salary a player has earned or a price for an exceptional player. On held-out seasons it missed by about ${m(v.maeCapPct)} on average, and by about ${m(v.richestAbsMissCapPct)} on average for the ${v.richestN} richest deals tested, with no consistent bias reported for those. A handful of tested deals is thin evidence for the very top, so treat a star's figure as a range, not a price.`;
+  return `What clubs have typically paid skaters with similar scoring, ice time, age and free-agent status, fitted to one-way standard contracts signed 2017–2026 as a share of the salary cap and shown here at this season's cap ($${capCeilingM}M). It is a typical signing value, not what a player's output has earned and not a price for an exceptional player. Tested on ${v.testN} later contracts (signed from July 2024) that the fit had not seen, its average miss was about ${m(v.maeCapPct)}. Across the ${v.richestN} richest of those contracts the average absolute miss was about ${m(v.richestAbsMissCapPct)}. Those are averages across contracts, not an error range for this player, and nothing is added to or subtracted from the estimate for them. A star's individual miss can be larger.`;
 }
 
 export const PLAYER_SIDE_DEFINITION =

@@ -58,11 +58,17 @@ describe("certainty wording", () => {
 });
 
 describe("market AAV definition", () => {
-  it("states typical-signing meaning and measured upper-end error from the artifact", () => {
+  it("describes the metric, cohort, cap basis and limits without presenting an interval", () => {
     const v = SKATER_FMV_VALIDATION.F;
     const text = marketAavDefinition(v, 104);
     expect(text).toMatch(/typical signing value/);
-    expect(text).toContain(`$${(v.richestAbsMissCapPct * 104).toFixed(1)}M`);
+    expect(text).toMatch(/share of the salary cap/);
+    expect(text).toContain(`${v.testN} later contracts`);
+    expect(text).toContain(`$${(v.maeCapPct * 104).toFixed(1)}M`);
     expect(text).toContain(`${v.richestN} richest`);
+    expect(text).toContain(`$${(v.richestAbsMissCapPct * 104).toFixed(1)}M`);
+    expect(text).toMatch(/not an error range for this player/);
+    expect(text).toMatch(/nothing is added to or subtracted/);
+    expect(text).not.toMatch(/bias/i);
   });
 });
