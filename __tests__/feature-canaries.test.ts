@@ -1593,11 +1593,11 @@ describe("Canary — Batch 6 audit fixes", () => {
 
   it("Strand rendering guards empty trait arrays before indexing or dividing", () => {
     const display = read("app/components/StrandDisplay.tsx");
-    const view = read("app/components/StrandView.tsx");
+    const view = read("app/lib/strand-type.ts");
     expect(display).toContain("if (n === 0) return");
     expect(display).toContain("offTraits.length > 0 && defTraits.length > 0");
     expect(display).toContain("compareOff.length > 0 && compareDef.length > 0");
-    expect(view).toContain('return "UNAVAILABLE"');
+    expect(view).toContain("STRAND_TYPES.unavailable");
   });
 
   it("admin cache flush includes all live roster/stat/enrichment cache keys", () => {
@@ -2206,11 +2206,12 @@ describe("Canary — G4 model propagation", () => {
 });
 
 describe("Canary — PA5 STRAND compare + PA8 dated feed + AG3 positions", () => {
-  it("PA5: the STRAND dossier panel offers a peer-compare dropdown", () => {
+  it("PA5: the STRAND dossier panel offers a searchable peer-compare picker", () => {
     const panel = read("app/components/PlayerStrandPanel.tsx");
     expect(panel).toContain("peers");
     expect(panel).toContain("compareOff");
-    expect(panel).toContain("<select");
+    expect(panel).toContain("<PlayerPicker");
+    expect(read("app/components/PlayerPicker.tsx")).toContain('role="combobox"');
     // The dossier page feeds same-position peers into it
     const page = read("app/players/[playerId]/page.tsx");
     expect(page).toContain("buildComparePeers");
@@ -4594,13 +4595,14 @@ describe("Canary — one place decides whether a contract is a bargain", () => {
 describe("Canary — the dossier shows the player apart from his contract", () => {
   const dossier = readSource("app/players/[playerId]/page.tsx");
 
-  it("splits the headline into on-ice value and what the deal does to it", () => {
+  it("splits the headline into player-side value and what the contract and control terms do to it", () => {
     // The blended total is the right number for a trade — no GM is indifferent
     // between an $18.8M Celebrini and a $1M one — but it lets a rich contract
     // swallow a good player. Both readings, or neither.
     expect(dossier).toContain("navSplit");
-    expect(dossier).toContain("On the ice");
-    expect(dossier).toContain("His contract");
+    expect(dossier).toContain("PLAYER_SIDE_LABEL");
+    expect(dossier).toContain("CONTRACT_SIDE_LABEL");
+    expect(dossier).not.toContain("On the ice");
   });
 
   it("keeps the split summing to the headline", () => {

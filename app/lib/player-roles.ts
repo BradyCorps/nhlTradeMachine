@@ -85,7 +85,7 @@ export const ROLE_DEFS: Record<PlayerRoleKey, RoleDef> = {
   },
   CEILING_RAISER: {
     key: "CEILING_RAISER", label: "Ceiling Raiser", icon: "⬆", color: "var(--ledger-green)",
-    blurb: "Adaptable elite complement — suppression, forechecking, or off-puck play that makes a great line greater.",
+    blurb: "On-ice expected-goal share and chance suppression both beat his teammates', with a balanced goal/assist mix and little reliance on his own shot volume. A pattern in the measured numbers, not a scouting judgement.",
   },
   WORKHORSE_WALL: {
     key: "WORKHORSE_WALL", label: "Workhorse Wall", icon: "▦", color: "var(--ledger-green)",
@@ -308,4 +308,70 @@ function deriveGoalieRoles(p: RoleInput): RoleResult | null {
     0.20 * ramp(gsax, 2, 12));
 
   return pickRoles(scores);
+}
+
+// ── What supports a role ─────────────────────────────────────────
+//
+// A role label is a score over a handful of inputs. Showing the inputs lets a
+// reader check the claim instead of trusting the name. Every line is a measured
+// value from the same record the score read (or "not reported"); none is a
+// judgement. The lists mirror the weights in `derivePlayerRoles` — a role scored
+// on an input that is absent from its list here would hide part of its basis.
+
+export interface RoleSupportLine { label: string; value: string }
+
+const f1 = (v: number | null | undefined, unit = "") => v == null || !isFinite(v) ? "not reported" : `${v.toFixed(1)}${unit}`;
+const signed = (v: number | null | undefined, unit = "") => v == null || !isFinite(v) ? "not reported" : `${v > 0 ? "+" : ""}${v.toFixed(1)}${unit}`;
+
+export function roleSupport(key: PlayerRoleKey, p: RoleInput): RoleSupportLine[] {
+  const games = p.games ?? 0;
+  const goals = p.goalsPace ?? 0, assists = p.assistsPace ?? 0;
+  const ga = goals + assists;
+  const assistShare = ga > 5 ? assists / ga : null;
+  const ixg = (p.baselineIxg82 ?? 0) > 0 ? p.baselineIxg82! : (p.goalsPace ?? null);
+  const supp = p.xgaRelTM != null ? -p.xgaRelTM : null;
+  const bursts82 = p.edgeBurstsOver20 != null && games > 0 ? (p.edgeBurstsOver20 / games) * 82 : null;
+  const L = {
+    xgRel: { label: "On-ice xG% vs teammates", value: signed(p.xgRelTM, " pts") },
+    supp: { label: "Chance suppression vs teammates (xGA/60, higher = fewer against)", value: signed(supp) },
+    assistShare: { label: "Assists as share of goals + assists", value: assistShare == null ? "not reported" : `${Math.round(assistShare * 100)}%` },
+    qoc: { label: "Competition index", value: f1(p.qocIndex) },
+    ixg: { label: "Individual xG / 82", value: f1(ixg) },
+    toi: { label: "Ice time / game (min)", value: f1(p.avgTOI) },
+    pts: { label: "Points / 82", value: f1(p.ptsPace) },
+    bursts: { label: "20+ mph bursts / 82", value: f1(bursts82) },
+    speed: { label: "Top speed (mph)", value: f1(p.edgeSpeedMaxMph) },
+    goals: { label: "Goals / 82", value: f1(p.goalsPace) },
+    assistsPace: { label: "Assists / 82", value: f1(p.assistsPace) },
+    hits: { label: "Hits / 82", value: f1(p.baselineHits82) },
+    blocks: { label: "Blocks / 82", value: f1(p.baselineBlocks82) },
+    pk: { label: "Penalty-kill share of ice time", value: p.pkTimeShare == null ? "not reported" : `${Math.round(p.pkTimeShare * 100)}%` },
+    pp: { label: "Power-play points / 82", value: f1(p.ppPtsPace82) },
+    hdFin: { label: "High-danger finishing vs league", value: signed(p.hdFinishingDelta != null ? p.hdFinishingDelta * 100 : null, " pts") },
+    dps: { label: "Defensive point shares", value: f1(p.dps) },
+    starts: { label: "Games started", value: f1(p.gamesStarted) },
+    gsax: { label: "Goals saved above expected", value: signed(p.gsax) },
+    hdsv: { label: "High-danger save %", value: p.baselineHdsvPct == null ? "not reported" : `${(p.baselineHdsvPct * 100).toFixed(1)}%` },
+    sv: { label: "Save %", value: p.savePct == null ? "not reported" : `${(p.savePct > 1 ? p.savePct : p.savePct * 100).toFixed(1)}%` },
+    teamXga: { label: "Team xGA/60", value: f1(p.teamXga60) },
+  };
+  const byRole: Record<PlayerRoleKey, (keyof typeof L)[]> = {
+    PUCK_MOVING_ANCHOR: ["assistsPace", "xgRel", "bursts"],
+    NEUTRAL_ZONE_ENGINE: ["bursts", "speed"],
+    HIGH_DANGER_DISTRIBUTOR: ["assistShare", "pp", "xgRel", "assistsPace"],
+    RUSH_WEAPON: ["speed", "bursts", "goals", "hdFin"],
+    SLOT_HUNTER: ["ixg", "assistShare", "hdFin", "goals"],
+    NET_FRONT_DISRUPTOR: ["ixg", "hits", "speed", "pp"],
+    VOLUME_SHOOTER: ["ixg", "assistShare", "goals"],
+    FORECHECK_MONSTER: ["hits", "supp"],
+    PERIMETER_LOCKDOWN: ["supp", "blocks", "pk"],
+    COMPLETE_SHUTDOWN: ["supp", "pk", "qoc", "dps"],
+    FLOOR_RAISER: ["toi", "pts", "xgRel", "bursts"],
+    CEILING_RAISER: ["xgRel", "supp", "assistShare", "qoc", "ixg"],
+    WORKHORSE_WALL: ["starts", "gsax"],
+    HIGH_DANGER_ERASER: ["hdsv", "gsax"],
+    STORM_CELLAR: ["teamXga", "gsax", "starts"],
+    TANDEM_WEAPON: ["starts", "sv", "gsax"],
+  };
+  return byRole[key].map(k => L[k]);
 }
