@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from 'next';
 import { BRAND } from "@/app/lib/brand";
 import { Libre_Baskerville, Courier_Prime } from 'next/font/google';
@@ -86,6 +87,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&display=swap" rel="stylesheet" />
       </head>
+      <Analytics />
       <body className="antialiased font-serif">
         {children}
         <LedgerToaster />
