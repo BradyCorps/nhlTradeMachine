@@ -1,5 +1,7 @@
 # Development Notes
 
+- 2026-10-06: **Methodology editorial rewrite** (`app/methodology/page.tsx`, `docs/methodology-editorial-2026-10-06.md`): use the homepage editorial voice, distinguish historical evidence from current model/release claims, and preserve layout, anchors, numerical evidence and support links; no model, calculator, data or flag changes.
+
 - 2026-10-06: **Issue-report migration command boundary** (`drizzle/0011_add_issue_reports.sql`, `__tests__/issue-report-migration-runner.test.ts`): separate table/index creation for remote libSQL execution; isolated journaled-runner coverage verifies upgrade, idempotence and protected-row preservation. The prior Production attempt rolled back; valid operator Admin authentication remains a rollout prerequisite.
 
 - 2026-10-05: **Private issue reporting, text-only release** (`app/report-issue`, issue-report APIs/Admin page, shared feedback links, `app/db/schema.ts`, journaled migration 0011, focused tests/browser harness): bounded validated submissions with URL sanitization, retry identity/rate limiting, signed-session review/status/notes/delete, and explicit screenshot unavailability; isolated local verification and rollout/storage requirements in `docs/issue-reporting-2026-10-05/README.md`. No Production migration, records, caches or deployment.
