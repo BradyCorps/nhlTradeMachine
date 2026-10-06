@@ -1,27 +1,30 @@
 "use client";
 
-// ── NavLeagueScatter — league-context scatter plot ─────────────
-// Plots same-position peers on a 2D scatter (OFF value vs DEF
-// value by default) so the reader can see where a player sits
-// relative to the league at a glance. The current player is
-// highlighted with a larger, labeled marker.
+// ── NavLeagueScatter — league-context scatter ────────────────────
+// Where a dossier player sits among same-position peers on two NAV
+// contributions: offensive (x) and defensive (y), in NAV points. They are the
+// OFF and DEF stage values from the player's X-NAV breakdown — not percentiles
+// and not overall player ratings.
 //
-// Supports brushable selection: drag a rectangle to list the
-// players inside it.
+// Rendered with Recharts. The server page still computes every plotted value;
+// this component only draws and filters. The cohort and the median reference
+// lines never change with search or selection (see app/lib/league-scatter.ts).
+//
+// Keyboard and touch: there is deliberately no tab stop per point. Players are
+// found with the search box (shared PlayerPicker), added up to three at a time,
+// and read in an ordinary table; tapping a point also toggles it.
 
-import React, { useState, useMemo, useRef, useCallback } from "react";
-import { scaleLinear } from "d3-scale";
+import React, { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import PlayerPicker from "@/app/components/PlayerPicker";
+import type { ScatterPlotProps } from "@/app/components/NavLeagueScatterPlot";
 import { HorizontalScrollCue } from "@/app/components/HorizontalScrollCue";
+import {
+  MAX_COMPARISONS, MIN_PLOTTED, SELECTED_STYLE, QUADRANT_LABEL, axisDomain, chartLabels, comparisonRows, leagueMedians, matchingIds,
+  quadrantOf, signedDelta, signedNav, toggleComparison, type ScatterPeer,
+} from "@/app/lib/league-scatter";
 
-export interface ScatterPeer {
-  id: string;
-  name: string;
-  teamId: string;
-  off: number;
-  def: number;
-  nav: number;
-  age: number;
-}
+export type { ScatterPeer } from "@/app/lib/league-scatter";
 
 interface Props {
   peers: ScatterPeer[];
@@ -32,609 +35,255 @@ interface Props {
   cohortLabel?: string;
 }
 
+const MONO = "'Courier Prime', monospace";
+const INK = "var(--ledger-ink, #1a1a18)";
+const FAINT = "var(--ledger-ink-faint)";
+const RULE = "var(--ledger-rule)";
 const CURRENT_COLOR = "var(--ledger-red, #b83020)";
-const PEER_COLOR = "var(--ledger-ink, #1a1a18)";
-const signedDelta = (value: number): string => `${value > 0 ? "+" : ""}${Math.round(value)}`;
 
-// Fixed layout — module-level so the coordinate callbacks have a stable
-// reference (no changing hook dependency).
-const margin = { top: 24, right: 16, bottom: 36, left: 44 };
-const W = 400;
-const H = 280;
+// Recharts is ~350 KiB of JS. The chart is loaded after hydration, in its own chunk, behind a
+// placeholder of the same height so nothing shifts; every value is also in the tables below.
+const ScatterPlot = dynamic<ScatterPlotProps>(() => import("@/app/components/NavLeagueScatterPlot"), {
+  ssr: false,
+  loading: () => (
+    <div role="status" className="flex items-center justify-center font-mono text-[10px] uppercase tracking-[0.14em]"
+      style={{ width: "100%", height: "clamp(300px, 56vw, 420px)", color: FAINT }}>
+      Loading chart… exact values are in the tables below.
+    </div>
+  ),
+});
 
-// ── Hexbin density (self-contained; no d3-hexbin dependency) ────
-// With ~250 peers the cloud overplots near the median and a reader can't tell a
-// crowded region from a sparse one. A faint single-hue hex wash UNDER the dots
-// carries that density (sequential: darker = more players in the cell) without
-// competing with the categorical dots on top. Standard pointy-top hex binning,
-// ported from d3-hexbin's core so the tessellation is exact.
-const HEX_R = 16;
-const HEX_PATH = (() => {
-  const a = Math.PI / 3;
-  return Array.from({ length: 6 }, (_, i) => {
-    const ang = i * a;
-    return `${i === 0 ? "M" : "L"}${(Math.sin(ang) * HEX_R).toFixed(2)},${(-Math.cos(ang) * HEX_R).toFixed(2)}`;
-  }).join("") + "Z";
-})();
-
-interface HexCell { x: number; y: number; count: number }
-function hexbinCells(pts: { x: number; y: number }[], radius: number): HexCell[] {
-  const dx = radius * 2 * Math.sin(Math.PI / 3);
-  const dy = radius * 1.5;
-  const map = new Map<string, HexCell>();
-  for (const { x, y } of pts) {
-    const py = y / dy;
-    let pj = Math.round(py);
-    let pi = Math.round(x / dx - (pj & 1 ? 0.5 : 0));
-    const py1 = py - pj;
-    if (Math.abs(py1) * 3 > 1) {
-      const px = x / dx - (pj & 1 ? 0.5 : 0);
-      const px1 = px - pi;
-      const pi2 = pi + (px < pi ? -1 : 1) / 2;
-      const pj2 = pj + (py < pj ? -1 : 1);
-      const px2 = px - pi2;
-      const py2 = py - pj2;
-      if (px1 * px1 + py1 * py1 > px2 * px2 + py2 * py2) { pi = pi2 + (pj & 1 ? 1 : -1) / 2; pj = pj2; }
-    }
-    const key = `${pi}-${pj}`;
-    const cell = map.get(key);
-    if (cell) cell.count += 1;
-    else map.set(key, { x: (pi + (pj & 1 ? 0.5 : 0)) * dx, y: pj * dy, count: 1 });
-  }
-  return [...map.values()];
-}
-
-interface BrushRect {
-  x0: number; y0: number;
-  x1: number; y1: number;
-}
+type Datum = ScatterPeer & { shortName: string };
+const lastName = (p: ScatterPeer): string => p.name.split(" ").slice(-1)[0];
 
 export default function NavLeagueScatter({ peers, currentPlayer, playerName, cohortLabel }: Props) {
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [pinnedId, setPinnedId] = useState<string | null>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
+  const [notice, setNotice] = useState("");
 
-  // Brush state
-  const [brushing, setBrushing] = useState(false);
-  const [brush, setBrush] = useState<BrushRect | null>(null);
-  const [activeBrush, setActiveBrush] = useState<BrushRect | null>(null);
-  const brushStartRef = useRef<{ x: number; y: number } | null>(null);
-
+  // The cohort. Nothing below this block may add to, remove from or reorder it.
   const all = useMemo(() => [currentPlayer, ...peers], [currentPlayer, peers]);
+  const cohortIds = useMemo(() => new Set(all.map(p => p.id)), [all]);
+  const med = useMemo(() => leagueMedians(all), [all]);
+  const xDomain = useMemo(() => axisDomain(all.map(p => p.off), 20), [all]);
+  const yDomain = useMemo(() => axisDomain(all.map(p => p.def), 10), [all]);
 
-  const innerW = W - margin.left - margin.right;
-  const innerH = H - margin.top - margin.bottom;
+  const byId = useMemo(() => new Map(all.map(p => [p.id, p])), [all]);
+  const selected = useMemo(
+    () => selectedIds.map(id => byId.get(id)).filter((p): p is ScatterPeer => p != null),
+    [selectedIds, byId],
+  );
+  const matches = useMemo(() => matchingIds(peers, query), [peers, query]);
+  const playerQuadrant = quadrantOf(currentPlayer, med);
 
-  const offVals = all.map(p => p.off);
-  const defVals = all.map(p => p.def);
-  const offPad = (Math.max(...offVals) - Math.min(...offVals)) * 0.08 || 20;
-  const defPad = (Math.max(...defVals) - Math.min(...defVals)) * 0.08 || 10;
-
-  const xScale = scaleLinear()
-    .domain([Math.min(...offVals) - offPad, Math.max(...offVals) + offPad])
-    .range([0, innerW]);
-
-  const yScale = scaleLinear()
-    .domain([Math.min(...defVals) - defPad, Math.max(...defVals) + defPad])
-    .range([innerH, 0]);
-
-  const sortedOff = [...offVals].sort((a, b) => a - b);
-  const sortedDef = [...defVals].sort((a, b) => a - b);
-  const medOff = sortedOff[Math.floor(sortedOff.length / 2)];
-  const medDef = sortedDef[Math.floor(sortedDef.length / 2)];
-
-  // Which quadrant the current player falls in — spoken in the aria label so a
-  // screen-reader user learns WHERE he sits, not just that a scatter exists.
-  const playerQuadrant = currentPlayer.off >= medOff
-    ? (currentPlayer.def >= medDef ? "above-median in both" : "above-median offence only")
-    : (currentPlayer.def >= medDef ? "above-median defence only" : "below-median in both");
-
-  const hoveredPeer = hoveredId ? all.find(p => p.id === hoveredId) : null;
-  const pinnedPeer = pinnedId ? all.find(p => p.id === pinnedId) : null;
-  const activePeer = hoveredPeer ?? pinnedPeer;
+  // Only the dossier player and the selection are labelled; disambiguate shared last names among them.
+  const labels = chartLabels([currentPlayer, ...selected]);
+  const toDatum = (p: ScatterPeer): Datum => ({ ...p, shortName: labels.get(p.id) ?? lastName(p) });
+  const selectedSet = new Set(selectedIds);
+  const background = useMemo(
+    () => peers.filter(p => !selectedSet.has(p.id) && !matches.has(p.id)).map(toDatum),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [peers, selectedIds, matches],
+  );
+  const highlighted = useMemo(
+    () => peers.filter(p => !selectedSet.has(p.id) && matches.has(p.id)).map(toDatum),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [peers, selectedIds, matches],
+  );
+  const options = useMemo(
+    () => peers.filter(p => !selectedSet.has(p.id)).map(p => ({ id: p.id, name: p.name, position: "", teamId: p.teamId }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [peers, selectedIds],
+  );
+  const rows = useMemo(() => comparisonRows(currentPlayer, selected), [currentPlayer, selected]);
   const tablePlayers = useMemo(
     () => [...all].sort((a, b) => b.nav - a.nav || a.name.localeCompare(b.name)),
     [all],
   );
 
-  // Convert mouse event to SVG-space coordinates
-  const toSvgCoords = useCallback((e: React.MouseEvent) => {
-    const svg = svgRef.current;
-    if (!svg) return null;
-    const rect = svg.getBoundingClientRect();
-    const scaleX = W / rect.width;
-    const scaleY = H / rect.height;
-    return {
-      x: (e.clientX - rect.left) * scaleX - margin.left,
-      y: (e.clientY - rect.top) * scaleY - margin.top,
-    };
-  }, []);
-
-  // Brush handlers
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    // Only start brush on background clicks (not on dots)
-    const target = e.target as SVGElement;
-    if (target.tagName === "circle") return;
-    const pt = toSvgCoords(e);
-    if (!pt) return;
-    brushStartRef.current = pt;
-    setBrushing(true);
-    setBrush(null);
-    setActiveBrush(null);
-    setHoveredId(null);
-  }, [toSvgCoords]);
-
-  const onMouseMove = useCallback((e: React.MouseEvent) => {
-    if (brushing && brushStartRef.current) {
-      const pt = toSvgCoords(e);
-      if (!pt) return;
-      const r: BrushRect = {
-        x0: Math.min(brushStartRef.current.x, pt.x),
-        y0: Math.min(brushStartRef.current.y, pt.y),
-        x1: Math.max(brushStartRef.current.x, pt.x),
-        y1: Math.max(brushStartRef.current.y, pt.y),
-      };
-      setBrush(r);
-    }
-  }, [brushing, toSvgCoords]);
-
-  const onMouseUp = useCallback(() => {
-    if (brushing && brush) {
-      const width = brush.x1 - brush.x0;
-      const height = brush.y1 - brush.y0;
-      if (width > 5 || height > 5) {
-        setActiveBrush(brush);
-      } else {
-        setActiveBrush(null);
-      }
-    }
-    setBrushing(false);
-    setBrush(null);
-    brushStartRef.current = null;
-  }, [brushing, brush]);
-
-  // Players inside the active brush
-  const brushedPlayers = useMemo(() => {
-    if (!activeBrush) return [];
-    return all.filter(p => {
-      const cx = xScale(p.off);
-      const cy = yScale(p.def);
-      return cx >= activeBrush.x0 && cx <= activeBrush.x1
-        && cy >= activeBrush.y0 && cy <= activeBrush.y1;
-    }).sort((a, b) => b.nav - a.nav);
-  }, [activeBrush, all, xScale, yScale]);
-
-  // Density hexbins for the whole cloud, in plot-pixel space. Cells with a
-  // single player are dropped so the wash marks genuine crowding, not scatter.
-  const hexBins = useMemo(() => {
-    const cells = hexbinCells(all.map(p => ({ x: xScale(p.off), y: yScale(p.def) })), HEX_R)
-      .filter(c => c.count >= 2);
-    const maxCount = cells.reduce((m, c) => Math.max(m, c.count), 1);
-    return { cells, maxCount };
-  }, [all, xScale, yScale]);
-
   // Too few peers to place a meaningful league cloud. Guarded AFTER every hook
   // so hook order stays constant across renders (rules-of-hooks).
-  if (all.length < 5) return null;
+  if (all.length < MIN_PLOTTED) return null;
 
-  // Current brush rect (while dragging or active)
-  const displayBrush = brush || activeBrush;
-
-  // Hover tooltip position in container-relative pixels
-  const getTooltipStyle = (): React.CSSProperties | null => {
-    if (!activePeer || activePeer.id === currentPlayer.id || !svgRef.current || !containerRef.current) return null;
-    const svgRect = svgRef.current.getBoundingClientRect();
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const scaleRatio = svgRect.width / W;
-    const dotX = (margin.left + xScale(activePeer.off)) * scaleRatio + svgRect.left - containerRect.left;
-    const dotY = (margin.top + yScale(activePeer.def)) * scaleRatio + svgRect.top - containerRect.top;
-    return {
-      position: "absolute" as const,
-      left: dotX,
-      top: dotY - 28,
-      transform: "translateX(-50%)",
-      pointerEvents: "none" as const,
-      zIndex: 10,
-    };
+  const apply = (id: string) => {
+    const r = toggleComparison(selectedIds, id, currentPlayer.id, cohortIds);
+    setSelectedIds(r.next);
+    const name = byId.get(id)?.name ?? "player";
+    setNotice(
+      r.change === "added" ? `${name} added to the comparison.`
+        : r.change === "removed" ? `${name} removed from the comparison.`
+        : r.change === "rejected" && r.reason === "full" ? `At most ${MAX_COMPARISONS} comparison players. Remove one first.`
+        : "");
   };
+  const clickPoint = (d: unknown) => {
+    const datum = (d as { id?: string; payload?: { id?: string } } | null);
+    const id = datum?.id ?? datum?.payload?.id;
+    if (id) apply(id);
+  };
+  const reset = () => { setSelectedIds([]); setNotice("Comparisons cleared."); };
+  const full = selectedIds.length >= MAX_COMPARISONS;
 
-  const tooltipStyle = getTooltipStyle();
+  const figureDescription =
+    `Scatter plot of offensive contribution (horizontal) against defensive contribution (vertical), both in NAV points, for ${playerName} and ${peers.length} same-position peers. ` +
+    `Dashed lines mark the cohort medians, offence ${Math.round(med.off)} and defence ${Math.round(med.def)}. ` +
+    `${playerName} is in the "${QUADRANT_LABEL[playerQuadrant]}" quadrant. ` +
+    `${selected.length} comparison ${selected.length === 1 ? "player" : "players"} selected. The tables below list the exact values.`;
 
   return (
-    <div ref={containerRef} className="border p-4 mb-4" style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-card, var(--paper-inset))", position: "relative" }}>
-      <div className="flex items-baseline justify-between mb-0.5">
-        <span className="font-mono text-[10px] sm:text-[11px] font-black uppercase tracking-[0.18em]"
-          style={{ color: "var(--ledger-ink-faint)" }}>
+    <section aria-label="League context" className="nls border p-4 mb-4"
+      style={{ borderColor: RULE, background: "var(--paper-card, var(--paper-inset))" }}>
+      <style>{`
+        /* Recharts layers take focus when a point is clicked and show a heavy browser
+           outline around the whole plot. They are not keyboard stops (see header), so
+           this removes no real focus indicator. */
+        .nls .recharts-surface g:focus, .nls .recharts-surface g:focus-visible, .nls .recharts-wrapper:focus, .nls .recharts-wrapper:focus-visible { outline: none; }
+        /* In-chart quadrant text collides below this width; the caption says it in words. */
+        @media (max-width: 479px) { .nls .nls-quad { display: none; } }
+      `}</style>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 mb-0.5">
+        <h3 className="font-mono text-[10px] sm:text-[11px] font-black uppercase tracking-[0.12em] sm:tracking-[0.18em]" style={{ color: FAINT }}>
           League Context
-        </span>
-        <span className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.12em]"
-          style={{ color: "var(--ledger-ink-faint)" }}>
+        </h3>
+        <span className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.12em]" style={{ color: FAINT }}>
           {all.length} plotted
-          {activeBrush ? ` · ${brushedPlayers.length} selected` : ""}
         </span>
       </div>
-      <div className="mb-2 font-mono text-[8px] sm:text-[9px] uppercase tracking-[0.12em]"
-        style={{ color: "var(--ledger-ink-faint)" }}>
+      <p className="mb-1 font-mono text-[8px] sm:text-[9px] uppercase tracking-[0.12em]" style={{ color: FAINT }}>
         Ranked among {cohortLabel ?? "same-position peers"}
-      </div>
-      <p className="mb-1 font-mono text-[9px] leading-relaxed" style={{ color: "var(--ledger-ink-faint)" }}>
-        <span className="sm:hidden">Tap a point to pin it. Open the table below to compare every player.</span>
-        <span className="hidden sm:inline">Click a point to pin it, or drag the plot to select a group.</span>
+      </p>
+      <p className="mb-3 font-mono text-[10px] leading-relaxed" style={{ color: "var(--ledger-ink-body, var(--ledger-ink))" }}>
+        Both axes are <strong>contributions to X-NAV, in NAV points</strong> (the OFF and DEF rows of the value breakdown).
+        They are not percentiles and not overall player ratings.
       </p>
 
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${W} ${H}`}
-        className="w-full"
-        style={{ maxWidth: W, cursor: brushing ? "crosshair" : "default" }}
-        role="group"
-        aria-label={`Scatter plot of offensive value (horizontal) vs defensive value (vertical) for ${playerName} and ${peers.length} same-position peers, split into four quadrants at the league median, with denser regions of the league shaded. ${playerName} sits in the ${playerQuadrant} quadrant.`}
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onMouseLeave={() => {
-          if (brushing) {
-            setBrushing(false);
-            setBrush(null);
-            brushStartRef.current = null;
-          }
-          setHoveredId(null);
-        }}
-      >
-        <defs>
-          <clipPath id="scatter-plot-clip">
-            <rect x={0} y={0} width={innerW} height={innerH} />
-          </clipPath>
-        </defs>
-        <g transform={`translate(${margin.left},${margin.top})`}>
-          {/* Density wash — darker where more of the league sits (under the dots) */}
-          <g clipPath="url(#scatter-plot-clip)">
-            {hexBins.cells.map((c, i) => (
-              <path
-                key={`hex-${i}`}
-                d={HEX_PATH}
-                transform={`translate(${c.x.toFixed(2)},${c.y.toFixed(2)})`}
-                fill="var(--ledger-ink)"
-                opacity={0.04 + ((c.count - 1) / Math.max(1, hexBins.maxCount - 1)) * 0.14}
-                stroke="none"
-              />
+      {/* Search and selection */}
+      <div className="mb-3 flex flex-wrap items-start gap-x-4 gap-y-2">
+        <PlayerPicker
+          label={`Add up to ${MAX_COMPARISONS} comparison players`}
+          options={options}
+          value=""
+          onChange={id => { if (id) apply(id); }}
+          onQueryChange={setQuery}
+          disabled={full}
+          placeholder={full ? `${MAX_COMPARISONS} selected` : "Search by name or team"}
+          rule={full ? `Limit reached: remove a player to add another.` : "Matches are highlighted on the chart."}
+          hideCount
+        />
+        <div className="flex-1 min-w-[180px]">
+          <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em] mb-1" style={{ color: FAINT }}>
+            Comparing ({selected.length}/{MAX_COMPARISONS})
+          </div>
+          <ul className="flex flex-wrap gap-1.5" aria-label="Selected comparison players">
+            {selected.length === 0 && <li className="font-mono text-[10px]" style={{ color: FAINT }}>None selected.</li>}
+            {selected.map((p, i) => (
+              <li key={p.id}>
+                <button type="button" onClick={() => apply(p.id)}
+                  aria-label={`Remove ${p.name} from the comparison`}
+                  className="font-mono text-[11px] font-bold px-2 border inline-flex items-center gap-1.5"
+                  style={{ minHeight: 44, borderColor: SELECTED_STYLE[i].color, color: INK, background: "var(--paper-bg)" }}>
+                  <span aria-hidden="true" style={{ color: SELECTED_STYLE[i].color }}>{SELECTED_STYLE[i].glyph}</span>
+                  {p.name}
+                  <span aria-hidden="true" style={{ color: FAINT }}>✕</span>
+                </button>
+              </li>
             ))}
-          </g>
-
-          {/* Quadrant lines at median */}
-          <line
-            x1={xScale(medOff)} y1={0}
-            x2={xScale(medOff)} y2={innerH}
-            stroke="var(--ledger-ink-faint)"
-            strokeWidth={0.8}
-            strokeDasharray="3,3"
-            opacity={0.3}
-          />
-          <line
-            x1={0} y1={yScale(medDef)}
-            x2={innerW} y2={yScale(medDef)}
-            stroke="var(--ledger-ink-faint)"
-            strokeWidth={0.8}
-            strokeDasharray="3,3"
-            opacity={0.3}
-          />
-
-          {/* Axis ticks — numeric scale so a reader can read a dot's OFF/DEF
-              value off the plot, not just its quadrant. */}
-          {xScale.ticks(4).map(v => (
-            <g key={`xt-${v}`}>
-              <line x1={xScale(v)} y1={innerH} x2={xScale(v)} y2={innerH + 3}
-                stroke="var(--ledger-ink-faint)" strokeWidth={0.6} opacity={0.5} />
-              <text x={xScale(v)} y={innerH + 11} textAnchor="middle"
-                fill="var(--ledger-ink-faint)" fontSize={7} opacity={0.7}
-                fontFamily="'Courier Prime', monospace">
-                {Math.round(v)}
-              </text>
-            </g>
-          ))}
-          {yScale.ticks(4).map(v => (
-            <g key={`yt-${v}`}>
-              <line x1={-3} y1={yScale(v)} x2={0} y2={yScale(v)}
-                stroke="var(--ledger-ink-faint)" strokeWidth={0.6} opacity={0.5} />
-              <text x={-5} y={yScale(v) + 2.5} textAnchor="end"
-                fill="var(--ledger-ink-faint)" fontSize={7} opacity={0.7}
-                fontFamily="'Courier Prime', monospace">
-                {Math.round(v)}
-              </text>
-            </g>
-          ))}
-
-          {/* Quadrant labels */}
-          <text x={innerW - 4} y={8} textAnchor="end"
-            fill="var(--ledger-ink-faint)" fontSize={9} opacity={0.55}
-            fontFamily="'Courier Prime', monospace" fontWeight={700}>
-            ABOVE MEDIAN IN BOTH
-          </text>
-          <text x={4} y={8} textAnchor="start"
-            fill="var(--ledger-ink-faint)" fontSize={9} opacity={0.55}
-            fontFamily="'Courier Prime', monospace" fontWeight={700}>
-            ABOVE MEDIAN DEF
-          </text>
-          <text x={innerW - 4} y={innerH - 4} textAnchor="end"
-            fill="var(--ledger-ink-faint)" fontSize={9} opacity={0.55}
-            fontFamily="'Courier Prime', monospace" fontWeight={700}>
-            ABOVE MEDIAN OFF
-          </text>
-          <text x={4} y={innerH - 4} textAnchor="start"
-            fill="var(--ledger-ink-faint)" fontSize={9} opacity={0.55}
-            fontFamily="'Courier Prime', monospace" fontWeight={700}>
-            BELOW MEDIAN BOTH
-          </text>
-
-          {/* Brush rectangle */}
-          {displayBrush && (
-            <rect
-              x={displayBrush.x0}
-              y={displayBrush.y0}
-              width={displayBrush.x1 - displayBrush.x0}
-              height={displayBrush.y1 - displayBrush.y0}
-              fill="var(--ledger-ink)"
-              opacity={0.06}
-              stroke="var(--ledger-ink)"
-              strokeWidth={1}
-              strokeOpacity={0.3}
-              strokeDasharray="3,2"
-              rx={2}
-            />
-          )}
-
-          {/* Peer dots */}
-          {peers.map(p => {
-            const cx = xScale(p.off);
-            const cy = yScale(p.def);
-            const isHovered = hoveredId === p.id;
-            const isPinned = pinnedId === p.id;
-            const isActive = isHovered || isPinned;
-            const isBrushed = activeBrush
-              && cx >= activeBrush.x0 && cx <= activeBrush.x1
-              && cy >= activeBrush.y0 && cy <= activeBrush.y1;
-            return (
-              <circle
-                key={p.id}
-                role="button"
-                tabIndex={0}
-                aria-pressed={isPinned}
-                aria-label={`${p.name}: offense ${Math.round(p.off)}, defense ${Math.round(p.def)}, NAV ${p.nav > 0 ? "+" : ""}${p.nav}. ${isPinned ? "Pinned; activate to dismiss" : "Activate to pin for comparison"}.`}
-                cx={cx} cy={cy}
-                r={isPinned ? 6 : isHovered ? 5 : isBrushed ? 4.5 : 3.5}
-                fill={isBrushed ? "var(--ledger-green, #2a7a3f)" : PEER_COLOR}
-                opacity={isActive ? 0.9 : isBrushed ? 0.6 : 0.28}
-                stroke={isActive ? PEER_COLOR : isBrushed ? "var(--ledger-green, #2a7a3f)" : "none"}
-                strokeWidth={isPinned ? 2 : isHovered || isBrushed ? 1 : 0}
-                onMouseEnter={() => { if (!brushing) setHoveredId(p.id); }}
-                onMouseLeave={() => { if (!brushing) setHoveredId(null); }}
-                onFocus={() => setHoveredId(p.id)}
-                onBlur={() => setHoveredId(null)}
-                onClick={() => setPinnedId(prev => (prev === p.id ? null : p.id))}
-                onKeyDown={event => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    setPinnedId(prev => (prev === p.id ? null : p.id));
-                  } else if (event.key === "Escape") {
-                    setPinnedId(null);
-                    setHoveredId(null);
-                  }
-                }}
-                style={{ cursor: "pointer", transition: "opacity 0.15s, r 0.15s" }}
-              />
-            );
-          })}
-
-          {/* Current player — on top */}
-          <circle
-            cx={xScale(currentPlayer.off)}
-            cy={yScale(currentPlayer.def)}
-            r={6}
-            fill={CURRENT_COLOR}
-            stroke="var(--paper-bg, #fff)"
-            strokeWidth={2}
-          />
-          <text
-            x={xScale(currentPlayer.off)}
-            y={yScale(currentPlayer.def) - 10}
-            textAnchor="middle"
-            fill={CURRENT_COLOR}
-            fontSize={9}
-            fontFamily="'Courier Prime', monospace"
-            fontWeight={700}
-          >
-            {playerName.split(" ").pop()}
-          </text>
-        </g>
-
-        {/* Axis labels */}
-        <text
-          x={W / 2} y={H - 4}
-          textAnchor="middle"
-          fill="var(--ledger-ink-faint)"
-          fontSize={9}
-          fontFamily="'Courier Prime', monospace"
-          fontWeight={700}
-          letterSpacing="0.1em"
-        >
-          OFFENSIVE VALUE
-        </text>
-        <text
-          x={10} y={H / 2}
-          textAnchor="middle"
-          fill="var(--ledger-ink-faint)"
-          fontSize={9}
-          fontFamily="'Courier Prime', monospace"
-          fontWeight={700}
-          letterSpacing="0.1em"
-          transform={`rotate(-90,10,${H / 2})`}
-        >
-          DEFENSIVE VALUE
-        </text>
-      </svg>
-
-      {/* HTML hover tooltip — outside SVG so it never clips */}
-      {tooltipStyle && activePeer && activePeer.id !== currentPlayer.id && (
-        <div style={tooltipStyle}>
-          <div style={{
-            background: "var(--paper-card, var(--paper-bg))",
-            border: "1px solid var(--ledger-rule, #ccc)",
-            borderRadius: 3,
-            padding: "3px 7px",
-            fontFamily: "'Courier Prime', monospace",
-            fontSize: 10,
-            color: "var(--ledger-ink)",
-            whiteSpace: "nowrap",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-            textAlign: "center",
-          }}>
-            <div style={{ fontWeight: 700 }}>{activePeer.name}{activePeer.id === pinnedId ? " · PINNED" : ""}</div>
-            <div style={{ fontSize: 9, color: "var(--ledger-ink-faint)" }}>
-              OFF {Math.round(activePeer.off)} · DEF {Math.round(activePeer.def)} · NAV {activePeer.nav > 0 ? "+" : ""}{activePeer.nav}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {pinnedPeer && pinnedPeer.id !== currentPlayer.id && (
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border px-3 py-2"
-          aria-live="polite"
-          style={{ borderColor: "var(--ledger-rule)", background: "var(--paper-inset)" }}>
-          <div className="font-mono text-[10px] leading-relaxed" style={{ color: "var(--ledger-ink)" }}>
-            <div className="font-black uppercase tracking-[0.12em]">Pinned · {pinnedPeer.name} ({pinnedPeer.teamId})</div>
-            <div style={{ color: "var(--ledger-ink-faint)" }}>
-              OFF {Math.round(pinnedPeer.off)} · DEF {Math.round(pinnedPeer.def)} · NAV {pinnedPeer.nav > 0 ? "+" : ""}{pinnedPeer.nav}
-            </div>
-            <div style={{ color: "var(--ledger-ink-faint)" }}>
-              Compared with {playerName}: OFF {signedDelta(pinnedPeer.off - currentPlayer.off)} · DEF {signedDelta(pinnedPeer.def - currentPlayer.def)} · NAV {signedDelta(pinnedPeer.nav - currentPlayer.nav)}
-            </div>
-          </div>
-          <button
-            type="button"
-            aria-label="Dismiss pinned player"
-            onClick={() => setPinnedId(null)}
-            className="min-h-11 px-3 font-mono text-[9px] font-black uppercase tracking-[0.12em] underline"
-            style={{ color: "var(--ledger-ink-faint)", background: "transparent", border: 0 }}
-          >
-            Dismiss
+          </ul>
+          <button type="button" onClick={reset} disabled={selected.length === 0}
+            className="mt-1 font-mono text-[10px] font-black uppercase tracking-[0.12em] underline px-1"
+            style={{ minHeight: 44, color: selected.length ? INK : FAINT, background: "transparent", border: 0, cursor: selected.length ? "pointer" : "default" }}>
+            Reset comparisons
           </button>
         </div>
-      )}
+      </div>
+      <p role="status" aria-live="polite" className="mb-1 font-mono text-[10px] min-h-[1.2em]" style={{ color: FAINT }}>
+        {notice || (query.trim() ? `${matches.size} ${matches.size === 1 ? "player matches" : "players match"} “${query.trim()}” and ${matches.size === 1 ? "is" : "are"} highlighted. The cohort and medians are unchanged.` : "")}
+      </p>
 
-      {/* Brushed-player list */}
-      {activeBrush && brushedPlayers.length > 0 && (
-        <div className="mt-2 border-t pt-2" style={{ borderColor: "var(--ledger-rule)" }}>
-          <div className="flex items-baseline justify-between mb-1">
-            <span className="font-mono text-[9px] sm:text-[10px] font-black uppercase tracking-[0.12em]"
-              style={{ color: "var(--ledger-ink-faint)" }}>
-              Selected Players
-            </span>
-            <button
-              onClick={() => setActiveBrush(null)}
-              className="font-mono text-[9px] uppercase tracking-[0.1em]"
-              style={{ color: "var(--ledger-ink-faint)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
-            >
-              Clear
-            </button>
-          </div>
-          <div className="grid gap-0" style={{ maxHeight: 160, overflowY: "auto" }}>
-            {brushedPlayers.slice(0, 20).map(p => (
-              <div key={p.id}
-                className="flex items-center justify-between gap-2 py-0.5 px-1"
-                style={{
-                  fontFamily: "'Courier Prime', monospace",
-                  fontSize: 11,
-                  color: p.id === currentPlayer.id ? CURRENT_COLOR : "var(--ledger-ink)",
-                  fontWeight: p.id === currentPlayer.id ? 800 : 400,
-                  borderBottom: "1px solid var(--ledger-rule)",
-                  opacity: 0.9,
-                }}
-              >
-                <span className="truncate">{p.name}</span>
-                <span className="flex items-baseline gap-2 shrink-0 tabular-nums">
-                  <span style={{ fontSize: 9, color: "var(--ledger-ink-faint)" }}>
-                    OFF {Math.round(p.off)} · DEF {Math.round(p.def)}
+      {/* The chart. No tab stop per point; see header comment. */}
+      <figure role="group" aria-label={figureDescription} className="m-0">
+        <ScatterPlot
+          xDomain={xDomain} yDomain={yDomain} med={med}
+          background={background} highlighted={highlighted} selected={selected.map(toDatum)}
+          current={toDatum(currentPlayer)} playerName={playerName} onPointClick={clickPoint}
+        />
+        <figcaption className="mt-1 font-mono text-[9px] leading-relaxed" style={{ color: FAINT }}>
+          Dashed lines are the medians of all {all.length} plotted players (offence {Math.round(med.off)}, defence {Math.round(med.def)}); they do not
+          change with search or selection. Right of the vertical line is above the median on offence; above the horizontal line is above the median on defence. <span className="sm:hidden">Tap a faint point to add it.</span>
+          <span className="hidden sm:inline">Click a faint point to add it.</span> Selected players are the only ones labelled.
+        </figcaption>
+      </figure>
+
+      {/* Exact values for the dossier player and the selection. */}
+      <div className="mt-3 overflow-x-auto" role="region" aria-label="Selected players: exact contributions" tabIndex={0}>
+        <table className="w-full font-mono" style={{ borderCollapse: "collapse" }}>
+          <caption className="text-left text-[9px] font-black uppercase tracking-[0.12em] pb-1" style={{ color: FAINT }}>
+            Exact contributions, NAV points
+          </caption>
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${RULE}` }}>
+              <th scope="col" className="px-2 py-1 text-left text-[9px] font-black uppercase" style={{ color: FAINT }}>Player</th>
+              <th scope="col" className="px-2 py-1 text-right text-[9px] font-black uppercase" style={{ color: FAINT }}>
+                <abbr title="Offensive contribution to NAV" style={{ textDecoration: "none" }}>OFF</abbr>
+              </th>
+              <th scope="col" className="px-2 py-1 text-right text-[9px] font-black uppercase" style={{ color: FAINT }}>
+                <abbr title="Defensive contribution to NAV" style={{ textDecoration: "none" }}>DEF</abbr>
+              </th>
+              <th scope="col" className="px-2 py-1 text-right text-[9px] font-black uppercase" style={{ color: FAINT }}>NAV</th>
+</tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.id} style={{ borderBottom: `1px solid ${RULE}` }}>
+                <th scope="row" className="px-2 py-1 text-left text-[11px] font-bold" style={{ color: r.isCurrent ? CURRENT_COLOR : INK }}>
+                  {!r.isCurrent && <span aria-hidden="true" style={{ color: SELECTED_STYLE[i - 1].color }}>{SELECTED_STYLE[i - 1].glyph} </span>}
+                  {r.name}{r.isCurrent ? " · this player" : ""}
+                  <span className="block text-[9px] font-normal" style={{ color: FAINT }}>
+                    {r.teamId}
+                    {r.vs && <> · vs {lastName(currentPlayer)}: OFF {signedDelta(r.vs.off)} · DEF {signedDelta(r.vs.def)} · NAV {signedDelta(r.vs.nav)}</>}
                   </span>
-                  <span style={{ fontWeight: 700, minWidth: 34, textAlign: "right" }}>
-                    {p.nav > 0 ? "+" : ""}{p.nav}
-                  </span>
-                </span>
-              </div>
+                </th>
+                <td className="px-2 py-1 text-right text-[11px] tabular-nums">{Math.round(r.off)}</td>
+                <td className="px-2 py-1 text-right text-[11px] tabular-nums">{Math.round(r.def)}</td>
+                <td className="px-2 py-1 text-right text-[11px] font-bold tabular-nums">{signedNav(r.nav)}</td>
+              </tr>
             ))}
-            {brushedPlayers.length > 20 && (
-              <div className="py-0.5 px-1 font-mono text-[10px]" style={{ color: "var(--ledger-ink-faint)" }}>
-                +{brushedPlayers.length - 20} more
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+          </tbody>
+        </table>
+      </div>
 
-      <details className="mt-3 border-t pt-1" style={{ borderColor: "var(--ledger-rule)" }}>
-        <summary className="flex min-h-11 cursor-pointer items-center font-mono text-[9px] font-black uppercase tracking-[0.12em]"
-          style={{ color: "var(--ledger-ink-faint)" }}>
+      <details className="mt-3 border-t pt-1" style={{ borderColor: RULE }}>
+        <summary className="flex min-h-11 cursor-pointer items-center font-mono text-[9px] font-black uppercase tracking-[0.12em]" style={{ color: FAINT }}>
           Compare all plotted players in a table
         </summary>
+        <p className="mb-1 font-mono text-[10px]" style={{ color: FAINT }}>
+          Read-only. Add a player to the comparison with the search box above.
+        </p>
         <HorizontalScrollCue label="Swipe or scroll for all comparison columns" />
-        <div
-          className="overflow-x-auto"
-          role="region"
-          aria-label="League context player comparison table"
-          tabIndex={0}
-        >
-          <table className="w-full font-mono" style={{ borderCollapse: "collapse", minWidth: 560 }}>
+        <div className="overflow-x-auto" role="region" aria-label="League context player table" tabIndex={0} style={{ maxHeight: 360, overflowY: "auto" }}>
+          <table className="w-full font-mono" style={{ borderCollapse: "collapse", minWidth: 420 }}>
             <caption className="sr-only">
-              Offensive value, defensive value, and NAV for {playerName} and {peers.length} same-position peers
+              Offensive and defensive contribution to NAV, and NAV, for {playerName} and {peers.length} same-position peers
             </caption>
             <thead>
-              <tr style={{ borderBottom: "1px solid var(--ledger-rule)" }}>
-                {[
-                  ["Player", "left"],
-                  ["Team", "left"],
-                  ["OFF", "right"],
-                  ["DEF", "right"],
-                  ["NAV", "right"],
-                  ["Compare", "right"],
-                ].map(([label, align]) => (
-                  <th key={label} scope="col" className="px-2 py-2 text-[9px] font-black uppercase tracking-[0.1em]"
-                    style={{ color: "var(--ledger-ink-faint)", textAlign: align as "left" | "right" }}>
-                    {label}
-                  </th>
+              <tr style={{ borderBottom: `1px solid ${RULE}` }}>
+                {([["Player", "left"], ["Team", "left"], ["OFF", "right"], ["DEF", "right"], ["NAV", "right"]] as const).map(([label, align]) => (
+                  <th key={label} scope="col" className="px-2 py-2 text-[9px] font-black uppercase tracking-[0.1em]" style={{ color: FAINT, textAlign: align }}>{label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {tablePlayers.map(player => {
-                const isCurrent = player.id === currentPlayer.id;
-                const isPinned = player.id === pinnedId;
+              {tablePlayers.map(p => {
+                const isCurrent = p.id === currentPlayer.id;
                 return (
-                  <tr key={player.id} style={{ borderBottom: "1px solid var(--ledger-rule)", background: isPinned ? "var(--paper-inset)" : "transparent" }}>
-                    <th scope="row" className="px-2 py-1 text-left text-[10px] font-bold" style={{ color: isCurrent ? CURRENT_COLOR : "var(--ledger-ink)" }}>
-                      {player.name}{isCurrent ? " · CURRENT" : ""}
+                  <tr key={p.id} style={{ borderBottom: `1px solid ${RULE}`, background: selectedSet.has(p.id) ? "var(--paper-inset)" : "transparent" }}>
+                    <th scope="row" className="px-2 py-1 text-left text-[10px] font-bold" style={{ color: isCurrent ? CURRENT_COLOR : INK }}>
+                      {p.name}{isCurrent ? " · this player" : ""}{selectedSet.has(p.id) ? " · selected" : ""}
                     </th>
-                    <td className="px-2 py-1 text-left text-[10px]" style={{ color: "var(--ledger-ink-faint)" }}>{player.teamId}</td>
-                    <td className="px-2 py-1 text-right text-[10px] tabular-nums">{Math.round(player.off)}</td>
-                    <td className="px-2 py-1 text-right text-[10px] tabular-nums">{Math.round(player.def)}</td>
-                    <td className="px-2 py-1 text-right text-[10px] font-bold tabular-nums">{player.nav > 0 ? "+" : ""}{player.nav}</td>
-                    <td className="px-1 py-0.5 text-right">
-                      {isCurrent ? (
-                        <span className="px-2 text-[9px] font-bold uppercase" style={{ color: "var(--ledger-ink-faint)" }}>Baseline</span>
-                      ) : (
-                        <button
-                          type="button"
-                          aria-pressed={isPinned}
-                          onClick={() => setPinnedId(prev => (prev === player.id ? null : player.id))}
-                          onKeyDown={event => {
-                            if (event.key === "Escape") setPinnedId(null);
-                          }}
-                          className="min-h-11 px-2 text-[9px] font-black uppercase underline"
-                          style={{ color: "var(--ledger-ink-faint)", background: "transparent", border: 0 }}
-                        >
-                          {isPinned ? "Dismiss" : "Pin"}
-                        </button>
-                      )}
-                    </td>
+                    <td className="px-2 py-1 text-left text-[10px]" style={{ color: FAINT }}>{p.teamId}</td>
+                    <td className="px-2 py-1 text-right text-[10px] tabular-nums">{Math.round(p.off)}</td>
+                    <td className="px-2 py-1 text-right text-[10px] tabular-nums">{Math.round(p.def)}</td>
+                    <td className="px-2 py-1 text-right text-[10px] font-bold tabular-nums">{signedNav(p.nav)}</td>
                   </tr>
                 );
               })}
@@ -642,6 +291,6 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName, coh
           </table>
         </div>
       </details>
-    </div>
+    </section>
   );
 }
