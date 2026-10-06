@@ -538,7 +538,7 @@ export function SeasonResultsPager({ simData, simResult, players = [], navMap = 
   } : null;
 
   const recapPage = simResult ? {
-    label: "Recap",
+    label: AI_SEASON_RECAP_ENABLED ? "Recap" : "Simulation status",
     node: <div className="space-y-4">{simResult.split('\n').map(renderRecapLine)}</div>,
   } : null;
 

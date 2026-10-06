@@ -1,5 +1,21 @@
 import { sqliteTable, text, real, integer } from "drizzle-orm/sqlite-core";
 
+export const issueReports = sqliteTable("issue_reports", {
+  id: text("id").primaryKey(),
+  requestFingerprint: text("request_fingerprint").notNull(),
+  description: text("description").notNull(),
+  pageUrl: text("page_url").notNull(),
+  steps: text("steps").notNull(),
+  email: text("email").notNull(),
+  browser: text("browser").notNull(),
+  viewportWidth: integer("viewport_width").notNull(),
+  viewportHeight: integer("viewport_height").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  status: text("status").notNull().default("New"),
+  internalNote: text("internal_note").notNull().default(""),
+});
+
 export const teams = sqliteTable("teams", {
   id:               text("id").primaryKey(),
   name:             text("name").notNull(),

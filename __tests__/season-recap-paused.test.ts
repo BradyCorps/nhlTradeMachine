@@ -26,6 +26,11 @@ describe("paused AI season recap presentation", () => {
       simData: null, simResult: message,
     }));
     expect(html).toContain(message);
+    const withResults = renderToStaticMarkup(createElement(SeasonResultsPager, {
+      simData: { seed: 123 }, simResult: message,
+    }));
+    expect(withResults).toContain(">Simulation status</button>");
+    expect(withResults).not.toContain(">Recap</button>");
     expect(html).not.toContain(AI_SEASON_RECAP_PAUSED_MESSAGE);
   });
 

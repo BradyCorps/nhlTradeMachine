@@ -103,6 +103,7 @@ describe("Phase 3 migration upgrade", () => {
       expect(pendingBefore.pending.map(entry => entry.tag)).toEqual([
         "0009_add_labs_candidate_foundation",
         "0010_add_labs_evaluation_evidence",
+        "0011_add_issue_reports",
       ]);
       await migrate(drizzle(client), { migrationsFolder: migrationFolder() });
       const after = await snapshotSummary(client);

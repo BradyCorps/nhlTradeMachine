@@ -1,6 +1,7 @@
 // ── Footer — methodology, glossary, icon key, data credits ───
 // Shared across Armchair GM, Trade Machine, and Player Analytics pages.
 import Link from "next/link";
+import { ReportIssueLink } from "@/app/components/ReportIssueLink";
 import { BRAND } from "@/app/lib/brand";
 import { BrandMark } from "@/app/components/BrandMark";
 import type { GravityTier } from "@/app/lib/gravity";
@@ -147,6 +148,8 @@ export default function Footer() {
             <Link href="/glossary#data-sources" className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-ledger-ink transition-colors">Sources</Link>
             <span aria-hidden="true">·</span>
             <Link href="/legal" className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-ledger-ink transition-colors">Legal</Link>
+            <span aria-hidden="true">·</span>
+            <ReportIssueLink className="inline-flex min-h-11 min-w-11 items-center justify-center underline hover:text-ledger-ink transition-colors" />
           </nav>
           <p className="mt-1 text-[10px] uppercase tracking-[0.14em] sm:tracking-[0.24em] font-mono text-ledger-rule">
             X-NAV · G-NAV · NOIV · STRAND · GM Audit

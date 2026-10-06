@@ -37,6 +37,8 @@ jobs:
         run: node scripts/mob-workflows.mjs
       - name: Welcome and nested Season Review regression
         run: node --import tsx scripts/verify-welcome-season-review.mjs
+      - name: Isolated issue reporting and Admin review
+        run: node --import tsx scripts/verify-issue-reporting.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

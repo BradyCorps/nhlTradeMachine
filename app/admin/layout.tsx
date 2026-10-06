@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: "/admin/labs",          label: "ANALYTICS LABS" },
   { href: "/admin/season-setup",  label: "SEASON"      },
   { href: "/admin/settings",      label: "SETTINGS"    },
+  { href: "/admin/issue-reports", label: "ISSUE REPORTS" },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
