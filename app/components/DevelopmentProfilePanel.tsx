@@ -1,3 +1,4 @@
+import { EVIDENCE_SCORE_NOTE, EVIDENCE_SCORE_SHORT, PEAK_YEARS_NOTE, SCENARIO_NOTE } from "@/app/lib/outlook-copy";
 import React from "react";
 import type { Asset } from "@/app/lib/trade-types";
 
@@ -78,7 +79,7 @@ const OUTLOOK_KEY: [string, string][] = [
   ["Now", "0-100 current-season value from production, role, experience, and risk."],
   ["Dynasty", "0-100 long-term keeper score; 90/100 is elite cornerstone territory, 50/100 is ordinary roster value."],
   ["Breakout", "0-100 near-term chance the player meaningfully outperforms their current tier."],
-  ["Peak Left", "Estimated prime-level seasons remaining for established veterans."],
+  ["Peak Left", PEAK_YEARS_NOTE],
   ["Risk", "0-100 regression risk from age, sample, trend, and availability signals."],
   ["Arc", "Boom/bust read: stable, boom lean, bust lean, or high variance."],
   ["Boom", "0-100 upside score from breakout odds, draft signal, production, role, trend, and age."],
@@ -88,10 +89,10 @@ const OUTLOOK_KEY: [string, string][] = [
   ["Draft Sig", "0-100 draft/prospect signal, reduced as NHL sample becomes more predictive. This is not career reputation."],
   ["Exp", "0-100 NHL sample and track record."],
   ["Durability", "0-100 average NHL games played per season against an 82-game season."],
-  ["Projection", "Pts/82 floor, median, and ceiling band with sample confidence."],
+  ["Projection", `Pts/82 low, median and high case. ${SCENARIO_NOTE}`],
   ["Phase", "Development stage such as emerging, breakout, peak window, veteran risk, or declining."],
   ["Trend", "Recent scoring direction: rising, flat, falling, or volatile."],
-  ["Sample Conf", "0-100 confidence in the projection based on NHL experience, timeline depth, context, volatility, and durability."],
+  ["Sample Evidence", EVIDENCE_SCORE_NOTE],
 ];
 
 function OutlookKey() {
@@ -150,7 +151,7 @@ export function DevelopmentProfilePanel({ asset }: { asset: Asset }) {
           {phaseLabel(profile.developmentPhase, isEstablishedVet)}
         </span>
         <span className="text-2xs font-black uppercase tracking-wider font-mono" style={{ color: confidenceColor }}>
-          {profile.timelineTrend} · {band.confidence}% SAMPLE CONF
+          {profile.timelineTrend} · {EVIDENCE_SCORE_SHORT} {band.confidence}/100
         </span>
       </div>
 
@@ -158,7 +159,7 @@ export function DevelopmentProfilePanel({ asset }: { asset: Asset }) {
         <Metric label="Now" value={profile.currentFantasyScore} color={tone(profile.currentFantasyScore)} title="Current-season value (production + role + experience)" />
         <Metric label="Dynasty" value={profile.dynastyScore} color={dynastyColor} title={`Long-term keeper value · current fantasy score ${profile.currentFantasyScore}/100`} />
         {isEstablishedVet
-          ? <Metric label="Peak Left" value={`${peakYearsLeft}yr`} color={peakLeftColor} title="Estimated prime-level seasons remaining" />
+          ? <Metric label="Peak Left" value={`${peakYearsLeft}yr`} color={peakLeftColor} title={PEAK_YEARS_NOTE} />
           : <Metric label="Breakout" value={profile.breakoutProbability} color={breakoutColor} title="Breakout probability" />
         }
         <Metric label="Risk" value={profile.regressionRisk} color={riskColor} title="Regression risk" />
@@ -190,7 +191,7 @@ export function DevelopmentProfilePanel({ asset }: { asset: Asset }) {
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">Inputs</span>
           <span className="text-2xs font-black text-ledger-ink-faint font-mono">
-            Draft weight {pedigreeWeight}% · Conf {confidenceScore}
+            Draft weight {pedigreeWeight}% · Evidence {confidenceScore}/100
           </span>
         </div>
         <div className="grid grid-cols-2 gap-1.5">
@@ -204,9 +205,9 @@ export function DevelopmentProfilePanel({ asset }: { asset: Asset }) {
 
       <div className="p-2 mb-1.5" style={{ background: "var(--ledger-warm)", border: "1px solid #b8a070" }}>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono">Projection</span>
+          <span className="text-2xs font-black uppercase tracking-wider text-ledger-ink-faint font-mono" title={SCENARIO_NOTE}>Projection (scenario range)</span>
           <span className="text-2xs font-black text-ledger-ice font-mono">
-            {band.floorPts82}-{band.ceilingPts82} pts/82 · median {band.medianPts82}
+            {band.floorPts82}-{band.ceilingPts82} pts/82 · median case {band.medianPts82}
           </span>
         </div>
         <div className="h-1.5 overflow-hidden" style={{ background: "var(--ledger-rule-light)", border: "1px solid #c8b890" }}>

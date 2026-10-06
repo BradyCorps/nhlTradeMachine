@@ -8,6 +8,9 @@
 import { useMemo } from "react";
 import { ChartData } from "@/app/components/ChartData";
 import type { Asset } from "@/app/lib/trade-types";
+import {
+  EVIDENCE_SCORE_LABEL, EVIDENCE_SCORE_NOTE, SCENARIO_HIGH, SCENARIO_LOW, SCENARIO_MEDIAN, SCENARIO_NOTE, SCENARIO_RANGE_LABEL,
+} from "@/app/lib/outlook-copy";
 import { deriveOutlook, type OutlookTone, type TrajectoryDirection } from "@/app/lib/player-outlook";
 
 const toneColor = (t: OutlookTone): string =>
@@ -71,34 +74,36 @@ export function PlayerOutlook({ asset }: { asset: Asset }) {
             {outlook.summary}
           </div>
         </div>
-        <div className="text-right shrink-0">
-          <div className="text-2xs uppercase tracking-wider" style={{ color: faint }}>Confidence</div>
-          <div className="text-[13px] font-black" style={{ color: "var(--ledger-ink)" }}>{outlook.confidence}</div>
+        <div className="text-right shrink-0" title={EVIDENCE_SCORE_NOTE} style={{ maxWidth: 120 }}>
+          <div className="text-2xs uppercase tracking-wider" style={{ color: faint }}>{EVIDENCE_SCORE_LABEL}</div>
+          <div className="text-[13px] font-black" style={{ color: "var(--ledger-ink)" }}>{outlook.confidence}<span style={{ color: faint, fontWeight: 400 }}> / 100</span></div>
+          <div className="text-[9px] leading-tight" style={{ color: faint }}>hand-weighted, not a probability</div>
         </div>
       </div>
 
       {/* Next-season projection band */}
       <ChartData title="Scoring outlook" columns={["Points / 82"]} rows={[
         ...outlook.trajectory.seasons.map(season => ({ id: season.season, label: season.season, values: [String(season.pace)] })),
-        { id: "floor", label: "Next season floor", values: [String(floor)] },
-        { id: "median", label: "Next season median", values: [String(median)] },
-        { id: "ceiling", label: "Next season ceiling", values: [String(ceiling)] },
+        { id: "floor", label: `Next season ${SCENARIO_LOW.toLowerCase()}`, values: [String(floor)] },
+        { id: "median", label: `Next season ${SCENARIO_MEDIAN.toLowerCase()}`, values: [String(median)] },
+        { id: "ceiling", label: `Next season ${SCENARIO_HIGH.toLowerCase()}`, values: [String(ceiling)] },
       ]} />
       <div className="p-2.5" style={{ background: "var(--ledger-warm)", border: "1px solid #b8a070" }}>
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-2xs font-black uppercase tracking-wider" style={{ color: faint }}>Next-Season Projection</span>
+          <span className="text-2xs font-black uppercase tracking-wider" style={{ color: faint }}>{SCENARIO_RANGE_LABEL}</span>
           <span className="text-2xs font-black" style={{ color: "var(--ledger-ice)" }}>
-            {floor}–{ceiling} pts/82 · median {median}
+            {floor}–{ceiling} pts/82 · median case {median}
           </span>
         </div>
         <div className="relative h-2 overflow-hidden" style={{ background: "var(--ledger-rule-light)", border: "1px solid #c8b890" }}>
           <div className="absolute top-0 h-full" style={{ left: 0, width: `${medianPct}%`, background: "var(--ledger-ice)", opacity: 0.8 }} />
-          <div className="absolute top-[-2px] h-[calc(100%+4px)] w-[2px]" style={{ left: `${medianPct}%`, background: "var(--ledger-ink)" }} title={`Median ${median} pts/82`} />
+          <div className="absolute top-[-2px] h-[calc(100%+4px)] w-[2px]" style={{ left: `${medianPct}%`, background: "var(--ledger-ink)" }} title={`Median case ${median} pts/82`} />
         </div>
         <div className="flex justify-between text-2xs mt-0.5" style={{ color: faint }}>
-          <span>Floor {floor}</span>
-          <span>Ceiling {ceiling}</span>
+          <span>{SCENARIO_LOW} {floor}</span>
+          <span>{SCENARIO_HIGH} {ceiling}</span>
         </div>
+        <p className="mt-1 text-[9px] leading-snug" style={{ color: faint }}>{SCENARIO_NOTE}</p>
       </div>
 
       {/* Accumulated scoring trajectory */}

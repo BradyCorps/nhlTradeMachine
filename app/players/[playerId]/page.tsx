@@ -33,6 +33,7 @@ import PlayerStrandPanel from "@/app/components/PlayerStrandPanel";
 import EdgeShotMap from "@/app/components/EdgeShotMap";
 import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { HelpPopover } from "@/app/components/HelpPopover";
+import { SKATER_FMV_VALIDATION } from "@/app/lib/skater-fmv";
 import MetricTip from "@/app/components/MetricTip";
 import { navSplit, navSplitNote, navStageDesc, navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
 import { derivePlayerRoles, roleSupport } from "@/app/lib/player-roles";
@@ -40,7 +41,7 @@ import { compareEligibility } from "@/app/lib/strand-compare";
 import { sectionSource } from "@/app/lib/dossier-context";
 import { formatToi } from "@/app/lib/edge-display";
 import {
-  ANNUAL_SURPLUS_DEFINITION, ANNUAL_SURPLUS_LABEL, CONTRACT_SIDE_LABEL, MARKET_AAV_LABEL,
+  ANNUAL_SURPLUS_DEFINITION, ANNUAL_SURPLUS_LABEL, CONTRACT_SIDE_LABEL, MARKET_AAV_LABEL, marketAavDefinition,
   PLAYER_SIDE_DEFINITION, PLAYER_SIDE_LABEL, PLAYER_SIDE_SUB, contractControlExplanation,
 } from "@/app/lib/valuation-copy";
 import Header from "@/app/components/Header";
@@ -415,7 +416,7 @@ export default async function PlayerPage({ params, searchParams }: {
             </div>
           </div>
           <div>
-              <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>{MARKET_AAV_LABEL}</div>
+              <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>{isGoalie ? MARKET_AAV_LABEL : <HelpPopover label={MARKET_AAV_LABEL} definition={marketAavDefinition(SKATER_FMV_VALIDATION[player.position === "D" ? "D" : "F"], capCeiling)}>{MARKET_AAV_LABEL}</HelpPopover>}</div>
               <div className="text-[13px] font-black font-mono">{marketValueLabel(xnav.fmvAav)}</div>
           </div>
           {surplus != null && (
