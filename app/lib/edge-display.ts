@@ -94,7 +94,7 @@ export function percentileReading(shots: unknown, percentile: unknown): Percenti
 }
 
 export const PERCENTILE_CAVEAT =
-  "Percentiles are NHL EDGE's own figures; the feed does not document their population or tie handling, so a zero count is shown as a count only.";
+  "Percentiles are NHL EDGE's own figures. The feed does not document their population, season window or tie rule, so what any of them rank is unconfirmed, including the non-zero ones shown here. Read them as EDGE's labels, not verified rankings; zero counts are shown as counts only.";
 
 // ── Sample size ──────────────────────────────────────────────────
 
