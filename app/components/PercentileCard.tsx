@@ -154,8 +154,9 @@ export default function PercentileCard({ player, allPlayers, teamName }: Percent
   const cardRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
   const [compareSelection, setCompareSelection] = useState<{ forPlayerId: string; player: PlayerData } | null>(null);
-  // Review prototype: bars stay the default; the radar is an alternative view.
-  const [view, setView] = useState<"bars" | "radar">("bars");
+  // The radar is the default for skaters (chosen after side-by-side review); the bars stay one
+  // tap away as "Detailed values". Goalies have no radar model, so they always show the bars.
+  const [view, setView] = useState<"bars" | "radar">("radar");
 
   const { percentiles, xnav, sortedMaps } = useMemo(() => {
     const peers = allPlayers.filter(p => {

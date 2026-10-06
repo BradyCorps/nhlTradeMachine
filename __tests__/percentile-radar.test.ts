@@ -97,6 +97,12 @@ describe("the card: no averaged quality verdict, bars retained", () => {
     expect(card).toMatch(/metricPercentile\(raw, sorted, stat\.invert \?\? false\)/);
     expect(card).not.toMatch(/PlayerPicker/);                           // no second picker
   });
+  it("opens on the radar for skaters, falls back to the bars where there is no radar model, and keeps one tap to the bars", () => {
+    expect(card).toMatch(/useState<"bars" \| "radar">\("radar"\)/);
+    expect(card).toMatch(/radarModel && view === "radar" \?/);          // goalies: radarModel is null, so bars render
+    expect(card).toMatch(/\["bars", "Detailed values"\]/);
+    expect(buildRadarModel("G", [])).toBeNull();
+  });
   it("leaves the percentile definitions themselves untouched", () => {
     for (const k of ["pts", "goals", "assists", "xg", "toi", "ops", "dps", "xgrel", "supp", "qoc", "oz"]) {
       expect(card).toContain(`key: "${k}"`);

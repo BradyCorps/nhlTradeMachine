@@ -28,7 +28,7 @@ keyboard path and is replaced by search plus multi-select; the faint dots carry 
 
 ## B. Percentile radar prototype (`PercentileRadar`, expanded player card)
 
-A "Radar (prototype)" view beside the existing bars, which stay as **"Detailed values"** (the default).
+A "Radar (prototype)" view beside the existing bars, which stay one tap away as **"Detailed values"**. After side-by-side review the radar is the default for skaters; goalies (no radar model) always show the bars.
 
 - Fixed 0–100 scale; dashed ring labelled as the 50th percentile (middle of the comparison group);
   fixed axis order per position group; one player plus at most one comparison.
@@ -54,7 +54,7 @@ nothing validates the average or the thresholds. The card and the PNG export now
 `avgPercentile: null`. Per-bar colouring is unchanged and still decorative. No recalibration.
 
 ## Bundle size
-Recharts is about 350 KiB of JavaScript, so both chart components load lazily (`next/dynamic`, `ssr: false`)
+Recharts is about 350 KiB of JavaScript, so both chart components load lazily (the radar loads when a skater card is opened, since it is now the default view) (`next/dynamic`, `ssr: false`)
 behind same-height placeholders. First-load JS from `.next/diagnostics/route-bundle-stats.json`, main vs
 this branch (uncompressed):
 
