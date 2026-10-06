@@ -76,7 +76,7 @@ const BY_POSITION = artifact.model.byPosition as Record<SkaterUnit, {
   /** Where each feature's slope is allowed to change, in the feature's units. */
   knots: { pts60: number[]; toi: number[] };
   featureDomain: Record<string, { min: number; p5: number; p50: number; p95: number; max: number }>;
-  validation: { walkForward: { trainN: number; testN: number; r2: number; maeCapPct: number } };
+  validation: { walkForward: { trainN: number; testN: number; r2: number; maeCapPct: number; richestAbsMissCapPct: number; richestN: number } };
 }>;
 
 /** Minutes per game the `toi` feature is expressed against. Matches the fit. */

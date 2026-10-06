@@ -1069,7 +1069,7 @@ describe("Canary — development profile rationale copy", () => {
     expect(src).toContain("scoringTrajectoryLabels");
     expect(panelSrc).toContain("pedigreeWeight");
     expect(panelSrc).toContain("3-Year Scoring");
-    expect(panelSrc).toContain("SAMPLE CONF");
+    expect(panelSrc).toContain("EVIDENCE_SCORE_SHORT");
     expect(panelSrc).toContain("MiniScore");
     expect(panelSrc).toContain('label="Durability"');
     expect(panelSrc).toContain("avg games played per season vs 82");
@@ -1086,7 +1086,7 @@ describe("Canary — development profile rationale copy", () => {
     expect(panelSrc).toContain("Draft Sig");
     expect(panelSrc).toContain("Draft weight");
     expect(panelSrc).toContain("not career reputation");
-    expect(panelSrc).toContain("Sample Conf");
+    expect(panelSrc).toContain("Sample Evidence");
     expect(panelSrc).toContain("Projection");
     expect(panelSrc).toContain("Peak Left");
     expect(panelSrc).toContain("Durability");
@@ -2269,7 +2269,7 @@ describe("Canary — PA12 redefined analytics Outlook", () => {
 
     const outlook = read("app/components/PlayerOutlook.tsx");
     expect(outlook).toContain("deriveOutlook");
-    expect(outlook).toContain("Next-Season Projection");
+    expect(outlook).toContain("SCENARIO_RANGE_LABEL");
     expect(outlook).toContain("Scoring Trajectory");
     expect(outlook).toContain("Leading Indicators");
 

@@ -31,6 +31,19 @@ export const CONTRACT_SIDE_LABEL = "Contract & control";
 export const MARKET_AAV_LABEL = "Market AAV (model est.)";
 export const ANNUAL_SURPLUS_LABEL = "Est. annual surplus";
 
+/**
+ * What "Market AAV (model est.)" means, with its measured upper-end accuracy.
+ * Numbers come from the fit's walk-forward validation, never typed by hand.
+ * Copy only: nothing here changes an estimate.
+ */
+export function marketAavDefinition(
+  v: { maeCapPct: number; richestAbsMissCapPct: number; richestN: number },
+  capCeilingM: number,
+): string {
+  const m = (pct: number) => `$${(pct * capCeilingM).toFixed(1)}M`;
+  return `What clubs have typically paid skaters with similar scoring, ice time, age and free-agent status, fitted to one-way contracts signed 2017–2026. It is a typical signing value, not a salary a player has earned or a price for an exceptional player. On held-out seasons it missed by about ${m(v.maeCapPct)} on average, and by about ${m(v.richestAbsMissCapPct)} on average for the ${v.richestN} richest deals tested, with no consistent bias reported for those. A handful of tested deals is thin evidence for the very top, so treat a star's figure as a range, not a price.`;
+}
+
 export const PLAYER_SIDE_DEFINITION =
   "Measured on-ice components plus this player's share of the model's adjustments (positional scarcity, development risk, floors, sample credibility). It is not a pure on-ice figure.";
 

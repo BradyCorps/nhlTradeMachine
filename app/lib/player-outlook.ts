@@ -13,6 +13,7 @@
 // (PlayerOutlook.tsx) just renders the result. The DevelopmentProfile
 // engine is untouched — this is a reading of it, not a rewrite.
 
+import { peakYearsPhrase } from "@/app/lib/outlook-copy";
 import type { DevelopmentProfile } from "./development-profile";
 
 export type OutlookTone = "good" | "neutral" | "warn" | "bad";
@@ -258,7 +259,7 @@ function headlineFor(
       return { headline: "ON THE RISE", tone: "good", summary: "Breakout-shaped: the underlying signals are running ahead of the point totals." };
     case "PEAK_WINDOW":
       if (cooling) return { headline: "AT PEAK — COOLING", tone: "neutral", summary: "Still prime-aged, but the scoring trend has flattened off its high." };
-      return { headline: "IN HIS PRIME", tone: "good", summary: peakLeft != null ? `Prime production, roughly ${peakLeft} peak-level year${peakLeft === 1 ? "" : "s"} left in the projection.` : "Peak-window production with the arrow holding level." };
+      return { headline: "IN HIS PRIME", tone: "good", summary: peakLeft != null ? `Prime production, with ${peakYearsPhrase(peakLeft)} (an assumption, not a forecast).` : "Peak-window production with the arrow holding level." };
     case "REGRESSION_RISK":
       if (rising) return { headline: "RISING — BUT REGRESSION-FLAGGED", tone: "warn", summary: "Points are climbing, but the model prices a pullback — a boom-or-bust hold, not a safe one." };
       return { headline: "REGRESSION RISK", tone: "warn", summary: "The projection sits below the recent scoring line — some pullback is priced in." };
