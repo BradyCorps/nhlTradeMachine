@@ -35,7 +35,14 @@ import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 import { HelpPopover } from "@/app/components/HelpPopover";
 import MetricTip from "@/app/components/MetricTip";
 import { navSplit, navSplitNote, navStageDesc, navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
-import { derivePlayerRoles } from "@/app/lib/player-roles";
+import { derivePlayerRoles, roleSupport } from "@/app/lib/player-roles";
+import { compareEligibility } from "@/app/lib/strand-compare";
+import { sectionSource } from "@/app/lib/dossier-context";
+import { formatToi } from "@/app/lib/edge-display";
+import {
+  ANNUAL_SURPLUS_DEFINITION, ANNUAL_SURPLUS_LABEL, CONTRACT_SIDE_LABEL, MARKET_AAV_LABEL,
+  PLAYER_SIDE_DEFINITION, PLAYER_SIDE_LABEL, PLAYER_SIDE_SUB, contractControlExplanation,
+} from "@/app/lib/valuation-copy";
 import Header from "@/app/components/Header";
 import Footer from "@/app/components/Footer";
 import { contractVerdict, verdictColor } from "@/app/lib/contract-verdict";
@@ -70,7 +77,7 @@ function buildComparePeers(allPlayers: any[], player: any) {
     .filter(p => String(p.id) !== String(player.id) && p.position !== "Pick")
     .filter(p => posGroupOf(p.position) === group && (p.games ?? 0) >= 20)
     .map(p => ({
-      id: String(p.id), name: p.name, position: p.position,
+      id: String(p.id), name: p.name, position: p.position, teamId: p.teamId ?? null,
       ops: p.ops ?? null, dps: p.dps ?? null, ptsPace: p.ptsPace ?? null,
       xGPace: p.xGPace ?? null, xgRelTM: p.xgRelTM ?? null, avgTOI: p.avgTOI ?? null,
       xgaRelTM: p.xgaRelTM ?? null, qocIndex: p.qocIndex ?? null, dzPct: p.dzPct ?? null,
@@ -154,6 +161,7 @@ export default async function PlayerPage({ params, searchParams }: {
     : null;
   const roles = derivePlayerRoles(player);
   const comparePeers = buildComparePeers(roster.players as any[], player);
+  const { excluded: compareExcluded } = compareEligibility(roster.players as any[], player);
   const strandCohort = buildStrandCohort(roster.players as any[], player);
   const strandCohortLabel = `${STRAND_COHORT_NOUN[posGroupOf(player.position)]}, ≥20 GP, ${SEASON.replaySeason}`;
 
@@ -214,6 +222,9 @@ export default async function PlayerPage({ params, searchParams }: {
     expiresThisOffseason: player.expiresThisOffseason, lastCapHit: player.lastCapHit,
   });
   const surplus = verdict.surplus;
+  const contractExplanation = contractControlExplanation({
+    contractNav: split.contract, annualSurplus: surplus, yearsRemaining: player.yearsRemaining,
+  });
 
   return (
     <main className="min-h-screen px-4 py-6" style={{ background: "var(--paper-bg)", color: ink }}>
@@ -264,7 +275,7 @@ export default async function PlayerPage({ params, searchParams }: {
         </div>
 
         <ObservedSeasonSelector selection={selection} />
-        <p className="text-[11px] font-mono mb-3">Current contracts and NAV · model inputs, roles, STRAND and comparisons: 2025–26 regular season. Current NAV is not historical NAV.</p>
+        <p className="text-[11px] font-mono mb-3">Stat strip and EDGE: the season you selected above. Value, role, STRAND and comparisons: the frozen 2025–26 regular-season baseline, each labelled below. Current NAV is not historical NAV.</p>
         {/* Modern role identity */}
         {roles && (
           <div className="border px-4 py-3 mb-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
@@ -284,6 +295,22 @@ export default async function PlayerPage({ params, searchParams }: {
             <p className="text-[11px] font-mono leading-relaxed mt-1" style={{ color: "var(--ledger-ink-body, var(--ledger-ink))" }}>
               {roles.primary.blurb}
             </p>
+            <details className="mt-1">
+              <summary className="text-[10px] font-black font-mono uppercase tracking-[0.12em] cursor-pointer" style={{ color: faint, minHeight: 24 }}>
+                What supports this role
+              </summary>
+              <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-[10px] font-mono">
+                {roleSupport(roles.primary.key, player).map(l => (
+                  <div key={l.label} className="contents">
+                    <dt style={{ color: faint }}>{l.label}</dt>
+                    <dd className="text-right font-black tabular-nums">{l.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-1 text-[9px] font-mono" style={{ color: faint }}>
+                Roles are scores over these measured inputs, not scouting assessments. {sectionSource("role", selection, games)}
+              </p>
+            </details>
           </div>
         )}
 
@@ -317,7 +344,7 @@ export default async function PlayerPage({ params, searchParams }: {
               value={pm != null ? `${pm > 0 ? "+" : ""}${pm}` : "—"}
               color={pm != null ? (pm > 0 ? "var(--ledger-green)" : pm < 0 ? "var(--ledger-red)" : undefined) : undefined}
             />
-            <StatCell label="Avg ice time" value={observed.toiMinutes != null ? observed.toiMinutes.toFixed(1) : "—"} />
+            <StatCell label="Ice time / GP (m:ss)" value={formatToi(observed.toiMinutes)} />
           </div>
         )}
 
@@ -330,25 +357,37 @@ export default async function PlayerPage({ params, searchParams }: {
           <GoalieEdgePanel detail={goalieDetail} playerName={player.name} /></div>
         )}
 
-        {/* The player, and what his contract does to him */}
+        {/* The player-side value, and what the contract and control terms do to it */}
         {split.known && navValueForDisplay(xnav) !== null && (
-          <div className="border mb-3 grid grid-cols-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
-            <div className="px-3 py-2 border-r" style={{ borderColor: rule }}>
-              <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>On the ice</div>
-              <div className="text-[17px] font-black font-mono" style={{ color: ink }}>{split.production}</div>
-            </div>
-            <div className="px-3 py-2 border-r" style={{ borderColor: rule }}>
-              <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>His contract</div>
-              <div className="text-[17px] font-black font-mono" style={{
-                color: split.contract > 0 ? "var(--ledger-green)" : split.contract < 0 ? "var(--ledger-red)" : ink,
-              }}>{split.contract > 0 ? "+" : ""}{split.contract}</div>
-            </div>
-            <div className="px-3 py-2">
-              <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>
-                <HelpPopover label="Trade-value split" definition={navSplitNote(split)}>Trade value</HelpPopover>
+          <div className="mb-3">
+            <div className="border grid grid-cols-3" style={{ borderColor: rule, background: "var(--paper-inset)" }}>
+              <div className="px-3 py-2 border-r" style={{ borderColor: rule }}>
+                <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>
+                  <HelpPopover label={PLAYER_SIDE_LABEL} definition={PLAYER_SIDE_DEFINITION}>{PLAYER_SIDE_LABEL}</HelpPopover>
+                </div>
+                <div className="text-[17px] font-black font-mono" style={{ color: ink }}>{split.production}</div>
+                <div className="text-[9px] font-mono" style={{ color: faint }}>{PLAYER_SIDE_SUB}</div>
               </div>
-              <div className="text-[17px] font-black font-mono" style={{ color: ink }}>{navLabelForDisplay(xnav)}</div>
+              <div className="px-3 py-2 border-r" style={{ borderColor: rule }}>
+                <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>
+                  <HelpPopover label={CONTRACT_SIDE_LABEL} definition={contractExplanation}>{CONTRACT_SIDE_LABEL}</HelpPopover>
+                </div>
+                <div className="text-[17px] font-black font-mono" style={{
+                  color: split.contract > 0 ? "var(--ledger-green)" : split.contract < 0 ? "var(--ledger-red)" : ink,
+                }}>{split.contract > 0 ? "+" : ""}{split.contract}</div>
+                <div className="text-[9px] font-mono" style={{ color: faint }}>multi-year, NAV points</div>
+              </div>
+              <div className="px-3 py-2">
+                <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>
+                  <HelpPopover label="Trade-value split" definition={navSplitNote(split)}>Trade value</HelpPopover>
+                </div>
+                <div className="text-[17px] font-black font-mono" style={{ color: ink }}>{navLabelForDisplay(xnav)}</div>
+                <div className="text-[9px] font-mono" style={{ color: faint }}>{split.production} {split.contract < 0 ? "−" : "+"} {Math.abs(split.contract)}</div>
+              </div>
             </div>
+            <p className="mt-1 text-[10px] font-mono leading-relaxed" style={{ color: faint }}>
+              {contractExplanation} {sectionSource("value", selection, games)}
+            </p>
           </div>
         )}
 
@@ -376,13 +415,13 @@ export default async function PlayerPage({ params, searchParams }: {
             </div>
           </div>
           <div>
-              <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>Market AAV</div>
+              <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>{MARKET_AAV_LABEL}</div>
               <div className="text-[13px] font-black font-mono">{marketValueLabel(xnav.fmvAav)}</div>
           </div>
           {surplus != null && (
             <div className="text-right">
               <div className="text-[9px] font-black font-mono uppercase tracking-[0.14em]" style={{ color: faint }}>
-                <HelpPopover label="Contract surplus" definition={verdict.note}>Surplus</HelpPopover>
+                <HelpPopover label={ANNUAL_SURPLUS_LABEL} definition={`${ANNUAL_SURPLUS_DEFINITION} ${verdict.note}`}>{ANNUAL_SURPLUS_LABEL}</HelpPopover>
               </div>
               <div className="text-[13px] font-black font-mono" style={{ color: verdictColor(verdict.tone) }}>
                 {surplus > 0 ? "+" : ""}${surplus.toFixed(1)}M
@@ -397,8 +436,11 @@ export default async function PlayerPage({ params, searchParams }: {
             STRAND DNA
           </div>
           <div className="flex justify-center">
-            <PlayerStrandPanel player={player} peers={comparePeers} cohort={strandCohort} cohortLabel={strandCohortLabel} />
+            <PlayerStrandPanel player={player} peers={comparePeers} excluded={compareExcluded} cohort={strandCohort} cohortLabel={strandCohortLabel} />
           </div>
+          <p className="mt-3 text-[10px] font-mono leading-relaxed" style={{ color: faint }}>
+            {sectionSource("strand", selection, games)} Time on ice, competition and offensive-zone starts describe how a player is used; they are not evidence of defensive quality.
+          </p>
         </div>
 
         {/* League context scatter — OFF vs DEF for same-position peers */}
@@ -411,7 +453,7 @@ export default async function PlayerPage({ params, searchParams }: {
           />
         )}
 
-        <SeasonReferenceBlock valuationSnapshotId={xnav.snapshot?.snapshotId ?? null} />
+        <SeasonReferenceBlock valuationSnapshotId={xnav.snapshot?.snapshotId ?? null} selection={selection} observedGames={games ?? null} />
 
         {/* NHL EDGE shot map — skaters with NHL ids only */}
         {player.position !== "G" && /^\d+$/.test(playerId) && (

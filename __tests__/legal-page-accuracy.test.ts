@@ -73,17 +73,34 @@ describe("legal page — the claims that are checkable in code", () => {
     expect(LEGAL).toMatch(/No cookies are set for visitors/i);
   });
 
-  it('claims no advertising or cross-site tracking, and ships no tracker', () => {
+  it('claims no advertising or cross-site tracking, and ships no undisclosed tracker', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf-8"));
     const deps = Object.keys(pkg.dependencies ?? {});
-    // Vercel Speed Insights IS disclosed by name on the page. Anything else in
-    // this family would not be.
+    // The only measurement dependencies allowed, each paired with the wording the
+    // page must contain while it is installed. Adding one here without adding the
+    // sentence to /legal still fails, and so does installing one that is not listed.
+    const DISCLOSED: Record<string, RegExp> = {
+      "@vercel/speed-insights": /Speed Insights/,
+      "@vercel/analytics": /Web Analytics/,
+    };
     const trackers = deps.filter(d =>
-      /analytics|gtag|google-tag|posthog|plausible|mixpanel|segment|amplitude|hotjar|fullstory|clarity/i.test(d)
-      && d !== "@vercel/speed-insights");
+      /analytics|gtag|google-tag|posthog|plausible|mixpanel|segment|amplitude|hotjar|fullstory|clarity|speed-insights/i.test(d)
+      && !(d in DISCLOSED));
     expect(trackers, `undisclosed analytics dependency: ${trackers.join(", ")}`).toEqual([]);
+    for (const [dep, wording] of Object.entries(DISCLOSED)) {
+      if (deps.includes(dep)) expect(LEGAL, `${dep} is installed but /legal does not name it`).toMatch(wording);
+    }
     expect(LEGAL).toMatch(/no advertising/i);
-    expect(LEGAL).toMatch(/Speed Insights/);
+    // What the page says Web Analytics does is limited to what Vercel documents:
+    // a request hash that resets daily instead of third-party cookies, no
+    // cross-site identification, city/country from IP address. Those claims, and
+    // this site's own no-advertising claim, must stay on the page.
+    expect(LEGAL).toMatch(/Vercel's documentation/);
+    expect(LEGAL).toMatch(/single day/);
+    expect(LEGAL).toMatch(/third-party cookies/);
+    expect(LEGAL).toMatch(/does not identify you across other sites/);
+    expect(LEGAL).toMatch(/Neither this site nor its author uses it for advertising/);
+    expect(LEGAL).not.toMatch(/sets no cookies/i); // Vercel documents "no third-party cookies", not "no cookies"
   });
 
   it("discloses the only third party a visitor's input is sent to", () => {

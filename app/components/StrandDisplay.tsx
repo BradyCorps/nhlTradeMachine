@@ -1,5 +1,6 @@
 "use client";
 import { ChartData } from "@/app/components/ChartData";
+import { strandTypeTone } from "@/app/lib/strand-type";
 // ── StrandDisplay — shared STRAND renderer ───────────────────
 // Used by Armchair GM (StrandView.tsx), the Trade Machine (asset rows),
 // and player analytics (players/page.tsx). Takes pre-computed traits —
@@ -188,9 +189,7 @@ export default function StrandDisplay({
               <rect x={4} y={4} width={strandType.length * 5.2 + 8} height={13} fill="var(--ledger-cream)" rx="1"/>
               <text x={8} y={13.5} fontSize="7.5" fontFamily="Courier Prime, monospace" fontWeight="bold"
                 fill={
-                  strandType === "ELITE TWO-WAY" || strandType === "COMPLETE PLAYER" ? "var(--ledger-green)" :
-                  strandType.includes("OFFENSIVE") ? "var(--ledger-ice)" :
-                  strandType.includes("DEFENSIVE") ? "var(--ledger-red)" : "var(--ledger-brown)"
+                  { both: "var(--ledger-green)", offense: "var(--ledger-ice)", defense: "var(--ledger-red)", neutral: "var(--ledger-brown)" }[strandTypeTone(strandType)]
                 }>{strandType}</text>
             </>
           )}

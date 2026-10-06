@@ -114,9 +114,9 @@ describe("navSplit — on real valuations", () => {
 
   it("writes a note that blames the deal, not the player", () => {
     const costly = navSplit([c("off", 100), c("cap", -40)], 60);
-    expect(navSplitNote(costly)).toMatch(/gives back 40/);
+    expect(navSplitNote(costly)).toMatch(/give back 40/);
     expect(navSplitNote(costly)).not.toMatch(/bad|poor|worse/i);
-    expect(navSplitNote(navSplit([c("off", 50), c("cap", 20)], 70))).toMatch(/adds 20/);
-    expect(navSplitNote(navSplit([c("off", 50), c("cap", 0)], 50))).toMatch(/neither adds/);
+    expect(navSplitNote(navSplit([c("off", 50), c("cap", 20)], 70))).toMatch(/terms add 20/);
+    expect(navSplitNote(navSplit([c("off", 50), c("cap", 0)], 50))).toMatch(/neither add to/);
   });
 });

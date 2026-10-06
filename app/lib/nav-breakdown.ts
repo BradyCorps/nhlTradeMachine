@@ -239,8 +239,8 @@ export function navSplit(stages: NavStage[] | undefined, total: number): NavSpli
  */
 export function navSplitNote(split: NavSplit): string {
   if (!split.known) return "No breakdown available for this valuation.";
-  if (split.contract === 0) return "His contract neither adds to nor subtracts from his trade value.";
+  if (split.contract === 0) return "The contract and control terms neither add to nor subtract from his trade value.";
   return split.contract > 0
-    ? `He is worth ${split.production} on the ice, and his contract adds ${split.contract} on top of that.`
-    : `He is worth ${split.production} on the ice; his contract gives back ${Math.abs(split.contract)} of it.`;
+    ? `Player-side value is ${split.production} (measured production plus its share of the model's adjustments), and contract and control terms add ${split.contract} on top of that.`
+    : `Player-side value is ${split.production} (measured production plus its share of the model's adjustments); contract and control terms give back ${Math.abs(split.contract)} of it.`;
 }

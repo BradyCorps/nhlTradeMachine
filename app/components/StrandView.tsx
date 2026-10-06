@@ -12,7 +12,7 @@
 import React from "react";
 import type { Asset, XNAVResult } from "@/app/lib/trade-types";
 import StrandDisplay from "@/app/components/StrandDisplay";
-import type { StrandTrait } from "@/app/lib/strand-traits";
+import { computeStrandType } from "@/app/lib/strand-type";
 import {
   buildStrandPercentiles,
   type PlayerLike,
@@ -38,33 +38,9 @@ export function buildAssetTraits(
   );
 }
 
-// ── Strand type label (computed from traits) ──────────────────
-export function computeStrandType(
-  offTraits: StrandTrait[], defTraits: StrandTrait[],
-  ops: number | null, dps: number | null
-): string {
-  if (offTraits.length === 0 || defTraits.length === 0) return "UNAVAILABLE";
-  const offAvg = offTraits.reduce((s, t) => s + t.val, 0) / offTraits.length;
-  const defAvg = defTraits.reduce((s, t) => s + t.val, 0) / defTraits.length;
-  const balance = Math.abs(offAvg - defAvg);
-  const psRatio = ops != null && dps != null && (ops + dps) > 1
-    ? ops / (ops + dps) : null;
-
-  return psRatio !== null && psRatio > 0.70 && offAvg > 0.60              ? "OFFENSIVE FORCE"
-    : psRatio !== null && psRatio > 0.60 && offAvg > 0.50                 ? "OFFENSIVE LEAN"
-    : psRatio !== null && psRatio < 0.30 && defAvg > 0.55                 ? "DEFENSIVE ANCHOR"
-    : psRatio !== null && psRatio < 0.40 && defAvg > 0.45                 ? "DEFENSIVE LEAN"
-    : psRatio !== null && psRatio >= 0.40 && psRatio <= 0.60
-        && offAvg > 0.58 && defAvg > 0.52                                 ? "ELITE TWO-WAY"
-    : psRatio !== null && psRatio >= 0.38 && psRatio <= 0.62              ? "COMPLETE PLAYER"
-    : (offAvg > 0.72 && defAvg > 0.60 && balance < 0.20)                 ? "ELITE TWO-WAY"
-    : offAvg > defAvg + 0.15
-      ? offAvg > 0.65 ? "OFFENSIVE FORCE" : "OFFENSIVE LEAN"
-    : defAvg > offAvg + 0.15
-      ? defAvg > 0.65 ? "DEFENSIVE ANCHOR" : "DEFENSIVE LEAN"
-    : offAvg > 0.52 && defAvg > 0.52 ? "COMPLETE PLAYER"
-    : "BALANCED";
-}
+// ── Strand type label ─────────────────────────────────────────
+// Lives in strand-type.ts (pure, tested). Re-exported so call sites keep one import.
+export { computeStrandType } from "@/app/lib/strand-type";
 
 // ── Shared loading placeholder ────────────────────────────────
 // The percentile rails need the league cohort, which client surfaces fetch once

@@ -16,6 +16,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ playerId
   if (!result.raw) return NextResponse.json(result, { status: result.coverage === "missing" ? 404 : 503 });
   const raw = result.raw;
   return NextResponse.json({ ...result, raw: undefined,
+    gamesPlayed: raw.player?.gamesPlayed ?? null,
     sogDetails: raw.sogDetails ?? [], sogSummary: raw.sogSummary ?? [], zoneTime: raw.zoneTimeDetails ?? null,
     speedMax: raw.skatingSpeed?.speedMax?.imperial ?? null,
     speedMaxPercentile: raw.skatingSpeed?.speedMax?.percentile ?? null,

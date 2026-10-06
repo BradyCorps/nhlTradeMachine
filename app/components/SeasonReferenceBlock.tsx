@@ -1,20 +1,29 @@
 import { buildSeasonReference } from "@/app/lib/season-snapshot";
+import { seasonReferenceRows } from "@/app/lib/dossier-context";
+import type { ObservedSelection } from "@/app/lib/observed-season";
 
 /**
- * Read-only season identity for a player or team view. Names the projected
- * season and the completed stats season separately so no surface can imply a
+ * Read-only season identity for a player or team view. Names the selected
+ * observations, the model's projected-season assumption and the completed stats season separately so no surface can imply a
  * 2026-27 result before a 2026-27 game has been played. Server component;
  * no data fetching.
  */
-export function SeasonReferenceBlock({ valuationSnapshotId }: { valuationSnapshotId?: string | null }) {
+export function SeasonReferenceBlock({ valuationSnapshotId, selection, observedGames }: {
+  valuationSnapshotId?: string | null;
+  /** What the reader selected, and the games the NHL summary reports for it. */
+  selection: ObservedSelection;
+  observedGames: number | null;
+}) {
   const ref = buildSeasonReference();
-  const items: Array<[string, string]> = [
-    ["Projected season", `${ref.projectedSeason} · ${ref.projectedSeasonGamesObserved} GP observed`],
-    ["Stats baseline", `${ref.statsSeason} · completed`],
-    ["Contracts", ref.contractSeason],
-    ["Model", ref.modelVersion],
-    ["Struck", ref.valuationAsOf],
-  ];
+  const items: Array<[string, string]> = seasonReferenceRows({
+    selection, observedGames,
+    modelProjectedSeason: ref.projectedSeason,
+    modelGames: ref.projectedSeasonGamesObserved,
+    statsSeason: ref.statsSeason,
+    contractSeason: ref.contractSeason,
+    modelVersion: ref.modelVersion,
+    computedOn: ref.valuationAsOf,
+  }).map(r => [r.label, r.value]);
   if (valuationSnapshotId) items.push(["Valuation id", valuationSnapshotId]);
   return (
     <section

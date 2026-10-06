@@ -127,8 +127,8 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName, coh
   // Which quadrant the current player falls in — spoken in the aria label so a
   // screen-reader user learns WHERE he sits, not just that a scatter exists.
   const playerQuadrant = currentPlayer.off >= medOff
-    ? (currentPlayer.def >= medDef ? "elite two-way" : "offensive")
-    : (currentPlayer.def >= medDef ? "defensive" : "depth");
+    ? (currentPlayer.def >= medDef ? "above-median in both" : "above-median offence only")
+    : (currentPlayer.def >= medDef ? "above-median defence only" : "below-median in both");
 
   const hoveredPeer = hoveredId ? all.find(p => p.id === hoveredId) : null;
   const pinnedPeer = pinnedId ? all.find(p => p.id === pinnedId) : null;
@@ -349,22 +349,22 @@ export default function NavLeagueScatter({ peers, currentPlayer, playerName, coh
           <text x={innerW - 4} y={8} textAnchor="end"
             fill="var(--ledger-ink-faint)" fontSize={9} opacity={0.55}
             fontFamily="'Courier Prime', monospace" fontWeight={700}>
-            ELITE TWO-WAY
+            ABOVE MEDIAN IN BOTH
           </text>
           <text x={4} y={8} textAnchor="start"
             fill="var(--ledger-ink-faint)" fontSize={9} opacity={0.55}
             fontFamily="'Courier Prime', monospace" fontWeight={700}>
-            DEFENSIVE
+            ABOVE MEDIAN DEF
           </text>
           <text x={innerW - 4} y={innerH - 4} textAnchor="end"
             fill="var(--ledger-ink-faint)" fontSize={9} opacity={0.55}
             fontFamily="'Courier Prime', monospace" fontWeight={700}>
-            OFFENSIVE
+            ABOVE MEDIAN OFF
           </text>
           <text x={4} y={innerH - 4} textAnchor="start"
             fill="var(--ledger-ink-faint)" fontSize={9} opacity={0.55}
             fontFamily="'Courier Prime', monospace" fontWeight={700}>
-            DEPTH
+            BELOW MEDIAN BOTH
           </text>
 
           {/* Brush rectangle */}
