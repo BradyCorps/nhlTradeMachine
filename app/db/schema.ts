@@ -412,3 +412,43 @@ export const labsEvaluationGateResults = sqliteTable("labs_evaluation_gate_resul
   evaluatorIdentity:   text("evaluator_identity").notNull(),
   metadataSchemaVersion: integer("metadata_schema_version").notNull(),
 });
+
+// ── STRAND evolution checkpoints ───────────────────────────────────────────
+// Immutable observations of a player's measured profile at a games-played
+// milestone, plus the reference cohort that ranks them. Insert-only: database
+// triggers abort UPDATE and DELETE. A later source correction at the same GP is a
+// NEW revision row that names the row it supersedes. See
+// docs/strand-evolution-2026-10-06/README.md. Independent of NAV.
+export const strandReferenceCohorts = sqliteTable("strand_reference_cohorts", {
+  id:                text("id").primaryKey(),          // sha256 of the canonical content
+  season:            text("season").notNull(),
+  gameType:          integer("game_type").notNull(),
+  posGroup:          text("pos_group").notNull(),      // F | D
+  definitionVersion: text("definition_version").notNull(),
+  minGp:             integer("min_gp").notNull(),
+  n:                 integer("n").notNull(),
+  valuesJson:        text("values_json").notNull(),    // { traitKey: sorted number[] }
+  provenanceJson:    text("provenance_json").notNull(),
+  capturedAt:        integer("captured_at").notNull(),
+});
+
+export const strandCheckpoints = sqliteTable("strand_checkpoints", {
+  id:                text("id").primaryKey(),          // "{player}:{season}:{gameType}:{milestone}:r{revision}"
+  playerId:          integer("player_id").notNull(),   // stable NHL id
+  season:            text("season").notNull(),
+  gameType:          integer("game_type").notNull(),
+  milestone:         text("milestone").notNull(),      // target: 10 | 20 | 40 | 60 | END
+  revision:          integer("revision").notNull().default(0),
+  supersedesId:      text("supersedes_id"),
+  status:            text("status").notNull(),         // observed | reconstructed
+  observedGp:        integer("observed_gp").notNull(), // the ACTUAL games at capture
+  posGroup:          text("pos_group").notNull(),
+  capturedAt:        integer("captured_at").notNull(),
+  sourceAsOf:        text("source_as_of"),
+  definitionVersion: text("definition_version").notNull(),
+  inputsJson:        text("inputs_json").notNull(),    // raw supported inputs, null = missing
+  missingJson:       text("missing_json").notNull(),   // trait -> reason
+  cohortId:          text("cohort_id"),
+  provenanceJson:    text("provenance_json").notNull(),
+  contentHash:       text("content_hash").notNull(),
+});

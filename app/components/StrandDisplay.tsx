@@ -31,6 +31,13 @@ interface Props {
   compareDef?:  StrandTrait[];
   compareLabel?: string;
   footer?:      React.ReactNode; // rendered inside the card, under the SVG (e.g. EDGE band)
+  /** What the two rails are called in the accessible description. Defaults to the
+   *  offensive/defensive STRAND vocabulary; the evolution panel's rails are
+   *  production and usage, and must not be announced as "defensive". */
+  railNames?:   { off: string; def: string };
+  /** Replaces the default key under the chart when the percentiles mean something
+   *  other than "vs the NHL field". */
+  legend?:      React.ReactNode;
   // SVG dimensions — a rail layout needs vertical room, so keep H ≳ 190.
   W?:      number;
   H?:      number;
@@ -107,6 +114,11 @@ const TRAIT_GUIDE: Record<string, string> = {
   WRKLD: "Workload — games started",
   BUSY: "Shot volume — shots faced per game",
   GAA:  "Goals-against average (higher rating = lower GAA)",
+  "PTS/GP": "Points per game played",
+  "SOG/GP": "Shots on goal per game, all locations (NHL EDGE)",
+  "HD SOG/GP": "High-danger shots on goal per game (NHL EDGE)",
+  "TOI/GP": "Average ice time per game, all situations",
+  "OZ TIME": "Share of on-ice time spent in the offensive zone (NHL EDGE); not the same as OZ Starts",
 };
 
 // The rails own the top and bottom bands; clamp the wave so its peaks never
@@ -115,7 +127,7 @@ const RAIL_ZONE = 46;
 
 export default function StrandDisplay({
   ariaDescription, offTraits, defTraits, ops, dps, strandType,
-  compareOff, compareDef, compareLabel, footer,
+  compareOff, compareDef, compareLabel, footer, railNames, legend,
   W = 340, H = 210, amplitude = 44, maxWidth,
 }: Props) {
   const cy       = H / 2;
@@ -139,14 +151,14 @@ export default function StrandDisplay({
   const primaryAria = [
     ariaDescription,
     strandType ? `Type: ${strandType}` : null,
-    describeRail("Offensive traits", offTraits),
-    describeRail("Defensive traits", defTraits),
+    describeRail(railNames?.off ?? "Offensive traits", offTraits),
+    describeRail(railNames?.def ?? "Defensive traits", defTraits),
   ].filter((part): part is string => Boolean(part));
   const comparisonAria = compareLabel && compareOff && compareDef
     ? [
         `Comparison with ${compareLabel}`,
-        describeRail("offensive traits", compareOff),
-        describeRail("defensive traits", compareDef),
+        describeRail((railNames?.off ?? "Offensive traits").toLowerCase(), compareOff),
+        describeRail((railNames?.def ?? "Defensive traits").toLowerCase(), compareDef),
       ].join(". ")
     : null;
   const accessibleLabel = [...primaryAria, comparisonAria]
@@ -308,7 +320,7 @@ export default function StrandDisplay({
       {/* ── EDGE band / footer ───────────────────────────────── */}
       {footer && <div style={{ marginTop: "6px" }}>{footer}</div>}
 
-      {/* Always-visible key: answers "what is this number?" at a glance */}
+      {legend ?? (
       <div className="mt-2" style={{
         fontSize: "10px", lineHeight: 1.45, color: "var(--ledger-ink-body)",
         fontFamily: "Courier Prime, monospace",
@@ -319,6 +331,7 @@ export default function StrandDisplay({
         <span style={{ color: "var(--ledger-red)", fontWeight: 700 }}>red = defensive traits</span>{" "}
         — wave color marks the trait family, never good vs bad.
       </div>
+      )}
 
       {/* Coverage. Silent on a complete profile; a badge that always shows is
           one nobody reads. */}

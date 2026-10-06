@@ -37,6 +37,8 @@ import MetricTip from "@/app/components/MetricTip";
 import { navSplit, navSplitNote, navStageDesc, navStageShort, navStagesForDisplay } from "@/app/lib/nav-breakdown";
 import { derivePlayerRoles, roleSupport } from "@/app/lib/player-roles";
 import { compareEligibility } from "@/app/lib/strand-compare";
+import { loadStrandEvolution } from "@/app/lib/strand-evolution.server";
+import StrandEvolution from "@/app/components/StrandEvolution";
 import { sectionSource } from "@/app/lib/dossier-context";
 import { formatToi } from "@/app/lib/edge-display";
 import {
@@ -199,6 +201,9 @@ export default async function PlayerPage({ params, searchParams }: {
   const goalieDetail = selectedEdge?.raw ? parseGoalieEdge(selectedEdge.raw, Number(selection.season)) : null;
   const games = observed.games;
   const isGoalie = player.position === "G";
+  // Display-only and independent of NAV: reads the shared cached summaries and any
+  // stored checkpoints. A failure here must never take the dossier down.
+  const evolution = isGoalie ? null : await loadStrandEvolution(player, selection).catch(() => null);
   const goals = observed.goals;
   const assists = observed.assists;
   const pts = observed.points;
@@ -442,6 +447,8 @@ export default async function PlayerPage({ params, searchParams }: {
             {sectionSource("strand", selection, games)} Time on ice, competition and offensive-zone starts describe how a player is used; they are not evidence of defensive quality.
           </p>
         </div>
+
+        {evolution && <StrandEvolution view={evolution} />}
 
         {/* League context scatter — OFF vs DEF for same-position peers */}
         {player.position !== "G" && scatterPeers.length >= 5 && (
